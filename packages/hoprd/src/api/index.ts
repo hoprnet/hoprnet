@@ -14,6 +14,7 @@ export default function setupAPI(
   logs: LogStream,
   stateOps: StateOps,
   options: {
+    disableApiAuthentication: boolean
     apiHost: string
     apiPort: number
     apiToken?: string

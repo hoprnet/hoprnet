@@ -1,4 +1,4 @@
-import { u8aToHex, defer } from '@hoprnet/hopr-utils'
+import { u8aToHex, defer, create_counter } from '@hoprnet/hopr-utils'
 import type { DeferType } from '@hoprnet/hopr-utils'
 
 import { randomBytes } from 'crypto'
@@ -22,6 +22,11 @@ import { eagerIterator } from '../utils/index.js'
 
 export const DEFAULT_PING_TIMEOUT = 300
 const DEFAULT_RELAY_FREE_TIMEOUT = 0
+
+const relayedPackets = create_counter(
+  'connect_counter_server_relayed_packets',
+  'Number of relayed packets (TURN server)'
+)
 
 enum ConnectionEventTypes {
   STREAM_SOURCE_SWITCH,
@@ -582,6 +587,9 @@ function RelayContext(
               reasonToLeave = ConnectionEventTypes.ENDED
               break
             }
+
+            // Only counting payload messages, not status messages
+            relayedPackets.increment()
 
             toYield = result.value.value
             advanceIterator()

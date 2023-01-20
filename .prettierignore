@@ -26,6 +26,12 @@ packages/ethereum/hardhat
 packages/ethereum/src/types
 packages/ethereum/deployments
 
+# Compiled rust code cache
+target/
+
+# Ignore WebAssembly
+*.wasm
+
 # prettier breaks scss
 *.scss
 
@@ -34,3 +40,6 @@ packages/ethereum/deployments
 
 # Yarn - conflict with yarn builtin linter
 .yarnrc.yaml
+
+# do not lint vendored source files
+vendor/

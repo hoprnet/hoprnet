@@ -1,6 +1,6 @@
 import type { MultiaddrConnection } from '@libp2p/interface-connection'
 import type { Instance as SimplePeer } from 'simple-peer'
-import { durations, u8aToHex, defer, type DeferType } from '@hoprnet/hopr-utils'
+import { durations, u8aToHex, defer, type DeferType, create_counter } from '@hoprnet/hopr-utils'
 
 import toIterable from 'stream-to-it'
 import Debug from 'debug'
@@ -28,6 +28,8 @@ const _log = Debug(DEBUG_PREFIX)
 const _verbose = Debug(`${DEBUG_PREFIX}:verbose`)
 const _flow = Debug(`flow:${DEBUG_PREFIX}:error`)
 const _error = Debug(`${DEBUG_PREFIX}:error`)
+
+const directPackets = create_counter('connect_counter_webrtc_packets', 'Number of directly sent packets (WebRTC)')
 
 export const WEBRTC_UPGRADE_TIMEOUT = durations.seconds(10)
 
@@ -457,6 +459,8 @@ export function WebRTCConnection(
                       toYield = encodeWithLengthPrefix(Uint8Array.of(MigrationStatus.DONE))
                       break
                     }
+
+                    directPackets.increment()
 
                     // log(
                     //   `sinking ${received.value.slice().length} bytes into webrtc[${

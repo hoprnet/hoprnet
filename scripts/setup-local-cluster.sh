@@ -140,23 +140,21 @@ trap cleanup SIGINT SIGTERM ERR EXIT
 
 # $1 = rest port
 # $2 = node port
-# $3 = admin port
-# $4 = healthcheck port
-# $5 = node data directory
-# $6 = node log file
-# $7 = node id file
-# $8 = host to listen on
-# $9 = OPTIONAL: additional args to hoprd
+# $3 = healthcheck port
+# $4 = node data directory
+# $5 = node log file
+# $6 = node id file
+# $7 = host to listen on
+# $8 = OPTIONAL: additional args to hoprd
 function setup_node() {
   local api_port=${1}
   local node_port=${2}
-  local admin_port=${3}
-  local healthcheck_port=${4}
-  local dir=${5}
-  local log=${6}
-  local id=${7}
-  local host=${8}
-  local additional_args=${9:-""}
+  local healthcheck_port=${3}
+  local dir=${4}
+  local log=${5}
+  local id=${6}
+  local host=${7}
+  local additional_args=${8:-""}
 
   log "Run node ${id} on rest port ${api_port} -> ${log}"
 
@@ -166,9 +164,6 @@ function setup_node() {
 
   log "Additional args: \"${additional_args}\""
 
-  # Set NODE_ENV=development to rebuild hopr-admin next files
-  # at runtime. Necessary to start multiple instances of hoprd
-  # in parallel
   env \
     DEBUG="hopr*" \
     NODE_ENV="${node_env}" \
@@ -178,9 +173,6 @@ function setup_node() {
     HOPRD_NETWORK_QUALITY_THRESHOLD="0.3" \
     HOPRD_ON_CHAIN_CONFIRMATIONS=2 \
     ${hoprd_command} \
-      --admin \
-      --adminHost "${host}" \
-      --adminPort ${admin_port} \
       --announce \
       --api-token "${api_token}" \
       --data="${dir}" \
@@ -253,7 +245,7 @@ rm -Rfv \
 # --- Running Mock Blockchain --- {{{
 log "Running hardhat local node"
 cd "${hardhat_basedir}" && \
-  yarn run:network \
+  NODE_OPTIONS=--experimental-wasm-modules yarn run:network \
     --network hardhat --show-stack-traces > \
     "${hardhat_rpc_log}" 2>&1 &
 
@@ -270,11 +262,11 @@ cp -R \
 # }}}
 
 #  --- Run nodes --- {{{
-setup_node 13301 19091 19501 18081 "${node1_dir}" "${node1_log}" "${node1_id}" "${listen_host}"
-setup_node 13302 19092 19502 18082 "${node2_dir}" "${node2_log}" "${node2_id}" "${listen_host}"
-setup_node 13303 19093 19503 18083 "${node3_dir}" "${node3_log}" "${node3_id}" "${listen_host}"
-setup_node 13304 19094 19504 18084 "${node4_dir}" "${node4_log}" "${node4_id}" "${listen_host}"
-setup_node 13305 19095 19505 18085 "${node5_dir}" "${node5_log}" "${node5_id}" "${listen_host}"
+setup_node 13301 19091 18081 "${node1_dir}" "${node1_log}" "${node1_id}" "${listen_host}"
+setup_node 13302 19092 18082 "${node2_dir}" "${node2_log}" "${node2_id}" "${listen_host}"
+setup_node 13303 19093 18083 "${node3_dir}" "${node3_log}" "${node3_id}" "${listen_host}"
+setup_node 13304 19094 18084 "${node4_dir}" "${node4_log}" "${node4_id}" "${listen_host}"
+setup_node 13305 19095 18085 "${node5_dir}" "${node5_log}" "${node5_id}" "${listen_host}"
 # }}}
 
 log "Waiting for nodes bootstrap"
@@ -289,7 +281,7 @@ log "Funding nodes"
 
 #  --- Fund nodes --- {{{
 cd "${hardhat_basedir}" && \
-  yarn faucet --identity-directory "${tmp_dir}"
+  NODE_OPTIONS=--experimental-wasm-modules yarn faucet --identity-directory "${tmp_dir}"
 # }}}
 
 log "Waiting for nodes startup"
@@ -318,10 +310,25 @@ log "All nodes came up online"
 declare endpoints="localhost:13301 localhost:13302 localhost:13303 localhost:13304 localhost:13305"
 
 # --- Call init script--- {{{
-if [ -n "${init_script}" ] && [ -x "${mydir}/${init_script}" ]; then
-  log "Calling init script ${init_script}"
-  HOPRD_API_TOKEN="${api_token}" \
-    "${mydir}/${init_script}" ${endpoints}
+if [ -n "${init_script}" ]; then
+  declare full_init_script=""
+
+  # find full executable path of the script
+  if [ -x "${init_script}" ]; then
+    full_init_script="${init_script}"
+  elif [ -x "${mydir}/${init_script}" ]; then
+    full_init_script="${mydir}/${init_script}"
+  fi
+
+  # execute script if a path was found
+  if [ -n "${full_init_script}" ]; then
+    log "Calling init script ${full_init_script}"
+    HOPRD_API_TOKEN="${api_token}" "${full_init_script}" ${endpoints}
+  else
+    log "Error: Could not determine executable path of init script ${init_script}"
+  fi
+else
+  log "No init script provided, skipping"
 fi
 # }}}
 

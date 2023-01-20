@@ -20,24 +20,44 @@ jobs:
       - name: Configure Git info
         run: ./scripts/configure-git-info.sh
 
-      - name: Use Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 16
-          registry-url: https://registry.npmjs.org/
-          cache: yarn
+      - name: install toolchain
+        run: ./scripts/toolchain/install-toolchain.sh
 
-      - name: Install Yarn (only when using ACT)
+      - name: get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn config get cacheFolder)"
+
+      - name: restore yarn cache
+        uses: actions/cache@v3
+        id: yarn-cache
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+
+      - name: restore cargo cache
+        uses: actions/cache@v3
+        with:
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+            .cargo/.package-cache/
+            .cargo/bin/
+
+      - name: Install tools (only when using ACT)
         if: ${{ env.ACT == 'true' }}
         run: |
-          curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
-          echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
           apt update
-          apt install --no-install-recommends yarn
+          apt install --no-install-recommends lsof
 
       - name: Generate docs
         run: |
-          make -j deps
+          make -j deps-ci
           make -j build-docs
 
       - name: Format newly created files

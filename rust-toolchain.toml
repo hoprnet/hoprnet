@@ -1,4 +1,7 @@
 [toolchain]
-channel = "stable"
+channel = "1.65"
 targets = [ "wasm32-unknown-unknown" ]
+# we need rustc + cargo + rustfmt
 profile = "default"
+# rust-src for rust-analyzer
+components = [ "rust-src" ]

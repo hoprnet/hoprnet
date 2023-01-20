@@ -41,6 +41,10 @@
 
 `number`
 
+#### Defined in
+
+lib/utils_metrics.d.ts:245
+
 ___
 
 ### free
@@ -50,6 +54,10 @@ ___
 #### Returns
 
 `void`
+
+#### Defined in
+
+lib/utils_metrics.d.ts:228
 
 ___
 
@@ -61,6 +69,10 @@ ___
 
 `bigint`
 
+#### Defined in
+
+lib/utils_metrics.d.ts:249
+
 ___
 
 ### get\_sample\_sum
@@ -71,6 +83,10 @@ ___
 
 `number`
 
+#### Defined in
+
+lib/utils_metrics.d.ts:253
+
 ___
 
 ### name
@@ -80,6 +96,10 @@ ___
 #### Returns
 
 `string`
+
+#### Defined in
+
+lib/utils_metrics.d.ts:257
 
 ___
 
@@ -97,6 +117,10 @@ ___
 
 `void`
 
+#### Defined in
+
+lib/utils_metrics.d.ts:232
+
 ___
 
 ### record\_measure
@@ -113,6 +137,10 @@ ___
 
 `void`
 
+#### Defined in
+
+lib/utils_metrics.d.ts:240
+
 ___
 
 ### start\_measure
@@ -122,3 +150,7 @@ ___
 #### Returns
 
 [`SimpleTimer`](SimpleTimer.md)
+
+#### Defined in
+
+lib/utils_metrics.d.ts:236

@@ -5,7 +5,6 @@
     "packages/connect",
     "packages/core",
     "packages/core-ethereum",
-    "packages/cover-traffic-daemon",
     "packages/ethereum",
     "packages/utils",
     "packages/hoprd",
@@ -19,7 +18,6 @@
     "build:utils": "yarn workspace @hoprnet/hopr-utils run build",
     "build:chain": "yarn workspace @hoprnet/hopr-core-ethereum run build",
     "run:network": "yarn workspace @hoprnet/hopr-ethereum run run:network",
-    "run:ctd": "yarn workspace @hoprnet/hopr-cover-traffic-daemon run start",
     "run:hoprd": "yarn workspace @hoprnet/hoprd run start --password='d3f4uL+!' --identity=/tmp/default-identity --disableApiAuthentication",
     "run:hoprd:xdai": "yarn workspace @hoprnet/hoprd run start --host=0.0.0.0:9080 --apiPort=2991 --password='xDai' --announce --data=/tmp/xdai --identity=/tmp/xdai-identity --disableApiAuthentication",
     "run:hoprd:xdai:protected": "yarn workspace @hoprnet/hoprd run start --host=0.0.0.0:9080 --apiPort=2991 --password='xDai' --announce --data=/tmp/xdai --identity=/tmp/xdai-identity --apiToken=xD4!-N3+w0rK",
@@ -34,10 +32,11 @@
   },
   "devDependencies": {
     "@ethersproject/cli": "5.7.0",
+    "@hoprnet/avadosdk": "0.4.4-rc.1",
+    "@types/node": "16",
     "prettier": "2.7.1",
-    "ts-node": "10.8.1",
-    "typescript": "4.7.4",
-    "wasm-pack": "0.10.3",
+    "ts-node": "10.9.1",
+    "typescript": "4.8.4",
     "yargs": "17.5.1"
   },
   "resolutions": {
@@ -54,5 +53,5 @@
     "printWidth": 120,
     "trailingComma": "none"
   },
-  "packageManager": "yarn@3.2.1"
+  "packageManager": "yarn@3.3.0"
 }

@@ -129,3 +129,7 @@ ___
 #### Returns
 
 [`ContractData`](modules.md#contractdata) \| `Deployment`
+
+#### Defined in
+
+[packages/ethereum/src/index.ts:41](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/src/index.ts#L41)

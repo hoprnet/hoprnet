@@ -1,0 +1,78 @@
+---
+id: snippets
+title: Code Snippets for HOPR Apps
+---
+
+import IframeLoader from './components/IframeLoader'
+
+Most HOPR applications require to do at least one of the following actions:
+
+- Send commands to a HOPR node REST API via an Authenticated request
+- Connect to a WebSocket HOPR and listen to responses sent there
+- Prompt users for the HOPR node HTTP and WebSocket endpoints and API token
+
+Since these actions are usually cumbersome, we have generated a few code snippets developers can copy and paste
+to execute most of these actions quickly. These snippets will eventually be included in an SDK[^1], but for the time being,
+having them here is the easiest and fastest way for anyone to get started.
+
+---
+
+### useWebSocket.js
+
+<IframeLoader
+  url={'/developers/snippets/useWebSocket.js'}
+  loadingMessage="Loading useWebSocket.js"
+  callback={(iframe) => {
+    Array.from(iframe.contentWindow.document.querySelectorAll('nav')).map((nav) => (nav.style.display = 'none'))
+    Array.from(iframe.contentWindow.document.querySelectorAll('footer')).map(
+      (footer) => (footer.style.display = 'none')
+    )
+  }}
+  width="100%"
+  height="400"
+  frameBorder="0"
+  marginHeight="0"
+  marginWidth="0"
+/>
+
+---
+
+### WebSocketHandler.jsx
+
+<IframeLoader
+  url={'/developers/snippets/WebSocketHandler.jsx'}
+  loadingMessage="Loading WebSocketHandler.jsx"
+  callback={(iframe) => {
+    Array.from(iframe.contentWindow.document.querySelectorAll('nav')).map((nav) => (nav.style.display = 'none'))
+    Array.from(iframe.contentWindow.document.querySelectorAll('footer')).map(
+      (footer) => (footer.style.display = 'none')
+    )
+  }}
+  width="100%"
+  height="400"
+  frameBorder="0"
+  marginHeight="0"
+  marginWidth="0"
+/>
+
+---
+
+### getHeaders.js
+
+<IframeLoader
+  url={'/developers/snippets/getHeaders.js'}
+  loadingMessage="Loading getHeaders.js"
+  callback={(iframe) => {
+    Array.from(iframe.contentWindow.document.querySelectorAll('nav')).map((nav) => (nav.style.display = 'none'))
+    Array.from(iframe.contentWindow.document.querySelectorAll('footer')).map(
+      (footer) => (footer.style.display = 'none')
+    )
+  }}
+  width="100%"
+  height="400"
+  frameBorder="0"
+  marginHeight="0"
+  marginWidth="0"
+/>
+
+[^1]: To get updates on the progress of our SDK, please subscribe to this [issue](https://github.com/hoprnet/hoprnet/issues/3538).

@@ -1,34 +1,40 @@
-use prometheus::{Error, Gauge, GaugeVec, Histogram, HistogramOpts, HistogramTimer, HistogramVec, IntCounter, IntCounterVec, Opts, TextEncoder};
 use prometheus::core::Collector;
+use prometheus::{
+    Error, Gauge, GaugeVec, Histogram, HistogramOpts, HistogramTimer, HistogramVec, IntCounter,
+    IntCounterVec, Opts, TextEncoder,
+};
+
+use utils_misc::ok_or_str;
 
 fn register_metric<M, C>(name: &str, desc: &str, creator: C) -> Result<M, String>
 where
     M: Clone + Collector + 'static,
-    C: Fn(Opts) -> prometheus::Result<M>
+    C: Fn(Opts) -> prometheus::Result<M>,
 {
-    let metric = creator(Opts::new(name, desc))
-        .map_err(|e| e.to_string())?;
+    let metric = ok_or_str!(creator(Opts::new(name, desc)))?;
 
-    prometheus::register(Box::new(metric.clone()))
-        .map_err(|e| e.to_string())?;
+    ok_or_str!(prometheus::register(Box::new(metric.clone())))?;
 
     Ok(metric)
 }
 
-fn register_metric_vec<M, C>(name: &str, desc: &str, labels: &[&str], creator: C) -> Result<M, String>
-    where
-        M: Clone + Collector + 'static,
-        C: Fn(Opts,&[&str]) -> prometheus::Result<M>
+fn register_metric_vec<M, C>(
+    name: &str,
+    desc: &str,
+    labels: &[&str],
+    creator: C,
+) -> Result<M, String>
+where
+    M: Clone + Collector + 'static,
+    C: Fn(Opts, &[&str]) -> prometheus::Result<M>,
 {
     if labels.len() == 0 {
         return Err("at least a single label must be specified".into());
     }
 
-    let metric = creator(Opts::new(name, desc), labels)
-        .map_err(|e| e.to_string())?;
+    let metric = ok_or_str!(creator(Opts::new(name, desc), labels))?;
 
-    prometheus::register(Box::new(metric.clone()))
-        .map_err(|e| e.to_string())?;
+    ok_or_str!(prometheus::register(Box::new(metric.clone())))?;
 
     Ok(metric)
 }
@@ -37,18 +43,16 @@ fn register_metric_vec<M, C>(name: &str, desc: &str, labels: &[&str], creator: C
 /// Wrapper for IntCounter type
 struct SimpleCounter {
     name: String,
-    ctr: IntCounter
+    ctr: IntCounter,
 }
 
 impl SimpleCounter {
-
     /// Creates a new integer counter with given name and description
     pub fn new(name: &str, description: &str) -> Result<Self, String> {
-        register_metric(name, description, IntCounter::with_opts)
-            .map(|m| Self {
-                name: name.to_string(),
-                ctr: m
-            })
+        register_metric(name, description, IntCounter::with_opts).map(|m| Self {
+            name: name.to_string(),
+            ctr: m,
+        })
     }
 
     /// Retrieves the value of the counter
@@ -72,19 +76,17 @@ impl SimpleCounter {
 struct MultiCounter {
     name: String,
     labels: Vec<String>,
-    ctr: IntCounterVec
+    ctr: IntCounterVec,
 }
 
 impl MultiCounter {
-
     /// Creates a new vector of integer counters with given name, description and counter labels.
     pub fn new(name: &str, description: &str, labels: &[&str]) -> Result<Self, String> {
-        register_metric_vec(name, description, labels, IntCounterVec::new)
-            .map(|m| Self {
-                name: name.to_string(),
-                labels: Vec::from(labels).iter().map(|s| String::from(*s)).collect(),
-                ctr: m
-            })
+        register_metric_vec(name, description, labels, IntCounterVec::new).map(|m| Self {
+            name: name.to_string(),
+            labels: Vec::from(labels).iter().map(|s| String::from(*s)).collect(),
+            ctr: m,
+        })
     }
 
     /// Increments counter with given labels by the given number.
@@ -96,11 +98,11 @@ impl MultiCounter {
 
     /// Retrieves the value of the specified counter
     pub fn get(&self, label_values: &[&str]) -> Option<u64> {
-        self.ctr.get_metric_with_label_values(label_values)
+        self.ctr
+            .get_metric_with_label_values(label_values)
             .map(|c| c.get())
             .ok()
     }
-
 
     /// Returns the name of the counter vector given at construction.
     pub fn name(&self) -> &str {
@@ -117,18 +119,16 @@ impl MultiCounter {
 /// Wrapper for Gauge type
 struct SimpleGauge {
     name: String,
-    gg: Gauge
+    gg: Gauge,
 }
 
 impl SimpleGauge {
-
     /// Creates a new gauge with given name and description.
     pub fn new(name: &str, description: &str) -> Result<Self, String> {
-        register_metric(name, description, Gauge::with_opts)
-            .map(|m| Self {
-                name: name.to_string(),
-                gg: m
-            })
+        register_metric(name, description, Gauge::with_opts).map(|m| Self {
+            name: name.to_string(),
+            gg: m,
+        })
     }
 
     /// Increments the gauge by the given value.
@@ -162,19 +162,17 @@ impl SimpleGauge {
 struct MultiGauge {
     name: String,
     labels: Vec<String>,
-    ctr: GaugeVec
+    ctr: GaugeVec,
 }
 
 impl MultiGauge {
-
     /// Creates a new vector of gauges with given name, description and counter labels.
     pub fn new(name: &str, description: &str, labels: &[&str]) -> Result<Self, String> {
-        register_metric_vec(name, description, labels, GaugeVec::new)
-            .map(|m| Self {
-                name: name.to_string(),
-                labels: Vec::from(labels).iter().map(|s| String::from(*s)).collect(),
-                ctr: m
-            })
+        register_metric_vec(name, description, labels, GaugeVec::new).map(|m| Self {
+            name: name.to_string(),
+            labels: Vec::from(labels).iter().map(|s| String::from(*s)).collect(),
+            ctr: m,
+        })
     }
 
     /// Increments gauge with given labels by the given number.
@@ -200,7 +198,8 @@ impl MultiGauge {
 
     /// Retrieves the value of the specified counter
     pub fn get(&self, label_values: &[&str]) -> Option<f64> {
-        self.ctr.get_metric_with_label_values(label_values)
+        self.ctr
+            .get_metric_with_label_values(label_values)
             .map(|c| c.get())
             .ok()
     }
@@ -220,16 +219,15 @@ impl MultiGauge {
 /// Wrapper for Histogram type
 struct SimpleHistogram {
     name: String,
-    hh: Histogram
+    hh: Histogram,
 }
 
 /// Represents a timer handle.
 struct SimpleTimer {
-    histogram_timer: HistogramTimer
+    histogram_timer: HistogramTimer,
 }
 
 impl SimpleHistogram {
-
     /// Creates a new histogram with the given name, description and buckets.
     /// If no buckets are specified, they will be defined automatically.
     /// The +Inf bucket is always added automatically.
@@ -239,15 +237,13 @@ impl SimpleHistogram {
             opts = opts.buckets(buckets);
         }
 
-        let metric = Histogram::with_opts(opts)
-            .map_err(|e| e.to_string())?;
+        let metric = ok_or_str!(Histogram::with_opts(opts))?;
 
-        prometheus::register(Box::new(metric.clone()))
-            .map_err(|e| e.to_string())?;
+        ok_or_str!(prometheus::register(Box::new(metric.clone())))?;
 
         Ok(Self {
             name: name.to_string(),
-            hh: metric
+            hh: metric,
         })
     }
 
@@ -259,7 +255,9 @@ impl SimpleHistogram {
     /// Starts a timer.
     #[allow(dead_code)]
     pub fn start_measure(&self) -> SimpleTimer {
-        SimpleTimer { histogram_timer: self.hh.start_timer() }
+        SimpleTimer {
+            histogram_timer: self.hh.start_timer(),
+        }
     }
 
     /// Stops the given timer and records the elapsed duration in seconds to the histogram.
@@ -295,30 +293,32 @@ impl SimpleHistogram {
 struct MultiHistogram {
     name: String,
     labels: Vec<String>,
-    hh: HistogramVec
+    hh: HistogramVec,
 }
 
 impl MultiHistogram {
-
     /// Creates a new histogram with the given name, description and buckets.
     /// If no buckets are specified, they will be defined automatically.
     /// The +Inf bucket is always added automatically.
-    pub fn new(name: &str, description: &str, buckets: Vec<f64>, labels: &[&str]) -> Result<Self, String> {
+    pub fn new(
+        name: &str,
+        description: &str,
+        buckets: Vec<f64>,
+        labels: &[&str],
+    ) -> Result<Self, String> {
         let mut opts = HistogramOpts::new(name, description);
         if !buckets.is_empty() {
             opts = opts.buckets(buckets);
         }
 
-        let metric = HistogramVec::new(opts, labels)
-            .map_err(|e| e.to_string())?;
+        let metric = ok_or_str!(HistogramVec::new(opts, labels))?;
 
-        prometheus::register(Box::new(metric.clone()))
-            .map_err(|e| e.to_string())?;
+        ok_or_str!(prometheus::register(Box::new(metric.clone())))?;
 
         Ok(Self {
             name: name.to_string(),
             labels: Vec::from(labels).iter().map(|s| String::from(*s)).collect(),
-            hh: metric
+            hh: metric,
         })
     }
 
@@ -332,8 +332,11 @@ impl MultiHistogram {
     /// Starts a timer for a histogram with the given labels.
     #[allow(dead_code)]
     pub fn start_measure(&self, label_values: &[&str]) -> Result<SimpleTimer, Error> {
-        self.hh.get_metric_with_label_values(label_values)
-            .map(|h| SimpleTimer { histogram_timer: h.start_timer() })
+        self.hh
+            .get_metric_with_label_values(label_values)
+            .map(|h| SimpleTimer {
+                histogram_timer: h.start_timer(),
+            })
     }
 
     /// Stops the given timer and records the elapsed duration in seconds to the histogram.
@@ -350,14 +353,16 @@ impl MultiHistogram {
 
     /// Get all samples count with given labels
     pub fn get_sample_count(&self, label_values: &[&str]) -> Option<u64> {
-        self.hh.get_metric_with_label_values(label_values)
+        self.hh
+            .get_metric_with_label_values(label_values)
             .map(|c| c.get_sample_count())
             .ok()
     }
 
     /// Get all samples sum with given labels
     pub fn get_sample_sum(&self, label_values: &[&str]) -> Option<f64> {
-        self.hh.get_metric_with_label_values(label_values)
+        self.hh
+            .get_metric_with_label_values(label_values)
             .map(|c| c.get_sample_sum())
             .ok()
     }
@@ -380,8 +385,7 @@ fn gather_all_metrics() -> Result<String, String> {
 
     // ... and encode them
     let encoder = TextEncoder::new();
-    encoder.encode_to_string(&metric_families)
-        .map_err(|e| e.to_string())
+    ok_or_str!(encoder.encode_to_string(&metric_families))
 }
 
 #[cfg(test)]
@@ -390,8 +394,7 @@ mod tests {
 
     #[test]
     fn test_counter() {
-        let counter = SimpleCounter::new("my_ctr", "test counter")
-            .unwrap();
+        let counter = SimpleCounter::new("my_ctr", "test counter").unwrap();
 
         assert_eq!("my_ctr", counter.name());
 
@@ -405,8 +408,7 @@ mod tests {
 
     #[test]
     fn test_multi_counter() {
-        let counter = MultiCounter::new("my_mctr", "test multicounter", &["version"])
-            .unwrap();
+        let counter = MultiCounter::new("my_mctr", "test multicounter", &["version"]).unwrap();
 
         assert_eq!("my_mctr", counter.name());
         assert!(counter.labels().contains(&"version"));
@@ -425,8 +427,7 @@ mod tests {
 
     #[test]
     fn test_gauge() {
-        let gauge = SimpleGauge::new("my_gauge", "test gauge")
-            .unwrap();
+        let gauge = SimpleGauge::new("my_gauge", "test gauge").unwrap();
 
         assert_eq!("my_gauge", gauge.name());
 
@@ -447,8 +448,7 @@ mod tests {
 
     #[test]
     fn test_multi_gauge() {
-        let gauge = MultiGauge::new("my_mgauge", "test multicounter", &["version"])
-            .unwrap();
+        let gauge = MultiGauge::new("my_mgauge", "test multicounter", &["version"]).unwrap();
 
         assert_eq!("my_mgauge", gauge.name());
         assert!(gauge.labels().contains(&"version"));
@@ -468,8 +468,12 @@ mod tests {
 
     #[test]
     fn test_histogram() {
-        let histogram = SimpleHistogram::new("my_histogram", "test histogram", vec![1.0,2.0,3.0,4.0,5.0])
-            .unwrap();
+        let histogram = SimpleHistogram::new(
+            "my_histogram",
+            "test histogram",
+            vec![1.0, 2.0, 3.0, 4.0, 5.0],
+        )
+        .unwrap();
 
         assert_eq!("my_histogram", histogram.name());
 
@@ -491,16 +495,21 @@ mod tests {
 
     #[test]
     fn test_multi_histogram() {
-        let histogram = MultiHistogram::new("my_mhistogram", "test histogram", vec![1.0,2.0,3.0,4.0,5.0], &["version"])
-            .unwrap();
+        let histogram = MultiHistogram::new(
+            "my_mhistogram",
+            "test histogram",
+            vec![1.0, 2.0, 3.0, 4.0, 5.0],
+            &["version"],
+        )
+        .unwrap();
 
         assert_eq!("my_mhistogram", histogram.name());
         assert!(histogram.labels().contains(&"version"));
 
-        histogram.observe(&["1.90.0"],2.0);
-        histogram.observe(&["1.90.0"],2.0);
-        histogram.observe(&["1.90.0"],1.0);
-        histogram.observe(&["1.90.0"],5.0);
+        histogram.observe(&["1.90.0"], 2.0);
+        histogram.observe(&["1.90.0"], 2.0);
+        histogram.observe(&["1.90.0"], 1.0);
+        histogram.observe(&["1.90.0"], 5.0);
         histogram.observe(&["1.89.20"], 10.0);
 
         assert_eq!(1, histogram.get_sample_count(&["1.89.20"]).unwrap());
@@ -520,45 +529,24 @@ mod tests {
     }
 }
 
-
 /// Bindings for JS/TS
+#[cfg(feature = "wasm")]
 pub mod wasm {
-    use std::fmt::Display;
+    use js_sys::{Date, JsString};
+    use utils_misc::{convert_from_jstrvec, convert_to_jstrvec, ok_or_jserr};
     use wasm_bindgen::prelude::*;
     use wasm_bindgen::JsValue;
-    use js_sys::{Date, JsString};
-
-    fn as_jsvalue<T>(v: T) -> JsValue where T: Display {
-        JsValue::from(v.to_string())
-    }
-
-    /// Macro used to convert Vec<JString> to Vec<&str>
-    macro_rules! convert_from_jstrvec {
-        ($v:expr,$r:ident) => {
-            let _aux: Vec<String> = $v.iter().map(String::from).collect();
-            let $r = _aux.iter().map(AsRef::as_ref).collect::<Vec<&str>>();
-        };
-    }
-
-    /// Macro used to convert Vec<&str> or Vec<String> to Vec<JString>
-    macro_rules! convert_to_jstrvec {
-        ($v:expr) => {
-            $v.iter().map(|e| JsString::from(e.as_ref())).collect()
-        };
-    }
 
     //// SimpleCounter
 
     #[wasm_bindgen]
     pub struct SimpleCounter {
-        w: super::SimpleCounter
+        w: super::SimpleCounter,
     }
 
     #[wasm_bindgen]
     pub fn create_counter(name: &str, description: &str) -> Result<SimpleCounter, JsValue> {
-        super::SimpleCounter::new(name, description)
-            .map(|c| SimpleCounter { w: c })
-            .map_err(as_jsvalue)
+        ok_or_jserr!(super::SimpleCounter::new(name, description).map(|c| SimpleCounter { w: c }))
     }
 
     #[wasm_bindgen]
@@ -567,9 +555,13 @@ pub mod wasm {
             self.w.increment(by);
         }
 
-        pub fn increment(&self) { self.w.increment(1) }
+        pub fn increment(&self) {
+            self.w.increment(1)
+        }
 
-        pub fn get(&self) -> u64 { self.w.get() }
+        pub fn get(&self) -> u64 {
+            self.w.get()
+        }
 
         pub fn name(&self) -> String {
             self.w.name().into()
@@ -580,15 +572,18 @@ pub mod wasm {
 
     #[wasm_bindgen]
     pub struct MultiCounter {
-        w: super::MultiCounter
+        w: super::MultiCounter,
     }
 
     #[wasm_bindgen]
-    pub fn create_multi_counter(name: &str, description: &str, labels: Vec<JsString>) -> Result<MultiCounter, JsValue> {
+    pub fn create_multi_counter(
+        name: &str,
+        description: &str,
+        labels: Vec<JsString>,
+    ) -> Result<MultiCounter, JsValue> {
         convert_from_jstrvec!(labels, bind);
-        super::MultiCounter::new(name, description, bind.as_slice())
-            .map(|c| MultiCounter { w: c })
-            .map_err(as_jsvalue)
+        ok_or_jserr!(super::MultiCounter::new(name, description, bind.as_slice())
+            .map(|c| MultiCounter { w: c }))
     }
 
     #[wasm_bindgen]
@@ -605,7 +600,8 @@ pub mod wasm {
 
         pub fn get(&self, label_values: Vec<JsString>) -> Result<u64, JsValue> {
             convert_from_jstrvec!(label_values, bind);
-            self.w.get(bind.as_slice())
+            self.w
+                .get(bind.as_slice())
                 .ok_or(JsValue::from_str("label value does not exist"))
         }
 
@@ -622,14 +618,12 @@ pub mod wasm {
 
     #[wasm_bindgen]
     pub struct SimpleGauge {
-        w: super::SimpleGauge
+        w: super::SimpleGauge,
     }
 
     #[wasm_bindgen]
     pub fn create_gauge(name: &str, description: &str) -> Result<SimpleGauge, JsValue> {
-        super::SimpleGauge::new(name, description)
-            .map(|c| SimpleGauge { w: c })
-            .map_err(as_jsvalue)
+        ok_or_jserr!(super::SimpleGauge::new(name, description).map(|c| SimpleGauge { w: c }))
     }
 
     #[wasm_bindgen]
@@ -667,15 +661,19 @@ pub mod wasm {
 
     #[wasm_bindgen]
     pub struct MultiGauge {
-        w: super::MultiGauge
+        w: super::MultiGauge,
     }
 
     #[wasm_bindgen]
-    pub fn create_multi_gauge(name: &str, description: &str, labels: Vec<JsString>) -> Result<MultiGauge, JsValue> {
+    pub fn create_multi_gauge(
+        name: &str,
+        description: &str,
+        labels: Vec<JsString>,
+    ) -> Result<MultiGauge, JsValue> {
         convert_from_jstrvec!(labels, bind);
-        super::MultiGauge::new(name, description, bind.as_slice())
-            .map(|c| MultiGauge { w: c })
-            .map_err(as_jsvalue)
+        ok_or_jserr!(
+            super::MultiGauge::new(name, description, bind.as_slice()).map(|c| MultiGauge { w: c })
+        )
     }
 
     #[wasm_bindgen]
@@ -707,7 +705,8 @@ pub mod wasm {
 
         pub fn get(&self, label_values: Vec<JsString>) -> Result<f64, JsValue> {
             convert_from_jstrvec!(label_values, bind);
-            self.w.get(bind.as_slice())
+            self.w
+                .get(bind.as_slice())
                 .ok_or(JsValue::from_str("label value does not exist"))
         }
 
@@ -724,7 +723,7 @@ pub mod wasm {
 
     #[wasm_bindgen]
     pub struct SimpleHistogram {
-        w: super::SimpleHistogram
+        w: super::SimpleHistogram,
     }
 
     #[wasm_bindgen]
@@ -733,10 +732,15 @@ pub mod wasm {
     }
 
     #[wasm_bindgen]
-    pub fn create_histogram_with_buckets(name: &str, description: &str, buckets: &[f64]) -> Result<SimpleHistogram, JsValue> {
-        super::SimpleHistogram::new(name, description, buckets.into())
-            .map(|c| SimpleHistogram { w: c })
-            .map_err(as_jsvalue)
+    pub fn create_histogram_with_buckets(
+        name: &str,
+        description: &str,
+        buckets: &[f64],
+    ) -> Result<SimpleHistogram, JsValue> {
+        ok_or_jserr!(
+            super::SimpleHistogram::new(name, description, buckets.into())
+                .map(|c| SimpleHistogram { w: c })
+        )
     }
 
     /// Currently the SimpleTimer is NOT a wrapper for HistogramTimer,
@@ -745,21 +749,20 @@ pub mod wasm {
     #[wasm_bindgen]
     pub struct SimpleTimer {
         start: f64,
-        labels: Vec<String>
+        labels: Vec<String>,
     }
 
     impl SimpleTimer {
-
         fn new(label_values: Vec<JsString>) -> Self {
             SimpleTimer {
                 start: Self::now(),
-                labels: label_values.iter().map(String::from).collect()
+                labels: label_values.iter().map(String::from).collect(),
             }
         }
 
         /// Current Unix timestamp (in seconds) using js_sys::Date
         fn now() -> f64 {
-            Date::now()/1000.0
+            Date::now() / 1000.0
         }
 
         /// Computes the time elapsed since the creation of this timer.
@@ -775,20 +778,24 @@ pub mod wasm {
         }
 
         pub fn start_measure(&self) -> SimpleTimer {
-          SimpleTimer::new(vec![])
+            SimpleTimer::new(vec![])
         }
 
         pub fn record_measure(&self, timer: SimpleTimer) {
-          self.w.observe(timer.diff() )
+            self.w.observe(timer.diff())
         }
 
         pub fn cancel_measure(&self, timer: SimpleTimer) -> f64 {
             timer.diff()
         }
 
-        pub fn get_sample_count(&self) -> u64 { self.w.get_sample_count() }
+        pub fn get_sample_count(&self) -> u64 {
+            self.w.get_sample_count()
+        }
 
-        pub fn get_sample_sum(&self) -> f64 { self.w.get_sample_sum() }
+        pub fn get_sample_sum(&self) -> f64 {
+            self.w.get_sample_sum()
+        }
 
         pub fn name(&self) -> String {
             self.w.name().into()
@@ -799,20 +806,30 @@ pub mod wasm {
 
     #[wasm_bindgen]
     pub struct MultiHistogram {
-        w: super::MultiHistogram
+        w: super::MultiHistogram,
     }
 
     #[wasm_bindgen]
-    pub fn create_multi_histogram(name: &str, description: &str, labels: Vec<JsString>) -> Result<MultiHistogram, JsValue> {
+    pub fn create_multi_histogram(
+        name: &str,
+        description: &str,
+        labels: Vec<JsString>,
+    ) -> Result<MultiHistogram, JsValue> {
         create_multi_histogram_with_buckets(name, description, &[] as &[f64; 0], labels)
     }
 
     #[wasm_bindgen]
-    pub fn create_multi_histogram_with_buckets(name: &str, description: &str, buckets: &[f64], labels: Vec<JsString>) -> Result<MultiHistogram, JsValue> {
+    pub fn create_multi_histogram_with_buckets(
+        name: &str,
+        description: &str,
+        buckets: &[f64],
+        labels: Vec<JsString>,
+    ) -> Result<MultiHistogram, JsValue> {
         convert_from_jstrvec!(labels, bind);
-        super::MultiHistogram::new(name, description, buckets.into(), bind.as_slice())
-            .map(|c| MultiHistogram { w: c })
-            .map_err(as_jsvalue)
+        ok_or_jserr!(
+            super::MultiHistogram::new(name, description, buckets.into(), bind.as_slice())
+                .map(|c| MultiHistogram { w: c })
+        )
     }
 
     #[wasm_bindgen]
@@ -837,13 +854,15 @@ pub mod wasm {
 
         pub fn get_sample_count(&self, label_values: Vec<JsString>) -> Result<u64, JsValue> {
             convert_from_jstrvec!(label_values, bind);
-            self.w.get_sample_count(bind.as_slice())
+            self.w
+                .get_sample_count(bind.as_slice())
                 .ok_or(JsValue::from_str("label value does not exist"))
         }
 
         pub fn get_sample_sum(&self, label_values: Vec<JsString>) -> Result<f64, JsValue> {
             convert_from_jstrvec!(label_values, bind);
-            self.w.get_sample_sum(bind.as_slice())
+            self.w
+                .get_sample_sum(bind.as_slice())
                 .ok_or(JsValue::from_str("label value does not exist"))
         }
 
@@ -858,10 +877,6 @@ pub mod wasm {
 
     #[wasm_bindgen]
     pub fn gather_all_metrics() -> Result<String, JsValue> {
-        super::gather_all_metrics()
-            .map_err(as_jsvalue)
+        ok_or_jserr!(super::gather_all_metrics())
     }
 }
-
-
-

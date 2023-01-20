@@ -545,6 +545,10 @@ node_modules/@ethersproject/contracts/lib/index.d.ts:81
 
 `Promise`<`BigNumber`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason5.ts:667
+
 ___
 
 ### BOOST\_CAP
@@ -560,6 +564,10 @@ ___
 #### Returns
 
 `Promise`<`BigNumber`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason5.ts:669
 
 ___
 
@@ -577,6 +585,10 @@ ___
 
 `Promise`<`BigNumber`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason5.ts:671
+
 ___
 
 ### LOCK\_TOKEN
@@ -592,6 +604,10 @@ ___
 #### Returns
 
 `Promise`<`string`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason5.ts:673
 
 ___
 
@@ -609,6 +625,10 @@ ___
 
 `Promise`<`string`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason5.ts:675
+
 ___
 
 ### PROGRAM\_END
@@ -624,6 +644,10 @@ ___
 #### Returns
 
 `Promise`<`BigNumber`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason5.ts:677
 
 ___
 
@@ -641,6 +665,10 @@ ___
 
 `Promise`<`BigNumber`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason5.ts:679
+
 ___
 
 ### REWARD\_TOKEN
@@ -656,6 +684,10 @@ ___
 #### Returns
 
 `Promise`<`string`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason5.ts:681
 
 ___
 
@@ -677,6 +709,10 @@ ___
 
 BaseContract.\_checkRunningEvents
 
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:121
+
 ___
 
 ### \_deployed
@@ -696,6 +732,10 @@ ___
 #### Inherited from
 
 BaseContract.\_deployed
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:114
 
 ___
 
@@ -719,6 +759,10 @@ ___
 
 BaseContract.\_wrapEvent
 
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:122
+
 ___
 
 ### accounts
@@ -735,6 +779,10 @@ ___
 #### Returns
 
 `Promise`<[`BigNumber`, `BigNumber`, `BigNumber`, `BigNumber`] & { `actualLockedTokenAmount`: `BigNumber` ; `claimedRewards`: `BigNumber` ; `cumulatedRewards`: `BigNumber` ; `lastSyncTimestamp`: `BigNumber`  }\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason5.ts:683
 
 ___
 
@@ -756,6 +804,10 @@ ___
 
 BaseContract.attach
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason5.ts:468
+
 ___
 
 ### availableReward
@@ -771,6 +823,10 @@ ___
 #### Returns
 
 `Promise`<`BigNumber`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason5.ts:695
 
 ___
 
@@ -788,6 +844,10 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason5.ts:697
 
 ___
 
@@ -809,6 +869,10 @@ ___
 
 BaseContract.connect
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason5.ts:467
+
 ___
 
 ### deployed
@@ -822,6 +886,10 @@ ___
 #### Overrides
 
 BaseContract.deployed
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason5.ts:469
 
 ___
 
@@ -844,6 +912,10 @@ ___
 
 BaseContract.emit
 
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:127
+
 ___
 
 ### fallback
@@ -864,6 +936,10 @@ ___
 
 BaseContract.fallback
 
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:115
+
 ___
 
 ### getCumulatedRewardsIncrement
@@ -881,6 +957,10 @@ ___
 
 `Promise`<`BigNumber`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason5.ts:702
+
 ___
 
 ### isBlockedNft
@@ -897,6 +977,10 @@ ___
 #### Returns
 
 `Promise`<`boolean`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason5.ts:707
 
 ___
 
@@ -917,6 +1001,10 @@ ___
 
 `Promise`<`boolean`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason5.ts:709
+
 ___
 
 ### isNftTypeAndRankRedeemed2
@@ -935,6 +1023,10 @@ ___
 #### Returns
 
 `Promise`<`boolean`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason5.ts:716
 
 ___
 
@@ -955,6 +1047,10 @@ ___
 
 `Promise`<`boolean`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason5.ts:723
+
 ___
 
 ### isNftTypeAndRankRedeemed4
@@ -973,6 +1069,10 @@ ___
 #### Returns
 
 `Promise`<`boolean`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason5.ts:730
 
 ___
 
@@ -993,6 +1093,10 @@ ___
 #### Inherited from
 
 BaseContract.listenerCount
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:128
 
 ___
 
@@ -1020,6 +1124,10 @@ ___
 
 BaseContract.listeners
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason5.ts:479
+
 ▸ **listeners**(`eventName?`): `Listener`[]
 
 #### Parameters
@@ -1035,6 +1143,10 @@ BaseContract.listeners
 #### Overrides
 
 BaseContract.listeners
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason5.ts:482
 
 ___
 
@@ -1056,6 +1168,10 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason5.ts:737
+
 ___
 
 ### onTokenTransfer
@@ -1075,6 +1191,10 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason5.ts:745
+
 ___
 
 ### owner
@@ -1090,6 +1210,10 @@ ___
 #### Returns
 
 `Promise`<`string`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason5.ts:752
 
 ___
 
@@ -1108,6 +1232,10 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason5.ts:754
+
 ___
 
 ### ownerUnblockNftType
@@ -1124,6 +1252,10 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason5.ts:759
 
 ___
 
@@ -1153,6 +1285,10 @@ ___
 
 BaseContract.queryFilter
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason5.ts:473
+
 ___
 
 ### reclaimErc20Tokens
@@ -1169,6 +1305,10 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason5.ts:764
 
 ___
 
@@ -1188,6 +1328,10 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason5.ts:769
+
 ___
 
 ### redeemedFactor
@@ -1206,6 +1350,10 @@ ___
 
 `Promise`<`BigNumber`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason5.ts:775
+
 ___
 
 ### redeemedFactorIndex
@@ -1222,6 +1370,10 @@ ___
 #### Returns
 
 `Promise`<`BigNumber`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason5.ts:781
 
 ___
 
@@ -1241,6 +1393,10 @@ ___
 
 `Promise`<`BigNumber`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason5.ts:786
+
 ___
 
 ### redeemedNftIndex
@@ -1257,6 +1413,10 @@ ___
 #### Returns
 
 `Promise`<`BigNumber`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason5.ts:792
 
 ___
 
@@ -1284,6 +1444,10 @@ ___
 
 BaseContract.removeAllListeners
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason5.ts:483
+
 ▸ **removeAllListeners**(`eventName?`): [`HoprStakeSeason5`](HoprStakeSeason5.md)
 
 #### Parameters
@@ -1300,6 +1464,10 @@ BaseContract.removeAllListeners
 
 BaseContract.removeAllListeners
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason5.ts:486
+
 ___
 
 ### renounceOwnership
@@ -1315,6 +1483,10 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason5.ts:794
 
 ___
 
@@ -1333,6 +1505,10 @@ ___
 
 `Promise`<`BigNumber`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason5.ts:798
+
 ___
 
 ### sync
@@ -1349,6 +1525,10 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason5.ts:803
 
 ___
 
@@ -1372,6 +1552,10 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason5.ts:808
+
 ___
 
 ### totalLocked
@@ -1387,6 +1571,10 @@ ___
 #### Returns
 
 `Promise`<`BigNumber`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason5.ts:818
 
 ___
 
@@ -1405,6 +1593,10 @@ ___
 
 `Promise`<`ContractTransaction`\>
 
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason5.ts:820
+
 ___
 
 ### unlock
@@ -1420,6 +1612,10 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason5.ts:825
 
 ___
 
@@ -1437,3 +1633,7 @@ ___
 #### Returns
 
 `Promise`<`ContractTransaction`\>
+
+#### Defined in
+
+packages/ethereum/src/types/contracts/stake/HoprStakeSeason5.ts:829

@@ -20,7 +20,7 @@
 
 ### INCOMING\_CONNECTION
 
-• **INCOMING\_CONNECTION**
+• **INCOMING\_CONNECTION** = ``2``
 
 #### Defined in
 
@@ -30,7 +30,7 @@ ___
 
 ### INITIALIZATION
 
-• **INITIALIZATION**
+• **INITIALIZATION** = ``0``
 
 #### Defined in
 
@@ -40,7 +40,7 @@ ___
 
 ### MANUAL\_PING
 
-• **MANUAL\_PING**
+• **MANUAL\_PING** = ``7``
 
 #### Defined in
 
@@ -50,7 +50,7 @@ ___
 
 ### NETWORK\_REGISTRY
 
-• **NETWORK\_REGISTRY**
+• **NETWORK\_REGISTRY** = ``1``
 
 #### Defined in
 
@@ -60,7 +60,7 @@ ___
 
 ### OUTGOING\_CONNECTION
 
-• **OUTGOING\_CONNECTION**
+• **OUTGOING\_CONNECTION** = ``3``
 
 #### Defined in
 
@@ -70,7 +70,7 @@ ___
 
 ### STRATEGY\_CONSIDERING\_CHANNEL
 
-• **STRATEGY\_CONSIDERING\_CHANNEL**
+• **STRATEGY\_CONSIDERING\_CHANNEL** = ``5``
 
 #### Defined in
 
@@ -80,7 +80,7 @@ ___
 
 ### STRATEGY\_EXISTING\_CHANNEL
 
-• **STRATEGY\_EXISTING\_CHANNEL**
+• **STRATEGY\_EXISTING\_CHANNEL** = ``4``
 
 #### Defined in
 
@@ -90,7 +90,7 @@ ___
 
 ### STRATEGY\_NEW\_CHANNEL
 
-• **STRATEGY\_NEW\_CHANNEL**
+• **STRATEGY\_NEW\_CHANNEL** = ``6``
 
 #### Defined in
 
@@ -100,7 +100,7 @@ ___
 
 ### TESTING
 
-• **TESTING**
+• **TESTING** = ``8``
 
 #### Defined in
 

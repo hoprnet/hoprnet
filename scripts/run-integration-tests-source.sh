@@ -68,8 +68,6 @@ declare node5_dir="${tmp}/${node_prefix}-5"
 declare node6_dir="${tmp}/${node_prefix}-6"
 declare node7_dir="${tmp}/${node_prefix}-7"
 
-declare ct_node1_dir="${tmp}/${node_prefix}-ct1"
-
 declare node1_log="${node1_dir}.log"
 declare node2_log="${node2_dir}.log"
 declare node3_log="${node3_dir}.log"
@@ -77,8 +75,6 @@ declare node4_log="${node4_dir}.log"
 declare node5_log="${node5_dir}.log"
 declare node6_log="${node6_dir}.log"
 declare node7_log="${node7_dir}.log"
-
-declare ct_node1_log="${ct_node1_dir}.log"
 
 declare node1_id="${node1_dir}.id"
 declare node2_id="${node2_dir}.id"
@@ -98,8 +94,6 @@ declare node7_privkey="0x9b813edd8a85cffbe3cd2e242dc0992cfa04be15caa9f50b0b03b5e
 
 declare password="e2e-test"
 
-declare ct_db_file="${tmp}/hopr-ct-db.json"
-
 declare hardhat_rpc_log="${tmp}/hopr-source-hardhat-rpc.log"
 
 # hardhat port
@@ -108,10 +102,6 @@ declare -a all_ports=( 8545 )
 all_ports+=( 13301 13302 13303 13304 13305 13306 13307 )
 # HOPRd p2p ports
 all_ports+=( 19091 19092 19093 19094 19095 19096 19097 )
-# HOPRd Admin ports
-all_ports+=( 19501 19502 19503 19504 19505 19506 19507 )
-# CTd healthcheck port
-all_ports+=( 20000 )
 
 function cleanup {
   local EXIT_CODE=$?
@@ -143,7 +133,7 @@ function cleanup {
   done
 
   log "Wiping databases"
-  rm -rf "${node1_dir}" "${node2_dir}" "${node3_dir}" "${node4_dir}" "${node5_dir}" "${node6_dir}" "${node7_dir}" "${ct_node1_dir}"
+  rm -rf "${node1_dir}" "${node2_dir}" "${node3_dir}" "${node4_dir}" "${node5_dir}" "${node6_dir}" "${node7_dir}"
 
   if [ ${non_zero} ]; then
     exit 1
@@ -157,8 +147,8 @@ if [ "${skip_cleanup}" != "1" ] && [ "${skip_cleanup}" != "true" ]; then
 fi
 
 # $1 = api port
-# $2 = node port
-# $3 = admin port
+# $2 = api token
+# $3 = node port
 # $4 = node data directory
 # $5 = node log file
 # $6 = node id file
@@ -168,12 +158,11 @@ function setup_node() {
   local api_port=${1}
   local api_token=${2}
   local node_port=${3}
-  local admin_port=${4}
-  local dir=${5}
-  local log=${6}
-  local id=${7}
-  local private_key=${8}
-  local additional_args=${9:-""}
+  local dir=${4}
+  local log=${5}
+  local id=${6}
+  local private_key=${7}
+  local additional_args=${8:-""}
 
   log "Run node ${id} on API port ${api_port} -> ${log}"
 
@@ -192,9 +181,7 @@ function setup_node() {
 
   log "Additional args: \"${additional_args}\""
 
-  # Set NODE_ENV=development to rebuild hopr-admin next files
-  # at runtime. Necessary to start multiple instances of hoprd
-  # in parallel. Using a mix of CLI parameters and env variables to ensure
+  # Using a mix of CLI parameters and env variables to ensure
   # both work.
   env \
     DEBUG="hopr*" \
@@ -206,9 +193,6 @@ function setup_node() {
     HOPRD_ON_CHAIN_CONFIRMATIONS=2 \
     NODE_OPTIONS="--experimental-wasm-modules" \
     node packages/hoprd/lib/main.cjs \
-      --admin \
-      --adminHost "127.0.0.1" \
-      --adminPort ${admin_port} \
       --data="${dir}" \
       --host="127.0.0.1:${node_port}" \
       --identity="${id}" \
@@ -224,48 +208,6 @@ function setup_node() {
       --allowPrivateNodeConnections \
       ${additional_args} \
       > "${log}" 2>&1 &
-}
-
-# $1 = node log file
-# $2 = private key, must be hex string of length 66
-# $3 = health check port
-# $4 = data directory
-# $5 = OPTIONAL: additional args to ct daemon
-function setup_ct_node() {
-  local log=${1}
-  local private_key=${2}
-  local health_check_port=${3}
-  local dir=${4}
-  local additional_args=${5:-""}
-
-  # Remove previous logs to make sure the regex does not match
-  rm -f "${log}"
-
-  log "Run CT node -> ${log}"
-
-  if [[ "${additional_args}" != *"--environment "* ]]; then
-    additional_args="--environment hardhat-localhost ${additional_args}"
-  fi
-  log "Additional args: \"${additional_args}\""
-
-  # Remove previous logs to make sure the regex does not match
-  rm -f "${log}"
-
-  HOPR_CTD_HEARTBEAT_INTERVAL=2500 \
-  HOPR_CTD_HEARTBEAT_THRESHOLD=2500 \
-  HOPR_CTD_HEARTBEAT_VARIANCE=1000 \
-  NODE_OPTIONS="--experimental-wasm-modules" \
-  DEBUG="hopr*" NODE_ENV=development node packages/cover-traffic-daemon/lib/index.js \
-    --privateKey "${private_key}" \
-    --dbFile "${ct_db_file}" \
-    --data="${dir}" \
-    --healthCheck \
-    --healthCheckPort "${health_check_port}" \
-    --allowLocalNodeConnections \
-    --testAnnounceLocalAddresses \
-    --testPreferLocalAddresses \
-    ${additional_args} \
-     > "${log}" 2>&1 &
 }
 
 # --- Log test info {{{
@@ -300,9 +242,6 @@ log "\tnode7"
 log "\t\tdata dir: ${node7_dir} (will be removed)"
 log "\t\tlog: ${node7_log}"
 log "\t\tid: ${node7_id}"
-log "\tct_node1"
-log "\t\tdata dir: ${ct_node1_dir} (will be removed)"
-log "\t\tlog: ${ct_node1_log}"
 # }}}
 
 # --- Check all resources we need are free {{{
@@ -333,23 +272,17 @@ cp -R \
   "${mydir}/../packages/ethereum/deployments/hardhat-localhost2"
 # }}}
 
-# static address because static private key
-declare ct_node1_address="0xde913eeed23bce5274ead3de8c196a41176fbd49"
-
 #  --- Run nodes --- {{{
-setup_node 13301 ${default_api_token} 19091 19501 "${node1_dir}" "${node1_log}" "${node1_id}" "${node1_privkey}" "--announce"
-setup_node 13302 "" 19092 19502 "${node2_dir}" "${node2_log}" "${node2_id}" "${node2_privkey}" "--announce"
-setup_node 13303 ${default_api_token} 19093 19503 "${node3_dir}" "${node3_log}" "${node3_id}" "${node3_privkey}" "--announce"
-setup_node 13304 ${default_api_token} 19094 19504 "${node4_dir}" "${node4_log}" "${node4_id}" "${node4_privkey}" "--testNoDirectConnections"
-setup_node 13305 ${default_api_token} 19095 19505 "${node5_dir}" "${node5_log}" "${node5_id}" "${node5_privkey}" "--testNoDirectConnections"
+setup_node 13301 ${default_api_token} 19091 "${node1_dir}" "${node1_log}" "${node1_id}" "${node1_privkey}" "--announce"
+setup_node 13302 ""                   19092 "${node2_dir}" "${node2_log}" "${node2_id}" "${node2_privkey}" "--announce"
+setup_node 13303 ${default_api_token} 19093 "${node3_dir}" "${node3_log}" "${node3_id}" "${node3_privkey}" "--announce"
+setup_node 13304 ${default_api_token} 19094 "${node4_dir}" "${node4_log}" "${node4_id}" "${node4_privkey}" "--testNoDirectConnections"
+setup_node 13305 ${default_api_token} 19095 "${node5_dir}" "${node5_log}" "${node5_id}" "${node5_privkey}" "--testNoDirectConnections"
 # should not be able to talk to the rest
-setup_node 13306 ${default_api_token} 19096 19506 "${node6_dir}" "${node6_log}" "${node6_id}" "${node6_privkey}" "--announce --environment hardhat-localhost2"
+setup_node 13306 ${default_api_token} 19096 "${node6_dir}" "${node6_log}" "${node6_id}" "${node6_privkey}" "--announce --environment hardhat-localhost2"
 # node n8 will be the only one NOT registered
-setup_node 13307 ${default_api_token} 19097 19507 "${node7_dir}" "${node7_log}" "${node7_id}" "${node7_privkey}" "--announce"
-setup_ct_node "${ct_node1_log}" "0xa08666bca1363cb00b5402bbeb6d47f6b84296f3bba0f2f95b1081df5588a613" 20000 "${ct_node1_dir}"
+setup_node 13307 ${default_api_token} 19097 "${node7_dir}" "${node7_log}" "${node7_id}" "${node7_privkey}" "--announce"
 # }}}
-
-log "CT node1 address: ${ct_node1_address}"
 
 # DO NOT MOVE THIS STEP
 #  --- Wait until private key has been created or recovered --- {{{
@@ -364,7 +297,7 @@ wait_for_regex ${node7_log} "please fund this node"
 
 log "Funding nodes"
 #  --- Fund nodes --- {{{
-fund_nodes "${node_prefix}" "${tmp}" "${password}" "${ct_node1_address}"
+fund_nodes "${node_prefix}" "${tmp}" "${password}"
 # }}}
 
 log "Waiting for port binding"
@@ -393,7 +326,7 @@ log "All nodes came up online"
 
 # --- Run security tests --- {{{
 ${mydir}/../test/security-test.sh \
-  127.0.0.1 13301 13302 19501 19502 "${default_api_token}"
+  127.0.0.1 13301 13302 "${default_api_token}"
 # }}}
 
 # --- Run protocol test --- {{{
@@ -404,7 +337,3 @@ ${mydir}/../test/integration-test.sh \
   "localhost:13301" "localhost:13302" "localhost:13303" "localhost:13304" "localhost:13305" "localhost:13306" "localhost:13307"
 # }}}
 
-# -- CT test {{{
-${mydir}/../test/ct-test.sh \
-  "${ct_node1_log}" "127.0.0.1" 20000
-# }}}

@@ -83,7 +83,7 @@ bash -c "$(curl -s https://raw.githubusercontent.com/hoprnet/hopr-sh/master/setu
 ### run hoprd
 
 ```bash
-DEBUG="hopr*" npx hoprd --init --admin --identity ./hoprd-id-01 --data ./hoprd-db-01 --password='hopr-01' --apiToken='<YOUR_SECRET_TOKEN>'
+DEBUG="hopr*" npx hoprd --init --identity ./hoprd-id-01 --data ./hoprd-db-01 --password='hopr-01' --apiToken='<YOUR_SECRET_TOKEN>'
 ```
 
 :::danger Important

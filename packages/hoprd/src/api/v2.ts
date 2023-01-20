@@ -6,7 +6,6 @@ import cors from 'cors'
 import swaggerUi from 'swagger-ui-express'
 import bodyParser from 'body-parser'
 import { initialize } from 'express-openapi'
-import type { default as OpenAPIFramework } from 'openapi-framework'
 import { peerIdFromString } from '@libp2p/peer-id'
 import { debug, Address } from '@hoprnet/hopr-utils'
 import { authenticateWsConnection, getStatusCodeForInvalidInputInRequest, removeQueryParams } from './utils.js'
@@ -29,8 +28,11 @@ export async function setupRestApi(
   urlPath: string,
   node: Hopr,
   stateOps: StateOps,
-  options: any
-): Promise<OpenAPIFramework> {
+  options: {
+    apiToken?: string
+    disableApiAuthentication: boolean
+  }
+): Promise<ReturnType<typeof initialize>> {
   // this API uses JSON data only
   service.use(urlPath, bodyParser.json())
 

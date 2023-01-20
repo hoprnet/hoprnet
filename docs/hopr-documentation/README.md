@@ -54,7 +54,7 @@ title: Start here
 
 Where `id` means identification of current page, `title` means page title which is reflected on top of the page, under `<h1>` tags.
 
-Text is formated based on [Markdown markup language](https://www.markdownguide.org/cheat-sheet/)
+Text is formatted based on [Markdown markup language](https://www.markdownguide.org/cheat-sheet/)
 
 ## Adding a new menu item to the sidebar
 
@@ -78,7 +78,7 @@ Is the name of a menu item.
 Are used only if the menu type is `category`.
 Items can be sub-pages or it can have also sub-categories.
 
-For example: `node/star-here`, `node` means a directory, `start-here` is the `ID` of a page (See HOPR docs file structure). Specificaly for this example, `start-here` page is under the `node` directory.
+For example: `node/star-here`, `node` means a directory, `start-here` is the `ID` of a page (See HOPR docs file structure). Specifically for this example, `start-here` page is under the `node` directory.
 
 ## Adding embed videos
 
@@ -90,3 +90,4 @@ Embed code should be included into `<div class="embed-container"></div>` html ta
 2. Paste into `versioned_docs` directory and rename `docs` to `version-v1.xx`
 3. On sidebars directory Duplicate `version-v1.87-sidebars.json` file and rename to `version-v1.xx-sidebars.json`, update duplicated file contents from `Next` version sidebar.
 4. Edit file `versions.json` to add a new version.
+5. Edit file `docusaurus.config.js` and update the `lastVersion:` to the latest version.

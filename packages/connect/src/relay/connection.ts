@@ -10,7 +10,15 @@ import {
 } from '../types.js'
 import { randomBytes } from 'crypto'
 import { RelayPrefix, ConnectionStatusMessages, StatusMessages, CODE_P2P } from '../constants.js'
-import { u8aEquals, u8aToHex, defer, createCircuitAddress, type DeferType, timeout } from '@hoprnet/hopr-utils'
+import {
+  u8aEquals,
+  u8aToHex,
+  defer,
+  createCircuitAddress,
+  type DeferType,
+  timeout,
+  create_counter
+} from '@hoprnet/hopr-utils'
 import HeapPkg, { type Heap as HeapType } from 'heap-js'
 
 import SimplePeer from 'simple-peer'
@@ -22,6 +30,11 @@ import assert from 'assert'
 import type { ConnectComponents } from '../components.js'
 
 const { Heap } = HeapPkg
+
+const relayedPackets = create_counter(
+  'connect_counter_client_relayed_packets',
+  'Number of relayed packets (TURN client)'
+)
 
 const DEBUG_PREFIX = 'hopr-connect'
 
@@ -560,6 +573,8 @@ export function RelayConnection(
           // Advance iterator
           nextMessagePromise = currentSourceIterator.next()
           flow(`FLOW: loop end`)
+
+          relayedPackets.increment()
 
           toYield = Uint8Array.from([RelayPrefix.PAYLOAD, ...result.value.value.subarray()])
           break

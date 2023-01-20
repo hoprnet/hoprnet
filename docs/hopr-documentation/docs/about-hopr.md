@@ -5,7 +5,7 @@ title: What is HOPR?
 
 The HOPR network is a decentralised and incentivized peer-to-peer network open to anyone who wants to join and run a node. Because of its decentralisation, there is no entity that controls it. No one with special administrator rights, no master node or server to control traffic or access. Instead, all the nodes are peers that, through the simple expedient of running the HOPR protocol, work together to run the network in communal fashion.
 
-Decentralisation ensures that the network is independent, with no one in a position to unduly infuence its development or manipulate outcomes to their advantage. (Not even members of the HOPR Association, who are tasked with managing the network, can control, censor or intercept its traffc.) It also makes the network resilient, able to keep running even if a majority of nodes are damaged or compromised and very diffcult, if not impossible, to shut down.
+Decentralisation ensures that the network is independent, with no one in a position to unduly influence its development or manipulate outcomes to their advantage. (Not even members of the HOPR Association, who are tasked with managing the network, can control, censor or intercept its traffic.) It also makes the network resilient, able to keep running even if a majority of nodes are damaged or compromised and very difficult, if not impossible, to shut down.
 
 <div class="embed-container">
 <iframe src="https://player.vimeo.com/video/508840889" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>
@@ -24,7 +24,7 @@ _HOPR gets its name from the fact that it provides metadata privacy by sending d
 
 The problem that the HOPR payment layer solves is how to reward node operators for forwarding data packets without inadvert - ently revealing metadata about those packets and so defeating the purpose of the network. This has long been recognised as a serious problem in trying to introduce incentivisation for a mixnet, and there are those in the academic community who argue that it is impossible to create a completely private/anonymous payment scheme for an incentivised mixnet.
 
-Here, too, we are very aware of the theoretical, though by no means insignifcant, risks involved. From the outset we have however believed strongly that you cannot have true network-level privacy without a decentralised network, that you cannot have a truly decentralised network without a decentralised means to reward node oper - ators for relaying messages, and that it is possible to devise an approach that mitigates the risks to a more than acceptable degree.
+Here, too, we are very aware of the theoretical, though by no means insignificant, risks involved. From the outset we have however believed strongly that you cannot have true network-level privacy without a decentralised network, that you cannot have a truly decentralised network without a decentralised means to reward node oper - ators for relaying messages, and that it is possible to devise an approach that mitigates the risks to a more than acceptable degree.
 
 HOPR is a Swiss-based project started by an experienced team of cryptographers and blockchain experts. The HOPR network is designed to provide network-level privacy both by the use of a messaging protocol that obscures metadata so that individual data packets do not reveal trackable information, and a decentralised network that is managed by its users, so that there is no danger of a controlling entity abusing its power. To compensate individuals for the work of running a node, HOPR also contains a native currency and incentivisation scheme.
 
@@ -43,7 +43,7 @@ This simple but extremely powerful innovation unlocks a whole world of possibili
 
 :::info
 
-For more indepth information on HOPR and it’s core concepts, as well as its governance modell and future ambitions, have a look at our [Book of HOPR](https://hoprnet.org/Book_Of_Hopr_2021.01_v1.pdf)
+For more in-depth information on HOPR and its core concepts, as well as its governance model and future ambitions, have a look at our [Book of HOPR](https://hoprnet.org/Book_Of_Hopr_2021.01_v1.pdf)
 
 :::
 

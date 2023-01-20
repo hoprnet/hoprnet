@@ -19,17 +19,7 @@ based on the different node types we can ping.
 
 ### GREEN
 
-• **GREEN**
-
-#### Defined in
-
-[packages/core/src/network/heartbeat.ts:84](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/network/heartbeat.ts#L84)
-
-___
-
-### ORANGE
-
-• **ORANGE**
+• **GREEN** = ``"Green"``
 
 #### Defined in
 
@@ -37,9 +27,19 @@ ___
 
 ___
 
+### ORANGE
+
+• **ORANGE** = ``"Orange"``
+
+#### Defined in
+
+[packages/core/src/network/heartbeat.ts:80](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/network/heartbeat.ts#L80)
+
+___
+
 ### RED
 
-• **RED**
+• **RED** = ``"Red"``
 
 #### Defined in
 
@@ -49,7 +49,7 @@ ___
 
 ### UNKNOWN
 
-• **UNKNOWN**
+• **UNKNOWN** = ``"Unknown"``
 
 #### Defined in
 
@@ -59,7 +59,7 @@ ___
 
 ### YELLOW
 
-• **YELLOW**
+• **YELLOW** = ``"Yellow"``
 
 #### Defined in
 
