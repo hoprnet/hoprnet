@@ -22,7 +22,7 @@ describe('test strategies', async function () {
     peers.set('Gustave', 1.0)
     peers.set('Heather', 0.1)
     peers.set('Ian', 0.2)
-    peers.set('Kate', 0.3)
+    peers.set('Joe', 0.3)
 
     let outgoing_channels = [
       new OutgoingChannelStatus('Alice', stake),

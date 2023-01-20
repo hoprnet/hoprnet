@@ -1,17 +1,18 @@
 use ethnum::{u256, AsU256};
 use std::ops::{Add, Sub};
 
-pub trait BaseBalance {
+pub trait TypeBase: PartialEq + ToString {
+
+    fn to_hex(&self) -> String;
+}
+
+pub trait BaseBalance: TypeBase {
     const SYMBOL: &'static str;
 
     fn value(&self) -> &u256;
 
     fn symbol(&self) -> &str {
         Self::SYMBOL
-    }
-
-    fn to_hex(&self) -> String {
-        hex::encode(self.value().to_be_bytes())
     }
 
     fn serialize_value(&self) -> Box<[u8]> {
@@ -37,11 +38,6 @@ pub trait BaseBalance {
         assert_eq!(self.symbol(), other.symbol());
         self.value().gt(other.value()) || self.value().eq(other.value())
     }
-
-    fn eq(&self, other: &impl BaseBalance) -> bool {
-        assert_eq!(self.symbol(), other.symbol());
-        self.value().eq(other.value())
-    }
 }
 
 #[derive(Clone)]
@@ -57,6 +53,17 @@ impl BaseBalance for Balance {
     }
 }
 
+impl TypeBase for Balance {
+    fn to_hex(&self) -> String { hex::encode(self.value().to_be_bytes()) }
+}
+
+impl PartialEq for Balance {
+    fn eq(&self, other: &Self) -> bool {
+        assert_eq!(self.symbol(), other.symbol());
+        self.value().eq(other.value())
+    }
+}
+
 impl ToString for Balance {
     fn to_string(&self) -> String {
         self.value.to_string()
@@ -64,15 +71,7 @@ impl ToString for Balance {
 }
 
 impl Balance {
-    pub fn from_u64(value: u64) -> Self {
-        Balance {
-            value: value.as_u256(),
-        }
-    }
-
-    pub fn zero() -> Self {
-        Self::from_u64(0)
-    }
+    pub const ZERO: Self = Self { value: u256::ZERO };
 
     pub fn from_str(value: &str) -> Result<Self, String> {
         Ok(Balance {
@@ -138,6 +137,7 @@ pub mod wasm {
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
 
+    use crate::primitives::TypeBase;
     use crate::primitives::BaseBalance;
 
     #[wasm_bindgen]

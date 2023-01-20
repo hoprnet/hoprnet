@@ -139,7 +139,7 @@ mod tests {
             ("Gustave".to_string(), 1.0),
             ("Heather".to_string(), 0.1),
             ("Ian".to_string(), 0.2),
-            ("Kate".to_string(), 0.3),
+            ("Joe".to_string(), 0.3),
         ]);
 
         let balance = Balance::from_str("1000000000000000000").unwrap();
