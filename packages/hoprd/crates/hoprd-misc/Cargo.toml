@@ -17,6 +17,7 @@ wasm = [ "dep:wasm-bindgen", "dep:serde-wasm-bindgen" ]
 console_error_panic_hook = [ "dep:console_error_panic_hook" ]
 
 [dependencies]
+# using own fork until the PR was merged
 clap = { git = "https://github.com/hoprnet/clap", branch = "robertkiel/update-env-from", features = ["derive", "env", "string"] }
 core-misc = { path = "../../../core/crates/core-misc" }
 core-ethereum-misc = { path = "../../../core-ethereum/crates/core-ethereum-misc" }
