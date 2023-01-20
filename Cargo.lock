@@ -521,42 +521,15 @@ dependencies = [
 [[package]]
 name = "clap"
 version = "4.0.32"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "bitflags",
- "clap_derive 4.0.21 (registry+https://github.com/rust-lang/crates.io-index)",
- "clap_lex 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "is-terminal",
- "once_cell",
- "strsim 0.10.0",
- "termcolor",
-]
-
-[[package]]
-name = "clap"
-version = "4.0.32"
 source = "git+https://github.com/hoprnet/clap?branch=robertkiel/update-env-from#57115b1d15a6b41687223955c02278882ccb97c4"
 dependencies = [
  "bitflags",
- "clap_derive 4.0.21 (git+https://github.com/hoprnet/clap?branch=robertkiel/update-env-from)",
- "clap_lex 0.3.0 (git+https://github.com/hoprnet/clap?branch=robertkiel/update-env-from)",
+ "clap_derive",
+ "clap_lex",
  "is-terminal",
  "once_cell",
  "strsim 0.10.0",
  "termcolor",
-]
-
-[[package]]
-name = "clap_derive"
-version = "4.0.21"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0177313f9f02afc995627906bbd8967e2be069f5261954222dac78290c2b9014"
-dependencies = [
- "heck 0.4.0",
- "proc-macro-error",
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]
@@ -569,15 +542,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "clap_lex"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d4198f73e42b4936b35b5bb248d81d2b595ecb170da0bac7655c54eedfa8da8"
-dependencies = [
- "os_str_bytes",
 ]
 
 [[package]]
@@ -1566,7 +1530,7 @@ dependencies = [
 name = "foundry-tool"
 version = "0.1.0"
 dependencies = [
- "clap 4.0.32 (registry+https://github.com/rust-lang/crates.io-index)",
+ "clap 4.0.32",
  "ethers",
 ]
 
@@ -1904,7 +1868,7 @@ dependencies = [
 name = "hoprd-misc"
 version = "0.1.0"
 dependencies = [
- "clap 4.0.32 (git+https://github.com/hoprnet/clap?branch=robertkiel/update-env-from)",
+ "clap 4.0.32",
  "console_error_panic_hook",
  "core-ethereum-misc",
  "core-misc",
