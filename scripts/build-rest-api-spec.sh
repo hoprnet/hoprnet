@@ -40,7 +40,7 @@ function cleanup {
   log "Stop hoprd node"
   lsof -i ":${api_port}" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
 
-  log "Stop hardhat"
+  log "Stop anvil"
   lsof -i ":8545" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
 
   log "Remove logs"
@@ -55,29 +55,18 @@ trap cleanup SIGINT SIGTERM ERR EXIT
 log "Clean previously generated spec (if exists)"
 rm -f "${spec_file_path}"
 
-log "Start local hardhat network"
-HOPR_ENVIRONMENT_ID="hardhat-localhost" \
-TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
-  yarn workspace @hoprnet/hopr-ethereum hardhat node \
-    --network hardhat \
-    --show-stack-traces > \
-    "${hardhat_rpc_log}" 2>&1 &
-wait_for_regex ${hardhat_rpc_log} "Started HTTP and WebSocket JSON-RPC server"
-log "Hardhat node started (127.0.0.1:8545)"
+${mydir}/run-local-anvil.sh
 
-# need to mirror contract data because of hardhat-deploy node only writing to localhost {{{
-cp -R \
-  "${mydir}/../packages/ethereum/deployments/hardhat-localhost/localhost" \
-  "${mydir}/../packages/ethereum/deployments/hardhat-localhost/hardhat"
-cp -R \
-  "${mydir}/../packages/ethereum/deployments/hardhat-localhost" \
-  "${mydir}/../packages/ethereum/deployments/hardhat-localhost2"
-# }}}
+# need to mirror contract data because of anvil-deploy node only writing to localhost {{{
+declare protocol_config="${mydir}/../packages/core/protocol-config.json"
+declare deployments_summary="${mydir}/../packages/ethereum/contracts/contracts-addresses.json"
+update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "anvil-localhost" "anvil-localhost"
+update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "anvil-localhost" "anvil-localhost2"
 
 log "Start hoprd node"
 cd "${mydir}/.."
 DEBUG="hopr*" CI="true" \
-  yarn run run:hoprd --environment=hardhat-localhost \
+  yarn run run:hoprd --environment=anvil-localhost \
     --api true --apiPort ${api_port} > "${node_log_file}" \
     2>&1 &
 

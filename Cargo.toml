@@ -7,7 +7,9 @@ members = [
     "packages/hoprd/crates/hoprd-misc",
     "packages/utils/crates/utils-misc",
     "packages/utils/crates/utils-proc-macros",
-    "packages/utils/crates/utils-metrics"
+    "packages/utils/crates/utils-metrics",
+    "packages/ethereum/crates/bindings",
+    "packages/ethereum/foundry-tool"
 ]
 
 [workspace.dependencies]

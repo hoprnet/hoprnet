@@ -45,7 +45,7 @@ import {
 import { isConfirmedBlock, snapshotComparator, type IndexerSnapshot } from './utils.js'
 import { BigNumber, type Contract, errors } from 'ethers'
 import { CORE_ETHEREUM_CONSTANTS } from '../../lib/core_ethereum_misc.js'
-import type { TypedEvent, TypedEventFilter } from '@hoprnet/hopr-ethereum'
+import type { TypedEvent, TypedEventFilter } from '../utils/common.js'
 
 // @ts-ignore untyped library
 import retimer from 'retimer'

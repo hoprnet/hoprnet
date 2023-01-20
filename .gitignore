@@ -47,3 +47,27 @@ logs.txt
 
 # ignore local secret env file
 /.secrets
+
+# FIXME: temporary fix to commit code
+*.js
+*.js.map
+*.d.ts
+*.d.ts.map
+*.mts
+*.mts.map
+*.mjs
+*.mjs.map
+*.cts
+*.cts.map
+*.cjs
+*.cjs.map
+
+*.id
+
+# local foundry installation
+/.foundry/
+/packages/ethereum/contracts/build-info/
+/target-install/
+
+# auto-generated temporary anvil configuration file
+/.anvil.cfg

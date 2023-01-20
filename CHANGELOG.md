@@ -7,6 +7,8 @@
 - Grafana dashboards integration for all supported platforms ([#4472](https://github.com/hoprnet/hoprnet/pull/4472))
 - Migrate environment checker code to Rust ([#4492](https://github.com/hoprnet/hoprnet/pull/4492))
 - Migrate hoprd CLI to Rust ([#4491](https://github.com/hoprnet/hoprnet/pull/4491))
+- Smart contract toolchain upgrade ([#4382](https://github.com/hoprnet/hoprnet/pull/4230))
+- Switch staging environment to using Gnosis Chain instead of Goerli ([#4497](https://github.com/hoprnet/hoprnet/pull/4497))
 
 <a name="1.91"></a>
 

@@ -14,7 +14,7 @@ services:
       - |
         ./prepare-node.sh
         node /opt/hopr/packages/hoprd/lib/main.cjs \
-          --healthCheck --healthCheckHost 0.0.0.0 --init --api --apiHost 0.0.0.0 --environment hardhat-localhost \
+          --healthCheck --healthCheckHost 0.0.0.0 --init --api --apiHost 0.0.0.0 --environment anvil-localhost \
           --apiToken MyT0ken123^ --password switzerland --testPreferLocalAddresses \
           --identity /var/hopr/identities/local-public.id --testUseWeakCrypto --announce
     volumes:

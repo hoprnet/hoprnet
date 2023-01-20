@@ -67,7 +67,7 @@ pub struct Environment {
     pub environment_type: EnvironmentType,
     // Node.js-fashioned semver string
     pub version_range: String,
-    pub channel_contract_deploy_block: u32,
+    pub indexer_start_block_number: u32,
     /// an Ethereum address
     pub token_contract_address: String,
     /// an Ethereum address
@@ -84,6 +84,8 @@ pub struct Environment {
     pub network_registry_contract_address: String,
     #[wasm_bindgen(skip)] // no tags in Typescript
     pub tags: Vec<String>,
+    /// the associated staking season
+    pub stake_season: Option<u32>,
 }
 
 #[derive(Deserialize)]
@@ -219,7 +221,7 @@ impl ResolvedEnvironment {
                 id: environment_id.into(),
                 network: network.to_owned(),
                 environment_type: environment.environment_type,
-                channel_contract_deploy_block: environment.channel_contract_deploy_block,
+                channel_contract_deploy_block: environment.indexer_start_block_number,
                 token_contract_address: environment.token_contract_address.to_owned(),
                 channels_contract_address: environment.channels_contract_address.to_owned(),
                 xhopr_contract_address: environment.xhopr_contract_address.to_owned(),

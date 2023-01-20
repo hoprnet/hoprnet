@@ -1,0 +1,14 @@
+error: this trait cannot be auto-implemented for Fn-traits (only traits with exactly one method and no other items are allowed)
+ --> $DIR/fn_associated_const.rs:5:1
+  |
+5 | trait Foo {
+  | ^^^^^
+
+error: the trait `Foo` cannot be auto-implemented for Fn-traits, because it has associated consts
+
+  = note: only traits with a single method can be implemented for Fn-traits
+
+ --> $DIR/fn_associated_const.rs:6:5
+  |
+6 |     const LEN: usize;
+  |     ^^^^^

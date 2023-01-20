@@ -25,6 +25,7 @@ packages/avado/releases.json
 packages/ethereum/hardhat
 packages/ethereum/src/types
 packages/ethereum/deployments
+packages/ethereum/contracts/out
 
 # Compiled rust code cache
 target/
@@ -43,3 +44,4 @@ target/
 
 # do not lint vendored source files
 vendor/
+

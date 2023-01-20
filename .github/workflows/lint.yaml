@@ -55,6 +55,7 @@ jobs:
           make lint-fix
 
       - name: Commit and push changes
+        if: ${{ !env.ACT }}
         run: ./scripts/commit-and-push-all-changes.sh
         env:
           HOPR_GIT_MSG: 'chore(build): apply linter changes'
