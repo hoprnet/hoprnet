@@ -206,32 +206,15 @@ export async function validateUnacknowledgedTicket(
     })
   })
 
-  const { unrealizedBalance, unrealizedIndex } = tickets.reduce(
+  const unrealizedBalance = tickets.reduce(
     (result, t) => {
-      // update index
-      if (result.unrealizedIndex.toBN().lt(t.index.toBN())) {
-        result.unrealizedIndex = t.index
-      }
-
       // update balance
-      result.unrealizedBalance = result.unrealizedBalance.sub(t.amount)
+      result = result.sub(t.amount)
 
       return result
     },
-    {
-      unrealizedBalance: channel.balance,
-      unrealizedIndex: channel.ticketIndex
-    }
+      channel.balance,
   )
-
-  // ticket's index MUST be higher than the channel's ticket index
-  if (ticket.index.toBN().lt(unrealizedIndex.toBN())) {
-    throw Error(
-      `Ticket index ${ticket.index.toBN().toString()} for channel ${channel
-        .getId()
-        .toHex()} must be higher than last ticket index ${unrealizedIndex.toBN().toString()}`
-    )
-  }
 
   // ensure sender has enough funds
   if (ticket.amount.toBN().gt(unrealizedBalance.toBN())) {

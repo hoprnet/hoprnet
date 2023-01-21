@@ -261,7 +261,7 @@ api_close_channel() {
   if [ "${close_check}" = "true" ]; then
     result="$(api_call ${source_api} "/channels/${destination_peer_id}/${channel_direction}" "DELETE" "" 'Closed|Channel is already closed' 600)"
   else
-    result="$(api_call ${source_api} "/channels/${destination_peer_id}/${channel_direction}" "DELETE" "" 'PendingToClose|Closed' 20 20)"
+    result="$(api_call ${source_api} "/channels/${destination_peer_id}/${channel_direction}" "DELETE" "" 'PendingToClose|Closed' 60 20)"
   fi
 
   log "Node ${source_id} close channel to Node ${destination_id} result -- ${result}"
