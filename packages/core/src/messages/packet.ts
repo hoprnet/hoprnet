@@ -141,7 +141,7 @@ export function createZeroHopTicket(dest: PublicKey, challenge: Challenge, privK
 // are always an integer multiple of the base unit.
 
 /**
- * Validate unacknowledged tickets as we receive them. 
+ * Validate unacknowledged tickets as we receive them.
  * Out of order validation is allowed. Ordering is enforced
  * when tickets are redeemed.
  */
@@ -207,15 +207,12 @@ export async function validateUnacknowledgedTicket(
     })
   })
 
-  const unrealizedBalance = tickets.reduce(
-    (result, t) => {
-      // update balance
-      result = result.sub(t.amount)
+  const unrealizedBalance = tickets.reduce((result, t) => {
+    // update balance
+    result = result.sub(t.amount)
 
-      return result
-    },
-      channel.balance,
-  )
+    return result
+  }, channel.balance)
 
   // ensure sender has enough funds
   if (ticket.amount.toBN().gt(unrealizedBalance.toBN())) {

@@ -145,9 +145,8 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
       new UINT256(new BN(2))
     )
 
-    return expect(
-      validateUnacknowledgedTicket(SENDER, new BN(1), new BN(1), signedTicket, mockChannel, getTicketsMock)
-    ).to.not.eventually.rejected
+    return expect(validateUnacknowledgedTicket(SENDER, new BN(1), new BN(1), signedTicket, mockChannel, getTicketsMock))
+      .to.not.eventually.rejected
   })
 
   it("should not throw if ticket's index is smaller than the last ticket index when you include unredeemed tickets", async function () {
