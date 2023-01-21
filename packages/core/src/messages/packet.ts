@@ -141,7 +141,9 @@ export function createZeroHopTicket(dest: PublicKey, challenge: Challenge, privK
 // are always an integer multiple of the base unit.
 
 /**
- * Validate unacknowledged tickets as we receive them
+ * Validate unacknowledged tickets as we receive them. 
+ * Out of order validation is allowed. Ordering is enforced
+ * when tickets are redeemed.
  */
 export async function validateUnacknowledgedTicket(
   themPeerId: PeerId,
@@ -196,8 +198,7 @@ export async function validateUnacknowledgedTicket(
     )
   }
 
-  // find out latest index and pending balance
-  // from unredeemed tickets
+  // find out pending balance from unredeemed tickets
 
   // all tickets from sender
   const tickets = await getTickets().then((ts) => {
