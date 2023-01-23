@@ -170,7 +170,7 @@ struct CliArgs {
         value_parser = clap::value_parser!(u16),
         value_name = "PORT",
         help = "Set port to which the API server will bind",
-        env = "HOPRD_API_HOST"
+        env = "HOPRD_API_PORT"
     )]
     pub api_port: u16,
 
