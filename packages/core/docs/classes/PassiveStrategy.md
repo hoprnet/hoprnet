@@ -2,23 +2,11 @@
 
 # Class: PassiveStrategy
 
-Staked nodes will likely want to automate opening and closing of channels. By
-implementing the following interface, they can decide how to allocate their
-stake to best attract traffic with a useful channel graph.
-
-Implementors should bear in mind:
-- Churn is expensive
-- Path finding will prefer high stakes, and high availability of nodes.
-
 ## Hierarchy
 
-- [`SaneDefaults`](SaneDefaults.md)
+- `RustStrategyWrapper`<`RS_PromiscuousStrategy`\>
 
   ↳ **`PassiveStrategy`**
-
-## Implements
-
-- [`ChannelStrategyInterface`](../interfaces/ChannelStrategyInterface.md)
 
 ## Table of contents
 
@@ -28,8 +16,11 @@ Implementors should bear in mind:
 
 ### Properties
 
-- [name](PassiveStrategy.md#name)
 - [tickInterval](PassiveStrategy.md#tickinterval)
+
+### Accessors
+
+- [name](PassiveStrategy.md#name)
 
 ### Methods
 
@@ -44,41 +35,45 @@ Implementors should bear in mind:
 
 • **new PassiveStrategy**()
 
-#### Inherited from
+#### Overrides
 
-[SaneDefaults](SaneDefaults.md).[constructor](SaneDefaults.md#constructor)
-
-## Properties
-
-### name
-
-• **name**: `string` = `'passive'`
-
-#### Implementation of
-
-[ChannelStrategyInterface](../interfaces/ChannelStrategyInterface.md).[name](../interfaces/ChannelStrategyInterface.md#name)
+RustStrategyWrapper&lt;RS\_PromiscuousStrategy\&gt;.constructor
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:89](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L89)
+[packages/core/src/channel-strategy.ts:107](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L107)
 
-___
+## Properties
 
 ### tickInterval
 
 • **tickInterval**: `number` = `CHECK_TIMEOUT`
 
-#### Implementation of
-
-[ChannelStrategyInterface](../interfaces/ChannelStrategyInterface.md).[tickInterval](../interfaces/ChannelStrategyInterface.md#tickinterval)
-
 #### Inherited from
 
-[SaneDefaults](SaneDefaults.md).[tickInterval](SaneDefaults.md#tickinterval)
+RustStrategyWrapper.tickInterval
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:84](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L84)
+[packages/core/src/channel-strategy.ts:75](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L75)
+
+## Accessors
+
+### name
+
+• `get` **name**(): `any`
+
+#### Returns
+
+`any`
+
+#### Inherited from
+
+RustStrategyWrapper.name
+
+#### Defined in
+
+[packages/core/src/channel-strategy.ts:95](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L95)
 
 ## Methods
 
@@ -97,17 +92,13 @@ ___
 
 `Promise`<`void`\>
 
-#### Implementation of
-
-[ChannelStrategyInterface](../interfaces/ChannelStrategyInterface.md).[onChannelWillClose](../interfaces/ChannelStrategyInterface.md#onchannelwillclose)
-
 #### Inherited from
 
-[SaneDefaults](SaneDefaults.md).[onChannelWillClose](SaneDefaults.md#onchannelwillclose)
+RustStrategyWrapper.onChannelWillClose
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:66](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L66)
+[packages/core/src/channel-strategy.ts:57](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L57)
 
 ___
 
@@ -126,23 +117,19 @@ ___
 
 `Promise`<`void`\>
 
-#### Implementation of
-
-[ChannelStrategyInterface](../interfaces/ChannelStrategyInterface.md).[onWinningTicket](../interfaces/ChannelStrategyInterface.md#onwinningticket)
-
 #### Inherited from
 
-[SaneDefaults](SaneDefaults.md).[onWinningTicket](SaneDefaults.md#onwinningticket)
+RustStrategyWrapper.onWinningTicket
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:60](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L60)
+[packages/core/src/channel-strategy.ts:51](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L51)
 
 ___
 
 ### shouldCommitToChannel
 
-▸ **shouldCommitToChannel**(`c`): `Promise`<`boolean`\>
+▸ **shouldCommitToChannel**(`c`): `boolean`
 
 #### Parameters
 
@@ -152,42 +139,39 @@ ___
 
 #### Returns
 
-`Promise`<`boolean`\>
-
-#### Implementation of
-
-[ChannelStrategyInterface](../interfaces/ChannelStrategyInterface.md).[shouldCommitToChannel](../interfaces/ChannelStrategyInterface.md#shouldcommittochannel)
+`boolean`
 
 #### Inherited from
 
-[SaneDefaults](SaneDefaults.md).[shouldCommitToChannel](SaneDefaults.md#shouldcommittochannel)
+RustStrategyWrapper.shouldCommitToChannel
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:79](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L79)
+[packages/core/src/channel-strategy.ts:70](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L70)
 
 ___
 
 ### tick
 
-▸ **tick**(`_balance`, `_c`, `_p`): `Promise`<[`StrategyTickResult`](../modules.md#strategytickresult)\>
+▸ **tick**(`balance`, `network_peer_ids`, `outgoing_channels`, `peer_quality`): [`StrategyTickResult`](StrategyTickResult.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `_balance` | `BN` |
-| `_c` | `ChannelEntry`[] |
-| `_p` | `NetworkPeers` |
+| `balance` | `BN` |
+| `network_peer_ids` | `Iterator`<`string`, `any`, `undefined`\> |
+| `outgoing_channels` | `OutgoingChannelStatus`[] |
+| `peer_quality` | (`string`: `any`) => `number` |
 
 #### Returns
 
-`Promise`<[`StrategyTickResult`](../modules.md#strategytickresult)\>
+[`StrategyTickResult`](StrategyTickResult.md)
 
-#### Implementation of
+#### Inherited from
 
-[ChannelStrategyInterface](../interfaces/ChannelStrategyInterface.md).[tick](../interfaces/ChannelStrategyInterface.md#tick)
+RustStrategyWrapper.tick
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:91](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L91)
+[packages/core/src/channel-strategy.ts:86](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L86)
