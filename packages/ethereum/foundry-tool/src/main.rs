@@ -1,7 +1,5 @@
 use clap::{Parser, Subcommand};
 use ethers::types::Address;
-use std::path::Path;
-use std::process::Command;
 
 mod helper_errors;
 mod key_pair;
