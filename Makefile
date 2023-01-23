@@ -188,6 +188,7 @@ build-docs-api: build
 
 .PHONY: clean
 clean: # Cleanup build directories (lib,build, ...etc.)
+	cargo clean
 	yarn clean
 
 .PHONY: reset

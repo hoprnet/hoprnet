@@ -67,7 +67,7 @@ log "Start hoprd node"
 cd "${mydir}/.."
 DEBUG="hopr*" CI="true" \
   yarn run run:hoprd --environment=anvil-localhost \
-    --api true --apiPort ${api_port} > "${node_log_file}" \
+    --apiPort ${api_port} > "${node_log_file}" \
     2>&1 &
 
 log "Wait 15 seconds for node startup to complete"

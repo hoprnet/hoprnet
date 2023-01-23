@@ -1,28 +1,20 @@
 import HoprCoreEthereum, { type ChannelEntry } from '@hoprnet/hopr-core-ethereum'
-import {
-  type AcknowledgedTicket,
-  PublicKey,
-  MINIMUM_REASONABLE_CHANNEL_STAKE,
-  MAX_AUTO_CHANNELS,
-  PRICE_PER_PACKET,
-  debug
-} from '@hoprnet/hopr-utils'
+import { type AcknowledgedTicket, debug } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
-import { MAX_NEW_CHANNELS_PER_TICK, NETWORK_QUALITY_THRESHOLD, INTERMEDIATE_HOPS, CHECK_TIMEOUT } from './constants.js'
-import type NetworkPeers from './network/network-peers.js'
-import { NetworkPeersOrigin } from './network/network-peers.js'
+import { CHECK_TIMEOUT } from './constants.js'
 
 const log = debug('hopr-core:channel-strategy')
 
-export type StrategyTickResult = {
-  toOpen: {
-    destination: PublicKey
-    stake: BN
-  }[]
-  toClose: {
-    destination: PublicKey
-  }[]
-}
+import {
+  PromiscuousStrategy as RS_PromiscuousStrategy,
+  PassiveStrategy as RS_PassiveStrategy,
+  StrategyTickResult,
+  OutgoingChannelStatus,
+  Balance,
+  utils_misc_set_panic_hook
+} from '../lib/core_strategy.js'
+utils_misc_set_panic_hook()
+export { OutgoingChannelStatus, StrategyTickResult } from '../lib/core_strategy.js'
 
 /**
  * Staked nodes will likely want to automate opening and closing of channels. By
@@ -38,15 +30,14 @@ export interface ChannelStrategyInterface {
 
   tick(
     balance: BN,
-    currentChannels: ChannelEntry[],
-    networkPeers: NetworkPeers,
-    getRandomChannel: () => Promise<ChannelEntry>
-  ): Promise<StrategyTickResult>
-  // TBD: Include ChannelsToClose as well.
+    network_peer_ids: Iterator<string>,
+    outgoing_channel: OutgoingChannelStatus[],
+    peer_quality: (string) => number
+  ): StrategyTickResult
 
   onChannelWillClose(channel: ChannelEntry, chain: HoprCoreEthereum): Promise<void> // Before a channel closes
   onWinningTicket(t: AcknowledgedTicket, chain: HoprCoreEthereum): Promise<void>
-  shouldCommitToChannel(c: ChannelEntry): Promise<boolean>
+  shouldCommitToChannel(c: ChannelEntry): boolean
 
   tickInterval: number
 }
@@ -76,7 +67,7 @@ export abstract class SaneDefaults {
     }
   }
 
-  async shouldCommitToChannel(c: ChannelEntry): Promise<boolean> {
+  shouldCommitToChannel(c: ChannelEntry): boolean {
     log(`committing to channel ${c.getId().toHex()}`)
     return true
   }
@@ -84,88 +75,36 @@ export abstract class SaneDefaults {
   tickInterval = CHECK_TIMEOUT
 }
 
-// Don't auto open any channels
-export class PassiveStrategy extends SaneDefaults implements ChannelStrategyInterface {
-  name = 'passive'
+/**
+  Temporary wrapper class before we migrate rest of the core to use Rust exported types (before we migrate everything to Rust!)
+ */
+abstract class RustStrategyWrapper<T extends { tick; name }> extends SaneDefaults implements ChannelStrategyInterface {
+  protected constructor(private strategy: T) {
+    super()
+  }
 
-  async tick(_balance: BN, _c: ChannelEntry[], _p: NetworkPeers): Promise<StrategyTickResult> {
-    return { toOpen: [], toClose: [] }
+  tick(
+    balance: BN,
+    network_peer_ids: Iterator<string>,
+    outgoing_channels: OutgoingChannelStatus[],
+    peer_quality: (string) => number
+  ): StrategyTickResult {
+    return this.strategy.tick(new Balance(balance.toString()), network_peer_ids, outgoing_channels, peer_quality)
+  }
+
+  get name() {
+    return this.strategy.name
   }
 }
 
-// Open channel to as many peers as possible
-export class PromiscuousStrategy extends SaneDefaults implements ChannelStrategyInterface {
-  name = 'promiscuous'
+export class PromiscuousStrategy extends RustStrategyWrapper<RS_PromiscuousStrategy> {
+  constructor() {
+    super(RS_PromiscuousStrategy.default())
+  }
+}
 
-  async tick(
-    balance: BN,
-    currentChannels: ChannelEntry[],
-    peers: NetworkPeers,
-    getRandomChannel: () => Promise<ChannelEntry>
-  ): Promise<StrategyTickResult> {
-    log(
-      'currently open',
-      currentChannels.map((x) => x.toString())
-    )
-    let toOpen: StrategyTickResult['toOpen'] = []
-
-    let i = 0
-    let toClose = currentChannels.filter((x: ChannelEntry) => {
-      return (
-        peers.qualityOf(x.destination.toPeerId()) < 0.1 ||
-        // Lets append channels with less balance than a full hop messageto toClose.
-        // NB: This is based on channel balance, not expected balance so may not be
-        // aggressive enough.
-        x.balance.toBN().lte(PRICE_PER_PACKET.muln(INTERMEDIATE_HOPS))
-      )
-    })
-
-    // First let's open channels to any interesting peers we have
-    peers.all().forEach((peerId) => {
-      if (
-        balance.gtn(0) &&
-        currentChannels.length + toOpen.length < MAX_AUTO_CHANNELS &&
-        !toOpen.find((x: typeof toOpen[number]) => x.destination.eq(PublicKey.fromPeerId(peerId))) &&
-        !currentChannels.find((x) => x.destination.toPeerId().equals(peerId)) &&
-        peers.qualityOf(peerId) > NETWORK_QUALITY_THRESHOLD
-      ) {
-        toOpen.push({
-          destination: PublicKey.fromPeerId(peerId),
-          stake: MINIMUM_REASONABLE_CHANNEL_STAKE
-        })
-        balance.isub(MINIMUM_REASONABLE_CHANNEL_STAKE)
-      }
-    })
-
-    // Now let's evaluate new channels
-    while (
-      balance.gtn(0) &&
-      i++ < MAX_NEW_CHANNELS_PER_TICK &&
-      currentChannels.length + toOpen.length < MAX_AUTO_CHANNELS
-    ) {
-      let randomChannel = await getRandomChannel()
-      if (randomChannel === undefined) {
-        log('no channel available')
-        break
-      }
-      log('evaluating', randomChannel.source.toString())
-      peers.register(randomChannel.source.toPeerId(), NetworkPeersOrigin.STRATEGY_CONSIDERING_CHANNEL)
-      if (
-        !toOpen.find((x) => x[0].eq(randomChannel.source)) &&
-        !currentChannels.find((x) => x.destination.eq(randomChannel.source)) &&
-        peers.qualityOf(randomChannel.source.toPeerId()) > NETWORK_QUALITY_THRESHOLD
-      ) {
-        toOpen.push({
-          destination: randomChannel.source,
-          stake: MINIMUM_REASONABLE_CHANNEL_STAKE
-        })
-        balance.isub(MINIMUM_REASONABLE_CHANNEL_STAKE)
-      }
-    }
-    log(
-      'Promiscuous toOpen: ',
-      toOpen.map((p) => p.toString())
-    )
-    return { toOpen, toClose }
+export class PassiveStrategy extends RustStrategyWrapper<RS_PromiscuousStrategy> {
+  constructor() {
+    super(new RS_PassiveStrategy())
   }
 }
