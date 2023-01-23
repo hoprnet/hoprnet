@@ -46,6 +46,7 @@ pub fn read_identities(
 mod tests {
 
     use super::*;
+    use ethers::core::rand::thread_rng;
 
     #[test]
     fn read_identities_from_directory_with_id_files() {
