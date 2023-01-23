@@ -140,7 +140,9 @@ if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
   # to create lockfiles with resolution overrides
   "${mydir}/build-lockfiles.sh" hoprd
 
+  # publish hoprd and wait until its available on npm
   yarn workspace @hoprnet/hoprd npm publish --access public
+  "${mydir}/wait-for-npm-package.sh" hoprd
 
   cleanup
 fi

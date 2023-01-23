@@ -118,16 +118,6 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: "[NPM] Wait for packages to be accessible"
-        if: ${{ (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/debug-deploy/') || startsWith(github.ref, 'refs/heads/release/') || startsWith(github.ref, 'refs/heads/staging/')) && !env.ACT }}
-        run: |
-          ./scripts/wait-for-npm-package.sh hoprd
-          ./scripts/wait-for-npm-package.sh core
-          ./scripts/wait-for-npm-package.sh core-ethereum
-          ./scripts/wait-for-npm-package.sh utils
-          ./scripts/wait-for-npm-package.sh ethereum
-          ./scripts/wait-for-npm-package.sh connect
-
       - name: "[FINISH] Send notification if anything failed on master or release/staging branches"
         if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/') || startsWith(github.ref, 'refs/heads/staging/')) && !env.ACT }}
         run: |
