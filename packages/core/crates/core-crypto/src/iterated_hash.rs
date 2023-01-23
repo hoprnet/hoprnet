@@ -16,12 +16,11 @@ pub struct HashIteration {
 }
 
 pub fn iterate_hash(seed: &[u8], iterations: usize, step_size: usize) -> Result<Vec<HashIteration>> {
-    let mut intermediates: Vec<HashIteration> = Vec::with_capacity(iterations);
-
-    if seed.len() == 0 || iterations == 0 {
+    if seed.len() == 0 || iterations == 0 || step_size == 0 {
         return Err(InvalidInputValue)
     }
 
+    let mut intermediates: Vec<HashIteration> = Vec::with_capacity(iterations / step_size + 1);
     let mut current: Box<[u8]> = Box::from(seed);
     let mut hash = Keccak256::default();
 
@@ -38,11 +37,6 @@ pub fn iterate_hash(seed: &[u8], iterations: usize, step_size: usize) -> Result<
         current = new_intermediate.into_boxed_slice();
     }
 
-    intermediates.push( HashIteration {
-        iteration: iterations,
-        intermediate: current.to_vec()
-    });
-
     Ok(intermediates)
 }
 
@@ -50,7 +44,7 @@ pub fn iterate_hash(seed: &[u8], iterations: usize, step_size: usize) -> Result<
 pub fn recover_iterated_hash<H>(hash_value: &[u8], hints: H, max_iterations: usize, step_size: usize, index_hint: Option<usize>) -> Result<HashIteration>
     where H: Fn(u32) -> Option<Box<[u8]>>
 {
-    if step_size == 0 {
+    if step_size == 0 || hash_value.len() == 0 || max_iterations == 0 {
         return Err(InvalidInputValue)
     }
 
@@ -67,7 +61,10 @@ pub fn recover_iterated_hash<H>(hash_value: &[u8], hints: H, max_iterations: usi
 
                 // Is the computed hash the one we're looking for ?
                 if hash.len() == hash_value.len() && hash == hash_value {
-                    return Ok(HashIteration { iteration, intermediate: intermediate.to_vec() });
+                    return Ok(HashIteration {
+                        iteration: iteration + i as usize,
+                        intermediate: intermediate.to_vec()
+                    });
                 }
 
                 intermediate = hash.into_boxed_slice();
@@ -80,9 +77,28 @@ pub fn recover_iterated_hash<H>(hash_value: &[u8], hints: H, max_iterations: usi
 
 #[cfg(test)]
 mod tests {
+    use crate::iterated_hash::{iterate_hash, recover_iterated_hash};
 
     #[test]
     fn test_iteration() {
+        let seed = [1u8; 16];
+        let hashes = iterate_hash(&seed, 1000, 10).unwrap();
+
+        assert_eq!(hashes.len(), 100);
+
+        let hint_idx = 98;
+
+        let last = hashes.last().unwrap();
+        let middle = &hashes[hint_idx];
+
+        let recovered = recover_iterated_hash(last.intermediate.as_slice(),
+                                              |it: u32| { if it == middle.iteration as u32 {
+                                                  Some(middle.intermediate.clone().into_boxed_slice())
+                                              } else { None } },
+                                              1000,
+                                              10,
+                                              None)
+            .unwrap();
 
     }
 }
