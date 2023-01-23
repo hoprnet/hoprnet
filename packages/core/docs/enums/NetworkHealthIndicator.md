@@ -23,7 +23,7 @@ based on the different node types we can ping.
 
 #### Defined in
 
-[packages/core/src/network/heartbeat.ts:84](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/network/heartbeat.ts#L84)
+[packages/core/src/network/heartbeat.ts:82](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/network/heartbeat.ts#L82)
 
 ___
 
@@ -33,7 +33,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/network/heartbeat.ts:82](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/network/heartbeat.ts#L82)
+[packages/core/src/network/heartbeat.ts:80](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/network/heartbeat.ts#L80)
 
 ___
 
