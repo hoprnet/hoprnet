@@ -84,19 +84,18 @@
 | `onChainConfirmations?` | `number` |
 | `password?` | `string` |
 | `strategy?` | [`ChannelStrategyInterface`](interfaces/ChannelStrategyInterface.md) |
-| `testing?` | { `announceLocalAddresses?`: `boolean` ; `mockedDHT?`: `Map`<`string`, `string`[]\> ; `mockedNetwork?`: `Libp2pEmitter`<`any`\> ; `noDirectConnections?`: `boolean` ; `noUPNP?`: `boolean` ; `noWebRTCUpgrade?`: `boolean` ; `preferLocalAddresses?`: `boolean` ; `useMockedLibp2p?`: `boolean`  } |
+| `testing?` | { `announceLocalAddresses?`: `boolean` ; `mockedDHT?`: `Map`<`string`, `string`[]\> ; `mockedNetwork?`: `Libp2pEmitter`<`any`\> ; `noDirectConnections?`: `boolean` ; `noWebRTCUpgrade?`: `boolean` ; `preferLocalAddresses?`: `boolean` ; `useMockedLibp2p?`: `boolean`  } |
 | `testing.announceLocalAddresses?` | `boolean` |
 | `testing.mockedDHT?` | `Map`<`string`, `string`[]\> |
 | `testing.mockedNetwork?` | `Libp2pEmitter`<`any`\> |
 | `testing.noDirectConnections?` | `boolean` |
-| `testing.noUPNP?` | `boolean` |
 | `testing.noWebRTCUpgrade?` | `boolean` |
 | `testing.preferLocalAddresses?` | `boolean` |
 | `testing.useMockedLibp2p?` | `boolean` |
 
 #### Defined in
 
-[packages/core/src/index.ts:119](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L119)
+[packages/core/src/index.ts:118](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L118)
 
 ___
 
@@ -106,7 +105,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:170](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L170)
+[packages/core/src/index.ts:165](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L165)
 
 ___
 
@@ -132,7 +131,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/environment.ts:54](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L54)
+[packages/core/src/environment.ts:45](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L45)
 
 ___
 
@@ -142,7 +141,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:185](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L185)
+[packages/core/src/index.ts:180](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L180)
 
 ___
 
@@ -169,7 +168,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:172](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L172)
+[packages/core/src/index.ts:167](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L167)
 
 ## Variables
 
@@ -361,7 +360,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/main.ts:204](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L204)
+[packages/core/src/main.ts:212](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L212)
 
 ___
 
@@ -416,7 +415,7 @@ the environment details, throws if environment is not supported
 
 #### Defined in
 
-[packages/core/src/environment.ts:90](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L90)
+[packages/core/src/environment.ts:74](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L74)
 
 ___
 
@@ -432,4 +431,4 @@ environments that the given HOPR version should be able to use
 
 #### Defined in
 
-[packages/core/src/environment.ts:72](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L72)
+[packages/core/src/environment.ts:65](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/environment.ts#L65)

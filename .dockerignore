@@ -47,12 +47,10 @@ packages/*/crates/*/pkg
 /packages/hoprd/hopr-admin/build
 /packages/hoprd/hopr-admin/.next
 
-# ethereum hardhat artifacts
-/packages/ethereum/hardhat/artifacts
-/packages/ethereum/hardhat/cache
-/packages/ethereum/deployments/**/solcInputs
-/packages/ethereum/deployments/hardhat-localhost
-/packages/ethereum/deployments/hardhat-localhost2
+# ethereum anvil artifacts
+/packages/ethereum/contracts/out
+/packages/ethereum/contracts/cache
+/package/ethereum/target
 
 # docusaurus builds
 /docs/hopr-documentation/build

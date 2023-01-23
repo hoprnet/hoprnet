@@ -9,7 +9,7 @@ To set up your DAppNode, follow the instructions that came with the box. Then, j
 Please withdraw all your funds and delete the old package before installing a new one.
 :::
 
-## Installing the HOPR Client: 1.90.68 (Valencia)
+## Installing the HOPR Client: 1.91.24 (Bogota)
 
 (**1**) Open the DAppStore using the sidebar to the left.
 
@@ -58,7 +58,9 @@ Using the downlaoded file either:
 
 ## Using a Custom RPC Endpoint
 
-You can set your own RPC endpoint for HOPR to use. Ideally, you would install an ETH client on your DAppNode and use its local provider. A local provider helps increase decentralisation and is generally good practice, but you can also use any RPC provider of your choice.
+You can set your own RPC endpoint for HOPR to use. Ideally, you would install an ETH client on your DAppNode and use its local provider. A local provider helps increase decentralisation and is generally good practice, but you can also use any RPC provider of your choice as long as they are on gnosis chain.
+
+**Note:** Only RPC providers on Gnosis chain will work with HOPR
 
 ### Finding your local endpoint
 

@@ -86,7 +86,7 @@ To exit your current session without closing it. To be clear, you press ctrl and
 
 Please make sure you are in a newly opened session and haven't exited it before continuing.
 
-## Installing HOPRd: 1.90.68 (Valencia)
+## Installing HOPRd: 1.91.24 (Bogota)
 
 :::info NOTE
 
@@ -119,7 +119,7 @@ This ensures the node cannot be accessed by a malicious user residing in the sam
 (**3**) Copy the following command and replace **YOUR_SECURITY_TOKEN** with your own.
 
 ```bash
-docker run --pull always --restart on-failure -m 2g -ti -v $HOME/.hoprd-db-valencia:/app/hoprd-db -p 9091:9091 -p 3000:3000 -p 3001:3001 -e DEBUG="hopr*" gcr.io/hoprassociation/hoprd:1.90.68 --environment monte_rosa --init --api --admin --identity /app/hoprd-db/.hopr-id-valencia --data /app/hoprd-db --password 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' --apiHost "0.0.0.0" --apiToken 'YOUR_SECURITY_TOKEN' --adminHost "0.0.0.0" --healthCheck --healthCheckHost "0.0.0.0"
+docker run --pull always --restart on-failure -m 2g -ti -v $HOME/.hoprd-db-bogota:/app/hoprd-db -p 9091:9091 -p 3000:3000 -p 3001:3001 -e DEBUG="hopr*" gcr.io/hoprassociation/hoprd:bogota --environment monte_rosa --init --api --admin --identity /app/hoprd-db/.hopr-id-bogota --data /app/hoprd-db --password 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' --apiHost "0.0.0.0" --apiToken 'YOUR_SECURITY_TOKEN' --adminHost "0.0.0.0" --healthCheck --healthCheckHost "0.0.0.0"
 ```
 
 If you are not logged in as the root user, add sudo to the start of the above command. E.g. `sudo docker run ...`. If you are using a VPS, you are likely a root user and can use the default command.
@@ -137,6 +137,34 @@ All ports are mapped to your local host, assuming you stick to the default port 
 If you are in the process of registering your node on the network registry, please complete the process [here](./network-registry-tutorial.md) before continuing.
 
 Otherwise, the installation process is complete! You can proceed to our [hopr-admin tutorial](using-hopr-admin).
+
+## Updating to a new release
+
+When migrating between releases, Docker users need to either move their identity file to the newly specified location or edit the command to point to their old location. Otherwise, you will be running a new node instead of accessing your old node's information.
+
+For example, when we update from version `1.90.68`, which is internally known as `Valencia` to `1.91.24`, which is internally known as `Bogota`, the location the command points to will change as such:
+
+1.) `$HOME/.hoprd-db-valencia` to `$HOME/.hoprd-db-bogota`
+2.) `$HOME/.hoprd-db-valencia/.hopr-id-valencia` to `$HOME/.hoprd-db-bogota/.hopr-id-bogota`
+
+### Moving your identity file over
+
+Preferably you would move your identity file to the new location, E.g. with the following commands for a migration from Valencia to Bogota.
+
+```bash
+cp -r $HOME/.hoprd-db-valencia $HOME/.hoprd-db-bogota
+cp -r $HOME/.hoprd-db-valencia/.hopr-id-valencia $HOME/.hoprd-db-bogota/.hopr-id-bogota
+```
+
+### Using the new command with the old file locations
+
+Following the above example of migration from Valencia to Bogota, you would just use the new Bogota command with the old directories/location: `$HOME/.hoprd-db-valencia/.hopr-id-valencia`
+
+```bash
+docker run --pull always --restart on-failure -m 2g -ti -v $HOME/.hoprd-db-valencia:/app/hoprd-db -p 9091:9091 -p 3000:3000 -p 3001:3001 -e DEBUG="hopr*" gcr.io/hoprassociation/hoprd:bogota --environment monte_rosa --init --api --admin --identity /app/hoprd-db/.hopr-id-valencia --data /app/hoprd-db --password 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' --apiHost "0.0.0.0" --apiToken 'YOUR_SECURITY_TOKEN' --adminHost "0.0.0.0" --healthCheck --healthCheckHost "0.0.0.0"
+```
+
+This also works fine as long as the other flags and details remain the same.
 
 ## Default ports
 

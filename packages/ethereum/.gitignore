@@ -1,34 +1,20 @@
-# Exclude node.js module directory
-/node_modules
+contracts/cache/
+contracts/out/
 
-# Coverage directory used by tools like istanbul
-coverage*
-.coverage*
-coverage.json
-coverageEnv
+# Ignore Environment Variables!
+.env
+.env.prod
 
-# Exclude runtime data
-pids
-*.pid
-*.seed
-allFiredEvents
-scTopics
+# Ignore all vscode settings
+.vscode/
 
-# Exclude secrets
-/.env
+# temporary files
+test.txt
 
-# Exclude built npm packages
-/*.tgz
+# braadcast files
+# ignore local files
+contracts/broadcast/*.*/*/*
+!contracts/broadcast/*.*/*/run-latest.json
+contracts/broadcast/*.*/31337
 
-# Hardhat
-/hardhat/artifacts
-/hardhat/cache
-/deployments/**/solcInputs
-/deployments/hardhat-localhost
-/deployments/hardhat-localhost2
-
-# typechain
-/src/types
-
-# Typescript builds
-/lib
+target/

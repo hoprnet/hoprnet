@@ -50,6 +50,7 @@ jobs:
             target/
             .cargo/.package-cache/
             .cargo/bin/
+            .foundry/bin/
 
       - name: Install dependencies
         run: make -j deps-ci
@@ -60,4 +61,4 @@ jobs:
       - name: Test
         run: make -j test
         env:
-          HOPR_ENVIRONMENT_ID: hardhat-localhost
+          HOPR_ENVIRONMENT_ID: anvil-localhost

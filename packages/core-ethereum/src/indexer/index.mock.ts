@@ -1,6 +1,7 @@
 import EventEmitter from 'events'
 import { providers as Providers, Wallet, BigNumber, utils } from 'ethers'
-import type { HoprChannels, HoprNetworkRegistry, HoprToken, TypedEvent } from '@hoprnet/hopr-ethereum'
+import type { HoprChannels, HoprNetworkRegistry, HoprToken, TypedEvent } from '../utils/index.js'
+
 import {
   Address,
   ChannelEntry,

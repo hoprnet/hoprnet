@@ -64,7 +64,7 @@ The preferred way of installation should be via Docker.
 
 All our docker images can be found in [our Google Cloud Container Registry][4].
 Each image is prefixed with `gcr.io/hoprassociation/$PROJECT:$RELEASE`.
-The `master-goerli` tag represents the `master` branch, while the `bogota` tag
+The `master-staging` tag represents the `master` branch, while the `bogota` tag
 represents the most recent `release/*` branch.
 
 You can pull the Docker image like so:
@@ -142,7 +142,7 @@ $ hoprd --help
 Options:
   --help                         Show help  [boolean]
   --version                      Show version number  [boolean]
-  --environment                  Environment id which the node shall run on (HOPRD_ENVIRONMENT)  [string] [choices: "hardhat-localhost", "hardhat-localhost2", "master-goerli", "debug-goerli", "tuttlingen", "prague", "budapest", "athens", "lisbon", "ouagadougou", "paleochora", "monte_rosa"] [default: ""]
+  --environment                  Environment id which the node shall run on (HOPRD_ENVIRONMENT)  [string] [choices: "anvil-localhost", "anvil-localhost2", "master-staging", "debug-staging", "tuttlingen", "prague", "budapest", "athens", "lisbon", "ouagadougou", "paleochora", "monte_rosa"] [default: ""]
   --host                         The network host to run the HOPR node on [env: HOPRD_HOST]  [string] [default: "0.0.0.0:9091"]
   --announce                     Announce public IP to the network [env: HOPRD_ANNOUNCE]  [boolean] [default: false]
   --api                          Expose the API on localhost:3001, requires --apiToken. [env: HOPRD_API]  [boolean] [default: false]
@@ -268,11 +268,11 @@ To install Rust toolchain (at least version 1.60) please follow instructions at 
 # build deps and HOPRd code
 make -j deps && make -j build
 
-# starting network (and put into background)
-make run-hardhat &
+# starting network
+make run-anvil
 
-# workaround for a temp issue with local hardhat-network
-cp -R packages/ethereum/deployments/hardhat-localhost/localhost/. packages/ethereum/deployments/hardhat-localhost/hardhat
+# update protocol-config
+scripts/update-protocol-config.sh -e anvil-localhost
 
 # running normal node alice (separate terminal)
 DEBUG="hopr*" yarn run:hoprd:alice
@@ -281,7 +281,7 @@ DEBUG="hopr*" yarn run:hoprd:alice
 DEBUG="hopr*" yarn run:hoprd:bob
 
 # fund all your nodes to get started
-HOPR_ENVIRONMENT_ID=hardhat-localhost yarn run:faucet:all
+make fund-local-all
 
 # start local HOPR admin in a container (and put into background)
 make run-hopr-admin &

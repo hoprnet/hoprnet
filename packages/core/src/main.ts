@@ -17,12 +17,12 @@ import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 
 import Hopr, { type HoprOptions } from './index.js'
 import { getAddrs } from './identity.js'
-import type AccessControl from './network/access-control.js'
 import { createLibp2pMock } from './libp2p.mock.js'
-import { NetworkPeersOrigin } from './network/network-peers.js'
-import { supportedEnvironments } from './environment.js'
+import { getContractData, supportedEnvironments } from './environment.js'
+import { MultiaddrConnection } from '@libp2p/interfaces/transport'
 
 const log = debug(`hopr-core:create-hopr`)
+const error = debug(`hopr-core:error`)
 
 /*
  * General function to create a libp2p instance to start sending
@@ -39,7 +39,6 @@ export async function createLibp2pInstance(
   options: HoprOptions,
   initialNodes: { id: PeerId; multiaddrs: Multiaddr[] }[],
   publicNodes: PublicNodesEmitter,
-  reviewConnection: AccessControl['reviewConnection'],
   isAllowedToAccessNetwork: Hopr['isAllowedAccessToNetwork']
 ): Promise<Libp2p> {
   let libp2p: Libp2p
@@ -96,6 +95,7 @@ export async function createLibp2pInstance(
             allowPrivateConnections: options.allowPrivateConnections,
             // Amount of nodes for which we are willing to act as a relay
             maxRelayedConnections: 50_000,
+            announce: options.announce,
             isAllowedToAccessNetwork
           },
           testing: {
@@ -109,9 +109,7 @@ export async function createLibp2pInstance(
             __noDirectConnections: options.testing?.noDirectConnections,
             // Do not upgrade to a direct WebRTC connection, even if it
             // is available. Used to test behavior of bidirectional NATs
-            __noWebRTCUpgrade: options.testing?.noWebRTCUpgrade,
-            // Prevent usage of UPNP to determine external IP address
-            __noUPNP: options.testing?.noUPNP
+            __noWebRTCUpgrade: options.testing?.noWebRTCUpgrade
           }
         })
       ],
@@ -147,11 +145,21 @@ export async function createLibp2pInstance(
         dialTimeout: 10e3
       },
       connectionGater: {
-        denyDialPeer: async (peer: PeerId) => {
-          return !(await reviewConnection(peer, NetworkPeersOrigin.OUTGOING_CONNECTION))
-        },
-        denyInboundEncryptedConnection: async (peer: PeerId) => {
-          return !(await reviewConnection(peer, NetworkPeersOrigin.INCOMING_CONNECTION))
+        denyDialPeer: async (peer: PeerId) => !(await isAllowedToAccessNetwork(peer)),
+        denyInboundEncryptedConnection: async (peer: PeerId, conn: MultiaddrConnection) => {
+          const isAllowed = await isAllowedToAccessNetwork(peer)
+
+          if (!isAllowed) {
+            try {
+              // Connection must be closed explicitly because not yet
+              // part of any data structure
+              await conn.close()
+            } catch (err) {
+              error(`Error while closing connection to non-registered node`)
+            }
+          }
+
+          return !isAllowed
         }
       },
       relay: {
@@ -238,8 +246,13 @@ export async function createHoprNode(
     automaticChainCreation
   )
 
+  // get contract data for the given envirionment id and pass it on to create chain wrapper
+  const resolvedContractAddresses = getContractData(options.environment.id)
+  log(
+    `[DEBUG] resolvedContractAddresses ${options.environment.id} ${JSON.stringify(resolvedContractAddresses, null, 2)}`
+  )
   // Initialize connection to the blockchain
-  await chain.initializeChainWrapper()
+  await chain.initializeChainWrapper(resolvedContractAddresses)
 
   return new Hopr(peerId, db, chain, options)
 }

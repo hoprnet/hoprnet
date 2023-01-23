@@ -12,16 +12,14 @@ class TestingHeartbeat extends Heartbeat {
   }
 }
 
-class NetworkHealth extends EventEmitter {
+class NetworkHealth {
   public state: NetworkHealthIndicator = NetworkHealthIndicator.UNKNOWN
 
   constructor() {
-    super()
-    this.on('hopr:network-health-changed', this.stateChanged.bind(this))
+    this.onHealthChanged = this.onHealthChanged.bind(this)
   }
-
-  private stateChanged(_oldState: NetworkHealthIndicator, newState: NetworkHealthIndicator) {
-    this.state = newState
+  public onHealthChanged(_oldHealthValue: NetworkHealthIndicator, newHealthValue: NetworkHealthIndicator) {
+    this.state = newHealthValue
   }
 }
 
@@ -132,7 +130,7 @@ function createFakeNetwork() {
 async function getPeer(
   self: PeerId,
   network: ReturnType<typeof createFakeNetwork>,
-  netStatEvents: EventEmitter
+  netStatEvents: NetworkHealth
 ): Promise<{ heartbeat: TestingHeartbeat; peers: NetworkPeers }> {
   const peers = new NetworkPeers([], [self], 0.3)
 
@@ -145,8 +143,7 @@ async function getPeer(
     (async () => {
       assert.fail(`must not call hangUp`)
     }) as any,
-    () => Promise.resolve(true),
-    netStatEvents,
+    netStatEvents.onHealthChanged,
     (peerId) => !peerId.equals(Charly) && !peerId.equals(Me),
     TESTING_ENVIRONMENT,
     {
@@ -175,8 +172,7 @@ describe('unit test heartbeat', async () => {
       (async () => {
         assert.fail(`must not call hangUp`)
       }) as any,
-      () => Promise.resolve(true),
-      netHealth,
+      netHealth.onHealthChanged,
       (_) => true,
       TESTING_ENVIRONMENT,
       SHORT_TIMEOUTS

@@ -75,6 +75,7 @@ jobs:
             target/
             .cargo/.package-cache/
             .cargo/bin/
+            .foundry/bin/
 
       - name: "[BUILD] Install dependencies / link / build"
         run: |
@@ -91,9 +92,9 @@ jobs:
         if: ${{ !env.ACT }}
         run: ./scripts/deploy-smart-contracts.sh
         env:
-          DEPLOYER_WALLET_PRIVATE_KEY: ${{ secrets.DEPLOYER_WALLET_PRIVATE_KEY }}
-          ETHERSCAN_KEY: ${{ secrets.ETHERSCAN }}
-          BLOCKSCOUT_KEY: ${{ secrets.BLOCKSCOUT }}
+          DEPLOYER_PRIVATE_KEY: ${{ secrets.DEPLOYER_WALLET_PRIVATE_KEY }}
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN }}
+          GNOSISSCAN_API_KEY: ${{ secrets.GNOSISSCAN_API_KEY }}
 
       - name: "[SMART-CONTRACTS] Commit & push changes"
         if: ${{ !env.ACT }}
@@ -125,7 +126,6 @@ jobs:
           ./scripts/wait-for-npm-package.sh core-ethereum
           ./scripts/wait-for-npm-package.sh utils
           ./scripts/wait-for-npm-package.sh ethereum
-          ./scripts/wait-for-npm-package.sh cover-traffic-daemon
           ./scripts/wait-for-npm-package.sh connect
 
       - name: "[FINISH] Send notification if anything failed on master or release/staging branches"
@@ -351,6 +351,7 @@ jobs:
             target/
             .cargo/.package-cache/
             .cargo/bin/
+            .foundry/bin/
 
       - name: Set up Google Cloud Credentials
         uses: google-github-actions/auth@v0
@@ -453,6 +454,7 @@ jobs:
             target/
             .cargo/.package-cache/
             .cargo/bin/
+            .foundry/bin/
 
       - name: Set up Google Cloud Credentials
         uses: google-github-actions/auth@v0

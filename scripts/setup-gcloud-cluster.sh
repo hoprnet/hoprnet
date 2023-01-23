@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # TODO: this script currently uses goerli as the RPC provider. However, it
-# should be extended to use its own instance of hardhat too.
+# should be extended to use its own instance of anvil too.
 
 # prevent sourcing of this script, only allow execution
 # shellcheck disable=SC2091
@@ -134,7 +134,7 @@ gcloud_create_or_update_managed_instance_group  \
   "${instance_template_name}"
 
 declare network_id
-network_id="$(get_network "${environment}")"
+network_id="$(get_environment_type "${environment}")"
 
 # Deployer CI wallet should ideally be "eligible". To be eligible:
 # 1. The wallet should have obtained a "Network_registry" NFT of `developer` rank (wallet should already have this)
@@ -143,7 +143,7 @@ network_id="$(get_network "${environment}")"
 # - the CI nodes wants to perform `selfRegister`
 # This can be called always, because the "stake" task is idempotent given the same arguments
 # CI wallet stakes a developer NR NFT
-make -C "${mydir}/.." stake-nrnft environment="${environment}" nftrank=developer network="${network_id}"
+make -C "${mydir}/.." stake-nrnft environment="${environment}" nftrank=developer environment_type="${network_id}"
 
 # Get names of all instances in this cluster
 # TODO: now `native-addresses` (a.k.a. `hopr_addrs`) doesn't need to contain unique values. The array can contain repetitive addresses

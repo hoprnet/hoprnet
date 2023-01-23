@@ -12,7 +12,6 @@ declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 declare HOPR_LOG_ID="testnet"
 source "${mydir}/utils.sh"
-source "${mydir}/gcloud.sh"
 source "${mydir}/dns.sh"
 
 # API used for funding the calls, source code in https://github.com/hoprnet/api
@@ -44,6 +43,13 @@ disk_name() {
 get_network() {
   local environment_id="${1}"
   jq -r ".environments.\"${environment_id}\".network_id" "${mydir}/../packages/core/protocol-config.json"
+}
+
+# $1=environment id
+get_environment_type() {
+  local environment_id="${1}"
+  # use `contracts-addresses.json` because it stores 
+  jq -r ".environments.\"${environment_id}\".environment_type" "${mydir}/../packages/ethereum/contracts/contracts-addresses.json"
 }
 
 # $1=environment id
@@ -174,7 +180,7 @@ fund_if_empty() {
 }
 
 # $1=vm name
-# Run a VM with a hardhat instance
+# Run a VM with an anvil instance
 start_chain_provider(){
   gcloud compute instances create-with-container $1-provider $GCLOUD_DEFAULTS \
       --create-disk name=$(disk_name $1),size=10GB,type=pd-standard,mode=rw \
@@ -193,21 +199,6 @@ add_keys() {
   fi
 }
 
-# $1 hardhat debug log file
-start_local_hardhat() {
-  # Remove previous log file to make sure that the regex does not match
-  rm -f "${hardhat_rpc_log}"
-
-  log "Running hardhat local node"
-  HOPR_ENVIRONMENT_ID="hardhat-localhost" \
-    TS_NODE_PROJECT="$(yarn workspace @hoprnet/hopr-ethereum exec pwd)/tsconfig.hardhat.json" \
-    NODE_OPTIONS="--experimental-wasm-modules" \
-    yarn workspace @hoprnet/hopr-ethereum hardhat node \
-      --network hardhat \
-      --show-stack-traces > \
-      "$1" 2>&1 &
-}
-
 # $1 prefix, e.g. "e2e-source"
 # $2 identity file directory, e.g. "/tmp"
 # $3 password, e.g. "dummy e2e password"
@@ -219,27 +210,22 @@ fund_nodes() {
   local addr_arg=""
   [[ -n "${4:-}" ]] && addr_arg="--address ${4}"
 
-  HOPR_ENVIRONMENT_ID=hardhat-localhost \
-  TS_NODE_PROJECT="$(yarn workspace @hoprnet/hopr-ethereum exec pwd)/tsconfig.hardhat.json" \
-  NODE_OPTIONS="--experimental-wasm-modules" \
-    yarn workspace @hoprnet/hopr-ethereum hardhat faucet \
-      --identity-prefix "${node_prefix}" \
-      --identity-directory "${tmp}" \
-      --use-local-identities \
-      --network hardhat \
-      --password "${password}" \
-      ${addr_arg}
+  ${mydir}/../.cargo/bin/foundry-tool \
+    --environment-name anvil-localhost --environment-type development \
+    faucet --password "${password}" --use-local-identities \
+    --identity-prefix "${node_prefix}" --identity-directory "${tmp}" \
+    --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+    --make-root "${mydir}/../packages/ethereum/contracts" \
+    ${addr_arg}
 }
 
 
 disable_network_registry() {
   log "Disabling register"
-  HOPR_ENVIRONMENT_ID=hardhat-localhost \
-  TS_NODE_PROJECT="$(yarn workspace @hoprnet/hopr-ethereum exec pwd)/tsconfig.hardhat.json" \
-  NODE_OPTIONS="--experimental-wasm-modules" \
-  yarn workspace @hoprnet/hopr-ethereum hardhat register \
-    --network hardhat \
-    --task disable
+  PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+  make -C "../" disable-network-registry \
+  environment=anvil-localhost \
+  environment_type=development
 
   log "Register disabled"
 }

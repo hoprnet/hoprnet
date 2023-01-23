@@ -1,5 +1,6 @@
 use wasm_bindgen::prelude::*;
 
+pub mod error;
 pub mod real;
 
 /// Dummy function to test WASM.
@@ -12,8 +13,8 @@ pub fn dummy_get_one() -> String {
 
 #[cfg(test)]
 mod tests {
-    use wasm_bindgen_test::*;
     use super::*;
+    use wasm_bindgen_test::*;
 
     #[wasm_bindgen_test]
     fn test_dummy_get_one() {

@@ -1,7 +1,7 @@
 {
   "name": "@hoprnet/hopr-utils",
   "description": "HOPR-based utilities to process multiple data structures",
-  "version": "1.92.0-next.30",
+  "version": "1.92.0-next.39",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "GPL-3.0",
@@ -13,7 +13,7 @@
     "build:wasm": "make -C crates all && make -C crates install",
     "test:wasm": "make -C crates test",
     "clean": "yarn clean:wasm && rm -Rf ./lib ./tsconfig.tsbuildinfo",
-    "test": "yarn test:wasm && NODE_OPTIONS=\"--experimental-wasm-modules\"  mocha",
+    "test": "NODE_OPTIONS=\"--experimental-wasm-modules\"  mocha",
     "dev": "yarn clean && yarn build:wasm && tsc -w",
     "build": "yarn clean && yarn build:wasm && tsc -p .",
     "docs:generate": "typedoc",

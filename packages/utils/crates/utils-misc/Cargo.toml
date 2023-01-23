@@ -11,11 +11,16 @@ license = "LGPL-3.0-only"
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[features]
+default = ["console_error_panic_hook", "wasm"]
+wasm = [ "dep:wasm-bindgen" ]
+console_error_panic_hook = [ "dep:console_error_panic_hook" ]
+
 [dependencies]
 real-base = { path = "../../../real/crates/real-base" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-wasm-bindgen = { version = "0.2.83", features = ["serde-serialize"] }
+wasm-bindgen = { version = "0.2.83", features = ["serde-serialize"], optional = true }
 
 console_error_panic_hook = { version = "0.1.6", optional = true }
 #wee_alloc = { version = "0.4.5", optional = true }
