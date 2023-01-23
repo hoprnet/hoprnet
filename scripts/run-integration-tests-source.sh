@@ -94,9 +94,10 @@ declare node7_privkey="0x9b813edd8a85cffbe3cd2e242dc0992cfa04be15caa9f50b0b03b5e
 
 declare password="e2e-test"
 
-declare hardhat_rpc_log="${tmp}/hopr-source-hardhat-rpc.log"
+declare anvil_rpc_log="${tmp}/hopr-source-anvil-rpc.log"
+declare anvil_cfg_file="${tmp}/hopr-source-anvil.cfg"
 
-# hardhat port
+# anvil port
 declare -a all_ports=( 8545 )
 # HOPRd API ports
 all_ports+=( 13301 13302 13303 13304 13305 13306 13307 )
@@ -118,14 +119,15 @@ function cleanup {
 
   local log exit_code non_zero
   for node_log in "${node1_log}" "${node2_log}" "${node3_log}" "${node4_log}" "${node5_log}" "${node6_log}" "${node7_log}"; do
-    log=$(wait_for_regex ${node_log} "Process exiting with signal [0-9]")
+    log=$(grep -E "Process exiting with signal [0-9]" ${node_log} || echo "")
 
     if [ -z "${log}" ]; then
       log "${node_log}: Process did not exit properly"
-      exit 1
+      exit_code=1
+    else
+      exit_code=$(echo ${log} | sed -E "s/.*signal[ ]([0-9]+).*/\1/")
     fi
 
-    exit_code=$(echo ${log} | sed -E "s/.*signal[ ]([0-9]+).*/\1/")
     if [ ${exit_code} != "0" ]; then
       non_zero=true
       log "${node_log}: terminated with non-zero exit code ${exit_code}"
@@ -167,7 +169,7 @@ function setup_node() {
   log "Run node ${id} on API port ${api_port} -> ${log}"
 
   if [[ "${additional_args}" != *"--environment "* ]]; then
-    additional_args="--environment hardhat-localhost ${additional_args}"
+    additional_args="--environment anvil-localhost ${additional_args}"
   fi
 
   if [[ -n "${api_token}" ]]; then
@@ -212,8 +214,9 @@ function setup_node() {
 
 # --- Log test info {{{
 log "Test files and directories"
-log "\thardhat"
-log "\t\tlog: ${hardhat_rpc_log}"
+log "\tanvil"
+log "\t\tlog: ${anvil_rpc_log}"
+log "\t\tcfg: ${anvil_cfg_file}"
 log "\tnode1"
 log "\t\tdata dir: ${node1_dir} (will be removed)"
 log "\t\tlog: ${node1_log}"
@@ -250,36 +253,36 @@ for p in ${all_ports[@]}; do
 done
 # }}}
 
-# --- Cleanup old contract deployments {{{
-log "Removing artifacts from old contract deployments"
-rm -Rf \
-  "${mydir}/../packages/ethereum/deployments/hardhat-localhost" \
-  "${mydir}/../packages/ethereum/deployments/hardhat-localhost2"
-# }}}
+declare protocol_config="${mydir}/../packages/core/protocol-config.json"
+declare deployments_summary="${mydir}/../packages/ethereum/contracts/contracts-addresses.json"
 
 # --- Running Mock Blockchain --- {{{
-start_local_hardhat "${hardhat_rpc_log}"
+${mydir}/run-local-anvil.sh -l "${anvil_rpc_log}" -c "${anvil_cfg_file}"
 
-wait_for_regex ${hardhat_rpc_log} "Started HTTP and WebSocket JSON-RPC server"
-log "Hardhat node started (127.0.0.1:8545)"
+# read auto-generated private key from anvil configuration
+declare anvil_private_key
+anvil_private_key="$(jq -r ".private_keys[0]" "${anvil_cfg_file}")"
+if [ -z "${anvil_private_key}" ]; then
+  log "Could not find private key in anvil cfg file ${anvil_cfg_file}"
+  exit 1
+fi
+# we export the private key so it gets picked up by other sub-shells
+export PRIVATE_KEY=${anvil_private_key}
 
-# need to mirror contract data because of hardhat-deploy node only writing to localhost {{{
-cp -R \
-  "${mydir}/../packages/ethereum/deployments/hardhat-localhost/localhost" \
-  "${mydir}/../packages/ethereum/deployments/hardhat-localhost/hardhat"
-cp -R \
-  "${mydir}/../packages/ethereum/deployments/hardhat-localhost" \
-  "${mydir}/../packages/ethereum/deployments/hardhat-localhost2"
+# need to mirror contract data because of anvil-deploy node only writing to localhost {{{
+update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "anvil-localhost" "anvil-localhost"
+update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "anvil-localhost" "anvil-localhost2"
 # }}}
 
 #  --- Run nodes --- {{{
 setup_node 13301 ${default_api_token} 19091 "${node1_dir}" "${node1_log}" "${node1_id}" "${node1_privkey}" "--announce"
+# use empty auth token to be able to test this in the security tests
 setup_node 13302 ""                   19092 "${node2_dir}" "${node2_log}" "${node2_id}" "${node2_privkey}" "--announce"
 setup_node 13303 ${default_api_token} 19093 "${node3_dir}" "${node3_log}" "${node3_id}" "${node3_privkey}" "--announce"
 setup_node 13304 ${default_api_token} 19094 "${node4_dir}" "${node4_log}" "${node4_id}" "${node4_privkey}" "--testNoDirectConnections"
 setup_node 13305 ${default_api_token} 19095 "${node5_dir}" "${node5_log}" "${node5_id}" "${node5_privkey}" "--testNoDirectConnections"
 # should not be able to talk to the rest
-setup_node 13306 ${default_api_token} 19096 "${node6_dir}" "${node6_log}" "${node6_id}" "${node6_privkey}" "--announce --environment hardhat-localhost2"
+setup_node 13306 ${default_api_token} 19096 "${node6_dir}" "${node6_log}" "${node6_id}" "${node6_privkey}" "--announce --environment anvil-localhost2"
 # node n8 will be the only one NOT registered
 setup_node 13307 ${default_api_token} 19097 "${node7_dir}" "${node7_log}" "${node7_id}" "${node7_privkey}" "--announce"
 # }}}

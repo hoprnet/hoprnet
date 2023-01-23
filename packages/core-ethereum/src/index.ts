@@ -23,6 +23,7 @@ import { CORE_ETHEREUM_CONSTANTS } from '../lib/core_ethereum_misc.js'
 import { EventEmitter } from 'events'
 import { initializeCommitment, findCommitmentPreImage, bumpCommitment, ChannelCommitmentInfo } from './commitment.js'
 import type { IndexerEvents } from './indexer/types.js'
+import { DeploymentExtract } from './utils/utils.js'
 
 const log = debug('hopr-core-ethereum')
 
@@ -85,21 +86,29 @@ export default class HoprCoreEthereum extends EventEmitter {
     )
   }
 
-  async initializeChainWrapper() {
+  async initializeChainWrapper(deploymentAddresses: DeploymentExtract) {
     // In some cases, we want to make sure the chain within the connector is not triggered
     // automatically but instead via an event. This is the case for `hoprd`, where we need
     // to get notified after ther chain was properly created, and we can't get setup the
     // listeners before the node was actually created.
+    log(`[DEBUG] initializeChainWrapper... ${JSON.stringify(deploymentAddresses, null, 2)} `)
     if (this.automaticChainCreation) {
-      await this.createChain()
+      await this.createChain(deploymentAddresses)
     } else {
-      this.once('connector:create', this.createChain.bind(this))
+      this.once('connector:create', this.createChain.bind(this, deploymentAddresses))
     }
   }
 
-  private async createChain(): Promise<void> {
+  private async createChain(deploymentAddresses: DeploymentExtract): Promise<void> {
     try {
-      this.chain = await createChainWrapper(this.options, this.privateKey, true)
+      log(
+        `[DEBUG] createChain createChainWrapper starting with deploymentAddresses... ${JSON.stringify(
+          deploymentAddresses,
+          null,
+          2
+        )} `
+      )
+      this.chain = await createChainWrapper(deploymentAddresses, this.options, this.privateKey, true)
     } catch (err) {
       const errMsg = 'failed to create provider chain wrapper'
       log(`error: ${errMsg}`, err)

@@ -136,7 +136,7 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
     ).to.eventually.rejectedWith('Ticket was created for a different channel iteration')
   })
 
-  it("should throw if ticket's index is smaller than the last ticket index", async function () {
+  it("should not throw if ticket's index is smaller than the last ticket index", async function () {
     const signedTicket = createMockTicket({})
     const mockChannel = await mockChannelEntry(
       true,
@@ -145,16 +145,15 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
       new UINT256(new BN(2))
     )
 
-    return expect(
-      validateUnacknowledgedTicket(SENDER, new BN(1), new BN(1), signedTicket, mockChannel, getTicketsMock)
-    ).to.eventually.rejectedWith('must be higher than last ticket index')
+    return expect(validateUnacknowledgedTicket(SENDER, new BN(1), new BN(1), signedTicket, mockChannel, getTicketsMock))
+      .to.not.eventually.rejected
   })
 
-  it("should throw if ticket's index is smaller than the last ticket index when you include unredeemed tickets", async function () {
+  it("should not throw if ticket's index is smaller than the last ticket index when you include unredeemed tickets", async function () {
     const signedTicket = createMockTicket({})
     const mockChannel = await mockChannelEntry(
       true,
-      new Balance(new BN(100)),
+      new Balance(new BN(200)),
       new UINT256(new BN(1)),
       new UINT256(new BN(1))
     )
@@ -167,7 +166,7 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
 
     return expect(
       validateUnacknowledgedTicket(SENDER, new BN(1), new BN(1), signedTicket, mockChannel, async () => ticketsInDb)
-    ).to.eventually.rejectedWith('must be higher than last ticket index')
+    ).to.not.eventually.rejected
   })
 
   it('should throw if channel does not have enough funds', async function () {

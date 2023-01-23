@@ -2157,6 +2157,26 @@ Dappnode or AVADO based nodes.
 
 ___
 
+### isAvadoPrivateNetwork
+
+▸ **isAvadoPrivateNetwork**(`address`, `family`): `boolean`
+
+Checks if given address is in internally network of
+Dappnode or AVADO based nodes.
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `address` | `Uint8Array` |
+| `family` | ``"IPv4"`` \| ``"IPv6"`` |
+
+#### Returns
+
+`boolean`
+
+___
+
 ### isErrorOutOfFunds
 
 ▸ **isErrorOutOfFunds**(`error`): ``"NATIVE"`` \| ``"HOPR"`` \| ``false``

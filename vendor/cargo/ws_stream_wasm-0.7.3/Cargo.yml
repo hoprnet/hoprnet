@@ -1,0 +1,116 @@
+package:
+
+  # When releasing to crates.io:
+  #
+  # - last check for all TODO, FIXME, expect, unwrap.
+  # - recheck log statements (informative, none left that were just for development, ...)
+  # - `cargo +nightly doc` and re-read and final polish of documentation.
+  #
+  # - Update CHANGELOG.md.
+  # - Update version numbers in Cargo.yml, Cargo.toml, install section of readme.
+  #
+  # - `touch **/*.rs && cargo clippy --tests --examples --benches --all-features`
+  # - `cargo update`
+  # - `cargo udeps --all-targets --all-features`
+  # - `cargo outdated --root-deps-only`
+  # - `cargo audit`
+  # - `cargo crev crate verify --show-all --recursive` and review.
+  # - 'cargo test --all-targets --all-features'
+  #
+  # - push dev and verify CI result
+  # - `cargo test` on dependent crates
+  #
+  # - cargo publish
+  # - `git checkout release && git merge dev --no-ff`
+  # - `git tag x.x.x` with version number.
+  # - `git push && git push --tags`
+  #
+  version       : 0.7.3
+  name          : ws_stream_wasm
+  edition       : '2018'
+  authors       : [ Naja Melan <najamelan@autistici.org> ]
+  description   : A convenience library for using websockets in WASM
+  license       : Unlicense
+  documentation : https://docs.rs/ws_stream_wasm
+  homepage      : https://github.com/najamelan/ws_stream_wasm
+  repository    : https://github.com/najamelan/ws_stream_wasm
+  readme        : README.md
+  keywords      : [ wasm, websocket, tokio, stream, async ]
+  categories    : [ asynchronous, network-programming, api-bindings, wasm, "web-programming::websocket" ]
+  exclude       : [ tests, examples ]
+
+  metadata:
+    docs:
+      rs:
+        all-features: true
+        targets     : [] # should be wasm, but that's not available.
+
+badges:
+
+  maintenance : { status     : actively-developed       }
+  travis-ci   : { repository : najamelan/ws_stream_wasm }
+
+
+features:
+
+  tokio_io: [ async_io_stream/tokio_io ]
+
+
+dependencies:
+
+  # public dependencies (bump major if changing version numbers here)
+  #
+  pharos               : { version: ^0.5                           }
+  futures              : { version: ^0.3, default-features: false  }
+  async_io_stream      : { version: ^0.3, features: [ map_pharos ] }
+
+  # We expose WebSocket and CloseEvent.
+  #
+  web-sys:
+
+    version : ^0.3
+
+    features:
+
+      - BinaryType
+      - Blob
+      - console
+      - MessageEvent
+      - WebSocket
+      - CloseEvent
+      - DomException
+
+  # private deps
+  #
+  js-sys               : ^0.3
+  thiserror            : ^1
+  send_wrapper         : ^0.5
+  wasm-bindgen         : ^0.2
+  wasm-bindgen-futures : ^0.4
+
+
+dev-dependencies:
+
+  # wasm-logger              : ^0.1
+  async_io_stream          : { version: ^0.3, features: [ tokio_io ] }
+  bytes                    : ^1
+  console_error_panic_hook : ^0.1
+  console_log              : ^0.2
+  # flexi_logger             : ^0.16
+  asynchronous-codec       : { version: ^0.6 }
+  log                      : ^0.4
+  # pretty_assertions        : ^0.6
+  rand                     : ^0.8
+  rand_xoshiro             : ^0.6
+  getrandom                : { version: ^0.2, features: [js] }
+  serde                    : { version: ^1, features: [ derive ] }
+  serde_cbor               : ^0.11
+  tokio                    : { version: ^1 }
+  tokio-serde-cbor         : { version: ^0.6 }
+  tokio-util               : { version: ^0.6, default-features: false, features: [codec] }
+  wasm-bindgen-test        : ^0.3
+
+
+build-dependencies:
+
+  rustc_version: ^0.4

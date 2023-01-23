@@ -50,7 +50,7 @@ $ yarn hopr-cover-traffic-daemon --help
 Options:
   --help             Show help  [boolean]
   --version          Show version number  [boolean]
-  --environment      Environment id which the node shall run on  [string] [choices: "hardhat-localhost", "hardhat-localhost2", "master-goerli", "debug-goerli", "tuttlingen", "prague", "budapest", "athens", "lisbon", "ouagadougou", "paleochora", "monte_rosa"] [default: ""]
+  --environment      Environment id which the node shall run on  [string] [choices: "anvil-localhost", "anvil-localhost2", "master-staging", "debug-staging", "tuttlingen", "prague", "budapest", "athens", "lisbon", "ouagadougou", "paleochora", "monte_rosa"] [default: ""]
   --privateKey       A private key to be used for the node  [string] [required]
   --provider         A custom RPC provider to be used for your HOPR node to connect to blockchain [string]
   --dbFile           A path to DB file for persistent storage  [string] [default: "./ct.json"]
@@ -63,5 +63,5 @@ Options:
 Example
 
 ```sh
-DEBUG="hopr*" yarn hopr-cover-traffic-daemon --environment hardhat-localhost --privateKey 0xcb1e5d91d46eb54a477a7eefec9c87a1575e3e5384d38f990f19c09aa8ddd332 --healthCheckHost "127.0.0.1" --healthCheckPort 20000
+DEBUG="hopr*" yarn hopr-cover-traffic-daemon --environment anvil-localhost --privateKey 0xcb1e5d91d46eb54a477a7eefec9c87a1575e3e5384d38f990f19c09aa8ddd332 --healthCheckHost "127.0.0.1" --healthCheckPort 20000
 ```

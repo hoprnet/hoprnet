@@ -2,7 +2,7 @@
 
 To test HOPR protocol and develop dApps on top of HOPR at a resonable scale, nodes are only allowed to join the network (sending messages) if they are registered on a "Network Registry" smart contract.
 
-This restriction on the access guarded by the "Network Registry" is only enabled in the staging or production environment by default. If you are running a cluster of HOPR nodes locally in the hardhat network, the "Network Registry" is not enabled.
+This restriction on the access guarded by the "Network Registry" is only enabled in the staging or production environment by default. If you are running a cluster of HOPR nodes locally in the anvil network, the "Network Registry" is not enabled.
 
 There are two ways of registering a node:
 
@@ -32,10 +32,10 @@ A node can be registered by its runner if the runner is eligible. There are two 
 
 To stake xHOPR tokens, you can interact directly with the staking contract of the environment your HOPR node is running on. For production network, there is even a web application for such a purpose.
 
-For the <mark>staging environment</mark>, please call the following function where the `PRIVATE_KEY` is the private key of the node runner's account. This call can only succeed if the caller (i.e. the `PRIVATE_KEY` or the node runner) has enough xHOPR (on goerli staging environment).
+For the <mark>staging environment</mark>, please call the following function where the `PRIVATE_KEY` is the private key of the node runner's account. This call can only succeed if the caller (i.e. the `PRIVATE_KEY` or the node runner) has enough xHOPR (in staging environment).
 
 ```
-PRIVATE_KEY=<private key of "account"> make stake-funds environment=master-goerli network=goerli
+PRIVATE_KEY=<private key of "account"> make stake-funds environment=master-staging environment_type=staging
 ```
 
 If there's not enough xHOPR token, please use "Dev Bank" account to transfer some to the node runner's account.
@@ -46,10 +46,10 @@ If there's not enough xHOPR token, please use "Dev Bank" account to transfer som
 
 There are 6 "Network_registry" NFTs (3 "developer" rank and 3 of "community" rank) being minted to the "Dev Bank" account per deployment, where you can transfer some tokens from.
 
-For the <mark>staging environment</mark>, please call the following function where the `PRIVATE_KEY` is the private key of the node runner's account. This call can only succeed if the caller (i.e. the `PRIVATE_KEY` or the node runner) has "Network_registry" NFT (on goerli staging environment).
+For the <mark>staging environment</mark>, please call the following function where the `PRIVATE_KEY` is the private key of the node runner's account. This call can only succeed if the caller (i.e. the `PRIVATE_KEY` or the node runner) has "Network_registry" NFT (in staging environment).
 
 ```
-PRIVATE_KEY<private key of "account"> make stake-nrnft environment=master-goerli network=goerli nftrank=<rank of "Network_registry" nft>
+PRIVATE_KEY<private key of "account"> make stake-nrnft environment=master-staging environment_type=staging nftrank=<rank of "Network_registry" nft>
 ```
 
 ### Register the peer ID
@@ -59,7 +59,7 @@ An eligible node runner can call `selfRegister(string[] hoprPeerIds)` method fro
 For the <mark>staging environment</mark>, please call the following function where the `PRIVATE_KEY` is the private key of the node runner's account. This call can only succeed if the caller (i.e. the `PRIVATE_KEY` of the node runner) is eligible (having enough stake or a "Network_registry" NFT).
 
 ```
-PRIVATE_KEY=<private key of “account”> make self-register-node environment=master-goerli network=goerli peer-ids=<peerId1,peerId2,peerId3>
+PRIVATE_KEY=<private key of “account”> make self-register-node environment=master-staging environment_type=staging peer-ids=<peerId1,peerId2,peerId3>
 ```
 
 ## Deregister a node
@@ -69,7 +69,7 @@ A node runner can call `selfDeregister(string[] hoprPeerIds)` method from `HoprN
 For the <mark>staging environment</mark>, please call the following function where the `PRIVATE_KEY` is the private key of the node runner's account.
 
 ```
-PRIVATE_KEY=<private key of “account”> make self-deregister-node environment=master-goerli network=goerli peer-ids=<peerId1,peerId2,peerId3>
+PRIVATE_KEY=<private key of “account”> make self-deregister-node environment=master-staging environment_type=staging peer-ids=<peerId1,peerId2,peerId3>
 ```
 
 ## Register a node by the Network Registry contract owner
@@ -83,8 +83,8 @@ Owner can register any account for any node. The eligibility of an account is no
 Owner can call `ownerRegister(address[] accounts, string[] hoprPeerIds)` method from `HoprNetworkRegistry` smart contract to register a list of HOPR nodes for a list of accounts respectively. Note that this registration can overwrite existing entries.
 
 ```
-make register-nodes environment=master-goerli network=goerli --native-addresses=<address1,address2,address3,address4> --peer-ids=<peerid1,peerid2,peerid3,peerid4>
-make force-eligibility-update environment=master-goerli network=goerli --native-addresses=<address1,address2,address3,address4> --eligibility=<true,false,true,true, etc>
+make register-nodes environment=master-staging environment_type=staging native_addresses=<address1,address2,address3,address4> peer_ids=<peerid1,peerid2,peerid3,peerid4>
+make force-eligibility-update environment=master-staging environment_type=staging native_addresses=<address1,address2,address3,address4> eligibility=<true,false,true,true, etc>
 ```
 
 ## Deregister a node
@@ -92,7 +92,7 @@ make force-eligibility-update environment=master-goerli network=goerli --native-
 Owner can call `ownerDeregister(string[] hoprPeerIds)` method from `HoprNetworkRegistry` smart contract to remove a list of nodes.
 
 ```
-make deregister-nodes environment=master-goerli network=goerli --peer_ids=<peerId1,peerId2,peerId3,peerId4>
+make deregister-nodes environment=master-staging environment_type=staging peer_ids=<peerId1,peerId2,peerId3,peerId4>
 ```
 
 ## Enable and disable globally
@@ -101,13 +101,13 @@ As mentioned in the beginning, by default, Network Registry is enabled for stagi
 To toggle the network registry, the following method can be called
 
 ```
-make disable-network-registry environment=master-goerli network=goerli --peer_ids=<peerId1,peerId2,peerId3,peerId4>
+make disable-network-registry environment=master-staging environment_type=staging
 ```
 
 or
 
 ```
-make enable-network-registry environment=master-goerli network=goerli --peer_ids=<peerId1,peerId2,peerId3,peerId4>
+make enable-network-registry environment=master-staging environment_type=staging
 ```
 
 ## Internal NR testing
@@ -144,46 +144,14 @@ source .env
 - Option 1: obtain a "Network_registry" NFT (with nftrank of "developer" or "community") and register your node on NR
 
   ```
-  make register-node-with-nft endpoint=<hoprd_endpoint> nftrank=<"Network_registry" NFT Rank> account=<staking_account> environment=master-goerli network=goerli
+  make register-node-with-nft endpoint=<hoprd_endpoint> nftrank=<"Network_registry" NFT Rank> account=<staking_account> environment=master-staging environment_type=staging
   ```
 
 - Option 2: stake tokens and register your node on NR
 
   ```
-  make register-node-with-stake endpoint=<hoprd_endpoint> account=<staking_account> environment=master-goerli network=goerli
+  make register-node-with-stake endpoint=<hoprd_endpoint> account=<staking_account> environment=master-staging environment_type=staging
   ```
-
-### [DEPRECATED] Production (with dummy proxy)
-
-Before "Network_registry" NFT gets minted in production environment, "Dummy proxy" is used to faciliate the process.
-
-Deployer wallet in the CI/CD registers node and its peerId when calling `make register-nodes` (followed by more flags and arguments). Developers must follow these steps to register their node in the registry:
-
-1. Create a MetaMask wallet (note as “account”)
-2. Start your local HOPR node
-3. Save private keys (`CI_DEPLOYER_PRIVKEY`) into `.env` file
-
-```
-export CI_DEPLOYER_PRIVKEY=<CI deployer account private key>
-```
-
-and
-
-```
-source .env
-```
-
-4. Run command
-
-```
-make register-node-when-dummy-proxy endpoint=<hoprd_endpoint> account=<staking_account> environment=monte_rosa network=xdai
-```
-
-e.g.
-
-```
-make register-node-when-dummy-proxy endpoint="localhost:3001" api_token="^MYtoken4testing^" account=0x35A3e15A2E2C297686A4fac5999647312fdDfa3f environment=monte_rosa network=xdai
-```
 
 ### Production
 
@@ -217,12 +185,8 @@ To register one (`community` rank) or many (`developer` rank) eligible node in t
    To stake one `developer` NFT:
 
    ```
-   HOPR_ENVIRONMENT_ID=monte_rosa \
-   TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
-   yarn workspace @hoprnet/hopr-ethereum run hardhat stake \
-   	--network xdai \
-   	--type nrnft \
-   	--nftrank developer
+   PRIVATE_KEY=${ACCOUNT_PRIVKEY} make stake-nrnft environment=monte_rosa environment_type=production \
+      nftrank=developer
    ```
 
    To register some peers:
@@ -230,27 +194,19 @@ To register one (`community` rank) or many (`developer` rank) eligible node in t
    1. When "staking proxy" is used:
 
       ```
-      HOPR_ENVIRONMENT_ID=monte_rosa \
-      TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
-      yarn workspace @hoprnet/hopr-ethereum run hardhat register:self \
-      --network xdai \
-      --task add \
-      --peer-ids <peerId1,peerId2,peerId3,peerId4...>
+      PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node environment=monte_rosa environment_type=production \
+         peer_ids=<peerId1,peerId2,peerId3,peerId4...>
       ```
 
    2. When "dummy proxy" is used:
       ```
-      HOPR_ENVIRONMENT_ID=monte_rosa \
-      TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
-      yarn workspace @hoprnet/hopr-ethereum run hardhat register:self \
-      --network xdai \
-      --task sync \
-      --peer-ids <peerId1,peerId2,peerId3,peerId4...>
+      PRIVATE_KEY=${ACCOUNT_PRIVKEY} make sync-eligibility environment=monte_rosa environment_type=production \
+         peer_ids=<peerId1,peerId2,peerId3,peerId4...>
       ```
 
    b. For community/team testing:
 
    ```
-   PRIVATE_KEY=${ACCOUNT_PRIVKEY} make stake-nrnft nftrank=<"developer" or "community"> environment=monte_rosa network=xdai
-   PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node peer_ids=<peerId1,peerId2,peerId3,peerId4...> environment=monte_rosa network=xdai
+   PRIVATE_KEY=${ACCOUNT_PRIVKEY} make stake-nrnft nftrank=<"developer" or "community"> environment=monte_rosa environment_type=production
+   PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node peer_ids=<peerId1,peerId2,peerId3,peerId4...> environment=monte_rosa environment_type=production
    ```

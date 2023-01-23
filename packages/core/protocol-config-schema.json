@@ -18,16 +18,14 @@
               "type": "string",
               "description": "The version range is a string which has one or more space-separated descriptors (same as npm dependancies, https://github.com/npm/node-semver)."
             },
-            "channel_contract_deploy_block": {
-              "type": "integer"
+            "indexer_start_block_number": {
+              "type": "string",
+              "description": "Block number the indexer should begin indexing on-chain events"
             },
             "token_contract_address": {
               "type": "string"
             },
             "channels_contract_address": {
-              "type": "string"
-            },
-            "minted_token_receiver_address": {
               "type": "string"
             },
             "xhopr_contract_address": {
@@ -56,7 +54,7 @@
             "network_id",
             "environment_type",
             "version_range",
-            "channel_contract_deploy_block",
+            "indexer_start_block_number",
             "token_contract_address",
             "channels_contract_address",
             "stake_contract_address",

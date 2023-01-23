@@ -1,5 +1,5 @@
 # Append here when new Rust WASM crate is added (the list is space separated)
-PACKAGES = core-crypto core-misc
+PACKAGES =core-crypto core-misc core-strategy
 ##########################################
 
 PKG_DIRS = $(addsuffix /pkg, $(PACKAGES))

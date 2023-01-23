@@ -24,6 +24,8 @@ pub mod wasm {
     use crate::ok_or_jserr;
     use wasm_bindgen::prelude::*;
 
+    pub type JsResult<T> = Result<T, JsValue>;
+
     /// Reads the given package.json file and determines its version.
     #[wasm_bindgen]
     pub fn get_package_version(package_file: &str) -> Result<String, JsValue> {

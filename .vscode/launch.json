@@ -18,7 +18,7 @@
         "--disableApiAuthentication",
         "--data=/tmp/debug",
         "--identity=/tmp/debug-identity",
-        "--environment='hardhat-localhost'"
+        "--environment='anvil-localhost'"
       ],
       "env": {
         "DEBUG": "hopr*"

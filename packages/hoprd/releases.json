@@ -1,7 +1,7 @@
 {
-  "master-goerli": {
+  "master-staging": {
     "git_ref": "^master$",
-    "environment_id": "master-goerli"
+    "environment_id": "master-staging"
   },
   "tuttlingen": {
     "git_ref": "^release/tuttlingen$",
@@ -57,12 +57,12 @@
     "version_major": "1",
     "version_minor": "91"
   },
-  "debug-goerli": {
+  "debug-staging": {
     "git_ref": "^debug-deploy/.*",
-    "environment_id": "debug-goerli"
+    "environment_id": "debug-staging"
   },
   "integration-test": {
     "git_ref": "^integration/.*",
-    "environment_id": "master-goerli"
+    "environment_id": "master-staging"
   }
 }

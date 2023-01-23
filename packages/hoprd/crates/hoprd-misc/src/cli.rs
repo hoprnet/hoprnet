@@ -3,15 +3,18 @@ use std::ffi::OsString;
 
 use clap::builder::{PossibleValuesParser, ValueParser};
 use clap::{Arg, ArgAction, ArgMatches, Args, Command, FromArgMatches as _};
-use core_misc::environment::{Environment, FromJsonFile, PackageJsonFile, ProtocolConfig};
-use core_misc::constants::{DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_THRESHOLD, DEFAULT_HEARTBEAT_INTERVAL_VARIANCE, DEFAULT_NETWORK_QUALITY_THRESHOLD};
 use core_ethereum_misc::constants::DEFAULT_CONFIRMATIONS;
+use core_misc::constants::{
+    DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_INTERVAL_VARIANCE, DEFAULT_HEARTBEAT_THRESHOLD,
+    DEFAULT_NETWORK_QUALITY_THRESHOLD,
+};
+use core_misc::environment::{Environment, FromJsonFile, PackageJsonFile, ProtocolConfig};
+use proc_macro_regex::regex;
 use real_base::real;
 use serde::{Deserialize, Serialize};
 use serde_json;
-use proc_macro_regex::regex;
-use utils_proc_macros::wasm_bindgen_if;
 use utils_misc::ok_or_str;
+use utils_proc_macros::wasm_bindgen_if;
 
 pub const DEFAULT_API_HOST: &str = "localhost";
 pub const DEFAULT_API_PORT: u16 = 3001;
@@ -24,7 +27,6 @@ pub const DEFAULT_HEALTH_CHECK_PORT: u16 = 8080;
 
 pub const MINIMAL_API_TOKEN_LENGTH: usize = 8;
 
-
 regex!(is_ipv4_host "^[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}[:]{1}[0-9]{1,6}$");
 
 // no lookaround support
@@ -33,7 +35,12 @@ regex!(is_prefixed_private_key "^0x[a-fA-F0-9]{64}$");
 
 fn parse_host(s: &str) -> Result<Host, String> {
     if !is_ipv4_host(s) {
-        return Err(format!("Given string {} is not a valid host, Example: {}:{}", s, DEFAULT_HOST.to_string(), DEFAULT_PORT.to_string()))
+        return Err(format!(
+            "Given string {} is not a valid host, Example: {}:{}",
+            s,
+            DEFAULT_HOST.to_string(),
+            DEFAULT_PORT.to_string()
+        ));
     }
 
     Host::from_ipv4_host_string(s)
@@ -43,13 +50,19 @@ fn parse_private_key(s: &str) -> Result<String, String> {
     if is_private_key(s) || is_prefixed_private_key(s) {
         Ok(s.into())
     } else {
-        Err(format!("Given string is not a private key. A private key must contain 64 hex chars."))
+        Err(format!(
+            "Given string is not a private key. A private key must contain 64 hex chars."
+        ))
     }
 }
 
 fn parse_api_token(mut s: &str) -> Result<String, String> {
     if s.len() < MINIMAL_API_TOKEN_LENGTH {
-        return Err(format!("Length of API token is too short, minimally required {} but given {}", MINIMAL_API_TOKEN_LENGTH.to_string(), s.len()))
+        return Err(format!(
+            "Length of API token is too short, minimally required {} but given {}",
+            MINIMAL_API_TOKEN_LENGTH.to_string(),
+            s.len()
+        ));
     }
 
     match (s.starts_with("'"), s.ends_with("'")) {
@@ -58,7 +71,7 @@ fn parse_api_token(mut s: &str) -> Result<String, String> {
             s = s.strip_suffix("'").unwrap();
 
             Ok(s.into())
-        },
+        }
         (true, false) => Err(format!("Found leading quote but no trailing quote")),
         (false, true) => Err(format!("Found trailing quote but no leading quote")),
         (false, false) => Ok(s.into()),
@@ -69,21 +82,21 @@ fn parse_api_token(mut s: &str) -> Result<String, String> {
 #[wasm_bindgen_if(getter_with_clone)]
 pub struct Host {
     pub ip: String,
-    pub port: u16
+    pub port: u16,
 }
 
 impl Host {
-    fn from_ipv4_host_string(s: &str) -> Result<Self,String> {
+    fn from_ipv4_host_string(s: &str) -> Result<Self, String> {
         let (ip, str_port) = match s.split_once(":") {
             None => return Err(format!("Invalid host")),
-            Some(splitted) => splitted
+            Some(splitted) => splitted,
         };
 
         let port = u16::from_str_radix(str_port, 10).map_err(|e| e.to_string())?;
 
         Ok(Self {
             ip: ip.to_owned(),
-            port
+            port,
         })
     }
 }
@@ -199,8 +212,8 @@ struct CliArgs {
     pub health_check_port: u16,
 
     #[arg(
-        long, 
-        env = "HOPRD_PASSWORD", 
+        long,
+        env = "HOPRD_PASSWORD",
         help = "A password to encrypt your keys",
         value_name = "PASSWORD"
     )]
@@ -483,9 +496,9 @@ pub mod wasm {
     use std::collections::HashMap;
     use std::ffi::OsString;
     use std::str::FromStr;
+    use utils_misc::{clean_mono_repo_path, convert_from_jstrvec, ok_or_jserr};
     use wasm_bindgen::prelude::*;
     use wasm_bindgen::JsValue;
-    use utils_misc::{clean_mono_repo_path, convert_from_jstrvec, ok_or_jserr};
 
     #[wasm_bindgen]
     pub fn parse_cli_arguments(
