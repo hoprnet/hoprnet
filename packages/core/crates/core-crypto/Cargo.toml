@@ -25,12 +25,17 @@ hex-literal = "0.3.4"
 hkdf = "0.12.3"
 hmac = "0.12.1"
 js-sys = { version = "0.3.60", optional = true }
-k256 = { version = "0.11.6", features = ["arithmetic", "ecdh"] }
+k256 = { version = "0.12.0", features = ["arithmetic", "ecdh"] }
 rand = "0.8.5"
+serde = "1.0"
+serde_bytes = "0.11.8"
+serde-wasm-bindgen = "0.4.5"
 sha3 = "0.10.6"
 static_assertions = "1.1.0"
 typenum = "1.15.0"
 thiserror = "1.0.37"
+utils-misc = { path = "../../../utils/crates/utils-misc" }
+utils-proc-macros = { path = "../../../utils/crates/utils-proc-macros" }
 wasm-bindgen = { version = "0.2.83", optional = true }
 
 console_error_panic_hook = { version = "0.1.7", optional = true }

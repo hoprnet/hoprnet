@@ -132,10 +132,11 @@ mod tests {
 pub mod wasm {
     use wasm_bindgen::prelude::*;
 
-    use crate::utils::{as_jsvalue, JsResult};
+    use utils_misc::utils::wasm::JsResult;
+    use utils_misc::ok_or_jserr;
 
     #[wasm_bindgen]
     pub fn calculate_mac(key: &[u8], data: &[u8]) -> JsResult<Box<[u8]>> {
-        super::calculate_mac(key, data).map_err(as_jsvalue)
+        ok_or_jserr!(super::calculate_mac(key, data))
     }
 }

@@ -9,7 +9,6 @@ pub mod random;
 pub mod iterated_hash;
 
 pub(crate) mod dummy_rng;
-mod utils;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
@@ -38,7 +37,6 @@ pub mod wasm {
 
 #[macro_use]
 extern crate static_assertions;
-extern crate core;
 
 // Static assertions on cryptographic parameters
 

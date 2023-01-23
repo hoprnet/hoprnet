@@ -239,7 +239,8 @@ mod tests {
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use wasm_bindgen::prelude::wasm_bindgen;
-    use crate::utils::{as_jsvalue, JsResult};
+    use utils_misc::utils::wasm::JsResult;
+    use utils_misc::ok_or_jserr;
 
     #[wasm_bindgen]
     pub struct PRPParameters {
@@ -251,7 +252,7 @@ pub mod wasm {
         #[wasm_bindgen(constructor)]
         pub fn new(secret: &[u8]) -> JsResult<PRPParameters> {
             Ok(Self {
-                w: super::PRPParameters::new(secret).map_err(as_jsvalue)?
+                w: ok_or_jserr!(super::PRPParameters::new(secret))?
             })
         }
 
@@ -281,18 +282,16 @@ pub mod wasm {
 
         pub fn create(key: &[u8], iv: &[u8]) -> JsResult<PRP> {
             Ok(Self {
-                w: super::PRP::new(key, iv).map_err(as_jsvalue)?
+                w: ok_or_jserr!(super::PRP::new(key, iv))?
             })
         }
 
         pub fn forward(&self, plaintext: &[u8]) -> JsResult<Box<[u8]>> {
-            self.w.forward(plaintext)
-                .map_err(as_jsvalue)
+            ok_or_jserr!(self.w.forward(plaintext))
         }
 
         pub fn inverse(&self, ciphertext: &[u8]) -> JsResult<Box<[u8]>> {
-            self.w.inverse(ciphertext)
-                .map_err(as_jsvalue)
+            ok_or_jserr!(self.w.inverse(ciphertext))
         }
     }
 }

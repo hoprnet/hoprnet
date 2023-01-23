@@ -230,7 +230,8 @@ pub mod wasm {
     use elliptic_curve::rand_core::OsRng;
     use wasm_bindgen::prelude::*;
     use js_sys::Uint8Array;
-    use crate::utils::{as_jsvalue, JsResult};
+    use utils_misc::utils::wasm::JsResult;
+    use utils_misc::ok_or_jserr;
 
     #[wasm_bindgen]
     pub struct SharedKeys {
@@ -262,16 +263,14 @@ pub mod wasm {
         }
 
         pub fn forward_transform(alpha: &[u8], public_key: &[u8], private_key: &[u8]) -> JsResult<SharedKeys> {
-            super::SharedKeys::forward_transform(alpha, public_key, private_key)
-                .map(|m| SharedKeys { w: m})
-                .map_err(as_jsvalue)
+            ok_or_jserr!(super::SharedKeys::forward_transform(alpha, public_key, private_key)
+                .map(|m| SharedKeys { w: m}))
         }
 
         /// Generate shared keys given the peer public keys
         pub fn generate(peer_public_keys: Vec<Uint8Array>) -> JsResult<SharedKeys> {
-            super::SharedKeys::generate(&mut OsRng, peer_public_keys.iter().map(|v| v.to_vec().into_boxed_slice()).collect())
-                .map(|m| SharedKeys { w: m})
-                .map_err(as_jsvalue)
+            ok_or_jserr!(super::SharedKeys::generate(&mut OsRng, peer_public_keys.iter().map(|v| v.to_vec().into_boxed_slice()).collect())
+                .map(|m| SharedKeys { w: m}))
         }
     }
 }

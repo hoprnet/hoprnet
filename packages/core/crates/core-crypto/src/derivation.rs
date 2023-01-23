@@ -71,16 +71,17 @@ pub fn generate_key_iv(secret: &[u8], info: &[u8], key: &mut [u8], iv: &mut [u8]
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use wasm_bindgen::prelude::*;
-    use crate::utils::{as_jsvalue, JsResult};
+    use utils_misc::utils::wasm::JsResult;
+    use utils_misc::ok_or_jserr;
 
     #[wasm_bindgen]
     pub fn derive_packet_tag(secret: &[u8]) -> JsResult<Box<[u8]>> {
-        super::derive_packet_tag(secret).map_err(as_jsvalue)
+        ok_or_jserr!(super::derive_packet_tag(secret))
     }
 
     #[wasm_bindgen]
     pub fn derive_commitment_seed(private_key: &[u8], channel_info: &[u8]) -> JsResult<Box<[u8]>> {
-        super::derive_commitment_seed(private_key, channel_info).map_err(as_jsvalue)
+        ok_or_jserr!(super::derive_commitment_seed(private_key, channel_info))
     }
 }
 

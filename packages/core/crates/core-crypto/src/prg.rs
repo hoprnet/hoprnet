@@ -150,7 +150,8 @@ mod tests {
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use wasm_bindgen::prelude::wasm_bindgen;
-    use crate::utils::{as_jsvalue, JsResult};
+    use utils_misc::utils::wasm::JsResult;
+    use utils_misc::ok_or_jserr;
 
     #[wasm_bindgen]
     pub struct PRGParameters {
@@ -163,7 +164,7 @@ pub mod wasm {
         #[wasm_bindgen(constructor)]
         pub fn new(secret: &[u8]) -> JsResult<PRGParameters> {
             Ok(Self {
-                w: super::PRGParameters::new(secret).map_err(as_jsvalue)?
+                w: ok_or_jserr!(super::PRGParameters::new(secret))?
             })
         }
 
@@ -191,7 +192,7 @@ pub mod wasm {
         }
 
         pub fn digest(&self, from: usize, to: usize) -> JsResult<Box<[u8]>> {
-            self.w.digest(from, to).map_err(as_jsvalue)
+            ok_or_jserr!(self.w.digest(from, to))
         }
     }
 

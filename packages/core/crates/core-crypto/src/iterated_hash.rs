@@ -1,11 +1,18 @@
 use digest::{Digest, FixedOutputReset};
 use sha3::Keccak256;
+use serde::{Deserialize, Serialize};
+use utils_proc_macros::wasm_bindgen_if;
+
 use crate::errors::CryptoError::{CalculationError, InvalidInputValue};
 use crate::errors::Result;
 
+#[wasm_bindgen_if(getter_with_clone)]
+#[derive(Deserialize, Serialize)]
 pub struct HashIteration {
     pub iteration: usize,
-    pub intermediate: Box<[u8]>
+
+    #[serde(with = "serde_bytes")]
+    pub intermediate: Vec<u8>,
 }
 
 pub fn iterate_hash(seed: &[u8], iterations: usize, step_size: usize) -> Result<Vec<HashIteration>> {
@@ -22,7 +29,7 @@ pub fn iterate_hash(seed: &[u8], iterations: usize, step_size: usize) -> Result<
         if i % step_size == 0 {
             intermediates.push(HashIteration {
                 iteration: i,
-                intermediate: current.clone()
+                intermediate: current.to_vec()
             });
         }
 
@@ -33,7 +40,7 @@ pub fn iterate_hash(seed: &[u8], iterations: usize, step_size: usize) -> Result<
 
     intermediates.push( HashIteration {
         iteration: iterations,
-        intermediate: current.clone()
+        intermediate: current.to_vec()
     });
 
     Ok(intermediates)
@@ -60,7 +67,7 @@ pub fn recover_iterated_hash<H>(hash_value: &[u8], hints: H, max_iterations: usi
 
                 // Is the computed hash the one we're looking for ?
                 if hash.len() == hash_value.len() && hash == hash_value {
-                    return Ok(HashIteration { iteration, intermediate });
+                    return Ok(HashIteration { iteration, intermediate: intermediate.to_vec() });
                 }
 
                 intermediate = hash.into_boxed_slice();
@@ -82,11 +89,27 @@ mod tests {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
+    use js_sys::{Number, Uint8Array};
+    use wasm_bindgen::JsValue;
     use wasm_bindgen::prelude::wasm_bindgen;
+    use utils_misc::utils::wasm::JsResult;
+    use utils_misc::ok_or_jserr;
 
-    pub struct HashIteration {
-        w: super::HashIteration
+    #[wasm_bindgen]
+    pub fn iterate_hash(seed: &[u8], iterations: usize, step_size: usize) -> JsResult<JsValue> {
+        let res = ok_or_jserr!(super::iterate_hash(seed, iterations, step_size))?;
+        ok_or_jserr!(serde_wasm_bindgen::to_value(&res))
     }
 
+    #[wasm_bindgen]
+    pub fn recover_iterated_hash(hash_value: &[u8], hints: &js_sys::Function, max_iterations: usize, step_size: usize, index_hint: Option<usize>) -> JsResult<JsValue> {
+        let res = ok_or_jserr!(super::recover_iterated_hash(hash_value, |iteration: u32| {
+            hints
+                .call1(&JsValue::null(), &Number::from(iteration))
+                .ok()
+                .map(|h| Uint8Array::from(h).to_vec().into_boxed_slice())
+        }, max_iterations, step_size, index_hint))?;
+        ok_or_jserr!(serde_wasm_bindgen::to_value(&res))
+    }
 
 }

@@ -46,7 +46,8 @@ pub fn random_fill(buffer: &mut [u8], from: usize, len: usize) {
 pub mod wasm {
     use js_sys::Uint8Array;
     use wasm_bindgen::prelude::wasm_bindgen;
-    use crate::utils::{as_jsvalue, JsResult};
+    use utils_misc::utils::wasm::JsResult;
+    use utils_misc::ok_or_jserr;
 
     #[wasm_bindgen]
     pub struct GroupElement {
@@ -91,7 +92,7 @@ pub mod wasm {
 
     #[wasm_bindgen]
     pub fn random_integer(start: u64, end: Option<u64>) -> JsResult<u64> {
-        crate::random::random_integer(start, end).map_err(as_jsvalue)
+        ok_or_jserr!(crate::random::random_integer(start, end))
     }
 
 
