@@ -1,48 +1,54 @@
 use digest::{Digest, FixedOutputReset};
 use sha3::Keccak256;
-use serde::{Deserialize, Serialize};
+
 use utils_proc_macros::wasm_bindgen_if;
 
 use crate::errors::CryptoError::{CalculationError, InvalidInputValue};
 use crate::errors::Result;
 
-#[wasm_bindgen_if(getter_with_clone)]
-#[derive(Deserialize, Serialize)]
-pub struct HashIteration {
-    pub iteration: usize,
-
-    #[serde(with = "serde_bytes")]
-    pub intermediate: Vec<u8>,
+pub struct IteratedHash {
+    pub hash: Box<[u8]>,
+    pub intermediates: Vec<Intermediate>
 }
 
-pub fn iterate_hash(seed: &[u8], iterations: usize, step_size: usize) -> Result<Vec<HashIteration>> {
+#[wasm_bindgen_if(getter_with_clone)]
+pub struct Intermediate {
+    pub iteration: usize,
+    pub intermediate: Box<[u8]>,
+}
+
+pub fn iterate_hash(seed: &[u8], iterations: usize, step_size: usize) -> Result<IteratedHash> {
     if seed.len() == 0 || iterations == 0 || step_size == 0 {
         return Err(InvalidInputValue)
     }
 
-    let mut intermediates: Vec<HashIteration> = Vec::with_capacity(iterations / step_size + 1);
-    let mut current: Box<[u8]> = Box::from(seed);
+    let mut intermediates: Vec<Intermediate> = Vec::with_capacity(iterations / step_size + 1);
+    let mut intermediate: Box<[u8]> = Box::from(seed);
     let mut hash = Keccak256::default();
 
     for i in 0..iterations {
+        hash.update(intermediate.as_ref());
+
         if i % step_size == 0 {
-            intermediates.push(HashIteration {
+            intermediates.push(Intermediate {
                 iteration: i,
-                intermediate: current.to_vec()
+                intermediate
             });
         }
 
-        hash.update(current.as_ref());
         let new_intermediate = hash.finalize_fixed_reset().to_vec();
-        current = new_intermediate.into_boxed_slice();
+        intermediate = new_intermediate.into_boxed_slice();
     }
 
-    Ok(intermediates)
+    Ok(IteratedHash {
+        hash: intermediate,
+        intermediates
+    })
 }
 
 
-pub fn recover_iterated_hash<H>(hash_value: &[u8], hints: H, max_iterations: usize, step_size: usize, index_hint: Option<usize>) -> Result<HashIteration>
-    where H: Fn(u32) -> Option<Box<[u8]>>
+pub fn recover_iterated_hash<H>(hash_value: &[u8], hints: H, max_iterations: usize, step_size: usize, index_hint: Option<usize>) -> Result<Intermediate>
+    where H: Fn(usize) -> Option<Box<[u8]>>
 {
     if step_size == 0 || hash_value.len() == 0 || max_iterations == 0 {
         return Err(InvalidInputValue)
@@ -51,19 +57,20 @@ pub fn recover_iterated_hash<H>(hash_value: &[u8], hints: H, max_iterations: usi
     let closest_intermediate = index_hint.unwrap_or(max_iterations - ( max_iterations % step_size ) );
     let mut digest = Keccak256::default();
 
-    for i in (0..closest_intermediate as u32 + 1).step_by(step_size).rev() {
+    for i in (0..=closest_intermediate).step_by(step_size) {
         // Check if we can get a hint for the current index
-        if let Some(mut intermediate) = hints(i) {
-            for iteration in 0..step_size {
+        let pos = closest_intermediate - i;
+        if let Some(mut intermediate) = hints(pos) {
+            for iteration in 0..(step_size + i){
                 // Compute the hash of current intermediate
                 digest.update(intermediate.as_ref());
                 let hash = digest.finalize_fixed_reset().to_vec();
 
                 // Is the computed hash the one we're looking for ?
                 if hash.len() == hash_value.len() && hash == hash_value {
-                    return Ok(HashIteration {
-                        iteration: iteration + i as usize,
-                        intermediate: intermediate.to_vec()
+                    return Ok(Intermediate {
+                        iteration: iteration + pos,
+                        intermediate
                     });
                 }
 
@@ -82,30 +89,33 @@ mod tests {
     #[test]
     fn test_iteration() {
         let seed = [1u8; 16];
-        let hashes = iterate_hash(&seed, 1000, 10).unwrap();
+        let final_hash = iterate_hash(&seed, 1000, 10).unwrap();
 
-        assert_eq!(hashes.len(), 100);
+        assert_eq!(final_hash.intermediates.len(), 100);
+        let final_src = final_hash.intermediates.last().unwrap();
 
-        let hint_idx = 98;
+        let hint_idx = 98; // hint is at iteration num. 980
+        let hint = &final_hash.intermediates[hint_idx];
+        assert_eq!(980, hint.iteration);
 
-        let last = hashes.last().unwrap();
-        let middle = &hashes[hint_idx];
-
-        let recovered = recover_iterated_hash(last.intermediate.as_slice(),
-                                              |it: u32| { if it == middle.iteration as u32 {
-                                                  Some(middle.intermediate.clone().into_boxed_slice())
+        let recovered = recover_iterated_hash(final_hash.hash.as_ref(),
+                                              |it: usize| { if it == hint.iteration {
+                                                  Some(hint.intermediate.clone())
                                               } else { None } },
                                               1000,
                                               10,
                                               None)
             .unwrap();
 
+        assert_eq!(final_src.iteration, recovered.iteration);
+        assert_eq!(final_src.intermediate.as_ref(), recovered.intermediate.as_ref());
+
     }
 }
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use js_sys::{Number, Uint8Array};
+    /*use js_sys::{Number, Uint8Array};
     use wasm_bindgen::JsValue;
     use wasm_bindgen::prelude::wasm_bindgen;
     use utils_misc::utils::wasm::JsResult;
@@ -126,6 +136,6 @@ pub mod wasm {
                 .map(|h| Uint8Array::from(h).to_vec().into_boxed_slice())
         }, max_iterations, step_size, index_hint))?;
         ok_or_jserr!(serde_wasm_bindgen::to_value(&res))
-    }
+    }*/
 
 }
