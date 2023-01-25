@@ -94,8 +94,8 @@ export function parseCliArguments(args: string[]) {
   } catch (err) {
     // both --version and --help are treated as errors, therefore we need some
     // special handling here to be able to return exit code 0 in such cases
-    const message = err instanceof Error ? err.message : err as String
-    if (message.startsWith("hoprd") || message.startsWith("HOPRd")) {
+    const message = err instanceof Error ? err.message : (err as String)
+    if (message.startsWith('hoprd') || message.startsWith('HOPRd')) {
       console.log(err)
       process.exit(0)
     }
