@@ -16,12 +16,12 @@ import {
 } from '@hoprnet/hopr-utils'
 import type { Components } from '@libp2p/interfaces/components'
 
-import { createHash, randomBytes } from 'crypto'
+import { randomBytes } from 'crypto'
 
 import type { SendMessage } from '../index.js'
 import { NetworkPeersOrigin } from './network-peers.js'
 import { pipe } from 'it-pipe'
-import { reply_to_ping } from '../../lib/core_misc.js'
+import { reply_to_ping, generate_ping_response } from '../../lib/core_misc.js'
 
 const log = debug('hopr-core:heartbeat')
 const error = debug('hopr-core:heartbeat:error')
@@ -31,8 +31,6 @@ const error = debug('hopr-core:heartbeat:error')
 import pkg from '../../package.json' assert { type: 'json' }
 
 const NORMALIZED_VERSION = pickVersion(pkg.version)
-
-const PING_HASH_ALGORITHM = 'blake2s256'
 
 const MAX_PARALLEL_HEARTBEATS = 14
 
@@ -144,8 +142,8 @@ export default class Heartbeat {
       try {
         await pipe(
           stream.source,
-          (source: AsyncIterable<Uint8Array>) => {
-            return {
+          async function* pipeToHandler(source: AsyncIterable<Uint8Array>) {
+            yield* {
               [Symbol.asyncIterator]() {
                 return reply_to_ping(source[Symbol.asyncIterator]())
               }
@@ -165,13 +163,6 @@ export default class Heartbeat {
   public stop() {
     this.stopHeartbeatInterval?.()
     log(`Heartbeat stopped`)
-  }
-
-  public handleHeartbeatRequest(msg: Uint8Array, remotePeer: PeerId): Promise<Uint8Array> {
-    // Recalculate network health when incoming heartbeat has been received
-
-    log(`received heartbeat from ${remotePeer.toString()}`)
-    return Promise.resolve(Heartbeat.calculatePingResponse(msg))
   }
 
   /**
@@ -200,7 +191,9 @@ export default class Heartbeat {
       if (pingErrorThrown) {
         log(`Error while pinging ${destination.toString()}`, pingError)
       } else if (pingResponse == null || pingResponse.length == 1) {
-        const expectedResponse = Heartbeat.calculatePingResponse(challenge)
+        const expectedResponse = generate_ping_response(
+          new Uint8Array(challenge.buffer, challenge.byteOffset, challenge.length)
+        )
 
         if (!u8aEquals(expectedResponse, pingResponse[0])) {
           log(`Mismatched challenge. Got ${u8aToHex(pingResponse[0])} but expected ${u8aToHex(expectedResponse)}`)
@@ -370,9 +363,5 @@ export default class Heartbeat {
       // Prevent nodes from querying each other at the very same time
       () => randomInteger(this.config.heartbeatInterval, this.config.heartbeatInterval + this.config.heartbeatVariance)
     )
-  }
-
-  public static calculatePingResponse(challenge: Uint8Array): Uint8Array {
-    return Uint8Array.from(createHash(PING_HASH_ALGORITHM).update(challenge).digest())
   }
 }
