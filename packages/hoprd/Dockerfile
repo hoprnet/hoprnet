@@ -26,7 +26,7 @@ RUN make deps-docker package=hoprd && \
     # No need for these packages
     rm -R packages/avado packages/cover-traffic-daemon && \
     # Everything that we don't need in ethereum package
-    rm -R packages/ethereum/contracts packages/ethereum/deploy packages/ethereum/tasks packages/ethereum/test && \
+    rm -R packages/ethereum/contracts && \
     # Remove node_modules as they include devDependencies
     rm -R node_modules && \
     # As we are on *nix, use hardlinks in node_modules to save some space
