@@ -17,6 +17,7 @@ wasm = ["dep:wasm-bindgen", "dep:serde-wasm-bindgen", "dep:js-sys", "dep:wasm-bi
 console_error_panic_hook = [ "dep:console_error_panic_hook" ]
 
 [dependencies]
+blake2 = "0.10.4"
 futures = "0.3.25"
 js-sys = { version = "0.3.60", optional = true }
 real-base = { path = "../../../real/crates/real-base" }
