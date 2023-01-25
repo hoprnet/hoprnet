@@ -671,17 +671,17 @@ class Hopr extends EventEmitter {
     try {
       // Perform the strategy tick
       tickResult = this.strategy.tick(
-          (await this.getBalance()).toBN(),
-          this.networkPeers
-            .all()
-            .map((p) => p.toString())
-            .values(),
-          currentChannels
-            .map((c) => new OutgoingChannelStatus(c.destination.toPeerId().toString(), c.balance.toBN().toString(), c.status)),
-          (peer_id_str: string) => this.networkPeers.qualityOf(peerIdFromString(peer_id_str))
+        (await this.getBalance()).toBN(),
+        this.networkPeers
+          .all()
+          .map((p) => p.toString())
+          .values(),
+        currentChannels.map(
+          (c) => new OutgoingChannelStatus(c.destination.toPeerId().toString(), c.balance.toBN().toString(), c.status)
+        ),
+        (peer_id_str: string) => this.networkPeers.qualityOf(peerIdFromString(peer_id_str))
       )
-    }
-    catch (e) {
+    } catch (e) {
       log(`failed to do a strategy tick`, e)
       throw new Error('error while performing strategy tick')
     }
