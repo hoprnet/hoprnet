@@ -14,11 +14,14 @@ import {
   create_histogram_with_buckets,
   create_multi_gauge
 } from '@hoprnet/hopr-utils'
+import type { Components } from '@libp2p/interfaces/components'
 
 import { createHash, randomBytes } from 'crypto'
 
-import type { Subscribe, SendMessage } from '../index.js'
+import type { SendMessage } from '../index.js'
 import { NetworkPeersOrigin } from './network-peers.js'
+import { pipe } from 'it-pipe'
+import { reply_to_ping } from '../../lib/core_misc.js'
 
 const log = debug('hopr-core:heartbeat')
 const error = debug('hopr-core:heartbeat:error')
@@ -96,7 +99,7 @@ export default class Heartbeat {
   constructor(
     private me: PeerId,
     private networkPeers: NetworkPeers,
-    private subscribe: Subscribe,
+    private libp2pComponents: Components,
     protected sendMessage: SendMessage,
     private closeConnectionsTo: (peer: PeerId) => void,
     private onNetworkHealthChange: (oldValue: NetworkHealthIndicator, currentHealth: NetworkHealthIndicator) => void,
@@ -126,7 +129,34 @@ export default class Heartbeat {
   }
 
   public async start() {
-    await this.subscribe(this.protocolHeartbeat, this.handleHeartbeatRequest.bind(this), true, this.errHandler)
+    this.libp2pComponents.getRegistrar().handle(this.protocolHeartbeat, async ({ connection, stream }) => {
+      if (this.networkPeers.has(connection.remotePeer)) {
+        this.networkPeers.updateRecord({
+          destination: connection.remotePeer,
+          lastSeen: Date.now()
+        })
+      } else {
+        this.networkPeers.register(connection.remotePeer, NetworkPeersOrigin.INCOMING_CONNECTION)
+      }
+
+      this.recalculateNetworkHealth()
+
+      try {
+        await pipe(
+          stream.source,
+          (source: AsyncIterable<Uint8Array>) => {
+            return {
+              [Symbol.asyncIterator]() {
+                return reply_to_ping(source[Symbol.asyncIterator]())
+              }
+            }
+          },
+          stream.sink
+        )
+      } catch (err) {
+        this.errHandler(err)
+      }
+    })
 
     this.startHeartbeatInterval()
     log(`Heartbeat started`)
@@ -138,17 +168,7 @@ export default class Heartbeat {
   }
 
   public handleHeartbeatRequest(msg: Uint8Array, remotePeer: PeerId): Promise<Uint8Array> {
-    if (this.networkPeers.has(remotePeer)) {
-      this.networkPeers.updateRecord({
-        destination: remotePeer,
-        lastSeen: Date.now()
-      })
-    } else {
-      this.networkPeers.register(remotePeer, NetworkPeersOrigin.INCOMING_CONNECTION)
-    }
-
     // Recalculate network health when incoming heartbeat has been received
-    this.recalculateNetworkHealth()
 
     log(`received heartbeat from ${remotePeer.toString()}`)
     return Promise.resolve(Heartbeat.calculatePingResponse(msg))
