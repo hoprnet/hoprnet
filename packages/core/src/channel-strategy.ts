@@ -9,12 +9,19 @@ import {
   PromiscuousStrategy as RS_PromiscuousStrategy,
   PassiveStrategy as RS_PassiveStrategy,
   StrategyTickResult,
-  OutgoingChannelStatus,
   Balance,
   utils_misc_set_panic_hook
 } from '../lib/core_strategy.js'
 utils_misc_set_panic_hook()
-export { OutgoingChannelStatus, StrategyTickResult, ChannelStatus } from '../lib/core_strategy.js'
+export { StrategyTickResult } from '../lib/core_strategy.js'
+
+import { ChannelStatus } from '@hoprnet/hopr-utils'
+
+export class OutgoingChannelStatus {
+  peer_id: string
+  stake_str: string
+  status: ChannelStatus
+}
 
 /**
  * Staked nodes will likely want to automate opening and closing of channels. By

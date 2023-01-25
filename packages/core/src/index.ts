@@ -624,6 +624,36 @@ class Hopr extends EventEmitter {
     this.emit('hopr:channel:closed', destination)
   }
 
+  private async updateChannelMetrics() {
+    const selfAddr = this.getEthereumAddress()
+
+    try {
+      let outgoingChannels = 0
+      for (const channel of await this.getChannelsFrom(selfAddr)) {
+        metric_channelBalances.set(
+          [channel.source.toAddress().toHex(), 'out'],
+          +ethersUtils.formatEther(channel.balance.toBN().toString())
+        )
+        outgoingChannels++
+      }
+
+      let incomingChannels = 0
+      for (const channel of await this.getChannelsTo(selfAddr)) {
+        metric_channelBalances.set(
+          [channel.source.toAddress().toHex(), 'in'],
+          +ethersUtils.formatEther(channel.balance.toBN().toString())
+        )
+        incomingChannels++
+      }
+
+      metric_inChannelCount.set(incomingChannels)
+      metric_outChannelCount.set(outgoingChannels)
+    }
+    catch (e) {
+      log(`error: failed to update channel metrics`, e)
+    }
+  }
+
   // On the strategy interval, poll the strategy to see what channel changes
   // need to be made.
   private async tickChannelStrategy() {
@@ -632,43 +662,21 @@ class Hopr extends EventEmitter {
       throw new Error('node is not RUNNING')
     }
 
-    let out = 'Channels obtained:\n'
-    const currentChannels: ChannelEntry[] = []
-    const selfAddr = this.getEthereumAddress()
-
-    let incomingChannels = 0,
-      outgoingChannels = 0
-    for await (const channel of this.getAllChannels()) {
-      // Determine which counter (incoming/outgoing) we need to increment
-      if (selfAddr.eq(channel.destination.toAddress())) {
-        metric_channelBalances.set(
-          [channel.source.toAddress().toHex(), 'in'],
-          +ethersUtils.formatEther(channel.balance.toBN().toString())
-        )
-        incomingChannels++
-      } else if (selfAddr.eq(channel.source.toAddress())) {
-        metric_channelBalances.set(
-          [channel.source.toAddress().toHex(), 'out'],
-          +ethersUtils.formatEther(channel.balance.toBN().toString())
-        )
-        outgoingChannels++
-      }
-
-      out += `${channel.toString()}\n`
-      currentChannels.push(channel)
-      if (await this.isAllowedAccessToNetwork(channel.destination.toPeerId())) {
-        this.networkPeers.register(channel.destination.toPeerId(), NetworkPeersOrigin.STRATEGY_EXISTING_CHANNEL) // Make sure current channels are 'interesting'
-      } else {
-        error(`Protocol error: Strategy is monitoring non-registered peer ${channel.destination.toString()}`)
-      }
-    }
-
-    metric_inChannelCount.set(incomingChannels)
-    metric_outChannelCount.set(outgoingChannels)
-    verbose(out.substring(0, out.length - 1))
-
     let tickResult: StrategyTickResult
     try {
+      // Retrieve all outgoing channels
+      const outgoingChannels = await this.getChannelsFrom(this.getEthereumAddress())
+      verbose(`strategy tracks ${outgoingChannels.length} outgoing channels`)
+
+      // Check if all peer ids are still registered
+      await Promise.all(outgoingChannels.map(async (channel) => {
+        if (await this.isAllowedAccessToNetwork(channel.destination.toPeerId())) {
+          this.networkPeers.register(channel.destination.toPeerId(), NetworkPeersOrigin.STRATEGY_EXISTING_CHANNEL)
+        } else {
+          error(`Protocol error: Strategy is monitoring non-registered peer ${channel.destination.toString()}`)
+        }
+      }))
+
       // Perform the strategy tick
       tickResult = this.strategy.tick(
         (await this.getBalance()).toBN(),
@@ -676,9 +684,13 @@ class Hopr extends EventEmitter {
           .all()
           .map((p) => p.toString())
           .values(),
-        currentChannels.map(
-          (c) => new OutgoingChannelStatus(c.destination.toPeerId().toString(), c.balance.toBN().toString(), c.status)
-        ),
+        outgoingChannels.map((c) => {
+            return {
+              peer_id: c.destination.toPeerId().toString(),
+              stake_str: c.balance.toBN().toString(),
+              status: c.status
+            }
+          }),
         (peer_id_str: string) => this.networkPeers.qualityOf(peerIdFromString(peer_id_str))
       )
     } catch (e) {
@@ -700,7 +712,7 @@ class Hopr extends EventEmitter {
     }
   }
 
-  private async *getAllChannels(): AsyncIterable<ChannelEntry> {
+  public async *getAllChannels(): AsyncIterable<ChannelEntry> {
     yield* this.db.getChannelsFromIterable(PublicKey.fromPeerId(this.getId()).toAddress())
   }
 
@@ -1020,6 +1032,7 @@ class Hopr extends EventEmitter {
       try {
         log('Triggering tick channel strategy')
         await this.tickChannelStrategy()
+        await this.updateChannelMetrics()
       } catch (e) {
         log('error in periodic check', e)
       }

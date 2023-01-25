@@ -110,24 +110,11 @@ pub mod wasm {
     use serde::{Deserialize, Serialize};
     use utils_types::channels::ChannelStatus;
 
-    #[wasm_bindgen(getter_with_clone)]
     #[derive(Serialize, Deserialize)]
     pub struct OutgoingChannelStatus {
         pub peer_id: String,
         pub stake_str: String,
         pub status: ChannelStatus,
-    }
-
-    #[wasm_bindgen]
-    impl OutgoingChannelStatus {
-        #[wasm_bindgen(constructor)]
-        pub fn new(peer_id: &str, stake_str: &str, status: ChannelStatus) -> Self {
-            OutgoingChannelStatus {
-                peer_id: peer_id.to_string(),
-                stake_str: stake_str.to_string(),
-                status
-            }
-        }
     }
 
     impl From<&super::OutgoingChannelStatus> for OutgoingChannelStatus {
@@ -153,13 +140,11 @@ pub mod wasm {
             to_open: JsValue,
             to_close: Vec<JsString>,
         ) -> JsResult<StrategyTickResult> {
-            let open: Vec<OutgoingChannelStatus> =
-                ok_or_jserr!(serde_wasm_bindgen::from_value(to_open))?;
-
             Ok(StrategyTickResult {
                 w: super::StrategyTickResult::new(
                     max_auto_channels as usize,
-                    open.into_iter()
+                    serde_wasm_bindgen::from_value::<Vec<OutgoingChannelStatus>>(to_open)?
+                        .into_iter()
                         .map(|x| super::OutgoingChannelStatus::from(&x))
                         .collect(),
                     to_close.iter().map(String::from).collect(),
@@ -201,16 +186,13 @@ pub mod wasm {
         outgoing_channels: JsValue,
         quality_of: &js_sys::Function,
     ) -> JsResult<StrategyTickResult> {
-        let out_channels: Vec<OutgoingChannelStatus> =
-            serde_wasm_bindgen::from_value(outgoing_channels)?;
-
         Ok(StrategyTickResult {
             w: strategy.tick(
                 balance.w,
                 peer_ids
                     .into_iter()
                     .map(|v| v.unwrap().as_string().unwrap()),
-                out_channels
+                serde_wasm_bindgen::from_value::<Vec<OutgoingChannelStatus>>(outgoing_channels)?
                     .iter()
                     .map(|c| super::OutgoingChannelStatus::from(c))
                     .collect(),

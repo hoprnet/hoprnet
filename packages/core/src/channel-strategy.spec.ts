@@ -1,6 +1,7 @@
 import assert from 'assert'
-import { PromiscuousStrategy, OutgoingChannelStatus, ChannelStatus } from './channel-strategy.js'
+import { PromiscuousStrategy } from './channel-strategy.js'
 import BN from 'bn.js'
+import { ChannelStatus } from '@hoprnet/hopr-utils'
 
 describe('test strategies', async function () {
   it('perform basic promiscuous strategy test', async function () {
@@ -25,9 +26,9 @@ describe('test strategies', async function () {
     peers.set('Joe', 0.3)
 
     let outgoing_channels = [
-      new OutgoingChannelStatus('Alice', stake, ChannelStatus.Open),
-      new OutgoingChannelStatus('Charlie', stake, ChannelStatus.Open),
-      new OutgoingChannelStatus('Gustave', '1000000000000000', ChannelStatus.Open)
+      { peer_id: 'Alice', stake_str: stake, status: ChannelStatus.Open },
+      { peer_id: 'Charlie', stake_str: stake, status: ChannelStatus.Open },
+      { peer_id: 'Gustave', stake_str: '1000000000000000', status: ChannelStatus.Open }
     ]
 
     let res = strategy.tick(new BN(stake), peers.keys(), outgoing_channels, (x: string) => peers.get(x))
