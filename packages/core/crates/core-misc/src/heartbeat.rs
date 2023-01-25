@@ -1,5 +1,11 @@
+use blake2::{Blake2s256, Digest};
+
 pub fn reply_to_ping(req: Result<Vec<u8>, String>) -> Result<Vec<u8>, String> {
-    req
+    let mut hasher = Blake2s256::new();
+
+    hasher.update(req.unwrap().as_slice());
+
+    Ok(hasher.finalize().to_vec())
 }
 
 pub mod wasm {
