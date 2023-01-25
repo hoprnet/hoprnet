@@ -663,10 +663,9 @@ class Hopr extends EventEmitter {
         .map((c) => new OutgoingChannelStatus(c.destination.toPeerId().toString(), c.balance.toBN().toString()))
     )
 
-    let peersIterator = this.networkPeers.all().map((p) => p.toString())
     const tickResult: StrategyTickResult = this.strategy.tick(
       balance.toBN(),
-      peersIterator.values(),
+      this.networkPeers.all().map((p) => p.toString()).values(),
       allOutgoingChannels,
       (peer_id_str: string) => this.networkPeers.qualityOf(peerIdFromString(peer_id_str))
     )
@@ -689,7 +688,7 @@ class Hopr extends EventEmitter {
 
     try {
       await Promise.all(
-        allClosedChannels.map((destination) => async () => {
+        allClosedChannels.map(async (destination) => {
           await this.closeChannel(peerIdFromString(destination), 'outgoing')
           verbose(`closed channel to ${destination.toString()}`)
           this.emit('hopr:channel:closed', destination)
@@ -704,7 +703,7 @@ class Hopr extends EventEmitter {
 
     try {
       await Promise.all(
-        allOpenedChannels.map((status) => async () => {
+        allOpenedChannels.map(async (status) => {
           const destination = peerIdFromString(status.peer_id)
           const stake = new BN(status.stake_str)
 
