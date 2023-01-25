@@ -59,6 +59,8 @@ jobs:
         run: |
           make -j deps-ci
           make -j build-docs
+        env:
+          DEPLOYER_PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY_DEFAULT_FOUNDRY }}
 
       - name: Format newly created files
         run: make lint-fix
@@ -69,7 +71,7 @@ jobs:
           git add docs/hopr-documentation/rest-api-v2-full-spec.json
 
       - name: Commit docs changes
-        # only commit changes when not running via act and when on final branch<Plug>_es
+        # only commit changes when not running via act and when on final branches
         if: |
           (github.ref == 'refs/heads/master' ||
            github.ref == 'refs/heads/avado' ||

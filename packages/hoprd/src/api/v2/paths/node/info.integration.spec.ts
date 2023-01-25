@@ -35,7 +35,7 @@ describe('GET /node/info', () => {
   })
 
   it('should get info', async () => {
-    node.environment = { id: 'hardhat-localhost' } as ResolvedEnvironment
+    node.environment = { id: 'anvil-localhost' } as ResolvedEnvironment
     node.smartContractInfo = sinon.fake.returns({
       network: 'a',
       hoprTokenAddress: HOPR_TOKEN_ADDRESS,
@@ -53,7 +53,7 @@ describe('GET /node/info', () => {
     expect(res.status).to.equal(200)
     expect(res).to.satisfyApiSpec
     expect(res.body).to.deep.equal({
-      environment: 'hardhat-localhost',
+      environment: 'anvil-localhost',
       announcedAddress: DHT_ADDRESSES.map((addr: Multiaddr) => addr.toString()),
       listeningAddress: LISTENING_ADDRS.map((addr: Multiaddr) => addr.toString()),
       network: 'a',

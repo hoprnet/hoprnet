@@ -27,18 +27,15 @@ usage() {
 cleanup() {
   # Remove lock files due to conflicts with workspaces
   rm -f \
-    "${mydir}/../packages/cover-traffic-daemon/npm-shrinkwrap.json" \
     "${mydir}/../packages/hoprd/npm-shrinkwrap.json"
 
   # Don't commit changed package.json files as package resolutions are
   # supposed to interfer with workspaces according to https://yarnpkg.com/configuration/manifest#resolutions
   git restore packages/hoprd/package.json
-  git restore packages/cover-traffic-daemon/package.json
 
   # delete default environments
   rm -f \
-    "${mydir}/../packages/hoprd/default-environment.json" \
-    "${mydir}/../packages/cover-traffic-daemon/default-environment.json"
+    "${mydir}/../packages/hoprd/default-environment.json"
 }
 
 # return early with help info when requested
@@ -57,7 +54,8 @@ if [ ! "${version_type}" = "patch" ] &&
 fi
 
 # define packages
-declare -a versioned_packages=( utils connect ethereum core-ethereum core real hoprd cover-traffic-daemon )
+# does not include ethereum, which isn't a real package anymore, just a folder
+declare -a versioned_packages=( utils connect core-ethereum core real hoprd )
 
 # ensure local copy is up-to-date with origin
 branch=$(git rev-parse --abbrev-ref HEAD)
@@ -88,10 +86,10 @@ environment_id="$("${mydir}/get-default-environment.sh")"
 log "using version template ${current_version} + ${version_type}"
 declare new_version
 new_version=$(npx semver --preid next -i "${version_type}" "${current_version}")
-log "creating new version ${new_version}"
 
 # create new version in each package
 for p in "${versioned_packages[@]}"; do
+  log "creating new version ${new_version} in package ${p}"
   cd "${mydir}/../packages/${p}"
   jq ".version = \"${new_version}\"" package.json > package.json.new
   mv package.json.new package.json
@@ -123,30 +121,28 @@ if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
   # pack and publish packages
   yarn workspaces foreach -piv --topological-dev \
     --exclude hoprnet --exclude hopr-docs \
-    --exclude @hoprnet/hoprd --exclude @hoprnet/hopr-cover-traffic-daemon \
+    --exclude @hoprnet/hoprd \
     npm publish --access public
 
-  "${mydir}/wait-for-npm-package.sh" utils
-  "${mydir}/wait-for-npm-package.sh" connect
-  "${mydir}/wait-for-npm-package.sh" ethereum
-  "${mydir}/wait-for-npm-package.sh" core-ethereum
-  "${mydir}/wait-for-npm-package.sh" core
-  "${mydir}/wait-for-npm-package.sh" real
+  for p in "${versioned_packages[@]}"; do
+    if [ "${p}" != "hoprd" ]; then
+      "${mydir}/wait-for-npm-package.sh" "${p}"
+    fi
+  done
 
   trap cleanup SIGINT SIGTERM ERR
 
   # set default environments
-  log "adding default environments to packages"
+  log "adding default environment ${environment_id} to hoprd package"
   echo "{\"id\": \"${environment_id}\"}" > "${mydir}/../packages/hoprd/default-environment.json"
-  echo "{\"id\": \"${environment_id}\"}" > "${mydir}/../packages/cover-traffic-daemon/default-environment.json"
 
   # special treatment for end-of-chain packages
   # to create lockfiles with resolution overrides
   "${mydir}/build-lockfiles.sh" hoprd
-  "${mydir}/build-lockfiles.sh" cover-traffic-daemon
 
+  # publish hoprd and wait until its available on npm
   yarn workspace @hoprnet/hoprd npm publish --access public
-  yarn workspace @hoprnet/hopr-cover-traffic-daemon npm publish --access public
+  "${mydir}/wait-for-npm-package.sh" hoprd
 
   cleanup
 fi

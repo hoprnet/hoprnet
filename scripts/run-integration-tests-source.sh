@@ -68,8 +68,6 @@ declare node5_dir="${tmp}/${node_prefix}-5"
 declare node6_dir="${tmp}/${node_prefix}-6"
 declare node7_dir="${tmp}/${node_prefix}-7"
 
-declare ct_node1_dir="${tmp}/${node_prefix}-ct1"
-
 declare node1_log="${node1_dir}.log"
 declare node2_log="${node2_dir}.log"
 declare node3_log="${node3_dir}.log"
@@ -77,8 +75,6 @@ declare node4_log="${node4_dir}.log"
 declare node5_log="${node5_dir}.log"
 declare node6_log="${node6_dir}.log"
 declare node7_log="${node7_dir}.log"
-
-declare ct_node1_log="${ct_node1_dir}.log"
 
 declare node1_id="${node1_dir}.id"
 declare node2_id="${node2_dir}.id"
@@ -98,18 +94,15 @@ declare node7_privkey="0x9b813edd8a85cffbe3cd2e242dc0992cfa04be15caa9f50b0b03b5e
 
 declare password="e2e-test"
 
-declare ct_db_file="${tmp}/hopr-ct-db.json"
+declare anvil_rpc_log="${tmp}/hopr-source-anvil-rpc.log"
+declare anvil_cfg_file="${tmp}/hopr-source-anvil.cfg"
 
-declare hardhat_rpc_log="${tmp}/hopr-source-hardhat-rpc.log"
-
-# hardhat port
+# anvil port
 declare -a all_ports=( 8545 )
 # HOPRd API ports
 all_ports+=( 13301 13302 13303 13304 13305 13306 13307 )
 # HOPRd p2p ports
 all_ports+=( 19091 19092 19093 19094 19095 19096 19097 )
-# CTd healthcheck port
-all_ports+=( 20000 )
 
 function cleanup {
   local EXIT_CODE=$?
@@ -126,14 +119,15 @@ function cleanup {
 
   local log exit_code non_zero
   for node_log in "${node1_log}" "${node2_log}" "${node3_log}" "${node4_log}" "${node5_log}" "${node6_log}" "${node7_log}"; do
-    log=$(wait_for_regex ${node_log} "Process exiting with signal [0-9]")
+    log=$(grep -E "Process exiting with signal [0-9]" ${node_log} || echo "")
 
     if [ -z "${log}" ]; then
       log "${node_log}: Process did not exit properly"
-      exit 1
+      exit_code=1
+    else
+      exit_code=$(echo ${log} | sed -E "s/.*signal[ ]([0-9]+).*/\1/")
     fi
 
-    exit_code=$(echo ${log} | sed -E "s/.*signal[ ]([0-9]+).*/\1/")
     if [ ${exit_code} != "0" ]; then
       non_zero=true
       log "${node_log}: terminated with non-zero exit code ${exit_code}"
@@ -141,7 +135,7 @@ function cleanup {
   done
 
   log "Wiping databases"
-  rm -rf "${node1_dir}" "${node2_dir}" "${node3_dir}" "${node4_dir}" "${node5_dir}" "${node6_dir}" "${node7_dir}" "${ct_node1_dir}"
+  rm -rf "${node1_dir}" "${node2_dir}" "${node3_dir}" "${node4_dir}" "${node5_dir}" "${node6_dir}" "${node7_dir}"
 
   if [ ${non_zero} ]; then
     exit 1
@@ -175,7 +169,7 @@ function setup_node() {
   log "Run node ${id} on API port ${api_port} -> ${log}"
 
   if [[ "${additional_args}" != *"--environment "* ]]; then
-    additional_args="--environment hardhat-localhost ${additional_args}"
+    additional_args="--environment anvil-localhost ${additional_args}"
   fi
 
   if [[ -n "${api_token}" ]]; then
@@ -218,52 +212,11 @@ function setup_node() {
       > "${log}" 2>&1 &
 }
 
-# $1 = node log file
-# $2 = private key, must be hex string of length 66
-# $3 = health check port
-# $4 = data directory
-# $5 = OPTIONAL: additional args to ct daemon
-function setup_ct_node() {
-  local log=${1}
-  local private_key=${2}
-  local health_check_port=${3}
-  local dir=${4}
-  local additional_args=${5:-""}
-
-  # Remove previous logs to make sure the regex does not match
-  rm -f "${log}"
-
-  log "Run CT node -> ${log}"
-
-  if [[ "${additional_args}" != *"--environment "* ]]; then
-    additional_args="--environment hardhat-localhost ${additional_args}"
-  fi
-  log "Additional args: \"${additional_args}\""
-
-  # Remove previous logs to make sure the regex does not match
-  rm -f "${log}"
-
-  HOPR_CTD_HEARTBEAT_INTERVAL=2500 \
-  HOPR_CTD_HEARTBEAT_THRESHOLD=2500 \
-  HOPR_CTD_HEARTBEAT_VARIANCE=1000 \
-  NODE_OPTIONS="--experimental-wasm-modules" \
-  DEBUG="hopr*" NODE_ENV=development node packages/cover-traffic-daemon/lib/index.js \
-    --privateKey "${private_key}" \
-    --dbFile "${ct_db_file}" \
-    --data="${dir}" \
-    --healthCheck \
-    --healthCheckPort "${health_check_port}" \
-    --allowLocalNodeConnections \
-    --testAnnounceLocalAddresses \
-    --testPreferLocalAddresses \
-    ${additional_args} \
-     > "${log}" 2>&1 &
-}
-
 # --- Log test info {{{
 log "Test files and directories"
-log "\thardhat"
-log "\t\tlog: ${hardhat_rpc_log}"
+log "\tanvil"
+log "\t\tlog: ${anvil_rpc_log}"
+log "\t\tcfg: ${anvil_cfg_file}"
 log "\tnode1"
 log "\t\tdata dir: ${node1_dir} (will be removed)"
 log "\t\tlog: ${node1_log}"
@@ -292,9 +245,6 @@ log "\tnode7"
 log "\t\tdata dir: ${node7_dir} (will be removed)"
 log "\t\tlog: ${node7_log}"
 log "\t\tid: ${node7_id}"
-log "\tct_node1"
-log "\t\tdata dir: ${ct_node1_dir} (will be removed)"
-log "\t\tlog: ${ct_node1_log}"
 # }}}
 
 # --- Check all resources we need are free {{{
@@ -303,45 +253,39 @@ for p in ${all_ports[@]}; do
 done
 # }}}
 
-# --- Cleanup old contract deployments {{{
-log "Removing artifacts from old contract deployments"
-rm -Rf \
-  "${mydir}/../packages/ethereum/deployments/hardhat-localhost" \
-  "${mydir}/../packages/ethereum/deployments/hardhat-localhost2"
-# }}}
+declare protocol_config="${mydir}/../packages/core/protocol-config.json"
+declare deployments_summary="${mydir}/../packages/ethereum/contracts/contracts-addresses.json"
 
 # --- Running Mock Blockchain --- {{{
-start_local_hardhat "${hardhat_rpc_log}"
+${mydir}/run-local-anvil.sh -l "${anvil_rpc_log}" -c "${anvil_cfg_file}"
 
-wait_for_regex ${hardhat_rpc_log} "Started HTTP and WebSocket JSON-RPC server"
-log "Hardhat node started (127.0.0.1:8545)"
+# read auto-generated private key from anvil configuration
+declare anvil_private_key
+anvil_private_key="$(jq -r ".private_keys[0]" "${anvil_cfg_file}")"
+if [ -z "${anvil_private_key}" ]; then
+  log "Could not find private key in anvil cfg file ${anvil_cfg_file}"
+  exit 1
+fi
+# we export the private key so it gets picked up by other sub-shells
+export PRIVATE_KEY=${anvil_private_key}
 
-# need to mirror contract data because of hardhat-deploy node only writing to localhost {{{
-cp -R \
-  "${mydir}/../packages/ethereum/deployments/hardhat-localhost/localhost" \
-  "${mydir}/../packages/ethereum/deployments/hardhat-localhost/hardhat"
-cp -R \
-  "${mydir}/../packages/ethereum/deployments/hardhat-localhost" \
-  "${mydir}/../packages/ethereum/deployments/hardhat-localhost2"
+# need to mirror contract data because of anvil-deploy node only writing to localhost {{{
+update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "anvil-localhost" "anvil-localhost"
+update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "anvil-localhost" "anvil-localhost2"
 # }}}
-
-# static address because static private key
-declare ct_node1_address="0xde913eeed23bce5274ead3de8c196a41176fbd49"
 
 #  --- Run nodes --- {{{
 setup_node 13301 ${default_api_token} 19091 "${node1_dir}" "${node1_log}" "${node1_id}" "${node1_privkey}" "--announce"
+# use empty auth token to be able to test this in the security tests
 setup_node 13302 ""                   19092 "${node2_dir}" "${node2_log}" "${node2_id}" "${node2_privkey}" "--announce"
 setup_node 13303 ${default_api_token} 19093 "${node3_dir}" "${node3_log}" "${node3_id}" "${node3_privkey}" "--announce"
 setup_node 13304 ${default_api_token} 19094 "${node4_dir}" "${node4_log}" "${node4_id}" "${node4_privkey}" "--testNoDirectConnections"
 setup_node 13305 ${default_api_token} 19095 "${node5_dir}" "${node5_log}" "${node5_id}" "${node5_privkey}" "--testNoDirectConnections"
 # should not be able to talk to the rest
-setup_node 13306 ${default_api_token} 19096 "${node6_dir}" "${node6_log}" "${node6_id}" "${node6_privkey}" "--announce --environment hardhat-localhost2"
+setup_node 13306 ${default_api_token} 19096 "${node6_dir}" "${node6_log}" "${node6_id}" "${node6_privkey}" "--announce --environment anvil-localhost2"
 # node n8 will be the only one NOT registered
 setup_node 13307 ${default_api_token} 19097 "${node7_dir}" "${node7_log}" "${node7_id}" "${node7_privkey}" "--announce"
-setup_ct_node "${ct_node1_log}" "0xa08666bca1363cb00b5402bbeb6d47f6b84296f3bba0f2f95b1081df5588a613" 20000 "${ct_node1_dir}"
 # }}}
-
-log "CT node1 address: ${ct_node1_address}"
 
 # DO NOT MOVE THIS STEP
 #  --- Wait until private key has been created or recovered --- {{{
@@ -356,7 +300,7 @@ wait_for_regex ${node7_log} "please fund this node"
 
 log "Funding nodes"
 #  --- Fund nodes --- {{{
-fund_nodes "${node_prefix}" "${tmp}" "${password}" "${ct_node1_address}"
+fund_nodes "${node_prefix}" "${tmp}" "${password}"
 # }}}
 
 log "Waiting for port binding"
@@ -396,7 +340,3 @@ ${mydir}/../test/integration-test.sh \
   "localhost:13301" "localhost:13302" "localhost:13303" "localhost:13304" "localhost:13305" "localhost:13306" "localhost:13307"
 # }}}
 
-# -- CT test {{{
-${mydir}/../test/ct-test.sh \
-  "${ct_node1_log}" "127.0.0.1" 20000
-# }}}

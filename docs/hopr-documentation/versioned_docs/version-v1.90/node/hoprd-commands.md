@@ -183,8 +183,8 @@ Output will look similar to this:
 ```
 Announcing to other nodes as           /ip4/127.0.0.1/tcp/19091/p2p/N7vkA  /ip4/172.17.0.4/tcp/19091/p2p/N7vkA  /p2p/ZZdJQ/p2p-circuit/p2p/N7vkA  /p2p/VpKCW/p2p-circuit/p2p/N7vkA  /p2p/uLoho/p2p-circuit/p2p/N7vkA  /p2p/Utqar/p2p-circuit/p2p/N7vkA
 Listening on                           /ip4/0.0.0.0/tcp/19091/p2p/N7vkA
-Running on                             hardhat
-Using HOPR environment                 hardhat-localhost
+Running on                             anvil
+Using HOPR environment                 anvil-localhost
 Channel closure period                 1 minutes
 HOPR Token Contract Address            0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512
 HOPR Channels Contract Addresss        0xC3bBD9F2c8553AeDe3f5EF612ED455047bF70150

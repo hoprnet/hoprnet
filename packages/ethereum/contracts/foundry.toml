@@ -1,0 +1,36 @@
+# See more config options https://github.com/foundry-rs/foundry/tree/master/config
+
+[profile.default]
+src = 'src'
+test = 'test'
+out = 'out'
+libs = ['lib']
+verbosity = 3
+fs_permissions = [{ access = "read-write", path = "./"}] # to write logs into a local `./test.txt` file
+auto_detect_solc = true
+offline = false
+build_info = true
+build_info_path = "build-info"
+
+[rpc_endpoints]
+local = "http://localhost:8545"
+gnosis = "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet"
+
+[etherscan]
+gnosis = { key = "${GNOSISSCAN_API_KEY}", url = "https://gnosisscan.io" }
+
+# testing and local network
+[profile.development]
+eth_rpc_url = "http://localhost:8545" # cannot directly use profile.default.rpc_endpoints.local
+
+# staging environment
+[profile.staging]
+# provide deployed BoostUtilsLib
+libraries = ["script/utils/BoostUtilsLib.sol:BoostUtilsLib:0x8197525557233031b110038Ae52dfC3C4A75567A"]
+eth_rpc_url = "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet"
+
+# production environment environment
+[profile.production]
+# provide deployed BoostUtilsLib
+libraries = ["script/utils/BoostUtilsLib.sol:BoostUtilsLib:0x8197525557233031b110038Ae52dfC3C4A75567A"]
+eth_rpc_url = "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet"

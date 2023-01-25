@@ -51,57 +51,20 @@ cd "${mydir}/../"
 
 declare release_config="${mydir}/../packages/hoprd/releases.json"
 declare protocol_config="${mydir}/../packages/core/protocol-config.json"
+declare deployments_summary="${mydir}/../packages/ethereum/contracts/contracts-addresses.json"
 
 for git_ref in $(cat "${release_config}" | jq -r "to_entries[] | .value.git_ref" | uniq); do
   if [[ "${branch}" =~ ${git_ref} ]]; then
     for environment_id in $(cat "${release_config}" | jq -r "to_entries[] | select(.value.git_ref==\"${git_ref}\") | .value.environment_id"); do
       declare network_id=$(cat "${protocol_config}" | jq -r ".environments.\"${environment_id}\".network_id")
+      declare environment_type=$(cat "${deployments_summary}" | jq -r ".environments.\"${environment_id}\".environment_type")
 
-      log "deploying for environment ${environment_id} on network ${network_id}"
+      log "deploying for environment ${environment_id} on network ${network_id} of type ${environment_type}"
 
-      # We need to pass the --write parameter due to hardhat-deploy expecting that
-      # to be set in addition to the hardhat config saveDeployments.
-      # See:
-      # https://github.com/wighawag/hardhat-deploy/blob/8c76e7f942010d09b3607650042007f935401633/src/DeploymentsManager.ts#L503
-      HOPR_ENVIRONMENT_ID="${environment_id}" yarn workspace @hoprnet/hopr-ethereum \
-        hardhat deploy --network "${network_id}" --write true
+      make -C "${mydir}/../packages/ethereum/contracts/" anvil-deploy-contracts environment-name="${environment_id}" environment-type="${environment_type}"
 
-      log "updating contract addresses in protocol configuration"
-
-      declare token_contract_address channels_contract_address deployments_path network_registry_contract_address
-      declare xhopr_contract_address boost_contract_address stake_contract_address network_registry_proxy_contract_address
-
-      deployments_path="${mydir}/../packages/ethereum/deployments/${environment_id}/${network_id}"
-      token_contract_address="$(cat "${deployments_path}/HoprToken.json" | jq -r ".address")"
-      channels_contract_address="$(cat "${deployments_path}/HoprChannels.json" | jq -r ".address")"
-      network_registry_contract_address="$(cat "${deployments_path}/HoprNetworkRegistry.json" | jq -r ".address")"
-      xhopr_contract_address="$(cat "${deployments_path}/xHoprToken.json" | jq -r ".address")"
-      boost_contract_address="$(cat "${deployments_path}/HoprBoost.json" | jq -r ".address")"
-      stake_contract_address="$(cat "${deployments_path}/HoprStake.json" | jq -r ".address")"
-      network_registry_proxy_contract_address="$(cat "${deployments_path}/HoprNetworkRegistryProxy.json" | jq -r ".address")"
-
-      cat "${protocol_config}" | jq ".environments.\"${environment_id}\".token_contract_address = \"${token_contract_address}\"" > "${protocol_config}.new"
-      mv "${protocol_config}.new" "${protocol_config}"
-
-      cat "${protocol_config}" | jq ".environments.\"${environment_id}\".channels_contract_address = \"${channels_contract_address}\"" > "${protocol_config}.new"
-      mv "${protocol_config}.new" "${protocol_config}"
-
-      cat "${protocol_config}" | jq ".environments.\"${environment_id}\".network_registry_contract_address = \"${network_registry_contract_address}\"" > "${protocol_config}.new"
-      mv "${protocol_config}.new" "${protocol_config}"
-
-      cat "${protocol_config}" | jq ".environments.\"${environment_id}\".xhopr_contract_address = \"${xhopr_contract_address}\"" > "${protocol_config}.new"
-      mv "${protocol_config}.new" "${protocol_config}"
-
-      cat "${protocol_config}" | jq ".environments.\"${environment_id}\".boost_contract_address = \"${boost_contract_address}\"" > "${protocol_config}.new"
-      mv "${protocol_config}.new" "${protocol_config}"
-
-      cat "${protocol_config}" | jq ".environments.\"${environment_id}\".stake_contract_address = \"${stake_contract_address}\"" > "${protocol_config}.new"
-      mv "${protocol_config}.new" "${protocol_config}"
-
-      cat "${protocol_config}" | jq ".environments.\"${environment_id}\".network_registry_proxy_contract_address = \"${network_registry_proxy_contract_address}\"" > "${protocol_config}.new"
-      mv "${protocol_config}.new" "${protocol_config}"
-
-      log "contract addresses are updated in protocol configuration"
+      # update the deployed files in protocol-config
+      update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "${environment_id}" "${environment_id}"
     done
   fi
 done

@@ -28,7 +28,7 @@ declare spec_file_path="${mydir}/../packages/hoprd/rest-api-v2-full-spec.json"
 declare api_port=9876
 declare tmp="$(find_tmp_dir)"
 declare node_log_file="${tmp}/node.logs"
-declare hardhat_rpc_log="${tmp}/hopr-apidocgen-hardhat-rpc.log"
+declare anvil_rpc_log="${tmp}/hopr-apidocgen-anvil-rpc.log"
 
 function cleanup {
   local EXIT_CODE=$?
@@ -40,11 +40,11 @@ function cleanup {
   log "Stop hoprd node"
   lsof -i ":${api_port}" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
 
-  log "Stop hardhat"
-  lsof -i ":8545" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
+  log "Stop anvil"
+  make -C "${mydir}/../" kill-anvil
 
   log "Remove logs"
-  rm -f "${node_log_file}" "${hardhat_rpc_log}"
+  rm -f "${node_log_file}" "${anvil_rpc_log}"
 
   wait
 
@@ -55,31 +55,17 @@ trap cleanup SIGINT SIGTERM ERR EXIT
 log "Clean previously generated spec (if exists)"
 rm -f "${spec_file_path}"
 
-log "Start local hardhat network"
-HOPR_ENVIRONMENT_ID="hardhat-localhost" \
-TS_NODE_PROJECT=${mydir}/../packages/ethereum/tsconfig.hardhat.json \
-  yarn workspace @hoprnet/hopr-ethereum hardhat node \
-    --network hardhat \
-    --show-stack-traces > \
-    "${hardhat_rpc_log}" 2>&1 &
-wait_for_regex ${hardhat_rpc_log} "Started HTTP and WebSocket JSON-RPC server"
-log "Hardhat node started (127.0.0.1:8545)"
+make -C "${mydir}/../" run-anvil
 
-# need to mirror contract data because of hardhat-deploy node only writing to localhost {{{
-cp -R \
-  "${mydir}/../packages/ethereum/deployments/hardhat-localhost/localhost" \
-  "${mydir}/../packages/ethereum/deployments/hardhat-localhost/hardhat"
-cp -R \
-  "${mydir}/../packages/ethereum/deployments/hardhat-localhost" \
-  "${mydir}/../packages/ethereum/deployments/hardhat-localhost2"
-# }}}
+# need to mirror contract data because of anvil-deploy node only writing to localhost {{{
+declare protocol_config="${mydir}/../packages/core/protocol-config.json"
+declare deployments_summary="${mydir}/../packages/ethereum/contracts/contracts-addresses.json"
+update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "anvil-localhost" "anvil-localhost"
+update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "anvil-localhost" "anvil-localhost2"
 
 log "Start hoprd node"
-cd "${mydir}/.."
-DEBUG="hopr*" CI="true" \
-  yarn run run:hoprd --environment=hardhat-localhost \
-    --api true --apiPort ${api_port} > "${node_log_file}" \
-    2>&1 &
+env DEBUG="hopr*" CI="true" HOPRD_API_PORT="${api_port}" \
+  make -C "${mydir}/../" run-local > "${node_log_file}" 2>&1 &
 
 log "Wait 15 seconds for node startup to complete"
 sleep 15

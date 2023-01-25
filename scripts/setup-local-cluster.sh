@@ -18,19 +18,19 @@ declare api_token="^^LOCAL-testing-123^^"
 declare myne_chat_url="http://app.myne.chat"
 declare init_script=""
 declare hoprd_command="node --experimental-wasm-modules packages/hoprd/lib/main.cjs"
-declare hardhat_basedir="packages/ethereum"
 declare listen_host="127.0.0.1"
 declare node_env="development"
+# first anvil account
+declare deployer_private_key=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 
 usage() {
   msg
-  msg "Usage: $0 [-h|--help] [-t|--api-token <api_token>] [-m|--myne-chat-url <myne_chat_url>] [-i|--init-script <init_script>] [--hoprd-command <hoprd_command>] [--hardhat-basedir <hardhat_basedir>] [--listen-host|-l <list_host>] [-p|--production]"
+  msg "Usage: $0 [-h|--help] [-t|--api-token <api_token>] [-m|--myne-chat-url <myne_chat_url>] [-i|--init-script <init_script>] [--hoprd-command <hoprd_command>] [--listen-host|-l <list_host>] [-p|--production]"
   msg
   msg "<api_token> is set to '${api_token}' by default"
   msg "<myne_chat_url> is set to '${myne_chat_url}' by default"
   msg "<init_script> is empty by default, expected to be path to a script which is called with all node API endpoints as parameters"
   msg "<hoprd_command> is used to start hoprd, default is '${hoprd_command}'"
-  msg "<hardhat_basedir> is entered before hardhat is started, default is '${hardhat_basedir}'"
   msg "<listen_host> is listened on by all hoprd instances, default is '${listen_host}'"
   msg "-p sets NODE_ENV to 'production'"
 }
@@ -71,11 +71,6 @@ while (( "$#" )); do
       shift
       shift
       ;;
-    --hardhat-basedir)
-      hardhat_basedir="${2}"
-      shift
-      shift
-      ;;
     -*|--*=)
       usage
       exit 1
@@ -111,7 +106,7 @@ declare node5_id="${node5_dir}.id"
 
 declare password="local"
 
-declare hardhat_rpc_log="${tmp_dir}/hopr-local-hardhat-rpc.log"
+declare anvil_rpc_log="${tmp_dir}/hopr-local-anvil-rpc.log"
 declare env_file="${tmp_dir}/local-cluster.env"
 
 function cleanup {
@@ -159,7 +154,7 @@ function setup_node() {
   log "Run node ${id} on rest port ${api_port} -> ${log}"
 
   if [[ "${additional_args}" != *"--environment "* ]]; then
-    additional_args="--environment hardhat-localhost ${additional_args}"
+    additional_args="--environment anvil-localhost ${additional_args}"
   fi
 
   log "Additional args: \"${additional_args}\""
@@ -197,8 +192,8 @@ function setup_node() {
 
 # --- Log setup info {{{
 log "Node files and directories"
-log "\thardhat"
-log "\t\tlog: ${hardhat_rpc_log}"
+log "\tanvil"
+log "\t\tlog: ${anvil_rpc_log}"
 log "\tnode1"
 log "\t\tdata dir: ${node1_dir} (will be removed)"
 log "\t\tlog: ${node1_log}"
@@ -235,31 +230,26 @@ ensure_port_is_free 19094
 ensure_port_is_free 19095
 # }}}
 
-# --- Cleanup old contract deployments {{{
-log "Removing artifacts from old contract deployments"
-rm -Rfv \
-  "${hardhat_basedir}/deployments/hardhat-localhost/*" \
-  "${hardhat_basedir}/deployments/hardhat-localhost2"
-# }}}
+declare protocol_config="${mydir}/../packages/core/protocol-config.json"
+declare deployments_summary="${mydir}/../packages/ethereum/contracts/contracts-addresses.json"
 
 # --- Running Mock Blockchain --- {{{
-log "Running hardhat local node"
-cd "${hardhat_basedir}" && \
-  NODE_OPTIONS=--experimental-wasm-modules yarn run:network \
-    --network hardhat --show-stack-traces > \
-    "${hardhat_rpc_log}" 2>&1 &
+log "Running anvil local node"
+"${mydir}/run-local-anvil.sh" -l ${anvil_rpc_log}
 
-wait_for_regex ${hardhat_rpc_log} "Started HTTP and WebSocket JSON-RPC server"
-log "Hardhat node started (127.0.0.1:8545)"
+log "Wait for anvil local node to complete startup"
+wait_for_regex ${anvil_rpc_log} "Listening on 127.0.0.1:8545"
+log "Anvil node started (127.0.0.1:8545)"
 
-# need to mirror contract data because of hardhat-deploy node only writing to localhost
-cp -R \
-  "${hardhat_basedir}/deployments/hardhat-localhost/localhost" \
-  "${hardhat_basedir}/deployments/hardhat-localhost/hardhat"
-cp -R \
-  "${hardhat_basedir}/deployments/hardhat-localhost" \
-  "${hardhat_basedir}/deployments/hardhat-localhost2"
+# need to mirror contract data because of anvil-deploy node only writing to localhost
+update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "anvil-localhost" "anvil-localhost"
+update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "anvil-localhost" "anvil-localhost2"
 # }}}
+
+log "Disable network registry"
+env PRIVATE_KEY="${deployer_private_key}" \
+  make -C "${mydir}/.." disable-network-registry \
+  environment=anvil-localhost environment_type=development
 
 #  --- Run nodes --- {{{
 setup_node 13301 19091 18081 "${node1_dir}" "${node1_log}" "${node1_id}" "${listen_host}"
@@ -280,8 +270,7 @@ wait_for_regex ${node5_log} "unfunded"
 log "Funding nodes"
 
 #  --- Fund nodes --- {{{
-cd "${hardhat_basedir}" && \
-  NODE_OPTIONS=--experimental-wasm-modules yarn faucet --identity-directory "${tmp_dir}"
+make fund-local id_dir="${tmp_dir}"
 # }}}
 
 log "Waiting for nodes startup"

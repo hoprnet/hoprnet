@@ -6,14 +6,10 @@
     { "path": "packages/connect" },
     { "path": "packages/core" },
     { "path": "packages/core-ethereum" },
-    { "path": "packages/cover-traffic-daemon" },
-    { "path": "packages/ethereum" },
     { "path": "packages/hoprd" },
     { "path": "packages/real" },
     { "path": "packages/utils" },
     { "path": "./tsconfig.scripts.json" },
-    // Hardhat environment within ethereum packages
-    { "path": "packages/ethereum/tsconfig.hardhat.json" },
     // Hopr-connect e2e tests
     { "path": "packages/connect/tests" }
   ]

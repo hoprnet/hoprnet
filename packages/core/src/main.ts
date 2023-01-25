@@ -18,7 +18,7 @@ import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import Hopr, { type HoprOptions } from './index.js'
 import { getAddrs } from './identity.js'
 import { createLibp2pMock } from './libp2p.mock.js'
-import { supportedEnvironments } from './environment.js'
+import { getContractData, supportedEnvironments } from './environment.js'
 import { MultiaddrConnection } from '@libp2p/interfaces/transport'
 
 const log = debug(`hopr-core:create-hopr`)
@@ -246,8 +246,13 @@ export async function createHoprNode(
     automaticChainCreation
   )
 
+  // get contract data for the given envirionment id and pass it on to create chain wrapper
+  const resolvedContractAddresses = getContractData(options.environment.id)
+  log(
+    `[DEBUG] resolvedContractAddresses ${options.environment.id} ${JSON.stringify(resolvedContractAddresses, null, 2)}`
+  )
   // Initialize connection to the blockchain
-  await chain.initializeChainWrapper()
+  await chain.initializeChainWrapper(resolvedContractAddresses)
 
   return new Hopr(peerId, db, chain, options)
 }

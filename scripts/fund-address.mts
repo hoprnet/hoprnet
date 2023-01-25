@@ -156,8 +156,11 @@ async function main() {
   const privKey = stringToU8a(PRIVATE_KEY)
 
   const { createChainWrapper } = await import('@hoprnet/hopr-core-ethereum')
+  const { getContractData } = await import('@hoprnet/hopr-core/src/environment.js')
+
   // Wait as long as it takes to mine the transaction, i.e. timeout=0
-  const chain = await createChainWrapper(chainOptions, privKey, true, 0)
+  const deploymentExtract = getContractData(environment.id)
+  const chain = await createChainWrapper(deploymentExtract, chainOptions, privKey, true, 0)
   const sender = chain.getPublicKey().toAddress().toString()
 
   // maybe fund ERC20

@@ -141,7 +141,9 @@ export function createZeroHopTicket(dest: PublicKey, challenge: Challenge, privK
 // are always an integer multiple of the base unit.
 
 /**
- * Validate unacknowledged tickets as we receive them
+ * Validate unacknowledged tickets as we receive them.
+ * Out of order validation is allowed. Ordering is enforced
+ * when tickets are redeemed.
  */
 export async function validateUnacknowledgedTicket(
   themPeerId: PeerId,
@@ -196,8 +198,7 @@ export async function validateUnacknowledgedTicket(
     )
   }
 
-  // find out latest index and pending balance
-  // from unredeemed tickets
+  // find out pending balance from unredeemed tickets
 
   // all tickets from sender
   const tickets = await getTickets().then((ts) => {
@@ -206,32 +207,12 @@ export async function validateUnacknowledgedTicket(
     })
   })
 
-  const { unrealizedBalance, unrealizedIndex } = tickets.reduce(
-    (result, t) => {
-      // update index
-      if (result.unrealizedIndex.toBN().lt(t.index.toBN())) {
-        result.unrealizedIndex = t.index
-      }
+  const unrealizedBalance = tickets.reduce((result, t) => {
+    // update balance
+    result = result.sub(t.amount)
 
-      // update balance
-      result.unrealizedBalance = result.unrealizedBalance.sub(t.amount)
-
-      return result
-    },
-    {
-      unrealizedBalance: channel.balance,
-      unrealizedIndex: channel.ticketIndex
-    }
-  )
-
-  // ticket's index MUST be higher than the channel's ticket index
-  if (ticket.index.toBN().lt(unrealizedIndex.toBN())) {
-    throw Error(
-      `Ticket index ${ticket.index.toBN().toString()} for channel ${channel
-        .getId()
-        .toHex()} must be higher than last ticket index ${unrealizedIndex.toBN().toString()}`
-    )
-  }
+    return result
+  }, channel.balance)
 
   // ensure sender has enough funds
   if (ticket.amount.toBN().gt(unrealizedBalance.toBN())) {

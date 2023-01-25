@@ -2010,7 +2010,7 @@ Reads the given package.json file and determines its version.
 
 #### Defined in
 
-lib/utils_misc.d.ts:11
+lib/utils_misc.d.ts:8
 
 ___
 
