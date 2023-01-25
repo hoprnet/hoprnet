@@ -780,7 +780,9 @@ name = "core-strategy"
 version = "0.1.0"
 dependencies = [
  "console_error_panic_hook",
+ "getrandom 0.2.8",
  "js-sys",
+ "rand 0.8.5",
  "serde",
  "serde-wasm-bindgen",
  "utils-misc",
@@ -4476,7 +4478,9 @@ dependencies = [
  "console_error_panic_hook",
  "ethnum",
  "hex 0.4.3",
+ "serde",
  "utils-misc",
+ "utils-proc-macros",
  "wasm-bindgen",
  "wasm-bindgen-test",
 ]

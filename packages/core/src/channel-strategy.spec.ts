@@ -1,5 +1,5 @@
 import assert from 'assert'
-import { PromiscuousStrategy, OutgoingChannelStatus } from './channel-strategy.js'
+import { PromiscuousStrategy, OutgoingChannelStatus, ChannelStatus } from './channel-strategy.js'
 import BN from 'bn.js'
 
 describe('test strategies', async function () {
@@ -25,9 +25,9 @@ describe('test strategies', async function () {
     peers.set('Joe', 0.3)
 
     let outgoing_channels = [
-      new OutgoingChannelStatus('Alice', stake),
-      new OutgoingChannelStatus('Charlie', stake),
-      new OutgoingChannelStatus('Gustave', '1000000000000000')
+      new OutgoingChannelStatus('Alice', stake, ChannelStatus.Open),
+      new OutgoingChannelStatus('Charlie', stake, ChannelStatus.Open),
+      new OutgoingChannelStatus('Gustave', '1000000000000000', ChannelStatus.Open)
     ]
 
     let res = strategy.tick(new BN(stake), peers.keys(), outgoing_channels, (x: string) => peers.get(x))

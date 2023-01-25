@@ -1,3 +1,4 @@
+use utils_types::channels::ChannelStatus;
 use utils_types::primitives::Balance;
 
 /// Basic strategy trait that all strategies must implement.
@@ -38,6 +39,7 @@ pub trait ChannelStrategy {
 pub struct OutgoingChannelStatus {
     pub peer_id: String,
     pub stake: Balance,
+    pub status: ChannelStatus,
 }
 
 #[cfg(feature = "wasm")]
@@ -46,6 +48,7 @@ impl From<&wasm::OutgoingChannelStatus> for OutgoingChannelStatus {
         OutgoingChannelStatus {
             peer_id: x.peer_id.clone(),
             stake: Balance::from_str(x.stake_str.as_str()).unwrap(),
+            status: x.status.clone()
         }
     }
 }
@@ -105,21 +108,24 @@ pub mod wasm {
     use utils_types::primitives::wasm::Balance;
 
     use serde::{Deserialize, Serialize};
+    use utils_types::channels::ChannelStatus;
 
     #[wasm_bindgen(getter_with_clone)]
     #[derive(Serialize, Deserialize)]
     pub struct OutgoingChannelStatus {
         pub peer_id: String,
         pub stake_str: String,
+        pub status: ChannelStatus,
     }
 
     #[wasm_bindgen]
     impl OutgoingChannelStatus {
         #[wasm_bindgen(constructor)]
-        pub fn new(peer_id: &str, stake_str: &str) -> Self {
+        pub fn new(peer_id: &str, stake_str: &str, status: ChannelStatus) -> Self {
             OutgoingChannelStatus {
                 peer_id: peer_id.to_string(),
                 stake_str: stake_str.to_string(),
+                status
             }
         }
     }
@@ -129,6 +135,7 @@ pub mod wasm {
             OutgoingChannelStatus {
                 peer_id: x.peer_id.clone(),
                 stake_str: x.stake.to_string(),
+                status: x.status.clone()
             }
         }
     }

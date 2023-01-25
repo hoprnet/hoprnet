@@ -14,7 +14,7 @@ import {
   utils_misc_set_panic_hook
 } from '../lib/core_strategy.js'
 utils_misc_set_panic_hook()
-export { OutgoingChannelStatus, StrategyTickResult } from '../lib/core_strategy.js'
+export { OutgoingChannelStatus, StrategyTickResult, ChannelStatus } from '../lib/core_strategy.js'
 
 /**
  * Staked nodes will likely want to automate opening and closing of channels. By

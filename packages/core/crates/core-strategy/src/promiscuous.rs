@@ -1,3 +1,7 @@
+use rand::rngs::OsRng;
+use rand::seq::SliceRandom;
+
+use utils_types::channels::ChannelStatus::{Open, PendingToClose};
 use utils_types::primitives::{Balance, BaseBalance};
 
 use crate::generic::{ChannelStrategy, OutgoingChannelStatus, StrategyTickResult};
@@ -10,6 +14,7 @@ pub struct PromiscuousStrategy {
     new_channel_stake: Balance,
     minimum_channel_balance: Balance,
     minimum_node_balance: Balance,
+    scaling_constant: u16,
 }
 
 impl Default for PromiscuousStrategy {
@@ -23,6 +28,7 @@ impl Default for PromiscuousStrategy {
             new_channel_stake: Balance::from_str("100000000000000000").unwrap(),
             minimum_channel_balance: Balance::from_str("10000000000000000").unwrap(),
             minimum_node_balance: Balance::from_str("100000000000000000").unwrap(),
+            scaling_constant: 1
         }
     }
 }
@@ -48,13 +54,13 @@ impl ChannelStrategy for PromiscuousStrategy {
         // which peer ids should become candidates for a new channel
         // Also re-open all the channels that have dropped under minimum given balance
         for peer_id in peer_ids {
-            // Skip this peer if we already processed it (iterator may have duplicates)
             if to_close.contains(&peer_id)
                 || new_channel_candidates
                     .iter()
                     .find(|(p, _)| p.eq(&peer_id))
                     .is_some()
             {
+                // Skip this peer if we already processed it (iterator may have duplicates)
                 continue;
             }
 
@@ -65,6 +71,7 @@ impl ChannelStrategy for PromiscuousStrategy {
             // Also get channels we have opened with it
             let channel_with_peer = outgoing_channels
                 .iter()
+                .filter(|c| c.status == Open)
                 .find(|c| c.peer_id.eq(&peer_id.as_str()));
 
             if let Some(channel) = channel_with_peer {
@@ -84,15 +91,24 @@ impl ChannelStrategy for PromiscuousStrategy {
             network_size = network_size + 1;
         }
 
+        // Also mark for closing all channels which are in PendingToClose state
+        outgoing_channels
+            .iter()
+            .filter(|c| c.status == PendingToClose)
+            .for_each(|c| to_close.push(c.peer_id.clone()));
+
         // We compute the upper bound for channels as a square-root of the perceived network size
-        let max_auto_channels = (network_size as f64).sqrt().ceil() as usize;
+        let max_auto_channels = self.scaling_constant as usize * (network_size as f64).sqrt().ceil() as usize;
+        let count_opened = outgoing_channels.iter().filter(|c| c.status == Open).count();
 
         // Sort the new channel candidates by best quality first, then truncate to the number of available slots
         // This way, we'll prefer candidates with higher quality, when we don't have enough node balance
+        // Shuffle first, so the equal candidates are randomized and then use unstable sorting for that purpose.
+        new_channel_candidates.shuffle(&mut OsRng);
         new_channel_candidates
             .sort_unstable_by(|(_, q1), (_, q2)| q1.partial_cmp(q2).unwrap().reverse());
         new_channel_candidates
-            .truncate(max_auto_channels - (outgoing_channels.len() - to_close.len()));
+            .truncate(max_auto_channels - (count_opened - to_close.len()));
 
         // Go through the new candidates for opening channels allow them to open based on our available node balance
         let mut to_open: Vec<OutgoingChannelStatus> = vec![];
@@ -108,6 +124,7 @@ impl ChannelStrategy for PromiscuousStrategy {
                 to_open.push(OutgoingChannelStatus {
                     peer_id,
                     stake: self.new_channel_stake.clone(),
+                    status: Open
                 });
                 remaining_balance = balance.sub(&self.new_channel_stake);
             }
@@ -149,14 +166,17 @@ mod tests {
             OutgoingChannelStatus {
                 peer_id: "Alice".to_string(),
                 stake: balance.clone(),
+                status: Open,
             },
             OutgoingChannelStatus {
                 peer_id: "Charlie".to_string(),
                 stake: balance.clone(),
+                status: Open,
             },
             OutgoingChannelStatus {
                 peer_id: "Gustave".to_string(),
                 stake: low_balance,
+                status: Open,
             },
         ];
 
@@ -205,6 +225,7 @@ pub mod wasm {
             minimum_node_balance: Balance,
             new_channel_stake: Balance,
             minimum_channel_balance: Balance,
+            scaling_constant: u16
         ) -> Self {
             PromiscuousStrategy {
                 w: super::PromiscuousStrategy {
@@ -212,6 +233,7 @@ pub mod wasm {
                     minimum_node_balance: minimum_node_balance.w,
                     new_channel_stake: new_channel_stake.w,
                     minimum_channel_balance: minimum_channel_balance.w,
+                    scaling_constant
                 },
             }
         }
