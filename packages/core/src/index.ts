@@ -665,7 +665,10 @@ class Hopr extends EventEmitter {
 
     const tickResult: StrategyTickResult = this.strategy.tick(
       balance.toBN(),
-      this.networkPeers.all().map((p) => p.toString()).values(),
+      this.networkPeers
+        .all()
+        .map((p) => p.toString())
+        .values(),
       allOutgoingChannels,
       (peer_id_str: string) => this.networkPeers.qualityOf(peerIdFromString(peer_id_str))
     )
