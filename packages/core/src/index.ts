@@ -648,8 +648,7 @@ class Hopr extends EventEmitter {
 
       metric_inChannelCount.set(incomingChannels)
       metric_outChannelCount.set(outgoingChannels)
-    }
-    catch (e) {
+    } catch (e) {
       log(`error: failed to update channel metrics`, e)
     }
   }
@@ -669,13 +668,15 @@ class Hopr extends EventEmitter {
       verbose(`strategy tracks ${outgoingChannels.length} outgoing channels`)
 
       // Check if all peer ids are still registered
-      await Promise.all(outgoingChannels.map(async (channel) => {
-        if (await this.isAllowedAccessToNetwork(channel.destination.toPeerId())) {
-          this.networkPeers.register(channel.destination.toPeerId(), NetworkPeersOrigin.STRATEGY_EXISTING_CHANNEL)
-        } else {
-          error(`Protocol error: Strategy is monitoring non-registered peer ${channel.destination.toString()}`)
-        }
-      }))
+      await Promise.all(
+        outgoingChannels.map(async (channel) => {
+          if (await this.isAllowedAccessToNetwork(channel.destination.toPeerId())) {
+            this.networkPeers.register(channel.destination.toPeerId(), NetworkPeersOrigin.STRATEGY_EXISTING_CHANNEL)
+          } else {
+            error(`Protocol error: Strategy is monitoring non-registered peer ${channel.destination.toString()}`)
+          }
+        })
+      )
 
       // Perform the strategy tick
       tickResult = this.strategy.tick(
@@ -685,12 +686,12 @@ class Hopr extends EventEmitter {
           .map((p) => p.toString())
           .values(),
         outgoingChannels.map((c) => {
-            return {
-              peer_id: c.destination.toPeerId().toString(),
-              stake_str: c.balance.toBN().toString(),
-              status: c.status
-            }
-          }),
+          return {
+            peer_id: c.destination.toPeerId().toString(),
+            stake_str: c.balance.toBN().toString(),
+            status: c.status
+          }
+        }),
         (peer_id_str: string) => this.networkPeers.qualityOf(peerIdFromString(peer_id_str))
       )
     } catch (e) {
