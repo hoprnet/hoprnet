@@ -1,28 +1,28 @@
 {
   "environments": {
     "anvil-localhost": {
-      "stake_season": 5,
-      "network_registry_contract_address": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e",
-      "token_contract_address": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
-      "boost_contract_address": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6",
-      "stake_contract_address": "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318",
-      "network_registry_proxy_contract_address": "0x610178dA211FEF7D417bC0e6FeD39F05609AD788",
       "channels_contract_address": "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707",
+      "stake_contract_address": "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318",
+      "xhopr_contract_address": "0x0165878A594ca255338adfa4d48449f69242Eb8F",
+      "stake_season": 5,
       "environment_type": "development",
       "indexer_start_block_number": 3,
-      "xhopr_contract_address": "0x0165878A594ca255338adfa4d48449f69242Eb8F"
+      "boost_contract_address": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6",
+      "token_contract_address": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+      "network_registry_contract_address": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e",
+      "network_registry_proxy_contract_address": "0x610178dA211FEF7D417bC0e6FeD39F05609AD788"
     },
     "anvil-localhost2": {
-      "stake_season": 5,
-      "network_registry_contract_address": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e",
-      "token_contract_address": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
-      "boost_contract_address": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6",
-      "stake_contract_address": "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318",
-      "network_registry_proxy_contract_address": "0x610178dA211FEF7D417bC0e6FeD39F05609AD788",
       "channels_contract_address": "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707",
+      "stake_contract_address": "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318",
+      "xhopr_contract_address": "0x0165878A594ca255338adfa4d48449f69242Eb8F",
+      "stake_season": 5,
       "environment_type": "development",
       "indexer_start_block_number": 3,
-      "xhopr_contract_address": "0x0165878A594ca255338adfa4d48449f69242Eb8F"
+      "boost_contract_address": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6",
+      "token_contract_address": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+      "network_registry_contract_address": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e",
+      "network_registry_proxy_contract_address": "0x610178dA211FEF7D417bC0e6FeD39F05609AD788"
     },
     "master-staging": {
       "channels_contract_address": "0x7e8c876Eab41238E3d03b5E202Ee5bC94425D8C3",
