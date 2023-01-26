@@ -384,7 +384,7 @@ class Hopr extends EventEmitter {
     this.heartbeat = new Heartbeat(
       this.id,
       this.networkPeers,
-      subscribe,
+      this.libp2pComponents,
       sendMessage,
       this.closeConnectionsTo.bind(this),
       (oldHealthValue: NetworkHealthIndicator, newNetworkHealth: NetworkHealthIndicator) =>

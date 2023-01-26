@@ -43,7 +43,12 @@ log "Verifying docker image ${image} has bundled package version ${package_versi
 declare version
 version=$(docker run -v /var/run/docker.sock:/var/run/docker.sock ${image} --version | sed -En '/^[0-9]+\.[0-9]+\.[0-9]+(-next\.[0-9]+)?$/p')
 
-if [ "${version}" != "${package_version}" ]; then
+# The version returned by hoprd has the following format: hoprd v1.2.3
+# Any suffix after the patch version is omitted.
+# Therefore, we check that the package version starts with the reported version
+# as a prefix.
+
+if [[ "${version#hoprd v}*" = "${package_version}" ]]; then
   log "Docker image ${image} has bundled package version ${version}, expected ${package_version}"
   exit 1
 fi
