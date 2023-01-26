@@ -110,7 +110,6 @@ pub mod wasm {
     use serde::{Deserialize, Serialize};
     use utils_types::channels::ChannelStatus;
 
-    #[wasm_bindgen]
     #[derive(Serialize, Deserialize)]
     pub struct OutgoingChannelStatus {
         pub peer_id: String,
