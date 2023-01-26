@@ -5,6 +5,10 @@ import { CHECK_TIMEOUT } from './constants.js'
 
 const log = debug('hopr-core:channel-strategy')
 
+import { webcrypto } from 'node:crypto'
+// @ts-ignore
+globalThis.crypto = webcrypto
+
 import {
   PromiscuousStrategy as RS_PromiscuousStrategy,
   PassiveStrategy as RS_PassiveStrategy,
@@ -13,6 +17,7 @@ import {
   PromiscuousSettings,
   utils_misc_set_panic_hook
 } from '../lib/core_strategy.js'
+
 utils_misc_set_panic_hook()
 
 export { StrategyTickResult, PromiscuousSettings } from '../lib/core_strategy.js'
