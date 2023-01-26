@@ -6,7 +6,7 @@ pub fn generate_ping_response(req: Box<[u8]>) -> Box<[u8]> {
 
     hasher.update(req);
 
-    Box::from_iter(hasher.finalize().to_vec())
+    hasher.finalize().to_vec().into_boxed_slice()
 }
 
 #[cfg(feature = "wasm")]
