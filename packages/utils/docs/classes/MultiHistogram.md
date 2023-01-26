@@ -44,7 +44,7 @@
 
 #### Defined in
 
-lib/utils_metrics.d.ts:168
+lib/utils_metrics.d.ts:206
 
 ___
 
@@ -58,7 +58,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:149
+lib/utils_metrics.d.ts:187
 
 ___
 
@@ -78,7 +78,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:173
+lib/utils_metrics.d.ts:211
 
 ___
 
@@ -98,7 +98,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:178
+lib/utils_metrics.d.ts:216
 
 ___
 
@@ -112,7 +112,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:186
+lib/utils_metrics.d.ts:224
 
 ___
 
@@ -126,7 +126,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:182
+lib/utils_metrics.d.ts:220
 
 ___
 
@@ -147,7 +147,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:154
+lib/utils_metrics.d.ts:192
 
 ___
 
@@ -167,7 +167,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:163
+lib/utils_metrics.d.ts:201
 
 ___
 
@@ -187,4 +187,4 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:159
+lib/utils_metrics.d.ts:197

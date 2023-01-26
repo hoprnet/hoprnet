@@ -269,7 +269,7 @@ because Rust does not support exporting constants to WASM
 
 #### Defined in
 
-packages/core/lib/core_misc.d.ts:8
+packages/core/lib/core_misc.d.ts:19
 
 ___
 
