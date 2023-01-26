@@ -14,23 +14,7 @@ pub struct PromiscuousStrategy {
     new_channel_stake: Balance,
     minimum_channel_balance: Balance,
     minimum_node_balance: Balance,
-    scaling_constant: u16,
-}
-
-impl Default for PromiscuousStrategy {
-    /// Creates promiscuous strategy with default parameters,
-    /// that is quality threshold 0.5, new channel stake 0.1 txHOPR,
-    /// minimum channel balance to 0.01 txHOPR (meaning an auto-channel can be used for 10 msgs)
-    /// minimum token balance on the node should not drop below 0.1 txHOPR.
-    fn default() -> Self {
-        PromiscuousStrategy {
-            network_quality_threshold: 0.5,
-            new_channel_stake: Balance::from_str("100000000000000000").unwrap(),
-            minimum_channel_balance: Balance::from_str("10000000000000000").unwrap(),
-            minimum_node_balance: Balance::from_str("100000000000000000").unwrap(),
-            scaling_constant: 1
-        }
-    }
+    max_channels: Option<usize>,
 }
 
 impl ChannelStrategy for PromiscuousStrategy {
@@ -98,7 +82,7 @@ impl ChannelStrategy for PromiscuousStrategy {
             .for_each(|c| to_close.push(c.peer_id.clone()));
 
         // We compute the upper bound for channels as a square-root of the perceived network size
-        let max_auto_channels = self.scaling_constant as usize * (network_size as f64).sqrt().ceil() as usize;
+        let max_auto_channels = self.max_channels.unwrap_or((network_size as f64).sqrt().ceil() as usize);
         let count_opened = outgoing_channels.iter().filter(|c| c.status == Open).count();
 
         // Sort the new channel candidates by best quality first, then truncate to the number of available slots
@@ -212,6 +196,28 @@ pub mod wasm {
     use crate::generic::wasm::StrategyTickResult;
     use crate::generic::ChannelStrategy;
 
+    #[wasm_bindgen(getter_with_clone)]
+    pub struct PromiscuousSettings {
+        pub network_quality_threshold: f64,
+        pub new_channel_stake: Balance,
+        pub minimum_channel_balance: Balance,
+        pub minimum_node_balance: Balance,
+        pub max_channels: Option<u32>,
+    }
+
+    #[wasm_bindgen]
+    impl PromiscuousSettings {
+        pub fn default() -> Self {
+            PromiscuousSettings {
+                network_quality_threshold: 0.5,
+                new_channel_stake: Balance::new("100000000000000000").unwrap(),
+                minimum_channel_balance: Balance::new("10000000000000000").unwrap(),
+                minimum_node_balance: Balance::new("100000000000000000").unwrap(),
+                max_channels: None
+            }
+        }
+    }
+
     #[wasm_bindgen]
     pub struct PromiscuousStrategy {
         w: super::PromiscuousStrategy,
@@ -220,27 +226,15 @@ pub mod wasm {
     #[wasm_bindgen]
     impl PromiscuousStrategy {
         #[wasm_bindgen(constructor)]
-        pub fn new(
-            network_quality_threshold: f64,
-            minimum_node_balance: Balance,
-            new_channel_stake: Balance,
-            minimum_channel_balance: Balance,
-            scaling_constant: u16
-        ) -> Self {
+        pub fn new(settings: PromiscuousSettings) -> Self {
             PromiscuousStrategy {
                 w: super::PromiscuousStrategy {
-                    network_quality_threshold,
-                    minimum_node_balance: minimum_node_balance.w,
-                    new_channel_stake: new_channel_stake.w,
-                    minimum_channel_balance: minimum_channel_balance.w,
-                    scaling_constant
+                    network_quality_threshold: settings.network_quality_threshold,
+                    minimum_node_balance: settings.minimum_node_balance.w,
+                    new_channel_stake: settings.new_channel_stake.w,
+                    minimum_channel_balance: settings.minimum_channel_balance.w,
+                    max_channels: settings.max_channels.map(|c| c as usize)
                 },
-            }
-        }
-
-        pub fn default() -> Self {
-            PromiscuousStrategy {
-                w: super::PromiscuousStrategy::default(),
             }
         }
 

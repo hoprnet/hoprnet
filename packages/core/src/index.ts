@@ -69,6 +69,7 @@ import {
   OutgoingChannelStatus,
   PassiveStrategy,
   PromiscuousStrategy,
+  PromiscuousSettings,
   SaneDefaults,
   StrategyTickResult
 } from './channel-strategy.js'
@@ -1470,6 +1471,7 @@ export { createHoprNode } from './main.js'
 export {
   PassiveStrategy,
   PromiscuousStrategy,
+  PromiscuousSettings,
   SaneDefaults,
   findPath,
   StrategyTickResult,

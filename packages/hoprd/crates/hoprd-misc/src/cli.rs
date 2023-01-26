@@ -220,6 +220,24 @@ struct CliArgs {
     pub password: Option<String>,
 
     #[arg(
+    long,
+    help = "Default channel strategy to use after node starts up",
+    env = "HOPRD_DEFAULT_STRATEGY",
+    value_name = "DEFAULT_STRATEGY",
+    default_value = "passive"
+    )]
+    pub default_strategy: Option<String>,
+
+    #[arg(
+    long,
+    help = "Maximum number of channel a strategy can open. If not specified, square root of number of available peers is used.",
+    env = "HOPRD_MAX_AUTO_CHANNELS",
+    value_name = "MAX_AUTO_CHANNELS",
+    value_parser = clap::value_parser!(u32)
+    )]
+    pub max_auto_channels: Option<u32>, // Make this a string if we want to supply functions instead in the future.
+
+    #[arg(
         long,
         help = "A custom RPC provider to be used for the node to connect to blockchain",
         env = "HOPRD_PROVIDER",

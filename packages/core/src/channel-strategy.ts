@@ -10,10 +10,12 @@ import {
   PassiveStrategy as RS_PassiveStrategy,
   StrategyTickResult,
   Balance,
+  PromiscuousSettings,
   utils_misc_set_panic_hook
 } from '../lib/core_strategy.js'
 utils_misc_set_panic_hook()
-export { StrategyTickResult } from '../lib/core_strategy.js'
+
+export { StrategyTickResult, PromiscuousSettings } from '../lib/core_strategy.js'
 
 import { ChannelStatus } from '@hoprnet/hopr-utils'
 
@@ -105,8 +107,8 @@ abstract class RustStrategyWrapper<T extends { tick; name }> extends SaneDefault
 }
 
 export class PromiscuousStrategy extends RustStrategyWrapper<RS_PromiscuousStrategy> {
-  constructor() {
-    super(RS_PromiscuousStrategy.default())
+  constructor(settings: PromiscuousSettings) {
+    super(new RS_PromiscuousStrategy(settings))
   }
 }
 

@@ -14,7 +14,7 @@ import {
   createHoprNode,
   default as Hopr,
   type HoprOptions,
-  NetworkHealthIndicator,
+  NetworkHealthIndicator, PassiveStrategy, PromiscuousStrategy, PromiscuousSettings,
   ResolvedEnvironment,
   resolveEnvironment
 } from '@hoprnet/hopr-core'
@@ -78,6 +78,18 @@ function generateNodeOptions(argv: CliArgs, environment: ResolvedEnvironment): H
 
   if (argv.password !== undefined) {
     options.password = argv.password as string
+  }
+
+  switch (argv.default_strategy) {
+    case 'promiscuous':
+      let settings = PromiscuousSettings.default()
+      settings.max_channels = argv.max_auto_channels
+      options.strategy = new PromiscuousStrategy(settings)
+      break;
+    default:
+    case 'passive':
+      options.strategy = new PassiveStrategy();
+      break;
   }
 
   return options

@@ -1,5 +1,5 @@
 import type Hopr from '@hoprnet/hopr-core'
-import { PassiveStrategy, PromiscuousStrategy } from '@hoprnet/hopr-core'
+import { PassiveStrategy, PromiscuousSettings, PromiscuousStrategy } from '@hoprnet/hopr-core'
 import type { Operation } from 'express-openapi'
 import { STATUS_CODES } from '../../utils.js'
 import { SettingKey, State, StateOps } from '../../../../types.js'
@@ -28,7 +28,8 @@ export const setSetting = (node: Hopr, stateOps: StateOps, key: keyof State['set
           strategy = new PassiveStrategy()
           break
         case 'promiscuous':
-          strategy = new PromiscuousStrategy()
+          let promiscSettings = PromiscuousSettings.default()
+          strategy = new PromiscuousStrategy(promiscSettings)
           break
       }
       if (!strategy) throw Error(STATUS_CODES.INVALID_SETTING_VALUE)
