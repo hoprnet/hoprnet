@@ -106,9 +106,18 @@ const metric_pathLength = create_histogram_with_buckets(
   new Float64Array([0, 1, 2, 3, 4])
 )
 const metric_strategyTicks = create_counter('core_counter_strategy_ticks', 'Number of strategy decisions (ticks)')
-const metric_strategyLastOpened = create_gauge('core_gauge_strategy_last_opened_channels', 'Number of opened channels in the last strategy tick')
-const metric_strategyLastClosed = create_gauge('core_gauge_strategy_last_closed_channels', 'Number of closed channels in the last strategy tick')
-const metric_strategyMaxChannels = create_gauge('core_gauge_strategy_max_auto_channels', 'Maximum number of channels the current strategy can open')
+const metric_strategyLastOpened = create_gauge(
+  'core_gauge_strategy_last_opened_channels',
+  'Number of opened channels in the last strategy tick'
+)
+const metric_strategyLastClosed = create_gauge(
+  'core_gauge_strategy_last_closed_channels',
+  'Number of closed channels in the last strategy tick'
+)
+const metric_strategyMaxChannels = create_gauge(
+  'core_gauge_strategy_max_auto_channels',
+  'Maximum number of channels the current strategy can open'
+)
 
 // Using libp2p components directly because it allows us
 // to bypass the API layer
