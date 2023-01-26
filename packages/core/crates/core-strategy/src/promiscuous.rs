@@ -17,6 +17,22 @@ pub struct PromiscuousStrategy {
     max_channels: Option<usize>,
 }
 
+impl PromiscuousStrategy {
+    pub fn new(network_quality_threshold: f64,
+               new_channel_stake: Balance,
+               minimum_channel_balance: Balance,
+               minimum_node_balance: Balance,
+               max_channels: Option<usize>) -> Self {
+        PromiscuousStrategy {
+            network_quality_threshold,
+            new_channel_stake,
+            minimum_channel_balance,
+            minimum_node_balance,
+            max_channels
+        }
+    }
+}
+
 impl ChannelStrategy for PromiscuousStrategy {
     const NAME: &'static str = "promiscuous";
 
@@ -126,7 +142,11 @@ mod tests {
 
     #[test]
     fn test_promiscuous_basic() {
-        let strat = PromiscuousStrategy::default();
+        let strat = PromiscuousStrategy::new(0.5,
+                                             Balance::from_str("100000000000000000").unwrap(),
+                                             Balance::from_str("10000000000000000").unwrap(),
+                                             Balance::from_str("100000000000000000").unwrap(),
+                                             None);
 
         assert_eq!(strat.name(), "promiscuous");
 
@@ -228,13 +248,12 @@ pub mod wasm {
         #[wasm_bindgen(constructor)]
         pub fn new(settings: PromiscuousSettings) -> Self {
             PromiscuousStrategy {
-                w: super::PromiscuousStrategy {
-                    network_quality_threshold: settings.network_quality_threshold,
-                    minimum_node_balance: settings.minimum_node_balance.w,
-                    new_channel_stake: settings.new_channel_stake.w,
-                    minimum_channel_balance: settings.minimum_channel_balance.w,
-                    max_channels: settings.max_channels.map(|c| c as usize)
-                },
+                w: super::PromiscuousStrategy::new(
+                    settings.network_quality_threshold,
+                    settings.minimum_node_balance.w,
+                    settings.new_channel_stake.w,
+                    settings.minimum_channel_balance.w,
+                    settings.max_channels.map(|c| c as usize))
             }
         }
 
