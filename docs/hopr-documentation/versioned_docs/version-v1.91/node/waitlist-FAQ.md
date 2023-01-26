@@ -2,6 +2,7 @@
 id: waitlist-FAQ
 title: Waitlist FAQ
 ---
+
 ### What is the waitlist?
 
 To allow for incremental scaling, we have temporarily implemented a HOPR network registry. To be able to access the HOPR network registry gradually, we implemented a waiting list, where every participant who is willing to run a node has to fill in the registration form.
