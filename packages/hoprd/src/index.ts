@@ -14,7 +14,10 @@ import {
   createHoprNode,
   default as Hopr,
   type HoprOptions,
-  NetworkHealthIndicator, PassiveStrategy, PromiscuousStrategy, PromiscuousSettings,
+  NetworkHealthIndicator,
+  PassiveStrategy,
+  PromiscuousStrategy,
+  PromiscuousSettings,
   ResolvedEnvironment,
   resolveEnvironment
 } from '@hoprnet/hopr-core'
@@ -85,11 +88,11 @@ function generateNodeOptions(argv: CliArgs, environment: ResolvedEnvironment): H
       let settings = PromiscuousSettings.default()
       settings.max_channels = argv.max_auto_channels
       options.strategy = new PromiscuousStrategy(settings)
-      break;
+      break
     default:
     case 'passive':
-      options.strategy = new PassiveStrategy();
-      break;
+      options.strategy = new PassiveStrategy()
+      break
   }
 
   return options
