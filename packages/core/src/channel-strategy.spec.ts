@@ -31,17 +31,37 @@ describe('test strategies', async function () {
       { peer_id: 'Gustave', stake_str: '1000000000000000', status: ChannelStatus.Open }
     ]
 
-    let res = strategy.tick(new BN(stake), peers.keys(), outgoing_channels, (x: string) => peers.get(x))
+    {
+      let res = strategy.tick(new BN(stake), peers.keys(), outgoing_channels, (x: string) => peers.get(x))
 
-    assert.equal(res.max_auto_channels, 4)
-    assert.equal(res.to_close().length, 2)
-    assert.equal(res.to_open().length, 3)
+      assert.equal(res.max_auto_channels, 4)
+      assert.equal(res.to_close().length, 2)
+      assert.equal(res.to_open().length, 3)
 
-    assert(res.to_close().includes('Alice'))
-    assert(res.to_close().includes('Gustave'))
+      assert(res.to_close().includes('Alice'))
+      assert(res.to_close().includes('Gustave'))
 
-    assert.equal(res.to_open()[0].peer_id, 'Gustave')
-    assert.equal(res.to_open()[1].peer_id, 'Eugene')
-    assert.equal(res.to_open()[2].peer_id, 'Bob')
+      assert.equal(res.to_open()[0].peer_id, 'Gustave')
+      assert.equal(res.to_open()[1].peer_id, 'Eugene')
+      assert.equal(res.to_open()[2].peer_id, 'Bob')
+    }
+
+    // Now reconfigure the strategy and tick again with same inputs
+    strategy.configure({
+      max_channels: 2
+    })
+
+    {
+      let res = strategy.tick(new BN(stake), peers.keys(), outgoing_channels, (x: string) => peers.get(x))
+
+      assert.equal(res.max_auto_channels, 2)
+      assert.equal(res.to_close().length, 2)
+      assert.equal(res.to_open().length, 1)
+
+      assert(res.to_close().includes('Alice'))
+      assert(res.to_close().includes('Gustave'))
+
+      assert.equal(res.to_open()[0].peer_id, 'Gustave')
+    }
   })
 })
