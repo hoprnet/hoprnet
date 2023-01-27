@@ -25,7 +25,7 @@ import BN from 'bn.js'
 import NonceTracker from './nonce-tracker.js'
 import TransactionManager, { type TransactionPayload } from './transaction-manager.js'
 import { debug } from '@hoprnet/hopr-utils'
-import { TX_CONFIRMATION_WAIT } from './constants.js'
+import { CORE_ETHEREUM_CONSTANTS } from '../lib/core_ethereum_misc.js'
 import type { Block } from '@ethersproject/abstract-provider'
 
 // @ts-ignore untyped library
@@ -39,6 +39,9 @@ import {
   HoprToken,
   DeploymentExtract
 } from './utils/index.js'
+
+// Exported from Rust
+const constants = CORE_ETHEREUM_CONSTANTS()
 
 const log = debug('hopr:core-ethereum:ethereum')
 const abiCoder = new utils.AbiCoder()
@@ -77,7 +80,7 @@ export async function createChainWrapper(
   },
   privateKey: Uint8Array,
   checkDuplicate: Boolean = true,
-  txTimeout = TX_CONFIRMATION_WAIT
+  txTimeout = constants.TX_CONFIRMATION_WAIT
 ) {
   log(`[DEBUG] networkInfo.provider ${JSON.stringify(networkInfo.provider, null, 2)}`)
   const provider = networkInfo.provider.startsWith('http')

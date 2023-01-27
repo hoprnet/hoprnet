@@ -520,9 +520,8 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.0.29"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4d63b9e9c07271b9957ad22c173bae2a4d9a81127680962039296abcd2f8251d"
+version = "4.0.32"
+source = "git+https://github.com/hoprnet/clap?branch=robertkiel/update-env-from#57115b1d15a6b41687223955c02278882ccb97c4"
 dependencies = [
  "bitflags",
  "clap_derive",
@@ -536,8 +535,7 @@ dependencies = [
 [[package]]
 name = "clap_derive"
 version = "4.0.21"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0177313f9f02afc995627906bbd8967e2be069f5261954222dac78290c2b9014"
+source = "git+https://github.com/hoprnet/clap?branch=robertkiel/update-env-from#57115b1d15a6b41687223955c02278882ccb97c4"
 dependencies = [
  "heck 0.4.0",
  "proc-macro-error",
@@ -549,8 +547,7 @@ dependencies = [
 [[package]]
 name = "clap_lex"
 version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d4198f73e42b4936b35b5bb248d81d2b595ecb170da0bac7655c54eedfa8da8"
+source = "git+https://github.com/hoprnet/clap?branch=robertkiel/update-env-from#57115b1d15a6b41687223955c02278882ccb97c4"
 dependencies = [
  "os_str_bytes",
 ]
@@ -734,6 +731,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "core-ethereum-misc"
+version = "0.1.0"
+dependencies = [
+ "console_error_panic_hook",
+ "utils-proc-macros",
+ "wasm-bindgen",
+ "wasm-bindgen-test",
+ "wasm-opt",
+ "wasm-pack",
+]
+
+[[package]]
 name = "core-foundation"
 version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -748,6 +757,41 @@ name = "core-foundation-sys"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5827cebf4670468b8772dd191856768aedcb1b0278a04f989f7766351917b9dc"
+
+[[package]]
+name = "core-misc"
+version = "0.1.0"
+dependencies = [
+ "blake2",
+ "console_error_panic_hook",
+ "futures 0.3.25",
+ "js-sys",
+ "real-base",
+ "serde",
+ "serde-wasm-bindgen",
+ "serde_json",
+ "utils-misc",
+ "utils-proc-macros",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "wasm-bindgen-test",
+ "wasm-opt",
+ "wasm-pack",
+]
+
+[[package]]
+name = "core-strategy"
+version = "0.1.0"
+dependencies = [
+ "console_error_panic_hook",
+ "js-sys",
+ "serde",
+ "serde-wasm-bindgen",
+ "utils-misc",
+ "utils-types",
+ "wasm-bindgen",
+ "wasm-bindgen-test",
+]
 
 [[package]]
 name = "cpufeatures"
@@ -1380,6 +1424,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "ethnum"
+version = "1.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0198b9d0078e0f30dedc7acbb21c974e838fc8fae3ee170128658a98cb2c1c04"
+
+[[package]]
 name = "eyre"
 version = "0.6.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1504,7 +1554,7 @@ dependencies = [
 name = "foundry-tool"
 version = "0.1.0"
 dependencies = [
- "clap 4.0.29",
+ "clap 4.0.32",
  "ethers",
 ]
 
@@ -1842,8 +1892,18 @@ dependencies = [
 name = "hoprd-misc"
 version = "0.1.0"
 dependencies = [
+ "clap 4.0.32",
  "console_error_panic_hook",
+ "core-ethereum-misc",
+ "core-misc",
+ "js-sys",
+ "proc-macro-regex",
  "real-base",
+ "serde",
+ "serde-wasm-bindgen",
+ "serde_json",
+ "utils-misc",
+ "utils-proc-macros",
  "wasm-bindgen",
  "wasm-bindgen-test",
  "wasm-opt",
@@ -2291,9 +2351,9 @@ dependencies = [
 
 [[package]]
 name = "linux-raw-sys"
-version = "0.1.3"
+version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f9f08d8963a6c613f4b1a78f4f4a4dbfadf8e6545b2d72861731e4858b8b47f"
+checksum = "f051f77a7c8e6957c0696eac88f26b0117e54f52d3fc682ab19397a8812846a4"
 
 [[package]]
 name = "lock_api"
@@ -2892,6 +2952,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "proc-macro-regex"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "25953f1376b0a33e2bcac2d7aa76029162ec6203536760c89e25d6a1f733c37d"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "regex-syntax",
+ "syn",
+ "thiserror",
+]
+
+[[package]]
 name = "proc-macro2"
 version = "1.0.47"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3143,6 +3216,7 @@ dependencies = [
 name = "real-base"
 version = "0.1.0"
 dependencies = [
+ "thiserror",
  "wasm-bindgen",
  "wasm-bindgen-test",
  "wasm-opt",
@@ -3605,6 +3679,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde-wasm-bindgen"
+version = "0.4.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e3b4c031cd0d9014307d82b8abf653c0290fbdaeb4c02d00c63cf52f728628bf"
+dependencies = [
+ "js-sys",
+ "serde",
+ "wasm-bindgen",
+]
+
+[[package]]
+name = "serde_bytes"
+version = "0.11.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "718dc5fff5b36f99093fc49b280cfc96ce6fc824317783bff5a1fed0c7a64819"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "serde_derive"
 version = "1.0.149"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3949,18 +4043,18 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "1.0.37"
+version = "1.0.38"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10deb33631e3c9018b9baf9dcbbc4f737320d2b576bac10f6aefa048fa407e3e"
+checksum = "6a9cd18aa97d5c45c6603caea1da6628790b37f7a34b6ca89522331c5180fed0"
 dependencies = [
  "thiserror-impl",
 ]
 
 [[package]]
 name = "thiserror-impl"
-version = "1.0.37"
+version = "1.0.38"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "982d17546b47146b28f7c22e3d08465f6b8903d0ea13c1660d9d84a6e7adcdbb"
+checksum = "1fb327af4685e4d03fa8cbcf1716380da910eeb2bb8be417e7f9fd3fb164f36f"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4359,6 +4453,7 @@ dependencies = [
  "console_error_panic_hook",
  "js-sys",
  "prometheus",
+ "utils-misc",
  "wasm-bindgen",
  "wasm-bindgen-test",
  "wasm-opt",
@@ -4367,16 +4462,42 @@ dependencies = [
 
 [[package]]
 name = "utils-misc"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "console_error_panic_hook",
+ "futures 0.3.25",
+ "js-sys",
  "real-base",
  "serde",
+ "serde-wasm-bindgen",
+ "serde_bytes",
  "serde_json",
+ "utils-proc-macros",
  "wasm-bindgen",
+ "wasm-bindgen-futures",
  "wasm-bindgen-test",
  "wasm-opt",
  "wasm-pack",
+]
+
+[[package]]
+name = "utils-proc-macros"
+version = "1.0.0"
+dependencies = [
+ "quote",
+ "wasm-bindgen-macro-support",
+]
+
+[[package]]
+name = "utils-types"
+version = "0.1.0"
+dependencies = [
+ "console_error_panic_hook",
+ "ethnum",
+ "hex 0.4.3",
+ "utils-misc",
+ "wasm-bindgen",
+ "wasm-bindgen-test",
 ]
 
 [[package]]
@@ -4473,8 +4594,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eaf9f5aceeec8be17c128b2e93e031fb8a4d469bb9c4ae2d7dc1888b26887268"
 dependencies = [
  "cfg-if 1.0.0",
- "serde",
- "serde_json",
  "wasm-bindgen-macro",
 ]
 
@@ -4500,6 +4619,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "23639446165ca5a5de86ae1d8896b737ae80319560fbaa4c2887b7da6e7ebd7d"
 dependencies = [
  "cfg-if 1.0.0",
+ "futures-core",
  "js-sys",
  "wasm-bindgen",
  "web-sys",

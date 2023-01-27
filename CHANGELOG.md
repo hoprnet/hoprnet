@@ -1,11 +1,17 @@
 # Changelog
 
 - Removal of HOPR admin from `hoprd` ([#4420](https://github.com/hoprnet/hoprnet/pull/4420))
-  - Includes removal of CLI option `--admin`, `--adminHost` and `--adminPort`
-  - HOPR admin may now be used as a stand-alone component, see https://github.com/hoprnet/hopr-admin
-  - Add `--disableApiAuthentication` CLI option to allow using the API without authentication, default for Avado & Dappnode ([#4466](https://github.com/hoprnet/hoprnet/pull/4466))
+- Includes removal of CLI option `--admin`, `--adminHost` and `--adminPort`
+- HOPR admin may now be used as a stand-alone component, see https://github.com/hoprnet/hopr-admin
+- Add `--disableApiAuthentication` CLI option to allow using the API without authentication, default for Avado & Dappnode ([#4466](https://github.com/hoprnet/hoprnet/pull/4466))
 - Grafana dashboards integration for all supported platforms ([#4472](https://github.com/hoprnet/hoprnet/pull/4472))
+- Migrate environment checker code to Rust ([#4492](https://github.com/hoprnet/hoprnet/pull/4492))
+- Migrate hoprd CLI to Rust ([#4491](https://github.com/hoprnet/hoprnet/pull/4491))
 - Smart contract toolchain upgrade ([#4382](https://github.com/hoprnet/hoprnet/pull/4230))
+- Switch staging environment to using Gnosis Chain instead of Goerli ([#4497](https://github.com/hoprnet/hoprnet/pull/4497))
+- Introduced Promiscuous Strategy v1, strategies migrated to Rust ([#4506](https://github.com/hoprnet/hoprnet/pull/4506))
+- Fix of ticket validation to be order-independent, thus not rejecting older tickets ([#4527](<(https://github.com/hoprnet/hoprnet/pull/4527)>)
+- Migrate `heartbeat` ping network interaction to Rust using Rust `futures::stream::Stream` ([#4539](https://github.com/hoprnet/hoprnet/pull/4539))
 
 <a name="1.91"></a>
 
@@ -25,6 +31,10 @@
 - Increase wait timeout for on-chain transactions to 60 seconds ([#4425](https://github.com/hoprnet/hoprnet/pull/4425))
 - Fix bug in waiting logic for on-chain transactions ([#4425](https://github.com/hoprnet/hoprnet/pull/4425))
 - Fixed incorrect acknowledged tickets handling in the DB
+- Fix non-registered nodes can connect despite they are not allowed to so ([#4454](https://github.com/hoprnet/hoprnet/pull/4454))
+- Fix STUN functionality, enhance it to check if host is exposed and a keep-alive mechanism to keep NAT port mapping ([#4401](https://github.com/hoprnet/hoprnet/pull/4401))
+- Fix DAppnode / AVADO announcing internal container addresses ([#4467](https://github.com/hoprnet/hoprnet/pull/4467))
+- Add `--disableApiAuthentication` CLI option to allow using the API without authentication, default for Avado & Dappnode ([#4466](https://github.com/hoprnet/hoprnet/pull/4466))
 
 ---
 

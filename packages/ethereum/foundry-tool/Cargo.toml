@@ -11,7 +11,8 @@ path = "src/key_pair.rs"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-clap = { version = "4.0.29", features = ["derive", "env"] }
+# using own fork until the PR was merged
+clap = { git = "https://github.com/hoprnet/clap", branch = "robertkiel/update-env-from", features = ["derive", "env", "string"] }
 # use the Git repository to be compatible with the foundry auto-generated
 # dependencies
 ethers = { version = "1.0.2" }

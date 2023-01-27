@@ -1,10 +1,10 @@
 import { type HeartbeatPingResult } from './heartbeat.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
-import { randomSubset, debug } from '@hoprnet/hopr-utils'
+import { randomSubset } from '@hoprnet/hopr-utils'
 
-const DEBUG_PREFIX = 'hopr-core:network-peers'
-const log = debug(DEBUG_PREFIX)
-//const verbose = debug(DEBUG_PREFIX.concat(`:verbose`))
+// const DEBUG_PREFIX = 'hopr-core:network-peers'
+// const log = debug(DEBUG_PREFIX)
+// const verbose = debug(DEBUG_PREFIX.concat(`:verbose`))
 
 export type Entry = {
   id: PeerId
@@ -141,9 +141,6 @@ class NetworkPeers {
   private entries: Map<string, Entry>
   // peerId.toString() -> ignore since timestamp
   private ignoredEntries: Map<string, number>
-  // peers which were denied connection via the HoprNetworkRegistry
-  // peerId.toString() -> minified previous entry
-  private deniedEntries: Map<string, Pick<Entry, 'id' | 'origin'>>
 
   // static set of excluded peers
   private excludedPeers: Set<string>
@@ -160,7 +157,6 @@ class NetworkPeers {
 
     this.entries = new Map<string, Entry>()
     this.ignoredEntries = new Map<string, number>()
-    this.deniedEntries = new Map<string, Pick<Entry, 'id' | 'origin'>>()
 
     this.excludedPeers = new Set<string>(excludedPeers.map((p: PeerId) => p.toString()))
 
@@ -302,11 +298,10 @@ class NetworkPeers {
     // Assumes that all maps / sets are disjoint
     const hasEntry = this.entries.has(id)
     const isExcluded = !hasEntry && this.excludedPeers.has(id)
-    const isDenied = !isExcluded && this.deniedEntries.has(id)
-    let isIgnored = !isDenied && this.ignoredEntries.has(id)
+    let isIgnored = !isExcluded && this.ignoredEntries.has(id)
 
     // the peer is excluded or denied
-    if (isExcluded || isDenied) {
+    if (isExcluded) {
       // not adding peer
       return
     }
@@ -336,6 +331,10 @@ class NetworkPeers {
     }
   }
 
+  public unregister(peerId: PeerId) {
+    this.entries.delete(peerId.toString())
+  }
+
   public has(peerId: PeerId): boolean {
     return this.entries.has(peerId.toString())
   }
@@ -355,35 +354,12 @@ class NetworkPeers {
     return printEntries(this.entries, this.qualityOf.bind(this), this.networkQualityThreshold, prefix)
   }
 
-  public getAllDenied(): IterableIterator<Pick<Entry, 'id' | 'origin'>> {
-    return this.deniedEntries.values()
-  }
-
   public getAllEntries(): IterableIterator<Entry> {
     return this.entries.values()
   }
 
   public getAllIgnored(): IterableIterator<string> {
     return this.ignoredEntries.keys()
-  }
-
-  public addPeerToDenied(peerId: PeerId, origin: NetworkPeersOrigin): void {
-    const peerIdStr = peerId.toString()
-    if (!this.deniedEntries.has(peerIdStr)) {
-      log('adding peer to denied', peerIdStr)
-      this.deniedEntries.set(peerIdStr, { id: peerId, origin })
-    } /*else {
-      verbose('peer is still denied', peerIdStr)
-    }*/
-  }
-
-  public removePeerFromDenied(peerId: PeerId): void {
-    const peerIdStr = peerId.toString()
-    const existed = this.deniedEntries.delete(peerIdStr)
-
-    if (existed) {
-      log('removed peer from denied', peerIdStr)
-    }
   }
 }
 

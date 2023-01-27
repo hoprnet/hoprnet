@@ -9,4 +9,4 @@ edition = "2021"
 ethers = { version = "1.0.2", default-features = false, features = ["abigen"] }
 
 [lib] 
-crate-type = ["cdylib", "rlib"] # rlib is necessary to run integration tests
+crate-type = ["cdylib", "rlib"]

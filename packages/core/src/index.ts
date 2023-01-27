@@ -1,9 +1,8 @@
-import { setImmediate } from 'timers/promises'
 import EventEmitter from 'events'
 
-import { protocols, Multiaddr } from '@multiformats/multiaddr'
+import { Multiaddr, protocols } from '@multiformats/multiaddr'
 
-import type BN from 'bn.js'
+import BN from 'bn.js'
 import { keysPBM } from '@libp2p/crypto/keys'
 import { createHash } from 'crypto'
 import secp256k1 from 'secp256k1'
@@ -12,61 +11,66 @@ import type { Connection } from '@libp2p/interface-connection'
 import type { Peer } from '@libp2p/interface-peer-store'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import type { Components } from '@libp2p/interfaces/components'
-import { compareAddressesLocalMode, compareAddressesPublicMode, type HoprConnectConfig } from '@hoprnet/hopr-connect'
+import {
+  compareAddressesLocalMode,
+  compareAddressesPublicMode,
+  type HoprConnectConfig,
+  PeerConnectionType
+} from '@hoprnet/hopr-connect'
 
 // @ts-ignore untyped library
 import retimer from 'retimer'
 
-import { PACKET_SIZE, INTERMEDIATE_HOPS, VERSION, FULL_VERSION } from './constants.js'
+import { FULL_VERSION, INTERMEDIATE_HOPS, PACKET_SIZE, VERSION } from './constants.js'
 
-import AccessControl from './network/access-control.js'
 import NetworkPeers, { type Entry, NetworkPeersOrigin } from './network/network-peers.js'
 import Heartbeat, { NetworkHealthIndicator } from './network/heartbeat.js'
 
 import { findPath } from './path/index.js'
 
 import {
-  PublicKey,
-  Balance,
-  NativeBalance,
-  libp2pSubscribe,
-  libp2pSendMessage,
-  isSecp256k1PeerId,
-  ChannelStatus,
-  MIN_NATIVE_BALANCE,
-  isMultiaddrLocal,
-  retryWithBackoffThenThrow,
-  durations,
-  isErrorOutOfFunds,
-  debug,
-  retimer as intervalTimer,
-  createRelayerKey,
-  createCircuitAddress,
-  convertPubKeyFromPeerId,
-  getBackoffRetryTimeout,
-  getBackoffRetries,
-  type LibP2PHandlerFunction,
   type AcknowledgedTicket,
-  type ChannelEntry,
   type Address,
-  type DialOpts,
-  type Hash,
-  type HalfKeyChallenge,
-  type Ticket,
-  type HoprDB,
-  create_gauge,
-  create_multi_gauge,
+  Balance,
+  type ChannelEntry,
+  ChannelStatus,
+  convertPubKeyFromPeerId,
   create_counter,
-  create_histogram_with_buckets
+  create_gauge,
+  create_histogram_with_buckets,
+  create_multi_gauge,
+  createCircuitAddress,
+  createRelayerKey,
+  debug,
+  type DialOpts,
+  durations,
+  getBackoffRetries,
+  getBackoffRetryTimeout,
+  type HalfKeyChallenge,
+  type Hash,
+  type HoprDB,
+  isErrorOutOfFunds,
+  isMultiaddrLocal,
+  isSecp256k1PeerId,
+  type LibP2PHandlerFunction,
+  libp2pSendMessage,
+  libp2pSubscribe,
+  MIN_NATIVE_BALANCE,
+  NativeBalance,
+  PublicKey,
+  retimer as intervalTimer,
+  retryWithBackoffThenThrow,
+  type Ticket
 } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum, { type Indexer } from '@hoprnet/hopr-core-ethereum'
 
 import {
-  type StrategyTickResult,
   type ChannelStrategyInterface,
+  OutgoingChannelStatus,
   PassiveStrategy,
   PromiscuousStrategy,
-  SaneDefaults
+  SaneDefaults,
+  StrategyTickResult
 } from './channel-strategy.js'
 
 import { AcknowledgementInteraction } from './interactions/packet/acknowledgement.js'
@@ -76,8 +80,8 @@ import { Packet } from './messages/index.js'
 import type { ResolvedEnvironment } from './environment.js'
 import { createLibp2pInstance } from './main.js'
 import type { EventEmitter as Libp2pEmitter } from '@libp2p/interfaces/events'
-import { PeerConnectionType } from '@hoprnet/hopr-connect'
 import { utils as ethersUtils } from 'ethers/lib/ethers.js'
+import { peerIdFromString } from '@libp2p/peer-id'
 
 const CODE_P2P = protocols('p2p').code
 
@@ -153,10 +157,6 @@ export type HoprOptions = {
     // don't do the upgrade to it to test bidirectional NAT
     // default: false
     noWebRTCUpgrade?: boolean
-    // when true, disable usage of UPNP to automatically detect
-    // external IP
-    // default: false
-    noUPNP?: boolean
     // Use mocked libp2p instance instead of real one
     useMockedLibp2p?: boolean
     // When using mocked libp2p instance, use existing mocked
@@ -303,9 +303,6 @@ class Hopr extends EventEmitter {
       this.options,
       initialNodes,
       this.publicNodesEmitter,
-      async (peerId: PeerId, origin: NetworkPeersOrigin): Promise<boolean> => {
-        return accessControl.reviewConnection(peerId, origin)
-      },
       this.isAllowedAccessToNetwork.bind(this)
     )) as Libp2p
 
@@ -341,27 +338,42 @@ class Hopr extends EventEmitter {
       }
     )
 
-    // Initialize AccessControl
-    const accessControl = new AccessControl(
-      this.networkPeers,
-      this.isAllowedAccessToNetwork.bind(this),
-      this.closeConnectionsTo.bind(this)
-    )
-
     // react when network registry is enabled / disabled
-    this.connector.indexer.on('network-registry-status-changed', (_enabled: boolean) => {
-      accessControl.reviewConnections()
+    this.connector.indexer.on('network-registry-status-changed', async (enabled: boolean) => {
+      // If Network Registry got enabled, we might need to close existing connections,
+      // otherwise there is nothing to do
+      if (enabled) {
+        for (const connection of this.libp2pComponents.getConnectionManager().getConnections()) {
+          if (!(await this.isAllowedAccessToNetwork(connection.remotePeer))) {
+            this.networkPeers.unregister(connection.remotePeer)
+            try {
+              await connection.close()
+            } catch (err) {
+              error(`error while closing existing connection to ${connection.remotePeer.toString()}`)
+            }
+          }
+        }
+      }
     })
+
     // react when an account's eligibility has changed
     this.connector.indexer.on(
       'network-registry-eligibility-changed',
-      (_account: Address, nodes: PublicKey[], _eligible: boolean) => {
-        for (const node of nodes) {
-          const peerId = node.toPeerId()
-          const origin = this.networkPeers.has(peerId)
-            ? this.networkPeers.getConnectionInfo(peerId).origin
-            : NetworkPeersOrigin.NETWORK_REGISTRY
-          accessControl.reviewConnection(peerId, origin)
+      async (_account: Address, nodes: PublicKey[], eligible: boolean) => {
+        // If account is no longer eligible to register nodes, we might need to close existing connections,
+        // otherwise there is nothing to do
+        if (!eligible) {
+          for (const node of nodes) {
+            this.networkPeers.unregister(node.toPeerId())
+
+            for (const conn of this.libp2pComponents.getConnectionManager().getConnections(node.toPeerId())) {
+              try {
+                await conn.close()
+              } catch (err) {
+                error(`error while closing existing connection to ${conn.remotePeer.toString()}`)
+              }
+            }
+          }
         }
       }
     )
@@ -371,11 +383,11 @@ class Hopr extends EventEmitter {
     this.heartbeat = new Heartbeat(
       this.id,
       this.networkPeers,
-      subscribe,
+      this.libp2pComponents,
       sendMessage,
       this.closeConnectionsTo.bind(this),
-      accessControl.reviewConnection.bind(accessControl),
-      this,
+      (oldHealthValue: NetworkHealthIndicator, newNetworkHealth: NetworkHealthIndicator) =>
+        this.emit('hopr:network-health-changed', oldHealthValue, newNetworkHealth),
       (peerId: PeerId) => {
         if (this.knownPublicNodesCache.has(peerId.toString())) return true
 
@@ -625,7 +637,11 @@ class Hopr extends EventEmitter {
 
       out += `${channel.toString()}\n`
       currentChannels.push(channel)
-      this.networkPeers.register(channel.destination.toPeerId(), NetworkPeersOrigin.STRATEGY_EXISTING_CHANNEL) // Make sure current channels are 'interesting'
+      if (await this.isAllowedAccessToNetwork(channel.destination.toPeerId())) {
+        this.networkPeers.register(channel.destination.toPeerId(), NetworkPeersOrigin.STRATEGY_EXISTING_CHANNEL) // Make sure current channels are 'interesting'
+      } else {
+        error(`Protocol error: Strategy is monitoring non-registered peer ${channel.destination.toString()}`)
+      }
     }
 
     metric_inChannelCount.set(incomingChannels)
@@ -640,69 +656,72 @@ class Hopr extends EventEmitter {
     } catch (e) {
       throw new Error('failed to getBalance, aborting tick')
     }
-    const tickResult: StrategyTickResult = await this.strategy.tick(
+
+    let allOutgoingChannels: OutgoingChannelStatus[] = Array.from(
+      currentChannels
+        .filter((c) => c.status == ChannelStatus.Open && c.source.toAddress().eq(selfAddr))
+        .map((c) => new OutgoingChannelStatus(c.destination.toPeerId().toString(), c.balance.toBN().toString()))
+    )
+
+    let peersIterator = this.networkPeers.all().map((p) => p.toString())[Symbol.iterator]
+
+    const tickResult: StrategyTickResult = this.strategy.tick(
       balance.toBN(),
-      currentChannels,
-      this.networkPeers,
-      this.connector.getRandomOpenChannel.bind(this.connector)
+      peersIterator(),
+      allOutgoingChannels,
+      (peer_id_str: string) => this.networkPeers.qualityOf(peerIdFromString(peer_id_str))
     )
 
-    const closeChannelDestinationsCount = tickResult.toClose.length
-    verbose(`strategy wants to close ${closeChannelDestinationsCount} channels`)
+    verbose(`strategy wants to close ${tickResult.to_close().length} channels`)
 
-    for (const channel of currentChannels) {
-      if (
-        channel.status == ChannelStatus.PendingToClose &&
-        !tickResult.toClose.find((x: typeof tickResult['toClose'][number]) => x.destination.eq(channel.destination))
-      ) {
-        // attempt to finalize closure
-        tickResult.toClose.push({
-          destination: channel.destination
+    let allClosedChannels = Array.from(tickResult.to_close())
+
+    // Enhance with all channels which are in PendingToClose state to close them for good
+    allClosedChannels.push(
+      ...currentChannels
+        .filter(
+          (c) =>
+            c.status == ChannelStatus.PendingToClose && !allClosedChannels.includes(c.destination.toPeerId().toString())
+        )
+        .map((c) => c.destination.toPeerId().toString())
+    )
+
+    verbose(`strategy wants to finalize closure of ${allClosedChannels.length - tickResult.to_close().length} channels`)
+
+    try {
+      await Promise.all(
+        allClosedChannels.map((destination) => async () => {
+          await this.closeChannel(peerIdFromString(destination), 'outgoing')
+          verbose(`closed channel to ${destination.toString()}`)
+          this.emit('hopr:channel:closed', destination)
         })
-      }
+      )
+    } catch (e) {
+      log(`error when strategy trying to close channels`, e)
     }
 
-    verbose(
-      `strategy wants to finalize closure of ${tickResult.toClose.length - closeChannelDestinationsCount} channels`
-    )
+    let allOpenedChannels: OutgoingChannelStatus[] = tickResult.to_open()
+    verbose(`strategy wants to open ${allOpenedChannels.length} new channels`)
 
-    for (let i = 0; i < tickResult.toClose.length; i++) {
-      const destination = tickResult.toClose[i].destination
-      verbose(`closing channel to ${destination.toString()}`)
-      try {
-        await this.closeChannel(destination.toPeerId(), 'outgoing')
-        verbose(`closed channel to ${destination.toString()}`)
-        this.emit('hopr:channel:closed', destination.toPeerId())
-      } catch (e) {
-        log(`error when strategy trying to close channel to ${destination.toString()}`, e)
-      }
+    try {
+      await Promise.all(
+        allOpenedChannels.map((status) => async () => {
+          const destination = peerIdFromString(status.peer_id)
+          const stake = new BN(status.stake_str)
 
-      if (i + 1 < tickResult.toClose.length) {
-        // Give other tasks CPU time to happen
-        // Push next loop iteration to end of next event loop iteration
-        await setImmediate()
-      }
-    }
+          if (await this.isAllowedAccessToNetwork(destination)) {
+            this.networkPeers.register(destination, NetworkPeersOrigin.STRATEGY_NEW_CHANNEL)
 
-    verbose(`strategy wants to open ${tickResult.toOpen.length} new channels`)
-
-    for (let i = 0; i < tickResult.toOpen.length; i++) {
-      const channel = tickResult.toOpen[i]
-      this.networkPeers.register(channel.destination.toPeerId(), NetworkPeersOrigin.STRATEGY_NEW_CHANNEL)
-      try {
-        // Opening channels can fail if we can't establish a connection.
-        const hash = await this.openChannel(channel.destination.toPeerId(), channel.stake)
-        verbose('- opened', channel, hash)
-        this.emit('hopr:channel:opened', channel)
-      } catch (e) {
-        log(`error when strategy trying to open channel to ${channel.destination.toString()}`, e)
-      }
-
-      if (i + 1 < tickResult.toOpen.length) {
-        // Give other tasks CPU time to happen
-        // Push next loop iteration to end of next event loop iteration
-        await setImmediate()
-      }
+            const hash = await this.openChannel(destination, stake)
+            verbose('- opened channel', destination, hash)
+            this.emit('hopr:channel:opened', status)
+          } else {
+            error(`Protocol error: strategy wants to open channel to non-registered peer ${destination.toString()}`)
+          }
+        })
+      )
+    } catch (e) {
+      log(`error when strategy trying to open channels`, e)
     }
   }
 
@@ -838,7 +857,7 @@ class Hopr extends EventEmitter {
 
       if (ticketIssuer.eq(ticketReceiver)) log(`WARNING: duplicated adjacent path entries.`)
 
-      let channel
+      let channel: ChannelEntry
       try {
         channel = await this.db.getChannelX(ticketIssuer, ticketReceiver)
       } catch (err) {
@@ -915,6 +934,9 @@ class Hopr extends EventEmitter {
   public async ping(destination: PeerId): Promise<{ info?: string; latency: number }> {
     let start = Date.now()
 
+    if (!(await this.isAllowedAccessToNetwork(destination))) {
+      throw Error(`Connection to node is not allowed`)
+    }
     // Propagate any errors thrown upwards
     let pingResult = await this.heartbeat.pingNode(destination)
 
@@ -1461,11 +1483,11 @@ export {
   PromiscuousStrategy,
   SaneDefaults,
   findPath,
-  type StrategyTickResult,
+  StrategyTickResult,
   NetworkHealthIndicator,
   NetworkPeersOrigin,
   type ChannelStrategyInterface
 }
 export { resolveEnvironment, supportedEnvironments, type ResolvedEnvironment } from './environment.js'
+export { CORE_CONSTANTS as CONSTANTS } from '../lib/core_misc.js'
 export { sampleOptions } from './index.mock.js'
-export { CONFIRMATIONS } from '@hoprnet/hopr-core-ethereum'

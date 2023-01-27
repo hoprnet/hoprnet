@@ -10,8 +10,8 @@ CRATES := $(foreach crate,${WORKSPACES_WITH_RUST_MODULES},$(dir $(wildcard $(cra
 FOUNDRY_TOOL_CRATE := ./packages/ethereum/foundry-tool
 
 # Set local foundry directory (for binaries) and versions
-FOUNDRY_DIR := ${CURDIR}/.foundry
-FOUNDRY_VSN := e919a63
+FOUNDRY_DIR ?= ${CURDIR}/.foundry
+FOUNDRY_VSN := be7084e
 
 # Set local cargo directory (for binaries)
 CARGO_DIR := ${CURDIR}/.cargo
@@ -133,7 +133,8 @@ build-solidity-types: ## generate Solidity typings
 # Change git = "http://..." into version = "1.0.2"
 	sed -i -e 's/https:\/\/github.com\/gakonst\/ethers-rs/1.0.2/g' ${CURDIR}/packages/ethereum/crates/bindings/Cargo.toml
 	sed -i -e 's/git/version/g' ${CURDIR}/packages/ethereum/crates/bindings/Cargo.toml
-	echo -e "\n[lib] \ncrate-type = [\"cdylib\", \"rlib\"] # rlib is necessary to run integration tests" >> ${CURDIR}/packages/ethereum/crates/bindings/Cargo.toml
+# add [lib] as rlib is necessary to run integration tests
+	echo -e "\n[lib] \ncrate-type = [\"cdylib\", \"rlib\"]" >> ${CURDIR}/packages/ethereum/crates/bindings/Cargo.toml
 
 .PHONY: build-yarn
 build-yarn: ## build yarn packages
@@ -154,9 +155,11 @@ build-cargo: build-solidity-types ## build cargo packages and create boilerplate
 # Skip building Rust crates
 ifeq ($(origin NO_CARGO),undefined)
 # First compile Rust crates and create bindings
-	$(MAKE) -j 1 $(CRATES)
+# filter out proc-macro crates since they need no compilation
+	$(MAKE) -j 1 $(filter-out %proc-macros/,$(CRATES))
 # Copy bindings to their destination
-	$(MAKE) ${WORKSPACES_WITH_RUST_MODULES}
+# filter out proc-macro crates since they need no compilation
+	$(MAKE) $(filter-out %proc-macros/,$(WORKSPACES_WITH_RUST_MODULES))
 # build foundry-tool
 	$(MAKE) $(FOUNDRY_TOOL_CRATE)
 endif
@@ -185,6 +188,7 @@ build-docs-api: build
 
 .PHONY: clean
 clean: # Cleanup build directories (lib,build, ...etc.)
+	cargo clean
 	yarn clean
 
 .PHONY: reset
@@ -196,10 +200,12 @@ reset: clean
 test: smart-contract-test ## run unit tests for all packages, or a single package if package= is set
 ifeq ($(package),)
 	yarn workspaces foreach -pv run test
+	cargo test
+# disabled until `wasm-bindgen-test-runner` supports ESM
+# cargo test --target wasm32-unknown-unknow
 else
-# Prebuild Rust unit tests
-	$(cargo) --frozen --offline build --tests
 	yarn workspace @hoprnet/${package} run test
+	yarn workspace @hoprnet/${package} run test:wasm
 endif
 
 .PHONY: smart-contract-test
@@ -216,7 +222,11 @@ lint-fix: ## run linter in fix mode
 
 .PHONY: run-anvil
 run-anvil: ## spinup a local anvil instance (daemon) and deploy contracts
-	./script/run-local-anvil.sh
+	./scripts/run-local-anvil.sh
+
+.PHONY: run-anvil-foreground
+run-anvil-foreground: ## spinup a local anvil instance
+	./scripts/run-local-anvil.sh -f -s
 
 .PHONY: kill-anvil
 kill-anvil: ## kill process running at port 8545 (default port of anvil)
@@ -232,9 +242,10 @@ run-local: ## run HOPRd from local repo
 		--testPreferLocalAddresses --disableApiAuthentication
 
 .PHONY: fund-local
+fund-local: id_dir=.
 fund-local: ## use faucet script to fund local identities
 	foundry-tool --environment-name anvil-localhost --environment-type development \
-		faucet --password local --use-local-identities --identity-directory "." \
+		faucet --password local --use-local-identities --identity-directory "${id_dir}" \
 		--private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
 		--make-root "./packages/ethereum/contracts"
 
@@ -316,8 +327,8 @@ ifeq ($(eligibility),)
 	echo "parameter <eligibility> missing" >&2 && exit 1
 endif
 	make -C packages/ethereum/contracts force-eligibility-update \
-	environment-name=$(environment) environment-type=$(environment_type) \
-	staking_addresses="$(native_addresses)" eligibility="$(eligibility)"
+		environment-name=$(environment) environment-type=$(environment_type) \
+		staking_addresses="$(native_addresses)" eligibility="$(eligibility)"
 
 sync-eligibility: ensure-environment-is-set
 sync-eligibility: ## owner sync eligibility of peers
@@ -325,8 +336,8 @@ ifeq ($(peer_ids),)
 	echo "parameter <peer_ids> missing" >&2 && exit 1
 endif
 	make -C packages/ethereum/contracts sync-eligibility \
-	environment-name=$(environment) environment-type=$(environment_type) \
-	peer_ids="$(peer_ids)"
+		environment-name=$(environment) environment-type=$(environment_type) \
+		peer_ids="$(peer_ids)"
 
 register-nodes: ensure-environment-is-set
 register-nodes: ## owner register given nodes in network registry contract
@@ -337,8 +348,8 @@ ifeq ($(peer_ids),)
 	echo "parameter <peer_ids> missing" >&2 && exit 1
 endif
 	make -C packages/ethereum/contracts register-nodes \
-	environment-name=$(environment) environment-type=$(environment_type) \
-	staking_addresses="$(native_addresses)" peer_ids="$(peer_ids)"
+		environment-name=$(environment) environment-type=$(environment_type) \
+		staking_addresses="$(native_addresses)" peer_ids="$(peer_ids)"
 
 deregister-nodes: ensure-environment-is-set
 deregister-nodes: ## owner de-register given nodes in network registry contract
@@ -346,8 +357,8 @@ ifeq ($(peer_ids),)
 	echo "parameter <peer_ids> missing" >&2 && exit 1
 endif
 	make -C packages/ethereum/contracts deregister-nodes \
-	environment-name=$(environment) environment-type=$(environment_type) \
-	staking_addresses="$(native_addresses)" peer_ids="$(peer_ids)"
+		environment-name=$(environment) environment-type=$(environment_type) \
+		staking_addresses="$(native_addresses)" peer_ids="$(peer_ids)"
 
 .PHONY: self-register-node
 self-register-node: ensure-environment-is-set
@@ -356,8 +367,8 @@ ifeq ($(peer_ids),)
 	echo "parameter <peer_ids> missing" >&2 && exit 1
 endif
 	make -C packages/ethereum/contracts self-register-node \
-	environment-name=$(environment) environment-type=$(environment_type) \
-	peer_ids="$(peer_ids)"
+		environment-name=$(environment) environment-type=$(environment_type) \
+		peer_ids="$(peer_ids)"
 
 .PHONY: self-deregister-node
 self-deregister-node: ensure-environment-is-set
@@ -366,34 +377,8 @@ ifeq ($(peer_ids),)
 	echo "parameter <peer_ids> missing" >&2 && exit 1
 endif
 	make -C packages/ethereum/contracts self-deregister-node \
-	environment-name=$(environment) environment-type=$(environment_type) \
-	peer_ids="$(peer_ids)"
-
-# .PHONY: register-node-when-dummy-proxy
-# # DEPRECATED. Only use it when a dummy network registry proxy is in use
-# # Register a node when a dummy proxy is in place of staking proxy
-# # node_api?=localhost:3001 provide endpoint of hoprd, with a default value 'localhost:3001'
-# register-node-when-dummy-proxy: ensure-environment-is-set
-# ifeq ($(endpoint),)
-# 	echo "parameter <endpoint> is default to localhost:3001" >&2
-# endif
-# ifeq ($(api_token),)
-# 	echo "parameter <api_token> missing" >&2 && exit 1
-# endif
-# ifeq ($(account),)
-# 	echo "parameter <account> missing" >&2 && exit 1
-# endif
-# ifeq ($(origin CI_DEPLOYER_PRIVKEY),undefined)
-# 	echo "<CI_DEPLOYER_PRIVKEY> environment variable missing" >&2 && exit 1
-# endif
-# 	TS_NODE_PROJECT=./tsconfig.hardhat.json \
-# 	HOPR_ENVIRONMENT_ID="$(environment)" \
-# 	  yarn workspace @hoprnet/hopr-ethereum run hardhat register \
-#    --network $(network) \
-#    --task add \
-#    --native-addresses "$(account)" \
-#    --peer-ids "$(shell eval ./scripts/get-hopr-address.sh "$(api_token)" "$(endpoint)")" \
-#    --privatekey "$(CI_DEPLOYER_PRIVKEY)"
+		environment-name=$(environment) environment-type=$(environment_type) \
+		peer_ids="$(peer_ids)"
 
 .PHONY: register-node-with-nft
 # node_api?=localhost:3001 provide endpoint of hoprd, with a default value 'localhost:3001'

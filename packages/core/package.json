@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core",
-  "version": "1.92.0-next.30",
+  "version": "1.92.0-next.48",
   "description": "Privacy-preserving messaging protocol with incentivations for relay operators",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -23,7 +23,7 @@
     "clean": "yarn clean:wasm && rm -Rf ./lib ./tsconfig.tsbuildinfo",
     "coverage": "nyc --reporter=html mocha",
     "build": "yarn clean && yarn build:wasm && tsc -p .",
-    "test": "yarn test:wasm && NODE_OPTIONS=\"--experimental-wasm-modules --trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace",
+    "test": "NODE_OPTIONS=\"--experimental-wasm-modules --trace-warnings --unhandled-rejections=strict\" mocha --full-trace",
     "docs:generate": "typedoc",
     "docs:watch": "typedoc --watch"
   },
@@ -56,8 +56,7 @@
     "levelup": "5.1.1",
     "libp2p": "0.37.3",
     "retimer": "3.0.0",
-    "secp256k1": "4.0.3",
-    "semver": "7.3.7"
+    "secp256k1": "4.0.3"
   },
   "devDependencies": {
     "@libp2p/interface-content-routing": "1.0.2",

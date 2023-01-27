@@ -28,7 +28,10 @@ export async function setupRestApi(
   urlPath: string,
   node: Hopr,
   stateOps: StateOps,
-  options: any
+  options: {
+    apiToken?: string
+    disableApiAuthentication: boolean
+  }
 ): Promise<ReturnType<typeof initialize>> {
   // this API uses JSON data only
   service.use(urlPath, bodyParser.json())

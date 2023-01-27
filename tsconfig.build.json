@@ -6,7 +6,6 @@
     { "path": "packages/connect" },
     { "path": "packages/core" },
     { "path": "packages/core-ethereum" },
-    { "path": "packages/cover-traffic-daemon" },
     { "path": "packages/hoprd" },
     { "path": "packages/real" },
     { "path": "packages/utils" },

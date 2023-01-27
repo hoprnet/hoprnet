@@ -165,6 +165,7 @@
 - [ipToU8aAddress](modules.md#iptou8aaddress)
 - [isAddressWithPeerId](modules.md#isaddresswithpeerid)
 - [isAnyAddress](modules.md#isanyaddress)
+- [isAvadoPrivateNetwork](modules.md#isavadoprivatenetwork)
 - [isErrorOutOfFunds](modules.md#iserroroutoffunds)
 - [isErrorOutOfHoprFunds](modules.md#iserroroutofhoprfunds)
 - [isErrorOutOfNativeFunds](modules.md#iserroroutofnativefunds)
@@ -1082,7 +1083,7 @@ true if address is at least one of the given networks
 
 #### Defined in
 
-[src/network/addrs.ts:91](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L91)
+[src/network/addrs.ts:97](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L97)
 
 ___
 
@@ -1148,7 +1149,7 @@ Create a multiaddress that is a circuit address using given relay to the given d
 
 #### Defined in
 
-[src/network/addrs.ts:308](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L308)
+[src/network/addrs.ts:314](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L314)
 
 ___
 
@@ -1883,7 +1884,7 @@ ___
 
 #### Defined in
 
-[src/network/addrs.ts:289](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L289)
+[src/network/addrs.ts:295](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L295)
 
 ___
 
@@ -1903,7 +1904,7 @@ ___
 
 #### Defined in
 
-[src/network/addrs.ts:300](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L300)
+[src/network/addrs.ts:306](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L306)
 
 ___
 
@@ -1925,7 +1926,7 @@ ___
 
 #### Defined in
 
-[src/network/addrs.ts:214](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L214)
+[src/network/addrs.ts:220](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L220)
 
 ___
 
@@ -1967,7 +1968,7 @@ ___
 
 #### Defined in
 
-[src/network/addrs.ts:286](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L286)
+[src/network/addrs.ts:292](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L292)
 
 ___
 
@@ -1987,7 +1988,7 @@ ___
 
 #### Defined in
 
-[src/network/addrs.ts:293](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L293)
+[src/network/addrs.ts:299](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L299)
 
 ___
 
@@ -2054,7 +2055,7 @@ ___
 
 #### Defined in
 
-[src/network/addrs.ts:227](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L227)
+[src/network/addrs.ts:233](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L233)
 
 ___
 
@@ -2079,7 +2080,7 @@ Byte representation of the given ip address
 
 #### Defined in
 
-[src/network/addrs.ts:113](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L113)
+[src/network/addrs.ts:119](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L119)
 
 ___
 
@@ -2105,7 +2106,7 @@ Used to filter addresses that get stored into libp2p's peer-store
 
 #### Defined in
 
-[src/network/addrs.ts:323](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L323)
+[src/network/addrs.ts:329](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L329)
 
 ___
 
@@ -2129,6 +2130,30 @@ Checks if given address is any address
 #### Defined in
 
 [src/network/addrs.ts:27](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L27)
+
+___
+
+### isAvadoPrivateNetwork
+
+▸ **isAvadoPrivateNetwork**(`address`, `family`): `boolean`
+
+Checks if given address is in internally network of
+Dappnode or AVADO based nodes.
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `address` | `Uint8Array` |
+| `family` | ``"IPv4"`` \| ``"IPv6"`` |
+
+#### Returns
+
+`boolean`
+
+#### Defined in
+
+[src/network/addrs.ts:65](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L65)
 
 ___
 
@@ -2239,7 +2264,7 @@ true if is link-locale address
 
 #### Defined in
 
-[src/network/addrs.ts:69](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L69)
+[src/network/addrs.ts:75](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L75)
 
 ___
 
@@ -2338,7 +2363,7 @@ true if address is a reserved address
 
 #### Defined in
 
-[src/network/addrs.ts:79](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L79)
+[src/network/addrs.ts:85](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L85)
 
 ___
 
@@ -2768,7 +2793,7 @@ the prefix length, e.g. 24
 
 #### Defined in
 
-[src/network/addrs.ts:162](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L162)
+[src/network/addrs.ts:168](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L168)
 
 ___
 
@@ -3030,7 +3055,7 @@ Repeatedly apply a function after a timeout
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `fn` | () => `void` | function to apply after every timeout |
+| `fn` | () => `void` \| `Promise`<`void`\> | function to apply after every timeout |
 | `newTimeout` | () => `number` | function that returns the new timeout |
 
 #### Returns
@@ -3319,7 +3344,7 @@ ___
 
 #### Defined in
 
-[src/network/addrs.ts:260](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L260)
+[src/network/addrs.ts:266](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L266)
 
 ___
 
@@ -3430,7 +3455,7 @@ Converts ip address from byte representation to string
 
 #### Defined in
 
-[src/network/addrs.ts:195](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L195)
+[src/network/addrs.ts:201](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L201)
 
 ___
 
@@ -3457,7 +3482,7 @@ a CIDR string, such as `192.168.1.0/24`
 
 #### Defined in
 
-[src/network/addrs.ts:185](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L185)
+[src/network/addrs.ts:191](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L191)
 
 ___
 

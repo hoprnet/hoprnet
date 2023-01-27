@@ -1,5 +1,4 @@
 import type NetworkPeers from './network-peers.js'
-import type AccessControl from './access-control.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
 
 import {
@@ -15,12 +14,14 @@ import {
   create_histogram_with_buckets,
   create_multi_gauge
 } from '@hoprnet/hopr-utils'
+import type { Components } from '@libp2p/interfaces/components'
 
-import { createHash, randomBytes } from 'crypto'
+import { randomBytes } from 'crypto'
 
-import type { Subscribe, SendMessage } from '../index.js'
-import EventEmitter from 'events'
+import type { SendMessage } from '../index.js'
 import { NetworkPeersOrigin } from './network-peers.js'
+import { pipe } from 'it-pipe'
+import { reply_to_ping, generate_ping_response } from '../../lib/core_misc.js'
 
 const log = debug('hopr-core:heartbeat')
 const error = debug('hopr-core:heartbeat:error')
@@ -30,8 +31,6 @@ const error = debug('hopr-core:heartbeat:error')
 import pkg from '../../package.json' assert { type: 'json' }
 
 const NORMALIZED_VERSION = pickVersion(pkg.version)
-
-const PING_HASH_ALGORITHM = 'blake2s256'
 
 const MAX_PARALLEL_HEARTBEATS = 14
 
@@ -98,11 +97,10 @@ export default class Heartbeat {
   constructor(
     private me: PeerId,
     private networkPeers: NetworkPeers,
-    private subscribe: Subscribe,
+    private libp2pComponents: Components,
     protected sendMessage: SendMessage,
     private closeConnectionsTo: (peer: PeerId) => void,
-    private reviewConnection: AccessControl['reviewConnection'],
-    private stateChangeEmitter: EventEmitter,
+    private onNetworkHealthChange: (oldValue: NetworkHealthIndicator, currentHealth: NetworkHealthIndicator) => void,
     private isPublicNode: (addr: PeerId) => boolean,
     environmentId: string,
     config?: Partial<HeartbeatConfig>
@@ -120,6 +118,8 @@ export default class Heartbeat {
       // deprecated
       `/hopr/${environmentId}/heartbeat`
     ]
+
+    this.pingNode = this.pingNode.bind(this)
   }
 
   private errHandler(err: any) {
@@ -127,9 +127,35 @@ export default class Heartbeat {
   }
 
   public async start() {
-    await this.subscribe(this.protocolHeartbeat, this.handleHeartbeatRequest.bind(this), true, this.errHandler)
+    this.libp2pComponents.getRegistrar().handle(this.protocolHeartbeat, async ({ connection, stream }) => {
+      if (this.networkPeers.has(connection.remotePeer)) {
+        this.networkPeers.updateRecord({
+          destination: connection.remotePeer,
+          lastSeen: Date.now()
+        })
+      } else {
+        this.networkPeers.register(connection.remotePeer, NetworkPeersOrigin.INCOMING_CONNECTION)
+      }
 
-    this.pingNode = this.pingNode.bind(this)
+      this.recalculateNetworkHealth()
+
+      try {
+        await pipe(
+          stream.source,
+          async function* pipeToHandler(source: AsyncIterable<Uint8Array>) {
+            yield* {
+              [Symbol.asyncIterator]() {
+                return reply_to_ping(source[Symbol.asyncIterator]())
+              }
+            }
+          },
+          stream.sink
+        )
+      } catch (err) {
+        this.errHandler(err)
+      }
+    })
+
     this.startHeartbeatInterval()
     log(`Heartbeat started`)
   }
@@ -137,23 +163,6 @@ export default class Heartbeat {
   public stop() {
     this.stopHeartbeatInterval?.()
     log(`Heartbeat stopped`)
-  }
-
-  public handleHeartbeatRequest(msg: Uint8Array, remotePeer: PeerId): Promise<Uint8Array> {
-    if (this.networkPeers.has(remotePeer)) {
-      this.networkPeers.updateRecord({
-        destination: remotePeer,
-        lastSeen: Date.now()
-      })
-    } else {
-      this.networkPeers.register(remotePeer, NetworkPeersOrigin.INCOMING_CONNECTION)
-    }
-
-    // Recalculate network health when incoming heartbeat has been received
-    this.recalculateNetworkHealth()
-
-    log(`received heartbeat from ${remotePeer.toString()}`)
-    return Promise.resolve(Heartbeat.calculatePingResponse(msg))
   }
 
   /**
@@ -164,36 +173,37 @@ export default class Heartbeat {
   public async pingNode(destination: PeerId): Promise<HeartbeatPingResult> {
     log(`ping ${destination.toString()}`)
 
-    const origin = this.networkPeers.has(destination)
-      ? this.networkPeers.getConnectionInfo(destination).origin
-      : NetworkPeersOrigin.OUTGOING_CONNECTION
-    const allowed = await this.reviewConnection(destination, origin)
-    if (!allowed) throw Error('Connection to node is not allowed')
-
     const challenge = randomBytes(16)
     let pingResponse: Uint8Array[] | undefined
 
     const ping_timer = metric_timeToPing.start_measure()
+    // Dial attempt will fail if `destination` is not registered
+    let pingError: any
+    let pingErrorThrown = false
     try {
       pingResponse = await this.sendMessage(destination, this.protocolHeartbeat, challenge, true)
     } catch (err) {
-      log(`Connection to ${destination.toString()} failed: ${err?.message}`)
-
-      metric_pingFailureCount.increment()
-      return {
-        destination,
-        lastSeen: -1
-      }
+      pingErrorThrown = true
+      pingError = err
     }
 
-    const expectedResponse = Heartbeat.calculatePingResponse(challenge)
+    if (pingErrorThrown || pingResponse == null || pingResponse.length != 1) {
+      if (pingErrorThrown) {
+        log(`Error while pinging ${destination.toString()}`, pingError)
+      } else if (pingResponse == null || pingResponse.length == 1) {
+        const expectedResponse = generate_ping_response(
+          new Uint8Array(challenge.buffer, challenge.byteOffset, challenge.length)
+        )
 
-    if (pingResponse == null || pingResponse.length != 1 || !u8aEquals(expectedResponse, pingResponse[0])) {
-      log(`Mismatched challenge. Got ${u8aToHex(pingResponse[0])} but expected ${u8aToHex(expectedResponse)}`)
+        if (!u8aEquals(expectedResponse, pingResponse[0])) {
+          log(`Mismatched challenge. Got ${u8aToHex(pingResponse[0])} but expected ${u8aToHex(expectedResponse)}`)
+        }
 
-      // Eventually close the connections, all errors are handled
-      this.closeConnectionsTo(destination)
+        // Eventually close the connections, all errors are handled
+        this.closeConnectionsTo(destination)
+      }
 
+      metric_timeToPing.cancel_measure(ping_timer)
       metric_pingFailureCount.increment()
       return {
         destination,
@@ -262,7 +272,7 @@ export default class Heartbeat {
     if (newHealthValue != this.currentHealth) {
       let oldValue = this.currentHealth
       this.currentHealth = newHealthValue
-      this.stateChangeEmitter.emit('hopr:network-health-changed', oldValue, this.currentHealth)
+      this.onNetworkHealthChange(oldValue, this.currentHealth)
 
       // Map network state to integers
       switch (newHealthValue as NetworkHealthIndicator) {
@@ -353,9 +363,5 @@ export default class Heartbeat {
       // Prevent nodes from querying each other at the very same time
       () => randomInteger(this.config.heartbeatInterval, this.config.heartbeatInterval + this.config.heartbeatVariance)
     )
-  }
-
-  public static calculatePingResponse(challenge: Uint8Array): Uint8Array {
-    return Uint8Array.from(createHash(PING_HASH_ALGORITHM).update(challenge).digest())
   }
 }

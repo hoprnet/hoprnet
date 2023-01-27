@@ -10,21 +10,21 @@ declare anvil_rpc_log="/tmp/anvil.logs"
 if [ "$(curl -s -o /dev/null -w ''%{http_code}'' 127.0.0.1:8545)" != "200" ]; then
 	# make sure other node instances are killed
 	sudo pkill node || :
-	# Start the HardHat network on localhost
-	echo "Starting HardHat network..."
-	make -C "${hopr_dir}" run-anvil > ${anvil_rpc_log} 2>&1 &
+	# Start the Anvil network on localhost
+	echo "Starting Anvil network..."
+	make -C "${hopr_dir}" run-anvil
 fi
 
 while [[
 	"$(curl -s -o /dev/null -w ''%{http_code}'' 127.0.0.1:8545)" != "200" ||
 	! -f "${anvil_rpc_log}" ||
-  -z "$(grep "Started HTTP and WebSocket JSON-RPC server" "${anvil_rpc_log}" || echo "")"
+  -z "$(grep "Listening on 127.0.0.1:8545" "${anvil_rpc_log}" || echo "")"
 	]] ; do
 	echo "Waiting for anvil network to come up..."
 	sleep 5;
 done
 
-echo "HardHat provider started up!"
+echo "Anvil provider started up!"
 # Copies all the deployment files including the .chainId file
 declare protocol_config="${mydir}/../packages/core/protocol-config.json"
 declare deployments_summary="${mydir}/../packages/ethereum/contracts/contracts-addresses.json"

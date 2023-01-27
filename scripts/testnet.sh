@@ -46,6 +46,13 @@ get_network() {
 }
 
 # $1=environment id
+get_environment_type() {
+  local environment_id="${1}"
+  # use `contracts-addresses.json` because it stores 
+  jq -r ".environments.\"${environment_id}\".environment_type" "${mydir}/../packages/ethereum/contracts/contracts-addresses.json"
+}
+
+# $1=environment id
 get_rpc() {
   local network_id
   network_id="$(get_network "${1}")"

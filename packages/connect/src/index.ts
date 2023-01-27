@@ -31,7 +31,6 @@ import { Discovery } from './discovery.js'
 import { ConnectComponents } from './components.js'
 import { EntryNodes } from './base/entry.js'
 import { WebRTCUpgrader } from './webrtc/upgrader.js'
-import { UpnpManager } from './base/upnp.js'
 import { create_counter, timeout } from '@hoprnet/hopr-utils'
 import { cleanExistingConnections } from './utils/index.js'
 
@@ -108,7 +107,6 @@ class HoprConnect implements Transport, Initializable, Startable {
       addressFilter: new Filter(this.options),
       entryNodes: new EntryNodes(this.options),
       relay: new Relay(this.options, this.testingOptions),
-      upnpManager: new UpnpManager(),
       webRTCUpgrader: new WebRTCUpgrader(this.options)
     })
 

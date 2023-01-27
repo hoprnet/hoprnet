@@ -6,7 +6,6 @@ test "$?" -eq "0" || { echo "This script should only be sourced." >&2; exit 1; }
 
 # exit on errors, undefined variables, ensure errors in pipes are not hidden
 set -Eeuo pipefail
-set -x
 
 # $1=version string, semver
 function get_version_maj_min() {
@@ -330,7 +329,8 @@ update_protocol_config_addresses() {
   log "updating contract addresses in protocol configuration"
 
   local source_data
-  source_data="$(jq -r ".environments.\"${source_environment_id}\"" "${source_file}")"
+  # copy all the fields except for the `stake_season`
+  source_data="$(jq -r ".environments.\"${source_environment_id}\"" "${source_file}" | jq "{environment_type: .environment_type, indexer_start_block_number: .indexer_start_block_number, token_contract_address: .token_contract_address, channels_contract_address: .channels_contract_address, xhopr_contract_address: .xhopr_contract_address, boost_contract_address: .boost_contract_address, stake_contract_address: .stake_contract_address, network_registry_proxy_contract_address: .network_registry_proxy_contract_address, network_registry_contract_address: .network_registry_contract_address}")" 
   jq --argjson inputdata "${source_data}" ".environments.\"${destination_environment_id}\" += \$inputdata" "${target_file}" > "${target_file}.new"
   mv "${target_file}.new" "${target_file}"
 

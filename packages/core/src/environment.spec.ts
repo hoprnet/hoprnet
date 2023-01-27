@@ -1,4 +1,4 @@
-import { resolveEnvironment } from './environment.js'
+import { resolveEnvironment, supportedEnvironments } from './environment.js'
 import assert from 'assert'
 
 describe('test environment and flags', async function () {
@@ -8,5 +8,10 @@ describe('test environment and flags', async function () {
 
     const resolvedEnvironment = resolveEnvironment(environment_id, customProvider)
     assert.equal(resolvedEnvironment.network.default_provider, customProvider, 'provider')
+  })
+
+  it('should get supported environments', function () {
+    // Assuming that `anvil-localhost` is always supported
+    assert(supportedEnvironments().length > 0)
   })
 })
