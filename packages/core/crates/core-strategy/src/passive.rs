@@ -60,6 +60,10 @@ pub mod wasm {
             }
         }
 
+        pub fn configure(&mut self, _settings: JsValue) -> JsResult<()> {
+            Ok(())
+        }
+
         #[wasm_bindgen(getter)]
         pub fn name(&self) -> String {
             self.w.name().into()

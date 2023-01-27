@@ -1,13 +1,14 @@
 import assert from 'assert'
-import { PromiscuousStrategy, OutgoingChannelStatus } from './channel-strategy.js'
+import { StrategyFactory } from './channel-strategy.js'
 import BN from 'bn.js'
+import { ChannelStatus } from '@hoprnet/hopr-utils'
 
 describe('test strategies', async function () {
   it('perform basic promiscuous strategy test', async function () {
     // Perform the same test we perform in the Rust crate to make sure
     // TS wrappers work as intended.
 
-    let strategy = new PromiscuousStrategy()
+    let strategy = StrategyFactory.getStrategy('promiscuous')
     assert.equal(strategy.name, 'promiscuous')
 
     const stake = '1000000000000000000'
@@ -25,22 +26,42 @@ describe('test strategies', async function () {
     peers.set('Joe', 0.3)
 
     let outgoing_channels = [
-      new OutgoingChannelStatus('Alice', stake),
-      new OutgoingChannelStatus('Charlie', stake),
-      new OutgoingChannelStatus('Gustave', '1000000000000000')
+      { peer_id: 'Alice', stake_str: stake, status: ChannelStatus.Open },
+      { peer_id: 'Charlie', stake_str: stake, status: ChannelStatus.Open },
+      { peer_id: 'Gustave', stake_str: '1000000000000000', status: ChannelStatus.Open }
     ]
 
-    let res = strategy.tick(new BN(stake), peers.keys(), outgoing_channels, (x: string) => peers.get(x))
+    {
+      let res = strategy.tick(new BN(stake), peers.keys(), outgoing_channels, (x: string) => peers.get(x))
 
-    assert.equal(res.max_auto_channels, 4)
-    assert.equal(res.to_close().length, 2)
-    assert.equal(res.to_open().length, 3)
+      assert.equal(res.max_auto_channels, 4)
+      assert.equal(res.to_close().length, 2)
+      assert.equal(res.to_open().length, 3)
 
-    assert(res.to_close().includes('Alice'))
-    assert(res.to_close().includes('Gustave'))
+      assert(res.to_close().includes('Alice'))
+      assert(res.to_close().includes('Gustave'))
 
-    assert.equal(res.to_open()[0].peer_id, 'Gustave')
-    assert.equal(res.to_open()[1].peer_id, 'Eugene')
-    assert.equal(res.to_open()[2].peer_id, 'Bob')
+      assert.equal(res.to_open()[0].peer_id, 'Gustave')
+      assert.equal(res.to_open()[1].peer_id, 'Eugene')
+      assert.equal(res.to_open()[2].peer_id, 'Bob')
+    }
+
+    // Now reconfigure the strategy and tick again with same inputs
+    strategy.configure({
+      max_channels: 2
+    })
+
+    {
+      let res = strategy.tick(new BN(stake), peers.keys(), outgoing_channels, (x: string) => peers.get(x))
+
+      assert.equal(res.max_auto_channels, 2)
+      assert.equal(res.to_close().length, 2)
+      assert.equal(res.to_open().length, 1)
+
+      assert(res.to_close().includes('Alice'))
+      assert(res.to_close().includes('Gustave'))
+
+      assert.equal(res.to_open()[0].peer_id, 'Gustave')
+    }
   })
 })

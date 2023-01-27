@@ -9,6 +9,7 @@ use core_misc::constants::{
     DEFAULT_NETWORK_QUALITY_THRESHOLD,
 };
 use core_misc::environment::{Environment, FromJsonFile, PackageJsonFile, ProtocolConfig};
+use core_strategy::{passive::PassiveStrategy, random::RandomStrategy, promiscuous::PromiscuousStrategy, generic::ChannelStrategy};
 use proc_macro_regex::regex;
 use real_base::real;
 use serde::{Deserialize, Serialize};
@@ -218,6 +219,25 @@ struct CliArgs {
         value_name = "PASSWORD"
     )]
     pub password: Option<String>,
+
+    #[arg(
+    long,
+    help = "Default channel strategy to use after node starts up",
+    env = "HOPRD_DEFAULT_STRATEGY",
+    value_name = "DEFAULT_STRATEGY",
+    default_value = "passive",
+    value_parser = PossibleValuesParser::new([PromiscuousStrategy::NAME, PassiveStrategy::NAME, RandomStrategy::NAME])
+    )]
+    pub default_strategy: Option<String>,
+
+    #[arg(
+    long,
+    help = "Maximum number of channel a strategy can open. If not specified, square root of number of available peers is used.",
+    env = "HOPRD_MAX_AUTO_CHANNELS",
+    value_name = "MAX_AUTO_CHANNELS",
+    value_parser = clap::value_parser!(u32)
+    )]
+    pub max_auto_channels: Option<u32>, // Make this a string if we want to supply functions instead in the future.
 
     #[arg(
         long,
