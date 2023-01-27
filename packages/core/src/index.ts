@@ -643,7 +643,7 @@ class Hopr extends EventEmitter {
 
     try {
       let outgoingChannels = 0
-      for (const channel of await this.getChannelsFrom(selfAddr)) {
+      for await (const channel of this.db.getChannelsFromIterable(selfAddr)) {
         metric_channelBalances.set(
           [channel.source.toAddress().toHex(), 'out'],
           +ethersUtils.formatEther(channel.balance.toBN().toString())
@@ -652,7 +652,7 @@ class Hopr extends EventEmitter {
       }
 
       let incomingChannels = 0
-      for (const channel of await this.getChannelsTo(selfAddr)) {
+      for await (const channel of this.db.getChannelsToIterable(selfAddr)) {
         metric_channelBalances.set(
           [channel.source.toAddress().toHex(), 'in'],
           +ethersUtils.formatEther(channel.balance.toBN().toString())

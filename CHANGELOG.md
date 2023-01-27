@@ -12,6 +12,7 @@
 - Introduced Promiscuous Strategy v1, strategies migrated to Rust ([#4506](https://github.com/hoprnet/hoprnet/pull/4506))
 - Fix of ticket validation to be order-independent, thus not rejecting older tickets ([#4527](<(https://github.com/hoprnet/hoprnet/pull/4527)>)
 - Migrate `heartbeat` ping network interaction to Rust using Rust `futures::stream::Stream` ([#4539](https://github.com/hoprnet/hoprnet/pull/4539))
+- Added strategy related metrics, refactoring of the strategy code ([#4537](https://github.com/hoprnet/hoprnet/pull/4537))
 
 <a name="1.91"></a>
 

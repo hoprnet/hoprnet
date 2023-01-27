@@ -5,6 +5,7 @@ import { CHECK_TIMEOUT } from './constants.js'
 
 const log = debug('hopr-core:channel-strategy')
 
+// Required to use with Node.js with ES, see https://docs.rs/getrandom/latest/getrandom/#nodejs-es-module-support
 import { webcrypto } from 'node:crypto'
 // @ts-ignore
 globalThis.crypto = webcrypto
@@ -23,7 +24,7 @@ export { StrategyTickResult } from '../lib/core_strategy.js'
 
 import { ChannelStatus } from '@hoprnet/hopr-utils'
 
-const STRATEGIES = ['passive', 'promiscuous']
+const STRATEGIES = ['passive', 'promiscuous', 'random']
 export type Strategy = typeof STRATEGIES[number]
 
 export function isStrategy(str: string): str is Strategy {
@@ -130,6 +131,8 @@ export class StrategyFactory {
     switch (strategy) {
       case 'promiscuous':
         return new RustStrategyWrapper(new PromiscuousStrategy())
+      case 'random':
+        log(`error: random strategy not implemented, falling back to 'passive'.`)
       default:
       case 'passive':
         return new RustStrategyWrapper(new PassiveStrategy())
