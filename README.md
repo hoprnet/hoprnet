@@ -168,6 +168,10 @@ Options:
           A password to encrypt your keys [env: HOPRD_PASSWORD=]
       --provider <PROVIDER>
           A custom RPC provider to be used for the node to connect to blockchain [env: HOPRD_PROVIDER=]
+      --defaultStrategy <STRATEGY>
+          Default channel strategy to use when the node is started [env: HOPRD_DEFAULT_STRATEGY=] [default: passive]
+      --maxAutoChannels <NUMBER>
+          Maximum number of channels a strategy can open [env: HOPRD_MAX_AUTOCHANNELS=] [default: square root of the number of active peers]
       --dryRun
           List all the options used to run the HOPR node, but quit instead of starting [env: HOPRD_DRY_RUN=]
       --init

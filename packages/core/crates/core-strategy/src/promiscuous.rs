@@ -10,25 +10,21 @@ use crate::generic::{ChannelStrategy, OutgoingChannelStatus, StrategyTickResult}
 /// This strategy opens channels to peers, which have quality above a given threshold.
 /// At the same time, it closes channels opened to peers whose quality dropped below this threshold.
 pub struct PromiscuousStrategy {
-    network_quality_threshold: f64,
-    new_channel_stake: Balance,
-    minimum_channel_balance: Balance,
-    minimum_node_balance: Balance,
-    scaling_constant: u16,
+    pub network_quality_threshold: f64,
+    pub new_channel_stake: Balance,
+    pub minimum_channel_balance: Balance,
+    pub minimum_node_balance: Balance,
+    pub max_channels: Option<usize>,
 }
 
-impl Default for PromiscuousStrategy {
-    /// Creates promiscuous strategy with default parameters,
-    /// that is quality threshold 0.5, new channel stake 0.1 txHOPR,
-    /// minimum channel balance to 0.01 txHOPR (meaning an auto-channel can be used for 10 msgs)
-    /// minimum token balance on the node should not drop below 0.1 txHOPR.
-    fn default() -> Self {
+impl PromiscuousStrategy {
+    pub fn new() -> Self {
         PromiscuousStrategy {
             network_quality_threshold: 0.5,
             new_channel_stake: Balance::from_str("100000000000000000").unwrap(),
             minimum_channel_balance: Balance::from_str("10000000000000000").unwrap(),
             minimum_node_balance: Balance::from_str("100000000000000000").unwrap(),
-            scaling_constant: 1
+            max_channels: None
         }
     }
 }
@@ -98,7 +94,7 @@ impl ChannelStrategy for PromiscuousStrategy {
             .for_each(|c| to_close.push(c.peer_id.clone()));
 
         // We compute the upper bound for channels as a square-root of the perceived network size
-        let max_auto_channels = self.scaling_constant as usize * (network_size as f64).sqrt().ceil() as usize;
+        let max_auto_channels = self.max_channels.unwrap_or((network_size as f64).sqrt().ceil() as usize);
         let count_opened = outgoing_channels.iter().filter(|c| c.status == Open).count();
 
         // Sort the new channel candidates by best quality first, then truncate to the number of available slots
@@ -142,7 +138,7 @@ mod tests {
 
     #[test]
     fn test_promiscuous_basic() {
-        let strat = PromiscuousStrategy::default();
+        let strat = PromiscuousStrategy::new();
 
         assert_eq!(strat.name(), "promiscuous");
 
@@ -204,6 +200,7 @@ mod tests {
 /// WASM bindings
 #[cfg(feature = "wasm")]
 pub mod wasm {
+    use serde::Deserialize;
     use wasm_bindgen::prelude::*;
 
     use utils_misc::utils::wasm::JsResult;
@@ -211,6 +208,15 @@ pub mod wasm {
 
     use crate::generic::wasm::StrategyTickResult;
     use crate::generic::ChannelStrategy;
+
+    #[derive(Deserialize)]
+    struct PromiscuousSettings {
+        pub network_quality_threshold: f64,
+        pub new_channel_stake: String,
+        pub minimum_channel_balance: String,
+        pub minimum_node_balance: String,
+        pub max_channels: Option<u32>,
+    }
 
     #[wasm_bindgen]
     pub struct PromiscuousStrategy {
@@ -220,28 +226,21 @@ pub mod wasm {
     #[wasm_bindgen]
     impl PromiscuousStrategy {
         #[wasm_bindgen(constructor)]
-        pub fn new(
-            network_quality_threshold: f64,
-            minimum_node_balance: Balance,
-            new_channel_stake: Balance,
-            minimum_channel_balance: Balance,
-            scaling_constant: u16
-        ) -> Self {
+        pub fn new() -> Self {
             PromiscuousStrategy {
-                w: super::PromiscuousStrategy {
-                    network_quality_threshold,
-                    minimum_node_balance: minimum_node_balance.w,
-                    new_channel_stake: new_channel_stake.w,
-                    minimum_channel_balance: minimum_channel_balance.w,
-                    scaling_constant
-                },
+                w: super::PromiscuousStrategy::new()
             }
         }
 
-        pub fn default() -> Self {
-            PromiscuousStrategy {
-                w: super::PromiscuousStrategy::default(),
-            }
+        pub fn configure(&mut self, settings: JsValue) -> JsResult<()> {
+            let cfg: PromiscuousSettings = serde_wasm_bindgen::from_value(settings)?;
+            self.w.network_quality_threshold = cfg.network_quality_threshold;
+            self.w.minimum_node_balance = super::Balance::from_str(cfg.minimum_node_balance.as_str())?;
+            self.w.new_channel_stake = super::Balance::from_str(cfg.new_channel_stake.as_str())?;
+            self.w.minimum_channel_balance = super::Balance::from_str(cfg.minimum_channel_balance.as_str())?;
+            self.w.max_channels = cfg.max_channels.map(|c| c as usize);
+
+            Ok(())
         }
 
         #[wasm_bindgen(getter)]

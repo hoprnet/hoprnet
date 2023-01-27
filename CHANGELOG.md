@@ -11,6 +11,7 @@
 - Switch staging environment to using Gnosis Chain instead of Goerli ([#4497](https://github.com/hoprnet/hoprnet/pull/4497))
 - Introduced Promiscuous Strategy v1, strategies migrated to Rust ([#4506](https://github.com/hoprnet/hoprnet/pull/4506))
 - Fix of ticket validation to be order-independent, thus not rejecting older tickets ([#4527](<(https://github.com/hoprnet/hoprnet/pull/4527)>)
+- Migrate `heartbeat` ping network interaction to Rust using Rust `futures::stream::Stream` ([#4539](https://github.com/hoprnet/hoprnet/pull/4539))
 
 <a name="1.91"></a>
 

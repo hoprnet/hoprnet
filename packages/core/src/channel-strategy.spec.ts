@@ -1,5 +1,5 @@
 import assert from 'assert'
-import { PromiscuousStrategy } from './channel-strategy.js'
+import { StrategyFactory } from './channel-strategy.js'
 import BN from 'bn.js'
 import { ChannelStatus } from '@hoprnet/hopr-utils'
 
@@ -8,7 +8,7 @@ describe('test strategies', async function () {
     // Perform the same test we perform in the Rust crate to make sure
     // TS wrappers work as intended.
 
-    let strategy = new PromiscuousStrategy()
+    let strategy = StrategyFactory.getStrategy('promiscuous')
     assert.equal(strategy.name, 'promiscuous')
 
     const stake = '1000000000000000000'

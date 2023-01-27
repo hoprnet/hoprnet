@@ -65,6 +65,7 @@ logs.txt
 /scripts/**/*.cts
 /scripts/**/*.cjs
 !/packages/connect/src/@types/*.d.ts
+!/packages/hoprd/src/main.cts
 
 *.id
 

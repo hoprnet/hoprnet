@@ -67,9 +67,10 @@ import HoprCoreEthereum, { type Indexer } from '@hoprnet/hopr-core-ethereum'
 import {
   type ChannelStrategyInterface,
   OutgoingChannelStatus,
-  PassiveStrategy,
-  PromiscuousStrategy,
   SaneDefaults,
+  Strategy,
+  isStrategy,
+  StrategyFactory,
   StrategyTickResult
 } from './channel-strategy.js'
 
@@ -103,6 +104,19 @@ const metric_pathLength = create_histogram_with_buckets(
   'core_histogram_path_length',
   'Distribution of number of hops of sent messages',
   new Float64Array([0, 1, 2, 3, 4])
+)
+const metric_strategyTicks = create_counter('core_counter_strategy_ticks', 'Number of strategy decisions (ticks)')
+const metric_strategyLastOpened = create_gauge(
+  'core_gauge_strategy_last_opened_channels',
+  'Number of opened channels in the last strategy tick'
+)
+const metric_strategyLastClosed = create_gauge(
+  'core_gauge_strategy_last_closed_channels',
+  'Number of closed channels in the last strategy tick'
+)
+const metric_strategyMaxChannels = create_gauge(
+  'core_gauge_strategy_max_auto_channels',
+  'Maximum number of channels the current strategy can open'
 )
 
 // Using libp2p components directly because it allows us
@@ -383,7 +397,7 @@ class Hopr extends EventEmitter {
     this.heartbeat = new Heartbeat(
       this.id,
       this.networkPeers,
-      subscribe,
+      this.libp2pComponents,
       sendMessage,
       this.closeConnectionsTo.bind(this),
       (oldHealthValue: NetworkHealthIndicator, newNetworkHealth: NetworkHealthIndicator) =>
@@ -467,7 +481,7 @@ class Hopr extends EventEmitter {
     // subscribe so we can process channel close events
     this.connector.indexer.on('own-channel-updated', this.onOwnChannelUpdated.bind(this))
 
-    this.setChannelStrategy(this.options.strategy || new PassiveStrategy())
+    this.setChannelStrategy(this.options.strategy || StrategyFactory.getStrategy('passive'))
 
     log('announcing done, starting heartbeat & strategy interval')
     await this.heartbeat.start()
@@ -694,16 +708,20 @@ class Hopr extends EventEmitter {
         }),
         (peer_id_str: string) => this.networkPeers.qualityOf(peerIdFromString(peer_id_str))
       )
+      metric_strategyTicks.increment()
+      metric_strategyMaxChannels.set(tickResult.max_auto_channels)
     } catch (e) {
       log(`failed to do a strategy tick`, e)
       throw new Error('error while performing strategy tick')
     }
 
     let allClosedChannels = tickResult.to_close()
-    verbose(`strategy wants to close ${tickResult.to_close().length} channels`)
+    verbose(`strategy wants to close ${allClosedChannels.length} channels`)
+    metric_strategyLastClosed.set(allClosedChannels.length)
 
     let allOpenedChannels: OutgoingChannelStatus[] = tickResult.to_open()
     verbose(`strategy wants to open ${allOpenedChannels.length} new channels`)
+    metric_strategyLastOpened.set(allOpenedChannels.length)
 
     try {
       await Promise.all(allClosedChannels.map(this.strategyCloseChannel.bind(this)))
@@ -711,10 +729,6 @@ class Hopr extends EventEmitter {
     } catch (e) {
       log(`error when strategy was trying to open or close channels`, e)
     }
-  }
-
-  public async *getAllChannels(): AsyncIterable<ChannelEntry> {
-    yield* this.db.getChannelsFromIterable(PublicKey.fromPeerId(this.getId()).toAddress())
   }
 
   /**
@@ -1468,11 +1482,12 @@ export default Hopr
 export * from './constants.js'
 export { createHoprNode } from './main.js'
 export {
-  PassiveStrategy,
-  PromiscuousStrategy,
+  Strategy,
+  StrategyFactory,
+  StrategyTickResult,
+  isStrategy,
   SaneDefaults,
   findPath,
-  StrategyTickResult,
   NetworkHealthIndicator,
   NetworkPeersOrigin,
   type ChannelStrategyInterface

@@ -1,8 +1,11 @@
 import type { PeerId } from '@libp2p/interface-peer-id'
+import { Strategy } from '@hoprnet/hopr-core'
 
 export enum SettingKey {
   STRATEGY = 'strategy',
-  INCLUDE_RECIPIENT = 'includeRecipient'
+  INCLUDE_RECIPIENT = 'includeRecipient',
+
+  MAX_AUTO_CHANNELS = 'maxAutoChannels'
 }
 
 /**
@@ -11,8 +14,9 @@ export enum SettingKey {
 export type State = {
   aliases: Map<string, PeerId>
   settings: {
-    [SettingKey.STRATEGY]: 'passive' | 'promiscuous'
+    [SettingKey.STRATEGY]: Strategy
     [SettingKey.INCLUDE_RECIPIENT]: boolean
+    [SettingKey.MAX_AUTO_CHANNELS]: number
   }
 }
 

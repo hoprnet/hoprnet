@@ -5,17 +5,30 @@ import { CHECK_TIMEOUT } from './constants.js'
 
 const log = debug('hopr-core:channel-strategy')
 
+import { webcrypto } from 'node:crypto'
+// @ts-ignore
+globalThis.crypto = webcrypto
+
 import {
-  PromiscuousStrategy as RS_PromiscuousStrategy,
-  PassiveStrategy as RS_PassiveStrategy,
+  PromiscuousStrategy,
+  PassiveStrategy,
   StrategyTickResult,
   Balance,
   utils_misc_set_panic_hook
 } from '../lib/core_strategy.js'
+
 utils_misc_set_panic_hook()
+
 export { StrategyTickResult } from '../lib/core_strategy.js'
 
 import { ChannelStatus } from '@hoprnet/hopr-utils'
+
+const STRATEGIES = ['passive', 'promiscuous']
+export type Strategy = typeof STRATEGIES[number]
+
+export function isStrategy(str: string): str is Strategy {
+  return STRATEGIES.includes(str)
+}
 
 export class OutgoingChannelStatus {
   peer_id: string
@@ -34,6 +47,8 @@ export class OutgoingChannelStatus {
  */
 export interface ChannelStrategyInterface {
   name: string
+
+  configure(settings: any)
 
   tick(
     balance: BN,
@@ -82,12 +97,18 @@ export abstract class SaneDefaults {
   tickInterval = CHECK_TIMEOUT
 }
 
+type RustStrategyInterface = { configure; tick; name }
+
 /**
   Temporary wrapper class before we migrate rest of the core to use Rust exported types (before we migrate everything to Rust!)
  */
-abstract class RustStrategyWrapper<T extends { tick; name }> extends SaneDefaults implements ChannelStrategyInterface {
-  protected constructor(private strategy: T) {
+class RustStrategyWrapper<T extends RustStrategyInterface> extends SaneDefaults implements ChannelStrategyInterface {
+  constructor(private strategy: T) {
     super()
+  }
+
+  configure(settings: any) {
+    this.strategy.configure(settings)
   }
 
   tick(
@@ -104,14 +125,14 @@ abstract class RustStrategyWrapper<T extends { tick; name }> extends SaneDefault
   }
 }
 
-export class PromiscuousStrategy extends RustStrategyWrapper<RS_PromiscuousStrategy> {
-  constructor() {
-    super(RS_PromiscuousStrategy.default())
-  }
-}
-
-export class PassiveStrategy extends RustStrategyWrapper<RS_PromiscuousStrategy> {
-  constructor() {
-    super(new RS_PassiveStrategy())
+export class StrategyFactory {
+  public static getStrategy(strategy: Strategy): ChannelStrategyInterface {
+    switch (strategy) {
+      case 'promiscuous':
+        return new RustStrategyWrapper(new PromiscuousStrategy())
+      default:
+      case 'passive':
+        return new RustStrategyWrapper(new PassiveStrategy())
+    }
   }
 }
