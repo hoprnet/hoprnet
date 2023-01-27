@@ -1898,6 +1898,7 @@ dependencies = [
  "console_error_panic_hook",
  "core-ethereum-misc",
  "core-misc",
+ "core-strategy",
  "js-sys",
  "proc-macro-regex",
  "real-base",

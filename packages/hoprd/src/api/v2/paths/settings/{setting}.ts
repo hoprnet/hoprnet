@@ -19,14 +19,13 @@ export const setSetting = (node: Hopr, stateOps: StateOps, key: keyof State['set
     case SettingKey.MAX_AUTO_CHANNELS:
       if (typeof value !== 'number') throw Error(STATUS_CODES.INVALID_SETTING_VALUE)
       state.settings[key] = value
-      break;
+      break
     case SettingKey.INCLUDE_RECIPIENT:
       if (typeof value !== 'boolean') throw Error(STATUS_CODES.INVALID_SETTING_VALUE)
       state.settings[key] = value
       break
     case SettingKey.STRATEGY:
-      if (!isStrategy(value))
-        throw Error(STATUS_CODES.INVALID_SETTING_VALUE)
+      if (!isStrategy(value)) throw Error(STATUS_CODES.INVALID_SETTING_VALUE)
 
       let strategy = StrategyFactory.getStrategy(value)
       strategy.configure({
