@@ -13,7 +13,8 @@ import {
 import {
   createHoprNode,
   default as Hopr,
-  type HoprOptions, isStrategy,
+  type HoprOptions,
+  isStrategy,
   NetworkHealthIndicator,
   ResolvedEnvironment,
   resolveEnvironment

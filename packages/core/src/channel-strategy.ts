@@ -24,7 +24,7 @@ export { StrategyTickResult } from '../lib/core_strategy.js'
 import { ChannelStatus } from '@hoprnet/hopr-utils'
 
 const STRATEGIES = ['passive', 'promiscuous']
-export type Strategy = typeof STRATEGIES[number];
+export type Strategy = typeof STRATEGIES[number]
 
 export function isStrategy(str: string): str is Strategy {
   return STRATEGIES.includes(str)
@@ -97,7 +97,7 @@ export abstract class SaneDefaults {
   tickInterval = CHECK_TIMEOUT
 }
 
-type RustStrategyInterface = {configure; tick; name};
+type RustStrategyInterface = { configure; tick; name }
 
 /**
   Temporary wrapper class before we migrate rest of the core to use Rust exported types (before we migrate everything to Rust!)
@@ -135,5 +135,4 @@ export class StrategyFactory {
         return new RustStrategyWrapper(new PassiveStrategy())
     }
   }
-
 }
