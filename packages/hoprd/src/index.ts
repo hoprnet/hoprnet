@@ -13,11 +13,8 @@ import {
 import {
   createHoprNode,
   default as Hopr,
-  type HoprOptions,
+  type HoprOptions, isStrategy,
   NetworkHealthIndicator,
-  PassiveStrategy,
-  PromiscuousStrategy,
-  PromiscuousSettings,
   ResolvedEnvironment,
   resolveEnvironment
 } from '@hoprnet/hopr-core'
@@ -29,6 +26,7 @@ import setupHealthcheck from './healthcheck.js'
 import { LogStream } from './logs.js'
 import { getIdentity } from './identity.js'
 import { decodeMessage } from './api/utils.js'
+import { StrategyFactory } from '@hoprnet/hopr-core/lib/channel-strategy.js'
 
 // Metrics
 const metric_processStartTime = create_gauge(
@@ -83,16 +81,13 @@ function generateNodeOptions(argv: CliArgs, environment: ResolvedEnvironment): H
     options.password = argv.password as string
   }
 
-  switch (argv.default_strategy) {
-    case 'promiscuous':
-      let settings = PromiscuousSettings.default()
-      settings.max_channels = argv.max_auto_channels
-      options.strategy = new PromiscuousStrategy(settings)
-      break
-    default:
-    case 'passive':
-      options.strategy = new PassiveStrategy()
-      break
+  if (isStrategy(argv.default_strategy)) {
+    options.strategy = StrategyFactory.getStrategy(argv.default_strategy)
+    if (argv.max_auto_channels !== undefined) {
+      options.strategy.configure({
+        max_channels: argv.max_auto_channels
+      })
+    }
   }
 
   return options
@@ -156,7 +151,8 @@ async function main() {
     aliases: new Map(),
     settings: {
       includeRecipient: false,
-      strategy: 'passive'
+      strategy: 'passive',
+      maxAutoChannels: undefined
     }
   }
 

@@ -67,10 +67,10 @@ import HoprCoreEthereum, { type Indexer } from '@hoprnet/hopr-core-ethereum'
 import {
   type ChannelStrategyInterface,
   OutgoingChannelStatus,
-  PassiveStrategy,
-  PromiscuousStrategy,
-  PromiscuousSettings,
   SaneDefaults,
+  Strategy,
+  isStrategy,
+  StrategyFactory,
   StrategyTickResult
 } from './channel-strategy.js'
 
@@ -481,7 +481,7 @@ class Hopr extends EventEmitter {
     // subscribe so we can process channel close events
     this.connector.indexer.on('own-channel-updated', this.onOwnChannelUpdated.bind(this))
 
-    this.setChannelStrategy(this.options.strategy || new PassiveStrategy())
+    this.setChannelStrategy(this.options.strategy || StrategyFactory.getStrategy('passive'))
 
     log('announcing done, starting heartbeat & strategy interval')
     await this.heartbeat.start()
@@ -1482,12 +1482,12 @@ export default Hopr
 export * from './constants.js'
 export { createHoprNode } from './main.js'
 export {
-  PassiveStrategy,
-  PromiscuousStrategy,
-  PromiscuousSettings,
+  Strategy,
+  StrategyFactory,
+  StrategyTickResult,
+  isStrategy,
   SaneDefaults,
   findPath,
-  StrategyTickResult,
   NetworkHealthIndicator,
   NetworkPeersOrigin,
   type ChannelStrategyInterface
