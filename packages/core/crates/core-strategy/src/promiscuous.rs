@@ -211,10 +211,10 @@ pub mod wasm {
 
     #[derive(Deserialize)]
     struct PromiscuousSettings {
-        pub network_quality_threshold: f64,
-        pub new_channel_stake: String,
-        pub minimum_channel_balance: String,
-        pub minimum_node_balance: String,
+        pub network_quality_threshold: Option<f64>,
+        pub new_channel_stake: Option<String>,
+        pub minimum_channel_balance: Option<String>,
+        pub minimum_node_balance: Option<String>,
         pub max_channels: Option<u32>,
     }
 
@@ -234,10 +234,18 @@ pub mod wasm {
 
         pub fn configure(&mut self, settings: JsValue) -> JsResult<()> {
             let cfg: PromiscuousSettings = serde_wasm_bindgen::from_value(settings)?;
-            self.w.network_quality_threshold = cfg.network_quality_threshold;
-            self.w.minimum_node_balance = super::Balance::from_str(cfg.minimum_node_balance.as_str())?;
-            self.w.new_channel_stake = super::Balance::from_str(cfg.new_channel_stake.as_str())?;
-            self.w.minimum_channel_balance = super::Balance::from_str(cfg.minimum_channel_balance.as_str())?;
+            if let Some(option) = cfg.network_quality_threshold {
+                self.w.network_quality_threshold = option;
+            }
+            if let Some(option) = cfg.minimum_node_balance {
+                self.w.minimum_node_balance = super::Balance::from_str(option.as_str())?;
+            }
+            if let Some(option) = cfg.new_channel_stake {
+                self.w.new_channel_stake = super::Balance::from_str(option.as_str())?;
+            }
+            if let Some(option) = cfg.minimum_channel_balance {
+                self.w.minimum_channel_balance = super::Balance::from_str(option.as_str())?;
+            }
             self.w.max_channels = cfg.max_channels.map(|c| c as usize);
 
             Ok(())
