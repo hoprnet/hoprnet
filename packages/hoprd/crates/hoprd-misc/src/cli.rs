@@ -9,6 +9,7 @@ use core_misc::constants::{
     DEFAULT_NETWORK_QUALITY_THRESHOLD,
 };
 use core_misc::environment::{Environment, FromJsonFile, PackageJsonFile, ProtocolConfig};
+use core_strategy::{passive::PassiveStrategy, random::RandomStrategy, promiscuous::PromiscuousStrategy, generic::ChannelStrategy};
 use proc_macro_regex::regex;
 use real_base::real;
 use serde::{Deserialize, Serialize};
@@ -224,7 +225,8 @@ struct CliArgs {
     help = "Default channel strategy to use after node starts up",
     env = "HOPRD_DEFAULT_STRATEGY",
     value_name = "DEFAULT_STRATEGY",
-    default_value = "passive"
+    default_value = "passive",
+    value_parser = PossibleValuesParser::new([PromiscuousStrategy::NAME, PassiveStrategy::NAME, RandomStrategy::NAME])
     )]
     pub default_strategy: Option<String>,
 
