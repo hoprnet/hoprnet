@@ -32,7 +32,7 @@
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:75](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L75)
+[packages/core/src/channel-strategy.ts:98](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L98)
 
 ## Methods
 
@@ -53,7 +53,7 @@
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:57](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L57)
+[packages/core/src/channel-strategy.ts:80](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L80)
 
 ___
 
@@ -74,7 +74,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:51](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L51)
+[packages/core/src/channel-strategy.ts:74](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L74)
 
 ___
 
@@ -94,4 +94,4 @@ ___
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:70](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L70)
+[packages/core/src/channel-strategy.ts:93](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L93)

@@ -2,6 +2,8 @@
 
 # Enumeration: ChannelStatus
 
+Describes status of the channel
+
 ## Table of contents
 
 ### Enumeration Members
@@ -15,38 +17,38 @@
 
 ### Closed
 
-• **Closed** = ``0``
+• **Closed** = `number`
 
 #### Defined in
 
-[src/types/channelEntry.ts:10](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L10)
+lib/utils_types.d.ts:24
 
 ___
 
 ### Open
 
-• **Open** = ``2``
+• **Open** = `number`
 
 #### Defined in
 
-[src/types/channelEntry.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L12)
+lib/utils_types.d.ts:26
 
 ___
 
 ### PendingToClose
 
-• **PendingToClose** = ``3``
+• **PendingToClose** = `number`
 
 #### Defined in
 
-[src/types/channelEntry.ts:13](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L13)
+lib/utils_types.d.ts:27
 
 ___
 
 ### WaitingForCommitment
 
-• **WaitingForCommitment** = ``1``
+• **WaitingForCommitment** = `number`
 
 #### Defined in
 
-[src/types/channelEntry.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L11)
+lib/utils_types.d.ts:25
