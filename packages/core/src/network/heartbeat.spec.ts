@@ -1,10 +1,12 @@
 import Heartbeat, { type HeartbeatConfig, NetworkHealthIndicator } from './heartbeat.js'
 import NetworkPeers, { NetworkPeersOrigin } from './network-peers.js'
 import { assert } from 'chai'
-import { type LibP2PHandlerFunction, privKeyToPeerId } from '@hoprnet/hopr-utils'
+import { privKeyToPeerId } from '@hoprnet/hopr-utils'
 import { EventEmitter, once } from 'events'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { NETWORK_QUALITY_THRESHOLD } from '../constants.js'
+import type { Connection, Stream } from '@libp2p/interfaces/connection'
+import type { Components } from '@libp2p/interfaces/components'
 
 class TestingHeartbeat extends Heartbeat {
   public async checkNodes() {
@@ -57,6 +59,7 @@ function reqEventName(self: PeerId, protocol: string): string {
 function resEventName(self: PeerId, dest: PeerId, protocol: string): string {
   return `res:${self.toString()}:${dest.toString()}:${protocol}`
 }
+
 /**
  * Creates an event-based fake network
  * @returns a fake network
@@ -70,7 +73,15 @@ function createFakeNetwork() {
   const subscribe = (
     self: PeerId,
     protocols: string | string[],
-    handler: (msg: Uint8Array, remotePeer: PeerId) => Promise<Uint8Array>
+    handler: ({
+      connection,
+      stream,
+      protocol
+    }: {
+      connection: Connection
+      stream: Stream
+      protocol: string
+    }) => Promise<void>
   ) => {
     let protocol: string
     if (Array.isArray(protocols)) {
@@ -80,9 +91,25 @@ function createFakeNetwork() {
     }
 
     network.on(reqEventName(self, protocol), async (from: PeerId, request: Uint8Array) => {
-      const response = await handler(request, from)
-
-      network.emit(resEventName(self, from, protocol), self, response)
+      await handler({
+        connection: {
+          remotePeer: from
+        } as Connection,
+        protocol,
+        stream: {
+          // Assuming that we are receiving exactly one message, namely ping
+          source: (async function* () {
+            yield request
+          })(),
+          sink: async function (source: AsyncIterable<Uint8Array>) {
+            for await (const msg of source) {
+              // Assuming that we are sending exactly one message, namely pong
+              network.emit(resEventName(self, from, protocol), self, msg)
+              break
+            }
+          }
+        } as any
+      })
     })
 
     subscribedPeers.set(self.toString(), reqEventName(self, protocol))
@@ -137,7 +164,26 @@ async function getPeer(
   const heartbeat = new TestingHeartbeat(
     Me,
     peers,
-    (protocols: string | string[], handler: LibP2PHandlerFunction<any>) => network.subscribe(self, protocols, handler),
+    {
+      getRegistrar() {
+        return {
+          async handle(
+            protocols: string | string[],
+            handler: ({
+              protocol,
+              stream,
+              connection
+            }: {
+              protocol: string
+              stream: Stream
+              connection: Connection
+            }) => Promise<void>
+          ) {
+            network.subscribe(self, protocols, handler)
+          }
+        } as NonNullable<Components['registrar']>
+      }
+    } as Components,
     ((dest: PeerId, protocols: string | string[], msg: Uint8Array) =>
       network.sendMessage(self, dest, protocols, msg)) as any,
     (async () => {

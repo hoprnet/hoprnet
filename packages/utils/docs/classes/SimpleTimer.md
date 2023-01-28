@@ -34,4 +34,4 @@ This is because WASM does not support system time functionality from the Rust st
 
 #### Defined in
 
-lib/utils_metrics.d.ts:265
+lib/utils_metrics.d.ts:317

@@ -1,3 +1,7 @@
+use rand::rngs::OsRng;
+use rand::seq::SliceRandom;
+
+use utils_types::channels::ChannelStatus::{Open, PendingToClose};
 use utils_types::primitives::{Balance, BaseBalance};
 
 use crate::generic::{ChannelStrategy, OutgoingChannelStatus, StrategyTickResult};
@@ -6,23 +10,21 @@ use crate::generic::{ChannelStrategy, OutgoingChannelStatus, StrategyTickResult}
 /// This strategy opens channels to peers, which have quality above a given threshold.
 /// At the same time, it closes channels opened to peers whose quality dropped below this threshold.
 pub struct PromiscuousStrategy {
-    network_quality_threshold: f64,
-    new_channel_stake: Balance,
-    minimum_channel_balance: Balance,
-    minimum_node_balance: Balance,
+    pub network_quality_threshold: f64,
+    pub new_channel_stake: Balance,
+    pub minimum_channel_balance: Balance,
+    pub minimum_node_balance: Balance,
+    pub max_channels: Option<usize>,
 }
 
-impl Default for PromiscuousStrategy {
-    /// Creates promiscuous strategy with default parameters,
-    /// that is quality threshold 0.5, new channel stake 0.1 txHOPR,
-    /// minimum channel balance to 0.01 txHOPR (meaning an auto-channel can be used for 10 msgs)
-    /// minimum token balance on the node should not drop below 0.1 txHOPR.
-    fn default() -> Self {
+impl PromiscuousStrategy {
+    pub fn new() -> Self {
         PromiscuousStrategy {
             network_quality_threshold: 0.5,
             new_channel_stake: Balance::from_str("100000000000000000").unwrap(),
             minimum_channel_balance: Balance::from_str("10000000000000000").unwrap(),
             minimum_node_balance: Balance::from_str("100000000000000000").unwrap(),
+            max_channels: None
         }
     }
 }
@@ -48,13 +50,13 @@ impl ChannelStrategy for PromiscuousStrategy {
         // which peer ids should become candidates for a new channel
         // Also re-open all the channels that have dropped under minimum given balance
         for peer_id in peer_ids {
-            // Skip this peer if we already processed it (iterator may have duplicates)
             if to_close.contains(&peer_id)
                 || new_channel_candidates
                     .iter()
                     .find(|(p, _)| p.eq(&peer_id))
                     .is_some()
             {
+                // Skip this peer if we already processed it (iterator may have duplicates)
                 continue;
             }
 
@@ -65,6 +67,7 @@ impl ChannelStrategy for PromiscuousStrategy {
             // Also get channels we have opened with it
             let channel_with_peer = outgoing_channels
                 .iter()
+                .filter(|c| c.status == Open)
                 .find(|c| c.peer_id.eq(&peer_id.as_str()));
 
             if let Some(channel) = channel_with_peer {
@@ -84,15 +87,24 @@ impl ChannelStrategy for PromiscuousStrategy {
             network_size = network_size + 1;
         }
 
+        // Also mark for closing all channels which are in PendingToClose state
+        outgoing_channels
+            .iter()
+            .filter(|c| c.status == PendingToClose)
+            .for_each(|c| to_close.push(c.peer_id.clone()));
+
         // We compute the upper bound for channels as a square-root of the perceived network size
-        let max_auto_channels = (network_size as f64).sqrt().ceil() as usize;
+        let max_auto_channels = self.max_channels.unwrap_or((network_size as f64).sqrt().ceil() as usize);
+        let count_opened = outgoing_channels.iter().filter(|c| c.status == Open).count();
 
         // Sort the new channel candidates by best quality first, then truncate to the number of available slots
         // This way, we'll prefer candidates with higher quality, when we don't have enough node balance
+        // Shuffle first, so the equal candidates are randomized and then use unstable sorting for that purpose.
+        new_channel_candidates.shuffle(&mut OsRng);
         new_channel_candidates
             .sort_unstable_by(|(_, q1), (_, q2)| q1.partial_cmp(q2).unwrap().reverse());
         new_channel_candidates
-            .truncate(max_auto_channels - (outgoing_channels.len() - to_close.len()));
+            .truncate(max_auto_channels - (count_opened - to_close.len()));
 
         // Go through the new candidates for opening channels allow them to open based on our available node balance
         let mut to_open: Vec<OutgoingChannelStatus> = vec![];
@@ -108,6 +120,7 @@ impl ChannelStrategy for PromiscuousStrategy {
                 to_open.push(OutgoingChannelStatus {
                     peer_id,
                     stake: self.new_channel_stake.clone(),
+                    status: Open
                 });
                 remaining_balance = balance.sub(&self.new_channel_stake);
             }
@@ -125,7 +138,7 @@ mod tests {
 
     #[test]
     fn test_promiscuous_basic() {
-        let strat = PromiscuousStrategy::default();
+        let strat = PromiscuousStrategy::new();
 
         assert_eq!(strat.name(), "promiscuous");
 
@@ -149,14 +162,17 @@ mod tests {
             OutgoingChannelStatus {
                 peer_id: "Alice".to_string(),
                 stake: balance.clone(),
+                status: Open,
             },
             OutgoingChannelStatus {
                 peer_id: "Charlie".to_string(),
                 stake: balance.clone(),
+                status: Open,
             },
             OutgoingChannelStatus {
                 peer_id: "Gustave".to_string(),
                 stake: low_balance,
+                status: Open,
             },
         ];
 
@@ -184,6 +200,7 @@ mod tests {
 /// WASM bindings
 #[cfg(feature = "wasm")]
 pub mod wasm {
+    use serde::Deserialize;
     use wasm_bindgen::prelude::*;
 
     use utils_misc::utils::wasm::JsResult;
@@ -191,6 +208,15 @@ pub mod wasm {
 
     use crate::generic::wasm::StrategyTickResult;
     use crate::generic::ChannelStrategy;
+
+    #[derive(Deserialize)]
+    struct PromiscuousSettings {
+        pub network_quality_threshold: Option<f64>,
+        pub new_channel_stake: Option<String>,
+        pub minimum_channel_balance: Option<String>,
+        pub minimum_node_balance: Option<String>,
+        pub max_channels: Option<u32>,
+    }
 
     #[wasm_bindgen]
     pub struct PromiscuousStrategy {
@@ -200,26 +226,29 @@ pub mod wasm {
     #[wasm_bindgen]
     impl PromiscuousStrategy {
         #[wasm_bindgen(constructor)]
-        pub fn new(
-            network_quality_threshold: f64,
-            minimum_node_balance: Balance,
-            new_channel_stake: Balance,
-            minimum_channel_balance: Balance,
-        ) -> Self {
+        pub fn new() -> Self {
             PromiscuousStrategy {
-                w: super::PromiscuousStrategy {
-                    network_quality_threshold,
-                    minimum_node_balance: minimum_node_balance.w,
-                    new_channel_stake: new_channel_stake.w,
-                    minimum_channel_balance: minimum_channel_balance.w,
-                },
+                w: super::PromiscuousStrategy::new()
             }
         }
 
-        pub fn default() -> Self {
-            PromiscuousStrategy {
-                w: super::PromiscuousStrategy::default(),
+        pub fn configure(&mut self, settings: JsValue) -> JsResult<()> {
+            let cfg: PromiscuousSettings = serde_wasm_bindgen::from_value(settings)?;
+            if let Some(option) = cfg.network_quality_threshold {
+                self.w.network_quality_threshold = option;
             }
+            if let Some(option) = cfg.minimum_node_balance {
+                self.w.minimum_node_balance = super::Balance::from_str(option.as_str())?;
+            }
+            if let Some(option) = cfg.new_channel_stake {
+                self.w.new_channel_stake = super::Balance::from_str(option.as_str())?;
+            }
+            if let Some(option) = cfg.minimum_channel_balance {
+                self.w.minimum_channel_balance = super::Balance::from_str(option.as_str())?;
+            }
+            self.w.max_channels = cfg.max_channels.map(|c| c as usize);
+
+            Ok(())
         }
 
         #[wasm_bindgen(getter)]

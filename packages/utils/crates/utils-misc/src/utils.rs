@@ -31,4 +31,15 @@ pub mod wasm {
     pub fn get_package_version(package_file: &str) -> Result<String, JsValue> {
         ok_or_jserr!(super::get_package_version(package_file))
     }
+
+    #[wasm_bindgen]
+    extern "C" {
+        #[wasm_bindgen(js_namespace = console)]
+        pub fn log(s: &str);
+    }
+
+    #[macro_export]
+    macro_rules! console_log {
+        ($($t:tt)*) => (utils_misc::utils::wasm::log(&format_args!($($t)*).to_string()))
+    }
 }

@@ -1053,7 +1053,7 @@ ___
 
 #### Defined in
 
-[src/types/channelEntry.ts:35](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L35)
+[src/types/channelEntry.ts:31](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L31)
 
 ___
 
@@ -1740,7 +1740,7 @@ ___
 
 #### Defined in
 
-[src/types/channelEntry.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L16)
+[src/types/channelEntry.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L12)
 
 ___
 
@@ -2010,7 +2010,7 @@ Reads the given package.json file and determines its version.
 
 #### Defined in
 
-lib/utils_misc.d.ts:11
+lib/utils_misc.d.ts:8
 
 ___
 
@@ -2154,26 +2154,6 @@ Dappnode or AVADO based nodes.
 #### Defined in
 
 [src/network/addrs.ts:65](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L65)
-
-___
-
-### isAvadoPrivateNetwork
-
-▸ **isAvadoPrivateNetwork**(`address`, `family`): `boolean`
-
-Checks if given address is in internally network of
-Dappnode or AVADO based nodes.
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `address` | `Uint8Array` |
-| `family` | ``"IPv4"`` \| ``"IPv6"`` |
-
-#### Returns
-
-`boolean`
 
 ___
 

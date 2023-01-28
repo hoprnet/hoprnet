@@ -141,6 +141,7 @@ pub mod wasm {
     use crate::primitives::BaseBalance;
 
     #[wasm_bindgen]
+    #[derive(Clone)]
     pub struct Balance {
         #[wasm_bindgen(skip)]
         pub w: super::Balance,

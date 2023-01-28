@@ -67,9 +67,10 @@ import HoprCoreEthereum, { type Indexer } from '@hoprnet/hopr-core-ethereum'
 import {
   type ChannelStrategyInterface,
   OutgoingChannelStatus,
-  PassiveStrategy,
-  PromiscuousStrategy,
   SaneDefaults,
+  Strategy,
+  isStrategy,
+  StrategyFactory,
   StrategyTickResult
 } from './channel-strategy.js'
 
@@ -103,6 +104,19 @@ const metric_pathLength = create_histogram_with_buckets(
   'core_histogram_path_length',
   'Distribution of number of hops of sent messages',
   new Float64Array([0, 1, 2, 3, 4])
+)
+const metric_strategyTicks = create_counter('core_counter_strategy_ticks', 'Number of strategy decisions (ticks)')
+const metric_strategyLastOpened = create_gauge(
+  'core_gauge_strategy_last_opened_channels',
+  'Number of opened channels in the last strategy tick'
+)
+const metric_strategyLastClosed = create_gauge(
+  'core_gauge_strategy_last_closed_channels',
+  'Number of closed channels in the last strategy tick'
+)
+const metric_strategyMaxChannels = create_gauge(
+  'core_gauge_strategy_max_auto_channels',
+  'Maximum number of channels the current strategy can open'
 )
 
 // Using libp2p components directly because it allows us
@@ -383,7 +397,7 @@ class Hopr extends EventEmitter {
     this.heartbeat = new Heartbeat(
       this.id,
       this.networkPeers,
-      subscribe,
+      this.libp2pComponents,
       sendMessage,
       this.closeConnectionsTo.bind(this),
       (oldHealthValue: NetworkHealthIndicator, newNetworkHealth: NetworkHealthIndicator) =>
@@ -467,7 +481,7 @@ class Hopr extends EventEmitter {
     // subscribe so we can process channel close events
     this.connector.indexer.on('own-channel-updated', this.onOwnChannelUpdated.bind(this))
 
-    this.setChannelStrategy(this.options.strategy || new PassiveStrategy())
+    this.setChannelStrategy(this.options.strategy || StrategyFactory.getStrategy('passive'))
 
     log('announcing done, starting heartbeat & strategy interval')
     await this.heartbeat.start()
@@ -603,6 +617,56 @@ class Hopr extends EventEmitter {
     this.heartbeat.recalculateNetworkHealth()
   }
 
+  private async strategyOpenChannel(status: OutgoingChannelStatus) {
+    const destination = peerIdFromString(status.peer_id)
+    const stake = new BN(status.stake_str)
+
+    if (await this.isAllowedAccessToNetwork(destination)) {
+      this.networkPeers.register(destination, NetworkPeersOrigin.STRATEGY_NEW_CHANNEL)
+
+      const hash = await this.openChannel(destination, stake)
+      verbose('- opened channel', destination, hash)
+      this.emit('hopr:channel:opened', status)
+    } else {
+      error(`Protocol error: strategy wants to open channel to non-registered peer ${destination.toString()}`)
+    }
+  }
+
+  private async strategyCloseChannel(destination: string) {
+    await this.closeChannel(peerIdFromString(destination), 'outgoing')
+    verbose(`closed channel to ${destination.toString()}`)
+    this.emit('hopr:channel:closed', destination)
+  }
+
+  private async updateChannelMetrics() {
+    const selfAddr = this.getEthereumAddress()
+
+    try {
+      let outgoingChannels = 0
+      for await (const channel of this.db.getChannelsFromIterable(selfAddr)) {
+        metric_channelBalances.set(
+          [channel.source.toAddress().toHex(), 'out'],
+          +ethersUtils.formatEther(channel.balance.toBN().toString())
+        )
+        outgoingChannels++
+      }
+
+      let incomingChannels = 0
+      for await (const channel of this.db.getChannelsToIterable(selfAddr)) {
+        metric_channelBalances.set(
+          [channel.source.toAddress().toHex(), 'in'],
+          +ethersUtils.formatEther(channel.balance.toBN().toString())
+        )
+        incomingChannels++
+      }
+
+      metric_inChannelCount.set(incomingChannels)
+      metric_outChannelCount.set(outgoingChannels)
+    } catch (e) {
+      log(`error: failed to update channel metrics`, e)
+    }
+  }
+
   // On the strategy interval, poll the strategy to see what channel changes
   // need to be made.
   private async tickChannelStrategy() {
@@ -611,122 +675,60 @@ class Hopr extends EventEmitter {
       throw new Error('node is not RUNNING')
     }
 
-    let out = 'Channels obtained:\n'
-
-    const currentChannels: ChannelEntry[] = []
-
-    const selfAddr = this.getEthereumAddress()
-
-    let incomingChannels = 0,
-      outgoingChannels = 0
-    for await (const channel of this.getAllChannels()) {
-      // Determine which counter (incoming/outgoing) we need to increment
-      if (selfAddr.eq(channel.destination.toAddress())) {
-        metric_channelBalances.set(
-          [channel.source.toAddress().toHex(), 'in'],
-          +ethersUtils.formatEther(channel.balance.toBN().toString())
-        )
-        incomingChannels++
-      } else if (selfAddr.eq(channel.source.toAddress())) {
-        metric_channelBalances.set(
-          [channel.source.toAddress().toHex(), 'out'],
-          +ethersUtils.formatEther(channel.balance.toBN().toString())
-        )
-        outgoingChannels++
-      }
-
-      out += `${channel.toString()}\n`
-      currentChannels.push(channel)
-      if (await this.isAllowedAccessToNetwork(channel.destination.toPeerId())) {
-        this.networkPeers.register(channel.destination.toPeerId(), NetworkPeersOrigin.STRATEGY_EXISTING_CHANNEL) // Make sure current channels are 'interesting'
-      } else {
-        error(`Protocol error: Strategy is monitoring non-registered peer ${channel.destination.toString()}`)
-      }
-    }
-
-    metric_inChannelCount.set(incomingChannels)
-    metric_outChannelCount.set(outgoingChannels)
-
-    // Remove last `\n`
-    verbose(out.substring(0, out.length - 1))
-
-    let balance: Balance
+    let tickResult: StrategyTickResult
     try {
-      balance = await this.getBalance()
-    } catch (e) {
-      throw new Error('failed to getBalance, aborting tick')
-    }
+      // Retrieve all outgoing channels
+      const outgoingChannels = await this.getChannelsFrom(this.getEthereumAddress())
+      verbose(`strategy tracks ${outgoingChannels.length} outgoing channels`)
 
-    let allOutgoingChannels: OutgoingChannelStatus[] = Array.from(
-      currentChannels
-        .filter((c) => c.status == ChannelStatus.Open && c.source.toAddress().eq(selfAddr))
-        .map((c) => new OutgoingChannelStatus(c.destination.toPeerId().toString(), c.balance.toBN().toString()))
-    )
-
-    let peersIterator = this.networkPeers.all().map((p) => p.toString())[Symbol.iterator]
-
-    const tickResult: StrategyTickResult = this.strategy.tick(
-      balance.toBN(),
-      peersIterator(),
-      allOutgoingChannels,
-      (peer_id_str: string) => this.networkPeers.qualityOf(peerIdFromString(peer_id_str))
-    )
-
-    verbose(`strategy wants to close ${tickResult.to_close().length} channels`)
-
-    let allClosedChannels = Array.from(tickResult.to_close())
-
-    // Enhance with all channels which are in PendingToClose state to close them for good
-    allClosedChannels.push(
-      ...currentChannels
-        .filter(
-          (c) =>
-            c.status == ChannelStatus.PendingToClose && !allClosedChannels.includes(c.destination.toPeerId().toString())
-        )
-        .map((c) => c.destination.toPeerId().toString())
-    )
-
-    verbose(`strategy wants to finalize closure of ${allClosedChannels.length - tickResult.to_close().length} channels`)
-
-    try {
+      // Check if all peer ids are still registered
       await Promise.all(
-        allClosedChannels.map((destination) => async () => {
-          await this.closeChannel(peerIdFromString(destination), 'outgoing')
-          verbose(`closed channel to ${destination.toString()}`)
-          this.emit('hopr:channel:closed', destination)
-        })
-      )
-    } catch (e) {
-      log(`error when strategy trying to close channels`, e)
-    }
-
-    let allOpenedChannels: OutgoingChannelStatus[] = tickResult.to_open()
-    verbose(`strategy wants to open ${allOpenedChannels.length} new channels`)
-
-    try {
-      await Promise.all(
-        allOpenedChannels.map((status) => async () => {
-          const destination = peerIdFromString(status.peer_id)
-          const stake = new BN(status.stake_str)
-
-          if (await this.isAllowedAccessToNetwork(destination)) {
-            this.networkPeers.register(destination, NetworkPeersOrigin.STRATEGY_NEW_CHANNEL)
-
-            const hash = await this.openChannel(destination, stake)
-            verbose('- opened channel', destination, hash)
-            this.emit('hopr:channel:opened', status)
+        outgoingChannels.map(async (channel) => {
+          if (await this.isAllowedAccessToNetwork(channel.destination.toPeerId())) {
+            this.networkPeers.register(channel.destination.toPeerId(), NetworkPeersOrigin.STRATEGY_EXISTING_CHANNEL)
           } else {
-            error(`Protocol error: strategy wants to open channel to non-registered peer ${destination.toString()}`)
+            error(`Protocol error: Strategy is monitoring non-registered peer ${channel.destination.toString()}`)
           }
         })
       )
-    } catch (e) {
-      log(`error when strategy trying to open channels`, e)
-    }
-  }
 
-  private async *getAllChannels(): AsyncIterable<ChannelEntry> {
-    yield* this.db.getChannelsFromIterable(PublicKey.fromPeerId(this.getId()).toAddress())
+      // Perform the strategy tick
+      tickResult = this.strategy.tick(
+        (await this.getBalance()).toBN(),
+        this.networkPeers
+          .all()
+          .map((p) => p.toString())
+          .values(),
+        outgoingChannels.map((c) => {
+          return {
+            peer_id: c.destination.toPeerId().toString(),
+            stake_str: c.balance.toBN().toString(),
+            status: c.status
+          }
+        }),
+        (peer_id_str: string) => this.networkPeers.qualityOf(peerIdFromString(peer_id_str))
+      )
+      metric_strategyTicks.increment()
+      metric_strategyMaxChannels.set(tickResult.max_auto_channels)
+    } catch (e) {
+      log(`failed to do a strategy tick`, e)
+      throw new Error('error while performing strategy tick')
+    }
+
+    let allClosedChannels = tickResult.to_close()
+    verbose(`strategy wants to close ${allClosedChannels.length} channels`)
+    metric_strategyLastClosed.set(allClosedChannels.length)
+
+    let allOpenedChannels: OutgoingChannelStatus[] = tickResult.to_open()
+    verbose(`strategy wants to open ${allOpenedChannels.length} new channels`)
+    metric_strategyLastOpened.set(allOpenedChannels.length)
+
+    try {
+      await Promise.all(allClosedChannels.map(this.strategyCloseChannel.bind(this)))
+      await Promise.all(allOpenedChannels.map(this.strategyOpenChannel.bind(this)))
+    } catch (e) {
+      log(`error when strategy was trying to open or close channels`, e)
+    }
   }
 
   /**
@@ -1045,6 +1047,7 @@ class Hopr extends EventEmitter {
       try {
         log('Triggering tick channel strategy')
         await this.tickChannelStrategy()
+        await this.updateChannelMetrics()
       } catch (e) {
         log('error in periodic check', e)
       }
@@ -1479,11 +1482,12 @@ export default Hopr
 export * from './constants.js'
 export { createHoprNode } from './main.js'
 export {
-  PassiveStrategy,
-  PromiscuousStrategy,
+  Strategy,
+  StrategyFactory,
+  StrategyTickResult,
+  isStrategy,
   SaneDefaults,
   findPath,
-  StrategyTickResult,
   NetworkHealthIndicator,
   NetworkPeersOrigin,
   type ChannelStrategyInterface

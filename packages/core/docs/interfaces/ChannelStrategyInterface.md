@@ -10,11 +10,6 @@ Implementors should bear in mind:
 - Churn is expensive
 - Path finding will prefer high stakes, and high availability of nodes.
 
-## Implemented by
-
-- [`PassiveStrategy`](../classes/PassiveStrategy.md)
-- [`PromiscuousStrategy`](../classes/PromiscuousStrategy.md)
-
 ## Table of contents
 
 ### Properties
@@ -24,6 +19,7 @@ Implementors should bear in mind:
 
 ### Methods
 
+- [configure](ChannelStrategyInterface.md#configure)
 - [onChannelWillClose](ChannelStrategyInterface.md#onchannelwillclose)
 - [onWinningTicket](ChannelStrategyInterface.md#onwinningticket)
 - [shouldCommitToChannel](ChannelStrategyInterface.md#shouldcommittochannel)
@@ -37,7 +33,7 @@ Implementors should bear in mind:
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:37](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L37)
+[packages/core/src/channel-strategy.ts:50](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L50)
 
 ___
 
@@ -47,9 +43,29 @@ ___
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:51](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L51)
+[packages/core/src/channel-strategy.ts:65](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L65)
 
 ## Methods
+
+### configure
+
+▸ **configure**(`settings`): `any`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `settings` | `any` |
+
+#### Returns
+
+`any`
+
+#### Defined in
+
+[packages/core/src/channel-strategy.ts:52](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L52)
+
+___
 
 ### onChannelWillClose
 
@@ -68,7 +84,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:47](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L47)
+[packages/core/src/channel-strategy.ts:61](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L61)
 
 ___
 
@@ -89,13 +105,13 @@ ___
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:48](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L48)
+[packages/core/src/channel-strategy.ts:62](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L62)
 
 ___
 
 ### shouldCommitToChannel
 
-▸ **shouldCommitToChannel**(`c`): `Promise`<`boolean`\>
+▸ **shouldCommitToChannel**(`c`): `boolean`
 
 #### Parameters
 
@@ -105,31 +121,31 @@ ___
 
 #### Returns
 
-`Promise`<`boolean`\>
+`boolean`
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:49](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L49)
+[packages/core/src/channel-strategy.ts:63](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L63)
 
 ___
 
 ### tick
 
-▸ **tick**(`balance`, `currentChannels`, `networkPeers`, `getRandomChannel`): `Promise`<[`StrategyTickResult`](../modules.md#strategytickresult)\>
+▸ **tick**(`balance`, `network_peer_ids`, `outgoing_channel`, `peer_quality`): [`StrategyTickResult`](../classes/StrategyTickResult.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `balance` | `BN` |
-| `currentChannels` | `ChannelEntry`[] |
-| `networkPeers` | `NetworkPeers` |
-| `getRandomChannel` | () => `Promise`<`ChannelEntry`\> |
+| `network_peer_ids` | `Iterator`<`string`, `any`, `undefined`\> |
+| `outgoing_channel` | `OutgoingChannelStatus`[] |
+| `peer_quality` | (`string`: `any`) => `number` |
 
 #### Returns
 
-`Promise`<[`StrategyTickResult`](../modules.md#strategytickresult)\>
+[`StrategyTickResult`](../classes/StrategyTickResult.md)
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:39](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L39)
+[packages/core/src/channel-strategy.ts:54](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L54)
