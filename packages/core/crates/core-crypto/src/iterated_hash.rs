@@ -1,19 +1,21 @@
 use digest::{Digest, FixedOutputReset};
+use serde::Serialize;
 use sha3::Keccak256;
-
-use utils_proc_macros::wasm_bindgen_if;
 
 use crate::errors::CryptoError::{CalculationError, InvalidInputValue};
 use crate::errors::Result;
 
+#[derive(Serialize)]
 pub struct IteratedHash {
+    #[serde(with = "serde_bytes")]
     pub hash: Box<[u8]>,
     pub intermediates: Vec<Intermediate>
 }
 
-#[wasm_bindgen_if(getter_with_clone)]
+#[derive(Serialize)]
 pub struct Intermediate {
     pub iteration: usize,
+    #[serde(with = "serde_bytes")]
     pub intermediate: Box<[u8]>,
 }
 
@@ -84,6 +86,8 @@ pub fn recover_iterated_hash<H>(hash_value: &[u8], hints: H, max_iterations: usi
 
 #[cfg(test)]
 mod tests {
+    use digest::{Digest, FixedOutput};
+    use sha3::Keccak256;
     use crate::iterated_hash::{iterate_hash, recover_iterated_hash};
 
     #[test]
@@ -107,15 +111,18 @@ mod tests {
                                               None)
             .unwrap();
 
-        assert_eq!(final_src.iteration, recovered.iteration);
-        assert_eq!(final_src.intermediate.as_ref(), recovered.intermediate.as_ref());
+        assert_eq!(final_src.iteration + 9, recovered.iteration);
 
+        let mut keccak = Keccak256::default();
+        keccak.update(recovered.intermediate);
+
+        assert_eq!(final_hash.hash.as_ref(), keccak.finalize_fixed().as_slice());
     }
 }
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    /*use js_sys::{Number, Uint8Array};
+    use js_sys::{Number, Uint8Array};
     use wasm_bindgen::JsValue;
     use wasm_bindgen::prelude::wasm_bindgen;
     use utils_misc::utils::wasm::JsResult;
@@ -129,13 +136,13 @@ pub mod wasm {
 
     #[wasm_bindgen]
     pub fn recover_iterated_hash(hash_value: &[u8], hints: &js_sys::Function, max_iterations: usize, step_size: usize, index_hint: Option<usize>) -> JsResult<JsValue> {
-        let res = ok_or_jserr!(super::recover_iterated_hash(hash_value, |iteration: u32| {
+        let res = ok_or_jserr!(super::recover_iterated_hash(hash_value, |iteration: usize| {
             hints
-                .call1(&JsValue::null(), &Number::from(iteration))
+                .call1(&JsValue::null(), &Number::from(iteration as u32))
                 .ok()
                 .map(|h| Uint8Array::from(h).to_vec().into_boxed_slice())
         }, max_iterations, step_size, index_hint))?;
         ok_or_jserr!(serde_wasm_bindgen::to_value(&res))
-    }*/
+    }
 
 }
