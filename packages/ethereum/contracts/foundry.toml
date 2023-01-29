@@ -1,6 +1,7 @@
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config
 
 [profile.default]
+solc = "0.8.13"
 src = 'src'
 test = 'test'
 out = 'out'
@@ -17,7 +18,7 @@ local = "http://localhost:8545"
 gnosis = "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet"
 
 [etherscan]
-gnosis = { key = "${GNOSISSCAN_API_KEY}", url = "https://gnosisscan.io" }
+gnosis = { key = "${ETHERSCAN_API_KEY}", url = "https://api.gnosisscan.io" }
 
 # testing and local network
 [profile.development]

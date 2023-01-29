@@ -59,7 +59,7 @@ source .env
 FOUNDRY_PROFILE=staging ENVIRONMENT_NAME=debug-staging forge script --broadcast --verify --verifier sourcify script/DeployAll.s.sol:DeployAllContractsScript
 
 // This deploys contract to staging environment and verifies contracts on etherscan
-FOUNDRY_PROFILE=staging ENVIRONMENT_NAME=debug-staging forge script --broadcast --verify --verifier etherscan --chain 5 script/DeployAll.s.sol:DeployAllContractsScript
+FOUNDRY_PROFILE=staging ENVIRONMENT_NAME=debug-staging forge script --broadcast --verify --verifier etherscan --verifier-url "https://api.gnosisscan.io/api" --chain gnosis --compiler-version <specify_if_other_than_that_in_config> script/DeployAll.s.sol:DeployAllContractsScript
 ```
 
 #### Production
@@ -73,17 +73,9 @@ FOUNDRY_PROFILE=staging ENVIRONMENT_NAME=debug-staging forge script --broadcast 
 If contracts are not properly verified on explorers, please try with the manual verification. E.g.
 
 ```
-# Verify Channal contract in staging environment
-forge verify-contract 0x78D92220eCe709A490F0831F9122535e0F9fe1b4 src/HoprChannels.sol:HoprChannels --chain-id 5 \
---constructor-args $(cast abi-encode "constructor(address,uint32)" "0xa3C8f4044b30Fb3071F5b3b02913DE524F1041dc" 300)
-
 # Verify HoprStakingProxyForNetworkRegistry contract on goerli
-forge verify-contract 0x7F71374dB65D6C93177Bc84484C47210e9c20F98 src/proxy/HoprStakingProxyForNetworkRegistry.sol:HoprStakingProxyForNetworkRegistry --chain-id 5 \
---constructor-args $(cast abi-encode "constructor(address,address,uint256)" "0x628ed93eebf1840bf26e8fb62bce4f1bccde9e95" "0x4fF4e61052a4DFb1bE72866aB711AE08DD861976" 1000000000000000000000) --compiler-version 0.8.13
-
-# Verify HoprNetworkRegistry contract on goerli
-forge verify-contract 0x8E750494e12914977a5C8B84E2D4677703f03B44 src/HoprNetworkRegistry.sol:HoprNetworkRegistry --chain-id 5 \
---constructor-args $(cast abi-encode "constructor(address,address)" "0x7F71374dB65D6C93177Bc84484C47210e9c20F98" "0x4fF4e61052a4DFb1bE72866aB711AE08DD861976")
+export ETHERSCAN_API_KEY=<gnosisscan_api_key>
+forge verify-contract --verifier etherscan --verifier-url "https://api.gnosisscan.io/api" --chain gnosis --constructor-args $(cast abi-encode "constructor(address,address,uint256)" 0xA02Af160a280957A8881879Ee9239A614Ab47F0D 0x4fF4e61052a4DFb1bE72866aB711AE08DD861976 1000000000000000000000) 0xcA9B1bC189F977B2A9217598D0300d956b6a719f src/proxy/HoprStakingProxyForNetworkRegistry.sol:HoprStakingProxyForNetworkRegistry
 ```
 
 To check the verification result, use
