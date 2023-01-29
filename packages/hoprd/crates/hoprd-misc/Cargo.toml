@@ -20,6 +20,7 @@ console_error_panic_hook = [ "dep:console_error_panic_hook" ]
 # using own fork until the PR was merged
 clap = { git = "https://github.com/hoprnet/clap", branch = "robertkiel/update-env-from", features = ["derive", "env", "string"] }
 core-misc = { path = "../../../core/crates/core-misc" }
+core-strategy = { path = "../../../core/crates/core-strategy" }
 core-ethereum-misc = { path = "../../../core-ethereum/crates/core-ethereum-misc" }
 js-sys = "0.3.60"
 real-base = { path = "../../../real/crates/real-base" }

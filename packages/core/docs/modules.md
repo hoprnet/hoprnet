@@ -11,10 +11,9 @@
 
 ### Classes
 
-- [PassiveStrategy](classes/PassiveStrategy.md)
-- [PromiscuousStrategy](classes/PromiscuousStrategy.md)
 - [ResolvedEnvironment](classes/ResolvedEnvironment.md)
 - [SaneDefaults](classes/SaneDefaults.md)
+- [StrategyFactory](classes/StrategyFactory.md)
 - [StrategyTickResult](classes/StrategyTickResult.md)
 - [default](classes/default.md)
 
@@ -27,6 +26,7 @@
 - [HoprOptions](modules.md#hoproptions)
 - [NodeStatus](modules.md#nodestatus)
 - [SendMessage](modules.md#sendmessage)
+- [Strategy](modules.md#strategy)
 - [Subscribe](modules.md#subscribe)
 
 ### Variables
@@ -50,6 +50,7 @@
 - [CONSTANTS](modules.md#constants)
 - [createHoprNode](modules.md#createhoprnode)
 - [findPath](modules.md#findpath)
+- [isStrategy](modules.md#isstrategy)
 - [resolveEnvironment](modules.md#resolveenvironment)
 - [supportedEnvironments](modules.md#supportedenvironments)
 
@@ -92,7 +93,7 @@
 
 #### Defined in
 
-[packages/core/src/index.ts:123](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L123)
+[packages/core/src/index.ts:137](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L137)
 
 ___
 
@@ -102,7 +103,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:170](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L170)
+[packages/core/src/index.ts:184](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L184)
 
 ___
 
@@ -112,7 +113,17 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:185](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L185)
+[packages/core/src/index.ts:199](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L199)
+
+___
+
+### Strategy
+
+Ƭ **Strategy**: typeof `STRATEGIES`[`number`]
+
+#### Defined in
+
+[packages/core/src/channel-strategy.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L28)
 
 ___
 
@@ -122,7 +133,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:172](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L172)
+[packages/core/src/index.ts:186](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L186)
 
 ## Variables
 
@@ -324,6 +335,26 @@ destination
 #### Defined in
 
 [packages/core/src/path/index.ts:38](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/path/index.ts#L38)
+
+___
+
+### isStrategy
+
+▸ **isStrategy**(`str`): str is string
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `str` | `string` |
+
+#### Returns
+
+str is string
+
+#### Defined in
+
+[packages/core/src/channel-strategy.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L30)
 
 ___
 

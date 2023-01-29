@@ -784,7 +784,9 @@ name = "core-strategy"
 version = "0.1.0"
 dependencies = [
  "console_error_panic_hook",
+ "getrandom 0.2.8",
  "js-sys",
+ "rand 0.8.5",
  "serde",
  "serde-wasm-bindgen",
  "utils-misc",
@@ -1896,6 +1898,7 @@ dependencies = [
  "console_error_panic_hook",
  "core-ethereum-misc",
  "core-misc",
+ "core-strategy",
  "js-sys",
  "proc-macro-regex",
  "real-base",
@@ -3730,6 +3733,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde_repr"
+version = "0.1.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9a5ec9fa74a20ebbe5d9ac23dac1fc96ba0ecfe9f50f2843b52e537b10fbcb4e"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "serde_urlencoded"
 version = "0.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4495,7 +4509,10 @@ dependencies = [
  "console_error_panic_hook",
  "ethnum",
  "hex 0.4.3",
+ "serde",
+ "serde_repr",
  "utils-misc",
+ "utils-proc-macros",
  "wasm-bindgen",
  "wasm-bindgen-test",
 ]

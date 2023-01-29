@@ -14,6 +14,7 @@ import {
   createHoprNode,
   default as Hopr,
   type HoprOptions,
+  isStrategy,
   NetworkHealthIndicator,
   ResolvedEnvironment,
   resolveEnvironment
@@ -26,6 +27,7 @@ import setupHealthcheck from './healthcheck.js'
 import { LogStream } from './logs.js'
 import { getIdentity } from './identity.js'
 import { decodeMessage } from './api/utils.js'
+import { StrategyFactory } from '@hoprnet/hopr-core/lib/channel-strategy.js'
 
 // Metrics
 const metric_processStartTime = create_gauge(
@@ -78,6 +80,15 @@ function generateNodeOptions(argv: CliArgs, environment: ResolvedEnvironment): H
 
   if (argv.password !== undefined) {
     options.password = argv.password as string
+  }
+
+  if (isStrategy(argv.default_strategy)) {
+    options.strategy = StrategyFactory.getStrategy(argv.default_strategy)
+    if (argv.max_auto_channels !== undefined) {
+      options.strategy.configure({
+        max_channels: argv.max_auto_channels
+      })
+    }
   }
 
   return options
@@ -141,7 +152,8 @@ async function main() {
     aliases: new Map(),
     settings: {
       includeRecipient: false,
-      strategy: 'passive'
+      strategy: 'passive',
+      maxAutoChannels: undefined
     }
   }
 
