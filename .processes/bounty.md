@@ -26,6 +26,8 @@ A bounty usually serves multiple purposes.
    - The time required to complete the bounty (in hours).
    - A guestimate of the bounty reward (in USD) based on a rate of ~50 USD per hour.
 
+6. The bounty admin makes a comment with a list of skills to complete the bounty (e.g. SQL, Python, HTML, etc.) and suggest one a difficulty level (Beginner, Intermediate or Expert). 
+
 ### During the time the bounty hunter is working on the bounty
 
 - The bounty admin may be asked (by the program owner) to answer some questions related to the bounty (posted by the bounty hunter) that the program owner cannot answer herself/himself. The bounty admin may consult with the bounty expert before answering the questions.
