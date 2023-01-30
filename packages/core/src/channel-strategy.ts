@@ -133,8 +133,8 @@ export class StrategyFactory {
         return new RustStrategyWrapper(new PromiscuousStrategy())
       case 'random':
         log(`error: random strategy not implemented, falling back to 'passive'.`)
-      default:
       case 'passive':
+      default:
         return new RustStrategyWrapper(new PassiveStrategy())
     }
   }

@@ -9,7 +9,7 @@ including tips related to `wasm-bindgen`.
 ## Structure
 
 All our packages contain the `crates` directory, that is meant to contain the Rust crates.
-E.g. the `utils` package looks as follows:
+E.g. the `utils` package may look as follows:
 
 ```text
 utils
@@ -37,6 +37,7 @@ Each crate is prefixed using the name of the package, therefore the crate names 
 
 - `utils-metrics`
 - `utils-misc`
+... etc.
 
 In addition, all Rust crates across all packages must be enumerated in `Cargo.toml` in the root of the Monorepo:
 
@@ -78,7 +79,8 @@ The unit tests are meant to be in the same module file, for each Rust module.
 They are pure-Rust and are easy to debug with IDE.
 
 The integration tests, that run in WASM runtime are currently not possible to be debugged
-and are located in the `test` directory of a crate.
+and are located in the `tests` directory of a crate.
+The developer is strongly encouraged to avoid tests in the `tests` directory and use TypeScript tests instead.
 
 ## Adding a new crate
 
@@ -87,16 +89,16 @@ To add a new Rust WASM module (crate) into an existing package:
 1. `cd packages/<package>/crates`
 2. `wasm-pack new my-crate --template https://github.com/hoprnet/hopr-wasm-template`, this will create a new Rust crate `my-crate` from a template.
 3. remove the cloned Git repo: `rm -rf my-crate/.git`
-4. add `my-crate` to `PACKAGES` space separated list in `Makefile`
-5. add `my-crate` to `workspace.members` in `Cargo.toml` in the root of the Monorepo
-6. run `make all && make install` for the first time
+4. add `my-crate` to `PACKAGES` space separated list in `Makefile` inside the corresponding `crates` directory.
+5. add `my-crate` to `workspace.members` in `Cargo.toml` in the root of the Monorepo.
+6. run `make all && make install` for the first time.
 7. commit all changes: `git add my-crate && git commit -a`
 
 You can use the following pattern in TS to export Rust types or functions:
 
 ```typescript
 // Load `my-crate` crate
-import { set_panic_hook as my_crate_panic_hook } from '../lib/my_crate.js'
+import my_crate_panic_hook from '../lib/my_crate.js'
 my_crate_panic_hook()
 export { foo } from '../lib/my_crate.js'
 ```
