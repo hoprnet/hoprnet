@@ -7,8 +7,11 @@ import swaggerUi from 'swagger-ui-express'
 import bodyParser from 'body-parser'
 import { initialize } from 'express-openapi'
 import { peerIdFromString } from '@libp2p/peer-id'
-import { debug, Address } from '@hoprnet/hopr-utils'
+import BN from 'bn.js'
+
+import { debug, Address, HoprDB } from '@hoprnet/hopr-utils'
 import { authenticateWsConnection, getStatusCodeForInvalidInputInRequest, removeQueryParams } from './utils.js'
+import { authenticateToken, authorizeToken } from './token.js'
 
 import type { Server } from 'http'
 import type { Application, Request } from 'express'
@@ -16,9 +19,29 @@ import type { WebSocketServer } from 'ws'
 import type Hopr from '@hoprnet/hopr-core'
 import { SettingKey, StateOps } from '../types.js'
 import type { LogStream } from './../logs.js'
-import BN from 'bn.js'
+import type { Token } from './token.js'
 
 const debugLog = debug('hoprd:api:v2')
+
+async function authenticateAndAuthorize(db: HoprDB, req: Request, reqToken: string, superuserToken: string): Promise<boolean> {
+        // 1. check superuser token
+        const isSuperuserAuthenticated = reqToken === superuserToken
+
+        // continue early if superuser is authenticated, no authorization checks needed
+        if (isSuperuserAuthenticated) {
+          return true
+        }
+
+        // 2. check user token authentication
+        const token: Token = await authenticateToken(db, reqToken)
+        if (token) {
+          // 3. token was found, therefore is authenticated, next check authorization
+          const endpointRef: string = 'todo'
+          return authorizeToken(db, token, endpointRef)
+        }
+
+        return false
+}
 
 // The Rest API v2 is uses JSON for input and output, is validated through a
 // Swagger schema which is also accessible for testing at:
@@ -124,14 +147,7 @@ export async function setupRestApi(
         // Applying multiple URI encoding is an identity
         let apiTokenFromUser = encodeURIComponent(req.get('x-auth-token') || '')
 
-        if (this.options.apiToken !== undefined && apiTokenFromUser !== encodedApiToken) {
-          // because this is not the last auth check, we just indicate that
-          // the authentication failed so the auth chain can continue
-          return false
-        }
-
-        // successfully authenticated, will stop the auth chain and proceed with the request
-        return true
+        return await authenticateAndAuthorize(node.db, req, apiTokenFromUser, encodedApiToken)
       }.bind({ options }),
       passwordScheme: function (req: Request, _scopes, _securityDefinition) {
         // skip checks if authentication is disabled
@@ -139,20 +155,9 @@ export async function setupRestApi(
 
         const authEncoded = (req.get('authorization') || '').replace('Basic ', '')
         // We only expect a single value here, instead of the usual user:password, so we take the user part as token
-        let apiTokenFromUser = encodeURIComponent(Buffer.from(authEncoded, 'base64').toString('binary').split(':')[0])
+        const apiTokenFromUser = encodeURIComponent(Buffer.from(authEncoded, 'base64').toString('binary').split(':')[0])
 
-        if (this.options.apiToken !== undefined && apiTokenFromUser !== encodedApiToken) {
-          // because this is the last auth check, we must throw the appropriate
-          // error to be sent back to the user
-          throw {
-            status: 403,
-            challenge: 'Basic realm=hoprd',
-            message: 'You must authenticate to access hoprd.'
-          }
-        }
-
-        // successfully authenticated
-        return true
+        return await authenticateAndAuthorize(node.db, req, apiTokenFromUser, encodedApiToken)
       }.bind({ options })
     }
   })

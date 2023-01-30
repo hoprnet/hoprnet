@@ -47,6 +47,8 @@ const NETWORK_REGISTRY_ADDRESS_PUBLIC_KEY_PREFIX: Uint8Array = encoder.encode('n
 
 const NETWORK_REGISTRY_ENABLED_PREFIX: Uint8Array = encoder.encode('networkRegistry:enabled')
 
+const GENERIC_OBJECT_PREFIX: Uint8Array = encoder.encode('genericObjects:')
+
 // Max value 2**32 - 1
 const DEFAULT_SERIALIZED_NUMBER_LENGTH = 4
 
@@ -76,6 +78,11 @@ function createPendingAcknowledgement(halfKey: HalfKeyChallenge): Uint8Array {
 }
 function createPacketTagKey(tag: Uint8Array): Uint8Array {
   return Uint8Array.from([...PACKET_TAG_PREFIX, ...tag])
+}
+function createObjectKey(namespace: string, key: string) {
+  const encodedNs = encoder.encode(`${namespace}:`)
+  const encodedKey = encoder.encode(key)
+  return Uint8Array.from([...GENERIC_OBJECT_PREFIX, ...encodedNs, ...encodedKey])
 }
 
 // Use compressed EC-points within entry key because canonical (uncompressed) representation
@@ -1107,5 +1114,17 @@ export class HoprDB {
     Object.setPrototypeOf(mock, HoprDB.prototype)
 
     return mock
+  }
+
+  public async putSerializedObject(namespace: string, key: string, object: Uint8Array): Promise<void> {
+    return await this.put(createObjectKey(namespace, key), object)
+  }
+
+  public async getSerializedObject(namespace: string, key: string): Promise<Uint8Array | undefined> {
+    return await this.maybeGet(createObjectKey(namespace, key))
+  }
+
+  public async deleteObject(namespace: string, key: string): Promise<void> {
+    await this.del(createObjectKey(namespace, key))
   }
 }
