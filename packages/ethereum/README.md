@@ -231,3 +231,5 @@ Note that deployment for `HoprDistributor` and `HoprWrapper` are skipped; ERC182
 10. Script migration:
 
 - `hardhat accounts` turns into `make get-account-balances environment-name=<name of the meta environment> environment-type=<type of environment, from development, staging, to production> account=<address to check>`
+
+11. `ETHERSCAN_API_KEY` contains the value of "API key for Gnosisscan", as our production and staging environment is on Gnosis chain. The reason why it remains "ETHERSCAN" instead of "GNOSISSCAN" is that foundry reads `ETHERSCAN_API_KEY` as an environment vairable for both `forge verify-contract` and `forge script`, which can not be configured in the foundry.toml file
