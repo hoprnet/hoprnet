@@ -1,117 +1,112 @@
+use std::num::ParseIntError;
 use ethnum::{u256, AsU256};
 use std::ops::{Add, Sub};
+use std::string::ToString;
 
-pub trait TypeBase: PartialEq + ToString {
-
-    fn to_hex(&self) -> String;
-}
-
-pub trait BaseBalance: TypeBase {
-    const SYMBOL: &'static str;
-
-    fn value(&self) -> &u256;
-
-    fn symbol(&self) -> &str {
-        Self::SYMBOL
-    }
-
-    fn serialize_value(&self) -> Box<[u8]> {
-        Box::new(self.value().to_be_bytes())
-    }
-
-    fn lt(&self, other: &impl BaseBalance) -> bool {
-        assert_eq!(self.symbol(), other.symbol());
-        self.value().lt(other.value())
-    }
-
-    fn lte(&self, other: &impl BaseBalance) -> bool {
-        assert_eq!(self.symbol(), other.symbol());
-        self.value().lt(other.value()) || self.value().eq(other.value())
-    }
-
-    fn gt(&self, other: &impl BaseBalance) -> bool {
-        assert_eq!(self.symbol(), other.symbol());
-        self.value().gt(other.value())
-    }
-
-    fn gte(&self, other: &impl BaseBalance) -> bool {
-        assert_eq!(self.symbol(), other.symbol());
-        self.value().gt(other.value()) || self.value().eq(other.value())
-    }
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+pub enum BalanceType {
+    Native,
+    HOPR
 }
 
 #[derive(Clone)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Balance {
     value: u256,
-}
-
-impl BaseBalance for Balance {
-    const SYMBOL: &'static str = "mHOPR";
-
-    fn value(&self) -> &u256 {
-        &self.value
-    }
-}
-
-impl TypeBase for Balance {
-    fn to_hex(&self) -> String { hex::encode(self.value().to_be_bytes()) }
-}
-
-impl PartialEq for Balance {
-    fn eq(&self, other: &Self) -> bool {
-        assert_eq!(self.symbol(), other.symbol());
-        self.value().eq(other.value())
-    }
-}
-
-impl ToString for Balance {
-    fn to_string(&self) -> String {
-        self.value.to_string()
-    }
+    balance_type: BalanceType
 }
 
 impl Balance {
-    pub const ZERO: Self = Self { value: u256::ZERO };
+    pub fn value(&self) -> &u256 {
+        &self.value
+    }
 
-    pub fn from_str(value: &str) -> Result<Self, String> {
+    pub fn from_str(value: &str, balance_type: BalanceType) -> Result<Balance, ParseIntError> {
         Ok(Balance {
-            value: u256::from_str_radix(value, 10).map_err(|_| "failed to parse")?,
+            value: u256::from_str_radix(value, 10)?,
+            balance_type,
         })
     }
 
+    pub fn deserialize(data: &[u8], balance_type: BalanceType) -> Result<Balance, ParseIntError> {
+        Ok(Balance {
+            value: u256::from_be_bytes(
+                data.try_into().unwrap()),
+            balance_type
+        })
+    }
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+impl Balance {
+    pub fn balance_type(&self) -> BalanceType {
+        self.balance_type
+    }
+
+    pub fn to_hex(&self) -> String { hex::encode(self.value().to_be_bytes()) }
+
+    pub fn to_string(&self) -> String {
+        self.value.to_string()
+    }
+
+    pub fn eq(&self, other: &Balance) -> bool {
+        assert_eq!(self.balance_type(), other.balance_type());
+        self.value().eq(other.value())
+    }
+
+    pub fn serialize_value(&self) -> Box<[u8]> {
+        Box::new(self.value().to_be_bytes())
+    }
+
+    pub fn lt(&self, other: &Balance) -> bool {
+        assert_eq!(self.balance_type(), other.balance_type());
+        self.value().lt(other.value())
+    }
+
+    pub fn lte(&self, other: &Balance) -> bool {
+        assert_eq!(self.balance_type(), other.balance_type());
+        self.value().lt(other.value()) || self.value().eq(other.value())
+    }
+
+    pub fn gt(&self, other: &Balance) -> bool {
+        assert_eq!(self.balance_type(), other.balance_type());
+        self.value().gt(other.value())
+    }
+
+    pub fn gte(&self, other: &Balance) -> bool {
+        assert_eq!(self.balance_type(), other.balance_type());
+        self.value().gt(other.value()) || self.value().eq(other.value())
+    }
+
     pub fn add(&self, other: &Balance) -> Self {
-        assert_eq!(self.symbol(), other.symbol());
+        assert_eq!(self.balance_type(), other.balance_type());
         Balance {
             value: self.value().add(other.value()),
+            balance_type: self.balance_type
         }
     }
 
     pub fn iadd(&self, amount: u64) -> Self {
         Balance {
             value: self.value().add(amount.as_u256()),
+            balance_type: self.balance_type
         }
     }
 
     pub fn sub(&self, other: &Balance) -> Self {
-        assert_eq!(self.symbol(), other.symbol());
+        assert_eq!(self.balance_type(), other.balance_type());
         Balance {
             value: self.value().sub(other.value()),
+            balance_type: self.balance_type
         }
     }
 
     pub fn isub(&self, amount: u64) -> Self {
         Balance {
             value: self.value().sub(amount.as_u256()),
+            balance_type: self.balance_type,
         }
-    }
-
-    pub fn deserialize(data: &[u8]) -> Result<Self, String> {
-        Ok(Balance {
-            value: u256::from_be_bytes(
-                data.try_into()
-                    .map_err(|_| "conversion error".to_string())?,
-            ),
-        })
     }
 }
 
@@ -122,90 +117,20 @@ mod tests {
 
     #[test]
     fn balance_tests() {
-        let b = Balance::from_str("10").unwrap();
+        let b = Balance::from_str("10", BalanceType::HOPR).unwrap();
         assert_eq!("10".to_string(), b.to_string());
     }
 }
 
-/// Module for WASM wrappers of Rust code
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use wasm_bindgen::prelude::*;
-
-    use ethnum::u256;
-    use std::str::FromStr;
+    use wasm_bindgen::prelude::wasm_bindgen;
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
-
-    use crate::primitives::TypeBase;
-    use crate::primitives::BaseBalance;
+    use crate::primitives::{Balance, BalanceType};
 
     #[wasm_bindgen]
-    #[derive(Clone)]
-    pub struct Balance {
-        #[wasm_bindgen(skip)]
-        pub w: super::Balance,
-    }
-
-    impl From<super::Balance> for Balance {
-        fn from(b: crate::primitives::Balance) -> Self {
-            Balance { w: b }
-        }
-    }
-
-    #[wasm_bindgen]
-    impl Balance {
-        #[wasm_bindgen(constructor)]
-        pub fn new(value: &str) -> JsResult<Balance> {
-            Ok(Self {
-                w: super::Balance {
-                    value: ok_or_jserr!(u256::from_str(value))?,
-                },
-            })
-        }
-
-        pub fn value(&self) -> String {
-            self.w.value().to_string()
-        }
-
-        pub fn symbol(&self) -> String {
-            self.w.symbol().to_string()
-        }
-
-        pub fn add(&self, other: &Balance) -> Balance {
-            self.w.add(&other.w).into()
-        }
-
-        pub fn sub(&self, other: &Balance) -> Balance {
-            self.w.sub(&other.w).into()
-        }
-
-        pub fn to_hex(&self) -> String {
-            self.w.to_hex()
-        }
-
-        pub fn serialize_value(&self) -> Box<[u8]> {
-            self.w.serialize_value()
-        }
-
-        pub fn lt(&self, other: &Balance) -> bool {
-            self.w.lt(&other.w)
-        }
-
-        pub fn lte(&self, other: &Balance) -> bool {
-            self.w.lte(&other.w)
-        }
-
-        pub fn gt(&self, other: &Balance) -> bool {
-            self.w.gt(&other.w)
-        }
-
-        pub fn gte(&self, other: &Balance) -> bool {
-            self.w.gte(&other.w)
-        }
-
-        pub fn eq(&self, other: &Balance) -> bool {
-            self.w.eq(&other.w)
-        }
+    pub fn balance_from_str(value: &str, balance_type: BalanceType) -> JsResult<Balance> {
+        ok_or_jserr!(Balance::from_str(value, balance_type))
     }
 }
