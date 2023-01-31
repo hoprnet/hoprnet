@@ -1,13 +1,14 @@
 import type { Operation } from 'express-openapi'
 import { STATUS_CODES } from '../../utils.js'
+import { deleteToken } from '../../../token.js'
 
 const DELETE: Operation = [
   async (req, res, _next) => {
-    const { stateOps } = req.context
-    const { alias } = req.params
+    const { node } = req.context
+    const { id } = req.params
 
     try {
-      removeAlias(stateOps, alias)
+      await deleteToken(node.db, id)
       return res.status(204).send()
     } catch (err) {
       return res
@@ -18,7 +19,8 @@ const DELETE: Operation = [
 ]
 
 DELETE.apiDoc = {
-  description: 'Deletes a token. Can only be done before the lifetime expired. After the lifetime expired the token is automatically deleted.',
+  description:
+    'Deletes a token. Can only be done before the lifetime expired. After the lifetime expired the token is automatically deleted.',
   tags: ['Tokens'],
   operationId: 'tokensDelete',
   parameters: [
@@ -35,7 +37,7 @@ DELETE.apiDoc = {
   ],
   responses: {
     '204': {
-      description: 'Token succesfully deleted.'
+      description: 'Token successfully deleted.'
     },
     '401': {
       $ref: '#/components/responses/Unauthorized'

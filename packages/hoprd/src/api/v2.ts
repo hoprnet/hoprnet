@@ -23,24 +23,32 @@ import type { Token } from './token.js'
 
 const debugLog = debug('hoprd:api:v2')
 
-async function authenticateAndAuthorize(db: HoprDB, req: Request, reqToken: string, superuserToken: string): Promise<boolean> {
-        // 1. check superuser token
-        const isSuperuserAuthenticated = reqToken === superuserToken
+async function authenticateAndAuthorize(
+  db: HoprDB,
+  req: Request,
+  reqToken: string,
+  superuserToken: string
+): Promise<boolean> {
+  // 1. check superuser token
+  const isSuperuserAuthenticated = reqToken === superuserToken
 
-        // continue early if superuser is authenticated, no authorization checks needed
-        if (isSuperuserAuthenticated) {
-          return true
-        }
+  // continue early if superuser is authenticated, no authorization checks needed
+  if (isSuperuserAuthenticated) {
+    return true
+  }
 
-        // 2. check user token authentication
-        const token: Token = await authenticateToken(db, reqToken)
-        if (token) {
-          // 3. token was found, therefore is authenticated, next check authorization
-          const endpointRef: string = 'todo'
-          return authorizeToken(db, token, endpointRef)
-        }
+  // 2. check user token authentication
+  const token: Token = await authenticateToken(db, reqToken)
+  if (token) {
+    // 3. token was found, therefore is authenticated, next check authorization
+    const endpointRef: string = 'todo'
+    if (authorizeToken(db, token, endpointRef)) {
+      req.context.token = token
+      return true
+    }
+  }
 
-        return false
+  return false
 }
 
 // The Rest API v2 is uses JSON for input and output, is validated through a
@@ -140,7 +148,7 @@ export async function setupRestApi(
     securityHandlers: {
       // TODO: We assume the handlers are always called in order. This isn't a
       // given and might change in the future. Thus, they should be made order-independent.
-      keyScheme: function (req: Request, _scopes, _securityDefinition) {
+      keyScheme: async function (req: Request, _scopes, _securityDefinition) {
         // skip checks if authentication is disabled
         if (this.options.disableApiAuthentication) return true
 
@@ -149,7 +157,7 @@ export async function setupRestApi(
 
         return await authenticateAndAuthorize(node.db, req, apiTokenFromUser, encodedApiToken)
       }.bind({ options }),
-      passwordScheme: function (req: Request, _scopes, _securityDefinition) {
+      passwordScheme: async function (req: Request, _scopes, _securityDefinition) {
         // skip checks if authentication is disabled
         if (options.disableApiAuthentication) return true
 
@@ -261,6 +269,8 @@ export function setupWsApi(
 // In order to pass custom objects along with each request we build a context
 // which is attached during request processing.
 export class Context {
+  public token: Token
+
   constructor(public node: Hopr, public stateOps: StateOps) {}
 }
 
@@ -270,6 +280,7 @@ declare global {
       context: {
         node: Hopr
         stateOps: StateOps
+        token: Token
       }
     }
   }
