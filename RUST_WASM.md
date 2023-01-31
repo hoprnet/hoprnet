@@ -110,6 +110,7 @@ will trigger your Rust unit tests and WASM integration tests.
 ## Guidelines and tips
 
 We distinguish between 3 different Rust types and expressions with respect to WASM:
+
 - Rust-specific (WASM-incompatible)
 - WASM-compatible
 - WASM-specific
@@ -126,6 +127,7 @@ types and functions.
 Do not use any attribute. Types NOT compatible with WASM can be used freely, unless the `#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]`
 is specified.
 Please note that:
+
 - trait implementations, lifetimes & generic types are NOT supported by `wasm-bindgen` and therefore they can be used only in pure Rust.
 
 ### Something available only to WASM
@@ -194,8 +196,8 @@ mod tests {
 #[cfg(feature = "wasm")]
 pub mod wasm {
 
-    // Use this module to specify everything that is WASM-specific (e.g. uses wasm-bindgen types, js_sys, ...etc.) 
-    
+    // Use this module to specify everything that is WASM-specific (e.g. uses wasm-bindgen types, js_sys, ...etc.)
+
     use wasm_bindgen::prelude::*;
     use wasm_bindgen::JsValue;
 
@@ -212,10 +214,12 @@ pub mod wasm {
 ```
 
 ### Types between WASM and Rust
+
 The following sections list examples of Rust types with respect to WASM.
 For a complete guidance, please refer to [wasm-bindgen docs](https://rustwasm.github.io/docs/wasm-bindgen/reference/types.html).
 
 #### WASM-incompatible types & expressions
+
 - fixed size arrays
 - `Result<X,Y>` where one of `X` and `Y` is WASM-incompatible
 - `Vec<X>` if `X` is not WASM-compatible
@@ -223,9 +227,10 @@ For a complete guidance, please refer to [wasm-bindgen docs](https://rustwasm.gi
 - trait implementations, lifetime specifiers & generic types
 
 #### WASM-compatible types & expressions
+
 Below are example of types are compatible with both pure Rust and WASM.
-As mentioned in the previous text, these can be used anywhere 
-below the `#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]` attribute. 
+As mentioned in the previous text, these can be used anywhere
+below the `#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]` attribute.
 
 - `Box<[X]>` on public members, arguments and return types which are fixed length byte arrays. (`X` is Rust builtin number type)
 - `Vec<X>` on public members, arguments and return types that can change at some point. (`X` is Rust builtin number type)
@@ -238,6 +243,7 @@ below the `#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]` a
 #### WASM-specific types & expressions
 
 The following are examples of WASM-specific types or expressions and MUST be used ONLY within the `wasm` submodule.
+
 - `#[wasm_bindgen]`
 - `JsValue`
 - `Result<X, JsValue>`
