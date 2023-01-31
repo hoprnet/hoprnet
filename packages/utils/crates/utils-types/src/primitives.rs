@@ -1,7 +1,7 @@
 use ethnum::{u256, AsU256};
 use std::ops::{Add, Sub};
 use std::string::ToString;
-use crate::errors::{GeneralError, Result, GeneralError::ParseError};
+use crate::errors::{Result, GeneralError::ParseError};
 
 pub const ADDRESS_LENGTH: usize = 20;
 
@@ -248,7 +248,7 @@ pub mod wasm {
     use wasm_bindgen::prelude::wasm_bindgen;
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
-    use crate::primitives::{Balance, BalanceType, EthereumChallenge, Signature};
+    use crate::primitives::{Balance, BalanceType, EthereumChallenge};
 
     #[wasm_bindgen]
     impl Balance {

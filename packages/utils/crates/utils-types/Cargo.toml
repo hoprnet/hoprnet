@@ -22,7 +22,8 @@ utils-misc = { path = "../../../utils/crates/utils-misc" }
 wasm-bindgen = { version = "0.2.83", optional = true}
 
 # TODO: Remove these and replace with core-crypto once merged
-k256 = { version = "0.12.0", features = ["ecdsa"] }
+getrandom = { version = "0.2.8", features = ["js"] }
+k256 = { version = "0.12.0", features = ["ecdsa-core"] }
 sha3 = "0.10.6"
 
 console_error_panic_hook = { version = "0.1.7", optional = true }

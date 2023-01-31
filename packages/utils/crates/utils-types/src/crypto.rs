@@ -1,13 +1,31 @@
 // TODO: All types specified in this module will be moved over to the core-crypto crate once merged.
 
-use crate::errors::GeneralError;
-use crate::errors::GeneralError::ParseError;
-use crate::errors::Result;
+use k256::ecdsa::{SigningKey, Signature as ECDSASignature, signature::Signer, VerifyingKey};
+use k256::{elliptic_curve, NonZeroScalar, Secp256k1};
+use crate::errors::{Result, GeneralError::ParseError};
 
 #[derive(Clone)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct PublicKey {
+    key: elliptic_curve::PublicKey<Secp256k1>
+}
 
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+impl PublicKey {
+    pub fn eq(&self, other: &PublicKey) -> bool {
+        self.key.eq(&other.key)
+    }
+
+    // TODO: Add more methods
+}
+
+impl PublicKey {
+    pub fn deserialize(bytes: &[u8]) -> Result<PublicKey> {
+        Ok(PublicKey{
+            key: elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(bytes)
+                .map_err(|_| ParseError)?
+        })
+    }
 }
 
 // TODO: Move all Signature related stuff to core-crypto once merged
@@ -35,7 +53,18 @@ impl Signature {
     }
 
     pub fn sign_message(message: &[u8], private_key: &[u8]) -> Signature {
+        let key = SigningKey::from_bytes(private_key)
+            .expect("invalid signing key");
+        let signature: ECDSASignature = key.sign(message);
 
+        // TODO: Find if compression is really needed here
+        Self::deserialize(signature.to_bytes().as_slice()).expect("signing failed")
+    }
+
+    pub fn verify(&self, message: &[u8], public_key: &[u8]) -> bool {
+        //let pub_key = VerifyingKey::from_sec1_bytes(public_key)
+        //    .expect("invalid public key");
+        todo!()
     }
 
     pub fn to_hex(&self) -> String {
@@ -83,6 +112,7 @@ pub mod tests {
 pub mod wasm {
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
+    use wasm_bindgen::prelude::*;
     use crate::crypto::Signature;
 
     #[wasm_bindgen]

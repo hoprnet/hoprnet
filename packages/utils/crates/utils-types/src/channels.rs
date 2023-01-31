@@ -1,8 +1,9 @@
 use ethnum::u256;
 use serde_repr::*;
+use crate::crypto::{PublicKey, Signature};
 use crate::errors::GeneralError;
 use crate::errors::GeneralError::ParseError;
-use crate::primitives::{Address, Balance, EthereumChallenge, Signature};
+use crate::primitives::{Address, Balance, EthereumChallenge, Hash};
 
 /// Describes status of the channel
 #[repr(u8)]
@@ -15,7 +16,7 @@ pub enum ChannelStatus {
     PendingToClose = 3
 }
 
-// TODO: Update to use secp256k1 private key length constant
+// TODO: Update to use secp256k1 private key length constant from core-crypto
 pub const RESPONSE_LENGTH: usize = 32;
 
 #[derive(Clone)]
@@ -88,6 +89,50 @@ impl Ticket {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter))]
     pub fn channel_epoch(&self) -> String {
         self.channel_epoch.to_string()
+    }
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
+pub struct AcknowledgedTicket {
+    pub ticket: Ticket,
+    pub response: Response,
+    pub pre_image: Hash,
+    pub signer: PublicKey
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
+pub struct ChannelEntry {
+    pub source: PublicKey,
+    pub destination: PublicKey,
+    pub balance: Balance,
+    pub commitment: Hash,
+    ticket_epoch: u256,
+    ticket_index: u256,
+    pub status: ChannelStatus,
+    channel_epoch: u256,
+    closure_time: u256,
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+impl ChannelEntry {
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter))]
+    pub fn ticket_epoch(&self) -> String {
+        self.ticket_epoch.to_string()
+    }
+
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter))]
+    pub fn ticket_index(&self) -> String {
+        self.ticket_index.to_string()
+    }
+
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter))]
+    pub fn channel_epoch(&self) -> String {
+        self.channel_epoch.to_string()
+    }
+
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter))]
+    pub fn closure_time(&self) -> String {
+        self.closure_time.to_string()
     }
 }
 
