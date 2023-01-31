@@ -119,7 +119,7 @@ therefore you MUST use only types which are compatible with BOTH. Avoid using WA
 
 Do not use any attribute. Types NOT compatible with WASM can be used freely.
 
-- trait implementations & generic types are NOT supported by `wasm-bindgen` and therefore they can be used only in pure Rust.
+- trait implementations, lifetimes & generic types are NOT supported by `wasm-bindgen` and therefore they can be used only in pure Rust.
 
 ### Something available only to WASM
 
