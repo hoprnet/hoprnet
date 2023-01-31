@@ -121,6 +121,7 @@ Do not use any attribute. Types NOT compatible with WASM can be used freely.
 ### Something available only to WASM
 Put it inside the `wasm` submodule. The code in that module is built only when the `wasm` feature is enabled in Cargo,
 and does not interfere with your pure Rust code (unless you intentionally `use` that module).
+You can use WASM-specific types freely.
 
 ## Avoid WASM-specific imports outside `wasm` submodule
 Any WASM imports (such as `js_sys`,...etc.) ARE WASM-specific (obviously), and must be used strictly inside 
