@@ -110,15 +110,19 @@ will trigger your Rust unit tests and WASM integration tests.
 ## Guidelines and tips
 
 ### To make something visible to WASM
+
 Use `#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]` attribute on it (a function, type or `impl` block).
 The attribute makes sure, that when the `wasm` feature is enabled in Cargo, it will be available to BOTH WASM and non-WASM (pure Rust),
 therefore you MUST use only types which are compatible with BOTH. Avoid using WASM-incompatible types and WASM-specific types.
 
 ### Something available only to pure Rust
+
 Do not use any attribute. Types NOT compatible with WASM can be used freely.
+
 - trait implementations & generic types are NOT supported by `wasm-bindgen` and therefore they can be used only in pure Rust.
 
 ### Something available only to WASM
+
 Put it inside the `wasm` submodule. The code in that module is built only when the `wasm` feature is enabled in Cargo,
 and does not interfere with your pure Rust code (unless you intentionally `use` that module).
 You can use WASM-specific types freely.
@@ -157,7 +161,7 @@ impl MyStruct {
    // Here, specify methods with types that are compatible with BOTH WASM and non-WASM (pure Rust)
 }
 
-// NOTE: That several `impl` blocks of the same type can co-exist, if there are different attributes on them! 
+// NOTE: That several `impl` blocks of the same type can co-exist, if there are different attributes on them!
 
 // Trait implementations for types can NEVER be made available for WASM (not currently supported by wasm-bindgen)
 impl ToString for ChannelStatus {
