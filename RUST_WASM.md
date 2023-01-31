@@ -37,7 +37,7 @@ Each crate is prefixed using the name of the package, therefore the crate names 
 
 - `utils-metrics`
 - `utils-misc`
-... etc.
+  ... etc.
 
 In addition, all Rust crates across all packages must be enumerated in `Cargo.toml` in the root of the Monorepo:
 
