@@ -595,7 +595,7 @@ dependencies = [
  "digest 0.10.6",
  "getrandom 0.2.8",
  "hmac",
- "k256",
+ "k256 0.11.6",
  "lazy_static 1.4.0",
  "serde",
  "sha2 0.10.6",
@@ -1074,6 +1074,7 @@ version = "0.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "12844141594ad74185a926d030f3b605f6a903b4e3fec351f3ea338ac5b7637e"
 dependencies = [
+ "der",
  "elliptic-curve",
  "rfc6979",
  "signature 2.0.0",
@@ -1324,7 +1325,7 @@ dependencies = [
  "ethabi",
  "generic-array 0.14.6",
  "hex 0.4.3",
- "k256",
+ "k256 0.11.6",
  "once_cell",
  "open-fastrlp",
  "proc-macro2",
@@ -2306,6 +2307,20 @@ dependencies = [
  "elliptic-curve",
  "sha2 0.10.6",
  "sha3",
+]
+
+[[package]]
+name = "k256"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "92a55e0ff3b72c262bcf041d9e97f1b84492b68f1c1a384de2323d3dc9403397"
+dependencies = [
+ "cfg-if 1.0.0",
+ "ecdsa 0.15.1",
+ "elliptic-curve",
+ "once_cell",
+ "sha2 0.10.6",
+ "signature 2.0.0",
 ]
 
 [[package]]
@@ -4531,9 +4546,9 @@ name = "utils-types"
 version = "0.1.0"
 dependencies = [
  "console_error_panic_hook",
- "ecdsa 0.15.1",
  "ethnum",
  "hex 0.4.3",
+ "k256 0.12.0",
  "serde",
  "serde_repr",
  "sha3",
