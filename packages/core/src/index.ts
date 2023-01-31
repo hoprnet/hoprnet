@@ -1258,9 +1258,10 @@ class Hopr extends EventEmitter {
 
     // TODO: should remove this blocker when https://github.com/hoprnet/hoprnet/issues/4194 gets addressed
     if (direction === 'incoming') {
-      log(`Incoming channel: ignoring closing channel ${channel
-        .getId()
-        .toHex()} because current HoprChannels contract does not support closing incoming channels.`
+      log(
+        `Incoming channel: ignoring closing channel ${channel
+          .getId()
+          .toHex()} because current HoprChannels contract does not support closing incoming channels.`
       )
       throw new Error('Incoming channel: Closing incoming channels currently is not supported.')
     }

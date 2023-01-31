@@ -60,7 +60,7 @@ export async function closeChannel(
     if (errString.match(/Channel is already closed/)) {
       // @TODO insert receipt
       return { success: true, receipt: /* @fixme */ '0x', channelStatus: ChannelStatus.Closed }
-    } else if (errString.includes("Incoming channel")) {
+    } else if (errString.includes('Incoming channel')) {
       return { success: false, reason: STATUS_CODES.UNSUPPORTED_FEATURE }
     } else {
       return { success: false, reason: STATUS_CODES.UNKNOWN_FAILURE }
