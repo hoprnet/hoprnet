@@ -6,6 +6,7 @@ use crate::errors::GeneralError::ParseError;
 
 pub const ADDRESS_LENGTH: usize = 20;
 
+#[derive(Clone)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Address {
     addr: [u8; ADDRESS_LENGTH],
@@ -154,9 +155,53 @@ impl Balance {
     }
 }
 
+pub const ETHEREUM_CHALLENGE_LENGTH: usize = 20;
+
+#[derive(Clone)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+pub struct EthereumChallenge {
+    challenge: [u8; ETHEREUM_CHALLENGE_LENGTH]
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+impl EthereumChallenge {
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
+    pub fn new(data: &[u8]) -> Self {
+        assert_eq!(data.len(), ETHEREUM_CHALLENGE_LENGTH);
+
+        let mut ret = EthereumChallenge {
+            challenge: [0u8; ETHEREUM_CHALLENGE_LENGTH]
+        };
+        ret.challenge.copy_from_slice(data);
+        ret
+    }
+
+    pub fn to_hex(&self) -> String {
+        hex::encode(self.challenge)
+    }
+
+    pub fn serialize(&self) -> Box<[u8]> {
+        self.challenge.into()
+    }
+
+    pub fn eq(&self, other: &EthereumChallenge) -> bool {
+        self.challenge.eq(&other.challenge)
+    }
+}
+
+impl EthereumChallenge {
+    pub fn deserialize(data: &[u8]) -> Result<EthereumChallenge, GeneralError> {
+        if data.len() == ETHEREUM_CHALLENGE_LENGTH {
+            Ok(EthereumChallenge::new(data))
+        } else {
+            Err(ParseError)
+        }
+    }
+}
 
 pub const HASH_LENGTH: usize = 32;
 
+#[derive(Clone)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Hash {
     hash: [u8; HASH_LENGTH],
@@ -190,6 +235,7 @@ impl Hash {
 // TODO: Move all Signature related stuff to core-crypto once merged
 pub const SIGNATURE_LENGTH: usize = 64;
 
+#[derive(Clone)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Signature {
     signature: [u8; SIGNATURE_LENGTH],
@@ -266,12 +312,19 @@ pub mod wasm {
     use wasm_bindgen::prelude::wasm_bindgen;
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
-    use crate::primitives::{Balance, BalanceType, Signature};
+    use crate::primitives::{Balance, BalanceType, EthereumChallenge, Signature};
 
     #[wasm_bindgen]
     impl Balance {
         pub fn deserialize_balance(data: &[u8], balance_type: BalanceType) -> JsResult<Balance> {
             ok_or_jserr!(Balance::deserialize(data, balance_type))
+        }
+    }
+
+    #[wasm_bindgen]
+    impl EthereumChallenge {
+        pub fn deserialize_challenge(data: &[u8]) -> JsResult<EthereumChallenge> {
+            ok_or_jserr!(EthereumChallenge::deserialize(data))
         }
     }
 
