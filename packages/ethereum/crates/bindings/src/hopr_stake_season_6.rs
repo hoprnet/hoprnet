@@ -1,11 +1,11 @@
-pub use hopr_stake_season_5::*;
+pub use hopr_stake_season_6::*;
 #[allow(clippy::too_many_arguments, non_camel_case_types)]
-pub mod hopr_stake_season_5 {
+pub mod hopr_stake_season_6 {
     #![allow(clippy::enum_variant_names)]
     #![allow(dead_code)]
     #![allow(clippy::type_complexity)]
     #![allow(unused_imports)]
-    ///HoprStakeSeason5 was auto-generated with ethers-rs Abigen. More information at: https://github.com/gakonst/ethers-rs
+    ///HoprStakeSeason6 was auto-generated with ethers-rs Abigen. More information at: https://github.com/gakonst/ethers-rs
     use std::sync::Arc;
     use ::ethers::core::{
         abi::{Abi, Token, Detokenize, InvalidOutputType, Tokenizable},
@@ -17,39 +17,39 @@ pub mod hopr_stake_season_5 {
     };
     use ::ethers::providers::Middleware;
     #[rustfmt::skip]
-    const __ABI: &str = "[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_newOwner\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"_nftAddress\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"_lockToken\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"_rewardToken\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"uint256\",\"name\":\"rewardAmount\",\"type\":\"uint256\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"Claimed\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"typeIndex\",\"type\":\"uint256\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"NftAllowed\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"typeIndex\",\"type\":\"uint256\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"NftBlocked\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"OwnershipTransferred\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"uint256\",\"name\":\"boostTokenId\",\"type\":\"uint256\",\"components\":[],\"indexed\":true},{\"internalType\":\"bool\",\"name\":\"factorRegistered\",\"type\":\"bool\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"Redeemed\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"uint256\",\"name\":\"actualAmount\",\"type\":\"uint256\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"Released\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"RewardFueled\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"uint256\",\"name\":\"actualAmount\",\"type\":\"uint256\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"Staked\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"uint256\",\"name\":\"increment\",\"type\":\"uint256\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"Sync\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"BASIC_FACTOR_NUMERATOR\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"BOOST_CAP\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"FACTOR_DENOMINATOR\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"LOCK_TOKEN\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"NFT_CONTRACT\",\"outputs\":[{\"internalType\":\"contract IHoprBoost\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"PROGRAM_END\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"PROGRAM_START\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"REWARD_TOKEN\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"accounts\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"actualLockedTokenAmount\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"lastSyncTimestamp\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"cumulatedRewards\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"claimedRewards\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"availableReward\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"claimRewards\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_account\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"getCumulatedRewardsIncrement\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"isBlockedNft\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"nftType\",\"type\":\"string\",\"components\":[]},{\"internalType\":\"string\",\"name\":\"nftRank\",\"type\":\"string\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"hodler\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"isNftTypeAndRankRedeemed1\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"nftTypeIndex\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"string\",\"name\":\"nftRank\",\"type\":\"string\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"hodler\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"isNftTypeAndRankRedeemed2\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"nftTypeIndex\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"boostNumerator\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"hodler\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"isNftTypeAndRankRedeemed3\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"nftType\",\"type\":\"string\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"boostNumerator\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"hodler\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"isNftTypeAndRankRedeemed4\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"operator\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"tokenId\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"onERC721Received\",\"outputs\":[{\"internalType\":\"bytes4\",\"name\":\"\",\"type\":\"bytes4\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_from\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"_value\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"bytes\",\"name\":\"_data\",\"type\":\"bytes\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"onTokenTransfer\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"typeIndex\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"ownerBlockNftType\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"typeIndex\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"ownerUnblockNftType\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"tokenAddress\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"reclaimErc20Tokens\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"tokenAddress\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"tokenId\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"reclaimErc721Tokens\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"redeemedFactor\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"redeemedFactorIndex\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"redeemedNft\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"redeemedNftIndex\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"renounceOwnership\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_account\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"stakedHoprTokens\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"sync\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"operator\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"bytes\",\"name\":\"userData\",\"type\":\"bytes\",\"components\":[]},{\"internalType\":\"bytes\",\"name\":\"operatorData\",\"type\":\"bytes\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"tokensReceived\",\"outputs\":[]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"totalLocked\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"transferOwnership\",\"outputs\":[]},{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"unlock\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"unlockFor\",\"outputs\":[]}]";
+    const __ABI: &str = "[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_newOwner\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"_nftAddress\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"_lockToken\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"_rewardToken\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"uint256\",\"name\":\"rewardAmount\",\"type\":\"uint256\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"Claimed\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"typeIndex\",\"type\":\"uint256\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"NftAllowed\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"typeIndex\",\"type\":\"uint256\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"NftBlocked\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"OwnershipTransferred\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"uint256\",\"name\":\"boostTokenId\",\"type\":\"uint256\",\"components\":[],\"indexed\":true},{\"internalType\":\"bool\",\"name\":\"factorRegistered\",\"type\":\"bool\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"Redeemed\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"uint256\",\"name\":\"actualAmount\",\"type\":\"uint256\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"Released\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"RewardFueled\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"uint256\",\"name\":\"actualAmount\",\"type\":\"uint256\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"Staked\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"uint256\",\"name\":\"increment\",\"type\":\"uint256\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"Sync\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"BASIC_FACTOR_NUMERATOR\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"BOOST_CAP\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"FACTOR_DENOMINATOR\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"LOCK_TOKEN\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"NFT_CONTRACT\",\"outputs\":[{\"internalType\":\"contract IHoprBoost\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"PROGRAM_END\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"PROGRAM_START\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"REWARD_TOKEN\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"accounts\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"actualLockedTokenAmount\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"lastSyncTimestamp\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"cumulatedRewards\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"claimedRewards\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"availableReward\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"_accounts\",\"type\":\"address[]\",\"components\":[]},{\"internalType\":\"uint256[]\",\"name\":\"_stakes\",\"type\":\"uint256[]\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"batchStakeFor\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"claimRewards\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_account\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"getCumulatedRewardsIncrement\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"isBlockedNft\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"nftType\",\"type\":\"string\",\"components\":[]},{\"internalType\":\"string\",\"name\":\"nftRank\",\"type\":\"string\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"hodler\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"isNftTypeAndRankRedeemed1\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"nftTypeIndex\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"string\",\"name\":\"nftRank\",\"type\":\"string\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"hodler\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"isNftTypeAndRankRedeemed2\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"nftTypeIndex\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"boostNumerator\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"hodler\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"isNftTypeAndRankRedeemed3\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"nftType\",\"type\":\"string\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"boostNumerator\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"hodler\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"isNftTypeAndRankRedeemed4\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"operator\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"tokenId\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"onERC721Received\",\"outputs\":[{\"internalType\":\"bytes4\",\"name\":\"\",\"type\":\"bytes4\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_from\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"_value\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"bytes\",\"name\":\"_data\",\"type\":\"bytes\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"onTokenTransfer\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"typeIndex\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"ownerBlockNftType\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"typeIndex\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"ownerUnblockNftType\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"tokenAddress\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"reclaimErc20Tokens\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"tokenAddress\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"tokenId\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"reclaimErc721Tokens\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"redeemedFactor\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"redeemedFactorIndex\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"redeemedNft\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"redeemedNftIndex\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"renounceOwnership\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_account\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"stakedHoprTokens\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"sync\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"operator\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"bytes\",\"name\":\"userData\",\"type\":\"bytes\",\"components\":[]},{\"internalType\":\"bytes\",\"name\":\"operatorData\",\"type\":\"bytes\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"tokensReceived\",\"outputs\":[]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"totalLocked\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"transferOwnership\",\"outputs\":[]},{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"unlock\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"unlockFor\",\"outputs\":[]}]";
     /// The parsed JSON-ABI of the contract.
-    pub static HOPRSTAKESEASON5_ABI: ::ethers::contract::Lazy<
+    pub static HOPRSTAKESEASON6_ABI: ::ethers::contract::Lazy<
         ::ethers::core::abi::Abi,
     > = ::ethers::contract::Lazy::new(|| {
         ::ethers::core::utils::__serde_json::from_str(__ABI).expect("invalid abi")
     });
     /// Bytecode of the #name contract
-    pub static HOPRSTAKESEASON5_BYTECODE: ::ethers::contract::Lazy<
+    pub static HOPRSTAKESEASON6_BYTECODE: ::ethers::contract::Lazy<
         ::ethers::core::types::Bytes,
     > = ::ethers::contract::Lazy::new(|| {
-        "0x610100604052600280546001600160a01b031990811673d057604a14982fe8d88c5fc25aac3267ea142a081790915560038054821673d4fdec44db9d44b8f2b6d529620f9c0c7066a2c1179055600480549091167343d13d7b83607f14335cf2cb75e87da369d056c71790553480156200007857600080fd5b5060405162002f4738038062002f478339810160408190526200009b91620003f9565b46606414620000ab5783620000c1565b73d9a00176cf49dfb9ca3ef61805a2850f45cb1d055b63635921406363d27950610319692a5a058fc295ed000000878787620000e73362000274565b60018055608087905260a086905260c085905260e08490526200010a88620002c4565b6040516329965a1d60e01b815230600482018190527fb281fc8c12954d22544db45de3159a39272895b169a852b314f9cc762e44c53b60248301526044820152731820a4b7618bde71dce8cdc73aab6c95905fad24906329965a1d90606401600060405180830381600087803b1580156200018457600080fd5b505af115801562000199573d6000803e3d6000fd5b5050505046606414620001e457600280546001600160a01b038085166001600160a01b0319928316179092556003805484841690831617905560048054928616929091169190911790555b5050505050505050620001fe60026200039960201b60201c565b6200020a600362000399565b62000216600462000399565b62000222600762000399565b6200022e600862000399565b6200023a600962000399565b62000246600a62000399565b62000252600b62000399565b6200025e600c62000399565b6200026a600d62000399565b5050505062000456565b600080546001600160a01b038381166001600160a01b0319831681178455604051919092169283917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e09190a35050565b6000546001600160a01b03163314620003245760405162461bcd60e51b815260206004820181905260248201527f4f776e61626c653a2063616c6c6572206973206e6f7420746865206f776e657260448201526064015b60405180910390fd5b6001600160a01b0381166200038b5760405162461bcd60e51b815260206004820152602660248201527f4f776e61626c653a206e6577206f776e657220697320746865207a65726f206160448201526564647265737360d01b60648201526084016200031b565b620003968162000274565b50565b600081815260096020526040808220805460ff191660011790555182917f620d09c7c7f3c5c41d8b5ea7f274622ddd6ac6b801f035fc741205d113199c0c91a250565b80516001600160a01b0381168114620003f457600080fd5b919050565b600080600080608085870312156200041057600080fd5b6200041b85620003dc565b93506200042b60208601620003dc565b92506200043b60408601620003dc565b91506200044b60608601620003dc565b905092959194509250565b60805160a05160c05160e051612a6a620004dd600039600081816105800152611be80152600081816104080152611b040152600081816105000152818161082c015281816114e401528181611ac401528181611c4301528181611ca40152611e0e01526000818161035a01528181611a9a01528181611c670152611cc90152612a6a6000f3fe608060405234801561001057600080fd5b506004361061021b5760003560e01c806381128c1d11610125578063cbffa3c7116100ad578063dde499791161007c578063dde4997914610568578063ef0526a21461057b578063ef5cfb8c146105a2578063f2fde38b146105b5578063f978fff1146105c857600080fd5b8063cbffa3c7146104fb578063ce23177e14610522578063d0c02d6314610535578063d0da68011461055557600080fd5b806399248ea7116100f457806399248ea7146104a7578063a4c0ed36146104ba578063a5841194146104cd578063a69df4b5146104e0578063a83d1ed6146104e857600080fd5b806381128c1d146104455780638c24add4146104705780638da5cb5b1461048357806396a9cd7d1461049457600080fd5b806356891412116101a85780635ef73d58116101775780635ef73d58146103e45780636067bc15146103f05780636aa8d4cf1461040357806370af09341461042a578063715018a61461043d57600080fd5b8063568914121461034c5780635bbb63a6146103555780635e4c0e151461037c5780635e5c06e21461038f57600080fd5b80631fda9a02116101ef5780631fda9a02146102bf57806321cf85ba146102ea57806342c93361146102fd57806348c64e41146103305780634ad84b341461034357600080fd5b806223de29146102205780630a1a257a14610235578063150b7a02146102735780631f014d831461029f575b600080fd5b61023361022e3660046123b5565b6105f1565b005b610260610243366004612460565b600560209081526000928352604080842090915290825290205481565b6040519081526020015b60405180910390f35b61028661028136600461248a565b61079e565b6040516001600160e01b0319909116815260200161026a565b6102606102ad3660046124f9565b60086020526000908152604090205481565b6004546102d2906001600160a01b031681565b6040516001600160a01b03909116815260200161026a565b6102336102f8366004612514565b610cb2565b61032061030b366004612514565b60096020526000908152604090205460ff1681565b604051901515815260200161026a565b61023361033e366004612460565b610d85565b610260600c5481565b610260600b5481565b6102607f000000000000000000000000000000000000000000000000000000000000000081565b61023361038a366004612514565b610f03565b6103c461039d3660046124f9565b600a6020526000908152604090208054600182015460028301546003909301549192909184565b60408051948552602085019390935291830152606082015260800161026a565b61026064e8d4a5100081565b6102336103fe3660046124f9565b610fa7565b6102607f000000000000000000000000000000000000000000000000000000000000000081565b6102606104383660046124f9565b61115a565b61023361116b565b610260610453366004612460565b600760209081526000928352604080842090915290825290205481565b61032061047e3660046125fa565b6111a1565b6000546001600160a01b03166102d2565b6103206104a2366004612651565b611313565b6003546102d2906001600160a01b031681565b6103206104c836600461269f565b611470565b6102336104db3660046124f9565b6115f9565b610233611602565b6103206104f636600461270a565b61160b565b6102607f000000000000000000000000000000000000000000000000000000000000000081565b610320610530366004612736565b61175e565b6102606105433660046124f9565b60066020526000908152604090205481565b6002546102d2906001600160a01b031681565b6102336105763660046124f9565b611878565b6102607f000000000000000000000000000000000000000000000000000000000000000081565b6102336105b03660046124f9565b611881565b6102336105c33660046124f9565b611893565b6102606105d63660046124f9565b6001600160a01b03166000908152600a602052604090205490565b6003546001600160a01b0316331461065f5760405162461bcd60e51b815260206004820152602660248201527f486f70725374616b653a2053656e646572206d757374206265207778484f5052604482015265103a37b5b2b760d11b60648201526084015b60405180910390fd5b6001600160a01b03861630146106dd5760405162461bcd60e51b815260206004820152603760248201527f486f70725374616b653a204d7573742062652073656e64696e6720746f6b656e60448201527f7320746f20486f70725374616b6520636f6e74726163740000000000000000006064820152608401610656565b6000546001600160a01b038881169116146107525760405162461bcd60e51b815260206004820152602f60248201527f486f70725374616b653a204f6e6c7920616363657074206f776e657220746f2060448201526e70726f76696465207265776172647360881b6064820152608401610656565b84600c600082825461076491906127a8565b909155505060405185907f2bf52bcae319602514e02ff69bbe4b89a19718b96e7867044128ec872419437c90600090a25050505050505050565b6004546000906001600160a01b0316336001600160a01b03161461082a5760405162461bcd60e51b815260206004820152603f60248201527f486f70725374616b653a2043616e6e6f7420536166655472616e73666572467260448201527f6f6d20746f6b656e73206f74686572207468616e20486f7072426f6f73742e006064820152608401610656565b7f00000000000000000000000000000000000000000000000000000000000000004211156108b25760405162461bcd60e51b815260206004820152602f60248201527f486f70725374616b653a2050726f6772616d20656e6465642c2063616e6e6f7460448201526e103932b232b2b6903137b7b9ba399760891b6064820152608401610656565b6108bb8561192b565b6001600160a01b03851660008181526005602090815260408083206006808452828520805486529184529184208990559383529052815460019291906109029084906127a8565b90915550506004805460405163562317c560e01b81529182018690526000916001600160a01b039091169063562317c590602401602060405180830381865afa158015610953573d6000803e3d6000fd5b505050506040513d601f19601f8201168201806040525081019061097791906127c0565b6004805460405163225b377d60e21b81529182018890529192506000916001600160a01b03169063896cddf4906024016040805180830381865afa1580156109c3573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906109e791906127d9565b5060008381526009602052604090205490915060ff1615610a645760405162461bcd60e51b815260206004820152603160248201527f486f70725374616b653a2043616e206f6e6c792072656465656d204e4654732060448201527037b31030b63637bbb2b2103a3cb832b99760791b6064820152608401610656565b6001600160a01b038716600090815260086020526040812054905b81811015610c15576001600160a01b0389811660009081526007602090815260408083208584529091528082205460048054925163562317c560e01b81529081018290529093919091169063562317c590602401602060405180830381865afa158015610af0573d6000803e3d6000fd5b505050506040513d601f19601f82011682018060405250810190610b1491906127c0565b6004805460405163225b377d60e21b81529182018590529192506000916001600160a01b03169063896cddf4906024016040805180830381865afa158015610b60573d6000803e3d6000fd5b505050506040513d601f19601f82011682018060405250810190610b8491906127d9565b509050868203610bff5785811015610bbd576001600160a01b038c16600090815260076020908152604080832087845290915290208b90555b604051868210908c906001600160a01b038f16907f066d96cb280fccf3a0a3a5686966a801b2690a32ec98fd2711a4e09f345d935d90600090a4505050610c15565b5050508080610c0d906127fd565b915050610a7f565b818103610c9c576001600160a01b038916600081815260076020908152604080832086845282528083208c905592825260089052908120805460019290610c5d9084906127a8565b909155505060405160019089906001600160a01b038c16907f066d96cb280fccf3a0a3a5686966a801b2690a32ec98fd2711a4e09f345d935d90600090a45b50630a85bd0160e11b9998505050505050505050565b6000546001600160a01b03163314610cdc5760405162461bcd60e51b815260040161065690612816565b60008181526009602052604090205460ff16610d455760405162461bcd60e51b815260206004820152602260248201527f486f70725374616b653a204e46542074797065206973206e6f7420626c6f636b604482015261195960f21b6064820152608401610656565b600081815260096020526040808220805460ff191690555182917ff78f7266ab985ddb2782b52fc236b9d2f22ff251a37a336a296ed4b188f7a92691a250565b6000546001600160a01b03163314610daf5760405162461bcd60e51b815260040161065690612816565b600260015403610e015760405162461bcd60e51b815260206004820152601f60248201527f5265656e7472616e637947756172643a207265656e7472616e742063616c6c006044820152606401610656565b60026001556004546001600160a01b0390811690831603610e725760405162461bcd60e51b815260206004820152602560248201527f486f70725374616b653a2043616e6e6f7420636c61696d20486f7072426f6f736044820152641d0813919560da1b6064820152608401610656565b816001600160a01b03166323b872dd30610e946000546001600160a01b031690565b6040516001600160e01b031960e085901b1681526001600160a01b0392831660048201529116602482015260448101849052606401600060405180830381600087803b158015610ee357600080fd5b505af1158015610ef7573d6000803e3d6000fd5b50506001805550505050565b6000546001600160a01b03163314610f2d5760405162461bcd60e51b815260040161065690612816565b60008181526009602052604090205460ff1615610f9b5760405162461bcd60e51b815260206004820152602660248201527f486f70725374616b653a204e4654207479706520697320616c726561647920626044820152651b1bd8dad95960d21b6064820152608401610656565b610fa4816119b6565b50565b6000546001600160a01b03163314610fd15760405162461bcd60e51b815260040161065690612816565b6002600154036110235760405162461bcd60e51b815260206004820152601f60248201527f5265656e7472616e637947756172643a207265656e7472616e742063616c6c006044820152606401610656565b60026001819055546000906001600160a01b03908116908316036110c157600b546002546040516370a0823160e01b81523060048201526001600160a01b03909116906370a0823190602401602060405180830381865afa15801561108c573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906110b091906127c0565b6110ba919061284b565b905061112c565b6040516370a0823160e01b81523060048201526001600160a01b038316906370a0823190602401602060405180830381865afa158015611105573d6000803e3d6000fd5b505050506040513d601f19601f8201168201806040525081019061112991906127c0565b90505b6111526111416000546001600160a01b031690565b6001600160a01b03841690836119f9565b505060018055565b600061116582611a50565b92915050565b6000546001600160a01b031633146111955760405162461bcd60e51b815260040161065690612816565b61119f6000611d13565b565b6000805b6001600160a01b038316600090815260066020526040902054811015611306576001600160a01b0383811660009081526005602090815260408083208584529091528082205460048054925163225b377d60e21b81529081018290529093919091169063896cddf4906024016040805180830381865afa15801561122d573d6000803e3d6000fd5b505050506040513d601f19601f8201168201806040525081019061125191906127d9565b50875160208901206004805460405163c588ff8b60e01b815291820186905292935090916001600160a01b03169063c588ff8b90602401600060405180830381865afa1580156112a5573d6000803e3d6000fd5b505050506040513d6000823e601f3d908101601f191682016040526112cd9190810190612892565b805190602001201480156112e057508086145b156112f1576001935050505061130c565b505080806112fe906127fd565b9150506111a5565b50600090505b9392505050565b6000805b6001600160a01b038316600090815260066020526040902054811015611306576001600160a01b0383811660009081526005602090815260408083208584529091528082205460048054925163c87b56dd60e01b81529081018290529093919091169063c87b56dd90602401600060405180830381865afa1580156113a0573d6000803e3d6000fd5b505050506040513d6000823e601f3d908101601f191682016040526113c89190810190612892565b6004805460405163562317c560e01b815291820185905291925088916001600160a01b03169063562317c590602401602060405180830381865afa158015611414573d6000803e3d6000fd5b505050506040513d601f19601f8201168201806040525081019061143891906127c0565b14801561144a575061144a8187611d63565b1561145b576001935050505061130c565b50508080611468906127fd565b915050611317565b6002546000906001600160a01b031633146114e25760405162461bcd60e51b815260206004820152602c60248201527f486f70725374616b653a204f6e6c7920616363657074204c4f434b5f544f4b4560448201526b4e20696e207374616b696e6760a01b6064820152608401610656565b7f000000000000000000000000000000000000000000000000000000000000000042111561156a5760405162461bcd60e51b815260206004820152602f60248201527f486f70725374616b653a2050726f6772616d20656e6465642c2063616e6e6f7460448201526e1039ba30b5b29030b73cb6b7b9329760891b6064820152608401610656565b6115738461192b565b6001600160a01b0384166000908152600a60205260408120805485929061159b9084906127a8565b9250508190555082600b60008282546115b491906127a8565b909155505060405183906001600160a01b038616907f9e71bc8eea02a63969f509818f2dafb9254532904319f9dbda79b67bd34a5f3d90600090a35060019392505050565b610fa48161192b565b61119f33611e0c565b6000805b6001600160a01b038316600090815260066020526040902054811015611306576001600160a01b0383811660009081526005602090815260408083208584529091528082205460048054925163225b377d60e21b81529081018290529093919091169063896cddf4906024016040805180830381865afa158015611697573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906116bb91906127d9565b506004805460405163562317c560e01b815291820185905291925088916001600160a01b03169063562317c590602401602060405180830381865afa158015611708573d6000803e3d6000fd5b505050506040513d601f19601f8201168201806040525081019061172c91906127c0565b14801561173857508086145b15611749576001935050505061130c565b50508080611756906127fd565b91505061160f565b6000808484604051602001611774929190612909565b604051602081830303815290604052905060005b6001600160a01b03841660009081526006602052604090205481101561186c576001600160a01b0384811660009081526005602090815260408083208584529091528082205460048054925163c87b56dd60e01b81529081018290529093919091169063c87b56dd90602401600060405180830381865afa158015611811573d6000803e3d6000fd5b505050506040513d6000823e601f3d908101601f191682016040526118399190810190612892565b90506118458185611d63565b1561185757600194505050505061130c565b50508080611864906127fd565b915050611788565b50600095945050505050565b610fa481611e0c565b61188a8161192b565b610fa481612006565b6000546001600160a01b031633146118bd5760405162461bcd60e51b815260040161065690612816565b6001600160a01b0381166119225760405162461bcd60e51b815260206004820152602660248201527f4f776e61626c653a206e6577206f776e657220697320746865207a65726f206160448201526564647265737360d01b6064820152608401610656565b610fa481611d13565b600061193682611a50565b6001600160a01b0383166000908152600a60205260408120600201805492935083929091906119669084906127a8565b90915550506001600160a01b0382166000818152600a602052604080822042600190910155518392917f99869d968ca3581a661f31abb3a6aa70ccec5cdc49855eab174cf9e00a2462db91a35050565b600081815260096020526040808220805460ff191660011790555182917f620d09c7c7f3c5c41d8b5ea7f274622ddd6ac6b801f035fc741205d113199c0c91a250565b604080516001600160a01b038416602482015260448082018490528251808303909101815260649091019091526020810180516001600160e01b031663a9059cbb60e01b179052611a4b90849061214d565b505050565b6001600160a01b0381166000908152600a602090815260408083208151608081018352815481526001820154938101939093526002810154918301919091526003015460608201527f000000000000000000000000000000000000000000000000000000000000000042111580611aeb57507f0000000000000000000000000000000000000000000000000000000000000000816020015110155b15611af95750600092915050565b8051600090611b29907f000000000000000000000000000000000000000000000000000000000000000090612945565b905060005b6001600160a01b038516600090815260086020526040902054811015611c37576001600160a01b0385811660009081526007602090815260408083208584529091528082205460048054925163225b377d60e21b81529081018290529093919091169063896cddf4906024016040805180830381865afa158015611bb6573d6000803e3d6000fd5b505050506040513d601f19601f82011682018060405250810190611bda91906127d9565b5085519091508190611c0c907f000000000000000000000000000000000000000000000000000000000000000061221f565b611c169190612945565b611c2090856127a8565b935050508080611c2f906127fd565b915050611b2e565b5064e8d4a51000611c9f7f0000000000000000000000000000000000000000000000000000000000000000611c997f0000000000000000000000000000000000000000000000000000000000000000866020015161223590919063ffffffff16565b9061221f565b611ced7f0000000000000000000000000000000000000000000000000000000000000000611c99427f0000000000000000000000000000000000000000000000000000000000000000612235565b611cf7919061284b565b611d019083612945565b611d0b9190612964565b949350505050565b600080546001600160a01b038381166001600160a01b0319831681178455604051919092169283917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e09190a35050565b8051825160009184918491908490611d7c90839061284b565b9050600084611d8c60018461284b565b81518110611d9c57611d9c612986565b01602001516001600160f81b0319169050602f60f81b8114611dc657600095505050505050611165565b6000611dd384602061284b565b611dde906008612945565b9050600080611dec8761299c565b979094016020015196821c9690911c959095149550505050505092915050565b7f00000000000000000000000000000000000000000000000000000000000000004211611e975760405162461bcd60e51b815260206004820152603360248201527f486f70725374616b653a2050726f6772616d206973206f6e676f696e672c206360448201527230b73737ba103ab73637b1b59039ba30b5b29760691b6064820152608401610656565b6001600160a01b0381166000908152600a6020526040902054611eb98261192b565b6001600160a01b0382166000908152600a60205260408120819055600b8054839290611ee690849061284b565b90915550611ef5905082612006565b600254611f0c906001600160a01b031683836119f9565b60005b6001600160a01b038316600090815260066020526040902054811015611fcb57600480546001600160a01b038581166000818152600560209081526040808320888452909152908190205490516323b872dd60e01b815230958101959095526024850191909152604484015216906323b872dd90606401600060405180830381600087803b158015611fa057600080fd5b505af1158015611fb4573d6000803e3d6000fd5b505050508080611fc3906127fd565b915050611f0f565b5060405181906001600160a01b038416907fb21fb52d5749b80f3182f8c6992236b5e5576681880914484d7f4c9b062e619e90600090a35050565b6001600160a01b0381166000908152600a602090815260408083208151608081018352815481526001820154938101939093526002810154918301829052600301546060830181905291929161205b9161284b565b90508015611a4b576001600160a01b0383166000908152600a602052604090206002810154600390910155600c548111156120e45760405162461bcd60e51b8152602060048201526024808201527f486f70725374616b653a20496e73756666696369656e7420726577617264207060448201526337b7b61760e11b6064820152608401610656565b80600c60008282546120f6919061284b565b9091555050600354612112906001600160a01b031684836119f9565b60405181906001600160a01b038516907fd8138f8a3f377c5259ca548e70e4c2de94f129f5a11036a15b69513cba2b426a90600090a3505050565b60006121a2826040518060400160405280602081526020017f5361666545524332303a206c6f772d6c6576656c2063616c6c206661696c6564815250856001600160a01b03166122459092919063ffffffff16565b805190915015611a4b57808060200190518101906121c091906129c3565b611a4b5760405162461bcd60e51b815260206004820152602a60248201527f5361666545524332303a204552433230206f7065726174696f6e20646964206e6044820152691bdd081cdd58d8d9595960b21b6064820152608401610656565b600081831061222e578161130c565b5090919050565b60008183101561222e578161130c565b6060611d0b848460008585843b61229e5760405162461bcd60e51b815260206004820152601d60248201527f416464726573733a2063616c6c20746f206e6f6e2d636f6e74726163740000006044820152606401610656565b600080866001600160a01b031685876040516122ba91906129e5565b60006040518083038185875af1925050503d80600081146122f7576040519150601f19603f3d011682016040523d82523d6000602084013e6122fc565b606091505b509150915061230c828286612317565b979650505050505050565b6060831561232657508161130c565b8251156123365782518084602001fd5b8160405162461bcd60e51b81526004016106569190612a01565b80356001600160a01b038116811461236757600080fd5b919050565b60008083601f84011261237e57600080fd5b50813567ffffffffffffffff81111561239657600080fd5b6020830191508360208285010111156123ae57600080fd5b9250929050565b60008060008060008060008060c0898b0312156123d157600080fd5b6123da89612350565b97506123e860208a01612350565b96506123f660408a01612350565b955060608901359450608089013567ffffffffffffffff8082111561241a57600080fd5b6124268c838d0161236c565b909650945060a08b013591508082111561243f57600080fd5b5061244c8b828c0161236c565b999c989b5096995094979396929594505050565b6000806040838503121561247357600080fd5b61247c83612350565b946020939093013593505050565b6000806000806000608086880312156124a257600080fd5b6124ab86612350565b94506124b960208701612350565b935060408601359250606086013567ffffffffffffffff8111156124dc57600080fd5b6124e88882890161236c565b969995985093965092949392505050565b60006020828403121561250b57600080fd5b61130c82612350565b60006020828403121561252657600080fd5b5035919050565b634e487b7160e01b600052604160045260246000fd5b604051601f8201601f1916810167ffffffffffffffff8111828210171561256c5761256c61252d565b604052919050565b600067ffffffffffffffff82111561258e5761258e61252d565b50601f01601f191660200190565b60006125af6125aa84612574565b612543565b90508281528383830111156125c357600080fd5b828260208301376000602084830101529392505050565b600082601f8301126125eb57600080fd5b61130c8383356020850161259c565b60008060006060848603121561260f57600080fd5b833567ffffffffffffffff81111561262657600080fd5b612632868287016125da565b9350506020840135915061264860408501612350565b90509250925092565b60008060006060848603121561266657600080fd5b83359250602084013567ffffffffffffffff81111561268457600080fd5b612690868287016125da565b92505061264860408501612350565b6000806000606084860312156126b457600080fd5b6126bd84612350565b925060208401359150604084013567ffffffffffffffff8111156126e057600080fd5b8401601f810186136126f157600080fd5b6127008682356020840161259c565b9150509250925092565b60008060006060848603121561271f57600080fd5b833592506020840135915061264860408501612350565b60008060006060848603121561274b57600080fd5b833567ffffffffffffffff8082111561276357600080fd5b61276f878388016125da565b9450602086013591508082111561278557600080fd5b50612690868287016125da565b634e487b7160e01b600052601160045260246000fd5b600082198211156127bb576127bb612792565b500190565b6000602082840312156127d257600080fd5b5051919050565b600080604083850312156127ec57600080fd5b505080516020909101519092909150565b60006001820161280f5761280f612792565b5060010190565b6020808252818101527f4f776e61626c653a2063616c6c6572206973206e6f7420746865206f776e6572604082015260600190565b60008282101561285d5761285d612792565b500390565b60005b8381101561287d578181015183820152602001612865565b8381111561288c576000848401525b50505050565b6000602082840312156128a457600080fd5b815167ffffffffffffffff8111156128bb57600080fd5b8201601f810184136128cc57600080fd5b80516128da6125aa82612574565b8181528560208385010111156128ef57600080fd5b612900826020830160208601612862565b95945050505050565b6000835161291b818460208801612862565b602f60f81b9083019081528351612939816001840160208801612862565b01600101949350505050565b600081600019048311821515161561295f5761295f612792565b500290565b60008261298157634e487b7160e01b600052601260045260246000fd5b500490565b634e487b7160e01b600052603260045260246000fd5b805160208083015191908110156129bd576000198160200360031b1b821691505b50919050565b6000602082840312156129d557600080fd5b8151801515811461130c57600080fd5b600082516129f7818460208701612862565b9190910192915050565b6020815260008251806020840152612a20816040850160208701612862565b601f01601f1916919091016040019291505056fea26469706673582212207a88577dcb99a83a77a672d2fa4a03cee2fda435d86d1329413b05fdbbdddf3564736f6c634300080d0033"
+        "0x610100604052600280546001600160a01b031990811673d057604a14982fe8d88c5fc25aac3267ea142a081790915560038054821673d4fdec44db9d44b8f2b6d529620f9c0c7066a2c1179055600480549091167343d13d7b83607f14335cf2cb75e87da369d056c71790553480156200007857600080fd5b5060405162003358380380620033588339810160408190526200009b91620004e0565b46606414620000ab5783620000c1565b73d9a00176cf49dfb9ca3ef61805a2850f45cb1d055b6363d27950636449124061018c6934f086f3b33b6840000046606414620000e95787620000ff565b7343d13d7b83607f14335cf2cb75e87da369d056c75b466064146200010f578762000125565b73d057604a14982fe8d88c5fc25aac3267ea142a085b466064146200013557876200014b565b73d4fdec44db9d44b8f2b6d529620f9c0c7066a2c15b62000156336200035b565b60018055608087905260a086905260c085905260e08490526200017988620003ab565b6040516329965a1d60e01b815230600482018190527fb281fc8c12954d22544db45de3159a39272895b169a852b314f9cc762e44c53b60248301526044820152731820a4b7618bde71dce8cdc73aab6c95905fad24906329965a1d90606401600060405180830381600087803b158015620001f357600080fd5b505af115801562000208573d6000803e3d6000fd5b50505050466064146200025357600280546001600160a01b038085166001600160a01b0319928316179092556003805484841690831617905560048054928616929091169190911790555b50505050505050506200026d60026200048060201b60201c565b62000279600362000480565b62000285600462000480565b62000291600762000480565b6200029d600862000480565b620002a9600962000480565b620002b5600a62000480565b620002c1600b62000480565b620002cd600c62000480565b620002d9600d62000480565b620002e5600e62000480565b620002f1600f62000480565b620002fd601062000480565b62000309601162000480565b62000315601262000480565b62000321601362000480565b6200032d601462000480565b62000339601562000480565b62000345601662000480565b62000351601762000480565b505050506200053d565b600080546001600160a01b038381166001600160a01b0319831681178455604051919092169283917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e09190a35050565b6000546001600160a01b031633146200040b5760405162461bcd60e51b815260206004820181905260248201527f4f776e61626c653a2063616c6c6572206973206e6f7420746865206f776e657260448201526064015b60405180910390fd5b6001600160a01b038116620004725760405162461bcd60e51b815260206004820152602660248201527f4f776e61626c653a206e6577206f776e657220697320746865207a65726f206160448201526564647265737360d01b606482015260840162000402565b6200047d816200035b565b50565b600081815260096020526040808220805460ff191660011790555182917f620d09c7c7f3c5c41d8b5ea7f274622ddd6ac6b801f035fc741205d113199c0c91a250565b80516001600160a01b0381168114620004db57600080fd5b919050565b60008060008060808587031215620004f757600080fd5b6200050285620004c3565b93506200051260208601620004c3565b92506200052260408601620004c3565b91506200053260608601620004c3565b905092959194509250565b60805160a05160c05160e051612d8d620005cb6000396000818161059e0152611dd10152600081816104130152611ced01526000818161050b0152818161084a015281816115020152818161187a01528181611cad01528181611e2c01528181611e8d0152611ff701526000818161036501528181611c8301528181611e500152611eb20152612d8d6000f3fe608060405234801561001057600080fd5b50600436106102265760003560e01c806381128c1d11610130578063cbffa3c7116100b8578063dde499791161007c578063dde4997914610586578063ef0526a214610599578063ef5cfb8c146105c0578063f2fde38b146105d3578063f978fff1146105e657600080fd5b8063cbffa3c714610506578063ce23177e1461052d578063d0c02d6314610540578063d0da680114610560578063d0f2dfa41461057357600080fd5b806399248ea7116100ff57806399248ea7146104b2578063a4c0ed36146104c5578063a5841194146104d8578063a69df4b5146104eb578063a83d1ed6146104f357600080fd5b806381128c1d146104505780638c24add41461047b5780638da5cb5b1461048e57806396a9cd7d1461049f57600080fd5b806356891412116101b35780635ef73d58116101825780635ef73d58146103ef5780636067bc15146103fb5780636aa8d4cf1461040e57806370af093414610435578063715018a61461044857600080fd5b806356891412146103575780635bbb63a6146103605780635e4c0e15146103875780635e5c06e21461039a57600080fd5b80631fda9a02116101fa5780631fda9a02146102ca57806321cf85ba146102f557806342c933611461030857806348c64e411461033b5780634ad84b341461034e57600080fd5b806223de291461022b5780630a1a257a14610240578063150b7a021461027e5780631f014d83146102aa575b600080fd5b61023e6102393660046125dc565b61060f565b005b61026b61024e366004612687565b600560209081526000928352604080842090915290825290205481565b6040519081526020015b60405180910390f35b61029161028c3660046126b1565b6107bc565b6040516001600160e01b03199091168152602001610275565b61026b6102b8366004612720565b60086020526000908152604090205481565b6004546102dd906001600160a01b031681565b6040516001600160a01b039091168152602001610275565b61023e61030336600461273b565b610cd0565b61032b61031636600461273b565b60096020526000908152604090205460ff1681565b6040519015158152602001610275565b61023e610349366004612687565b610da3565b61026b600c5481565b61026b600b5481565b61026b7f000000000000000000000000000000000000000000000000000000000000000081565b61023e61039536600461273b565b610f21565b6103cf6103a8366004612720565b600a6020526000908152604090208054600182015460028301546003909301549192909184565b604080519485526020850193909352918301526060820152608001610275565b61026b64e8d4a5100081565b61023e610409366004612720565b610fc5565b61026b7f000000000000000000000000000000000000000000000000000000000000000081565b61026b610443366004612720565b611178565b61023e611189565b61026b61045e366004612687565b600760209081526000928352604080842090915290825290205481565b61032b610489366004612821565b6111bf565b6000546001600160a01b03166102dd565b61032b6104ad366004612878565b611331565b6003546102dd906001600160a01b031681565b61032b6104d33660046128c6565b61148e565b61023e6104e6366004612720565b6115cf565b61023e6115d8565b61032b610501366004612931565b6115e1565b61026b7f000000000000000000000000000000000000000000000000000000000000000081565b61032b61053b36600461295d565b611734565b61026b61054e366004612720565b60066020526000908152604090205481565b6002546102dd906001600160a01b031681565b61023e6105813660046129fe565b61184e565b61023e610594366004612720565b611a50565b61026b7f000000000000000000000000000000000000000000000000000000000000000081565b61023e6105ce366004612720565b611a59565b61023e6105e1366004612720565b611a6b565b61026b6105f4366004612720565b6001600160a01b03166000908152600a602052604090205490565b6003546001600160a01b0316331461067d5760405162461bcd60e51b815260206004820152602660248201527f486f70725374616b653a2053656e646572206d757374206265207778484f5052604482015265103a37b5b2b760d11b60648201526084015b60405180910390fd5b6001600160a01b03861630146106fb5760405162461bcd60e51b815260206004820152603760248201527f486f70725374616b653a204d7573742062652073656e64696e6720746f6b656e60448201527f7320746f20486f70725374616b6520636f6e74726163740000000000000000006064820152608401610674565b6000546001600160a01b038881169116146107705760405162461bcd60e51b815260206004820152602f60248201527f486f70725374616b653a204f6e6c7920616363657074206f776e657220746f2060448201526e70726f76696465207265776172647360881b6064820152608401610674565b84600c60008282546107829190612a80565b909155505060405185907f2bf52bcae319602514e02ff69bbe4b89a19718b96e7867044128ec872419437c90600090a25050505050505050565b6004546000906001600160a01b0316336001600160a01b0316146108485760405162461bcd60e51b815260206004820152603f60248201527f486f70725374616b653a2043616e6e6f7420536166655472616e73666572467260448201527f6f6d20746f6b656e73206f74686572207468616e20486f7072426f6f73742e006064820152608401610674565b7f00000000000000000000000000000000000000000000000000000000000000004211156108d05760405162461bcd60e51b815260206004820152602f60248201527f486f70725374616b653a2050726f6772616d20656e6465642c2063616e6e6f7460448201526e103932b232b2b6903137b7b9ba399760891b6064820152608401610674565b6108d985611b03565b6001600160a01b0385166000818152600560209081526040808320600680845282852080548652918452918420899055938352905281546001929190610920908490612a80565b90915550506004805460405163562317c560e01b81529182018690526000916001600160a01b039091169063562317c590602401602060405180830381865afa158015610971573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906109959190612a98565b6004805460405163225b377d60e21b81529182018890529192506000916001600160a01b03169063896cddf4906024016040805180830381865afa1580156109e1573d6000803e3d6000fd5b505050506040513d601f19601f82011682018060405250810190610a059190612ab1565b5060008381526009602052604090205490915060ff1615610a825760405162461bcd60e51b815260206004820152603160248201527f486f70725374616b653a2043616e206f6e6c792072656465656d204e4654732060448201527037b31030b63637bbb2b2103a3cb832b99760791b6064820152608401610674565b6001600160a01b038716600090815260086020526040812054905b81811015610c33576001600160a01b0389811660009081526007602090815260408083208584529091528082205460048054925163562317c560e01b81529081018290529093919091169063562317c590602401602060405180830381865afa158015610b0e573d6000803e3d6000fd5b505050506040513d601f19601f82011682018060405250810190610b329190612a98565b6004805460405163225b377d60e21b81529182018590529192506000916001600160a01b03169063896cddf4906024016040805180830381865afa158015610b7e573d6000803e3d6000fd5b505050506040513d601f19601f82011682018060405250810190610ba29190612ab1565b509050868203610c1d5785811015610bdb576001600160a01b038c16600090815260076020908152604080832087845290915290208b90555b604051868210908c906001600160a01b038f16907f066d96cb280fccf3a0a3a5686966a801b2690a32ec98fd2711a4e09f345d935d90600090a4505050610c33565b5050508080610c2b90612ad5565b915050610a9d565b818103610cba576001600160a01b038916600081815260076020908152604080832086845282528083208c905592825260089052908120805460019290610c7b908490612a80565b909155505060405160019089906001600160a01b038c16907f066d96cb280fccf3a0a3a5686966a801b2690a32ec98fd2711a4e09f345d935d90600090a45b50630a85bd0160e11b9998505050505050505050565b6000546001600160a01b03163314610cfa5760405162461bcd60e51b815260040161067490612aee565b60008181526009602052604090205460ff16610d635760405162461bcd60e51b815260206004820152602260248201527f486f70725374616b653a204e46542074797065206973206e6f7420626c6f636b604482015261195960f21b6064820152608401610674565b600081815260096020526040808220805460ff191690555182917ff78f7266ab985ddb2782b52fc236b9d2f22ff251a37a336a296ed4b188f7a92691a250565b6000546001600160a01b03163314610dcd5760405162461bcd60e51b815260040161067490612aee565b600260015403610e1f5760405162461bcd60e51b815260206004820152601f60248201527f5265656e7472616e637947756172643a207265656e7472616e742063616c6c006044820152606401610674565b60026001556004546001600160a01b0390811690831603610e905760405162461bcd60e51b815260206004820152602560248201527f486f70725374616b653a2043616e6e6f7420636c61696d20486f7072426f6f736044820152641d0813919560da1b6064820152608401610674565b816001600160a01b03166323b872dd30610eb26000546001600160a01b031690565b6040516001600160e01b031960e085901b1681526001600160a01b0392831660048201529116602482015260448101849052606401600060405180830381600087803b158015610f0157600080fd5b505af1158015610f15573d6000803e3d6000fd5b50506001805550505050565b6000546001600160a01b03163314610f4b5760405162461bcd60e51b815260040161067490612aee565b60008181526009602052604090205460ff1615610fb95760405162461bcd60e51b815260206004820152602660248201527f486f70725374616b653a204e4654207479706520697320616c726561647920626044820152651b1bd8dad95960d21b6064820152608401610674565b610fc281611b8e565b50565b6000546001600160a01b03163314610fef5760405162461bcd60e51b815260040161067490612aee565b6002600154036110415760405162461bcd60e51b815260206004820152601f60248201527f5265656e7472616e637947756172643a207265656e7472616e742063616c6c006044820152606401610674565b60026001819055546000906001600160a01b03908116908316036110df57600b546002546040516370a0823160e01b81523060048201526001600160a01b03909116906370a0823190602401602060405180830381865afa1580156110aa573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906110ce9190612a98565b6110d89190612b23565b905061114a565b6040516370a0823160e01b81523060048201526001600160a01b038316906370a0823190602401602060405180830381865afa158015611123573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906111479190612a98565b90505b61117061115f6000546001600160a01b031690565b6001600160a01b0384169083611bd1565b505060018055565b600061118382611c39565b92915050565b6000546001600160a01b031633146111b35760405162461bcd60e51b815260040161067490612aee565b6111bd6000611efc565b565b6000805b6001600160a01b038316600090815260066020526040902054811015611324576001600160a01b0383811660009081526005602090815260408083208584529091528082205460048054925163225b377d60e21b81529081018290529093919091169063896cddf4906024016040805180830381865afa15801561124b573d6000803e3d6000fd5b505050506040513d601f19601f8201168201806040525081019061126f9190612ab1565b50875160208901206004805460405163c588ff8b60e01b815291820186905292935090916001600160a01b03169063c588ff8b90602401600060405180830381865afa1580156112c3573d6000803e3d6000fd5b505050506040513d6000823e601f3d908101601f191682016040526112eb9190810190612b66565b805190602001201480156112fe57508086145b1561130f576001935050505061132a565b5050808061131c90612ad5565b9150506111c3565b50600090505b9392505050565b6000805b6001600160a01b038316600090815260066020526040902054811015611324576001600160a01b0383811660009081526005602090815260408083208584529091528082205460048054925163c87b56dd60e01b81529081018290529093919091169063c87b56dd90602401600060405180830381865afa1580156113be573d6000803e3d6000fd5b505050506040513d6000823e601f3d908101601f191682016040526113e69190810190612b66565b6004805460405163562317c560e01b815291820185905291925088916001600160a01b03169063562317c590602401602060405180830381865afa158015611432573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906114569190612a98565b14801561146857506114688187611f4c565b15611479576001935050505061132a565b5050808061148690612ad5565b915050611335565b6002546000906001600160a01b031633146115005760405162461bcd60e51b815260206004820152602c60248201527f486f70725374616b653a204f6e6c7920616363657074204c4f434b5f544f4b4560448201526b4e20696e207374616b696e6760a01b6064820152608401610674565b7f00000000000000000000000000000000000000000000000000000000000000004211156115405760405162461bcd60e51b815260040161067490612bdd565b61154984611b03565b6001600160a01b0384166000908152600a602052604081208054859290611571908490612a80565b9250508190555082600b600082825461158a9190612a80565b909155505060405183906001600160a01b038616907f9e71bc8eea02a63969f509818f2dafb9254532904319f9dbda79b67bd34a5f3d90600090a35060019392505050565b610fc281611b03565b6111bd33611ff5565b6000805b6001600160a01b038316600090815260066020526040902054811015611324576001600160a01b0383811660009081526005602090815260408083208584529091528082205460048054925163225b377d60e21b81529081018290529093919091169063896cddf4906024016040805180830381865afa15801561166d573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906116919190612ab1565b506004805460405163562317c560e01b815291820185905291925088916001600160a01b03169063562317c590602401602060405180830381865afa1580156116de573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906117029190612a98565b14801561170e57508086145b1561171f576001935050505061132a565b5050808061172c90612ad5565b9150506115e5565b600080848460405160200161174a929190612c2c565b604051602081830303815290604052905060005b6001600160a01b038416600090815260066020526040902054811015611842576001600160a01b0384811660009081526005602090815260408083208584529091528082205460048054925163c87b56dd60e01b81529081018290529093919091169063c87b56dd90602401600060405180830381865afa1580156117e7573d6000803e3d6000fd5b505050506040513d6000823e601f3d908101601f1916820160405261180f9190810190612b66565b905061181b8185611f4c565b1561182d57600194505050505061132a565b5050808061183a90612ad5565b91505061175e565b50600095945050505050565b6000546001600160a01b031633146118785760405162461bcd60e51b815260040161067490612aee565b7f00000000000000000000000000000000000000000000000000000000000000004211156118b85760405162461bcd60e51b815260040161067490612bdd565b82811461192d5760405162461bcd60e51b815260206004820152603960248201527f486f70725374616b653a206163636f756e747320616e64207374616b6573206160448201527f72726179206c656e6774687320646f206e6f74206d61746368000000000000006064820152608401610674565b60008080805b86811015611a0b5787878281811061194d5761194d612c68565b90506020020160208101906119629190612720565b925085858281811061197657611976612c68565b90506020020135915061198883611b03565b6001600160a01b0383166000908152600a6020526040812080548492906119b0908490612a80565b909155506119c090508285612a80565b935081836001600160a01b03167f9e71bc8eea02a63969f509818f2dafb9254532904319f9dbda79b67bd34a5f3d60405160405180910390a380611a0381612ad5565b915050611933565b5082600b6000828254611a1e9190612a80565b9091555050600054611a47906001600160a01b03166002546001600160a01b03169030866121ef565b50505050505050565b610fc281611ff5565b611a6281611b03565b610fc28161222d565b6000546001600160a01b03163314611a955760405162461bcd60e51b815260040161067490612aee565b6001600160a01b038116611afa5760405162461bcd60e51b815260206004820152602660248201527f4f776e61626c653a206e6577206f776e657220697320746865207a65726f206160448201526564647265737360d01b6064820152608401610674565b610fc281611efc565b6000611b0e82611c39565b6001600160a01b0383166000908152600a6020526040812060020180549293508392909190611b3e908490612a80565b90915550506001600160a01b0382166000818152600a602052604080822042600190910155518392917f99869d968ca3581a661f31abb3a6aa70ccec5cdc49855eab174cf9e00a2462db91a35050565b600081815260096020526040808220805460ff191660011790555182917f620d09c7c7f3c5c41d8b5ea7f274622ddd6ac6b801f035fc741205d113199c0c91a250565b6040516001600160a01b038316602482015260448101829052611c3490849063a9059cbb60e01b906064015b60408051601f198184030181529190526020810180516001600160e01b03166001600160e01b031990931692909217909152612374565b505050565b6001600160a01b0381166000908152600a602090815260408083208151608081018352815481526001820154938101939093526002810154918301919091526003015460608201527f000000000000000000000000000000000000000000000000000000000000000042111580611cd457507f0000000000000000000000000000000000000000000000000000000000000000816020015110155b15611ce25750600092915050565b8051600090611d12907f000000000000000000000000000000000000000000000000000000000000000090612c7e565b905060005b6001600160a01b038516600090815260086020526040902054811015611e20576001600160a01b0385811660009081526007602090815260408083208584529091528082205460048054925163225b377d60e21b81529081018290529093919091169063896cddf4906024016040805180830381865afa158015611d9f573d6000803e3d6000fd5b505050506040513d601f19601f82011682018060405250810190611dc39190612ab1565b5085519091508190611df5907f0000000000000000000000000000000000000000000000000000000000000000612446565b611dff9190612c7e565b611e099085612a80565b935050508080611e1890612ad5565b915050611d17565b5064e8d4a51000611e887f0000000000000000000000000000000000000000000000000000000000000000611e827f0000000000000000000000000000000000000000000000000000000000000000866020015161245c90919063ffffffff16565b90612446565b611ed67f0000000000000000000000000000000000000000000000000000000000000000611e82427f000000000000000000000000000000000000000000000000000000000000000061245c565b611ee09190612b23565b611eea9083612c7e565b611ef49190612c9d565b949350505050565b600080546001600160a01b038381166001600160a01b0319831681178455604051919092169283917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e09190a35050565b8051825160009184918491908490611f65908390612b23565b9050600084611f75600184612b23565b81518110611f8557611f85612c68565b01602001516001600160f81b0319169050602f60f81b8114611faf57600095505050505050611183565b6000611fbc846020612b23565b611fc7906008612c7e565b9050600080611fd587612cbf565b979094016020015196821c9690911c959095149550505050505092915050565b7f000000000000000000000000000000000000000000000000000000000000000042116120805760405162461bcd60e51b815260206004820152603360248201527f486f70725374616b653a2050726f6772616d206973206f6e676f696e672c206360448201527230b73737ba103ab73637b1b59039ba30b5b29760691b6064820152608401610674565b6001600160a01b0381166000908152600a60205260409020546120a282611b03565b6001600160a01b0382166000908152600a60205260408120819055600b80548392906120cf908490612b23565b909155506120de90508261222d565b6002546120f5906001600160a01b03168383611bd1565b60005b6001600160a01b0383166000908152600660205260409020548110156121b457600480546001600160a01b038581166000818152600560209081526040808320888452909152908190205490516323b872dd60e01b815230958101959095526024850191909152604484015216906323b872dd90606401600060405180830381600087803b15801561218957600080fd5b505af115801561219d573d6000803e3d6000fd5b5050505080806121ac90612ad5565b9150506120f8565b5060405181906001600160a01b038416907fb21fb52d5749b80f3182f8c6992236b5e5576681880914484d7f4c9b062e619e90600090a35050565b6040516001600160a01b03808516602483015283166044820152606481018290526122279085906323b872dd60e01b90608401611bfd565b50505050565b6001600160a01b0381166000908152600a602090815260408083208151608081018352815481526001820154938101939093526002810154918301829052600301546060830181905291929161228291612b23565b90508015611c34576001600160a01b0383166000908152600a602052604090206002810154600390910155600c5481111561230b5760405162461bcd60e51b8152602060048201526024808201527f486f70725374616b653a20496e73756666696369656e7420726577617264207060448201526337b7b61760e11b6064820152608401610674565b80600c600082825461231d9190612b23565b9091555050600354612339906001600160a01b03168483611bd1565b60405181906001600160a01b038516907fd8138f8a3f377c5259ca548e70e4c2de94f129f5a11036a15b69513cba2b426a90600090a3505050565b60006123c9826040518060400160405280602081526020017f5361666545524332303a206c6f772d6c6576656c2063616c6c206661696c6564815250856001600160a01b031661246c9092919063ffffffff16565b805190915015611c3457808060200190518101906123e79190612ce6565b611c345760405162461bcd60e51b815260206004820152602a60248201527f5361666545524332303a204552433230206f7065726174696f6e20646964206e6044820152691bdd081cdd58d8d9595960b21b6064820152608401610674565b6000818310612455578161132a565b5090919050565b600081831015612455578161132a565b6060611ef4848460008585843b6124c55760405162461bcd60e51b815260206004820152601d60248201527f416464726573733a2063616c6c20746f206e6f6e2d636f6e74726163740000006044820152606401610674565b600080866001600160a01b031685876040516124e19190612d08565b60006040518083038185875af1925050503d806000811461251e576040519150601f19603f3d011682016040523d82523d6000602084013e612523565b606091505b509150915061253382828661253e565b979650505050505050565b6060831561254d57508161132a565b82511561255d5782518084602001fd5b8160405162461bcd60e51b81526004016106749190612d24565b80356001600160a01b038116811461258e57600080fd5b919050565b60008083601f8401126125a557600080fd5b50813567ffffffffffffffff8111156125bd57600080fd5b6020830191508360208285010111156125d557600080fd5b9250929050565b60008060008060008060008060c0898b0312156125f857600080fd5b61260189612577565b975061260f60208a01612577565b965061261d60408a01612577565b955060608901359450608089013567ffffffffffffffff8082111561264157600080fd5b61264d8c838d01612593565b909650945060a08b013591508082111561266657600080fd5b506126738b828c01612593565b999c989b5096995094979396929594505050565b6000806040838503121561269a57600080fd5b6126a383612577565b946020939093013593505050565b6000806000806000608086880312156126c957600080fd5b6126d286612577565b94506126e060208701612577565b935060408601359250606086013567ffffffffffffffff81111561270357600080fd5b61270f88828901612593565b969995985093965092949392505050565b60006020828403121561273257600080fd5b61132a82612577565b60006020828403121561274d57600080fd5b5035919050565b634e487b7160e01b600052604160045260246000fd5b604051601f8201601f1916810167ffffffffffffffff8111828210171561279357612793612754565b604052919050565b600067ffffffffffffffff8211156127b5576127b5612754565b50601f01601f191660200190565b60006127d66127d18461279b565b61276a565b90508281528383830111156127ea57600080fd5b828260208301376000602084830101529392505050565b600082601f83011261281257600080fd5b61132a838335602085016127c3565b60008060006060848603121561283657600080fd5b833567ffffffffffffffff81111561284d57600080fd5b61285986828701612801565b9350506020840135915061286f60408501612577565b90509250925092565b60008060006060848603121561288d57600080fd5b83359250602084013567ffffffffffffffff8111156128ab57600080fd5b6128b786828701612801565b92505061286f60408501612577565b6000806000606084860312156128db57600080fd5b6128e484612577565b925060208401359150604084013567ffffffffffffffff81111561290757600080fd5b8401601f8101861361291857600080fd5b612927868235602084016127c3565b9150509250925092565b60008060006060848603121561294657600080fd5b833592506020840135915061286f60408501612577565b60008060006060848603121561297257600080fd5b833567ffffffffffffffff8082111561298a57600080fd5b61299687838801612801565b945060208601359150808211156129ac57600080fd5b506128b786828701612801565b60008083601f8401126129cb57600080fd5b50813567ffffffffffffffff8111156129e357600080fd5b6020830191508360208260051b85010111156125d557600080fd5b60008060008060408587031215612a1457600080fd5b843567ffffffffffffffff80821115612a2c57600080fd5b612a38888389016129b9565b90965094506020870135915080821115612a5157600080fd5b50612a5e878288016129b9565b95989497509550505050565b634e487b7160e01b600052601160045260246000fd5b60008219821115612a9357612a93612a6a565b500190565b600060208284031215612aaa57600080fd5b5051919050565b60008060408385031215612ac457600080fd5b505080516020909101519092909150565b600060018201612ae757612ae7612a6a565b5060010190565b6020808252818101527f4f776e61626c653a2063616c6c6572206973206e6f7420746865206f776e6572604082015260600190565b600082821015612b3557612b35612a6a565b500390565b60005b83811015612b55578181015183820152602001612b3d565b838111156122275750506000910152565b600060208284031215612b7857600080fd5b815167ffffffffffffffff811115612b8f57600080fd5b8201601f81018413612ba057600080fd5b8051612bae6127d18261279b565b818152856020838501011115612bc357600080fd5b612bd4826020830160208601612b3a565b95945050505050565b6020808252602f908201527f486f70725374616b653a2050726f6772616d20656e6465642c2063616e6e6f7460408201526e1039ba30b5b29030b73cb6b7b9329760891b606082015260800190565b60008351612c3e818460208801612b3a565b602f60f81b9083019081528351612c5c816001840160208801612b3a565b01600101949350505050565b634e487b7160e01b600052603260045260246000fd5b6000816000190483118215151615612c9857612c98612a6a565b500290565b600082612cba57634e487b7160e01b600052601260045260246000fd5b500490565b80516020808301519190811015612ce0576000198160200360031b1b821691505b50919050565b600060208284031215612cf857600080fd5b8151801515811461132a57600080fd5b60008251612d1a818460208701612b3a565b9190910192915050565b6020815260008251806020840152612d43816040850160208701612b3a565b601f01601f1916919091016040019291505056fea2646970667358221220a1d7e935f92ed686e48a57b4de78bd17830068d6148e5ac3483105ec67e5ccd864736f6c634300080d0033"
             .parse()
             .expect("invalid bytecode")
     });
-    pub struct HoprStakeSeason5<M>(::ethers::contract::Contract<M>);
-    impl<M> Clone for HoprStakeSeason5<M> {
+    pub struct HoprStakeSeason6<M>(::ethers::contract::Contract<M>);
+    impl<M> Clone for HoprStakeSeason6<M> {
         fn clone(&self) -> Self {
-            HoprStakeSeason5(self.0.clone())
+            HoprStakeSeason6(self.0.clone())
         }
     }
-    impl<M> std::ops::Deref for HoprStakeSeason5<M> {
+    impl<M> std::ops::Deref for HoprStakeSeason6<M> {
         type Target = ::ethers::contract::Contract<M>;
         fn deref(&self) -> &Self::Target {
             &self.0
         }
     }
-    impl<M> std::fmt::Debug for HoprStakeSeason5<M> {
+    impl<M> std::fmt::Debug for HoprStakeSeason6<M> {
         fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-            f.debug_tuple(stringify!(HoprStakeSeason5)).field(&self.address()).finish()
+            f.debug_tuple(stringify!(HoprStakeSeason6)).field(&self.address()).finish()
         }
     }
-    impl<M: ::ethers::providers::Middleware> HoprStakeSeason5<M> {
+    impl<M: ::ethers::providers::Middleware> HoprStakeSeason6<M> {
         /// Creates a new contract instance with the specified `ethers`
         /// client at the given `Address`. The contract derefs to a `ethers::Contract`
         /// object
@@ -60,7 +60,7 @@ pub mod hopr_stake_season_5 {
             Self(
                 ::ethers::contract::Contract::new(
                     address.into(),
-                    HOPRSTAKESEASON5_ABI.clone(),
+                    HOPRSTAKESEASON6_ABI.clone(),
                     client,
                 ),
             )
@@ -96,8 +96,8 @@ pub mod hopr_stake_season_5 {
             ::ethers::contract::ContractError<M>,
         > {
             let factory = ::ethers::contract::ContractFactory::new(
-                HOPRSTAKESEASON5_ABI.clone(),
-                HOPRSTAKESEASON5_BYTECODE.clone().into(),
+                HOPRSTAKESEASON6_ABI.clone(),
+                HOPRSTAKESEASON6_BYTECODE.clone().into(),
                 client,
             );
             let deployer = factory.deploy(constructor_args)?;
@@ -200,6 +200,16 @@ pub mod hopr_stake_season_5 {
         ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
             self.0
                 .method_hash([74, 216, 75, 52], ())
+                .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `batchStakeFor` (0xd0f2dfa4) function
+        pub fn batch_stake_for(
+            &self,
+            accounts: ::std::vec::Vec<::ethers::core::types::Address>,
+            stakes: ::std::vec::Vec<::ethers::core::types::U256>,
+        ) -> ::ethers::contract::builders::ContractCall<M, ()> {
+            self.0
+                .method_hash([208, 242, 223, 164], (accounts, stakes))
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `claimRewards` (0xef5cfb8c) function
@@ -515,12 +525,12 @@ pub mod hopr_stake_season_5 {
         /// Returns an [`Event`](#ethers_contract::builders::Event) builder for all events of this contract
         pub fn events(
             &self,
-        ) -> ::ethers::contract::builders::Event<M, HoprStakeSeason5Events> {
+        ) -> ::ethers::contract::builders::Event<M, HoprStakeSeason6Events> {
             self.0.event_with_filter(Default::default())
         }
     }
     impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
-    for HoprStakeSeason5<M> {
+    for HoprStakeSeason6<M> {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }
@@ -669,7 +679,7 @@ pub mod hopr_stake_season_5 {
         pub increment: ::ethers::core::types::U256,
     }
     #[derive(Debug, Clone, PartialEq, Eq, ::ethers::contract::EthAbiType)]
-    pub enum HoprStakeSeason5Events {
+    pub enum HoprStakeSeason6Events {
         ClaimedFilter(ClaimedFilter),
         NftAllowedFilter(NftAllowedFilter),
         NftBlockedFilter(NftBlockedFilter),
@@ -680,7 +690,7 @@ pub mod hopr_stake_season_5 {
         StakedFilter(StakedFilter),
         SyncFilter(SyncFilter),
     }
-    impl ::ethers::contract::EthLogDecode for HoprStakeSeason5Events {
+    impl ::ethers::contract::EthLogDecode for HoprStakeSeason6Events {
         fn decode_log(
             log: &::ethers::core::abi::RawLog,
         ) -> ::std::result::Result<Self, ::ethers::core::abi::Error>
@@ -688,49 +698,49 @@ pub mod hopr_stake_season_5 {
             Self: Sized,
         {
             if let Ok(decoded) = ClaimedFilter::decode_log(log) {
-                return Ok(HoprStakeSeason5Events::ClaimedFilter(decoded));
+                return Ok(HoprStakeSeason6Events::ClaimedFilter(decoded));
             }
             if let Ok(decoded) = NftAllowedFilter::decode_log(log) {
-                return Ok(HoprStakeSeason5Events::NftAllowedFilter(decoded));
+                return Ok(HoprStakeSeason6Events::NftAllowedFilter(decoded));
             }
             if let Ok(decoded) = NftBlockedFilter::decode_log(log) {
-                return Ok(HoprStakeSeason5Events::NftBlockedFilter(decoded));
+                return Ok(HoprStakeSeason6Events::NftBlockedFilter(decoded));
             }
             if let Ok(decoded) = OwnershipTransferredFilter::decode_log(log) {
-                return Ok(HoprStakeSeason5Events::OwnershipTransferredFilter(decoded));
+                return Ok(HoprStakeSeason6Events::OwnershipTransferredFilter(decoded));
             }
             if let Ok(decoded) = RedeemedFilter::decode_log(log) {
-                return Ok(HoprStakeSeason5Events::RedeemedFilter(decoded));
+                return Ok(HoprStakeSeason6Events::RedeemedFilter(decoded));
             }
             if let Ok(decoded) = ReleasedFilter::decode_log(log) {
-                return Ok(HoprStakeSeason5Events::ReleasedFilter(decoded));
+                return Ok(HoprStakeSeason6Events::ReleasedFilter(decoded));
             }
             if let Ok(decoded) = RewardFueledFilter::decode_log(log) {
-                return Ok(HoprStakeSeason5Events::RewardFueledFilter(decoded));
+                return Ok(HoprStakeSeason6Events::RewardFueledFilter(decoded));
             }
             if let Ok(decoded) = StakedFilter::decode_log(log) {
-                return Ok(HoprStakeSeason5Events::StakedFilter(decoded));
+                return Ok(HoprStakeSeason6Events::StakedFilter(decoded));
             }
             if let Ok(decoded) = SyncFilter::decode_log(log) {
-                return Ok(HoprStakeSeason5Events::SyncFilter(decoded));
+                return Ok(HoprStakeSeason6Events::SyncFilter(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData)
         }
     }
-    impl ::std::fmt::Display for HoprStakeSeason5Events {
+    impl ::std::fmt::Display for HoprStakeSeason6Events {
         fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
             match self {
-                HoprStakeSeason5Events::ClaimedFilter(element) => element.fmt(f),
-                HoprStakeSeason5Events::NftAllowedFilter(element) => element.fmt(f),
-                HoprStakeSeason5Events::NftBlockedFilter(element) => element.fmt(f),
-                HoprStakeSeason5Events::OwnershipTransferredFilter(element) => {
+                HoprStakeSeason6Events::ClaimedFilter(element) => element.fmt(f),
+                HoprStakeSeason6Events::NftAllowedFilter(element) => element.fmt(f),
+                HoprStakeSeason6Events::NftBlockedFilter(element) => element.fmt(f),
+                HoprStakeSeason6Events::OwnershipTransferredFilter(element) => {
                     element.fmt(f)
                 }
-                HoprStakeSeason5Events::RedeemedFilter(element) => element.fmt(f),
-                HoprStakeSeason5Events::ReleasedFilter(element) => element.fmt(f),
-                HoprStakeSeason5Events::RewardFueledFilter(element) => element.fmt(f),
-                HoprStakeSeason5Events::StakedFilter(element) => element.fmt(f),
-                HoprStakeSeason5Events::SyncFilter(element) => element.fmt(f),
+                HoprStakeSeason6Events::RedeemedFilter(element) => element.fmt(f),
+                HoprStakeSeason6Events::ReleasedFilter(element) => element.fmt(f),
+                HoprStakeSeason6Events::RewardFueledFilter(element) => element.fmt(f),
+                HoprStakeSeason6Events::StakedFilter(element) => element.fmt(f),
+                HoprStakeSeason6Events::SyncFilter(element) => element.fmt(f),
             }
         }
     }
@@ -854,6 +864,21 @@ pub mod hopr_stake_season_5 {
     #[derive(Default)]
     #[ethcall(name = "availableReward", abi = "availableReward()")]
     pub struct AvailableRewardCall;
+    ///Container type for all input parameters for the `batchStakeFor` function with signature `batchStakeFor(address[],uint256[])` and selector `0xd0f2dfa4`
+    #[derive(
+        Clone,
+        Debug,
+        Eq,
+        PartialEq,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+    )]
+    #[derive(Default)]
+    #[ethcall(name = "batchStakeFor", abi = "batchStakeFor(address[],uint256[])")]
+    pub struct BatchStakeForCall {
+        pub accounts: ::std::vec::Vec<::ethers::core::types::Address>,
+        pub stakes: ::std::vec::Vec<::ethers::core::types::U256>,
+    }
     ///Container type for all input parameters for the `claimRewards` function with signature `claimRewards(address)` and selector `0xef5cfb8c`
     #[derive(
         Clone,
@@ -1250,7 +1275,7 @@ pub mod hopr_stake_season_5 {
         pub account: ::ethers::core::types::Address,
     }
     #[derive(Debug, Clone, PartialEq, Eq, ::ethers::contract::EthAbiType)]
-    pub enum HoprStakeSeason5Calls {
+    pub enum HoprStakeSeason6Calls {
         BasicFactorNumerator(BasicFactorNumeratorCall),
         BoostCap(BoostCapCall),
         FactorDenominator(FactorDenominatorCall),
@@ -1261,6 +1286,7 @@ pub mod hopr_stake_season_5 {
         RewardToken(RewardTokenCall),
         Accounts(AccountsCall),
         AvailableReward(AvailableRewardCall),
+        BatchStakeFor(BatchStakeForCall),
         ClaimRewards(ClaimRewardsCall),
         GetCumulatedRewardsIncrement(GetCumulatedRewardsIncrementCall),
         IsBlockedNft(IsBlockedNftCall),
@@ -1288,7 +1314,7 @@ pub mod hopr_stake_season_5 {
         Unlock(UnlockCall),
         UnlockFor(UnlockForCall),
     }
-    impl ::ethers::core::abi::AbiDecode for HoprStakeSeason5Calls {
+    impl ::ethers::core::abi::AbiDecode for HoprStakeSeason6Calls {
         fn decode(
             data: impl AsRef<[u8]>,
         ) -> ::std::result::Result<Self, ::ethers::core::abi::AbiError> {
@@ -1296,498 +1322,511 @@ pub mod hopr_stake_season_5 {
                 = <BasicFactorNumeratorCall as ::ethers::core::abi::AbiDecode>::decode(
                     data.as_ref(),
                 ) {
-                return Ok(HoprStakeSeason5Calls::BasicFactorNumerator(decoded));
+                return Ok(HoprStakeSeason6Calls::BasicFactorNumerator(decoded));
             }
             if let Ok(decoded)
                 = <BoostCapCall as ::ethers::core::abi::AbiDecode>::decode(
                     data.as_ref(),
                 ) {
-                return Ok(HoprStakeSeason5Calls::BoostCap(decoded));
+                return Ok(HoprStakeSeason6Calls::BoostCap(decoded));
             }
             if let Ok(decoded)
                 = <FactorDenominatorCall as ::ethers::core::abi::AbiDecode>::decode(
                     data.as_ref(),
                 ) {
-                return Ok(HoprStakeSeason5Calls::FactorDenominator(decoded));
+                return Ok(HoprStakeSeason6Calls::FactorDenominator(decoded));
             }
             if let Ok(decoded)
                 = <LockTokenCall as ::ethers::core::abi::AbiDecode>::decode(
                     data.as_ref(),
                 ) {
-                return Ok(HoprStakeSeason5Calls::LockToken(decoded));
+                return Ok(HoprStakeSeason6Calls::LockToken(decoded));
             }
             if let Ok(decoded)
                 = <NftContractCall as ::ethers::core::abi::AbiDecode>::decode(
                     data.as_ref(),
                 ) {
-                return Ok(HoprStakeSeason5Calls::NftContract(decoded));
+                return Ok(HoprStakeSeason6Calls::NftContract(decoded));
             }
             if let Ok(decoded)
                 = <ProgramEndCall as ::ethers::core::abi::AbiDecode>::decode(
                     data.as_ref(),
                 ) {
-                return Ok(HoprStakeSeason5Calls::ProgramEnd(decoded));
+                return Ok(HoprStakeSeason6Calls::ProgramEnd(decoded));
             }
             if let Ok(decoded)
                 = <ProgramStartCall as ::ethers::core::abi::AbiDecode>::decode(
                     data.as_ref(),
                 ) {
-                return Ok(HoprStakeSeason5Calls::ProgramStart(decoded));
+                return Ok(HoprStakeSeason6Calls::ProgramStart(decoded));
             }
             if let Ok(decoded)
                 = <RewardTokenCall as ::ethers::core::abi::AbiDecode>::decode(
                     data.as_ref(),
                 ) {
-                return Ok(HoprStakeSeason5Calls::RewardToken(decoded));
+                return Ok(HoprStakeSeason6Calls::RewardToken(decoded));
             }
             if let Ok(decoded)
                 = <AccountsCall as ::ethers::core::abi::AbiDecode>::decode(
                     data.as_ref(),
                 ) {
-                return Ok(HoprStakeSeason5Calls::Accounts(decoded));
+                return Ok(HoprStakeSeason6Calls::Accounts(decoded));
             }
             if let Ok(decoded)
                 = <AvailableRewardCall as ::ethers::core::abi::AbiDecode>::decode(
                     data.as_ref(),
                 ) {
-                return Ok(HoprStakeSeason5Calls::AvailableReward(decoded));
+                return Ok(HoprStakeSeason6Calls::AvailableReward(decoded));
+            }
+            if let Ok(decoded)
+                = <BatchStakeForCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data.as_ref(),
+                ) {
+                return Ok(HoprStakeSeason6Calls::BatchStakeFor(decoded));
             }
             if let Ok(decoded)
                 = <ClaimRewardsCall as ::ethers::core::abi::AbiDecode>::decode(
                     data.as_ref(),
                 ) {
-                return Ok(HoprStakeSeason5Calls::ClaimRewards(decoded));
+                return Ok(HoprStakeSeason6Calls::ClaimRewards(decoded));
             }
             if let Ok(decoded)
                 = <GetCumulatedRewardsIncrementCall as ::ethers::core::abi::AbiDecode>::decode(
                     data.as_ref(),
                 ) {
-                return Ok(HoprStakeSeason5Calls::GetCumulatedRewardsIncrement(decoded));
+                return Ok(HoprStakeSeason6Calls::GetCumulatedRewardsIncrement(decoded));
             }
             if let Ok(decoded)
                 = <IsBlockedNftCall as ::ethers::core::abi::AbiDecode>::decode(
                     data.as_ref(),
                 ) {
-                return Ok(HoprStakeSeason5Calls::IsBlockedNft(decoded));
+                return Ok(HoprStakeSeason6Calls::IsBlockedNft(decoded));
             }
             if let Ok(decoded)
                 = <IsNftTypeAndRankRedeemed1Call as ::ethers::core::abi::AbiDecode>::decode(
                     data.as_ref(),
                 ) {
-                return Ok(HoprStakeSeason5Calls::IsNftTypeAndRankRedeemed1(decoded));
+                return Ok(HoprStakeSeason6Calls::IsNftTypeAndRankRedeemed1(decoded));
             }
             if let Ok(decoded)
                 = <IsNftTypeAndRankRedeemed2Call as ::ethers::core::abi::AbiDecode>::decode(
                     data.as_ref(),
                 ) {
-                return Ok(HoprStakeSeason5Calls::IsNftTypeAndRankRedeemed2(decoded));
+                return Ok(HoprStakeSeason6Calls::IsNftTypeAndRankRedeemed2(decoded));
             }
             if let Ok(decoded)
                 = <IsNftTypeAndRankRedeemed3Call as ::ethers::core::abi::AbiDecode>::decode(
                     data.as_ref(),
                 ) {
-                return Ok(HoprStakeSeason5Calls::IsNftTypeAndRankRedeemed3(decoded));
+                return Ok(HoprStakeSeason6Calls::IsNftTypeAndRankRedeemed3(decoded));
             }
             if let Ok(decoded)
                 = <IsNftTypeAndRankRedeemed4Call as ::ethers::core::abi::AbiDecode>::decode(
                     data.as_ref(),
                 ) {
-                return Ok(HoprStakeSeason5Calls::IsNftTypeAndRankRedeemed4(decoded));
+                return Ok(HoprStakeSeason6Calls::IsNftTypeAndRankRedeemed4(decoded));
             }
             if let Ok(decoded)
                 = <OnERC721ReceivedCall as ::ethers::core::abi::AbiDecode>::decode(
                     data.as_ref(),
                 ) {
-                return Ok(HoprStakeSeason5Calls::OnERC721Received(decoded));
+                return Ok(HoprStakeSeason6Calls::OnERC721Received(decoded));
             }
             if let Ok(decoded)
                 = <OnTokenTransferCall as ::ethers::core::abi::AbiDecode>::decode(
                     data.as_ref(),
                 ) {
-                return Ok(HoprStakeSeason5Calls::OnTokenTransfer(decoded));
+                return Ok(HoprStakeSeason6Calls::OnTokenTransfer(decoded));
             }
             if let Ok(decoded)
                 = <OwnerCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref()) {
-                return Ok(HoprStakeSeason5Calls::Owner(decoded));
+                return Ok(HoprStakeSeason6Calls::Owner(decoded));
             }
             if let Ok(decoded)
                 = <OwnerBlockNftTypeCall as ::ethers::core::abi::AbiDecode>::decode(
                     data.as_ref(),
                 ) {
-                return Ok(HoprStakeSeason5Calls::OwnerBlockNftType(decoded));
+                return Ok(HoprStakeSeason6Calls::OwnerBlockNftType(decoded));
             }
             if let Ok(decoded)
                 = <OwnerUnblockNftTypeCall as ::ethers::core::abi::AbiDecode>::decode(
                     data.as_ref(),
                 ) {
-                return Ok(HoprStakeSeason5Calls::OwnerUnblockNftType(decoded));
+                return Ok(HoprStakeSeason6Calls::OwnerUnblockNftType(decoded));
             }
             if let Ok(decoded)
                 = <ReclaimErc20TokensCall as ::ethers::core::abi::AbiDecode>::decode(
                     data.as_ref(),
                 ) {
-                return Ok(HoprStakeSeason5Calls::ReclaimErc20Tokens(decoded));
+                return Ok(HoprStakeSeason6Calls::ReclaimErc20Tokens(decoded));
             }
             if let Ok(decoded)
                 = <ReclaimErc721TokensCall as ::ethers::core::abi::AbiDecode>::decode(
                     data.as_ref(),
                 ) {
-                return Ok(HoprStakeSeason5Calls::ReclaimErc721Tokens(decoded));
+                return Ok(HoprStakeSeason6Calls::ReclaimErc721Tokens(decoded));
             }
             if let Ok(decoded)
                 = <RedeemedFactorCall as ::ethers::core::abi::AbiDecode>::decode(
                     data.as_ref(),
                 ) {
-                return Ok(HoprStakeSeason5Calls::RedeemedFactor(decoded));
+                return Ok(HoprStakeSeason6Calls::RedeemedFactor(decoded));
             }
             if let Ok(decoded)
                 = <RedeemedFactorIndexCall as ::ethers::core::abi::AbiDecode>::decode(
                     data.as_ref(),
                 ) {
-                return Ok(HoprStakeSeason5Calls::RedeemedFactorIndex(decoded));
+                return Ok(HoprStakeSeason6Calls::RedeemedFactorIndex(decoded));
             }
             if let Ok(decoded)
                 = <RedeemedNftCall as ::ethers::core::abi::AbiDecode>::decode(
                     data.as_ref(),
                 ) {
-                return Ok(HoprStakeSeason5Calls::RedeemedNft(decoded));
+                return Ok(HoprStakeSeason6Calls::RedeemedNft(decoded));
             }
             if let Ok(decoded)
                 = <RedeemedNftIndexCall as ::ethers::core::abi::AbiDecode>::decode(
                     data.as_ref(),
                 ) {
-                return Ok(HoprStakeSeason5Calls::RedeemedNftIndex(decoded));
+                return Ok(HoprStakeSeason6Calls::RedeemedNftIndex(decoded));
             }
             if let Ok(decoded)
                 = <RenounceOwnershipCall as ::ethers::core::abi::AbiDecode>::decode(
                     data.as_ref(),
                 ) {
-                return Ok(HoprStakeSeason5Calls::RenounceOwnership(decoded));
+                return Ok(HoprStakeSeason6Calls::RenounceOwnership(decoded));
             }
             if let Ok(decoded)
                 = <StakedHoprTokensCall as ::ethers::core::abi::AbiDecode>::decode(
                     data.as_ref(),
                 ) {
-                return Ok(HoprStakeSeason5Calls::StakedHoprTokens(decoded));
+                return Ok(HoprStakeSeason6Calls::StakedHoprTokens(decoded));
             }
             if let Ok(decoded)
                 = <SyncCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref()) {
-                return Ok(HoprStakeSeason5Calls::Sync(decoded));
+                return Ok(HoprStakeSeason6Calls::Sync(decoded));
             }
             if let Ok(decoded)
                 = <TokensReceivedCall as ::ethers::core::abi::AbiDecode>::decode(
                     data.as_ref(),
                 ) {
-                return Ok(HoprStakeSeason5Calls::TokensReceived(decoded));
+                return Ok(HoprStakeSeason6Calls::TokensReceived(decoded));
             }
             if let Ok(decoded)
                 = <TotalLockedCall as ::ethers::core::abi::AbiDecode>::decode(
                     data.as_ref(),
                 ) {
-                return Ok(HoprStakeSeason5Calls::TotalLocked(decoded));
+                return Ok(HoprStakeSeason6Calls::TotalLocked(decoded));
             }
             if let Ok(decoded)
                 = <TransferOwnershipCall as ::ethers::core::abi::AbiDecode>::decode(
                     data.as_ref(),
                 ) {
-                return Ok(HoprStakeSeason5Calls::TransferOwnership(decoded));
+                return Ok(HoprStakeSeason6Calls::TransferOwnership(decoded));
             }
             if let Ok(decoded)
                 = <UnlockCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref()) {
-                return Ok(HoprStakeSeason5Calls::Unlock(decoded));
+                return Ok(HoprStakeSeason6Calls::Unlock(decoded));
             }
             if let Ok(decoded)
                 = <UnlockForCall as ::ethers::core::abi::AbiDecode>::decode(
                     data.as_ref(),
                 ) {
-                return Ok(HoprStakeSeason5Calls::UnlockFor(decoded));
+                return Ok(HoprStakeSeason6Calls::UnlockFor(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
         }
     }
-    impl ::ethers::core::abi::AbiEncode for HoprStakeSeason5Calls {
+    impl ::ethers::core::abi::AbiEncode for HoprStakeSeason6Calls {
         fn encode(self) -> Vec<u8> {
             match self {
-                HoprStakeSeason5Calls::BasicFactorNumerator(element) => element.encode(),
-                HoprStakeSeason5Calls::BoostCap(element) => element.encode(),
-                HoprStakeSeason5Calls::FactorDenominator(element) => element.encode(),
-                HoprStakeSeason5Calls::LockToken(element) => element.encode(),
-                HoprStakeSeason5Calls::NftContract(element) => element.encode(),
-                HoprStakeSeason5Calls::ProgramEnd(element) => element.encode(),
-                HoprStakeSeason5Calls::ProgramStart(element) => element.encode(),
-                HoprStakeSeason5Calls::RewardToken(element) => element.encode(),
-                HoprStakeSeason5Calls::Accounts(element) => element.encode(),
-                HoprStakeSeason5Calls::AvailableReward(element) => element.encode(),
-                HoprStakeSeason5Calls::ClaimRewards(element) => element.encode(),
-                HoprStakeSeason5Calls::GetCumulatedRewardsIncrement(element) => {
+                HoprStakeSeason6Calls::BasicFactorNumerator(element) => element.encode(),
+                HoprStakeSeason6Calls::BoostCap(element) => element.encode(),
+                HoprStakeSeason6Calls::FactorDenominator(element) => element.encode(),
+                HoprStakeSeason6Calls::LockToken(element) => element.encode(),
+                HoprStakeSeason6Calls::NftContract(element) => element.encode(),
+                HoprStakeSeason6Calls::ProgramEnd(element) => element.encode(),
+                HoprStakeSeason6Calls::ProgramStart(element) => element.encode(),
+                HoprStakeSeason6Calls::RewardToken(element) => element.encode(),
+                HoprStakeSeason6Calls::Accounts(element) => element.encode(),
+                HoprStakeSeason6Calls::AvailableReward(element) => element.encode(),
+                HoprStakeSeason6Calls::BatchStakeFor(element) => element.encode(),
+                HoprStakeSeason6Calls::ClaimRewards(element) => element.encode(),
+                HoprStakeSeason6Calls::GetCumulatedRewardsIncrement(element) => {
                     element.encode()
                 }
-                HoprStakeSeason5Calls::IsBlockedNft(element) => element.encode(),
-                HoprStakeSeason5Calls::IsNftTypeAndRankRedeemed1(element) => {
+                HoprStakeSeason6Calls::IsBlockedNft(element) => element.encode(),
+                HoprStakeSeason6Calls::IsNftTypeAndRankRedeemed1(element) => {
                     element.encode()
                 }
-                HoprStakeSeason5Calls::IsNftTypeAndRankRedeemed2(element) => {
+                HoprStakeSeason6Calls::IsNftTypeAndRankRedeemed2(element) => {
                     element.encode()
                 }
-                HoprStakeSeason5Calls::IsNftTypeAndRankRedeemed3(element) => {
+                HoprStakeSeason6Calls::IsNftTypeAndRankRedeemed3(element) => {
                     element.encode()
                 }
-                HoprStakeSeason5Calls::IsNftTypeAndRankRedeemed4(element) => {
+                HoprStakeSeason6Calls::IsNftTypeAndRankRedeemed4(element) => {
                     element.encode()
                 }
-                HoprStakeSeason5Calls::OnERC721Received(element) => element.encode(),
-                HoprStakeSeason5Calls::OnTokenTransfer(element) => element.encode(),
-                HoprStakeSeason5Calls::Owner(element) => element.encode(),
-                HoprStakeSeason5Calls::OwnerBlockNftType(element) => element.encode(),
-                HoprStakeSeason5Calls::OwnerUnblockNftType(element) => element.encode(),
-                HoprStakeSeason5Calls::ReclaimErc20Tokens(element) => element.encode(),
-                HoprStakeSeason5Calls::ReclaimErc721Tokens(element) => element.encode(),
-                HoprStakeSeason5Calls::RedeemedFactor(element) => element.encode(),
-                HoprStakeSeason5Calls::RedeemedFactorIndex(element) => element.encode(),
-                HoprStakeSeason5Calls::RedeemedNft(element) => element.encode(),
-                HoprStakeSeason5Calls::RedeemedNftIndex(element) => element.encode(),
-                HoprStakeSeason5Calls::RenounceOwnership(element) => element.encode(),
-                HoprStakeSeason5Calls::StakedHoprTokens(element) => element.encode(),
-                HoprStakeSeason5Calls::Sync(element) => element.encode(),
-                HoprStakeSeason5Calls::TokensReceived(element) => element.encode(),
-                HoprStakeSeason5Calls::TotalLocked(element) => element.encode(),
-                HoprStakeSeason5Calls::TransferOwnership(element) => element.encode(),
-                HoprStakeSeason5Calls::Unlock(element) => element.encode(),
-                HoprStakeSeason5Calls::UnlockFor(element) => element.encode(),
+                HoprStakeSeason6Calls::OnERC721Received(element) => element.encode(),
+                HoprStakeSeason6Calls::OnTokenTransfer(element) => element.encode(),
+                HoprStakeSeason6Calls::Owner(element) => element.encode(),
+                HoprStakeSeason6Calls::OwnerBlockNftType(element) => element.encode(),
+                HoprStakeSeason6Calls::OwnerUnblockNftType(element) => element.encode(),
+                HoprStakeSeason6Calls::ReclaimErc20Tokens(element) => element.encode(),
+                HoprStakeSeason6Calls::ReclaimErc721Tokens(element) => element.encode(),
+                HoprStakeSeason6Calls::RedeemedFactor(element) => element.encode(),
+                HoprStakeSeason6Calls::RedeemedFactorIndex(element) => element.encode(),
+                HoprStakeSeason6Calls::RedeemedNft(element) => element.encode(),
+                HoprStakeSeason6Calls::RedeemedNftIndex(element) => element.encode(),
+                HoprStakeSeason6Calls::RenounceOwnership(element) => element.encode(),
+                HoprStakeSeason6Calls::StakedHoprTokens(element) => element.encode(),
+                HoprStakeSeason6Calls::Sync(element) => element.encode(),
+                HoprStakeSeason6Calls::TokensReceived(element) => element.encode(),
+                HoprStakeSeason6Calls::TotalLocked(element) => element.encode(),
+                HoprStakeSeason6Calls::TransferOwnership(element) => element.encode(),
+                HoprStakeSeason6Calls::Unlock(element) => element.encode(),
+                HoprStakeSeason6Calls::UnlockFor(element) => element.encode(),
             }
         }
     }
-    impl ::std::fmt::Display for HoprStakeSeason5Calls {
+    impl ::std::fmt::Display for HoprStakeSeason6Calls {
         fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
             match self {
-                HoprStakeSeason5Calls::BasicFactorNumerator(element) => element.fmt(f),
-                HoprStakeSeason5Calls::BoostCap(element) => element.fmt(f),
-                HoprStakeSeason5Calls::FactorDenominator(element) => element.fmt(f),
-                HoprStakeSeason5Calls::LockToken(element) => element.fmt(f),
-                HoprStakeSeason5Calls::NftContract(element) => element.fmt(f),
-                HoprStakeSeason5Calls::ProgramEnd(element) => element.fmt(f),
-                HoprStakeSeason5Calls::ProgramStart(element) => element.fmt(f),
-                HoprStakeSeason5Calls::RewardToken(element) => element.fmt(f),
-                HoprStakeSeason5Calls::Accounts(element) => element.fmt(f),
-                HoprStakeSeason5Calls::AvailableReward(element) => element.fmt(f),
-                HoprStakeSeason5Calls::ClaimRewards(element) => element.fmt(f),
-                HoprStakeSeason5Calls::GetCumulatedRewardsIncrement(element) => {
+                HoprStakeSeason6Calls::BasicFactorNumerator(element) => element.fmt(f),
+                HoprStakeSeason6Calls::BoostCap(element) => element.fmt(f),
+                HoprStakeSeason6Calls::FactorDenominator(element) => element.fmt(f),
+                HoprStakeSeason6Calls::LockToken(element) => element.fmt(f),
+                HoprStakeSeason6Calls::NftContract(element) => element.fmt(f),
+                HoprStakeSeason6Calls::ProgramEnd(element) => element.fmt(f),
+                HoprStakeSeason6Calls::ProgramStart(element) => element.fmt(f),
+                HoprStakeSeason6Calls::RewardToken(element) => element.fmt(f),
+                HoprStakeSeason6Calls::Accounts(element) => element.fmt(f),
+                HoprStakeSeason6Calls::AvailableReward(element) => element.fmt(f),
+                HoprStakeSeason6Calls::BatchStakeFor(element) => element.fmt(f),
+                HoprStakeSeason6Calls::ClaimRewards(element) => element.fmt(f),
+                HoprStakeSeason6Calls::GetCumulatedRewardsIncrement(element) => {
                     element.fmt(f)
                 }
-                HoprStakeSeason5Calls::IsBlockedNft(element) => element.fmt(f),
-                HoprStakeSeason5Calls::IsNftTypeAndRankRedeemed1(element) => {
+                HoprStakeSeason6Calls::IsBlockedNft(element) => element.fmt(f),
+                HoprStakeSeason6Calls::IsNftTypeAndRankRedeemed1(element) => {
                     element.fmt(f)
                 }
-                HoprStakeSeason5Calls::IsNftTypeAndRankRedeemed2(element) => {
+                HoprStakeSeason6Calls::IsNftTypeAndRankRedeemed2(element) => {
                     element.fmt(f)
                 }
-                HoprStakeSeason5Calls::IsNftTypeAndRankRedeemed3(element) => {
+                HoprStakeSeason6Calls::IsNftTypeAndRankRedeemed3(element) => {
                     element.fmt(f)
                 }
-                HoprStakeSeason5Calls::IsNftTypeAndRankRedeemed4(element) => {
+                HoprStakeSeason6Calls::IsNftTypeAndRankRedeemed4(element) => {
                     element.fmt(f)
                 }
-                HoprStakeSeason5Calls::OnERC721Received(element) => element.fmt(f),
-                HoprStakeSeason5Calls::OnTokenTransfer(element) => element.fmt(f),
-                HoprStakeSeason5Calls::Owner(element) => element.fmt(f),
-                HoprStakeSeason5Calls::OwnerBlockNftType(element) => element.fmt(f),
-                HoprStakeSeason5Calls::OwnerUnblockNftType(element) => element.fmt(f),
-                HoprStakeSeason5Calls::ReclaimErc20Tokens(element) => element.fmt(f),
-                HoprStakeSeason5Calls::ReclaimErc721Tokens(element) => element.fmt(f),
-                HoprStakeSeason5Calls::RedeemedFactor(element) => element.fmt(f),
-                HoprStakeSeason5Calls::RedeemedFactorIndex(element) => element.fmt(f),
-                HoprStakeSeason5Calls::RedeemedNft(element) => element.fmt(f),
-                HoprStakeSeason5Calls::RedeemedNftIndex(element) => element.fmt(f),
-                HoprStakeSeason5Calls::RenounceOwnership(element) => element.fmt(f),
-                HoprStakeSeason5Calls::StakedHoprTokens(element) => element.fmt(f),
-                HoprStakeSeason5Calls::Sync(element) => element.fmt(f),
-                HoprStakeSeason5Calls::TokensReceived(element) => element.fmt(f),
-                HoprStakeSeason5Calls::TotalLocked(element) => element.fmt(f),
-                HoprStakeSeason5Calls::TransferOwnership(element) => element.fmt(f),
-                HoprStakeSeason5Calls::Unlock(element) => element.fmt(f),
-                HoprStakeSeason5Calls::UnlockFor(element) => element.fmt(f),
+                HoprStakeSeason6Calls::OnERC721Received(element) => element.fmt(f),
+                HoprStakeSeason6Calls::OnTokenTransfer(element) => element.fmt(f),
+                HoprStakeSeason6Calls::Owner(element) => element.fmt(f),
+                HoprStakeSeason6Calls::OwnerBlockNftType(element) => element.fmt(f),
+                HoprStakeSeason6Calls::OwnerUnblockNftType(element) => element.fmt(f),
+                HoprStakeSeason6Calls::ReclaimErc20Tokens(element) => element.fmt(f),
+                HoprStakeSeason6Calls::ReclaimErc721Tokens(element) => element.fmt(f),
+                HoprStakeSeason6Calls::RedeemedFactor(element) => element.fmt(f),
+                HoprStakeSeason6Calls::RedeemedFactorIndex(element) => element.fmt(f),
+                HoprStakeSeason6Calls::RedeemedNft(element) => element.fmt(f),
+                HoprStakeSeason6Calls::RedeemedNftIndex(element) => element.fmt(f),
+                HoprStakeSeason6Calls::RenounceOwnership(element) => element.fmt(f),
+                HoprStakeSeason6Calls::StakedHoprTokens(element) => element.fmt(f),
+                HoprStakeSeason6Calls::Sync(element) => element.fmt(f),
+                HoprStakeSeason6Calls::TokensReceived(element) => element.fmt(f),
+                HoprStakeSeason6Calls::TotalLocked(element) => element.fmt(f),
+                HoprStakeSeason6Calls::TransferOwnership(element) => element.fmt(f),
+                HoprStakeSeason6Calls::Unlock(element) => element.fmt(f),
+                HoprStakeSeason6Calls::UnlockFor(element) => element.fmt(f),
             }
         }
     }
-    impl ::std::convert::From<BasicFactorNumeratorCall> for HoprStakeSeason5Calls {
+    impl ::std::convert::From<BasicFactorNumeratorCall> for HoprStakeSeason6Calls {
         fn from(var: BasicFactorNumeratorCall) -> Self {
-            HoprStakeSeason5Calls::BasicFactorNumerator(var)
+            HoprStakeSeason6Calls::BasicFactorNumerator(var)
         }
     }
-    impl ::std::convert::From<BoostCapCall> for HoprStakeSeason5Calls {
+    impl ::std::convert::From<BoostCapCall> for HoprStakeSeason6Calls {
         fn from(var: BoostCapCall) -> Self {
-            HoprStakeSeason5Calls::BoostCap(var)
+            HoprStakeSeason6Calls::BoostCap(var)
         }
     }
-    impl ::std::convert::From<FactorDenominatorCall> for HoprStakeSeason5Calls {
+    impl ::std::convert::From<FactorDenominatorCall> for HoprStakeSeason6Calls {
         fn from(var: FactorDenominatorCall) -> Self {
-            HoprStakeSeason5Calls::FactorDenominator(var)
+            HoprStakeSeason6Calls::FactorDenominator(var)
         }
     }
-    impl ::std::convert::From<LockTokenCall> for HoprStakeSeason5Calls {
+    impl ::std::convert::From<LockTokenCall> for HoprStakeSeason6Calls {
         fn from(var: LockTokenCall) -> Self {
-            HoprStakeSeason5Calls::LockToken(var)
+            HoprStakeSeason6Calls::LockToken(var)
         }
     }
-    impl ::std::convert::From<NftContractCall> for HoprStakeSeason5Calls {
+    impl ::std::convert::From<NftContractCall> for HoprStakeSeason6Calls {
         fn from(var: NftContractCall) -> Self {
-            HoprStakeSeason5Calls::NftContract(var)
+            HoprStakeSeason6Calls::NftContract(var)
         }
     }
-    impl ::std::convert::From<ProgramEndCall> for HoprStakeSeason5Calls {
+    impl ::std::convert::From<ProgramEndCall> for HoprStakeSeason6Calls {
         fn from(var: ProgramEndCall) -> Self {
-            HoprStakeSeason5Calls::ProgramEnd(var)
+            HoprStakeSeason6Calls::ProgramEnd(var)
         }
     }
-    impl ::std::convert::From<ProgramStartCall> for HoprStakeSeason5Calls {
+    impl ::std::convert::From<ProgramStartCall> for HoprStakeSeason6Calls {
         fn from(var: ProgramStartCall) -> Self {
-            HoprStakeSeason5Calls::ProgramStart(var)
+            HoprStakeSeason6Calls::ProgramStart(var)
         }
     }
-    impl ::std::convert::From<RewardTokenCall> for HoprStakeSeason5Calls {
+    impl ::std::convert::From<RewardTokenCall> for HoprStakeSeason6Calls {
         fn from(var: RewardTokenCall) -> Self {
-            HoprStakeSeason5Calls::RewardToken(var)
+            HoprStakeSeason6Calls::RewardToken(var)
         }
     }
-    impl ::std::convert::From<AccountsCall> for HoprStakeSeason5Calls {
+    impl ::std::convert::From<AccountsCall> for HoprStakeSeason6Calls {
         fn from(var: AccountsCall) -> Self {
-            HoprStakeSeason5Calls::Accounts(var)
+            HoprStakeSeason6Calls::Accounts(var)
         }
     }
-    impl ::std::convert::From<AvailableRewardCall> for HoprStakeSeason5Calls {
+    impl ::std::convert::From<AvailableRewardCall> for HoprStakeSeason6Calls {
         fn from(var: AvailableRewardCall) -> Self {
-            HoprStakeSeason5Calls::AvailableReward(var)
+            HoprStakeSeason6Calls::AvailableReward(var)
         }
     }
-    impl ::std::convert::From<ClaimRewardsCall> for HoprStakeSeason5Calls {
+    impl ::std::convert::From<BatchStakeForCall> for HoprStakeSeason6Calls {
+        fn from(var: BatchStakeForCall) -> Self {
+            HoprStakeSeason6Calls::BatchStakeFor(var)
+        }
+    }
+    impl ::std::convert::From<ClaimRewardsCall> for HoprStakeSeason6Calls {
         fn from(var: ClaimRewardsCall) -> Self {
-            HoprStakeSeason5Calls::ClaimRewards(var)
+            HoprStakeSeason6Calls::ClaimRewards(var)
         }
     }
     impl ::std::convert::From<GetCumulatedRewardsIncrementCall>
-    for HoprStakeSeason5Calls {
+    for HoprStakeSeason6Calls {
         fn from(var: GetCumulatedRewardsIncrementCall) -> Self {
-            HoprStakeSeason5Calls::GetCumulatedRewardsIncrement(var)
+            HoprStakeSeason6Calls::GetCumulatedRewardsIncrement(var)
         }
     }
-    impl ::std::convert::From<IsBlockedNftCall> for HoprStakeSeason5Calls {
+    impl ::std::convert::From<IsBlockedNftCall> for HoprStakeSeason6Calls {
         fn from(var: IsBlockedNftCall) -> Self {
-            HoprStakeSeason5Calls::IsBlockedNft(var)
+            HoprStakeSeason6Calls::IsBlockedNft(var)
         }
     }
-    impl ::std::convert::From<IsNftTypeAndRankRedeemed1Call> for HoprStakeSeason5Calls {
+    impl ::std::convert::From<IsNftTypeAndRankRedeemed1Call> for HoprStakeSeason6Calls {
         fn from(var: IsNftTypeAndRankRedeemed1Call) -> Self {
-            HoprStakeSeason5Calls::IsNftTypeAndRankRedeemed1(var)
+            HoprStakeSeason6Calls::IsNftTypeAndRankRedeemed1(var)
         }
     }
-    impl ::std::convert::From<IsNftTypeAndRankRedeemed2Call> for HoprStakeSeason5Calls {
+    impl ::std::convert::From<IsNftTypeAndRankRedeemed2Call> for HoprStakeSeason6Calls {
         fn from(var: IsNftTypeAndRankRedeemed2Call) -> Self {
-            HoprStakeSeason5Calls::IsNftTypeAndRankRedeemed2(var)
+            HoprStakeSeason6Calls::IsNftTypeAndRankRedeemed2(var)
         }
     }
-    impl ::std::convert::From<IsNftTypeAndRankRedeemed3Call> for HoprStakeSeason5Calls {
+    impl ::std::convert::From<IsNftTypeAndRankRedeemed3Call> for HoprStakeSeason6Calls {
         fn from(var: IsNftTypeAndRankRedeemed3Call) -> Self {
-            HoprStakeSeason5Calls::IsNftTypeAndRankRedeemed3(var)
+            HoprStakeSeason6Calls::IsNftTypeAndRankRedeemed3(var)
         }
     }
-    impl ::std::convert::From<IsNftTypeAndRankRedeemed4Call> for HoprStakeSeason5Calls {
+    impl ::std::convert::From<IsNftTypeAndRankRedeemed4Call> for HoprStakeSeason6Calls {
         fn from(var: IsNftTypeAndRankRedeemed4Call) -> Self {
-            HoprStakeSeason5Calls::IsNftTypeAndRankRedeemed4(var)
+            HoprStakeSeason6Calls::IsNftTypeAndRankRedeemed4(var)
         }
     }
-    impl ::std::convert::From<OnERC721ReceivedCall> for HoprStakeSeason5Calls {
+    impl ::std::convert::From<OnERC721ReceivedCall> for HoprStakeSeason6Calls {
         fn from(var: OnERC721ReceivedCall) -> Self {
-            HoprStakeSeason5Calls::OnERC721Received(var)
+            HoprStakeSeason6Calls::OnERC721Received(var)
         }
     }
-    impl ::std::convert::From<OnTokenTransferCall> for HoprStakeSeason5Calls {
+    impl ::std::convert::From<OnTokenTransferCall> for HoprStakeSeason6Calls {
         fn from(var: OnTokenTransferCall) -> Self {
-            HoprStakeSeason5Calls::OnTokenTransfer(var)
+            HoprStakeSeason6Calls::OnTokenTransfer(var)
         }
     }
-    impl ::std::convert::From<OwnerCall> for HoprStakeSeason5Calls {
+    impl ::std::convert::From<OwnerCall> for HoprStakeSeason6Calls {
         fn from(var: OwnerCall) -> Self {
-            HoprStakeSeason5Calls::Owner(var)
+            HoprStakeSeason6Calls::Owner(var)
         }
     }
-    impl ::std::convert::From<OwnerBlockNftTypeCall> for HoprStakeSeason5Calls {
+    impl ::std::convert::From<OwnerBlockNftTypeCall> for HoprStakeSeason6Calls {
         fn from(var: OwnerBlockNftTypeCall) -> Self {
-            HoprStakeSeason5Calls::OwnerBlockNftType(var)
+            HoprStakeSeason6Calls::OwnerBlockNftType(var)
         }
     }
-    impl ::std::convert::From<OwnerUnblockNftTypeCall> for HoprStakeSeason5Calls {
+    impl ::std::convert::From<OwnerUnblockNftTypeCall> for HoprStakeSeason6Calls {
         fn from(var: OwnerUnblockNftTypeCall) -> Self {
-            HoprStakeSeason5Calls::OwnerUnblockNftType(var)
+            HoprStakeSeason6Calls::OwnerUnblockNftType(var)
         }
     }
-    impl ::std::convert::From<ReclaimErc20TokensCall> for HoprStakeSeason5Calls {
+    impl ::std::convert::From<ReclaimErc20TokensCall> for HoprStakeSeason6Calls {
         fn from(var: ReclaimErc20TokensCall) -> Self {
-            HoprStakeSeason5Calls::ReclaimErc20Tokens(var)
+            HoprStakeSeason6Calls::ReclaimErc20Tokens(var)
         }
     }
-    impl ::std::convert::From<ReclaimErc721TokensCall> for HoprStakeSeason5Calls {
+    impl ::std::convert::From<ReclaimErc721TokensCall> for HoprStakeSeason6Calls {
         fn from(var: ReclaimErc721TokensCall) -> Self {
-            HoprStakeSeason5Calls::ReclaimErc721Tokens(var)
+            HoprStakeSeason6Calls::ReclaimErc721Tokens(var)
         }
     }
-    impl ::std::convert::From<RedeemedFactorCall> for HoprStakeSeason5Calls {
+    impl ::std::convert::From<RedeemedFactorCall> for HoprStakeSeason6Calls {
         fn from(var: RedeemedFactorCall) -> Self {
-            HoprStakeSeason5Calls::RedeemedFactor(var)
+            HoprStakeSeason6Calls::RedeemedFactor(var)
         }
     }
-    impl ::std::convert::From<RedeemedFactorIndexCall> for HoprStakeSeason5Calls {
+    impl ::std::convert::From<RedeemedFactorIndexCall> for HoprStakeSeason6Calls {
         fn from(var: RedeemedFactorIndexCall) -> Self {
-            HoprStakeSeason5Calls::RedeemedFactorIndex(var)
+            HoprStakeSeason6Calls::RedeemedFactorIndex(var)
         }
     }
-    impl ::std::convert::From<RedeemedNftCall> for HoprStakeSeason5Calls {
+    impl ::std::convert::From<RedeemedNftCall> for HoprStakeSeason6Calls {
         fn from(var: RedeemedNftCall) -> Self {
-            HoprStakeSeason5Calls::RedeemedNft(var)
+            HoprStakeSeason6Calls::RedeemedNft(var)
         }
     }
-    impl ::std::convert::From<RedeemedNftIndexCall> for HoprStakeSeason5Calls {
+    impl ::std::convert::From<RedeemedNftIndexCall> for HoprStakeSeason6Calls {
         fn from(var: RedeemedNftIndexCall) -> Self {
-            HoprStakeSeason5Calls::RedeemedNftIndex(var)
+            HoprStakeSeason6Calls::RedeemedNftIndex(var)
         }
     }
-    impl ::std::convert::From<RenounceOwnershipCall> for HoprStakeSeason5Calls {
+    impl ::std::convert::From<RenounceOwnershipCall> for HoprStakeSeason6Calls {
         fn from(var: RenounceOwnershipCall) -> Self {
-            HoprStakeSeason5Calls::RenounceOwnership(var)
+            HoprStakeSeason6Calls::RenounceOwnership(var)
         }
     }
-    impl ::std::convert::From<StakedHoprTokensCall> for HoprStakeSeason5Calls {
+    impl ::std::convert::From<StakedHoprTokensCall> for HoprStakeSeason6Calls {
         fn from(var: StakedHoprTokensCall) -> Self {
-            HoprStakeSeason5Calls::StakedHoprTokens(var)
+            HoprStakeSeason6Calls::StakedHoprTokens(var)
         }
     }
-    impl ::std::convert::From<SyncCall> for HoprStakeSeason5Calls {
+    impl ::std::convert::From<SyncCall> for HoprStakeSeason6Calls {
         fn from(var: SyncCall) -> Self {
-            HoprStakeSeason5Calls::Sync(var)
+            HoprStakeSeason6Calls::Sync(var)
         }
     }
-    impl ::std::convert::From<TokensReceivedCall> for HoprStakeSeason5Calls {
+    impl ::std::convert::From<TokensReceivedCall> for HoprStakeSeason6Calls {
         fn from(var: TokensReceivedCall) -> Self {
-            HoprStakeSeason5Calls::TokensReceived(var)
+            HoprStakeSeason6Calls::TokensReceived(var)
         }
     }
-    impl ::std::convert::From<TotalLockedCall> for HoprStakeSeason5Calls {
+    impl ::std::convert::From<TotalLockedCall> for HoprStakeSeason6Calls {
         fn from(var: TotalLockedCall) -> Self {
-            HoprStakeSeason5Calls::TotalLocked(var)
+            HoprStakeSeason6Calls::TotalLocked(var)
         }
     }
-    impl ::std::convert::From<TransferOwnershipCall> for HoprStakeSeason5Calls {
+    impl ::std::convert::From<TransferOwnershipCall> for HoprStakeSeason6Calls {
         fn from(var: TransferOwnershipCall) -> Self {
-            HoprStakeSeason5Calls::TransferOwnership(var)
+            HoprStakeSeason6Calls::TransferOwnership(var)
         }
     }
-    impl ::std::convert::From<UnlockCall> for HoprStakeSeason5Calls {
+    impl ::std::convert::From<UnlockCall> for HoprStakeSeason6Calls {
         fn from(var: UnlockCall) -> Self {
-            HoprStakeSeason5Calls::Unlock(var)
+            HoprStakeSeason6Calls::Unlock(var)
         }
     }
-    impl ::std::convert::From<UnlockForCall> for HoprStakeSeason5Calls {
+    impl ::std::convert::From<UnlockForCall> for HoprStakeSeason6Calls {
         fn from(var: UnlockForCall) -> Self {
-            HoprStakeSeason5Calls::UnlockFor(var)
+            HoprStakeSeason6Calls::UnlockFor(var)
         }
     }
     ///Container type for all return fields from the `BASIC_FACTOR_NUMERATOR` function with signature `BASIC_FACTOR_NUMERATOR()` and selector `0x6aa8d4cf`

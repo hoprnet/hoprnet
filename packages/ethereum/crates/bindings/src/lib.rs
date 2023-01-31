@@ -15,6 +15,7 @@ pub mod hopr_stake_base;
 pub mod hopr_stake_season_3;
 pub mod hopr_stake_season_4;
 pub mod hopr_stake_season_5;
+pub mod hopr_stake_season_6;
 pub mod hopr_staking_proxy_for_network_registry;
 pub mod hopr_token;
 pub mod hopr_wrapper;

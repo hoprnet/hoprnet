@@ -9,7 +9,7 @@ including tips related to `wasm-bindgen`.
 ## Structure
 
 All our packages contain the `crates` directory, that is meant to contain the Rust crates.
-E.g. the `utils` package may look as follows:
+E.g. the `utils` package looks as follows:
 
 ```text
 utils
@@ -37,7 +37,6 @@ Each crate is prefixed using the name of the package, therefore the crate names 
 
 - `utils-metrics`
 - `utils-misc`
-  ... etc.
 
 In addition, all Rust crates across all packages must be enumerated in `Cargo.toml` in the root of the Monorepo:
 
@@ -79,8 +78,7 @@ The unit tests are meant to be in the same module file, for each Rust module.
 They are pure-Rust and are easy to debug with IDE.
 
 The integration tests, that run in WASM runtime are currently not possible to be debugged
-and are located in the `tests` directory of a crate.
-The developer is strongly encouraged to avoid tests in the `tests` directory and use TypeScript tests instead.
+and are located in the `test` directory of a crate.
 
 ## Adding a new crate
 
@@ -89,16 +87,16 @@ To add a new Rust WASM module (crate) into an existing package:
 1. `cd packages/<package>/crates`
 2. `wasm-pack new my-crate --template https://github.com/hoprnet/hopr-wasm-template`, this will create a new Rust crate `my-crate` from a template.
 3. remove the cloned Git repo: `rm -rf my-crate/.git`
-4. add `my-crate` to `PACKAGES` space separated list in `Makefile` inside the corresponding `crates` directory.
-5. add `my-crate` to `workspace.members` in `Cargo.toml` in the root of the Monorepo.
-6. run `make all && make install` for the first time.
+4. add `my-crate` to `PACKAGES` space separated list in `Makefile`
+5. add `my-crate` to `workspace.members` in `Cargo.toml` in the root of the Monorepo
+6. run `make all && make install` for the first time
 7. commit all changes: `git add my-crate && git commit -a`
 
 You can use the following pattern in TS to export Rust types or functions:
 
 ```typescript
 // Load `my-crate` crate
-import my_crate_panic_hook from '../lib/my_crate.js'
+import { set_panic_hook as my_crate_panic_hook } from '../lib/my_crate.js'
 my_crate_panic_hook()
 export { foo } from '../lib/my_crate.js'
 ```
@@ -111,7 +109,25 @@ will trigger your Rust unit tests and WASM integration tests.
 
 ## Guidelines and tips
 
-The following example shows our guidelines to properly implement WASM and non-WASM types and their definitions:
+### To make something visible to WASM
+Use `#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]` attribute on it (a function, type or `impl` block).
+The attribute makes sure, that when the `wasm` feature is enabled in Cargo, it will be available to BOTH WASM and non-WASM (pure Rust),
+therefore you MUST use only types which are compatible with BOTH. Avoid using WASM-incompatible types and WASM-specific types.
+
+### Something available only to pure Rust
+Do not use any attribute. Types NOT compatible with WASM can be used freely.
+- trait implementations & generic types are NOT supported by `wasm-bindgen` and therefore they can be used only in pure Rust.
+
+### Something available only to WASM
+Put it inside the `wasm` submodule. The code in that module is built only when the `wasm` feature is enabled in Cargo,
+and does not interfere with your pure Rust code (unless you intentionally `use` that module).
+You can use WASM-specific types freely.
+
+## Avoid WASM-specific imports outside `wasm` submodule
+Any WASM imports (such as `js_sys`,...etc.) ARE WASM-specific (obviously), and must be used strictly inside 
+the `wasm` submodule. This makes sure our code is buildable with the `wasm` Cargo feature turned on/off.
+
+The following example shows our some guidelines how to properly implement WASM and non-WASM types and their definitions:
 
 ```rust
 // This type will be made available to both WASM (when the "wasm" feature is turned on)
@@ -141,7 +157,9 @@ impl MyStruct {
    // Here, specify methods with types that are compatible with BOTH WASM and non-WASM (pure Rust)
 }
 
-// Trait implementations for types can NEVER be made available for WASM
+// NOTE: That several `impl` blocks of the same type can co-exist, if there are different attributes on them! 
+
+// Trait implementations for types can NEVER be made available for WASM (not currently supported by wasm-bindgen)
 impl ToString for ChannelStatus {
     fn to_string(&self) -> String {
         todo!()
