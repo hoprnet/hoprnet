@@ -11,3 +11,7 @@ pub enum ChannelStatus {
     PendingToClose = 3
 }
 
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+pub struct Ticket {
+
+}

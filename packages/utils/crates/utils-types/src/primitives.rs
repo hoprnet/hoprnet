@@ -1,7 +1,44 @@
-use std::num::ParseIntError;
 use ethnum::{u256, AsU256};
 use std::ops::{Add, Sub};
 use std::string::ToString;
+use crate::errors::GeneralError;
+use crate::errors::GeneralError::ParseError;
+
+pub const ADDRESS_LENGTH: usize = 20;
+
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+pub struct Address {
+    addr: [u8; ADDRESS_LENGTH],
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+impl Address {
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
+    pub fn new(bytes: &[u8]) -> Self {
+        assert_eq!(bytes.len(), ADDRESS_LENGTH, "invalid length");
+        let mut ret = Address {
+            addr: [0u8; ADDRESS_LENGTH]
+        };
+        ret.addr.copy_from_slice(bytes);
+        ret
+    }
+
+    pub fn to_hex(&self) -> String {
+        hex::encode(self.addr)
+    }
+
+    pub fn serialize(&self) -> Box<[u8]> {
+        self.addr.into()
+    }
+
+    pub fn to_string(&self) -> String {
+        self.to_hex()
+    }
+
+    pub fn eq(&self, other: &Address) -> bool {
+        self.addr.eq(&other.addr)
+    }
+}
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -17,29 +54,16 @@ pub struct Balance {
     balance_type: BalanceType
 }
 
-impl Balance {
-    pub fn value(&self) -> &u256 {
-        &self.value
-    }
-
-    pub fn from_str(value: &str, balance_type: BalanceType) -> Result<Balance, ParseIntError> {
-        Ok(Balance {
-            value: u256::from_str_radix(value, 10)?,
-            balance_type,
-        })
-    }
-
-    pub fn deserialize(data: &[u8], balance_type: BalanceType) -> Result<Balance, ParseIntError> {
-        Ok(Balance {
-            value: u256::from_be_bytes(
-                data.try_into().unwrap()),
-            balance_type
-        })
-    }
-}
-
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl Balance {
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
+    pub fn from_str(value: &str, balance_type: BalanceType) -> Self {
+        Balance {
+            value: u256::from_str_radix(value, 10).unwrap(),
+            balance_type,
+        }
+    }
+
     pub fn balance_type(&self) -> BalanceType {
         self.balance_type
     }
@@ -110,6 +134,116 @@ impl Balance {
     }
 }
 
+impl Balance {
+    pub fn new(value: u256, balance_type: BalanceType) -> Self {
+        Balance {
+            value, balance_type
+        }
+    }
+
+    pub fn value(&self) -> &u256 {
+        &self.value
+    }
+
+    pub fn deserialize(data: &[u8], balance_type: BalanceType) -> Result<Balance, GeneralError> {
+        Ok(Balance {
+            value: u256::from_be_bytes(
+                data.try_into().map_err(|_| ParseError)?),
+            balance_type
+        })
+    }
+}
+
+
+pub const HASH_LENGTH: usize = 32;
+
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+pub struct Hash {
+    hash: [u8; HASH_LENGTH],
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+impl Hash {
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
+    pub fn new(hash: &[u8]) -> Self {
+        assert_eq!(hash.len(), HASH_LENGTH, "invalid length");
+        let mut ret = Hash {
+            hash: [0u8; HASH_LENGTH]
+        };
+        ret.hash.copy_from_slice(hash);
+        ret
+    }
+
+    pub fn to_hex(&self) -> String {
+        hex::encode(self.hash)
+    }
+
+    pub fn serialize(&self) -> Box<[u8]> {
+        self.hash.into()
+    }
+
+    pub fn eq(&self, other: &Hash) -> bool {
+        self.hash.eq(&other.hash)
+    }
+}
+
+// TODO: Move all Signature related stuff to core-crypto once merged
+pub const SIGNATURE_LENGTH: usize = 64;
+
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+pub struct Signature {
+    signature: [u8; SIGNATURE_LENGTH],
+    recovery: u8,
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+impl Signature {
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
+    pub fn new(raw_bytes: &[u8], recovery: u8) -> Signature {
+        assert_eq!(raw_bytes.len(), SIGNATURE_LENGTH, "invalid length");
+        assert!(recovery <= 1, "invalid recovery bit");
+        let mut ret = Self {
+            signature: [0u8; SIGNATURE_LENGTH],
+            recovery
+        };
+        ret.signature.copy_from_slice(raw_bytes);
+        ret
+    }
+
+    pub fn to_hex(&self) -> String {
+        hex::encode(self.signature)
+    }
+
+    pub fn raw_signature(&self) -> Box<[u8]> {
+        self.signature.into()
+    }
+
+    pub fn serialize(&self) -> Box<[u8]> {
+        let mut compressed = Vec::from(self.signature);
+        compressed[SIGNATURE_LENGTH/2] &= 0x7f;
+        compressed[SIGNATURE_LENGTH/2] |= self.recovery << 7;
+        compressed.into_boxed_slice()
+    }
+}
+
+impl Signature {
+    pub fn deserialize(signature: &[u8]) -> Result<Signature, GeneralError> {
+        if signature.len() == SIGNATURE_LENGTH {
+            let mut ret = Signature {
+                signature: [0u8; SIGNATURE_LENGTH],
+                recovery: if signature[SIGNATURE_LENGTH/2]&0x80 != 0 { 1 } else { 0 }
+            };
+            ret.signature.copy_from_slice(signature);
+            ret.signature[SIGNATURE_LENGTH/2] &= 0x7f;
+
+            Ok(ret)
+        } else {
+            Err(ParseError)
+        }
+    }
+}
+
+
 /// Unit tests of pure Rust code
 #[cfg(test)]
 mod tests {
@@ -120,6 +254,11 @@ mod tests {
         let b = Balance::from_str("10", BalanceType::HOPR).unwrap();
         assert_eq!("10".to_string(), b.to_string());
     }
+
+    #[test]
+    fn signature_tests() {
+
+    }
 }
 
 #[cfg(feature = "wasm")]
@@ -127,10 +266,19 @@ pub mod wasm {
     use wasm_bindgen::prelude::wasm_bindgen;
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
-    use crate::primitives::{Balance, BalanceType};
+    use crate::primitives::{Balance, BalanceType, Signature};
 
     #[wasm_bindgen]
-    pub fn balance_from_str(value: &str, balance_type: BalanceType) -> JsResult<Balance> {
-        ok_or_jserr!(Balance::from_str(value, balance_type))
+    impl Balance {
+        pub fn deserialize_balance(data: &[u8], balance_type: BalanceType) -> JsResult<Balance> {
+            ok_or_jserr!(Balance::deserialize(data, balance_type))
+        }
+    }
+
+    #[wasm_bindgen]
+    impl Signature {
+        pub fn deserialize_signature(signature: &[u8]) -> JsResult<Signature> {
+            ok_or_jserr!(Signature::deserialize(signature))
+        }
     }
 }

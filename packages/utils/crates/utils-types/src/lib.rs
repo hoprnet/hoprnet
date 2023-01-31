@@ -1,6 +1,7 @@
 pub mod primitives;
 pub mod channels;
 pub mod generic;
+pub mod errors;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {

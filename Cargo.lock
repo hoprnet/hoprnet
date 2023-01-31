@@ -4514,6 +4514,7 @@ dependencies = [
  "hex 0.4.3",
  "serde",
  "serde_repr",
+ "thiserror",
  "utils-misc",
  "wasm-bindgen",
  "wasm-bindgen-test",
