@@ -77,6 +77,11 @@ export abstract class SaneDefaults {
     await chain.redeemTicketsInChannelByCounterparty(counterparty)
   }
 
+  /**
+   * When an incoming channel is going to be closed, auto redeem tickets
+   * @param channel channel that will be closed
+   * @param chain Core Ethereum object
+   */
   async onChannelWillClose(channel: ChannelEntry, chain: HoprCoreEthereum) {
     const counterparty = channel.source
     const selfPubKey = chain.getPublicKey()

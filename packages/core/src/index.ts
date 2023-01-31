@@ -1256,17 +1256,26 @@ class Hopr extends EventEmitter {
       await this.strategy.onChannelWillClose(channel, this.connector)
     }
 
+    // TODO: should remove this blocker when https://github.com/hoprnet/hoprnet/issues/4194 gets addressed
+    if (direction === 'incoming') {
+      log(`Incoming channel: ignoring closing channel ${channel
+        .getId()
+        .toHex()} because current HoprChannels contract does not support closing incoming channels.`
+      )
+      throw new Error('Incoming channel: Closing incoming channels currently is not supported.')
+    }
+
     let txHash: string
     try {
       if (channel.status === ChannelStatus.Open || channel.status == ChannelStatus.WaitingForCommitment) {
         log('initiating closure of channel', channel.getId().toHex())
-        txHash = await this.connector.initializeClosure(counterpartyPubKey)
+        txHash = await this.connector.initializeClosure(channel.source, channel.destination)
       } else {
         // verify that we passed the closure waiting period to prevent failing
         // on-chain transactions
 
         if (channel.closureTimePassed()) {
-          txHash = await this.connector.finalizeClosure(counterpartyPubKey)
+          txHash = await this.connector.finalizeClosure(channel.source, channel.destination)
         } else {
           log(
             `ignoring finalizing closure of channel ${channel

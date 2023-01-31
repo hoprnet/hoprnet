@@ -60,6 +60,8 @@ export async function closeChannel(
     if (errString.match(/Channel is already closed/)) {
       // @TODO insert receipt
       return { success: true, receipt: /* @fixme */ '0x', channelStatus: ChannelStatus.Closed }
+    } else if (errString.includes("Incoming channel")) {
+      return { success: false, reason: STATUS_CODES.UNSUPPORTED_FEATURE }
     } else {
       return { success: false, reason: STATUS_CODES.UNKNOWN_FAILURE }
     }
@@ -81,7 +83,7 @@ const DELETE: Operation = [
         .status(200)
         .send({ receipt: closingResult.receipt, channelStatus: channelStatusToString(closingResult.channelStatus) })
     } else {
-      res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE })
+      res.status(422).send({ status: closingResult.reason })
     }
   }
 ]

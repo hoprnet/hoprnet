@@ -4,7 +4,7 @@
       "network_id": "anvil",
       "environment_type": "development",
       "version_range": "*",
-      "indexer_start_block_number": 3,
+      "indexer_start_block_number": 2,
       "token_contract_address": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
       "channels_contract_address": "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707",
       "xhopr_contract_address": "0xD057604A14982FE8D88c5fC25Aac3267eA142a08",
@@ -40,7 +40,9 @@
       "stake_contract_address": "0x8d9978466161c2897F483A93f51aDEA9e52d8D32",
       "network_registry_proxy_contract_address": "0x32c4F15B80CDD75cA2f4Be9fAeF3503c15895cd0",
       "network_registry_contract_address": "0xDD7b845405E931A7177270e2955E9683da19cFB1",
-      "tags": ["etherscan"]
+      "tags": [
+        "etherscan"
+      ]
     },
     "debug-staging": {
       "network_id": "xdai",
@@ -54,7 +56,9 @@
       "xhopr_contract_address": "0x223c4Fe6d9C19cbdC6C66aa9a6b7Ce5a445BF884",
       "boost_contract_address": "0x43575668AC2c5066697101F27b4DC94819e490B7",
       "network_registry_proxy_contract_address": "0xc1351a3EC7eCD5C57B44798752dBCC5f549932AD",
-      "tags": ["development"]
+      "tags": [
+        "development"
+      ]
     },
     "tuttlingen": {
       "environment_type": "production",
@@ -152,7 +156,9 @@
       "stake_contract_address": "0x5Bb7e435aDa333A6714e27962e4Bb6aFDE1cECd4",
       "network_registry_contract_address": "0xf0D4D48866C4F9665212B29A64c14A1f0FEDFD4c",
       "network_registry_proxy_contract_address": "0x15e068Ef1f76319b1848b1fcB3e49D68724AEE07",
-      "tags": ["etherscan"]
+      "tags": [
+        "etherscan"
+      ]
     },
     "monte_rosa": {
       "network_id": "xdai",
@@ -166,7 +172,9 @@
       "stake_contract_address": "0xA02Af160a280957A8881879Ee9239A614Ab47F0D",
       "network_registry_contract_address": "0x819E6a81e1e3f96CF1ac9200477C2d09c676959D",
       "network_registry_proxy_contract_address": "0xcA9B1bC189F977B2A9217598D0300d956b6a719f",
-      "tags": ["etherscan"]
+      "tags": [
+        "etherscan"
+      ]
     }
   },
   "networks": {
