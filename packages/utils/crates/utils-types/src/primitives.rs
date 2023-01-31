@@ -1,8 +1,7 @@
 use ethnum::{u256, AsU256};
 use std::ops::{Add, Sub};
 use std::string::ToString;
-use crate::errors::GeneralError;
-use crate::errors::GeneralError::ParseError;
+use crate::errors::{GeneralError, Result, GeneralError::ParseError};
 
 pub const ADDRESS_LENGTH: usize = 20;
 
@@ -146,7 +145,7 @@ impl Balance {
         &self.value
     }
 
-    pub fn deserialize(data: &[u8], balance_type: BalanceType) -> Result<Balance, GeneralError> {
+    pub fn deserialize(data: &[u8], balance_type: BalanceType) -> Result<Balance> {
         Ok(Balance {
             value: u256::from_be_bytes(
                 data.try_into().map_err(|_| ParseError)?),
@@ -190,7 +189,7 @@ impl EthereumChallenge {
 }
 
 impl EthereumChallenge {
-    pub fn deserialize(data: &[u8]) -> Result<EthereumChallenge, GeneralError> {
+    pub fn deserialize(data: &[u8]) -> Result<EthereumChallenge> {
         if data.len() == ETHEREUM_CHALLENGE_LENGTH {
             Ok(EthereumChallenge::new(data))
         } else {
@@ -232,64 +231,6 @@ impl Hash {
     }
 }
 
-// TODO: Move all Signature related stuff to core-crypto once merged
-pub const SIGNATURE_LENGTH: usize = 64;
-
-#[derive(Clone)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-pub struct Signature {
-    signature: [u8; SIGNATURE_LENGTH],
-    recovery: u8,
-}
-
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-impl Signature {
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
-    pub fn new(raw_bytes: &[u8], recovery: u8) -> Signature {
-        assert_eq!(raw_bytes.len(), SIGNATURE_LENGTH, "invalid length");
-        assert!(recovery <= 1, "invalid recovery bit");
-        let mut ret = Self {
-            signature: [0u8; SIGNATURE_LENGTH],
-            recovery
-        };
-        ret.signature.copy_from_slice(raw_bytes);
-        ret
-    }
-
-    pub fn to_hex(&self) -> String {
-        hex::encode(self.signature)
-    }
-
-    pub fn raw_signature(&self) -> Box<[u8]> {
-        self.signature.into()
-    }
-
-    pub fn serialize(&self) -> Box<[u8]> {
-        let mut compressed = Vec::from(self.signature);
-        compressed[SIGNATURE_LENGTH/2] &= 0x7f;
-        compressed[SIGNATURE_LENGTH/2] |= self.recovery << 7;
-        compressed.into_boxed_slice()
-    }
-}
-
-impl Signature {
-    pub fn deserialize(signature: &[u8]) -> Result<Signature, GeneralError> {
-        if signature.len() == SIGNATURE_LENGTH {
-            let mut ret = Signature {
-                signature: [0u8; SIGNATURE_LENGTH],
-                recovery: if signature[SIGNATURE_LENGTH/2]&0x80 != 0 { 1 } else { 0 }
-            };
-            ret.signature.copy_from_slice(signature);
-            ret.signature[SIGNATURE_LENGTH/2] &= 0x7f;
-
-            Ok(ret)
-        } else {
-            Err(ParseError)
-        }
-    }
-}
-
-
 /// Unit tests of pure Rust code
 #[cfg(test)]
 mod tests {
@@ -299,11 +240,6 @@ mod tests {
     fn balance_tests() {
         let b = Balance::from_str("10", BalanceType::HOPR).unwrap();
         assert_eq!("10".to_string(), b.to_string());
-    }
-
-    #[test]
-    fn signature_tests() {
-
     }
 }
 
@@ -325,13 +261,6 @@ pub mod wasm {
     impl EthereumChallenge {
         pub fn deserialize_challenge(data: &[u8]) -> JsResult<EthereumChallenge> {
             ok_or_jserr!(EthereumChallenge::deserialize(data))
-        }
-    }
-
-    #[wasm_bindgen]
-    impl Signature {
-        pub fn deserialize_signature(signature: &[u8]) -> JsResult<Signature> {
-            ok_or_jserr!(Signature::deserialize(signature))
         }
     }
 }
