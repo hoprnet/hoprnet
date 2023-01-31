@@ -128,7 +128,8 @@ and does not interfere with your pure Rust code (unless you intentionally `use` 
 You can use WASM-specific types freely.
 
 ## Avoid WASM-specific imports outside `wasm` submodule
-Any WASM imports (such as `js_sys`,...etc.) ARE WASM-specific (obviously), and must be used strictly inside 
+
+Any WASM imports (such as `js_sys`,...etc.) ARE WASM-specific (obviously), and must be used strictly inside
 the `wasm` submodule. This makes sure our code is buildable with the `wasm` Cargo feature turned on/off.
 
 The following example shows our some guidelines how to properly implement WASM and non-WASM types and their definitions:
