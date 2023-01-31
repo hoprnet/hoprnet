@@ -109,28 +109,35 @@ will trigger your Rust unit tests and WASM integration tests.
 
 ## Guidelines and tips
 
-### To make something visible to WASM
+We distinguish between 3 different Rust types and expressions with respect to WASM:
+- Rust-specific (WASM-incompatible)
+- WASM-compatible
+- WASM-specific
 
-Use `#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]` attribute on it (a function, type or `impl` block).
+### To make something visible to WASM and Rust
+
+Use `#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]` attribute on it (on a function, type or `impl` block).
 The attribute makes sure, that when the `wasm` feature is enabled in Cargo, it will be available to BOTH WASM and non-WASM (pure Rust),
-therefore you MUST use only types which are compatible with BOTH. Avoid using WASM-incompatible types and WASM-specific types.
+therefore you MUST use only types which are compatible with BOTH. Avoid using WASM-incompatible types and WASM-specific types in your
+types and functions.
 
 ### Something available only to pure Rust
 
-Do not use any attribute. Types NOT compatible with WASM can be used freely.
-
+Do not use any attribute. Types NOT compatible with WASM can be used freely, unless the `#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]`
+is specified.
+Please note that:
 - trait implementations, lifetimes & generic types are NOT supported by `wasm-bindgen` and therefore they can be used only in pure Rust.
 
 ### Something available only to WASM
 
-Put it inside the `wasm` submodule. The code in that module is built only when the `wasm` feature is enabled in Cargo,
+Put it strictly inside the `wasm` submodule. The code in that module is built only when the `wasm` feature is enabled in Cargo,
 and does not interfere with your pure Rust code (unless you intentionally `use` that module).
-You can use WASM-specific types freely.
+You can use WASM-specific types freely in this submodule.
 
 ## Avoid WASM-specific imports outside `wasm` submodule
 
-Any WASM imports (such as `js_sys`,...etc.) ARE WASM-specific (obviously), and must be used strictly inside
-the `wasm` submodule. This makes sure our code is buildable with the `wasm` Cargo feature turned on/off.
+Any WASM imports (such as from `wasm_bindgen`, `js_sys`,...etc.) ARE WASM-specific (obviously), and must be used strictly inside
+the `wasm` submodule. This makes sure our code is buildable with the `wasm` Cargo feature turned off.
 
 The following example shows our some guidelines how to properly implement WASM and non-WASM types and their definitions:
 
@@ -139,27 +146,28 @@ The following example shows our some guidelines how to properly implement WASM a
 // and non-WASM (pure Rust)
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct MyStruct {
-    foo: u32,        // private members do not need to have WASM-compatible types
+    foo: u32,       // private members do not need to have WASM-compatible types
     pub bar: u32    // public members MUST have WASM-compatible types, if struct used with #[cfg_attr(feature = "wasm"...
     // NOTE: you can use #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(skip))]
     // on a public attribute that shall not be available to WASM
 }
 
-// This function won't be available in WASM, even when the "wasm" feature is on
+// This function won't be available in WASM, even when the "wasm" feature is turned on
+// You can use WASM-incompatible types in its arguments and return types freely.
 pub fn foo() -> u32 { 42 }
 
-// This function must not use WASM-specific types, but must be WASM compatible,
+// This function must not use WASM-specific types. Only WASM-compatible types must be used,
 // because the attribute makes it available to both WASM and non-WASM (pure Rust)
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub fn bar() -> u32 { 0 }
 
 impl MyStruct {
-   // Here, specify methods with types that are strictly NOT compatible with WASM (pure Rust)
+   // Here, specify methods with types that are strictly NOT WASM-compatible
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl MyStruct {
-   // Here, specify methods with types that are compatible with BOTH WASM and non-WASM (pure Rust)
+   // Here, specify methods with types that are strictly WASM-compatible, but not WASM-specific.
 }
 
 // NOTE: That several `impl` blocks of the same type can co-exist, if there are different attributes on them!
@@ -171,7 +179,7 @@ impl ToString for ChannelStatus {
     }
 }
 
-/// Unit tests of pure Rust code (must not contain anything WASM specific)
+/// Unit tests of pure Rust code (must not contain anything WASM-specific)
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -186,9 +194,8 @@ mod tests {
 #[cfg(feature = "wasm")]
 pub mod wasm {
 
-    // Specify free functions here that operate on MyStruct which are stricly WASM-only compatible (e.g. use js_sys,...etc.)
-    // Also types and other free functions that are WASM-only specific are defined here
-
+    // Use this module to specify everything that is WASM-specific (e.g. uses wasm-bindgen types, js_sys, ...etc.) 
+    
     use wasm_bindgen::prelude::*;
     use wasm_bindgen::JsValue;
 
@@ -196,5 +203,42 @@ pub mod wasm {
     pub fn foo(_val: JsValue) -> i32 {
         super::foo()
     }
+
+    #[wasm_bindgen]
+    impl MyStruct {
+        // Specify methods of MyStruct which use WASM-specific
+    }
 }
 ```
+
+### Types between WASM and Rust
+The following sections list examples of Rust types with respect to WASM.
+For a complete guidance, please refer to [wasm-bindgen docs](https://rustwasm.github.io/docs/wasm-bindgen/reference/types.html).
+
+#### WASM-incompatible types & expressions
+- fixed size arrays
+- `Result<X,Y>` where one of `X` and `Y` is WASM-incompatible
+- `Vec<X>` if `X` is not WASM-compatible
+- any reference types used on return values
+- trait implementations, lifetime specifiers & generic types
+
+#### WASM-compatible types & expressions
+Below are example of types are compatible with both pure Rust and WASM.
+As mentioned in the previous text, these can be used anywhere 
+below the `#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]` attribute. 
+
+- `Box<[X]>` on public members, arguments and return types which are fixed length byte arrays. (`X` is Rust builtin number type)
+- `Vec<X>` on public members, arguments and return types that can change at some point. (`X` is Rust builtin number type)
+- `&[X]` on arguments only. (`X` is Rust builtin number type)
+- `String` on public members and return types.
+- `&str` on arguments only.
+- any builtin Rust numeric types except `usize`, can be used on members, arguments and return types.
+- WASM-incompatible types used as private members
+
+#### WASM-specific types & expressions
+
+The following are examples of WASM-specific types or expressions and MUST be used ONLY within the `wasm` submodule.
+- `#[wasm_bindgen]`
+- `JsValue`
+- `Result<X, JsValue>`
+- `JsString`, `JsFunction`, `Uint8Array`... and anything from `js_sys` crate
