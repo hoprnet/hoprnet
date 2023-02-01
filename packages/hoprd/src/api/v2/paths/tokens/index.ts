@@ -2,7 +2,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { createHash } from 'crypto'
 
 import { STATUS_CODES } from '../../utils.js'
-import { createToken, authenticateToken } from '../../../token.js'
+import { storeToken, authenticateToken } from '../../../token.js'
 
 import type { Operation } from 'express-openapi'
 import type { HoprDB } from '@hoprnet/hopr-utils'
@@ -38,7 +38,7 @@ const POST: Operation = [
       capabilities
     }
 
-    await createToken(node.db, token)
+    await storeToken(node.db, token)
 
     res.status(201).send({ token: id })
   }

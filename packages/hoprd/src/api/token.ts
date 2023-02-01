@@ -44,7 +44,7 @@ export async function authenticateToken(db: HoprDB, id: string): Promise<Token> 
   return deserializedToken
 }
 
-export async function authorizeToken(_db: HoprDB, token: Token, endpointRef: string): Promise<boolean> {
+export async function authorizeToken(db: HoprDB, token: Token, endpointRef: string): Promise<boolean> {
   // find relevant endpoint capabilities
   const endpointCaps = token.capabilities.filter((capability: Capability) => capability.endpoint === endpointRef)
 
@@ -68,15 +68,17 @@ export async function authorizeToken(_db: HoprDB, token: Token, endpointRef: str
   const tokenAuthorized = capsChecks.some((c) => c === true)
   if (tokenAuthorized) {
     // update limits before returning
-    token.capabilities = endpointCaps.map((c) => {
-      return c.limits.map((l) => {
-        if (l.type === 'calls') {
+    token.capabilities = endpointCaps.map(c => {
+      const limits = c.limits.map(l => {
+      if (l.type === 'calls') {
           // Add or increment field 'used'
           const used = l.used ? ++l.used : 1
           l.used = used
-        }
-        return l
-      })
+      }
+      return l
+    })
+    c.limits = limits
+    return c
     })
     await storeToken(db, token)
   }
