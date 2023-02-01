@@ -786,6 +786,7 @@ dependencies = [
  "console_error_panic_hook",
  "getrandom 0.2.8",
  "js-sys",
+ "lazy_static 1.4.0",
  "rand 0.8.5",
  "serde",
  "serde-wasm-bindgen",

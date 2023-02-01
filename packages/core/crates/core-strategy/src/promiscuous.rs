@@ -166,6 +166,27 @@ impl ChannelStrategy for PromiscuousStrategy {
 mod tests {
     use super::*;
     use std::collections::HashMap;
+    use lazy_static::lazy_static;
+
+    lazy_static! {
+        static ref PEERS: HashMap<String, f64> = {
+            HashMap::from([
+                ("Alice".to_string(), 0.1),
+                ("Bob".to_string(), 0.7),
+                ("Charlie".to_string(), 0.9),
+                ("Dahlia".to_string(), 0.1),
+                ("Eugene".to_string(), 0.8),
+                ("Felicia".to_string(), 0.3),
+                ("Gustave".to_string(), 1.0),
+                ("Heather".to_string(), 0.1),
+                ("Ian".to_string(), 0.2),
+                ("Joe".to_string(), 0.3),
+            ])
+        };
+
+        static ref DEFAULT_BALANCE: Balance = Balance::from_str("1000000000000000000", HOPR);
+        static ref LOW_BALANCE: Balance = Balance::from_str("1000000000000000", HOPR);
+    }
 
     #[test]
     fn test_promiscuous_basic() {
@@ -173,48 +194,32 @@ mod tests {
 
         assert_eq!(strat.name(), "promiscuous");
 
-        let peers = HashMap::from([
-            ("Alice".to_string(), 0.1),
-            ("Bob".to_string(), 0.7),
-            ("Charlie".to_string(), 0.9),
-            ("Dahlia".to_string(), 0.1),
-            ("Eugene".to_string(), 0.8),
-            ("Felicia".to_string(), 0.3),
-            ("Gustave".to_string(), 1.0),
-            ("Heather".to_string(), 0.1),
-            ("Ian".to_string(), 0.2),
-            ("Joe".to_string(), 0.3),
-        ]);
-
-        let balance = Balance::from_str("1000000000000000000", HOPR).unwrap();
-        let low_balance = Balance::from_str("1000000000000000", HOPR).unwrap();
-
         let outgoing_channels = vec![
             OutgoingChannelStatus {
                 peer_id: "Alice".to_string(),
-                stake: balance.clone(),
+                stake: DEFAULT_BALANCE.clone(),
                 status: Open,
             },
             OutgoingChannelStatus {
                 peer_id: "Charlie".to_string(),
-                stake: balance.clone(),
+                stake: DEFAULT_BALANCE.clone(),
                 status: Open,
             },
             OutgoingChannelStatus {
                 peer_id: "Gustave".to_string(),
-                stake: low_balance,
+                stake: LOW_BALANCE.clone(),
                 status: Open,
             },
         ];
 
         let results = strat.tick(
-            balance,
-            peers.iter().map(|x| x.0.clone()),
+            DEFAULT_BALANCE.clone(),
+            PEERS.iter().map(|x| x.0.clone()),
             outgoing_channels,
-            |s| peers.get(s).copied(),
+            |s| PEERS.get(s).copied(),
         );
 
-        assert_eq!(results.max_auto_channels(), 4);
+        assert_eq!(results.max_auto_channels, 4);
 
         assert_eq!(results.to_close().len(), 2);
         assert_eq!(results.to_open().len(), 3);
@@ -225,6 +230,42 @@ mod tests {
         assert_eq!(results.to_open()[0].peer_id, "Gustave".to_string());
         assert_eq!(results.to_open()[1].peer_id, "Eugene".to_string());
         assert_eq!(results.to_open()[2].peer_id, "Bob".to_string());
+    }
+
+    #[test]
+    fn test_promiscuous_max() {
+        let mut strat = PromiscuousStrategy::new();
+        strat.max_channels = Some(2);
+
+        let outgoing_channels = vec![
+            OutgoingChannelStatus {
+                peer_id: "Charlie".to_string(),
+                stake: DEFAULT_BALANCE.clone(),
+                status: Open,
+            },
+            OutgoingChannelStatus {
+                peer_id: "Dahlia".to_string(),
+                stake: DEFAULT_BALANCE.clone(),
+                status: Open,
+            },
+            OutgoingChannelStatus {
+                peer_id: "Eugene".to_string(),
+                stake: DEFAULT_BALANCE.clone(),
+                status: Open,
+            },
+        ];
+
+        let results = strat.tick(
+            DEFAULT_BALANCE.clone(),
+            PEERS.iter().map(|x| x.0.clone()),
+            outgoing_channels,
+            |s| PEERS.get(s).copied(),
+        );
+
+        assert_eq!(results.max_auto_channels, 2);
+
+        assert_eq!(results.to_close().len(), 1);
+        assert_eq!(results.to_open().len(), 0);
     }
 }
 
