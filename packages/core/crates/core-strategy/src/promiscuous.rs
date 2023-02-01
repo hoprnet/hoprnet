@@ -244,7 +244,7 @@ mod tests {
                 status: Open,
             },
             OutgoingChannelStatus {
-                peer_id: "Dahlia".to_string(),
+                peer_id: "Gustave".to_string(),
                 stake: DEFAULT_BALANCE.clone(),
                 status: Open,
             },
@@ -266,6 +266,8 @@ mod tests {
 
         assert_eq!(results.to_close().len(), 1);
         assert_eq!(results.to_open().len(), 0);
+
+        assert!(results.to_close().contains(&"Eugene".to_string()));
     }
 }
 
