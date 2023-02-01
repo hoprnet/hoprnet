@@ -22,7 +22,6 @@ pub fn get_package_version(package_file: &str) -> Result<String, RealError> {
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use crate::ok_or_jserr;
-    use paste::paste;
     use wasm_bindgen::prelude::*;
 
     pub type JsResult<T> = Result<T, JsValue>;
@@ -49,7 +48,7 @@ pub mod wasm {
     #[macro_export]
     macro_rules! make_jsiterable {
         ($t: ident) => {
-            paste! {
+            paste::paste! {
                 #[wasm_bindgen(getter_with_clone)]
                 pub struct [<$t IterableNext>] {
                     pub value: Option<$t>,

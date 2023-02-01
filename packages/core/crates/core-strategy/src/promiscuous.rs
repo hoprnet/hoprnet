@@ -2,8 +2,7 @@ use rand::rngs::OsRng;
 use rand::seq::SliceRandom;
 
 use utils_types::channels::ChannelStatus::{Open, PendingToClose};
-use utils_types::primitives::{Balance, BaseBalance};
-use utils_types::primitives::BalanceType::HOPR;
+use utils_types::primitives::{Balance, BalanceType::HOPR};
 
 use crate::generic::{ChannelStrategy, OutgoingChannelStatus, StrategyTickResult};
 
@@ -25,9 +24,9 @@ impl PromiscuousStrategy {
     pub fn new() -> Self {
         PromiscuousStrategy {
             network_quality_threshold: 0.5,
-            new_channel_stake: Balance::from_str("100000000000000000", HOPR).unwrap(),
-            minimum_channel_balance: Balance::from_str("10000000000000000", HOPR).unwrap(),
-            minimum_node_balance: Balance::from_str("100000000000000000", HOPR).unwrap(),
+            new_channel_stake: Balance::from_str("100000000000000000", HOPR),
+            minimum_channel_balance: Balance::from_str("10000000000000000", HOPR),
+            minimum_node_balance: Balance::from_str("100000000000000000", HOPR),
             max_channels: None
         }
     }
@@ -107,17 +106,18 @@ impl ChannelStrategy for PromiscuousStrategy {
         // If there is still more channels opened than we allow, close some
         // lowest-quality ones which passed the threshold
         if occupied > max_auto_channels  {
-            let mut sorted_channels = outgoing_channels
+            let mut sorted_channels: Vec<OutgoingChannelStatus> = outgoing_channels
                 .iter()
                 .filter(|c| !to_close.contains(&c.peer_id))
+                .cloned()
                 .collect();
             // Sort by quality, lowest-quality first
             sorted_channels.
                 sort_unstable_by(|p1, p2| {
                     let q1 = quality_of_peer(p1.peer_id.as_str())
-                        .expect(format!("failed to retrieve quality of {}", peer_id).as_str());
+                        .expect(format!("failed to retrieve quality of {}", p1.peer_id).as_str());
                     let q2 = quality_of_peer(p2.peer_id.as_str())
-                        .expect(format!("failed to retrieve quality of {}", peer_id).as_str());
+                        .expect(format!("failed to retrieve quality of {}", p2.peer_id).as_str());
                     q1.partial_cmp(&q2).unwrap()
                 });
             // Close the lowest-quality channels (those we did not mark for closing yet)
@@ -231,19 +231,17 @@ mod tests {
 /// WASM bindings
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use serde::Deserialize;
     use wasm_bindgen::prelude::*;
 
     use utils_misc::utils::wasm::JsResult;
-    use utils_types::primitives::wasm::Balance;
+    use utils_types::primitives::Balance;
 
-    use crate::generic::wasm::StrategyTickResult;
+    use crate::generic::StrategyTickResult;
     use crate::generic::ChannelStrategy;
     use crate::promiscuous::PromiscuousStrategy;
 
     #[wasm_bindgen]
     impl PromiscuousStrategy {
-
         #[wasm_bindgen(getter, js_name="name")]
         pub fn strategy_name(&self) -> String {
             self.name().into()
@@ -258,7 +256,7 @@ pub mod wasm {
             quality_of: &js_sys::Function,
         ) -> JsResult<StrategyTickResult> {
             crate::generic::wasm::tick_wrap(
-                &self.w,
+                self,
                 balance,
                 peer_ids,
                 outgoing_channels,

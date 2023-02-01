@@ -3,6 +3,7 @@ use utils_types::primitives::Balance;
 use crate::generic::{ChannelStrategy, OutgoingChannelStatus, StrategyTickResult};
 
 /// Implements random strategy (cover traffic)
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct RandomStrategy;
 
 impl ChannelStrategy for RandomStrategy {
@@ -19,6 +20,14 @@ impl ChannelStrategy for RandomStrategy {
         Q: Fn(&str) -> Option<f64>,
     {
         unimplemented!("Cover Traffic Strategy (Random strategy) not yet implemented!");
+    }
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+impl RandomStrategy {
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
+    pub fn new() -> Self {
+        RandomStrategy {}
     }
 }
 
@@ -42,30 +51,20 @@ pub mod wasm {
     use wasm_bindgen::JsValue;
 
     use utils_misc::utils::wasm::JsResult;
-    use utils_types::primitives::wasm::Balance;
+    use utils_types::primitives::Balance;
 
-    use crate::generic::wasm::StrategyTickResult;
-
-    #[wasm_bindgen]
-    pub struct RandomStrategy {
-        w: super::RandomStrategy,
-    }
+    use crate::generic::StrategyTickResult;
+    use crate::random::RandomStrategy;
 
     #[wasm_bindgen]
     impl RandomStrategy {
-        #[wasm_bindgen(constructor)]
-        pub fn new() -> Self {
-            RandomStrategy {
-                w: super::RandomStrategy {},
-            }
+        #[wasm_bindgen(getter, js_name="name")]
+        pub fn strategy_name(&self) -> String {
+            self.name().into()
         }
 
-        #[wasm_bindgen(getter)]
-        pub fn name(&self) -> String {
-            self.w.name().into()
-        }
-
-        pub fn tick(
+        #[wasm_bindgen(js_name="tick")]
+        pub fn strategy_tick(
             &self,
             balance: Balance,
             peer_ids: &js_sys::Iterator,
@@ -73,7 +72,7 @@ pub mod wasm {
             quality_of: &js_sys::Function,
         ) -> JsResult<StrategyTickResult> {
             crate::generic::wasm::tick_wrap(
-                &self.w,
+                self,
                 balance,
                 peer_ids,
                 outgoing_channels,

@@ -1,5 +1,6 @@
 use utils_types::channels::ChannelStatus;
 use utils_types::primitives::Balance;
+use utils_types::primitives::BalanceType::HOPR;
 
 /// Basic strategy trait that all strategies must implement.
 /// Strategies make decisions to automatically open/close certain channels.
@@ -36,6 +37,7 @@ pub trait ChannelStrategy {
 }
 
 /// Represents a request to open a channel with a stake.
+#[derive(Clone)]
 pub struct OutgoingChannelStatus {
     pub peer_id: String,
     pub stake: Balance,
@@ -47,7 +49,7 @@ impl From<&wasm::OutgoingChannelStatus> for OutgoingChannelStatus {
     fn from(x: &wasm::OutgoingChannelStatus) -> Self {
         OutgoingChannelStatus {
             peer_id: x.peer_id.clone(),
-            stake: Balance::from_str(x.stake_str.as_str()).unwrap(),
+            stake: Balance::from_str(x.stake_str.as_str(), HOPR),
             status: x.status.clone()
         }
     }
@@ -57,8 +59,9 @@ impl From<&wasm::OutgoingChannelStatus> for OutgoingChannelStatus {
 /// represents which channels should be closed and which should be opened.
 /// Also indicates a number of maximum channels this strategy can open given the current network size.
 /// Note that the number changes as the network size changes.
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct StrategyTickResult {
-    max_auto_channels: usize,
+    pub max_auto_channels: usize,
     to_open: Vec<OutgoingChannelStatus>,
     to_close: Vec<String>,
 }
@@ -75,12 +78,6 @@ impl StrategyTickResult {
             to_open,
             to_close,
         }
-    }
-
-    /// Maximum number of channels this strategy can open.
-    /// This number changes based on the network size.
-    pub fn max_auto_channels(&self) -> usize {
-        self.max_auto_channels
     }
 
     /// Channels that this strategy wishes to open.
@@ -101,14 +98,14 @@ pub mod wasm {
     use wasm_bindgen::prelude::wasm_bindgen;
     use wasm_bindgen::JsValue;
 
-    use crate::generic::ChannelStrategy;
+    use crate::generic::{ChannelStrategy, StrategyTickResult};
 
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
-    use utils_types::primitives::wasm::Balance;
 
     use serde::{Deserialize, Serialize};
     use utils_types::channels::ChannelStatus;
+    use utils_types::primitives::Balance;
 
     #[derive(Serialize, Deserialize)]
     pub struct OutgoingChannelStatus {
@@ -128,38 +125,27 @@ pub mod wasm {
     }
 
     #[wasm_bindgen]
-    pub struct StrategyTickResult {
-        pub(crate) w: super::StrategyTickResult,
-    }
-
-    #[wasm_bindgen]
     impl StrategyTickResult {
         #[wasm_bindgen(constructor)]
-        pub fn new(
+        pub fn create(
             max_auto_channels: u32,
             to_open: JsValue,
             to_close: Vec<JsString>,
         ) -> JsResult<StrategyTickResult> {
-            Ok(StrategyTickResult {
-                w: super::StrategyTickResult::new(
+            Ok(StrategyTickResult::new(
                     max_auto_channels as usize,
                     serde_wasm_bindgen::from_value::<Vec<OutgoingChannelStatus>>(to_open)?
                         .into_iter()
                         .map(|x| super::OutgoingChannelStatus::from(&x))
                         .collect(),
                     to_close.iter().map(String::from).collect(),
-                ),
-            })
+                )
+            )
         }
 
-        #[wasm_bindgen(getter)]
-        pub fn max_auto_channels(&self) -> usize {
-            self.w.max_auto_channels
-        }
-
-        pub fn to_open(&self) -> JsResult<JsValue> {
+        #[wasm_bindgen(js_name = "to_open")]
+        pub fn channels_to_open(&self) -> JsResult<JsValue> {
             let ret: Vec<OutgoingChannelStatus> = self
-                .w
                 .to_open()
                 .iter()
                 .map(|s| OutgoingChannelStatus::from(s))
@@ -168,9 +154,9 @@ pub mod wasm {
             ok_or_jserr!(serde_wasm_bindgen::to_value(&ret))
         }
 
-        pub fn to_close(&self) -> Vec<JsString> {
-            self.w
-                .to_close()
+        #[wasm_bindgen(js_name = "to_close")]
+        pub fn channels_to_close(&self) -> Vec<JsString> {
+            self.to_close()
                 .iter()
                 .map(|s| JsString::from(s.clone()))
                 .collect()
@@ -186,9 +172,8 @@ pub mod wasm {
         outgoing_channels: JsValue,
         quality_of: &js_sys::Function,
     ) -> JsResult<StrategyTickResult> {
-        Ok(StrategyTickResult {
-            w: strategy.tick(
-                balance.w,
+        Ok(strategy.tick(
+                balance,
                 peer_ids
                     .into_iter()
                     .map(|v| v.unwrap().as_string().unwrap()),
@@ -203,7 +188,7 @@ pub mod wasm {
                             .map(|q| q.as_f64())
                             .flatten()
                     },
-            ),
-        })
+            )
+        )
     }
 }
