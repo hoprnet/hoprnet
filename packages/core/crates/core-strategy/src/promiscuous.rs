@@ -3,12 +3,14 @@ use rand::seq::SliceRandom;
 
 use utils_types::channels::ChannelStatus::{Open, PendingToClose};
 use utils_types::primitives::{Balance, BaseBalance};
+use utils_types::primitives::BalanceType::HOPR;
 
 use crate::generic::{ChannelStrategy, OutgoingChannelStatus, StrategyTickResult};
 
 /// Implements promiscuous strategy.
 /// This strategy opens channels to peers, which have quality above a given threshold.
 /// At the same time, it closes channels opened to peers whose quality dropped below this threshold.
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct PromiscuousStrategy {
     pub network_quality_threshold: f64,
     pub new_channel_stake: Balance,
@@ -17,13 +19,15 @@ pub struct PromiscuousStrategy {
     pub max_channels: Option<usize>,
 }
 
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl PromiscuousStrategy {
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new() -> Self {
         PromiscuousStrategy {
             network_quality_threshold: 0.5,
-            new_channel_stake: Balance::from_str("100000000000000000").unwrap(),
-            minimum_channel_balance: Balance::from_str("10000000000000000").unwrap(),
-            minimum_node_balance: Balance::from_str("100000000000000000").unwrap(),
+            new_channel_stake: Balance::from_str("100000000000000000", HOPR).unwrap(),
+            minimum_channel_balance: Balance::from_str("10000000000000000", HOPR).unwrap(),
+            minimum_node_balance: Balance::from_str("100000000000000000", HOPR).unwrap(),
             max_channels: None
         }
     }
@@ -155,8 +159,8 @@ mod tests {
             ("Joe".to_string(), 0.3),
         ]);
 
-        let balance = Balance::from_str("1000000000000000000").unwrap();
-        let low_balance = Balance::from_str("1000000000000000").unwrap();
+        let balance = Balance::from_str("1000000000000000000", HOPR).unwrap();
+        let low_balance = Balance::from_str("1000000000000000", HOPR).unwrap();
 
         let outgoing_channels = vec![
             OutgoingChannelStatus {
@@ -208,6 +212,7 @@ pub mod wasm {
 
     use crate::generic::wasm::StrategyTickResult;
     use crate::generic::ChannelStrategy;
+    use crate::promiscuous::PromiscuousStrategy;
 
     #[derive(Deserialize)]
     struct PromiscuousSettings {
@@ -219,44 +224,15 @@ pub mod wasm {
     }
 
     #[wasm_bindgen]
-    pub struct PromiscuousStrategy {
-        w: super::PromiscuousStrategy,
-    }
-
-    #[wasm_bindgen]
     impl PromiscuousStrategy {
-        #[wasm_bindgen(constructor)]
-        pub fn new() -> Self {
-            PromiscuousStrategy {
-                w: super::PromiscuousStrategy::new()
-            }
+
+        #[wasm_bindgen(getter, js_name="name")]
+        pub fn strategy_name(&self) -> String {
+            self.name().into()
         }
 
-        pub fn configure(&mut self, settings: JsValue) -> JsResult<()> {
-            let cfg: PromiscuousSettings = serde_wasm_bindgen::from_value(settings)?;
-            if let Some(option) = cfg.network_quality_threshold {
-                self.w.network_quality_threshold = option;
-            }
-            if let Some(option) = cfg.minimum_node_balance {
-                self.w.minimum_node_balance = super::Balance::from_str(option.as_str())?;
-            }
-            if let Some(option) = cfg.new_channel_stake {
-                self.w.new_channel_stake = super::Balance::from_str(option.as_str())?;
-            }
-            if let Some(option) = cfg.minimum_channel_balance {
-                self.w.minimum_channel_balance = super::Balance::from_str(option.as_str())?;
-            }
-            self.w.max_channels = cfg.max_channels.map(|c| c as usize);
-
-            Ok(())
-        }
-
-        #[wasm_bindgen(getter)]
-        pub fn name(&self) -> String {
-            self.w.name().into()
-        }
-
-        pub fn tick(
+        #[wasm_bindgen(js_name = "tick")]
+        pub fn strategy_tick(
             &self,
             balance: Balance,
             peer_ids: &js_sys::Iterator,
