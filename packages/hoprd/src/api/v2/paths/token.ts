@@ -17,9 +17,11 @@ GET.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            $ref: '#/components/schema/Token'
+            $ref: '#/components/schemas/Token'
           }
-        },
+        }
+      }
+    },
         '401': {
           $ref: '#/components/responses/Unauthorized'
         },
@@ -28,7 +30,5 @@ GET.apiDoc = {
         }
       }
     }
-  }
-}
 
 export default { GET }

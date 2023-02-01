@@ -58,9 +58,9 @@ components:
           type: string
         error:
           type: string
-        required:
-          - status
-          - error
+      required:
+        - status
+        - error
     RequestStatus:
       type: object
       properties:
