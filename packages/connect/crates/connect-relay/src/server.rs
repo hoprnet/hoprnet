@@ -6,11 +6,14 @@ use futures::{
     ready,
     stream::Stream,
     task::{Context, Poll},
-    Future,
+    Future, Sink,
 };
 use pin_project_lite::pin_project;
 use std::sync::{Arc, Mutex};
 use std::task::Waker;
+
+#[cfg(feature = "wasm")]
+use wasm_bindgen::JsValue;
 
 // cfg_if! {
 //     if #[cfg(target = "wasm32")] {
@@ -198,7 +201,7 @@ pin_project! {
 impl<St> Server<St>
 where
     St: Stream + Unpin,
-    St::Item: Into<Result<Box<[u8]>, String>>,
+    St::Item: IntoItem<St::Item>,
 {
     fn new(stream: St) -> Self {
         let (status_messages_tx, status_messages_rx) = mpsc::unbounded::<Box<[u8]>>();
@@ -224,10 +227,32 @@ where
     }
 }
 
+pub trait IntoItem<T> {
+    fn into_box_u8(t: T) -> Result<Box<[u8]>, String>;
+}
+
+#[cfg(feature = "wasm")]
+impl IntoItem<Result<JsValue, JsValue>> for Result<JsValue, JsValue> {
+    #[inline]
+    fn into_box_u8(t: Result<JsValue, JsValue>) -> Result<Box<[u8]>, String> {
+        match t {
+            Ok(x) => Ok(Box::from_iter(js_sys::Uint8Array::new(&x).to_vec())),
+            Err(e) => Err(format!("{:?}", e)),
+        }
+    }
+}
+
+impl IntoItem<Result<Box<[u8]>, String>> for Result<Box<[u8]>, String> {
+    #[inline]
+    fn into_box_u8(t: Result<Box<[u8]>, String>) -> Result<Box<[u8]>, String> {
+        t
+    }
+}
+
 impl<St> Stream for Server<St>
 where
     St: Stream + Unpin,
-    St::Item: Into<Result<Box<[u8]>, String>>,
+    St::Item: IntoItem<St::Item>,
 {
     type Item = Result<Box<[u8]>, String>;
 
@@ -248,7 +273,7 @@ where
                 ready!(this.stream.as_mut().as_pin_mut().unwrap().poll_next(cx))
             {
                 // TODO no error handling
-                let msg = <St::Item as Into<Result<Box<[u8]>, String>>>::into(item).unwrap();
+                let msg = <St::Item as IntoItem<St::Item>>::into_box_u8(item).unwrap();
 
                 match msg.first() {
                     Some(prefix) if *prefix == MessagePrefix::ConnectionStatus as u8 => {
@@ -312,7 +337,6 @@ where
                     // TODO log this
                     _ => break None,
                 };
-                // this.handle_message(Some(item))
             } else {
                 break None;
             }
@@ -324,23 +348,71 @@ where
     }
 }
 
+impl<St> Sink<Box<[u8]>> for Server<St> {
+    type Error = String;
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        todo!()
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        todo!()
+    }
+
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        todo!()
+    }
+
+    fn start_send(self: Pin<&mut Self>, item: Box<[u8]>) -> Result<(), Self::Error> {
+        todo!()
+    }
+}
+
+#[cfg(feature = "wasm")]
 pub mod wasm {
-    use futures::{Stream, StreamExt};
+    use futures::{SinkExt, StreamExt};
     use js_sys::AsyncIterator;
+    use utils_misc::{
+        async_iterable::wasm::{to_box_u8_stream, to_jsvalue_stream},
+        ok_or_jserr,
+    };
     use wasm_bindgen::prelude::*;
     use wasm_bindgen_futures::stream::JsStream;
 
     #[wasm_bindgen]
+    pub struct Source {}
+
+    #[wasm_bindgen]
     pub struct RelayServer {
-        server: Box<dyn Stream<Item = Result<Box<[u8]>, String>>>,
+        server: super::Server<JsStream>,
     }
 
-    // pub impl RelayServer {
-    //     fn new(stream: AsyncIterator) -> Self {
+    #[wasm_bindgen]
+    impl RelayServer {
+        #[wasm_bindgen]
+        pub async fn next(&mut self) -> Result<JsValue, JsValue> {
+            to_jsvalue_stream(<super::Server<JsStream> as StreamExt>::next(&mut self.server).await)
+        }
 
-    //         Self {
-    //             server: Box::new(super::Server::new(stream)),
-    //         }
-    //     }
-    // }
+        #[wasm_bindgen]
+        pub async fn sink(&mut self, stream: AsyncIterator) -> Result<(), JsValue> {
+            let mut stream = JsStream::from(stream).map(to_box_u8_stream);
+
+            ok_or_jserr!(
+                <super::Server<JsStream> as SinkExt<Box<[u8]>>>::send_all(
+                    &mut self.server,
+                    &mut stream
+                )
+                .await
+            )
+        }
+    }
+
+    #[wasm_bindgen]
+    pub fn relay_context(stream: AsyncIterator) -> Result<RelayServer, JsValue> {
+        let stream = JsStream::from(stream);
+
+        let server = super::Server::new(stream);
+
+        Ok(RelayServer { server })
+    }
 }
