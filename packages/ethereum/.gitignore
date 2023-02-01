@@ -18,3 +18,5 @@ contracts/broadcast/*.*/*/*
 contracts/broadcast/*.*/31337
 
 target/
+
+crates/bindings/
