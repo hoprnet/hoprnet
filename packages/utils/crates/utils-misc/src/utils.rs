@@ -22,6 +22,7 @@ pub fn get_package_version(package_file: &str) -> Result<String, RealError> {
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use crate::ok_or_jserr;
+    use paste::paste;
     use wasm_bindgen::prelude::*;
 
     pub type JsResult<T> = Result<T, JsValue>;
@@ -41,5 +42,46 @@ pub mod wasm {
     #[macro_export]
     macro_rules! console_log {
         ($($t:tt)*) => (utils_misc::utils::wasm::log(&format_args!($($t)*).to_string()))
+    }
+
+    /// Creates an iterable type in for JavaScript for the given type.
+    /// This helps passing vectors in and out of wasm_bindgen bound functions.
+    #[macro_export]
+    macro_rules! make_jsiterable {
+        ($t: ident) => {
+            paste! {
+                #[wasm_bindgen(getter_with_clone)]
+                pub struct [<$t IterableNext>] {
+                    pub value: Option<$t>,
+                    pub done: bool,
+                }
+
+                #[wasm_bindgen]
+                pub struct [<$t Iterable>] {
+                    backend: std::collections::VecDeque<$t>
+                }
+
+                #[wasm_bindgen]
+                impl [<$t Iterable>] {
+                    pub fn next(&mut self) -> [<$t IterableNext>] {
+                        let ret = self.backend.pop_front();
+                        [<$t IterableNext>] {
+                            done: ret.is_none(),
+                            value: ret,
+                        }
+                    }
+
+                    pub fn count(&self) -> u32 { self.backend.len() as u32 }
+                }
+
+                impl From<Vec<$t>> for [<$t Iterable>] {
+                    fn from(v: Vec<$t>) -> Self {
+                        Self {
+                            backend: v.into()
+                        }
+                    }
+                }
+            }
+        };
     }
 }

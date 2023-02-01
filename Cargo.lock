@@ -2847,6 +2847,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "paste"
+version = "1.0.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d01a5bd0424d00070b0098dd17ebca6f961a959dead1dbcbbbc1d1cd8d3deeba"
+
+[[package]]
 name = "pbkdf2"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4520,6 +4526,7 @@ dependencies = [
  "console_error_panic_hook",
  "futures 0.3.25",
  "js-sys",
+ "paste",
  "real-base",
  "serde",
  "serde-wasm-bindgen",
