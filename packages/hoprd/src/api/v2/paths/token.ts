@@ -22,13 +22,13 @@ GET.apiDoc = {
         }
       }
     },
-        '401': {
-          $ref: '#/components/responses/Unauthorized'
-        },
-        '422': {
-          $ref: '#/components/responses/UnknownFailure'
-        }
-      }
+    '401': {
+      $ref: '#/components/responses/Unauthorized'
+    },
+    '422': {
+      $ref: '#/components/responses/UnknownFailure'
     }
+  }
+}
 
 export default { GET }

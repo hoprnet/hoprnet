@@ -41,7 +41,7 @@ async function authenticateAndAuthorize(
   const token: Token = await authenticateToken(db, reqToken)
   if (token) {
     // 3. token was found, therefore is authenticated, next check authorization
-    const endpointRef: string = req["operationDoc"].operationId
+    const endpointRef: string = req['operationDoc'].operationId
     if (authorizeToken(db, token, endpointRef)) {
       req.context.token = token
       return true

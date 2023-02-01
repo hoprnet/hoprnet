@@ -50,33 +50,33 @@ export async function authorizeToken(_db: HoprDB, token: Token, endpointRef: str
 
   // Go through all specified capabilities. If at least one entry is set to
   // valid, let the request pass through.
-  const capsChecks = endpointCaps.map(c => {
+  const capsChecks = endpointCaps.map((c) => {
     // Go through all specified limits. If all entries are set to valid, set the
     // limit to be passed.
-    const limitsChecks = c.limits.map(l => {
+    const limitsChecks = c.limits.map((l) => {
       if (l.type === 'calls') {
-          // check that max calls is more than the consumed number
-          return l.max > l.used
+        // check that max calls is more than the consumed number
+        return l.max > l.used
       }
       // unknown limit type, set to invalid
       return false
     })
 
-    return limitsChecks.every(c => c === true)
+    return limitsChecks.every((c) => c === true)
   })
 
-  const tokenAuthorized = capsChecks.some(c => c === true)
+  const tokenAuthorized = capsChecks.some((c) => c === true)
   if (tokenAuthorized) {
     // update limits before returning
-    token.capabilities = endpointCaps.map(c => {
-      return c.limits.map(l => {
-      if (l.type === 'calls') {
+    token.capabilities = endpointCaps.map((c) => {
+      return c.limits.map((l) => {
+        if (l.type === 'calls') {
           // Add or increment field 'used'
           const used = l.used ? ++l.used : 1
           l.used = used
-      }
-      return l
-    })
+        }
+        return l
+      })
     })
     await storeToken(db, token)
   }
