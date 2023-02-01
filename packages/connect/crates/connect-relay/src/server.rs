@@ -6,7 +6,7 @@ use futures::{
     ready,
     stream::Stream,
     task::{Context, Poll},
-    Future, Sink,
+    Future, Sink, StreamExt,
 };
 use pin_project_lite::pin_project;
 use std::sync::{Arc, Mutex};
@@ -120,6 +120,32 @@ impl PingFuture {
     }
 }
 
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+pub struct AsyncIterableHelper {
+    stream: Box<dyn Stream<Item = Result<JsValue, JsValue>>>,
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+impl AsyncIterableHelper {
+    #[wasm_bindgen]
+    pub async fn next(&mut self) {
+        utils_misc::async_iterable::wasm::to_jsvalue_stream(self.stream.as_mut().next().await)
+    }
+}
+
+trait IntoSink<T> {
+    fn into_sink(t: T) {}
+}
+
+impl IntoSink<&js_sys::Function> for &js_sys::Function {
+    fn into_sink(t: &js_sys::Function, stream: impl Stream<Item = Result<Box<[u8]>, String>>) {
+        let this = JsValue::null();
+
+        let arg = JsValue::from(AsyncIterableHelper { stream });
+        let _ = t.call1(&this, &arg);
+    }
+}
+
 struct StreamSharedState<St> {
     can_yield: bool,
 
@@ -203,7 +229,7 @@ where
     St: Stream + Unpin,
     St::Item: IntoItem<St::Item>,
 {
-    fn new(stream: St) -> Self {
+    fn new(stream: St, sink: impl IntoSink<St::Item>) -> Self {
         let (status_messages_tx, status_messages_rx) = mpsc::unbounded::<Box<[u8]>>();
         Self {
             stream: Some(stream),
@@ -408,7 +434,10 @@ pub mod wasm {
     }
 
     #[wasm_bindgen]
-    pub fn relay_context(stream: AsyncIterator) -> Result<RelayServer, JsValue> {
+    pub fn relay_context(
+        stream: AsyncIterator,
+        sink: &js_sys::Function,
+    ) -> Result<RelayServer, JsValue> {
         let stream = JsStream::from(stream);
 
         let server = super::Server::new(stream);
