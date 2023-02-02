@@ -16,7 +16,8 @@ import {
   privKeyToPeerId,
   type ChannelEntry,
   type DeferType,
-  PublicKey, AccountEntry
+  PublicKey,
+  AccountEntry
 } from '@hoprnet/hopr-utils'
 import Indexer from './indexer/index.js'
 import { CORE_ETHEREUM_CONSTANTS } from '../lib/core_ethereum_misc.js'
@@ -62,7 +63,6 @@ type ticketRedemtionInChannelOperations = {
 const constants = CORE_ETHEREUM_CONSTANTS()
 
 export default class HoprCoreEthereum extends EventEmitter {
-
   private static _instance: HoprCoreEthereum
 
   public indexer: Indexer
@@ -89,14 +89,19 @@ export default class HoprCoreEthereum extends EventEmitter {
     )
   }
 
-  public static createInstance(db: HoprDB, publicKey: PublicKey, privateKey: Uint8Array, options: ChainOptions, automaticChainCreation = true) {
+  public static createInstance(
+    db: HoprDB,
+    publicKey: PublicKey,
+    privateKey: Uint8Array,
+    options: ChainOptions,
+    automaticChainCreation = true
+  ) {
     HoprCoreEthereum._instance = new HoprCoreEthereum(db, publicKey, privateKey, options, automaticChainCreation)
     return HoprCoreEthereum._instance
   }
 
   public static get instance(): HoprCoreEthereum {
-    if (!HoprCoreEthereum._instance)
-      throw new Error("non-existent instance of HoprCoreEthereum")
+    if (!HoprCoreEthereum._instance) throw new Error('non-existent instance of HoprCoreEthereum')
     return HoprCoreEthereum._instance
   }
 
