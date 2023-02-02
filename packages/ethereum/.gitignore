@@ -21,3 +21,4 @@ target/
 
 # ignore coverage test outpout
 contracts/lcov.info
+lcov.info
