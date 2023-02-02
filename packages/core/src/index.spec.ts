@@ -1,6 +1,6 @@
 import { rm } from 'fs/promises'
 import assert from 'assert'
-import { createConnectorMock } from '@hoprnet/hopr-core-ethereum'
+import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import { dbMock, debug, privKeyToPeerId } from '@hoprnet/hopr-utils'
 import Hopr, { type HoprOptions } from './index.js'
 import { sampleOptions } from './index.mock.js'
@@ -17,8 +17,8 @@ describe('hopr core (instance)', async function () {
     await rm(sampleOptions.dataPath, { recursive: true, force: true })
 
     log('Creating hopr node...')
-    const connectorMock = createConnectorMock(peerId)
-    const node = new Hopr(peerId, dbMock, connectorMock, sampleOptions as HoprOptions)
+    HoprCoreEthereum.createMockInstance(peerId)
+    const node = new Hopr(peerId, dbMock, sampleOptions as HoprOptions)
 
     log('Node created with Id', node.getId().toString())
     assert(node instanceof Hopr)
@@ -30,6 +30,7 @@ describe('hopr core (instance)', async function () {
     await setTimeout(8000)
 
     await node.stop()
+    await HoprCoreEthereum.instance.stop()
 
     await setTimeout(100)
 

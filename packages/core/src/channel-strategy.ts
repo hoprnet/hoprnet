@@ -72,13 +72,14 @@ export interface ChannelStrategyInterface {
  */
 /*
 export abstract class SaneDefaults {
-  async onWinningTicket(ackTicket: AcknowledgedTicket, chain: HoprCoreEthereum) {
+  async onWinningTicket(ackTicket: AcknowledgedTicket) {
     const counterparty = ackTicket.signer
     log(`auto redeeming tickets in channel to ${counterparty.toPeerId().toString()}`)
-    await chain.redeemTicketsInChannelByCounterparty(counterparty)
+    await HoprCoreEthereum.instance.redeemTicketsInChannelByCounterparty(counterparty)
   }
 
-  async onChannelWillClose(channel: ChannelEntry, chain: HoprCoreEthereum) {
+  async onChannelWillClose(channel: ChannelEntry) {
+    const chain = HoprCoreEthereum.instance;
     const counterparty = channel.source
     const selfPubKey = chain.getPublicKey()
     if (!counterparty.eq(selfPubKey)) {
