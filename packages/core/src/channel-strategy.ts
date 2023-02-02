@@ -1,7 +1,7 @@
 import HoprCoreEthereum, { type ChannelEntry } from '@hoprnet/hopr-core-ethereum'
-import { type AcknowledgedTicket, debug } from '@hoprnet/hopr-utils'
+import { type AcknowledgedTicket, ChannelStatus, debug } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
-import { CHECK_TIMEOUT } from './constants.js'
+import { RS_ChannelEntry } from '@hoprnet/hopr-utils'
 
 const log = debug('hopr-core:channel-strategy')
 
@@ -13,17 +13,17 @@ globalThis.crypto = webcrypto
 import {
   PromiscuousStrategy,
   PassiveStrategy,
+  RandomStrategy,
   StrategyTickResult,
   Balance,
-  utils_misc_set_panic_hook
+  BalanceType,
+  core_strategy_set_panic_hook
 } from '../lib/core_strategy.js'
+import { CHECK_TIMEOUT } from './constants.js'
 
-utils_misc_set_panic_hook()
+core_strategy_set_panic_hook()
 
-export { StrategyTickResult } from '../lib/core_strategy.js'
-
-import { ChannelStatus } from '@hoprnet/hopr-utils'
-
+type RustStrategyInterface = PromiscuousStrategy | PassiveStrategy | RandomStrategy;
 const STRATEGIES = ['passive', 'promiscuous', 'random']
 export type Strategy = typeof STRATEGIES[number]
 
@@ -58,8 +58,8 @@ export interface ChannelStrategyInterface {
     peer_quality: (string) => number
   ): StrategyTickResult
 
-  onChannelWillClose(channel: ChannelEntry, chain: HoprCoreEthereum): Promise<void> // Before a channel closes
-  onWinningTicket(t: AcknowledgedTicket, chain: HoprCoreEthereum): Promise<void>
+  onChannelWillClose(channel: ChannelEntry)
+  onWinningTicket(t: AcknowledgedTicket)
   shouldCommitToChannel(c: ChannelEntry): boolean
 
   tickInterval: number
@@ -70,6 +70,7 @@ export interface ChannelStrategyInterface {
  *
  * At present this does not take gas into consideration.
  */
+/*
 export abstract class SaneDefaults {
   async onWinningTicket(ackTicket: AcknowledgedTicket, chain: HoprCoreEthereum) {
     const counterparty = ackTicket.signer
@@ -97,15 +98,13 @@ export abstract class SaneDefaults {
 
   tickInterval = CHECK_TIMEOUT
 }
-
-type RustStrategyInterface = { configure; tick; name }
+*/
 
 /**
   Temporary wrapper class before we migrate rest of the core to use Rust exported types (before we migrate everything to Rust!)
  */
-class RustStrategyWrapper<T extends RustStrategyInterface> extends SaneDefaults implements ChannelStrategyInterface {
+class RustStrategyWrapper<T extends RustStrategyInterface> implements ChannelStrategyInterface {
   constructor(private strategy: T) {
-    super()
   }
 
   configure(settings: any) {
@@ -118,11 +117,32 @@ class RustStrategyWrapper<T extends RustStrategyInterface> extends SaneDefaults 
     outgoing_channels: OutgoingChannelStatus[],
     peer_quality: (string) => number
   ): StrategyTickResult {
-    return this.strategy.tick(new Balance(balance.toString()), network_peer_ids, outgoing_channels, peer_quality)
+    return this.strategy.tick(
+      new Balance(balance.toString(), BalanceType.HOPR),
+      network_peer_ids,
+      outgoing_channels,
+      peer_quality
+    )
   }
 
   get name() {
     return this.strategy.name
+  }
+
+  tickInterval: number = CHECK_TIMEOUT
+
+  onChannelWillClose(channel: ChannelEntry) {
+  }
+
+  onWinningTicket(t: AcknowledgedTicket) {
+  }
+
+  shouldCommitToChannel(_c: ChannelEntry): boolean {
+    let ce: RS_ChannelEntry =  {
+      source: Pub
+    }
+
+    return this.strategy.should_commit_to_channel(ce)
   }
 }
 

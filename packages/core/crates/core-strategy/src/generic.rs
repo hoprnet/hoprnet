@@ -1,4 +1,4 @@
-use utils_types::channels::ChannelStatus;
+use utils_types::channels::{AcknowledgedTicket, ChannelEntry, ChannelStatus};
 use utils_types::primitives::Balance;
 use utils_types::primitives::BalanceType::HOPR;
 
@@ -30,10 +30,14 @@ pub trait ChannelStrategy {
     where
         Q: Fn(&str) -> Option<f64>;
 
+    /// Performs a strategy action when a winning ticket has been encountered
+    fn on_winning_ticket(&self, ack_ticket: &AcknowledgedTicket);
+
+    /// Performs a strategy action when a channel will be closed
+    fn on_channel_closing(&self, channel: &ChannelEntry);
+
     /// Indicates if according to this strategy, a commitment should be made for the given channel.
-    fn should_commit_to_channel(&self, _channel: &OutgoingChannelStatus) -> bool {
-        true
-    }
+    fn should_commit_to_channel(&self, _channel: &ChannelEntry) -> bool;
 }
 
 /// Represents a request to open a channel with a stake.
@@ -163,16 +167,17 @@ pub mod wasm {
         }
     }
 
-    /// Generic binding for all strategies to use in WASM wrappers
-    /// Since wasm_bindgen annotation is not supported on trait impls, the WASM-wrapped strategies cannot implement a common trait.
-    pub fn tick_wrap<S: ChannelStrategy>(
-        strategy: &S,
-        balance: Balance,
-        peer_ids: &js_sys::Iterator,
-        outgoing_channels: JsValue,
-        quality_of: &js_sys::Function,
-    ) -> JsResult<StrategyTickResult> {
-        Ok(strategy.tick(
+    /// A common trait that is implemented by all ChannelStrategies when "wasm" feature is enabled.
+    /// It contains a wrapper converting types of the ChannelStrategy::tick() method to
+    /// a WasmChannelStrategy::wrapped_tick() methods that uses WASM-specific types.
+    pub trait WasmChannelStrategy : ChannelStrategy {
+        fn wrapped_tick(&self,
+            balance: Balance,
+            peer_ids: &js_sys::Iterator,
+            outgoing_channels: JsValue,
+            quality_of: &js_sys::Function,
+        ) -> JsResult<StrategyTickResult> {
+            Ok(self.tick(
                 balance,
                 peer_ids
                     .into_iter()
@@ -182,13 +187,14 @@ pub mod wasm {
                     .map(|c| super::OutgoingChannelStatus::from(c))
                     .collect(),
                 |peer_id: &str| {
-                        quality_of
-                            .call1(&JsValue::null(), &JsString::from(peer_id))
-                            .ok()
-                            .map(|q| q.as_f64())
-                            .flatten()
-                    },
+                    quality_of
+                        .call1(&JsValue::null(), &JsString::from(peer_id))
+                        .ok()
+                        .map(|q| q.as_f64())
+                        .flatten()
+                },
             )
-        )
+            )
+        }
     }
 }

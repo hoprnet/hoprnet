@@ -7,7 +7,7 @@ import chalk from 'chalk'
 import type { BigNumberish } from 'ethers'
 
 import { ChannelStatus } from '../../lib/utils_types.js'
-export { ChannelStatus } from '../../lib/utils_types.js'
+export { ChannelStatus, ChannelEntry as RS_ChannelEntry  } from '../../lib/utils_types.js'
 
 export function generateChannelId(source: Address, destination: Address) {
   return Hash.create(Uint8Array.from([...source.serialize(), ...destination.serialize()]))

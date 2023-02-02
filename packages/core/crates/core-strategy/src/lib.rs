@@ -3,9 +3,6 @@ pub mod passive;
 pub mod promiscuous;
 pub mod random;
 
-#[macro_use]
-extern crate lazy_static;
-
 #[cfg(feature = "wasm")]
 pub mod wasm {
 

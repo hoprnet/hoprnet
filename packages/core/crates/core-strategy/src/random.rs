@@ -1,3 +1,4 @@
+use utils_types::channels::{AcknowledgedTicket, ChannelEntry};
 use utils_types::primitives::Balance;
 
 use crate::generic::{ChannelStrategy, OutgoingChannelStatus, StrategyTickResult};
@@ -21,6 +22,18 @@ impl ChannelStrategy for RandomStrategy {
     {
         unimplemented!("Cover Traffic Strategy (Random strategy) not yet implemented!");
     }
+
+    fn on_winning_ticket(&self, ack_ticket: &AcknowledgedTicket) {
+        self.on_winning_ticket(ack_ticket)
+    }
+
+    fn on_channel_closing(&self, channel: &ChannelEntry) {
+        self.on_channel_closing(channel)
+    }
+
+    fn should_commit_to_channel(&self, channel: &ChannelEntry) -> bool {
+        self.should_commit_to_channel(channel)
+    }
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -28,6 +41,18 @@ impl RandomStrategy {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new() -> Self {
         RandomStrategy {}
+    }
+
+    pub fn on_winning_ticket(&self, _ack_ticket: &AcknowledgedTicket) {
+        unimplemented!()
+    }
+
+    pub fn on_channel_closing(&self, _channel: &ChannelEntry) {
+        unimplemented!()
+    }
+
+    pub fn should_commit_to_channel(&self, _channel: &ChannelEntry) -> bool {
+        unimplemented!()
     }
 }
 
@@ -54,7 +79,10 @@ pub mod wasm {
     use utils_types::primitives::Balance;
 
     use crate::generic::StrategyTickResult;
+    use crate::generic::wasm::WasmChannelStrategy;
     use crate::random::RandomStrategy;
+
+    impl WasmChannelStrategy for RandomStrategy {}
 
     #[wasm_bindgen]
     impl RandomStrategy {
@@ -71,8 +99,7 @@ pub mod wasm {
             outgoing_channels: JsValue,
             quality_of: &js_sys::Function,
         ) -> JsResult<StrategyTickResult> {
-            crate::generic::wasm::tick_wrap(
-                self,
+            self.wrapped_tick(
                 balance,
                 peer_ids,
                 outgoing_channels,

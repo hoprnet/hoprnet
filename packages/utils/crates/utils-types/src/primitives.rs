@@ -1,7 +1,9 @@
+use std::cmp::Ordering;
 use ethnum::{u256, AsU256};
 use std::ops::{Add, Sub};
 use std::string::ToString;
 use crate::errors::{Result, GeneralError::ParseError};
+use crate::errors::GeneralError::MathError;
 
 pub const ADDRESS_LENGTH: usize = 20;
 
@@ -231,6 +233,76 @@ impl Hash {
     }
 }
 
+#[derive(Clone)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+pub struct U256 {
+    value: u256
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+impl U256 {
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
+    pub fn new(value: &str) -> Self {
+        U256 {
+            value: u256::from_str_radix(value, 10)
+                .expect("invalid decimal number string")
+        }
+    }
+
+    pub fn to_hex(&self) -> String { hex::encode(self.value().to_be_bytes()) }
+
+    pub fn serialize(&self) -> Box<[u8]> {
+        self.value.to_be_bytes().into()
+    }
+
+    pub fn eq(&self, other: &U256) -> bool {
+        self.value.eq(&other.value)
+    }
+
+    pub fn cmp(&self, other: &U256) -> i32 {
+        match self.value.cmp(&other.value) {
+            Ordering::Less => -1,
+            Ordering::Equal => 0,
+            Ordering::Greater => 1,
+        }
+    }
+}
+
+impl U256 {
+    pub fn deserialize(data: &[u8]) -> Result<U256> {
+        Ok(U256{
+            value: u256::from_be_bytes(data.try_into().map_err(|_|ParseError)?)
+        })
+    }
+
+    pub fn value(&self) -> &u256 {
+        &self.value
+    }
+
+    pub fn from_inverse_probability(inverse_prob: &u256) -> Result<U256> {
+        let higest_prob = u256::MAX;
+        if inverse_prob.gt(&u256::ZERO) {
+            Ok(U256{
+                value: higest_prob / inverse_prob
+            })
+        }
+        else if inverse_prob.eq(&u256::ZERO) {
+            Ok(U256 {
+                value: higest_prob
+            })
+        }
+        else {
+            Err(MathError)
+        }
+    }
+}
+
+impl From<u256> for U256 {
+    fn from(value: u256) -> Self {
+        U256 { value }
+    }
+}
+
 /// Unit tests of pure Rust code
 #[cfg(test)]
 mod tests {
@@ -248,12 +320,23 @@ pub mod wasm {
     use wasm_bindgen::prelude::wasm_bindgen;
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
-    use crate::primitives::{Balance, BalanceType, EthereumChallenge};
+    use crate::primitives::{Balance, BalanceType, EthereumChallenge, U256};
 
     #[wasm_bindgen]
     impl Balance {
         pub fn deserialize_balance(data: &[u8], balance_type: BalanceType) -> JsResult<Balance> {
             ok_or_jserr!(Balance::deserialize(data, balance_type))
+        }
+    }
+
+    #[wasm_bindgen]
+    impl U256 {
+        pub fn deserialize_u256(data: &[u8]) -> JsResult<U256> {
+            ok_or_jserr!(U256::deserialize(data))
+        }
+
+        pub fn u256_from_inverse_probability(inverse_prob: &U256) -> JsResult<U256> {
+            ok_or_jserr!(U256::from_inverse_probability(inverse_prob.value()))
         }
     }
 

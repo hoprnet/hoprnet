@@ -1,3 +1,4 @@
+use utils_types::channels::{AcknowledgedTicket, ChannelEntry};
 use utils_types::primitives::Balance;
 
 use crate::generic::{ChannelStrategy, OutgoingChannelStatus, StrategyTickResult};
@@ -21,6 +22,21 @@ impl ChannelStrategy for PassiveStrategy {
     {
         StrategyTickResult::new(0, vec![], vec![])
     }
+
+    // Re-implementations to satisfy the trait, because
+    // we cannot put #[wasm_bindgen] on trait impl blocks
+
+    fn on_winning_ticket(&self, ack_ticket: &AcknowledgedTicket) {
+        self.on_winning_ticket(ack_ticket)
+    }
+
+    fn on_channel_closing(&self, channel: &ChannelEntry) {
+        self.on_channel_closing(channel)
+    }
+
+    fn should_commit_to_channel(&self, channel: &ChannelEntry) -> bool {
+        self.should_commit_to_channel(channel)
+    }
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -28,6 +44,18 @@ impl PassiveStrategy {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new() -> Self {
         PassiveStrategy {}
+    }
+
+    pub fn on_winning_ticket(&self, _ack_ticket: &AcknowledgedTicket) {
+        // Passive strategy does nothing
+    }
+
+    pub fn on_channel_closing(&self, _channel: &ChannelEntry) {
+        // Passive strategy does nothing
+    }
+
+    pub fn should_commit_to_channel(&self, _channel: &ChannelEntry) -> bool {
+        true
     }
 }
 
@@ -52,7 +80,10 @@ pub mod wasm {
 
     use utils_misc::utils::wasm::JsResult;
     use utils_types::primitives::Balance;
+    use crate::generic::wasm::WasmChannelStrategy;
     use crate::passive::PassiveStrategy;
+
+    impl WasmChannelStrategy for PassiveStrategy { }
 
     #[wasm_bindgen]
     impl PassiveStrategy {
@@ -69,13 +100,7 @@ pub mod wasm {
             outgoing_channels: JsValue,
             quality_of: &js_sys::Function,
         ) -> JsResult<StrategyTickResult> {
-            crate::generic::wasm::tick_wrap(
-                self,
-                balance,
-                peer_ids,
-                outgoing_channels,
-                quality_of,
-            )
+            self.wrapped_tick(balance, peer_ids, outgoing_channels, quality_of)
         }
     }
 }

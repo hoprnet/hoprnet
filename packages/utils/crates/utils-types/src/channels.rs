@@ -3,7 +3,7 @@ use serde_repr::*;
 use crate::crypto::{PublicKey, Signature};
 use crate::errors::GeneralError;
 use crate::errors::GeneralError::ParseError;
-use crate::primitives::{Address, Balance, EthereumChallenge, Hash};
+use crate::primitives::{Address, Balance, EthereumChallenge, Hash, U256};
 
 /// Describes status of the channel
 #[repr(u8)]
@@ -14,6 +14,27 @@ pub enum ChannelStatus {
     WaitingForCommitment = 1,
     Open = 2,
     PendingToClose = 3
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
+pub struct AcknowledgedTicket {
+    pub ticket: Ticket,
+    pub response: Response,
+    pub pre_image: Hash,
+    pub signer: PublicKey
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
+pub struct ChannelEntry {
+    pub source: PublicKey,
+    pub destination: PublicKey,
+    pub balance: Balance,
+    pub commitment: Hash,
+    pub ticket_epoch: U256,
+    pub ticket_index: U256,
+    pub status: ChannelStatus,
+    pub channel_epoch: U256,
+    pub closure_time: U256,
 }
 
 // TODO: Update to use secp256k1 private key length constant from core-crypto
@@ -61,79 +82,12 @@ impl Response {
 pub struct Ticket {
     pub counterparty: Address,
     pub challenge: EthereumChallenge,
-    epoch: u256,
-    index: u256,
+    pub epoch: U256,
+    pub index: U256,
     pub amount: Balance,
-    win_prob: u256,
-    channel_epoch: u256,
+    pub win_prob: U256,
+    pub channel_epoch: U256,
     pub signature: Signature
-}
-
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-impl Ticket {
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter))]
-    pub fn epoch(&self) -> String {
-        self.epoch.to_string()
-    }
-
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter))]
-    pub fn index(&self) -> String {
-        self.index.to_string()
-    }
-
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter))]
-    pub fn win_probability(&self) -> String {
-        self.win_prob.to_string()
-    }
-
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter))]
-    pub fn channel_epoch(&self) -> String {
-        self.channel_epoch.to_string()
-    }
-}
-
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
-pub struct AcknowledgedTicket {
-    pub ticket: Ticket,
-    pub response: Response,
-    pub pre_image: Hash,
-    pub signer: PublicKey
-}
-
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
-pub struct ChannelEntry {
-    pub source: PublicKey,
-    pub destination: PublicKey,
-    pub balance: Balance,
-    pub commitment: Hash,
-    ticket_epoch: u256,
-    ticket_index: u256,
-    pub status: ChannelStatus,
-    channel_epoch: u256,
-    closure_time: u256,
-}
-
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-impl ChannelEntry {
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter))]
-    pub fn ticket_epoch(&self) -> String {
-        self.ticket_epoch.to_string()
-    }
-
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter))]
-    pub fn ticket_index(&self) -> String {
-        self.ticket_index.to_string()
-    }
-
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter))]
-    pub fn channel_epoch(&self) -> String {
-        self.channel_epoch.to_string()
-    }
-
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter))]
-    pub fn closure_time(&self) -> String {
-        self.closure_time.to_string()
-    }
 }
 
 #[cfg(feature = "wasm")]
@@ -141,7 +95,45 @@ pub mod wasm {
     use wasm_bindgen::prelude::wasm_bindgen;
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
-    use crate::channels::Response;
+    use crate::channels::{AcknowledgedTicket, ChannelEntry, ChannelStatus, Response, Ticket};
+    use crate::crypto::{PublicKey, Signature};
+    use crate::primitives::{Address, Balance, EthereumChallenge, Hash, U256};
+
+    #[wasm_bindgen]
+    impl AcknowledgedTicket {
+        #[wasm_bindgen(constructor)]
+        pub fn new(
+            ticket: Ticket,
+            response: Response,
+            pre_image: Hash,
+            signer: PublicKey
+        ) -> Self {
+            AcknowledgedTicket {
+                ticket, response, pre_image, signer
+            }
+        }
+    }
+
+    #[wasm_bindgen]
+    impl ChannelEntry {
+        #[wasm_bindgen(constructor)]
+        pub fn new(
+            source: PublicKey,
+            destination: PublicKey,
+            balance: Balance,
+            commitment: Hash,
+            ticket_epoch: U256,
+            ticket_index: U256,
+            status: ChannelStatus,
+            channel_epoch: U256,
+            closure_time: U256,
+        ) -> Self {
+            ChannelEntry {
+                source, destination, balance, commitment, ticket_epoch, ticket_index, status,
+                channel_epoch, closure_time
+            }
+        }
+    }
 
     #[wasm_bindgen]
     impl Response {
@@ -149,4 +141,25 @@ pub mod wasm {
             ok_or_jserr!(Response::deserialize(data))
         }
     }
+
+    #[wasm_bindgen]
+    impl Ticket {
+        #[wasm_bindgen(constructor)]
+        pub fn new(
+            counterparty: Address,
+            challenge: EthereumChallenge,
+            epoch: U256,
+            index: U256,
+            amount: Balance,
+            win_prob: U256,
+            channel_epoch: U256,
+            signature: Signature
+        ) -> Self {
+            Ticket {
+                counterparty, challenge, epoch, index, amount, win_prob, channel_epoch, signature
+            }
+        }
+    }
+
+
 }

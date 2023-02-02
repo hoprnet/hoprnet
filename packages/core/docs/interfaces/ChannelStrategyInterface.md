@@ -21,7 +21,7 @@ Implementors should bear in mind:
 
 - [configure](ChannelStrategyInterface.md#configure)
 - [onChannelWillClose](ChannelStrategyInterface.md#onchannelwillclose)
-- [onWinningTicket](ChannelStrategyInterface.md#onwinningticket)
+- [on_winning_ticket](ChannelStrategyInterface.md#onwinningticket)
 - [shouldCommitToChannel](ChannelStrategyInterface.md#shouldcommittochannel)
 - [tick](ChannelStrategyInterface.md#tick)
 
@@ -88,9 +88,9 @@ ___
 
 ___
 
-### onWinningTicket
+### on_winning_ticket
 
-▸ **onWinningTicket**(`t`, `chain`): `Promise`<`void`\>
+▸ **on_winning_ticket**(`t`, `chain`): `Promise`<`void`\>
 
 #### Parameters
 

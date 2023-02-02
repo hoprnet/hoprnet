@@ -548,7 +548,7 @@ class Hopr extends EventEmitter {
    */
   private async onOwnChannelUpdated(channel: ChannelEntry): Promise<void> {
     if (channel.status === ChannelStatus.PendingToClose) {
-      await this.strategy.onChannelWillClose(channel, this.connector)
+      this.strategy.onChannelWillClose(channel)
     }
   }
 
@@ -1137,7 +1137,7 @@ class Hopr extends EventEmitter {
 
     this.connector.on('ticket:win', async (ack: AcknowledgedTicket) => {
       try {
-        await this.strategy.onWinningTicket(ack, this.connector)
+        this.strategy.onWinningTicket(ack)
       } catch (err) {
         error(`Strategy error while handling winning ticket`, err)
       }
@@ -1253,7 +1253,7 @@ class Hopr extends EventEmitter {
     }
 
     if (channel.status === ChannelStatus.Open) {
-      await this.strategy.onChannelWillClose(channel, this.connector)
+      this.strategy.onChannelWillClose(channel)
     }
 
     let txHash: string

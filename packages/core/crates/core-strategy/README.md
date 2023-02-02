@@ -38,6 +38,11 @@ The sorting algorithm is intentionally unstable, so that the nodes which have th
 The constant `k` can be also set to a value > 1, which will make the strategy to open more channels for smaller networks,
 but it would keep the same asymptotic properties.
 
+All the above parameters can be changed at runtime.
+
+If the `Nmax` value is set to a lower value than there are opened channels, the strategy will close
+channels regardless the `Q` quality threshold to satisfy the `Nmax` limit (but still worse quality channels will close first).
+
 ## Random Strategy
 
 Currently not yet implemented.

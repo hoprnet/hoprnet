@@ -1,5 +1,6 @@
 use rand::rngs::OsRng;
 use rand::seq::SliceRandom;
+use utils_types::channels::{AcknowledgedTicket, ChannelEntry};
 
 use utils_types::channels::ChannelStatus::{Open, PendingToClose};
 use utils_types::primitives::{Balance, BalanceType::HOPR};
@@ -29,6 +30,21 @@ impl PromiscuousStrategy {
             minimum_node_balance: Balance::from_str("100000000000000000", HOPR),
             max_channels: None
         }
+    }
+
+    // Re-implementations to satisfy the trait, because
+    // we cannot put #[wasm_bindgen] on trait impl blocks
+
+    pub fn on_winning_ticket(&self, ack_ticket: &AcknowledgedTicket) {
+        todo!()
+    }
+
+    pub fn on_channel_closing(&self, channel: &ChannelEntry) {
+        todo!()
+    }
+
+    pub fn should_commit_to_channel(&self, _channel: &ChannelEntry) -> bool {
+        true
     }
 }
 
@@ -159,6 +175,18 @@ impl ChannelStrategy for PromiscuousStrategy {
 
         StrategyTickResult::new(max_auto_channels, to_open, to_close)
     }
+
+    fn on_winning_ticket(&self, ack_ticket: &AcknowledgedTicket) {
+        self.on_winning_ticket(ack_ticket)
+    }
+
+    fn on_channel_closing(&self, channel: &ChannelEntry) {
+        self.on_channel_closing(channel)
+    }
+
+    fn should_commit_to_channel(&self, channel: &ChannelEntry) -> bool {
+        self.should_commit_to_channel(channel)
+    }
 }
 
 /// Unit tests of pure Rust code
@@ -188,6 +216,14 @@ mod tests {
         static ref LOW_BALANCE: Balance = Balance::from_str("1000000000000000", HOPR);
     }
 
+    fn make_channel(channel: (&str, &Balance)) -> OutgoingChannelStatus {
+        OutgoingChannelStatus {
+            peer_id: channel.0.to_string(),
+            stake: channel.1.clone(),
+            status: Open
+        }
+    }
+
     #[test]
     fn test_promiscuous_basic() {
         let strat = PromiscuousStrategy::new();
@@ -195,21 +231,9 @@ mod tests {
         assert_eq!(strat.name(), "promiscuous");
 
         let outgoing_channels = vec![
-            OutgoingChannelStatus {
-                peer_id: "Alice".to_string(),
-                stake: DEFAULT_BALANCE.clone(),
-                status: Open,
-            },
-            OutgoingChannelStatus {
-                peer_id: "Charlie".to_string(),
-                stake: DEFAULT_BALANCE.clone(),
-                status: Open,
-            },
-            OutgoingChannelStatus {
-                peer_id: "Gustave".to_string(),
-                stake: LOW_BALANCE.clone(),
-                status: Open,
-            },
+            make_channel(("Alice", &DEFAULT_BALANCE)),
+            make_channel(("Charlie", &DEFAULT_BALANCE)),
+            make_channel(("Gustave", &LOW_BALANCE)),
         ];
 
         let results = strat.tick(
@@ -238,21 +262,9 @@ mod tests {
         strat.max_channels = Some(2);
 
         let outgoing_channels = vec![
-            OutgoingChannelStatus {
-                peer_id: "Charlie".to_string(),
-                stake: DEFAULT_BALANCE.clone(),
-                status: Open,
-            },
-            OutgoingChannelStatus {
-                peer_id: "Gustave".to_string(),
-                stake: DEFAULT_BALANCE.clone(),
-                status: Open,
-            },
-            OutgoingChannelStatus {
-                peer_id: "Eugene".to_string(),
-                stake: DEFAULT_BALANCE.clone(),
-                status: Open,
-            },
+            make_channel(("Charlie", &DEFAULT_BALANCE)),
+            make_channel(("Gustave", &DEFAULT_BALANCE)),
+            make_channel(("Eugene", &DEFAULT_BALANCE)),
         ];
 
         let results = strat.tick(
@@ -281,7 +293,10 @@ pub mod wasm {
 
     use crate::generic::StrategyTickResult;
     use crate::generic::ChannelStrategy;
+    use crate::generic::wasm::WasmChannelStrategy;
     use crate::promiscuous::PromiscuousStrategy;
+
+    impl WasmChannelStrategy for PromiscuousStrategy {}
 
     #[wasm_bindgen]
     impl PromiscuousStrategy {
@@ -298,8 +313,7 @@ pub mod wasm {
             outgoing_channels: JsValue,
             quality_of: &js_sys::Function,
         ) -> JsResult<StrategyTickResult> {
-            crate::generic::wasm::tick_wrap(
-                self,
+            self.wrapped_tick(
                 balance,
                 peer_ids,
                 outgoing_channels,
