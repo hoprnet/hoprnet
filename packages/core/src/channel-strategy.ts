@@ -1,7 +1,6 @@
 import HoprCoreEthereum, { type ChannelEntry } from '@hoprnet/hopr-core-ethereum'
-import { type AcknowledgedTicket, ChannelStatus, debug } from '@hoprnet/hopr-utils'
+import { type AcknowledgedTicket, ChannelStatus, debug, RS_ChannelEntry } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
-import { RS_ChannelEntry } from '@hoprnet/hopr-utils'
 
 const log = debug('hopr-core:channel-strategy')
 
@@ -139,9 +138,7 @@ class RustStrategyWrapper<T extends RustStrategyInterface> implements ChannelStr
   }
 
   shouldCommitToChannel(_c: ChannelEntry): boolean {
-    let ce: RS_ChannelEntry =  {
-      source: Pub
-    }
+    let ce: RS_ChannelEntry = new ChannelEntry()
 
     return this.strategy.should_commit_to_channel(ce)
   }

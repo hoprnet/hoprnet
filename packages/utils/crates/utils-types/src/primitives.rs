@@ -310,7 +310,7 @@ mod tests {
 
     #[test]
     fn balance_tests() {
-        let b = Balance::from_str("10", BalanceType::HOPR).unwrap();
+        let b = Balance::from_str("10", BalanceType::HOPR);
         assert_eq!("10".to_string(), b.to_string());
     }
 }

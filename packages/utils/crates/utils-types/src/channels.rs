@@ -1,4 +1,3 @@
-use ethnum::u256;
 use serde_repr::*;
 use crate::crypto::{PublicKey, Signature};
 use crate::errors::GeneralError;
