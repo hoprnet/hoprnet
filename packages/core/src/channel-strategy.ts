@@ -78,7 +78,7 @@ export abstract class SaneDefaults {
   }
 
   async onChannelWillClose(channel: ChannelEntry) {
-    const chain = HoprCoreEthereum.instance;
+    const chain = HoprCoreEthereum.instance
     const counterparty = channel.source
     const selfPubKey = chain.getPublicKey()
     if (!counterparty.eq(selfPubKey)) {
