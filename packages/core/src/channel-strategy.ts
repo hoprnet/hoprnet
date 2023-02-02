@@ -23,7 +23,7 @@ import { CHECK_TIMEOUT } from './constants.js'
 
 core_strategy_set_panic_hook()
 
-type RustStrategyInterface = PromiscuousStrategy | PassiveStrategy | RandomStrategy;
+type RustStrategyInterface = PromiscuousStrategy | PassiveStrategy | RandomStrategy
 const STRATEGIES = ['passive', 'promiscuous', 'random']
 export type Strategy = typeof STRATEGIES[number]
 
@@ -104,8 +104,7 @@ export abstract class SaneDefaults {
   Temporary wrapper class before we migrate rest of the core to use Rust exported types (before we migrate everything to Rust!)
  */
 class RustStrategyWrapper<T extends RustStrategyInterface> implements ChannelStrategyInterface {
-  constructor(private strategy: T) {
-  }
+  constructor(private strategy: T) {}
 
   configure(settings: any) {
     this.strategy.configure(settings)
@@ -131,14 +130,12 @@ class RustStrategyWrapper<T extends RustStrategyInterface> implements ChannelStr
 
   tickInterval: number = CHECK_TIMEOUT
 
-  onChannelWillClose(channel: ChannelEntry) {
-  }
+  onChannelWillClose(channel: ChannelEntry) {}
 
-  onWinningTicket(t: AcknowledgedTicket) {
-  }
+  onWinningTicket(t: AcknowledgedTicket) {}
 
   shouldCommitToChannel(_c: ChannelEntry): boolean {
-    let ce: RS_ChannelEntry =  {
+    let ce: RS_ChannelEntry = {
       source: Pub
     }
 
