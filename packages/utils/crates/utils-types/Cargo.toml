@@ -9,12 +9,13 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 default = ["console_error_panic_hook", "wasm"]
-wasm = ["dep:wasm-bindgen"]
+wasm = ["dep:wasm-bindgen", "dep:js-sys"]
 console_error_panic_hook = [ "dep:console_error_panic_hook" ]
 
 [dependencies]
 ethnum = { version = "1.3.2", features = ["serde"] }
 hex = "0.4.3"
+js-sys = { version = "0.3", optional = true}
 lazy_static = "1.4"
 serde = "1.0"
 serde_repr = "0.1"

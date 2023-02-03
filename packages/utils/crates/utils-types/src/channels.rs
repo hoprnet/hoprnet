@@ -1,8 +1,8 @@
 use serde_repr::*;
-use crate::crypto::{PublicKey, Signature};
+use crate::crypto::{Hash, PublicKey, Signature};
 use crate::errors::GeneralError;
 use crate::errors::GeneralError::ParseError;
-use crate::primitives::{Address, Balance, EthereumChallenge, Hash, U256};
+use crate::primitives::{Address, Balance, EthereumChallenge, U256};
 
 /// Describes status of the channel
 #[repr(u8)]
@@ -95,8 +95,8 @@ pub mod wasm {
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use crate::channels::{AcknowledgedTicket, ChannelEntry, ChannelStatus, Response, Ticket};
-    use crate::crypto::{PublicKey, Signature};
-    use crate::primitives::{Address, Balance, EthereumChallenge, Hash, U256};
+    use crate::crypto::{Hash, PublicKey, Signature};
+    use crate::primitives::{Address, Balance, EthereumChallenge, U256};
 
     #[wasm_bindgen]
     impl AcknowledgedTicket {

@@ -200,39 +200,6 @@ impl EthereumChallenge {
     }
 }
 
-pub const HASH_LENGTH: usize = 32;
-
-#[derive(Clone)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-pub struct Hash {
-    hash: [u8; HASH_LENGTH],
-}
-
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-impl Hash {
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
-    pub fn new(hash: &[u8]) -> Self {
-        assert_eq!(hash.len(), HASH_LENGTH, "invalid length");
-        let mut ret = Hash {
-            hash: [0u8; HASH_LENGTH]
-        };
-        ret.hash.copy_from_slice(hash);
-        ret
-    }
-
-    pub fn to_hex(&self) -> String {
-        hex::encode(self.hash)
-    }
-
-    pub fn serialize(&self) -> Box<[u8]> {
-        self.hash.into()
-    }
-
-    pub fn eq(&self, other: &Hash) -> bool {
-        self.hash.eq(&other.hash)
-    }
-}
-
 #[derive(Clone)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct U256 {

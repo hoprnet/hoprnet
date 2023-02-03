@@ -1,3 +1,5 @@
+extern crate core;
+
 pub mod primitives;
 pub mod channels;
 pub mod generic;

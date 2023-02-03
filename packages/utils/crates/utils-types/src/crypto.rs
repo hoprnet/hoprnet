@@ -6,13 +6,62 @@ use k256::{elliptic_curve, NonZeroScalar, Secp256k1};
 use k256::ecdsa::signature::Verifier;
 use k256::elliptic_curve::sec1::ToEncodedPoint;
 use libp2p_core::PeerId;
+use sha3::{Keccak256, digest::DynDigest};
 use crate::errors::{Result, GeneralError::ParseError};
+use crate::primitives::Address;
+
+pub const HASH_LENGTH: usize = 32;
+
+#[derive(Clone)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+pub struct Hash {
+    hash: [u8; HASH_LENGTH],
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+impl Hash {
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
+    pub fn new(hash: &[u8]) -> Self {
+        assert_eq!(hash.len(), HASH_LENGTH, "invalid length");
+        let mut ret = Hash {
+            hash: [0u8; HASH_LENGTH]
+        };
+        ret.hash.copy_from_slice(hash);
+        ret
+    }
+
+    pub fn to_hex(&self) -> String {
+        hex::encode(self.hash)
+    }
+
+    pub fn serialize(&self) -> Box<[u8]> {
+        self.hash.into()
+    }
+
+    pub fn eq(&self, other: &Hash) -> bool {
+        self.hash.eq(&other.hash)
+    }
+}
+
+impl Hash {
+    pub fn create(inputs: &[&[u8]]) -> Self {
+        let mut hash = Keccak256::default();
+        inputs.into_iter().for_each(|v| hash.update(*v));
+        let mut ret = Hash {
+            hash: [0u8; HASH_LENGTH]
+        };
+        hash.finalize_into(&mut ret.hash).unwrap();
+
+        ret
+    }
+}
 
 #[derive(Clone, Eq, PartialEq, Debug)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct PublicKey {
+    // A Schrödinger public key, both compressed and uncompressed to save some cycles
     key: elliptic_curve::PublicKey<Secp256k1>,
-    compressed: Box<[u8]> // cache the compressed form to save some cycles
+    compressed: Box<[u8]>
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -36,6 +85,12 @@ impl PublicKey {
 
     pub fn to_peerid_str(&self) -> String {
         self.to_peerid().to_base58()
+    }
+
+    pub fn to_address(&self) -> Address {
+        let uncompressed = self.serialize(false);
+        let serialized = Hash::create(&[&uncompressed[1..]]).serialize();
+        Address::new(&serialized[12..])
     }
 
 }
@@ -221,15 +276,25 @@ pub mod tests {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
+    use js_sys::Uint8Array;
+    use sha3::{Keccak256, digest::DynDigest};
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use wasm_bindgen::prelude::*;
-    use crate::crypto::{PublicKey, Signature};
+    use crate::crypto::{Hash, HASH_LENGTH, PublicKey, Signature};
 
     #[wasm_bindgen]
-    impl Signature {
-        pub fn deserialize_signature(signature: &[u8]) -> JsResult<Signature> {
-            ok_or_jserr!(Signature::deserialize(signature))
+    impl Hash {
+        pub fn create_from(inputs: Vec<Uint8Array>) -> Self {
+            let mut hash = Keccak256::default();
+            inputs.into_iter().map(|a| a.to_vec()).for_each(|v| hash.update(&v));
+
+            let mut ret = Hash {
+                hash: [0u8; HASH_LENGTH]
+            };
+            hash.finalize_into(&mut ret.hash).unwrap();
+
+            ret
         }
     }
 
@@ -241,6 +306,13 @@ pub mod wasm {
 
         pub fn public_key_from_peerid_str(peer_id: &str) -> JsResult<PublicKey> {
             ok_or_jserr!(PublicKey::from_peerid_str(peer_id))
+        }
+    }
+
+    #[wasm_bindgen]
+    impl Signature {
+        pub fn deserialize_signature(signature: &[u8]) -> JsResult<Signature> {
+            ok_or_jserr!(Signature::deserialize(signature))
         }
     }
 }
