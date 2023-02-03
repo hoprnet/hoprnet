@@ -23,30 +23,40 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
   /**
    * @dev Possible channel states.
    *
-   *         finalizeChannelClosure()    +----------------------+
-   *              (After delay)          |                      | initiateChannelClosure()
-   *                    +----------------+   Pending To Close   |<-----------------+
-   *                    |                |                      |                  |
-   *                    |                +----------------------+                  |
-   *                    |                              ^                           |
-   *                    |                              |                           |
-   *                    |                              |  initiateChannelClosure() |
-   *                    |                              |  (If not committed)       |
-   *                    v                              |                           |
-   *             +------------+                        +-+                    +----+-----+
-   *             |            |                          |                    |          |
-   *             |   Closed   +--------------------------+--------------------+   Open   |
-   *             |            |    tokensReceived()      |                    |          |
-   *             +------+-----+ (If already committed) +-+                    +----------+
-   *                    |                              |                           ^
-   *                    |                              |                           |
-   *                    |                              |                           |
-   *   tokensReceived() |                              |                           | bumpChannel()
-   *                    |              +---------------+------------+              |
-   *                    |              |                            |              |
-   *                    +--------------+   Waiting For Commitment   +--------------+
-   *                                   |                            |
-   *                                   +----------------------------+
+   *                  finalizeChannelClosure() +----------------------+
+   *                       (After delay)       |                      | initiateChannelClosure()
+   *                    +----------------------+   Pending To Close   |<-----------------------+
+   *                    |                      |                      |                        |
+   *                    |                      +----------------------+                        |
+   *                    |                                    ^                                 |
+   *                    |                                    |                                 |
+   *                    |                                    | initiateChannelClosure()        |
+   *                    |                                    | (If not committed)              |
+   *                    v                                    |                                 |
+   *             +------------+  finalizeChannelClosure()    +-+                          +----+-----+
+   *             |            |     (by destination)           |                          |          |
+   *             |   Closed   |<-------------------------------+------------------------->|   Open   |
+   *             |            |<-------------------------+     |     tokensReceived(()    |          |
+   *             +------+-----+                          |   +-+  (If already committed)  +----------+
+   *                    |                                |   |                                 ^
+   *                    |       finalizeChannelClosure() |   |                                 |
+   *                    |          (by destination)      |   |                                 |
+   *   tokensReceived() |                                |   |                                 | bumpChannel()
+   *                    |                    +---------------+------------+                    |
+   *                    |                    |                            |                    |
+   *                    +--------------------+   Waiting For Commitment   +--------------------+
+   *                                         |                            |
+   *                                         +----------------------------+
+   *
+   *
+   * Lifecycle of a channel can follow:
+   * - CLOSED -> WAITING_FOR_COMMITMENT -> OPEN -> PENDING_TO_CLOSE -> CLOSED (when channel closed by source, or during the cool-off period, closed by destination)
+   * - CLOSED -> WAITING_FOR_COMMITMENT -> PENDING_TO_CLOSE -> CLOSED (when channel destination doesn't bump)
+   * - CLOSED -> OPEN -> PENDING_TO_CLOSE -> CLOSED (when a bumped channel gets new funds and is closed by source)
+   * - CLOSED -> WAITING_FOR_COMMITMENT -> OPEN -> CLOSED (when channel closed by destination)
+   * - CLOSED -> WAITING_FOR_COMMITMENT -> CLOSED (when channel destination doesn't bump but prefers not being the destination, so shutting down the channel immediately)
+   * - CLOSED -> OPEN -> CLOSED (when a bumped channel gets new funds and is closed by the destination)
+   *
    */
   enum ChannelStatus {
     CLOSED,
@@ -170,6 +180,18 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     require(source != destination, 'source and destination must not be the same');
     require(source != address(0), 'source must not be empty');
     require(destination != address(0), 'destination must not be empty');
+    _;
+  }
+
+  /**
+   * Assert that caller is either a source or a destination
+   */
+  modifier isSourceOrDest(
+    address caller,
+    address source,
+    address destination
+  ) {
+    require(caller == source || caller == destination, 'caller must be channel source or destination');
     _;
   }
 
@@ -322,25 +344,39 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
   }
 
   /**
-   * @dev Finalize the channel closure, if cool-off period
-   * is over it will close the channel and transfer funds
-   * to the sender. Then emits {ChannelUpdated} and the
-   * {ChannelClosureFinalized} event.
+   * @dev Finalize the channel closure.
+   *
+   * For outgoing channel, if cool-off period is over it will close the channel
+   * and transfer funds to the sender.
+   * For incoming channel, close the channel immediately
+   *
+   * It emits {ChannelUpdated} and the {ChannelClosureFinalized} event.
+   * @param source the address of the source
    * @param destination the address of the counterparty
    */
-  function finalizeChannelClosure(address destination) external validateSourceAndDest(msg.sender, destination) {
-    (, Channel storage channel) = _getChannel(msg.sender, destination);
-    require(channel.status == ChannelStatus.PENDING_TO_CLOSE, 'channel must be pending to close');
-    require(channel.closureTime < _currentBlockTimestamp(), 'closureTime must be before now');
+  function finalizeChannelClosure(address source, address destination)
+    external
+    isSourceOrDest(msg.sender, source, destination)
+    validateSourceAndDest(source, destination)
+  {
+    (, Channel storage channel) = _getChannel(source, destination);
+    if (source == msg.sender) {
+      // source finalizes an outgoing channel closure
+      require(channel.status == ChannelStatus.PENDING_TO_CLOSE, 'channel must be pending to close');
+      require(channel.closureTime < _currentBlockTimestamp(), 'closureTime must be before now');
+    } else {
+      // destination finalize an incoming channel closure
+      require(channel.status != ChannelStatus.CLOSED, 'channel must not be already closed');
+    }
     uint256 amountToTransfer = channel.balance;
-    emit ChannelClosureFinalized(msg.sender, destination, channel.closureTime, channel.balance);
+    emit ChannelClosureFinalized(source, destination, channel.closureTime, channel.balance);
     delete channel.balance;
     delete channel.closureTime;
     channel.status = ChannelStatus.CLOSED;
-    emit ChannelUpdated(msg.sender, destination, channel);
+    emit ChannelUpdated(source, destination, channel);
 
     if (amountToTransfer > 0) {
-      token.transfer(msg.sender, amountToTransfer);
+      token.transfer(source, amountToTransfer);
     }
   }
 
