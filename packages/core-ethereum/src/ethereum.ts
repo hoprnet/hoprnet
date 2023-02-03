@@ -601,15 +601,17 @@ export async function createChainWrapper(
   /**
    * Initiates a transaction that performs the second step to settle
    * a payment channel.
-   * @param counterparty second participant of the payment channel
+   * @param source source of the payment channel
+   * @param destination destination of the payment channel
    * @param txHandler handler to call once the transaction has been published
    * @returns a Promise that resolves with the transaction hash
    */
   const finalizeChannelClosure = async (
-    counterparty: Address,
+    source: Address,
+    destination: Address,
     txHandler: (tx: string) => DeferType<string>
   ): Promise<Receipt> => {
-    log('Finalizing channel closure to %s', counterparty.to_hex())
+    log('Finalizing channel closure from %s to %s', source.to_hex(), destination.to_hex())
     let sendResult: SendTransactionReturn
     let error: unknown
 
@@ -618,7 +620,8 @@ export async function createChainWrapper(
         0,
         channels,
         'finalizeChannelClosure',
-        counterparty.to_hex()
+        source.to_hex(),
+        destination.to_hex()
       )
       sendResult = await sendTransaction(checkDuplicate, finalizeChannelClosureEssentialTxPayload, txHandler)
     } catch (err) {

@@ -90,10 +90,9 @@ export abstract class SaneDefaults {
   async onChannelWillClose(channel: ChannelEntry) {
     if (this.autoRedeemTickets) {
       const chain = HoprCoreEthereum.getInstance()
-      const counterparty = channel.source
       const selfPubKey = chain.getPublicKey()
-      if (!counterparty.eq(selfPubKey)) {
-        log(`auto redeeming tickets in channel to ${counterparty.to_peerid_str()}`)
+      if (!channel.source.eq(selfPubKey) && channel.destination.eq(selfPubKey)) {
+        log(`auto redeeming tickets in channel to ${channel.source.to_peerid_str()}`)
         try {
           await chain.redeemTicketsInChannel(channel)
         } catch (err) {

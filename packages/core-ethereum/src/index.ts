@@ -501,17 +501,26 @@ export default class HoprCoreEthereum extends EventEmitter {
   }
 
   public async finalizeClosure(src: PublicKey, dest: PublicKey): Promise<string> {
-    // TODO: should remove this blocker when https://github.com/hoprnet/hoprnet/issues/4194 gets addressed
-    if (!this.publicKey.eq(src)) {
-      throw Error('Finalizing incoming channel closure currently is not supported.')
-    }
     const c = await this.db.getChannelX(src, dest)
-    if (c.status !== ChannelStatus.PendingToClose) {
-      throw Error('Channel status is not PENDING_TO_CLOSE')
+    if (this.publicKey.eq(dest)) {
+      // for incoming channel
+      if (c.status === ChannelStatus.Closed) {
+        throw Error('Channel status is already CLOSED')
+      }
+      return await this.chain.finalizeChannelClosure(src.to_address(), dest.to_address(), (txHash: string) =>
+        this.setTxHandler(`channel-updated-${txHash}`, txHash)
+      )
+    } else if (this.publicKey.eq(src)) {
+      // for outgoing channel
+      if (c.status !== ChannelStatus.PendingToClose) {
+        throw Error('Channel status is not PENDING_TO_CLOSE')
+      }
+      return await this.chain.finalizeChannelClosure(src.to_address(), dest.to_address(), (txHash: string) =>
+        this.setTxHandler(`channel-updated-${txHash}`, txHash)
+      )
+    } else {
+      throw Error('Cannot finalize closure for channels irrelevant to this node')
     }
-    return await this.chain.finalizeChannelClosure(dest.to_address(), (txHash: string) =>
-      this.setTxHandler(`channel-updated-${txHash}`, txHash)
-    )
   }
 
   public async openChannel(dest: PublicKey, amount: Balance): Promise<{ channelId: Hash; receipt: Receipt }> {

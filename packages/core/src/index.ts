@@ -1359,35 +1359,31 @@ class Hopr extends EventEmitter {
       await this.strategy.onChannelWillClose(channel)
     }
 
-    // TODO: should remove this blocker when https://github.com/hoprnet/hoprnet/issues/4194 gets addressed
-    if (direction === 'incoming') {
-      log(
-        `Incoming channel: ignoring closing channel ${channel
-          .get_id()
-          .to_hex()} because current HoprChannels contract does not support closing incoming channels.`
-      )
-      throw new Error('Incoming channel: Closing incoming channels currently is not supported.')
-    }
-
     let txHash: string
     try {
-      if (channel.status === ChannelStatus.Open || channel.status == ChannelStatus.WaitingForCommitment) {
-        log('initiating closure of channel', channel.get_id().to_hex())
-        txHash = await connector.initializeClosure(channel.source, channel.destination)
+      if (direction === 'incoming') {
+        // As a destination, node can directly close an incoming channel (that is not CLOSED)
+        log('finalizing closure of an incoming channel', channel.get_id().to_hex())
+        txHash = await connector.finalizeClosure(counterpartyPubKey, this.pubKey)
       } else {
-        // verify that we passed the closure waiting period to prevent failing
-        // on-chain transactions
-
-        if (channel.closure_time_passed()) {
-          txHash = await connector.finalizeClosure(channel.source, channel.destination)
+        // for outgoing channel, it should initializeClosure, then finalizeClosure
+        if (channel.status === ChannelStatus.Open || channel.status == ChannelStatus.WaitingForCommitment) {
+          log('initiating closure of channel', channel.get_id().to_hex())
+          txHash = await connector.initializeClosure(this.pubKey, counterpartyPubKey)
         } else {
-          log(
-            `ignoring finalizing closure of channel ${channel
-              .get_id()
-              .to_hex()} because closure window is still active. Need to wait ${channel
-              .remaining_closure_time()
-              .toString(10)} seconds.`
-          )
+          // verify that we passed the closure waiting period to prevent failing
+          // on-chain transactions
+          if (channel.closure_time_passed()) {
+            txHash = await connector.finalizeClosure(this.pubKey, counterpartyPubKey)
+          } else {
+            log(
+              `ignoring finalizing closure of channel ${channel
+                .get_id()
+                .to_hex()} because closure window is still active. Need to wait ${channel
+                .remaining_closure_time()
+                .toString(10)} seconds.`
+            )
+          }
         }
       }
     } catch (err) {
