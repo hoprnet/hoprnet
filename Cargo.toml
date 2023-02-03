@@ -3,6 +3,7 @@
 members = [
     "packages/core/crates/core-misc",
     "packages/core/crates/core-strategy",
+    "packages/core-ethereum/crates/core-ethereum-connector",
     "packages/core-ethereum/crates/core-ethereum-misc",
     "packages/ethereum/crates/bindings",
     "packages/ethereum/foundry-tool",

@@ -51,7 +51,6 @@ impl Hash {
             hash: [0u8; HASH_LENGTH]
         };
         hash.finalize_into(&mut ret.hash).unwrap();
-
         ret
     }
 }
@@ -67,7 +66,7 @@ pub struct PublicKey {
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl PublicKey {
     pub fn eq(&self, other: &PublicKey) -> bool {
-        // Needs reimplemented, because the trait impl is not available in WASM
+        // Needs to be re-implemented here, because the trait impl is not available in WASM
         self.key.eq(&other.key) && self.compressed.eq(&other.compressed)
     }
 
@@ -293,7 +292,6 @@ pub mod wasm {
                 hash: [0u8; HASH_LENGTH]
             };
             hash.finalize_into(&mut ret.hash).unwrap();
-
             ret
         }
     }

@@ -1,5 +1,5 @@
 # Append here when new Rust WASM crate is added (the list is space separated)
-PACKAGES = core-ethereum-misc
+PACKAGES = core-ethereum-misc core-ethereum-connector
 ##########################################
 
 PKG_DIRS = $(addsuffix /pkg, $(PACKAGES))

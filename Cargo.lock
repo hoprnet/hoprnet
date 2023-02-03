@@ -752,6 +752,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "core-ethereum-connector"
+version = "0.1.0"
+dependencies = [
+ "console_error_panic_hook",
+ "wasm-bindgen",
+ "wasm-bindgen-test",
+]
+
+[[package]]
 name = "core-ethereum-misc"
 version = "0.1.0"
 dependencies = [
