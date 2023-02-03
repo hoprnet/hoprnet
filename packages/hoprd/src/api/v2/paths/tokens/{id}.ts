@@ -1,20 +1,17 @@
 import type { Operation } from 'express-openapi'
-import { STATUS_CODES } from '../../utils.js'
-import { deleteToken } from '../../../token.js'
+import { authenticateToken, deleteToken } from '../../../token.js'
 
 const DELETE: Operation = [
   async (req, res, _next) => {
     const { node } = req.context
     const { id } = req.params
 
-    try {
-      await deleteToken(node.db, id)
-      return res.status(204).send()
-    } catch (err) {
-      return res
-        .status(422)
-        .send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err instanceof Error ? err.message : 'Unknown error' })
-    }
+      const token = await authenticateToken(node.db, id)
+      if (token) {
+        await deleteToken(node.db, id)
+        return res.status(204).send()
+      }
+      return res.status(404).send()
   }
 ]
 
@@ -42,8 +39,11 @@ DELETE.apiDoc = {
     '401': {
       $ref: '#/components/responses/Unauthorized'
     },
-    '422': {
-      $ref: '#/components/responses/UnknownFailure'
+    '403': {
+      $ref: '#/components/responses/Forbidden'
+    },
+    '404': {
+      $ref: '#/components/responses/NotFound'
     }
   }
 }
