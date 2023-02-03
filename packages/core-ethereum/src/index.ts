@@ -444,14 +444,27 @@ export default class HoprCoreEthereum extends EventEmitter {
     )
   }
 
-  public async finalizeClosure(dest: PublicKey): Promise<string> {
-    const c = await this.db.getChannelTo(dest)
-    if (c.status !== ChannelStatus.PendingToClose) {
-      throw Error('Channel status is not PENDING_TO_CLOSE')
+  public async finalizeClosure(source: PublicKey, dest: PublicKey): Promise<string> {
+    const c = await this.db.getChannelX(source, dest)
+    if (this.publicKey.eq(dest)) {
+      // for incoming channel
+      if (c.status === ChannelStatus.Closed) {
+        throw Error('Channel status is already CLOSED')
+      }
+      return await this.chain.finalizeChannelClosure(source.toAddress(), dest.toAddress(), (txHash: string) =>
+        this.setTxHandler(`channel-updated-${txHash}`, txHash)
+      )
+    } else if (this.publicKey.eq(source)) {
+      // for outgoing channel
+      if (c.status !== ChannelStatus.PendingToClose) {
+        throw Error('Channel status is not PENDING_TO_CLOSE')
+      }
+      return await this.chain.finalizeChannelClosure(source.toAddress(), dest.toAddress(), (txHash: string) =>
+        this.setTxHandler(`channel-updated-${txHash}`, txHash)
+      )
+    } else {
+      throw Error('Cannot finalize closure for channels irrelevant to this node')
     }
-    return await this.chain.finalizeChannelClosure(dest.toAddress(), (txHash: string) =>
-      this.setTxHandler(`channel-updated-${txHash}`, txHash)
-    )
   }
 
   public async openChannel(dest: PublicKey, amount: Balance): Promise<{ channelId: Hash; receipt: Receipt }> {

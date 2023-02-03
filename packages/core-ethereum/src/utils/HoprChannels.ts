@@ -47,7 +47,7 @@ export interface HoprChannelsInterface extends utils.Interface {
     'bumpChannel(address,bytes32)': FunctionFragment
     'canImplementInterfaceForAddress(bytes32,address)': FunctionFragment
     'channels(bytes32)': FunctionFragment
-    'finalizeChannelClosure(address)': FunctionFragment
+    'finalizeChannelClosure(address,address)': FunctionFragment
     'fundChannelMulti(address,address,uint256,uint256)': FunctionFragment
     'initiateChannelClosure(address)': FunctionFragment
     'multicall(bytes[])': FunctionFragment
@@ -83,7 +83,7 @@ export interface HoprChannelsInterface extends utils.Interface {
   encodeFunctionData(functionFragment: 'bumpChannel', values: [string, BytesLike]): string
   encodeFunctionData(functionFragment: 'canImplementInterfaceForAddress', values: [BytesLike, string]): string
   encodeFunctionData(functionFragment: 'channels', values: [BytesLike]): string
-  encodeFunctionData(functionFragment: 'finalizeChannelClosure', values: [string]): string
+  encodeFunctionData(functionFragment: 'finalizeChannelClosure', values: [string, string]): string
   encodeFunctionData(functionFragment: 'fundChannelMulti', values: [string, string, BigNumberish, BigNumberish]): string
   encodeFunctionData(functionFragment: 'initiateChannelClosure', values: [string]): string
   encodeFunctionData(functionFragment: 'multicall', values: [BytesLike[]]): string
@@ -287,6 +287,7 @@ export interface HoprChannels extends BaseContract {
     >
 
     finalizeChannelClosure(
+      source: string,
       destination: string,
       overrides?: Overrides & { from?: string | Promise<string> }
     ): Promise<ContractTransaction>
@@ -372,6 +373,7 @@ export interface HoprChannels extends BaseContract {
   >
 
   finalizeChannelClosure(
+    source: string,
     destination: string,
     overrides?: Overrides & { from?: string | Promise<string> }
   ): Promise<ContractTransaction>
@@ -452,7 +454,7 @@ export interface HoprChannels extends BaseContract {
       }
     >
 
-    finalizeChannelClosure(destination: string, overrides?: CallOverrides): Promise<void>
+    finalizeChannelClosure(source: string, destination: string, overrides?: CallOverrides): Promise<void>
 
     fundChannelMulti(
       account1: string,
@@ -615,6 +617,7 @@ export interface HoprChannels extends BaseContract {
     channels(arg0: BytesLike, overrides?: CallOverrides): Promise<BigNumber>
 
     finalizeChannelClosure(
+      source: string,
       destination: string,
       overrides?: Overrides & { from?: string | Promise<string> }
     ): Promise<BigNumber>
@@ -689,6 +692,7 @@ export interface HoprChannels extends BaseContract {
     channels(arg0: BytesLike, overrides?: CallOverrides): Promise<PopulatedTransaction>
 
     finalizeChannelClosure(
+      source: string,
       destination: string,
       overrides?: Overrides & { from?: string | Promise<string> }
     ): Promise<PopulatedTransaction>
