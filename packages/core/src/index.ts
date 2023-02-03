@@ -1242,10 +1242,10 @@ class Hopr extends EventEmitter {
     direction: 'incoming' | 'outgoing'
   ): Promise<{ receipt: string; status: ChannelStatus }> {
     const counterpartyPubKey = PublicKey.fromPeerId(counterparty)
-    const channel =
-      direction === 'outgoing'
-        ? await this.db.getChannelX(this.pubKey, counterpartyPubKey)
-        : await this.db.getChannelX(counterpartyPubKey, this.pubKey)
+    const channel = direction === 'outgoing'
+      ? await this.db.getChannelX(this.pubKey, counterpartyPubKey)
+      : await this.db.getChannelX(counterpartyPubKey, this.pubKey)
+
 
     // TODO: should we wait for confirmation?
     if (channel.status === ChannelStatus.Closed) {
@@ -1258,23 +1258,30 @@ class Hopr extends EventEmitter {
 
     let txHash: string
     try {
-      if (channel.status === ChannelStatus.Open || channel.status == ChannelStatus.WaitingForCommitment) {
-        log('initiating closure of channel', channel.getId().toHex())
-        txHash = await this.connector.initializeClosure(counterpartyPubKey)
+      if (direction === 'incoming') {
+        // As a destination, node can directly close an incoming channel (that is not CLOSED)
+        log('finalizing closure of an incoming channel', channel.getId().toHex())
+        txHash = await this.connector.finalizeClosure(counterpartyPubKey, this.pubKey)
       } else {
-        // verify that we passed the closure waiting period to prevent failing
-        // on-chain transactions
-
-        if (channel.closureTimePassed()) {
-          txHash = await this.connector.finalizeClosure(counterpartyPubKey)
+        // for outgoing channel, it should initializeClosure, then finalizeClosure
+        if (channel.status === ChannelStatus.Open || channel.status == ChannelStatus.WaitingForCommitment) {
+          log('initiating closure of channel', channel.getId().toHex())
+          txHash = await this.connector.initializeClosure(counterpartyPubKey)
         } else {
-          log(
-            `ignoring finalizing closure of channel ${channel
-              .getId()
-              .toHex()} because closure window is still active. Need to wait ${channel
-              .getRemainingClosureTime()
-              .toString(10)} seconds.`
-          )
+          // verify that we passed the closure waiting period to prevent failing
+          // on-chain transactions
+  
+          if (channel.closureTimePassed()) {
+            txHash = await this.connector.finalizeClosure(this.pubKey, counterpartyPubKey)
+          } else {
+            log(
+              `ignoring finalizing closure of channel ${channel
+                .getId()
+                .toHex()} because closure window is still active. Need to wait ${channel
+                .getRemainingClosureTime()
+                .toString(10)} seconds.`
+            )
+          }
         }
       }
     } catch (err) {
