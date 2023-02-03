@@ -25,7 +25,12 @@ describe(`test HoprEthereum instance creation`, function () {
 })
 
 describe('test HoprEthereum', function () {
-  const connector = HoprCoreEthereum.createInstance(dbMock, PARTY_A, stringToU8a(ACCOUNT_A.privateKey), sampleChainOptions)
+  const connector = HoprCoreEthereum.createInstance(
+    dbMock,
+    PARTY_A,
+    stringToU8a(ACCOUNT_A.privateKey),
+    sampleChainOptions
+  )
 
   it('should test isAllowedAccessToNetwork', async function () {
     // @ts-ignore

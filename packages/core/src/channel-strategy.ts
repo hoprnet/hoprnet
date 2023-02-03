@@ -135,7 +135,6 @@ class RustStrategyWrapper<T extends RustStrategyInterface> implements ChannelStr
   onWinningTicket(t: AcknowledgedTicket) {}
 
   shouldCommitToChannel(_c: ChannelEntry): boolean {
-
     return this.strategy.should_commit_to_channel(ce)
   }
 }
