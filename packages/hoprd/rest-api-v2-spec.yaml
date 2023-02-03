@@ -27,18 +27,14 @@ components:
   responses:
     NotFound:
       description: The specified resource was not found
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
     Unauthorized:
-      description: Unauthorized
+      description: authentication failed
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
     Forbidden:
-      description: Forbidden
+      description: authorization failed
       content:
         application/json:
           schema:
@@ -79,7 +75,7 @@ components:
           type: string
           description: some description
         capabilities:
-          type: object
+          type: array
           description: Array of capabilities associated with the token
       example:
         id: someTOKENid1223

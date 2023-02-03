@@ -1,46 +1,20 @@
-import { v4 as uuidv4 } from 'uuid'
-import { createHash } from 'crypto'
-
 import { STATUS_CODES } from '../../utils.js'
-import { storeToken, authenticateToken } from '../../../token.js'
+import { createToken, storeToken } from '../../../token.js'
 
 import type { Operation } from 'express-openapi'
-import type { HoprDB } from '@hoprnet/hopr-utils'
-
-async function generateNewId(db: HoprDB): Promise<string> {
-  let id = undefined
-
-  // iterate until we find a usable id
-  while (!id) {
-    const uuid = uuidv4()
-    const nextId = createHash('sha256').update(uuid).digest('base64')
-    // try to load the token given the new id
-    const token = await authenticateToken(db, nextId)
-    if (!token) {
-      // no token found, id can be used
-      id = nextId
-    }
-  }
-
-  return id
-}
 
 const POST: Operation = [
   async (req, res, _next) => {
     const { node } = req.context
     const { description, capabilities } = req.body
 
-    const id = await generateNewId(node.db)
-
-    const token = {
-      id,
-      description,
-      capabilities
+    try {
+      const token = await createToken(node.db, capabilities, description)
+      await storeToken(node.db, token)
+      res.status(201).send({ token: token.id })
+    } catch (err) {
+      res.status(422)
     }
-
-    await storeToken(node.db, token)
-
-    res.status(201).send({ token: id })
   }
 ]
 

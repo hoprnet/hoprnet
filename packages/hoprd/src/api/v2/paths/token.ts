@@ -3,7 +3,10 @@ import type { Operation } from 'express-openapi'
 const GET: Operation = [
   async (req, res, _next) => {
     const { token } = req.context
-    return res.status(200).send(token)
+    if (token) {
+      return res.status(200).send(token)
+    }
+    return res.status(404).send()
   }
 ]
 
@@ -25,8 +28,11 @@ GET.apiDoc = {
     '401': {
       $ref: '#/components/responses/Unauthorized'
     },
-    '422': {
-      $ref: '#/components/responses/UnknownFailure'
+    '403': {
+      $ref: '#/components/responses/Forbidden'
+    },
+    '404': {
+      $ref: '#/components/responses/NotFound'
     }
   }
 }
