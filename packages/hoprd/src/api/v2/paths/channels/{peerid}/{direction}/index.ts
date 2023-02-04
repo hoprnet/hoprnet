@@ -146,6 +146,12 @@ DELETE.apiDoc = {
         }
       }
     },
+    '401': {
+      $ref: '#/components/responses/Unauthorized'
+    },
+    '403': {
+      $ref: '#/components/responses/Forbidden'
+    },
     '422': {
       description: 'Unknown failure.',
       content: {
@@ -270,6 +276,12 @@ GET.apiDoc = {
           }
         }
       }
+    },
+    '401': {
+      $ref: '#/components/responses/Unauthorized'
+    },
+    '403': {
+      $ref: '#/components/responses/Forbidden'
     },
     '404': {
       description: 'Channel with that peerId was not found. You can list all channels using /channels/ endpoint.',

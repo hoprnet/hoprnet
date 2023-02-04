@@ -117,6 +117,12 @@ POST.apiDoc = {
         }
       }
     },
+    '401': {
+      $ref: '#/components/responses/Unauthorized'
+    },
+    '403': {
+      $ref: '#/components/responses/Forbidden'
+    },
     '422': {
       description:
         'Withdraw amount exeeds current balance or unknown error. You can check current balance using /account/balance endpoint.',
