@@ -5,15 +5,18 @@ import chai, { expect } from 'chai'
 
 import { createToken, storeToken } from '../../token.js'
 
-import { createAuthenticatedTestApiInstance, createMockDb } from '../fixtures.js'
+import { createAuthenticatedTestApiInstance, createMockDb } from './../fixtures.js'
 
-let node = sinon.fake() as any
-node.db = createMockDb()
+import type { default as Hopr } from '@hoprnet/hopr-core'
 
 describe('GET /token', function () {
+  let node: Hopr
   let service: any
 
   before(async function () {
+    node = sinon.fake() as any
+    node.db = createMockDb()
+
     const loaded = await createAuthenticatedTestApiInstance(node)
 
     service = loaded.service

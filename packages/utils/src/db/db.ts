@@ -1116,14 +1116,26 @@ export class HoprDB {
     return mock
   }
 
+  // Stores an already serialized object in the database.
+  // @param namespace Namespace which is used for the object.
+  // @param key Key to identify the object in the namespace.
+  // @param object Serialized object.
   public async putSerializedObject(namespace: string, key: string, object: Uint8Array): Promise<void> {
     return await this.put(createObjectKey(namespace, key), object)
   }
 
+  // Reads an a serialized object from the database.
+  // @param namespace Namespace which is used for the object.
+  // @param key Key to identify the object in the namespace.
+  // @returns The serialized object or `undefined` if none was found.
   public async getSerializedObject(namespace: string, key: string): Promise<Uint8Array | undefined> {
     return await this.maybeGet(createObjectKey(namespace, key))
   }
 
+  // Deletes an object from the database. Silently succeeds if object wasn't in
+  // the database.
+  // @param namespace Namespace which is used for the object.
+  // @param key Key to identify the object in the namespace.
   public async deleteObject(namespace: string, key: string): Promise<void> {
     await this.del(createObjectKey(namespace, key))
   }

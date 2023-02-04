@@ -3,12 +3,12 @@ import sinon from 'sinon'
 import chaiResponseValidator from 'chai-openapi-response-validator'
 import chai, { expect } from 'chai'
 
-import { createToken, storeToken } from '../../../token.js'
+import { authenticateToken, createToken, storeToken } from '../../../token.js'
 
 import { createAuthenticatedTestApiInstance, createMockDb } from '../../fixtures.js'
 
-import type {default as Hopr} from '@hoprnet/hopr-core'
-import type {Token} from './../../../token.js'
+import type { default as Hopr } from '@hoprnet/hopr-core'
+import type { Token } from './../../../token.js'
 
 describe('DELETE /tokens/{id}', function () {
   let node: Hopr
@@ -43,6 +43,9 @@ describe('DELETE /tokens/{id}', function () {
     const res = await request(service).delete(`/api/v2/tokens/${token.id}`).set('x-auth-token', 'superuser')
     expect(res.status).to.equal(204)
     expect(res).to.satisfyApiSpec
+
+    const tokenInDb = await authenticateToken(node.db, token.id)
+    expect(tokenInDb).to.be.undefined
   })
 
   it('should fail with unauthenticated error when using no token', async function () {
@@ -51,7 +54,7 @@ describe('DELETE /tokens/{id}', function () {
     expect(res).to.satisfyApiSpec
   })
 
-  it('should fail with unauthenticated error when using no token with missing capability', async function () {
+  it('should fail with unauthenticated error when using token with missing capability', async function () {
     // create token with wrong capability
     const caps = [{ endpoint: 'tokensCreate' }]
     const wrongToken = await createToken(node.db, caps)
@@ -71,5 +74,8 @@ describe('DELETE /tokens/{id}', function () {
     const res = await request(service).delete(`/api/v2/tokens/${token.id}`).set('x-auth-token', correctToken.id)
     expect(res.status).to.equal(204)
     expect(res).to.satisfyApiSpec
+
+    const tokenInDb = await authenticateToken(node.db, token.id)
+    expect(tokenInDb).to.be.undefined
   })
 })

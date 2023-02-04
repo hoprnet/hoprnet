@@ -11,7 +11,7 @@ import BN from 'bn.js'
 
 import { debug, Address, HoprDB } from '@hoprnet/hopr-utils'
 import { authenticateWsConnection, getStatusCodeForInvalidInputInRequest, removeQueryParams } from './utils.js'
-import { authenticateToken, authorizeToken } from './token.js'
+import { authenticateToken, authorizeToken, validateTokenCapabilities } from './token.js'
 import { STATUS_CODES } from './v2/utils.js'
 
 import type { Server } from 'http'
@@ -163,6 +163,9 @@ export async function setupRestApi(
       },
       settingKey: (input) => {
         return Object.values(SettingKey).includes(input)
+      },
+      tokenCapabilities: (input) => {
+        return validateTokenCapabilities(input)
       }
     },
     securityHandlers: {

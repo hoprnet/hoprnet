@@ -3,7 +3,7 @@ import { createHash } from 'crypto'
 
 import { HoprDB } from '@hoprnet/hopr-utils'
 
-type Limit = {
+export type Limit = {
   type: string
   conditions: {
     max?: number
@@ -11,7 +11,7 @@ type Limit = {
   used?: number
 }
 
-type Capability = {
+export type Capability = {
   endpoint: string
   limits?: Array<Limit>
 }
@@ -27,6 +27,10 @@ export type Token = {
 // this namespace is used as a prefix for all stored keys
 const ns = 'authenticationTokens'
 
+// Authenticate the given token object, verifying its stored in the database.
+// @param db Reference to a HoprDB instance.
+// @param id Token id which should be authenticated.
+// @return the token object which is found in the database, or undefined
 export async function authenticateToken(db: HoprDB, id: string): Promise<Token> {
   if (!id) {
     return undefined
@@ -53,6 +57,13 @@ export async function authenticateToken(db: HoprDB, id: string): Promise<Token> 
   return deserializedToken
 }
 
+// Authorize the given token object, verifying its capabilities against the
+// chosen endpoint.
+// @param db Reference to a HoprDB instance.
+// @param token Token object which should be authorized.
+// @param endpointRef Logical name of the endpoint the authorization is checked
+// for.
+// @return true if the token is authorized, false if not
 export async function authorizeToken(db: HoprDB, token: Token, endpointRef: string): Promise<boolean> {
   // find relevant endpoint capabilities
   const endpointCaps = token.capabilities.filter((capability: Capability) => capability.endpoint === endpointRef)
@@ -73,9 +84,15 @@ export async function authorizeToken(db: HoprDB, token: Token, endpointRef: stri
         const limit = supportedCapabilities[endpointRef][l.type] || genericLimits[l.type]
 
         if (limit) {
-          // perform runtime check
-          const check = limit.runtimeCheck
-          return check(l.conditions.max, l.used)
+          return Object.entries(l.conditions).every(([condition, value]) => {
+            // perform runtime check
+            const check = limit[condition]?.runtimeCheck
+            if (check) {
+              const checkResult = check(value, l.used || 0)
+              return checkResult
+            }
+            return false
+          })
         }
 
         // unknown limit type, set to invalid
@@ -87,7 +104,7 @@ export async function authorizeToken(db: HoprDB, token: Token, endpointRef: stri
     return true
   })
 
-  const tokenAuthorized = capsChecks.some((c) => c === true)
+  const tokenAuthorized = capsChecks.every((c) => c === true)
   if (tokenAuthorized) {
     // update limits before returning
     token.capabilities = endpointCaps.map((c) => {
@@ -110,25 +127,50 @@ export async function authorizeToken(db: HoprDB, token: Token, endpointRef: stri
   return tokenAuthorized
 }
 
-export async function createToken(db: HoprDB, capabilities: Array<Capability>, description?: string): Promise<Token> {
-  if (!validateCapabilities(capabilities)) {
+// Create a token object from the given parameters, but don't store it in the database yet.
+// @param db Reference to a HoprDB instance.
+// @param capabilities Capabilities which are attached to the token object.
+// @param description Description which is attached to the token object.
+// @param lifetime Number of seconds used to calculate the maximum lifetime of the token.
+export async function createToken(
+  db: HoprDB,
+  capabilities: Array<Capability>,
+  description?: string,
+  lifetime?: number
+): Promise<Token> {
+  if (!validateTokenCapabilities(capabilities)) {
     throw new Error('invalid token capabilities')
   }
 
-  const id = await generateNewId(db)
+  if (lifetime && lifetime < 1) {
+    throw new Error('invalid token lifetime')
+  }
 
-  return {
+  const id = await generateNewId(db)
+  const token: Token = {
     id,
     description: description || '',
     capabilities
   }
+
+  if (lifetime) {
+    token.valid_until = Date.now() + lifetime
+  }
+
+  return token
 }
 
+// Store a token in the database.
+// @param db Reference to a HoprDB instance.
+// @param id Token object.
 export async function storeToken(db: HoprDB, token: Token): Promise<void> {
   const serializedToken = serializeToken(token)
   await db.putSerializedObject(ns, token.id, serializedToken)
 }
 
+// Delete a token from the database.
+// @param db Reference to a HoprDB instance.
+// @param id Token id. The operation is a no-op if its an empty string.
 export async function deleteToken(db: HoprDB, id: string): Promise<void> {
   if (!id) {
     return
@@ -136,16 +178,25 @@ export async function deleteToken(db: HoprDB, id: string): Promise<void> {
   await db.deleteObject(ns, id)
 }
 
+// Serialize the given token object into a byte array.
+// @param token Token object which shall be serialized.
+// @return Serialized token object.
 function serializeToken(token: Token): Uint8Array {
   const stringifiedToken = JSON.stringify(token)
   return Buffer.from(stringifiedToken, 'utf-8')
 }
 
+// Deserialize the given array into a token object.
+// @param token Array representing a serialized token object.
+// @return Deserialized token object.
 function deserializeToken(token: Uint8Array): Token {
   const deserializedToken = new TextDecoder('utf-8').decode(token)
   return JSON.parse(deserializedToken)
 }
 
+// Generate a token id which is not present yet in the database.
+// @param db Reference to a HoprDB instance.
+// @return a new unique token id
 async function generateNewId(db: HoprDB): Promise<string> {
   let id = undefined
 
@@ -164,6 +215,7 @@ async function generateNewId(db: HoprDB): Promise<string> {
   return id
 }
 
+// Generic limits which are supported on every supported endpoint.
 const genericLimits = {
   calls: {
     max: {
@@ -212,7 +264,17 @@ const supportedCapabilities = {
   aliasesRemoveAlias: {}
 }
 
-function validateCapabilities(capabilities: Array<Capability>): boolean {
+// Validates the given list of capabilities. Fails if the list is empty or any
+// of the capabilities is invalid.
+// @param capabilities Non-empty list of capabilities.
+// @return true if list is valid, false if any entry is invalid or the list is
+// empty.
+export function validateTokenCapabilities(capabilities: Array<Capability>): boolean {
+  // fail early if list is empty
+  if (capabilities.length === 0) {
+    return false
+  }
+
   return capabilities.every((c) => {
     if (!(c.endpoint in supportedCapabilities)) {
       // endpoint not supported, validation fails

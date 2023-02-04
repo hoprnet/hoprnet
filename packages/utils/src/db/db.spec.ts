@@ -348,4 +348,41 @@ describe(`database tests`, function () {
     await db.setNetworkRegistryEnabled(false, TestingSnapshot)
     assert((await db.isNetworkRegistryEnabled()) === false, 'register should be disabled')
   })
+
+  it('putSerializedObject and getSerializedObject should store and read object', async function () {
+    const ns = 'testobjects'
+    const key = '1'
+    const object = Uint8Array.from(randomBytes(32))
+
+    await db.putSerializedObject(ns, key, object)
+    const storedObject = await db.getSerializedObject(ns, key)
+    assert(storedObject !== undefined, 'storedObject should not be undefined')
+    assert(u8aEquals(object, storedObject), 'storedObject should equal object')
+  })
+
+  it('putSerializedObject should update object', async function () {
+    const ns = 'testobjects'
+    const key = '2'
+    const object1 = Uint8Array.from(randomBytes(32))
+    const object2 = Uint8Array.from(randomBytes(32))
+
+    await db.putSerializedObject(ns, key, object1)
+    await db.putSerializedObject(ns, key, object2)
+
+    const storedObject = await db.getSerializedObject(ns, key)
+    assert(storedObject !== undefined, 'storedObject should not be undefined')
+    assert(u8aEquals(object2, storedObject), 'storedObject should equal object2')
+  })
+
+  it('deleteSerializedObject should delete object', async function () {
+    const ns = 'testobjects'
+    const key = '3'
+    const object = Uint8Array.from(randomBytes(32))
+
+    await db.putSerializedObject(ns, key, object)
+    await db.deleteObject(ns, key)
+
+    const storedObject = await db.getSerializedObject(ns, key)
+    assert(storedObject === undefined, 'storedObject should be undefined')
+  })
 })

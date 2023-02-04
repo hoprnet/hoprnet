@@ -8,13 +8,9 @@ const POST: Operation = [
     const { node } = req.context
     const { description, capabilities } = req.body
 
-    try {
-      const token = await createToken(node.db, capabilities, description)
-      await storeToken(node.db, token)
-      res.status(201).send({ token: token.id })
-    } catch (err) {
-      res.status(422)
-    }
+    const token = await createToken(node.db, capabilities, description)
+    await storeToken(node.db, token)
+    res.status(201).send({ token: token.id })
   }
 ]
 
@@ -31,13 +27,17 @@ POST.apiDoc = {
           required: ['capabilities'],
           properties: {
             capabilities: {
-              format: 'capabilities',
-              type: 'string',
-              description: 'Capabilities attached to the created token.'
+              description: 'Capabilities attached to the created token.',
+              type: 'array',
+              format: 'tokenCapabilities',
+              minItems: 1,
+              items: {
+                $ref: '#/components/schemas/TokenCapability'
+              }
             },
             lifetime: {
-              format: 'amount',
               type: 'integer',
+              minimum: 1,
               description: 'Lifetime of the token in seconds since creation. Defaults to unlimited lifetime.'
             },
             description: {

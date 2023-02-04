@@ -81,6 +81,34 @@ components:
         id: someTOKENid1223
         description: this is an interesting token
         capabilities: []
+    TokenCapabilityLimit:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          description: Limit type
+        conditions:
+          type: object
+          description: Limit conditions, if any
+          properties:
+            max:
+              type: integer
+              description: Upper ceiling. Applies to limit type calls.
+    TokenCapability:
+      type: object
+      required:
+        - endpoint
+      properties:
+        endpoint:
+          type: string
+          description: Short reference of the operation this capability is tied to.
+        limits:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/TokenCapabilityLimit'
     Signature:
       type: string
       description: Signature from requested message.

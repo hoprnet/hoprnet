@@ -6,12 +6,12 @@ const DELETE: Operation = [
     const { node } = req.context
     const { id } = req.params
 
-      const token = await authenticateToken(node.db, id)
-      if (token) {
-        await deleteToken(node.db, id)
-        return res.status(204).send()
-      }
-      return res.status(404).send()
+    const token = await authenticateToken(node.db, id)
+    if (token) {
+      await deleteToken(node.db, id)
+      return res.status(204).send()
+    }
+    return res.status(404).send()
   }
 ]
 
