@@ -13,7 +13,7 @@
 - Fix of ticket validation to be order-independent, thus not rejecting older tickets ([#4527](<(https://github.com/hoprnet/hoprnet/pull/4527)>)
 - Migrate `heartbeat` ping network interaction to Rust using Rust `futures::stream::Stream` ([#4539](https://github.com/hoprnet/hoprnet/pull/4539))
 - Added strategy related metrics, refactoring of the strategy code ([#4537](https://github.com/hoprnet/hoprnet/pull/4537))
-- API: Allow user to specify number of intermediate hops when sending a message ([#4562](https://github.com/hoprnet/hoprnet/pull/4562))
+- API: Allow user to specify number of intermediate hops when sending a message ([#4563](https://github.com/hoprnet/hoprnet/pull/4563))
 
 <a name="1.91"></a>
 
