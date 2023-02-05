@@ -1,7 +1,8 @@
 .POSIX:
 
 # Gets all packages that include a Rust crates
-WORKSPACES_WITH_RUST_MODULES := $(wildcard $(addsuffix /crates, $(wildcard ./packages/*)))
+# Disable automatic compilation of SC bindings. Can still be done manually.
+WORKSPACES_WITH_RUST_MODULES := $(filter-out ./packages/ethereum/crates,$(wildcard $(addsuffix /crates, $(wildcard ./packages/*))))
 
 # Gets all individual crates such that they can get built
 CRATES := $(foreach crate,${WORKSPACES_WITH_RUST_MODULES},$(dir $(wildcard $(crate)/*/Cargo.toml)))
@@ -151,7 +152,8 @@ build-yarn-watch: build-solidity-types build-cargo
 	npx tsc --build tsconfig.build.json -w
 
 .PHONY: build-cargo
-build-cargo: build-solidity-types ## build cargo packages and create boilerplate JS code
+build-cargo: ## build cargo packages and create boilerplate JS code
+# build-cargo: build-solidity-types ## build cargo packages and create boilerplate JS code
 # Skip building Rust crates
 ifeq ($(origin NO_CARGO),undefined)
 # First compile Rust crates and create bindings
