@@ -893,7 +893,7 @@ class Hopr extends EventEmitter {
       // Validate the manually specified intermediate path
       await this.validateIntermediatePath(intermediatePath)
     } else {
-      intermediatePath = await this.getIntermediateNodes(PublicKey.fromPeerId(destination, hops))
+      intermediatePath = await this.getIntermediateNodes(PublicKey.fromPeerId(destination), hops)
 
       if (intermediatePath == null || !intermediatePath.length) {
         throw Error(`Failed to find automatic path`)
@@ -1416,7 +1416,7 @@ class Hopr extends EventEmitter {
    */
   private async getIntermediateNodes(destination: PublicKey, hops?: number): Promise<PublicKey[]> {
     // hops must be at least 1, default is internal constant
-    hops = (hops > 0) : hops ? INTERMEDIATE_HOPS
+    hops = hops > 0 ? hops : INTERMEDIATE_HOPS
     return await findPath(
       PublicKey.fromPeerId(this.getId()),
       destination,

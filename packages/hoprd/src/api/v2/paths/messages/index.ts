@@ -8,7 +8,7 @@ const POST: Operation = [
   async (req, res, _next) => {
     const message = encodeMessage(req.body.body)
     const recipient = peerIdFromString(req.body.recipient)
-    const hops = peerIdFromString(req.body.hops)
+    const hops = req.body.hops
 
     // only set path if given, otherwise a path will be chosen by hopr core
     let path: PublicKey[]
@@ -63,13 +63,12 @@ POST.apiDoc = {
                 example: '16Uiu2HAm1uV82HyD1iJ5DmwJr4LftmJUeMfj8zFypBRACmrJc16n'
               }
             },
-	    hops: {
-		    description: 'Number of required intermediate nodes. This parameter is ignored if path is set.',
-		    type: 'integer',
-		    min: 1,
-		    example: 3
-	    }
-	    }
+            hops: {
+              description: 'Number of required intermediate nodes. This parameter is ignored if path is set.',
+              type: 'integer',
+              minimum: 1,
+              example: 3
+            }
           }
         }
       }
