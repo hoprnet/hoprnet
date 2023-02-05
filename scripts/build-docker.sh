@@ -81,7 +81,10 @@ build_and_tag_images() {
     log "Waiting for toolchain image to finish"
     wait
 
-    if [ -z "${image_name}" ] || [ "${image_name}" = "hoprd" ] || [ "${image_name}" = "pluto-complete" ]; then
+    if [ -z "${image_name}" ] || \
+       [ "${image_name}" = "hoprd" ] || \
+       [ "${image_name}" = "hoprd-nat" ] || \
+       [ "${image_name}" = "pluto-complete" ]; then
       log "Building Docker image hoprd-local"
       docker build -q -t hoprd-local \
         -f packages/hoprd/Dockerfile . &
