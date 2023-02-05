@@ -49,3 +49,4 @@ Learn more about how subgraphs work by checking out [The Graph's official docume
 - [Querying from an application](https://thegraph.com/docs/en/developer/querying-from-your-app/)
 - [How to use the explorer and playground to query on-chain data](https://medium.com/@chidubem_/how-to-query-on-chain-data-with-the-graph-f8507488215)
 - [Explorer Page](https://thegraph.com/explorer/subgraph?id=FDrqtqbp8LhG1hSnwtWB2hE6C97FWA54irrozjb2TtMH&view=Overview)
+- [Deploy your own Subgraph](https://thegraph.com/docs/en/developing/creating-a-subgraph/)
