@@ -878,8 +878,9 @@ class Hopr extends EventEmitter {
    * @param msg message to send
    * @param destination PeerId of the destination
    * @param intermediatePath optional set path manually
+   * @param hops optional number of required intermediate nodes
    */
-  public async sendMessage(msg: Uint8Array, destination: PeerId, intermediatePath?: PublicKey[]) {
+  public async sendMessage(msg: Uint8Array, destination: PeerId, intermediatePath?: PublicKey[], hops?: number) {
     if (this.status != 'RUNNING') {
       throw new Error('Cannot send message until the node is running')
     }
@@ -892,7 +893,7 @@ class Hopr extends EventEmitter {
       // Validate the manually specified intermediate path
       await this.validateIntermediatePath(intermediatePath)
     } else {
-      intermediatePath = await this.getIntermediateNodes(PublicKey.fromPeerId(destination))
+      intermediatePath = await this.getIntermediateNodes(PublicKey.fromPeerId(destination, hops))
 
       if (intermediatePath == null || !intermediatePath.length) {
         throw Error(`Failed to find automatic path`)
@@ -1406,16 +1407,20 @@ class Hopr extends EventEmitter {
   }
 
   /**
-   * Takes a destination and samples randomly intermediate nodes
+   * Takes a destination, and optionally the desired number of hops,
+   * and samples randomly intermediate nodes
    * that will relay that message before it reaches its destination.
    *
    * @param destination instance of peerInfo that contains the peerId of the destination
+   * @param hops optional number of required intermediate nodes
    */
-  private async getIntermediateNodes(destination: PublicKey): Promise<PublicKey[]> {
+  private async getIntermediateNodes(destination: PublicKey, hops?: number): Promise<PublicKey[]> {
+    // hops must be at least 1, default is internal constant
+    hops = (hops > 0) : hops ? INTERMEDIATE_HOPS
     return await findPath(
       PublicKey.fromPeerId(this.getId()),
       destination,
-      INTERMEDIATE_HOPS,
+      hops,
       (p: PublicKey) => this.networkPeers.qualityOf(p.toPeerId()),
       this.connector.getOpenChannelsFrom.bind(this.connector)
     )
