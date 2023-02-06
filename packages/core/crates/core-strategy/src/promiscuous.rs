@@ -1,5 +1,7 @@
+use async_trait::async_trait;
 use rand::rngs::OsRng;
 use rand::seq::SliceRandom;
+use core_ethereum_connector::connector::{CONNECTOR_INSTANCE, HoprCoreEthereum};
 use utils_types::channels::{AcknowledgedTicket, ChannelEntry};
 
 use utils_types::channels::ChannelStatus::{Open, PendingToClose};
@@ -36,11 +38,22 @@ impl PromiscuousStrategy {
     // we cannot put #[wasm_bindgen] on trait impl blocks
 
     pub async fn on_winning_ticket(&self, ack_ticket: &AcknowledgedTicket) {
-        todo!()
+        CONNECTOR_INSTANCE
+            .lock()
+            .unwrap()
+            .redeem_tickets_in_channel_by_counterparty(&ack_ticket.signer)
+            .await
+            .expect("failed to redeem winning ticket") // TODO: Add logging
     }
 
     pub async fn on_channel_closing(&self, channel: &ChannelEntry) {
-        todo!()
+        let g = CONNECTOR_INSTANCE.lock().unwrap();
+        let pk = g.get_public_key();
+        if !pk.eq(&channel.source) {
+            g.redeem_tickets_in_channel(channel)
+                .await
+                .expect("failed to redeem channel") // TODO: Add logging
+        }
     }
 
 
@@ -49,6 +62,7 @@ impl PromiscuousStrategy {
     }
 }
 
+#[async_trait]
 impl ChannelStrategy for PromiscuousStrategy {
     const NAME: &'static str = "promiscuous";
 
@@ -177,12 +191,12 @@ impl ChannelStrategy for PromiscuousStrategy {
         StrategyTickResult::new(max_auto_channels, to_open, to_close)
     }
 
-    fn on_winning_ticket(&self, ack_ticket: &AcknowledgedTicket) {
-        self.on_winning_ticket(ack_ticket)
+    async fn on_winning_ticket(&self, ack_ticket: &AcknowledgedTicket) {
+        self.on_winning_ticket(ack_ticket).await
     }
 
-    fn on_channel_closing(&self, channel: &ChannelEntry) {
-        self.on_channel_closing(channel)
+    async fn on_channel_closing(&self, channel: &ChannelEntry) {
+        self.on_channel_closing(channel).await
     }
 
     fn should_commit_to_channel(&self, channel: &ChannelEntry) -> bool {
@@ -324,13 +338,5 @@ pub mod wasm {
             )
         }
 
-
-        pub fn on_winning_ticket(&self, ack_ticket: &AcknowledgedTicket) {
-            todo!()
-        }
-
-        pub fn on_channel_closing(&self, channel: &ChannelEntry) {
-            todo!()
-        }
     }
 }

@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use utils_types::channels::{AcknowledgedTicket, ChannelEntry, ChannelStatus};
 use utils_types::primitives::Balance;
 use utils_types::primitives::BalanceType::HOPR;
@@ -9,6 +10,8 @@ use utils_types::primitives::BalanceType::HOPR;
 /// of connections to the other peers in the network.
 /// Other additional parameters affecting this decision could be members of implementors
 /// of this trait.
+
+#[async_trait]
 pub trait ChannelStrategy {
     /// Human readable name of the strategy
     const NAME: &'static str;
@@ -31,10 +34,10 @@ pub trait ChannelStrategy {
         Q: Fn(&str) -> Option<f64>;
 
     /// Performs a strategy action when a winning ticket has been encountered
-    fn on_winning_ticket(&self, ack_ticket: &AcknowledgedTicket);
+    async fn on_winning_ticket(&self, ack_ticket: &AcknowledgedTicket);
 
     /// Performs a strategy action when a channel will be closed
-    fn on_channel_closing(&self, channel: &ChannelEntry);
+    async fn on_channel_closing(&self, channel: &ChannelEntry);
 
     /// Indicates if according to this strategy, a commitment should be made for the given channel.
     fn should_commit_to_channel(&self, _channel: &ChannelEntry) -> bool;

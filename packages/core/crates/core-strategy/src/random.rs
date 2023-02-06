@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use utils_types::channels::{AcknowledgedTicket, ChannelEntry};
 use utils_types::primitives::Balance;
 
@@ -7,6 +8,7 @@ use crate::generic::{ChannelStrategy, OutgoingChannelStatus, StrategyTickResult}
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct RandomStrategy;
 
+#[async_trait]
 impl ChannelStrategy for RandomStrategy {
     const NAME: &'static str = "random";
 
@@ -23,12 +25,12 @@ impl ChannelStrategy for RandomStrategy {
         unimplemented!("Cover Traffic Strategy (Random strategy) not yet implemented!");
     }
 
-    fn on_winning_ticket(&self, ack_ticket: &AcknowledgedTicket) {
-        self.on_winning_ticket(ack_ticket)
+    async fn on_winning_ticket(&self, ack_ticket: &AcknowledgedTicket) {
+        self.on_winning_ticket(ack_ticket).await
     }
 
-    fn on_channel_closing(&self, channel: &ChannelEntry) {
-        self.on_channel_closing(channel)
+    async fn on_channel_closing(&self, channel: &ChannelEntry) {
+        self.on_channel_closing(channel).await
     }
 
     fn should_commit_to_channel(&self, channel: &ChannelEntry) -> bool {
@@ -43,11 +45,11 @@ impl RandomStrategy {
         RandomStrategy {}
     }
 
-    pub fn on_winning_ticket(&self, _ack_ticket: &AcknowledgedTicket) {
+    pub async fn on_winning_ticket(&self, _ack_ticket: &AcknowledgedTicket) {
         unimplemented!()
     }
 
-    pub fn on_channel_closing(&self, _channel: &ChannelEntry) {
+    pub async fn on_channel_closing(&self, _channel: &ChannelEntry) {
         unimplemented!()
     }
 

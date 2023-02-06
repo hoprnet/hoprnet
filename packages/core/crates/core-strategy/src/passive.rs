@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use utils_types::channels::{AcknowledgedTicket, ChannelEntry};
 use utils_types::primitives::Balance;
 
@@ -7,6 +8,7 @@ use crate::generic::{ChannelStrategy, OutgoingChannelStatus, StrategyTickResult}
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct PassiveStrategy;
 
+#[async_trait]
 impl ChannelStrategy for PassiveStrategy {
     const NAME: &'static str = "passive";
 
@@ -26,12 +28,12 @@ impl ChannelStrategy for PassiveStrategy {
     // Re-implementations to satisfy the trait, because
     // we cannot put #[wasm_bindgen] on trait impl blocks
 
-    fn on_winning_ticket(&self, ack_ticket: &AcknowledgedTicket) {
-        self.on_winning_ticket(ack_ticket)
+    async fn on_winning_ticket(&self, ack_ticket: &AcknowledgedTicket) {
+        self.on_winning_ticket(ack_ticket).await
     }
 
-    fn on_channel_closing(&self, channel: &ChannelEntry) {
-        self.on_channel_closing(channel)
+    async fn on_channel_closing(&self, channel: &ChannelEntry) {
+        self.on_channel_closing(channel).await
     }
 
     fn should_commit_to_channel(&self, channel: &ChannelEntry) -> bool {
@@ -46,11 +48,11 @@ impl PassiveStrategy {
         PassiveStrategy {}
     }
 
-    pub fn on_winning_ticket(&self, _ack_ticket: &AcknowledgedTicket) {
+    pub async fn on_winning_ticket(&self, _ack_ticket: &AcknowledgedTicket) {
         // Passive strategy does nothing
     }
 
-    pub fn on_channel_closing(&self, _channel: &ChannelEntry) {
+    pub async fn on_channel_closing(&self, _channel: &ChannelEntry) {
         // Passive strategy does nothing
     }
 
