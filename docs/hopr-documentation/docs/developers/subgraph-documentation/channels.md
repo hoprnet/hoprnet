@@ -19,7 +19,7 @@ sidebar_label: Channels
 | ----------------- | ----------- | ----------------------------------------------------------- |
 | id                | Bytes!      | Account's address                                           |
 | publicKey         | Bytes       | Account's public key                                        |
-| multiaddr         | [Bytes!]!   |                                                             |
+| multiaddr         | [Bytes!]!   | Multi address                                               |
 | fromChannels      | [Channel!]! | Channels where the account is the source                    |
 | toChannels        | [Channel!]! | Channels where the account is the destination               |
 | fromChannelsCount | BigInt!     | Number of outgoing channels                                 |
