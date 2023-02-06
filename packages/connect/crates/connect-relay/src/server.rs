@@ -6,11 +6,12 @@ use futures::{
     ready,
     stream::Stream,
     task::{Context, Poll},
-    Future, Sink, StreamExt,
+    Future, Sink, SinkExt, StreamExt,
 };
 use pin_project_lite::pin_project;
 use std::sync::{Arc, Mutex};
 use std::task::Waker;
+use utils_misc::async_iterable::wasm::to_jsvalue_stream;
 
 #[cfg(feature = "wasm")]
 use wasm_bindgen::JsValue;
@@ -122,27 +123,162 @@ impl PingFuture {
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct AsyncIterableHelper {
-    stream: Box<dyn Stream<Item = Result<JsValue, JsValue>>>,
+    stream: Box<dyn Stream<Item = Result<Box<[u8]>, String>> + Unpin>,
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl AsyncIterableHelper {
     #[wasm_bindgen]
-    pub async fn next(&mut self) {
+    pub async fn next(&mut self) -> Result<JsValue, JsValue> {
         utils_misc::async_iterable::wasm::to_jsvalue_stream(self.stream.as_mut().next().await)
     }
 }
 
 trait IntoSink<T> {
-    fn into_sink(t: T) {}
+    fn into_sink(t: T) -> dyn Sink<Box<[u8]>, Error = String> {}
+}
+
+impl<T> IntoSink<T> for T
+where
+    T: Sink<Box<[u8]>>,
+{
+    fn into_sink(t: T) -> dyn Sink<Box<[u8]>, Error = String> {
+        t
+    }
 }
 
 impl IntoSink<&js_sys::Function> for &js_sys::Function {
-    fn into_sink(t: &js_sys::Function, stream: impl Stream<Item = Result<Box<[u8]>, String>>) {
-        let this = JsValue::null();
+    fn into_sink(t: &js_sys::Function) -> JsSink {
+        JsSink::new(t)
+    }
+}
 
-        let arg = JsValue::from(AsyncIterableHelper { stream });
-        let _ = t.call1(&this, &arg);
+struct JsSinkSharedState {
+    message_available: bool,
+    ended: bool,
+    sink_attached: bool,
+    message_waker: Option<Waker>,
+    ready_to_send_waker: Option<Waker>,
+    sink_attached_waker: Option<Waker>,
+    buffered: Option<JsValue>,
+    done: bool,
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+struct JsSink {
+    shared_state: Arc<Mutex<JsSinkSharedState>>,
+    // Must be a Box because JsSinkFuture requires a lifetime assertion which is
+    // unavailable for wasm_bindgen exports
+    fut: Box<dyn Future<Output = JsValue>>,
+    sink: &'static js_sys::Function,
+}
+
+impl JsSink {
+    fn new(sink: &'static js_sys::Function) -> Self {
+        let shared_state = Arc::new(Mutex::new(JsSinkSharedState {
+            message_available: false,
+            sink_attached: false,
+            message_waker: None,
+            sink_attached_waker: None,
+            ready_to_send_waker: None,
+            buffered: None,
+            done: false,
+            ended: false,
+        }));
+
+        let js_sink = Self {
+            shared_state,
+            fut: Box::new_uninit(),
+            sink,
+        };
+
+        js_sink.fut = Box::new(JsSinkFuture::new(&mut js_sink));
+
+        js_sink
+    }
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+impl JsSink {
+    #[wasm_bindgen]
+    pub async fn next(&mut self) -> Result<JsValue, JsValue> {
+        // lock it somehow
+        let foo = self.fut.await;
+        self.fut = JsSinkFuture::new(self);
+
+        to_jsvalue_stream(foo)
+    }
+}
+
+struct JsSinkFuture<'a> {
+    js_sink: &'a mut JsSink,
+}
+
+impl<'a> JsSinkFuture<'a> {
+    fn new(js_sink: &'a mut JsSink) {
+        Self { js_sink }
+    }
+}
+
+impl Future for JsSinkFuture<'_> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let shared_state = self.js_sink.shared_state.lock().unwrap();
+
+        if shared_state.message_available {
+            shared_state.message_available = false;
+            Poll::ready(shared_state.buffered)
+        }
+
+        if !shared_state.sink_attached {
+            shared_state.sink_attached_waker.take().unwrap().wake();
+        }
+
+        shared_state.message_waker = Some(cx.waker().clone());
+        Poll::Pending
+    }
+}
+
+impl Sink<Box<[u8]>> for JsSink {
+    type Error = String;
+
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        let shared_state = self.shared_state.lock().unwrap();
+
+        if shared_state.sink_attached {
+            match shared_state.message_waker {
+                Some(x) => Poll::Ready(Ok(())),
+                None => {
+                    shared_state.ready_to_send_waker = Some(cx.waker().clone());
+                    Poll::Pending
+                }
+            }
+        } else {
+            shared_state.sink_attached = true;
+
+            self.sink.call1(&JsValue::null(), self);
+
+            shared_state.sink_attached_waker = Some(cx.waker().clone());
+            Poll::Pending
+        }
+    }
+
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {}
+
+    fn start_send(self: Pin<&mut Self>, item: JsValue) -> Result<(), String> {
+        let shared_state = self.shared_state.lock().unwrap();
+
+        let waker = shared_state.message_waker.take().unwrap();
+
+        shared_state.buffered.replace(item);
+        waker.wake();
+
+        if self.ended {
+            Err(format!("Stream has already ended"))
+        }
+        // self.buffered.replace(item);
+        // self.waker.unwrap().wake();
+
+        Ok(())
     }
 }
 
@@ -213,23 +349,25 @@ where
 }
 
 pin_project! {
-    struct Server<St> {
+    struct Server<St, Si> {
         #[pin]
         stream: Option<St>,
+        #[pin]
+        sink: Option<Si>,
         #[pin]
         next_stream: StreamStream<St>,
         status_messages_rx: mpsc::UnboundedReceiver<Box<[u8]>>,
         status_messages_tx: mpsc::UnboundedSender<Box<[u8]>>,
-        ping_requests: std::collections::HashMap<u32, PingFuture>
+        ping_requests: std::collections::HashMap<u32, PingFuture>,
     }
 }
 
-impl<St> Server<St>
+impl<St, Si> Server<St, Si>
 where
     St: Stream + Unpin,
     St::Item: IntoItem<St::Item>,
 {
-    fn new(stream: St, sink: impl IntoSink<St::Item>) -> Self {
+    fn new(stream: St, sink: impl IntoSink<St>) -> Self {
         let (status_messages_tx, status_messages_rx) = mpsc::unbounded::<Box<[u8]>>();
         Self {
             stream: Some(stream),
@@ -240,10 +378,15 @@ where
         }
     }
 
-    async fn ping(&mut self) {
+    async fn ping(&mut self) -> usize {
         let random_value: u32 = 0;
 
-        self.ping_requests.insert(random_value, PingFuture::new());
+        let fut = PingFuture::new();
+        // takes ownership
+        self.ping_requests.insert(random_value, fut);
+
+        // cannot clone futures
+        self.ping_requests.get_mut(&random_value).unwrap().await
     }
 
     fn update(self: Pin<&mut Self>, new_stream: St) -> Result<(), String> {
@@ -275,7 +418,7 @@ impl IntoItem<Result<Box<[u8]>, String>> for Result<Box<[u8]>, String> {
     }
 }
 
-impl<St> Stream for Server<St>
+impl<St, Si> Stream for Server<St, Si>
 where
     St: Stream + Unpin,
     St::Item: IntoItem<St::Item>,
@@ -374,7 +517,7 @@ where
     }
 }
 
-impl<St> Sink<Box<[u8]>> for Server<St> {
+impl<St, Si> Sink<Box<[u8]>> for Server<St, Si> {
     type Error = String;
     fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         todo!()
@@ -395,6 +538,7 @@ impl<St> Sink<Box<[u8]>> for Server<St> {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
+    use super::IntoSink;
     use futures::{SinkExt, StreamExt};
     use js_sys::AsyncIterator;
     use utils_misc::{
@@ -440,7 +584,7 @@ pub mod wasm {
     ) -> Result<RelayServer, JsValue> {
         let stream = JsStream::from(stream);
 
-        let server = super::Server::new(stream);
+        let server = super::Server::new(stream, sink);
 
         Ok(RelayServer { server })
     }
