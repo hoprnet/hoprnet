@@ -1242,10 +1242,10 @@ class Hopr extends EventEmitter {
     direction: 'incoming' | 'outgoing'
   ): Promise<{ receipt: string; status: ChannelStatus }> {
     const counterpartyPubKey = PublicKey.fromPeerId(counterparty)
-    const channel = direction === 'outgoing'
-      ? await this.db.getChannelX(this.pubKey, counterpartyPubKey)
-      : await this.db.getChannelX(counterpartyPubKey, this.pubKey)
-
+    const channel =
+      direction === 'outgoing'
+        ? await this.db.getChannelX(this.pubKey, counterpartyPubKey)
+        : await this.db.getChannelX(counterpartyPubKey, this.pubKey)
 
     // TODO: should we wait for confirmation?
     if (channel.status === ChannelStatus.Closed) {
@@ -1270,7 +1270,7 @@ class Hopr extends EventEmitter {
         } else {
           // verify that we passed the closure waiting period to prevent failing
           // on-chain transactions
-  
+
           if (channel.closureTimePassed()) {
             txHash = await this.connector.finalizeClosure(this.pubKey, counterpartyPubKey)
           } else {

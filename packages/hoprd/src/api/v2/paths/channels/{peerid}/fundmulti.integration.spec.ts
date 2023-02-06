@@ -18,7 +18,6 @@ node.getEthereumAddress = sinon.fake.returns(ALICE_NATIVE_ADDR)
 node.getNativeBalance = sinon.fake.returns(new NativeBalance(new BN(10)))
 node.getBalance = sinon.fake.returns(new Balance(new BN(1)))
 
-
 node.openChannel = sinon.fake.returns(
   Promise.resolve({
     receipt: 'testReceipt'
@@ -48,8 +47,8 @@ describe('POST /channels/{peerId}', () => {
 
   it('should fail on invalid peerId', async () => {
     const res = await request(service).post(`/api/v2/channels/${INVALID_PEER_ID}`).send({
-        outgoingAmount: '0.3',
-        incomingAmount: '0.2'
+      outgoingAmount: '0.3',
+      incomingAmount: '0.2'
     })
     expect(res.status).to.equal(400)
     expect(res).to.satisfyApiSpec
@@ -60,8 +59,8 @@ describe('POST /channels/{peerId}', () => {
 
   it('should fail on invalid amount', async () => {
     const res = await request(service).post(`/api/v2/channels/${BOB_PEER_ID}`).send({
-        outgoingAmount: '0.3',
-        incomingAmount: 'abc'
+      outgoingAmount: '0.3',
+      incomingAmount: 'abc'
     })
     expect(res.status).to.equal(400)
     expect(res).to.satisfyApiSpec
@@ -72,8 +71,8 @@ describe('POST /channels/{peerId}', () => {
 
   it('should fail when out of balance', async () => {
     const res = await request(service).post(`/api/v2/channels/${BOB_PEER_ID}`).send({
-        outgoingAmount: '8',
-        incomingAmount: '3'
+      outgoingAmount: '8',
+      incomingAmount: '3'
     })
     expect(res.status).to.equal(403)
     expect(res).to.satisfyApiSpec

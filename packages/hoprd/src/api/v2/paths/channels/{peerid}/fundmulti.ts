@@ -1,11 +1,6 @@
 import type { Operation } from 'express-openapi'
 import type Hopr from '@hoprnet/hopr-core'
-import {
-  defer,
-  generateChannelId,
-  PublicKey,
-  type DeferType
-} from '@hoprnet/hopr-utils'
+import { defer, generateChannelId, PublicKey, type DeferType } from '@hoprnet/hopr-utils'
 import { peerIdFromString } from '@libp2p/peer-id'
 import { PeerId } from '@libp2p/interface-peer-id'
 import BN from 'bn.js'
@@ -76,7 +71,6 @@ async function validateFundChannelMultiParameters(
   }
 }
 
-
 /**
  * Fund channel between two parties (between this node and another one).
  * @returns two channel ids (outgoing and incoming)
@@ -88,17 +82,22 @@ export async function fundMultiChannels(
   incomingAmountStr: string
 ): Promise<
   | {
-    success: false
-    reason: keyof typeof STATUS_CODES
-  }
+      success: false
+      reason: keyof typeof STATUS_CODES
+    }
   | {
-    success: true
-    outgoingChannelId: string
-    incomingChannelId: string
-    receipt: string
-  }
+      success: true
+      outgoingChannelId: string
+      incomingChannelId: string
+      receipt: string
+    }
 > {
-  const validationResult = await validateFundChannelMultiParameters(node, counterpartyStr, outgoingAmountStr, incomingAmountStr)
+  const validationResult = await validateFundChannelMultiParameters(
+    node,
+    counterpartyStr,
+    outgoingAmountStr,
+    incomingAmountStr
+  )
 
   if (validationResult.valid == false) {
     return { success: false, reason: validationResult.reason }
@@ -128,8 +127,17 @@ export async function fundMultiChannels(
   }
 
   try {
-    const receipt = await node.fundChannel(validationResult.counterparty, validationResult.incomingAmount, validationResult.outgoingAmount)
-    return { success: true, outgoingChannelId: outgoingChannelId.toHex(), incomingChannelId: incomingChannelId.toHex(), receipt }
+    const receipt = await node.fundChannel(
+      validationResult.counterparty,
+      validationResult.incomingAmount,
+      validationResult.outgoingAmount
+    )
+    return {
+      success: true,
+      outgoingChannelId: outgoingChannelId.toHex(),
+      incomingChannelId: incomingChannelId.toHex(),
+      receipt
+    }
   } catch (err) {
     return { success: false, reason: STATUS_CODES.UNKNOWN_FAILURE }
   } finally {
