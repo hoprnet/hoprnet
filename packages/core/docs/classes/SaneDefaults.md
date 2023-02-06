@@ -32,20 +32,19 @@
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:98](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L98)
+[packages/core/src/channel-strategy.ts:99](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L99)
 
 ## Methods
 
 ### onChannelWillClose
 
-▸ **onChannelWillClose**(`channel`, `chain`): `Promise`<`void`\>
+▸ **onChannelWillClose**(`channel`): `Promise`<`void`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `channel` | `ChannelEntry` |
-| `chain` | `default` |
 
 #### Returns
 
@@ -59,14 +58,13 @@ ___
 
 ### onWinningTicket
 
-▸ **onWinningTicket**(`ackTicket`, `chain`): `Promise`<`void`\>
+▸ **onWinningTicket**(`ackTicket`): `Promise`<`void`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `ackTicket` | `AcknowledgedTicket` |
-| `chain` | `default` |
 
 #### Returns
 
@@ -94,4 +92,4 @@ ___
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:93](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L93)
+[packages/core/src/channel-strategy.ts:94](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L94)
