@@ -20,11 +20,19 @@ export const setSetting = (node: Hopr, stateOps: StateOps, key: keyof State['set
       if (typeof value !== 'number') throw Error(STATUS_CODES.INVALID_SETTING_VALUE)
       state.settings[key] = value
       break
+
     case SettingKey.INCLUDE_RECIPIENT:
     case SettingKey.AUTO_REDEEM_TICKETS:
       if (typeof value !== 'boolean') throw Error(STATUS_CODES.INVALID_SETTING_VALUE)
+
       state.settings[key] = value
+      let currentStrategy = node.getChannelStrategy()
+      currentStrategy.configure({
+        max_channels: state.settings[SettingKey.MAX_AUTO_CHANNELS],
+        auto_redeem_tickets: state.settings[SettingKey.AUTO_REDEEM_TICKETS]
+      })
       break
+
     case SettingKey.STRATEGY:
       if (!isStrategy(value)) throw Error(STATUS_CODES.INVALID_SETTING_VALUE)
 

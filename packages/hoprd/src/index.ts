@@ -84,12 +84,10 @@ function generateNodeOptions(argv: CliArgs, environment: ResolvedEnvironment): H
 
   if (isStrategy(argv.default_strategy)) {
     options.strategy = StrategyFactory.getStrategy(argv.default_strategy)
-    if (argv.max_auto_channels !== undefined) {
-      options.strategy.configure({
-        max_channels: argv.max_auto_channels,
-        auto_redeem_tickets: argv.auto_redeem_tickets
-      })
-    }
+    options.strategy.configure({
+      auto_redeem_tickets: argv.auto_redeem_tickets ?? false,
+      max_channels: argv.max_auto_channels ?? undefined
+    })
   }
 
   return options
