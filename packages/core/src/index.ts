@@ -1213,7 +1213,7 @@ class Hopr extends EventEmitter {
    * @param myFund the amount to fund the channel in my favor HOPR(wei)
    * @param counterpartyFund the amount to fund the channel in counterparty's favor HOPR(wei)
    */
-  public async fundChannel(counterparty: PeerId, myFund: BN, counterpartyFund: BN): Promise<void> {
+  public async fundChannel(counterparty: PeerId, myFund: BN, counterpartyFund: BN): Promise<string> {
     const counterpartyPubKey = PublicKey.fromPeerId(counterparty)
     const myBalance = await this.connector.getBalance(false)
     const totalFund = myFund.add(counterpartyFund)
@@ -1230,7 +1230,7 @@ class Hopr extends EventEmitter {
     }
 
     try {
-      await this.connector.fundChannel(counterpartyPubKey, new Balance(myFund), new Balance(counterpartyFund))
+      return this.connector.fundChannel(counterpartyPubKey, new Balance(myFund), new Balance(counterpartyFund))
     } catch (err) {
       this.maybeEmitFundsEmptyEvent(err)
       throw new Error(`Failed to fundChannel: ${err}`)

@@ -138,7 +138,7 @@ build-solidity-types: ## generate Solidity typings
 
 .PHONY: build-yarn
 build-yarn: ## build yarn packages
-build-yarn: build-solidity-types build-cargo
+build-yarn: build-cargo
 ifeq ($(package),)
 	npx tsc --build tsconfig.build.json
 else
