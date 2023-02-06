@@ -1269,7 +1269,7 @@ class Hopr extends EventEmitter {
         // on-chain transactions
 
         if (channel.closureTimePassed()) {
-          txHash = await connector.finalizeClosure(counterpartyPubKey)
+          txHash = await connector.finalizeClosure(this.pubKey, counterpartyPubKey)
         } else {
           log(
             `ignoring finalizing closure of channel ${channel
