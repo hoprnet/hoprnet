@@ -58,8 +58,8 @@ export interface ChannelStrategyInterface {
     peer_quality: (string) => number
   ): StrategyTickResult
 
-  onChannelWillClose(channel: ChannelEntry, chain: HoprCoreEthereum): Promise<void> // Before a channel closes
-  onWinningTicket(t: AcknowledgedTicket, chain: HoprCoreEthereum): Promise<void>
+  onChannelWillClose(channel: ChannelEntry): Promise<void> // Before a channel closes
+  onWinningTicket(t: AcknowledgedTicket): Promise<void>
   shouldCommitToChannel(c: ChannelEntry): boolean
 
   tickInterval: number
@@ -71,14 +71,15 @@ export interface ChannelStrategyInterface {
  * At present this does not take gas into consideration.
  */
 export abstract class SaneDefaults {
-  async onWinningTicket(ackTicket: AcknowledgedTicket, chain: HoprCoreEthereum) {
+  async onWinningTicket(ackTicket: AcknowledgedTicket) {
     const counterparty = ackTicket.signer
     log(`auto redeeming tickets in channel to ${counterparty.toPeerId().toString()}`)
-    await chain.redeemTicketsInChannelByCounterparty(counterparty)
+    await HoprCoreEthereum.getInstance().redeemTicketsInChannelByCounterparty(counterparty)
   }
 
-  async onChannelWillClose(channel: ChannelEntry, chain: HoprCoreEthereum) {
-    const source = channel.source
+  async onChannelWillClose(channel: ChannelEntry) {
+    const chain = HoprCoreEthereum.getInstance()
+    const counterparty = channel.source
     const selfPubKey = chain.getPublicKey()
     if (!source.eq(selfPubKey) && channel.destination.eq(selfPubKey)) {
       log(`auto redeeming tickets in channel to ${source.toPeerId().toString()}`)

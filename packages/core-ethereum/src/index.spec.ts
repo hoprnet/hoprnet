@@ -19,13 +19,18 @@ describe(`test HoprEthereum instance creation`, function () {
   })
   it('should instantiate a new class w/o any issues', function () {
     log('starting new instance of HoprEthereum.')
-    new HoprCoreEthereum(dbMock, PARTY_A, stringToU8a(ACCOUNT_A.privateKey), sampleChainOptions)
+    HoprCoreEthereum.createInstance(dbMock, PARTY_A, stringToU8a(ACCOUNT_A.privateKey), sampleChainOptions)
     log('successfully created the HoprEthereum instance.')
   })
 })
 
 describe('test HoprEthereum', function () {
-  const connector = new HoprCoreEthereum(dbMock, PARTY_A, stringToU8a(ACCOUNT_A.privateKey), sampleChainOptions)
+  const connector = HoprCoreEthereum.createInstance(
+    dbMock,
+    PARTY_A,
+    stringToU8a(ACCOUNT_A.privateKey),
+    sampleChainOptions
+  )
 
   it('should test isAllowedAccessToNetwork', async function () {
     // @ts-ignore
