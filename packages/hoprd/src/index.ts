@@ -154,6 +154,7 @@ async function main() {
     settings: {
       includeRecipient: false,
       strategy: 'passive',
+      autoRedeemTickets: false,
       maxAutoChannels: undefined
     }
   }
