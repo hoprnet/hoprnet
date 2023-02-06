@@ -31,7 +31,7 @@ describe('cover-traffic daemon', async function () {
 
   afterEach(async function () {
     await node.stop()
-    await HoprCoreEthereum.instance.stop()
+    await HoprCoreEthereum.getInstance().stop()
   })
 
   it('should run and stop properly', async function () {

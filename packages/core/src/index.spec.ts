@@ -30,7 +30,7 @@ describe('hopr core (instance)', async function () {
     await setTimeout(8000)
 
     await node.stop()
-    await HoprCoreEthereum.instance.stop()
+    await HoprCoreEthereum.getInstance().stop()
 
     await setTimeout(100)
 

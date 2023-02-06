@@ -74,11 +74,11 @@ export abstract class SaneDefaults {
   async onWinningTicket(ackTicket: AcknowledgedTicket) {
     const counterparty = ackTicket.signer
     log(`auto redeeming tickets in channel to ${counterparty.toPeerId().toString()}`)
-    await HoprCoreEthereum.instance.redeemTicketsInChannelByCounterparty(counterparty)
+    await HoprCoreEthereum.getInstance().redeemTicketsInChannelByCounterparty(counterparty)
   }
 
   async onChannelWillClose(channel: ChannelEntry) {
-    const chain = HoprCoreEthereum.instance
+    const chain = HoprCoreEthereum.getInstance()
     const counterparty = channel.source
     const selfPubKey = chain.getPublicKey()
     if (!counterparty.eq(selfPubKey)) {

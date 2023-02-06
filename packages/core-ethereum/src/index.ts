@@ -100,7 +100,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     return HoprCoreEthereum._instance
   }
 
-  public static get instance(): HoprCoreEthereum {
+  public static getInstance(): HoprCoreEthereum {
     if (!HoprCoreEthereum._instance) throw new Error('non-existent instance of HoprCoreEthereum')
     return HoprCoreEthereum._instance
   }
