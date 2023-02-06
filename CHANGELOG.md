@@ -13,6 +13,7 @@
 - Fix of ticket validation to be order-independent, thus not rejecting older tickets ([#4527](<(https://github.com/hoprnet/hoprnet/pull/4527)>)
 - Migrate `heartbeat` ping network interaction to Rust using Rust `futures::stream::Stream` ([#4539](https://github.com/hoprnet/hoprnet/pull/4539))
 - Added strategy related metrics, refactoring of the strategy code ([#4537](https://github.com/hoprnet/hoprnet/pull/4537))
+- Bring back `fund` command, to open outgoing and incoming channels with counterpart ([#4566](https://github.com/hoprnet/hoprnet/pull/4566))
 
 <a name="1.91"></a>
 
