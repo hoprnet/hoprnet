@@ -6,7 +6,7 @@ use wasm_bindgen_test::*;
 
 /// All integration tests for WASM wrappers go in this directory.
 
-use core_ethereum_connector::my_module::wasm::*;
+use core_ethereum_connector::connector::wasm::*;
 
 // wasm_bindgen_test_configure!(run_in_browser);
 

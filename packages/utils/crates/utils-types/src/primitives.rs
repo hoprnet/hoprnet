@@ -82,7 +82,7 @@ impl Balance {
     }
 
     pub fn serialize_value(&self) -> Box<[u8]> {
-        Box::new(self.value().to_be_bytes())
+        self.value().to_be_bytes().into()
     }
 
     pub fn lt(&self, other: &Balance) -> bool {

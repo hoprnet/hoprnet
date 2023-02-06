@@ -13,6 +13,7 @@ wasm = ["dep:wasm-bindgen", "dep:js-sys", "dep:serde-wasm-bindgen"]
 console_error_panic_hook = [ "dep:console_error_panic_hook" ]
 
 [dependencies]
+core-ethereum-connector = { path = "../../../core-ethereum/crates/core-ethereum-connector" }
 getrandom = { version = "0.2.8", features = ["js"] }
 js-sys = { version = "0.3.60", optional = true }
 rand = "0.8.5"

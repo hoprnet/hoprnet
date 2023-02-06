@@ -35,16 +35,14 @@ impl PromiscuousStrategy {
     // Re-implementations to satisfy the trait, because
     // we cannot put #[wasm_bindgen] on trait impl blocks
 
-    /*
-    TODO: Right now there's only WASM-specific implementation until HoprCoreEthereum is migrated
-    pub fn on_winning_ticket(&self, ack_ticket: &AcknowledgedTicket) {
+    pub async fn on_winning_ticket(&self, ack_ticket: &AcknowledgedTicket) {
         todo!()
     }
 
-    pub fn on_channel_closing(&self, channel: &ChannelEntry) {
+    pub async fn on_channel_closing(&self, channel: &ChannelEntry) {
         todo!()
     }
-    */
+
 
     pub fn should_commit_to_channel(&self, _channel: &ChannelEntry) -> bool {
         true
@@ -300,20 +298,6 @@ pub mod wasm {
     use crate::generic::ChannelStrategy;
     use crate::generic::wasm::WasmChannelStrategy;
     use crate::promiscuous::PromiscuousStrategy;
-
-    #[wasm_bindgen(module = "@hoprnet/hopr-core-ethereum")]
-    extern "C" {
-        type HoprCoreEthereum;
-
-        #[wasm_bindgen(static_method_of = HoprCoreEthereum, getter)]
-        fn instance() -> HoprCoreEthereum;
-
-        #[wasm_bindgen(method)]
-        fn redeemTicketsInChannelByCounterparty(this: &HoprCoreEthereum, counterparty: &JsValue) -> Promise;
-
-        #[wasm_bindgen(method)]
-        fn redeemTicketsInChannel(this: &HoprCoreEthereum, channel: &JsValue) -> Promise;
-    }
 
     impl WasmChannelStrategy for PromiscuousStrategy {}
 

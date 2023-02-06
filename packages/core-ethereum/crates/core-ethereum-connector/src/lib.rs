@@ -1,4 +1,5 @@
-pub mod my_module;
+pub mod connector;
+pub mod errors;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {

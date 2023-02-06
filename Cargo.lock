@@ -756,7 +756,13 @@ name = "core-ethereum-connector"
 version = "0.1.0"
 dependencies = [
  "console_error_panic_hook",
+ "js-sys",
+ "lazy_static 1.4.0",
+ "thiserror",
+ "utils-misc",
+ "utils-types",
  "wasm-bindgen",
+ "wasm-bindgen-futures",
  "wasm-bindgen-test",
 ]
 
@@ -814,6 +820,7 @@ name = "core-strategy"
 version = "0.2.0"
 dependencies = [
  "console_error_panic_hook",
+ "core-ethereum-connector",
  "getrandom 0.2.8",
  "js-sys",
  "lazy_static 1.4.0",

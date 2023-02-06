@@ -36,6 +36,22 @@ pub struct ChannelEntry {
     pub closure_time: U256,
 }
 
+impl ChannelEntry {
+    pub fn serialize(&self) -> Box<[u8]> {
+        let mut ret: Vec<u8> = vec![];
+        ret.extend_from_slice(self.source.serialize(false).as_ref());
+        ret.extend_from_slice(self.destination.serialize(false).as_ref());
+        ret.extend_from_slice(self.balance.serialize_value().as_ref());
+        ret.extend_from_slice(self.commitment.serialize().as_ref());
+        ret.extend_from_slice(self.ticket_epoch.serialize().as_ref());
+        ret.extend_from_slice(self.ticket_index.serialize().as_ref());
+        ret.push(self.status as u8);
+        ret.extend_from_slice(self.channel_epoch.serialize().as_ref());
+        ret.extend_from_slice(self.closure_time.serialize().as_ref());
+        ret.into_boxed_slice()
+    }
+}
+
 // TODO: Update to use secp256k1 private key length constant from core-crypto
 pub const RESPONSE_LENGTH: usize = 32;
 
