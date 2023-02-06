@@ -31,7 +31,7 @@ export const setSetting = (node: Hopr, stateOps: StateOps, key: keyof State['set
       let strategy = StrategyFactory.getStrategy(value)
       strategy.configure({
         max_channels: state.settings[SettingKey.MAX_AUTO_CHANNELS],
-        auto_redeem_tickets: state.settings[SettingKey.AUTO_REDEEM_TICKETS],
+        auto_redeem_tickets: state.settings[SettingKey.AUTO_REDEEM_TICKETS]
       })
 
       node.setChannelStrategy(strategy)

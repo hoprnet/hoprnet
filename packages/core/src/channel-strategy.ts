@@ -71,7 +71,6 @@ export interface ChannelStrategyInterface {
  * At present this does not take gas into consideration.
  */
 export abstract class SaneDefaults {
-
   protected autoRedeemTickets: boolean = false
 
   async onWinningTicket(ackTicket: AcknowledgedTicket) {
