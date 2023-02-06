@@ -81,7 +81,7 @@ async function validateFundChannelMultiParameters(
  * Fund channel between two parties (between this node and another one).
  * @returns two channel ids (outgoing and incoming)
  */
-export async function fundChannelMulti(
+export async function fundMultiChannels(
   node: Hopr,
   counterpartyStr: string,
   outgoingAmountStr: string,
@@ -146,7 +146,7 @@ const POST: Operation = [
     const { peerid } = req.params
     const { outgoingAmount, incomingAmount } = req.body
 
-    const fundingResult = await fundChannelMulti(node, peerid, outgoingAmount, incomingAmount)
+    const fundingResult = await fundMultiChannels(node, peerid, outgoingAmount, incomingAmount)
 
     if (fundingResult.success == true) {
       res.status(201).send({ receipt: fundingResult.receipt })
@@ -195,13 +195,8 @@ POST.apiDoc = {
       'application/json': {
         schema: {
           type: 'object',
-          required: ['peerId', 'outgoingAmount', 'incomingAmount'],
+          required: ['outgoingAmount', 'incomingAmount'],
           properties: {
-            peerId: {
-              format: 'peerId',
-              type: 'string',
-              description: 'PeerId that we want to transact with using this channel.'
-            },
             outgoingAmount: {
               format: 'amount',
               type: 'string',
@@ -216,8 +211,8 @@ POST.apiDoc = {
             }
           },
           example: {
-            peerId: '16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12',
-            amount: '1000000'
+            outgoingAmount: '1000000',
+            incomingAmount: '1000000'
           }
         }
       }
