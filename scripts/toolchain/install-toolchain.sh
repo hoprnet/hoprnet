@@ -206,8 +206,8 @@ if ${install_all}; then
     # launch rustc once so it installs updated components
     rustc --version
 
-    install_wasm_pack
     install_wasm_opt
+    install_wasm_pack
     install_node_js
     install_yarn
     install_javascript_utilities
