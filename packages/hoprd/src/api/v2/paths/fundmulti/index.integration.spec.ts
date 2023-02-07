@@ -19,9 +19,7 @@ node.getEthereumAddress = sinon.fake.returns(ALICE_NATIVE_ADDR)
 node.getNativeBalance = sinon.fake.returns(new NativeBalance(new BN(10)))
 node.getBalance = sinon.fake.returns(new Balance(new BN(5)))
 
-node.fundChannel = sinon.fake.returns(
-  Promise.resolve('testReceipt')
-)
+node.fundChannel = sinon.fake.returns(Promise.resolve('testReceipt'))
 
 describe('POST /fundmulti', () => {
   let service: any

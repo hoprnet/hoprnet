@@ -30,7 +30,7 @@ async function validateFundChannelMultiParameters(
     counterparty = peerIdFromString(counterpartyStr)
     // cannot open channel to self
     if (counterparty.equals(node.getId())) {
-      throw Error("Counter party is the same as current node")
+      throw Error('Counter party is the same as current node')
     }
   } catch (err) {
     return {
@@ -94,9 +94,9 @@ export async function fundMultiChannels(
     counterpartyStr,
     outgoingAmountStr,
     incomingAmountStr
-    )
-    
-    if (validationResult.valid == false) {
+  )
+
+  if (validationResult.valid == false) {
     return { success: false, reason: validationResult.reason }
   }
 
@@ -161,8 +161,8 @@ const POST: Operation = [
           res.status(400).send({ status: STATUS_CODES.INVALID_PEERID })
           break
         case STATUS_CODES.INVALID_AMOUNT:
-            res.status(400).send({ status: STATUS_CODES.INVALID_AMOUNT })
-            break
+          res.status(400).send({ status: STATUS_CODES.INVALID_AMOUNT })
+          break
         case STATUS_CODES.NOT_ENOUGH_BALANCE:
           console.log(`Found it...${STATUS_CODES.NOT_ENOUGH_BALANCE}`)
           res.status(403).send({ status: STATUS_CODES.NOT_ENOUGH_BALANCE })
