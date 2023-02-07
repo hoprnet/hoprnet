@@ -236,7 +236,7 @@ IFS=','
 PRIVATE_KEY="${DEPLOYER_PRIVATE_KEY}" make -C "${mydir}/.." self-register-node \
   environment="${environment}" \
   peer_ids="${hopr_addrs[*]}" \
-  network="${network_id}"
+  environment_type="${network_id}"
 unset IFS
 
 # Finally wait for the public nodes to come up, for NAT nodes this isn't possible
