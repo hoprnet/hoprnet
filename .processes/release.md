@@ -125,7 +125,7 @@ particular branch to deploy on every change.
 ### Release Cycle
 
 ```
-   hotfix/patch-bogota    staging/bogota         release/bogota           master
+   hotfix/patch-riga    staging/riga         release/riga           master
 
          x                   x                       x  create new release  x
          x                   x                       x◄─────────────────────x 1.91.0-next.44
@@ -153,15 +153,16 @@ particular branch to deploy on every change.
 
 1. Setup some environment variables:
 
-- Give a name to the release like `paleochora`, `valencia`. For instance : `export RELEASE_NAME=bogota`.
-- Give a name to the previous release: `export OLD_RELEASE_NAME=valencia`
+- Give a name to the release. For instance : `export RELEASE_NAME=riga`.
+- Give a name to the previous release: `export OLD_RELEASE_NAME=bogota`
 - Give a name to the target environment of the release. For instance: `export ENVIRONMENT_NAME=monte_rosa`
 
-2. Create a release tracking issue on GitHub. Use previous issues as [templates](https://github.com/hoprnet/hoprnet/issues/4275)
+2. Create a release tracking issue on GitHub. Use previous issues as [templates](https://github.com/hoprnet/hoprnet/issues/4487)
 3. On the `master` branch, and before the creation of the release branch, there should be an entry in `packages/hoprd/releases.json` for the new release name.
 
 - If the release will run in its own environment ($RELEASENAME == $ENVIRONMENT_NAME) then a new entry in `packages/core/protocol-config.json` should be created for the network.
-- If the release will run in a multienvironment network like `monte_rosa` then update the monte_rosa entry to accespt the new `version_range` of the new release.
+- If the release will run in a multienvironment network like `monte_rosa` then update the file `packages/core/protocol-config.json` for the `monte_rosa` entry to accept the new `version_range` of the new release.
+- Create a PR and merge it into master
 
 4. On the `master` branch, create the release branch locally by executing `git checkout -b release/${RELEASE_NAME}`.
 5. On the `release/${RELEASE_NAME}` branch, and before pushing the branch to GitHub, some release-specific changes should be applied to ensure the resulting CD artifacts actually are proper release artifacts.
