@@ -181,7 +181,7 @@ build-docs-typescript: build
 
 .PHONY: build-docs-website
 build-docs-website: ## build docs website
-	yarn workspace hopr-docs build
+	yarn workspace @hoprnet/hopr-docs build
 
 .PHONY: build-docs-api
 build-docs-api: ## build Rest API docs
