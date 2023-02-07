@@ -18,8 +18,8 @@ jobs:
         with:
           version: nightly
 
-      - name: Print forge version
-        run: forge --version
+      - name: Install dependencies
+        run: forge install
 
       # Backwards compatibility checks.
       - name: Check compatibility with 0.8.0
@@ -69,8 +69,8 @@ jobs:
         with:
           version: nightly
 
-      - name: Print forge version
-        run: forge --version
+      - name: Install dependencies
+        run: forge install
 
       - name: Run tests
         run: forge test -vvv
@@ -84,9 +84,6 @@ jobs:
         uses: onbjerg/foundry-toolchain@v1
         with:
           version: nightly
-
-      - name: Print forge version
-        run: forge --version
 
       - name: Check formatting
         run: forge fmt --check

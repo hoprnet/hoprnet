@@ -219,41 +219,6 @@ contract StdCheatsTest is Test {
         receipts;
     }
 
-    function testGasMeteringModifier() public {
-        uint256 gas_start_normal = gasleft();
-        addInLoop();
-        uint256 gas_used_normal = gas_start_normal - gasleft();
-
-        uint256 gas_start_single = gasleft();
-        addInLoopNoGas();
-        uint256 gas_used_single = gas_start_single - gasleft();
-
-        uint256 gas_start_double = gasleft();
-        addInLoopNoGasNoGas();
-        uint256 gas_used_double = gas_start_double - gasleft();
-
-        emit log_named_uint("Normal gas", gas_used_normal);
-        emit log_named_uint("Single modifier gas", gas_used_single);
-        emit log_named_uint("Double modifier  gas", gas_used_double);
-        assertTrue(gas_used_double + gas_used_single < gas_used_normal);
-    }
-
-    function addInLoop() internal pure returns (uint256) {
-        uint256 b;
-        for (uint256 i; i < 10000; i++) {
-            b += i;
-        }
-        return b;
-    }
-
-    function addInLoopNoGas() internal noGasMetering returns (uint256) {
-        return addInLoop();
-    }
-
-    function addInLoopNoGasNoGas() internal noGasMetering returns (uint256) {
-        return addInLoopNoGas();
-    }
-
     function bytesToUint_test(bytes memory b) private pure returns (uint256) {
         uint256 number;
         for (uint256 i = 0; i < b.length; i++) {
@@ -262,35 +227,32 @@ contract StdCheatsTest is Test {
         return number;
     }
 
+    function testChainRpcInitialization() public {
+        // RPCs specified in `foundry.toml` should be updated.
+        assertEq(stdChains["mainnet"].rpcUrl, "https://api.mycryptoapi.com/eth/");
+        assertEq(stdChains["optimism_goerli"].rpcUrl, "https://goerli.optimism.io/");
+        assertEq(stdChains["arbitrum_one_goerli"].rpcUrl, "https://goerli-rollup.arbitrum.io/rpc/");
+
+        // Other RPCs should remain unchanged.
+        assertEq(stdChains["anvil"].rpcUrl, "http://127.0.0.1:8545");
+        assertEq(stdChains["hardhat"].rpcUrl, "http://127.0.0.1:8545");
+        assertEq(stdChains["sepolia"].rpcUrl, "https://rpc.sepolia.dev");
+    }
+
+    // Ensure we can connect to the default RPC URL for each chain.
+    function testRpcs() public {
+        (string[2][] memory rpcs) = vm.rpcUrls();
+        for (uint256 i = 0; i < rpcs.length; i++) {
+            ( /* string memory name */ , string memory rpcUrl) = (rpcs[i][0], rpcs[i][1]);
+            vm.createSelectFork(rpcUrl);
+        }
+    }
+
     function testAssumeNoPrecompiles(address addr) external {
-        assumeNoPrecompiles(addr, getChain("optimism_goerli").chainId);
+        assumeNoPrecompiles(addr, stdChains["optimism_goerli"].chainId);
         assertTrue(
             addr < address(1) || (addr > address(9) && addr < address(0x4200000000000000000000000000000000000000))
                 || addr > address(0x4200000000000000000000000000000000000800)
-        );
-    }
-
-    function testAssumePayable() external {
-        // all should revert since these addresses are not payable
-
-        // VM address
-        vm.expectRevert();
-        assumePayable(0x7109709ECfa91a80626fF3989D68f67F5b1DD12D);
-
-        // Console address
-        vm.expectRevert();
-        assumePayable(0x000000000000000000636F6e736F6c652e6c6f67);
-
-        // Create2Deployer
-        vm.expectRevert();
-        assumePayable(0x4e59b44847b379578588920cA78FbF26c0B4956C);
-    }
-
-    function testAssumePayable(address addr) external {
-        assumePayable(addr);
-        assertTrue(
-            addr != 0x7109709ECfa91a80626fF3989D68f67F5b1DD12D && addr != 0x000000000000000000636F6e736F6c652e6c6f67
-                && addr != 0x4e59b44847b379578588920cA78FbF26c0B4956C
         );
     }
 }

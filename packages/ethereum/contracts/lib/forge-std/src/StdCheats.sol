@@ -3,13 +3,31 @@ pragma solidity >=0.6.2 <0.9.0;
 
 pragma experimental ABIEncoderV2;
 
-import {StdStorage, stdStorage} from "./StdStorage.sol";
-import {Vm} from "./Vm.sol";
+import "./StdStorage.sol";
+import "./Vm.sol";
 
 abstract contract StdCheatsSafe {
-    Vm private constant vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
+    VmSafe private constant vm = VmSafe(address(uint160(uint256(keccak256("hevm cheat code")))));
 
-    bool private gasMeteringOff;
+    /// @dev To hide constructor warnings across solc versions due to different constructor visibility requirements and
+    /// syntaxes, we put the constructor in a private method and assign an unused return value to a variable. This
+    /// forces the method to run during construction, but without declaring an explicit constructor.
+    uint256 private CONSTRUCTOR = _constructor();
+
+    struct Chain {
+        // The chain name, using underscores as the separator to match `foundry.toml` conventions.
+        string name;
+        // The chain's Chain ID.
+        uint256 chainId;
+        // A default RPC endpoint for this chain.
+        // NOTE: This default RPC URL is included for convenience to facilitate quick tests and
+        // experimentation. Do not use this RPC URL for production test suites, CI, or other heavy
+        // usage as you will be throttled and this is a disservice to others who need this endpoint.
+        string rpcUrl;
+    }
+
+    // Maps from a chain's name (matching what's in the `foundry.toml` file) to chain data.
+    mapping(string => Chain) internal stdChains;
 
     // Data structures to parse Transaction objects from the broadcast artifact
     // that conform to EIP1559. The Raw structs is what is parsed from the JSON
@@ -188,7 +206,35 @@ abstract contract StdCheatsSafe {
         string value;
     }
 
-    function assumeNoPrecompiles(address addr) internal virtual {
+    function _constructor() private returns (uint256) {
+        // Initialize `stdChains` with the defaults.
+        stdChains["anvil"] = Chain("Anvil", 31337, "http://127.0.0.1:8545");
+        stdChains["hardhat"] = Chain("Hardhat", 31337, "http://127.0.0.1:8545");
+        stdChains["mainnet"] = Chain("Mainnet", 1, "https://api.mycryptoapi.com/eth");
+        stdChains["goerli"] = Chain("Goerli", 5, "https://goerli.infura.io/v3/6770454bc6ea42c58aac12978531b93f");
+        stdChains["sepolia"] = Chain("Sepolia", 11155111, "https://rpc.sepolia.dev");
+        stdChains["optimism"] = Chain("Optimism", 10, "https://mainnet.optimism.io");
+        stdChains["optimism_goerli"] = Chain("Optimism Goerli", 420, "https://goerli.optimism.io");
+        stdChains["arbitrum_one"] = Chain("Arbitrum One", 42161, "https://arb1.arbitrum.io/rpc");
+        stdChains["arbitrum_one_goerli"] = Chain("Arbitrum One Goerli", 421613, "https://goerli-rollup.arbitrum.io/rpc");
+        stdChains["arbitrum_nova"] = Chain("Arbitrum Nova", 42170, "https://nova.arbitrum.io/rpc");
+        stdChains["polygon"] = Chain("Polygon", 137, "https://polygon-rpc.com");
+        stdChains["polygon_mumbai"] = Chain("Polygon Mumbai", 80001, "https://rpc-mumbai.matic.today");
+        stdChains["avalanche"] = Chain("Avalanche", 43114, "https://api.avax.network/ext/bc/C/rpc");
+        stdChains["avalanche_fuji"] = Chain("Avalanche Fuji", 43113, "https://api.avax-test.network/ext/bc/C/rpc");
+        stdChains["bnb_smart_chain"] = Chain("BNB Smart Chain", 56, "https://bsc-dataseed1.binance.org");
+        stdChains["bnb_smart_chain_testnet"] = Chain("BNB Smart Chain Testnet", 97, "https://data-seed-prebsc-1-s1.binance.org:8545");// forgefmt: disable-line
+        stdChains["gnosis_chain"] = Chain("Gnosis Chain", 100, "https://rpc.gnosischain.com");
+
+        // Loop over RPC URLs in the config file to replace the default RPC URLs
+        Vm.Rpc[] memory rpcs = vm.rpcUrlStructs();
+        for (uint256 i = 0; i < rpcs.length; i++) {
+            stdChains[rpcs[i].name].rpcUrl = rpcs[i].url;
+        }
+        return 0;
+    }
+
+    function assumeNoPrecompiles(address addr) internal view virtual {
         // Assembly required since `block.chainid` was introduced in 0.8.0.
         uint256 chainId;
         assembly {
@@ -197,7 +243,7 @@ abstract contract StdCheatsSafe {
         assumeNoPrecompiles(addr, chainId);
     }
 
-    function assumeNoPrecompiles(address addr, uint256 chainId) internal pure virtual {
+    function assumeNoPrecompiles(address addr, uint256 chainId) internal view virtual {
         // Note: For some chains like Optimism these are technically predeploys (i.e. bytecode placed at a specific
         // address), but the same rationale for excluding them applies so we include those too.
 
@@ -205,13 +251,13 @@ abstract contract StdCheatsSafe {
         vm.assume(addr < address(0x1) || addr > address(0x9));
 
         // forgefmt: disable-start
-        if (chainId == 10 || chainId == 420) {
+        if (chainId == stdChains["optimism"].chainId || chainId == stdChains["optimism_goerli"].chainId) {
             // https://github.com/ethereum-optimism/optimism/blob/eaa371a0184b56b7ca6d9eb9cb0a2b78b2ccd864/op-bindings/predeploys/addresses.go#L6-L21
             vm.assume(addr < address(0x4200000000000000000000000000000000000000) || addr > address(0x4200000000000000000000000000000000000800));
-        } else if (chainId == 42161 || chainId == 421613) {
+        } else if (chainId == stdChains["arbitrum_one"].chainId || chainId == stdChains["arbitrum_one_goerli"].chainId) {
             // https://developer.arbitrum.io/useful-addresses#arbitrum-precompiles-l2-same-on-all-arb-chains
             vm.assume(addr < address(0x0000000000000000000000000000000000000064) || addr > address(0x0000000000000000000000000000000000000068));
-        } else if (chainId == 43114 || chainId == 43113) {
+        } else if (chainId == stdChains["avalanche"].chainId || chainId == stdChains["avalanche_fuji"].chainId) {
             // https://github.com/ava-labs/subnet-evm/blob/47c03fd007ecaa6de2c52ea081596e0a88401f58/precompile/params.go#L18-L59
             vm.assume(addr < address(0x0100000000000000000000000000000000000000) || addr > address(0x01000000000000000000000000000000000000ff));
             vm.assume(addr < address(0x0200000000000000000000000000000000000000) || addr > address(0x02000000000000000000000000000000000000FF));
@@ -269,10 +315,10 @@ abstract contract StdCheatsSafe {
         txDetail.data = rawDetail.data;
         txDetail.from = rawDetail.from;
         txDetail.to = rawDetail.to;
-        txDetail.nonce = _bytesToUint(rawDetail.nonce);
-        txDetail.txType = _bytesToUint(rawDetail.txType);
-        txDetail.value = _bytesToUint(rawDetail.value);
-        txDetail.gas = _bytesToUint(rawDetail.gas);
+        txDetail.nonce = bytesToUint(rawDetail.nonce);
+        txDetail.txType = bytesToUint(rawDetail.txType);
+        txDetail.value = bytesToUint(rawDetail.value);
+        txDetail.gas = bytesToUint(rawDetail.gas);
         txDetail.accessList = rawDetail.accessList;
         return txDetail;
     }
@@ -322,12 +368,12 @@ abstract contract StdCheatsSafe {
         receipt.to = rawReceipt.to;
         receipt.from = rawReceipt.from;
         receipt.contractAddress = rawReceipt.contractAddress;
-        receipt.effectiveGasPrice = _bytesToUint(rawReceipt.effectiveGasPrice);
-        receipt.cumulativeGasUsed = _bytesToUint(rawReceipt.cumulativeGasUsed);
-        receipt.gasUsed = _bytesToUint(rawReceipt.gasUsed);
-        receipt.status = _bytesToUint(rawReceipt.status);
-        receipt.transactionIndex = _bytesToUint(rawReceipt.transactionIndex);
-        receipt.blockNumber = _bytesToUint(rawReceipt.blockNumber);
+        receipt.effectiveGasPrice = bytesToUint(rawReceipt.effectiveGasPrice);
+        receipt.cumulativeGasUsed = bytesToUint(rawReceipt.cumulativeGasUsed);
+        receipt.gasUsed = bytesToUint(rawReceipt.gasUsed);
+        receipt.status = bytesToUint(rawReceipt.status);
+        receipt.transactionIndex = bytesToUint(rawReceipt.transactionIndex);
+        receipt.blockNumber = bytesToUint(rawReceipt.blockNumber);
         receipt.logs = rawToConvertedReceiptLogs(rawReceipt.logs);
         receipt.logsBloom = rawReceipt.logsBloom;
         receipt.transactionHash = rawReceipt.transactionHash;
@@ -344,12 +390,12 @@ abstract contract StdCheatsSafe {
         for (uint256 i; i < rawLogs.length; i++) {
             logs[i].logAddress = rawLogs[i].logAddress;
             logs[i].blockHash = rawLogs[i].blockHash;
-            logs[i].blockNumber = _bytesToUint(rawLogs[i].blockNumber);
+            logs[i].blockNumber = bytesToUint(rawLogs[i].blockNumber);
             logs[i].data = rawLogs[i].data;
-            logs[i].logIndex = _bytesToUint(rawLogs[i].logIndex);
+            logs[i].logIndex = bytesToUint(rawLogs[i].logIndex);
             logs[i].topics = rawLogs[i].topics;
-            logs[i].transactionIndex = _bytesToUint(rawLogs[i].transactionIndex);
-            logs[i].transactionLogIndex = _bytesToUint(rawLogs[i].transactionLogIndex);
+            logs[i].transactionIndex = bytesToUint(rawLogs[i].transactionIndex);
+            logs[i].transactionLogIndex = bytesToUint(rawLogs[i].transactionLogIndex);
             logs[i].removed = rawLogs[i].removed;
         }
         return logs;
@@ -420,55 +466,12 @@ abstract contract StdCheatsSafe {
         who = vm.rememberKey(privateKey);
     }
 
-    function _bytesToUint(bytes memory b) private pure returns (uint256) {
-        require(b.length <= 32, "StdCheats _bytesToUint(bytes): Bytes length exceeds 32.");
-        return abi.decode(abi.encodePacked(new bytes(32 - b.length), b), (uint256));
-    }
-
-    function isFork() internal view virtual returns (bool status) {
-        try vm.activeFork() {
-            status = true;
-        } catch (bytes memory) {}
-    }
-
-    modifier skipWhenForking() {
-        if (!isFork()) {
-            _;
+    function bytesToUint(bytes memory b) private pure returns (uint256) {
+        uint256 number;
+        for (uint256 i = 0; i < b.length; i++) {
+            number = number + uint256(uint8(b[i])) * (2 ** (8 * (b.length - (i + 1))));
         }
-    }
-
-    modifier skipWhenNotForking() {
-        if (isFork()) {
-            _;
-        }
-    }
-
-    modifier noGasMetering() {
-        vm.pauseGasMetering();
-        // To prevent turning gas monitoring back on with nested functions that use this modifier,
-        // we check if gasMetering started in the off position. If it did, we don't want to turn
-        // it back on until we exit the top level function that used the modifier
-        //
-        // i.e. funcA() noGasMetering { funcB() }, where funcB has noGasMetering as well.
-        // funcA will have `gasStartedOff` as false, funcB will have it as true,
-        // so we only turn metering back on at the end of the funcA
-        bool gasStartedOff = gasMeteringOff;
-        gasMeteringOff = true;
-
-        _;
-
-        // if gas metering was on when this modifier was called, turn it back on at the end
-        if (!gasStartedOff) {
-            gasMeteringOff = false;
-            vm.resumeGasMetering();
-        }
-    }
-
-    // a cheat for fuzzing addresses that are payable only
-    // see https://github.com/foundry-rs/foundry/issues/3631
-    function assumePayable(address addr) internal virtual {
-        (bool success,) = payable(addr).call{value: 0}("");
-        vm.assume(success);
+        return number;
     }
 }
 
