@@ -48,6 +48,7 @@ fn parse_host(s: &str) -> Result<Host, String> {
     Host::from_ipv4_host_string(s)
 }
 
+/// Parse a hex string private key to a boxed u8 slice
 fn parse_private_key(s: &str) -> Result<Box<[u8]>, String> {
     if is_private_key(s) || is_prefixed_private_key(s) {
         let mut decoded = [0u8; 32];
@@ -526,6 +527,49 @@ fn get_data_path(mono_repo_path: &str, maybe_default_environment: Option<String>
             mono_repo_path, default_environment
         ),
         None => format!("{}/packages/hoprd/hoprd-db", mono_repo_path),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn parse_private_key () {
+        let parsed = super::parse_private_key("cd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e0317").unwrap();
+
+        let priv_key: Vec<u8> = vec![205, 9, 249, 41, 63, 253, 214, 155, 233, 120, 3, 44, 83, 59, 107, 205, 2, 223, 213, 217, 55, 201, 135, 190, 222, 195, 226, 141, 224, 126, 3, 23];
+
+        assert_eq!(parsed, priv_key.into())
+    }
+
+    #[test]
+    fn parse_private_key_with_prefix () {
+        let parsed_with_prefix = super::parse_private_key("cd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e0317").unwrap();
+
+        let priv_key: Vec<u8> = vec![205, 9, 249, 41, 63, 253, 214, 155, 233, 120, 3, 44, 83, 59, 107, 205, 2, 223, 213, 217, 55, 201, 135, 190, 222, 195, 226, 141, 224, 126, 3, 23];
+
+        assert_eq!(parsed_with_prefix, priv_key.into())
+    }
+
+    #[test]
+    fn parse_too_short_private_key () {
+        let parsed = super::parse_private_key("cd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e031").unwrap_err();
+
+        assert_eq!(parsed, "Given string is not a private key. A private key must contain 64 hex chars.")
+    }
+
+    #[test]
+    fn parse_too_long_private_key () {
+        let parsed = super::parse_private_key("cd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e03177").unwrap_err();
+
+        assert_eq!(parsed, "Given string is not a private key. A private key must contain 64 hex chars.")
+    }
+
+    #[test]
+    fn parse_non_hex_values () {
+        let parsed = super::parse_private_key("really not a private key").unwrap_err();
+
+        assert_eq!(parsed, "Given string is not a private key. A private key must contain 64 hex chars.")
+
     }
 }
 
