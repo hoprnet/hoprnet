@@ -9,10 +9,6 @@ This package is responsible of creating a set of load testing scenarios to be us
 - Generate cover traffic on nodes while there is a better cover traffic approach implemented within the hoprd node
 - Generate constant traffic on nodes to test the network and their nodes against long running periods
 
-
-
-
-
 https://github.com/grafana/xk6-output-prometheus-remote
 https://k6.io/docs/results-output/real-time/prometheus-remote-write/
 https://k6.io/docs/get-started/results-output/
