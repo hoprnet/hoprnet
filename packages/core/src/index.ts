@@ -1430,8 +1430,7 @@ class Hopr extends EventEmitter {
   private async getIntermediateNodes(destination: PublicKey, hops?: number): Promise<PublicKey[]> {
     if (!hops) {
       hops = INTERMEDIATE_HOPS
-    }
-    else if (! [...Array(MAX_HOPS).keys()].map(i => i + 1).includes(hops) ) {
+    } else if (![...Array(MAX_HOPS).keys()].map((i) => i + 1).includes(hops)) {
       throw new Error(`the number of intermediate nodes must be an integer between 1 and ${MAX_HOPS} inclusive`)
     }
     return await findPath(
