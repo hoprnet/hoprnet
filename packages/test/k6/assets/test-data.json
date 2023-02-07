@@ -1,0 +1,94 @@
+{
+  "nodes": [
+    {
+      "alias": "node1",
+      "url": "http://localhost:13301/api/v2",
+      "apiToken": "^^LOCAL-testing-123^^",
+      "sleepTime": {
+        "defaultMin": 3,
+        "defaultMax": 3
+      },
+      "thresholds": {
+        "incommingOpenChannels": 2,
+        "outgoingOpenChannels": 2,
+        "connectivityStatus": "Green",
+        "peersQuality": 0.8
+      },
+      "scenarios": [
+        "constant-traffic"
+      ]
+    },
+    {
+      "alias": "node2",
+      "url": "http://localhost:13302/api/v2",
+      "apiToken": "^^LOCAL-testing-123^^",
+      "sleepTime": {
+        "defaultMin": 3,
+        "defaultMax": 3
+      },
+      "thresholds": {
+        "incommingOpenChannels": 2,
+        "outgoingOpenChannels": 2,
+        "connectivityStatus": "Green",
+        "peersQuality": 0.8
+      },
+      "scenarios": [
+        "constant-traffic"
+      ]
+    },
+    {
+      "alias": "node3",
+      "url": "http://localhost:13303/api/v2",
+      "apiToken": "^^LOCAL-testing-123^^",
+      "sleepTime": {
+        "defaultMin": 3,
+        "defaultMax": 3
+      },
+      "thresholds": {
+        "incommingOpenChannels": 2,
+        "outgoingOpenChannels": 2,
+        "connectivityStatus": "Green",
+        "peersQuality": 0.8
+      },
+      "scenarios": [
+        "constant-traffic"
+      ]
+    },
+    {
+      "alias": "node4",
+      "url": "http://localhost:13304/api/v2",
+      "apiToken": "^^LOCAL-testing-123^^",
+      "sleepTime": {
+        "defaultMin": 3,
+        "defaultMax": 3
+      },
+      "thresholds": {
+        "incommingOpenChannels": 2,
+        "outgoingOpenChannels": 2,
+        "connectivityStatus": "Green",
+        "peersQuality": 0.8
+      },
+      "scenarios": [
+        "constant-traffic"
+      ]
+    },
+    {
+      "alias": "node5",
+      "url": "http://localhost:13305/api/v2",
+      "apiToken": "^^LOCAL-testing-123^^",
+      "sleepTime": {
+        "defaultMin": 3,
+        "defaultMax": 3
+      },
+      "thresholds": {
+        "incommingOpenChannels": 2,
+        "outgoingOpenChannels": 2,
+        "connectivityStatus": "Green",
+        "peersQuality": 0.8
+      },
+      "scenarios": [
+        "constant-traffic"
+      ]
+    }
+]
+}
