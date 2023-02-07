@@ -925,6 +925,107 @@
         "deprecated": true
       }
     },
+    "/fundmulti/": {
+      "parameters": [],
+      "post": {
+        "description": "Fund one or two payment channels between this node and the counter party provided.",
+        "tags": ["Channels"],
+        "operationId": "channelsFundChannels",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["peerId", "outgoingAmount", "incomingAmount"],
+                "properties": {
+                  "peerId": {
+                    "format": "peerId",
+                    "type": "string",
+                    "description": "PeerId to fund the outgoing/incoming channels with."
+                  },
+                  "outgoingAmount": {
+                    "format": "amount",
+                    "type": "string",
+                    "description": "Amount of HOPR tokens to fund the outgoing channel (node -> counterparty). It will be used to pay for sending messages through channel"
+                  },
+                  "incomingAmount": {
+                    "format": "amount",
+                    "type": "string",
+                    "description": "Amount of HOPR tokens to fund the incoming channel (counterparty -> node). It will be used to pay for sending messages through channel"
+                  }
+                },
+                "example": {
+                  "peerId": "16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12",
+                  "outgoingAmount": "1000000",
+                  "incomingAmount": "1000000"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Channels succesfully funded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "receipt": {
+                      "type": "string",
+                      "example": "0x37954ca4a630aa28f045df2e8e604cae22071046042e557355acf00f4ef20d2e",
+                      "description": "Receipt for fund multi channels transaction. Can be used to check status of the smart contract call on blockchain."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem with inputs (invalid peerId or invalid amount).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/RequestStatus" },
+                "example": { "status": "INVALID_PEERID | INVALID_AMOUNT" }
+              }
+            }
+          },
+          "403": {
+            "description": "Failed to fund the channels because of insufficient HOPR balance.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "NOT_ENOUGH_BALANCE",
+                      "description": "Insufficient balance to fund channels. Amount passed in request body exeeds current balance."
+                    }
+                  }
+                },
+                "example": { "status": "NOT_ENOUGH_BALANCE" }
+              }
+            }
+          },
+          "422": {
+            "description": "Unknown failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
+                    "error": { "type": "string", "example": "Full error message." }
+                  }
+                },
+                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
+              }
+            }
+          }
+        }
+      }
+    },
     "/channels/": {
       "parameters": [],
       "post": {
