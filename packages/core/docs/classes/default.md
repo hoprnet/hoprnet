@@ -154,7 +154,7 @@ ___
 
 ### db
 
-• `Private` **db**: `HoprDB`
+• **db**: `HoprDB`
 
 used to persist protocol state
 

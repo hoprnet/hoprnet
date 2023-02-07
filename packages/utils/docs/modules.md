@@ -419,7 +419,7 @@ ___
 
 #### Defined in
 
-[src/db/db.ts:119](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L119)
+[src/db/db.ts:126](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L126)
 
 ___
 
@@ -463,7 +463,7 @@ ___
 
 #### Defined in
 
-[src/db/db.ts:114](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L114)
+[src/db/db.ts:121](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L121)
 
 ___
 
@@ -479,7 +479,7 @@ ___
 
 #### Defined in
 
-[src/db/db.ts:110](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L110)
+[src/db/db.ts:117](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L117)
 
 ## Variables
 
