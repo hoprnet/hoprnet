@@ -135,10 +135,6 @@ contract DeployAllContractsScript is
           currentEnvironmentDetail.hoprTokenContractAddress
         )
       );
-      emit log_named_address('boost', currentEnvironmentDetail.hoprBoostContractAddress);
-      emit log_named_address('xhopr', currentEnvironmentDetail.xhoprTokenContractAddress);
-      emit log_named_address('hopr', currentEnvironmentDetail.hoprTokenContractAddress);
-      emit log_named_address('stake', currentEnvironmentDetail.stakeContractAddress);
     }
 
     // 3.6. NetworkRegistryProxy Contract
