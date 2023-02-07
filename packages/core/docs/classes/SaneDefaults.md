@@ -32,7 +32,7 @@
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:99](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L99)
+[packages/core/src/channel-strategy.ts:103](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L103)
 
 ## Methods
 
@@ -40,11 +40,13 @@
 
 ▸ **onChannelWillClose**(`channel`): `Promise`<`void`\>
 
+When an incoming channel is going to be closed, auto redeem tickets
+
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `channel` | `ChannelEntry` |
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `channel` | `ChannelEntry` | channel that will be closed |
 
 #### Returns
 
@@ -52,7 +54,7 @@
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:80](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L80)
+[packages/core/src/channel-strategy.ts:84](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L84)
 
 ___
 
@@ -92,4 +94,4 @@ ___
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:94](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L94)
+[packages/core/src/channel-strategy.ts:98](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L98)

@@ -36,4 +36,4 @@
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:131](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L131)
+[packages/core/src/channel-strategy.ts:135](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L135)

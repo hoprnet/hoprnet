@@ -549,12 +549,13 @@ ___
 
 ### finalizeClosure
 
-▸ **finalizeClosure**(`dest`): `Promise`<`string`\>
+▸ **finalizeClosure**(`src`, `dest`): `Promise`<`string`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
+| `src` | `PublicKey` |
 | `dest` | `PublicKey` |
 
 #### Returns
@@ -563,7 +564,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:466](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L466)
+[packages/core-ethereum/src/index.ts:471](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L471)
 
 ___
 
@@ -585,7 +586,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:494](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L494)
+[packages/core-ethereum/src/index.ts:503](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L503)
 
 ___
 
@@ -770,12 +771,13 @@ ___
 
 ### initializeClosure
 
-▸ **initializeClosure**(`dest`): `Promise`<`string`\>
+▸ **initializeClosure**(`src`, `dest`): `Promise`<`string`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
+| `src` | `PublicKey` |
 | `dest` | `PublicKey` |
 
 #### Returns
@@ -810,7 +812,7 @@ true if registered
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:516](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L516)
+[packages/core-ethereum/src/index.ts:525](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L525)
 
 ___
 
@@ -1038,7 +1040,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:476](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L476)
+[packages/core-ethereum/src/index.ts:485](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L485)
 
 ___
 
@@ -1632,7 +1634,7 @@ ___
 
 #### Defined in
 
-[packages/core-ethereum/src/index.ts:532](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L532)
+[packages/core-ethereum/src/index.ts:541](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L541)
 
 ___
 
