@@ -453,8 +453,13 @@ export default class HoprCoreEthereum extends EventEmitter {
     }
   }
 
-  async initializeClosure(dest: PublicKey): Promise<string> {
-    const c = await this.db.getChannelTo(dest)
+  async initializeClosure(src: PublicKey, dest: PublicKey): Promise<string> {
+    // TODO: should remove this blocker when https://github.com/hoprnet/hoprnet/issues/4194 gets addressed
+    if (!this.publicKey.eq(src)) {
+      throw Error('Initialize incoming channel closure currently is not supported.')
+    }
+
+    const c = await this.db.getChannelX(src, dest)
     if (c.status !== ChannelStatus.Open && c.status !== ChannelStatus.WaitingForCommitment) {
       throw Error('Channel status is not OPEN or WAITING FOR COMMITMENT')
     }
@@ -462,28 +467,18 @@ export default class HoprCoreEthereum extends EventEmitter {
       this.setTxHandler(`channel-updated-${txHash}`, txHash)
     )
   }
-
-  public async finalizeClosure(source: PublicKey, dest: PublicKey): Promise<string> {
-    const c = await this.db.getChannelX(source, dest)
-    if (this.publicKey.eq(dest)) {
-      // for incoming channel
-      if (c.status === ChannelStatus.Closed) {
-        throw Error('Channel status is already CLOSED')
-      }
-      return await this.chain.finalizeChannelClosure(source.toAddress(), dest.toAddress(), (txHash: string) =>
-        this.setTxHandler(`channel-updated-${txHash}`, txHash)
-      )
-    } else if (this.publicKey.eq(source)) {
-      // for outgoing channel
-      if (c.status !== ChannelStatus.PendingToClose) {
-        throw Error('Channel status is not PENDING_TO_CLOSE')
-      }
-      return await this.chain.finalizeChannelClosure(source.toAddress(), dest.toAddress(), (txHash: string) =>
-        this.setTxHandler(`channel-updated-${txHash}`, txHash)
-      )
-    } else {
-      throw Error('Cannot finalize closure for channels irrelevant to this node')
+  public async finalizeClosure(src: PublicKey, dest: PublicKey): Promise<string> {
+    // TODO: should remove this blocker when https://github.com/hoprnet/hoprnet/issues/4194 gets addressed
+    if (!this.publicKey.eq(src)) {
+      throw Error('Finalizing incoming channel closure currently is not supported.')
     }
+    const c = await this.db.getChannelX(src, dest)
+    if (c.status !== ChannelStatus.PendingToClose) {
+      throw Error('Channel status is not PENDING_TO_CLOSE')
+    }
+    return await this.chain.finalizeChannelClosure(src.toAddress(), dest.toAddress(), (txHash: string) =>
+      this.setTxHandler(`channel-updated-${txHash}`, txHash)
+    )
   }
 
   public async openChannel(dest: PublicKey, amount: Balance): Promise<{ channelId: Hash; receipt: Receipt }> {
