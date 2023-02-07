@@ -20,4 +20,4 @@ contracts/broadcast/*.*/31337
 target/
 
 # ignore coverage test outpout
-lcov.info
+contracts/lcov.info
