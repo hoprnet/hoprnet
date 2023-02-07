@@ -21,7 +21,9 @@ export enum STATUS_CODES {
   CHANNEL_ALREADY_OPEN = 'CHANNEL_ALREADY_OPEN',
   TIMEOUT = 'TIMEOUT',
   // other
-  UNKNOWN_FAILURE = 'UNKNOWN_FAILURE'
+  UNKNOWN_FAILURE = 'UNKNOWN_FAILURE',
+  // initiate/close incoming channel is not supported in monte_rosa
+  UNSUPPORTED_FEATURE = 'UNSUPPORTED_FEATURE'
 }
 
 /**

@@ -453,8 +453,13 @@ export default class HoprCoreEthereum extends EventEmitter {
     }
   }
 
-  async initializeClosure(dest: PublicKey): Promise<string> {
-    const c = await this.db.getChannelTo(dest)
+  async initializeClosure(src: PublicKey, dest: PublicKey): Promise<string> {
+    // TODO: should remove this blocker when https://github.com/hoprnet/hoprnet/issues/4194 gets addressed
+    if (!this.publicKey.eq(src)) {
+      throw Error('Initialize incoming channel closure currently is not supported.')
+    }
+
+    const c = await this.db.getChannelX(src, dest)
     if (c.status !== ChannelStatus.Open && c.status !== ChannelStatus.WaitingForCommitment) {
       throw Error('Channel status is not OPEN or WAITING FOR COMMITMENT')
     }
@@ -463,8 +468,12 @@ export default class HoprCoreEthereum extends EventEmitter {
     )
   }
 
-  public async finalizeClosure(dest: PublicKey): Promise<string> {
-    const c = await this.db.getChannelTo(dest)
+  public async finalizeClosure(src: PublicKey, dest: PublicKey): Promise<string> {
+    // TODO: should remove this blocker when https://github.com/hoprnet/hoprnet/issues/4194 gets addressed
+    if (!this.publicKey.eq(src)) {
+      throw Error('Finalizing incoming channel closure currently is not supported.')
+    }
+    const c = await this.db.getChannelX(src, dest)
     if (c.status !== ChannelStatus.PendingToClose) {
       throw Error('Channel status is not PENDING_TO_CLOSE')
     }
