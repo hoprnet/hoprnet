@@ -777,7 +777,7 @@ contract HoprChannelsTest is
     vm.prank(accountA.accountAddr);
     // fail to force finalize channel closure
     vm.expectRevert(bytes('channel must be pending to close'));
-    hoprChannels.finalizeChannelClosure(accountA.accountAddr, accountB.accountAddr);
+    hoprChannels.finalizeChannelClosure(accountB.accountAddr);
   }
 
   /**
@@ -834,7 +834,7 @@ contract HoprChannelsTest is
       abi.encodeWithSignature('transfer(address,uint256)', accountA.accountAddr, amount1), // provide specific
       abi.encode(true)
     );
-    hoprChannels.finalizeChannelClosure(accountA.accountAddr, accountB.accountAddr);
+    hoprChannels.finalizeChannelClosure(accountB.accountAddr);
     vm.stopPrank();
   }
 
@@ -855,15 +855,15 @@ contract HoprChannelsTest is
 
     // fail when source and destination are the same
     vm.expectRevert(bytes('source and destination must not be the same'));
-    hoprChannels.finalizeChannelClosure(accountA.accountAddr, accountA.accountAddr);
+    hoprChannels.finalizeChannelClosure(accountA.accountAddr);
 
     // fail when the destination is empty
     vm.expectRevert(bytes('destination must not be empty'));
-    hoprChannels.finalizeChannelClosure(accountA.accountAddr, address(0));
+    hoprChannels.finalizeChannelClosure(address(0));
 
     // fail when finallization hasn't reached yet
     vm.expectRevert(bytes('closureTime must be before now'));
-    hoprChannels.finalizeChannelClosure(accountA.accountAddr, accountB.accountAddr);
+    hoprChannels.finalizeChannelClosure(accountB.accountAddr);
     vm.stopPrank();
   }
 
@@ -1117,7 +1117,7 @@ contract HoprChannelsTest is
       abi.encodeWithSignature('transfer(address,uint256)', accountA.accountAddr, reopenAmount1), // provide specific
       abi.encode(true)
     );
-    hoprChannels.finalizeChannelClosure(accountA.accountAddr, accountB.accountAddr);
+    hoprChannels.finalizeChannelClosure(accountB.accountAddr);
     vm.stopPrank();
 
     // succeed in redeeming the ticket
@@ -1143,225 +1143,6 @@ contract HoprChannelsTest is
     // check vallidate from channels()
     assertEqChannels(getChannelFromTuple(hoprChannels, channelIdAB), channelAB);
     assertEqChannels(getChannelFromTuple(hoprChannels, channelIdBA), channelBA);
-  }
-
-  /**
-   * @dev When the channel closure is initialized,
-   * it should close an incoming channel immediately by the destination
-   */
-  function test_FinalizeInitializedClosureByDestination(
-    uint256 amount1,
-    uint256 amount2,
-    uint256 timeElapsed
-  ) public {
-    // channel is funded for at least 10 HoprTokens (Ticket's amount)
-    amount1 = bound(amount1, TICKET_AB_WIN.amount, 1e36);
-    amount2 = bound(amount2, TICKET_BA_WIN.amount, 1e36);
-    timeElapsed = bound(timeElapsed, 0, ENOUGH_TIME_FOR_CLOSURE + 100);
-    // fund channels
-    _helperFundMultiAB(amount1, amount2);
-    // accountA redeem ticket
-    vm.startPrank(accountA.accountAddr);
-    // initiate channel closure first
-    hoprChannels.initiateChannelClosure(accountB.accountAddr);
-    // any time between between channel closure initiation and after `ENOUGH_TIME_FOR_CLOSURE`
-    vm.warp(block.timestamp + timeElapsed);
-
-    // change to destination account
-    changePrank(accountB.accountAddr);
-    // Update channel AB state
-    HoprChannels.Channel memory channelAB = getChannelFromTuple(hoprChannels, channelIdAB);
-    // succeed in finalizing channel closure
-    vm.expectEmit(true, true, false, true, address(hoprChannels));
-    emit ChannelClosureFinalized(accountA.accountAddr, accountB.accountAddr, channelAB.closureTime, amount1);
-    vm.expectEmit(true, true, false, true, address(hoprChannels));
-    emit ChannelUpdated(
-      accountA.accountAddr,
-      accountB.accountAddr,
-      HoprChannels.Channel(0, bytes32(0), 0, 0, HoprChannels.ChannelStatus.CLOSED, 1, 0)
-    );
-    vm.mockCall(
-      vm.addr(1),
-      abi.encodeWithSignature('transfer(address,uint256)', accountA.accountAddr, amount1), // provide specific
-      abi.encode(true)
-    );
-    hoprChannels.finalizeChannelClosure(accountA.accountAddr, accountB.accountAddr);
-    vm.stopPrank();
-  }
-
-  /**
-   * @dev When the channel is open,
-   * it should close an incoming channel immediately by the destination
-   */
-  function test_CloseAnOpenChannelByDestination(
-    uint256 amount1,
-    uint256 amount2,
-    uint256 timeElapsed
-  ) public {
-    // channel is funded for at least 10 HoprTokens (Ticket's amount)
-    amount1 = bound(amount1, 1, 1e36);
-    amount2 = bound(amount2, 1, 1e36);
-    timeElapsed = bound(timeElapsed, 0, ENOUGH_TIME_FOR_CLOSURE + 100);
-    // make bidirectional channels
-    _helperOpenBidirectionalChannels(amount1, amount2);
-    // any time between between channel closure initiation and after `ENOUGH_TIME_FOR_CLOSURE`
-    vm.warp(block.timestamp + timeElapsed);
-
-    // change to destination account
-    vm.startPrank(accountB.accountAddr);
-    // Update channel AB state
-    HoprChannels.Channel memory channelAB = getChannelFromTuple(hoprChannels, channelIdAB);
-    // succeed in finalizing channel closure
-    vm.expectEmit(true, true, false, true, address(hoprChannels));
-    emit ChannelClosureFinalized(accountA.accountAddr, accountB.accountAddr, channelAB.closureTime, amount1);
-    vm.expectEmit(true, true, false, true, address(hoprChannels));
-    emit ChannelUpdated(
-      accountA.accountAddr,
-      accountB.accountAddr,
-      HoprChannels.Channel(0, SECRET_2, 0, 0, HoprChannels.ChannelStatus.CLOSED, 1, 0)
-    );
-    vm.mockCall(
-      vm.addr(1),
-      abi.encodeWithSignature('transfer(address,uint256)', accountA.accountAddr, amount1), // provide specific
-      abi.encode(true)
-    );
-    hoprChannels.finalizeChannelClosure(accountA.accountAddr, accountB.accountAddr);
-    vm.stopPrank();
-  }
-
-  /**
-   * @dev When the channel is open,
-   * it should fail to close an outging channel
-   */
-  function testRevert_CloseAnOpenChannelDirectlyBySource(
-    uint256 amount1,
-    uint256 amount2,
-    uint256 timeElapsed
-  ) public {
-    // channel is funded for at least 10 HoprTokens (Ticket's amount)
-    amount1 = bound(amount1, TICKET_AB_WIN.amount, 1e36);
-    amount2 = bound(amount2, TICKET_BA_WIN.amount, 1e36);
-    timeElapsed = bound(timeElapsed, 0, ENOUGH_TIME_FOR_CLOSURE + 100);
-    // make bidirectional channels
-    _helperOpenBidirectionalChannels(amount1, amount2);
-    // accountA redeem ticket
-    vm.startPrank(accountA.accountAddr);
-    // any time between between channel closure initiation and after `ENOUGH_TIME_FOR_CLOSURE`
-    vm.warp(block.timestamp + timeElapsed);
-
-    vm.expectRevert(bytes('channel must be pending to close'));
-    hoprChannels.finalizeChannelClosure(accountA.accountAddr, accountB.accountAddr);
-    vm.stopPrank();
-  }
-
-  /**
-   * @dev When the channel is waiting for commitment,
-   * it should fail to close an outging channel
-   */
-  function test_CloseAWaitForCommitmentChannelByDestination(
-    uint256 amount1,
-    uint256 amount2,
-    uint256 timeElapsed
-  ) public {
-    // channel is funded for at least 10 HoprTokens (Ticket's amount)
-    amount1 = bound(amount1, 1, 1e36);
-    amount2 = bound(amount2, 1, 1e36);
-    timeElapsed = bound(timeElapsed, 0, ENOUGH_TIME_FOR_CLOSURE + 100);
-    // make bidirectional WAIT_FOR_COMMITMENT channels
-    _helperFundMultiAB(amount1, amount2);
-    // any time between between channel closure initiation and after `ENOUGH_TIME_FOR_CLOSURE`
-    vm.warp(block.timestamp + timeElapsed);
-
-    // change to destination account
-    vm.startPrank(accountB.accountAddr);
-    // Update channel AB state
-    HoprChannels.Channel memory channelAB = getChannelFromTuple(hoprChannels, channelIdAB);
-    // succeed in finalizing channel closure
-    vm.expectEmit(true, true, false, true, address(hoprChannels));
-    emit ChannelClosureFinalized(accountA.accountAddr, accountB.accountAddr, channelAB.closureTime, amount1);
-    vm.expectEmit(true, true, false, true, address(hoprChannels));
-    emit ChannelUpdated(
-      accountA.accountAddr,
-      accountB.accountAddr,
-      HoprChannels.Channel(0, bytes32(0), 0, 0, HoprChannels.ChannelStatus.CLOSED, 1, 0)
-    );
-    vm.mockCall(
-      vm.addr(1),
-      abi.encodeWithSignature('transfer(address,uint256)', accountA.accountAddr, amount1), // provide specific
-      abi.encode(true)
-    );
-    hoprChannels.finalizeChannelClosure(accountA.accountAddr, accountB.accountAddr);
-    vm.stopPrank();
-  }
-
-  /**
-   * @dev When the channel is waiting for commitment,
-   * it should fail to close an outging channel
-   */
-  function testRevert_CloseAWaitForCommitmentChannelDirectlyBySource(
-    uint256 amount1,
-    uint256 amount2,
-    uint256 timeElapsed
-  ) public {
-    // channel is funded for at least 10 HoprTokens (Ticket's amount)
-    amount1 = bound(amount1, TICKET_AB_WIN.amount, 1e36);
-    amount2 = bound(amount2, TICKET_BA_WIN.amount, 1e36);
-    timeElapsed = bound(timeElapsed, 0, ENOUGH_TIME_FOR_CLOSURE + 100);
-    // make bidirectional WAIT_FOR_COMMITMENT channels
-    _helperFundMultiAB(amount1, amount2);
-    // accountA redeem ticket
-    vm.startPrank(accountA.accountAddr);
-    // any time between between channel closure initiation and after `ENOUGH_TIME_FOR_CLOSURE`
-    vm.warp(block.timestamp + timeElapsed);
-
-    vm.expectRevert(bytes('channel must be pending to close'));
-    hoprChannels.finalizeChannelClosure(accountA.accountAddr, accountB.accountAddr);
-    vm.stopPrank();
-  }
-
-  /**
-   * @dev When the channel is closed,
-   * it should fail to close an outging channel
-   */
-  function testRevert_CloseAClosedChannelBySource(uint256 amount1, uint256 amount2) public {
-    // create channels and close them
-    amount1 = bound(amount1, 1, 1e36);
-    amount2 = bound(amount2, 1, 1e36);
-    _helperFundMultiAB(amount1, amount2);
-    vm.startPrank(accountB.accountAddr);
-    vm.mockCall(
-      vm.addr(1),
-      abi.encodeWithSignature('transfer(address,uint256)', accountA.accountAddr, amount1), // provide specific
-      abi.encode(true)
-    );
-    hoprChannels.finalizeChannelClosure(accountA.accountAddr, accountB.accountAddr);
-
-    changePrank(accountA.accountAddr);
-    vm.expectRevert(bytes('channel must be pending to close'));
-    hoprChannels.finalizeChannelClosure(accountA.accountAddr, accountB.accountAddr);
-    vm.stopPrank();
-  }
-
-  /**
-   * @dev When the channel is closed,
-   * it should fail to close an incoming channel
-   */
-  function testRevert_CloseAClosedChannelByDestination(uint256 amount1, uint256 amount2) public {
-    // create channels and close them
-    amount1 = bound(amount1, 1, 1e36);
-    amount2 = bound(amount2, 1, 1e36);
-    _helperFundMultiAB(amount1, amount2);
-    vm.startPrank(accountB.accountAddr);
-    vm.mockCall(
-      vm.addr(1),
-      abi.encodeWithSignature('transfer(address,uint256)', accountA.accountAddr, amount1), // provide specific
-      abi.encode(true)
-    );
-    hoprChannels.finalizeChannelClosure(accountA.accountAddr, accountB.accountAddr);
-
-    vm.expectRevert(bytes('channel must not be already closed'));
-    hoprChannels.finalizeChannelClosure(accountA.accountAddr, accountB.accountAddr);
-    vm.stopPrank();
   }
 
   /**
@@ -1448,7 +1229,7 @@ contract HoprChannelsTest is
       abi.encodeWithSignature('transfer(address,uint256)', accountA.accountAddr, amount1), // provide specific
       abi.encode(true)
     );
-    hoprChannels.finalizeChannelClosure(accountA.accountAddr, accountB.accountAddr);
+    hoprChannels.finalizeChannelClosure(accountB.accountAddr);
     vm.stopPrank();
   }
 
@@ -1476,7 +1257,7 @@ contract HoprChannelsTest is
       abi.encodeWithSignature('transfer(address,uint256)', accountA.accountAddr, amount1), // provide specific
       abi.encode(true)
     );
-    hoprChannels.finalizeChannelClosure(accountA.accountAddr, accountB.accountAddr);
+    hoprChannels.finalizeChannelClosure(accountB.accountAddr);
     vm.stopPrank();
 
     // fund channel again
