@@ -505,8 +505,7 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
         log(`Re-allocating NAT UDP mapping using ${multiaddrs.length} potential servers`)
         try {
           await getExternalIp(multiaddrs, this.udpSocket, this.testingOptions.__preferLocalAddresses)
-        }
-        catch (e) {
+        } catch (e) {
           log(`could not get an external ip ${e}`)
         }
       },
