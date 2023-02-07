@@ -1,10 +1,10 @@
 import type { Operation } from 'express-openapi'
-import type Hopr from '@hoprnet/hopr-core'
+import type { default as Hopr } from '@hoprnet/hopr-core'
 import { defer, generateChannelId, PublicKey, type DeferType } from '@hoprnet/hopr-utils'
 import { peerIdFromString } from '@libp2p/peer-id'
 import { PeerId } from '@libp2p/interface-peer-id'
 import BN from 'bn.js'
-import { STATUS_CODES } from '../../../utils.js'
+import { STATUS_CODES } from '../../utils.js'
 
 const fundingRequests = new Map<string, DeferType<void>>()
 
@@ -28,14 +28,11 @@ async function validateFundChannelMultiParameters(
   let counterparty: PeerId
   try {
     counterparty = peerIdFromString(counterpartyStr)
-  } catch (err) {
-    return {
-      valid: false,
-      reason: STATUS_CODES.INVALID_PEERID
+    // cannot open channel to self
+    if (counterparty.equals(node.getId())) {
+      throw Error("Counter party is the same as current node")
     }
-  }
-  // cannot open channel to self
-  if (counterparty.equals(node.getId())) {
+  } catch (err) {
     return {
       valid: false,
       reason: STATUS_CODES.INVALID_PEERID
@@ -56,7 +53,7 @@ async function validateFundChannelMultiParameters(
 
   const totalAmount = incomingAmount.add(outgoingAmount)
   const balance = await node.getBalance()
-  if (totalAmount.lten(0) || balance.toBN().lte(totalAmount)) {
+  if (totalAmount.lten(0) || balance.toBN().lt(totalAmount)) {
     return {
       valid: false,
       reason: STATUS_CODES.NOT_ENOUGH_BALANCE
@@ -97,9 +94,9 @@ export async function fundMultiChannels(
     counterpartyStr,
     outgoingAmountStr,
     incomingAmountStr
-  )
-
-  if (validationResult.valid == false) {
+    )
+    
+    if (validationResult.valid == false) {
     return { success: false, reason: validationResult.reason }
   }
 
@@ -151,22 +148,23 @@ export async function fundMultiChannels(
 const POST: Operation = [
   async (req, res, _next) => {
     const { node } = req.context
-    const { peerid } = req.params
-    const { outgoingAmount, incomingAmount } = req.body
+    const { peerId, outgoingAmount, incomingAmount } = req.body
 
-    const fundingResult = await fundMultiChannels(node, peerid, outgoingAmount, incomingAmount)
+    const fundingResult = await fundMultiChannels(node, peerId, outgoingAmount, incomingAmount)
 
     if (fundingResult.success == true) {
       res.status(201).send({ receipt: fundingResult.receipt })
     } else {
+      console.log(`Switching...${fundingResult.reason}`)
       switch (fundingResult.reason) {
         case STATUS_CODES.INVALID_PEERID:
           res.status(400).send({ status: STATUS_CODES.INVALID_PEERID })
           break
         case STATUS_CODES.INVALID_AMOUNT:
-          res.status(400).send({ status: STATUS_CODES.INVALID_AMOUNT })
-          break
+            res.status(400).send({ status: STATUS_CODES.INVALID_AMOUNT })
+            break
         case STATUS_CODES.NOT_ENOUGH_BALANCE:
+          console.log(`Found it...${STATUS_CODES.NOT_ENOUGH_BALANCE}`)
           res.status(403).send({ status: STATUS_CODES.NOT_ENOUGH_BALANCE })
           break
         case STATUS_CODES.CHANNEL_ALREADY_OPEN:
@@ -184,27 +182,18 @@ POST.apiDoc = {
   description: 'Fund one or two payment channels between this node and the counter party provided.',
   tags: ['Channels'],
   operationId: 'channelsFundChannels',
-  parameters: [
-    {
-      in: 'path',
-      name: 'peerid',
-      example: '16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit',
-      required: true,
-      schema: {
-        type: 'string',
-        format: 'peerId',
-        description: 'PeerId attached to the channel.',
-        example: '16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12'
-      }
-    }
-  ],
   requestBody: {
     content: {
       'application/json': {
         schema: {
           type: 'object',
-          required: ['outgoingAmount', 'incomingAmount'],
+          required: ['peerId', 'outgoingAmount', 'incomingAmount'],
           properties: {
+            peerId: {
+              format: 'peerId',
+              type: 'string',
+              description: 'PeerId to fund the outgoing/incoming channels with.'
+            },
             outgoingAmount: {
               format: 'amount',
               type: 'string',
@@ -219,6 +208,7 @@ POST.apiDoc = {
             }
           },
           example: {
+            peerId: '16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12',
             outgoingAmount: '1000000',
             incomingAmount: '1000000'
           }
