@@ -67,6 +67,7 @@ POST.apiDoc = {
               description: 'Number of required intermediate nodes. This parameter is ignored if path is set.',
               type: 'integer',
               minimum: 1,
+              maximum: 3,
               example: 3
             }
           }
