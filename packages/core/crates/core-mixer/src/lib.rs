@@ -1,8 +1,7 @@
-pub mod my_module;
+pub mod mixer;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-
     use wasm_bindgen::prelude::*;
 
     // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global allocator.
@@ -12,7 +11,7 @@ pub mod wasm {
 
     #[allow(dead_code)]
     #[wasm_bindgen]
-    pub fn my_crate_set_panic_hook() {
+    pub fn mixer_set_panic_hook() {
         // When the `console_error_panic_hook` feature is enabled, we can call the
         // `set_panic_hook` function at least once during initialization, and then
         // we will get better error messages if our code ever panics.
