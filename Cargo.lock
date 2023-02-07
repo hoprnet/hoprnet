@@ -1927,6 +1927,7 @@ dependencies = [
  "core-ethereum-misc",
  "core-misc",
  "core-strategy",
+ "hex 0.4.3",
  "js-sys",
  "proc-macro-regex",
  "real-base",
