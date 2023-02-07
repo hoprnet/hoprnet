@@ -21,7 +21,7 @@ import {
 // @ts-ignore untyped library
 import retimer from 'retimer'
 
-import { FULL_VERSION, INTERMEDIATE_HOPS, PACKET_SIZE, VERSION } from './constants.js'
+import { FULL_VERSION, INTERMEDIATE_HOPS, MAX_HOPS, PACKET_SIZE, VERSION } from './constants.js'
 
 import NetworkPeers, { type Entry, NetworkPeersOrigin } from './network/network-peers.js'
 import Heartbeat, { NetworkHealthIndicator } from './network/heartbeat.js'
@@ -878,8 +878,9 @@ class Hopr extends EventEmitter {
    * @param msg message to send
    * @param destination PeerId of the destination
    * @param intermediatePath optional set path manually
+   * @param hops optional number of required intermediate nodes
    */
-  public async sendMessage(msg: Uint8Array, destination: PeerId, intermediatePath?: PublicKey[]) {
+  public async sendMessage(msg: Uint8Array, destination: PeerId, intermediatePath?: PublicKey[], hops?: number) {
     if (this.status != 'RUNNING') {
       throw new Error('Cannot send message until the node is running')
     }
@@ -892,7 +893,7 @@ class Hopr extends EventEmitter {
       // Validate the manually specified intermediate path
       await this.validateIntermediatePath(intermediatePath)
     } else {
-      intermediatePath = await this.getIntermediateNodes(PublicKey.fromPeerId(destination))
+      intermediatePath = await this.getIntermediateNodes(PublicKey.fromPeerId(destination), hops)
 
       if (intermediatePath == null || !intermediatePath.length) {
         throw Error(`Failed to find automatic path`)
@@ -1419,16 +1420,23 @@ class Hopr extends EventEmitter {
   }
 
   /**
-   * Takes a destination and samples randomly intermediate nodes
+   * Takes a destination, and optionally the desired number of hops,
+   * and samples randomly intermediate nodes
    * that will relay that message before it reaches its destination.
    *
    * @param destination instance of peerInfo that contains the peerId of the destination
+   * @param hops optional number of required intermediate nodes (must be an integer 1,2,...MAX_HOPS inclusive)
    */
-  private async getIntermediateNodes(destination: PublicKey): Promise<PublicKey[]> {
+  private async getIntermediateNodes(destination: PublicKey, hops?: number): Promise<PublicKey[]> {
+    if (!hops) {
+      hops = INTERMEDIATE_HOPS
+    } else if (![...Array(MAX_HOPS).keys()].map((i) => i + 1).includes(hops)) {
+      throw new Error(`the number of intermediate nodes must be an integer between 1 and ${MAX_HOPS} inclusive`)
+    }
     return await findPath(
       PublicKey.fromPeerId(this.getId()),
       destination,
-      INTERMEDIATE_HOPS,
+      hops,
       (p: PublicKey) => this.networkPeers.qualityOf(p.toPeerId()),
       HoprCoreEthereum.getInstance().getOpenChannelsFrom.bind(HoprCoreEthereum.getInstance())
     )
