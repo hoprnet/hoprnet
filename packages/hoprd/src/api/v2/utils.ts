@@ -27,7 +27,9 @@ export enum STATUS_CODES {
   // other
   UNKNOWN_FAILURE = 'UNKNOWN_FAILURE',
   FORBIDDEN = 'FORBIDDEN',
-  UNAUTHORIZED = 'UNAUTHORIZED'
+  UNAUTHORIZED = 'UNAUTHORIZED',
+  // initiate/close incoming channel is not supported in monte_rosa
+  UNSUPPORTED_FEATURE = 'UNSUPPORTED_FEATURE'
 }
 
 /**
