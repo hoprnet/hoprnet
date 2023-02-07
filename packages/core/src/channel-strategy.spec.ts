@@ -48,7 +48,8 @@ describe('test strategies', async function () {
 
     // Now reconfigure the strategy and tick again with same inputs
     strategy.configure({
-      max_channels: 2
+      max_channels: 2,
+      auto_redeem_tickets: false
     })
 
     {

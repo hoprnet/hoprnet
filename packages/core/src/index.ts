@@ -1145,8 +1145,8 @@ class Hopr extends EventEmitter {
     })
   }
 
-  public getChannelStrategy(): string {
-    return this.strategy.name
+  public getChannelStrategy(): ChannelStrategyInterface {
+    return this.strategy
   }
 
   public async getBalance(): Promise<Balance> {
