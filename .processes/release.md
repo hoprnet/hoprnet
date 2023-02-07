@@ -128,24 +128,24 @@ particular branch to deploy on every change.
    hotfix/patch-riga    staging/riga         release/riga           master
 
          x                   x                       x  create new release  x
-         x                   x                       x◄─────────────────────x 1.91.0-next.44
-         x                   x   create new staging  x 1.91.0               x
+         x                   x                       x◄─────────────────────x 1.92.0-next.44
+         x                   x   create new staging  x 1.92.0               x
          x                   │ ◄─────────────────────│                      x
          x                   │                       │   first merge-back   x
-         x                   │                       │ ──────────────────►  x 1.92.0-next.0
-         x                   │ 1.91.0-next.0         │                      x
+         x                   │                       │ ──────────────────►  x 1.93.0-next.0
+         x                   │ 1.92.0-next.0         │                      x
          x                   │                       │                      x
          x  start hotfix     ▼                       │                      x
          ┌◄──────────────────x                       │                      x
          │                   x                       │                      x
          │  hotfix merge     x                       │                      x
-         ▼──────────────────►┐ 1.91.0-next.1         │                      x
+         ▼──────────────────►┐ 1.92.0-next.1         │                      x
          x                   │                       │                      x
                              │   release upgrade     │                      x
-         x                   ▼──────────────────────►┐ 1.91.1               x
+         x                   ▼──────────────────────►┐ 1.92.1               x
          x                   x   staging upgrade     │                      x
          x                   x ◄─────────────────────│                      x
-         x                   x 1.91.1-next.0         │                      x
+         x                   x 1.92.1-next.0         │                      x
          x                   x                       │   next merge-back    x
          x                   x                       │ ──────────────────►  x
 
