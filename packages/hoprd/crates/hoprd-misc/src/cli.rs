@@ -240,6 +240,14 @@ struct CliArgs {
     pub max_auto_channels: Option<u32>, // Make this a string if we want to supply functions instead in the future.
 
     #[arg(
+    long = "autoRedeemTickets",
+    default_value_t = false,
+    env = "HOPRD_AUTO_REDEEEM_TICKETS",
+    help = "If enabled automatically redeems winning tickets."
+    )]
+    pub auto_redeem_tickets: bool,
+
+    #[arg(
         long,
         help = "A custom RPC provider to be used for the node to connect to blockchain",
         env = "HOPRD_PROVIDER",

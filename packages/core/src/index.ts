@@ -237,7 +237,6 @@ class Hopr extends EventEmitter {
   public constructor(
     private id: PeerId,
     public db: HoprDB,
-    private connector: HoprCoreEthereum,
     private options: HoprOptions,
     private publicNodesEmitter = new (EventEmitter as new () => HoprConnectConfig['config']['publicNodes'])()
   ) {
@@ -248,7 +247,7 @@ class Hopr extends EventEmitter {
     }
     this.environment = options.environment
     log(`using environment: ${this.environment.id}`)
-    this.indexer = this.connector.indexer // TODO temporary
+    this.indexer = HoprCoreEthereum.getInstance().indexer // TODO temporary
     this.pubKey = PublicKey.fromPeerId(id)
   }
 
@@ -279,7 +278,9 @@ class Hopr extends EventEmitter {
     this.status = 'INITIALIZING'
     log('Starting hopr node...')
 
-    const balance = await this.connector.getNativeBalance(false)
+    const connector = HoprCoreEthereum.getInstance()
+
+    const balance = await connector.getNativeBalance(false)
 
     verbose(
       `Ethereum account ${this.getEthereumAddress().toHex()} has ${balance.toFormattedString()}. Mininum balance is ${new NativeBalance(
@@ -292,7 +293,7 @@ class Hopr extends EventEmitter {
     }
     log('Node has enough to get started, continuing starting payment channels')
     verbose('Starting HoprEthereum, which will trigger the indexer')
-    await this.connector.start()
+    await connector.start()
     verbose('Started HoprEthereum. Waiting for indexer to find connected nodes.')
 
     // Add us as public node if announced
@@ -301,7 +302,7 @@ class Hopr extends EventEmitter {
     }
 
     // Fetch previous announcements from database
-    const initialNodes = await this.connector.waitForPublicNodes()
+    const initialNodes = await connector.waitForPublicNodes()
 
     // Add all initial public nodes to public nodes cache
     initialNodes.forEach((initialNode) => this.knownPublicNodesCache.add(initialNode.id.toString()))
@@ -309,7 +310,7 @@ class Hopr extends EventEmitter {
     // Fetch all nodes that will announces themselves during startup
     const recentlyAnnouncedNodes: PeerStoreAddress[] = []
     const pushToRecentlyAnnouncedNodes = (peer: PeerStoreAddress) => recentlyAnnouncedNodes.push(peer)
-    this.connector.indexer.on('peer', pushToRecentlyAnnouncedNodes)
+    connector.indexer.on('peer', pushToRecentlyAnnouncedNodes)
 
     // Initialize libp2p object and pass configuration
     const libp2p = (await createLibp2pInstance(
@@ -353,7 +354,7 @@ class Hopr extends EventEmitter {
     )
 
     // react when network registry is enabled / disabled
-    this.connector.indexer.on('network-registry-status-changed', async (enabled: boolean) => {
+    connector.indexer.on('network-registry-status-changed', async (enabled: boolean) => {
       // If Network Registry got enabled, we might need to close existing connections,
       // otherwise there is nothing to do
       if (enabled) {
@@ -371,7 +372,7 @@ class Hopr extends EventEmitter {
     })
 
     // react when an account's eligibility has changed
-    this.connector.indexer.on(
+    connector.indexer.on(
       'network-registry-eligibility-changed',
       async (_account: Address, nodes: PublicKey[], eligible: boolean) => {
         // If account is no longer eligible to register nodes, we might need to close existing connections,
@@ -436,7 +437,7 @@ class Hopr extends EventEmitter {
         this.emit(`hopr:message-acknowledged:${ackChallenge.toHex()}`)
         this.emit('hopr:message-acknowledged', ackChallenge.toHex())
       },
-      (ack: AcknowledgedTicket) => this.connector.emit('ticket:win', ack),
+      (ack: AcknowledgedTicket) => connector.emit('ticket:win', ack),
       () => {},
       this.environment
     )
@@ -461,15 +462,15 @@ class Hopr extends EventEmitter {
 
     log('libp2p started')
 
-    this.connector.indexer.on('peer', this.onPeerAnnouncement.bind(this))
+    connector.indexer.on('peer', this.onPeerAnnouncement.bind(this))
 
     // Add all entry nodes that were announced during startup
-    this.connector.indexer.off('peer', pushToRecentlyAnnouncedNodes)
+    connector.indexer.off('peer', pushToRecentlyAnnouncedNodes)
     for (const announcedNode of recentlyAnnouncedNodes) {
       await this.onPeerAnnouncement(announcedNode)
     }
 
-    this.connector.indexer.on('channel-waiting-for-commitment', this.onChannelWaitingForCommitment.bind(this))
+    connector.indexer.on('channel-waiting-for-commitment', this.onChannelWaitingForCommitment.bind(this))
 
     try {
       await this.announce(this.options.announce)
@@ -479,7 +480,7 @@ class Hopr extends EventEmitter {
       process.exit(1)
     }
     // subscribe so we can process channel close events
-    this.connector.indexer.on('own-channel-updated', this.onOwnChannelUpdated.bind(this))
+    connector.indexer.on('own-channel-updated', this.onOwnChannelUpdated.bind(this))
 
     this.setChannelStrategy(this.options.strategy || StrategyFactory.getStrategy('passive'))
 
@@ -529,7 +530,7 @@ class Hopr extends EventEmitter {
     if (this.strategy.shouldCommitToChannel(c)) {
       log(`Found channel ${c.getId().toHex()} to us with unset commitment. Setting commitment`)
       try {
-        await retryWithBackoffThenThrow(() => this.connector.commitToChannel(c))
+        await retryWithBackoffThenThrow(() => HoprCoreEthereum.getInstance().commitToChannel(c))
       } catch (err) {
         // @TODO what to do here? E.g. delete channel from db?
         error(
@@ -548,7 +549,7 @@ class Hopr extends EventEmitter {
    */
   private async onOwnChannelUpdated(channel: ChannelEntry): Promise<void> {
     if (channel.status === ChannelStatus.PendingToClose) {
-      await this.strategy.onChannelWillClose(channel, this.connector)
+      await this.strategy.onChannelWillClose(channel)
     }
   }
 
@@ -760,8 +761,7 @@ class Hopr extends EventEmitter {
     this.stopPeriodicCheck?.()
     verbose('Stopping heartbeat & indexer')
     this.heartbeat?.stop()
-    verbose(`Stopping connector`)
-    await this.connector?.stop()
+
     verbose('Stopping database')
     await this.db?.close()
     log(`Database closed.`)
@@ -1020,7 +1020,7 @@ class Hopr extends EventEmitter {
     const connected = this.networkPeers.debugLog()
 
     let announced: string[] = []
-    for await (const announcement of this.connector.indexer.getAddressesAnnouncedOnChain()) {
+    for await (const announcement of HoprCoreEthereum.getInstance().indexer.getAddressesAnnouncedOnChain()) {
       announced.push(announcement.toString())
     }
 
@@ -1030,10 +1030,10 @@ class Hopr extends EventEmitter {
   }
 
   public subscribeOnConnector(event: string, callback: () => void): void {
-    this.connector.on(event, callback)
+    HoprCoreEthereum.getInstance().on(event, callback)
   }
   public emitOnConnector(event: string): void {
-    this.connector.emit(event)
+    HoprCoreEthereum.getInstance().emit(event)
   }
 
   public startPeriodicStrategyCheck() {
@@ -1073,6 +1073,7 @@ class Hopr extends EventEmitter {
 
     // Address that we will announce soon
     let addrToAnnounce: Multiaddr
+    const connector = HoprCoreEthereum.getInstance()
 
     if (announceRoutableAddress) {
       let multiaddrs = await this.getAddressesAnnouncedToDHT()
@@ -1110,7 +1111,7 @@ class Hopr extends EventEmitter {
     }
 
     // Check if there was a previous annoucement from us
-    const ownAccount = await this.connector.getAccount(this.getEthereumAddress())
+    const ownAccount = await connector.getAccount(this.getEthereumAddress())
 
     // Do not announce if our last is equal to what we intend to announce
     if (ownAccount?.multiAddr?.equals(addrToAnnounce)) {
@@ -1123,7 +1124,7 @@ class Hopr extends EventEmitter {
         'announcing on-chain %s routable address',
         announceRoutableAddress && routableAddressAvailable ? 'with' : 'without'
       )
-      const announceTxHash = await this.connector.announce(addrToAnnounce)
+      const announceTxHash = await connector.announce(addrToAnnounce)
       log('announcing address %s done in tx %s', addrToAnnounce.toString(), announceTxHash)
     } catch (err) {
       log('announcing address %s failed', addrToAnnounce.toString())
@@ -1136,26 +1137,26 @@ class Hopr extends EventEmitter {
     log('setting channel strategy from', this.strategy?.name, 'to', strategy.name)
     this.strategy = strategy
 
-    this.connector.on('ticket:win', async (ack: AcknowledgedTicket) => {
+    HoprCoreEthereum.getInstance().on('ticket:win', async (ack: AcknowledgedTicket) => {
       try {
-        await this.strategy.onWinningTicket(ack, this.connector)
+        await this.strategy.onWinningTicket(ack)
       } catch (err) {
         error(`Strategy error while handling winning ticket`, err)
       }
     })
   }
 
-  public getChannelStrategy(): string {
-    return this.strategy.name
+  public getChannelStrategy(): ChannelStrategyInterface {
+    return this.strategy
   }
 
   public async getBalance(): Promise<Balance> {
-    return await this.connector.getBalance(true)
+    return await HoprCoreEthereum.getInstance().getBalance(true)
   }
 
   public async getNativeBalance(): Promise<NativeBalance> {
     verbose('Requesting native balance from node.')
-    return await this.connector.getNativeBalance(true)
+    return await HoprCoreEthereum.getInstance().getNativeBalance(true)
   }
 
   public smartContractInfo(): {
@@ -1165,7 +1166,7 @@ class Hopr extends EventEmitter {
     hoprNetworkRegistryAddress: string
     channelClosureSecs: number
   } {
-    return this.connector.smartContractInfo()
+    return HoprCoreEthereum.getInstance().smartContractInfo()
   }
 
   /**
@@ -1186,7 +1187,7 @@ class Hopr extends EventEmitter {
     }
 
     const counterpartyPubKey = PublicKey.fromPeerId(counterparty)
-    const myAvailableTokens = await this.connector.getBalance(true)
+    const myAvailableTokens = await HoprCoreEthereum.getInstance().getBalance(true)
 
     // validate 'amountToFund'
     if (amountToFund.lten(0)) {
@@ -1200,7 +1201,7 @@ class Hopr extends EventEmitter {
     }
 
     try {
-      return this.connector.openChannel(counterpartyPubKey, new Balance(amountToFund))
+      return HoprCoreEthereum.getInstance().openChannel(counterpartyPubKey, new Balance(amountToFund))
     } catch (err) {
       this.maybeEmitFundsEmptyEvent(err)
       throw new Error(`Failed to openChannel: ${err}`)
@@ -1215,8 +1216,9 @@ class Hopr extends EventEmitter {
    * @param counterpartyFund the amount to fund the channel in counterparty's favor HOPR(wei)
    */
   public async fundChannel(counterparty: PeerId, myFund: BN, counterpartyFund: BN): Promise<void> {
+    const connector = HoprCoreEthereum.getInstance()
     const counterpartyPubKey = PublicKey.fromPeerId(counterparty)
-    const myBalance = await this.connector.getBalance(false)
+    const myBalance = await connector.getBalance(false)
     const totalFund = myFund.add(counterpartyFund)
 
     // validate 'amountToFund'
@@ -1231,7 +1233,7 @@ class Hopr extends EventEmitter {
     }
 
     try {
-      await this.connector.fundChannel(counterpartyPubKey, new Balance(myFund), new Balance(counterpartyFund))
+      await connector.fundChannel(counterpartyPubKey, new Balance(myFund), new Balance(counterpartyFund))
     } catch (err) {
       this.maybeEmitFundsEmptyEvent(err)
       throw new Error(`Failed to fundChannel: ${err}`)
@@ -1242,6 +1244,7 @@ class Hopr extends EventEmitter {
     counterparty: PeerId,
     direction: 'incoming' | 'outgoing'
   ): Promise<{ receipt: string; status: ChannelStatus }> {
+    const connector = HoprCoreEthereum.getInstance()
     const counterpartyPubKey = PublicKey.fromPeerId(counterparty)
     const channel =
       direction === 'outgoing'
@@ -1254,20 +1257,30 @@ class Hopr extends EventEmitter {
     }
 
     if (channel.status === ChannelStatus.Open) {
-      await this.strategy.onChannelWillClose(channel, this.connector)
+      await this.strategy.onChannelWillClose(channel)
+    }
+
+    // TODO: should remove this blocker when https://github.com/hoprnet/hoprnet/issues/4194 gets addressed
+    if (direction === 'incoming') {
+      log(
+        `Incoming channel: ignoring closing channel ${channel
+          .getId()
+          .toHex()} because current HoprChannels contract does not support closing incoming channels.`
+      )
+      throw new Error('Incoming channel: Closing incoming channels currently is not supported.')
     }
 
     let txHash: string
     try {
       if (channel.status === ChannelStatus.Open || channel.status == ChannelStatus.WaitingForCommitment) {
         log('initiating closure of channel', channel.getId().toHex())
-        txHash = await this.connector.initializeClosure(counterpartyPubKey)
+        txHash = await connector.initializeClosure(channel.source, channel.destination)
       } else {
         // verify that we passed the closure waiting period to prevent failing
         // on-chain transactions
 
         if (channel.closureTimePassed()) {
-          txHash = await this.connector.finalizeClosure(counterpartyPubKey)
+          txHash = await connector.finalizeClosure(channel.source, channel.destination)
         } else {
           log(
             `ignoring finalizing closure of channel ${channel
@@ -1324,14 +1337,14 @@ class Hopr extends EventEmitter {
   }
 
   public async redeemAllTickets() {
-    await this.connector.redeemAllTickets()
+    await HoprCoreEthereum.getInstance().redeemAllTickets()
   }
 
   public async redeemTicketsInChannel(peerId: PeerId) {
     const selfPubKey = PublicKey.fromPeerId(this.getId())
     const counterpartyPubKey = PublicKey.fromPeerId(peerId)
     const channel = await this.db.getChannelX(counterpartyPubKey, selfPubKey)
-    await this.connector.redeemTicketsInChannel(channel)
+    await HoprCoreEthereum.getInstance().redeemTicketsInChannel(channel)
   }
 
   /**
@@ -1353,11 +1366,11 @@ class Hopr extends EventEmitter {
   }
 
   public async getPublicKeyOf(addr: Address): Promise<PublicKey> {
-    return await this.connector.getPublicKeyOf(addr)
+    return await HoprCoreEthereum.getInstance().getPublicKeyOf(addr)
   }
 
   public async getEntryNodes(): Promise<{ id: PeerId; multiaddrs: Multiaddr[] }[]> {
-    return this.connector.waitForPublicNodes()
+    return HoprCoreEthereum.getInstance().waitForPublicNodes()
   }
 
   // @TODO remove this
@@ -1376,7 +1389,7 @@ class Hopr extends EventEmitter {
   }
 
   public getEthereumAddress(): Address {
-    return this.connector.getPublicKey().toAddress()
+    return HoprCoreEthereum.getInstance().getPublicKey().toAddress()
   }
 
   /**
@@ -1389,7 +1402,7 @@ class Hopr extends EventEmitter {
   public async withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
     let result: string
     try {
-      result = await this.connector.withdraw(currency, recipient, amount)
+      result = await HoprCoreEthereum.getInstance().withdraw(currency, recipient, amount)
     } catch (err) {
       this.maybeEmitFundsEmptyEvent(err)
       throw new Error(`Failed to withdraw: ${err}`)
@@ -1403,7 +1416,7 @@ class Hopr extends EventEmitter {
    * @returns true if allowed access
    */
   public async isAllowedAccessToNetwork(id: PeerId): Promise<boolean> {
-    return this.connector.isAllowedAccessToNetwork(PublicKey.fromPeerId(id))
+    return HoprCoreEthereum.getInstance().isAllowedAccessToNetwork(PublicKey.fromPeerId(id))
   }
 
   /**
@@ -1422,7 +1435,7 @@ class Hopr extends EventEmitter {
       destination,
       hops,
       (p: PublicKey) => this.networkPeers.qualityOf(p.toPeerId()),
-      this.connector.getOpenChannelsFrom.bind(this.connector)
+      HoprCoreEthereum.getInstance().getOpenChannelsFrom.bind(HoprCoreEthereum.getInstance())
     )
   }
 
@@ -1442,7 +1455,7 @@ class Hopr extends EventEmitter {
             try {
               // call connector directly and don't use cache, since this is
               // most likely outdated during node startup
-              const nativeBalance = await this.connector.getNativeBalance(false)
+              const nativeBalance = await HoprCoreEthereum.getInstance().getNativeBalance(false)
               if (nativeBalance.toBN().gte(MIN_NATIVE_BALANCE)) {
                 resolve()
               } else {
@@ -1470,6 +1483,7 @@ class Hopr extends EventEmitter {
       )
       // Close DB etc.
       await this.stop()
+      await HoprCoreEthereum.getInstance().stop()
       process.exit(1)
     }
   }

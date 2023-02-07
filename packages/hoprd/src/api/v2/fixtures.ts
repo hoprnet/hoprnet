@@ -59,7 +59,7 @@ export const createAuthenticatedTestApiInstance = async (node: any) => {
 export const createTestMocks = () => {
   let state: State = {
     aliases: new Map(),
-    settings: { includeRecipient: false, strategy: 'passive', maxAutoChannels: undefined }
+    settings: { includeRecipient: false, strategy: 'passive', maxAutoChannels: undefined, autoRedeemTickets: false }
   }
 
   return {

@@ -14,6 +14,9 @@
 - Migrate `heartbeat` ping network interaction to Rust using Rust `futures::stream::Stream` ([#4539](https://github.com/hoprnet/hoprnet/pull/4539))
 - Added strategy related metrics, refactoring of the strategy code ([#4537](https://github.com/hoprnet/hoprnet/pull/4537))
 - API: Allow user to specify number of intermediate hops when sending a message ([#4563](https://github.com/hoprnet/hoprnet/pull/4563))
+- API: Add capability-based authorization ([#4560](https://github.com/hoprnet/hoprnet/pull/4560))
+- Automatic ticket redemption disabled by default, added `--autoTicketRedemption` CLI option to enable it explicitly ([#4565](https://github.com/hoprnet/hoprnet/pull/4565))
+- Return explict message for unsupported closing incoming channel ([#4551](https://github.com/hoprnet/hoprnet/pull/4551)) with a fix in admin UI ([hopr-admin/#3](https://github.com/hoprnet/hopr-admin/pull/3))
 
 <a name="1.91"></a>
 
