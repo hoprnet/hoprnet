@@ -31,7 +31,7 @@ services:
     networks:
       - k6
     ports:
-      - "6565:6565"
+      - '6565:6565'
     # command:
     #   - run
     #   - /scripts/send-messsages.test.js

@@ -27,7 +27,7 @@
   },
   "scripts": {
     "check-types": "tsc",
-    "check-types:watch": "tsc --watch",    
+    "check-types:watch": "tsc --watch",
     "build": "webpack",
     "monitors": "docker-compose up -d influxdb grafana",
     "test:docker": "docker-compose run --rm k6 run /scripts/send-messsages.test.js",

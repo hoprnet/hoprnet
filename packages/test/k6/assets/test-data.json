@@ -14,9 +14,7 @@
         "connectivityStatus": "Green",
         "peersQuality": 0.8
       },
-      "scenarios": [
-        "constant-traffic"
-      ]
+      "scenarios": ["constant-traffic"]
     },
     {
       "alias": "node2",
@@ -32,9 +30,7 @@
         "connectivityStatus": "Green",
         "peersQuality": 0.8
       },
-      "scenarios": [
-        "constant-traffic"
-      ]
+      "scenarios": ["constant-traffic"]
     },
     {
       "alias": "node3",
@@ -50,9 +46,7 @@
         "connectivityStatus": "Green",
         "peersQuality": 0.8
       },
-      "scenarios": [
-        "constant-traffic"
-      ]
+      "scenarios": ["constant-traffic"]
     },
     {
       "alias": "node4",
@@ -68,9 +62,7 @@
         "connectivityStatus": "Green",
         "peersQuality": 0.8
       },
-      "scenarios": [
-        "constant-traffic"
-      ]
+      "scenarios": ["constant-traffic"]
     },
     {
       "alias": "node5",
@@ -86,9 +78,7 @@
         "connectivityStatus": "Green",
         "peersQuality": 0.8
       },
-      "scenarios": [
-        "constant-traffic"
-      ]
+      "scenarios": ["constant-traffic"]
     }
-]
+  ]
 }
