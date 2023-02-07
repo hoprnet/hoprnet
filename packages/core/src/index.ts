@@ -1425,11 +1425,15 @@ class Hopr extends EventEmitter {
    * that will relay that message before it reaches its destination.
    *
    * @param destination instance of peerInfo that contains the peerId of the destination
-   * @param hops optional number of required intermediate nodes
+   * @param hops optional number of required intermediate nodes (must be either 1,2 or 3)
    */
   private async getIntermediateNodes(destination: PublicKey, hops?: number): Promise<PublicKey[]> {
-    // hops must be at least 1, default is internal constant
-    hops = hops > 0 ? hops : INTERMEDIATE_HOPS
+    if (!hops) {
+      hops = INTERMEDIATE_HOPS;
+    }
+    else if (![1,2,3].includes(hops)) {
+      throw new Error("the number of intermediate nodes must be either 1,2 or 3")
+    }
     return await findPath(
       PublicKey.fromPeerId(this.getId()),
       destination,
