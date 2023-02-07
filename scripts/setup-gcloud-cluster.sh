@@ -233,7 +233,7 @@ done
 IFS=','
 
 # use CI wallet to register VM instances. This action may fail if nodes were previously linked to other staking accounts
-make -C "${mydir}/.." self-register-node \
+PRIVATE_KEY="${DEPLOYER_PRIVATE_KEY}" make -C "${mydir}/.." self-register-node \
   environment="${environment}" \
   peer_ids="${hopr_addrs[*]}" \
   network="${network_id}"
