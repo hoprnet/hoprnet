@@ -23,7 +23,11 @@ RUN make -f Makefile run-anvil \
  && rm -f .anvil.state.json
 
 # install missing process runner
-RUN apk add --no-cache tini
+RUN apt-get update \
+ && apt-get install -y \
+      tini \
+ && rm -rf /var/lib/apt/lists/* \
+ && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
 
 # start anvil in foreground, don't deploy contracts again
-ENTRYPOINT ["/sbin/tini", "--", "make", "run-anvil-foreground"]
+ENTRYPOINT ["/usr/bin/tini", "--", "make", "run-anvil-foreground"]

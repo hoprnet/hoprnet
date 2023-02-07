@@ -30,8 +30,11 @@ COPY grafana/ /etc/grafana/
 COPY prometheus/ /etc/prometheus/
 WORKDIR /app/hoprnet/packages/hoprd
 
-RUN apk add --no-cache --purge -uU supervisor && \
-    rm -rf /var/cache/apk/* /tmp/*
+RUN apt-get update \
+ && apt-get install -y \
+      supervisor \
+ && rm -rf /var/lib/apt/lists/* \
+ && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
 
 COPY supervisord.conf /etc/supervisord.conf
 

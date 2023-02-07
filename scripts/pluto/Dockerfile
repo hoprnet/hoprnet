@@ -8,10 +8,12 @@ FROM ${ANVIL_IMAGE} as runtime
 
 LABEL description="Docker image running a HOPR-enabled anvil network with 5 hoprd nodes using it and being fully interconnected."
 
-# 1. install tools required within our scripts
-# 2. overwrite libc link under lib to make nodejs work alongside forge
-RUN apk add --no-cache bash lsof curl jq \
- && ln -sf /lib/libc.musl-x86_64.so.1 /lib/ld-linux-x86-64.so.2
+# install tools required within our scripts
+RUN apt-get update \
+ && apt-get install -y \
+      bash curl jq lsof \
+ && rm -rf /var/lib/apt/lists/* \
+ && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
 
 WORKDIR /app/hoprnet
 
