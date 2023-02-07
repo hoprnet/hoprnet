@@ -778,11 +778,11 @@ ___
 
 ### getChannelStrategy
 
-▸ **getChannelStrategy**(): `string`
+▸ **getChannelStrategy**(): [`ChannelStrategyInterface`](../interfaces/ChannelStrategyInterface.md)
 
 #### Returns
 
-`string`
+[`ChannelStrategyInterface`](../interfaces/ChannelStrategyInterface.md)
 
 #### Defined in
 

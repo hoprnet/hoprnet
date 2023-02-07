@@ -10,6 +10,7 @@
 
 ### Properties
 
+- [autoRedeemTickets](SaneDefaults.md#autoredeemtickets)
 - [tickInterval](SaneDefaults.md#tickinterval)
 
 ### Methods
@@ -26,13 +27,23 @@
 
 ## Properties
 
+### autoRedeemTickets
+
+• `Protected` **autoRedeemTickets**: `boolean` = `false`
+
+#### Defined in
+
+[packages/core/src/channel-strategy.ts:74](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L74)
+
+___
+
 ### tickInterval
 
 • **tickInterval**: `number` = `CHECK_TIMEOUT`
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:103](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L103)
+[packages/core/src/channel-strategy.ts:113](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L113)
 
 ## Methods
 
@@ -54,7 +65,7 @@ When an incoming channel is going to be closed, auto redeem tickets
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:84](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L84)
+[packages/core/src/channel-strategy.ts:90](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L90)
 
 ___
 
@@ -74,7 +85,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:74](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L74)
+[packages/core/src/channel-strategy.ts:76](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L76)
 
 ___
 
@@ -94,4 +105,4 @@ ___
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:98](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L98)
+[packages/core/src/channel-strategy.ts:108](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L108)
