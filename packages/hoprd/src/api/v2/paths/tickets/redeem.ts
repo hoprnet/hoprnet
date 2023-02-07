@@ -25,6 +25,12 @@ POST.apiDoc = {
     '204': {
       description: 'Tickets redeemed succesfully.'
     },
+    '401': {
+      $ref: '#/components/responses/Unauthorized'
+    },
+    '403': {
+      $ref: '#/components/responses/Forbidden'
+    },
     '422': {
       description: 'Unknown failure.',
       content: {

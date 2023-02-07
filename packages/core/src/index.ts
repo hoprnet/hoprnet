@@ -236,7 +236,7 @@ class Hopr extends EventEmitter {
    */
   public constructor(
     private id: PeerId,
-    private db: HoprDB,
+    public db: HoprDB,
     private options: HoprOptions,
     private publicNodesEmitter = new (EventEmitter as new () => HoprConnectConfig['config']['publicNodes'])()
   ) {

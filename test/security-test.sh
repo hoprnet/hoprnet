@@ -47,15 +47,15 @@ declare http_status_code
 # TEST API v2
 log "REST API v2 should reject authentication with invalid token"
 http_status_code=$(curl -H "X-Auth-Token: ${bad_token}" --output /dev/null --write-out "%{http_code}" --silent --max-time 360 "${host}:${api_port}/api/v2/node/version")
-if [ ${http_status_code} -ne 403 ]; then
-  log "⛔️ Expected 403 http status code, got ${http_status_code}"
+if [ ${http_status_code} -ne 401 ]; then
+  log "⛔️ Expected 401 http status code, got ${http_status_code}"
   exit 1
 fi
 
 log "REST API v2 should reject authentication without token"
 http_status_code=$(curl --output /dev/null --write-out "%{http_code}" --silent --max-time 360 "${host}:${api_port}/api/v2/node/version")
-if [ ${http_status_code} -ne 403 ]; then
-  log "⛔️ Expected 403 http status code, got ${http_status_code}"
+if [ ${http_status_code} -ne 401 ]; then
+  log "⛔️ Expected 401 http status code, got ${http_status_code}"
   exit 1
 fi
 
@@ -68,15 +68,15 @@ fi
 
 log "REST API v2 should reject authentication with invalid basic auth credentials"
 http_status_code=$(curl --basic --user "${bad_token}:" --output /dev/null --write-out "%{http_code}" --silent --max-time 360 "${host}:${api_port}/api/v2/node/version")
-if [ ${http_status_code} -ne 403 ]; then
-  log "⛔️ Expected 403 http status code, got ${http_status_code}"
+if [ ${http_status_code} -ne 401 ]; then
+  log "⛔️ Expected 401 http status code, got ${http_status_code}"
   exit 1
 fi
 
 log "REST API v2 should reject authentication without basic auth credentials"
 http_status_code=$(curl --output /dev/null --write-out "%{http_code}" --silent --max-time 360 "${host}:${api_port}/api/v2/node/version")
-if [ ${http_status_code} -ne 403 ]; then
-  log "⛔️ Expected 403 http status code, got ${http_status_code}"
+if [ ${http_status_code} -ne 401 ]; then
+  log "⛔️ Expected 401 http status code, got ${http_status_code}"
   exit 1
 fi
 
