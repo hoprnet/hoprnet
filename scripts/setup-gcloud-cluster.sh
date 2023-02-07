@@ -134,8 +134,8 @@ gcloud_create_or_update_managed_instance_group  \
   "${cluster_size}" \
   "${instance_template_name}"
 
-declare network_id
-network_id="$(get_environment_type "${environment}")"
+declare environment_type
+environment_type="$(get_environment_type "${environment}")"
 
 # Deployer CI wallet should ideally be "eligible". To be eligible:
 # 1. The wallet should have obtained a "Network_registry" NFT of `developer` rank (wallet should already have this)
@@ -144,7 +144,7 @@ network_id="$(get_environment_type "${environment}")"
 # - the CI nodes wants to perform `selfRegister`
 # This can be called always, because the "stake" task is idempotent given the same arguments
 # CI wallet stakes a developer NR NFT
-PRIVATE_KEY="${DEPLOYER_PRIVATE_KEY}" make -C "${mydir}/.." stake-nrnft environment="${environment}" nftrank=developer environment_type="${network_id}"
+PRIVATE_KEY="${DEPLOYER_PRIVATE_KEY}" make -C "${mydir}/.." stake-nrnft environment="${environment}" nftrank=developer environment_type="${environment_type}"
 
 # Get names of all instances in this cluster
 # TODO: now `native-addresses` (a.k.a. `hopr_addrs`) doesn't need to contain unique values. The array can contain repetitive addresses
@@ -236,7 +236,7 @@ IFS=','
 PRIVATE_KEY="${DEPLOYER_PRIVATE_KEY}" make -C "${mydir}/.." self-register-node \
   environment="${environment}" \
   peer_ids="${hopr_addrs[*]}" \
-  environment_type="${network_id}"
+  environment_type="${environment_type}"
 unset IFS
 
 # Finally wait for the public nodes to come up, for NAT nodes this isn't possible
