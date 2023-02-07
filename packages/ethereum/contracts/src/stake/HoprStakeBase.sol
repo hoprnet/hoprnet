@@ -31,9 +31,9 @@ contract HoprStakeBase is Ownable, IERC777Recipient, IERC721Receiver, Reentrancy
   // public constants
   uint256 public constant FACTOR_DENOMINATOR = 1e12; // Denominator of the “Basic reward factor”. Default value is 1e12.
 
-  address public LOCK_TOKEN = 0xD057604A14982FE8D88c5fC25Aac3267eA142a08; // Token that HOPR holders need to lock to the contract: xHOPR address.
-  address public REWARD_TOKEN = 0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1; // Token that HOPR holders can claim as rewards: wxHOPR address
-  IHoprBoost public NFT_CONTRACT = IHoprBoost(0x43d13D7B83607F14335cF2cB75E87dA369D056c7); // Address of the HoprBoost NFT smart contract.
+  address public LOCK_TOKEN = 0xD057604A14982FE8D88c5fC25Aac3267eA142a08; // Token that HOPR holders need to lock to the contract: xHOPR address. Default value: HOPR on xdai
+  address public REWARD_TOKEN = 0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1; // Token that HOPR holders can claim as rewards: wxHOPR address Default value: wxHOPR
+  IHoprBoost public NFT_CONTRACT = IHoprBoost(0x43d13D7B83607F14335cF2cB75E87dA369D056c7); // Address of the HoprBoost NFT smart contract. Default value: HoprBoost
 
   // immutable variables defined in the constructor
   uint256 public immutable PROGRAM_START; // Block timestamp at which incentive program starts.
@@ -94,12 +94,10 @@ contract HoprStakeBase is Ownable, IERC777Recipient, IERC721Receiver, Reentrancy
     BOOST_CAP = _boostCap;
     transferOwnership(_newOwner);
     ERC1820_REGISTRY.setInterfaceImplementer(address(this), TOKENS_RECIPIENT_INTERFACE_HASH, address(this));
-    // implement in favor of testing
-    if (block.chainid != 100) {
-      LOCK_TOKEN = _lockToken;
-      REWARD_TOKEN = _rewardToken;
-      NFT_CONTRACT = IHoprBoost(_nftAddress);
-    }
+    // remove this condition as the staging environment is with Gnosis
+    LOCK_TOKEN = _lockToken;
+    REWARD_TOKEN = _rewardToken;
+    NFT_CONTRACT = IHoprBoost(_nftAddress);
   }
 
   /**

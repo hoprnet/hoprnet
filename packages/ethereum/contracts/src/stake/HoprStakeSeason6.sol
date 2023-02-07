@@ -29,18 +29,7 @@ contract HoprStakeSeason6 is HoprStakeBase {
     address _nftAddress,
     address _lockToken,
     address _rewardToken
-  )
-    HoprStakeBase(
-      block.chainid == 100 ? 0xD9a00176Cf49dFB9cA3Ef61805a2850F45Cb1D05 : _newOwner,
-      1674738000,
-      1682510400,
-      396,
-      25e22,
-      block.chainid == 100 ? 0x43d13D7B83607F14335cF2cB75E87dA369D056c7 : _nftAddress,
-      block.chainid == 100 ? 0xD057604A14982FE8D88c5fC25Aac3267eA142a08 : _lockToken,
-      block.chainid == 100 ? 0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1 : _rewardToken
-    )
-  {
+  ) HoprStakeBase(_newOwner, 1674738000, 1682510400, 396, 25e22, _nftAddress, _lockToken, _rewardToken) {
     // block a selection of HoprBoost NFTs
     _ownerBlockNftType(2); // HODLr
     _ownerBlockNftType(3); // Wildhorn_v1
