@@ -14,6 +14,13 @@ COPY Makefile .
 
 ENV FOUNDRY_DIR=/app/hoprnet-toolchain/.foundry
 
+# install missing process runner
+RUN apt-get update \
+ && apt-get install -y \
+      time tini \
+ && rm -rf /var/lib/apt/lists/* \
+ && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false
+
 # start anvil, deploy contracts, then terminate
 RUN make -f Makefile run-anvil \
  && sleep 2 \
@@ -21,13 +28,6 @@ RUN make -f Makefile run-anvil \
  && rm -rf packages/ethereum/contracts/broadcast/ \
  && rm -f /tmp/*.log \
  && rm -f .anvil.state.json
-
-# install missing process runner
-RUN apt-get update \
- && apt-get install -y \
-      tini \
- && rm -rf /var/lib/apt/lists/* \
- && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
 
 # start anvil in foreground, don't deploy contracts again
 ENTRYPOINT ["/usr/bin/tini", "--", "make", "run-anvil-foreground"]

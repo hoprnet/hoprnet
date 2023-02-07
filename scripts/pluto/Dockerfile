@@ -13,15 +13,15 @@ RUN apt-get update \
  && apt-get install -y \
       bash curl jq lsof \
  && rm -rf /var/lib/apt/lists/* \
- && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
+ && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false
 
 WORKDIR /app/hoprnet
 
 COPY --from=hoprd /app/hoprnet/ ./
 COPY --from=hoprd /app/hoprnet/.cargo/ ./.cargo/
 
-COPY packages/ethereum/contracts/ ./packages/ethereum/contracts/
-COPY scripts/ ./scripts/
+COPY packages/ethereum/contracts packages/ethereum/contracts
+COPY scripts/ scripts
 COPY Makefile .
 
 # anvil RPC port

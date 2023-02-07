@@ -46,7 +46,7 @@ COPY scripts/toolchain/install-toolchain.sh ./scripts/toolchain
 
 RUN apt-get update \
  && apt-get install -y \
-      bash curl jq tini ca-certificates tar xz \
+      bash curl jq tini ca-certificates tar xz-utils \
  && rm -rf /var/lib/apt/lists/* \
  && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
  # Install Node.js

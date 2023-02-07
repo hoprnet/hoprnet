@@ -21,6 +21,7 @@ RUN apt-get update \
       lsof \
       python3 \
       unzip \
+      xz-utils \
  && rm -rf /var/lib/apt/lists/* \
  && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false
 

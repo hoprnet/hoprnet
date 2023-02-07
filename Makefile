@@ -223,8 +223,9 @@ lint-fix: ## run linter in fix mode
 	npx prettier --write .
 
 .PHONY: run-anvil
+run-anvil: args=""
 run-anvil: ## spinup a local anvil instance (daemon) and deploy contracts
-	./scripts/run-local-anvil.sh
+	./scripts/run-local-anvil.sh $(args)
 
 .PHONY: run-anvil-foreground
 run-anvil-foreground: ## spinup a local anvil instance
@@ -232,7 +233,8 @@ run-anvil-foreground: ## spinup a local anvil instance
 
 .PHONY: kill-anvil
 kill-anvil: ## kill process running at port 8545 (default port of anvil)
-	lsof -i :8545 -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
+	# may fail, we can ignore that
+	lsof -i :8545 -s TCP:LISTEN -t | xargs -I {} -n 1 kill {} || :
 
 .PHONY: run-local
 run-local: ## run HOPRd from local repo
