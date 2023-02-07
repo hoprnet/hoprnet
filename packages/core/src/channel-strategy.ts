@@ -77,7 +77,7 @@ export abstract class SaneDefaults {
     await HoprCoreEthereum.getInstance().redeemTicketsInChannelByCounterparty(counterparty)
   }
 
-    /**
+  /**
    * When an incoming channel is going to be closed, auto redeem tickets
    * @param channel channel that will be closed
    */
