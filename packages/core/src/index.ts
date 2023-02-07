@@ -1214,7 +1214,7 @@ class Hopr extends EventEmitter {
    * @param myFund the amount to fund the channel in my favor HOPR(wei)
    * @param counterpartyFund the amount to fund the channel in counterparty's favor HOPR(wei)
    */
-  public async fundChannel(counterparty: PeerId, myFund: BN, counterpartyFund: BN): Promise<void> {
+  public async fundChannel(counterparty: PeerId, myFund: BN, counterpartyFund: BN): Promise<string> {
     const connector = HoprCoreEthereum.getInstance()
     const counterpartyPubKey = PublicKey.fromPeerId(counterparty)
     const myBalance = await connector.getBalance(false)
@@ -1232,7 +1232,7 @@ class Hopr extends EventEmitter {
     }
 
     try {
-      await connector.fundChannel(counterpartyPubKey, new Balance(myFund), new Balance(counterpartyFund))
+      return connector.fundChannel(counterpartyPubKey, new Balance(myFund), new Balance(counterpartyFund))
     } catch (err) {
       this.maybeEmitFundsEmptyEvent(err)
       throw new Error(`Failed to fundChannel: ${err}`)
@@ -1279,7 +1279,7 @@ class Hopr extends EventEmitter {
         // on-chain transactions
 
         if (channel.closureTimePassed()) {
-          txHash = await connector.finalizeClosure(channel.source, channel.destination)
+          txHash = await connector.finalizeClosure(channel.destination, channel.destination)
         } else {
           log(
             `ignoring finalizing closure of channel ${channel

@@ -80,6 +80,8 @@ export const getStatusCodeForInvalidInputInRequest = (inputPath: string) => {
     case 'currency':
       return STATUS_CODES.INVALID_CURRENCY
     case 'amount':
+    case 'outgoingamount':
+    case 'incomingamount':
       return STATUS_CODES.INVALID_AMOUNT
     case 'recipient':
       return STATUS_CODES.INVALID_ADDRESS
