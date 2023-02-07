@@ -83,6 +83,10 @@ export abstract class SaneDefaults {
     }
   }
 
+  /**
+   * When an incoming channel is going to be closed, auto redeem tickets
+   * @param channel channel that will be closed
+   */
   async onChannelWillClose(channel: ChannelEntry) {
     if (this.autoRedeemTickets) {
       const chain = HoprCoreEthereum.getInstance()
