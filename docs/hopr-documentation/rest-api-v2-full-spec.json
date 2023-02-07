@@ -836,6 +836,13 @@
                       "maxItems": 3,
                       "example": "16Uiu2HAm1uV82HyD1iJ5DmwJr4LftmJUeMfj8zFypBRACmrJc16n"
                     }
+                  },
+                  "hops": {
+                    "description": "Number of required intermediate nodes. This parameter is ignored if path is set.",
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 3,
+                    "example": 3
                   }
                 }
               }
