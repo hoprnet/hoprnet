@@ -1245,10 +1245,10 @@ class Hopr extends EventEmitter {
   ): Promise<{ receipt: string; status: ChannelStatus }> {
     const connector = HoprCoreEthereum.getInstance()
     const counterpartyPubKey = PublicKey.fromPeerId(counterparty)
-    const channel =
-      direction === 'outgoing'
-        ? await this.db.getChannelX(this.pubKey, counterpartyPubKey)
-        : await this.db.getChannelX(counterpartyPubKey, this.pubKey)
+    const channel = direction === 'outgoing'
+      ? await this.db.getChannelX(this.pubKey, counterpartyPubKey)
+      : await this.db.getChannelX(counterpartyPubKey, this.pubKey)
+
 
     // TODO: should we wait for confirmation?
     if (channel.status === ChannelStatus.Closed) {

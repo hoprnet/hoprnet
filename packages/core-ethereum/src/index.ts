@@ -467,16 +467,13 @@ export default class HoprCoreEthereum extends EventEmitter {
       this.setTxHandler(`channel-updated-${txHash}`, txHash)
     )
   }
-  public async finalizeClosure(src: PublicKey, dest: PublicKey): Promise<string> {
-    // TODO: should remove this blocker when https://github.com/hoprnet/hoprnet/issues/4194 gets addressed
-    if (!this.publicKey.eq(src)) {
-      throw Error('Finalizing incoming channel closure currently is not supported.')
-    }
-    const c = await this.db.getChannelX(src, dest)
+
+  public async finalizeClosure(dest: PublicKey): Promise<string> {
+    const c = await this.db.getChannelTo(dest)
     if (c.status !== ChannelStatus.PendingToClose) {
       throw Error('Channel status is not PENDING_TO_CLOSE')
     }
-    return await this.chain.finalizeChannelClosure(src.toAddress(), dest.toAddress(), (txHash: string) =>
+    return await this.chain.finalizeChannelClosure(dest.toAddress(), (txHash: string) =>
       this.setTxHandler(`channel-updated-${txHash}`, txHash)
     )
   }
