@@ -1429,10 +1429,9 @@ class Hopr extends EventEmitter {
    */
   private async getIntermediateNodes(destination: PublicKey, hops?: number): Promise<PublicKey[]> {
     if (!hops) {
-      hops = INTERMEDIATE_HOPS;
-    }
-    else if (![1,2,3].includes(hops)) {
-      throw new Error("the number of intermediate nodes must be either 1,2 or 3")
+      hops = INTERMEDIATE_HOPS
+    } else if (![1, 2, 3].includes(hops)) {
+      throw new Error('the number of intermediate nodes must be either 1,2 or 3')
     }
     return await findPath(
       PublicKey.fromPeerId(this.getId()),
