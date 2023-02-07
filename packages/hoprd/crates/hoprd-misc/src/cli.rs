@@ -16,6 +16,7 @@ use serde::{Deserialize, Serialize};
 use serde_json;
 use utils_misc::ok_or_str;
 use utils_proc_macros::wasm_bindgen_if;
+use hex;
 
 pub const DEFAULT_API_HOST: &str = "localhost";
 pub const DEFAULT_API_PORT: u16 = 3001;
@@ -47,9 +48,19 @@ fn parse_host(s: &str) -> Result<Host, String> {
     Host::from_ipv4_host_string(s)
 }
 
-fn parse_private_key(s: &str) -> Result<String, String> {
+fn parse_private_key(s: &str) -> Result<Box<[u8]>, String> {
     if is_private_key(s) || is_prefixed_private_key(s) {
-        Ok(s.into())
+        let mut decoded = [0u8; 32];
+
+        let priv_key = match s.strip_prefix("0x") {
+            Some(priv_without_prefix) => priv_without_prefix,
+            None => s
+        };
+
+        // no errors because filtered by regex
+        hex::decode_to_slice(priv_key, &mut decoded).unwrap();
+
+        Ok(Box::new(decoded))
     } else {
         Err(format!(
             "Given string is not a private key. A private key must contain 64 hex chars."
@@ -281,7 +292,7 @@ struct CliArgs {
         value_name = "PRIVATE_KEY",
         value_parser = ValueParser::new(parse_private_key)
     )]
-    pub private_key: Option<String>,
+    pub private_key: Option<Box<[u8]>>,
 
     #[arg(
         long = "allowLocalNodeConnections",
