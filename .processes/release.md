@@ -322,7 +322,7 @@ export HOPRD_API_TOKEN=^binary6wire6GLEEMAN9urbanebetween1watch^
 
 HOPRD_PERFORM_CLEANUP=false \
 HOPRD_SHOW_PRESTART_INFO=true \
-./scripts/setup-gcloud-cluster.sh monte_rosa `pwd`/scripts/topologies/full_interconnected_cluster.sh bogota-topology-1-91 gcr.io/hoprassociation/hoprd:bogota 6 bogota-topology-1-91 true
+./scripts/setup-gcloud-cluster.sh monte_rosa `pwd`/scripts/topologies/full_interconnected_cluster.sh ${RELEASE_NAME}-topology-1-91 gcr.io/hoprassociation/hoprd:${RELEASE_NAME} 6 ${RELEASE_NAME}-topology-1-91 true
 
 
 ```
