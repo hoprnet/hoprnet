@@ -200,3 +200,7 @@ summary {
   padding-left: var(--ifm-pre-padding);
   margin-left: var(--ifm-global-spacing);
 }
+
+span.theme-code-block-highlighted-line {
+  background: unset;
+}
