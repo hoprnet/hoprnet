@@ -84,6 +84,11 @@ fi
 declare download_dir="/tmp/hopr-toolchain/download"
 mkdir -p ${download_dir}
 
+function is_alpine() {
+    local os_id=$(grep -E '^ID=' /etc/os-release | tr -d 'ID=')
+    [ "${os_id}" = "alpine" ]
+}
+
 function install_rustup() {
     if ! command -v rustup; then
         echo "Installing Rustup"
@@ -172,10 +177,15 @@ function install_node_js() {
         local nvmrc_path="${mydir}/../../.nvmrc"
         local node_js_version=$(sed -En 's/^v*([0-9.])/\1/p' ${nvmrc_path})
         echo "Installing Node.js v${node_js_version}"
-        # Using musl builds for alpine
         local node_release=$(curl 'https://unofficial-builds.nodejs.org/download/release/index.json' | jq -r "[.[] | .version | select(. | startswith(\"v${node_js_version}\"))][0]")
-        curl -fsSLO --compressed "https://unofficial-builds.nodejs.org/download/release/${node_release}/node-${node_release}-linux-x64-musl.tar.xz"
-        tar -xJf "node-${node_release}-linux-x64-musl.tar.xz" -C /usr/local --strip-components=1 --no-same-owner
+	# using linux x64 builds by default
+	local node_download_url="https://nodejs.org/download/release/${node_release}/node-${node_release}-linux-x64.tar.xz"
+	if is_alpine; then
+            # Using musl builds for alpine
+	    node_download_url="https://unofficial-builds.nodejs.org/download/release/${node_release}/node-${node_release}-linux-x64-musl.tar.xz"
+	fi
+	curl -fsSL --compressed "${node_download_url}" > node.tar.xz
+        tar -xJf node.tar.xz -C /usr/local --strip-components=1 --no-same-owner
         cd ${mydir}
     fi
 }
