@@ -18,5 +18,3 @@ hoprd:
 	--adminHost "0.0.0.0" \
 	--healthCheck --healthCheckHost "0.0.0.0"
 
-start: 
-	./scripts/setup-local-cluster.sh -i topologies/full_interconnected_cluster.sh

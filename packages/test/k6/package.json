@@ -26,13 +26,15 @@
     "webpack-glob-entries": "^1.0.1"
   },
   "scripts": {
-    "check-types": "tsc",
-    "check-types:watch": "tsc --watch",
+    "check": "tsc",
     "build": "webpack",
-    "monitors": "docker-compose up -d influxdb grafana",
+    "cluster:start" : "../../../scripts/setup-local-cluster.sh -i topologies/full_interconnected_cluster.sh",
+    "cluster:stop" : "pkill -f ../../../scripts/setup-local-cluster.sh",
+    "admin:start": "docker run -d --name hopr_admin -p 3000:3000 gcr.io/hoprassociation/hopr-admin:latest",
+    "admin:stop": "docker rm -f hopr_admin",
+    "test": "npm run test:constant-traffic",
+    "test:constant-traffic": "npm run build && k6 run ./dist/constant-traffic.test.js",
     "test:docker": "docker-compose run --rm k6 run /scripts/send-messsages.test.js",
-    "test": "k6 run ./dist/constant-traffic.test.js",
-    "go:docker": "yarn build && yarn test",
-    "go:k6": "yarn build && k6 run dist/soak.test.js"
+    "monitors": "docker-compose up -d influxdb grafana"
   }
 }
