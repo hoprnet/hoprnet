@@ -227,9 +227,17 @@ Once the upgraded release is deployed, the Staging deployment must be updated as
 
 1. (on `staging/${RELEASE_NAME}`) create branch `release-upgrade-${RELEASE_NAME}`: `git checkout -b release-upgrade-${RELEASE_NAME}`
 2. (on `release-upgrade-${RELEASE_NAME}`) merge `release/${RELEASE_NAME}` into the branch: `git merge release/${RELEASE_NAME}`.
-   In case of a merge conflict, the changes from the `release-upgrade-${RELEASE_NAME}` branch take precedence.
-3. Create a PR of `release-upgrade-${RELEASE_NAME}` and ask for a peer review.
+   In case of a merge conflict, the changes from the `release-upgrade-${RELEASE_NAME}` branch take precedence. For the conflict on the package.json version attribute, it should be taken the one comming from the `release/${RELEASE_NAME}` branch which does not have the suffix `-next.X`.
+3. Create a PR of `release-upgrade-${RELEASE_NAME}` and target to `release/${RELEASE_NAME}` and ask for a peer review.
    Each of such PR merges will trigger a new release version, and re-build our infrastructure.
+   ````
+    git checkout release/${RELEASE_NAME}
+    git pull
+    git checkout staging/${RELEASE_NAME}
+    git pull
+    git checkout -b release-upgrade-${RELEASE_NAME}
+    git merge release/${RELEASE_NAME}
+   ````
 4. Wait for the CI to deploy upgraded Release. Then perform the following steps for Staging upgrade.
 5. (on `staging/${RELEASE_NAME}`) create branch `staging-upgrade-${RELEASE_NAME}`: `git checkout -b staging-upgrade-${RELEASE_NAME}`
 6. (on `staging-upgrade-${RELEASE_NAME}`) merge `release/${RELEASE_NAME}` into the branch: `git merge release/${RELEASE_NAME}`.
@@ -250,6 +258,33 @@ Once the upgraded release is deployed, the Staging deployment must be updated as
       In regards to version naming convention for the merge-back:
    - If it is the first merge-back, then the version number to be used should be the one being used in the release branch which does not have the suffix `-next.XX`.
    - If it is other merge-back, then the version number to be used should be the one being used in the master branch which it has the suffix `-next.XX`.
+  `````
+    git checkout master
+    git pull
+    git branch -D merge-back-release-${RELEASE_NAME}
+    git checkout release/${RELEASE_NAME}
+    git pull
+    git checkout -b merge-back-release-${RELEASE_NAME}
+    git merge master
+
+    packages=(connect core-ethereum core cover-traffic-daemon ethereum hoprd real utils)
+    for package in "${packages[@]}"; do
+      changes=$(git diff packages/$package/package.json  | grep @@ | wc -l)
+      if [ "$changes" -eq "1" ]; then
+        echo "git checkout --theirs packages/$package/package.json"
+        echo "git add packages/$package/package.json"
+      else
+        echo "Review changes manully for ./packages/$package/package.json"
+      fi
+    done
+
+    echo "Resolving clonficts on Vscode for the package.json it would be similar to perform a \"Accept incomming change\" "
+
+    git status
+
+    git commit -m "Merge branch 'master' into merge-back-release-${RELEASE_NAME}"
+    git push --set-upstream origin merge-back-release-${RELEASE_NAME}
+   ````
 4. Modify the above created PR to add reviewers, and labels accordingly. Wait for the review before merge the `merge-back-release-${RELEASE_NAME}` branch to `master`.
 5. If the release runs in a new environment, then redeploy `api.hoprnet.org` in Vercel to pickup release specific changes from the `protocol-config.json`.
 6. Remind that the release must be merged-back every week (Friday) to minimise conflicts whenever we want to merge a hotfix back to master.
