@@ -285,6 +285,7 @@ async function main() {
     logs.log(`Ready to request on-chain connector to connect to provider.`)
     node.emitOnConnector('connector:create')
   } catch (e) {
+    console.log(e)
     logs.log('Node failed to start:')
     logs.logFatalError('' + e)
     process.exit(1)
