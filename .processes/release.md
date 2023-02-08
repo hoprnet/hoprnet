@@ -259,7 +259,7 @@ Once the upgraded release is deployed, the Staging deployment must be updated as
    - If it is the first merge-back, then the version number to be used should be the one being used in the release branch which does not have the suffix `-next.XX`.
    - If it is other merge-back, then the version number to be used should be the one being used in the master branch which it has the suffix `-next.XX`.
 
-`````
+````
   git checkout master
   git pull
   git branch -D merge-back-release-${RELEASE_NAME}
@@ -279,7 +279,7 @@ Once the upgraded release is deployed, the Staging deployment must be updated as
     fi
   done
 
-  echo "Resolving clonficts on Vscode for the package.json it would be similar to perform a \"Accept incomming change\" "
+  echo "Resolving clonficts on Vscode for the package.json it would be similar to perform a 'Accept incomming change'"
 
   git status
 
@@ -358,8 +358,7 @@ export HOPRD_API_TOKEN=^binary6wire6GLEEMAN9urbanebetween1watch^
 
 HOPRD_PERFORM_CLEANUP=false \
 HOPRD_SHOW_PRESTART_INFO=true \
-./scripts/setup-gcloud-cluster.sh monte_rosa `pwd`/scripts/topologies/full_interconnected_cluster.sh ${RELEASE_NAME}-topology-1-91 gcr.io/hoprassociation/hoprd:${RELEASE_NAME} 6 ${RELEASE_NAME}-topology-1-91 true
+./scripts/setup-gcloud-cluster.sh monte_rosa `pwd`/scripts/topologies/full_interconnected_cluster.sh ${RELEASE_NAME}-topology-1-92 gcr.io/hoprassociation/hoprd:${RELEASE_NAME} 6 ${RELEASE_NAME}-topology-1-92 true
 
 
 ```
-`````
