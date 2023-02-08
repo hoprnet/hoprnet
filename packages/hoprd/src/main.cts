@@ -4,35 +4,40 @@
 // such as `export` or `import`, which causes incomprensive syntax errors when
 // running with old versions of Node.js.
 
-if (!process) {
-  throw Error(`Please run with Node.js`)
-}
+const peer = require('simple-peer')
+const wrtc = require('wrtc')
 
-// Gives the process a meaningful name, Node.js default is `node`
-process.title = 'hoprd'
+console.log(new peer({ initiator: true, wrtc }))
 
-const nodeVersion = process.version
+// if (!process) {
+//   throw Error(`Please run with Node.js`)
+// }
 
-// File is a CommonJS script, so we can safely use `require`
-const semver = require('semver')
-const pkg = require('../package.json')
+// // Gives the process a meaningful name, Node.js default is `node`
+// process.title = 'hoprd'
 
-if (!pkg.engines || !pkg.engines.node) {
-  console.error(`Incorrect package.json file. Please make sure it specifies a minimum Node.js version.`)
-}
+// const nodeVersion = process.version
 
-const minimumVersion = semver.valid(semver.coerce(pkg.engines.node))
+// // File is a CommonJS script, so we can safely use `require`
+// const semver = require('semver')
+// const pkg = require('../package.json')
 
-if (semver.lt(nodeVersion, minimumVersion)) {
-  console.error(
-    `Incompatible Node.js version. Got Node.js v${semver.clean(
-      nodeVersion
-    )} but required is at least Node.js v${semver.clean(minimumVersion)}`
-  )
-  process.exit(1)
-}
+// if (!pkg.engines || !pkg.engines.node) {
+//   console.error(`Incorrect package.json file. Please make sure it specifies a minimum Node.js version.`)
+// }
 
-;(async function () {
-  // Starts the ESM bootstrap process *after* Node.js version has been checked
-  await import('./index.js')
-})()
+// const minimumVersion = semver.valid(semver.coerce(pkg.engines.node))
+
+// if (semver.lt(nodeVersion, minimumVersion)) {
+//   console.error(
+//     `Incompatible Node.js version. Got Node.js v${semver.clean(
+//       nodeVersion
+//     )} but required is at least Node.js v${semver.clean(minimumVersion)}`
+//   )
+//   process.exit(1)
+// }
+
+// ;(async function () {
+//   // Starts the ESM bootstrap process *after* Node.js version has been checked
+//   await import('./index.js')
+// })()
