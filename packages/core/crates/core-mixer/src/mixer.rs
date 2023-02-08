@@ -4,18 +4,16 @@ use priority_queue::PriorityQueue;
 use rand::Rng;
 
 
-
-
 type Packet = u8;      // [u8; MAX_PACKET_SIZE];
 
 const MIXER_BUFFER_CAPACITY: usize = 1024;
-const DELAY_MIN_VALUE: u16 = 50;    /// minimum delay in milliseconds
-const DELAY_MAX_VALUE: u16 = 1000;  /// maximum delay in milliseconds
+const DELAY_MIN_VALUE: u64 = 0;    /// minimum delay in milliseconds
+const DELAY_MAX_VALUE: u64 = 200;  /// maximum delay in milliseconds
 
 #[derive(Eq, PartialEq, Debug, Copy, Clone)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct MixerTimestamp {
-    value: u32
+    value: u64
 }
 
 /// This reverses the timestamp logic
@@ -36,13 +34,6 @@ impl PartialOrd for MixerTimestamp {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
-}
-
-
-fn random_value_from_range(min: f32, max: f32) -> f32
-{
-    let random = rand::random::<f32>();
-    ((max - min) * random) + min
 }
 
 
@@ -92,8 +83,9 @@ impl StochasticUniformMixer {
     ///
     /// * `packet` - A string slice that holds the name of the person
     /// * `timestamp` - The current timestamp (note: necessary due to WASM interface)
-    pub fn push(&mut self, packet: Packet, timestamp: u32) {    //
-        let random_delay = random_value_from_range(DELAY_MIN_VALUE as f32, DELAY_MAX_VALUE as f32) as u32 ;
+    pub fn push(&mut self, packet: Packet, timestamp: u64) {    //
+        let mut rng = rand::thread_rng();
+        let random_delay =  rng.gen_range(DELAY_MIN_VALUE..DELAY_MAX_VALUE);
         if let Some(_) = self.queue.push(packet, MixerTimestamp{value: timestamp + random_delay}) {
             panic!("Duplicate packet detected")
         }
@@ -117,7 +109,8 @@ pub mod wasm {
     #[wasm_bindgen]
     impl StochasticUniformMixer {
         pub fn push_data(&mut self, packet: Packet) {
-            self.push(packet, 0);   // TODO: add javascript time
+            let timestamp_now = (js_sys::Date::now() / 1000.0) as u64;
+            self.push(packet, timestamp_now);
         }
     }
 }
@@ -214,8 +207,8 @@ mod tests {
         let at_least_two_packets = 1;
         let mut mixer = StochasticUniformMixer::new(at_least_two_packets);
 
-        let (packet_with_earlier_timestamp, earlier_timestamp) = (random_packet(), DELAY_MIN_VALUE as u32);
-        let (packet_with_latter_timestamp, latter_timestamp) = (random_packet(), (DELAY_MAX_VALUE * 2) as u32);
+        let (packet_with_earlier_timestamp, earlier_timestamp) = (random_packet(), DELAY_MIN_VALUE);
+        let (packet_with_latter_timestamp, latter_timestamp) = (random_packet(), (DELAY_MAX_VALUE * 2));
 
         mixer.push(packet_with_latter_timestamp, latter_timestamp);
         mixer.push(packet_with_earlier_timestamp, earlier_timestamp);
