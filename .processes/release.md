@@ -259,7 +259,7 @@ Once the upgraded release is deployed, the Staging deployment must be updated as
    - If it is the first merge-back, then the version number to be used should be the one being used in the release branch which does not have the suffix `-next.XX`.
    - If it is other merge-back, then the version number to be used should be the one being used in the master branch which it has the suffix `-next.XX`.
 
-````
+```
   git checkout master
   git pull
   git branch -D merge-back-release-${RELEASE_NAME}
@@ -285,7 +285,8 @@ Once the upgraded release is deployed, the Staging deployment must be updated as
 
   git commit -m "Merge branch 'master' into merge-back-release-${RELEASE_NAME}"
   git push --set-upstream origin merge-back-release-${RELEASE_NAME}
- ````
+```
+
 4. Modify the above created PR to add reviewers, and labels accordingly. Wait for the review before merge the `merge-back-release-${RELEASE_NAME}` branch to `master`.
 5. If the release runs in a new environment, then redeploy `api.hoprnet.org` in Vercel to pickup release specific changes from the `protocol-config.json`.
 6. Remind that the release must be merged-back every week (Friday) to minimise conflicts whenever we want to merge a hotfix back to master.
