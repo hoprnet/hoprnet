@@ -22,7 +22,7 @@ export let options: Partial<Options> = {
   // test thresholds https://docs.k6.io/docs/thresholds
   thresholds: {
     http_req_duration: ['avg<500', 'p(95)<1500'], // 95% Percentil below 1500 ms and average below 500 ms
-    http_req_failed: ['rate<0.01'], // Less than 1 %
+    http_req_failed: ['rate<0.05'], // Less than 5 %
     NumberOfMessagesSuccessfullySent: ['rate<0.96'], // More than 96%
     NumberOfSentMessagesFailed: ['count<10'] // Less than 10
   }

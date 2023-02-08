@@ -63,7 +63,7 @@ export class ConstantTrafficNode {
     const messageResponse = this.messagesApi.sendMessage(messageRequest)
 
     if (check(messageResponse, { 'Message sent': () => messageResponse.status === 202 })) {
-      console.log(`Message send from node '${this.node.alias}' using path ${JSON.stringify(messageRequest.path)}} `)
+      console.log(`Message sent from node '${this.node.alias}' using path ${JSON.stringify(messageRequest.path)}} `)
       successCounter.add(1)
     } else {
       console.error(`Failed to send message. Details: ${JSON.stringify(messageResponse)}`)
