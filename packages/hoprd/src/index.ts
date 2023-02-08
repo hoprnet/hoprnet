@@ -199,6 +199,18 @@ async function main() {
 
   const argv = parseCliArguments(process.argv.slice(1))
 
+  if (argv.default_strategy) {
+    state.settings.strategy = argv.default_strategy
+  }
+
+  if (argv.auto_redeem_tickets) {
+    state.settings.autoRedeemTickets = argv.auto_redeem_tickets
+  }
+
+  if (argv.max_auto_channels) {
+    state.settings.maxAutoChannels = argv.max_auto_channels
+  }
+
   if (!argv.disable_api_authentication && argv.api) {
     if (argv.api_token == null) {
       throw Error(`Must provide --apiToken when --api is specified`)

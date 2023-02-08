@@ -327,7 +327,7 @@ struct CliArgs {
         env = "HOPRD_TEST_PREFER_LOCAL_ADDRESSES",
         action = ArgAction::SetTrue,
         help = "For testing local testnets. Prefer local peers to remote",
-        default_value_t = true,
+        default_value_t = false,
         hide = true
     )]
     pub test_prefer_local_addresses: bool,
