@@ -56,7 +56,7 @@ async function storeIdentity(path: string, id: Uint8Array) {
 }
 
 async function createIdentity(idPath: string, password: string, useWeakCrypto = false, privateKey?: Uint8Array) {
-  privateKey = privateKey ?? randomBytes(PRIVATE_KEY_SIZE)
+  privateKey = new Uint8Array(privateKey) ?? randomBytes(PRIVATE_KEY_SIZE)
   const peerId = privKeyToPeerId(privateKey)
   const serializedKeyPair = await serializeKeyPair(peerId, password, useWeakCrypto)
   await storeIdentity(idPath, serializedKeyPair)
