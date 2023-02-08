@@ -44,7 +44,7 @@ RUN mkdir -p scripts/toolchain
 COPY .nvmrc package.json ./
 COPY scripts/toolchain/install-toolchain.sh ./scripts/toolchain
 
-RUN apk add --no-cache tini libc6-compat bash curl tar jq xz libstdc++ && \
+RUN apk add --no-cache tini gcompat bash curl tar jq xz libstdc++ && \
     # Install Node.js
     ./scripts/toolchain/install-toolchain.sh --runtime-only && \
     # Remove unused tools
@@ -52,7 +52,7 @@ RUN apk add --no-cache tini libc6-compat bash curl tar jq xz libstdc++ && \
     # Remove unused files and config
     rm -R scripts .nvmrc && \
     # symlink required to get WRTC and other glibc-based tools to work
-    ln -s /lib64/ld-linux-x86-64.so.2 /lib/ld-linux-x86-64.so.2 && \
+    # ln -s /lib64/ld-linux-x86-64.so.2 /lib/ld-linux-x86-64.so.2 && \
     # create directory which is later used for the database, so that it inherits
     # permissions when mapped to a volume
     mkdir -p hoprd-db
