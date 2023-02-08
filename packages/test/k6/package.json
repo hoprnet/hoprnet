@@ -35,6 +35,5 @@
     "test": "npm run test:constant-traffic",
     "test:constant-traffic": "npm run build && k6 run ./dist/constant-traffic.test.js",
     "test:docker": "docker-compose run --rm k6 run /scripts/constant-traffic.test.js"
-    
   }
 }
