@@ -15,6 +15,7 @@ import {
   PassiveStrategy,
   StrategyTickResult,
   Balance,
+  BalanceType,
   utils_misc_set_panic_hook
 } from '../lib/core_strategy.js'
 
@@ -134,7 +135,7 @@ class RustStrategyWrapper<T extends RustStrategyInterface> extends SaneDefaults 
     outgoing_channels: OutgoingChannelStatus[],
     peer_quality: (string) => number
   ): StrategyTickResult {
-    return this.strategy.tick(new Balance(balance.toString()), network_peer_ids, outgoing_channels, peer_quality)
+    return this.strategy.tick(new Balance(balance.toString(), BalanceType.HOPR), network_peer_ids, outgoing_channels, peer_quality)
   }
 
   get name() {
