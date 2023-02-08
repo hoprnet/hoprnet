@@ -2,7 +2,6 @@ extern crate core;
 
 pub mod primitives;
 pub mod channels;
-pub mod generic;
 pub mod errors;
 pub mod crypto;
 

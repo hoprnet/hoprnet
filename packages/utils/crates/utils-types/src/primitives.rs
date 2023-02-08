@@ -7,7 +7,8 @@ use crate::errors::GeneralError::MathError;
 
 pub const ADDRESS_LENGTH: usize = 20;
 
-#[derive(Clone)]
+/// Represents an Ethereum address
+#[derive(Clone, Eq, PartialEq, Debug)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Address {
     addr: [u8; ADDRESS_LENGTH],
@@ -42,6 +43,25 @@ impl Address {
     }
 }
 
+impl Address {
+    pub fn from_str(value: &str) -> Result<Address> {
+        Self::deserialize(&hex::decode(value).map_err(|_| ParseError)?)
+    }
+
+    pub fn deserialize(value: &[u8]) -> Result<Address> {
+        if value.len() == ADDRESS_LENGTH {
+            let mut ret = Address{
+                addr: [0u8; ADDRESS_LENGTH]
+            };
+            ret.addr.copy_from_slice(&value);
+            Ok(ret)
+        } else {
+            Err(ParseError)
+        }
+    }
+}
+
+/// Represents a type of the balance: native or HOPR tokens.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub enum BalanceType {
@@ -49,11 +69,18 @@ pub enum BalanceType {
     HOPR
 }
 
-#[derive(Clone)]
+/// Represents balance of some coin or token.
+#[derive(Clone, Debug)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Balance {
     value: u256,
     balance_type: BalanceType
+}
+
+impl PartialEq for Balance {
+    fn eq(&self, other: &Self) -> bool {
+        self.eq(other)
+    }
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -66,6 +93,7 @@ impl Balance {
         }
     }
 
+    /// Retrieves the type (symbol) of the balance
     pub fn balance_type(&self) -> BalanceType {
         self.balance_type
     }
@@ -81,6 +109,7 @@ impl Balance {
         self.value().eq(other.value())
     }
 
+    /// Serializes just the value of the balance (not the symbol)
     pub fn serialize_value(&self) -> Box<[u8]> {
         self.value().to_be_bytes().into()
     }
@@ -158,7 +187,8 @@ impl Balance {
 
 pub const ETHEREUM_CHALLENGE_LENGTH: usize = 20;
 
-#[derive(Clone)]
+/// Represents and Ethereum challenge.
+#[derive(Clone, Eq, PartialEq, Debug)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct EthereumChallenge {
     challenge: [u8; ETHEREUM_CHALLENGE_LENGTH]
@@ -200,7 +230,8 @@ impl EthereumChallenge {
     }
 }
 
-#[derive(Clone)]
+/// Represents the Ethereum's basic numeric type - unsigned 256-bit integer
+#[derive(Clone, Eq, PartialEq, Debug)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct U256 {
     value: u256
@@ -276,9 +307,36 @@ mod tests {
     use super::*;
 
     #[test]
+    fn address_tests() {
+        let addr_1 = Address::new(&[0u8; ADDRESS_LENGTH]);
+        let addr_2 = Address::deserialize(&addr_1.serialize()).unwrap();
+
+        assert_eq!(addr_1, addr_2);
+    }
+
+    #[test]
     fn balance_tests() {
-        let b = Balance::from_str("10", BalanceType::HOPR);
-        assert_eq!("10".to_string(), b.to_string());
+        let b_1 = Balance::from_str("10", BalanceType::HOPR);
+        assert_eq!("10".to_string(), b_1.to_string());
+
+        let b_2 = Balance::deserialize(&b_1.serialize_value(), BalanceType::HOPR).unwrap();
+        assert_eq!(b_1, b_2);
+    }
+
+    #[test]
+    fn eth_challenge_tests() {
+        let e_1 = EthereumChallenge::new(&[0u8; ETHEREUM_CHALLENGE_LENGTH]);
+        let e_2 = EthereumChallenge::deserialize(&e_1.serialize()).unwrap();
+
+        assert_eq!(e_1, e_2);
+    }
+
+    #[test]
+    fn u256_tests() {
+        let u_1 = U256::new("1234567899876543210");
+        let u_2 = U256::deserialize(&u_1.serialize()).unwrap();
+
+        assert_eq!(u_1, u_2);
     }
 }
 
@@ -287,7 +345,14 @@ pub mod wasm {
     use wasm_bindgen::prelude::wasm_bindgen;
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
-    use crate::primitives::{Balance, BalanceType, EthereumChallenge, U256};
+    use crate::primitives::{Address, Balance, BalanceType, EthereumChallenge, U256};
+
+    #[wasm_bindgen]
+    impl Address {
+        pub fn deserialize_address(data: &[u8]) -> JsResult<Address> {
+            ok_or_jserr!(Address::deserialize(data))
+        }
+    }
 
     #[wasm_bindgen]
     impl Balance {
