@@ -60,6 +60,6 @@ macro_rules! clean_mono_repo_path {
 #[macro_export]
 macro_rules! ok_or_jserr {
     ($v:expr) => {
-        $v.map_err(|e| JsValue::from(e.to_string()))
+        $v.map_err(|e| wasm_bindgen::JsValue::from(e.to_string()))
     };
 }

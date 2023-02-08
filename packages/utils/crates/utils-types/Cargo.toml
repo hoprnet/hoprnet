@@ -1,7 +1,7 @@
 [package]
 name = "utils-types"
-version = "0.1.0"
-authors = ["NumberFour8 <lukas.pohanka@inina.net>"]
+version = "0.2.0"
+authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 
 [lib]
@@ -9,17 +9,25 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 default = ["console_error_panic_hook", "wasm"]
-wasm = ["dep:wasm-bindgen"]
+wasm = ["dep:wasm-bindgen", "dep:js-sys"]
 console_error_panic_hook = [ "dep:console_error_panic_hook" ]
 
 [dependencies]
-ethnum = "1.3.2"
+ethnum = { version = "1.3.2", features = ["serde"] }
 hex = "0.4.3"
+js-sys = { version = "0.3", optional = true}
+lazy_static = "1.4"
 serde = "1.0"
 serde_repr = "0.1"
+thiserror = "1.0"
 utils-misc = { path = "../../../utils/crates/utils-misc" }
-utils-proc-macros = { path = "../../../utils/crates/utils-proc-macros" }
 wasm-bindgen = { version = "0.2.83", optional = true}
+
+# TODO: Remove these and replace with core-crypto once merged
+getrandom = { version = "0.2.8", features = ["js"] }
+k256 = { version = "0.12.0", features = ["ecdsa-core"] }
+libp2p-core = { version = "0.38.0", features = ["secp256k1"] }
+sha3 = "0.10.6"
 
 console_error_panic_hook = { version = "0.1.7", optional = true }
 #wee_alloc = { version = "0.4.5", optional = true }
