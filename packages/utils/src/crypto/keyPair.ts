@@ -24,8 +24,8 @@ export async function serializeKeyPair(
   __salt?: string,
   __uuidSalt?: string
 ): Promise<Uint8Array> {
-  console.log(peerId, peerId.privateKey)
-  const w = new Wallet(keysPBM.PrivateKey.decode(peerId.privateKey).Data)
+  console.log(peerId, Uint8Array.from(keysPBM.PrivateKey.decode(peerId.privateKey).Data))
+  const w = new Wallet(Uint8Array.from(keysPBM.PrivateKey.decode(peerId.privateKey).Data))
 
   let serialized: string
   if (useWeakCrypto) {
