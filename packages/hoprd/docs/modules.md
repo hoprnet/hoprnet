@@ -26,4 +26,4 @@
 
 #### Defined in
 
-[index.ts:100](https://github.com/hoprnet/hoprnet/blob/master/packages/hoprd/src/index.ts#L100)
+[index.ts:99](https://github.com/hoprnet/hoprnet/blob/master/packages/hoprd/src/index.ts#L99)

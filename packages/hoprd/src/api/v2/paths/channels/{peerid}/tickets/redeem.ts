@@ -59,6 +59,12 @@ POST.apiDoc = {
         }
       }
     },
+    '401': {
+      $ref: '#/components/responses/Unauthorized'
+    },
+    '403': {
+      $ref: '#/components/responses/Forbidden'
+    },
     '404': {
       description:
         'Tickets were not found for that channel. That means that no messages were sent inside this channel yet.',

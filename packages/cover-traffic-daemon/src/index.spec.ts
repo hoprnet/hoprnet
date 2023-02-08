@@ -4,7 +4,7 @@ import { debug, PublicKey, wait, HoprDB, privKeyToPeerId } from '@hoprnet/hopr-u
 import { PersistedState } from './state.js'
 import { CoverTrafficStrategy } from './strategy.js'
 import { sampleOptions } from '@hoprnet/hopr-core'
-import { createConnectorMock } from '@hoprnet/hopr-core-ethereum'
+import HoprCoreEthereum, { createConnectorMock } from '@hoprnet/hopr-core-ethereum'
 
 const namespace = 'hopr:test:cover-traffic'
 const log = debug(namespace)
@@ -18,7 +18,7 @@ describe('cover-traffic daemon', async function () {
   beforeEach(async function () {
     const connectorMock = createConnectorMock(mockPeerId)
     log('Mocked chain', connectorMock)
-    node = new Hopr(mockPeerId, HoprDB.createMock(), connectorMock, {
+    node = new Hopr(mockPeerId, HoprDB.createMock(), {
       ...sampleOptions,
       testing: {
         // Do not use real libp2p instance to keep setup simple
@@ -31,6 +31,7 @@ describe('cover-traffic daemon', async function () {
 
   afterEach(async function () {
     await node.stop()
+    await HoprCoreEthereum.getInstance().stop()
   })
 
   it('should run and stop properly', async function () {

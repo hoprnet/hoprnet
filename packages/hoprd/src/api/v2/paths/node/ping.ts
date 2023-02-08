@@ -109,6 +109,12 @@ POST.apiDoc = {
         }
       }
     },
+    '401': {
+      $ref: '#/components/responses/Unauthorized'
+    },
+    '403': {
+      $ref: '#/components/responses/Forbidden'
+    },
     '422': {
       description: `An error occured (see error details) or timeout - node with specified PeerId didn't respond in time.`,
       content: {
