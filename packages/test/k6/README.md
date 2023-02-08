@@ -15,11 +15,10 @@ https://k6.io/docs/get-started/results-output/
 
 https://github.com/hoprnet/hopr-network-dashboard/blob/main/be-scripts/modules/hopr-sdk.js
 
-
-
 # Setup development environment
 
 Here are the most useful commands:
+
 - `yarn install`: Install dependencies
 - `npm run build`: Build source code
 - `npm run cluster:start`: Start local cluster

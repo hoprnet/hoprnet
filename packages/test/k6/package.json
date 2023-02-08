@@ -28,8 +28,8 @@
   "scripts": {
     "check": "tsc",
     "build": "webpack",
-    "cluster:start" : "../../../scripts/setup-local-cluster.sh -i topologies/full_interconnected_cluster.sh",
-    "cluster:stop" : "pkill -f ../../../scripts/setup-local-cluster.sh",
+    "cluster:start": "../../../scripts/setup-local-cluster.sh -i topologies/full_interconnected_cluster.sh",
+    "cluster:stop": "pkill -f ../../../scripts/setup-local-cluster.sh",
     "admin:start": "docker run -d --name hopr_admin -p 3000:3000 gcr.io/hoprassociation/hopr-admin:latest",
     "admin:stop": "docker rm -f hopr_admin",
     "test": "npm run test:constant-traffic",
