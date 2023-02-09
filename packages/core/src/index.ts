@@ -632,8 +632,7 @@ class Hopr extends EventEmitter {
       } else {
         error(`Protocol error: strategy wants to open channel to non-registered peer ${destination.toString()}`)
       }
-    }
-    catch (e) {
+    } catch (e) {
       error(`strategy could not open channel to ${status.peer_id}`)
     }
   }
@@ -643,8 +642,7 @@ class Hopr extends EventEmitter {
       await this.closeChannel(peerIdFromString(destination), 'outgoing')
       verbose(`closed channel to ${destination.toString()}`)
       this.emit('hopr:channel:closed', destination)
-    }
-    catch (e) {
+    } catch (e) {
       error(`strategy could not close channel ${destination}`)
     }
   }
