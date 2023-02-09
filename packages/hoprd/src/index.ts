@@ -70,6 +70,7 @@ function generateNodeOptions(argv: CliArgs, environment: ResolvedEnvironment): H
     heartbeatVariance: argv.heartbeat_variance,
     networkQualityThreshold: argv.network_quality_threshold,
     onChainConfirmations: argv.on_chain_confirmations,
+    checkUnrealizedBalance: argv.check_unrealized_balance,
     testing: {
       announceLocalAddresses: argv.test_announce_local_addresses,
       preferLocalAddresses: argv.test_prefer_local_addresses,

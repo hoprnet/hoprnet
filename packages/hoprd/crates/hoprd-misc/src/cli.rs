@@ -260,6 +260,14 @@ struct CliArgs {
     pub auto_redeem_tickets: bool,
 
     #[arg(
+    long = "checkUnrealizedBalance",
+    default_value_t = false,
+    env = "HOPRD_AUTO_REDEEEM_TICKETS",
+    help = "Determines if unrealized balance shall be checked first before validating unacknowledged tickets."
+    )]
+    pub check_unrealized_balance: bool,
+
+    #[arg(
         long,
         help = "A custom RPC provider to be used for the node to connect to blockchain",
         env = "HOPRD_PROVIDER",

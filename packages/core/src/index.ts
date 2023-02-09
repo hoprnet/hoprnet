@@ -154,6 +154,8 @@ export type HoprOptions = {
   heartbeatVariance?: number
   networkQualityThreshold?: number
   onChainConfirmations?: number
+  checkUnrealizedBalance?: boolean
+
   testing?: {
     // when true, assume that the node is running in an isolated network and does
     // not need any connection to nodes outside of the subnet
@@ -450,7 +452,8 @@ class Hopr extends EventEmitter {
       onMessage,
       this.db,
       this.environment,
-      this.acknowledgements
+      this.acknowledgements,
+      this.options
     )
 
     // Attach socket listener and check availability of entry nodes
