@@ -39,7 +39,7 @@ export class PacketForwardInteraction {
     private acknowledgements: AcknowledgementInteraction,
     private options: HoprOptions,
     // used for testing
-    nextRandomInt?: () => number,
+    nextRandomInt?: () => number
   ) {
     this.mixer = new Mixer(nextRandomInt)
     this.handlePacket = this.handlePacket.bind(this)
