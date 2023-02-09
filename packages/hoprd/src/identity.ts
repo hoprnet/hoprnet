@@ -1,5 +1,5 @@
 import type { PeerId } from '@libp2p/interface-peer-id'
-import { privKeyToPeerId, stringToU8a, serializeKeyPair, deserializeKeyPair } from '@hoprnet/hopr-utils'
+import { privKeyToPeerId, serializeKeyPair, deserializeKeyPair } from '@hoprnet/hopr-utils'
 import { randomBytes } from 'crypto'
 import { writeFile, readFile } from 'fs/promises'
 import { resolve } from 'path'
@@ -24,7 +24,7 @@ export type IdentityOptions = {
   idPath: string
   password: string
   useWeakCrypto?: boolean
-  privateKey?: string
+  privateKey?: Uint8Array
 }
 
 /**
@@ -65,11 +65,7 @@ async function createIdentity(idPath: string, password: string, useWeakCrypto = 
 
 export async function getIdentity(options: IdentityOptions): Promise<PeerId> {
   if (options.privateKey) {
-    if (options.privateKey.match(/0x[0-9a-fA-F]{64}/) == null && options.privateKey.match(/[0-9a-fA-F]{64}/) == null) {
-      throw new Error(IdentityErrors.INVALID_PRIVATE_KEY_GIVEN)
-    }
-    const privateKey = stringToU8a(options.privateKey)
-    return await createIdentity(options.idPath, options.password, options.useWeakCrypto, privateKey)
+    return await createIdentity(options.idPath, options.password, options.useWeakCrypto, options.privateKey)
   }
 
   if (typeof options.password !== 'string' || options.password.length == 0) {

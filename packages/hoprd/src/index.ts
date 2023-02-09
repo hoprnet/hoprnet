@@ -112,6 +112,10 @@ export function parseCliArguments(args: string[]) {
     console.error(err)
     process.exit(1)
   }
+  if (argv.private_key) {
+    // wasm-bindgen returns number array but does not call the Uint8Array constructor
+    argv.private_key = new Uint8Array(argv.private_key)
+  }
   return argv
 }
 
