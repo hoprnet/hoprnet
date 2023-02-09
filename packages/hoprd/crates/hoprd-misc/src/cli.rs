@@ -262,7 +262,7 @@ struct CliArgs {
     #[arg(
     long = "checkUnrealizedBalance",
     default_value_t = false,
-    env = "HOPRD_AUTO_REDEEEM_TICKETS",
+    env = "HOPRD_CHECK_UNREALIZED_BALANCE",
     help = "Determines if unrealized balance shall be checked first before validating unacknowledged tickets."
     )]
     pub check_unrealized_balance: bool,
