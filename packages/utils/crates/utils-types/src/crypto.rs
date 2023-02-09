@@ -10,21 +10,21 @@ use sha3::{Keccak256, digest::DynDigest};
 use crate::errors::{Result, GeneralError::ParseError};
 use crate::primitives::Address;
 
-pub const HASH_LENGTH: usize = 32;
 
-#[derive(Clone)]
+/// Represents a 256-bit hash value
+#[derive(Clone, Eq, PartialEq, Debug)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Hash {
-    hash: [u8; HASH_LENGTH],
+    hash: [u8; Self::SIZE],
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl Hash {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(hash: &[u8]) -> Self {
-        assert_eq!(hash.len(), HASH_LENGTH, "invalid length");
+        assert_eq!(hash.len(), Self::SIZE, "invalid length");
         let mut ret = Hash {
-            hash: [0u8; HASH_LENGTH]
+            hash: [0u8; Self::SIZE]
         };
         ret.hash.copy_from_slice(hash);
         ret
@@ -44,21 +44,25 @@ impl Hash {
 }
 
 impl Hash {
+    /// Size of the hash value in bytes
+    pub const SIZE: usize = 32;
+
     pub fn create(inputs: &[&[u8]]) -> Self {
         let mut hash = Keccak256::default();
         inputs.into_iter().for_each(|v| hash.update(*v));
         let mut ret = Hash {
-            hash: [0u8; HASH_LENGTH]
+            hash: [0u8; Self::SIZE]
         };
         hash.finalize_into(&mut ret.hash).unwrap();
         ret
     }
 }
 
+/// Represents a secp256k1 public key.
+/// This is a "Schrödinger public key", both compressed and uncompressed to save some cycles.
 #[derive(Clone, Eq, PartialEq, Debug)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct PublicKey {
-    // A Schrödinger public key, both compressed and uncompressed to save some cycles
     key: elliptic_curve::PublicKey<Secp256k1>,
     compressed: Box<[u8]>
 }
@@ -95,6 +99,12 @@ impl PublicKey {
 }
 
 impl PublicKey {
+    /// Size of the compressed public key in bytes
+    pub const SIZE_COMPRESSED: usize = 33;
+
+    /// Size of the uncompressed public key in bytes
+    pub const SIZE_UNCOMPRESSED: usize = 64;
+
     pub fn to_peerid(&self) -> PeerId {
         PeerId::from_public_key(&libp2p_core::PublicKey::Secp256k1(
             libp2p_core::identity::secp256k1::PublicKey::decode(&self.compressed)
@@ -134,13 +144,11 @@ impl PublicKey {
     }
 }
 
-// TODO: Move all Signature related stuff to core-crypto once merged
-pub const SIGNATURE_LENGTH: usize = 64;
-
+/// Represents an ECDSA signature based on the secp256k1 curve.
 #[derive(Clone, Eq, PartialEq, Debug)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Signature {
-    signature: [u8; SIGNATURE_LENGTH],
+    signature: [u8; Self::SIZE],
     recovery: u8,
 }
 
@@ -148,16 +156,17 @@ pub struct Signature {
 impl Signature {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(raw_bytes: &[u8], recovery: u8) -> Signature {
-        assert_eq!(raw_bytes.len(), SIGNATURE_LENGTH, "invalid length");
+        assert_eq!(raw_bytes.len(), Self::SIZE, "invalid length");
         assert!(recovery <= 1, "invalid recovery bit");
         let mut ret = Self {
-            signature: [0u8; SIGNATURE_LENGTH],
+            signature: [0u8; Self::SIZE],
             recovery
         };
         ret.signature.copy_from_slice(raw_bytes);
         ret
     }
 
+    /// Signs the given message using the raw private key.
     pub fn sign_message(message: &[u8], private_key: &[u8]) -> Signature {
         let key = SigningKey::from_bytes(private_key)
             .expect("invalid signing key");
@@ -165,6 +174,7 @@ impl Signature {
         Self::deserialize(signature.to_bytes().as_slice()).expect("signing failed")
     }
 
+    /// Verifies this signature against the given message and a public key (compressed or uncompressed)
     pub fn verify(&self, message: &[u8], public_key: &[u8]) -> bool {
         let pub_key = VerifyingKey::from_sec1_bytes(public_key)
             .expect("invalid public key");
@@ -184,22 +194,25 @@ impl Signature {
 
     pub fn serialize(&self) -> Box<[u8]> {
         let mut compressed = Vec::from(self.signature);
-        compressed[SIGNATURE_LENGTH/2] &= 0x7f;
-        compressed[SIGNATURE_LENGTH/2] |= self.recovery << 7;
+        compressed[Self::SIZE/2] &= 0x7f;
+        compressed[Self::SIZE/2] |= self.recovery << 7;
         compressed.into_boxed_slice()
     }
 }
 
 impl Signature {
+    /// Size of the signature in bytes
+    pub const SIZE: usize = 64;
+    
     pub fn deserialize(signature: &[u8]) -> Result<Signature> {
-        if signature.len() == SIGNATURE_LENGTH {
+        if signature.len() == Self::SIZE {
             // Read & clear the top-most bit in S
             let mut ret = Signature {
-                signature: [0u8; SIGNATURE_LENGTH],
-                recovery: if signature[SIGNATURE_LENGTH/2]&0x80 != 0 { 1 } else { 0 }
+                signature: [0u8; Self::SIZE],
+                recovery: if signature[Self::SIZE/2]&0x80 != 0 { 1 } else { 0 }
             };
             ret.signature.copy_from_slice(signature);
-            ret.signature[SIGNATURE_LENGTH/2] &= 0x7f;
+            ret.signature[Self::SIZE/2] &= 0x7f;
 
             Ok(ret)
         } else {
@@ -280,7 +293,7 @@ pub mod wasm {
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use wasm_bindgen::prelude::*;
-    use crate::crypto::{Hash, HASH_LENGTH, PublicKey, Signature};
+    use crate::crypto::{Hash, PublicKey, Signature};
 
     #[wasm_bindgen]
     impl Hash {
@@ -289,10 +302,14 @@ pub mod wasm {
             inputs.into_iter().map(|a| a.to_vec()).for_each(|v| hash.update(&v));
 
             let mut ret = Hash {
-                hash: [0u8; HASH_LENGTH]
+                hash: [0u8; Self::SIZE]
             };
             hash.finalize_into(&mut ret.hash).unwrap();
             ret
+        }
+
+        pub fn size() -> u32 {
+            Self::SIZE as u32
         }
     }
 
@@ -305,12 +322,24 @@ pub mod wasm {
         pub fn public_key_from_peerid_str(peer_id: &str) -> JsResult<PublicKey> {
             ok_or_jserr!(PublicKey::from_peerid_str(peer_id))
         }
+
+        pub fn size_compressed() -> u32 {
+            Self::SIZE_COMPRESSED as u32
+        }
+
+        pub fn size_uncompressed() -> u32 {
+            Self::SIZE_UNCOMPRESSED as u32
+        }
     }
 
     #[wasm_bindgen]
     impl Signature {
         pub fn deserialize_signature(signature: &[u8]) -> JsResult<Signature> {
             ok_or_jserr!(Signature::deserialize(signature))
+        }
+
+        pub fn size() -> u32 {
+            Self::SIZE as u32
         }
     }
 }

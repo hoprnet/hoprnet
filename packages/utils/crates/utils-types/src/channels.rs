@@ -1,10 +1,9 @@
 use serde_repr::*;
 use crate::crypto::{Hash, PublicKey, Signature};
-use crate::errors::GeneralError;
-use crate::errors::GeneralError::ParseError;
+use crate::errors::{Result, GeneralError::ParseError};
 use crate::primitives::{Address, Balance, EthereumChallenge, U256};
 
-/// Describes status of the channel
+/// Describes status of a channel
 #[repr(u8)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize_repr, Deserialize_repr)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -15,6 +14,7 @@ pub enum ChannelStatus {
     PendingToClose = 3
 }
 
+/// Contains acknowledgment information and the respective ticket
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct AcknowledgedTicket {
     pub ticket: Ticket,
@@ -23,6 +23,7 @@ pub struct AcknowledgedTicket {
     pub signer: PublicKey
 }
 
+/// Overall description of a channel
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct ChannelEntry {
     pub source: PublicKey,
@@ -52,22 +53,20 @@ impl ChannelEntry {
     }
 }
 
-// TODO: Update to use secp256k1 private key length constant from core-crypto
-pub const RESPONSE_LENGTH: usize = 32;
-
+/// Contains a response upon ticket acknowledgement
 #[derive(Clone)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Response {
-    response: [u8; RESPONSE_LENGTH],
+    response: [u8; Self::SIZE],
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl Response {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(data: &[u8]) -> Self {
-        assert_eq!(data.len(), RESPONSE_LENGTH);
+        assert_eq!(data.len(), Self::SIZE);
         let mut ret = Response {
-            response: [0u8; RESPONSE_LENGTH]
+            response: [0u8; Self::SIZE]
         };
         ret.response.copy_from_slice(data);
         ret
@@ -83,8 +82,11 @@ impl Response {
 }
 
 impl Response {
-    pub fn deserialize(data: &[u8]) -> Result<Response, GeneralError> {
-        if data.len() == RESPONSE_LENGTH {
+    /// Size of the serialized response
+    pub const SIZE: usize = 32;
+
+    pub fn deserialize(data: &[u8]) -> Result<Response> {
+        if data.len() == Self::SIZE {
             Ok(Response::new(data))
         } else {
             Err(ParseError)
@@ -92,6 +94,7 @@ impl Response {
     }
 }
 
+/// Contains the overall description of a ticket
 #[derive(Clone)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct Ticket {
@@ -154,6 +157,10 @@ pub mod wasm {
     impl Response {
         pub fn deserialize_response(data: &[u8]) -> JsResult<Response> {
             ok_or_jserr!(Response::deserialize(data))
+        }
+
+        pub fn size() -> u32 {
+            Self::SIZE as u32
         }
     }
 

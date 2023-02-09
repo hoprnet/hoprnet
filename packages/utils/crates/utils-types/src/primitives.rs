@@ -5,22 +5,20 @@ use std::string::ToString;
 use crate::errors::{Result, GeneralError::ParseError};
 use crate::errors::GeneralError::MathError;
 
-pub const ADDRESS_LENGTH: usize = 20;
-
 /// Represents an Ethereum address
 #[derive(Clone, Eq, PartialEq, Debug)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Address {
-    addr: [u8; ADDRESS_LENGTH],
+    addr: [u8; Self::SIZE],
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl Address {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(bytes: &[u8]) -> Self {
-        assert_eq!(bytes.len(), ADDRESS_LENGTH, "invalid length");
+        assert_eq!(bytes.len(), Self::SIZE, "invalid length");
         let mut ret = Address {
-            addr: [0u8; ADDRESS_LENGTH]
+            addr: [0u8; Self::SIZE]
         };
         ret.addr.copy_from_slice(bytes);
         ret
@@ -44,14 +42,17 @@ impl Address {
 }
 
 impl Address {
+    /// Size of the address when serialized
+    pub const SIZE: usize = 20;
+    
     pub fn from_str(value: &str) -> Result<Address> {
         Self::deserialize(&hex::decode(value).map_err(|_| ParseError)?)
     }
 
     pub fn deserialize(value: &[u8]) -> Result<Address> {
-        if value.len() == ADDRESS_LENGTH {
+        if value.len() == Self::SIZE {
             let mut ret = Address{
-                addr: [0u8; ADDRESS_LENGTH]
+                addr: [0u8; Self::SIZE]
             };
             ret.addr.copy_from_slice(&value);
             Ok(ret)
@@ -185,23 +186,21 @@ impl Balance {
     }
 }
 
-pub const ETHEREUM_CHALLENGE_LENGTH: usize = 20;
-
 /// Represents and Ethereum challenge.
 #[derive(Clone, Eq, PartialEq, Debug)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct EthereumChallenge {
-    challenge: [u8; ETHEREUM_CHALLENGE_LENGTH]
+    challenge: [u8; Self::SIZE]
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl EthereumChallenge {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(data: &[u8]) -> Self {
-        assert_eq!(data.len(), ETHEREUM_CHALLENGE_LENGTH);
+        assert_eq!(data.len(), Self::SIZE);
 
         let mut ret = EthereumChallenge {
-            challenge: [0u8; ETHEREUM_CHALLENGE_LENGTH]
+            challenge: [0u8; Self::SIZE]
         };
         ret.challenge.copy_from_slice(data);
         ret
@@ -221,8 +220,11 @@ impl EthereumChallenge {
 }
 
 impl EthereumChallenge {
+    /// Size of the challenge when serialized
+    pub const SIZE: usize = 20;
+    
     pub fn deserialize(data: &[u8]) -> Result<EthereumChallenge> {
-        if data.len() == ETHEREUM_CHALLENGE_LENGTH {
+        if data.len() == Self::SIZE {
             Ok(EthereumChallenge::new(data))
         } else {
             Err(ParseError)
@@ -308,7 +310,7 @@ mod tests {
 
     #[test]
     fn address_tests() {
-        let addr_1 = Address::new(&[0u8; ADDRESS_LENGTH]);
+        let addr_1 = Address::new(&[0u8; Self::SIZE]);
         let addr_2 = Address::deserialize(&addr_1.serialize()).unwrap();
 
         assert_eq!(addr_1, addr_2);
@@ -325,7 +327,7 @@ mod tests {
 
     #[test]
     fn eth_challenge_tests() {
-        let e_1 = EthereumChallenge::new(&[0u8; ETHEREUM_CHALLENGE_LENGTH]);
+        let e_1 = EthereumChallenge::new(&[0u8; Self::SIZE]);
         let e_2 = EthereumChallenge::deserialize(&e_1.serialize()).unwrap();
 
         assert_eq!(e_1, e_2);
@@ -352,6 +354,10 @@ pub mod wasm {
         pub fn deserialize_address(data: &[u8]) -> JsResult<Address> {
             ok_or_jserr!(Address::deserialize(data))
         }
+
+        pub fn size() -> u32 {
+            Self::SIZE as u32
+        }
     }
 
     #[wasm_bindgen]
@@ -376,6 +382,10 @@ pub mod wasm {
     impl EthereumChallenge {
         pub fn deserialize_challenge(data: &[u8]) -> JsResult<EthereumChallenge> {
             ok_or_jserr!(EthereumChallenge::deserialize(data))
+        }
+
+        pub fn size() -> u32 {
+            Self::SIZE as u32
         }
     }
 }
