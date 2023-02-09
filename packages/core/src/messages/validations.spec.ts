@@ -72,7 +72,15 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
     const signedTicket = createMockTicket({})
 
     return expect(
-      validateUnacknowledgedTicket(SENDER, new BN(1), new BN(1), signedTicket, await mockChannelEntry(), getTicketsMock, true)
+      validateUnacknowledgedTicket(
+        SENDER,
+        new BN(1),
+        new BN(1),
+        signedTicket,
+        await mockChannelEntry(),
+        getTicketsMock,
+        true
+      )
     ).to.not.eventually.rejected
   })
 
@@ -80,7 +88,15 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
     const signedTicket = createMockTicket({})
 
     return expect(
-      validateUnacknowledgedTicket(TARGET, new BN(2), new BN(1), signedTicket, await mockChannelEntry(), getTicketsMock, true)
+      validateUnacknowledgedTicket(
+        TARGET,
+        new BN(2),
+        new BN(1),
+        signedTicket,
+        await mockChannelEntry(),
+        getTicketsMock,
+        true
+      )
     ).to.eventually.rejectedWith('The signer of the ticket does not match the sender')
   })
 
@@ -88,7 +104,15 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
     const signedTicket = createMockTicket({})
 
     return expect(
-      validateUnacknowledgedTicket(SENDER, new BN(2), new BN(1), signedTicket, await mockChannelEntry(), getTicketsMock, true)
+      validateUnacknowledgedTicket(
+        SENDER,
+        new BN(2),
+        new BN(1),
+        signedTicket,
+        await mockChannelEntry(),
+        getTicketsMock,
+        true
+      )
     ).to.eventually.rejectedWith('Ticket amount')
   })
 
@@ -98,7 +122,15 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
     })
 
     return expect(
-      validateUnacknowledgedTicket(SENDER, new BN(1), new BN(1), signedTicket, await mockChannelEntry(), getTicketsMock, true)
+      validateUnacknowledgedTicket(
+        SENDER,
+        new BN(1),
+        new BN(1),
+        signedTicket,
+        await mockChannelEntry(),
+        getTicketsMock,
+        true
+      )
     ).to.eventually.rejectedWith('Ticket winning probability')
   })
 
@@ -133,7 +165,15 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
     })
 
     return expect(
-      validateUnacknowledgedTicket(SENDER, new BN(1), new BN(1), signedTicket, await mockChannelEntry(), getTicketsMock, true)
+      validateUnacknowledgedTicket(
+        SENDER,
+        new BN(1),
+        new BN(1),
+        signedTicket,
+        await mockChannelEntry(),
+        getTicketsMock,
+        true
+      )
     ).to.eventually.rejectedWith('Ticket was created for a different channel iteration')
   })
 
@@ -146,8 +186,9 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
       new UINT256(new BN(2))
     )
 
-    return expect(validateUnacknowledgedTicket(SENDER, new BN(1), new BN(1), signedTicket, mockChannel, getTicketsMock, true))
-      .to.not.eventually.rejected
+    return expect(
+      validateUnacknowledgedTicket(SENDER, new BN(1), new BN(1), signedTicket, mockChannel, getTicketsMock, true)
+    ).to.not.eventually.rejected
   })
 
   it("should not throw if ticket's index is smaller than the last ticket index when you include unredeemed tickets", async function () {
@@ -166,7 +207,15 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
     ]
 
     return expect(
-      validateUnacknowledgedTicket(SENDER, new BN(1), new BN(1), signedTicket, mockChannel, async () => ticketsInDb, true)
+      validateUnacknowledgedTicket(
+        SENDER,
+        new BN(1),
+        new BN(1),
+        signedTicket,
+        mockChannel,
+        async () => ticketsInDb,
+        true
+      )
     ).to.not.eventually.rejected
   })
 
