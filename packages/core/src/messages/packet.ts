@@ -201,6 +201,7 @@ export async function validateUnacknowledgedTicket(
 
   if (checkUnrealizedBalance) {
     // find out pending balance from unredeemed tickets
+    log(`checking unrealized balances for channel ${channel.getId().toHex()}`)
 
     // all tickets from sender
     const tickets = await getTickets().then((ts) => {
