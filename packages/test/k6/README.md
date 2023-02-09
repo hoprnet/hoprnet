@@ -22,5 +22,7 @@ Here are the most useful commands:
 - `yarn install`: Install dependencies
 - `npm run build`: Build source code
 - `npm run cluster:start`: Start local cluster
-- `npm run test`: Execute tests locally
+- `npm run test`: Execute constant traffic test locally
 - `npm run cluster:stop`: Stops the local cluster
+- `npm run admin:start`: Starts the Admin UI container
+- `npm run admin:stop`: Stops the Admin UI container
