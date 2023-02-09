@@ -82,9 +82,9 @@ endif
 faucet: ensure-environment-is-set ensure-privatekey-is-set
 faucet: ## Mint some (default: 20000) HOPR tokens and send some (default value: 10) native tokens to the recipient hopramount
 ifeq ($(recipient),)
-    echo "parameter <recipient> missing" >&2 && exit 1
+	echo "parameter <recipient> missing" >&2 && exit 1
 endif
-    $(forge-script) script/SingleAction.s.sol:SingleActionFromPrivateKeyScript \
+	$(forge-script) script/SingleAction.s.sol:SingleActionFromPrivateKeyScript \
         --broadcast --sig "mintHoprAndSendNative(address,uint256,uint256)" \
         $(recipient) $(or $(hopramount),20000) $(or $(nativeamount),10)
 
