@@ -114,12 +114,12 @@ export async function handleTcpStunRequest(
               secondarySocket.end()
             })
           })
-          secondarySocket.once('timeout', () => {
-            secondarySocket.destroy()
-          })
-          secondarySocket.once('error', () => {
-            secondarySocket.destroy()
-          })
+            .once('timeout', () => {
+              secondarySocket.destroy()
+            })
+            .once('error', () => {
+              secondarySocket.destroy()
+            })
           socket.end()
         } else {
           socket.write(response.toBuffer(), () => {
