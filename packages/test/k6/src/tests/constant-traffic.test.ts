@@ -7,9 +7,9 @@ import { Counter } from 'k6/metrics'
 import { Addresses } from '../api/hoprd.types'
 
 const environmentName = __ENV.ENVIRONMENT_NAME
-const testData = (JSON.parse(open(`./constant-traffic-${environmentName}.json`)))
+const testData = JSON.parse(open(`./constant-traffic-${environmentName}.json`))
 
-const hoprNodes = (testData.nodes as HoprNode[])
+const hoprNodes = testData.nodes as HoprNode[]
 
 // Test Options https://docs.k6.io/docs/options
 export let options: Partial<Options> = {

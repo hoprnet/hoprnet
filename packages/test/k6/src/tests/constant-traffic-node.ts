@@ -45,9 +45,9 @@ export class ConstantTrafficNode {
 
   public checkHealth() {
     this.checkAddresses()
-    this.checkBalance();
-    this.checkConnectivity();
-    this.checkChannels();
+    this.checkBalance()
+    this.checkConnectivity()
+    this.checkChannels()
   }
 
   public getQualityPeers(peerType: string): Peer[] {
