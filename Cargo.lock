@@ -806,10 +806,14 @@ name = "core-mixer"
 version = "0.1.0"
 dependencies = [
  "console_error_panic_hook",
+ "futures 0.3.26",
+ "futures-timer",
  "getrandom 0.2.8",
+ "gloo-timers",
  "js-sys",
  "priority-queue",
  "rand 0.8.5",
+ "tokio 1.25.0",
  "wasm-bindgen",
  "wasm-bindgen-test",
 ]
@@ -1807,6 +1811,16 @@ name = "glob"
 version = "0.2.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8be18de09a56b60ed0edf84bc9df007e30040691af7acd1c41874faac5895bfb"
+
+[[package]]
+name = "gloo-timers"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9b995a66bb87bebce9a0f4a95aed01daca4872c050bfcb21653361c03bc35e5c"
+dependencies = [
+ "js-sys",
+ "wasm-bindgen",
+]
 
 [[package]]
 name = "group"
@@ -4186,6 +4200,7 @@ dependencies = [
  "num_cpus",
  "pin-project-lite",
  "socket2",
+ "tokio-macros",
  "windows-sys 0.42.0",
 ]
 
@@ -4229,6 +4244,17 @@ dependencies = [
  "bytes 0.4.12",
  "futures 0.1.31",
  "log",
+]
+
+[[package]]
+name = "tokio-macros"
+version = "1.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d266c00fde287f55d3f1c3e96c500c362a2b8c695076ec180f27918820bc6df8"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

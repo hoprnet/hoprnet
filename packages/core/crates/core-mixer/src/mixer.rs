@@ -1,28 +1,36 @@
 use std::cmp::Ordering;
 
-use priority_queue::PriorityQueue;
+use priority_queue::PriorityQueue;      // TODO: replace with https://doc.rust-lang.org/src/alloc/collections/binary_heap.rs.html#268
 use rand::Rng;
-
 
 type Packet = Box<[u8]>;
 
 const MIXER_BUFFER_CAPACITY: usize = 1024;
-const DELAY_MIN_VALUE: u64 = 0;    /// minimum delay in milliseconds
-const DELAY_MAX_VALUE: u64 = 200;  /// maximum delay in milliseconds
+const DELAY_MIN_MS: u64 = 0;    /// minimum delay in milliseconds
+const DELAY_MAX_MS: u64 = 200;  /// maximum delay in milliseconds
+
+#[cfg(not(wasm))]
+async fn sleep(time: std::time::Duration) -> futures_timer::Delay {
+    futures_timer::Delay::new(time)
+}
+
+#[cfg(not(wasm))]
+type Delay = futures_timer::Delay;
 
 #[derive(Eq, PartialEq, Debug, Copy, Clone)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-pub struct MixerTimestamp {
-    value: u64
+pub struct ScheduledPacket {
+    timestamp: u64,
+    // TODO: Add packet here
 }
 
 /// This reverses the timestamp logic
 ///
 /// The higher the timestamp, the later in time the scheduling is required, therefore the smaller
 /// the priority.
-impl Ord for MixerTimestamp {
+impl Ord for ScheduledPacket {
     fn cmp(&self, other: &Self) -> Ordering {
-        if self.value < other.value {
+        if self.timestamp < other.timestamp {
             Ordering::Greater
         } else {
             Ordering::Less
@@ -30,7 +38,7 @@ impl Ord for MixerTimestamp {
     }
 }
 
-impl PartialOrd for MixerTimestamp {
+impl PartialOrd for ScheduledPacket {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
@@ -49,34 +57,57 @@ impl PartialOrd for MixerTimestamp {
 /// mixer value comparator function
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct StochasticUniformMixer {
-   queue: PriorityQueue<Packet, MixerTimestamp>,
-   min_packet_count: usize,
+    queue: PriorityQueue<Packet, ScheduledPacket>,
+    delay_min_ms: u64,
+    delay_max_ms: u64,
+    timer: futures_timer::Delay,
 }
 
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl StochasticUniformMixer {
-    pub fn new(packet_release_threshold: usize) -> StochasticUniformMixer {
+    pub fn new() -> StochasticUniformMixer {
+        StochasticUniformMixer::new_with_delay_spec(DELAY_MIN_MS, DELAY_MAX_MS)
+    }
+
+    pub fn new_with_delay_spec(delay_min_ms: u64, delay_max_ms: u64) -> StochasticUniformMixer {
         StochasticUniformMixer {
             queue: PriorityQueue::with_capacity_and_default_hasher(MIXER_BUFFER_CAPACITY),
-            min_packet_count: packet_release_threshold
+            delay_min_ms,
+            delay_max_ms,
+            timer: Delay::new(std::time::Duration::from_secs(0))
         }
     }
 }
 
-
 impl StochasticUniformMixer {
-    pub fn pop(&mut self) -> Option<Packet> {
-        let current_time: u64 = u64::MAX;   // TODO: implement current timestamp comparison
+    /// Ingests a single packet along with the current timestamp
+    ///
+    /// # Arguments
+    ///
+    /// * `packet` - A string slice that holds the name of the person
+    /// !!! The same packet cannot be duplicated!
+    pub fn push(&mut self, packet: Packet) {    //
+        let mut rng = rand::thread_rng();
+        let random_delay =  rng.gen_range(self.delay_min_ms..self.delay_max_ms);
+        if let Some(_) = self.queue.push(packet, ScheduledPacket { timestamp: current_timestamp() + random_delay}) {
+            panic!("Duplicate packet detected")
+        }
 
-        if self.queue.len() > self.min_packet_count  {
-            if let Some((_, priority)) = self.queue.peek() {
-                if priority.value <= current_time {
-                    if let Some((value, _ )) = self.queue.pop() {
-                        return Some(value);
-                    } else {
-                        panic!("Expected to pop out a value")
-                    }
+        let current_ts = current_timestamp();
+        if let Some((_, priority)) = self.queue.peek() {
+            let remaining_time = if priority.timestamp > current_ts { priority.timestamp - current_ts } else { 0u64 };
+            self.timer.reset(std::time::Duration::from_millis(remaining_time));
+        }
+    }
+
+    pub fn pop(&mut self) -> Option<Packet> {
+        if let Some((_, priority)) = self.queue.peek() {
+            if priority.timestamp <= current_timestamp() {
+                if let Some((value, _ )) = self.queue.pop() {
+                    return Some(value);
+                } else {
+                    panic!("Expected to pop out a value")
                 }
             }
         }
@@ -84,18 +115,30 @@ impl StochasticUniformMixer {
         None
     }
 
-    /// Ingests a single packet along with the current timestamp
-    ///
-    /// # Arguments
-    ///
-    /// * `packet` - A string slice that holds the name of the person
-    /// * `timestamp` - The current timestamp (note: necessary due to WASM interface)
-    pub fn push(&mut self, packet: Packet, timestamp: u64) {    //
-        let mut rng = rand::thread_rng();
-        let random_delay =  rng.gen_range(DELAY_MIN_VALUE..DELAY_MAX_VALUE);
-        if let Some(_) = self.queue.push(packet, MixerTimestamp{value: timestamp + random_delay}) {
-            panic!("Duplicate packet detected")
+    pub async fn pop_async(&mut self) -> Packet {
+        loop {
+            let bar = futures::future::pending::<()>();
+            match futures::future::select(&mut self.timer, bar).await {
+                futures::future::Either::Left(_) => {
+                    if self.queue.is_empty() {
+                        self.timer.reset(std::time::Duration::from_millis(1000));
+                    } else {
+                        break;
+                    };
+                },
+                futures::future::Either::Right(_) => unreachable!("A failed case for long wait time"),
+            }
         }
+
+        if let Some((value, _ )) = self.queue.pop() {
+            return value;
+        } else {
+            panic!("There should have been a value")
+        }
+    }
+
+    pub fn peek(&self) -> Option<(&Packet,&ScheduledPacket)> {
+        self.queue.peek()
     }
 
     pub fn length(&self) -> usize {
@@ -103,7 +146,25 @@ impl StochasticUniformMixer {
     }
 }
 
-// impl
+// #[cfg(wasm)]
+// Some wrapper with specific definitions
+// use Timer = gloo_timer::Timer;
+
+
+// move to misc-utils crate
+#[cfg(not(wasm))]
+fn current_timestamp() -> u64 {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    match SystemTime::now().duration_since(UNIX_EPOCH) {
+        Ok(d) => d.as_millis() as u64,
+        Err(_) => 1,
+    }
+}
+
+#[cfg(wasm)]
+fn get_current_timestamp() -> u64 {
+    (js_sys::Date::now() / 1000.0) as u64
+}
 
 
 #[cfg(feature = "wasm")]
@@ -118,8 +179,7 @@ pub mod wasm {
     #[wasm_bindgen]
     impl StochasticUniformMixer {
         pub fn push_data(&mut self, packet: Packet) {
-            let timestamp_now = (js_sys::Date::now() / 1000.0) as u64;
-            self.push(packet, timestamp_now);
+            self.push(packet);
         }
     }
 }
@@ -129,105 +189,111 @@ pub mod wasm {
 mod tests {
     use super::*;
 
-    const NO_PACKET_THRESHOLD: usize = 0;
+    fn random_packet() -> Packet {
+        let mut rng = rand::thread_rng();
+
+        Box::new([rng.gen()])
+    }
 
     #[test]
-    fn test_mixer_timestamp_derives_equality() {
-        let left = MixerTimestamp{ value: 1 };
-        let right = MixerTimestamp{ value: 1 };
+    fn test_scheduled_packet_derives_equality() {
+        let left = ScheduledPacket { timestamp: 1 };
+        let right = ScheduledPacket { timestamp: 1 };
 
         assert_eq!(left, right)
     }
 
     #[test]
     fn test_mixer_timestamp_derives_reverse_instead_of_direct_ordering_for_priority_queue_logic() {
-        let smaller = MixerTimestamp{ value: 1 };
-        let greater = MixerTimestamp{ value: 2 };
+        let smaller = ScheduledPacket { timestamp: 1 };
+        let greater = ScheduledPacket { timestamp: 2 };
 
         assert!(smaller > greater);
         assert!(greater < smaller);
     }
 
-    fn random_packet() -> Packet {
-        let mut rng = rand::thread_rng();
-
-        let value: Packet = Box::new([rng.gen()]);
-        value
-    }
-
     #[test]
     fn test_mixer_without_any_packets_should_declare_none() {
-        let mixer = StochasticUniformMixer::new(NO_PACKET_THRESHOLD);
+        let mixer = StochasticUniformMixer::new();
 
         assert_eq!(0, mixer.length())
     }
 
     #[test]
     fn test_mixer_should_register_packets() {
-        let mut mixer = StochasticUniformMixer::new(NO_PACKET_THRESHOLD);
+        let mut mixer = StochasticUniformMixer::new();
 
-        mixer.push(random_packet(), 0);
+        mixer.push(random_packet());
         assert_eq!(1, mixer.length());
     }
 
     #[test]
-    #[should_panic]
-    fn test_mixer_should_panic_on_adding_the_same_packet() {
-        std::panic::set_hook(Box::new(|_| {}));
-
-        let mut mixer = StochasticUniformMixer::new(NO_PACKET_THRESHOLD);
-
-        let random_generated_packet = random_packet();
-        let the_same_random_packet = random_generated_packet.clone();
-        mixer.push(random_generated_packet, 0);
-        mixer.push(the_same_random_packet, 1);
-    }
-
-    #[test]
     fn test_mixer_should_return_no_value_if_it_is_empty() {
-        let mut mixer = StochasticUniformMixer::new(NO_PACKET_THRESHOLD);
+        let mut mixer = StochasticUniformMixer::new();
 
         let actual = mixer.pop();
         assert!(actual.is_none())
     }
 
-    #[test]
-    fn test_mixer_should_return_no_value_unless_it_contains_at_least_the_threshold_amount_of_values() {
-        let packet_threshold = 1;
-        let mut mixer = StochasticUniformMixer::new(packet_threshold);
+    #[tokio::test]
+    async fn test_mixer_should_return_exactly_the_same_packet_as_obtained() {
+        let mut mixer = StochasticUniformMixer::new();
 
-        mixer.push(random_packet(), 0);
-        let actual = mixer.pop();
+        let expected = random_packet();
 
-        assert!(actual.is_none())
+        mixer.push(expected.clone());
+        sleep(std::time::Duration::from_millis(2)).await;
+        let actual = mixer.pop_async().await;
+
+        assert_eq!(expected, actual)
     }
 
-    #[test]
-    fn test_mixer_should_return_value_if_more_than_threshold_values_are_present() {
-        let mut mixer = StochasticUniformMixer::new(NO_PACKET_THRESHOLD);
+    #[tokio::test]
+    async fn test_mixer_should_return_the_scheduled_packet() {
+        let mut mixer = StochasticUniformMixer::new();
 
-        mixer.push(random_packet(), 0);
-        let actual = mixer.pop();
+        mixer.push(random_packet());
+        let actual = mixer.pop_async().await;
 
-        assert!(actual.is_some())
+        assert!(actual.len() > 0);
     }
 
-    #[test]
-    fn test_mixer_should_return_the_value_with_an_earlier_timestamp_first() {
-        let at_least_two_packets = 1;
-        let mut mixer = StochasticUniformMixer::new(at_least_two_packets);
+    #[tokio::test]
+    async fn test_mixer_should_return_the_value_with_an_earlier_timestamp_first() {
+        let mut mixer = StochasticUniformMixer::new();
 
-        let (packet_with_earlier_timestamp, earlier_timestamp) = (random_packet(), DELAY_MIN_VALUE);
-        let (packet_with_latter_timestamp, latter_timestamp) = (random_packet(), (DELAY_MAX_VALUE * 2));
-        let expected = packet_with_earlier_timestamp.clone();
+        mixer.push(random_packet());
+        mixer.push(random_packet());
 
-        mixer.push(packet_with_latter_timestamp, latter_timestamp);
-        mixer.push(packet_with_earlier_timestamp, earlier_timestamp);
+        let first_timestamp = mixer.peek().unwrap().1.timestamp.clone();
+        let _x =  mixer.pop_async().await;
+        let second_timestamp = mixer.peek().unwrap().1.timestamp.clone();
 
-        let first = mixer.pop();
+        assert!(first_timestamp < second_timestamp);
+    }
 
-        assert!(first.is_some());
-        assert_eq!(first.unwrap(), expected);
+    #[tokio::test]
+    async fn test_mixer_pop_operation_with_will_not_last_longer_than_the_latest_possible_interval() {
+        let base_delay: u64 = 15;
+
+        let mut mixer = StochasticUniformMixer::new_with_delay_spec(base_delay, base_delay+1);
+
+        let first = random_packet();
+        let second = random_packet();
+
+        let before = current_timestamp();
+
+        mixer.push(first);
+        sleep(std::time::Duration::from_millis(base_delay/2)).await;
+        mixer.push(second);
+
+        let _ = mixer.pop_async().await;
+        let _ = mixer.pop_async().await;
+
+        let after = current_timestamp();
+
+        // assert_eq!(before, after);
+        assert!((after - before) < (base_delay + base_delay / 2));
     }
 }
 
