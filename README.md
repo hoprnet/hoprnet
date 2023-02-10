@@ -158,6 +158,8 @@ Options:
           Set port to which the API server will bind [env: HOPRD_API_PORT=] [default: 3001]
       --apiToken <TOKEN>
           A REST API token and for user authentication [env: HOPRD_API_TOKEN=]
+      --disableApiAuthentication
+          Completely disables the token authentication for the API, overrides any `apiToken` if set [env: HOPRD_DISABLE_API_AUTHENTICATION] [default: false]
       --healthCheck
           Run a health check end point on localhost:8080 [env: HOPRD_HEALTH_CHECK=]
       --healthCheckHost <HOST>

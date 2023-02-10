@@ -352,9 +352,9 @@ struct CliArgs {
 
     #[arg(
         long = "disableApiAuthentication",
-        help = "no remote authentication for easier testing",
+        help = "completely disables the token authentication for the API, overrides any apiToken if set",
         action = ArgAction::SetTrue,
-        env = "HOPRD_TEST_NO_AUTHENTICATION",
+        env = "HOPRD_DISABLE_API_AUTHENTICATION",
         default_value_t = false,
         hide = true
     )]
