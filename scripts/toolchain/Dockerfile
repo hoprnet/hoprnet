@@ -1,26 +1,29 @@
-# Alpine 3.16 x86_64 https://hub.docker.com/layers/library/alpine/3.16.3/images/sha256-3d426b0bfc361d6e8303f51459f17782b219dece42a1c7fe463b6014b189c86d
-FROM alpine:3.16@sha256:3d426b0bfc361d6e8303f51459f17782b219dece42a1c7fe463b6014b189c86d as runtime
+# Debian 11.5 https://hub.docker.com/layers/library/debian/bullseye-slim/images/sha256-64e251208f3bddf166a7020437103f75aabf3fceb1d5bd932272f3f73668caa9?context=explore
+FROM debian:bullseye-slim@sha256:64e251208f3bddf166a7020437103f75aabf3fceb1d5bd932272f3f73668caa9 as runtime
 
 LABEL description="Image that contains all utilities necessary to build hopr monorepo, including Rust and Yarn"
+
+# use bash to have source command and persistent environment
+SHELL ["/bin/bash", "-lc"]
 
 WORKDIR /app/hoprnet-toolchain
 
 RUN mkdir -p scripts/toolchain
 
-# install glibc for alpine to be compatible with libc-based software
-ENV GLIBC_REPO=https://github.com/sgerrand/alpine-pkg-glibc
-ENV GLIBC_VERSION=2.34-r0
-
-RUN apk add --no-cache --update \
-      bash build-base ca-certificates jq curl git libstdc++ lsof && \
-    for pkg in glibc-${GLIBC_VERSION} glibc-bin-${GLIBC_VERSION}; do \
-      curl -sSL ${GLIBC_REPO}/releases/download/${GLIBC_VERSION}/${pkg}.apk -o /tmp/${pkg}.apk; \
-    done && \
-    apk add --force-overwrite --allow-untrusted /tmp/*.apk && \
-    apk fix --force-overwrite alpine-baselayout-data && \
-    rm -v /tmp/*.apk && \
-    /usr/glibc-compat/sbin/ldconfig /lib /usr/glibc-compat/lib && \
-    echo 'hosts: files mdns4_minimal [NOTFOUND=return] dns mdns4' >> /etc/nsswitch.conf
+RUN apt-get update \
+ && apt-get install -y \
+      bash \
+      build-essential \
+      ca-certificates \
+      curl \
+      git \
+      jq \
+      lsof \
+      python3 \
+      unzip \
+      xz-utils \
+ && rm -rf /var/lib/apt/lists/* \
+ && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false
 
 # Gets yarn executable
 COPY .yarn .yarn/

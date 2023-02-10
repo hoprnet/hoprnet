@@ -503,7 +503,11 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
         }
 
         log(`Re-allocating NAT UDP mapping using ${multiaddrs.length} potential servers`)
-        await getExternalIp(multiaddrs, this.udpSocket, this.testingOptions.__preferLocalAddresses)
+        try {
+          await getExternalIp(multiaddrs, this.udpSocket, this.testingOptions.__preferLocalAddresses)
+        } catch (e) {
+          log(`could not get an external ip ${e}`)
+        }
       },
       // Following recommendations of https://www.rfc-editor.org/rfc/rfc5626
       () => randomInteger(24_000, 29_000)

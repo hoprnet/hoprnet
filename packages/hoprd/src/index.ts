@@ -70,6 +70,7 @@ function generateNodeOptions(argv: CliArgs, environment: ResolvedEnvironment): H
     heartbeatVariance: argv.heartbeat_variance,
     networkQualityThreshold: argv.network_quality_threshold,
     onChainConfirmations: argv.on_chain_confirmations,
+    checkUnrealizedBalance: argv.check_unrealized_balance,
     testing: {
       announceLocalAddresses: argv.test_announce_local_addresses,
       preferLocalAddresses: argv.test_prefer_local_addresses,
@@ -111,6 +112,10 @@ export function parseCliArguments(args: string[]) {
     }
     console.error(err)
     process.exit(1)
+  }
+  if (argv.private_key) {
+    // wasm-bindgen returns number array but does not call the Uint8Array constructor
+    argv.private_key = new Uint8Array(argv.private_key)
   }
   return argv
 }
@@ -194,6 +199,18 @@ async function main() {
   }
 
   const argv = parseCliArguments(process.argv.slice(1))
+
+  if (argv.default_strategy) {
+    state.settings.strategy = argv.default_strategy
+  }
+
+  if (argv.auto_redeem_tickets) {
+    state.settings.autoRedeemTickets = argv.auto_redeem_tickets
+  }
+
+  if (argv.max_auto_channels) {
+    state.settings.maxAutoChannels = argv.max_auto_channels
+  }
 
   if (!argv.disable_api_authentication && argv.api) {
     if (argv.api_token == null) {
