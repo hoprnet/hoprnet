@@ -359,14 +359,10 @@ describe('unit test heartbeat', async () => {
   })
 
   it('should abort heartbeat but not call closeConnectionsTo, if the ping takes 61 seconds to return', async () => {
-    const sendMessageToMoon = (
-      _dest: PeerId,
-      _protocols: string | string[],
-      msg: Uint8Array,
-      _includeReply: true
-    ) => new Promise(resolve => setTimeout(() => resolve([msg]), 61000)) as Promise<Uint8Array[]>
-  
-    const closeConnectionsToFake = sinon.fake();
+    const sendMessageToMoon = (_dest: PeerId, _protocols: string | string[], msg: Uint8Array, _includeReply: true) =>
+      new Promise((resolve) => setTimeout(() => resolve([msg]), 61000)) as Promise<Uint8Array[]>
+
+    const closeConnectionsToFake = sinon.fake()
     let netHealth = new NetworkHealth()
     const myheartbeat = new TestingHeartbeat(
       Me,
@@ -380,21 +376,17 @@ describe('unit test heartbeat', async () => {
       SHORT_TIMEOUTS
     )
 
-    const pingResult = await myheartbeat.pingNode(Alice);
+    const pingResult = await myheartbeat.pingNode(Alice)
 
-    assert.equal(pingResult.lastSeen, -1);
-    assert(closeConnectionsToFake.notCalled);
+    assert.equal(pingResult.lastSeen, -1)
+    assert(closeConnectionsToFake.notCalled)
   }).timeout(300000)
 
   it('should but not call closeConnectionsTo, if the ping timed out ', async () => {
-    const sendMessageToMoon = (
-      _dest: PeerId,
-      _protocols: string | string[],
-      msg: Uint8Array,
-      _includeReply: true
-    ) => new Promise(resolve => setTimeout(() => resolve([msg]), 1000)) as Promise<Uint8Array[]>
-  
-    const closeConnectionsToFake = sinon.fake();
+    const sendMessageToMoon = (_dest: PeerId, _protocols: string | string[], msg: Uint8Array, _includeReply: true) =>
+      new Promise((resolve) => setTimeout(() => resolve([msg]), 1000)) as Promise<Uint8Array[]>
+
+    const closeConnectionsToFake = sinon.fake()
     let netHealth = new NetworkHealth()
     const myheartbeat = new TestingHeartbeat(
       Me,
@@ -408,11 +400,9 @@ describe('unit test heartbeat', async () => {
       SHORT_TIMEOUTS
     )
 
-    const pingResult = await myheartbeat.pingNode(Alice);
+    const pingResult = await myheartbeat.pingNode(Alice)
 
-    assert.notEqual(pingResult.lastSeen, -1);
-    assert(closeConnectionsToFake.notCalled);
+    assert.notEqual(pingResult.lastSeen, -1)
+    assert(closeConnectionsToFake.notCalled)
   }).timeout(300000)
-
-  
 })

@@ -185,7 +185,9 @@ export default class Heartbeat {
     let pingErrorThrown = false
     try {
       // race the HEART_BEAT_ROUND_TIMEOUT. Abort ping action when timeout.
-      pingResponse = await timeout(HEART_BEAT_ROUND_TIMEOUT, () => this.sendMessage(destination, this.protocolHeartbeat, challenge, true))
+      pingResponse = await timeout(HEART_BEAT_ROUND_TIMEOUT, () =>
+        this.sendMessage(destination, this.protocolHeartbeat, challenge, true)
+      )
     } catch (err) {
       pingErrorThrown = true
       pingError = err
