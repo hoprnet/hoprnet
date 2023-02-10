@@ -126,8 +126,8 @@ export async function fundMultiChannels(
   try {
     const receipt = await node.fundChannel(
       validationResult.counterparty,
-      validationResult.incomingAmount,
-      validationResult.outgoingAmount
+      validationResult.outgoingAmount,
+      validationResult.incomingAmount
     )
     return {
       success: true,

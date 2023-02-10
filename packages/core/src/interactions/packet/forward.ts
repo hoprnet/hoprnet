@@ -6,7 +6,7 @@ import { debug } from '@hoprnet/hopr-utils'
 import { Packet } from '../../messages/index.js'
 import { Mixer } from '../../mixer.js'
 import type { AcknowledgementInteraction } from './acknowledgement.js'
-import type { SendMessage, Subscribe } from '../../index.js'
+import type { HoprOptions, SendMessage, Subscribe } from '../../index.js'
 import type { ResolvedEnvironment } from '../../environment.js'
 
 const log = debug('hopr-core:packet:forward')
@@ -37,6 +37,7 @@ export class PacketForwardInteraction {
     private db: HoprDB,
     private environment: ResolvedEnvironment,
     private acknowledgements: AcknowledgementInteraction,
+    private options: HoprOptions,
     // used for testing
     nextRandomInt?: () => number
   ) {
@@ -98,7 +99,7 @@ export class PacketForwardInteraction {
 
     // Packet should be forwarded
     try {
-      await packet.validateUnacknowledgedTicket(this.db)
+      await packet.validateUnacknowledgedTicket(this.db, this.options.checkUnrealizedBalance)
     } catch (err) {
       log(`Ticket validation failed. Dropping packet`, err)
       return

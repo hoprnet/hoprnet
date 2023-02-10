@@ -28,6 +28,7 @@ import { PacketForwardInteraction } from './forward.js'
 import { initializeCommitment } from '@hoprnet/hopr-core-ethereum'
 import { ChannelCommitmentInfo } from '@hoprnet/hopr-core-ethereum'
 import type { ResolvedEnvironment } from '../../environment.js'
+import { HoprOptions } from '../../index.js'
 
 const SECRET_LENGTH = 32
 
@@ -48,6 +49,12 @@ const COUNTERPARTY = privKeyToPeerId(stringToU8a('0x0726a9704d56a013980a9077d195
 const nodes: PeerId[] = [SELF, RELAY0, RELAY1, RELAY2, COUNTERPARTY]
 
 const TestingSnapshot = new Snapshot(new BN(0), new BN(0), new BN(0))
+
+const TestOptions: HoprOptions = {
+  environment: undefined,
+  dataPath: '',
+  checkUnrealizedBalance: false
+}
 
 /**
  * Creates a mocked network to send and receive acknowledgements and packets
@@ -326,6 +333,7 @@ describe('packet acknowledgement', function () {
         id: 'testing'
       } as ResolvedEnvironment,
       ackRelay0Interaction,
+      TestOptions,
       () => 1
     )
     await interaction.start()
@@ -416,6 +424,7 @@ describe('packet relaying interaction', function () {
           id: 'testing'
         } as ResolvedEnvironment,
         acknowledgementInteraction,
+        TestOptions,
         () => 1
       )
       await interaction.start()
