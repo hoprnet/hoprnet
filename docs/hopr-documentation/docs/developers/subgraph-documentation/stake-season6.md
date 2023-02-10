@@ -1,8 +1,8 @@
 ---
-title: Entities & Sample Queries
-sidebar_position: 4
 id: entities-and-queries
+sidebar_position: 4
 sidebar_label: Stake Season6
+title: Entities & Sample Queries
 ---
 
 ## HOPR Stake Season6 - Entities
@@ -28,13 +28,13 @@ sidebar_label: Stake Season6
 
 ## Boost
 
-| Field          | Type    | Description       |
-| -------------- | ------- | ----------------- |
-| id             | ID!     | Account address   |
-| boostTypeIndex | BigInt! | Boost type index  |
-| uri            | String! | Boost URI         |
-| boostNumerator | BigInt! | Boost numerator   |
-| redeemDeadline | BigInt! | Redeem deadline   |
+| Field          | Type    | Description                    |
+| -------------- | ------- | ------------------------------ |
+| id             | ID!     | Account address                |
+| boostTypeIndex | BigInt! | Boost type index               |
+| uri            | String! | Url to the metadata of the NFT |
+| boostNumerator | BigInt! | Boost numerator                |
+| redeemDeadline | BigInt! | Redeem deadline                |
 
 ## Program
 
@@ -55,6 +55,8 @@ sidebar_label: Stake Season6
 Below are some sample queries you can use to gather information from the Stake Season6 subgraph.
 
 You can build your own queries using a [GraphQL Explorer](https://graphiql-online.com/graphiql) and enter your endpoint to limit the data to exactly what you need.
+
+Each entity has a plural version and singular version. When querying for a single record response (eg account) you will need to supply the id for the entity. When querying for list of responses (eg accounts) you may add filters using the 'where' clause.
 
 ### Staked balance
 

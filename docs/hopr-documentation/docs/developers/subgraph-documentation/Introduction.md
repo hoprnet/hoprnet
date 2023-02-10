@@ -1,8 +1,8 @@
 ---
-title: Introduction
-sidebar_position: 1
 id: subgraph-intro
+sidebar_position: 1
 sidebar_label: Subgraph Introduction
+title: Introduction
 ---
 
 ## HOPR Subgraph Introduction
