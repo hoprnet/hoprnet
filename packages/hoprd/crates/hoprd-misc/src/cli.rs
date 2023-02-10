@@ -344,7 +344,7 @@ struct CliArgs {
 
     #[arg(
         long = "disableApiAuthentication",
-        help = "completely disables the token authentication for the API",
+        help = "completely disables the token authentication for the API, overrides any apiToken if set",
         action = ArgAction::SetTrue,
         env = "HOPRD_DISABLE_API_AUTHENTICATION",
         default_value_t = false,
