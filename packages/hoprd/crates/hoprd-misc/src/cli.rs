@@ -233,7 +233,7 @@ struct CliArgs {
     pub password: Option<String>,
 
     #[arg(
-    long,
+    long = "defaultStrategy",
     help = "Default channel strategy to use after node starts up",
     env = "HOPRD_DEFAULT_STRATEGY",
     value_name = "DEFAULT_STRATEGY",
@@ -243,7 +243,7 @@ struct CliArgs {
     pub default_strategy: Option<String>,
 
     #[arg(
-    long,
+    long = "maxAutoChannels",
     help = "Maximum number of channel a strategy can open. If not specified, square root of number of available peers is used.",
     env = "HOPRD_MAX_AUTO_CHANNELS",
     value_name = "MAX_AUTO_CHANNELS",
