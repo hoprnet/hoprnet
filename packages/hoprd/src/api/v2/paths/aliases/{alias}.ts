@@ -73,6 +73,12 @@ GET.apiDoc = {
         }
       }
     },
+    '401': {
+      $ref: '#/components/responses/Unauthorized'
+    },
+    '403': {
+      $ref: '#/components/responses/Forbidden'
+    },
     '404': {
       description: `This alias was not assigned to any PeerId before. You can get the list of all PeerId's and thier corresponding aliases using /aliases endpoint.`,
       content: {
@@ -138,6 +144,12 @@ DELETE.apiDoc = {
   responses: {
     '204': {
       description: 'Alias removed succesfully.'
+    },
+    '401': {
+      $ref: '#/components/responses/Unauthorized'
+    },
+    '403': {
+      $ref: '#/components/responses/Forbidden'
     },
     '422': {
       description: 'Unknown failure.',

@@ -1,4 +1,4 @@
-import type { Multiaddr } from '@multiformats/multiaddr'
+import { Multiaddr } from '@multiformats/multiaddr'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { ChainWrapper, createChainWrapper, Receipt } from './ethereum.js'
 import chalk from 'chalk'
@@ -16,7 +16,8 @@ import {
   privKeyToPeerId,
   type ChannelEntry,
   type DeferType,
-  type PublicKey
+  PublicKey,
+  AccountEntry
 } from '@hoprnet/hopr-utils'
 import Indexer from './indexer/index.js'
 import { CORE_ETHEREUM_CONSTANTS } from '../lib/core_ethereum_misc.js'
@@ -24,6 +25,7 @@ import { EventEmitter } from 'events'
 import { initializeCommitment, findCommitmentPreImage, bumpCommitment, ChannelCommitmentInfo } from './commitment.js'
 import type { IndexerEvents } from './indexer/types.js'
 import { DeploymentExtract } from './utils/utils.js'
+import BN from 'bn.js'
 
 const log = debug('hopr-core-ethereum')
 
@@ -61,6 +63,8 @@ type ticketRedemtionInChannelOperations = {
 const constants = CORE_ETHEREUM_CONSTANTS()
 
 export default class HoprCoreEthereum extends EventEmitter {
+  private static _instance: HoprCoreEthereum
+
   public indexer: Indexer
   private chain: ChainWrapper
   private started: Promise<HoprCoreEthereum> | undefined
@@ -68,13 +72,12 @@ export default class HoprCoreEthereum extends EventEmitter {
   // Used to store ongoing operations to prevent duplicate redemption attempts
   private ticketRedemtionInChannelOperations: ticketRedemtionInChannelOperations = {}
 
-  constructor(
-    //private chain: ChainWrapper, private db: HoprDB, public indexer: Indexer) {
+  private constructor(
     private db: HoprDB,
     private publicKey: PublicKey,
     private privateKey: Uint8Array,
     private options: ChainOptions,
-    protected automaticChainCreation = true
+    private automaticChainCreation: boolean
   ) {
     super()
 
@@ -84,6 +87,22 @@ export default class HoprCoreEthereum extends EventEmitter {
       this.options.maxConfirmations ?? constants.DEFAULT_CONFIRMATIONS,
       constants.INDEXER_BLOCK_RANGE
     )
+  }
+
+  public static createInstance(
+    db: HoprDB,
+    publicKey: PublicKey,
+    privateKey: Uint8Array,
+    options: ChainOptions,
+    automaticChainCreation = true
+  ) {
+    HoprCoreEthereum._instance = new HoprCoreEthereum(db, publicKey, privateKey, options, automaticChainCreation)
+    return HoprCoreEthereum._instance
+  }
+
+  public static getInstance(): HoprCoreEthereum {
+    if (!HoprCoreEthereum._instance) throw new Error('non-existent instance of HoprCoreEthereum')
+    return HoprCoreEthereum._instance
   }
 
   async initializeChainWrapper(deploymentAddresses: DeploymentExtract) {
@@ -434,8 +453,13 @@ export default class HoprCoreEthereum extends EventEmitter {
     }
   }
 
-  async initializeClosure(dest: PublicKey): Promise<string> {
-    const c = await this.db.getChannelTo(dest)
+  async initializeClosure(src: PublicKey, dest: PublicKey): Promise<string> {
+    // TODO: should remove this blocker when https://github.com/hoprnet/hoprnet/issues/4194 gets addressed
+    if (!this.publicKey.eq(src)) {
+      throw Error('Initialize incoming channel closure currently is not supported.')
+    }
+
+    const c = await this.db.getChannelX(src, dest)
     if (c.status !== ChannelStatus.Open && c.status !== ChannelStatus.WaitingForCommitment) {
       throw Error('Channel status is not OPEN or WAITING FOR COMMITMENT')
     }
@@ -444,8 +468,12 @@ export default class HoprCoreEthereum extends EventEmitter {
     )
   }
 
-  public async finalizeClosure(dest: PublicKey): Promise<string> {
-    const c = await this.db.getChannelTo(dest)
+  public async finalizeClosure(src: PublicKey, dest: PublicKey): Promise<string> {
+    // TODO: should remove this blocker when https://github.com/hoprnet/hoprnet/issues/4194 gets addressed
+    if (!this.publicKey.eq(src)) {
+      throw Error('Finalizing incoming channel closure currently is not supported.')
+    }
+    const c = await this.db.getChannelX(src, dest)
     if (c.status !== ChannelStatus.PendingToClose) {
       throw Error('Channel status is not PENDING_TO_CLOSE')
     }
@@ -509,9 +537,57 @@ export default class HoprCoreEthereum extends EventEmitter {
       return false
     }
   }
+
+  public static createMockInstance(peer: PeerId): HoprCoreEthereum {
+    const connectorLogger = debug(`hopr:mocks:connector`)
+    HoprCoreEthereum._instance = {
+      start: () => {
+        connectorLogger('starting connector called.')
+        return {} as unknown as HoprCoreEthereum
+      },
+      stop: () => {
+        connectorLogger('stopping connector called.')
+        return Promise.resolve()
+      },
+      getNativeBalance: () => {
+        connectorLogger('getNativeBalance method was called')
+        return Promise.resolve(new NativeBalance(new BN('10000000000000000000')))
+      },
+      getPublicKey: () => {
+        connectorLogger('getPublicKey method was called')
+        return PublicKey.fromPeerId(peer)
+      },
+      getAccount: () => {
+        connectorLogger('getAccount method was called')
+        return Promise.resolve(
+          new AccountEntry(
+            PublicKey.fromPeerId(peer),
+            new Multiaddr(`/ip4/127.0.0.1/tcp/124/p2p/${peer.toString()}`),
+            new BN('1')
+          )
+        )
+      },
+      waitForPublicNodes: () => {
+        connectorLogger('On-chain request for existing public nodes.')
+        return Promise.resolve([])
+      },
+      announce: () => {
+        connectorLogger('On-chain announce request sent')
+      },
+      on: (event: string) => {
+        connectorLogger(`On-chain signal for event "${event}"`)
+      },
+      indexer: {
+        on: (event: string) => connectorLogger(`Indexer on handler top of chain called with event "${event}"`),
+        off: (event: string) => connectorLogger(`Indexer off handler top of chain called with event "${event}`),
+        getPublicNodes: () => Promise.resolve([])
+      }
+    } as unknown as HoprCoreEthereum
+
+    return HoprCoreEthereum._instance
+  }
 }
 
-export { createConnectorMock } from './index.mock.js'
 export { useFixtures } from './indexer/index.mock.js'
 export { sampleChainOptions } from './ethereum.mock.js'
 

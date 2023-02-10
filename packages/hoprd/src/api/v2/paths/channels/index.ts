@@ -120,6 +120,12 @@ GET.apiDoc = {
         }
       }
     },
+    '401': {
+      $ref: '#/components/responses/Unauthorized'
+    },
+    '403': {
+      $ref: '#/components/responses/Forbidden'
+    },
     '422': {
       description: 'Unknown failure.',
       content: {
@@ -338,6 +344,9 @@ POST.apiDoc = {
           example: { status: `${STATUS_CODES.INVALID_AMOUNT} | ${STATUS_CODES.INVALID_ADDRESS}` }
         }
       }
+    },
+    '401': {
+      $ref: '#/components/responses/Unauthorized'
     },
     '403': {
       description: 'Failed to open the channel because of insufficient HOPR balance.',

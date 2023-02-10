@@ -60,6 +60,7 @@ usage() {
 
 # verify and set parameters
 : "${FAUCET_SECRET_API_KEY?"Missing environment variable FAUCET_SECRET_API_KEY"}"
+: "${DEPLOYER_PRIVATE_KEY?"Missing environment variable DEPLOYER_PRIVATE_KEY"}"
 
 declare environment="${1?"missing parameter <environment>"}"
 declare init_script=${2:-}
@@ -143,7 +144,7 @@ network_id="$(get_environment_type "${environment}")"
 # - the CI nodes wants to perform `selfRegister`
 # This can be called always, because the "stake" task is idempotent given the same arguments
 # CI wallet stakes a developer NR NFT
-make -C "${mydir}/.." stake-nrnft environment="${environment}" nftrank=developer environment_type="${network_id}"
+PRIVATE_KEY="${DEPLOYER_PRIVATE_KEY}" make -C "${mydir}/.." stake-nrnft environment="${environment}" nftrank=developer environment_type="${network_id}"
 
 # Get names of all instances in this cluster
 # TODO: now `native-addresses` (a.k.a. `hopr_addrs`) doesn't need to contain unique values. The array can contain repetitive addresses

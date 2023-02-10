@@ -69,14 +69,13 @@ ___
 
 ### onChannelWillClose
 
-▸ **onChannelWillClose**(`channel`, `chain`): `Promise`<`void`\>
+▸ **onChannelWillClose**(`channel`): `Promise`<`void`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `channel` | `ChannelEntry` |
-| `chain` | `default` |
 
 #### Returns
 
@@ -90,14 +89,13 @@ ___
 
 ### onWinningTicket
 
-▸ **onWinningTicket**(`t`, `chain`): `Promise`<`void`\>
+▸ **onWinningTicket**(`t`): `Promise`<`void`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `t` | `AcknowledgedTicket` |
-| `chain` | `default` |
 
 #### Returns
 

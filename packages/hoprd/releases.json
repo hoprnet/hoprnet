@@ -3,48 +3,6 @@
     "git_ref": "^master$",
     "environment_id": "master-staging"
   },
-  "tuttlingen": {
-    "git_ref": "^release/tuttlingen$",
-    "environment_id": "tuttlingen",
-    "version_major": "1",
-    "version_minor": "83"
-  },
-  "prague": {
-    "git_ref": "^release/prague$",
-    "environment_id": "prague",
-    "version_major": "1",
-    "version_minor": "84"
-  },
-  "budapest": {
-    "git_ref": "^release/budapest$",
-    "environment_id": "budapest",
-    "version_major": "1",
-    "version_minor": "85"
-  },
-  "athens": {
-    "git_ref": "^release/athens$",
-    "environment_id": "athens",
-    "version_major": "1",
-    "version_minor": "86"
-  },
-  "lisbon": {
-    "git_ref": "^release/lisbon$",
-    "environment_id": "lisbon",
-    "version_major": "1",
-    "version_minor": "87"
-  },
-  "ouagadougou": {
-    "git_ref": "^release/ouagadougou$",
-    "environment_id": "ouagadougou",
-    "version_major": "1",
-    "version_minor": "88"
-  },
-  "paleochora": {
-    "git_ref": "^release/paleochora$",
-    "environment_id": "paleochora",
-    "version_major": "1",
-    "version_minor": "89"
-  },
   "valencia": {
     "git_ref": "^(release|staging)/valencia$",
     "environment_id": "monte_rosa",
@@ -56,6 +14,12 @@
     "environment_id": "monte_rosa",
     "version_major": "1",
     "version_minor": "91"
+  },
+  "riga": {
+    "git_ref": "^(release|staging)/riga$",
+    "environment_id": "monte_rosa",
+    "version_major": "1",
+    "version_minor": "92"
   },
   "debug-staging": {
     "git_ref": "^debug-deploy/.*",
