@@ -7,6 +7,8 @@ import type { PeerId } from '@libp2p/interface-peer-id'
 import { NETWORK_QUALITY_THRESHOLD } from '../constants.js'
 import type { Connection, Stream } from '@libp2p/interfaces/connection'
 import type { Components } from '@libp2p/interfaces/components'
+import sinon from 'sinon'
+import { SendMessage } from '../index.js'
 
 class TestingHeartbeat extends Heartbeat {
   public async checkNodes() {
@@ -355,4 +357,62 @@ describe('unit test heartbeat', async () => {
     peerA.heartbeat.stop()
     peerB.heartbeat.stop()
   })
+
+  it('should abort heartbeat but not call closeConnectionsTo, if the ping takes 61 seconds to return', async () => {
+    const sendMessageToMoon = (
+      _dest: PeerId,
+      _protocols: string | string[],
+      msg: Uint8Array,
+      _includeReply: true
+    ) => new Promise(resolve => setTimeout(() => resolve([msg]), 61000)) as Promise<Uint8Array[]>
+  
+    const closeConnectionsToFake = sinon.fake();
+    let netHealth = new NetworkHealth()
+    const myheartbeat = new TestingHeartbeat(
+      Me,
+      new NetworkPeers([], [Alice], 0.3),
+      (() => {}) as any,
+      sendMessageToMoon as SendMessage,
+      closeConnectionsToFake,
+      netHealth.onHealthChanged,
+      (_) => true,
+      TESTING_ENVIRONMENT,
+      SHORT_TIMEOUTS
+    )
+
+    const pingResult = await myheartbeat.pingNode(Alice);
+
+    assert.equal(pingResult.lastSeen, -1);
+    assert(closeConnectionsToFake.notCalled);
+  }).timeout(300000)
+
+  it('should but not call closeConnectionsTo, if the ping timed out ', async () => {
+    const sendMessageToMoon = (
+      _dest: PeerId,
+      _protocols: string | string[],
+      msg: Uint8Array,
+      _includeReply: true
+    ) => new Promise(resolve => setTimeout(() => resolve([msg]), 1000)) as Promise<Uint8Array[]>
+  
+    const closeConnectionsToFake = sinon.fake();
+    let netHealth = new NetworkHealth()
+    const myheartbeat = new TestingHeartbeat(
+      Me,
+      new NetworkPeers([], [Alice], 0.3),
+      (() => {}) as any,
+      sendMessageToMoon as SendMessage,
+      closeConnectionsToFake,
+      netHealth.onHealthChanged,
+      (_) => true,
+      TESTING_ENVIRONMENT,
+      SHORT_TIMEOUTS
+    )
+
+    const pingResult = await myheartbeat.pingNode(Alice);
+
+    assert.notEqual(pingResult.lastSeen, -1);
+    assert(closeConnectionsToFake.notCalled);
+  }).timeout(300000)
+
+  
 })
