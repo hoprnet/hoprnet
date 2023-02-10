@@ -636,7 +636,7 @@ class Hopr extends EventEmitter {
         error(`Protocol error: strategy wants to open channel to non-registered peer ${destination.toString()}`)
       }
     } catch (e) {
-      error(`strategy could not open channel to ${status.peer_id}`)
+      error(`strategy could not open channel to ${status.peer_id}`,e)
     }
   }
 
