@@ -1,19 +1,15 @@
-use std::future::{Future, ready};
+use std::future::{Future, pending};
 use std::time::Duration;
 use std::pin::Pin;
-use std::task::{Waker, Context, Poll};
 
-use futures::future::Either;
 use futures::stream::{FuturesUnordered, StreamExt};
 use rand::Rng;
 
-// NOTE: futures_timer::Delay did not work in tokio runtime
 #[cfg(not(wasm))]
-use tokio::time::sleep as sleep;
+use async_std::task::sleep as sleep;
 
 #[cfg(wasm)]
 use gloo_timers::future::sleep as sleep;
-
 
 
 type Packet = Box<[u8]>;
@@ -21,23 +17,6 @@ type Packet = Box<[u8]>;
 const DELAY_MIN_MS: u64 = 0;    /// minimum delay in milliseconds
 const DELAY_MAX_MS: u64 = 200;  /// maximum delay in milliseconds
 
-struct MixerWakingFuture<'a> {
-    mixer: &'a mut StochasticUniformMixer,
-}
-
-impl Future for MixerWakingFuture<'_> {
-    type Output = ();
-
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        self.mixer.waker = Some(cx.waker().clone());
-
-        if self.mixer.length() > 0 {
-            Poll::Ready(())
-        } else {
-            Poll::Pending
-        }
-    }
-}
 
 /// Mixer
 /// API definition
@@ -54,7 +33,6 @@ pub struct StochasticUniformMixer {
     queue: FuturesUnordered<Pin<Box<dyn Future<Output = Packet>>>>,
     delay_min_ms: u64,
     delay_max_ms: u64,
-    waker: Option<Waker>
 }
 
 
@@ -65,11 +43,22 @@ impl StochasticUniformMixer {
     }
 
     pub fn new_with_delay_spec(delay_min_ms: u64, delay_max_ms: u64) -> StochasticUniformMixer {
+        if delay_min_ms >= delay_max_ms {
+            panic!("The minimum delay must be smaller than the maximum delay")
+        }
+
+        // push a dummy packet that is never going to be awaited resulting in a perpetually
+        // open stream waiting for other futures to finish
+        let futures: FuturesUnordered<Pin<Box<dyn Future<Output = Packet>>>> = FuturesUnordered::new();
+        futures.push(Box::pin(async move {
+            let () = pending().await;
+            unreachable!();
+        }));
+
         StochasticUniformMixer {
-            queue: FuturesUnordered::new(),
+            queue: futures,
             delay_min_ms,
             delay_max_ms,
-            waker: None
         }
     }
 }
@@ -88,24 +77,9 @@ impl StochasticUniformMixer {
             sleep(Duration::from_millis(random_delay)).await;
             packet
         }));
-
-        if let Some(waker) = &self.waker {
-            waker.wake_by_ref();
-        }
     }
 
     pub async fn pop(&mut self) -> Packet {
-        let timeout_til_next_packet = if self.queue.len() > 0 {
-            Either::Left(ready(()))
-        } else {
-            let mixer_waking = MixerWakingFuture{mixer: self};
-            Either::Right(async move {
-                mixer_waking.await;
-                ()
-            })
-        };
-        timeout_til_next_packet.await;
-
         if let Some(packet) = self.queue.next().await {
             packet
         } else {
@@ -114,11 +88,12 @@ impl StochasticUniformMixer {
     }
 
     pub fn length(&self) -> usize {
-        self.queue.len()
+        // accounting for the dummy packet
+        self.queue.len() - 1
     }
 }
 
-// TOTO: never used, should be exported?
+// TODO: never used, should be exported?
 // // move to misc-utils crate
 // #[cfg(not(wasm))]
 // fn current_timestamp() -> u64 {
@@ -137,18 +112,24 @@ impl StochasticUniformMixer {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    // TODO: add JS API here
-    // Use this module to specify everything that is WASM-specific (e.g. uses wasm-bindgen types, js_sys, ...etc.)
-
     use super::*;
     use wasm_bindgen::prelude::*;
-    // use wasm_bindgen::JsValue;
+    use wasm_bindgen::JsValue;
+    // use js_sys::AsyncIterator;
 
     #[wasm_bindgen]
     impl StochasticUniformMixer {
-        pub fn push_data(&mut self, packet: Packet) {
-            self.push(packet);
+        pub fn push_data(&mut self, packet: JsValue) {
+            self.push(Box::from_iter(js_sys::Uint8Array::new(&packet).to_vec()));
         }
+
+        // TODO: create an async iterator implementation
+        // pub async fn pop_data(&mut self) -> js_sys::Promise {
+        //     let value = self.pop().await;
+        //     wasm_bindgen_futures::future_to_promise(async move {
+        //         Ok(serde_wasm_bindgen::to_value(value.as_ref())?)
+        //     })
+        // }
     }
 }
 
@@ -157,19 +138,30 @@ pub mod wasm {
 mod tests {
     use super::*;
 
+    const TINY_CONSTANT_DELAY: u64 = 20;        // ms
+
     fn random_packet() -> Packet {
         let mut rng = rand::thread_rng();
 
         Box::new([rng.gen()])
     }
 
-    const TINY_CONSTANT_DELAY: u64 = 20;        // ms
-
     #[test]
     fn test_mixer_without_any_packets_should_declare_none() {
         let mixer = StochasticUniformMixer::new();
 
         assert_eq!(0, mixer.length())
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_mixer_with_incorrect_delay_ordering_in_definition_should_panic() {
+        std::panic::set_hook(Box::new(|_| {}));       // remove stack trace on expected panic
+
+        let smaller: u64 = 5;
+        let greater: u64 = 10;
+
+        StochasticUniformMixer::new_with_delay_spec(greater, smaller);
     }
 
     #[test]
@@ -181,21 +173,16 @@ mod tests {
         assert_eq!(1, mixer.length());
     }
 
-    #[tokio::test]
+    #[async_std::test]
     async fn test_mixer_should_return_no_value_if_it_is_empty() {
         let mut mixer = StochasticUniformMixer::new_with_delay_spec(TINY_CONSTANT_DELAY-1, TINY_CONSTANT_DELAY);
 
-        if let Err(_) = tokio::time::timeout(Duration::from_millis(TINY_CONSTANT_DELAY), mixer.pop()).await {
+        if let Err(_) = async_std::future::timeout(Duration::from_millis(TINY_CONSTANT_DELAY), mixer.pop()).await {
             assert!(true, "Timeout expected as no packet has been pushed")
         }
     }
 
-    // #[tokio::test]
-    // async fn test_mixer_should_wait_for_packet_push() {
-    //     todo!()
-    // }
-
-    #[tokio::test]
+    #[async_std::test]
     async fn test_mixer_should_return_exactly_the_same_packet_as_obtained() {
         let mut mixer = StochasticUniformMixer::new();
 
@@ -206,7 +193,7 @@ mod tests {
         assert_eq!(expected, actual)
     }
 
-    #[tokio::test]
+    #[async_std::test]
     async fn test_mixer_should_return_the_scheduled_packet() {
         let mut mixer = StochasticUniformMixer::new_with_delay_spec(TINY_CONSTANT_DELAY-1, TINY_CONSTANT_DELAY);
 
@@ -216,7 +203,7 @@ mod tests {
         assert!(actual.len() > 0);
     }
 
-    #[tokio::test]
+    #[async_std::test]
     async fn test_mixer_pop_operation_will_not_last_longer_than_the_latest_possible_interval() {
         let mut mixer = StochasticUniformMixer::new_with_delay_spec(TINY_CONSTANT_DELAY-1, TINY_CONSTANT_DELAY);
 
@@ -233,5 +220,23 @@ mod tests {
         }
 
         assert!(timer.elapsed().as_millis() <= (TINY_CONSTANT_DELAY + tolerance_ms) as u128);
+    }
+
+    #[async_std::test]
+    async fn test_mixer_should_be_resumable() {
+        let mut mixer = StochasticUniformMixer::new_with_delay_spec(TINY_CONSTANT_DELAY-1, TINY_CONSTANT_DELAY);
+
+        mixer.push(random_packet());
+        mixer.pop().await;
+
+        if let Err(_) = async_std::future::timeout(Duration::from_millis(TINY_CONSTANT_DELAY), mixer.pop()).await {
+            assert!(true, "Timeout expected as no packets can be fetched")
+        }
+
+        let expected = random_packet();
+        mixer.push(expected.clone());
+        let actual = mixer.pop().await;
+
+        assert_eq!(expected, actual);
     }
 }

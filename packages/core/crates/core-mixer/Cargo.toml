@@ -12,6 +12,7 @@ default = ["console_error_panic_hook", "wasm"]
 wasm = []
 
 [dependencies]
+async-std = { version = "1.12.0", features = ["attributes"] }
 futures = "0.3.26"
 rand = "0.8.5"
 # wasm specific
@@ -19,13 +20,16 @@ getrandom = { version = "0.2.8", features = ["js"] }
 gloo-timers = "0.2.6"       # WASM alternative for futures-timer
 js-sys = "0.3.60"
 wasm-bindgen = "0.2.83"
-tokio = { version = "1.25.0", features = ["time"] }
+wasm-bindgen-futures = "0.4.33"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_bytes = "0.11"
+serde-wasm-bindgen = { version = "0.4" }
 
 console_error_panic_hook = { version = "0.1.7", optional = true }
 #wee_alloc = { version = "0.4.5", optional = true }
 
 [dev-dependencies]
-tokio = { version = "1.25.0", features = ["rt", "macros", "time"] }
 wasm-bindgen-test = "0.3.33"
 
 
