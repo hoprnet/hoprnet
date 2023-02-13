@@ -14,6 +14,7 @@ import {
   createHoprNode,
   default as Hopr,
   type HoprOptions,
+  isStrategy,
   NetworkHealthIndicator,
   ResolvedEnvironment,
   resolveEnvironment
@@ -26,6 +27,7 @@ import setupHealthcheck from './healthcheck.js'
 import { LogStream } from './logs.js'
 import { getIdentity } from './identity.js'
 import { decodeMessage } from './api/utils.js'
+import { StrategyFactory } from '@hoprnet/hopr-core/lib/channel-strategy.js'
 
 // Metrics
 const metric_processStartTime = create_gauge(
@@ -80,7 +82,41 @@ function generateNodeOptions(argv: CliArgs, environment: ResolvedEnvironment): H
     options.password = argv.password as string
   }
 
+  if (isStrategy(argv.default_strategy)) {
+    options.strategy = StrategyFactory.getStrategy(argv.default_strategy)
+    options.strategy.configure({
+      auto_redeem_tickets: argv.auto_redeem_tickets ?? false,
+      max_channels: argv.max_auto_channels ?? undefined
+    })
+  }
+
   return options
+}
+
+// Parse the CLI arguments and return the processed object.
+// This function may exit the calling process entirely if an error is
+// encountered or the version or help are rendered.
+export function parseCliArguments(args: string[]) {
+  const mono_repo_path = new URL('../../../', import.meta.url).pathname
+  let argv: CliArgs
+  try {
+    argv = parse_cli_arguments(args, process.env, mono_repo_path, process.env.HOME) as CliArgs
+  } catch (err) {
+    // both --version and --help are treated as errors, therefore we need some
+    // special handling here to be able to return exit code 0 in such cases
+    const message = err instanceof Error ? err.message : (err as String)
+    if (message.startsWith('hoprd') || message.startsWith('HOPRd')) {
+      console.log(err)
+      process.exit(0)
+    }
+    console.error(err)
+    process.exit(1)
+  }
+  if (argv.private_key) {
+    // wasm-bindgen returns number array but does not call the Uint8Array constructor
+    argv.private_key = new Uint8Array(argv.private_key)
+  }
+  return argv
 }
 
 async function addUnhandledPromiseRejectionHandler() {
@@ -119,7 +155,9 @@ async function main() {
     aliases: new Map(),
     settings: {
       includeRecipient: false,
-      strategy: 'passive'
+      strategy: 'passive',
+      autoRedeemTickets: false,
+      maxAutoChannels: undefined
     }
   }
 
@@ -129,16 +167,6 @@ async function main() {
 
   const getState = (): State => {
     return state
-  }
-
-  const mono_repo_path = new URL('../../../', import.meta.url).pathname
-  let argv: CliArgs
-  try {
-    argv = parse_cli_arguments(process.argv.slice(1), process.env, mono_repo_path, process.env.HOME) as CliArgs
-  } catch (err) {
-    // Show if CLI parser did not accept any of the provided arguments
-    console.log(err)
-    process.exit(1)
   }
 
   let metric_timerToGreen = metric_timeToGreen.start_measure()
@@ -167,6 +195,20 @@ async function main() {
       logs.log('Could not decode message', err instanceof Error ? err.message : 'Unknown error')
       logs.log(msg.toString())
     }
+  }
+
+  const argv = parseCliArguments(process.argv.slice(1))
+
+  if (argv.default_strategy) {
+    state.settings.strategy = argv.default_strategy
+  }
+
+  if (argv.auto_redeem_tickets) {
+    state.settings.autoRedeemTickets = argv.auto_redeem_tickets
+  }
+
+  if (argv.max_auto_channels) {
+    state.settings.maxAutoChannels = argv.max_auto_channels
   }
 
   if (!argv.disable_api_authentication && argv.api) {

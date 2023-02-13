@@ -1,5 +1,4 @@
 use ethers::core::k256::ecdsa::SigningKey;
-use ethers::core::rand::thread_rng;
 use ethers::signers::Signer;
 use ethers::signers::Wallet;
 use ethers::types::Address;
@@ -47,6 +46,7 @@ pub fn read_identities(
 mod tests {
 
     use super::*;
+    use ethers::core::rand::thread_rng;
 
     #[test]
     fn read_identities_from_directory_with_id_files() {

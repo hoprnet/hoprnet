@@ -81,7 +81,7 @@ const config = {
           sidebarPath: require.resolve('./sidebars.js'),
           routeBasePath: '/',
           editUrl: 'https://github.com/hoprnet/hoprnet/edit/master/docs/hopr-documentation',
-          lastVersion: 'v1.90'
+          lastVersion: 'v1.91'
         },
         theme: {
           customCss: require.resolve('./src/css/custom.css')
@@ -138,8 +138,7 @@ const config = {
       },
       prism: {
         additionalLanguages: ['solidity'],
-        theme: lightCodeTheme,
-        darkTheme: darkCodeTheme
+        theme: darkCodeTheme
       }
     })
 }

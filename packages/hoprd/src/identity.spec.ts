@@ -1,4 +1,5 @@
 import { getIdentity, IdentityErrors, IdentityOptions } from './identity.js'
+import { stringToU8a } from '@hoprnet/hopr-utils'
 import { unlinkSync, existsSync } from 'fs'
 import assert from 'assert'
 
@@ -6,11 +7,8 @@ describe('Identity', function () {
   const DUMMY_PATH = new URL('./hopr-test-identity', import.meta.url).pathname
   const DUMMY_PASSWORD = 'hopr-unit-test-password'
   const WRONG_DUMMY_PASSWORD = 'hopr-unit-test-wrong-password'
-  const INVALID_PRIVATE_KEY = 'invalid_hex_string'
-  const INVALID_SECP256K1_PRIVATE_KEY = 'cd09f9'
-  const INVALID_TOO_SHORT_PRIVATE_KEY = '0xcd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e03'
-  const DUMMY_PRIVATE_KEY = 'cd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e0317'
-  const DUMMY_PREFIXED_PRIVATE_KEY = '0xcd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e0317'
+  const DUMMY_PRIVATE_KEY = stringToU8a('cd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e0317')
+  const DUMMY_PREFIXED_PRIVATE_KEY = stringToU8a('0xcd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e0317')
 
   const mockIdentityOptions: IdentityOptions = {
     initialize: false,
@@ -37,50 +35,6 @@ describe('Identity', function () {
   })
 
   describe('Private Key', () => {
-    it('fails to load a non-hexadecimal value as private key', async () => {
-      await assert.rejects(
-        async () => {
-          await getIdentity({
-            ...mockIdentityOptions,
-            privateKey: INVALID_PRIVATE_KEY
-          })
-        },
-        {
-          name: 'Error',
-          message: IdentityErrors.INVALID_PRIVATE_KEY_GIVEN
-        }
-      )
-    })
-
-    it('fails to load a private key that is too short', async () => {
-      await assert.rejects(
-        async () => {
-          await getIdentity({
-            ...mockIdentityOptions,
-            privateKey: INVALID_TOO_SHORT_PRIVATE_KEY
-          })
-        },
-        {
-          name: 'Error',
-          message: IdentityErrors.INVALID_PRIVATE_KEY_GIVEN
-        }
-      )
-    })
-
-    it('fails to load a non-secp256k1 hex encoded value as private key', async () => {
-      await assert.rejects(
-        async () => {
-          await getIdentity({
-            ...mockIdentityOptions,
-            privateKey: INVALID_SECP256K1_PRIVATE_KEY
-          })
-        },
-        {
-          name: 'Error',
-          message: IdentityErrors.INVALID_PRIVATE_KEY_GIVEN
-        }
-      )
-    })
     it('receives a private key and stores it on a given path serialized', async () => {
       const testIdentity = await getIdentity({
         ...initializedMockIdentity,

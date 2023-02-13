@@ -1,0 +1,31 @@
+[package]
+name = "core-strategy"
+version = "0.1.0"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["console_error_panic_hook", "wasm"]
+wasm = ["dep:wasm-bindgen", "dep:js-sys", "dep:serde-wasm-bindgen"]
+console_error_panic_hook = [ "dep:console_error_panic_hook" ]
+
+[dependencies]
+getrandom = { version = "0.2.8", features = ["js"] }
+js-sys = { version = "0.3.60", optional = true }
+rand = "0.8.5"
+serde = { version = "1.0", features = ["derive"] }
+serde-wasm-bindgen = { version = "0.4.5", optional = true }
+utils-misc = { path = "../../../utils/crates/utils-misc" }
+utils-types = { path = "../../../utils/crates/utils-types" }
+wasm-bindgen = { version = "0.2.83", optional = true }
+
+console_error_panic_hook = { version = "0.1.7", optional = true }
+#wee_alloc = { version = "0.4.5", optional = true }
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3.33"
+
+

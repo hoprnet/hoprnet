@@ -4,22 +4,26 @@
 
 ## Table of contents
 
-### Type Aliases
+### Functions
 
-- [DefaultEnvironment](modules.md#defaultenvironment)
+- [parseCliArguments](modules.md#parsecliarguments)
 
-## Type Aliases
+## Functions
 
-### DefaultEnvironment
+### parseCliArguments
 
-Ƭ **DefaultEnvironment**: `Object`
+▸ **parseCliArguments**(`args`): `CliArgs`
 
-#### Type declaration
+#### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `id?` | `string` |
+| `args` | `string`[] |
+
+#### Returns
+
+`CliArgs`
 
 #### Defined in
 
-[index.ts:40](https://github.com/hoprnet/hoprnet/blob/master/packages/hoprd/src/index.ts#L40)
+[index.ts:99](https://github.com/hoprnet/hoprnet/blob/master/packages/hoprd/src/index.ts#L99)

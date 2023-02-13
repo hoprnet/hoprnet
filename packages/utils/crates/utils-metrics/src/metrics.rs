@@ -41,7 +41,7 @@ where
 
 /// Represents a simple monotonic unsigned integer counter.
 /// Wrapper for IntCounter type
-struct SimpleCounter {
+pub struct SimpleCounter {
     name: String,
     ctr: IntCounter,
 }
@@ -73,7 +73,7 @@ impl SimpleCounter {
 
 /// Represents a vector of named monotonic unsigned integer counters.
 /// Wrapper for IntCounterVec type
-struct MultiCounter {
+pub struct MultiCounter {
     name: String,
     labels: Vec<String>,
     ctr: IntCounterVec,
@@ -117,7 +117,7 @@ impl MultiCounter {
 
 /// Represents a simple gauge with floating point values.
 /// Wrapper for Gauge type
-struct SimpleGauge {
+pub struct SimpleGauge {
     name: String,
     gg: Gauge,
 }
@@ -159,7 +159,7 @@ impl SimpleGauge {
 
 /// Represents a vector of gauges with floating point values.
 /// Wrapper for GaugeVec type
-struct MultiGauge {
+pub struct MultiGauge {
     name: String,
     labels: Vec<String>,
     ctr: GaugeVec,
@@ -217,13 +217,13 @@ impl MultiGauge {
 
 /// Represents a histogram with floating point values.
 /// Wrapper for Histogram type
-struct SimpleHistogram {
+pub struct SimpleHistogram {
     name: String,
     hh: Histogram,
 }
 
 /// Represents a timer handle.
-struct SimpleTimer {
+pub struct SimpleTimer {
     histogram_timer: HistogramTimer,
 }
 
@@ -290,7 +290,7 @@ impl SimpleHistogram {
 
 /// Represents a vector of histograms with floating point values.
 /// Wrapper for HistogramVec type
-struct MultiHistogram {
+pub struct MultiHistogram {
     name: String,
     labels: Vec<String>,
     hh: HistogramVec,
@@ -379,7 +379,7 @@ impl MultiHistogram {
 }
 
 /// Gathers all the global Prometheus metrics.
-fn gather_all_metrics() -> Result<String, String> {
+pub fn gather_all_metrics() -> Result<String, String> {
     // Simply gather all global metric families
     let metric_families = prometheus::gather();
 

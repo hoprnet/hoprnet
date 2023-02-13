@@ -1,7 +1,8 @@
 .POSIX:
 
 # Gets all packages that include a Rust crates
-WORKSPACES_WITH_RUST_MODULES := $(wildcard $(addsuffix /crates, $(wildcard ./packages/*)))
+# Disable automatic compilation of SC bindings. Can still be done manually.
+WORKSPACES_WITH_RUST_MODULES := $(filter-out ./packages/ethereum/crates,$(wildcard $(addsuffix /crates, $(wildcard ./packages/*))))
 
 # Gets all individual crates such that they can get built
 CRATES := $(foreach crate,${WORKSPACES_WITH_RUST_MODULES},$(dir $(wildcard $(crate)/*/Cargo.toml)))
@@ -89,8 +90,8 @@ deps: ## Installs dependencies for development setup
 # we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op
 	mkdir -p .cargo/bin
 	$(MAKE) cargo-update
-	command -v wasm-pack || $(cargo) install wasm-pack
 	command -v wasm-opt || $(cargo) install wasm-opt
+	command -v wasm-pack || $(cargo) install wasm-pack
 	yarn workspaces focus ${YARNFLAGS}
 # install foundry (cast + forge + anvil)
 	$(MAKE) install-foundry
@@ -138,7 +139,7 @@ build-solidity-types: ## generate Solidity typings
 
 .PHONY: build-yarn
 build-yarn: ## build yarn packages
-build-yarn: build-solidity-types build-cargo
+build-yarn: build-cargo
 ifeq ($(package),)
 	npx tsc --build tsconfig.build.json
 else
@@ -151,7 +152,8 @@ build-yarn-watch: build-solidity-types build-cargo
 	npx tsc --build tsconfig.build.json -w
 
 .PHONY: build-cargo
-build-cargo: build-solidity-types ## build cargo packages and create boilerplate JS code
+build-cargo: ## build cargo packages and create boilerplate JS code
+# build-cargo: build-solidity-types ## build cargo packages and create boilerplate JS code
 # Skip building Rust crates
 ifeq ($(origin NO_CARGO),undefined)
 # First compile Rust crates and create bindings
@@ -179,7 +181,7 @@ build-docs-typescript: build
 
 .PHONY: build-docs-website
 build-docs-website: ## build docs website
-	yarn workspace hopr-docs build
+	yarn workspace @hoprnet/hopr-docs build
 
 .PHONY: build-docs-api
 build-docs-api: ## build Rest API docs
@@ -188,6 +190,7 @@ build-docs-api: build
 
 .PHONY: clean
 clean: # Cleanup build directories (lib,build, ...etc.)
+	cargo clean
 	yarn clean
 
 .PHONY: reset
@@ -220,8 +223,9 @@ lint-fix: ## run linter in fix mode
 	npx prettier --write .
 
 .PHONY: run-anvil
+run-anvil: args=""
 run-anvil: ## spinup a local anvil instance (daemon) and deploy contracts
-	./scripts/run-local-anvil.sh
+	./scripts/run-local-anvil.sh $(args)
 
 .PHONY: run-anvil-foreground
 run-anvil-foreground: ## spinup a local anvil instance
@@ -229,7 +233,8 @@ run-anvil-foreground: ## spinup a local anvil instance
 
 .PHONY: kill-anvil
 kill-anvil: ## kill process running at port 8545 (default port of anvil)
-	lsof -i :8545 -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
+	# may fail, we can ignore that
+	lsof -i :8545 -s TCP:LISTEN -t | xargs -I {} -n 1 kill {} || :
 
 .PHONY: run-local
 run-local: ## run HOPRd from local repo

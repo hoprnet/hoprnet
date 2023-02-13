@@ -26,7 +26,7 @@ RUN make deps-docker package=hoprd && \
     # No need for these packages
     rm -R packages/avado packages/cover-traffic-daemon && \
     # Everything that we don't need in ethereum package
-    rm -R packages/ethereum/contracts packages/ethereum/deploy packages/ethereum/tasks packages/ethereum/test && \
+    rm -R packages/ethereum/contracts && \
     # Remove node_modules as they include devDependencies
     rm -R node_modules && \
     # As we are on *nix, use hardlinks in node_modules to save some space
@@ -34,8 +34,8 @@ RUN make deps-docker package=hoprd && \
     # Install without devDependencies
     PRODUCTION=true make deps-docker package=hoprd
 
-# Alpine 3.16 x86_64 https://hub.docker.com/layers/library/alpine/3.16.3/images/sha256-3d426b0bfc361d6e8303f51459f17782b219dece42a1c7fe463b6014b189c86d
-FROM alpine:3.16@sha256:3d426b0bfc361d6e8303f51459f17782b219dece42a1c7fe463b6014b189c86d as runtime
+# Debian 11.5 https://hub.docker.com/layers/library/debian/bullseye-slim/images/sha256-64e251208f3bddf166a7020437103f75aabf3fceb1d5bd932272f3f73668caa9?context=explore
+FROM debian:bullseye-slim@sha256:64e251208f3bddf166a7020437103f75aabf3fceb1d5bd932272f3f73668caa9 as runtime
 
 WORKDIR /app/hoprnet
 
@@ -44,18 +44,18 @@ RUN mkdir -p scripts/toolchain
 COPY .nvmrc package.json ./
 COPY scripts/toolchain/install-toolchain.sh ./scripts/toolchain
 
-RUN apk add --no-cache tini libc6-compat bash curl tar jq xz libstdc++ && \
-    # Install Node.js
-    ./scripts/toolchain/install-toolchain.sh --runtime-only && \
-    # Remove unused tools
-    apk del bash curl tar jq xz && \
-    # Remove unused files and config
-    rm -R scripts .nvmrc && \
-    # symlink required to get WRTC and other glibc-based tools to work
-    ln -s /lib/libc.musl-x86_64.so.1 /lib/ld-linux-x86-64.so.2 && \
-    # create directory which is later used for the database, so that it inherits
-    # permissions when mapped to a volume
-    mkdir -p hoprd-db
+RUN apt-get update \
+ && apt-get install -y \
+      bash curl jq tini ca-certificates tar xz-utils \
+ && rm -rf /var/lib/apt/lists/* \
+ && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
+ # Install Node.js
+ && ./scripts/toolchain/install-toolchain.sh --runtime-only \
+ # Remove unused files and config
+ && rm -R scripts .nvmrc \
+ # create directory which is later used for the database, so that it inherits
+ # permissions when mapped to a volume
+ && mkdir -p hoprd-db
 
 COPY --from=build /app/hoprnet/packages ./packages
 COPY --from=build /app/hoprnet/node_modules ./node_modules
@@ -94,4 +94,4 @@ EXPOSE 8080
 # p2p
 EXPOSE 9091
 
-ENTRYPOINT ["/sbin/tini", "--", "node", "./lib/main.cjs"]
+ENTRYPOINT ["/usr/bin/tini", "--", "node", "./lib/main.cjs"]

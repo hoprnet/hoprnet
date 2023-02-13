@@ -1,5 +1,5 @@
 import type Hopr from '@hoprnet/hopr-core'
-import { PassiveStrategy, PromiscuousStrategy } from '@hoprnet/hopr-core'
+import { isStrategy, StrategyFactory } from '@hoprnet/hopr-core'
 import type { Operation } from 'express-openapi'
 import { STATUS_CODES } from '../../utils.js'
 import { SettingKey, State, StateOps } from '../../../../types.js'
@@ -16,24 +16,40 @@ export const setSetting = (node: Hopr, stateOps: StateOps, key: keyof State['set
   }
 
   switch (key) {
+    case SettingKey.MAX_AUTO_CHANNELS:
+      if (typeof value !== 'number') throw Error(STATUS_CODES.INVALID_SETTING_VALUE)
+      state.settings[key] = value
+      node.getChannelStrategy().configure({
+        max_channels: state.settings[SettingKey.MAX_AUTO_CHANNELS],
+        auto_redeem_tickets: state.settings[SettingKey.AUTO_REDEEM_TICKETS]
+      })
+      break
+
     case SettingKey.INCLUDE_RECIPIENT:
       if (typeof value !== 'boolean') throw Error(STATUS_CODES.INVALID_SETTING_VALUE)
       state.settings[key] = value
       break
-    case SettingKey.STRATEGY:
-      let strategy: PassiveStrategy | PromiscuousStrategy
 
-      switch (value) {
-        case 'passive':
-          strategy = new PassiveStrategy()
-          break
-        case 'promiscuous':
-          strategy = new PromiscuousStrategy()
-          break
-      }
-      if (!strategy) throw Error(STATUS_CODES.INVALID_SETTING_VALUE)
-      node.setChannelStrategy(strategy)
+    case SettingKey.AUTO_REDEEM_TICKETS:
+      if (typeof value !== 'boolean') throw Error(STATUS_CODES.INVALID_SETTING_VALUE)
       state.settings[key] = value
+      node.getChannelStrategy().configure({
+        max_channels: state.settings[SettingKey.MAX_AUTO_CHANNELS],
+        auto_redeem_tickets: state.settings[SettingKey.AUTO_REDEEM_TICKETS]
+      })
+      break
+
+    case SettingKey.STRATEGY:
+      if (!isStrategy(value)) throw Error(STATUS_CODES.INVALID_SETTING_VALUE)
+
+      let strategy = StrategyFactory.getStrategy(value)
+      strategy.configure({
+        max_channels: state.settings[SettingKey.MAX_AUTO_CHANNELS],
+        auto_redeem_tickets: state.settings[SettingKey.AUTO_REDEEM_TICKETS]
+      })
+
+      node.setChannelStrategy(strategy)
+      state.settings[key] = value as string
       break
   }
 
@@ -111,6 +127,12 @@ PUT.apiDoc = {
           }
         }
       }
+    },
+    '401': {
+      $ref: '#/components/responses/Unauthorized'
+    },
+    '403': {
+      $ref: '#/components/responses/Forbidden'
     },
     '422': {
       description: 'Unknown failure.',

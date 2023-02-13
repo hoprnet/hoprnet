@@ -32,7 +32,7 @@ steps:
     waitFor:
       - buildHoprd
   - name: 'gcr.io/kaniko-project/executor:v1.9.1'
-    id: buildHardhat
+    id: buildAnvil
     args:
       - --build-arg=HOPR_TOOLCHAIN_IMAGE=gcr.io/${PROJECT_ID}/hopr-toolchain:${_IMAGE_VERSION}
       - --dockerfile=packages/ethereum/Dockerfile.anvil
@@ -57,7 +57,7 @@ steps:
     waitFor:
       - buildHoprd
       - buildHoprdNat
-      - buildHardhat
+      - buildAnvil
   - name: 'gcr.io/kaniko-project/executor:v1.9.1'
     id: buildPluto
     args:
@@ -70,14 +70,14 @@ steps:
     timeout: 1200s
     waitFor:
       - buildHoprd
-      - buildHardhat
+      - buildAnvil
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: tagImages
     script: |
       #!/usr/bin/env bash
       set -Eeuo pipefail
       [ "${NO_TAGS}" = "true" ] && { exit 0; }
-      for image in hoprd hoprd-nat hopr-anvil hopr-hardhat hopr-pluto; do
+      for image in hoprd hoprd-nat hopr-anvil hopr-pluto; do
         full_image="gcr.io/${PROJECT_ID}/${image}"
         gcloud container images add-tag ${full_image}:${IMAGE_VERSION} ${full_image}:${PACKAGE_VERSION}
         for release in ${RELEASES}; do

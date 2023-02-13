@@ -419,7 +419,7 @@ ___
 
 #### Defined in
 
-[src/db/db.ts:119](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L119)
+[src/db/db.ts:126](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L126)
 
 ___
 
@@ -463,7 +463,7 @@ ___
 
 #### Defined in
 
-[src/db/db.ts:114](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L114)
+[src/db/db.ts:121](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L121)
 
 ___
 
@@ -479,7 +479,7 @@ ___
 
 #### Defined in
 
-[src/db/db.ts:110](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L110)
+[src/db/db.ts:117](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L117)
 
 ## Variables
 
@@ -1053,7 +1053,7 @@ ___
 
 #### Defined in
 
-[src/types/channelEntry.ts:35](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L35)
+[src/types/channelEntry.ts:31](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L31)
 
 ___
 
@@ -1740,7 +1740,7 @@ ___
 
 #### Defined in
 
-[src/types/channelEntry.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L16)
+[src/types/channelEntry.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L12)
 
 ___
 
@@ -2010,7 +2010,7 @@ Reads the given package.json file and determines its version.
 
 #### Defined in
 
-lib/utils_misc.d.ts:11
+lib/utils_misc.d.ts:8
 
 ___
 
