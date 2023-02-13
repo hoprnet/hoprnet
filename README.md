@@ -158,6 +158,8 @@ Options:
           Set port to which the API server will bind [env: HOPRD_API_PORT=] [default: 3001]
       --apiToken <TOKEN>
           A REST API token and for user authentication [env: HOPRD_API_TOKEN=]
+      --disableApiAuthentication
+          Completely disables the token authentication for the API, overrides any `apiToken` if set [env: HOPRD_DISABLE_API_AUTHENTICATION] [default: false]
       --healthCheck
           Run a health check end point on localhost:8080 [env: HOPRD_HEALTH_CHECK=]
       --healthCheckHost <HOST>
@@ -172,6 +174,10 @@ Options:
           Default channel strategy to use when the node is started [env: HOPRD_DEFAULT_STRATEGY=] [default: passive]
       --maxAutoChannels <NUMBER>
           Maximum number of channels a strategy can open [env: HOPRD_MAX_AUTOCHANNELS=] [default: square root of the number of active peers]
+      --autoRedeemTickets
+        Enables automatic ticket redemption when received a winning ticket [env: HOPRD_AUTO_REDEEM_TICKETS=] [default: false]
+      --checkUnrealizedBalance
+        Check unrealized balance in the channel when validating unacknowledged tickets [env: HOPRD_CHECK_UNREALIZED_BALANCE=] [default: false]
       --dryRun
           List all the options used to run the HOPR node, but quit instead of starting [env: HOPRD_DRY_RUN=]
       --init
@@ -275,7 +281,7 @@ These criteria however, are not required when you develop using your local nodes
 At the moment we DO NOT HAVE backward compatibility between releases.
 We attempt to provide instructions on how to migrate your tokens between releases.
 
-1. Set your automatic channel strategy to `MANUAL`.
+1. Set your automatic channel strategy to `passive`.
 2. Redeem all unredeemed tickets.
 3. Close all open payment channels.
 4. Once all payment channels have closed, withdraw your funds to an external
