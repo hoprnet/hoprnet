@@ -311,7 +311,7 @@
           "showLineNumbers": false,
           "showMiniMap": false
         },
-        "content": "This graph separates your peers into low (quality =< 0.5)  and high-quality (> 0.5) connections.\n\nThe quality of your connection to a peer is standardised between 0 to 1, depending on the ratio of successful pings to the total number of pings, regardless of who is sending them. \n",
+        "content": "This graph represents the number of public relay nodes (PRN) you are connected to (yellow line) and if you are a PRN, the number of nodes you are connected to.\n\nIf you are not a PRN, the green line should be flat.\n",
         "mode": "markdown"
       },
       "pluginVersion": "9.3.2",
