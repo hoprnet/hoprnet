@@ -272,7 +272,7 @@
       },
       "description": "",
       "gridPos": {
-        "h": 5,
+        "h": 4,
         "w": 12,
         "x": 0,
         "y": 10
@@ -299,7 +299,7 @@
       },
       "description": "",
       "gridPos": {
-        "h": 5,
+        "h": 4,
         "w": 12,
         "x": 12,
         "y": 10
@@ -383,7 +383,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 15
+        "y": 14
       },
       "id": 6,
       "options": {
@@ -506,7 +506,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 15
+        "y": 14
       },
       "id": 8,
       "interval": "1m",
@@ -560,7 +560,7 @@
         "h": 5,
         "w": 12,
         "x": 0,
-        "y": 24
+        "y": 23
       },
       "id": 37,
       "options": {
@@ -587,7 +587,7 @@
         "h": 5,
         "w": 12,
         "x": 12,
-        "y": 24
+        "y": 23
       },
       "id": 39,
       "options": {
@@ -613,22 +613,22 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "thresholds"
+            "mode": "continuous-GrYlRd"
           },
+          "decimals": 1,
           "mappings": [],
+          "max": 100,
+          "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
                 "color": "green",
                 "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
               }
             ]
-          }
+          },
+          "unit": "percent"
         },
         "overrides": []
       },
@@ -636,7 +636,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 29
+        "y": 28
       },
       "id": 12,
       "options": {
@@ -645,7 +645,9 @@
         "minVizWidth": 0,
         "orientation": "horizontal",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -659,11 +661,14 @@
             "type": "prometheus",
             "uid": "PBFA97CFB590B2093"
           },
-          "exemplar": true,
-          "expr": "core_histogram_heartbeat_time_seconds_bucket",
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "100 * core_histogram_heartbeat_time_seconds_bucket / scalar(core_histogram_heartbeat_time_seconds_count)",
           "format": "heatmap",
+          "instant": true,
           "interval": "",
           "legendFormat": "{{le}}",
+          "range": false,
           "refId": "A"
         }
       ],
@@ -679,9 +684,11 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "thresholds"
+            "mode": "continuous-GrYlRd"
           },
+          "decimals": 1,
           "mappings": [],
+          "max": 100,
           "min": 0,
           "thresholds": {
             "mode": "absolute",
@@ -689,13 +696,10 @@
               {
                 "color": "green",
                 "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
               }
             ]
-          }
+          },
+          "unit": "percent"
         },
         "overrides": []
       },
@@ -703,7 +707,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 29
+        "y": 28
       },
       "id": 14,
       "options": {
@@ -712,7 +716,9 @@
         "minVizWidth": 0,
         "orientation": "horizontal",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -726,11 +732,14 @@
             "type": "prometheus",
             "uid": "PBFA97CFB590B2093"
           },
-          "exemplar": true,
-          "expr": "core_histogram_ping_time_seconds_bucket",
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "100 * core_histogram_ping_time_seconds_bucket / scalar(core_histogram_ping_time_seconds_count)",
           "format": "heatmap",
+          "instant": true,
           "interval": "",
           "legendFormat": "{{le}}",
+          "range": false,
           "refId": "A"
         }
       ],
@@ -744,10 +753,10 @@
       },
       "description": "",
       "gridPos": {
-        "h": 5,
+        "h": 3,
         "w": 12,
         "x": 0,
-        "y": 37
+        "y": 36
       },
       "id": 40,
       "options": {
@@ -771,10 +780,10 @@
       },
       "description": "",
       "gridPos": {
-        "h": 5,
+        "h": 3,
         "w": 12,
         "x": 12,
-        "y": 37
+        "y": 36
       },
       "id": 41,
       "options": {
@@ -783,7 +792,7 @@
           "showLineNumbers": false,
           "showMiniMap": false
         },
-        "content": "This shows the spread of the response time for your pings rounded to the nearest interval. \n\nThis is specifically the response time for pings sent by your node as part of the heartbeat mechanism.\n",
+        "content": "This shows the spread of the response time for your pings rounded to the nearest interval. \nThis is specifically the response time for pings sent by your node as part of the heartbeat mechanism.\n",
         "mode": "markdown"
       },
       "pluginVersion": "9.3.2",
@@ -801,7 +810,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 42
+        "y": 39
       },
       "id": 16,
       "panels": [],
@@ -845,7 +854,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 43
+        "y": 40
       },
       "id": 20,
       "options": {
@@ -854,7 +863,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -934,7 +945,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 43
+        "y": 40
       },
       "id": 22,
       "options": {
@@ -943,7 +954,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -1083,7 +1096,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 51
+        "y": 48
       },
       "id": 24,
       "interval": "1h",
@@ -1167,7 +1180,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 51
+        "y": 48
       },
       "id": 26,
       "options": {
@@ -1176,7 +1189,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -1222,7 +1237,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 59
+        "y": 56
       },
       "id": 10,
       "panels": [],
@@ -1301,7 +1316,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 60
+        "y": 57
       },
       "id": 28,
       "options": {
@@ -1376,13 +1391,15 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 60
+        "y": 57
       },
       "id": 30,
       "options": {
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -1466,7 +1483,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 68
+        "y": 65
       },
       "id": 32,
       "options": {
@@ -1514,7 +1531,7 @@
         "type": "prometheus",
         "uid": "PBFA97CFB590B2093"
       },
-      "description": "Timestamped view of node startup and restart.",
+      "description": "Timestamped view of node startups and restarts.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1534,13 +1551,13 @@
               "tooltip": false,
               "viz": false
             },
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
+            "lineInterpolation": "stepBefore",
+            "lineWidth": 3,
             "pointSize": 5,
             "scaleDistribution": {
               "type": "linear"
             },
-            "showPoints": "auto",
+            "showPoints": "never",
             "spanNulls": true,
             "stacking": {
               "group": "A",
@@ -1561,18 +1578,33 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Node startup timestamp (unix)"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "hidden"
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 68
+        "y": 65
       },
       "id": 34,
       "options": {
         "legend": {
-          "calcs": [],
+          "calcs": [
+            "changeCount"
+          ],
           "displayMode": "list",
           "placement": "bottom",
           "showLegend": true
@@ -1588,10 +1620,12 @@
             "type": "prometheus",
             "uid": "PBFA97CFB590B2093"
           },
+          "editorMode": "code",
           "exemplar": true,
           "expr": "hoprd_gauge_startup_unix_time_seconds",
           "interval": "",
-          "legendFormat": "Startup unix timestamp",
+          "legendFormat": "Node startup timestamp (unix)",
+          "range": true,
           "refId": "A"
         }
       ],
@@ -1607,13 +1641,13 @@
     "list": []
   },
   "time": {
-    "from": "now-30m",
+    "from": "now-1h",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "HOPR Node Overview",
   "uid": "8KfdzTpVz",
-  "version": 1,
+  "version": 6,
   "weekStart": ""
 }
