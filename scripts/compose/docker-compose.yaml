@@ -26,7 +26,6 @@ services:
       - '3001:3001'
     environment:
       - DEBUG=hopr*
-      - GCLOUD=1
       - HOPRD_ANNOUNCE=${HOPRD_ANNOUNCE}
       - HOPRD_DATA=/app/hoprd-db
       - HOPRD_PASSWORD=${HOPRD_PASSWORD}
