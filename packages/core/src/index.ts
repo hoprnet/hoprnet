@@ -154,6 +154,8 @@ export type HoprOptions = {
   heartbeatVariance?: number
   networkQualityThreshold?: number
   onChainConfirmations?: number
+  checkUnrealizedBalance?: boolean
+
   testing?: {
     // when true, assume that the node is running in an isolated network and does
     // not need any connection to nodes outside of the subnet
@@ -450,7 +452,8 @@ class Hopr extends EventEmitter {
       onMessage,
       this.db,
       this.environment,
-      this.acknowledgements
+      this.acknowledgements,
+      this.options
     )
 
     // Attach socket listener and check availability of entry nodes
@@ -619,24 +622,32 @@ class Hopr extends EventEmitter {
   }
 
   private async strategyOpenChannel(status: OutgoingChannelStatus) {
-    const destination = peerIdFromString(status.peer_id)
-    const stake = new BN(status.stake_str)
+    try {
+      const destination = peerIdFromString(status.peer_id)
+      const stake = new BN(status.stake_str)
 
-    if (await this.isAllowedAccessToNetwork(destination)) {
-      this.networkPeers.register(destination, NetworkPeersOrigin.STRATEGY_NEW_CHANNEL)
+      if (await this.isAllowedAccessToNetwork(destination)) {
+        this.networkPeers.register(destination, NetworkPeersOrigin.STRATEGY_NEW_CHANNEL)
 
-      const hash = await this.openChannel(destination, stake)
-      verbose('- opened channel', destination, hash)
-      this.emit('hopr:channel:opened', status)
-    } else {
-      error(`Protocol error: strategy wants to open channel to non-registered peer ${destination.toString()}`)
+        const hash = await this.openChannel(destination, stake)
+        verbose('- opened channel', destination, hash)
+        this.emit('hopr:channel:opened', status)
+      } else {
+        error(`Protocol error: strategy wants to open channel to non-registered peer ${destination.toString()}`)
+      }
+    } catch (e) {
+      error(`strategy could not open channel to ${status.peer_id}`, e)
     }
   }
 
   private async strategyCloseChannel(destination: string) {
-    await this.closeChannel(peerIdFromString(destination), 'outgoing')
-    verbose(`closed channel to ${destination.toString()}`)
-    this.emit('hopr:channel:closed', destination)
+    try {
+      await this.closeChannel(peerIdFromString(destination), 'outgoing')
+      verbose(`closed channel to ${destination.toString()}`)
+      this.emit('hopr:channel:closed', destination)
+    } catch (e) {
+      error(`strategy could not close channel ${destination}`)
+    }
   }
 
   private async updateChannelMetrics() {
@@ -664,7 +675,7 @@ class Hopr extends EventEmitter {
       metric_inChannelCount.set(incomingChannels)
       metric_outChannelCount.set(outgoingChannels)
     } catch (e) {
-      log(`error: failed to update channel metrics`, e)
+      error(`error: failed to update channel metrics`, e)
     }
   }
 
@@ -712,7 +723,7 @@ class Hopr extends EventEmitter {
       metric_strategyTicks.increment()
       metric_strategyMaxChannels.set(tickResult.max_auto_channels)
     } catch (e) {
-      log(`failed to do a strategy tick`, e)
+      error(`failed to do a strategy tick`, e)
       throw new Error('error while performing strategy tick')
     }
 
@@ -728,7 +739,7 @@ class Hopr extends EventEmitter {
       await Promise.all(allClosedChannels.map(this.strategyCloseChannel.bind(this)))
       await Promise.all(allOpenedChannels.map(this.strategyOpenChannel.bind(this)))
     } catch (e) {
-      log(`error when strategy was trying to open or close channels`, e)
+      error(`error when strategy was trying to open or close channels`, e)
     }
   }
 
@@ -1280,7 +1291,7 @@ class Hopr extends EventEmitter {
         // on-chain transactions
 
         if (channel.closureTimePassed()) {
-          txHash = await connector.finalizeClosure(channel.destination, channel.destination)
+          txHash = await connector.finalizeClosure(channel.source, channel.destination)
         } else {
           log(
             `ignoring finalizing closure of channel ${channel

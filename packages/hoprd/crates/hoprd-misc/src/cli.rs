@@ -16,6 +16,7 @@ use serde::{Deserialize, Serialize};
 use serde_json;
 use utils_misc::ok_or_str;
 use utils_proc_macros::wasm_bindgen_if;
+use hex;
 
 pub const DEFAULT_API_HOST: &str = "localhost";
 pub const DEFAULT_API_PORT: u16 = 3001;
@@ -47,9 +48,20 @@ fn parse_host(s: &str) -> Result<Host, String> {
     Host::from_ipv4_host_string(s)
 }
 
-fn parse_private_key(s: &str) -> Result<String, String> {
+/// Parse a hex string private key to a boxed u8 slice
+fn parse_private_key(s: &str) -> Result<Box<[u8]>, String> {
     if is_private_key(s) || is_prefixed_private_key(s) {
-        Ok(s.into())
+        let mut decoded = [0u8; 32];
+
+        let priv_key = match s.strip_prefix("0x") {
+            Some(priv_without_prefix) => priv_without_prefix,
+            None => s
+        };
+
+        // no errors because filtered by regex
+        hex::decode_to_slice(priv_key, &mut decoded).unwrap();
+
+        Ok(Box::new(decoded))
     } else {
         Err(format!(
             "Given string is not a private key. A private key must contain 64 hex chars."
@@ -221,7 +233,7 @@ struct CliArgs {
     pub password: Option<String>,
 
     #[arg(
-    long,
+    long = "defaultStrategy",
     help = "Default channel strategy to use after node starts up",
     env = "HOPRD_DEFAULT_STRATEGY",
     value_name = "DEFAULT_STRATEGY",
@@ -231,7 +243,7 @@ struct CliArgs {
     pub default_strategy: Option<String>,
 
     #[arg(
-    long,
+    long = "maxAutoChannels",
     help = "Maximum number of channel a strategy can open. If not specified, square root of number of available peers is used.",
     env = "HOPRD_MAX_AUTO_CHANNELS",
     value_name = "MAX_AUTO_CHANNELS",
@@ -246,6 +258,14 @@ struct CliArgs {
     help = "If enabled automatically redeems winning tickets."
     )]
     pub auto_redeem_tickets: bool,
+
+    #[arg(
+    long = "checkUnrealizedBalance",
+    default_value_t = false,
+    env = "HOPRD_CHECK_UNREALIZED_BALANCE",
+    help = "Determines if unrealized balance shall be checked first before validating unacknowledged tickets."
+    )]
+    pub check_unrealized_balance: bool,
 
     #[arg(
         long,
@@ -281,7 +301,7 @@ struct CliArgs {
         value_name = "PRIVATE_KEY",
         value_parser = ValueParser::new(parse_private_key)
     )]
-    pub private_key: Option<String>,
+    pub private_key: Option<Box<[u8]>>,
 
     #[arg(
         long = "allowLocalNodeConnections",
@@ -315,7 +335,7 @@ struct CliArgs {
         env = "HOPRD_TEST_PREFER_LOCAL_ADDRESSES",
         action = ArgAction::SetTrue,
         help = "For testing local testnets. Prefer local peers to remote",
-        default_value_t = true,
+        default_value_t = false,
         hide = true
     )]
     pub test_prefer_local_addresses: bool,
@@ -332,9 +352,9 @@ struct CliArgs {
 
     #[arg(
         long = "disableApiAuthentication",
-        help = "no remote authentication for easier testing",
+        help = "completely disables the token authentication for the API, overrides any apiToken if set",
         action = ArgAction::SetTrue,
-        env = "HOPRD_TEST_NO_AUTHENTICATION",
+        env = "HOPRD_DISABLE_API_AUTHENTICATION",
         default_value_t = false,
         hide = true
     )]
@@ -515,6 +535,49 @@ fn get_data_path(mono_repo_path: &str, maybe_default_environment: Option<String>
             mono_repo_path, default_environment
         ),
         None => format!("{}/packages/hoprd/hoprd-db", mono_repo_path),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn parse_private_key () {
+        let parsed = super::parse_private_key("cd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e0317").unwrap();
+
+        let priv_key: Vec<u8> = vec![205, 9, 249, 41, 63, 253, 214, 155, 233, 120, 3, 44, 83, 59, 107, 205, 2, 223, 213, 217, 55, 201, 135, 190, 222, 195, 226, 141, 224, 126, 3, 23];
+
+        assert_eq!(parsed, priv_key.into())
+    }
+
+    #[test]
+    fn parse_private_key_with_prefix () {
+        let parsed_with_prefix = super::parse_private_key("cd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e0317").unwrap();
+
+        let priv_key: Vec<u8> = vec![205, 9, 249, 41, 63, 253, 214, 155, 233, 120, 3, 44, 83, 59, 107, 205, 2, 223, 213, 217, 55, 201, 135, 190, 222, 195, 226, 141, 224, 126, 3, 23];
+
+        assert_eq!(parsed_with_prefix, priv_key.into())
+    }
+
+    #[test]
+    fn parse_too_short_private_key () {
+        let parsed = super::parse_private_key("cd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e031").unwrap_err();
+
+        assert_eq!(parsed, "Given string is not a private key. A private key must contain 64 hex chars.")
+    }
+
+    #[test]
+    fn parse_too_long_private_key () {
+        let parsed = super::parse_private_key("cd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e03177").unwrap_err();
+
+        assert_eq!(parsed, "Given string is not a private key. A private key must contain 64 hex chars.")
+    }
+
+    #[test]
+    fn parse_non_hex_values () {
+        let parsed = super::parse_private_key("really not a private key").unwrap_err();
+
+        assert_eq!(parsed, "Given string is not a private key. A private key must contain 64 hex chars.")
+
     }
 }
 
