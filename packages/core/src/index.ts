@@ -66,10 +66,10 @@ import HoprCoreEthereum, { type Indexer } from '@hoprnet/hopr-core-ethereum'
 
 import {
   type ChannelStrategyInterface,
+  isStrategy,
   OutgoingChannelStatus,
   SaneDefaults,
   Strategy,
-  isStrategy,
   StrategyFactory,
   StrategyTickResult
 } from './channel-strategy.js'
@@ -656,20 +656,24 @@ class Hopr extends EventEmitter {
     try {
       let outgoingChannels = 0
       for await (const channel of this.db.getChannelsFromIterable(selfAddr)) {
-        metric_channelBalances.set(
-          [channel.source.toAddress().toHex(), 'out'],
-          +ethersUtils.formatEther(channel.balance.toBN().toString())
-        )
-        outgoingChannels++
+        if (channel.status == ChannelStatus.Open) {
+          metric_channelBalances.set(
+            [channel.source.toAddress().toHex(), 'out'],
+            +ethersUtils.formatEther(channel.balance.toBN().toString())
+          )
+          outgoingChannels++
+        }
       }
 
       let incomingChannels = 0
       for await (const channel of this.db.getChannelsToIterable(selfAddr)) {
-        metric_channelBalances.set(
-          [channel.source.toAddress().toHex(), 'in'],
-          +ethersUtils.formatEther(channel.balance.toBN().toString())
-        )
-        incomingChannels++
+        if (channel.status == ChannelStatus.Open) {
+          metric_channelBalances.set(
+            [channel.source.toAddress().toHex(), 'in'],
+            +ethersUtils.formatEther(channel.balance.toBN().toString())
+          )
+          incomingChannels++
+        }
       }
 
       metric_inChannelCount.set(incomingChannels)
