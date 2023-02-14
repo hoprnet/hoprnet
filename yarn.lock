@@ -3177,6 +3177,7 @@ __metadata:
     bn.js: 5.2.0
     body-parser: 1.20.1
     chai: 4.3.6
+    chai-as-promised: 7.1.1
     chai-openapi-response-validator: ^0.14.2
     cookie: 0.5.0
     cors: 2.8.5
