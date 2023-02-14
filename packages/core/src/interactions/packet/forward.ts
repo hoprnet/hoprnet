@@ -6,7 +6,7 @@ import { debug } from '@hoprnet/hopr-utils'
 import { AsyncIterableQueue } from 'async-iterable-queue'
 
 import { Packet } from '../../messages/index.js'
-import { AsyncIterableHelperMixer, core_mixer_set_panic_hook } from '../../../lib/core_mixer_bg.js'
+import { new_mixer, core_mixer_set_panic_hook, AsyncIterableHelperMixer } from '../../../lib/core_mixer_bg.js'
 core_mixer_set_panic_hook()
 
 import type { AcknowledgementInteraction } from './acknowledgement.js'
@@ -47,7 +47,7 @@ export class PacketForwardInteraction {
     private options: HoprOptions
   ) {
     this.packetQueue = new AsyncIterableQueue<Packet>()
-    this.mixer = new AsyncIterableHelperMixer(this.packetQueue)
+    this.mixer = new_mixer(this.packetQueue)
 
     this.protocols = [
       // current
@@ -86,9 +86,7 @@ export class PacketForwardInteraction {
     let self = this
     for await (const packet of {
       [Symbol.asyncIterator]() {
-        return {
-          next: self.mixer.next()
-        }
+        return self.mixer
       }
     }) {
       await this.handleMixedPacket(packet)
