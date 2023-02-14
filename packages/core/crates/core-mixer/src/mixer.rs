@@ -51,6 +51,7 @@ pub mod wasm {
         })
     }
 
+    #[wasm_bindgen]
     impl AsyncIterableHelperMixer {
         pub async fn next(&mut self) -> Result<JsValue, JsValue> {
             to_jsvalue_stream(self.stream.as_mut().next().await)
