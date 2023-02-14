@@ -15,7 +15,7 @@ source "${mydir}/utils.sh"
 
 usage() {
   msg
-  msg "This script can be used to run a local Anvil instance at 127.0.0.1:8545"
+  msg "This script can be used to run a local Anvil instance at 0.0.0.0:8545"
   msg
   msg "Usage: $0 [-h|--help] [-f] [-l <log_file>] [-c <cfg_file>] [-s]"
   msg
@@ -97,7 +97,7 @@ function cleanup {
 trap cleanup SIGINT SIGTERM ERR
 
 # mine a block every 2 seconds
-declare flags="--block-time 2 --config-out ${cfg_file}"
+declare flags="--host 0.0.0.0 --block-time 2 --config-out ${cfg_file}"
 
 # prepare PATH if anvil is not present yet
 if ! command -v anvil ; then
@@ -111,8 +111,8 @@ fi
 if ! lsof -i ":8545" -s TCP:LISTEN; then
   log "Start local anvil network"
   anvil ${flags} > "${log_file}" 2>&1 &
-  wait_for_regex ${log_file} "Listening on 127.0.0.1:8545"
-  log "Anvil network started (127.0.0.1:8545)"
+  wait_for_regex ${log_file} "Listening on 0.0.0.0:8545"
+  log "Anvil network started (0.0.0.0:8545)"
 else
   log "Anvil network already running, skipping"
 fi

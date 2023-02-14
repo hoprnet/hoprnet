@@ -9,8 +9,6 @@ export const FULL_VERSION = pkg.version
 
 export const VERSION = pickVersion(pkg.version)
 
-export const MAX_PACKET_DELAY = 200
-
 export const INTERMEDIATE_HOPS = 3 // require 3 intermediary nodes
 export const PATH_RANDOMNESS = 0.1
 export const MAX_PATH_ITERATIONS = 100

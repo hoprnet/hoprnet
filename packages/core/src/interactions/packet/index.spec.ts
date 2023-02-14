@@ -28,6 +28,9 @@ import { PacketForwardInteraction } from './forward.js'
 import { initializeCommitment } from '@hoprnet/hopr-core-ethereum'
 import { ChannelCommitmentInfo } from '@hoprnet/hopr-core-ethereum'
 import type { ResolvedEnvironment } from '../../environment.js'
+import type { HoprOptions } from '../../index.js'
+import type { Components } from '@libp2p/interfaces/components'
+import type { Connection, Stream } from '@libp2p/interfaces/connection'
 
 const SECRET_LENGTH = 32
 
@@ -48,6 +51,12 @@ const COUNTERPARTY = privKeyToPeerId(stringToU8a('0x0726a9704d56a013980a9077d195
 const nodes: PeerId[] = [SELF, RELAY0, RELAY1, RELAY2, COUNTERPARTY]
 
 const TestingSnapshot = new Snapshot(new BN(0), new BN(0), new BN(0))
+
+const TestOptions: HoprOptions = {
+  environment: undefined,
+  dataPath: '',
+  checkUnrealizedBalance: false
+}
 
 /**
  * Creates a mocked network to send and receive acknowledgements and packets
@@ -315,7 +324,38 @@ describe('packet acknowledgement', function () {
     await ackRelay0Interaction.start()
 
     const interaction = new PacketForwardInteraction(
-      libp2pRelay0.subscribe,
+      {
+        getRegistrar() {
+          return {
+            async handle(
+              protocols: string | string[],
+              handler: ({
+                protocol,
+                stream,
+                connection
+              }: {
+                protocol: string
+                stream: Stream
+                connection: Connection
+              }) => Promise<void>
+            ) {
+              libp2pRelay0.subscribe(protocols, (msg: Uint8Array, sender: PeerId) =>
+                handler({
+                  stream: {
+                    source: (async function* () {
+                      yield msg
+                    })(),
+                    sink: async function () {}
+                  } as any,
+                  connection: {
+                    remotePeer: sender
+                  } as any
+                } as any)
+              )
+            }
+          } as NonNullable<Components['registrar']>
+        }
+      } as Components,
       libp2pRelay0.send as any,
       RELAY0,
       () => {
@@ -326,7 +366,7 @@ describe('packet acknowledgement', function () {
         id: 'testing'
       } as ResolvedEnvironment,
       ackRelay0Interaction,
-      () => 1
+      TestOptions
     )
     await interaction.start()
 
@@ -407,7 +447,38 @@ describe('packet relaying interaction', function () {
       )
 
       const interaction = new PacketForwardInteraction(
-        subscribe,
+        {
+          getRegistrar() {
+            return {
+              async handle(
+                protocols: string | string[],
+                handler: ({
+                  protocol,
+                  stream,
+                  connection
+                }: {
+                  protocol: string
+                  stream: Stream
+                  connection: Connection
+                }) => Promise<void>
+              ) {
+                subscribe(protocols, (msg: Uint8Array, sender: PeerId) =>
+                  handler({
+                    stream: {
+                      source: (async function* () {
+                        yield msg
+                      })(),
+                      sink: async function () {}
+                    } as any,
+                    connection: {
+                      remotePeer: sender
+                    } as any
+                  } as any)
+                )
+              }
+            } as NonNullable<Components['registrar']>
+          }
+        } as Components,
         send as any,
         pId,
         receiveHandler,
@@ -416,7 +487,7 @@ describe('packet relaying interaction', function () {
           id: 'testing'
         } as ResolvedEnvironment,
         acknowledgementInteraction,
-        () => 1
+        TestOptions
       )
       await interaction.start()
 

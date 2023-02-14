@@ -3,11 +3,17 @@ import type { PeerId } from '@libp2p/interface-peer-id'
 import { durations, pickVersion, pubKeyToPeerId, type HoprDB, create_counter } from '@hoprnet/hopr-utils'
 import { debug } from '@hoprnet/hopr-utils'
 
+import { AsyncIterableQueue } from 'async-iterable-queue'
+
 import { Packet } from '../../messages/index.js'
-import { Mixer } from '../../mixer.js'
+import { AsyncIterableHelperMixer, core_mixer_set_panic_hook } from '../../../lib/core_mixer_bg.js'
+core_mixer_set_panic_hook()
+
 import type { AcknowledgementInteraction } from './acknowledgement.js'
-import type { SendMessage, Subscribe } from '../../index.js'
+import type { HoprOptions, SendMessage } from '../../index.js'
 import type { ResolvedEnvironment } from '../../environment.js'
+
+import type { Components } from '@libp2p/interfaces/components'
 
 const log = debug('hopr-core:packet:forward')
 const error = debug('hopr-core:packet:forward:error')
@@ -25,23 +31,23 @@ import pkg from '../../../package.json' assert { type: 'json' }
 const NORMALIZED_VERSION = pickVersion(pkg.version)
 
 export class PacketForwardInteraction {
-  protected mixer: Mixer
+  protected mixer: AsyncIterableHelperMixer
+  protected packetQueue: AsyncIterableQueue<Packet>
 
   public readonly protocols: string | string[]
 
   constructor(
-    private subscribe: Subscribe,
+    private libp2pComponents: Components,
     private sendMessage: SendMessage,
     private privKey: PeerId,
     private emitMessage: (msg: Uint8Array) => void,
     private db: HoprDB,
     private environment: ResolvedEnvironment,
     private acknowledgements: AcknowledgementInteraction,
-    // used for testing
-    nextRandomInt?: () => number
+    private options: HoprOptions
   ) {
-    this.mixer = new Mixer(nextRandomInt)
-    this.handlePacket = this.handlePacket.bind(this)
+    this.packetQueue = new AsyncIterableQueue<Packet>()
+    this.mixer = new AsyncIterableHelperMixer(this.packetQueue)
 
     this.protocols = [
       // current
@@ -56,18 +62,35 @@ export class PacketForwardInteraction {
   }
 
   async start() {
-    await this.subscribe(this.protocols, this.handlePacket, false, this.errHandler)
+    this.libp2pComponents.getRegistrar().handle(this.protocols, async ({ connection, stream }) => {
+      try {
+        for await (const chunk of stream.source) {
+          const packet = Packet.deserialize(chunk, this.privKey, connection.remotePeer)
+
+          this.packetQueue.push(packet)
+        }
+      } catch (err) {
+        this.errHandler(err)
+      }
+    })
 
     this.handleMixedPackets()
   }
 
   stop() {
-    // Clear mixer timeouts
-    this.mixer.end()
+    this.packetQueue.end().then(function (_) {})
   }
 
   async handleMixedPackets() {
-    for await (const packet of this.mixer) {
+    console.log(this.mixer.next)
+    let self = this
+    for await (const packet of {
+      [Symbol.asyncIterator]() {
+        return {
+          next: self.mixer.next()
+        }
+      }
+    }) {
       await this.handleMixedPacket(packet)
     }
   }
@@ -76,12 +99,6 @@ export class PacketForwardInteraction {
     await this.sendMessage(counterparty, this.protocols, packet.serialize(), false, {
       timeout: FORWARD_TIMEOUT
     })
-  }
-
-  async handlePacket(msg: Uint8Array, remotePeer: PeerId) {
-    const packet = Packet.deserialize(msg, this.privKey, remotePeer)
-
-    this.mixer.push(packet)
   }
 
   async handleMixedPacket(packet: Packet) {
@@ -98,7 +115,7 @@ export class PacketForwardInteraction {
 
     // Packet should be forwarded
     try {
-      await packet.validateUnacknowledgedTicket(this.db)
+      await packet.validateUnacknowledgedTicket(this.db, this.options.checkUnrealizedBalance)
     } catch (err) {
       log(`Ticket validation failed. Dropping packet`, err)
       return

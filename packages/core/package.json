@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core",
-  "version": "1.92.0-next.61",
+  "version": "1.93.0-next.0",
   "description": "Privacy-preserving messaging protocol with incentivations for relay operators",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -50,6 +50,7 @@
     "datastore-level": "^8.0.0",
     "debug": "4.3.4",
     "err-code": "3.0.1",
+    "async-iterable-queue": "1.0.15",
     "heap-js": "2.2.0",
     "it-pushable": "3.0.0",
     "leveldown": "6.1.1",

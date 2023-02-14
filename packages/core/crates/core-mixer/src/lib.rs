@@ -1,3 +1,4 @@
+mod future_extensions;
 pub mod mixer;
 
 #[cfg(feature = "wasm")]
@@ -11,7 +12,7 @@ pub mod wasm {
 
     #[allow(dead_code)]
     #[wasm_bindgen]
-    pub fn mixer_set_panic_hook() {
+    pub fn core_mixer_set_panic_hook() {
         // When the `console_error_panic_hook` feature is enabled, we can call the
         // `set_panic_hook` function at least once during initialization, and then
         // we will get better error messages if our code ever panics.

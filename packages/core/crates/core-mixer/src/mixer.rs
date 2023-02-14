@@ -1,247 +1,135 @@
-use std::cmp::Ordering;
+use std::time::Duration;
 
-use priority_queue::PriorityQueue;
+use futures::stream::Stream;
+use futures_lite::stream::StreamExt;
 use rand::Rng;
 
+use crate::future_extensions::StreamThenConcurrentExt;
 
-type Packet = u8;      // [u8; MAX_PACKET_SIZE];
+#[cfg(not(wasm))]
+use async_std::task::sleep;
 
-const MIXER_BUFFER_CAPACITY: usize = 1024;
-const DELAY_MIN_VALUE: u64 = 0;    /// minimum delay in milliseconds
-const DELAY_MAX_VALUE: u64 = 200;  /// maximum delay in milliseconds
+#[cfg(wasm)]
+use gloo_timers::future::sleep;
 
-#[derive(Eq, PartialEq, Debug, Copy, Clone)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-pub struct MixerTimestamp {
-    value: u64
-}
+const DELAY_MIN_MS: u64 = 0;
+/// minimum delay in milliseconds
+const DELAY_MAX_MS: u64 = 200;
+/// maximum delay in milliseconds
 
-/// This reverses the timestamp logic
-///
-/// The higher the timestamp, the later in time the scheduling is required, therefore the smaller
-/// the priority.
-impl Ord for MixerTimestamp {
-    fn cmp(&self, other: &Self) -> Ordering {
-        if self.value < other.value {
-            Ordering::Greater
-        } else {
-            Ordering::Less
-        }
-    }
-}
-
-impl PartialOrd for MixerTimestamp {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-
-/// Mixer
-/// API definition
-/// - gets a random int to set a threshold for packet release
-/// - uses a heap to establish an internal data structure
-///
-/// - push(packet) - push a packet into the mixer queue
-/// - next() // create an iterable that returns a packet promise
-/// - end() // clear mixer timeouts
-///
-/// mixer value comparator function
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-pub struct StochasticUniformMixer {
-   queue: PriorityQueue<Packet, MixerTimestamp>,
-   min_packet_count: usize,
-}
-
-
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-impl StochasticUniformMixer {
-    pub fn new(packet_release_threshold: usize) -> StochasticUniformMixer {
-        StochasticUniformMixer {
-            queue: PriorityQueue::with_capacity_and_default_hasher(MIXER_BUFFER_CAPACITY),
-            min_packet_count: packet_release_threshold
-        }
-    }
-}
-
-
-impl StochasticUniformMixer {
-    pub fn pop(&mut self) -> Option<Packet> {
-        if self.queue.len() > self.min_packet_count  {
-            if let Some(top) = self.queue.peek() {
-                let (value, _priority) = top;
-                return Some(*value);
-            }
-        }
-
-        None
-    }
-
-    /// Ingests a single packet along with the current timestamp
-    ///
-    /// # Arguments
-    ///
-    /// * `packet` - A string slice that holds the name of the person
-    /// * `timestamp` - The current timestamp (note: necessary due to WASM interface)
-    pub fn push(&mut self, packet: Packet, timestamp: u64) {    //
-        let mut rng = rand::thread_rng();
-        let random_delay =  rng.gen_range(DELAY_MIN_VALUE..DELAY_MAX_VALUE);
-        if let Some(_) = self.queue.push(packet, MixerTimestamp{value: timestamp + random_delay}) {
-            panic!("Duplicate packet detected")
-        }
-    }
-
-    pub fn length(&self) -> usize {
-        self.queue.len()
-    }
-}
-
-/// Module for WASM-specific Rust code
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    // TODO: add JS API here
-    // Use this module to specify everything that is WASM-specific (e.g. uses wasm-bindgen types, js_sys, ...etc.)
-
     use super::*;
+    use js_sys::AsyncIterator;
+    use utils_misc::async_iterable::wasm::{to_box_u8_stream, to_jsvalue_stream};
     use wasm_bindgen::prelude::*;
-    // use wasm_bindgen::JsValue;
+    use wasm_bindgen::JsValue;
+    use wasm_bindgen_futures::stream::JsStream;
 
     #[wasm_bindgen]
-    impl StochasticUniformMixer {
-        pub fn push_data(&mut self, packet: Packet) {
-            let timestamp_now = (js_sys::Date::now() / 1000.0) as u64;
-            self.push(packet, timestamp_now);
+    pub struct AsyncIterableHelperMixer {
+        stream: Box<dyn Stream<Item = Result<Box<[u8]>, String>> + Unpin>,
+    }
+
+    pub fn new(packet_input: AsyncIterator) -> Result<AsyncIterableHelperMixer, String> {
+        if DELAY_MIN_MS >= DELAY_MAX_MS {
+            panic!("The minimum delay must be smaller than the maximum delay")
+        }
+
+        let stream = JsStream::from(packet_input)
+            .map(to_box_u8_stream)
+            .then_concurrent(|packet| async move {
+                let mut rng = rand::thread_rng();
+                let random_delay = rng.gen_range(DELAY_MIN_MS..DELAY_MAX_MS);
+
+                sleep(Duration::from_millis(random_delay)).await;
+                packet
+            });
+
+        Ok(AsyncIterableHelperMixer {
+            stream: Box::new(Box::pin(stream)),
+        })
+    }
+
+    impl AsyncIterableHelperMixer {
+        pub async fn next(&mut self) -> Result<JsValue, JsValue> {
+            to_jsvalue_stream(self.stream.as_mut().next().await)
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use more_asserts::*;
 
-    const NO_PACKET_THRESHOLD: usize = 0;
+    type Packet = Box<[u8]>;
 
-    #[test]
-    fn test_mixer_timestamp_derives_equality() {
-        let left = MixerTimestamp{ value: 1 };
-        let right = MixerTimestamp{ value: 1 };
+    const TINY_CONSTANT_DELAY: Duration = Duration::from_millis(10);
 
-        assert_eq!(left, right)
-    }
-
-    #[test]
-    fn test_mixer_timestamp_derives_reverse_instead_of_direct_ordering() {
-        let smaller = MixerTimestamp{ value: 1 };
-        let greater = MixerTimestamp{ value: 2 };
-
-        assert!(smaller > greater);
-        assert!(greater < smaller);
-    }
-
-    fn random_packet() -> Packet {
+    fn random_packets(count: usize) -> Vec<Packet> {
         let mut rng = rand::thread_rng();
+        let mut packets: Vec<Packet> = Vec::new();
 
-        let value: Packet = rng.gen();
-        value
+        for _ in 0..count {
+            packets.push(Box::new([rng.gen()]))
+        }
+
+        packets
     }
 
-    #[test]
-    fn test_mixer_without_any_packets_should_declare_none() {
-        let mixer = StochasticUniformMixer::new(NO_PACKET_THRESHOLD);
+    #[async_std::test]
+    async fn test_then_concurrent_empty_stream_should_not_produce_a_value_if_none_is_ready() {
+        let mut stream = futures::stream::iter(random_packets(1)).then_concurrent(|x| async {
+            sleep(TINY_CONSTANT_DELAY * 3).await;
+            x
+        });
 
-        assert_eq!(0, mixer.length())
+        if let Err(_) = async_std::future::timeout(TINY_CONSTANT_DELAY, stream.next()).await {
+            assert!(
+                true,
+                "Timeout expected, it's ok, the packet could not get through the pipeline"
+            )
+        } else {
+            assert!(false, "Timeout expected, but none occurred");
+        }
     }
 
-    #[test]
-    fn test_mixer_should_register_packets() {
-        let mut mixer = StochasticUniformMixer::new(NO_PACKET_THRESHOLD);
+    #[async_std::test]
+    async fn test_then_concurrent_proper_execution_results_in_concurrent_processing() {
+        let constant_delay = Duration::from_millis(10);
+        let tolerance = Duration::from_millis(1);
 
-        mixer.push(random_packet(), 0);
-        assert_eq!(1, mixer.length());
+        let expected = vec![1, 2, 3];
+
+        let start = std::time::Instant::now();
+
+        let stream = futures::stream::iter(expected.clone()).then_concurrent(|x| async move {
+            sleep(constant_delay).await;
+            x
+        });
+
+        let _ = stream.collect::<Vec<i32>>().await;
+
+        assert_gt!(start.elapsed(), constant_delay);
+        assert_lt!(start.elapsed() - constant_delay, tolerance);
     }
 
-    #[test]
-    #[should_panic]
-    fn test_mixer_should_panic_on_adding_the_same_packet() {
-        std::panic::set_hook(Box::new(|_| {}));
+    #[async_std::test]
+    async fn test_then_concurrent_futures_are_processed_in_the_correct_order() {
+        let packet_1 = 10u64; // 3rd in the output
+        let packet_2 = 5u64; // 1st in the output
+        let packet_3 = 7u64; // 2nd in the output
+        let expected_packets = vec![packet_2, packet_3, packet_1];
 
-        let mut mixer = StochasticUniformMixer::new(NO_PACKET_THRESHOLD);
+        let stream = futures::stream::iter(vec![packet_1, packet_2, packet_3]).then_concurrent(
+            |x| async move {
+                sleep(std::time::Duration::from_millis(x)).await;
+                x
+            },
+        );
+        let actual_packets = stream.collect::<Vec<u64>>().await;
 
-        let random_generated_packet = random_packet();
-        mixer.push(random_generated_packet, 0);
-        mixer.push(random_generated_packet, 1);
-    }
-
-    #[test]
-    fn test_mixer_should_return_no_value_if_it_is_empty() {
-        let mut mixer = StochasticUniformMixer::new(NO_PACKET_THRESHOLD);
-
-        let actual = mixer.pop();
-        assert!(actual.is_none())
-    }
-
-    #[test]
-    fn test_mixer_should_return_no_value_unless_it_contains_at_least_the_threshold_amount_of_values() {
-        let packet_threshold = 1;
-        let mut mixer = StochasticUniformMixer::new(packet_threshold);
-
-        mixer.push(random_packet(), 0);
-        let actual = mixer.pop();
-
-        assert!(actual.is_none())
-    }
-
-    #[test]
-    fn test_mixer_should_return_value_if_more_than_threshold_values_are_present() {
-        let mut mixer = StochasticUniformMixer::new(NO_PACKET_THRESHOLD);
-
-        mixer.push(random_packet(), 0);
-        let actual = mixer.pop();
-
-        assert!(actual.is_some())
-    }
-
-    #[test]
-    fn test_mixer_should_the_value_with_an_earlier_timestamp_first() {
-        let at_least_two_packets = 1;
-        let mut mixer = StochasticUniformMixer::new(at_least_two_packets);
-
-        let (packet_with_earlier_timestamp, earlier_timestamp) = (random_packet(), DELAY_MIN_VALUE);
-        let (packet_with_latter_timestamp, latter_timestamp) = (random_packet(), (DELAY_MAX_VALUE * 2));
-
-        mixer.push(packet_with_latter_timestamp, latter_timestamp);
-        mixer.push(packet_with_earlier_timestamp, earlier_timestamp);
-
-        let first = mixer.pop();
-
-        assert!(first.is_some());
-        assert_eq!(first.unwrap(), packet_with_earlier_timestamp);
+        assert_eq!(actual_packets, expected_packets);
     }
 }
-
-
-
-// This function must not use WASM-specific types. Only WASM-compatible types must be used,
-// because the attribute makes it available to both WASM and non-WASM (pure Rust)
-// #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-// pub fn bar() -> u32 { 0 }
-
-// impl MyStruct {
-//     // Here, specify methods with types that are strictly NOT WASM-compatible.
-// }
-//
-// #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-// impl MyStruct {
-//     // Here, specify methods with types that are strictly WASM-compatible, but not WASM-specific.
-// }
-
-// // Trait implementations for types can NEVER be made available for WASM
-// impl std::string::ToString for MyStruct {
-//     fn to_string(&self) -> String {
-//         format!("{}", self.foo)
-//     }
-// }
-
-
-
