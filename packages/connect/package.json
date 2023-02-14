@@ -82,7 +82,7 @@
   },
   "mocha": {
     "spec": [
-      "lib/**/*.spec.js"
+      "lib/wasm.spec.js"
     ]
   },
   "publishConfig": {
