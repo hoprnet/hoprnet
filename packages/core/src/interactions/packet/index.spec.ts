@@ -333,7 +333,7 @@ describe('packet acknowledgement', function () {
         id: 'testing'
       } as ResolvedEnvironment,
       ackRelay0Interaction,
-      TestOptions,
+      TestOptions
     )
     await interaction.start()
 

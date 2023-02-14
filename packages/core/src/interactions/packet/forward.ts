@@ -42,7 +42,7 @@ export class PacketForwardInteraction {
     private db: HoprDB,
     private environment: ResolvedEnvironment,
     private acknowledgements: AcknowledgementInteraction,
-    private options: HoprOptions,
+    private options: HoprOptions
   ) {
     this.packetQueue = new AsyncIterableQueue<Packet>()
     this.mixer = new AsyncIterableHelperMixer(this.packetQueue)
@@ -68,7 +68,7 @@ export class PacketForwardInteraction {
   }
 
   stop() {
-    this.packetQueue.end().then(function(_) {})
+    this.packetQueue.end().then(function (_) {})
   }
 
   async handleMixedPackets() {
