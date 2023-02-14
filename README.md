@@ -239,7 +239,7 @@ have an extended monitoring of the HOPR node's activity (using Prometheus + Graf
 To startup a HOPRd node with monitoring, you can use the following command:
 
 ```shell
-docker compose --env-file scripts/compose/default.env --file scripts/compose/docker-compose.yaml up -d
+docker compose --file scripts/compose/docker-compose.yaml up -d
 ```
 
 The configuration of the HOPRd node can be changed in the `scripts/compose/default.env` file.
