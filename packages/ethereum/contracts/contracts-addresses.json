@@ -49,16 +49,16 @@
       "boost_contract_address": "0x2Fc87247085F4658ADB698cDbF4d732c704f1e06"
     },
     "monte_rosa": {
-      "indexer_start_block_number": 24097267,
-      "environment_type": "production",
-      "token_contract_address": "0x66225dE86Cac02b32f34992eb3410F59DE416698",
-      "stake_season": 6,
-      "stake_contract_address": "0xA02Af160a280957A8881879Ee9239A614Ab47F0D",
-      "network_registry_contract_address": "0x819E6a81e1e3f96CF1ac9200477C2d09c676959D",
-      "boost_contract_address": "0x43d13D7B83607F14335cF2cB75E87dA369D056c7",
-      "network_registry_proxy_contract_address": "0xcA9B1bC189F977B2A9217598D0300d956b6a719f",
       "xhopr_contract_address": "0xD057604A14982FE8D88c5fC25Aac3267eA142a08",
-      "channels_contract_address": "0xFaBeE463f31E39eC8952bBfB4490C41103bf573e"
+      "boost_contract_address": "0x43d13D7B83607F14335cF2cB75E87dA369D056c7",
+      "indexer_start_block_number": 24097267,
+      "channels_contract_address": "0xFaBeE463f31E39eC8952bBfB4490C41103bf573e",
+      "stake_contract_address": "0xA02Af160a280957A8881879Ee9239A614Ab47F0D",
+      "token_contract_address": "0x66225dE86Cac02b32f34992eb3410F59DE416698",
+      "environment_type": "production",
+      "network_registry_proxy_contract_address": "0xcA9B1bC189F977B2A9217598D0300d956b6a719f",
+      "stake_season": 6,
+      "network_registry_contract_address": "0x819E6a81e1e3f96CF1ac9200477C2d09c676959D"
     }
   }
 }

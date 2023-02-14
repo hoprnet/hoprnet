@@ -23,6 +23,7 @@
 - Return explict message for unsupported closing incoming channel ([#4551](https://github.com/hoprnet/hoprnet/pull/4551)) with a fix in admin UI ([hopr-admin/#3](https://github.com/hoprnet/hopr-admin/pull/3))
 - Bring back `fund` command, to open outgoing and incoming channels with counterpart ([#4566](https://github.com/hoprnet/hoprnet/pull/4566))
 - Improve Grafana dashboards & compose setup ([#4479](https://github.com/hoprnet/hoprnet/pull/4479))
+- API: Prevent API privilege escalation ([#4625](https://github.com/hoprnet/hoprnet/pull/4625))
 
 <a name="1.91"></a>
 
