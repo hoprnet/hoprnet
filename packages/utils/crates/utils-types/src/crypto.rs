@@ -2,14 +2,82 @@
 
 use std::str::FromStr;
 use k256::ecdsa::{SigningKey, Signature as ECDSASignature, signature::Signer, VerifyingKey};
-use k256::{elliptic_curve, NonZeroScalar, Secp256k1};
+use k256::{AffinePoint, elliptic_curve, EncodedPoint, NonZeroScalar, Secp256k1};
 use k256::ecdsa::signature::Verifier;
+use k256::elliptic_curve::Curve;
+use k256::elliptic_curve::group::GroupEncoding;
 use k256::elliptic_curve::sec1::ToEncodedPoint;
 use libp2p_core::PeerId;
 use sha3::{Keccak256, digest::DynDigest};
-use crate::errors::{Result, GeneralError::ParseError};
+use crate::errors::{Result, GeneralError::ParseError, GeneralError};
 use crate::primitives::Address;
 
+/// Represent an uncompressed elliptic curve point on the secp256k1 curve
+#[derive(Clone, Eq, PartialEq, Debug)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+pub struct CurvePoint {
+    uncompressed: [u8; Self::SIZE]
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+impl CurvePoint {
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
+    pub fn new(bytes: &[u8]) -> Self {
+        assert_eq!(bytes.len(), Self::SIZE, "invalid length");
+        let mut ret = CurvePoint {
+            uncompressed: [0u8; Self::SIZE]
+        };
+        ret.uncompressed.copy_from_slice(bytes);
+        ret
+    }
+
+    pub fn to_hex(&self) -> String {
+        hex::encode(self.uncompressed)
+    }
+
+    pub fn to_address(&self) -> Address {
+        Address::new(&Hash::create(&[&self.uncompressed[1..]]).serialize())
+    }
+
+    pub fn serialize(&self) -> Box<[u8]> {
+        self.uncompressed.into()
+    }
+
+    pub fn eq(&self, other: &CurvePoint) -> bool {
+        self.uncompressed.eq(&other.uncompressed)
+    }
+
+    pub fn to_peerid_str(&self) -> String {
+        self.to_peerid().to_base58()
+    }
+}
+
+impl CurvePoint {
+    /// Size of the uncompressed elliptic curve point
+    pub const SIZE: usize = 64;
+
+    pub fn from_exponent(exponent: &[u8]) -> Result<Self> {
+        Ok(CurvePoint::new(&PublicKey::from_privkey(exponent)?
+               .serialize(false)
+        ))
+    }
+
+    pub fn from_str(s: &[str]) -> Result<Self> {
+        Ok(CurvePoint::new(&hex::decode(s).map_err(|_| ParseError)?))
+    }
+
+    pub fn from_peerid(peer_id: &PeerId) -> Result<Self> {
+        Ok(CurvePoint::new(&PublicKey::from_peerid(peer_id)?.serialize(false)))
+    }
+
+    pub fn from_peerid_str(peer_id: &str) -> Result<Self> {
+        Self::from_peerid(&PeerId::from_str(peer_id).map_err(|_|ParseError)?)
+    }
+
+    pub fn to_peerid(&self) -> PeerId {
+        PublicKey::deserialize(&self.uncompressed).unwrap().to_peerid()
+    }
+}
 
 /// Represents a 256-bit hash value
 #[derive(Clone, Eq, PartialEq, Debug)]
@@ -289,14 +357,36 @@ pub mod tests {
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use js_sys::Uint8Array;
+    use libp2p_core::PeerId;
     use sha3::{Keccak256, digest::DynDigest};
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use wasm_bindgen::prelude::*;
-    use crate::crypto::{Hash, PublicKey, Signature};
+    use crate::crypto::{CurvePoint, Hash, PublicKey, Signature};
+
+    #[wasm_bindgen]
+    impl CurvePoint {
+        #[wasm_bindgen(js_name = "from_exponent")]
+        pub fn create_from_exponent(exponent: &[u8]) -> JsResult<CurvePoint> {
+            ok_or_jserr!(Self::from_exponent(exponent))
+        }
+
+        #[wasm_bindgen(js_name = "from_str")]
+        pub fn create_from_str(str: &[str]) -> JsResult<CurvePoint> {
+            ok_or_jserr!(Self::from_str(str))
+        }
+
+        #[wasm_bindgen(js_name = "from_peerid_str")]
+        pub fn create_from_peerid_str(peer_id: &[str]) -> JsResult<CurvePoint> {
+            ok_or_jserr!(Self::from_peerid_str(peer_id))
+        }
+
+        pub fn size() -> u32 { Self::SIZE as u32 }
+    }
 
     #[wasm_bindgen]
     impl Hash {
+        #[wasm_bindgen(js_name = "create")]
         pub fn create_from(inputs: Vec<Uint8Array>) -> Self {
             let mut hash = Keccak256::default();
             inputs.into_iter().map(|a| a.to_vec()).for_each(|v| hash.update(&v));
@@ -315,10 +405,12 @@ pub mod wasm {
 
     #[wasm_bindgen]
     impl PublicKey {
+        #[wasm_bindgen(js_name = "deserialize")]
         pub fn deserialize_public_key(bytes: &[u8]) -> JsResult<PublicKey> {
             ok_or_jserr!(PublicKey::deserialize(bytes))
         }
 
+        #[wasm_bindgen(js_name = "from_peerid_str")]
         pub fn public_key_from_peerid_str(peer_id: &str) -> JsResult<PublicKey> {
             ok_or_jserr!(PublicKey::from_peerid_str(peer_id))
         }
@@ -334,6 +426,7 @@ pub mod wasm {
 
     #[wasm_bindgen]
     impl Signature {
+        #[wasm_bindgen(js_name = "deserialize")]
         pub fn deserialize_signature(signature: &[u8]) -> JsResult<Signature> {
             ok_or_jserr!(Signature::deserialize(signature))
         }
