@@ -2,7 +2,7 @@ import { isDeepStrictEqual } from 'util'
 import { v4 as uuidv4 } from 'uuid'
 import { createHash } from 'crypto'
 
-import { HoprDB } from '@hoprnet/hopr-utils'
+import { HoprDB, loadJson } from '@hoprnet/hopr-utils'
 
 export type Limit = {
   type: string
@@ -241,42 +241,7 @@ const genericLimits = {
 
 // List of endpoints which are supported as capabilitities.
 // Each entry also specifies supported endpoint-specific limits.
-const supportedCapabilities = {
-  tokensCreate: {},
-  tokensGetToken: {},
-  ticketsGetStatistics: {},
-  ticketsRedeemTickets: {},
-  ticketsGetTickets: {},
-  settingsGetSettings: {},
-  nodeGetVersion: {},
-  nodeStreamWebsocket: {},
-  nodePing: {},
-  nodeGetPeers: {},
-  nodeGetMetrics: {},
-  nodeGetInfo: {},
-  nodeGetEntryNodes: {},
-  messagesWebsocket: {},
-  messagesSign: {},
-  messagesSendMessage: {},
-  messageSign: {},
-  channelsOpenChannel: {},
-  channelsGetChannels: {},
-  aliasesGetAliases: {},
-  aliasesSetAlias: {},
-  accountWithdraw: {},
-  accountGetBalances: {},
-  accountGetAddresses: {},
-  accountGetAddress: {},
-  tokensDelete: {},
-  settingsSetSetting: {},
-  peerInfoGetPeerInfo: {},
-  channelsRedeemTickets: {},
-  channelsGetTickets: {},
-  channelsCloseChannel: {},
-  channelsGetChannel: {},
-  aliasesGetAlias: {},
-  aliasesRemoveAlias: {}
-}
+const supportedCapabilities = loadJson('./supported-api-capabilitities.json'
 
 // Validates the given list of capabilities. Fails if the list is empty or any
 // of the capabilities is invalid.
