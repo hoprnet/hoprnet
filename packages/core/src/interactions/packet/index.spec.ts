@@ -334,7 +334,6 @@ describe('packet acknowledgement', function () {
       } as ResolvedEnvironment,
       ackRelay0Interaction,
       TestOptions,
-      () => 1
     )
     await interaction.start()
 
@@ -424,8 +423,7 @@ describe('packet relaying interaction', function () {
           id: 'testing'
         } as ResolvedEnvironment,
         acknowledgementInteraction,
-        TestOptions,
-        () => 1
+        TestOptions
       )
       await interaction.start()
 

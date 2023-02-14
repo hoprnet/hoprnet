@@ -3,8 +3,12 @@ import type { PeerId } from '@libp2p/interface-peer-id'
 import { durations, pickVersion, pubKeyToPeerId, type HoprDB, create_counter } from '@hoprnet/hopr-utils'
 import { debug } from '@hoprnet/hopr-utils'
 
+import { AsyncIterableQueue } from 'async-iterable-queue'
+
 import { Packet } from '../../messages/index.js'
-import { Mixer } from '../../mixer.js'
+import { AsyncIterableHelperMixer, core_mixer_set_panic_hook } from '../../../lib/core_mixer_bg.js'
+core_mixer_set_panic_hook()
+
 import type { AcknowledgementInteraction } from './acknowledgement.js'
 import type { HoprOptions, SendMessage, Subscribe } from '../../index.js'
 import type { ResolvedEnvironment } from '../../environment.js'
@@ -25,7 +29,8 @@ import pkg from '../../../package.json' assert { type: 'json' }
 const NORMALIZED_VERSION = pickVersion(pkg.version)
 
 export class PacketForwardInteraction {
-  protected mixer: Mixer
+  protected mixer: AsyncIterableHelperMixer
+  protected packetQueue: AsyncIterableQueue<Packet>
 
   public readonly protocols: string | string[]
 
@@ -38,10 +43,10 @@ export class PacketForwardInteraction {
     private environment: ResolvedEnvironment,
     private acknowledgements: AcknowledgementInteraction,
     private options: HoprOptions,
-    // used for testing
-    nextRandomInt?: () => number
   ) {
-    this.mixer = new Mixer(nextRandomInt)
+    this.packetQueue = new AsyncIterableQueue<Packet>()
+    this.mixer = new AsyncIterableHelperMixer(this.packetQueue)
+
     this.handlePacket = this.handlePacket.bind(this)
 
     this.protocols = [
@@ -63,8 +68,7 @@ export class PacketForwardInteraction {
   }
 
   stop() {
-    // Clear mixer timeouts
-    this.mixer.end()
+    this.packetQueue.end().then(function(_) {})
   }
 
   async handleMixedPackets() {
@@ -82,7 +86,7 @@ export class PacketForwardInteraction {
   async handlePacket(msg: Uint8Array, remotePeer: PeerId) {
     const packet = Packet.deserialize(msg, this.privKey, remotePeer)
 
-    this.mixer.push(packet)
+    await this.packetQueue.push(packet)
   }
 
   async handleMixedPacket(packet: Packet) {

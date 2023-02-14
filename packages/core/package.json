@@ -50,6 +50,7 @@
     "datastore-level": "^8.0.0",
     "debug": "4.3.4",
     "err-code": "3.0.1",
+    "async-iterable-queue": "1.0.15",
     "heap-js": "2.2.0",
     "it-pushable": "3.0.0",
     "leveldown": "6.1.1",
