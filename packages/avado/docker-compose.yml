@@ -9,9 +9,9 @@ services:
       context: ./build
       args:
         UPSTREAM_VERSION: '%UPSTREAM_VERSION%'
-        PROMETHEUS_VERSION: 2.30.0
-        GRAFANA_VERSION: 8.1.8
-        HOPR_ADMIN_VERSION: 07aec21b
+        PROMETHEUS_VERSION: 2.41.0
+        GRAFANA_VERSION: 9.3.2
+        HOPR_ADMIN_VERSION: latest
     # Lines between *_JSON_EXPORT are intentionally also a valid JSON
     # Info: a hoprd node should never consume more than 1GByte of memory
     # DO NOT REMOVE
