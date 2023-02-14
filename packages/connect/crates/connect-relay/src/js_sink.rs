@@ -8,12 +8,12 @@ use futures::{
     task::{Context, Poll},
     Future, Sink, SinkExt, StreamExt,
 };
-use js_sys::AsyncIterator;
+use js_sys::{AsyncIterator, Function};
 use pin_project_lite::pin_project;
 use std::sync::{Arc, Mutex};
 use std::task::Waker;
 use utils_misc::async_iterable::wasm::to_jsvalue_stream;
-use wasm_bindgen::{prelude::*, JsCast};
+use wasm_bindgen::{closure, convert::IntoWasmAbi, prelude::*, JsCast};
 use wasm_bindgen_futures::JsFuture;
 
 #[cfg(feature = "wasm")]
@@ -29,6 +29,24 @@ interface IStream {
     source: AsyncIterable<Uint8Array>;
 }
 "#;
+
+#[wasm_bindgen]
+extern "C" {
+    // Use `js_namespace` here to bind `console.log(..)` instead of just
+    // `log(..)`
+    #[wasm_bindgen(js_namespace = console)]
+    fn log(s: &str);
+
+    // // The `console.log` is quite polymorphic, so we can bind it with multiple
+    // // signatures. Note that we need to use `js_name` to ensure we always call
+    // // `log` in JS.
+    // #[wasm_bindgen(js_namespace = console, js_name = log)]
+    // fn log_u32(a: u32);
+
+    // // Multiple arguments too!
+    // #[wasm_bindgen(js_namespace = console, js_name = log)]
+    // fn log_many(a: &str, b: &str);
+}
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct MyJsSource {}
@@ -58,6 +76,7 @@ impl AsyncIterable {
             Err(_) => return false,
         };
 
+        log(format!("{:?}", async_iter_fn).as_str());
         async_iter_fn.is_function()
     }
 }
@@ -76,25 +95,68 @@ extern "C" {
 }
 
 // TODO: make this thread-safe using an Arc
+pin_project! {
+    #[derive(Debug)]
+    pub struct MyJsStreamStruct<'a> {
+        iter: Option<AsyncIterator>,
+        done: bool,
+        next: Option<JsFuture>,
+        fut: Option<MyJsStreamStructFuture>,
+        js_stream: &'a MyJsStream,
+        sink_called: bool,
+        next_chunk: Option<Box<[u8]>>,
+        waker: Option<std::task::Waker>,
+    }
+}
+
 #[derive(Debug)]
-pub struct MyJsStreamStruct<'a> {
-    iter: Option<AsyncIterator>,
-    done: bool,
-    next: Option<JsFuture>,
-    js_stream: &'a MyJsStream,
+struct MyJsStreamStructFuture {
+    js_stream: &'static MyJsStreamStruct<'static>,
+}
+
+impl Future for MyJsStreamStructFuture {
+    type Output = Box<[u8]>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        // let mut this = unsafe { self.get_unchecked_mut() };
+
+        // foo.
+        // if this.js_stream.next_chunk.is_none() {
+        //     this.js_stream.waker = Some(cx.waker().clone());
+        //     Poll::Pending
+        // } else {
+        //     let to_send = self.js_stream.next_chunk.take().unwrap();
+        //     Poll::Ready(to_send)
+        // }
+
+        Poll::Pending
+    }
 }
 
 // Turn this into an arc
-impl MyJsStream {
-    fn from(&self) -> MyJsStreamStruct<'_> {
+impl MyJsStreamStruct<'_> {
+    fn from<'a>(stream: &'a MyJsStream) -> MyJsStreamStruct<'a> {
         MyJsStreamStruct {
-            js_stream: self,
+            js_stream: stream,
             done: false,
             next: None,
             iter: None,
+            sink_called: false,
+            fut: None,
+            next_chunk: None,
+            waker: None,
         }
     }
 }
+
+// #[wasm_bindgen]
+// impl MyJsStreamStruct<'_> {
+//     #[wasm_bindgen]
+//     pub async fn next_item(&mut self) -> Result<JsValue, JsValue> {
+//         todo!()
+//         // to_jsvalue_stream(Some(Ok(self.js_stream.fut.unwrap().await)))
+//     }
+// }
 
 impl Stream for MyJsStreamStruct<'_> {
     type Item = Result<Box<[u8]>, String>;
@@ -105,14 +167,33 @@ impl Stream for MyJsStreamStruct<'_> {
         }
 
         if self.iter.is_none() {
-            let foo: AsyncIterator = match self.js_stream.source().dyn_into() {
+            let async_sym = js_sys::Symbol::async_iterator();
+
+            let initial = self.js_stream.source();
+            let async_iter_fn = match js_sys::Reflect::get(&initial, async_sym.as_ref()) {
                 Ok(x) => x,
-                Err(_) => {
+                Err(_) => return Poll::Ready(None),
+            };
+
+            let async_iter_fn: js_sys::Function = match async_iter_fn.dyn_into() {
+                Ok(fun) => fun,
+                Err(e) => {
+                    log(format!("{:?}", e).as_str());
                     self.done = true;
                     return Poll::Ready(None);
                 }
             };
-            self.iter.replace(foo);
+
+            let async_it: AsyncIterator = match async_iter_fn.call0(&initial).unwrap().dyn_into() {
+                Ok(x) => x,
+                Err(e) => {
+                    log(format!("{:?}", e).as_str());
+                    self.done = true;
+                    return Poll::Ready(None);
+                }
+            };
+
+            self.iter.replace(async_it);
         }
 
         let future = match self.next.as_mut() {
@@ -162,7 +243,30 @@ impl FusedStream for MyJsStreamStruct<'_> {
 impl Sink<Box<[u8]>> for MyJsStreamStruct<'_> {
     type Error = String;
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        todo!()
+        let this = self.project();
+
+        if !*this.sink_called {
+            // let foo = self.my_fun();
+            // JsValue::from(Closure::new(self.my_fun()));
+            // self.js_stream.sink(&JsValue::from(AsyncIterableHelper {
+            //     js_stream: self.get_unchecked_mut(),
+            // }));
+            let obj = js_sys::Object::new();
+            let bar: Closure<dyn Fn() -> ()> = Closure::new(|| {
+                log("interval elapsed!");
+            });
+            // let closure = Closure::new(foo.next_item());
+            // let abi = foo.into_abi();
+            js_sys::Reflect::set(
+                &obj,
+                &js_sys::Symbol::async_iterator(),
+                // Cast Closure to js_sys::Function
+                bar.as_ref().unchecked_ref(),
+            )
+            .unwrap();
+        }
+
+        Poll::Pending
     }
 
     fn start_send(self: Pin<&mut Self>, item: Box<[u8]>) -> Result<(), Self::Error> {
@@ -178,20 +282,12 @@ impl Sink<Box<[u8]>> for MyJsStreamStruct<'_> {
     }
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-pub struct MyRelay {}
-
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-impl MyRelay {
-    pub async fn next(&mut self, stream: MyJsStream) -> Result<JsValue, JsValue> {
-        let foo = stream.source();
-        Ok(JsValue::from(""))
-    }
-}
-
 #[wasm_bindgen]
-pub fn foo_bar(stream: &MyJsStream) {
-    todo!()
+pub async fn foo_bar(stream: MyJsStream) {
+    let mut foo = MyJsStreamStruct::from(&stream);
+    log(format!("first result {:?}", foo.next().await).as_str());
+    log(format!("second result {:?}", foo.next().await).as_str());
+    log(format!("third result {:?}", foo.next().await).as_str());
 }
 
 // trait IntoSink<T, Sink> {
