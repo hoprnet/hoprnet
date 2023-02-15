@@ -52,11 +52,11 @@ const nodes: PeerId[] = [SELF, RELAY0, RELAY1, RELAY2, COUNTERPARTY]
 
 const TestingSnapshot = new Snapshot(new BN(0), new BN(0), new BN(0))
 
-const TestOptions: HoprOptions = {
+const TestOptions = {
   environment: undefined,
   dataPath: '',
   checkUnrealizedBalance: false
-}
+} as HoprOptions
 
 /**
  * Creates a mocked network to send and receive acknowledgements and packets

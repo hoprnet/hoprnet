@@ -69,6 +69,10 @@ export async function createTicket(
   db: HoprDB,
   privKey: PeerId
 ): Promise<Ticket> {
+  if (!privKey.privateKey) {
+    throw Error(`Cannot create acknowledgement because lacking access to private key`)
+  }
+
   const channel = await db.getChannelTo(dest)
   const currentTicketIndex = await bumpTicketIndex(channel.getId(), db)
   const amount = new Balance(PRICE_PER_PACKET.mul(INVERSE_TICKET_WIN_PROB).muln(pathLength - 1))
@@ -122,6 +126,10 @@ export async function createTicket(
  * @returns a ticket
  */
 export function createZeroHopTicket(dest: PublicKey, challenge: Challenge, privKey: PeerId): Ticket {
+  if (!privKey.privateKey) {
+    throw Error(`Cannot create acknowledgement because lacking access to private key`)
+  }
+
   return Ticket.create(
     dest.toAddress(),
     challenge,

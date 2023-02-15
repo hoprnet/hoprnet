@@ -136,9 +136,9 @@ export class AcknowledgementInteraction {
     let pending: PendingAckowledgement
     try {
       pending = await this.db.getPendingAcknowledgement(acknowledgement.ackChallenge)
-    } catch (err) {
+    } catch (err: any) {
       // Protocol bug?
-      if (err.notFound) {
+      if (err != undefined && err.notFound) {
         log(
           `Received unexpected acknowledgement for half key challenge ${acknowledgement.ackChallenge.toHex()} - half key ${acknowledgement.ackKeyShare.toHex()}`
         )
