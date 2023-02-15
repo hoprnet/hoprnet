@@ -57,7 +57,7 @@ export class PacketForwardInteraction {
   }
 
   async start() {
-    this.libp2pComponents.getRegistrar().handle(this.protocols, async ({ connection, stream }) => {
+    await this.libp2pComponents.getRegistrar().handle(this.protocols, async ({ connection, stream }) => {
       try {
         for await (const chunk of stream.source) {
           // TODO: this is a temporary quick-and-dirty solution to be used until
