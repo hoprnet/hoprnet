@@ -170,6 +170,27 @@ function install_wasm_opt() {
     fi
 }
 
+# used by rust libp2p to compile objects
+function install_protobuf() {
+  local ostype="$(uname -s)"
+  local cputype="$(uname -m)"
+  case "${ostype}" in
+      Linux | linux)
+          ostype="linux"
+          ;;
+      Darwin)
+          ostype="macos"
+          ;;
+      *)
+          echo "no precompiled binaries available for OS: ${ostype}"
+      ;;
+  esac
+  PB_REL="https://github.com/protocolbuffers/protobuf/releases"
+  curl -fsSLO "${PB_REL}/download/v21.12/protoc-21.12-${ostype}-${cputype}.zip"
+  unzip protoc-21.12-${ostype}-${cputype}.zip -d /usr/local
+}
+
+
 function install_node_js() {
     if ! command -v node; then
         cd ${download_dir}
@@ -218,6 +239,7 @@ if ${install_all}; then
 
     install_wasm_opt
     install_wasm_pack
+    install_protobuf
     install_node_js
     install_yarn
     install_javascript_utilities
