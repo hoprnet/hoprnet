@@ -1,4 +1,7 @@
+use std::ops::Sub;
+use ethnum::u256;
 use serde_repr::*;
+use utils_misc::utils::get_time_millis;
 use crate::crypto::{Hash, PublicKey, Signature};
 use crate::errors::{Result, GeneralError::ParseError};
 use crate::primitives::{Address, Balance, BalanceType, EthereumChallenge, U256};
@@ -21,6 +24,15 @@ impl ChannelStatus {
 
     pub fn to_byte(&self) -> u8 {
         *self as u8
+    }
+
+    pub fn to_string(&self) -> String {
+        match self {
+            ChannelStatus::Closed => "Closed",
+            ChannelStatus::WaitingForCommitment => "WaitingForCommitment",
+            ChannelStatus::Open => "Open",
+            ChannelStatus::PendingToClose => "PendingToClose",
+        }.to_string()
     }
 }
 
@@ -63,6 +75,24 @@ impl ChannelEntry {
         ret.extend_from_slice(self.closure_time.serialize().as_ref());
         ret.into_boxed_slice()
     }
+
+    pub fn get_id(&self) -> Hash {
+        generate_channel_id(&self.source.to_address(), &self.destination.to_address())
+    }
+
+    pub fn closure_time_passed(&self) -> bool {
+        let now_seconds =  get_time_millis() / 1000;
+        self.closure_time.value().lt(&u256::from(now_seconds))
+    }
+
+    pub fn remaining_closure_time(&self) -> u64 {
+        let now_seconds = u256::from(get_time_millis());
+        if now_seconds.ge(self.closure_time.value()) {
+            now_seconds.sub(self.closure_time.value()).as_u64()
+        } else {
+            0
+        }
+    }
 }
 
 impl ChannelEntry {
@@ -95,6 +125,11 @@ impl ChannelEntry {
             Err(ParseError)
         }
     }
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+pub fn generate_channel_id(source: &Address, destination: &Address) -> Hash {
+    Hash::create(&[&source.serialize(), &destination.serialize()])
 }
 
 /// Contains a response upon ticket acknowledgement
@@ -160,6 +195,21 @@ pub mod wasm {
     use crate::channels::{AcknowledgedTicket, ChannelEntry, ChannelStatus, Response, Ticket};
     use crate::crypto::{Hash, PublicKey, Signature};
     use crate::primitives::{Address, Balance, EthereumChallenge, U256};
+
+    #[wasm_bindgen]
+    pub fn channel_status_to_number(status: ChannelStatus) -> u8 {
+        status as u8
+    }
+
+    #[wasm_bindgen]
+    pub fn number_to_channel_status(number: u8) -> ChannelStatus {
+        ChannelStatus::from_byte(number)
+    }
+
+    #[wasm_bindgen]
+    pub fn channel_status_to_string(status: ChannelStatus) -> String {
+        status.to_string()
+    }
 
     #[wasm_bindgen]
     impl AcknowledgedTicket {

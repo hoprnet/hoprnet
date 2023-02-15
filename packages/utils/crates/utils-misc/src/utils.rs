@@ -3,6 +3,16 @@ use real_base::error::RealError::GeneralError;
 use real_base::real;
 use serde::Deserialize;
 
+#[cfg(feature = "wasm")]
+pub fn get_time_millis() -> u64 {
+    js_sys::Date::now() as u64
+}
+
+#[cfg(not(feature = "wasm"))]
+pub fn get_time_millis() -> u64 {
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as u64
+}
+
 /// Serialization structure for package.json
 #[derive(Deserialize)]
 struct PackageJsonFile {
