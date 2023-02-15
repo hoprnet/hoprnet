@@ -10,8 +10,9 @@ import { AsyncIterableHelperMixer, new_mixer, core_mixer_set_panic_hook } from '
 core_mixer_set_panic_hook()
 
 import type { AcknowledgementInteraction } from './acknowledgement.js'
-import type { HoprOptions, SendMessage, Subscribe } from '../../index.js'
+import type { HoprOptions, SendMessage } from '../../index.js'
 import type { ResolvedEnvironment } from '../../environment.js'
+import type { Components } from '@libp2p/interfaces/components'
 
 const log = debug('hopr-core:packet:forward')
 const error = debug('hopr-core:packet:forward:error')
@@ -35,7 +36,7 @@ export class PacketForwardInteraction {
   public readonly protocols: string | string[]
 
   constructor(
-    private subscribe: Subscribe,
+    private libp2pComponents: Components,
     private sendMessage: SendMessage,
     private privKey: PeerId,
     private emitMessage: (msg: Uint8Array) => void,
@@ -62,7 +63,19 @@ export class PacketForwardInteraction {
   }
 
   async start() {
-    await this.subscribe(this.protocols, this.handlePacket, false, this.errHandler)
+    this.libp2pComponents.getRegistrar().handle(this.protocols, async ({ connection, stream }) => {
+      try {
+        for await (const chunk of stream.source) {
+          // TODO: this is a temporary quick-and-dirty solution to be used until
+          // packet transformation logic has been ported to Rust
+          const packet = Packet.deserialize(chunk, this.privKey, connection.remotePeer)
+
+          this.mixer.push(packet)
+        }
+      } catch (err) {
+        this.errHandler(err)
+      }
+    })
 
     this.handleMixedPackets()
   }
@@ -85,12 +98,6 @@ export class PacketForwardInteraction {
     await this.sendMessage(counterparty, this.protocols, packet.serialize(), false, {
       timeout: FORWARD_TIMEOUT
     })
-  }
-
-  async handlePacket(msg: Uint8Array, remotePeer: PeerId) {
-    const packet = Packet.deserialize(msg, this.privKey, remotePeer)
-
-    await this.packetQueue.push(packet)
   }
 
   async handleMixedPacket(packet: Packet) {
