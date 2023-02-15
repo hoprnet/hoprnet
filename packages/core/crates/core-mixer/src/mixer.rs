@@ -32,7 +32,8 @@ pub mod wasm {
         stream: Box<dyn Stream<Item = Result<Box<[u8]>, String>> + Unpin>,
     }
 
-    pub fn new(packet_input: AsyncIterator) -> Result<AsyncIterableHelperMixer,String> {
+    #[wasm_bindgen]
+    pub fn new_mixer(packet_input: AsyncIterator) -> Result<AsyncIterableHelperMixer,String> {
         if DELAY_MIN_MS >= DELAY_MAX_MS {
             panic!("The minimum delay must be smaller than the maximum delay")
         }
@@ -52,6 +53,7 @@ pub mod wasm {
         })
     }
 
+    #[wasm_bindgen]
     impl AsyncIterableHelperMixer {
         pub async fn next(&mut self) -> Result<JsValue, JsValue> {
             to_jsvalue_stream(self.stream.as_mut().next().await)
@@ -89,7 +91,7 @@ mod tests {
             });
 
         if let Err(_) = async_std::future::timeout(TINY_CONSTANT_DELAY, stream.next()).await {
-            assert!(true, "Timeout expected, it's ok, the packet could not get through the pipeline")
+            assert!(true, "Timeout expected, the packet should not get through the pipeline")
         } else {
             assert!(false, "Timeout expected, but none occurred");
         }

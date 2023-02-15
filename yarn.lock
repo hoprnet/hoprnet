@@ -3050,6 +3050,7 @@ __metadata:
     "@types/semver": ^7
     "@types/yargs": 17.0.10
     abort-controller: 3.0.0
+    async-iterable-queue: 1.0.15
     bn.js: 5.2.0
     chai: 4.3.6
     chai-as-promised: 7.1.1
@@ -6110,6 +6111,13 @@ __metadata:
   version: 1.1.0
   resolution: "assertion-error@npm:1.1.0"
   checksum: fd9429d3a3d4fd61782eb3962ae76b6d08aa7383123fca0596020013b3ebd6647891a85b05ce821c47d1471ed1271f00b0545cf6a4326cf2fc91efcc3b0fbecf
+  languageName: node
+  linkType: hard
+
+"async-iterable-queue@npm:1.0.15":
+  version: 1.0.15
+  resolution: "async-iterable-queue@npm:1.0.15"
+  checksum: 7894939aade074ad55300466251cb216f0e0378e84ddd03cfa0029b4c305380c6210d1e71cad951204b1ccc0d3851f42b3bb88ac9580de973aa1bab4383b49f0
   languageName: node
   linkType: hard
 
