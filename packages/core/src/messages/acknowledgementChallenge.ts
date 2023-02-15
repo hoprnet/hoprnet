@@ -25,7 +25,7 @@ export class AcknowledgementChallenge {
 
     let arr: Uint8Array
     if (typeof Buffer !== 'undefined' && Buffer.isBuffer(preArray)) {
-      arr = Uint8Array.from(preArray)
+      arr = new Uint8Array(preArray.buffer, preArray.byteOffset, preArray.byteLength)
     } else {
       arr = preArray
     }

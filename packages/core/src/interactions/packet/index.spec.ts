@@ -28,7 +28,9 @@ import { PacketForwardInteraction } from './forward.js'
 import { initializeCommitment } from '@hoprnet/hopr-core-ethereum'
 import { ChannelCommitmentInfo } from '@hoprnet/hopr-core-ethereum'
 import type { ResolvedEnvironment } from '../../environment.js'
-import { HoprOptions } from '../../index.js'
+import type { HoprOptions } from '../../index.js'
+import type { Components } from '@libp2p/interfaces/components'
+import type { Connection, Stream } from '@libp2p/interfaces/connection'
 
 const SECRET_LENGTH = 32
 
@@ -66,46 +68,68 @@ function createFakeSendReceive(events: EventEmitter, self: PeerId) {
     events.emit('msg', msg, self, destination, protocol)
   }
 
-  const subscribe = async (
-    subscribedProtocols: string | string[],
-    onPacket: (msg: Uint8Array, sender: PeerId) => any
-  ) => {
-    if (!Array.isArray(subscribedProtocols)) {
-      subscribedProtocols = [subscribedProtocols]
-    }
-    subscribedProtocols.sort()
+  const components = {
+    getRegistrar() {
+      return {
+        async handle(
+          protocols: string | string[],
+          handler: ({
+            protocol,
+            stream,
+            connection
+          }: {
+            protocol: string
+            stream: Stream
+            connection: Connection
+          }) => Promise<void>
+        ) {
+          events.on(
+            'msg',
+            (msg: Uint8Array, sender: PeerId, destination: PeerId, incomingProtocols: string | string[]) => {
+              if (!self.equals(destination)) {
+                return
+              }
 
-    events.on('msg', (msg: Uint8Array, sender: PeerId, destination: PeerId, incomingProtocols: string | string[]) => {
-      if (!self.equals(destination)) {
-        return
-      }
+              if (!Array.isArray(incomingProtocols)) {
+                incomingProtocols = [incomingProtocols]
+              }
 
-      if (!Array.isArray(incomingProtocols)) {
-        incomingProtocols = [incomingProtocols]
-      }
+              incomingProtocols.sort()
 
-      incomingProtocols.sort()
+              let found = false
+              for (const subscribedProtocol of (Array.isArray(protocols) ? protocols : [protocols]).sort()) {
+                for (const incomingProtocol of incomingProtocols) {
+                  if (incomingProtocol === subscribedProtocol) {
+                    found = true
+                  }
+                }
+              }
 
-      let found = false
-      for (const subscribedProtocol of subscribedProtocols) {
-        for (const incomingProtocol of incomingProtocols) {
-          if (incomingProtocol === subscribedProtocol) {
-            found = true
-          }
+              if (!found) {
+                return
+              }
+
+              handler({
+                stream: {
+                  source: (async function* () {
+                    yield msg
+                  })(),
+                  sink: async function () {}
+                } as any,
+                connection: {
+                  remotePeer: sender
+                } as any
+              } as any)
+            }
+          )
         }
-      }
-
-      if (!found) {
-        return
-      }
-
-      onPacket(msg, sender)
-    })
-  }
+      } as NonNullable<Components['registrar']>
+    }
+  } as Components
 
   return {
     send,
-    subscribe
+    components
   }
 }
 
@@ -220,7 +244,7 @@ describe('packet acknowledgement', function () {
 
     const ackInteration = new AcknowledgementInteraction(
       libp2pSelf.send as any,
-      libp2pSelf.subscribe,
+      libp2pSelf.components,
       SELF,
       dbs[0],
       (receivedAckChallenge: HalfKeyChallenge) => {
@@ -237,7 +261,7 @@ describe('packet acknowledgement', function () {
 
     const ackInterationCounterparty = new AcknowledgementInteraction(
       libp2pCounterparty.send as any,
-      libp2pCounterparty.subscribe,
+      libp2pCounterparty.components,
       COUNTERPARTY,
       dbs[1],
       () => {},
@@ -292,7 +316,7 @@ describe('packet acknowledgement', function () {
 
     const ackRelay0Interaction = new AcknowledgementInteraction(
       libp2pRelay0.send as any,
-      libp2pRelay0.subscribe,
+      libp2pRelay0.components,
       RELAY0,
       dbs[1],
       () => {},
@@ -307,7 +331,7 @@ describe('packet acknowledgement', function () {
 
     const ackCounterpartyInteraction = new AcknowledgementInteraction(
       libp2pCounterparty.send as any,
-      libp2pCounterparty.subscribe,
+      libp2pCounterparty.components,
       COUNTERPARTY,
       dbs[2],
       () => {},
@@ -322,7 +346,7 @@ describe('packet acknowledgement', function () {
     await ackRelay0Interaction.start()
 
     const interaction = new PacketForwardInteraction(
-      libp2pRelay0.subscribe,
+      libp2pRelay0.components,
       libp2pRelay0.send as any,
       RELAY0,
       () => {
@@ -338,8 +362,12 @@ describe('packet acknowledgement', function () {
     )
     await interaction.start()
 
-    await libp2pCounterparty.subscribe(interaction.protocols, async (msg: Uint8Array) => {
-      ackCounterpartyInteraction.sendAcknowledgement(Packet.deserialize(msg, COUNTERPARTY, RELAY0), RELAY0)
+    libp2pCounterparty.components.getRegistrar().handle(interaction.protocols, async ({ stream }) => {
+      for await (const msg of stream.source) {
+        ackCounterpartyInteraction.sendAcknowledgement(Packet.deserialize(msg, COUNTERPARTY, RELAY0), RELAY0)
+        // we're only interested in first acknowledgement
+        break
+      }
     })
 
     await interaction.handleMixedPacket(Packet.deserialize(packet.serialize(), RELAY0, SELF))
@@ -387,7 +415,7 @@ describe('packet relaying interaction', function () {
     const ackInteractions: AcknowledgementInteraction[] = []
 
     for (const [index, pId] of allNodes.entries()) {
-      const { subscribe, send } = createFakeSendReceive(events, pId)
+      const { components, send } = createFakeSendReceive(events, pId)
 
       const receiveHandler = (msg: Uint8Array): void => {
         if (u8aEquals(msg, TEST_MESSAGE)) {
@@ -403,7 +431,7 @@ describe('packet relaying interaction', function () {
 
       const acknowledgementInteraction = new AcknowledgementInteraction(
         send as any,
-        subscribe,
+        components,
         pId,
         dbs[index],
         () => {},
@@ -415,7 +443,7 @@ describe('packet relaying interaction', function () {
       )
 
       const interaction = new PacketForwardInteraction(
-        subscribe,
+        components,
         send as any,
         pId,
         receiveHandler,
