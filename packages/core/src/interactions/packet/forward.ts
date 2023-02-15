@@ -6,7 +6,7 @@ import { debug } from '@hoprnet/hopr-utils'
 import { AsyncIterableQueue } from 'async-iterable-queue'
 
 import { Packet } from '../../messages/index.js'
-import { AsyncIterableHelperMixer, new_mixer, core_mixer_set_panic_hook } from '../../../lib/core_mixer_bg.js'
+import { new_mixer, core_mixer_set_panic_hook } from '../../../lib/core_mixer_bg.js'
 core_mixer_set_panic_hook()
 
 import type { AcknowledgementInteraction } from './acknowledgement.js'
@@ -26,12 +26,12 @@ const metric_recvMessageCount = create_counter('core_counter_received_messages',
 // Do not type-check JSON files
 // @ts-ignore
 import pkg from '../../../package.json' assert { type: 'json' }
+import { peerIdFromBytes } from '@libp2p/peer-id'
 
 const NORMALIZED_VERSION = pickVersion(pkg.version)
 
 export class PacketForwardInteraction {
-  protected mixer: AsyncIterableHelperMixer
-  protected packetQueue: AsyncIterableQueue<Packet>
+  protected packetQueue: AsyncIterableQueue<Uint8Array>
 
   public readonly protocols: string | string[]
 
@@ -45,10 +45,7 @@ export class PacketForwardInteraction {
     private acknowledgements: AcknowledgementInteraction,
     private options: HoprOptions
   ) {
-    this.packetQueue = new AsyncIterableQueue<Packet>()
-    this.mixer = new_mixer(this.packetQueue)
-
-    this.handlePacket = this.handlePacket.bind(this)
+    this.packetQueue = new AsyncIterableQueue<Uint8Array>()
 
     this.protocols = [
       // current
@@ -68,9 +65,7 @@ export class PacketForwardInteraction {
         for await (const chunk of stream.source) {
           // TODO: this is a temporary quick-and-dirty solution to be used until
           // packet transformation logic has been ported to Rust
-          const packet = Packet.deserialize(chunk, this.privKey, connection.remotePeer)
-
-          this.mixer.push(packet)
+          this.packetQueue.push(Uint8Array.from([...connection.remotePeer.toBytes(), ...chunk]))
         }
       } catch (err) {
         this.errHandler(err)
@@ -84,12 +79,18 @@ export class PacketForwardInteraction {
     this.packetQueue.end().then(function (_) {})
   }
 
-  async *[Symbol.asyncIterator](): AsyncIterableIterator<Packet> {
-    yield await this.mixer.next()
-  }
-
   async handleMixedPackets() {
-    for await (const packet of this) {
+    let self = this
+    for await (const chunk of {
+      [Symbol.asyncIterator]() {
+        return new_mixer(self.packetQueue[Symbol.asyncIterator]())
+      }
+    }) {
+      // TODO: this is a temporary quick-and-dirty solution to be used until
+      // packet transformation logic has been ported to Rust
+      const sender = peerIdFromBytes(chunk.slice(0, 39))
+      const packet = Packet.deserialize(chunk.slice(39), this.privKey, sender)
+
       await this.handleMixedPacket(packet)
     }
   }
