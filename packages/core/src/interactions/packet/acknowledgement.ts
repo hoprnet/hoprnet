@@ -75,7 +75,7 @@ export class AcknowledgementInteraction {
     this.handleAcknowledgement = this.handleAcknowledgement.bind(this)
   }
   async start() {
-    this.libp2pComponents.getRegistrar().handle(this.protocols, async ({ connection, stream }) => {
+    await this.libp2pComponents.getRegistrar().handle(this.protocols, async ({ connection, stream }) => {
       try {
         for await (const chunk of stream.source) {
           this.incomingAcks.push([chunk, connection.remotePeer])
