@@ -6,3 +6,7 @@ directory = "vendor/cargo"
 
 [install]
 root = ".cargo"
+
+[env]
+CARGO_MAKEFLAGS="-j"
+MAKEFLAGS="-j"
