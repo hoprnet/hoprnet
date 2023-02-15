@@ -1,4 +1,5 @@
 pub mod heartbeat;
+pub mod peers;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
