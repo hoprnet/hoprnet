@@ -241,7 +241,7 @@ const genericLimits = {
 
 // List of endpoints which are supported as capabilitities.
 // Each entry also specifies supported endpoint-specific limits.
-const supportedCapabilities = loadJson('./supported-api-capabilitities.json'
+const supportedCapabilities = loadJson('./supported-api-capabilitities.json')
 
 // Validates the given list of capabilities. Fails if the list is empty or any
 // of the capabilities is invalid.
