@@ -62,6 +62,9 @@ jobs:
         env:
           DEPLOYER_PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY_DEFAULT_FOUNDRY }}
 
+      - name: Sync supported API capabilities
+        run: ./scripts/sync-api-capabilities.sh
+
       - name: Format newly created files
         run: make lint-fix
 

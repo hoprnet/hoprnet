@@ -16,10 +16,11 @@
   "messagesSign": {},
   "messagesSendMessage": {},
   "messageSign": {},
+  "channelsFundChannels": {},
   "channelsOpenChannel": {},
   "channelsGetChannels": {},
-  "aliasesGetAliases": {},
   "aliasesSetAlias": {},
+  "aliasesGetAliases": {},
   "accountWithdraw": {},
   "accountGetBalances": {},
   "accountGetAddresses": {},
@@ -29,8 +30,8 @@
   "peerInfoGetPeerInfo": {},
   "channelsRedeemTickets": {},
   "channelsGetTickets": {},
-  "channelsCloseChannel": {},
   "channelsGetChannel": {},
+  "channelsCloseChannel": {},
   "aliasesGetAlias": {},
   "aliasesRemoveAlias": {}
 }
