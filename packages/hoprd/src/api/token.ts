@@ -2,7 +2,11 @@ import { isDeepStrictEqual } from 'util'
 import { v4 as uuidv4 } from 'uuid'
 import { createHash } from 'crypto'
 
-import { HoprDB, loadJson } from '@hoprnet/hopr-utils'
+import { HoprDB } from '@hoprnet/hopr-utils'
+
+// List of endpoints which are supported as capabilitities.
+// Each entry also specifies supported endpoint-specific limits.
+import supportedCapabilities from './../supported-api-capabilities.json' assert { type: 'json' }
 
 export type Limit = {
   type: string
@@ -238,10 +242,6 @@ const genericLimits = {
     }
   }
 }
-
-// List of endpoints which are supported as capabilitities.
-// Each entry also specifies supported endpoint-specific limits.
-const supportedCapabilities = loadJson('./supported-api-capabilitities.json')
 
 // Validates the given list of capabilities. Fails if the list is empty or any
 // of the capabilities is invalid.

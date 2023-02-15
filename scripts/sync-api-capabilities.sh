@@ -26,7 +26,7 @@ usage() {
 
 declare spec_file_path="${mydir}/../packages/hoprd/rest-api-v2-full-spec.json"
 declare partial_spec_file_path="${mydir}/../packages/hoprd/rest-api-v2-spec.yaml"
-declare caps_file_path="${mydir}/../packages/hoprd/src/api/v2/supported-api-capabilities.json"
+declare caps_file_path="${mydir}/../packages/hoprd/src/supported-api-capabilities.json"
 declare endpoints
 
 # get all known operation ids and add empty capabilities as the basic configuration

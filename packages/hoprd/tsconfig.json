@@ -7,7 +7,7 @@
     "outDir": "./lib",
     "rootDir": "./src"
   },
-  "include": ["src"],
+  "include": ["src/**/*.ts", "src/supported-api-capabilities.json"],
   "typedocOptions": {
     "entryPoints": ["src/index.ts"],
     "out": "docs",
