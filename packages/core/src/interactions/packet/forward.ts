@@ -3,11 +3,16 @@ import type { PeerId } from '@libp2p/interface-peer-id'
 import { durations, pickVersion, pubKeyToPeerId, type HoprDB, create_counter } from '@hoprnet/hopr-utils'
 import { debug } from '@hoprnet/hopr-utils'
 
+import { AsyncIterableQueue } from 'async-iterable-queue'
+
 import { Packet } from '../../messages/index.js'
-import { Mixer } from '../../mixer.js'
+import { new_mixer, core_mixer_set_panic_hook } from '../../../lib/core_mixer_bg.js'
+core_mixer_set_panic_hook()
+
 import type { AcknowledgementInteraction } from './acknowledgement.js'
-import type { HoprOptions, SendMessage, Subscribe } from '../../index.js'
+import type { HoprOptions, SendMessage } from '../../index.js'
 import type { ResolvedEnvironment } from '../../environment.js'
+import type { Components } from '@libp2p/interfaces/components'
 
 const log = debug('hopr-core:packet:forward')
 const error = debug('hopr-core:packet:forward:error')
@@ -21,28 +26,26 @@ const metric_recvMessageCount = create_counter('core_counter_received_messages',
 // Do not type-check JSON files
 // @ts-ignore
 import pkg from '../../../package.json' assert { type: 'json' }
+import { peerIdFromBytes } from '@libp2p/peer-id'
 
 const NORMALIZED_VERSION = pickVersion(pkg.version)
 
 export class PacketForwardInteraction {
-  protected mixer: Mixer
+  protected packetQueue: AsyncIterableQueue<Uint8Array>
 
   public readonly protocols: string | string[]
 
   constructor(
-    private subscribe: Subscribe,
+    private libp2pComponents: Components,
     private sendMessage: SendMessage,
     private privKey: PeerId,
     private emitMessage: (msg: Uint8Array) => void,
     private db: HoprDB,
     private environment: ResolvedEnvironment,
     private acknowledgements: AcknowledgementInteraction,
-    private options: HoprOptions,
-    // used for testing
-    nextRandomInt?: () => number
+    private options: HoprOptions
   ) {
-    this.mixer = new Mixer(nextRandomInt)
-    this.handlePacket = this.handlePacket.bind(this)
+    this.packetQueue = new AsyncIterableQueue<Uint8Array>()
 
     this.protocols = [
       // current
@@ -57,18 +60,37 @@ export class PacketForwardInteraction {
   }
 
   async start() {
-    await this.subscribe(this.protocols, this.handlePacket, false, this.errHandler)
+    await this.libp2pComponents.getRegistrar().handle(this.protocols, async ({ connection, stream }) => {
+      try {
+        for await (const chunk of stream.source) {
+          // TODO: this is a temporary quick-and-dirty solution to be used until
+          // packet transformation logic has been ported to Rust
+          this.packetQueue.push(Uint8Array.from([...connection.remotePeer.toBytes(), ...chunk]))
+        }
+      } catch (err) {
+        this.errHandler(err)
+      }
+    })
 
     this.handleMixedPackets()
   }
 
   stop() {
-    // Clear mixer timeouts
-    this.mixer.end()
+    this.packetQueue.end().then(function (_) {})
   }
 
   async handleMixedPackets() {
-    for await (const packet of this.mixer) {
+    let self = this
+    for await (const chunk of {
+      [Symbol.asyncIterator]() {
+        return new_mixer(self.packetQueue[Symbol.asyncIterator]())
+      }
+    }) {
+      // TODO: this is a temporary quick-and-dirty solution to be used until
+      // packet transformation logic has been ported to Rust
+      const sender = peerIdFromBytes(chunk.slice(0, 39))
+      const packet = Packet.deserialize(chunk.slice(39), this.privKey, sender)
+
       await this.handleMixedPacket(packet)
     }
   }
@@ -77,12 +99,6 @@ export class PacketForwardInteraction {
     await this.sendMessage(counterparty, this.protocols, packet.serialize(), false, {
       timeout: FORWARD_TIMEOUT
     })
-  }
-
-  async handlePacket(msg: Uint8Array, remotePeer: PeerId) {
-    const packet = Packet.deserialize(msg, this.privKey, remotePeer)
-
-    this.mixer.push(packet)
   }
 
   async handleMixedPacket(packet: Packet) {

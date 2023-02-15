@@ -9,12 +9,14 @@ import {
   create_counter
 } from '@hoprnet/hopr-utils'
 import { findCommitmentPreImage, bumpCommitment } from '@hoprnet/hopr-core-ethereum'
-import type { SendMessage, Subscribe } from '../../index.js'
+import type { SendMessage } from '../../index.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { ACKNOWLEDGEMENT_TIMEOUT } from '../../constants.js'
 import { Acknowledgement, Packet } from '../../messages/index.js'
 import { Pushable, pushable } from 'it-pushable'
 import type { ResolvedEnvironment } from '../../environment.js'
+import type { Components } from '@libp2p/interfaces/components'
+
 const log = debug('hopr-core:acknowledgement')
 
 type OnAcknowledgement = (halfKey: HalfKeyChallenge) => void
@@ -52,7 +54,7 @@ export class AcknowledgementInteraction {
 
   constructor(
     private sendMessage: SendMessage,
-    private subscribe: Subscribe,
+    private libp2pComponents: Components,
     private privKey: PeerId,
     private db: HoprDB,
     private onAcknowledgement: OnAcknowledgement,
@@ -73,16 +75,15 @@ export class AcknowledgementInteraction {
     this.handleAcknowledgement = this.handleAcknowledgement.bind(this)
   }
   async start() {
-    await this.subscribe(
-      this.protocols,
-      (msg: Uint8Array, remotePeer: PeerId) => {
-        this.incomingAcks.push([msg, remotePeer])
-      },
-      false,
-      (err: any) => {
+    await this.libp2pComponents.getRegistrar().handle(this.protocols, async ({ connection, stream }) => {
+      try {
+        for await (const chunk of stream.source) {
+          this.incomingAcks.push([chunk, connection.remotePeer])
+        }
+      } catch (err) {
         log(`Error while receiving acknowledgement`, err)
       }
-    )
+    })
 
     this.startHandleIncoming()
     this.startSendAcknowledgements()
