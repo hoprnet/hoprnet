@@ -27,12 +27,13 @@ const metric_recvMessageCount = create_counter('core_counter_received_messages',
 // Do not type-check JSON files
 // @ts-ignore
 import pkg from '../../../package.json' assert { type: 'json' }
+import { peerIdFromBytes } from '@libp2p/peer-id'
 
 const NORMALIZED_VERSION = pickVersion(pkg.version)
 
 export class PacketForwardInteraction {
   protected mixer: AsyncIterableHelperMixer
-  protected packetQueue: AsyncIterableQueue<Packet>
+  protected packetQueue: AsyncIterableQueue<Uint8Array>
 
   public readonly protocols: string | string[]
 
@@ -46,8 +47,7 @@ export class PacketForwardInteraction {
     private acknowledgements: AcknowledgementInteraction,
     private options: HoprOptions
   ) {
-    this.packetQueue = new AsyncIterableQueue<Packet>()
-    this.mixer = new_mixer(this.packetQueue)
+    this.packetQueue = new AsyncIterableQueue<Uint8Array>()
 
     this.protocols = [
       // current
@@ -65,9 +65,9 @@ export class PacketForwardInteraction {
     this.libp2pComponents.getRegistrar().handle(this.protocols, async ({ connection, stream }) => {
       try {
         for await (const chunk of stream.source) {
-          const packet = Packet.deserialize(chunk, this.privKey, connection.remotePeer)
-
-          this.packetQueue.push(packet)
+          // TODO: this is a temporary quick-and-dirty solution to be used until
+          // packet transformation logic has been ported to Rust
+          this.packetQueue.push(Uint8Array.from([...connection.remotePeer.toBytes(), ...chunk]))
         }
       } catch (err) {
         this.errHandler(err)
@@ -82,13 +82,17 @@ export class PacketForwardInteraction {
   }
 
   async handleMixedPackets() {
-    console.log(this.mixer.next)
     let self = this
-    for await (const packet of {
+    for await (const chunk of {
       [Symbol.asyncIterator]() {
-        return self.mixer
+        return new_mixer(self.packetQueue[Symbol.asyncIterator]())
       }
     }) {
+      // TODO: this is a temporary quick-and-dirty solution to be used until
+      // packet transformation logic has been ported to Rust
+      const sender = peerIdFromBytes(chunk.slice(0, 39))
+      const packet = Packet.deserialize(chunk.slice(39), this.privKey, sender)
+
       await this.handleMixedPacket(packet)
     }
   }

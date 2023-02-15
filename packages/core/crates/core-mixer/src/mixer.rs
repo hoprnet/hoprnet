@@ -32,7 +32,7 @@ pub mod wasm {
     }
 
     #[wasm_bindgen]
-    pub fn new_mixer(packet_input: AsyncIterator) -> Result<AsyncIterableHelperMixer, String> {
+    pub fn new_mixer(packet_input: AsyncIterator) -> Result<AsyncIterableHelperMixer, JsValue> {
         if DELAY_MIN_MS >= DELAY_MAX_MS {
             panic!("The minimum delay must be smaller than the maximum delay")
         }
@@ -48,7 +48,7 @@ pub mod wasm {
             });
 
         Ok(AsyncIterableHelperMixer {
-            stream: Box::new(Box::pin(stream)),
+            stream: Box::new(stream),
         })
     }
 
