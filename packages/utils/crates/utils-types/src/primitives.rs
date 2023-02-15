@@ -167,6 +167,9 @@ impl Balance {
 }
 
 impl Balance {
+    /// Size of the balance value is equal to U256 size (32 bytes)
+    pub const SIZE: usize = U256::SIZE;
+
     pub fn new(value: u256, balance_type: BalanceType) -> Self {
         Balance {
             value, balance_type
@@ -232,6 +235,51 @@ impl EthereumChallenge {
     }
 }
 
+/// Represents a snapshot in the blockchain
+#[derive(Clone, Eq, PartialEq, Debug)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
+pub struct Snapshot {
+    pub block_number: U256,
+    pub transaction_index: U256,
+    pub log_index: U256
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+impl Snapshot {
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
+    pub fn new(block_number: U256, transaction_index: U256, log_index: U256) -> Self {
+        Self {
+            block_number, transaction_index, log_index
+        }
+    }
+
+    pub fn serialize(&self) -> Box<[u8]> {
+
+        let mut ret = vec![];
+        ret.extend_from_slice(&self.block_number.serialize());
+        ret.extend_from_slice(&self.transaction_index.serialize());
+        ret.extend_from_slice(&self.log_index.serialize());
+        ret.into_boxed_slice()
+    }
+}
+
+impl Snapshot {
+    /// Size of the snapshot
+    pub const SIZE: usize = 3 * U256::SIZE;
+
+    pub fn deserialize(data: &[u8]) -> Result<Self> {
+        if data.len() == Self::SIZE {
+            Ok(Self {
+                block_number: U256::deserialize(&data[0..32])?,
+                transaction_index: U256::deserialize(&data[32..64])?,
+                log_index: U256::deserialize(&data[64..96])?,
+            })
+        } else {
+            Err(ParseError)
+        }
+    }
+}
+
 /// Represents the Ethereum's basic numeric type - unsigned 256-bit integer
 #[derive(Clone, Eq, PartialEq, Debug)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -269,6 +317,9 @@ impl U256 {
 }
 
 impl U256 {
+    /// Size is always 32 bytes
+    pub const SIZE: usize = 32;
+
     pub fn deserialize(data: &[u8]) -> Result<U256> {
         Ok(U256{
             value: u256::from_be_bytes(data.try_into().map_err(|_|ParseError)?)
@@ -347,10 +398,11 @@ pub mod wasm {
     use wasm_bindgen::prelude::wasm_bindgen;
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
-    use crate::primitives::{Address, Balance, BalanceType, EthereumChallenge, U256};
+    use crate::primitives::{Address, Balance, BalanceType, EthereumChallenge, Snapshot, U256};
 
     #[wasm_bindgen]
     impl Address {
+        #[wasm_bindgen(js_name = "deserialize")]
         pub fn deserialize_address(data: &[u8]) -> JsResult<Address> {
             ok_or_jserr!(Address::deserialize(data))
         }
@@ -362,24 +414,15 @@ pub mod wasm {
 
     #[wasm_bindgen]
     impl Balance {
+        #[wasm_bindgen(js_name = "deserialize")]
         pub fn deserialize_balance(data: &[u8], balance_type: BalanceType) -> JsResult<Balance> {
             ok_or_jserr!(Balance::deserialize(data, balance_type))
         }
     }
 
     #[wasm_bindgen]
-    impl U256 {
-        pub fn deserialize_u256(data: &[u8]) -> JsResult<U256> {
-            ok_or_jserr!(U256::deserialize(data))
-        }
-
-        pub fn u256_from_inverse_probability(inverse_prob: &U256) -> JsResult<U256> {
-            ok_or_jserr!(U256::from_inverse_probability(inverse_prob.value()))
-        }
-    }
-
-    #[wasm_bindgen]
     impl EthereumChallenge {
+        #[wasm_bindgen(js_name = "deserialize")]
         pub fn deserialize_challenge(data: &[u8]) -> JsResult<EthereumChallenge> {
             ok_or_jserr!(EthereumChallenge::deserialize(data))
         }
@@ -388,4 +431,31 @@ pub mod wasm {
             Self::SIZE as u32
         }
     }
+
+    #[wasm_bindgen]
+    impl Snapshot {
+        #[wasm_bindgen(js_name = "deserialize")]
+        pub fn deserialize_snapshot(data: &[u8]) -> JsResult<Snapshot> {
+            ok_or_jserr!(Snapshot::deserialize(data))
+        }
+
+        pub fn size() -> u32 {
+            Self::SIZE as u32
+        }
+    }
+
+    #[wasm_bindgen]
+    impl U256 {
+        #[wasm_bindgen(js_name = "deserialize")]
+        pub fn deserialize_u256(data: &[u8]) -> JsResult<U256> {
+            ok_or_jserr!(U256::deserialize(data))
+        }
+
+        #[wasm_bindgen(js_name = "from_inverse_probability")]
+        pub fn u256_from_inverse_probability(inverse_prob: &U256) -> JsResult<U256> {
+            ok_or_jserr!(U256::from_inverse_probability(inverse_prob.value()))
+        }
+    }
+
+
 }

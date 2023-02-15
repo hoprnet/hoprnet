@@ -1,7 +1,7 @@
 use serde_repr::*;
 use crate::crypto::{Hash, PublicKey, Signature};
 use crate::errors::{Result, GeneralError::ParseError};
-use crate::primitives::{Address, Balance, EthereumChallenge, U256};
+use crate::primitives::{Address, Balance, BalanceType, EthereumChallenge, U256};
 
 /// Describes status of a channel
 #[repr(u8)]
@@ -14,6 +14,16 @@ pub enum ChannelStatus {
     PendingToClose = 3
 }
 
+impl ChannelStatus {
+    pub fn from_byte(byte: u8) -> Self {
+        unsafe { std::mem::transmute(byte) }
+    }
+
+    pub fn to_byte(&self) -> u8 {
+        *self as u8
+    }
+}
+
 /// Contains acknowledgment information and the respective ticket
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct AcknowledgedTicket {
@@ -24,6 +34,7 @@ pub struct AcknowledgedTicket {
 }
 
 /// Overall description of a channel
+#[derive(Debug, PartialEq)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct ChannelEntry {
     pub source: PublicKey,
@@ -37,6 +48,7 @@ pub struct ChannelEntry {
     pub closure_time: U256,
 }
 
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl ChannelEntry {
     pub fn serialize(&self) -> Box<[u8]> {
         let mut ret: Vec<u8> = vec![];
@@ -50,6 +62,38 @@ impl ChannelEntry {
         ret.extend_from_slice(self.channel_epoch.serialize().as_ref());
         ret.extend_from_slice(self.closure_time.serialize().as_ref());
         ret.into_boxed_slice()
+    }
+}
+
+impl ChannelEntry {
+    pub const SIZE: usize = PublicKey::SIZE_UNCOMPRESSED +
+                            PublicKey::SIZE_UNCOMPRESSED +
+                            Balance::SIZE +
+                            Hash::SIZE +
+                            U256::SIZE +
+                            U256::SIZE +
+                            1 +
+                            U256::SIZE +
+                            U256::SIZE;
+
+    pub fn deserialize(data: &[u8]) -> Result<ChannelEntry> {
+        if data.len() == Self::SIZE {
+            let mut b = Vec::from(data);
+            let source = PublicKey::deserialize(b.drain(0..PublicKey::SIZE_UNCOMPRESSED).as_ref())?;
+            let destination = PublicKey::deserialize(b.drain(0..PublicKey::SIZE_UNCOMPRESSED).as_ref())?;
+            let balance = Balance::deserialize(b.drain(0..Balance::SIZE).as_ref(), BalanceType::HOPR)?;
+            let commitment = Hash::deserialize(b.drain(0..Hash::SIZE).as_ref())?;
+            let ticket_epoch = U256::deserialize(b.drain(0..U256::SIZE).as_ref())?;
+            let ticket_index = U256::deserialize(b.drain(0..U256::SIZE).as_ref())?;
+            let status = ChannelStatus::from_byte(b.pop().unwrap());
+            let channel_epoch = U256::deserialize(b.drain(0..U256::SIZE).as_ref())?;
+            let closure_time = U256::deserialize(b.drain(0..U256::SIZE).as_ref())?;
+            Ok(Self {
+                source, destination, balance, commitment, ticket_epoch, ticket_index, status, channel_epoch, closure_time
+            })
+        } else {
+            Err(ParseError)
+        }
     }
 }
 
@@ -155,6 +199,7 @@ pub mod wasm {
 
     #[wasm_bindgen]
     impl Response {
+        #[wasm_bindgen(js_name = "deserialize")]
         pub fn deserialize_response(data: &[u8]) -> JsResult<Response> {
             ok_or_jserr!(Response::deserialize(data))
         }

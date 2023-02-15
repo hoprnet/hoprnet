@@ -2,14 +2,12 @@
 
 use std::str::FromStr;
 use k256::ecdsa::{SigningKey, Signature as ECDSASignature, signature::Signer, VerifyingKey};
-use k256::{AffinePoint, elliptic_curve, EncodedPoint, NonZeroScalar, Secp256k1};
+use k256::{elliptic_curve, NonZeroScalar, Secp256k1};
 use k256::ecdsa::signature::Verifier;
-use k256::elliptic_curve::Curve;
-use k256::elliptic_curve::group::GroupEncoding;
 use k256::elliptic_curve::sec1::ToEncodedPoint;
 use libp2p_core::PeerId;
 use sha3::{Keccak256, digest::DynDigest};
-use crate::errors::{Result, GeneralError::ParseError, GeneralError};
+use crate::errors::{Result, GeneralError::ParseError};
 use crate::primitives::Address;
 
 /// Represent an uncompressed elliptic curve point on the secp256k1 curve
@@ -62,7 +60,7 @@ impl CurvePoint {
         ))
     }
 
-    pub fn from_str(s: &[str]) -> Result<Self> {
+    pub fn from_str(s: &str) -> Result<Self> {
         Ok(CurvePoint::new(&hex::decode(s).map_err(|_| ParseError)?))
     }
 
@@ -77,6 +75,141 @@ impl CurvePoint {
     pub fn to_peerid(&self) -> PeerId {
         PublicKey::deserialize(&self.uncompressed).unwrap().to_peerid()
     }
+}
+
+/// Represents a half-key used for Proof of Relay
+#[derive(Clone, Eq, PartialEq, Debug)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+pub struct HalfKey {
+    hkey: [u8; Self::SIZE]
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+impl HalfKey {
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
+    pub fn new(half_key: &[u8]) -> Self {
+        assert_eq!(half_key.len(), Self::SIZE, "invalid length");
+        let mut ret = Self {
+            hkey: [0u8; Self::SIZE]
+        };
+        ret.hkey.copy_from_slice(&half_key);
+        ret
+    }
+
+    pub fn to_hex(&self) -> String {
+        hex::encode(self.hkey)
+    }
+
+    pub fn serialize(&self) -> Box<[u8]> {
+        self.hkey.into()
+    }
+
+    pub fn eq(&self, other: &HalfKey) -> bool {
+        self.hkey.eq(&other.hkey)
+    }
+
+    pub fn clone_halfkey(&self) -> HalfKey {
+        self.clone()
+    }
+}
+
+impl HalfKey {
+    /// Size of the half-key
+    pub const SIZE: usize = 32;
+
+    pub fn deserialize(data: &[u8]) -> Result<Self> {
+        if data.len() == Self::SIZE {
+            let mut ret = Self {
+                hkey: [0u8; Self::SIZE]
+            };
+            ret.hkey.copy_from_slice(&data);
+            Ok(ret)
+        } else {
+            Err(ParseError)
+        }
+    }
+}
+
+/// Represents a challange for the half-key in Proof of Relay
+#[derive(Clone, Eq, PartialEq, Debug)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+pub struct HalfKeyChallenge {
+    hkc: [u8; Self::SIZE]
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+impl HalfKeyChallenge {
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
+    pub fn new(half_key_challenge: &[u8]) -> Self {
+        assert_eq!(half_key_challenge.len(), Self::SIZE, "invalid length");
+        let mut ret = Self {
+            hkc: [0u8; Self::SIZE]
+        };
+        ret.hkc.copy_from_slice(&half_key_challenge);
+        ret
+    }
+
+    pub fn to_hex(&self) -> String {
+        hex::encode(self.hkc)
+    }
+
+    pub fn serialize(&self) -> Box<[u8]> {
+        self.hkc.into()
+    }
+
+    pub fn eq(&self, other: &HalfKeyChallenge) -> bool {
+        self.hkc.eq(&other.hkc)
+    }
+
+    pub fn clone_halfkey_challenge(&self) -> HalfKeyChallenge {
+        self.clone()
+    }
+
+    pub fn to_address(&self) -> Address {
+        PublicKey::deserialize(&self.hkc)
+            .expect("invalid half-key")
+            .to_address()
+    }
+
+    pub fn to_peerid_str(&self) -> String {
+        self.to_peerid().to_base58()
+    }
+}
+
+impl HalfKeyChallenge {
+    /// Size of the half-key challenge is the size of the compressed secp256k1 point
+    pub const SIZE: usize = 33;
+
+    pub fn deserialize(data: &[u8]) -> Result<Self> {
+        if data.len() == Self::SIZE {
+            let mut ret = Self {
+                hkc: [0u8; Self::SIZE]
+            };
+            ret.hkc.copy_from_slice(&data);
+            Ok(ret)
+        } else {
+            Err(ParseError)
+        }
+    }
+
+    pub fn from_str(str: &str) -> Result<Self> {
+        Self::deserialize(&hex::decode(str).map_err(|_| ParseError)?)
+    }
+
+    pub fn from_peerid(peer_id: &PeerId) -> Result<Self> {
+        HalfKeyChallenge::deserialize(&PublicKey::from_peerid(peer_id)?.serialize(true))
+    }
+
+    pub fn from_peerid_str(peer_id: &str) -> Result<Self> {
+        Self::from_peerid(&PeerId::from_str(peer_id).map_err(|_|ParseError)?)
+    }
+
+    pub fn to_peerid(&self) -> PeerId {
+        PublicKey::deserialize(&self.hkc)
+            .expect("invalid half-key")
+            .to_peerid()
+    }
+
 }
 
 /// Represents a 256-bit hash value
@@ -123,6 +256,18 @@ impl Hash {
         };
         hash.finalize_into(&mut ret.hash).unwrap();
         ret
+    }
+
+    pub fn deserialize(data: &[u8]) -> Result<Self> {
+        if data.len() == Self::SIZE {
+            let mut ret = Self {
+                hash: [0u8; Self::SIZE]
+            };
+            ret.hash.copy_from_slice(data);
+            Ok(ret)
+        } else {
+            Err(ParseError)
+        }
     }
 }
 
@@ -171,7 +316,7 @@ impl PublicKey {
     pub const SIZE_COMPRESSED: usize = 33;
 
     /// Size of the uncompressed public key in bytes
-    pub const SIZE_UNCOMPRESSED: usize = 64;
+    pub const SIZE_UNCOMPRESSED: usize = 65;
 
     pub fn to_peerid(&self) -> PeerId {
         PeerId::from_public_key(&libp2p_core::PublicKey::Secp256k1(
@@ -352,17 +497,21 @@ pub mod tests {
         assert_eq!(pk1, pk2);
         assert_eq!(pk1, pk2);
     }
+
+    #[test]
+    fn curve_point_test() {
+
+    }
 }
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use js_sys::Uint8Array;
-    use libp2p_core::PeerId;
     use sha3::{Keccak256, digest::DynDigest};
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use wasm_bindgen::prelude::*;
-    use crate::crypto::{CurvePoint, Hash, PublicKey, Signature};
+    use crate::crypto::{CurvePoint, HalfKey, HalfKeyChallenge, Hash, PublicKey, Signature};
 
     #[wasm_bindgen]
     impl CurvePoint {
@@ -372,12 +521,42 @@ pub mod wasm {
         }
 
         #[wasm_bindgen(js_name = "from_str")]
-        pub fn create_from_str(str: &[str]) -> JsResult<CurvePoint> {
+        pub fn create_from_str(str: &str) -> JsResult<CurvePoint> {
             ok_or_jserr!(Self::from_str(str))
         }
 
         #[wasm_bindgen(js_name = "from_peerid_str")]
-        pub fn create_from_peerid_str(peer_id: &[str]) -> JsResult<CurvePoint> {
+        pub fn create_from_peerid_str(peer_id: &str) -> JsResult<CurvePoint> {
+            ok_or_jserr!(Self::from_peerid_str(peer_id))
+        }
+
+        pub fn size() -> u32 { Self::SIZE as u32 }
+    }
+
+    #[wasm_bindgen]
+    impl HalfKey {
+        #[wasm_bindgen(js_name = "deserialize")]
+        pub fn deserialize_halfkey(data: &[u8]) -> JsResult<HalfKey> {
+            ok_or_jserr!(Self::deserialize(data))
+        }
+
+        pub fn size() -> u32 { Self::SIZE as u32 }
+    }
+
+    #[wasm_bindgen]
+    impl HalfKeyChallenge {
+        #[wasm_bindgen(js_name = "deserialize")]
+        pub fn deserialize_halfkey_challenge(data: &[u8]) -> JsResult<HalfKeyChallenge> {
+            ok_or_jserr!(Self::deserialize(data))
+        }
+
+        #[wasm_bindgen(js_name = "from_str")]
+        pub fn create_from_str(str: &str) -> JsResult<HalfKeyChallenge> {
+            ok_or_jserr!(Self::from_str(str))
+        }
+
+        #[wasm_bindgen(js_name = "from_peerid_str")]
+        pub fn create_from_peerid_str(peer_id: &str) -> JsResult<HalfKeyChallenge> {
             ok_or_jserr!(Self::from_peerid_str(peer_id))
         }
 
@@ -396,6 +575,11 @@ pub mod wasm {
             };
             hash.finalize_into(&mut ret.hash).unwrap();
             ret
+        }
+
+        #[wasm_bindgen(js_name = "deserialize")]
+        pub fn deserialize_hash(data: &[u8]) -> JsResult<Hash> {
+            ok_or_jserr!(Self::deserialize(data))
         }
 
         pub fn size() -> u32 {
