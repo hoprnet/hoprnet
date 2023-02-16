@@ -94,6 +94,10 @@ This is optional in the possibility we want to gather more data points and/or a 
 - May occur after [HOPR team testing](#hopr-team-testing) is successful.
 - Launch and fund HOPRd, then follow release instructions.
 
+### Bug reporting
+
+Bugs found in any of the testing phases should have an issue created in the monorepo and linked in the release project.
+
 ## Release promotion
 
 - All releases start by being internal releases.
@@ -157,7 +161,7 @@ particular branch to deploy on every change.
 - Give a name to the previous release: `export OLD_RELEASE_NAME=bogota`
 - Give a name to the target environment of the release. For instance: `export ENVIRONMENT_NAME=monte_rosa`
 
-2. Create a release tracking issue on GitHub. Use previous issues as [templates](https://github.com/hoprnet/hoprnet/issues/4487)
+2. Create a release tracking issue on GitHub. Use previous issues as [templates](https://github.com/hoprnet/hoprnet/issues/4487) as well as a [release tracking project](https://github.com/hoprnet/hoprnet/projects?query=is%3Aopen) in the monorepo (e.g. [Release Riga project](https://github.com/orgs/hoprnet/projects/16))
 3. On the `master` branch, and before the creation of the release branch, there should be an entry in `packages/hoprd/releases.json` for the new release name.
 
 - If the release will run in its own environment ($RELEASENAME == $ENVIRONMENT_NAME) then a new entry in `packages/core/protocol-config.json` should be created for the network.
@@ -219,6 +223,7 @@ To create a hotfix:
 1. (on `staging/${RELEASE_NAME}`) create a hotfix branch `hotfix/fix-bug`
 2. (on `hotfix/fix-bug`) add commits to fix the bug
 3. Once the fix needs to be tested, create a PR of `hotfix/fix-bug` to `staging/${RELEASE_NAME}` and merge once peer-reviewed & approved.
+4. Manutally ["link an Issue"](https://docs.github.com/en/issues/tracking-your-work-with-issues/linking-a-pull-request-to-an-issue) in the PR, so that this PR is reflected in the project board.
 
 #### Release upgrade
 
