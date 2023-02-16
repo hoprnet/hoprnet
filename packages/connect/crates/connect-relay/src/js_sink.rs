@@ -3,6 +3,7 @@ use std::{pin::Pin, u8};
 
 use futures::{
     channel::mpsc,
+    future::{BoxFuture, LocalBoxFuture},
     ready,
     stream::{FusedStream, Stream},
     task::{Context, Poll},
@@ -101,7 +102,7 @@ pin_project! {
         done: bool,
         next: Option<JsFuture>,
         fut: Option<MyJsStreamStructFuture>,
-        sink_flushed_fut: Option<Pin<Box<dyn Future<Output = ()>>>>,
+        sink_flushed_fut: Option<LocalBoxFuture<'a, ()>>,
         #[pin]
         js_stream: &'a MyJsStream,
         sink_called: bool,
@@ -247,8 +248,9 @@ impl Sink<Box<[u8]>> for MyJsStreamStruct<'_> {
         log("poll_ready called");
 
         let this = self.project();
+        let ptr = unsafe { this.js_stream.get_unchecked_mut() };
 
-        if !*this.sink_called {
+        if this.sink_flushed_fut.is_none() {
             log("calling sink");
             // let foo = self.my_fun();
             // JsValue::from(Closure::new(self.my_fun()));
@@ -269,26 +271,33 @@ impl Sink<Box<[u8]>> for MyJsStreamStruct<'_> {
             )
             .unwrap();
 
-            let obj = js_sys::Object::new();
-            let bar: Closure<dyn FnMut() -> js_sys::Object> = Closure::once(move || {
-                log("interval elapsed!");
-                inner_obj
-            });
             // let closure = Closure::new(foo.next_item());
             // let abi = foo.into_abi();
-            js_sys::Reflect::set(
-                &obj,
-                &js_sys::Symbol::async_iterator(),
-                // Cast Closure to js_sys::Function
-                bar.as_ref().unchecked_ref(),
-            )
-            .unwrap();
+            *this.sink_flushed_fut = Some(Box::pin(async move {
+                let foo = ptr;
+                let obj = js_sys::Object::new();
+                let bar: Closure<dyn FnMut() -> js_sys::Object> = Closure::once(move || {
+                    log("interval elapsed!");
+                    inner_obj
+                });
 
-            *this.sink_flushed_fut = Some(Box::pin(Pin::new(this.js_stream).as_mut().sink(&obj)));
+                js_sys::Reflect::set(
+                    &obj,
+                    &js_sys::Symbol::async_iterator(),
+                    // Cast Closure to js_sys::Function
+                    bar.as_ref().unchecked_ref(),
+                )
+                .unwrap();
+
+                foo.sink(&obj).await;
+
+                // *this.sink_flushed_fut =
+                //     Some(Box::pin(Pin::new(this.js_stream).as_mut().sink(&obj)));
+            }));
 
             // *this.sink_flushed_fut = Some(Box::pin(this.js_stream.sink(&obj)));
 
-            *this.sink_called = true;
+            // *this.sink_called = true;
         }
 
         Poll::Ready(Ok(()))
