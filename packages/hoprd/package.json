@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hoprd",
-  "version": "1.92.8-next.6",
+  "version": "1.92.8",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -61,7 +61,6 @@
     "@types/supertest": "^2.0.11",
     "@types/uuid": "^9",
     "chai": "4.3.6",
-    "chai-as-promised": "7.1.1",
     "chai-openapi-response-validator": "^0.14.2",
     "mocha": "9.2.2",
     "sinon": "12.0.1",
