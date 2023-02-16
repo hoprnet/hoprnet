@@ -1,5 +1,7 @@
 use std::time::Duration;
 
+use libp2p::PeerId;
+
 const MAX_PARALLEL_HEARTBEATS: u16 = 14;
 const HEART_BEAT_ROUND_TIMEOUT: Duration = Duration::from_secs(60);
 
@@ -7,6 +9,11 @@ mod metrics {
 
 }
 
+#[derive(Debug)]
+pub struct HeartbeatPingResult {
+    pub destination: PeerId,
+    pub last_seen: Option<u64>
+}
 
 
 // // This type will be made available to both WASM (when the "wasm" feature is turned on)
