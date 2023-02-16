@@ -15,7 +15,7 @@ use std::sync::{Arc, Mutex};
 use std::task::Waker;
 use utils_misc::{async_iterable::wasm::to_jsvalue_stream, ok_or_jserr};
 use wasm_bindgen::{closure, convert::IntoWasmAbi, prelude::*, JsCast};
-use wasm_bindgen_futures::JsFuture;
+use wasm_bindgen_futures::{stream::JsStream, JsFuture};
 
 #[cfg(feature = "wasm")]
 use wasm_bindgen::{closure::Closure, JsValue};
@@ -101,21 +101,20 @@ pin_project! {
         iter: Option<AsyncIterator>,
         done: bool,
         next: Option<JsFuture>,
-        fut: Option<MyJsStreamStructFuture>,
+        fut: Option<MyJsStreamStructFuture<'a>>,
         sink_flushed_fut: Option<LocalBoxFuture<'a, ()>>,
         #[pin]
         js_stream: &'a MyJsStream,
-        sink_called: bool,
         next_chunk: Option<Box<[u8]>>,
         waker: Option<std::task::Waker>,
     }
 }
 
-struct MyJsStreamStructFuture {
-    js_stream: &'static MyJsStreamStruct<'static>,
+struct MyJsStreamStructFuture<'b> {
+    js_stream: &'b MyJsStreamStruct<'b>,
 }
 
-impl Future for MyJsStreamStructFuture {
+impl<'b> Future for MyJsStreamStructFuture<'b> {
     type Output = Box<[u8]>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -142,7 +141,6 @@ impl MyJsStreamStruct<'_> {
             done: false,
             next: None,
             iter: None,
-            sink_called: false,
             fut: None,
             next_chunk: None,
             waker: None,
@@ -242,45 +240,35 @@ impl FusedStream for MyJsStreamStruct<'_> {
     }
 }
 
-impl Sink<Box<[u8]>> for MyJsStreamStruct<'_> {
+impl<'a> Sink<Box<[u8]>> for MyJsStreamStruct<'a> {
     type Error = String;
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         log("poll_ready called");
 
         let this = self.project();
-        let ptr = unsafe { this.js_stream.get_unchecked_mut() };
+        let js_stream_ptr: &'a MyJsStream = this.js_stream.get_mut();
 
         if this.sink_flushed_fut.is_none() {
             log("calling sink");
-            // let foo = self.my_fun();
-            // JsValue::from(Closure::new(self.my_fun()));
-            // self.js_stream.sink(&JsValue::from(AsyncIterableHelper {
-            //     js_stream: self.get_unchecked_mut(),
-            // }));
-            let other_closure: Closure<dyn FnMut() -> js_sys::Object> = Closure::new(|| {
-                let obj = js_sys::Object::new();
-                js_sys::Reflect::set(&obj, &"done".into(), &JsValue::FALSE).unwrap();
-                js_sys::Reflect::set(&obj, &"value".into(), &JsValue::FALSE).unwrap();
-                obj
-            });
-            let inner_obj = js_sys::Object::new();
-            js_sys::Reflect::set(
-                &inner_obj,
-                &"next".into(),
-                other_closure.as_ref().unchecked_ref(),
-            )
-            .unwrap();
-
-            // let closure = Closure::new(foo.next_item());
-            // let abi = foo.into_abi();
             *this.sink_flushed_fut = Some(Box::pin(async move {
-                let foo = ptr;
-                let obj = js_sys::Object::new();
-                let bar: Closure<dyn FnMut() -> js_sys::Object> = Closure::once(move || {
-                    log("interval elapsed!");
-                    inner_obj
-                });
+                log("sink calling code called");
+                let next_chunk_closure: Closure<dyn FnMut() -> js_sys::Object> =
+                    Closure::new(|| {
+                        let obj = js_sys::Object::new();
+                        js_sys::Reflect::set(&obj, &"done".into(), &JsValue::FALSE).unwrap();
+                        js_sys::Reflect::set(&obj, &"value".into(), &JsValue::FALSE).unwrap();
+                        obj
+                    });
+                let inner_obj = js_sys::Object::new();
+                js_sys::Reflect::set(
+                    &inner_obj,
+                    &"next".into(),
+                    next_chunk_closure.as_ref().unchecked_ref(),
+                )
+                .unwrap();
 
+                let obj = js_sys::Object::new();
+                let bar: Closure<dyn FnMut() -> js_sys::Object> = Closure::once(move || inner_obj);
                 js_sys::Reflect::set(
                     &obj,
                     &js_sys::Symbol::async_iterator(),
@@ -289,15 +277,10 @@ impl Sink<Box<[u8]>> for MyJsStreamStruct<'_> {
                 )
                 .unwrap();
 
-                foo.sink(&obj).await;
+                js_stream_ptr.sink(&obj).await;
 
-                // *this.sink_flushed_fut =
-                //     Some(Box::pin(Pin::new(this.js_stream).as_mut().sink(&obj)));
+                log("awaited");
             }));
-
-            // *this.sink_flushed_fut = Some(Box::pin(this.js_stream.sink(&obj)));
-
-            // *this.sink_called = true;
         }
 
         Poll::Ready(Ok(()))
@@ -306,7 +289,9 @@ impl Sink<Box<[u8]>> for MyJsStreamStruct<'_> {
     fn start_send(self: Pin<&mut Self>, item: Box<[u8]>) -> Result<(), Self::Error> {
         log("poll_ready called");
 
-        Ok(())
+        let this = self.project();
+
+        this.fut = MyJsStreamStructFuture::Ok(())
     }
 
     fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -316,16 +301,10 @@ impl Sink<Box<[u8]>> for MyJsStreamStruct<'_> {
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         let this = self.project();
 
-        match this.sink_flushed_fut.unwrap().as_mut().poll(cx) {
-            Poll::Ready(x) => Poll::Ready(Ok(())),
+        match this.sink_flushed_fut.as_mut().unwrap().as_mut().poll(cx) {
+            Poll::Ready(_) => Poll::Ready(Ok::<(), Self::Error>(())),
             Poll::Pending => Poll::Pending,
         }
-
-        // let foo = Box::pin(this.sink_flushed_fut.as_mut().unwrap().as_mut())
-        //         match this.sink_flushed_fut.unwrap().as_mut().poll(cx) {
-        //             Poll::Ready(()) => Poll::Ready(Ok(())),
-        //             Poll::Pending => Poll::Pending
-        //         }
     }
 }
 
