@@ -1459,7 +1459,7 @@ ___
 
 `fn`
 
-▸ (`message`, ...`parameters`): `void`
+▸ (`message`, `...parameters`): `void`
 
 ##### Parameters
 
@@ -3509,7 +3509,7 @@ ___
 
 ### u8aConcat
 
-▸ **u8aConcat**(...`list`): `Uint8Array`
+▸ **u8aConcat**(`...list`): `Uint8Array`
 
 Concatenates the input arrays into a single `UInt8Array`.
 
@@ -3545,7 +3545,7 @@ ___
 
 ### u8aEquals
 
-▸ **u8aEquals**(...`arrays`): `boolean`
+▸ **u8aEquals**(`...arrays`): `boolean`
 
 Checks if the contents of the given Uint8Arrays are equal. Returns once at least
 one different entry is found.
@@ -3658,7 +3658,7 @@ ___
 
 ### u8aXOR
 
-▸ **u8aXOR**(`inPlace?`, ...`list`): `Uint8Array`
+▸ **u8aXOR**(`inPlace?`, `...list`): `Uint8Array`
 
 Apply an XOR on a list of arrays.
 
