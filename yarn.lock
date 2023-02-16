@@ -2957,8 +2957,8 @@ __metadata:
     retimer: 3.0.0
     secp256k1: 4.0.3
     sinon: 12.0.1
-    typedoc: 0.23.20
-    typedoc-plugin-markdown: 3.13.6
+    typedoc: 0.23.25
+    typedoc-plugin-markdown: 3.14.0
     typescript: 4.9.5
   languageName: unknown
   linkType: soft
@@ -3003,8 +3003,8 @@ __metadata:
     retimer: 3.0.0
     secp256k1: 4.0.3
     sinon: 12.0.1
-    typedoc: 0.23.20
-    typedoc-plugin-markdown: 3.13.6
+    typedoc: 0.23.25
+    typedoc-plugin-markdown: 3.14.0
     typescript: 4.9.5
   languageName: unknown
   linkType: soft
@@ -3039,8 +3039,8 @@ __metadata:
     "@types/mocha": 9.1.1
     mocha: 9.2.2
     semver: 7.3.8
-    typedoc: 0.23.20
-    typedoc-plugin-markdown: 3.13.6
+    typedoc: 0.23.25
+    typedoc-plugin-markdown: 3.14.0
     typescript: 4.9.5
   languageName: unknown
   linkType: soft
@@ -3089,8 +3089,8 @@ __metadata:
     secp256k1: 4.0.3
     sinon: 12.0.1
     timeout-abort-controller: 3.0.0
-    typedoc: 0.23.20
-    typedoc-plugin-markdown: 3.13.6
+    typedoc: 0.23.25
+    typedoc-plugin-markdown: 3.14.0
     typescript: 4.9.5
   languageName: unknown
   linkType: soft
@@ -3128,8 +3128,8 @@ __metadata:
     swagger-ui-express: 4.6.0
     trace-unhandled: 2.0.1
     ts-node: ^10.9.1
-    typedoc: 0.23.20
-    typedoc-plugin-markdown: 3.13.6
+    typedoc: 0.23.25
+    typedoc-plugin-markdown: 3.14.0
     typescript: 4.9.5
     uuid: ^9.0.0
     ws: 8.12.0
@@ -5738,6 +5738,13 @@ __metadata:
   version: 6.0.1
   resolution: "ansi-regex@npm:6.0.1"
   checksum: 1ff8b7667cded1de4fa2c9ae283e979fc87036864317da86a2e546725f96406746411d0d85e87a2d12fa5abd715d90006de7fa4fa0477c92321ad3b4c7d4e169
+  languageName: node
+  linkType: hard
+
+"ansi-sequence-parser@npm:^1.1.0":
+  version: 1.1.0
+  resolution: "ansi-sequence-parser@npm:1.1.0"
+  checksum: 75f4d3a4c555655a698aec05b5763cbddcd16ccccdbfd178fb0aa471ab74fdf98e031b875ef26e64be6a95cf970c89238744b26de6e34af97f316d5186b1df53
   languageName: node
   linkType: hard
 
@@ -12540,10 +12547,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"jsonc-parser@npm:^3.0.0":
-  version: 3.1.0
-  resolution: "jsonc-parser@npm:3.1.0"
-  checksum: 81b00c565c60cb1b400523a918d42ad9c7bb3d9cf34c708bf78d37c8c496ecd670c3ff8828f2f60aa6e6627ef4287982794ddf92261ea71e320973c54b29fb22
+"jsonc-parser@npm:^3.2.0":
+  version: 3.2.0
+  resolution: "jsonc-parser@npm:3.2.0"
+  checksum: 946dd9a5f326b745aa326d48a7257e3f4a4b62c5e98ec8e49fa2bdd8d96cef7e6febf1399f5c7016114fd1f68a1c62c6138826d5d90bc650448e3cf0951c53c7
   languageName: node
   linkType: hard
 
@@ -13339,12 +13346,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"marked@npm:^4.0.15, marked@npm:^4.0.19":
-  version: 4.2.2
-  resolution: "marked@npm:4.2.2"
+"marked@npm:^4.0.15, marked@npm:^4.2.12":
+  version: 4.2.12
+  resolution: "marked@npm:4.2.12"
   bin:
     marked: bin/marked.js
-  checksum: 1593e0632ff8dee1b9c8b669f26c8ce41e675bcb08ef75052845d4943db2c4d887edacd5b2120cf99a2cc06e9fbffc346ebaf98a7555273fda6a935adbfacf50
+  checksum: bd551cd61028ee639d4ca2ccdfcc5a6ba4227c1b143c4538f3cde27f569dcb57df8e6313560394645b418b84a7336c07ab1e438b89b6324c29d7d8cdd3102d63
   languageName: node
   linkType: hard
 
@@ -13622,12 +13629,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"minimatch@npm:*, minimatch@npm:^5.0.1, minimatch@npm:^5.1.0":
-  version: 5.1.1
-  resolution: "minimatch@npm:5.1.1"
+"minimatch@npm:*, minimatch@npm:^6.1.6":
+  version: 6.2.0
+  resolution: "minimatch@npm:6.2.0"
   dependencies:
     brace-expansion: ^2.0.1
-  checksum: 215edd0978320a3354188f84a537d45841f2449af4df4379f79b9b777e71aa4f5722cc9d1717eabd2a70d38ef76ab7b708d24d83ea6a6c909dfd8833de98b437
+  checksum: 0ffb77d05bd483fcc344ba3e64a501d569e658fa6c592d94e9716ffc7925de7a8c2ac294cafa822b160bd8b2cbf7e01012917e06ffb9a85cfa9604629b3f2c04
   languageName: node
   linkType: hard
 
@@ -13655,6 +13662,15 @@ __metadata:
   dependencies:
     brace-expansion: ^1.1.7
   checksum: c154e566406683e7bcb746e000b84d74465b3a832c45d59912b9b55cd50dee66e5c4b1e5566dba26154040e51672f9aa450a9aef0c97cfc7336b78b7afb9540a
+  languageName: node
+  linkType: hard
+
+"minimatch@npm:^5.0.1":
+  version: 5.1.1
+  resolution: "minimatch@npm:5.1.1"
+  dependencies:
+    brace-expansion: ^2.0.1
+  checksum: 215edd0978320a3354188f84a537d45841f2449af4df4379f79b9b777e71aa4f5722cc9d1717eabd2a70d38ef76ab7b708d24d83ea6a6c909dfd8833de98b437
   languageName: node
   linkType: hard
 
@@ -17772,14 +17788,15 @@ __metadata:
   languageName: node
   linkType: hard
 
-"shiki@npm:^0.11.1":
-  version: 0.11.1
-  resolution: "shiki@npm:0.11.1"
+"shiki@npm:^0.14.1":
+  version: 0.14.1
+  resolution: "shiki@npm:0.14.1"
   dependencies:
-    jsonc-parser: ^3.0.0
-    vscode-oniguruma: ^1.6.1
-    vscode-textmate: ^6.0.0
-  checksum: 2a4ebc3b466816263fc244ae4f67a4ff96aa74d863b9c5e7e4affc50f37fd6d1a781405de0dbf763b777bc33e49a0d441de7ff3fededb8b01e3b8dbb37e2927d
+    ansi-sequence-parser: ^1.1.0
+    jsonc-parser: ^3.2.0
+    vscode-oniguruma: ^1.7.0
+    vscode-textmate: ^8.0.0
+  checksum: b19ea337cc84da69d99ca39d109f82946e0c56c11cc4c67b3b91cc14a9479203365fd0c9e0dd87e908f493ab409dc6f1849175384b6ca593ce7da884ae1edca2
   languageName: node
   linkType: hard
 
@@ -19206,30 +19223,30 @@ __metadata:
   languageName: node
   linkType: hard
 
-"typedoc-plugin-markdown@npm:3.13.6":
-  version: 3.13.6
-  resolution: "typedoc-plugin-markdown@npm:3.13.6"
+"typedoc-plugin-markdown@npm:3.14.0":
+  version: 3.14.0
+  resolution: "typedoc-plugin-markdown@npm:3.14.0"
   dependencies:
     handlebars: ^4.7.7
   peerDependencies:
     typedoc: ">=0.23.0"
-  checksum: eae59997759f485b2a6f2c306dc6de47dc0b008acc4651d66a24b8ba31fc7fd7729b69ba0b1235aaab268931701510ef5af88588f9b3ea124166a2ca7b63f954
+  checksum: 6205600052185b4b193ab8a253d9df5ccbc95002c948a07f9024bcd26f0f23fbcc089fda4d6b4c8f4172f4eaca2bf9c32129989f6baaace7261cf4a0e41c976b
   languageName: node
   linkType: hard
 
-"typedoc@npm:0.23.20":
-  version: 0.23.20
-  resolution: "typedoc@npm:0.23.20"
+"typedoc@npm:0.23.25":
+  version: 0.23.25
+  resolution: "typedoc@npm:0.23.25"
   dependencies:
     lunr: ^2.3.9
-    marked: ^4.0.19
-    minimatch: ^5.1.0
-    shiki: ^0.11.1
+    marked: ^4.2.12
+    minimatch: ^6.1.6
+    shiki: ^0.14.1
   peerDependencies:
-    typescript: 4.6.x || 4.7.x || 4.8.x
+    typescript: 4.6.x || 4.7.x || 4.8.x || 4.9.x
   bin:
     typedoc: bin/typedoc
-  checksum: 8dbe046794a827b87e186523df86573673520ea5c706e1dfc2a820360bda5e998c23fd2ced91299ef060339f6ebba1086776e4e7423769da9b135a13edee10ec
+  checksum: 2089d6da0293e63f6d3fac9460e9427fb6bfd56ddf669f2f13bef9435aa69ca7e72a8754e8951788db69432356e419c48b811105c8a74a47cab1f92a0bdad75b
   languageName: node
   linkType: hard
 
@@ -19899,17 +19916,17 @@ __metadata:
   languageName: node
   linkType: hard
 
-"vscode-oniguruma@npm:^1.6.1":
-  version: 1.6.2
-  resolution: "vscode-oniguruma@npm:1.6.2"
-  checksum: 6b754acdafd5b68242ea5938bb00a32effc16c77f471d4f0f337d879d0e8e592622998e2441f42d9a7ff799c1593f31c11f26ca8d9bf9917e3ca881d3c1f3e19
+"vscode-oniguruma@npm:^1.7.0":
+  version: 1.7.0
+  resolution: "vscode-oniguruma@npm:1.7.0"
+  checksum: 53519d91d90593e6fb080260892e87d447e9b200c4964d766772b5053f5699066539d92100f77f1302c91e8fc5d9c772fbe40fe4c90f3d411a96d5a9b1e63f42
   languageName: node
   linkType: hard
 
-"vscode-textmate@npm:^6.0.0":
-  version: 6.0.0
-  resolution: "vscode-textmate@npm:6.0.0"
-  checksum: ff6f17a406c2906586afc14ef01cb122e33acd35312e815abb5c924347a777c6783ce3fe7db8b83f1760ebf843c669843b9390f905b69c433b3395af28e4b483
+"vscode-textmate@npm:^8.0.0":
+  version: 8.0.0
+  resolution: "vscode-textmate@npm:8.0.0"
+  checksum: 127780dfea89559d70b8326df6ec344cfd701312dd7f3f591a718693812b7852c30b6715e3cfc8b3200a4e2515b4c96f0843c0eacc0a3020969b5de262c2a4bb
   languageName: node
   linkType: hard
 
