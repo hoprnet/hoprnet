@@ -86,7 +86,7 @@ Below are some sample queries you can use to gather information from the HOPR Ch
 
 You can build your own queries using a [GraphQL Explorer](https://graphiql-online.com/graphiql) and enter your endpoint to limit the data to exactly what you need.
 
-Each entity has a plural version and singular version. When querying for a single record response (eg account) you will need to supply the id for the entity. When querying for list of responses (eg accounts) you may add filters using the 'where' clause.
+Each entity has a plural version and a singular version. When querying for a single record response (e.g. account), you will need to supply the id for the entity. When querying for a list of responses (e.g. accounts), you may add filters using the 'where' clause.
 
 ### Channels
 
