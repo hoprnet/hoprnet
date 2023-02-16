@@ -3007,7 +3007,6 @@ __metadata:
     async-mutex: 0.3.2
     bn.js: 5.2.0
     chai: 4.3.6
-    chai-as-promised: 7.1.1
     chalk: 5.0.1
     debug: 4.3.4
     ethers: 5.7.0
@@ -3170,6 +3169,7 @@ __metadata:
     "@libp2p/peer-id": 1.1.16
     "@multiformats/multiaddr": 10.3.3
     "@types/chai": 4.3.3
+    "@types/chai-as-promised": 7.1.5
     "@types/cors": 2.8.12
     "@types/mocha": 9.1.1
     "@types/supertest": ^2.0.11
