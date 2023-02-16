@@ -295,7 +295,7 @@ EventEmitter.captureRejectionSymbol
 
 #### Defined in
 
-node_modules/@types/node/ts4.8/events.d.ts:291
+node_modules/@types/node/events.d.ts:291
 
 ___
 
@@ -311,7 +311,7 @@ EventEmitter.captureRejections
 
 #### Defined in
 
-node_modules/@types/node/ts4.8/events.d.ts:296
+node_modules/@types/node/events.d.ts:296
 
 ___
 
@@ -325,7 +325,7 @@ EventEmitter.defaultMaxListeners
 
 #### Defined in
 
-node_modules/@types/node/ts4.8/events.d.ts:297
+node_modules/@types/node/events.d.ts:297
 
 ___
 
@@ -347,7 +347,7 @@ EventEmitter.errorMonitor
 
 #### Defined in
 
-node_modules/@types/node/ts4.8/events.d.ts:290
+node_modules/@types/node/events.d.ts:290
 
 ## Methods
 
@@ -378,7 +378,7 @@ EventEmitter.addListener
 
 #### Defined in
 
-node_modules/@types/node/ts4.8/events.d.ts:317
+node_modules/@types/node/events.d.ts:317
 
 ___
 
@@ -505,7 +505,7 @@ EventEmitter.emit
 
 #### Defined in
 
-node_modules/@types/node/ts4.8/events.d.ts:573
+node_modules/@types/node/events.d.ts:573
 
 ___
 
@@ -543,7 +543,7 @@ EventEmitter.eventNames
 
 #### Defined in
 
-node_modules/@types/node/ts4.8/events.d.ts:632
+node_modules/@types/node/events.d.ts:632
 
 ___
 
@@ -657,7 +657,7 @@ EventEmitter.getMaxListeners
 
 #### Defined in
 
-node_modules/@types/node/ts4.8/events.d.ts:489
+node_modules/@types/node/events.d.ts:489
 
 ___
 
@@ -842,7 +842,7 @@ EventEmitter.listenerCount
 
 #### Defined in
 
-node_modules/@types/node/ts4.8/events.d.ts:579
+node_modules/@types/node/events.d.ts:579
 
 ___
 
@@ -880,7 +880,7 @@ EventEmitter.listeners
 
 #### Defined in
 
-node_modules/@types/node/ts4.8/events.d.ts:502
+node_modules/@types/node/events.d.ts:502
 
 ___
 
@@ -911,7 +911,7 @@ EventEmitter.off
 
 #### Defined in
 
-node_modules/@types/node/ts4.8/events.d.ts:462
+node_modules/@types/node/events.d.ts:462
 
 ___
 
@@ -966,7 +966,7 @@ EventEmitter.on
 
 #### Defined in
 
-node_modules/@types/node/ts4.8/events.d.ts:348
+node_modules/@types/node/events.d.ts:348
 
 ___
 
@@ -1019,7 +1019,7 @@ EventEmitter.once
 
 #### Defined in
 
-node_modules/@types/node/ts4.8/events.d.ts:377
+node_modules/@types/node/events.d.ts:377
 
 ___
 
@@ -1082,7 +1082,7 @@ EventEmitter.prependListener
 
 #### Defined in
 
-node_modules/@types/node/ts4.8/events.d.ts:597
+node_modules/@types/node/events.d.ts:597
 
 ___
 
@@ -1122,7 +1122,7 @@ EventEmitter.prependOnceListener
 
 #### Defined in
 
-node_modules/@types/node/ts4.8/events.d.ts:613
+node_modules/@types/node/events.d.ts:613
 
 ___
 
@@ -1177,7 +1177,7 @@ EventEmitter.rawListeners
 
 #### Defined in
 
-node_modules/@types/node/ts4.8/events.d.ts:532
+node_modules/@types/node/events.d.ts:532
 
 ___
 
@@ -1322,7 +1322,7 @@ EventEmitter.removeAllListeners
 
 #### Defined in
 
-node_modules/@types/node/ts4.8/events.d.ts:473
+node_modules/@types/node/events.d.ts:473
 
 ___
 
@@ -1428,7 +1428,7 @@ EventEmitter.removeListener
 
 #### Defined in
 
-node_modules/@types/node/ts4.8/events.d.ts:457
+node_modules/@types/node/events.d.ts:457
 
 ___
 
@@ -1463,7 +1463,7 @@ EventEmitter.setMaxListeners
 
 #### Defined in
 
-node_modules/@types/node/ts4.8/events.d.ts:483
+node_modules/@types/node/events.d.ts:483
 
 ___
 
@@ -1688,7 +1688,7 @@ EventEmitter.getEventListeners
 
 #### Defined in
 
-node_modules/@types/node/ts4.8/events.d.ts:262
+node_modules/@types/node/events.d.ts:262
 
 ___
 
@@ -1746,7 +1746,7 @@ EventEmitter.listenerCount
 
 #### Defined in
 
-node_modules/@types/node/ts4.8/events.d.ts:234
+node_modules/@types/node/events.d.ts:234
 
 ___
 
@@ -1832,7 +1832,7 @@ EventEmitter.on
 
 #### Defined in
 
-node_modules/@types/node/ts4.8/events.d.ts:217
+node_modules/@types/node/events.d.ts:217
 
 ___
 
@@ -1942,7 +1942,7 @@ EventEmitter.once
 
 #### Defined in
 
-node_modules/@types/node/ts4.8/events.d.ts:157
+node_modules/@types/node/events.d.ts:157
 
 ▸ `Static` **once**(`emitter`, `eventName`, `options?`): `Promise`<`any`[]\>
 
@@ -1964,7 +1964,7 @@ EventEmitter.once
 
 #### Defined in
 
-node_modules/@types/node/ts4.8/events.d.ts:158
+node_modules/@types/node/events.d.ts:158
 
 ___
 
@@ -2005,4 +2005,4 @@ EventEmitter.setMaxListeners
 
 #### Defined in
 
-node_modules/@types/node/ts4.8/events.d.ts:280
+node_modules/@types/node/events.d.ts:280
