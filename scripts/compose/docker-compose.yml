@@ -2,7 +2,7 @@
 version: '3.8'
 
 networks:
-  hopr-nat:
+  hopr-net:
     driver: bridge
 
 volumes:
@@ -19,27 +19,24 @@ services:
     hostname: hoprd
     restart: unless-stopped
     networks:
-      - hopr-nat
+      - hopr-net
     ports:
       - '8080:8080'
       - '9091:9091'
       - '3001:3001'
     environment:
       - DEBUG=hopr*
-      - GCLOUD=1
-    command: |
-      --data /app/hoprd-db
-      --password ${HOPRD_PASSWORD}
-      --init
-      --api
-      --apiHost 0.0.0.0
-      --identity /app/hoprd-db/.hopr-id
-      --disableApiAuthentication
-      --environment ${HOPRD_ENVIRONMENT_ID}
-      --healthCheck
-      --healthCheckHost 0.0.0.0
-      --announce ${HOPRD_ANNOUNCE}
-
+      - HOPRD_ANNOUNCE=${HOPRD_ANNOUNCE}
+      - HOPRD_DATA=/app/hoprd-db
+      - HOPRD_PASSWORD=${HOPRD_PASSWORD}
+      - HOPRD_INIT=true
+      - HOPRD_API=true
+      - HOPRD_API_HOST=0.0.0.0
+      - HOPRD_IDENTITY=/app/hoprd-db/.hopr-id
+      - HOPRD_DISABLE_API_AUTHENTICATION=true
+      - HOPRD_ENVIRONMENT=${HOPRD_ENVIRONMENT}
+      - HOPRD_HEALTH_CHECK=true
+      - HOPRD_HEALTH_CHECK_HOST=0.0.0.0
     volumes:
       - hoprd_data:/app/hoprd-db
     deploy:
@@ -50,12 +47,12 @@ services:
   admin:
     image: ${HOPR_ADMIN_DOCKER_IMAGE}
     ports:
-      - '3000'
+      - '3000:3000'
     restart: unless-stopped
     depends_on:
       - hoprd
     networks:
-      - hopr-nat
+      - hopr-net
     deploy:
       resources:
         limits:
@@ -77,12 +74,33 @@ services:
     ports:
       - '9093:8080'
     networks:
-      - hopr-nat
+      - hopr-net
     devices:
       - /dev/kmsg:/dev/kmsg
 
+  nodeexporter:
+    image: prom/node-exporter:v1.4.0
+    container_name: nodeexporter
+    hostname: nodeexporter
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($$|/)'
+    restart: unless-stopped
+    expose:
+      - 9100
+    ports:
+      - '9100:9100'
+    networks:
+      - hopr-net
+
   prometheus:
-    image: prom/prometheus:v2.30.0
+    image: prom/prometheus:v2.41.0
     restart: always
     container_name: prometheus
     hostname: prometheus
@@ -102,10 +120,10 @@ services:
     environment:
       DATA_RETENTION_DAYS: 30
     networks:
-      - hopr-nat
+      - hopr-net
 
   grafana:
-    image: grafana/grafana:8.1.8
+    image: grafana/grafana:9.3.2
     user: '472'
     restart: always
     environment:
@@ -120,4 +138,4 @@ services:
     depends_on:
       - prometheus
     networks:
-      - hopr-nat
+      - hopr-net

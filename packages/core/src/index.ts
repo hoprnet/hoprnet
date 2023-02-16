@@ -54,7 +54,6 @@ import {
   isSecp256k1PeerId,
   type LibP2PHandlerFunction,
   libp2pSendMessage,
-  libp2pSubscribe,
   MIN_NATIVE_BALANCE,
   NativeBalance,
   PublicKey,
@@ -66,10 +65,10 @@ import HoprCoreEthereum, { type Indexer } from '@hoprnet/hopr-core-ethereum'
 
 import {
   type ChannelStrategyInterface,
+  isStrategy,
   OutgoingChannelStatus,
   SaneDefaults,
   Strategy,
-  isStrategy,
   StrategyFactory,
   StrategyTickResult
 } from './channel-strategy.js'
@@ -327,13 +326,6 @@ class Hopr extends EventEmitter {
     this.stopLibp2p = libp2p.stop.bind(libp2p)
 
     this.libp2pComponents = libp2p.components
-    // Subscribe to p2p events from libp2p. Wraps our instance of libp2p.
-    const subscribe = (
-      protocols: string | string[],
-      handler: LibP2PHandlerFunction<Promise<Uint8Array> | Promise<void> | void>,
-      includeReply: boolean,
-      errHandler: (err: any) => void
-    ) => libp2pSubscribe(this.libp2pComponents, protocols, handler, errHandler, includeReply)
 
     const sendMessage = ((
       dest: PeerId,
@@ -431,7 +423,7 @@ class Hopr extends EventEmitter {
 
     this.acknowledgements = new AcknowledgementInteraction(
       sendMessage,
-      subscribe,
+      this.libp2pComponents,
       this.getId(),
       this.db,
       (ackChallenge: HalfKeyChallenge) => {
@@ -446,7 +438,7 @@ class Hopr extends EventEmitter {
 
     const onMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
     this.forward = new PacketForwardInteraction(
-      subscribe,
+      this.libp2pComponents,
       sendMessage,
       this.getId(),
       onMessage,
@@ -656,20 +648,24 @@ class Hopr extends EventEmitter {
     try {
       let outgoingChannels = 0
       for await (const channel of this.db.getChannelsFromIterable(selfAddr)) {
-        metric_channelBalances.set(
-          [channel.source.toAddress().toHex(), 'out'],
-          +ethersUtils.formatEther(channel.balance.toBN().toString())
-        )
-        outgoingChannels++
+        if (channel.status == ChannelStatus.Open) {
+          metric_channelBalances.set(
+            [channel.source.toAddress().toHex(), 'out'],
+            +ethersUtils.formatEther(channel.balance.toBN().toString())
+          )
+          outgoingChannels++
+        }
       }
 
       let incomingChannels = 0
       for await (const channel of this.db.getChannelsToIterable(selfAddr)) {
-        metric_channelBalances.set(
-          [channel.source.toAddress().toHex(), 'in'],
-          +ethersUtils.formatEther(channel.balance.toBN().toString())
-        )
-        incomingChannels++
+        if (channel.status == ChannelStatus.Open) {
+          metric_channelBalances.set(
+            [channel.source.toAddress().toHex(), 'in'],
+            +ethersUtils.formatEther(channel.balance.toBN().toString())
+          )
+          incomingChannels++
+        }
       }
 
       metric_inChannelCount.set(incomingChannels)
