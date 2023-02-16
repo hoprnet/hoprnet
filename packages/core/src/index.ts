@@ -135,26 +135,25 @@ type PeerStoreAddress = {
 
 export type HoprOptions = {
   environment: ResolvedEnvironment
-  announce?: boolean
+  announce: boolean
   dataPath: string
-  createDbIfNotExist?: boolean
-  forceCreateDB?: boolean
-  allowLocalConnections?: boolean
-  allowPrivateConnections?: boolean
-  password?: string
+  createDbIfNotExist: boolean
+  forceCreateDB: boolean
+  allowLocalConnections: boolean
+  allowPrivateConnections: boolean
+  password: string
   connector?: HoprCoreEthereum
-  strategy?: ChannelStrategyInterface
-  hosts?: {
+  strategy: ChannelStrategyInterface
+  hosts: {
     ip4?: NetOptions
     ip6?: NetOptions
   }
-  heartbeatInterval?: number
-  heartbeatThreshold?: number
-  heartbeatVariance?: number
-  networkQualityThreshold?: number
-  onChainConfirmations?: number
-  checkUnrealizedBalance?: boolean
-
+  heartbeatInterval: number
+  heartbeatThreshold: number
+  heartbeatVariance: number
+  networkQualityThreshold: number
+  onChainConfirmations: number
+  checkUnrealizedBalance: boolean
   testing?: {
     // when true, assume that the node is running in an isolated network and does
     // not need any connection to nodes outside of the subnet

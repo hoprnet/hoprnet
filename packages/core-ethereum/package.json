@@ -13,7 +13,6 @@
     "build:wasm": "make -C crates all && make -C crates install",
     "test:wasm": "make -C crates test",
     "clean": "yarn clean:wasm && rm -Rf ./lib ./tsconfig.tsbuildinfo",
-    "coverage": "nyc --reporter=html mocha",
     "test": "NODE_OPTIONS=\"--experimental-wasm-modules --trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace",
     "dev": "yarn clean && yarn build:wasm && tsc -w",
     "build": "yarn clean && yarn build:wasm && tsc",
@@ -48,15 +47,13 @@
     "@types/chai": "4.3.3",
     "@types/mocha": "9.1.1",
     "@types/sinon": "10.0.13",
-    "@types/yargs": "17.0.10",
     "chai": "4.3.6",
     "chai-as-promised": "7.1.1",
     "mocha": "9.2.2",
-    "nyc": "15.1.0",
     "sinon": "12.0.1",
     "typedoc": "0.23.20",
     "typedoc-plugin-markdown": "3.13.6",
-    "typescript": "4.8.4"
+    "typescript": "4.9.5"
   },
   "mocha": {
     "spec": "lib/**/*.spec.js"

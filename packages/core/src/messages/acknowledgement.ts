@@ -19,6 +19,10 @@ export class Acknowledgement {
   }
 
   static create(challenge: AcknowledgementChallenge, ackKey: HalfKey, privKey: PeerId): Acknowledgement {
+    if (!privKey.privateKey) {
+      throw Error(`Cannot create acknowledgement because lacking access to private key`)
+    }
+
     const toSign = Uint8Array.from([...challenge.serialize(), ...ackKey.serialize()])
 
     const signature = secp256k1.ecdsaSign(
@@ -50,7 +54,11 @@ export class Acknowledgement {
     const challengeToVerify = createHash(HASH_ALGORITHM).update(new HalfKey(ackKey).toChallenge().serialize()).digest()
 
     if (
-      !secp256k1.ecdsaVerify(challengeSignature, challengeToVerify, unmarshalPublicKey(ownPubKey.publicKey).marshal())
+      !secp256k1.ecdsaVerify(
+        challengeSignature,
+        challengeToVerify,
+        unmarshalPublicKey(ownPubKey.publicKey as Uint8Array).marshal()
+      )
     ) {
       throw Error(`Challenge signature verification failed.`)
     }
@@ -59,7 +67,13 @@ export class Acknowledgement {
       .update(Uint8Array.from([...challengeSignature, ...ackKey]))
       .digest()
 
-    if (!secp256k1.ecdsaVerify(ackSignature, ackToVerify, unmarshalPublicKey(senderPubKey.publicKey).marshal())) {
+    if (
+      !secp256k1.ecdsaVerify(
+        ackSignature,
+        ackToVerify,
+        unmarshalPublicKey(senderPubKey.publicKey as Uint8Array).marshal()
+      )
+    ) {
       throw Error(`Acknowledgement signature verification failed.`)
     }
 

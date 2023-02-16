@@ -63,7 +63,11 @@ export class AcknowledgementChallenge {
 }
 
 function verifyChallenge(pubKey: PeerId, signature: Uint8Array, challenge: HalfKeyChallenge): boolean {
-  return secp256k1.ecdsaVerify(signature, hashChallenge(challenge), unmarshalPublicKey(pubKey.publicKey).marshal())
+  return secp256k1.ecdsaVerify(
+    signature,
+    hashChallenge(challenge),
+    unmarshalPublicKey(pubKey.publicKey as Uint8Array).marshal()
+  )
 }
 
 function hashChallenge(ackChallenge: HalfKeyChallenge): Uint8Array {

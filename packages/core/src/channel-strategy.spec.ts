@@ -32,7 +32,7 @@ describe('test strategies', async function () {
     ]
 
     {
-      let res = strategy.tick(new BN(stake), peers.keys(), outgoing_channels, (x: string) => peers.get(x))
+      let res = strategy.tick(new BN(stake), peers.keys(), outgoing_channels, (x: string) => peers.get(x) as number)
 
       assert.equal(res.max_auto_channels, 4)
       assert.equal(res.to_close().length, 2)
@@ -53,7 +53,7 @@ describe('test strategies', async function () {
     })
 
     {
-      let res = strategy.tick(new BN(stake), peers.keys(), outgoing_channels, (x: string) => peers.get(x))
+      let res = strategy.tick(new BN(stake), peers.keys(), outgoing_channels, (x: string) => peers.get(x) as number)
 
       assert.equal(res.max_auto_channels, 2)
       assert.equal(res.to_close().length, 2)

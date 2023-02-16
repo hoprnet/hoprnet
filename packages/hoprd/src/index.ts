@@ -27,7 +27,7 @@ import setupHealthcheck from './healthcheck.js'
 import { LogStream } from './logs.js'
 import { getIdentity } from './identity.js'
 import { decodeMessage } from './api/utils.js'
-import { StrategyFactory } from '@hoprnet/hopr-core/lib/channel-strategy.js'
+import { type ChannelStrategyInterface, StrategyFactory } from '@hoprnet/hopr-core/lib/channel-strategy.js'
 
 // Metrics
 const metric_processStartTime = create_gauge(
@@ -57,6 +57,18 @@ const version = get_package_version(packageFile)
 const on_avado = (process.env.AVADO ?? 'false').toLowerCase() === 'true'
 
 function generateNodeOptions(argv: CliArgs, environment: ResolvedEnvironment): HoprOptions {
+  let strategy: ChannelStrategyInterface
+
+  if (isStrategy(argv.default_strategy)) {
+    strategy = StrategyFactory.getStrategy(argv.default_strategy)
+    strategy.configure({
+      auto_redeem_tickets: argv.auto_redeem_tickets ?? false,
+      max_channels: argv.max_auto_channels ?? undefined
+    })
+  } else {
+    throw Error(`Invalid strategy selected`)
+  }
+
   let options: HoprOptions = {
     createDbIfNotExist: argv.init,
     announce: argv.announce,
@@ -76,19 +88,10 @@ function generateNodeOptions(argv: CliArgs, environment: ResolvedEnvironment): H
       preferLocalAddresses: argv.test_prefer_local_addresses,
       noWebRTCUpgrade: argv.test_no_webrtc_upgrade,
       noDirectConnections: argv.test_no_direct_connections
-    }
-  }
-
-  if (argv.password !== undefined) {
-    options.password = argv.password as string
-  }
-
-  if (isStrategy(argv.default_strategy)) {
-    options.strategy = StrategyFactory.getStrategy(argv.default_strategy)
-    options.strategy.configure({
-      auto_redeem_tickets: argv.auto_redeem_tickets ?? false,
-      max_channels: argv.max_auto_channels ?? undefined
-    })
+    },
+    password: argv.password,
+    strategy,
+    forceCreateDB: argv.force_init
   }
 
   return options

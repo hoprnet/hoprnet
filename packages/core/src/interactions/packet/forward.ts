@@ -3,7 +3,7 @@ import type { PeerId } from '@libp2p/interface-peer-id'
 import { durations, pickVersion, pubKeyToPeerId, type HoprDB, create_counter } from '@hoprnet/hopr-utils'
 import { debug } from '@hoprnet/hopr-utils'
 
-import { AsyncIterableQueue } from 'async-iterable-queue'
+import { pushable, type Pushable } from 'it-pushable'
 
 import { Packet } from '../../messages/index.js'
 import { new_mixer, core_mixer_set_panic_hook } from '../../../lib/core_mixer_bg.js'
@@ -31,7 +31,7 @@ import { peerIdFromBytes } from '@libp2p/peer-id'
 const NORMALIZED_VERSION = pickVersion(pkg.version)
 
 export class PacketForwardInteraction {
-  protected packetQueue: AsyncIterableQueue<Uint8Array>
+  protected packetQueue: Pushable<Uint8Array>
 
   public readonly protocols: string | string[]
 
@@ -45,7 +45,7 @@ export class PacketForwardInteraction {
     private acknowledgements: AcknowledgementInteraction,
     private options: HoprOptions
   ) {
-    this.packetQueue = new AsyncIterableQueue<Uint8Array>()
+    this.packetQueue = pushable()
 
     this.protocols = [
       // current
@@ -76,7 +76,7 @@ export class PacketForwardInteraction {
   }
 
   stop() {
-    this.packetQueue.end().then(function (_) {})
+    this.packetQueue.end()
   }
 
   async handleMixedPackets() {
