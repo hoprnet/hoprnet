@@ -67,6 +67,7 @@
 | `allowLocalConnections?` | `boolean` |
 | `allowPrivateConnections?` | `boolean` |
 | `announce?` | `boolean` |
+| `checkUnrealizedBalance?` | `boolean` |
 | `connector?` | `HoprCoreEthereum` |
 | `createDbIfNotExist?` | `boolean` |
 | `dataPath` | `string` |
@@ -103,7 +104,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:184](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L184)
+[packages/core/src/index.ts:186](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L186)
 
 ___
 
@@ -113,7 +114,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:199](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L199)
+[packages/core/src/index.ts:201](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L201)
 
 ___
 
@@ -133,7 +134,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:186](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L186)
+[packages/core/src/index.ts:188](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L188)
 
 ## Variables
 
