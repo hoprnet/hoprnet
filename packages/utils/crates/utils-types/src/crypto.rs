@@ -1,14 +1,16 @@
 // TODO: All types specified in this module will be moved over to the core-crypto crate once merged.
 
+use std::ops::Add;
 use std::str::FromStr;
 use k256::ecdsa::{SigningKey, Signature as ECDSASignature, signature::Signer, VerifyingKey};
-use k256::{elliptic_curve, NonZeroScalar, Secp256k1};
+use k256::{AffinePoint, elliptic_curve, NonZeroScalar, Secp256k1};
 use k256::ecdsa::signature::Verifier;
+use k256::elliptic_curve::ProjectiveArithmetic;
 use k256::elliptic_curve::sec1::ToEncodedPoint;
 use libp2p_core::PeerId;
 use sha3::{Keccak256, digest::DynDigest};
 use crate::errors::{Result, GeneralError::ParseError};
-use crate::primitives::Address;
+use crate::primitives::{Address, EthereumChallenge};
 
 /// Represent an uncompressed elliptic curve point on the secp256k1 curve
 #[derive(Clone, Eq, PartialEq, Debug)]
@@ -52,7 +54,7 @@ impl CurvePoint {
 
 impl CurvePoint {
     /// Size of the uncompressed elliptic curve point
-    pub const SIZE: usize = 64;
+    pub const SIZE: usize = 65;
 
     pub fn from_exponent(exponent: &[u8]) -> Result<Self> {
         Ok(CurvePoint::new(&PublicKey::from_privkey(exponent)?
@@ -74,6 +76,43 @@ impl CurvePoint {
 
     pub fn to_peerid(&self) -> PeerId {
         PublicKey::deserialize(&self.uncompressed).unwrap().to_peerid()
+    }
+}
+
+/// Natural extension of the Curve Point to the PoR challenge
+#[derive(Clone, Eq, PartialEq, Debug)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
+pub struct Challenge {
+    pub curve_point: CurvePoint
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+impl Challenge {
+    pub fn from_hint_and_share(own_share: &HalfKeyChallenge, hint: &HalfKeyChallenge) -> Self {
+        Self {
+            curve_point: CurvePoint::new(&PublicKey::combine(&[
+                    &PublicKey::deserialize(&own_share.hkc)
+                        .expect("invalid own share"),
+                    &PublicKey::deserialize(&hint.hkc)
+                        .expect("invalid hint")])
+                    .serialize(false))
+        }
+    }
+
+    pub fn from_own_share_and_half_key(own_share: &HalfKeyChallenge, half_key: &HalfKey) -> Self {
+        Self {
+            curve_point: CurvePoint::new(
+                &PublicKey::tweak_add(&PublicKey::deserialize(&own_share.hkc)
+                    .expect("invalid own share"),
+                                      &half_key.serialize()
+                )
+                .serialize(false)
+            )
+        }
+    }
+
+    pub fn to_ethereum_challenge(&self) -> EthereumChallenge {
+        EthereumChallenge::new(&self.curve_point.to_address().serialize())
     }
 }
 
@@ -271,6 +310,11 @@ impl Hash {
     }
 }
 
+/// Prefix hash with "\x19Ethereum Signed Message:\n {length} {message}" and return hash
+pub fn ethereum_signed_hash(hash: &Hash) -> Hash {
+    unimplemented!()
+}
+
 /// Represents a secp256k1 public key.
 /// This is a "Schrödinger public key", both compressed and uncompressed to save some cycles.
 #[derive(Clone, Eq, PartialEq, Debug)]
@@ -354,6 +398,39 @@ impl PublicKey {
             key,
             compressed: key.to_encoded_point(true).to_bytes()
         })
+    }
+
+    /// Sums all given public keys together, creating a new public key.
+    /// Panics if reaches infinity (EC identity point), which is an invalid public key.
+    pub fn combine(summands: &[&PublicKey]) -> PublicKey {
+        // Convert all public keys to EC points in the projective coordinates, which are
+        // more efficient for doing the additions. Then finally make in an affine point
+        let affine: AffinePoint = summands
+            .iter()
+            .map(|p| p.key.to_projective())
+            .fold(<Secp256k1 as ProjectiveArithmetic>::ProjectivePoint::IDENTITY, |acc, x| acc.add(x))
+            .to_affine();
+
+        Self {
+            key: elliptic_curve::PublicKey::<Secp256k1>::from_affine(affine)
+                .expect("combination results into ec identity (which is an invalid pub key)"),
+            compressed: affine.to_encoded_point(true).to_bytes()
+        }
+    }
+
+    /// Adds the public key with tweak times generator, producing a new public key.
+    /// Panics if reaches infinity (EC identity point), which is an invalid public key.
+    pub fn tweak_add(key: &PublicKey, tweak: &[u8]) -> PublicKey {
+        let scalar = NonZeroScalar::try_from(tweak)
+            .expect("invalid tweak results in identity point");
+
+        let new_pk = (key.key.to_projective() + <Secp256k1 as ProjectiveArithmetic>::ProjectivePoint::IDENTITY * scalar.as_ref())
+            .to_affine();
+        Self {
+            key: elliptic_curve::PublicKey::<Secp256k1>::from_affine(new_pk)
+                .expect("combination results into ec identity (which is an invalid pub key)"),
+            compressed: new_pk.to_encoded_point(true).to_bytes()
+        }
     }
 }
 

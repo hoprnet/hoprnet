@@ -2,7 +2,7 @@ use std::ops::Sub;
 use ethnum::u256;
 use serde_repr::*;
 use utils_misc::utils::get_time_millis;
-use crate::crypto::{Hash, PublicKey, Signature};
+use crate::crypto::{Challenge, ethereum_signed_hash, Hash, PublicKey, Signature};
 use crate::errors::{Result, GeneralError::ParseError};
 use crate::primitives::{Address, Balance, BalanceType, EthereumChallenge, U256};
 
@@ -185,6 +185,35 @@ pub struct Ticket {
     pub win_prob: U256,
     pub channel_epoch: U256,
     pub signature: Signature
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+impl Ticket {
+
+    fn serialize_unsigned(counterparty: &Address, challenge: &EthereumChallenge, epoch: &U256, amount: &Balance, win_prob: &U256, index: &U256, channel_epoch: &U256) -> Box<[u8]> {
+        let mut ret = Vec::<u8>::new();
+        ret.extend_from_slice(&counterparty.serialize());
+        ret.extend_from_slice(&challenge.serialize());
+        ret.extend_from_slice(&epoch.serialize());
+        ret.extend_from_slice(&amount.serialize_value());
+        ret.extend_from_slice(&win_prob.serialize());
+        ret.extend_from_slice(&index.serialize());
+        ret.extend_from_slice(&channel_epoch.serialize());
+        ret.into_boxed_slice()
+    }
+
+    pub fn create(counterparty: Address, challenge: Challenge, epoch: U256, index: U256, amount: Balance, win_prob: U256, channel_epoch: U256, signing_key: &[u8]) -> Self {
+        let encoded_challenge = challenge.to_ethereum_challenge();
+        let hashed_ticket = Hash::create(&[&Self::serialize_unsigned(&counterparty, &encoded_challenge, &epoch, &amount, &win_prob, &index, &channel_epoch)]);
+        let msg = ethereum_signed_hash(&hashed_ticket);
+        let signature = Signature::sign_message(&msg.serialize(), signing_key);
+
+        Self {
+            counterparty, challenge: encoded_challenge, epoch, index, amount, win_prob, channel_epoch, signature
+        }
+
+    }
+
 }
 
 #[cfg(feature = "wasm")]
