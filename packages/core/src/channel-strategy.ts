@@ -32,7 +32,7 @@ export function isStrategy(str: string): str is Strategy {
   return STRATEGIES.includes(str)
 }
 
-export class OutgoingChannelStatus {
+export interface OutgoingChannelStatus {
   peer_id: string
   stake_str: string
   status: ChannelStatus
@@ -50,13 +50,13 @@ export class OutgoingChannelStatus {
 export interface ChannelStrategyInterface {
   name: string
 
-  configure(settings: any)
+  configure(settings: any): void
 
   tick(
     balance: BN,
     network_peer_ids: Iterator<string>,
     outgoing_channel: OutgoingChannelStatus[],
-    peer_quality: (string) => number
+    peer_quality: (string: string) => number
   ): StrategyTickResult
 
   onChannelWillClose(channel: ChannelEntry): Promise<void> // Before a channel closes
@@ -114,7 +114,16 @@ export abstract class SaneDefaults {
   tickInterval = CHECK_TIMEOUT
 }
 
-type RustStrategyInterface = { configure; tick; name }
+interface RustStrategyInterface {
+  configure: (settings: any) => void
+  tick: (
+    balance: Balance,
+    network_peer_ids: Iterator<string>,
+    outgoing_channels: OutgoingChannelStatus[],
+    peer_quality: (string: string) => number
+  ) => StrategyTickResult
+  name: string
+}
 
 /**
   Temporary wrapper class before we migrate rest of the core to use Rust exported types (before we migrate everything to Rust!)
@@ -133,7 +142,7 @@ class RustStrategyWrapper<T extends RustStrategyInterface> extends SaneDefaults 
     balance: BN,
     network_peer_ids: Iterator<string>,
     outgoing_channels: OutgoingChannelStatus[],
-    peer_quality: (string) => number
+    peer_quality: (string: string) => number
   ): StrategyTickResult {
     return this.strategy.tick(
       new Balance(balance.toString(), BalanceType.HOPR),

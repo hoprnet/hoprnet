@@ -1265,7 +1265,7 @@ ___
 
 ### keyOf
 
-▸ `Private` **keyOf**(...`segments`): `Uint8Array`
+▸ `Private` **keyOf**(`...segments`): `Uint8Array`
 
 #### Parameters
 

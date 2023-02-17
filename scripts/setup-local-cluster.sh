@@ -235,11 +235,11 @@ declare deployments_summary="${mydir}/../packages/ethereum/contracts/contracts-a
 
 # --- Running Mock Blockchain --- {{{
 log "Running anvil local node"
-"${mydir}/run-local-anvil.sh" -l ${anvil_rpc_log}
+make -C "${mydir}/../" run-anvil args="-l ${anvil_rpc_log}"
 
 log "Wait for anvil local node to complete startup"
-wait_for_regex ${anvil_rpc_log} "Listening on 127.0.0.1:8545"
-log "Anvil node started (127.0.0.1:8545)"
+wait_for_regex ${anvil_rpc_log} "Listening on 0.0.0.0:8545"
+log "Anvil node started (0.0.0.0:8545)"
 
 # need to mirror contract data because of anvil-deploy node only writing to localhost
 update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "anvil-localhost" "anvil-localhost"

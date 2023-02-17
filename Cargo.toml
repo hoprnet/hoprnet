@@ -2,6 +2,7 @@
 
 members = [
     "packages/core/crates/core-misc",
+    "packages/core/crates/core-mixer",
     "packages/core/crates/core-strategy",
     "packages/core-ethereum/crates/core-ethereum-misc",
     "packages/ethereum/crates/bindings",
@@ -16,7 +17,7 @@ members = [
 
 [workspace.dependencies]
 wasm-pack = "0.10.3"
-wasm-opt = "0.110.2"
+wasm-opt = "0.111.0"
 
 [profile.release]
 # Tell `rustc` to optimize for small code size.
