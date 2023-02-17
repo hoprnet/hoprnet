@@ -2,7 +2,6 @@
 id: using-docker
 title: Using Docker
 ---
-
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
@@ -145,6 +144,7 @@ When migrating between releases, Docker users need to either move their identity
 For example, when we update from version `1.91.24` (Bogota) to `1.92.9` (Monte Rosa), the location the command points to will change as such:
 
 1.) `$HOME/.hoprd-db-bogota` to `$HOME/.hoprd-db-monte-rosa`
+
 2.) `$HOME/.hoprd-db-bogota/.hopr-id-bogota` to `$HOME/.hoprd-db-monte-rosa/.hopr-id-monte-rosa`
 
 ### Moving your identity file over
