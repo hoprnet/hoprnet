@@ -8,7 +8,7 @@ import {
   type Hash,
   create_counter
 } from '@hoprnet/hopr-utils'
-import { findCommitmentPreImage, bumpCommitment } from '@hoprnet/hopr-core-ethereum'
+import { findCommitmentPreImage } from '@hoprnet/hopr-core-ethereum'
 import type { SendMessage } from '../../index.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { ACKNOWLEDGEMENT_TIMEOUT } from '../../constants.js'
@@ -179,6 +179,8 @@ export class AcknowledgementInteraction {
     }
     const response = unacknowledged.getResponse(acknowledgement.ackKeyShare)
     const ticket = unacknowledged.ticket
+
+    // get the current commitment preimage, this value will be updated at ticket redemption
     let opening: Hash
     try {
       opening = await findCommitmentPreImage(this.db, channelId)
@@ -189,26 +191,28 @@ export class AcknowledgementInteraction {
       return
     }
 
+    // Store the acknowledged ticket, regardless if it's a win or a loss
+    // FIXME: preImage (`opening` here) should not be assigned at this moment.
+    const ack = new AcknowledgedTicket(ticket, response, opening, unacknowledged.signer)
+    log(`Acknowledging ticket. Using not-up-to-date opening ${opening.toHex()} and response ${response.toHex()}`)
+    // replace the unAcked ticket with Acked ticket.
+  
+    try {
+      await this.db.replaceUnAckWithAck(acknowledgement.ackChallenge, ack)
+      log(`Stored acknowledged ticket`)
+    } catch (err) {
+      log(`ERROR: cannot replace an UnAck ticket with Ack ticket, thus dropping ticket`, err)
+    }
+
+    // If the ticket is a win, the default strategy would trigger the onWinningTicket action (e.g. auto- ticket redemption).
     if (!ticket.isWinningTicket(opening, response, ticket.winProb)) {
-      log(`Got a ticket that is not a win. Dropping ticket.`)
+      log(`Got a ticket that is not a win. Marking it as a loss`)
       await this.db.markLosing(unacknowledged)
       metric_losingTickets.increment()
       return
     }
 
-    // Ticket is a win, let's store it
-    const ack = new AcknowledgedTicket(ticket, response, opening, unacknowledged.signer)
-    log(`Acknowledging ticket. Using opening ${opening.toHex()} and response ${response.toHex()}`)
-
-    try {
-      await this.db.replaceUnAckWithAck(acknowledgement.ackChallenge, ack)
-      log(`Stored winning ticket`)
-    } catch (err) {
-      log(`ERROR: commitment could not be bumped, thus dropping ticket`, err)
-    }
-
-    // store commitment in db
-    await bumpCommitment(this.db, channelId, opening)
+    // Do not bump commitment in db here. Commitment is bumped in `redeemTicket` (`redeemTicketsInChannelLoop`)
     metric_winningTickets.increment()
     this.onWinningTicket(ack)
   }

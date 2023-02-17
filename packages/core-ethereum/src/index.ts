@@ -326,10 +326,10 @@ export default class HoprCoreEthereum extends EventEmitter {
   }
 
   private async redeemTicketsInChannelLoop(channel: ChannelEntry): Promise<void> {
-    const channelId = channel.getId().toHex()
+    const channelId = channel.getId()
     if (!channel.destination.eq(this.getPublicKey())) {
       // delete operation before returning
-      delete this.ticketRedemtionInChannelOperations[channelId]
+      delete this.ticketRedemtionInChannelOperations[channelId.toHex()]
       throw new Error('Cannot redeem ticket in channel that is not to us')
     }
 
@@ -354,7 +354,7 @@ export default class HoprCoreEthereum extends EventEmitter {
           log(
             `Could not redeem ticket with index ${ticket.ticket.index
               .toBN()
-              .toString()} in channel ${channelId}. Giving up.`
+              .toString()} in channel ${channelId.toHex()}. Giving up.`
           )
           break
         }
@@ -368,7 +368,8 @@ export default class HoprCoreEthereum extends EventEmitter {
         )
 
         log(ticket.ticket.toString())
-        const result = await boundRedeemTicket(channel.source, ticket)
+        
+        const result = await boundRedeemTicket(channel.source, channelId, ticket)
 
         if (result.status !== 'SUCCESS') {
           if (result.status === 'ERROR') {
@@ -392,12 +393,12 @@ export default class HoprCoreEthereum extends EventEmitter {
     } catch (err) {
       log(`redemption of tickets from ${channel.source.toString()} failed`, err)
     } finally {
-      delete this.ticketRedemtionInChannelOperations[channelId]
+      delete this.ticketRedemtionInChannelOperations[channelId.toHex()]
     }
   }
 
   // Private as out of order redemption will break things - redeem all at once.
-  private async redeemTicket(counterparty: PublicKey, ackTicket: AcknowledgedTicket): Promise<RedeemTicketResponse> {
+  private async redeemTicket(counterparty: PublicKey, channelId: Hash, ackTicket: AcknowledgedTicket): Promise<RedeemTicketResponse> {
     if (!ackTicket.verify(counterparty)) {
       return {
         status: 'FAILURE',
@@ -405,11 +406,27 @@ export default class HoprCoreEthereum extends EventEmitter {
       }
     }
 
+    let commitmentPreImage: Hash // actual ackTicket.preImage
+
+    try {
+      commitmentPreImage = await findCommitmentPreImage(this.db, channelId)
+
+    } catch (err) {
+      log(`Channel ${channelId.toHex()} is out of commitments`)
+      // TODO: How should we handle this ticket if it's out of commitment
+      return {
+        status: 'ERROR',
+        error: err
+      }
+    }
+    // set the commitment
+    ackTicket.setPreImage(commitmentPreImage)
+    log(`Set preImage ${commitmentPreImage.toHex()} for ticket ${ackTicket.response.toHex()}`)
+
     let receipt: string
 
     try {
       const ticket = ackTicket.ticket
-
       log('Submitting ticket', ackTicket.response.toHex())
       const emptyPreImage = new Hash(new Uint8Array(Hash.SIZE).fill(0x00))
       const hasPreImage = !ackTicket.preImage.eq(emptyPreImage)
@@ -442,8 +459,12 @@ export default class HoprCoreEthereum extends EventEmitter {
         error: err
       }
     }
-
     log('Successfully submitted ticket', ackTicket.response.toHex())
+    
+    // bump commitment when on-chain ticket redemption is successful
+    await bumpCommitment(this.db, channelId, commitmentPreImage)
+    log(`Successfully bump local commitment after ${commitmentPreImage.toHex()}`)
+
     await this.db.markRedeemeed(ackTicket)
     this.emit('ticket:redeemed', ackTicket)
     return {
