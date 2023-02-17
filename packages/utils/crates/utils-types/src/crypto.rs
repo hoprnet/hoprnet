@@ -1,13 +1,15 @@
 // TODO: All types specified in this module will be moved over to the core-crypto crate once merged.
 
 use std::str::FromStr;
-use k256::ecdsa::{SigningKey, Signature as ECDSASignature, signature::Signer, VerifyingKey};
+use k256::ecdsa::{SigningKey, Signature as ECDSASignature, signature::Signer, VerifyingKey, RecoveryId};
 use k256::{elliptic_curve, NonZeroScalar, Secp256k1};
 use k256::ecdsa::signature::Verifier;
+use k256::elliptic_curve::generic_array::GenericArray;
 use k256::elliptic_curve::sec1::ToEncodedPoint;
 use libp2p_core::PeerId;
 use sha3::{Keccak256, digest::DynDigest};
 use crate::errors::{Result, GeneralError::ParseError};
+use crate::errors::GeneralError::MathError;
 use crate::primitives::Address;
 
 /// Represent an uncompressed elliptic curve point on the secp256k1 curve
@@ -354,6 +356,20 @@ impl PublicKey {
             key,
             compressed: key.to_encoded_point(true).to_bytes()
         })
+    }
+
+    pub fn from_signature(hash: &[u8], r: &[u8], s: &[u8], v: u8) -> Result<PublicKey> {
+        let recid = RecoveryId::try_from(v).map_err(|_| ParseError)?;
+        let signature = ECDSASignature::from_scalars(
+            GenericArray::clone_from_slice(r),GenericArray::clone_from_slice(s))
+            .map_err(|_| ParseError)?;
+        let recovered_key = VerifyingKey::recover_from_prehash(
+            hash,
+            &signature,
+            recid
+        ).map_err(|_| MathError)?;
+
+        Self::deserialize(&recovered_key.to_encoded_point(false).to_bytes())
     }
 }
 
