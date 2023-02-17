@@ -23,6 +23,7 @@
 - Return explict message for unsupported closing incoming channel ([#4551](https://github.com/hoprnet/hoprnet/pull/4551)) with a fix in admin UI ([hopr-admin/#3](https://github.com/hoprnet/hopr-admin/pull/3))
 - Bring back `fund` command, to open outgoing and incoming channels with counterpart ([#4566](https://github.com/hoprnet/hoprnet/pull/4566))
 - Migrate mixer code to Rust ([#4567](https://github.com/hoprnet/hoprnet/pull/4567))
+- Primitive & basic types re-created in Rust ([#4645](https://github.com/hoprnet/hoprnet/pull/4645)))
 
 <a name="1.91"></a>
 
