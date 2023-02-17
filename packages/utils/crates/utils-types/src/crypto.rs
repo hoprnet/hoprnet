@@ -566,7 +566,7 @@ pub mod tests {
     use k256::{NonZeroScalar, Secp256k1, U256};
     use k256::elliptic_curve::sec1::ToEncodedPoint;
     use lazy_static::lazy_static;
-    use crate::crypto::{Challenge, CurvePoint, PublicKey, Signature};
+    use crate::crypto::{Challenge, CurvePoint, HalfKeyChallenge, Hash, PublicKey, Signature};
 
     lazy_static! {
         static ref PUBLIC_KEY: Vec<u8>  = hex::decode("021464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8").unwrap();
@@ -653,6 +653,24 @@ pub mod tests {
 
         assert_eq!(ch1.to_ethereum_challenge(), ch2.to_ethereum_challenge());
         assert_eq!(ch1, ch2);
+    }
+
+    #[test]
+    fn half_key_challenge_test() {
+        let peer_id = PublicKey::deserialize(&PUBLIC_KEY).unwrap().to_peerid();
+        let hkc1 = HalfKeyChallenge::from_peerid(&peer_id).unwrap();
+        let hkc2 = HalfKeyChallenge::deserialize(&hkc1.serialize()).unwrap();
+        assert_eq!(hkc1, hkc2);
+        assert_eq!(peer_id, hkc2.to_peerid());
+    }
+
+    #[test]
+    fn hash_test() {
+        let hash1 = Hash::create(&[b"msg"]);
+        assert_eq!("92aef1b955b9de564fc50e31a55b470b0c8cdb931f186485d620729fb03d6f2c", hash1.to_hex());
+
+        let hash2 = Hash::deserialize(&hash1.serialize()).unwrap();
+        assert_eq!(hash1, hash2);
     }
 
 
