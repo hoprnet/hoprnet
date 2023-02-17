@@ -196,7 +196,7 @@ export class AcknowledgementInteraction {
     const ack = new AcknowledgedTicket(ticket, response, opening, unacknowledged.signer)
     log(`Acknowledging ticket. Using not-up-to-date opening ${opening.toHex()} and response ${response.toHex()}`)
     // replace the unAcked ticket with Acked ticket.
-  
+
     try {
       await this.db.replaceUnAckWithAck(acknowledgement.ackChallenge, ack)
       log(`Stored acknowledged ticket`)
