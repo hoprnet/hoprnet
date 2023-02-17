@@ -157,8 +157,8 @@ mod tests {
             ("Joe".to_string(), 0.3),
         ]);
 
-        let balance = Balance::from_str("1000000000000000000", BalanceType::HOPR).unwrap();
-        let low_balance = Balance::from_str("1000000000000000", BalanceType::HOPR).unwrap();
+        let balance = Balance::from_str("1000000000000000000", BalanceType::HOPR);
+        let low_balance = Balance::from_str("1000000000000000", BalanceType::HOPR);
 
         let outgoing_channels = vec![
             OutgoingChannelStatus {
