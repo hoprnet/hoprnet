@@ -22,6 +22,7 @@ serde_repr = "0.1"
 thiserror = "1.0"
 utils-misc = { path = "../../../utils/crates/utils-misc" }
 wasm-bindgen = { version = "0.2.83", optional = true}
+proc-macro-crate = "1.3.0"
 
 # TODO: Remove these and replace with core-crypto once merged
 getrandom = { version = "0.2.8", features = ["js"] }
