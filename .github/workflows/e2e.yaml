@@ -56,6 +56,9 @@ jobs:
             .cargo/bin/
             .foundry/bin/
 
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v1
+
       - name: Install dependencies
         run: make -j deps-ci
 

@@ -49,6 +49,9 @@ jobs:
             .cargo/.package-cache/
             .cargo/bin/
 
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v1
+
       - name: Run linter
         run: |
           make -j deps-ci

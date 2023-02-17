@@ -55,6 +55,9 @@ jobs:
           apt update
           apt install --no-install-recommends lsof
 
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v1
+
       - name: Generate docs
         run: |
           make -j deps-ci
