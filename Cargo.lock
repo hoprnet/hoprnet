@@ -3862,6 +3862,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "pickledb"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c53a5ade47760e8cc4986bdc5e72daeffaaaee64cbc374f9cfe0a00c1cd87b1f"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "pin-project"
 version = "1.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5853,6 +5863,19 @@ version = "1.0.0"
 dependencies = [
  "quote",
  "wasm-bindgen-macro-support",
+]
+
+[[package]]
+name = "utils-storage"
+version = "0.1.0"
+dependencies = [
+ "console_error_panic_hook",
+ "pickledb",
+ "scopeguard 1.1.0",
+ "serde",
+ "tempfile 3.3.0",
+ "wasm-bindgen",
+ "wasm-bindgen-test",
 ]
 
 [[package]]
