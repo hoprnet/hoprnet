@@ -254,6 +254,7 @@ impl HalfKeyChallenge {
 }
 
 /// Represents a 256-bit hash value
+/// This implementation instantiates the hash via Keccak256 digest.
 #[derive(Clone, Eq, PartialEq, Debug)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Hash {
@@ -289,6 +290,8 @@ impl Hash {
     /// Size of the hash value in bytes
     pub const SIZE: usize = 32;
 
+    /// Takes all the byte slices and computes hash of their concatenated value.
+    /// Uses the Keccak256 digest.
     pub fn create(inputs: &[&[u8]]) -> Self {
         let mut hash = Keccak256::default();
         inputs.into_iter().for_each(|v| hash.update(*v));
@@ -312,9 +315,22 @@ impl Hash {
     }
 }
 
-/// Prefix hash with "\x19Ethereum Signed Message:\n {length} {message}" and return hash
-pub fn ethereum_signed_hash(hash: &Hash) -> Hash {
-    unimplemented!()
+/// Prefix message with "\x19Ethereum Signed Message:\n {length} {message}" and returns its hash
+/// Keccak256 is used as the underlying digest.
+pub fn ethereum_signed_hash<T: AsRef<[u8]>>(message: T) -> Hash {
+    const PREFIX: &str = "\x19Ethereum Signed Message:\n";
+
+    let message = message.as_ref();
+    let len = message.len();
+    let len_string = len.to_string();
+
+    let mut eth_message = Vec::with_capacity(PREFIX.len() + len_string.len() + len);
+    eth_message.extend_from_slice(PREFIX.as_bytes());
+    eth_message.extend_from_slice(len_string.as_bytes());
+    eth_message.extend_from_slice(message);
+
+
+    Hash::create(&[&eth_message])
 }
 
 /// Represents a secp256k1 public key.
@@ -402,7 +418,7 @@ impl PublicKey {
         })
     }
 
-    pub fn from_signature(hash: &[u8], r: &[u8], s: &[u8], v: u8) -> Result<PublicKey> {
+    pub fn from_raw_signature(hash: &[u8], r: &[u8], s: &[u8], v: u8) -> Result<PublicKey> {
         let recid = RecoveryId::try_from(v).map_err(|_| ParseError)?;
         let signature = ECDSASignature::from_scalars(
             GenericArray::clone_from_slice(r),GenericArray::clone_from_slice(s))
@@ -414,6 +430,13 @@ impl PublicKey {
         ).map_err(|_| MathError)?;
 
         Self::deserialize(&recovered_key.to_encoded_point(false).to_bytes())
+    }
+
+    pub fn from_signature(hash: &[u8], signature: &Signature) -> Result<PublicKey> {
+        Self::from_raw_signature(hash,
+                                 &signature.signature[0..Signature::SIZE/2],
+                                 &signature.signature[Signature::SIZE/2..],
+                                 signature.recovery)
     }
 
     /// Sums all given public keys together, creating a new public key.
@@ -451,6 +474,9 @@ impl PublicKey {
 }
 
 /// Represents an ECDSA signature based on the secp256k1 curve.
+/// This signature encodes the 2-bit recovery information into the
+/// upper-most bits of MSB of the S value, which are never used by this ECDSA
+/// instantiation over secp256k1.
 #[derive(Clone, Eq, PartialEq, Debug)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Signature {
@@ -690,6 +716,16 @@ pub mod wasm {
         #[wasm_bindgen(js_name = "from_peerid_str")]
         pub fn public_key_from_peerid_str(peer_id: &str) -> JsResult<PublicKey> {
             ok_or_jserr!(PublicKey::from_peerid_str(peer_id))
+        }
+
+        #[wasm_bindgen(js_name = "from_signature")]
+        pub fn public_key_from_raw_signature(hash: &[u8], r: &[u8], s: &[u8], v: u8) -> JsResult<PublicKey> {
+            ok_or_jserr!(PublicKey::from_raw_signature(hash, r, s, v))
+        }
+
+        #[wasm_bindgen(js_name = "from_privkey")]
+        pub fn public_key_from_privkey(private_key: &[u8]) -> JsResult<PublicKey> {
+            ok_or_jserr!(PublicKey::from_privkey(private_key))
         }
 
         pub fn size_compressed() -> u32 {

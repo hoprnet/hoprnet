@@ -1,4 +1,4 @@
-use std::ops::Sub;
+use std::ops::{Div, Mul, Sub};
 use ethnum::u256;
 use serde_repr::*;
 use utils_misc::utils::get_time_millis;
@@ -46,7 +46,7 @@ pub struct AcknowledgedTicket {
 }
 
 /// Overall description of a channel
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct ChannelEntry {
     pub source: PublicKey,
@@ -173,8 +173,8 @@ impl Response {
     }
 }
 
-/// Contains the overall description of a ticket
-#[derive(Clone)]
+/// Contains the overall description of a ticket with a signature
+#[derive(Clone, PartialEq, Debug)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct Ticket {
     pub counterparty: Address,
@@ -189,8 +189,7 @@ pub struct Ticket {
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl Ticket {
-
-    fn serialize_unsigned(counterparty: &Address, challenge: &EthereumChallenge, epoch: &U256, amount: &Balance, win_prob: &U256, index: &U256, channel_epoch: &U256) -> Box<[u8]> {
+    fn serialize_unsigned_aux(counterparty: &Address, challenge: &EthereumChallenge, epoch: &U256, amount: &Balance, win_prob: &U256, index: &U256, channel_epoch: &U256) -> Vec<u8> {
         let mut ret = Vec::<u8>::new();
         ret.extend_from_slice(&counterparty.serialize());
         ret.extend_from_slice(&challenge.serialize());
@@ -199,21 +198,98 @@ impl Ticket {
         ret.extend_from_slice(&win_prob.serialize());
         ret.extend_from_slice(&index.serialize());
         ret.extend_from_slice(&channel_epoch.serialize());
-        ret.into_boxed_slice()
+        ret
     }
 
     pub fn create(counterparty: Address, challenge: Challenge, epoch: U256, index: U256, amount: Balance, win_prob: U256, channel_epoch: U256, signing_key: &[u8]) -> Self {
         let encoded_challenge = challenge.to_ethereum_challenge();
-        let hashed_ticket = Hash::create(&[&Self::serialize_unsigned(&counterparty, &encoded_challenge, &epoch, &amount, &win_prob, &index, &channel_epoch)]);
-        let msg = ethereum_signed_hash(&hashed_ticket);
+        let hashed_ticket = Hash::create(&[&Self::serialize_unsigned_aux(&counterparty, &encoded_challenge, &epoch, &amount, &win_prob, &index, &channel_epoch)]);
+        let msg = ethereum_signed_hash(hashed_ticket.serialize());
         let signature = Signature::sign_message(&msg.serialize(), signing_key);
 
         Self {
             counterparty, challenge: encoded_challenge, epoch, index, amount, win_prob, channel_epoch, signature
         }
-
     }
 
+    /// Serializes the ticket except the signature
+    pub fn serialize_unsigned(&self) -> Box<[u8]> {
+        Self::serialize_unsigned_aux(&self.counterparty, &self.challenge, &self.epoch, &self.amount, &self.win_prob, &self.index, &self.channel_epoch)
+            .into_boxed_slice()
+    }
+
+    pub fn serialize(&self) -> Box<[u8]> {
+        let mut unsigned = Self::serialize_unsigned_aux(&self.counterparty, &self.challenge, &self.epoch, &self.amount, &self.win_prob, &self.index, &self.channel_epoch);
+        unsigned.extend_from_slice(&self.signature.serialize());
+        unsigned.into_boxed_slice()
+    }
+
+    /// Computes Ethereum signature hash of the ticket
+    pub fn get_hash(&self) -> Hash {
+        ethereum_signed_hash(Hash::create(&[&self.serialize_unsigned()]).serialize())
+    }
+
+    /// Recovers the signer public key from the embedded ticket signature.
+    /// This is possible due this specific instantiation of the ECDSA over the secp256k1 curve.
+    pub fn recover_signer(&self) -> PublicKey {
+        PublicKey::from_signature(&self.get_hash().serialize(), &self.signature)
+            .expect("invalid signature on ticket, public key not recoverable")
+    }
+
+    /// Verifies the signature of this ticket
+    pub fn verify(&self, public_key: &PublicKey) -> bool {
+        self.recover_signer().eq(public_key)
+    }
+
+    /// Computes a candidate check value to verify if this ticket is winning
+    pub fn get_luck(&self, preimage: &Hash, channel_response: &Response) -> U256 {
+        U256::deserialize(&Hash::create(&[
+            &self.get_hash().serialize(),
+            &preimage.serialize(),
+            &channel_response.serialize()
+        ]).serialize())
+            .unwrap()
+    }
+
+    /// Decides whether a ticket is a win or not.
+    /// Note that this mimics the on-chain logic.
+    /// Purpose of the function is to check the validity of ticket before we submit it to the blockchain.
+    pub fn is_winning(&self, preimage: &Hash, channel_response: &Response, win_prob: &U256) -> bool {
+        let luck = self.get_luck(preimage, channel_response);
+        luck.value().le(win_prob.value())
+    }
+
+    /// Based on the price of this ticket, determines the path position (hop number) this ticket
+    /// relates to.
+    pub fn get_path_position(&self, price_per_packet: &U256, inverse_ticket_win_prob: &U256) -> u8 {
+        let base_unit = price_per_packet.value().mul(inverse_ticket_win_prob.value());
+        self.amount.value().div(base_unit).as_u8()
+    }
+}
+
+impl Ticket {
+    pub const SIZE: usize = Address::SIZE + EthereumChallenge::SIZE + 2 * U256::SIZE +
+        Balance::SIZE + 2 * U256::SIZE + Signature::SIZE;
+
+    pub fn deserialize(bytes: &[u8]) -> Result<Ticket> {
+        if bytes.len() == Self::SIZE {
+            let mut b = Vec::from(bytes);
+            let counterparty = Address::deserialize(b.drain(0..Address::SIZE).as_ref())?;
+            let challenge = EthereumChallenge::deserialize(b.drain(0..EthereumChallenge::SIZE).as_ref())?;
+            let epoch = U256::deserialize(b.drain(0..U256::SIZE).as_ref())?;
+            let index = U256::deserialize(b.drain(0..U256::SIZE).as_ref())?;
+            let amount = Balance::deserialize(b.drain(0..Balance::SIZE).as_ref(), BalanceType::HOPR)?;
+            let win_prob = U256::deserialize(b.drain(0..U256::SIZE).as_ref())?;
+            let channel_epoch = U256::deserialize(b.drain(0..U256::SIZE).as_ref())?;
+            let signature = Signature::deserialize(b.drain(0..Signature::SIZE).as_ref())?;
+
+            Ok(Self {
+                counterparty, challenge, epoch, index, amount, win_prob, channel_epoch, signature
+            })
+        } else {
+            Err(ParseError)
+        }
+    }
 }
 
 #[cfg(feature = "wasm")]
@@ -304,6 +380,11 @@ pub mod wasm {
             Ticket {
                 counterparty, challenge, epoch, index, amount, win_prob, channel_epoch, signature
             }
+        }
+
+        #[wasm_bindgen(js_name = "deserialize")]
+        pub fn deserialize_bytes(bytes: &[u8]) -> JsResult<Ticket> {
+            ok_or_jserr!(Self::deserialize(bytes))
         }
     }
 }
