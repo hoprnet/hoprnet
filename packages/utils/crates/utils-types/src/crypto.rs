@@ -566,7 +566,7 @@ pub mod tests {
     use k256::{NonZeroScalar, Secp256k1, U256};
     use k256::elliptic_curve::sec1::ToEncodedPoint;
     use lazy_static::lazy_static;
-    use crate::crypto::{Challenge, CurvePoint, HalfKeyChallenge, Hash, PublicKey, Signature};
+    use crate::crypto::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, Hash, PublicKey, Signature};
 
     lazy_static! {
         static ref PUBLIC_KEY: Vec<u8>  = hex::decode("021464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8").unwrap();
@@ -653,6 +653,14 @@ pub mod tests {
 
         assert_eq!(ch1.to_ethereum_challenge(), ch2.to_ethereum_challenge());
         assert_eq!(ch1, ch2);
+    }
+
+    #[test]
+    fn half_key_test() {
+        let hk1 = HalfKey::new(&[0u8; HalfKey::SIZE]);
+        let hk2 = HalfKey::deserialize(&hk1.serialize()).unwrap();
+
+        assert_eq!(hk1, hk2);
     }
 
     #[test]
