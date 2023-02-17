@@ -76,15 +76,18 @@ impl ChannelEntry {
         ret.into_boxed_slice()
     }
 
+    /// Generates the ticket ID using the source and destination address
     pub fn get_id(&self) -> Hash {
         generate_channel_id(&self.source.to_address(), &self.destination.to_address())
     }
 
+    /// Checks if the closure time of this channel has passed.
     pub fn closure_time_passed(&self) -> bool {
         let now_seconds =  get_time_millis() / 1000;
         self.closure_time.value().lt(&u256::from(now_seconds))
     }
 
+    /// Calculates the remaining channel closure grace period.
     pub fn remaining_closure_time(&self) -> u64 {
         let now_seconds = u256::from(get_time_millis());
         if now_seconds.ge(self.closure_time.value()) {
