@@ -361,7 +361,7 @@ mod tests {
 
     #[test]
     fn address_tests() {
-        let addr_1 = Address::new(&[0u8; Self::SIZE]);
+        let addr_1 = Address::new(&[0u8; Address::SIZE]);
         let addr_2 = Address::deserialize(&addr_1.serialize()).unwrap();
 
         assert_eq!(addr_1, addr_2);
@@ -378,7 +378,7 @@ mod tests {
 
     #[test]
     fn eth_challenge_tests() {
-        let e_1 = EthereumChallenge::new(&[0u8; Self::SIZE]);
+        let e_1 = EthereumChallenge::new(&[0u8; EthereumChallenge::SIZE]);
         let e_2 = EthereumChallenge::deserialize(&e_1.serialize()).unwrap();
 
         assert_eq!(e_1, e_2);

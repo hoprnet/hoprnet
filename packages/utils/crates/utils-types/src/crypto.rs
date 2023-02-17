@@ -38,7 +38,8 @@ impl CurvePoint {
     }
 
     pub fn to_address(&self) -> Address {
-        Address::new(&Hash::create(&[&self.uncompressed[1..]]).serialize())
+        let hash = Hash::create(&[&self.uncompressed[1..]]).serialize();
+        Address::new(&hash[12..])
     }
 
     pub fn serialize(&self) -> Box<[u8]> {
@@ -78,6 +79,12 @@ impl CurvePoint {
 
     pub fn to_peerid(&self) -> PeerId {
         PublicKey::deserialize(&self.uncompressed).unwrap().to_peerid()
+    }
+
+    pub fn deserialize(bytes: &[u8]) -> Result<Self> {
+        Ok(CurvePoint::new(&PublicKey::deserialize(bytes)?
+            .serialize(false)
+        ))
     }
 }
 
@@ -418,13 +425,13 @@ impl PublicKey {
         })
     }
 
-    pub fn from_raw_signature(hash: &[u8], r: &[u8], s: &[u8], v: u8) -> Result<PublicKey> {
+    pub fn from_raw_signature(msg: &[u8], r: &[u8], s: &[u8], v: u8) -> Result<PublicKey> {
         let recid = RecoveryId::try_from(v).map_err(|_| ParseError)?;
         let signature = ECDSASignature::from_scalars(
             GenericArray::clone_from_slice(r),GenericArray::clone_from_slice(s))
             .map_err(|_| ParseError)?;
-        let recovered_key = VerifyingKey::recover_from_prehash(
-            hash,
+        let recovered_key = VerifyingKey::recover_from_msg(
+            msg,
             &signature,
             recid
         ).map_err(|_| MathError)?;
@@ -432,8 +439,8 @@ impl PublicKey {
         Self::deserialize(&recovered_key.to_encoded_point(false).to_bytes())
     }
 
-    pub fn from_signature(hash: &[u8], signature: &Signature) -> Result<PublicKey> {
-        Self::from_raw_signature(hash,
+    pub fn from_signature(msg: &[u8], signature: &Signature) -> Result<PublicKey> {
+        Self::from_raw_signature(msg,
                                  &signature.signature[0..Signature::SIZE/2],
                                  &signature.signature[Signature::SIZE/2..],
                                  signature.recovery)
@@ -555,8 +562,11 @@ impl Signature {
 
 #[cfg(test)]
 pub mod tests {
+    use k256::elliptic_curve::ProjectiveArithmetic;
+    use k256::{NonZeroScalar, Secp256k1, U256};
+    use k256::elliptic_curve::sec1::ToEncodedPoint;
     use lazy_static::lazy_static;
-    use crate::crypto::{PublicKey, Signature};
+    use crate::crypto::{Challenge, CurvePoint, PublicKey, Signature};
 
     lazy_static! {
         static ref PUBLIC_KEY: Vec<u8>  = hex::decode("021464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8").unwrap();
@@ -568,7 +578,11 @@ pub mod tests {
         let msg = b"test";
         let sgn = Signature::sign_message(msg, &PRIVATE_KEY);
 
-        assert!(sgn.verify(msg, &PUBLIC_KEY))
+        assert!(sgn.verify(msg, &PUBLIC_KEY));
+
+        let extracted_pk = PublicKey::from_signature(msg, &sgn).unwrap();
+        let expected_pk = PublicKey::deserialize(&PUBLIC_KEY).unwrap();
+        assert_eq!(expected_pk, extracted_pk);
     }
 
     #[test]
@@ -577,7 +591,6 @@ pub mod tests {
         let sgn = Signature::sign_message(msg, &PRIVATE_KEY);
 
         let deserialized = Signature::deserialize(&sgn.serialize()).unwrap();
-
         assert_eq!(sgn, deserialized, "signatures don't match");
     }
 
@@ -619,8 +632,30 @@ pub mod tests {
 
     #[test]
     fn curve_point_test() {
+        let scalar = NonZeroScalar::from_uint(U256::from_u8(100)).unwrap();
+        let test_point = (<Secp256k1 as ProjectiveArithmetic>::ProjectivePoint::GENERATOR * scalar.as_ref())
+            .to_affine();
 
+        let cp1 = CurvePoint::from_str(hex::encode(test_point.to_encoded_point(false).to_bytes()).as_str())
+            .unwrap();
+
+        let cp2 = CurvePoint::deserialize(&cp1.serialize())
+            .unwrap();
+
+        assert_eq!(cp1, cp2);
+
+        let pk = PublicKey::from_privkey(&scalar.to_bytes()).unwrap();
+
+        assert_eq!(cp1.to_address(), pk.to_address());
+
+        let ch1 = Challenge { curve_point: cp1 };
+        let ch2 = Challenge { curve_point: cp2 };
+
+        assert_eq!(ch1.to_ethereum_challenge(), ch2.to_ethereum_challenge());
+        assert_eq!(ch1, ch2);
     }
+
+
 }
 
 #[cfg(feature = "wasm")]
@@ -647,6 +682,11 @@ pub mod wasm {
         #[wasm_bindgen(js_name = "from_peerid_str")]
         pub fn create_from_peerid_str(peer_id: &str) -> JsResult<CurvePoint> {
             ok_or_jserr!(Self::from_peerid_str(peer_id))
+        }
+
+        #[wasm_bindgen(js_name = "deserialize")]
+        pub fn curve_point_deserialize(bytes: &[u8]) -> JsResult<CurvePoint> {
+            ok_or_jserr!(Self::deserialize(bytes))
         }
 
         pub fn size() -> u32 { Self::SIZE as u32 }
