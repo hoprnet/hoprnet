@@ -187,7 +187,9 @@ function install_protobuf() {
   esac
   PB_REL="https://github.com/protocolbuffers/protobuf/releases"
   curl -fsSLO "${PB_REL}/download/v21.12/protoc-21.12-${ostype}-${cputype}.zip"
-  unzip protoc-21.12-${ostype}-${cputype}.zip -d /usr/local
+  mkdir -p /opt/protoc-21.12-${ostype}-${cputype}
+  unzip protoc-21.12-${ostype}-${cputype}.zip -d /opt/protoc-21.12-${ostype}-${cputype}
+  ln -sf /opt/protoc-21.12-${ostype}-${cputype}/bin/protoc /usr/local/bin/protoc
 }
 
 
