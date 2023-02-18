@@ -118,7 +118,7 @@ impl ChannelEntry {
             let commitment = Hash::deserialize(b.drain(0..Hash::SIZE).as_ref())?;
             let ticket_epoch = U256::deserialize(b.drain(0..U256::SIZE).as_ref())?;
             let ticket_index = U256::deserialize(b.drain(0..U256::SIZE).as_ref())?;
-            let status = ChannelStatus::from_byte(b.pop().unwrap());
+            let status = ChannelStatus::from_byte(b.drain(0..1).as_ref()[0]);
             let channel_epoch = U256::deserialize(b.drain(0..U256::SIZE).as_ref())?;
             let closure_time = U256::deserialize(b.drain(0..U256::SIZE).as_ref())?;
             Ok(Self {
@@ -292,6 +292,37 @@ impl Ticket {
         } else {
             Err(ParseError)
         }
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use ethnum::u256;
+    use hex_literal::hex;
+    use crate::channels::{ChannelEntry, ChannelStatus};
+    use crate::crypto::{Hash, PublicKey};
+    use crate::primitives::{Balance, BalanceType, U256};
+
+    const PUBLIC_KEY_1: [u8; 65] = hex!("0443a3958ac66a3b2ab89fcf90bc948a8b8be0e0478d21574d077ddeb11f4b1e9f2ca21d90bd66cee037255480a514b91afae89e20f7f7fa7353891cc90a52bf6e");
+    const PUBLIC_KEY_2: [u8; 65] = hex!("04f16fd6701aea01032716377d52d8213497c118f99cdd1c3c621b2795cac8681606b7221f32a8c5d2ef77aa783bec8d96c11480acccabba9e8ee324ae2dfe92bb");
+    const COMMITMENT: [u8; 32] = hex!("ffab46f058090de082a086ea87c535d34525a48871c5a2024f80d0ac850f81ef");
+
+    #[test]
+    pub fn channel_entry_test() {
+        let ce1 = ChannelEntry::new(
+            PublicKey::deserialize(&PUBLIC_KEY_1).unwrap(),
+            PublicKey::deserialize(&PUBLIC_KEY_2).unwrap(),
+            Balance::new(u256::from(10u8), BalanceType::HOPR),
+            Hash::new(&COMMITMENT),
+            U256::new("0"),
+            U256::new("1"),
+            ChannelStatus::Closed,
+            U256::new("3"),
+            U256::new("4")
+        );
+
+        let ce2 = ChannelEntry::deserialize(&ce1.serialize()).unwrap();
+        assert_eq!(ce1, ce2);
     }
 }
 

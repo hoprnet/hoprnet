@@ -439,6 +439,20 @@ impl PublicKey {
         Self::deserialize(&recovered_key.to_encoded_point(false).to_bytes())
     }
 
+    pub fn from_raw_signature_hash(hash: &[u8], r: &[u8], s: &[u8], v: u8) -> Result<PublicKey> {
+        let recid = RecoveryId::try_from(v).map_err(|_| ParseError)?;
+        let signature = ECDSASignature::from_scalars(
+            GenericArray::clone_from_slice(r),GenericArray::clone_from_slice(s))
+            .map_err(|_| ParseError)?;
+        let recovered_key = VerifyingKey::recover_from_prehash(
+            hash,
+            &signature,
+            recid
+        ).map_err(|_| MathError)?;
+
+        Self::deserialize(&recovered_key.to_encoded_point(false).to_bytes())
+    }
+
     pub fn from_signature(msg: &[u8], signature: &Signature) -> Result<PublicKey> {
         Self::from_raw_signature(msg,
                                  &signature.signature[0..Signature::SIZE/2],
@@ -562,16 +576,16 @@ impl Signature {
 
 #[cfg(test)]
 pub mod tests {
+    use hex_literal::hex;
     use k256::elliptic_curve::ProjectiveArithmetic;
     use k256::{NonZeroScalar, Secp256k1, U256};
     use k256::elliptic_curve::sec1::ToEncodedPoint;
-    use lazy_static::lazy_static;
     use crate::crypto::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, Hash, PublicKey, Signature};
+    use crate::primitives::Address;
 
-    lazy_static! {
-        static ref PUBLIC_KEY: Vec<u8>  = hex::decode("021464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8").unwrap();
-        static ref PRIVATE_KEY: Vec<u8> = hex::decode("e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8").unwrap();
-    }
+    const PUBLIC_KEY: [u8; 33] = hex!("021464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8");
+    const PRIVATE_KEY: [u8; 32] = hex!("e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8");
+    
 
     #[test]
     fn signature_signing_test() {
@@ -604,6 +618,19 @@ pub mod tests {
 
         assert_eq!(pk1, pk2, "pubkeys don't match");
         assert_eq!(pk1.to_peerid_str(), pk2.to_peerid_str(), "peer id strings don't match");
+    }
+
+    #[test]
+    fn public_key_recover_test() {
+        let address = Address::from_str("f39Fd6e51aad88F6F4ce6aB8827279cffFb92266").unwrap();
+
+        let r = hex!("bcae4d37e3a1cd869984d1d68f9242291773cd33d26f1e754ecc1a9bfaee7d17");
+        let s = hex!("0b755ab5f6375595fc7fc245c45f6598cc873719183733f4c464d63eefd8579b");
+        let v = 1u8;
+
+        let hash = hex!("fac7acad27047640b069e8157b61623e3cb6bb86e6adf97151f93817c291f3cf");
+
+        assert_eq!(address, PublicKey::from_raw_signature_hash(&hash, &r, &s, v).unwrap().to_address())
     }
 
     #[test]
