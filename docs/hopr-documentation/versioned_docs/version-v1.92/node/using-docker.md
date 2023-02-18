@@ -131,6 +131,16 @@ Please note the `--apiToken` (Security token), as this will be used to access ho
 
 **Note:** Withdrawing funds is possible through hopr-admin. This is just a precaution for safekeeping.
 
+### Launching HOPR admin UI
+
+From 1.92 version HOPR admin UI was separated from the HOPRd node. This means you will need additionally to launch a new docker command. You will need to execute docker command in a new **tmux** session, more details you will find [here](using-docker#using-tmux).
+
+Docker command to start HOPR admin UI:
+
+```bash
+docker run -d --name hopr_admin -p 3000:3000 gcr.io/hoprassociation/hopr-admin
+```
+
 All ports are mapped to your local host, assuming you stick to the default port numbers. You should be able to view the `hopr-admin` interface at [http://localhost:3000](http://localhost:3000) (replace `localhost` with your `server IP address` if you are using a VPS, for example `http://142.93.5.175:3000`).
 
 If you are in the process of registering your node on the network registry, please complete the process [here](./network-registry-tutorial.md) before continuing.

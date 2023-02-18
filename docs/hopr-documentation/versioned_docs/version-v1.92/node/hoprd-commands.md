@@ -134,33 +134,61 @@ You may also see nodes with the status `PendingToClose` if they are closing or `
 
 ## close
 
-This command will let you close an open channel.
+This command will let you close an open channel from either sides.
 
 ```
-close [HOPR address]
+close [HOPR address] [direction "incoming" or "outgoing"]
 ```
 
 **HOPR address** - the address of the node you have an open channel with.
+**direction** - you can close payment channels from either side: outgoing or incoming. (Currently only the outgoing direction is enabled)
 
 Example use:
 
 ```
-close 16Uiu2HAmLkgxw4dxvGPaAb5iYmSQHwjZFkzxGxdp3CDccW2uLoho
+close 16Uiu2HAmMrqMH5xS1PeavQBY7WrQLiAKQXxBgEiMUtEWFzDZA9Mc outgoing
 ```
 
 Output:
 
 ```
-Closing channel to "uLoho"..
+Closing channel to "ZA9Mc"..
 
-Initiated channel closure, the channel must remain open for at least 1 minutes. Please send the close command again once the cool-off has passed. Receipt: "0xb85d2d668316e6d62e960e48d95cc1c9e27dad89f009be9ae8b045500590fc9a".
-
-Closed channel to uLoho
+Initiated channel closure, the channel must remain open for at least 5 minutes. Please send the close command again once the cool-off has passed. Receipt: "0x952e3b308302cd98ca05b3c99e62efac3047e05fb75df16b9055ea4018a29ec6".
 ```
 
 Once you’ve initiated channel closure, you have to wait for a specified closure time, it will show you a closure initiation message with cool-off time you need to wait.
 
 Then you will need to send the same command again to finalize closure. This is a cool down period to give the other party in the channel sufficient time to redeem their tickets.
+
+Final Output after sending the same command to finalize closure:
+
+```
+Closing channel to "ZA9Mc"..
+ 
+14:31:19.113Z
+Closed channel. Receipt: 0xbb0adc621eac15fdf81b0284234a0e024eebd2ca87ca00fe8d31020ef89ac71a
+```
+
+## fund
+
+You can use the fund command to add tokens to either side of the payment channel. The fund command also opens payment channels by default if they don't exist, (note: this will cost native tokens to pay the gas fee)
+
+```
+fund [HOPR address] [Amount of HOPR tokens for outgoing channel] [Amount of HOPR tokens for incoming channel]
+```
+
+**HOPR address** - open payment channel with specified node. Address starts with **16Uiu2HA...**
+
+**Amount of HOPR tokens for outgoing channel** - funds payment channel from your HOPR node to the counterparty's node.
+
+**Amount of HOPR tokens for incoming channel** - funds payment channel from the counterparty's node to your node.
+
+Example: funding an outgoing channel:
+
+```
+fund 16Uiu2HAmMBYpQVq7rfFxV5iP3JPXJKs1dqRe2Z6HX7zXJgwjTzjV 0.1 0
+```
 
 ## help
 
@@ -364,11 +392,12 @@ settings
 Output will look similar to this:
 
 ```
-includeRecipient  false    Prepends your address to all messages (true|false)
-strategy          passive  Set an automatic strategy for the node. (passive|promiscuous)
+includeRecipient   false    Prepends your address to all messages (true / false)
+strategy           passive  Set an automatic strategy for the node (passive / promiscuous)
+autoRedeemTickets  false    By default auto redeeming tickets are disabled. (true / false)
 ```
 
-This will show whether you’re currently including your address with sent messages (_includeRecipient true / false_), and your current channel opening strategy (_promiscuous / passive_).
+This will show whether you’re currently including your address with sent messages (_includeRecipient true / false_), your current channel opening strategy (_promiscuous / passive_) and setting tickets auto redemtion (_autoRedeemTickets true / false_).
 
 To change your `includeRecipient` setting, type:
 
@@ -382,7 +411,7 @@ or
 settings includeRecipient false
 ```
 
-If includeRecipient is `true`, the recipient ofyouor message will know you sent them a message. Your HOPR address will be visible before the message:
+If includeRecipient is `true`, the recipient of your message will know you sent them a message. Your HOPR address will be visible before the message:
 
 ```
 #### NODE RECEIVED MESSAGE ####
@@ -392,7 +421,7 @@ Message: M6psb:Hello Bob!
 Latency: 170 ms
 ```
 
-To change your funding strategy type:
+To change your channel management strategy:
 
 ```
 settings strategy promiscuous
@@ -407,6 +436,21 @@ settings strategy passive
 **Passive and Promiscuous strategies**
 
 By default, hoprd runs in **passive** mode, this means that your node will not attempt to open or close any channels automatically. When you set your strategy to **promiscuous** mode, your node will attempt to open channels to a _randomly_ selected group of nodes which you have a healthy connection to. At the same time, your node will also attempt to close channels that are running low on balance or are unhealthy.
+
+To enabling or disabling auto redeeming, type (This setting is currently DISABLED):
+
+```
+settings autoRedeemTickets true
+```
+
+or
+
+```
+settings autoRedeemTickets false
+```
+
+By setting autoRedeemTickets to `true`, when your node receives a ticket, it will be auto-redeemed.
+
 
 ## sign
 
