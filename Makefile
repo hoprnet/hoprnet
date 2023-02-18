@@ -27,8 +27,7 @@ PATH := $(subst :${HOME}/.cargo/bin,,$(PATH)):${HOME}/.cargo/bin
 # add local Foundry install path (only once)
 PATH := $(subst :${FOUNDRY_DIR}/bin,,$(PATH)):${FOUNDRY_DIR}/bin
 # use custom PATH in all shell processes
-#SHELL := env PATH=$(PATH) $(shell which bash)
-SHELL := /bin/bash
+SHELL := env PATH=$(PATH) $(shell which bash)
 
 # use custom Cargo config file for each invocation
 cargo := cargo --config ${CARGO_DIR}/config.toml
