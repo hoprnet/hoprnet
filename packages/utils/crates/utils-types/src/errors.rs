@@ -5,7 +5,7 @@ use thiserror::Error;
 pub enum GeneralError {
     #[error("failed to parse/deserialize the data")]
     ParseError,
-    #[error("error computing the result, possibly cause by invalid input")]
+    #[error("failed to compute the result (could be caused by invalid input)")]
     MathError
 }
 
