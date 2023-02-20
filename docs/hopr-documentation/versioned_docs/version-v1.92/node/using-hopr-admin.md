@@ -92,7 +92,7 @@ Now that you have started your node, what exactly is your node and what are its 
 The **_identity file_** contains your private key and is essentially your wallet for the node. When you installed your node, you supplied `--identity` and `--password` arguments.
 
 ```bash
-docker run --pull always --restart on-failure -m 2g -ti -v $HOME/.hoprd-db-monte-rosa:/app/hoprd-db -p 9091:9091 -p 3000:3000 -p 3001:3001 -e DEBUG="hopr*" gcr.io/hoprassociation/hoprd:1.91.24 --environment monte_rosa --init --api --admin --identity /app/hoprd-db/.hopr-id-monte-rosa --data /app/hoprd-db --password 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' --apiHost "0.0.0.0" --apiToken 'YOUR_SECURITY_TOKEN' --adminHost "0.0.0.0" --healthCheck --healthCheckHost "0.0.0.0"
+docker run --pull always --restart on-failure -m 2g --log-driver json-file --log-opt max-size=100M --log-opt max-file=5 -ti -v $HOME/.hoprd-db-monte-rosa:/app/hoprd-db -p 9091:9091 -p 8080:8080 -p 3001:3001 -e DEBUG="hopr*" gcr.io/hoprassociation/hoprd:1.92.9 --environment monte_rosa --init --api --identity /app/hoprd-db/.hopr-id-monte-rosa --data /app/hoprd-db --password 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' --apiHost "0.0.0.0" --apiToken 'YOUR_SECURITY_TOKEN' --healthCheck --healthCheckHost "0.0.0.0"
 ```
 
 `--identity` is a path to where the file is located, and `--password` is used to decrypt the file.
@@ -103,7 +103,7 @@ If one doesn’t exist, it is created, encrypted and stored at the given locatio
 
 ### Backing up your identity file
 
-If you used Docker to install your node, then your identity file will be stored on your OS at the path you specified: `/<computer username>/.hoprd-db-valencia/.hopr-id-valencia`, so you can skip this step.
+If you used Docker to install your node, then your identity file will be stored on your OS at the path you specified: `/<computer username>/.hoprd-db-bogota/.hopr-id-bogota`, so you can skip this step.
 
 If you are using Dappnode or Avado, you can download your identity file on their interfaces.
 
@@ -707,11 +707,11 @@ If you have [backed up your identity file,](using-hopr-admin#backing-up-your-ide
 
 #### For local or VPS users
 
-(**1**) find the folder `.hoprd-db-valencia` on your machine or VPS
+(**1**) find the folder `.hoprd-db-bogota` on your machine or VPS
 
-(**2**) locate the file `.hopr-id-valencia`
+(**2**) locate the file `.hopr-id-bogota`
 
-(**3**) Rename the file to `hopr-id-valencia.json`
+(**3**) Rename the file to `hopr-id-bogota.json`
 
 #### Importing the JSON file
 
