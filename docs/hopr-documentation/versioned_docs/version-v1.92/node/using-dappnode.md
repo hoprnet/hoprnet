@@ -9,13 +9,29 @@ To set up your DAppNode, follow the instructions that came with the box. Then, j
 Please withdraw all your funds and delete the old package before installing a new one.
 :::
 
-## Installing the HOPR Client: 1.92 (Monte Rosa)
+## Installing the HOPR Client: 1.92.8 (Monte Rosa)
+
+While connected to your Dappnode's network or via a VPN, go to the following [link](http://my.dappnode/#/installer/%2Fipfs%2FQmakbsW3DyfYmP4dtv7QxABh4hh1o3BNWssuGMfGFDvp5j). Just click the install button and wait until the download completes.
+
+If you are unable to use the link above, search for this hash in the Dappnode DappStore:
 
 (**1**) Open the DAppStore using the sidebar to the left.
 
 ![DappStore](/img/node/DappStore-NR-1.png)
 
-(**2**) You should see the latest version of the HOPR client now. Just click `Get` and wait for it to install.
+(**2**) Enable public repository by clicking on the toggle icon. When the popup opens up, please select: "I understand, take me to the public repo"
+
+(**3**) Search for the HOPR package using this hash:
+
+```
+/ipfs/QmakbsW3DyfYmP4dtv7QxABh4hh1o3BNWssuGMfGFDvp5j
+```
+
+(**4**) Under the Install / Update button, click on Advanced Options and enable "Bypass only signed safe restriction"
+
+(**5**) Click on the Install / Update button
+
+P.S Sometimes, after trying to Install or Update, it will give you an error. Just re-install or update the package if this happens.
 
 That's all! You should now be able to find the HOPR client in your 'Packages'.
 
