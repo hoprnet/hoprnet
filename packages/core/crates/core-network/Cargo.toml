@@ -12,6 +12,7 @@ default = ["console_error_panic_hook", "wasm"]
 wasm = ["dep:wasm-bindgen"]
 
 [dependencies]
+utils-misc = { path = "../../../utils/crates/utils-misc"}
 libp2p = { version = "0.50.0", features = ["async-std", "wasm-bindgen", "wasm-ext"] }
 wasm-bindgen = {version = "0.2.83", optional = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }
