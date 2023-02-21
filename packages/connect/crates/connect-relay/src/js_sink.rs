@@ -3,7 +3,7 @@ use std::{pin::Pin, u8};
 
 use futures::{
     channel::mpsc,
-    future::{BoxFuture, LocalBoxFuture},
+    future::{BoxFuture, FutureExt, LocalBoxFuture},
     ready,
     stream::{FusedStream, Stream},
     task::{Context, Poll},
@@ -11,6 +11,7 @@ use futures::{
 };
 use js_sys::{AsyncIterator, Function, Object};
 use pin_project_lite::pin_project;
+use std::mem::ManuallyDrop;
 use std::sync::{Arc, Mutex};
 use std::task::Waker;
 use utils_misc::{async_iterable::wasm::to_jsvalue_stream, ok_or_jserr};
@@ -101,25 +102,71 @@ pin_project! {
         iter: Option<AsyncIterator>,
         done: bool,
         next: Option<JsFuture>,
-        fut: Option<MyJsStreamStructFuture<'a>>,
-        sink_flushed_fut: Option<LocalBoxFuture<'a, ()>>,
-        #[pin]
         js_stream: &'a MyJsStream,
-        next_chunk: Option<Box<[u8]>>,
+        // shared_state: Arc<Mutex<MyJsStreamSharedStructSharedState>>,
+        #[pin]
+        fut: Option<MyJsStreamStructFuture>,
+        #[pin]
+        sink_flushed_fut: Option<LocalBoxFuture<'a, ()>>,
+        next_send_chunk: Option<Box<[u8]>>,
         waker: Option<std::task::Waker>,
     }
 }
 
-struct MyJsStreamStructFuture<'b> {
-    js_stream: &'b MyJsStreamStruct<'b>,
+struct MyJsStreamSharedStructSharedState {
+    fut: Option<MyJsStreamStructFuture>,
+    sink_flushed_fut: Option<Pin<Box<dyn Future<Output = ()>>>>,
+    next_send_chunk: Option<Box<[u8]>>,
+    waker: Option<std::task::Waker>,
 }
 
-impl<'b> Future for MyJsStreamStructFuture<'b> {
-    type Output = Box<[u8]>;
+pin_project! {
+struct MyJsStreamStructFuture {
+    waker: Option<std::task::Waker>,
+    // None => no value to send at the moment
+    // Some(Some(Box<[u8]>)) => one chunk pending to send
+    // Some(None) => stream closed
+    next_send_chunk: Option<Option<Result<Box<[u8]>, String>>>,
+}
+}
+
+trait SomeTrait {
+    fn take_item(&mut self, item: Box<[u8]>) -> ();
+}
+
+impl MyJsStreamStructFuture {
+    fn new() -> MyJsStreamStructFuture {
+        MyJsStreamStructFuture {
+            waker: None,
+            next_send_chunk: None,
+        }
+    }
+}
+
+impl SomeTrait for MyJsStreamStructFuture {
+    fn take_item(&mut self, item: Box<[u8]>) {
+        self.next_send_chunk.insert(Some(Ok(item)));
+        self.waker.as_ref().unwrap().wake_by_ref();
+    }
+}
+
+impl Future for MyJsStreamStructFuture {
+    type Output = Result<JsValue, JsValue>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.project();
+        this.waker.replace(cx.waker().clone());
+
+        // if self.js_stream.
         // let mut this = unsafe { self.get_unchecked_mut() };
 
+        if this.next_send_chunk.is_none() {
+            Poll::Pending
+        } else {
+            Poll::Ready(utils_misc::async_iterable::wasm::to_jsvalue_stream(
+                this.next_send_chunk.take().unwrap(),
+            ))
+        }
         // foo.
         // if this.js_stream.next_chunk.is_none() {
         //     this.js_stream.waker = Some(cx.waker().clone());
@@ -129,7 +176,7 @@ impl<'b> Future for MyJsStreamStructFuture<'b> {
         //     Poll::Ready(to_send)
         // }
 
-        Poll::Pending
+        // Poll::Pending
     }
 }
 
@@ -141,11 +188,19 @@ impl MyJsStreamStruct<'_> {
             done: false,
             next: None,
             iter: None,
-            fut: None,
-            next_chunk: None,
+            // shared_state: Arc::new(Mutex::new(MyJsStreamSharedStructSharedState {
+            fut: Some(MyJsStreamStructFuture::new()),
+            next_send_chunk: None,
             waker: None,
             sink_flushed_fut: None,
+            // })),
         }
+    }
+
+    async fn call_sink(&self) {
+        self.js_stream.sink(&JsValue::from("")).await;
+
+        log("awaited");
     }
 }
 
@@ -242,45 +297,120 @@ impl FusedStream for MyJsStreamStruct<'_> {
 
 impl<'a> Sink<Box<[u8]>> for MyJsStreamStruct<'a> {
     type Error = String;
-    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(
+        mut self: Pin<&mut MyJsStreamStruct<'a>>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Result<(), Self::Error>> {
         log("poll_ready called");
-
         let this = self.project();
-        let js_stream_ptr: &'a MyJsStream = this.js_stream.get_mut();
+
+        // let shared_state = self.shared_state.lock().unwrap();
+        // let this = ManuallyDrop::new(self.project());
+        // let this = Pin::new(self);
+        // let js_stream_ptr: &'a MyJsStream = this.js_stream.get_mut();
+        // let foo = this.fut.as_mut();
+        // let fut_ptr: &mut Option<MyJsStreamStructFuture> = unsafe { this.fut.get_unchecked_mut() };
+
+        // let fut_ptr: &'a mut Option<MyJsStreamStructFuture> =
+        // unsafe { this.fut.get_unchecked_mut() };
 
         if this.sink_flushed_fut.is_none() {
-            log("calling sink");
-            *this.sink_flushed_fut = Some(Box::pin(async move {
-                log("sink calling code called");
-                let next_chunk_closure: Closure<dyn FnMut() -> js_sys::Object> =
-                    Closure::new(|| {
-                        let obj = js_sys::Object::new();
-                        js_sys::Reflect::set(&obj, &"done".into(), &JsValue::FALSE).unwrap();
-                        js_sys::Reflect::set(&obj, &"value".into(), &JsValue::FALSE).unwrap();
-                        obj
-                    });
-                let inner_obj = js_sys::Object::new();
-                js_sys::Reflect::set(
-                    &inner_obj,
-                    &"next".into(),
-                    next_chunk_closure.as_ref().unchecked_ref(),
-                )
-                .unwrap();
+            Pin::new(unsafe { this.sink_flushed_fut.get_unchecked_mut() }).set(Some(
+                async {
+                    // fut_ptr;
+                    log("sink calling code called");
+                    let fut_taken = this.fut.take();
+                    // fut_ptr;
+                    // let foo = this.fut;
+                    let next_chunk_closure: Closure<dyn FnMut() -> js_sys::Promise> =
+                        Closure::new(move || {
+                            // if this.waker.is_some() {
+                            //     this.waker.take().unwrap().wake();
+                            // }
+                            // let current = unsafe { this.fut.get_unchecked_mut() }.take();
+                            // this.fut.set(Some(MyJsStreamStructFuture::new()));
+                            // let current = fut_ptr.take();
+                            wasm_bindgen_futures::future_to_promise(fut_taken.unwrap())
 
-                let obj = js_sys::Object::new();
-                let bar: Closure<dyn FnMut() -> js_sys::Object> = Closure::once(move || inner_obj);
-                js_sys::Reflect::set(
-                    &obj,
-                    &js_sys::Symbol::async_iterator(),
-                    // Cast Closure to js_sys::Function
-                    bar.as_ref().unchecked_ref(),
-                )
-                .unwrap();
+                            // js_sys::Reflect::set(&obj, &"done".into(), &JsValue::FALSE).unwrap();
+                            // js_sys::Reflect::set(&obj, &"value".into(), &JsValue::FALSE).unwrap();
+                            // obj
+                        });
+                    let inner_obj = js_sys::Object::new();
+                    js_sys::Reflect::set(
+                        &inner_obj,
+                        &"next".into(),
+                        next_chunk_closure.as_ref().unchecked_ref(),
+                    )
+                    .unwrap();
+                    let obj = js_sys::Object::new();
+                    let iterator_closure: Closure<dyn FnMut() -> js_sys::Object> =
+                        Closure::once(move || inner_obj);
+                    js_sys::Reflect::set(
+                        &obj,
+                        &js_sys::Symbol::async_iterator(),
+                        // Cast Closure to js_sys::Function
+                        iterator_closure.as_ref().unchecked_ref(),
+                    )
+                    .unwrap();
+                    this.js_stream.sink(&JsValue::from("")).await;
+                }
+                .boxed_local(),
+            ))
+        }
 
-                js_stream_ptr.sink(&obj).await;
+        // if this.sink_flushed_fut.is_none() {
+        //     log("calling sink");
+        //     *this.sink_flushed_fut = Some(Box::pin(async {
+        //         // fut_ptr;
+        //         log("sink calling code called");
+        //         // this.fut.take();
+        //         // fut_ptr;
+        //         // let foo = this.fut;
+        //         let next_chunk_closure: Closure<dyn FnMut() -> js_sys::Promise> =
+        //             Closure::new(move || {
+        //                 // if this.waker.is_some() {
+        //                 //     this.waker.take().unwrap().wake();
+        //                 // }
+        //                 // let current = this.fut.take();
+        //                 // let current = fut_ptr.take();
+        //                 wasm_bindgen_futures::future_to_promise(
+        //                     Some(MyJsStreamStructFuture::new()).unwrap(),
+        //                 )
+        //                 // js_sys::Reflect::set(&obj, &"done".into(), &JsValue::FALSE).unwrap();
+        //                 // js_sys::Reflect::set(&obj, &"value".into(), &JsValue::FALSE).unwrap();
+        //                 // obj
+        //             });
+        //         let inner_obj = js_sys::Object::new();
+        //         js_sys::Reflect::set(
+        //             &inner_obj,
+        //             &"next".into(),
+        //             next_chunk_closure.as_ref().unchecked_ref(),
+        //         )
+        //         .unwrap();
 
-                log("awaited");
-            }));
+        //         let obj = js_sys::Object::new();
+        //         let iterator_closure: Closure<dyn FnMut() -> js_sys::Object> =
+        //             Closure::once(move || inner_obj);
+        //         js_sys::Reflect::set(
+        //             &obj,
+        //             &js_sys::Symbol::async_iterator(),
+        //             // Cast Closure to js_sys::Function
+        //             iterator_closure.as_ref().unchecked_ref(),
+        //         )
+        //         .unwrap();
+
+        //         // js_stream_ptr.sink(&obj).await;
+
+        //         log("awaited");
+        //     }));
+        // }
+
+        // let this = self.project();
+
+        if this.fut.is_none() {
+            // this.waker.replace(cx.waker().clone());
+            return Poll::Pending;
         }
 
         Poll::Ready(Ok(()))
@@ -291,7 +421,14 @@ impl<'a> Sink<Box<[u8]>> for MyJsStreamStruct<'a> {
 
         let this = self.project();
 
-        this.fut = MyJsStreamStructFuture::Ok(())
+        // let foo = this.fut;
+        // .this
+        // .fut
+        // .as_mut()
+        // .unwrap()
+        // .take(item);
+
+        Ok(())
     }
 
     fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -299,18 +436,23 @@ impl<'a> Sink<Box<[u8]>> for MyJsStreamStruct<'a> {
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        let this = self.project();
+        let mut this = self.project();
 
-        match this.sink_flushed_fut.as_mut().unwrap().as_mut().poll(cx) {
-            Poll::Ready(_) => Poll::Ready(Ok::<(), Self::Error>(())),
-            Poll::Pending => Poll::Pending,
-        }
+        // let foo = this.sink_flushed_fut.as_mut().unwrap().poll_unpin(cx)
+        // if let Some(fut) = this.sink_flushed_fut.as_mut().as_pin_mut() {
+        //     match fut.poll_unpin(cx) {
+        //         Poll::Ready(_) => Poll::Ready(Ok::<(), Self::Error>(())),
+        //         Poll::Pending => Poll::Pending,
+        //     }
+        // }
+
+        Poll::Pending
     }
 }
 
 #[wasm_bindgen]
 pub async fn foo_bar(stream: MyJsStream) {
-    let mut foo = MyJsStreamStruct::from(&stream);
+    let mut foo = ManuallyDrop::new(MyJsStreamStruct::from(&stream));
 
     ok_or_jserr!(foo.send(Box::new([0u8, 0u8])).await);
     // log(format!("first result {:?}", foo.next().await).as_str());
