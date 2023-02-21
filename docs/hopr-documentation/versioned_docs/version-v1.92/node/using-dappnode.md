@@ -5,10 +5,6 @@ title: Using Dappnode
 
 To set up your DAppNode, follow the instructions that came with the box. Then, just install the HOPR client and you can start using your node right away!
 
-:::caution Warning
-Please withdraw all your funds and delete the old package before installing a new one.
-:::
-
 ## Installing the HOPR Client: 1.92.8 (Monte Rosa)
 
 While connected to your Dappnode's network or via a VPN, go to the following [link](http://my.dappnode/#/installer/%2Fipfs%2FQmakbsW3DyfYmP4dtv7QxABh4hh1o3BNWssuGMfGFDvp5j). Just click the install button and wait until the download completes.
