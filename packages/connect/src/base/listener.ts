@@ -143,6 +143,8 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
     ]
   }
 
+  attachStunProtocolHandlers() {}
+
   attachSocketHandlers() {
     this.udpSocket.once('close', () => {
       if (![ListenerState.CLOSING, ListenerState.CLOSED].includes(this.state)) {
@@ -231,7 +233,7 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
 
     const ownInterface = this.tcpSocket.address() as AddressInfo
 
-    this.attachSocketHandlers()
+    this.attachStunProtocolHandlers()
 
     const natSituation = await this.checkNATSituation(ownInterface.address, ownInterface.port)
 
@@ -261,6 +263,8 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
     }
 
     this.addrs.interface = internalInterfaces.map(nodeToMultiaddr)
+
+    this.attachSocketHandlers()
 
     // Need to be called before _emitListening
     // because _emitListening() sets an attribute in
@@ -547,7 +551,7 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
       (listener: (socket: TCPSocket, stream: AsyncIterable<Uint8Array>) => void): (() => void) => {
         const identifier = `STUN request ${Date.now()}`
         this.protocols.push({
-          isProtocol: (data: Uint8Array) => data[0] == 1 && data[1] == 1,
+          isProtocol: (data: Uint8Array) => data[0] == 1 && [0, 1].includes(data[1]),
           identifier,
           takeStream: listener
         })
