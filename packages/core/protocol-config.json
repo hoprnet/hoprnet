@@ -40,9 +40,7 @@
       "stake_contract_address": "0x84F238243FA06cac8E9811Cc36D49CB6A86d4c62",
       "network_registry_proxy_contract_address": "0x628ED93eEBF1840bF26e8fB62BCe4F1BCCDE9e95",
       "network_registry_contract_address": "0x278A44a487D2Ca9303c2B9Abe00605B075cBa69F",
-      "tags": [
-        "etherscan"
-      ]
+      "tags": ["etherscan"]
     },
     "debug-staging": {
       "network_id": "xdai",
@@ -56,9 +54,7 @@
       "xhopr_contract_address": "0x223c4Fe6d9C19cbdC6C66aa9a6b7Ce5a445BF884",
       "boost_contract_address": "0x43575668AC2c5066697101F27b4DC94819e490B7",
       "network_registry_proxy_contract_address": "0xc1351a3EC7eCD5C57B44798752dBCC5f549932AD",
-      "tags": [
-        "development"
-      ]
+      "tags": ["development"]
     },
     "tuttlingen": {
       "environment_type": "production",
@@ -156,9 +152,7 @@
       "stake_contract_address": "0x5Bb7e435aDa333A6714e27962e4Bb6aFDE1cECd4",
       "network_registry_contract_address": "0xf0D4D48866C4F9665212B29A64c14A1f0FEDFD4c",
       "network_registry_proxy_contract_address": "0x15e068Ef1f76319b1848b1fcB3e49D68724AEE07",
-      "tags": [
-        "etherscan"
-      ]
+      "tags": ["etherscan"]
     },
     "monte_rosa": {
       "network_id": "xdai",
@@ -172,9 +166,7 @@
       "stake_contract_address": "0xA02Af160a280957A8881879Ee9239A614Ab47F0D",
       "network_registry_contract_address": "0x819E6a81e1e3f96CF1ac9200477C2d09c676959D",
       "network_registry_proxy_contract_address": "0xcA9B1bC189F977B2A9217598D0300d956b6a719f",
-      "tags": [
-        "etherscan"
-      ]
+      "tags": ["etherscan"]
     }
   },
   "networks": {
