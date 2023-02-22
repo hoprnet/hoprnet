@@ -1,36 +1,12 @@
-import { isExposedHost, handleTcpStunRequest, handleUdpStunRequest, getExternalIp } from './index.js'
+import { isExposedHost, handleUdpStunRequest, getExternalIp } from './index.js'
 import { ip6Lookup } from '../../utils/index.js'
+import { startStunServer } from './utils.js'
 
 import { Multiaddr } from '@multiformats/multiaddr'
 
 import { type AddressInfo, createServer, type Socket } from 'net'
 import { createSocket } from 'dgram'
 import assert from 'assert'
-
-async function startServer() {
-  const tcpServer = createServer()
-  const udpSocket = createSocket({
-    type: 'udp6',
-    reuseAddr: true,
-    lookup: ip6Lookup
-  })
-
-  await new Promise<void>((resolve) => tcpServer.listen(resolve))
-  const tcpPort = (tcpServer.address() as AddressInfo).port
-
-  await new Promise<void>((resolve) => udpSocket.bind(tcpPort, resolve))
-
-  tcpServer.on('connection', (socket) => handleTcpStunRequest(socket, socket))
-  udpSocket.on('message', (msg, rinfo) => handleUdpStunRequest(udpSocket, msg, rinfo))
-
-  return {
-    tcpPort,
-    close: async () => {
-      await new Promise<any>((resolve) => tcpServer.close(resolve))
-      await new Promise<void>((resolve) => udpSocket.close(resolve))
-    }
-  }
-}
 
 async function startUdpStunServer() {
   const udpSocket = createSocket({
@@ -88,8 +64,8 @@ async function startClient(serverPorts: number[]) {
 
 describe('STUN exposed host check', function () {
   it('check if host is exposed', async function () {
-    const { tcpPort: firstPort, close: closeFirstServer } = await startServer()
-    const { tcpPort: secondPort, close: closeSecondServer } = await startServer()
+    const { tcpPort: firstPort, close: closeFirstServer } = await startStunServer()
+    const { tcpPort: secondPort, close: closeSecondServer } = await startStunServer()
 
     const { isExposed, close: closeClient } = await startClient([firstPort, secondPort])
 
