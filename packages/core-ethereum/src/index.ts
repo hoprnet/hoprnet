@@ -342,6 +342,7 @@ export default class HoprCoreEthereum extends EventEmitter {
 
     const boundRedeemTicket = this.redeemTicket.bind(this)
     const boundGetAckdTickets = this.db.getAcknowledgedTickets.bind(this.db)
+    const boundMarkLosingAckedTicket = this.db.markLosingAckedTicket.bind(this.db)
 
     // Use an async iterator to make execution interruptable and allow
     // Node.JS to schedule iterations at any time
@@ -376,6 +377,10 @@ export default class HoprCoreEthereum extends EventEmitter {
             // We need to abort as tickets require ordered redemption.
             // delete operation before returning
             throw result.error
+          } else {
+            // May fail due to out-of-commits, preimage-is-empty, not-a-winning-ticket
+            // Treat those acked tickets as losing tickets, and remove them from the DB.
+            await boundMarkLosingAckedTicket(ticket)
           }
         }
 
