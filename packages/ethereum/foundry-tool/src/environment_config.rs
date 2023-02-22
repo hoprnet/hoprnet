@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::env;
 use std::path::PathBuf;
 
 #[derive(Debug, Deserialize, Serialize, Clone, Copy, PartialEq)]
@@ -74,7 +73,7 @@ mod tests {
 
     #[test]
     fn read_anvil_localhost_at_right_path() {
-        let correct_dir = &env::current_dir()
+        let correct_dir = &std::env::current_dir()
             .unwrap()
             .parent()
             .unwrap()
@@ -89,7 +88,7 @@ mod tests {
 
     #[test]
     fn read_anvil_localhost_at_wrong_path() {
-        let wrong_dir = &env::current_dir().unwrap();
+        let wrong_dir = &std::env::current_dir().unwrap();
         let environment_name = "anvil-localhost";
         let environment_type = "development";
         let result = std::panic::catch_unwind(|| {
@@ -100,7 +99,7 @@ mod tests {
 
     #[test]
     fn read_non_existing_environment_at_right_path() {
-        let correct_dir = &env::current_dir()
+        let correct_dir = &std::env::current_dir()
             .unwrap()
             .parent()
             .unwrap()
@@ -114,7 +113,7 @@ mod tests {
 
     #[test]
     fn read_wrong_type_at_right_path() {
-        let correct_dir = &env::current_dir()
+        let correct_dir = &std::env::current_dir()
             .unwrap()
             .parent()
             .unwrap()
