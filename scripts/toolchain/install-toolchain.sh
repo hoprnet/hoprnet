@@ -14,6 +14,7 @@ mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 # Installs all toolchain utilities that are required to build hoprnet monorepo, including
 # - Node.js -> /usr/local/bin
 # - Yarn -> /usr/local/bin + /opt/yarn-v${version}
+# - protoc -> /usr/local/bin
 # - Typescript + related utilities, such as ts-node -> ${mydir}/node_modules
 # - Rust (rustc, cargo) -> ./../../.cargo/bin
 # - wasm-pack + wasm-opt, necessary to build WebAssembly modules -> ./../../.cargo/bin
@@ -188,11 +189,10 @@ function install_protobuf() {
       ;;
   esac
   PB_REL="https://github.com/protocolbuffers/protobuf/releases"
-  curl -fsSLO "${PB_REL}/download/v21.12/protoc-21.12-${ostype}-${cputype}.zip"
+  curl -o /tmp/protoc-${protobuf_version}.zip -fsSLO "${PB_REL}/download/v${protobuf_version}/protoc-${protobuf_version}-${ostype}-${cputype}.zip"
   mkdir -p /opt/protoc-${protobuf_version}-${ostype}-${cputype}
-  unzip protoc-${protobuf_version}-${ostype}-${cputype}.zip -d /opt/protoc-${protobuf_version}-${ostype}-${cputype}
+  unzip /tmp/protoc-${protobuf_version}.zip -d /opt/protoc-${protobuf_version}-${ostype}-${cputype}
   ln -sf /opt/protoc-${protobuf_version}-${ostype}-${cputype}/bin/protoc /usr/local/bin/protoc
-  /usr/local/bin/protoc --version
 }
 
 
@@ -272,6 +272,7 @@ command -v wasm-pack >/dev/null && wasm-pack --version
 command -v wasm-opt >/dev/null && wasm-opt --version
 command -v node >/dev/null && echo "node $(node --version)"
 command -v yarn >/dev/null && echo "yarn $(yarn --version)"
+command -v protoc >/dev/null && echo "yarn $(protoc --version)"
 npx --no tsc --version >/dev/null && echo "Typescript $(npx tsc --version)"
 echo ""
 

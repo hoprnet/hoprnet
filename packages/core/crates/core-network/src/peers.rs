@@ -11,10 +11,12 @@ use utils_misc::time::current_timestamp;
 const MIN_DELAY: Duration = Duration::from_secs(1);
 const MAX_DELAY: Duration = Duration::from_secs(300); // 5 minutes
 const BACKOFF_EXPONENT: f64 = 1.5;
+const MIN_BACKOFF: f64 = 2.0;
 const MAX_BACKOFF: f64 = MAX_DELAY.as_millis() as f64 / MIN_DELAY.as_millis() as f64;
 /// Default quality for unknown or offline nodes
 const BAD_QUALITY: f64 = 0.2;
 const IGNORE_TIMEFRAME: Duration = Duration::from_secs(600); // 10 minutes
+
 
 // Does not work with enums
 #[derive(Debug, Clone)]
@@ -76,7 +78,7 @@ impl Entry {
             heartbeats_sent: 0,
             heartbeats_succeeded: 0,
             last_seen: 0,
-            backoff: 2.0,
+            backoff: MIN_BACKOFF,
             quality: 0.0,
             ignored_at: None,
         }
@@ -232,7 +234,7 @@ impl NetworkPeers {
                 }
             } else {
                 entry.heartbeats_succeeded = entry.heartbeats_succeeded + 1;
-                entry.backoff = 2.0;
+                entry.backoff = MIN_BACKOFF;
                 entry.quality = 1.0_f64.min(entry.quality + 0.1)
             }
 

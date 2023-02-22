@@ -3,7 +3,7 @@ use std::time::Duration;
 use libp2p::PeerId;
 
 const MAX_PARALLEL_HEARTBEATS: u16 = 14;
-const HEART_BEAT_ROUND_TIMEOUT: Duration = Duration::from_secs(60);
+const HEARTBEAT_ROUND_TIMEOUT: Duration = Duration::from_secs(60);
 
 mod metrics {
 
