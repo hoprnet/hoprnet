@@ -272,7 +272,7 @@ command -v wasm-pack >/dev/null && wasm-pack --version
 command -v wasm-opt >/dev/null && wasm-opt --version
 command -v node >/dev/null && echo "node $(node --version)"
 command -v yarn >/dev/null && echo "yarn $(yarn --version)"
-command -v protoc >/dev/null && echo "yarn $(protoc --version)"
+command -v protoc >/dev/null && protoc --version
 npx --no tsc --version >/dev/null && echo "Typescript $(npx tsc --version)"
 echo ""
 
