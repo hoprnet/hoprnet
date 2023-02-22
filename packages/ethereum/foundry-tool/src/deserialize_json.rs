@@ -7,7 +7,7 @@ use std::path::PathBuf;
 
 use crate::helper_errors::HelperErrors;
 
-#[derive(Deserialize, Serialize, Clone, Copy)]
+#[derive(Debug, Deserialize, Serialize, Clone, Copy, PartialEq)]
 #[serde(rename_all(deserialize = "lowercase"))]
 pub enum EnvironmentType {
     Production,
@@ -25,14 +25,14 @@ impl ToString for EnvironmentType {
     }
 }
 
-#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EnvironmentDetail {
     pub stake_season: u8,
     pub indexer_start_block_number: u32,
     pub boost_contract_address: String,
     pub stake_contract_address: String,
     pub network_registry_proxy_contract_address: String,
-    pub environment_type: String,
+    pub environment_type: EnvironmentType,
     pub channels_contract_address: String,
     pub xhopr_contract_address: String,
     pub network_registry_contract_address: String,
@@ -64,7 +64,7 @@ pub fn ensure_environment_is_set(
         .get(environment_name)
         .expect("Unable to find environment details");
 
-    if env_detail.environment_type == environment_type {
+    if env_detail.environment_type.to_string() == environment_type {
         return Ok(true);
     } else {
         return Ok(false);
