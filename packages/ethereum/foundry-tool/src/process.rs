@@ -68,7 +68,7 @@ pub fn child_process_call_foundry(
     let test_forge = Command::new("forge")
         .args(["config", "--basic"])
         .output()
-        .expect("sh command failed to start");
+        .expect("forge config command failed to start");
     io::stdout().write_all(&test_forge.stdout).unwrap();
     io::stderr().write_all(&test_forge.stderr).unwrap();
 
@@ -85,7 +85,7 @@ pub fn child_process_call_foundry(
             &native_amount.to_string(),
         ])
         .output()
-        .expect("sh command failed to start");
+        .expect("forge faucet command failed to start");
     io::stdout().write_all(&faucet_output.stdout).unwrap();
     io::stderr().write_all(&faucet_output.stderr).unwrap();
 
