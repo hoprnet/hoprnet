@@ -65,6 +65,14 @@ pub fn child_process_call_foundry(
     println!("Running command in {:?}", &env::current_dir().unwrap());
 
     // building the command
+    let test_forge = Command::new("forge")
+        .args(["config", "--basic"])
+        .output()
+        .expect("sh command failed to start");
+    io::stdout().write_all(&test_forge.stdout).unwrap();
+    io::stderr().write_all(&test_forge.stderr).unwrap();
+
+    // building the command
     let faucet_output = Command::new("forge")
         .args([
             "script",
