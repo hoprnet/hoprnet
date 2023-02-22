@@ -397,8 +397,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     }
   }
 
-  // Private as out of order redemption will break things - redeem all at once.
-  private async redeemTicket(
+  public async redeemTicket(
     counterparty: PublicKey,
     channelId: Hash,
     ackTicket: AcknowledgedTicket
