@@ -16,6 +16,7 @@ RUN apt-get update \
       build-essential \
       ca-certificates \
       curl \
+      unzip \
       git \
       jq \
       lsof \

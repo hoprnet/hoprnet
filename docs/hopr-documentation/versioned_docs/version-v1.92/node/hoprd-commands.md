@@ -165,7 +165,7 @@ Final Output after sending the same command to finalize closure:
 
 ```
 Closing channel to "ZA9Mc"..
- 
+
 14:31:19.113Z
 Closed channel. Receipt: 0xbb0adc621eac15fdf81b0284234a0e024eebd2ca87ca00fe8d31020ef89ac71a
 ```
@@ -450,7 +450,6 @@ settings autoRedeemTickets false
 ```
 
 By setting autoRedeemTickets to `true`, when your node receives a ticket, it will be auto-redeemed.
-
 
 ## sign
 
