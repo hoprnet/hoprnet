@@ -172,6 +172,8 @@ function install_wasm_opt() {
 
 # used by rust libp2p to compile objects
 function install_protobuf() {
+  local protobuf_version=21.12
+  echo "Installing protobuf version 3.${protobuf_version}"
   local ostype="$(uname -s)"
   local cputype="$(uname -m)"
   case "${ostype}" in
@@ -187,9 +189,10 @@ function install_protobuf() {
   esac
   PB_REL="https://github.com/protocolbuffers/protobuf/releases"
   curl -fsSLO "${PB_REL}/download/v21.12/protoc-21.12-${ostype}-${cputype}.zip"
-  mkdir -p /opt/protoc-21.12-${ostype}-${cputype}
-  unzip protoc-21.12-${ostype}-${cputype}.zip -d /opt/protoc-21.12-${ostype}-${cputype}
-  ln -sf /opt/protoc-21.12-${ostype}-${cputype}/bin/protoc /usr/local/bin/protoc
+  mkdir -p /opt/protoc-${protobuf_version}-${ostype}-${cputype}
+  unzip protoc-${protobuf_version}-${ostype}-${cputype}.zip -d /opt/protoc-${protobuf_version}-${ostype}-${cputype}
+  ln -sf /opt/protoc-${protobuf_version}-${ostype}-${cputype}/bin/protoc /usr/local/bin/protoc
+  /usr/local/bin/protoc --version
 }
 
 
