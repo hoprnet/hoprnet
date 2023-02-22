@@ -315,14 +315,9 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
 
     await Promise.all(this.__connections.map((conn: Connection) => attemptClose(conn, error)))
 
-    console.log(this.__connections)
     const promise = once(this.tcpSocket, 'close')
 
     this.tcpSocket.close()
-
-    await setTimeout(500)
-    this.tcpSocket.getConnections(console.log)
-    await setTimeout(500)
 
     // Node.js bug workaround: ocassionally on macOS close is not emitted and callback is not called
     await timeout(SOCKET_CLOSE_TIMEOUT, () => promise)
