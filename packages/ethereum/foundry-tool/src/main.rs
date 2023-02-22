@@ -1,6 +1,7 @@
 use clap::{Parser, Subcommand};
 use ethers::types::Address;
 
+mod deserialize_json;
 mod helper_errors;
 mod key_pair;
 mod process;
@@ -101,6 +102,22 @@ enum Commands {
             default_value = None
         )]
         private_key: String,
+
+        #[clap(
+            help = "Hopr amount in ether, e.g. 10",
+            long,
+            short = 'h',
+            default_value_t = 2000
+        )]
+        hopr_amount: u128,
+
+        #[clap(
+            help = "Native token amount in ether, e.g. 1",
+            long,
+            short = 'n',
+            default_value_t = 10
+        )]
+        native_amount: u128,
     },
 }
 
@@ -124,6 +141,8 @@ fn main() -> Result<(), HelperErrors> {
             token_type: _,
             make_root,
             private_key,
+            hopr_amount,
+            native_amount,
         }) => {
             // Include provided address
             let mut addresses_all = Vec::new();
@@ -162,10 +181,12 @@ fn main() -> Result<(), HelperErrors> {
             addresses_all
                 .into_iter()
                 .map(|a| {
-                    process::child_process_call_make(
+                    process::child_process_call_foundry(
                         &cli.environment_name,
                         &cli.environment_type,
                         &a,
+                        &hopr_amount,
+                        &native_amount,
                     )
                 })
                 .collect()
