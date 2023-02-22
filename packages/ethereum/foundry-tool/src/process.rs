@@ -62,6 +62,8 @@ pub fn child_process_call_foundry(
         return Err(HelperErrors::EnvironmentInfoMismatch);
     }
 
+    println!("Running command in {:?}", &env::current_dir().unwrap());
+
     // building the command
     let faucet_output = Command::new("forge")
         .args([
