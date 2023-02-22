@@ -5,6 +5,7 @@ use std::io::{self, Write};
 use std::path::Path;
 use std::process::Command;
 
+use crate::environment_config;
 use crate::helper_errors::HelperErrors;
 
 pub fn build_path(environment_name: &str, environment_type: &str) -> String {
@@ -21,6 +22,8 @@ pub fn build_path(environment_name: &str, environment_type: &str) -> String {
 pub fn set_process_path_env(
     make_root: &Option<String>,
     private_key: &String,
+    foundry_profile: &String,
+    environment_name: &String,
 ) -> Result<(), HelperErrors> {
     // run in the repo where the make target is saved
     if let Some(new_root) = make_root {
@@ -36,6 +39,8 @@ pub fn set_process_path_env(
 
     // use cmd to call process
     env::set_var("PRIVATE_KEY", private_key);
+    env::set_var("FOUNDRY_PROFILE", foundry_profile);
+    env::set_var("ENVIRONMENT_NAME", environment_name);
     Ok(())
 }
 
@@ -46,13 +51,29 @@ pub fn child_process_call_foundry(
     hopr_amount: &u128,
     native_amount: &u128,
 ) -> Result<(), HelperErrors> {
-    let env_name_arg = &vec!["environment-name=", environment_name].concat();
-    let env_type_arg = &vec!["environment-type=", environment_type].concat();
-    let recipient_arg = &vec!["recipient=", &format!("{:#x}", &address)].concat(); // format is necessary due to fixed-hash crate's default behavior of eliding the middle part
+    // check environment is set
+    let envrionment_check = environment_config::ensure_environment_is_set(
+        &env::current_dir().unwrap(),
+        environment_name,
+        environment_type,
+    )
+    .unwrap();
+    if !envrionment_check {
+        return Err(HelperErrors::EnvironmentInfoMismatch);
+    }
 
     // building the command
-    let faucet_output = Command::new("make")
-        .args(["faucet", env_name_arg, env_type_arg, recipient_arg])
+    let faucet_output = Command::new("forge")
+        .args([
+            "script",
+            "script/SingleAction.s.sol:SingleActionFromPrivateKeyScript",
+            "--broadcast",
+            "--sig",
+            "mintHoprAndSendNative(address,uint256,uint256)",
+            &format!("{:#x}", &address),
+            &hopr_amount.to_string(),
+            &native_amount.to_string(),
+        ])
         .output()
         .expect("sh command failed to start");
     io::stdout().write_all(&faucet_output.stdout).unwrap();

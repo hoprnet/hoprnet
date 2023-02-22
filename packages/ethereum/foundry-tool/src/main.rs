@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 use ethers::types::Address;
 
-mod deserialize_json;
+mod environment_config;
 mod helper_errors;
 mod key_pair;
 mod process;
@@ -80,14 +80,6 @@ enum Commands {
         identity_prefix: Option<String>,
 
         #[clap(
-            help = "Specify the type of token to be sent ('hopr' or 'native'), if needed. Defaut value means sending both tokens",
-            long,
-            short,
-            default_value = None
-        )]
-        token_type: Option<String>,
-
-        #[clap(
             help = "Specify path pointing to the faucet make target",
             long,
             short,
@@ -106,7 +98,7 @@ enum Commands {
         #[clap(
             help = "Hopr amount in ether, e.g. 10",
             long,
-            short = 'h',
+            short = 't',
             default_value_t = 2000
         )]
         hopr_amount: u128,
@@ -138,7 +130,6 @@ fn main() -> Result<(), HelperErrors> {
             use_local_identities,
             identity_directory,
             identity_prefix,
-            token_type: _,
             make_root,
             private_key,
             hopr_amount,
@@ -173,7 +164,12 @@ fn main() -> Result<(), HelperErrors> {
             // TODO: by default, use faucet to fund both native tokens and HOPR tokens
 
             // set directory and environment variables
-            if let Err(e) = process::set_process_path_env(&make_root, &private_key) {
+            if let Err(e) = process::set_process_path_env(
+                &make_root,
+                &private_key,
+                &cli.environment_type,
+                &cli.environment_name,
+            ) {
                 return Err(e);
             }
 

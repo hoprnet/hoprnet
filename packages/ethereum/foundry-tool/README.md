@@ -7,8 +7,17 @@ Complete some missing funcitonalities of the foundry-centered smart contract too
 ```
 cargo run -- -h
 cargo run -- --environment-name localhost --environment-type development files --list
+```
 
-cargo run -- --environment-name localhost --environment-type development faucet --password local --use-local-identities --token-type native --identity-directory "/tmp" --address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1 --private-key <bank_private_key> --make-root "../contracts"
+```
+export PRIVATE_KEY=<bank_private_key>
+cargo run -- --environment-name anvil-localhost \
+    --environment-type development faucet \
+    --password local --use-local-identities --identity-directory "/tmp" \
+    --address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1 \
+    --private-key $PRIVATE_KEY \
+    --make-root "../contracts"  \
+    --hopr-amount 10 --native-amount 1
 ```
 
 ### Test
@@ -25,7 +34,11 @@ cargo install --path .
 ```
 
 ```
-foundry-tool --environment-name anvil-localhost --environment-type development faucet --password local --use-local-identities --token-type native --identity-directory "/tmp" --address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1 --private-key <bank_private_key> --make-root "../contracts"
+foundry-tool --environment-name anvil-localhost --environment-type development \
+    faucet --password local --use-local-identities --identity-directory "/tmp" \
+    --address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1 --private-key <bank_private_key> \
+    --make-root "../contracts" \
+    --hopr-amount 10 --native-amount 1
 ```
 
 Note that only identity files ending with `.id` are recognized by the CLI
