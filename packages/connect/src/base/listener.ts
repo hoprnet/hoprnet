@@ -513,7 +513,7 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
       () => randomInteger(24_000, 29_000)
     )
 
-    if (this.testingOptions.__preferLocalAddresses && this.testingOptions.__localModeStun != true) {
+    if (this.testingOptions.__preferLocalAddresses && this.testingOptions.__localModeStun !== true) {
       const address = this.tcpSocket.address() as Address
 
       // Pretend to be an exposed host if running locally, e.g. as part of an E2E test
