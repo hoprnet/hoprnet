@@ -4,6 +4,10 @@ import { createHash } from 'crypto'
 
 import { HoprDB } from '@hoprnet/hopr-utils'
 
+// List of endpoints which are supported as capabilitities.
+// Each entry also specifies supported endpoint-specific limits.
+import supportedCapabilities from './../supported-api-capabilities.json' assert { type: 'json' }
+
 export type Limit = {
   type: string
   conditions: {
@@ -237,45 +241,6 @@ const genericLimits = {
       runtimeCheck: (v: number, w: number): boolean => v > w
     }
   }
-}
-
-// List of endpoints which are supported as capabilitities.
-// Each entry also specifies supported endpoint-specific limits.
-const supportedCapabilities = {
-  tokensCreate: {},
-  tokensGetToken: {},
-  ticketsGetStatistics: {},
-  ticketsRedeemTickets: {},
-  ticketsGetTickets: {},
-  settingsGetSettings: {},
-  nodeGetVersion: {},
-  nodeStreamWebsocket: {},
-  nodePing: {},
-  nodeGetPeers: {},
-  nodeGetMetrics: {},
-  nodeGetInfo: {},
-  nodeGetEntryNodes: {},
-  messagesWebsocket: {},
-  messagesSign: {},
-  messagesSendMessage: {},
-  messageSign: {},
-  channelsOpenChannel: {},
-  channelsGetChannels: {},
-  aliasesGetAliases: {},
-  aliasesSetAlias: {},
-  accountWithdraw: {},
-  accountGetBalances: {},
-  accountGetAddresses: {},
-  accountGetAddress: {},
-  tokensDelete: {},
-  settingsSetSetting: {},
-  peerInfoGetPeerInfo: {},
-  channelsRedeemTickets: {},
-  channelsGetTickets: {},
-  channelsCloseChannel: {},
-  channelsGetChannel: {},
-  aliasesGetAlias: {},
-  aliasesRemoveAlias: {}
 }
 
 // Validates the given list of capabilities. Fails if the list is empty or any
