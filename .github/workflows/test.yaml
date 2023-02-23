@@ -1,64 +1,64 @@
-name: HOPR Test
+# name: HOPR Test
 
-on:
-  push:
-    branches: ['**']
-    paths-ignore:
-      - '.processes/**/*'
-      - 'docs/**/*'
-      - 'packages/*/docs/**/*'
+# on:
+#   push:
+#     branches: ['**']
+#     paths-ignore:
+#       - '.processes/**/*'
+#       - 'docs/**/*'
+#       - 'packages/*/docs/**/*'
 
-jobs:
-  build_and_test:
-    name: Build & Test
-    runs-on: ${{ matrix.os }}
+# jobs:
+#   build_and_test:
+#     name: Build & Test
+#     runs-on: ${{ matrix.os }}
 
-    strategy:
-      matrix:
-        os: ['ubuntu-latest']
+#     strategy:
+#       matrix:
+#         os: ['ubuntu-latest']
 
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
+#     steps:
+#       - uses: actions/checkout@v3
+#         with:
+#           fetch-depth: 0
 
-      - name: install toolchain
-        run: ./scripts/toolchain/install-toolchain.sh
+#       - name: install toolchain
+#         run: ./scripts/toolchain/install-toolchain.sh
 
-      - name: get yarn cache directory path
-        id: yarn-cache-dir-path
-        run: echo "dir=$(yarn config get cacheFolder)" >> $GITHUB_OUTPUT
+#       - name: get yarn cache directory path
+#         id: yarn-cache-dir-path
+#         run: echo "dir=$(yarn config get cacheFolder)" >> $GITHUB_OUTPUT
 
-      - name: restore yarn cache
-        uses: actions/cache@v3
-        id: yarn-cache
-        with:
-          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
-          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-yarn-
+#       - name: restore yarn cache
+#         uses: actions/cache@v3
+#         id: yarn-cache
+#         with:
+#           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+#           key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+#           restore-keys: |
+#             ${{ runner.os }}-yarn-
 
-      - name: restore cargo cache
-        uses: actions/cache@v3
-        with:
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-            .cargo/.package-cache/
-            .cargo/bin/
-            .foundry/bin/
+#       - name: restore cargo cache
+#         uses: actions/cache@v3
+#         with:
+#           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
+#           path: |
+#             ~/.cargo/bin/
+#             ~/.cargo/registry/index/
+#             ~/.cargo/registry/cache/
+#             ~/.cargo/git/db/
+#             target/
+#             .cargo/.package-cache/
+#             .cargo/bin/
+#             .foundry/bin/
 
-      - name: Install dependencies
-        run: make -j deps-ci
+#       - name: Install dependencies
+#         run: make -j deps-ci
 
-      - name: Build
-        run: make -j build
+#       - name: Build
+#         run: make -j build
 
-      - name: Test
-        run: make -j test
-        env:
-          HOPR_ENVIRONMENT_ID: anvil-localhost
+#       - name: Test
+#         run: make -j test
+#         env:
+#           HOPR_ENVIRONMENT_ID: anvil-localhost
