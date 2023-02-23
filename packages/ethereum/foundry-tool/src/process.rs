@@ -62,10 +62,6 @@ pub fn child_process_call_foundry(
         return Err(HelperErrors::EnvironmentInfoMismatch);
     }
 
-    println!("Running command in {:?}", &env::current_dir().unwrap());
-
-    // FIXME: remove the debug block
-    debug_foundry_calling_error();
     // building the command
     let faucet_output = Command::new("forge")
         .args([
@@ -90,51 +86,4 @@ pub fn child_process_call_foundry(
     } else {
         return Err(HelperErrors::ErrorInRunningFoundry);
     }
-}
-
-// FIXME: remove the debug block
-fn debug_foundry_calling_error() {
-    // ask rust to print full back trace
-    env::set_var("RUST_BACKTRACE", "full");
-
-    // list PATH variable
-    if let Ok(env_path) = env::var("PATH") {
-        println!("PATH: {}", env_path)
-    }
-
-    // list all the files in the project dir
-    let project_dir = PathBuf::from("../../..");
-    let project_abs_dir = std::fs::canonicalize(&project_dir).unwrap();
-    println!("{:?}", project_abs_dir);
-    let paths = std::fs::read_dir(project_abs_dir).unwrap();
-    for path in paths {
-        println!("File: {}", path.unwrap().path().display())
-    }
-
-    // check add .foundry/bin into PATH if needed
-    match Command::new("forge").spawn() {
-        Ok(_) => println!("Was spawned :)"),
-        Err(e) => {
-            if let NotFound = e.kind() {
-                println!("`forge` was not found! adding .foundry/bin to your PATH");
-                //
-                if let Some(path) = env::var_os("PATH") {
-                    let mut paths = env::split_paths(&path).collect::<Vec<_>>();
-                    paths.push(PathBuf::from("../../../.foundry/bin"));
-                    let new_path = env::join_paths(paths).unwrap();
-                    env::set_var("PATH", &new_path);
-                }
-            } else {
-                println!("Other errors occurred :(");
-            }
-        }
-    }
-
-    // test with a simple forge command: forge config --basic
-    let test_forge = Command::new("forge")
-        .args(["config", "--basic"])
-        .output()
-        .expect("forge config command failed to start");
-    io::stdout().write_all(&test_forge.stdout).unwrap();
-    io::stderr().write_all(&test_forge.stderr).unwrap();
 }
