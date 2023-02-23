@@ -133,7 +133,7 @@ function decodeIncomingSTUNResponses(
 
     switch (response.type & kStunTypeMask) {
       case isStunSuccessResponse:
-        log(`received STUN response from ${rinfo.address}:${rinfo.port}`)
+        log(`received UDP STUN response from ${rinfo.address}:${rinfo.port}`)
         update({
           response: response.getXorAddress() ?? response.getAddress(),
           transactionId: response.transactionId

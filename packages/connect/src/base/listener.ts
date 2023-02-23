@@ -545,7 +545,7 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
     const isExposed = await isExposedHost(
       usableStunServers,
       (listener: (socket: TCPSocket, stream: AsyncIterable<Uint8Array>) => void): (() => void) => {
-        const identifier = `STUN request ${Date.now()}`
+        const identifier = `STUN response ${Date.now()}`
         this.protocols.push({
           isProtocol: (data: Uint8Array) => data[0] == 1 && data[1] == 1,
           identifier,
