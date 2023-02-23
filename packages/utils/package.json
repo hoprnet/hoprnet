@@ -1,7 +1,7 @@
 {
   "name": "@hoprnet/hopr-utils",
   "description": "HOPR-based utilities to process multiple data structures",
-  "version": "1.92.8-next.6",
+  "version": "1.92.9-next.1",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "GPL-3.0",
@@ -61,7 +61,6 @@
     "@libp2p/peer-id-factory": "1.0.18",
     "@libp2p/tcp": "1.0.11",
     "@types/chai": "4.3.3",
-    "@types/hjson": "^2.4.3",
     "@types/mocha": "9.1.1",
     "bl": "5.0.0",
     "chai": "4.3.6",
