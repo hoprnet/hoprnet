@@ -26,6 +26,7 @@ interface MinimalStunServer {
   tcpPort: number
   close: () => Promise<void>
 }
+
 function stunServerToAddress(stunServers: MinimalStunServer[]) {
   return stunServers.map((serverPort: MinimalStunServer) => {
     const peerId = createPeerId()

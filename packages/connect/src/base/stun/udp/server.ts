@@ -48,7 +48,7 @@ export function handleUdpStunRequest(
     case isStunRequest:
       const response = createMessage(constants.STUN_BINDING_RESPONSE, request.transactionId)
 
-      verbose(`Received ${request.isLegacy() ? 'legacy ' : ''}STUN request from ${rinfo.address}:${rinfo.port}`)
+      verbose(`Received ${request.isLegacy() ? 'legacy ' : ''}UDP STUN request from ${rinfo.address}:${rinfo.port}`)
 
       let addrInfo = rinfo
       if (__fakeRInfo) {
