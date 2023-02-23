@@ -42,7 +42,7 @@ pub fn set_process_path_env(
     env::set_var("FOUNDRY_PROFILE", foundry_profile);
     env::set_var("ENVIRONMENT_NAME", environment_name);
     // FIXME: remove the debug variable
-    env::set_var("RUST_BACKTRACE", "1");
+    env::set_var("RUST_BACKTRACE", "full");
     Ok(())
 }
 
@@ -67,6 +67,10 @@ pub fn child_process_call_foundry(
     println!("Running command in {:?}", &env::current_dir().unwrap());
 
     // FIXME: remove the debug block
+    let paths = std::fs::read_dir("./").unwrap();
+    for path in paths {
+        println!("Name: {}", path.unwrap().path().display())
+    }
     let test_forge = Command::new("forge")
         .args(["config", "--basic"])
         .output()
