@@ -442,6 +442,13 @@ run-hopr-admin: ## launches HOPR Admin in a Docker container, supports port= and
 	docker run -p $(port):3000 --add-host=host.docker.internal:host-gateway \
 		gcr.io/hoprassociation/hopr-admin:$(version)
 
+.PHONY: exec-script
+exec-script: ## execute given script= with the correct PATH set
+ifeq ($(script),)
+	echo "parameter <script> missing" >&2 && exit 1
+endif
+	bash "${script}"
+
 .PHONY: help
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' Makefile | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
