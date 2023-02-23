@@ -341,7 +341,7 @@ class Hopr extends EventEmitter {
     // Attach network health measurement functionality
     const peers: Peer[] = await this.libp2pComponents.getPeerStore().all()
     this.networkPeers = new NetworkPeers(
-      peers.map((p) => p.id),
+      peers.map((p) => p.id), // TODO: This does not work in Rust anymore, has to register these manually to simplify API
       [this.id],
       this.options.networkQualityThreshold,
       (peer: PeerId) => {

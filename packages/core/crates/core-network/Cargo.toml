@@ -9,11 +9,15 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 default = ["console_error_panic_hook", "wasm"]
-wasm = ["dep:wasm-bindgen"]
+wasm = ["dep:wasm-bindgen", "dep:getrandom"]
 
 [dependencies]
+rand = { version = "0.8.5", features = ["std_rng"] }
 utils-misc = { path = "../../../utils/crates/utils-misc"}
+utils-metrics = { path = "../../../utils/crates/utils-metrics"}
 libp2p = { version = "0.50.0", features = ["async-std", "wasm-bindgen", "wasm-ext"] }
+scopeguard = "1.1.0"
+getrandom = { version = "0.2.8", features = ["js"], optional = true }
 wasm-bindgen = {version = "0.2.83", optional = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }
 #wee_alloc = { version = "0.4.5", optional = true }

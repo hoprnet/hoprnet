@@ -1086,7 +1086,11 @@ name = "core-network"
 version = "0.1.0"
 dependencies = [
  "console_error_panic_hook",
+ "getrandom 0.2.8",
  "libp2p",
+ "rand 0.8.5",
+ "scopeguard 1.1.0",
+ "utils-metrics",
  "utils-misc",
  "wasm-bindgen",
  "wasm-bindgen-test",
