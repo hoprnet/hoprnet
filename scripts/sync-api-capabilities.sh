@@ -29,6 +29,10 @@ declare partial_spec_file_path="${mydir}/../packages/hoprd/rest-api-v2-spec.yaml
 declare caps_file_path="${mydir}/../packages/hoprd/src/supported-api-capabilities.json"
 declare endpoints
 
+# ensure all input files exist
+[ -f "${spec_file_path}" ] || { log "${spec_file_path} missing"; exit 1; }
+[ -f "${partial_spec_file_path}" ] || { log "${partial_spec_file_path} missing"; exit 1; }
+
 # get all known operation ids and add empty capabilities as the basic configuration
 jq '.paths[] | .post, .get, .delete, .put, .head | select(. != null) | .operationId' "${spec_file_path}" |
   jq -s 'map({ (.): {} }) | add' > "${caps_file_path}.base"
@@ -43,8 +47,8 @@ rm "${caps_file_path}.base"
 endpoints="$(jq -r "to_entries | map(.key)" ${caps_file_path})"
 
 # update list in API documentation
-cat "${partial_spec_file_path}" | \
-  yq -y --argjson endpoints "${endpoints}" \
-  ".components.schemas.TokenCapability.properties.endpoint.enum = \$endpoints" > \
-  "${partial_spec_file_path}.updated"
+yq e -o=json '.' "${partial_spec_file_path}" | \
+  jq --argjson endpoints "${endpoints}" \
+  ".components.schemas.TokenCapability.properties.endpoint.enum = \$endpoints" | \
+  yq e -P '.' - > "${partial_spec_file_path}.updated"
 mv "${partial_spec_file_path}.updated" "${partial_spec_file_path}"
