@@ -88,7 +88,7 @@ To change your RPC endpoint:
 
 ![Environment variables](/img/node/HOPR-provider-Avado.png)
 
-(**3**) The default endpoint is `https://provider-proxy.hoprnet.workers.dev/dai_mainnet`. Replace this with your own, e.g. `http://ethchain-geth.my.ava.do:8545` in my case.
+(**3**) The default endpoint is `https://provider-proxy.hoprnet.workers.dev/xdai_mainnet`. Replace this with your own, e.g. `http://ethchain-geth.my.ava.do:8545` in my case.
 
 (**4**) Click 'Update environment variables' and wait for your node to restart.
 
