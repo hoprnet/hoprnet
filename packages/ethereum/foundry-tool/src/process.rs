@@ -2,7 +2,7 @@ use ethers::types::Address;
 use std::env;
 use std::ffi::OsStr;
 use std::io::{self, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::environment_config;
@@ -102,10 +102,32 @@ fn debug_foundry_calling_error() {
         println!("PATH: {}", env_path)
     }
 
-    // list all the files in the current directory
-    let paths = std::fs::read_dir("./").unwrap();
+    // list all the files in the project dir
+    let project_dir = PathBuf::from("../../..");
+    let project_abs_dir = std::fs::canonicalize(&project_dir).unwrap();
+    println!("{:?}", project_abs_dir);
+    let paths = std::fs::read_dir(project_abs_dir).unwrap();
     for path in paths {
         println!("File: {}", path.unwrap().path().display())
+    }
+
+    // check add .foundry/bin into PATH if needed
+    match Command::new("forge").spawn() {
+        Ok(_) => println!("Was spawned :)"),
+        Err(e) => {
+            if let NotFound = e.kind() {
+                println!("`forge` was not found! adding .foundry/bin to your PATH");
+                //
+                if let Some(path) = env::var_os("PATH") {
+                    let mut paths = env::split_paths(&path).collect::<Vec<_>>();
+                    paths.push(PathBuf::from("../../../.foundry/bin"));
+                    let new_path = env::join_paths(paths).unwrap();
+                    env::set_var("PATH", &new_path);
+                }
+            } else {
+                println!("Other errors occurred :(");
+            }
+        }
     }
 
     // test with a simple forge command: forge config --basic
