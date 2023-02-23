@@ -350,6 +350,23 @@ export function isUdpExposedHost(
       lookup: ip6Lookup
     })
 
+    let stopListening: () => void
+    let stopListeningSecondary: () => void
+
+    const end = () => {
+      stopListening()
+      stopListeningSecondary()
+      secondarySocket.close()
+    }
+
+    const onError = (err: any) => {
+      end()
+      error(err)
+      resolve(STUN_EXPOSED_CHECK_RESPOSE.UNKNOWN)
+    }
+
+    secondarySocket.on('error', onError)
+
     await new Promise<void>((resolve) => secondarySocket.bind(resolve))
 
     const [secondaryInterface, usedStunServers] = await performSTUNRequests(
@@ -363,15 +380,6 @@ export function isUdpExposedHost(
       // Endpoint-dependent mapping, most likely bidirectional NAT
       resolve(STUN_EXPOSED_CHECK_RESPOSE.NOT_EXPOSED)
       return
-    }
-
-    let stopListening: () => void
-    let stopListeningSecondary: () => void
-
-    const end = () => {
-      stopListening()
-      stopListeningSecondary()
-      secondarySocket.close()
     }
 
     const it = (function* () {
@@ -523,12 +531,6 @@ export function isUdpExposedHost(
 
     stopListening = decodeIncomingSTUNResponses(socket, updatePrimary)
     stopListeningSecondary = decodeIncomingSTUNResponses(secondarySocket, updateSecondary)
-
-    const onError = (err: any) => {
-      end()
-      error(err)
-      resolve(STUN_EXPOSED_CHECK_RESPOSE.UNKNOWN)
-    }
 
     // Initiate requests
     nextSTUNRequest(

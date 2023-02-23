@@ -168,6 +168,9 @@ export type HoprOptions = {
     // to test NAT behavior
     // default: false
     noDirectConnections?: boolean
+    // local-mode STUN, used for unit testing and e2e testing
+    // default: false
+    localModeStun?: boolean
     // when true, even if a direct WebRTC connection is possible,
     // don't do the upgrade to it to test bidirectional NAT
     // default: false
@@ -275,7 +278,7 @@ class Hopr extends EventEmitter {
    *
    * @param __testingLibp2p use simulated libp2p instance for testing
    */
-  public async start(__testingLibp2p?: Libp2p) {
+  public async start(__initialNodes?: { id: PeerId; multiaddrs: Multiaddr[] }[], __testingLibp2p?: Libp2p) {
     this.status = 'INITIALIZING'
     log('Starting hopr node...')
 
@@ -303,7 +306,7 @@ class Hopr extends EventEmitter {
     }
 
     // Fetch previous announcements from database
-    const initialNodes = await connector.waitForPublicNodes()
+    const initialNodes = __initialNodes ?? (await connector.waitForPublicNodes())
 
     // Add all initial public nodes to public nodes cache
     initialNodes.forEach((initialNode) => this.knownPublicNodesCache.add(initialNode.id.toString()))

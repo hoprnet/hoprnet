@@ -581,7 +581,8 @@ export default class HoprCoreEthereum extends EventEmitter {
         on: (event: string) => connectorLogger(`Indexer on handler top of chain called with event "${event}"`),
         off: (event: string) => connectorLogger(`Indexer off handler top of chain called with event "${event}`),
         getPublicNodes: () => Promise.resolve([])
-      }
+      },
+      isAllowedAccessToNetwork: () => Promise.resolve(true)
     } as unknown as HoprCoreEthereum
 
     return HoprCoreEthereum._instance

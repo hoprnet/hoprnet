@@ -380,6 +380,16 @@ struct CliArgs {
     pub test_no_webrtc_upgrade: bool,
 
     #[arg(
+        long = "testLocalModeStun",
+        help = "Transport testing: use full-featured STUN with local addresses",
+        env = "HOPRD_TEST_LOCAL_MODE_STUN",
+        default_value_t = false,
+        action = ArgAction::SetTrue,
+        hide = true
+    )]
+    pub test_local_mode_stun: bool,
+
+    #[arg(
         long = "heartbeatInterval",
         help = "Interval in milliseconds in which the availability of other nodes get measured",
         value_name = "MILLISECONDS",
