@@ -65,7 +65,7 @@ jobs:
           DEPLOYER_PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY_DEFAULT_FOUNDRY }}
 
       - name: Sync supported API capabilities
-        run: bash -x ./scripts/sync-api-capabilities.sh
+        run: ./scripts/sync-api-capabilities.sh
 
       # a second run is needed to include the newly updated API docs into the
       # final API spec file
