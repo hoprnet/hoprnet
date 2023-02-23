@@ -41,8 +41,6 @@ pub fn set_process_path_env(
     env::set_var("PRIVATE_KEY", private_key);
     env::set_var("FOUNDRY_PROFILE", foundry_profile);
     env::set_var("ENVIRONMENT_NAME", environment_name);
-    // FIXME: remove the debug variable
-    env::set_var("RUST_BACKTRACE", "full");
     Ok(())
 }
 
@@ -67,17 +65,7 @@ pub fn child_process_call_foundry(
     println!("Running command in {:?}", &env::current_dir().unwrap());
 
     // FIXME: remove the debug block
-    let paths = std::fs::read_dir("./").unwrap();
-    for path in paths {
-        println!("Name: {}", path.unwrap().path().display())
-    }
-    let test_forge = Command::new("forge")
-        .args(["config", "--basic"])
-        .output()
-        .expect("forge config command failed to start");
-    io::stdout().write_all(&test_forge.stdout).unwrap();
-    io::stderr().write_all(&test_forge.stderr).unwrap();
-
+    debug_foundry_calling_error();
     // building the command
     let faucet_output = Command::new("forge")
         .args([
@@ -102,4 +90,29 @@ pub fn child_process_call_foundry(
     } else {
         return Err(HelperErrors::ErrorInRunningFoundry);
     }
+}
+
+// FIXME: remove the debug block
+fn debug_foundry_calling_error() {
+    // ask rust to print full back trace
+    env::set_var("RUST_BACKTRACE", "full");
+
+    // list PATH variable
+    if let Ok(env_path) = env::var("PATH") {
+        println!("PATH: {}", env_path)
+    }
+
+    // list all the files in the current directory
+    let paths = std::fs::read_dir("./").unwrap();
+    for path in paths {
+        println!("File: {}", path.unwrap().path().display())
+    }
+
+    // test with a simple forge command: forge config --basic
+    let test_forge = Command::new("forge")
+        .args(["config", "--basic"])
+        .output()
+        .expect("forge config command failed to start");
+    io::stdout().write_all(&test_forge.stdout).unwrap();
+    io::stderr().write_all(&test_forge.stderr).unwrap();
 }
