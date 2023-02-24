@@ -801,12 +801,6 @@ export class HoprDB {
     await this.subBalance(createPendingTicketsCountKey(a.ticket.counterparty), a.ticket.amount)
   }
 
-  public async markLosing(t: UnacknowledgedTicket): Promise<void> {
-    await this.increment(LOSING_TICKET_COUNT)
-    await this.del(createPendingAcknowledgement(t.getChallenge()))
-    await this.subBalance(createPendingTicketsCountKey(t.ticket.counterparty), t.ticket.amount)
-  }
-
   public async getRejectedTicketsValue(): Promise<Balance> {
     return await this.getCoercedOrDefault<Balance>(REJECTED_TICKETS_VALUE, Balance.deserialize, Balance.ZERO)
   }

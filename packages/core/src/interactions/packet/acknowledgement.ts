@@ -4,11 +4,9 @@ import {
   AcknowledgedTicket,
   type HoprDB,
   type PendingAckowledgement,
-  type HalfKeyChallenge,
-  type Hash,
+  type HalfKeyChallenge, Hash,
   create_counter
 } from '@hoprnet/hopr-utils'
-import { findCommitmentPreImage } from '@hoprnet/hopr-core-ethereum'
 import type { SendMessage } from '../../index.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { ACKNOWLEDGEMENT_TIMEOUT } from '../../constants.js'
@@ -20,8 +18,7 @@ import type { Components } from '@libp2p/interfaces/components'
 const log = debug('hopr-core:acknowledgement')
 
 type OnAcknowledgement = (halfKey: HalfKeyChallenge) => void
-type OnWinningTicket = (ackMessage: AcknowledgedTicket) => void
-type OnOutOfCommitments = (channelId: Hash) => void
+type OnAckedTicket = (ackMessage: AcknowledgedTicket) => void
 
 type Incoming = [msg: Uint8Array, remotePeer: PeerId]
 type Outgoing = [ack: Uint8Array, destination: PeerId]
@@ -43,8 +40,9 @@ const metric_receivedFailedAcks = create_counter(
 )
 const metric_sentAcks = create_counter('core_counter_sent_acks', 'Number of sent message acknowledgements')
 
-const metric_winningTickets = create_counter('core_counter_winning_tickets', 'Number of winning tickets')
-const metric_losingTickets = create_counter('core_counter_losing_tickets', 'Number of losing tickets')
+const metric_ackedTickets = create_counter('core_counter_acked_tickets', 'Number of acknowledged tickets')
+
+const PREIMAGE_PLACE_HOLDER = new Hash(new Uint8Array({ length: Hash.SIZE }).fill(1))
 
 export class AcknowledgementInteraction {
   private incomingAcks: Pushable<Incoming>
@@ -58,8 +56,7 @@ export class AcknowledgementInteraction {
     private privKey: PeerId,
     private db: HoprDB,
     private onAcknowledgement: OnAcknowledgement,
-    private onWinningTicket: OnWinningTicket,
-    private onOutOfCommitments: OnOutOfCommitments,
+    private onAckedTicket: OnAckedTicket,
     private environment: ResolvedEnvironment
   ) {
     this.incomingAcks = pushable<Incoming>({ objectMode: true })
@@ -165,9 +162,8 @@ export class AcknowledgementInteraction {
       throw Error(`The acknowledgement is not sufficient to solve the embedded challenge.`)
     }
 
-    let channelId: Hash
     try {
-      channelId = (await this.db.getChannelFrom(unacknowledged.signer)).getId()
+      await this.db.getChannelFrom(unacknowledged.signer)
     } catch (e) {
       // We are acknowledging a ticket for a channel we do not think exists?
       // Also we know about the unacknowledged ticket? This should never happen.
@@ -180,21 +176,11 @@ export class AcknowledgementInteraction {
     const response = unacknowledged.getResponse(acknowledgement.ackKeyShare)
     const ticket = unacknowledged.ticket
 
-    // get the current commitment preimage, this value will be updated at ticket redemption
-    let opening: Hash
-    try {
-      opening = await findCommitmentPreImage(this.db, channelId)
-    } catch (err) {
-      log(`Channel ${channelId.toHex()} is out of commitments`)
-      this.onOutOfCommitments(channelId)
-      // TODO: How should we handle this ticket?
-      return
-    }
 
     // Store the acknowledged ticket, regardless if it's a win or a loss
-    // FIXME: preImage (`opening` here) should not be assigned at this moment.
-    const ack = new AcknowledgedTicket(ticket, response, opening, unacknowledged.signer)
-    log(`Acknowledging ticket. Using not-up-to-date opening ${opening.toHex()} and response ${response.toHex()}`)
+    // create an acked ticket with a pre image place holder
+    const ack = new AcknowledgedTicket(ticket, response, PREIMAGE_PLACE_HOLDER, unacknowledged.signer)
+    log(`Acknowledging ticket. Using response ${response.toHex()}`)
     // replace the unAcked ticket with Acked ticket.
 
     try {
@@ -204,16 +190,9 @@ export class AcknowledgementInteraction {
       log(`ERROR: cannot replace an UnAck ticket with Ack ticket, thus dropping ticket`, err)
     }
 
-    // If the ticket is a win, the default strategy would trigger the onWinningTicket action (e.g. auto- ticket redemption).
-    if (!ticket.isWinningTicket(opening, response, ticket.winProb)) {
-      log(`Got a ticket that is not a win. Marking it as a loss`)
-      await this.db.markLosing(unacknowledged)
-      metric_losingTickets.increment()
-      return
-    }
+    metric_ackedTickets.increment()
 
-    // Do not bump commitment in db here. Commitment is bumped in `redeemTicket` (`redeemTicketsInChannelLoop`)
-    metric_winningTickets.increment()
-    this.onWinningTicket(ack)
+    // If auto-ticket-redemption is on, onAckedTicket, try to redeem
+    this.onAckedTicket(ack)
   }
 }

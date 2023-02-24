@@ -17,7 +17,8 @@ import {
   type ChannelEntry,
   type DeferType,
   PublicKey,
-  AccountEntry
+  AccountEntry,
+  create_counter
 } from '@hoprnet/hopr-utils'
 import Indexer from './indexer/index.js'
 import { CORE_ETHEREUM_CONSTANTS } from '../lib/core_ethereum_misc.js'
@@ -61,6 +62,10 @@ type ticketRedemtionInChannelOperations = {
 
 // Exported from Rust
 const constants = CORE_ETHEREUM_CONSTANTS()
+
+// Metrics
+const metric_losingTickets = create_counter('core_ethereum_counter_losing_tickets', 'Number of losing tickets')
+const metric_winningTickets = create_counter('core_ethereum_counter_winning_tickets', 'Number of winning tickets')
 
 export default class HoprCoreEthereum extends EventEmitter {
   private static _instance: HoprCoreEthereum
@@ -381,6 +386,7 @@ export default class HoprCoreEthereum extends EventEmitter {
             // May fail due to out-of-commits, preimage-is-empty, not-a-winning-ticket
             // Treat those acked tickets as losing tickets, and remove them from the DB.
             await boundMarkLosingAckedTicket(ticket)
+            metric_losingTickets.increment()
           }
         }
 
@@ -454,6 +460,9 @@ export default class HoprCoreEthereum extends EventEmitter {
           message: 'Not a winning ticket.'
         }
       }
+
+      // address winning ticket
+      metric_winningTickets.increment()
 
       receipt = await this.chain.redeemTicket(counterparty.toAddress(), ackTicket, (txHash: string) =>
         this.setTxHandler(`channel-updated-${txHash}`, txHash)

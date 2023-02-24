@@ -431,8 +431,7 @@ class Hopr extends EventEmitter {
         this.emit(`hopr:message-acknowledged:${ackChallenge.toHex()}`)
         this.emit('hopr:message-acknowledged', ackChallenge.toHex())
       },
-      (ack: AcknowledgedTicket) => connector.emit('ticket:win', ack),
-      () => {},
+      (ack: AcknowledgedTicket) => connector.emit('ticket:acknowledged', ack),
       this.environment
     )
 
@@ -1144,11 +1143,11 @@ class Hopr extends EventEmitter {
     log('setting channel strategy from', this.strategy?.name, 'to', strategy.name)
     this.strategy = strategy
 
-    HoprCoreEthereum.getInstance().on('ticket:win', async (ack: AcknowledgedTicket) => {
+    HoprCoreEthereum.getInstance().on('ticket:acknowledged', async (ack: AcknowledgedTicket) => {
       try {
-        await this.strategy.onWinningTicket(ack)
+        await this.strategy.onAckedTicket(ack)
       } catch (err) {
-        error(`Strategy error while handling winning ticket`, err)
+        error(`Strategy error while handling acknowledged ticket`, err)
       }
     })
   }
