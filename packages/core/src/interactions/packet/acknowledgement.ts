@@ -4,7 +4,8 @@ import {
   AcknowledgedTicket,
   type HoprDB,
   type PendingAckowledgement,
-  type HalfKeyChallenge, Hash,
+  type HalfKeyChallenge,
+  Hash,
   create_counter
 } from '@hoprnet/hopr-utils'
 import type { SendMessage } from '../../index.js'
@@ -175,7 +176,6 @@ export class AcknowledgementInteraction {
     }
     const response = unacknowledged.getResponse(acknowledgement.ackKeyShare)
     const ticket = unacknowledged.ticket
-
 
     // Store the acknowledged ticket, regardless if it's a win or a loss
     // create an acked ticket with a pre image place holder
