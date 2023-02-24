@@ -14,6 +14,7 @@ mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 # Installs all toolchain utilities that are required to build hoprnet monorepo, including
 # - Node.js -> /usr/local/bin
 # - Yarn -> /usr/local/bin + /opt/yarn-v${version}
+# - protoc -> /usr/local/bin
 # - Typescript + related utilities, such as ts-node -> ${mydir}/node_modules
 # - Rust (rustc, cargo) -> ./../../.cargo/bin
 # - wasm-pack + wasm-opt, necessary to build WebAssembly modules -> ./../../.cargo/bin
@@ -170,6 +171,31 @@ function install_wasm_opt() {
     fi
 }
 
+# used by rust libp2p to compile objects
+function install_protobuf() {
+  local protobuf_version=21.12
+  echo "Installing protobuf version 3.${protobuf_version}"
+  local ostype="$(uname -s)"
+  local cputype="$(uname -m)"
+  case "${ostype}" in
+      Linux | linux)
+          ostype="linux"
+          ;;
+      Darwin)
+          ostype="macos"
+          ;;
+      *)
+          echo "no precompiled binaries available for OS: ${ostype}"
+      ;;
+  esac
+  PB_REL="https://github.com/protocolbuffers/protobuf/releases"
+  curl -o /tmp/protoc-${protobuf_version}.zip -fsSLO "${PB_REL}/download/v${protobuf_version}/protoc-${protobuf_version}-${ostype}-${cputype}.zip"
+  mkdir -p /opt/protoc-${protobuf_version}-${ostype}-${cputype}
+  unzip /tmp/protoc-${protobuf_version}.zip -d /opt/protoc-${protobuf_version}-${ostype}-${cputype}
+  ln -sf /opt/protoc-${protobuf_version}-${ostype}-${cputype}/bin/protoc /usr/local/bin/protoc
+}
+
+
 function install_node_js() {
     if ! command -v node; then
         cd ${download_dir}
@@ -218,6 +244,7 @@ if ${install_all}; then
 
     install_wasm_opt
     install_wasm_pack
+    install_protobuf
     install_node_js
     install_yarn
     install_javascript_utilities
@@ -245,6 +272,7 @@ command -v wasm-pack >/dev/null && wasm-pack --version
 command -v wasm-opt >/dev/null && wasm-opt --version
 command -v node >/dev/null && echo "node $(node --version)"
 command -v yarn >/dev/null && echo "yarn $(yarn --version)"
+command -v protoc >/dev/null && protoc --version
 npx --no tsc --version >/dev/null && echo "Typescript $(npx tsc --version)"
 echo ""
 
