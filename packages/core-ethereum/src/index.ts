@@ -469,6 +469,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     log('Successfully submitted ticket', ackTicket.response.toHex())
 
     // bump commitment when on-chain ticket redemption is successful
+    // FIXME: bump commitment can fail if channel runs out of commitments
     await bumpCommitment(this.db, channelId, commitmentPreImage)
     log(`Successfully bump local commitment after ${commitmentPreImage.toHex()}`)
 
