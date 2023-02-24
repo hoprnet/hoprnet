@@ -3,7 +3,7 @@ use std::{pin::Pin, u8};
 
 use futures::{
     future::{FutureExt, LocalBoxFuture},
-    stream::{FusedStream, Stream},
+    stream::{FusedStream, Stream, iter},
     task::{Context, Poll},
     Future, Sink, SinkExt,
 };
@@ -82,9 +82,11 @@ pin_project! {
         #[pin]
         sink_flushed_fut: Option<LocalBoxFuture<'a, ()>>,
         next_send_chunk: Option<Box<[u8]>>,
+        close_waker: Option<Waker>,
         waker: Option<Waker>,
         #[pin]
         resolve: Option<Function>,
+        closed: bool
     }
 }
 
@@ -98,8 +100,10 @@ impl MyJsStreamStruct<'_> {
             iter: None,
             next_send_chunk: None,
             waker: None,
+            close_waker: None,
             sink_flushed_fut: None,
-            resolve: None
+            resolve: None,
+            closed: false
         }
     }
 }
@@ -194,7 +198,6 @@ impl<'a> Sink<Box<[u8]>> for MyJsStreamStruct<'a> {
     ) -> Poll<Result<(), Self::Error>> {
         log("poll_ready called");
 
-        // let mut this = self.project();
         let mut this = unsafe { std::mem::transmute::<Pin<&mut MyJsStreamStruct<'a>>, Pin<&mut MyJsStreamStruct<'static>>>(self) }.project();
 
         *this.waker = Some(cx.waker().clone());
@@ -210,7 +213,9 @@ impl<'a> Sink<Box<[u8]>> for MyJsStreamStruct<'a> {
 
                         js_sys::Promise::new(&mut |resolve, reject| {
                             this.resolve.set(Some(resolve));
-                            if let Some(waker) = this.waker.take() {
+                            if this.close_waker.is_some() {
+                                this.close_waker.take().unwrap().wake()
+                            } else if let Some(waker) = this.waker.take() {
                                 log("waking up");
                                 waker.wake();
                             }
@@ -272,7 +277,28 @@ impl<'a> Sink<Box<[u8]>> for MyJsStreamStruct<'a> {
     }
 
     fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        log("close called");
+
         let mut this = self.project();
+
+        if this.sink_flushed_fut.is_none() {
+            return Poll::Ready(Err("Uninitialized. Please call and `await` poll_ready first.".into()));
+        }
+
+        *this.close_waker = Some(cx.waker().clone());
+
+        if !*this.closed {
+            if this.resolve.is_none() {
+                return Poll::Pending
+            }
+    
+            match this.resolve.take().unwrap().call1(&JsValue::undefined(), &to_jsvalue_stream(None).unwrap()) {
+                Ok(_) => {
+                    *this.closed = true;
+                },
+                Err(e) => return Poll::Ready(Err(format!("{:?}", e).into()))
+            };   
+        }
 
         if let Some(fut) = this.sink_flushed_fut.as_mut().as_pin_mut() {
             return match fut.poll(cx) {
@@ -295,8 +321,10 @@ pub async fn foo_bar(stream: MyJsStream) {
     let mut foo = std::mem::ManuallyDrop::new(MyJsStreamStruct::from(&stream));
 
     // foo.send_all(stream)
-    ok_or_jserr!(foo.send(Box::new([0u8, 1u8])).await);
-    ok_or_jserr!(foo.send(Box::new([2u8, 3u8])).await);
+    let mut s = iter::<Vec<Result<Box<[u8]>, String>>>(vec![Ok(Box::new([0u8, 1u8])), Ok(Box::new([2u8, 3u8]))]);
+    ok_or_jserr!(foo.send_all(&mut s).await);
+    foo.close().await;
+    // ok_or_jserr!(foo.send().await);
 
     // log(format!("first result {:?}", foo.next().await).as_str());
     // log(format!("second result {:?}", foo.next().await).as_str());
