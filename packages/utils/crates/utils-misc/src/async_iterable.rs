@@ -60,6 +60,33 @@ pub mod wasm {
         }
     }
 
+    /// Transforms input into iterator protocol
+    /// 
+    /// ```no_run
+    /// # use utils_misc::async_iterable::wasm::to_jsvalue_iterator;
+    /// 
+    /// let first_chunk: Box<[u8]> = Box::new([0u8,1u8]);
+    /// 
+    /// to_jsvalue_iterator(Some(first_chunk));
+    /// 
+    /// // end stream
+    /// to_jsvalue_iterator(None);
+    /// ```
+    pub fn to_jsvalue_iterator(item: Option<Box<[u8]>>) -> JsValue {
+        match item {
+            Some(m) => serde_wasm_bindgen::to_value(&IteratorResult {
+                done: false,
+                value: Some(m),
+            })
+            .unwrap(),
+            None => serde_wasm_bindgen::to_value(&IteratorResult {
+                done: true,
+                value: None,
+            })
+            .unwrap()
+        }
+    }
+
     /// Helper struct to export Rust Streams into Javascript AsyncIterables
     ///
     /// ```
