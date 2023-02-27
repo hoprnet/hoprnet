@@ -211,8 +211,8 @@ export class CoverTrafficStrategy extends SaneDefaults implements ChannelStrateg
     return new StrategyTickResult(MAX_CT_AUTO_CHANNELS, toOpen, toClose)
   }
 
-  async onWinningTicket() {
-    log('cover traffic ignores winning ticket.')
+  async onAckedTicket() {
+    log('cover traffic ignores acknowledged ticket.')
   }
 
   async onChannelWillClose() {
