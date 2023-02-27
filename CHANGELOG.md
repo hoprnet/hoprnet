@@ -24,6 +24,7 @@
 - Bring back `fund` command, to open outgoing and incoming channels with counterpart ([#4566](https://github.com/hoprnet/hoprnet/pull/4566))
 - Improve Grafana dashboards & compose setup ([#4479](https://github.com/hoprnet/hoprnet/pull/4479))
 - API: Prevent API privilege escalation ([#4625](https://github.com/hoprnet/hoprnet/pull/4625))
+- Assign commitent at ticket redemption, so that tickets can be redeemed with a gap in ticket index ([#4643](https://github.com/hoprnet/hoprnet/pull/4643))
 
 <a name="1.91"></a>
 
