@@ -11,7 +11,7 @@ WORKDIR /app/hoprnet-toolchain
 RUN mkdir -p scripts/toolchain
 
 RUN apt-get update \
-&& apt-get install -y \
+ && apt-get install -y \
       bash \
       build-essential \
       ca-certificates \
@@ -23,8 +23,8 @@ RUN apt-get update \
       unzip \
       xz-utils \
       time \
-&& rm -rf /var/lib/apt/lists/* \
-&& apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false
+ && rm -rf /var/lib/apt/lists/* \
+ && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false
 
 # Gets yarn executable
 COPY .yarn .yarn/
