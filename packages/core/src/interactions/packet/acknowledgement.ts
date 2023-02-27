@@ -43,7 +43,7 @@ const metric_sentAcks = create_counter('core_counter_sent_acks', 'Number of sent
 
 const metric_ackedTickets = create_counter('core_counter_acked_tickets', 'Number of acknowledged tickets')
 
-const PREIMAGE_PLACE_HOLDER = new Hash(new Uint8Array({ length: Hash.SIZE }).fill(1))
+const PREIMAGE_PLACE_HOLDER = new Hash(new Uint8Array(Hash.SIZE).fill(0xff))
 
 export class AcknowledgementInteraction {
   private incomingAcks: Pushable<Incoming>
