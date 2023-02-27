@@ -317,10 +317,10 @@ export default class HoprCoreEthereum extends EventEmitter {
     // start new operation and store it
     return new Promise((resolve, reject) => {
       try {
-        this.ticketRedemtionInChannelOperations.set(channelId, this.redeemTicketsInChannelLoop(channel).then(
-          resolve,
-          reject
-        ))
+        this.ticketRedemtionInChannelOperations.set(
+          channelId,
+          this.redeemTicketsInChannelLoop(channel).then(resolve, reject)
+        )
       } catch (err) {
         reject(err)
       }
