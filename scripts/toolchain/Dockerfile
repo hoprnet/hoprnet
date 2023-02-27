@@ -12,17 +12,17 @@ RUN mkdir -p scripts/toolchain
 
 RUN apt-get update \
 && apt-get install -y \
-   bash \
-   build-essential \
-   ca-certificates \
-   curl \
-   git \
-   jq \
-   lsof \
-   python3 \
-   unzip \
-   xz-utils \
-   time \
+      bash \
+      build-essential \
+      ca-certificates \
+      curl \
+      git \
+      jq \
+      lsof \
+      python3 \
+      unzip \
+      xz-utils \
+      time \
 && rm -rf /var/lib/apt/lists/* \
 && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false
 
