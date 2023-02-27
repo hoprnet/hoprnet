@@ -55,10 +55,7 @@ export type ChainOptions = {
   environment: string
 }
 
-type ticketRedemtionInChannelOperations = {
-  // maps channel id to ongoing operation
-  [id: string]: Promise<void>
-}
+type ticketRedemtionInChannelOperations = Map<string, Promise<void>>
 
 // Exported from Rust
 const constants = CORE_ETHEREUM_CONSTANTS()
@@ -75,7 +72,7 @@ export default class HoprCoreEthereum extends EventEmitter {
   private started: Promise<HoprCoreEthereum> | undefined
   private redeemingAll: Promise<void> | undefined = undefined
   // Used to store ongoing operations to prevent duplicate redemption attempts
-  private ticketRedemtionInChannelOperations: ticketRedemtionInChannelOperations = {}
+  private ticketRedemtionInChannelOperations: ticketRedemtionInChannelOperations = new Map()
 
   private constructor(
     private db: HoprDB,
@@ -310,7 +307,7 @@ export default class HoprCoreEthereum extends EventEmitter {
 
   public async redeemTicketsInChannel(channel: ChannelEntry) {
     const channelId = channel.getId().toHex()
-    const currentOperation = this.ticketRedemtionInChannelOperations[channelId]
+    const currentOperation = this.ticketRedemtionInChannelOperations.get(channelId)
 
     // verify that no operation is running, or return the active operation
     if (currentOperation) {
@@ -320,10 +317,10 @@ export default class HoprCoreEthereum extends EventEmitter {
     // start new operation and store it
     return new Promise((resolve, reject) => {
       try {
-        this.ticketRedemtionInChannelOperations[channelId] = this.redeemTicketsInChannelLoop(channel).then(
+        this.ticketRedemtionInChannelOperations.set(channelId, this.redeemTicketsInChannelLoop(channel).then(
           resolve,
           reject
-        )
+        ))
       } catch (err) {
         reject(err)
       }
@@ -334,7 +331,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     const channelId = channel.getId()
     if (!channel.destination.eq(this.getPublicKey())) {
       // delete operation before returning
-      delete this.ticketRedemtionInChannelOperations[channelId.toHex()]
+      this.ticketRedemtionInChannelOperations.delete(channelId.toHex())
       throw new Error('Cannot redeem ticket in channel that is not to us')
     }
 
@@ -404,7 +401,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     } catch (err) {
       log(`redemption of tickets from ${channel.source.toString()} failed`, err)
     } finally {
-      delete this.ticketRedemtionInChannelOperations[channelId.toHex()]
+      this.ticketRedemtionInChannelOperations.delete(channelId.toHex())
     }
   }
 
