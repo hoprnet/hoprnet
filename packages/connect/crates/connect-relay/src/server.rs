@@ -1,13 +1,11 @@
-use std::{collections::HashMap, pin::Pin, sync::mpsc::SendError, u8};
+use std::{collections::HashMap, pin::Pin, u8};
 
 use futures::{
     channel::mpsc::{self, UnboundedReceiver, UnboundedSender},
-    future::LocalBoxFuture,
     ready,
-    sink::Send,
     stream::{FusedStream, Stream},
     task::{Context, Poll},
-    Future, FutureExt, Sink, SinkExt, StreamExt,
+    Future, FutureExt, Sink, SinkExt,
 };
 use pin_project_lite::pin_project;
 use std::sync::{Arc, Mutex};
@@ -95,21 +93,21 @@ impl PingFuture {
 }
 
 pin_project! {
-    pub struct NextStream<'a> {
-        next_stream: Option<StreamingIterable<'a>>,
+    pub struct NextStream {
+        next_stream: Option<StreamingIterable>,
         waker: Option<Waker>,
     }
 }
 
-impl<'a> NextStream<'a> {
-    fn new() -> NextStream<'a> {
+impl<'a> NextStream {
+    fn new() -> NextStream {
         Self {
             next_stream: None,
             waker: None,
         }
     }
 
-    fn take_stream(&mut self, new_stream: &'a JsStreamingIterable) -> Result<(), String> {
+    fn take_stream(&mut self, new_stream: JsStreamingIterable) -> Result<(), String> {
         match self.next_stream {
             Some(_) => Err(format!(
                 "Cannot take stream because previous stream has not yet been consumed"
@@ -127,10 +125,10 @@ impl<'a> NextStream<'a> {
     }
 }
 
-impl<'a> Stream for NextStream<'a> {
-    type Item = StreamingIterable<'a>;
+impl<'a> Stream for NextStream {
+    type Item = StreamingIterable;
 
-    fn poll_next(self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let this = self.project();
 
         match this.next_stream.take() {
@@ -145,13 +143,11 @@ impl<'a> Stream for NextStream<'a> {
 }
 
 pin_project! {
-    #[project = ServerProjection]
-    #[project_replace = MyProjReplace]
-    struct Server<'a> {
+    struct Server {
         #[pin]
-        stream: Option<StreamingIterable<'a>>,
+        stream: Option<StreamingIterable>,
         #[pin]
-        next_stream: NextStream<'a>,
+        next_stream: NextStream,
         #[pin]
         status_messages_rx: Option<UnboundedReceiver<Box<[u8]>>>,
         status_messages_tx: UnboundedSender<Box<[u8]>>,
@@ -161,8 +157,8 @@ pin_project! {
     }
 }
 
-impl<'a> Server<'a> {
-    fn new(stream: StreamingIterable<'a>) -> Server<'a> {
+impl Server {
+    fn new(stream: StreamingIterable) -> Server {
         let (status_messages_tx, status_messages_rx) = mpsc::unbounded::<Box<[u8]>>();
         Self {
             stream: Some(stream),
@@ -188,18 +184,18 @@ impl<'a> Server<'a> {
     }
 
     /// Used to attach a new incoming connection
-    fn update(self: Pin<&mut Self>, new_stream: &'a JsStreamingIterable) -> Result<(), String> {
+    fn update(self: Pin<&mut Self>, new_stream: JsStreamingIterable) -> Result<(), String> {
         let mut this = self.project();
 
         this.next_stream.take_stream(new_stream)
     }
 }
 
-impl<'b> Stream for Server<'b> {
+impl<'b> Stream for Server {
     type Item = Result<Box<[u8]>, String>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let mut this: ServerProjection<'_, '_> = self.project();
+        let mut this = self.project();
 
         Poll::Ready(loop {
             // Make sure previous send attempt has finished
@@ -289,13 +285,13 @@ impl<'b> Stream for Server<'b> {
     }
 }
 
-impl<'a> FusedStream for Server<'a> {
+impl FusedStream for Server {
     fn is_terminated(&self) -> bool {
         self.stream.as_ref().unwrap().is_terminated()
     }
 }
 
-impl<'a> Sink<Box<[u8]>> for Server<'a> {
+impl Sink<Box<[u8]>> for Server {
     type Error = String;
 
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {

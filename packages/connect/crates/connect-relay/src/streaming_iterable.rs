@@ -3,14 +3,17 @@ use std::{pin::Pin, u8};
 
 use futures::{
     future::{FutureExt, LocalBoxFuture},
-    stream::{iter, FusedStream},
+    stream::{iter, FusedStream, Next},
     task::{Context, Poll},
-    Future, Sink, SinkExt, Stream,
+    Future, Sink, SinkExt, Stream, StreamExt,
 };
 use js_sys::{AsyncIterator, Function, Object, Promise, Reflect, Symbol};
 use pin_project_lite::pin_project;
 use std::task::Waker;
-use utils_misc::{async_iterable::wasm::to_jsvalue_iterator, ok_or_jserr};
+use utils_misc::{
+    async_iterable::wasm::{to_jsvalue_iterator, to_jsvalue_stream},
+    ok_or_jserr,
+};
 use wasm_bindgen::{prelude::*, JsCast};
 use wasm_bindgen_futures::JsFuture;
 
@@ -38,7 +41,7 @@ extern "C" {
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 extern "C" {
-    #[wasm_bindgen(is_type_of = AsyncIterable::looks_like_async_iterable, typescript_type = "Iterator<any>")]
+    #[wasm_bindgen(is_type_of = AsyncIterable::looks_like_async_iterable, typescript_type = "AsyncIterable<Uint8Array>")]
     pub type AsyncIterable;
 }
 
@@ -76,7 +79,7 @@ extern "C" {
 pin_project! {
     /// Holds a Javascript Streaming Iterable object and
     /// implements Rust `futures::Sink` and `futures::Stream` trait
-    pub struct StreamingIterable<'a> {
+    pub struct StreamingIterable {
         // stream iterator
         iter: Option<AsyncIterator>,
         // stream done
@@ -85,7 +88,7 @@ pin_project! {
         next: Option<JsFuture>,
         // sink closed promise
         #[pin]
-        sink_close_future: Option<LocalBoxFuture<'a, ()>>,
+        sink_close_future: Option<LocalBoxFuture<'static, ()>>,
         // signals that sink `Sink::poll_close` future can proceed
         close_waker: Option<Waker>,
         // signals that sink `Sink::poll_ready` future can proceed
@@ -95,13 +98,13 @@ pin_project! {
         // true once `poll_close` has been called
         sink_done: bool,
         // the Javascript StreamingIterable object
-        js_stream: &'a JsStreamingIterable,
+        js_stream: JsStreamingIterable,
     }
 }
 
 // Turn this into an arc
-impl StreamingIterable<'_> {
-    pub fn from<'a>(stream: &'a JsStreamingIterable) -> StreamingIterable<'a> {
+impl StreamingIterable {
+    pub fn from(stream: JsStreamingIterable) -> StreamingIterable {
         StreamingIterable {
             js_stream: stream,
             stream_done: false,
@@ -116,7 +119,7 @@ impl StreamingIterable<'_> {
     }
 }
 
-impl Stream for StreamingIterable<'_> {
+impl Stream for StreamingIterable {
     type Item = Result<Box<[u8]>, String>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
@@ -151,7 +154,7 @@ impl Stream for StreamingIterable<'_> {
                 }
             };
 
-            self.iter.replace(async_it);
+            self.iter = Some(async_it);
         }
 
         let future = match self.next.as_mut() {
@@ -192,25 +195,24 @@ impl Stream for StreamingIterable<'_> {
     }
 }
 
-impl FusedStream for StreamingIterable<'_> {
+impl FusedStream for StreamingIterable {
     fn is_terminated(&self) -> bool {
         self.stream_done
     }
 }
 
-impl<'a> Sink<Box<[u8]>> for StreamingIterable<'a> {
+impl Sink<Box<[u8]>> for StreamingIterable {
     type Error = String;
     fn poll_ready(
-        self: Pin<&mut StreamingIterable<'a>>,
+        self: Pin<&mut StreamingIterable>,
         cx: &mut Context<'_>,
     ) -> Poll<Result<(), Self::Error>> {
         log("poll_ready called");
 
         let mut this = unsafe {
-            std::mem::transmute::<
-                Pin<&mut StreamingIterable<'a>>,
-                Pin<&mut StreamingIterable<'static>>,
-            >(self)
+            std::mem::transmute::<Pin<&mut StreamingIterable>, Pin<&'static mut StreamingIterable>>(
+                self,
+            )
         }
         .project();
 
@@ -276,7 +278,13 @@ impl<'a> Sink<Box<[u8]>> for StreamingIterable<'a> {
                 .boxed_local(),
             ));
 
-            return match this.sink_close_future.as_pin_mut().unwrap().poll(cx) {
+            return match this
+                .sink_close_future
+                .as_mut()
+                .as_pin_mut()
+                .unwrap()
+                .poll(cx)
+            {
                 Poll::Pending => Poll::Pending,
                 Poll::Ready(_) => Poll::Ready(Err("Stream has been closed".into())),
             };
@@ -347,8 +355,70 @@ impl<'a> Sink<Box<[u8]>> for StreamingIterable<'a> {
 }
 
 #[wasm_bindgen]
+struct JsStreamingIterableOutput {
+    streaming_iterable: StreamingIterable,
+}
+
+impl JsStreamingIterableOutput {
+    fn from(streaming_iterable: StreamingIterable) -> Self {
+        Self { streaming_iterable }
+    }
+}
+
+#[wasm_bindgen]
+impl JsStreamingIterableOutput {
+    #[wasm_bindgen(getter, typescript_type = AsyncIterable)]
+    pub fn source(&mut self) -> AsyncIterable {
+        let this = unsafe { std::mem::transmute::<&mut Self, &'static mut Self>(self) };
+        let iterator_obj = Object::new();
+
+        let iterator_fn: Closure<dyn FnMut() -> Promise + 'static> = Closure::once(move || {
+            log("rs: iterator code called");
+
+            wasm_bindgen_futures::future_to_promise(async move {
+                to_jsvalue_stream(this.streaming_iterable.next().await)
+            })
+        });
+
+        // {
+        //    next(): Promise<IteratorResult> {
+        //      // ... function body
+        //    }
+        // }
+        Reflect::set(
+            &iterator_obj,
+            &"next".into(),
+            iterator_fn.as_ref().unchecked_ref(),
+        )
+        .unwrap();
+
+        let iterable_fn: Closure<dyn FnMut() -> Object> = Closure::once(move || iterator_obj);
+
+        let iterable_obj = Object::new();
+
+        // {
+        //    [Symbol.aysncIterator](): Iterator {
+        //      // ... function body
+        //    }
+        // }
+        Reflect::set(
+            &iterable_obj,
+            &Symbol::async_iterator(),
+            // Cast Closure to js_sys::Function
+            iterable_fn.as_ref().unchecked_ref(),
+        )
+        .unwrap();
+
+        iterable_obj.dyn_into().unwrap()
+    }
+
+    #[wasm_bindgen]
+    pub async fn sink(source: AsyncIterable) {}
+}
+
+#[wasm_bindgen]
 pub async fn foo_bar(stream: JsStreamingIterable) {
-    let mut foo = std::mem::ManuallyDrop::new(StreamingIterable::from(&stream));
+    let mut foo = std::mem::ManuallyDrop::new(StreamingIterable::from(stream));
 
     // foo.send_all(stream)
     let mut s = iter::<Vec<Result<Box<[u8]>, String>>>(vec![
