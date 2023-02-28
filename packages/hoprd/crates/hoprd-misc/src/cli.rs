@@ -6,7 +6,7 @@ use clap::{Arg, ArgAction, ArgMatches, Args, Command, FromArgMatches as _};
 use core_ethereum_misc::constants::DEFAULT_CONFIRMATIONS;
 use core_misc::constants::{
     DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_INTERVAL_VARIANCE, DEFAULT_HEARTBEAT_THRESHOLD,
-    DEFAULT_NETWORK_QUALITY_THRESHOLD,
+    DEFAULT_NETWORK_QUALITY_THRESHOLD, DEFAULT_MAX_PARALLEL_CONNECTIONS, DEFAULT_MAX_PARALLEL_CONNECTION_PUBLIC_RELAY
 };
 use core_misc::environment::{Environment, FromJsonFile, PackageJsonFile, ProtocolConfig};
 use core_strategy::{passive::PassiveStrategy, random::RandomStrategy, promiscuous::PromiscuousStrategy, generic::ChannelStrategy};
@@ -148,7 +148,7 @@ struct CliArgs {
         }, 
         env = "HOPRD_HOST", 
         help = "Host to listen on for P2P connections",
-        value_parser = ValueParser::new(parse_host)
+        value_parser = ValueParser::new(parse_host),
     )]
     pub host: Host,
 
@@ -233,37 +233,37 @@ struct CliArgs {
     pub password: Option<String>,
 
     #[arg(
-    long = "defaultStrategy",
-    help = "Default channel strategy to use after node starts up",
-    env = "HOPRD_DEFAULT_STRATEGY",
-    value_name = "DEFAULT_STRATEGY",
-    default_value = "passive",
-    value_parser = PossibleValuesParser::new([PromiscuousStrategy::NAME, PassiveStrategy::NAME, RandomStrategy::NAME])
+        long = "defaultStrategy",
+        help = "Default channel strategy to use after node starts up",
+        env = "HOPRD_DEFAULT_STRATEGY",
+        value_name = "DEFAULT_STRATEGY",
+        default_value = "passive",
+        value_parser = PossibleValuesParser::new([PromiscuousStrategy::NAME, PassiveStrategy::NAME, RandomStrategy::NAME])
     )]
     pub default_strategy: Option<String>,
 
     #[arg(
-    long = "maxAutoChannels",
-    help = "Maximum number of channel a strategy can open. If not specified, square root of number of available peers is used.",
-    env = "HOPRD_MAX_AUTO_CHANNELS",
-    value_name = "MAX_AUTO_CHANNELS",
-    value_parser = clap::value_parser!(u32)
+        long = "maxAutoChannels",
+        help = "Maximum number of channel a strategy can open. If not specified, square root of number of available peers is used.",
+        env = "HOPRD_MAX_AUTO_CHANNELS",
+        value_name = "MAX_AUTO_CHANNELS",
+        value_parser = clap::value_parser!(u32)
     )]
     pub max_auto_channels: Option<u32>, // Make this a string if we want to supply functions instead in the future.
 
     #[arg(
-    long = "autoRedeemTickets",
-    default_value_t = false,
-    env = "HOPRD_AUTO_REDEEEM_TICKETS",
-    help = "If enabled automatically redeems winning tickets."
+        long = "autoRedeemTickets",
+        default_value_t = false,
+        env = "HOPRD_AUTO_REDEEEM_TICKETS",
+        help = "If enabled automatically redeems winning tickets."
     )]
     pub auto_redeem_tickets: bool,
 
     #[arg(
-    long = "checkUnrealizedBalance",
-    default_value_t = false,
-    env = "HOPRD_CHECK_UNREALIZED_BALANCE",
-    help = "Determines if unrealized balance shall be checked first before validating unacknowledged tickets."
+        long = "checkUnrealizedBalance",
+        default_value_t = false,
+        env = "HOPRD_CHECK_UNREALIZED_BALANCE",
+        help = "Determines if unrealized balance shall be checked first before validating unacknowledged tickets."
     )]
     pub check_unrealized_balance: bool,
 
@@ -322,8 +322,21 @@ struct CliArgs {
     pub allow_private_node_connections: bool,
 
     #[arg(
+        long = "maxParallelConnections",
+        default_value_t = DEFAULT_MAX_PARALLEL_CONNECTIONS,
+        default_value_ifs = [
+            ("announce", "true", DEFAULT_MAX_PARALLEL_CONNECTION_PUBLIC_RELAY.to_string()),
+        ],
+        value_parser = clap::value_parser!(u32),
+        value_name = "CONNECTIONS",
+        help = "Set maximum parallel connections",
+        env = "HOPRD_MAX_PARALLEL_CONNECTIONS"
+    )]
+    pub max_parallel_connections: u32,
+
+    #[arg(
         long = "testAnnounceLocalAddresses",
-        env = "HOPRD_TEST_ANNOUNCE_LOCAL_ADDRESSES",
+        env = "HOPRD_TEST_ANNOUNCE_LOCAL_ADDRESSES"
         help = "For testing local testnets. Announce local addresses",
         action = ArgAction::SetTrue,
         default_value_t = false

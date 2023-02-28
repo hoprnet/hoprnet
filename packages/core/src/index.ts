@@ -154,7 +154,7 @@ export type HoprOptions = {
   networkQualityThreshold?: number
   onChainConfirmations?: number
   checkUnrealizedBalance?: boolean
-
+  maxParallelConnections?: number
   testing?: {
     // when true, assume that the node is running in an isolated network and does
     // not need any connection to nodes outside of the subnet
