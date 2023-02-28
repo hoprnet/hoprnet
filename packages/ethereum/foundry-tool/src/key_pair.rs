@@ -1,4 +1,4 @@
-use ethers::core::k256::ecdsa::SigningKey;
+use ethers::core::{k256::ecdsa::SigningKey, rand::thread_rng};
 use ethers::signers::Signer;
 use ethers::signers::Wallet;
 use ethers::types::Address;
@@ -24,11 +24,11 @@ pub fn read_identities(
                 // .map(|r| r.into_os_string().into_string().unwrap())
                 .filter(|r| match &identity_prefix {
                     Some(identity_prefix) => r
-                            .file_stem()
-                            .unwrap()
-                            .to_str()
-                            .unwrap()
-                            .contains(identity_prefix.as_str()),
+                        .file_stem()
+                        .unwrap()
+                        .to_str()
+                        .unwrap()
+                        .contains(identity_prefix.as_str()),
                     _ => true,
                 }) // TODO: Now it is a loose check on contain but not strict on the prefix
                 .filter_map(|r| Wallet::<SigningKey>::decrypt_keystore(r, password).ok()) // read keystore and return non-error results
@@ -42,17 +42,47 @@ pub fn read_identities(
     }
 }
 
+pub fn create_identity(dir_name: &str, password: &str, name: &str) -> Result<(), std::io::Error> {
+    // create dir if not exist
+    fs::create_dir_all(dir_name)?;
+
+    // create identity with the given password
+    let (_key, uuid) =
+        Wallet::new_keystore(Path::new(dir_name), &mut thread_rng(), password, Some(name)).unwrap();
+
+    // Rename keystore from uuid to uuid.id
+    let old_file_path = vec![dir_name, "/", name].concat();
+    let new_file_path = vec![dir_name, "/", name, ".id"].concat();
+    fs::rename(&old_file_path, &new_file_path)
+        .map_err(|err| println!("{:?}", err))
+        .ok();
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
 
     use super::*;
-    use ethers::core::rand::thread_rng;
+
+    #[test]
+    fn create_identities_from_directory_with_id_files() {
+        let path = "./tmp_create";
+        let pwd = "password_create";
+        match create_identity(path, pwd, "node1") {
+            Ok(val) => assert!(true),
+            _ => assert!(false),
+        }
+        remove_json_keystore(path)
+            .map_err(|err| println!("{:?}", err))
+            .ok();
+    }
 
     #[test]
     fn read_identities_from_directory_with_id_files() {
         let path = "./tmp_1";
         let pwd = "password";
-        create_json_keystore(path, pwd, false).unwrap();
+        create_identity(path, pwd, "2da2bc3e-259e-4c0b-bfeb-fe0351d60148").unwrap();
         match read_identities(path, &pwd.to_string(), &None) {
             Ok(val) => assert_eq!(val.len(), 1),
             _ => assert!(false),
@@ -67,7 +97,7 @@ mod tests {
         let path = "./tmp_2";
         let pwd = "password";
         let wrong_pwd = "wrong_password";
-        create_json_keystore(path, pwd, false).unwrap();
+        create_identity(path, pwd, "2da2bc3e-259e-4c0b-bfeb-fe0351d60148").unwrap();
         match read_identities(path, &wrong_pwd.to_string(), &None) {
             Ok(val) => assert_eq!(val.len(), 0),
             _ => assert!(false),
@@ -90,7 +120,7 @@ mod tests {
     fn read_identities_from_tmp_folder() {
         let path = "./tmp_4";
         let pwd = "local";
-        create_json_keystore(path, pwd, true).unwrap();
+        create_identity(path, pwd, "local-alice").unwrap();
         match read_identities(path, &pwd.to_string(), &None) {
             Ok(val) => assert_eq!(val.len(), 1),
             _ => assert!(false),
@@ -104,7 +134,7 @@ mod tests {
     fn read_identities_from_tmp_folder_with_prefix() {
         let path = "./tmp_5";
         let pwd = "local";
-        create_json_keystore(path, pwd, true).unwrap();
+        create_identity(path, pwd, "local-alice").unwrap();
         match read_identities(path, &pwd.to_string(), &Some("local".to_string())) {
             Ok(val) => assert_eq!(val.len(), 1),
             _ => assert!(false),
@@ -118,7 +148,7 @@ mod tests {
     fn read_identities_from_tmp_folder_no_match() {
         let path = "./tmp_6";
         let pwd = "local";
-        create_json_keystore(path, pwd, true).unwrap();
+        create_identity(path, pwd, "local-alice").unwrap();
         match read_identities(path, &pwd.to_string(), &Some("npm-".to_string())) {
             Ok(val) => assert_eq!(val.len(), 0),
             _ => assert!(false),
@@ -126,26 +156,6 @@ mod tests {
         remove_json_keystore(path)
             .map_err(|err| println!("{:?}", err))
             .ok();
-    }
-
-    fn create_json_keystore(
-        dir_name: &str,
-        pwd: &str,
-        local_like: bool,
-    ) -> Result<(), std::io::Error> {
-        fs::create_dir_all(dir_name)?;
-        let (_key, uuid) =
-            Wallet::new_keystore(Path::new(dir_name), &mut thread_rng(), pwd, None).unwrap();
-        let old_file_path = vec![dir_name, "/", &*uuid].concat();
-        let new_file_path = if local_like {
-            vec![dir_name, "/local-alice.id"].concat()
-        } else {
-            vec![dir_name, "/", &*uuid, ".id"].concat()
-        };
-        fs::rename(&old_file_path, &new_file_path)
-            .map_err(|err| println!("{:?}", err))
-            .ok(); // Rename keystore from uuid to uuid.id
-        Ok(())
     }
 
     fn remove_json_keystore(path: &str) -> Result<(), std::io::Error> {
