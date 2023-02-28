@@ -1,9 +1,11 @@
 use crate::faucet::FaucetArgs;
+use crate::identity::IdentityArgs;
 use crate::utils::{Cmd, HelperErrors};
 use clap::{Parser, Subcommand};
 // use ethers::types::Address;
 pub mod environment_config;
 pub mod faucet;
+pub mod identity;
 pub mod key_pair;
 pub mod process;
 pub mod utils;
@@ -23,14 +25,8 @@ struct Cli {
     about = "Helper to create node identities, fund nodes, etc."
 )]
 enum Commands {
-    // // related to file structure. TODO: Extend this command to store deployment files, if needed
-    // #[clap(
-    //     about = "Print path to the folder that should store deployment files for given envirionment and type."
-    // )]
-    // Files {
-    //     #[clap(short, long)]
-    //     list: bool,
-    // },
+    #[clap(about = "Create and store identity files")]
+    Identity(IdentityArgs),
     #[clap(
         about = "Fund given address and/or addressed derived from identity files native tokens or HOPR tokens"
     )]
@@ -41,6 +37,9 @@ fn main() -> Result<(), HelperErrors> {
     let cli = Cli::parse();
 
     match cli.command {
+        Commands::Identity(opt) => {
+            opt.run()?;
+        }
         Commands::Faucet(opt) => {
             opt.run()?;
         }

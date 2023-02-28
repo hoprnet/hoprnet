@@ -6,7 +6,7 @@ Complete some missing funcitonalities of the foundry-centered smart contract too
 
 ```
 cargo run -- -h
-cargo run -- --environment-name localhost --environment-type development files --list
+cargo run -- identity --password switzerland -- directory "./test" --name node_ --number 3
 ```
 
 ```

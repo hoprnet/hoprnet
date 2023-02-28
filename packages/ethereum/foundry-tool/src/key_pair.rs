@@ -45,18 +45,17 @@ pub fn read_identities(
 pub fn create_identity(
     dir_name: &str,
     password: &str,
-    name: Option<&str>,
-) -> Result<(), std::io::Error> {
+    name: &Option<String>,
+) -> Result<Address, std::io::Error> {
     // create dir if not exist
     fs::create_dir_all(dir_name)?;
 
     // create identity with the given password
-    let (_key, uuid) =
+    let (wallet, uuid) =
         Wallet::new_keystore(Path::new(dir_name), &mut thread_rng(), password, None).unwrap();
 
     // Rename keystore from uuid to uuid.id (or `name.id`, if provided)
     let old_file_path = vec![dir_name, "/", &*uuid].concat();
-    // let new_file_path = vec![dir_name, "/", &*id_name, ".id"].concat();
 
     // check if `name` is end with `.id`, if not, append it
     let new_file_path = match name {
@@ -75,7 +74,7 @@ pub fn create_identity(
         .map_err(|err| println!("{:?}", err))
         .ok();
 
-    Ok(())
+    Ok(wallet.address())
 }
 
 #[cfg(test)]
@@ -87,7 +86,7 @@ mod tests {
     fn create_identities_from_directory_with_id_files() {
         let path = "./tmp_create";
         let pwd = "password_create";
-        match create_identity(path, pwd, Some("node1")) {
+        match create_identity(path, pwd, &Some(String::from("node1"))) {
             Ok(_) => assert!(true),
             _ => assert!(false),
         }
@@ -100,7 +99,7 @@ mod tests {
     fn read_identities_from_directory_with_id_files() {
         let path = "./tmp_1";
         let pwd = "password";
-        create_identity(path, pwd, None).unwrap();
+        create_identity(path, pwd, &None).unwrap();
         match read_identities(path, &pwd.to_string(), &None) {
             Ok(val) => assert_eq!(val.len(), 1),
             _ => assert!(false),
@@ -115,7 +114,7 @@ mod tests {
         let path = "./tmp_2";
         let pwd = "password";
         let wrong_pwd = "wrong_password";
-        create_identity(path, pwd, None).unwrap();
+        create_identity(path, pwd, &None).unwrap();
         match read_identities(path, &wrong_pwd.to_string(), &None) {
             Ok(val) => assert_eq!(val.len(), 0),
             _ => assert!(false),
@@ -138,7 +137,7 @@ mod tests {
     fn read_identities_from_tmp_folder() {
         let path = "./tmp_4";
         let pwd = "local";
-        create_identity(path, pwd, Some("local-alice")).unwrap();
+        create_identity(path, pwd, &Some(String::from("local-alice"))).unwrap();
         match read_identities(path, &pwd.to_string(), &None) {
             Ok(val) => assert_eq!(val.len(), 1),
             _ => assert!(false),
@@ -152,7 +151,7 @@ mod tests {
     fn read_identities_from_tmp_folder_with_prefix() {
         let path = "./tmp_5";
         let pwd = "local";
-        create_identity(path, pwd, Some("local-alice")).unwrap();
+        create_identity(path, pwd, &Some(String::from("local-alice"))).unwrap();
         match read_identities(path, &pwd.to_string(), &Some("local".to_string())) {
             Ok(val) => assert_eq!(val.len(), 1),
             _ => assert!(false),
@@ -166,7 +165,7 @@ mod tests {
     fn read_identities_from_tmp_folder_no_match() {
         let path = "./tmp_6";
         let pwd = "local";
-        create_identity(path, pwd, Some("local-alice")).unwrap();
+        create_identity(path, pwd, &Some(String::from("local-alice"))).unwrap();
         match read_identities(path, &pwd.to_string(), &Some("npm-".to_string())) {
             Ok(val) => assert_eq!(val.len(), 0),
             _ => assert!(false),
