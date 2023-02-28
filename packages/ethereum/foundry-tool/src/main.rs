@@ -1,5 +1,6 @@
 use crate::faucet::FaucetArgs;
 use crate::identity::IdentityArgs;
+use crate::network_registry::NetworkRegistryArgs;
 use crate::utils::{Cmd, HelperErrors};
 use clap::{Parser, Subcommand};
 // use ethers::types::Address;
@@ -7,6 +8,7 @@ pub mod environment_config;
 pub mod faucet;
 pub mod identity;
 pub mod key_pair;
+pub mod network_registry;
 pub mod process;
 pub mod utils;
 
@@ -31,6 +33,8 @@ enum Commands {
         about = "Fund given address and/or addressed derived from identity files native tokens or HOPR tokens"
     )]
     Faucet(FaucetArgs),
+    #[clap(about = "Registry some nodes peer ids to the network registery contract")]
+    NetworkRegistry(NetworkRegistryArgs),
 }
 
 fn main() -> Result<(), HelperErrors> {
@@ -41,6 +45,9 @@ fn main() -> Result<(), HelperErrors> {
             opt.run()?;
         }
         Commands::Faucet(opt) => {
+            opt.run()?;
+        }
+        Commands::NetworkRegistry(opt) => {
             opt.run()?;
         }
     }

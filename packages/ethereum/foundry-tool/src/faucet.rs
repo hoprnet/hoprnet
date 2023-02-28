@@ -1,5 +1,5 @@
 use crate::key_pair::read_identities;
-use crate::process::{child_process_call_foundry, set_process_path_env};
+use crate::process::{child_process_call_foundry_faucet, set_process_path_env};
 use clap::Parser;
 use ethers::types::Address;
 
@@ -54,7 +54,7 @@ pub struct FaucetArgs {
     identity_prefix: Option<String>,
 
     #[clap(
-        help = "Specify path pointing to the faucet make target",
+        help = "Specify path pointing to the foundry root",
         long,
         short,
         default_value = None
@@ -144,7 +144,7 @@ impl FaucetArgs {
         addresses_all
             .into_iter()
             .map(|a| {
-                child_process_call_foundry(
+                child_process_call_foundry_faucet(
                     &environment_name,
                     &environment_type,
                     &a,

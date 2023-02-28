@@ -44,7 +44,7 @@ pub fn set_process_path_env(
     Ok(())
 }
 
-pub fn child_process_call_foundry(
+pub fn child_process_call_foundry_faucet(
     environment_name: &str,
     environment_type: &str,
     address: &Address,
@@ -73,6 +73,49 @@ pub fn child_process_call_foundry(
             &format!("{:#x}", &address),
             &hopr_amount.to_string(),
             &native_amount.to_string(),
+        ])
+        .output()
+        .expect("forge faucet command failed to start");
+    io::stdout().write_all(&faucet_output.stdout).unwrap();
+    io::stderr().write_all(&faucet_output.stderr).unwrap();
+
+    println!("Foundry command execution status: {}", faucet_output.status);
+
+    if faucet_output.status.success() {
+        return Ok(());
+    } else {
+        return Err(HelperErrors::ErrorInRunningFoundry);
+    }
+}
+
+pub fn child_process_call_foundry_self_register(
+    environment_name: &str,
+    environment_type: &str,
+    peer_ids: &String,
+) -> Result<(), HelperErrors> {
+    // check environment is set
+    let envrionment_check = environment_config::ensure_environment_is_set(
+        &env::current_dir().unwrap(),
+        environment_name,
+        environment_type,
+    )
+    .unwrap();
+    if !envrionment_check {
+        return Err(HelperErrors::EnvironmentInfoMismatch);
+    }
+
+    // add brackets to around the string
+    let peer_id_string = vec!["[", &peer_ids, "]"].concat();
+
+    // building the command
+    let faucet_output = Command::new("forge")
+        .args([
+            "script",
+            "script/SingleAction.s.sol:SingleActionFromPrivateKeyScript",
+            "--broadcast",
+            "--sig",
+            "selfRegisterNodes(string[])",
+            &peer_id_string,
         ])
         .output()
         .expect("forge faucet command failed to start");
