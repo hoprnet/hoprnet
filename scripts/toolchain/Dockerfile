@@ -23,6 +23,7 @@ RUN apt-get update \
       python3 \
       unzip \
       xz-utils \
+      time \
  && rm -rf /var/lib/apt/lists/* \
  && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false
 
