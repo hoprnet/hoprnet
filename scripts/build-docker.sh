@@ -75,7 +75,7 @@ build_and_tag_images() {
 
   if [ "${local_build:-}" = "true" ]; then
     log "Building Docker toolchain image"
-    docker build -q -t hopr-toolchain-local \
+    docker build -q -t hopr-toolchain-local:latest \
       -f scripts/toolchain/Dockerfile . &
 
     log "Waiting for toolchain image to finish"

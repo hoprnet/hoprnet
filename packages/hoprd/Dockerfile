@@ -9,6 +9,12 @@ WORKDIR /app/hoprnet
 RUN mv /app/hoprnet-toolchain/.cargo . && \
     mv /app/hoprnet-toolchain/.yarn .
 
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      pkg-config libssl-dev \
+ && rm -rf /var/lib/apt/lists/* \
+ && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false
+
 COPY .cargo/config.toml .cargo/
 COPY vendor vendor/
 COPY packages packages/

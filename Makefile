@@ -30,7 +30,7 @@ PATH := $(subst :${FOUNDRY_DIR}/bin,,$(PATH)):${FOUNDRY_DIR}/bin
 SHELL := env PATH=$(PATH) $(shell which bash)
 
 # use custom Cargo config file for each invocation
-cargo := CARGO_MAKEFLAGS=-j cargo --config ${CARGO_DIR}/config.toml
+cargo := cargo --config ${CARGO_DIR}/config.toml
 
 # use custom flags for installing dependencies
 YARNFLAGS :=
@@ -113,6 +113,10 @@ install-foundry: ## install foundry
 	else \
 	  echo "foundry binaries already installed under "${FOUNDRY_DIR}/bin", skipping"; \
 	fi
+	@forge --version
+	@anvil --version
+	@chisel --version
+	@forge --version
 
 .PHONY: cargo-update
 cargo-update: ## update vendored Cargo dependencies
@@ -158,12 +162,12 @@ build-cargo: ## build cargo packages and create boilerplate JS code
 ifeq ($(origin NO_CARGO),undefined)
 # First compile Rust crates and create bindings
 # filter out proc-macro crates since they need no compilation
-	$(MAKE) -j $(filter-out %proc-macros/,$(CRATES))
+	$(MAKE) $(filter-out %proc-macros/,$(CRATES))
 # Copy bindings to their destination
 # filter out proc-macro crates since they need no compilation
-	$(MAKE) -j $(filter-out %proc-macros/,$(WORKSPACES_WITH_RUST_MODULES))
+	$(MAKE) $(filter-out %proc-macros/,$(WORKSPACES_WITH_RUST_MODULES))
 # build foundry-tool
-	$(MAKE) -j $(FOUNDRY_TOOL_CRATE)
+	$(MAKE) $(FOUNDRY_TOOL_CRATE)
 endif
 
 .PHONY: build-yellowpaper
