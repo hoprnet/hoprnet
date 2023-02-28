@@ -141,7 +141,7 @@ export async function createLibp2pInstance(
         maxDialsPerPeer: 1,
         // If we are a public node, assume that our system is able to handle
         // more connections
-        maxParallelDials: options.announce ? 250 : 50,
+        maxParallelDials: options.maxParallelConnections,
         // default timeout of 30s appears to be too long
         dialTimeout: 10e3
       },
