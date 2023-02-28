@@ -327,7 +327,7 @@ struct CliArgs {
         default_value_ifs = [
             ("announce", "true", DEFAULT_MAX_PARALLEL_CONNECTION_PUBLIC_RELAY.to_string()),
         ],
-        value_parser = clap::value_parser!(u32),
+        value_parser = clap::value_parser!(u32).range(1..),
         value_name = "CONNECTIONS",
         help = "Set maximum parallel connections",
         env = "HOPRD_MAX_PARALLEL_CONNECTIONS"
