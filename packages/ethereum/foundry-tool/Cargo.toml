@@ -5,11 +5,6 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[lib]
-name = "readidentity"
-path = "src/key_pair.rs"
-crate-type = ["cdylib", "rlib"]
-
 [dependencies]
 # using own fork until the PR was merged
 clap = { git = "https://github.com/hoprnet/clap", branch = "robertkiel/update-env-from", features = ["derive", "env", "string"] }

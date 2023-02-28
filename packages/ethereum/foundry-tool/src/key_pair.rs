@@ -42,17 +42,35 @@ pub fn read_identities(
     }
 }
 
-pub fn create_identity(dir_name: &str, password: &str, name: &str) -> Result<(), std::io::Error> {
+pub fn create_identity(
+    dir_name: &str,
+    password: &str,
+    name: Option<&str>,
+) -> Result<(), std::io::Error> {
     // create dir if not exist
     fs::create_dir_all(dir_name)?;
 
     // create identity with the given password
     let (_key, uuid) =
-        Wallet::new_keystore(Path::new(dir_name), &mut thread_rng(), password, Some(name)).unwrap();
+        Wallet::new_keystore(Path::new(dir_name), &mut thread_rng(), password, None).unwrap();
 
-    // Rename keystore from uuid to uuid.id
-    let old_file_path = vec![dir_name, "/", name].concat();
-    let new_file_path = vec![dir_name, "/", name, ".id"].concat();
+    // Rename keystore from uuid to uuid.id (or `name.id`, if provided)
+    let old_file_path = vec![dir_name, "/", &*uuid].concat();
+    // let new_file_path = vec![dir_name, "/", &*id_name, ".id"].concat();
+
+    // check if `name` is end with `.id`, if not, append it
+    let new_file_path = match name {
+        Some(provided_name) => {
+            // check if ending with `.id`
+            if provided_name.ends_with(".id") {
+                vec![dir_name, "/", provided_name].concat()
+            } else {
+                vec![dir_name, "/", provided_name, ".id"].concat()
+            }
+        }
+        None => vec![dir_name, "/", &*uuid, ".id"].concat(),
+    };
+
     fs::rename(&old_file_path, &new_file_path)
         .map_err(|err| println!("{:?}", err))
         .ok();
@@ -69,8 +87,8 @@ mod tests {
     fn create_identities_from_directory_with_id_files() {
         let path = "./tmp_create";
         let pwd = "password_create";
-        match create_identity(path, pwd, "node1") {
-            Ok(val) => assert!(true),
+        match create_identity(path, pwd, Some("node1")) {
+            Ok(_) => assert!(true),
             _ => assert!(false),
         }
         remove_json_keystore(path)
@@ -82,7 +100,7 @@ mod tests {
     fn read_identities_from_directory_with_id_files() {
         let path = "./tmp_1";
         let pwd = "password";
-        create_identity(path, pwd, "2da2bc3e-259e-4c0b-bfeb-fe0351d60148").unwrap();
+        create_identity(path, pwd, None).unwrap();
         match read_identities(path, &pwd.to_string(), &None) {
             Ok(val) => assert_eq!(val.len(), 1),
             _ => assert!(false),
@@ -97,7 +115,7 @@ mod tests {
         let path = "./tmp_2";
         let pwd = "password";
         let wrong_pwd = "wrong_password";
-        create_identity(path, pwd, "2da2bc3e-259e-4c0b-bfeb-fe0351d60148").unwrap();
+        create_identity(path, pwd, None).unwrap();
         match read_identities(path, &wrong_pwd.to_string(), &None) {
             Ok(val) => assert_eq!(val.len(), 0),
             _ => assert!(false),
@@ -120,7 +138,7 @@ mod tests {
     fn read_identities_from_tmp_folder() {
         let path = "./tmp_4";
         let pwd = "local";
-        create_identity(path, pwd, "local-alice").unwrap();
+        create_identity(path, pwd, Some("local-alice")).unwrap();
         match read_identities(path, &pwd.to_string(), &None) {
             Ok(val) => assert_eq!(val.len(), 1),
             _ => assert!(false),
@@ -134,7 +152,7 @@ mod tests {
     fn read_identities_from_tmp_folder_with_prefix() {
         let path = "./tmp_5";
         let pwd = "local";
-        create_identity(path, pwd, "local-alice").unwrap();
+        create_identity(path, pwd, Some("local-alice")).unwrap();
         match read_identities(path, &pwd.to_string(), &Some("local".to_string())) {
             Ok(val) => assert_eq!(val.len(), 1),
             _ => assert!(false),
@@ -148,7 +166,7 @@ mod tests {
     fn read_identities_from_tmp_folder_no_match() {
         let path = "./tmp_6";
         let pwd = "local";
-        create_identity(path, pwd, "local-alice").unwrap();
+        create_identity(path, pwd, Some("local-alice")).unwrap();
         match read_identities(path, &pwd.to_string(), &Some("npm-".to_string())) {
             Ok(val) => assert_eq!(val.len(), 0),
             _ => assert!(false),
