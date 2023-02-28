@@ -138,7 +138,7 @@ build-solidity-types: ## generate Solidity typings
 
 .PHONY: build-yarn
 build-yarn: ## build yarn packages
-build-yarn: build-solidity-types build-cargo
+build-yarn: build-cargo
 ifeq ($(package),)
 	npx tsc --build tsconfig.build.json
 else
@@ -151,7 +151,7 @@ build-yarn-watch: build-solidity-types build-cargo
 	npx tsc --build tsconfig.build.json -w
 
 .PHONY: build-cargo
-build-cargo: build-solidity-types ## build cargo packages and create boilerplate JS code
+build-cargo: ## build cargo packages and create boilerplate JS code
 # Skip building Rust crates
 ifeq ($(origin NO_CARGO),undefined)
 # First compile Rust crates and create bindings
