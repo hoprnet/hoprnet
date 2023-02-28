@@ -336,7 +336,7 @@ struct CliArgs {
 
     #[arg(
         long = "testAnnounceLocalAddresses",
-        env = "HOPRD_TEST_ANNOUNCE_LOCAL_ADDRESSES"
+        env = "HOPRD_TEST_ANNOUNCE_LOCAL_ADDRESSES",
         help = "For testing local testnets. Announce local addresses",
         action = ArgAction::SetTrue,
         default_value_t = false
