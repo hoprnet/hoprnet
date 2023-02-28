@@ -2,11 +2,11 @@ use ethers::types::Address;
 use std::env;
 use std::ffi::OsStr;
 use std::io::{self, Write};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 
 use crate::environment_config;
-use crate::helper_errors::HelperErrors;
+use crate::utils::HelperErrors;
 
 pub fn build_path(environment_name: &str, environment_type: &str) -> String {
     let new_path = vec!["./", environment_name, "/", &environment_type.to_string()].concat();

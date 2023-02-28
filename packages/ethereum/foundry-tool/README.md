@@ -11,8 +11,8 @@ cargo run -- --environment-name localhost --environment-type development files -
 
 ```
 export PRIVATE_KEY=<bank_private_key>
-cargo run -- --environment-name anvil-localhost \
-    --environment-type development faucet \
+cargo run -- faucet --environment-name anvil-localhost \
+    --environment-type development \
     --password local --use-local-identities --identity-directory "/tmp" \
     --address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1 \
     --private-key $PRIVATE_KEY \
@@ -34,8 +34,9 @@ cargo install --path .
 ```
 
 ```
-foundry-tool --environment-name anvil-localhost --environment-type development \
-    faucet --password local --use-local-identities --identity-directory "/tmp" \
+foundry-tool faucet \
+    --environment-name anvil-localhost --environment-type development \
+    --password local --use-local-identities --identity-directory "/tmp" \
     --address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1 --private-key <bank_private_key> \
     --make-root "../contracts" \
     --hopr-amount 10 --native-amount 1
