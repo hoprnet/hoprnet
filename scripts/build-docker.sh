@@ -86,21 +86,21 @@ build_and_tag_images() {
        [ "${image_name}" = "hoprd-nat" ] || \
        [ "${image_name}" = "pluto-complete" ]; then
       log "Building Docker image hoprd-local"
-      docker build -q -t hoprd-local \
+      docker build -q -t hoprd-local:latest \
         --build-arg=HOPR_TOOLCHAIN_IMAGE="hopr-toolchain-local" \
         -f packages/hoprd/Dockerfile . &
     fi
 
     if [ -z "${image_name}" ] || [ "${image_name}" = "hoprd-nat" ]; then
       log "Building Docker image hoprd-nat-local"
-      docker build -q -t hoprd-nat-local \
+      docker build -q -t hoprd-nat-local:latest \
         --build-arg=HOPRD_RELEASE="${image_version}" \
         scripts/nat &
     fi
 
     if [ -z "${image_name}" ] || [ "${image_name}" = "anvil" ] || [ "${image_name}" = "pluto-complete" ]; then
       log "Building Docker image hopr-anvil-local"
-      docker build -t hopr-anvil-local \
+      docker build -t hopr-anvil-local:latest \
         --build-arg=HOPR_TOOLCHAIN_IMAGE="hopr-toolchain-local" \
         -f packages/ethereum/Dockerfile.anvil . &
     fi
@@ -110,7 +110,7 @@ build_and_tag_images() {
 
     if [ -z "${image_name}" ] || [ "${image_name}" = "pluto" ] || [ "${image_name}" = "pluto-complete" ]; then
       log "Building Docker image hopr-pluto-local"
-      docker build -q -t hopr-pluto-local \
+      docker build -q -t hopr-pluto-local:latest \
         --build-arg=ANVIL_IMAGE="hopr-anvil-local" \
         --build-arg=HOPRD_IMAGE="hoprd-local" \
         -f scripts/pluto/Dockerfile . &

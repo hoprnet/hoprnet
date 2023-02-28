@@ -10,7 +10,7 @@ LABEL description="Docker image running a HOPR-enabled anvil network with 5 hopr
 
 # install tools required within our scripts
 RUN apt-get update \
- && apt-get install -y \
+ && apt-get install -y --no-install-recommends \
       bash curl jq lsof \
  && rm -rf /var/lib/apt/lists/* \
  && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false
