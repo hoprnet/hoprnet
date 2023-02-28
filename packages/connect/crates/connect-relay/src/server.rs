@@ -1,29 +1,24 @@
-use core::panic;
-use std::{collections::HashMap, pin::Pin, u8};
+use std::{collections::HashMap, pin::Pin, sync::mpsc::SendError, u8};
 
 use futures::{
-    channel::mpsc,
+    channel::mpsc::{self, UnboundedReceiver, UnboundedSender},
+    future::LocalBoxFuture,
     ready,
-    stream::Stream,
+    sink::Send,
+    stream::{FusedStream, Stream},
     task::{Context, Poll},
-    Future, Sink, SinkExt, StreamExt,
+    Future, FutureExt, Sink, SinkExt, StreamExt,
 };
 use pin_project_lite::pin_project;
 use std::sync::{Arc, Mutex};
 use std::task::Waker;
-use utils_misc::async_iterable::wasm::to_jsvalue_stream;
 
 #[cfg(feature = "wasm")]
 use wasm_bindgen::JsValue;
 
-// cfg_if! {
-//     if #[cfg(target = "wasm32")] {
-//         use wasm_bindgen_futures::spawn_local as executor
-//     } else {
-//         // search for a non-wasm executor
-//     }
+#[cfg(feature = "wasm")]
+use crate::streaming_iterable::{JsStreamingIterable, StreamingIterable};
 
-// }
 use wasm_bindgen_futures::future_to_promise;
 
 #[repr(u8)]
@@ -55,181 +50,132 @@ fn get_time() -> usize {
     }
 }
 
-fn spawn<F>(fun: F)
-where
-    F: Future<Output = ()> + 'static,
-{
-    if cfg!(target = "wasm32") {
-        wasm_bindgen_futures::spawn_local(fun);
-    } else {
-        todo!("Implement me");
-        // std::thread::spawn(fun);
+pin_project! {
+    pub struct PingFuture {
+        waker: Option<Waker>,
+        started_at: usize,
+        completed_at: Option<usize>
     }
-}
-
-struct PingSharedState {
-    /// set to true once completed
-    completed: bool,
-    /// called to wake the Future
-    maybe_waker: Option<Waker>,
-    /// timestamp set at creation
-    started_at: usize,
-    /// timestamp set once completed
-    completed_at: Option<usize>,
-}
-// }
-
-pub struct PingFuture {
-    shared_state: Arc<Mutex<PingSharedState>>,
 }
 
 impl Future for PingFuture {
     type Output = usize;
 
-    fn poll(self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut shared_state = self.shared_state.lock().unwrap();
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.project();
 
-        if shared_state.completed {
-            Poll::Ready(shared_state.completed_at.unwrap() - shared_state.started_at)
-        } else {
-            shared_state.maybe_waker.replace(cx.waker().clone());
-            Poll::Pending
+        match this.completed_at {
+            Some(completed_at) => Poll::Ready(*completed_at - *this.started_at),
+            None => {
+                // maybe turn this into a vec to store multiple waker instances
+                *this.waker = Some(cx.waker().clone());
+                Poll::Pending
+            }
         }
     }
 }
 
 impl PingFuture {
-    pub fn new() -> Self {
-        let shared_state = Arc::new(Mutex::new(PingSharedState {
-            completed: false,
-            maybe_waker: None,
+    fn new() -> Self {
+        Self {
+            waker: None,
             started_at: get_time(),
             completed_at: None,
-        }));
-
-        Self { shared_state }
-    }
-
-    pub fn wake(&self) -> () {
-        let mut shared_state = self.shared_state.lock().unwrap();
-
-        shared_state.completed_at.replace(get_time());
-
-        if let Some(waker) = shared_state.maybe_waker.take() {
-            waker.wake()
         }
     }
-}
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-pub struct AsyncIterableHelper {
-    stream: Box<dyn Stream<Item = Result<Box<[u8]>, String>> + Unpin>,
-}
+    /// Wake the future and assign final timestamp
+    fn wake(&mut self) -> () {
+        self.completed_at.get_or_insert(get_time());
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-impl AsyncIterableHelper {
-    #[wasm_bindgen]
-    pub async fn next(&mut self) -> Result<JsValue, JsValue> {
-        utils_misc::async_iterable::wasm::to_jsvalue_stream(self.stream.as_mut().next().await)
-    }
-}
-
-struct StreamSharedState<St> {
-    can_yield: bool,
-
-    next_stream: Option<St>,
-    maybe_waker: Option<Waker>,
-}
-
-pub struct StreamStream<St> {
-    shared_state: Arc<Mutex<StreamSharedState<St>>>,
-}
-
-impl<St> StreamStream<St>
-where
-    St: Stream,
-{
-    fn new() -> StreamStream<St> {
-        let shared_state = Arc::new(Mutex::new(StreamSharedState::<St> {
-            can_yield: false,
-            next_stream: None,
-            maybe_waker: None,
-        }));
-
-        Self { shared_state }
-    }
-
-    fn take_stream(&self, new_stream: St) -> Result<(), String> {
-        let mut shared_state = self.shared_state.lock().unwrap();
-
-        // new_stream.filter(f)
-        if shared_state.can_yield {
-            Err(format!(
-                "Cannot take stream because previous stream has not yet been consumed"
-            ))
-        } else {
-            shared_state.can_yield = true;
-            shared_state.next_stream.replace(new_stream);
-
-            if let Some(waker) = shared_state.maybe_waker.take() {
-                waker.wake();
-            }
-
-            Ok(())
-        }
-    }
-}
-
-impl<St> Stream for StreamStream<St>
-where
-    St: Stream,
-{
-    type Item = St;
-
-    fn poll_next(self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let mut shared_state = self.shared_state.lock().unwrap();
-
-        shared_state.maybe_waker.replace(cx.waker().clone());
-
-        if shared_state.can_yield {
-            shared_state.can_yield = false;
-            Poll::Ready(shared_state.next_stream.take())
-        } else {
-            Poll::Pending
+        if let Some(waker) = self.waker.take() {
+            waker.wake();
         }
     }
 }
 
 pin_project! {
-    struct Server<St> {
-        #[pin]
-        stream: Option<St>,
-        // #[pin]
-        // sink: Option<Si>,
-        #[pin]
-        next_stream: StreamStream<St>,
-        status_messages_rx: mpsc::UnboundedReceiver<Box<[u8]>>,
-        status_messages_tx: mpsc::UnboundedSender<Box<[u8]>>,
-        ping_requests: std::collections::HashMap<u32, PingFuture>,
+    pub struct NextStream<'a> {
+        next_stream: Option<StreamingIterable<'a>>,
+        waker: Option<Waker>,
     }
 }
 
-impl<St> Server<St>
-where
-    St: Stream + Unpin,
-    St::Item: IntoItem<St::Item>,
-{
-    fn new(stream: St) -> Self {
-        let (status_messages_tx, status_messages_rx) = mpsc::unbounded::<Box<[u8]>>();
+impl<'a> NextStream<'a> {
+    fn new() -> NextStream<'a> {
         Self {
-            stream: Some(stream),
-            next_stream: StreamStream::new(),
-            status_messages_rx,
-            status_messages_tx,
-            ping_requests: HashMap::new(),
+            next_stream: None,
+            waker: None,
         }
     }
 
+    fn take_stream(&mut self, new_stream: &'a JsStreamingIterable) -> Result<(), String> {
+        match self.next_stream {
+            Some(_) => Err(format!(
+                "Cannot take stream because previous stream has not yet been consumed"
+            )),
+            None => {
+                self.next_stream = Some(StreamingIterable::from(new_stream));
+
+                if let Some(waker) = self.waker.take() {
+                    waker.wake();
+                }
+
+                Ok(())
+            }
+        }
+    }
+}
+
+impl<'a> Stream for NextStream<'a> {
+    type Item = StreamingIterable<'a>;
+
+    fn poll_next(self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.project();
+
+        match this.next_stream.take() {
+            Some(stream) => Poll::Ready(Some(stream)),
+            None => {
+                // maybe turn this into a vec to store multiple waker instances
+                *this.waker = Some(cx.waker().clone());
+                Poll::Pending
+            }
+        }
+    }
+}
+
+pin_project! {
+    #[project = ServerProjection]
+    #[project_replace = MyProjReplace]
+    struct Server<'a> {
+        #[pin]
+        stream: Option<StreamingIterable<'a>>,
+        #[pin]
+        next_stream: NextStream<'a>,
+        #[pin]
+        status_messages_rx: Option<UnboundedReceiver<Box<[u8]>>>,
+        status_messages_tx: UnboundedSender<Box<[u8]>>,
+        status_message_waker: Option<Waker>,
+        ping_requests: std::collections::HashMap<u32, PingFuture>,
+        buffered: Option<Box<[u8]>>
+    }
+}
+
+impl<'a> Server<'a> {
+    fn new(stream: StreamingIterable<'a>) -> Server<'a> {
+        let (status_messages_tx, status_messages_rx) = mpsc::unbounded::<Box<[u8]>>();
+        Self {
+            stream: Some(stream),
+            next_stream: NextStream::new(),
+            status_messages_rx: Some(status_messages_rx),
+            status_messages_tx,
+            status_message_waker: None,
+            ping_requests: HashMap::new(),
+            buffered: None,
+        }
+    }
+
+    /// Used to test whether the connection is alive
     async fn ping(&mut self) -> usize {
         let random_value: u32 = 0;
 
@@ -241,51 +187,28 @@ where
         self.ping_requests.get_mut(&random_value).unwrap().await
     }
 
-    fn update(self: Pin<&mut Self>, new_stream: St) -> Result<(), String> {
-        let this = self.project();
+    /// Used to attach a new incoming connection
+    fn update(self: Pin<&mut Self>, new_stream: &'a JsStreamingIterable) -> Result<(), String> {
+        let mut this = self.project();
 
         this.next_stream.take_stream(new_stream)
     }
 }
 
-pub trait IntoItem<T> {
-    fn into_box_u8(t: T) -> Result<Box<[u8]>, String>;
-}
-
-#[cfg(feature = "wasm")]
-impl IntoItem<Result<JsValue, JsValue>> for Result<JsValue, JsValue> {
-    #[inline]
-    fn into_box_u8(t: Result<JsValue, JsValue>) -> Result<Box<[u8]>, String> {
-        match t {
-            Ok(x) => Ok(Box::from_iter(js_sys::Uint8Array::new(&x).to_vec())),
-            Err(e) => Err(format!("{:?}", e)),
-        }
-    }
-}
-
-impl IntoItem<Result<Box<[u8]>, String>> for Result<Box<[u8]>, String> {
-    #[inline]
-    fn into_box_u8(t: Result<Box<[u8]>, String>) -> Result<Box<[u8]>, String> {
-        t
-    }
-}
-
-impl<St> Stream for Server<St>
-where
-    St: Stream + Unpin,
-    St::Item: IntoItem<St::Item>,
-{
+impl<'b> Stream for Server<'b> {
     type Item = Result<Box<[u8]>, String>;
 
-    fn poll_next(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Option<Self::Item>> {
-        let mut this = self.project();
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let mut this: ServerProjection<'_, '_> = self.project();
 
         Poll::Ready(loop {
+            // Make sure previous send attempt has finished
+            // if let Some(x) = this.sink_send_future.as_mut().as_pin_mut() {
+            //     ready!(x.poll(cx));
+            // }
+
             if let Poll::Ready(Some(new_stream)) = this.next_stream.as_mut().poll_next(cx) {
-                this.stream.replace(new_stream);
+                this.stream.set(Some(new_stream));
                 break Some(Ok(Box::new([
                     MessagePrefix::ConnectionStatus as u8,
                     ConnectionStatusMessage::Restart as u8,
@@ -293,12 +216,10 @@ where
             } else if let Some(item) =
                 ready!(this.stream.as_mut().as_pin_mut().unwrap().poll_next(cx))
             {
-                // TODO no error handling
-                let msg = <St::Item as IntoItem<St::Item>>::into_box_u8(item).unwrap();
-
-                match msg.first() {
+                let item = item.unwrap();
+                match item.get(0) {
                     Some(prefix) if *prefix == MessagePrefix::ConnectionStatus as u8 => {
-                        match msg.get(1) {
+                        match item.get(1) {
                             Some(inner_prefix)
                                 if [
                                     ConnectionStatusMessage::Stop as u8,
@@ -306,21 +227,20 @@ where
                                 ]
                                 .contains(inner_prefix) =>
                             {
-                                break None
+                                this.status_messages_tx.send(item).poll_unpin(cx);
+
+                                break None;
                             }
-                            Some(_) => break Some(Ok(msg)),
+                            Some(_) => break Some(Ok(item)),
                             None => break None,
                         };
                     }
                     Some(prefix) if *prefix == MessagePrefix::StatusMessage as u8 => {
-                        match msg.get(1) {
+                        match item.get(1) {
                             Some(inner_prefix) if *inner_prefix == StatusMessage::Ping as u8 => {
                                 match this.status_messages_tx.poll_ready(cx) {
                                     Poll::Ready(Ok(())) => {
-                                        match this.status_messages_tx.start_send(msg) {
-                                            Ok(()) => (),
-                                            Err(e) => panic!("{}", e),
-                                        }
+                                        this.status_messages_tx.send(item).poll_unpin(cx);
                                     }
                                     Poll::Ready(Err(e)) => panic!("{}", e),
                                     Poll::Pending => return Poll::Pending,
@@ -328,12 +248,12 @@ where
                             }
                             Some(inner_prefix) if *inner_prefix == StatusMessage::Pong as u8 => {
                                 // 2 byte prefix, 4 byte ping identifier
-                                if msg.len() < 6 {
+                                if item.len() < 6 {
                                     // drop malformed pong message
                                     return Poll::Pending;
                                 }
 
-                                let (_, ping_id) = msg.split_at(2);
+                                let (_, ping_id) = item.split_at(2);
                                 match this
                                     .ping_requests
                                     .get_mut(&u32::from_ne_bytes(ping_id.try_into().unwrap()))
@@ -351,7 +271,7 @@ where
                         if [MessagePrefix::Payload as u8, MessagePrefix::WebRTC as u8]
                             .contains(prefix) =>
                     {
-                        break Some(Ok(msg))
+                        break Some(Ok(item))
                     }
                     // Empty message, stream ended
                     None => break None,
@@ -369,75 +289,144 @@ where
     }
 }
 
-impl<St> Sink<Box<[u8]>> for Server<St> {
-    type Error = String;
-    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        todo!()
+impl<'a> FusedStream for Server<'a> {
+    fn is_terminated(&self) -> bool {
+        self.stream.as_ref().unwrap().is_terminated()
     }
+}
 
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        todo!()
-    }
+impl<'a> Sink<Box<[u8]>> for Server<'a> {
+    type Error = String;
 
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        todo!()
+        let mut this = self.project();
+
+        if let Poll::Ready(Some(new_stream)) = this.next_stream.as_mut().poll_next(cx) {
+            this.stream.set(Some(new_stream));
+        }
+
+        // Send all pending status messages before forwarding any new messages
+        loop {
+            match ready!(this
+                .status_messages_rx
+                .as_mut()
+                .as_pin_mut()
+                .unwrap()
+                .poll_next(cx))
+            {
+                Some(item) => {
+                    if item.starts_with(&[MessagePrefix::ConnectionStatus as u8])
+                        && [
+                            ConnectionStatusMessage::Stop as u8,
+                            ConnectionStatusMessage::Restart as u8,
+                            ConnectionStatusMessage::Upgraded as u8,
+                        ]
+                        .contains(item.get(1).unwrap())
+                    {
+                        this.stream.as_mut().as_pin_mut().unwrap().poll_close(cx);
+                        return Poll::Ready(Err("closed".into()));
+                    }
+                    this.stream
+                        .as_mut()
+                        .as_pin_mut()
+                        .unwrap()
+                        .start_send(item)
+                        .unwrap();
+
+                    match this.stream.as_mut().as_pin_mut().unwrap().poll_flush(cx) {
+                        Poll::Pending => {
+                            return Poll::Pending;
+                        }
+                        // FIXME
+                        Poll::Ready(Ok(())) => (),
+                        Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
+                    };
+                }
+                None => break,
+            };
+        }
+
+        this.stream.as_mut().as_pin_mut().unwrap().poll_ready(cx)
     }
 
     fn start_send(self: Pin<&mut Self>, item: Box<[u8]>) -> Result<(), Self::Error> {
-        todo!()
+        let mut this = self.project();
+
+        match item.get(1) {
+            // Some(prefix) if *prefix == MessagePrefix::ConnectionStatus as u8 && item.len() > 1 && *(item.get(1).unwrap()) == ConnectionStatusMessage::Stop as u8 => {
+            //     this.stream.as_mut().as_pin_mut().unwrap().poll_close(
+
+            //     )
+            // },
+            Some(_) => this.stream.as_mut().as_pin_mut().unwrap().start_send(item),
+            None => Ok(()),
+        }
+        // todo!()
+    }
+
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        let mut this = self.project();
+
+        this.stream.as_mut().as_pin_mut().unwrap().poll_close(cx)
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        let mut this = self.project();
+
+        this.stream.as_mut().as_pin_mut().unwrap().poll_flush(cx)
     }
 }
 
-#[cfg(feature = "wasm")]
-pub mod wasm {
-    use super::IntoSink;
-    use futures::{SinkExt, StreamExt};
-    use js_sys::AsyncIterator;
-    use utils_misc::{
-        async_iterable::wasm::{to_box_u8_stream, to_jsvalue_stream},
-        ok_or_jserr,
-    };
-    use wasm_bindgen::prelude::*;
-    use wasm_bindgen_futures::stream::JsStream;
+// #[cfg(feature = "wasm")]
+// pub mod wasm {
+//     use super::IntoSink;
+//     use futures::{SinkExt, StreamExt};
+//     use js_sys::AsyncIterator;
+//     use utils_misc::{
+//         async_iterable::wasm::{to_box_u8_stream, to_jsvalue_stream},
+//         ok_or_jserr,
+//     };
+//     use wasm_bindgen::prelude::*;
+//     use wasm_bindgen_futures::stream::JsStream;
 
-    #[wasm_bindgen]
-    pub struct Source {}
+//     #[wasm_bindgen]
+//     pub struct Source {}
 
-    #[wasm_bindgen]
-    pub struct RelayServer {
-        server: super::Server<JsStream>,
-    }
+//     #[wasm_bindgen]
+//     pub struct RelayServer {
+//         server: super::Server<JsStream>,
+//     }
 
-    #[wasm_bindgen]
-    impl RelayServer {
-        #[wasm_bindgen]
-        pub async fn next(&mut self) -> Result<JsValue, JsValue> {
-            to_jsvalue_stream(<super::Server<JsStream> as StreamExt>::next(&mut self.server).await)
-        }
+//     #[wasm_bindgen]
+//     impl RelayServer {
+//         #[wasm_bindgen]
+//         pub async fn next(&mut self) -> Result<JsValue, JsValue> {
+//             to_jsvalue_stream(<super::Server<JsStream> as StreamExt>::next(&mut self.server).await)
+//         }
 
-        #[wasm_bindgen]
-        pub async fn sink(&mut self, stream: AsyncIterator) -> Result<(), JsValue> {
-            let mut stream = JsStream::from(stream).map(to_box_u8_stream);
+//         #[wasm_bindgen]
+//         pub async fn sink(&mut self, stream: AsyncIterator) -> Result<(), JsValue> {
+//             let mut stream = JsStream::from(stream).map(to_box_u8_stream);
 
-            ok_or_jserr!(
-                <super::Server<JsStream> as SinkExt<Box<[u8]>>>::send_all(
-                    &mut self.server,
-                    &mut stream
-                )
-                .await
-            )
-        }
-    }
+//             ok_or_jserr!(
+//                 <super::Server<JsStream> as SinkExt<Box<[u8]>>>::send_all(
+//                     &mut self.server,
+//                     &mut stream
+//                 )
+//                 .await
+//             )
+//         }
+//     }
 
-    #[wasm_bindgen]
-    pub fn relay_context(
-        stream: AsyncIterator,
-        sink: &js_sys::Function,
-    ) -> Result<RelayServer, JsValue> {
-        let stream = JsStream::from(stream);
+//     #[wasm_bindgen]
+//     pub fn relay_context(
+//         stream: AsyncIterator,
+//         sink: &js_sys::Function,
+//     ) -> Result<RelayServer, JsValue> {
+//         let stream = JsStream::from(stream);
 
-        let server = super::Server::new(stream, sink);
+//         let server = super::Server::new(stream, sink);
 
-        Ok(RelayServer { server })
-    }
-}
+//         Ok(RelayServer { server })
+//     }
+// }

@@ -1,5 +1,5 @@
-pub mod streaming_iterable;
 pub mod server;
+pub mod streaming_iterable;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
