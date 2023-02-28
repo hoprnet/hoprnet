@@ -1,16 +1,28 @@
 use std::time::Duration;
 
+use futures::{
+    future::{
+        Either,
+        FutureExt,      // .fuse()
+        select
+    },
+    pin_mut,
+    stream::{FuturesUnordered, StreamExt}
+};
+
 use libp2p::PeerId;
 
-use crate::peers::{NetworkPeerOrigin,NetworkPeers};
+use utils_metrics::metrics::{SimpleHistogram, SimpleCounter};
+use utils_misc::time::current_timestamp;
 
-use utils_metrics::metrics::{MultiGauge, SimpleGauge, SimpleHistogram, SimpleCounter};
+#[cfg(not(wasm))]
+use async_std::task::sleep as sleep;
 
-// #[cfg(not(wasm))]
+#[cfg(wasm)]
+use gloo_timers::future::sleep as sleep;
 
 
-const MAX_PARALLEL_HEARTBEATS: u32 = 14;
-const HEARTBEAT_ROUND_TIMEOUT: Duration = Duration::from_secs(60);
+const PINGS_MAX_PARALLEL: usize = 14;
 
 
 
@@ -21,11 +33,20 @@ pub struct HeartbeatPingResult {
     pub last_seen: Option<u64>
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PingConfig {
+    pub max_parallel_pings: usize,
+    pub environment_id: &'static str,
+    pub normalized_version: &'static str,
+    pub timeout: Duration,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct HeartbeatConfig {
-    pub max_parallel_heartbeats: u32,
+    pub max_parallel_heartbeats: usize,
     pub heartbeat_variance: f32,
     pub heartbeat_interval: u32,
-    pub heartbeat_threshold: u32,
+    pub heartbeat_threshold: u64,
     pub network_quality_threshold: f32,
 }
 
@@ -51,39 +72,100 @@ impl std::fmt::Display for NetworkHealthIndicator {
     }
 }
 
+// #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+// extern "C" {
+//     #[wasm_bindgen(catch)]
+//     pub async fn send_message(msg: Box<[u8]>, recipient: &str) -> Result<js_sys::JsValue, js_sys::JsValue>;
+// }
 
-struct Heartbeat {
-    config: HeartbeatConfig,
-    health: NetworkHealthIndicator,
-    environment_id: String,
+
+type SendMsgFn = Box<dyn Fn(PeerId, &[String], Box<[u8]>, bool) -> Result<Box<[u8]>, String>>;
+type OnFailedPeerPingFn = Box<dyn Fn(&PeerId)>;
+type NotifyPeerPingResultFn = Box<dyn Fn(&PeerId, crate::types::Result)>;
+
+type PingMeasurement = (PeerId, crate::types::Result);
+
+#[cfg_attr(test, mockall::automock)]
+pub(crate) trait PingCallable {
+    fn send_msg(&self, peer: PeerId, protocols: &[String], msg: Box<[u8]>, include_reply: bool) -> Result<Box<[u8]>, String>;
+
+    fn close_connection(&self, peer: &PeerId);
+
+    fn on_finished_ping(&self, peer: &PeerId, result: crate::types::Result);
+}
+
+struct PingCallbacks {
+    send_msg_cb: SendMsgFn,
+    notify_peer_ping_result_cb: NotifyPeerPingResultFn,
+    on_failed_peer_ping_cb: OnFailedPeerPingFn,
+}
+
+impl PingCallable for PingCallbacks {
+    fn send_msg(&self, peer: PeerId, protocols: &[String], msg: Box<[u8]>, include_reply: bool) -> Result<Box<[u8]>, String> {
+        (*self.send_msg_cb)(peer, protocols, msg, include_reply)
+    }
+
+    fn close_connection(&self, peer: &PeerId) {
+        (*self.on_failed_peer_ping_cb)(peer)
+    }
+
+    fn on_finished_ping(&self, peer: &PeerId, result: crate::types::Result) {
+        (*self.notify_peer_ping_result_cb)(peer, result)
+    }
+}
+
+
+struct Ping {
+    config: PingConfig,
     protocol_heartbeat: [String; 2],
-    send_msg_cb: Box<dyn Fn()>,
-    is_public_node_cb: Box<dyn Fn(&PeerId) -> bool>,
-    close_connections_to_cb: Box<dyn Fn(&PeerId)>,
+    external_api: Box<dyn PingCallable>,
     metric_time_to_heartbeat: Option<SimpleHistogram>,
     metric_time_to_ping: Option<SimpleHistogram>,
     metric_successful_ping_count: Option<SimpleCounter>,
     metric_failed_ping_count: Option<SimpleCounter>,
 }
 
-impl Heartbeat {
-    pub fn new(config: HeartbeatConfig, environment_id: &str, normalized_version: &str) -> Heartbeat {
-        let config = HeartbeatConfig {
-            max_parallel_heartbeats: config.max_parallel_heartbeats.max(MAX_PARALLEL_HEARTBEATS),
+fn to_futures_unordered<F>(mut fs: Vec<F>) -> FuturesUnordered<F> {
+    let futures: FuturesUnordered<F> = FuturesUnordered::new();
+    for f in fs.drain(..) {
+        futures.push(f);
+    }
+
+    futures
+}
+
+fn compare(a: &[u8], b: &[u8]) -> std::cmp::Ordering {
+    if a.len() != b.len() {
+        return a.len().cmp(&b.len());
+    }
+
+    for (ai, bi) in a.iter().zip(b.iter()) {
+        match ai.cmp(&bi) {
+            std::cmp::Ordering::Equal => continue,
+            ord => return ord
+        }
+    }
+
+    a.len().cmp(&b.len())
+}
+
+
+impl Ping {
+    pub fn new(config: PingConfig, external_api: Box<dyn PingCallable>) -> Ping {
+        let config = PingConfig {
+            max_parallel_pings: config.max_parallel_pings.max(PINGS_MAX_PARALLEL),
             ..config
         };
 
-        Heartbeat {
+        Ping {
             config,
-            health: NetworkHealthIndicator::UNKNOWN,
-            environment_id: environment_id.to_owned(),
             protocol_heartbeat: [
-                format!("/hopr/{environment_id}/heartbeat/{normalized_version}"),       // new
-                format!("/hopr/{environment_id}/heartbeat")                             // deprecated
+                /// new
+                format!("/hopr/{}/heartbeat/{}", config.environment_id, config.normalized_version),
+                /// deprecated
+                format!("/hopr/{}/heartbeat", config.environment_id)
             ],
-            send_msg_cb: Box::new(|| {}),
-            is_public_node_cb: Box::new(|_| { true }),
-            close_connections_to_cb: Box::new(|_| {  }),
+            external_api,
             metric_time_to_heartbeat: SimpleHistogram::new(
                 "core_histogram_heartbeat_time_seconds",
                 "Measures total time it takes to probe all other nodes (in seconds)",
@@ -105,48 +187,102 @@ impl Heartbeat {
         }
     }
 
-    pub fn start(&self) {
+    pub async fn ping_peers(&self, mut peers: Vec<PeerId>) {
+        if peers.is_empty() {
+            // TODO: log here?
+            ()
+        }
 
-    }
-
-    pub fn stop(&self) {
-
-    }
-
-    fn check_nodes(&self) {
-
-    }
-
-    pub fn ping_node(&mut self, destination: &PeerId) -> HeartbeatPingResult {
-        // log(format!("Pinging the node with peer id {destination}"));
-        use rand::{RngCore,SeedableRng};
-        let mut challenge: [u8; 16] = [0u8; 16];
-        rand::rngs::StdRng::from_entropy().fill_bytes(&mut challenge);
-
-        let _ping_timer = match &self.metric_time_to_ping {
-            Some(metric_time_to_ping) => {
-                let timer = metric_time_to_ping.start_measure();
-                Some(scopeguard::guard((), move |_| { metric_time_to_ping.cancel_measure(timer); }))
+        let _ping_peers_timer = match &self.metric_time_to_heartbeat {
+            Some(metric_time_to_heartbeat) => {
+                let timer = metric_time_to_heartbeat.start_measure();
+                Some(scopeguard::guard((), move |_| { metric_time_to_heartbeat.cancel_measure(timer); }))
             },
             None => None
         };
 
-        // timeout with send message should be here
-        let is_successful = true;
+        let remainder = peers.split_off(self.config.max_parallel_pings.min(peers.len()));
 
-        let ping_result = HeartbeatPingResult{
-            destination: destination.clone(),
-            last_seen: if is_successful { Some(4u64) } else { None },       // TODO: proper timestamp
+        let start = current_timestamp();
+        let mut futs = to_futures_unordered(
+            peers.iter()
+                .map(|x| { self.ping_peer(x.clone(), self.config.timeout)})
+                .collect::<Vec<_>>()
+        );
+
+        let mut waiting = remainder.iter();
+        while let Some(heartbeat) = futs.next().await {
+            if let Some(v) = waiting.next() {
+                futs.push(self.ping_peer(v.clone(), Duration::from_millis(current_timestamp() - start)));
+            }
+
+            self.external_api.on_finished_ping(&heartbeat.0, heartbeat.1);
+        }
+    }
+
+    async fn ping_peer(&self, destination: PeerId, timeout_duration: Duration) -> PingMeasurement {
+        // TODO: log(format!("Pinging the node with peer id {destination}"));
+        use rand::{RngCore,SeedableRng};
+        let mut challenge = Box::new([0u8; 16]);
+        rand::rngs::StdRng::from_entropy().fill_bytes(&mut challenge.as_mut_slice());
+
+        let ping_result: PingMeasurement = {
+            let _ping_peer_timer = match &self.metric_time_to_ping {
+                Some(metric_time_to_ping) => {
+                    let timer = metric_time_to_ping.start_measure();
+                    Some(scopeguard::guard((), move |_| { metric_time_to_ping.cancel_measure(timer); }))
+                },
+                None => None
+            };
+
+            let timeout = sleep(std::cmp::min(timeout_duration, self.config.timeout)).fuse();
+            let ping = async {
+                let result = self.external_api.send_msg(destination.clone(), &self.protocol_heartbeat, challenge.clone(), true);
+                result
+            }.fuse();
+
+            pin_mut!(timeout, ping);
+
+            let ping_result: Result<(), String> = match select(
+                timeout, ping).await
+            {
+                Either::Left(_) => Err(format!("The ping timed out {}s", timeout_duration.as_secs())),
+                Either::Right((v, _)) => match v {
+                    // Result<Box<u8>, String>
+                    Ok(data) => {
+                        let reply = core_misc::heartbeat::generate_ping_response(data);
+                        let r = match compare(challenge.as_ref(), reply.as_ref()) {
+                            std::cmp::Ordering::Equal => Ok(()),
+                            _ => {
+                                // TODO: log error here
+                                Err(format!("Received incorrect reply for challenge, expected '{:x?}', but received: {:x?}", challenge.as_ref(), reply.as_ref()))
+                            }
+                        };
+
+                        self.external_api.close_connection(&destination);
+
+                        r
+                    },
+                    Err(description) => {
+                        // TODO: log error here
+                        Err(format!("Error during ping to peer '{}': {}", destination.to_string(), description))
+                    }
+                },
+            };
+
+            (
+                destination,
+                if ping_result.is_ok() { Ok(current_timestamp()) } else { Err(()) }
+            )
         };
 
-
-        match ping_result.last_seen {
-            Some(_) => {
+        match ping_result.1 {
+            Ok(_) => {
                 if let Some(metric_successful_ping_count) = &self.metric_successful_ping_count {
                     metric_successful_ping_count.increment(1u64);
                 };
             }
-            None => {
+            Err(_) => {
                 if let Some(metric_failed_ping_count) = &self.metric_failed_ping_count {
                     metric_failed_ping_count.increment(1u64);
                 };
@@ -155,34 +291,94 @@ impl Heartbeat {
 
         ping_result
     }
+}
 
-    /**
-     * Recalculates the network health indicator based on the
-     * current network state knowledge.
-     * @returns Value of the current network health indicator (possibly updated).
-     */
-    pub fn recalculate_network_health() -> NetworkHealthIndicator {
-        NetworkHealthIndicator::UNKNOWN
+//
+pub mod wasm {
+    use super::*;
+
+    #[derive(Copy, Clone, Debug)]
+    struct Heartbeat {
+        peers: i32
+    }
+
+    impl Heartbeat {
+        pub async fn start() {
+            // TODO: set WASM based interval trigger for heartbeat
+        }
+
+        fn peers_to_check(&self) {
+            let _threshold = current_timestamp();    // FIX: self.config.heartbeat_threshold;
+            // TODO: log(`Checking nodes since ${thresholdTime} (${new Date(thresholdTime).toLocaleString()})`)
+        }
     }
 }
 
 
 #[cfg(test)]
 mod tests {
-    use crate::heartbeat;
     use super::*;
+    use mockall::*;
 
-    const HEARTBEAT_CONFIG: HeartbeatConfig = HeartbeatConfig {
-        max_parallel_heartbeats: 10,
-        heartbeat_variance: 10.0,
-        heartbeat_interval: 1000,
-        heartbeat_threshold: 100,       // time since we want to ping again
-        network_quality_threshold: 0.1,
-    };
+    fn simple_ping_config() -> PingConfig {
+        PingConfig {
+            max_parallel_pings: 2,
+            environment_id: "test",
+            normalized_version: "1.0a",
+            timeout: Duration::from_millis(150),
+        }
+    }
 
-    #[test]
-    fn test_entry_should_advance_time_on_ping() {
-        let heartbeat = Heartbeat::new(HEARTBEAT_CONFIG, "environment_id", "1.2.3");
-        assert_eq!(2828, 2828);
+    #[async_std::test]
+    async fn test_ping_peer_the_send_message_function_is_invoked_with_the_challenge() {
+        let peer = PeerId::random();
+
+        let mut mock = MockPingCallable::new();
+        mock.expect_send_msg()
+            .returning(|_,_,msg,_| Ok(core_misc::heartbeat::generate_ping_response(msg)));
+        mock.expect_on_finished_ping()
+            .with(predicate::eq(peer), predicate::function(|x: &crate::types::Result| x.is_ok()))
+            .return_const(());
+        mock.expect_close_connection()
+            .with(predicate::eq(peer))
+            .return_const(());
+
+        let mut pinger = Ping::new(simple_ping_config(), Box::new(mock) );
+        pinger.ping_peers(vec![peer.clone()]).await;
+    }
+
+    #[async_std::test]
+    async fn test_ping_peer_always_generates_a_random_challenge() {
+        assert!(true)
+    }
+
+    #[async_std::test]
+    async fn test_ping_peer_invokes_send_message_and_returns_a_valid_response() {
+        assert!(true)
+    }
+
+    #[async_std::test]
+    async fn test_ping_peer_invokes_send_message_but_the_time_runs_out() {
+        assert!(true)
+    }
+
+    #[async_std::test]
+    async fn test_ping_peers_empty_list_will_not_trigger_any_pinging() {
+        assert!(true)
+    }
+
+    #[async_std::test]
+    async fn test_ping_peers_multiple_peers_are_pinged_in_parallel() {
+        assert!(true)
+    }
+
+    #[async_std::test]
+    async fn test_ping_peers_should_ping_parallel_only_a_limited_number_of_peers() {
+        assert!(true)
+    }
+
+    #[async_std::test]
+    async fn test_ping_peer_should_not_ping_all_peers_if_the_max_timeout_is_reached() {
+        assert!(true)
     }
 }

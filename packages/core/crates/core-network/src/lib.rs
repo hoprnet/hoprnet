@@ -1,5 +1,6 @@
 pub mod heartbeat;
 pub mod peers;
+pub(crate) mod types;
 
 
 #[cfg(feature = "wasm")]

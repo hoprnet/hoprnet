@@ -5,6 +5,7 @@ use std::time::Duration;
 use libp2p::PeerId;
 
 use utils_metrics::metrics::{MultiGauge, SimpleGauge};
+
 #[cfg(any(not(feature = "wasm"), test))]
 use utils_misc::time::native::current_timestamp;
 
@@ -110,6 +111,7 @@ pub struct NetworkPeers {
     last_health: crate::heartbeat::NetworkHealthIndicator,
     on_peer_offline_cb: Box<dyn Fn(&PeerId)>,
     is_public_node_cb: Box<dyn Fn(&PeerId) -> bool>,
+    on_network_health_change_cb: Box<dyn Fn(NetworkHealthIndicator, NetworkHealthIndicator)>,
     metric_network_health: Option<SimpleGauge>,
     metric_peers_by_quality: Option<MultiGauge>,
     metric_peer_count: Option<SimpleGauge>
@@ -120,7 +122,8 @@ impl NetworkPeers {
         my_peer_id: PeerId,
         network_quality_threshold: f64,
         on_peer_offline: Box<dyn Fn(&PeerId)>,
-        is_public_node: Box<dyn Fn(&PeerId) -> bool>
+        is_public_node: Box<dyn Fn(&PeerId) -> bool>,
+        on_network_health_change: Box<dyn Fn(NetworkHealthIndicator, NetworkHealthIndicator)>
     ) -> NetworkPeers {
         if network_quality_threshold < BAD_QUALITY as f64 {
             panic!("Requested quality criteria are too low, expected: {network_quality_threshold}, minimum: {BAD_QUALITY}");
@@ -129,7 +132,7 @@ impl NetworkPeers {
         let mut excluded = HashSet::new();
         excluded.insert(my_peer_id.to_string());
 
-        let mut instance = NetworkPeers {
+        let instance = NetworkPeers {
             entries: HashMap::new(),
             ignored: HashMap::new(),
             excluded,
@@ -140,6 +143,7 @@ impl NetworkPeers {
             last_health: crate::heartbeat::NetworkHealthIndicator::UNKNOWN,
             on_peer_offline_cb: on_peer_offline,
             is_public_node_cb: is_public_node,
+            on_network_health_change_cb: on_network_health_change,
             metric_network_health: SimpleGauge::new(
                 "core_gauge_network_health", "Connectivity health indicator").ok(),
             metric_peers_by_quality: MultiGauge::new(
@@ -211,7 +215,7 @@ impl NetworkPeers {
     pub fn unregister(&mut self, peer: &PeerId) {
         self.prune_from_network_status(&peer);
         self.entries.remove(peer.to_string().as_str());
-        // TODO: remove from ignored a nd excluded as well?
+        // TODO: remove from ignored and excluded as well?
     }
 
     /// Returns the quality of the node
@@ -317,7 +321,7 @@ impl NetworkPeers {
         // metrics
 
         if health != self.last_health {
-            // (*self.on_network_health_change(self.last_health, health));  // TODO: emit
+            (*self.on_network_health_change_cb)(self.last_health, health);
             self.last_health = health;
         }
 
@@ -359,6 +363,16 @@ mod tests {
     use crate::heartbeat;
     use super::*;
 
+    fn basic_peers(my_id: &PeerId) -> NetworkPeers {
+        NetworkPeers::new(
+            my_id.clone(),
+            0.6,
+            Box::new(|_x| { () }),
+            Box::new(|_x| -> bool { false } ),
+            Box::new(|_x,_y| { () } ),
+        )
+    }
+
     #[test]
     fn test_network_health_should_be_ordered_numerically_for_metrics_output() {
         assert_eq!(crate::heartbeat::NetworkHealthIndicator::UNKNOWN as i32, 0);
@@ -379,11 +393,7 @@ mod tests {
     fn test_peers_should_not_contain_the_self_reference() {
         let me = PeerId::random();
 
-        let mut peers = NetworkPeers::new(
-            me.clone(),
-            0.6,
-            Box::new(|x| { () }),
-            Box::new(|x| -> bool { false } ));
+        let mut peers = basic_peers(&me);
 
         peers.register(&me, NetworkPeerOrigin::IncomingConnection);
 
@@ -395,11 +405,7 @@ mod tests {
     fn test_peers_should_contain_a_registered_peer() {
         let expected = PeerId::random();
 
-        let mut peers = NetworkPeers::new(
-            PeerId::random(),
-            0.6,
-            Box::new(|x| { () }),
-            Box::new(|x| -> bool { false } ));
+        let mut peers = basic_peers(&PeerId::random());
 
         peers.register(&expected, NetworkPeerOrigin::IncomingConnection);
 
@@ -411,11 +417,7 @@ mod tests {
     fn test_peers_should_remove_a_peer_on_unregistration() {
         let peer = PeerId::random();
 
-        let mut peers = NetworkPeers::new(
-            PeerId::random(),
-            0.6,
-            Box::new(|x| { () }),
-            Box::new(|x| -> bool { false } ));
+        let mut peers = basic_peers(&PeerId::random());
 
         peers.register(&peer, NetworkPeerOrigin::IncomingConnection);
 
@@ -429,11 +431,7 @@ mod tests {
     fn test_peers_should_ingore_heartbeat_updates_for_peers_that_were_not_registered() {
         let peer = PeerId::random();
 
-        let mut peers = NetworkPeers::new(
-            PeerId::random(),
-            0.6,
-            Box::new(|x| { () }),
-            Box::new(|x| -> bool { false } ));
+        let mut peers = basic_peers(&PeerId::random());
 
         peers.update_record(heartbeat::HeartbeatPingResult{
             destination: peer.clone(),
@@ -448,11 +446,7 @@ mod tests {
     fn test_peers_should_be_able_to_register_a_succeeded_heartbeat_result() {
         let peer = PeerId::random();
 
-        let mut peers = NetworkPeers::new(
-            PeerId::random(),
-            0.6,
-            Box::new(|x| { () }),
-            Box::new(|x| -> bool { false } ));
+        let mut peers = basic_peers(&PeerId::random());
 
         peers.register(&peer, NetworkPeerOrigin::IncomingConnection);
 
@@ -473,11 +467,7 @@ mod tests {
     #[test]
     fn test_peers_should_be_able_to_register_a_failed_heartbeat_result() {
         let peer = PeerId::random();
-        let mut peers = NetworkPeers::new(
-            PeerId::random(),
-            0.6,
-            Box::new(|x| { () }),
-            Box::new(|x| -> bool { false } ));
+        let mut peers = basic_peers(&PeerId::random());
 
         peers.register(&peer, NetworkPeerOrigin::IncomingConnection);
 
@@ -534,13 +524,7 @@ mod tests {
 
     #[test]
     fn test_peers_should_have_no_knowledge_about_health_without_any_registered_peers() {
-        let peer = PeerId::random();
-
-        let mut peers = NetworkPeers::new(
-            PeerId::random(),
-            0.3,
-            Box::new(|x| { () }),
-            Box::new(|x| -> bool { false } ));
+        let mut peers = basic_peers(&PeerId::random());
 
         assert_eq!(peers.health(), crate::heartbeat::NetworkHealthIndicator::UNKNOWN);
     }
@@ -549,11 +533,7 @@ mod tests {
     fn test_peers_should_be_unhealthy_without_any_heartbeat_updates() {
         let peer = PeerId::random();
 
-        let mut peers = NetworkPeers::new(
-            PeerId::random(),
-            0.6,
-            Box::new(|x| { () }),
-            Box::new(|x| -> bool { false } ));
+        let mut peers = basic_peers(&PeerId::random());
 
         peers.register(&peer, NetworkPeerOrigin::IncomingConnection);
 
@@ -564,17 +544,32 @@ mod tests {
     fn test_peers_should_be_unhealthy_without_any_peers_once_the_health_was_known() {
         let peer = PeerId::random();
 
-        let mut peers = NetworkPeers::new(
-            PeerId::random(),
-            0.6,
-            Box::new(|x| { () }),
-            Box::new(|x| -> bool { false } ));
+        let mut peers = basic_peers(&PeerId::random());
 
         peers.register(&peer, NetworkPeerOrigin::IncomingConnection);
         let _ = peers.health();
         peers.unregister(&peer);
 
         assert_eq!(peers.health(), crate::heartbeat::NetworkHealthIndicator::RED);
+    }
+
+    #[test]
+    #[should_panic(expected = "Callback on health change")]
+    fn test_peers_should_notify_the_callback_for_every_health_change() {
+        std::panic::set_hook(Box::new(|_| {}));
+
+        let peer = PeerId::random();
+
+        let mut peers = NetworkPeers::new(
+            PeerId::random(),
+            0.6,
+            Box::new(|_x| { () }),
+            Box::new(|_x| -> bool { false } ),
+            Box::new(|_x,_y| { panic!("Callback on health change") } ),
+        );
+
+        peers.register(&peer, NetworkPeerOrigin::IncomingConnection);
+        let _ = peers.health();
     }
 
     #[test]
@@ -585,8 +580,9 @@ mod tests {
         let mut peers = NetworkPeers::new(
             PeerId::random(),
             0.6,
-            Box::new(|x| { () }),
-            Box::new(move |x| -> bool { x == &public } ));
+            Box::new(|_x| { () }),
+            Box::new(move |x| -> bool { x == &public } ),
+            Box::new(|_x, _y| { () }),);
 
         peers.register(&peer, NetworkPeerOrigin::IncomingConnection);
 
@@ -599,7 +595,7 @@ mod tests {
     }
 
     #[test]
-    fn test_peers_should_be_healthy_when_a_public_peer_is_pingable_with_high_quality_and_I_am_public() {
+    fn test_peers_should_be_healthy_when_a_public_peer_is_pingable_with_high_quality_and_i_am_public() {
         let me = PeerId::random();
         let peer = PeerId::random();
         let public = vec![peer.clone(), me.clone()];
@@ -607,8 +603,9 @@ mod tests {
         let mut peers = NetworkPeers::new(
             me,
             0.3,
-            Box::new(|x| { () }),
-            Box::new(move |x| -> bool { public.contains(&x) } ));
+            Box::new(|_x| { () }),
+            Box::new(move |x| -> bool { public.contains(&x) } ),
+            Box::new(|_x,_y| { () }));
 
         peers.register(&peer, NetworkPeerOrigin::IncomingConnection);
 
@@ -631,8 +628,9 @@ mod tests {
         let mut peers = NetworkPeers::new(
             PeerId::random(),
             0.3,
-            Box::new(|x| { () }),
-            Box::new(move |x| -> bool { public.contains(&x) } ));
+            Box::new(|_x| { () }),
+            Box::new(move |x| -> bool { public.contains(&x) } ),
+            Box::new(|_x,_y| { () }),);
 
         peers.register(&peer, NetworkPeerOrigin::IncomingConnection);
         peers.register(&peer2, NetworkPeerOrigin::IncomingConnection);

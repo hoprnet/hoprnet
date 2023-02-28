@@ -330,7 +330,7 @@ class Hopr extends EventEmitter {
 
     this.libp2pComponents = libp2p.components
 
-    const sendMessage = ((
+    const sendMessage =[((
       dest: PeerId,
       protocols: string | string[],
       msg: Uint8Array,
