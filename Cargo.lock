@@ -1044,10 +1044,7 @@ checksum = "5827cebf4670468b8772dd191856768aedcb1b0278a04f989f7766351917b9dc"
 name = "core-misc"
 version = "0.1.0"
 dependencies = [
- "blake2",
  "console_error_panic_hook",
- "futures 0.3.26",
- "js-sys",
  "real-base",
  "serde",
  "serde-wasm-bindgen",
@@ -1055,7 +1052,6 @@ dependencies = [
  "utils-misc",
  "utils-proc-macros",
  "wasm-bindgen",
- "wasm-bindgen-futures",
  "wasm-bindgen-test",
  "wasm-opt",
  "wasm-pack",
@@ -1086,17 +1082,20 @@ name = "core-network"
 version = "0.1.0"
 dependencies = [
  "async-std",
+ "blake2",
  "console_error_panic_hook",
- "core-misc",
  "futures 0.3.26",
  "getrandom 0.2.8",
+ "js-sys",
  "libp2p",
  "mockall",
+ "more-asserts",
  "rand 0.8.5",
  "scopeguard 1.1.0",
  "utils-metrics",
  "utils-misc",
  "wasm-bindgen",
+ "wasm-bindgen-futures",
  "wasm-bindgen-test",
 ]
 
