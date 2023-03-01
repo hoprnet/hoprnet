@@ -1,9 +1,11 @@
 use ethers::types::Address;
-use std::env;
-use std::ffi::OsStr;
-use std::io::{self, Write};
-use std::path::Path;
-use std::process::Command;
+use std::{
+    env,
+    ffi::OsStr,
+    io::{self, Write},
+    path::Path,
+    process::Command,
+};
 
 use crate::environment_config;
 use crate::utils::HelperErrors;
@@ -68,41 +70,22 @@ pub fn child_process_call_foundry_faucet(
     hopr_amount: &u128,
     native_amount: &u128,
 ) -> Result<(), HelperErrors> {
-    // check environment is set
-    let envrionment_check = environment_config::ensure_environment_is_set(
-        &env::current_dir().unwrap(),
-        environment_name,
-        environment_type,
-    )
-    .unwrap();
-    if !envrionment_check {
-        return Err(HelperErrors::EnvironmentInfoMismatch);
-    }
+    let hopr_amount_str = hopr_amount.to_string();
+    let native_amount_str = native_amount.to_string();
+    let addresses_str = format!("{:#x}", &address);
 
-    // building the command
-    let faucet_output = Command::new("forge")
-        .args([
-            "script",
-            "script/SingleAction.s.sol:SingleActionFromPrivateKeyScript",
-            "--broadcast",
-            "--sig",
-            "mintHoprAndSendNative(address,uint256,uint256)",
-            &format!("{:#x}", &address),
-            &hopr_amount.to_string(),
-            &native_amount.to_string(),
-        ])
-        .output()
-        .expect("forge faucet command failed to start");
-    io::stdout().write_all(&faucet_output.stdout).unwrap();
-    io::stderr().write_all(&faucet_output.stderr).unwrap();
+    let faucet_args = vec![
+        "script",
+        "script/SingleAction.s.sol:SingleActionFromPrivateKeyScript",
+        "--broadcast",
+        "--sig",
+        "mintHoprAndSendNative(address,uint256,uint256)",
+        &addresses_str,
+        &hopr_amount_str,
+        &native_amount_str,
+    ];
 
-    println!("Foundry command execution status: {}", faucet_output.status);
-
-    if faucet_output.status.success() {
-        return Ok(());
-    } else {
-        return Err(HelperErrors::ErrorInRunningFoundry);
-    }
+    child_process_call_foundry(environment_name, environment_type, &faucet_args)
 }
 
 /// Launch a child process to call foundry self-register command
@@ -117,6 +100,35 @@ pub fn child_process_call_foundry_self_register(
     environment_type: &str,
     peer_ids: &String,
 ) -> Result<(), HelperErrors> {
+    // add brackets to around the string
+    let peer_id_string = vec!["[", &peer_ids, "]"].concat();
+    let self_register_args = vec![
+        "script",
+        "script/SingleAction.s.sol:SingleActionFromPrivateKeyScript",
+        "--broadcast",
+        "--sig",
+        "selfRegisterNodes(string[])",
+        &peer_id_string,
+    ];
+
+    child_process_call_foundry(environment_name, environment_type, &self_register_args)
+}
+
+/// Launch a child process to call a foundry script
+///
+/// # Arguments
+///
+/// * `environment_name` - Name of the environment that nodes run in
+/// * `environment_type` - Type of the environment that nodes run in
+/// * `forge_args` - arguments to be passed to `forge`
+pub fn child_process_call_foundry<T>(
+    environment_name: &str,
+    environment_type: &str,
+    forge_args: &[T],
+) -> Result<(), HelperErrors>
+where
+    T: AsRef<OsStr>,
+{
     // check environment is set
     let envrionment_check = environment_config::ensure_environment_is_set(
         &env::current_dir().unwrap(),
@@ -128,21 +140,11 @@ pub fn child_process_call_foundry_self_register(
         return Err(HelperErrors::EnvironmentInfoMismatch);
     }
 
-    // add brackets to around the string
-    let peer_id_string = vec!["[", &peer_ids, "]"].concat();
-
     // building the command
     let faucet_output = Command::new("forge")
-        .args([
-            "script",
-            "script/SingleAction.s.sol:SingleActionFromPrivateKeyScript",
-            "--broadcast",
-            "--sig",
-            "selfRegisterNodes(string[])",
-            &peer_id_string,
-        ])
+        .args(forge_args)
         .output()
-        .expect("forge faucet command failed to start");
+        .expect("forge command failed to start");
     io::stdout().write_all(&faucet_output.stdout).unwrap();
     io::stderr().write_all(&faucet_output.stderr).unwrap();
 

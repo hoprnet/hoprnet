@@ -96,6 +96,7 @@ mod tests {
             .unwrap()
             .parent()
             .unwrap()
+            .join("ethereum")
             .join("contracts");
         let environment_name = "anvil-localhost";
         let environment_type = "development";
@@ -122,6 +123,7 @@ mod tests {
             .unwrap()
             .parent()
             .unwrap()
+            .join("ethereum")
             .join("contracts");
 
         let result = std::panic::catch_unwind(|| {
@@ -136,6 +138,7 @@ mod tests {
             .unwrap()
             .parent()
             .unwrap()
+            .join("ethereum")
             .join("contracts");
         let environment_name = "anvil-localhost";
         let environment_type = "production";
