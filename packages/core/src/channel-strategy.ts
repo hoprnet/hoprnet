@@ -59,7 +59,7 @@ export interface ChannelStrategyInterface {
   ): StrategyTickResult
 
   onChannelWillClose(channel: ChannelEntry): Promise<void> // Before a channel closes
-  onWinningTicket(t: AcknowledgedTicket): Promise<void>
+  onAckedTicket(t: AcknowledgedTicket): Promise<void>
   shouldCommitToChannel(c: ChannelEntry): boolean
 
   tickInterval: number
@@ -73,7 +73,7 @@ export interface ChannelStrategyInterface {
 export abstract class SaneDefaults {
   protected autoRedeemTickets: boolean = false
 
-  async onWinningTicket(ackTicket: AcknowledgedTicket) {
+  async onAckedTicket(ackTicket: AcknowledgedTicket) {
     if (this.autoRedeemTickets) {
       const counterparty = ackTicket.signer
       log(`auto redeeming tickets in channel to ${counterparty.toPeerId().toString()}`)

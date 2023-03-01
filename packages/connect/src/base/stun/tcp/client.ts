@@ -281,20 +281,7 @@ export function isTcpExposedHost(
       request.timeout.clear()
       requests.delete(tIdString)
 
-      if (response.response == undefined) {
-        verbose(`Ignoring empty STUN response, transaction ${tIdString}`)
-        nextSTUNRequest(
-          it,
-          requests,
-          timeout,
-          undefined,
-          updateSecondary,
-          onTimeoutSecondary,
-          onError,
-          STUN_QUERY_STATE.SEARCHING_RFC_5780_STUN_SERVER
-        )
-        return
-      }
+      verbose(`Received TCP STUN response on secondary interface`)
 
       switch (request.state) {
         case STUN_QUERY_STATE.SEARCHING_RFC_5780_STUN_SERVER:
@@ -338,6 +325,8 @@ export function isTcpExposedHost(
         verbose(`Received unexpected STUN response. Dropping response`)
         return
       }
+
+      verbose(`Received TCP STUN response on primary interface`)
 
       request.timeout.clear()
       requests.delete(tIdString)
