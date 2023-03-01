@@ -2005,16 +2005,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "foundry-tool"
-version = "0.1.0"
-dependencies = [
- "clap 4.0.32",
- "ethers",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "fuchsia-cprng"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2391,6 +2381,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6c49c37c09c17a53d937dfbb742eb3a961d65a994e6bcdcf37e7399d0cc8ab5e"
 dependencies = [
  "digest 0.10.6",
+]
+
+[[package]]
+name = "hopli"
+version = "0.1.0"
+dependencies = [
+ "clap 4.0.32",
+ "ethers",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

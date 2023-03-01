@@ -60,8 +60,8 @@ RUN apt-get update \
 COPY --from=build /app/hoprnet/packages ./packages
 COPY --from=build /app/hoprnet/node_modules ./node_modules
 
-# we copy foundry-tool over since we might need it at some point as a binary
-COPY --from=build /app/hoprnet/.cargo/bin/foundry-tool .cargo/bin/
+# we copy hopli over since we might need it at some point as a binary
+COPY --from=build /app/hoprnet/.cargo/bin/hopli .cargo/bin/
 
 # set volume which can be mapped by users on the host system
 VOLUME ["/app/hoprnet/hoprd-db"]

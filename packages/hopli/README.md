@@ -1,6 +1,6 @@
-# Tool
+# Hopli
 
-Complete some missing funcitonalities of the foundry-centered smart contract toolchain. Notably storage of deployment files per environment.
+CLI tool to manage HOPR identity generation, decryption, funding and registering to network registry.
 
 ### Run local development
 
@@ -45,7 +45,7 @@ cargo install --path .
 To create some identities
 
 ```
-foundry-tool identity \
+hopli identity \
     --password switzerland \
     --directory "./test" \
     --name node_ \
@@ -55,7 +55,7 @@ foundry-tool identity \
 To fund nodes
 
 ```
-foundry-tool faucet \
+hopli faucet \
     --environment-name anvil-localhost --environment-type development \
     --password local --use-local-identities --identity-directory "/tmp" \
     --address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1 \
@@ -69,7 +69,7 @@ Note that only identity files ending with `.id` are recognized by the CLI
 To register nodes
 
 ```
-foundry-tool network-registry \
+hopli network-registry \
     --environment-name anvil-localhost \
     --environment-type development \
     --peer-ids 16Uiu2HAmC9CRFeuF2cTf6955ECFmgDw6d27jLows7bftMqat5Woz,16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12 \

@@ -2,7 +2,7 @@
 
 cd /opt/hopr || exit 1
 
-foundry-tool faucet \
+hopli faucet \
 	--environment-name anvil-localhost --environment-type development \
 	--password switzerland --use-local-identities \
 	--identity-prefix "local" --identity-directory "/var/hopr/identities/" \

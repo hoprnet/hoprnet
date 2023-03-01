@@ -1,5 +1,5 @@
 [package]
-name = "foundry-tool"
+name = "hopli"
 version = "0.1.0"
 edition = "2021"
 

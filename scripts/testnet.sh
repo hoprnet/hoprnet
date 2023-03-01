@@ -210,7 +210,7 @@ fund_nodes() {
   local addr_arg=""
   [[ -n "${4:-}" ]] && addr_arg="--address ${4}"
 
-  ${mydir}/../.cargo/bin/foundry-tool faucet \
+  ${mydir}/../.cargo/bin/hopli faucet \
     --environment-name anvil-localhost --environment-type development \
     --password "${password}" --use-local-identities \
     --identity-prefix "${node_prefix}" --identity-directory "${tmp}" \

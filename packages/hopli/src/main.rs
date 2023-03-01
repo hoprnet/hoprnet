@@ -13,7 +13,7 @@ pub mod process;
 pub mod utils;
 
 #[derive(Parser, Debug)]
-#[clap(name = "foundry-tool")]
+#[clap(name = "hopli")]
 struct Cli {
     #[command(subcommand)]
     pub command: Commands,
