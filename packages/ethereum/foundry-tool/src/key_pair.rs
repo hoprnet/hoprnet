@@ -5,6 +5,13 @@ use ethers::types::Address;
 use std::fs;
 use std::path::Path;
 
+/// Decrypt identity files and returns an vec of ethereum addresses
+///
+/// # Arguments
+///
+/// * `identity_directory` - Directory to all the identity files
+/// * `password` - Password to unlock all the identity files
+/// * `identity_prefix` - Prefix of identity files. Only identity files with the provided are decrypted with the password
 pub fn read_identities(
     identity_directory: &str,
     password: &String,
@@ -28,7 +35,7 @@ pub fn read_identities(
                         .unwrap()
                         .to_str()
                         .unwrap()
-                        .contains(identity_prefix.as_str()),
+                        .starts_with(identity_prefix.as_str()),
                     _ => true,
                 }) // TODO: Now it is a loose check on contain but not strict on the prefix
                 .filter_map(|r| Wallet::<SigningKey>::decrypt_keystore(r, password).ok()) // read keystore and return non-error results
@@ -42,6 +49,13 @@ pub fn read_identities(
     }
 }
 
+/// Create one identity file and return the ethereum address
+///
+/// # Arguments
+///
+/// * `dir_name` - Directory to the storage of an identity file
+/// * `password` - Password to encrypt the identity file
+/// * `name` - Prefix of identity files.
 pub fn create_identity(
     dir_name: &str,
     password: &str,
@@ -167,6 +181,20 @@ mod tests {
         let pwd = "local";
         create_identity(path, pwd, &Some(String::from("local-alice"))).unwrap();
         match read_identities(path, &pwd.to_string(), &Some("npm-".to_string())) {
+            Ok(val) => assert_eq!(val.len(), 0),
+            _ => assert!(false),
+        }
+        remove_json_keystore(path)
+            .map_err(|err| println!("{:?}", err))
+            .ok();
+    }
+
+    #[test]
+    fn read_identities_from_tmp_folder_with_wrong_prefix() {
+        let path = "./tmp_7";
+        let pwd = "local";
+        create_identity(path, pwd, &Some(String::from("local-alice"))).unwrap();
+        match read_identities(path, &pwd.to_string(), &Some("alice".to_string())) {
             Ok(val) => assert_eq!(val.len(), 0),
             _ => assert!(false),
         }

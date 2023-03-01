@@ -5,6 +5,7 @@ use ethers::types::Address;
 
 use crate::utils::{Cmd, HelperErrors};
 
+/// CLI arguments for `hopli faucet`
 #[derive(Parser, Default, Debug)]
 pub struct FaucetArgs {
     #[clap(help = "Environment name. E.g. monte_rosa", long)]
@@ -30,7 +31,7 @@ pub struct FaucetArgs {
     password: String,
 
     #[clap(
-        help = "Make faucet script access and extract addresses from local identity files",
+        help = "Forge faucet script access and extract addresses from local identity files",
         long,
         short,
         default_value = "false"
@@ -87,6 +88,7 @@ pub struct FaucetArgs {
 }
 
 impl FaucetArgs {
+    /// Execute the command with given parameters
     fn execute_faucet(self) -> Result<(), HelperErrors> {
         let FaucetArgs {
             environment_name,
@@ -157,6 +159,7 @@ impl FaucetArgs {
 }
 
 impl Cmd for FaucetArgs {
+    /// Run the execute_faucet function
     fn run(self) -> Result<(), HelperErrors> {
         self.execute_faucet()
     }

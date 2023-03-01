@@ -19,6 +19,14 @@ pub fn build_path(environment_name: &str, environment_type: &str) -> String {
     }
 }
 
+/// Set environment variables
+///
+/// # Arguments
+///
+/// * `make_root` - Directory to the foundry project
+/// * `private_key` - Private key to send on-chain transactions
+/// * `foundry_profile` - Value of FOUNDRY_PROFILE variable
+/// * `environment_name` - Name of the environment that nodes run in
 pub fn set_process_path_env(
     make_root: &Option<String>,
     private_key: &String,
@@ -44,6 +52,15 @@ pub fn set_process_path_env(
     Ok(())
 }
 
+/// Launch a child process to call foundry faucet command
+///
+/// # Arguments
+///
+/// * `environment_name` - Name of the environment that nodes run in
+/// * `environment_type` - Type of the environment that nodes run in
+/// * `address` - Address that the tool fund
+/// * `hopr_amount` - Amount of HOPR tokens to be funded
+/// * `native_amount` - Amount of native tokens to be funded
 pub fn child_process_call_foundry_faucet(
     environment_name: &str,
     environment_type: &str,
@@ -88,6 +105,13 @@ pub fn child_process_call_foundry_faucet(
     }
 }
 
+/// Launch a child process to call foundry self-register command
+///
+/// # Arguments
+///
+/// * `environment_name` - Name of the environment that nodes run in
+/// * `environment_type` - Type of the environment that nodes run in
+/// * `peer_id` - Peer Ids of HOPR nodes to be registered under the caller
 pub fn child_process_call_foundry_self_register(
     environment_name: &str,
     environment_type: &str,

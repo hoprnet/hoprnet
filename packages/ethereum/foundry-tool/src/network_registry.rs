@@ -3,6 +3,7 @@ use clap::Parser;
 
 use crate::utils::{Cmd, HelperErrors};
 
+/// CLI arguments for `hopli network-registry`
 #[derive(Parser, Default, Debug)]
 pub struct NetworkRegistryArgs {
     #[clap(help = "Environment name. E.g. monte_rosa", long)]
@@ -37,6 +38,7 @@ pub struct NetworkRegistryArgs {
 }
 
 impl NetworkRegistryArgs {
+    /// Node self register with given parameters
     fn execute_self_register(self) -> Result<(), HelperErrors> {
         let NetworkRegistryArgs {
             environment_name,
@@ -62,6 +64,7 @@ impl NetworkRegistryArgs {
 }
 
 impl Cmd for NetworkRegistryArgs {
+    /// Run the execute_self_register function
     fn run(self) -> Result<(), HelperErrors> {
         self.execute_self_register()
     }

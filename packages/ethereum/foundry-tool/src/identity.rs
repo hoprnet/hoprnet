@@ -4,6 +4,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::utils::{Cmd, HelperErrors};
 
+/// CLI arguments for `hopli identity`
 #[derive(Parser, Default, Debug)]
 pub struct IdentityArgs {
     #[clap(
@@ -35,6 +36,7 @@ pub struct IdentityArgs {
 }
 
 impl IdentityArgs {
+    /// Execute the command with given parameters
     fn execute_identity_creation_loop(self) -> Result<(), HelperErrors> {
         let IdentityArgs {
             password,
@@ -71,6 +73,7 @@ impl IdentityArgs {
 }
 
 impl Cmd for IdentityArgs {
+    /// Run the execute_identity_creation_loop function
     fn run(self) -> Result<(), HelperErrors> {
         self.execute_identity_creation_loop()
     }
