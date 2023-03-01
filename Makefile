@@ -252,7 +252,7 @@ fund-local: ## use faucet script to fund local identities
 		--environment-name anvil-localhost --environment-type development \
 		--password local --use-local-identities --identity-directory "${id_dir}" \
 		--private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
-		--make-root "./packages/ethereum/contracts"
+		--contracts-root "./packages/ethereum/contracts"
 
 .PHONY: fund-local-all
 fund-local-all: ## use faucet script to fund all the local identities
@@ -260,7 +260,7 @@ fund-local-all: ## use faucet script to fund all the local identities
 		--environment-name anvil-localhost --environment-type development \
 		--password local --use-local-identities --identity-directory "/tmp/" \
 		--private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
-		--make-root "./packages/ethereum/contracts"
+		--contracts-root "./packages/ethereum/contracts"
 
 .PHONY: docker-build-local
 docker-build-local: ## build Docker images locally, or single image if image= is set

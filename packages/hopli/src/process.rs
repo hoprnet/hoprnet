@@ -23,18 +23,18 @@ pub fn build_path(environment_name: &str, environment_type: &str) -> String {
 ///
 /// # Arguments
 ///
-/// * `make_root` - Directory to the foundry project
+/// * `contracts_root` - Directory to the foundry project
 /// * `private_key` - Private key to send on-chain transactions
 /// * `foundry_profile` - Value of FOUNDRY_PROFILE variable
 /// * `environment_name` - Name of the environment that nodes run in
 pub fn set_process_path_env(
-    make_root: &Option<String>,
+    contracts_root: &Option<String>,
     private_key: &String,
     foundry_profile: &String,
     environment_name: &String,
 ) -> Result<(), HelperErrors> {
     // run in the repo where the make target is saved
-    if let Some(new_root) = make_root {
+    if let Some(new_root) = contracts_root {
         let root = Path::new(OsStr::new(&new_root));
         match env::set_current_dir(&root) {
             Ok(_) => println!(

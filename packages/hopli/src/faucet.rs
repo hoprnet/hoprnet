@@ -60,7 +60,7 @@ pub struct FaucetArgs {
         short,
         default_value = None
     )]
-    make_root: Option<String>,
+    contracts_root: Option<String>,
 
     #[clap(
         help = "Private key of the caller address, e.g. 0xabc",
@@ -98,7 +98,7 @@ impl FaucetArgs {
             use_local_identities,
             identity_directory,
             identity_prefix,
-            make_root,
+            contracts_root,
             private_key,
             hopr_amount,
             native_amount,
@@ -134,7 +134,7 @@ impl FaucetArgs {
 
         // set directory and environment variables
         if let Err(e) = set_process_path_env(
-            &make_root,
+            &contracts_root,
             &private_key,
             &environment_type,
             &environment_name,

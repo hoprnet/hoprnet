@@ -16,7 +16,7 @@ cargo run -- faucet --environment-name anvil-localhost \
     --password local --use-local-identities --identity-directory "/tmp" \
     --address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1 \
     --private-key $PRIVATE_KEY \
-    --make-root "../contracts"  \
+    --contracts-root "../contracts"  \
     --hopr-amount 10 --native-amount 1
 ```
 
@@ -26,7 +26,7 @@ cargo run -- network-registry --environment-name anvil-localhost \
     --environment-type development \
     --peer-ids 16Uiu2HAmC9CRFeuF2cTf6955ECFmgDw6d27jLows7bftMqat5Woz,16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12 \
     --private-key $PRIVATE_KEY \
-    --make-root "../contracts"
+    --contracts-root "../contracts"
 ```
 
 ### Test
@@ -60,7 +60,7 @@ hopli faucet \
     --password local --use-local-identities --identity-directory "/tmp" \
     --address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1 \
     --private-key <bank_private_key> \
-    --make-root "../contracts" \
+    --contracts-root "../contracts" \
     --hopr-amount 10 --native-amount 1
 ```
 
@@ -74,5 +74,5 @@ hopli network-registry \
     --environment-type development \
     --peer-ids 16Uiu2HAmC9CRFeuF2cTf6955ECFmgDw6d27jLows7bftMqat5Woz,16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12 \
     --private-key <bank_private_key> \
-    --make-root "../contracts"
+    --contracts-root "../contracts"
 ```
