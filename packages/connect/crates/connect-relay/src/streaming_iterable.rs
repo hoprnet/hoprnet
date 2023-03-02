@@ -7,13 +7,10 @@ use futures::{
     task::{Context, Poll},
     Future, Sink, SinkExt, Stream, StreamExt,
 };
-use js_sys::{AsyncIterator, Function, Object, Promise, Reflect, Symbol};
+use js_sys::{AsyncIterator, Function, IteratorNext, Object, Promise, Reflect, Symbol, Uint8Array};
 use pin_project_lite::pin_project;
 use std::task::Waker;
-use utils_misc::{
-    async_iterable::wasm::{to_jsvalue_iterator, to_jsvalue_stream},
-    ok_or_jserr,
-};
+use utils_misc::async_iterable::wasm::{to_jsvalue_iterator, to_jsvalue_stream};
 use wasm_bindgen::{prelude::*, JsCast};
 use wasm_bindgen_futures::JsFuture;
 
@@ -51,8 +48,8 @@ impl AsyncIterable {
             return false;
         }
 
-        let async_sym = js_sys::Symbol::async_iterator();
-        let async_iter_fn = match js_sys::Reflect::get(it, async_sym.as_ref()) {
+        let async_sym = Symbol::async_iterator();
+        let async_iter_fn = match Reflect::get(it, async_sym.as_ref()) {
             Ok(f) => f,
             Err(_) => return false,
         };
@@ -128,15 +125,15 @@ impl Stream for StreamingIterable {
         }
 
         if self.iter.is_none() {
-            let async_sym = js_sys::Symbol::async_iterator();
+            let async_sym = Symbol::async_iterator();
 
             let initial = self.js_stream.source();
-            let async_iter_fn = match js_sys::Reflect::get(&initial, async_sym.as_ref()) {
+            let async_iter_fn = match Reflect::get(&initial, async_sym.as_ref()) {
                 Ok(x) => x,
                 Err(_) => return Poll::Ready(None),
             };
 
-            let async_iter_fn: js_sys::Function = match async_iter_fn.dyn_into() {
+            let async_iter_fn: Function = match async_iter_fn.dyn_into() {
                 Ok(fun) => fun,
                 Err(e) => {
                     log(format!("{:?}", e).as_str());
@@ -174,14 +171,14 @@ impl Stream for StreamingIterable {
         match Pin::new(future).poll(cx) {
             Poll::Ready(res) => match res {
                 Ok(iter_next) => {
-                    let next = iter_next.unchecked_into::<js_sys::IteratorNext>();
+                    let next = iter_next.unchecked_into::<IteratorNext>();
                     if next.done() {
                         self.stream_done = true;
                         Poll::Ready(None)
                     } else {
                         self.next.take();
                         Poll::Ready(Some(Ok(Box::from_iter(
-                            js_sys::Uint8Array::new(&next.value()).to_vec(),
+                            Uint8Array::new(&next.value()).to_vec(),
                         ))))
                     }
                 }
@@ -229,7 +226,7 @@ impl Sink<Box<[u8]>> for StreamingIterable {
                     let iterator_fn: Closure<dyn FnMut() -> Promise> = Closure::new(move || {
                         log("rs: iterator code called");
 
-                        js_sys::Promise::new(&mut |resolve, reject| {
+                        Promise::new(&mut |resolve, reject| {
                             *this.resolve = Some(resolve);
                             if this.close_waker.is_some() {
                                 this.close_waker.take().unwrap().wake()
@@ -355,44 +352,47 @@ impl Sink<Box<[u8]>> for StreamingIterable {
 }
 
 #[wasm_bindgen]
-struct JsStreamingIterableOutput {
+pub struct JsStreamingIterableOutput {
     streaming_iterable: StreamingIterable,
 }
 
-impl JsStreamingIterableOutput {
-    fn from(streaming_iterable: StreamingIterable) -> Self {
-        Self { streaming_iterable }
-    }
-}
+impl JsStreamingIterableOutput {}
 
 #[wasm_bindgen]
 impl JsStreamingIterableOutput {
-    #[wasm_bindgen(getter, typescript_type = AsyncIterable)]
+    #[wasm_bindgen(constructor)]
+    pub fn from(streaming_iterable: JsStreamingIterable) -> Self {
+        Self {
+            streaming_iterable: StreamingIterable::from(streaming_iterable),
+        }
+    }
+
+    #[wasm_bindgen(getter)]
     pub fn source(&mut self) -> AsyncIterable {
         let this = unsafe { std::mem::transmute::<&mut Self, &'static mut Self>(self) };
         let iterator_obj = Object::new();
 
-        let iterator_fn: Closure<dyn FnMut() -> Promise + 'static> = Closure::once(move || {
-            log("rs: iterator code called");
-
-            wasm_bindgen_futures::future_to_promise(async move {
-                to_jsvalue_stream(this.streaming_iterable.next().await)
-            })
-        });
+        let iterator_fn =
+            std::mem::ManuallyDrop::new(Closure::<dyn FnMut() -> Promise>::new(move || {
+                let fut = unsafe {
+                    std::mem::transmute::<
+                        Next<'_, StreamingIterable>,
+                        Next<'static, StreamingIterable>,
+                    >(this.streaming_iterable.next())
+                };
+                log("rs: iterator code called");
+                wasm_bindgen_futures::future_to_promise(async move { to_jsvalue_stream(fut.await) })
+            }));
 
         // {
         //    next(): Promise<IteratorResult> {
         //      // ... function body
         //    }
         // }
-        Reflect::set(
-            &iterator_obj,
-            &"next".into(),
-            iterator_fn.as_ref().unchecked_ref(),
-        )
-        .unwrap();
+        Reflect::set(&iterator_obj, &"next".into(), iterator_fn.as_ref()).unwrap();
 
-        let iterable_fn: Closure<dyn FnMut() -> Object> = Closure::once(move || iterator_obj);
+        // let wrapped = Wrapper { js_output: this };
+        let iterable_fn = std::mem::ManuallyDrop::new(Closure::once(move || iterator_obj));
 
         let iterable_obj = Object::new();
 
@@ -405,7 +405,7 @@ impl JsStreamingIterableOutput {
             &iterable_obj,
             &Symbol::async_iterator(),
             // Cast Closure to js_sys::Function
-            iterable_fn.as_ref().unchecked_ref(),
+            &iterable_fn.as_ref().unchecked_ref(),
         )
         .unwrap();
 
@@ -413,181 +413,74 @@ impl JsStreamingIterableOutput {
     }
 
     #[wasm_bindgen]
-    pub async fn sink(source: AsyncIterable) {}
+    pub async fn sink(&mut self, source: AsyncIterable) {
+        let async_sym = Symbol::async_iterator();
+
+        let async_iter_fn = match Reflect::get(&source, async_sym.as_ref()) {
+            Ok(x) => x,
+            Err(_) => todo!(),
+        };
+
+        let async_iter_fn: Function = match async_iter_fn.dyn_into() {
+            Ok(fun) => fun,
+            Err(e) => {
+                log(format!("{:?}", e).as_str());
+                todo!()
+            }
+        };
+
+        let async_it: AsyncIterator = match async_iter_fn.call0(&source).unwrap().dyn_into() {
+            Ok(x) => x,
+            Err(e) => {
+                log(format!("{:?}", e).as_str());
+                todo!()
+            }
+        };
+
+        loop {
+            match async_it.next().map(JsFuture::from) {
+                Ok(m) => {
+                    let foo = match m.await {
+                        Ok(x) => x,
+                        Err(e) => {
+                            self.streaming_iterable.close().await;
+                            break;
+                        }
+                    };
+                    let next = foo.unchecked_into::<IteratorNext>();
+                    if next.done() {
+                        self.streaming_iterable.close().await;
+                        break;
+                    } else {
+                        self.streaming_iterable
+                            .send(Box::from_iter(Uint8Array::new(&next.value()).to_vec()))
+                            .await;
+                    }
+                }
+                Err(e) => {
+                    self.streaming_iterable.close().await;
+                    break;
+                }
+            }
+        }
+    }
 }
 
-#[wasm_bindgen]
-pub async fn foo_bar(stream: JsStreamingIterable) {
-    let mut foo = std::mem::ManuallyDrop::new(StreamingIterable::from(stream));
+// #[wasm_bindgen]
+// pub fn foo_bar(stream: JsStreamingIterable) -> JsStreamingIterableOutput {
+//     JsStreamingIterableOutput::from(StreamingIterable::from(stream))
+//     // let mut foo = std::mem::ManuallyDrop::new(StreamingIterable::from(stream));
 
-    // foo.send_all(stream)
-    let mut s = iter::<Vec<Result<Box<[u8]>, String>>>(vec![
-        Ok(Box::new([0u8, 1u8])),
-        Ok(Box::new([2u8, 3u8])),
-    ]);
-    ok_or_jserr!(foo.send_all(&mut s).await);
-    foo.close().await;
-    // ok_or_jserr!(foo.send().await);
+//     // // foo.send_all(stream)
+//     // let mut s = iter::<Vec<Result<Box<[u8]>, String>>>(vec![
+//     //     Ok(Box::new([0u8, 1u8])),
+//     //     Ok(Box::new([2u8, 3u8])),
+//     // ]);
+//     // ok_or_jserr!(foo.send_all(&mut s).await);
+//     // foo.close().await;
+//     // ok_or_jserr!(foo.send().await);
 
-    // log(format!("first result {:?}", foo.next().await).as_str());
-    // log(format!("second result {:?}", foo.next().await).as_str());
-    // log(format!("third result {:?}", foo.next().await).as_str());
-}
-
-// trait IntoSink<T, Sink> {
-//     fn into_sink(t: T) -> Sink;
-// }
-
-// impl<T, Sink> IntoSink<T, Sink> for T
-// where
-//     T: Into<Sink>,
-// {
-//     fn into_sink(t: T) -> Sink {
-//         t.into()
-//     }
-// }
-
-// impl IntoSink<&js_sys::Function, JsSink> for &js_sys::Function {
-//     fn into_sink(t: &js_sys::Function) -> JsSink {
-//         JsSink::new(t)
-//     }
-// }
-
-// struct JsSinkSharedState {
-//     message_available: bool,
-//     ended: bool,
-//     sink_attached: bool,
-//     message_waker: Option<Waker>,
-//     ready_to_send_waker: Option<Waker>,
-//     sink_attached_waker: Option<Waker>,
-//     buffered: Option<Box<[u8]>>,
-//     done: bool,
-// }
-
-// #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-// struct JsSink {
-//     shared_state: Arc<Mutex<JsSinkSharedState>>,
-//     // Must be a Box because JsSinkFuture requires a lifetime assertion which is
-//     // unavailable for wasm_bindgen exports
-//     fut: Option<Box<dyn Future<Output = Option<Result<Box<[u8]>, String>>> + Unpin>>,
-//     sink: &'static js_sys::Function,
-// }
-
-// impl JsSink {
-//     fn new(sink: &'static js_sys::Function) -> Self {
-//         let shared_state = Arc::new(Mutex::new(JsSinkSharedState {
-//             message_available: false,
-//             sink_attached: false,
-//             message_waker: None,
-//             sink_attached_waker: None,
-//             ready_to_send_waker: None,
-//             buffered: None,
-//             done: false,
-//             ended: false,
-//         }));
-
-//         let js_sink = Self {
-//             shared_state,
-//             fut: None,
-//             sink,
-//         };
-
-//         js_sink.fut = Some(Box::new(JsSinkFuture::new(&mut js_sink)));
-
-//         js_sink
-//     }
-// }
-
-// #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-// impl JsSink {
-//     #[wasm_bindgen]
-//     pub async fn next(&mut self) -> Result<JsValue, JsValue> {
-//         // lock it somehow
-//         let foo = self.fut.unwrap().as_mut().await;
-//         self.fut = Some(Box::new(JsSinkFuture::new(self)));
-
-//         to_jsvalue_stream(foo)
-//     }
-// }
-
-// struct JsSinkFuture<'a> {
-//     js_sink: &'a mut JsSink,
-// }
-
-// impl<'a> JsSinkFuture<'a> {
-//     fn new(js_sink: &'a mut JsSink) -> Self {
-//         Self { js_sink }
-//     }
-// }
-
-// impl Future for JsSinkFuture<'_> {
-//     type Output = Option<Result<Box<[u8]>, String>>;
-
-//     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-//         let shared_state = self.js_sink.shared_state.lock().unwrap();
-
-//         if shared_state.message_available {
-//             shared_state.message_available = false;
-//             return Poll::Ready(Some(Ok(shared_state.buffered.unwrap())));
-//         }
-
-//         if !shared_state.sink_attached {
-//             shared_state.sink_attached_waker.take().unwrap().wake();
-//         }
-
-//         shared_state.message_waker = Some(cx.waker().clone());
-//         Poll::Pending
-//     }
-// }
-
-// impl Sink<Box<[u8]>> for JsSink {
-//     type Error = String;
-
-//     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-//         let shared_state = self.shared_state.lock().unwrap();
-
-//         if shared_state.sink_attached {
-//             match shared_state.message_waker {
-//                 Some(x) => Poll::Ready(Ok(())),
-//                 None => {
-//                     shared_state.ready_to_send_waker = Some(cx.waker().clone());
-//                     Poll::Pending
-//                 }
-//             }
-//         } else {
-//             shared_state.sink_attached = true;
-
-//             JsValue::from(Closure::new(self.next()));
-//             self.sink.call1(&JsValue::null(), &self);
-
-//             shared_state.sink_attached_waker = Some(cx.waker().clone());
-//             Poll::Pending
-//         }
-//     }
-
-//     fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-//         todo!()
-//     }
-
-//     fn start_send(self: Pin<&mut Self>, item: Box<[u8]>) -> Result<(), String> {
-//         todo!()
-//         // let shared_state = self.shared_state.lock().unwrap();
-
-//         // let waker = shared_state.message_waker.take().unwrap();
-
-//         // shared_state.buffered.replace(item);
-//         // waker.wake();
-
-//         // if self.ended {
-//         //     Err(format!("Stream has already ended"))
-//         // }
-//         // // self.buffered.replace(item);
-//         // // self.waker.unwrap().wake();
-
-//         // Ok(())
-//     }
-
-//     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-//         todo!()
-//     }
+//     // log(format!("first result {:?}", foo.next().await).as_str());
+//     // log(format!("second result {:?}", foo.next().await).as_str());
+//     // log(format!("third result {:?}", foo.next().await).as_str());
 // }
