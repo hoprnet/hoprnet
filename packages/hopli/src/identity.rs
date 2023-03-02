@@ -1,5 +1,5 @@
 use crate::key_pair::create_identity;
-use clap::Parser;
+use clap::{builder::RangedU64ValueParser, Parser};
 use std::{
     str::FromStr,
     time::{SystemTime, UNIX_EPOCH},
@@ -60,6 +60,7 @@ pub struct IdentityArgs {
         help = "Number of identities to be generated, e.g. 1",
         long,
         short,
+        value_parser = RangedU64ValueParser::<u32>::new().range(1..),
         default_value_t = 1
     )]
     number: u32,
