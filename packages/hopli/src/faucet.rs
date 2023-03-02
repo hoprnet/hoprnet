@@ -1,4 +1,5 @@
 use crate::key_pair::read_identities;
+use crate::password::PasswordArgs;
 use crate::process::{child_process_call_foundry_faucet, set_process_path_env};
 use clap::Parser;
 use ethers::types::Address;
@@ -22,13 +23,8 @@ pub struct FaucetArgs {
     )]
     address: Option<String>,
 
-    #[clap(
-        help = "Password to decrypt identity files",
-        long,
-        short,
-        default_value = ""
-    )]
-    password: String,
+    #[clap(flatten)]
+    password: PasswordArgs,
 
     #[clap(
         help = "Forge faucet script access and extract addresses from local identity files",
@@ -104,6 +100,12 @@ impl FaucetArgs {
             native_amount,
         } = self;
 
+        // check if password is provided
+        let pwd = match password.read_password() {
+            Ok(read_pwd) => read_pwd,
+            Err(e) => return Err(e),
+        };
+
         // Include provided address
         let mut addresses_all = Vec::new();
         if let Some(addr) = address {
@@ -119,7 +121,7 @@ impl FaucetArgs {
         if use_local_identities {
             // read all the files from the directory
             if let Some(id_dir) = identity_directory {
-                match read_identities(&id_dir.as_str(), &password, &identity_prefix) {
+                match read_identities(&id_dir.as_str(), &pwd, &identity_prefix) {
                     Ok(addresses_from_identities) => {
                         addresses_all.extend(addresses_from_identities);
                     }

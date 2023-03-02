@@ -210,9 +210,9 @@ fund_nodes() {
   local addr_arg=""
   [[ -n "${4:-}" ]] && addr_arg="--address ${4}"
 
-  ${mydir}/../.cargo/bin/hopli faucet \
+  IDENTITY_PASSWORD=${password} ${mydir}/../.cargo/bin/hopli faucet \
     --environment-name anvil-localhost --environment-type development \
-    --password "${password}" --use-local-identities \
+    --use-local-identities \
     --identity-prefix "${node_prefix}" --identity-directory "${tmp}" \
     --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
     --contracts-root "${mydir}/../packages/ethereum/contracts" \

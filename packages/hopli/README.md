@@ -22,16 +22,21 @@ cargo run -- identity --action create --directory "./test" --name node_ --number
 
 ```
 
+Fund nodes with password as env variable. Alternatively, a path to the password file can be provided with `--password-path`, e.g. `--password-path ./.pwd`
+
 ```
 export PRIVATE_KEY=<bank_private_key>
+export IDENTITY_PASSWORD=local
 cargo run -- faucet --environment-name anvil-localhost \
     --environment-type development \
-    --password local --use-local-identities --identity-directory "/tmp" \
+    --use-local-identities --identity-directory "/tmp" \
     --address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1 \
     --private-key $PRIVATE_KEY \
     --contracts-root "../ethereum/contracts"  \
     --hopr-amount 10 --native-amount 1
 ```
+
+Register some peer ids in the network registry contract
 
 ```
 export PRIVATE_KEY=<bank_private_key>
@@ -55,23 +60,24 @@ cargo build --release
 cargo install --path .
 ```
 
-To create some identities
+To create some identities with password as env variable. Alternatively, a path to the password file can be provided with `--password-path`, e.g. `--password-path ./.pwd`
 
 ```
+IDENTITY_PASSWORD=local
 hopli identity \
     --action create \
-    --password switzerland \
     --directory "./test" \
     --name node_ \
     --number 3
 ```
 
-To fund nodes
+To fund nodes with password from env variable `IDENTITY_PASSWORD`. Alternatively, a path to the password file can be provided with `--password-path`, e.g. `--password-path ./.pwd`
 
 ```
+IDENTITY_PASSWORD=local
 hopli faucet \
     --environment-name anvil-localhost --environment-type development \
-    --password local --use-local-identities --identity-directory "/tmp" \
+    --use-local-identities --identity-directory "/tmp" \
     --address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1 \
     --private-key <bank_private_key> \
     --contracts-root "../ethereum/contracts" \
