@@ -12,21 +12,22 @@ use futures::{
 use libp2p::PeerId;
 
 use utils_metrics::metrics::{SimpleHistogram, SimpleCounter};
-use utils_misc::time::current_timestamp;
+// use utils_misc::time::current_timestamp;
+pub fn current_timestamp() -> u64 {
+    (js_sys::Date::now() / 1000.0) as u64
+}
 
-#[cfg(not(wasm))]
-use async_std::task::sleep as sleep;
-
-#[cfg(wasm)]
+// #[cfg(not(feature = “wasm”))]
+// use async_std::task::sleep as sleep;
+//
+// #[cfg(feature = "wasm")]
 use gloo_timers::future::sleep as sleep;
 
 const PINGS_MAX_PARALLEL: usize = 14;
 
 
 #[cfg_attr(test, mockall::automock)]
-pub(crate) trait PingCallable {
-    fn send_msg(&self, peer: PeerId, protocols: &[String], msg: Box<[u8]>, include_reply: bool) -> Result<Box<[u8]>, String>;
-
+pub trait PingCallable {
     fn close_connection(&self, peer: &PeerId);
 
     fn on_finished_ping(&self, peer: &PeerId, result: crate::types::Result);
@@ -35,15 +36,17 @@ pub(crate) trait PingCallable {
 
 type PingMeasurement = (PeerId, crate::types::Result);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PingConfig {
     pub max_parallel_pings: usize,
-    pub environment_id: &'static str,
-    pub normalized_version: &'static str,
+    pub environment_id: String,
+    pub normalized_version: String,
     pub timeout: Duration,
 }
 
-struct Ping {
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+pub struct Ping {
     config: PingConfig,
     protocol_heartbeat: [String; 2],
     external_api: Box<dyn PingCallable>,
@@ -61,38 +64,46 @@ impl Ping {
         };
 
         Ping {
-            config,
             protocol_heartbeat: [
                 // new
-                format!("/hopr/{}/heartbeat/{}", config.environment_id, config.normalized_version),
+                format!("/hopr/{}/heartbeat/{}", &config.environment_id, &config.normalized_version),
                 // deprecated
-                format!("/hopr/{}/heartbeat", config.environment_id)
+                format!("/hopr/{}/heartbeat", &config.environment_id)
             ],
+            config,
             external_api,
-            metric_time_to_heartbeat: SimpleHistogram::new(
-                "core_histogram_heartbeat_time_seconds",
-                "Measures total time it takes to probe all other nodes (in seconds)",
-                vec![0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0, 60.0, 90.0, 120.0, 300.0]
-            ).ok(),
-            metric_time_to_ping: SimpleHistogram::new(
-                "core_histogram_ping_time_seconds",
-                "Measures total time it takes to ping a single node (seconds)",
-                vec![0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0, 60.0, 90.0, 120.0, 300.0]
-            ).ok(),
-            metric_successful_ping_count: SimpleCounter::new(
-                "core_counter_heartbeat_successful_pings",
-                "Total number of successful pings"
-            ).ok(),
-            metric_failed_ping_count: SimpleCounter::new(
-                "core_counter_heartbeat_failed_pings",
-                "Total number of failed pings"
-            ).ok(),
+            metric_time_to_heartbeat: None,     // TODO: wasm alternative must be used here
+            metric_time_to_ping: None,          // TODO: wasm alternative must be used here
+            metric_successful_ping_count: None, // TODO: wasm alternative must be used here
+            metric_failed_ping_count: None,     // TODO: wasm alternative must be used here
+            // metric_time_to_heartbeat: SimpleHistogram::create_histogram_with_buckets(
+            //     "core_histogram_heartbeat_time_seconds",
+            //     "Measures total time it takes to probe all other nodes (in seconds)",
+            //     vec![0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0, 60.0, 90.0, 120.0, 300.0]
+            // ).ok(),
+            // metric_time_to_ping: SimpleHistogram::create_histogram_with_buckets(
+            //     "core_histogram_ping_time_seconds",
+            //     "Measures total time it takes to ping a single node (seconds)",
+            //     vec![0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0, 60.0, 90.0, 120.0, 300.0]
+            // ).ok(),
+            // metric_successful_ping_count: SimpleCounter::new(
+            //     "core_counter_heartbeat_successful_pings",
+            //     "Total number of successful pings"
+            // ).ok(),
+            // metric_failed_ping_count: SimpleCounter::new(
+            //     "core_counter_heartbeat_failed_pings",
+            //     "Total number of failed pings"
+            // ).ok(),
         }
     }
 
-    pub async fn ping_peers(&self, mut peers: Vec<PeerId>) {
+    pub async fn ping_peers<F>(&self, mut peers: Vec<PeerId>,
+                                 send_msg: &impl Fn(Box<[u8]>, String) -> F)
+    where
+        F: futures::Future<Output =  Result<Box<[u8]>, String>>
+    {
         if peers.is_empty() {
-            // TODO: log here
+            // debug!("Received an empty peer list");
             ()
         }
 
@@ -109,7 +120,7 @@ impl Ping {
         let start = current_timestamp();
         let mut futs = to_futures_unordered(
             peers.iter()
-                .map(|x| { self.ping_peer(x.clone(), self.config.timeout)})
+                .map(|x| { self.ping_peer(x.clone(), self.config.timeout, send_msg)})
                 .collect::<Vec<_>>()
         );
 
@@ -118,7 +129,7 @@ impl Ping {
             if let Some(v) = waiting.next() {
                 let remaining_time = current_timestamp() - start;
                 if (remaining_time as u128) < self.config.timeout.as_millis() {
-                    futs.push(self.ping_peer(v.clone(), Duration::from_millis(remaining_time)));
+                    futs.push(self.ping_peer(v.clone(), Duration::from_millis(remaining_time), send_msg));
                 }
             }
 
@@ -126,7 +137,11 @@ impl Ping {
         }
     }
 
-    async fn ping_peer(&self, destination: PeerId, timeout_duration: Duration) -> PingMeasurement {
+    async fn ping_peer<F>(&self, destination: PeerId, timeout_duration: Duration,
+                       send_msg: &impl Fn(Box<[u8]>, String) -> F) -> PingMeasurement
+    where
+        F: futures::Future<Output = Result<Box<[u8]>, String>>
+    {
         // TODO: log(format!("Pinging the peer '{}'", destination));
         use rand::{RngCore,SeedableRng};
         let mut challenge = Box::new([0u8; 16]);
@@ -143,8 +158,7 @@ impl Ping {
 
             let timeout = sleep(std::cmp::min(timeout_duration, self.config.timeout)).fuse();
             let ping = async {
-                let result = self.external_api.send_msg(destination.clone(), &self.protocol_heartbeat, challenge.clone(), true);
-                result
+                send_msg(challenge.clone(), destination.to_string()).await
             }.fuse();
 
             pin_mut!(timeout, ping);
@@ -171,7 +185,8 @@ impl Ping {
                 },
             };
 
-            // TODO: log(format!("The ping result for peer {} in {}", destination, ping_result));
+            // panic!("=====> Error: {:?}", ping_result);
+            // TODO: info!("The ping result for peer {} in {}", destination, ping_result);
 
             (
                 destination,
@@ -221,19 +236,181 @@ fn compare(a: &[u8], b: &[u8]) -> std::cmp::Ordering {
 }
 
 
+#[cfg(feature = "wasm")]
+pub mod wasm {
+    use super::*;
+    use std::str::FromStr;
+    use js_sys::JsString;
+    use wasm_bindgen::prelude::*;
+
+    #[wasm_bindgen]
+    extern "C" {
+        #[wasm_bindgen(catch)]
+        pub async fn send_ping_message(msg: Box<[u8]>, recipient: &str) -> Result<JsValue, JsValue>;
+    }
+
+    #[wasm_bindgen]
+    struct WasmPingApi {
+        _environment_id: String,
+        _version: String,
+        close_connection_cb: js_sys::Function,
+        on_finished_ping_cb: js_sys::Function,
+    }
+
+    impl PingCallable for WasmPingApi {
+        fn close_connection(&self, peer: &PeerId) {
+            let this = JsValue::null();
+            let peer = JsValue::from(peer.to_base58());
+            if let Err(_err) = self.close_connection_cb.call1(&this, &peer) {
+                // TODO: error!("Failed to perform on peer offline operation with: {}", err.as_string())
+            };
+        }
+
+        fn on_finished_ping(&self, peer: &PeerId, result: crate::types::Result) {
+            let this = JsValue::null();
+            let peer = JsValue::from(peer.to_base58());
+            let res = {
+                if let Ok(v) = result {
+                    JsValue::from(v)
+                } else {
+                    JsValue::undefined()
+                }
+            };
+            if let Err(_err) = self.on_finished_ping_cb.call2(&this, &peer, &res) {
+                // TODO: error!("Failed to perform on peer offline operation with: {}", err.as_string())
+            };
+        }
+    }
+
+    #[wasm_bindgen]
+    pub struct Pinger {
+        pinger: Ping,
+        send_msg_cb: js_sys::Function,
+    }
+
+    #[wasm_bindgen]
+    impl Pinger {
+        #[wasm_bindgen]
+        pub fn build(environment_id: String, version: String,
+                     close_connection_cb: js_sys::Function,
+                     on_finished_ping_cb: js_sys::Function,
+                     send_msg_cb: js_sys::Function) -> Self {
+            let api = Box::new(WasmPingApi {
+                _environment_id: environment_id.clone(),
+                _version: version.clone(),
+                close_connection_cb,
+                on_finished_ping_cb,
+            });
+
+            let config = PingConfig {
+                environment_id,
+                normalized_version: version,
+                max_parallel_pings: PINGS_MAX_PARALLEL,
+                timeout: Duration::from_secs(30)
+            };
+
+            Self {
+                pinger: Ping::new(config, api),
+                send_msg_cb
+            }
+        }
+
+        #[wasm_bindgen]
+        pub async fn ping(&self, mut peers: Vec<JsString>) {
+            let converted = peers.drain(..)
+                .map(|x| {
+                    let x: String = x.into();
+                    PeerId::from_str(&x).ok().unwrap()
+                })
+                .collect::<Vec<_>>();
+
+            let message_transport = |msg: Box<[u8]>, peer: String| -> std::pin::Pin<Box<dyn futures::Future<Output = Result<Box<[u8]>,String>>>> {
+                Box::pin(async move {
+                    let this = JsValue::null();
+                    let data: JsValue = js_sys::Uint8Array::from(msg.as_ref()).into();
+                    let peer: JsValue = JsString::from(peer.as_str()).into();
+
+                    match self.send_msg_cb.call2(&this, &data, &peer) {
+                        Ok(r) => {
+                            let promise = js_sys::Promise::from(r);
+                            let data =
+                                wasm_bindgen_futures::JsFuture::from(promise).await
+                                    .map(|x| js_sys::Uint8Array::new(&x).to_vec().into_boxed_slice())
+                                    .map_err(|x| JsString::try_from(&x)
+                                        .map_or("Failed to send ping message".to_owned(), |x| -> String { x.into() }));
+
+                            data
+                        },
+                        Err(e) => {
+                            // TODO: error!("The message transport could not be established: {}", e.as_str())
+                            Err(format!("Failed to extract transport error as string: {:?}", e))
+                        }
+                    }
+                })
+            };
+
+            self.pinger.ping_peers(converted, &message_transport).await;
+        }
+    }
+}
+
+#[cfg(test)]
+use tests::send_ping;
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use mockall::*;
     use more_asserts::*;
+    use std::str::FromStr;
 
     fn simple_ping_config() -> PingConfig {
         PingConfig {
             max_parallel_pings: 2,
-            environment_id: "test",
-            normalized_version: "1.0a",
+            environment_id: "test".to_owned(),
+            normalized_version: "1.0a".to_owned(),
             timeout: Duration::from_millis(150),
         }
+    }
+
+    const BAD_PEER: &'static str = "1Ank4EeHLAd3bwwtJma1WsXYSmiGgqmjkQoCUpevx67ix8";
+    const PEER_DELAYED_1_MS: &'static str = "1AcPsXRKVc3U64NBb4obUUT34jSLWtvAz2JMw192L92QKW";
+    const PEER_DELAYED_2_MS: &'static str = "1Ag7Agu1thSZFRGyoPWydqCiFS6tJFXLeukpVjCtwy1V8m";
+    const PEER_DELAYED_10_MS: &'static str = "1AduBfEp4KpymzNGzVAmsoF5RhHReRa8LfSjBoDwwWz96s";
+    const PEER_DELAYED_11_MS: &'static str = "1AWpJQyRSosNeKKZAGzA9VLue6qdC1yyUv594F6W8Jasjn";
+
+    // Testing override
+    pub async fn send_ping(msg: Box<[u8]>, peer: String) -> Result<Box<[u8]>, String> {
+        let mut reply = crate::heartbeat::generate_ping_response(msg);
+
+        match peer.as_str() {
+            BAD_PEER => {
+                // let's damage the reply bytes
+                for x in reply.iter_mut() {
+                    if *x < u8::MAX {
+                        *x = *x + 1;
+                    }
+                }
+            },
+            PEER_DELAYED_1_MS =>  std::thread::sleep(Duration::from_millis(1)),
+            PEER_DELAYED_2_MS =>  std::thread::sleep(Duration::from_millis(2)),
+            PEER_DELAYED_10_MS =>  std::thread::sleep(Duration::from_millis(10)),
+            PEER_DELAYED_11_MS =>  std::thread::sleep(Duration::from_millis(11)),
+            _ => ()
+        }
+
+        Ok(reply)
+    }
+
+    #[async_std::test]
+    async fn test_ping_peers_with_no_peers_should_not_do_any_api_calls() {
+        let mock = MockPingCallable::new();
+
+        let pinger = Ping::new(
+            simple_ping_config(),
+            Box::new(mock)
+        );
+        pinger.ping_peers(vec![], &send_ping).await;
     }
 
     #[async_std::test]
@@ -241,8 +418,6 @@ mod tests {
         let peer = PeerId::random();
 
         let mut mock = MockPingCallable::new();
-        mock.expect_send_msg()
-            .returning(|_,_,msg,_| Ok(crate::heartbeat::generate_ping_response(msg)));
         mock.expect_on_finished_ping()
             .with(predicate::eq(peer), predicate::function(|x: &crate::types::Result| x.is_ok()))
             .return_const(());
@@ -250,33 +425,26 @@ mod tests {
             .with(predicate::eq(peer))
             .return_const(());
 
-        let pinger = Ping::new(simple_ping_config(), Box::new(mock) );
-        pinger.ping_peers(vec![peer.clone()]).await;
+        let pinger = Ping::new(
+            simple_ping_config(),
+            Box::new(mock) );
+        pinger.ping_peers(vec![peer.clone()], &send_ping).await;
     }
 
     #[async_std::test]
     async fn test_ping_should_invoke_a_failed_ping_reply_for_an_incorrect_reply() {
-        let peer = PeerId::random();
+        let bad_peer = PeerId::from_str("1Ank4EeHLAd3bwwtJma1WsXYSmiGgqmjkQoCUpevx67ix8").ok().unwrap();
 
         let mut mock = MockPingCallable::new();
-        mock.expect_send_msg()
-            .returning(|_,_,msg,_| {
-                let mut reply = crate::heartbeat::generate_ping_response(msg);
-                // let's damage the reply bytes
-                for x in reply.iter_mut() {
-                    *x = *x + 1;
-                }
-                Ok(reply)
-            });
         mock.expect_on_finished_ping()
-            .with(predicate::eq(peer), predicate::function(|x: &crate::types::Result| x.is_err()))
+            .with(predicate::eq(bad_peer), predicate::function(|x: &crate::types::Result| x.is_err()))
             .return_const(());
         mock.expect_close_connection()
-            .with(predicate::eq(peer))
+            .with(predicate::eq(bad_peer))
             .return_const(());
 
         let pinger = Ping::new(simple_ping_config(), Box::new(mock) );
-        pinger.ping_peers(vec![peer.clone()]).await;
+        pinger.ping_peers(vec![bad_peer.clone()], &send_ping).await;
     }
 
     #[async_std::test]
@@ -286,8 +454,6 @@ mod tests {
         ping_config.timeout = Duration::from_millis(0);
 
         let mut mock = MockPingCallable::new();
-        mock.expect_send_msg()
-            .returning(move |_,_,msg,_| Ok(crate::heartbeat::generate_ping_response(msg)));
         mock.expect_on_finished_ping()
             .with(predicate::eq(peer), predicate::function(|x: &crate::types::Result| x.is_err()))
             .return_const(());
@@ -296,7 +462,7 @@ mod tests {
             .return_const(());
 
         let pinger = Ping::new(ping_config, Box::new(mock) );
-        pinger.ping_peers(vec![peer.clone()]).await;
+        pinger.ping_peers(vec![peer.clone()], &send_ping).await;
     }
 
     #[async_std::test]
@@ -304,24 +470,17 @@ mod tests {
         let mock = MockPingCallable::new();
         let pinger = Ping::new(simple_ping_config(), Box::new(mock) );
 
-        pinger.ping_peers(vec![]).await;
+        pinger.ping_peers(vec![], &send_ping).await;
     }
 
     #[async_std::test]
     async fn test_ping_peers_multiple_peers_are_pinged_in_parallel() {
-        let peers = vec![PeerId::random(), PeerId::random()];
+        let peers = vec![
+            PeerId::from_str(PEER_DELAYED_1_MS).ok().unwrap(),
+            PeerId::from_str(PEER_DELAYED_2_MS).ok().unwrap()
+        ];
 
         let mut mock = MockPingCallable::new();
-        mock.expect_send_msg()
-            .returning(move |_,_,msg,_| {
-                std::thread::sleep(Duration::from_millis(1));
-                Ok(crate::heartbeat::generate_ping_response(msg))
-            });
-        mock.expect_send_msg()
-            .returning(move |_,_,msg,_| {
-                std::thread::sleep(Duration::from_millis(2));
-                Ok(crate::heartbeat::generate_ping_response(msg))
-            });
         mock.expect_on_finished_ping()
             .with(predicate::eq(peers[0].clone()), predicate::function(|x: &crate::types::Result| x.is_ok()))
             .return_const(());
@@ -336,7 +495,7 @@ mod tests {
             .return_const(());
 
         let pinger = Ping::new(simple_ping_config(), Box::new(mock) );
-        pinger.ping_peers(peers).await;
+        pinger.ping_peers(peers, &send_ping).await;
     }
 
     #[async_std::test]
@@ -347,25 +506,18 @@ mod tests {
         let ping_delay_first = 10u64;
         let ping_delay_second = 10u64;
 
-        let peers = vec![PeerId::random(), PeerId::random()];
+        let peers = vec![
+            PeerId::from_str(PEER_DELAYED_10_MS).ok().unwrap(),
+            PeerId::from_str(PEER_DELAYED_11_MS).ok().unwrap()
+        ];
 
         let mut mock = MockPingCallable::new();
-        mock.expect_send_msg()
-            .returning(move |_,_,msg,_| {
-                std::thread::sleep(Duration::from_millis(ping_delay_first));
-                Ok(crate::heartbeat::generate_ping_response(msg))
-            });
         mock.expect_on_finished_ping()
             .with(predicate::eq(peers[0].clone()), predicate::function(|x: &crate::types::Result| x.is_ok()))
             .return_const(());
         mock.expect_close_connection()
             .with(predicate::eq(peers[0].clone()))
             .return_const(());
-        mock.expect_send_msg()
-            .returning(move |_,_,msg,_| {
-                std::thread::sleep(Duration::from_millis(ping_delay_second));
-                Ok(crate::heartbeat::generate_ping_response(msg))
-            });
         mock.expect_on_finished_ping()
             .with(predicate::eq(peers[1].clone()), predicate::function(|x: &crate::types::Result| x.is_ok()))
             .return_const(());
@@ -376,7 +528,7 @@ mod tests {
         let pinger = Ping::new(config, Box::new(mock) );
 
         let start = current_timestamp();
-        pinger.ping_peers(peers).await;
+        pinger.ping_peers(peers, &send_ping).await;
         let end = current_timestamp();
 
         assert_ge!(end - start, ping_delay_first + ping_delay_second)
@@ -388,14 +540,12 @@ mod tests {
         config.timeout = Duration::from_millis(1);
         config.max_parallel_pings = 1;
 
-        let peers = vec![PeerId::random(), PeerId::random()];
+        let peers = vec![
+            PeerId::from_str(PEER_DELAYED_10_MS).ok().unwrap(),
+            PeerId::from_str(PEER_DELAYED_11_MS).ok().unwrap()
+        ];
 
         let mut mock = MockPingCallable::new();
-        mock.expect_send_msg()
-            .returning(move |_,_,msg,_| {
-                std::thread::sleep(Duration::from_millis(10));
-                Ok(crate::heartbeat::generate_ping_response(msg))
-            });
         mock.expect_on_finished_ping()
             .with(predicate::eq(peers[0].clone()), predicate::function(|x: &crate::types::Result| x.is_ok()))
             .return_const(());
@@ -405,6 +555,6 @@ mod tests {
 
         let pinger = Ping::new(config, Box::new(mock) );
 
-        pinger.ping_peers(peers).await;
+        pinger.ping_peers(peers, &send_ping).await;
     }
 }

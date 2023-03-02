@@ -5,7 +5,32 @@ use std::time::Duration;
 use libp2p::PeerId;
 
 use utils_metrics::metrics::{MultiGauge, SimpleGauge};
-use utils_misc::time::current_timestamp;
+// use utils_misc::time::current_timestamp;
+
+
+// #[cfg(not(wasm))]
+// pub fn current_timestamp() -> u64 {
+//     panic!("This should not even be loaded");
+//     use std::time::{SystemTime, UNIX_EPOCH};
+//     match SystemTime::now().duration_since(UNIX_EPOCH) {
+//         Ok(d) => d.as_millis() as u64,
+//         Err(_) => 1,
+//     }
+// }
+
+
+// #[cfg(wasm)]
+pub fn current_timestamp() -> u64 {
+    (js_sys::Date::now() / 1000.0) as u64
+}
+
+
+// #[cfg(feature = "wasm")]
+// mod wasm {
+//     pub fn current_timestamp() -> u64 {
+//         (js_sys::Date::now() / 1000.0) as u64
+//     }
+// }
 
 
 /// Minimum delay will be multiplied by backoff, it will be half the actual minimum value
@@ -17,6 +42,7 @@ const MAX_BACKOFF: f64 = MAX_DELAY.as_millis() as f64 / MIN_DELAY.as_millis() as
 /// Default quality for unknown or offline nodes
 const BAD_QUALITY: f64 = 0.2;
 const IGNORE_TIMEFRAME: Duration = Duration::from_secs(600);    // 10 minutes
+
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -36,7 +62,7 @@ impl std::fmt::Display for PeerOrigin {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let description = match self {
             PeerOrigin::Initialization => "node initialization",
-            PeerOrigin::NetworkRegistry => "registered in network registry",
+            PeerOrigin::NetworkRegistry => "ed in network registry",
             PeerOrigin::IncomingConnection => "incoming connection",
             PeerOrigin::OutgoingConnection => "outgoing connection attempt",
             PeerOrigin::StrategyExistingChannel => "strategy monitors existing channel",
@@ -83,14 +109,14 @@ pub trait NetworkActionable {
 #[derive(Debug, Clone)]
 pub struct PeerStatus {
     id: PeerId,
-    origin: PeerOrigin,
-    is_public: bool,
-    last_seen: u64,     // timestamp
-    quality: f64,
-    heartbeats_sent: u64,
-    heartbeats_succeeded: u64,
-    backoff: f64,
-    ignored_at: Option<f32>,
+    pub origin: PeerOrigin,
+    pub is_public: bool,
+    pub last_seen: u64,     // timestamp
+    pub quality: f64,
+    pub heartbeats_sent: u64,
+    pub heartbeats_succeeded: u64,
+    pub backoff: f64,
+    pub ignored_at: Option<f32>,
 }
 
 impl PeerStatus {
@@ -125,10 +151,7 @@ impl std::fmt::Display for PeerStatus {
     }
 }
 
-// pub struct NetworkConfig {
-//     network_quality_threshold: f64,
-// }
-
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Network {
     me: PeerId,
     entries: HashMap<String, PeerStatus>,
@@ -171,28 +194,27 @@ impl Network {
             bad_quality_non_public: HashSet::new(),
             last_health: Health::UNKNOWN,
             network_actions_api,
-            metric_network_health: SimpleGauge::new(
-                "core_gauge_network_health", "Connectivity health indicator").ok(),
-            metric_peers_by_quality: MultiGauge::new(
-                "core_mgauge_peers_by_quality",
-                "Number different peer types by quality",
-                &["type", "quality"]
-            ).ok(),
-            metric_peer_count: SimpleGauge::new("core_gauge_num_peers", "Number of all peers").ok()
+            metric_network_health: None,        // TODO: wasm alternative must be used here
+            metric_peers_by_quality: None,      // TODO: wasm alternative must be used here
+            metric_peer_count: None             // TODO: wasm alternative must be used here
+            // metric_network_health: SimpleGauge::new(
+            //     "core_gauge_network_health", "Connectivity health indicator").ok(),
+            // metric_peers_by_quality: MultiGauge::new(
+            //     "core_mgauge_peers_by_quality",
+            //     "Number different peer types by quality",
+            //     &["type", "quality"]
+            // ).ok(),
+            // metric_peer_count: SimpleGauge::new("core_gauge_num_peers", "Number of all peers").ok()
         };
 
         instance
-    }
-
-    pub fn length(&self) -> usize {
-        self.entries.len()
     }
 
     pub fn has(&self, peer: &PeerId) -> bool {
         self.entries.contains_key(peer.to_string().as_str())
     }
 
-    pub fn register(&mut self, peer: &PeerId, origin: PeerOrigin) {
+    pub fn add(&mut self, peer: &PeerId, origin: PeerOrigin) {
         let id = peer.to_string();
         let now = current_timestamp();
 
@@ -219,13 +241,13 @@ impl Network {
                 self.refresh_network_status(&entry);
 
                 if let Some(_x) = self.entries.insert(peer.to_string(), entry) {
-                    // warn!(format!("Evicting an existing record for {}, this should not happen!", &x))
+                    // warn!("Evicting an existing record for {}, this should not happen!", &x);
                 }
             }
         }
     }
 
-    pub fn unregister(&mut self, peer: &PeerId) {
+    pub fn remove(&mut self, peer: &PeerId) {
         self.prune_from_network_status(&peer);
         self.entries.remove(peer.to_string().as_str());
         // TODO: remove from ignored and excluded as well?
@@ -234,7 +256,7 @@ impl Network {
     pub fn update(&mut self, peer: &PeerId, ping_result: crate::types::Result) {
         if let Some(existing) = self.entries.get(peer.to_string().as_str()) {
             let mut entry = existing.clone();
-            entry.last_seen = current_timestamp();
+            entry.last_seen = if ping_result.is_err() {current_timestamp()} else {ping_result.ok().unwrap()} ;
             entry.heartbeats_sent = entry.heartbeats_sent + 1;
             // entry.is_public = self.network_actions_api.is_public(&peer);    // TODO: Reconsider whether this is necessary
 
@@ -329,36 +351,25 @@ impl Network {
         self.bad_quality_non_public.remove(&peer);
     }
 
-    // /// Returns the quality of the node
-    // ///
-    // /// # Arguments
-    // ///  id: The desired PeerId
-    // ///
-    // /// # Returns
-    // /// A float value from the range <0,1>, where:
-    // /// - 0.0 => completely unreliable / offline or unknown
-    // /// - 1.0 => completely reliable / online
-    // fn quality_of(&self, id: &PeerId) -> f64 {
-    //     return match self.entries.get(id.to_string().as_str()) {
-    //         Some(entry) => if entry.heartbeats_sent > 0 {entry.quality} else {BAD_QUALITY},
-    //         None => 0.0,
-    //     }
-    // }
-
-    pub fn get_peer_status(&self, id: &PeerId) -> Option<PeerStatus> {
-        return match self.entries.get(id.to_string().as_str()) {
+    pub fn get_peer_status(&self, peer: &PeerId) -> Option<PeerStatus> {
+        return match self.entries.get(peer.to_string().as_str()) {
             Some(entry) => Some(entry.clone()),
             None => None
         }
     }
 
+    pub fn filter<F>(&self, f: F) -> Vec<PeerId>
+    where
+        F: FnMut(&&PeerStatus) -> bool
+    {
+        self.entries.values()
+            .filter(f)
+            .map(|x| { x.id.clone() })
+            .collect::<Vec<_>>()
+    }
+
     pub fn find_peers_to_ping(&self, threshold: u64) -> Vec<PeerId> {
-        let mut data: Vec<PeerId> = Vec::new();
-        for v in self.entries.values() {
-            if v.next_ping() < threshold {
-                data.push(v.id);
-            }
-        }
+        let mut data: Vec<PeerId> = self.filter(|v| { v.next_ping() < threshold } );
         data.sort_by(|a, b| {
             if self.entries.get(a.to_string().as_str()).unwrap().last_seen < self.entries.get(b.to_string().as_str()).unwrap().last_seen {
                 std::cmp::Ordering::Less
@@ -369,14 +380,23 @@ impl Network {
 
         data
     }
+}
 
-
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+impl Network {
+    /// Total count of the peers observed withing the network
+    #[wasm_bindgen]
+    pub fn length(&self) -> usize {
+        self.entries.len()
+    }
 
     /// Returns the quality of the network as a network health indicator.
+    #[wasm_bindgen]
     pub fn health(&self) -> Health {
         self.last_health
     }
 
+    #[wasm_bindgen]
     pub fn debug_output(&self) -> String {
         let mut output = "".to_string();
 
@@ -388,24 +408,182 @@ impl Network {
     }
 }
 
+#[cfg(feature = "wasm")]
+pub mod wasm {
+    use super::*;
+    use std::str::FromStr;
+    use js_sys::{JsString};
+    use wasm_bindgen::prelude::*;
+
+    #[wasm_bindgen]
+    impl PeerStatus {
+        #[wasm_bindgen]
+        pub fn peer_id(&self) -> String {
+            self.id.to_base58()
+        }
+    }
+
+    #[wasm_bindgen]
+    impl PeerStatus {
+        #[wasm_bindgen]
+        pub fn build(peer: JsString,
+                     origin: PeerOrigin, is_public: bool, last_seen: u64,
+                     quality: f64, heartbeats_sent: u64, heartbeats_succeeded: u64,
+                     backoff: f64) -> Self {
+            let peer = PeerId::from_str(peer.as_string().unwrap().as_ref()).ok().unwrap();
+            Self {
+                id: peer,
+                origin,
+                is_public,
+                last_seen,
+                quality,
+                heartbeats_sent,
+                heartbeats_succeeded,
+                backoff,
+                ignored_at: None
+            }
+        }
+    }
+
+
+    #[wasm_bindgen]
+    struct WasmNetworkApi {
+        on_peer_offline_cb: js_sys::Function,
+        on_network_health_change_cb: js_sys::Function,
+        is_public_cb: js_sys::Function,
+    }
+
+    impl NetworkActionable for WasmNetworkApi {
+        fn is_public(&self, peer: &PeerId) -> bool {
+            let this = JsValue::null();
+            let peer = JsValue::from(peer.to_base58());
+            match self.is_public_cb.call1(&this, &peer) {
+                Ok(v) => v.as_bool().unwrap(),
+                _ => {
+                    // TODO: warn!("Encountered error when trying to find out whether {} is public", peer);
+                    false
+                }
+            }
+        }
+
+        fn on_peer_offline(&self, peer: &PeerId) {
+            let this = JsValue::null();
+            let peer = JsValue::from(peer.to_base58());
+            if let Err(_err) = self.on_peer_offline_cb.call1(&this, &peer) {
+                // TODO: error!("Failed to perform on peer offline operation with: {}", err.as_string())
+            };
+        }
+
+        fn on_network_health_change(&self, old: Health, new: Health) {
+            let this = JsValue::null();
+            let old = JsValue::from(old as i32);
+            let new = JsValue::from(new as i32);
+            if let Err(_err) = self.on_network_health_change_cb.call2(&this, &old, &new) {
+                // TODO: error!("Failed to perform on network health change operation with: {}", err.as_string())
+            };
+        }
+    }
+
+    #[wasm_bindgen]
+    impl Network {
+        #[wasm_bindgen]
+        pub fn build(me: JsString, quality_threshold: f64,
+                     on_peer_offline: js_sys::Function,
+                     on_network_health_change: js_sys::Function,
+                     is_public: js_sys::Function) -> Self {
+            let me: String = me.into();
+            let api = Box::new(WasmNetworkApi{
+                on_peer_offline_cb: on_peer_offline,
+                on_network_health_change_cb: on_network_health_change,
+                is_public_cb: is_public,
+            });
+
+            Self::new(
+                PeerId::from_str(&me).ok().unwrap(),
+                quality_threshold,
+                api
+            )
+        }
+
+        #[wasm_bindgen]
+        pub fn peers_to_ping(&self, threshold: u64) -> Vec<JsString> {
+            self.find_peers_to_ping(threshold)
+                .iter()
+                .map(|x| { x.to_base58().into() })
+                .collect::<Vec<JsString>>()
+        }
+
+        #[wasm_bindgen]
+        pub fn contains(&self, peer: JsString) -> bool {
+            let peer: String = peer.into();
+            self.has(&PeerId::from_str(&peer).ok().unwrap())
+        }
+
+        #[wasm_bindgen]
+        pub fn register(&mut self, peer: JsString, origin: PeerOrigin) {
+            let peer: String = peer.into();
+            self.add(&PeerId::from_str(&peer).ok().unwrap(), origin)
+        }
+
+        #[wasm_bindgen]
+        pub fn unregister(&mut self, peer: JsString) {
+            let peer: String = peer.into();
+            self.remove(&PeerId::from_str(&peer).ok().unwrap())
+        }
+
+        #[wasm_bindgen]
+        pub fn refresh(&mut self, peer: JsString, timestamp: &JsValue) {
+            let peer: String = peer.into();
+            let result: crate::types::Result = if timestamp.is_undefined() {
+                Err(()) } else {
+                let ts = timestamp.as_f64().unwrap_or(0f64) as u64;
+                if ts > 1 {Ok(ts)} else {Err(())}
+                };
+            self.update(&PeerId::from_str(&peer).ok().unwrap(), result)
+        }
+
+        #[wasm_bindgen]
+        pub fn quality_of(&self, peer: JsString) -> f64 {
+            let peer: String = peer.into();
+            match self.get_peer_status(&PeerId::from_str(&peer).ok().unwrap()) {
+                Some(v) => v.quality,
+                _ => 0.0
+            }
+        }
+
+        #[wasm_bindgen]
+        pub fn all(&self)  -> Vec<JsString> {
+            self.filter(|_| true)
+                .iter()
+                .map(|x| { x.to_base58().into() })
+                .collect::<Vec<JsString>>()
+        }
+
+        #[wasm_bindgen]
+        pub fn get_peer_info(&self, peer: JsString) -> Option<PeerStatus> {
+            let peer: String = peer.into();
+            self.get_peer_status(&PeerId::from_str(&peer).ok().unwrap())
+        }
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use mockall::*;
 
     struct DummyNetworkAction {}
     
     impl NetworkActionable for DummyNetworkAction {
-        fn is_public(&self, peer: &PeerId) -> bool {
+        fn is_public(&self, _: &PeerId) -> bool {
             false
         }
 
-        fn on_network_health_change(&self, old: Health, new: Health) {
+        fn on_network_health_change(&self, _: Health, _: Health) {
             ()
         }
 
-        fn on_peer_offline(&self, peer: &PeerId) {
+        fn on_peer_offline(&self, _: &PeerId) {
             ()
         }
     }
@@ -440,7 +618,7 @@ mod tests {
 
         let mut peers = basic_network(&me);
 
-        peers.register(&me, PeerOrigin::IncomingConnection);
+        peers.add(&me, PeerOrigin::IncomingConnection);
 
         assert_eq!(0, peers.length());
         assert!(! peers.has(&me))
@@ -452,7 +630,7 @@ mod tests {
 
         let mut peers = basic_network(&PeerId::random());
 
-        peers.register(&expected, PeerOrigin::IncomingConnection);
+        peers.add(&expected, PeerOrigin::IncomingConnection);
 
         assert_eq!(1, peers.length());
         assert!(peers.has(&expected))
@@ -464,9 +642,9 @@ mod tests {
 
         let mut peers = basic_network(&PeerId::random());
 
-        peers.register(&peer, PeerOrigin::IncomingConnection);
+        peers.add(&peer, PeerOrigin::IncomingConnection);
 
-        peers.unregister(&peer);
+        peers.remove(&peer);
 
         assert_eq!(0, peers.length());
         assert!(! peers.has(&peer))
@@ -490,7 +668,7 @@ mod tests {
 
         let mut peers = basic_network(&PeerId::random());
 
-        peers.register(&peer, PeerOrigin::IncomingConnection);
+        peers.add(&peer, PeerOrigin::IncomingConnection);
 
         let ts = current_timestamp();
 
@@ -508,7 +686,7 @@ mod tests {
         let peer = PeerId::random();
         let mut peers = basic_network(&PeerId::random());
 
-        peers.register(&peer, PeerOrigin::IncomingConnection);
+        peers.add(&peer, PeerOrigin::IncomingConnection);
 
         peers.update(&peer, Err(()));
 
@@ -525,8 +703,8 @@ mod tests {
         let second = PeerId::random();
         let mut peers = basic_network(&PeerId::random());
 
-        peers.register(&first, PeerOrigin::IncomingConnection);
-        peers.register(&second, PeerOrigin::IncomingConnection);
+        peers.add(&first, PeerOrigin::IncomingConnection);
+        peers.add(&second, PeerOrigin::IncomingConnection);
 
         let ts = utils_misc::time::current_timestamp();
 
@@ -544,7 +722,7 @@ mod tests {
 
     #[test]
     fn test_network_should_have_no_knowledge_about_health_without_any_registered_peers() {
-        let mut peers = basic_network(&PeerId::random());
+        let peers = basic_network(&PeerId::random());
 
         assert_eq!(peers.health(), Health::UNKNOWN);
     }
@@ -555,7 +733,7 @@ mod tests {
 
         let mut peers = basic_network(&PeerId::random());
 
-        peers.register(&peer, PeerOrigin::IncomingConnection);
+        peers.add(&peer, PeerOrigin::IncomingConnection);
 
         assert_eq!(peers.health(), Health::RED);
     }
@@ -566,9 +744,9 @@ mod tests {
 
         let mut peers = basic_network(&PeerId::random());
 
-        peers.register(&peer, PeerOrigin::IncomingConnection);
+        peers.add(&peer, PeerOrigin::IncomingConnection);
         let _ = peers.health();
-        peers.unregister(&peer);
+        peers.remove(&peer);
 
         assert_eq!(peers.health(), Health::RED);
     }
@@ -591,7 +769,7 @@ mod tests {
             Box::new(mock),
         );
 
-        peers.register(&peer, PeerOrigin::IncomingConnection);
+        peers.add(&peer, PeerOrigin::IncomingConnection);
 
         assert_eq!(peers.health(), Health::RED);
     }
@@ -614,7 +792,7 @@ mod tests {
             Box::new(mock)
         );
 
-        peers.register(&peer, PeerOrigin::IncomingConnection);
+        peers.add(&peer, PeerOrigin::IncomingConnection);
 
         peers.update(&peer, Ok(current_timestamp()));
 
@@ -640,7 +818,7 @@ mod tests {
             Box::new(mock)
         );
 
-        peers.register(&peer, PeerOrigin::IncomingConnection);
+        peers.add(&peer, PeerOrigin::IncomingConnection);
 
         for _ in 0..3 {
             peers.update(&peer, Ok(current_timestamp()));
@@ -669,8 +847,8 @@ mod tests {
             Box::new(mock)
         );
 
-        peers.register(&peer, PeerOrigin::IncomingConnection);
-        peers.register(&peer2, PeerOrigin::IncomingConnection);
+        peers.add(&peer, PeerOrigin::IncomingConnection);
+        peers.add(&peer2, PeerOrigin::IncomingConnection);
 
         for _ in 0..3 {
             peers.update(&peer2, Ok(current_timestamp()));

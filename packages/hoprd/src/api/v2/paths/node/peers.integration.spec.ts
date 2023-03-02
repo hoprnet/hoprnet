@@ -13,68 +13,74 @@ import {
 import { STATUS_CODES } from '../../utils.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import type Hopr from '@hoprnet/hopr-core'
-import { NetworkPeersOrigin } from '@hoprnet/hopr-core'
+import { PeerOrigin, PeerStatus } from '@hoprnet/hopr-core'
 
-const ALICE_ENTRY = {
-  id: ALICE_PEER_ID,
-  heartbeatsSent: 10,
-  heartbeatsSuccess: 10,
-  lastSeen: 1646410980793,
-  backoff: 0,
-  quality: 1,
-  origin: NetworkPeersOrigin.TESTING
-}
+const ALICE_ENTRY = PeerStatus.build(
+  ALICE_PEER_ID.toString(),
+  PeerOrigin.Initialization,
+  false,
+  BigInt(1646410980793),
+  1.0,
+  BigInt(10),
+  BigInt(10),
+  0
+)
+
 const ALICE_PEER_INFO = {
   peerId: ALICE_PEER_ID.toString(),
   multiAddr: ALICE_MULTI_ADDR.toString(),
   heartbeats: {
-    sent: ALICE_ENTRY.heartbeatsSent,
-    success: ALICE_ENTRY.heartbeatsSuccess
+    sent: ALICE_ENTRY.heartbeats_sent,
+    success: ALICE_ENTRY.heartbeats_succeeded
   },
-  lastSeen: ALICE_ENTRY.lastSeen,
+  lastSeen: ALICE_ENTRY.last_seen,
   quality: ALICE_ENTRY.quality,
   backoff: ALICE_ENTRY.backoff,
   isNew: false
 }
 
-const BOB_ENTRY = {
-  id: BOB_PEER_ID,
-  heartbeatsSent: 0,
-  heartbeatsSuccess: 0,
-  lastSeen: 1646410680793,
-  backoff: 0,
-  quality: 0.2,
-  origin: NetworkPeersOrigin.TESTING
-}
+const BOB_ENTRY = PeerStatus.build(
+  BOB_PEER_ID.toString(),
+  PeerOrigin.Initialization,
+  false,
+  BigInt(1646410680793),
+  0.2,
+  BigInt(0),
+  BigInt(0),
+  0
+)
+
 const BOB_PEER_INFO = {
   peerId: BOB_PEER_ID.toString(),
   multiAddr: BOB_MULTI_ADDR.toString(),
   heartbeats: {
-    sent: BOB_ENTRY.heartbeatsSent,
-    success: BOB_ENTRY.heartbeatsSuccess
+    sent: BOB_ENTRY.heartbeats_sent,
+    success: BOB_ENTRY.heartbeats_succeeded
   },
-  lastSeen: BOB_ENTRY.lastSeen,
+  lastSeen: BOB_ENTRY.last_seen,
   quality: BOB_ENTRY.quality,
   backoff: BOB_ENTRY.backoff,
   isNew: true
 }
 
-const CHARLIE_ENTRY = {
-  id: CHARLIE_PEER_ID,
-  heartbeatsSent: 10,
-  heartbeatsSuccess: 8,
-  lastSeen: 1646410980993,
-  backoff: 0,
-  quality: 0.8,
-  origin: NetworkPeersOrigin.TESTING
-}
+const CHARLIE_ENTRY = PeerStatus.build(
+  CHARLIE_PEER_ID.toString(),
+  PeerOrigin.Initialization,
+  false,
+  BigInt(1646410980993),
+  0.8,
+  BigInt(10),
+  BigInt(8),
+  0
+)
+
 const CHARLIE_PEER_INFO = {
   peerId: CHARLIE_PEER_ID.toString(),
   heartbeats: {
-    sent: CHARLIE_ENTRY.heartbeatsSent,
-    success: CHARLIE_ENTRY.heartbeatsSuccess
+    sent: CHARLIE_ENTRY.heartbeats_sent,
+    success: CHARLIE_ENTRY.heartbeats_succeeded
   },
-  lastSeen: CHARLIE_ENTRY.lastSeen,
+  lastSeen: CHARLIE_ENTRY.last_seen,
   quality: CHARLIE_ENTRY.quality,
   backoff: CHARLIE_ENTRY.backoff,
   isNew: false
