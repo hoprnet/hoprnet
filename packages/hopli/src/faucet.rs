@@ -3,6 +3,7 @@ use crate::password::PasswordArgs;
 use crate::process::{child_process_call_foundry_faucet, set_process_path_env};
 use clap::Parser;
 use ethers::types::Address;
+use std::env;
 
 use crate::utils::{Cmd, HelperErrors};
 
@@ -59,14 +60,6 @@ pub struct FaucetArgs {
     contracts_root: Option<String>,
 
     #[clap(
-        help = "Private key of the caller address, e.g. 0xabc",
-        long,
-        short = 'k',
-        default_value = None
-    )]
-    private_key: String,
-
-    #[clap(
         help = "Hopr amount in ether, e.g. 10",
         long,
         short = 't',
@@ -85,6 +78,7 @@ pub struct FaucetArgs {
 
 impl FaucetArgs {
     /// Execute the command with given parameters
+    /// `PRIVATE_KEY` env variable is required to send on-chain transactions
     fn execute_faucet(self) -> Result<(), HelperErrors> {
         let FaucetArgs {
             environment_name,
@@ -95,7 +89,6 @@ impl FaucetArgs {
             identity_directory,
             identity_prefix,
             contracts_root,
-            private_key,
             hopr_amount,
             native_amount,
         } = self;
@@ -105,6 +98,11 @@ impl FaucetArgs {
             Ok(read_pwd) => read_pwd,
             Err(e) => return Err(e),
         };
+
+        // `PRIVATE_KEY` - Private key is required to send on-chain transactions
+        if let Err(_) = env::var("PRIVATE_KEY") {
+            return Err(HelperErrors::UnableToReadPrivateKey);
+        }
 
         // Include provided address
         let mut addresses_all = Vec::new();
@@ -132,15 +130,9 @@ impl FaucetArgs {
 
         println!("All the addresses: {:?}", addresses_all);
 
-        // TODO: by default, use faucet to fund both native tokens and HOPR tokens
-
         // set directory and environment variables
-        if let Err(e) = set_process_path_env(
-            &contracts_root,
-            &private_key,
-            &environment_type,
-            &environment_name,
-        ) {
+        if let Err(e) = set_process_path_env(&contracts_root, &environment_type, &environment_name)
+        {
             return Err(e);
         }
 

@@ -38,7 +38,6 @@ impl PasswordArgs {
             None => {
                 // read password from environment variable
                 if let Ok(pwd_from_env) = env::var("IDENTITY_PASSWORD") {
-                    println!("pwd_from_env:\n{pwd_from_env}");
                     return Ok(pwd_from_env);
                 } else {
                     return Err(HelperErrors::UnableToReadPassword);

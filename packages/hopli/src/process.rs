@@ -26,12 +26,10 @@ pub fn build_path(environment_name: &str, environment_type: &str) -> String {
 /// # Arguments
 ///
 /// * `contracts_root` - Directory to the foundry project
-/// * `private_key` - Private key to send on-chain transactions
 /// * `foundry_profile` - Value of FOUNDRY_PROFILE variable
 /// * `environment_name` - Name of the environment that nodes run in
 pub fn set_process_path_env(
     contracts_root: &Option<String>,
-    private_key: &String,
     foundry_profile: &String,
     environment_name: &String,
 ) -> Result<(), HelperErrors> {
@@ -48,7 +46,6 @@ pub fn set_process_path_env(
     }
 
     // use cmd to call process
-    env::set_var("PRIVATE_KEY", private_key);
     env::set_var("FOUNDRY_PROFILE", foundry_profile);
     env::set_var("ENVIRONMENT_NAME", environment_name);
     Ok(())

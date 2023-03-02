@@ -25,13 +25,12 @@ cargo run -- identity --action create --directory "./test" --name node_ --number
 Fund nodes with password as env variable. Alternatively, a path to the password file can be provided with `--password-path`, e.g. `--password-path ./.pwd`
 
 ```
-export PRIVATE_KEY=<bank_private_key>
-export IDENTITY_PASSWORD=local
-cargo run -- faucet --environment-name anvil-localhost \
+PRIVATE_KEY=<bank_private_key> \
+IDENTITY_PASSWORD=local \
+    cargo run -- faucet --environment-name anvil-localhost \
     --environment-type development \
     --use-local-identities --identity-directory "/tmp" \
     --address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1 \
-    --private-key $PRIVATE_KEY \
     --contracts-root "../ethereum/contracts"  \
     --hopr-amount 10 --native-amount 1
 ```
@@ -39,11 +38,10 @@ cargo run -- faucet --environment-name anvil-localhost \
 Register some peer ids in the network registry contract
 
 ```
-export PRIVATE_KEY=<bank_private_key>
-cargo run -- network-registry --environment-name anvil-localhost \
+PRIVATE_KEY=<bank_private_key> \
+    cargo run -- network-registry --environment-name anvil-localhost \
     --environment-type development \
     --peer-ids 16Uiu2HAmC9CRFeuF2cTf6955ECFmgDw6d27jLows7bftMqat5Woz,16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12 \
-    --private-key $PRIVATE_KEY \
     --contracts-root "../ethereum/contracts"
 ```
 
@@ -63,8 +61,8 @@ cargo install --path .
 To create some identities with password as env variable. Alternatively, a path to the password file can be provided with `--password-path`, e.g. `--password-path ./.pwd`
 
 ```
-IDENTITY_PASSWORD=local
-hopli identity \
+IDENTITY_PASSWORD=local \
+    hopli identity \
     --action create \
     --directory "./test" \
     --name node_ \
@@ -74,12 +72,12 @@ hopli identity \
 To fund nodes with password from env variable `IDENTITY_PASSWORD`. Alternatively, a path to the password file can be provided with `--password-path`, e.g. `--password-path ./.pwd`
 
 ```
-IDENTITY_PASSWORD=local
+IDENTITY_PASSWORD=local \
+PRIVATE_KEY=<bank_private_key> \
 hopli faucet \
     --environment-name anvil-localhost --environment-type development \
     --use-local-identities --identity-directory "/tmp" \
     --address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1 \
-    --private-key <bank_private_key> \
     --contracts-root "../ethereum/contracts" \
     --hopr-amount 10 --native-amount 1
 ```
@@ -89,10 +87,10 @@ Note that only identity files ending with `.id` are recognized by the CLI
 To register nodes
 
 ```
+export PRIVATE_KEY=<bank_private_key> \
 hopli network-registry \
     --environment-name anvil-localhost \
     --environment-type development \
     --peer-ids 16Uiu2HAmC9CRFeuF2cTf6955ECFmgDw6d27jLows7bftMqat5Woz,16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12 \
-    --private-key <bank_private_key> \
     --contracts-root "../ethereum/contracts"
 ```

@@ -14,6 +14,7 @@ pub enum HelperErrors {
     UnableToSetFoundryRoot,
     ErrorInRunningFoundry,
     UnableToReadPassword,
+    UnableToReadPrivateKey,
 }
 
 impl From<SystemTimeError> for HelperErrors {

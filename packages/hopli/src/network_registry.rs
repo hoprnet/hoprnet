@@ -1,5 +1,6 @@
 use crate::process::{child_process_call_foundry_self_register, set_process_path_env};
 use clap::Parser;
+use std::env;
 
 use crate::utils::{Cmd, HelperErrors};
 
@@ -27,34 +28,27 @@ pub struct NetworkRegistryArgs {
         default_value = None
     )]
     contracts_root: Option<String>,
-
-    #[clap(
-        help = "Private key of the caller address, e.g. 0xabc",
-        long,
-        short = 'k',
-        default_value = None
-    )]
-    private_key: String,
 }
 
 impl NetworkRegistryArgs {
     /// Node self register with given parameters
+    /// `PRIVATE_KEY` env variable is required to send on-chain transactions
     fn execute_self_register(self) -> Result<(), HelperErrors> {
         let NetworkRegistryArgs {
             environment_name,
             environment_type,
             peer_ids,
             contracts_root,
-            private_key,
         } = self;
 
+        // `PRIVATE_KEY` - Private key is required to send on-chain transactions
+        if let Err(_) = env::var("PRIVATE_KEY") {
+            return Err(HelperErrors::UnableToReadPrivateKey);
+        }
+
         // set directory and environment variables
-        if let Err(e) = set_process_path_env(
-            &contracts_root,
-            &private_key,
-            &environment_type,
-            &environment_name,
-        ) {
+        if let Err(e) = set_process_path_env(&contracts_root, &environment_type, &environment_name)
+        {
             return Err(e);
         }
 

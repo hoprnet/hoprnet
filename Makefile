@@ -248,18 +248,18 @@ run-local: ## run HOPRd from local repo
 .PHONY: fund-local
 fund-local: id_dir=.
 fund-local: ## use faucet script to fund local identities
-	IDENTITY_PASSWORD=local hopli faucet \
+	IDENTITY_PASSWORD=local PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+		hopli faucet \
 		--environment-name anvil-localhost --environment-type development \
 		--use-local-identities --identity-directory "${id_dir}" \
-		--private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
 		--contracts-root "./packages/ethereum/contracts"
 
 .PHONY: fund-local-all
 fund-local-all: ## use faucet script to fund all the local identities
-	IDENTITY_PASSWORD=local hopli faucet \
+	IDENTITY_PASSWORD=local PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+		hopli faucet \
 		--environment-name anvil-localhost --environment-type development \
 		--use-local-identities --identity-directory "/tmp/" \
-		--private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
 		--contracts-root "./packages/ethereum/contracts"
 
 .PHONY: docker-build-local
