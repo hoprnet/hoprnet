@@ -4,9 +4,9 @@ use std::env;
 
 use crate::utils::{Cmd, HelperErrors};
 
-/// CLI arguments for `hopli network-registry`
+/// CLI arguments for `hopli register-in-network-registry`
 #[derive(Parser, Default, Debug)]
-pub struct NetworkRegistryArgs {
+pub struct RegisterInNetworkRegistryArgs {
     #[clap(help = "Environment name. E.g. monte_rosa", long)]
     environment_name: String,
 
@@ -27,11 +27,11 @@ pub struct NetworkRegistryArgs {
     contracts_root: Option<String>,
 }
 
-impl NetworkRegistryArgs {
+impl RegisterInNetworkRegistryArgs {
     /// Node self register with given parameters
     /// `PRIVATE_KEY` env variable is required to send on-chain transactions
     fn execute_self_register(self) -> Result<(), HelperErrors> {
-        let NetworkRegistryArgs {
+        let RegisterInNetworkRegistryArgs {
             environment_name,
             peer_ids,
             contracts_root,
@@ -52,7 +52,7 @@ impl NetworkRegistryArgs {
     }
 }
 
-impl Cmd for NetworkRegistryArgs {
+impl Cmd for RegisterInNetworkRegistryArgs {
     /// Run the execute_self_register function
     fn run(self) -> Result<(), HelperErrors> {
         self.execute_self_register()

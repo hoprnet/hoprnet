@@ -1,6 +1,6 @@
 use crate::faucet::FaucetArgs;
 use crate::identity::IdentityArgs;
-use crate::network_registry::NetworkRegistryArgs;
+use crate::network_registry::RegisterInNetworkRegistryArgs;
 use crate::utils::{Cmd, HelperErrors};
 use clap::{Parser, Subcommand};
 // use ethers::types::Address;
@@ -35,7 +35,7 @@ enum Commands {
     )]
     Faucet(FaucetArgs),
     #[clap(about = "Registry some nodes peer ids to the network registery contract")]
-    NetworkRegistry(NetworkRegistryArgs),
+    RegisterInNetworkRegistry(RegisterInNetworkRegistryArgs),
 }
 
 fn main() -> Result<(), HelperErrors> {
@@ -48,7 +48,7 @@ fn main() -> Result<(), HelperErrors> {
         Commands::Faucet(opt) => {
             opt.run()?;
         }
-        Commands::NetworkRegistry(opt) => {
+        Commands::RegisterInNetworkRegistry(opt) => {
             opt.run()?;
         }
     }
