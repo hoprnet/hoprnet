@@ -21,7 +21,7 @@ pub struct NetworkRegistryArgs {
     peer_ids: String,
 
     #[clap(
-        help = "Specify path pointing to the foundry root",
+        help = "Specify path pointing to the contracts root",
         long,
         short,
         default_value = None

@@ -55,7 +55,7 @@ pub struct FaucetArgs {
     identity_prefix: Option<String>,
 
     #[clap(
-        help = "Specify path pointing to the foundry root",
+        help = "Specify path pointing to the contracts root",
         long,
         short,
         default_value = None
