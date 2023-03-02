@@ -28,7 +28,6 @@ Fund nodes with password as env variable. Alternatively, a path to the password 
 PRIVATE_KEY=<bank_private_key> \
 IDENTITY_PASSWORD=local \
     cargo run -- faucet --environment-name anvil-localhost \
-    --environment-type development \
     --use-local-identities --identity-directory "/tmp" \
     --address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1 \
     --contracts-root "../ethereum/contracts"  \
@@ -40,7 +39,6 @@ Register some peer ids in the network registry contract
 ```
 PRIVATE_KEY=<bank_private_key> \
     cargo run -- network-registry --environment-name anvil-localhost \
-    --environment-type development \
     --peer-ids 16Uiu2HAmC9CRFeuF2cTf6955ECFmgDw6d27jLows7bftMqat5Woz,16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12 \
     --contracts-root "../ethereum/contracts"
 ```
@@ -75,7 +73,7 @@ To fund nodes with password from env variable `IDENTITY_PASSWORD`. Alternatively
 IDENTITY_PASSWORD=local \
 PRIVATE_KEY=<bank_private_key> \
 hopli faucet \
-    --environment-name anvil-localhost --environment-type development \
+    --environment-name anvil-localhost \
     --use-local-identities --identity-directory "/tmp" \
     --address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1 \
     --contracts-root "../ethereum/contracts" \
@@ -90,7 +88,6 @@ To register nodes
 export PRIVATE_KEY=<bank_private_key> \
 hopli network-registry \
     --environment-name anvil-localhost \
-    --environment-type development \
     --peer-ids 16Uiu2HAmC9CRFeuF2cTf6955ECFmgDw6d27jLows7bftMqat5Woz,16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12 \
     --contracts-root "../ethereum/contracts"
 ```

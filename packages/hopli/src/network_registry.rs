@@ -10,9 +10,6 @@ pub struct NetworkRegistryArgs {
     #[clap(help = "Environment name. E.g. monte_rosa", long)]
     environment_name: String,
 
-    #[clap(help = "Environment type. E.g. production", long, short)]
-    environment_type: String,
-
     #[clap(
         help = "Comma sperated node peer ids",
         long,
@@ -36,7 +33,6 @@ impl NetworkRegistryArgs {
     fn execute_self_register(self) -> Result<(), HelperErrors> {
         let NetworkRegistryArgs {
             environment_name,
-            environment_type,
             peer_ids,
             contracts_root,
         } = self;
@@ -47,13 +43,12 @@ impl NetworkRegistryArgs {
         }
 
         // set directory and environment variables
-        if let Err(e) = set_process_path_env(&contracts_root, &environment_type, &environment_name)
-        {
+        if let Err(e) = set_process_path_env(&contracts_root, &environment_name) {
             return Err(e);
         }
 
         // iterate and collect execution result. If error occurs, the entire operation failes.
-        child_process_call_foundry_self_register(&environment_name, &environment_type, &peer_ids)
+        child_process_call_foundry_self_register(&environment_name, &peer_ids)
     }
 }
 

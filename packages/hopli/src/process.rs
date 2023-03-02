@@ -30,7 +30,6 @@ pub fn build_path(environment_name: &str, environment_type: &str) -> String {
 /// * `environment_name` - Name of the environment that nodes run in
 pub fn set_process_path_env(
     contracts_root: &Option<String>,
-    foundry_profile: &String,
     environment_name: &String,
 ) -> Result<(), HelperErrors> {
     // run in the repo where the make target is saved
@@ -45,8 +44,17 @@ pub fn set_process_path_env(
         }
     }
 
+    // get environment_type and set it as FOUNDRY_PROFILE
+    if let Ok(foundry_profile) = environment_config::get_environment_type_from_name(
+        &env::current_dir().unwrap(),
+        environment_name,
+    ) {
+        env::set_var("FOUNDRY_PROFILE", foundry_profile.to_string());
+    } else {
+        return Err(HelperErrors::UnableToSetFoundryRoot);
+    }
+
     // use cmd to call process
-    env::set_var("FOUNDRY_PROFILE", foundry_profile);
     env::set_var("ENVIRONMENT_NAME", environment_name);
     Ok(())
 }
@@ -56,13 +64,11 @@ pub fn set_process_path_env(
 /// # Arguments
 ///
 /// * `environment_name` - Name of the environment that nodes run in
-/// * `environment_type` - Type of the environment that nodes run in
 /// * `address` - Address that the tool fund
 /// * `hopr_amount` - Amount of HOPR tokens to be funded
 /// * `native_amount` - Amount of native tokens to be funded
 pub fn child_process_call_foundry_faucet(
     environment_name: &str,
-    environment_type: &str,
     address: &Address,
     hopr_amount: &u128,
     native_amount: &u128,
@@ -82,7 +88,7 @@ pub fn child_process_call_foundry_faucet(
         &native_amount_str,
     ];
 
-    child_process_call_foundry(environment_name, environment_type, &faucet_args)
+    child_process_call_foundry(environment_name, &faucet_args)
 }
 
 /// Launch a child process to call foundry self-register command
@@ -94,7 +100,6 @@ pub fn child_process_call_foundry_faucet(
 /// * `peer_id` - Peer Ids of HOPR nodes to be registered under the caller
 pub fn child_process_call_foundry_self_register(
     environment_name: &str,
-    environment_type: &str,
     peer_ids: &String,
 ) -> Result<(), HelperErrors> {
     // add brackets to around the string
@@ -108,7 +113,7 @@ pub fn child_process_call_foundry_self_register(
         &peer_id_string,
     ];
 
-    child_process_call_foundry(environment_name, environment_type, &self_register_args)
+    child_process_call_foundry(environment_name, &self_register_args)
 }
 
 /// Launch a child process to call a foundry script
@@ -116,11 +121,9 @@ pub fn child_process_call_foundry_self_register(
 /// # Arguments
 ///
 /// * `environment_name` - Name of the environment that nodes run in
-/// * `environment_type` - Type of the environment that nodes run in
 /// * `forge_args` - arguments to be passed to `forge`
 pub fn child_process_call_foundry<T>(
     environment_name: &str,
-    environment_type: &str,
     forge_args: &[T],
 ) -> Result<(), HelperErrors>
 where
@@ -130,7 +133,7 @@ where
     let envrionment_check = environment_config::ensure_environment_is_set(
         &env::current_dir().unwrap(),
         environment_name,
-        environment_type,
+        &env::var("FOUNDRY_PROFILE").unwrap(),
     )
     .unwrap();
     if !envrionment_check {

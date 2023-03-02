@@ -13,9 +13,6 @@ pub struct FaucetArgs {
     #[clap(help = "Environment name. E.g. monte_rosa", long)]
     environment_name: String,
 
-    #[clap(help = "Environment type. E.g. production", long, short)]
-    environment_type: String,
-
     #[clap(
         help = "Ethereum address of node that will receive funds",
         long,
@@ -82,7 +79,6 @@ impl FaucetArgs {
     fn execute_faucet(self) -> Result<(), HelperErrors> {
         let FaucetArgs {
             environment_name,
-            environment_type,
             address,
             password,
             use_local_identities,
@@ -131,8 +127,7 @@ impl FaucetArgs {
         println!("All the addresses: {:?}", addresses_all);
 
         // set directory and environment variables
-        if let Err(e) = set_process_path_env(&contracts_root, &environment_type, &environment_name)
-        {
+        if let Err(e) = set_process_path_env(&contracts_root, &environment_name) {
             return Err(e);
         }
 
@@ -142,7 +137,6 @@ impl FaucetArgs {
             .map(|a| {
                 child_process_call_foundry_faucet(
                     &environment_name,
-                    &environment_type,
                     &a,
                     &hopr_amount,
                     &native_amount,

@@ -85,6 +85,29 @@ pub fn ensure_environment_is_set(
     }
 }
 
+/// Returns the environment type from the environment name
+/// according to `contracts-addresses.json`
+pub fn get_environment_type_from_name(
+    make_root_dir_path: &PathBuf,
+    environment_name: &str,
+) -> Result<EnvironmentType, String> {
+    // read `contracts-addresses.json` at make_root_dir_path
+    let contract_environment_config_path = make_root_dir_path.join("contracts-addresses.json");
+
+    let file_read = std::fs::read_to_string(contract_environment_config_path)
+        .expect("Unable to read contracts-addresses.json file");
+
+    let env_config = serde_json::from_str::<EnvironmentConfig>(&file_read)
+        .expect("Unable to deserialize environment config");
+
+    let env_detail = env_config
+        .environments
+        .get(environment_name)
+        .expect("Unable to find environment details");
+
+    return Ok(env_detail.environment_type);
+}
+
 #[cfg(test)]
 mod tests {
 

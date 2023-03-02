@@ -250,7 +250,7 @@ fund-local: id_dir=.
 fund-local: ## use faucet script to fund local identities
 	IDENTITY_PASSWORD=local PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
 		hopli faucet \
-		--environment-name anvil-localhost --environment-type development \
+		--environment-name anvil-localhost \
 		--use-local-identities --identity-directory "${id_dir}" \
 		--contracts-root "./packages/ethereum/contracts"
 
@@ -258,7 +258,7 @@ fund-local: ## use faucet script to fund local identities
 fund-local-all: ## use faucet script to fund all the local identities
 	IDENTITY_PASSWORD=local PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
 		hopli faucet \
-		--environment-name anvil-localhost --environment-type development \
+		--environment-name anvil-localhost \
 		--use-local-identities --identity-directory "/tmp/" \
 		--contracts-root "./packages/ethereum/contracts"
 
