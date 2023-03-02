@@ -6,7 +6,7 @@ CLI tool to manage HOPR identity generation, decryption, funding and registering
 
 ```
 cargo run -- -h
-cargo run -- identity --password switzerland --directory "./test" --name node_ --number 3
+cargo run -- identity --action create --password switzerland --directory "./test" --name node_ --number 3
 ```
 
 ```
@@ -46,6 +46,7 @@ To create some identities
 
 ```
 hopli identity \
+    --action create \
     --password switzerland \
     --directory "./test" \
     --name node_ \
