@@ -42,7 +42,6 @@ pub fn read_identities(
                 .map(|r| r.address()) // read keystore and return address
                 .collect();
 
-            println!("Addresses from identities {:?}", addresses);
             Ok(addresses)
         }
         Err(e) => Err(e),

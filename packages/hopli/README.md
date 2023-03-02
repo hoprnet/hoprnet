@@ -17,8 +17,15 @@ cargo run -- identity --action create --password-path ./.pwd --directory "./test
 Create 2 identity files in `./test` folder where password is stored as an environment variable `IDENTITY_PASSWORD`
 
 ```
-export IDENTITY_PASSWORD=switzerland
+IDENTITY_PASSWORD=switzerland \
 cargo run -- identity --action create --directory "./test" --name node_ --number 2
+```
+
+Read ethereum addresses from identities
+
+```
+IDENTITY_PASSWORD=switzerland \
+cargo run -- identity --action read --directory "./test" --name node_
 
 ```
 
@@ -65,6 +72,17 @@ IDENTITY_PASSWORD=local \
     --directory "./test" \
     --name node_ \
     --number 3
+```
+
+Read ethereum addresses from identities
+
+```
+IDENTITY_PASSWORD=switzerland \
+    hopli identity \
+    --action read \
+    --directory "./test" \
+    --name node_
+
 ```
 
 To fund nodes with password from env variable `IDENTITY_PASSWORD`. Alternatively, a path to the password file can be provided with `--password-path`, e.g. `--password-path ./.pwd`

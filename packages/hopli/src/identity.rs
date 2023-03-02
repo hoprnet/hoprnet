@@ -1,4 +1,4 @@
-use crate::key_pair::create_identity;
+use crate::key_pair::{create_identity, read_identities};
 use crate::password::PasswordArgs;
 use clap::{builder::RangedU64ValueParser, Parser};
 use std::{
@@ -49,7 +49,11 @@ pub struct IdentityArgs {
     )]
     directory: String,
 
-    #[clap(help = "Name of the identity file", long, default_value = "node_")]
+    #[clap(
+        help = "Prefix of the identity file to create/read",
+        long,
+        default_value = "node_"
+    )]
     name: Option<String>,
 
     #[clap(
@@ -104,6 +108,10 @@ impl IdentityArgs {
             }
             IdentityActionType::Read => {
                 // read ids
+                match read_identities(&directory, &pwd, &name) {
+                    Ok(addrs) => addresses.extend(addrs),
+                    Err(_) => return Err(HelperErrors::UnableToReadIdentity),
+                }
             }
         }
 

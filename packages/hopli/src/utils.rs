@@ -10,6 +10,7 @@ pub enum HelperErrors {
     UnableToParseAddress(String),
     SystemTime(SystemTimeError),
     UnableToCreateIdentity,
+    UnableToReadIdentity,
     EnvironmentInfoMismatch,
     UnableToSetFoundryRoot,
     ErrorInRunningFoundry,
