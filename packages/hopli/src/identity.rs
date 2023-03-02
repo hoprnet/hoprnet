@@ -1,4 +1,5 @@
 use crate::key_pair::create_identity;
+use crate::password::PasswordArgs;
 use clap::{builder::RangedU64ValueParser, Parser};
 use std::{
     str::FromStr,
@@ -37,13 +38,8 @@ pub struct IdentityArgs {
     )]
     pub action: IdentityActionType,
 
-    #[clap(
-        help = "Password to encrypt identity files",
-        long,
-        short,
-        default_value = ""
-    )]
-    password: String,
+    #[clap(flatten)]
+    password_path: PasswordArgs,
 
     #[clap(
         help = "Path to the directory that stores identity files",
@@ -71,7 +67,7 @@ impl IdentityArgs {
     fn execute_identity_creation_loop(self) -> Result<(), HelperErrors> {
         let IdentityArgs {
             action,
-            password,
+            password_path,
             directory,
             name,
             number,

@@ -9,6 +9,7 @@ pub mod faucet;
 pub mod identity;
 pub mod key_pair;
 pub mod network_registry;
+pub mod password;
 pub mod process;
 pub mod utils;
 
