@@ -22,6 +22,7 @@
 ### Methods
 
 - [serialize](AcknowledgedTicket.md#serialize)
+- [setPreImage](AcknowledgedTicket.md#setpreimage)
 - [verify](AcknowledgedTicket.md#verify)
 - [deserialize](AcknowledgedTicket.md#deserialize)
 
@@ -48,7 +49,7 @@
 
 ### preImage
 
-• `Readonly` **preImage**: [`Hash`](Hash.md)
+• **preImage**: [`Hash`](Hash.md)
 
 #### Defined in
 
@@ -96,7 +97,7 @@ ___
 
 #### Defined in
 
-[src/types/acknowledgedTicket.ts:41](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L41)
+[src/types/acknowledgedTicket.ts:45](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L45)
 
 ## Methods
 
@@ -107,6 +108,26 @@ ___
 #### Returns
 
 `Uint8Array`
+
+#### Defined in
+
+[src/types/acknowledgedTicket.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L20)
+
+___
+
+### setPreImage
+
+▸ **setPreImage**(`preImg`): `void`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `preImg` | [`Hash`](Hash.md) |
+
+#### Returns
+
+`void`
 
 #### Defined in
 
@@ -130,7 +151,7 @@ ___
 
 #### Defined in
 
-[src/types/acknowledgedTicket.ts:25](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L25)
+[src/types/acknowledgedTicket.ts:29](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L29)
 
 ___
 
@@ -150,4 +171,4 @@ ___
 
 #### Defined in
 
-[src/types/acknowledgedTicket.ts:31](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L31)
+[src/types/acknowledgedTicket.ts:35](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L35)

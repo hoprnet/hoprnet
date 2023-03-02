@@ -20,8 +20,8 @@ Implementors should bear in mind:
 ### Methods
 
 - [configure](ChannelStrategyInterface.md#configure)
+- [onAckedTicket](ChannelStrategyInterface.md#onackedticket)
 - [onChannelWillClose](ChannelStrategyInterface.md#onchannelwillclose)
-- [onWinningTicket](ChannelStrategyInterface.md#onwinningticket)
 - [shouldCommitToChannel](ChannelStrategyInterface.md#shouldcommittochannel)
 - [tick](ChannelStrategyInterface.md#tick)
 
@@ -67,6 +67,26 @@ ___
 
 ___
 
+### onAckedTicket
+
+▸ **onAckedTicket**(`t`): `Promise`<`void`\>
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `t` | `AcknowledgedTicket` |
+
+#### Returns
+
+`Promise`<`void`\>
+
+#### Defined in
+
+[packages/core/src/channel-strategy.ts:62](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L62)
+
+___
+
 ### onChannelWillClose
 
 ▸ **onChannelWillClose**(`channel`): `Promise`<`void`\>
@@ -84,26 +104,6 @@ ___
 #### Defined in
 
 [packages/core/src/channel-strategy.ts:61](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L61)
-
-___
-
-### onWinningTicket
-
-▸ **onWinningTicket**(`t`): `Promise`<`void`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `t` | `AcknowledgedTicket` |
-
-#### Returns
-
-`Promise`<`void`\>
-
-#### Defined in
-
-[packages/core/src/channel-strategy.ts:62](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L62)
 
 ___
 
