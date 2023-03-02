@@ -13,6 +13,7 @@ pub enum HelperErrors {
     EnvironmentInfoMismatch,
     UnableToSetFoundryRoot,
     ErrorInRunningFoundry,
+    UnableToReadPassword,
 }
 
 impl From<SystemTimeError> for HelperErrors {

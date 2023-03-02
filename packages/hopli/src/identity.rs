@@ -39,7 +39,7 @@ pub struct IdentityArgs {
     pub action: IdentityActionType,
 
     #[clap(flatten)]
-    password_path: PasswordArgs,
+    password: PasswordArgs,
 
     #[clap(
         help = "Path to the directory that stores identity files",
@@ -67,11 +67,17 @@ impl IdentityArgs {
     fn execute_identity_creation_loop(self) -> Result<(), HelperErrors> {
         let IdentityArgs {
             action,
-            password_path,
+            password,
             directory,
             name,
             number,
         } = self;
+
+        // check if password is provided
+        let pwd = match password.read_password() {
+            Ok(read_pwd) => read_pwd,
+            Err(e) => return Err(e),
+        };
 
         let mut addresses = Vec::new();
 
@@ -90,7 +96,7 @@ impl IdentityArgs {
                         None => None,
                     };
 
-                    match create_identity(&directory, &password, &id_name) {
+                    match create_identity(&directory, &pwd, &id_name) {
                         Ok(addr) => addresses.push(addr),
                         Err(_) => return Err(HelperErrors::UnableToCreateIdentity),
                     }

@@ -25,21 +25,24 @@ impl Default for PasswordArgs {
 }
 
 impl PasswordArgs {
-    fn read_password(self) -> Result<String> {
+    pub fn read_password(self) -> Result<String, HelperErrors> {
         match self.password_path {
             Some(ref password_path) => {
                 // read password from file
-                let pwd_from_file =
-                    read_to_string(constructor_args_path).expect("Fail to read password file");
-                println!("pwd_from_file:\n{pwd_from_file}");
-                Ok(pwd_from_file)
+                if let Ok(pwd_from_file) = read_to_string(password_path) {
+                    return Ok(pwd_from_file);
+                } else {
+                    return Err(HelperErrors::UnableToReadPassword);
+                }
             }
             None => {
                 // read password from environment variable
-                let pwd_from_env = env::var("IDENTITY_PASSWORD")
-                    .expect("Fail to read password from environment variable");
-                println!("pwd_from_env:\n{pwd_from_env}");
-                Ok(pwd_from_env)
+                if let Ok(pwd_from_env) = env::var("IDENTITY_PASSWORD") {
+                    println!("pwd_from_env:\n{pwd_from_env}");
+                    return Ok(pwd_from_env);
+                } else {
+                    return Err(HelperErrors::UnableToReadPassword);
+                }
             }
         }
     }

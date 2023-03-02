@@ -6,7 +6,20 @@ CLI tool to manage HOPR identity generation, decryption, funding and registering
 
 ```
 cargo run -- -h
-cargo run -- identity --action create --password switzerland --directory "./test" --name node_ --number 3
+```
+
+Create 3 identity files in `./test` folder where password is saved in `.pwd` file
+
+```
+cargo run -- identity --action create --password-path ./.pwd --directory "./test" --name node_ --number 3
+```
+
+Create 2 identity files in `./test` folder where password is stored as an environment variable `IDENTITY_PASSWORD`
+
+```
+export IDENTITY_PASSWORD=switzerland
+cargo run -- identity --action create --directory "./test" --name node_ --number 2
+
 ```
 
 ```
