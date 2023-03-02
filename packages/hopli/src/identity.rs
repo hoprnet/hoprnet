@@ -49,7 +49,7 @@ pub struct IdentityArgs {
         help = "Path to the directory that stores identity files",
         long,
         short,
-        default_value = "/tmp"
+        default_value = "/tmp/hopli"
     )]
     directory: String,
 
