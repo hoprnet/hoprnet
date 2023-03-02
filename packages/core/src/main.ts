@@ -143,7 +143,7 @@ export async function createLibp2pInstance(
         // more connections
         maxParallelDials: options.maxParallelConnections,
         // default timeout of 30s appears to be too long
-        dialTimeout: 10e3
+        dialTimeout: 3e3
       },
       connectionGater: {
         denyDialPeer: async (peer: PeerId) => !(await isAllowedToAccessNetwork(peer)),
