@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::path::PathBuf;
+use std::{collections::HashMap, fmt, path::PathBuf};
 
 /// Type of environment that HOPR node is running in
 #[derive(Debug, Deserialize, Serialize, Clone, Copy, PartialEq)]
@@ -14,13 +13,12 @@ pub enum EnvironmentType {
     Development,
 }
 
-impl ToString for EnvironmentType {
-    /// convert environment type to string
-    fn to_string(&self) -> String {
+impl fmt::Display for EnvironmentType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::Production => "production".into(),
-            Self::Staging => "staging".into(),
-            Self::Development => "development".into(),
+            Self::Production => write!(f, "production"),
+            Self::Staging => write!(f, "staging"),
+            Self::Development => write!(f, "development"),
         }
     }
 }
