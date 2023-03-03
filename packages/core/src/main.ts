@@ -176,20 +176,24 @@ export async function createLibp2pInstance(
         enabled: false
       },
       ping: {
-        // libp2p automatically adds a leading `/`
-        protocolPrefix: protocolPrefix.startsWith('/') ? protocolPrefix.slice(1) : protocolPrefix
+        // FIXME: libp2p automatically adds a leading `/`
+        // protocolPrefix: protocolPrefix.startsWith('/') ? protocolPrefix.slice(1) : protocolPrefix
+        protocolPrefix // for compatibility
       },
       fetch: {
-        // libp2p automatically adds a leading `/`
-        protocolPrefix: protocolPrefix.startsWith('/') ? protocolPrefix.slice(1) : protocolPrefix
+        // FIXME: libp2p automatically adds a leading `/`
+        // protocolPrefix: protocolPrefix.startsWith('/') ? protocolPrefix.slice(1) : protocolPrefix
+        protocolPrefix // for compatibility
       },
       push: {
-        // libp2p automatically adds a leading `/`
-        protocolPrefix: protocolPrefix.startsWith('/') ? protocolPrefix.slice(1) : protocolPrefix
+        // FIXME: libp2p automatically adds a leading `/`
+        // protocolPrefix: protocolPrefix.startsWith('/') ? protocolPrefix.slice(1) : protocolPrefix
+        protocolPrefix // for compatibility
       },
       identify: {
-        // libp2p automatically adds a leading `/`
-        protocolPrefix: protocolPrefix.startsWith('/') ? protocolPrefix.slice(1) : protocolPrefix
+        // FIXME: libp2p automatically adds a leading `/`
+        // protocolPrefix: protocolPrefix.startsWith('/') ? protocolPrefix.slice(1) : protocolPrefix
+        protocolPrefix // for compatibility
       },
       peerStore: {
         // Prevents peer-store from storing addresses twice, e.g.
