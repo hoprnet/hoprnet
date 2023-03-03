@@ -176,16 +176,20 @@ export async function createLibp2pInstance(
         enabled: false
       },
       ping: {
-        protocolPrefix
+        // libp2p automatically adds a leading `/`
+        protocolPrefix: protocolPrefix.slice(1)
       },
       fetch: {
-        protocolPrefix
+        // libp2p automatically adds a leading `/`
+        protocolPrefix: protocolPrefix.slice(1)
       },
       push: {
-        protocolPrefix
+        // libp2p automatically adds a leading `/`
+        protocolPrefix: protocolPrefix.slice(1)
       },
       identify: {
-        protocolPrefix
+        // libp2p automatically adds a leading `/`
+        protocolPrefix: protocolPrefix.slice(1)
       },
       peerStore: {
         // Prevents peer-store from storing addresses twice, e.g.

@@ -14,6 +14,8 @@ import type { Components } from '@libp2p/interfaces/components'
 import {
   compareAddressesLocalMode,
   compareAddressesPublicMode,
+  maToClass,
+  AddressClass,
   type HoprConnectConfig,
   PeerConnectionType
 } from '@hoprnet/hopr-connect'
@@ -500,8 +502,42 @@ class Hopr extends EventEmitter {
     } else {
       log(`No multiaddrs has been registered.`)
     }
+
+    // Public relay nodes always run the DHT in server-mode
+    // so only switch modes if node was started without the `--announce` flag.
+    if (!this.options.announce) {
+      await this.maybeEnableDhtServerMode()
+    }
+
     await this.maybeLogProfilingToGCloud()
+
+    console.log(this.libp2pComponents.getRegistrar().getProtocols())
+
     this.heartbeat.recalculateNetworkHealth()
+  }
+
+  /**
+   * Checks if we are announcing public addresses to the DHT.
+   * If so, switch DHT to `server`-mode such that the node will
+   * reply to DHT queries of other nodes
+   */
+  private async maybeEnableDhtServerMode() {
+    let dht: Components['dht']
+    try {
+      dht = this.libp2pComponents.getDHT()
+    } catch (err) {
+      error(`Cannot switch DHT to server mode:`, err)
+      return
+    }
+
+    let announcedAddresses = this.libp2pComponents.getTransportManager().getAddrs()
+
+    for (const addr of announcedAddresses) {
+      if ([AddressClass.Public, AddressClass.Public6].includes(maToClass(addr))) {
+        await dht.setMode('server')
+        break
+      }
+    }
   }
 
   private async maybeLogProfilingToGCloud() {
