@@ -1,5 +1,7 @@
 # Changelog
 
+- Rebrand `foundry-tool` to `hopli` and allow it to interact with identities and network-registry ([#4652](https://github.com/hoprnet/hoprnet/pull/4652))
+
 <a name="1.92"></a>
 
 ## [1.92](https://github.com/hoprnet/hoprnet/compare/release/bogota...hoprnet:release/riga)
