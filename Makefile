@@ -197,6 +197,8 @@ clean: # Cleanup build directories (lib,build, ...etc.)
 .PHONY: reset
 reset: # Performs cleanup & also deletes all "node_modules" directories
 reset: clean
+# remove contract bindings
+	rm -rf packages/ethereum/crates/bindings
 	yarn reset
 
 .PHONY: test
