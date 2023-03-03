@@ -21,3 +21,7 @@ target/
 
 # ignore coverage test outpout
 contracts/lcov.info
+
+# ignore content of bindings
+crates/*
+!crates/Makefile

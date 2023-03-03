@@ -130,6 +130,7 @@ build: build-yarn
 .PHONY: build-solidity-types
 build-solidity-types: ## generate Solidity typings
 	echo "Foundry create binding"
+	mkdir packages/ethereum/crates/bindings
 	$(MAKE) -C packages/ethereum/contracts/ overwrite-sc-bindings
 # Change git = "http://..." into version = "1.0.2"
 	sed -i -e 's/https:\/\/github.com\/gakonst\/ethers-rs/1.0.2/g' ${CURDIR}/packages/ethereum/crates/bindings/Cargo.toml
@@ -152,8 +153,8 @@ build-yarn-watch: build-solidity-types build-cargo
 	npx tsc --build tsconfig.build.json -w
 
 .PHONY: build-cargo
-build-cargo: ## build cargo packages and create boilerplate JS code
-# build-cargo: build-solidity-types ## build cargo packages and create boilerplate JS code
+# build-cargo: ## build cargo packages and create boilerplate JS code
+build-cargo: build-solidity-types ## build cargo packages and create boilerplate JS code
 # Skip building Rust crates
 ifeq ($(origin NO_CARGO),undefined)
 # First compile Rust crates and create bindings
