@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-No changes.
+No changes..
 
 ## [1.0.2 - 2021-02-26](https://github.com/jonas-schievink/adler/releases/tag/v1.0.2)
 

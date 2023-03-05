@@ -1,0 +1,35 @@
+[package]
+name = "core-mixer"
+version = "0.1.0"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["console_error_panic_hook", "wasm"]
+wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:getrandom", "dep:gloo-timers", "dep:utils-misc"]
+
+[dependencies]
+async-std = { version = "1.12.0", features = ["attributes"] }
+futures = "0.3.26"
+futures-lite = "1.12.0"
+rand = "0.8.5"
+pin-project = "1.0.12"
+console_error_panic_hook = { version = "0.1.7", optional = true }
+# wasm
+#wee_alloc = { version = "0.4.5", optional = true }
+utils-misc = { path = "../../../utils/crates/utils-misc", optional = true }
+getrandom = { version = "0.2.8", features = ["js"], optional = true }
+gloo-timers = { version = "0.2.6", optional = true }
+js-sys = { version = "0.3.60", optional = true }
+wasm-bindgen = { version = "0.2.83", optional = true }
+wasm-bindgen-futures = { version = "0.4.33", optional = true }
+
+[dev-dependencies]
+more-asserts = "0.3.1"
+wasm-bindgen-test = "0.3.33"
+
+[profile.release]
+opt-level = "s"     # small code size

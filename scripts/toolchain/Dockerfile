@@ -16,12 +16,14 @@ RUN apt-get update \
       build-essential \
       ca-certificates \
       curl \
+      unzip \
       git \
       jq \
       lsof \
       python3 \
       unzip \
       xz-utils \
+      time \
  && rm -rf /var/lib/apt/lists/* \
  && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false
 

@@ -37,7 +37,6 @@
 - [INTERMEDIATE\_HOPS](modules.md#intermediate_hops)
 - [MAX\_HOPS](modules.md#max_hops)
 - [MAX\_NEW\_CHANNELS\_PER\_TICK](modules.md#max_new_channels_per_tick)
-- [MAX\_PACKET\_DELAY](modules.md#max_packet_delay)
 - [MAX\_PATH\_ITERATIONS](modules.md#max_path_iterations)
 - [NETWORK\_QUALITY\_THRESHOLD](modules.md#network_quality_threshold)
 - [PACKET\_SIZE](modules.md#packet_size)
@@ -64,25 +63,25 @@
 
 | Name | Type |
 | :------ | :------ |
-| `allowLocalConnections?` | `boolean` |
-| `allowPrivateConnections?` | `boolean` |
-| `announce?` | `boolean` |
-| `checkUnrealizedBalance?` | `boolean` |
+| `allowLocalConnections` | `boolean` |
+| `allowPrivateConnections` | `boolean` |
+| `announce` | `boolean` |
+| `checkUnrealizedBalance` | `boolean` |
 | `connector?` | `HoprCoreEthereum` |
-| `createDbIfNotExist?` | `boolean` |
+| `createDbIfNotExist` | `boolean` |
 | `dataPath` | `string` |
 | `environment` | [`ResolvedEnvironment`](classes/ResolvedEnvironment.md) |
-| `forceCreateDB?` | `boolean` |
-| `heartbeatInterval?` | `number` |
-| `heartbeatThreshold?` | `number` |
-| `heartbeatVariance?` | `number` |
-| `hosts?` | { `ip4?`: `NetOptions` ; `ip6?`: `NetOptions`  } |
+| `forceCreateDB` | `boolean` |
+| `heartbeatInterval` | `number` |
+| `heartbeatThreshold` | `number` |
+| `heartbeatVariance` | `number` |
+| `hosts` | { `ip4?`: `NetOptions` ; `ip6?`: `NetOptions`  } |
 | `hosts.ip4?` | `NetOptions` |
 | `hosts.ip6?` | `NetOptions` |
-| `networkQualityThreshold?` | `number` |
-| `onChainConfirmations?` | `number` |
-| `password?` | `string` |
-| `strategy?` | [`ChannelStrategyInterface`](interfaces/ChannelStrategyInterface.md) |
+| `networkQualityThreshold` | `number` |
+| `onChainConfirmations` | `number` |
+| `password` | `string` |
+| `strategy` | [`ChannelStrategyInterface`](interfaces/ChannelStrategyInterface.md) |
 | `testing?` | { `announceLocalAddresses?`: `boolean` ; `mockedDHT?`: `Map`<`string`, `string`[]\> ; `mockedNetwork?`: `Libp2pEmitter`<`any`\> ; `noDirectConnections?`: `boolean` ; `noWebRTCUpgrade?`: `boolean` ; `preferLocalAddresses?`: `boolean` ; `useMockedLibp2p?`: `boolean`  } |
 | `testing.announceLocalAddresses?` | `boolean` |
 | `testing.mockedDHT?` | `Map`<`string`, `string`[]\> |
@@ -94,7 +93,7 @@
 
 #### Defined in
 
-[packages/core/src/index.ts:137](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L137)
+[packages/core/src/index.ts:136](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L136)
 
 ___
 
@@ -104,7 +103,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:186](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L186)
+[packages/core/src/index.ts:184](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L184)
 
 ___
 
@@ -114,7 +113,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:201](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L201)
+[packages/core/src/index.ts:199](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L199)
 
 ___
 
@@ -134,7 +133,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:188](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L188)
+[packages/core/src/index.ts:186](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L186)
 
 ## Variables
 
@@ -144,7 +143,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L22)
+[packages/core/src/constants.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L20)
 
 ___
 
@@ -154,7 +153,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:21](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L21)
+[packages/core/src/constants.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L19)
 
 ___
 
@@ -174,7 +173,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L14)
+[packages/core/src/constants.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L12)
 
 ___
 
@@ -184,7 +183,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L19)
+[packages/core/src/constants.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L17)
 
 ___
 
@@ -194,17 +193,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L18)
-
-___
-
-### MAX\_PACKET\_DELAY
-
-• `Const` **MAX\_PACKET\_DELAY**: ``200``
-
-#### Defined in
-
-[packages/core/src/constants.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L12)
+[packages/core/src/constants.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L16)
 
 ___
 
@@ -214,7 +203,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L16)
+[packages/core/src/constants.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L14)
 
 ___
 
@@ -224,7 +213,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L17)
+[packages/core/src/constants.ts:15](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L15)
 
 ___
 
@@ -244,7 +233,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:15](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L15)
+[packages/core/src/constants.ts:13](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L13)
 
 ___
 

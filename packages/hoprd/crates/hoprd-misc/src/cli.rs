@@ -156,7 +156,8 @@ struct CliArgs {
         long,
         default_value_t = false,
         env = "HOPRD_ANNOUNCE",
-        help = "Run as a Public Relay Node (PRN)"
+        help = "Run as a Public Relay Node (PRN)",
+        action = ArgAction::SetTrue
     )]
     pub announce: bool,
 
@@ -201,7 +202,8 @@ struct CliArgs {
         long = "healthCheck",
         default_value_t = false,
         env = "HOPRD_HEALTH_CHECK",
-        help = format!("Run a health check end point on {}:{}", DEFAULT_HEALTH_CHECK_HOST, DEFAULT_HEALTH_CHECK_PORT)
+        help = format!("Run a health check end point on {}:{}", DEFAULT_HEALTH_CHECK_HOST, DEFAULT_HEALTH_CHECK_PORT),
+        action = ArgAction::SetTrue
     )]
     pub health_check: bool,
 
@@ -233,37 +235,39 @@ struct CliArgs {
     pub password: Option<String>,
 
     #[arg(
-    long = "defaultStrategy",
-    help = "Default channel strategy to use after node starts up",
-    env = "HOPRD_DEFAULT_STRATEGY",
-    value_name = "DEFAULT_STRATEGY",
-    default_value = "passive",
-    value_parser = PossibleValuesParser::new([PromiscuousStrategy::NAME, PassiveStrategy::NAME, RandomStrategy::NAME])
+        long = "defaultStrategy",
+        help = "Default channel strategy to use after node starts up",
+        env = "HOPRD_DEFAULT_STRATEGY",
+        value_name = "DEFAULT_STRATEGY",
+        default_value = "passive",
+        value_parser = PossibleValuesParser::new([PromiscuousStrategy::NAME, PassiveStrategy::NAME, RandomStrategy::NAME])
     )]
     pub default_strategy: Option<String>,
 
     #[arg(
-    long = "maxAutoChannels",
-    help = "Maximum number of channel a strategy can open. If not specified, square root of number of available peers is used.",
-    env = "HOPRD_MAX_AUTO_CHANNELS",
-    value_name = "MAX_AUTO_CHANNELS",
-    value_parser = clap::value_parser!(u32)
+        long = "maxAutoChannels",
+        help = "Maximum number of channel a strategy can open. If not specified, square root of number of available peers is used.",
+        env = "HOPRD_MAX_AUTO_CHANNELS",
+        value_name = "MAX_AUTO_CHANNELS",
+        value_parser = clap::value_parser!(u32)
     )]
     pub max_auto_channels: Option<u32>, // Make this a string if we want to supply functions instead in the future.
 
     #[arg(
-    long = "autoRedeemTickets",
-    default_value_t = false,
-    env = "HOPRD_AUTO_REDEEEM_TICKETS",
-    help = "If enabled automatically redeems winning tickets."
+        long = "autoRedeemTickets",
+        default_value_t = false,
+        env = "HOPRD_AUTO_REDEEEM_TICKETS",
+        help = "If enabled automatically redeems winning tickets.",
+        action = ArgAction::SetTrue
     )]
     pub auto_redeem_tickets: bool,
 
     #[arg(
-    long = "checkUnrealizedBalance",
-    default_value_t = false,
-    env = "HOPRD_CHECK_UNREALIZED_BALANCE",
-    help = "Determines if unrealized balance shall be checked first before validating unacknowledged tickets."
+        long = "checkUnrealizedBalance",
+        default_value_t = false,
+        env = "HOPRD_CHECK_UNREALIZED_BALANCE",
+        help = "Determines if unrealized balance shall be checked first before validating unacknowledged tickets.",
+        action = ArgAction::SetTrue
     )]
     pub check_unrealized_balance: bool,
 
@@ -280,7 +284,7 @@ struct CliArgs {
         help = "List all the options used to run the HOPR node, but quit instead of starting",
         env = "HOPRD_DRY_RUN",
         default_value_t = false,
-        action = ArgAction:: SetTrue
+        action = ArgAction::SetTrue
     )]
     pub dry_run: bool,
 
@@ -289,9 +293,20 @@ struct CliArgs {
         help = "initialize a database if it doesn't already exist",
         action = ArgAction::SetTrue,
         env = "HOPRD_INIT",
-        default_value_t = false
+        default_value_t = false,
+        action = ArgAction::SetTrue
     )]
     pub init: bool,
+
+    #[arg(
+        long = "forceInit",
+        help = "initialize a database, even if it already exists",
+        action = ArgAction::SetTrue,
+        env = "HOPRD_FORCE_INIT",
+        default_value_t = false,
+        action = ArgAction::SetTrue
+    )]
+    pub force_init: bool,
 
     #[arg(
         long = "privateKey",

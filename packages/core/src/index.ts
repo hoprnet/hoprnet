@@ -54,7 +54,6 @@ import {
   isSecp256k1PeerId,
   type LibP2PHandlerFunction,
   libp2pSendMessage,
-  libp2pSubscribe,
   MIN_NATIVE_BALANCE,
   NativeBalance,
   PublicKey,
@@ -136,26 +135,25 @@ type PeerStoreAddress = {
 
 export type HoprOptions = {
   environment: ResolvedEnvironment
-  announce?: boolean
+  announce: boolean
   dataPath: string
-  createDbIfNotExist?: boolean
-  forceCreateDB?: boolean
-  allowLocalConnections?: boolean
-  allowPrivateConnections?: boolean
-  password?: string
+  createDbIfNotExist: boolean
+  forceCreateDB: boolean
+  allowLocalConnections: boolean
+  allowPrivateConnections: boolean
+  password: string
   connector?: HoprCoreEthereum
-  strategy?: ChannelStrategyInterface
-  hosts?: {
+  strategy: ChannelStrategyInterface
+  hosts: {
     ip4?: NetOptions
     ip6?: NetOptions
   }
-  heartbeatInterval?: number
-  heartbeatThreshold?: number
-  heartbeatVariance?: number
-  networkQualityThreshold?: number
-  onChainConfirmations?: number
-  checkUnrealizedBalance?: boolean
-
+  heartbeatInterval: number
+  heartbeatThreshold: number
+  heartbeatVariance: number
+  networkQualityThreshold: number
+  onChainConfirmations: number
+  checkUnrealizedBalance: boolean
   testing?: {
     // when true, assume that the node is running in an isolated network and does
     // not need any connection to nodes outside of the subnet
@@ -327,13 +325,6 @@ class Hopr extends EventEmitter {
     this.stopLibp2p = libp2p.stop.bind(libp2p)
 
     this.libp2pComponents = libp2p.components
-    // Subscribe to p2p events from libp2p. Wraps our instance of libp2p.
-    const subscribe = (
-      protocols: string | string[],
-      handler: LibP2PHandlerFunction<Promise<Uint8Array> | Promise<void> | void>,
-      includeReply: boolean,
-      errHandler: (err: any) => void
-    ) => libp2pSubscribe(this.libp2pComponents, protocols, handler, errHandler, includeReply)
 
     const sendMessage = ((
       dest: PeerId,
@@ -431,7 +422,7 @@ class Hopr extends EventEmitter {
 
     this.acknowledgements = new AcknowledgementInteraction(
       sendMessage,
-      subscribe,
+      this.libp2pComponents,
       this.getId(),
       this.db,
       (ackChallenge: HalfKeyChallenge) => {
@@ -446,7 +437,7 @@ class Hopr extends EventEmitter {
 
     const onMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
     this.forward = new PacketForwardInteraction(
-      subscribe,
+      this.libp2pComponents,
       sendMessage,
       this.getId(),
       onMessage,

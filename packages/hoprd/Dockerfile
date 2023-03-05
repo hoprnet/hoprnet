@@ -25,8 +25,6 @@ RUN make deps-docker package=hoprd && \
     find ./packages -type f -name '*.ts' -delete && \
     # No need for these packages
     rm -R packages/avado packages/cover-traffic-daemon && \
-    # Everything that we don't need in ethereum package
-    rm -R packages/ethereum/contracts && \
     # Remove node_modules as they include devDependencies
     rm -R node_modules && \
     # As we are on *nix, use hardlinks in node_modules to save some space
@@ -60,8 +58,8 @@ RUN apt-get update \
 COPY --from=build /app/hoprnet/packages ./packages
 COPY --from=build /app/hoprnet/node_modules ./node_modules
 
-# we copy foundry-tool over since we might need it at some point as a binary
-COPY --from=build /app/hoprnet/.cargo/bin/foundry-tool .cargo/bin/
+# we copy hopli over since we might need it at some point as a binary
+COPY --from=build /app/hoprnet/.cargo/bin/hopli .cargo/bin/
 
 # set volume which can be mapped by users on the host system
 VOLUME ["/app/hoprnet/hoprd-db"]
