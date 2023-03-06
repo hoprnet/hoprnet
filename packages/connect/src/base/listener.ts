@@ -25,6 +25,7 @@ import { getAddrs } from './addrs.js'
 import { fromSocket } from './tcp.js'
 import { RELAY_CHANGED_EVENT } from './entry.js'
 import { bindToPort, attemptClose, nodeToMultiaddr, cleanExistingConnections, ip6Lookup } from '../utils/index.js'
+import type { Interface } from './stun/types.js'
 
 import type { Components } from '@libp2p/interfaces/components'
 import type { ConnectComponents } from '../components.js'
@@ -242,7 +243,7 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
       includeLocalhostIPv4: true
     })
 
-    if (!natSituation.bidirectionalNAT) {
+    if (!natSituation.bidirectionalNAT && natSituation.isExposed) {
       // If any of the interface addresses is the
       // external address,
       for (const [index, internalInterface] of internalInterfaces.entries()) {
@@ -534,39 +535,44 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
       this.testingOptions.__preferLocalAddresses
     )
 
+    // We can't reach any STUN server or all STUN responses were invalid
     if (externalInterface == undefined) {
       return {
         bidirectionalNAT: true
       }
     }
 
-    log(`External interface seems to be ${externalInterface.address}:${externalInterface.port}`)
+    // We got some STUN requests but ports were ambiguous
+    // let's see if socket port is exposed for some reason
+    if ((externalInterface as Interface).port == undefined) {
+      const ownPortExposed = await this.isExposedHost(ownPort, usableStunServers, `exposed ${ownPort}`)
 
-    const isExposed = await isExposedHost(
-      usableStunServers,
-      (listener: (socket: TCPSocket, stream: AsyncIterable<Uint8Array>) => void): (() => void) => {
-        const identifier = `STUN response ${Date.now()}`
-        this.protocols.push({
-          isProtocol: (data: Uint8Array) => data[0] == 1 && data[1] == 1,
-          identifier,
-          takeStream: listener
-        })
-        return () => {
-          this.protocols.splice(
-            this.protocols.findIndex((protocol: ProtocolListener) => protocol.identifier === identifier),
-            1
-          )
+      if (ownPortExposed) {
+        return {
+          bidirectionalNAT: false,
+          externalAddress: externalInterface.address,
+          externalPort: ownPort,
+          isExposed: true
         }
-      },
-      this.udpSocket,
-      externalInterface.port,
-      this.testingOptions.__localModeStun
+      } else {
+        return {
+          bidirectionalNAT: true
+        }
+      }
+    }
+
+    log(`External interface seems to be ${externalInterface.address}:${(externalInterface as Interface).port}`)
+
+    let isExposed = await this.isExposedHost(
+      (externalInterface as Interface).port,
+      usableStunServers,
+      `exposed ${(externalInterface as Interface).port}`
     )
 
     return {
       bidirectionalNAT: false,
       externalAddress: externalInterface.address,
-      externalPort: externalInterface.port,
+      externalPort: (externalInterface as Interface).port,
       isExposed
     }
   }
@@ -613,6 +619,35 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
     }
 
     return filtered
+  }
+
+  /**
+   * Checks if given port is reachable by other nodes using RFC 5780 STUN requests
+   * @param port port number to check
+   * @param stunServers array of (RFC5780) STUN servers to use for the request
+   * @param identifier unique identifier to correctly route STUN responses, e.g. "9091 exposed"
+   * @returns Promise that resolves to true if port is reachable by other nodes
+   */
+  private async isExposedHost(port: number, stunServers: Multiaddr[], identifier: string): Promise<boolean> {
+    return await isExposedHost(
+      stunServers,
+      (listener: (socket: TCPSocket, stream: AsyncIterable<Uint8Array>) => void): (() => void) => {
+        this.protocols.push({
+          isProtocol: (data: Uint8Array) => data[0] == 1 && data[1] == 1,
+          identifier,
+          takeStream: listener
+        })
+        return () => {
+          this.protocols.splice(
+            this.protocols.findIndex((protocol: ProtocolListener) => protocol.identifier === identifier),
+            1
+          )
+        }
+      },
+      this.udpSocket,
+      port,
+      this.testingOptions.__localModeStun
+    )
   }
 
   private getAddressForInterface(host: string, family: NetworkInterfaceInfo['family']): string {
