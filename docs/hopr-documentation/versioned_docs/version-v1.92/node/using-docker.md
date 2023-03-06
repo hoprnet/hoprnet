@@ -163,7 +163,8 @@ hoprd
   --init 				                      # initialize the database and identity if not present
   --announce 				                  # announce the node to other nodes in the network \ 
                                                 and act as a relay
-  --host "0.0.0.0:9091"   	                  # set IP and port of the P2P API to the container's \                                             external IP
+  --host "0.0.0.0:9091"   	                  # set IP and port of the P2P API to the container's \
+                                                external IP
   --apiToken <MY_TOKEN>                       # specify password for accessing REST API(REQUIRED)
   --environment monte_rosa                    # set an environment (e.g. monte_rosa)
 ```
