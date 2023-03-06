@@ -76,7 +76,7 @@ docker pull gcr.io/hoprassociation/hoprd:riga
 For ease of use you can set up a shell alias to run the latest release as a docker container:
 
 ```sh
-alias hoprd='docker run --pull always -m 2g -ti -v ${HOPRD_DATA_DIR:-$HOME/.hoprd-db}:/app/db -p 9091:9091 -p 3001:3001 gcr.io/hoprassociation/hoprd:riga'
+alias hoprd='docker run --pull always -m 2g -ti -v ${HOPRD_DATA_DIR:-$HOME/.hoprd-db}:/app/db -p 9091:9091/tcp -p 9091:9091/udp -p 3001:3001 gcr.io/hoprassociation/hoprd:riga'
 ```
 
 **IMPORTANT:** Using the above command will map the database folder used by hoprd to a local folder called `.hoprd-db` in your home directory. You can customize the location of that folder further by executing the following command:

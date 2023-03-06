@@ -93,7 +93,7 @@ The **_identity file_** contains your private key and is essentially your wallet
 
 ```bash
 export RELEASE_NAME=bogota
-docker run --pull always --restart on-failure -m 2g -ti -v $HOME/.hoprd-db-${RELEASE_NAME}:/app/hoprd-db -p 9091:9091 -p 3000:3000 -p 3001:3001 -e DEBUG="hopr*" gcr.io/hoprassociation/hoprd:${RELEASE_NAME} --environment monte_rosa --init --api --admin --identity /app/hoprd-db/.hopr-id-${RELEASE_NAME} --data /app/hoprd-db --password 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' --apiHost "0.0.0.0" --apiToken 'YOUR_SECURITY_TOKEN' --adminHost "0.0.0.0" --healthCheck --healthCheckHost "0.0.0.0"
+docker run --pull always --restart on-failure -m 2g -ti -v $HOME/.hoprd-db-${RELEASE_NAME}:/app/hoprd-db -p 9091:9091/tcp -p 9091:9091/udp -p 3000:3000 -p 3001:3001 -e DEBUG="hopr*" gcr.io/hoprassociation/hoprd:${RELEASE_NAME} --environment monte_rosa --init --api --admin --identity /app/hoprd-db/.hopr-id-${RELEASE_NAME} --data /app/hoprd-db --password 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' --apiHost "0.0.0.0" --apiToken 'YOUR_SECURITY_TOKEN' --adminHost "0.0.0.0" --healthCheck --healthCheckHost "0.0.0.0"
 ```
 
 `--identity` is a path to where the file is located, and `--password` is used to decrypt the file.
