@@ -72,7 +72,8 @@ ENV NODE_ENV production
 ENV DEBUG 'hopr*'
 ENV NODE_OPTIONS='--max_old_space_size=4096 --experimental-wasm-modules'
 
-# p2p
-EXPOSE 9091
+# p2p UDP + TCP
+EXPOSE 9091/udp
+EXPOSE 9091/tcp
 
 ENTRYPOINT ["/sbin/tini", "--", "node", "lib/main.cjs"]
