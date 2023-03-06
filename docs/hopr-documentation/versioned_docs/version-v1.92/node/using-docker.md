@@ -148,6 +148,22 @@ If you are in the process of registering your node on the network registry, plea
 
 Otherwise, the installation process is complete! You can proceed to our [hopr-admin tutorial](using-hopr-admin).
 
+### Breakdown of arguments
+
+```
+hoprd
+  --restart on-failure -m 2g                  # restart node if it crashes or consumes 2GB of memory (-m 2g)
+  --log-opt max-size                          # maximum size of a single log file, will use a new one if reached
+  --log-opt max-file                          # maximum number of log files per docker container
+  --identity /app/hoprd-db/.hopr-identity     # store your node identity information in the persisted database folder
+  --password switzerland   	                  # set the encryption password for your identity
+  --init 				                      # initialize the database and identity if not present
+  --announce 				                  # announce the node to other nodes in the network and act as a relay
+  --host "0.0.0.0:9091"   	                  # set IP and port of the P2P API to the container's external IP
+  --apiToken <MY_TOKEN>                       # specify password for accessing REST API(REQUIRED)
+  --environment monte_rosa                    # set an environment (e.g. monte_rosa)
+```
+
 ## Updating to a new release
 
 When migrating between releases, Docker users need to either move their identity file to the newly specified location or edit the command to point to their old location. Otherwise, you will be running a new node instead of accessing your old node's information.
