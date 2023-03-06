@@ -908,10 +908,10 @@
     }
   },
   "0.100.0": {
-    "hash": "/ipfs/QmPkjVpk2gZZirsXZYkr1Xrd6GS8Gv5iYtt3r3T5ch56f2",
+    "hash": "/ipfs/Qmbmna8RV97fMLScBghVRShKRN28RGeADTK89DxZYEZ62Y",
     "type": "manifest",
     "uploadedTo": {
-      "http://80.208.229.228:5001": "Tue, 07 Feb 2023 12:54:52 GMT"
+      "http://80.208.229.228:5001": "Thu, 16 Feb 2023 15:12:21 GMT"
     }
   },
   "1.64.0": {
@@ -2588,10 +2588,10 @@
     }
   },
   "0.200.0": {
-    "hash": "/ipfs/QmSGeSBDMXBvixaRaVu7DmX4APcMEUn2DvG9uwEzFADL6Q",
+    "hash": "/ipfs/QmanU9XEuebgpCWM3TKMBAhK7EobdDxY7y5s37LP879nYZ",
     "type": "manifest",
     "uploadedTo": {
-      "http://80.208.229.228:5001": "Tue, 03 Jan 2023 12:02:28 GMT"
+      "http://80.208.229.228:5001": "Fri, 10 Feb 2023 13:56:26 GMT"
     }
   },
   "1.91.19": {
@@ -2662,6 +2662,55 @@
     "type": "manifest",
     "uploadedTo": {
       "http://80.208.229.228:5001": "Wed, 04 Jan 2023 08:36:54 GMT"
+    }
+  },
+  "1.92.0": {
+    "hash": "/ipfs/Qma87EncVEbrVm1y65kAVH2pdDzAwLJhaidFq71HqzMiSM",
+    "type": "manifest",
+    "uploadedTo": {
+      "http://80.208.229.228:5001": "Tue, 07 Feb 2023 13:39:02 GMT"
+    }
+  },
+  "1.92.1": {
+    "hash": "/ipfs/QmQHX8i7QEzr4kWrEAF843XpsAMbxHgusfiTYsavrsnYoK",
+    "type": "manifest",
+    "uploadedTo": {
+      "http://80.208.229.228:5001": "Tue, 07 Feb 2023 14:49:31 GMT"
+    }
+  },
+  "1.92.2": {
+    "hash": "/ipfs/Qmf1wkraReGxgncvcqkryWj2NNgwcoHHNt2Tb2VbxsBcqp",
+    "type": "manifest",
+    "uploadedTo": {
+      "http://80.208.229.228:5001": "Tue, 07 Feb 2023 17:36:34 GMT"
+    }
+  },
+  "1.92.4": {
+    "hash": "/ipfs/QmdxcM3wUaiyAL41REmbQbKNJ1mS5zUfvysR6RggYCAiEa",
+    "type": "manifest",
+    "uploadedTo": {
+      "http://80.208.229.228:5001": "Tue, 07 Feb 2023 19:01:33 GMT"
+    }
+  },
+  "1.92.5": {
+    "hash": "/ipfs/QmVg6rWEwctCQNgZJJN8RCXoe9wJHnxerbZGYH6ewRtFjx",
+    "type": "manifest",
+    "uploadedTo": {
+      "http://80.208.229.228:5001": "Tue, 07 Feb 2023 22:42:29 GMT"
+    }
+  },
+  "1.92.6": {
+    "hash": "/ipfs/QmT7vUKwcjTQEhPRTksvoMfUdvkCMeugLHSpRm16UPG6iz",
+    "type": "manifest",
+    "uploadedTo": {
+      "http://80.208.229.228:5001": "Wed, 08 Feb 2023 11:14:30 GMT"
+    }
+  },
+  "1.92.7": {
+    "hash": "/ipfs/Qmc4ob7cCN92ugSqAizhS29V35i4aXV4ifiGkHtNuS2cbP",
+    "type": "manifest",
+    "uploadedTo": {
+      "http://80.208.229.228:5001": "Wed, 08 Feb 2023 15:25:50 GMT"
     }
   }
 }

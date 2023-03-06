@@ -139,7 +139,7 @@ ___
 
 ### create
 
-▸ `Static` **create**(...`inputs`): [`Hash`](Hash.md)
+▸ `Static` **create**(`...inputs`): [`Hash`](Hash.md)
 
 #### Parameters
 

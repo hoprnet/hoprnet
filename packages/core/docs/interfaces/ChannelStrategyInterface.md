@@ -49,7 +49,7 @@ ___
 
 ### configure
 
-▸ **configure**(`settings`): `any`
+▸ **configure**(`settings`): `void`
 
 #### Parameters
 
@@ -59,7 +59,7 @@ ___
 
 #### Returns
 
-`any`
+`void`
 
 #### Defined in
 
@@ -138,7 +138,7 @@ ___
 | `balance` | `BN` |
 | `network_peer_ids` | `Iterator`<`string`, `any`, `undefined`\> |
 | `outgoing_channel` | `OutgoingChannelStatus`[] |
-| `peer_quality` | (`string`: `any`) => `number` |
+| `peer_quality` | (`string`: `string`) => `number` |
 
 #### Returns
 

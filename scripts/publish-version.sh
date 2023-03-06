@@ -120,7 +120,7 @@ if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
 
   # pack and publish packages
   yarn workspaces foreach -piv --topological-dev \
-    --exclude hoprnet --exclude hopr-docs \
+    --exclude hoprnet --exclude @hoprnet/hopr-docs \
     --exclude @hoprnet/hoprd \
     npm publish --access public
 
