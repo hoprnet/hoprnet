@@ -1,7 +1,7 @@
 use std::ops::{Div, Mul, Sub};
 use ethnum::u256;
 use serde_repr::*;
-use utils_misc::utils::get_time_millis;
+use utils_misc::time::current_timestamp;
 use crate::crypto::{Challenge, ethereum_signed_hash, Hash, PublicKey, Signature};
 use crate::errors::{Result, GeneralError::ParseError};
 use crate::primitives::{Address, Balance, BalanceType, EthereumChallenge, U256};
@@ -83,13 +83,13 @@ impl ChannelEntry {
 
     /// Checks if the closure time of this channel has passed.
     pub fn closure_time_passed(&self) -> bool {
-        let now_seconds =  get_time_millis() / 1000;
+        let now_seconds =  current_timestamp() / 1000;
         self.closure_time.value().lt(&u256::from(now_seconds))
     }
 
     /// Calculates the remaining channel closure grace period.
     pub fn remaining_closure_time(&self) -> u64 {
-        let now_seconds = u256::from(get_time_millis());
+        let now_seconds = u256::from(current_timestamp());
         if now_seconds.ge(self.closure_time.value()) {
             now_seconds.sub(self.closure_time.value()).as_u64()
         } else {

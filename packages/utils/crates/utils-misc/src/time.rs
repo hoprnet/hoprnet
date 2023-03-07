@@ -12,7 +12,6 @@ pub fn current_timestamp() -> u64 {
 #[cfg(wasm)]
 use wasm::current_timestamp;
 
-
 #[cfg(wasm)]
 mod wasm {
     pub fn current_timestamp() -> u64 {
