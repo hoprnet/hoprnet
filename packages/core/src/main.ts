@@ -11,7 +11,12 @@ import type { PeerId } from '@libp2p/interface-peer-id'
 import { keysPBM } from '@libp2p/crypto/keys'
 import type { AddressSorter, Address } from '@libp2p/interfaces/peer-store'
 
-import { HoprConnect, compareAddressesLocalMode, type PublicNodesEmitter } from '@hoprnet/hopr-connect'
+import {
+  HoprConnect,
+  compareAddressesLocalMode,
+  type PublicNodesEmitter,
+  compareAddressesPublicMode
+} from '@hoprnet/hopr-connect'
 import { HoprDB, PublicKey, debug, isAddressWithPeerId } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 
@@ -53,13 +58,13 @@ export async function createLibp2pInstance(
 
     if (options.testing?.preferLocalAddresses) {
       addressSorter = (a: Address, b: Address) => compareAddressesLocalMode(a.multiaddr, b.multiaddr)
-      log('Preferring local addresses')
+      log('Address sorting: prefer local addresses')
     } else {
       // Overwrite address sorter with identity function since
       // libp2p's own address sorter function is unable to handle
       // p2p addresses, e.g. /p2p/<RELAY>/p2p-circuit/p2p/<DESTINATION>
-      addressSorter = (_addr) => 0
-      log('Addresses are sorted by default')
+      addressSorter = (a: Address, b: Address) => compareAddressesPublicMode(a.multiaddr, b.multiaddr)
+      log('Address sorting: start with most promising addresses')
     }
 
     // Store the peerstore on-disk under the main data path. Ensure store is
