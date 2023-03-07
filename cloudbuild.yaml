@@ -4,6 +4,7 @@ steps:
     args:
       - --dockerfile=scripts/toolchain/Dockerfile
       - --destination=gcr.io/${PROJECT_ID}/hopr-toolchain:${_IMAGE_VERSION}
+      - --destination=gcr.io/${PROJECT_ID}/hopr-toolchain:latest
       - --cache=true
       - --cache-ttl=168h
     timeout: 1200s

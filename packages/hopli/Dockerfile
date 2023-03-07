@@ -1,18 +1,24 @@
-ARG RUST_IMAGE=${RUST_IMAGE:-rust:1.67}
-# Debian Bullseye https://hub.docker.com/layers/library/debian/bullseye-20230227/images/sha256-6f1f698e20c8ae73b110eb614a2c6d13fbdb504bbbbcf2965c4d0b80b7bb7fb1?context=explore
-ARG DEBIAN_IMAGE=${RUST_IMAGE:-debian:bullseye-20230227@sha256:6f1f698e20c8ae73b110eb614a2c6d13fbdb504bbbbcf2965c4d0b80b7bb7fb1}
+ARG HOPR_TOOLCHAIN_IMAGE=${HOPR_TOOLCHAIN_IMAGE:-gcr.io/hoprassociation/hopr-toolchain:latest}
+# Debian 11.5 https://hub.docker.com/layers/library/debian/bullseye-slim/images/sha256-64e251208f3bddf166a7020437103f75aabf3fceb1d5bd932272f3f73668caa9?context=explore
+ARG DEBIAN_IMAGE=${DEBIAN_IMAGE:-debian:bullseye-slim@sha256:64e251208f3bddf166a7020437103f75aabf3fceb1d5bd932272f3f73668caa9}
 
-FROM ${RUST_IMAGE} as builder
+FROM ${HOPR_TOOLCHAIN_IMAGE} as builder
 
+WORKDIR /app/hopli
 
-RUN mkdir -p /hopli
-WORKDIR /hopli
+# musl toolchain for static binaries
+RUN apt update && apt install -y pkg-config libssl-dev musl-tools
+ENV SYSROOT=/dummy
+ENV OPENSSL_STATIC=1
+ENV OPENSSL_INCLUDE_DIR=/usr/include/openssl
 
 COPY ./packages/hopli/Cargo.toml ./Cargo.toml
 COPY ./packages/hopli/src ./src
 
-RUN cargo build --release
-
+RUN rustup target install $(uname -m)-unknown-linux-musl
+RUN OPENSSL_LIB_DIR=/usr/lib/$(uname -m)-linux-gnu RUSTFLAGS="-C target-feature=+crt-static" cargo build --release --target $(uname -m)-unknown-linux-musl
+RUN rm -rf target/release && \
+    mv target/$(uname -m)-unknown-linux-musl/release target/
 
 FROM ${DEBIAN_IMAGE} as runtime
 
@@ -25,13 +31,16 @@ LABEL name="hopli" \
 # build project sources
 WORKDIR /root
 COPY ./packages/ethereum/contracts /root/contracts
-COPY --from=builder /hopli/target/release/hopli /bin/hopli
+COPY Makefile /root
+COPY --from=builder /app/hopli/target/release/hopli /bin/hopli
 RUN apt-get update && \
-    apt install --no-install-recommends -y git curl ca-certificates && \
-    curl -L "https://raw.githubusercontent.com/foundry-rs/foundry/master/foundryup/install" | bash && \
+    apt install --no-install-recommends -y git curl ca-certificates make && \
+    make install-foundry && \
+    echo "export PATH=${PATH}:/root/.foundry/bin/" >> /root/.bashrc && \
     rm -rf /var/lib/apt/lists/* && \
+    apt remove -y make && \
     apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false && \
-    $HOME/.foundry/bin/foundryup
+    rm /root/Makefile
 
 ENTRYPOINT ["/bin/hopli"]
 CMD ["--help"]

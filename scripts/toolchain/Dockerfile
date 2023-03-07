@@ -42,3 +42,4 @@ RUN make install-foundry
 
 # Downloads prebuilt toolchain utilities
 RUN ./scripts/toolchain/install-toolchain.sh
+RUN echo "export PATH=${PATH}:${HOME}/.cargo/bin:/app/hoprnet-toolchain/.foundry/bin" >> /root/.bashrc
