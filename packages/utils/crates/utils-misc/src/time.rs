@@ -1,5 +1,5 @@
 
-#[cfg(not(wasm))]
+#[cfg(not(feature = "wasm"))]
 pub fn current_timestamp() -> u64 {
     use std::time::{SystemTime, UNIX_EPOCH};
     match SystemTime::now().duration_since(UNIX_EPOCH) {
@@ -9,12 +9,12 @@ pub fn current_timestamp() -> u64 {
 }
 
 
-#[cfg(wasm)]
+#[cfg(feature = "wasm")]
 use wasm::current_timestamp;
 
-#[cfg(wasm)]
+#[cfg(feature = "wasm")]
 mod wasm {
     pub fn current_timestamp() -> u64 {
-        (js_sys::Date::now() / 1000.0) as u64
+        js_sys::Date::now() as u64
     }
 }
