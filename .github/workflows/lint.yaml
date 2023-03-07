@@ -49,11 +49,6 @@ jobs:
             .cargo/.package-cache/
             .cargo/bin/
 
-      - name: Install Protoc
-        uses: arduino/setup-protoc@v1
-        with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Run linter
         run: |
           make -j deps-ci

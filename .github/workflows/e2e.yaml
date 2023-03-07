@@ -56,11 +56,6 @@ jobs:
             .cargo/bin/
             .foundry/bin/
 
-      - name: Install Protoc
-        uses: arduino/setup-protoc@v1
-        with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Install dependencies
         run: make -j deps-ci
 
