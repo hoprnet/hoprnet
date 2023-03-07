@@ -92,7 +92,7 @@ Now that you have started your node, what exactly is your node and what are its 
 The **_identity file_** contains your private key and is essentially your wallet for the node. When you installed your node, you supplied `--identity` and `--password` arguments.
 
 ```bash
-docker run --pull always --restart on-failure -m 2g -ti -v $HOME/.hoprd-db-bogota:/app/hoprd-db -p 9091:9091/tcp -p 9091:9091/udp -p 3001:3001 -e DEBUG="hopr*" gcr.io/hoprassociation/hoprd:1.91.24 --environment monte_rosa --init --api --admin --identity /app/hoprd-db/.hopr-id-bogota --data /app/hoprd-db --password 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' --apiHost "0.0.0.0" --apiToken 'YOUR_SECURITY_TOKEN' --adminHost "0.0.0.0" --healthCheck --healthCheckHost "0.0.0.0"
+docker run --pull always --restart on-failure -m 2g -ti -v $HOME/.hoprd-db-monte-rosa:/app/hoprd-db -p 9091:9091/tcp -p 9091:9091/udp -p 3001:3001 -e DEBUG="hopr*" gcr.io/hoprassociation/hoprd:1.91.24 --environment monte_rosa --init --api --admin --identity /app/hoprd-db/.hopr-id-bogota --data /app/hoprd-db --password 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' --apiHost "0.0.0.0" --apiToken 'YOUR_SECURITY_TOKEN' --adminHost "0.0.0.0" --healthCheck --healthCheckHost "0.0.0.0"
 ```
 
 `--identity` is a path to where the file is located, and `--password` is used to decrypt the file.
