@@ -13,12 +13,7 @@ import { PUBLIC_UDP_RFC_5780_SERVERS, PUBLIC_UDP_STUN_SERVERS } from './udp/cons
 import { isTcpExposedHost } from './tcp/index.js'
 import { exposedResponseToString, STUN_EXPOSED_CHECK_RESPOSE } from './constants.js'
 import { PUBLIC_TCP_RFC_5780_SERVERS } from './tcp/constants.js'
-
-type Interface = {
-  family: 'IPv4' | 'IPv6'
-  port: number
-  address: string
-}
+import type { Interface, InterfaceWithoutPort } from './types.js'
 
 const log = debug('hopr-connect:stun')
 
@@ -39,7 +34,7 @@ export async function getExternalIp(
   multiAddrs: Multiaddr[] | undefined,
   socket: Socket,
   __preferLocalAddress = false
-): Promise<Interface | undefined> {
+): Promise<Interface | InterfaceWithoutPort | undefined> {
   if (__preferLocalAddress) {
     if (multiAddrs == undefined || multiAddrs.length == 0) {
       const socketAddress = socket.address() as Interface | null
