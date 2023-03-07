@@ -209,7 +209,7 @@ contract HoprBoostTest is Test {
     string memory _base,
     string memory _type,
     string memory _rank
-  ) internal returns (string memory) {
+  ) internal pure returns (string memory) {
     return string(abi.encodePacked(_base, _type, '/', _rank));
   }
 }

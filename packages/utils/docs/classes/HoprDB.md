@@ -71,7 +71,7 @@
 - [isEligible](HoprDB.md#iseligible)
 - [isNetworkRegistryEnabled](HoprDB.md#isnetworkregistryenabled)
 - [keyOf](HoprDB.md#keyof)
-- [markLosing](HoprDB.md#marklosing)
+- [markLosingAckedTicket](HoprDB.md#marklosingackedticket)
 - [markPending](HoprDB.md#markpending)
 - [markRedeemeed](HoprDB.md#markredeemeed)
 - [markRejected](HoprDB.md#markrejected)
@@ -1283,15 +1283,15 @@ ___
 
 ___
 
-### markLosing
+### markLosingAckedTicket
 
-▸ **markLosing**(`t`): `Promise`<`void`\>
+▸ **markLosingAckedTicket**(`a`): `Promise`<`void`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `t` | [`UnacknowledgedTicket`](UnacknowledgedTicket.md) |
+| `a` | [`AcknowledgedTicket`](AcknowledgedTicket.md) |
 
 #### Returns
 

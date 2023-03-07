@@ -1,5 +1,8 @@
 # Changelog
 
+- Rebrand `foundry-tool` to `hopli` and allow it to interact with identities and network-registry ([#4652](https://github.com/hoprnet/hoprnet/pull/4652))
+- Migrate mixer code to Rust ([#4567](https://github.com/hoprnet/hoprnet/pull/4567))
+
 <a name="1.92"></a>
 
 ## [1.92](https://github.com/hoprnet/hoprnet/compare/release/bogota...hoprnet:release/riga)
@@ -22,6 +25,11 @@
 - Automatic ticket redemption disabled by default, added `--autoTicketRedemption` CLI option to enable it explicitly ([#4565](https://github.com/hoprnet/hoprnet/pull/4565))
 - Return explict message for unsupported closing incoming channel ([#4551](https://github.com/hoprnet/hoprnet/pull/4551)) with a fix in admin UI ([hopr-admin/#3](https://github.com/hoprnet/hopr-admin/pull/3))
 - Bring back `fund` command, to open outgoing and incoming channels with counterpart ([#4566](https://github.com/hoprnet/hoprnet/pull/4566))
+- Improve Grafana dashboards & compose setup ([#4479](https://github.com/hoprnet/hoprnet/pull/4479))
+- API: Prevent API privilege escalation ([#4625](https://github.com/hoprnet/hoprnet/pull/4625))
+- Assign commitent at ticket redemption, so that tickets can be redeemed with a gap in ticket index ([#4643](https://github.com/hoprnet/hoprnet/pull/4643))
+- Make maximum parallel connections configurable (#[4675](https://github.com/hoprnet/hoprnet/pull/4675))
+- Reduce overall connection timeout from 10s to 3s (#[4680](https://github.com/hoprnet/hoprnet/pull/4680))
 - Migrate mixer code to Rust ([#4567](https://github.com/hoprnet/hoprnet/pull/4567))
 - Primitive & basic types re-created in Rust ([#4645](https://github.com/hoprnet/hoprnet/pull/4645)))
 

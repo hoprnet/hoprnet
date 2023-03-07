@@ -1,0 +1,25 @@
+[package]
+name = "core-network"
+version = "0.1.0"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["console_error_panic_hook", "wasm"]
+wasm = ["dep:wasm-bindgen"]
+
+[dependencies]
+utils-misc = { path = "../../../utils/crates/utils-misc"}
+libp2p = { version = "0.50.0", features = ["async-std", "wasm-bindgen", "wasm-ext"] }
+wasm-bindgen = {version = "0.2.83", optional = true }
+console_error_panic_hook = { version = "0.1.7", optional = true }
+#wee_alloc = { version = "0.4.5", optional = true }
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3.33"
+
+[profile.release]
+opt-level = "s"     # small code size

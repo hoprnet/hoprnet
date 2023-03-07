@@ -76,7 +76,7 @@ docker pull gcr.io/hoprassociation/hoprd:riga
 For ease of use you can set up a shell alias to run the latest release as a docker container:
 
 ```sh
-alias hoprd='docker run --pull always -m 2g -ti -v ${HOPRD_DATA_DIR:-$HOME/.hoprd-db}:/app/db -p 9091:9091 -p 3001:3001 gcr.io/hoprassociation/hoprd:riga'
+alias hoprd='docker run --pull always -m 2g -ti -v ${HOPRD_DATA_DIR:-$HOME/.hoprd-db}:/app/db -p 9091:9091/tcp -p 9091:9091/udp -p 3001:3001 gcr.io/hoprassociation/hoprd:riga'
 ```
 
 **IMPORTANT:** Using the above command will map the database folder used by hoprd to a local folder called `.hoprd-db` in your home directory. You can customize the location of that folder further by executing the following command:
@@ -239,7 +239,7 @@ have an extended monitoring of the HOPR node's activity (using Prometheus + Graf
 To startup a HOPRd node with monitoring, you can use the following command:
 
 ```shell
-docker compose --env-file scripts/compose/default.env --file scripts/compose/docker-compose.yaml up -d
+docker compose --file scripts/compose/docker-compose.yml up -d
 ```
 
 The configuration of the HOPRd node can be changed in the `scripts/compose/default.env` file.
@@ -247,6 +247,8 @@ The configuration of the HOPRd node can be changed in the `scripts/compose/defau
 Once the configuration starts up, the HOPRd Admin UI is accessible as usual via `localhost:3000`. The Grafana instance is
 accessible via `localhost:3030` and is provisioned with a dashboard that contains useful metrics and information
 about the HOPR network as perceived from your node plus some additional runtime information.
+
+The default username for Grafana is `admin` with password `hopr`.
 
 ### Using NPM
 

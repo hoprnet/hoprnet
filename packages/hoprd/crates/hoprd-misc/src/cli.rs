@@ -6,7 +6,7 @@ use clap::{Arg, ArgAction, ArgMatches, Args, Command, FromArgMatches as _};
 use core_ethereum_misc::constants::DEFAULT_CONFIRMATIONS;
 use core_misc::constants::{
     DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_INTERVAL_VARIANCE, DEFAULT_HEARTBEAT_THRESHOLD,
-    DEFAULT_NETWORK_QUALITY_THRESHOLD,
+    DEFAULT_NETWORK_QUALITY_THRESHOLD, DEFAULT_MAX_PARALLEL_CONNECTIONS, DEFAULT_MAX_PARALLEL_CONNECTION_PUBLIC_RELAY
 };
 use core_misc::environment::{Environment, FromJsonFile, PackageJsonFile, ProtocolConfig};
 use core_strategy::{passive::PassiveStrategy, random::RandomStrategy, promiscuous::PromiscuousStrategy, generic::ChannelStrategy};
@@ -148,7 +148,7 @@ struct CliArgs {
         }, 
         env = "HOPRD_HOST", 
         help = "Host to listen on for P2P connections",
-        value_parser = ValueParser::new(parse_host)
+        value_parser = ValueParser::new(parse_host),
     )]
     pub host: Host,
 
@@ -337,6 +337,19 @@ struct CliArgs {
     pub allow_private_node_connections: bool,
 
     #[arg(
+        long = "maxParallelConnections",
+        default_value_t = DEFAULT_MAX_PARALLEL_CONNECTIONS,
+        default_value_ifs = [
+            ("announce", "true", DEFAULT_MAX_PARALLEL_CONNECTION_PUBLIC_RELAY.to_string()),
+        ],
+        value_parser = clap::value_parser!(u32).range(1..),
+        value_name = "CONNECTIONS",
+        help = "Set maximum parallel connections",
+        env = "HOPRD_MAX_PARALLEL_CONNECTIONS"
+    )]
+    pub max_parallel_connections: u32,
+
+    #[arg(
         long = "testAnnounceLocalAddresses",
         env = "HOPRD_TEST_ANNOUNCE_LOCAL_ADDRESSES",
         help = "For testing local testnets. Announce local addresses",
@@ -394,6 +407,16 @@ struct CliArgs {
         hide = true
     )]
     pub test_no_webrtc_upgrade: bool,
+
+    #[arg(
+        long = "testLocalModeStun",
+        help = "Transport testing: use full-featured STUN with local addresses",
+        env = "HOPRD_TEST_LOCAL_MODE_STUN",
+        default_value_t = false,
+        action = ArgAction::SetTrue,
+        hide = true
+    )]
+    pub test_local_mode_stun: bool,
 
     #[arg(
         long = "heartbeatInterval",

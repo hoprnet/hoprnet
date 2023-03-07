@@ -40,7 +40,7 @@ describe('GET /token', function () {
   it('should fail with unauthorized error when using token with missing capability', async function () {
     // create token with wrong capability
     const caps = [{ endpoint: 'tokensCreate' }]
-    const token = await createToken(node.db, caps)
+    const token = await createToken(node.db, undefined, caps)
     await storeToken(node.db, token)
 
     const res = await request(service).get('/api/v2/token').set('x-auth-token', token.id)
@@ -51,7 +51,7 @@ describe('GET /token', function () {
   it('should succeed when using token with correct capability', async function () {
     // create token with correct capability
     const caps = [{ endpoint: 'tokensGetToken' }]
-    const token = await createToken(node.db, caps)
+    const token = await createToken(node.db, undefined, caps)
     await storeToken(node.db, token)
 
     const res = await request(service).get('/api/v2/token').set('x-auth-token', token.id)

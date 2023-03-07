@@ -1,40 +1,40 @@
 {
   "environments": {
     "anvil-localhost": {
-      "stake_season": 6,
-      "indexer_start_block_number": 20,
-      "boost_contract_address": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853",
+      "indexer_start_block_number": 3,
       "stake_contract_address": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6",
+      "token_contract_address": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+      "network_registry_contract_address": "0x610178dA211FEF7D417bC0e6FeD39F05609AD788",
       "network_registry_proxy_contract_address": "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318",
       "environment_type": "development",
-      "channels_contract_address": "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707",
       "xhopr_contract_address": "0xD057604A14982FE8D88c5fC25Aac3267eA142a08",
-      "network_registry_contract_address": "0x610178dA211FEF7D417bC0e6FeD39F05609AD788",
-      "token_contract_address": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
+      "boost_contract_address": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853",
+      "stake_season": 6,
+      "channels_contract_address": "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707"
     },
     "anvil-localhost2": {
-      "stake_season": 6,
-      "indexer_start_block_number": 20,
-      "boost_contract_address": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853",
+      "indexer_start_block_number": 3,
       "stake_contract_address": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6",
+      "token_contract_address": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+      "network_registry_contract_address": "0x610178dA211FEF7D417bC0e6FeD39F05609AD788",
       "network_registry_proxy_contract_address": "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318",
       "environment_type": "development",
-      "channels_contract_address": "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707",
       "xhopr_contract_address": "0xD057604A14982FE8D88c5fC25Aac3267eA142a08",
-      "network_registry_contract_address": "0x610178dA211FEF7D417bC0e6FeD39F05609AD788",
-      "token_contract_address": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
+      "boost_contract_address": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853",
+      "stake_season": 6,
+      "channels_contract_address": "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707"
     },
     "master-staging": {
-      "network_registry_proxy_contract_address": "0x628ED93eEBF1840bF26e8fB62BCe4F1BCCDE9e95",
-      "network_registry_contract_address": "0x278A44a487D2Ca9303c2B9Abe00605B075cBa69F",
-      "environment_type": "staging",
-      "indexer_start_block_number": 26356392,
-      "xhopr_contract_address": "0x4DeCc7e6c63fF6c40630654A3b9C92b937369998",
-      "channels_contract_address": "0xB20ee6e0b714e531CabF2C29fbA147f4e5905B7b",
-      "stake_season": 6,
+      "boost_contract_address": "0x2Fc87247085F4658ADB698cDbF4d732c704f1e06",
       "token_contract_address": "0xf1aDf07D0d4e1beFdDe79066771d057337e55c08",
+      "network_registry_proxy_contract_address": "0x628ED93eEBF1840bF26e8fB62BCe4F1BCCDE9e95",
+      "environment_type": "staging",
+      "xhopr_contract_address": "0x4DeCc7e6c63fF6c40630654A3b9C92b937369998",
+      "stake_season": 6,
       "stake_contract_address": "0x84F238243FA06cac8E9811Cc36D49CB6A86d4c62",
-      "boost_contract_address": "0x2Fc87247085F4658ADB698cDbF4d732c704f1e06"
+      "network_registry_contract_address": "0x278A44a487D2Ca9303c2B9Abe00605B075cBa69F",
+      "channels_contract_address": "0xB20ee6e0b714e531CabF2C29fbA147f4e5905B7b",
+      "indexer_start_block_number": 26356392
     },
     "debug-staging": {
       "stake_season": 6,

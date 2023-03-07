@@ -66,24 +66,26 @@
 | `allowLocalConnections` | `boolean` |
 | `allowPrivateConnections` | `boolean` |
 | `announce` | `boolean` |
-| `checkUnrealizedBalance` | `boolean` |
+| `checkUnrealizedBalance?` | `boolean` |
 | `connector?` | `HoprCoreEthereum` |
 | `createDbIfNotExist` | `boolean` |
 | `dataPath` | `string` |
 | `environment` | [`ResolvedEnvironment`](classes/ResolvedEnvironment.md) |
 | `forceCreateDB` | `boolean` |
-| `heartbeatInterval` | `number` |
-| `heartbeatThreshold` | `number` |
-| `heartbeatVariance` | `number` |
+| `heartbeatInterval?` | `number` |
+| `heartbeatThreshold?` | `number` |
+| `heartbeatVariance?` | `number` |
 | `hosts` | { `ip4?`: `NetOptions` ; `ip6?`: `NetOptions`  } |
 | `hosts.ip4?` | `NetOptions` |
 | `hosts.ip6?` | `NetOptions` |
-| `networkQualityThreshold` | `number` |
-| `onChainConfirmations` | `number` |
+| `maxParallelConnections?` | `number` |
+| `networkQualityThreshold?` | `number` |
+| `onChainConfirmations?` | `number` |
 | `password` | `string` |
 | `strategy` | [`ChannelStrategyInterface`](interfaces/ChannelStrategyInterface.md) |
-| `testing?` | { `announceLocalAddresses?`: `boolean` ; `mockedDHT?`: `Map`<`string`, `string`[]\> ; `mockedNetwork?`: `Libp2pEmitter`<`any`\> ; `noDirectConnections?`: `boolean` ; `noWebRTCUpgrade?`: `boolean` ; `preferLocalAddresses?`: `boolean` ; `useMockedLibp2p?`: `boolean`  } |
+| `testing?` | { `announceLocalAddresses?`: `boolean` ; `localModeStun?`: `boolean` ; `mockedDHT?`: `Map`<`string`, `string`[]\> ; `mockedNetwork?`: `Libp2pEmitter`<`any`\> ; `noDirectConnections?`: `boolean` ; `noWebRTCUpgrade?`: `boolean` ; `preferLocalAddresses?`: `boolean` ; `useMockedLibp2p?`: `boolean`  } |
 | `testing.announceLocalAddresses?` | `boolean` |
+| `testing.localModeStun?` | `boolean` |
 | `testing.mockedDHT?` | `Map`<`string`, `string`[]\> |
 | `testing.mockedNetwork?` | `Libp2pEmitter`<`any`\> |
 | `testing.noDirectConnections?` | `boolean` |
@@ -103,7 +105,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:184](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L184)
+[packages/core/src/index.ts:188](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L188)
 
 ___
 
@@ -113,7 +115,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:199](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L199)
+[packages/core/src/index.ts:203](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L203)
 
 ___
 
@@ -133,7 +135,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:186](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L186)
+[packages/core/src/index.ts:190](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L190)
 
 ## Variables
 
@@ -159,7 +161,7 @@ ___
 
 ### FULL\_VERSION
 
-• `Const` **FULL\_VERSION**: `any` = `pkg.version`
+• `Const` **FULL\_VERSION**: `string` = `pkg.version`
 
 #### Defined in
 
@@ -270,7 +272,7 @@ because Rust does not support exporting constants to WASM
 
 #### Defined in
 
-packages/core/lib/core_misc.d.ts:19
+packages/core/lib/core_misc.d.ts:8
 
 ___
 
@@ -292,7 +294,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/main.ts:212](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L212)
+[packages/core/src/main.ts:213](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L213)
 
 ___
 

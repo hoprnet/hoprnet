@@ -74,7 +74,7 @@ jobs:
         run: ./scripts/install-jq.sh
 
       - name: Test
-        run: ./scripts/run-integration-tests-source.sh
+        run: make exec-script script=./scripts/run-integration-tests-source.sh
 
       - name: Upload node logs (Linux)
         uses: actions/upload-artifact@v3

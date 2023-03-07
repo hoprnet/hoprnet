@@ -7,8 +7,8 @@ WORKSPACES_WITH_RUST_MODULES := $(filter-out ./packages/ethereum/crates,$(wildca
 # Gets all individual crates such that they can get built
 CRATES := $(foreach crate,${WORKSPACES_WITH_RUST_MODULES},$(dir $(wildcard $(crate)/*/Cargo.toml)))
 
-# define specific crate for foundry-tool which is a native helper
-FOUNDRY_TOOL_CRATE := ./packages/ethereum/foundry-tool
+# define specific crate for hopli which is a native helper
+HOPLI_CRATE := ./packages/hopli
 
 # Set local foundry directory (for binaries) and versions
 FOUNDRY_DIR ?= ${CURDIR}/.foundry
@@ -50,13 +50,13 @@ endif
 all: help
 
 .PHONY: $(CRATES)
-$(CRATES): ## builds all Rust crates with wasm-pack (except for foundry-tool)
+$(CRATES): ## builds all Rust crates with wasm-pack (except for hopli)
 # --out-dir is relative to working directory
 	echo "use wasm-pack build"
 	wasm-pack build --target=bundler --out-dir ./pkg $@
 
-.PHONY: $(FOUNDRY_TOOL_CRATE)
-$(FOUNDRY_TOOL_CRATE): ## builds foundry-tool Rust crates with cargo
+.PHONY: $(HOPLI_CRATE)
+$(HOPLI_CRATE): ## builds hopli Rust crates with cargo
 	echo "use cargo build"
 	cargo build --manifest-path $@/Cargo.toml
 # install the package
@@ -162,8 +162,8 @@ ifeq ($(origin NO_CARGO),undefined)
 # Copy bindings to their destination
 # filter out proc-macro crates since they need no compilation
 	$(MAKE) $(filter-out %proc-macros/,$(WORKSPACES_WITH_RUST_MODULES))
-# build foundry-tool
-	$(MAKE) $(FOUNDRY_TOOL_CRATE)
+# build hopli
+	$(MAKE) $(HOPLI_CRATE)
 endif
 
 .PHONY: build-yellowpaper
@@ -248,17 +248,19 @@ run-local: ## run HOPRd from local repo
 .PHONY: fund-local
 fund-local: id_dir=.
 fund-local: ## use faucet script to fund local identities
-	foundry-tool --environment-name anvil-localhost --environment-type development \
-		faucet --password local --use-local-identities --identity-directory "${id_dir}" \
-		--private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
-		--make-root "./packages/ethereum/contracts"
+	IDENTITY_PASSWORD=local PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+		hopli faucet \
+		--environment-name anvil-localhost \
+		--use-local-identities --identity-directory "${id_dir}" \
+		--contracts-root "./packages/ethereum/contracts"
 
 .PHONY: fund-local-all
 fund-local-all: ## use faucet script to fund all the local identities
-	foundry-tool --environment-name anvil-localhost --environment-type development \
-		faucet --password local --use-local-identities --identity-directory "/tmp/" \
-		--private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
-		--make-root "./packages/ethereum/contracts"
+	IDENTITY_PASSWORD=local PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+		hopli faucet \
+		--environment-name anvil-localhost \
+		--use-local-identities --identity-directory "/tmp/" \
+		--contracts-root "./packages/ethereum/contracts"
 
 .PHONY: docker-build-local
 docker-build-local: ## build Docker images locally, or single image if image= is set
@@ -441,6 +443,13 @@ run-hopr-admin: port=3000
 run-hopr-admin: ## launches HOPR Admin in a Docker container, supports port= and version=, use http://host.docker.internal to access the host machine
 	docker run -p $(port):3000 --add-host=host.docker.internal:host-gateway \
 		gcr.io/hoprassociation/hopr-admin:$(version)
+
+.PHONY: exec-script
+exec-script: ## execute given script= with the correct PATH set
+ifeq ($(script),)
+	echo "parameter <script> missing" >&2 && exit 1
+endif
+	bash "${script}"
 
 .PHONY: help
 help:

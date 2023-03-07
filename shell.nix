@@ -24,6 +24,7 @@ mkShell {
 
     ## rust for core development and required utils
     (rust-bin.fromRustupToolchainFile ./rust-toolchain.toml)
+    protobuf
 
     ## python is required by node module bcrypto
     python3
@@ -34,6 +35,7 @@ mkShell {
     # testing utilities
     websocat
     jq
+    yq-go
     vagrant
     shellcheck
 
