@@ -2080,10 +2080,11 @@
               "messagesSign",
               "messagesSendMessage",
               "messageSign",
+              "channelsFundChannels",
               "channelsOpenChannel",
               "channelsGetChannels",
-              "aliasesGetAliases",
               "aliasesSetAlias",
+              "aliasesGetAliases",
               "accountWithdraw",
               "accountGetBalances",
               "accountGetAddresses",
@@ -2093,8 +2094,8 @@
               "peerInfoGetPeerInfo",
               "channelsRedeemTickets",
               "channelsGetTickets",
-              "channelsCloseChannel",
               "channelsGetChannel",
+              "channelsCloseChannel",
               "aliasesGetAlias",
               "aliasesRemoveAlias"
             ]
@@ -2106,7 +2107,7 @@
       "Signature": {
         "type": "string",
         "description": "Signature from requested message.",
-        "example": "0x304402201065a95fd22fc3e48266c3b270ace032489b0177e07d33c59e0d13dccc89108402205f41fb911bcfe485a8e58162ebce90382dc96ccafff378e5c8960e07efcf9e92"
+        "example": 7.115342872866815e167
       },
       "MultiAddress": {
         "type": "string",
@@ -2128,7 +2129,7 @@
         "type": "string",
         "format": "address",
         "description": "Blockchain-native account address. Can be funded from external wallets (starts with **0x...**). It **can't be used** internally to send / receive messages, open / close payment channels.",
-        "example": "0xEA9eDAE5CfC794B75C45c8fa89b605508A03742a"
+        "example": 1.339446426793328e48
       },
       "HoprAddress": {
         "format": "peerId",
@@ -2158,7 +2159,7 @@
           "channelId": {
             "type": "string",
             "description": "Channel ID that can be used in other calls, not to confuse with transaction hash.",
-            "example": "0x04e50b7ddce9770f58cebe51f33b472c92d1c40384759f5a0b1025220bf15ec5"
+            "example": 2.2139386846352097e75
           },
           "peerId": { "$ref": "#/components/schemas/HoprAddress" },
           "status": {

@@ -83,15 +83,29 @@ function generateNodeOptions(argv: CliArgs, environment: ResolvedEnvironment): H
     networkQualityThreshold: argv.network_quality_threshold,
     onChainConfirmations: argv.on_chain_confirmations,
     checkUnrealizedBalance: argv.check_unrealized_balance,
+    maxParallelConnections: argv.max_parallel_connections,
     testing: {
       announceLocalAddresses: argv.test_announce_local_addresses,
       preferLocalAddresses: argv.test_prefer_local_addresses,
       noWebRTCUpgrade: argv.test_no_webrtc_upgrade,
-      noDirectConnections: argv.test_no_direct_connections
+      noDirectConnections: argv.test_no_direct_connections,
+      localModeStun: argv.test_local_mode_stun
     },
     password: argv.password,
     strategy,
     forceCreateDB: argv.force_init
+  }
+
+  if (argv.password !== undefined) {
+    options.password = argv.password as string
+  }
+
+  if (isStrategy(argv.default_strategy)) {
+    options.strategy = StrategyFactory.getStrategy(argv.default_strategy)
+    options.strategy.configure({
+      auto_redeem_tickets: argv.auto_redeem_tickets ?? false,
+      max_channels: argv.max_auto_channels ?? undefined
+    })
   }
 
   return options

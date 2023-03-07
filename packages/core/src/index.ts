@@ -65,10 +65,10 @@ import HoprCoreEthereum, { type Indexer } from '@hoprnet/hopr-core-ethereum'
 
 import {
   type ChannelStrategyInterface,
+  isStrategy,
   OutgoingChannelStatus,
   SaneDefaults,
   Strategy,
-  isStrategy,
   StrategyFactory,
   StrategyTickResult
 } from './channel-strategy.js'
@@ -148,12 +148,13 @@ export type HoprOptions = {
     ip4?: NetOptions
     ip6?: NetOptions
   }
-  heartbeatInterval: number
-  heartbeatThreshold: number
-  heartbeatVariance: number
-  networkQualityThreshold: number
-  onChainConfirmations: number
-  checkUnrealizedBalance: boolean
+  heartbeatInterval?: number
+  heartbeatThreshold?: number
+  heartbeatVariance?: number
+  networkQualityThreshold?: number
+  onChainConfirmations?: number
+  checkUnrealizedBalance?: boolean
+  maxParallelConnections?: number
   testing?: {
     // when true, assume that the node is running in an isolated network and does
     // not need any connection to nodes outside of the subnet
@@ -167,6 +168,9 @@ export type HoprOptions = {
     // to test NAT behavior
     // default: false
     noDirectConnections?: boolean
+    // local-mode STUN, used for unit testing and e2e testing
+    // default: false
+    localModeStun?: boolean
     // when true, even if a direct WebRTC connection is possible,
     // don't do the upgrade to it to test bidirectional NAT
     // default: false
@@ -274,7 +278,7 @@ class Hopr extends EventEmitter {
    *
    * @param __testingLibp2p use simulated libp2p instance for testing
    */
-  public async start(__testingLibp2p?: Libp2p) {
+  public async start(__initialNodes?: { id: PeerId; multiaddrs: Multiaddr[] }[], __testingLibp2p?: Libp2p) {
     this.status = 'INITIALIZING'
     log('Starting hopr node...')
 
@@ -302,7 +306,7 @@ class Hopr extends EventEmitter {
     }
 
     // Fetch previous announcements from database
-    const initialNodes = await connector.waitForPublicNodes()
+    const initialNodes = __initialNodes ?? (await connector.waitForPublicNodes())
 
     // Add all initial public nodes to public nodes cache
     initialNodes.forEach((initialNode) => this.knownPublicNodesCache.add(initialNode.id.toString()))
@@ -430,8 +434,7 @@ class Hopr extends EventEmitter {
         this.emit(`hopr:message-acknowledged:${ackChallenge.toHex()}`)
         this.emit('hopr:message-acknowledged', ackChallenge.toHex())
       },
-      (ack: AcknowledgedTicket) => connector.emit('ticket:win', ack),
-      () => {},
+      (ack: AcknowledgedTicket) => connector.emit('ticket:acknowledged', ack),
       this.environment
     )
 
@@ -647,20 +650,24 @@ class Hopr extends EventEmitter {
     try {
       let outgoingChannels = 0
       for await (const channel of this.db.getChannelsFromIterable(selfAddr)) {
-        metric_channelBalances.set(
-          [channel.source.toAddress().toHex(), 'out'],
-          +ethersUtils.formatEther(channel.balance.toBN().toString())
-        )
-        outgoingChannels++
+        if (channel.status == ChannelStatus.Open) {
+          metric_channelBalances.set(
+            [channel.source.toAddress().toHex(), 'out'],
+            +ethersUtils.formatEther(channel.balance.toBN().toString())
+          )
+          outgoingChannels++
+        }
       }
 
       let incomingChannels = 0
       for await (const channel of this.db.getChannelsToIterable(selfAddr)) {
-        metric_channelBalances.set(
-          [channel.source.toAddress().toHex(), 'in'],
-          +ethersUtils.formatEther(channel.balance.toBN().toString())
-        )
-        incomingChannels++
+        if (channel.status == ChannelStatus.Open) {
+          metric_channelBalances.set(
+            [channel.source.toAddress().toHex(), 'in'],
+            +ethersUtils.formatEther(channel.balance.toBN().toString())
+          )
+          incomingChannels++
+        }
       }
 
       metric_inChannelCount.set(incomingChannels)
@@ -1139,11 +1146,11 @@ class Hopr extends EventEmitter {
     log('setting channel strategy from', this.strategy?.name, 'to', strategy.name)
     this.strategy = strategy
 
-    HoprCoreEthereum.getInstance().on('ticket:win', async (ack: AcknowledgedTicket) => {
+    HoprCoreEthereum.getInstance().on('ticket:acknowledged', async (ack: AcknowledgedTicket) => {
       try {
-        await this.strategy.onWinningTicket(ack)
+        await this.strategy.onAckedTicket(ack)
       } catch (err) {
-        error(`Strategy error while handling winning ticket`, err)
+        error(`Strategy error while handling acknowledged ticket`, err)
       }
     })
   }

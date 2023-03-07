@@ -35,6 +35,7 @@ mkShell {
     # testing utilities
     websocat
     jq
+    yq-go
     vagrant
     shellcheck
 

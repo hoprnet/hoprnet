@@ -19,6 +19,7 @@
     "declarationMap": true,
     "allowSyntheticDefaultImports": true,
     "module": "nodenext",
-    "moduleResolution": "nodenext"
+    "moduleResolution": "nodenext",
+    "resolveJsonModule": true
   }
 }
