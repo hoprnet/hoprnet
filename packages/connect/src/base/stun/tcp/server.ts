@@ -57,7 +57,7 @@ export async function handleTcpStunRequest(
         const response = createMessage(constants.STUN_BINDING_RESPONSE, request.transactionId)
 
         verbose(
-          `Received ${request.isLegacy() ? 'legacy ' : ''}STUN request from ${socket.remoteAddress}:${
+          `Received ${request.isLegacy() ? 'legacy ' : ''}TCP STUN request from ${socket.remoteAddress}:${
             socket.remotePort
           }`
         )
