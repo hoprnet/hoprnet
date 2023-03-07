@@ -44,7 +44,7 @@ COPY scripts/toolchain/install-toolchain.sh ./scripts/toolchain
 
 RUN apt-get update \
  && apt-get install -y \
-      bash curl jq tini ca-certificates tar xz-utils \
+ bash curl jq tini ca-certificates tar xz-utils \
  && rm -rf /var/lib/apt/lists/* \
  && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
  # Install Node.js
@@ -89,7 +89,8 @@ EXPOSE 3000
 EXPOSE 3001
 # Healthcheck server
 EXPOSE 8080
-# p2p
-EXPOSE 9091
+# p2p UDP + TCP
+EXPOSE 9091/udp
+EXPOSE 9091/tcp
 
 ENTRYPOINT ["/usr/bin/tini", "--", "node", "./lib/main.cjs"]
