@@ -133,8 +133,8 @@ build-solidity-types: ## generate Solidity typings
 	rm -rf packages/ethereum/crates/bindings; mkdir packages/ethereum/crates/bindings
 	$(MAKE) -C packages/ethereum/contracts/ overwrite-sc-bindings
 # Change git = "http://..." into version = "1.0.2"
-	sed -i -e 's/https:\/\/github.com\/gakonst\/ethers-rs/1.0.2/g' ${CURDIR}/packages/ethereum/crates/bindings/Cargo.toml
-	sed -i -e 's/git/version/g' ${CURDIR}/packages/ethereum/crates/bindings/Cargo.toml
+# sed -i -e 's/https:\/\/github.com\/gakonst\/ethers-rs/1.0.2/g' ${CURDIR}/packages/ethereum/crates/bindings/Cargo.toml
+# sed -i -e 's/git/version/g' ${CURDIR}/packages/ethereum/crates/bindings/Cargo.toml
 # add [lib] as rlib is necessary to run integration tests
 	echo -e "\n[lib] \ncrate-type = [\"cdylib\", \"rlib\"]" >> ${CURDIR}/packages/ethereum/crates/bindings/Cargo.toml
 
@@ -198,7 +198,8 @@ clean: # Cleanup build directories (lib,build, ...etc.)
 reset: # Performs cleanup & also deletes all "node_modules" directories
 reset: clean
 # remove contract bindings
-	rm -rf packages/ethereum/crates/bindings
+	rm -rf packages/ethereum/crates/bindings/src
+	mkdir packages/ethereum/crates/bindings/src & touch packages/ethereum/crates/bindings/src/lib.rs
 	yarn reset
 
 .PHONY: test

@@ -21,6 +21,7 @@ wasm-bindgen = { version = "0.2.83", optional = true }
 utils-proc-macros = { path = "../../../utils/crates/utils-proc-macros" }
 # hopr internal
 hopr-core-misc = { path = "../../../core/crates/core-misc", package = "core-misc" }
+hopr-ethereum = { path = "../../../ethereum/crates/bindings", package = "bindings" }
 
 console_error_panic_hook = { version = "0.1.6", optional = true }
 # wee_alloc = { version = "0.4.5", optional = true }
