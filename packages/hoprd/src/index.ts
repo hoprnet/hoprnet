@@ -88,7 +88,7 @@ function generateNodeOptions(argv: CliArgs, environment: ResolvedEnvironment): H
       announceLocalAddresses: argv.test_announce_local_addresses,
       preferLocalAddresses: argv.test_prefer_local_addresses,
       noWebRTCUpgrade: argv.test_no_webrtc_upgrade,
-      noDirectConnections: argv.test_no_direct_connections
+      noDirectConnections: argv.test_no_direct_connections,
       localModeStun: argv.test_local_mode_stun
     },
     password: argv.password,
