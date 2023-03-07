@@ -1,0 +1,14 @@
+erlang_application(
+    name = "buck2_shell_utils",
+    srcs = glob(["src/*.erl"]),
+    applications = [
+        "kernel",
+        "stdlib",
+    ],
+    included_applications = [
+        "prelude//erlang/common_test/test_exec:test_exec",
+        "prelude//erlang/toolchain:resources[jsone]",
+    ],
+    shell_libs = [],
+    visibility = ["PUBLIC"],
+)
