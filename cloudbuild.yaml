@@ -4,6 +4,7 @@ steps:
     args:
       - --dockerfile=scripts/toolchain/Dockerfile
       - --destination=gcr.io/${PROJECT_ID}/hopr-toolchain:${_IMAGE_VERSION}
+      - --destination=gcr.io/${PROJECT_ID}/hopr-toolchain:latest
       - --cache=true
       - --cache-ttl=168h
     timeout: 1200s
@@ -42,6 +43,14 @@ steps:
     timeout: 1200s
     waitFor:
       - 'buildHoprToolchain'
+  - name: 'gcr.io/kaniko-project/executor:v1.9.1'
+    id: buildHopli
+    args:
+      - --dockerfile=packages/hopli/Dockerfile
+      - --destination=gcr.io/${PROJECT_ID}/hopli:${_IMAGE_VERSION}
+      - --cache=true
+      - --cache-ttl=96h
+    timeout: 1200s
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: testImages
     script: |
