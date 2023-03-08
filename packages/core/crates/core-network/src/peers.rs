@@ -4,7 +4,11 @@ use std::time::Duration;
 
 use libp2p::PeerId;
 
-use utils_misc::time::current_timestamp;
+#[cfg(any(not(feature = "wasm"), test))]
+use utils_misc::time::native::current_timestamp;
+
+#[cfg(all(feature = "wasm", not(test)))]
+use utils_misc::time::wasm::current_timestamp;
 
 
 /// Minimum delay will be multiplied by backoff, it will be half the actual minimum value
@@ -289,7 +293,7 @@ mod tests {
             vec!(),
             0.6, Box::new(|x| { () }));
 
-        let ts = utils_misc::time::current_timestamp();
+        let ts = current_timestamp();
 
         peers.update_record(heartbeat::HeartbeatPingResult{
             destination: peer.clone(),
@@ -332,7 +336,7 @@ mod tests {
             vec!(),
             0.6, Box::new(|x| { () }));
 
-        let ts = utils_misc::time::current_timestamp();
+        let ts = current_timestamp();
 
         peers.update_record(heartbeat::HeartbeatPingResult{
             destination: first.clone(),
