@@ -4,7 +4,11 @@ use std::time::Duration;
 
 use libp2p::PeerId;
 
-use utils_misc::time::current_timestamp;
+#[cfg(any(not(feature = "wasm"), test))]
+use utils_misc::time::native::current_timestamp;
+
+#[cfg(all(feature = "wasm", not(test)))]
+use utils_misc::time::wasm::current_timestamp;
 
 
 /// Minimum delay will be multiplied by backoff, it will be half the actual minimum value
@@ -289,7 +293,7 @@ mod tests {
             vec!(),
             0.6, Box::new(|x| { () }));
 
-        let ts = utils_misc::time::current_timestamp();
+        let ts = current_timestamp();
 
         peers.update_record(heartbeat::HeartbeatPingResult{
             destination: peer.clone(),
@@ -327,12 +331,15 @@ mod tests {
     fn test_peers_should_be_listed_for_the_ping_since_if_the_were_recorded_later_than_reference() {
         let first = PeerId::random();
         let second = PeerId::random();
+
+        let mut expected = vec!(first, second);
+
         let mut peers = NetworkPeers::new(
-            vec!(first.clone(), second.clone()),
+            expected.clone(),
             vec!(),
             0.6, Box::new(|x| { () }));
 
-        let ts = utils_misc::time::current_timestamp();
+        let ts = current_timestamp();
 
         peers.update_record(heartbeat::HeartbeatPingResult{
             destination: first.clone(),
@@ -343,7 +350,12 @@ mod tests {
             last_seen: Some(ts)
         });
 
-        assert_eq!(peers.ping_since(ts + 3000), vec!(first, second));
+        let mut actual = peers.ping_since(ts + 3000);
+
+        expected.sort();
+        actual.sort();
+
+        assert_eq!(actual, expected);
     }
 
     #[test]
