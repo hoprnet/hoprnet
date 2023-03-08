@@ -331,8 +331,11 @@ mod tests {
     fn test_peers_should_be_listed_for_the_ping_since_if_the_were_recorded_later_than_reference() {
         let first = PeerId::random();
         let second = PeerId::random();
+
+        let mut expected = vec!(first, second);
+
         let mut peers = NetworkPeers::new(
-            vec!(first.clone(), second.clone()),
+            expected.clone(),
             vec!(),
             0.6, Box::new(|x| { () }));
 
@@ -347,7 +350,12 @@ mod tests {
             last_seen: Some(ts)
         });
 
-        assert_eq!(peers.ping_since(ts + 3000), vec!(first, second));
+        let mut actual = peers.ping_since(ts + 3000);
+
+        expected.sort();
+        actual.sort();
+
+        assert_eq!(actual, expected);
     }
 
     #[test]
