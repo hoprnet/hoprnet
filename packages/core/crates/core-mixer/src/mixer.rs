@@ -7,10 +7,10 @@ use rand::Rng;
 use crate::future_extensions::StreamThenConcurrentExt;
 
 
-#[cfg(not(wasm))]
+#[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::sleep as sleep;
 
-#[cfg(wasm)]
+#[cfg(all(feature = "wasm", not(test)))]
 use gloo_timers::future::sleep as sleep;
 
 
@@ -114,8 +114,9 @@ mod tests {
 
         let _ = stream.collect::<Vec<i32>>().await;
 
-        assert_gt!(start.elapsed(), constant_delay);
-        assert_lt!(start.elapsed() - constant_delay, tolerance);
+        let elapsed = start.elapsed();
+        assert_gt!(elapsed, constant_delay);
+        assert_lt!(elapsed - constant_delay, tolerance);
     }
 
     #[async_std::test]
