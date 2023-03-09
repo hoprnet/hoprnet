@@ -5,7 +5,7 @@ use crate::crypto::{Challenge, ethereum_signed_hash, Hash, PublicKey, Signature}
 use crate::errors::{Result, GeneralError::ParseError};
 use crate::primitives::{Address, Balance, BalanceType, EthereumChallenge, U256};
 
-#[cfg(feature = "wasm")]
+#[cfg(all(feature = "wasm", not(test)))]
 use utils_misc::time::wasm::current_timestamp;
 
 #[cfg(any(not(feature = "wasm"), test))]
@@ -209,6 +209,7 @@ impl Ticket {
         ret
     }
 
+    /// Creates a new Ticket given the raw Challenge and signs it using the given key.
     pub fn create(counterparty: Address, challenge: Challenge, epoch: U256, index: U256, amount: Balance, win_prob: U256, channel_epoch: U256, signing_key: &[u8]) -> Self {
         let encoded_challenge = challenge.to_ethereum_challenge();
         let hashed_ticket = Hash::create(&[&Self::serialize_unsigned_aux(&counterparty, &encoded_challenge, &epoch, &amount, &win_prob, &index, &channel_epoch)]);
@@ -328,6 +329,13 @@ pub mod tests {
 
         let ce2 = ChannelEntry::deserialize(&ce1.serialize()).unwrap();
         assert_eq!(ce1, ce2);
+    }
+
+    #[test]
+    pub fn channel_status_test() {
+        let cs1 = ChannelStatus::Open;
+        let cs2 = ChannelStatus::from_byte(cs1.to_byte());
+        assert_eq!(cs1, cs2);
     }
 }
 
