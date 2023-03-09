@@ -23,6 +23,7 @@ target/
 contracts/lcov.info
 
 # ignore content of bindings
-crates/bindings/*
+crates/bindings/src/*
 !crates/bindings/Cargo.toml
+!crates/bindings/src/lib.rs
 !crates/Makefile
