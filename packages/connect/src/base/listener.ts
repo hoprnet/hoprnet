@@ -485,6 +485,25 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
   }
 
   /**
+   * Initiates a STUN request to keep the UDP port mapped
+   */
+  private async renewUdpPortMapping(): Promise<void> {
+    const multiaddrs = this.getUsableStunServers()
+
+    if (multiaddrs.length < 2) {
+      log(`Postponing re-allocation of NAT UDP mapping because not enough STUN servers known.`)
+      return
+    }
+
+    log(`Re-allocating NAT UDP mapping using ${multiaddrs.length} potential servers`)
+    try {
+      await getExternalIp(multiaddrs, this.udpSocket, this.testingOptions.__preferLocalAddresses)
+    } catch (e) {
+      log(`could not get an external ip ${e}`)
+    }
+  }
+
+  /**
    * *Tries* to determine the node's NAT situation. Note that this
    * is *not* an exact science and can lead to incorrect results.
    *
@@ -492,24 +511,10 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
    * @param ownPort the port on which we are listening
    * @returns Promise that resolves once STUN request came back or STUN timeout was reched
    */
-  async checkNATSituation(ownAddress: string, ownPort: number): Promise<NATSituation> {
+  async checkNATSituation(_ownAddress: string, ownPort: number): Promise<NATSituation> {
     // Continously contacts other stun servers to preserve NAT mapping
     this.stopUdpSocketKeepAliveInterval = retimer(
-      async () => {
-        const multiaddrs = this.getUsableStunServers(ownAddress, ownPort)
-
-        if (multiaddrs.length < 2) {
-          log(`Postponing re-allocation of NAT UDP mapping because not enough STUN servers known.`)
-          return
-        }
-
-        log(`Re-allocating NAT UDP mapping using ${multiaddrs.length} potential servers`)
-        try {
-          await getExternalIp(multiaddrs, this.udpSocket, this.testingOptions.__preferLocalAddresses)
-        } catch (e) {
-          log(`could not get an external ip ${e}`)
-        }
-      },
+      this.renewUdpPortMapping.bind(this),
       // Following recommendations of https://www.rfc-editor.org/rfc/rfc5626
       () => randomInteger(24_000, 29_000)
     )
@@ -526,7 +531,7 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
       }
     }
 
-    const usableStunServers = this.getUsableStunServers(ownAddress, ownPort)
+    const usableStunServers = this.getUsableStunServers()
 
     // allocate UDP port mapping
     let externalInterface = await getExternalIp(
@@ -584,7 +589,11 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
    * @param ownHost [optional] the host on which we are listening
    * @returns a list of STUN servers, excluding ourself
    */
-  private getUsableStunServers(ownHost: string, ownPort: number): Multiaddr[] {
+  private getUsableStunServers(interfaceToExculude?: Interface): Multiaddr[] {
+    // By default, use TCP socket address,
+    // alternatively on demand, use different interface to exclude
+    const ownInterface = interfaceToExculude ?? (this.tcpSocket.address() as AddressInfo)
+
     const filtered = []
 
     let usableNodes: PeerStoreType[] = this.connectComponents.getEntryNodes().getAvailabeEntryNodes()
@@ -609,7 +618,7 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
           continue
         }
 
-        if (cOpts.host === ownHost && cOpts.port === ownPort) {
+        if (cOpts.host === ownInterface.address && cOpts.port == ownInterface.port) {
           // Exclude self
           continue
         }
