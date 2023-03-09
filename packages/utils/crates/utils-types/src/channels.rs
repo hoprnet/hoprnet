@@ -1,10 +1,15 @@
 use std::ops::{Div, Mul, Sub};
 use ethnum::u256;
 use serde_repr::*;
-use utils_misc::time::native::current_timestamp;
 use crate::crypto::{Challenge, ethereum_signed_hash, Hash, PublicKey, Signature};
 use crate::errors::{Result, GeneralError::ParseError};
 use crate::primitives::{Address, Balance, BalanceType, EthereumChallenge, U256};
+
+#[cfg(feature = "wasm")]
+use utils_misc::time::native::current_timestamp;
+
+#[cfg(not(feature = "wasm"))]
+use utils_misc::time::wasm::current_timestamp;
 
 /// Describes status of a channel
 #[repr(u8)]
