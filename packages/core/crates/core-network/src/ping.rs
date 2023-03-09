@@ -11,17 +11,21 @@ use futures::{
 };
 use libp2p::PeerId;
 
-use utils_metrics::metrics::{SimpleHistogram, SimpleCounter};
-// use utils_misc::time::current_timestamp;
-pub fn current_timestamp() -> u64 {
-    (js_sys::Date::now() / 1000.0) as u64
-}
+use utils_metrics::metrics::native::SimpleCounter;
+#[cfg(any(not(feature = "wasm"), test))]
+use utils_metrics::metrics::native::SimpleHistogram;
+#[cfg(any(not(feature = "wasm"), test))]
+use utils_misc::time::native::current_timestamp;
+#[cfg(any(not(feature = "wasm"), test))]
+use async_std::task::sleep as sleep;
 
-// #[cfg(not(feature = “wasm”))]
-// use async_std::task::sleep as sleep;
-//
-// #[cfg(feature = "wasm")]
+#[cfg(all(feature = "wasm", not(test)))]
+use utils_metrics::metrics::wasm::SimpleHistogram;
+#[cfg(all(feature = "wasm", not(test)))]
+use utils_misc::time::wasm::current_timestamp;
+#[cfg(all(feature = "wasm", not(test)))]
 use gloo_timers::future::sleep as sleep;
+
 
 const PINGS_MAX_PARALLEL: usize = 14;
 
@@ -48,7 +52,7 @@ pub struct PingConfig {
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Ping {
     config: PingConfig,
-    protocol_heartbeat: [String; 2],
+    _protocol_heartbeat: [String; 2],
     external_api: Box<dyn PingCallable>,
     metric_time_to_heartbeat: Option<SimpleHistogram>,
     metric_time_to_ping: Option<SimpleHistogram>,
@@ -64,7 +68,7 @@ impl Ping {
         };
 
         Ping {
-            protocol_heartbeat: [
+            _protocol_heartbeat: [
                 // new
                 format!("/hopr/{}/heartbeat/{}", &config.environment_id, &config.normalized_version),
                 // deprecated
@@ -72,28 +76,24 @@ impl Ping {
             ],
             config,
             external_api,
-            metric_time_to_heartbeat: None,     // TODO: wasm alternative must be used here
-            metric_time_to_ping: None,          // TODO: wasm alternative must be used here
-            metric_successful_ping_count: None, // TODO: wasm alternative must be used here
-            metric_failed_ping_count: None,     // TODO: wasm alternative must be used here
-            // metric_time_to_heartbeat: SimpleHistogram::create_histogram_with_buckets(
-            //     "core_histogram_heartbeat_time_seconds",
-            //     "Measures total time it takes to probe all other nodes (in seconds)",
-            //     vec![0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0, 60.0, 90.0, 120.0, 300.0]
-            // ).ok(),
-            // metric_time_to_ping: SimpleHistogram::create_histogram_with_buckets(
-            //     "core_histogram_ping_time_seconds",
-            //     "Measures total time it takes to ping a single node (seconds)",
-            //     vec![0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0, 60.0, 90.0, 120.0, 300.0]
-            // ).ok(),
-            // metric_successful_ping_count: SimpleCounter::new(
-            //     "core_counter_heartbeat_successful_pings",
-            //     "Total number of successful pings"
-            // ).ok(),
-            // metric_failed_ping_count: SimpleCounter::new(
-            //     "core_counter_heartbeat_failed_pings",
-            //     "Total number of failed pings"
-            // ).ok(),
+            metric_time_to_heartbeat: SimpleHistogram::new(
+                "core_histogram_heartbeat_time_seconds",
+                "Measures total time it takes to probe all other nodes (in seconds)",
+                vec![0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0, 60.0, 90.0, 120.0, 300.0]
+            ).ok(),
+            metric_time_to_ping: SimpleHistogram::new(
+                "core_histogram_ping_time_seconds",
+                "Measures total time it takes to ping a single node (seconds)",
+                vec![0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0, 60.0, 90.0, 120.0, 300.0]
+            ).ok(),
+            metric_successful_ping_count: SimpleCounter::new(
+                "core_counter_heartbeat_successful_pings",
+                "Total number of successful pings"
+            ).ok(),
+            metric_failed_ping_count: SimpleCounter::new(
+                "core_counter_heartbeat_failed_pings",
+                "Total number of failed pings"
+            ).ok(),
         }
     }
 
@@ -242,6 +242,7 @@ pub mod wasm {
     use std::str::FromStr;
     use js_sys::JsString;
     use wasm_bindgen::prelude::*;
+    use wasm_bindgen::JsCast;
 
     #[wasm_bindgen]
     extern "C" {
@@ -336,7 +337,7 @@ pub mod wasm {
                             let data =
                                 wasm_bindgen_futures::JsFuture::from(promise).await
                                     .map(|x| js_sys::Uint8Array::new(&x).to_vec().into_boxed_slice())
-                                    .map_err(|x| JsString::try_from(&x)
+                                    .map_err(|x| x.dyn_ref::<JsString>()
                                         .map_or("Failed to send ping message".to_owned(), |x| -> String { x.into() }));
 
                             data
@@ -353,9 +354,6 @@ pub mod wasm {
         }
     }
 }
-
-#[cfg(test)]
-use tests::send_ping;
 
 #[cfg(test)]
 mod tests {

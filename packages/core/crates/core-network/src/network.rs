@@ -4,33 +4,13 @@ use std::time::Duration;
 
 use libp2p::PeerId;
 
-use utils_metrics::metrics::{MultiGauge, SimpleGauge};
-// use utils_misc::time::current_timestamp;
+use utils_metrics::metrics::native::{MultiGauge, SimpleGauge};
 
+#[cfg(any(not(feature = "wasm"), test))]
+use utils_misc::time::native::current_timestamp;
 
-// #[cfg(not(wasm))]
-// pub fn current_timestamp() -> u64 {
-//     panic!("This should not even be loaded");
-//     use std::time::{SystemTime, UNIX_EPOCH};
-//     match SystemTime::now().duration_since(UNIX_EPOCH) {
-//         Ok(d) => d.as_millis() as u64,
-//         Err(_) => 1,
-//     }
-// }
-
-
-// #[cfg(wasm)]
-pub fn current_timestamp() -> u64 {
-    (js_sys::Date::now() / 1000.0) as u64
-}
-
-
-// #[cfg(feature = "wasm")]
-// mod wasm {
-//     pub fn current_timestamp() -> u64 {
-//         (js_sys::Date::now() / 1000.0) as u64
-//     }
-// }
+#[cfg(all(feature = "wasm", not(test)))]
+use utils_misc::time::wasm::current_timestamp;
 
 
 /// Minimum delay will be multiplied by backoff, it will be half the actual minimum value
@@ -194,17 +174,14 @@ impl Network {
             bad_quality_non_public: HashSet::new(),
             last_health: Health::UNKNOWN,
             network_actions_api,
-            metric_network_health: None,        // TODO: wasm alternative must be used here
-            metric_peers_by_quality: None,      // TODO: wasm alternative must be used here
-            metric_peer_count: None             // TODO: wasm alternative must be used here
-            // metric_network_health: SimpleGauge::new(
-            //     "core_gauge_network_health", "Connectivity health indicator").ok(),
-            // metric_peers_by_quality: MultiGauge::new(
-            //     "core_mgauge_peers_by_quality",
-            //     "Number different peer types by quality",
-            //     &["type", "quality"]
-            // ).ok(),
-            // metric_peer_count: SimpleGauge::new("core_gauge_num_peers", "Number of all peers").ok()
+            metric_network_health: SimpleGauge::new(
+                "core_gauge_network_health", "Connectivity health indicator").ok(),
+            metric_peers_by_quality: MultiGauge::new(
+                "core_mgauge_peers_by_quality",
+                "Number different peer types by quality",
+                &["type", "quality"]
+            ).ok(),
+            metric_peer_count: SimpleGauge::new("core_gauge_num_peers", "Number of all peers").ok()
         };
 
         instance
@@ -706,7 +683,7 @@ mod tests {
         peers.add(&first, PeerOrigin::IncomingConnection);
         peers.add(&second, PeerOrigin::IncomingConnection);
 
-        let ts = utils_misc::time::current_timestamp();
+        let ts = current_timestamp();
 
         let mut expected = vec!(first, second);
         expected.sort();
