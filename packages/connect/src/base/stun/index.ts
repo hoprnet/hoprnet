@@ -28,14 +28,14 @@ const metric_isExposed = create_gauge(
  *
  * @param multiAddrs Multiaddrs to use as STUN servers
  * @param socket Node.JS socket to use for the STUN request
- * @param __preferLocalAddress [testing] assume that all nodes run in a local network
+ * @param preferLocalAddresses [testing] assume that all nodes run in a local network
  */
 export async function getExternalIp(
   multiAddrs: Multiaddr[] | undefined,
   socket: Socket,
-  __preferLocalAddress = false
+  preferLocalAddresses = false
 ): Promise<Interface | InterfaceWithoutPort | undefined> {
-  if (__preferLocalAddress) {
+  if (preferLocalAddresses) {
     if (multiAddrs == undefined || multiAddrs.length == 0) {
       const socketAddress = socket.address() as Interface | null
       if (socketAddress == null) {
@@ -58,13 +58,11 @@ export async function getExternalIp(
   return (
     await performSTUNRequests(
       (function* () {
-        // Intermediate solution, to be changed once more nodes are upgraded
-        // Fallback option
-        if (!__preferLocalAddress) {
-          yield* PUBLIC_UDP_STUN_SERVERS
-        }
         if (multiAddrs != undefined && multiAddrs.length > 0) {
           yield* randomIterator(multiAddrs)
+        }
+        if (!preferLocalAddresses) {
+          yield* PUBLIC_UDP_STUN_SERVERS
         }
       })(),
       socket,
@@ -97,13 +95,12 @@ export async function isExposedHost(
   // receive TCP packets on that port.
   const udpMapped = await isUdpExposedHost(
     (function* () {
-      // Intermediate solution, to be changed once more nodes are upgraded
-      if (!runningLocally) {
-        yield* PUBLIC_UDP_RFC_5780_SERVERS
-      }
-
       if (multiAddrs != undefined && multiAddrs.length > 0) {
         yield* randomIterator(multiAddrs)
+      }
+
+      if (!runningLocally) {
+        yield* PUBLIC_UDP_RFC_5780_SERVERS
       }
     })(),
     udpSocket,
