@@ -373,16 +373,22 @@ impl JsStreamingIterableOutput {
         let iterator_obj = Object::new();
 
         let iterator_fn =
-            std::mem::ManuallyDrop::new(Closure::<dyn FnMut() -> Promise>::new(move || {
-                let fut = unsafe {
-                    std::mem::transmute::<
-                        Next<'_, StreamingIterable>,
-                        Next<'static, StreamingIterable>,
-                    >(this.streaming_iterable.next())
-                };
-                log("rs: iterator code called");
-                wasm_bindgen_futures::future_to_promise(async move { to_jsvalue_stream(fut.await) })
-            }));
+            std::mem::ManuallyDrop::<Closure<dyn FnMut() -> Promise>>::new(Closure::<
+                dyn FnMut() -> Promise,
+            >::new(
+                move || {
+                    let fut = unsafe {
+                        std::mem::transmute::<
+                            Next<'_, StreamingIterable>,
+                            Next<'static, StreamingIterable>,
+                        >(this.streaming_iterable.next())
+                    };
+                    log("rs: iterator code called");
+                    wasm_bindgen_futures::future_to_promise(
+                        async move { to_jsvalue_stream(fut.await) },
+                    )
+                },
+            ));
 
         // {
         //    next(): Promise<IteratorResult> {
@@ -392,7 +398,9 @@ impl JsStreamingIterableOutput {
         Reflect::set(&iterator_obj, &"next".into(), iterator_fn.as_ref()).unwrap();
 
         // let wrapped = Wrapper { js_output: this };
-        let iterable_fn = std::mem::ManuallyDrop::new(Closure::once(move || iterator_obj));
+        let iterable_fn = std::mem::ManuallyDrop::<Closure<dyn FnMut() -> Object>>::new(
+            Closure::once(move || iterator_obj),
+        );
 
         let iterable_obj = Object::new();
 
