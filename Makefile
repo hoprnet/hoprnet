@@ -12,7 +12,7 @@ HOPLI_CRATE := ./packages/hopli
 
 # Set local foundry directory (for binaries) and versions
 FOUNDRY_DIR ?= ${CURDIR}/.foundry
-FOUNDRY_VSN := be7084e
+FOUNDRY_VSN := ed9298d
 
 # Set local cargo directory (for binaries)
 CARGO_DIR := ${CURDIR}/.cargo
