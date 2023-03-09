@@ -6,10 +6,10 @@ use crate::errors::{Result, GeneralError::ParseError};
 use crate::primitives::{Address, Balance, BalanceType, EthereumChallenge, U256};
 
 #[cfg(feature = "wasm")]
-use utils_misc::time::native::current_timestamp;
-
-#[cfg(not(feature = "wasm"))]
 use utils_misc::time::wasm::current_timestamp;
+
+#[cfg(any(not(feature = "wasm"), test))]
+use utils_misc::time::native::current_timestamp;
 
 /// Describes status of a channel
 #[repr(u8)]
