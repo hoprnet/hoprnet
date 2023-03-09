@@ -1,7 +1,7 @@
 use std::ops::{Div, Mul, Sub};
 use ethnum::u256;
 use serde_repr::*;
-use utils_misc::time::current_timestamp;
+use utils_misc::time::native::current_timestamp;
 use crate::crypto::{Challenge, ethereum_signed_hash, Hash, PublicKey, Signature};
 use crate::errors::{Result, GeneralError::ParseError};
 use crate::primitives::{Address, Balance, BalanceType, EthereumChallenge, U256};
