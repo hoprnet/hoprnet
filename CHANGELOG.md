@@ -27,6 +27,9 @@
 - Assign commitent at ticket redemption, so that tickets can be redeemed with a gap in ticket index ([#4643](https://github.com/hoprnet/hoprnet/pull/4643))
 - Make maximum parallel connections configurable (#[4675](https://github.com/hoprnet/hoprnet/pull/4675))
 - Reduce overall connection timeout from 10s to 3s (#[4680](https://github.com/hoprnet/hoprnet/pull/4680))
+- Automatically switch to DHT `server`-mode if node announces public addresses to DHT ([#4685](https://github.com/hoprnet/hoprnet/pull/4685))
+- Enhance address to sorting when dialing nodes ([#4684](https://github.com/hoprnet/hoprnet/pull/4684))
+- Adjust NAT detection mechanism to correctly detect exposed ports on GCP ([#4692](https://github.com/hoprnet/hoprnet/pull/4692))
 
 <a name="1.91"></a>
 

@@ -14,6 +14,8 @@ import type { Components } from '@libp2p/interfaces/components'
 import {
   compareAddressesLocalMode,
   compareAddressesPublicMode,
+  maToClass,
+  AddressClass,
   type HoprConnectConfig,
   PeerConnectionType
 } from '@hoprnet/hopr-connect'
@@ -492,16 +494,81 @@ class Hopr extends EventEmitter {
     log('# STARTED NODE')
     log('ID', this.getId().toString())
     log('Protocol version', VERSION)
-    if (this.libp2pComponents.getAddressManager().getAddresses() !== undefined) {
-      log(`Available under the following addresses:`)
-      for (const ma of this.libp2pComponents.getAddressManager().getAddresses()) {
-        log(` - ${ma.toString()}`)
-      }
-    } else {
-      log(`No multiaddrs has been registered.`)
-    }
+
+    log(this.printAvailableAddresses())
+    log(this.printAvailableProtocols())
+
+    // Enable DHT server-mode if announcing publicly routable addresses to the DHT
+    await this.maybeEnableDhtServerMode()
+
     await this.maybeLogProfilingToGCloud()
+
     this.heartbeat.recalculateNetworkHealth()
+  }
+
+  /**
+   * Pretty-print available addresses
+   */
+  private printAvailableAddresses() {
+    const addrs = this.libp2pComponents.getAddressManager().getAddresses()
+
+    if (addrs == undefined || addrs.length == 0) {
+      return 'Attention: no Multiaddr registered for listening. Node might not be able to communicate.'
+    }
+    let out = 'Available under the following addresses:'
+
+    for (const addr of addrs) {
+      out += ` - ${addr.toString()}\n`
+    }
+
+    return out
+  }
+
+  /**
+   * Pretty-print available addresses
+   */
+  private printAvailableProtocols() {
+    const protos = this.libp2pComponents.getRegistrar().getProtocols()
+
+    if (protos == undefined || protos.length == 0) {
+      return 'Attention: no protocols registered for listening. Node might not be able communicate.'
+    }
+    let out = 'Listening to following protocols:'
+
+    for (const protocol of this.libp2pComponents.getRegistrar().getProtocols()) {
+      out += ` - ${protocol}\n`
+    }
+
+    return out
+  }
+
+  /**
+   * Checks if we are announcing public addresses to the DHT.
+   * If so, switch DHT to `server`-mode such that the node will
+   * reply to DHT queries of other nodes
+   */
+  private async maybeEnableDhtServerMode() {
+    let dht: Components['dht']
+    try {
+      dht = this.libp2pComponents.getDHT()
+    } catch (err) {
+      error(`Cannot switch DHT to server mode:`, err)
+      return
+    }
+
+    if (dht.getMode() === 'server') {
+      // Nothing to do
+      return
+    }
+
+    let announcedAddresses = this.libp2pComponents.getTransportManager().getAddrs()
+
+    for (const addr of announcedAddresses) {
+      if ([AddressClass.Public, AddressClass.Public6].includes(maToClass(addr))) {
+        await dht.setMode('server')
+        break
+      }
+    }
   }
 
   private async maybeLogProfilingToGCloud() {
