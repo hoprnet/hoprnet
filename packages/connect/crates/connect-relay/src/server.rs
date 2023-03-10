@@ -184,7 +184,7 @@ impl Server {
     }
 
     /// Used to attach a new incoming connection
-    fn update(self: Pin<&mut Self>, new_stream: JsStreamingIterable) -> Result<(), String> {
+    pub fn update(self: Pin<&mut Self>, new_stream: JsStreamingIterable) -> Result<(), String> {
         let mut this = self.project();
 
         this.next_stream.take_stream(new_stream)
@@ -373,6 +373,128 @@ impl Sink<Box<[u8]>> for Server {
     }
 }
 
+pub mod wasm {
+    use futures::SinkExt;
+    use wasm_bindgen::prelude::*;
+
+    #[wasm_bindgen]
+    struct Server {
+        w: super::Server,
+    }
+
+    // #[wasm_bindgen]
+    impl Server {
+        // #[wasm_bindgen]
+        pub fn update(&mut self) {
+            self.w.update()
+        }
+        // #[wasm_bindgen(getter)]
+        // pub fn source(&mut self) -> AsyncIterable {
+        //     let this = unsafe { std::mem::transmute::<&mut Self, &'static mut Self>(self) };
+        //     let iterator_obj = Object::new();
+
+        //     let iterator_fn =
+        //         std::mem::ManuallyDrop::<Closure<dyn FnMut() -> Promise>>::new(Closure::<
+        //             dyn FnMut() -> Promise,
+        //         >::new(
+        //             move || {
+        //                 let fut = unsafe {
+        //                     std::mem::transmute::<
+        //                         Next<'_, StreamingIterable>,
+        //                         Next<'static, StreamingIterable>,
+        //                     >(this.streaming_iterable.next())
+        //                 };
+        //                 log("rs: iterator code called");
+        //                 wasm_bindgen_futures::future_to_promise(async move {
+        //                     to_jsvalue_stream(fut.await)
+        //                 })
+        //             },
+        //         ));
+
+        //     // {
+        //     //    next(): Promise<IteratorResult> {
+        //     //      // ... function body
+        //     //    }
+        //     // }
+        //     Reflect::set(&iterator_obj, &"next".into(), iterator_fn.as_ref()).unwrap();
+
+        //     // let wrapped = Wrapper { js_output: this };
+        //     let iterable_fn = std::mem::ManuallyDrop::<Closure<dyn FnMut() -> Object>>::new(
+        //         Closure::once(move || iterator_obj),
+        //     );
+
+        //     let iterable_obj = Object::new();
+
+        //     // {
+        //     //    [Symbol.aysncIterator](): Iterator {
+        //     //      // ... function body
+        //     //    }
+        //     // }
+        //     Reflect::set(
+        //         &iterable_obj,
+        //         &Symbol::async_iterator(),
+        //         // Cast Closure to js_sys::Function
+        //         &iterable_fn.as_ref().unchecked_ref(),
+        //     )
+        //     .unwrap();
+
+        //     iterable_obj.dyn_into().unwrap()
+        // }
+
+        // #[wasm_bindgen]
+        // pub async fn sink(&mut self, source: AsyncIterable) {
+        //     let async_sym = Symbol::async_iterator();
+
+        //     let async_iter_fn = match Reflect::get(&source, async_sym.as_ref()) {
+        //         Ok(x) => x,
+        //         Err(_) => todo!(),
+        //     };
+
+        //     let async_iter_fn: Function = match async_iter_fn.dyn_into() {
+        //         Ok(fun) => fun,
+        //         Err(e) => {
+        //             log(format!("{:?}", e).as_str());
+        //             todo!()
+        //         }
+        //     };
+
+        //     let async_it: AsyncIterator = match async_iter_fn.call0(&source).unwrap().dyn_into() {
+        //         Ok(x) => x,
+        //         Err(e) => {
+        //             log(format!("{:?}", e).as_str());
+        //             todo!()
+        //         }
+        //     };
+
+        //     loop {
+        //         match async_it.next().map(JsFuture::from) {
+        //             Ok(m) => {
+        //                 let foo = match m.await {
+        //                     Ok(x) => x,
+        //                     Err(e) => {
+        //                         self.w.stream.unwrap().close().await;
+        //                         break;
+        //                     }
+        //                 };
+        //                 let next = foo.unchecked_into::<IteratorNext>();
+        //                 if next.done() {
+        //                     self.streaming_iterable.close().await;
+        //                     break;
+        //                 } else {
+        //                     self.streaming_iterable
+        //                         .send(Box::from_iter(Uint8Array::new(&next.value()).to_vec()))
+        //                         .await;
+        //                 }
+        //             }
+        //             Err(e) => {
+        //                 self.streaming_iterable.close().await;
+        //                 break;
+        //             }
+        //         }
+        //     }
+        // }
+    }
+}
 // #[cfg(feature = "wasm")]
 // pub mod wasm {
 //     use super::IntoSink;
