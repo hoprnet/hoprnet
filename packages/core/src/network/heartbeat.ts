@@ -30,7 +30,6 @@ export default class Heartbeat {
     protected networkPeers: Network, // protected for testing
     private libp2pComponents: Components,
     protected sendMessage: SendMessage,
-    private onCloseConnectionCb: (peer: PeerId) => void,
     environmentId: string,
     config: HeartbeatConfig
   ) {
@@ -46,10 +45,9 @@ export default class Heartbeat {
     this.pinger = Pinger.build(
       environmentId,
       NORMALIZED_VERSION,
-      (peer: string) => this.onCloseConnectionCb(peerIdFromString(peer)),
       (peer: string, result: number | undefined) => this.networkPeers.refresh(peer, result),
       (msg: Uint8Array, dest: string): Promise<Uint8Array[]> =>
-        Promise.resolve(this.sendMessage(peerIdFromString(dest), this.protocolHeartbeat, msg, true))
+        this.sendMessage(peerIdFromString(dest), this.protocolHeartbeat, msg, true)
     )
 
     this.pingNode = this.pingNode.bind(this)

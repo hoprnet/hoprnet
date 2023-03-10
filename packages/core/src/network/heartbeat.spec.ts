@@ -12,7 +12,8 @@ import { peerIdFromString } from '@libp2p/peer-id'
 class TestingHeartbeat extends Heartbeat {
   public async checkNodes() {
     try {
-      const thresholdTime = Date.now() - 100_000
+      // timestamp far in the future to allow pinging immediately after the previous ping in the tests
+      const thresholdTime = Date.now() + 1_000_000
 
       return await this.pinger.ping(this.networkPeers.peers_to_ping(BigInt(thresholdTime)))
     } catch (err) {
@@ -105,7 +106,7 @@ function createFakeNetwork() {
   }
 
   // mocks libp2p.dialProtocol
-  const sendMessage = async (self: PeerId, dest: PeerId, protocols: string | string[], msg: Uint8Array) => {
+  const sendMessage = async (self: PeerId, dest: PeerId, protocols: string | string[], msg: Uint8Array): Promise<Uint8Array[]> => {
     let protocol: string
     if (Array.isArray(protocols)) {
       protocol = protocols[0]
@@ -150,9 +151,12 @@ async function getPeer(
   const peers = Network.build(
     self.toString(),
     NETWORK_QUALITY_THRESHOLD,
-    (_: string) => assert.equal(1, 1),
-    (_o: Health, _n: Health) => assert.equal(1, 1),
-    (peerId: string) => !peerIdFromString(peerId).equals(Charly) && !peerIdFromString(peerId).equals(Me)
+    (_: string) => {},
+    (_o: Health, _n: Health) => {},
+    (peerId: string) => !peerIdFromString(peerId).equals(Charly) && !peerIdFromString(peerId).equals(Me),
+      (async () => {
+        assert.fail(`must not call hangUp`)
+      }) as any
   )
 
   let cfg = HeartbeatConfig.build(MAX_PARALLEL_PINGS, 1, 2000, BigInt(15000))
@@ -181,9 +185,6 @@ async function getPeer(
     } as Components,
     ((dest: PeerId, protocols: string | string[], msg: Uint8Array) =>
       network.sendMessage(self, dest, protocols, msg)) as any,
-    (async () => {
-      assert.fail(`must not call hangUp`)
-    }) as any,
     TESTING_ENVIRONMENT,
     cfg
   )
@@ -211,9 +212,10 @@ describe('integration test heartbeat', async () => {
     await peerA.heartbeat.checkNodes()
     await peerA.heartbeat.checkNodes()
     await peerA.heartbeat.checkNodes()
+    await peerA.heartbeat.checkNodes()
 
-    assert.isAbove(peerA.peers.quality_of(Bob.toString()), NETWORK_QUALITY_THRESHOLD)
-    assert.isAbove(peerA.peers.quality_of(Charly.toString()), NETWORK_QUALITY_THRESHOLD)
+    assert.equal(peerA.peers.quality_of(Bob.toString()), NETWORK_QUALITY_THRESHOLD)
+    assert.equal(peerA.peers.quality_of(Charly.toString()), NETWORK_QUALITY_THRESHOLD)
 
     network.unsubscribe(Charly)
     peerC.heartbeat.stop()
@@ -222,7 +224,7 @@ describe('integration test heartbeat', async () => {
     await peerA.heartbeat.checkNodes()
 
     assert.isAbove(peerA.peers.quality_of(Bob.toString()), NETWORK_QUALITY_THRESHOLD)
-    assert.isAtMost(peerA.peers.quality_of(Charly.toString()), NETWORK_QUALITY_THRESHOLD)
+    assert.isBelow(peerA.peers.quality_of(Charly.toString()), NETWORK_QUALITY_THRESHOLD)
 
     peerA.heartbeat.stop()
     peerB.heartbeat.stop()

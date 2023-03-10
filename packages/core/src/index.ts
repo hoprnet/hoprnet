@@ -211,10 +211,6 @@ export type SendMessage = ((
 ) => Promise<Uint8Array[]>) &
   ((dest: PeerId, protocols: string | string[], msg: Uint8Array, includeReply: false, opts?: DialOpts) => Promise<void>)
 
-// function send_ping_message(msg: Uint8Array, recipient: string) -> Promise<Uint8Array[]> {
-//   await sendMessage(peerIdFromString(recipient), this.protocolHeartbeat, msg, true))
-// }
-
 class Hopr extends EventEmitter {
   public status: NodeStatus = 'UNINITIALIZED'
 
@@ -371,7 +367,8 @@ class Hopr extends EventEmitter {
         }
 
         return false
-      }
+      },
+      (peer: string) => this.closeConnectionsTo(peerIdFromString(peer)),
     )
 
     // initialize with all the peers identified in the peer store
@@ -433,7 +430,6 @@ class Hopr extends EventEmitter {
       this.networkPeers,
       this.libp2pComponents,
       sendMessage,
-      this.closeConnectionsTo.bind(this),
       this.environment.id,
       heartbeat_config
     )

@@ -32,8 +32,6 @@ const PINGS_MAX_PARALLEL: usize = 14;
 
 #[cfg_attr(test, mockall::automock)]
 pub trait PingCallable {
-    fn close_connection(&self, peer: &PeerId);
-
     fn on_finished_ping(&self, peer: &PeerId, result: crate::types::Result);
 }
 
@@ -170,14 +168,10 @@ impl Ping {
                 Either::Right((v, _)) => match v {
                     Ok(received) => {
                         let expected = crate::heartbeat::generate_ping_response(challenge.clone());
-                        let r = match compare(expected.as_ref(), received.as_ref()) {
+                        match compare(expected.as_ref(), received.as_ref()) {
                             std::cmp::Ordering::Equal => Ok(()),
                             _ => Err(format!("Received incorrect reply for challenge, expected '{:x?}', but received: {:x?}", expected.as_ref(), received.as_ref()))
-                        };
-
-                        self.external_api.close_connection(&destination);
-
-                        r
+                        }
                     }
                     Err(description) => {
                         Err(format!("Error during ping to peer '{}': {}", destination.to_string(), description))
@@ -245,34 +239,19 @@ pub mod wasm {
     use wasm_bindgen::JsCast;
 
     #[wasm_bindgen]
-    extern "C" {
-        #[wasm_bindgen(catch)]
-        pub async fn send_ping_message(msg: Box<[u8]>, recipient: &str) -> Result<JsValue, JsValue>;
-    }
-
-    #[wasm_bindgen]
     struct WasmPingApi {
         _environment_id: String,
         _version: String,
-        close_connection_cb: js_sys::Function,
         on_finished_ping_cb: js_sys::Function,
     }
 
     impl PingCallable for WasmPingApi {
-        fn close_connection(&self, peer: &PeerId) {
-            let this = JsValue::null();
-            let peer = JsValue::from(peer.to_base58());
-            if let Err(_err) = self.close_connection_cb.call1(&this, &peer) {
-                // TODO: error!("Failed to perform on peer offline operation with: {}", err.as_string())
-            };
-        }
-
         fn on_finished_ping(&self, peer: &PeerId, result: crate::types::Result) {
             let this = JsValue::null();
             let peer = JsValue::from(peer.to_base58());
             let res = {
                 if let Ok(v) = result {
-                    JsValue::from(v)
+                    JsValue::from(v as f64)
                 } else {
                     JsValue::undefined()
                 }
@@ -293,13 +272,11 @@ pub mod wasm {
     impl Pinger {
         #[wasm_bindgen]
         pub fn build(environment_id: String, version: String,
-                     close_connection_cb: js_sys::Function,
                      on_finished_ping_cb: js_sys::Function,
                      send_msg_cb: js_sys::Function) -> Self {
             let api = Box::new(WasmPingApi {
                 _environment_id: environment_id.clone(),
                 _version: version.clone(),
-                close_connection_cb,
                 on_finished_ping_cb,
             });
 
@@ -336,6 +313,7 @@ pub mod wasm {
                             let promise = js_sys::Promise::from(r);
                             let data =
                                 wasm_bindgen_futures::JsFuture::from(promise).await
+                                    .map(|x| js_sys::Array::from(x.as_ref()).get(0))
                                     .map(|x| js_sys::Uint8Array::new(&x).to_vec().into_boxed_slice())
                                     .map_err(|x| x.dyn_ref::<JsString>()
                                         .map_or("Failed to send ping message".to_owned(), |x| -> String { x.into() }));
@@ -419,9 +397,6 @@ mod tests {
         mock.expect_on_finished_ping()
             .with(predicate::eq(peer), predicate::function(|x: &crate::types::Result| x.is_ok()))
             .return_const(());
-        mock.expect_close_connection()
-            .with(predicate::eq(peer))
-            .return_const(());
 
         let pinger = Ping::new(
             simple_ping_config(),
@@ -437,9 +412,6 @@ mod tests {
         mock.expect_on_finished_ping()
             .with(predicate::eq(bad_peer), predicate::function(|x: &crate::types::Result| x.is_err()))
             .return_const(());
-        mock.expect_close_connection()
-            .with(predicate::eq(bad_peer))
-            .return_const(());
 
         let pinger = Ping::new(simple_ping_config(), Box::new(mock) );
         pinger.ping_peers(vec![bad_peer.clone()], &send_ping).await;
@@ -454,9 +426,6 @@ mod tests {
         let mut mock = MockPingCallable::new();
         mock.expect_on_finished_ping()
             .with(predicate::eq(peer), predicate::function(|x: &crate::types::Result| x.is_err()))
-            .return_const(());
-        mock.expect_close_connection()
-            .with(predicate::eq(peer))
             .return_const(());
 
         let pinger = Ping::new(ping_config, Box::new(mock) );
@@ -485,12 +454,6 @@ mod tests {
         mock.expect_on_finished_ping()
             .with(predicate::eq(peers[1].clone()), predicate::function(|x: &crate::types::Result| x.is_ok()))
             .return_const(());
-        mock.expect_close_connection()
-            .with(predicate::eq(peers[0].clone()))
-            .return_const(());
-        mock.expect_close_connection()
-            .with(predicate::eq(peers[1].clone()))
-            .return_const(());
 
         let pinger = Ping::new(simple_ping_config(), Box::new(mock) );
         pinger.ping_peers(peers, &send_ping).await;
@@ -513,14 +476,8 @@ mod tests {
         mock.expect_on_finished_ping()
             .with(predicate::eq(peers[0].clone()), predicate::function(|x: &crate::types::Result| x.is_ok()))
             .return_const(());
-        mock.expect_close_connection()
-            .with(predicate::eq(peers[0].clone()))
-            .return_const(());
         mock.expect_on_finished_ping()
             .with(predicate::eq(peers[1].clone()), predicate::function(|x: &crate::types::Result| x.is_ok()))
-            .return_const(());
-        mock.expect_close_connection()
-            .with(predicate::eq(peers[1].clone()))
             .return_const(());
 
         let pinger = Ping::new(config, Box::new(mock) );
@@ -546,9 +503,6 @@ mod tests {
         let mut mock = MockPingCallable::new();
         mock.expect_on_finished_ping()
             .with(predicate::eq(peers[0].clone()), predicate::function(|x: &crate::types::Result| x.is_ok()))
-            .return_const(());
-        mock.expect_close_connection()
-            .with(predicate::eq(peers[0].clone()))
             .return_const(());
 
         let pinger = Ping::new(config, Box::new(mock) );

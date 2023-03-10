@@ -80,6 +80,8 @@ impl std::fmt::Display for Health {
 pub trait NetworkActionable {
     fn is_public(&self, peer: &PeerId) -> bool;
 
+    fn close_connection(&self, peer: &PeerId);
+
     fn on_peer_offline(&self, peer: &PeerId);
 
     fn on_network_health_change(&self, old: Health, new: Health);
@@ -241,8 +243,10 @@ impl Network {
                 entry.backoff = MAX_BACKOFF.max(entry.backoff.powf(BACKOFF_EXPONENT));
                 entry.quality = 0.0_f64.max(entry.quality - 0.1);
 
-                if entry.quality < self.network_quality_threshold {
-                    self.network_actions_api.on_peer_offline(&entry.id);
+                if entry.quality < 0.001 {
+                    self.network_actions_api.close_connection(&entry.id);
+                    self.prune_from_network_status(&entry.id);
+                    self.entries.remove(entry.id.to_string().as_str());
                     return
                 }
 
@@ -252,6 +256,10 @@ impl Network {
                     self.prune_from_network_status(&entry.id);
                     return
                 }
+
+                if entry.quality < self.network_quality_threshold {
+                    self.network_actions_api.on_peer_offline(&entry.id);
+                }
             } else {
                 entry.heartbeats_succeeded = entry.heartbeats_succeeded + 1;
                 entry.backoff = MIN_BACKOFF;
@@ -260,6 +268,8 @@ impl Network {
 
             self.refresh_network_status(&entry);
             self.entries.insert(entry.id.to_string(), entry);
+        } else {
+            ()      // TODO: info!("Ignoring update request for unknown peer {:?}", peer)
         }
     }
 
@@ -428,6 +438,7 @@ pub mod wasm {
         on_peer_offline_cb: js_sys::Function,
         on_network_health_change_cb: js_sys::Function,
         is_public_cb: js_sys::Function,
+        close_connection_cb: js_sys::Function,
     }
 
     impl NetworkActionable for WasmNetworkApi {
@@ -441,6 +452,14 @@ pub mod wasm {
                     false
                 }
             }
+        }
+
+        fn close_connection(&self, peer: &PeerId) {
+            let this = JsValue::null();
+            let peer = JsValue::from(peer.to_base58());
+            if let Err(_err) = self.close_connection_cb.call1(&this, &peer) {
+                // TODO: error!("Failed to perform on peer offline operation with: {}", err.as_string())
+            };
         }
 
         fn on_peer_offline(&self, peer: &PeerId) {
@@ -467,12 +486,14 @@ pub mod wasm {
         pub fn build(me: JsString, quality_threshold: f64,
                      on_peer_offline: js_sys::Function,
                      on_network_health_change: js_sys::Function,
-                     is_public: js_sys::Function) -> Self {
+                     is_public: js_sys::Function,
+                     close_connection: js_sys::Function) -> Self {
             let me: String = me.into();
             let api = Box::new(WasmNetworkApi{
                 on_peer_offline_cb: on_peer_offline,
                 on_network_health_change_cb: on_network_health_change,
                 is_public_cb: is_public,
+                close_connection_cb: close_connection,
             });
 
             Self::new(
@@ -509,12 +530,14 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub fn refresh(&mut self, peer: JsString, timestamp: &JsValue) {
+        pub fn refresh(&mut self, peer: JsString, timestamp: JsValue) {
             let peer: String = peer.into();
             let result: crate::types::Result = if timestamp.is_undefined() {
-                Err(()) } else {
-                let ts = timestamp.as_f64().unwrap_or(0f64) as u64;
-                if ts > 1 {Ok(ts)} else {Err(())}
+                    Err(())
+                } else {
+                    timestamp.as_f64()
+                        .map(|v| v as u64)
+                        .ok_or(())
                 };
             self.update(&PeerId::from_str(&peer).ok().unwrap(), result)
         }
@@ -547,6 +570,7 @@ pub mod wasm {
 
 #[cfg(test)]
 mod tests {
+    use async_std::task::current;
     use super::*;
 
     struct DummyNetworkAction {}
@@ -561,6 +585,10 @@ mod tests {
         }
 
         fn on_peer_offline(&self, _: &PeerId) {
+            ()
+        }
+
+        fn close_connection(&self, _: &PeerId) {
             ()
         }
     }
@@ -665,12 +693,13 @@ mod tests {
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
 
+        peers.update(&peer, Ok(current_timestamp()));
+        peers.update(&peer, Ok(current_timestamp()));
         peers.update(&peer, Err(()));
 
         let actual = peers.debug_output();
 
-        assert!(actual.contains("last seen on=0"));
-        assert!(actual.contains("heartbeats succeeded=0"));
+        assert!(actual.contains("heartbeats succeeded=2"));
         assert!(actual.contains("backoff=2"));
     }
 
@@ -774,6 +803,36 @@ mod tests {
         peers.update(&peer, Ok(current_timestamp()));
 
         assert_eq!(peers.health(), Health::ORANGE);
+    }
+
+    #[test]
+    fn test_network_should_remove_the_peer_once_it_reaches_the_lowest_possible_quality() {
+        let peer = PeerId::random();
+        let public = peer.clone();
+
+        let mut mock = MockNetworkActionable::new();
+        mock.expect_is_public()
+            .times(1)
+            .returning(move |x| { x == &public });
+        mock.expect_on_network_health_change()
+            .times(1)
+            .return_const(());
+        mock.expect_close_connection()
+            .times(1)
+            .return_const(());
+
+        let mut peers = Network::new(
+            PeerId::random(),
+            0.6,
+            Box::new(mock)
+        );
+
+        peers.add(&peer, PeerOrigin::IncomingConnection);
+
+        peers.update(&peer, Ok(current_timestamp()));
+        peers.update(&peer, Err(()));
+
+        assert!(! peers.has(&public));
     }
 
     #[test]
