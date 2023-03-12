@@ -368,7 +368,7 @@ class Hopr extends EventEmitter {
 
         return false
       },
-      (peer: string) => this.closeConnectionsTo(peerIdFromString(peer)),
+      (peer: string) => this.closeConnectionsTo(peerIdFromString(peer))
     )
 
     // initialize with all the peers identified in the peer store

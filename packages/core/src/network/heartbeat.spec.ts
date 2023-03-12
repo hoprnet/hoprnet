@@ -106,7 +106,12 @@ function createFakeNetwork() {
   }
 
   // mocks libp2p.dialProtocol
-  const sendMessage = async (self: PeerId, dest: PeerId, protocols: string | string[], msg: Uint8Array): Promise<Uint8Array[]> => {
+  const sendMessage = async (
+    self: PeerId,
+    dest: PeerId,
+    protocols: string | string[],
+    msg: Uint8Array
+  ): Promise<Uint8Array[]> => {
     let protocol: string
     if (Array.isArray(protocols)) {
       protocol = protocols[0]
@@ -154,9 +159,9 @@ async function getPeer(
     (_: string) => {},
     (_o: Health, _n: Health) => {},
     (peerId: string) => !peerIdFromString(peerId).equals(Charly) && !peerIdFromString(peerId).equals(Me),
-      (async () => {
-        assert.fail(`must not call hangUp`)
-      }) as any
+    (async () => {
+      assert.fail(`must not call hangUp`)
+    }) as any
   )
 
   let cfg = HeartbeatConfig.build(MAX_PARALLEL_PINGS, 1, 2000, BigInt(15000))
