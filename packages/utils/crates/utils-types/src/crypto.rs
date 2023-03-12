@@ -7,7 +7,7 @@ use k256::{AffinePoint, elliptic_curve, NonZeroScalar, Secp256k1};
 use k256::ecdsa::signature::Verifier;
 use k256::elliptic_curve::generic_array::GenericArray;
 use k256::elliptic_curve::ProjectiveArithmetic;
-use k256::elliptic_curve::sec1::ToEncodedPoint;
+use k256::elliptic_curve::sec1::{FromEncodedPoint, ToEncodedPoint};
 use libp2p_core::PeerId;
 use sha3::{Keccak256, digest::DynDigest};
 use crate::errors::{Result, GeneralError::ParseError};
@@ -23,13 +23,26 @@ pub struct CurvePoint {
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl CurvePoint {
+    /// Creates a new curve point from a serialized encoded point.
+    /// If a compressed representation is given, the point will be decompressed.
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(bytes: &[u8]) -> Self {
-        assert_eq!(bytes.len(), Self::SIZE, "invalid length");
+        let encoded_point = elliptic_curve::sec1::EncodedPoint::<Secp256k1>::from_bytes(bytes)
+            .expect("invalid ec point data");
         let mut ret = CurvePoint {
             uncompressed: [0u8; Self::SIZE]
         };
-        ret.uncompressed.copy_from_slice(bytes);
+
+        // Decompress automatically if a compressed point was provided, which is an expensive op
+        if encoded_point.is_compressed() {
+            let uncompressed = AffinePoint::from_encoded_point(&encoded_point)
+                .unwrap()
+                .to_encoded_point(false);
+            ret.uncompressed.copy_from_slice(uncompressed.as_bytes());
+        } else {
+            ret.uncompressed.copy_from_slice(encoded_point.as_bytes())
+        }
+
         ret
     }
 
@@ -336,7 +349,6 @@ pub fn ethereum_signed_hash<T: AsRef<[u8]>>(message: T) -> Hash {
     eth_message.extend_from_slice(len_string.as_bytes());
     eth_message.extend_from_slice(message);
 
-
     Hash::create(&[&eth_message])
 }
 
@@ -577,8 +589,8 @@ impl Signature {
 #[cfg(test)]
 pub mod tests {
     use hex_literal::hex;
-    use k256::elliptic_curve::ProjectiveArithmetic;
-    use k256::{NonZeroScalar, Secp256k1, U256};
+    use k256::elliptic_curve::{AffineXCoordinate, ProjectiveArithmetic};
+    use k256::{EncodedPoint, NonZeroScalar, Secp256k1, U256};
     use k256::elliptic_curve::sec1::ToEncodedPoint;
     use crate::crypto::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, Hash, PublicKey, Signature};
     use crate::primitives::Address;
@@ -680,6 +692,21 @@ pub mod tests {
 
         assert_eq!(ch1.to_ethereum_challenge(), ch2.to_ethereum_challenge());
         assert_eq!(ch1, ch2);
+
+        // Must be able to create from compressed and uncompressed data
+        let scalar2 = NonZeroScalar::from_uint(U256::from_u8(123)).unwrap();
+        let test_point2 = (<Secp256k1 as ProjectiveArithmetic>::ProjectivePoint::GENERATOR * scalar2.as_ref())
+            .to_affine();
+        let uncompressed = test_point2.to_encoded_point(false);
+        assert!(!uncompressed.is_compressed());
+
+        let compressed = uncompressed.compress();
+        assert!(compressed.is_compressed());
+
+        let cp3 = CurvePoint::new(uncompressed.as_bytes());
+        let cp4 = CurvePoint::new(compressed.as_bytes());
+
+        assert_eq!(cp3, cp4);
     }
 
     #[test]
