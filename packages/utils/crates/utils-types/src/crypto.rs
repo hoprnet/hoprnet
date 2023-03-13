@@ -4,6 +4,7 @@ use std::ops::Add;
 use std::str::FromStr;
 use k256::ecdsa::{SigningKey, Signature as ECDSASignature, VerifyingKey, RecoveryId};
 use k256::{AffinePoint, ecdsa, elliptic_curve, NonZeroScalar, Secp256k1};
+use k256::ecdsa::signature::hazmat::PrehashVerifier;
 use k256::ecdsa::signature::Verifier;
 use k256::elliptic_curve::generic_array::GenericArray;
 use k256::elliptic_curve::ProjectiveArithmetic;
@@ -554,14 +555,34 @@ impl Signature {
                    |k: &SigningKey, data: &[u8]| { k.sign_prehash_recoverable(data) })
     }
 
-    /// Verifies this signature against the given message and a public key (compressed or uncompressed)
-    pub fn verify(&self, message: &[u8], public_key: &[u8]) -> bool {
+    fn verify<V>(&self, message: &[u8], public_key: &[u8], verifier: V) -> bool
+    where V: Fn(&VerifyingKey, &[u8], &ECDSASignature) -> ecdsa::signature::Result<()> {
         let pub_key = VerifyingKey::from_sec1_bytes(public_key)
             .expect("invalid public key");
         let signature = ECDSASignature::try_from(self.signature.as_slice())
             .expect("invalid signature");
 
-        pub_key.verify(message, &signature).is_ok()
+        verifier(&pub_key, message, &signature).is_ok()
+    }
+
+    /// Verifies this signature against the given message and a public key (compressed or uncompressed)
+    pub fn verify_message(&self, message: &[u8], public_key: &[u8]) -> bool {
+        self.verify(message, public_key, |k, msg, sgn| k.verify(msg, sgn))
+    }
+
+    /// Verifies this signature against the given message and a public key object
+    pub fn verify_message_with_pubkey(&self, message: &[u8], public_key: &PublicKey) -> bool {
+        self.verify_message(message, &public_key.serialize(false))
+    }
+
+    /// Verifies this signature against the given hash and a public key (compressed or uncompressed)
+    pub fn verify_hash(&self, hash: &[u8], public_key: &[u8]) -> bool {
+        self.verify(hash, public_key, |k, msg, sgn| k.verify_prehash(msg, sgn))
+    }
+
+    /// Verifies this signature against the given message and a public key object
+    pub fn verify_hash_with_pubkey(&self, message: &[u8], public_key: &PublicKey) -> bool {
+        self.verify_hash(message, &public_key.serialize(false))
     }
 
     pub fn to_hex(&self) -> String {
@@ -617,19 +638,19 @@ pub mod tests {
 
     #[test]
     fn signature_signing_test() {
-        let msg = b"test";
+        let msg = b"test12345";
         let sgn = Signature::sign_message(msg, &PRIVATE_KEY);
 
-        assert!(sgn.verify(msg, &PUBLIC_KEY));
+        assert!(sgn.verify_message(msg, &PUBLIC_KEY));
 
         let extracted_pk = PublicKey::from_signature(msg, &sgn).unwrap();
         let expected_pk = PublicKey::deserialize(&PUBLIC_KEY).unwrap();
-        assert_eq!(expected_pk, extracted_pk);
+        assert_eq!(expected_pk, extracted_pk, "key extracted from signature does not match");
     }
 
     #[test]
     fn signature_serialize_test() {
-        let msg = b"test";
+        let msg = b"test000000";
         let sgn = Signature::sign_message(msg, &PRIVATE_KEY);
 
         let deserialized = Signature::deserialize(&sgn.serialize()).unwrap();
@@ -675,6 +696,14 @@ pub mod tests {
 
         assert_eq!(pub_key1, pub_key2, "recovered public key does not match");
         assert_eq!(pub_key1, pub_key3, "recovered public key does not match");
+
+        assert!(signature1.verify_message_with_pubkey(&msg, &pub_key1), "signature 1 verification failed with pub key 1");
+        assert!(signature1.verify_message_with_pubkey(&msg, &pub_key2), "signature 1 verification failed with pub key 2");
+        assert!(signature1.verify_message_with_pubkey(&msg, &pub_key3), "signature 1 verification failed with pub key 3");
+
+        assert!(signature2.verify_hash_with_pubkey(&msg, &pub_key1), "signature 2 verification failed with pub key 1");
+        assert!(signature2.verify_hash_with_pubkey(&msg, &pub_key2), "signature 2 verification failed with pub key 2");
+        assert!(signature2.verify_hash_with_pubkey(&msg, &pub_key3), "signature 2 verification failed with pub key 3");
     }
 
     #[test]
@@ -697,7 +726,7 @@ pub mod tests {
         let pk2 = PublicKey::deserialize(&PUBLIC_KEY)
             .expect("failed to deserialize");
 
-        assert_eq!(pk1, pk2);
+        assert_eq!(pk1, pk2, "failed to match deserialized pub key");
     }
 
     #[test]
@@ -712,32 +741,32 @@ pub mod tests {
         let cp2 = CurvePoint::deserialize(&cp1.serialize())
             .unwrap();
 
-        assert_eq!(cp1, cp2);
+        assert_eq!(cp1, cp2, "failed to match deserialized curve point");
 
         let pk = PublicKey::from_privkey(&scalar.to_bytes()).unwrap();
 
-        assert_eq!(cp1.to_address(), pk.to_address());
+        assert_eq!(cp1.to_address(), pk.to_address(), "failed to match curve point address with pub key address");
 
         let ch1 = Challenge { curve_point: cp1 };
         let ch2 = Challenge { curve_point: cp2 };
 
         assert_eq!(ch1.to_ethereum_challenge(), ch2.to_ethereum_challenge());
-        assert_eq!(ch1, ch2);
+        assert_eq!(ch1, ch2, "failed to match ethereum challenges from curve points");
 
         // Must be able to create from compressed and uncompressed data
         let scalar2 = NonZeroScalar::from_uint(U256::from_u8(123)).unwrap();
         let test_point2 = (<Secp256k1 as ProjectiveArithmetic>::ProjectivePoint::GENERATOR * scalar2.as_ref())
             .to_affine();
         let uncompressed = test_point2.to_encoded_point(false);
-        assert!(!uncompressed.is_compressed());
+        assert!(!uncompressed.is_compressed(), "given point is compressed");
 
         let compressed = uncompressed.compress();
-        assert!(compressed.is_compressed());
+        assert!(compressed.is_compressed(), "failed to compress points");
 
         let cp3 = CurvePoint::new(uncompressed.as_bytes());
         let cp4 = CurvePoint::new(compressed.as_bytes());
 
-        assert_eq!(cp3, cp4);
+        assert_eq!(cp3, cp4, "failed to match curve point from compressed and uncompressed source");
     }
 
     #[test]
@@ -745,7 +774,7 @@ pub mod tests {
         let hk1 = HalfKey::new(&[0u8; HalfKey::SIZE]);
         let hk2 = HalfKey::deserialize(&hk1.serialize()).unwrap();
 
-        assert_eq!(hk1, hk2);
+        assert_eq!(hk1, hk2, "failed to match deserialized half-key");
     }
 
     #[test]
@@ -753,17 +782,17 @@ pub mod tests {
         let peer_id = PublicKey::deserialize(&PUBLIC_KEY).unwrap().to_peerid();
         let hkc1 = HalfKeyChallenge::from_peerid(&peer_id).unwrap();
         let hkc2 = HalfKeyChallenge::deserialize(&hkc1.serialize()).unwrap();
-        assert_eq!(hkc1, hkc2);
-        assert_eq!(peer_id, hkc2.to_peerid());
+        assert_eq!(hkc1, hkc2, "failed to match deserialized half key challenge");
+        assert_eq!(peer_id, hkc2.to_peerid(), "failed to match half-key challenge peer id");
     }
 
     #[test]
     fn hash_test() {
         let hash1 = Hash::create(&[b"msg"]);
-        assert_eq!("92aef1b955b9de564fc50e31a55b470b0c8cdb931f186485d620729fb03d6f2c", hash1.to_hex());
+        assert_eq!("92aef1b955b9de564fc50e31a55b470b0c8cdb931f186485d620729fb03d6f2c", hash1.to_hex(), "hash test vector failed to match");
 
         let hash2 = Hash::deserialize(&hash1.serialize()).unwrap();
-        assert_eq!(hash1, hash2);
+        assert_eq!(hash1, hash2, "failed to match deserialized hash");
     }
 
 }

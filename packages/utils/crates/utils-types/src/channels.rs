@@ -330,14 +330,14 @@ pub mod tests {
         );
 
         let ce2 = ChannelEntry::deserialize(&ce1.serialize()).unwrap();
-        assert_eq!(ce1, ce2);
+        assert_eq!(ce1, ce2, "deserialized channel entry does not match");
     }
 
     #[test]
     pub fn channel_status_test() {
         let cs1 = ChannelStatus::Open;
         let cs2 = ChannelStatus::from_byte(cs1.to_byte());
-        assert_eq!(cs1, cs2);
+        assert_eq!(cs1, cs2, "channel status does not match");
     }
 
     #[test]
@@ -357,10 +357,10 @@ pub mod tests {
 
         let ticket2 = Ticket::deserialize(&ticket1.serialize()).unwrap();
 
-        assert_eq!(ticket1, ticket2);
+        assert_eq!(ticket1, ticket2, "deserialized ticket does not match");
 
         let pub_key = PublicKey::from_privkey(&SGN_PRIVATE_KEY).unwrap();
-        assert!(ticket1.verify(&pub_key));
+        assert!(ticket1.verify(&pub_key), "failed to verify signed ticket");
     }
 }
 
