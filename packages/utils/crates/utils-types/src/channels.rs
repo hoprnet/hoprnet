@@ -214,7 +214,6 @@ impl Ticket {
         let encoded_challenge = challenge.to_ethereum_challenge();
         let hashed_ticket = Hash::create(&[&Self::serialize_unsigned_aux(&counterparty, &encoded_challenge, &epoch, &amount, &win_prob, &index, &channel_epoch)]);
         let msg = ethereum_signed_hash(hashed_ticket.serialize()).serialize();
-        println!("create: {}",hex::encode(&msg));
         let signature = Signature::sign_message(&msg, signing_key);
 
         Self {
@@ -242,9 +241,7 @@ impl Ticket {
     /// Recovers the signer public key from the embedded ticket signature.
     /// This is possible due this specific instantiation of the ECDSA over the secp256k1 curve.
     pub fn recover_signer(&self) -> PublicKey {
-        let hash = self.get_hash().serialize();
-        println!("recovered: {}", hex::encode(&hash));
-        PublicKey::from_signature_hash(&hash, &self.signature)
+        PublicKey::from_signature(&self.get_hash().serialize(), &self.signature)
             .expect("invalid signature on ticket, public key not recoverable")
     }
 

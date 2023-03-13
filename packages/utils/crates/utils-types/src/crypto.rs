@@ -2,7 +2,7 @@
 
 use std::ops::Add;
 use std::str::FromStr;
-use k256::ecdsa::{SigningKey, Signature as ECDSASignature, signature::Signer, VerifyingKey, RecoveryId};
+use k256::ecdsa::{SigningKey, Signature as ECDSASignature, VerifyingKey, RecoveryId};
 use k256::{AffinePoint, ecdsa, elliptic_curve, NonZeroScalar, Secp256k1};
 use k256::ecdsa::signature::Verifier;
 use k256::elliptic_curve::generic_array::GenericArray;
@@ -465,7 +465,7 @@ impl PublicKey {
                                  &signature.signature[0..Signature::SIZE/2],
                                  &signature.signature[Signature::SIZE/2..],
                                  signature.recovery,
-                                    VerifyingKey::recover_from_prehash)
+                                 VerifyingKey::recover_from_prehash)
     }
 
     /// Sums all given public keys together, creating a new public key.
@@ -502,7 +502,7 @@ impl PublicKey {
     }
 }
 
-/// Represents an ECDSA signature based on the secp256k1 curve.
+/// Represents an ECDSA signature based on the secp256k1 curve with recoverable public key.
 /// This signature encodes the 2-bit recovery information into the
 /// upper-most bits of MSB of the S value, which are never used by this ECDSA
 /// instantiation over secp256k1.
@@ -527,12 +527,31 @@ impl Signature {
         ret
     }
 
-    /// Signs the given message using the raw private key.
-    pub fn sign_message(message: &[u8], private_key: &[u8]) -> Signature {
+    fn sign<S>(data: &[u8], private_key: &[u8], signing_method: S) -> Signature
+    where S: Fn(&SigningKey, &[u8]) -> ecdsa::signature::Result<(ECDSASignature, RecoveryId)> {
         let key = SigningKey::from_bytes(private_key)
             .expect("invalid signing key");
-        let signature: ECDSASignature = key.sign(message);
-        Self::deserialize(signature.to_bytes().as_slice()).expect("signing failed")
+        let (sig, rec) = signing_method(&key, data)
+            .expect("signing failed");
+
+        let mut ret = Signature {
+            signature: [0u8; Self::SIZE],
+            recovery: rec.to_byte()
+        };
+        ret.signature.copy_from_slice(&sig.to_vec());
+        ret
+    }
+
+    /// Signs the given message using the raw private key.
+    pub fn sign_message(message: &[u8], private_key: &[u8]) -> Signature {
+        Self::sign(message, private_key,|k: &SigningKey, data: &[u8]| { k.sign_recoverable(data) })
+    }
+
+    /// Signs the given hash using the raw private key.
+    pub fn sign_hash(hash: &[u8], private_key: &[u8]) -> Signature {
+        Self::sign(hash,
+                   private_key,
+                   |k: &SigningKey, data: &[u8]| { k.sign_prehash_recoverable(data) })
     }
 
     /// Verifies this signature against the given message and a public key (compressed or uncompressed)
@@ -640,11 +659,22 @@ pub mod tests {
         let hash = hex!("fac7acad27047640b069e8157b61623e3cb6bb86e6adf97151f93817c291f3cf");
 
         assert_eq!(address, PublicKey::from_raw_signature(&hash, &r, &s, v, VerifyingKey::recover_from_prehash).unwrap().to_address());
+    }
 
-        let signature = Signature::sign_message(b"test", &PRIVATE_KEY);
+    #[test]
+    fn sign_and_recover_test() {
+        //let msg = b"test";
+        let msg = hex!("eff80b9f035b1d369c6a60f362ac7c8b8c3b61b76d151d1be535145ccaa3e83e");
+
+        let signature1 = Signature::sign_message(&msg, &PRIVATE_KEY);
+        let signature2 = Signature::sign_hash(&msg, &PRIVATE_KEY);
+
         let pub_key1 = PublicKey::from_privkey(&PRIVATE_KEY).unwrap();
-        let pub_key2 = PublicKey::from_signature(b"test", &signature).unwrap();
-        assert_eq!(pub_key1, pub_key2);
+        let pub_key2 = PublicKey::from_signature(&msg, &signature1).unwrap();
+        let pub_key3 = PublicKey::from_signature_hash(&msg, &signature2).unwrap();
+
+        assert_eq!(pub_key1, pub_key2, "recovered public key does not match");
+        assert_eq!(pub_key1, pub_key3, "recovered public key does not match");
     }
 
     #[test]
@@ -667,7 +697,6 @@ pub mod tests {
         let pk2 = PublicKey::deserialize(&PUBLIC_KEY)
             .expect("failed to deserialize");
 
-        assert_eq!(pk1, pk2);
         assert_eq!(pk1, pk2);
     }
 
