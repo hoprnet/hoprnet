@@ -26,19 +26,6 @@ const ALICE_ENTRY = PeerStatus.build(
   0
 )
 
-const ALICE_PEER_INFO = {
-  peerId: ALICE_PEER_ID.toString(),
-  multiAddr: ALICE_MULTI_ADDR.toString(),
-  heartbeats: {
-    sent: ALICE_ENTRY.heartbeats_sent,
-    success: ALICE_ENTRY.heartbeats_succeeded
-  },
-  lastSeen: ALICE_ENTRY.last_seen,
-  quality: ALICE_ENTRY.quality,
-  backoff: ALICE_ENTRY.backoff,
-  isNew: false
-}
-
 const BOB_ENTRY = PeerStatus.build(
   BOB_PEER_ID.toString(),
   PeerOrigin.Initialization,
@@ -49,19 +36,6 @@ const BOB_ENTRY = PeerStatus.build(
   BigInt(0),
   0
 )
-
-const BOB_PEER_INFO = {
-  peerId: BOB_PEER_ID.toString(),
-  multiAddr: BOB_MULTI_ADDR.toString(),
-  heartbeats: {
-    sent: BOB_ENTRY.heartbeats_sent,
-    success: BOB_ENTRY.heartbeats_succeeded
-  },
-  lastSeen: BOB_ENTRY.last_seen,
-  quality: BOB_ENTRY.quality,
-  backoff: BOB_ENTRY.backoff,
-  isNew: true
-}
 
 const CHARLIE_ENTRY = PeerStatus.build(
   CHARLIE_PEER_ID.toString(),
@@ -74,17 +48,43 @@ const CHARLIE_ENTRY = PeerStatus.build(
   0
 )
 
-const CHARLIE_PEER_INFO = {
-  peerId: CHARLIE_PEER_ID.toString(),
-  heartbeats: {
-    sent: CHARLIE_ENTRY.heartbeats_sent,
-    success: CHARLIE_ENTRY.heartbeats_succeeded
-  },
-  lastSeen: CHARLIE_ENTRY.last_seen,
-  quality: CHARLIE_ENTRY.quality,
-  backoff: CHARLIE_ENTRY.backoff,
-  isNew: false
+function toJsonDict(peer: PeerStatus, isNew: boolean, multiaddr: string | undefined) {
+  if (multiaddr === undefined) {
+    return {
+      peerId: peer.peer_id(),
+      heartbeats: {
+        sent: Number(peer.heartbeats_sent),
+        success: Number(peer.heartbeats_succeeded)
+      },
+      lastSeen: Number(peer.last_seen),
+      quality: peer.quality,
+      backoff: peer.backoff,
+      isNew: isNew
+    }
+  } else {
+    return {
+      peerId: peer.peer_id(),
+      multiAddr: multiaddr,
+      heartbeats: {
+        sent: Number(peer.heartbeats_sent),
+        success: Number(peer.heartbeats_succeeded)
+      },
+      lastSeen: Number(peer.last_seen),
+      quality: peer.quality,
+      backoff: peer.backoff,
+      isNew: isNew
+    }
+  }
 }
+
+// sinon.fake always attempts to deserialize types, but it deserializes BigInt as a string
+;(BigInt.prototype as any).toJSON = function () {
+  return Number(this)
+}
+
+const ALICE_PEER_INFO = toJsonDict(ALICE_ENTRY, false, ALICE_MULTI_ADDR.toString())
+const BOB_PEER_INFO = toJsonDict(BOB_ENTRY, true, BOB_MULTI_ADDR.toString())
+const CHARLIE_PEER_INFO = toJsonDict(CHARLIE_ENTRY, false, undefined)
 
 let node = sinon.fake() as any as Hopr
 node.getConnectedPeers = sinon.fake.returns([ALICE_PEER_ID, BOB_PEER_ID, CHARLIE_PEER_ID])

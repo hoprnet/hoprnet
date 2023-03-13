@@ -61,7 +61,7 @@ describe('GET /node/info', () => {
       hoprChannels: HOPR_CHANNELS_ADDRESS,
       hoprNetworkRegistry: HOPR_NEWTWORK_REGISTRY_ADDRESS,
       isEligible: true,
-      connectivityStatus: Health.GREEN,
+      connectivityStatus: Health.GREEN.toString(),
       channelClosurePeriod: 1
     })
   })
