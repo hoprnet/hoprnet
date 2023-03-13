@@ -71,7 +71,7 @@ impl SharedKeys {
     /// Generates shared secrets given the peer public keys array.
     /// The order of the peer public keys is preserved for resulting shared keys.
     /// The specified random number generator will be used.
-    pub fn generate(rng: impl CryptoRng + RngCore, peer_public_keys: Vec<Box<[u8]>>) -> Result<SharedKeys> {
+    pub fn generate(rng: &mut (impl CryptoRng + RngCore), peer_public_keys: Vec<Box<[u8]>>) -> Result<SharedKeys> {
 
         let mut shared_keys = Vec::new();
 
