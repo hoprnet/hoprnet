@@ -364,5 +364,6 @@ class HoprConnect implements Transport, Initializable, Startable {
 
 export type { PublicNodesEmitter, HoprConnectConfig }
 export { compareAddressesLocalMode, compareAddressesPublicMode } from './utils/index.js'
+export { startStunServer } from './base/stun/utils.js'
 
 export { HoprConnect, PeerConnectionType }

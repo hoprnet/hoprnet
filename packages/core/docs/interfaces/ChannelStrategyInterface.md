@@ -20,8 +20,8 @@ Implementors should bear in mind:
 ### Methods
 
 - [configure](ChannelStrategyInterface.md#configure)
+- [onAckedTicket](ChannelStrategyInterface.md#onackedticket)
 - [onChannelWillClose](ChannelStrategyInterface.md#onchannelwillclose)
-- [onWinningTicket](ChannelStrategyInterface.md#onwinningticket)
 - [shouldCommitToChannel](ChannelStrategyInterface.md#shouldcommittochannel)
 - [tick](ChannelStrategyInterface.md#tick)
 
@@ -49,7 +49,7 @@ ___
 
 ### configure
 
-▸ **configure**(`settings`): `any`
+▸ **configure**(`settings`): `void`
 
 #### Parameters
 
@@ -59,7 +59,7 @@ ___
 
 #### Returns
 
-`any`
+`void`
 
 #### Defined in
 
@@ -67,37 +67,15 @@ ___
 
 ___
 
-### onChannelWillClose
+### onAckedTicket
 
-▸ **onChannelWillClose**(`channel`, `chain`): `Promise`<`void`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `channel` | `ChannelEntry` |
-| `chain` | `default` |
-
-#### Returns
-
-`Promise`<`void`\>
-
-#### Defined in
-
-[packages/core/src/channel-strategy.ts:61](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L61)
-
-___
-
-### onWinningTicket
-
-▸ **onWinningTicket**(`t`, `chain`): `Promise`<`void`\>
+▸ **onAckedTicket**(`t`): `Promise`<`void`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `t` | `AcknowledgedTicket` |
-| `chain` | `default` |
 
 #### Returns
 
@@ -106,6 +84,26 @@ ___
 #### Defined in
 
 [packages/core/src/channel-strategy.ts:62](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L62)
+
+___
+
+### onChannelWillClose
+
+▸ **onChannelWillClose**(`channel`): `Promise`<`void`\>
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `channel` | `ChannelEntry` |
+
+#### Returns
+
+`Promise`<`void`\>
+
+#### Defined in
+
+[packages/core/src/channel-strategy.ts:61](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L61)
 
 ___
 
@@ -140,7 +138,7 @@ ___
 | `balance` | `BN` |
 | `network_peer_ids` | `Iterator`<`string`, `any`, `undefined`\> |
 | `outgoing_channel` | `OutgoingChannelStatus`[] |
-| `peer_quality` | (`string`: `any`) => `number` |
+| `peer_quality` | (`string`: `string`) => `number` |
 
 #### Returns
 

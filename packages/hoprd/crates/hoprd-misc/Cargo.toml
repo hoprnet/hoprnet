@@ -22,6 +22,7 @@ clap = { git = "https://github.com/hoprnet/clap", branch = "robertkiel/update-en
 core-misc = { path = "../../../core/crates/core-misc" }
 core-strategy = { path = "../../../core/crates/core-strategy" }
 core-ethereum-misc = { path = "../../../core-ethereum/crates/core-ethereum-misc" }
+hex = "0.4.3"
 js-sys = "0.3.60"
 real-base = { path = "../../../real/crates/real-base" }
 proc-macro-regex = "~1.1.0"

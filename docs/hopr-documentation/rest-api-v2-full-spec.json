@@ -9,6 +9,101 @@
     "license": { "name": "GPL-3.0", "url": "https://github.com/hoprnet/hoprnet/blob/master/LICENSE" }
   },
   "paths": {
+    "/tokens/": {
+      "parameters": [],
+      "post": {
+        "description": "Create a new authentication token based on the given information. The new token is returned as part of the response body and must be stored by the client. It cannot be read again in cleartext and is lost, if the client loses the token. An authentication has a lifetime. It can be unbound, meaning it will not expire. Or it has a limited lifetime after which it expires. The requested limited lifetime is requested by the client in seconds.",
+        "tags": ["Tokens"],
+        "operationId": "tokensCreate",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["capabilities"],
+                "properties": {
+                  "capabilities": {
+                    "description": "Capabilities attached to the created token.",
+                    "type": "array",
+                    "format": "tokenCapabilities",
+                    "minItems": 1,
+                    "items": { "$ref": "#/components/schemas/TokenCapability" }
+                  },
+                  "lifetime": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Lifetime of the token in seconds since creation. Defaults to unlimited lifetime."
+                  },
+                  "description": { "type": "string", "description": "Description associated with the token." }
+                },
+                "example": { "description": "my test token", "lifetime": 360, "capabilities": [] }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Token succesfully created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "token": {
+                      "type": "string",
+                      "example": "MYtoken1223",
+                      "description": "The generated token which must be used when authenticating for API calls."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem with inputs.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/RequestStatus" },
+                "example": { "status": "INVALID_TOKEN_LIFETIME | INVALID_TOKEN_CAPABILITIES" }
+              }
+            }
+          },
+          "403": { "description": "Missing capability to access endpoint" },
+          "422": {
+            "description": "Unknown failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
+                    "error": { "type": "string", "example": "Full error message." }
+                  }
+                },
+                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/token": {
+      "parameters": [],
+      "get": {
+        "description": "Get the full token information for the token used in authentication.",
+        "tags": ["Tokens"],
+        "operationId": "tokensGetToken",
+        "responses": {
+          "200": {
+            "description": "Token information.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Token" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
     "/tickets/statistics": {
       "parameters": [],
       "get": {
@@ -65,6 +160,8 @@
               }
             }
           },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
           "422": {
             "description": "Unknown failure.",
             "content": {
@@ -91,6 +188,8 @@
         "operationId": "ticketsRedeemTickets",
         "responses": {
           "204": { "description": "Tickets redeemed succesfully." },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
           "422": {
             "description": "Unknown failure.",
             "content": {
@@ -122,6 +221,8 @@
               "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Ticket" } } }
             }
           },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
           "422": {
             "description": "Unknown failure.",
             "content": {
@@ -151,6 +252,8 @@
             "description": "Settings fetched succesfully.",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Settings" } } }
           },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
           "422": {
             "description": "Unknown failure.",
             "content": {
@@ -184,6 +287,8 @@
               }
             }
           },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
           "422": {
             "description": "Unknown failure.",
             "content": {
@@ -235,7 +340,8 @@
               }
             }
           },
-          "401": { "description": "Unauthorized" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "description": "Not found" }
         }
       }
@@ -291,6 +397,8 @@
               }
             }
           },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
           "422": {
             "description": "An error occured (see error details) or timeout - node with specified PeerId didn't respond in time.",
             "content": {
@@ -411,6 +519,8 @@
               }
             }
           },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
           "422": {
             "description": "Unknown failure.",
             "content": {
@@ -448,6 +558,8 @@
               }
             }
           },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
           "422": {
             "description": "Unknown failure.",
             "content": {
@@ -546,6 +658,8 @@
               }
             }
           },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
           "422": {
             "description": "Unknown failure.",
             "content": {
@@ -595,6 +709,8 @@
               }
             }
           },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
           "422": {
             "description": "Unknown failure.",
             "content": {
@@ -630,7 +746,8 @@
               }
             }
           },
-          "401": { "description": "Unauthorized" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "description": "Not found" }
         }
       }
@@ -664,6 +781,8 @@
               }
             }
           },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
           "422": {
             "description": "Unknown failure.",
             "content": {
@@ -717,6 +836,13 @@
                       "maxItems": 3,
                       "example": "16Uiu2HAm1uV82HyD1iJ5DmwJr4LftmJUeMfj8zFypBRACmrJc16n"
                     }
+                  },
+                  "hops": {
+                    "description": "Number of required intermediate nodes. This parameter is ignored if path is set.",
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 3,
+                    "example": 3
                   }
                 }
               }
@@ -736,6 +862,8 @@
               }
             }
           },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
           "422": {
             "description": "Unknown failure.",
             "content": {
@@ -783,6 +911,8 @@
               }
             }
           },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
           "422": {
             "description": "Unknown failure.",
             "content": {
@@ -800,6 +930,107 @@
           }
         },
         "deprecated": true
+      }
+    },
+    "/fundmulti/": {
+      "parameters": [],
+      "post": {
+        "description": "Fund one or two payment channels between this node and the counter party provided.",
+        "tags": ["Channels"],
+        "operationId": "channelsFundChannels",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["peerId", "outgoingAmount", "incomingAmount"],
+                "properties": {
+                  "peerId": {
+                    "format": "peerId",
+                    "type": "string",
+                    "description": "PeerId to fund the outgoing/incoming channels with."
+                  },
+                  "outgoingAmount": {
+                    "format": "amount",
+                    "type": "string",
+                    "description": "Amount of HOPR tokens to fund the outgoing channel (node -> counterparty). It will be used to pay for sending messages through channel"
+                  },
+                  "incomingAmount": {
+                    "format": "amount",
+                    "type": "string",
+                    "description": "Amount of HOPR tokens to fund the incoming channel (counterparty -> node). It will be used to pay for sending messages through channel"
+                  }
+                },
+                "example": {
+                  "peerId": "16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12",
+                  "outgoingAmount": "1000000",
+                  "incomingAmount": "1000000"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Channels succesfully funded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "receipt": {
+                      "type": "string",
+                      "example": "0x37954ca4a630aa28f045df2e8e604cae22071046042e557355acf00f4ef20d2e",
+                      "description": "Receipt for fund multi channels transaction. Can be used to check status of the smart contract call on blockchain."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem with inputs (invalid peerId or invalid amount).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/RequestStatus" },
+                "example": { "status": "INVALID_PEERID | INVALID_AMOUNT" }
+              }
+            }
+          },
+          "403": {
+            "description": "Failed to fund the channels because of insufficient HOPR balance.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "NOT_ENOUGH_BALANCE",
+                      "description": "Insufficient balance to fund channels. Amount passed in request body exeeds current balance."
+                    }
+                  }
+                },
+                "example": { "status": "NOT_ENOUGH_BALANCE" }
+              }
+            }
+          },
+          "422": {
+            "description": "Unknown failure.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "UNKNOWN_FAILURE" },
+                    "error": { "type": "string", "example": "Full error message." }
+                  }
+                },
+                "example": { "status": "UNKNOWN_FAILURE", "error": "Full error message." }
+              }
+            }
+          }
+        }
       }
     },
     "/channels/": {
@@ -863,6 +1094,7 @@
               }
             }
           },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
           "403": {
             "description": "Failed to open the channel because of insufficient HOPR balance.",
             "content": {
@@ -951,6 +1183,8 @@
               }
             }
           },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
           "422": {
             "description": "Unknown failure.",
             "content": {
@@ -1041,6 +1275,8 @@
               }
             }
           },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
           "422": {
             "description": "Unknown failure.",
             "content": {
@@ -1112,6 +1348,8 @@
               }
             }
           },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
           "422": {
             "description": "Withdraw amount exeeds current balance or unknown error. You can check current balance using /account/balance endpoint.",
             "content": {
@@ -1151,6 +1389,8 @@
               }
             }
           },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
           "422": {
             "description": "Unknown failure.",
             "content": {
@@ -1196,6 +1436,8 @@
               }
             }
           },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
           "422": {
             "description": "Unknown failure.",
             "content": {
@@ -1241,6 +1483,8 @@
               }
             }
           },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
           "422": {
             "description": "Unknown failure.",
             "content": {
@@ -1258,6 +1502,29 @@
           }
         },
         "deprecated": true
+      }
+    },
+    "/tokens/{id}": {
+      "parameters": [],
+      "delete": {
+        "description": "Deletes a token. Can only be done before the lifetime expired. After the lifetime expired the token is automatically deleted.",
+        "tags": ["Tokens"],
+        "operationId": "tokensDelete",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the token which shall be deleted.",
+            "required": true,
+            "schema": { "type": "string", "example": "someTOKENid1234" }
+          }
+        ],
+        "responses": {
+          "204": { "description": "Token successfully deleted." },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
       }
     },
     "/settings/{setting}": {
@@ -1302,6 +1569,8 @@
               }
             }
           },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
           "422": {
             "description": "Unknown failure.",
             "content": {
@@ -1344,6 +1613,8 @@
               }
             }
           },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
           "422": {
             "description": "Unknown failure.",
             "content": {
@@ -1393,6 +1664,8 @@
               }
             }
           },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
           "404": {
             "description": "Tickets were not found for that channel. That means that no messages were sent inside this channel yet.",
             "content": {
@@ -1456,6 +1729,8 @@
               }
             }
           },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
           "404": {
             "description": "Tickets were not found for that channel. That means that no messages were sent inside this channel yet.",
             "content": {
@@ -1541,6 +1816,8 @@
               }
             }
           },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
           "422": {
             "description": "Unknown failure.",
             "content": {
@@ -1592,6 +1869,8 @@
               }
             }
           },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
           "404": {
             "description": "Channel with that peerId was not found. You can list all channels using /channels/ endpoint.",
             "content": {
@@ -1646,6 +1925,8 @@
               }
             }
           },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
           "404": {
             "description": "This alias was not assigned to any PeerId before. You can get the list of all PeerId's and thier corresponding aliases using /aliases endpoint.",
             "content": {
@@ -1687,6 +1968,8 @@
         ],
         "responses": {
           "204": { "description": "Alias removed succesfully." },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
           "422": {
             "description": "Unknown failure.",
             "content": {
@@ -1709,7 +1992,27 @@
   "security": [{ "keyScheme": ["write"] }, { "passwordScheme": ["write"] }],
   "externalDocs": { "description": "Find out more about HOPR and HOPRd.", "url": "http://docs.hoprnet.org" },
   "components": {
+    "responses": {
+      "NotFound": { "description": "The specified resource was not found" },
+      "Unauthorized": {
+        "description": "authentication failed",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "Forbidden": {
+        "description": "authorization failed",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "UnknownFailure": {
+        "description": "Unknown failure",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      }
+    },
     "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": { "status": { "type": "string" }, "error": { "type": "string" } },
+        "required": ["status", "error"]
+      },
       "RequestStatus": {
         "type": "object",
         "properties": {
@@ -1717,10 +2020,94 @@
         },
         "example": { "status": "success" }
       },
+      "Token": {
+        "type": "object",
+        "required": ["id", "capabilities"],
+        "properties": {
+          "id": { "type": "string", "description": "Unique ID of the token" },
+          "description": { "type": "string", "description": "Some description for the token" },
+          "valid_until": { "type": "integer", "description": "Seconds since epoch until the token is valid" },
+          "capabilities": {
+            "type": "array",
+            "description": "Array of capabilities associated with the token",
+            "minItems": 1,
+            "items": { "$ref": "#/components/schemas/TokenCapability" }
+          }
+        },
+        "example": {
+          "id": "someTOKENid1223",
+          "description": "this is an interesting token",
+          "capabilities": [
+            { "endpoint": "tokensGetToken", "limits": [{ "type": "calls", "conditions": { "max": 100 } }] }
+          ]
+        }
+      },
+      "TokenCapabilityLimit": {
+        "type": "object",
+        "required": ["type"],
+        "properties": {
+          "type": { "type": "string", "description": "Limit type" },
+          "conditions": {
+            "type": "object",
+            "description": "Limit conditions, if any",
+            "properties": { "max": { "type": "integer", "description": "Upper ceiling. Applies to limit type calls." } }
+          }
+        },
+        "example": { "type": "calls", "conditions": { "max": 100 } }
+      },
+      "TokenCapability": {
+        "type": "object",
+        "required": ["endpoint"],
+        "properties": {
+          "endpoint": {
+            "type": "string",
+            "description": "Short reference of the operation this capability is tied to.",
+            "enum": [
+              "tokensCreate",
+              "tokensGetToken",
+              "ticketsGetStatistics",
+              "ticketsRedeemTickets",
+              "ticketsGetTickets",
+              "settingsGetSettings",
+              "nodeGetVersion",
+              "nodeStreamWebsocket",
+              "nodePing",
+              "nodeGetPeers",
+              "nodeGetMetrics",
+              "nodeGetInfo",
+              "nodeGetEntryNodes",
+              "messagesWebsocket",
+              "messagesSign",
+              "messagesSendMessage",
+              "messageSign",
+              "channelsFundChannels",
+              "channelsOpenChannel",
+              "channelsGetChannels",
+              "aliasesSetAlias",
+              "aliasesGetAliases",
+              "accountWithdraw",
+              "accountGetBalances",
+              "accountGetAddresses",
+              "accountGetAddress",
+              "tokensDelete",
+              "settingsSetSetting",
+              "peerInfoGetPeerInfo",
+              "channelsRedeemTickets",
+              "channelsGetTickets",
+              "channelsGetChannel",
+              "channelsCloseChannel",
+              "aliasesGetAlias",
+              "aliasesRemoveAlias"
+            ]
+          },
+          "limits": { "type": "array", "minItems": 1, "items": { "$ref": "#/components/schemas/TokenCapabilityLimit" } }
+        },
+        "example": { "endpoint": "tokensGetToken", "limits": [{ "type": "calls", "conditions": { "max": 100 } }] }
+      },
       "Signature": {
         "type": "string",
         "description": "Signature from requested message.",
-        "example": "0x304402201065a95fd22fc3e48266c3b270ace032489b0177e07d33c59e0d13dccc89108402205f41fb911bcfe485a8e58162ebce90382dc96ccafff378e5c8960e07efcf9e92"
+        "example": 7.115342872866815e167
       },
       "MultiAddress": {
         "type": "string",
@@ -1742,7 +2129,7 @@
         "type": "string",
         "format": "address",
         "description": "Blockchain-native account address. Can be funded from external wallets (starts with **0x...**). It **can't be used** internally to send / receive messages, open / close payment channels.",
-        "example": "0xEA9eDAE5CfC794B75C45c8fa89b605508A03742a"
+        "example": 1.339446426793328e48
       },
       "HoprAddress": {
         "format": "peerId",
@@ -1772,7 +2159,7 @@
           "channelId": {
             "type": "string",
             "description": "Channel ID that can be used in other calls, not to confuse with transaction hash.",
-            "example": "0x04e50b7ddce9770f58cebe51f33b472c92d1c40384759f5a0b1025220bf15ec5"
+            "example": 2.2139386846352097e75
           },
           "peerId": { "$ref": "#/components/schemas/HoprAddress" },
           "status": {
@@ -1835,7 +2222,7 @@
         "type": "apiKey",
         "name": "x-auth-token",
         "in": "header",
-        "description": "A valid API token which had been configured at node startup."
+        "description": "A valid API token which had been configured at node startup or through the token API."
       },
       "passwordScheme": {
         "type": "http",
@@ -1852,6 +2239,7 @@
     { "name": "Node" },
     { "name": "PeerInfo" },
     { "name": "Settings" },
-    { "name": "Tickets" }
+    { "name": "Tickets" },
+    { "name": "Tokens" }
   ]
 }

@@ -3,7 +3,10 @@
     "list": [
       {
         "builtIn": 1,
-        "datasource": "-- Grafana --",
+        "datasource": {
+          "type": "datasource",
+          "uid": "grafana"
+        },
         "enable": true,
         "hide": true,
         "iconColor": "rgba(0, 211, 255, 1)",
@@ -19,14 +22,17 @@
     ]
   },
   "editable": true,
-  "gnetId": null,
+  "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 7,
   "links": [],
+  "liveNow": false,
   "panels": [
     {
       "collapsed": false,
-      "datasource": null,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -35,18 +41,32 @@
       },
       "id": 18,
       "panels": [],
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "refId": "A"
+        }
+      ],
       "title": "Peers & Connectivity information",
       "type": "row"
     },
     {
-      "datasource": null,
-      "description": "Shows number of connected peers by their quality.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "description": "The number of high & low-quality peers your node is connected to.",
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "palette-classic"
           },
           "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
@@ -102,14 +122,20 @@
         "legend": {
           "calcs": [],
           "displayMode": "list",
-          "placement": "bottom"
+          "placement": "bottom",
+          "showLegend": true
         },
         "tooltip": {
-          "mode": "single"
+          "mode": "single",
+          "sort": "none"
         }
       },
       "targets": [
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
           "exemplar": true,
           "expr": "sum by(quality) (core_mgauge_peers_by_quality)",
           "interval": "",
@@ -117,6 +143,10 @@
           "refId": "A"
         },
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
           "exemplar": true,
           "expr": "core_gauge_num_peers",
           "hide": false,
@@ -129,14 +159,19 @@
       "type": "timeseries"
     },
     {
-      "datasource": null,
-      "description": "Shows number of relayed connections (public relay nodes only) and number of connections to other public relay nodes.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "description": "Connections to and from public relay nodes.",
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "palette-classic"
           },
           "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
@@ -192,14 +227,20 @@
         "legend": {
           "calcs": [],
           "displayMode": "list",
-          "placement": "bottom"
+          "placement": "bottom",
+          "showLegend": true
         },
         "tooltip": {
-          "mode": "single"
+          "mode": "single",
+          "sort": "none"
         }
       },
       "targets": [
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
           "exemplar": true,
           "expr": "connect_gauge_relayed_conns",
           "interval": "",
@@ -207,11 +248,17 @@
           "refId": "A"
         },
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
           "exemplar": true,
           "expr": "connect_gauge_conns_to_relays",
           "hide": false,
           "interval": "",
-          "legendFormat": "Number of connections to relays",
+          "legendFormat": "Number of connected PRNs",
+          "range": true,
           "refId": "B"
         }
       ],
@@ -219,8 +266,65 @@
       "type": "timeseries"
     },
     {
-      "datasource": null,
-      "description": "Shows history of network health states.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "description": "",
+      "gridPos": {
+        "h": 4,
+        "w": 12,
+        "x": 0,
+        "y": 10
+      },
+      "id": 36,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "This graph separates your peers into low (quality =< 0.5)  and high-quality (> 0.5) connections.\n\nThe quality of your connection to a peer is standardised between 0 to 1, depending on the ratio of successful pings to the total number of pings, regardless of who is sending them. \n",
+        "mode": "markdown"
+      },
+      "pluginVersion": "9.3.2",
+      "title": "Graph description",
+      "transparent": true,
+      "type": "text"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "description": "",
+      "gridPos": {
+        "h": 4,
+        "w": 12,
+        "x": 12,
+        "y": 10
+      },
+      "id": 38,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "This graph represents the number of public relay nodes (PRN) you are connected to (yellow line) and if you are a PRN, the number of nodes you are connected to.\n\nIf you are not a PRN, the green line should be flat.\n",
+        "mode": "markdown"
+      },
+      "pluginVersion": "9.3.2",
+      "title": "Graph description",
+      "transparent": true,
+      "type": "text"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "description": "History of your node’s connectivity status.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -228,7 +332,8 @@
           },
           "custom": {
             "fillOpacity": 52,
-            "lineWidth": 4
+            "lineWidth": 4,
+            "spanNulls": false
           },
           "mappings": [
             {
@@ -278,24 +383,30 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 10
+        "y": 14
       },
       "id": 6,
       "options": {
         "alignValue": "center",
         "legend": {
-          "displayMode": "hidden",
-          "placement": "bottom"
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
         },
         "mergeValues": true,
         "rowHeight": 1,
         "showValue": "always",
         "tooltip": {
-          "mode": "single"
+          "mode": "single",
+          "sort": "none"
         }
       },
       "targets": [
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
           "exemplar": true,
           "expr": "core_gauge_network_health",
           "interval": "",
@@ -307,14 +418,19 @@
       "type": "state-timeline"
     },
     {
-      "datasource": null,
-      "description": "Shows rates of successful and failed pings over 1 minute windows.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "description": "The number of successful and unsuccessful pings your node sends per second.",
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "palette-classic"
           },
           "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
@@ -390,7 +506,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 10
+        "y": 14
       },
       "id": 8,
       "interval": "1m",
@@ -398,14 +514,20 @@
         "legend": {
           "calcs": [],
           "displayMode": "list",
-          "placement": "bottom"
+          "placement": "bottom",
+          "showLegend": true
         },
         "tooltip": {
-          "mode": "single"
+          "mode": "single",
+          "sort": "none"
         }
       },
       "targets": [
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
           "exemplar": true,
           "expr": "rate(core_counter_heartbeat_successful_pings[$__rate_interval])",
           "interval": "",
@@ -413,6 +535,10 @@
           "refId": "A"
         },
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
           "exemplar": true,
           "expr": "rate(core_counter_heartbeat_failed_pings[$__rate_interval])",
           "hide": false,
@@ -425,8 +551,287 @@
       "type": "timeseries"
     },
     {
-      "datasource": null,
-      "description": "Distribution of total time (in seconds) it takes to probe all nodes we know about.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "description": "",
+      "gridPos": {
+        "h": 5,
+        "w": 12,
+        "x": 0,
+        "y": 23
+      },
+      "id": 37,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "This displays your network connectivity status over time (x-axis).\n\nYour connection can be one of five states:\n- **Unknown (Grey)**: The network could not assess your node's connection.\n- 🔴 **Red**: You have no connection to the network at all.\n- 🟠 **Orange**: At least one low-quality connection to a public relay node.\n- 🟡 **Yellow**: At least one high-quality connection to a public relay node.\n- 🟢 **Green**: At least one high-quality connection to a public relay node and one non-public node.\n",
+        "mode": "markdown"
+      },
+      "pluginVersion": "9.3.2",
+      "title": "Graph description",
+      "transparent": true,
+      "type": "text"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "description": "",
+      "gridPos": {
+        "h": 5,
+        "w": 12,
+        "x": 12,
+        "y": 23
+      },
+      "id": 39,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "This graph shows the number of successful (blue) and unsuccessful (red) pings your node sends per second.\n\nThese are pings counted from your node's heartbeat.\n",
+        "mode": "markdown"
+      },
+      "pluginVersion": "9.3.2",
+      "title": "Graph description",
+      "transparent": true,
+      "type": "text"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "description": "The time it takes your node to complete a heartbeat probing cycle.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-GrYlRd"
+          },
+          "decimals": 1,
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 28
+      },
+      "id": 12,
+      "options": {
+        "displayMode": "gradient",
+        "minVizHeight": 10,
+        "minVizWidth": 0,
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "text": {}
+      },
+      "pluginVersion": "9.3.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "100 * core_histogram_heartbeat_time_seconds_bucket / scalar(core_histogram_heartbeat_time_seconds_count)",
+          "format": "heatmap",
+          "instant": true,
+          "interval": "",
+          "legendFormat": "{{le}}",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Total heartbeat probing time",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "description": "Response time for pings sent by your node in seconds.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-GrYlRd"
+          },
+          "decimals": 1,
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 28
+      },
+      "id": 14,
+      "options": {
+        "displayMode": "gradient",
+        "minVizHeight": 10,
+        "minVizWidth": 0,
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "text": {}
+      },
+      "pluginVersion": "9.3.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "100 * core_histogram_ping_time_seconds_bucket / scalar(core_histogram_ping_time_seconds_count)",
+          "format": "heatmap",
+          "instant": true,
+          "interval": "",
+          "legendFormat": "{{le}}",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Ping response time",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "description": "",
+      "gridPos": {
+        "h": 3,
+        "w": 12,
+        "x": 0,
+        "y": 36
+      },
+      "id": 40,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "This shows the total time it takes your node to complete a probing cycle. E.g. how long it takes your node to successfully ping all of its known peers. ",
+        "mode": "markdown"
+      },
+      "pluginVersion": "9.3.2",
+      "title": "Graph description",
+      "transparent": true,
+      "type": "text"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "description": "",
+      "gridPos": {
+        "h": 3,
+        "w": 12,
+        "x": 12,
+        "y": 36
+      },
+      "id": 41,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "This shows the spread of the response time for your pings rounded to the nearest interval. \nThis is specifically the response time for pings sent by your node as part of the heartbeat mechanism.\n",
+        "mode": "markdown"
+      },
+      "pluginVersion": "9.3.2",
+      "title": "Graph description",
+      "transparent": true,
+      "type": "text"
+    },
+    {
+      "collapsed": false,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 39
+      },
+      "id": 16,
+      "panels": [],
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "refId": "A"
+        }
+      ],
+      "title": "Network metrics",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "description": "Basic statistics on sent/received/forwarded HOPR messages by this node.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -439,10 +844,6 @@
               {
                 "color": "green",
                 "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
               }
             ]
           }
@@ -453,44 +854,77 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 19
+        "y": 40
       },
-      "id": 12,
+      "id": 20,
       "options": {
-        "displayMode": "gradient",
-        "orientation": "horizontal",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
-        "showUnfilled": true,
-        "text": {}
+        "text": {},
+        "textMode": "auto"
       },
-      "pluginVersion": "8.1.8",
+      "pluginVersion": "9.3.2",
       "targets": [
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
           "exemplar": true,
-          "expr": "core_histogram_heartbeat_time_seconds_bucket",
-          "format": "heatmap",
+          "expr": "core_counter_sent_messages",
           "interval": "",
-          "legendFormat": "{{le}}",
+          "legendFormat": "Sent messages",
           "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "exemplar": true,
+          "expr": "core_counter_received_messages",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "Received messages",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "exemplar": true,
+          "expr": "core_counter_forwarded_messages",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "Forwarded  messages",
+          "refId": "C"
         }
       ],
-      "title": "Total heartbeat probing time",
-      "type": "bargauge"
+      "title": "Message statistics",
+      "type": "stat"
     },
     {
-      "datasource": null,
-      "description": "Distribution of times it takes to get a single ping response.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "description": "Numbers of incoming/outgoing payment channels",
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "thresholds"
           },
           "mappings": [],
-          "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -511,404 +945,319 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 19
+        "y": 40
       },
-      "id": 14,
+      "id": 22,
       "options": {
-        "displayMode": "gradient",
-        "orientation": "horizontal",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
-        "showUnfilled": true,
-        "text": {}
+        "text": {},
+        "textMode": "auto"
       },
-      "pluginVersion": "8.1.8",
+      "pluginVersion": "9.3.2",
       "targets": [
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
           "exemplar": true,
-          "expr": "core_histogram_ping_time_seconds_bucket",
-          "format": "heatmap",
+          "expr": "core_gauge_num_incoming_channels",
           "interval": "",
-          "legendFormat": "{{le}}",
+          "legendFormat": "Number of incoming channels",
           "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "exemplar": true,
+          "expr": "core_gauge_num_outgoing_channels",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "Number of outgoing channels",
+          "refId": "B"
         }
       ],
-      "title": "Ping response time",
-      "type": "bargauge"
+      "title": "Channels",
+      "type": "stat"
     },
     {
-      "collapsed": true,
-      "datasource": null,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 27
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
       },
-      "id": 16,
-      "panels": [
-        {
-          "datasource": null,
-          "description": "Basic statistics on sent/received/forwarded HOPR messages by this node.",
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "thresholds"
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  }
-                ]
-              }
-            },
-            "overrides": []
+      "description": "Rate of messages per hour .",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
           },
-          "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 0,
-            "y": 2
-          },
-          "id": 20,
-          "options": {
-            "colorMode": "value",
-            "graphMode": "area",
-            "justifyMode": "auto",
-            "orientation": "auto",
-            "reduceOptions": {
-              "calcs": ["lastNotNull"],
-              "fields": "",
-              "values": false
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
             },
-            "text": {},
-            "textMode": "auto"
-          },
-          "pluginVersion": "8.1.8",
-          "targets": [
-            {
-              "exemplar": true,
-              "expr": "core_counter_sent_messages",
-              "interval": "",
-              "legendFormat": "Sent messages",
-              "refId": "A"
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
             },
-            {
-              "exemplar": true,
-              "expr": "core_counter_received_messages",
-              "hide": false,
-              "interval": "",
-              "legendFormat": "Received messages",
-              "refId": "B"
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
             },
-            {
-              "exemplar": true,
-              "expr": "core_counter_forwarded_messages",
-              "hide": false,
-              "interval": "",
-              "legendFormat": "Forwarded  messages",
-              "refId": "C"
+            "thresholdsStyle": {
+              "mode": "off"
             }
-          ],
-          "title": "Message statistics",
-          "type": "stat"
-        },
-        {
-          "datasource": null,
-          "description": "Numbers of incoming/outgoing payment channels",
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "thresholds"
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
-                  }
-                ]
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
               }
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 12,
-            "y": 2
-          },
-          "id": 22,
-          "options": {
-            "colorMode": "value",
-            "graphMode": "area",
-            "justifyMode": "auto",
-            "orientation": "auto",
-            "reduceOptions": {
-              "calcs": ["lastNotNull"],
-              "fields": "",
-              "values": false
-            },
-            "text": {},
-            "textMode": "auto"
-          },
-          "pluginVersion": "8.1.8",
-          "targets": [
-            {
-              "exemplar": true,
-              "expr": "core_gauge_num_incoming_channels",
-              "interval": "",
-              "legendFormat": "Number of incoming channels",
-              "refId": "A"
-            },
-            {
-              "exemplar": true,
-              "expr": "core_gauge_num_outgoing_channels",
-              "hide": false,
-              "interval": "",
-              "legendFormat": "Number of outgoing channels",
-              "refId": "B"
-            }
-          ],
-          "title": "Channels",
-          "type": "stat"
+            ]
+          }
         },
-        {
-          "datasource": null,
-          "description": "Hourly rates of send/received/forwarded messages by this node",
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "palette-classic"
-              },
-              "custom": {
-                "axisLabel": "",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
-                "hideFrom": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": false
-                },
-                "lineInterpolation": "linear",
-                "lineWidth": 2,
-                "pointSize": 5,
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "showPoints": "never",
-                "spanNulls": false,
-                "stacking": {
-                  "group": "A",
-                  "mode": "none"
-                },
-                "thresholdsStyle": {
-                  "mode": "off"
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Rate of received messages"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "dark-red",
+                  "mode": "fixed"
                 }
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  }
-                ]
-              }
-            },
-            "overrides": [
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "Rate of received messages"
-                },
-                "properties": [
-                  {
-                    "id": "color",
-                    "value": {
-                      "fixedColor": "dark-red",
-                      "mode": "fixed"
-                    }
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "Rate of sent messages"
-                },
-                "properties": [
-                  {
-                    "id": "color",
-                    "value": {
-                      "fixedColor": "dark-blue",
-                      "mode": "fixed"
-                    }
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "Rate of forwarded messages"
-                },
-                "properties": [
-                  {
-                    "id": "color",
-                    "value": {
-                      "fixedColor": "dark-purple",
-                      "mode": "fixed"
-                    }
-                  }
-                ]
               }
             ]
           },
-          "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 0,
-            "y": 10
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Rate of sent messages"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "dark-blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
           },
-          "id": 24,
-          "interval": "1h",
-          "options": {
-            "legend": {
-              "calcs": [],
-              "displayMode": "list",
-              "placement": "bottom"
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Rate of forwarded messages"
             },
-            "tooltip": {
-              "mode": "single"
-            }
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "dark-purple",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 48
+      },
+      "id": 24,
+      "interval": "1h",
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
           },
-          "targets": [
-            {
-              "exemplar": true,
-              "expr": "rate(core_counter_received_messages[1h])",
-              "interval": "",
-              "legendFormat": "Rate of received messages",
-              "refId": "A"
-            },
-            {
-              "exemplar": true,
-              "expr": "rate(core_counter_sent_messages[1h])",
-              "hide": false,
-              "interval": "",
-              "legendFormat": "Rate of sent messages",
-              "refId": "B"
-            },
-            {
-              "exemplar": true,
-              "expr": "rate(core_counter_forwarded_messages[1h])",
-              "hide": false,
-              "interval": "",
-              "legendFormat": "Rate of forwarded messages",
-              "refId": "C"
-            }
-          ],
-          "title": "Hourly message rates",
-          "type": "timeseries"
+          "exemplar": true,
+          "expr": "rate(core_counter_received_messages[1h])",
+          "interval": "",
+          "legendFormat": "Rate of received messages",
+          "refId": "A"
         },
         {
-          "datasource": null,
-          "description": "Number of winning/losing tickets.",
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "thresholds"
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  }
-                ]
-              }
-            },
-            "overrides": []
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
           },
-          "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 12,
-            "y": 10
+          "exemplar": true,
+          "expr": "rate(core_counter_sent_messages[1h])",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "Rate of sent messages",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
           },
-          "id": 26,
-          "options": {
-            "colorMode": "value",
-            "graphMode": "area",
-            "justifyMode": "auto",
-            "orientation": "auto",
-            "reduceOptions": {
-              "calcs": ["lastNotNull"],
-              "fields": "",
-              "values": false
-            },
-            "text": {},
-            "textMode": "auto"
-          },
-          "pluginVersion": "8.1.8",
-          "targets": [
-            {
-              "exemplar": true,
-              "expr": "core_counter_winning_tickets",
-              "interval": "",
-              "legendFormat": "Winning tickets",
-              "refId": "A"
-            },
-            {
-              "exemplar": true,
-              "expr": "core_counter_losing_tickets",
-              "hide": false,
-              "interval": "",
-              "legendFormat": "Losing tickets",
-              "refId": "B"
-            }
-          ],
-          "title": "Tickets",
-          "type": "stat"
+          "exemplar": true,
+          "expr": "rate(core_counter_forwarded_messages[1h])",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "Rate of forwarded messages",
+          "refId": "C"
         }
       ],
-      "title": "Network metrics",
-      "type": "row"
+      "title": "Hourly message rates",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "description": "Number of winning/losing tickets.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 48
+      },
+      "id": 26,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "auto"
+      },
+      "pluginVersion": "9.3.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "exemplar": true,
+          "expr": "core_counter_winning_tickets",
+          "interval": "",
+          "legendFormat": "Winning tickets",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "exemplar": true,
+          "expr": "core_counter_losing_tickets",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "Losing tickets",
+          "refId": "B"
+        }
+      ],
+      "title": "Tickets",
+      "type": "stat"
     },
     {
       "collapsed": false,
-      "datasource": null,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 28
+        "y": 56
       },
       "id": 10,
       "panels": [],
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "refId": "A"
+        }
+      ],
       "title": "V8 metrics",
       "type": "row"
     },
     {
-      "datasource": null,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
       "description": "Amount of heap used by V8 engine in Node.js runtime.",
       "fieldConfig": {
         "defaults": {
@@ -916,6 +1265,8 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
@@ -965,21 +1316,27 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 29
+        "y": 57
       },
       "id": 28,
       "options": {
         "legend": {
           "calcs": [],
           "displayMode": "list",
-          "placement": "bottom"
+          "placement": "bottom",
+          "showLegend": true
         },
         "tooltip": {
-          "mode": "single"
+          "mode": "single",
+          "sort": "none"
         }
       },
       "targets": [
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
           "exemplar": true,
           "expr": "hoprd_gauge_nodejs_total_used_heap_bytes",
           "interval": "",
@@ -987,6 +1344,10 @@
           "refId": "A"
         },
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
           "exemplar": true,
           "expr": "avg_over_time(hoprd_gauge_nodejs_total_used_heap_bytes[1h])",
           "hide": false,
@@ -999,7 +1360,10 @@
       "type": "timeseries"
     },
     {
-      "datasource": null,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
       "description": "Number of times the node has restarted (either on user's request or due to error).",
       "fieldConfig": {
         "defaults": {
@@ -1027,12 +1391,15 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 29
+        "y": 57
       },
       "id": 30,
       "options": {
+        "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -1040,9 +1407,13 @@
         "showThresholdMarkers": true,
         "text": {}
       },
-      "pluginVersion": "8.1.8",
+      "pluginVersion": "9.3.2",
       "targets": [
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
           "exemplar": true,
           "expr": "changes(hoprd_gauge_startup_unix_time_seconds[$__range])",
           "interval": "",
@@ -1054,7 +1425,10 @@
       "type": "gauge"
     },
     {
-      "datasource": null,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
       "description": "Total amount of heap available for V8 engine in Node.js runtime.",
       "fieldConfig": {
         "defaults": {
@@ -1062,6 +1436,8 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
@@ -1107,21 +1483,27 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 37
+        "y": 65
       },
       "id": 32,
       "options": {
         "legend": {
           "calcs": [],
           "displayMode": "list",
-          "placement": "bottom"
+          "placement": "bottom",
+          "showLegend": true
         },
         "tooltip": {
-          "mode": "single"
+          "mode": "single",
+          "sort": "none"
         }
       },
       "targets": [
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
           "exemplar": true,
           "expr": "hoprd_gauge_nodejs_total_available_heap_bytes",
           "interval": "",
@@ -1129,6 +1511,10 @@
           "refId": "A"
         },
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
           "exemplar": true,
           "expr": "avg_over_time(hoprd_gauge_nodejs_total_available_heap_bytes[1h])",
           "hide": false,
@@ -1141,14 +1527,19 @@
       "type": "timeseries"
     },
     {
-      "datasource": null,
-      "description": "Plots Unix timestamp of when the node has started up. Changes in this graph indicate node restarts.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "description": "Timestamped view of node startups and restarts.",
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "palette-classic"
           },
           "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
@@ -1160,13 +1551,13 @@
               "tooltip": false,
               "viz": false
             },
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
+            "lineInterpolation": "stepBefore",
+            "lineWidth": 3,
             "pointSize": 5,
             "scaleDistribution": {
               "type": "linear"
             },
-            "showPoints": "auto",
+            "showPoints": "never",
             "spanNulls": true,
             "stacking": {
               "group": "A",
@@ -1187,31 +1578,54 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Node startup timestamp (unix)"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "hidden"
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 37
+        "y": 65
       },
       "id": 34,
       "options": {
         "legend": {
-          "calcs": [],
+          "calcs": [
+            "changeCount"
+          ],
           "displayMode": "list",
-          "placement": "bottom"
+          "placement": "bottom",
+          "showLegend": true
         },
         "tooltip": {
-          "mode": "single"
+          "mode": "single",
+          "sort": "none"
         }
       },
       "targets": [
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
           "exemplar": true,
           "expr": "hoprd_gauge_startup_unix_time_seconds",
           "interval": "",
-          "legendFormat": "Startup unix timestamp",
+          "legendFormat": "Node startup timestamp (unix)",
+          "range": true,
           "refId": "A"
         }
       ],
@@ -1219,19 +1633,21 @@
       "type": "timeseries"
     }
   ],
-  "schemaVersion": 30,
+  "refresh": "5s",
+  "schemaVersion": 37,
   "style": "dark",
   "tags": [],
   "templating": {
     "list": []
   },
   "time": {
-    "from": "now-30m",
+    "from": "now-1h",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "HOPR Node Overview",
   "uid": "8KfdzTpVz",
-  "version": 6
+  "version": 6,
+  "weekStart": ""
 }

@@ -141,6 +141,12 @@ POST.apiDoc = {
         }
       }
     },
+    '401': {
+      $ref: '#/components/responses/Unauthorized'
+    },
+    '403': {
+      $ref: '#/components/responses/Forbidden'
+    },
     '422': {
       description: 'Unknown failure.',
       content: {

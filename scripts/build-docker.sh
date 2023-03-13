@@ -75,15 +75,19 @@ build_and_tag_images() {
 
   if [ "${local_build:-}" = "true" ]; then
     log "Building Docker toolchain image"
-    docker build -q -t hopr-toolchain \
+    docker build -q -t hopr-toolchain-local \
       -f scripts/toolchain/Dockerfile . &
 
     log "Waiting for toolchain image to finish"
     wait
 
-    if [ -z "${image_name}" ] || [ "${image_name}" = "hoprd" ] || [ "${image_name}" = "pluto-complete" ]; then
+    if [ -z "${image_name}" ] || \
+       [ "${image_name}" = "hoprd" ] || \
+       [ "${image_name}" = "hoprd-nat" ] || \
+       [ "${image_name}" = "pluto-complete" ]; then
       log "Building Docker image hoprd-local"
       docker build -q -t hoprd-local \
+        --build-arg=HOPR_TOOLCHAIN_IMAGE="hopr-toolchain-local" \
         -f packages/hoprd/Dockerfile . &
     fi
 
@@ -97,6 +101,7 @@ build_and_tag_images() {
     if [ -z "${image_name}" ] || [ "${image_name}" = "anvil" ] || [ "${image_name}" = "pluto-complete" ]; then
       log "Building Docker image hopr-anvil-local"
       docker build -t hopr-anvil-local \
+        --build-arg=HOPR_TOOLCHAIN_IMAGE="hopr-toolchain-local" \
         -f packages/ethereum/Dockerfile.anvil . &
     fi
 

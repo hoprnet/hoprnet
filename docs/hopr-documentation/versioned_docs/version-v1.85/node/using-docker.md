@@ -57,7 +57,7 @@ docker pull gcr.io/hoprassociation/hoprd:wildhorn-v2
 Then start a container:
 
 ```bash
-docker run --pull always -ti -v $HOME/.hoprd-db-wildhorn-v2:/app/db -p 9091:9091 -p 3000:3000 -p 8080:8080 hopr/hoprd:wildhorn-v2 --password='h0pR-w1ldhorn-v2' --init --announce --identity /app/db/.hopr-id-wildhorn-v2 --apiToken='<YOUR_SECRET_TOKEN>'
+docker run --pull always -ti -v $HOME/.hoprd-db-wildhorn-v2:/app/db -p 9091:9091/tcp -p 9091:9091/udp -p 3000:3000 -p 8080:8080 hopr/hoprd:wildhorn-v2 --password='h0pR-w1ldhorn-v2' --init --announce --identity /app/db/.hopr-id-wildhorn-v2 --apiToken='<YOUR_SECRET_TOKEN>'
 ```
 
 Also all ports are mapped to your local host, assuming you stick to the default port numbers.

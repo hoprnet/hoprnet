@@ -5,12 +5,16 @@ export class AcknowledgedTicket {
   constructor(
     public readonly ticket: Ticket,
     public readonly response: Response,
-    public readonly preImage: Hash,
+    public preImage: Hash,
     public readonly signer: PublicKey
   ) {
     if (signer.toAddress().eq(this.ticket.counterparty)) {
       throw Error(`Given signer public key must be different from counterparty`)
     }
+  }
+
+  public setPreImage(preImg: Hash) {
+    this.preImage = preImg
   }
 
   public serialize(): Uint8Array {

@@ -1,6 +1,7 @@
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config
 
 [profile.default]
+solc = "0.8.13"
 src = 'src'
 test = 'test'
 out = 'out'
@@ -17,7 +18,7 @@ local = "http://localhost:8545"
 gnosis = "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet"
 
 [etherscan]
-gnosis = { key = "${GNOSISSCAN_API_KEY}", url = "https://gnosisscan.io" }
+gnosis = { key = "${ETHERSCAN_API_KEY}", url = "https://api.gnosisscan.io" }
 
 # testing and local network
 [profile.development]
@@ -29,7 +30,7 @@ eth_rpc_url = "http://localhost:8545" # cannot directly use profile.default.rpc_
 libraries = ["script/utils/BoostUtilsLib.sol:BoostUtilsLib:0x8197525557233031b110038Ae52dfC3C4A75567A"]
 eth_rpc_url = "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet"
 
-# production environment environment
+# production environment
 [profile.production]
 # provide deployed BoostUtilsLib
 libraries = ["script/utils/BoostUtilsLib.sol:BoostUtilsLib:0x8197525557233031b110038Ae52dfC3C4A75567A"]

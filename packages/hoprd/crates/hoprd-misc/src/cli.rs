@@ -6,7 +6,7 @@ use clap::{Arg, ArgAction, ArgMatches, Args, Command, FromArgMatches as _};
 use core_ethereum_misc::constants::DEFAULT_CONFIRMATIONS;
 use core_misc::constants::{
     DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_INTERVAL_VARIANCE, DEFAULT_HEARTBEAT_THRESHOLD,
-    DEFAULT_NETWORK_QUALITY_THRESHOLD,
+    DEFAULT_NETWORK_QUALITY_THRESHOLD, DEFAULT_MAX_PARALLEL_CONNECTIONS, DEFAULT_MAX_PARALLEL_CONNECTION_PUBLIC_RELAY
 };
 use core_misc::environment::{Environment, FromJsonFile, PackageJsonFile, ProtocolConfig};
 use core_strategy::{passive::PassiveStrategy, random::RandomStrategy, promiscuous::PromiscuousStrategy, generic::ChannelStrategy};
@@ -16,6 +16,7 @@ use serde::{Deserialize, Serialize};
 use serde_json;
 use utils_misc::ok_or_str;
 use utils_proc_macros::wasm_bindgen_if;
+use hex;
 
 pub const DEFAULT_API_HOST: &str = "localhost";
 pub const DEFAULT_API_PORT: u16 = 3001;
@@ -47,9 +48,20 @@ fn parse_host(s: &str) -> Result<Host, String> {
     Host::from_ipv4_host_string(s)
 }
 
-fn parse_private_key(s: &str) -> Result<String, String> {
+/// Parse a hex string private key to a boxed u8 slice
+fn parse_private_key(s: &str) -> Result<Box<[u8]>, String> {
     if is_private_key(s) || is_prefixed_private_key(s) {
-        Ok(s.into())
+        let mut decoded = [0u8; 32];
+
+        let priv_key = match s.strip_prefix("0x") {
+            Some(priv_without_prefix) => priv_without_prefix,
+            None => s
+        };
+
+        // no errors because filtered by regex
+        hex::decode_to_slice(priv_key, &mut decoded).unwrap();
+
+        Ok(Box::new(decoded))
     } else {
         Err(format!(
             "Given string is not a private key. A private key must contain 64 hex chars."
@@ -136,7 +148,7 @@ struct CliArgs {
         }, 
         env = "HOPRD_HOST", 
         help = "Host to listen on for P2P connections",
-        value_parser = ValueParser::new(parse_host)
+        value_parser = ValueParser::new(parse_host),
     )]
     pub host: Host,
 
@@ -144,7 +156,8 @@ struct CliArgs {
         long,
         default_value_t = false,
         env = "HOPRD_ANNOUNCE",
-        help = "Run as a Public Relay Node (PRN)"
+        help = "Run as a Public Relay Node (PRN)",
+        action = ArgAction::SetTrue
     )]
     pub announce: bool,
 
@@ -189,7 +202,8 @@ struct CliArgs {
         long = "healthCheck",
         default_value_t = false,
         env = "HOPRD_HEALTH_CHECK",
-        help = format!("Run a health check end point on {}:{}", DEFAULT_HEALTH_CHECK_HOST, DEFAULT_HEALTH_CHECK_PORT)
+        help = format!("Run a health check end point on {}:{}", DEFAULT_HEALTH_CHECK_HOST, DEFAULT_HEALTH_CHECK_PORT),
+        action = ArgAction::SetTrue
     )]
     pub health_check: bool,
 
@@ -221,23 +235,41 @@ struct CliArgs {
     pub password: Option<String>,
 
     #[arg(
-    long,
-    help = "Default channel strategy to use after node starts up",
-    env = "HOPRD_DEFAULT_STRATEGY",
-    value_name = "DEFAULT_STRATEGY",
-    default_value = "passive",
-    value_parser = PossibleValuesParser::new([PromiscuousStrategy::NAME, PassiveStrategy::NAME, RandomStrategy::NAME])
+        long = "defaultStrategy",
+        help = "Default channel strategy to use after node starts up",
+        env = "HOPRD_DEFAULT_STRATEGY",
+        value_name = "DEFAULT_STRATEGY",
+        default_value = "passive",
+        value_parser = PossibleValuesParser::new([PromiscuousStrategy::NAME, PassiveStrategy::NAME, RandomStrategy::NAME])
     )]
     pub default_strategy: Option<String>,
 
     #[arg(
-    long,
-    help = "Maximum number of channel a strategy can open. If not specified, square root of number of available peers is used.",
-    env = "HOPRD_MAX_AUTO_CHANNELS",
-    value_name = "MAX_AUTO_CHANNELS",
-    value_parser = clap::value_parser!(u32)
+        long = "maxAutoChannels",
+        help = "Maximum number of channel a strategy can open. If not specified, square root of number of available peers is used.",
+        env = "HOPRD_MAX_AUTO_CHANNELS",
+        value_name = "MAX_AUTO_CHANNELS",
+        value_parser = clap::value_parser!(u32)
     )]
     pub max_auto_channels: Option<u32>, // Make this a string if we want to supply functions instead in the future.
+
+    #[arg(
+        long = "autoRedeemTickets",
+        default_value_t = false,
+        env = "HOPRD_AUTO_REDEEEM_TICKETS",
+        help = "If enabled automatically redeems winning tickets.",
+        action = ArgAction::SetTrue
+    )]
+    pub auto_redeem_tickets: bool,
+
+    #[arg(
+        long = "checkUnrealizedBalance",
+        default_value_t = false,
+        env = "HOPRD_CHECK_UNREALIZED_BALANCE",
+        help = "Determines if unrealized balance shall be checked first before validating unacknowledged tickets.",
+        action = ArgAction::SetTrue
+    )]
+    pub check_unrealized_balance: bool,
 
     #[arg(
         long,
@@ -252,7 +284,7 @@ struct CliArgs {
         help = "List all the options used to run the HOPR node, but quit instead of starting",
         env = "HOPRD_DRY_RUN",
         default_value_t = false,
-        action = ArgAction:: SetTrue
+        action = ArgAction::SetTrue
     )]
     pub dry_run: bool,
 
@@ -261,9 +293,20 @@ struct CliArgs {
         help = "initialize a database if it doesn't already exist",
         action = ArgAction::SetTrue,
         env = "HOPRD_INIT",
-        default_value_t = false
+        default_value_t = false,
+        action = ArgAction::SetTrue
     )]
     pub init: bool,
+
+    #[arg(
+        long = "forceInit",
+        help = "initialize a database, even if it already exists",
+        action = ArgAction::SetTrue,
+        env = "HOPRD_FORCE_INIT",
+        default_value_t = false,
+        action = ArgAction::SetTrue
+    )]
+    pub force_init: bool,
 
     #[arg(
         long = "privateKey",
@@ -273,7 +316,7 @@ struct CliArgs {
         value_name = "PRIVATE_KEY",
         value_parser = ValueParser::new(parse_private_key)
     )]
-    pub private_key: Option<String>,
+    pub private_key: Option<Box<[u8]>>,
 
     #[arg(
         long = "allowLocalNodeConnections",
@@ -294,6 +337,19 @@ struct CliArgs {
     pub allow_private_node_connections: bool,
 
     #[arg(
+        long = "maxParallelConnections",
+        default_value_t = DEFAULT_MAX_PARALLEL_CONNECTIONS,
+        default_value_ifs = [
+            ("announce", "true", DEFAULT_MAX_PARALLEL_CONNECTION_PUBLIC_RELAY.to_string()),
+        ],
+        value_parser = clap::value_parser!(u32).range(1..),
+        value_name = "CONNECTIONS",
+        help = "Set maximum parallel connections",
+        env = "HOPRD_MAX_PARALLEL_CONNECTIONS"
+    )]
+    pub max_parallel_connections: u32,
+
+    #[arg(
         long = "testAnnounceLocalAddresses",
         env = "HOPRD_TEST_ANNOUNCE_LOCAL_ADDRESSES",
         help = "For testing local testnets. Announce local addresses",
@@ -307,7 +363,7 @@ struct CliArgs {
         env = "HOPRD_TEST_PREFER_LOCAL_ADDRESSES",
         action = ArgAction::SetTrue,
         help = "For testing local testnets. Prefer local peers to remote",
-        default_value_t = true,
+        default_value_t = false,
         hide = true
     )]
     pub test_prefer_local_addresses: bool,
@@ -324,9 +380,9 @@ struct CliArgs {
 
     #[arg(
         long = "disableApiAuthentication",
-        help = "no remote authentication for easier testing",
+        help = "completely disables the token authentication for the API, overrides any apiToken if set",
         action = ArgAction::SetTrue,
-        env = "HOPRD_TEST_NO_AUTHENTICATION",
+        env = "HOPRD_DISABLE_API_AUTHENTICATION",
         default_value_t = false,
         hide = true
     )]
@@ -351,6 +407,16 @@ struct CliArgs {
         hide = true
     )]
     pub test_no_webrtc_upgrade: bool,
+
+    #[arg(
+        long = "testLocalModeStun",
+        help = "Transport testing: use full-featured STUN with local addresses",
+        env = "HOPRD_TEST_LOCAL_MODE_STUN",
+        default_value_t = false,
+        action = ArgAction::SetTrue,
+        hide = true
+    )]
+    pub test_local_mode_stun: bool,
 
     #[arg(
         long = "heartbeatInterval",
@@ -507,6 +573,49 @@ fn get_data_path(mono_repo_path: &str, maybe_default_environment: Option<String>
             mono_repo_path, default_environment
         ),
         None => format!("{}/packages/hoprd/hoprd-db", mono_repo_path),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn parse_private_key () {
+        let parsed = super::parse_private_key("cd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e0317").unwrap();
+
+        let priv_key: Vec<u8> = vec![205, 9, 249, 41, 63, 253, 214, 155, 233, 120, 3, 44, 83, 59, 107, 205, 2, 223, 213, 217, 55, 201, 135, 190, 222, 195, 226, 141, 224, 126, 3, 23];
+
+        assert_eq!(parsed, priv_key.into())
+    }
+
+    #[test]
+    fn parse_private_key_with_prefix () {
+        let parsed_with_prefix = super::parse_private_key("cd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e0317").unwrap();
+
+        let priv_key: Vec<u8> = vec![205, 9, 249, 41, 63, 253, 214, 155, 233, 120, 3, 44, 83, 59, 107, 205, 2, 223, 213, 217, 55, 201, 135, 190, 222, 195, 226, 141, 224, 126, 3, 23];
+
+        assert_eq!(parsed_with_prefix, priv_key.into())
+    }
+
+    #[test]
+    fn parse_too_short_private_key () {
+        let parsed = super::parse_private_key("cd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e031").unwrap_err();
+
+        assert_eq!(parsed, "Given string is not a private key. A private key must contain 64 hex chars.")
+    }
+
+    #[test]
+    fn parse_too_long_private_key () {
+        let parsed = super::parse_private_key("cd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e03177").unwrap_err();
+
+        assert_eq!(parsed, "Given string is not a private key. A private key must contain 64 hex chars.")
+    }
+
+    #[test]
+    fn parse_non_hex_values () {
+        let parsed = super::parse_private_key("really not a private key").unwrap_err();
+
+        assert_eq!(parsed, "Given string is not a private key. A private key must contain 64 hex chars.")
+
     }
 }
 

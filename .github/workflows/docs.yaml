@@ -52,13 +52,25 @@ jobs:
       - name: Install tools (only when using ACT)
         if: ${{ env.ACT == 'true' }}
         run: |
+          apt-key adv --keyserver keyserver.ubuntu.com --recv-keys CC86BB64
+          add-apt-repository -y ppa:rmescandon/yq
           apt update
-          apt install --no-install-recommends lsof
+          apt install -y --no-install-recommends lsof yq
 
-      - name: Generate docs
+      - name: Generate docs (first run)
         run: |
           make -j deps-ci
           make -j build-docs
+        env:
+          DEPLOYER_PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY_DEFAULT_FOUNDRY }}
+
+      - name: Sync supported API capabilities
+        run: ./scripts/sync-api-capabilities.sh
+
+      # a second run is needed to include the newly updated API docs into the
+      # final API spec file
+      - name: Generate docs (second run)
+        run: make -j build-docs
         env:
           DEPLOYER_PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY_DEFAULT_FOUNDRY }}
 

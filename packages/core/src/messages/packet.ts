@@ -69,6 +69,10 @@ export async function createTicket(
   db: HoprDB,
   privKey: PeerId
 ): Promise<Ticket> {
+  if (!privKey.privateKey) {
+    throw Error(`Cannot create acknowledgement because lacking access to private key`)
+  }
+
   const channel = await db.getChannelTo(dest)
   const currentTicketIndex = await bumpTicketIndex(channel.getId(), db)
   const amount = new Balance(PRICE_PER_PACKET.mul(INVERSE_TICKET_WIN_PROB).muln(pathLength - 1))
@@ -122,6 +126,10 @@ export async function createTicket(
  * @returns a ticket
  */
 export function createZeroHopTicket(dest: PublicKey, challenge: Challenge, privKey: PeerId): Ticket {
+  if (!privKey.privateKey) {
+    throw Error(`Cannot create acknowledgement because lacking access to private key`)
+  }
+
   return Ticket.create(
     dest.toAddress(),
     challenge,
@@ -151,7 +159,8 @@ export async function validateUnacknowledgedTicket(
   reqInverseTicketWinProb: BN,
   ticket: Ticket,
   channel: ChannelEntry,
-  getTickets: () => Promise<Ticket[]>
+  getTickets: () => Promise<Ticket[]>,
+  checkUnrealizedBalance: boolean
 ): Promise<void> {
   const them = PublicKey.fromPeerId(themPeerId)
   const requiredTicketWinProb = UINT256.fromInverseProbability(reqInverseTicketWinProb).toBN()
@@ -198,25 +207,28 @@ export async function validateUnacknowledgedTicket(
     )
   }
 
-  // find out pending balance from unredeemed tickets
+  if (checkUnrealizedBalance) {
+    // find out pending balance from unredeemed tickets
+    log(`checking unrealized balances for channel ${channel.getId().toHex()}`)
 
-  // all tickets from sender
-  const tickets = await getTickets().then((ts) => {
-    return ts.filter((t) => {
-      return t.epoch.toBN().eq(channel.ticketEpoch.toBN()) && t.channelEpoch.toBN().eq(channel.channelEpoch.toBN())
+    // all tickets from sender
+    const tickets = await getTickets().then((ts) => {
+      return ts.filter((t) => {
+        return t.epoch.toBN().eq(channel.ticketEpoch.toBN()) && t.channelEpoch.toBN().eq(channel.channelEpoch.toBN())
+      })
     })
-  })
 
-  const unrealizedBalance = tickets.reduce((result, t) => {
-    // update balance
-    result = result.sub(t.amount)
+    const unrealizedBalance = tickets.reduce((result, t) => {
+      // update balance
+      result = result.sub(t.amount)
 
-    return result
-  }, channel.balance)
+      return result
+    }, channel.balance)
 
-  // ensure sender has enough funds
-  if (ticket.amount.toBN().gt(unrealizedBalance.toBN())) {
-    throw Error(`Payment channel ${channel.getId().toHex()} does not have enough funds`)
+    // ensure sender has enough funds
+    if (ticket.amount.toBN().gt(unrealizedBalance.toBN())) {
+      throw Error(`Payment channel ${channel.getId().toHex()} does not have enough funds`)
+    }
   }
 }
 
@@ -326,7 +338,7 @@ export class Packet {
 
     let arr: Uint8Array
     if (typeof Buffer !== 'undefined' && Buffer.isBuffer(preArray)) {
-      arr = Uint8Array.from(arr)
+      arr = new Uint8Array(preArray.buffer, preArray.byteOffset, preArray.byteLength)
     } else {
       arr = preArray
     }
@@ -400,7 +412,7 @@ export class Packet {
     await db.storePendingAcknowledgement(this.ackChallenge, true)
   }
 
-  async validateUnacknowledgedTicket(db: HoprDB) {
+  async validateUnacknowledgedTicket(db: HoprDB, checkUnrealizedBalance: boolean) {
     const channel = await db.getChannelFrom(this.previousHop)
 
     try {
@@ -413,7 +425,8 @@ export class Packet {
         () =>
           db.getTickets({
             signer: this.previousHop
-          })
+          }),
+        checkUnrealizedBalance
       )
     } catch (e) {
       log(`mark ticket as rejected`, this.ticket.toString())
