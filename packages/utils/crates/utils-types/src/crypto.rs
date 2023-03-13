@@ -472,6 +472,13 @@ impl PublicKey {
                                  signature.recovery)
     }
 
+    pub fn from_signature_hash(hash: &[u8], signature: &Signature) -> Result<PublicKey> {
+        Self::from_raw_signature_hash(hash,
+                                 &signature.signature[0..Signature::SIZE/2],
+                                 &signature.signature[Signature::SIZE/2..],
+                                 signature.recovery)
+    }
+
     /// Sums all given public keys together, creating a new public key.
     /// Panics if reaches infinity (EC identity point), which is an invalid public key.
     pub fn combine(summands: &[&PublicKey]) -> PublicKey {

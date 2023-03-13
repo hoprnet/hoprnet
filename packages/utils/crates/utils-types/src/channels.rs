@@ -213,8 +213,9 @@ impl Ticket {
     pub fn create(counterparty: Address, challenge: Challenge, epoch: U256, index: U256, amount: Balance, win_prob: U256, channel_epoch: U256, signing_key: &[u8]) -> Self {
         let encoded_challenge = challenge.to_ethereum_challenge();
         let hashed_ticket = Hash::create(&[&Self::serialize_unsigned_aux(&counterparty, &encoded_challenge, &epoch, &amount, &win_prob, &index, &channel_epoch)]);
-        let msg = ethereum_signed_hash(hashed_ticket.serialize());
-        let signature = Signature::sign_message(&msg.serialize(), signing_key);
+        let msg = ethereum_signed_hash(hashed_ticket.serialize()).serialize();
+        println!("create: {}",hex::encode(&msg));
+        let signature = Signature::sign_message(&msg, signing_key);
 
         Self {
             counterparty, challenge: encoded_challenge, epoch, index, amount, win_prob, channel_epoch, signature
@@ -241,7 +242,9 @@ impl Ticket {
     /// Recovers the signer public key from the embedded ticket signature.
     /// This is possible due this specific instantiation of the ECDSA over the secp256k1 curve.
     pub fn recover_signer(&self) -> PublicKey {
-        PublicKey::from_signature(&self.get_hash().serialize(), &self.signature)
+        let hash = self.get_hash().serialize();
+        println!("recovered: {}", hex::encode(&hash));
+        PublicKey::from_signature_hash(&hash, &self.signature)
             .expect("invalid signature on ticket, public key not recoverable")
     }
 
@@ -286,9 +289,9 @@ impl Ticket {
             let counterparty = Address::deserialize(b.drain(0..Address::SIZE).as_ref())?;
             let challenge = EthereumChallenge::deserialize(b.drain(0..EthereumChallenge::SIZE).as_ref())?;
             let epoch = U256::deserialize(b.drain(0..U256::SIZE).as_ref())?;
-            let index = U256::deserialize(b.drain(0..U256::SIZE).as_ref())?;
             let amount = Balance::deserialize(b.drain(0..Balance::SIZE).as_ref(), BalanceType::HOPR)?;
             let win_prob = U256::deserialize(b.drain(0..U256::SIZE).as_ref())?;
+            let index = U256::deserialize(b.drain(0..U256::SIZE).as_ref())?;
             let channel_epoch = U256::deserialize(b.drain(0..U256::SIZE).as_ref())?;
             let signature = Signature::deserialize(b.drain(0..Signature::SIZE).as_ref())?;
 
@@ -305,13 +308,15 @@ impl Ticket {
 pub mod tests {
     use ethnum::u256;
     use hex_literal::hex;
-    use crate::channels::{ChannelEntry, ChannelStatus};
-    use crate::crypto::{Hash, PublicKey};
-    use crate::primitives::{Balance, BalanceType, U256};
+    use crate::channels::{ChannelEntry, ChannelStatus, Ticket};
+    use crate::crypto::{Challenge, CurvePoint, Hash, PublicKey};
+    use crate::primitives::{Address, Balance, BalanceType, U256};
 
     const PUBLIC_KEY_1: [u8; 65] = hex!("0443a3958ac66a3b2ab89fcf90bc948a8b8be0e0478d21574d077ddeb11f4b1e9f2ca21d90bd66cee037255480a514b91afae89e20f7f7fa7353891cc90a52bf6e");
     const PUBLIC_KEY_2: [u8; 65] = hex!("04f16fd6701aea01032716377d52d8213497c118f99cdd1c3c621b2795cac8681606b7221f32a8c5d2ef77aa783bec8d96c11480acccabba9e8ee324ae2dfe92bb");
     const COMMITMENT: [u8; 32] = hex!("ffab46f058090de082a086ea87c535d34525a48871c5a2024f80d0ac850f81ef");
+
+    const SGN_PRIVATE_KEY: [u8; 32] = hex!("e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8");
 
     #[test]
     pub fn channel_entry_test() {
@@ -322,7 +327,7 @@ pub mod tests {
             Hash::new(&COMMITMENT),
             U256::new("0"),
             U256::new("1"),
-            ChannelStatus::Closed,
+            ChannelStatus::PendingToClose,
             U256::new("3"),
             U256::new("4")
         );
@@ -336,6 +341,29 @@ pub mod tests {
         let cs1 = ChannelStatus::Open;
         let cs2 = ChannelStatus::from_byte(cs1.to_byte());
         assert_eq!(cs1, cs2);
+    }
+
+    #[test]
+    pub fn ticket_test() {
+        let ticket1 = Ticket::create(
+          Address::new(&[0u8; Address::SIZE]),
+            Challenge {
+                curve_point: CurvePoint::new(&hex!("03c2aa76d6837c51337001c8b5a60473726064fc35d0a40b8f0e1f068cc8e38e10"))
+            },
+            U256::new("1"),
+            U256::new("2"),
+            Balance::new(10u32.into(), BalanceType::HOPR),
+          U256::new("3"),
+            U256::new("4"),
+            &SGN_PRIVATE_KEY
+        );
+
+        let ticket2 = Ticket::deserialize(&ticket1.serialize()).unwrap();
+
+        assert_eq!(ticket1, ticket2);
+
+        let pub_key = PublicKey::from_privkey(&SGN_PRIVATE_KEY).unwrap();
+        assert!(ticket1.verify(&pub_key));
     }
 }
 
