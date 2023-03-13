@@ -482,7 +482,7 @@ impl PublicKey {
 
         Self {
             key: elliptic_curve::PublicKey::<Secp256k1>::from_affine(affine)
-                .expect("combination results into ec identity (which is an invalid pub key)"),
+                .expect("combination results in the ec identity (which is an invalid pub key)"),
             compressed: affine.to_encoded_point(true).to_bytes()
         }
     }
@@ -634,7 +634,6 @@ pub mod tests {
 
     const PUBLIC_KEY: [u8; 33] = hex!("021464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8");
     const PRIVATE_KEY: [u8; 32] = hex!("e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8");
-    
 
     #[test]
     fn signature_signing_test() {
@@ -684,7 +683,6 @@ pub mod tests {
 
     #[test]
     fn sign_and_recover_test() {
-        //let msg = b"test";
         let msg = hex!("eff80b9f035b1d369c6a60f362ac7c8b8c3b61b76d151d1be535145ccaa3e83e");
 
         let signature1 = Signature::sign_message(&msg, &PRIVATE_KEY);

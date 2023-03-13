@@ -342,6 +342,10 @@ pub mod tests {
 
     #[test]
     pub fn ticket_test() {
+        let inverse_win_prob = u256::new(1u128); // 100 %
+        let price_per_packet = u256::new(10000000000000000u128); // 0.01 HOPR
+        let path_pos = 5u8;
+
         let ticket1 = Ticket::create(
           Address::new(&[0u8; Address::SIZE]),
             Challenge {
@@ -349,8 +353,8 @@ pub mod tests {
             },
             U256::new("1"),
             U256::new("2"),
-            Balance::new(10u32.into(), BalanceType::HOPR),
-          U256::new("3"),
+            Balance::new(inverse_win_prob * price_per_packet * path_pos as u128, BalanceType::HOPR),
+          U256::from_inverse_probability(&inverse_win_prob).unwrap(),
             U256::new("4"),
             &SGN_PRIVATE_KEY
         );
@@ -361,6 +365,9 @@ pub mod tests {
 
         let pub_key = PublicKey::from_privkey(&SGN_PRIVATE_KEY).unwrap();
         assert!(ticket1.verify(&pub_key), "failed to verify signed ticket");
+
+        assert_eq!(ticket1.get_path_position(&price_per_packet.into(), &inverse_win_prob.into()), path_pos, "invalid path pos");
+        assert_eq!(ticket2.get_path_position(&price_per_packet.into(), &inverse_win_prob.into()), path_pos, "invalid path pos");
     }
 }
 
