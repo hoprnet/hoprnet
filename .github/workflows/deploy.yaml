@@ -47,8 +47,10 @@ jobs:
       - name: "[SETUP] Configure Git info"
         run: ./scripts/configure-git-info.sh
 
-      - name: install toolchain
-        run: ./scripts/toolchain/install-toolchain.sh
+      - name: install toolchain (and update PATH)
+        run: |
+          ./scripts/toolchain/install-toolchain.sh
+          echo "/usr/local/bin" >> $GITHUB_PATH
 
       - name: get yarn cache directory path
         id: yarn-cache-dir-path
@@ -210,8 +212,10 @@ jobs:
       - name: "[SETUP] Configure Git info"
         run: ./scripts/configure-git-info.sh
 
-      - name: install toolchain
-        run: ./scripts/toolchain/install-toolchain.sh
+      - name: install toolchain (and update PATH)
+        run: |
+          ./scripts/toolchain/install-toolchain.sh
+          echo "/usr/local/bin" >> $GITHUB_PATH
 
       - name: get yarn cache directory path
         id: yarn-cache-dir-path
@@ -313,8 +317,10 @@ jobs:
       - name: "[SETUP] Configure Git info"
         run: ./scripts/configure-git-info.sh
 
-      - name: install toolchain
-        run: ./scripts/toolchain/install-toolchain.sh
+      - name: install toolchain (and update PATH)
+        run: |
+          ./scripts/toolchain/install-toolchain.sh
+          echo "/usr/local/bin" >> $GITHUB_PATH
 
       - name: get yarn cache directory path
         id: yarn-cache-dir-path
@@ -416,8 +422,10 @@ jobs:
       - name: "[SETUP] Configure Git info"
         run: ./scripts/configure-git-info.sh
 
-      - name: install toolchain
-        run: ./scripts/toolchain/install-toolchain.sh
+      - name: install toolchain (and update PATH)
+        run: |
+          ./scripts/toolchain/install-toolchain.sh
+          echo "/usr/local/bin" >> $GITHUB_PATH
 
       - name: get yarn cache directory path
         id: yarn-cache-dir-path

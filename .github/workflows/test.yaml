@@ -22,8 +22,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: install toolchain
-        run: ./scripts/toolchain/install-toolchain.sh
+      - name: install toolchain (and update PATH)
+        run: |
+          ./scripts/toolchain/install-toolchain.sh
+          echo "/usr/local/bin" >> $GITHUB_PATH
 
       - name: get yarn cache directory path
         id: yarn-cache-dir-path
