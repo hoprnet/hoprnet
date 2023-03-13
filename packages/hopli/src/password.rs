@@ -32,6 +32,7 @@ impl PasswordArgs {
                 if let Ok(pwd_from_file) = read_to_string(password_path) {
                     return Ok(pwd_from_file);
                 } else {
+                    println!("Cannot read from password_path");
                     return Err(HelperErrors::UnableToReadPassword);
                 }
             }
@@ -40,6 +41,7 @@ impl PasswordArgs {
                 if let Ok(pwd_from_env) = env::var("IDENTITY_PASSWORD") {
                     return Ok(pwd_from_env);
                 } else {
+                    println!("Cannot read from env var");
                     return Err(HelperErrors::UnableToReadPassword);
                 }
             }
