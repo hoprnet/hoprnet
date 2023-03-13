@@ -254,7 +254,6 @@ impl Snapshot {
     }
 
     pub fn serialize(&self) -> Box<[u8]> {
-
         let mut ret = vec![];
         ret.extend_from_slice(&self.block_number.serialize());
         ret.extend_from_slice(&self.transaction_index.serialize());
@@ -270,9 +269,9 @@ impl Snapshot {
     pub fn deserialize(data: &[u8]) -> Result<Self> {
         if data.len() == Self::SIZE {
             Ok(Self {
-                block_number: U256::deserialize(&data[0..32])?,
-                transaction_index: U256::deserialize(&data[32..64])?,
-                log_index: U256::deserialize(&data[64..96])?,
+                block_number: U256::deserialize(&data[0..U256::SIZE])?,
+                transaction_index: U256::deserialize(&data[U256::SIZE..2*U256::SIZE])?,
+                log_index: U256::deserialize(&data[2*U256::SIZE..3*U256::SIZE])?,
             })
         } else {
             Err(ParseError)
