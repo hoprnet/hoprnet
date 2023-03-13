@@ -3,7 +3,7 @@
 use std::ops::Add;
 use std::str::FromStr;
 use k256::ecdsa::{SigningKey, Signature as ECDSASignature, signature::Signer, VerifyingKey, RecoveryId};
-use k256::{AffinePoint, elliptic_curve, NonZeroScalar, Secp256k1};
+use k256::{AffinePoint, ecdsa, elliptic_curve, NonZeroScalar, Secp256k1};
 use k256::ecdsa::signature::Verifier;
 use k256::elliptic_curve::generic_array::GenericArray;
 use k256::elliptic_curve::ProjectiveArithmetic;
@@ -410,8 +410,8 @@ impl PublicKey {
         let key = elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(bytes)
             .map_err(|_| ParseError)?;
         Ok(PublicKey{
-            compressed: key.to_encoded_point(true).to_bytes(),
             key,
+            compressed: key.to_encoded_point(true).to_bytes()
         })
     }
 
@@ -437,27 +437,14 @@ impl PublicKey {
         })
     }
 
-    pub fn from_raw_signature(msg: &[u8], r: &[u8], s: &[u8], v: u8) -> Result<PublicKey> {
+    fn from_raw_signature<R>(msg: &[u8], r: &[u8], s: &[u8], v: u8, recovery_method: R) -> Result<PublicKey>
+    where R: Fn(&[u8], &ECDSASignature, RecoveryId) -> std::result::Result<VerifyingKey, ecdsa::Error> {
         let recid = RecoveryId::try_from(v).map_err(|_| ParseError)?;
         let signature = ECDSASignature::from_scalars(
             GenericArray::clone_from_slice(r),GenericArray::clone_from_slice(s))
             .map_err(|_| ParseError)?;
-        let recovered_key = VerifyingKey::recover_from_msg(
+        let recovered_key = recovery_method(
             msg,
-            &signature,
-            recid
-        ).map_err(|_| MathError)?;
-
-        Self::deserialize(&recovered_key.to_encoded_point(false).to_bytes())
-    }
-
-    pub fn from_raw_signature_hash(hash: &[u8], r: &[u8], s: &[u8], v: u8) -> Result<PublicKey> {
-        let recid = RecoveryId::try_from(v).map_err(|_| ParseError)?;
-        let signature = ECDSASignature::from_scalars(
-            GenericArray::clone_from_slice(r),GenericArray::clone_from_slice(s))
-            .map_err(|_| ParseError)?;
-        let recovered_key = VerifyingKey::recover_from_prehash(
-            hash,
             &signature,
             recid
         ).map_err(|_| MathError)?;
@@ -469,14 +456,16 @@ impl PublicKey {
         Self::from_raw_signature(msg,
                                  &signature.signature[0..Signature::SIZE/2],
                                  &signature.signature[Signature::SIZE/2..],
-                                 signature.recovery)
+                                 signature.recovery,
+                                 VerifyingKey::recover_from_msg)
     }
 
     pub fn from_signature_hash(hash: &[u8], signature: &Signature) -> Result<PublicKey> {
-        Self::from_raw_signature_hash(hash,
+        Self::from_raw_signature(hash,
                                  &signature.signature[0..Signature::SIZE/2],
                                  &signature.signature[Signature::SIZE/2..],
-                                 signature.recovery)
+                                 signature.recovery,
+                                    VerifyingKey::recover_from_prehash)
     }
 
     /// Sums all given public keys together, creating a new public key.
@@ -596,8 +585,9 @@ impl Signature {
 #[cfg(test)]
 pub mod tests {
     use hex_literal::hex;
-    use k256::elliptic_curve::{AffineXCoordinate, ProjectiveArithmetic};
-    use k256::{EncodedPoint, NonZeroScalar, Secp256k1, U256};
+    use k256::elliptic_curve::ProjectiveArithmetic;
+    use k256::{NonZeroScalar, Secp256k1, U256};
+    use k256::ecdsa::VerifyingKey;
     use k256::elliptic_curve::sec1::ToEncodedPoint;
     use crate::crypto::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, Hash, PublicKey, Signature};
     use crate::primitives::Address;
@@ -649,7 +639,12 @@ pub mod tests {
 
         let hash = hex!("fac7acad27047640b069e8157b61623e3cb6bb86e6adf97151f93817c291f3cf");
 
-        assert_eq!(address, PublicKey::from_raw_signature_hash(&hash, &r, &s, v).unwrap().to_address())
+        assert_eq!(address, PublicKey::from_raw_signature(&hash, &r, &s, v, VerifyingKey::recover_from_prehash).unwrap().to_address());
+
+        let signature = Signature::sign_message(b"test", &PRIVATE_KEY);
+        let pub_key1 = PublicKey::from_privkey(&PRIVATE_KEY).unwrap();
+        let pub_key2 = PublicKey::from_signature(b"test", &signature).unwrap();
+        assert_eq!(pub_key1, pub_key2);
     }
 
     #[test]
@@ -742,12 +737,12 @@ pub mod tests {
         assert_eq!(hash1, hash2);
     }
 
-
 }
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use js_sys::Uint8Array;
+    use k256::ecdsa::VerifyingKey;
     use sha3::{Keccak256, digest::DynDigest};
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
@@ -847,7 +842,7 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "from_signature")]
         pub fn public_key_from_raw_signature(hash: &[u8], r: &[u8], s: &[u8], v: u8) -> JsResult<PublicKey> {
-            ok_or_jserr!(PublicKey::from_raw_signature(hash, r, s, v))
+            ok_or_jserr!(PublicKey::from_raw_signature(hash, r, s, v, VerifyingKey::recover_from_msg))
         }
 
         #[wasm_bindgen(js_name = "from_privkey")]
