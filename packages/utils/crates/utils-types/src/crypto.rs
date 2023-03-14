@@ -6,11 +6,11 @@ use k256::ecdsa::{SigningKey, Signature as ECDSASignature, VerifyingKey, Recover
 use k256::{AffinePoint, ecdsa, elliptic_curve, NonZeroScalar, Secp256k1};
 use k256::ecdsa::signature::hazmat::PrehashVerifier;
 use k256::ecdsa::signature::Verifier;
+use k256::elliptic_curve::CurveArithmetic;
 use k256::elliptic_curve::generic_array::GenericArray;
-use k256::elliptic_curve::ProjectiveArithmetic;
 use k256::elliptic_curve::sec1::{FromEncodedPoint, ToEncodedPoint};
-use libp2p_core::PeerId;
 use sha3::{Keccak256, digest::DynDigest};
+use libp2p_identity::{PeerId, PublicKey as lp2p_PublicKey, secp256k1::PublicKey as lp2p_k256_PublicKey};
 
 use crate::errors::{Result, GeneralError::ParseError, GeneralError};
 use crate::errors::GeneralError::MathError;
@@ -353,8 +353,10 @@ impl PeerIdLike for PublicKey {
     }
 
     fn to_peerid(&self) -> PeerId {
-        PeerId::from_public_key(&libp2p_core::PublicKey::Secp256k1(
-            libp2p_core::identity::secp256k1::PublicKey::decode(&self.compressed)
+        // TODO: Once the enum is made opaque as described in the deprecation note, a workaround must be done
+        // Possibly by constructing directly the protobuf structure and then parsing it via l2p_PublicKey::from_protobuf_encoding
+        PeerId::from_public_key(&lp2p_PublicKey::Secp256k1(
+            lp2p_k256_PublicKey::decode(&self.compressed)
                 .expect("cannot convert this public key to secp256k1 peer id")
         ))
     }
@@ -426,7 +428,7 @@ impl PublicKey {
         let affine: AffinePoint = summands
             .iter()
             .map(|p| p.key.to_projective())
-            .fold(<Secp256k1 as ProjectiveArithmetic>::ProjectivePoint::IDENTITY, |acc, x| acc.add(x))
+            .fold(<Secp256k1 as CurveArithmetic>::ProjectivePoint::IDENTITY, |acc, x| acc.add(x))
             .to_affine();
 
         Self {
@@ -442,7 +444,7 @@ impl PublicKey {
         let scalar = NonZeroScalar::try_from(tweak)
             .expect("invalid tweak results in identity point");
 
-        let new_pk = (key.key.to_projective() + <Secp256k1 as ProjectiveArithmetic>::ProjectivePoint::IDENTITY * scalar.as_ref())
+        let new_pk = (key.key.to_projective() + <Secp256k1 as CurveArithmetic>::ProjectivePoint::IDENTITY * scalar.as_ref())
             .to_affine();
         Self {
             key: elliptic_curve::PublicKey::<Secp256k1>::from_affine(new_pk)
@@ -480,7 +482,7 @@ impl Signature {
     fn sign<S>(data: &[u8], private_key: &[u8], signing_method: S) -> Signature
     where
         S: Fn(&SigningKey, &[u8]) -> ecdsa::signature::Result<(ECDSASignature, RecoveryId)> {
-        let key = SigningKey::from_bytes(private_key)
+        let key = SigningKey::from_bytes(private_key.into())
             .expect("invalid signing key");
         let (sig, rec) = signing_method(&key, data)
             .expect("signing failed");
@@ -573,7 +575,7 @@ impl BinarySerializable for Signature {
 pub mod tests {
     use std::str::FromStr;
     use hex_literal::hex;
-    use k256::elliptic_curve::ProjectiveArithmetic;
+    use k256::elliptic_curve::CurveArithmetic;
     use k256::{NonZeroScalar, Secp256k1, U256};
     use k256::ecdsa::VerifyingKey;
     use k256::elliptic_curve::sec1::ToEncodedPoint;
@@ -679,7 +681,7 @@ pub mod tests {
     #[test]
     fn curve_point_test() {
         let scalar = NonZeroScalar::from_uint(U256::from_u8(100)).unwrap();
-        let test_point = (<Secp256k1 as ProjectiveArithmetic>::ProjectivePoint::GENERATOR * scalar.as_ref())
+        let test_point = (<Secp256k1 as CurveArithmetic>::ProjectivePoint::GENERATOR * scalar.as_ref())
             .to_affine();
 
         let cp1 = CurvePoint::from_str(hex::encode(test_point.to_encoded_point(false).to_bytes()).as_str())
@@ -702,7 +704,7 @@ pub mod tests {
 
         // Must be able to create from compressed and uncompressed data
         let scalar2 = NonZeroScalar::from_uint(U256::from_u8(123)).unwrap();
-        let test_point2 = (<Secp256k1 as ProjectiveArithmetic>::ProjectivePoint::GENERATOR * scalar2.as_ref())
+        let test_point2 = (<Secp256k1 as CurveArithmetic>::ProjectivePoint::GENERATOR * scalar2.as_ref())
             .to_affine();
         let uncompressed = test_point2.to_encoded_point(false);
         assert!(!uncompressed.is_compressed(), "given point is compressed");

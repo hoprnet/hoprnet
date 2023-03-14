@@ -1056,7 +1056,7 @@ dependencies = [
  "js-sys",
  "real-base",
  "serde",
- "serde-wasm-bindgen",
+ "serde-wasm-bindgen 0.4.5",
  "serde_json",
  "utils-misc",
  "utils-proc-macros",
@@ -1107,11 +1107,13 @@ dependencies = [
  "js-sys",
  "rand 0.8.5",
  "serde",
- "serde-wasm-bindgen",
+ "serde-wasm-bindgen 0.5.0",
  "utils-misc",
  "utils-types",
  "wasm-bindgen",
  "wasm-bindgen-test",
+ "wasm-opt",
+ "wasm-pack",
 ]
 
 [[package]]
@@ -2548,7 +2550,7 @@ dependencies = [
  "proc-macro-regex",
  "real-base",
  "serde",
- "serde-wasm-bindgen",
+ "serde-wasm-bindgen 0.4.5",
  "serde_json",
  "utils-misc",
  "utils-proc-macros",
@@ -3072,7 +3074,7 @@ dependencies = [
  "futures-timer",
  "getrandom 0.2.8",
  "instant",
- "libp2p-core 0.38.0",
+ "libp2p-core",
  "libp2p-dns",
  "libp2p-mdns",
  "libp2p-quic",
@@ -3120,34 +3122,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "libp2p-core"
-version = "0.39.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9b7f8b7d65c070a5a1b5f8f0510648189da08f787b8963f8e21219e0710733af"
-dependencies = [
- "either",
- "fnv",
- "futures 0.3.26",
- "futures-timer",
- "instant",
- "libp2p-identity",
- "log",
- "multiaddr 0.17.0",
- "multihash 0.17.0",
- "multistream-select",
- "once_cell",
- "parking_lot 0.12.1",
- "pin-project",
- "quick-protobuf",
- "rand 0.8.5",
- "rw-stream-sink",
- "smallvec 1.10.0",
- "thiserror",
- "unsigned-varint",
- "void",
-]
-
-[[package]]
 name = "libp2p-dns"
 version = "0.38.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3155,7 +3129,7 @@ checksum = "8e42a271c1b49f789b92f7fc87749fa79ce5c7bdc88cbdfacb818a4bca47fec5"
 dependencies = [
  "async-std-resolver",
  "futures 0.3.26",
- "libp2p-core 0.38.0",
+ "libp2p-core",
  "log",
  "parking_lot 0.12.1",
  "smallvec 1.10.0",
@@ -3170,7 +3144,6 @@ checksum = "ff6c9cb71e2333d31f18e7556b9a5f1d0a2e013effc9325e36f436be65fe7bd2"
 dependencies = [
  "asn1_der",
  "bs58",
- "ed25519-dalek",
  "libsecp256k1",
  "log",
  "multiaddr 0.17.0",
@@ -3194,7 +3167,7 @@ dependencies = [
  "data-encoding",
  "futures 0.3.26",
  "if-watch",
- "libp2p-core 0.38.0",
+ "libp2p-core",
  "libp2p-swarm",
  "log",
  "rand 0.8.5",
@@ -3215,7 +3188,7 @@ dependencies = [
  "futures 0.3.26",
  "futures-timer",
  "if-watch",
- "libp2p-core 0.38.0",
+ "libp2p-core",
  "libp2p-tls",
  "log",
  "parking_lot 0.12.1",
@@ -3238,7 +3211,7 @@ dependencies = [
  "futures-timer",
  "getrandom 0.2.8",
  "instant",
- "libp2p-core 0.38.0",
+ "libp2p-core",
  "log",
  "pin-project",
  "rand 0.8.5",
@@ -3259,7 +3232,7 @@ dependencies = [
  "futures-timer",
  "if-watch",
  "libc",
- "libp2p-core 0.38.0",
+ "libp2p-core",
  "log",
  "socket2",
 ]
@@ -3272,7 +3245,7 @@ checksum = "f7905ce0d040576634e8a3229a7587cc8beab83f79db6023800f1792895defa8"
 dependencies = [
  "futures 0.3.26",
  "futures-rustls",
- "libp2p-core 0.38.0",
+ "libp2p-core",
  "rcgen",
  "ring",
  "rustls",
@@ -3290,7 +3263,7 @@ checksum = "1bb1a35299860e0d4b3c02a3e74e3b293ad35ae0cee8a056363b0c862d082069"
 dependencies = [
  "futures 0.3.26",
  "js-sys",
- "libp2p-core 0.38.0",
+ "libp2p-core",
  "parity-send-wrapper",
  "wasm-bindgen",
  "wasm-bindgen-futures",
@@ -5248,6 +5221,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde-wasm-bindgen"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f3b143e2833c57ab9ad3ea280d21fd34e285a42837aeb0ee301f4f41890fa00e"
+dependencies = [
+ "js-sys",
+ "serde",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "serde_bytes"
 version = "0.11.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6226,7 +6210,7 @@ dependencies = [
  "js-sys",
  "real-base",
  "serde",
- "serde-wasm-bindgen",
+ "serde-wasm-bindgen 0.5.0",
  "serde_bytes",
  "serde_json",
  "utils-proc-macros",
@@ -6270,15 +6254,17 @@ dependencies = [
  "hex-literal",
  "js-sys",
  "k256 0.13.0",
- "libp2p-core 0.39.1",
- "proc-macro-crate",
+ "libp2p-identity",
  "serde",
  "serde_repr",
  "sha3",
  "thiserror",
+ "utils-log",
  "utils-misc",
  "wasm-bindgen",
  "wasm-bindgen-test",
+ "wasm-opt",
+ "wasm-pack",
 ]
 
 [[package]]

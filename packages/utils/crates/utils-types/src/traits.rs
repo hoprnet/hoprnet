@@ -1,5 +1,5 @@
 use std::str::FromStr;
-use libp2p_core::PeerId;
+use libp2p_identity::PeerId;
 use crate::errors::GeneralError::ParseError;
 use crate::errors::Result;
 
