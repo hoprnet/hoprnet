@@ -93,7 +93,7 @@ jobs:
           ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN }}
 
       - name: Format newly created files
-        run: nix develop -c make lint-fix
+        run: nix develop -c make fmt
 
       - name: Commit docs changes
         # only commit changes when not running via act and when on final branches

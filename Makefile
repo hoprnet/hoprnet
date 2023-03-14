@@ -11,6 +11,9 @@ WORKSPACES_WITH_RUST_MODULES := $(filter-out ./packages/ethereum/crates,$(wildca
 # Gets all individual crates such that they can get built
 CRATES := $(foreach crate,${WORKSPACES_WITH_RUST_MODULES},$(dir $(wildcard $(crate)/*/Cargo.toml)))
 
+# base names of all crates
+CRATES_NAMES := $(foreach crate,${CRATES},$(shell basename $(crate)))
+
 # define specific crate for hopli which is a native helper
 HOPLI_CRATE := ./packages/hopli
 
@@ -52,6 +55,12 @@ ifneq ($(origin PRODUCTION),undefined)
 endif
 
 all: help
+
+.PHONY: init
+init: ## initialize repository (idempotent operation)
+	for gh in `find .githooks/ -type f`; do \
+		ln -sf "../../$${gh}" .git/hooks/; \
+	done
 
 .PHONY: $(CRATES)
 $(CRATES): ## builds all Rust crates with wasm-pack (except for hopli)
@@ -218,13 +227,29 @@ endif
 smart-contract-test: # forge test smart contracts
 	$(MAKE) -C packages/ethereum/contracts/ sc-test
 
-.PHONY: lint-check
-lint-check: ## run linter in check mode
+.PHONY: lint
+lint: lint-ts lint-rust
+lint: ## run linter for TS and Rust
+
+.PHONY: lint-ts
+lint-ts: ## run linter for TS
 	npx prettier --check .
 
-.PHONY: lint-fix
-lint-fix: ## run linter in fix mode
+.PHONY: lint-rust
+lint-rust: ## run linter for Rust
+	$(foreach c, $(CRATES_NAMES), cargo fmt --check -p $(c) && ) echo ""
+
+.PHONY: fmt
+fmt: fmt-ts fmt-rust
+fmt: ## run code formatter for TS and Rust
+
+.PHONY: fmt-ts
+fmt-ts: ## run code formatter for TS
 	npx prettier --write .
+
+.PHONY: fmt-rust
+fmt-rust: ## run code formatter for Rust
+	$(foreach c, $(CRATES_NAMES), cargo fmt -p $(c) && ) echo ""
 
 .PHONY: run-anvil
 run-anvil: args=""
