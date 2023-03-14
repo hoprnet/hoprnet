@@ -2,22 +2,36 @@ use std::{collections::HashMap, pin::Pin, u8};
 
 use futures::{
     channel::mpsc::{self, UnboundedReceiver, UnboundedSender},
-    ready,
+    pin_mut, ready,
     stream::{FusedStream, Stream},
     task::{Context, Poll},
-    Future, FutureExt, Sink, SinkExt,
+    Future, Sink, SinkExt,
 };
 use pin_project_lite::pin_project;
-use std::sync::{Arc, Mutex};
 use std::task::Waker;
-
-#[cfg(feature = "wasm")]
-use wasm_bindgen::JsValue;
 
 #[cfg(feature = "wasm")]
 use crate::streaming_iterable::{JsStreamingIterable, StreamingIterable};
 
-use wasm_bindgen_futures::future_to_promise;
+use wasm_bindgen::prelude::*;
+
+#[cfg(not(feature = "wasm"))]
+use async_std::task::sleep;
+#[cfg(not(feature = "wasm"))]
+use utils_misc::time::native::current_timestamp;
+
+#[cfg(feature = "wasm")]
+use gloo_timers::future::sleep;
+#[cfg(feature = "wasm")]
+use utils_misc::time::wasm::current_timestamp;
+
+#[wasm_bindgen]
+extern "C" {
+    // Use `js_namespace` here to bind `console.log(..)` instead of just
+    // `log(..)`
+    #[wasm_bindgen(js_namespace = console)]
+    fn log(s: &str);
+}
 
 #[repr(u8)]
 pub enum MessagePrefix {
@@ -41,7 +55,7 @@ pub enum ConnectionStatusMessage {
 }
 
 fn get_time() -> usize {
-    if cfg!(feature = "wasm32") {
+    if cfg!(feature = "wasm") {
         js_sys::Date::now() as u32 as usize
     } else {
         todo!("Implement me");
@@ -49,6 +63,7 @@ fn get_time() -> usize {
 }
 
 pin_project! {
+    #[derive(Debug)]
     pub struct PingFuture {
         waker: Option<Waker>,
         started_at: usize,
@@ -89,6 +104,35 @@ impl PingFuture {
         if let Some(waker) = self.waker.take() {
             waker.wake();
         }
+    }
+}
+
+// #[derive(Debug)]
+// #[must_use = "futures do nothing unless you `.await` or poll them"]
+pin_project! {
+    pub struct PollReady<'a, Si: ?Sized> {
+        #[pin]
+        sink: &'a mut Si,
+    }
+
+}
+
+// Pinning is never projected to children
+// impl<Si: Unpin + ?Sized> Unpin for PollReady<'_, Si> {}
+
+impl<'a, Si: Sink<Box<[u8]>> + Unpin + ?Sized> PollReady<'a, Si> {
+    pub(super) fn new(sink: &'a mut Si) -> Self {
+        Self { sink }
+    }
+}
+
+impl<Si: Sink<Box<[u8]>> + Unpin + ?Sized> Future for PollReady<'_, Si> {
+    type Output = Result<(), Si::Error>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.project();
+
+        this.sink.poll_ready(cx)
     }
 }
 
@@ -172,22 +216,42 @@ impl Server {
     }
 
     /// Used to test whether the connection is alive
-    async fn ping(&mut self) -> usize {
+    async fn ping(&mut self, timeout: Option<usize>) -> usize {
+        log("server: ping called");
         let random_value: u32 = 0;
 
         let fut = PingFuture::new();
         // takes ownership
         self.ping_requests.insert(random_value, fut);
 
+        match self
+            .send(Box::new([
+                MessagePrefix::StatusMessage as u8,
+                StatusMessage::Ping as u8,
+            ]))
+            .await
+        {
+            Ok(()) => (),
+            Err(e) => log(format!("Failed sending ping request {}", e).as_str()),
+        };
+
+        log("server: after sending PING message");
+
         // cannot clone futures
         self.ping_requests.get_mut(&random_value).unwrap().await
     }
 
-    /// Used to attach a new incoming connection
-    pub fn update(self: Pin<&mut Self>, new_stream: JsStreamingIterable) -> Result<(), String> {
-        let mut this = self.project();
+    pub fn get_pending_ping_requests(&self) -> Vec<u32> {
+        let reqs: Vec<u32> = self.ping_requests.keys().copied().collect();
+        log("requests");
+        reqs
+    }
 
-        this.next_stream.take_stream(new_stream)
+    /// Used to attach a new incoming connection
+    pub fn update(&mut self, new_stream: JsStreamingIterable) -> Result<(), String> {
+        // le/t mut this = self.project();
+
+        self.next_stream.take_stream(new_stream)
     }
 }
 
@@ -195,6 +259,7 @@ impl<'b> Stream for Server {
     type Item = Result<Box<[u8]>, String>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        log("server: poll_next called");
         let mut this = self.project();
 
         Poll::Ready(loop {
@@ -223,7 +288,17 @@ impl<'b> Stream for Server {
                                 ]
                                 .contains(inner_prefix) =>
                             {
-                                this.status_messages_tx.send(item).poll_unpin(cx);
+                                match this.status_messages_tx.unbounded_send(item) {
+                                    Ok(()) => (),
+                                    Err(e) => {
+                                        log(format!(
+                                            "Failed queuing connection status request {}",
+                                            e
+                                        )
+                                        .as_str());
+                                        panic!()
+                                    }
+                                };
 
                                 break None;
                             }
@@ -236,7 +311,14 @@ impl<'b> Stream for Server {
                             Some(inner_prefix) if *inner_prefix == StatusMessage::Ping as u8 => {
                                 match this.status_messages_tx.poll_ready(cx) {
                                     Poll::Ready(Ok(())) => {
-                                        this.status_messages_tx.send(item).poll_unpin(cx);
+                                        match this.status_messages_tx.unbounded_send(item) {
+                                            Ok(()) => (),
+                                            Err(e) => {
+                                                log(format!("Failed queuing status message {}", e)
+                                                    .as_str());
+                                                panic!()
+                                            }
+                                        };
                                     }
                                     Poll::Ready(Err(e)) => panic!("{}", e),
                                     Poll::Pending => return Poll::Pending,
@@ -244,6 +326,8 @@ impl<'b> Stream for Server {
                             }
                             Some(inner_prefix) if *inner_prefix == StatusMessage::Pong as u8 => {
                                 // 2 byte prefix, 4 byte ping identifier
+                                log(format!("received PONG {:?}", item).as_str());
+
                                 if item.len() < 6 {
                                     // drop malformed pong message
                                     return Poll::Pending;
@@ -295,6 +379,7 @@ impl Sink<Box<[u8]>> for Server {
     type Error = String;
 
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        log("server: poll_ready called");
         let mut this = self.project();
 
         if let Poll::Ready(Some(new_stream)) = this.next_stream.as_mut().poll_next(cx) {
@@ -303,13 +388,20 @@ impl Sink<Box<[u8]>> for Server {
 
         // Send all pending status messages before forwarding any new messages
         loop {
-            match ready!(this
+            let received = match this
                 .status_messages_rx
                 .as_mut()
                 .as_pin_mut()
                 .unwrap()
-                .poll_next(cx))
+                .poll_next(cx)
             {
+                Poll::Pending => break,
+                Poll::Ready(t) => t,
+            };
+
+            log(format!("received {:?}", received).as_str());
+
+            match received {
                 Some(item) => {
                     if item.starts_with(&[MessagePrefix::ConnectionStatus as u8])
                         && [
@@ -319,7 +411,7 @@ impl Sink<Box<[u8]>> for Server {
                         ]
                         .contains(item.get(1).unwrap())
                     {
-                        this.stream.as_mut().as_pin_mut().unwrap().poll_close(cx);
+                        this.stream.as_mut().as_pin_mut().unwrap().close();
                         return Poll::Ready(Err("closed".into()));
                     }
                     this.stream
@@ -340,12 +432,16 @@ impl Sink<Box<[u8]>> for Server {
                 }
                 None => break,
             };
+            log("loop iteration");
         }
 
         this.stream.as_mut().as_pin_mut().unwrap().poll_ready(cx)
     }
 
     fn start_send(self: Pin<&mut Self>, item: Box<[u8]>) -> Result<(), Self::Error> {
+        log("server: start_send called");
+        log(format!("server: start_send {:?}", item).as_str());
+
         let mut this = self.project();
 
         match item.get(1) {
@@ -373,126 +469,227 @@ impl Sink<Box<[u8]>> for Server {
     }
 }
 
+#[cfg(feature = "wasm")]
 pub mod wasm {
-    use futures::SinkExt;
-    use wasm_bindgen::prelude::*;
+    use crate::streaming_iterable::{AsyncIterable, JsStreamingIterable, StreamingIterable};
+    use futures::{stream::Next, FutureExt, SinkExt, StreamExt};
+    use js_sys::{
+        AsyncIterator, Function, IteratorNext, Number, Object, Promise, Reflect, Symbol, Uint8Array,
+    };
+    use utils_misc::async_iterable::wasm::to_jsvalue_stream;
+
+    use wasm_bindgen::{prelude::*, JsCast};
+    use wasm_bindgen_futures::JsFuture;
 
     #[wasm_bindgen]
-    struct Server {
+    extern "C" {
+        // Use `js_namespace` here to bind `console.log(..)` instead of just
+        // `log(..)`
+        #[wasm_bindgen(js_namespace = console)]
+        fn log(s: &str);
+    }
+
+    #[wasm_bindgen]
+    extern "C" {
+        #[wasm_bindgen]
+        #[derive(Clone, Debug)]
+        pub type RelayServerCbs;
+
+        #[wasm_bindgen]
+        pub fn onClose();
+
+        #[wasm_bindgen]
+        pub fn onUpgrade();
+    }
+
+    #[wasm_bindgen]
+    extern "C" {
+        #[wasm_bindgen]
+        pub type RelayServerOpts;
+
+        #[wasm_bindgen(getter, js_name = "relayFreeTimeout")]
+        pub fn relay_free_timeout() -> u32;
+    }
+
+    #[wasm_bindgen]
+    pub struct Server {
         w: super::Server,
     }
 
-    // #[wasm_bindgen]
+    #[wasm_bindgen]
     impl Server {
-        // #[wasm_bindgen]
-        pub fn update(&mut self) {
-            self.w.update()
+        #[wasm_bindgen(constructor)]
+        pub fn new(
+            stream: JsStreamingIterable,
+            _signals: RelayServerCbs,
+            _options: RelayServerOpts,
+        ) -> Self {
+            Self {
+                w: super::Server::new(StreamingIterable::from(stream)),
+            }
         }
-        // #[wasm_bindgen(getter)]
-        // pub fn source(&mut self) -> AsyncIterable {
-        //     let this = unsafe { std::mem::transmute::<&mut Self, &'static mut Self>(self) };
-        //     let iterator_obj = Object::new();
+        #[wasm_bindgen]
+        pub fn update(&mut self, new_stream: JsStreamingIterable) -> Result<(), String> {
+            self.w.update(new_stream)
+        }
 
-        //     let iterator_fn =
-        //         std::mem::ManuallyDrop::<Closure<dyn FnMut() -> Promise>>::new(Closure::<
-        //             dyn FnMut() -> Promise,
-        //         >::new(
-        //             move || {
-        //                 let fut = unsafe {
-        //                     std::mem::transmute::<
-        //                         Next<'_, StreamingIterable>,
-        //                         Next<'static, StreamingIterable>,
-        //                     >(this.streaming_iterable.next())
-        //                 };
-        //                 log("rs: iterator code called");
-        //                 wasm_bindgen_futures::future_to_promise(async move {
-        //                     to_jsvalue_stream(fut.await)
-        //                 })
-        //             },
-        //         ));
+        #[wasm_bindgen]
+        pub fn ping(&mut self, timeout: Option<Number>) -> Promise {
+            let this = unsafe { std::mem::transmute::<&mut Server, &mut Server>(self) };
+            let ping_fut = this
+                .w
+                .ping(timeout.map(|f| f.value_of() as u32 as usize))
+                .map(|x| Ok(JsValue::from(x)));
 
-        //     // {
-        //     //    next(): Promise<IteratorResult> {
-        //     //      // ... function body
-        //     //    }
-        //     // }
-        //     Reflect::set(&iterator_obj, &"next".into(), iterator_fn.as_ref()).unwrap();
+            wasm_bindgen_futures::future_to_promise(ping_fut)
+        }
 
-        //     // let wrapped = Wrapper { js_output: this };
-        //     let iterable_fn = std::mem::ManuallyDrop::<Closure<dyn FnMut() -> Object>>::new(
-        //         Closure::once(move || iterator_obj),
-        //     );
+        #[wasm_bindgen(getter, js_name = "pendingPingRequests")]
+        pub fn get_pending_ping_requests(&self) -> Box<[Number]> {
+            Box::from_iter(
+                self.w
+                    .get_pending_ping_requests()
+                    .iter()
+                    .map(|u| Number::from(*u)),
+            )
+        }
 
-        //     let iterable_obj = Object::new();
+        #[wasm_bindgen(getter)]
+        pub fn source(&mut self) -> AsyncIterable {
+            let this = unsafe { std::mem::transmute::<&mut Self, &'static mut Self>(self) };
+            let iterator_obj = Object::new();
 
-        //     // {
-        //     //    [Symbol.aysncIterator](): Iterator {
-        //     //      // ... function body
-        //     //    }
-        //     // }
-        //     Reflect::set(
-        //         &iterable_obj,
-        //         &Symbol::async_iterator(),
-        //         // Cast Closure to js_sys::Function
-        //         &iterable_fn.as_ref().unchecked_ref(),
-        //     )
-        //     .unwrap();
+            log("source called");
+            let iterator_fn = Closure::<dyn FnMut() -> Promise>::new(move || {
+                let fut = unsafe {
+                    std::mem::transmute::<Next<'_, super::Server>, Next<'_, super::Server>>(
+                        this.w.next(),
+                    )
+                };
+                log("rs: iterator code called");
+                wasm_bindgen_futures::future_to_promise(async move {
+                    log("source fut executed");
+                    to_jsvalue_stream(fut.await)
+                })
+            });
 
-        //     iterable_obj.dyn_into().unwrap()
-        // }
+            // {
+            //    next(): Promise<IteratorResult> {
+            //      // ... function body
+            //    }
+            // }
+            Reflect::set(&iterator_obj, &"next".into(), iterator_fn.as_ref()).unwrap();
 
-        // #[wasm_bindgen]
-        // pub async fn sink(&mut self, source: AsyncIterable) {
-        //     let async_sym = Symbol::async_iterator();
+            // This leaks memory, but intended
+            iterator_fn.forget();
 
-        //     let async_iter_fn = match Reflect::get(&source, async_sym.as_ref()) {
-        //         Ok(x) => x,
-        //         Err(_) => todo!(),
-        //     };
+            // let wrapped = Wrapper { js_output: this };
+            let iterable_fn = Closure::once(move || iterator_obj);
 
-        //     let async_iter_fn: Function = match async_iter_fn.dyn_into() {
-        //         Ok(fun) => fun,
-        //         Err(e) => {
-        //             log(format!("{:?}", e).as_str());
-        //             todo!()
-        //         }
-        //     };
+            let iterable_obj = Object::new();
 
-        //     let async_it: AsyncIterator = match async_iter_fn.call0(&source).unwrap().dyn_into() {
-        //         Ok(x) => x,
-        //         Err(e) => {
-        //             log(format!("{:?}", e).as_str());
-        //             todo!()
-        //         }
-        //     };
+            // {
+            //    [Symbol.aysncIterator](): Iterator {
+            //      // ... function body
+            //    }
+            // }
+            Reflect::set(
+                &iterable_obj,
+                &Symbol::async_iterator(),
+                // Cast Closure to js_sys::Function
+                &iterable_fn.as_ref().unchecked_ref(),
+            )
+            .unwrap();
 
-        //     loop {
-        //         match async_it.next().map(JsFuture::from) {
-        //             Ok(m) => {
-        //                 let foo = match m.await {
-        //                     Ok(x) => x,
-        //                     Err(e) => {
-        //                         self.w.stream.unwrap().close().await;
-        //                         break;
-        //                     }
-        //                 };
-        //                 let next = foo.unchecked_into::<IteratorNext>();
-        //                 if next.done() {
-        //                     self.streaming_iterable.close().await;
-        //                     break;
-        //                 } else {
-        //                     self.streaming_iterable
-        //                         .send(Box::from_iter(Uint8Array::new(&next.value()).to_vec()))
-        //                         .await;
-        //                 }
-        //             }
-        //             Err(e) => {
-        //                 self.streaming_iterable.close().await;
-        //                 break;
-        //             }
-        //         }
-        //     }
-        // }
+            // This leaks memory, but intended
+            iterable_fn.forget();
+
+            iterable_obj.dyn_into().unwrap()
+        }
+
+        #[wasm_bindgen]
+        pub fn sink(&mut self, source: AsyncIterable) -> js_sys::Promise {
+            log("sink called");
+
+            let async_sym = Symbol::async_iterator();
+
+            let async_iter_fn = match Reflect::get(&source, async_sym.as_ref()) {
+                Ok(x) => x,
+                Err(e) => {
+                    log(format!("Error access Symbol.asyncIterator {:?}", e).as_str());
+                    todo!()
+                }
+            };
+
+            let async_iter_fn: Function = match async_iter_fn.dyn_into() {
+                Ok(fun) => fun,
+                Err(e) => {
+                    log(format!("Cannot perform dynamic convertion {:?}", e).as_str());
+                    todo!()
+                }
+            };
+
+            let async_it: AsyncIterator = match async_iter_fn.call0(&source).unwrap().dyn_into() {
+                Ok(x) => x,
+                Err(e) => {
+                    log(format!("Cannot call iterable function {:?}", e).as_str());
+                    todo!()
+                }
+            };
+
+            log(format!("iterator {:?}", async_it).as_str());
+
+            // let foo = self;
+
+            let this = unsafe { std::mem::transmute::<&mut Self, &mut Self>(self) };
+
+            wasm_bindgen_futures::future_to_promise(async move {
+                loop {
+                    log("iteration");
+                    match async_it.next().map(JsFuture::from) {
+                        Ok(m) => {
+                            log(format!("next future {:?}", m).as_str());
+                            let foo = match m.await {
+                                Ok(x) => x,
+                                Err(e) => {
+                                    log(format!("error handling next() future {:?}", e).as_str());
+                                    this.w.stream.as_mut().unwrap().close().await;
+                                    todo!()
+                                    // break;
+                                }
+                            };
+                            let next = foo.unchecked_into::<IteratorNext>();
+                            log(format!("sink: next chunk {:?}", next).as_str());
+                            if next.done() {
+                                this.w.close().await;
+                                todo!()
+                            } else {
+                                log("sending");
+                                log(format!(
+                                    "sending result {:?}",
+                                    this.w
+                                        .send(Box::from_iter(
+                                            Uint8Array::new(&next.value()).to_vec()
+                                        ))
+                                        .await
+                                )
+                                .as_str());
+                                log("after sending");
+                            }
+                            // break;
+                        }
+                        Err(e) => {
+                            log(format!("Error calling next function {:?}", e).as_str());
+                            this.w.close().await;
+                            // break;
+                        }
+                    };
+                }
+            })
+            // js_sys::Promise::resolve(&JsValue::from(""))
+
+            // log("sink end");
+        }
     }
 }
 // #[cfg(feature = "wasm")]

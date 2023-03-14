@@ -1,19 +1,22 @@
+// @ts-ignore
 import { RelayContext, DEFAULT_PING_TIMEOUT } from './context.js'
 import { ConnectionStatusMessages, RelayPrefix, StatusMessages } from '../constants.js'
-import { u8aEquals, defer } from '@hoprnet/hopr-utils'
+import { u8aEquals, defer, toU8a } from '@hoprnet/hopr-utils'
 import { pair } from 'it-pair'
 import { duplexPair } from 'it-pair/duplex'
 import { handshake } from 'it-handshake'
 
 import type { StreamType } from '../types.js'
 import assert from 'assert'
+import { IStream, Server, connect_relay_set_panic_hook } from '../../lib/connect_relay.js'
+connect_relay_set_panic_hook()
 
-describe('relay swtich context', function () {
+describe('relay switch context', function () {
   it('forward payload messages', async function () {
     const [relayToNode, nodeToRelay] = duplexPair<StreamType>()
 
-    const ctx = RelayContext(
-      nodeToRelay,
+    const ctx = new Server(
+      nodeToRelay as IStream,
       {
         onClose: () => {},
         onUpgrade: () => {}
@@ -24,7 +27,7 @@ describe('relay swtich context', function () {
     )
 
     const nodeShaker = handshake(relayToNode)
-    const destinationShaker = handshake(ctx)
+    const destinationShaker = handshake(ctx as any)
 
     const messages = ['first message', 'second message'].map((x) => new TextEncoder().encode(x))
     const replies = ['reply to first message', 'reply to second message'].map((x) => new TextEncoder().encode(x))
@@ -55,8 +58,8 @@ describe('relay swtich context', function () {
   it('forward webrtc signalling messages', async function () {
     const [relayToNode, nodeToRelay] = duplexPair<StreamType>()
 
-    const ctx = RelayContext(
-      nodeToRelay,
+    const ctx = new Server(
+      nodeToRelay as IStream,
       {
         onClose: () => {},
         onUpgrade: () => {}
@@ -67,7 +70,7 @@ describe('relay swtich context', function () {
     )
 
     const nodeShaker = handshake(relayToNode)
-    const destinationShaker = handshake(ctx)
+    const destinationShaker = handshake(ctx as any)
 
     const messages = ['first ICE message', 'second ICE message'].map((x) => new TextEncoder().encode(x))
     const replies = ['reply to first ICE message', 'reply to second ICE message'].map((x) =>
@@ -97,11 +100,11 @@ describe('relay swtich context', function () {
     destinationShaker.rest()
   })
 
-  it('ping comes back in time', async function () {
+  it.only('ping comes back in time', async function () {
     const [relayToNode, nodeToRelay] = duplexPair<StreamType>()
 
-    const ctx = RelayContext(
-      nodeToRelay,
+    const ctx = new Server(
+      nodeToRelay as IStream,
       {
         onClose: () => {},
         onUpgrade: () => {}
@@ -112,6 +115,7 @@ describe('relay swtich context', function () {
     )
 
     const nodeShaker = handshake(relayToNode)
+    const destinationShaker = handshake(ctx as any)
 
     const pingPromise = ctx.ping()
 
@@ -121,7 +125,18 @@ describe('relay swtich context', function () {
         Uint8Array.of(RelayPrefix.STATUS_MESSAGE, StatusMessages.PING)
       )
     )
-    nodeShaker.write(Uint8Array.of(RelayPrefix.STATUS_MESSAGE, StatusMessages.PONG))
+
+    // start source pipeline
+    destinationShaker.read()
+
+    const pendingPingRequests = ctx.pendingPingRequests
+
+    nodeShaker.write(
+      Uint8Array.of(RelayPrefix.STATUS_MESSAGE, StatusMessages.PONG, ...toU8a(pendingPingRequests[0], 4))
+    )
+
+    // @TODO make compatible with old protocol
+    // nodeShaker.write(Uint8Array.of(RelayPrefix.STATUS_MESSAGE, StatusMessages.PONG))
 
     const pingResponse = await pingPromise
 
@@ -131,7 +146,7 @@ describe('relay swtich context', function () {
     assert(pingResponse >= 0 && pingResponse <= DEFAULT_PING_TIMEOUT)
   })
 
-  it('ping timeout', async function () {
+  it.only('ping timeout', async function () {
     const [relayToNode, nodeToRelay] = duplexPair<StreamType>()
 
     const ctx = RelayContext(

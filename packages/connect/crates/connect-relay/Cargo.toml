@@ -13,18 +13,20 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 default = ["console_error_panic_hook", "wasm"]
-wasm = ["dep:wasm-bindgen", "dep:serde-wasm-bindgen", "dep:js-sys", "dep:wasm-bindgen-futures" ]
+wasm = ["dep:wasm-bindgen", "dep:serde-wasm-bindgen", "dep:js-sys", "dep:wasm-bindgen-futures", "dep:gloo-timers" ]
 console_error_panic_hook = [ "dep:console_error_panic_hook" ]
 
 [dependencies]
+async-std = { version = "1.12.0", features = ["attributes"] }
 cfg-if = "1.0.0"
-futures = "0.3.25"
+futures = "0.3.27"
+gloo-timers = { version = "0.2.6", optional = true , features = ["futures"]}
 js-sys = { version = "0.3.60", optional = true }
 pin-project-lite = "0.2.9"
 real-base = { path = "../../../real/crates/real-base" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-serde-wasm-bindgen = { version = "0.4", optional = true }
+serde-wasm-bindgen = { version = "0.5", optional = true }
 utils-misc = { path = "../../../utils/crates/utils-misc" }
 wasm-bindgen = { version ="0.2.83", optional = true }
 wasm-bindgen-futures = { version = "0.4.33", optional = true, features = ["futures-core-03-stream"] }

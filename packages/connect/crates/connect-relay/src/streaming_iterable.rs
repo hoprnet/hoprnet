@@ -3,7 +3,7 @@ use std::{pin::Pin, u8};
 
 use futures::{
     future::{FutureExt, LocalBoxFuture},
-    stream::{iter, FusedStream, Next},
+    stream::{FusedStream, Next},
     task::{Context, Poll},
     Future, Sink, SinkExt, Stream, StreamExt,
 };
@@ -120,6 +120,7 @@ impl Stream for StreamingIterable {
     type Item = Result<Box<[u8]>, String>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        log("poll_next called");
         if self.stream_done {
             return Poll::Ready(None);
         }
@@ -214,8 +215,10 @@ impl Sink<Box<[u8]>> for StreamingIterable {
         .project();
 
         *this.waker = Some(cx.waker().clone());
+        log("poll_ready called 2");
 
         if *this.sink_done {
+            log("sink done");
             return Poll::Ready(Err("Cannot send any data. Stream has been closed".into()));
         } else if this.sink_close_future.is_none() {
             log("about to call sink");
@@ -283,11 +286,16 @@ impl Sink<Box<[u8]>> for StreamingIterable {
                 .poll(cx)
             {
                 Poll::Pending => Poll::Pending,
-                Poll::Ready(_) => Poll::Ready(Err("Stream has been closed".into())),
+                Poll::Ready(_) => {
+                    log("stream closed");
+                    Poll::Ready(Err("Stream has been closed".into()))
+                }
             };
         } else if this.resolve.is_some() {
+            log("second time");
             Poll::Ready(Ok(()))
         } else {
+            log("sink pending");
             Poll::Pending
         }
     }
