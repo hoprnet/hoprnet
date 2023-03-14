@@ -397,6 +397,7 @@ pub mod native {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::native::*;
 
     #[test]
     fn test_counter() {

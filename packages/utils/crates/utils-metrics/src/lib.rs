@@ -1,10 +1,10 @@
 pub mod metrics;
 
 #[cfg(any(not(feature = "wasm"), test))]
-use metrics::native::*;
+pub use metrics::native::*;
 
 #[cfg(all(feature = "wasm", not(test)))]
-use metrics::wasm::*;
+pub use metrics::wasm::*;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {

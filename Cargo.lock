@@ -1093,6 +1093,7 @@ dependencies = [
  "more-asserts",
  "rand 0.8.5",
  "scopeguard 1.1.0",
+ "utils-log",
  "utils-metrics",
  "utils-misc",
  "wasm-bindgen",

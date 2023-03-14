@@ -9,6 +9,7 @@ pub fn generate_ping_response(req: Box<[u8]>) -> Box<[u8]> {
     hasher.finalize().to_vec().into_boxed_slice()
 }
 
+/// Configuration of the Heartbeat
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct HeartbeatConfig {

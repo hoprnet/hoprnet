@@ -18,6 +18,7 @@ futures = "0.3.26"
 libp2p = { version = "0.50.0", features = ["async-std", "wasm-bindgen", "wasm-ext"] }
 rand = { version = "0.8.5", features = ["std_rng"] }
 scopeguard = "1.1.0"
+utils-log = { path = "../../../utils/crates/utils-log"}
 utils-misc = { path = "../../../utils/crates/utils-misc"}
 utils-metrics = { path = "../../../utils/crates/utils-metrics"}
 gloo-timers = { version = "0.2.6", optional = true , features = ["futures"]}
