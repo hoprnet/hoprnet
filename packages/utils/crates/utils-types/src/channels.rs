@@ -42,6 +42,7 @@ impl ChannelStatus {
 }
 
 /// Contains acknowledgment information and the respective ticket
+#[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct AcknowledgedTicket {
     pub ticket: Ticket,
@@ -68,7 +69,7 @@ pub struct ChannelEntry {
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl ChannelEntry {
     pub fn serialize(&self) -> Box<[u8]> {
-        let mut ret: Vec<u8> = vec![];
+        let mut ret = Vec::<u8>::with_capacity(Self::SIZE);
         ret.extend_from_slice(self.source.serialize(false).as_ref());
         ret.extend_from_slice(self.destination.serialize(false).as_ref());
         ret.extend_from_slice(self.balance.serialize_value().as_ref());
@@ -198,7 +199,7 @@ pub struct Ticket {
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl Ticket {
     fn serialize_unsigned_aux(counterparty: &Address, challenge: &EthereumChallenge, epoch: &U256, amount: &Balance, win_prob: &U256, index: &U256, channel_epoch: &U256) -> Vec<u8> {
-        let mut ret = Vec::<u8>::new();
+        let mut ret = Vec::<u8>::with_capacity(Self::SIZE);
         ret.extend_from_slice(&counterparty.serialize());
         ret.extend_from_slice(&challenge.serialize());
         ret.extend_from_slice(&epoch.serialize());

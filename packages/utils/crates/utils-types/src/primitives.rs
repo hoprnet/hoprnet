@@ -254,7 +254,7 @@ impl Snapshot {
     }
 
     pub fn serialize(&self) -> Box<[u8]> {
-        let mut ret = vec![];
+        let mut ret = Vec::<u8>::with_capacity(Self::SIZE);
         ret.extend_from_slice(&self.block_number.serialize());
         ret.extend_from_slice(&self.transaction_index.serialize());
         ret.extend_from_slice(&self.log_index.serialize());
