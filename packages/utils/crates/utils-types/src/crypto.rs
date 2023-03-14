@@ -529,7 +529,8 @@ impl Signature {
     }
 
     fn sign<S>(data: &[u8], private_key: &[u8], signing_method: S) -> Signature
-    where S: Fn(&SigningKey, &[u8]) -> ecdsa::signature::Result<(ECDSASignature, RecoveryId)> {
+    where
+        S: Fn(&SigningKey, &[u8]) -> ecdsa::signature::Result<(ECDSASignature, RecoveryId)> {
         let key = SigningKey::from_bytes(private_key)
             .expect("invalid signing key");
         let (sig, rec) = signing_method(&key, data)
@@ -556,13 +557,14 @@ impl Signature {
     }
 
     fn verify<V>(&self, message: &[u8], public_key: &[u8], verifier: V) -> bool
-    where V: Fn(&VerifyingKey, &[u8], &ECDSASignature) -> ecdsa::signature::Result<()> {
+    where
+        V: Fn(&VerifyingKey, &[u8], &ECDSASignature) -> ecdsa::signature::Result<()> {
         let pub_key = VerifyingKey::from_sec1_bytes(public_key)
             .expect("invalid public key");
-        let signature = ECDSASignature::try_from(self.signature.as_slice())
-            .expect("invalid signature");
 
-        verifier(&pub_key, message, &signature).is_ok()
+        let signature = ECDSASignature::try_from(self.signature.as_slice());
+        // TODO: should probably log an invalid signature case when `!signature.is_ok()`
+        signature.is_ok() && verifier(&pub_key, message, &signature.unwrap()).is_ok()
     }
 
     /// Verifies this signature against the given message and a public key (compressed or uncompressed)

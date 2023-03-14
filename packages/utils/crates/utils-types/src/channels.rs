@@ -1,5 +1,6 @@
 use std::ops::{Div, Mul, Sub};
 use ethnum::u256;
+use enum_iterator::{all, Sequence };
 use serde_repr::*;
 use crate::crypto::{Challenge, ethereum_signed_hash, Hash, PublicKey, Signature};
 use crate::errors::{Result, GeneralError::ParseError};
@@ -13,7 +14,7 @@ use utils_misc::time::native::current_timestamp;
 
 /// Describes status of a channel
 #[repr(u8)]
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize_repr, Deserialize_repr)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize_repr, Deserialize_repr, Sequence)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub enum ChannelStatus {
     Closed = 0,
@@ -23,8 +24,9 @@ pub enum ChannelStatus {
 }
 
 impl ChannelStatus {
-    pub fn from_byte(byte: u8) -> Self {
-        unsafe { std::mem::transmute(byte) }
+    pub fn from_byte(byte: u8) -> Option<Self> {
+        all::<ChannelStatus>()
+            .find(|v| v.to_byte() == byte)
     }
 
     pub fn to_byte(&self) -> u8 {
@@ -124,7 +126,7 @@ impl ChannelEntry {
             let commitment = Hash::deserialize(b.drain(0..Hash::SIZE).as_ref())?;
             let ticket_epoch = U256::deserialize(b.drain(0..U256::SIZE).as_ref())?;
             let ticket_index = U256::deserialize(b.drain(0..U256::SIZE).as_ref())?;
-            let status = ChannelStatus::from_byte(b.drain(0..1).as_ref()[0]);
+            let status = ChannelStatus::from_byte(b.drain(0..1).as_ref()[0]).ok_or(ParseError)?;
             let channel_epoch = U256::deserialize(b.drain(0..U256::SIZE).as_ref())?;
             let closure_time = U256::deserialize(b.drain(0..U256::SIZE).as_ref())?;
             Ok(Self {
@@ -142,7 +144,7 @@ pub fn generate_channel_id(source: &Address, destination: &Address) -> Hash {
 }
 
 /// Contains a response upon ticket acknowledgement
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Response {
     response: [u8; Self::SIZE],
@@ -306,7 +308,7 @@ impl Ticket {
 pub mod tests {
     use ethnum::u256;
     use hex_literal::hex;
-    use crate::channels::{ChannelEntry, ChannelStatus, Ticket};
+    use crate::channels::{ChannelEntry, ChannelStatus, Response, Ticket};
     use crate::crypto::{Challenge, CurvePoint, Hash, PublicKey};
     use crate::primitives::{Address, Balance, BalanceType, U256};
 
@@ -337,7 +339,9 @@ pub mod tests {
     #[test]
     pub fn channel_status_test() {
         let cs1 = ChannelStatus::Open;
-        let cs2 = ChannelStatus::from_byte(cs1.to_byte());
+        let cs2 = ChannelStatus::from_byte(cs1.to_byte()).unwrap();
+
+        assert!(ChannelStatus::from_byte(231).is_none());
         assert_eq!(cs1, cs2, "channel status does not match");
     }
 
@@ -370,6 +374,13 @@ pub mod tests {
         assert_eq!(ticket1.get_path_position(&price_per_packet.into(), &inverse_win_prob.into()), path_pos, "invalid path pos");
         assert_eq!(ticket2.get_path_position(&price_per_packet.into(), &inverse_win_prob.into()), path_pos, "invalid path pos");
     }
+
+    #[test]
+    pub fn response_test() {
+        let r1 = Response::new(&[0u8; Response::SIZE]);
+        let r2 = Response::deserialize(&r1.serialize()).unwrap();
+        assert_eq!(r1, r2, "deserialized response does not match");
+    }
 }
 
 #[cfg(feature = "wasm")]
@@ -387,7 +398,7 @@ pub mod wasm {
     }
 
     #[wasm_bindgen]
-    pub fn number_to_channel_status(number: u8) -> ChannelStatus {
+    pub fn number_to_channel_status(number: u8) -> Option<ChannelStatus> {
         ChannelStatus::from_byte(number)
     }
 

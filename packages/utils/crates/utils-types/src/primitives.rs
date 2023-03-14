@@ -6,7 +6,7 @@ use crate::errors::{Result, GeneralError::ParseError};
 use crate::errors::GeneralError::MathError;
 
 /// Represents an Ethereum address
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Debug)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Address {
     addr: [u8; Self::SIZE],
@@ -330,15 +330,15 @@ impl U256 {
     }
 
     pub fn from_inverse_probability(inverse_prob: &u256) -> Result<U256> {
-        let higest_prob = u256::MAX;
+        let highest_prob = u256::MAX;
         if inverse_prob.gt(&u256::ZERO) {
             Ok(U256{
-                value: higest_prob / inverse_prob
+                value: highest_prob / inverse_prob
             })
         }
         else if inverse_prob.eq(&u256::ZERO) {
             Ok(U256 {
-                value: higest_prob
+                value: highest_prob
             })
         }
         else {
@@ -353,6 +353,24 @@ impl From<u256> for U256 {
     }
 }
 
+impl From<u128> for U256 {
+    fn from(value: u128) -> Self {
+        U256 { value: u256::from(value) }
+    }
+}
+
+impl From<u64> for U256 {
+    fn from(value: u64) -> Self {
+        U256 { value: u256::from(value) }
+    }
+}
+
+impl From<u32> for U256 {
+    fn from(value: u32) -> Self {
+        U256 { value: u256::from(value) }
+    }
+}
+
 /// Unit tests of pure Rust code
 #[cfg(test)]
 mod tests {
@@ -363,16 +381,27 @@ mod tests {
         let addr_1 = Address::new(&[0u8; Address::SIZE]);
         let addr_2 = Address::deserialize(&addr_1.serialize()).unwrap();
 
-        assert_eq!(addr_1, addr_2);
+        assert_eq!(addr_1, addr_2, "deserialized address does not match");
     }
 
     #[test]
     fn balance_tests() {
         let b_1 = Balance::from_str("10", BalanceType::HOPR);
-        assert_eq!("10".to_string(), b_1.to_string());
+        assert_eq!("10".to_string(), b_1.to_string(), "to_string failed");
 
         let b_2 = Balance::deserialize(&b_1.serialize_value(), BalanceType::HOPR).unwrap();
-        assert_eq!(b_1, b_2);
+        assert_eq!(b_1, b_2, "deserialized balance does not match");
+
+        let b3 = Balance::new(100_u32.into(), BalanceType::HOPR);
+        let b4 = Balance::new(200_u32.into(), BalanceType::HOPR);
+
+        assert_eq!(300_u32, b3.add(&b4).value().as_u32(), "add test failed");
+        assert_eq!(100_u32, b4.sub(&b3).value().as_u32(), "sub test failed");
+
+        assert!(b3.lt(&b4) && b4.gt(&b3), "lte or lt test failed");
+        assert!(b3.lte(&b3) && b4.gte(&b4), "gte or gt test failed");
+
+        //assert!(Balance::new(100_u32.into()).lte(), "lte or lte test failed")
     }
 
     #[test]
@@ -381,6 +410,14 @@ mod tests {
         let e_2 = EthereumChallenge::deserialize(&e_1.serialize()).unwrap();
 
         assert_eq!(e_1, e_2);
+    }
+
+    #[test]
+    fn snapshot_tests() {
+        let s1 = Snapshot::new(1234_u32.into(), 4567_u32.into(), 102030_u32.into());
+        let s2 = Snapshot::deserialize(&s1.serialize()).unwrap();
+
+        assert_eq!(s1, s2);
     }
 
     #[test]
