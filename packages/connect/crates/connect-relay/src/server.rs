@@ -1,11 +1,14 @@
 use std::{collections::HashMap, pin::Pin, u8};
 
+use crate::constants::DEFAULT_RELAYED_CONNECTION_PING_TIMEOUT;
 use futures::{
     channel::mpsc::{self, UnboundedReceiver, UnboundedSender},
+    future::select,
+    future::Either,
     pin_mut, ready,
     stream::{FusedStream, Stream},
     task::{Context, Poll},
-    Future, Sink, SinkExt,
+    Future, FutureExt, Sink, SinkExt,
 };
 use pin_project_lite::pin_project;
 use std::task::Waker;
@@ -216,7 +219,7 @@ impl Server {
     }
 
     /// Used to test whether the connection is alive
-    async fn ping(&mut self, timeout: Option<usize>) -> usize {
+    async fn ping(&mut self, maybe_timeout: Option<usize>) -> Result<usize, String> {
         log("server: ping called");
         let random_value: u32 = 0;
 
@@ -236,9 +239,26 @@ impl Server {
         };
 
         log("server: after sending PING message");
+        let timeout_duration = if let Some(timeout) = maybe_timeout {
+            timeout
+        } else {
+            DEFAULT_RELAYED_CONNECTION_PING_TIMEOUT as usize
+        };
 
+        // TODO: move this up to catch all
+        let timeout = sleep(std::time::Duration::from_millis(timeout_duration as u64)).fuse();
         // cannot clone futures
-        self.ping_requests.get_mut(&random_value).unwrap().await
+        let ping = self.ping_requests.get_mut(&random_value).unwrap();
+
+        pin_mut!(timeout);
+
+        match select(timeout, ping).await {
+            Either::Left(_) => Err(format!(
+                "Low-level ping timed out after {}",
+                timeout_duration
+            )),
+            Either::Right((latency, _)) => Ok(latency),
+        }
     }
 
     pub fn get_pending_ping_requests(&self) -> Vec<u32> {
@@ -539,7 +559,10 @@ pub mod wasm {
             let ping_fut = this
                 .w
                 .ping(timeout.map(|f| f.value_of() as u32 as usize))
-                .map(|x| Ok(JsValue::from(x)));
+                .map(|x| match x {
+                    Ok(u) => Ok(JsValue::from(u)),   // converting from usize
+                    Err(e) => Err(JsValue::from(e)), // converting from string
+                });
 
             wasm_bindgen_futures::future_to_promise(ping_fut)
         }

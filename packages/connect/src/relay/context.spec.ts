@@ -100,7 +100,7 @@ describe('relay switch context', function () {
     destinationShaker.rest()
   })
 
-  it.only('ping comes back in time', async function () {
+  it('ping comes back in time', async function () {
     const [relayToNode, nodeToRelay] = duplexPair<StreamType>()
 
     const ctx = new Server(
@@ -149,8 +149,8 @@ describe('relay switch context', function () {
   it.only('ping timeout', async function () {
     const [relayToNode, nodeToRelay] = duplexPair<StreamType>()
 
-    const ctx = RelayContext(
-      nodeToRelay,
+    const ctx = new Server(
+      nodeToRelay as IStream,
       {
         onClose: () => {},
         onUpgrade: () => {}
@@ -161,6 +161,7 @@ describe('relay switch context', function () {
     )
 
     const nodeShaker = handshake(relayToNode)
+    const destinationShaker = handshake(ctx as any)
 
     const pingPromise = ctx.ping(100)
 
@@ -171,21 +172,33 @@ describe('relay switch context', function () {
       )
     )
 
-    const pingResponse = await pingPromise
+    // start source pipeline
+    destinationShaker.read()
+
+    let firstErrThrown = false
+    // does not work with try / catch
+    await pingPromise.catch((_errMessage) => {
+      firstErrThrown = true
+    })
+
+    assert(firstErrThrown)
 
     nodeShaker.write(Uint8Array.of(RelayPrefix.STATUS_MESSAGE, StatusMessages.PONG))
 
-    assert(pingResponse == -1)
+    // assert(pingResponse == -1)
 
     // Let async operations happen
-    await new Promise((resolve) => setTimeout(resolve))
+    // await new Promise((resolve) => setTimeout(resolve))
 
-    const secondPingResult = await ctx.ping(100)
+    let secondErrThrown = false
+    await ctx.ping(100).catch((_errMessage) => {
+      secondErrThrown = true
+    })
+
+    assert(secondErrThrown)
 
     // Should not produce infinite loops
     nodeShaker.rest()
-
-    assert(secondPingResult == -1)
   })
 
   it('stop a stream', async function () {
