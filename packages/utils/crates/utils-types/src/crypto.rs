@@ -11,9 +11,11 @@ use k256::elliptic_curve::ProjectiveArithmetic;
 use k256::elliptic_curve::sec1::{FromEncodedPoint, ToEncodedPoint};
 use libp2p_core::PeerId;
 use sha3::{Keccak256, digest::DynDigest};
-use crate::errors::{Result, GeneralError::ParseError};
+
+use crate::errors::{Result, GeneralError::ParseError, GeneralError};
 use crate::errors::GeneralError::MathError;
 use crate::primitives::{Address, EthereumChallenge};
+use crate::traits::{BinarySerializable, PeerIdLike};
 
 /// Represent an uncompressed elliptic curve point on the secp256k1 curve
 #[derive(Clone, Eq, PartialEq, Debug)]
@@ -47,57 +49,52 @@ impl CurvePoint {
         ret
     }
 
-    pub fn to_hex(&self) -> String {
-        hex::encode(self.uncompressed)
-    }
-
     pub fn to_address(&self) -> Address {
         let hash = Hash::create(&[&self.uncompressed[1..]]).serialize();
         Address::new(&hash[12..])
     }
 
-    pub fn serialize(&self) -> Box<[u8]> {
-        self.uncompressed.into()
-    }
-
     pub fn eq(&self, other: &CurvePoint) -> bool {
         self.uncompressed.eq(&other.uncompressed)
     }
+}
 
-    pub fn to_peerid_str(&self) -> String {
-        self.to_peerid().to_base58()
+impl FromStr for CurvePoint {
+    type Err = GeneralError;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        Ok(CurvePoint::new(&hex::decode(s).map_err(|_| ParseError)?))
+    }
+}
+
+impl PeerIdLike for CurvePoint {
+    fn from_peerid(peer_id: &PeerId) -> Result<Self> {
+        Ok(CurvePoint::new(&PublicKey::from_peerid(peer_id)?.serialize(false)))
+    }
+
+    fn to_peerid(&self) -> PeerId {
+        PublicKey::deserialize(&self.uncompressed).unwrap().to_peerid()
+    }
+}
+
+impl BinarySerializable for CurvePoint {
+    const SIZE: usize = 65;
+
+    fn deserialize(bytes: &[u8]) -> Result<Self> {
+        Ok(CurvePoint::new(&PublicKey::deserialize(bytes)?
+            .serialize(false)
+        ))
+    }
+
+    fn serialize(&self) -> Box<[u8]> {
+        self.uncompressed.into()
     }
 }
 
 impl CurvePoint {
-    /// Size of the uncompressed elliptic curve point
-    pub const SIZE: usize = 65;
-
     pub fn from_exponent(exponent: &[u8]) -> Result<Self> {
         Ok(CurvePoint::new(&PublicKey::from_privkey(exponent)?
                .serialize(false)
-        ))
-    }
-
-    pub fn from_str(s: &str) -> Result<Self> {
-        Ok(CurvePoint::new(&hex::decode(s).map_err(|_| ParseError)?))
-    }
-
-    pub fn from_peerid(peer_id: &PeerId) -> Result<Self> {
-        Ok(CurvePoint::new(&PublicKey::from_peerid(peer_id)?.serialize(false)))
-    }
-
-    pub fn from_peerid_str(peer_id: &str) -> Result<Self> {
-        Self::from_peerid(&PeerId::from_str(peer_id).map_err(|_|ParseError)?)
-    }
-
-    pub fn to_peerid(&self) -> PeerId {
-        PublicKey::deserialize(&self.uncompressed).unwrap().to_peerid()
-    }
-
-    pub fn deserialize(bytes: &[u8]) -> Result<Self> {
-        Ok(CurvePoint::new(&PublicKey::deserialize(bytes)?
-            .serialize(false)
         ))
     }
 }
@@ -157,29 +154,12 @@ impl HalfKey {
         ret.hkey.copy_from_slice(&half_key);
         ret
     }
-
-    pub fn to_hex(&self) -> String {
-        hex::encode(self.hkey)
-    }
-
-    pub fn serialize(&self) -> Box<[u8]> {
-        self.hkey.into()
-    }
-
-    pub fn eq(&self, other: &HalfKey) -> bool {
-        self.hkey.eq(&other.hkey)
-    }
-
-    pub fn clone_halfkey(&self) -> HalfKey {
-        self.clone()
-    }
 }
 
-impl HalfKey {
-    /// Size of the half-key
-    pub const SIZE: usize = 32;
+impl BinarySerializable for HalfKey {
+    const SIZE: usize = 32;
 
-    pub fn deserialize(data: &[u8]) -> Result<Self> {
+    fn deserialize(data: &[u8]) -> Result<Self> {
         if data.len() == Self::SIZE {
             let mut ret = Self {
                 hkey: [0u8; Self::SIZE]
@@ -189,6 +169,10 @@ impl HalfKey {
         } else {
             Err(ParseError)
         }
+    }
+
+    fn serialize(&self) -> Box<[u8]> {
+        self.hkey.into()
     }
 }
 
@@ -211,38 +195,17 @@ impl HalfKeyChallenge {
         ret
     }
 
-    pub fn to_hex(&self) -> String {
-        hex::encode(self.hkc)
-    }
-
-    pub fn serialize(&self) -> Box<[u8]> {
-        self.hkc.into()
-    }
-
-    pub fn eq(&self, other: &HalfKeyChallenge) -> bool {
-        self.hkc.eq(&other.hkc)
-    }
-
-    pub fn clone_halfkey_challenge(&self) -> HalfKeyChallenge {
-        self.clone()
-    }
-
     pub fn to_address(&self) -> Address {
         PublicKey::deserialize(&self.hkc)
             .expect("invalid half-key")
             .to_address()
     }
-
-    pub fn to_peerid_str(&self) -> String {
-        self.to_peerid().to_base58()
-    }
 }
 
-impl HalfKeyChallenge {
-    /// Size of the half-key challenge is the size of the compressed secp256k1 point
-    pub const SIZE: usize = 33;
+impl BinarySerializable for HalfKeyChallenge {
+    const SIZE: usize = 33; // Size of the compressed secp256k1 point.
 
-    pub fn deserialize(data: &[u8]) -> Result<Self> {
+    fn deserialize(data: &[u8]) -> Result<Self> {
         if data.len() == Self::SIZE {
             let mut ret = Self {
                 hkc: [0u8; Self::SIZE]
@@ -254,24 +217,29 @@ impl HalfKeyChallenge {
         }
     }
 
-    pub fn from_str(str: &str) -> Result<Self> {
-        Self::deserialize(&hex::decode(str).map_err(|_| ParseError)?)
+    fn serialize(&self) -> Box<[u8]> {
+        self.hkc.into()
     }
+}
 
-    pub fn from_peerid(peer_id: &PeerId) -> Result<Self> {
+impl PeerIdLike for HalfKeyChallenge {
+    fn from_peerid(peer_id: &PeerId) -> Result<Self> {
         HalfKeyChallenge::deserialize(&PublicKey::from_peerid(peer_id)?.serialize(true))
     }
 
-    pub fn from_peerid_str(peer_id: &str) -> Result<Self> {
-        Self::from_peerid(&PeerId::from_str(peer_id).map_err(|_|ParseError)?)
-    }
-
-    pub fn to_peerid(&self) -> PeerId {
+    fn to_peerid(&self) -> PeerId {
         PublicKey::deserialize(&self.hkc)
             .expect("invalid half-key")
             .to_peerid()
     }
+}
 
+impl FromStr for HalfKeyChallenge {
+    type Err = GeneralError;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        Self::deserialize(&hex::decode(s).map_err(|_| ParseError)?)
+    }
 }
 
 /// Represents a 256-bit hash value
@@ -293,24 +261,29 @@ impl Hash {
         ret.hash.copy_from_slice(hash);
         ret
     }
+}
 
-    pub fn to_hex(&self) -> String {
-        hex::encode(self.hash)
+impl BinarySerializable for Hash {
+    const SIZE: usize = 32; // Defined by Keccak256.
+
+    fn deserialize(data: &[u8]) -> Result<Self> {
+        if data.len() == Self::SIZE {
+            let mut ret = Self {
+                hash: [0u8; Self::SIZE]
+            };
+            ret.hash.copy_from_slice(data);
+            Ok(ret)
+        } else {
+            Err(ParseError)
+        }
     }
 
-    pub fn serialize(&self) -> Box<[u8]> {
+    fn serialize(&self) -> Box<[u8]> {
         self.hash.into()
-    }
-
-    pub fn eq(&self, other: &Hash) -> bool {
-        self.hash.eq(&other.hash)
     }
 }
 
 impl Hash {
-    /// Size of the hash value in bytes
-    pub const SIZE: usize = 32;
-
     /// Takes all the byte slices and computes hash of their concatenated value.
     /// Uses the Keccak256 digest.
     pub fn create(inputs: &[&[u8]]) -> Self {
@@ -321,18 +294,6 @@ impl Hash {
         };
         hash.finalize_into(&mut ret.hash).unwrap();
         ret
-    }
-
-    pub fn deserialize(data: &[u8]) -> Result<Self> {
-        if data.len() == Self::SIZE {
-            let mut ret = Self {
-                hash: [0u8; Self::SIZE]
-            };
-            ret.hash.copy_from_slice(data);
-            Ok(ret)
-        } else {
-            Err(ParseError)
-        }
     }
 }
 
@@ -364,9 +325,10 @@ pub struct PublicKey {
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl PublicKey {
-    pub fn eq(&self, other: &PublicKey) -> bool {
-        // Needs to be re-implemented here, because the trait impl is not available in WASM
-        self.key.eq(&other.key) && self.compressed.eq(&other.compressed)
+    pub fn to_address(&self) -> Address {
+        let uncompressed = self.serialize(false);
+        let serialized = Hash::create(&[&uncompressed[1..]]).serialize();
+        Address::new(&serialized[12..])
     }
 
     pub fn serialize(&self, compressed: bool) -> Box<[u8]> {
@@ -380,17 +342,22 @@ impl PublicKey {
     pub fn to_hex(&self, compressed: bool) -> String {
         hex::encode(self.serialize(compressed))
     }
+}
 
-    pub fn to_peerid_str(&self) -> String {
-        self.to_peerid().to_base58()
+impl PeerIdLike for PublicKey {
+    fn from_peerid(peer_id: &PeerId) -> Result<Self> {
+        // Here we explicitly assume non-RSA PeerId, so that multihash bytes are the actual public key
+        let pid = peer_id.to_bytes();
+        let (_, mh) = pid.split_at(6);
+        Self::deserialize(mh)
     }
 
-    pub fn to_address(&self) -> Address {
-        let uncompressed = self.serialize(false);
-        let serialized = Hash::create(&[&uncompressed[1..]]).serialize();
-        Address::new(&serialized[12..])
+    fn to_peerid(&self) -> PeerId {
+        PeerId::from_public_key(&libp2p_core::PublicKey::Secp256k1(
+            libp2p_core::identity::secp256k1::PublicKey::decode(&self.compressed)
+                .expect("cannot convert this public key to secp256k1 peer id")
+        ))
     }
-
 }
 
 impl PublicKey {
@@ -400,31 +367,13 @@ impl PublicKey {
     /// Size of the uncompressed public key in bytes
     pub const SIZE_UNCOMPRESSED: usize = 65;
 
-    pub fn to_peerid(&self) -> PeerId {
-        PeerId::from_public_key(&libp2p_core::PublicKey::Secp256k1(
-            libp2p_core::identity::secp256k1::PublicKey::decode(&self.compressed)
-                .expect("cannot convert this public key to secp256k1 peer id")
-        ))
-    }
-
-    pub fn deserialize(bytes: &[u8]) -> Result<PublicKey> {
-        let key = elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(bytes)
+    pub fn deserialize(data: &[u8]) -> Result<Self> {
+        let key = elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(data)
             .map_err(|_| ParseError)?;
         Ok(PublicKey{
             key,
             compressed: key.to_encoded_point(true).to_bytes()
         })
-    }
-
-    pub fn from_peerid_str(peer_id: &str) -> Result<PublicKey> {
-        Self::from_peerid(&PeerId::from_str(peer_id).map_err(|_|ParseError)?)
-    }
-
-    pub fn from_peerid(peer_id: &PeerId) -> Result<PublicKey> {
-        // Here we explicitly assume non-RSA PeerId, so that multihash bytes are the actual public key
-        let pid = peer_id.to_bytes();
-        let (_, mh) = pid.split_at(6);
-        Self::deserialize(mh)
     }
 
     pub fn from_privkey(private_key: &[u8]) -> Result<PublicKey> {
@@ -587,34 +536,23 @@ impl Signature {
         self.verify_hash(message, &public_key.serialize(false))
     }
 
-    pub fn to_hex(&self) -> String {
-        hex::encode(self.signature)
-    }
-
     pub fn raw_signature(&self) -> Box<[u8]> {
         self.signature.into()
     }
 
-    pub fn serialize(&self) -> Box<[u8]> {
-        let mut compressed = Vec::from(self.signature);
-        compressed[Self::SIZE/2] &= 0x7f;
-        compressed[Self::SIZE/2] |= self.recovery << 7;
-        compressed.into_boxed_slice()
-    }
 }
 
-impl Signature {
-    /// Size of the signature in bytes
-    pub const SIZE: usize = 64;
-    
-    pub fn deserialize(signature: &[u8]) -> Result<Signature> {
-        if signature.len() == Self::SIZE {
+impl BinarySerializable for Signature {
+    const SIZE: usize = 64;
+
+    fn deserialize(data: &[u8]) -> Result<Self> {
+        if data.len() == Self::SIZE {
             // Read & clear the top-most bit in S
             let mut ret = Signature {
                 signature: [0u8; Self::SIZE],
-                recovery: if signature[Self::SIZE/2]&0x80 != 0 { 1 } else { 0 }
+                recovery: if data[Self::SIZE/2]&0x80 != 0 { 1 } else { 0 }
             };
-            ret.signature.copy_from_slice(signature);
+            ret.signature.copy_from_slice(data);
             ret.signature[Self::SIZE/2] &= 0x7f;
 
             Ok(ret)
@@ -622,10 +560,18 @@ impl Signature {
             Err(ParseError)
         }
     }
+
+    fn serialize(&self) -> Box<[u8]> {
+        let mut compressed = Vec::from(self.signature);
+        compressed[Self::SIZE/2] &= 0x7f;
+        compressed[Self::SIZE/2] |= self.recovery << 7;
+        compressed.into_boxed_slice()
+    }
 }
 
 #[cfg(test)]
 pub mod tests {
+    use std::str::FromStr;
     use hex_literal::hex;
     use k256::elliptic_curve::ProjectiveArithmetic;
     use k256::{NonZeroScalar, Secp256k1, U256};
@@ -633,6 +579,7 @@ pub mod tests {
     use k256::elliptic_curve::sec1::ToEncodedPoint;
     use crate::crypto::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, Hash, PublicKey, Signature};
     use crate::primitives::Address;
+    use crate::traits::{BinarySerializable, PeerIdLike, ToHex};
 
     const PUBLIC_KEY: [u8; 33] = hex!("021464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8");
     const PRIVATE_KEY: [u8; 32] = hex!("e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8");
@@ -799,6 +746,7 @@ pub mod tests {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
+    use std::str::FromStr;
     use js_sys::Uint8Array;
     use k256::ecdsa::VerifyingKey;
     use sha3::{Keccak256, digest::DynDigest};
@@ -806,27 +754,43 @@ pub mod wasm {
     use utils_misc::utils::wasm::JsResult;
     use wasm_bindgen::prelude::*;
     use crate::crypto::{CurvePoint, HalfKey, HalfKeyChallenge, Hash, PublicKey, Signature};
+    use crate::traits::{BinarySerializable, PeerIdLike, ToHex};
 
     #[wasm_bindgen]
     impl CurvePoint {
         #[wasm_bindgen(js_name = "from_exponent")]
-        pub fn create_from_exponent(exponent: &[u8]) -> JsResult<CurvePoint> {
+        pub fn _from_exponent(exponent: &[u8]) -> JsResult<CurvePoint> {
             ok_or_jserr!(Self::from_exponent(exponent))
         }
 
         #[wasm_bindgen(js_name = "from_str")]
-        pub fn create_from_str(str: &str) -> JsResult<CurvePoint> {
+        pub fn _from_str(str: &str) -> JsResult<CurvePoint> {
             ok_or_jserr!(Self::from_str(str))
         }
 
         #[wasm_bindgen(js_name = "from_peerid_str")]
-        pub fn create_from_peerid_str(peer_id: &str) -> JsResult<CurvePoint> {
+        pub fn _from_peerid_str(peer_id: &str) -> JsResult<CurvePoint> {
             ok_or_jserr!(Self::from_peerid_str(peer_id))
         }
 
+        #[wasm_bindgen(js_name = "to_peerid_str")]
+        pub fn _to_peerid_str(&self) -> String {
+            self.to_peerid_str()
+        }
+
         #[wasm_bindgen(js_name = "deserialize")]
-        pub fn curve_point_deserialize(bytes: &[u8]) -> JsResult<CurvePoint> {
+        pub fn _deserialize(bytes: &[u8]) -> JsResult<CurvePoint> {
             ok_or_jserr!(Self::deserialize(bytes))
+        }
+
+        #[wasm_bindgen(js_name = "to_hex")]
+        pub fn _to_hex(&self) -> String {
+            self.to_hex()
+        }
+
+        #[wasm_bindgen(js_name = "serialize")]
+        pub fn _serialize(&self) -> Box<[u8]> {
+            self.serialize()
         }
 
         pub fn size() -> u32 { Self::SIZE as u32 }
@@ -835,8 +799,28 @@ pub mod wasm {
     #[wasm_bindgen]
     impl HalfKey {
         #[wasm_bindgen(js_name = "deserialize")]
-        pub fn deserialize_halfkey(data: &[u8]) -> JsResult<HalfKey> {
+        pub fn _deserialize(data: &[u8]) -> JsResult<HalfKey> {
             ok_or_jserr!(Self::deserialize(data))
+        }
+
+        #[wasm_bindgen(js_name = "to_hex")]
+        pub fn _to_hex(&self) -> String {
+            self.to_hex()
+        }
+
+        #[wasm_bindgen(js_name = "serialize")]
+        pub fn _serialize(&self) -> Box<[u8]> {
+            self.serialize()
+        }
+
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> HalfKey {
+            self.clone()
+        }
+
+        #[wasm_bindgen(js_name = "eq")]
+        pub fn _eq(&self, other: &HalfKey) -> bool {
+            self.eq(other)
         }
 
         pub fn size() -> u32 { Self::SIZE as u32 }
@@ -844,18 +828,38 @@ pub mod wasm {
 
     #[wasm_bindgen]
     impl HalfKeyChallenge {
+        #[wasm_bindgen(js_name = "to_hex")]
+        pub fn _to_hex(&self) -> String {
+            self.to_hex()
+        }
+
+        #[wasm_bindgen(js_name = "eq")]
+        pub fn _eq(&self, other: &HalfKeyChallenge) -> bool {
+            self.eq(other)
+        }
+
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> HalfKeyChallenge {
+            self.clone()
+        }
+
+        #[wasm_bindgen(js_name = "to_peerid_str")]
+        pub fn _to_peerid_str(&self) -> String {
+            self.to_peerid_str()
+        }
+
         #[wasm_bindgen(js_name = "deserialize")]
-        pub fn deserialize_halfkey_challenge(data: &[u8]) -> JsResult<HalfKeyChallenge> {
+        pub fn _deserialize(data: &[u8]) -> JsResult<HalfKeyChallenge> {
             ok_or_jserr!(Self::deserialize(data))
         }
 
         #[wasm_bindgen(js_name = "from_str")]
-        pub fn create_from_str(str: &str) -> JsResult<HalfKeyChallenge> {
+        pub fn _from_str(str: &str) -> JsResult<HalfKeyChallenge> {
             ok_or_jserr!(Self::from_str(str))
         }
 
         #[wasm_bindgen(js_name = "from_peerid_str")]
-        pub fn create_from_peerid_str(peer_id: &str) -> JsResult<HalfKeyChallenge> {
+        pub fn _from_peerid_str(peer_id: &str) -> JsResult<HalfKeyChallenge> {
             ok_or_jserr!(Self::from_peerid_str(peer_id))
         }
 
@@ -865,7 +869,7 @@ pub mod wasm {
     #[wasm_bindgen]
     impl Hash {
         #[wasm_bindgen(js_name = "create")]
-        pub fn create_from(inputs: Vec<Uint8Array>) -> Self {
+        pub fn _create(inputs: Vec<Uint8Array>) -> Self {
             let mut hash = Keccak256::default();
             inputs.into_iter().map(|a| a.to_vec()).for_each(|v| hash.update(&v));
 
@@ -877,8 +881,23 @@ pub mod wasm {
         }
 
         #[wasm_bindgen(js_name = "deserialize")]
-        pub fn deserialize_hash(data: &[u8]) -> JsResult<Hash> {
+        pub fn _deserialize(data: &[u8]) -> JsResult<Hash> {
             ok_or_jserr!(Self::deserialize(data))
+        }
+
+        #[wasm_bindgen(js_name = "to_hex")]
+        pub fn _to_hex(&self) -> String {
+            self.to_hex()
+        }
+
+        #[wasm_bindgen(js_name = "serialize")]
+        pub fn _serialize(&self) -> Box<[u8]> {
+            self.serialize()
+        }
+
+        #[wasm_bindgen(js_name = "eq")]
+        pub fn _eq(&self, other: &Hash) -> bool {
+            self.eq(other)
         }
 
         pub fn size() -> u32 {
@@ -889,23 +908,33 @@ pub mod wasm {
     #[wasm_bindgen]
     impl PublicKey {
         #[wasm_bindgen(js_name = "deserialize")]
-        pub fn deserialize_public_key(bytes: &[u8]) -> JsResult<PublicKey> {
+        pub fn _deserialize(bytes: &[u8]) -> JsResult<PublicKey> {
             ok_or_jserr!(PublicKey::deserialize(bytes))
         }
 
         #[wasm_bindgen(js_name = "from_peerid_str")]
-        pub fn public_key_from_peerid_str(peer_id: &str) -> JsResult<PublicKey> {
+        pub fn _from_peerid_str(peer_id: &str) -> JsResult<PublicKey> {
             ok_or_jserr!(PublicKey::from_peerid_str(peer_id))
         }
 
+        #[wasm_bindgen(js_name = "to_peerid_str")]
+        pub fn _to_peerid_str(&self) -> String {
+            self.to_peerid_str()
+        }
+
         #[wasm_bindgen(js_name = "from_signature")]
-        pub fn public_key_from_raw_signature(hash: &[u8], r: &[u8], s: &[u8], v: u8) -> JsResult<PublicKey> {
+        pub fn _from_raw_signature(hash: &[u8], r: &[u8], s: &[u8], v: u8) -> JsResult<PublicKey> {
             ok_or_jserr!(PublicKey::from_raw_signature(hash, r, s, v, VerifyingKey::recover_from_msg))
         }
 
         #[wasm_bindgen(js_name = "from_privkey")]
-        pub fn public_key_from_privkey(private_key: &[u8]) -> JsResult<PublicKey> {
+        pub fn _from_privkey(private_key: &[u8]) -> JsResult<PublicKey> {
             ok_or_jserr!(PublicKey::from_privkey(private_key))
+        }
+
+        #[wasm_bindgen(js_name = "eq")]
+        pub fn _eq(&self, other: &PublicKey) -> bool {
+            self.eq(other)
         }
 
         pub fn size_compressed() -> u32 {
@@ -920,8 +949,18 @@ pub mod wasm {
     #[wasm_bindgen]
     impl Signature {
         #[wasm_bindgen(js_name = "deserialize")]
-        pub fn deserialize_signature(signature: &[u8]) -> JsResult<Signature> {
+        pub fn _deserialize(signature: &[u8]) -> JsResult<Signature> {
             ok_or_jserr!(Signature::deserialize(signature))
+        }
+
+        #[wasm_bindgen(js_name = "to_hex")]
+        pub fn _to_hex(&self) -> String {
+            self.to_hex()
+        }
+
+        #[wasm_bindgen(js_name = "serialize")]
+        pub fn _serialize(&self) -> Box<[u8]> {
+            self.serialize()
         }
 
         pub fn size() -> u32 {

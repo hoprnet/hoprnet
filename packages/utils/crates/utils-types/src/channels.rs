@@ -11,6 +11,7 @@ use utils_misc::time::wasm::current_timestamp;
 
 #[cfg(any(not(feature = "wasm"), test))]
 use utils_misc::time::native::current_timestamp;
+use crate::traits::BinarySerializable;
 
 /// Describes status of a channel
 #[repr(u8)]
@@ -70,20 +71,6 @@ pub struct ChannelEntry {
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl ChannelEntry {
-    pub fn serialize(&self) -> Box<[u8]> {
-        let mut ret = Vec::<u8>::with_capacity(Self::SIZE);
-        ret.extend_from_slice(self.source.serialize(false).as_ref());
-        ret.extend_from_slice(self.destination.serialize(false).as_ref());
-        ret.extend_from_slice(self.balance.serialize_value().as_ref());
-        ret.extend_from_slice(self.commitment.serialize().as_ref());
-        ret.extend_from_slice(self.ticket_epoch.serialize().as_ref());
-        ret.extend_from_slice(self.ticket_index.serialize().as_ref());
-        ret.push(self.status as u8);
-        ret.extend_from_slice(self.channel_epoch.serialize().as_ref());
-        ret.extend_from_slice(self.closure_time.serialize().as_ref());
-        ret.into_boxed_slice()
-    }
-
     /// Generates the ticket ID using the source and destination address
     pub fn get_id(&self) -> Hash {
         generate_channel_id(&self.source.to_address(), &self.destination.to_address())
@@ -106,18 +93,18 @@ impl ChannelEntry {
     }
 }
 
-impl ChannelEntry {
-    pub const SIZE: usize = PublicKey::SIZE_UNCOMPRESSED +
-                            PublicKey::SIZE_UNCOMPRESSED +
-                            Balance::SIZE +
-                            Hash::SIZE +
-                            U256::SIZE +
-                            U256::SIZE +
-                            1 +
-                            U256::SIZE +
-                            U256::SIZE;
+impl BinarySerializable for ChannelEntry {
+    const SIZE: usize = PublicKey::SIZE_UNCOMPRESSED +
+        PublicKey::SIZE_UNCOMPRESSED +
+        Balance::SIZE +
+        Hash::SIZE +
+        U256::SIZE +
+        U256::SIZE +
+        1 +
+        U256::SIZE +
+        U256::SIZE;
 
-    pub fn deserialize(data: &[u8]) -> Result<ChannelEntry> {
+    fn deserialize(data: &[u8]) -> Result<Self> {
         if data.len() == Self::SIZE {
             let mut b = Vec::from(data);
             let source = PublicKey::deserialize(b.drain(0..PublicKey::SIZE_UNCOMPRESSED).as_ref())?;
@@ -135,6 +122,20 @@ impl ChannelEntry {
         } else {
             Err(ParseError)
         }
+    }
+
+    fn serialize(&self) -> Box<[u8]> {
+        let mut ret = Vec::<u8>::with_capacity(Self::SIZE);
+        ret.extend_from_slice(self.source.serialize(false).as_ref());
+        ret.extend_from_slice(self.destination.serialize(false).as_ref());
+        ret.extend_from_slice(self.balance.serialize_value().as_ref());
+        ret.extend_from_slice(self.commitment.serialize().as_ref());
+        ret.extend_from_slice(self.ticket_epoch.serialize().as_ref());
+        ret.extend_from_slice(self.ticket_index.serialize().as_ref());
+        ret.push(self.status as u8);
+        ret.extend_from_slice(self.channel_epoch.serialize().as_ref());
+        ret.extend_from_slice(self.closure_time.serialize().as_ref());
+        ret.into_boxed_slice()
     }
 }
 
@@ -161,26 +162,21 @@ impl Response {
         ret.response.copy_from_slice(data);
         ret
     }
-
-    pub fn to_hex(&self) -> String {
-        hex::encode(self.response)
-    }
-
-    pub fn serialize(&self) -> Box<[u8]> {
-        self.response.into()
-    }
 }
 
-impl Response {
-    /// Size of the serialized response
-    pub const SIZE: usize = 32;
+impl BinarySerializable for Response {
+    const SIZE: usize = 32;
 
-    pub fn deserialize(data: &[u8]) -> Result<Response> {
+    fn deserialize(data: &[u8]) -> Result<Self> {
         if data.len() == Self::SIZE {
             Ok(Response::new(data))
         } else {
             Err(ParseError)
         }
+    }
+
+    fn serialize(&self) -> Box<[u8]> {
+        self.response.into()
     }
 }
 
@@ -230,12 +226,6 @@ impl Ticket {
             .into_boxed_slice()
     }
 
-    pub fn serialize(&self) -> Box<[u8]> {
-        let mut unsigned = Self::serialize_unsigned_aux(&self.counterparty, &self.challenge, &self.epoch, &self.amount, &self.win_prob, &self.index, &self.channel_epoch);
-        unsigned.extend_from_slice(&self.signature.serialize());
-        unsigned.into_boxed_slice()
-    }
-
     /// Computes Ethereum signature hash of the ticket
     pub fn get_hash(&self) -> Hash {
         ethereum_signed_hash(Hash::create(&[&self.serialize_unsigned()]).serialize())
@@ -279,13 +269,13 @@ impl Ticket {
     }
 }
 
-impl Ticket {
-    pub const SIZE: usize = Address::SIZE + EthereumChallenge::SIZE + 2 * U256::SIZE +
+impl BinarySerializable for Ticket {
+    const SIZE: usize = Address::SIZE + EthereumChallenge::SIZE + 2 * U256::SIZE +
         Balance::SIZE + 2 * U256::SIZE + Signature::SIZE;
 
-    pub fn deserialize(bytes: &[u8]) -> Result<Ticket> {
-        if bytes.len() == Self::SIZE {
-            let mut b = Vec::from(bytes);
+    fn deserialize(data: &[u8]) -> Result<Self> {
+        if data.len() == Self::SIZE {
+            let mut b = Vec::from(data);
             let counterparty = Address::deserialize(b.drain(0..Address::SIZE).as_ref())?;
             let challenge = EthereumChallenge::deserialize(b.drain(0..EthereumChallenge::SIZE).as_ref())?;
             let epoch = U256::deserialize(b.drain(0..U256::SIZE).as_ref())?;
@@ -302,6 +292,12 @@ impl Ticket {
             Err(ParseError)
         }
     }
+
+    fn serialize(&self) -> Box<[u8]> {
+        let mut unsigned = Self::serialize_unsigned_aux(&self.counterparty, &self.challenge, &self.epoch, &self.amount, &self.win_prob, &self.index, &self.channel_epoch);
+        unsigned.extend_from_slice(&self.signature.serialize());
+        unsigned.into_boxed_slice()
+    }
 }
 
 #[cfg(test)]
@@ -311,6 +307,7 @@ pub mod tests {
     use crate::channels::{ChannelEntry, ChannelStatus, Response, Ticket};
     use crate::crypto::{Challenge, CurvePoint, Hash, PublicKey};
     use crate::primitives::{Address, Balance, BalanceType, U256};
+    use crate::traits::BinarySerializable;
 
     const PUBLIC_KEY_1: [u8; 65] = hex!("0443a3958ac66a3b2ab89fcf90bc948a8b8be0e0478d21574d077ddeb11f4b1e9f2ca21d90bd66cee037255480a514b91afae89e20f7f7fa7353891cc90a52bf6e");
     const PUBLIC_KEY_2: [u8; 65] = hex!("04f16fd6701aea01032716377d52d8213497c118f99cdd1c3c621b2795cac8681606b7221f32a8c5d2ef77aa783bec8d96c11480acccabba9e8ee324ae2dfe92bb");
@@ -391,6 +388,7 @@ pub mod wasm {
     use crate::channels::{AcknowledgedTicket, ChannelEntry, ChannelStatus, Response, Ticket};
     use crate::crypto::{Hash, PublicKey, Signature};
     use crate::primitives::{Address, Balance, EthereumChallenge, U256};
+    use crate::traits::{BinarySerializable, ToHex};
 
     #[wasm_bindgen]
     pub fn channel_status_to_number(status: ChannelStatus) -> u8 {
@@ -441,13 +439,33 @@ pub mod wasm {
                 channel_epoch, closure_time
             }
         }
+
+        #[wasm_bindgen(js_name = "deserialize")]
+        pub fn _deserialize(data: &[u8]) -> JsResult<ChannelEntry> {
+            ok_or_jserr!(ChannelEntry::deserialize(data))
+        }
+
+        #[wasm_bindgen(js_name = "serialize")]
+        pub fn _serialize(&self) -> Box<[u8]> {
+            self.serialize()
+        }
     }
 
     #[wasm_bindgen]
     impl Response {
         #[wasm_bindgen(js_name = "deserialize")]
-        pub fn deserialize_response(data: &[u8]) -> JsResult<Response> {
+        pub fn _deserialize(data: &[u8]) -> JsResult<Response> {
             ok_or_jserr!(Response::deserialize(data))
+        }
+
+        #[wasm_bindgen(js_name = "serialize")]
+        pub fn _serialize(&self) -> Box<[u8]> {
+            self.serialize()
+        }
+
+        #[wasm_bindgen(js_name = "to_hex")]
+        pub fn _to_hex(&self) -> String {
+            self.to_hex()
         }
 
         pub fn size() -> u32 {
@@ -474,8 +492,13 @@ pub mod wasm {
         }
 
         #[wasm_bindgen(js_name = "deserialize")]
-        pub fn deserialize_bytes(bytes: &[u8]) -> JsResult<Ticket> {
+        pub fn _deserialize(bytes: &[u8]) -> JsResult<Ticket> {
             ok_or_jserr!(Self::deserialize(bytes))
+        }
+
+        #[wasm_bindgen(js_name = "serialize")]
+        pub fn _serialize(&self) -> Box<[u8]> {
+            self.serialize()
         }
     }
 }
