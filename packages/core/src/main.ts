@@ -109,7 +109,8 @@ export async function createLibp2pInstance(
             __noDirectConnections: options.testing?.noDirectConnections,
             // Do not upgrade to a direct WebRTC connection, even if it
             // is available. Used to test behavior of bidirectional NATs
-            __noWebRTCUpgrade: options.testing?.noWebRTCUpgrade
+            __noWebRTCUpgrade: options.testing?.noWebRTCUpgrade,
+            __localModeStun: options.testing?.localModeStun
           }
         })
       ],
@@ -140,9 +141,9 @@ export async function createLibp2pInstance(
         maxDialsPerPeer: 1,
         // If we are a public node, assume that our system is able to handle
         // more connections
-        maxParallelDials: options.announce ? 250 : 50,
+        maxParallelDials: options.maxParallelConnections,
         // default timeout of 30s appears to be too long
-        dialTimeout: 10e3
+        dialTimeout: 3e3
       },
       connectionGater: {
         denyDialPeer: async (peer: PeerId) => !(await isAllowedToAccessNetwork(peer)),
@@ -231,7 +232,7 @@ export async function createHoprNode(
   }
 
   log(`using provider URL: ${options.environment.network.default_provider}`)
-  const chain = new HoprCoreEthereum(
+  const chain = HoprCoreEthereum.createInstance(
     db,
     PublicKey.fromPeerId(peerId),
     keysPBM.PrivateKey.decode(peerId.privateKey as Uint8Array).Data,
@@ -254,5 +255,5 @@ export async function createHoprNode(
   // Initialize connection to the blockchain
   await chain.initializeChainWrapper(resolvedContractAddresses)
 
-  return new Hopr(peerId, db, chain, options)
+  return new Hopr(peerId, db, options)
 }

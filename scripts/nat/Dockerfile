@@ -1,5 +1,5 @@
-# Alpine 3.16 x86_64 https://hub.docker.com/layers/library/alpine/3.16.3/images/sha256-3d426b0bfc361d6e8303f51459f17782b219dece42a1c7fe463b6014b189c86d
-FROM alpine:3.16@sha256:3d426b0bfc361d6e8303f51459f17782b219dece42a1c7fe463b6014b189c86d as runtime
+# Docker 20.10.23 on Alpine 3.17 x86_64 https://hub.docker.com/layers/library/docker/23.0.0-alpine3.17/images/sha256-81d8c3b659f44a0a0bdcde3c1f0b27f3ca246105a8a1ecab242efc6de586de7e
+FROM docker:20.10.23-alpine3.17@sha256:81d8c3b659f44a0a0bdcde3c1f0b27f3ca246105a8a1ecab242efc6de586de7e as runtime
 
 # This build arg is mandatory
 ARG HOPRD_RELEASE

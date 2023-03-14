@@ -11,10 +11,9 @@
 
 ### Classes
 
-- [PassiveStrategy](classes/PassiveStrategy.md)
-- [PromiscuousStrategy](classes/PromiscuousStrategy.md)
 - [ResolvedEnvironment](classes/ResolvedEnvironment.md)
 - [SaneDefaults](classes/SaneDefaults.md)
+- [StrategyFactory](classes/StrategyFactory.md)
 - [StrategyTickResult](classes/StrategyTickResult.md)
 - [default](classes/default.md)
 
@@ -27,6 +26,7 @@
 - [HoprOptions](modules.md#hoproptions)
 - [NodeStatus](modules.md#nodestatus)
 - [SendMessage](modules.md#sendmessage)
+- [Strategy](modules.md#strategy)
 - [Subscribe](modules.md#subscribe)
 
 ### Variables
@@ -37,7 +37,6 @@
 - [INTERMEDIATE\_HOPS](modules.md#intermediate_hops)
 - [MAX\_HOPS](modules.md#max_hops)
 - [MAX\_NEW\_CHANNELS\_PER\_TICK](modules.md#max_new_channels_per_tick)
-- [MAX\_PACKET\_DELAY](modules.md#max_packet_delay)
 - [MAX\_PATH\_ITERATIONS](modules.md#max_path_iterations)
 - [NETWORK\_QUALITY\_THRESHOLD](modules.md#network_quality_threshold)
 - [PACKET\_SIZE](modules.md#packet_size)
@@ -50,6 +49,7 @@
 - [CONSTANTS](modules.md#constants)
 - [createHoprNode](modules.md#createhoprnode)
 - [findPath](modules.md#findpath)
+- [isStrategy](modules.md#isstrategy)
 - [resolveEnvironment](modules.md#resolveenvironment)
 - [supportedEnvironments](modules.md#supportedenvironments)
 
@@ -63,26 +63,29 @@
 
 | Name | Type |
 | :------ | :------ |
-| `allowLocalConnections?` | `boolean` |
-| `allowPrivateConnections?` | `boolean` |
-| `announce?` | `boolean` |
+| `allowLocalConnections` | `boolean` |
+| `allowPrivateConnections` | `boolean` |
+| `announce` | `boolean` |
+| `checkUnrealizedBalance?` | `boolean` |
 | `connector?` | `HoprCoreEthereum` |
-| `createDbIfNotExist?` | `boolean` |
+| `createDbIfNotExist` | `boolean` |
 | `dataPath` | `string` |
 | `environment` | [`ResolvedEnvironment`](classes/ResolvedEnvironment.md) |
-| `forceCreateDB?` | `boolean` |
+| `forceCreateDB` | `boolean` |
 | `heartbeatInterval?` | `number` |
 | `heartbeatThreshold?` | `number` |
 | `heartbeatVariance?` | `number` |
-| `hosts?` | { `ip4?`: `NetOptions` ; `ip6?`: `NetOptions`  } |
+| `hosts` | { `ip4?`: `NetOptions` ; `ip6?`: `NetOptions`  } |
 | `hosts.ip4?` | `NetOptions` |
 | `hosts.ip6?` | `NetOptions` |
+| `maxParallelConnections?` | `number` |
 | `networkQualityThreshold?` | `number` |
 | `onChainConfirmations?` | `number` |
-| `password?` | `string` |
-| `strategy?` | [`ChannelStrategyInterface`](interfaces/ChannelStrategyInterface.md) |
-| `testing?` | { `announceLocalAddresses?`: `boolean` ; `mockedDHT?`: `Map`<`string`, `string`[]\> ; `mockedNetwork?`: `Libp2pEmitter`<`any`\> ; `noDirectConnections?`: `boolean` ; `noWebRTCUpgrade?`: `boolean` ; `preferLocalAddresses?`: `boolean` ; `useMockedLibp2p?`: `boolean`  } |
+| `password` | `string` |
+| `strategy` | [`ChannelStrategyInterface`](interfaces/ChannelStrategyInterface.md) |
+| `testing?` | { `announceLocalAddresses?`: `boolean` ; `localModeStun?`: `boolean` ; `mockedDHT?`: `Map`<`string`, `string`[]\> ; `mockedNetwork?`: `Libp2pEmitter`<`any`\> ; `noDirectConnections?`: `boolean` ; `noWebRTCUpgrade?`: `boolean` ; `preferLocalAddresses?`: `boolean` ; `useMockedLibp2p?`: `boolean`  } |
 | `testing.announceLocalAddresses?` | `boolean` |
+| `testing.localModeStun?` | `boolean` |
 | `testing.mockedDHT?` | `Map`<`string`, `string`[]\> |
 | `testing.mockedNetwork?` | `Libp2pEmitter`<`any`\> |
 | `testing.noDirectConnections?` | `boolean` |
@@ -92,7 +95,7 @@
 
 #### Defined in
 
-[packages/core/src/index.ts:123](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L123)
+[packages/core/src/index.ts:136](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L136)
 
 ___
 
@@ -102,7 +105,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:170](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L170)
+[packages/core/src/index.ts:188](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L188)
 
 ___
 
@@ -112,7 +115,17 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:185](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L185)
+[packages/core/src/index.ts:203](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L203)
+
+___
+
+### Strategy
+
+Ƭ **Strategy**: typeof `STRATEGIES`[`number`]
+
+#### Defined in
+
+[packages/core/src/channel-strategy.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L28)
 
 ___
 
@@ -122,7 +135,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:172](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L172)
+[packages/core/src/index.ts:190](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L190)
 
 ## Variables
 
@@ -132,7 +145,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L22)
+[packages/core/src/constants.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L20)
 
 ___
 
@@ -142,13 +155,13 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:21](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L21)
+[packages/core/src/constants.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L19)
 
 ___
 
 ### FULL\_VERSION
 
-• `Const` **FULL\_VERSION**: `any` = `pkg.version`
+• `Const` **FULL\_VERSION**: `string` = `pkg.version`
 
 #### Defined in
 
@@ -162,7 +175,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L14)
+[packages/core/src/constants.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L12)
 
 ___
 
@@ -172,7 +185,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L19)
+[packages/core/src/constants.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L17)
 
 ___
 
@@ -182,17 +195,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L18)
-
-___
-
-### MAX\_PACKET\_DELAY
-
-• `Const` **MAX\_PACKET\_DELAY**: ``200``
-
-#### Defined in
-
-[packages/core/src/constants.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L12)
+[packages/core/src/constants.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L16)
 
 ___
 
@@ -202,7 +205,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L16)
+[packages/core/src/constants.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L14)
 
 ___
 
@@ -212,7 +215,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L17)
+[packages/core/src/constants.ts:15](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L15)
 
 ___
 
@@ -232,7 +235,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:15](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L15)
+[packages/core/src/constants.ts:13](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L13)
 
 ___
 
@@ -269,7 +272,7 @@ because Rust does not support exporting constants to WASM
 
 #### Defined in
 
-packages/core/lib/core_misc.d.ts:19
+packages/core/lib/core_misc.d.ts:8
 
 ___
 
@@ -291,7 +294,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/main.ts:212](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L212)
+[packages/core/src/main.ts:213](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L213)
 
 ___
 
@@ -324,6 +327,26 @@ destination
 #### Defined in
 
 [packages/core/src/path/index.ts:38](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/path/index.ts#L38)
+
+___
+
+### isStrategy
+
+▸ **isStrategy**(`str`): str is string
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `str` | `string` |
+
+#### Returns
+
+str is string
+
+#### Defined in
+
+[packages/core/src/channel-strategy.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L30)
 
 ___
 

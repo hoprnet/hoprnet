@@ -64,19 +64,19 @@ The preferred way of installation should be via Docker.
 
 All our docker images can be found in [our Google Cloud Container Registry][4].
 Each image is prefixed with `gcr.io/hoprassociation/$PROJECT:$RELEASE`.
-The `master-staging` tag represents the `master` branch, while the `bogota` tag
+The `master-staging` tag represents the `master` branch, while the `riga` tag
 represents the most recent `release/*` branch.
 
 You can pull the Docker image like so:
 
 ```sh
-docker pull gcr.io/hoprassociation/hoprd:bogota
+docker pull gcr.io/hoprassociation/hoprd:riga
 ```
 
 For ease of use you can set up a shell alias to run the latest release as a docker container:
 
 ```sh
-alias hoprd='docker run --pull always -m 2g -ti -v ${HOPRD_DATA_DIR:-$HOME/.hoprd-db}:/app/db -p 9091:9091 -p 3000:3000 -p 3001:3001 gcr.io/hoprassociation/hoprd:bogota'
+alias hoprd='docker run --pull always -m 2g -ti -v ${HOPRD_DATA_DIR:-$HOME/.hoprd-db}:/app/db -p 9091:9091/tcp -p 9091:9091/udp -p 3001:3001 gcr.io/hoprassociation/hoprd:riga'
 ```
 
 **IMPORTANT:** Using the above command will map the database folder used by hoprd to a local folder called `.hoprd-db` in your home directory. You can customize the location of that folder further by executing the following command:
@@ -158,6 +158,8 @@ Options:
           Set port to which the API server will bind [env: HOPRD_API_PORT=] [default: 3001]
       --apiToken <TOKEN>
           A REST API token and for user authentication [env: HOPRD_API_TOKEN=]
+      --disableApiAuthentication
+          Completely disables the token authentication for the API, overrides any `apiToken` if set [env: HOPRD_DISABLE_API_AUTHENTICATION] [default: false]
       --healthCheck
           Run a health check end point on localhost:8080 [env: HOPRD_HEALTH_CHECK=]
       --healthCheckHost <HOST>
@@ -168,6 +170,14 @@ Options:
           A password to encrypt your keys [env: HOPRD_PASSWORD=]
       --provider <PROVIDER>
           A custom RPC provider to be used for the node to connect to blockchain [env: HOPRD_PROVIDER=]
+      --defaultStrategy <STRATEGY>
+          Default channel strategy to use when the node is started [env: HOPRD_DEFAULT_STRATEGY=] [default: passive]
+      --maxAutoChannels <NUMBER>
+          Maximum number of channels a strategy can open [env: HOPRD_MAX_AUTOCHANNELS=] [default: square root of the number of active peers]
+      --autoRedeemTickets
+        Enables automatic ticket redemption when received a winning ticket [env: HOPRD_AUTO_REDEEM_TICKETS=] [default: false]
+      --checkUnrealizedBalance
+        Check unrealized balance in the channel when validating unacknowledged tickets [env: HOPRD_CHECK_UNREALIZED_BALANCE=] [default: false]
       --dryRun
           List all the options used to run the HOPR node, but quit instead of starting [env: HOPRD_DRY_RUN=]
       --init
@@ -229,7 +239,7 @@ have an extended monitoring of the HOPR node's activity (using Prometheus + Graf
 To startup a HOPRd node with monitoring, you can use the following command:
 
 ```shell
-docker compose --env-file scripts/compose/default.env --file scripts/compose/docker-compose.yaml up -d
+docker compose --file scripts/compose/docker-compose.yml up -d
 ```
 
 The configuration of the HOPRd node can be changed in the `scripts/compose/default.env` file.
@@ -237,6 +247,8 @@ The configuration of the HOPRd node can be changed in the `scripts/compose/defau
 Once the configuration starts up, the HOPRd Admin UI is accessible as usual via `localhost:3000`. The Grafana instance is
 accessible via `localhost:3030` and is provisioned with a dashboard that contains useful metrics and information
 about the HOPR network as perceived from your node plus some additional runtime information.
+
+The default username for Grafana is `admin` with password `hopr`.
 
 ### Using NPM
 
@@ -269,7 +281,7 @@ These criteria however, are not required when you develop using your local nodes
 At the moment we DO NOT HAVE backward compatibility between releases.
 We attempt to provide instructions on how to migrate your tokens between releases.
 
-1. Set your automatic channel strategy to `MANUAL`.
+1. Set your automatic channel strategy to `passive`.
 2. Redeem all unredeemed tickets.
 3. Close all open payment channels.
 4. Once all payment channels have closed, withdraw your funds to an external
@@ -512,7 +524,7 @@ script to the creation script:
 ```sh
 ./scripts/setup-gcloud-cluster.sh \
   my-custom-cluster-without-name \
-  gcr.io/hoprassociation/hoprd:bogota \
+  gcr.io/hoprassociation/hoprd:riga \
   `pwd`/scripts/topologies/full_interconnected_cluster.sh
 ```
 

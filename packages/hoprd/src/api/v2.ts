@@ -7,8 +7,12 @@ import swaggerUi from 'swagger-ui-express'
 import bodyParser from 'body-parser'
 import { initialize } from 'express-openapi'
 import { peerIdFromString } from '@libp2p/peer-id'
-import { debug, Address } from '@hoprnet/hopr-utils'
+import BN from 'bn.js'
+
+import { debug, Address, HoprDB } from '@hoprnet/hopr-utils'
 import { authenticateWsConnection, getStatusCodeForInvalidInputInRequest, removeQueryParams } from './utils.js'
+import { authenticateToken, authorizeToken, validateTokenCapabilities } from './token.js'
+import { STATUS_CODES } from './v2/utils.js'
 
 import type { Server } from 'http'
 import type { Application, Request } from 'express'
@@ -16,9 +20,45 @@ import type { WebSocketServer } from 'ws'
 import type Hopr from '@hoprnet/hopr-core'
 import { SettingKey, StateOps } from '../types.js'
 import type { LogStream } from './../logs.js'
-import BN from 'bn.js'
+import type { Token } from './token.js'
 
 const debugLog = debug('hoprd:api:v2')
+
+enum AuthResult {
+  Failed,
+  Authenticated,
+  Authorized
+}
+
+async function authenticateAndAuthorize(
+  db: HoprDB,
+  req: Request,
+  reqToken: string,
+  superuserToken: string
+): Promise<AuthResult> {
+  // 1. check superuser token
+  const isSuperuserAuthenticated = reqToken === superuserToken
+
+  // continue early if superuser is authenticated, no authorization checks needed
+  if (isSuperuserAuthenticated) {
+    return AuthResult.Authorized
+  }
+
+  // 2. check user token authentication
+  reqToken = decodeURIComponent(reqToken)
+  const token: Token = await authenticateToken(db, reqToken)
+  if (token) {
+    // 3. token was found, therefore is authenticated, next check authorization
+    const endpointRef: string = req['operationDoc'].operationId
+    if (await authorizeToken(db, token, endpointRef)) {
+      req.context.token = token
+      return AuthResult.Authorized
+    }
+    return AuthResult.Authenticated
+  }
+
+  return AuthResult.Failed
+}
 
 // The Rest API v2 is uses JSON for input and output, is validated through a
 // Swagger schema which is also accessible for testing at:
@@ -30,7 +70,7 @@ export async function setupRestApi(
   stateOps: StateOps,
   options: {
     apiToken?: string
-    disableApiAuthentication: boolean
+    disableApiAuthentication?: boolean
   }
 ): Promise<ReturnType<typeof initialize>> {
   // this API uses JSON data only
@@ -44,7 +84,7 @@ export async function setupRestApi(
   service.use(
     urlPath,
     function addNodeContext(req, _res, next) {
-      req.context = { node: this.node, stateOps: this.stateOps }
+      req.context = { node, stateOps }
       next()
     }
       // Need to explicitly bind the instances to the function
@@ -74,14 +114,25 @@ export async function setupRestApi(
     routesIndexFileRegExp: /(?:index)?\.js$/,
     // since we pass the spec directly we don't need to expose it via HTTP
     exposeApiDocs: false,
-    errorMiddleware: function (err, _, res, next) {
+    errorMiddleware: function (err, req, res, next) {
       // @fixme index-0 access does not always work
       if (err.status === 400) {
         const path = String(err.errors[0].path) || ''
         res.status(err.status).send({ status: getStatusCodeForInvalidInputInRequest(path) })
-      } else {
-        next(err)
+        return
       }
+      if (err.status === 401) {
+        // distinguish between 401 and 403
+        if (req.context.authResult === AuthResult.Failed) {
+          res.status(401).send({ status: STATUS_CODES.UNAUTHORIZED, error: 'authentication failed' })
+          return
+        }
+        if (req.context.authResult === AuthResult.Authenticated) {
+          res.status(403).send({ status: STATUS_CODES.UNAUTHORIZED, error: 'authorization failed' })
+          return
+        }
+      }
+      next(err)
     },
     // we use custom formats for particular internal data types
     customFormats: {
@@ -112,47 +163,39 @@ export async function setupRestApi(
       },
       settingKey: (input) => {
         return Object.values(SettingKey).includes(input)
+      },
+      tokenCapabilities: (input) => {
+        return validateTokenCapabilities(input)
       }
     },
     securityHandlers: {
       // TODO: We assume the handlers are always called in order. This isn't a
       // given and might change in the future. Thus, they should be made order-independent.
-      keyScheme: function (req: Request, _scopes, _securityDefinition) {
+      keyScheme: async function (req: Request, _scopes, _securityDefinition) {
         // skip checks if authentication is disabled
-        if (this.options.disableApiAuthentication) return true
+        if (options.disableApiAuthentication) return true
 
         // Applying multiple URI encoding is an identity
         let apiTokenFromUser = encodeURIComponent(req.get('x-auth-token') || '')
 
-        if (this.options.apiToken !== undefined && apiTokenFromUser !== encodedApiToken) {
-          // because this is not the last auth check, we just indicate that
-          // the authentication failed so the auth chain can continue
-          return false
-        }
-
-        // successfully authenticated, will stop the auth chain and proceed with the request
-        return true
+        req.context.authResult = await authenticateAndAuthorize(node.db, req, apiTokenFromUser, encodedApiToken)
+        return req.context.authResult === AuthResult.Authorized
       }.bind({ options }),
-      passwordScheme: function (req: Request, _scopes, _securityDefinition) {
+      passwordScheme: async function (req: Request, _scopes, _securityDefinition) {
         // skip checks if authentication is disabled
         if (options.disableApiAuthentication) return true
 
         const authEncoded = (req.get('authorization') || '').replace('Basic ', '')
         // We only expect a single value here, instead of the usual user:password, so we take the user part as token
-        let apiTokenFromUser = encodeURIComponent(Buffer.from(authEncoded, 'base64').toString('binary').split(':')[0])
+        const apiTokenFromUser = encodeURIComponent(Buffer.from(authEncoded, 'base64').toString('binary').split(':')[0])
 
-        if (this.options.apiToken !== undefined && apiTokenFromUser !== encodedApiToken) {
-          // because this is the last auth check, we must throw the appropriate
-          // error to be sent back to the user
-          throw {
-            status: 403,
-            challenge: 'Basic realm=hoprd',
-            message: 'You must authenticate to access hoprd.'
-          }
+        const result = await authenticateAndAuthorize(node.db, req, apiTokenFromUser, encodedApiToken)
+        if (result === AuthResult.Authorized) {
+          return true
         }
-
-        // successfully authenticated
-        return true
+        // if authentication or authorization failed capture highest failure mode
+        req.context.authResult = Math.max(result, req.context.authResult)
+        return false
       }.bind({ options })
     }
   })
@@ -256,6 +299,9 @@ export function setupWsApi(
 // In order to pass custom objects along with each request we build a context
 // which is attached during request processing.
 export class Context {
+  public token: Token
+  public authResult: AuthResult
+
   constructor(public node: Hopr, public stateOps: StateOps) {}
 }
 
@@ -265,6 +311,8 @@ declare global {
       context: {
         node: Hopr
         stateOps: StateOps
+        token: Token
+        authResult: AuthResult
       }
     }
   }

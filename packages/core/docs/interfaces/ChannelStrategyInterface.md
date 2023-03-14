@@ -19,8 +19,9 @@ Implementors should bear in mind:
 
 ### Methods
 
+- [configure](ChannelStrategyInterface.md#configure)
+- [onAckedTicket](ChannelStrategyInterface.md#onackedticket)
 - [onChannelWillClose](ChannelStrategyInterface.md#onchannelwillclose)
-- [onWinningTicket](ChannelStrategyInterface.md#onwinningticket)
 - [shouldCommitToChannel](ChannelStrategyInterface.md#shouldcommittochannel)
 - [tick](ChannelStrategyInterface.md#tick)
 
@@ -32,7 +33,7 @@ Implementors should bear in mind:
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:29](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L29)
+[packages/core/src/channel-strategy.ts:50](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L50)
 
 ___
 
@@ -42,41 +43,39 @@ ___
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:42](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L42)
+[packages/core/src/channel-strategy.ts:65](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L65)
 
 ## Methods
 
-### onChannelWillClose
+### configure
 
-▸ **onChannelWillClose**(`channel`, `chain`): `Promise`<`void`\>
+▸ **configure**(`settings`): `void`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `channel` | `ChannelEntry` |
-| `chain` | `default` |
+| `settings` | `any` |
 
 #### Returns
 
-`Promise`<`void`\>
+`void`
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:38](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L38)
+[packages/core/src/channel-strategy.ts:52](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L52)
 
 ___
 
-### onWinningTicket
+### onAckedTicket
 
-▸ **onWinningTicket**(`t`, `chain`): `Promise`<`void`\>
+▸ **onAckedTicket**(`t`): `Promise`<`void`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `t` | `AcknowledgedTicket` |
-| `chain` | `default` |
 
 #### Returns
 
@@ -84,7 +83,27 @@ ___
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:39](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L39)
+[packages/core/src/channel-strategy.ts:62](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L62)
+
+___
+
+### onChannelWillClose
+
+▸ **onChannelWillClose**(`channel`): `Promise`<`void`\>
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `channel` | `ChannelEntry` |
+
+#### Returns
+
+`Promise`<`void`\>
+
+#### Defined in
+
+[packages/core/src/channel-strategy.ts:61](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L61)
 
 ___
 
@@ -104,7 +123,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:40](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L40)
+[packages/core/src/channel-strategy.ts:63](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L63)
 
 ___
 
@@ -119,7 +138,7 @@ ___
 | `balance` | `BN` |
 | `network_peer_ids` | `Iterator`<`string`, `any`, `undefined`\> |
 | `outgoing_channel` | `OutgoingChannelStatus`[] |
-| `peer_quality` | (`string`: `any`) => `number` |
+| `peer_quality` | (`string`: `string`) => `number` |
 
 #### Returns
 
@@ -127,4 +146,4 @@ ___
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:31](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L31)
+[packages/core/src/channel-strategy.ts:54](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L54)

@@ -6,6 +6,7 @@ import {
   u8aEquals,
   debug,
   retimer,
+  timeout,
   nAtATime,
   u8aToHex,
   pickVersion,
@@ -33,6 +34,8 @@ import pkg from '../../package.json' assert { type: 'json' }
 const NORMALIZED_VERSION = pickVersion(pkg.version)
 
 const MAX_PARALLEL_HEARTBEATS = 14
+
+const HEART_BEAT_ROUND_TIMEOUT = 60000 // 1 minute in ms;
 
 // Metrics
 const metric_networkHealth = create_gauge('core_gauge_network_health', 'Connectivity health indicator')
@@ -181,7 +184,10 @@ export default class Heartbeat {
     let pingError: any
     let pingErrorThrown = false
     try {
-      pingResponse = await this.sendMessage(destination, this.protocolHeartbeat, challenge, true)
+      // race the HEART_BEAT_ROUND_TIMEOUT. Abort ping action when timeout.
+      pingResponse = await timeout(HEART_BEAT_ROUND_TIMEOUT, () =>
+        this.sendMessage(destination, this.protocolHeartbeat, challenge, true)
+      )
     } catch (err) {
       pingErrorThrown = true
       pingError = err

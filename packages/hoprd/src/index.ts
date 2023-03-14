@@ -14,6 +14,7 @@ import {
   createHoprNode,
   default as Hopr,
   type HoprOptions,
+  isStrategy,
   NetworkHealthIndicator,
   ResolvedEnvironment,
   resolveEnvironment
@@ -26,6 +27,7 @@ import setupHealthcheck from './healthcheck.js'
 import { LogStream } from './logs.js'
 import { getIdentity } from './identity.js'
 import { decodeMessage } from './api/utils.js'
+import { type ChannelStrategyInterface, StrategyFactory } from '@hoprnet/hopr-core/lib/channel-strategy.js'
 
 // Metrics
 const metric_processStartTime = create_gauge(
@@ -55,6 +57,18 @@ const version = get_package_version(packageFile)
 const on_avado = (process.env.AVADO ?? 'false').toLowerCase() === 'true'
 
 function generateNodeOptions(argv: CliArgs, environment: ResolvedEnvironment): HoprOptions {
+  let strategy: ChannelStrategyInterface
+
+  if (isStrategy(argv.default_strategy)) {
+    strategy = StrategyFactory.getStrategy(argv.default_strategy)
+    strategy.configure({
+      auto_redeem_tickets: argv.auto_redeem_tickets ?? false,
+      max_channels: argv.max_auto_channels ?? undefined
+    })
+  } else {
+    throw Error(`Invalid strategy selected`)
+  }
+
   let options: HoprOptions = {
     createDbIfNotExist: argv.init,
     announce: argv.announce,
@@ -68,16 +82,30 @@ function generateNodeOptions(argv: CliArgs, environment: ResolvedEnvironment): H
     heartbeatVariance: argv.heartbeat_variance,
     networkQualityThreshold: argv.network_quality_threshold,
     onChainConfirmations: argv.on_chain_confirmations,
+    checkUnrealizedBalance: argv.check_unrealized_balance,
+    maxParallelConnections: argv.max_parallel_connections,
     testing: {
       announceLocalAddresses: argv.test_announce_local_addresses,
       preferLocalAddresses: argv.test_prefer_local_addresses,
       noWebRTCUpgrade: argv.test_no_webrtc_upgrade,
-      noDirectConnections: argv.test_no_direct_connections
-    }
+      noDirectConnections: argv.test_no_direct_connections,
+      localModeStun: argv.test_local_mode_stun
+    },
+    password: argv.password,
+    strategy,
+    forceCreateDB: argv.force_init
   }
 
   if (argv.password !== undefined) {
     options.password = argv.password as string
+  }
+
+  if (isStrategy(argv.default_strategy)) {
+    options.strategy = StrategyFactory.getStrategy(argv.default_strategy)
+    options.strategy.configure({
+      auto_redeem_tickets: argv.auto_redeem_tickets ?? false,
+      max_channels: argv.max_auto_channels ?? undefined
+    })
   }
 
   return options
@@ -101,6 +129,10 @@ export function parseCliArguments(args: string[]) {
     }
     console.error(err)
     process.exit(1)
+  }
+  if (argv.private_key) {
+    // wasm-bindgen returns number array but does not call the Uint8Array constructor
+    argv.private_key = new Uint8Array(argv.private_key)
   }
   return argv
 }
@@ -141,7 +173,9 @@ async function main() {
     aliases: new Map(),
     settings: {
       includeRecipient: false,
-      strategy: 'passive'
+      strategy: 'passive',
+      autoRedeemTickets: false,
+      maxAutoChannels: undefined
     }
   }
 
@@ -182,6 +216,18 @@ async function main() {
   }
 
   const argv = parseCliArguments(process.argv.slice(1))
+
+  if (argv.default_strategy) {
+    state.settings.strategy = argv.default_strategy
+  }
+
+  if (argv.auto_redeem_tickets) {
+    state.settings.autoRedeemTickets = argv.auto_redeem_tickets
+  }
+
+  if (argv.max_auto_channels) {
+    state.settings.maxAutoChannels = argv.max_auto_channels
+  }
 
   if (!argv.disable_api_authentication && argv.api) {
     if (argv.api_token == null) {

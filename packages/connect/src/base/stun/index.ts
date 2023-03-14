@@ -174,5 +174,6 @@ export async function isExposedHost(
   return isExposed
 }
 
+export { startStunServer } from './utils.js'
 export { handleTcpStunRequest, PUBLIC_RFC_5780_SERVERS } from './tcp/index.js'
 export { handleUdpStunRequest, PUBLIC_UDP_RFC_5780_SERVERS } from './udp/index.js'

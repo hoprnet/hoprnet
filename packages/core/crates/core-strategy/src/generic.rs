@@ -1,3 +1,4 @@
+use utils_types::channels::ChannelStatus;
 use utils_types::primitives::Balance;
 
 /// Basic strategy trait that all strategies must implement.
@@ -38,6 +39,7 @@ pub trait ChannelStrategy {
 pub struct OutgoingChannelStatus {
     pub peer_id: String,
     pub stake: Balance,
+    pub status: ChannelStatus,
 }
 
 #[cfg(feature = "wasm")]
@@ -46,6 +48,7 @@ impl From<&wasm::OutgoingChannelStatus> for OutgoingChannelStatus {
         OutgoingChannelStatus {
             peer_id: x.peer_id.clone(),
             stake: Balance::from_str(x.stake_str.as_str()).unwrap(),
+            status: x.status.clone()
         }
     }
 }
@@ -105,23 +108,13 @@ pub mod wasm {
     use utils_types::primitives::wasm::Balance;
 
     use serde::{Deserialize, Serialize};
+    use utils_types::channels::ChannelStatus;
 
-    #[wasm_bindgen(getter_with_clone)]
     #[derive(Serialize, Deserialize)]
     pub struct OutgoingChannelStatus {
         pub peer_id: String,
         pub stake_str: String,
-    }
-
-    #[wasm_bindgen]
-    impl OutgoingChannelStatus {
-        #[wasm_bindgen(constructor)]
-        pub fn new(peer_id: &str, stake_str: &str) -> Self {
-            OutgoingChannelStatus {
-                peer_id: peer_id.to_string(),
-                stake_str: stake_str.to_string(),
-            }
-        }
+        pub status: ChannelStatus,
     }
 
     impl From<&super::OutgoingChannelStatus> for OutgoingChannelStatus {
@@ -129,6 +122,7 @@ pub mod wasm {
             OutgoingChannelStatus {
                 peer_id: x.peer_id.clone(),
                 stake_str: x.stake.to_string(),
+                status: x.status.clone()
             }
         }
     }
@@ -146,13 +140,11 @@ pub mod wasm {
             to_open: JsValue,
             to_close: Vec<JsString>,
         ) -> JsResult<StrategyTickResult> {
-            let open: Vec<OutgoingChannelStatus> =
-                ok_or_jserr!(serde_wasm_bindgen::from_value(to_open))?;
-
             Ok(StrategyTickResult {
                 w: super::StrategyTickResult::new(
                     max_auto_channels as usize,
-                    open.into_iter()
+                    serde_wasm_bindgen::from_value::<Vec<OutgoingChannelStatus>>(to_open)?
+                        .into_iter()
                         .map(|x| super::OutgoingChannelStatus::from(&x))
                         .collect(),
                     to_close.iter().map(String::from).collect(),
@@ -194,16 +186,13 @@ pub mod wasm {
         outgoing_channels: JsValue,
         quality_of: &js_sys::Function,
     ) -> JsResult<StrategyTickResult> {
-        let out_channels: Vec<OutgoingChannelStatus> =
-            serde_wasm_bindgen::from_value(outgoing_channels)?;
-
         Ok(StrategyTickResult {
             w: strategy.tick(
                 balance.w,
                 peer_ids
                     .into_iter()
                     .map(|v| v.unwrap().as_string().unwrap()),
-                out_channels
+                serde_wasm_bindgen::from_value::<Vec<OutgoingChannelStatus>>(outgoing_channels)?
                     .iter()
                     .map(|c| super::OutgoingChannelStatus::from(c))
                     .collect(),

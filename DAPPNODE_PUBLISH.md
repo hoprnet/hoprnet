@@ -5,8 +5,8 @@ Each Dappnode package version is tied to a certain upstream version in our Monor
 
 The current process is as follows when a new version needs to be published:
 
-1. Clone the HOPR Dappnode repo from https://github.com/dappnode/DAppNodePackage-Hopr
-2. Connect to your Dappnode VPN.
+1. Clone the HOPR Dappnode repo from https://github.com/hoprnet/DAppNodePackage-Hopr
+2. Connect to your Dappnode VPN following this guide: https://welcome.dappnode.io/vpn and https://docs.dappnode.io/user/product-manual/vpn
 3. Make changes to `dappnode_package.json`: bump the `version` and change to the desired `upstreamVersion`.
 4. Do a Dappnode build using: `dapnnodesdk build` This will build a new unsigned Dappnode package and push it to your IPFS node.
 5. Commit all the changes in a new branch (e.g. `bump-upstream-1.90.x`) and create a new PR in the `DAppNodePackage-Hopr` repo.

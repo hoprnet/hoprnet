@@ -1,4 +1,4 @@
-ARG HOPR_TOOLCHAIN_IMAGE=${HOPR_TOOLCHAIN_IMAGE:-hopr-toolchain:latest}
+ARG HOPR_TOOLCHAIN_IMAGE=${HOPR_TOOLCHAIN_IMAGE:-gcr.io/hoprassociation/hopr-toolchain:latest}
 
 # Creates a Docker container that encapsulates a local testnet with deployed smart contracts
 
@@ -14,6 +14,13 @@ COPY Makefile .
 
 ENV FOUNDRY_DIR=/app/hoprnet-toolchain/.foundry
 
+# install missing process runner
+RUN apt-get update \
+ && apt-get install -y \
+      time tini \
+ && rm -rf /var/lib/apt/lists/* \
+ && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false
+
 # start anvil, deploy contracts, then terminate
 RUN make -f Makefile run-anvil \
  && sleep 2 \
@@ -22,8 +29,5 @@ RUN make -f Makefile run-anvil \
  && rm -f /tmp/*.log \
  && rm -f .anvil.state.json
 
-# install missing process runner
-RUN apk add --no-cache tini
-
 # start anvil in foreground, don't deploy contracts again
-ENTRYPOINT ["/sbin/tini", "--", "make", "run-anvil-foreground"]
+ENTRYPOINT ["/usr/bin/tini", "--", "make", "run-anvil-foreground"]

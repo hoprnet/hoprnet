@@ -1,4 +1,4 @@
-import type { Multiaddr } from '@multiformats/multiaddr'
+import { Multiaddr } from '@multiformats/multiaddr'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { ChainWrapper, createChainWrapper, Receipt } from './ethereum.js'
 import chalk from 'chalk'
@@ -16,7 +16,9 @@ import {
   privKeyToPeerId,
   type ChannelEntry,
   type DeferType,
-  type PublicKey
+  PublicKey,
+  AccountEntry,
+  create_counter
 } from '@hoprnet/hopr-utils'
 import Indexer from './indexer/index.js'
 import { CORE_ETHEREUM_CONSTANTS } from '../lib/core_ethereum_misc.js'
@@ -24,6 +26,7 @@ import { EventEmitter } from 'events'
 import { initializeCommitment, findCommitmentPreImage, bumpCommitment, ChannelCommitmentInfo } from './commitment.js'
 import type { IndexerEvents } from './indexer/types.js'
 import { DeploymentExtract } from './utils/utils.js'
+import BN from 'bn.js'
 
 const log = debug('hopr-core-ethereum')
 
@@ -52,29 +55,31 @@ export type ChainOptions = {
   environment: string
 }
 
-type ticketRedemtionInChannelOperations = {
-  // maps channel id to ongoing operation
-  [id: string]: Promise<void>
-}
+type ticketRedemtionInChannelOperations = Map<string, Promise<void>>
 
 // Exported from Rust
 const constants = CORE_ETHEREUM_CONSTANTS()
 
+// Metrics
+const metric_losingTickets = create_counter('core_ethereum_counter_losing_tickets', 'Number of losing tickets')
+const metric_winningTickets = create_counter('core_ethereum_counter_winning_tickets', 'Number of winning tickets')
+
 export default class HoprCoreEthereum extends EventEmitter {
+  private static _instance: HoprCoreEthereum
+
   public indexer: Indexer
   private chain: ChainWrapper
   private started: Promise<HoprCoreEthereum> | undefined
   private redeemingAll: Promise<void> | undefined = undefined
   // Used to store ongoing operations to prevent duplicate redemption attempts
-  private ticketRedemtionInChannelOperations: ticketRedemtionInChannelOperations = {}
+  private ticketRedemtionInChannelOperations: ticketRedemtionInChannelOperations = new Map()
 
-  constructor(
-    //private chain: ChainWrapper, private db: HoprDB, public indexer: Indexer) {
+  private constructor(
     private db: HoprDB,
     private publicKey: PublicKey,
     private privateKey: Uint8Array,
     private options: ChainOptions,
-    protected automaticChainCreation = true
+    private automaticChainCreation: boolean
   ) {
     super()
 
@@ -84,6 +89,22 @@ export default class HoprCoreEthereum extends EventEmitter {
       this.options.maxConfirmations ?? constants.DEFAULT_CONFIRMATIONS,
       constants.INDEXER_BLOCK_RANGE
     )
+  }
+
+  public static createInstance(
+    db: HoprDB,
+    publicKey: PublicKey,
+    privateKey: Uint8Array,
+    options: ChainOptions,
+    automaticChainCreation = true
+  ) {
+    HoprCoreEthereum._instance = new HoprCoreEthereum(db, publicKey, privateKey, options, automaticChainCreation)
+    return HoprCoreEthereum._instance
+  }
+
+  public static getInstance(): HoprCoreEthereum {
+    if (!HoprCoreEthereum._instance) throw new Error('non-existent instance of HoprCoreEthereum')
+    return HoprCoreEthereum._instance
   }
 
   async initializeChainWrapper(deploymentAddresses: DeploymentExtract) {
@@ -286,7 +307,7 @@ export default class HoprCoreEthereum extends EventEmitter {
 
   public async redeemTicketsInChannel(channel: ChannelEntry) {
     const channelId = channel.getId().toHex()
-    const currentOperation = this.ticketRedemtionInChannelOperations[channelId]
+    const currentOperation = this.ticketRedemtionInChannelOperations.get(channelId)
 
     // verify that no operation is running, or return the active operation
     if (currentOperation) {
@@ -296,9 +317,9 @@ export default class HoprCoreEthereum extends EventEmitter {
     // start new operation and store it
     return new Promise((resolve, reject) => {
       try {
-        this.ticketRedemtionInChannelOperations[channelId] = this.redeemTicketsInChannelLoop(channel).then(
-          resolve,
-          reject
+        this.ticketRedemtionInChannelOperations.set(
+          channelId,
+          this.redeemTicketsInChannelLoop(channel).then(resolve, reject)
         )
       } catch (err) {
         reject(err)
@@ -307,10 +328,10 @@ export default class HoprCoreEthereum extends EventEmitter {
   }
 
   private async redeemTicketsInChannelLoop(channel: ChannelEntry): Promise<void> {
-    const channelId = channel.getId().toHex()
+    const channelId = channel.getId()
     if (!channel.destination.eq(this.getPublicKey())) {
       // delete operation before returning
-      delete this.ticketRedemtionInChannelOperations[channelId]
+      this.ticketRedemtionInChannelOperations.delete(channelId.toHex())
       throw new Error('Cannot redeem ticket in channel that is not to us')
     }
 
@@ -323,6 +344,7 @@ export default class HoprCoreEthereum extends EventEmitter {
 
     const boundRedeemTicket = this.redeemTicket.bind(this)
     const boundGetAckdTickets = this.db.getAcknowledgedTickets.bind(this.db)
+    const boundMarkLosingAckedTicket = this.db.markLosingAckedTicket.bind(this.db)
 
     // Use an async iterator to make execution interruptable and allow
     // Node.JS to schedule iterations at any time
@@ -335,7 +357,7 @@ export default class HoprCoreEthereum extends EventEmitter {
           log(
             `Could not redeem ticket with index ${ticket.ticket.index
               .toBN()
-              .toString()} in channel ${channelId}. Giving up.`
+              .toString()} in channel ${channelId.toHex()}. Giving up.`
           )
           break
         }
@@ -349,13 +371,19 @@ export default class HoprCoreEthereum extends EventEmitter {
         )
 
         log(ticket.ticket.toString())
-        const result = await boundRedeemTicket(channel.source, ticket)
+
+        const result = await boundRedeemTicket(channel.source, channelId, ticket)
 
         if (result.status !== 'SUCCESS') {
           if (result.status === 'ERROR') {
             // We need to abort as tickets require ordered redemption.
             // delete operation before returning
             throw result.error
+          } else {
+            // May fail due to out-of-commits, preimage-is-empty, not-a-winning-ticket
+            // Treat those acked tickets as losing tickets, and remove them from the DB.
+            await boundMarkLosingAckedTicket(ticket)
+            metric_losingTickets.increment()
           }
         }
 
@@ -373,12 +401,15 @@ export default class HoprCoreEthereum extends EventEmitter {
     } catch (err) {
       log(`redemption of tickets from ${channel.source.toString()} failed`, err)
     } finally {
-      delete this.ticketRedemtionInChannelOperations[channelId]
+      this.ticketRedemtionInChannelOperations.delete(channelId.toHex())
     }
   }
 
-  // Private as out of order redemption will break things - redeem all at once.
-  private async redeemTicket(counterparty: PublicKey, ackTicket: AcknowledgedTicket): Promise<RedeemTicketResponse> {
+  public async redeemTicket(
+    counterparty: PublicKey,
+    channelId: Hash,
+    ackTicket: AcknowledgedTicket
+  ): Promise<RedeemTicketResponse> {
     if (!ackTicket.verify(counterparty)) {
       return {
         status: 'FAILURE',
@@ -386,11 +417,26 @@ export default class HoprCoreEthereum extends EventEmitter {
       }
     }
 
+    let commitmentPreImage: Hash // actual ackTicket.preImage
+
+    try {
+      commitmentPreImage = await findCommitmentPreImage(this.db, channelId)
+    } catch (err) {
+      log(`Channel ${channelId.toHex()} is out of commitments`)
+      // TODO: How should we handle this ticket if it's out of commitment
+      return {
+        status: 'ERROR',
+        error: err
+      }
+    }
+    // set the commitment
+    ackTicket.setPreImage(commitmentPreImage)
+    log(`Set preImage ${commitmentPreImage.toHex()} for ticket ${ackTicket.response.toHex()}`)
+
     let receipt: string
 
     try {
       const ticket = ackTicket.ticket
-
       log('Submitting ticket', ackTicket.response.toHex())
       const emptyPreImage = new Hash(new Uint8Array(Hash.SIZE).fill(0x00))
       const hasPreImage = !ackTicket.preImage.eq(emptyPreImage)
@@ -412,6 +458,9 @@ export default class HoprCoreEthereum extends EventEmitter {
         }
       }
 
+      // address winning ticket
+      metric_winningTickets.increment()
+
       receipt = await this.chain.redeemTicket(counterparty.toAddress(), ackTicket, (txHash: string) =>
         this.setTxHandler(`channel-updated-${txHash}`, txHash)
       )
@@ -423,8 +472,13 @@ export default class HoprCoreEthereum extends EventEmitter {
         error: err
       }
     }
-
     log('Successfully submitted ticket', ackTicket.response.toHex())
+
+    // bump commitment when on-chain ticket redemption is successful
+    // FIXME: bump commitment can fail if channel runs out of commitments
+    await bumpCommitment(this.db, channelId, commitmentPreImage)
+    log(`Successfully bump local commitment after ${commitmentPreImage.toHex()}`)
+
     await this.db.markRedeemeed(ackTicket)
     this.emit('ticket:redeemed', ackTicket)
     return {
@@ -434,8 +488,13 @@ export default class HoprCoreEthereum extends EventEmitter {
     }
   }
 
-  async initializeClosure(dest: PublicKey): Promise<string> {
-    const c = await this.db.getChannelTo(dest)
+  async initializeClosure(src: PublicKey, dest: PublicKey): Promise<string> {
+    // TODO: should remove this blocker when https://github.com/hoprnet/hoprnet/issues/4194 gets addressed
+    if (!this.publicKey.eq(src)) {
+      throw Error('Initialize incoming channel closure currently is not supported.')
+    }
+
+    const c = await this.db.getChannelX(src, dest)
     if (c.status !== ChannelStatus.Open && c.status !== ChannelStatus.WaitingForCommitment) {
       throw Error('Channel status is not OPEN or WAITING FOR COMMITMENT')
     }
@@ -444,8 +503,12 @@ export default class HoprCoreEthereum extends EventEmitter {
     )
   }
 
-  public async finalizeClosure(dest: PublicKey): Promise<string> {
-    const c = await this.db.getChannelTo(dest)
+  public async finalizeClosure(src: PublicKey, dest: PublicKey): Promise<string> {
+    // TODO: should remove this blocker when https://github.com/hoprnet/hoprnet/issues/4194 gets addressed
+    if (!this.publicKey.eq(src)) {
+      throw Error('Finalizing incoming channel closure currently is not supported.')
+    }
+    const c = await this.db.getChannelX(src, dest)
     if (c.status !== ChannelStatus.PendingToClose) {
       throw Error('Channel status is not PENDING_TO_CLOSE')
     }
@@ -509,9 +572,58 @@ export default class HoprCoreEthereum extends EventEmitter {
       return false
     }
   }
+
+  public static createMockInstance(peer: PeerId): HoprCoreEthereum {
+    const connectorLogger = debug(`hopr:mocks:connector`)
+    HoprCoreEthereum._instance = {
+      start: () => {
+        connectorLogger('starting connector called.')
+        return {} as unknown as HoprCoreEthereum
+      },
+      stop: () => {
+        connectorLogger('stopping connector called.')
+        return Promise.resolve()
+      },
+      getNativeBalance: () => {
+        connectorLogger('getNativeBalance method was called')
+        return Promise.resolve(new NativeBalance(new BN('10000000000000000000')))
+      },
+      getPublicKey: () => {
+        connectorLogger('getPublicKey method was called')
+        return PublicKey.fromPeerId(peer)
+      },
+      getAccount: () => {
+        connectorLogger('getAccount method was called')
+        return Promise.resolve(
+          new AccountEntry(
+            PublicKey.fromPeerId(peer),
+            new Multiaddr(`/ip4/127.0.0.1/tcp/124/p2p/${peer.toString()}`),
+            new BN('1')
+          )
+        )
+      },
+      waitForPublicNodes: () => {
+        connectorLogger('On-chain request for existing public nodes.')
+        return Promise.resolve([])
+      },
+      announce: () => {
+        connectorLogger('On-chain announce request sent')
+      },
+      on: (event: string) => {
+        connectorLogger(`On-chain signal for event "${event}"`)
+      },
+      indexer: {
+        on: (event: string) => connectorLogger(`Indexer on handler top of chain called with event "${event}"`),
+        off: (event: string) => connectorLogger(`Indexer off handler top of chain called with event "${event}`),
+        getPublicNodes: () => Promise.resolve([])
+      },
+      isAllowedAccessToNetwork: () => Promise.resolve(true)
+    } as unknown as HoprCoreEthereum
+
+    return HoprCoreEthereum._instance
+  }
 }
 
-export { createConnectorMock } from './index.mock.js'
 export { useFixtures } from './indexer/index.mock.js'
 export { sampleChainOptions } from './ethereum.mock.js'
 

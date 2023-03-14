@@ -210,12 +210,12 @@ fund_nodes() {
   local addr_arg=""
   [[ -n "${4:-}" ]] && addr_arg="--address ${4}"
 
-  ${mydir}/../.cargo/bin/foundry-tool \
-    --environment-name anvil-localhost --environment-type development \
-    faucet --password "${password}" --use-local-identities \
+  IDENTITY_PASSWORD=${password} PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+    ${mydir}/../.cargo/bin/hopli faucet \
+    --environment-name anvil-localhost \
+    --use-local-identities \
     --identity-prefix "${node_prefix}" --identity-directory "${tmp}" \
-    --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
-    --make-root "${mydir}/../packages/ethereum/contracts" \
+    --contracts-root "${mydir}/../packages/ethereum/contracts" \
     ${addr_arg}
 }
 

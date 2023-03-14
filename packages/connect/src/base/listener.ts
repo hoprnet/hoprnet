@@ -231,6 +231,8 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
 
     const ownInterface = this.tcpSocket.address() as AddressInfo
 
+    this.attachSocketHandlers()
+
     const natSituation = await this.checkNATSituation(ownInterface.address, ownInterface.port)
 
     log(`NAT situation detected: `, natSituation)
@@ -259,8 +261,6 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
     }
 
     this.addrs.interface = internalInterfaces.map(nodeToMultiaddr)
-
-    this.attachSocketHandlers()
 
     // Need to be called before _emitListening
     // because _emitListening() sets an attribute in
@@ -320,7 +320,7 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
     this.tcpSocket.close()
 
     // Node.js bug workaround: ocassionally on macOS close is not emitted and callback is not called
-    return await timeout(SOCKET_CLOSE_TIMEOUT, () => promise)
+    await timeout(SOCKET_CLOSE_TIMEOUT, () => promise)
   }
 
   /**
@@ -503,13 +503,17 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
         }
 
         log(`Re-allocating NAT UDP mapping using ${multiaddrs.length} potential servers`)
-        await getExternalIp(multiaddrs, this.udpSocket, this.testingOptions.__preferLocalAddresses)
+        try {
+          await getExternalIp(multiaddrs, this.udpSocket, this.testingOptions.__preferLocalAddresses)
+        } catch (e) {
+          log(`could not get an external ip ${e}`)
+        }
       },
       // Following recommendations of https://www.rfc-editor.org/rfc/rfc5626
       () => randomInteger(24_000, 29_000)
     )
 
-    if (this.testingOptions.__preferLocalAddresses) {
+    if (this.testingOptions.__preferLocalAddresses && this.testingOptions.__localModeStun !== true) {
       const address = this.tcpSocket.address() as Address
 
       // Pretend to be an exposed host if running locally, e.g. as part of an E2E test
@@ -541,9 +545,9 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
     const isExposed = await isExposedHost(
       usableStunServers,
       (listener: (socket: TCPSocket, stream: AsyncIterable<Uint8Array>) => void): (() => void) => {
-        const identifier = `STUN request ${Date.now()}`
+        const identifier = `STUN response ${Date.now()}`
         this.protocols.push({
-          isProtocol: (data: Uint8Array) => data[0] == 1 && data[1] == 0,
+          isProtocol: (data: Uint8Array) => data[0] == 1 && data[1] == 1,
           identifier,
           takeStream: listener
         })
@@ -555,7 +559,8 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
         }
       },
       this.udpSocket,
-      externalInterface.port
+      externalInterface.port,
+      this.testingOptions.__localModeStun
     )
 
     return {

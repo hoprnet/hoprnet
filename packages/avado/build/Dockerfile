@@ -1,7 +1,7 @@
 ARG UPSTREAM_VERSION
-ARG HOPR_ADMIN_VERSION=07aec21b
-ARG PROMETHEUS_VERSION=2.32.0
-ARG GRAFANA_VERSION=8.1.8
+ARG HOPR_ADMIN_VERSION=latest
+ARG PROMETHEUS_VERSION=2.41.0
+ARG GRAFANA_VERSION=9.3.2
 
 FROM gcr.io/hoprassociation/hopr-admin:${HOPR_ADMIN_VERSION} as hopr-admin
 
@@ -30,8 +30,11 @@ COPY grafana/ /etc/grafana/
 COPY prometheus/ /etc/prometheus/
 WORKDIR /app/hoprnet/packages/hoprd
 
-RUN apk add --no-cache --purge -uU supervisor && \
-    rm -rf /var/cache/apk/* /tmp/*
+RUN apt-get update \
+ && apt-get install -y \
+      supervisor \
+ && rm -rf /var/lib/apt/lists/* \
+ && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false
 
 COPY supervisord.conf /etc/supervisord.conf
 

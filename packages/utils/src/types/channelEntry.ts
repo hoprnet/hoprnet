@@ -6,12 +6,8 @@ import BN from 'bn.js'
 import chalk from 'chalk'
 import type { BigNumberish } from 'ethers'
 
-export enum ChannelStatus {
-  Closed = 0,
-  WaitingForCommitment = 1,
-  Open = 2,
-  PendingToClose = 3
-}
+import { ChannelStatus } from '../../lib/utils_types.js'
+export { ChannelStatus } from '../../lib/utils_types.js'
 
 export function generateChannelId(source: Address, destination: Address) {
   return Hash.create(Uint8Array.from([...source.serialize(), ...destination.serialize()]))

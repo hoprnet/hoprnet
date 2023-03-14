@@ -6,7 +6,7 @@ use prometheus::{
 
 use utils_misc::ok_or_str;
 
-fn register_metric<M, C>(name: &str, desc: &str, creator: C) -> Result<M, String>
+pub(crate) fn register_metric<M, C>(name: &str, desc: &str, creator: C) -> Result<M, String>
 where
     M: Clone + Collector + 'static,
     C: Fn(Opts) -> prometheus::Result<M>,
@@ -18,7 +18,18 @@ where
     Ok(metric)
 }
 
-fn register_metric_vec<M, C>(
+/// Gathers all the global Prometheus metrics.
+pub fn gather_all_metrics() -> Result<String, String> {
+    // Simply gather all global metric families
+    let metric_families = prometheus::gather();
+
+    // ... and encode them
+    let encoder = TextEncoder::new();
+    ok_or_str!(encoder.encode_to_string(&metric_families))
+}
+
+
+pub(crate) fn register_metric_vec<M, C>(
     name: &str,
     desc: &str,
     labels: &[&str],
@@ -39,353 +50,379 @@ where
     Ok(metric)
 }
 
-/// Represents a simple monotonic unsigned integer counter.
-/// Wrapper for IntCounter type
-pub struct SimpleCounter {
-    name: String,
-    ctr: IntCounter,
-}
+#[cfg(any(not(feature = "wasm"), test))]
+use native::SimpleCounter;
+#[cfg(any(not(feature = "wasm"), test))]
+use native::MultiCounter;
+#[cfg(any(not(feature = "wasm"), test))]
+use native::SimpleTimer;
+#[cfg(any(not(feature = "wasm"), test))]
+use native::SimpleGauge;
+#[cfg(any(not(feature = "wasm"), test))]
+use native::MultiGauge;
+#[cfg(any(not(feature = "wasm"), test))]
+use native::SimpleHistogram;
+#[cfg(any(not(feature = "wasm"), test))]
+use native::MultiHistogram;
 
-impl SimpleCounter {
-    /// Creates a new integer counter with given name and description
-    pub fn new(name: &str, description: &str) -> Result<Self, String> {
-        register_metric(name, description, IntCounter::with_opts).map(|m| Self {
-            name: name.to_string(),
-            ctr: m,
-        })
+#[cfg(all(feature = "wasm", not(test)))]
+use wasm::SimpleCounter;
+#[cfg(all(feature = "wasm", not(test)))]
+use wasm::MultiCounter;
+#[cfg(all(feature = "wasm", not(test)))]
+use wasm::SimpleTimer;
+#[cfg(all(feature = "wasm", not(test)))]
+use wasm::SimpleGauge;
+#[cfg(all(feature = "wasm", not(test)))]
+use wasm::MultiGauge;
+#[cfg(all(feature = "wasm", not(test)))]
+use wasm::SimpleHistogram;
+#[cfg(all(feature = "wasm", not(test)))]
+use wasm::MultiHistogram;
+
+
+pub mod native {
+    /// Represents a timer handle.
+    pub struct SimpleTimer {
+        histogram_timer: crate::metrics::HistogramTimer,
     }
 
-    /// Retrieves the value of the counter
-    pub fn get(&self) -> u64 {
-        self.ctr.get()
+    /// Represents a simple monotonic unsigned integer counter.
+    /// Wrapper for IntCounter type
+    pub struct SimpleCounter {
+        name: String,
+        ctr: crate::metrics::IntCounter,
     }
 
-    /// Increments the counter by the given number.
-    pub fn increment(&self, by: u64) {
-        self.ctr.inc_by(by)
-    }
-
-    /// Returns the name of the counter given at construction.
-    pub fn name(&self) -> &str {
-        self.name.as_str()
-    }
-}
-
-/// Represents a vector of named monotonic unsigned integer counters.
-/// Wrapper for IntCounterVec type
-pub struct MultiCounter {
-    name: String,
-    labels: Vec<String>,
-    ctr: IntCounterVec,
-}
-
-impl MultiCounter {
-    /// Creates a new vector of integer counters with given name, description and counter labels.
-    pub fn new(name: &str, description: &str, labels: &[&str]) -> Result<Self, String> {
-        register_metric_vec(name, description, labels, IntCounterVec::new).map(|m| Self {
-            name: name.to_string(),
-            labels: Vec::from(labels).iter().map(|s| String::from(*s)).collect(),
-            ctr: m,
-        })
-    }
-
-    /// Increments counter with given labels by the given number.
-    pub fn increment(&self, label_values: &[&str], by: u64) {
-        if let Ok(c) = self.ctr.get_metric_with_label_values(label_values) {
-            c.inc_by(by)
-        }
-    }
-
-    /// Retrieves the value of the specified counter
-    pub fn get(&self, label_values: &[&str]) -> Option<u64> {
-        self.ctr
-            .get_metric_with_label_values(label_values)
-            .map(|c| c.get())
-            .ok()
-    }
-
-    /// Returns the name of the counter vector given at construction.
-    pub fn name(&self) -> &str {
-        self.name.as_str()
-    }
-
-    /// Returns the labels of the counters given at construction.
-    pub fn labels(&self) -> Vec<&str> {
-        self.labels.iter().map(String::as_str).collect()
-    }
-}
-
-/// Represents a simple gauge with floating point values.
-/// Wrapper for Gauge type
-pub struct SimpleGauge {
-    name: String,
-    gg: Gauge,
-}
-
-impl SimpleGauge {
-    /// Creates a new gauge with given name and description.
-    pub fn new(name: &str, description: &str) -> Result<Self, String> {
-        register_metric(name, description, Gauge::with_opts).map(|m| Self {
-            name: name.to_string(),
-            gg: m,
-        })
-    }
-
-    /// Increments the gauge by the given value.
-    pub fn increment(&self, by: f64) {
-        self.gg.add(by)
-    }
-
-    /// Decrements the gauge by the given value.
-    pub fn decrement(&self, by: f64) {
-        self.gg.sub(by)
-    }
-
-    /// Sets the gauge to the given value.
-    pub fn set(&self, value: f64) {
-        self.gg.set(value)
-    }
-
-    /// Retrieves the value of the gauge
-    pub fn get(&self) -> f64 {
-        self.gg.get()
-    }
-
-    /// Returns the name of the gauge given at construction.
-    pub fn name(&self) -> &str {
-        self.name.as_str()
-    }
-}
-
-/// Represents a vector of gauges with floating point values.
-/// Wrapper for GaugeVec type
-pub struct MultiGauge {
-    name: String,
-    labels: Vec<String>,
-    ctr: GaugeVec,
-}
-
-impl MultiGauge {
-    /// Creates a new vector of gauges with given name, description and counter labels.
-    pub fn new(name: &str, description: &str, labels: &[&str]) -> Result<Self, String> {
-        register_metric_vec(name, description, labels, GaugeVec::new).map(|m| Self {
-            name: name.to_string(),
-            labels: Vec::from(labels).iter().map(|s| String::from(*s)).collect(),
-            ctr: m,
-        })
-    }
-
-    /// Increments gauge with given labels by the given number.
-    pub fn increment(&self, label_values: &[&str], by: f64) {
-        if let Ok(c) = self.ctr.get_metric_with_label_values(label_values) {
-            c.add(by)
-        }
-    }
-
-    /// Decrements gauge with given labels by the given number.
-    pub fn decrement(&self, label_values: &[&str], by: f64) {
-        if let Ok(c) = self.ctr.get_metric_with_label_values(label_values) {
-            c.sub(by)
-        }
-    }
-
-    /// Sets gauge with given labels to the given value.
-    pub fn set(&self, label_values: &[&str], value: f64) {
-        if let Ok(c) = self.ctr.get_metric_with_label_values(label_values) {
-            c.set(value)
-        }
-    }
-
-    /// Retrieves the value of the specified counter
-    pub fn get(&self, label_values: &[&str]) -> Option<f64> {
-        self.ctr
-            .get_metric_with_label_values(label_values)
-            .map(|c| c.get())
-            .ok()
-    }
-
-    /// Returns the name of the gauge vector given at construction.
-    pub fn name(&self) -> &str {
-        self.name.as_str()
-    }
-
-    /// Returns the labels of the counters given at construction.
-    pub fn labels(&self) -> Vec<&str> {
-        self.labels.iter().map(String::as_str).collect()
-    }
-}
-
-/// Represents a histogram with floating point values.
-/// Wrapper for Histogram type
-pub struct SimpleHistogram {
-    name: String,
-    hh: Histogram,
-}
-
-/// Represents a timer handle.
-pub struct SimpleTimer {
-    histogram_timer: HistogramTimer,
-}
-
-impl SimpleHistogram {
-    /// Creates a new histogram with the given name, description and buckets.
-    /// If no buckets are specified, they will be defined automatically.
-    /// The +Inf bucket is always added automatically.
-    pub fn new(name: &str, description: &str, buckets: Vec<f64>) -> Result<Self, String> {
-        let mut opts = HistogramOpts::new(name, description);
-        if !buckets.is_empty() {
-            opts = opts.buckets(buckets);
-        }
-
-        let metric = ok_or_str!(Histogram::with_opts(opts))?;
-
-        ok_or_str!(prometheus::register(Box::new(metric.clone())))?;
-
-        Ok(Self {
-            name: name.to_string(),
-            hh: metric,
-        })
-    }
-
-    /// Records a value observation to the histogram.
-    pub fn observe(&self, value: f64) {
-        self.hh.observe(value)
-    }
-
-    /// Starts a timer.
-    #[allow(dead_code)]
-    pub fn start_measure(&self) -> SimpleTimer {
-        SimpleTimer {
-            histogram_timer: self.hh.start_timer(),
-        }
-    }
-
-    /// Stops the given timer and records the elapsed duration in seconds to the histogram.
-    #[allow(dead_code)]
-    pub fn record_measure(&self, timer: SimpleTimer) {
-        timer.histogram_timer.observe_duration()
-    }
-
-    /// Stops the given timer and discards the measured duration in seconds and returns it.
-    #[allow(dead_code)]
-    pub fn cancel_measure(&self, timer: SimpleTimer) -> f64 {
-        timer.histogram_timer.stop_and_discard()
-    }
-
-    /// Get all samples count
-    pub fn get_sample_count(&self) -> u64 {
-        self.hh.get_sample_count()
-    }
-
-    /// Get all samples sum
-    pub fn get_sample_sum(&self) -> f64 {
-        self.hh.get_sample_sum()
-    }
-
-    /// Returns the name of the histogram given at construction.
-    pub fn name(&self) -> &str {
-        self.name.as_str()
-    }
-}
-
-/// Represents a vector of histograms with floating point values.
-/// Wrapper for HistogramVec type
-pub struct MultiHistogram {
-    name: String,
-    labels: Vec<String>,
-    hh: HistogramVec,
-}
-
-impl MultiHistogram {
-    /// Creates a new histogram with the given name, description and buckets.
-    /// If no buckets are specified, they will be defined automatically.
-    /// The +Inf bucket is always added automatically.
-    pub fn new(
-        name: &str,
-        description: &str,
-        buckets: Vec<f64>,
-        labels: &[&str],
-    ) -> Result<Self, String> {
-        let mut opts = HistogramOpts::new(name, description);
-        if !buckets.is_empty() {
-            opts = opts.buckets(buckets);
-        }
-
-        let metric = ok_or_str!(HistogramVec::new(opts, labels))?;
-
-        ok_or_str!(prometheus::register(Box::new(metric.clone())))?;
-
-        Ok(Self {
-            name: name.to_string(),
-            labels: Vec::from(labels).iter().map(|s| String::from(*s)).collect(),
-            hh: metric,
-        })
-    }
-
-    /// Records a value observation to the histogram with the given labels.
-    pub fn observe(&self, label_values: &[&str], value: f64) {
-        if let Ok(c) = self.hh.get_metric_with_label_values(label_values) {
-            c.observe(value)
-        }
-    }
-
-    /// Starts a timer for a histogram with the given labels.
-    #[allow(dead_code)]
-    pub fn start_measure(&self, label_values: &[&str]) -> Result<SimpleTimer, Error> {
-        self.hh
-            .get_metric_with_label_values(label_values)
-            .map(|h| SimpleTimer {
-                histogram_timer: h.start_timer(),
+    impl SimpleCounter {
+        /// Creates a new integer counter with given name and description
+        pub fn new(name: &str, description: &str) -> Result<Self, String> {
+            crate::metrics::register_metric(name, description,crate::metrics::IntCounter::with_opts).map(|m| Self {
+                name: name.to_string(),
+                ctr: m,
             })
+        }
+
+        /// Retrieves the value of the counter
+        pub fn get(&self) -> u64 {
+            self.ctr.get()
+        }
+
+        /// Increments the counter by the given number.
+        pub fn increment(&self, by: u64) {
+            self.ctr.inc_by(by)
+        }
+
+        /// Returns the name of the counter given at construction.
+        pub fn name(&self) -> &str {
+            self.name.as_str()
+        }
     }
 
-    /// Stops the given timer and records the elapsed duration in seconds to the histogram.
-    #[allow(dead_code)]
-    pub fn record_measure(&self, timer: SimpleTimer) {
-        timer.histogram_timer.observe_duration()
+
+    /// Represents a vector of named monotonic unsigned integer counters.
+    /// Wrapper for IntCounterVec type
+    pub struct MultiCounter {
+        name: String,
+        labels: Vec<String>,
+        ctr: crate::metrics::IntCounterVec,
     }
 
-    /// Stops the given timer and discards the measured duration in seconds and returns it.
-    #[allow(dead_code)]
-    pub fn cancel_measure(&self, timer: SimpleTimer) -> f64 {
-        timer.histogram_timer.stop_and_discard()
+    impl MultiCounter {
+        /// Creates a new vector of integer counters with given name, description and counter labels.
+        pub fn new(name: &str, description: &str, labels: &[&str]) -> Result<Self, String> {
+            crate::metrics::register_metric_vec(name, description, labels, crate::metrics::IntCounterVec::new).map(|m| Self {
+                name: name.to_string(),
+                labels: Vec::from(labels).iter().map(|s| String::from(*s)).collect(),
+                ctr: m,
+            })
+        }
+
+        /// Increments counter with given labels by the given number.
+        pub fn increment(&self, label_values: &[&str], by: u64) {
+            if let Ok(c) = self.ctr.get_metric_with_label_values(label_values) {
+                c.inc_by(by)
+            }
+        }
+
+        /// Retrieves the value of the specified counter
+        pub fn get(&self, label_values: &[&str]) -> Option<u64> {
+            self.ctr
+                .get_metric_with_label_values(label_values)
+                .map(|c| c.get())
+                .ok()
+        }
+
+        /// Returns the name of the counter vector given at construction.
+        pub fn name(&self) -> &str {
+            self.name.as_str()
+        }
+
+        /// Returns the labels of the counters given at construction.
+        pub fn labels(&self) -> Vec<&str> {
+            self.labels.iter().map(String::as_str).collect()
+        }
     }
 
-    /// Get all samples count with given labels
-    pub fn get_sample_count(&self, label_values: &[&str]) -> Option<u64> {
-        self.hh
-            .get_metric_with_label_values(label_values)
-            .map(|c| c.get_sample_count())
-            .ok()
+    /// Represents a simple gauge with floating point values.
+    /// Wrapper for Gauge type
+    pub struct SimpleGauge {
+        name: String,
+        gg: crate::metrics::Gauge,
     }
 
-    /// Get all samples sum with given labels
-    pub fn get_sample_sum(&self, label_values: &[&str]) -> Option<f64> {
-        self.hh
-            .get_metric_with_label_values(label_values)
-            .map(|c| c.get_sample_sum())
-            .ok()
+    impl SimpleGauge {
+        /// Creates a new gauge with given name and description.
+        pub fn new(name: &str, description: &str) -> Result<Self, String> {
+            crate::metrics::register_metric(name, description, crate::metrics::Gauge::with_opts).map(|m| Self {
+                name: name.to_string(),
+                gg: m,
+            })
+        }
+
+        /// Increments the gauge by the given value.
+        pub fn increment(&self, by: f64) {
+            self.gg.add(by)
+        }
+
+        /// Decrements the gauge by the given value.
+        pub fn decrement(&self, by: f64) {
+            self.gg.sub(by)
+        }
+
+        /// Sets the gauge to the given value.
+        pub fn set(&self, value: f64) {
+            self.gg.set(value)
+        }
+
+        /// Retrieves the value of the gauge
+        pub fn get(&self) -> f64 {
+            self.gg.get()
+        }
+
+        /// Returns the name of the gauge given at construction.
+        pub fn name(&self) -> &str {
+            self.name.as_str()
+        }
     }
 
-    /// Returns the name of the histogram given at construction.
-    pub fn name(&self) -> &str {
-        self.name.as_str()
+
+    /// Represents a vector of gauges with floating point values.
+    /// Wrapper for GaugeVec type
+    pub struct MultiGauge {
+        name: String,
+        labels: Vec<String>,
+        ctr: crate::metrics::GaugeVec,
     }
 
-    /// Returns the labels of the histogram given at construction.
-    pub fn labels(&self) -> Vec<&str> {
-        self.labels.iter().map(String::as_str).collect()
+    impl MultiGauge {
+        /// Creates a new vector of gauges with given name, description and counter labels.
+        pub fn new(name: &str, description: &str, labels: &[&str]) -> Result<Self, String> {
+            crate::metrics::register_metric_vec(name, description, labels, crate::metrics::GaugeVec::new).map(|m| Self {
+                name: name.to_string(),
+                labels: Vec::from(labels).iter().map(|s| String::from(*s)).collect(),
+                ctr: m,
+            })
+        }
+
+        /// Increments gauge with given labels by the given number.
+        pub fn increment(&self, label_values: &[&str], by: f64) {
+            if let Ok(c) = self.ctr.get_metric_with_label_values(label_values) {
+                c.add(by)
+            }
+        }
+
+        /// Decrements gauge with given labels by the given number.
+        pub fn decrement(&self, label_values: &[&str], by: f64) {
+            if let Ok(c) = self.ctr.get_metric_with_label_values(label_values) {
+                c.sub(by)
+            }
+        }
+
+        /// Sets gauge with given labels to the given value.
+        pub fn set(&self, label_values: &[&str], value: f64) {
+            if let Ok(c) = self.ctr.get_metric_with_label_values(label_values) {
+                c.set(value)
+            }
+        }
+
+        /// Retrieves the value of the specified counter
+        pub fn get(&self, label_values: &[&str]) -> Option<f64> {
+            self.ctr
+                .get_metric_with_label_values(label_values)
+                .map(|c| c.get())
+                .ok()
+        }
+
+        /// Returns the name of the gauge vector given at construction.
+        pub fn name(&self) -> &str {
+            self.name.as_str()
+        }
+
+        /// Returns the labels of the counters given at construction.
+        pub fn labels(&self) -> Vec<&str> {
+            self.labels.iter().map(String::as_str).collect()
+        }
     }
-}
 
-/// Gathers all the global Prometheus metrics.
-pub fn gather_all_metrics() -> Result<String, String> {
-    // Simply gather all global metric families
-    let metric_families = prometheus::gather();
 
-    // ... and encode them
-    let encoder = TextEncoder::new();
-    ok_or_str!(encoder.encode_to_string(&metric_families))
+    /// Represents a histogram with floating point values.
+    /// Wrapper for Histogram type
+    pub struct SimpleHistogram {
+        name: String,
+        hh: crate::metrics::Histogram,
+    }
+
+    impl SimpleHistogram {
+        /// Creates a new histogram with the given name, description and buckets.
+        /// If no buckets are specified, they will be defined automatically.
+        /// The +Inf bucket is always added automatically.
+        pub fn new(name: &str, description: &str, buckets: Vec<f64>) -> Result<Self, String> {
+            let mut opts = crate::metrics::HistogramOpts::new(name, description);
+            if !buckets.is_empty() {
+                opts = opts.buckets(buckets);
+            }
+
+            let metric = crate::metrics::ok_or_str!(crate::metrics::Histogram::with_opts(opts))?;
+
+            crate::metrics::ok_or_str!(prometheus::register(Box::new(metric.clone())))?;
+
+            Ok(Self {
+                name: name.to_string(),
+                hh: metric,
+            })
+        }
+
+        /// Records a value observation to the histogram.
+        pub fn observe(&self, value: f64) {
+            self.hh.observe(value)
+        }
+
+        /// Starts a timer.
+        #[allow(dead_code)]
+        pub fn start_measure(&self) -> SimpleTimer {
+            SimpleTimer {
+                histogram_timer: self.hh.start_timer(),
+            }
+        }
+
+        /// Stops the given timer and records the elapsed duration in seconds to the histogram.
+        #[allow(dead_code)]
+        pub fn record_measure(&self, timer: SimpleTimer) {
+            timer.histogram_timer.observe_duration()
+        }
+
+        /// Stops the given timer and discards the measured duration in seconds and returns it.
+        #[allow(dead_code)]
+        pub fn cancel_measure(&self, timer: SimpleTimer) -> f64 {
+            timer.histogram_timer.stop_and_discard()
+        }
+
+        /// Get all samples count
+        pub fn get_sample_count(&self) -> u64 {
+            self.hh.get_sample_count()
+        }
+
+        /// Get all samples sum
+        pub fn get_sample_sum(&self) -> f64 {
+            self.hh.get_sample_sum()
+        }
+
+        /// Returns the name of the histogram given at construction.
+        pub fn name(&self) -> &str {
+            self.name.as_str()
+        }
+    }
+
+    /// Represents a vector of histograms with floating point values.
+    /// Wrapper for HistogramVec type
+    pub struct MultiHistogram {
+        name: String,
+        labels: Vec<String>,
+        hh: crate::metrics::HistogramVec,
+    }
+
+    impl MultiHistogram {
+        /// Creates a new histogram with the given name, description and buckets.
+        /// If no buckets are specified, they will be defined automatically.
+        /// The +Inf bucket is always added automatically.
+        pub fn new(
+            name: &str,
+            description: &str,
+            buckets: Vec<f64>,
+            labels: &[&str],
+        ) -> Result<Self, String> {
+            let mut opts = crate::metrics::HistogramOpts::new(name, description);
+            if !buckets.is_empty() {
+                opts = opts.buckets(buckets);
+            }
+
+            let metric = crate::metrics::ok_or_str!(crate::metrics::HistogramVec::new(opts, labels))?;
+
+            crate::metrics::ok_or_str!(prometheus::register(Box::new(metric.clone())))?;
+
+            Ok(Self {
+                name: name.to_string(),
+                labels: Vec::from(labels).iter().map(|s| String::from(*s)).collect(),
+                hh: metric,
+            })
+        }
+
+        /// Records a value observation to the histogram with the given labels.
+        pub fn observe(&self, label_values: &[&str], value: f64) {
+            if let Ok(c) = self.hh.get_metric_with_label_values(label_values) {
+                c.observe(value)
+            }
+        }
+
+        /// Starts a timer for a histogram with the given labels.
+        #[allow(dead_code)]
+        pub fn start_measure(&self, label_values: &[&str]) -> Result<SimpleTimer, crate::metrics::Error> {
+            self.hh
+                .get_metric_with_label_values(label_values)
+                .map(|h| SimpleTimer {
+                    histogram_timer: h.start_timer(),
+                })
+        }
+
+        /// Stops the given timer and records the elapsed duration in seconds to the histogram.
+        #[allow(dead_code)]
+        pub fn record_measure(&self, timer: SimpleTimer) {
+            timer.histogram_timer.observe_duration()
+        }
+
+        /// Stops the given timer and discards the measured duration in seconds and returns it.
+        #[allow(dead_code)]
+        pub fn cancel_measure(&self, timer: SimpleTimer) -> f64 {
+            timer.histogram_timer.stop_and_discard()
+        }
+
+        /// Get all samples count with given labels
+        pub fn get_sample_count(&self, label_values: &[&str]) -> Option<u64> {
+            self.hh
+                .get_metric_with_label_values(label_values)
+                .map(|c| c.get_sample_count())
+                .ok()
+        }
+
+        /// Get all samples sum with given labels
+        pub fn get_sample_sum(&self, label_values: &[&str]) -> Option<f64> {
+            self.hh
+                .get_metric_with_label_values(label_values)
+                .map(|c| c.get_sample_sum())
+                .ok()
+        }
+
+        /// Returns the name of the histogram given at construction.
+        pub fn name(&self) -> &str {
+            self.name.as_str()
+        }
+
+        /// Returns the labels of the histogram given at construction.
+        pub fn labels(&self) -> Vec<&str> {
+            self.labels.iter().map(String::as_str).collect()
+        }
+    }
 }
 
 #[cfg(test)]
@@ -541,12 +578,12 @@ pub mod wasm {
 
     #[wasm_bindgen]
     pub struct SimpleCounter {
-        w: super::SimpleCounter,
+        w: super::native::SimpleCounter,
     }
 
     #[wasm_bindgen]
     pub fn create_counter(name: &str, description: &str) -> Result<SimpleCounter, JsValue> {
-        ok_or_jserr!(super::SimpleCounter::new(name, description).map(|c| SimpleCounter { w: c }))
+        ok_or_jserr!(super::native::SimpleCounter::new(name, description).map(|c| SimpleCounter { w: c }))
     }
 
     #[wasm_bindgen]
@@ -572,7 +609,7 @@ pub mod wasm {
 
     #[wasm_bindgen]
     pub struct MultiCounter {
-        w: super::MultiCounter,
+        w: super::native::MultiCounter,
     }
 
     #[wasm_bindgen]
@@ -582,7 +619,7 @@ pub mod wasm {
         labels: Vec<JsString>,
     ) -> Result<MultiCounter, JsValue> {
         convert_from_jstrvec!(labels, bind);
-        ok_or_jserr!(super::MultiCounter::new(name, description, bind.as_slice())
+        ok_or_jserr!(super::native::MultiCounter::new(name, description, bind.as_slice())
             .map(|c| MultiCounter { w: c }))
     }
 
@@ -610,7 +647,7 @@ pub mod wasm {
         }
 
         pub fn labels(&self) -> Vec<JsString> {
-            convert_to_jstrvec!(self.w.labels)
+            convert_to_jstrvec!(self.w.labels())
         }
     }
 
@@ -618,12 +655,12 @@ pub mod wasm {
 
     #[wasm_bindgen]
     pub struct SimpleGauge {
-        w: super::SimpleGauge,
+        w: super::native::SimpleGauge,
     }
 
     #[wasm_bindgen]
     pub fn create_gauge(name: &str, description: &str) -> Result<SimpleGauge, JsValue> {
-        ok_or_jserr!(super::SimpleGauge::new(name, description).map(|c| SimpleGauge { w: c }))
+        ok_or_jserr!(super::native::SimpleGauge::new(name, description).map(|c| SimpleGauge { w: c }))
     }
 
     #[wasm_bindgen]
@@ -661,7 +698,7 @@ pub mod wasm {
 
     #[wasm_bindgen]
     pub struct MultiGauge {
-        w: super::MultiGauge,
+        w: super::native::MultiGauge,
     }
 
     #[wasm_bindgen]
@@ -672,7 +709,7 @@ pub mod wasm {
     ) -> Result<MultiGauge, JsValue> {
         convert_from_jstrvec!(labels, bind);
         ok_or_jserr!(
-            super::MultiGauge::new(name, description, bind.as_slice()).map(|c| MultiGauge { w: c })
+            super::native::MultiGauge::new(name, description, bind.as_slice()).map(|c| MultiGauge { w: c })
         )
     }
 
@@ -715,7 +752,7 @@ pub mod wasm {
         }
 
         pub fn labels(&self) -> Vec<JsString> {
-            convert_to_jstrvec!(self.w.labels)
+            convert_to_jstrvec!(self.w.labels())
         }
     }
 
@@ -723,7 +760,7 @@ pub mod wasm {
 
     #[wasm_bindgen]
     pub struct SimpleHistogram {
-        w: super::SimpleHistogram,
+        w: super::native::SimpleHistogram,
     }
 
     #[wasm_bindgen]
@@ -738,7 +775,7 @@ pub mod wasm {
         buckets: &[f64],
     ) -> Result<SimpleHistogram, JsValue> {
         ok_or_jserr!(
-            super::SimpleHistogram::new(name, description, buckets.into())
+            super::native::SimpleHistogram::new(name, description, buckets.into())
                 .map(|c| SimpleHistogram { w: c })
         )
     }
@@ -806,7 +843,7 @@ pub mod wasm {
 
     #[wasm_bindgen]
     pub struct MultiHistogram {
-        w: super::MultiHistogram,
+        w: super::native::MultiHistogram,
     }
 
     #[wasm_bindgen]
@@ -827,7 +864,7 @@ pub mod wasm {
     ) -> Result<MultiHistogram, JsValue> {
         convert_from_jstrvec!(labels, bind);
         ok_or_jserr!(
-            super::MultiHistogram::new(name, description, buckets.into(), bind.as_slice())
+            super::native::MultiHistogram::new(name, description, buckets.into(), bind.as_slice())
                 .map(|c| MultiHistogram { w: c })
         )
     }
@@ -871,7 +908,7 @@ pub mod wasm {
         }
 
         pub fn labels(&self) -> Vec<JsString> {
-            convert_to_jstrvec!(self.w.labels)
+            convert_to_jstrvec!(self.w.labels())
         }
     }
 
