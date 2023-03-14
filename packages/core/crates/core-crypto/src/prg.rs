@@ -1,11 +1,12 @@
 use aes::cipher::{KeyIvInit, StreamCipher};
 use crate::derivation::generate_key_iv;
 use crate::errors::Result;
-use crate::errors::CryptoError::{InvalidInputValue, InvalidParameterSize};
+use crate::errors::CryptoError::InvalidInputValue;
 use crate::parameters::{AES_BLOCK_SIZE, HASH_KEY_PRG, PRG_IV_LENGTH, PRG_KEY_LENGTH};
 
 type Aes128Ctr32BE = ctr::Ctr32BE<aes::Aes128>;
 
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct PRGParameters {
     key: [u8; PRG_KEY_LENGTH],
     iv: [u8; PRG_IV_LENGTH]
@@ -20,27 +21,38 @@ impl Default for PRGParameters {
     }
 }
 
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl PRGParameters {
-    pub fn new(secret: &[u8]) -> Result<Self> {
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
+    pub fn new(secret: &[u8]) -> Self {
         let mut ret = PRGParameters::default();
-        generate_key_iv(secret, HASH_KEY_PRG.as_bytes(), &mut ret.key, &mut ret.iv, true)?;
-        Ok(ret)
+        generate_key_iv(secret, HASH_KEY_PRG.as_bytes(), &mut ret.key, &mut ret.iv, true)
+            .expect("invalid secret given");
+        ret
     }
 }
 
+impl PRGParameters {
+    pub fn key(&self) ->&[u8] {
+        &self.key
+    }
+
+    pub fn iv(&self) -> &[u8] {
+        &self.iv
+    }
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct PRG {
     params: PRGParameters
 }
 
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl PRG {
-    pub fn new(key: &[u8], iv: &[u8]) -> Result<Self> {
-        if key.len() != PRG_KEY_LENGTH {
-            return Err(InvalidParameterSize { name: "key".into(), expected: PRG_KEY_LENGTH})
-        }
-
-        if iv.len() != PRG_IV_LENGTH {
-            return Err(InvalidParameterSize { name: "iv".into(), expected: PRG_IV_LENGTH})
-        }
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
+    pub fn new(key: &[u8], iv: &[u8]) -> Self {
+        assert_eq!(key.len(), PRG_KEY_LENGTH, "invalid key size");
+        assert_eq!(iv.len(), PRG_IV_LENGTH, "invalid iv size");
 
         let mut ret = Self {
             params: PRGParameters::default()
@@ -49,13 +61,15 @@ impl PRG {
         ret.params.key.copy_from_slice(key);
         ret.params.iv.copy_from_slice(iv);
 
-        Ok(ret)
+        ret
     }
 
     pub fn from_parameters(params: PRGParameters) -> Self {
-        Self::new(&params.key, &params.iv).unwrap() // Correct sizing taken care of by PRGParameters
+        Self::new(&params.key, &params.iv) // Correct sizing taken care of by PRGParameters
     }
+}
 
+impl PRG {
     pub fn digest(&self, from: usize, to: usize) -> Result<Box<[u8]>> {
         if from >= to {
             return Err(InvalidInputValue)
@@ -101,7 +115,6 @@ mod tests {
         let iv = [0u8; 12];
 
         let out = PRG::new(&key, &iv)
-            .unwrap()
             .digest(5,10)
             .unwrap();
 
@@ -114,7 +127,6 @@ mod tests {
         let iv = [0u8; 12];
 
         let out = PRG::new(&key, &iv)
-            .unwrap()
             .digest(0,AES_BLOCK_SIZE * 2)
             .unwrap();
 
@@ -127,7 +139,6 @@ mod tests {
         let iv = [0u8; 12];
 
         let out = PRG::new(&key, &iv)
-            .unwrap()
             .digest(5,AES_KEY_SIZE * 2 + 10)
             .unwrap();
 
@@ -148,52 +159,20 @@ mod tests {
 }
 
 #[cfg(feature = "wasm")]
-pub mod wasm {
+mod wasm {
     use wasm_bindgen::prelude::wasm_bindgen;
-    use utils_misc::utils::wasm::JsResult;
-    use utils_misc::ok_or_jserr;
-
-    #[wasm_bindgen]
-    pub struct PRGParameters {
-        w: super::PRGParameters
-    }
+    use crate::prg::PRGParameters;
 
     #[wasm_bindgen]
     impl PRGParameters {
-
-        #[wasm_bindgen(constructor)]
-        pub fn new(secret: &[u8]) -> JsResult<PRGParameters> {
-            Ok(Self {
-                w: ok_or_jserr!(super::PRGParameters::new(secret))?
-            })
+        #[wasm_bindgen(js_name = "key")]
+        pub fn key_box(&self) -> Box<[u8]> {
+            self.key.into()
         }
 
-        pub fn key(&self) -> Box<[u8]> {
-            self.w.key.into()
-        }
-
-        pub fn iv(&self) -> Box<[u8]> {
-            self.w.iv.into()
+        #[wasm_bindgen(js_name = "iv")]
+        pub fn iv_box(&self) -> Box<[u8]> {
+            self.iv.into()
         }
     }
-
-    #[wasm_bindgen]
-    pub struct PRG {
-        w: super::PRG
-    }
-
-    #[wasm_bindgen]
-    impl PRG {
-        #[wasm_bindgen(constructor)]
-        pub fn new(params: PRGParameters) -> PRG {
-            Self {
-                w: super::PRG::from_parameters(params.w)
-            }
-        }
-
-        pub fn digest(&self, from: usize, to: usize) -> JsResult<Box<[u8]>> {
-            ok_or_jserr!(self.w.digest(from, to))
-        }
-    }
-
 }

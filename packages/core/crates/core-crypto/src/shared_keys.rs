@@ -61,9 +61,10 @@ fn to_checked_secret_scalar(secret_scalar: KeyBytes) -> Result<NonZeroScalar> {
 
 /// Structure containing shared keys for peers.
 /// The members are exposed only using specialized methods.
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct SharedKeys {
-    pub alpha: Vec<u8>,
-    pub secrets: Vec<Vec<u8>>
+    alpha: Vec<u8>,
+    secrets: Vec<Vec<u8>>
 }
 
 impl SharedKeys {
@@ -232,25 +233,21 @@ pub mod wasm {
     use js_sys::Uint8Array;
     use utils_misc::utils::wasm::JsResult;
     use utils_misc::ok_or_jserr;
-
-    #[wasm_bindgen]
-    pub struct SharedKeys {
-        w: super::SharedKeys
-    }
+    use crate::shared_keys::SharedKeys;
 
     #[wasm_bindgen]
     impl SharedKeys {
         /// Get the `alpha` value of the derived shared secrets.
         pub fn get_alpha(&self) -> Uint8Array {
-            self.w.alpha.as_slice().into()
+            self.alpha.as_slice().into()
         }
 
         /// Gets the shared secret of the peer on the given index.
         /// The indices are assigned in the same order as they were given to the
         /// [`generate`] function.
         pub fn get_peer_shared_key(&self, peer_idx: usize) -> Option<Uint8Array> {
-            if peer_idx < self.w.secrets.len() {
-                Some(self.w.secrets[peer_idx].as_slice().into())
+            if peer_idx < self.secrets.len() {
+                Some(self.secrets[peer_idx].as_slice().into())
             }
             else {
                 None
@@ -259,18 +256,18 @@ pub mod wasm {
 
         /// Returns the number of shared keys generated in this structure.
         pub fn count_shared_keys(&self) -> usize {
-            self.w.secrets.len()
+            self.secrets.len()
         }
 
-        pub fn forward_transform(alpha: &[u8], public_key: &[u8], private_key: &[u8]) -> JsResult<SharedKeys> {
-            ok_or_jserr!(super::SharedKeys::forward_transform(alpha, public_key, private_key)
-                .map(|m| SharedKeys { w: m}))
+        #[wasm_bindgen(js_name = "forward_transform")]
+        pub fn shared_keys_forward_transform(alpha: &[u8], public_key: &[u8], private_key: &[u8]) -> JsResult<SharedKeys> {
+            ok_or_jserr!(super::SharedKeys::forward_transform(alpha, public_key, private_key))
         }
 
         /// Generate shared keys given the peer public keys
-        pub fn generate(peer_public_keys: Vec<Uint8Array>) -> JsResult<SharedKeys> {
-            ok_or_jserr!(super::SharedKeys::generate(&mut OsRng, peer_public_keys.iter().map(|v| v.to_vec().into_boxed_slice()).collect())
-                .map(|m| SharedKeys { w: m}))
+        #[wasm_bindgen(js_name = "generate")]
+        pub fn shared_keys_generate(peer_public_keys: Vec<Uint8Array>) -> JsResult<SharedKeys> {
+            ok_or_jserr!(super::SharedKeys::generate(&mut OsRng, peer_public_keys.iter().map(|v| v.to_vec().into_boxed_slice()).collect()))
         }
     }
 }

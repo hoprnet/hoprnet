@@ -1,10 +1,11 @@
 use crate::derivation::generate_key_iv;
 use crate::errors::Result;
-use crate::errors::CryptoError::{InvalidInputValue, InvalidParameterSize};
+use crate::errors::CryptoError::InvalidInputValue;
 
 use crate::parameters::{HASH_KEY_PRP, PRP_INTERMEDIATE_IV_LENGTH, PRP_INTERMEDIATE_KEY_LENGTH, PRP_IV_LENGTH, PRP_KEY_LENGTH, PRP_MIN_LENGTH};
 use crate::primitives::{calculate_mac, SimpleStreamCipher};
 
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct PRPParameters {
     key: [u8; PRP_KEY_LENGTH],
     iv: [u8; PRP_IV_LENGTH]
@@ -19,34 +20,33 @@ impl Default for PRPParameters {
     }
 }
 
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl PRPParameters {
-    pub fn new(secret: &[u8]) -> Result<Self> {
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
+    pub fn new(secret: &[u8]) -> Self {
         let mut ret = PRPParameters::default();
-        generate_key_iv(secret, HASH_KEY_PRP.as_bytes(), &mut ret.key, &mut ret.iv, false)?;
-        Ok(ret)
+        generate_key_iv(secret, HASH_KEY_PRP.as_bytes(), &mut ret.key, &mut ret.iv, false)
+            .expect("invalid secret given");
+        ret
     }
 }
 
 /// Implementation of Pseudo-Random Permutation (PRP).
 /// Currently based on Lioness wide-block cipher
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct PRP {
     keys: [Vec<u8>; 4],
     ivs: [Vec<u8>; 4]
 }
 
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl PRP {
-
     /// Creates new instance of the PRP
-    pub fn new(key: &[u8], iv: &[u8]) -> Result<Self> {
-        if key.len() != PRP_KEY_LENGTH {
-            return Err(InvalidParameterSize{name: "key".into(), expected: PRP_KEY_LENGTH})
-        }
+    pub fn new(key: &[u8], iv: &[u8]) -> Self {
+        assert_eq!(key.len(), PRP_KEY_LENGTH, "invalid key length");
+        assert_eq!(iv.len(), PRP_IV_LENGTH, "invalid iv length");
 
-        if iv.len() != PRP_IV_LENGTH {
-            return Err(InvalidParameterSize{name: "iv".into(), expected: PRP_IV_LENGTH})
-        }
-
-        Ok(Self {
+        Self {
             keys: [
                 key[0* PRP_INTERMEDIATE_KEY_LENGTH..1* PRP_INTERMEDIATE_KEY_LENGTH].to_vec(),
                 key[1* PRP_INTERMEDIATE_KEY_LENGTH..2* PRP_INTERMEDIATE_KEY_LENGTH].to_vec(),
@@ -59,13 +59,16 @@ impl PRP {
                 iv[2* PRP_INTERMEDIATE_IV_LENGTH..3* PRP_INTERMEDIATE_IV_LENGTH].to_vec(),
                 iv[3* PRP_INTERMEDIATE_IV_LENGTH..4* PRP_INTERMEDIATE_IV_LENGTH].to_vec()
             ]
-        })
+        }
     }
 
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn from_parameters(params: PRPParameters) -> Self {
-        Self::new(&params.key, &params.iv).unwrap() // Parameter size checking taken care of by PRPParameters
+        Self::new(&params.key, &params.iv) // Parameter size checking taken care of by PRPParameters
     }
+}
 
+impl PRP {
     /// Applies forward permutation on the given plaintext and returns a new buffer
     /// containing the result.
     pub fn forward(&self, plaintext: &[u8]) -> Result<Box<[u8]>> {
@@ -241,57 +244,18 @@ pub mod wasm {
     use wasm_bindgen::prelude::wasm_bindgen;
     use utils_misc::utils::wasm::JsResult;
     use utils_misc::ok_or_jserr;
-
-    #[wasm_bindgen]
-    pub struct PRPParameters {
-        w: super::PRPParameters
-    }
-
-    #[wasm_bindgen]
-    impl PRPParameters {
-        #[wasm_bindgen(constructor)]
-        pub fn new(secret: &[u8]) -> JsResult<PRPParameters> {
-            Ok(Self {
-                w: ok_or_jserr!(super::PRPParameters::new(secret))?
-            })
-        }
-
-        pub fn key(&self) -> Box<[u8]> {
-            self.w.key.into()
-        }
-
-        pub fn iv(&self) -> Box<[u8]> {
-            self.w.iv.into()
-        }
-    }
-
-    #[wasm_bindgen]
-    pub struct PRP {
-        w: super::PRP
-    }
+    use crate::prp::PRP;
 
     #[wasm_bindgen]
     impl PRP {
-
-        #[wasm_bindgen(constructor)]
-        pub fn new(params: PRPParameters) -> PRP {
-            Self {
-                w: super::PRP::from_parameters(params.w)
-            }
+        #[wasm_bindgen(js_name = "forward")]
+        pub fn prp_forward(&self, plaintext: &[u8]) -> JsResult<Box<[u8]>> {
+            ok_or_jserr!(self.forward(plaintext))
         }
 
-        pub fn create(key: &[u8], iv: &[u8]) -> JsResult<PRP> {
-            Ok(Self {
-                w: ok_or_jserr!(super::PRP::new(key, iv))?
-            })
-        }
-
-        pub fn forward(&self, plaintext: &[u8]) -> JsResult<Box<[u8]>> {
-            ok_or_jserr!(self.w.forward(plaintext))
-        }
-
-        pub fn inverse(&self, ciphertext: &[u8]) -> JsResult<Box<[u8]>> {
-            ok_or_jserr!(self.w.inverse(ciphertext))
+        #[wasm_bindgen(js_name = "inverse")]
+        pub fn prp_inverse(&self, ciphertext: &[u8]) -> JsResult<Box<[u8]>> {
+            ok_or_jserr!(self.inverse(ciphertext))
         }
     }
 }

@@ -48,7 +48,6 @@ pub fn iterate_hash(seed: &[u8], iterations: usize, step_size: usize) -> Result<
     })
 }
 
-
 pub fn recover_iterated_hash<H>(hash_value: &[u8], hints: H, max_iterations: usize, step_size: usize, index_hint: Option<usize>) -> Result<Intermediate>
     where H: Fn(usize) -> Option<Box<[u8]>>
 {
