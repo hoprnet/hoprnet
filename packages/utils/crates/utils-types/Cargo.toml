@@ -17,7 +17,6 @@ enum-iterator = "1.4.0"
 ethnum = { version = "1.3.2", features = ["serde"] }
 hex = "0.4.3"
 js-sys = { version = "0.3", optional = true}
-lazy_static = "1.4"
 serde = "1.0"
 serde_repr = "0.1"
 thiserror = "1.0"
@@ -27,8 +26,8 @@ proc-macro-crate = "1.3.0"
 
 # TODO: Remove these and replace with core-crypto once merged
 getrandom = { version = "0.2.8", features = ["js"] }
-k256 = { version = "0.12.0", features = ["ecdsa-core"] }
-libp2p-core = { version = "0.38.0", features = ["secp256k1"] }
+k256 = { version = "0.13.0", features = ["ecdsa-core"] }
+libp2p-core = { version = "0.39.1", features = ["secp256k1"] }
 sha3 = "0.10.6"
 
 console_error_panic_hook = { version = "0.1.7", optional = true }
