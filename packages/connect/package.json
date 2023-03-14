@@ -79,7 +79,7 @@
   },
   "mocha": {
     "spec": [
-      "lib/wasm.spec.js"
+      "lib/relay/context.spec.js"
     ]
   },
   "publishConfig": {
