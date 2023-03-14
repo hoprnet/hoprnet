@@ -53,10 +53,6 @@ impl CurvePoint {
         let hash = Hash::create(&[&self.uncompressed[1..]]).serialize();
         Address::new(&hash[12..])
     }
-
-    pub fn eq(&self, other: &CurvePoint) -> bool {
-        self.uncompressed.eq(&other.uncompressed)
-    }
 }
 
 impl FromStr for CurvePoint {
@@ -541,7 +537,6 @@ impl Signature {
     pub fn raw_signature(&self) -> Box<[u8]> {
         self.signature.into()
     }
-
 }
 
 impl BinarySerializable for Signature {
@@ -743,7 +738,6 @@ pub mod tests {
         let hash2 = Hash::deserialize(&hash1.serialize()).unwrap();
         assert_eq!(hash1, hash2, "failed to match deserialized hash");
     }
-
 }
 
 #[cfg(feature = "wasm")]
@@ -793,6 +787,11 @@ pub mod wasm {
         #[wasm_bindgen(js_name = "serialize")]
         pub fn _serialize(&self) -> Box<[u8]> {
             self.serialize()
+        }
+
+        #[wasm_bindgen(js_name = "eq")]
+        pub fn _eq(&self, other: &CurvePoint) -> bool {
+            self.eq(&other)
         }
 
         pub fn size() -> u32 { Self::SIZE as u32 }
