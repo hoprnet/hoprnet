@@ -26,7 +26,7 @@ pub const DEFAULT_HOST: &str = "0.0.0.0";
 pub const DEFAULT_PORT: u16 = 9091;
 
 // use specifically ipv4 localhost so that there is no DNS lookup
-pub const DEFAULT_HEALTH_CHECK_HOST: &str = "localhost";
+pub const DEFAULT_HEALTH_CHECK_HOST: &str = "127.0.0.1";
 pub const DEFAULT_HEALTH_CHECK_PORT: u16 = 8080;
 
 pub const MINIMAL_API_TOKEN_LENGTH: usize = 8;
