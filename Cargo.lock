@@ -6191,6 +6191,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "utils-log"
+version = "0.1.0"
+dependencies = [
+ "console_error_panic_hook",
+ "js-sys",
+ "log",
+ "wasm-bindgen",
+ "wasm-bindgen-test",
+ "wasm-opt",
+ "wasm-pack",
+]
+
+[[package]]
 name = "utils-metrics"
 version = "1.0.0"
 dependencies = [
