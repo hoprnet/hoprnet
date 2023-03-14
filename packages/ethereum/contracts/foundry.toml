@@ -14,7 +14,7 @@ build_info = true
 build_info_path = "build-info"
 
 [rpc_endpoints]
-local = "http://localhost:8545"
+local = "http://127.0.0.1:8545"
 gnosis = "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet"
 
 [etherscan]
@@ -22,7 +22,7 @@ gnosis = { key = "${ETHERSCAN_API_KEY}", url = "https://api.gnosisscan.io" }
 
 # testing and local network
 [profile.development]
-eth_rpc_url = "http://localhost:8545" # cannot directly use profile.default.rpc_endpoints.local
+eth_rpc_url = "http://127.0.0.1:8545" # cannot directly use profile.default.rpc_endpoints.local
 
 # staging environment
 [profile.staging]

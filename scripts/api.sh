@@ -14,7 +14,7 @@ declare HOPR_LOG_ID="api"
 source "${mydir}/../scripts/utils.sh"
 
 # Call API endpoint and assert response or status code
-# $1 = source api url (http://localhost:13001)
+# $1 = source api url (http://127.0.0.1:13001)
 # $2 = api_endpoint (/channels)
 # $3 = rest method for cURL (GET,POST...)
 # $4 = request body as json string
@@ -202,7 +202,7 @@ api_get_tickets_in_channel() {
 # $2 = counterparty peer id
 # $3 = assertion
 api_ping() {
-  local origin=${1:-localhost:3001}
+  local origin=${1:-127.0.0.1:3001}
   local peer_id="${2}"
   local assertion="${3}"
 
@@ -211,7 +211,7 @@ api_ping() {
 
 # $1 = node api endpoint
 api_peers() {
-  local origin=${1:-localhost:3001}
+  local origin=${1:-127.0.0.1:3001}
 
   api_call ${origin} "/node/peers" "GET" "" "" 600
 }
@@ -219,7 +219,7 @@ api_peers() {
 # $1 = node api endpoint
 # $2 = assertion
 api_get_ticket_statistics() {
-  local origin=${1:-localhost:3001}
+  local origin=${1:-127.0.0.1:3001}
   local assertion="${2}"
 
   api_call ${origin} "/tickets/statistics" "GET" "" "${assertion}" 600
@@ -291,7 +291,7 @@ api_open_channel() {
 # validate that node is funded
 api_validate_node_balance_gt0() {
   local balance eth_balance hopr_balance
-  local endpoint=${1:-localhost:3001}
+  local endpoint=${1:-127.0.0.1:3001}
 
   balance=$(api_get_balances ${endpoint})
   eth_balance=$(echo ${balance} | jq -r ".native")

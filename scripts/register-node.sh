@@ -35,8 +35,8 @@ test -z "${ACCOUNT_PRIVKEY:-}" && { msg "Missing ACCOUNT_PRIVKEY"; usage; exit 1
 test -z "${DEV_BANK_PRIVKEY:-}" && { msg "Missing DEV_BANK_PRIVKEY"; usage; exit 1; }
 
 declare account="${1}"
-# node_api defaults to localhost:3001
-declare node_api="${2:-localhost:3001}" 
+# node_api defaults to 127.0.0.1:3001
+declare node_api="${2:-127.0.0.1:3001}"
 
 declare api_token=${HOPRD_API_TOKEN}
 declare account_privkey="${ACCOUNT_PRIVKEY:-}"

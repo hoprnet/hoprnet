@@ -7,7 +7,7 @@ Runs a HOPR Node and the HOPR Admin interface.
 When the Rest API is enabled, the node serves a Swagger UI to inspect and test
 the Rest API v2 at:
 
-http://localhost:3001/api/v2/\_swagger
+http://127.0.0.1:3001/api/v2/\_swagger
 
 NOTE: Hostname and port can be different, since they depend on the settings `--apiHost` and `--apiPort`.
 
@@ -35,17 +35,17 @@ Options:
       --announce
           Run as a Public Relay Node (PRN) [env: HOPRD_ANNOUNCE=]
       --api
-          Expose the API on localhost:3001 [env: HOPRD_API=]
+          Expose the API on 127.0.0.1:3001 [env: HOPRD_API=]
       --apiHost <HOST>
-          Set host IP to which the API server will bind [env: HOPRD_API_HOST=] [default: localhost]
+          Set host IP to which the API server will bind [env: HOPRD_API_HOST=] [default: 127.0.0.1]
       --apiPort <PORT>
           Set port to which the API server will bind [env: HOPRD_API_PORT=] [default: 3001]
       --apiToken <TOKEN>
           A REST API token and for user authentication [env: HOPRD_API_TOKEN=]
       --healthCheck
-          Run a health check end point on localhost:8080 [env: HOPRD_HEALTH_CHECK=]
+          Run a health check end point on 127.0.0.1:8080 [env: HOPRD_HEALTH_CHECK=]
       --healthCheckHost <HOST>
-          Updates the host for the healthcheck server [env: HOPRD_HEALTH_CHECK_HOST=] [default: localhost]
+          Updates the host for the healthcheck server [env: HOPRD_HEALTH_CHECK_HOST=] [default: 127.0.0.1]
       --healthCheckPort <PORT>
           Updates the port for the healthcheck server [env: HOPRD_HEALTH_CHECK_PORT=] [default: 8080]
       --password <PASSWORD>

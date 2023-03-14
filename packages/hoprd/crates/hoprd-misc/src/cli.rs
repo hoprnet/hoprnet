@@ -18,12 +18,14 @@ use utils_misc::ok_or_str;
 use utils_proc_macros::wasm_bindgen_if;
 use hex;
 
-pub const DEFAULT_API_HOST: &str = "localhost";
+// use specifically ipv4 localhost so that there is no DNS lookup
+pub const DEFAULT_API_HOST: &str = "127.0.0.1";
 pub const DEFAULT_API_PORT: u16 = 3001;
 
 pub const DEFAULT_HOST: &str = "0.0.0.0";
 pub const DEFAULT_PORT: u16 = 9091;
 
+// use specifically ipv4 localhost so that there is no DNS lookup
 pub const DEFAULT_HEALTH_CHECK_HOST: &str = "localhost";
 pub const DEFAULT_HEALTH_CHECK_PORT: u16 = 8080;
 

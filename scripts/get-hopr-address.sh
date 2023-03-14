@@ -13,15 +13,15 @@ source "${mydir}/utils.sh"
 
 # $1 = optional: apitoken, defaults to ""
 declare apitoken="${1:-}"
-# $2 = optional: endpoint, defaults to http://localhost:3001
-declare endpoint="${2:-localhost:3001}"
+# $2 = optional: endpoint, defaults to http://127.0.0.1:3001
+declare endpoint="${2:-127.0.0.1:3001}"
 
 if [[ -z "${apitoken}" ]]; then
     msg "No <apitoken> is set"
     exit 1
 fi
 if [[ -z "${endpoint}" ]]; then
-    msg "No <endpoint> is set, use default value localhost:3001"
+    msg "No <endpoint> is set, use default value 127.0.0.1:3001"
 fi
 
 declare url="${apitoken}@${endpoint}/api/v2/account/addresses"

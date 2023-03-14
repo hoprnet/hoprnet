@@ -62,7 +62,7 @@ async function authenticateAndAuthorize(
 
 // The Rest API v2 is uses JSON for input and output, is validated through a
 // Swagger schema which is also accessible for testing at:
-// http://localhost:3001/api/v2/_swagger
+// http://127.0.0.1:3001/api/v2/_swagger
 export async function setupRestApi(
   service: Application,
   urlPath: string,

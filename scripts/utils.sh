@@ -207,18 +207,18 @@ encode_api_token(){
   echo -n "$api_token" | base64 | tr -d \\n
 }
 
-# $1 = optional: endpoint, defaults to http://localhost:3001
+# $1 = optional: endpoint, defaults to http://127.0.0.1:3001
 get_native_address(){
-  local endpoint="${1:-localhost:3001}"
+  local endpoint="${1:-127.0.0.1:3001}"
   local url="${endpoint}/api/v2/account/addresses"
   local cmd="$(get_authenticated_curl_cmd ${url})"
 
   try_cmd "${cmd}" 30 5 | jq -r ".native"
 }
 
-# $1 = optional: endpoint, defaults to http://localhost:3001
+# $1 = optional: endpoint, defaults to http://127.0.0.1:3001
 get_hopr_address() {
-  local endpoint="${1:-localhost:3001}"
+  local endpoint="${1:-127.0.0.1:3001}"
   local url="${endpoint}/api/v2/account/addresses"
   local cmd="$(get_authenticated_curl_cmd ${url})"
 

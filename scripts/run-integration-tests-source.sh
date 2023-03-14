@@ -337,6 +337,6 @@ ADDITIONAL_NODE_ADDRS="0xde913eeed23bce5274ead3de8c196a41176fbd49" \
 ADDITIONAL_NODE_PEERIDS="16Uiu2HAm2VD6owCxPEZwP6Moe1jzapqziVeaTXf1h7jVzu5dW1mk" \
 HOPRD_API_TOKEN="${default_api_token}" \
 ${mydir}/../test/integration-test.sh \
-  "localhost:13301" "localhost:13302" "localhost:13303" "localhost:13304" "localhost:13305" "localhost:13306" "localhost:13307"
+  "127.0.0.1:13301" "127.0.0.1:13302" "127.0.0.1:13303" "127.0.0.1:13304" "127.0.0.1:13305" "127.0.0.1:13306" "127.0.0.1:13307"
 # }}}
 
