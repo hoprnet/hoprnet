@@ -8,7 +8,7 @@ use futures::{
     pin_mut, ready,
     stream::{FusedStream, Stream},
     task::{Context, Poll},
-    Future, FutureExt, Sink, SinkExt,
+    Future, FutureExt, Sink, SinkExt, TryFutureExt,
 };
 use pin_project_lite::pin_project;
 use std::task::Waker;
@@ -40,8 +40,8 @@ extern "C" {
 pub enum MessagePrefix {
     Payload = 0x00,
     StatusMessage = 0x01,
-    WebRTC = 0x02,
-    ConnectionStatus = 0x03,
+    ConnectionStatus = 0x02,
+    WebRTC = 0x03,
 }
 
 #[repr(u8)]
@@ -200,7 +200,7 @@ pin_project! {
         status_messages_tx: UnboundedSender<Box<[u8]>>,
         status_message_waker: Option<Waker>,
         ping_requests: std::collections::HashMap<u32, PingFuture>,
-        buffered: Option<Box<[u8]>>
+        ended: bool
     }
 }
 
@@ -214,7 +214,7 @@ impl Server {
             status_messages_tx,
             status_message_waker: None,
             ping_requests: HashMap::new(),
-            buffered: None,
+            ended: false,
         }
     }
 
@@ -238,14 +238,12 @@ impl Server {
                 MessagePrefix::StatusMessage as u8,
                 StatusMessage::Ping as u8,
             ]))
-            .map(|r| match r {
-                Ok(()) => Ok(()),
-                Err(e) => Err(format!("Failed sending ping request {}", e)),
-            });
+            .map_err(|e| format!("Failed sending ping request {}", e));
 
         let send_timeout = sleep(std::time::Duration::from_millis(timeout_duration as u64)).fuse();
 
         pin_mut!(send_timeout);
+
         match select(send_timeout, send_fut).await {
             Either::Left(_) => {
                 return Err(format!(
@@ -308,10 +306,13 @@ impl<'b> Stream for Server {
                     MessagePrefix::ConnectionStatus as u8,
                     ConnectionStatusMessage::Restart as u8,
                 ])));
+            } else if *this.ended {
+                break None;
             } else if let Some(item) =
                 ready!(this.stream.as_mut().as_pin_mut().unwrap().poll_next(cx))
             {
                 let item = item.unwrap();
+                log(format!("item received {:?}", item).as_str());
                 match item.get(0) {
                     Some(prefix) if *prefix == MessagePrefix::ConnectionStatus as u8 => {
                         match item.get(1) {
@@ -322,7 +323,7 @@ impl<'b> Stream for Server {
                                 ]
                                 .contains(inner_prefix) =>
                             {
-                                match this.status_messages_tx.unbounded_send(item) {
+                                match this.status_messages_tx.unbounded_send(item.clone()) {
                                     Ok(()) => (),
                                     Err(e) => {
                                         log(format!(
@@ -334,7 +335,12 @@ impl<'b> Stream for Server {
                                     }
                                 };
 
-                                break None;
+                                break if *inner_prefix == ConnectionStatusMessage::Stop as u8 {
+                                    *this.ended = true;
+                                    Some(Ok(item))
+                                } else {
+                                    None
+                                };
                             }
                             Some(_) => break Some(Ok(item)),
                             None => break None,
@@ -593,7 +599,7 @@ pub mod wasm {
 
         #[wasm_bindgen(getter)]
         pub fn source(&mut self) -> AsyncIterable {
-            let this = unsafe { std::mem::transmute::<&mut Self, &'static mut Self>(self) };
+            let this = unsafe { std::mem::transmute::<&mut Self, &mut Self>(self) };
             let iterator_obj = Object::new();
 
             log("source called");

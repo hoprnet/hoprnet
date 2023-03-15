@@ -11,7 +11,7 @@ import assert from 'assert'
 import { IStream, Server, connect_relay_set_panic_hook } from '../../lib/connect_relay.js'
 connect_relay_set_panic_hook()
 
-describe('relay switch context', function () {
+describe.only('relay switch context', function () {
   it('forward payload messages', async function () {
     const [relayToNode, nodeToRelay] = duplexPair<StreamType>()
 
@@ -201,7 +201,7 @@ describe('relay switch context', function () {
     nodeShaker.rest()
   })
 
-  it.only('stop a stream', async function () {
+  it('stop a stream', async function () {
     const [relayToNode, nodeToRelay] = duplexPair<StreamType>()
 
     const ctx = new Server(
@@ -234,8 +234,8 @@ describe('relay switch context', function () {
   it('update stream', async function () {
     const [relayToNode, nodeToRelay] = duplexPair<StreamType>()
 
-    const ctx = RelayContext(
-      nodeToRelay,
+    const ctx = new Server(
+      nodeToRelay as IStream,
       {
         onClose: () => {},
         onUpgrade: () => {}
@@ -246,7 +246,7 @@ describe('relay switch context', function () {
     )
 
     const nodeShaker = handshake(relayToNode)
-    const destinationShaker = handshake(ctx)
+    const destinationShaker = handshake(ctx as any)
 
     // Sending messages should work before stream switching
     const firstMessage = new TextEncoder().encode('first message')
@@ -277,7 +277,7 @@ describe('relay switch context', function () {
     for (let i = 0; i < UPDATE_ATTEMPTS; i++) {
       const [relayToNodeAfterUpdate, nodeToRelayAfterUpdate] = duplexPair<StreamType>()
 
-      ctx.update(nodeToRelayAfterUpdate)
+      ctx.update(nodeToRelayAfterUpdate as IStream)
 
       const nodeShakerAfterUpdate = handshake(relayToNodeAfterUpdate)
 
@@ -316,8 +316,8 @@ describe('relay switch context - falsy streams', function () {
   it('falsy sink source', async function () {
     const [relayToNode, nodeToRelay] = duplexPair<StreamType>()
     const errorInSource = 'error in source'
-    const ctx = RelayContext(
-      nodeToRelay,
+    const ctx = new Server(
+      nodeToRelay as IStream,
       {
         onClose: () => {},
         onUpgrade: () => {}

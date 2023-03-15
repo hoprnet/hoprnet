@@ -208,9 +208,7 @@ impl Sink<Box<[u8]>> for StreamingIterable {
         log("poll_ready called");
 
         let mut this = unsafe {
-            std::mem::transmute::<Pin<&mut StreamingIterable>, Pin<&'static mut StreamingIterable>>(
-                self,
-            )
+            std::mem::transmute::<Pin<&mut StreamingIterable>, Pin<&mut StreamingIterable>>(self)
         }
         .project();
 
