@@ -25,16 +25,16 @@ export type PeerInfo = {
  */
 function toPeerInfoFormat(info: ReturnType<Hopr['getConnectionInfo']>, multiaddr?: Multiaddr): PeerInfo {
   return {
-    peerId: info.id.toString(),
+    peerId: info.peer_id(),
     multiAddr: multiaddr ? multiaddr.toString() : undefined,
     heartbeats: {
-      sent: info.heartbeatsSent,
-      success: info.heartbeatsSuccess
+      sent: Number(info.heartbeats_sent),
+      success: Number(info.heartbeats_succeeded)
     },
-    lastSeen: info.lastSeen,
+    lastSeen: Number(info.last_seen),
     quality: info.quality,
     backoff: info.backoff,
-    isNew: info.heartbeatsSent === 0
+    isNew: info.heartbeats_sent === BigInt(0)
   }
 }
 
