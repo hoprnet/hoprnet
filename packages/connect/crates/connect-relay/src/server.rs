@@ -227,32 +227,46 @@ impl Server {
         // takes ownership
         self.ping_requests.insert(random_value, fut);
 
-        match self
-            .send(Box::new([
-                MessagePrefix::StatusMessage as u8,
-                StatusMessage::Ping as u8,
-            ]))
-            .await
-        {
-            Ok(()) => (),
-            Err(e) => log(format!("Failed sending ping request {}", e).as_str()),
-        };
-
-        log("server: after sending PING message");
         let timeout_duration = if let Some(timeout) = maybe_timeout {
             timeout
         } else {
             DEFAULT_RELAYED_CONNECTION_PING_TIMEOUT as usize
         };
 
+        let send_fut = self
+            .send(Box::new([
+                MessagePrefix::StatusMessage as u8,
+                StatusMessage::Ping as u8,
+            ]))
+            .map(|r| match r {
+                Ok(()) => Ok(()),
+                Err(e) => Err(format!("Failed sending ping request {}", e)),
+            });
+
+        let send_timeout = sleep(std::time::Duration::from_millis(timeout_duration as u64)).fuse();
+
+        pin_mut!(send_timeout);
+        match select(send_timeout, send_fut).await {
+            Either::Left(_) => {
+                return Err(format!(
+                    "Low-level ping timed out after {}",
+                    timeout_duration
+                ))
+            }
+            Either::Right((Ok(()), _)) => (),
+            Either::Right((Err(e), _)) => return Err(e),
+        };
+        log("server: after sending PING message");
+
         // TODO: move this up to catch all
-        let timeout = sleep(std::time::Duration::from_millis(timeout_duration as u64)).fuse();
+        let response_timeout =
+            sleep(std::time::Duration::from_millis(timeout_duration as u64)).fuse();
         // cannot clone futures
         let ping = self.ping_requests.get_mut(&random_value).unwrap();
 
-        pin_mut!(timeout);
+        pin_mut!(response_timeout);
 
-        match select(timeout, ping).await {
+        match select(response_timeout, ping).await {
             Either::Left(_) => Err(format!(
                 "Low-level ping timed out after {}",
                 timeout_duration

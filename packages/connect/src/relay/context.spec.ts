@@ -146,7 +146,7 @@ describe('relay switch context', function () {
     assert(pingResponse >= 0 && pingResponse <= DEFAULT_PING_TIMEOUT)
   })
 
-  it.only('ping timeout', async function () {
+  it('ping timeout', async function () {
     const [relayToNode, nodeToRelay] = duplexPair<StreamType>()
 
     const ctx = new Server(
@@ -201,11 +201,11 @@ describe('relay switch context', function () {
     nodeShaker.rest()
   })
 
-  it('stop a stream', async function () {
+  it.only('stop a stream', async function () {
     const [relayToNode, nodeToRelay] = duplexPair<StreamType>()
 
-    const ctx = RelayContext(
-      nodeToRelay,
+    const ctx = new Server(
+      nodeToRelay as IStream,
       {
         onClose: () => {},
         onUpgrade: () => {}
