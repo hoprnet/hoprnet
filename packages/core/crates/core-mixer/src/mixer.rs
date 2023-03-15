@@ -14,8 +14,54 @@ use async_std::task::sleep as sleep;
 use gloo_timers::future::sleep as sleep;
 
 
-const DELAY_MIN_MS: u64 = 0;    /// minimum delay in milliseconds
-const DELAY_MAX_MS: u64 = 200;  /// maximum delay in milliseconds
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub struct MixerConfig {
+    min_delay: Duration,
+    max_delay: Duration,
+}
+
+impl Default for MixerConfig {
+    fn default() -> Self {
+        Self {
+            min_delay: Duration::from_millis(0u64),
+            max_delay: Duration::from_millis(200u64),
+        }
+    }
+}
+
+impl MixerConfig {
+    /// Get a random delay duration from the specified minimum and maximum delay available
+    /// inside the configuration.
+    fn random_delay(&self) -> Duration {
+        let mut rng = rand::thread_rng();
+        let random_delay =  rng.gen_range(self.min_delay.as_millis()..self.max_delay.as_millis()) as u64;
+
+        Duration::from_millis(random_delay)
+    }
+}
+
+
+
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+impl MixerConfig {
+    /// Create an instance of a new mixer configuration
+    ///
+    /// # Arguments
+    /// * `min_delay` - the minimum delay invoked by the mixer represented in milliseconds
+    /// * `min_delay` - the maximum delay invoked by the mixer represented in milliseconds
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+    pub fn new(min_delay: u64, max_delay: u64) -> Self {
+        if min_delay >= max_delay {
+            panic!("The minimum delay must be smaller than the maximum delay")
+        }
+
+        Self {
+            min_delay: Duration::from_millis(min_delay),
+            max_delay: Duration::from_millis(max_delay)
+        }
+    }
+}
 
 
 #[cfg(feature = "wasm")]
@@ -34,17 +80,10 @@ pub mod wasm {
 
     #[wasm_bindgen]
     pub fn new_mixer(packet_input: AsyncIterator) -> Result<AsyncIterableHelperMixer,JsValue> {
-        if DELAY_MIN_MS >= DELAY_MAX_MS {
-            panic!("The minimum delay must be smaller than the maximum delay")
-        }
-
         let stream = JsStream::from(packet_input)
             .map(to_box_u8_stream)
             .then_concurrent(|packet| async move {
-                let mut rng = rand::thread_rng();
-                let random_delay =  rng.gen_range(DELAY_MIN_MS..DELAY_MAX_MS);
-
-                sleep(Duration::from_millis(random_delay)).await;
+                sleep(MixerConfig::default().random_delay()).await;
                 packet
             });
 
