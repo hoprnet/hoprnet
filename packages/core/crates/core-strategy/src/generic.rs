@@ -1,5 +1,5 @@
 use utils_types::channels::ChannelStatus;
-use utils_types::primitives::Balance;
+use utils_types::primitives::{Balance, BalanceType};
 
 /// Basic strategy trait that all strategies must implement.
 /// Strategies make decisions to automatically open/close certain channels.
@@ -47,7 +47,7 @@ impl From<&wasm::OutgoingChannelStatus> for OutgoingChannelStatus {
     fn from(x: &wasm::OutgoingChannelStatus) -> Self {
         OutgoingChannelStatus {
             peer_id: x.peer_id.clone(),
-            stake: Balance::from_str(x.stake_str.as_str()).unwrap(),
+            stake: Balance::from_str(x.stake_str.as_str(), BalanceType::HOPR),
             status: x.status.clone()
         }
     }
@@ -105,7 +105,7 @@ pub mod wasm {
 
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
-    use utils_types::primitives::wasm::Balance;
+    use utils_types::primitives::Balance;
 
     use serde::{Deserialize, Serialize};
     use utils_types::channels::ChannelStatus;
@@ -188,7 +188,7 @@ pub mod wasm {
     ) -> JsResult<StrategyTickResult> {
         Ok(StrategyTickResult {
             w: strategy.tick(
-                balance.w,
+                balance,
                 peer_ids
                     .into_iter()
                     .map(|v| v.unwrap().as_string().unwrap()),

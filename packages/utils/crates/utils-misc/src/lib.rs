@@ -47,7 +47,7 @@ macro_rules! convert_from_jstrvec {
 #[macro_export]
 macro_rules! convert_to_jstrvec {
     ($v:expr) => {
-        $v.iter().map(|e| JsString::from(e.as_ref())).collect()
+        $v.iter().map(|e| js_sys::JsString::from(e.as_ref())).collect()
     };
 }
 
@@ -61,6 +61,6 @@ macro_rules! clean_mono_repo_path {
 #[macro_export]
 macro_rules! ok_or_jserr {
     ($v:expr) => {
-        $v.map_err(|e| JsValue::from(e.to_string()))
+        $v.map_err(|e| wasm_bindgen::JsValue::from(e.to_string()))
     };
 }
