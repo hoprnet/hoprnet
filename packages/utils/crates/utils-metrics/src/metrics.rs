@@ -3,6 +3,7 @@ use prometheus::{
     Error, Gauge, GaugeVec, Histogram, HistogramOpts, HistogramTimer, HistogramVec, IntCounter,
     IntCounterVec, Opts, TextEncoder,
 };
+use prometheus::proto::MetricFamily;
 
 use utils_misc::ok_or_str;
 
@@ -18,16 +19,42 @@ where
     Ok(metric)
 }
 
-/// Gathers all the global Prometheus metrics.
-pub fn gather_all_metrics() -> Result<String, String> {
-    // Simply gather all global metric families
-    let metric_families = prometheus::gather();
-
-    // ... and encode them
-    let encoder = TextEncoder::new();
-    ok_or_str!(encoder.encode_to_string(&metric_families))
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+pub struct GatheredMetrics {
+    families: Vec<MetricFamily>
 }
 
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+impl GatheredMetrics {
+    /// Appends other gathered metrics to this instance
+    pub fn accumulate(&mut self, other: &GatheredMetrics) -> u32 {
+        let mut duplicates = 0;
+        for f in &other.families {
+            if !self.families.contains(&f) {
+                self.families.push(f.clone())
+            } else {
+                duplicates+=1
+            }
+        }
+        duplicates
+    }
+}
+
+impl GatheredMetrics {
+    /// Encodes all the gathered metrics to the standard publishable text format
+    pub fn encode(&self) -> Result<String, String> {
+        let encoder = TextEncoder::new();
+        ok_or_str!(encoder.encode_to_string(&self.families))
+    }
+}
+
+/// Gathers all the global Prometheus metrics.
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+pub fn gather_all_metrics() -> GatheredMetrics {
+    GatheredMetrics {
+        families: prometheus::gather()
+    }
+}
 
 pub(crate) fn register_metric_vec<M, C>(
     name: &str,
@@ -543,6 +570,16 @@ pub mod wasm {
     use utils_misc::{convert_from_jstrvec, convert_to_jstrvec, ok_or_jserr};
     use wasm_bindgen::prelude::*;
     use wasm_bindgen::JsValue;
+    use utils_misc::utils::wasm::JsResult;
+    use crate::metrics::GatheredMetrics;
+
+    #[wasm_bindgen]
+    impl GatheredMetrics {
+        #[wasm_bindgen(js_name = "encode")]
+        pub fn _encode(&self) -> JsResult<String> {
+            ok_or_jserr!(self.encode())
+        }
+    }
 
     //// SimpleCounter
 
@@ -895,10 +932,5 @@ pub mod wasm {
         pub fn labels(&self) -> Vec<JsString> {
             convert_to_jstrvec!(self.w.labels())
         }
-    }
-
-    #[wasm_bindgen]
-    pub fn gather_all_metrics() -> Result<String, JsValue> {
-        ok_or_jserr!(super::gather_all_metrics())
     }
 }
