@@ -31,5 +31,3 @@ wasm-bindgen-futures = { version = "0.4.33", optional = true }
 more-asserts = "0.3.1"
 wasm-bindgen-test = "0.3.33"
 
-[profile.release]
-opt-level = "s"     # small code size
