@@ -438,7 +438,6 @@ impl MultiHistogram {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::native::*;
 
     #[test]
     fn test_counter() {
@@ -450,7 +449,7 @@ mod tests {
 
         assert_eq!(1, counter.get());
 
-        let metrics = gather_all_metrics().unwrap();
+        let metrics = gather_all_metrics().encode().unwrap();
         assert!(metrics.contains("my_ctr 1"));
     }
 
@@ -459,7 +458,7 @@ mod tests {
         let counter = MultiCounter::new("my_mctr", "test multicounter", &["version"]).unwrap();
 
         assert_eq!("my_mctr", counter.name());
-        assert!(counter.labels().contains("version".into()));
+        assert!(counter.labels().contains(&"version"));
 
         counter.increment(&["1.90.1"], 10);
         counter.increment(&["1.89.20"], 1);
@@ -468,7 +467,7 @@ mod tests {
         assert_eq!(25, counter.get(&["1.90.1"]).unwrap());
         assert_eq!(1, counter.get(&["1.89.20"]).unwrap());
 
-        let metrics = gather_all_metrics().unwrap();
+        let metrics = gather_all_metrics().encode().unwrap();
         assert!(metrics.contains("my_mctr{version=\"1.90.1\"} 25"));
         assert!(metrics.contains("my_mctr{version=\"1.89.20\"} 1"));
     }
@@ -483,14 +482,14 @@ mod tests {
 
         assert_eq!(10.0, gauge.get());
 
-        let metrics = gather_all_metrics().unwrap();
+        let metrics = gather_all_metrics().encode().unwrap();
         assert!(metrics.contains("my_gauge 10"));
 
         gauge.decrement(5.1);
 
         assert_eq!(4.9, gauge.get());
 
-        let metrics2 = gather_all_metrics().unwrap();
+        let metrics2 = gather_all_metrics().encode().unwrap();
         assert!(metrics2.contains("my_gauge 4.9"));
     }
 
@@ -499,7 +498,7 @@ mod tests {
         let gauge = MultiGauge::new("my_mgauge", "test multicounter", &["version"]).unwrap();
 
         assert_eq!("my_mgauge", gauge.name());
-        assert!(gauge.labels().contains("version".into()));
+        assert!(gauge.labels().contains(&"version"));
 
         gauge.increment(&["1.90.1"], 10.0);
         gauge.increment(&["1.89.20"], 5.0);
@@ -509,7 +508,7 @@ mod tests {
         assert_eq!(25.0, gauge.get(&["1.90.1"]).unwrap());
         assert_eq!(3.0, gauge.get(&["1.89.20"]).unwrap());
 
-        let metrics = gather_all_metrics().unwrap();
+        let metrics = gather_all_metrics().encode().unwrap();
         assert!(metrics.contains("my_mgauge{version=\"1.90.1\"} 25"));
         assert!(metrics.contains("my_mgauge{version=\"1.89.20\"} 3"));
     }
@@ -533,7 +532,7 @@ mod tests {
         assert_eq!(4, histogram.get_sample_count());
         assert_eq!(10.0, histogram.get_sample_sum());
 
-        let metrics = gather_all_metrics().unwrap();
+        let metrics = gather_all_metrics().encode().unwrap();
         assert!(metrics.contains("my_histogram_bucket{le=\"1\"} 1"));
         assert!(metrics.contains("my_histogram_bucket{le=\"2\"} 3"));
         assert!(metrics.contains("my_histogram_bucket{le=\"3\"} 3"));
@@ -552,7 +551,7 @@ mod tests {
         .unwrap();
 
         assert_eq!("my_mhistogram", histogram.name());
-        assert!(histogram.labels().contains("version".into()));
+        assert!(histogram.labels().contains(&"version"));
 
         histogram.observe(&["1.90.0"], 2.0);
         histogram.observe(&["1.90.0"], 2.0);
@@ -566,7 +565,7 @@ mod tests {
         assert_eq!(4, histogram.get_sample_count(&["1.90.0"]).unwrap());
         assert_eq!(10.0, histogram.get_sample_sum(&["1.90.0"]).unwrap());
 
-        let metrics = gather_all_metrics().unwrap();
+        let metrics = gather_all_metrics().encode().unwrap();
         assert!(metrics.contains("my_mhistogram_bucket{version=\"1.90.0\",le=\"1\"} 1"));
         assert!(metrics.contains("my_mhistogram_bucket{version=\"1.90.0\",le=\"2\"} 3"));
         assert!(metrics.contains("my_mhistogram_bucket{version=\"1.90.0\",le=\"3\"} 3"));
