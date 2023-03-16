@@ -1,7 +1,7 @@
 import type { Operation } from 'express-openapi'
 import { STATUS_CODES } from '../../utils.js'
 import { getHeapStatistics } from 'v8'
-import { create_gauge, gather_all_metrics } from '@hoprnet/hopr-utils'
+import { create_gauge, gather_all_metrics, GatheredMetrics } from '@hoprnet/hopr-utils'
 
 // Metrics
 const metric_totalAllocHeap = create_gauge(
@@ -31,12 +31,17 @@ function recordNodeHeapStats() {
   metric_detachedCtxs.set(heapStats.number_of_detached_contexts)
 }
 
+type MetricCollector = () => GatheredMetrics;
+
 const GET: Operation = [
   (_, res, _next) => {
     try {
       recordNodeHeapStats()
-      const metrics = gather_all_metrics()
-      return res.status(200).type('text/plain; version=0.0.4').send(metrics)
+      // @ts-ignore
+      let metrics = gather_all_metrics()
+      (global.metricCollectors as MetricCollector[] || [])
+        .forEach((collector) => metrics.accumulate(collector()))
+      return res.status(200).type('text/plain; version=0.0.4').send(metrics.encode())
     } catch (err) {
       return res
         .status(422)

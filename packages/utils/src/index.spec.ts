@@ -15,7 +15,7 @@ describe('wasm modules', function () {
     await setTimeout(2500)
     histogram.record_measure(timer)
 
-    let metrics = gather_all_metrics()
+    let metrics = gather_all_metrics().encode()
     assert(metrics.includes('my_histogram_bucket{le="1"} 0'))
     assert(metrics.includes('my_histogram_bucket{le="2"} 0'))
     assert(metrics.includes('my_histogram_bucket{le="3"} 1'))

@@ -23,9 +23,11 @@ import retimer from 'retimer'
 
 import { FULL_VERSION, INTERMEDIATE_HOPS, MAX_HOPS, PACKET_SIZE, VERSION, MAX_PARALLEL_PINGS } from './constants.js'
 
-import { Network, PeerStatus, PeerOrigin, Health, HeartbeatConfig } from '../lib/core_network.js'
-import { core_network_set_panic_hook } from '../lib/core_network.js'
+import { Network, PeerStatus, PeerOrigin, Health, HeartbeatConfig, core_network_set_panic_hook, core_network_gather_metrics } from '../lib/core_network.js'
+// @ts-ignore
 core_network_set_panic_hook()
+
+(global.metricCollectors = global.metricCollectors || []).push(core_network_gather_metrics);
 import Heartbeat from './network/heartbeat.js'
 
 import { findPath } from './path/index.js'

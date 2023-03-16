@@ -90,9 +90,12 @@ impl SimpleCounter {
     }
 
     /// Increments the counter by the given number.
-    pub fn increment(&self, by: u64) {
+    pub fn increment_by(&self, by: u64) {
         self.ctr.inc_by(by)
     }
+
+    /// Increments the counter by 1
+    pub fn increment(&self) { self.increment_by(1) }
 
     /// Returns the name of the counter given at construction.
     pub fn name(&self) -> String {
@@ -139,10 +142,15 @@ impl MultiCounter {
     }
 
     /// Increments counter with given labels by the given number.
-    pub fn increment(&self, label_values: &[&str], by: u64) {
+    pub fn increment_by(&self, label_values: &[&str], by: u64) {
         if let Ok(c) = self.ctr.get_metric_with_label_values(label_values) {
             c.inc_by(by)
         }
+    }
+
+    /// Increments counter with given labels by 1.
+    pub fn increment(&self, label_values: &[&str]) {
+        self.increment_by(label_values, 1)
     }
 
     /// Retrieves the value of the specified counter
@@ -497,7 +505,7 @@ mod tests {
 
         assert_eq!("my_ctr", counter.name());
 
-        counter.increment(1);
+        counter.increment();
 
         assert_eq!(1, counter.get());
 
@@ -512,9 +520,9 @@ mod tests {
         assert_eq!("my_mctr", counter.name());
         assert!(counter.labels().contains(&"version"));
 
-        counter.increment(&["1.90.1"], 10);
-        counter.increment(&["1.89.20"], 1);
-        counter.increment(&["1.90.1"], 15);
+        counter.increment_by(&["1.90.1"], 10);
+        counter.increment_by(&["1.89.20"], 1);
+        counter.increment_by(&["1.90.1"], 15);
 
         assert_eq!(25, counter.get(&["1.90.1"]).unwrap());
         assert_eq!(1, counter.get(&["1.89.20"]).unwrap());
@@ -673,13 +681,13 @@ pub mod wasm {
         #[wasm_bindgen(js_name = "increment_by")]
         pub fn _increment_by(&self, label_values: Vec<JsString>, by: u64) {
             convert_from_jstrvec!(label_values, bind);
-            self.increment(bind.as_slice(), by);
+            self.increment_by(bind.as_slice(), by);
         }
 
         #[wasm_bindgen(js_name = "increment")]
         pub fn _increment(&self, label_values: Vec<JsString>) {
             convert_from_jstrvec!(label_values, bind);
-            self.increment(bind.as_slice(), 1)
+            self.increment(bind.as_slice())
         }
 
         #[wasm_bindgen(js_name = "get")]
