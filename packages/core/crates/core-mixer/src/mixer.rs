@@ -99,7 +99,9 @@ impl Mixer {
         sleep(random_delay).await;
 
         if let Some(m) = &self.metrics.average_delay {
-            m.set((0.1f64 * random_delay.as_millis() as f64) + (0.9f64 * m.get()))
+            let weight = 1.0f64 / self.cfg.metric_delay_window as f64;
+            m.set(
+                (weight * random_delay.as_millis() as f64) + ((1.0f64 - weight) * m.get()))
         };
         if let Some(m) = &self.metrics.queue_size { m.decrement(1.0f64); }
 
