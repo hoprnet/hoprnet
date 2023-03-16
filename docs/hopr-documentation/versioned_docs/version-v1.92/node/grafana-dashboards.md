@@ -3,7 +3,7 @@ id: grafana-dashboards
 title: Using Grafana
 ---
 
-Currently, there is only support for the Grafana dashboards on Dappnode. If you are using an Avado or VPS/Docker setup, these dashboards will become available to you on the next release: `Riga`.
+Currently, there is only support for the Grafana dashboards on Dappnode. If you are using an Avado or VPS/Docker setup, these dashboards will become available to you on the next release: `Monte Rosa 1.93`.
 
 The Grafana dashboards will give you an advanced look into your node, with a dashboard breaking down several key metrics about your node.
 
@@ -13,10 +13,10 @@ The Grafana dashboards will give you an advanced look into your node, with a das
 
 To access your node's Grafana Dashboard, you need to install both:
 
-- The latest release: `Bogota`
+- The latest release: `Monte Rosa 1.92`
 - The DMS Package
 
-(**1**) First, make sure you are using the latest release, `Bogota`. Follow the instructions [here](using-dappnode#installing-the-hopr-client) to ensure you are up-to-date.
+(**1**) First, make sure you are using the latest release, `Monte Rosa 1.92`. Follow the instructions [here](using-dappnode#installing-the-hopr-client) to ensure you are up-to-date.
 
 (**2**) Next, go to the DAppStore and install the package `DMS`. It stands for Dappnode Monitoring System and will give you access to your node's dashboards.
 
