@@ -6,6 +6,9 @@ use rand::Rng;
 
 use crate::future_extensions::StreamThenConcurrentExt;
 
+use utils_log::debug;
+use utils_metrics::metrics::native::SimpleGauge;
+
 
 #[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::sleep as sleep;
@@ -19,6 +22,7 @@ use gloo_timers::future::sleep as sleep;
 pub struct MixerConfig {
     min_delay: Duration,
     max_delay: Duration,
+    pub metric_delay_window: u64,
 }
 
 impl Default for MixerConfig {
@@ -26,6 +30,7 @@ impl Default for MixerConfig {
         Self {
             min_delay: Duration::from_millis(0u64),
             max_delay: Duration::from_millis(200u64),
+            metric_delay_window: 10u64
         }
     }
 }
@@ -40,8 +45,6 @@ impl MixerConfig {
         Duration::from_millis(random_delay)
     }
 }
-
-
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl MixerConfig {
@@ -58,8 +61,49 @@ impl MixerConfig {
 
         Self {
             min_delay: Duration::from_millis(min_delay),
-            max_delay: Duration::from_millis(max_delay)
+            max_delay: Duration::from_millis(max_delay),
+            metric_delay_window: 10u64,
         }
+    }
+}
+
+/// Aggregation of all Prometheus metrics exported by the mixer.
+struct MixerMetrics {
+    /// Current mixer queue size
+    pub queue_size: Option<SimpleGauge>,
+    /// Running average of the last N packet delays
+    pub average_delay: Option<SimpleGauge>
+}
+
+
+/// Mixer implementation using Async instead of a real queue to provide the packet mixing functionality
+struct Mixer {
+    cfg: MixerConfig,
+    metrics: MixerMetrics
+}
+
+impl Mixer {
+    /// Async mixing operation on the packet.
+    ///
+    /// # Arguments
+    /// * packet: Packet contents or an error
+    ///
+    /// # Returns
+    /// The same packet as ingested on input postponed by a random delay
+    pub async fn mix(&self, packet: Result<Box<[u8]>, String>) -> Result<Box<[u8]>, String> {
+        let random_delay = self.cfg.random_delay();
+        debug!("Mixer created a random packet delay of {}ms", random_delay.as_millis());
+
+        if let Some(m) = &self.metrics.queue_size { m.increment(1.0f64) }
+
+        sleep(random_delay).await;
+
+        if let Some(m) = &self.metrics.average_delay {
+            m.set((0.1f64 * random_delay.as_millis() as f64) + (0.9f64 * m.get()))
+        };
+        if let Some(m) = &self.metrics.queue_size { m.decrement(1.0f64); }
+
+        packet
     }
 }
 
@@ -78,17 +122,28 @@ pub mod wasm {
         stream: Box<dyn Stream<Item = Result<Box<[u8]>, String>> + Unpin>,
     }
 
+    /// A mixer wrapper around the core functionality
+    ///
+    /// Async closure interaction was inspired by: https://www.fpcomplete.com/blog/captures-closures-async/
     #[wasm_bindgen]
     pub fn new_mixer(packet_input: AsyncIterator) -> Result<AsyncIterableHelperMixer,JsValue> {
-        let stream = JsStream::from(packet_input)
-            .map(to_box_u8_stream)
-            .then_concurrent(|packet| async move {
-                sleep(MixerConfig::default().random_delay()).await;
-                packet
-            });
+        let mixer = std::sync::Arc::new(Mixer{
+            cfg: MixerConfig::default(),
+            metrics: MixerMetrics {
+                queue_size: SimpleGauge::new("core_gauge_mixer_queue_size", "Current mixer queue size").ok(),
+                average_delay: SimpleGauge::new("core_gauge_mixer_average_packet_delay", "Average mixer packet delay averaged over a packet window").ok(),
+            }
+        });
 
         Ok(AsyncIterableHelperMixer {
-            stream: Box::new(stream),
+            stream: Box::new(JsStream::from(packet_input)
+                .map(to_box_u8_stream)
+                .then_concurrent(move |packet| {
+                    let mixer_clone = mixer.clone();
+                    async move {
+                        mixer_clone.clone().as_ref().mix(packet).await
+                    }
+                })),
         })
     }
 
@@ -160,7 +215,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_then_concurrent_futures_are_processed_in_the_correct_order() {
-        let packet_1 = 10u64;         // 3rd in the output
+        let packet_1 = 10u64;        // 3rd in the output
         let packet_2 = 5u64;         // 1st in the output
         let packet_3 = 7u64;         // 2nd in the output
         let expected_packets = vec!(packet_2, packet_3, packet_1);

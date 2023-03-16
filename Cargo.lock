@@ -1077,6 +1077,7 @@ dependencies = [
  "more-asserts",
  "pin-project",
  "rand 0.8.5",
+ "utils-log",
  "utils-metrics",
  "utils-misc",
  "wasm-bindgen",
