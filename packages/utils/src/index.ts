@@ -39,6 +39,6 @@ export {
   create_multi_histogram_with_buckets,
   MultiHistogram,
   SimpleTimer,
-  GatheredMetrics,
+  merge_encoded_metrics,
   gather_all_metrics,
 } from '../lib/utils_metrics.js'

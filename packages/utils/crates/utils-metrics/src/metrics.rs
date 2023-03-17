@@ -1,44 +1,34 @@
 use prometheus::core::Collector;
 use prometheus::{Gauge, GaugeVec, Histogram, HistogramOpts, HistogramTimer, HistogramVec, IntCounter, IntCounterVec, Opts, TextEncoder};
-use prometheus::proto::MetricFamily;
-
-use utils_misc::ok_or_str;
-
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-pub struct GatheredMetrics {
-    families: Vec<MetricFamily>
-}
-
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-impl GatheredMetrics {
-    /// Appends other gathered metrics to this instance
-    pub fn accumulate(&mut self, other: &GatheredMetrics) -> u32 {
-        let mut duplicates = 0;
-        for f in &other.families {
-            if !self.families.contains(&f) {
-                self.families.push(f.clone())
-            } else {
-                duplicates+=1
-            }
-        }
-        duplicates
-    }
-}
-
-impl GatheredMetrics {
-    /// Encodes all the gathered metrics to the standard publishable text format
-    pub fn encode(&self) -> Result<String, String> {
-        let encoder = TextEncoder::new();
-        ok_or_str!(encoder.encode_to_string(&self.families))
-    }
-}
 
 /// Gathers all the global Prometheus metrics.
+pub fn gather_all_metrics() -> prometheus::Result<String> {
+    let families = prometheus::gather();
+
+    let encoder = TextEncoder::new();
+    encoder.encode_to_string(&families)
+}
+
+/// A naive merging method for two serialized metric registries.
+/// It performs union of the sets, removing those metrics which have the same name (regardless of their type).
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-pub fn gather_all_metrics() -> GatheredMetrics {
-    GatheredMetrics {
-        families: prometheus::gather()
-    }
+pub fn merge_encoded_metrics(metrics1: &str, metrics2: &str) -> String {
+    // Extract all names from LHS metrics
+    let names = metrics1.lines()
+        .filter(|line| !line.starts_with('#'))
+        .map(|line| line.split(' ').nth(0).unwrap())
+        .collect::<Vec<&str>>();
+
+    (
+        metrics1.to_owned() +
+        &metrics2
+            .lines() // Select only those lines from RHS metrics that do not contain any name from LHS metrics
+            .filter(|line| names.iter().all(|name|
+                !line.contains(&format!(" {} ", name)) && !line.starts_with(&format!("{} ", name))
+            ))
+            .collect::<Vec<_>>()
+            .join("\n")
+    ).trim_end().to_owned() + "\n"
 }
 
 pub(crate) fn register_metric<M, C>(name: &str, desc: &str, creator: C) -> prometheus::Result<M>
@@ -275,11 +265,18 @@ impl MultiGauge {
     }
 }
 
+/// Convenience helper macro for creating time measurements to a histogram.
+/// The macro will distinguish between WASM and non-WASM case automatically and will evaluate
+/// the SimpleTimer object.
+/// First argument is either SimpleHistogram or MultiHistogram.
+/// If MultiHistogram has been supplied, an additional argument with labels must be passed.
 #[macro_export]
 macro_rules! histogram_start_measure {
+    // SimpleHistogram case
     ($v:ident) => {
         if cfg!(wasm) && !cfg!(test) { $v.wasm_start_measure() } else { $v.start_measure() }
     };
+    // MultiHistogram case
     ($v:ident, $l:expr) => {
         if cfg!(wasm) && !cfg!(test){
             $v.wasm_start_measure($l.iter().map(|s| js_sys::JsString::from(*s)).collect()).map_err(|_| prometheus::Error::Msg("invalid label".into()))
@@ -509,7 +506,7 @@ mod tests {
 
         assert_eq!(1, counter.get());
 
-        let metrics = gather_all_metrics().encode().unwrap();
+        let metrics = gather_all_metrics().unwrap();
         assert!(metrics.contains("my_ctr 1"));
     }
 
@@ -527,7 +524,7 @@ mod tests {
         assert_eq!(25, counter.get(&["1.90.1"]).unwrap());
         assert_eq!(1, counter.get(&["1.89.20"]).unwrap());
 
-        let metrics = gather_all_metrics().encode().unwrap();
+        let metrics = gather_all_metrics().unwrap();
         assert!(metrics.contains("my_mctr{version=\"1.90.1\"} 25"));
         assert!(metrics.contains("my_mctr{version=\"1.89.20\"} 1"));
     }
@@ -542,14 +539,14 @@ mod tests {
 
         assert_eq!(10.0, gauge.get());
 
-        let metrics = gather_all_metrics().encode().unwrap();
+        let metrics = gather_all_metrics().unwrap();
         assert!(metrics.contains("my_gauge 10"));
 
         gauge.decrement(5.1);
 
         assert_eq!(4.9, gauge.get());
 
-        let metrics2 = gather_all_metrics().encode().unwrap();
+        let metrics2 = gather_all_metrics().unwrap();
         assert!(metrics2.contains("my_gauge 4.9"));
     }
 
@@ -568,7 +565,7 @@ mod tests {
         assert_eq!(25.0, gauge.get(&["1.90.1"]).unwrap());
         assert_eq!(3.0, gauge.get(&["1.89.20"]).unwrap());
 
-        let metrics = gather_all_metrics().encode().unwrap();
+        let metrics = gather_all_metrics().unwrap();
         assert!(metrics.contains("my_mgauge{version=\"1.90.1\"} 25"));
         assert!(metrics.contains("my_mgauge{version=\"1.89.20\"} 3"));
     }
@@ -592,7 +589,7 @@ mod tests {
         assert_eq!(4, histogram.get_sample_count());
         assert_eq!(10.0, histogram.get_sample_sum());
 
-        let metrics = gather_all_metrics().encode().unwrap();
+        let metrics = gather_all_metrics().unwrap();
         assert!(metrics.contains("my_histogram_bucket{le=\"1\"} 1"));
         assert!(metrics.contains("my_histogram_bucket{le=\"2\"} 3"));
         assert!(metrics.contains("my_histogram_bucket{le=\"3\"} 3"));
@@ -628,7 +625,7 @@ mod tests {
         assert_eq!(4, histogram.get_sample_count(&["1.90.0"]).unwrap());
         assert_eq!(10.0, histogram.get_sample_sum(&["1.90.0"]).unwrap());
 
-        let metrics = gather_all_metrics().encode().unwrap();
+        let metrics = gather_all_metrics().unwrap();
         assert!(metrics.contains("my_mhistogram_bucket{version=\"1.90.0\",le=\"1\"} 1"));
         assert!(metrics.contains("my_mhistogram_bucket{version=\"1.90.0\",le=\"2\"} 3"));
         assert!(metrics.contains("my_mhistogram_bucket{version=\"1.90.0\",le=\"3\"} 3"));
@@ -640,6 +637,41 @@ mod tests {
         let timer = histogram_start_measure!(histogram, &["1.90.0"]).unwrap();
         histogram.cancel_measure(timer);
     }
+
+    #[test]
+    fn test_merging() {
+        let counter = SimpleCounter::new("my_ctr", "test counter").unwrap();
+        counter.increment();
+
+        let metrics1 = gather_all_metrics().unwrap();
+
+        let counter2 = SimpleCounter::new("my_ctr_2", "test counter 2").unwrap();
+        counter2.increment_by(2);
+        let metrics2 = gather_all_metrics().unwrap();
+
+        let res1 = merge_encoded_metrics(&metrics1, &metrics2);
+        assert_eq!(6, res1.lines().count());
+
+        assert!(res1.contains("my_ctr "));
+        assert_eq!(3, res1.match_indices("my_ctr ").count());
+
+        assert!(res1.contains("my_ctr_2"));
+        assert_eq!(3, res1.match_indices("my_ctr_2").count());
+
+        let res2 = merge_encoded_metrics(&metrics1, &metrics1);
+        assert_eq!(3, res2.lines().count());
+
+        assert!(res2.contains("my_ctr "));
+        assert_eq!(3, res2.match_indices("my_ctr ").count());
+
+        let res3 = merge_encoded_metrics(&metrics1, "");
+        assert_eq!(metrics1, res3);
+
+        let res4 = merge_encoded_metrics("", &metrics1);
+        assert_eq!(metrics1, res4);
+
+        assert!(merge_encoded_metrics("", "").trim().is_empty());
+    }
 }
 
 /// Bindings for JS/TS
@@ -650,15 +682,12 @@ pub mod wasm {
     use wasm_bindgen::prelude::*;
     use wasm_bindgen::JsValue;
     use utils_misc::utils::wasm::JsResult;
-    use crate::metrics::{GatheredMetrics, MultiCounter, MultiGauge, MultiHistogram, SimpleCounter, SimpleGauge, SimpleHistogram, SimpleTimer};
+    use crate::metrics::{MultiCounter, MultiGauge, MultiHistogram, SimpleCounter, SimpleGauge, SimpleHistogram, SimpleTimer};
     use crate::metrics::TimerVariant::WASM;
 
     #[wasm_bindgen]
-    impl GatheredMetrics {
-        #[wasm_bindgen(js_name = "encode")]
-        pub fn _encode(&self) -> JsResult<String> {
-            ok_or_jserr!(self.encode())
-        }
+    pub fn gather_all_metrics() -> JsResult<String> {
+        ok_or_jserr!(super::gather_all_metrics())
     }
 
     #[wasm_bindgen]

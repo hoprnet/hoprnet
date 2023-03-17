@@ -1,7 +1,7 @@
 import type { Operation } from 'express-openapi'
 import { STATUS_CODES } from '../../utils.js'
 import { getHeapStatistics } from 'v8'
-import { create_gauge, gather_all_metrics, GatheredMetrics } from '@hoprnet/hopr-utils'
+import { create_gauge, gather_all_metrics, merge_encoded_metrics } from '@hoprnet/hopr-utils'
 
 // Metrics
 const metric_totalAllocHeap = create_gauge(
@@ -31,17 +31,23 @@ function recordNodeHeapStats() {
   metric_detachedCtxs.set(heapStats.number_of_detached_contexts)
 }
 
-type MetricCollector = () => GatheredMetrics;
+function getMetricsCollectors(): MetricCollector[] {
+    return (global.metricCollectors as MetricCollector[] || [])
+}
+
+type MetricCollector = () => string;
 
 const GET: Operation = [
   (_, res, _next) => {
     try {
       recordNodeHeapStats()
-      // @ts-ignore
-      let metrics = gather_all_metrics()
-      (global.metricCollectors as MetricCollector[] || [])
-        .forEach((collector) => metrics.accumulate(collector()))
-      return res.status(200).type('text/plain; version=0.0.4').send(metrics.encode())
+      let global_metrics = gather_all_metrics()
+      let merged = getMetricsCollectors()
+        .map((c) => c())
+        .reduce((prev, current, _i, _a) => merge_encoded_metrics(prev, current),
+          global_metrics)
+
+      return res.status(200).type('text/plain; version=0.0.4').send(merged)
     } catch (err) {
       return res
         .status(422)

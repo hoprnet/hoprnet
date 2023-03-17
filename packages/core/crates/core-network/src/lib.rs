@@ -8,7 +8,7 @@ pub(crate) mod types;
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use wasm_bindgen::prelude::*;
-    use utils_metrics::metrics::GatheredMetrics;
+    use utils_misc::utils::wasm::JsResult;
 
     // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global allocator.
     #[cfg(feature = "wee_alloc")]
@@ -28,7 +28,7 @@ pub mod wasm {
     }
 
     #[wasm_bindgen]
-    pub fn core_network_gather_metrics() -> GatheredMetrics {
-        utils_metrics::metrics::gather_all_metrics()
+    pub fn core_network_gather_metrics() -> JsResult<String> {
+        utils_metrics::metrics::wasm::gather_all_metrics()
     }
 }
