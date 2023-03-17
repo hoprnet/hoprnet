@@ -45,7 +45,10 @@ You should get a login screen, where you'll need to use the following credential
 
 ### Docker
 
-You'll need to have docker with docker-compose support; you may need to install this separately. You can read up on how to do so [here.](https://docs.docker.com/compose/install/)
+To set up Grafana with docker you will need to have installed:
+
+- Docker with docker-compose support, you may need to install this seperately. Read [here.](https://docs.docker.com/compose/install/)
+- git E.g. through shell with `sudo apt-get install git`
 
 The following are command line instructions for Linux:
 
@@ -69,7 +72,7 @@ docker compose --file scripts/compose/docker-compose.yml up -d
 
 **Note:** Generating your node this way will give it the default api/secret token: `YOUR_SECURITY_TOKEN`. You will need this api token to access your node.
 
-Once your HOPRd node is up and running, you should have Grafana exposed on port `3030`, E.g. if you're running this locally and not on a VPS, it would be at the endpoint [http://localhost:3000](http://localhost:3000) (replace `localhost` with your `server IP address` if you are using a VPS, for example, `http://142.93.5.175:3000`).
+Once your HOPRd node is up and running, you should have Grafana exposed on port `3030`, E.g. if you're running this locally and not on a VPS, it would be at the endpoint [http://localhost:3030](http://localhost:3030) (replace `localhost` with your `server IP address` if you are using a VPS, for example, `http://142.93.5.175:3030`).
 
 You should get a login screen, where you'll need to use the following credentials:
 
