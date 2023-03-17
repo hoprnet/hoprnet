@@ -98,6 +98,18 @@ All our docker images can be found in [our Google Cloud Container Registry](http
 Each image is prefixed with `gcr.io/hoprassociation/hoprd`.
 The `1.92.9` tag represents the latest community release version.
 
+### Install HOPRd with Grafana
+
+:::info INFO
+Using this setup will generate a new node, it will not migrate your old node. To keep using your old node, follow the setup without Grafana.
+:::
+
+To install HOPRd with Grafana, you can follow the instructions [here.](./grafana-dashboards.md#docker)
+
+**Note:** Following these instructions will generate a node with no authentication, so no security/api token will be needed to access your node.
+
+### Install HOPRd without Grafana
+
 (**1**) Open your terminal.
 
 (**2**) Create a **Security Token** (password) which satisfies the following requirements:
