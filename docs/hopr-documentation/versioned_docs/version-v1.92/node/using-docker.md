@@ -132,6 +132,12 @@ Please note the `--apiToken` (Security token), as this will be used to access ho
 
 **Note:** Withdrawing funds is possible through hopr-admin. This is just a precaution for safekeeping.
 
+### Alternative: Install HOPRd with Grafana
+
+To install HOPRd with Grafana, you can follow the instructions [here.](./grafana-dashboards.md#docker)
+
+**Note:** Following these instructions will give you the default api/security token: `YOUR_SECURITY_TOKEN`. Keep this in mind as you will need it to access the your node.  
+
 ### Launching HOPR admin UI
 
 From 1.92 version HOPR admin UI was separated from the HOPRd node. This means you will need additionally to launch a new docker command. You will need to execute docker command in a new **tmux** session, more details you will find [here](using-docker#using-tmux).
