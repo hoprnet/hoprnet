@@ -102,7 +102,7 @@ The `1.92.9` tag represents the latest community release version.
 
 To install HOPRd with Grafana, you can follow the instructions [here.](./grafana-dashboards.md#docker)
 
-**Note:** Following these instructions will give you the default api/security token: `YOUR_SECURITY_TOKEN`. Keep this in mind as you will need it to access the your node.  
+**Note:** Following these instructions will generate a node with no authentication, so no security/api token will be needed to access your node.
 
 ### Install HOPRd without Grafana
 

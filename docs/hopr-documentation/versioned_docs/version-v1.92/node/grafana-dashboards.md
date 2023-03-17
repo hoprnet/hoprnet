@@ -66,7 +66,9 @@ cd hoprnet
 docker compose --file scripts/compose/docker-compose.yml up -d
 ```
 
-Once your HOPRd node is up and running, you should have Grafana exposed on port `3030`, E.g. if you're running this locally and not on a VPS, it would be at the endpoint [http://localhost:3030](http://localhost:3030) (replace `localhost` with your `server IP address` if you are using a VPS, for example, `http://142.93.5.175:3030`).
+**Note:** This will create a node with no authentication so you will not need to enter a security/API token when using it's functionality. This setup will also launch hopr-admin for you so no other commands are needed, you can proceed directly to our [hopr-admin tutorial](./using-hopr-admin.md) for further details on how to interact with your node through your browser.
+
+Otherwise once your HOPRd node is up and running, you should have Grafana exposed on port `3030`, E.g. if you're running this locally and not on a VPS, it would be at the endpoint [http://localhost:3030](http://localhost:3030) (replace `localhost` with your `server IP address` if you are using a VPS, for example, `http://142.93.5.175:3030`).
 
 You should get a login screen, where you'll need to use the following credentials:
 
