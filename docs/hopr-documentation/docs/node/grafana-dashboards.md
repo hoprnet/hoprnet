@@ -5,9 +5,9 @@ title: Using Grafana
 
 The Grafana dashboards will give you an advanced look into your node, with a dashboard breaking down several key metrics. You can access Grafana Dashboards on all setups:
 
-- ![Dappnode](./grafana-dashboards.md#dappnode)
-- ![Avado](./grafana-dashboards.md#avado) 
-- ![Docker](./grafana-dashboards.md#docker)
+- [Dappnode](./grafana-dashboards.md#dappnode)
+- [Avado](./grafana-dashboards.md#avado) 
+- [Docker](./grafana-dashboards.md#docker)
 
 ![Grafana Dashboard](/img/node/Grafana-Dashboard.png)
 
@@ -27,8 +27,8 @@ To access your node's Grafana Dashboard, you just need to install the DMS packag
 
 You should get a login screen, where you'll need to use the following credentials:
 
-- `Username`: `admin`
-- `password`: `hopr`
+- Username: `admin`
+- Password: `hopr`
 
 ![Grafana Login](/img/node/Grafana-login.png)
 
@@ -38,8 +38,8 @@ For Avado, you can access the Grafana dashboards by just visiting the URL: [http
 
 You should get a login screen, where you'll need to use the following credentials:
 
-- `Username`: `admin`
-- `password`: `hopr`
+- Username: `admin`
+- Password: `hopr`
 
 ![Grafana Login](/img/node/Grafana-login.png)
 
@@ -71,8 +71,8 @@ Once your HOPRd node is up and running, you should have Grafana exposed on port 
 
 You should get a login screen, where you'll need to use the following credentials:
 
-- `Username`: `admin`
-- `password`: `hopr`
+- Username: `admin`
+- Password: `hopr`
 
 ![Grafana Login](/img/node/Grafana-login.png)
 
