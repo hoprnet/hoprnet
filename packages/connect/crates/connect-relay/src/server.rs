@@ -683,7 +683,6 @@ pub mod wasm {
             log(format!("iterator {:?}", async_it).as_str());
 
             // let foo = self;
-
             let this = unsafe { std::mem::transmute::<&mut Self, &mut Self>(self) };
 
             wasm_bindgen_futures::future_to_promise(async move {
@@ -691,13 +690,19 @@ pub mod wasm {
                     log("iteration");
                     match async_it.next().map(JsFuture::from) {
                         Ok(m) => {
+                            // Initiates call to underlying JS functions
+                            match super::PollReady::new(this.w.stream.as_mut().unwrap()).await {
+                                Ok(_) => (),
+                                Err(e) => log(e.to_string().as_str()),
+                            };
                             log(format!("next future {:?}", m).as_str());
                             let foo = match m.await {
                                 Ok(x) => x,
                                 Err(e) => {
                                     log(format!("error handling next() future {:?}", e).as_str());
                                     this.w.stream.as_mut().unwrap().close().await;
-                                    todo!()
+                                    // todo!()
+                                    return Err(e);
                                     // break;
                                 }
                             };
@@ -707,12 +712,11 @@ pub mod wasm {
                                 this.w.close().await;
                                 todo!()
                             } else {
-                                log("sending");
                                 log(format!(
                                     "sending result {:?}",
                                     this.w
                                         .send(Box::from_iter(
-                                            Uint8Array::new(&next.value()).to_vec()
+                                            next.value().dyn_into::<Uint8Array>().unwrap().to_vec()
                                         ))
                                         .await
                                 )
@@ -729,9 +733,6 @@ pub mod wasm {
                     };
                 }
             })
-            // js_sys::Promise::resolve(&JsValue::from(""))
-
-            // log("sink end");
         }
     }
 }

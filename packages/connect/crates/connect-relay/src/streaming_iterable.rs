@@ -2,7 +2,6 @@ use core::panic;
 use std::{pin::Pin, u8};
 
 use futures::{
-    future::{FutureExt, LocalBoxFuture},
     stream::{FusedStream, Next},
     task::{Context, Poll},
     Future, Sink, SinkExt, Stream, StreamExt,
@@ -65,8 +64,8 @@ extern "C" {
     #[derive(Clone, Debug)]
     pub type JsStreamingIterable;
 
-    #[wasm_bindgen(structural, method)]
-    pub async fn sink(this: &JsStreamingIterable, stream: &JsValue);
+    #[wasm_bindgen(structural, method, catch)]
+    pub fn sink(this: &JsStreamingIterable, stream: &JsValue) -> Result<JsValue, JsValue>;
 
     #[wasm_bindgen(structural, method, getter)]
     pub fn source(this: &JsStreamingIterable) -> JsValue;
@@ -85,7 +84,7 @@ pin_project! {
         next: Option<JsFuture>,
         // sink closed promise
         #[pin]
-        sink_close_future: Option<LocalBoxFuture<'static, ()>>,
+        sink_close_future: Option<JsFuture>,
         // signals that sink `Sink::poll_close` future can proceed
         close_waker: Option<Waker>,
         // signals that sink `Sink::poll_ready` future can proceed
@@ -179,7 +178,7 @@ impl Stream for StreamingIterable {
                     } else {
                         self.next.take();
                         Poll::Ready(Some(Ok(Box::from_iter(
-                            Uint8Array::new(&next.value()).to_vec(),
+                            next.value().dyn_into::<Uint8Array>().unwrap().to_vec(),
                         ))))
                     }
                 }
@@ -207,6 +206,7 @@ impl Sink<Box<[u8]>> for StreamingIterable {
     ) -> Poll<Result<(), Self::Error>> {
         log("poll_ready called");
 
+        // let mut this = self.project();
         let mut this = unsafe {
             std::mem::transmute::<Pin<&mut StreamingIterable>, Pin<&mut StreamingIterable>>(self)
         }
@@ -219,62 +219,71 @@ impl Sink<Box<[u8]>> for StreamingIterable {
             log("sink done");
             return Poll::Ready(Err("Cannot send any data. Stream has been closed".into()));
         } else if this.sink_close_future.is_none() {
+            log("sink calling code called");
+
+            let iterator_fn: Closure<dyn FnMut() -> Promise> = Closure::new(move || {
+                log("rs: iterator code called");
+
+                Promise::new(&mut |resolve, reject| {
+                    *this.resolve = Some(resolve);
+                    if this.close_waker.is_some() {
+                        this.close_waker.take().unwrap().wake()
+                    } else if let Some(waker) = this.waker.take() {
+                        log("waking up");
+                        waker.wake();
+                    }
+                })
+            });
+
+            let iterator_obj = Object::new();
+
+            // {
+            //    next(): Promise<IteratorResult> {
+            //      // ... function body
+            //    }
+            // }
+            Reflect::set(
+                &iterator_obj,
+                &"next".into(),
+                iterator_fn.as_ref().unchecked_ref(),
+            )
+            .unwrap();
+
+            iterator_fn.forget();
+
+            let iterable_fn: Closure<dyn FnMut() -> Object> = Closure::once(move || iterator_obj);
+
+            let iterable_obj = Object::new();
+
+            // {
+            //    [Symbol.aysncIterator](): Iterator {
+            //      // ... function body
+            //    }
+            // }
+            Reflect::set(
+                &iterable_obj,
+                &Symbol::async_iterator(),
+                // Cast Closure to js_sys::Function
+                iterable_fn.as_ref().unchecked_ref(),
+            )
+            .unwrap();
+
+            iterable_fn.forget();
+
             log("about to call sink");
-            this.sink_close_future.set(Some(
-                async {
-                    log("sink calling code called");
+            let promise = match this.js_stream.sink(&iterable_obj) {
+                Ok(x) => {
+                    log(format!("before conversion {:?}", x).as_str());
+                    let promise = x.dyn_into::<Promise>().unwrap();
 
-                    let iterator_fn: Closure<dyn FnMut() -> Promise> = Closure::new(move || {
-                        log("rs: iterator code called");
-
-                        Promise::new(&mut |resolve, reject| {
-                            *this.resolve = Some(resolve);
-                            if this.close_waker.is_some() {
-                                this.close_waker.take().unwrap().wake()
-                            } else if let Some(waker) = this.waker.take() {
-                                log("waking up");
-                                waker.wake();
-                            }
-                        })
-                    });
-
-                    let iterator_obj = Object::new();
-
-                    // {
-                    //    next(): Promise<IteratorResult> {
-                    //      // ... function body
-                    //    }
-                    // }
-                    Reflect::set(
-                        &iterator_obj,
-                        &"next".into(),
-                        iterator_fn.as_ref().unchecked_ref(),
-                    )
-                    .unwrap();
-
-                    let iterable_fn: Closure<dyn FnMut() -> Object> =
-                        Closure::once(move || iterator_obj);
-
-                    let iterable_obj = Object::new();
-
-                    // {
-                    //    [Symbol.aysncIterator](): Iterator {
-                    //      // ... function body
-                    //    }
-                    // }
-                    Reflect::set(
-                        &iterable_obj,
-                        &Symbol::async_iterator(),
-                        // Cast Closure to js_sys::Function
-                        iterable_fn.as_ref().unchecked_ref(),
-                    )
-                    .unwrap();
-
-                    // Resolves once stream is closed
-                    this.js_stream.sink(&iterable_obj).await;
+                    JsFuture::from(promise)
                 }
-                .boxed_local(),
-            ));
+                Err(e) => {
+                    log(format!("{:?}", e).as_str());
+                    todo!();
+                }
+            };
+            this.sink_close_future.set(Some(promise));
 
             return match this
                 .sink_close_future
@@ -325,6 +334,7 @@ impl Sink<Box<[u8]>> for StreamingIterable {
 
         *this.close_waker = Some(cx.waker().clone());
 
+        log(format!("sink done {}", this.sink_done).as_str());
         if !*this.sink_done {
             match this.resolve.take() {
                 None => return Poll::Pending,
@@ -344,7 +354,7 @@ impl Sink<Box<[u8]>> for StreamingIterable {
 
         if let Some(fut) = this.sink_close_future.as_mut().as_pin_mut() {
             return match fut.poll(cx) {
-                Poll::Ready(()) => Poll::Ready(Ok(())),
+                Poll::Ready(_) => Poll::Ready(Ok(())),
                 Poll::Pending => Poll::Pending,
             };
         }
