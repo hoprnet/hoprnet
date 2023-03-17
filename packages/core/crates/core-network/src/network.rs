@@ -14,16 +14,40 @@ use utils_misc::time::native::current_timestamp;
 use utils_misc::time::wasm::current_timestamp;
 
 
-/// Minimum delay will be multiplied by backoff, it will be half the actual minimum value
-const MIN_DELAY: Duration = Duration::from_secs(1);
-const MAX_DELAY: Duration = Duration::from_secs(300);   // 5 minutes
-const BACKOFF_EXPONENT: f64 = 1.5;
-const MIN_BACKOFF: f64 = 2.0;
-const MAX_BACKOFF: f64 = MAX_DELAY.as_millis() as f64 / MIN_DELAY.as_millis() as f64;
-/// Default quality for unknown or offline nodes
-const BAD_QUALITY: f64 = 0.2;
-const IGNORE_TIMEFRAME: Duration = Duration::from_secs(600);    // 10 minutes
-const QUALITY_STEP: f64 = 0.1;
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct NetworkConfig {
+    /// Minimum delay will be multiplied by backoff, it will be half the actual minimum value
+    min_delay: Duration,
+    /// Maximum delay
+    max_delay: Duration,
+    quality_bad_threshold: f64,
+    quality_offline_threshold: f64,
+    quality_step: f64,
+    ignore_timeframe: Duration,
+    backoff_exponent: f64,
+    backoff_min: f64,
+    backoff_max: f64,
+}
+
+impl Default for NetworkConfig {
+    fn default() -> Self {
+        let min_delay_in_s = 1;
+        let max_delay_in_s = 300;
+
+        Self {
+            min_delay: Duration::from_secs(min_delay_in_s),
+            max_delay: Duration::from_secs(max_delay_in_s),         // 5 minutes
+            quality_bad_threshold: 0.2,
+            quality_offline_threshold: 0.5,
+            quality_step: 0.1,
+            ignore_timeframe: Duration::from_secs(600),             // 10 minutes
+            backoff_exponent: 1.5,
+            backoff_min: 2.0,
+            backoff_max: max_delay_in_s as f64 / min_delay_in_s as f64,
+        }
+    }
+}
 
 
 
@@ -105,7 +129,7 @@ pub struct PeerStatus {
 }
 
 impl PeerStatus {
-    fn new(id: PeerId, origin: PeerOrigin) -> PeerStatus {
+    fn new(id: PeerId, origin: PeerOrigin, backoff: f64) -> PeerStatus {
         PeerStatus {
             id,
             origin,
@@ -113,19 +137,10 @@ impl PeerStatus {
             heartbeats_sent: 0,
             heartbeats_succeeded: 0,
             last_seen: 0,
-            backoff: MIN_BACKOFF,
+            backoff,
             quality: 0.0,
             ignored_at: None,
         }
-    }
-
-    fn next_ping(&self) -> u64 {
-        let backoff = self.backoff.powf(BACKOFF_EXPONENT);
-        let delay = std::cmp::min(
-            MAX_DELAY,
-            Duration::from_millis((MIN_DELAY.as_millis() as f64 * backoff) as u64),
-        );
-        return self.last_seen + delay.as_millis() as u64;
     }
 }
 
@@ -139,10 +154,10 @@ impl std::fmt::Display for PeerStatus {
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Network {
     me: PeerId,
+    cfg: NetworkConfig,
     entries: HashMap<String, PeerStatus>,
     ignored: HashMap<String, u64>,      // timestamp
     excluded: HashSet<String>,
-    network_quality_threshold: f64,
     good_quality_public: HashSet<PeerId>,
     bad_quality_public: HashSet<PeerId>,
     good_quality_non_public: HashSet<PeerId>,
@@ -160,8 +175,14 @@ impl Network {
         network_quality_threshold: f64,
         network_actions_api: Box<dyn NetworkExternalActions>
     ) -> Network {
-        if network_quality_threshold < BAD_QUALITY as f64 {
-            panic!("Requested quality criteria are too low, expected: {network_quality_threshold}, minimum: {BAD_QUALITY}");
+        let cfg = NetworkConfig {
+            quality_offline_threshold: network_quality_threshold,
+            ..NetworkConfig::default()
+        };
+
+        if network_quality_threshold < cfg.quality_offline_threshold as f64 {
+            panic!("Requested quality criteria are too low, expected: {}, minimum: {}",
+                   network_quality_threshold, cfg.quality_offline_threshold);
         }
 
         let mut excluded = HashSet::new();
@@ -169,10 +190,10 @@ impl Network {
 
         let instance = Network {
             me: my_peer_id,
+            cfg,
             entries: HashMap::new(),
             ignored: HashMap::new(),
             excluded,
-            network_quality_threshold,
             good_quality_public: HashSet::new(),
             bad_quality_public: HashSet::new(),
             good_quality_non_public: HashSet::new(),
@@ -211,7 +232,7 @@ impl Network {
         if ! is_excluded {
             let is_ignored = if !has_entry && self.ignored.contains_key(id.as_str()) {
                 let timestamp = self.ignored.get(id.as_str()).unwrap();
-                if timestamp + (IGNORE_TIMEFRAME.as_millis() as u64) < now {
+                if timestamp + (self.cfg.ignore_timeframe.as_millis() as u64) < now {
                     self.ignored.remove(id.as_str());
                     false
                 } else {
@@ -222,12 +243,12 @@ impl Network {
             };
 
             if ! has_entry && ! is_ignored {
-                let mut entry = PeerStatus::new(peer.clone(), origin);
+                let mut entry = PeerStatus::new(peer.clone(), origin, self.cfg.backoff_min);
                 entry.is_public = self.network_actions_api.is_public(&peer);
                 self.refresh_network_status(&entry);
 
-                if let Some(_x) = self.entries.insert(peer.to_string(), entry) {
-                    // warn!("Evicting an existing record for {}, this should not happen!", &x);
+                if let Some(x) = self.entries.insert(peer.to_string(), entry) {
+                    warn!("Evicting an existing record for {}, this should not happen!", &x);
                 }
             }
         }
@@ -249,17 +270,17 @@ impl Network {
             // entry.is_public = self.network_actions_api.is_public(&peer);    // TODO: Reconsider whether this is necessary
 
             if ping_result.is_err() {
-                entry.backoff = MAX_BACKOFF.max(entry.backoff.powf(BACKOFF_EXPONENT));
-                entry.quality = 0.0_f64.max(entry.quality - QUALITY_STEP);
+                entry.backoff = self.cfg.backoff_max.max(entry.backoff.powf(self.cfg.backoff_exponent));
+                entry.quality = 0.0_f64.max(entry.quality - self.cfg.quality_step);
 
-                if entry.quality < (QUALITY_STEP / 2.0) {
+                if entry.quality < (self.cfg.quality_step / 2.0) {
                     self.network_actions_api.close_connection(&entry.id);
                     self.prune_from_network_status(&entry.id);
                     self.entries.remove(entry.id.to_string().as_str());
                     return
                 }
 
-                if entry.quality < BAD_QUALITY {
+                if entry.quality < self.cfg.quality_bad_threshold {
                     self.ignored.insert(entry.id.to_string(), current_timestamp());
                     // self.entries.remove(entry.id.to_string().as_str());
                     // self.prune_from_network_status(&entry.id);
@@ -267,12 +288,12 @@ impl Network {
                     return
                 }
 
-                if entry.quality < self.network_quality_threshold {
+                if entry.quality < self.cfg.quality_offline_threshold {
                     self.network_actions_api.on_peer_offline(&entry.id);
                 }
             } else {
                 entry.heartbeats_succeeded = entry.heartbeats_succeeded + 1;
-                entry.backoff = MIN_BACKOFF;
+                entry.backoff = self.cfg.backoff_min;
                 entry.quality = 1.0_f64.min(entry.quality + 0.1)
             }
 
@@ -287,7 +308,7 @@ impl Network {
     fn refresh_network_status(&mut self, entry: &PeerStatus) {
         self.prune_from_network_status(&entry.id);
 
-        if entry.quality < self.network_quality_threshold {
+        if entry.quality < self.cfg.quality_offline_threshold {
             if entry.is_public {
                 self.bad_quality_public.insert(entry.id.clone());
             } else {
@@ -369,7 +390,17 @@ impl Network {
     }
 
     pub fn find_peers_to_ping(&self, threshold: u64) -> Vec<PeerId> {
-        let mut data: Vec<PeerId> = self.filter(|v| { v.next_ping() < threshold } );
+
+
+        let mut data: Vec<PeerId> = self.filter(|v| {
+            let backoff = v.backoff.powf(self.cfg.backoff_exponent);
+            let delay = std::cmp::min(
+                self.cfg.max_delay,
+                Duration::from_millis((self.cfg.min_delay.as_millis() as f64 * backoff) as u64),
+            );
+
+            (v.last_seen + (delay.as_millis() as u64)) < threshold
+        });
         data.sort_by(|a, b| {
             if self.entries.get(a.to_string().as_str()).unwrap().last_seen < self.entries.get(b.to_string().as_str()).unwrap().last_seen {
                 std::cmp::Ordering::Less
@@ -617,13 +648,6 @@ mod tests {
         assert_eq!(Health::ORANGE as i32, 2);
         assert_eq!(Health::YELLOW as i32, 3);
         assert_eq!(Health::GREEN as i32, 4);
-    }
-
-    #[test]
-    fn test_entry_should_advance_time_on_ping() {
-        let entry = PeerStatus::new(PeerId::random(), PeerOrigin::ManualPing);
-
-        assert_eq!(entry.next_ping(), 2828);
     }
 
     #[test]
