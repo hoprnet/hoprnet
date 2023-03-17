@@ -30,8 +30,6 @@ You should get a login screen, where you'll need to use the following credential
 - Username: `admin`
 - Password: `hopr`
 
-![Grafana Login](/img/node/Grafana-login.png)
-
 ### Avado
 
 For Avado, you can access the Grafana dashboards by just visiting the URL: [http://hopr.my.ava.do:3030/](http://hopr.my.ava.do:3030/). This is assuming you have HOPR installed on your Avado. You can view instructions on how to do so [here.](./using-avado.md)
@@ -40,8 +38,6 @@ You should get a login screen, where you'll need to use the following credential
 
 - Username: `admin`
 - Password: `hopr`
-
-![Grafana Login](/img/node/Grafana-login.png)
 
 ### Docker
 
@@ -77,13 +73,18 @@ You should get a login screen, where you'll need to use the following credential
 - Username: `admin`
 - Password: `hopr`
 
-![Grafana Login](/img/node/Grafana-login.png)
-
 ## Using Grafana
 
 Once you have logged into Grafana, you can access your node's metrics by locating the dashboard: `HOPR NODE Overview`.
 
-(**1**) Under `Dashboard`, look/search for `HOPR NODE Overview`, under the `hopr` category.
+(**1**) Log into Grafana using the credentials:
+
+- Username: `admin`
+- Password: `hopr`
+
+![Grafana Login](/img/node/Grafana-login.png)
+
+(**2**) Under `Dashboard`, look/search for `HOPR NODE Overview`, under the `hopr` category.
 
 ![Gashboard searchbar](/img/node/Grafana-dashboard-searchbar.png)
 
