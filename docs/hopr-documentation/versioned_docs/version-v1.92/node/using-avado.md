@@ -66,15 +66,15 @@ With your copied loges either:
 
 ## Using a Custom RPC Endpoint
 
-You can set your own RPC endpoint for HOPR to use. Ideally, you would install an ETH client on your Avado and use its local provider. A local provider helps increase decentralisation and is generally good practice, but you can also use any RPC provider of your choice.
+You can set your own RPC endpoint for HOPR to use. Ideally, you would install an Gnosis Execution Client (Nethermind) on your Avado and use its local provider. A local provider helps increase decentralisation and is generally good practice, but you can also use any RPC provider of your choice.
 
 ### Finding your local endpoint
 
-If you have already installed an ETH client, you can find its RPC endpoint on the client's settings page.
+If you have already installed an Gnosis Execution Client (Nethermind), you can find its RPC endpoint on the client's settings page.
 
 ![ETH client settings](/img/node/RPC-endpoint-avado.png)
 
-The image above shows the RPC for the GETH client: `http://ethchain-geth.my.ava.do:8545`. Your endpoint will be different depending on the client you have installed. Otherwise, you can use any non-local RPC provider such as [ankr.](https://www.ankr.com/)
+The image above shows the RPC for the Gnosis Execution Client (Nethermind): `http://nethermind-gnosis.my.ava.do:8545`. Your endpoint will be different depending on the client you have installed. Otherwise, you can use any non-local RPC provider such as [ankr.](https://www.ankr.com/)
 
 ### Changing your RPC endpoint
 
@@ -88,7 +88,7 @@ To change your RPC endpoint:
 
 ![Environment variables](/img/node/HOPR-provider-Avado.png)
 
-(**3**) The default endpoint is `https://provider-proxy.hoprnet.workers.dev/xdai_mainnet`. Replace this with your own, e.g. `http://ethchain-geth.my.ava.do:8545` in my case.
+(**3**) The default endpoint is `https://provider-proxy.hoprnet.workers.dev/xdai_mainnet`. Replace this with your own, e.g. `http://nethermind-gnosis.my.ava.do:8545` in my case.
 
 (**4**) Click 'Update environment variables' and wait for your node to restart.
 
