@@ -5,29 +5,15 @@ title: Using Dappnode
 
 To set up your DAppNode, follow the instructions that came with the box. Then, just install the HOPR client and you can start using your node right away!
 
-## Installing the HOPR Client: 1.92.8 (Monte Rosa)
+## Installing the HOPR Client: 1.92.12 (Monte Rosa)
 
-While connected to your Dappnode's network or via a VPN, go to the following [link](http://my.dappnode/#/installer/%2Fipfs%2FQmakbsW3DyfYmP4dtv7QxABh4hh1o3BNWssuGMfGFDvp5j). Just click the install button and wait until the download completes.
-
-If you are unable to use the link above, search for this hash in the Dappnode DappStore:
+While connected to your Dappnode's network or via a VPN:
 
 (**1**) Open the DAppStore using the sidebar to the left.
 
 ![DappStore](/img/node/DappStore-NR-1.png)
 
-(**2**) Enable public repository by clicking on the toggle icon. When the popup opens up, please select: "I understand, take me to the public repo"
-
-(**3**) Search for the HOPR package using this hash:
-
-```
-/ipfs/QmakbsW3DyfYmP4dtv7QxABh4hh1o3BNWssuGMfGFDvp5j
-```
-
-(**4**) Under the Install / Update button, click on Advanced Options and enable "Bypass only signed safe restriction"
-
-(**5**) Click on the Install / Update button
-
-P.S Sometimes, after trying to Install or Update, it will give you an error. Just re-install or update the package if this happens.
+(**2**) You should now see the latest version of the HOPR client. Just click Get or Update and wait for it to install.
 
 That's all! You should now be able to find the HOPR client in your 'Packages'.
 
@@ -70,17 +56,17 @@ Using the downlaoded file either:
 
 ## Using a Custom RPC Endpoint
 
-You can set your own RPC endpoint for HOPR to use. Ideally, you would install an ETH client on your DAppNode and use its local provider. A local provider helps increase decentralisation and is generally good practice, but you can also use any RPC provider of your choice as long as they are on gnosis chain.
+You can set your own RPC endpoint for HOPR to use. Ideally, you would install an Nethermind xDai client on your DAppNode and use its local provider. A local provider helps increase decentralisation and is generally good practice, but you can also use any RPC provider of your choice as long as they are on gnosis chain.
 
 **Note:** Only RPC providers on Gnosis chain will work with HOPR
 
 ### Finding your local endpoint
 
-If you have already installed an ETH client, you can find its RPC endpoint on the package's info page.
+If you have already installed an Nethermind xDai client, you can find its RPC endpoint on the package's info page.
 
 ![ETH client settings](/img/node/RPC-endpoint-Dappnode.png)
 
-The image above shows the RPC endpoint for the GETH client (querying API in the image): `http://ethchain-geth.my.ava.do:8545`. Your endpoint will be different depending on the client you have installed. Otherwise, you can use any non-local RPC provider such as [ankr.](https://www.ankr.com/)
+The image above shows the RPC endpoint for the Nethermind xDai client (querying API in the image): `http://nethermind-xdai.dappnode:8545`. Your endpoint will be different depending on the client you have installed. Otherwise, you can use any non-local RPC provider such as [ankr.](https://www.ankr.com/)
 
 ### Changing your RPC endpoint
 
