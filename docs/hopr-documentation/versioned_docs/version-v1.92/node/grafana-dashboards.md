@@ -30,8 +30,6 @@ You should get a login screen, where you'll need to use the following credential
 - Username: `admin`
 - Password: `hopr`
 
-![Grafana Login](/img/node/Grafana-login.png)
-
 ### Avado
 
 For Avado, you can access the Grafana dashboards by just visiting the URL: [http://hopr.my.ava.do:3030/](http://hopr.my.ava.do:3030/). This is assuming you have HOPR installed on your Avado. You can view instructions on how to do so [here.](./using-avado.md)
@@ -40,8 +38,6 @@ You should get a login screen, where you'll need to use the following credential
 
 - Username: `admin`
 - Password: `hopr`
-
-![Grafana Login](/img/node/Grafana-login.png)
 
 ### Docker
 
@@ -70,8 +66,6 @@ cd hoprnet
 docker compose --file scripts/compose/docker-compose.yml up -d
 ```
 
-**Note:** Generating your node this way will give it the default api/secret token: `YOUR_SECURITY_TOKEN`. You will need this api token to access your node.
-
 Once your HOPRd node is up and running, you should have Grafana exposed on port `3030`, E.g. if you're running this locally and not on a VPS, it would be at the endpoint [http://localhost:3030](http://localhost:3030) (replace `localhost` with your `server IP address` if you are using a VPS, for example, `http://142.93.5.175:3030`).
 
 You should get a login screen, where you'll need to use the following credentials:
@@ -79,13 +73,18 @@ You should get a login screen, where you'll need to use the following credential
 - Username: `admin`
 - Password: `hopr`
 
-![Grafana Login](/img/node/Grafana-login.png)
-
 ## Using Grafana
 
 Once you have logged into Grafana, you can access your node's metrics by locating the dashboard: `HOPR NODE Overview`.
 
-(**1**) Under `Dashboard`, look/search for `HOPR NODE Overview`, under the `hopr` category.
+(**1**) Log into Grafana using the credentials:
+
+- Username: `admin`
+- Password: `hopr`
+
+![Grafana Login](/img/node/Grafana-login.png)
+
+(**2**) Under `Dashboard`, look/search for `HOPR NODE Overview`, under the `hopr` category.
 
 ![Gashboard searchbar](/img/node/Grafana-dashboard-searchbar.png)
 
@@ -96,11 +95,3 @@ Once you have logged into Grafana, you can access your node's metrics by locatin
 ![Initial Dashboard](/img/node/Grafana-initial-dashboard.png)
 
 Each dashboard will have a description and tooltip explaining what you are looking at for all the major and important metrics. 
-
-## Heartbeat
-
-Many of your Grafana metrics will relate to pings generated from the `heartbeat` of your node or other nodes on the network. The heartbeat mechanism is simply the periodic pings every node on the network sends to its visible peers.
-
-Your node will send a ping to every node it can see and record whether or not it gets a response. If there is no response, it will wait twice as long to send the next ping. This exponential backoff starts with the default of one ping every two seconds and doubles until 512 seconds, the maximum delay between pings to a specific node. 
-
-When a successful ping goes through, the pinging delay reduces to two seconds again. A node's ratio of successful pings to total pings generates the [connectivity score](./hoprd-commands.md#info) between those two nodes.
