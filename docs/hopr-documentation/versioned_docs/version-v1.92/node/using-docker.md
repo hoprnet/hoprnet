@@ -98,6 +98,14 @@ All our docker images can be found in [our Google Cloud Container Registry](http
 Each image is prefixed with `gcr.io/hoprassociation/hoprd`.
 The `1.92.9` tag represents the latest community release version.
 
+### Install HOPRd with Grafana
+
+To install HOPRd with Grafana, you can follow the instructions [here.](./grafana-dashboards.md#docker)
+
+**Note:** Following these instructions will give you the default api/security token: `YOUR_SECURITY_TOKEN`. Keep this in mind as you will need it to access the your node.  
+
+### Install HOPRd without Grafana
+
 (**1**) Open your terminal.
 
 (**2**) Create a **Security Token** (password) which satisfies the following requirements:
@@ -131,12 +139,6 @@ If you are not logged in as the root user, add sudo to the start of the above co
 Please note the `--apiToken` (Security token), as this will be used to access hopr-admin. It may also be a good idea to note the `--password`, in case you want to decrypt your identity file and retrieve your private key or funds later.
 
 **Note:** Withdrawing funds is possible through hopr-admin. This is just a precaution for safekeeping.
-
-### Alternative: Install HOPRd with Grafana
-
-To install HOPRd with Grafana, you can follow the instructions [here.](./grafana-dashboards.md#docker)
-
-**Note:** Following these instructions will give you the default api/security token: `YOUR_SECURITY_TOKEN`. Keep this in mind as you will need it to access the your node.  
 
 ### Launching HOPR admin UI
 
