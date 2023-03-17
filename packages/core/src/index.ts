@@ -373,7 +373,7 @@ class Hopr extends EventEmitter {
 
     // initialize with all the peers identified in the peer store
     const peers: Peer[] = await this.libp2pComponents.getPeerStore().all()
-    peers.map((peer) => peer.id.toString()) .forEach((peerId) => {
+    peers.map((peer) => peer.id.toString()).forEach((peerId) => {
       this.networkPeers.register(peerId, PeerOrigin.Initialization)
       log(`peer store: loaded peer ${peerId}`)
     })
