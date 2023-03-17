@@ -5,12 +5,6 @@ title: How to use hopr-admin
 
 This is a guide on how to use `hopr-admin`. It is not exhaustive and is intended only as a brief overview of its functionality and use.
 
-:::caution Warning
-
-The HOPR client software (hoprd) is still under heavy development. Please do not add funds to the node that you cannot lose.
-
-:::
-
 Make sure you have installed a `hoprd` node either through Docker or with a hardware node such as Avado or Dappnode. If you have not completed the installation process, please [start here](start-here).
 
 :::info Tip
