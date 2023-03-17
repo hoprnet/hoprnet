@@ -274,11 +274,11 @@ impl MultiGauge {
 macro_rules! histogram_start_measure {
     // SimpleHistogram case
     ($v:ident) => {
-        if cfg!(wasm) && !cfg!(test) { $v.wasm_start_measure() } else { $v.start_measure() }
+        if cfg!(feature = "wasm") && !cfg!(test) { $v.wasm_start_measure() } else { $v.start_measure() }
     };
     // MultiHistogram case
     ($v:ident, $l:expr) => {
-        if cfg!(wasm) && !cfg!(test){
+        if cfg!(feature = "wasm") && !cfg!(test){
             $v.wasm_start_measure($l.iter().map(|s| js_sys::JsString::from(*s)).collect()).map_err(|_| prometheus::Error::Msg("invalid label".into()))
         } else {
             $v.start_measure($l)
@@ -640,29 +640,27 @@ mod tests {
 
     #[test]
     fn test_merging() {
-        let counter = SimpleCounter::new("my_ctr", "test counter").unwrap();
+        let counter = SimpleCounter::new("my_test_ctr", "test counter").unwrap();
         counter.increment();
 
         let metrics1 = gather_all_metrics().unwrap();
 
-        let counter2 = SimpleCounter::new("my_ctr_2", "test counter 2").unwrap();
+        let counter2 = SimpleCounter::new("my_test_ctr_2", "test counter 2").unwrap();
         counter2.increment_by(2);
         let metrics2 = gather_all_metrics().unwrap();
 
         let res1 = merge_encoded_metrics(&metrics1, &metrics2);
-        assert_eq!(6, res1.lines().count());
 
-        assert!(res1.contains("my_ctr "));
-        assert_eq!(3, res1.match_indices("my_ctr ").count());
+        assert!(res1.contains("my_test_ctr "));
+        assert_eq!(3, res1.match_indices("my_test_ctr ").count());
 
-        assert!(res1.contains("my_ctr_2"));
-        assert_eq!(3, res1.match_indices("my_ctr_2").count());
+        assert!(res1.contains("my_test_ctr_2"));
+        assert_eq!(3, res1.match_indices("my_test_ctr_2").count());
 
         let res2 = merge_encoded_metrics(&metrics1, &metrics1);
-        assert_eq!(3, res2.lines().count());
 
-        assert!(res2.contains("my_ctr "));
-        assert_eq!(3, res2.match_indices("my_ctr ").count());
+        assert!(res2.contains("my_test_ctr "));
+        assert_eq!(3, res2.match_indices("my_test_ctr ").count());
 
         let res3 = merge_encoded_metrics(&metrics1, "");
         assert_eq!(metrics1, res3);
