@@ -13,7 +13,7 @@ pub fn gather_all_metrics() -> prometheus::Result<String> {
 }
 
 /// A naive merging method for two serialized metric registries.
-/// It performs union of the sets, removing those metrics which have the same name (regardless of their type).
+/// It performs union of the sets, removing those metrics which have the same name and type.
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub fn merge_encoded_metrics(metrics1: &str, metrics2: &str) -> String {
     let mut merged_metrics = BTreeMap::new();
@@ -23,8 +23,9 @@ pub fn merge_encoded_metrics(metrics1: &str, metrics2: &str) -> String {
     let merged_texts = metrics1.to_owned() + metrics2;
 
     for complete_metric in metric_expr.captures_iter(&merged_texts) {
-        if let Entry::Vacant(metric) = merged_metrics.entry((&complete_metric["name"]).to_string()) {
-            metric.insert((&complete_metric[0]).to_string());
+        let metric_key = format!("{}~{}", &complete_metric["name"], &complete_metric["type"]);
+        if let Entry::Vacant(metric) = merged_metrics.entry(metric_key) {
+            metric.insert(complete_metric[0].to_string());
         }
     }
 
