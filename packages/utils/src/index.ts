@@ -42,3 +42,12 @@ export {
   merge_encoded_metrics,
   gather_all_metrics,
 } from '../lib/utils_metrics.js'
+
+export type MetricCollector = () => string;
+export function getMetricsCollectors(): MetricCollector[] {
+  return (global.metricCollectors as MetricCollector[] || [])
+}
+export function registerMetricsCollector(collector: MetricCollector) {
+  getMetricsCollectors().push(collector);
+}
+
