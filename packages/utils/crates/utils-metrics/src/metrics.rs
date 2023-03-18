@@ -16,22 +16,26 @@ pub fn gather_all_metrics() -> prometheus::Result<String> {
 /// It performs union of the sets, removing those metrics which have the same name (regardless of their type).
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub fn merge_encoded_metrics(metrics1: &str, metrics2: &str) -> String {
-    let mut merged_metrics: BTreeMap<&str, &str> = BTreeMap::new();
+    let mut merged_metrics = BTreeMap::new();
     let metric_expr = Regex::new(r"(?:# HELP)\s(?P<name>\w+)\s.+\s+(?:# TYPE)\s\w+\s(?P<type>\w+)\s+(?:[^#]+\s)+")
         .unwrap();
 
     let merged_texts = metrics1.to_owned() + metrics2;
 
     for complete_metric in metric_expr.captures_iter(&merged_texts) {
-        let metric_name = complete_metric.name("name").unwrap().as_str();
-        if let Entry::Vacant(metric) = merged_metrics.entry(metric_name) {
-            metric.insert(complete_metric.get(0).unwrap().as_str());
+        if let Entry::Vacant(metric) = merged_metrics.entry((&complete_metric["name"]).to_string()) {
+            metric.insert((&complete_metric[0]).to_string());
         }
     }
 
     // Output metrics sorted lexicographically by name
-    merged_metrics.values()
-        .fold(String::new(), |a, b| a + b)
+    merged_metrics
+        .values()
+        .fold(String::new(), |mut a, b| {
+            a.reserve(b.len() + 1); // pre-alloc space on LHS for better efficiency
+            a.push_str(b);
+            a
+        })
 }
 
 fn register_metric<M, C>(name: &str, desc: &str, creator: C) -> prometheus::Result<M>
