@@ -1,5 +1,7 @@
+use std::collections::BTreeMap;
 use prometheus::core::Collector;
 use prometheus::{Gauge, GaugeVec, Histogram, HistogramOpts, HistogramTimer, HistogramVec, IntCounter, IntCounterVec, Opts, TextEncoder};
+use regex::Regex;
 
 /// Gathers all the global Prometheus metrics.
 pub fn gather_all_metrics() -> prometheus::Result<String> {
@@ -13,22 +15,29 @@ pub fn gather_all_metrics() -> prometheus::Result<String> {
 /// It performs union of the sets, removing those metrics which have the same name (regardless of their type).
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub fn merge_encoded_metrics(metrics1: &str, metrics2: &str) -> String {
-    // Extract all names from LHS metrics
-    let names = metrics1.lines()
-        .filter(|line| !line.starts_with('#'))
-        .map(|line| line.split(' ').nth(0).unwrap())
-        .collect::<Vec<&str>>();
+    let mut merged_metrics: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
+    let metric_expr = Regex::new(r"(?m)^(?:(?:#\sHELP\s)|(?:#\sTYPE\s))?(\w+)\s.+$").unwrap();
+    let merged_texts = metrics1.to_owned() + metrics2;
 
-    (
-        metrics1.to_owned() +
-        &metrics2
-            .lines() // Select only those lines from RHS metrics that do not contain any name from LHS metrics
-            .filter(|line| names.iter().all(|name|
-                !line.contains(&format!(" {} ", name)) && !line.starts_with(&format!("{} ", name))
-            ))
-            .collect::<Vec<_>>()
-            .join("\n")
-    ).trim_end().to_owned() + "\n"
+    const ENTRIES_PER_METRIC: usize = 3;
+    for names in metric_expr.captures_iter(&merged_texts) {
+        let whole_line = names.get(0).unwrap().as_str();
+        if let Some(name) = names.get(1).map(|m| m.as_str()) {
+            if let Some(metric) = merged_metrics.get_mut(name) {
+                if metric.len() < ENTRIES_PER_METRIC {
+                    metric.push(whole_line);
+                }
+            } else {
+                merged_metrics.insert(name, vec![whole_line]);
+            }
+        }
+    }
+
+    // Output metrics sorted lexicographically by name
+    merged_metrics.into_iter()
+        .flat_map(|e| e.1.into_iter())
+        .collect::<Vec<_>>()
+        .join("\n") + "\n"
 }
 
 pub(crate) fn register_metric<M, C>(name: &str, desc: &str, creator: C) -> prometheus::Result<M>
