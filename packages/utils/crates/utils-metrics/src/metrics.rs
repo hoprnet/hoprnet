@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::collections::btree_map::Entry;
 use prometheus::core::Collector;
 use prometheus::{Gauge, GaugeVec, Histogram, HistogramOpts, HistogramTimer, HistogramVec, IntCounter, IntCounterVec, Opts, TextEncoder};
 use regex::Regex;
@@ -15,32 +16,25 @@ pub fn gather_all_metrics() -> prometheus::Result<String> {
 /// It performs union of the sets, removing those metrics which have the same name (regardless of their type).
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub fn merge_encoded_metrics(metrics1: &str, metrics2: &str) -> String {
-    let mut merged_metrics: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
-    let metric_expr = Regex::new(r"(?m)^(?:(?:#\sHELP\s)|(?:#\sTYPE\s))?(\w+)\s.+$").unwrap();
+    let mut merged_metrics: BTreeMap<&str, &str> = BTreeMap::new();
+    let metric_expr = Regex::new(r"(?:# HELP)\s(?P<name>\w+)\s.+\s+(?:# TYPE)\s\w+\s(?P<type>\w+)\s+(?:[^#]+\s)+")
+        .unwrap();
+
     let merged_texts = metrics1.to_owned() + metrics2;
 
-    const ENTRIES_PER_METRIC: usize = 3;
-    for names in metric_expr.captures_iter(&merged_texts) {
-        let whole_line = names.get(0).unwrap().as_str();
-        if let Some(name) = names.get(1).map(|m| m.as_str()) {
-            if let Some(metric) = merged_metrics.get_mut(name) {
-                if metric.len() < ENTRIES_PER_METRIC {
-                    metric.push(whole_line);
-                }
-            } else {
-                merged_metrics.insert(name, vec![whole_line]);
-            }
+    for complete_metric in metric_expr.captures_iter(&merged_texts) {
+        let metric_name = complete_metric.name("name").unwrap().as_str();
+        if let Entry::Vacant(metric) = merged_metrics.entry(metric_name) {
+            metric.insert(complete_metric.get(0).unwrap().as_str());
         }
     }
 
     // Output metrics sorted lexicographically by name
-    merged_metrics.into_iter()
-        .flat_map(|e| e.1.into_iter())
-        .collect::<Vec<_>>()
-        .join("\n") + "\n"
+    merged_metrics.values()
+        .fold(String::new(), |a, b| a + b)
 }
 
-pub(crate) fn register_metric<M, C>(name: &str, desc: &str, creator: C) -> prometheus::Result<M>
+fn register_metric<M, C>(name: &str, desc: &str, creator: C) -> prometheus::Result<M>
     where
         M: Clone + Collector + 'static,
         C: Fn(Opts) -> prometheus::Result<M>,
@@ -52,7 +46,7 @@ pub(crate) fn register_metric<M, C>(name: &str, desc: &str, creator: C) -> prome
     Ok(metric)
 }
 
-pub(crate) fn register_metric_vec<M, C>(
+fn register_metric_vec<M, C>(
     name: &str,
     desc: &str,
     labels: &[&str],
@@ -649,27 +643,40 @@ mod tests {
 
     #[test]
     fn test_merging() {
-        let counter = SimpleCounter::new("my_test_ctr", "test counter").unwrap();
+        let counter = SimpleCounter::new("b_my_test_ctr", "test counter").unwrap();
         counter.increment();
+
+        let multi_gauge = MultiGauge::new("c_mgauge", "test mgauge", &["version", "method"]).unwrap();
+        multi_gauge.increment(&["1.10.11", "get"], 3.0);
+        multi_gauge.increment(&["1.10.11", "post"], 1.0);
 
         let metrics1 = gather_all_metrics().unwrap();
 
-        let counter2 = SimpleCounter::new("my_test_ctr_2", "test counter 2").unwrap();
+        let counter2 = SimpleCounter::new("a_my_test_ctr_2", "test counter 2").unwrap();
         counter2.increment_by(2);
+
+        let histogram = SimpleHistogram::new("b_histogram", "test histogram", vec![0.5, 1.0, 5.0]).unwrap();
+        histogram.observe(0.3);
+
         let metrics2 = gather_all_metrics().unwrap();
 
         let res1 = merge_encoded_metrics(&metrics1, &metrics2);
+        assert!(res1.contains("b_my_test_ctr"));
+        assert_eq!(3, res1.match_indices("b_my_test_ctr").count());
 
-        assert!(res1.contains("my_test_ctr "));
-        assert_eq!(3, res1.match_indices("my_test_ctr ").count());
+        assert!(res1.contains("a_my_test_ctr_2"));
+        assert_eq!(3, res1.match_indices("a_my_test_ctr_2").count());
 
-        assert!(res1.contains("my_test_ctr_2"));
-        assert_eq!(3, res1.match_indices("my_test_ctr_2").count());
+        // Metrics must be sorted lexicographically by their names
+        assert!(res1.find("b_my_test_ctr").unwrap() > res1.find("a_my_test_ctr_2").unwrap());
+        assert!(res1.find("b_my_test_ctr").unwrap() > res1.find("b_histogram").unwrap());
+        assert!(res1.find("c_mgauge").unwrap() > res1.find("b_my_test_ctr").unwrap());
+
+        // Test degenerate cases
 
         let res2 = merge_encoded_metrics(&metrics1, &metrics1);
-
-        assert!(res2.contains("my_test_ctr "));
-        assert_eq!(3, res2.match_indices("my_test_ctr ").count());
+        assert!(res2.contains("b_my_test_ctr"));
+        assert_eq!(3, res2.match_indices("b_my_test_ctr").count());
 
         let res3 = merge_encoded_metrics(&metrics1, "");
         assert_eq!(metrics1, res3);
