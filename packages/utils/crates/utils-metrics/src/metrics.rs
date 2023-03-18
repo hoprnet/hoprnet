@@ -22,6 +22,7 @@ pub fn merge_encoded_metrics(metrics1: &str, metrics2: &str) -> String {
 
     let merged_texts = metrics1.to_owned() + metrics2;
 
+    // Search for all metrics in the merged texts and skip those with duplicate name and type, first comes first served.
     for complete_metric in metric_expr.captures_iter(&merged_texts) {
         let metric_key = format!("{}~{}", &complete_metric["name"], &complete_metric["type"]);
         if let Entry::Vacant(metric) = merged_metrics.entry(metric_key) {
@@ -32,7 +33,7 @@ pub fn merge_encoded_metrics(metrics1: &str, metrics2: &str) -> String {
     // Output metrics sorted lexicographically by name
     merged_metrics
         .values()
-        .fold(String::new(), |mut a, b| {
+        .fold("".into(), |mut a, b| {
             a.reserve(b.len()); // pre-alloc space on LHS for better efficiency
             a.push_str(b);
             a
