@@ -32,7 +32,7 @@ pub fn merge_encoded_metrics(metrics1: &str, metrics2: &str) -> String {
     merged_metrics
         .values()
         .fold(String::new(), |mut a, b| {
-            a.reserve(b.len() + 1); // pre-alloc space on LHS for better efficiency
+            a.reserve(b.len()); // pre-alloc space on LHS for better efficiency
             a.push_str(b);
             a
         })
