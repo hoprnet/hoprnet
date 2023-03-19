@@ -48,7 +48,7 @@ const GET: Operation = [
         .reduce((prev, current, _i, _a) => merge_encoded_metrics(prev, current),
           tsMetrics)
 
-      log(`All gathered metrics contain ${countMetricsFromText(tsMetrics)} values`)
+      log(`All gathered metrics contain ${countMetricsFromText(allMetrics)} values`)
 
       return res.status(200).type('text/plain; version=0.0.4').send(allMetrics)
     } catch (err) {
