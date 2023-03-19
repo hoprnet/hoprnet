@@ -44,6 +44,7 @@ export {
 } from '../lib/utils_metrics.js'
 
 export type MetricCollector = () => string;
+
 let metricCollectors: MetricCollector[] = [];
 export { metricCollectors };
 
