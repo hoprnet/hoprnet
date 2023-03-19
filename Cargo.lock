@@ -742,6 +742,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
+name = "chacha20"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c7fc89c7c5b9e7a02dfe45cd2367bae382f9ed31c61ca8debe5f827c420a2f08"
+dependencies = [
+ "cfg-if 1.0.0",
+ "cipher",
+ "cpufeatures",
+]
+
+[[package]]
 name = "chrono"
 version = "0.4.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1016,6 +1027,38 @@ dependencies = [
  "time 0.1.45",
  "try_from",
  "url 1.7.2",
+]
+
+[[package]]
+name = "core-crypto"
+version = "0.1.0"
+dependencies = [
+ "aes",
+ "blake2",
+ "chacha20",
+ "console_error_panic_hook",
+ "ctr",
+ "digest 0.10.6",
+ "elliptic-curve 0.13.2",
+ "generic-array 0.14.6",
+ "getrandom 0.2.8",
+ "hex-literal",
+ "hkdf",
+ "hmac 0.12.1",
+ "js-sys",
+ "k256 0.13.0",
+ "rand 0.8.5",
+ "serde",
+ "serde-wasm-bindgen 0.5.0",
+ "serde_bytes",
+ "sha3",
+ "static_assertions",
+ "thiserror",
+ "typenum",
+ "utils-misc",
+ "utils-proc-macros",
+ "wasm-bindgen",
+ "wasm-bindgen-test",
 ]
 
 [[package]]
@@ -1607,6 +1650,7 @@ dependencies = [
  "ff 0.13.0",
  "generic-array 0.14.6",
  "group 0.13.0",
+ "hkdf",
  "pkcs8 0.10.1",
  "rand_core 0.6.4",
  "sec1 0.7.1",
@@ -2531,6 +2575,15 @@ name = "hex-literal"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ebdb29d2ea9ed0083cd8cece49bbd968021bd99b0849edb4a9a7ee0fdf6a4e0"
+
+[[package]]
+name = "hkdf"
+version = "0.12.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "791a029f6b9fc27657f6f188ec6e5e43f6911f6f878e0dc5501396e09809d437"
+dependencies = [
+ "hmac 0.12.1",
+]
 
 [[package]]
 name = "hmac"
