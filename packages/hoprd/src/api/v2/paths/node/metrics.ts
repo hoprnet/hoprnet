@@ -33,7 +33,7 @@ function recordNodeHeapStats() {
 
 }
 function countMetricsFromText(encoded_metrics: string): number {
-  return encoded_metrics.split(/\r\n|\r|\n/).find((s) => s.startsWith("# HELP")).length
+  return (encoded_metrics.match(/#\sHELP/g) || []).length
 }
 
 const GET: Operation = [
@@ -47,7 +47,6 @@ const GET: Operation = [
         .map((c) => c())
         .reduce((prev, current, _i, _a) => merge_encoded_metrics(prev, current),
           tsMetrics)
-
       log(`All gathered metrics contain ${countMetricsFromText(allMetrics)} values`)
 
       return res.status(200).type('text/plain; version=0.0.4').send(allMetrics)
