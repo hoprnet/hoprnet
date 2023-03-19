@@ -86,7 +86,7 @@ To exit your current session without closing it. To be clear, you press ctrl and
 
 Please make sure you are in a newly opened session and haven't exited it before continuing.
 
-## Installing HOPRd: 1.92.9 (Monte Rosa)
+## Installing HOPRd: 1.92.12 (Monte Rosa)
 
 :::info NOTE
 
@@ -96,7 +96,19 @@ Before downloading the HOPRd image, make sure **Docker** is installed.
 
 All our docker images can be found in [our Google Cloud Container Registry](https://console.cloud.google.com/gcr/images/hoprassociation/global/hoprd).
 Each image is prefixed with `gcr.io/hoprassociation/hoprd`.
-The `1.92.9` tag represents the latest community release version.
+The `1.92.12` tag represents the latest community release version.
+
+### Install HOPRd with Grafana
+
+:::info INFO
+Using this setup will generate a new node, it will not migrate your old node. To keep using your old node, follow the setup without Grafana.
+:::
+
+To install HOPRd with Grafana, you can follow the instructions [here.](./grafana-dashboards.md#docker)
+
+**Note:** Following these instructions will generate a node with no authentication, so no security/api token will be needed to access your node.
+
+### Install HOPRd without Grafana
 
 (**1**) Open your terminal.
 
@@ -119,7 +131,7 @@ This ensures the node cannot be accessed by a malicious user residing in the sam
 (**3**) Copy the following command and replace **YOUR_SECURITY_TOKEN** with your own.
 
 ```bash
-docker run --pull always --restart on-failure -m 2g --log-driver json-file --log-opt max-size=100M --log-opt max-file=5 -ti -v $HOME/.hoprd-db-monte-rosa:/app/hoprd-db -p 9091:9091/tcp -p 9091:9091/udp -p 8080:8080 -p 3001:3001 -e DEBUG="hopr*" gcr.io/hoprassociation/hoprd:1.92.9 --environment monte_rosa --init --api --identity /app/hoprd-db/.hopr-id-monte-rosa --data /app/hoprd-db --password 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' --apiHost "0.0.0.0" --apiToken 'YOUR_SECURITY_TOKEN' --healthCheck --healthCheckHost "0.0.0.0"
+docker run --pull always --restart on-failure -m 2g --log-driver json-file --log-opt max-size=100M --log-opt max-file=5 -ti -v $HOME/.hoprd-db-monte-rosa:/app/hoprd-db -p 9091:9091/tcp -p 9091:9091/udp -p 8080:8080 -p 3001:3001 -e DEBUG="hopr*" gcr.io/hoprassociation/hoprd:1.92.12 --environment monte_rosa --init --api --identity /app/hoprd-db/.hopr-id-monte-rosa --data /app/hoprd-db --password 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' --apiHost "0.0.0.0" --apiToken 'YOUR_SECURITY_TOKEN' --healthCheck --healthCheckHost "0.0.0.0"
 ```
 
 If you are not logged in as the root user, add sudo to the start of the above command. E.g. `sudo docker run ...`. If you are using a VPS, you are likely a root user and can use the default command.
@@ -152,7 +164,7 @@ Otherwise, the installation process is complete! You can proceed to our [hopr-ad
 
 When migrating between releases, Docker users need to either move their identity file to the newly specified location or edit the command to point to their old location. Otherwise, you will be running a new node instead of accessing your old node's information.
 
-For example, when we update from version `1.91.24` (Bogota) to `1.92.9` (Monte Rosa), the location the command points to will change as such:
+For example, when we update from version `1.91.24` (Bogota) to `1.92.12` (Monte Rosa), the location the command points to will change as such:
 
 1.) `$HOME/.hoprd-db-bogota` to `$HOME/.hoprd-db-monte-rosa`
 
@@ -172,7 +184,7 @@ cp -r $HOME/.hoprd-db-bogota/.hopr-id-bogota $HOME/.hoprd-db-monte-rosa/.hopr-id
 Following the above example of migration from Bogota to Monte Rosa, you would just use the new Monte Rosa command with the old directories/location: `$HOME/.hoprd-db-bogota/.hopr-id-bogota`
 
 ```bash
-docker run --pull always --restart on-failure -m 2g -ti -v $HOME/.hoprd-db-bogota:/app/hoprd-db -p 9091:9091/tcp -p 9091:9091/udp -p 3001:3001 -e DEBUG="hopr*" gcr.io/hoprassociation/hoprd:1.92.9 --environment monte_rosa --init --api --admin --identity /app/hoprd-db/.hopr-id-bogota --data /app/hoprd-db --password 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' --apiHost "0.0.0.0" --apiToken 'YOUR_SECURITY_TOKEN' --adminHost "0.0.0.0" --healthCheck --healthCheckHost "0.0.0.0"
+docker run --pull always --restart on-failure -m 2g -ti -v $HOME/.hoprd-db-bogota:/app/hoprd-db -p 9091:9091/tcp -p 9091:9091/udp -p 3001:3001 -e DEBUG="hopr*" gcr.io/hoprassociation/hoprd:1.92.12 --environment monte_rosa --init --api --admin --identity /app/hoprd-db/.hopr-id-bogota --data /app/hoprd-db --password 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' --apiHost "0.0.0.0" --apiToken 'YOUR_SECURITY_TOKEN' --adminHost "0.0.0.0" --healthCheck --healthCheckHost "0.0.0.0"
 ```
 
 This also works fine as long as the other flags and details remain the same.

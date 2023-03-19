@@ -1,5 +1,8 @@
 pub mod heartbeat;
-pub mod peers;
+pub mod network;
+pub mod ping;
+pub(crate) mod types;
+
 
 #[cfg(feature = "wasm")]
 pub mod wasm {

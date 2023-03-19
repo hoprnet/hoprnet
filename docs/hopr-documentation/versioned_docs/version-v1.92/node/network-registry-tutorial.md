@@ -7,7 +7,7 @@ title: Network Registry
 
 The Network Registry is a list of nodes allowed to interact with others on the network. This is a utility used by HOPR to scale and test the network at a controlled pace.
 
-The Network Registry is only enabled in the staging or production environment by default. If you run a cluster of HOPR nodes locally in the hardhat network, the Network Registry is not enabled.
+The Network Registry is only enabled in the staging or production environment by default. If you run a cluster of HOPR nodes locally, the Network Registry is not enabled.
 
 ## Monte Rosa Release
 
@@ -19,9 +19,9 @@ The staking address you provide on this form will be the primary indicator of yo
 
 From the list of interested participants, an ordered waitlist will be generated. Your rank on the waitlist is determined by the NFTs held in your staking address from past testnets/staking seasons and how much HOPR you have staked currently.
 
-Users from the waitlist will then be given an NFT in blocks of 20. You can use this NFT to register your node on the network registry smart contract.
+Users from the waitlist will then be given an NFT in blocks of 15. You can use this NFT to register your node on the network registry smart contract.
 
-For every 20 NFTs given out, the majority will go to the next highest-ranking participants on the waitlist, but a few will also be allocated to Dappnode/Avado users. And one of every 20 will be given to someone at random further down the waitlist (so you always have a chance of being chosen even without having participated in previous staking seasons or releases).
+For every 15 NFTs given out, the majority will go to the next highest-ranking participants on the waitlist, but a few will also be allocated to Dappnode/Avado users. And one of every 15 will be given to someone at random further down the waitlist (so you always have a chance of being chosen even without having participated in previous staking seasons or releases).
 
 Depending on your prefered method of contact, you will either be notified by email when you have been chosen or you can review the waitlist manually [here.](https://docs.google.com/spreadsheets/d/13RcEaB2PyovJ4oEx0ViT3v5QeqpdxBJ74Pk3dyALCF8/edit#gid=0)
 
@@ -33,21 +33,17 @@ If you are chosen to join the registry, you will be sent a network registry NFT 
 
 (**1**) Go to [stake.hoprnet.org](https://stake.hoprnet.org/)
 
-(**2**) Connect your wallet (make sure this is the one containing your NFT). You should see an icon for this on the top right of the site. Once you have connected your wallet, you should see the option to 'Sync'.
+(**2**) Connect your wallet (make sure this is the one containing your NFT). You should see an icon for this on the top right of the site.
 
-![connect wallet](/img/node/connect_wallet_NR.png)
+![connect wallet](/img/node/NR_connect_wallet2.png)
 
-(**3**) Click the sync icon.
+(**3**) Scroll down and click on the `HOPR NFTs` dropdown, You should see your Network Registry NFT under available HOPR NFTs
 
-![sync](/img/node/sync_NR.png)
+![sync](/img/node/NR_HOPR_NFT_2.png)
 
-(**4**) You should now see your Network Registry NFT under available HOPR NFTs
+(**4**) Click Lock NFT
 
-(**5**) Click Lock NFT
-
-![NFT](/img/node/NFT-NR.png)
-
-(**6**) Then click sync again and make sure your NFT now appears under 'locked HOPR NFTs'.
+(**5**) Wait for the transaction to go through and make sure your NFT now appears under 'locked HOPR NFTs'.
 
 ### Step 2: Get your peerID
 

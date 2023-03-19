@@ -5,15 +5,7 @@ title: Start here
 
 # Start here
 
-:::caution Warning
-The HOPR client software (hoprd) is still under heavy development. Please do _not_ add funds to the node you cannot lose.
-
-For further questions, please visit our [Telegram channel](https://t.me/hoprnet)
-:::
-
-To use the HOPR network, you will need to install a HOPR node. Currently, the only way to do so is by running `hoprd`, a node.js process that implements the HOPR protocol and effectively transforms the device you are running it on into a HOPR node. Please bear in mind that by simply installing `hoprd`, you are not making your computer a HOPR node. It is required you run the service as an application and have a working internet connection.
-
-There are several ways to run `hoprd`: you can run it on your device, on a virtual private server (VPS) or use a dedicated hardware device such as the AVADO/Dappnode HOPR Node PC, which has it as a pre-installed package (Docker image).
+To use the HOPR network, you will need to install a `hoprd` node. There are several ways to do so: you can run it on your device, on a virtual private server (VPS) or use a dedicated hardware device such as the AVADO/Dappnode HOPR Node PC, which has it as a pre-installed package (Docker image).
 
 ## Network Registry
 
@@ -51,4 +43,4 @@ A [Dappnode](https://dappnode.io/) plug-n-play device, another quick set-up and 
 
 Using [Docker](https://www.docker.com/) you can run `hoprd` on your device.
 
-Regardless of which way you install `hoprd`, you will access and interact with it through your browser. The exact URL for this will vary depending on your installation method and whether or not you used a VPS. All details can be found in their respective installation section.
+Regardless of which way you install `hoprd`, you will likely access and interact with it through your browser. The exact URL for this will vary depending on your installation method and whether or not you used a VPS. All details can be found in their respective installation section.

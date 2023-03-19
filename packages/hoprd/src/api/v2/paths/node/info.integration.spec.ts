@@ -5,7 +5,7 @@ import chai, { expect } from 'chai'
 import { createTestApiInstance } from '../../fixtures.js'
 import { privKeyToPeerId } from '@hoprnet/hopr-utils'
 import type Hopr from '@hoprnet/hopr-core'
-import { NetworkHealthIndicator, ResolvedEnvironment } from '@hoprnet/hopr-core'
+import { Health, ResolvedEnvironment } from '@hoprnet/hopr-core'
 import { Multiaddr } from '@multiformats/multiaddr'
 
 const node = sinon.fake() as any as Hopr
@@ -47,7 +47,7 @@ describe('GET /node/info', () => {
     node.getListeningAddresses = sinon.fake.returns(LISTENING_ADDRS)
     node.getId = sinon.fake.returns(nodePeerId)
     node.isAllowedAccessToNetwork = sinon.fake.returns(Promise.resolve(true))
-    node.getConnectivityHealth = sinon.fake.returns(NetworkHealthIndicator.GREEN)
+    node.getConnectivityHealth = sinon.fake.returns(Health.GREEN)
 
     const res = await request(service).get(`/api/v2/node/info`)
     expect(res.status).to.equal(200)
@@ -61,7 +61,7 @@ describe('GET /node/info', () => {
       hoprChannels: HOPR_CHANNELS_ADDRESS,
       hoprNetworkRegistry: HOPR_NEWTWORK_REGISTRY_ADDRESS,
       isEligible: true,
-      connectivityStatus: NetworkHealthIndicator.GREEN,
+      connectivityStatus: Health.GREEN.toString(),
       channelClosurePeriod: 1
     })
   })

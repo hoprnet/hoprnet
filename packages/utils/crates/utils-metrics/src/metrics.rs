@@ -50,37 +50,6 @@ where
     Ok(metric)
 }
 
-#[cfg(any(not(feature = "wasm"), test))]
-use native::SimpleCounter;
-#[cfg(any(not(feature = "wasm"), test))]
-use native::MultiCounter;
-#[cfg(any(not(feature = "wasm"), test))]
-use native::SimpleTimer;
-#[cfg(any(not(feature = "wasm"), test))]
-use native::SimpleGauge;
-#[cfg(any(not(feature = "wasm"), test))]
-use native::MultiGauge;
-#[cfg(any(not(feature = "wasm"), test))]
-use native::SimpleHistogram;
-#[cfg(any(not(feature = "wasm"), test))]
-use native::MultiHistogram;
-
-#[cfg(all(feature = "wasm", not(test)))]
-use wasm::SimpleCounter;
-#[cfg(all(feature = "wasm", not(test)))]
-use wasm::MultiCounter;
-#[cfg(all(feature = "wasm", not(test)))]
-use wasm::SimpleTimer;
-#[cfg(all(feature = "wasm", not(test)))]
-use wasm::SimpleGauge;
-#[cfg(all(feature = "wasm", not(test)))]
-use wasm::MultiGauge;
-#[cfg(all(feature = "wasm", not(test)))]
-use wasm::SimpleHistogram;
-#[cfg(all(feature = "wasm", not(test)))]
-use wasm::MultiHistogram;
-
-
 pub mod native {
     /// Represents a timer handle.
     pub struct SimpleTimer {
@@ -428,6 +397,7 @@ pub mod native {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::native::*;
 
     #[test]
     fn test_counter() {
@@ -588,12 +558,16 @@ pub mod wasm {
 
     #[wasm_bindgen]
     impl SimpleCounter {
-        pub fn increment_by(&self, by: u64) {
-            self.w.increment(by);
+        /// Explicitly called `increment` to be backwards compatible with TS code and native implementation
+        #[wasm_bindgen(js_name = increment)]
+        pub fn increment_by_one(&self) {
+            self.increment(1u64)
         }
 
-        pub fn increment(&self) {
-            self.w.increment(1)
+        /// Explicitly called `increment_by` to not clash with the increment
+        #[wasm_bindgen(js_name = increment_by)]
+        pub fn increment(&self, by: u64) {
+            self.w.increment(by);
         }
 
         pub fn get(&self) -> u64 {
@@ -756,29 +730,7 @@ pub mod wasm {
         }
     }
 
-    //// SimpleHistogram
-
-    #[wasm_bindgen]
-    pub struct SimpleHistogram {
-        w: super::native::SimpleHistogram,
-    }
-
-    #[wasm_bindgen]
-    pub fn create_histogram(name: &str, description: &str) -> Result<SimpleHistogram, JsValue> {
-        create_histogram_with_buckets(name, description, &[] as &[f64; 0])
-    }
-
-    #[wasm_bindgen]
-    pub fn create_histogram_with_buckets(
-        name: &str,
-        description: &str,
-        buckets: &[f64],
-    ) -> Result<SimpleHistogram, JsValue> {
-        ok_or_jserr!(
-            super::native::SimpleHistogram::new(name, description, buckets.into())
-                .map(|c| SimpleHistogram { w: c })
-        )
-    }
+    //// SimpleTimer
 
     /// Currently the SimpleTimer is NOT a wrapper for HistogramTimer,
     /// but rather implements the timer logic using js_sys::Date to achieve a similar functionality.
@@ -808,8 +760,41 @@ pub mod wasm {
         }
     }
 
+    //// SimpleHistogram
+
+    #[wasm_bindgen]
+    pub fn create_histogram(name: &str, description: &str) -> Result<SimpleHistogram, JsValue> {
+        create_histogram_with_buckets(name, description, &[] as &[f64; 0])
+    }
+
+    #[wasm_bindgen]
+    pub fn create_histogram_with_buckets(
+        name: &str,
+        description: &str,
+        buckets: &[f64],
+    ) -> Result<SimpleHistogram, JsValue> {
+        SimpleHistogram::new(name, description, buckets.into())
+    }
+
+    #[wasm_bindgen]
+    pub struct SimpleHistogram {
+        w: super::native::SimpleHistogram,
+    }
+
     #[wasm_bindgen]
     impl SimpleHistogram {
+        #[wasm_bindgen]
+        pub fn new(
+            name: &str,
+            description: &str,
+            buckets: Vec<f64>,
+        ) -> Result<SimpleHistogram, JsValue> {
+            ok_or_jserr!(
+                super::native::SimpleHistogram::new(name, description, buckets)
+                    .map(|c| SimpleHistogram { w: c })
+            )
+        }
+
         pub fn observe(&self, value: f64) {
             self.w.observe(value)
         }
