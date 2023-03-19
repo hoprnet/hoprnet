@@ -58,7 +58,6 @@ import {
 import { FULL_VERSION, INTERMEDIATE_HOPS, MAX_HOPS, PACKET_SIZE, VERSION, MAX_PARALLEL_PINGS } from './constants.js'
 
 import { Network, PeerStatus, PeerOrigin, Health, HeartbeatConfig, core_network_set_panic_hook, core_network_gather_metrics } from '../lib/core_network.js'
-
 core_network_set_panic_hook();
 registerMetricsCollector(core_network_gather_metrics);
 
