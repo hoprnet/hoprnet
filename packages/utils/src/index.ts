@@ -44,10 +44,13 @@ export {
 } from '../lib/utils_metrics.js'
 
 export type MetricCollector = () => string;
+let metricCollectors: MetricCollector[] = [];
+export { metricCollectors };
+
 export function getMetricsCollectors(): MetricCollector[] {
-  return (global.metricCollectors as MetricCollector[] || [])
+  return metricCollectors
 }
 export function registerMetricsCollector(collector: MetricCollector) {
-  getMetricsCollectors().push(collector);
+  metricCollectors.push(collector);
 }
 

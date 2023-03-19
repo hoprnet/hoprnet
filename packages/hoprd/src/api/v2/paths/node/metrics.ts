@@ -2,6 +2,7 @@ import type { Operation } from 'express-openapi'
 import { STATUS_CODES } from '../../utils.js'
 import { getHeapStatistics } from 'v8'
 import { create_gauge, gather_all_metrics, merge_encoded_metrics, getMetricsCollectors } from '@hoprnet/hopr-utils'
+import { log } from 'debug'
 
 // Metrics
 const metric_totalAllocHeap = create_gauge(
@@ -32,17 +33,25 @@ function recordNodeHeapStats() {
 }
 
 
+function countMetricsFromText(encoded_metrics: string): number {
+  return encoded_metrics.split(/\r\n|\r|\n/).find((s) => s.startsWith("# HELP")).length
+}
+
 const GET: Operation = [
   (_, res, _next) => {
     try {
       recordNodeHeapStats()
-      let global_metrics = gather_all_metrics()
-      let merged = getMetricsCollectors()
+      let tsMetrics = gather_all_metrics()
+      log(`TS metrics contain ${countMetricsFromText(tsMetrics)} values`)
+
+      let allMetrics = getMetricsCollectors()
         .map((c) => c())
         .reduce((prev, current, _i, _a) => merge_encoded_metrics(prev, current),
-          global_metrics)
+          tsMetrics)
 
-      return res.status(200).type('text/plain; version=0.0.4').send(merged)
+      log(`All gathered metrics contain ${countMetricsFromText(tsMetrics)} values`)
+
+      return res.status(200).type('text/plain; version=0.0.4').send(allMetrics)
     } catch (err) {
       return res
         .status(422)
