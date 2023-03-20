@@ -5,7 +5,7 @@ use std::time::Duration;
 use libp2p::PeerId;
 
 use utils_log::{info,warn,error};
-use utils_metrics::metrics::native::{MultiGauge, SimpleGauge};
+use utils_metrics::metrics::{MultiGauge, SimpleGauge};
 
 #[cfg(any(not(feature = "wasm"), test))]
 use utils_misc::time::native::current_timestamp;

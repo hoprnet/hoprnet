@@ -21,15 +21,6 @@ import {
 // @ts-ignore untyped library
 import retimer from 'retimer'
 
-import { FULL_VERSION, INTERMEDIATE_HOPS, MAX_HOPS, PACKET_SIZE, VERSION, MAX_PARALLEL_PINGS } from './constants.js'
-
-import { Network, PeerStatus, PeerOrigin, Health, HeartbeatConfig } from '../lib/core_network.js'
-import { core_network_set_panic_hook } from '../lib/core_network.js'
-core_network_set_panic_hook()
-import Heartbeat from './network/heartbeat.js'
-
-import { findPath } from './path/index.js'
-
 import {
   type AcknowledgedTicket,
   type Address,
@@ -58,11 +49,22 @@ import {
   libp2pSendMessage,
   MIN_NATIVE_BALANCE,
   NativeBalance,
-  PublicKey,
+  PublicKey, registerMetricsCollector,
   retimer as intervalTimer,
   retryWithBackoffThenThrow,
   type Ticket
 } from '@hoprnet/hopr-utils'
+
+import { FULL_VERSION, INTERMEDIATE_HOPS, MAX_HOPS, PACKET_SIZE, VERSION, MAX_PARALLEL_PINGS } from './constants.js'
+
+import { Network, PeerStatus, PeerOrigin, Health, HeartbeatConfig, core_network_set_panic_hook, core_network_gather_metrics } from '../lib/core_network.js'
+core_network_set_panic_hook();
+registerMetricsCollector(core_network_gather_metrics);
+
+import Heartbeat from './network/heartbeat.js'
+
+import { findPath } from './path/index.js'
+
 import HoprCoreEthereum, { type Indexer } from '@hoprnet/hopr-core-ethereum'
 
 import {

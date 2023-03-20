@@ -1,7 +1,8 @@
 import type { Operation } from 'express-openapi'
 import { STATUS_CODES } from '../../utils.js'
 import { getHeapStatistics } from 'v8'
-import { create_gauge, gather_all_metrics } from '@hoprnet/hopr-utils'
+import { create_gauge, gather_all_metrics, merge_encoded_metrics, getMetricsCollectors } from '@hoprnet/hopr-utils'
+import { log } from 'debug'
 
 // Metrics
 const metric_totalAllocHeap = create_gauge(
@@ -29,14 +30,26 @@ function recordNodeHeapStats() {
   metric_totalAvailHeap.set(heapStats.total_available_size)
   metric_activeCtxs.set(heapStats.number_of_native_contexts)
   metric_detachedCtxs.set(heapStats.number_of_detached_contexts)
+
+}
+function countMetricsFromText(encoded_metrics: string): number {
+  return (encoded_metrics.match(/#\sHELP/g) || []).length
 }
 
 const GET: Operation = [
   (_, res, _next) => {
     try {
       recordNodeHeapStats()
-      const metrics = gather_all_metrics()
-      return res.status(200).type('text/plain; version=0.0.4').send(metrics)
+      let tsMetrics = gather_all_metrics()
+      log(`TS metrics contain ${countMetricsFromText(tsMetrics)} values`)
+
+      let allMetrics = getMetricsCollectors()
+        .map((c) => c())
+        .reduce((prev, current, _i, _a) => merge_encoded_metrics(prev, current),
+          tsMetrics)
+      log(`All gathered metrics contain ${countMetricsFromText(allMetrics)} values`)
+
+      return res.status(200).type('text/plain; version=0.0.4').send(allMetrics)
     } catch (err) {
       return res
         .status(422)
