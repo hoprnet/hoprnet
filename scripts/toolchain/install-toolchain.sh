@@ -214,7 +214,22 @@ function install_node_js() {
             node_download_url="https://unofficial-builds.nodejs.org/download/release/${node_release}/node-${node_release}-linux-x64-musl.tar.xz"
         fi
         curl -fsSL --compressed "${node_download_url}" > node.tar.xz
-        tar -xJf node.tar.xz -C /usr/local --strip-components=1 --no-same-owner
+        # ensure older installations are uninstalled first
+        rm -rf \
+          /usr/local/bin/node \
+          /usr/local/bin/npx \
+          /usr/local/bin/npm \
+          /usr/local/bin/corepack \
+          /usr/local/share/systemtap/tapset/node.stp \
+          /usr/local/share/doc/node \
+          /usr/local/share/man/man1/node.1 \
+          /usr/local/include/node \
+          /usr/local/lib/node_modules
+        tar -xJf node.tar.xz -C /usr/local \
+          --strip-components=1 --no-same-owner \
+          --exclude README.md \
+          --exclude LICENSE \
+          --exclude CHANGELOG.md
         cd ${mydir}
     fi
 }
