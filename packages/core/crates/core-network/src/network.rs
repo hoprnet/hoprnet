@@ -446,14 +446,12 @@ pub mod wasm {
                      origin: PeerOrigin, is_public: bool, last_seen: u64,
                      quality: f64, heartbeats_sent: u64, heartbeats_succeeded: u64,
                      backoff: f64) -> Self {
-            let peer = match peer.as_string() {
-                Some(peer) => peer,
-                None => panic!("Own peer id was not passed as a string")
-            };
-            let peer = match PeerId::from_str(peer.as_str()) {
-                Ok(peer) => peer,
-                Err(err) => panic!("Failed to parse PeerId from string: {}", err.to_string())
-            };
+            let peer = peer.as_string()
+                .ok_or_else(|| "Own peer id was not passed as a string".to_owned())
+                .and_then(|peer| PeerId::from_str(peer.as_str()).map_err(|e| e.to_string()))
+                .map_err(|e| panic!("Failed to parse PeerId from string: {}", e.to_string()))
+                .expect("Unknown peer parsing failure occurred");
+
             Self {
                 id: peer,
                 origin,
