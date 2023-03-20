@@ -3,7 +3,7 @@
   <a href="https://hoprnet.org" target="_blank" rel="noopener noreferrer">
     <img width="100" src="https://github.com/hoprnet/hopr-assets/blob/master/v1/logo/hopr_logo_padded.png?raw=true" alt="HOPR Logo">
   </a>
-  
+
   <!-- Title Placeholder -->
   <h3 align="center">HOPR</h3>
   <p align="center">
@@ -395,23 +395,31 @@ For more information please refer to [act][8]'s documentation.
 
 #### Running Tests Locally
 
-End-to-end testing is usually performed by the CI, but can also be performed
-locally by executing:
+##### Testing environment
+
+Tests are using the `pytest` infrastructure that can be set up inside a virtualenv using as:
 
 ```sh
-./scripts/run-integration-tests-source.sh
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install -r tests/integration/requirements.txt
 ```
 
-Read the full help information of the script in case of questions:
+To deactivate the activated testing environment if no longer needed:
 
 ```sh
-./scripts/run-integration-tests-source.sh --help
+deactivate
 ```
 
-That command will spawn multiple `hoprd` nodes locally from the local
-source code and run the tests against this cluster of nodes. The tests can be
-found in the files `test/*.sh`. The script will clean up all nodes once completed
-unless instructed otherwise.
+##### Test execution
+
+With the environment activated, execute the tests locally:
+
+```sh
+pytest tests/integration/
+```
+
+#### NPM local testing alternative
 
 An alternative to using the local source code is running the tests against
 a NPM package.
