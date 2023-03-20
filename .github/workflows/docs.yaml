@@ -79,11 +79,6 @@ jobs:
       - name: Format newly created files
         run: make lint-fix
 
-      - name: Move OpenAPI spec file into documentation directory
-        run: |
-          mv packages/hoprd/rest-api-v2-full-spec.json docs/hopr-documentation/
-          git add docs/hopr-documentation/rest-api-v2-full-spec.json
-
       - name: Commit docs changes
         # only commit changes when not running via act and when on final branches
         if: |
