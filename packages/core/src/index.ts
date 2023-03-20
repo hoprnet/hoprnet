@@ -384,12 +384,19 @@ class Hopr extends EventEmitter {
 
     // initialize with all the peers identified in the peer store
     const peers: Peer[] = await this.libp2pComponents.getPeerStore().all()
+<<<<<<< HEAD
     peers
       .map((peer) => peer.id.toString())
       .forEach((peerId) => {
         this.networkPeers.register(peerId, PeerOrigin.Initialization)
         log(`peer store: loaded peer ${peerId}`)
       })
+=======
+    peers.map((peer) => peer.id.toString()).forEach((peerId) => {
+      this.networkPeers.register(peerId, PeerOrigin.Initialization)
+      log(`peer store: loaded peer ${peerId}`)
+    })
+>>>>>>> Refactor metrics, allow cross-WASM module metrics scraping (#4734)
 
     // react when network registry is enabled / disabled
     connector.indexer.on('network-registry-status-changed', async (enabled: boolean) => {

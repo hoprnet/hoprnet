@@ -148,15 +148,14 @@ passing the `my_crate_gather_metrics` as argument:
 ```typescript
 import registerMetricsCollector from '@hoprnet/hopr-utils'
 import { my_crate_set_panic_hook, my_crate_gather_metrics } from '../lib/my_crate.js'
-my_crate_set_panic_hook()
-registerMetricsCollector(my_crate_gather_metrics)
+my_crate_set_panic_hook();
+registerMetricsCollector(my_crate_gather_metrics);
 ```
 
 If TS code in HOPRd is using the WASM bindings from `utils_metrics` directly, it does not need to do anything
 to register these metrics for scraping as this is done automatically by HOPRd.
 
 #### Avoid taking metrics in low-level crates
-
 Before HOPRd is fully migrated to Rust, it is highly recommended to **NOT** gather metrics in low-level Rust crates
 that might be possibly used by separate WASM runtimes in HOPRd. This will result in metrics duplication when scraped from different WASM runtimes.
 The metrics are trivially de-duplicated before publishing, but this necessarily results in inaccuracies of the metrics. It is not possible
