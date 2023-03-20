@@ -422,28 +422,65 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
   /**
    * @dev On network registry contract, deregister peers associated with the calling wallet.
    */
-  function mintHoprAndSendNative(
+  function transferOrMintHoprAndSendNative(
     address recipient,
-    uint256 horpTokenAmountInEther,
-    uint256 nativeTokenAmountInEther
+    uint256 hoprTokenAmountInWei,
+    uint256 nativeTokenAmountInWei
   ) external payable {
     // 1. get environment and msg.sender
     getEnvironmentAndMsgSender();
 
-    // 2. mint some Hopr tokens to the recipient
-    if (horpTokenAmountInEther > 0) {
-      uint256 hoprTokenAmount = horpTokenAmountInEther * 1 ether;
-      (bool successMintTokens, ) = currentEnvironmentDetail.hoprTokenContractAddress.call(
-        abi.encodeWithSignature('mint(address,uint256,bytes,bytes)', recipient, hoprTokenAmount, hex'00', hex'00')
-      );
-      if (!successMintTokens) {
-        emit log_string('Cannot mint HOPR tokens to the recipient');
+    // 2. transfer some Hopr tokens to the recipient, or mint tokens
+    if (hoprTokenAmountInWei > 0) {
+      // check the hopr token balance
+      (bool successReadOwnedHoprTokens, bytes memory returndataReadOwnedHoprTokens) = currentEnvironmentDetail
+        .hoprTokenContractAddress
+        .staticcall(abi.encodeWithSignature('balanceOf(address)', msgSender));
+      if (!successReadOwnedHoprTokens) {
+        revert('Cannot read Hopr token balance.');
+      }
+      uint256 ownedHoprTokens = abi.decode(returndataReadOwnedHoprTokens, (uint256));
+
+      if (ownedHoprTokens >= hoprTokenAmountInWei) {
+        // call transfer
+        (bool successTransfserTokens, ) = currentEnvironmentDetail.hoprTokenContractAddress.call(
+          abi.encodeWithSignature('transfer(address,uint256)', recipient, hoprTokenAmountInWei)
+        );
+        if (!successTransfserTokens) {
+          emit log_string('Cannot transfer HOPR tokens to the recipient');
+        }
+      } else {
+        // if transfer cannot be called, try minting token as a minter
+        bytes32 MINTER_ROLE = keccak256('MINTER_ROLE');
+        (bool successHasRole, bytes memory returndataHasRole) = currentEnvironmentDetail
+          .hoprTokenContractAddress
+          .staticcall(abi.encodeWithSignature('hasRole(bytes32,address)', MINTER_ROLE, msgSender));
+        if (!successHasRole) {
+          revert('Cannot check role for Hopr token.');
+        }
+        bool isMinter = abi.decode(returndataHasRole, (bool));
+        require(isMinter, 'Caller is not a minter');
+
+        (bool successMintTokens, ) = currentEnvironmentDetail.hoprTokenContractAddress.call(
+          abi.encodeWithSignature(
+            'mint(address,uint256,bytes,bytes)',
+            recipient,
+            hoprTokenAmountInWei,
+            hex'00',
+            hex'00'
+          )
+        );
+        if (!successMintTokens) {
+          emit log_string('Cannot mint HOPR tokens to the recipient');
+        }
       }
     }
 
     // 3. transfer native balance to the recipient
-    (bool nativeTokenTransferSuccess, ) = recipient.call{value: nativeTokenAmountInEther * 1 ether}('');
-    require(nativeTokenTransferSuccess, 'Cannot send native tokens to the recipient');
+    if (nativeTokenAmountInWei > 0) {
+      (bool nativeTokenTransferSuccess, ) = recipient.call{value: nativeTokenAmountInWei}('');
+      require(nativeTokenTransferSuccess, 'Cannot send native tokens to the recipient');
+    }
     vm.stopBroadcast();
   }
 }

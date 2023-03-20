@@ -125,3 +125,39 @@ let gathered_metrics = gather_all_metrics()
 // Metrics are in text format and can be exposed using an HTTP API endpoint
 console.log(gathered_metrics)
 ```
+
+### Scraping metrics across separate WASM runtimes in HOPRd
+
+Each WASM module runs in its own separate runtime and has a private memory space. This has implications for the metric
+registries used by Prometheus in HOPRd. As a direct consequence of this fact, each WASM runtime has its own global metric
+registry which has to be scraped separately in order to have all the metrics exposed.
+
+Each Rust crate that will become a separate WASM runtime instantiated from the TS in HOPRd, must declare a public WASM-bound
+function for gathering metrics:
+
+```rust
+#[wasm_bindgen]
+pub fn my_crate_gather_metrics() -> JsResult<String> {
+    utils_metrics::metrics::wasm::gather_all_metrics()
+}
+```
+
+and when initializing the crate in TS, `registerMetricsCollector` function must be called
+passing the `my_crate_gather_metrics` as argument:
+
+```typescript
+import registerMetricsCollector from '@hoprnet/hopr-utils'
+import { my_crate_set_panic_hook, my_crate_gather_metrics } from '../lib/my_crate.js'
+my_crate_set_panic_hook()
+registerMetricsCollector(my_crate_gather_metrics)
+```
+
+If TS code in HOPRd is using the WASM bindings from `utils_metrics` directly, it does not need to do anything
+to register these metrics for scraping as this is done automatically by HOPRd.
+
+#### Avoid taking metrics in low-level crates
+
+Before HOPRd is fully migrated to Rust, it is highly recommended to **NOT** gather metrics in low-level Rust crates
+that might be possibly used by separate WASM runtimes in HOPRd. This will result in metrics duplication when scraped from different WASM runtimes.
+The metrics are trivially de-duplicated before publishing, but this necessarily results in inaccuracies of the metrics. It is not possible
+to determine which duplicate metric is more recent and should therefore take precedence.

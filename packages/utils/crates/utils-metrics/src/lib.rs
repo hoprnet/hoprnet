@@ -1,11 +1,5 @@
 pub mod metrics;
 
-#[cfg(any(not(feature = "wasm"), test))]
-pub use metrics::native::*;
-
-#[cfg(all(feature = "wasm", not(test)))]
-pub use metrics::wasm::*;
-
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use wasm_bindgen::prelude::wasm_bindgen;
