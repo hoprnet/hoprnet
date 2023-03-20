@@ -1683,6 +1683,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@chainsafe/is-ip@npm:^2.0.1":
+  version: 2.0.1
+  resolution: "@chainsafe/is-ip@npm:2.0.1"
+  checksum: c5bbebe58eadc700d12112713fd75e41ae26020eedcac0e8b593fdda16a180239ede1d68d55b500fd8b30189c9a82b5e10769ed86a816e879c83248069152b79
+  languageName: node
+  linkType: hard
+
 "@chainsafe/libp2p-noise@npm:7.0.0":
   version: 7.0.0
   resolution: "@chainsafe/libp2p-noise@npm:7.0.0"
@@ -2966,7 +2973,7 @@ __metadata:
     "@libp2p/crypto": 1.0.0
     "@libp2p/interface-address-manager": 1.0.1
     "@libp2p/interface-connection": 1.0.1
-    "@libp2p/interface-connection-manager": 1.1.0
+    "@libp2p/interface-connection-manager": 1.3.8
     "@libp2p/interface-peer-discovery": 1.0.0
     "@libp2p/interface-peer-id": 1.0.2
     "@libp2p/interface-peer-store": 1.0.0
@@ -3124,7 +3131,7 @@ __metadata:
     "@hoprnet/hopr-real": "workspace:packages/real"
     "@libp2p/crypto": 1.0.0
     "@libp2p/interface-connection": 1.0.1
-    "@libp2p/interface-connection-manager": 1.1.0
+    "@libp2p/interface-connection-manager": 1.3.8
     "@libp2p/interface-keys": 1.0.3
     "@libp2p/interface-peer-id": 1.0.5
     "@libp2p/interface-peer-store": 1.0.0
@@ -3394,15 +3401,15 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@libp2p/interface-connection-manager@npm:1.1.0":
-  version: 1.1.0
-  resolution: "@libp2p/interface-connection-manager@npm:1.1.0"
+"@libp2p/interface-connection-manager@npm:1.3.8":
+  version: 1.3.8
+  resolution: "@libp2p/interface-connection-manager@npm:1.3.8"
   dependencies:
     "@libp2p/interface-connection": ^3.0.0
-    "@libp2p/interface-peer-id": ^1.0.0
+    "@libp2p/interface-peer-id": ^2.0.0
     "@libp2p/interfaces": ^3.0.0
-    "@multiformats/multiaddr": ^10.2.0
-  checksum: 2368b98ebaea7247073d5ac804f7ce4e6dc38dbc4830709c57036636b5206ccb8e7964e430e519465d06db12cbff12f64eb762543592eb23da46bb8d5dbfd307
+    "@multiformats/multiaddr": ^12.0.0
+  checksum: ac5528373aaeb346144f719595d2a3b76405abe77bb5d574eb99a5aa670d2e9c483cf2f5fb10ff0933516e9565076391f4e4cedeb44650ca7208c067da72ec32
   languageName: node
   linkType: hard
 
@@ -3474,6 +3481,15 @@ __metadata:
   dependencies:
     multiformats: ^10.0.0
   checksum: 346a7c8e12d394938b71b5871bfb85bb7bc14d0c871b3101029d6fbefc3ce0da7378e57ae6f8a588ffad913f967b56256298644982586c11e8ad503297629253
+  languageName: node
+  linkType: hard
+
+"@libp2p/interface-peer-id@npm:^2.0.0":
+  version: 2.0.1
+  resolution: "@libp2p/interface-peer-id@npm:2.0.1"
+  dependencies:
+    multiformats: ^11.0.0
+  checksum: 05e286725be50a6397a11b03f3edd6e64ec311782d96732f1185c0a9e94af6f879944198cd75d73b9883bb86b2fd91de9bf10e0462943e1f6b4a6f5d8126d186
   languageName: node
   linkType: hard
 
@@ -3936,6 +3952,20 @@ __metadata:
     uint8arrays: ^3.0.0
     varint: ^6.0.0
   checksum: b59568a9d227594c1926374637e9d436273e8d0edd6ad230a387484bef3d8934da5fe80a0809dfda2f424b774505ddac1c4473cf9f353ada5f830396cdce8379
+  languageName: node
+  linkType: hard
+
+"@multiformats/multiaddr@npm:^12.0.0":
+  version: 12.0.0
+  resolution: "@multiformats/multiaddr@npm:12.0.0"
+  dependencies:
+    "@chainsafe/is-ip": ^2.0.1
+    dns-over-http-resolver: ^2.1.0
+    err-code: ^3.0.1
+    multiformats: ^11.0.0
+    uint8arrays: ^4.0.2
+    varint: ^6.0.0
+  checksum: fc5f02705e6d6313444e29c772cdcc3cc2c811c301b6e2097f4659b7510fbccc0ec7a12cedc0b9e8fbd165871721dca3b92652647b4535aa8cf836baaa42679d
   languageName: node
   linkType: hard
 
@@ -14191,6 +14221,13 @@ __metadata:
   version: 10.0.0
   resolution: "multiformats@npm:10.0.0"
   checksum: f43c317c997a21c138734883a8fc9c05687e691efe5884aa2854688ea43a2135d4b7daec3d14c7e40f0ae38ca51682054908de374f1d2d7e6a4b53d2d1322669
+  languageName: node
+  linkType: hard
+
+"multiformats@npm:^11.0.0":
+  version: 11.0.2
+  resolution: "multiformats@npm:11.0.2"
+  checksum: e587bbe709f29e42ae3c22458c960070269027d962183afc49a83b8ba26c31525e81ce2ac71082a52ba0a75e9aed4d0d044cac68d32656fdcd5cd340fb367fac
   languageName: node
   linkType: hard
 
