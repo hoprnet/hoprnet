@@ -31,6 +31,7 @@ function recordNodeHeapStats() {
   metric_activeCtxs.set(heapStats.number_of_native_contexts)
   metric_detachedCtxs.set(heapStats.number_of_detached_contexts)
 }
+
 function countMetricsFromText(encoded_metrics: string): number {
   return (encoded_metrics.match(/#\sHELP/g) || []).length
 }
