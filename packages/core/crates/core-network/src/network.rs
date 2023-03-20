@@ -446,7 +446,14 @@ pub mod wasm {
                      origin: PeerOrigin, is_public: bool, last_seen: u64,
                      quality: f64, heartbeats_sent: u64, heartbeats_succeeded: u64,
                      backoff: f64) -> Self {
-            let peer = PeerId::from_str(peer.as_string().unwrap().as_ref()).ok().unwrap();
+            let peer = match peer.as_string() {
+                Some(peer) => peer,
+                None => panic!("Own peer id was not passed as a string")
+            };
+            let peer = match PeerId::from_str(peer.as_str()) {
+                Ok(peer) => peer,
+                Err(err) => panic!("Failed to parse PeerId from string: {}", err.to_string())
+            };
             Self {
                 id: peer,
                 origin,
@@ -472,9 +479,12 @@ pub mod wasm {
         fn is_public(&self, peer: &PeerId) -> bool {
             let this = JsValue::null();
             match self.is_public_cb.call1(&this, &JsValue::from(peer.to_base58())) {
-                Ok(v) => v.as_bool().unwrap(),
+                Ok(v) => v.as_bool().unwrap_or_else(|| {
+                    error!("Failed to extract 'is_public_cb` result as bool, defaulting to 'false'");
+                    false
+                }),
                 _ => {
-                    warn!("Encountered error when trying to find out whether peer {} is public", peer);
+                    error!("Encountered error when trying to find out whether peer {} is public", peer);
                     false
                 }
             }
@@ -483,14 +493,16 @@ pub mod wasm {
         fn close_connection(&self, peer: &PeerId) {
             let this = JsValue::null();
             if let Err(err) = self.close_connection_cb.call1(&this, &JsValue::from(peer.to_base58())) {
-                error!("Failed to perform close connection for peer {} with: {}", peer, err.as_string().unwrap().as_str())
+                error!("Failed to perform close connection for peer {} with: {}",
+                    peer, err.as_string().unwrap_or_else(|| "unknown error".to_owned()).as_str())
             };
         }
 
         fn on_peer_offline(&self, peer: &PeerId) {
             let this = JsValue::null();
             if let Err(err) = self.on_peer_offline_cb.call1(&this, &JsValue::from(peer.to_base58())) {
-                error!("Failed to perform on peer offline operation for peer {} with: {}", peer, err.as_string().unwrap().as_str())
+                error!("Failed to perform on peer offline operation for peer {} with: {}",
+                    peer, err.as_string().unwrap_or_else(|| "unknown error".to_owned()).as_str())
             };
         }
 
@@ -499,7 +511,8 @@ pub mod wasm {
             let old = JsValue::from(old as i32);
             let new = JsValue::from(new as i32);
             if let Err(err) = self.on_network_health_change_cb.call2(&this, &old, &new) {
-                error!("Failed to perform the network health change operation with: {}", err.as_string().unwrap().as_str())
+                error!("Failed to perform the network health change operation with: {}",
+                    err.as_string().unwrap_or_else(|| "unknown error".to_owned()).as_str())
             };
         }
     }
@@ -520,8 +533,11 @@ pub mod wasm {
                 close_connection_cb: close_connection,
             });
 
+            let me = PeerId::from_str(&me)
+                .expect("Failed to parse own peer id from JsString");
+
             Self::new(
-                PeerId::from_str(&me).ok().unwrap(),
+                me,
                 quality_threshold,
                 api
             )
@@ -538,19 +554,38 @@ pub mod wasm {
         #[wasm_bindgen]
         pub fn contains(&self, peer: JsString) -> bool {
             let peer: String = peer.into();
-            self.has(&PeerId::from_str(&peer).ok().unwrap())
+            match PeerId::from_str(&peer) {
+                Ok(p) => self.has(&p),
+                Err(err) => {
+                    warn!("Failed to parse peer id {}, network assumes it is not present: {}",
+                        peer, err.to_string());
+                    false
+                },
+            }
         }
 
         #[wasm_bindgen]
         pub fn register(&mut self, peer: JsString, origin: PeerOrigin) {
             let peer: String = peer.into();
-            self.add(&PeerId::from_str(&peer).ok().unwrap(), origin)
+            match PeerId::from_str(&peer) {
+                Ok(p) => self.add(&p, origin),
+                Err(err) => {
+                    warn!("Failed to parse peer id {}, network ignores the register attempt: {}",
+                        peer, err.to_string());
+                },
+            }
         }
 
         #[wasm_bindgen]
         pub fn unregister(&mut self, peer: JsString) {
             let peer: String = peer.into();
-            self.remove(&PeerId::from_str(&peer).ok().unwrap())
+            match PeerId::from_str(&peer) {
+                Ok(p) => self.remove(&p),
+                Err(err) => {
+                    warn!("Failed to parse peer id {}, network ignores the unregister attempt: {}",
+                        peer, err.to_string());
+                },
+            }
         }
 
         #[wasm_bindgen]
@@ -563,15 +598,28 @@ pub mod wasm {
                         .map(|v| v as u64)
                         .ok_or(())
                 };
-            self.update(&PeerId::from_str(&peer).ok().unwrap(), result)
+            match PeerId::from_str(&peer) {
+                Ok(p) => self.update(&p, result),
+                Err(err) => {
+                    warn!("Failed to parse peer id {}, network ignores the regresh attempt: {}",
+                        peer, err.to_string());
+                },
+            }
         }
 
         #[wasm_bindgen]
         pub fn quality_of(&self, peer: JsString) -> f64 {
             let peer: String = peer.into();
-            match self.get_peer_status(&PeerId::from_str(&peer).ok().unwrap()) {
-                Some(v) => v.quality,
-                _ => 0.0
+            match PeerId::from_str(&peer) {
+                Ok(p) => match self.get_peer_status(&p) {
+                    Some(v) => v.quality,
+                    _ => 0.0f64
+                },
+                Err(err) => {
+                    warn!("Failed to parse peer id {}, using lowest possible quality: {}",
+                        peer, err.to_string());
+                    0.0f64
+                },
             }
         }
 
@@ -586,7 +634,14 @@ pub mod wasm {
         #[wasm_bindgen]
         pub fn get_peer_info(&self, peer: JsString) -> Option<PeerStatus> {
             let peer: String = peer.into();
-            self.get_peer_status(&PeerId::from_str(&peer).ok().unwrap())
+            match PeerId::from_str(&peer) {
+                Ok(p) => self.get_peer_status(&p),
+                Err(err) => {
+                    warn!("Failed to parse peer id {}, peer info unavailable: {}",
+                        peer, err.to_string());
+                    None
+                },
+            }
         }
     }
 }
