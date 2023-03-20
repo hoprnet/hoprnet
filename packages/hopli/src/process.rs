@@ -70,8 +70,8 @@ pub fn set_process_path_env(
 pub fn child_process_call_foundry_faucet(
     environment_name: &str,
     address: &Address,
-    hopr_amount: &u128,
-    native_amount: &u128,
+    hopr_amount: &str,
+    native_amount: &str,
 ) -> Result<(), HelperErrors> {
     let hopr_amount_str = hopr_amount.to_string();
     let native_amount_str = native_amount.to_string();
@@ -82,7 +82,7 @@ pub fn child_process_call_foundry_faucet(
         "script/SingleAction.s.sol:SingleActionFromPrivateKeyScript",
         "--broadcast",
         "--sig",
-        "mintHoprAndSendNative(address,uint256,uint256)",
+        "transferOrMintHoprAndSendNative(address,uint256,uint256)",
         &addresses_str,
         &hopr_amount_str,
         &native_amount_str,
