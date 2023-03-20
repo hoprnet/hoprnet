@@ -25,6 +25,8 @@ mkShell {
     ## rust for core development and required utils
     (rust-bin.fromRustupToolchainFile ./rust-toolchain.toml)
     protobuf
+    wasm-pack # v0.10.3
+    binaryen # v109
 
     ## python is required by node module bcrypto
     python3
