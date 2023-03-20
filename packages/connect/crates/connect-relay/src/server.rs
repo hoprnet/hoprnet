@@ -711,9 +711,9 @@ pub mod wasm {
                     log("iteration");
 
                     match async_it.next().map(JsFuture::from) {
-                        Ok(m) => {
+                        Ok(chunk_fut) => {
                             // Initiates call to underlying JS functions
-                            let foo = match m.await {
+                            let chunk = match chunk_fut.await {
                                 Ok(x) => x,
                                 Err(e) => {
                                     log(format!("error handling next() future {:?}", e).as_str());
@@ -721,7 +721,7 @@ pub mod wasm {
                                     return Err(e);
                                 }
                             };
-                            let next = foo.unchecked_into::<IteratorNext>();
+                            let next = chunk.unchecked_into::<IteratorNext>();
                             log(format!("sink: next chunk {:?}", next).as_str());
                             if next.done() {
                                 this.w.close().await;

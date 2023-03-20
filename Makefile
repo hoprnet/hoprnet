@@ -133,7 +133,7 @@ build: build-yarn
 .PHONY: build-solidity-types
 build-solidity-types: ## generate Solidity typings
 	echo "Foundry create binding"
-# $(MAKE) -C packages/ethereum/contracts/ overwrite-sc-bindings
+	$(MAKE) -C packages/ethereum/contracts/ overwrite-sc-bindings
 # Change git = "http://..." into version = "1.0.2"
 	sed -i -e 's/https:\/\/github.com\/gakonst\/ethers-rs/1.0.2/g' $(CURDIR)/packages/ethereum/crates/bindings/Cargo.toml
 	sed -i -e 's/git/version/g' $(CURDIR)/packages/ethereum/crates/bindings/Cargo.toml
@@ -212,6 +212,10 @@ endif
 .PHONY: smart-contract-test
 smart-contract-test: # forge test smart contracts
 	$(MAKE) -C packages/ethereum/contracts/ sc-test
+
+.PHONY: e2e-test-source
+e2e-test-source:
+	${CURDIR}/scripts/run-integration-tests-source.sh
 
 .PHONY: lint-check
 lint-check: ## run linter in check mode
