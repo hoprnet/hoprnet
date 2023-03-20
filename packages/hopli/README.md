@@ -50,10 +50,10 @@ IDENTITY_PASSWORD=local \
 PRIVATE_KEY=<bank_private_key> \
 hopli faucet \
     --environment-name anvil-localhost \
-    --use-local-identities --identity-directory "/tmp" \
+    --use-local-identities --identity-directory "/app/.hoprd-db-riga" \
     --address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1 \
     --contracts-root "../ethereum/contracts" \
-    --hopr-amount 10 --native-amount 1
+    --hopr-amount 10 --native-amount 0.1
 ```
 
 Note that only identity files ending with `.id` are recognized by the CLI
@@ -108,7 +108,7 @@ IDENTITY_PASSWORD=local \
     --use-local-identities --identity-directory "/tmp" \
     --address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1 \
     --contracts-root "../ethereum/contracts"  \
-    --hopr-amount 10 --native-amount 1
+    --hopr-amount 10 --native-amount 0.1
 ```
 
 Register some peer ids in the network registry contract
@@ -125,3 +125,7 @@ PRIVATE_KEY=<bank_private_key> \
 ```
 cargo test -- --nocapture
 ```
+
+## Note:
+
+1. When ` --use-local-identities`, the identity file should contain "id" in its name, either as part of the extention, or in the file stem.

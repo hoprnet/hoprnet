@@ -2,7 +2,10 @@ use crate::key_pair::read_identities;
 use crate::password::PasswordArgs;
 use crate::process::{child_process_call_foundry_faucet, set_process_path_env};
 use clap::Parser;
-use ethers::types::Address;
+use ethers::{
+    types::{Address, U256},
+    utils::parse_units, //, types::U256, utils::format_units, ParseUnits
+};
 use std::env;
 
 use crate::utils::{Cmd, HelperErrors};
@@ -60,17 +63,19 @@ pub struct FaucetArgs {
         help = "Hopr amount in ether, e.g. 10",
         long,
         short = 't',
-        default_value_t = 2000
+        value_parser = clap::value_parser!(f64),
+        default_value_t = 2000.0
     )]
-    hopr_amount: u128,
+    hopr_amount: f64,
 
     #[clap(
         help = "Native token amount in ether, e.g. 1",
         long,
         short = 'n',
-        default_value_t = 10
+        value_parser = clap::value_parser!(f64),
+        default_value_t = 10.0
     )]
-    native_amount: u128,
+    native_amount: f64,
 }
 
 impl FaucetArgs {
@@ -88,12 +93,6 @@ impl FaucetArgs {
             hopr_amount,
             native_amount,
         } = self;
-
-        // check if password is provided
-        let pwd = match password.read_password() {
-            Ok(read_pwd) => read_pwd,
-            Err(e) => return Err(e),
-        };
 
         // `PRIVATE_KEY` - Private key is required to send on-chain transactions
         if let Err(_) = env::var("PRIVATE_KEY") {
@@ -113,6 +112,12 @@ impl FaucetArgs {
 
         // Check if local identity files should be used. Push all the read identities.
         if use_local_identities {
+            // check if password is provided
+            let pwd = match password.read_password() {
+                Ok(read_pwd) => read_pwd,
+                Err(e) => return Err(e),
+            };
+
             // read all the files from the directory
             if let Some(id_dir) = identity_directory {
                 match read_identities(&id_dir.as_str(), &pwd, &identity_prefix) {
@@ -131,6 +136,12 @@ impl FaucetArgs {
             return Err(e);
         }
 
+        // convert hopr_amount and native_amount from f64 to uint256 string
+        let hopr_amount_uint256 = parse_units(hopr_amount, "ether").unwrap();
+        let hopr_amount_uint256_string = U256::from(hopr_amount_uint256).to_string();
+        let native_amount_uint256 = parse_units(native_amount, "ether").unwrap();
+        let native_amount_uint256_string = U256::from(native_amount_uint256).to_string();
+
         // iterate and collect execution result. If error occurs, the entire operation failes.
         addresses_all
             .into_iter()
@@ -138,8 +149,8 @@ impl FaucetArgs {
                 child_process_call_foundry_faucet(
                     &environment_name,
                     &a,
-                    &hopr_amount,
-                    &native_amount,
+                    &hopr_amount_uint256_string,
+                    &native_amount_uint256_string,
                 )
             })
             .collect()
