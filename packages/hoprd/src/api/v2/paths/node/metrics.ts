@@ -30,7 +30,6 @@ function recordNodeHeapStats() {
   metric_totalAvailHeap.set(heapStats.total_available_size)
   metric_activeCtxs.set(heapStats.number_of_native_contexts)
   metric_detachedCtxs.set(heapStats.number_of_detached_contexts)
-
 }
 function countMetricsFromText(encoded_metrics: string): number {
   return (encoded_metrics.match(/#\sHELP/g) || []).length
@@ -45,8 +44,7 @@ const GET: Operation = [
 
       let allMetrics = getMetricsCollectors()
         .map((c) => c())
-        .reduce((prev, current, _i, _a) => merge_encoded_metrics(prev, current),
-          tsMetrics)
+        .reduce((prev, current, _i, _a) => merge_encoded_metrics(prev, current), tsMetrics)
       log(`All gathered metrics contain ${countMetricsFromText(allMetrics)} values`)
 
       return res.status(200).type('text/plain; version=0.0.4').send(allMetrics)

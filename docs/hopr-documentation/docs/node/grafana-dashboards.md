@@ -6,7 +6,7 @@ title: Using Grafana
 The Grafana dashboards will give you an advanced look into your node, with a dashboard breaking down several key metrics. You can access Grafana Dashboards on all setups:
 
 - [Dappnode](./grafana-dashboards.md#dappnode)
-- [Avado](./grafana-dashboards.md#avado) 
+- [Avado](./grafana-dashboards.md#avado)
 - [Docker](./grafana-dashboards.md#docker)
 
 ![Grafana Dashboard](/img/node/Grafana-Dashboard.png)
@@ -54,7 +54,7 @@ The following are command line instructions for Linux:
 git clone https://github.com/hoprnet/hoprnet.git
 ```
 
-(**2**) Enter the downloaded file 
+(**2**) Enter the downloaded file
 
 ```bash
 cd hoprnet
@@ -94,4 +94,4 @@ Once you have logged into Grafana, you can access your node's metrics by locatin
 
 ![Initial Dashboard](/img/node/Grafana-initial-dashboard.png)
 
-Each dashboard will have a description and tooltip explaining what you are looking at for all the major and important metrics. 
+Each dashboard will have a description and tooltip explaining what you are looking at for all the major and important metrics.
