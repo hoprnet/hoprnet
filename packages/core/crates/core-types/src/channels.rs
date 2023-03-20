@@ -2,16 +2,16 @@ use std::ops::{Div, Mul, Sub};
 use ethnum::u256;
 use enum_iterator::{all, Sequence };
 use serde_repr::*;
-use crate::crypto::{Challenge, ethereum_signed_hash, Hash, PublicKey, Signature};
-use crate::errors::{Result, GeneralError::ParseError};
-use crate::primitives::{Address, Balance, BalanceType, EthereumChallenge, U256};
+use core_crypto::types::{Challenge, ethereum_signed_hash, Hash, PublicKey, Signature};
+use utils_types::primitives::{Address, Balance, BalanceType, EthereumChallenge, U256};
+use utils_types::errors::{Result, GeneralError::ParseError};
 
 #[cfg(all(feature = "wasm", not(test)))]
 use utils_misc::time::wasm::current_timestamp;
 
 #[cfg(any(not(feature = "wasm"), test))]
 use utils_misc::time::native::current_timestamp;
-use crate::traits::BinarySerializable;
+use utils_types::traits::BinarySerializable;
 
 /// Describes status of a channel
 #[repr(u8)]
@@ -382,13 +382,14 @@ pub mod tests {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
+    use core_crypto::types::{Hash, PublicKey, Signature};
     use wasm_bindgen::prelude::wasm_bindgen;
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
+    use utils_types::primitives::{Address, Balance, EthereumChallenge, U256};
+    use utils_types::traits::{BinarySerializable, ToHex};
+
     use crate::channels::{AcknowledgedTicket, ChannelEntry, ChannelStatus, Response, Ticket};
-    use crate::crypto::{Hash, PublicKey, Signature};
-    use crate::primitives::{Address, Balance, EthereumChallenge, U256};
-    use crate::traits::{BinarySerializable, ToHex};
 
     #[wasm_bindgen]
     pub fn channel_status_to_number(status: ChannelStatus) -> u8 {
