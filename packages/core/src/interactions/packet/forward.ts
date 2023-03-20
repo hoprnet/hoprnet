@@ -7,8 +7,8 @@ import { pushable, type Pushable } from 'it-pushable'
 
 import { Packet } from '../../messages/index.js'
 import { new_mixer, core_mixer_set_panic_hook, core_mixer_gather_metrics } from '../../../lib/core_mixer_bg.js'
-core_mixer_set_panic_hook();
-registerMetricsCollector(core_mixer_gather_metrics);
+core_mixer_set_panic_hook()
+registerMetricsCollector(core_mixer_gather_metrics)
 
 import type { AcknowledgementInteraction } from './acknowledgement.js'
 import type { HoprOptions, SendMessage } from '../../index.js'

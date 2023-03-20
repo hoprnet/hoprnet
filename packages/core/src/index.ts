@@ -49,7 +49,8 @@ import {
   libp2pSendMessage,
   MIN_NATIVE_BALANCE,
   NativeBalance,
-  PublicKey, registerMetricsCollector,
+  PublicKey,
+  registerMetricsCollector,
   retimer as intervalTimer,
   retryWithBackoffThenThrow,
   type Ticket
@@ -57,9 +58,17 @@ import {
 
 import { FULL_VERSION, INTERMEDIATE_HOPS, MAX_HOPS, PACKET_SIZE, VERSION, MAX_PARALLEL_PINGS } from './constants.js'
 
-import { Network, PeerStatus, PeerOrigin, Health, HeartbeatConfig, core_network_set_panic_hook, core_network_gather_metrics } from '../lib/core_network.js'
-core_network_set_panic_hook();
-registerMetricsCollector(core_network_gather_metrics);
+import {
+  Network,
+  PeerStatus,
+  PeerOrigin,
+  Health,
+  HeartbeatConfig,
+  core_network_set_panic_hook,
+  core_network_gather_metrics
+} from '../lib/core_network.js'
+core_network_set_panic_hook()
+registerMetricsCollector(core_network_gather_metrics)
 
 import Heartbeat from './network/heartbeat.js'
 
@@ -375,10 +384,12 @@ class Hopr extends EventEmitter {
 
     // initialize with all the peers identified in the peer store
     const peers: Peer[] = await this.libp2pComponents.getPeerStore().all()
-    peers.map((peer) => peer.id.toString()).forEach((peerId) => {
-      this.networkPeers.register(peerId, PeerOrigin.Initialization)
-      log(`peer store: loaded peer ${peerId}`)
-    })
+    peers
+      .map((peer) => peer.id.toString())
+      .forEach((peerId) => {
+        this.networkPeers.register(peerId, PeerOrigin.Initialization)
+        log(`peer store: loaded peer ${peerId}`)
+      })
 
     // react when network registry is enabled / disabled
     connector.indexer.on('network-registry-status-changed', async (enabled: boolean) => {
