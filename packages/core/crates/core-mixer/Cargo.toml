@@ -17,7 +17,8 @@ futures = "0.3.26"
 futures-lite = "1.12.0"
 rand = "0.8.5"
 pin-project = "1.0.12"
-utils-metrics = { path = "../../../utils/crates/utils-metrics" }
+utils-log = { path = "../../../utils/crates/utils-log"}
+utils-metrics = { path = "../../../utils/crates/utils-metrics"}
 # wasm
 console_error_panic_hook = { version = "0.1.7", optional = true }
 #wee_alloc = { version = "0.4.5", optional = true }

@@ -50,15 +50,10 @@
     "wrtc": "0.4.7"
   },
   "devDependencies": {
-    "@chainsafe/libp2p-noise": "7.0.0",
-    "@libp2p/crypto": "1.0.0",
-    "@libp2p/interface-address-manager": "1.0.1",
     "@libp2p/interface-connection": "1.0.1",
     "@libp2p/interface-connection-manager": "1.1.0",
     "@libp2p/interface-peer-id": "1.0.2",
-    "@libp2p/interface-peer-store": "1.0.0",
     "@libp2p/interface-registrar": "1.1.0",
-    "@libp2p/mplex": "1.2.1",
     "@types/debug": "4.1.7",
     "@types/mocha": "9.1.1",
     "@types/node": "16",
@@ -66,7 +61,6 @@
     "it-pair": "2.0.2",
     "it-pipe": "2.0.3",
     "it-pushable": "3.0.0",
-    "libp2p": "0.37.3",
     "mocha": "9.2.2",
     "typescript": "4.9.5"
   },

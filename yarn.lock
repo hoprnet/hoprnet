@@ -759,9 +759,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@hoprnet/hopr-connect@workspace:packages/connect"
   dependencies:
-    "@chainsafe/libp2p-noise": 7.0.0
     "@hoprnet/hopr-utils": "workspace:packages/utils"
-    "@libp2p/crypto": 1.0.0
     "@libp2p/interface-address-manager": 1.0.1
     "@libp2p/interface-connection": 1.0.1
     "@libp2p/interface-connection-manager": 1.1.0
@@ -771,7 +769,6 @@ __metadata:
     "@libp2p/interface-registrar": 1.1.0
     "@libp2p/interface-transport": 1.0.0
     "@libp2p/interfaces": 2.0.4
-    "@libp2p/mplex": 1.2.1
     "@libp2p/peer-id": 1.1.16
     "@multiformats/multiaddr": 10.3.3
     "@types/debug": 4.1.7
@@ -787,7 +784,6 @@ __metadata:
     it-pair: 2.0.2
     it-pipe: 2.0.3
     it-pushable: 3.0.0
-    libp2p: 0.37.3
     mocha: 9.2.2
     multiformats: 9.6.5
     retimer: 3.0.0
@@ -1311,25 +1307,6 @@ __metadata:
     interface-datastore: ^6.1.0
     multiformats: ^9.6.3
   checksum: f693b2a0e0afda1148372ec50490b7bc39f97e9e866ae81abd6db79f32d8240f365e0bfe6a2b9e9847ba14ed4c5396a94052d277841b596d6640e24c2326c3d1
-  languageName: node
-  linkType: hard
-
-"@libp2p/mplex@npm:1.2.1":
-  version: 1.2.1
-  resolution: "@libp2p/mplex@npm:1.2.1"
-  dependencies:
-    "@libp2p/logger": ^1.1.3
-    "@libp2p/tracked-map": ^1.0.5
-    abortable-iterator: ^4.0.2
-    any-signal: ^3.0.0
-    err-code: ^3.0.1
-    it-pipe: ^2.0.3
-    it-pushable: ^3.0.0
-    it-stream-types: ^1.0.4
-    uint8arraylist: ^1.4.0
-    uint8arrays: ^3.0.0
-    varint: ^6.0.0
-  checksum: f21d6191ca7e415788784555770ab39665517e772f715f186a8075457e0ced83603d260633ee14076c9c3cbc8692e10f22c8180cce3ce179e5dc6dc4575f643a
   languageName: node
   linkType: hard
 
