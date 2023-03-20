@@ -2,6 +2,7 @@
 
 # utility variables
 space := $(subst ,, )
+mydir := $(dir $(abspath $(firstword $(MAKEFILE_LIST))))
 
 # Gets all packages that include a Rust crates
 # Disable automatic compilation of SC bindings. Can still be done manually.
@@ -14,11 +15,11 @@ CRATES := $(foreach crate,${WORKSPACES_WITH_RUST_MODULES},$(dir $(wildcard $(cra
 HOPLI_CRATE := ./packages/hopli
 
 # Set local foundry directory (for binaries) and versions
-FOUNDRY_DIR ?= $(CURDIR)/.foundry
+FOUNDRY_DIR ?= $(mydir)/.foundry
 FOUNDRY_VSN := ed9298d
 
 # Set local cargo directory (for binaries)
-CARGO_DIR := $(CURDIR)/.cargo
+CARGO_DIR := $(mydir)/.cargo
 
 # use custom foundryup to ensure the local directory is used
 foundryup := env FOUNDRY_DIR="${FOUNDRY_DIR}" foundryup
@@ -135,10 +136,10 @@ build-solidity-types: ## generate Solidity typings
 	echo "Foundry create binding"
 	$(MAKE) -C packages/ethereum/contracts/ overwrite-sc-bindings
 # Change git = "http://..." into version = "1.0.2"
-	sed -i -e 's/https:\/\/github.com\/gakonst\/ethers-rs/1.0.2/g' $(CURDIR)/packages/ethereum/crates/bindings/Cargo.toml
-	sed -i -e 's/git/version/g' $(CURDIR)/packages/ethereum/crates/bindings/Cargo.toml
+	sed -i -e 's/https:\/\/github.com\/gakonst\/ethers-rs/1.0.2/g' $(mydir)/packages/ethereum/crates/bindings/Cargo.toml
+	sed -i -e 's/git/version/g' $(mydir)/packages/ethereum/crates/bindings/Cargo.toml
 # add [lib] as rlib is necessary to run integration tests
-	echo -e "\n[lib] \ncrate-type = [\"cdylib\", \"rlib\"]" >> $(CURDIR)/packages/ethereum/crates/bindings/Cargo.toml
+	echo -e "\n[lib] \ncrate-type = [\"cdylib\", \"rlib\"]" >> $(mydir)/packages/ethereum/crates/bindings/Cargo.toml
 
 .PHONY: build-yarn
 build-yarn: ## build yarn packages
@@ -244,21 +245,17 @@ run-local: ## run HOPRd from local repo
 		--testUseWeakCrypto --testAnnounceLocalAddresses \
 		--testPreferLocalAddresses --disableApiAuthentication
 
-.PHONY: fund-local
-fund-local: id_dir=.
-fund-local: ## use faucet script to fund local identities
-	IDENTITY_PASSWORD=local PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
-		hopli faucet \
-		--environment-name anvil-localhost \
-		--use-local-identities --identity-directory "${id_dir}" \
-		--contracts-root "./packages/ethereum/contracts"
-
 .PHONY: fund-local-all
+fund-local-all: id_dir=/tmp/
+fund-local-all: id_password=local
+fund-local-all: id_prefix=
 fund-local-all: ## use faucet script to fund all the local identities
-	IDENTITY_PASSWORD=local PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+	IDENTITY_PASSWORD="${id_password}" PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
 		hopli faucet \
 		--environment-name anvil-localhost \
-		--use-local-identities --identity-directory "/tmp/" \
+		--use-local-identities \
+		--identity-prefix "${id_prefix}" \
+		--identity-directory "${id_dir}" \
 		--contracts-root "./packages/ethereum/contracts"
 
 .PHONY: docker-build-local
