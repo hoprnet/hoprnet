@@ -161,18 +161,28 @@ mod tests {
 #[cfg(feature = "wasm")]
 mod wasm {
     use wasm_bindgen::prelude::wasm_bindgen;
-    use crate::prg::PRGParameters;
+    use utils_misc::ok_or_jserr;
+    use utils_misc::utils::wasm::JsResult;
+    use crate::prg::{PRG, PRGParameters};
 
     #[wasm_bindgen]
     impl PRGParameters {
         #[wasm_bindgen(js_name = "key")]
-        pub fn key_box(&self) -> Box<[u8]> {
+        pub fn _key(&self) -> Box<[u8]> {
             self.key.into()
         }
 
         #[wasm_bindgen(js_name = "iv")]
-        pub fn iv_box(&self) -> Box<[u8]> {
+        pub fn _iv(&self) -> Box<[u8]> {
             self.iv.into()
+        }
+    }
+
+    #[wasm_bindgen]
+    impl PRG {
+        #[wasm_bindgen(js_name = "digest")]
+        pub fn _digest(&self, from: u32, to: u32) -> JsResult<Box<[u8]>> {
+            ok_or_jserr!(self.digest(from as usize, to as usize))
         }
     }
 }

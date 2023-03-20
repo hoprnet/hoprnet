@@ -1,7 +1,7 @@
 use rand::rngs::OsRng;
 use rand::seq::SliceRandom;
 
-use utils_types::channels::ChannelStatus::{Open, PendingToClose};
+use core_types::channels::ChannelStatus::{Open, PendingToClose};
 use utils_types::primitives::{Balance, BalanceType};
 
 use crate::generic::{ChannelStrategy, OutgoingChannelStatus, StrategyTickResult};

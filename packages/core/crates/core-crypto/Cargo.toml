@@ -4,6 +4,9 @@ version = "0.1.0"
 description = "Core cryptographic primitives and functions used in HOPR"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "LGPL-3.0-only"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -21,11 +24,13 @@ digest = "0.10.5"
 elliptic-curve = "0.13.1"
 generic-array = "0.14.6"
 getrandom = { version = "0.2.8", features = ["js"] }
-hex-literal = "0.3.4"
+hex = "0.4"
+hex-literal = "0.3"
 hkdf = "0.12.3"
 hmac = "0.12.1"
 js-sys = { version = "0.3.60", optional = true }
 k256 = { version = "0.13.0", features = ["arithmetic", "ecdh"] }
+libp2p-identity = { version = "0.1.0", features = ["secp256k1", "peerid"] }
 rand = "0.8.5"
 serde = "1.0"
 serde_bytes = "0.11"
@@ -34,8 +39,10 @@ sha3 = "0.10.6"
 static_assertions = "1.1.0"
 typenum = "1.15.0"
 thiserror = "1.0.37"
+utils-log = { path = "../../../utils/crates/utils-log" }
 utils-misc = { path = "../../../utils/crates/utils-misc" }
 utils-proc-macros = { path = "../../../utils/crates/utils-proc-macros" }
+utils-types = { path = "../../../utils/crates/utils-types" }
 wasm-bindgen = { version = "0.2.83", optional = true }
 
 console_error_panic_hook = { version = "0.1.7", optional = true }

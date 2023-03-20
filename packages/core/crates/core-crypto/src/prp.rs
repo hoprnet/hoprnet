@@ -244,17 +244,30 @@ pub mod wasm {
     use wasm_bindgen::prelude::wasm_bindgen;
     use utils_misc::utils::wasm::JsResult;
     use utils_misc::ok_or_jserr;
-    use crate::prp::PRP;
+    use crate::prp::{PRP, PRPParameters};
+
+    #[wasm_bindgen]
+    impl PRPParameters {
+        #[wasm_bindgen(js_name = "key")]
+        pub fn _key(&self) -> Box<[u8]> {
+            self.key.into()
+        }
+
+        #[wasm_bindgen(js_name = "iv")]
+        pub fn _iv(&self) -> Box<[u8]> {
+            self.iv.into()
+        }
+    }
 
     #[wasm_bindgen]
     impl PRP {
         #[wasm_bindgen(js_name = "forward")]
-        pub fn prp_forward(&self, plaintext: &[u8]) -> JsResult<Box<[u8]>> {
+        pub fn _forward(&self, plaintext: &[u8]) -> JsResult<Box<[u8]>> {
             ok_or_jserr!(self.forward(plaintext))
         }
 
         #[wasm_bindgen(js_name = "inverse")]
-        pub fn prp_inverse(&self, ciphertext: &[u8]) -> JsResult<Box<[u8]>> {
+        pub fn _inverse(&self, ciphertext: &[u8]) -> JsResult<Box<[u8]>> {
             ok_or_jserr!(self.inverse(ciphertext))
         }
     }

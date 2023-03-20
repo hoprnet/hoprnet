@@ -33,7 +33,7 @@ describe('cryptographic correspondence tests', async function () {
 
     {
       let rs_prg_params = new Rust_PRGParameters(secret)
-      let rs_output = new Rust_PRG(rs_prg_params).digest(5, 10)
+      let rs_output = Rust_PRG.from_parameters(rs_prg_params).digest(5, 10)
 
       let ts_prg_params = derivePRGParameters(secret)
       let ts_output = TS_PRG.createPRG(ts_prg_params).digest(5, 10)
@@ -43,7 +43,7 @@ describe('cryptographic correspondence tests', async function () {
 
     {
       let rs_prg_params = new Rust_PRGParameters(secret)
-      let rs_output = new Rust_PRG(rs_prg_params).digest(0, 100)
+      let rs_output = Rust_PRG.from_parameters(rs_prg_params).digest(0, 100)
 
       let ts_prg_params = derivePRGParameters(secret)
       let ts_output = TS_PRG.createPRG(ts_prg_params).digest(0, 100)
@@ -53,7 +53,7 @@ describe('cryptographic correspondence tests', async function () {
 
     {
       let rs_prg_params = new Rust_PRGParameters(secret)
-      let rs_output = new Rust_PRG(rs_prg_params).digest(10, 100)
+      let rs_output = Rust_PRG.from_parameters(rs_prg_params).digest(10, 100)
 
       let ts_prg_params = derivePRGParameters(secret)
       let ts_output = TS_PRG.createPRG(ts_prg_params).digest(10, 100)
@@ -63,7 +63,7 @@ describe('cryptographic correspondence tests', async function () {
 
     {
       let rs_prg_params = new Rust_PRGParameters(secret)
-      let rs_output = new Rust_PRG(rs_prg_params).digest(16, 22)
+      let rs_output = Rust_PRG.from_parameters(rs_prg_params).digest(16, 22)
 
       let ts_prg_params = derivePRGParameters(secret)
       let ts_output = TS_PRG.createPRG(ts_prg_params).digest(16, 22)

@@ -1,5 +1,3 @@
-// TODO: All types specified in this module will be moved over to the core-crypto crate once merged.
-
 use std::ops::Add;
 use std::str::FromStr;
 use k256::ecdsa::{SigningKey, Signature as ECDSASignature, VerifyingKey, RecoveryId};
@@ -11,11 +9,13 @@ use k256::elliptic_curve::generic_array::GenericArray;
 use k256::elliptic_curve::sec1::{FromEncodedPoint, ToEncodedPoint};
 use sha3::{Keccak256, digest::DynDigest};
 use libp2p_identity::{PeerId, PublicKey as lp2p_PublicKey, secp256k1::PublicKey as lp2p_k256_PublicKey};
+use utils_types::errors::GeneralError;
+use utils_types::errors::GeneralError::{Other, ParseError};
 
-use crate::errors::{Result, GeneralError::ParseError, GeneralError};
-use crate::errors::GeneralError::MathError;
-use crate::primitives::{Address, EthereumChallenge};
-use crate::traits::{BinarySerializable, PeerIdLike};
+use utils_types::primitives::{Address, EthereumChallenge};
+use utils_types::traits::{BinarySerializable, PeerIdLike};
+
+use crate::errors::{Result, CryptoError, CryptoError::CalculationError};
 
 /// Represent an uncompressed elliptic curve point on the secp256k1 curve
 #[derive(Clone, Eq, PartialEq, Debug)]
@@ -56,7 +56,7 @@ impl CurvePoint {
 }
 
 impl FromStr for CurvePoint {
-    type Err = GeneralError;
+    type Err = CryptoError;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         Ok(CurvePoint::new(&hex::decode(s).map_err(|_| ParseError)?))
@@ -64,7 +64,7 @@ impl FromStr for CurvePoint {
 }
 
 impl PeerIdLike for CurvePoint {
-    fn from_peerid(peer_id: &PeerId) -> Result<Self> {
+    fn from_peerid(peer_id: &PeerId) -> utils_types::errors::Result<Self> {
         Ok(CurvePoint::new(&PublicKey::from_peerid(peer_id)?.serialize(false)))
     }
 
@@ -76,8 +76,8 @@ impl PeerIdLike for CurvePoint {
 impl BinarySerializable for CurvePoint {
     const SIZE: usize = 65;
 
-    fn deserialize(bytes: &[u8]) -> Result<Self> {
-        Ok(CurvePoint::new(&PublicKey::deserialize(bytes)?
+    fn deserialize(bytes: &[u8]) -> utils_types::errors::Result<Self> {
+        Ok(CurvePoint::new(&PublicKey::deserialize(bytes).map_err(|e| Other(e.into()))?
             .serialize(false)
         ))
     }
@@ -155,7 +155,7 @@ impl HalfKey {
 impl BinarySerializable for HalfKey {
     const SIZE: usize = 32;
 
-    fn deserialize(data: &[u8]) -> Result<Self> {
+    fn deserialize(data: &[u8]) -> utils_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
             let mut ret = Self {
                 hkey: [0u8; Self::SIZE]
@@ -201,7 +201,7 @@ impl HalfKeyChallenge {
 impl BinarySerializable for HalfKeyChallenge {
     const SIZE: usize = 33; // Size of the compressed secp256k1 point.
 
-    fn deserialize(data: &[u8]) -> Result<Self> {
+    fn deserialize(data: &[u8]) -> utils_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
             let mut ret = Self {
                 hkc: [0u8; Self::SIZE]
@@ -209,7 +209,7 @@ impl BinarySerializable for HalfKeyChallenge {
             ret.hkc.copy_from_slice(&data);
             Ok(ret)
         } else {
-            Err(ParseError)
+            Err(GeneralError::ParseError)
         }
     }
 
@@ -219,7 +219,7 @@ impl BinarySerializable for HalfKeyChallenge {
 }
 
 impl PeerIdLike for HalfKeyChallenge {
-    fn from_peerid(peer_id: &PeerId) -> Result<Self> {
+    fn from_peerid(peer_id: &PeerId) -> utils_types::errors::Result<Self> {
         HalfKeyChallenge::deserialize(&PublicKey::from_peerid(peer_id)?.serialize(true))
     }
 
@@ -262,7 +262,7 @@ impl Hash {
 impl BinarySerializable for Hash {
     const SIZE: usize = 32; // Defined by Keccak256.
 
-    fn deserialize(data: &[u8]) -> Result<Self> {
+    fn deserialize(data: &[u8]) -> utils_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
             let mut ret = Self {
                 hash: [0u8; Self::SIZE]
@@ -270,7 +270,7 @@ impl BinarySerializable for Hash {
             ret.hash.copy_from_slice(data);
             Ok(ret)
         } else {
-            Err(ParseError)
+            Err(GeneralError::ParseError)
         }
     }
 
@@ -341,11 +341,11 @@ impl PublicKey {
 }
 
 impl PeerIdLike for PublicKey {
-    fn from_peerid(peer_id: &PeerId) -> Result<Self> {
+    fn from_peerid(peer_id: &PeerId) -> utils_types::errors::Result<Self> {
         // Here we explicitly assume non-RSA PeerId, so that multihash bytes are the actual public key
         let pid = peer_id.to_bytes();
         let (_, mh) = pid.split_at(6);
-        Self::deserialize(mh)
+        Self::deserialize(mh).map_err(|e| Other(e.into()))
     }
 
     fn to_peerid(&self) -> PeerId {
@@ -365,7 +365,7 @@ impl PublicKey {
     /// Size of the uncompressed public key in bytes
     pub const SIZE_UNCOMPRESSED: usize = 65;
 
-    pub fn deserialize(data: &[u8]) -> Result<Self> {
+    pub fn deserialize(data: &[u8]) -> utils_types::errors::Result<Self> {
         let key = elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(data)
             .map_err(|_| ParseError)?;
         Ok(PublicKey{
@@ -395,9 +395,10 @@ impl PublicKey {
             msg,
             &signature,
             recid
-        ).map_err(|_| MathError)?;
+        ).map_err(|_| CalculationError)?;
 
         Self::deserialize(&recovered_key.to_encoded_point(false).to_bytes())
+            .map_err(|e| CryptoError::Other(e.into()))
     }
 
     pub fn from_signature(msg: &[u8], signature: &Signature) -> Result<PublicKey> {
@@ -542,7 +543,7 @@ impl Signature {
 impl BinarySerializable for Signature {
     const SIZE: usize = 64;
 
-    fn deserialize(data: &[u8]) -> Result<Self> {
+    fn deserialize(data: &[u8]) -> utils_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
             // Read & clear the top-most bit in S
             let mut ret = Signature {
@@ -554,7 +555,7 @@ impl BinarySerializable for Signature {
 
             Ok(ret)
         } else {
-            Err(ParseError)
+            Err(GeneralError::ParseError)
         }
     }
 
@@ -574,9 +575,10 @@ pub mod tests {
     use k256::{NonZeroScalar, Secp256k1, U256};
     use k256::ecdsa::VerifyingKey;
     use k256::elliptic_curve::sec1::ToEncodedPoint;
-    use crate::crypto::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, Hash, PublicKey, Signature};
-    use crate::primitives::Address;
-    use crate::traits::{BinarySerializable, PeerIdLike, ToHex};
+    use utils_types::primitives::Address;
+    use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
+
+    use crate::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, Hash, PublicKey, Signature};
 
     const PUBLIC_KEY: [u8; 33] = hex!("021464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8");
     const PRIVATE_KEY: [u8; 32] = hex!("e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8");
@@ -748,9 +750,10 @@ pub mod wasm {
     use sha3::{Keccak256, digest::DynDigest};
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
+    use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
     use wasm_bindgen::prelude::*;
-    use crate::crypto::{CurvePoint, HalfKey, HalfKeyChallenge, Hash, PublicKey, Signature};
-    use crate::traits::{BinarySerializable, PeerIdLike, ToHex};
+
+    use crate::types::{CurvePoint, HalfKey, HalfKeyChallenge, Hash, PublicKey, Signature};
 
     #[wasm_bindgen]
     impl CurvePoint {

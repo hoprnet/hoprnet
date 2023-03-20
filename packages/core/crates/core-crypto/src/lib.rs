@@ -7,6 +7,7 @@ pub mod prg;
 pub mod errors;
 pub mod random;
 pub mod iterated_hash;
+pub mod types;
 
 pub(crate) mod dummy_rng;
 
