@@ -760,12 +760,10 @@ __metadata:
   resolution: "@hoprnet/hopr-connect@workspace:packages/connect"
   dependencies:
     "@hoprnet/hopr-utils": "workspace:packages/utils"
-    "@libp2p/interface-address-manager": 1.0.1
     "@libp2p/interface-connection": 1.0.1
     "@libp2p/interface-connection-manager": 1.1.0
     "@libp2p/interface-peer-discovery": 1.0.0
     "@libp2p/interface-peer-id": 1.0.2
-    "@libp2p/interface-peer-store": 1.0.0
     "@libp2p/interface-registrar": 1.1.0
     "@libp2p/interface-transport": 1.0.0
     "@libp2p/interfaces": 2.0.4
@@ -1064,16 +1062,6 @@ __metadata:
     protons-runtime: ^2.0.2
     uint8arrays: ^3.0.0
   checksum: 473f6b6266aef0f067e7acae660cf1bac21188eff0deb33f73428cb422306276b146512d18fd903db4630bffcc6aa37be71a5cd5cfeb92d47d437854b9011808
-  languageName: node
-  linkType: hard
-
-"@libp2p/interface-address-manager@npm:1.0.1":
-  version: 1.0.1
-  resolution: "@libp2p/interface-address-manager@npm:1.0.1"
-  dependencies:
-    "@libp2p/interfaces": ^3.0.0
-    "@multiformats/multiaddr": ^10.2.0
-  checksum: 8249ee9c18a467e9c0159efb20a27ac074165100f9de63a39fe6616758dd06517eb390876163ecdca36cc00da4a100ca4ab965061f14db7cc0979f25d7083c59
   languageName: node
   linkType: hard
 
