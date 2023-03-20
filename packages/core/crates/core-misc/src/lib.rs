@@ -1,6 +1,5 @@
 pub mod constants;
 pub mod environment;
-pub mod heartbeat;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {

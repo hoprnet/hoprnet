@@ -1,5 +1,8 @@
 .POSIX:
 
+# utility variables
+space := $(subst ,, )
+
 # Gets all packages that include a Rust crates
 # Disable automatic compilation of SC bindings. Can still be done manually.
 WORKSPACES_WITH_RUST_MODULES := $(filter-out ./packages/ethereum/crates,$(wildcard $(addsuffix /crates, $(wildcard ./packages/*))))
@@ -11,11 +14,11 @@ CRATES := $(foreach crate,${WORKSPACES_WITH_RUST_MODULES},$(dir $(wildcard $(cra
 HOPLI_CRATE := ./packages/hopli
 
 # Set local foundry directory (for binaries) and versions
-FOUNDRY_DIR ?= ${CURDIR}/.foundry
+FOUNDRY_DIR ?= $(CURDIR)/.foundry
 FOUNDRY_VSN := ed9298d
 
 # Set local cargo directory (for binaries)
-CARGO_DIR := ${CURDIR}/.cargo
+CARGO_DIR := $(CURDIR)/.cargo
 
 # use custom foundryup to ensure the local directory is used
 foundryup := env FOUNDRY_DIR="${FOUNDRY_DIR}" foundryup
@@ -26,8 +29,8 @@ PATH := $(subst :${CARGO_DIR}/bin,,$(PATH)):${CARGO_DIR}/bin
 PATH := $(subst :${HOME}/.cargo/bin,,$(PATH)):${HOME}/.cargo/bin
 # add local Foundry install path (only once)
 PATH := $(subst :${FOUNDRY_DIR}/bin,,$(PATH)):${FOUNDRY_DIR}/bin
-# use custom PATH in all shell processes
-SHELL := env PATH=$(PATH) $(shell which bash)
+# use custom PATH in all shell processes, escape spaces
+SHELL := env PATH=$(subst $(space),\$(space),$(PATH)) $(shell which bash)
 
 # use custom Cargo config file for each invocation
 cargo := cargo --config ${CARGO_DIR}/config.toml
@@ -132,10 +135,10 @@ build-solidity-types: ## generate Solidity typings
 	echo "Foundry create binding"
 # $(MAKE) -C packages/ethereum/contracts/ overwrite-sc-bindings
 # Change git = "http://..." into version = "1.0.2"
-	sed -i -e 's/https:\/\/github.com\/gakonst\/ethers-rs/1.0.2/g' ${CURDIR}/packages/ethereum/crates/bindings/Cargo.toml
-	sed -i -e 's/git/version/g' ${CURDIR}/packages/ethereum/crates/bindings/Cargo.toml
+	sed -i -e 's/https:\/\/github.com\/gakonst\/ethers-rs/1.0.2/g' $(CURDIR)/packages/ethereum/crates/bindings/Cargo.toml
+	sed -i -e 's/git/version/g' $(CURDIR)/packages/ethereum/crates/bindings/Cargo.toml
 # add [lib] as rlib is necessary to run integration tests
-	echo -e "\n[lib] \ncrate-type = [\"cdylib\", \"rlib\"]" >> ${CURDIR}/packages/ethereum/crates/bindings/Cargo.toml
+	echo -e "\n[lib] \ncrate-type = [\"cdylib\", \"rlib\"]" >> $(CURDIR)/packages/ethereum/crates/bindings/Cargo.toml
 
 .PHONY: build-yarn
 build-yarn: ## build yarn packages
@@ -171,17 +174,13 @@ build-yellowpaper: ## build the yellowpaper in docs/yellowpaper
 	$(MAKE) -C docs/yellowpaper
 
 .PHONY: build-docs
-build-docs: ## build typedocs, Rest API docs, and docs website
-build-docs: | build-docs-typescript build-docs-website build-docs-api
+build-docs: ## build typedocs, Rest API docs
+build-docs: | build-docs-typescript build-docs-api
 
 .PHONY: build-docs-typescript
 build-docs-typescript: ## build typedocs
 build-docs-typescript: build
 	yarn workspaces foreach -pv run docs:generate
-
-.PHONY: build-docs-website
-build-docs-website: ## build docs website
-	yarn workspace @hoprnet/hopr-docs build
 
 .PHONY: build-docs-api
 build-docs-api: ## build Rest API docs

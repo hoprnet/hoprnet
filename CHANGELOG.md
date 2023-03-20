@@ -1,7 +1,10 @@
 # Changelog
 
+- Migrate the `Heartbeat`, `Ping` and `Network` functionality into Rust ([#4568](https://github.com/hoprnet/hoprnet/pull/4658))
 - Rebrand `foundry-tool` to `hopli` and allow it to interact with identities and network-registry ([#4652](https://github.com/hoprnet/hoprnet/pull/4652))
 - Migrate mixer code to Rust ([#4567](https://github.com/hoprnet/hoprnet/pull/4567))
+- Fix initial network peer registration from the Peer Store ([#4741](https://github.com/hoprnet/hoprnet/pull/4741))
+- `hopli` accepts floating number for the amount of tokens to be transferred/minted. Lossen requirement on the identtiy file. ([#4723](https://github.com/hoprnet/hoprnet/pull/4723))
 
 <a name="1.92"></a>
 
@@ -30,6 +33,8 @@
 - Assign commitent at ticket redemption, so that tickets can be redeemed with a gap in ticket index ([#4643](https://github.com/hoprnet/hoprnet/pull/4643))
 - Make maximum parallel connections configurable (#[4675](https://github.com/hoprnet/hoprnet/pull/4675))
 - Reduce overall connection timeout from 10s to 3s (#[4680](https://github.com/hoprnet/hoprnet/pull/4680))
+- Migrate mixer code to Rust ([#4567](https://github.com/hoprnet/hoprnet/pull/4567))
+- Primitive & basic types re-created in Rust ([#4645](https://github.com/hoprnet/hoprnet/pull/4645)))
 
 <a name="1.91"></a>
 

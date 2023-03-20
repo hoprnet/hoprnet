@@ -2,7 +2,7 @@ use rand::rngs::OsRng;
 use rand::seq::SliceRandom;
 
 use utils_types::channels::ChannelStatus::{Open, PendingToClose};
-use utils_types::primitives::{Balance, BaseBalance};
+use utils_types::primitives::{Balance, BalanceType};
 
 use crate::generic::{ChannelStrategy, OutgoingChannelStatus, StrategyTickResult};
 
@@ -22,9 +22,9 @@ impl PromiscuousStrategy {
     pub fn new() -> Self {
         PromiscuousStrategy {
             network_quality_threshold: 0.5,
-            new_channel_stake: Balance::from_str("100000000000000000").unwrap(),
-            minimum_channel_balance: Balance::from_str("10000000000000000").unwrap(),
-            minimum_node_balance: Balance::from_str("100000000000000000").unwrap(),
+            new_channel_stake: Balance::from_str("100000000000000000", BalanceType::HOPR),
+            minimum_channel_balance: Balance::from_str("10000000000000000", BalanceType::HOPR),
+            minimum_node_balance: Balance::from_str("100000000000000000", BalanceType::HOPR),
             max_channels: None,
             auto_redeem_tickets: false
         }
@@ -157,8 +157,8 @@ mod tests {
             ("Joe".to_string(), 0.3),
         ]);
 
-        let balance = Balance::from_str("1000000000000000000").unwrap();
-        let low_balance = Balance::from_str("1000000000000000").unwrap();
+        let balance = Balance::from_str("1000000000000000000", BalanceType::HOPR);
+        let low_balance = Balance::from_str("1000000000000000", BalanceType::HOPR);
 
         let outgoing_channels = vec![
             OutgoingChannelStatus {
@@ -206,7 +206,7 @@ pub mod wasm {
     use wasm_bindgen::prelude::*;
 
     use utils_misc::utils::wasm::JsResult;
-    use utils_types::primitives::wasm::Balance;
+    use utils_types::primitives::{Balance, BalanceType};
 
     use crate::generic::wasm::StrategyTickResult;
     use crate::generic::ChannelStrategy;
@@ -241,13 +241,13 @@ pub mod wasm {
                 self.w.network_quality_threshold = option;
             }
             if let Some(option) = cfg.minimum_node_balance {
-                self.w.minimum_node_balance = super::Balance::from_str(option.as_str())?;
+                self.w.minimum_node_balance = Balance::from_str(option.as_str(), BalanceType::HOPR);
             }
             if let Some(option) = cfg.new_channel_stake {
-                self.w.new_channel_stake = super::Balance::from_str(option.as_str())?;
+                self.w.new_channel_stake = Balance::from_str(option.as_str(), BalanceType::HOPR);
             }
             if let Some(option) = cfg.minimum_channel_balance {
-                self.w.minimum_channel_balance = super::Balance::from_str(option.as_str())?;
+                self.w.minimum_channel_balance = Balance::from_str(option.as_str(), BalanceType::HOPR);
             }
             self.w.max_channels = cfg.max_channels.map(|c| c as usize);
             self.w.auto_redeem_tickets = cfg.auto_redeem_tickets.unwrap_or(false);

@@ -11,11 +11,11 @@ import {
   pickVersion
 } from '@hoprnet/hopr-utils'
 import {
+  Health,
   createHoprNode,
   default as Hopr,
   type HoprOptions,
   isStrategy,
-  NetworkHealthIndicator,
   ResolvedEnvironment,
   resolveEnvironment
 } from '@hoprnet/hopr-core'
@@ -189,11 +189,11 @@ async function main() {
 
   let metric_timerToGreen = metric_timeToGreen.start_measure()
 
-  const networkHealthChanged = (oldState: NetworkHealthIndicator, newState: NetworkHealthIndicator): void => {
+  const networkHealthChanged = (oldState: Health, newState: Health): void => {
     // Log the network health indicator state change (goes over the WS as well)
     logs.log(`Network health indicator changed: ${oldState} -> ${newState}`)
     logs.log(`NETWORK HEALTH: ${newState}`)
-    if (metric_timerToGreen && newState == NetworkHealthIndicator.GREEN) {
+    if (metric_timerToGreen && newState == Health.GREEN) {
       metric_timeToGreen.record_measure(metric_timerToGreen)
       metric_timerToGreen = undefined
     }

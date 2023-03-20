@@ -42,7 +42,7 @@ pub mod wasm {
     use wasm_bindgen::JsValue;
 
     use utils_misc::utils::wasm::JsResult;
-    use utils_types::primitives::wasm::Balance;
+    use utils_types::primitives::Balance;
 
     use crate::generic::wasm::StrategyTickResult;
 
