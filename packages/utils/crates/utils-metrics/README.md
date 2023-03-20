@@ -148,8 +148,8 @@ passing the `my_crate_gather_metrics` as argument:
 ```typescript
 import registerMetricsCollector from '@hoprnet/hopr-utils'
 import { my_crate_set_panic_hook, my_crate_gather_metrics } from '../lib/my_crate.js'
-my_crate_set_panic_hook();
-registerMetricsCollector(my_crate_gather_metrics);
+my_crate_set_panic_hook()
+registerMetricsCollector(my_crate_gather_metrics)
 ```
 
 If TS code in HOPRd is using the WASM bindings from `utils_metrics` directly, it does not need to do anything

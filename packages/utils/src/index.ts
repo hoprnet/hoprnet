@@ -40,17 +40,17 @@ export {
   MultiHistogram,
   SimpleTimer,
   merge_encoded_metrics,
-  gather_all_metrics,
+  gather_all_metrics
 } from '../lib/utils_metrics.js'
 
-export type MetricCollector = () => string;
+export type MetricCollector = () => string
 
-let metricCollectors: MetricCollector[] = [];
-export { metricCollectors };
+let metricCollectors: MetricCollector[] = []
+export { metricCollectors }
 
 export function getMetricsCollectors(): MetricCollector[] {
   return metricCollectors
 }
 export function registerMetricsCollector(collector: MetricCollector) {
-  metricCollectors.push(collector);
+  metricCollectors.push(collector)
 }

@@ -7,7 +7,7 @@ use rand::Rng;
 use crate::future_extensions::StreamThenConcurrentExt;
 
 use utils_log::debug;
-use utils_metrics::metrics::native::SimpleGauge;
+use utils_metrics::metrics::SimpleGauge;
 
 
 #[cfg(any(not(feature = "wasm"), test))]
@@ -98,12 +98,11 @@ impl Mixer {
 
         sleep(random_delay).await;
 
+        if let Some(m) = &self.metrics.queue_size { m.decrement(1.0f64); }
         if let Some(m) = &self.metrics.average_delay {
             let weight = 1.0f64 / self.cfg.metric_delay_window as f64;
-            m.set(
-                (weight * random_delay.as_millis() as f64) + ((1.0f64 - weight) * m.get()))
+            m.set((weight * random_delay.as_millis() as f64) + ((1.0f64 - weight) * m.get()))
         };
-        if let Some(m) = &self.metrics.queue_size { m.decrement(1.0f64); }
 
         packet
     }
