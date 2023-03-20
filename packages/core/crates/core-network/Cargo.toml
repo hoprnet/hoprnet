@@ -34,5 +34,3 @@ mockall = "0.11.3"
 more-asserts = "0.3.1"
 wasm-bindgen-test = "0.3.33"
 
-[profile.release]
-opt-level = "s"     # small code size

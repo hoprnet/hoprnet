@@ -12,24 +12,21 @@ use futures::{
 use libp2p::PeerId;
 
 use utils_log::{debug,info,error};
-use utils_metrics::metrics::native::SimpleCounter;
-#[cfg(any(not(feature = "wasm"), test))]
-use utils_metrics::metrics::native::SimpleHistogram;
+use utils_metrics::metrics::SimpleCounter;
+use utils_metrics::metrics::SimpleHistogram;
+use utils_metrics::histogram_start_measure;
+
 #[cfg(any(not(feature = "wasm"), test))]
 use utils_misc::time::native::current_timestamp;
 #[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::sleep as sleep;
 
 #[cfg(all(feature = "wasm", not(test)))]
-use utils_metrics::metrics::wasm::SimpleHistogram;
-#[cfg(all(feature = "wasm", not(test)))]
 use utils_misc::time::wasm::current_timestamp;
 #[cfg(all(feature = "wasm", not(test)))]
 use gloo_timers::future::sleep as sleep;
 
-
 const PINGS_MAX_PARALLEL: usize = 14;
-
 
 #[cfg_attr(test, mockall::automock)]
 pub trait PingExternalAPI {
@@ -120,7 +117,7 @@ impl Ping {
 
         let _ping_peers_timer = match &self.metric_time_to_heartbeat {
             Some(metric_time_to_heartbeat) => {
-                let timer = metric_time_to_heartbeat.start_measure();
+                let timer = histogram_start_measure!(metric_time_to_heartbeat);
                 Some(scopeguard::guard((), move |_| { metric_time_to_heartbeat.cancel_measure(timer); }))
             },
             None => None
@@ -163,7 +160,7 @@ impl Ping {
         let ping_result: PingMeasurement = {
             let _ping_peer_timer = match &self.metric_time_to_ping {
                 Some(metric_time_to_ping) => {
-                    let timer = metric_time_to_ping.start_measure();
+                    let timer = histogram_start_measure!(metric_time_to_ping);
                     Some(scopeguard::guard((), move |_| { metric_time_to_ping.cancel_measure(timer); }))
                 },
                 None => None
@@ -205,12 +202,12 @@ impl Ping {
         match ping_result.1 {
             Ok(_) => {
                 if let Some(metric_successful_ping_count) = &self.metric_successful_ping_count {
-                    metric_successful_ping_count.increment(1u64);
+                    metric_successful_ping_count.increment();
                 };
             }
             Err(_) => {
                 if let Some(metric_failed_ping_count) = &self.metric_failed_ping_count {
-                    metric_failed_ping_count.increment(1u64);
+                    metric_failed_ping_count.increment();
                 };
             }
         }

@@ -1,6 +1,6 @@
 [package]
 name = "utils-metrics"
-version = "1.0.0"
+version = "1.1.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Rust WASM module containing support for general metrics collection"
@@ -17,12 +17,12 @@ wasm = [ "dep:wasm-bindgen", "dep:js-sys" ]
 console_error_panic_hook = [ "dep:console_error_panic_hook" ]
 
 [dependencies]
-prometheus = "0.13.2"
+console_error_panic_hook = { version = "0.1.6", optional = true }
 js-sys = { version = "0.3.60", optional = true }
+prometheus = "0.13.2"
+regex = "1"
 utils-misc = { path = "../../../utils/crates/utils-misc" }
 wasm-bindgen = { version = "0.2.83", optional = true }
-console_error_panic_hook = { version = "0.1.6", optional = true }
-#wee_alloc = { version = "0.4.5", optional = true }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.30"

@@ -1,13 +1,14 @@
 import type { PeerId } from '@libp2p/interface-peer-id'
 
 import { durations, pickVersion, pubKeyToPeerId, type HoprDB, create_counter } from '@hoprnet/hopr-utils'
-import { debug } from '@hoprnet/hopr-utils'
+import { debug, registerMetricsCollector } from '@hoprnet/hopr-utils'
 
 import { pushable, type Pushable } from 'it-pushable'
 
 import { Packet } from '../../messages/index.js'
-import { new_mixer, core_mixer_set_panic_hook } from '../../../lib/core_mixer_bg.js'
-core_mixer_set_panic_hook()
+import { new_mixer, core_mixer_set_panic_hook, core_mixer_gather_metrics } from '../../../lib/core_mixer_bg.js'
+core_mixer_set_panic_hook();
+registerMetricsCollector(core_mixer_gather_metrics);
 
 import type { AcknowledgementInteraction } from './acknowledgement.js'
 import type { HoprOptions, SendMessage } from '../../index.js'
