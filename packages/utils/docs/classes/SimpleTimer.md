@@ -2,9 +2,7 @@
 
 # Class: SimpleTimer
 
-Currently the SimpleTimer is NOT a wrapper for HistogramTimer,
-but rather implements the timer logic using js_sys::Date to achieve a similar functionality.
-This is because WASM does not support system time functionality from the Rust stdlib.
+Represents a timer handle.
 
 ## Table of contents
 
@@ -34,4 +32,4 @@ This is because WASM does not support system time functionality from the Rust st
 
 #### Defined in
 
-lib/utils_metrics.d.ts:317
+lib/utils_metrics.d.ts:337

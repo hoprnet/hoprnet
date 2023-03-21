@@ -2,6 +2,9 @@
 
 # Class: SimpleGauge
 
+Represents a simple gauge with floating point values.
+Wrapper for Gauge type
+
 ## Table of contents
 
 ### Constructors
@@ -11,11 +14,9 @@
 ### Methods
 
 - [decrement](SimpleGauge.md#decrement)
-- [decrement\_by](SimpleGauge.md#decrement_by)
 - [free](SimpleGauge.md#free)
 - [get](SimpleGauge.md#get)
 - [increment](SimpleGauge.md#increment)
-- [increment\_by](SimpleGauge.md#increment_by)
 - [name](SimpleGauge.md#name)
 - [set](SimpleGauge.md#set)
 
@@ -29,21 +30,9 @@
 
 ### decrement
 
-▸ **decrement**(): `void`
+▸ **decrement**(`by`): `void`
 
-#### Returns
-
-`void`
-
-#### Defined in
-
-lib/utils_metrics.d.ts:263
-
-___
-
-### decrement\_by
-
-▸ **decrement_by**(`by`): `void`
+Decrements the gauge by the given value.
 
 #### Parameters
 
@@ -57,7 +46,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:260
+lib/utils_metrics.d.ts:274
 
 ___
 
@@ -71,7 +60,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:249
+lib/utils_metrics.d.ts:264
 
 ___
 
@@ -79,33 +68,23 @@ ___
 
 ▸ **get**(): `number`
 
+Retrieves the value of the gauge
+
 #### Returns
 
 `number`
 
 #### Defined in
 
-lib/utils_metrics.d.ts:271
+lib/utils_metrics.d.ts:284
 
 ___
 
 ### increment
 
-▸ **increment**(): `void`
+▸ **increment**(`by`): `void`
 
-#### Returns
-
-`void`
-
-#### Defined in
-
-lib/utils_metrics.d.ts:256
-
-___
-
-### increment\_by
-
-▸ **increment_by**(`by`): `void`
+Increments the gauge by the given value.
 
 #### Parameters
 
@@ -119,7 +98,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:253
+lib/utils_metrics.d.ts:269
 
 ___
 
@@ -127,19 +106,23 @@ ___
 
 ▸ **name**(): `string`
 
+Returns the name of the gauge given at construction.
+
 #### Returns
 
 `string`
 
 #### Defined in
 
-lib/utils_metrics.d.ts:275
+lib/utils_metrics.d.ts:289
 
 ___
 
 ### set
 
 ▸ **set**(`value`): `void`
+
+Sets the gauge to the given value.
 
 #### Parameters
 
@@ -153,4 +136,4 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:267
+lib/utils_metrics.d.ts:279

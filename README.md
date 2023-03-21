@@ -319,8 +319,6 @@ make fund-local-all
 make run-hopr-admin &
 ```
 
-##
-
 ## Local cluster
 
 The best way to test with multiple HOPR nodes is by using a local cluster of interconnected nodes.

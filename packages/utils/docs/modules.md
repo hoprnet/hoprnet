@@ -59,6 +59,7 @@
 - [Hosts](modules.md#hosts)
 - [LibP2PHandlerArgs](modules.md#libp2phandlerargs)
 - [LibP2PHandlerFunction](modules.md#libp2phandlerfunction)
+- [MetricCollector](modules.md#metriccollector)
 - [Network](modules.md#network)
 - [PRGParameters](modules.md#prgparameters)
 - [PRPParameters](modules.md#prpparameters)
@@ -113,6 +114,7 @@
 - [b58StringRegex](modules.md#b58stringregex)
 - [dbMock](modules.md#dbmock)
 - [durations](modules.md#durations)
+- [metricCollectors](modules.md#metriccollectors)
 
 ### Functions
 
@@ -155,6 +157,7 @@
 - [getHeaderLength](modules.md#getheaderlength)
 - [getLocalAddresses](modules.md#getlocaladdresses)
 - [getLocalHosts](modules.md#getlocalhosts)
+- [getMetricsCollectors](modules.md#getmetricscollectors)
 - [getNetworkPrefix](modules.md#getnetworkprefix)
 - [getPacketLength](modules.md#getpacketlength)
 - [getPrivateAddresses](modules.md#getprivateaddresses)
@@ -180,6 +183,7 @@
 - [libp2pSendMessage](modules.md#libp2psendmessage)
 - [libp2pSubscribe](modules.md#libp2psubscribe)
 - [loadJson](modules.md#loadjson)
+- [merge\_encoded\_metrics](modules.md#merge_encoded_metrics)
 - [moveDecimalPoint](modules.md#movedecimalpoint)
 - [nAtATime](modules.md#natatime)
 - [oneAtATime](modules.md#oneatatime)
@@ -198,6 +202,7 @@
 - [randomPermutation](modules.md#randompermutation)
 - [randomSubset](modules.md#randomsubset)
 - [recoverIteratedHash](modules.md#recoveriteratedhash)
+- [registerMetricsCollector](modules.md#registermetricscollector)
 - [retimer](modules.md#retimer)
 - [retryWithBackoffThenThrow](modules.md#retrywithbackoffthenthrow)
 - [sampleGroupElement](modules.md#samplegroupelement)
@@ -358,6 +363,24 @@ ___
 #### Defined in
 
 [src/libp2p/index.ts:172](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L172)
+
+___
+
+### MetricCollector
+
+Ƭ **MetricCollector**: () => `string`
+
+#### Type declaration
+
+▸ (): `string`
+
+##### Returns
+
+`string`
+
+#### Defined in
+
+[src/index.ts:46](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/index.ts#L46)
 
 ___
 
@@ -946,6 +969,16 @@ ___
 
 [src/time.ts:1](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/time.ts#L1)
 
+___
+
+### metricCollectors
+
+• **metricCollectors**: [`MetricCollector`](modules.md#metriccollector)[] = `[]`
+
+#### Defined in
+
+[src/index.ts:48](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/index.ts#L48)
+
 ## Functions
 
 ### FIFO
@@ -1288,7 +1321,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:8
+lib/utils_metrics.d.ts:23
 
 ___
 
@@ -1309,7 +1342,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:21
+lib/utils_metrics.d.ts:36
 
 ___
 
@@ -1330,7 +1363,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:34
+lib/utils_metrics.d.ts:49
 
 ___
 
@@ -1352,7 +1385,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:41
+lib/utils_metrics.d.ts:56
 
 ___
 
@@ -1374,7 +1407,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:15
+lib/utils_metrics.d.ts:30
 
 ___
 
@@ -1396,7 +1429,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:28
+lib/utils_metrics.d.ts:43
 
 ___
 
@@ -1418,7 +1451,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:48
+lib/utils_metrics.d.ts:63
 
 ___
 
@@ -1441,7 +1474,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:56
+lib/utils_metrics.d.ts:71
 
 ___
 
@@ -1696,7 +1729,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:60
+lib/utils_metrics.d.ts:17
 
 ___
 
@@ -1905,6 +1938,20 @@ ___
 #### Defined in
 
 [src/network/addrs.ts:306](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L306)
+
+___
+
+### getMetricsCollectors
+
+▸ **getMetricsCollectors**(): [`MetricCollector`](modules.md#metriccollector)[]
+
+#### Returns
+
+[`MetricCollector`](modules.md#metriccollector)[]
+
+#### Defined in
+
+[src/index.ts:51](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/index.ts#L51)
 
 ___
 
@@ -2511,6 +2558,30 @@ object parsed from JSON data
 
 ___
 
+### merge\_encoded\_metrics
+
+▸ **merge_encoded_metrics**(`metrics1`, `metrics2`): `string`
+
+A naive merging method for two serialized metric registries.
+It performs union of the sets, removing those metrics which have the same name and type.
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `metrics1` | `string` |
+| `metrics2` | `string` |
+
+#### Returns
+
+`string`
+
+#### Defined in
+
+lib/utils_metrics.d.ts:10
+
+___
+
 ### moveDecimalPoint
 
 ▸ **moveDecimalPoint**(`amount`, `position`): `string`
@@ -3042,6 +3113,26 @@ ___
 #### Defined in
 
 [src/crypto/hashIterator.ts:55](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/hashIterator.ts#L55)
+
+___
+
+### registerMetricsCollector
+
+▸ **registerMetricsCollector**(`collector`): `void`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `collector` | [`MetricCollector`](modules.md#metriccollector) |
+
+#### Returns
+
+`void`
+
+#### Defined in
+
+[src/index.ts:54](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/index.ts#L54)
 
 ___
 
