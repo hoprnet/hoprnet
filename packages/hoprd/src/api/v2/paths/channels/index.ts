@@ -97,7 +97,7 @@ GET.apiDoc = {
   ],
   responses: {
     '200': {
-      description: 'Channels fetched succesfully.',
+      description: 'Channels fetched successfully.',
       content: {
         'application/json': {
           schema: {
