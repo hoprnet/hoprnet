@@ -42,7 +42,7 @@ an Ethereum address
 
 #### Defined in
 
-packages/core/lib/core_misc.d.ts:230
+packages/core/lib/core_misc.d.ts:210
 
 ___
 
@@ -52,7 +52,7 @@ ___
 
 #### Defined in
 
-packages/core/lib/core_misc.d.ts:233
+packages/core/lib/core_misc.d.ts:213
 
 ___
 
@@ -64,7 +64,7 @@ an Ethereum address
 
 #### Defined in
 
-packages/core/lib/core_misc.d.ts:237
+packages/core/lib/core_misc.d.ts:217
 
 ___
 
@@ -74,7 +74,7 @@ ___
 
 #### Defined in
 
-packages/core/lib/core_misc.d.ts:240
+packages/core/lib/core_misc.d.ts:220
 
 ___
 
@@ -86,7 +86,7 @@ the environment identifier, e.g. monte_rosa
 
 #### Defined in
 
-packages/core/lib/core_misc.d.ts:244
+packages/core/lib/core_misc.d.ts:224
 
 ___
 
@@ -96,7 +96,7 @@ ___
 
 #### Defined in
 
-packages/core/lib/core_misc.d.ts:247
+packages/core/lib/core_misc.d.ts:227
 
 ___
 
@@ -108,7 +108,7 @@ an Ethereum address
 
 #### Defined in
 
-packages/core/lib/core_misc.d.ts:251
+packages/core/lib/core_misc.d.ts:231
 
 ___
 
@@ -120,7 +120,7 @@ an Ethereum address
 
 #### Defined in
 
-packages/core/lib/core_misc.d.ts:255
+packages/core/lib/core_misc.d.ts:235
 
 ___
 
@@ -132,7 +132,7 @@ an Ethereum address
 
 #### Defined in
 
-packages/core/lib/core_misc.d.ts:259
+packages/core/lib/core_misc.d.ts:239
 
 ___
 
@@ -144,7 +144,7 @@ an Ethereum address
 
 #### Defined in
 
-packages/core/lib/core_misc.d.ts:263
+packages/core/lib/core_misc.d.ts:243
 
 ___
 
@@ -156,7 +156,7 @@ an Ethereum address
 
 #### Defined in
 
-packages/core/lib/core_misc.d.ts:267
+packages/core/lib/core_misc.d.ts:247
 
 ## Methods
 
@@ -170,4 +170,4 @@ packages/core/lib/core_misc.d.ts:267
 
 #### Defined in
 
-packages/core/lib/core_misc.d.ts:226
+packages/core/lib/core_misc.d.ts:206

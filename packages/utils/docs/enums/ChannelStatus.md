@@ -2,7 +2,7 @@
 
 # Enumeration: ChannelStatus
 
-Describes status of the channel
+Describes status of a channel
 
 ## Table of contents
 
@@ -21,7 +21,7 @@ Describes status of the channel
 
 #### Defined in
 
-lib/utils_types.d.ts:24
+lib/utils_types.d.ts:45
 
 ___
 
@@ -31,7 +31,7 @@ ___
 
 #### Defined in
 
-lib/utils_types.d.ts:26
+lib/utils_types.d.ts:47
 
 ___
 
@@ -41,7 +41,7 @@ ___
 
 #### Defined in
 
-lib/utils_types.d.ts:27
+lib/utils_types.d.ts:48
 
 ___
 
@@ -51,4 +51,4 @@ ___
 
 #### Defined in
 
-lib/utils_types.d.ts:25
+lib/utils_types.d.ts:46

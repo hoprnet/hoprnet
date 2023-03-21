@@ -2,6 +2,9 @@
 
 # Class: SimpleHistogram
 
+Represents a histogram with floating point values.
+Wrapper for Histogram type
+
 ## Table of contents
 
 ### Constructors
@@ -31,6 +34,8 @@
 
 ▸ **cancel_measure**(`timer`): `number`
 
+Stops the given timer and discards the measured duration in seconds and returns it.
+
 #### Parameters
 
 | Name | Type |
@@ -43,7 +48,7 @@
 
 #### Defined in
 
-lib/utils_metrics.d.ts:297
+lib/utils_metrics.d.ts:312
 
 ___
 
@@ -57,7 +62,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:280
+lib/utils_metrics.d.ts:296
 
 ___
 
@@ -65,13 +70,15 @@ ___
 
 ▸ **get_sample_count**(): `bigint`
 
+Get all samples count
+
 #### Returns
 
 `bigint`
 
 #### Defined in
 
-lib/utils_metrics.d.ts:301
+lib/utils_metrics.d.ts:317
 
 ___
 
@@ -79,13 +86,15 @@ ___
 
 ▸ **get_sample_sum**(): `number`
 
+Get all samples sum
+
 #### Returns
 
 `number`
 
 #### Defined in
 
-lib/utils_metrics.d.ts:305
+lib/utils_metrics.d.ts:322
 
 ___
 
@@ -93,19 +102,23 @@ ___
 
 ▸ **name**(): `string`
 
+Returns the name of the histogram given at construction.
+
 #### Returns
 
 `string`
 
 #### Defined in
 
-lib/utils_metrics.d.ts:309
+lib/utils_metrics.d.ts:327
 
 ___
 
 ### observe
 
 ▸ **observe**(`value`): `void`
+
+Records a value observation to the histogram.
 
 #### Parameters
 
@@ -119,13 +132,15 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:284
+lib/utils_metrics.d.ts:301
 
 ___
 
 ### record\_measure
 
 ▸ **record_measure**(`timer`): `void`
+
+Stops the given timer and records the elapsed duration in seconds to the histogram.
 
 #### Parameters
 
@@ -139,7 +154,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:292
+lib/utils_metrics.d.ts:306
 
 ___
 
@@ -153,4 +168,4 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:288
+lib/utils_metrics.d.ts:331

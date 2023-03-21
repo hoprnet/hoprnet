@@ -33,7 +33,7 @@ Implementors should bear in mind:
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:50](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L50)
+[packages/core/src/channel-strategy.ts:51](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L51)
 
 ___
 
@@ -43,7 +43,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:65](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L65)
+[packages/core/src/channel-strategy.ts:66](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L66)
 
 ## Methods
 
@@ -63,7 +63,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:52](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L52)
+[packages/core/src/channel-strategy.ts:53](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L53)
 
 ___
 
@@ -83,7 +83,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:62](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L62)
+[packages/core/src/channel-strategy.ts:63](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L63)
 
 ___
 
@@ -103,7 +103,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:61](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L61)
+[packages/core/src/channel-strategy.ts:62](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L62)
 
 ___
 
@@ -123,7 +123,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:63](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L63)
+[packages/core/src/channel-strategy.ts:64](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L64)
 
 ___
 
@@ -146,4 +146,4 @@ ___
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:54](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L54)
+[packages/core/src/channel-strategy.ts:55](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L55)

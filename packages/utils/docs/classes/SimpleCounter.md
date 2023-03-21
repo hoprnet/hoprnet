@@ -2,6 +2,9 @@
 
 # Class: SimpleCounter
 
+Represents a simple monotonic unsigned integer counter.
+Wrapper for IntCounter type
+
 ## Table of contents
 
 ### Constructors
@@ -34,7 +37,7 @@
 
 #### Defined in
 
-lib/utils_metrics.d.ts:229
+lib/utils_metrics.d.ts:238
 
 ___
 
@@ -42,13 +45,15 @@ ___
 
 ▸ **get**(): `bigint`
 
+Retrieves the value of the counter
+
 #### Returns
 
 `bigint`
 
 #### Defined in
 
-lib/utils_metrics.d.ts:240
+lib/utils_metrics.d.ts:243
 
 ___
 
@@ -56,19 +61,23 @@ ___
 
 ▸ **increment**(): `void`
 
+Increments the counter by 1
+
 #### Returns
 
 `void`
 
 #### Defined in
 
-lib/utils_metrics.d.ts:236
+lib/utils_metrics.d.ts:252
 
 ___
 
 ### increment\_by
 
 ▸ **increment_by**(`by`): `void`
+
+Increments the counter by the given number.
 
 #### Parameters
 
@@ -82,7 +91,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:233
+lib/utils_metrics.d.ts:248
 
 ___
 
@@ -90,10 +99,12 @@ ___
 
 ▸ **name**(): `string`
 
+Returns the name of the counter given at construction.
+
 #### Returns
 
 `string`
 
 #### Defined in
 
-lib/utils_metrics.d.ts:244
+lib/utils_metrics.d.ts:257
