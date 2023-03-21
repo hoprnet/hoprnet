@@ -15,7 +15,7 @@ use crate::errors::CryptoError::InvalidSecretScalar;
 use crate::parameters;
 
 use crate::errors::Result;
-use crate::types::CurvePoint;
+use crate::types::{CurvePoint, PublicKey};
 
 /// Type for the secret keys with fixed size
 /// The GenericArray<..> is mostly deprecated since Rust 1.51 and it's introduction of const generics,
@@ -27,7 +27,6 @@ pub type KeyBytes = GenericArray<u8, typenum::U32>;
 fn extract_key_from_group_element(group_element: &AffinePoint, salt: &[u8]) -> KeyBytes {
     // Create the compressed EC point representation first
     let compressed_element = group_element.to_encoded_point(true);
-
     SimpleHkdf::<Blake2s256>::extract(Some(salt), compressed_element.as_bytes()).0
 }
 
@@ -41,25 +40,19 @@ fn expand_key_from_group_element(group_element: &AffinePoint, salt: &[u8]) -> Ke
         .expand(b"", &mut out)
         .unwrap(); // Cannot panic, unless the constants are wrong
 
-    KeyBytes::from(out)
+    out.into()
 }
 
 /// Decodes the public key and converts it into an EC point in projective coordinates
 fn decode_public_key_to_point(encoded_public_key: &[u8]) -> Result<ProjectivePoint<Secp256k1>> {
-    Ok(crate::types::PublicKey::deserialize(encoded_public_key)
-        .map(|pk| CurvePoint::from(pk).to_projective_point())?)
-    /*PublicKey::<Secp256k1>::from_sec1_bytes(encoded_public_key)
-        .map(|decoded| ProjectivePoint::<Secp256k1>::from(decoded))
-        .map_err(|e| EllipticCurveError(e))*/
+    let curve_point: CurvePoint = PublicKey::deserialize(encoded_public_key)?.into();
+    Ok(curve_point.to_projective_point())
 }
 
 /// Checks if the given key bytes can form a scalar for EC point
 fn to_checked_secret_scalar(secret_scalar: KeyBytes) -> Result<NonZeroScalar> {
-    let scalar = NonZeroScalar::from_repr(secret_scalar);
-    match Option::from(scalar) {
-        Some(s) => Ok(s),
-        None => Err(InvalidSecretScalar)
-    }
+    Option::from(NonZeroScalar::from_repr(secret_scalar))
+        .ok_or(InvalidSecretScalar)
 }
 
 /// Structure containing shared keys for peers.
