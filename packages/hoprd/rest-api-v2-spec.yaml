@@ -193,6 +193,15 @@ components:
       type: string
       description: HOPR account address, also called a PeerId. Used to send / receive messages, open / close payment channels.
       example: 16Uiu2HAmVfV4GKQhdECMqYmUMGLy84RjTJQxTWDcmUX5847roBar
+    ChannelStatus:
+      type: string
+      enum:
+        - WaitingForCommitment
+        - Open
+        - PendingToClose
+        - Closed
+      description: 'Status of the channel can be: WaitingForCommitment, Open, PendingToClose, or Closed.'
+      example: Open
     NativeBalance:
       type: string
       example: '1000000000000000000'
@@ -218,16 +227,43 @@ components:
         peerId:
           $ref: '#/components/schemas/HoprAddress'
         status:
-          type: string
-          enum:
-            - WaitingForCommitment
-            - Open
-            - PendingToClose
-            - Closed
-          description: 'Status of the channel can be: WaitingForCommitment, Open, PendingToClose, or Closed.'
-          example: Open
+          $ref: '#/components/schemas/ChannelStatus'
         balance:
           $ref: '#/components/schemas/HoprBalance'
+    TopologyChannel:
+      type: object
+      properties:
+        channelId:
+          type: string
+          description: Channel ID that can be used in other calls, not to confuse with transaction hash.
+          example: 0x04e50b7ddce9770f58cebe51f33b472c92d1c40384759f5a0b1025220bf15ec5
+        sourcePeerId:
+          $ref: '#/components/schemas/HoprAddress'
+        destinationPeerId:
+          $ref: '#/components/schemas/HoprAddress'
+        sourceAddress:
+          $ref: '#/components/schemas/NativeAddress'
+        destinationAddress:
+          $ref: '#/components/schemas/NativeAddress'
+        balance:
+          $ref: '#/components/schemas/HoprBalance'
+        status:
+          $ref: '#/components/schemas/ChannelStatus'
+        commitment:
+          type: string
+          description: Redeemed commitment
+        ticketEpoch:
+          type: string
+          description: Ticket redemption relies on providing the value opening to a series of commitments that have previously been stored on-chain by the ticket recipient.
+        ticketIndex:
+          type: string
+          description: Each ticket is labeled by an ongoing serial number named ticket index i and its current value is stored in the smart contract.
+        channelEpoch:
+          type: string
+          description: Payment channels might run through multiple open and close sequences, this epoch tracks the sequence.
+        closureTime:
+          type: string
+          description: Time when the channel can be closed
     Ticket:
       type: object
       properties:
