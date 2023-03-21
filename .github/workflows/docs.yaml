@@ -20,10 +20,15 @@ jobs:
       - name: Configure Git info
         run: ./scripts/configure-git-info.sh
 
-      - name: install toolchain (and update PATH)
-        run: |
-          ./scripts/toolchain/install-toolchain.sh
-          echo "/usr/local/bin" >> $GITHUB_PATH
+      - name: Install Nix
+        uses: cachix/install-nix-action@v17
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: cachix/cachix-action@v12
+        with:
+          name: hoprnet
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
 
       - name: get yarn cache directory path
         id: yarn-cache-dir-path
@@ -51,33 +56,26 @@ jobs:
             .cargo/.package-cache/
             .cargo/bin/
 
-      - name: Install tools (only when using ACT)
-        if: ${{ env.ACT == 'true' }}
-        run: |
-          apt-key adv --keyserver keyserver.ubuntu.com --recv-keys CC86BB64
-          add-apt-repository -y ppa:rmescandon/yq
-          apt update
-          apt install -y --no-install-recommends lsof yq
+      - name: Install dependencies
+        run: nix develop -c make -j deps-ci
 
       - name: Generate docs (first run)
-        run: |
-          make -j deps-ci
-          make -j build-docs
+        run: nix develop -c make -j build-docs
         env:
           DEPLOYER_PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY_DEFAULT_FOUNDRY }}
 
       - name: Sync supported API capabilities
-        run: ./scripts/sync-api-capabilities.sh
+        run: nix develop -c ./scripts/sync-api-capabilities.sh
 
       # a second run is needed to include the newly updated API docs into the
       # final API spec file
       - name: Generate docs (second run)
-        run: make -j build-docs
+        run: nix develop -c make -j build-docs
         env:
           DEPLOYER_PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY_DEFAULT_FOUNDRY }}
 
       - name: Format newly created files
-        run: make lint-fix
+        run: nix develop -c make lint-fix
 
       - name: Commit docs changes
         # only commit changes when not running via act and when on final branches

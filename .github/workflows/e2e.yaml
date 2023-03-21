@@ -26,10 +26,15 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: install toolchain (and update PATH)
-        run: |
-          ./scripts/toolchain/install-toolchain.sh
-          echo "/usr/local/bin" >> $GITHUB_PATH
+      - name: Install Nix
+        uses: cachix/install-nix-action@v17
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: cachix/cachix-action@v12
+        with:
+          name: hoprnet
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
 
       - name: get yarn cache directory path
         id: yarn-cache-dir-path
@@ -59,19 +64,13 @@ jobs:
             .foundry/bin/
 
       - name: Install dependencies
-        run: make -j deps-ci
+        run: nix develop -c make -j deps-ci
 
       - name: Build
-        run: make -j build
-
-      - name: Install websocat
-        run: ./scripts/install-websocat.sh
-
-      - name: Install jq
-        run: ./scripts/install-jq.sh
+        run: nix develop -c make -j build
 
       - name: Test
-        run: make exec-script script=./scripts/run-integration-tests-source.sh
+        run: nix develop -c ./scripts/run-integration-tests-source.sh
 
       - name: Upload node logs (Linux)
         uses: actions/upload-artifact@v3
