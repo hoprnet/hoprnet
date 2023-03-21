@@ -1,5 +1,10 @@
 name: HOPR Test
 
+env:
+  RUST_BACKTRACE: "1"
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: "sccache"
+
 on:
   push:
     branches: ['**']
@@ -21,6 +26,11 @@ jobs:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
+
+      - name: Sccache Setup
+        uses: mozilla-actions/sccache-action@v0.0.1
+        with:
+          version: "v0.4.0"
 
       - name: Install Nix
         uses: cachix/install-nix-action@v17

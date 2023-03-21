@@ -2,6 +2,9 @@ name: HOPR Generate API docs
 
 env:
   HOPR_GITHUB_REF: ${{ github.ref }}
+  RUST_BACKTRACE: "1"
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: "sccache"
 
 on:
   push:
@@ -19,6 +22,11 @@ jobs:
 
       - name: Configure Git info
         run: ./scripts/configure-git-info.sh
+
+      - name: Sccache Setup
+        uses: mozilla-actions/sccache-action@v0.0.1
+        with:
+          version: "v0.4.0"
 
       - name: Install Nix
         uses: cachix/install-nix-action@v17
