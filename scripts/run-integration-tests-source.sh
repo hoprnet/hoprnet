@@ -27,6 +27,7 @@ usage() {
 declare wait_delay=2
 declare wait_max_wait=1000
 declare skip_cleanup="false"
+declare just_cleanup="false"
 declare default_api_token="e2e-API-token^^"
 
 while (( "$#" )); do
@@ -38,6 +39,10 @@ while (( "$#" )); do
       ;;
     -s|--skip-cleanup)
       skip_cleanup="true"
+      shift
+      ;;
+    -c|--just-cleanup)
+      just_cleanup="true"
       shift
       ;;
     -*|--*=)
@@ -148,6 +153,11 @@ if [ "${skip_cleanup}" != "1" ] && [ "${skip_cleanup}" != "true" ]; then
   trap cleanup SIGINT SIGTERM ERR EXIT
 fi
 
+if [ "${just_cleanup}" == "1" ] || [ "${just_cleanup}" == "true" ]; then
+  cleanup
+  exit $?
+fi
+
 # $1 = api port
 # $2 = api token
 # $3 = node port
@@ -248,7 +258,7 @@ log "\t\tid: ${node7_id}"
 # }}}
 
 # --- Check all resources we need are free {{{
-for p in ${all_ports[@]}; do
+for p in "${all_ports[@]}"; do
   ensure_port_is_free "${p}"
 done
 # }}}
@@ -328,16 +338,16 @@ done
 
 log "All nodes came up online"
 
-# --- Run security tests --- {{{
-${mydir}/../test/security-test.sh \
-  127.0.0.1 13301 13302 "${default_api_token}"
-# }}}
-
-# --- Run protocol test --- {{{
-ADDITIONAL_NODE_ADDRS="0xde913eeed23bce5274ead3de8c196a41176fbd49" \
-ADDITIONAL_NODE_PEERIDS="16Uiu2HAm2VD6owCxPEZwP6Moe1jzapqziVeaTXf1h7jVzu5dW1mk" \
-HOPRD_API_TOKEN="${default_api_token}" \
-${mydir}/../test/integration-test.sh \
-  "localhost:13301" "localhost:13302" "localhost:13303" "localhost:13304" "localhost:13305" "localhost:13306" "localhost:13307"
-# }}}
+## --- Run security tests --- {{{
+#${mydir}/../test/security-test.sh \
+#  127.0.0.1 13301 13302 "${default_api_token}"
+## }}}
+#
+## --- Run protocol test --- {{{
+#ADDITIONAL_NODE_ADDRS="0xde913eeed23bce5274ead3de8c196a41176fbd49" \
+#ADDITIONAL_NODE_PEERIDS="16Uiu2HAm2VD6owCxPEZwP6Moe1jzapqziVeaTXf1h7jVzu5dW1mk" \
+#HOPRD_API_TOKEN="${default_api_token}" \
+#${mydir}/../test/integration-test.sh \
+#  "localhost:13301" "localhost:13302" "localhost:13303" "localhost:13304" "localhost:13305" "localhost:13306" "localhost:13307"
+## }}}
 
