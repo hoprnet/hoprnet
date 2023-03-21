@@ -416,7 +416,7 @@ deactivate
 With the environment activated, execute the tests locally:
 
 ```sh
-pytest tests/integration/
+python3 -m pytest tests/
 ```
 
 #### NPM local testing alternative
