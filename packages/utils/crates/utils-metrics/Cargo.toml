@@ -22,7 +22,7 @@ js-sys = { version = "0.3.60", optional = true }
 prometheus = "0.13.2"
 regex = "1"
 utils-misc = { path = "../../../utils/crates/utils-misc" }
-wasm-bindgen = { version = "0.2.83", optional = true }
+wasm-bindgen = { workspace = true, optional = true }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.30"

@@ -7,6 +7,9 @@ env:
   MATRIX_CLUSTER_INFO_ROOM: ${{ secrets.MATRIX_CLUSTER_INFO_ROOM }}
   MATRIX_SERVER: ${{ secrets.MATRIX_SERVER }}
   MATRIX_ACCESS_TOKEN: ${{ secrets.MATRIX_ACCESS_TOKEN }}
+  RUST_BACKTRACE: "1"
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: "sccache"
 
 on:
   push:
@@ -47,10 +50,20 @@ jobs:
       - name: "[SETUP] Configure Git info"
         run: ./scripts/configure-git-info.sh
 
-      - name: install toolchain (and update PATH)
-        run: |
-          ./scripts/toolchain/install-toolchain.sh
-          echo "/usr/local/bin" >> $GITHUB_PATH
+      - name: Sccache Setup
+        uses: mozilla-actions/sccache-action@v0.0.1
+        with:
+          version: "v0.4.0"
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v17
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: cachix/cachix-action@v12
+        with:
+          name: hoprnet
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
 
       - name: get yarn cache directory path
         id: yarn-cache-dir-path
@@ -81,8 +94,8 @@ jobs:
 
       - name: "[BUILD] Install dependencies / link / build"
         run: |
-          make -j deps-ci
-          make -j build
+          nix develop -c make -j deps-ci
+          nix develop -c make -j build
 
       - name: "Cache built artifacts (for later use)"
         uses: actions/cache@v3
@@ -101,14 +114,14 @@ jobs:
       - name: "[SMART-CONTRACTS] Commit & push changes"
         if: ${{ !env.ACT }}
         run: |
-          make lint-fix
+          nix develop -c make lint-fix
           ./scripts/commit-and-push-all-changes.sh
         env:
           HOPR_GIT_MSG: "chore(release): update smart contract deployments"
 
       - name: "[NPM] Publish prerelease version (On pushes to master, debug-deploy/* or staging/*)"
         if: ${{ (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/debug-deploy/')  || startsWith(github.ref, 'refs/heads/staging/')) && !env.ACT }}
-        run: ./scripts/publish-version.sh prerelease
+        run: nix develop -c ./scripts/publish-version.sh prerelease
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -116,7 +129,7 @@ jobs:
       # accordance with semver.
       - name: "[NPM] Publish patch version (On pushes to release branches)"
         if: ${{ startsWith(github.ref, 'refs/heads/release/') && !env.ACT }}
-        run: ./scripts/publish-version.sh patch
+        run: nix develop -c ./scripts/publish-version.sh patch
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -192,7 +205,7 @@ jobs:
           git pull origin "${branch}" --rebase
 
       - name: Build Docker images
-        run: ./scripts/build-docker.sh
+        run: nix develop -c ./scripts/build-docker.sh
 
       - name: Send notification if anything failed on master or release/staging branches
         if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/') || startsWith(github.ref, 'refs/heads/staging/')) && !env.ACT }}
@@ -212,10 +225,20 @@ jobs:
       - name: "[SETUP] Configure Git info"
         run: ./scripts/configure-git-info.sh
 
-      - name: install toolchain (and update PATH)
-        run: |
-          ./scripts/toolchain/install-toolchain.sh
-          echo "/usr/local/bin" >> $GITHUB_PATH
+      - name: Sccache Setup
+        uses: mozilla-actions/sccache-action@v0.0.1
+        with:
+          version: "v0.4.0"
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v17
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: cachix/cachix-action@v12
+        with:
+          name: hoprnet
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
 
       - name: get yarn cache directory path
         id: yarn-cache-dir-path
@@ -256,13 +279,14 @@ jobs:
         env:
           HOPR_PACKAGE: hoprd
 
+      - name: Install dependencies
+        run: nix develop -c make -j deps-ci
+
       - name: Build Avado
         env:
           HOPR_GITHUB_REF: ${{ github.ref }}
           AVADO_VERSION: ${{ steps.set-version.outputs.vsn }}
-        run: |
-          make deps-ci
-          ./scripts/build-avado.sh ${AVADO_VERSION}
+        run: nix develop -c ./scripts/build-avado.sh ${AVADO_VERSION}
 
       - name: Commit & Push changes
         if: ${{ !env.ACT }}
@@ -317,10 +341,20 @@ jobs:
       - name: "[SETUP] Configure Git info"
         run: ./scripts/configure-git-info.sh
 
-      - name: install toolchain (and update PATH)
-        run: |
-          ./scripts/toolchain/install-toolchain.sh
-          echo "/usr/local/bin" >> $GITHUB_PATH
+      - name: Sccache Setup
+        uses: mozilla-actions/sccache-action@v0.0.1
+        with:
+          version: "v0.4.0"
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v17
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: cachix/cachix-action@v12
+        with:
+          name: hoprnet
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
 
       - name: get yarn cache directory path
         id: yarn-cache-dir-path
@@ -365,7 +399,7 @@ jobs:
           # get latest version
           git pull
           # need to build our packages which might by used by the scripts, such as the fund script
-          make -j deps-ci
+          nix develop -c make -j deps-ci
 
       - name: Restore built artifacts
         uses: actions/cache@v3
@@ -422,10 +456,20 @@ jobs:
       - name: "[SETUP] Configure Git info"
         run: ./scripts/configure-git-info.sh
 
-      - name: install toolchain (and update PATH)
-        run: |
-          ./scripts/toolchain/install-toolchain.sh
-          echo "/usr/local/bin" >> $GITHUB_PATH
+      - name: Sccache Setup
+        uses: mozilla-actions/sccache-action@v0.0.1
+        with:
+          version: "v0.4.0"
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v17
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: cachix/cachix-action@v12
+        with:
+          name: hoprnet
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
 
       - name: get yarn cache directory path
         id: yarn-cache-dir-path
@@ -470,7 +514,7 @@ jobs:
           # get latest version
           git pull
           # need to build our packages which might by used by the scripts, such as the fund script
-          make -j deps-ci
+          nix develop -c make -j deps-ci
 
       - name: Restore built artifacts
         uses: actions/cache@v3
