@@ -185,6 +185,16 @@ jobs:
       - name: Configure Git info
         run: ./scripts/configure-git-info.sh
 
+      - name: Install Nix
+        uses: cachix/install-nix-action@v17
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: cachix/cachix-action@v12
+        with:
+          name: hoprnet
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+
       - name: Set up Google Cloud Credentials
         uses: google-github-actions/auth@v0
         with:
