@@ -32,9 +32,12 @@ let
     curl # v7.88.0
 
     # testing utilities
-    websocat # v1.11.0
     jq # v1.6
     yq-go # v4.30.8
+    jq
+    yq-go
+    vagrant
+    shellcheck
 
     # test Github automation
     act # 0.2.42
