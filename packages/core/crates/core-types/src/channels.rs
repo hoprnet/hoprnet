@@ -304,10 +304,11 @@ impl BinarySerializable for Ticket {
 pub mod tests {
     use ethnum::u256;
     use hex_literal::hex;
+    use core_crypto::types::{Challenge, CurvePoint, Hash, PublicKey};
+    use utils_types::primitives::{Address, Balance, BalanceType, U256};
+    use utils_types::traits::BinarySerializable;
+
     use crate::channels::{ChannelEntry, ChannelStatus, Response, Ticket};
-    use crate::crypto::{Challenge, CurvePoint, Hash, PublicKey};
-    use crate::primitives::{Address, Balance, BalanceType, U256};
-    use crate::traits::BinarySerializable;
 
     const PUBLIC_KEY_1: [u8; 65] = hex!("0443a3958ac66a3b2ab89fcf90bc948a8b8be0e0478d21574d077ddeb11f4b1e9f2ca21d90bd66cee037255480a514b91afae89e20f7f7fa7353891cc90a52bf6e");
     const PUBLIC_KEY_2: [u8; 65] = hex!("04f16fd6701aea01032716377d52d8213497c118f99cdd1c3c621b2795cac8681606b7221f32a8c5d2ef77aa783bec8d96c11480acccabba9e8ee324ae2dfe92bb");

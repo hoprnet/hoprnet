@@ -151,7 +151,7 @@ mod tests {
         let expected_iv = hex!("a735d1806513af957dd25de7");
 
         let secret = [0u8; SECRET_KEY_LENGTH];
-        let params = PRGParameters::new(&secret).unwrap();
+        let params = PRGParameters::new(&secret);
 
         assert_eq!(expected_key, params.key);
         assert_eq!(expected_iv, params.iv)

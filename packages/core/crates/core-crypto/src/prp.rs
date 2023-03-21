@@ -146,7 +146,7 @@ mod tests {
         let key = [0u8; 4*32];
         let iv = [0u8; 4*16];
 
-        let prp = PRP::new(&key, &iv).unwrap();
+        let prp = PRP::new(&key, &iv);
 
         let data = [1u8; 278];
 
@@ -161,7 +161,7 @@ mod tests {
         let key = [0u8; 4*32];
         let iv = [0u8; 4*16];
 
-        let prp = PRP::new(&key, &iv).unwrap();
+        let prp = PRP::new(&key, &iv);
 
         let pt = [0u8; 100];
         let ct = prp.forward(&pt).unwrap();
@@ -176,7 +176,7 @@ mod tests {
         let key = [0u8; 4*32];
         let iv = [0u8; 4*16];
 
-        let prp = PRP::new(&key, &iv).unwrap();
+        let prp = PRP::new(&key, &iv);
 
         let ct = hex!("e31d924dd07dbe87b54854a05cc09453b873d4b520f6cd787fbaa43e543ac9bf480457c20b39a93f4f05a7aa2566b944cedfcc1bec7fa0f456d361150835edca0c1e0c475350d39e2c658acced7d7cd00ded9dd44bbcd2b1ae367b3a7b2d3b45937ca118");
         let ct_c = hex!("e31d924dd07dbe87b54854a05cc09453b873d4b520f6cd787fbaa43e543ac9bf480457c20b39a93f4f05a7aa2566b944cedfcc1bec7fa0f456d361150835edca0c1e0c475350d39e2c658acced7d7cd00ded9dd44bbcd2b1ae367b3a7b2d3b45937ca118");
@@ -195,7 +195,7 @@ mod tests {
         let mut iv = [0u8; 4*16];
         getrandom(&mut iv).unwrap();
 
-        let prp = PRP::new(&key, &iv).unwrap();
+        let prp = PRP::new(&key, &iv);
 
         let mut data = [1u8; 278];
         getrandom(&mut data).unwrap();
@@ -212,7 +212,7 @@ mod tests {
         let expected_iv = hex!("a59991716be504b26471dea53d688c4bab8e910328e54ebb6ebf07b49e6d12eacfc56e0935ba2300559b43ede25aa09eee7e8a2deea5f0bdaee2e859834edd38");
 
         let secret = [0u8; SECRET_KEY_LENGTH];
-        let params = PRPParameters::new(&secret).unwrap();
+        let params = PRPParameters::new(&secret);
 
         assert_eq!(expected_key, params.key);
         assert_eq!(expected_iv, params.iv)
@@ -221,7 +221,7 @@ mod tests {
     #[test]
     fn test_prp_ciphertext_from_params() {
         let secret = [0u8; SECRET_KEY_LENGTH];
-        let params = PRPParameters::new(&secret).unwrap();
+        let params = PRPParameters::new(&secret);
 
         let expected_key = hex!("a9c6632c9f76e5e4dd03203196932350a47562f816cebb810c64287ff68586f35cb715a26e268fc3ce68680e16767581de4e2cb3944c563d1f1a0cc077f3e788a12f31ae07111d77a876a66de5bdd6176bdaa2e07d1cb2e36e428afafdebb2109f70ce8422c8821233053bdd5871523ffb108f1e0f86809999a99d407590df25");
         let expected_iv = hex!("a59991716be504b26471dea53d688c4bab8e910328e54ebb6ebf07b49e6d12eacfc56e0935ba2300559b43ede25aa09eee7e8a2deea5f0bdaee2e859834edd38");

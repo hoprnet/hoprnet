@@ -1183,6 +1183,7 @@ dependencies = [
  "core-crypto",
  "enum-iterator",
  "ethnum",
+ "hex-literal",
  "js-sys",
  "serde",
  "serde_repr",
