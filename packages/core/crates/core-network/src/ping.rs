@@ -271,7 +271,10 @@ pub mod wasm {
             };
 
             if let Err(err) = self.on_finished_ping_cb.call2(&this, &peer, &res) {
-                error!("Failed to perform on peer offline operation with: {}", err.as_string().unwrap().as_str())
+                error!("Failed to perform on peer offline operation with: {}",
+                    err.as_string()
+                    .unwrap_or_else(|| "Unspecified error occurred on registering the ping result".to_owned())
+                    .as_str())
             };
         }
     }
@@ -317,9 +320,9 @@ pub mod wasm {
         #[wasm_bindgen]
         pub async fn ping(&self, mut peers: Vec<JsString>) {
             let converted = peers.drain(..)
-                .map(|x| {
+                .filter_map(|x| {
                     let x: String = x.into();
-                    PeerId::from_str(&x).ok().unwrap()
+                    PeerId::from_str(&x).ok()
                 })
                 .collect::<Vec<_>>();
 
@@ -344,7 +347,10 @@ pub mod wasm {
                             data
                         },
                         Err(e) => {
-                            error!("The message transport could not be established: {}", e.as_string().unwrap().as_str());
+                            error!("The message transport could not be established: {}",
+                                e.as_string()
+                                .unwrap_or_else(|| "The message transport failed with unknown error".to_owned())
+                                .as_str());
                             Err(format!("Failed to extract transport error as string: {:?}", e))
                         }
                     }
