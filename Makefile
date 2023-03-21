@@ -89,13 +89,14 @@ endif
 
 .PHONY: deps
 deps: ## Installs dependencies for development setup
-	[ -n "${NIX_PATH}" ] || corepack enable
+	[[ "${name}" =~ nix-shell* ]] || corepack enable
 	command -v rustup && rustup update || echo "No rustup installed, ignoring"
 # we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op
 	mkdir -p .cargo/bin
 	$(MAKE) cargo-update
 	command -v wasm-opt || $(cargo) install wasm-opt
 	command -v wasm-pack || $(cargo) install wasm-pack
+	command -v wasm-bindgen || $(cargo) install wasm-bindgen
 	yarn workspaces focus ${YARNFLAGS}
 # install foundry (cast + forge + anvil)
 	$(MAKE) install-foundry

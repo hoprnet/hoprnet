@@ -26,7 +26,8 @@ mkShell {
     (rust-bin.fromRustupToolchainFile ./rust-toolchain.toml)
     protobuf
     wasm-pack # v0.10.3
-    binaryen # v109
+    binaryen # v111 (includes wasm-opt)
+    wasm-bindgen-cli # v0.2.83
 
     ## python is required by node module bcrypto
     python3

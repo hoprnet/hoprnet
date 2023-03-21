@@ -56,9 +56,6 @@ jobs:
             .cargo/.package-cache/
             .cargo/bin/
 
-      - name: Print env
-        run: nix develop -c env
-
       - name: Install dependencies
         run: nix develop -c make -j deps-ci
 
