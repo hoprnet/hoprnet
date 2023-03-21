@@ -3,6 +3,8 @@
 - Migrate the `Heartbeat`, `Ping` and `Network` functionality into Rust ([#4568](https://github.com/hoprnet/hoprnet/pull/4658))
 - Rebrand `foundry-tool` to `hopli` and allow it to interact with identities and network-registry ([#4652](https://github.com/hoprnet/hoprnet/pull/4652))
 - Migrate mixer code to Rust ([#4567](https://github.com/hoprnet/hoprnet/pull/4567))
+- Fix initial network peer registration from the Peer Store ([#4741](https://github.com/hoprnet/hoprnet/pull/4741))
+- `hopli` accepts floating number for the amount of tokens to be transferred/minted. Lossen requirement on the identtiy file. ([#4723](https://github.com/hoprnet/hoprnet/pull/4723))
 
 <a name="1.92"></a>
 

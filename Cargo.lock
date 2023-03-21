@@ -1077,6 +1077,8 @@ dependencies = [
  "more-asserts",
  "pin-project",
  "rand 0.8.5",
+ "utils-log",
+ "utils-metrics",
  "utils-misc",
  "wasm-bindgen",
  "wasm-bindgen-futures",
@@ -6294,11 +6296,12 @@ dependencies = [
 
 [[package]]
 name = "utils-metrics"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "console_error_panic_hook",
  "js-sys",
  "prometheus",
+ "regex",
  "utils-misc",
  "wasm-bindgen",
  "wasm-bindgen-test",

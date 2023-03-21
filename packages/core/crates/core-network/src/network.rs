@@ -5,7 +5,7 @@ use std::time::Duration;
 use libp2p::PeerId;
 
 use utils_log::{info,warn,error};
-use utils_metrics::metrics::native::{MultiGauge, SimpleGauge};
+use utils_metrics::metrics::{MultiGauge, SimpleGauge};
 
 #[cfg(any(not(feature = "wasm"), test))]
 use utils_misc::time::native::current_timestamp;
@@ -14,18 +14,40 @@ use utils_misc::time::native::current_timestamp;
 use utils_misc::time::wasm::current_timestamp;
 
 
-/// Minimum delay will be multiplied by backoff, it will be half the actual minimum value
-const MIN_DELAY: Duration = Duration::from_secs(1);
-const MAX_DELAY: Duration = Duration::from_secs(300);   // 5 minutes
-const BACKOFF_EXPONENT: f64 = 1.5;
-const MIN_BACKOFF: f64 = 2.0;
-const MAX_BACKOFF: f64 = MAX_DELAY.as_millis() as f64 / MIN_DELAY.as_millis() as f64;
-/// Default quality for unknown or offline nodes
-const BAD_QUALITY: f64 = 0.2;
-const IGNORE_TIMEFRAME: Duration = Duration::from_secs(600);    // 10 minutes
-const QUALITY_STEP: f64 = 0.1;
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct NetworkConfig {
+    /// Minimum delay will be multiplied by backoff, it will be half the actual minimum value
+    min_delay: Duration,
+    /// Maximum delay
+    max_delay: Duration,
+    quality_bad_threshold: f64,
+    quality_offline_threshold: f64,
+    quality_step: f64,
+    ignore_timeframe: Duration,
+    backoff_exponent: f64,
+    backoff_min: f64,
+    backoff_max: f64,
+}
 
+impl Default for NetworkConfig {
+    fn default() -> Self {
+        let min_delay_in_s = 1;
+        let max_delay_in_s = 300;
 
+        Self {
+            min_delay: Duration::from_secs(min_delay_in_s),
+            max_delay: Duration::from_secs(max_delay_in_s),         // 5 minutes
+            quality_bad_threshold: 0.2,
+            quality_offline_threshold: 0.5,
+            quality_step: 0.1,
+            ignore_timeframe: Duration::from_secs(600),             // 10 minutes
+            backoff_exponent: 1.5,
+            backoff_min: 2.0,
+            backoff_max: max_delay_in_s as f64 / min_delay_in_s as f64,
+        }
+    }
+}
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -64,11 +86,11 @@ pub enum Health {
     UNKNOWN = 0,
     /// No connection, default
     RED = 1,
-    /// Low quality (<= 0.5) connection to at least 1 public relay
+    /// Low quality connection to at least 1 public relay
     ORANGE = 2,
-    /// High quality (> 0.5) connection to at least 1 public relay
+    /// High quality connection to at least 1 public relay
     YELLOW = 3,
-    /// High quality (> 0.5) connection to at least 1 public relay and 1 NAT node
+    /// High quality connection to at least 1 public relay and 1 NAT node
     GREEN = 4,
 }
 
@@ -91,7 +113,7 @@ pub trait NetworkExternalActions {
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct PeerStatus {
     id: PeerId,
     pub origin: PeerOrigin,
@@ -101,11 +123,10 @@ pub struct PeerStatus {
     pub heartbeats_sent: u64,
     pub heartbeats_succeeded: u64,
     pub backoff: f64,
-    pub ignored_at: Option<f32>,
 }
 
 impl PeerStatus {
-    fn new(id: PeerId, origin: PeerOrigin) -> PeerStatus {
+    fn new(id: PeerId, origin: PeerOrigin, backoff: f64) -> PeerStatus {
         PeerStatus {
             id,
             origin,
@@ -113,36 +134,26 @@ impl PeerStatus {
             heartbeats_sent: 0,
             heartbeats_succeeded: 0,
             last_seen: 0,
-            backoff: MIN_BACKOFF,
+            backoff,
             quality: 0.0,
-            ignored_at: None,
         }
-    }
-
-    fn next_ping(&self) -> u64 {
-        let backoff = self.backoff.powf(BACKOFF_EXPONENT);
-        let delay = std::cmp::min(
-            MAX_DELAY,
-            Duration::from_millis((MIN_DELAY.as_millis() as f64 * backoff) as u64),
-        );
-        return self.last_seen + delay.as_millis() as u64;
     }
 }
 
 impl std::fmt::Display for PeerStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "Entry: [id={}, origin={}, last seen on={}, quality={}, heartbeats sent={}, heartbeats succeeded={}, backoff={}, ignored at={:#?}]",
-               self.id, self.origin, self.last_seen, self.quality, self.heartbeats_sent, self.heartbeats_succeeded, self.backoff, self.ignored_at)
+        write!(f, "Entry: [id={}, origin={}, last seen on={}, quality={}, heartbeats sent={}, heartbeats succeeded={}, backoff={}]",
+               self.id, self.origin, self.last_seen, self.quality, self.heartbeats_sent, self.heartbeats_succeeded, self.backoff)
     }
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Network {
     me: PeerId,
+    cfg: NetworkConfig,
     entries: HashMap<String, PeerStatus>,
     ignored: HashMap<String, u64>,      // timestamp
     excluded: HashSet<String>,
-    network_quality_threshold: f64,
     good_quality_public: HashSet<PeerId>,
     bad_quality_public: HashSet<PeerId>,
     good_quality_non_public: HashSet<PeerId>,
@@ -160,8 +171,14 @@ impl Network {
         network_quality_threshold: f64,
         network_actions_api: Box<dyn NetworkExternalActions>
     ) -> Network {
-        if network_quality_threshold < BAD_QUALITY as f64 {
-            panic!("Requested quality criteria are too low, expected: {network_quality_threshold}, minimum: {BAD_QUALITY}");
+        let cfg = NetworkConfig {
+            quality_offline_threshold: network_quality_threshold,
+            ..NetworkConfig::default()
+        };
+
+        if cfg.quality_offline_threshold < cfg.quality_bad_threshold {
+            panic!("Strict requirement failed, bad quality threshold {} must be lower than quality offline threshold {}",
+                   cfg.quality_bad_threshold, cfg.quality_offline_threshold);
         }
 
         let mut excluded = HashSet::new();
@@ -169,10 +186,10 @@ impl Network {
 
         let instance = Network {
             me: my_peer_id,
+            cfg,
             entries: HashMap::new(),
             ignored: HashMap::new(),
             excluded,
-            network_quality_threshold,
             good_quality_public: HashSet::new(),
             bad_quality_public: HashSet::new(),
             good_quality_non_public: HashSet::new(),
@@ -211,7 +228,7 @@ impl Network {
         if ! is_excluded {
             let is_ignored = if !has_entry && self.ignored.contains_key(id.as_str()) {
                 let timestamp = self.ignored.get(id.as_str()).unwrap();
-                if timestamp + (IGNORE_TIMEFRAME.as_millis() as u64) < now {
+                if Duration::from_millis(now - timestamp) > self.cfg.ignore_timeframe {
                     self.ignored.remove(id.as_str());
                     false
                 } else {
@@ -222,12 +239,12 @@ impl Network {
             };
 
             if ! has_entry && ! is_ignored {
-                let mut entry = PeerStatus::new(peer.clone(), origin);
+                let mut entry = PeerStatus::new(peer.clone(), origin, self.cfg.backoff_min);
                 entry.is_public = self.network_actions_api.is_public(&peer);
                 self.refresh_network_status(&entry);
 
-                if let Some(_x) = self.entries.insert(peer.to_string(), entry) {
-                    // warn!("Evicting an existing record for {}, this should not happen!", &x);
+                if let Some(x) = self.entries.insert(peer.to_string(), entry) {
+                    warn!("Evicting an existing record for {}, this should not happen!", &x);
                 }
             }
         }
@@ -237,43 +254,34 @@ impl Network {
     pub fn remove(&mut self, peer: &PeerId) {
         self.prune_from_network_status(&peer);
         self.entries.remove(peer.to_string().as_str());
-        // TODO: remove from ignored and excluded as well?
     }
 
     /// Update the PeerId record in the network
     pub fn update(&mut self, peer: &PeerId, ping_result: crate::types::Result) {
         if let Some(existing) = self.entries.get(peer.to_string().as_str()) {
             let mut entry = existing.clone();
-            entry.last_seen = if ping_result.is_err() {current_timestamp()} else {ping_result.ok().unwrap()} ;
             entry.heartbeats_sent = entry.heartbeats_sent + 1;
-            // entry.is_public = self.network_actions_api.is_public(&peer);    // TODO: Reconsider whether this is necessary
+            entry.is_public = self.network_actions_api.is_public(&peer);
 
             if ping_result.is_err() {
-                entry.backoff = MAX_BACKOFF.max(entry.backoff.powf(BACKOFF_EXPONENT));
-                entry.quality = 0.0_f64.max(entry.quality - QUALITY_STEP);
+                entry.backoff = self.cfg.backoff_max.max(entry.backoff.powf(self.cfg.backoff_exponent));
+                entry.quality = 0.0_f64.max(entry.quality - self.cfg.quality_step);
 
-                if entry.quality < (QUALITY_STEP / 2.0) {
+                if entry.quality < (self.cfg.quality_step / 2.0) {
                     self.network_actions_api.close_connection(&entry.id);
                     self.prune_from_network_status(&entry.id);
                     self.entries.remove(entry.id.to_string().as_str());
                     return
-                }
-
-                if entry.quality < BAD_QUALITY {
+                } else if entry.quality < self.cfg.quality_bad_threshold {
                     self.ignored.insert(entry.id.to_string(), current_timestamp());
-                    // self.entries.remove(entry.id.to_string().as_str());
-                    // self.prune_from_network_status(&entry.id);
-                    // TODO: Just add the entry to ignored? Prune once 0.0 quality is reached?
-                    return
-                }
-
-                if entry.quality < self.network_quality_threshold {
+                } else if entry.quality < self.cfg.quality_offline_threshold {
                     self.network_actions_api.on_peer_offline(&entry.id);
                 }
             } else {
+                entry.last_seen = ping_result.ok().unwrap();
                 entry.heartbeats_succeeded = entry.heartbeats_succeeded + 1;
-                entry.backoff = MIN_BACKOFF;
-                entry.quality = 1.0_f64.min(entry.quality + 0.1)
+                entry.backoff = self.cfg.backoff_min;
+                entry.quality = 1.0_f64.min(entry.quality + self.cfg.quality_step);
             }
 
             self.refresh_network_status(&entry);
@@ -287,7 +295,7 @@ impl Network {
     fn refresh_network_status(&mut self, entry: &PeerStatus) {
         self.prune_from_network_status(&entry.id);
 
-        if entry.quality < self.network_quality_threshold {
+        if entry.quality < self.cfg.quality_offline_threshold {
             if entry.is_public {
                 self.bad_quality_public.insert(entry.id.clone());
             } else {
@@ -369,7 +377,15 @@ impl Network {
     }
 
     pub fn find_peers_to_ping(&self, threshold: u64) -> Vec<PeerId> {
-        let mut data: Vec<PeerId> = self.filter(|v| { v.next_ping() < threshold } );
+        let mut data: Vec<PeerId> = self.filter(|v| {
+            let backoff = v.backoff.powf(self.cfg.backoff_exponent);
+            let delay = std::cmp::min(
+                self.cfg.min_delay * (backoff as u32),
+                self.cfg.max_delay,
+            );
+
+            (v.last_seen + (delay.as_millis() as u64)) < threshold
+        });
         data.sort_by(|a, b| {
             if self.entries.get(a.to_string().as_str()).unwrap().last_seen < self.entries.get(b.to_string().as_str()).unwrap().last_seen {
                 std::cmp::Ordering::Less
@@ -430,7 +446,12 @@ pub mod wasm {
                      origin: PeerOrigin, is_public: bool, last_seen: u64,
                      quality: f64, heartbeats_sent: u64, heartbeats_succeeded: u64,
                      backoff: f64) -> Self {
-            let peer = PeerId::from_str(peer.as_string().unwrap().as_ref()).ok().unwrap();
+            let peer = peer.as_string()
+                .ok_or_else(|| "Own peer id was not passed as a string".to_owned())
+                .and_then(|peer| PeerId::from_str(peer.as_str()).map_err(|e| e.to_string()))
+                .map_err(|e| panic!("Failed to parse PeerId from string: {}", e.to_string()))
+                .expect("Unknown peer parsing failure occurred");
+
             Self {
                 id: peer,
                 origin,
@@ -440,11 +461,9 @@ pub mod wasm {
                 heartbeats_sent,
                 heartbeats_succeeded,
                 backoff,
-                ignored_at: None
             }
         }
     }
-
 
     #[wasm_bindgen]
     struct WasmNetworkApi {
@@ -458,9 +477,12 @@ pub mod wasm {
         fn is_public(&self, peer: &PeerId) -> bool {
             let this = JsValue::null();
             match self.is_public_cb.call1(&this, &JsValue::from(peer.to_base58())) {
-                Ok(v) => v.as_bool().unwrap(),
+                Ok(v) => v.as_bool().unwrap_or_else(|| {
+                    error!("Failed to extract 'is_public_cb` result as bool, defaulting to 'false'");
+                    false
+                }),
                 _ => {
-                    warn!("Encountered error when trying to find out whether peer {} is public", peer);
+                    error!("Encountered error when trying to find out whether peer {} is public", peer);
                     false
                 }
             }
@@ -469,14 +491,16 @@ pub mod wasm {
         fn close_connection(&self, peer: &PeerId) {
             let this = JsValue::null();
             if let Err(err) = self.close_connection_cb.call1(&this, &JsValue::from(peer.to_base58())) {
-                error!("Failed to perform close connection for peer {} with: {}", peer, err.as_string().unwrap().as_str())
+                error!("Failed to perform close connection for peer {} with: {}",
+                    peer, err.as_string().unwrap_or_else(|| "unknown error".to_owned()).as_str())
             };
         }
 
         fn on_peer_offline(&self, peer: &PeerId) {
             let this = JsValue::null();
             if let Err(err) = self.on_peer_offline_cb.call1(&this, &JsValue::from(peer.to_base58())) {
-                error!("Failed to perform on peer offline operation for peer {} with: {}", peer, err.as_string().unwrap().as_str())
+                error!("Failed to perform on peer offline operation for peer {} with: {}",
+                    peer, err.as_string().unwrap_or_else(|| "unknown error".to_owned()).as_str())
             };
         }
 
@@ -485,7 +509,8 @@ pub mod wasm {
             let old = JsValue::from(old as i32);
             let new = JsValue::from(new as i32);
             if let Err(err) = self.on_network_health_change_cb.call2(&this, &old, &new) {
-                error!("Failed to perform the network health change operation with: {}", err.as_string().unwrap().as_str())
+                error!("Failed to perform the network health change operation with: {}",
+                    err.as_string().unwrap_or_else(|| "unknown error".to_owned()).as_str())
             };
         }
     }
@@ -506,8 +531,11 @@ pub mod wasm {
                 close_connection_cb: close_connection,
             });
 
+            let me = PeerId::from_str(&me)
+                .expect("Failed to parse own peer id from JsString");
+
             Self::new(
-                PeerId::from_str(&me).ok().unwrap(),
+                me,
                 quality_threshold,
                 api
             )
@@ -524,19 +552,38 @@ pub mod wasm {
         #[wasm_bindgen]
         pub fn contains(&self, peer: JsString) -> bool {
             let peer: String = peer.into();
-            self.has(&PeerId::from_str(&peer).ok().unwrap())
+            match PeerId::from_str(&peer) {
+                Ok(p) => self.has(&p),
+                Err(err) => {
+                    warn!("Failed to parse peer id {}, network assumes it is not present: {}",
+                        peer, err.to_string());
+                    false
+                },
+            }
         }
 
         #[wasm_bindgen]
         pub fn register(&mut self, peer: JsString, origin: PeerOrigin) {
             let peer: String = peer.into();
-            self.add(&PeerId::from_str(&peer).ok().unwrap(), origin)
+            match PeerId::from_str(&peer) {
+                Ok(p) => self.add(&p, origin),
+                Err(err) => {
+                    warn!("Failed to parse peer id {}, network ignores the register attempt: {}",
+                        peer, err.to_string());
+                },
+            }
         }
 
         #[wasm_bindgen]
         pub fn unregister(&mut self, peer: JsString) {
             let peer: String = peer.into();
-            self.remove(&PeerId::from_str(&peer).ok().unwrap())
+            match PeerId::from_str(&peer) {
+                Ok(p) => self.remove(&p),
+                Err(err) => {
+                    warn!("Failed to parse peer id {}, network ignores the unregister attempt: {}",
+                        peer, err.to_string());
+                },
+            }
         }
 
         #[wasm_bindgen]
@@ -549,15 +596,28 @@ pub mod wasm {
                         .map(|v| v as u64)
                         .ok_or(())
                 };
-            self.update(&PeerId::from_str(&peer).ok().unwrap(), result)
+            match PeerId::from_str(&peer) {
+                Ok(p) => self.update(&p, result),
+                Err(err) => {
+                    warn!("Failed to parse peer id {}, network ignores the regresh attempt: {}",
+                        peer, err.to_string());
+                },
+            }
         }
 
         #[wasm_bindgen]
         pub fn quality_of(&self, peer: JsString) -> f64 {
             let peer: String = peer.into();
-            match self.get_peer_status(&PeerId::from_str(&peer).ok().unwrap()) {
-                Some(v) => v.quality,
-                _ => 0.0
+            match PeerId::from_str(&peer) {
+                Ok(p) => match self.get_peer_status(&p) {
+                    Some(v) => v.quality,
+                    _ => 0.0f64
+                },
+                Err(err) => {
+                    warn!("Failed to parse peer id {}, using lowest possible quality: {}",
+                        peer, err.to_string());
+                    0.0f64
+                },
             }
         }
 
@@ -572,7 +632,14 @@ pub mod wasm {
         #[wasm_bindgen]
         pub fn get_peer_info(&self, peer: JsString) -> Option<PeerStatus> {
             let peer: String = peer.into();
-            self.get_peer_status(&PeerId::from_str(&peer).ok().unwrap())
+            match PeerId::from_str(&peer) {
+                Ok(p) => self.get_peer_status(&p),
+                Err(err) => {
+                    warn!("Failed to parse peer id {}, peer info unavailable: {}",
+                        peer, err.to_string());
+                    None
+                },
+            }
         }
     }
 }
@@ -589,7 +656,7 @@ mod tests {
             false
         }
 
-        fn on_network_health_change(&self, _: Health, _: Health) {
+        fn close_connection(&self, _: &PeerId) {
             ()
         }
 
@@ -597,7 +664,7 @@ mod tests {
             ()
         }
 
-        fn close_connection(&self, _: &PeerId) {
+        fn on_network_health_change(&self, _: Health, _: Health) {
             ()
         }
     }
@@ -617,13 +684,6 @@ mod tests {
         assert_eq!(Health::ORANGE as i32, 2);
         assert_eq!(Health::YELLOW as i32, 3);
         assert_eq!(Health::GREEN as i32, 4);
-    }
-
-    #[test]
-    fn test_entry_should_advance_time_on_ping() {
-        let entry = PeerStatus::new(PeerId::random(), PeerOrigin::ManualPing);
-
-        assert_eq!(entry.next_ping(), 2828);
     }
 
     #[test]
@@ -696,6 +756,27 @@ mod tests {
     }
 
     #[test]
+    fn test_network_should_ignore_a_peer_that_has_reached_lower_thresholds_a_specified_amount_of_time() {
+        let peer = PeerId::random();
+
+        let mut peers = basic_network(&PeerId::random());
+
+        peers.add(&peer, PeerOrigin::IncomingConnection);
+
+        peers.update(&peer, Ok(current_timestamp()));
+        peers.update(&peer, Ok(current_timestamp()));
+        peers.update(&peer, Err(()));          // should drop to ignored
+        peers.update(&peer, Err(()));          // should drop from network
+
+        assert!(! peers.has(&peer));
+
+        // peer should remain ignored and not be added
+        peers.add(&peer, PeerOrigin::IncomingConnection);
+
+        assert!(! peers.has(&peer))
+    }
+
+    #[test]
     fn test_network_should_be_able_to_register_a_failed_heartbeat_result() {
         let peer = PeerId::random();
         let mut peers = basic_network(&PeerId::random());
@@ -709,7 +790,7 @@ mod tests {
         let actual = peers.debug_output();
 
         assert!(actual.contains("heartbeats succeeded=2"));
-        assert!(actual.contains("backoff=2"));
+        assert!(actual.contains("backoff=300"));
     }
 
     #[test]
@@ -796,7 +877,7 @@ mod tests {
 
         let mut mock = MockNetworkExternalActions::new();
         mock.expect_is_public()
-            .times(1)
+            .times(2)
             .returning(move |x| { x == &public });
         mock.expect_on_network_health_change()
             .times(1)
@@ -821,7 +902,7 @@ mod tests {
 
         let mut mock = MockNetworkExternalActions::new();
         mock.expect_is_public()
-            .times(1)
+            .times(3)
             .returning(move |x| { x == &public });
         mock.expect_on_network_health_change()
             .times(1)
@@ -852,7 +933,7 @@ mod tests {
 
         let mut mock = MockNetworkExternalActions::new();
         mock.expect_is_public()
-            .times(2)
+            .times(5)
             .returning(move |x| { public.contains(&x) });
         mock.expect_on_network_health_change()
             .times(2)
@@ -881,7 +962,7 @@ mod tests {
         let mut mock = MockNetworkExternalActions::new();
 
         mock.expect_is_public()
-            .times(2)
+            .times(8)
             .returning(move |x| { public.contains(&x) });
         mock.expect_on_network_health_change()
             .times(2)

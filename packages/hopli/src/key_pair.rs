@@ -24,11 +24,7 @@ pub fn read_identities(
                 .filter(|r| r.is_ok()) // Get rid of Err variants for Result<DirEntry>
                 .map(|r| r.unwrap().path()) // Read all the files from the given directory
                 .filter(|r| r.is_file()) // Filter out folders
-                .filter(|r| match r.extension() {
-                    Some(ext) => &ext.to_os_string().into_string().unwrap() == "id",
-                    None => false,
-                }) // Filter out wrong extension
-                // .map(|r| r.into_os_string().into_string().unwrap())
+                .filter(|r| r.to_str().unwrap().contains("id")) // file name should contain "id"
                 .filter(|r| match &identity_prefix {
                     Some(identity_prefix) => r
                         .file_stem()
