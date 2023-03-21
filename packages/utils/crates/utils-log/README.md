@@ -8,7 +8,7 @@ The goal of this wrapper is to hide the internal switching mechanism for WASM an
 ### Usage in Rust code
 
 Add this crate as a dependency and `use` the desired macros.
- 
+
 #### Example use in Rust
 
 ```rust
@@ -18,7 +18,7 @@ fn main() {
     info!("This is an example of an info level log");
     warn!("This is an example of a warn level log");
     error!("This is an example of an error level log");
-    
+
     println!("Any logic can go here");
 }
 ```
