@@ -81,6 +81,7 @@ jobs:
         run: nix develop -c make -j build-docs
         env:
           DEPLOYER_PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY_DEFAULT_FOUNDRY }}
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN }}
 
       - name: Format newly created files
         run: nix develop -c make lint-fix
