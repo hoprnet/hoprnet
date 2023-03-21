@@ -1,7 +1,7 @@
 use std::ops::Mul;
 use blake2::Blake2s256;
 
-use elliptic_curve::{ProjectivePoint, PublicKey};
+use elliptic_curve::ProjectivePoint;
 use elliptic_curve::rand_core::{CryptoRng, RngCore};
 use elliptic_curve::sec1::ToEncodedPoint;
 
@@ -10,11 +10,12 @@ use generic_array::GenericArray;
 use k256::{AffinePoint, NonZeroScalar, Secp256k1};
 
 use hkdf::SimpleHkdf;
-use crate::errors::CryptoError::{EllipticCurveError, InvalidSecretScalar};
+use crate::errors::CryptoError::InvalidSecretScalar;
 
 use crate::parameters;
 
 use crate::errors::Result;
+use crate::types::CurvePoint;
 
 /// Type for the secret keys with fixed size
 /// The GenericArray<..> is mostly deprecated since Rust 1.51 and it's introduction of const generics,
@@ -45,9 +46,11 @@ fn expand_key_from_group_element(group_element: &AffinePoint, salt: &[u8]) -> Ke
 
 /// Decodes the public key and converts it into an EC point in projective coordinates
 fn decode_public_key_to_point(encoded_public_key: &[u8]) -> Result<ProjectivePoint<Secp256k1>> {
-    PublicKey::<Secp256k1>::from_sec1_bytes(encoded_public_key)
+    Ok(crate::types::PublicKey::deserialize(encoded_public_key)
+        .map(|pk| CurvePoint::from(pk).to_projective_point())?)
+    /*PublicKey::<Secp256k1>::from_sec1_bytes(encoded_public_key)
         .map(|decoded| ProjectivePoint::<Secp256k1>::from(decoded))
-        .map_err(|e| EllipticCurveError(e))
+        .map_err(|e| EllipticCurveError(e))*/
 }
 
 /// Checks if the given key bytes can form a scalar for EC point
@@ -260,13 +263,13 @@ pub mod wasm {
         }
 
         #[wasm_bindgen(js_name = "forward_transform")]
-        pub fn shared_keys_forward_transform(alpha: &[u8], public_key: &[u8], private_key: &[u8]) -> JsResult<SharedKeys> {
+        pub fn _forward_transform(alpha: &[u8], public_key: &[u8], private_key: &[u8]) -> JsResult<SharedKeys> {
             ok_or_jserr!(super::SharedKeys::forward_transform(alpha, public_key, private_key))
         }
 
         /// Generate shared keys given the peer public keys
         #[wasm_bindgen(js_name = "generate")]
-        pub fn shared_keys_generate(peer_public_keys: Vec<Uint8Array>) -> JsResult<SharedKeys> {
+        pub fn _generate(peer_public_keys: Vec<Uint8Array>) -> JsResult<SharedKeys> {
             ok_or_jserr!(super::SharedKeys::generate(&mut OsRng, peer_public_keys.iter().map(|v| v.to_vec().into_boxed_slice()).collect()))
         }
     }

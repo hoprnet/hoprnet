@@ -349,11 +349,11 @@ pub mod tests {
         let price_per_packet = u256::new(10000000000000000u128); // 0.01 HOPR
         let path_pos = 5u8;
 
+        let curve_point = CurvePoint::deserialize(&hex!("03c2aa76d6837c51337001c8b5a60473726064fc35d0a40b8f0e1f068cc8e38e10")).unwrap();
+
         let ticket1 = Ticket::create(
           Address::new(&[0u8; Address::SIZE]),
-            Challenge {
-                curve_point: CurvePoint::new(&hex!("03c2aa76d6837c51337001c8b5a60473726064fc35d0a40b8f0e1f068cc8e38e10"))
-            },
+            Challenge { curve_point },
             U256::new("1"),
             U256::new("2"),
             Balance::new(inverse_win_prob * price_per_packet * path_pos as u128, BalanceType::HOPR),

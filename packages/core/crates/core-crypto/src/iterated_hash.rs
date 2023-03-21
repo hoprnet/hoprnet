@@ -143,5 +143,4 @@ pub mod wasm {
         }, max_iterations, step_size, index_hint))?;
         ok_or_jserr!(serde_wasm_bindgen::to_value(&res))
     }
-
 }

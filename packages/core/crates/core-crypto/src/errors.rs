@@ -24,5 +24,4 @@ pub enum CryptoError {
     Other(#[from] GeneralError),
 }
 
-
 pub type Result<T> = core::result::Result<T, CryptoError>;

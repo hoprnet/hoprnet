@@ -20,7 +20,7 @@ pub mod dummy_rng {
     bb8cfb2c005c7de64fb7c8f08613fafe824f1cbebd869aae560299d771f2b896b
     26fcf9a70b0ea3066531ac1a9190b52eb12cc10997aca62d7ce");
 
-    /// Dummy RNG that cyclically outputs same set of random bytes
+    /// Dummy RNG that cyclically outputs the same set of random bytes
     #[derive(Clone, Copy, Debug, Default)]
     pub(crate) struct DummyFixedRng {
         ptr: usize

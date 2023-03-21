@@ -1,5 +1,6 @@
 use std::ops::Add;
 use std::str::FromStr;
+use elliptic_curve::ProjectivePoint;
 use k256::ecdsa::{SigningKey, Signature as ECDSASignature, VerifyingKey, RecoveryId};
 use k256::{AffinePoint, ecdsa, elliptic_curve, NonZeroScalar, Secp256k1};
 use k256::ecdsa::signature::hazmat::PrehashVerifier;
@@ -21,37 +22,21 @@ use crate::errors::{Result, CryptoError, CryptoError::CalculationError};
 #[derive(Clone, Eq, PartialEq, Debug)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct CurvePoint {
-    uncompressed: [u8; Self::SIZE]
+    affine: AffinePoint
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl CurvePoint {
-    /// Creates a new curve point from a serialized encoded point.
-    /// If a compressed representation is given, the point will be decompressed.
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
-    pub fn new(bytes: &[u8]) -> Self {
-        let encoded_point = elliptic_curve::sec1::EncodedPoint::<Secp256k1>::from_bytes(bytes)
-            .expect("invalid ec point data");
-        let mut ret = CurvePoint {
-            uncompressed: [0u8; Self::SIZE]
-        };
-
-        // Decompress automatically if a compressed point was provided, which is an expensive op
-        if encoded_point.is_compressed() {
-            let uncompressed = AffinePoint::from_encoded_point(&encoded_point)
-                .unwrap()
-                .to_encoded_point(false);
-            ret.uncompressed.copy_from_slice(uncompressed.as_bytes());
-        } else {
-            ret.uncompressed.copy_from_slice(encoded_point.as_bytes())
-        }
-
-        ret
-    }
-
     pub fn to_address(&self) -> Address {
-        let hash = Hash::create(&[&self.uncompressed[1..]]).serialize();
+        let serialized = self.serialize();
+        let hash = Hash::create(&[&serialized[1..]]).serialize();
         Address::new(&hash[12..])
+    }
+}
+
+impl From<PublicKey> for CurvePoint {
+    fn from(pubkey: PublicKey) -> Self {
+        CurvePoint::from_affine(pubkey.key.as_affine().clone())
     }
 }
 
@@ -59,17 +44,17 @@ impl FromStr for CurvePoint {
     type Err = CryptoError;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        Ok(CurvePoint::new(&hex::decode(s).map_err(|_| ParseError)?))
+        Ok(CurvePoint::deserialize(&hex::decode(s).map_err(|_| ParseError)?)?)
     }
 }
 
 impl PeerIdLike for CurvePoint {
     fn from_peerid(peer_id: &PeerId) -> utils_types::errors::Result<Self> {
-        Ok(CurvePoint::new(&PublicKey::from_peerid(peer_id)?.serialize(false)))
+        Ok(CurvePoint::deserialize(&PublicKey::from_peerid(peer_id)?.serialize(false))?)
     }
 
     fn to_peerid(&self) -> PeerId {
-        PublicKey::deserialize(&self.uncompressed).unwrap().to_peerid()
+        PublicKey::deserialize(&self.serialize()).unwrap().to_peerid()
     }
 }
 
@@ -77,21 +62,32 @@ impl BinarySerializable for CurvePoint {
     const SIZE: usize = 65;
 
     fn deserialize(bytes: &[u8]) -> utils_types::errors::Result<Self> {
-        Ok(CurvePoint::new(&PublicKey::deserialize(bytes).map_err(|e| Other(e.into()))?
-            .serialize(false)
-        ))
+        elliptic_curve::sec1::EncodedPoint::<Secp256k1>::from_bytes(bytes)
+            .map_err(|_| ParseError)
+            .and_then(|encoded| Option::from(AffinePoint::from_encoded_point(&encoded))
+                .ok_or(ParseError))
+            .map(|affine| Self { affine })
     }
 
     fn serialize(&self) -> Box<[u8]> {
-        self.uncompressed.into()
+        self.affine.to_encoded_point(false).to_bytes()
     }
 }
 
 impl CurvePoint {
+    /// Creates a curve point from a non-zero scalar.
     pub fn from_exponent(exponent: &[u8]) -> Result<Self> {
-        Ok(CurvePoint::new(&PublicKey::from_privkey(exponent)?
-               .serialize(false)
-        ))
+        PublicKey::from_privkey(exponent)
+            .map(CurvePoint::from)
+    }
+
+    pub fn from_affine(affine: AffinePoint) -> Self {
+        Self { affine }
+    }
+
+    /// Converts the curve point to a representation suitable for calculations
+    pub fn to_projective_point(&self) -> ProjectivePoint<Secp256k1> {
+        ProjectivePoint::<Secp256k1>::from(&self.affine)
     }
 }
 
@@ -104,31 +100,27 @@ pub struct Challenge {
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl Challenge {
-    pub fn from_hint_and_share(own_share: &HalfKeyChallenge, hint: &HalfKeyChallenge) -> Self {
-        Self {
-            curve_point: CurvePoint::new(&PublicKey::combine(&[
-                    &PublicKey::deserialize(&own_share.hkc)
-                        .expect("invalid own share"),
-                    &PublicKey::deserialize(&hint.hkc)
-                        .expect("invalid hint")])
-                    .serialize(false))
-        }
-    }
-
-    pub fn from_own_share_and_half_key(own_share: &HalfKeyChallenge, half_key: &HalfKey) -> Self {
-        Self {
-            curve_point: CurvePoint::new(
-                &PublicKey::tweak_add(&PublicKey::deserialize(&own_share.hkc)
-                    .expect("invalid own share"),
-                                      &half_key.serialize()
-                )
-                .serialize(false)
-            )
-        }
-    }
 
     pub fn to_ethereum_challenge(&self) -> EthereumChallenge {
         EthereumChallenge::new(&self.curve_point.to_address().serialize())
+    }
+}
+
+impl Challenge {
+    pub fn from_hint_and_share(own_share: &HalfKeyChallenge, hint: &HalfKeyChallenge) -> Result<Self> {
+        let curve_point: CurvePoint = PublicKey::combine( & [
+            & PublicKey::deserialize( & own_share.hkc)?,
+            & PublicKey::deserialize( & hint.hkc)?
+        ]).into();
+        Ok(Self { curve_point })
+    }
+
+    pub fn from_own_share_and_half_key(own_share: &HalfKeyChallenge, half_key: &HalfKey) -> Result<Self> {
+        let curve_point: CurvePoint = PublicKey::tweak_add(
+            &PublicKey::deserialize(&own_share.hkc)?,
+            &half_key.serialize()
+        ).into();
+        Ok(Self { curve_point })
     }
 }
 
@@ -397,8 +389,7 @@ impl PublicKey {
             recid
         ).map_err(|_| CalculationError)?;
 
-        Self::deserialize(&recovered_key.to_encoded_point(false).to_bytes())
-            .map_err(|e| CryptoError::Other(e.into()))
+        Ok(Self::deserialize(&recovered_key.to_encoded_point(false).to_bytes())?)
     }
 
     pub fn from_signature(msg: &[u8], signature: &Signature) -> Result<PublicKey> {
@@ -555,7 +546,7 @@ impl BinarySerializable for Signature {
 
             Ok(ret)
         } else {
-            Err(GeneralError::ParseError)
+            Err(ParseError)
         }
     }
 
@@ -666,6 +657,13 @@ pub mod tests {
     }
 
     #[test]
+    fn public_key_curve_point() {
+        let cp1: CurvePoint = PublicKey::deserialize(&PUBLIC_KEY).unwrap().into();
+        let cp2 = CurvePoint::deserialize(&cp1.serialize()).unwrap();
+        assert_eq!(cp1, cp2);
+    }
+
+    #[test]
     fn public_key_from_privkey() {
         let pk1 = PublicKey::from_privkey(&PRIVATE_KEY)
             .expect("failed to convert from private key");
@@ -709,8 +707,8 @@ pub mod tests {
         let compressed = uncompressed.compress();
         assert!(compressed.is_compressed(), "failed to compress points");
 
-        let cp3 = CurvePoint::new(uncompressed.as_bytes());
-        let cp4 = CurvePoint::new(compressed.as_bytes());
+        let cp3 = CurvePoint::deserialize(uncompressed.as_bytes()).unwrap();
+        let cp4 = CurvePoint::deserialize(compressed.as_bytes()).unwrap();
 
         assert_eq!(cp3, cp4, "failed to match curve point from compressed and uncompressed source");
     }
@@ -753,7 +751,7 @@ pub mod wasm {
     use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
     use wasm_bindgen::prelude::*;
 
-    use crate::types::{CurvePoint, HalfKey, HalfKeyChallenge, Hash, PublicKey, Signature};
+    use crate::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, Hash, PublicKey, Signature};
 
     #[wasm_bindgen]
     impl CurvePoint {
@@ -798,6 +796,19 @@ pub mod wasm {
         }
 
         pub fn size() -> u32 { Self::SIZE as u32 }
+    }
+
+    #[wasm_bindgen]
+    impl Challenge {
+        #[wasm_bindgen(js_name = "from_hint_and_share")]
+        pub fn _from_hint_and_share(own_share: &HalfKeyChallenge, hint: &HalfKeyChallenge) -> JsResult<Challenge> {
+            ok_or_jserr!(Self::from_hint_and_share(own_share, hint))
+        }
+
+        #[wasm_bindgen(js_name = "from_own_share_and_half_key")]
+        pub fn _from_own_share_and_half_key(own_share: &HalfKeyChallenge, half_key: &HalfKey) -> JsResult<Challenge> {
+            ok_or_jserr!(Self::from_own_share_and_half_key(own_share, half_key))
+        }
     }
 
     #[wasm_bindgen]

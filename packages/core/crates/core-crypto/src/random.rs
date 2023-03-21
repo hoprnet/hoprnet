@@ -1,11 +1,11 @@
+use elliptic_curve::{NonZeroScalar, ProjectivePoint};
 use elliptic_curve::rand_core::OsRng;
 use elliptic_curve::sec1::ToEncodedPoint;
-use k256::NonZeroScalar;
-use crate::errors::CryptoError::InvalidInputValue;
-
-use crate::errors::Result;
-
+use k256::Secp256k1;
 use rand::{Rng, RngCore};
+
+use crate::errors::CryptoError::InvalidInputValue;
+use crate::errors::Result;
 
 pub const MAX_RANDOM_INTEGER: u64 = 9007199254740991;
 
@@ -28,9 +28,9 @@ pub fn random_integer(start: u64, end: Option<u64>) -> Result<u64> {
     }
 }
 
-pub fn random_group_element(compressed: bool) -> (Box<[u8]>,Box<[u8]>) {
-    let scalar = NonZeroScalar::random(&mut OsRng);
-    let point = k256::ProjectivePoint::GENERATOR * scalar.as_ref();
+pub fn random_group_element(compressed: bool) -> (Box<[u8]>, Box<[u8]>) {
+    let scalar = NonZeroScalar::<Secp256k1>::random(&mut OsRng);
+    let point = ProjectivePoint::<Secp256k1>::GENERATOR * scalar.as_ref();
 
     let encoded = point.to_encoded_point(compressed);
 
