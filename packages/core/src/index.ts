@@ -1375,6 +1375,10 @@ class Hopr extends EventEmitter {
     return await this.db.getChannelX(PublicKey.fromPeerId(src), PublicKey.fromPeerId(dest))
   }
 
+  public async getAllChannels(): Promise<ChannelEntry[]> {
+    return await this.db.getChannels()
+  }
+
   public async getChannelsFrom(addr: Address): Promise<ChannelEntry[]> {
     return await this.db.getChannelsFrom(addr)
   }
