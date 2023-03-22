@@ -15,7 +15,7 @@ proc-macro = true
 version = "1.0"
 
 [dependencies.wasm-bindgen-macro-support]
-version = "=0.2.83"
+version = "0.2"
 
 [features]
 default = ["wasm"]
