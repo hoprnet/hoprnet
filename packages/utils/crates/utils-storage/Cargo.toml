@@ -14,8 +14,7 @@ wasm = ["dep:wasm-bindgen"]
 [dependencies]
 pickledb = "0.5.1"      # pure Rust
 serde = { version = "1.0", features = ["derive"] }      # pickledb
-
-wasm-bindgen = {version = "0.2.83", optional = true }
+wasm-bindgen = { workspace = true, optional = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }
 #wee_alloc = { version = "0.4.5", optional = true }
 
@@ -23,6 +22,3 @@ console_error_panic_hook = { version = "0.1.7", optional = true }
 scopeguard = "1.1.0"
 tempfile = "3.3.0"
 wasm-bindgen-test = "0.3.33"
-
-[profile.release]
-opt-level = "s"     # small code size

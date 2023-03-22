@@ -12,7 +12,7 @@ RUN mv /app/hoprnet-toolchain/.cargo . && \
 COPY .cargo/config.toml .cargo/
 COPY vendor vendor/
 COPY packages packages/
-COPY Makefile Cargo.toml Cargo.lock .yarnrc.yml yarn.lock package.json tsconfig.build.json tsconfig.json tsconfig.scripts.json yarn.lock rust-toolchain.toml ./
+COPY Makefile Cargo.toml Cargo.lock .yarnrc.yml yarn.lock package.json tsconfig.build.json tsconfig.json yarn.lock rust-toolchain.toml ./
 
 LABEL description="Launches a hoprd node"
 

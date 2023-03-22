@@ -6,11 +6,12 @@
 
 ### Enumerations
 
-- [NetworkHealthIndicator](enums/NetworkHealthIndicator.md)
-- [NetworkPeersOrigin](enums/NetworkPeersOrigin.md)
+- [Health](enums/Health.md)
+- [PeerOrigin](enums/PeerOrigin.md)
 
 ### Classes
 
+- [PeerStatus](classes/PeerStatus.md)
 - [ResolvedEnvironment](classes/ResolvedEnvironment.md)
 - [SaneDefaults](classes/SaneDefaults.md)
 - [StrategyFactory](classes/StrategyFactory.md)
@@ -37,6 +38,7 @@
 - [INTERMEDIATE\_HOPS](modules.md#intermediate_hops)
 - [MAX\_HOPS](modules.md#max_hops)
 - [MAX\_NEW\_CHANNELS\_PER\_TICK](modules.md#max_new_channels_per_tick)
+- [MAX\_PARALLEL\_PINGS](modules.md#max_parallel_pings)
 - [MAX\_PATH\_ITERATIONS](modules.md#max_path_iterations)
 - [NETWORK\_QUALITY\_THRESHOLD](modules.md#network_quality_threshold)
 - [PACKET\_SIZE](modules.md#packet_size)
@@ -95,7 +97,7 @@
 
 #### Defined in
 
-[packages/core/src/index.ts:136](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L136)
+[packages/core/src/index.ts:149](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L149)
 
 ___
 
@@ -105,7 +107,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:188](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L188)
+[packages/core/src/index.ts:201](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L201)
 
 ___
 
@@ -115,7 +117,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:203](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L203)
+[packages/core/src/index.ts:216](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L216)
 
 ___
 
@@ -125,7 +127,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L28)
+[packages/core/src/channel-strategy.ts:29](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L29)
 
 ___
 
@@ -135,7 +137,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:190](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L190)
+[packages/core/src/index.ts:203](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L203)
 
 ## Variables
 
@@ -145,7 +147,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L20)
+[packages/core/src/constants.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L22)
 
 ___
 
@@ -155,7 +157,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L19)
+[packages/core/src/constants.ts:21](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L21)
 
 ___
 
@@ -196,6 +198,16 @@ ___
 #### Defined in
 
 [packages/core/src/constants.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L16)
+
+___
+
+### MAX\_PARALLEL\_PINGS
+
+• `Const` **MAX\_PARALLEL\_PINGS**: ``14``
+
+#### Defined in
+
+[packages/core/src/constants.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L19)
 
 ___
 
@@ -272,7 +284,7 @@ because Rust does not support exporting constants to WASM
 
 #### Defined in
 
-packages/core/lib/core_misc.d.ts:8
+packages/core/lib/core_misc.d.ts:23
 
 ___
 
@@ -346,7 +358,7 @@ str is string
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L30)
+[packages/core/src/channel-strategy.ts:31](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L31)
 
 ___
 

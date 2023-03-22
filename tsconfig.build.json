@@ -8,9 +8,6 @@
     { "path": "packages/core-ethereum" },
     { "path": "packages/hoprd" },
     { "path": "packages/real" },
-    { "path": "packages/utils" },
-    { "path": "./tsconfig.scripts.json" },
-    // Hopr-connect e2e tests
-    { "path": "packages/connect/tests" }
+    { "path": "packages/utils" }
   ]
 }

@@ -2,6 +2,9 @@ name: HOPR Lint fix
 
 env:
   HOPR_GITHUB_REF: ${{ github.ref }}
+  RUST_BACKTRACE: "1"
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: "sccache"
 
 on:
   push:
@@ -20,8 +23,20 @@ jobs:
       - name: Configure Git info
         run: ./scripts/configure-git-info.sh
 
-      - name: install toolchain
-        run: ./scripts/toolchain/install-toolchain.sh
+      - name: Sccache Setup
+        uses: mozilla-actions/sccache-action@v0.0.1
+        with:
+          version: "v0.4.0"
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v17
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: cachix/cachix-action@v12
+        with:
+          name: hoprnet
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
 
       - name: get yarn cache directory path
         id: yarn-cache-dir-path
@@ -49,16 +64,18 @@ jobs:
             .cargo/.package-cache/
             .cargo/bin/
 
+      - name: Install dependencies
+        run: nix develop -c make -j deps-ci
+
       - name: Run linter
-        run: |
-          make -j deps-ci
-          make lint-fix
+        run: nix develop -c make lint-fix
 
       - name: Commit and push changes
         if: ${{ !env.ACT }}
         run: ./scripts/commit-and-push-all-changes.sh
         env:
           HOPR_GIT_MSG: 'chore(build): apply linter changes'
+
   shellcheck:
     name: Shellcheck
     runs-on: ubuntu-latest

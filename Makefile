@@ -1,5 +1,9 @@
 .POSIX:
 
+# utility variables
+space := $(subst ,, )
+mydir := $(dir $(abspath $(firstword $(MAKEFILE_LIST))))
+
 # Gets all packages that include a Rust crates
 # Disable automatic compilation of SC bindings. Can still be done manually.
 WORKSPACES_WITH_RUST_MODULES := $(filter-out ./packages/ethereum/crates,$(wildcard $(addsuffix /crates, $(wildcard ./packages/*))))
@@ -11,11 +15,11 @@ CRATES := $(foreach crate,${WORKSPACES_WITH_RUST_MODULES},$(dir $(wildcard $(cra
 HOPLI_CRATE := ./packages/hopli
 
 # Set local foundry directory (for binaries) and versions
-FOUNDRY_DIR ?= ${CURDIR}/.foundry
+FOUNDRY_DIR ?= $(mydir)/.foundry
 FOUNDRY_VSN := ed9298d
 
 # Set local cargo directory (for binaries)
-CARGO_DIR := ${CURDIR}/.cargo
+CARGO_DIR := $(mydir)/.cargo
 
 # use custom foundryup to ensure the local directory is used
 foundryup := env FOUNDRY_DIR="${FOUNDRY_DIR}" foundryup
@@ -26,8 +30,8 @@ PATH := $(subst :${CARGO_DIR}/bin,,$(PATH)):${CARGO_DIR}/bin
 PATH := $(subst :${HOME}/.cargo/bin,,$(PATH)):${HOME}/.cargo/bin
 # add local Foundry install path (only once)
 PATH := $(subst :${FOUNDRY_DIR}/bin,,$(PATH)):${FOUNDRY_DIR}/bin
-# use custom PATH in all shell processes
-SHELL := env PATH="$(PATH)" $(shell which bash)
+# use custom PATH in all shell processes, escape spaces
+SHELL := env PATH=$(subst $(space),\$(space),$(PATH)) $(shell which bash)
 
 # use custom Cargo config file for each invocation
 cargo := cargo --config ${CARGO_DIR}/config.toml
@@ -85,13 +89,14 @@ endif
 
 .PHONY: deps
 deps: ## Installs dependencies for development setup
-	[ -n "${NIX_PATH}" ] || corepack enable
+	[[ "${name}" =~ nix-shell* ]] || corepack enable
 	command -v rustup && rustup update || echo "No rustup installed, ignoring"
 # we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op
 	mkdir -p .cargo/bin
 	$(MAKE) cargo-update
 	command -v wasm-opt || $(cargo) install wasm-opt
 	command -v wasm-pack || $(cargo) install wasm-pack
+	command -v wasm-bindgen || $(cargo) install wasm-bindgen
 	yarn workspaces focus ${YARNFLAGS}
 # install foundry (cast + forge + anvil)
 	$(MAKE) install-foundry
@@ -132,10 +137,10 @@ build-solidity-types: ## generate Solidity typings
 	echo "Foundry create binding"
 	$(MAKE) -C packages/ethereum/contracts/ overwrite-sc-bindings
 # Change git = "http://..." into version = "1.0.2"
-	sed -i -e 's/https:\/\/github.com\/gakonst\/ethers-rs/1.0.2/g' ${CURDIR}/packages/ethereum/crates/bindings/Cargo.toml
-	sed -i -e 's/git/version/g' ${CURDIR}/packages/ethereum/crates/bindings/Cargo.toml
+	sed -i -e 's/https:\/\/github.com\/gakonst\/ethers-rs/1.0.2/g' $(mydir)/packages/ethereum/crates/bindings/Cargo.toml
+	sed -i -e 's/git/version/g' $(mydir)/packages/ethereum/crates/bindings/Cargo.toml
 # add [lib] as rlib is necessary to run integration tests
-	echo -e "\n[lib] \ncrate-type = [\"cdylib\", \"rlib\"]" >> ${CURDIR}/packages/ethereum/crates/bindings/Cargo.toml
+	echo -e "\n[lib] \ncrate-type = [\"cdylib\", \"rlib\"]" >> $(mydir)/packages/ethereum/crates/bindings/Cargo.toml
 
 .PHONY: build-yarn
 build-yarn: ## build yarn packages
@@ -171,17 +176,13 @@ build-yellowpaper: ## build the yellowpaper in docs/yellowpaper
 	$(MAKE) -C docs/yellowpaper
 
 .PHONY: build-docs
-build-docs: ## build typedocs, Rest API docs, and docs website
-build-docs: | build-docs-typescript build-docs-website build-docs-api
+build-docs: ## build typedocs, Rest API docs
+build-docs: | build-docs-typescript build-docs-api
 
 .PHONY: build-docs-typescript
 build-docs-typescript: ## build typedocs
 build-docs-typescript: build
 	yarn workspaces foreach -pv run docs:generate
-
-.PHONY: build-docs-website
-build-docs-website: ## build docs website
-	yarn workspace @hoprnet/hopr-docs build
 
 .PHONY: build-docs-api
 build-docs-api: ## build Rest API docs
@@ -245,21 +246,17 @@ run-local: ## run HOPRd from local repo
 		--testUseWeakCrypto --testAnnounceLocalAddresses \
 		--testPreferLocalAddresses --disableApiAuthentication
 
-.PHONY: fund-local
-fund-local: id_dir=.
-fund-local: ## use faucet script to fund local identities
-	IDENTITY_PASSWORD=local PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
-		hopli faucet \
-		--environment-name anvil-localhost \
-		--use-local-identities --identity-directory "${id_dir}" \
-		--contracts-root "./packages/ethereum/contracts"
-
 .PHONY: fund-local-all
+fund-local-all: id_dir=/tmp/
+fund-local-all: id_password=local
+fund-local-all: id_prefix=
 fund-local-all: ## use faucet script to fund all the local identities
-	IDENTITY_PASSWORD=local PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+	IDENTITY_PASSWORD="${id_password}" PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
 		hopli faucet \
 		--environment-name anvil-localhost \
-		--use-local-identities --identity-directory "/tmp/" \
+		--use-local-identities \
+		--identity-prefix "${id_prefix}" \
+		--identity-directory "${id_dir}" \
 		--contracts-root "./packages/ethereum/contracts"
 
 .PHONY: docker-build-local
