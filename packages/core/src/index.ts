@@ -1388,7 +1388,7 @@ class Hopr extends EventEmitter {
   }
 
   public async getAllChannels(): Promise<ChannelEntry[]> {
-    return yield* this.db.getChannelsIterable()
+    return yield * this.db.getChannelsIterable()
   }
 
   public async getChannelsFrom(addr: Address): Promise<ChannelEntry[]> {
