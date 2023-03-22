@@ -53,7 +53,8 @@ import {
   registerMetricsCollector,
   retimer as intervalTimer,
   retryWithBackoffThenThrow,
-  type Ticket
+  type Ticket,
+  iterableToArray
 } from '@hoprnet/hopr-utils'
 
 import { FULL_VERSION, INTERMEDIATE_HOPS, MAX_HOPS, PACKET_SIZE, VERSION, MAX_PARALLEL_PINGS } from './constants.js'
@@ -1388,7 +1389,7 @@ class Hopr extends EventEmitter {
   }
 
   public async getAllChannels(): Promise<ChannelEntry[]> {
-    return yield* this.db.getChannelsIterable()
+    return iterableToArray(this.db.getChannelsIterable())
   }
 
   public async getChannelsFrom(addr: Address): Promise<ChannelEntry[]> {
