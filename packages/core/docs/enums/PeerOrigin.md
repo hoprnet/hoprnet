@@ -20,7 +20,7 @@
 
 ### IncomingConnection
 
-• **IncomingConnection** = `number`
+• **IncomingConnection** = ``2``
 
 #### Defined in
 
@@ -30,7 +30,7 @@ ___
 
 ### Initialization
 
-• **Initialization** = `number`
+• **Initialization** = ``0``
 
 #### Defined in
 
@@ -40,7 +40,7 @@ ___
 
 ### ManualPing
 
-• **ManualPing** = `number`
+• **ManualPing** = ``7``
 
 #### Defined in
 
@@ -50,7 +50,7 @@ ___
 
 ### NetworkRegistry
 
-• **NetworkRegistry** = `number`
+• **NetworkRegistry** = ``1``
 
 #### Defined in
 
@@ -60,7 +60,7 @@ ___
 
 ### OutgoingConnection
 
-• **OutgoingConnection** = `number`
+• **OutgoingConnection** = ``3``
 
 #### Defined in
 
@@ -70,7 +70,7 @@ ___
 
 ### StrategyConsideringChannel
 
-• **StrategyConsideringChannel** = `number`
+• **StrategyConsideringChannel** = ``5``
 
 #### Defined in
 
@@ -80,7 +80,7 @@ ___
 
 ### StrategyExistingChannel
 
-• **StrategyExistingChannel** = `number`
+• **StrategyExistingChannel** = ``4``
 
 #### Defined in
 
@@ -90,7 +90,7 @@ ___
 
 ### StrategyNewChannel
 
-• **StrategyNewChannel** = `number`
+• **StrategyNewChannel** = ``6``
 
 #### Defined in
 
@@ -100,7 +100,7 @@ ___
 
 ### Testing
 
-• **Testing** = `number`
+• **Testing** = ``8``
 
 #### Defined in
 

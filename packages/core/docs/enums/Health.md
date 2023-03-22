@@ -16,7 +16,7 @@
 
 ### GREEN
 
-• **GREEN** = `number`
+• **GREEN** = ``4``
 
 High quality connection to at least 1 public relay and 1 NAT node
 
@@ -28,7 +28,7 @@ ___
 
 ### ORANGE
 
-• **ORANGE** = `number`
+• **ORANGE** = ``2``
 
 Low quality connection to at least 1 public relay
 
@@ -40,7 +40,7 @@ ___
 
 ### RED
 
-• **RED** = `number`
+• **RED** = ``1``
 
 No connection, default
 
@@ -52,7 +52,7 @@ ___
 
 ### UNKNOWN
 
-• **UNKNOWN** = `number`
+• **UNKNOWN** = ``0``
 
 #### Defined in
 
@@ -62,7 +62,7 @@ ___
 
 ### YELLOW
 
-• **YELLOW** = `number`
+• **YELLOW** = ``3``
 
 High quality connection to at least 1 public relay
 
