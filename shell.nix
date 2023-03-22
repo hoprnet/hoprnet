@@ -32,7 +32,7 @@ let
     curl # v7.88.0
 
     # integration testing utilities
-    python3.pkgs.pip
+    python310Packages.pip
 
     # testing utilities
     jq # v1.6
