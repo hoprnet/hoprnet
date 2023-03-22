@@ -201,7 +201,7 @@ impl BinarySerializable for HalfKeyChallenge {
             ret.hkc.copy_from_slice(&data);
             Ok(ret)
         } else {
-            Err(GeneralError::ParseError)
+            Err(ParseError)
         }
     }
 
@@ -262,7 +262,7 @@ impl BinarySerializable for Hash {
             ret.hash.copy_from_slice(data);
             Ok(ret)
         } else {
-            Err(GeneralError::ParseError)
+            Err(ParseError)
         }
     }
 
@@ -430,10 +430,11 @@ impl PublicKey {
     /// Panics if reaches infinity (EC identity point), which is an invalid public key.
     pub fn tweak_add(key: &PublicKey, tweak: &[u8]) -> PublicKey {
         let scalar = NonZeroScalar::try_from(tweak)
-            .expect("invalid tweak results in identity point");
+            .expect("zero tweak provided");
 
-        let new_pk = (key.key.to_projective() + <Secp256k1 as CurveArithmetic>::ProjectivePoint::IDENTITY * scalar.as_ref())
+        let new_pk = (key.key.to_projective() + <Secp256k1 as CurveArithmetic>::ProjectivePoint::GENERATOR * scalar.as_ref())
             .to_affine();
+
         Self {
             key: elliptic_curve::PublicKey::<Secp256k1>::from_affine(new_pk)
                 .expect("combination results into ec identity (which is an invalid pub key)"),
@@ -568,6 +569,7 @@ pub mod tests {
     use k256::elliptic_curve::sec1::ToEncodedPoint;
     use utils_types::primitives::Address;
     use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
+    use crate::random::random_group_element;
 
     use crate::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, Hash, PublicKey, Signature};
 
@@ -618,6 +620,22 @@ pub mod tests {
         let hash = hex!("fac7acad27047640b069e8157b61623e3cb6bb86e6adf97151f93817c291f3cf");
 
         assert_eq!(address, PublicKey::from_raw_signature(&hash, &r, &s, v, VerifyingKey::recover_from_prehash).unwrap().to_address());
+    }
+
+    #[test]
+    fn public_key_combine_tweak() {
+        let (scalar1, point1) = random_group_element();
+        let (scalar2, point2) = random_group_element();
+
+        let pk1 = PublicKey::deserialize(&point1.serialize()).unwrap();
+        let pk2 = PublicKey::deserialize(&point2.serialize()).unwrap();
+
+        let sum = PublicKey::combine(&[&pk1, &pk2]);
+        let tweak1 = PublicKey::tweak_add(&pk1, &scalar2);
+        assert_eq!(sum, tweak1);
+
+        let tweak2 = PublicKey::tweak_add(&pk2, &scalar1);
+        assert_eq!(sum, tweak2);
     }
 
     #[test]

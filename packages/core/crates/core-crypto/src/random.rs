@@ -1,22 +1,23 @@
-use elliptic_curve::{NonZeroScalar, ProjectivePoint};
+use elliptic_curve::{Group, NonZeroScalar, ProjectivePoint};
 use elliptic_curve::rand_core::OsRng;
-use elliptic_curve::sec1::ToEncodedPoint;
 use k256::Secp256k1;
 use rand::{Rng, RngCore};
 
 use crate::errors::CryptoError::InvalidInputValue;
 use crate::errors::Result;
+use crate::types::CurvePoint;
 
+/// Maximum random integer that can be generated.
+/// This is the last positive 64-bit value in the two's complement representation.
 pub const MAX_RANDOM_INTEGER: u64 = 9007199254740991;
 
+/// Generates a random float uniformly distributed between 0 (inclusive) and 1 (exclusive).
 pub fn random_float() -> f64 {
     OsRng.gen()
 }
 
-pub fn random_bounded_integer(bound: u64) -> u64 {
-    OsRng.gen_range(0..bound)
-}
-
+/// Generates random unsigned integer which is at least `start` and optionally strictly less than `end`.
+/// If `end` is not given, `MAX_RANDOM_INTEGER` value is used.
 pub fn random_integer(start: u64, end: Option<u64>) -> Result<u64> {
     let real_end = end.unwrap_or(MAX_RANDOM_INTEGER);
 
@@ -24,22 +25,54 @@ pub fn random_integer(start: u64, end: Option<u64>) -> Result<u64> {
         Err(InvalidInputValue)
     }
     else {
-        Ok(start + random_bounded_integer(real_end - start))
+        let bound = real_end - start;
+        Ok(start + OsRng.gen_range(0..bound))
     }
 }
 
-pub fn random_group_element(compressed: bool) -> (Box<[u8]>, Box<[u8]>) {
-    let scalar = NonZeroScalar::<Secp256k1>::random(&mut OsRng);
-    let point = ProjectivePoint::<Secp256k1>::GENERATOR * scalar.as_ref();
-
-    let encoded = point.to_encoded_point(compressed);
-
-    (scalar.to_bytes().as_slice().into(), encoded.as_bytes().into())
+/// Generates a random elliptic curve point on secp256k1 curve (but not a point in infinity).
+/// Returns the encoded secret scalar and the corresponding point.
+pub fn random_group_element() -> (Box<[u8]>, CurvePoint) {
+    let mut scalar: NonZeroScalar<Secp256k1> = NonZeroScalar::<Secp256k1>::from_uint(10u32.into()).unwrap();
+    let mut point = ProjectivePoint::<Secp256k1>::IDENTITY;
+    while point.is_identity().into() {
+        scalar = NonZeroScalar::<Secp256k1>::random(&mut OsRng);
+        point = ProjectivePoint::<Secp256k1>::GENERATOR * scalar.as_ref();
+    }
+    (scalar.to_bytes().as_slice().into(), CurvePoint::from_affine(point.to_affine()))
 }
 
+/// Fills the specific number of bytes starting from the given offset in the given buffer
 pub fn random_fill(buffer: &mut [u8], from: usize, len: usize) {
     assert!(from + len <= buffer.len());
     OsRng.fill_bytes(&mut buffer[from..from + len]);
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::random::{random_float, random_group_element, random_integer};
+    use crate::types::CurvePoint;
+
+    #[test]
+    fn test_random_integer() {
+        assert!(random_integer(10, None).unwrap() > 10);
+
+        let bounded = random_integer(10, Some(20)).unwrap();
+        assert!(bounded >= 10);
+        assert!(bounded < 20)
+    }
+
+    #[test]
+    fn test_random_float() {
+        let f = random_float();
+        assert!(f >= 0.0 && f < 1.0);
+    }
+
+    #[test]
+    fn test_random_element() {
+        let (scalar, point) = random_group_element();
+        assert_eq!(CurvePoint::from_exponent(&scalar).unwrap(), point);
+    }
 }
 
 #[cfg(feature = "wasm")]
@@ -48,35 +81,27 @@ pub mod wasm {
     use wasm_bindgen::prelude::wasm_bindgen;
     use utils_misc::utils::wasm::JsResult;
     use utils_misc::ok_or_jserr;
+    use crate::types::CurvePoint;
 
     #[wasm_bindgen]
     pub struct GroupElement {
         coeff: Box<[u8]>,
-        element: Box<[u8]>,
-        compressed: bool
+        element: CurvePoint,
     }
 
     #[wasm_bindgen]
     impl GroupElement {
-        pub fn random(compressed: bool) -> GroupElement {
-            let (coeff, element) = crate::random::random_group_element(compressed);
-            Self {
-                coeff,
-                element,
-                compressed
-            }
+        pub fn random() -> GroupElement {
+            let (coeff, element) = crate::random::random_group_element();
+            Self { coeff, element }
         }
 
         pub fn coefficient(&self) -> Uint8Array {
             self.coeff.as_ref().into()
         }
 
-        pub fn element(&self) -> Uint8Array {
-            self.element.as_ref().into()
-        }
-
-        pub fn is_compressed(&self) -> bool {
-            self.compressed
+        pub fn element(&self) -> CurvePoint {
+            self.element.clone()
         }
     }
 
@@ -86,15 +111,14 @@ pub mod wasm {
     }
 
     #[wasm_bindgen]
-    pub fn random_bounded_integer(bound: u64) -> u64 {
-        crate::random::random_bounded_integer(bound)
+    pub fn random_bounded_integer(bound: u64) -> JsResult<u64> {
+        ok_or_jserr!(crate::random::random_integer(0, Some(bound)))
     }
 
     #[wasm_bindgen]
     pub fn random_integer(start: u64, end: Option<u64>) -> JsResult<u64> {
         ok_or_jserr!(crate::random::random_integer(start, end))
     }
-
 
     #[wasm_bindgen]
     pub fn random_fill(buffer: Uint8Array, from: usize, len: usize) {

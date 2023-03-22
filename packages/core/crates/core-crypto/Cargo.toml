@@ -13,6 +13,7 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 default = ["console_error_panic_hook", "wasm"]
+ed25519 = [ ]
 wasm = ["dep:wasm-bindgen", "dep:js-sys"]
 
 [dependencies]

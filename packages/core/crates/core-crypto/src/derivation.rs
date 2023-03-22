@@ -42,7 +42,7 @@ pub fn derive_packet_tag(secret: &[u8]) -> Result<Box<[u8]>> {
     Ok(out.into_boxed_slice())
 }
 
-pub fn generate_key_iv(secret: &[u8], info: &[u8], key: &mut [u8], iv: &mut [u8], iv_first: bool) -> Result<()> {
+pub(crate) fn generate_key_iv(secret: &[u8], info: &[u8], key: &mut [u8], iv: &mut [u8], iv_first: bool) -> Result<()> {
     if secret.len() != SECRET_KEY_LENGTH {
         return Err(InvalidParameterSize{name: "secret".into(), expected: SECRET_KEY_LENGTH})
     }
@@ -92,15 +92,22 @@ mod tests {
 
     #[test]
     fn test_derive_commitment_seed() {
-
         let priv_key = [0u8; SECRET_KEY_LENGTH];
         let chinfo = [0u8; SECRET_KEY_LENGTH];
 
-        let res = derive_commitment_seed(&priv_key, &chinfo);
-        assert_eq!(false, res.is_err());
+        let res = derive_commitment_seed(&priv_key, &chinfo).unwrap();
 
         let r = hex!("6CBD916300C24CC0DA636490668A4D85A4F42113496FCB452099F76131A3662E");
-        assert_eq!(r, res.unwrap().as_ref());
+        assert_eq!(r, res.as_ref());
+    }
+
+    #[test]
+    fn test_derive_packet_tag() {
+        let secret = [0u8; SECRET_KEY_LENGTH];
+        let tag = derive_packet_tag(&secret).unwrap();
+
+        let r = hex!("e0cf0fb82ea5a541b0367b376eb36a60");
+        assert_eq!(r, tag.as_ref());
     }
 }
 
