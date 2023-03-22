@@ -77,11 +77,11 @@ jobs:
       - name: Build application
         run: nix develop -c make -j build
 
-      - name: Install dependencies
+      - name: Install pytest dependencies
         run: |
           nix develop -c python3 -m ensurepip --default-pip
-          nix develop -c python3 -m pip install --upgrade pip
-          nix develop -c python3 -m pip install -r tests/requirements.txt
+          nix develop -c python3 -m pip install --user --upgrade pip
+          nix develop -c python3 -m pip install --user -r tests/requirements.txt
 
       - name: Test with pytest
         run: |
