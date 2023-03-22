@@ -25,19 +25,18 @@ let
     binaryen # v111 (includes wasm-opt)
     wasm-bindgen-cli # v0.2.83
 
-    ## python is required by node module bcrypto
+    ## python is required by node module bcrypto and integration tests
     python3 # v3.10.10
   ];
   devPkgs = with pkgs; [
     curl # v7.88.0
 
+    # integration testing utilities
+    python310Packages.pip
+
     # testing utilities
     jq # v1.6
     yq-go # v4.30.8
-    jq
-    yq-go
-    vagrant
-    shellcheck
 
     # test Github automation
     act # 0.2.42
@@ -55,5 +54,8 @@ mkShell {
     patchelf --interpreter `cat $NIX_CC/nix-support/dynamic-linker` .foundry/bin/anvil
     patchelf --interpreter `cat $NIX_CC/nix-support/dynamic-linker` .foundry/bin/cast
     patchelf --interpreter `cat $NIX_CC/nix-support/dynamic-linker` .foundry/bin/forge
+    python -m venv .venv
+    source .venv/bin/activate
+    pip install -r tests/requirements.txt
   '';
 }

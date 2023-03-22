@@ -1,6 +1,5 @@
 import logging
 import subprocess
-from contextlib import closing
 
 import pytest
 
@@ -72,15 +71,16 @@ def check_socket(address, port):
 
 @pytest.fixture(scope="module")
 def setup_7_nodes():
-    logging.info(f"Setting up a cluster of 7 nodes from the source")
-
-    yield NODES
-
-    # TODO: remove before push
-    # try:
-    #     subprocess.run('./scripts/fixture_local_test_setup.sh --skip-cleanup', shell=True)
-    #               .check_returncode()
-    #     yield NODES
-    # finally:
-    #     subprocess.run('./scripts/fixture_local_test_setup.sh --cleanup-only', shell=True)
-    #               .check_returncode()
+    try:
+        logging.info("Creating a 7 node cluster from source")
+        subprocess.run('./scripts/fixture_local_test_setup.sh --skip-cleanup',
+                       shell=True,
+                       capture_output=True,
+                       check=True)
+        yield NODES
+    finally:
+        logging.info("Tearing down the 7 node cluster from source")
+        subprocess.run('./scripts/fixture_local_test_setup.sh --just-cleanup',
+                       shell=True,
+                       capture_output=True,
+                       check=True)

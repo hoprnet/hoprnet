@@ -5,9 +5,8 @@ import subprocess
 
 from conftest import DEFAULT_API_TOKEN
 
-def test_hoprd_integration_tests(setup_7_nodes):
-    logging.info("Running protocol tests")
 
+def test_hoprd_protocol_integration_tests(setup_7_nodes):
     with open('/tmp/hopr-source-anvil.cfg') as f:
         data = json.load(f)
 
@@ -26,5 +25,6 @@ def test_hoprd_integration_tests(setup_7_nodes):
     subprocess.run(f'./tests/integration-test.sh {nodes_api_as_str}',
                    shell=True,
                    capture_output=True,
-                   env=env_vars) \
-        .check_returncode()
+                   env=env_vars,
+                   # timeout=2000,
+                   check=True)
