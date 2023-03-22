@@ -214,6 +214,10 @@ mod tests {
             },
         ];
 
+        // Add fake samples to allow the test to run
+        strat.sma.add_sample(peers.len());
+        strat.sma.add_sample(peers.len());
+
         let results = strat.tick(
             balance,
             peers.iter().map(|x| x.0.clone()),
