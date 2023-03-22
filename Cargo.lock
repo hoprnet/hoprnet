@@ -1111,7 +1111,7 @@ dependencies = [
 
 [[package]]
 name = "core-strategy"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "console_error_panic_hook",
  "getrandom 0.2.8",
@@ -1119,6 +1119,8 @@ dependencies = [
  "rand 0.8.5",
  "serde",
  "serde-wasm-bindgen 0.5.0",
+ "simple_moving_average",
+ "utils-log",
  "utils-misc",
  "utils-types",
  "wasm-bindgen",
@@ -5490,6 +5492,15 @@ checksum = "8fe458c98333f9c8152221191a77e2a44e8325d0193484af2e9421a53019e57d"
 dependencies = [
  "digest 0.10.6",
  "rand_core 0.6.4",
+]
+
+[[package]]
+name = "simple_moving_average"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cdd19d3808aad2604c824399fd270260d634678b010328c9d96851bb0fb63121"
+dependencies = [
+ "num-traits",
 ]
 
 [[package]]
