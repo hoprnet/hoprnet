@@ -50,6 +50,7 @@ pub fn random_fill(buffer: &mut [u8], from: usize, len: usize) {
 
 #[cfg(test)]
 mod tests {
+    use elliptic_curve::Group;
     use crate::random::{random_fill, random_float, random_group_element, random_integer};
     use crate::types::CurvePoint;
 
@@ -71,6 +72,8 @@ mod tests {
     #[test]
     fn test_random_element() {
         let (scalar, point) = random_group_element();
+        let is_identity: bool = point.to_projective_point().is_identity().into();
+        assert!(!is_identity);
         assert_eq!(CurvePoint::from_exponent(&scalar).unwrap(), point);
     }
 
