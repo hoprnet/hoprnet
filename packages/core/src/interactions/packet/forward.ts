@@ -6,7 +6,7 @@ import { debug, registerMetricsCollector } from '@hoprnet/hopr-utils'
 import { pushable, type Pushable } from 'it-pushable'
 
 import { Packet } from '../../messages/index.js'
-import { new_mixer, core_mixer_set_panic_hook, core_mixer_gather_metrics } from '../../../lib/core_mixer_bg.js'
+import { new_mixer, core_mixer_set_panic_hook, core_mixer_gather_metrics } from '../../../lib/core_mixer.js'
 core_mixer_set_panic_hook()
 registerMetricsCollector(core_mixer_gather_metrics)
 
