@@ -17,9 +17,10 @@ source "${mydir}/utils.sh"
 
 usage() {
   msg
-  msg "Usage: $0 [-h|--help] [-s|--skip-cleanup]"
+  msg "Usage: $0 [-h|--help] [-s|--skip-cleanup] [-c|--just-cleanup]"
   msg
   msg "The cleanup process can be skipped by using '--skip-cleanup'."
+  msg "The cleanup process can be triggered by using '--just-cleanup'."
   msg
 }
 
