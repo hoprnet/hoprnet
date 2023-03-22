@@ -51,14 +51,11 @@ def setup_node(*args, **kwargs):
 
 
 def test_sanity():
-    assert (len(NODES) == len(set(map(lambda n: n['private_key'], NODES.values()))),
-            "All private keys must be unique")
+    assert len(NODES.keys()) == len(set([i['private_key'] for i in NODES.values()])), "All private keys must be unique"
 
-    assert (len(NODES) == len(set(map(lambda n: n['api_port'], NODES.values()))),
-            "All API ports must be unique")
+    assert len(NODES.keys()) == len(set([i['api_port'] for i in NODES.values()])), "All API ports must be unique"
 
-    assert (len(NODES) == len(set(map(lambda n: n['p2p_port'], NODES.values()))),
-            "All p2p ports must be unique")
+    assert len(NODES.keys()) == len(set([i['p2p_port'] for i in NODES.values()])), "All p2p ports must be unique"
 
 
 def check_socket(address, port):
@@ -81,12 +78,9 @@ def setup_7_nodes():
 
     # TODO: remove before push
     # try:
-    #     exit_code = subprocess.call('../scripts/run-integration-tests-source.sh --skip-cleanup', shell=True)
-    #     if exit_code != 0:
-    #         raise Exception(f"Failed to set up a local cluster from source")
-    #     else:
-    #         yield NODES
+    #     subprocess.run('./scripts/fixture_local_test_setup.sh --skip-cleanup', shell=True)
+    #               .check_returncode()
+    #     yield NODES
     # finally:
-    #     exit_code = subprocess.call('../scripts/run-integration-tests-source.sh --cleanup-only', shell=True)
-    #     if exit_code != 0:
-    #         raise Exception(f"Failed to clean up the local cluster created from source")
+    #     subprocess.run('./scripts/fixture_local_test_setup.sh --cleanup-only', shell=True)
+    #               .check_returncode()
