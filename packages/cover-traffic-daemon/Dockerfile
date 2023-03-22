@@ -10,7 +10,7 @@ COPY .yarn .yarn
 COPY .cargo .cargo/
 COPY vendor vendor/
 COPY packages packages/
-COPY Makefile Cargo.toml Cargo.lock yarn.lock .yarnrc.yml package.json tsconfig.build.json tsconfig.json tsconfig.scripts.json yarn.lock rust-toolchain.toml ./
+COPY Makefile Cargo.toml Cargo.lock yarn.lock .yarnrc.yml package.json tsconfig.build.json tsconfig.json yarn.lock rust-toolchain.toml ./
 
 LABEL description="Launches a cover-traffic node which keeps sending cover-traffic through the hopr network"
 
