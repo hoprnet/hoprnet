@@ -53,7 +53,6 @@ export function validateData(data: any, schema: any) {
   }
 }
 
-
 /**
  * Convert an async iterator to an array
  * @param iter generator
@@ -61,7 +60,7 @@ export function validateData(data: any, schema: any) {
  */
 export async function iterableToArray<T>(iter: AsyncIterable<T>): Promise<T[]> {
   const output: T[] = []
-  for await(const x of iter) {
+  for await (const x of iter) {
     output.push(x)
   }
   return output
