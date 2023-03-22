@@ -17,6 +17,7 @@ use utils_types::primitives::{Address, EthereumChallenge};
 use utils_types::traits::{BinarySerializable, PeerIdLike};
 
 use crate::errors::{Result, CryptoError, CryptoError::CalculationError};
+use crate::errors::CryptoError::InvalidInputValue;
 
 /// Represent an uncompressed elliptic curve point on the secp256k1 curve
 #[derive(Clone, Eq, PartialEq, Debug)]
@@ -100,7 +101,6 @@ pub struct Challenge {
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl Challenge {
-
     pub fn to_ethereum_challenge(&self) -> EthereumChallenge {
         EthereumChallenge::new(&self.curve_point.to_address().serialize())
     }
@@ -347,6 +347,19 @@ impl PeerIdLike for PublicKey {
             lp2p_k256_PublicKey::decode(&self.compressed)
                 .expect("cannot convert this public key to secp256k1 peer id")
         ))
+    }
+}
+
+impl TryFrom<CurvePoint> for PublicKey {
+    type Error = CryptoError;
+
+    fn try_from(value: CurvePoint) -> std::result::Result<Self, Self::Error> {
+        let key = elliptic_curve::PublicKey::<Secp256k1>::from_affine(value.affine)
+            .map_err(|_| InvalidInputValue)?;
+        Ok(Self {
+            key,
+            compressed: key.to_encoded_point(true).to_bytes()
+        })
     }
 }
 
@@ -627,8 +640,8 @@ pub mod tests {
         let (scalar1, point1) = random_group_element();
         let (scalar2, point2) = random_group_element();
 
-        let pk1 = PublicKey::deserialize(&point1.serialize()).unwrap();
-        let pk2 = PublicKey::deserialize(&point2.serialize()).unwrap();
+        let pk1 = PublicKey::try_from(point1).unwrap();
+        let pk2 = PublicKey::try_from(point2).unwrap();
 
         let sum = PublicKey::combine(&[&pk1, &pk2]);
         let tweak1 = PublicKey::tweak_add(&pk1, &scalar2);
