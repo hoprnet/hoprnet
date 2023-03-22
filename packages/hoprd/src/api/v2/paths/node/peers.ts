@@ -62,7 +62,7 @@ export async function getPeers(
       try {
         const info = node.getConnectionInfo(peerId)
         // exclude if quality is lesser than the one wanted
-        if (info.quality < quality) {
+        if (info === undefined || info.quality < quality) {
           continue
         }
         announcedMap.set(peerId.toString(), toPeerInfoFormat(info, addr))
@@ -81,7 +81,7 @@ export async function getPeers(
             try {
               const info = node.getConnectionInfo(peerId)
               // exclude if quality is less than the one wanted
-              if (info.quality < quality) {
+              if (info === undefined || info.quality < quality) {
                 continue
               }
               yield toPeerInfoFormat(info)
