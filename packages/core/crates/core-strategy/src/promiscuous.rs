@@ -102,6 +102,12 @@ impl ChannelStrategy for PromiscuousStrategy {
         self.sma.add_sample(network_size);
         info!("evaluated qualities of {} peers seen in the network", network_size);
 
+        if self.sma.get_num_samples() < self.sma.get_sample_window_size() {
+            info!("not yet enough samples ({} out of {}) of network size to perform a strategy tick, skipping.",
+            self.sma.get_num_samples(), self.sma.get_sample_window_size());
+            return StrategyTickResult::new(0, vec![], vec![]);
+        }
+
         // Also mark for closing all channels which are in PendingToClose state
         let before_pending = outgoing_channels.len();
         outgoing_channels
