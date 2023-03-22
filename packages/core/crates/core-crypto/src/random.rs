@@ -42,7 +42,7 @@ pub fn random_group_element() -> (Box<[u8]>, CurvePoint) {
     (scalar.to_bytes().as_slice().into(), CurvePoint::from_affine(point.to_affine()))
 }
 
-/// Fills the specific number of bytes starting from the given offset in the given buffer
+/// Fills the specific number of bytes starting from the given offset in the given buffer.
 pub fn random_fill(buffer: &mut [u8], from: usize, len: usize) {
     assert!(from + len <= buffer.len());
     OsRng.fill_bytes(&mut buffer[from..from + len]);
@@ -50,7 +50,7 @@ pub fn random_fill(buffer: &mut [u8], from: usize, len: usize) {
 
 #[cfg(test)]
 mod tests {
-    use crate::random::{random_float, random_group_element, random_integer};
+    use crate::random::{random_fill, random_float, random_group_element, random_integer};
     use crate::types::CurvePoint;
 
     #[test]
@@ -72,6 +72,16 @@ mod tests {
     fn test_random_element() {
         let (scalar, point) = random_group_element();
         assert_eq!(CurvePoint::from_exponent(&scalar).unwrap(), point);
+    }
+
+    #[test]
+    fn test_random_fill() {
+        let mut buffer = [0u8; 10];
+        // 7 bytes with indices 2,3,4,5,6,7,8 will be filled with random bytes, other stay zero
+        random_fill(&mut buffer, 2, 7);
+        assert_eq!(0, buffer[0]);
+        assert_eq!(0, buffer[1]);
+        assert_eq!(0, buffer[9]);
     }
 }
 
