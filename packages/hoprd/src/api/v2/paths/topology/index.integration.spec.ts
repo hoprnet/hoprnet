@@ -7,7 +7,7 @@ import {
   ALICE_PEER_ID,
   BOB_PEER_ID,
   CHARLIE_PEER_ID,
-  ALICE_NATIVE_ADDR,
+  ALICE_NATIVE_ADDR
 } from '../../fixtures.js'
 import { Balance, ChannelEntry, NativeBalance, PublicKey, UINT256, Hash, ChannelStatus } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
@@ -20,37 +20,37 @@ node.getNativeBalance = sinon.fake.returns(new NativeBalance(new BN(10)))
 node.getBalance = sinon.fake.returns(new Balance(new BN(1)))
 
 const incomingChannel = new ChannelEntry(
-    PublicKey.fromPeerId(ALICE_PEER_ID),
-    PublicKey.fromPeerId(BOB_PEER_ID),
-    new Balance(new BN(1)),
-    Hash.create(),
-    new UINT256(new BN(1)),
-    new UINT256(new BN(1)),
-    ChannelStatus.Closed,
-    new UINT256(new BN(1)),
-    new UINT256(new BN(1))
-  )
+  PublicKey.fromPeerId(ALICE_PEER_ID),
+  PublicKey.fromPeerId(BOB_PEER_ID),
+  new Balance(new BN(1)),
+  Hash.create(),
+  new UINT256(new BN(1)),
+  new UINT256(new BN(1)),
+  ChannelStatus.Closed,
+  new UINT256(new BN(1)),
+  new UINT256(new BN(1))
+)
 const outgoingChannel = new ChannelEntry(
-    PublicKey.fromPeerId(BOB_PEER_ID),
-    PublicKey.fromPeerId(ALICE_PEER_ID),
-    new Balance(new BN(2)),
-    Hash.create(),
-    new UINT256(new BN(2)),
-    new UINT256(new BN(2)),
-    ChannelStatus.Open,
-    new UINT256(new BN(2)),
-    new UINT256(new BN(2))
+  PublicKey.fromPeerId(BOB_PEER_ID),
+  PublicKey.fromPeerId(ALICE_PEER_ID),
+  new Balance(new BN(2)),
+  Hash.create(),
+  new UINT256(new BN(2)),
+  new UINT256(new BN(2)),
+  ChannelStatus.Open,
+  new UINT256(new BN(2)),
+  new UINT256(new BN(2))
 )
 const otherChannel = new ChannelEntry(
-    PublicKey.fromPeerId(BOB_PEER_ID),
-    PublicKey.fromPeerId(CHARLIE_PEER_ID),
-    new Balance(new BN(3)),
-    Hash.create(),
-    new UINT256(new BN(3)),
-    new UINT256(new BN(3)),
-    ChannelStatus.WaitingForCommitment,
-    new UINT256(new BN(3)),
-    new UINT256(new BN(3))
+  PublicKey.fromPeerId(BOB_PEER_ID),
+  PublicKey.fromPeerId(CHARLIE_PEER_ID),
+  new Balance(new BN(3)),
+  Hash.create(),
+  new UINT256(new BN(3)),
+  new UINT256(new BN(3)),
+  ChannelStatus.WaitingForCommitment,
+  new UINT256(new BN(3)),
+  new UINT256(new BN(3))
 )
 node.getAllChannels = sinon.fake.returns(Promise.resolve([incomingChannel, outgoingChannel, otherChannel]))
 
