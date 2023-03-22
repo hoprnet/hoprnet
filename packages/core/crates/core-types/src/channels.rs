@@ -2,7 +2,7 @@ use std::ops::{Div, Mul, Sub};
 use ethnum::u256;
 use enum_iterator::{all, Sequence };
 use serde_repr::*;
-use core_crypto::types::{Challenge, ethereum_signed_hash, Hash, PublicKey, Signature};
+use core_crypto::types::{Challenge, Hash, PublicKey, Signature};
 use utils_types::primitives::{Address, Balance, BalanceType, EthereumChallenge, U256};
 use utils_types::errors::{Result, GeneralError::ParseError};
 
@@ -192,6 +192,23 @@ pub struct Ticket {
     pub win_prob: U256,
     pub channel_epoch: U256,
     pub signature: Signature
+}
+
+/// Prefix message with "\x19Ethereum Signed Message:\n {length} {message}" and returns its hash
+/// Keccak256 is used as the underlying digest.
+pub fn ethereum_signed_hash<T: AsRef<[u8]>>(message: T) -> Hash {
+    const PREFIX: &str = "\x19Ethereum Signed Message:\n";
+
+    let message = message.as_ref();
+    let len = message.len();
+    let len_string = len.to_string();
+
+    let mut eth_message = Vec::with_capacity(PREFIX.len() + len_string.len() + len);
+    eth_message.extend_from_slice(PREFIX.as_bytes());
+    eth_message.extend_from_slice(len_string.as_bytes());
+    eth_message.extend_from_slice(message);
+
+    Hash::create(&[&eth_message])
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]

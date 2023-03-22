@@ -285,23 +285,6 @@ impl Hash {
     }
 }
 
-/// Prefix message with "\x19Ethereum Signed Message:\n {length} {message}" and returns its hash
-/// Keccak256 is used as the underlying digest.
-pub fn ethereum_signed_hash<T: AsRef<[u8]>>(message: T) -> Hash {
-    const PREFIX: &str = "\x19Ethereum Signed Message:\n";
-
-    let message = message.as_ref();
-    let len = message.len();
-    let len_string = len.to_string();
-
-    let mut eth_message = Vec::with_capacity(PREFIX.len() + len_string.len() + len);
-    eth_message.extend_from_slice(PREFIX.as_bytes());
-    eth_message.extend_from_slice(len_string.as_bytes());
-    eth_message.extend_from_slice(message);
-
-    Hash::create(&[&eth_message])
-}
-
 /// Represents a secp256k1 public key.
 /// This is a "Schrödinger public key", both compressed and uncompressed to save some cycles.
 #[derive(Clone, Eq, PartialEq, Debug)]
