@@ -338,11 +338,6 @@ done
 
 log "All nodes came up online"
 
-## --- Run security tests --- {{{
-#${mydir}/../test/security-test.sh \
-#  127.0.0.1 13301 13302 "${default_api_token}"
-## }}}
-#
 ## --- Run protocol test --- {{{
 #ADDITIONAL_NODE_ADDRS="0xde913eeed23bce5274ead3de8c196a41176fbd49" \
 #ADDITIONAL_NODE_PEERIDS="16Uiu2HAm2VD6owCxPEZwP6Moe1jzapqziVeaTXf1h7jVzu5dW1mk" \
