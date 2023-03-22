@@ -167,8 +167,10 @@ ifeq ($(origin NO_CARGO),undefined)
 # Copy bindings to their destination
 # filter out proc-macro crates since they need no compilation
 	$(MAKE) $(filter-out %proc-macros/,$(WORKSPACES_WITH_RUST_MODULES))
+ifeq ($(origin NO_HOPLI),undefined)
 # build hopli
 	$(MAKE) $(HOPLI_CRATE)
+endif
 endif
 
 .PHONY: build-yellowpaper
