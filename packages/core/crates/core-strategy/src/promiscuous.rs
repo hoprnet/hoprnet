@@ -11,6 +11,8 @@ use crate::generic::{ChannelStrategy, OutgoingChannelStatus, StrategyTickResult}
 /// Size of the simple moving average window used to smoothen the number of registered peers.
 pub const SMA_WINDOW_SIZE: usize = 3;
 
+type SimpleMovingAvg = SumTreeSMA<usize, usize, SMA_WINDOW_SIZE>;
+
 /// Implements promiscuous strategy.
 /// This strategy opens channels to peers, which have quality above a given threshold.
 /// At the same time, it closes channels opened to peers whose quality dropped below this threshold.
@@ -21,7 +23,7 @@ pub struct PromiscuousStrategy {
     pub minimum_node_balance: Balance,
     pub max_channels: Option<usize>,
     pub auto_redeem_tickets: bool,
-    sma: SumTreeSMA<usize, usize, SMA_WINDOW_SIZE>
+    sma: SimpleMovingAvg
 }
 
 impl PromiscuousStrategy {
@@ -33,7 +35,7 @@ impl PromiscuousStrategy {
             minimum_node_balance: Balance::from_str("100000000000000000", BalanceType::HOPR),
             max_channels: None,
             auto_redeem_tickets: false,
-            sma: SumTreeSMA::<usize, usize, SMA_WINDOW_SIZE>::new()
+            sma: SimpleMovingAvg::new()
         }
     }
 }
