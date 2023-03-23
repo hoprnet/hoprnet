@@ -186,7 +186,7 @@ function setup_node() {
   # Using a mix of CLI parameters and env variables to ensure
   # both work.
   env \
-    DEBUG="hopr*" \
+    DEBUG="flow*,hopr*,libp2p:noise,libp2p:mplex*" \
     NODE_ENV=development \
     HOPRD_HEARTBEAT_INTERVAL=2500 \
     HOPRD_HEARTBEAT_THRESHOLD=2500 \
