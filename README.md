@@ -133,6 +133,13 @@ nix develop
 
 Now you may follow the instructions in [Develop](#develop).
 
+Alternatively you may use a development Docker container which uses the same Nix
+setup.
+
+```
+make run-docker-dev
+```
+
 ## Using
 
 The `hoprd` provides various command-line switches to configure its behaviour. For reference these are documented here as well:

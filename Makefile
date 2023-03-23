@@ -436,6 +436,13 @@ ifeq ($(environment_type),)
 endif
 endif
 
+.PHONY: run-docker-dev
+run-docker-dev: ## start a local development Docker container
+	docker run -v `pwd`:/src -ti -w "/src" --name hoprd-local-dev nixos/nix nix \
+		--extra-experimental-features nix-command \
+		--extra-experimental-features flakes \
+		develop
+
 .PHONY: run-hopr-admin
 run-hopr-admin: version=07aec21b
 run-hopr-admin: port=3000
