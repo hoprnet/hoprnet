@@ -9,6 +9,9 @@ import { handshake } from 'it-handshake'
 import type { StreamType } from '../types.js'
 import assert from 'assert'
 import { IStream, Server, connect_relay_set_panic_hook } from '../../lib/connect_relay.js'
+import { webcrypto } from 'node:crypto'
+// @ts-ignore
+globalThis.crypto = webcrypto
 connect_relay_set_panic_hook()
 
 describe('relay switch context', function () {

@@ -389,24 +389,13 @@ impl<'b> Stream for Server {
                                     ]
                                     .contains(inner_prefix) =>
                                 {
-                                    match this.status_messages_tx.unbounded_send(item.clone()) {
-                                        Ok(()) => (),
-                                        Err(e) => {
-                                            log(format!(
-                                                "Failed queuing connection status request {}",
-                                                e
-                                            )
-                                            .as_str());
-                                            panic!()
-                                        }
-                                    };
-
                                     break if *inner_prefix == ConnectionStatusMessage::Stop as u8 {
                                         // Connection has ended, mark it ended for next iteration
                                         *this.ended = true;
                                         Some(Ok(item))
                                     } else {
-                                        None
+                                        // swallow message and go for next one
+                                        continue;
                                     };
                                 }
                                 Some(_) => break Some(Ok(item)),
@@ -638,13 +627,23 @@ impl Sink<Box<[u8]>> for Server {
     fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), String>> {
         let mut this = self.project();
 
-        this.stream.as_mut().as_pin_mut().unwrap().poll_close(cx)
+        // The stream might have already ended, so stream is already deleted
+        if let Some(stream) = this.stream.as_mut().as_pin_mut() {
+            return stream.poll_close(cx);
+        }
+
+        Poll::Ready(Ok(()))
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), String>> {
         let mut this = self.project();
 
-        this.stream.as_mut().as_pin_mut().unwrap().poll_flush(cx)
+        // The stream might have already ended, so stream is already deleted
+        if let Some(stream) = this.stream.as_mut().as_pin_mut() {
+            return stream.poll_flush(cx);
+        }
+
+        Poll::Ready(Ok(()))
     }
 }
 

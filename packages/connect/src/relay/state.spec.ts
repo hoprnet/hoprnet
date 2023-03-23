@@ -63,7 +63,7 @@ describe('relay state management', function () {
     assert.throws(() => RelayState.getId(initiator, initiator))
   })
 
-  it('check if active, create new and exchange messages', async function () {
+  it.only('check if active, create new and exchange messages', async function () {
     const state = new RelayState({
       relayFreeTimeout: 1
     })
@@ -76,79 +76,80 @@ describe('relay state management', function () {
     const [destinationToRelay, relayToDestination] = duplexPair<StreamType>()
 
     const initiatorShaker = handshake(initiatorToRelay)
-    const destinationShaker = handshake(relayToDestination)
+    const destinationShaker = handshake(destinationToRelay)
 
-    state.createNew(initiator, destination, relayToInitiator, destinationToRelay)
+    state.createNew(initiator, destination, relayToInitiator, relayToDestination)
 
-    const destinationIsActivePromise = state.isActive(initiator, destination)
+    for (let i = 0; i < 3; i++) {
+      const destinationIsActivePromise = state.isActive(initiator, destination)
 
-    assert(
-      u8aEquals(
-        ((await destinationShaker.read()) as Uint8Array).slice(),
-        Uint8Array.of(RelayPrefix.STATUS_MESSAGE, StatusMessages.PING)
+      assert(
+        u8aEquals(
+          ((await destinationShaker.read()) as Uint8Array).slice(),
+          Uint8Array.of(RelayPrefix.STATUS_MESSAGE, StatusMessages.PING)
+        )
       )
-    )
 
-    destinationShaker.write(Uint8Array.of(RelayPrefix.STATUS_MESSAGE, StatusMessages.PONG))
+      destinationShaker.write(Uint8Array.of(RelayPrefix.STATUS_MESSAGE, StatusMessages.PONG))
 
-    assert((await destinationIsActivePromise) === true, `link to destination must be active`)
+      assert((await destinationIsActivePromise) === true, `link to destination must be active`)
 
-    const initiatorIsActivePromise = state.isActive(destination, initiator)
+      const initiatorIsActivePromise = state.isActive(destination, initiator)
 
-    assert(
-      u8aEquals(
-        ((await initiatorShaker.read()) as Uint8Array).slice(),
-        Uint8Array.of(RelayPrefix.STATUS_MESSAGE, StatusMessages.PING)
+      assert(
+        u8aEquals(
+          ((await initiatorShaker.read()) as Uint8Array).slice(),
+          Uint8Array.of(RelayPrefix.STATUS_MESSAGE, StatusMessages.PING)
+        )
       )
-    )
 
-    initiatorShaker.write(Uint8Array.of(RelayPrefix.STATUS_MESSAGE, StatusMessages.PONG))
+      initiatorShaker.write(Uint8Array.of(RelayPrefix.STATUS_MESSAGE, StatusMessages.PONG))
 
-    assert((await initiatorIsActivePromise) === true, `link to initiator must be active`)
+      assert((await initiatorIsActivePromise) === true, `link to initiator must be active`)
+    }
 
-    // check that we can communicate
-    const initiatorHello = new TextEncoder().encode('Hello!')
-    initiatorShaker.write(Uint8Array.from([RelayPrefix.PAYLOAD, ...initiatorHello]))
+    for (let i = 0; i < 5; i++) {
+      // check that we can communicate
+      const initiatorHello = new TextEncoder().encode('Hello!')
+      initiatorShaker.write(Uint8Array.from([RelayPrefix.PAYLOAD, ...initiatorHello]))
 
-    assert(
-      u8aEquals(
-        ((await destinationShaker.read()) as Uint8Array).slice(),
-        Uint8Array.from([RelayPrefix.PAYLOAD, ...initiatorHello])
+      assert(
+        u8aEquals(
+          ((await destinationShaker.read()) as Uint8Array).slice(),
+          Uint8Array.from([RelayPrefix.PAYLOAD, ...initiatorHello])
+        )
       )
-    )
 
-    const destinationHello = new TextEncoder().encode('Hello from the other side!')
-    destinationShaker.write(Uint8Array.from([RelayPrefix.PAYLOAD, ...destinationHello]))
+      const destinationHello = new TextEncoder().encode('Hello from the other side!')
+      destinationShaker.write(Uint8Array.from([RelayPrefix.PAYLOAD, ...destinationHello]))
 
-    assert(
-      u8aEquals(
-        ((await initiatorShaker.read()) as Uint8Array).slice(),
-        Uint8Array.from([RelayPrefix.PAYLOAD, ...destinationHello])
+      assert(
+        u8aEquals(
+          ((await initiatorShaker.read()) as Uint8Array).slice(),
+          Uint8Array.from([RelayPrefix.PAYLOAD, ...destinationHello])
+        )
       )
-    )
+    }
 
-    const [initiatorToRelayAfterUpdate, relayToInitiatorAfterUpdate] = duplexPair<StreamType>()
+    for (let i = 0; i < 5; i++) {
+      const [initiatorToRelayAfterUpdate, relayToInitiatorAfterUpdate] = duplexPair<StreamType>()
 
-    state.updateExisting(initiator, destination, initiatorToRelayAfterUpdate)
+      state.updateExisting(initiator, destination, initiatorToRelayAfterUpdate)
 
-    const initiatorShakerAfterUpdate = handshake(relayToInitiatorAfterUpdate)
+      const initiatorShakerAfterUpdate = handshake(relayToInitiatorAfterUpdate)
 
-    const initiatorHelloAfterUpdate = new TextEncoder().encode(`Hello, I'm back!`)
-    initiatorShakerAfterUpdate.write(Uint8Array.from([RelayPrefix.PAYLOAD, ...initiatorHelloAfterUpdate]))
+      await new Promise((resolve) => setTimeout(resolve, 100))
 
-    assert(
-      u8aEquals(
-        ((await destinationShaker.read()) as Uint8Array).slice(),
-        Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.RESTART)
+      const initiatorHelloAfterUpdate = new TextEncoder().encode(`Hello, I'm back!`)
+      initiatorShakerAfterUpdate.write(Uint8Array.from([RelayPrefix.PAYLOAD, ...initiatorHelloAfterUpdate]))
+
+      assert(
+        u8aEquals(
+          ((await destinationShaker.read()) as Uint8Array).slice(),
+          Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.RESTART)
+        )
       )
-    )
-
-    assert(
-      u8aEquals(
-        ((await destinationShaker.read()) as Uint8Array).slice(),
-        Uint8Array.from([RelayPrefix.PAYLOAD, ...initiatorHelloAfterUpdate])
-      )
-    )
+    }
   })
 
   it('check cleanup', async function () {
