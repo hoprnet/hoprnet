@@ -4,14 +4,17 @@ import {
   PRP as Rust_PRP,
   PRPParameters as Rust_PRPParameters,
   SharedKeys,
-  derive_packet_tag, iterate_hash, recover_iterated_hash
+  derive_packet_tag,
+  iterate_hash,
+  recover_iterated_hash
 } from './cryptography.js'
 import {
   generateKeyShares,
   Hash,
   iterateHash,
   PRG as TS_PRG,
-  PRP as TS_PRP, recoverIteratedHash,
+  PRP as TS_PRP,
+  recoverIteratedHash,
   u8aEquals,
   u8aToHex
 } from '@hoprnet/hopr-utils'
@@ -185,7 +188,7 @@ describe('cryptographic correspondence tests', async function () {
   })
 
   it('correspondence of iterated hash & recovery', async function () {
-    let seed = new Uint8Array(16);
+    let seed = new Uint8Array(16)
     let hashFn = (msg: Uint8Array) => Hash.create(msg).serialize().slice(0, Hash.SIZE)
     let TS_iterated = await iterateHash(seed, hashFn, 1000, 10)
     let RS_iterated = iterate_hash(seed, 1000, 10)
@@ -200,16 +203,28 @@ describe('cryptographic correspondence tests', async function () {
 
     let RS_hint = RS_iterated.intermediate(98)
     assert.equal(RS_hint.iteration, 980)
-    let TS_recovered = await recoverIteratedHash(RS_iterated.hash(), hashFn, async (i) => i == RS_hint.iteration ? RS_hint.intermediate : undefined, 1000, 10, undefined )
+    let TS_recovered = await recoverIteratedHash(
+      RS_iterated.hash(),
+      hashFn,
+      async (i) => (i == RS_hint.iteration ? RS_hint.intermediate : undefined),
+      1000,
+      10,
+      undefined
+    )
     assert(TS_recovered != undefined)
 
     let TS_hint = TS_iterated.intermediates[98]
     assert.equal(TS_hint.iteration, 980)
-    let RS_recovered = recover_iterated_hash(TS_iterated.hash, (i: number) => i == TS_hint.iteration ? TS_hint.preImage : undefined, 1000, 10, undefined)
+    let RS_recovered = recover_iterated_hash(
+      TS_iterated.hash,
+      (i: number) => (i == TS_hint.iteration ? TS_hint.preImage : undefined),
+      1000,
+      10,
+      undefined
+    )
     assert(RS_recovered != undefined)
 
     assert.equal(TS_recovered.iteration, RS_recovered.iteration)
     assert(u8aEquals(TS_recovered.preImage, RS_recovered.intermediate))
   })
-
 })
