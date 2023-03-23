@@ -1,3 +1,4 @@
+use utils_log::debug;
 use utils_types::primitives::Balance;
 
 use crate::generic::{ChannelStrategy, OutgoingChannelStatus, StrategyTickResult};
@@ -9,7 +10,7 @@ impl ChannelStrategy for PassiveStrategy {
     const NAME: &'static str = "passive";
 
     fn tick<Q>(
-        &self,
+        &mut self,
         _balance: Balance,
         _peer_ids: impl Iterator<Item = String>,
         _outgoing_channel_peer_ids: Vec<OutgoingChannelStatus>,
@@ -18,6 +19,7 @@ impl ChannelStrategy for PassiveStrategy {
     where
         Q: Fn(&str) -> Option<f64>,
     {
+        debug!("using passive strategy that does nothing");
         StrategyTickResult::new(0, vec![], vec![])
     }
 }
@@ -70,14 +72,14 @@ pub mod wasm {
         }
 
         pub fn tick(
-            &self,
+            &mut self,
             balance: Balance,
             peer_ids: &js_sys::Iterator,
             outgoing_channels: JsValue,
             quality_of: &js_sys::Function,
         ) -> JsResult<StrategyTickResult> {
             crate::generic::wasm::tick_wrap(
-                &self.w,
+                &mut self.w,
                 balance,
                 peer_ids,
                 outgoing_channels,

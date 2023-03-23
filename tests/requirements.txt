@@ -1,0 +1,5 @@
+pytest==7.2.1
+waiting==1.4.1
+requests==2.28.2
+websocket-client==1.5.1
+httpx==0.23.3

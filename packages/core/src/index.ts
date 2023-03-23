@@ -978,7 +978,7 @@ class Hopr extends EventEmitter {
     await this.heartbeat.pingNode(destination)
 
     let peer_info = this.networkPeers.get_peer_info(destination.toString())
-    if (peer_info.last_seen >= 0) {
+    if (peer_info !== undefined && peer_info.last_seen >= 0) {
       return { latency: Number(peer_info.last_seen) - start }
     } else {
       return { info: 'failure', latency: -1 }
@@ -1013,7 +1013,7 @@ class Hopr extends EventEmitter {
    * @param peerId of the node we want to get the connection info for
    * @returns various information about the connection
    */
-  public getConnectionInfo(peerId: PeerId): PeerStatus {
+  public getConnectionInfo(peerId: PeerId): PeerStatus | undefined {
     return this.networkPeers.get_peer_info(peerId.toString())
   }
 

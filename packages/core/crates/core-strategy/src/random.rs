@@ -9,7 +9,7 @@ impl ChannelStrategy for RandomStrategy {
     const NAME: &'static str = "random";
 
     fn tick<Q>(
-        &self,
+        &mut self,
         _balance: Balance,
         _peer_ids: impl Iterator<Item = String>,
         _outgoing_channel_peer_ids: Vec<OutgoingChannelStatus>,
@@ -66,14 +66,14 @@ pub mod wasm {
         }
 
         pub fn tick(
-            &self,
+            &mut self,
             balance: Balance,
             peer_ids: &js_sys::Iterator,
             outgoing_channels: JsValue,
             quality_of: &js_sys::Function,
         ) -> JsResult<StrategyTickResult> {
             crate::generic::wasm::tick_wrap(
-                &self.w,
+                &mut self.w,
                 balance,
                 peer_ids,
                 outgoing_channels,

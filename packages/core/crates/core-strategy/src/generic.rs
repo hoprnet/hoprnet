@@ -20,7 +20,7 @@ pub trait ChannelStrategy {
     /// Performs the strategy tick - deciding which new channels should be opened and
     /// which existing channels should be closed.
     fn tick<Q>(
-        &self,
+        &mut self,
         balance: Balance,
         peer_ids: impl Iterator<Item = String>,
         outgoing_channels: Vec<OutgoingChannelStatus>,
@@ -180,7 +180,7 @@ pub mod wasm {
     /// Generic binding for all strategies to use in WASM wrappers
     /// Since wasm_bindgen annotation is not supported on trait impls, the WASM-wrapped strategies cannot implement a common trait.
     pub fn tick_wrap<S: ChannelStrategy>(
-        strategy: &S,
+        strategy: &mut S,
         balance: Balance,
         peer_ids: &js_sys::Iterator,
         outgoing_channels: JsValue,
