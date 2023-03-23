@@ -242,12 +242,7 @@ pub mod wasm {
         /// The indices are assigned in the same order as they were given to the
         /// [`generate`] function.
         pub fn get_peer_shared_key(&self, peer_idx: usize) -> Option<Uint8Array> {
-            if peer_idx < self.secrets.len() {
-                Some(self.secrets[peer_idx].as_slice().into())
-            }
-            else {
-                None
-            }
+            self.secrets.get(peer_idx).map(|k| Uint8Array::from(k.as_slice()))
         }
 
         /// Returns the number of shared keys generated in this structure.
