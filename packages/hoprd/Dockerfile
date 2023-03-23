@@ -20,7 +20,7 @@ RUN make deps-docker package=hoprd && \
     # Remove all tests
     find ./packages -type f -name '*.spec.ts' -delete && \
     # Only build hoprd + dependencies
-    make -j build package=hoprd && \
+    NO_HOPLI=true make -j build package=hoprd && \
     # Remove all typescript files
     find ./packages -type f -name '*.ts' -delete && \
     # No need for these packages
