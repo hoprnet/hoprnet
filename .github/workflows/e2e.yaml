@@ -79,7 +79,6 @@ jobs:
 
       - name: Test with pytest
         run: |
-          nix develop -c python3 -m pip install -r tests/requirements.txt
           nix develop -c python3 -m pytest tests/
         env:
           ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN }}
