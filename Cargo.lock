@@ -916,6 +916,7 @@ dependencies = [
  "hex 0.4.3",
  "js-sys",
  "pin-project-lite",
+ "utils-log",
  "utils-misc",
  "wasm-bindgen",
  "wasm-bindgen-futures",

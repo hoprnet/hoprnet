@@ -12,6 +12,7 @@ use futures::{
 use getrandom::getrandom;
 use pin_project_lite::pin_project;
 use std::task::Waker;
+use utils_log::{error, info};
 
 #[cfg(feature = "wasm")]
 use crate::streaming_iterable::{JsStreamingIterable, StreamingIterable};
@@ -21,15 +22,12 @@ use wasm_bindgen::prelude::*;
 #[cfg(feature = "wasm")]
 use gloo_timers::future::sleep;
 #[cfg(not(feature = "wasm"))]
-use utils_misc::time::wasm::current_timestamp;
+use utils_misc::time::wasm::sleep;
 
-#[wasm_bindgen]
-extern "C" {
-    // Use `js_namespace` here to bind `console.log(..)` instead of just
-    // `log(..)`
-    #[wasm_bindgen(js_namespace = console)]
-    fn log(s: &str);
-}
+#[cfg(feature = "wasm")]
+use utils_misc::time::wasm::current_timestamp;
+#[cfg(not(feature = "wasm"))]
+use utils_misc::time::wasm::current_timestamp;
 
 #[repr(u8)]
 pub enum MessagePrefix {
@@ -52,12 +50,17 @@ pub enum ConnectionStatusMessage {
     Upgraded = 0x02,
 }
 
-fn get_time() -> usize {
-    if cfg!(feature = "wasm") {
-        js_sys::Date::now() as u32 as usize
-    } else {
-        todo!("Implement me");
-    }
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+extern "C" {
+    #[wasm_bindgen]
+    #[derive(Clone, Debug)]
+    pub type RelayServerCbs;
+
+    #[wasm_bindgen(js_name = "onClose", structural, method)]
+    pub fn on_close(this: &RelayServerCbs);
+
+    #[wasm_bindgen(js_name = "onUpgrade", structural, method)]
+    pub fn on_upgrade(this: &RelayServerCbs);
 }
 
 pin_project! {
@@ -65,13 +68,13 @@ pin_project! {
     #[derive(Debug)]
     pub struct PingFuture {
         waker: Option<Waker>,
-        started_at: usize,
-        completed_at: Option<usize>
+        started_at: u64,
+        completed_at: Option<u64>
     }
 }
 
 impl Future for PingFuture {
-    type Output = usize;
+    type Output = u64;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
@@ -91,14 +94,14 @@ impl PingFuture {
     fn new() -> Self {
         Self {
             waker: None,
-            started_at: get_time(),
+            started_at: current_timestamp(),
             completed_at: None,
         }
     }
 
     /// Wake the future and assign final timestamp
     fn wake(&mut self) -> () {
-        self.completed_at.get_or_insert(get_time());
+        self.completed_at.get_or_insert(current_timestamp());
 
         if let Some(waker) = self.waker.take() {
             waker.wake();
@@ -154,10 +157,7 @@ impl<'a> NextStream {
     fn take_stream(&mut self, new_stream: JsStreamingIterable) -> Result<(), String> {
         match self.next_stream {
             Some(_) => {
-                log(format!(
-                    "Cannot take stream because previous stream has not yet been consumed"
-                )
-                .as_str());
+                error!("Cannot take stream because previous stream has not yet been consumed");
                 Err(format!(
                     "Cannot take stream because previous stream has not yet been consumed"
                 ))
@@ -165,9 +165,9 @@ impl<'a> NextStream {
             None => {
                 self.next_stream = Some(StreamingIterable::from(new_stream));
 
-                log(format!("next_stream waker {:?}", self.waker).as_str());
+                info!("next_stream waker {:?}", self.waker);
                 if let Some(waker) = self.waker.take() {
-                    log("waking next_stream stream");
+                    info!("waking next_stream stream");
                     waker.wake();
                 }
 
@@ -183,7 +183,7 @@ impl<'a> Stream for NextStream {
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let this = self.project();
 
-        log(format!("next stream, poll_next called").as_str());
+        info!("next stream, poll_next called");
 
         match this.next_stream.take() {
             Some(stream) => Poll::Ready(Some(stream)),
@@ -201,25 +201,39 @@ pin_project! {
     /// and handles reconnects
     #[derive(Debug)]
     struct Server {
+        // the underlying Stream / Sink struct
         #[pin]
         stream: Option<StreamingIterable>,
         #[pin]
+        // stream of new Stream / Sink structs, used
+        // for stream handovers after reconnects
         next_stream: NextStream,
+        // used to dequeue status messages
         #[pin]
         status_messages_rx: Option<UnboundedReceiver<Box<[u8]>>>,
+        // used to queue status messages
         status_messages_tx: UnboundedSender<Box<[u8]>>,
+        // holds current ping requests
         ping_requests: std::collections::HashMap<u32, PingFuture>,
+        // true if stream / sink has ended
         ended: bool,
+        // set to true after stream switched
         stream_switched: bool,
+        // holds a status message if it could not get send directly
         buffered_status_message: Option<Box<[u8]>>,
+        // unique id of this instance
         id: Box<[u8; 4]>,
-        waker: Option<Waker>,
-        poll_ready_waker: Option<Waker>
+        // wake stream after reconnect
+        poll_next_waker: Option<Waker>,
+        // wake sink after reconnect
+        poll_ready_waker: Option<Waker>,
+        // signal events to management code
+        callbacks: Option<RelayServerCbs>
     }
 }
 
 impl Server {
-    fn new(stream: StreamingIterable) -> Server {
+    fn new(stream: StreamingIterable, callbacks: RelayServerCbs) -> Server {
         let (status_messages_tx, status_messages_rx) = mpsc::unbounded::<Box<[u8]>>();
 
         let mut id = [0u8; 4];
@@ -238,13 +252,14 @@ impl Server {
             stream_switched: false,
             buffered_status_message: None,
             id: Box::from(id),
-            waker: None,
+            poll_next_waker: None,
             poll_ready_waker: None,
+            callbacks: Some(callbacks),
         }
     }
 
-    /// Used to test whether the connection is alive
-    async fn ping(&mut self, maybe_timeout: Option<usize>) -> Result<usize, String> {
+    /// Used to test whether relayed connection is alive
+    async fn ping(&mut self, maybe_timeout: Option<u64>) -> Result<u64, String> {
         self.log("server: ping called");
 
         // legacy mode to be compatible with older version
@@ -258,7 +273,7 @@ impl Server {
         let timeout_duration = if let Some(timeout) = maybe_timeout {
             timeout
         } else {
-            DEFAULT_RELAYED_CONNECTION_PING_TIMEOUT as usize
+            DEFAULT_RELAYED_CONNECTION_PING_TIMEOUT as u64
         };
 
         let send_fut = self
@@ -301,7 +316,7 @@ impl Server {
         }
     }
 
-    /// Each ping request
+    /// Returns identifiers of ping requests
     pub fn get_pending_ping_requests(&self) -> Vec<u32> {
         self.ping_requests.keys().copied().collect()
     }
@@ -311,7 +326,7 @@ impl Server {
         self.log(format!("server: Initiating stream handover").as_str());
 
         let res = self.next_stream.take_stream(new_stream);
-        if let Some(item) = self.waker.take() {
+        if let Some(item) = self.poll_next_waker.take() {
             item.wake()
         }
 
@@ -323,7 +338,11 @@ impl Server {
     }
 
     pub fn log(&self, msg: &str) {
-        log(format!("{} {}", hex::encode(*self.id), msg).as_str())
+        info!("{} {}", hex::encode(*self.id), msg)
+    }
+
+    pub fn error(&self, msg: &str) {
+        error!("{} {}", hex::encode(*self.id), msg)
     }
 }
 
@@ -335,7 +354,7 @@ impl<'b> Stream for Server {
 
         let mut this = self.project();
 
-        *this.waker = Some(cx.waker().clone());
+        *this.poll_next_waker = Some(cx.waker().clone());
         Poll::Ready(loop {
             if *this.ended {
                 break None;
@@ -359,26 +378,26 @@ impl<'b> Stream for Server {
             }
 
             if this.stream.is_none() {
-                log("source: no stream set");
+                info!("source: no stream set");
                 return Poll::Pending;
             }
 
             match this.stream.as_mut().as_pin_mut().unwrap().poll_next(cx) {
                 Poll::Pending => {
-                    log("server: stream pending");
+                    info!("server: stream pending");
                     return Poll::Pending;
                 }
                 Poll::Ready(Some(item)) => {
                     let item = match item {
                         Ok(good) => good,
                         Err(some_err) => {
-                            log(format!("stream failed due to {:?}", some_err).as_str());
+                            error!("stream failed due to {:?}", some_err);
                             // Stream threw an unrecoverable error, wait for better connection
                             this.stream.take();
                             return Poll::Ready(None);
                         }
                     };
-                    log(format!("item received {:?}", item).as_str());
+                    info!("item received {:?}", item);
                     match item.get(0) {
                         Some(prefix) if *prefix == MessagePrefix::ConnectionStatus as u8 => {
                             match item.get(1) {
@@ -391,9 +410,11 @@ impl<'b> Stream for Server {
                                 {
                                     break if *inner_prefix == ConnectionStatusMessage::Stop as u8 {
                                         // Connection has ended, mark it ended for next iteration
+                                        this.callbacks.as_mut().unwrap().on_close();
                                         *this.ended = true;
                                         Some(Ok(item))
                                     } else {
+                                        this.callbacks.as_mut().unwrap().on_upgrade();
                                         // swallow message and go for next one
                                         continue;
                                     };
@@ -412,11 +433,7 @@ impl<'b> Stream for Server {
                                             match this.status_messages_tx.unbounded_send(item) {
                                                 Ok(()) => (),
                                                 Err(e) => {
-                                                    log(format!(
-                                                        "Failed queuing status message {}",
-                                                        e
-                                                    )
-                                                    .as_str());
+                                                    error!("Failed queuing status message {}", e);
                                                     panic!()
                                                 }
                                             };
@@ -437,10 +454,10 @@ impl<'b> Stream for Server {
                                     }
 
                                     let ping_id = if has_legacy_entry {
-                                        log(format!("received legacy PONG {:?}", item).as_str());
+                                        info!("received legacy PONG {:?}", item);
                                         0u32
                                     } else {
-                                        log(format!("received PONG {:?}", item).as_str());
+                                        info!("received PONG {:?}", item);
                                         u32::from_ne_bytes(item.split_at(2).1.try_into().unwrap())
                                     };
 
@@ -467,7 +484,7 @@ impl<'b> Stream for Server {
                     };
                 }
                 Poll::Ready(None) => {
-                    log("stream ended");
+                    info!("stream ended");
                     break None;
                 }
             }
@@ -496,7 +513,7 @@ impl Sink<Box<[u8]>> for Server {
 
         match this.next_stream.as_mut().poll_next(cx) {
             Poll::Ready(new_stream) => {
-                log("sink switched");
+                info!("sink switched");
                 *this.stream_switched = true;
                 this.stream.set(new_stream)
             }
@@ -526,24 +543,24 @@ impl Sink<Box<[u8]>> for Server {
                 {
                     Poll::Pending => break,
                     Poll::Ready(None) => {
-                        log("status message stream is closed");
+                        info!("status message stream is closed");
                         break;
                     }
                     Poll::Ready(Some(item)) => item,
                 }
             };
 
-            log(format!("status_message_to_send {:?}", status_message_to_send).as_str());
+            info!("status_message_to_send {:?}", status_message_to_send);
 
             if status_message_to_send.len() == 0 {
-                log("fatal error: prevented sending of empty status message");
+                error!("fatal error: prevented sending of empty status message");
                 break;
             }
 
             match status_message_to_send[0] {
                 prefix if prefix == MessagePrefix::ConnectionStatus as u8 => {
                     if status_message_to_send.len() < 1 {
-                        log("fatal error: missing bytes in status message");
+                        error!("fatal error: missing bytes in status message");
                         break;
                     }
                     if [
@@ -553,7 +570,7 @@ impl Sink<Box<[u8]>> for Server {
                     ]
                     .contains(status_message_to_send.get(1).unwrap())
                     {
-                        log("restart received closed");
+                        info!("restart received closed");
                         this.stream.as_mut().as_pin_mut().unwrap().close();
                         return Poll::Ready(Err("closed".into()));
                     }
@@ -576,12 +593,12 @@ impl Sink<Box<[u8]>> for Server {
                     {
                         Ok(_) => (),
                         Err(e) => {
-                            log(format!("Could not send status message, {}", e).as_str());
+                            error!("Could not send status message, {}", e);
                             return Poll::Ready(Err(e));
                         }
                     };
 
-                    log("initiated sending of status message");
+                    info!("initiated sending of status message");
 
                     match this.stream.as_mut().as_pin_mut().unwrap().poll_flush(cx) {
                         Poll::Pending => {
@@ -591,20 +608,17 @@ impl Sink<Box<[u8]>> for Server {
                         Poll::Ready(Ok(())) => (),
                         Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
                     };
-                    log("status message flushed")
+                    info!("status message flushed")
                 }
             }
-            log("loop iteration");
+            info!("loop iteration");
         }
-
-        log("no status message to send");
 
         match this.stream.as_mut().as_pin_mut().unwrap().poll_ready(cx) {
             Poll::Pending => Poll::Pending,
             Poll::Ready(Ok(())) => Poll::Ready(Ok(())),
             Poll::Ready(Err(e)) => {
-                log(format!("error while starting sink stream {}", e).as_str());
-                log("deleting stream");
+                error!("error while starting sink stream {}, deleting stream", e);
                 this.stream.take();
                 Poll::Pending
             }
@@ -619,7 +633,7 @@ impl Sink<Box<[u8]>> for Server {
         if item.len() > 0 {
             this.stream.as_mut().as_pin_mut().unwrap().start_send(item)
         } else {
-            log("server: prevented sending empty message");
+            error!("server: prevented sending empty message");
             Err("Message must not be empty".into())
         }
     }
@@ -656,29 +670,9 @@ pub mod wasm {
     };
     use utils_misc::async_iterable::wasm::to_jsvalue_stream;
 
+    use utils_log::{error, info};
     use wasm_bindgen::{prelude::*, JsCast};
     use wasm_bindgen_futures::JsFuture;
-
-    #[wasm_bindgen]
-    extern "C" {
-        // Use `js_namespace` here to bind `console.log(..)` instead of just
-        // `log(..)`
-        #[wasm_bindgen(js_namespace = console)]
-        fn log(s: &str);
-    }
-
-    #[wasm_bindgen]
-    extern "C" {
-        #[wasm_bindgen]
-        #[derive(Clone, Debug)]
-        pub type RelayServerCbs;
-
-        #[wasm_bindgen]
-        pub fn onClose();
-
-        #[wasm_bindgen]
-        pub fn onUpgrade();
-    }
 
     #[wasm_bindgen]
     extern "C" {
@@ -699,11 +693,11 @@ pub mod wasm {
         #[wasm_bindgen(constructor)]
         pub fn new(
             stream: JsStreamingIterable,
-            _signals: RelayServerCbs,
+            signals: super::RelayServerCbs,
             _options: RelayServerOpts,
         ) -> Self {
             Self {
-                w: super::Server::new(StreamingIterable::from(stream)),
+                w: super::Server::new(StreamingIterable::from(stream), signals),
             }
         }
         #[wasm_bindgen]
@@ -716,11 +710,7 @@ pub mod wasm {
             let this = unsafe { std::mem::transmute::<&mut Server, &mut Server>(self) };
 
             wasm_bindgen_futures::future_to_promise(async move {
-                match this
-                    .w
-                    .ping(timeout.map(|f| f.value_of() as u32 as usize))
-                    .await
-                {
+                match this.w.ping(timeout.map(|f| f.value_of() as u64)).await {
                     Ok(u) => Ok(JsValue::from(u)),
                     Err(e) => Err(JsValue::from(e)),
                 }
@@ -745,7 +735,7 @@ pub mod wasm {
             let iterator_obj = Object::new();
 
             let iterator_fn = Closure::<dyn FnMut() -> Promise>::new(move || {
-                log("rs: iterator code called");
+                info!("rs: iterator code called");
                 let promise = Promise::new(&mut |resolve, reject| {
                     let fut = unsafe {
                         std::mem::transmute::<Next<'_, super::Server>, Next<'_, super::Server>>(
@@ -753,7 +743,7 @@ pub mod wasm {
                         )
                     };
                     let fut = fut.map(to_jsvalue_stream).then(|x| async move {
-                        log("source future executed");
+                        info!("source future executed");
                         resolve.call1(&JsValue::undefined(), &x.unwrap());
                     });
 
@@ -812,7 +802,7 @@ pub mod wasm {
                     Ok(x) => x,
                     Err(e) => {
                         self.w
-                            .log(format!("Error access Symbol.asyncIterator {:?}", e).as_str());
+                            .error(format!("Error access Symbol.asyncIterator {:?}", e).as_str());
                         todo!()
                         // return Promise::reject(&e);
                     }
@@ -822,7 +812,7 @@ pub mod wasm {
                     Ok(fun) => fun,
                     Err(e) => {
                         self.w
-                            .log(format!("Cannot perform dynamic convertion {:?}", e).as_str());
+                            .error(format!("Cannot perform dynamic convertion {:?}", e).as_str());
                         todo!()
                         // return Promise::reject(&e);
                     }
@@ -833,7 +823,7 @@ pub mod wasm {
                     Ok(x) => x,
                     Err(e) => {
                         self.w
-                            .log(format!("Cannot call iterable function {:?}", e).as_str());
+                            .error(format!("Cannot call iterable function {:?}", e).as_str());
                         todo!()
                         // return Promise::reject(&e);
                     }
@@ -841,14 +831,14 @@ pub mod wasm {
 
                 wasm_bindgen_futures::spawn_local(async move {
                     loop {
-                        log("iteration");
+                        info!("iteration");
                         match async_it.next().map(JsFuture::from) {
                             Ok(chunk_fut) => {
                                 // Initiates call to underlying JS functions
                                 let chunk = match chunk_fut.await {
                                     Ok(x) => x,
                                     Err(e) => {
-                                        this.w.log(
+                                        this.w.error(
                                             format!("error handling next() future {:?}", e)
                                                 .as_str(),
                                         );
@@ -858,7 +848,7 @@ pub mod wasm {
                                     }
                                 };
                                 let next = chunk.unchecked_into::<IteratorNext>();
-                                log(format!("sink: next chunk {:?}", next).as_str());
+                                info!("sink: next chunk {:?}", next);
                                 if next.done() {
                                     resolve.call0(&JsValue::undefined());
                                     this.w.close().await;

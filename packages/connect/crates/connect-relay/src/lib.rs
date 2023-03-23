@@ -1,5 +1,7 @@
 pub mod constants;
 pub mod server;
+
+#[cfg(feature = "wasm")]
 pub mod streaming_iterable;
 
 #[cfg(feature = "wasm")]

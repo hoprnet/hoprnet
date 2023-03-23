@@ -63,7 +63,7 @@ describe('relay state management', function () {
     assert.throws(() => RelayState.getId(initiator, initiator))
   })
 
-  it.only('check if active, create new and exchange messages', async function () {
+  it('check if active, create new and exchange messages', async function () {
     const state = new RelayState({
       relayFreeTimeout: 1
     })
