@@ -68,7 +68,7 @@ pub fn recover_iterated_hash<H>(hash_value: &[u8], hints: H, max_iterations: usi
         // Check if we can get a hint for the current index
         let pos = closest_intermediate - i;
         if let Some(mut intermediate) = hints(pos) {
-            for iteration in 0..(step_size + i){
+            for iteration in 0..step_size{
                 // Compute the hash of current intermediate
                 digest.update(intermediate.as_ref());
                 let hash = digest.finalize_fixed_reset().to_vec();
@@ -91,37 +91,39 @@ pub fn recover_iterated_hash<H>(hash_value: &[u8], hints: H, max_iterations: usi
 
 #[cfg(test)]
 mod tests {
-    use digest::{Digest, FixedOutput};
-    use sha3::Keccak256;
+    use hex_literal::hex;
+    use utils_types::traits::BinarySerializable;
     use crate::iterated_hash::{iterate_hash, recover_iterated_hash};
+    use crate::types::Hash;
 
     #[test]
     fn test_iteration() {
-        let seed = [1u8; 16];
+        let seed = [0u8; 16];
         let final_hash = iterate_hash(&seed, 1000, 10).unwrap();
-
         assert_eq!(final_hash.intermediates.len(), 100);
-        let final_src = final_hash.intermediates.last().unwrap();
 
-        let hint_idx = 98; // hint is at iteration num. 980
-        let hint = &final_hash.intermediates[hint_idx];
+        let hint = &final_hash.intermediates[98]; // hint is at iteration num. 980
         assert_eq!(980, hint.iteration);
 
-        let recovered = recover_iterated_hash(final_hash.hash.as_ref(),
-                                              |it: usize| { if it == hint.iteration {
-                                                  Some(hint.intermediate.clone())
-                                              } else { None } },
+        let expected = hex!("a380d145d8612d33912494f1b36571c0b59b9bd459e6bb7d5ea05946be4c256b");
+        assert_eq!(&expected, hint.intermediate.as_ref())
+    }
+
+    #[test]
+    fn test_recovery() {
+        let hint_idx = 980;
+        let hint_hash = hex!("a380d145d8612d33912494f1b36571c0b59b9bd459e6bb7d5ea05946be4c256b");
+        let target = hex!("16db2cf9913ccaf4976c825d1fd7b8f8e6510f479390c3272ed4e27fa015a537");
+
+        let recovered = recover_iterated_hash(&target,
+                                              |i| { if i == hint_idx { Some(Box::new(hint_hash)) } else { None } },
                                               1000,
                                               10,
                                               None)
             .unwrap();
 
-        assert_eq!(final_src.iteration + 9, recovered.iteration);
-
-        let mut keccak = Keccak256::default();
-        keccak.update(recovered.intermediate);
-
-        assert_eq!(final_hash.hash.as_ref(), keccak.finalize_fixed().as_slice());
+        assert_eq!(recovered.iteration, hint_idx + 7);
+        assert_eq!(Hash::create(&[recovered.intermediate.as_ref()]).serialize().as_ref(), &target);
     }
 }
 

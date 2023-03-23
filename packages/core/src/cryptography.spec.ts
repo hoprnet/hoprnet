@@ -11,7 +11,7 @@ import {
   Hash,
   iterateHash,
   PRG as TS_PRG,
-  PRP as TS_PRP, recoverIteratedHash,
+  PRP as TS_PRP, recoverIteratedHash, stringToU8a,
   u8aEquals,
   u8aToHex
 } from '@hoprnet/hopr-utils'
@@ -200,16 +200,22 @@ describe('cryptographic correspondence tests', async function () {
 
     let RS_hint = RS_iterated.intermediate(98)
     assert.equal(RS_hint.iteration, 980)
-    let TS_recovered = await recoverIteratedHash(RS_iterated.hash(), hashFn, async (i) => i == RS_hint.iteration ? RS_hint.intermediate : undefined, 1000, 10, undefined )
+    assert(u8aEquals(RS_hint.intermediate, stringToU8a("a380d145d8612d33912494f1b36571c0b59b9bd459e6bb7d5ea05946be4c256b")))
+
+    let target_idx = 988
+    let target_hash = stringToU8a("614eeebc22e8a79cbcac8bb6ba140768dd4bee4017460ad941de72f0fd5610e3")
+
+    let TS_recovered = await recoverIteratedHash(target_hash, hashFn, async (i) => i == RS_hint.iteration ? RS_hint.intermediate : undefined, 1000, 10, undefined )
     assert(TS_recovered != undefined)
 
     let TS_hint = TS_iterated.intermediates[98]
     assert.equal(TS_hint.iteration, 980)
-    let RS_recovered = recover_iterated_hash(TS_iterated.hash, (i: number) => i == TS_hint.iteration ? TS_hint.preImage : undefined, 1000, 10, undefined)
+    let RS_recovered = recover_iterated_hash(target_hash, (i: number) => i == TS_hint.iteration ? TS_hint.preImage : undefined, 1000, 10, undefined)
     assert(RS_recovered != undefined)
 
     assert.equal(TS_recovered.iteration, RS_recovered.iteration)
     assert(u8aEquals(TS_recovered.preImage, RS_recovered.intermediate))
+    assert.equal(target_idx, RS_recovered.iteration)
   })
 
 })
