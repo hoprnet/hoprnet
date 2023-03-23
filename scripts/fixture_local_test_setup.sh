@@ -125,6 +125,10 @@ function cleanup {
 
   local log exit_code non_zero
   for node_log in "${node1_log}" "${node2_log}" "${node3_log}" "${node4_log}" "${node5_log}" "${node6_log}" "${node7_log}"; do
+    if [ ! -f "${node_log}" ]; then
+      continue
+    fi
+
     log=$(grep -E "Process exiting with signal [0-9]" ${node_log} || echo "")
 
     if [ -z "${log}" ]; then
@@ -150,13 +154,13 @@ function cleanup {
   fi
 }
 
-if [ "${skip_cleanup}" != "1" ] && [ "${skip_cleanup}" != "true" ]; then
-  trap cleanup SIGINT SIGTERM ERR EXIT
-fi
-
 if [ "${just_cleanup}" == "1" ] || [ "${just_cleanup}" == "true" ]; then
   cleanup
   exit $?
+fi
+
+if [ "${skip_cleanup}" != "1" ] && [ "${skip_cleanup}" != "true" ]; then
+  trap cleanup SIGINT SIGTERM ERR EXIT
 fi
 
 # $1 = api port
