@@ -199,27 +199,6 @@ add_keys() {
   fi
 }
 
-# $1 prefix, e.g. "e2e-source"
-# $2 identity file directory, e.g. "/tmp"
-# $3 password, e.g. "dummy e2e password"
-# $4 optional: additional address, e.g CT node address
-fund_nodes() {
-  local node_prefix="${1}"
-  local tmp_dir="${2}"
-  local password="${3}"
-  local addr_arg=""
-  [[ -n "${4:-}" ]] && addr_arg="--address ${4}"
-
-  IDENTITY_PASSWORD=${password} PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
-    ${mydir}/../.cargo/bin/hopli faucet \
-    --environment-name anvil-localhost \
-    --use-local-identities \
-    --identity-prefix "${node_prefix}" --identity-directory "${tmp}" \
-    --contracts-root "${mydir}/../packages/ethereum/contracts" \
-    ${addr_arg}
-}
-
-
 disable_network_registry() {
   log "Disabling register"
   PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \

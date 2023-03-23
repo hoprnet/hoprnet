@@ -10,45 +10,43 @@ let
       CoreServices
     ]
   );
-in
-with pkgs;
-mkShell {
-  buildInputs = [
+  hoprdPkgs = with pkgs; [
     ## base
     envsubst
-    curl
 
     ## node, minimum recommended version is v16, see README for more details
-    nodejs-16_x # v16.5.0
-    (yarn.override { nodejs = nodejs-16_x; }) # v1.22.10
+    nodejs-16_x # v16.19.1
+    (yarn.override { nodejs = nodejs-16_x; }) # v3.3.0 (as per local yarn cfg)
 
     ## rust for core development and required utils
     (rust-bin.fromRustupToolchainFile ./rust-toolchain.toml)
-    protobuf
+    protobuf # v3.21.12
+    wasm-pack # v0.10.3
+    binaryen # v111 (includes wasm-opt)
+    wasm-bindgen-cli # v0.2.83
 
     ## python is required by node module bcrypto
-    python3
-
-    # test Github automation
-    act
+    python3 # v3.10.10
+  ];
+  devPkgs = with pkgs; [
+    curl # v7.88.0
 
     # testing utilities
-    websocat
-    jq
-    yq-go
-    vagrant
-    shellcheck
+    websocat # v1.11.0
+    jq # v1.6
+    yq-go # v4.30.8
 
-    # devops tooling
-    google-cloud-sdk
-
-    # used by AvadoSDK
-    docker-compose
+    # test Github automation
+    act # 0.2.42
 
     # custom pkg groups
     macosPkgs
     linuxPkgs
   ];
+in
+with pkgs;
+mkShell {
+  buildInputs = hoprdPkgs ++ devPkgs;
   shellHook = ''
     make deps
     patchelf --interpreter `cat $NIX_CC/nix-support/dynamic-linker` .foundry/bin/anvil

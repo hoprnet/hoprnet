@@ -2308,6 +2308,22 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/yargs-parser@npm:*":
+  version: 21.0.0
+  resolution: "@types/yargs-parser@npm:21.0.0"
+  checksum: b2f4c8d12ac18a567440379909127cf2cec393daffb73f246d0a25df36ea983b93b7e9e824251f959e9f928cbc7c1aab6728d0a0ff15d6145f66cec2be67d9a2
+  languageName: node
+  linkType: hard
+
+"@types/yargs@npm:^17.0.23":
+  version: 17.0.23
+  resolution: "@types/yargs@npm:17.0.23"
+  dependencies:
+    "@types/yargs-parser": "*"
+  checksum: c5f787d7a9a36ea94ba5d3f340fc5d93d2860eff8fa9731cd614ed23212e4fca75637e2386e37e376a720e4bf088ceed6f39050f1c3638fc1b75bce5c70b1ad4
+  languageName: node
+  linkType: hard
+
 "@ungap/promise-all-settled@npm:1.1.2":
   version: 1.1.2
   resolution: "@ungap/promise-all-settled@npm:1.1.2"
@@ -5771,6 +5787,7 @@ __metadata:
     "@ethersproject/cli": 5.7.0
     "@hoprnet/avadosdk": 0.4.4-rc.1
     "@types/node": 16
+    "@types/yargs": ^17.0.23
     prettier: 2.7.1
     ts-node: 10.9.1
     typescript: 4.9.5

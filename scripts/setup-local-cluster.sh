@@ -270,7 +270,8 @@ wait_for_regex ${node5_log} "unfunded"
 log "Funding nodes"
 
 #  --- Fund nodes --- {{{
-make fund-local id_dir="${tmp_dir}"
+make -C "${mydir}/../" fund-local-all \
+  id_dir="${tmp_dir}"
 # }}}
 
 log "Waiting for nodes startup"

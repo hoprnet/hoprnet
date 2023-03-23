@@ -300,7 +300,8 @@ wait_for_regex ${node7_log} "please fund this node"
 
 log "Funding nodes"
 #  --- Fund nodes --- {{{
-fund_nodes "${node_prefix}" "${tmp}" "${password}"
+make -C "${mydir}/../" fund-local-all \
+  id_password="${password}" id_prefix="${node_prefix}"
 # }}}
 
 log "Waiting for port binding"
