@@ -53,7 +53,6 @@ impl AsyncIterable {
             Err(_) => return false,
         };
 
-        log(format!("{:?}", async_iter_fn).as_str());
         async_iter_fn.is_function()
     }
 }
@@ -137,7 +136,7 @@ impl Stream for StreamingIterable {
             let async_iter_fn: Function = match async_iter_fn.dyn_into() {
                 Ok(fun) => fun,
                 Err(e) => {
-                    log(format!("{:?}", e).as_str());
+                    log(format!("error while dynamic conversion to function {:?}", e).as_str());
                     self.stream_done = true;
                     return Poll::Ready(None);
                 }
@@ -146,7 +145,10 @@ impl Stream for StreamingIterable {
             let async_it: AsyncIterator = match async_iter_fn.call0(&initial).unwrap().dyn_into() {
                 Ok(x) => x,
                 Err(e) => {
-                    log(format!("{:?}", e).as_str());
+                    log(
+                        format!("error while dynamic conversion to async iterator {:?}", e)
+                            .as_str(),
+                    );
                     self.stream_done = true;
                     return Poll::Ready(None);
                 }
@@ -172,6 +174,7 @@ impl Stream for StreamingIterable {
         match Pin::new(future).poll(cx) {
             Poll::Ready(res) => match res {
                 Ok(iter_next) => {
+                    log(format!("received low-level {:?}", iter_next).as_str());
                     let next = iter_next.unchecked_into::<IteratorNext>();
                     if next.done() {
                         self.stream_done = true;
@@ -220,13 +223,19 @@ impl Sink<Box<[u8]>> for StreamingIterable {
         if *this.sink_done {
             log("sink done");
             return Poll::Ready(Err("Cannot send any data. Stream has been closed".into()));
-        } else if this.sink_close_future.is_none() {
+        }
+
+        if this.resolve.is_some() {
+            log(format!("resolve present {:?}", this.resolve).as_str());
+            return Poll::Ready(Ok(()));
+        }
+
+        if this.sink_close_future.is_none() {
             log("sink calling code called");
 
             let iterator_cb = Closure::new(move || {
-                log("rs: iterator code called");
-
                 Promise::new(&mut |resolve, reject| {
+                    log("sink: setting new resolve");
                     // TODO: use borrow_mut()
                     *this.resolve = Some(resolve);
                     if this.close_waker.is_some() {
@@ -278,13 +287,24 @@ impl Sink<Box<[u8]>> for StreamingIterable {
             log("about to call sink");
             let promise = match this.js_stream.sink(&iterable_obj) {
                 Ok(x) => {
-                    log(format!("before conversion {:?}", x).as_str());
-                    let promise = x.dyn_into::<Promise>().unwrap();
+                    log(format!("low-level sink before conversion {:?}", x).as_str());
+                    let promise = x.unchecked_into::<Promise>();
+                    //  {
+                    //     Ok(p) => p,
+                    //     Err(e) => {
+                    //         log(format!("Could not dynamically convert to Promise, {:?}", e)
+                    //             .as_str());
+                    //         return Poll::Ready(Err(format!(
+                    //             "Could not dynamically convert to Promise, {:?}",
+                    //             e
+                    //         )));
+                    //     }
+                    // };
 
                     JsFuture::from(promise)
                 }
                 Err(e) => {
-                    log(format!("{:?}", e).as_str());
+                    log(format!("error while calling sink {:?}", e).as_str());
                     todo!();
                 }
             };
@@ -306,38 +326,43 @@ impl Sink<Box<[u8]>> for StreamingIterable {
                     }
                 }),
             };
-        } else if this.resolve.is_some() {
-            log("second time");
-            Poll::Ready(Ok(()))
-        } else {
-            match this
-                .sink_close_future
-                .as_mut()
-                .as_pin_mut()
-                .unwrap()
-                .poll(cx)
-            {
-                Poll::Pending => Poll::Pending,
-                Poll::Ready(res) => Poll::Ready(match res {
-                    Ok(_) => Ok(()),
-                    Err(e) => {
-                        *this.sink_done = true;
-                        Err(format!("Stream closed due to error {:?}", e).into())
-                    }
-                }),
-            }
         }
+
+        Poll::Pending
+        // } else
+        // } else {
+        //     match this
+        //         .sink_close_future
+        //         .as_mut()
+        //         .as_pin_mut()
+        //         .unwrap()
+        //         .poll(cx)
+        //     {
+        //         Poll::Pending => Poll::Ready(Ok(())),
+        //         Poll::Ready(res) => Poll::Ready(match res {
+        //             Ok(_) => Ok(()),
+        //             Err(e) => {
+        //                 *this.sink_done = true;
+        //                 Err(format!("Stream closed due to error {:?}", e).into())
+        //             }
+        //         }),
+        //     }
+        // }
     }
 
     fn start_send(self: Pin<&mut Self>, item: Box<[u8]>) -> Result<(), String> {
-        log("start_send called");
+        log(format!("start_send called {:?}", item).as_str());
 
         let this = self.project();
 
+        log(format!("resolve function {:?}", this.resolve).as_str());
         match this.resolve.take() {
             Some(f) => match f.call1(&JsValue::undefined(), &to_jsvalue_iterator(Some(item))) {
                 Ok(_) => Ok(()),
-                Err(e) => Err(format!("{:?}", e).into()),
+                Err(e) => {
+                    log(format!("error while calling resolve function {:?}", e).as_str());
+                    Err(format!("error while calling resolve function {:?}", e).into())
+                }
             },
             None => Err("Sink is not yet ready. Please call and `await` poll_ready first".into()),
         }

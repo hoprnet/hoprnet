@@ -4,6 +4,9 @@ import { unmarshalPublicKey } from '@libp2p/crypto/keys'
 
 import { nAtATime, u8aCompare } from '@hoprnet/hopr-utils'
 import { IStream, Server, connect_relay_set_panic_hook } from '../../lib/connect_relay.js'
+import { webcrypto } from 'node:crypto'
+// @ts-ignore
+globalThis.crypto = webcrypto
 connect_relay_set_panic_hook()
 
 import debug from 'debug'
@@ -141,16 +144,36 @@ class RelayState {
     __relayFreeTimeout?: number
   ): Promise<void> {
     const toSourceContext = new Server(
-      toSource as IStream,
+      {
+        source: (async function* () {
+          for await (const maybeBuf of toSource.source) {
+            if (Buffer.isBuffer(maybeBuf)) {
+              yield new Uint8Array(maybeBuf.buffer, maybeBuf.byteOffset, maybeBuf.length)
+            } else {
+              yield maybeBuf
+            }
+          }
+        })(),
+        sink: toSource.sink
+      },
+      // toSource as IStream,
       { onClose: this.cleanListener(source, destination), onUpgrade: this.cleanListener(source, destination) },
       this.options
     )
     const toDestinationContext = new Server(
-      toDestination as IStream,
       {
-        onClose: this.cleanListener(destination, source),
-        onUpgrade: this.cleanListener(destination, source)
+        source: (async function* () {
+          for await (const maybeBuf of toDestination.source) {
+            if (Buffer.isBuffer(maybeBuf)) {
+              yield new Uint8Array(maybeBuf.buffer, maybeBuf.byteOffset, maybeBuf.length)
+            } else {
+              yield maybeBuf
+            }
+          }
+        })(),
+        sink: toDestination.sink
       },
+      { onClose: this.cleanListener(destination, source), onUpgrade: this.cleanListener(destination, source) },
       this.options
     )
 
