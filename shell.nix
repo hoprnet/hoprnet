@@ -37,8 +37,6 @@ let
     # testing utilities
     jq # v1.6
     yq-go # v4.30.8
-    jq
-    yq-go
     vagrant
     shellcheck
 
