@@ -2,9 +2,20 @@ use crate::derivation::generate_key_iv;
 use crate::errors::Result;
 use crate::errors::CryptoError::InvalidInputValue;
 
-use crate::parameters::{HASH_KEY_PRP, PRP_INTERMEDIATE_IV_LENGTH, PRP_INTERMEDIATE_KEY_LENGTH, PRP_IV_LENGTH, PRP_KEY_LENGTH, PRP_MIN_LENGTH};
 use crate::primitives::{calculate_mac, SimpleStreamCipher};
 
+// Module-specific constants
+const PRP_INTERMEDIATE_KEY_LENGTH: usize = 32;
+const PRP_INTERMEDIATE_IV_LENGTH: usize = 16;
+const PRP_KEY_LENGTH: usize = 4 * PRP_INTERMEDIATE_KEY_LENGTH;
+const PRP_IV_LENGTH: usize = 4 * PRP_INTERMEDIATE_IV_LENGTH;
+const HASH_KEY_PRP: &str = "HASH_KEY_PRP";
+
+// The minimum input length must be at least size of the key, which is XORed with plaintext/ciphertext
+pub const PRP_MIN_LENGTH: usize = PRP_INTERMEDIATE_KEY_LENGTH;
+
+/// Parameters for the Pseudo-Random Permutation (PRP) function
+/// This consists of IV and the raw secret key for use by the underlying cryptographic transformation.
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct PRPParameters {
     key: [u8; PRP_KEY_LENGTH],
@@ -22,6 +33,8 @@ impl Default for PRPParameters {
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl PRPParameters {
+    /// Creates new parameters for the PRP by expanding the given
+    /// keying material into the secret key and IV for the underlying cryptographic transformation.
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(secret: &[u8]) -> Self {
         let mut ret = PRPParameters::default();
@@ -32,7 +45,7 @@ impl PRPParameters {
 }
 
 /// Implementation of Pseudo-Random Permutation (PRP).
-/// Currently based on Lioness wide-block cipher
+/// Currently based on the Lioness wide-block cipher.
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct PRP {
     keys: [Vec<u8>; 4],
@@ -41,7 +54,7 @@ pub struct PRP {
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl PRP {
-    /// Creates new instance of the PRP
+    /// Creates new instance of the PRP using the raw key and IV.
     pub fn new(key: &[u8], iv: &[u8]) -> Self {
         assert_eq!(key.len(), PRP_KEY_LENGTH, "invalid key length");
         assert_eq!(iv.len(), PRP_IV_LENGTH, "invalid iv length");
@@ -62,6 +75,7 @@ impl PRP {
         }
     }
 
+    /// Creates a new PRP instance using the given parameters
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn from_parameters(params: PRPParameters) -> Self {
         Self::new(&params.key, &params.iv) // Parameter size checking taken care of by PRPParameters

@@ -4,6 +4,7 @@ use chacha20::cipher::{IvSizeUser, KeySizeUser, StreamCipher, StreamCipherSeek};
 use hmac::{Mac, SimpleHmac};
 use chacha20::cipher::KeyIvInit;
 use digest::FixedOutputReset;
+use crate::derivation::derive_mac_key;
 
 use crate::errors::Result;
 use crate::errors::CryptoError::{InvalidInputValue, InvalidParameterSize};
@@ -81,7 +82,7 @@ impl SimpleStreamCipher {
     }
 }
 
-/// Calculates MAC using the given key and data.
+/// Calculates MAC using the given raw key and data.
 /// Uses HMAC based on Blake2s256.
 pub fn calculate_mac(key: &[u8], data: &[u8]) -> Result<Box<[u8]>> {
     let mut mac = SimpleMac::new(key)?;
@@ -89,13 +90,22 @@ pub fn calculate_mac(key: &[u8], data: &[u8]) -> Result<Box<[u8]>> {
     Ok(mac.finalize())
 }
 
+/// Calculates a message authentication code with fixed key tag (HASH_KEY_HMAC)
+/// The given secret is first transformed using HKDF before the MAC calculation is performed.
+/// Uses HMAC based on Blake2s256.
+pub fn create_tagged_mac(secret: &[u8], data: &[u8]) -> Result<Box<[u8]>> {
+    calculate_mac(&derive_mac_key(secret)?, data)
+}
+
 #[cfg(test)]
 mod tests {
     use hex_literal::hex;
+    use crate::parameters::SECRET_KEY_LENGTH;
     use crate::primitives::SimpleStreamCipher;
+    use crate::primitives::wasm::create_tagged_mac;
 
     #[test]
-    pub fn test_chacha20() {
+    fn test_chacha20() {
         let key = [0u8; 32];
         let mut iv = [0u8; 12];
         iv[11] = 2u8;
@@ -110,7 +120,7 @@ mod tests {
     }
 
    #[test]
-    pub fn test_chacha20_iv_block_counter() {
+    fn test_chacha20_iv_block_counter() {
         let key = hex!("a9c6632c9f76e5e4dd03203196932350a47562f816cebb810c64287ff68586f3");
         let iv = hex!("6be504b26471dea53d688c4b");
 
@@ -125,6 +135,15 @@ mod tests {
         assert_eq!(expected_ct, data);
     }
 
+    #[test]
+    fn test_mac() {
+        let key = [1u8; SECRET_KEY_LENGTH];
+        let data = [2u8; 64];
+        let mac = create_tagged_mac(&key, &data).unwrap();
+
+        let expected = hex!("a52161fd19f576948f13effe9fb66b5705607e626f5a6621c20c828495639d04");
+        assert_eq!(expected, mac.as_ref())
+    }
 }
 
 /// Functions and types exposed to WASM
@@ -138,5 +157,10 @@ pub mod wasm {
     #[wasm_bindgen]
     pub fn calculate_mac(key: &[u8], data: &[u8]) -> JsResult<Box<[u8]>> {
         ok_or_jserr!(super::calculate_mac(key, data))
+    }
+
+    #[wasm_bindgen]
+    pub fn create_tagged_mac(secret: &[u8], data: &[u8]) -> JsResult<Box<[u8]>> {
+        ok_or_jserr!(super::create_tagged_mac(secret, data))
     }
 }

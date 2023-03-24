@@ -27,6 +27,7 @@ pub mod dummy_rng {
     }
 
     impl DummyFixedRng {
+        #[allow(dead_code)]
         pub fn new() -> Self {
             DummyFixedRng { ptr: 0 }
         }

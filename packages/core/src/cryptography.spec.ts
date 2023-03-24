@@ -1,4 +1,5 @@
 import {
+  Hash as Rust_HASH,
   PRG as Rust_PRG,
   PRGParameters as Rust_PRGParameters,
   PRP as Rust_PRP,
@@ -6,8 +7,10 @@ import {
   SharedKeys,
   derive_packet_tag,
   iterate_hash,
-  recover_iterated_hash
+  recover_iterated_hash,
+  create_tagged_mac
 } from './cryptography.js'
+
 import {
   generateKeyShares,
   Hash,
@@ -17,21 +20,35 @@ import {
   recoverIteratedHash,
   stringToU8a,
   u8aEquals,
-  u8aToHex
-} from '@hoprnet/hopr-utils'
-import assert from 'assert'
-
-import { createSecp256k1PeerId } from '@libp2p/peer-id-factory'
-import { forwardTransform } from '@hoprnet/hopr-utils/lib/crypto/packet/keyShares.js'
-import {
+  u8aToHex,
+  SECRET_LENGTH,
+  createMAC,
+  forwardTransform,
   derivePacketTag,
   derivePRGParameters,
   derivePRPParameters
-} from '@hoprnet/hopr-utils/lib/crypto/packet/keyDerivation.js'
+} from '@hoprnet/hopr-utils'
 
-import { SECRET_LENGTH } from '@hoprnet/hopr-utils/lib/crypto/packet/constants.js'
+import assert from 'assert'
+
+import { createSecp256k1PeerId } from '@libp2p/peer-id-factory'
 
 describe('cryptographic correspondence tests', async function () {
+  it('digest correspondence', async function () {
+      let data = new Uint8Array(32).fill(1)
+      let h1 = Hash.create(data).serialize()
+      let h2 = Rust_HASH.create([data]).serialize()
+      assert(u8aEquals(h1, h2))
+  })
+
+  it('mac correspondence', async function () {
+    let data = new Uint8Array(32).fill(1)
+    let key = new Uint8Array(32)
+    let m1 = create_tagged_mac(key, data)
+    let m2 = createMAC(key, data)
+    assert(u8aEquals(m1, m2))
+  })
+
   it('derived parameters correspondence', async function () {
     let secret = new Uint8Array(SECRET_LENGTH)
 

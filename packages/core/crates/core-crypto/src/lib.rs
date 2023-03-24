@@ -9,6 +9,7 @@ pub mod random;
 pub mod iterated_hash;
 pub mod types;
 
+#[cfg(test)]
 pub(crate) mod dummy_rng;
 
 #[cfg(feature = "wasm")]
