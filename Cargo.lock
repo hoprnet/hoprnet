@@ -2918,9 +2918,9 @@ dependencies = [
 
 [[package]]
 name = "libp2p-identity"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ff6c9cb71e2333d31f18e7556b9a5f1d0a2e013effc9325e36f436be65fe7bd2"
+checksum = "8a8ea433ae0cea7e3315354305237b9897afe45278b2118a7a57ca744e70fd27"
 dependencies = [
  "asn1_der",
  "bs58",
@@ -2929,7 +2929,6 @@ dependencies = [
  "multiaddr 0.17.0",
  "multihash 0.17.0",
  "prost",
- "prost-build",
  "quick-protobuf",
  "rand 0.8.5",
  "sha2 0.10.6",

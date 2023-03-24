@@ -21,10 +21,8 @@ pub struct Intermediate {
 
 /// Performs hash iteration progression from the given seed, the total number of iteration and step size.
 /// The Keccak256 digest is used to perform the hash iteration.
-pub fn iterate_hash(seed: &[u8], iterations: usize, step_size: usize) -> Result<IteratedHash> {
-    if seed.len() == 0 || iterations == 0 || step_size == 0 {
-        return Err(InvalidInputValue)
-    }
+pub fn iterate_hash(seed: &[u8], iterations: usize, step_size: usize) -> IteratedHash {
+    assert!(seed.len() > 0 && step_size > 0 && iterations > step_size);
 
     let mut intermediates: Vec<Intermediate> = Vec::with_capacity(iterations / step_size + 1);
     let mut intermediate: Box<[u8]> = Box::from(seed);
@@ -44,10 +42,10 @@ pub fn iterate_hash(seed: &[u8], iterations: usize, step_size: usize) -> Result<
         intermediate = new_intermediate.into_boxed_slice();
     }
 
-    Ok(IteratedHash {
+    IteratedHash {
         hash: intermediate,
         intermediates
-    })
+    }
 }
 
 /// Recovers the iterated hash pre-image for the given hash value.
@@ -99,7 +97,7 @@ mod tests {
     #[test]
     fn test_iteration() {
         let seed = [0u8; 16];
-        let final_hash = iterate_hash(&seed, 1000, 10).unwrap();
+        let final_hash = iterate_hash(&seed, 1000, 10);
         assert_eq!(final_hash.intermediates.len(), 100);
 
         let hint = &final_hash.intermediates[98]; // hint is at iteration num. 980
@@ -157,8 +155,8 @@ pub mod wasm {
     }
 
     #[wasm_bindgen]
-    pub fn iterate_hash(seed: &[u8], iterations: usize, step_size: usize) -> JsResult<IteratedHash> {
-        Ok(IteratedHash { w: ok_or_jserr!(super::iterate_hash(seed, iterations, step_size))? })
+    pub fn iterate_hash(seed: &[u8], iterations: usize, step_size: usize) -> IteratedHash {
+        IteratedHash { w: super::iterate_hash(seed, iterations, step_size) }
     }
 
     #[wasm_bindgen]

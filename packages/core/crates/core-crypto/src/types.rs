@@ -10,6 +10,7 @@ use k256::elliptic_curve::generic_array::GenericArray;
 use k256::elliptic_curve::sec1::{FromEncodedPoint, ToEncodedPoint};
 use sha3::{Keccak256, digest::DynDigest};
 use libp2p_identity::{PeerId, PublicKey as lp2p_PublicKey, secp256k1::PublicKey as lp2p_k256_PublicKey};
+use utils_log::warn;
 use utils_types::errors::GeneralError;
 use utils_types::errors::GeneralError::{Other, ParseError};
 
@@ -317,15 +318,27 @@ impl PublicKey {
 
 impl PeerIdLike for PublicKey {
     fn from_peerid(peer_id: &PeerId) -> utils_types::errors::Result<Self> {
-        // Here we explicitly assume non-RSA PeerId, so that multihash bytes are the actual public key
-        let pid = peer_id.to_bytes();
-        let (_, mh) = pid.split_at(6);
-        Self::deserialize(mh).map_err(|e| Other(e.into()))
+        // Workaround for the missing public key API on PeerIds
+        let peer_id_str = peer_id.to_base58();
+        if peer_id_str.starts_with("16U") {
+            // Here we explicitly assume non-RSA PeerId, so that multihash bytes are the actual public key
+            let pid = peer_id.to_bytes();
+            let (_, mh) = pid.split_at(6);
+            Self::deserialize(mh).map_err(|e| Other(e.into()))
+        } else if peer_id_str.starts_with("12D") {
+            warn!("Ed25519-based peer id not yet supported");
+            Err(ParseError)
+        } else {
+            // RSA-based peer ID might never going to be supported by HOPR
+            warn!("RSA-based peer id encountered");
+            Err(ParseError)
+        }
     }
 
+    // TODO: Once the enum is made opaque as described in the deprecation note, a workaround must be done.
+    // Possibly by constructing directly the protobuf structure and then parsing it via l2p_PublicKey::from_protobuf_encoding
+    #[allow(deprecated)]
     fn to_peerid(&self) -> PeerId {
-        // TODO: Once the enum is made opaque as described in the deprecation note, a workaround must be done
-        // Possibly by constructing directly the protobuf structure and then parsing it via l2p_PublicKey::from_protobuf_encoding
         PeerId::from_public_key(&lp2p_PublicKey::Secp256k1(
             lp2p_k256_PublicKey::decode(&self.compressed)
                 .expect("cannot convert this public key to secp256k1 peer id")
@@ -498,9 +511,12 @@ impl Signature {
         let pub_key = VerifyingKey::from_sec1_bytes(public_key)
             .expect("invalid public key");
 
-        let signature = ECDSASignature::try_from(self.signature.as_slice());
-        // TODO: should probably log an invalid signature case when `!signature.is_ok()`
-        signature.is_ok() && verifier(&pub_key, message, &signature.unwrap()).is_ok()
+        if let Ok(signature) = ECDSASignature::try_from(self.signature.as_slice()) {
+            verifier(&pub_key, message, &signature).is_ok()
+        } else {
+            warn!("un-parseable signature encountered");
+            false
+        }
     }
 
     /// Verifies this signature against the given message and a public key (compressed or uncompressed)
