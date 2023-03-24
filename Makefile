@@ -240,13 +240,26 @@ kill-anvil: ## kill process running at port 8545 (default port of anvil)
 	lsof -i :8545 -s TCP:LISTEN -t | xargs -I {} -n 1 kill {} || :
 
 .PHONY: run-local
+run-local: args=""
 run-local: ## run HOPRd from local repo
 	env NODE_OPTIONS="--experimental-wasm-modules" NODE_ENV=development DEBUG="hopr*" node \
 		packages/hoprd/lib/main.cjs --init --api \
 		--password="local" --identity=`pwd`/.identity-local.id \
 		--environment anvil-localhost --announce \
 		--testUseWeakCrypto --testAnnounceLocalAddresses \
-		--testPreferLocalAddresses --disableApiAuthentication
+		--testPreferLocalAddresses --disableApiAuthentication \
+		$(args)
+
+run-local-dev-compose: ## run local development Compose setup
+	echo "Starting Anvil on host"
+	make kill-anvil
+	ETHERSCAN_API_KEY=anykey make run-anvil
+	echo "Starting Compose setup (grafana, prometheus)"
+	cd scripts/compose && docker compose -f docker-compose.local-dev.yml up -d
+	echo "Starting Hoprd from source on host"
+	# hoprd must listen on the Docker bridge interface for Prometheus to be able
+	# to connect to it
+	make run-local args="--apiHost=0.0.0.0"
 
 .PHONY: fund-local-all
 fund-local-all: id_dir=/tmp/
