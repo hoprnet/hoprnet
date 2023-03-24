@@ -33,7 +33,7 @@ pub fn random_integer(start: u64, end: Option<u64>) -> Result<u64> {
 /// Generates a random elliptic curve point on secp256k1 curve (but not a point in infinity).
 /// Returns the encoded secret scalar and the corresponding point.
 pub fn random_group_element() -> (Box<[u8]>, CurvePoint) {
-    let mut scalar: NonZeroScalar<Secp256k1> = NonZeroScalar::<Secp256k1>::from_uint(10u32.into()).unwrap();
+    let mut scalar: NonZeroScalar<Secp256k1> = NonZeroScalar::<Secp256k1>::from_uint(0u32.into()).unwrap();
     let mut point = ProjectivePoint::<Secp256k1>::IDENTITY;
     while point.is_identity().into() {
         scalar = NonZeroScalar::<Secp256k1>::random(&mut OsRng);
@@ -43,9 +43,9 @@ pub fn random_group_element() -> (Box<[u8]>, CurvePoint) {
 }
 
 /// Fills the specific number of bytes starting from the given offset in the given buffer.
-pub fn random_fill(buffer: &mut [u8], from: usize, len: usize) {
-    assert!(from + len <= buffer.len());
-    OsRng.fill_bytes(&mut buffer[from..from + len]);
+pub fn random_fill(buffer: &mut [u8]) {
+    //assert!(from + len <= buffer.len());
+    OsRng.fill_bytes(buffer);
 }
 
 #[cfg(test)]
@@ -81,7 +81,7 @@ mod tests {
     fn test_random_fill() {
         let mut buffer = [0u8; 10];
         // 7 bytes with indices 2,3,4,5,6,7,8 will be filled with random bytes, other stay zero
-        random_fill(&mut buffer, 2, 7);
+        random_fill(&mut buffer[2..9]);
         assert_eq!(0, buffer[0]);
         assert_eq!(0, buffer[1]);
         assert_eq!(0, buffer[9]);
@@ -136,7 +136,10 @@ pub mod wasm {
     #[wasm_bindgen]
     pub fn random_fill(buffer: Uint8Array, from: usize, len: usize) {
         let mut buf = vec![0u8; buffer.length() as usize];
-        crate::random::random_fill(buf.as_mut_slice(), from, len);
+        buffer.copy_to(buf.as_mut_slice());
+
+        let chunk = buf.as_mut_slice();
+        crate::random::random_fill(&mut chunk[from..from + len]);
         buffer.copy_from(buf.as_slice());
     }
 }
