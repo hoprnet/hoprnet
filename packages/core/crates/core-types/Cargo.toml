@@ -3,6 +3,7 @@ name = "core-types"
 version = "0.1.0"
 authors = ["NumberFour8 <lukas.pohanka@inina.net>"]
 edition = "2021"
+license = "GPL-3.0-only"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
