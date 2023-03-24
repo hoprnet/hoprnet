@@ -11,7 +11,7 @@ import { addPadding, removePadding } from './padding.js'
 // Temporarily export everything else for correspondence tests with Rust
 export * from './mac.js'
 export * from './keyDerivation.js'
-export * from './keyShares.js'
+export { keyShareTransform }
 
 /**
  * Encrypts the plaintext in the reverse order of the path

@@ -23,7 +23,7 @@ import {
   u8aToHex,
   SECRET_LENGTH,
   createMAC,
-  forwardTransform,
+  keyShareTransform as forwardTransform,
   derivePacketTag,
   derivePRGParameters,
   derivePRPParameters
