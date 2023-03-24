@@ -18,7 +18,7 @@ services:
     networks:
       - hopr-net
     extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - 'host.docker.internal:host-gateway'
     deploy:
       resources:
         limits:
@@ -86,7 +86,7 @@ services:
     networks:
       - hopr-net
     extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - 'host.docker.internal:host-gateway'
 
   grafana:
     image: grafana/grafana:9.3.2
