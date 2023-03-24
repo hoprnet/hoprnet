@@ -31,6 +31,10 @@ describe('test strategies', async function () {
       { peer_id: 'Gustave', stake_str: '1000000000000000', status: ChannelStatus.Open }
     ]
 
+    // Do some dummy ticks to add some samples
+    strategy.tick(new BN(stake), peers.keys(), outgoing_channels, (x: string) => peers.get(x) as number)
+    strategy.tick(new BN(stake), peers.keys(), outgoing_channels, (x: string) => peers.get(x) as number)
+
     {
       let res = strategy.tick(new BN(stake), peers.keys(), outgoing_channels, (x: string) => peers.get(x) as number)
 

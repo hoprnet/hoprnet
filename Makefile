@@ -167,8 +167,10 @@ ifeq ($(origin NO_CARGO),undefined)
 # Copy bindings to their destination
 # filter out proc-macro crates since they need no compilation
 	$(MAKE) $(filter-out %proc-macros/,$(WORKSPACES_WITH_RUST_MODULES))
+ifeq ($(origin NO_HOPLI),undefined)
 # build hopli
 	$(MAKE) $(HOPLI_CRATE)
+endif
 endif
 
 .PHONY: build-yellowpaper
@@ -433,6 +435,13 @@ ifeq ($(environment_type),)
 	echo "could not read environment type info from contracts-addresses.json" >&2 && exit 1
 endif
 endif
+
+.PHONY: run-docker-dev
+run-docker-dev: ## start a local development Docker container
+	docker run -v `pwd`:/src -ti -w "/src" --name hoprd-local-dev nixos/nix nix \
+		--extra-experimental-features nix-command \
+		--extra-experimental-features flakes \
+		develop
 
 .PHONY: run-hopr-admin
 run-hopr-admin: version=07aec21b

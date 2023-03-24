@@ -17,7 +17,7 @@ Describes status of a channel
 
 ### Closed
 
-• **Closed** = `number`
+• **Closed** = ``0``
 
 #### Defined in
 
@@ -27,7 +27,7 @@ ___
 
 ### Open
 
-• **Open** = `number`
+• **Open** = ``2``
 
 #### Defined in
 
@@ -37,7 +37,7 @@ ___
 
 ### PendingToClose
 
-• **PendingToClose** = `number`
+• **PendingToClose** = ``3``
 
 #### Defined in
 
@@ -47,7 +47,7 @@ ___
 
 ### WaitingForCommitment
 
-• **WaitingForCommitment** = `number`
+• **WaitingForCommitment** = ``1``
 
 #### Defined in
 
