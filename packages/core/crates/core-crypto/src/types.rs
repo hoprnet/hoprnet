@@ -326,6 +326,7 @@ impl PeerIdLike for PublicKey {
             let (_, mh) = pid.split_at(6);
             Self::deserialize(mh).map_err(|e| Other(e.into()))
         } else if peer_id_str.starts_with("12D") {
+            // TODO: support for Ed25519 peer ids needs to be added here
             warn!("Ed25519-based peer id not yet supported");
             Err(ParseError)
         } else {
