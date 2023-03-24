@@ -74,11 +74,11 @@ build_and_tag_images() {
   cd "${mydir}/.."
 
   if [ "${local_build:-}" = "true" ]; then
-    log "Building Docker toolchain image"
+    log "Building Docker image hopr-toolchain-local"
     docker build -q -t hopr-toolchain-local \
       -f scripts/toolchain/Dockerfile . &
 
-    log "Waiting for toolchain image to finish"
+    log "Waiting for Docker builds (part 1) to finish"
     wait
 
     if [ -z "${image_name}" ] || \
@@ -105,7 +105,14 @@ build_and_tag_images() {
         -f packages/ethereum/Dockerfile.anvil . &
     fi
 
-    log "Waiting for Docker builds (part 1) to finish"
+    if [ -z "${image_name}" ] || [ "${image_name}" = "hopli" ]; then
+      log "Building Docker image hopli-local"
+      docker build -t hopli-local \
+        --build-arg=HOPR_TOOLCHAIN_IMAGE="hopr-toolchain-local" \
+        -f packages/hopli/Dockerfile . &
+    fi
+
+    log "Waiting for Docker builds (part 2) to finish"
     wait
 
     if [ -z "${image_name}" ] || [ "${image_name}" = "pluto" ] || [ "${image_name}" = "pluto-complete" ]; then
@@ -116,7 +123,7 @@ build_and_tag_images() {
         -f scripts/pluto/Dockerfile . &
     fi
 
-    log "Waiting for Docker builds (part 2) to finish"
+    log "Waiting for Docker builds (part 3) to finish"
     wait
   else
     gcloud builds submit --config cloudbuild.yaml \

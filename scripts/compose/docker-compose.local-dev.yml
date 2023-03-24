@@ -1,0 +1,107 @@
+---
+version: '3.8'
+
+networks:
+  hopr-net:
+    driver: bridge
+
+volumes:
+  prometheus_data: {}
+  grafana_data: {}
+
+services:
+  admin:
+    image: ${HOPR_ADMIN_DOCKER_IMAGE}
+    ports:
+      - '3000:3000'
+    restart: unless-stopped
+    networks:
+      - hopr-net
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.45.0
+    container_name: cadvisor
+    hostname: cadvisor
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    privileged: true
+    expose:
+      - 9093
+    ports:
+      - '9093:8080'
+    networks:
+      - hopr-net
+    devices:
+      - /dev/kmsg:/dev/kmsg
+
+  nodeexporter:
+    image: prom/node-exporter:v1.4.0
+    container_name: nodeexporter
+    hostname: nodeexporter
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($$|/)'
+    restart: unless-stopped
+    expose:
+      - 9100
+    ports:
+      - '9100:9100'
+    networks:
+      - hopr-net
+
+  prometheus:
+    image: prom/prometheus:v2.41.0
+    restart: always
+    container_name: prometheus
+    hostname: prometheus
+    command: |
+      --web.listen-address=0.0.0.0:9090
+      --config.file=/etc/prometheus/prometheus.yml
+      --storage.tsdb.path=/prometheus
+      --web.console.libraries=/usr/share/prometheus/console_libraries
+      --web.console.templates=/usr/share/prometheus/consoles
+    ports:
+      - '9090:9090'
+    volumes:
+      - ./prometheus/prometheus.local-dev.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    environment:
+      DATA_RETENTION_DAYS: 30
+    networks:
+      - hopr-net
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+
+  grafana:
+    image: grafana/grafana:9.3.2
+    user: '472'
+    restart: always
+    environment:
+      GF_INSTALL_PLUGINS: 'grafana-clock-panel,grafana-simple-json-datasource'
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning/:/etc/grafana/provisioning/
+    env_file:
+      - ./grafana/config.monitoring
+    ports:
+      - '3030:3000'
+    depends_on:
+      - prometheus
+    networks:
+      - hopr-net
