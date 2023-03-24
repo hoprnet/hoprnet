@@ -35,10 +35,10 @@ import { createSecp256k1PeerId } from '@libp2p/peer-id-factory'
 
 describe('cryptographic correspondence tests', async function () {
   it('digest correspondence', async function () {
-      let data = new Uint8Array(32).fill(1)
-      let h1 = Hash.create(data).serialize()
-      let h2 = Rust_HASH.create([data]).serialize()
-      assert(u8aEquals(h1, h2))
+    let data = new Uint8Array(32).fill(1)
+    let h1 = Hash.create(data).serialize()
+    let h2 = Rust_HASH.create([data]).serialize()
+    assert(u8aEquals(h1, h2))
   })
 
   it('mac correspondence', async function () {

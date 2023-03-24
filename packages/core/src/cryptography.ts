@@ -30,5 +30,5 @@ export {
   random_float,
   random_fill,
   random_bounded_integer,
-  GroupElement,
+  GroupElement
 } from '../lib/core_crypto.js'
