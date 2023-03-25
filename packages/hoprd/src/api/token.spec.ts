@@ -184,8 +184,26 @@ describe('authentication token capabilities', function () {
     validateTokenCapabilities(caps).should.be.false
   })
 
-  it('should not validate - two endpoints (one with wrong limits - type)', async function () {
+  it('should not validate - two endpoints of the same name (one with wrong limits - max)', async function () {
     const caps: Array<Capability> = [
+      { endpoint: 'tokensGetToken', limits: [{ type: 'calls', conditions: { max: 1 } }] },
+      { endpoint: 'tokensGetToken', limits: [{ type: 'calls', conditions: { max: 0 } }] }
+    ]
+
+    validateTokenCapabilities(caps).should.be.false
+  })
+
+  it('should validate - two endpoints of the same name (both with correct limits - max)', async function () {
+    const caps: Array<Capability> = [
+      { endpoint: 'tokensGetToken', limits: [{ type: 'calls', conditions: { max: 1 } }] },
+      { endpoint: 'tokensGetToken', limits: [{ type: 'calls', conditions: { max: 1 } }] }
+    ]
+
+    validateTokenCapabilities(caps).should.be.true
+  })
+
+  it('should not validate - two endpoints (one with wrong limits - type)', async function () {
+    const caps: Array<any> = [
       { endpoint: 'tokensCreate', limits: [{ type: 'calls2', conditions: { max: 1 } }] },
       { endpoint: 'tokensGetToken', limits: [{ type: 'calls', conditions: { max: 1 } }] }
     ]
@@ -261,5 +279,53 @@ describe('authentication token authorization', function () {
     authorized.should.be.false
     token = await authenticateToken(node.db, token.id)
     token.capabilities[0].limits[0].should.include({ used: 2 })
+  })
+
+  it('should update calls used counter for used endpoint', async function () {
+    const caps: Array<Capability> = [
+      { endpoint: 'tokensGetToken', limits: [{ type: 'calls', conditions: { max: 2 } }] },
+      { endpoint: 'messagesSendMessage', limits: [{ type: 'calls', conditions: { max: 2 } }] }
+    ]
+    let token = await createToken(node.db, undefined, caps)
+    let authorized: boolean
+    await storeToken(node.db, token)
+
+    token = await authenticateToken(node.db, token.id)
+    token.capabilities[0].limits[0].should.not.include({ used: 0 })
+    token.capabilities[1].limits[0].should.not.include({ used: 0 })
+
+    authorized = await authorizeToken(node.db, token, 'tokensGetToken')
+    authorized.should.be.true
+    token = await authenticateToken(node.db, token.id)
+    token.capabilities.forEach(cap => {
+      if (cap.endpoint === 'tokenGetToken') {
+        cap.limits[0].should.include({ used: 1 })
+      } else if (cap.endpoint === 'messagesSendMessage') {
+        cap.limits[0].should.not.own.property('used')
+        // include({ used: 1 })
+      }
+    })
+
+    authorized = await authorizeToken(node.db, token, 'tokensGetToken')
+    authorized.should.be.true
+    token = await authenticateToken(node.db, token.id)
+    token.capabilities.forEach(cap => {
+      if (cap.endpoint === 'tokenGetToken') {
+        cap.limits[0].should.include({ used: 2 })
+      } else if (cap.endpoint === 'messagesSendMessage') {
+        cap.limits[0].should.not.own.property('used')
+      }
+    })
+
+    authorized = await authorizeToken(node.db, token, 'tokensGetToken')
+    authorized.should.be.false
+    token = await authenticateToken(node.db, token.id)
+    token.capabilities.forEach(cap => {
+      if (cap.endpoint === 'tokenGetToken') {
+        cap.limits[0].should.include({ used: 2 })
+      } else if (cap.endpoint === 'messagesSendMessage') {
+        cap.limits[0].should.not.own.property('used')
+      }
+    })
   })
 })
