@@ -297,7 +297,7 @@ describe('authentication token authorization', function () {
     authorized = await authorizeToken(node.db, token, 'tokensGetToken')
     authorized.should.be.true
     token = await authenticateToken(node.db, token.id)
-    token.capabilities.forEach(cap => {
+    token.capabilities.forEach((cap) => {
       if (cap.endpoint === 'tokenGetToken') {
         cap.limits[0].should.include({ used: 1 })
       } else if (cap.endpoint === 'messagesSendMessage') {
@@ -309,7 +309,7 @@ describe('authentication token authorization', function () {
     authorized = await authorizeToken(node.db, token, 'tokensGetToken')
     authorized.should.be.true
     token = await authenticateToken(node.db, token.id)
-    token.capabilities.forEach(cap => {
+    token.capabilities.forEach((cap) => {
       if (cap.endpoint === 'tokenGetToken') {
         cap.limits[0].should.include({ used: 2 })
       } else if (cap.endpoint === 'messagesSendMessage') {
@@ -320,7 +320,7 @@ describe('authentication token authorization', function () {
     authorized = await authorizeToken(node.db, token, 'tokensGetToken')
     authorized.should.be.false
     token = await authenticateToken(node.db, token.id)
-    token.capabilities.forEach(cap => {
+    token.capabilities.forEach((cap) => {
       if (cap.endpoint === 'tokenGetToken') {
         cap.limits[0].should.include({ used: 2 })
       } else if (cap.endpoint === 'messagesSendMessage') {

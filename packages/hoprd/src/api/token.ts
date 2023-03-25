@@ -12,7 +12,7 @@ enum LimitType {
   calls
 }
 
-export type LimitTypeString = keyof typeof LimitType;
+export type LimitTypeString = keyof typeof LimitType
 
 export type Limit = {
   type: LimitTypeString
