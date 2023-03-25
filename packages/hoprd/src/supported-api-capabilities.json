@@ -33,5 +33,6 @@
   "channelsGetChannel": {},
   "channelsCloseChannel": {},
   "aliasesGetAlias": {},
-  "aliasesRemoveAlias": {}
+  "aliasesRemoveAlias": {},
+  "topologyGetChannels": {}
 }
