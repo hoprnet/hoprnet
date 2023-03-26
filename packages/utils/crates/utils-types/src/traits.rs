@@ -1,5 +1,6 @@
 use crate::errors::{GeneralError::ParseError, Result};
 use libp2p_identity::PeerId;
+use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
 // NOTE on wasm_bindgen: since #[wasm_bindgen] attributes cannot be used
@@ -13,25 +14,44 @@ pub trait ToHex {
     fn to_hex(&self) -> String;
 }
 
-/// A type that can be serialized and deserialized to a binary
-/// form with a fixed size.
+/// A type that can be serialized and deserialized to a binary form.
 /// Implementing this trait automatically implements ToHex trait
 /// which then uses the serialize method.
-pub trait BinarySerializable: Sized {
-    /// Fixed serialized size of this type in bytes.
+pub trait BinarySerializable<'a> : Sized {
+    /// Minimum size of this type in bytes.
     const SIZE: usize;
 
     /// Deserializes the type from a binary blob.
-    fn deserialize(data: &[u8]) -> Result<Self>;
+    fn deserialize(data: &'a [u8]) -> Result<Self>;
 
     /// Serializes the type into a fixed size binary blob.
     fn serialize(&self) -> Box<[u8]>;
 }
 
-impl<T> ToHex for T
-where
-    T: BinarySerializable,
-{
+/// Type implementing this trait has automatic binary serialization/deserialization capability
+/// using the default binary format, which is currently `bincode`.
+pub trait AutoBinarySerializable<'a>: Serialize + Deserialize<'a> {
+    /// Minimum size of an automatically serialized type in bytes is 1.
+    const SIZE: usize = 1;
+}
+
+impl<'a, T> BinarySerializable<'a> for T
+where T: AutoBinarySerializable<'a> {
+    const SIZE: usize = Self::SIZE;
+
+    /// Deserializes the type from a binary blob.
+    fn deserialize(data: &'a [u8]) -> Result<Self> {
+        bincode::deserialize(data).map_err(|_| ParseError)
+    }
+
+    /// Serializes the type into a fixed size binary blob.
+    fn serialize(&self) -> Box<[u8]> {
+        bincode::serialize(&self).unwrap().into_boxed_slice()
+    }
+}
+
+impl<'a, T> ToHex for T
+where T: BinarySerializable<'a> {
     fn to_hex(&self) -> String {
         hex::encode(&self.serialize())
     }
