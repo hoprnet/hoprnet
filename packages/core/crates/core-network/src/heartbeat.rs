@@ -1,5 +1,9 @@
 use blake2::{Blake2s256, Digest};
 
+pub fn generate_ping_request() -> Box<[u8]> {
+    todo!()
+}
+
 /// Takes a ping request message and returns a ping response message
 pub fn generate_ping_response(req: Box<[u8]>) -> Box<[u8]> {
     let mut hasher = Blake2s256::new();
