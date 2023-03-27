@@ -409,7 +409,7 @@ Tests are using the `pytest` infrastructure that can be set up inside a virtuale
 ```sh
 python3 -m venv .venv
 source .venv/bin/activate
-python3 -m pip install -r tests/integration/requirements.txt
+python3 -m pip install -r tests/requirements.txt
 ```
 
 To deactivate the activated testing environment if no longer needed:
@@ -424,25 +424,6 @@ With the environment activated, execute the tests locally:
 
 ```sh
 python3 -m pytest tests/
-```
-
-#### NPM local testing alternative
-
-An alternative to using the local source code is running the tests against
-a NPM package.
-
-```sh
-./scripts/run-integration-tests-npm.sh
-```
-
-If no parameter is given the NPM package which correlates to the most recent Git
-tag will be used, otherwise the first parameter is used as the NPM package
-version to test.
-
-Read the full help information of the script in case of questions:
-
-```sh
-./scripts/run-integration-tests-npm.sh --help
 ```
 
 #### Running Tests on Google Cloud Platform
