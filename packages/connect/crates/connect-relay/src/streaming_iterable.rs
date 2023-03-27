@@ -198,7 +198,6 @@ impl Sink<Box<[u8]>> for StreamingIterable {
     ) -> Poll<Result<(), Self::Error>> {
         info!("poll_ready called");
 
-        // let mut this = self.project();
         let mut this = unsafe {
             std::mem::transmute::<Pin<&mut StreamingIterable>, Pin<&mut StreamingIterable>>(self)
         }
@@ -224,8 +223,8 @@ impl Sink<Box<[u8]>> for StreamingIterable {
                     info!("sink: setting new resolve");
                     // TODO: use borrow_mut()
                     *this.resolve = Some(resolve);
-                    if this.close_waker.is_some() {
-                        this.close_waker.take().unwrap().wake()
+                    if let Some(waker) = this.close_waker.take() {
+                        waker.wake();
                     } else if let Some(waker) = this.waker.take() {
                         waker.wake();
                     }
@@ -274,17 +273,6 @@ impl Sink<Box<[u8]>> for StreamingIterable {
                 Ok(x) => {
                     info!("low-level sink before conversion {:?}", x);
                     let promise = x.unchecked_into::<Promise>();
-                    //  {
-                    //     Ok(p) => p,
-                    //     Err(e) => {
-                    //         log(format!("Could not dynamically convert to Promise, {:?}", e)
-                    //             .as_str());
-                    //         return Poll::Ready(Err(format!(
-                    //             "Could not dynamically convert to Promise, {:?}",
-                    //             e
-                    //         )));
-                    //     }
-                    // };
 
                     JsFuture::from(promise)
                 }

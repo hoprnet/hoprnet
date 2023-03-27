@@ -1,4 +1,4 @@
-use std::{collections::HashMap, pin::Pin, u8};
+use std::{collections::HashMap, pin::Pin};
 
 use crate::constants::DEFAULT_RELAYED_CONNECTION_PING_TIMEOUT;
 use futures::{
@@ -17,16 +17,14 @@ use utils_log::{error, info};
 #[cfg(feature = "wasm")]
 use crate::streaming_iterable::{JsStreamingIterable, StreamingIterable};
 
-use wasm_bindgen::prelude::*;
-
 #[cfg(feature = "wasm")]
 use gloo_timers::future::sleep;
 #[cfg(not(feature = "wasm"))]
-use utils_misc::time::wasm::sleep;
+use utils_misc::time::native::sleep;
 
-#[cfg(feature = "wasm")]
-use utils_misc::time::wasm::current_timestamp;
 #[cfg(not(feature = "wasm"))]
+use utils_misc::time::native::current_timestamp;
+#[cfg(feature = "wasm")]
 use utils_misc::time::wasm::current_timestamp;
 
 #[repr(u8)]
@@ -214,7 +212,7 @@ pin_project! {
         // used to queue status messages
         status_messages_tx: UnboundedSender<Box<[u8]>>,
         // holds current ping requests
-        ping_requests: std::collections::HashMap<u32, PingFuture>,
+        ping_requests: std::collections::HashMap<[u8; 4], PingFuture>,
         // true if stream / sink has ended
         ended: bool,
         // set to true after stream switched
@@ -258,13 +256,12 @@ impl Server {
         }
     }
 
-    /// Used to test whether relayed connection is alive
+    /// Used to test whether the relayed connection is alive
     async fn ping(&mut self, maybe_timeout: Option<u64>) -> Result<u64, String> {
         self.log("server: ping called");
 
-        // legacy mode to be compatible with older version
-        // FIXME: use random value
-        let random_value: u32 = 0;
+        let mut random_value = [0u8; 4];
+        getrandom(&mut random_value).unwrap();
 
         let fut = PingFuture::new();
         // takes ownership
@@ -317,7 +314,7 @@ impl Server {
     }
 
     /// Returns identifiers of ping requests
-    pub fn get_pending_ping_requests(&self) -> Vec<u32> {
+    pub fn get_pending_ping_requests(&self) -> Vec<[u8; 4]> {
         self.ping_requests.keys().copied().collect()
     }
 
@@ -337,10 +334,12 @@ impl Server {
         res
     }
 
+    /// Prepends logs with a per-instance identifier
     pub fn log(&self, msg: &str) {
         info!("{} {}", hex::encode(*self.id), msg)
     }
 
+    /// Prepends error logs with a per-instance identifier
     pub fn error(&self, msg: &str) {
         error!("{} {}", hex::encode(*self.id), msg)
     }
@@ -447,7 +446,8 @@ impl<'b> Stream for Server {
                                 {
                                     // 2 byte prefix, 4 byte ping identifier
 
-                                    let has_legacy_entry = this.ping_requests.contains_key(&0u32);
+                                    let has_legacy_entry =
+                                        this.ping_requests.contains_key(&[0u8; 4]);
                                     if item.len() < 6 && !has_legacy_entry {
                                         // drop malformed pong message
                                         return Poll::Pending;
@@ -455,10 +455,10 @@ impl<'b> Stream for Server {
 
                                     let ping_id = if has_legacy_entry {
                                         info!("received legacy PONG {:?}", item);
-                                        0u32
+                                        [0u8; 4]
                                     } else {
                                         info!("received PONG {:?}", item);
-                                        u32::from_ne_bytes(item.split_at(2).1.try_into().unwrap())
+                                        item[2..6].try_into().unwrap()
                                     };
 
                                     match this.ping_requests.get_mut(&ping_id) {
@@ -601,9 +601,7 @@ impl Sink<Box<[u8]>> for Server {
                     info!("initiated sending of status message");
 
                     match this.stream.as_mut().as_pin_mut().unwrap().poll_flush(cx) {
-                        Poll::Pending => {
-                            return Poll::Pending;
-                        }
+                        Poll::Pending => return Poll::Pending,
                         // FIXME
                         Poll::Ready(Ok(())) => (),
                         Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
@@ -670,7 +668,7 @@ pub mod wasm {
     };
     use utils_misc::async_iterable::wasm::to_jsvalue_stream;
 
-    use utils_log::{error, info};
+    use utils_log::info;
     use wasm_bindgen::{prelude::*, JsCast};
     use wasm_bindgen_futures::JsFuture;
 
@@ -709,21 +707,23 @@ pub mod wasm {
         pub fn ping(&mut self, timeout: Option<Number>) -> Promise {
             let this = unsafe { std::mem::transmute::<&mut Server, &mut Server>(self) };
 
-            wasm_bindgen_futures::future_to_promise(async move {
-                match this.w.ping(timeout.map(|f| f.value_of() as u64)).await {
-                    Ok(u) => Ok(JsValue::from(u)),
-                    Err(e) => Err(JsValue::from(e)),
-                }
-            })
+            wasm_bindgen_futures::future_to_promise(
+                this.w
+                    .ping(timeout.map(|f| f.value_of() as u64))
+                    .map(|r| match r {
+                        Ok(u) => Ok(JsValue::from(u)),
+                        Err(e) => Err(JsValue::from(e)),
+                    }),
+            )
         }
 
         #[wasm_bindgen(getter, js_name = "pendingPingRequests")]
-        pub fn get_pending_ping_requests(&self) -> Box<[Number]> {
+        pub fn get_pending_ping_requests(&self) -> Box<[Uint8Array]> {
             Box::from_iter(
                 self.w
                     .get_pending_ping_requests()
                     .iter()
-                    .map(|u| Number::from(*u)),
+                    .map(|u| unsafe { Uint8Array::view(u) }),
             )
         }
 
@@ -803,8 +803,10 @@ pub mod wasm {
                     Err(e) => {
                         self.w
                             .error(format!("Error access Symbol.asyncIterator {:?}", e).as_str());
-                        todo!()
-                        // return Promise::reject(&e);
+                        reject
+                            .call1(&JsValue::undefined(), &JsValue::from(e))
+                            .unwrap();
+                        return;
                     }
                 };
 
@@ -813,8 +815,10 @@ pub mod wasm {
                     Err(e) => {
                         self.w
                             .error(format!("Cannot perform dynamic convertion {:?}", e).as_str());
-                        todo!()
-                        // return Promise::reject(&e);
+                        reject
+                            .call1(&JsValue::undefined(), &JsValue::from(e))
+                            .unwrap();
+                        return;
                     }
                 };
 
@@ -824,8 +828,10 @@ pub mod wasm {
                     Err(e) => {
                         self.w
                             .error(format!("Cannot call iterable function {:?}", e).as_str());
-                        todo!()
-                        // return Promise::reject(&e);
+                        reject
+                            .call1(&JsValue::undefined(), &JsValue::from(e))
+                            .unwrap();
+                        return;
                     }
                 };
 
@@ -843,8 +849,10 @@ pub mod wasm {
                                                 .as_str(),
                                         );
                                         this.w.stream.as_mut().unwrap().close().await;
-                                        todo!()
-                                        // return Err(e);
+                                        reject
+                                            .call1(&JsValue::undefined(), &JsValue::from(e))
+                                            .unwrap();
+                                        return;
                                     }
                                 };
                                 let next = chunk.unchecked_into::<IteratorNext>();
