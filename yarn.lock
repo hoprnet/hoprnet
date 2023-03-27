@@ -772,7 +772,7 @@ __metadata:
     "@types/debug": 4.1.7
     "@types/mocha": 9.1.1
     "@types/node": 16
-    "@types/simple-peer": 9.11.4
+    "@types/simple-peer": 9.11.5
     abortable-iterator: 4.0.2
     chalk: 5.0.1
     debug: 4.3.4
@@ -2250,12 +2250,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/simple-peer@npm:9.11.4":
-  version: 9.11.4
-  resolution: "@types/simple-peer@npm:9.11.4"
+"@types/simple-peer@npm:9.11.5":
+  version: 9.11.5
+  resolution: "@types/simple-peer@npm:9.11.5"
   dependencies:
     "@types/node": "*"
-  checksum: 13cea3c319b2f02b80a3ae5b051714840e8c75e4884b22242991ba0116f2ef10ccdc588853299b1320608ac191ea575544c00e173988ead53c5de96f3131b2fc
+  checksum: f54d22cb1bfd188628078cdd9dd2884687a73e6f8eeb6851d08103be23dd178d3711d9530ed54e9930a55d9794ae7f23a7b1e2052b797f479260019a4bb48bcf
   languageName: node
   linkType: hard
 

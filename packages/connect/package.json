@@ -57,7 +57,7 @@
     "@types/debug": "4.1.7",
     "@types/mocha": "9.1.1",
     "@types/node": "16",
-    "@types/simple-peer": "9.11.4",
+    "@types/simple-peer": "9.11.5",
     "it-pair": "2.0.2",
     "it-pipe": "2.0.3",
     "it-pushable": "3.0.0",
