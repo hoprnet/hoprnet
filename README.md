@@ -426,25 +426,6 @@ With the environment activated, execute the tests locally:
 python3 -m pytest tests/
 ```
 
-#### NPM local testing alternative
-
-An alternative to using the local source code is running the tests against
-a NPM package.
-
-```sh
-./scripts/run-integration-tests-npm.sh
-```
-
-If no parameter is given the NPM package which correlates to the most recent Git
-tag will be used, otherwise the first parameter is used as the NPM package
-version to test.
-
-Read the full help information of the script in case of questions:
-
-```sh
-./scripts/run-integration-tests-npm.sh --help
-```
-
 #### Running Tests on Google Cloud Platform
 
 In some unique cases, some bugs might not have been picked up by our end-to-end
