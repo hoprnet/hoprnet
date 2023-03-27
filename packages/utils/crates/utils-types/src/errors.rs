@@ -5,8 +5,12 @@ use thiserror::Error;
 pub enum GeneralError {
     #[error("failed to parse/deserialize the data")]
     ParseError,
+
     #[error("failed to compute the result (could be caused by invalid input)")]
-    MathError
+    MathError,
+
+    #[error("non-specific error occurred: {0}")]
+    NonSpecific(String)
 }
 
 pub type Result<T> = core::result::Result<T, GeneralError>;

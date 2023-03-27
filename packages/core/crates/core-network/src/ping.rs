@@ -27,7 +27,7 @@ use utils_misc::time::wasm::current_timestamp;
 use gloo_timers::future::sleep as sleep;
 use utils_types::traits::BinarySerializable;
 use crate::errors::NetworkingError;
-use crate::errors::NetworkingError::{MessagingError, Other, Timeout};
+use crate::errors::NetworkingError::{DecodingError, Other, Timeout};
 use crate::messaging::ControlMessage;
 
 const PINGS_MAX_PARALLEL: usize = 14;
@@ -156,11 +156,7 @@ impl Ping {
         F: futures::Future<Output = Result<Box<[u8]>, String>>
     {
         info!("Pinging peer '{}'", destination);
-
-        use rand::{RngCore,SeedableRng};
-        //let mut challenge = Box::new([0u8; 16]);
-        //rand::rngs::StdRng::from_entropy().fill_bytes(&mut challenge.as_mut_slice());
-        let ping_req = ControlMessage::generate_ping_request();
+        let sent_ping = ControlMessage::generate_ping_request();
 
         let ping_result: PingMeasurement = {
             let _ping_peer_timer = match &self.metric_time_to_ping {
@@ -173,7 +169,7 @@ impl Ping {
 
             let timeout = sleep(std::cmp::min(timeout_duration, self.config.timeout)).fuse();
             let ping = async {
-                send_msg(ping_req.serialize(), destination.to_string()).await
+                send_msg(sent_ping.serialize(), destination.to_string()).await
             }.fuse();
 
             pin_mut!(timeout, ping);
@@ -183,17 +179,10 @@ impl Ping {
             {
                 Either::Left(_) => Err(Timeout(timeout_duration.as_secs())),
                 Either::Right((v, _)) => match v {
-                    Ok(received) => {
-                        let expected = ControlMessage::try_response(&ping_req)?.serialize();
-                        let recv_decoded = ControlMessage::deserialize(received.as_ref())?;
-                        match compare(expected.as_ref(), received.as_ref()) {
-                            std::cmp::Ordering::Equal => Ok(()),
-                            _ => Err(MessagingError(format!("Received incorrect reply for challenge, expected '{:x?}', but received: {:x?}", expected.as_ref(), received.as_ref())))
-                        }
-                    }
-                    Err(description) => {
-                        Err(Other(format!("Error during ping to peer '{}': {}", destination.to_string(), description)))
-                    }
+                    Ok(received) => ControlMessage::deserialize(received.as_ref())
+                        .map_err(|_| DecodingError)
+                        .and_then(|deserialized| ControlMessage::validate_pong_response(&sent_ping, &deserialized)),
+                    Err(description) => Err(Other(format!("Error during ping to peer '{}': {}", destination.to_string(), description)))
                 },
             };
 
@@ -231,23 +220,6 @@ fn to_futures_unordered<F>(mut fs: Vec<F>) -> FuturesUnordered<F> {
 
     futures
 }
-
-/// Compare functions to create ordering result for array of u8s
-fn compare(a: &[u8], b: &[u8]) -> std::cmp::Ordering {
-    if a.len() != b.len() {
-        return a.len().cmp(&b.len());
-    }
-
-    for (ai, bi) in a.iter().zip(b.iter()) {
-        match ai.cmp(&bi) {
-            std::cmp::Ordering::Equal => continue,
-            ord => return ord
-        }
-    }
-
-    a.len().cmp(&b.len())
-}
-
 
 #[cfg(feature = "wasm")]
 pub mod wasm {

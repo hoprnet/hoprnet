@@ -8,7 +8,10 @@ pub enum NetworkingError {
     #[error("error in the messaging sub-protocol: {0}")]
     MessagingError(String),
 
-    #[error("unknown error: {0}")]
+    #[error("error while decoding message data")]
+    DecodingError,
+
+    #[error("unknown error or low-level error: {0}")]
     Other(String)
 }
 
