@@ -3,6 +3,8 @@ pub mod network;
 pub mod ping;
 pub(crate) mod types;
 pub mod messaging;
+pub mod errors;
+
 #[allow(dead_code)]
 #[cfg(feature = "wasm")]
 pub mod wasm {

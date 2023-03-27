@@ -26,6 +26,11 @@ use gloo_timers::future::sleep;
 #[cfg(all(feature = "wasm", not(test)))]
 use utils_misc::time::wasm::current_timestamp;
 
+use utils_types::traits::BinarySerializable;
+use crate::errors::NetworkingError;
+use crate::errors::NetworkingError::{MessagingError, Other, Timeout};
+use crate::messaging::ControlMessage;
+
 const PINGS_MAX_PARALLEL: usize = 14;
 
 #[cfg_attr(test, mockall::automock)]
@@ -165,9 +170,10 @@ impl Ping {
     {
         info!("Pinging peer '{}'", destination);
 
-        use rand::{RngCore, SeedableRng};
-        let mut challenge = Box::new([0u8; 16]);
-        rand::rngs::StdRng::from_entropy().fill_bytes(&mut challenge.as_mut_slice());
+        use rand::{RngCore,SeedableRng};
+        //let mut challenge = Box::new([0u8; 16]);
+        //rand::rngs::StdRng::from_entropy().fill_bytes(&mut challenge.as_mut_slice());
+        let ping_req = ControlMessage::generate_ping_request();
 
         let ping_result: PingMeasurement = {
             let _ping_peer_timer = match &self.metric_time_to_ping {
@@ -181,29 +187,28 @@ impl Ping {
             };
 
             let timeout = sleep(std::cmp::min(timeout_duration, self.config.timeout)).fuse();
-            let ping = async { send_msg(challenge.clone(), destination.to_string()).await }.fuse();
+            let ping = async {
+                send_msg(ping_req.serialize(), destination.to_string()).await
+            }.fuse();
 
             pin_mut!(timeout, ping);
 
-            let ping_result: Result<(), String> = match select(timeout, ping).await {
-                Either::Left(_) => Err(format!("The ping timed out {}s", timeout_duration.as_secs())),
+            let ping_result: Result<(), NetworkingError> = match select(
+                timeout, ping).await
+            {
+                Either::Left(_) => Err(Timeout(timeout_duration.as_secs())),
                 Either::Right((v, _)) => match v {
                     Ok(received) => {
-                        let expected = crate::heartbeat::generate_ping_response(challenge.clone());
+                        let expected = ControlMessage::try_response(&ping_req)?.serialize();
+                        let recv_decoded = ControlMessage::deserialize(received.as_ref())?;
                         match compare(expected.as_ref(), received.as_ref()) {
                             std::cmp::Ordering::Equal => Ok(()),
-                            _ => Err(format!(
-                                "Received incorrect reply for challenge, expected '{:x?}', but received: {:x?}",
-                                expected.as_ref(),
-                                received.as_ref()
-                            )),
+                            _ => Err(MessagingError(format!("Received incorrect reply for challenge, expected '{:x?}', but received: {:x?}", expected.as_ref(), received.as_ref())))
                         }
                     }
-                    Err(description) => Err(format!(
-                        "Error during ping to peer '{}': {}",
-                        destination.to_string(),
-                        description
-                    )),
+                    Err(description) => {
+                        Err(Other(format!("Error during ping to peer '{}': {}", destination.to_string(), description)))
+                    }
                 },
             };
 
