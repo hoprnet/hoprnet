@@ -99,4 +99,4 @@ packages/*/crates/*/pkg
 /.cargo/.crates.toml
 /.cargo/.crates2.json
 
-
+.venv/

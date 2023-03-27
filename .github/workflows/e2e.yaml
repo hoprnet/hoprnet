@@ -74,11 +74,12 @@ jobs:
       - name: Install dependencies
         run: nix develop -c make -j deps-ci
 
-      - name: Build
+      - name: Build application
         run: nix develop -c make -j build
 
-      - name: Test
-        run: nix develop -c ./scripts/run-integration-tests-source.sh
+      - name: Test with pytest
+        run: |
+          nix develop -c python3 -m pytest tests/
         env:
           ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN }}
 
