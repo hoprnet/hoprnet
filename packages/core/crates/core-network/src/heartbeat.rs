@@ -23,7 +23,6 @@ pub struct HeartbeatConfig {
     pub heartbeat_threshold: u64,
 }
 
-
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use futures::stream::{Stream, StreamExt};

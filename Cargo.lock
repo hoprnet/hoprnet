@@ -1103,6 +1103,7 @@ dependencies = [
  "rand 0.8.5",
  "scopeguard 1.1.0",
  "serde",
+ "thiserror",
  "utils-log",
  "utils-metrics",
  "utils-misc",
