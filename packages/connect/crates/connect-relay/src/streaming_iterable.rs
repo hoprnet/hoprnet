@@ -7,7 +7,7 @@ use futures::{
     task::{Context, Poll},
     Future, Sink, Stream,
 };
-use js_sys::{AsyncIterator, Function, IteratorNext, Object, Promise, Reflect, Symbol, Uint8Array};
+use js_sys::{AsyncIterator, Function, Object, Promise, Reflect, Symbol};
 use pin_project_lite::pin_project;
 use std::task::Waker;
 use utils_log::{error, info};
@@ -58,6 +58,19 @@ extern "C" {
 
     #[wasm_bindgen(structural, method, getter)]
     pub fn source(this: &JsStreamingIterable) -> JsValue;
+}
+
+/// Special-purpose version of js_sys::IteratorNext for Uint8Arrays
+#[wasm_bindgen]
+extern "C" {
+    #[derive(Clone, Debug)]
+    pub type Uint8ArrayIteratorNext;
+
+    #[wasm_bindgen(method, getter, structural)]
+    pub fn done(this: &Uint8ArrayIteratorNext) -> bool;
+
+    #[wasm_bindgen(method, getter, structural)]
+    pub fn value(this: &Uint8ArrayIteratorNext) -> Box<[u8]>;
 }
 
 // TODO: make this thread-safe using an Arc
@@ -162,15 +175,14 @@ impl Stream for StreamingIterable {
             Poll::Ready(res) => match res {
                 Ok(iter_next) => {
                     info!("received low-level {:?}", iter_next);
-                    let next = iter_next.unchecked_into::<IteratorNext>();
+                    let next = iter_next.unchecked_into::<Uint8ArrayIteratorNext>();
                     if next.done() {
                         self.stream_done = true;
                         Poll::Ready(None)
                     } else {
                         self.next.take();
-                        Poll::Ready(Some(Ok(Box::from_iter(
-                            next.value().dyn_into::<Uint8Array>().unwrap().to_vec(),
-                        ))))
+
+                        Poll::Ready(Some(Ok(next.value())))
                     }
                 }
                 Err(e) => {

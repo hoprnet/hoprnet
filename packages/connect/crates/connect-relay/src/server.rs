@@ -62,12 +62,41 @@ extern "C" {
 }
 
 pin_project! {
-    /// Encapsulates everything needed to run a ping request
+    /// In order to test the liveness of a relayed connection, the relay management
+    /// code issues ping requests, which are encaspsulated in this struct.
+    ///
+    /// The struct itself implements the `futures::Future` trait, so it can get
+    /// polled to see if there has been a reply.
     #[derive(Debug)]
     pub struct PingFuture {
+        // used to signal that the ping request was successful
         waker: Option<Waker>,
+        // timestamp when the request has been started, used check
+        // timeout and compute latency
         started_at: u64,
+        // filled with a timestamp once reply came back.
         completed_at: Option<u64>
+    }
+}
+
+impl PingFuture {
+    /// Creates a new ping request instance
+    fn new() -> Self {
+        Self {
+            waker: None,
+            started_at: current_timestamp(),
+            completed_at: None,
+        }
+    }
+
+    /// Once the ping reply came back, wake the future to tell
+    /// the calling code that ping request has been successful.
+    fn wake(&mut self) -> () {
+        self.completed_at.get_or_insert(current_timestamp());
+
+        if let Some(waker) = self.waker.take() {
+            waker.wake();
+        }
     }
 }
 
@@ -80,7 +109,6 @@ impl Future for PingFuture {
         match this.completed_at {
             Some(completed_at) => Poll::Ready(*completed_at - *this.started_at),
             None => {
-                // maybe turn this into a vec to store multiple waker instances
                 *this.waker = Some(cx.waker().clone());
                 Poll::Pending
             }
@@ -88,54 +116,14 @@ impl Future for PingFuture {
     }
 }
 
-impl PingFuture {
-    fn new() -> Self {
-        Self {
-            waker: None,
-            started_at: current_timestamp(),
-            completed_at: None,
-        }
-    }
-
-    /// Wake the future and assign final timestamp
-    fn wake(&mut self) -> () {
-        self.completed_at.get_or_insert(current_timestamp());
-
-        if let Some(waker) = self.waker.take() {
-            waker.wake();
-        }
-    }
-}
-
 pin_project! {
-    /// Used to call `poll_ready` on `Unpin` Sinks
-    #[derive(Debug)]
-    pub struct PollReady<'a, Si: ?Sized> {
-        #[pin]
-        sink: &'a mut Si,
-    }
-
-}
-
-impl<'a, Si: Sink<Box<[u8]>> + Unpin + ?Sized> PollReady<'a, Si> {
-    pub(super) fn new(sink: &'a mut Si) -> Self {
-        Self { sink }
-    }
-}
-
-impl<Si: Sink<Box<[u8]>> + Unpin + ?Sized> Future for PollReady<'_, Si> {
-    type Output = Result<(), Si::Error>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let this = self.project();
-
-        this.sink.poll_ready(cx)
-    }
-}
-
-pin_project! {
-    /// Stream of Streams, returns a new stream
-    /// on every reconnect
+    /// Relayed connections consist of two individual connections,
+    /// one to the initiator and another one to the destination.
+    /// Both sides may reconnect multiple times, which creates a
+    /// stream of *fresh* connections.
+    ///
+    /// This struct holds new incoming stream, e.g. after reconnects
+    /// and itself implements the `futures::Stream` trait
     #[derive(Debug)]
     pub struct NextStream {
         next_stream: Option<StreamingIterable>,
@@ -151,7 +139,11 @@ impl<'a> NextStream {
         }
     }
 
-    /// Takes ownership of a new incoming duplex stream
+    /// Once there has been a reconnect, there is a *fresh* connection. This
+    /// method takes this *fresh* connection and signals that a new stream
+    /// item is ready to be processed.
+    ///
+    /// The method throws if the previous stream has not yet been taken out.
     fn take_stream(&mut self, new_stream: JsStreamingIterable) -> Result<(), String> {
         match self.next_stream {
             Some(_) => {
@@ -195,11 +187,24 @@ impl<'a> Stream for NextStream {
 }
 
 pin_project! {
-    /// Struct that manages server-side relay connections
-    /// and handles reconnects
+    ///  Encapsulates the relay-side stream state management.
+    ///
+    /// ┌────┐   stream    ┌────────┐
+    /// │ A  ├────────────►│        │ stream
+    /// └────┘             │Server  ├───────►
+    ///                ┌──►│        │
+    /// ┌────┐         │   └────────┘
+    /// │ A' ├─────────┘
+    /// └────┘  new stream
+    ///
+    /// At the beginning, this code get instantiated with a connection
+    /// to one of the participants. Once there is a reconnects, a new
+    /// connection can get attached and the server does a stream handover
+    /// to the newly attached connection.
     #[derive(Debug)]
     struct Server {
         // the underlying Stream / Sink struct
+        // FIXME: make it work for pure Rust *and* WebAssembly
         #[pin]
         stream: Option<StreamingIterable>,
         #[pin]
@@ -231,6 +236,9 @@ pin_project! {
 }
 
 impl Server {
+    /// Takes a stream to one of the endpoints and callbacks to the relay
+    /// management code and creates a new instance server-side relay stream
+    /// state management instance.
     fn new(stream: StreamingIterable, callbacks: RelayServerCbs) -> Server {
         let (status_messages_tx, status_messages_rx) = mpsc::unbounded::<Box<[u8]>>();
 
@@ -256,22 +264,23 @@ impl Server {
         }
     }
 
-    /// Used to test whether the relayed connection is alive
+    /// Used to test whether the relayed connection is alive, takes
+    /// an optional custom timeout. If none is supplied, a default
+    /// timeout is used.
     async fn ping(&mut self, maybe_timeout: Option<u64>) -> Result<u64, String> {
         self.log("server: ping called");
 
-        let mut random_value = [0u8; 4];
-        getrandom(&mut random_value).unwrap();
+        let random_value: [u8; 4] = [0u8; 4];
+
+        // FIXME: enable once client code is migrated
+        // getrandom(&mut random_value).unwrap();
 
         let fut = PingFuture::new();
         // takes ownership
         self.ping_requests.insert(random_value, fut);
 
-        let timeout_duration = if let Some(timeout) = maybe_timeout {
-            timeout
-        } else {
-            DEFAULT_RELAYED_CONNECTION_PING_TIMEOUT as u64
-        };
+        let timeout_duration =
+            maybe_timeout.unwrap_or(DEFAULT_RELAYED_CONNECTION_PING_TIMEOUT as u64);
 
         let send_fut = self
             .send(Box::new([
@@ -287,7 +296,7 @@ impl Server {
         match select(send_timeout, send_fut).await {
             Either::Left(_) => {
                 return Err(format!(
-                    "Low-level ping timed out after {}",
+                    "Low-level ping timed out after {} ms",
                     timeout_duration
                 ))
             }
@@ -302,6 +311,8 @@ impl Server {
         // cannot clone futures
         let ping = self.ping_requests.get_mut(&random_value).unwrap();
 
+        info!("from map {:?}", ping);
+
         pin_mut!(response_timeout);
 
         match select(response_timeout, ping).await {
@@ -313,12 +324,17 @@ impl Server {
         }
     }
 
-    /// Returns identifiers of ping requests
+    /// To test if the relayed connection is alive, the relay management code
+    /// issues low-level ping requests. Each ping request gets a unique identifier.
+    /// This method returns all currently open ping requests, mainly used for testing.
     pub fn get_pending_ping_requests(&self) -> Vec<[u8; 4]> {
         self.ping_requests.keys().copied().collect()
     }
 
-    /// Used to attach a new incoming connection
+    /// A relayed connection contains two sides, one towards the initiator and one
+    /// towards the destination. Each side can break. Once one side reconnects, this
+    /// method takes the *fresh* connections and attaches it to the existing relay
+    /// connection pipeline.
     pub fn update(&mut self, new_stream: JsStreamingIterable) -> Result<(), String> {
         self.log(format!("server: Initiating stream handover").as_str());
 
@@ -334,12 +350,12 @@ impl Server {
         res
     }
 
-    /// Prepends logs with a per-instance identifier
+    /// Prepends logs with a per-instance identifier to enhance debugging
     pub fn log(&self, msg: &str) {
         info!("{} {}", hex::encode(*self.id), msg)
     }
 
-    /// Prepends error logs with a per-instance identifier
+    /// Prepends error logs with a per-instance identifier to enhance debugging
     pub fn error(&self, msg: &str) {
         error!("{} {}", hex::encode(*self.id), msg)
     }
@@ -453,7 +469,7 @@ impl<'b> Stream for Server {
                                         return Poll::Pending;
                                     }
 
-                                    let ping_id = if has_legacy_entry {
+                                    let ping_id: [u8; 4] = if has_legacy_entry {
                                         info!("received legacy PONG {:?}", item);
                                         [0u8; 4]
                                     } else {
@@ -661,11 +677,11 @@ impl Sink<Box<[u8]>> for Server {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use crate::streaming_iterable::{AsyncIterable, JsStreamingIterable, StreamingIterable};
-    use futures::{stream::Next, FutureExt, SinkExt, StreamExt};
-    use js_sys::{
-        AsyncIterator, Function, IteratorNext, Number, Object, Promise, Reflect, Symbol, Uint8Array,
+    use crate::streaming_iterable::{
+        AsyncIterable, JsStreamingIterable, StreamingIterable, Uint8ArrayIteratorNext,
     };
+    use futures::{stream::Next, FutureExt, SinkExt, StreamExt};
+    use js_sys::{AsyncIterator, Function, Number, Object, Promise, Reflect, Symbol, Uint8Array};
     use utils_misc::async_iterable::wasm::to_jsvalue_stream;
 
     use utils_log::info;
@@ -681,6 +697,32 @@ pub mod wasm {
         pub fn relay_free_timeout() -> u32;
     }
 
+    /// Wraps a server instance to make its API accessible by Javascript.
+    ///
+    /// This especially means turning the `futures::Stream` trait implemntation
+    /// ```rust
+    /// trait Stream {
+    ///     type Item;
+    ///     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Box<[u8]>>>;
+    /// }
+    /// ```
+    /// futures::Sink` trait implementation
+    /// ```rust
+    /// pub trait Sink<Item> {
+    ///   fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), String>>;
+    ///   fn start_send(self: Pin<&mut Self>, item: Box<[u8]>) -> Result<(), String>;
+    ///   fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), String>>;
+    ///   fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), String>>;
+    /// }
+    /// ```
+    ///  into the following Typescript API
+    ///
+    /// ```ts
+    /// interface IStream {
+    ///   sink(source: AsyncIterable<Uint8Array>): Promise<void>;
+    ///   source: AsyncIterable<Uint8Array>;
+    /// ]
+    /// ```
     #[wasm_bindgen]
     pub struct Server {
         w: super::Server,
@@ -688,6 +730,8 @@ pub mod wasm {
 
     #[wasm_bindgen]
     impl Server {
+        /// Assign duplex stream endpoint and create a new instance
+        /// of server-side relay stream state management code
         #[wasm_bindgen(constructor)]
         pub fn new(
             stream: JsStreamingIterable,
@@ -698,11 +742,14 @@ pub mod wasm {
                 w: super::Server::new(StreamingIterable::from(stream), signals),
             }
         }
+
+        /// After a reconnect, assign a new stream
         #[wasm_bindgen]
         pub fn update(&mut self, new_stream: JsStreamingIterable) -> Result<(), String> {
             self.w.update(new_stream)
         }
 
+        /// Issues a new low-level ping request
         #[wasm_bindgen]
         pub fn ping(&mut self, timeout: Option<Number>) -> Promise {
             let this = unsafe { std::mem::transmute::<&mut Server, &mut Server>(self) };
@@ -717,16 +764,23 @@ pub mod wasm {
             )
         }
 
+        /// Expose identifiers of open ping request, mainly used for unit testing
         #[wasm_bindgen(getter, js_name = "pendingPingRequests")]
         pub fn get_pending_ping_requests(&self) -> Box<[Uint8Array]> {
             Box::from_iter(
                 self.w
                     .get_pending_ping_requests()
                     .iter()
-                    .map(|u| unsafe { Uint8Array::view(u) }),
+                    .map(|u| Uint8Array::from(&u[..])),
             )
         }
 
+        /// Turns `futures::Stream` trait implementation into
+        /// ```ts
+        /// type Stream {
+        ///   source: AsyncIterable<Uint8Array>;
+        /// }
+        /// ```
         #[wasm_bindgen(getter)]
         pub fn source(&mut self) -> AsyncIterable {
             self.w.log("source called");
@@ -787,13 +841,17 @@ pub mod wasm {
             iterable_obj.unchecked_into()
         }
 
-        /// Takes a JS async iterable stream and feeds it into a Rust Sink
+        /// Turns `futures::Sink<Box<[u8]>>` trait implementation into
+        /// ```ts
+        /// interface IStream {
+        ///   sink(source: AsyncIterable<Uint8Array>): Promise<void>;
+        /// }
+        /// ```
         #[wasm_bindgen]
         pub fn sink(&mut self, source: AsyncIterable) -> js_sys::Promise {
             self.w.log("sink called");
 
             let promise = Promise::new(&mut |resolve, reject| {
-                // let this = self;
                 let this = unsafe { std::mem::transmute::<&mut Self, &mut Self>(self) };
 
                 let async_sym = Symbol::async_iterator();
@@ -855,18 +913,15 @@ pub mod wasm {
                                         return;
                                     }
                                 };
-                                let next = chunk.unchecked_into::<IteratorNext>();
+                                let next = chunk.unchecked_into::<Uint8ArrayIteratorNext>();
                                 info!("sink: next chunk {:?}", next);
                                 if next.done() {
                                     resolve.call0(&JsValue::undefined());
                                     this.w.close().await;
                                     break;
                                 } else {
-                                    this.w
-                                        .send(Box::from_iter(
-                                            next.value().dyn_into::<Uint8Array>().unwrap().to_vec(),
-                                        ))
-                                        .await;
+                                    // Uint8Array -> Box
+                                    this.w.send(next.value()).await;
 
                                     this.w.log("after sending");
                                 }

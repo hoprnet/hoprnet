@@ -6,7 +6,7 @@ edition = "2021"
 description = "Connect relay implementation"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
-license = "LGPL-3.0-only"
+license = "GPL-3.0-only"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -26,7 +26,7 @@ pin-project-lite = "0.2.9"
 utils-log = { path = "../../../utils/crates/utils-log" }
 utils-misc = { path = "../../../utils/crates/utils-misc" }
 wasm-bindgen = { version ="0.2.83", optional = true }
-wasm-bindgen-futures = { version = "0.4.33", optional = true, features = ["futures-core-03-stream"] }
+wasm-bindgen-futures = { version = "0.4.33", optional = true }
 
 console_error_panic_hook = { version = "0.1.6", optional = true }
 # wee_alloc = { version = "0.4.5", optional = true }

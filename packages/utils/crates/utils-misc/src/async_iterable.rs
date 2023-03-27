@@ -1,17 +1,25 @@
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use futures::stream::{Stream, StreamExt};
-    use js_sys::Uint8Array;
-    use serde::Serialize;
-    use serde_wasm_bindgen;
+    use js_sys::{Object, Reflect, Uint8Array};
     use wasm_bindgen::prelude::*;
 
     #[wasm_bindgen]
-    #[derive(Serialize, Clone)]
-    pub struct IteratorResult {
-        done: bool,
-        #[serde(with = "serde_bytes")]
-        value: Option<Box<[u8]>>,
+    extern "C" {
+        // Use `js_namespace` here to bind `console.log(..)` instead of just
+        // `log(..)`
+        #[wasm_bindgen(js_namespace = console)]
+        fn log(s: &str);
+
+        // The `console.log` is quite polymorphic, so we can bind it with multiple
+        // signatures. Note that we need to use `js_name` to ensure we always call
+        // `log` in JS.
+        #[wasm_bindgen(js_namespace = console, js_name = log)]
+        fn log_u32(a: u32);
+
+        // Multiple arguments too!
+        #[wasm_bindgen(js_namespace = console, js_name = log)]
+        fn log_many(a: &str, b: &str);
     }
 
     /// Turns a JsValue stream into a Box<[u8]> stream
@@ -45,45 +53,49 @@ pub mod wasm {
     /// }
     /// ```
     pub fn to_jsvalue_stream(item: Option<Result<Box<[u8]>, String>>) -> Result<JsValue, JsValue> {
+        let obj = Object::new();
+
         match item {
-            Some(Ok(m)) => Ok(serde_wasm_bindgen::to_value(&IteratorResult {
-                done: false,
-                value: Some(m),
-            })
-            .unwrap()),
+            Some(Ok(m)) => {
+                Reflect::set(&obj, &"done".into(), &JsValue::FALSE).unwrap();
+                Reflect::set(&obj, &"value".into(), &Uint8Array::from(&*m)).unwrap();
+                Ok(obj.into())
+            }
             Some(Err(e)) => Err(JsValue::from(e)),
-            None => Ok(serde_wasm_bindgen::to_value(&IteratorResult {
-                done: true,
-                value: None,
-            })
-            .unwrap()),
+            None => {
+                Reflect::set(&obj, &"done".into(), &JsValue::TRUE).unwrap();
+                Reflect::set(&obj, &"value".into(), &JsValue::undefined()).unwrap();
+                Ok(obj.into())
+            }
         }
     }
 
     /// Transforms input into iterator protocol
-    /// 
+    ///
     /// ```no_run
     /// # use utils_misc::async_iterable::wasm::to_jsvalue_iterator;
-    /// 
+    ///
     /// let first_chunk: Box<[u8]> = Box::new([0u8,1u8]);
-    /// 
+    ///
     /// to_jsvalue_iterator(Some(first_chunk));
-    /// 
+    ///
     /// // end stream
     /// to_jsvalue_iterator(None);
     /// ```
     pub fn to_jsvalue_iterator(item: Option<Box<[u8]>>) -> JsValue {
+        let obj = Object::new();
+
         match item {
-            Some(m) => serde_wasm_bindgen::to_value(&IteratorResult {
-                done: false,
-                value: Some(m),
-            })
-            .unwrap(),
-            None => serde_wasm_bindgen::to_value(&IteratorResult {
-                done: true,
-                value: None,
-            })
-            .unwrap()
+            Some(m) => {
+                Reflect::set(&obj, &"done".into(), &JsValue::FALSE).unwrap();
+                Reflect::set(&obj, &"value".into(), &Uint8Array::from(&*m)).unwrap();
+                obj.into()
+            }
+            None => {
+                Reflect::set(&obj, &"done".into(), &JsValue::TRUE).unwrap();
+                Reflect::set(&obj, &"value".into(), &JsValue::undefined()).unwrap();
+                obj.into()
+            }
         }
     }
 

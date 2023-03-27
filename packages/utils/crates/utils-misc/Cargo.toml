@@ -13,7 +13,7 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 default = ["console_error_panic_hook", "wasm"]
-wasm = [ "dep:wasm-bindgen", "dep:js-sys", "dep:wasm-bindgen-futures", "dep:serde-wasm-bindgen" ]
+wasm = [ "dep:wasm-bindgen", "dep:js-sys", "dep:wasm-bindgen-futures" ]
 console_error_panic_hook = [ "dep:console_error_panic_hook" ]
 
 [dependencies]
@@ -21,8 +21,6 @@ futures = "0.3.25"
 real-base = { path = "../../../real/crates/real-base" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-serde_bytes = "0.11"
-serde-wasm-bindgen = { version = "0.5.0", optional = true }
 js-sys = { version = "0.3.60", optional = true }
 utils-proc-macros = { path = "../../../utils/crates/utils-proc-macros" }
 wasm-bindgen = { workspace = true, optional = true }
