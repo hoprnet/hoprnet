@@ -2,6 +2,7 @@ use blake2::{Digest, Blake2s256};
 use rand::Rng;
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
+use utils_misc::utils::MajMinPatch;
 use utils_types::traits::AutoBinarySerializable;
 use crate::errors::NetworkingError::MessagingError;
 
@@ -18,21 +19,22 @@ pub enum ControlMessage {
 }
 
 impl ControlMessage {
-    pub fn generate_ping_request() -> Self {
+    pub fn generate_ping_request(version: MajMinPatch) -> Self {
         let mut ping = PingMessage{
-            version: [0u8; VERSION_SIZE],
+            version,
             nonce: [0u8; PING_NONCE_SIZE]
         };
+
         // TODO: use core-crypto random_fill once rebased
         OsRng.fill(&mut ping.nonce);
         Self::Ping(ping)
     }
 
-    pub fn generate_pong_response(request: &ControlMessage) -> Result<Self> {
+    pub fn generate_pong_response(version: MajMinPatch, request: &ControlMessage) -> Result<Self> {
         match request {
             ControlMessage::Ping(ping) => {
                 let mut pong = PingMessage {
-                    version: [0u8; VERSION_SIZE],
+                    version,
                     nonce: [0u8; PING_NONCE_SIZE]
                 };
 
@@ -49,7 +51,7 @@ impl ControlMessage {
     }
 
     pub fn validate_pong_response(request: &ControlMessage, response: &ControlMessage) -> Result<()> {
-        if let Self::Pong(expected_pong) = Self::generate_pong_response(request).unwrap() {
+        if let Self::Pong(expected_pong) = Self::generate_pong_response([0,0,0], request).unwrap() {
             match response {
                 ControlMessage::Pong(received_pong) => {
                     match expected_pong.nonce.eq(&received_pong.nonce) {
@@ -72,7 +74,7 @@ const PING_NONCE_SIZE: usize = 16;
 
 #[derive(Clone, Debug, Eq, PartialEq, Default, Serialize, Deserialize)]
 pub struct PingMessage {
-    version: [u8; VERSION_SIZE],
+    version: MajMinPatch,
     nonce: [u8; PING_NONCE_SIZE]
 }
 
@@ -94,9 +96,20 @@ mod tests {
     use crate::messaging::ControlMessage;
 
     #[test]
-    fn test_ping_pong_rountrip() {
-        let sent_req = ControlMessage::generate_ping_request();
-        let recv_req = ControlMessage::generate_pong_response(&sent_req).unwrap();
-        assert!(ControlMessage::validate_pong_response(&sent_req, &recv_req).is_ok());
+    fn test_ping_pong_roundtrip() {
+        let sent_req = ControlMessage::generate_ping_request([1,2,3]);
+        match &sent_req {
+            ControlMessage::Ping(m) => assert_eq!("1.2.3", m.format_version()),
+            ControlMessage::Pong(_) => panic!("invalid request version")
+        }
+
+        let recv_res = ControlMessage::generate_pong_response([4,5,6], &sent_req).unwrap();
+        match &recv_res {
+            ControlMessage::Ping(_) => panic!("invalid response version"),
+            ControlMessage::Pong(m) => assert_eq!("4.5.6", m.format_version())
+        }
+
+        assert!(ControlMessage::validate_pong_response(&sent_req, &recv_res).is_ok());
+
     }
 }

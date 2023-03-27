@@ -1,3 +1,4 @@
+use semver::Version;
 use real_base::error::RealError;
 use real_base::error::RealError::GeneralError;
 use real_base::real;
@@ -17,6 +18,18 @@ pub fn get_package_version(package_file: &str) -> Result<String, RealError> {
         Ok(package_json) => Ok(package_json.version),
         Err(e) => Err(GeneralError(e.to_string())),
     }
+}
+
+/// Represents a version number simplified to Major, Minor and Patch.
+pub type MajMinPatch = [u8; 3];
+
+/// Parses the Semver package version from the package.json file and converts it
+/// to a simplified Major, Minor and Patch.
+pub fn parse_package_version(package_file: &str) -> Result<MajMinPatch, RealError> {
+    get_package_version(package_file)
+        .and_then(|v| Version::parse(v.as_str())
+            .map_err(|e| GeneralError(e.to_string()))
+            .map(|v| [v.major as u8, v.minor as u8, v.patch as u8]))
 }
 
 #[cfg(feature = "wasm")]
