@@ -32,7 +32,7 @@ logs.txt
 # see https://www.typescriptlang.org/docs/handbook/project-references.html
 **/*.tsbuildinfo
 
-/.env
+*.env
 .identity-local
 
 /.cargo/lib
