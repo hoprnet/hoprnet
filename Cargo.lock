@@ -6391,6 +6391,7 @@ dependencies = [
  "futures 0.3.27",
  "js-sys",
  "real-base",
+ "semver 1.0.16",
  "serde",
  "serde_json",
  "utils-proc-macros",

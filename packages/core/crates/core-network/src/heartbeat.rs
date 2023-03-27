@@ -1,18 +1,3 @@
-use blake2::{Blake2s256, Digest};
-
-pub fn generate_ping_request() -> Box<[u8]> {
-    todo!()
-}
-
-/// Takes a ping request message and returns a ping response message
-pub fn generate_ping_response(req: Box<[u8]>) -> Box<[u8]> {
-    let mut hasher = Blake2s256::new();
-
-    hasher.update(req);
-
-    hasher.finalize().to_vec().into_boxed_slice()
-}
-
 /// Configuration of the Heartbeat
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -31,6 +16,10 @@ pub mod wasm {
     use utils_misc::async_iterable::wasm::{to_box_u8_stream, to_jsvalue_stream};
     use wasm_bindgen::prelude::*;
     use wasm_bindgen_futures::stream::JsStream;
+    use utils_misc::ok_or_str;
+    use utils_types::traits::BinarySerializable;
+    use crate::heartbeat::HeartbeatConfig;
+    use crate::messaging::ControlMessage;
 
     #[wasm_bindgen]
     impl HeartbeatConfig {
@@ -63,10 +52,14 @@ pub mod wasm {
     }
 
     #[wasm_bindgen]
-    pub fn reply_to_ping(stream: AsyncIterator) -> Result<AsyncIterableHelperCoreHeartbeat, JsValue> {
+    pub fn reply_to_ping(
+        stream: AsyncIterator,
+    ) -> Result<AsyncIterableHelperCoreHeartbeat, JsValue> {
+        // TODO: add version param
         let stream = JsStream::from(stream)
             .map(to_box_u8_stream)
-            .map(|req| req.map(super::generate_ping_response));
+            .map(|m| m.and_then(|r| ok_or_str!(ControlMessage::deserialize(r.as_ref()))))
+            .map(|r| r.and_then(|c| Ok(ok_or_str!(ControlMessage::generate_pong_response([1,2,3], &c))?.serialize())));
 
         Ok(AsyncIterableHelperCoreHeartbeat {
             stream: Box::new(stream),
@@ -76,6 +69,8 @@ pub mod wasm {
     /// Used to pre-compute ping responses
     #[wasm_bindgen]
     pub fn generate_ping_response(u8a: &[u8]) -> Box<[u8]> {
-        super::generate_ping_response(u8a.into())
+        // TODO: add error handling & version
+        let msg = ControlMessage::deserialize(u8a).unwrap();
+        ControlMessage::generate_pong_response([1,2,3], &msg).unwrap().serialize()
     }
 }
