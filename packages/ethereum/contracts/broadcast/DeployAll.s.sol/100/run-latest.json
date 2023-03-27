@@ -51,7 +51,7 @@
       "blockNumber": "0x19e4449",
       "from": "0x4fF4e61052a4DFb1bE72866aB711AE08DD861976",
       "to": "0x2Fc87247085F4658ADB698cDbF4d732c704f1e06",
-      "cumulativeGasUsed": "0x101afa",
+      "cumulativeGasUsed": "0xfc8f2",
       "gasUsed": "0xfc8f2",
       "contractAddress": null,
       "logs": [
@@ -180,7 +180,7 @@
       "blockNumber": "0x19e4449",
       "from": "0x4fF4e61052a4DFb1bE72866aB711AE08DD861976",
       "to": "0x2Fc87247085F4658ADB698cDbF4d732c704f1e06",
-      "cumulativeGasUsed": "0x1fe3ec",
+      "cumulativeGasUsed": "0x1f91e4",
       "gasUsed": "0xfc8f2",
       "contractAddress": null,
       "logs": [
