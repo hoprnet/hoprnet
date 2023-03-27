@@ -409,7 +409,7 @@ Tests are using the `pytest` infrastructure that can be set up inside a virtuale
 ```sh
 python3 -m venv .venv
 source .venv/bin/activate
-python3 -m pip install -r tests/integration/requirements.txt
+python3 -m pip install -r tests/requirements.txt
 ```
 
 To deactivate the activated testing environment if no longer needed:
