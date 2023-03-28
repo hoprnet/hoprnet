@@ -1,10 +1,10 @@
 [workspace]
 
 members = [
+    "packages/core/crates/core-crypto",
     "packages/core/crates/core-misc",
     "packages/core/crates/core-mixer",
     "packages/core/crates/core-network",
-    "packages/core/crates/core-crypto",
     "packages/core/crates/core-strategy",
     "packages/core/crates/core-types",
     "packages/core-ethereum/crates/core-ethereum-misc",
