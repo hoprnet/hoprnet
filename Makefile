@@ -217,10 +217,6 @@ endif
 smart-contract-test: # forge test smart contracts
 	$(MAKE) -C packages/ethereum/contracts/ sc-test
 
-.PHONY: e2e-test-source
-e2e-test-source:
-	${CURDIR}/scripts/run-integration-tests-source.sh
-
 .PHONY: lint-check
 lint-check: ## run linter in check mode
 	npx prettier --check .
