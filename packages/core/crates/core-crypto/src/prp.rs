@@ -48,8 +48,8 @@ impl PRPParameters {
 /// Currently based on the Lioness wide-block cipher.
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct PRP {
-    keys: [Vec<u8>; 4],
-    ivs: [Vec<u8>; 4]
+    keys: [Box<[u8]>; 4],
+    ivs: [Box<[u8]>; 4]
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -61,16 +61,16 @@ impl PRP {
 
         Self {
             keys: [
-                key[0* PRP_INTERMEDIATE_KEY_LENGTH..1* PRP_INTERMEDIATE_KEY_LENGTH].to_vec(),
-                key[1* PRP_INTERMEDIATE_KEY_LENGTH..2* PRP_INTERMEDIATE_KEY_LENGTH].to_vec(),
-                key[2* PRP_INTERMEDIATE_KEY_LENGTH..3* PRP_INTERMEDIATE_KEY_LENGTH].to_vec(),
-                key[3* PRP_INTERMEDIATE_KEY_LENGTH..4* PRP_INTERMEDIATE_KEY_LENGTH].to_vec()
+                key[0* PRP_INTERMEDIATE_KEY_LENGTH..1* PRP_INTERMEDIATE_KEY_LENGTH].into(),
+                key[1* PRP_INTERMEDIATE_KEY_LENGTH..2* PRP_INTERMEDIATE_KEY_LENGTH].into(),
+                key[2* PRP_INTERMEDIATE_KEY_LENGTH..3* PRP_INTERMEDIATE_KEY_LENGTH].into(),
+                key[3* PRP_INTERMEDIATE_KEY_LENGTH..4* PRP_INTERMEDIATE_KEY_LENGTH].into()
             ],
             ivs: [ // NOTE: ChaCha20 takes only 12 byte IV
-                iv[0* PRP_INTERMEDIATE_IV_LENGTH..1* PRP_INTERMEDIATE_IV_LENGTH].to_vec(),
-                iv[1* PRP_INTERMEDIATE_IV_LENGTH..2* PRP_INTERMEDIATE_IV_LENGTH].to_vec(),
-                iv[2* PRP_INTERMEDIATE_IV_LENGTH..3* PRP_INTERMEDIATE_IV_LENGTH].to_vec(),
-                iv[3* PRP_INTERMEDIATE_IV_LENGTH..4* PRP_INTERMEDIATE_IV_LENGTH].to_vec()
+                iv[0* PRP_INTERMEDIATE_IV_LENGTH..1* PRP_INTERMEDIATE_IV_LENGTH].into(),
+                iv[1* PRP_INTERMEDIATE_IV_LENGTH..2* PRP_INTERMEDIATE_IV_LENGTH].into(),
+                iv[2* PRP_INTERMEDIATE_IV_LENGTH..3* PRP_INTERMEDIATE_IV_LENGTH].into(),
+                iv[3* PRP_INTERMEDIATE_IV_LENGTH..4* PRP_INTERMEDIATE_IV_LENGTH].into()
             ]
         }
     }
@@ -129,6 +129,7 @@ impl PRP {
 
     fn xor_inplace(a: &mut [u8], b: &[u8]) {
         let bound = if a.len() > b.len() { b.len() } else { a.len() };
+        // TODO: Certainly space for SIMD optimization
         for i in 0..bound {
             a[i] = a[i] ^ b[i];
         }

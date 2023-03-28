@@ -1,7 +1,7 @@
 use std::ops::Mul;
 use blake2::Blake2s256;
 
-use elliptic_curve::ProjectivePoint;
+use elliptic_curve::{Group, ProjectivePoint};
 use elliptic_curve::rand_core::{CryptoRng, RngCore};
 use elliptic_curve::sec1::ToEncodedPoint;
 
@@ -10,7 +10,7 @@ use generic_array::GenericArray;
 use k256::{AffinePoint, NonZeroScalar, Secp256k1};
 
 use hkdf::SimpleHkdf;
-use crate::errors::CryptoError::InvalidSecretScalar;
+use crate::errors::CryptoError::{CalculationError, InvalidSecretScalar};
 
 use crate::parameters;
 
@@ -103,6 +103,9 @@ impl SharedKeys {
             // Update coeff prev and alpha
             coeff_prev = coeff_prev.mul(b_k_checked);
             alpha_prev = alpha_prev * b_k_checked.as_ref();
+            if alpha_prev.is_identity().unwrap_u8() != 0 {
+                return Err(CalculationError)
+            }
         }
 
         Ok(SharedKeys {
