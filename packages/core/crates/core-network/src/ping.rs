@@ -169,7 +169,7 @@ impl Ping {
         F: futures::Future<Output = Result<Box<[u8]>, String>>,
     {
         info!("Pinging peer '{}'", destination);
-        let sent_ping = ControlMessage::generate_ping_request([0,0,0]); // TODO: externalize
+        let sent_ping = ControlMessage::generate_ping_request();
 
         let ping_result: PingMeasurement = {
             let _ping_peer_timer = match &self.metric_time_to_ping {
@@ -402,7 +402,7 @@ mod tests {
     // Testing override
     pub async fn send_ping(msg: Box<[u8]>, peer: String) -> Result<Box<[u8]>, String> {
         let chall = ControlMessage::deserialize(msg.as_ref()).unwrap();
-        let mut reply = ControlMessage::generate_pong_response([1,2,3], &chall)
+        let mut reply = ControlMessage::generate_pong_response(&chall)
             .unwrap()
             .serialize();
 
