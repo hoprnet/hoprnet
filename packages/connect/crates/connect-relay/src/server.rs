@@ -1,6 +1,6 @@
 use std::{collections::HashMap, pin::Pin};
 
-use crate::constants::DEFAULT_RELAYED_CONNECTION_PING_TIMEOUT;
+use crate::{constants::DEFAULT_RELAYED_CONNECTION_PING_TIMEOUT, traits::DuplexStream};
 use futures::{
     channel::mpsc::{self, UnboundedReceiver, UnboundedSender},
     future::{select, Either},
@@ -14,13 +14,10 @@ use pin_project_lite::pin_project;
 use std::task::Waker;
 use utils_log::{error, info};
 
-#[cfg(feature = "wasm")]
-use crate::streaming_iterable::{JsStreamingIterable, StreamingIterable};
-
+#[cfg(not(feature = "wasm"))]
+use async_std::task::sleep;
 #[cfg(feature = "wasm")]
 use gloo_timers::future::sleep;
-#[cfg(not(feature = "wasm"))]
-use utils_misc::time::native::sleep;
 
 #[cfg(not(feature = "wasm"))]
 use utils_misc::time::native::current_timestamp;
@@ -48,17 +45,9 @@ pub enum ConnectionStatusMessage {
     Upgraded = 0x02,
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-extern "C" {
-    #[wasm_bindgen]
-    #[derive(Clone, Debug)]
-    pub type RelayServerCbs;
-
-    #[wasm_bindgen(js_name = "onClose", structural, method)]
-    pub fn on_close(this: &RelayServerCbs);
-
-    #[wasm_bindgen(js_name = "onUpgrade", structural, method)]
-    pub fn on_upgrade(this: &RelayServerCbs);
+pub trait RelayServerCbs {
+    fn on_close(&self) -> ();
+    fn on_upgrade(&self) -> ();
 }
 
 pin_project! {
@@ -125,14 +114,14 @@ pin_project! {
     /// This struct holds new incoming stream, e.g. after reconnects
     /// and itself implements the `futures::Stream` trait
     #[derive(Debug)]
-    pub struct NextStream {
-        next_stream: Option<StreamingIterable>,
+    pub struct NextStream<St> {
+        next_stream: Option<St>,
         waker: Option<Waker>,
     }
 }
 
-impl<'a> NextStream {
-    fn new() -> NextStream {
+impl<'a, St> NextStream<St> {
+    fn new() -> NextStream<St> {
         Self {
             next_stream: None,
             waker: None,
@@ -144,7 +133,7 @@ impl<'a> NextStream {
     /// item is ready to be processed.
     ///
     /// The method throws if the previous stream has not yet been taken out.
-    fn take_stream(&mut self, new_stream: JsStreamingIterable) -> Result<(), String> {
+    fn take_stream(&mut self, new_stream: St) -> Result<(), String> {
         match self.next_stream {
             Some(_) => {
                 error!("Cannot take stream because previous stream has not yet been consumed");
@@ -153,7 +142,7 @@ impl<'a> NextStream {
                 ))
             }
             None => {
-                self.next_stream = Some(StreamingIterable::from(new_stream));
+                self.next_stream = Some(new_stream);
 
                 info!("next_stream waker {:?}", self.waker);
                 if let Some(waker) = self.waker.take() {
@@ -167,8 +156,8 @@ impl<'a> NextStream {
     }
 }
 
-impl<'a> Stream for NextStream {
-    type Item = StreamingIterable;
+impl<'a, St> Stream for NextStream<St> {
+    type Item = St;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let this = self.project();
@@ -202,15 +191,15 @@ pin_project! {
     /// connection can get attached and the server does a stream handover
     /// to the newly attached connection.
     #[derive(Debug)]
-    struct Server {
+    struct Server<St: DuplexStream, Cbs: RelayServerCbs> {
         // the underlying Stream / Sink struct
         // FIXME: make it work for pure Rust *and* WebAssembly
         #[pin]
-        stream: Option<StreamingIterable>,
+        stream: Option<St>,
         #[pin]
         // stream of new Stream / Sink structs, used
         // for stream handovers after reconnects
-        next_stream: NextStream,
+        next_stream: NextStream<St>,
         // used to dequeue status messages
         #[pin]
         status_messages_rx: Option<UnboundedReceiver<Box<[u8]>>>,
@@ -231,15 +220,15 @@ pin_project! {
         // wake sink after reconnect
         poll_ready_waker: Option<Waker>,
         // signal events to management code
-        callbacks: Option<RelayServerCbs>
+        callbacks: Option<Cbs>
     }
 }
 
-impl Server {
+impl<St: DuplexStream, Cbs: RelayServerCbs> Server<St, Cbs> {
     /// Takes a stream to one of the endpoints and callbacks to the relay
     /// management code and creates a new instance server-side relay stream
     /// state management instance.
-    fn new(stream: StreamingIterable, callbacks: RelayServerCbs) -> Server {
+    fn new(stream: St, callbacks: Cbs) -> Server<St, Cbs> {
         let (status_messages_tx, status_messages_rx) = mpsc::unbounded::<Box<[u8]>>();
 
         let mut id = [0u8; 4];
@@ -335,7 +324,7 @@ impl Server {
     /// towards the destination. Each side can break. Once one side reconnects, this
     /// method takes the *fresh* connections and attaches it to the existing relay
     /// connection pipeline.
-    pub fn update(&mut self, new_stream: JsStreamingIterable) -> Result<(), String> {
+    pub fn update(&mut self, new_stream: St) -> Result<(), String> {
         self.log(format!("server: Initiating stream handover").as_str());
 
         let res = self.next_stream.take_stream(new_stream);
@@ -361,7 +350,7 @@ impl Server {
     }
 }
 
-impl<'b> Stream for Server {
+impl<'b, St: DuplexStream, Cbs: RelayServerCbs> Stream for Server<St, Cbs> {
     type Item = Result<Box<[u8]>, String>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
@@ -512,13 +501,13 @@ impl<'b> Stream for Server {
     }
 }
 
-impl FusedStream for Server {
+impl<St: DuplexStream + FusedStream, Cbs: RelayServerCbs> FusedStream for Server<St, Cbs> {
     fn is_terminated(&self) -> bool {
         self.stream.as_ref().unwrap().is_terminated()
     }
 }
 
-impl Sink<Box<[u8]>> for Server {
+impl<St: DuplexStream, Cbs: RelayServerCbs> Sink<Box<[u8]>> for Server<St, Cbs> {
     type Error = String;
 
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), String>> {
@@ -697,6 +686,29 @@ pub mod wasm {
         pub fn relay_free_timeout() -> u32;
     }
 
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+    extern "C" {
+        #[wasm_bindgen]
+        #[derive(Clone, Debug)]
+        pub type RelayServerCbs;
+
+        #[wasm_bindgen(js_name = "onClose", structural, method)]
+        pub fn js_on_close(this: &RelayServerCbs);
+
+        #[wasm_bindgen(js_name = "onUpgrade", structural, method)]
+        pub fn js_on_upgrade(this: &RelayServerCbs);
+    }
+
+    impl super::RelayServerCbs for RelayServerCbs {
+        fn on_close(&self) -> () {
+            self.js_on_close()
+        }
+
+        fn on_upgrade(&self) -> () {
+            self.js_on_upgrade()
+        }
+    }
+
     /// Wraps a server instance to make its API accessible by Javascript.
     ///
     /// This especially means turning the `futures::Stream` trait implemntation
@@ -725,7 +737,7 @@ pub mod wasm {
     /// ```
     #[wasm_bindgen]
     pub struct Server {
-        w: super::Server,
+        w: super::Server<StreamingIterable, RelayServerCbs>,
     }
 
     #[wasm_bindgen]
@@ -735,7 +747,7 @@ pub mod wasm {
         #[wasm_bindgen(constructor)]
         pub fn new(
             stream: JsStreamingIterable,
-            signals: super::RelayServerCbs,
+            signals: RelayServerCbs,
             _options: RelayServerOpts,
         ) -> Self {
             Self {
@@ -746,7 +758,7 @@ pub mod wasm {
         /// After a reconnect, assign a new stream
         #[wasm_bindgen]
         pub fn update(&mut self, new_stream: JsStreamingIterable) -> Result<(), String> {
-            self.w.update(new_stream)
+            self.w.update(StreamingIterable::from(new_stream))
         }
 
         /// Issues a new low-level ping request
@@ -792,9 +804,10 @@ pub mod wasm {
                 info!("rs: iterator code called");
                 let promise = Promise::new(&mut |resolve, reject| {
                     let fut = unsafe {
-                        std::mem::transmute::<Next<'_, super::Server>, Next<'_, super::Server>>(
-                            this.w.next(),
-                        )
+                        std::mem::transmute::<
+                            Next<'_, super::Server<StreamingIterable, RelayServerCbs>>,
+                            Next<'_, super::Server<StreamingIterable, RelayServerCbs>>,
+                        >(this.w.next())
                     };
                     let fut = fut.map(to_jsvalue_stream).then(|x| async move {
                         info!("source future executed");

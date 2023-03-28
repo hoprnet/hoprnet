@@ -1,4 +1,5 @@
 /// Converts from duplex JS stream to Rust `futures::Stream` / `futures::Sink`
+use crate::traits::DuplexStream;
 use core::panic;
 use std::{pin::Pin, u8};
 
@@ -231,7 +232,7 @@ impl Sink<Box<[u8]>> for StreamingIterable {
             info!("sink calling code called");
 
             let iterator_cb = Closure::new(move || {
-                Promise::new(&mut |resolve, reject| {
+                Promise::new(&mut |resolve, _reject| {
                     info!("sink: setting new resolve");
                     // TODO: use borrow_mut()
                     *this.resolve = Some(resolve);
@@ -375,7 +376,9 @@ impl Sink<Box<[u8]>> for StreamingIterable {
         Poll::Pending
     }
 
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 }
+
+impl DuplexStream for StreamingIterable {}

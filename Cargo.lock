@@ -909,6 +909,7 @@ dependencies = [
 name = "connect-relay"
 version = "0.1.0"
 dependencies = [
+ "async-std",
  "console_error_panic_hook",
  "futures 0.3.27",
  "getrandom 0.2.8",
