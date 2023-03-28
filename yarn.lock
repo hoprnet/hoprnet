@@ -779,7 +779,7 @@ __metadata:
     err-code: 3.0.1
     heap-js: 2.2.0
     it-handshake: 4.0.0
-    it-pair: 2.0.2
+    it-pair: 2.0.4
     it-pipe: 2.0.3
     it-pushable: 3.0.0
     mocha: 9.2.2
@@ -6826,7 +6826,17 @@ __metadata:
   languageName: node
   linkType: hard
 
-"it-pair@npm:2.0.2, it-pair@npm:^2.0.2":
+"it-pair@npm:2.0.4":
+  version: 2.0.4
+  resolution: "it-pair@npm:2.0.4"
+  dependencies:
+    it-stream-types: ^1.0.3
+    p-defer: ^4.0.0
+  checksum: 7eedc5712c860b3741a26efdbfb747b9757acd328b7ffd48c73f46710f76b3e0462e4649044ca3210f9e6cae1a5f011bcf2b603ff3ef3ac6c3c5ce91f951804c
+  languageName: node
+  linkType: hard
+
+"it-pair@npm:^2.0.2":
   version: 2.0.2
   resolution: "it-pair@npm:2.0.2"
   dependencies:
