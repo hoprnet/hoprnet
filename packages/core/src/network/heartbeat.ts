@@ -18,6 +18,12 @@ import pkg from '../../package.json' assert { type: 'json' }
 import { peerIdFromString } from '@libp2p/peer-id'
 
 const NORMALIZED_VERSION = pickVersion(pkg.version)
+export const PEER_METADATA_PROTOCOL_VERSION = "protocol_version"
+
+function versionFromProtocol(protocol: string): string {
+  let parts = protocol.split('/')
+  return (parts.length == 5) ? parts[5] : undefined
+}
 
 export default class Heartbeat {
   private stopHeartbeatInterval: (() => void) | undefined
@@ -58,12 +64,19 @@ export default class Heartbeat {
   }
 
   public async start() {
-    this.libp2pComponents.getRegistrar().handle(this.protocolHeartbeat, async ({ connection, stream }) => {
+    this.libp2pComponents.getRegistrar().handle(this.protocolHeartbeat, async ({ protocol, connection, stream }) => {
+      let peer_metadata = new Map<string, string>();
       let remote = connection.remotePeer.toString()
+
+      let observedVersion = versionFromProtocol(protocol)
+      if (observedVersion) {
+        peer_metadata.set(PEER_METADATA_PROTOCOL_VERSION, observedVersion)
+      }
+
       if (this.networkPeers.contains(remote)) {
-        this.networkPeers.refresh(remote, Date.now())
+        this.networkPeers.refresh(remote, Date.now(), peer_metadata)
       } else {
-        this.networkPeers.register(remote, PeerOrigin.IncomingConnection)
+        this.networkPeers.register(remote, PeerOrigin.IncomingConnection, peer_metadata)
       }
 
       try {

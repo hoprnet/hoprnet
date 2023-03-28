@@ -8,8 +8,9 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = ["console_error_panic_hook", "wasm"]
+default = ["console_error_panic_hook", "wasm", "compat-ping"]
 wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:getrandom", "dep:js-sys", "dep:gloo-timers"]
+compat-ping = []
 
 [dependencies]
 async-std = { version = "1.12.0", features = ["attributes"] }
