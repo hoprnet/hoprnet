@@ -46,6 +46,5 @@ console_error_panic_hook = { version = "0.1.7", optional = true }
 #wee_alloc = { version = "0.4.5", optional = true }
 
 [dev-dependencies]
-hex-literal = "0.3.4"
 wasm-bindgen-test = "0.3.33"
 
