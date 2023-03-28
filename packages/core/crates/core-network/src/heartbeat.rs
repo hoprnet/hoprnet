@@ -15,7 +15,9 @@ pub mod wasm {
     use utils_misc::async_iterable::wasm::{to_box_u8_stream, to_jsvalue_stream};
     use wasm_bindgen::prelude::*;
     use wasm_bindgen_futures::stream::JsStream;
-    use utils_misc::ok_or_str;
+    use utils_misc::{ok_or_jserr, ok_or_str};
+    use utils_misc::utils::{MajMinPatch, parse_package_version_string};
+    use utils_misc::utils::wasm::JsResult;
     use utils_types::traits::BinarySerializable;
     use crate::heartbeat::HeartbeatConfig;
     use crate::messaging::ControlMessage;
@@ -43,31 +45,30 @@ pub mod wasm {
 
     #[wasm_bindgen]
     impl AsyncIterableHelperCoreHeartbeat {
-        pub async fn next(&mut self) -> Result<JsValue, JsValue> {
+        pub async fn next(&mut self) -> JsResult<JsValue> {
             to_jsvalue_stream(self.stream.as_mut().next().await)
         }
     }
 
+    /// Used to pre-compute ping responses
     #[wasm_bindgen]
-    pub fn reply_to_ping(
+    pub fn generate_ping_response(advertised_version: &str, u8a: &[u8]) -> JsResult<Box<[u8]>> {
+        let mmp = ok_or_jserr!(parse_package_version_string(advertised_version))?;
+        ok_or_jserr!(ControlMessage::deserialize(u8a))
+            .and_then(|req| ok_or_jserr!(ControlMessage::generate_pong_response(mmp, &req)))
+            .map(|msg| msg.serialize())
+    }
+
+    #[wasm_bindgen]
+    pub fn reply_to_ping(advertised_version: &str,
         stream: AsyncIterator,
-    ) -> Result<AsyncIterableHelperCoreHeartbeat, JsValue> {
-        // TODO: add version param
+    ) -> JsResult<AsyncIterableHelperCoreHeartbeat> {
         let stream = JsStream::from(stream)
             .map(to_box_u8_stream)
-            .map(|m| m.and_then(|r| ok_or_str!(ControlMessage::deserialize(r.as_ref()))))
-            .map(|r| r.and_then(|c| Ok(ok_or_str!(ControlMessage::generate_pong_response([1,2,3], &c))?.serialize())));
+            .map(|res| res.map(|rq| generate_ping_response(advertised_version, rq.as_ref())));
 
         Ok(AsyncIterableHelperCoreHeartbeat {
             stream: Box::new(stream),
         })
-    }
-
-    /// Used to pre-compute ping responses
-    #[wasm_bindgen]
-    pub fn generate_ping_response(u8a: &[u8]) -> Box<[u8]> {
-        // TODO: add error handling & version
-        let msg = ControlMessage::deserialize(u8a).unwrap();
-        ControlMessage::generate_pong_response([1,2,3], &msg).unwrap().serialize()
     }
 }

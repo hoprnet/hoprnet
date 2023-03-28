@@ -366,7 +366,9 @@ mod tests {
     // Testing override
     pub async fn send_ping(msg: Box<[u8]>, peer: String) -> Result<Box<[u8]>, String> {
         let chall = ControlMessage::deserialize(msg.as_ref()).unwrap();
-        let mut reply = ControlMessage::generate_pong_response([1,2,3], &chall).unwrap().serialize();
+        let mut reply = ControlMessage::generate_pong_response([1,2,3], &chall)
+            .unwrap()
+            .serialize();
 
         match peer.as_str() {
             BAD_PEER => {

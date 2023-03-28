@@ -23,13 +23,17 @@ pub fn get_package_version(package_file: &str) -> Result<String, RealError> {
 /// Represents a version number simplified to Major, Minor and Patch.
 pub type MajMinPatch = [u8; 3];
 
+pub fn parse_package_version_string(version: &str) -> Result<MajMinPatch, RealError> {
+    Version::parse(version)
+        .map_err(|e| GeneralError(e.to_string()))
+        .map(|v| [v.major as u8, v.minor as u8, v.patch as u8])
+}
+
 /// Parses the Semver package version from the package.json file and converts it
 /// to a simplified Major, Minor and Patch.
 pub fn parse_package_version(package_file: &str) -> Result<MajMinPatch, RealError> {
     get_package_version(package_file)
-        .and_then(|v| Version::parse(v.as_str())
-            .map_err(|e| GeneralError(e.to_string()))
-            .map(|v| [v.major as u8, v.minor as u8, v.patch as u8]))
+        .and_then(|v| parse_package_version_string(v.as_str()))
 }
 
 #[cfg(feature = "wasm")]

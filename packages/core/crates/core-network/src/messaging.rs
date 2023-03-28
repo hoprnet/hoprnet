@@ -65,20 +65,27 @@ impl ControlMessage {
             Err(MessagingError("request is not a valid ping message".into()))
         }
     }
+
+    pub fn get_ping_message(&self) -> Result<&PingMessage> {
+        match self {
+            ControlMessage::Ping(m) | ControlMessage::Pong(m) => Ok(m),
+            _ => Err(MessagingError("not a ping message".into()))
+        }
+    }
 }
 
 impl AutoBinarySerializable<'_> for ControlMessage { }
 
-const VERSION_SIZE: usize = 3;
 const PING_NONCE_SIZE: usize = 16;
 
 #[derive(Clone, Debug, Eq, PartialEq, Default, Serialize, Deserialize)]
 pub struct PingMessage {
+    nonce: [u8; PING_NONCE_SIZE],
     version: MajMinPatch,
-    nonce: [u8; PING_NONCE_SIZE]
 }
 
 impl PingMessage {
+    /// Retrieves the challenge or response in this ping/pong message.
     pub fn nonce(&self) -> &[u8] {
         &self.nonce
     }
@@ -89,7 +96,7 @@ impl PingMessage {
     }
 }
 
-impl AutoBinarySerializable<'_> for PingMessage { const SIZE: usize = VERSION_SIZE + PING_NONCE_SIZE; }
+impl AutoBinarySerializable<'_> for PingMessage { const SIZE: usize = 3 + PING_NONCE_SIZE; }
 
 #[cfg(test)]
 mod tests {
