@@ -1,4 +1,5 @@
 pub mod cli;
+pub mod config;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
