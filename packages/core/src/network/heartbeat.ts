@@ -51,7 +51,7 @@ export default class Heartbeat {
     this.pinger = Pinger.build(
       environmentId,
       NORMALIZED_VERSION,
-      (peer: string, result: number | undefined) => this.networkPeers.refresh(peer, result),
+      (peer: string, result: number | undefined) => this.networkPeers.refresh(peer, result, undefined), // no metadata update here
       (msg: Uint8Array, dest: string): Promise<Uint8Array[]> =>
         this.sendMessage(peerIdFromString(dest), this.protocolHeartbeat, msg, true)
     )
