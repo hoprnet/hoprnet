@@ -186,11 +186,6 @@ describe('relay switch context', function () {
 
     nodeShaker.write(Uint8Array.of(RelayPrefix.STATUS_MESSAGE, StatusMessages.PONG))
 
-    // assert(pingResponse == -1)
-
-    // Let async operations happen
-    // await new Promise((resolve) => setTimeout(resolve))
-
     let secondErrThrown = false
     await ctx.ping(100).catch((_errMessage) => {
       secondErrThrown = true
