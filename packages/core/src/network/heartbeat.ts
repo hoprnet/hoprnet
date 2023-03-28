@@ -18,11 +18,11 @@ import pkg from '../../package.json' assert { type: 'json' }
 import { peerIdFromString } from '@libp2p/peer-id'
 
 const NORMALIZED_VERSION = pickVersion(pkg.version)
-export const PEER_METADATA_PROTOCOL_VERSION = "protocol_version"
+export const PEER_METADATA_PROTOCOL_VERSION = 'protocol_version'
 
 function versionFromProtocol(protocol: string): string {
   let parts = protocol.split('/')
-  return (parts.length == 5) ? parts[5] : undefined
+  return parts.length == 5 ? parts[5] : undefined
 }
 
 export default class Heartbeat {
@@ -65,7 +65,7 @@ export default class Heartbeat {
 
   public async start() {
     this.libp2pComponents.getRegistrar().handle(this.protocolHeartbeat, async ({ protocol, connection, stream }) => {
-      let peer_metadata = new Map<string, string>();
+      let peer_metadata = new Map<string, string>()
       let remote = connection.remotePeer.toString()
 
       let observedVersion = versionFromProtocol(protocol)
