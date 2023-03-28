@@ -1,7 +1,7 @@
 [package]
 name = "core-crypto"
 version = "0.1.0"
-description = "Core cryptographic primitives and functions used in HOPR"
+description = "Core cryptographic primitives and functions used in the HOPR protocol"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 homepage = "https://hoprnet.org/"
@@ -17,25 +17,25 @@ ed25519 = [ ]
 wasm = ["dep:wasm-bindgen", "dep:js-sys"]
 
 [dependencies]
-aes = "0.8.2"
-blake2 = "0.10.4"
-chacha20 = "0.9.0"
-ctr = "0.9.1"
-digest = "0.10.5"
-elliptic-curve = "0.13.1"
+aes = "0.8"
+blake2 = "0.10"
+chacha20 = "0.9"
+ctr = "0.9"
+digest = "0.10"
+elliptic-curve = "0.13"
 generic-array = "0.14.6"
 getrandom = { version = "0.2.8", features = ["js"] }
 hex = "0.4"
 hex-literal = "0.3"
-hkdf = "0.12.3"
-hmac = "0.12.1"
+hkdf = "0.12"
+hmac = "0.12"
 js-sys = { version = "0.3.60", optional = true }
 k256 = { version = "0.13.0", features = ["arithmetic", "ecdh"] }
 libp2p-identity = { version = "0.1.1", features = ["secp256k1", "peerid"] }
 rand = "0.8.5"
-sha3 = "0.10.6"
-typenum = "1.15.0"
-thiserror = "1.0.37"
+sha3 = "0.10"
+typenum = "1.15"
+thiserror = "1.0"
 utils-log = { path = "../../../utils/crates/utils-log" }
 utils-misc = { path = "../../../utils/crates/utils-misc" }
 utils-proc-macros = { path = "../../../utils/crates/utils-proc-macros" }

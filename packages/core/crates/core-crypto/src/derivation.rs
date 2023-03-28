@@ -1,10 +1,12 @@
 use blake2::Blake2s256;
+use digest::{Digest, FixedOutput};
 use hkdf::SimpleHkdf;
 use crate::errors::CryptoError::{InvalidInputValue, InvalidParameterSize};
 
 use crate::errors::Result;
-use crate::parameters::{PACKET_TAG_LENGTH, SECRET_KEY_LENGTH};
+use crate::parameters::{PACKET_TAG_LENGTH, SECRET_KEY_LENGTH, PING_PONG_NONCE_SIZE};
 use crate::primitives::calculate_mac;
+use crate::random::random_fill;
 
 // Module-specific constants
 const HASH_KEY_COMMITMENT_SEED: &str = "HASH_KEY_COMMITMENT_SEED";
@@ -23,6 +25,22 @@ fn hkdf_expand_from_prk<const OUT_LENGTH: usize>(secret: &[u8], tag: &[u8]) -> R
         .map_err(|_| InvalidInputValue)?;
 
     Ok(out)
+}
+
+/// Derives a ping challenge (if no challenge is given) or a pong response to a ping challenge.
+pub fn derive_ping_pong(challenge: Option<&[u8]>) -> Box<[u8]> {
+    let mut ret = [0u8; PING_PONG_NONCE_SIZE];
+    match challenge {
+       None => random_fill(&mut ret),
+       Some(chal) => {
+           let mut digest = Blake2s256::default();
+           digest.update(chal);
+           // Finalize requires enough space for the hash value, so this needs an extra copy
+           let hash = digest.finalize_fixed().to_vec();
+           ret.copy_from_slice(&hash[0..PING_PONG_NONCE_SIZE]);
+       }
+    }
+    ret.into()
 }
 
 /// Derives the commitment seed given the compressed private key representation
