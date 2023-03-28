@@ -8,8 +8,14 @@ import { HoprDB } from '@hoprnet/hopr-utils'
 // Each entry also specifies supported endpoint-specific limits.
 import supportedCapabilities from './../supported-api-capabilities.json' assert { type: 'json' }
 
+enum LimitType {
+  calls
+}
+
+export type LimitTypeString = keyof typeof LimitType
+
 export type Limit = {
-  type: string
+  type: LimitTypeString
   conditions: {
     max?: number
   }
@@ -112,8 +118,8 @@ export async function authorizeToken(db: HoprDB, token: Token, endpointRef: stri
   const tokenAuthorized = capsChecks.every((c) => c === true)
   if (tokenAuthorized) {
     // update limits before returning
-    token.capabilities = endpointCaps.map((c) => {
-      if (c.limits) {
+    token.capabilities = token.capabilities.map((c) => {
+      if (c.endpoint === endpointRef && c.limits) {
         const limits = c.limits.map((l) => {
           if (l.type === 'calls') {
             // Add or increment field 'used'
@@ -234,7 +240,7 @@ async function generateNewId(db: HoprDB): Promise<string> {
 }
 
 // Generic limits which are supported on every supported endpoint.
-const genericLimits = {
+const genericLimits: Record<LimitTypeString, any> = {
   calls: {
     max: {
       validityCheck: (v: number): boolean => v > 0,

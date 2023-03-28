@@ -13,6 +13,7 @@ COPY scripts/ scripts
 COPY Makefile .
 
 ENV FOUNDRY_DIR=/app/hoprnet-toolchain/.foundry
+ENV ETHERSCAN_API_KEY="random_giberish"
 
 # install missing process runner
 RUN apt-get update \

@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-connect",
-  "version": "1.93.0-next.34",
+  "version": "1.93.0-next.39",
   "description": "A libp2p-complaint transport module that handles NAT traversal by using WebRTC",
   "repository": "https://github.com/hoprnet/hopr-connect.git",
   "homepage": "https://github.com/hoprnet/hopr-connect",
@@ -58,7 +58,7 @@
     "@types/mocha": "9.1.1",
     "@types/node": "16",
     "@types/simple-peer": "9.11.5",
-    "it-pair": "2.0.2",
+    "it-pair": "2.0.4",
     "it-pipe": "2.0.3",
     "it-pushable": "3.0.0",
     "mocha": "9.2.2",

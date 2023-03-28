@@ -779,7 +779,7 @@ __metadata:
     err-code: 3.0.1
     heap-js: 2.2.0
     it-handshake: 4.0.0
-    it-pair: 2.0.2
+    it-pair: 2.0.4
     it-pipe: 2.0.3
     it-pushable: 3.0.0
     mocha: 9.2.2
@@ -924,7 +924,7 @@ __metadata:
     memdown: 6.1.1
     mocha: 9.2.2
     multiformats: 9.6.5
-    rewiremock: 3.14.3
+    rewiremock: 3.14.5
     secp256k1: 4.0.3
     sinon: 12.0.1
     timeout-abort-controller: 3.0.0
@@ -6826,7 +6826,17 @@ __metadata:
   languageName: node
   linkType: hard
 
-"it-pair@npm:2.0.2, it-pair@npm:^2.0.2":
+"it-pair@npm:2.0.4":
+  version: 2.0.4
+  resolution: "it-pair@npm:2.0.4"
+  dependencies:
+    it-stream-types: ^1.0.3
+    p-defer: ^4.0.0
+  checksum: 7eedc5712c860b3741a26efdbfb747b9757acd328b7ffd48c73f46710f76b3e0462e4649044ca3210f9e6cae1a5f011bcf2b603ff3ef3ac6c3c5ce91f951804c
+  languageName: node
+  linkType: hard
+
+"it-pair@npm:^2.0.2":
   version: 2.0.2
   resolution: "it-pair@npm:2.0.2"
   dependencies:
@@ -9995,9 +10005,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"rewiremock@npm:3.14.3":
-  version: 3.14.3
-  resolution: "rewiremock@npm:3.14.3"
+"rewiremock@npm:3.14.5":
+  version: 3.14.5
+  resolution: "rewiremock@npm:3.14.5"
   dependencies:
     babel-runtime: ^6.26.0
     compare-module-exports: ^2.1.0
@@ -10007,7 +10017,7 @@ __metadata:
     path-parse: ^1.0.5
     wipe-node-cache: ^2.1.2
     wipe-webpack-cache: ^2.1.0
-  checksum: 96cebd8aac67c1f01b25c81a443716a75e4d0cbfd5c93712d5e99a1b0d3d514e8121389fd563b411377374098d4643c6784ed3de7e9fbfdfa7b84c3468942db4
+  checksum: be1fb6df47babf59da1ba1dadc63cb0021bc36ffd75d0c21a8aff9ad6016b35c73f6773f435754b353d3ddf9b3c6ef42ff86254c996c496360233d6d51eadb6f
   languageName: node
   linkType: hard
 
