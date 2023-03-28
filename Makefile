@@ -96,7 +96,6 @@ deps: ## Installs dependencies for development setup
 	$(MAKE) cargo-update
 	command -v wasm-opt || $(cargo) install wasm-opt
 	command -v wasm-pack || $(cargo) install wasm-pack
-	command -v wasm-bindgen || $(cargo) install wasm-bindgen
 	yarn workspaces focus ${YARNFLAGS}
 # install foundry (cast + forge + anvil)
 	$(MAKE) install-foundry
