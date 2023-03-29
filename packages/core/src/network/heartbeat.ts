@@ -51,7 +51,7 @@ export default class Heartbeat {
     this.pinger = Pinger.build(
       environmentId,
       NORMALIZED_VERSION,
-      (peer: string, result: number | undefined) => this.networkPeers.refresh(peer, result, undefined), // no metadata update here
+      (peer: string, result: number | undefined) => this.networkPeers.refresh(peer, result),
       (msg: Uint8Array, dest: string): Promise<Uint8Array[]> =>
         this.sendMessage(peerIdFromString(dest), this.protocolHeartbeat, msg, true)
     )
@@ -74,9 +74,9 @@ export default class Heartbeat {
       }
 
       if (this.networkPeers.contains(remote)) {
-        this.networkPeers.refresh(remote, Date.now(), peer_metadata)
+        this.networkPeers.refresh_with_metadata(remote, Date.now(), peer_metadata)
       } else {
-        this.networkPeers.register(remote, PeerOrigin.IncomingConnection, peer_metadata)
+        this.networkPeers.register_with_metadata(remote, PeerOrigin.IncomingConnection, peer_metadata)
       }
 
       try {

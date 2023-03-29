@@ -219,7 +219,11 @@ impl Network {
     /// Add a new PeerId into the network
     ///
     /// Each PeerId must have an origin specification.
-    pub fn add(&mut self, peer: &PeerId, origin: PeerOrigin, metadata: Option<HashMap<String, String>>) {
+    pub fn add(&mut self, peer: &PeerId, origin: PeerOrigin) {
+        self.add_with_metadata(peer, origin, None)
+    }
+
+    pub fn add_with_metadata(&mut self, peer: &PeerId, origin: PeerOrigin, metadata: Option<HashMap<String, String>>) {
         let id = peer.to_string();
         let now = current_timestamp();
 
@@ -261,8 +265,12 @@ impl Network {
         self.entries.remove(peer.to_string().as_str());
     }
 
+    pub fn update(&mut self, peer: &PeerId, ping_result: crate::types::Result) {
+        self.update_with_metadata(peer, ping_result, None)
+    }
+
     /// Update the PeerId record in the network
-    pub fn update(&mut self, peer: &PeerId, ping_result: crate::types::Result, metadata: Option<HashMap<String, String>>) {
+    pub fn update_with_metadata(&mut self, peer: &PeerId, ping_result: crate::types::Result, metadata: Option<HashMap<String, String>>) {
         if let Some(existing) = self.entries.get(peer.to_string().as_str()) {
             let mut entry = existing.clone();
             entry.heartbeats_sent = entry.heartbeats_sent + 1;
@@ -621,10 +629,15 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub fn register(&mut self, peer: JsString, origin: PeerOrigin, metadata: &js_sys::Map) {
+        pub fn register(&mut self, peer: JsString, origin: PeerOrigin) {
+            self.register_with_metadata(peer, origin, &js_sys::Map::from(JsValue::undefined()))
+        }
+
+        #[wasm_bindgen]
+        pub fn register_with_metadata(&mut self, peer: JsString, origin: PeerOrigin, metadata: &js_sys::Map) {
             let peer: String = peer.into();
             match PeerId::from_str(&peer) {
-                Ok(p) => self.add(&p, origin, js_map_to_hash_map(metadata)),
+                Ok(p) => self.add_with_metadata(&p, origin, js_map_to_hash_map(metadata)),
                 Err(err) => {
                     warn!(
                         "Failed to parse peer id {}, network ignores the register attempt: {}",
@@ -651,7 +664,12 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub fn refresh(&mut self, peer: JsString, timestamp: JsValue, metadata: &js_sys::Map) {
+        pub fn refresh(&mut self, peer: JsString, timestamp: JsValue) {
+            self.refresh_with_metadata(peer, timestamp, &js_sys::Map::from(JsValue::undefined()))
+        }
+
+        #[wasm_bindgen]
+        pub fn refresh_with_metadata(&mut self, peer: JsString, timestamp: JsValue, metadata: &js_sys::Map) {
             let peer: String = peer.into();
             let result: crate::types::Result = if timestamp.is_undefined() {
                 Err(())
@@ -659,7 +677,7 @@ pub mod wasm {
                 timestamp.as_f64().map(|v| v as u64).ok_or(())
             };
             match PeerId::from_str(&peer) {
-                Ok(p) => self.update(&p, result, js_map_to_hash_map(metadata)),
+                Ok(p) => self.update_with_metadata(&p, result, js_map_to_hash_map(metadata)),
                 Err(err) => {
                     warn!(
                         "Failed to parse peer id {}, network ignores the regresh attempt: {}",
@@ -758,7 +776,7 @@ mod tests {
 
         let mut peers = basic_network(&me);
 
-        peers.add(&me, PeerOrigin::IncomingConnection, None);
+        peers.add(&me, PeerOrigin::IncomingConnection);
 
         assert_eq!(0, peers.length());
         assert!(!peers.has(&me))
@@ -770,7 +788,7 @@ mod tests {
 
         let mut peers = basic_network(&PeerId::random());
 
-        peers.add(&expected, PeerOrigin::IncomingConnection, None);
+        peers.add(&expected, PeerOrigin::IncomingConnection);
 
         assert_eq!(1, peers.length());
         assert!(peers.has(&expected))
@@ -782,7 +800,7 @@ mod tests {
 
         let mut peers = basic_network(&PeerId::random());
 
-        peers.add(&peer, PeerOrigin::IncomingConnection, None);
+        peers.add(&peer, PeerOrigin::IncomingConnection);
 
         peers.remove(&peer);
 
@@ -796,7 +814,7 @@ mod tests {
 
         let mut peers = basic_network(&PeerId::random());
 
-        peers.update(&peer, Ok(current_timestamp()), None);
+        peers.update(&peer, Ok(current_timestamp()));
 
         assert_eq!(0, peers.length());
         assert!(!peers.has(&peer))
@@ -808,11 +826,11 @@ mod tests {
 
         let mut peers = basic_network(&PeerId::random());
 
-        peers.add(&peer, PeerOrigin::IncomingConnection, None);
+        peers.add(&peer, PeerOrigin::IncomingConnection);
 
         let ts = current_timestamp();
 
-        peers.update(&peer, Ok(ts.clone()), None);
+        peers.update(&peer, Ok(ts.clone()));
 
         let actual = peers.debug_output();
 
@@ -827,17 +845,17 @@ mod tests {
 
         let mut peers = basic_network(&PeerId::random());
 
-        peers.add(&peer, PeerOrigin::IncomingConnection, None);
+        peers.add(&peer, PeerOrigin::IncomingConnection);
 
-        peers.update(&peer, Ok(current_timestamp()), None);
-        peers.update(&peer, Ok(current_timestamp()), None);
-        peers.update(&peer, Err(()), None);          // should drop to ignored
-        peers.update(&peer, Err(()), None);          // should drop from network
+        peers.update(&peer, Ok(current_timestamp()));
+        peers.update(&peer, Ok(current_timestamp()));
+        peers.update(&peer, Err(())); // should drop to ignored
+        peers.update(&peer, Err(())); // should drop from network
 
         assert!(!peers.has(&peer));
 
         // peer should remain ignored and not be added
-        peers.add(&peer, PeerOrigin::IncomingConnection, None);
+        peers.add(&peer, PeerOrigin::IncomingConnection);
 
         assert!(!peers.has(&peer))
     }
@@ -847,11 +865,11 @@ mod tests {
         let peer = PeerId::random();
         let mut peers = basic_network(&PeerId::random());
 
-        peers.add(&peer, PeerOrigin::IncomingConnection, None);
+        peers.add(&peer, PeerOrigin::IncomingConnection);
 
-        peers.update(&peer, Ok(current_timestamp()), None);
-        peers.update(&peer, Ok(current_timestamp()), None);
-        peers.update(&peer, Err(()), None);
+        peers.update(&peer, Ok(current_timestamp()));
+        peers.update(&peer, Ok(current_timestamp()));
+        peers.update(&peer, Err(()));
 
         let actual = peers.debug_output();
 
@@ -865,16 +883,16 @@ mod tests {
         let second = PeerId::random();
         let mut peers = basic_network(&PeerId::random());
 
-        peers.add(&first, PeerOrigin::IncomingConnection, None);
-        peers.add(&second, PeerOrigin::IncomingConnection, None);
+        peers.add(&first, PeerOrigin::IncomingConnection);
+        peers.add(&second, PeerOrigin::IncomingConnection);
 
         let ts = current_timestamp();
 
         let mut expected = vec![first, second];
         expected.sort();
 
-        peers.update(&first, Ok(ts), None);
-        peers.update(&second, Ok(ts), None);
+        peers.update(&first, Ok(ts));
+        peers.update(&second, Ok(ts));
 
         let mut actual = peers.find_peers_to_ping(ts + 3000);
         actual.sort();
@@ -895,7 +913,7 @@ mod tests {
 
         let mut peers = basic_network(&PeerId::random());
 
-        peers.add(&peer, PeerOrigin::IncomingConnection, None);
+        peers.add(&peer, PeerOrigin::IncomingConnection);
 
         assert_eq!(peers.health(), Health::RED);
     }
@@ -906,7 +924,7 @@ mod tests {
 
         let mut peers = basic_network(&PeerId::random());
 
-        peers.add(&peer, PeerOrigin::IncomingConnection, None);
+        peers.add(&peer, PeerOrigin::IncomingConnection);
         let _ = peers.health();
         peers.remove(&peer);
 
@@ -923,7 +941,7 @@ mod tests {
 
         let mut peers = Network::new(PeerId::random(), 0.6, Box::new(mock));
 
-        peers.add(&peer, PeerOrigin::IncomingConnection, None);
+        peers.add(&peer, PeerOrigin::IncomingConnection);
 
         assert_eq!(peers.health(), Health::RED);
     }
@@ -938,9 +956,9 @@ mod tests {
         mock.expect_on_network_health_change().times(1).return_const(());
         let mut peers = Network::new(PeerId::random(), 0.6, Box::new(mock));
 
-        peers.add(&peer, PeerOrigin::IncomingConnection, None);
+        peers.add(&peer, PeerOrigin::IncomingConnection);
 
-        peers.update(&peer, Ok(current_timestamp()), None);
+        peers.update(&peer, Ok(current_timestamp()));
 
         assert_eq!(peers.health(), Health::ORANGE);
     }
@@ -957,10 +975,10 @@ mod tests {
 
         let mut peers = Network::new(PeerId::random(), 0.6, Box::new(mock));
 
-        peers.add(&peer, PeerOrigin::IncomingConnection, None);
+        peers.add(&peer, PeerOrigin::IncomingConnection);
 
-        peers.update(&peer, Ok(current_timestamp()), None);
-        peers.update(&peer, Err(()), None);
+        peers.update(&peer, Ok(current_timestamp()));
+        peers.update(&peer, Err(()));
 
         assert!(!peers.has(&public));
     }
@@ -976,10 +994,10 @@ mod tests {
         mock.expect_on_network_health_change().times(2).return_const(());
         let mut peers = Network::new(me, 0.3, Box::new(mock));
 
-        peers.add(&peer, PeerOrigin::IncomingConnection, None);
+        peers.add(&peer, PeerOrigin::IncomingConnection);
 
         for _ in 0..3 {
-            peers.update(&peer, Ok(current_timestamp()), None);
+            peers.update(&peer, Ok(current_timestamp()));
         }
 
         assert_eq!(peers.health(), Health::GREEN);
@@ -998,12 +1016,12 @@ mod tests {
         mock.expect_on_network_health_change().times(2).return_const(());
         let mut peers = Network::new(PeerId::random(), 0.3, Box::new(mock));
 
-        peers.add(&peer, PeerOrigin::IncomingConnection, None);
-        peers.add(&peer2, PeerOrigin::IncomingConnection, None);
+        peers.add(&peer, PeerOrigin::IncomingConnection);
+        peers.add(&peer2, PeerOrigin::IncomingConnection);
 
         for _ in 0..3 {
-            peers.update(&peer2, Ok(current_timestamp()), None);
-            peers.update(&peer, Ok(current_timestamp()), None);
+            peers.update(&peer2, Ok(current_timestamp()));
+            peers.update(&peer, Ok(current_timestamp()));
         }
 
         assert_eq!(peers.health(), Health::GREEN);
