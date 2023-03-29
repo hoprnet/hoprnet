@@ -1,2 +1,2 @@
 # use image with standard tools installed
--P ubuntu-latest=catthehacker/ubuntu:custom-22.04-20230215
+-P ubuntu-latest=catthehacker/ubuntu:custom-22.04-20230322
