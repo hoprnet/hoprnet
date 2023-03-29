@@ -41,6 +41,9 @@ function usage() {
 export CARGO_BIN_DIR="${mydir}/../../.cargo/bin"
 export PATH=${PATH}:${CARGO_BIN_DIR}
 
+declare usr_local="/usr/local"
+declare usr_local_bin="${usr_local}/bin"
+
 declare install_all with_yarn
 install_all="true"
 with_yarn="false"
@@ -70,20 +73,23 @@ while (( "$#" )); do
   esac
 done
 
-if [[ "${PATH}" =~ "/usr/local/bin" ]]; then
-    echo "Cannot install utilities. \"/usr/local/bin\" is not part of home-path."
+# move /usr/local/bin to beginning of PATH
+export PATH="${usr_local_bin}:${PATH//:\/usr\/local\/bin/}"
+
+if [[ "${PATH}" =~ "${usr_local_bin}" ]]; then
+    echo "Cannot install utilities. \"${usr_local_bin}\" is not part of home-path. ${PATH}"
+    exit 1
 fi
 
-if ! [ -w "/usr/local/bin" ]; then
-    echo "Cannot install utilities. \"/usr/local/bin\" is not writable."
+if ! [ -w "${usr_local_bin}" ]; then
+    echo "Cannot install utilities. \"${usr_local_bin}\" is not writable."
+    exit 1
 fi
 
 if ! [ -d "/opt" ] && ! [ -w "/opt" ] || ! [ -w "/" ]; then
     echo "Cannot install utilities. \"/opt\" does not exist or is not writable."
+    exit 1
 fi
-
-# move /usr/local/bin to beginning of PATH
-export PATH="/usr/local/bin:${PATH//:\/usr\/local\/bin/}"
 
 declare download_dir="/tmp/hopr-toolchain/download"
 mkdir -p ${download_dir}
@@ -225,7 +231,7 @@ function install_node_js() {
           /usr/local/share/man/man1/node.1 \
           /usr/local/include/node \
           /usr/local/lib/node_modules
-        tar -xJf node.tar.xz -C /usr/local \
+        tar -xJf node.tar.xz -C ${usr_local} \
           --strip-components=1 --no-same-owner \
           --exclude README.md \
           --exclude LICENSE \
@@ -242,7 +248,7 @@ function install_yarn() {
         curl -fsSLO --compressed "https://yarnpkg.com/downloads/${yarn_release}/yarn-v${yarn_release}.tar.gz"
         mkdir -p /opt
         tar -xzf "yarn-v${yarn_release}.tar.gz" -C /opt
-        ln -s /opt/yarn-v${yarn_release}/bin/yarn /usr/local/bin/yarn
+        ln -s /opt/yarn-v${yarn_release}/bin/yarn ${usr_local_bin}/yarn
         cd ${mydir}
     fi
 }
