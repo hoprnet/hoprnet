@@ -19,7 +19,6 @@ pub mod wasm {
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use utils_types::traits::BinarySerializable;
-    use crate::heartbeat::HeartbeatConfig;
     use crate::messaging::ControlMessage;
 
     #[wasm_bindgen]
