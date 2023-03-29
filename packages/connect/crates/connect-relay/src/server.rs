@@ -269,8 +269,7 @@ impl<St: DuplexStream, Cbs: RelayServerCbs> Server<St, Cbs> {
         // takes ownership
         self.ping_requests.insert(random_value, fut);
 
-        let timeout_duration =
-            maybe_timeout.unwrap_or(DEFAULT_RELAYED_CONNECTION_PING_TIMEOUT as u64);
+        let timeout_duration = maybe_timeout.unwrap_or(DEFAULT_RELAYED_CONNECTION_PING_TIMEOUT as u64);
 
         let send_fut = self
             .send(Box::new([
@@ -284,20 +283,14 @@ impl<St: DuplexStream, Cbs: RelayServerCbs> Server<St, Cbs> {
         pin_mut!(send_timeout);
 
         match select(send_timeout, send_fut).await {
-            Either::Left(_) => {
-                return Err(format!(
-                    "Low-level ping timed out after {} ms",
-                    timeout_duration
-                ))
-            }
+            Either::Left(_) => return Err(format!("Low-level ping timed out after {} ms", timeout_duration)),
             Either::Right((Ok(()), _)) => (),
             Either::Right((Err(e), _)) => return Err(e),
         };
         self.log("server: after sending PING message");
 
         // TODO: move this up to catch all
-        let response_timeout =
-            sleep(std::time::Duration::from_millis(timeout_duration as u64)).fuse();
+        let response_timeout = sleep(std::time::Duration::from_millis(timeout_duration as u64)).fuse();
         // cannot clone futures
         let ping = self.ping_requests.get_mut(&random_value).unwrap();
 
@@ -306,10 +299,7 @@ impl<St: DuplexStream, Cbs: RelayServerCbs> Server<St, Cbs> {
         pin_mut!(response_timeout);
 
         match select(response_timeout, ping).await {
-            Either::Left(_) => Err(format!(
-                "Low-level ping timed out after {}",
-                timeout_duration
-            )),
+            Either::Left(_) => Err(format!("Low-level ping timed out after {}", timeout_duration)),
             Either::Right((latency, _)) => Ok(latency),
         }
     }
@@ -430,9 +420,7 @@ impl<'b, St: DuplexStream, Cbs: RelayServerCbs> Stream for Server<St, Cbs> {
                         }
                         Some(prefix) if *prefix == MessagePrefix::StatusMessage as u8 => {
                             match item.get(1) {
-                                Some(inner_prefix)
-                                    if *inner_prefix == StatusMessage::Ping as u8 =>
-                                {
+                                Some(inner_prefix) if *inner_prefix == StatusMessage::Ping as u8 => {
                                     match this.status_messages_tx.poll_ready(cx) {
                                         Poll::Ready(Ok(())) => {
                                             match this.status_messages_tx.unbounded_send(item) {
@@ -447,13 +435,10 @@ impl<'b, St: DuplexStream, Cbs: RelayServerCbs> Stream for Server<St, Cbs> {
                                         Poll::Pending => return Poll::Pending,
                                     };
                                 }
-                                Some(inner_prefix)
-                                    if *inner_prefix == StatusMessage::Pong as u8 =>
-                                {
+                                Some(inner_prefix) if *inner_prefix == StatusMessage::Pong as u8 => {
                                     // 2 byte prefix, 4 byte ping identifier
 
-                                    let has_legacy_entry =
-                                        this.ping_requests.contains_key(&[0u8; 4]);
+                                    let has_legacy_entry = this.ping_requests.contains_key(&[0u8; 4]);
                                     if item.len() < 6 && !has_legacy_entry {
                                         // drop malformed pong message
                                         return Poll::Pending;
@@ -478,8 +463,7 @@ impl<'b, St: DuplexStream, Cbs: RelayServerCbs> Stream for Server<St, Cbs> {
                             };
                         }
                         Some(prefix)
-                            if *prefix == MessagePrefix::Payload as u8
-                                || *prefix == MessagePrefix::WebRTC as u8 =>
+                            if *prefix == MessagePrefix::Payload as u8 || *prefix == MessagePrefix::WebRTC as u8 =>
                         {
                             break Some(Ok(item))
                         }
@@ -536,17 +520,10 @@ impl<St: DuplexStream, Cbs: RelayServerCbs> Sink<Box<[u8]>> for Server<St, Cbs> 
 
         // Send all pending status messages before forwarding any new messages
         loop {
-            let status_message_to_send = if let Some(buffered) = this.buffered_status_message.take()
-            {
+            let status_message_to_send = if let Some(buffered) = this.buffered_status_message.take() {
                 buffered
             } else {
-                match this
-                    .status_messages_rx
-                    .as_mut()
-                    .as_pin_mut()
-                    .unwrap()
-                    .poll_next(cx)
-                {
+                match this.status_messages_rx.as_mut().as_pin_mut().unwrap().poll_next(cx) {
                     Poll::Pending => break,
                     Poll::Ready(None) => {
                         info!("status message stream is closed");
@@ -667,9 +644,7 @@ impl<St: DuplexStream, Cbs: RelayServerCbs> Sink<Box<[u8]>> for Server<St, Cbs> 
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use crate::streaming_iterable::{
-        AsyncIterable, JsStreamingIterable, StreamingIterable, Uint8ArrayIteratorNext,
-    };
+    use crate::streaming_iterable::{AsyncIterable, JsStreamingIterable, StreamingIterable, Uint8ArrayIteratorNext};
     use futures::{stream::Next, FutureExt, SinkExt, StreamExt};
     use js_sys::{AsyncIterator, Function, Number, Object, Promise, Reflect, Symbol, Uint8Array};
     use utils_misc::async_iterable::wasm::to_jsvalue_stream;
@@ -746,11 +721,7 @@ pub mod wasm {
         /// Assign duplex stream endpoint and create a new instance
         /// of server-side relay stream state management code
         #[wasm_bindgen(constructor)]
-        pub fn new(
-            stream: JsStreamingIterable,
-            signals: RelayServerCbs,
-            _options: RelayServerOpts,
-        ) -> Self {
+        pub fn new(stream: JsStreamingIterable, signals: RelayServerCbs, _options: RelayServerOpts) -> Self {
             Self {
                 w: super::Server::new(StreamingIterable::from(stream), signals),
             }
@@ -767,14 +738,12 @@ pub mod wasm {
         pub fn ping(&mut self, timeout: Option<Number>) -> Promise {
             let this = unsafe { std::mem::transmute::<&mut Server, &mut Server>(self) };
 
-            wasm_bindgen_futures::future_to_promise(
-                this.w
-                    .ping(timeout.map(|f| f.value_of() as u64))
-                    .map(|r| match r {
-                        Ok(u) => Ok(JsValue::from(u)),
-                        Err(e) => Err(JsValue::from(e)),
-                    }),
-            )
+            wasm_bindgen_futures::future_to_promise(this.w.ping(timeout.map(|f| f.value_of() as u64)).map(
+                |r| match r {
+                    Ok(u) => Ok(JsValue::from(u)),
+                    Err(e) => Err(JsValue::from(e)),
+                },
+            ))
         }
 
         /// Expose identifiers of open ping request, mainly used for unit testing
@@ -875,9 +844,7 @@ pub mod wasm {
                     Err(e) => {
                         self.w
                             .error(format!("Error access Symbol.asyncIterator {:?}", e).as_str());
-                        reject
-                            .call1(&JsValue::undefined(), &JsValue::from(e))
-                            .unwrap();
+                        reject.call1(&JsValue::undefined(), &JsValue::from(e)).unwrap();
                         return;
                     }
                 };
@@ -887,22 +854,16 @@ pub mod wasm {
                     Err(e) => {
                         self.w
                             .error(format!("Cannot perform dynamic convertion {:?}", e).as_str());
-                        reject
-                            .call1(&JsValue::undefined(), &JsValue::from(e))
-                            .unwrap();
+                        reject.call1(&JsValue::undefined(), &JsValue::from(e)).unwrap();
                         return;
                     }
                 };
 
-                let async_it: AsyncIterator = match async_iter_fn.call0(&source).unwrap().dyn_into()
-                {
+                let async_it: AsyncIterator = match async_iter_fn.call0(&source).unwrap().dyn_into() {
                     Ok(x) => x,
                     Err(e) => {
-                        self.w
-                            .error(format!("Cannot call iterable function {:?}", e).as_str());
-                        reject
-                            .call1(&JsValue::undefined(), &JsValue::from(e))
-                            .unwrap();
+                        self.w.error(format!("Cannot call iterable function {:?}", e).as_str());
+                        reject.call1(&JsValue::undefined(), &JsValue::from(e)).unwrap();
                         return;
                     }
                 };
@@ -916,14 +877,9 @@ pub mod wasm {
                                 let chunk = match chunk_fut.await {
                                     Ok(x) => x,
                                     Err(e) => {
-                                        this.w.error(
-                                            format!("error handling next() future {:?}", e)
-                                                .as_str(),
-                                        );
+                                        this.w.error(format!("error handling next() future {:?}", e).as_str());
                                         this.w.stream.as_mut().unwrap().close().await;
-                                        reject
-                                            .call1(&JsValue::undefined(), &JsValue::from(e))
-                                            .unwrap();
+                                        reject.call1(&JsValue::undefined(), &JsValue::from(e)).unwrap();
                                         return;
                                     }
                                 };
@@ -943,8 +899,7 @@ pub mod wasm {
                             Err(e) => {
                                 resolve.call0(&JsValue::undefined());
 
-                                this.w
-                                    .log(format!("Error calling next function {:?}", e).as_str());
+                                this.w.log(format!("Error calling next function {:?}", e).as_str());
                                 this.w.close().await;
                             }
                         };

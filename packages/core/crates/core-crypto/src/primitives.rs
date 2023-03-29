@@ -1,28 +1,30 @@
-use blake2::Blake2s256;
-use chacha20::ChaCha20;
-use chacha20::cipher::{IvSizeUser, KeySizeUser, StreamCipher, StreamCipherSeek};
-use hmac::{Mac, SimpleHmac};
-use chacha20::cipher::KeyIvInit;
-use digest::FixedOutputReset;
 use crate::derivation::derive_mac_key;
+use blake2::Blake2s256;
+use chacha20::cipher::KeyIvInit;
+use chacha20::cipher::{IvSizeUser, KeySizeUser, StreamCipher, StreamCipherSeek};
+use chacha20::ChaCha20;
+use digest::FixedOutputReset;
+use hmac::{Mac, SimpleHmac};
 
-use crate::errors::Result;
 use crate::errors::CryptoError::{InvalidInputValue, InvalidParameterSize};
+use crate::errors::Result;
 use crate::parameters::SECRET_KEY_LENGTH;
 
 /// Simple Message Authentication Code (MAC) computation wrapper
 /// Use `new`, `update` and `finalize` triplet to produce MAC of arbitrary data.
 /// Currently this instance is computing HMAC based on Blake2s256
 pub struct SimpleMac {
-    instance: SimpleHmac<Blake2s256>
+    instance: SimpleHmac<Blake2s256>,
 }
 
 impl SimpleMac {
-
     /// Create new instance of the MAC using the given secret key.
     pub fn new(key: &[u8]) -> Result<Self> {
         Ok(Self {
-            instance: SimpleHmac::<Blake2s256>::new_from_slice(key).map_err(|_| InvalidParameterSize {name: "key".into(), expected: SECRET_KEY_LENGTH})?
+            instance: SimpleHmac::<Blake2s256>::new_from_slice(key).map_err(|_| InvalidParameterSize {
+                name: "key".into(),
+                expected: SECRET_KEY_LENGTH,
+            })?,
         })
     }
 
@@ -42,26 +44,31 @@ impl SimpleMac {
 /// Use `new` and `apply` (or `apply_copy`) to XOR the keystream on the plaintext or ciphertext.
 /// Currently this instance is using ChaCha20.
 pub struct SimpleStreamCipher {
-    instance: ChaCha20
+    instance: ChaCha20,
 }
 
 impl SimpleStreamCipher {
-
     /// Create new instance of the stream cipher initialized
     /// with the given secret key and IV.
     pub fn new(key: &[u8], iv: &[u8]) -> Result<Self> {
         let chacha_iv_size = ChaCha20::iv_size();
         if iv.len() != chacha_iv_size {
-            return Err(InvalidParameterSize {name: "iv".into(), expected: chacha_iv_size})
+            return Err(InvalidParameterSize {
+                name: "iv".into(),
+                expected: chacha_iv_size,
+            });
         }
 
         let chacha_key_size = ChaCha20::key_size();
         if key.len() != chacha_key_size {
-            return Err(InvalidParameterSize {name: "key".into(), expected: chacha_key_size})
+            return Err(InvalidParameterSize {
+                name: "key".into(),
+                expected: chacha_key_size,
+            });
         }
 
         Ok(Self {
-            instance: ChaCha20::new_from_slices(key, iv).map_err(|_| InvalidInputValue)?
+            instance: ChaCha20::new_from_slices(key, iv).map_err(|_| InvalidInputValue)?,
         })
     }
 
@@ -99,10 +106,10 @@ pub fn create_tagged_mac(secret: &[u8], data: &[u8]) -> Result<Box<[u8]>> {
 
 #[cfg(test)]
 mod tests {
-    use hex_literal::hex;
     use crate::parameters::SECRET_KEY_LENGTH;
-    use crate::primitives::SimpleStreamCipher;
     use crate::primitives::wasm::create_tagged_mac;
+    use crate::primitives::SimpleStreamCipher;
+    use hex_literal::hex;
 
     #[test]
     fn test_chacha20() {
@@ -119,7 +126,7 @@ mod tests {
         assert_eq!(expected_ct, data);
     }
 
-   #[test]
+    #[test]
     fn test_chacha20_iv_block_counter() {
         let key = hex!("a9c6632c9f76e5e4dd03203196932350a47562f816cebb810c64287ff68586f3");
         let iv = hex!("6be504b26471dea53d688c4b");
@@ -151,8 +158,8 @@ mod tests {
 pub mod wasm {
     use wasm_bindgen::prelude::*;
 
-    use utils_misc::utils::wasm::JsResult;
     use utils_misc::ok_or_jserr;
+    use utils_misc::utils::wasm::JsResult;
 
     #[wasm_bindgen]
     pub fn calculate_mac(key: &[u8], data: &[u8]) -> JsResult<Box<[u8]>> {

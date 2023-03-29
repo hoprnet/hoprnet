@@ -1,8 +1,11 @@
-use std::collections::BTreeMap;
-use std::collections::btree_map::Entry;
 use prometheus::core::Collector;
-use prometheus::{Gauge, GaugeVec, Histogram, HistogramOpts, HistogramTimer, HistogramVec, IntCounter, IntCounterVec, Opts, TextEncoder};
+use prometheus::{
+    Gauge, GaugeVec, Histogram, HistogramOpts, HistogramTimer, HistogramVec, IntCounter, IntCounterVec, Opts,
+    TextEncoder,
+};
 use regex::Regex;
+use std::collections::btree_map::Entry;
+use std::collections::BTreeMap;
 
 /// Gathers all the global Prometheus metrics.
 pub fn gather_all_metrics() -> prometheus::Result<String> {
@@ -17,8 +20,8 @@ pub fn gather_all_metrics() -> prometheus::Result<String> {
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub fn merge_encoded_metrics(metrics1: &str, metrics2: &str) -> String {
     let mut merged_metrics = BTreeMap::new();
-    let metric_expr = Regex::new(r"(?:# HELP)\s(?P<name>\w+)\s.+\s+(?:# TYPE)\s\w+\s(?P<type>\w+)\s+(?:[^#]+\s)+")
-        .unwrap();
+    let metric_expr =
+        Regex::new(r"(?:# HELP)\s(?P<name>\w+)\s.+\s+(?:# TYPE)\s\w+\s(?P<type>\w+)\s+(?:[^#]+\s)+").unwrap();
 
     let merged_texts = metrics1.to_owned() + metrics2;
 
@@ -31,19 +34,17 @@ pub fn merge_encoded_metrics(metrics1: &str, metrics2: &str) -> String {
     }
 
     // Output metrics sorted lexicographically by name
-    merged_metrics
-        .values()
-        .fold("".into(), |mut a, b| {
-            a.reserve(b.len()); // pre-alloc space on LHS for better efficiency
-            a.push_str(b);
-            a
-        })
+    merged_metrics.values().fold("".into(), |mut a, b| {
+        a.reserve(b.len()); // pre-alloc space on LHS for better efficiency
+        a.push_str(b);
+        a
+    })
 }
 
 fn register_metric<M, C>(name: &str, desc: &str, creator: C) -> prometheus::Result<M>
-    where
-        M: Clone + Collector + 'static,
-        C: Fn(Opts) -> prometheus::Result<M>,
+where
+    M: Clone + Collector + 'static,
+    C: Fn(Opts) -> prometheus::Result<M>,
 {
     let metric = creator(Opts::new(name, desc))?;
 
@@ -52,18 +53,15 @@ fn register_metric<M, C>(name: &str, desc: &str, creator: C) -> prometheus::Resu
     Ok(metric)
 }
 
-fn register_metric_vec<M, C>(
-    name: &str,
-    desc: &str,
-    labels: &[&str],
-    creator: C,
-) -> prometheus::Result<M>
+fn register_metric_vec<M, C>(name: &str, desc: &str, labels: &[&str], creator: C) -> prometheus::Result<M>
 where
     M: Clone + Collector + 'static,
     C: Fn(Opts, &[&str]) -> prometheus::Result<M>,
 {
     if labels.len() == 0 {
-        return Err(prometheus::Error::Msg("at least a single label must be specified".into()));
+        return Err(prometheus::Error::Msg(
+            "at least a single label must be specified".into(),
+        ));
     }
 
     let metric = creator(Opts::new(name, desc), labels)?;
@@ -94,7 +92,9 @@ impl SimpleCounter {
     }
 
     /// Increments the counter by 1
-    pub fn increment(&self) { self.increment_by(1) }
+    pub fn increment(&self) {
+        self.increment_by(1)
+    }
 
     /// Returns the name of the counter given at construction.
     pub fn name(&self) -> String {
@@ -105,13 +105,12 @@ impl SimpleCounter {
 impl SimpleCounter {
     /// Creates a new integer counter with given name and description
     pub fn new(name: &str, description: &str) -> prometheus::Result<Self> {
-        register_metric(name, description,IntCounter::with_opts).map(|m| Self {
+        register_metric(name, description, IntCounter::with_opts).map(|m| Self {
             name: name.to_string(),
             ctr: m,
         })
     }
 }
-
 
 /// Represents a vector of named monotonic unsigned integer counters.
 /// Wrapper for IntCounterVec type
@@ -283,12 +282,17 @@ impl MultiGauge {
 macro_rules! histogram_start_measure {
     // SimpleHistogram case
     ($v:ident) => {
-        if cfg!(feature = "wasm") && !cfg!(test) { $v.wasm_start_measure() } else { $v.start_measure() }
+        if cfg!(feature = "wasm") && !cfg!(test) {
+            $v.wasm_start_measure()
+        } else {
+            $v.start_measure()
+        }
     };
     // MultiHistogram case
     ($v:ident, $l:expr) => {
-        if cfg!(feature = "wasm") && !cfg!(test){
-            $v.wasm_start_measure($l.iter().map(|s| js_sys::JsString::from(*s)).collect()).map_err(|_| prometheus::Error::Msg("invalid label".into()))
+        if cfg!(feature = "wasm") && !cfg!(test) {
+            $v.wasm_start_measure($l.iter().map(|s| js_sys::JsString::from(*s)).collect())
+                .map_err(|_| prometheus::Error::Msg("invalid label".into()))
         } else {
             $v.start_measure($l)
         }
@@ -298,16 +302,16 @@ macro_rules! histogram_start_measure {
 enum TimerVariant {
     Native(HistogramTimer),
     WASM {
-         start_ts: f64,
-         new_ts: fn() -> f64,
-         labels: Vec<String>
-    }
+        start_ts: f64,
+        new_ts: fn() -> f64,
+        labels: Vec<String>,
+    },
 }
 
 /// Represents a timer handle.
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct SimpleTimer {
-    inner: TimerVariant
+    inner: TimerVariant,
 }
 
 /// Represents a histogram with floating point values.
@@ -315,7 +319,7 @@ pub struct SimpleTimer {
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct SimpleHistogram {
     name: String,
-    hh: Histogram
+    hh: Histogram,
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -328,24 +332,16 @@ impl SimpleHistogram {
     /// Stops the given timer and records the elapsed duration in seconds to the histogram.
     pub fn record_measure(&self, timer: SimpleTimer) {
         match timer.inner {
-            TimerVariant::Native(timer) => {
-                timer.observe_duration()
-            }
-            TimerVariant::WASM { start_ts, new_ts, .. } => {
-                self.hh.observe(new_ts() - start_ts)
-            }
+            TimerVariant::Native(timer) => timer.observe_duration(),
+            TimerVariant::WASM { start_ts, new_ts, .. } => self.hh.observe(new_ts() - start_ts),
         }
     }
 
     /// Stops the given timer and discards the measured duration in seconds and returns it.
     pub fn cancel_measure(&self, timer: SimpleTimer) -> f64 {
         match timer.inner {
-            TimerVariant::Native(timer) => {
-                timer.stop_and_discard()
-            }
-            TimerVariant::WASM { start_ts, new_ts, .. } => {
-                new_ts() - start_ts
-            }
+            TimerVariant::Native(timer) => timer.stop_and_discard(),
+            TimerVariant::WASM { start_ts, new_ts, .. } => new_ts() - start_ts,
         }
     }
 
@@ -388,7 +384,7 @@ impl SimpleHistogram {
     /// Starts a timer.
     pub fn start_measure(&self) -> SimpleTimer {
         SimpleTimer {
-            inner: TimerVariant::Native(self.hh.start_timer())
+            inner: TimerVariant::Native(self.hh.start_timer()),
         }
     }
 }
@@ -407,11 +403,16 @@ impl MultiHistogram {
     /// Stops the given timer and records the elapsed duration in seconds to the multi-histogram.
     pub fn record_measure(&self, timer: SimpleTimer) {
         match timer.inner {
-            TimerVariant::Native(timer) => {
-                timer.observe_duration()
-            }
-            TimerVariant::WASM { start_ts, new_ts, labels } => {
-                if let Ok(h) = self.hh.get_metric_with_label_values(&labels.iter().map(String::as_str).collect::<Vec<&str>>()) {
+            TimerVariant::Native(timer) => timer.observe_duration(),
+            TimerVariant::WASM {
+                start_ts,
+                new_ts,
+                labels,
+            } => {
+                if let Ok(h) = self
+                    .hh
+                    .get_metric_with_label_values(&labels.iter().map(String::as_str).collect::<Vec<&str>>())
+                {
                     h.observe(new_ts() - start_ts)
                 }
             }
@@ -421,12 +422,8 @@ impl MultiHistogram {
     /// Stops the given timer and discards the measured duration in seconds and returns it.
     pub fn cancel_measure(&self, timer: SimpleTimer) -> f64 {
         match timer.inner {
-            TimerVariant::Native(timer) => {
-                timer.stop_and_discard()
-            }
-            TimerVariant::WASM { start_ts, new_ts, .. } => {
-                new_ts() - start_ts
-            }
+            TimerVariant::Native(timer) => timer.stop_and_discard(),
+            TimerVariant::WASM { start_ts, new_ts, .. } => new_ts() - start_ts,
         }
     }
 
@@ -440,12 +437,7 @@ impl MultiHistogram {
     /// Creates a new histogram with the given name, description and buckets.
     /// If no buckets are specified, they will be defined automatically.
     /// The +Inf bucket is always added automatically.
-    pub fn new(
-        name: &str,
-        description: &str,
-        buckets: Vec<f64>,
-        labels: &[&str],
-    ) -> prometheus::Result<Self> {
+    pub fn new(name: &str, description: &str, buckets: Vec<f64>, labels: &[&str]) -> prometheus::Result<Self> {
         let mut opts = HistogramOpts::new(name, description);
         if !buckets.is_empty() {
             opts = opts.buckets(buckets);
@@ -464,11 +456,9 @@ impl MultiHistogram {
 
     /// Starts a timer for a histogram with the given labels.
     pub fn start_measure(&self, label_values: &[&str]) -> prometheus::Result<SimpleTimer> {
-        self.hh
-            .get_metric_with_label_values(label_values)
-            .map(|h|SimpleTimer {
-                inner: TimerVariant::Native(h.start_timer())
-            })
+        self.hh.get_metric_with_label_values(label_values).map(|h| SimpleTimer {
+            inner: TimerVariant::Native(h.start_timer()),
+        })
     }
 
     /// Records a value observation to the histogram with the given labels.
@@ -499,7 +489,6 @@ impl MultiHistogram {
         self.labels.iter().map(String::as_str).collect()
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -581,12 +570,7 @@ mod tests {
 
     #[test]
     fn test_histogram() {
-        let histogram = SimpleHistogram::new(
-            "my_histogram",
-            "test histogram",
-            vec![1.0, 2.0, 3.0, 4.0, 5.0],
-        )
-        .unwrap();
+        let histogram = SimpleHistogram::new("my_histogram", "test histogram", vec![1.0, 2.0, 3.0, 4.0, 5.0]).unwrap();
 
         assert_eq!("my_histogram", histogram.name());
 
@@ -697,13 +681,15 @@ mod tests {
 /// Bindings for JS/TS
 #[cfg(feature = "wasm")]
 pub mod wasm {
+    use crate::metrics::TimerVariant::WASM;
+    use crate::metrics::{
+        MultiCounter, MultiGauge, MultiHistogram, SimpleCounter, SimpleGauge, SimpleHistogram, SimpleTimer,
+    };
     use js_sys::JsString;
+    use utils_misc::utils::wasm::JsResult;
     use utils_misc::{convert_from_jstrvec, ok_or_jserr};
     use wasm_bindgen::prelude::*;
     use wasm_bindgen::JsValue;
-    use utils_misc::utils::wasm::JsResult;
-    use crate::metrics::{MultiCounter, MultiGauge, MultiHistogram, SimpleCounter, SimpleGauge, SimpleHistogram, SimpleTimer};
-    use crate::metrics::TimerVariant::WASM;
 
     #[wasm_bindgen]
     pub fn gather_all_metrics() -> JsResult<String> {
@@ -716,11 +702,7 @@ pub mod wasm {
     }
 
     #[wasm_bindgen]
-    pub fn create_multi_counter(
-        name: &str,
-        description: &str,
-        labels: Vec<JsString>,
-    ) -> JsResult<MultiCounter> {
+    pub fn create_multi_counter(name: &str, description: &str, labels: Vec<JsString>) -> JsResult<MultiCounter> {
         convert_from_jstrvec!(labels, bind);
         ok_or_jserr!(MultiCounter::new(name, description, bind.as_slice()))
     }
@@ -753,15 +735,9 @@ pub mod wasm {
     }
 
     #[wasm_bindgen]
-    pub fn create_multi_gauge(
-        name: &str,
-        description: &str,
-        labels: Vec<JsString>,
-    ) -> JsResult<MultiGauge> {
+    pub fn create_multi_gauge(name: &str, description: &str, labels: Vec<JsString>) -> JsResult<MultiGauge> {
         convert_from_jstrvec!(labels, bind);
-        ok_or_jserr!(
-            MultiGauge::new(name, description, bind.as_slice())
-        )
+        ok_or_jserr!(MultiGauge::new(name, description, bind.as_slice()))
     }
 
     #[wasm_bindgen]
@@ -810,11 +786,7 @@ pub mod wasm {
     }
 
     #[wasm_bindgen]
-    pub fn create_histogram_with_buckets(
-        name: &str,
-        description: &str,
-        buckets: &[f64],
-    ) -> JsResult<SimpleHistogram> {
+    pub fn create_histogram_with_buckets(name: &str, description: &str, buckets: &[f64]) -> JsResult<SimpleHistogram> {
         ok_or_jserr!(SimpleHistogram::new(name, description, buckets.into()))
     }
 
@@ -825,19 +797,15 @@ pub mod wasm {
             SimpleTimer {
                 inner: WASM {
                     start_ts: js_sys::Date::now() / 1000.0,
-                    new_ts: || { js_sys::Date::now() / 1000.0 },
-                    labels: vec![]
-                }
+                    new_ts: || js_sys::Date::now() / 1000.0,
+                    labels: vec![],
+                },
             }
         }
     }
 
     #[wasm_bindgen]
-    pub fn create_multi_histogram(
-        name: &str,
-        description: &str,
-        labels: Vec<JsString>,
-    ) -> JsResult<MultiHistogram> {
+    pub fn create_multi_histogram(name: &str, description: &str, labels: Vec<JsString>) -> JsResult<MultiHistogram> {
         create_multi_histogram_with_buckets(name, description, &[] as &[f64; 0], labels)
     }
 
@@ -864,16 +832,14 @@ pub mod wasm {
         pub fn wasm_start_measure(&self, label_values: Vec<JsString>) -> JsResult<SimpleTimer> {
             convert_from_jstrvec!(label_values, bind);
             match self.hh.get_metric_with_label_values(bind.as_slice()) {
-                Ok(_) => {
-                    Ok(SimpleTimer {
-                        inner: WASM {
-                            start_ts: js_sys::Date::now() / 1000.0,
-                            new_ts: || { js_sys::Date::now() / 1000.0 },
-                            labels: label_values.into_iter().map(String::from).collect()
-                        }
-                    })
-                },
-                Err(x) => Err(JsValue::from(x.to_string()))
+                Ok(_) => Ok(SimpleTimer {
+                    inner: WASM {
+                        start_ts: js_sys::Date::now() / 1000.0,
+                        new_ts: || js_sys::Date::now() / 1000.0,
+                        labels: label_values.into_iter().map(String::from).collect(),
+                    },
+                }),
+                Err(x) => Err(JsValue::from(x.to_string())),
             }
         }
 

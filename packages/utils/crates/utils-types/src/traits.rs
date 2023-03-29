@@ -1,6 +1,6 @@
-use std::str::FromStr;
+use crate::errors::{GeneralError::ParseError, Result};
 use libp2p_identity::PeerId;
-use crate::errors::{Result, GeneralError::ParseError};
+use std::str::FromStr;
 
 // NOTE on wasm_bindgen: since #[wasm_bindgen] attributes cannot be used
 // on trait impl blocks, the trait inherited methods need to be re-implemented
@@ -17,7 +17,7 @@ pub trait ToHex {
 /// form with a fixed size.
 /// Implementing this trait automatically implements ToHex trait
 /// which then uses the serialize method.
-pub trait BinarySerializable : Sized  {
+pub trait BinarySerializable: Sized {
     /// Fixed serialized size of this type in bytes.
     const SIZE: usize;
 
@@ -29,14 +29,16 @@ pub trait BinarySerializable : Sized  {
 }
 
 impl<T> ToHex for T
-where T: BinarySerializable {
+where
+    T: BinarySerializable,
+{
     fn to_hex(&self) -> String {
         hex::encode(&self.serialize())
     }
 }
 
 /// A generic type which can be equivalently and completely represented by a PeerID
-pub trait PeerIdLike : Sized {
+pub trait PeerIdLike: Sized {
     /// Creates type from a PeerID representation
     fn from_peerid(peer_id: &PeerId) -> Result<Self>;
 
@@ -45,7 +47,7 @@ pub trait PeerIdLike : Sized {
 
     /// Creates instance from base-58 PeerId representation
     fn from_peerid_str(peer_id: &str) -> Result<Self> {
-        Self::from_peerid(&PeerId::from_str(peer_id).map_err(|_|ParseError)?)
+        Self::from_peerid(&PeerId::from_str(peer_id).map_err(|_| ParseError)?)
     }
 
     /// Outputs base-58 PeerId representation

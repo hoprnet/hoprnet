@@ -3,7 +3,8 @@ pub mod dummy_rng {
     use elliptic_curve::rand_core::{CryptoRng, Error, RngCore};
     use hex_literal::hex;
 
-    const RNG_BYTES: [u8; 512] = hex!("cc6cb43c4928eea3c31e0d3bfcf8563f85d4bcc771e8efc4792fe3422a09f08a
+    const RNG_BYTES: [u8; 512] = hex!(
+        "cc6cb43c4928eea3c31e0d3bfcf8563f85d4bcc771e8efc4792fe3422a09f08a
     36dd22e648fce34edcd20439d9075075073f6da33d344430a45e7e2dfd297890
     7975caa9619afec8b43b3da891ec2369710a61d9630fbdfcd5509da466139c5f7
     a3c91f01fd6fac3665ad229def29873a2b0498bfefadbcb95f946bbea2a3f7657
@@ -18,12 +19,13 @@ pub mod dummy_rng {
     f50c24ee05a3f938e617fb40b7e56dff9a0536b9b7a3b70c607e76086ee61bd05
     d626878acfd5d7ca093d75fd152a00de1ebcd06788b9f6bfa2b289799b75b31c5
     bb8cfb2c005c7de64fb7c8f08613fafe824f1cbebd869aae560299d771f2b896b
-    26fcf9a70b0ea3066531ac1a9190b52eb12cc10997aca62d7ce");
+    26fcf9a70b0ea3066531ac1a9190b52eb12cc10997aca62d7ce"
+    );
 
     /// Dummy RNG that cyclically outputs the same set of random bytes
     #[derive(Clone, Copy, Debug, Default)]
     pub(crate) struct DummyFixedRng {
-        ptr: usize
+        ptr: usize,
     }
 
     impl DummyFixedRng {

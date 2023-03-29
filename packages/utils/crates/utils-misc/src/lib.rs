@@ -1,6 +1,6 @@
 pub mod async_iterable;
-pub mod utils;
 pub mod time;
+pub mod utils;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {

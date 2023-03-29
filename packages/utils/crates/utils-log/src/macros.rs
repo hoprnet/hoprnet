@@ -83,6 +83,3 @@ macro_rules! error {
     // error!("a {} event", "log")
     ($($arg:tt)+) => ($crate::log!($crate::Level::Error, $($arg)+))
 }
-
-
-

@@ -46,8 +46,7 @@ pub mod wasm {
             default_heartbeat_interval_variance: super::DEFAULT_HEARTBEAT_INTERVAL_VARIANCE,
             default_network_quality_threshold: super::DEFAULT_NETWORK_QUALITY_THRESHOLD,
             default_max_parallel_connections: super::DEFAULT_MAX_PARALLEL_CONNECTIONS,
-            default_max_parallel_connections_public_relay:
-                super::DEFAULT_MAX_PARALLEL_CONNECTION_PUBLIC_RELAY,
+            default_max_parallel_connections_public_relay: super::DEFAULT_MAX_PARALLEL_CONNECTION_PUBLIC_RELAY,
         }
     }
 }

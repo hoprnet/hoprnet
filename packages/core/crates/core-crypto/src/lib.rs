@@ -1,12 +1,12 @@
 pub mod derivation;
+pub mod errors;
+pub mod iterated_hash;
 pub mod parameters;
-pub mod shared_keys;
+pub mod prg;
 pub mod primitives;
 pub mod prp;
-pub mod prg;
-pub mod errors;
 pub mod random;
-pub mod iterated_hash;
+pub mod shared_keys;
 pub mod types;
 
 #[cfg(test)]
@@ -35,5 +35,3 @@ pub mod wasm {
     #[global_allocator]
     static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 }
-
-

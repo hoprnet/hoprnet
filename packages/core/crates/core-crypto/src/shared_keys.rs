@@ -1,16 +1,16 @@
-use std::ops::Mul;
 use blake2::Blake2s256;
+use std::ops::Mul;
 
-use elliptic_curve::{Group, ProjectivePoint};
 use elliptic_curve::rand_core::{CryptoRng, RngCore};
 use elliptic_curve::sec1::ToEncodedPoint;
+use elliptic_curve::{Group, ProjectivePoint};
 
 use generic_array::GenericArray;
 
 use k256::{AffinePoint, NonZeroScalar, Secp256k1};
 
-use hkdf::SimpleHkdf;
 use crate::errors::CryptoError::{CalculationError, InvalidSecretScalar};
+use hkdf::SimpleHkdf;
 
 use crate::parameters;
 
@@ -51,8 +51,7 @@ fn decode_public_key_to_point(encoded_public_key: &[u8]) -> Result<ProjectivePoi
 
 /// Checks if the given key bytes can form a scalar for EC point
 fn to_checked_secret_scalar(secret_scalar: KeyBytes) -> Result<NonZeroScalar> {
-    Option::from(NonZeroScalar::from_repr(secret_scalar))
-        .ok_or(InvalidSecretScalar)
+    Option::from(NonZeroScalar::from_repr(secret_scalar)).ok_or(InvalidSecretScalar)
 }
 
 /// Structure containing shared keys for peers.
@@ -60,16 +59,14 @@ fn to_checked_secret_scalar(secret_scalar: KeyBytes) -> Result<NonZeroScalar> {
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct SharedKeys {
     alpha: Vec<u8>,
-    secrets: Vec<Vec<u8>>
+    secrets: Vec<Vec<u8>>,
 }
 
 impl SharedKeys {
-
     /// Generates shared secrets given the peer public keys array.
     /// The order of the peer public keys is preserved for resulting shared keys.
     /// The specified random number generator will be used.
     pub fn generate(rng: &mut (impl CryptoRng + RngCore), peer_public_keys: Vec<Box<[u8]>>) -> Result<SharedKeys> {
-
         let mut shared_keys = Vec::new();
 
         // This becomes: x * b_0 * b_1 * b_2 * ...
@@ -104,19 +101,18 @@ impl SharedKeys {
             coeff_prev = coeff_prev.mul(b_k_checked);
             alpha_prev = alpha_prev * b_k_checked.as_ref();
             if alpha_prev.is_identity().unwrap_u8() != 0 {
-                return Err(CalculationError)
+                return Err(CalculationError);
             }
         }
 
         Ok(SharedKeys {
             alpha: alpha.as_bytes().into(),
-            secrets: shared_keys
+            secrets: shared_keys,
         })
     }
 
     /// Calculates the forward transformation for the given peer public key.
     pub fn forward_transform(alpha: &[u8], public_key: &[u8], private_key: &[u8]) -> Result<SharedKeys> {
-
         let priv_key = to_checked_secret_scalar(KeyBytes::clone_from_slice(&private_key[0..private_key.len()]))?;
         let alpha_proj = decode_public_key_to_point(alpha)?;
 
@@ -130,7 +126,7 @@ impl SharedKeys {
 
         Ok(SharedKeys {
             alpha: alpha_new.as_bytes().into(),
-            secrets: vec![secret.to_vec()]
+            secrets: vec![secret.to_vec()],
         })
     }
 }
@@ -139,11 +135,11 @@ impl SharedKeys {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hex_literal::hex;
     use elliptic_curve::group::prime::PrimeCurveAffine;
     use elliptic_curve::rand_core::OsRng;
+    use hex_literal::hex;
 
-   #[test]
+    #[test]
     fn test_decode_point() {
         let point = hex!("0253f6e72ad23de294466b830619448d6d9059a42050141cd83bac4e3ee82c3f1e");
         decode_public_key_to_point(&point).unwrap();
@@ -151,7 +147,7 @@ mod tests {
 
     #[test]
     fn test_extract_key_from_group_element() {
-        let salt = [0xde, 0xad, 0xbe, 0xef ];
+        let salt = [0xde, 0xad, 0xbe, 0xef];
         let pt = AffinePoint::generator();
 
         let key = extract_key_from_group_element(&pt, &salt);
@@ -163,7 +159,7 @@ mod tests {
 
     #[test]
     fn test_expand_key_from_group_element() {
-        let salt = [0xde, 0xad, 0xbe, 0xef ];
+        let salt = [0xde, 0xad, 0xbe, 0xef];
         let pt = AffinePoint::generator();
 
         let key = expand_key_from_group_element(&pt, &salt);
@@ -198,9 +194,8 @@ mod tests {
             let priv_key = priv_keys[i].to_vec();
             let pub_key = pub_keys[i].to_vec();
 
-            let shared_key = SharedKeys::forward_transform(alpha_cpy.as_slice(),
-                                                           pub_key.as_slice(),
-                                                           priv_key.as_slice()).unwrap();
+            let shared_key =
+                SharedKeys::forward_transform(alpha_cpy.as_slice(), pub_key.as_slice(), priv_key.as_slice()).unwrap();
 
             assert_eq!(&shared_key.secrets[0], &generated_shares.secrets[i]);
 
@@ -211,9 +206,15 @@ mod tests {
     #[test]
     fn test_key_shares() {
         let pub_keys: Vec<Box<[u8]>> = vec![
-            Box::new(hex!("0253f6e72ad23de294466b830619448d6d9059a42050141cd83bac4e3ee82c3f1e")),
-            Box::new(hex!("035fc5660f59059c263d3946d7abaf33fa88181e27bf298fcc5a9fa493bec9110b")),
-            Box::new(hex!("038d2b50a77fd43eeae9b37856358c7f1aee773b3e3c9d26f30b8706c02cbbfbb6"))
+            Box::new(hex!(
+                "0253f6e72ad23de294466b830619448d6d9059a42050141cd83bac4e3ee82c3f1e"
+            )),
+            Box::new(hex!(
+                "035fc5660f59059c263d3946d7abaf33fa88181e27bf298fcc5a9fa493bec9110b"
+            )),
+            Box::new(hex!(
+                "038d2b50a77fd43eeae9b37856358c7f1aee773b3e3c9d26f30b8706c02cbbfbb6"
+            )),
         ];
 
         let keyshares = SharedKeys::generate(&mut OsRng, pub_keys).unwrap();
@@ -227,12 +228,12 @@ mod tests {
 /// wraps code that has been unit tested in pure Rust.
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use elliptic_curve::rand_core::OsRng;
-    use wasm_bindgen::prelude::*;
-    use js_sys::Uint8Array;
-    use utils_misc::utils::wasm::JsResult;
-    use utils_misc::ok_or_jserr;
     use crate::shared_keys::SharedKeys;
+    use elliptic_curve::rand_core::OsRng;
+    use js_sys::Uint8Array;
+    use utils_misc::ok_or_jserr;
+    use utils_misc::utils::wasm::JsResult;
+    use wasm_bindgen::prelude::*;
 
     #[wasm_bindgen]
     impl SharedKeys {
@@ -261,7 +262,10 @@ pub mod wasm {
         /// Generate shared keys given the peer public keys
         #[wasm_bindgen(js_name = "generate")]
         pub fn _generate(peer_public_keys: Vec<Uint8Array>) -> JsResult<SharedKeys> {
-            ok_or_jserr!(super::SharedKeys::generate(&mut OsRng, peer_public_keys.iter().map(|v| v.to_vec().into_boxed_slice()).collect()))
+            ok_or_jserr!(super::SharedKeys::generate(
+                &mut OsRng,
+                peer_public_keys.iter().map(|v| v.to_vec().into_boxed_slice()).collect()
+            ))
         }
     }
 }

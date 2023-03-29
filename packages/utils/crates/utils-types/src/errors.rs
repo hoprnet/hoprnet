@@ -1,6 +1,5 @@
 use thiserror::Error;
 
-
 /// Type for any possible error, because the traits in this modules
 /// can be used in with any possible contexts (and error types).
 pub type AnyError = Box<dyn std::error::Error + Send + Sync + 'static>;
