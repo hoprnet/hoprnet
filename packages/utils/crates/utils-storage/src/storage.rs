@@ -75,11 +75,7 @@ pub struct PickleStorage<V> {
 impl<V> PickleStorage<V> {
     pub fn new(path: &str) -> PickleStorage<V> {
         PickleStorage {
-            data: PickleDb::new(
-                path,
-                PickleDbDumpPolicy::AutoDump,
-                SerializationMethod::Json,
-            ),
+            data: PickleDb::new(path, PickleDbDumpPolicy::AutoDump, SerializationMethod::Json),
             _phantom_value: Default::default(),
         }
     }

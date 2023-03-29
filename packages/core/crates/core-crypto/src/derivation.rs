@@ -14,10 +14,7 @@ const HASH_KEY_HMAC: &str = "HASH_KEY_HMAC";
 const HASH_KEY_PACKET_TAG: &str = "HASH_KEY_PACKET_TAG";
 
 /// Helper function to expand an already cryptographically strong key material using the HKDF expand function
-fn hkdf_expand_from_prk<const OUT_LENGTH: usize>(
-    secret: &[u8],
-    tag: &[u8],
-) -> Result<[u8; OUT_LENGTH]> {
+fn hkdf_expand_from_prk<const OUT_LENGTH: usize>(secret: &[u8], tag: &[u8]) -> Result<[u8; OUT_LENGTH]> {
     // Create HKDF instance
     let hkdf = SimpleHkdf::<Blake2s256>::from_prk(secret).map_err(|_| InvalidParameterSize {
         name: "secret".into(),
@@ -64,13 +61,7 @@ pub fn derive_mac_key(secret: &[u8]) -> Result<Box<[u8]>> {
     hkdf_expand_from_prk::<SECRET_KEY_LENGTH>(secret, HASH_KEY_HMAC.as_bytes()).map(Box::from)
 }
 
-pub(crate) fn generate_key_iv(
-    secret: &[u8],
-    info: &[u8],
-    key: &mut [u8],
-    iv: &mut [u8],
-    iv_first: bool,
-) -> Result<()> {
+pub(crate) fn generate_key_iv(secret: &[u8], info: &[u8], key: &mut [u8], iv: &mut [u8], iv_first: bool) -> Result<()> {
     if secret.len() != SECRET_KEY_LENGTH {
         return Err(InvalidParameterSize {
             name: "secret".into(),

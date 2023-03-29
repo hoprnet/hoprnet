@@ -65,11 +65,7 @@ pub struct StrategyTickResult {
 
 impl StrategyTickResult {
     /// Constructor for the strategy tick result.
-    pub fn new(
-        max_auto_channels: usize,
-        to_open: Vec<OutgoingChannelStatus>,
-        to_close: Vec<String>,
-    ) -> Self {
+    pub fn new(max_auto_channels: usize, to_open: Vec<OutgoingChannelStatus>, to_close: Vec<String>) -> Self {
         StrategyTickResult {
             max_auto_channels,
             to_open,
@@ -135,11 +131,7 @@ pub mod wasm {
     #[wasm_bindgen]
     impl StrategyTickResult {
         #[wasm_bindgen(constructor)]
-        pub fn new(
-            max_auto_channels: u32,
-            to_open: JsValue,
-            to_close: Vec<JsString>,
-        ) -> JsResult<StrategyTickResult> {
+        pub fn new(max_auto_channels: u32, to_open: JsValue, to_close: Vec<JsString>) -> JsResult<StrategyTickResult> {
             Ok(StrategyTickResult {
                 w: super::StrategyTickResult::new(
                     max_auto_channels as usize,
@@ -169,11 +161,7 @@ pub mod wasm {
         }
 
         pub fn to_close(&self) -> Vec<JsString> {
-            self.w
-                .to_close()
-                .iter()
-                .map(|s| JsString::from(s.clone()))
-                .collect()
+            self.w.to_close().iter().map(|s| JsString::from(s.clone())).collect()
         }
     }
 
@@ -189,9 +177,7 @@ pub mod wasm {
         Ok(StrategyTickResult {
             w: strategy.tick(
                 balance,
-                peer_ids
-                    .into_iter()
-                    .map(|v| v.unwrap().as_string().unwrap()),
+                peer_ids.into_iter().map(|v| v.unwrap().as_string().unwrap()),
                 serde_wasm_bindgen::from_value::<Vec<OutgoingChannelStatus>>(outgoing_channels)?
                     .iter()
                     .map(|c| super::OutgoingChannelStatus::from(c))

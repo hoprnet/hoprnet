@@ -59,9 +59,7 @@ pub mod wasm {
     }
 
     #[wasm_bindgen]
-    pub fn reply_to_ping(
-        stream: AsyncIterator,
-    ) -> Result<AsyncIterableHelperCoreHeartbeat, JsValue> {
+    pub fn reply_to_ping(stream: AsyncIterator) -> Result<AsyncIterableHelperCoreHeartbeat, JsValue> {
         let stream = JsStream::from(stream)
             .map(to_box_u8_stream)
             .map(|req| req.map(super::generate_ping_response));

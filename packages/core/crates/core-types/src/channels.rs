@@ -46,10 +46,7 @@ impl ChannelStatus {
 
 /// Contains acknowledgment information and the respective ticket
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(
-    feature = "wasm",
-    wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)
-)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct AcknowledgedTicket {
     pub ticket: Ticket,
     pub response: Response,
@@ -59,10 +56,7 @@ pub struct AcknowledgedTicket {
 
 /// Overall description of a channel
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(
-    feature = "wasm",
-    wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)
-)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct ChannelEntry {
     pub source: PublicKey,
     pub destination: PublicKey,
@@ -114,10 +108,8 @@ impl BinarySerializable for ChannelEntry {
         if data.len() == Self::SIZE {
             let mut b = Vec::from(data);
             let source = PublicKey::deserialize(b.drain(0..PublicKey::SIZE_UNCOMPRESSED).as_ref())?;
-            let destination =
-                PublicKey::deserialize(b.drain(0..PublicKey::SIZE_UNCOMPRESSED).as_ref())?;
-            let balance =
-                Balance::deserialize(b.drain(0..Balance::SIZE).as_ref(), BalanceType::HOPR)?;
+            let destination = PublicKey::deserialize(b.drain(0..PublicKey::SIZE_UNCOMPRESSED).as_ref())?;
+            let balance = Balance::deserialize(b.drain(0..Balance::SIZE).as_ref(), BalanceType::HOPR)?;
             let commitment = Hash::deserialize(b.drain(0..Hash::SIZE).as_ref())?;
             let ticket_epoch = U256::deserialize(b.drain(0..U256::SIZE).as_ref())?;
             let ticket_index = U256::deserialize(b.drain(0..U256::SIZE).as_ref())?;
@@ -198,10 +190,7 @@ impl BinarySerializable for Response {
 
 /// Contains the overall description of a ticket with a signature
 #[derive(Clone, PartialEq, Debug)]
-#[cfg_attr(
-    feature = "wasm",
-    wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)
-)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct Ticket {
     pub counterparty: Address,
     pub challenge: EthereumChallenge,
@@ -335,12 +324,7 @@ impl Ticket {
     /// Decides whether a ticket is a win or not.
     /// Note that this mimics the on-chain logic.
     /// Purpose of the function is to check the validity of ticket before we submit it to the blockchain.
-    pub fn is_winning(
-        &self,
-        preimage: &Hash,
-        channel_response: &Response,
-        win_prob: &U256,
-    ) -> bool {
+    pub fn is_winning(&self, preimage: &Hash, channel_response: &Response, win_prob: &U256) -> bool {
         let luck = self.get_luck(preimage, channel_response);
         luck.value().le(win_prob.value())
     }
@@ -348,30 +332,22 @@ impl Ticket {
     /// Based on the price of this ticket, determines the path position (hop number) this ticket
     /// relates to.
     pub fn get_path_position(&self, price_per_packet: &U256, inverse_ticket_win_prob: &U256) -> u8 {
-        let base_unit = price_per_packet
-            .value()
-            .mul(inverse_ticket_win_prob.value());
+        let base_unit = price_per_packet.value().mul(inverse_ticket_win_prob.value());
         self.amount.value().div(base_unit).as_u8()
     }
 }
 
 impl BinarySerializable for Ticket {
-    const SIZE: usize = Address::SIZE
-        + EthereumChallenge::SIZE
-        + 2 * U256::SIZE
-        + Balance::SIZE
-        + 2 * U256::SIZE
-        + Signature::SIZE;
+    const SIZE: usize =
+        Address::SIZE + EthereumChallenge::SIZE + 2 * U256::SIZE + Balance::SIZE + 2 * U256::SIZE + Signature::SIZE;
 
     fn deserialize(data: &[u8]) -> Result<Self> {
         if data.len() == Self::SIZE {
             let mut b = Vec::from(data);
             let counterparty = Address::deserialize(b.drain(0..Address::SIZE).as_ref())?;
-            let challenge =
-                EthereumChallenge::deserialize(b.drain(0..EthereumChallenge::SIZE).as_ref())?;
+            let challenge = EthereumChallenge::deserialize(b.drain(0..EthereumChallenge::SIZE).as_ref())?;
             let epoch = U256::deserialize(b.drain(0..U256::SIZE).as_ref())?;
-            let amount =
-                Balance::deserialize(b.drain(0..Balance::SIZE).as_ref(), BalanceType::HOPR)?;
+            let amount = Balance::deserialize(b.drain(0..Balance::SIZE).as_ref(), BalanceType::HOPR)?;
             let win_prob = U256::deserialize(b.drain(0..U256::SIZE).as_ref())?;
             let index = U256::deserialize(b.drain(0..U256::SIZE).as_ref())?;
             let channel_epoch = U256::deserialize(b.drain(0..U256::SIZE).as_ref())?;
@@ -419,11 +395,9 @@ pub mod tests {
 
     const PUBLIC_KEY_1: [u8; 65] = hex!("0443a3958ac66a3b2ab89fcf90bc948a8b8be0e0478d21574d077ddeb11f4b1e9f2ca21d90bd66cee037255480a514b91afae89e20f7f7fa7353891cc90a52bf6e");
     const PUBLIC_KEY_2: [u8; 65] = hex!("04f16fd6701aea01032716377d52d8213497c118f99cdd1c3c621b2795cac8681606b7221f32a8c5d2ef77aa783bec8d96c11480acccabba9e8ee324ae2dfe92bb");
-    const COMMITMENT: [u8; 32] =
-        hex!("ffab46f058090de082a086ea87c535d34525a48871c5a2024f80d0ac850f81ef");
+    const COMMITMENT: [u8; 32] = hex!("ffab46f058090de082a086ea87c535d34525a48871c5a2024f80d0ac850f81ef");
 
-    const SGN_PRIVATE_KEY: [u8; 32] =
-        hex!("e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8");
+    const SGN_PRIVATE_KEY: [u8; 32] = hex!("e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8");
 
     #[test]
     pub fn channel_entry_test() {

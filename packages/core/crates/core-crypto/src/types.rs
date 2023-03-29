@@ -6,9 +6,7 @@ use k256::elliptic_curve::generic_array::GenericArray;
 use k256::elliptic_curve::sec1::{FromEncodedPoint, ToEncodedPoint};
 use k256::elliptic_curve::CurveArithmetic;
 use k256::{ecdsa, elliptic_curve, AffinePoint, NonZeroScalar, Secp256k1};
-use libp2p_identity::{
-    secp256k1::PublicKey as lp2p_k256_PublicKey, PeerId, PublicKey as lp2p_PublicKey,
-};
+use libp2p_identity::{secp256k1::PublicKey as lp2p_k256_PublicKey, PeerId, PublicKey as lp2p_PublicKey};
 use sha3::{digest::DynDigest, Keccak256};
 use std::ops::Add;
 use std::str::FromStr;
@@ -48,9 +46,7 @@ impl FromStr for CurvePoint {
     type Err = CryptoError;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        Ok(CurvePoint::deserialize(
-            &hex::decode(s).map_err(|_| ParseError)?,
-        )?)
+        Ok(CurvePoint::deserialize(&hex::decode(s).map_err(|_| ParseError)?)?)
     }
 }
 
@@ -62,9 +58,7 @@ impl PeerIdLike for CurvePoint {
     }
 
     fn to_peerid(&self) -> PeerId {
-        PublicKey::deserialize(&self.serialize())
-            .unwrap()
-            .to_peerid()
+        PublicKey::deserialize(&self.serialize()).unwrap().to_peerid()
     }
 }
 
@@ -74,9 +68,7 @@ impl BinarySerializable for CurvePoint {
     fn deserialize(bytes: &[u8]) -> utils_types::errors::Result<Self> {
         elliptic_curve::sec1::EncodedPoint::<Secp256k1>::from_bytes(bytes)
             .map_err(|_| ParseError)
-            .and_then(|encoded| {
-                Option::from(AffinePoint::from_encoded_point(&encoded)).ok_or(ParseError)
-            })
+            .and_then(|encoded| Option::from(AffinePoint::from_encoded_point(&encoded)).ok_or(ParseError))
             .map(|affine| Self { affine })
     }
 
@@ -103,10 +95,7 @@ impl CurvePoint {
 
 /// Natural extension of the Curve Point to the PoR challenge
 #[derive(Clone, Eq, PartialEq, Debug)]
-#[cfg_attr(
-    feature = "wasm",
-    wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)
-)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct Challenge {
     pub curve_point: CurvePoint,
 }
@@ -119,10 +108,7 @@ impl Challenge {
 }
 
 impl Challenge {
-    pub fn from_hint_and_share(
-        own_share: &HalfKeyChallenge,
-        hint: &HalfKeyChallenge,
-    ) -> Result<Self> {
+    pub fn from_hint_and_share(own_share: &HalfKeyChallenge, hint: &HalfKeyChallenge) -> Result<Self> {
         let curve_point: CurvePoint = PublicKey::combine(&[
             &PublicKey::deserialize(&own_share.hkc)?,
             &PublicKey::deserialize(&hint.hkc)?,
@@ -131,15 +117,9 @@ impl Challenge {
         Ok(Self { curve_point })
     }
 
-    pub fn from_own_share_and_half_key(
-        own_share: &HalfKeyChallenge,
-        half_key: &HalfKey,
-    ) -> Result<Self> {
-        let curve_point: CurvePoint = PublicKey::tweak_add(
-            &PublicKey::deserialize(&own_share.hkc)?,
-            &half_key.serialize(),
-        )
-        .into();
+    pub fn from_own_share_and_half_key(own_share: &HalfKeyChallenge, half_key: &HalfKey) -> Result<Self> {
+        let curve_point: CurvePoint =
+            PublicKey::tweak_add(&PublicKey::deserialize(&own_share.hkc)?, &half_key.serialize()).into();
         Ok(Self { curve_point })
     }
 }
@@ -196,9 +176,7 @@ impl HalfKeyChallenge {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(half_key_challenge: &[u8]) -> Self {
         assert_eq!(half_key_challenge.len(), Self::SIZE, "invalid length");
-        let mut ret = Self {
-            hkc: [0u8; Self::SIZE],
-        };
+        let mut ret = Self { hkc: [0u8; Self::SIZE] };
         ret.hkc.copy_from_slice(&half_key_challenge);
         ret
     }
@@ -215,9 +193,7 @@ impl BinarySerializable for HalfKeyChallenge {
 
     fn deserialize(data: &[u8]) -> utils_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
-            let mut ret = Self {
-                hkc: [0u8; Self::SIZE],
-            };
+            let mut ret = Self { hkc: [0u8; Self::SIZE] };
             ret.hkc.copy_from_slice(&data);
             Ok(ret)
         } else {
@@ -236,9 +212,7 @@ impl PeerIdLike for HalfKeyChallenge {
     }
 
     fn to_peerid(&self) -> PeerId {
-        PublicKey::deserialize(&self.hkc)
-            .expect("invalid half-key")
-            .to_peerid()
+        PublicKey::deserialize(&self.hkc).expect("invalid half-key").to_peerid()
     }
 }
 
@@ -360,8 +334,7 @@ impl PeerIdLike for PublicKey {
     #[allow(deprecated)]
     fn to_peerid(&self) -> PeerId {
         PeerId::from_public_key(&lp2p_PublicKey::Secp256k1(
-            lp2p_k256_PublicKey::decode(&self.compressed)
-                .expect("cannot convert this public key to secp256k1 peer id"),
+            lp2p_k256_PublicKey::decode(&self.compressed).expect("cannot convert this public key to secp256k1 peer id"),
         ))
     }
 }
@@ -370,8 +343,7 @@ impl TryFrom<CurvePoint> for PublicKey {
     type Error = CryptoError;
 
     fn try_from(value: CurvePoint) -> std::result::Result<Self, Self::Error> {
-        let key = elliptic_curve::PublicKey::<Secp256k1>::from_affine(value.affine)
-            .map_err(|_| InvalidInputValue)?;
+        let key = elliptic_curve::PublicKey::<Secp256k1>::from_affine(value.affine).map_err(|_| InvalidInputValue)?;
         Ok(Self {
             key,
             compressed: key.to_encoded_point(true).to_bytes(),
@@ -387,8 +359,7 @@ impl PublicKey {
     pub const SIZE_UNCOMPRESSED: usize = 65;
 
     pub fn deserialize(data: &[u8]) -> utils_types::errors::Result<Self> {
-        let key = elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(data)
-            .map_err(|_| ParseError)?;
+        let key = elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(data).map_err(|_| ParseError)?;
         Ok(PublicKey {
             key,
             compressed: key.to_encoded_point(true).to_bytes(),
@@ -405,32 +376,17 @@ impl PublicKey {
         })
     }
 
-    fn from_raw_signature<R>(
-        msg: &[u8],
-        r: &[u8],
-        s: &[u8],
-        v: u8,
-        recovery_method: R,
-    ) -> Result<PublicKey>
+    fn from_raw_signature<R>(msg: &[u8], r: &[u8], s: &[u8], v: u8, recovery_method: R) -> Result<PublicKey>
     where
-        R: Fn(
-            &[u8],
-            &ECDSASignature,
-            RecoveryId,
-        ) -> std::result::Result<VerifyingKey, ecdsa::Error>,
+        R: Fn(&[u8], &ECDSASignature, RecoveryId) -> std::result::Result<VerifyingKey, ecdsa::Error>,
     {
         let recid = RecoveryId::try_from(v).map_err(|_| ParseError)?;
-        let signature = ECDSASignature::from_scalars(
-            GenericArray::clone_from_slice(r),
-            GenericArray::clone_from_slice(s),
-        )
-        .map_err(|_| ParseError)?;
-        let recovered_key =
-            recovery_method(msg, &signature, recid).map_err(|_| CalculationError)?;
+        let signature =
+            ECDSASignature::from_scalars(GenericArray::clone_from_slice(r), GenericArray::clone_from_slice(s))
+                .map_err(|_| ParseError)?;
+        let recovered_key = recovery_method(msg, &signature, recid).map_err(|_| CalculationError)?;
 
-        Ok(Self::deserialize(
-            &recovered_key.to_encoded_point(false).to_bytes(),
-        )?)
+        Ok(Self::deserialize(&recovered_key.to_encoded_point(false).to_bytes())?)
     }
 
     pub fn from_signature(msg: &[u8], signature: &Signature) -> Result<PublicKey> {
@@ -461,10 +417,9 @@ impl PublicKey {
         let affine: AffinePoint = summands
             .iter()
             .map(|p| p.key.to_projective())
-            .fold(
-                <Secp256k1 as CurveArithmetic>::ProjectivePoint::IDENTITY,
-                |acc, x| acc.add(x),
-            )
+            .fold(<Secp256k1 as CurveArithmetic>::ProjectivePoint::IDENTITY, |acc, x| {
+                acc.add(x)
+            })
             .to_affine();
 
         Self {
@@ -592,11 +547,7 @@ impl BinarySerializable for Signature {
             // Read & clear the top-most bit in S
             let mut ret = Signature {
                 signature: [0u8; Self::SIZE],
-                recovery: if data[Self::SIZE / 2] & 0x80 != 0 {
-                    1
-                } else {
-                    0
-                },
+                recovery: if data[Self::SIZE / 2] & 0x80 != 0 { 1 } else { 0 },
             };
             ret.signature.copy_from_slice(data);
             ret.signature[Self::SIZE / 2] &= 0x7f;
@@ -627,14 +578,10 @@ pub mod tests {
     use utils_types::primitives::Address;
     use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
 
-    use crate::types::{
-        Challenge, CurvePoint, HalfKey, HalfKeyChallenge, Hash, PublicKey, Signature,
-    };
+    use crate::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, Hash, PublicKey, Signature};
 
-    const PUBLIC_KEY: [u8; 33] =
-        hex!("021464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8");
-    const PRIVATE_KEY: [u8; 32] =
-        hex!("e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8");
+    const PUBLIC_KEY: [u8; 33] = hex!("021464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8");
+    const PRIVATE_KEY: [u8; 32] = hex!("e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8");
 
     #[test]
     fn signature_signing_test() {
@@ -645,10 +592,7 @@ pub mod tests {
 
         let extracted_pk = PublicKey::from_signature(msg, &sgn).unwrap();
         let expected_pk = PublicKey::deserialize(&PUBLIC_KEY).unwrap();
-        assert_eq!(
-            expected_pk, extracted_pk,
-            "key extracted from signature does not match"
-        );
+        assert_eq!(expected_pk, extracted_pk, "key extracted from signature does not match");
     }
 
     #[test]
@@ -664,15 +608,10 @@ pub mod tests {
     fn public_key_peerid_test() {
         let pk1 = PublicKey::deserialize(&PUBLIC_KEY).expect("failed to deserialize");
 
-        let pk2 = PublicKey::from_peerid_str(pk1.to_peerid_str().as_str())
-            .expect("peer id serialization failed");
+        let pk2 = PublicKey::from_peerid_str(pk1.to_peerid_str().as_str()).expect("peer id serialization failed");
 
         assert_eq!(pk1, pk2, "pubkeys don't match");
-        assert_eq!(
-            pk1.to_peerid_str(),
-            pk2.to_peerid_str(),
-            "peer id strings don't match"
-        );
+        assert_eq!(pk1.to_peerid_str(), pk2.to_peerid_str(), "peer id strings don't match");
     }
 
     #[test]
@@ -769,8 +708,7 @@ pub mod tests {
 
     #[test]
     fn public_key_from_privkey() {
-        let pk1 =
-            PublicKey::from_privkey(&PRIVATE_KEY).expect("failed to convert from private key");
+        let pk1 = PublicKey::from_privkey(&PRIVATE_KEY).expect("failed to convert from private key");
         let pk2 = PublicKey::deserialize(&PUBLIC_KEY).expect("failed to deserialize");
 
         assert_eq!(pk1, pk2, "failed to match deserialized pub key");
@@ -779,14 +717,9 @@ pub mod tests {
     #[test]
     fn curve_point_test() {
         let scalar = NonZeroScalar::from_uint(U256::from_u8(100)).unwrap();
-        let test_point = (<Secp256k1 as CurveArithmetic>::ProjectivePoint::GENERATOR
-            * scalar.as_ref())
-        .to_affine();
+        let test_point = (<Secp256k1 as CurveArithmetic>::ProjectivePoint::GENERATOR * scalar.as_ref()).to_affine();
 
-        let cp1 = CurvePoint::from_str(
-            hex::encode(test_point.to_encoded_point(false).to_bytes()).as_str(),
-        )
-        .unwrap();
+        let cp1 = CurvePoint::from_str(hex::encode(test_point.to_encoded_point(false).to_bytes()).as_str()).unwrap();
 
         let cp2 = CurvePoint::deserialize(&cp1.serialize()).unwrap();
 
@@ -804,16 +737,11 @@ pub mod tests {
         let ch2 = Challenge { curve_point: cp2 };
 
         assert_eq!(ch1.to_ethereum_challenge(), ch2.to_ethereum_challenge());
-        assert_eq!(
-            ch1, ch2,
-            "failed to match ethereum challenges from curve points"
-        );
+        assert_eq!(ch1, ch2, "failed to match ethereum challenges from curve points");
 
         // Must be able to create from compressed and uncompressed data
         let scalar2 = NonZeroScalar::from_uint(U256::from_u8(123)).unwrap();
-        let test_point2 = (<Secp256k1 as CurveArithmetic>::ProjectivePoint::GENERATOR
-            * scalar2.as_ref())
-        .to_affine();
+        let test_point2 = (<Secp256k1 as CurveArithmetic>::ProjectivePoint::GENERATOR * scalar2.as_ref()).to_affine();
         let uncompressed = test_point2.to_encoded_point(false);
         assert!(!uncompressed.is_compressed(), "given point is compressed");
 
@@ -842,15 +770,8 @@ pub mod tests {
         let peer_id = PublicKey::deserialize(&PUBLIC_KEY).unwrap().to_peerid();
         let hkc1 = HalfKeyChallenge::from_peerid(&peer_id).unwrap();
         let hkc2 = HalfKeyChallenge::deserialize(&hkc1.serialize()).unwrap();
-        assert_eq!(
-            hkc1, hkc2,
-            "failed to match deserialized half key challenge"
-        );
-        assert_eq!(
-            peer_id,
-            hkc2.to_peerid(),
-            "failed to match half-key challenge peer id"
-        );
+        assert_eq!(hkc1, hkc2, "failed to match deserialized half key challenge");
+        assert_eq!(peer_id, hkc2.to_peerid(), "failed to match half-key challenge peer id");
     }
 
     #[test]
@@ -878,9 +799,7 @@ pub mod wasm {
     use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
     use wasm_bindgen::prelude::*;
 
-    use crate::types::{
-        Challenge, CurvePoint, HalfKey, HalfKeyChallenge, Hash, PublicKey, Signature,
-    };
+    use crate::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, Hash, PublicKey, Signature};
 
     #[wasm_bindgen]
     impl CurvePoint {
@@ -932,18 +851,12 @@ pub mod wasm {
     #[wasm_bindgen]
     impl Challenge {
         #[wasm_bindgen(js_name = "from_hint_and_share")]
-        pub fn _from_hint_and_share(
-            own_share: &HalfKeyChallenge,
-            hint: &HalfKeyChallenge,
-        ) -> JsResult<Challenge> {
+        pub fn _from_hint_and_share(own_share: &HalfKeyChallenge, hint: &HalfKeyChallenge) -> JsResult<Challenge> {
             ok_or_jserr!(Self::from_hint_and_share(own_share, hint))
         }
 
         #[wasm_bindgen(js_name = "from_own_share_and_half_key")]
-        pub fn _from_own_share_and_half_key(
-            own_share: &HalfKeyChallenge,
-            half_key: &HalfKey,
-        ) -> JsResult<Challenge> {
+        pub fn _from_own_share_and_half_key(own_share: &HalfKeyChallenge, half_key: &HalfKey) -> JsResult<Challenge> {
             ok_or_jserr!(Self::from_own_share_and_half_key(own_share, half_key))
         }
     }
@@ -1027,10 +940,7 @@ pub mod wasm {
         #[wasm_bindgen(js_name = "create")]
         pub fn _create(inputs: Vec<Uint8Array>) -> Self {
             let mut hash = Keccak256::default();
-            inputs
-                .into_iter()
-                .map(|a| a.to_vec())
-                .for_each(|v| hash.update(&v));
+            inputs.into_iter().map(|a| a.to_vec()).for_each(|v| hash.update(&v));
 
             let mut ret = Hash {
                 hash: [0u8; Self::SIZE],

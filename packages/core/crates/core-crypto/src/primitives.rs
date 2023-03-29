@@ -21,11 +21,9 @@ impl SimpleMac {
     /// Create new instance of the MAC using the given secret key.
     pub fn new(key: &[u8]) -> Result<Self> {
         Ok(Self {
-            instance: SimpleHmac::<Blake2s256>::new_from_slice(key).map_err(|_| {
-                InvalidParameterSize {
-                    name: "key".into(),
-                    expected: SECRET_KEY_LENGTH,
-                }
+            instance: SimpleHmac::<Blake2s256>::new_from_slice(key).map_err(|_| InvalidParameterSize {
+                name: "key".into(),
+                expected: SECRET_KEY_LENGTH,
             })?,
         })
     }
@@ -38,10 +36,7 @@ impl SimpleMac {
     /// Retrieve the final MAC and reset this instance so it could be reused for
     /// a new MAC computation.
     pub fn finalize(&mut self) -> Box<[u8]> {
-        self.instance
-            .finalize_fixed_reset()
-            .to_vec()
-            .into_boxed_slice()
+        self.instance.finalize_fixed_reset().to_vec().into_boxed_slice()
     }
 }
 

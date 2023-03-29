@@ -12,10 +12,7 @@ pub struct IteratedHash {
 }
 
 /// Contains the intermediate result in the hash iteration progression
-#[cfg_attr(
-    feature = "wasm",
-    wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)
-)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Intermediate {
     pub iteration: usize,
@@ -140,9 +137,7 @@ mod tests {
 
         assert_eq!(recovered.iteration, hint_idx + 7);
         assert_eq!(
-            Hash::create(&[recovered.intermediate.as_ref()])
-                .serialize()
-                .as_ref(),
+            Hash::create(&[recovered.intermediate.as_ref()]).serialize().as_ref(),
             &target
         );
     }

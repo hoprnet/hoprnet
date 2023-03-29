@@ -203,16 +203,11 @@ impl FusedStream for StreamingIterable {
 impl Sink<Box<[u8]>> for StreamingIterable {
     type Error = String;
 
-    fn poll_ready(
-        self: Pin<&mut StreamingIterable>,
-        cx: &mut Context<'_>,
-    ) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(self: Pin<&mut StreamingIterable>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         info!("poll_ready called");
 
-        let mut this = unsafe {
-            std::mem::transmute::<Pin<&mut StreamingIterable>, Pin<&mut StreamingIterable>>(self)
-        }
-        .project();
+        let mut this =
+            unsafe { std::mem::transmute::<Pin<&mut StreamingIterable>, Pin<&mut StreamingIterable>>(self) }.project();
 
         *this.waker = Some(cx.waker().clone());
 
@@ -249,12 +244,7 @@ impl Sink<Box<[u8]>> for StreamingIterable {
             //      // ... function body
             //    }
             // }
-            Reflect::set(
-                &iterator_obj,
-                &"next".into(),
-                iterator_cb.as_ref().unchecked_ref(),
-            )
-            .unwrap();
+            Reflect::set(&iterator_obj, &"next".into(), iterator_cb.as_ref().unchecked_ref()).unwrap();
 
             // Release closure to JS garbage collector
             iterator_cb.forget();
@@ -294,13 +284,7 @@ impl Sink<Box<[u8]>> for StreamingIterable {
             };
             this.sink_close_future.set(Some(promise));
 
-            return match this
-                .sink_close_future
-                .as_mut()
-                .as_pin_mut()
-                .unwrap()
-                .poll(cx)
-            {
+            return match this.sink_close_future.as_mut().as_pin_mut().unwrap().poll(cx) {
                 Poll::Pending => Poll::Pending,
                 Poll::Ready(res) => Poll::Ready(match res {
                     Ok(_) => Ok(()),
@@ -339,9 +323,7 @@ impl Sink<Box<[u8]>> for StreamingIterable {
         let mut this = self.project();
 
         if this.sink_close_future.is_none() {
-            return Poll::Ready(Err(
-                "Uninitialized. Please call and `await` poll_ready first.".into(),
-            ));
+            return Poll::Ready(Err("Uninitialized. Please call and `await` poll_ready first.".into()));
         }
 
         *this.close_waker = Some(cx.waker().clone());

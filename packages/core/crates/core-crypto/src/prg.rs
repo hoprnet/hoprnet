@@ -39,14 +39,8 @@ impl PRGParameters {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(secret: &[u8]) -> Self {
         let mut ret = PRGParameters::default();
-        generate_key_iv(
-            secret,
-            HASH_KEY_PRG.as_bytes(),
-            &mut ret.key,
-            &mut ret.iv,
-            true,
-        )
-        .expect("invalid secret given");
+        generate_key_iv(secret, HASH_KEY_PRG.as_bytes(), &mut ret.key, &mut ret.iv, true)
+            .expect("invalid secret given");
         ret
     }
 }
@@ -168,9 +162,7 @@ mod tests {
         let key = [0u8; 16];
         let iv = [0u8; 12];
 
-        let out = PRG::new(&key, &iv)
-            .digest(5, AES_KEY_SIZE * 2 + 10)
-            .unwrap();
+        let out = PRG::new(&key, &iv).digest(5, AES_KEY_SIZE * 2 + 10).unwrap();
 
         assert_eq!(AES_BLOCK_SIZE * 2 + 5, out.len());
     }

@@ -38,8 +38,7 @@ impl MixerConfig {
     /// inside the configuration.
     fn random_delay(&self) -> Duration {
         let mut rng = rand::thread_rng();
-        let random_delay =
-            rng.gen_range(self.min_delay.as_millis()..self.max_delay.as_millis()) as u64;
+        let random_delay = rng.gen_range(self.min_delay.as_millis()..self.max_delay.as_millis()) as u64;
 
         Duration::from_millis(random_delay)
     }
@@ -90,10 +89,7 @@ impl Mixer {
     /// The same packet as ingested on input postponed by a random delay
     pub async fn mix(&self, packet: Result<Box<[u8]>, String>) -> Result<Box<[u8]>, String> {
         let random_delay = self.cfg.random_delay();
-        debug!(
-            "Mixer created a random packet delay of {}ms",
-            random_delay.as_millis()
-        );
+        debug!("Mixer created a random packet delay of {}ms", random_delay.as_millis());
 
         if let Some(m) = &self.metrics.queue_size {
             m.increment(1.0f64)
@@ -135,11 +131,7 @@ pub mod wasm {
         let mixer = std::sync::Arc::new(Mixer {
             cfg: MixerConfig::default(),
             metrics: MixerMetrics {
-                queue_size: SimpleGauge::new(
-                    "core_gauge_mixer_queue_size",
-                    "Current mixer queue size",
-                )
-                .ok(),
+                queue_size: SimpleGauge::new("core_gauge_mixer_queue_size", "Current mixer queue size").ok(),
                 average_delay: SimpleGauge::new(
                     "core_gauge_mixer_average_packet_delay",
                     "Average mixer packet delay averaged over a packet window",
@@ -196,10 +188,7 @@ mod tests {
         });
 
         if let Err(_) = async_std::future::timeout(TINY_CONSTANT_DELAY, stream.next()).await {
-            assert!(
-                true,
-                "Timeout expected, the packet should not get through the pipeline"
-            )
+            assert!(true, "Timeout expected, the packet should not get through the pipeline")
         } else {
             assert!(false, "Timeout expected, but none occurred");
         }
@@ -233,12 +222,10 @@ mod tests {
         let packet_3 = 7u64; // 2nd in the output
         let expected_packets = vec![packet_2, packet_3, packet_1];
 
-        let stream = futures::stream::iter(vec![packet_1, packet_2, packet_3]).then_concurrent(
-            |x| async move {
-                sleep(std::time::Duration::from_millis(x)).await;
-                x
-            },
-        );
+        let stream = futures::stream::iter(vec![packet_1, packet_2, packet_3]).then_concurrent(|x| async move {
+            sleep(std::time::Duration::from_millis(x)).await;
+            x
+        });
         let actual_packets = stream.collect::<Vec<u64>>().await;
 
         assert_eq!(actual_packets, expected_packets);

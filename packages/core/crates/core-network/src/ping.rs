@@ -78,17 +78,13 @@ impl Ping {
             metric_time_to_heartbeat: SimpleHistogram::new(
                 "core_histogram_heartbeat_time_seconds",
                 "Measures total time it takes to probe all other nodes (in seconds)",
-                vec![
-                    0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0, 60.0, 90.0, 120.0, 300.0,
-                ],
+                vec![0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0, 60.0, 90.0, 120.0, 300.0],
             )
             .ok(),
             metric_time_to_ping: SimpleHistogram::new(
                 "core_histogram_ping_time_seconds",
                 "Measures total time it takes to ping a single node (seconds)",
-                vec![
-                    0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0, 60.0, 90.0, 120.0, 300.0,
-                ],
+                vec![0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0, 60.0, 90.0, 120.0, 300.0],
             )
             .ok(),
             metric_successful_ping_count: SimpleCounter::new(
@@ -115,11 +111,8 @@ impl Ping {
     ///
     /// * `peers` - A vector of PeerId objects referencing the peers to be pinged
     /// * `send_msg` - The send function producing a Future with the reply of the pinged peer
-    pub async fn ping_peers<F>(
-        &self,
-        mut peers: Vec<PeerId>,
-        send_msg: &impl Fn(Box<[u8]>, String) -> F,
-    ) where
+    pub async fn ping_peers<F>(&self, mut peers: Vec<PeerId>, send_msg: &impl Fn(Box<[u8]>, String) -> F)
+    where
         F: futures::Future<Output = Result<Box<[u8]>, String>>,
     {
         if peers.is_empty() {
@@ -152,16 +145,11 @@ impl Ping {
             if let Some(v) = waiting.next() {
                 let remaining_time = current_timestamp() - start;
                 if (remaining_time as u128) < self.config.timeout.as_millis() {
-                    futs.push(self.ping_peer(
-                        v.clone(),
-                        Duration::from_millis(remaining_time),
-                        send_msg,
-                    ));
+                    futs.push(self.ping_peer(v.clone(), Duration::from_millis(remaining_time), send_msg));
                 }
             }
 
-            self.external_api
-                .on_finished_ping(&heartbeat.0, heartbeat.1);
+            self.external_api.on_finished_ping(&heartbeat.0, heartbeat.1);
         }
     }
 
@@ -198,16 +186,17 @@ impl Ping {
             pin_mut!(timeout, ping);
 
             let ping_result: Result<(), String> = match select(timeout, ping).await {
-                Either::Left(_) => Err(format!(
-                    "The ping timed out {}s",
-                    timeout_duration.as_secs()
-                )),
+                Either::Left(_) => Err(format!("The ping timed out {}s", timeout_duration.as_secs())),
                 Either::Right((v, _)) => match v {
                     Ok(received) => {
                         let expected = crate::heartbeat::generate_ping_response(challenge.clone());
                         match compare(expected.as_ref(), received.as_ref()) {
                             std::cmp::Ordering::Equal => Ok(()),
-                            _ => Err(format!("Received incorrect reply for challenge, expected '{:x?}', but received: {:x?}", expected.as_ref(), received.as_ref()))
+                            _ => Err(format!(
+                                "Received incorrect reply for challenge, expected '{:x?}', but received: {:x?}",
+                                expected.as_ref(),
+                                received.as_ref()
+                            )),
                         }
                     }
                     Err(description) => Err(format!(
@@ -218,10 +207,7 @@ impl Ping {
                 },
             };
 
-            info!(
-                "Ping finished for peer {} with: {:?}",
-                destination, ping_result
-            );
+            info!("Ping finished for peer {} with: {:?}", destination, ping_result);
 
             (
                 destination,
@@ -307,9 +293,7 @@ pub mod wasm {
                 error!(
                     "Failed to perform on peer offline operation with: {}",
                     err.as_string()
-                        .unwrap_or_else(|| {
-                            "Unspecified error occurred on registering the ping result".to_owned()
-                        })
+                        .unwrap_or_else(|| { "Unspecified error occurred on registering the ping result".to_owned() })
                         .as_str()
                 )
             };
@@ -367,51 +351,47 @@ pub mod wasm {
                 })
                 .collect::<Vec<_>>();
 
-            let message_transport = |msg: Box<[u8]>,
-                                     peer: String|
-             -> std::pin::Pin<
-                Box<dyn futures::Future<Output = Result<Box<[u8]>, String>>>,
-            > {
-                Box::pin(async move {
-                    let this = JsValue::null();
-                    let data: JsValue = js_sys::Uint8Array::from(msg.as_ref()).into();
-                    let peer: JsValue = JsString::from(peer.as_str()).into();
+            let message_transport =
+                |msg: Box<[u8]>,
+                 peer: String|
+                 -> std::pin::Pin<Box<dyn futures::Future<Output = Result<Box<[u8]>, String>>>> {
+                    Box::pin(async move {
+                        let this = JsValue::null();
+                        let data: JsValue = js_sys::Uint8Array::from(msg.as_ref()).into();
+                        let peer: JsValue = JsString::from(peer.as_str()).into();
 
-                    // call a send_msg_cb producing a JS promise that is further converted to a Future
-                    // holding the reply of the pinged peer for the ping message.
-                    match self.send_msg_cb.call2(&this, &data, &peer) {
-                        Ok(r) => {
-                            let promise = js_sys::Promise::from(r);
-                            let data = wasm_bindgen_futures::JsFuture::from(promise)
-                                .await
-                                .map(|x| js_sys::Array::from(x.as_ref()).get(0))
-                                .map(|x| js_sys::Uint8Array::new(&x).to_vec().into_boxed_slice())
-                                .map_err(|x| {
-                                    x.dyn_ref::<JsString>().map_or(
-                                        "Failed to send ping message".to_owned(),
-                                        |x| -> String { x.into() },
-                                    )
-                                });
+                        // call a send_msg_cb producing a JS promise that is further converted to a Future
+                        // holding the reply of the pinged peer for the ping message.
+                        match self.send_msg_cb.call2(&this, &data, &peer) {
+                            Ok(r) => {
+                                let promise = js_sys::Promise::from(r);
+                                let data = wasm_bindgen_futures::JsFuture::from(promise)
+                                    .await
+                                    .map(|x| js_sys::Array::from(x.as_ref()).get(0))
+                                    .map(|x| js_sys::Uint8Array::new(&x).to_vec().into_boxed_slice())
+                                    .map_err(|x| {
+                                        x.dyn_ref::<JsString>()
+                                            .map_or("Failed to send ping message".to_owned(), |x| -> String {
+                                                x.into()
+                                            })
+                                    });
 
-                            data
+                                data
+                            }
+                            Err(e) => {
+                                error!(
+                                    "The message transport could not be established: {}",
+                                    e.as_string()
+                                        .unwrap_or_else(|| {
+                                            "The message transport failed with unknown error".to_owned()
+                                        })
+                                        .as_str()
+                                );
+                                Err(format!("Failed to extract transport error as string: {:?}", e))
+                            }
                         }
-                        Err(e) => {
-                            error!(
-                                "The message transport could not be established: {}",
-                                e.as_string()
-                                    .unwrap_or_else(|| {
-                                        "The message transport failed with unknown error".to_owned()
-                                    })
-                                    .as_str()
-                            );
-                            Err(format!(
-                                "Failed to extract transport error as string: {:?}",
-                                e
-                            ))
-                        }
-                    }
-                })
-            };
+                    })
+                };
 
             self.pinger.ping_peers(converted, &message_transport).await;
         }

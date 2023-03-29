@@ -38,14 +38,8 @@ impl PRPParameters {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(secret: &[u8]) -> Self {
         let mut ret = PRPParameters::default();
-        generate_key_iv(
-            secret,
-            HASH_KEY_PRP.as_bytes(),
-            &mut ret.key,
-            &mut ret.iv,
-            false,
-        )
-        .expect("invalid secret given");
+        generate_key_iv(secret, HASH_KEY_PRP.as_bytes(), &mut ret.key, &mut ret.iv, false)
+            .expect("invalid secret given");
         ret
     }
 }

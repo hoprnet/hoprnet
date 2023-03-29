@@ -168,10 +168,7 @@ impl Balance {
     pub const SIZE: usize = U256::SIZE;
 
     pub fn new(value: u256, balance_type: BalanceType) -> Self {
-        Balance {
-            value,
-            balance_type,
-        }
+        Balance { value, balance_type }
     }
 
     pub fn value(&self) -> &u256 {
@@ -225,10 +222,7 @@ impl BinarySerializable for EthereumChallenge {
 
 /// Represents a snapshot in the blockchain
 #[derive(Clone, Eq, PartialEq, Debug)]
-#[cfg_attr(
-    feature = "wasm",
-    wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)
-)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct Snapshot {
     pub block_number: U256,
     pub transaction_index: U256,
@@ -344,9 +338,7 @@ impl U256 {
                 value: highest_prob / inverse_prob,
             })
         } else if inverse_prob.eq(&u256::ZERO) {
-            Ok(U256 {
-                value: highest_prob,
-            })
+            Ok(U256 { value: highest_prob })
         } else {
             Err(InvalidInput)
         }

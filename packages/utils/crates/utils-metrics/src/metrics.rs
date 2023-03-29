@@ -1,7 +1,7 @@
 use prometheus::core::Collector;
 use prometheus::{
-    Gauge, GaugeVec, Histogram, HistogramOpts, HistogramTimer, HistogramVec, IntCounter,
-    IntCounterVec, Opts, TextEncoder,
+    Gauge, GaugeVec, Histogram, HistogramOpts, HistogramTimer, HistogramVec, IntCounter, IntCounterVec, Opts,
+    TextEncoder,
 };
 use regex::Regex;
 use std::collections::btree_map::Entry;
@@ -20,10 +20,8 @@ pub fn gather_all_metrics() -> prometheus::Result<String> {
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub fn merge_encoded_metrics(metrics1: &str, metrics2: &str) -> String {
     let mut merged_metrics = BTreeMap::new();
-    let metric_expr = Regex::new(
-        r"(?:# HELP)\s(?P<name>\w+)\s.+\s+(?:# TYPE)\s\w+\s(?P<type>\w+)\s+(?:[^#]+\s)+",
-    )
-    .unwrap();
+    let metric_expr =
+        Regex::new(r"(?:# HELP)\s(?P<name>\w+)\s.+\s+(?:# TYPE)\s\w+\s(?P<type>\w+)\s+(?:[^#]+\s)+").unwrap();
 
     let merged_texts = metrics1.to_owned() + metrics2;
 
@@ -55,12 +53,7 @@ where
     Ok(metric)
 }
 
-fn register_metric_vec<M, C>(
-    name: &str,
-    desc: &str,
-    labels: &[&str],
-    creator: C,
-) -> prometheus::Result<M>
+fn register_metric_vec<M, C>(name: &str, desc: &str, labels: &[&str], creator: C) -> prometheus::Result<M>
 where
     M: Clone + Collector + 'static,
     C: Fn(Opts, &[&str]) -> prometheus::Result<M>,
@@ -340,9 +333,7 @@ impl SimpleHistogram {
     pub fn record_measure(&self, timer: SimpleTimer) {
         match timer.inner {
             TimerVariant::Native(timer) => timer.observe_duration(),
-            TimerVariant::WASM {
-                start_ts, new_ts, ..
-            } => self.hh.observe(new_ts() - start_ts),
+            TimerVariant::WASM { start_ts, new_ts, .. } => self.hh.observe(new_ts() - start_ts),
         }
     }
 
@@ -350,9 +341,7 @@ impl SimpleHistogram {
     pub fn cancel_measure(&self, timer: SimpleTimer) -> f64 {
         match timer.inner {
             TimerVariant::Native(timer) => timer.stop_and_discard(),
-            TimerVariant::WASM {
-                start_ts, new_ts, ..
-            } => new_ts() - start_ts,
+            TimerVariant::WASM { start_ts, new_ts, .. } => new_ts() - start_ts,
         }
     }
 
@@ -420,9 +409,10 @@ impl MultiHistogram {
                 new_ts,
                 labels,
             } => {
-                if let Ok(h) = self.hh.get_metric_with_label_values(
-                    &labels.iter().map(String::as_str).collect::<Vec<&str>>(),
-                ) {
+                if let Ok(h) = self
+                    .hh
+                    .get_metric_with_label_values(&labels.iter().map(String::as_str).collect::<Vec<&str>>())
+                {
                     h.observe(new_ts() - start_ts)
                 }
             }
@@ -433,9 +423,7 @@ impl MultiHistogram {
     pub fn cancel_measure(&self, timer: SimpleTimer) -> f64 {
         match timer.inner {
             TimerVariant::Native(timer) => timer.stop_and_discard(),
-            TimerVariant::WASM {
-                start_ts, new_ts, ..
-            } => new_ts() - start_ts,
+            TimerVariant::WASM { start_ts, new_ts, .. } => new_ts() - start_ts,
         }
     }
 
@@ -449,12 +437,7 @@ impl MultiHistogram {
     /// Creates a new histogram with the given name, description and buckets.
     /// If no buckets are specified, they will be defined automatically.
     /// The +Inf bucket is always added automatically.
-    pub fn new(
-        name: &str,
-        description: &str,
-        buckets: Vec<f64>,
-        labels: &[&str],
-    ) -> prometheus::Result<Self> {
+    pub fn new(name: &str, description: &str, buckets: Vec<f64>, labels: &[&str]) -> prometheus::Result<Self> {
         let mut opts = HistogramOpts::new(name, description);
         if !buckets.is_empty() {
             opts = opts.buckets(buckets);
@@ -473,11 +456,9 @@ impl MultiHistogram {
 
     /// Starts a timer for a histogram with the given labels.
     pub fn start_measure(&self, label_values: &[&str]) -> prometheus::Result<SimpleTimer> {
-        self.hh
-            .get_metric_with_label_values(label_values)
-            .map(|h| SimpleTimer {
-                inner: TimerVariant::Native(h.start_timer()),
-            })
+        self.hh.get_metric_with_label_values(label_values).map(|h| SimpleTimer {
+            inner: TimerVariant::Native(h.start_timer()),
+        })
     }
 
     /// Records a value observation to the histogram with the given labels.
@@ -589,12 +570,7 @@ mod tests {
 
     #[test]
     fn test_histogram() {
-        let histogram = SimpleHistogram::new(
-            "my_histogram",
-            "test histogram",
-            vec![1.0, 2.0, 3.0, 4.0, 5.0],
-        )
-        .unwrap();
+        let histogram = SimpleHistogram::new("my_histogram", "test histogram", vec![1.0, 2.0, 3.0, 4.0, 5.0]).unwrap();
 
         assert_eq!("my_histogram", histogram.name());
 
@@ -660,8 +636,7 @@ mod tests {
         let counter = SimpleCounter::new("b_my_test_ctr", "test counter").unwrap();
         counter.increment();
 
-        let multi_gauge =
-            MultiGauge::new("c_mgauge", "test mgauge", &["version", "method"]).unwrap();
+        let multi_gauge = MultiGauge::new("c_mgauge", "test mgauge", &["version", "method"]).unwrap();
         multi_gauge.increment(&["1.10.11", "get"], 3.0);
         multi_gauge.increment(&["1.10.11", "post"], 1.0);
 
@@ -670,8 +645,7 @@ mod tests {
         let counter2 = SimpleCounter::new("a_my_test_ctr_2", "test counter 2").unwrap();
         counter2.increment_by(2);
 
-        let histogram =
-            SimpleHistogram::new("b_histogram", "test histogram", vec![0.5, 1.0, 5.0]).unwrap();
+        let histogram = SimpleHistogram::new("b_histogram", "test histogram", vec![0.5, 1.0, 5.0]).unwrap();
         histogram.observe(0.3);
 
         let metrics2 = gather_all_metrics().unwrap();
@@ -709,8 +683,7 @@ mod tests {
 pub mod wasm {
     use crate::metrics::TimerVariant::WASM;
     use crate::metrics::{
-        MultiCounter, MultiGauge, MultiHistogram, SimpleCounter, SimpleGauge, SimpleHistogram,
-        SimpleTimer,
+        MultiCounter, MultiGauge, MultiHistogram, SimpleCounter, SimpleGauge, SimpleHistogram, SimpleTimer,
     };
     use js_sys::JsString;
     use utils_misc::utils::wasm::JsResult;
@@ -729,11 +702,7 @@ pub mod wasm {
     }
 
     #[wasm_bindgen]
-    pub fn create_multi_counter(
-        name: &str,
-        description: &str,
-        labels: Vec<JsString>,
-    ) -> JsResult<MultiCounter> {
+    pub fn create_multi_counter(name: &str, description: &str, labels: Vec<JsString>) -> JsResult<MultiCounter> {
         convert_from_jstrvec!(labels, bind);
         ok_or_jserr!(MultiCounter::new(name, description, bind.as_slice()))
     }
@@ -766,11 +735,7 @@ pub mod wasm {
     }
 
     #[wasm_bindgen]
-    pub fn create_multi_gauge(
-        name: &str,
-        description: &str,
-        labels: Vec<JsString>,
-    ) -> JsResult<MultiGauge> {
+    pub fn create_multi_gauge(name: &str, description: &str, labels: Vec<JsString>) -> JsResult<MultiGauge> {
         convert_from_jstrvec!(labels, bind);
         ok_or_jserr!(MultiGauge::new(name, description, bind.as_slice()))
     }
@@ -821,11 +786,7 @@ pub mod wasm {
     }
 
     #[wasm_bindgen]
-    pub fn create_histogram_with_buckets(
-        name: &str,
-        description: &str,
-        buckets: &[f64],
-    ) -> JsResult<SimpleHistogram> {
+    pub fn create_histogram_with_buckets(name: &str, description: &str, buckets: &[f64]) -> JsResult<SimpleHistogram> {
         ok_or_jserr!(SimpleHistogram::new(name, description, buckets.into()))
     }
 
@@ -844,11 +805,7 @@ pub mod wasm {
     }
 
     #[wasm_bindgen]
-    pub fn create_multi_histogram(
-        name: &str,
-        description: &str,
-        labels: Vec<JsString>,
-    ) -> JsResult<MultiHistogram> {
+    pub fn create_multi_histogram(name: &str, description: &str, labels: Vec<JsString>) -> JsResult<MultiHistogram> {
         create_multi_histogram_with_buckets(name, description, &[] as &[f64; 0], labels)
     }
 
@@ -860,12 +817,7 @@ pub mod wasm {
         labels: Vec<JsString>,
     ) -> JsResult<MultiHistogram> {
         convert_from_jstrvec!(labels, bind);
-        ok_or_jserr!(MultiHistogram::new(
-            name,
-            description,
-            buckets.into(),
-            bind.as_slice()
-        ))
+        ok_or_jserr!(MultiHistogram::new(name, description, buckets.into(), bind.as_slice()))
     }
 
     #[wasm_bindgen]

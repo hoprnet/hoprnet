@@ -32,8 +32,7 @@ pub fn random_integer(start: u64, end: Option<u64>) -> Result<u64> {
 /// Generates a random elliptic curve point on secp256k1 curve (but not a point in infinity).
 /// Returns the encoded secret scalar and the corresponding point.
 pub fn random_group_element() -> (Box<[u8]>, CurvePoint) {
-    let mut scalar: NonZeroScalar<Secp256k1> =
-        NonZeroScalar::<Secp256k1>::from_uint(1u32.into()).unwrap();
+    let mut scalar: NonZeroScalar<Secp256k1> = NonZeroScalar::<Secp256k1>::from_uint(1u32.into()).unwrap();
     let mut point = ProjectivePoint::<Secp256k1>::IDENTITY;
     while point.is_identity().into() {
         scalar = NonZeroScalar::<Secp256k1>::random(&mut OsRng);

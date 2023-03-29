@@ -66,10 +66,7 @@ impl SharedKeys {
     /// Generates shared secrets given the peer public keys array.
     /// The order of the peer public keys is preserved for resulting shared keys.
     /// The specified random number generator will be used.
-    pub fn generate(
-        rng: &mut (impl CryptoRng + RngCore),
-        peer_public_keys: Vec<Box<[u8]>>,
-    ) -> Result<SharedKeys> {
+    pub fn generate(rng: &mut (impl CryptoRng + RngCore), peer_public_keys: Vec<Box<[u8]>>) -> Result<SharedKeys> {
         let mut shared_keys = Vec::new();
 
         // This becomes: x * b_0 * b_1 * b_2 * ...
@@ -115,14 +112,8 @@ impl SharedKeys {
     }
 
     /// Calculates the forward transformation for the given peer public key.
-    pub fn forward_transform(
-        alpha: &[u8],
-        public_key: &[u8],
-        private_key: &[u8],
-    ) -> Result<SharedKeys> {
-        let priv_key = to_checked_secret_scalar(KeyBytes::clone_from_slice(
-            &private_key[0..private_key.len()],
-        ))?;
+    pub fn forward_transform(alpha: &[u8], public_key: &[u8], private_key: &[u8]) -> Result<SharedKeys> {
+        let priv_key = to_checked_secret_scalar(KeyBytes::clone_from_slice(&private_key[0..private_key.len()]))?;
         let alpha_proj = decode_public_key_to_point(alpha)?;
 
         let s_k = (alpha_proj * priv_key.as_ref()).to_affine();
@@ -131,9 +122,7 @@ impl SharedKeys {
         let b_k = expand_key_from_group_element(&s_k, alpha);
         let b_k_checked = to_checked_secret_scalar(b_k)?;
 
-        let alpha_new = (alpha_proj * b_k_checked.as_ref())
-            .to_affine()
-            .to_encoded_point(true);
+        let alpha_new = (alpha_proj * b_k_checked.as_ref()).to_affine().to_encoded_point(true);
 
         Ok(SharedKeys {
             alpha: alpha_new.as_bytes().into(),
@@ -205,12 +194,8 @@ mod tests {
             let priv_key = priv_keys[i].to_vec();
             let pub_key = pub_keys[i].to_vec();
 
-            let shared_key = SharedKeys::forward_transform(
-                alpha_cpy.as_slice(),
-                pub_key.as_slice(),
-                priv_key.as_slice(),
-            )
-            .unwrap();
+            let shared_key =
+                SharedKeys::forward_transform(alpha_cpy.as_slice(), pub_key.as_slice(), priv_key.as_slice()).unwrap();
 
             assert_eq!(&shared_key.secrets[0], &generated_shares.secrets[i]);
 
@@ -261,9 +246,7 @@ pub mod wasm {
         /// The indices are assigned in the same order as they were given to the
         /// [`generate`] function.
         pub fn get_peer_shared_key(&self, peer_idx: usize) -> Option<Uint8Array> {
-            self.secrets
-                .get(peer_idx)
-                .map(|k| Uint8Array::from(k.as_slice()))
+            self.secrets.get(peer_idx).map(|k| Uint8Array::from(k.as_slice()))
         }
 
         /// Returns the number of shared keys generated in this structure.
@@ -272,16 +255,8 @@ pub mod wasm {
         }
 
         #[wasm_bindgen(js_name = "forward_transform")]
-        pub fn _forward_transform(
-            alpha: &[u8],
-            public_key: &[u8],
-            private_key: &[u8],
-        ) -> JsResult<SharedKeys> {
-            ok_or_jserr!(super::SharedKeys::forward_transform(
-                alpha,
-                public_key,
-                private_key
-            ))
+        pub fn _forward_transform(alpha: &[u8], public_key: &[u8], private_key: &[u8]) -> JsResult<SharedKeys> {
+            ok_or_jserr!(super::SharedKeys::forward_transform(alpha, public_key, private_key))
         }
 
         /// Generate shared keys given the peer public keys
@@ -289,10 +264,7 @@ pub mod wasm {
         pub fn _generate(peer_public_keys: Vec<Uint8Array>) -> JsResult<SharedKeys> {
             ok_or_jserr!(super::SharedKeys::generate(
                 &mut OsRng,
-                peer_public_keys
-                    .iter()
-                    .map(|v| v.to_vec().into_boxed_slice())
-                    .collect()
+                peer_public_keys.iter().map(|v| v.to_vec().into_boxed_slice()).collect()
             ))
         }
     }

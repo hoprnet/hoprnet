@@ -175,8 +175,10 @@ impl Network {
         };
 
         if cfg.quality_offline_threshold < cfg.quality_bad_threshold {
-            panic!("Strict requirement failed, bad quality threshold {} must be lower than quality offline threshold {}",
-                   cfg.quality_bad_threshold, cfg.quality_offline_threshold);
+            panic!(
+                "Strict requirement failed, bad quality threshold {} must be lower than quality offline threshold {}",
+                cfg.quality_bad_threshold, cfg.quality_offline_threshold
+            );
         }
 
         let mut excluded = HashSet::new();
@@ -194,11 +196,7 @@ impl Network {
             bad_quality_non_public: HashSet::new(),
             last_health: Health::UNKNOWN,
             network_actions_api,
-            metric_network_health: SimpleGauge::new(
-                "core_gauge_network_health",
-                "Connectivity health indicator",
-            )
-            .ok(),
+            metric_network_health: SimpleGauge::new("core_gauge_network_health", "Connectivity health indicator").ok(),
             metric_peers_by_quality: MultiGauge::new(
                 "core_mgauge_peers_by_quality",
                 "Number different peer types by quality",
@@ -246,10 +244,7 @@ impl Network {
                 self.refresh_network_status(&entry);
 
                 if let Some(x) = self.entries.insert(peer.to_string(), entry) {
-                    warn!(
-                        "Evicting an existing record for {}, this should not happen!",
-                        &x
-                    );
+                    warn!("Evicting an existing record for {}, this should not happen!", &x);
                 }
             }
         }
@@ -269,10 +264,7 @@ impl Network {
             entry.is_public = self.network_actions_api.is_public(&peer);
 
             if ping_result.is_err() {
-                entry.backoff = self
-                    .cfg
-                    .backoff_max
-                    .max(entry.backoff.powf(self.cfg.backoff_exponent));
+                entry.backoff = self.cfg.backoff_max.max(entry.backoff.powf(self.cfg.backoff_exponent));
                 entry.quality = 0.0_f64.max(entry.quality - self.cfg.quality_step);
 
                 if entry.quality < (self.cfg.quality_step / 2.0) {
@@ -281,8 +273,7 @@ impl Network {
                     self.entries.remove(entry.id.to_string().as_str());
                     return;
                 } else if entry.quality < self.cfg.quality_bad_threshold {
-                    self.ignored
-                        .insert(entry.id.to_string(), current_timestamp());
+                    self.ignored.insert(entry.id.to_string(), current_timestamp());
                 } else if entry.quality < self.cfg.quality_offline_threshold {
                     self.network_actions_api.on_peer_offline(&entry.id);
                 }
@@ -337,10 +328,7 @@ impl Network {
         }
 
         if health != self.last_health {
-            info!(
-                "Network health changed from {} to {}",
-                self.last_health, health
-            );
+            info!("Network health changed from {} to {}", self.last_health, health);
             self.network_actions_api
                 .on_network_health_change(self.last_health, health);
             self.last_health = health;
@@ -348,8 +336,7 @@ impl Network {
 
         // metrics
         if let Some(metric_peer_count) = &self.metric_peer_count {
-            metric_peer_count
-                .set((good_public + good_non_public + bad_public + bad_non_public) as f64);
+            metric_peer_count.set((good_public + good_non_public + bad_public + bad_non_public) as f64);
         }
 
         if let Some(metric_peers_by_quality) = &self.metric_peers_by_quality {
@@ -497,14 +484,9 @@ pub mod wasm {
     impl NetworkExternalActions for WasmNetworkApi {
         fn is_public(&self, peer: &PeerId) -> bool {
             let this = JsValue::null();
-            match self
-                .is_public_cb
-                .call1(&this, &JsValue::from(peer.to_base58()))
-            {
+            match self.is_public_cb.call1(&this, &JsValue::from(peer.to_base58())) {
                 Ok(v) => v.as_bool().unwrap_or_else(|| {
-                    error!(
-                        "Failed to extract 'is_public_cb` result as bool, defaulting to 'false'"
-                    );
+                    error!("Failed to extract 'is_public_cb` result as bool, defaulting to 'false'");
                     false
                 }),
                 _ => {
@@ -519,32 +501,22 @@ pub mod wasm {
 
         fn close_connection(&self, peer: &PeerId) {
             let this = JsValue::null();
-            if let Err(err) = self
-                .close_connection_cb
-                .call1(&this, &JsValue::from(peer.to_base58()))
-            {
+            if let Err(err) = self.close_connection_cb.call1(&this, &JsValue::from(peer.to_base58())) {
                 error!(
                     "Failed to perform close connection for peer {} with: {}",
                     peer,
-                    err.as_string()
-                        .unwrap_or_else(|| "unknown error".to_owned())
-                        .as_str()
+                    err.as_string().unwrap_or_else(|| "unknown error".to_owned()).as_str()
                 )
             };
         }
 
         fn on_peer_offline(&self, peer: &PeerId) {
             let this = JsValue::null();
-            if let Err(err) = self
-                .on_peer_offline_cb
-                .call1(&this, &JsValue::from(peer.to_base58()))
-            {
+            if let Err(err) = self.on_peer_offline_cb.call1(&this, &JsValue::from(peer.to_base58())) {
                 error!(
                     "Failed to perform on peer offline operation for peer {} with: {}",
                     peer,
-                    err.as_string()
-                        .unwrap_or_else(|| "unknown error".to_owned())
-                        .as_str()
+                    err.as_string().unwrap_or_else(|| "unknown error".to_owned()).as_str()
                 )
             };
         }
@@ -556,9 +528,7 @@ pub mod wasm {
             if let Err(err) = self.on_network_health_change_cb.call2(&this, &old, &new) {
                 error!(
                     "Failed to perform the network health change operation with: {}",
-                    err.as_string()
-                        .unwrap_or_else(|| "unknown error".to_owned())
-                        .as_str()
+                    err.as_string().unwrap_or_else(|| "unknown error".to_owned()).as_str()
                 )
             };
         }
@@ -814,8 +784,7 @@ mod tests {
     }
 
     #[test]
-    fn test_network_should_ignore_a_peer_that_has_reached_lower_thresholds_a_specified_amount_of_time(
-    ) {
+    fn test_network_should_ignore_a_peer_that_has_reached_lower_thresholds_a_specified_amount_of_time() {
         let peer = PeerId::random();
 
         let mut peers = basic_network(&PeerId::random());
@@ -912,9 +881,7 @@ mod tests {
 
         let mut mock = MockNetworkExternalActions::new();
         mock.expect_is_public().times(1).returning(|_| false);
-        mock.expect_on_network_health_change()
-            .times(1)
-            .return_const(());
+        mock.expect_on_network_health_change().times(1).return_const(());
 
         let mut peers = Network::new(PeerId::random(), 0.6, Box::new(mock));
 
@@ -929,12 +896,8 @@ mod tests {
         let public = peer.clone();
 
         let mut mock = MockNetworkExternalActions::new();
-        mock.expect_is_public()
-            .times(2)
-            .returning(move |x| x == &public);
-        mock.expect_on_network_health_change()
-            .times(1)
-            .return_const(());
+        mock.expect_is_public().times(2).returning(move |x| x == &public);
+        mock.expect_on_network_health_change().times(1).return_const(());
         let mut peers = Network::new(PeerId::random(), 0.6, Box::new(mock));
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
@@ -950,12 +913,8 @@ mod tests {
         let public = peer.clone();
 
         let mut mock = MockNetworkExternalActions::new();
-        mock.expect_is_public()
-            .times(3)
-            .returning(move |x| x == &public);
-        mock.expect_on_network_health_change()
-            .times(1)
-            .return_const(());
+        mock.expect_is_public().times(3).returning(move |x| x == &public);
+        mock.expect_on_network_health_change().times(1).return_const(());
         mock.expect_close_connection().times(1).return_const(());
 
         let mut peers = Network::new(PeerId::random(), 0.6, Box::new(mock));
@@ -969,19 +928,14 @@ mod tests {
     }
 
     #[test]
-    fn test_network_should_be_healthy_when_a_public_peer_is_pingable_with_high_quality_and_i_am_public(
-    ) {
+    fn test_network_should_be_healthy_when_a_public_peer_is_pingable_with_high_quality_and_i_am_public() {
         let me = PeerId::random();
         let peer = PeerId::random();
         let public = vec![peer.clone(), me.clone()];
 
         let mut mock = MockNetworkExternalActions::new();
-        mock.expect_is_public()
-            .times(5)
-            .returning(move |x| public.contains(&x));
-        mock.expect_on_network_health_change()
-            .times(2)
-            .return_const(());
+        mock.expect_is_public().times(5).returning(move |x| public.contains(&x));
+        mock.expect_on_network_health_change().times(2).return_const(());
         let mut peers = Network::new(me, 0.3, Box::new(mock));
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
@@ -1002,12 +956,8 @@ mod tests {
 
         let mut mock = MockNetworkExternalActions::new();
 
-        mock.expect_is_public()
-            .times(8)
-            .returning(move |x| public.contains(&x));
-        mock.expect_on_network_health_change()
-            .times(2)
-            .return_const(());
+        mock.expect_is_public().times(8).returning(move |x| public.contains(&x));
+        mock.expect_on_network_health_change().times(2).return_const(());
         let mut peers = Network::new(PeerId::random(), 0.3, Box::new(mock));
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
