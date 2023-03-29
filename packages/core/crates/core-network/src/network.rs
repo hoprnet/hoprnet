@@ -882,7 +882,6 @@ mod tests {
             assert_eq!(&proto_version.1, status.metadata().get(&proto_version.0).unwrap());
             assert_eq!(&other_metadata_1.1, status.metadata().get(&other_metadata_1.0).unwrap());
             assert!(status.metadata().get(&other_metadata_2.0).is_none());
-
         }
 
         let ts = current_timestamp();
