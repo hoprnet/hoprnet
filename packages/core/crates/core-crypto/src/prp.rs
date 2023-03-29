@@ -1,6 +1,6 @@
 use crate::derivation::generate_key_iv;
-use crate::errors::Result;
 use crate::errors::CryptoError::InvalidInputValue;
+use crate::errors::Result;
 
 use crate::primitives::{calculate_mac, SimpleStreamCipher};
 
@@ -19,14 +19,14 @@ pub const PRP_MIN_LENGTH: usize = PRP_INTERMEDIATE_KEY_LENGTH;
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct PRPParameters {
     key: [u8; PRP_KEY_LENGTH],
-    iv: [u8; PRP_IV_LENGTH]
+    iv: [u8; PRP_IV_LENGTH],
 }
 
 impl Default for PRPParameters {
     fn default() -> Self {
         Self {
             key: [0u8; PRP_KEY_LENGTH],
-            iv: [0u8; PRP_IV_LENGTH]
+            iv: [0u8; PRP_IV_LENGTH],
         }
     }
 }
@@ -38,8 +38,14 @@ impl PRPParameters {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(secret: &[u8]) -> Self {
         let mut ret = PRPParameters::default();
-        generate_key_iv(secret, HASH_KEY_PRP.as_bytes(), &mut ret.key, &mut ret.iv, false)
-            .expect("invalid secret given");
+        generate_key_iv(
+            secret,
+            HASH_KEY_PRP.as_bytes(),
+            &mut ret.key,
+            &mut ret.iv,
+            false,
+        )
+        .expect("invalid secret given");
         ret
     }
 }
@@ -49,7 +55,7 @@ impl PRPParameters {
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct PRP {
     keys: [Box<[u8]>; 4],
-    ivs: [Box<[u8]>; 4]
+    ivs: [Box<[u8]>; 4],
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -61,17 +67,18 @@ impl PRP {
 
         Self {
             keys: [
-                key[0* PRP_INTERMEDIATE_KEY_LENGTH..1* PRP_INTERMEDIATE_KEY_LENGTH].into(),
-                key[1* PRP_INTERMEDIATE_KEY_LENGTH..2* PRP_INTERMEDIATE_KEY_LENGTH].into(),
-                key[2* PRP_INTERMEDIATE_KEY_LENGTH..3* PRP_INTERMEDIATE_KEY_LENGTH].into(),
-                key[3* PRP_INTERMEDIATE_KEY_LENGTH..4* PRP_INTERMEDIATE_KEY_LENGTH].into()
+                key[0 * PRP_INTERMEDIATE_KEY_LENGTH..1 * PRP_INTERMEDIATE_KEY_LENGTH].into(),
+                key[1 * PRP_INTERMEDIATE_KEY_LENGTH..2 * PRP_INTERMEDIATE_KEY_LENGTH].into(),
+                key[2 * PRP_INTERMEDIATE_KEY_LENGTH..3 * PRP_INTERMEDIATE_KEY_LENGTH].into(),
+                key[3 * PRP_INTERMEDIATE_KEY_LENGTH..4 * PRP_INTERMEDIATE_KEY_LENGTH].into(),
             ],
-            ivs: [ // NOTE: ChaCha20 takes only 12 byte IV
-                iv[0* PRP_INTERMEDIATE_IV_LENGTH..1* PRP_INTERMEDIATE_IV_LENGTH].into(),
-                iv[1* PRP_INTERMEDIATE_IV_LENGTH..2* PRP_INTERMEDIATE_IV_LENGTH].into(),
-                iv[2* PRP_INTERMEDIATE_IV_LENGTH..3* PRP_INTERMEDIATE_IV_LENGTH].into(),
-                iv[3* PRP_INTERMEDIATE_IV_LENGTH..4* PRP_INTERMEDIATE_IV_LENGTH].into()
-            ]
+            ivs: [
+                // NOTE: ChaCha20 takes only 12 byte IV
+                iv[0 * PRP_INTERMEDIATE_IV_LENGTH..1 * PRP_INTERMEDIATE_IV_LENGTH].into(),
+                iv[1 * PRP_INTERMEDIATE_IV_LENGTH..2 * PRP_INTERMEDIATE_IV_LENGTH].into(),
+                iv[2 * PRP_INTERMEDIATE_IV_LENGTH..3 * PRP_INTERMEDIATE_IV_LENGTH].into(),
+                iv[3 * PRP_INTERMEDIATE_IV_LENGTH..4 * PRP_INTERMEDIATE_IV_LENGTH].into(),
+            ],
         }
     }
 
@@ -151,15 +158,15 @@ impl PRP {
 
 #[cfg(test)]
 mod tests {
+    use crate::parameters::SECRET_KEY_LENGTH;
+    use crate::prp::{PRPParameters, PRP};
     use getrandom::getrandom;
     use hex_literal::hex;
-    use crate::parameters::SECRET_KEY_LENGTH;
-    use crate::prp::{PRP, PRPParameters};
 
     #[test]
     fn test_prp_fixed() {
-        let key = [0u8; 4*32];
-        let iv = [0u8; 4*16];
+        let key = [0u8; 4 * 32];
+        let iv = [0u8; 4 * 16];
 
         let prp = PRP::new(&key, &iv);
 
@@ -173,8 +180,8 @@ mod tests {
 
     #[test]
     fn test_prp_forward_only() {
-        let key = [0u8; 4*32];
-        let iv = [0u8; 4*16];
+        let key = [0u8; 4 * 32];
+        let iv = [0u8; 4 * 16];
 
         let prp = PRP::new(&key, &iv);
 
@@ -182,14 +189,14 @@ mod tests {
         let ct = prp.forward(&pt).unwrap();
 
         let expected_ct = hex!("e31d924dd07dbe87b54854a05cc09453b873d4b520f6cd787fbaa43e543ac9bf480457c20b39a93f4f05a7aa2566b944cedfcc1bec7fa0f456d361150835edca0c1e0c475350d39e2c658acced7d7cd00ded9dd44bbcd2b1ae367b3a7b2d3b45937ca118");
-        assert_eq!([0u8;100], pt); // input is not overwritten
+        assert_eq!([0u8; 100], pt); // input is not overwritten
         assert_eq!(&expected_ct, ct.as_ref());
     }
 
     #[test]
     fn test_prp_inverse_only() {
-        let key = [0u8; 4*32];
-        let iv = [0u8; 4*16];
+        let key = [0u8; 4 * 32];
+        let iv = [0u8; 4 * 16];
 
         let prp = PRP::new(&key, &iv);
 
@@ -204,10 +211,10 @@ mod tests {
 
     #[test]
     fn test_prp_random() {
-        let mut key = [0u8; 4*32];
+        let mut key = [0u8; 4 * 32];
         getrandom(&mut key).unwrap();
 
-        let mut iv = [0u8; 4*16];
+        let mut iv = [0u8; 4 * 16];
         getrandom(&mut iv).unwrap();
 
         let prp = PRP::new(&key, &iv);
@@ -249,17 +256,17 @@ mod tests {
         let ct = prp.forward(&pt).unwrap();
 
         let expected_ct = hex!("f80036d72b5e61e20f3f5840a013d12b5dd496f2da55b930f961905fbbbc8158dc17b58510bf280d0359e0b233a099bde840e07d54ca308e55ee0196b8f013b5def9b6a3ec9a727071c5dbdbeabdedcecfbdc3ecdd69fdcd957ff60ac573cc0dbab45b04");
-        assert_eq!([0u8;100], pt); // input is not overwritten
+        assert_eq!([0u8; 100], pt); // input is not overwritten
         assert_eq!(&expected_ct, ct.as_ref());
     }
 }
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use wasm_bindgen::prelude::wasm_bindgen;
-    use utils_misc::utils::wasm::JsResult;
+    use crate::prp::{PRPParameters, PRP};
     use utils_misc::ok_or_jserr;
-    use crate::prp::{PRP, PRPParameters};
+    use utils_misc::utils::wasm::JsResult;
+    use wasm_bindgen::prelude::wasm_bindgen;
 
     #[wasm_bindgen]
     impl PRPParameters {

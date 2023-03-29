@@ -48,7 +48,7 @@ impl From<&wasm::OutgoingChannelStatus> for OutgoingChannelStatus {
         OutgoingChannelStatus {
             peer_id: x.peer_id.clone(),
             stake: Balance::from_str(x.stake_str.as_str(), BalanceType::HOPR),
-            status: x.status.clone()
+            status: x.status.clone(),
         }
     }
 }
@@ -107,8 +107,8 @@ pub mod wasm {
     use utils_misc::utils::wasm::JsResult;
     use utils_types::primitives::Balance;
 
-    use serde::{Deserialize, Serialize};
     use core_types::channels::ChannelStatus;
+    use serde::{Deserialize, Serialize};
 
     #[derive(Serialize, Deserialize)]
     pub struct OutgoingChannelStatus {
@@ -122,7 +122,7 @@ pub mod wasm {
             OutgoingChannelStatus {
                 peer_id: x.peer_id.clone(),
                 stake_str: x.stake.to_string(),
-                status: x.status.clone()
+                status: x.status.clone(),
             }
         }
     }
@@ -197,12 +197,12 @@ pub mod wasm {
                     .map(|c| super::OutgoingChannelStatus::from(c))
                     .collect(),
                 |peer_id: &str| {
-                        quality_of
-                            .call1(&JsValue::null(), &JsString::from(peer_id))
-                            .ok()
-                            .map(|q| q.as_f64())
-                            .flatten()
-                    },
+                    quality_of
+                        .call1(&JsValue::null(), &JsString::from(peer_id))
+                        .ok()
+                        .map(|q| q.as_f64())
+                        .flatten()
+                },
             ),
         })
     }

@@ -1,6 +1,6 @@
 pub mod async_iterable;
-pub mod utils;
 pub mod time;
+pub mod utils;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
@@ -47,7 +47,9 @@ macro_rules! convert_from_jstrvec {
 #[macro_export]
 macro_rules! convert_to_jstrvec {
     ($v:expr) => {
-        $v.iter().map(|e| js_sys::JsString::from(e.as_ref())).collect()
+        $v.iter()
+            .map(|e| js_sys::JsString::from(e.as_ref()))
+            .collect()
     };
 }
 

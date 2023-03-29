@@ -1,6 +1,6 @@
 use rand::rngs::OsRng;
 use rand::seq::SliceRandom;
-use simple_moving_average::{SMA, SumTreeSMA};
+use simple_moving_average::{SumTreeSMA, SMA};
 use utils_log::{debug, info, warn};
 
 use core_types::channels::ChannelStatus::{Open, PendingToClose};
@@ -23,7 +23,7 @@ pub struct PromiscuousStrategy {
     pub minimum_node_balance: Balance,
     pub max_channels: Option<usize>,
     pub auto_redeem_tickets: bool,
-    sma: SimpleMovingAvg
+    sma: SimpleMovingAvg,
 }
 
 impl PromiscuousStrategy {
@@ -35,7 +35,7 @@ impl PromiscuousStrategy {
             minimum_node_balance: Balance::from_str("100000000000000000", BalanceType::HOPR),
             max_channels: None,
             auto_redeem_tickets: false,
-            sma: SimpleMovingAvg::new()
+            sma: SimpleMovingAvg::new(),
         }
     }
 }
@@ -95,14 +95,20 @@ impl ChannelStrategy for PromiscuousStrategy {
                 }
             } else if quality >= self.network_quality_threshold {
                 // Try to open channel with this peer, because it is high-quality
-                debug!("will open a new channel to {} with quality {}", peer_id, quality);
+                debug!(
+                    "will open a new channel to {} with quality {}",
+                    peer_id, quality
+                );
                 new_channel_candidates.push((peer_id, quality));
             }
 
             network_size += 1;
         }
         self.sma.add_sample(network_size);
-        info!("evaluated qualities of {} peers seen in the network", network_size);
+        info!(
+            "evaluated qualities of {} peers seen in the network",
+            network_size
+        );
 
         if self.sma.get_num_samples() < self.sma.get_sample_window_size() {
             info!("not yet enough samples ({} out of {}) of network size to perform a strategy tick, skipping.",
@@ -116,15 +122,19 @@ impl ChannelStrategy for PromiscuousStrategy {
             .iter()
             .filter(|c| c.status == PendingToClose)
             .for_each(|c| to_close.push(c.peer_id.clone()));
-        debug!("{} channels are in PendingToClose, so strategy will mark them for closing too", outgoing_channels.len() - before_pending);
+        debug!(
+            "{} channels are in PendingToClose, so strategy will mark them for closing too",
+            outgoing_channels.len() - before_pending
+        );
 
         // We compute the upper bound for channels as a square-root of the perceived network size
-        let max_auto_channels = self.max_channels.unwrap_or(
-            (self.sma.get_average() as f64)
-                .sqrt()
-                .ceil() as usize
+        let max_auto_channels = self
+            .max_channels
+            .unwrap_or((self.sma.get_average() as f64).sqrt().ceil() as usize);
+        debug!(
+            "current upper bound for maximum number of auto-channels if {}",
+            max_auto_channels
         );
-        debug!("current upper bound for maximum number of auto-channels if {}", max_auto_channels);
 
         // Count all the opened channels
         let count_opened = outgoing_channels
@@ -138,9 +148,11 @@ impl ChannelStrategy for PromiscuousStrategy {
         new_channel_candidates.shuffle(&mut OsRng);
         new_channel_candidates
             .sort_unstable_by(|(_, q1), (_, q2)| q1.partial_cmp(q2).unwrap().reverse());
-        new_channel_candidates
-            .truncate(max_auto_channels - (count_opened - to_close.len()));
-        debug!("got {} new channel candidates", new_channel_candidates.len());
+        new_channel_candidates.truncate(max_auto_channels - (count_opened - to_close.len()));
+        debug!(
+            "got {} new channel candidates",
+            new_channel_candidates.len()
+        );
 
         // Go through the new candidates for opening channels allow them to open based on our available node balance
         let mut to_open: Vec<OutgoingChannelStatus> = vec![];
@@ -148,7 +160,10 @@ impl ChannelStrategy for PromiscuousStrategy {
         for peer_id in new_channel_candidates.into_iter().map(|(p, _)| p) {
             // Stop if we ran out of balance
             if remaining_balance.lte(&self.minimum_node_balance) {
-                warn!("strategy ran out of allowed node balance - balance is {}", remaining_balance.to_string());
+                warn!(
+                    "strategy ran out of allowed node balance - balance is {}",
+                    remaining_balance.to_string()
+                );
                 break;
             }
 
@@ -158,14 +173,18 @@ impl ChannelStrategy for PromiscuousStrategy {
                 to_open.push(OutgoingChannelStatus {
                     peer_id,
                     stake: self.new_channel_stake.clone(),
-                    status: Open
+                    status: Open,
                 });
                 remaining_balance = balance.sub(&self.new_channel_stake);
             }
         }
 
-        info!("strategy tick #{} result: {} peers for channel opening, {} peer for channel closure",
-            self.sma.get_num_samples(), to_open.len(), to_close.len());
+        info!(
+            "strategy tick #{} result: {} peers for channel opening, {} peer for channel closure",
+            self.sma.get_num_samples(),
+            to_open.len(),
+            to_close.len()
+        );
         StrategyTickResult::new(max_auto_channels, to_open, to_close)
     }
 }
@@ -273,7 +292,7 @@ pub mod wasm {
         #[wasm_bindgen(constructor)]
         pub fn new() -> Self {
             PromiscuousStrategy {
-                w: super::PromiscuousStrategy::new()
+                w: super::PromiscuousStrategy::new(),
             }
         }
 
@@ -289,7 +308,8 @@ pub mod wasm {
                 self.w.new_channel_stake = Balance::from_str(option.as_str(), BalanceType::HOPR);
             }
             if let Some(option) = cfg.minimum_channel_balance {
-                self.w.minimum_channel_balance = Balance::from_str(option.as_str(), BalanceType::HOPR);
+                self.w.minimum_channel_balance =
+                    Balance::from_str(option.as_str(), BalanceType::HOPR);
             }
             self.w.max_channels = cfg.max_channels.map(|c| c as usize);
             self.w.auto_redeem_tickets = cfg.auto_redeem_tickets.unwrap_or(false);
