@@ -1,4 +1,5 @@
-use std::{collections::HashMap, pin::Pin};
+use core::pin::Pin;
+use std::collections::HashMap;
 
 use crate::{constants::DEFAULT_RELAYED_CONNECTION_PING_TIMEOUT, traits::DuplexStream};
 use futures::{
@@ -14,14 +15,14 @@ use pin_project_lite::pin_project;
 use std::task::Waker;
 use utils_log::{error, info};
 
-#[cfg(not(feature = "wasm"))]
+#[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::sleep;
-#[cfg(feature = "wasm")]
+#[cfg(all(feature = "wasm", not(test)))]
 use gloo_timers::future::sleep;
 
-#[cfg(not(feature = "wasm"))]
+#[cfg(any(not(feature = "wasm"), test))]
 use utils_misc::time::native::current_timestamp;
-#[cfg(feature = "wasm")]
+#[cfg(all(feature = "wasm", not(test)))]
 use utils_misc::time::wasm::current_timestamp;
 
 #[repr(u8)]
@@ -46,8 +47,8 @@ pub enum ConnectionStatusMessage {
 }
 
 pub trait RelayServerCbs {
-    fn on_close(&self) -> ();
-    fn on_upgrade(&self) -> ();
+    fn on_close(&self) -> () {}
+    fn on_upgrade(&self) -> () {}
 }
 
 pin_project! {
