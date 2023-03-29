@@ -1,4 +1,4 @@
-use utils_types::channels::ChannelStatus;
+use core_types::channels::ChannelStatus;
 use utils_types::primitives::{Balance, BalanceType};
 
 /// Basic strategy trait that all strategies must implement.
@@ -108,7 +108,7 @@ pub mod wasm {
     use utils_types::primitives::Balance;
 
     use serde::{Deserialize, Serialize};
-    use utils_types::channels::ChannelStatus;
+    use core_types::channels::ChannelStatus;
 
     #[derive(Serialize, Deserialize)]
     pub struct OutgoingChannelStatus {

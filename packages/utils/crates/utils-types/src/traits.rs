@@ -1,7 +1,6 @@
 use std::str::FromStr;
 use libp2p_identity::PeerId;
-use crate::errors::GeneralError::ParseError;
-use crate::errors::Result;
+use crate::errors::{Result, GeneralError::ParseError};
 
 // NOTE on wasm_bindgen: since #[wasm_bindgen] attributes cannot be used
 // on trait impl blocks, the trait inherited methods need to be re-implemented

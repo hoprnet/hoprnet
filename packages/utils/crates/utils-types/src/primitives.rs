@@ -1,8 +1,7 @@
 use ethnum::{u256, AsU256};
 use std::ops::{Add, Sub};
 use std::string::ToString;
-use crate::errors::{Result, GeneralError::ParseError};
-use crate::errors::GeneralError::MathError;
+use crate::errors::{Result, GeneralError::ParseError, GeneralError::InvalidInput};
 use crate::traits::{BinarySerializable, ToHex};
 
 /// Represents an Ethereum address
@@ -339,7 +338,7 @@ impl U256 {
             })
         }
         else {
-            Err(MathError)
+            Err(InvalidInput)
         }
     }
 }
