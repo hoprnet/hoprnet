@@ -23,7 +23,8 @@ const ALICE_ENTRY = PeerStatus.build(
   1.0,
   BigInt(10),
   BigInt(10),
-  0
+  0,
+  undefined
 )
 
 const BOB_ENTRY = PeerStatus.build(
@@ -34,7 +35,8 @@ const BOB_ENTRY = PeerStatus.build(
   0.2,
   BigInt(0),
   BigInt(0),
-  0
+  0,
+  undefined
 )
 
 const CHARLIE_ENTRY = PeerStatus.build(
@@ -45,7 +47,8 @@ const CHARLIE_ENTRY = PeerStatus.build(
   0.8,
   BigInt(10),
   BigInt(8),
-  0
+  0,
+  undefined
 )
 
 function toJsonDict(peer: PeerStatus, isNew: boolean, multiaddr: string | undefined) {
