@@ -6,7 +6,7 @@ authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Rust module that holds proc macros"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
-license = "LGPL-3.0-only"
+license = "GPL-3.0-only"
 
 [lib]
 proc-macro = true

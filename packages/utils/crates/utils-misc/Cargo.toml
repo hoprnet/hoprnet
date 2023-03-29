@@ -6,7 +6,7 @@ edition = "2021"
 description = "Rust WASM modules for hopr-utils"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
-license = "LGPL-3.0-only"
+license = "GPL-3.0-only"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
