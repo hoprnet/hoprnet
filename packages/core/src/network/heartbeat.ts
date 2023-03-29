@@ -4,6 +4,7 @@ import { randomInteger, debug, retimer, pickVersion } from '@hoprnet/hopr-utils'
 import type { Components } from '@libp2p/interfaces/components'
 
 import type { SendMessage } from '../index.js'
+import { PEER_METADATA_PROTOCOL_VERSION } from '../index.js'
 import { pipe } from 'it-pipe'
 import { reply_to_ping, HeartbeatConfig, Network, Pinger, PeerOrigin } from '../../lib/core_network.js'
 import { core_network_set_panic_hook } from '../../lib/core_network.js'
@@ -18,7 +19,6 @@ import pkg from '../../package.json' assert { type: 'json' }
 import { peerIdFromString } from '@libp2p/peer-id'
 
 const NORMALIZED_VERSION = pickVersion(pkg.version)
-export const PEER_METADATA_PROTOCOL_VERSION = 'protocol_version'
 
 function versionFromProtocol(protocol: string): string {
   let parts = protocol.split('/')

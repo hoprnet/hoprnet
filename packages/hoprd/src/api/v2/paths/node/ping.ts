@@ -3,10 +3,11 @@ import type { Operation } from 'express-openapi'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { peerIdFromString } from '@libp2p/peer-id'
 import { STATUS_CODES } from '../../utils.js'
+import { PEER_METADATA_PROTOCOL_VERSION } from '@hoprnet/hopr-core'
 
 /**
  * Pings another node to check its availability.
- * @returns Latency if ping was successfull.
+ * @returns Latency and HOPR protocol version (once known) if ping was successful.
  */
 export const ping = async ({ node, peerId }: { node: Hopr; peerId: string }) => {
   let validPeerId: PeerId
@@ -30,7 +31,10 @@ export const ping = async ({ node, peerId }: { node: Hopr; peerId: string }) => 
   }
 
   if (pingResult.latency >= 0) {
-    return { latency: pingResult.latency }
+    const info = node.getConnectionInfo(validPeerId)
+    let protocol_version = info.metadata().get(PEER_METADATA_PROTOCOL_VERSION) ?? "unknown";
+
+    return { latency: pingResult.latency, reported_version: protocol_version }
   }
 
   throw Error(STATUS_CODES.TIMEOUT)
@@ -92,6 +96,11 @@ POST.apiDoc = {
                 type: 'number',
                 example: 10,
                 description: 'Number of miliseconds it took to get the response from the pinged node.'
+              },
+              reported_version: {
+                type: 'string',
+                example: '1.92.12',
+                description: 'HOPR protocol version as determined from the successful ping in the Major.Minor.Patch format or "unknown"'
               }
             }
           }
