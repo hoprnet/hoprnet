@@ -180,6 +180,7 @@ struct CliArgs {
         env = "HOPRD_API_HOST"
     )]
     pub api_host: String,
+
     #[arg(
         long = "apiPort",
         default_value_t = DEFAULT_API_PORT,
