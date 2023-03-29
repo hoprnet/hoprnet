@@ -22,7 +22,7 @@ const NORMALIZED_VERSION = pickVersion(pkg.version)
 
 function versionFromProtocol(protocol: string): string {
   let parts = protocol.split('/')
-  return parts.length == 5 ? parts[4] : "unknown"
+  return parts.length == 5 ? parts[4] : 'unknown'
 }
 
 export default class Heartbeat {

@@ -19,12 +19,12 @@ describe('POST /node/ping', () => {
   })
 
   it('should ping successfuly', async () => {
-    node.ping = sinon.fake.returns({ latency: 10 })
+    node.ping = sinon.fake.returns({ latency: 10, reported_version: '1.2.3' })
 
     const res = await request(service).post(`/api/v2/node/ping`).send({ peerId: ALICE_PEER_ID.toString() })
     expect(res.status).to.equal(200)
     expect(res).to.satisfyApiSpec
-    expect(res.body).to.deep.equal({ latency: 10 })
+    expect(res.body).to.deep.equal({ latency: 10, reported_version: '1.2.3' })
   })
 
   it('should return error on invalid peerId', async () => {
