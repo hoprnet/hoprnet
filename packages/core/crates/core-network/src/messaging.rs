@@ -1,7 +1,5 @@
-use blake2::{Digest, Blake2s256};
-use rand::Rng;
-use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
+use core_crypto::derivation::derive_ping_pong;
 use utils_types::traits::{AutoBinarySerializable, BinarySerializable};
 use crate::errors::NetworkingError::MessagingError;
 
@@ -20,9 +18,7 @@ pub enum ControlMessage {
 impl ControlMessage {
     pub fn generate_ping_request() -> Self {
         let mut ping = PingMessage::default();
-
-        // TODO: use core-crypto random_fill once rebased
-        OsRng.fill(&mut ping.nonce);
+        ping.nonce.copy_from_slice(&derive_ping_pong(None));
         Self::Ping(ping)
     }
 
@@ -30,13 +26,7 @@ impl ControlMessage {
         match request {
             ControlMessage::Ping(ping) => {
                 let mut pong = PingMessage::default();
-
-                // TODO: move this to core-crypto once rebased
-                let mut hasher = Blake2s256::new();
-                hasher.update(&ping.nonce);
-                let hash= hasher.finalize().to_vec();
-                pong.nonce.copy_from_slice(&hash[0..PingMessage::PING_NONCE_SIZE]);
-
+                pong.nonce.copy_from_slice(&derive_ping_pong(Some(ping.nonce())));
                 Ok(Self::Pong(pong))
             }
             ControlMessage::Pong(_) => Err(MessagingError("invalid ping message".into()))
@@ -70,12 +60,10 @@ impl AutoBinarySerializable<'_> for ControlMessage { }
 
 #[derive(Clone, Debug, Eq, PartialEq, Default, Serialize, Deserialize)]
 pub struct PingMessage {
-    nonce: [u8; Self::PING_NONCE_SIZE],
+    nonce: [u8; core_crypto::parameters::PING_PONG_NONCE_SIZE],
 }
 
 impl PingMessage {
-    const PING_NONCE_SIZE: usize = 16;
-
     /// Retrieves the challenge or response in this ping/pong message.
     pub fn nonce(&self) -> &[u8] {
         &self.nonce
@@ -83,11 +71,11 @@ impl PingMessage {
 }
 
 #[cfg(not(feature = "compat-ping"))]
-impl AutoBinarySerializable<'_> for PingMessage { const SIZE: usize = PING_NONCE_SIZE; }
+impl AutoBinarySerializable<'_> for PingMessage { const SIZE: usize = core_crypto::parameters::PING_PONG_NONCE_SIZE; }
 
 #[cfg(feature = "compat-ping")]
 impl BinarySerializable<'_> for PingMessage {
-    const SIZE: usize = Self::PING_NONCE_SIZE;
+    const SIZE: usize = core_crypto::parameters::PING_PONG_NONCE_SIZE;
 
     // This implementation is backwards compatible with older HOPR versions
 
@@ -123,21 +111,12 @@ mod tests {
         {
             let recv_req = ControlMessage::deserialize(sent_req_s.as_ref()).unwrap();
             let send_resp = ControlMessage::generate_pong_response(&recv_req).unwrap();
-            match &send_resp {
-                ControlMessage::Ping(_) => panic!("invalid response version"),
-                ControlMessage::Pong(m) => assert_eq!("4.5.6", m.format_version())
-            }
-
             sent_resp_s = send_resp.serialize();
         }
 
         {
             let recv_resp = ControlMessage::deserialize(sent_resp_s.as_ref()).unwrap();
             assert!(ControlMessage::validate_pong_response(&sent_req, &recv_resp).is_ok());
-            match recv_resp {
-                ControlMessage::Ping(_) => panic!("must be pong"),
-                ControlMessage::Pong(m) => assert_eq!("4.5.6", m.format_version())
-            }
         }
     }
 }

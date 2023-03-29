@@ -30,9 +30,6 @@ use utils_misc::time::native::current_timestamp;
 use gloo_timers::future::sleep;
 #[cfg(all(feature = "wasm", not(test)))]
 use utils_misc::time::wasm::current_timestamp;
-#[cfg(all(feature = "wasm", not(test)))]
-use gloo_timers::future::sleep as sleep;
-
 
 const PINGS_MAX_PARALLEL: usize = 14;
 
@@ -385,7 +382,6 @@ mod tests {
     use mockall::*;
     use more_asserts::*;
     use std::str::FromStr;
-    use serde::Serialize;
 
     fn simple_ping_config() -> PingConfig {
         PingConfig {
@@ -405,9 +401,8 @@ mod tests {
     // Testing override
     pub async fn send_ping(msg: Box<[u8]>, peer: String) -> Result<Box<[u8]>, String> {
         let chall = ControlMessage::deserialize(msg.as_ref()).unwrap();
-        let mut reply = ControlMessage::generate_pong_response(&chall)
-            .unwrap()
-            .serialize();
+        let mut reply = BinarySerializable::serialize(&ControlMessage::generate_pong_response(&chall)
+            .unwrap());
 
         match peer.as_str() {
             BAD_PEER => {
