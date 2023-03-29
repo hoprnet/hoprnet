@@ -16,12 +16,14 @@ pub enum ControlMessage {
 }
 
 impl ControlMessage {
+    /// Creates ping challenge message
     pub fn generate_ping_request() -> Self {
         let mut ping = PingMessage::default();
         ping.nonce.copy_from_slice(&derive_ping_pong(None));
         Self::Ping(ping)
     }
 
+    /// Given the received ping challenge, generates an appropriate response to the challenge.
     pub fn generate_pong_response(request: &ControlMessage) -> Result<Self> {
         match request {
             ControlMessage::Ping(ping) => {
@@ -33,6 +35,8 @@ impl ControlMessage {
         }
     }
 
+    /// Given the original ping challenge message, verifies that the received pong response is valid
+    /// according to the challenge.
     pub fn validate_pong_response(request: &ControlMessage, response: &ControlMessage) -> Result<()> {
         if let Self::Pong(expected_pong) = Self::generate_pong_response(request).unwrap() {
             match response {
@@ -49,6 +53,8 @@ impl ControlMessage {
         }
     }
 
+    /// Convenience method to de-structure the ping message payload, if this
+    /// instance is a Ping or Pong.
     pub fn get_ping_message(&self) -> Result<&PingMessage> {
         match self {
             ControlMessage::Ping(m) | ControlMessage::Pong(m) => Ok(m),
@@ -64,7 +70,7 @@ pub struct PingMessage {
 }
 
 impl PingMessage {
-    /// Retrieves the challenge or response in this ping/pong message.
+    /// Gets the challenge or response in this ping/pong message.
     pub fn nonce(&self) -> &[u8] {
         &self.nonce
     }
@@ -100,6 +106,7 @@ mod tests {
 
     #[test]
     fn test_ping_pong_roundtrip() {
+        // ping initiator
         let sent_req_s: Box<[u8]>;
         let sent_req: ControlMessage;
         {
@@ -107,6 +114,7 @@ mod tests {
             sent_req_s = sent_req.serialize();
         }
 
+        // pong responder
         let sent_resp_s: Box<[u8]>;
         {
             let recv_req = ControlMessage::deserialize(sent_req_s.as_ref()).unwrap();
@@ -114,6 +122,7 @@ mod tests {
             sent_resp_s = send_resp.serialize();
         }
 
+        // verify pong
         {
             let recv_resp = ControlMessage::deserialize(sent_resp_s.as_ref()).unwrap();
             assert!(ControlMessage::validate_pong_response(&sent_req, &recv_resp).is_ok());
