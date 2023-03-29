@@ -138,6 +138,11 @@ impl PeerStatus {
             metadata: HashMap::new()
         }
     }
+
+    /// Gets metadata associated with the peer
+    pub fn metadata(&self) -> &HashMap<String, String> {
+        &self.metadata
+    }
 }
 
 impl std::fmt::Display for PeerStatus {
@@ -480,8 +485,8 @@ pub mod wasm {
             self.id.to_base58()
         }
 
-        #[wasm_bindgen]
-        pub fn metadata(&self) -> js_sys::Map {
+        #[wasm_bindgen(js_name = "metadata")]
+        pub fn _metadata(&self) -> js_sys::Map {
             let ret = js_sys::Map::new();
             self.metadata
                 .iter()
@@ -795,6 +800,24 @@ mod tests {
     }
 
     #[test]
+    fn test_network_should_add_metadata() {
+        let expected = PeerId::random();
+
+        let mut peers = basic_network(&PeerId::random());
+
+        let proto_version = ("protocol_version".to_string(), "1.2.3".to_string());
+
+        peers.add_with_metadata(&expected, PeerOrigin::IncomingConnection, Some([ proto_version.clone() ].into()));
+
+        assert_eq!(1, peers.length());
+        assert!(peers.has(&expected));
+
+        let status = peers.get_peer_status(&expected).unwrap();
+        assert!(status.metadata().contains_key(&proto_version.0));
+        assert_eq!(&proto_version.1, status.metadata().get(&proto_version.0).unwrap());
+    }
+
+    #[test]
     fn test_network_should_remove_a_peer_on_unregistration() {
         let peer = PeerId::random();
 
@@ -837,6 +860,45 @@ mod tests {
         assert!(actual.contains("heartbeats sent=1"));
         assert!(actual.contains("heartbeats succeeded=1"));
         assert!(actual.contains(format!("last seen on={}", ts).as_str()))
+    }
+
+    #[test]
+    fn test_network_update_should_merge_metadata() {
+        let peer = PeerId::random();
+
+        let mut peers = basic_network(&PeerId::random());
+
+        let other_metadata_1 = ("other_1".to_string(), "efgh".to_string());
+        let other_metadata_2 = ("other_2".to_string(), "abcd".to_string());
+
+        {
+            let proto_version = ("protocol_version".to_string(), "1.2.3".to_string());
+
+            peers.add_with_metadata(&peer, PeerOrigin::IncomingConnection, Some([ proto_version.clone(), other_metadata_1.clone() ].into()));
+
+            let status = peers.get_peer_status(&peer).unwrap();
+
+            assert_eq!(2, status.metadata().len());
+            assert_eq!(&proto_version.1, status.metadata().get(&proto_version.0).unwrap());
+            assert_eq!(&other_metadata_1.1, status.metadata().get(&other_metadata_1.0).unwrap());
+            assert!(status.metadata().get(&other_metadata_2.0).is_none());
+
+        }
+
+        let ts = current_timestamp();
+
+        {
+            let proto_version = ("protocol_version".to_string(), "1.2.4".to_string());
+
+            peers.update_with_metadata(&peer, Ok(ts.clone()), Some([proto_version.clone(), other_metadata_2.clone()].into()));
+
+            let status = peers.get_peer_status(&peer).unwrap();
+
+            assert_eq!(3, status.metadata().len());
+            assert_eq!(&proto_version.1, status.metadata().get(&proto_version.0).unwrap());
+            assert_eq!(&other_metadata_1.1, status.metadata().get(&other_metadata_1.0).unwrap());
+            assert_eq!(&other_metadata_2.1, status.metadata().get(&other_metadata_2.0).unwrap());
+        }
     }
 
     #[test]
