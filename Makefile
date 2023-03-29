@@ -89,8 +89,10 @@ endif
 
 .PHONY: deps
 deps: ## Installs dependencies for development setup
-	[[ "${name}" =~ nix-shell* ]] || corepack enable
-	command -v rustup && rustup update || echo "No rustup installed, ignoring"
+	if [[ ! "${name}" =~ nix-shell* ]]; then \
+		corepack enable; \
+		command -v rustup && rustup update || echo "No rustup installed, ignoring"; \
+	fi
 # we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op
 	mkdir -p .cargo/bin
 	$(MAKE) cargo-update
@@ -239,7 +241,7 @@ kill-anvil: ## kill process running at port 8545 (default port of anvil)
 	lsof -i :8545 -s TCP:LISTEN -t | xargs -I {} -n 1 kill {} || :
 
 .PHONY: run-local
-run-local: args=""
+run-local: args=
 run-local: ## run HOPRd from local repo
 	env NODE_OPTIONS="--experimental-wasm-modules" NODE_ENV=development DEBUG="hopr*" node \
 		packages/hoprd/lib/main.cjs --init --api \
