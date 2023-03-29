@@ -1,7 +1,6 @@
 /// Converts from duplex JS stream to Rust `futures::Stream` / `futures::Sink`
 use crate::traits::DuplexStream;
-use core::panic;
-use std::{pin::Pin, u8};
+use core::{panic, pin::Pin, task::Waker};
 
 use futures::{
     stream::FusedStream,
@@ -10,7 +9,6 @@ use futures::{
 };
 use js_sys::{AsyncIterator, Function, Object, Promise, Reflect, Symbol};
 use pin_project_lite::pin_project;
-use std::task::Waker;
 use utils_log::{error, info};
 use utils_misc::async_iterable::wasm::to_jsvalue_iterator;
 use wasm_bindgen::{closure::Closure, JsValue};
