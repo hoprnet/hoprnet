@@ -84,6 +84,6 @@ jobs:
         run: nix develop -c make -j build
 
       - name: Test
-        run: nix develop -c make -j test
+        run: nix develop -c "source .venv/bin/activate && make -j test"
         env:
           HOPR_ENVIRONMENT_ID: anvil-localhost

@@ -128,6 +128,10 @@ install-foundry: ## install foundry
 	else \
 	  echo "foundry binaries already installed under "${FOUNDRY_DIR}/bin", skipping"; \
 	fi
+	@forge --version
+	@anvil --version
+	@chisel --version
+	@cast --version
 
 .PHONY: cargo-update
 cargo-update: ## update vendored Cargo dependencies
