@@ -32,7 +32,7 @@ export const ping = async ({ node, peerId }: { node: Hopr; peerId: string }) => 
 
   if (pingResult.latency >= 0) {
     const info = node.getConnectionInfo(validPeerId)
-    let protocol_version = info.metadata().get(PEER_METADATA_PROTOCOL_VERSION) ?? "unknown";
+    let protocol_version = info.metadata().get(PEER_METADATA_PROTOCOL_VERSION) ?? 'unknown';
 
     return { latency: pingResult.latency, reported_version: protocol_version }
   }
@@ -95,7 +95,7 @@ POST.apiDoc = {
               latency: {
                 type: 'number',
                 example: 10,
-                description: 'Number of miliseconds it took to get the response from the pinged node.'
+                description: 'Number of milliseconds it took to get the response from the pinged node.'
               },
               reported_version: {
                 type: 'string',
