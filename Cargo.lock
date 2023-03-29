@@ -5403,7 +5403,6 @@ dependencies = [
  "futures",
  "js-sys",
  "real-base",
- "semver",
  "serde",
  "serde_json",
  "utils-proc-macros",
