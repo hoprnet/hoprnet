@@ -228,6 +228,9 @@ impl Network {
         self.add_with_metadata(peer, origin, None)
     }
 
+    /// Add a new PeerId into the network (with optional metadata entries)
+    ///
+    /// Each PeerId must have an origin specification.
     pub fn add_with_metadata(&mut self, peer: &PeerId, origin: PeerOrigin, metadata: Option<HashMap<String, String>>) {
         let id = peer.to_string();
         let now = current_timestamp();
@@ -270,11 +273,12 @@ impl Network {
         self.entries.remove(peer.to_string().as_str());
     }
 
+    /// Update the PeerId record in the network
     pub fn update(&mut self, peer: &PeerId, ping_result: crate::types::Result) {
         self.update_with_metadata(peer, ping_result, None)
     }
 
-    /// Update the PeerId record in the network
+    /// Update the PeerId record in the network (with optional metadata entries that will be merged into the existing ones)
     pub fn update_with_metadata(&mut self, peer: &PeerId, ping_result: crate::types::Result, metadata: Option<HashMap<String, String>>) {
         if let Some(existing) = self.entries.get(peer.to_string().as_str()) {
             let mut entry = existing.clone();

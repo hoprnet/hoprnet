@@ -22,7 +22,7 @@ const NORMALIZED_VERSION = pickVersion(pkg.version)
 
 function versionFromProtocol(protocol: string): string {
   let parts = protocol.split('/')
-  return parts.length == 5 ? parts[5] : undefined
+  return parts.length == 5 ? parts[4] : "unknown"
 }
 
 export default class Heartbeat {
@@ -65,13 +65,10 @@ export default class Heartbeat {
 
   public async start() {
     this.libp2pComponents.getRegistrar().handle(this.protocolHeartbeat, async ({ protocol, connection, stream }) => {
-      let peer_metadata = new Map<string, string>()
       let remote = connection.remotePeer.toString()
 
-      let observedVersion = versionFromProtocol(protocol)
-      if (observedVersion) {
-        peer_metadata.set(PEER_METADATA_PROTOCOL_VERSION, observedVersion)
-      }
+      let peer_metadata = new Map<string, string>()
+      peer_metadata.set(PEER_METADATA_PROTOCOL_VERSION, versionFromProtocol(protocol))
 
       if (this.networkPeers.contains(remote)) {
         this.networkPeers.refresh_with_metadata(remote, Date.now(), peer_metadata)
