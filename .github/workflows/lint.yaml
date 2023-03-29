@@ -23,7 +23,14 @@ jobs:
       - name: Configure Git info
         run: ./scripts/configure-git-info.sh
 
+      - name: Disable sccache (act-only)
+        if: ${{ env.ACT }}
+        run: |
+          echo "SCCACHE_GHA_ENABLED=false" >> $GITHUB_ENV
+          echo "RUSTC_WRAPPER=" >> $GITHUB_ENV
+
       - name: Sccache Setup
+        if: ${{ !env.ACT }}
         uses: mozilla-actions/sccache-action@v0.0.1
         with:
           version: "v0.4.0"
@@ -34,6 +41,7 @@ jobs:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: cachix/cachix-action@v12
+        if: ${{ !env.ACT }}
         with:
           name: hoprnet
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
@@ -68,13 +76,7 @@ jobs:
         run: nix develop -c make -j deps-ci
 
       - name: Run linter
-        run: nix develop -c make lint-fix
-
-      - name: Commit and push changes
-        if: ${{ !env.ACT }}
-        run: ./scripts/commit-and-push-all-changes.sh
-        env:
-          HOPR_GIT_MSG: 'chore(build): apply linter changes'
+        run: nix develop -c make lint
 
   shellcheck:
     name: Shellcheck

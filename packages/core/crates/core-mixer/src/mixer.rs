@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use futures::stream::{Stream};
+use futures::stream::Stream;
 use futures_lite::stream::StreamExt;
 use rand::Rng;
 
@@ -9,13 +9,11 @@ use crate::future_extensions::StreamThenConcurrentExt;
 use utils_log::debug;
 use utils_metrics::metrics::SimpleGauge;
 
-
 #[cfg(any(not(feature = "wasm"), test))]
-use async_std::task::sleep as sleep;
+use async_std::task::sleep;
 
 #[cfg(all(feature = "wasm", not(test)))]
-use gloo_timers::future::sleep as sleep;
-
+use gloo_timers::future::sleep;
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -30,7 +28,7 @@ impl Default for MixerConfig {
         Self {
             min_delay: Duration::from_millis(0u64),
             max_delay: Duration::from_millis(200u64),
-            metric_delay_window: 10u64
+            metric_delay_window: 10u64,
         }
     }
 }
@@ -40,7 +38,7 @@ impl MixerConfig {
     /// inside the configuration.
     fn random_delay(&self) -> Duration {
         let mut rng = rand::thread_rng();
-        let random_delay =  rng.gen_range(self.min_delay.as_millis()..self.max_delay.as_millis()) as u64;
+        let random_delay = rng.gen_range(self.min_delay.as_millis()..self.max_delay.as_millis()) as u64;
 
         Duration::from_millis(random_delay)
     }
@@ -72,14 +70,13 @@ struct MixerMetrics {
     /// Current mixer queue size
     pub queue_size: Option<SimpleGauge>,
     /// Running average of the last N packet delays
-    pub average_delay: Option<SimpleGauge>
+    pub average_delay: Option<SimpleGauge>,
 }
-
 
 /// Mixer implementation using Async instead of a real queue to provide the packet mixing functionality
 struct Mixer {
     cfg: MixerConfig,
-    metrics: MixerMetrics
+    metrics: MixerMetrics,
 }
 
 impl Mixer {
@@ -94,11 +91,15 @@ impl Mixer {
         let random_delay = self.cfg.random_delay();
         debug!("Mixer created a random packet delay of {}ms", random_delay.as_millis());
 
-        if let Some(m) = &self.metrics.queue_size { m.increment(1.0f64) }
+        if let Some(m) = &self.metrics.queue_size {
+            m.increment(1.0f64)
+        }
 
         sleep(random_delay).await;
 
-        if let Some(m) = &self.metrics.queue_size { m.decrement(1.0f64); }
+        if let Some(m) = &self.metrics.queue_size {
+            m.decrement(1.0f64);
+        }
         if let Some(m) = &self.metrics.average_delay {
             let weight = 1.0f64 / self.cfg.metric_delay_window as f64;
             m.set((weight * random_delay.as_millis() as f64) + ((1.0f64 - weight) * m.get()))
@@ -108,15 +109,14 @@ impl Mixer {
     }
 }
 
-
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use super::*;
-    use wasm_bindgen::prelude::*;
-    use wasm_bindgen_futures::stream::JsStream;
-    use wasm_bindgen::JsValue;
-    use utils_misc::async_iterable::wasm::{to_box_u8_stream,to_jsvalue_stream};
     use js_sys::AsyncIterator;
+    use utils_misc::async_iterable::wasm::{to_box_u8_stream, to_jsvalue_stream};
+    use wasm_bindgen::prelude::*;
+    use wasm_bindgen::JsValue;
+    use wasm_bindgen_futures::stream::JsStream;
 
     #[wasm_bindgen]
     pub struct AsyncIterableHelperMixer {
@@ -127,24 +127,28 @@ pub mod wasm {
     ///
     /// Async closure interaction was inspired by: https://www.fpcomplete.com/blog/captures-closures-async/
     #[wasm_bindgen]
-    pub fn new_mixer(packet_input: AsyncIterator) -> Result<AsyncIterableHelperMixer,JsValue> {
-        let mixer = std::sync::Arc::new(Mixer{
+    pub fn new_mixer(packet_input: AsyncIterator) -> Result<AsyncIterableHelperMixer, JsValue> {
+        let mixer = std::sync::Arc::new(Mixer {
             cfg: MixerConfig::default(),
             metrics: MixerMetrics {
                 queue_size: SimpleGauge::new("core_gauge_mixer_queue_size", "Current mixer queue size").ok(),
-                average_delay: SimpleGauge::new("core_gauge_mixer_average_packet_delay", "Average mixer packet delay averaged over a packet window").ok(),
-            }
+                average_delay: SimpleGauge::new(
+                    "core_gauge_mixer_average_packet_delay",
+                    "Average mixer packet delay averaged over a packet window",
+                )
+                .ok(),
+            },
         });
 
         Ok(AsyncIterableHelperMixer {
-            stream: Box::new(JsStream::from(packet_input)
-                .map(to_box_u8_stream)
-                .then_concurrent(move |packet| {
-                    let mixer_clone = mixer.clone();
-                    async move {
-                        mixer_clone.clone().as_ref().mix(packet).await
-                    }
-                })),
+            stream: Box::new(
+                JsStream::from(packet_input)
+                    .map(to_box_u8_stream)
+                    .then_concurrent(move |packet| {
+                        let mixer_clone = mixer.clone();
+                        async move { mixer_clone.clone().as_ref().mix(packet).await }
+                    }),
+            ),
         })
     }
 
@@ -155,7 +159,6 @@ pub mod wasm {
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -179,11 +182,10 @@ mod tests {
 
     #[async_std::test]
     async fn test_then_concurrent_empty_stream_should_not_produce_a_value_if_none_is_ready() {
-        let mut stream = futures::stream::iter(random_packets(1))
-            .then_concurrent(|x|async {
-                sleep(TINY_CONSTANT_DELAY * 3).await;
-                x
-            });
+        let mut stream = futures::stream::iter(random_packets(1)).then_concurrent(|x| async {
+            sleep(TINY_CONSTANT_DELAY * 3).await;
+            x
+        });
 
         if let Err(_) = async_std::future::timeout(TINY_CONSTANT_DELAY, stream.next()).await {
             assert!(true, "Timeout expected, the packet should not get through the pipeline")
@@ -197,15 +199,14 @@ mod tests {
         let constant_delay = Duration::from_millis(10);
         let tolerance = Duration::from_millis(1);
 
-        let expected = vec!(1,2,3);
+        let expected = vec![1, 2, 3];
 
         let start = std::time::Instant::now();
 
-        let stream = futures::stream::iter(expected.clone()).then_concurrent(
-            |x| async move {
-                sleep(constant_delay).await;
-                x
-            });
+        let stream = futures::stream::iter(expected.clone()).then_concurrent(|x| async move {
+            sleep(constant_delay).await;
+            x
+        });
 
         let _ = stream.collect::<Vec<i32>>().await;
 
@@ -216,16 +217,15 @@ mod tests {
 
     #[async_std::test]
     async fn test_then_concurrent_futures_are_processed_in_the_correct_order() {
-        let packet_1 = 10u64;        // 3rd in the output
-        let packet_2 = 5u64;         // 1st in the output
-        let packet_3 = 7u64;         // 2nd in the output
-        let expected_packets = vec!(packet_2, packet_3, packet_1);
+        let packet_1 = 10u64; // 3rd in the output
+        let packet_2 = 5u64; // 1st in the output
+        let packet_3 = 7u64; // 2nd in the output
+        let expected_packets = vec![packet_2, packet_3, packet_1];
 
-        let stream = futures::stream::iter(vec!(packet_1, packet_2, packet_3))
-            .then_concurrent(|x| async move {
-                sleep(std::time::Duration::from_millis(x)).await;
-                x
-            });
+        let stream = futures::stream::iter(vec![packet_1, packet_2, packet_3]).then_concurrent(|x| async move {
+            sleep(std::time::Duration::from_millis(x)).await;
+            x
+        });
         let actual_packets = stream.collect::<Vec<u64>>().await;
 
         assert_eq!(actual_packets, expected_packets);

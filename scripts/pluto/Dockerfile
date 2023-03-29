@@ -18,7 +18,6 @@ RUN apt-get update \
 WORKDIR /app/hoprnet
 
 COPY --from=hoprd /app/hoprnet/ ./
-COPY --from=hoprd /app/hoprnet/.cargo/ ./.cargo/
 
 COPY packages/ethereum/contracts packages/ethereum/contracts
 COPY scripts/ scripts

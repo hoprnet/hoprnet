@@ -78,13 +78,7 @@ pub mod wasm {
             outgoing_channels: JsValue,
             quality_of: &js_sys::Function,
         ) -> JsResult<StrategyTickResult> {
-            crate::generic::wasm::tick_wrap(
-                &mut self.w,
-                balance,
-                peer_ids,
-                outgoing_channels,
-                quality_of,
-            )
+            crate::generic::wasm::tick_wrap(&mut self.w, balance, peer_ids, outgoing_channels, quality_of)
         }
     }
 }

@@ -10,6 +10,7 @@ pub struct HeartbeatConfig {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
+    use crate::heartbeat::HeartbeatConfig;
     use futures::stream::{Stream, StreamExt};
     use js_sys::AsyncIterator;
     use utils_misc::async_iterable::wasm::{to_box_u8_stream, to_jsvalue_stream};
@@ -24,15 +25,17 @@ pub mod wasm {
     #[wasm_bindgen]
     impl HeartbeatConfig {
         #[wasm_bindgen]
-        pub fn build(max_parallel_heartbeats: usize,
-                     heartbeat_variance: f32,
-                     heartbeat_interval: u32,
-                     heartbeat_threshold: u64) -> Self{
+        pub fn build(
+            max_parallel_heartbeats: usize,
+            heartbeat_variance: f32,
+            heartbeat_interval: u32,
+            heartbeat_threshold: u64,
+        ) -> Self {
             Self {
                 max_parallel_heartbeats,
                 heartbeat_variance,
                 heartbeat_interval,
-                heartbeat_threshold
+                heartbeat_threshold,
             }
         }
     }
@@ -58,8 +61,7 @@ pub mod wasm {
     }
 
     #[wasm_bindgen]
-    pub fn reply_to_ping(stream: AsyncIterator,
-    ) -> JsResult<AsyncIterableHelperCoreHeartbeat> {
+    pub fn reply_to_ping(stream: AsyncIterator) -> JsResult<AsyncIterableHelperCoreHeartbeat> {
         let stream = JsStream::from(stream)
             .map(to_box_u8_stream)
             .map(|res| res.and_then(|rq| generate_ping_response(rq.as_ref())

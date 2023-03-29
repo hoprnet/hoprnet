@@ -8,8 +8,8 @@ pub mod errors;
 #[allow(dead_code)]
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use wasm_bindgen::prelude::*;
     use utils_misc::utils::wasm::JsResult;
+    use wasm_bindgen::prelude::*;
 
     // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global allocator.
     #[cfg(feature = "wee_alloc")]
