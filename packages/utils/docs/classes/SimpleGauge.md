@@ -46,7 +46,7 @@ Decrements the gauge by the given value.
 
 #### Defined in
 
-lib/utils_metrics.d.ts:274
+utils/lib/utils_metrics.d.ts:269
 
 ___
 
@@ -60,7 +60,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:264
+utils/lib/utils_metrics.d.ts:259
 
 ___
 
@@ -76,7 +76,7 @@ Retrieves the value of the gauge
 
 #### Defined in
 
-lib/utils_metrics.d.ts:284
+utils/lib/utils_metrics.d.ts:279
 
 ___
 
@@ -98,7 +98,7 @@ Increments the gauge by the given value.
 
 #### Defined in
 
-lib/utils_metrics.d.ts:269
+utils/lib/utils_metrics.d.ts:264
 
 ___
 
@@ -114,7 +114,7 @@ Returns the name of the gauge given at construction.
 
 #### Defined in
 
-lib/utils_metrics.d.ts:289
+utils/lib/utils_metrics.d.ts:284
 
 ___
 
@@ -136,4 +136,4 @@ Sets the gauge to the given value.
 
 #### Defined in
 
-lib/utils_metrics.d.ts:279
+utils/lib/utils_metrics.d.ts:274

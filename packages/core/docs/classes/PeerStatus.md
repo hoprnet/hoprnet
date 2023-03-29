@@ -38,7 +38,7 @@
 
 #### Defined in
 
-packages/core/lib/core_network.d.ts:417
+packages/core/lib/core_network.d.ts:412
 
 ___
 
@@ -48,7 +48,7 @@ ___
 
 #### Defined in
 
-packages/core/lib/core_network.d.ts:420
+packages/core/lib/core_network.d.ts:415
 
 ___
 
@@ -58,7 +58,7 @@ ___
 
 #### Defined in
 
-packages/core/lib/core_network.d.ts:423
+packages/core/lib/core_network.d.ts:418
 
 ___
 
@@ -68,7 +68,7 @@ ___
 
 #### Defined in
 
-packages/core/lib/core_network.d.ts:426
+packages/core/lib/core_network.d.ts:421
 
 ___
 
@@ -78,7 +78,7 @@ ___
 
 #### Defined in
 
-packages/core/lib/core_network.d.ts:429
+packages/core/lib/core_network.d.ts:424
 
 ___
 
@@ -88,7 +88,7 @@ ___
 
 #### Defined in
 
-packages/core/lib/core_network.d.ts:432
+packages/core/lib/core_network.d.ts:427
 
 ___
 
@@ -98,7 +98,7 @@ ___
 
 #### Defined in
 
-packages/core/lib/core_network.d.ts:435
+packages/core/lib/core_network.d.ts:430
 
 ## Methods
 
@@ -112,7 +112,7 @@ packages/core/lib/core_network.d.ts:435
 
 #### Defined in
 
-packages/core/lib/core_network.d.ts:398
+packages/core/lib/core_network.d.ts:393
 
 ___
 
@@ -126,7 +126,7 @@ ___
 
 #### Defined in
 
-packages/core/lib/core_network.d.ts:402
+packages/core/lib/core_network.d.ts:397
 
 ___
 
@@ -153,4 +153,4 @@ ___
 
 #### Defined in
 
-packages/core/lib/core_network.d.ts:414
+packages/core/lib/core_network.d.ts:409

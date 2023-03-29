@@ -58,7 +58,7 @@
 
 #### Defined in
 
-[src/types/ticket.ts:49](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L49)
+[utils/src/types/ticket.ts:49](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L49)
 
 ## Properties
 
@@ -68,7 +68,7 @@
 
 #### Defined in
 
-[src/types/ticket.ts:54](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L54)
+[utils/src/types/ticket.ts:54](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L54)
 
 ___
 
@@ -78,7 +78,7 @@ ___
 
 #### Defined in
 
-[src/types/ticket.ts:51](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L51)
+[utils/src/types/ticket.ts:51](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L51)
 
 ___
 
@@ -88,7 +88,7 @@ ___
 
 #### Defined in
 
-[src/types/ticket.ts:56](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L56)
+[utils/src/types/ticket.ts:56](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L56)
 
 ___
 
@@ -98,7 +98,7 @@ ___
 
 #### Defined in
 
-[src/types/ticket.ts:50](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L50)
+[utils/src/types/ticket.ts:50](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L50)
 
 ___
 
@@ -108,7 +108,7 @@ ___
 
 #### Defined in
 
-[src/types/ticket.ts:52](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L52)
+[utils/src/types/ticket.ts:52](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L52)
 
 ___
 
@@ -118,7 +118,7 @@ ___
 
 #### Defined in
 
-[src/types/ticket.ts:53](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L53)
+[utils/src/types/ticket.ts:53](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L53)
 
 ___
 
@@ -128,7 +128,7 @@ ___
 
 #### Defined in
 
-[src/types/ticket.ts:57](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L57)
+[utils/src/types/ticket.ts:57](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L57)
 
 ___
 
@@ -138,7 +138,7 @@ ___
 
 #### Defined in
 
-[src/types/ticket.ts:55](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L55)
+[utils/src/types/ticket.ts:55](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L55)
 
 ## Accessors
 
@@ -152,7 +152,7 @@ ___
 
 #### Defined in
 
-[src/types/ticket.ts:138](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L138)
+[utils/src/types/ticket.ts:138](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L138)
 
 ## Methods
 
@@ -166,7 +166,7 @@ ___
 
 #### Defined in
 
-[src/types/ticket.ts:134](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L134)
+[utils/src/types/ticket.ts:134](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L134)
 
 ___
 
@@ -187,7 +187,7 @@ ___
 
 #### Defined in
 
-[src/types/ticket.ts:160](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L160)
+[utils/src/types/ticket.ts:160](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L160)
 
 ___
 
@@ -201,7 +201,7 @@ ___
 
 #### Defined in
 
-[src/types/ticket.ts:184](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L184)
+[utils/src/types/ticket.ts:184](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L184)
 
 ___
 
@@ -231,7 +231,7 @@ a ticket before we submit it to the blockchain.
 
 #### Defined in
 
-[src/types/ticket.ts:179](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L179)
+[utils/src/types/ticket.ts:179](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L179)
 
 ___
 
@@ -245,7 +245,7 @@ ___
 
 #### Defined in
 
-[src/types/ticket.ts:151](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L151)
+[utils/src/types/ticket.ts:151](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L151)
 
 ___
 
@@ -259,7 +259,7 @@ ___
 
 #### Defined in
 
-[src/types/ticket.ts:89](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L89)
+[utils/src/types/ticket.ts:89](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L89)
 
 ___
 
@@ -273,7 +273,7 @@ ___
 
 #### Defined in
 
-[src/types/ticket.ts:93](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L93)
+[utils/src/types/ticket.ts:93](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L93)
 
 ___
 
@@ -287,7 +287,7 @@ ___
 
 #### Defined in
 
-[src/types/ticket.ts:120](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L120)
+[utils/src/types/ticket.ts:120](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L120)
 
 ___
 
@@ -307,7 +307,7 @@ ___
 
 #### Defined in
 
-[src/types/ticket.ts:155](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L155)
+[utils/src/types/ticket.ts:155](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L155)
 
 ___
 
@@ -334,7 +334,7 @@ ___
 
 #### Defined in
 
-[src/types/ticket.ts:60](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L60)
+[utils/src/types/ticket.ts:60](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L60)
 
 ___
 
@@ -354,4 +354,4 @@ ___
 
 #### Defined in
 
-[src/types/ticket.ts:97](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L97)
+[utils/src/types/ticket.ts:97](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L97)

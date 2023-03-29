@@ -52,7 +52,7 @@
 
 #### Defined in
 
-[src/types/curvePoint.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L12)
+[utils/src/types/curvePoint.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L12)
 
 ## Accessors
 
@@ -70,7 +70,7 @@ CurvePoint.SIZE
 
 #### Defined in
 
-[src/types/curvePoint.ts:55](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L55)
+[utils/src/types/curvePoint.ts:55](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L55)
 
 ## Methods
 
@@ -94,7 +94,7 @@ CurvePoint.SIZE
 
 #### Defined in
 
-[src/types/curvePoint.ts:67](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L67)
+[utils/src/types/curvePoint.ts:67](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L67)
 
 ___
 
@@ -112,7 +112,7 @@ ___
 
 #### Defined in
 
-[src/types/curvePoint.ts:59](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L59)
+[utils/src/types/curvePoint.ts:59](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L59)
 
 ___
 
@@ -130,7 +130,7 @@ ___
 
 #### Defined in
 
-[src/types/curvePoint.ts:38](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L38)
+[utils/src/types/curvePoint.ts:38](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L38)
 
 ___
 
@@ -144,7 +144,7 @@ ___
 
 #### Defined in
 
-[src/types/challenge.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/challenge.ts#L20)
+[utils/src/types/challenge.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/challenge.ts#L20)
 
 ___
 
@@ -162,7 +162,7 @@ ___
 
 #### Defined in
 
-[src/types/curvePoint.ts:63](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L63)
+[utils/src/types/curvePoint.ts:63](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L63)
 
 ___
 
@@ -180,7 +180,7 @@ ___
 
 #### Defined in
 
-[src/types/curvePoint.ts:47](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L47)
+[utils/src/types/curvePoint.ts:47](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L47)
 
 ___
 
@@ -198,7 +198,7 @@ ___
 
 #### Defined in
 
-[src/types/curvePoint.ts:42](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L42)
+[utils/src/types/curvePoint.ts:42](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L42)
 
 ___
 
@@ -222,7 +222,7 @@ ___
 
 #### Defined in
 
-[src/types/challenge.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/challenge.ts#L8)
+[utils/src/types/challenge.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/challenge.ts#L8)
 
 ___
 
@@ -243,7 +243,7 @@ ___
 
 #### Defined in
 
-[src/types/challenge.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/challenge.ts#L12)
+[utils/src/types/challenge.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/challenge.ts#L12)
 
 ___
 
@@ -264,7 +264,7 @@ ___
 
 #### Defined in
 
-[src/types/challenge.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/challenge.ts#L16)
+[utils/src/types/challenge.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/challenge.ts#L16)
 
 ___
 
@@ -288,7 +288,7 @@ ___
 
 #### Defined in
 
-[src/types/curvePoint.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L34)
+[utils/src/types/curvePoint.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L34)
 
 ___
 
@@ -312,7 +312,7 @@ ___
 
 #### Defined in
 
-[src/types/curvePoint.ts:51](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L51)
+[utils/src/types/curvePoint.ts:51](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L51)
 
 ___
 
@@ -336,4 +336,4 @@ ___
 
 #### Defined in
 
-[src/types/curvePoint.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L26)
+[utils/src/types/curvePoint.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L26)

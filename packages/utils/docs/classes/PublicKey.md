@@ -55,7 +55,7 @@
 
 #### Defined in
 
-[src/types/publicKey.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L18)
+[utils/src/types/publicKey.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L18)
 
 ## Properties
 
@@ -65,7 +65,7 @@
 
 #### Defined in
 
-[src/types/publicKey.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L16)
+[utils/src/types/publicKey.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L16)
 
 ___
 
@@ -75,7 +75,7 @@ ___
 
 #### Defined in
 
-[src/types/publicKey.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L18)
+[utils/src/types/publicKey.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L18)
 
 ## Accessors
 
@@ -89,7 +89,7 @@ ___
 
 #### Defined in
 
-[src/types/publicKey.ts:129](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L129)
+[utils/src/types/publicKey.ts:129](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L129)
 
 ___
 
@@ -103,7 +103,7 @@ ___
 
 #### Defined in
 
-[src/types/publicKey.ts:121](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L121)
+[utils/src/types/publicKey.ts:121](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L121)
 
 ___
 
@@ -117,7 +117,7 @@ ___
 
 #### Defined in
 
-[src/types/publicKey.ts:125](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L125)
+[utils/src/types/publicKey.ts:125](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L125)
 
 ## Methods
 
@@ -137,7 +137,7 @@ ___
 
 #### Defined in
 
-[src/types/publicKey.ts:181](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L181)
+[utils/src/types/publicKey.ts:181](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L181)
 
 ___
 
@@ -151,7 +151,7 @@ ___
 
 #### Defined in
 
-[src/types/publicKey.ts:160](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L160)
+[utils/src/types/publicKey.ts:160](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L160)
 
 ___
 
@@ -165,7 +165,7 @@ ___
 
 #### Defined in
 
-[src/types/publicKey.ts:168](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L168)
+[utils/src/types/publicKey.ts:168](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L168)
 
 ___
 
@@ -179,7 +179,7 @@ ___
 
 #### Defined in
 
-[src/types/publicKey.ts:133](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L133)
+[utils/src/types/publicKey.ts:133](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L133)
 
 ___
 
@@ -193,7 +193,7 @@ ___
 
 #### Defined in
 
-[src/types/publicKey.ts:152](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L152)
+[utils/src/types/publicKey.ts:152](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L152)
 
 ___
 
@@ -207,7 +207,7 @@ ___
 
 #### Defined in
 
-[src/types/publicKey.ts:156](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L156)
+[utils/src/types/publicKey.ts:156](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L156)
 
 ___
 
@@ -221,7 +221,7 @@ ___
 
 #### Defined in
 
-[src/types/publicKey.ts:177](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L177)
+[utils/src/types/publicKey.ts:177](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L177)
 
 ___
 
@@ -235,7 +235,7 @@ ___
 
 #### Defined in
 
-[src/types/publicKey.ts:148](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L148)
+[utils/src/types/publicKey.ts:148](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L148)
 
 ___
 
@@ -249,7 +249,7 @@ ___
 
 #### Defined in
 
-[src/types/publicKey.ts:191](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L191)
+[utils/src/types/publicKey.ts:191](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L191)
 
 ___
 
@@ -269,7 +269,7 @@ ___
 
 #### Defined in
 
-[src/types/publicKey.ts:32](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L32)
+[utils/src/types/publicKey.ts:32](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L32)
 
 ___
 
@@ -293,7 +293,7 @@ an array of deserialized publicKeys
 
 #### Defined in
 
-[src/types/publicKey.ts:56](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L56)
+[utils/src/types/publicKey.ts:56](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L56)
 
 ___
 
@@ -313,7 +313,7 @@ ___
 
 #### Defined in
 
-[src/types/publicKey.ts:95](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L95)
+[utils/src/types/publicKey.ts:95](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L95)
 
 ___
 
@@ -333,7 +333,7 @@ ___
 
 #### Defined in
 
-[src/types/publicKey.ts:102](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L102)
+[utils/src/types/publicKey.ts:102](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L102)
 
 ___
 
@@ -353,7 +353,7 @@ ___
 
 #### Defined in
 
-[src/types/publicKey.ts:24](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L24)
+[utils/src/types/publicKey.ts:24](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L24)
 
 ___
 
@@ -373,7 +373,7 @@ ___
 
 #### Defined in
 
-[src/types/publicKey.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L20)
+[utils/src/types/publicKey.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L20)
 
 ___
 
@@ -395,7 +395,7 @@ ___
 
 #### Defined in
 
-[src/types/publicKey.ts:106](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L106)
+[utils/src/types/publicKey.ts:106](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L106)
 
 ___
 
@@ -418,7 +418,7 @@ ___
 
 #### Defined in
 
-[src/types/publicKey.ts:110](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L110)
+[utils/src/types/publicKey.ts:110](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L110)
 
 ___
 
@@ -438,7 +438,7 @@ ___
 
 #### Defined in
 
-[src/types/publicKey.ts:114](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L114)
+[utils/src/types/publicKey.ts:114](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L114)
 
 ___
 
@@ -462,4 +462,4 @@ a Uint8Array containing the given publicKeys
 
 #### Defined in
 
-[src/types/publicKey.ts:91](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L91)
+[utils/src/types/publicKey.ts:91](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/publicKey.ts#L91)
