@@ -18,7 +18,7 @@ use utils_metrics::metrics::SimpleHistogram;
 
 use crate::errors::NetworkingError;
 use crate::errors::NetworkingError::{DecodingError, Other, Timeout};
-use crate::messaging::ControlMessage;
+use crate::messaging::{ControlMessage, PingMessage};
 use utils_types::traits::BinarySerializable;
 
 #[cfg(any(not(feature = "wasm"), test))]
@@ -30,6 +30,7 @@ use utils_misc::time::native::current_timestamp;
 use gloo_timers::future::sleep;
 #[cfg(all(feature = "wasm", not(test)))]
 use utils_misc::time::wasm::current_timestamp;
+use crate::messaging::ControlMessage::Pong;
 
 const PINGS_MAX_PARALLEL: usize = 14;
 
@@ -183,16 +184,16 @@ impl Ping {
             };
 
             let timeout = sleep(std::cmp::min(timeout_duration, self.config.timeout)).fuse();
-            let ping = async { send_msg(sent_ping.serialize(), destination.to_string()).await }.fuse();
+            let ping = async { send_msg(sent_ping.get_ping_message().unwrap().serialize(), destination.to_string()).await }.fuse();
 
             pin_mut!(timeout, ping);
 
             let ping_result: Result<(), NetworkingError> = match select(timeout, ping).await {
                 Either::Left(_) => Err(Timeout(timeout_duration.as_secs())),
                 Either::Right((v, _)) => match v {
-                    Ok(received) => ControlMessage::deserialize(received.as_ref())
+                    Ok(received) => PingMessage::deserialize(received.as_ref())
                         .map_err(|_| DecodingError)
-                        .and_then(|deserialized| ControlMessage::validate_pong_response(&sent_ping, &deserialized)),
+                        .and_then(|deserialized| ControlMessage::validate_pong_response(&sent_ping, &Pong(deserialized))),
                     Err(description) => Err(Other(format!(
                         "Error during ping to peer '{}': {}",
                         destination.to_string(),
@@ -382,6 +383,8 @@ mod tests {
     use mockall::*;
     use more_asserts::*;
     use std::str::FromStr;
+    use crate::messaging::ControlMessage;
+    use crate::ping::Ping;
 
     fn simple_ping_config() -> PingConfig {
         PingConfig {
@@ -400,8 +403,10 @@ mod tests {
 
     // Testing override
     pub async fn send_ping(msg: Box<[u8]>, peer: String) -> Result<Box<[u8]>, String> {
-        let chall = ControlMessage::deserialize(msg.as_ref()).unwrap();
-        let mut reply = BinarySerializable::serialize(&ControlMessage::generate_pong_response(&chall).unwrap());
+        let chall = PingMessage::deserialize(msg.as_ref()).unwrap();
+        let mut reply = ControlMessage::generate_pong_response(
+            &ControlMessage::Ping(chall)
+        ).unwrap().get_ping_message().unwrap().serialize();
 
         match peer.as_str() {
             BAD_PEER => {

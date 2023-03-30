@@ -11,7 +11,7 @@ pub struct HeartbeatConfig {
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use crate::heartbeat::HeartbeatConfig;
-    use crate::messaging::ControlMessage;
+    use crate::messaging::{ControlMessage, ControlMessage::Ping, PingMessage};
     use futures::stream::{Stream, StreamExt};
     use js_sys::AsyncIterator;
     use utils_misc::async_iterable::wasm::{to_box_u8_stream, to_jsvalue_stream};
@@ -54,9 +54,9 @@ pub mod wasm {
     /// Used to pre-compute ping responses
     #[wasm_bindgen]
     pub fn generate_ping_response(u8a: &[u8]) -> JsResult<Box<[u8]>> {
-        ok_or_jserr!(ControlMessage::deserialize(u8a))
-            .and_then(|req| ok_or_jserr!(ControlMessage::generate_pong_response(&req)))
-            .map(|msg| msg.serialize())
+        ok_or_jserr!(PingMessage::deserialize(u8a))
+            .and_then(|req| ok_or_jserr!(ControlMessage::generate_pong_response(&Ping(req))))
+            .map(|msg| msg.get_ping_message().unwrap().serialize())
     }
 
     #[wasm_bindgen]
