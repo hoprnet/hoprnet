@@ -19,7 +19,7 @@ steps:
       - --cache-ttl=96h
     timeout: 1200s
     waitFor:
-      - 'buildHoprToolchain'
+      - buildHoprToolchain
   - name: 'gcr.io/kaniko-project/executor:v1.9.1'
     id: buildHoprdNat
     args:
@@ -42,15 +42,18 @@ steps:
       - --cache-ttl=96h
     timeout: 1200s
     waitFor:
-      - 'buildHoprToolchain'
+      - buildHoprToolchain
   - name: 'gcr.io/kaniko-project/executor:v1.9.1'
     id: buildHopli
     args:
+      - --build-arg=HOPR_TOOLCHAIN_IMAGE=gcr.io/${PROJECT_ID}/hopr-toolchain:${_IMAGE_VERSION}
       - --dockerfile=packages/hopli/Dockerfile
       - --destination=gcr.io/${PROJECT_ID}/hopli:${_IMAGE_VERSION}
       - --cache=true
       - --cache-ttl=96h
     timeout: 1200s
+    waitFor:
+      - buildHoprToolchain
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: testImages
     script: |
@@ -67,6 +70,7 @@ steps:
       - buildHoprd
       - buildHoprdNat
       - buildAnvil
+      - buildHopli
   - name: 'gcr.io/kaniko-project/executor:v1.9.1'
     id: buildPluto
     args:
