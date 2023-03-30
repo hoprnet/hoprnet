@@ -1,7 +1,7 @@
 use crate::errors::NetworkingError::MessagingError;
 use core_crypto::derivation::derive_ping_pong;
 use serde::{Deserialize, Serialize};
-use utils_types::traits::{AutoBinarySerializable, BinarySerializable};
+use utils_types::traits::{BinarySerializable};
 
 use crate::errors::Result;
 
@@ -60,8 +60,6 @@ impl ControlMessage {
     }
 }
 
-impl AutoBinarySerializable<'_> for ControlMessage {}
-
 #[derive(Clone, Debug, Eq, PartialEq, Default, Serialize, Deserialize)]
 pub struct PingMessage {
     nonce: [u8; core_crypto::parameters::PING_PONG_NONCE_SIZE],
@@ -75,7 +73,7 @@ impl PingMessage {
 }
 
 #[cfg(not(feature = "compat-ping"))]
-impl AutoBinarySerializable<'_> for PingMessage {
+impl utils_types::traits::AutoBinarySerializable<'_> for PingMessage {
     const SIZE: usize = core_crypto::parameters::PING_PONG_NONCE_SIZE;
 }
 
@@ -101,8 +99,9 @@ impl BinarySerializable<'_> for PingMessage {
 
 #[cfg(test)]
 mod tests {
-    use crate::messaging::ControlMessage;
+    use crate::messaging::{ControlMessage, PingMessage};
     use utils_types::traits::BinarySerializable;
+    use crate::messaging::ControlMessage::{Ping, Pong};
 
     #[test]
     fn test_ping_pong_roundtrip() {
@@ -111,21 +110,21 @@ mod tests {
         let sent_req: ControlMessage;
         {
             sent_req = ControlMessage::generate_ping_request();
-            sent_req_s = sent_req.serialize();
+            sent_req_s = sent_req.get_ping_message().unwrap().serialize();
         }
 
         // pong responder
         let sent_resp_s: Box<[u8]>;
         {
-            let recv_req = ControlMessage::deserialize(sent_req_s.as_ref()).unwrap();
-            let send_resp = ControlMessage::generate_pong_response(&recv_req).unwrap();
-            sent_resp_s = send_resp.serialize();
+            let recv_req = PingMessage::deserialize(sent_req_s.as_ref()).unwrap();
+            let send_resp = ControlMessage::generate_pong_response(&Ping(recv_req)).unwrap();
+            sent_resp_s = send_resp.get_ping_message().unwrap().serialize();
         }
 
         // verify pong
         {
-            let recv_resp = ControlMessage::deserialize(sent_resp_s.as_ref()).unwrap();
-            assert!(ControlMessage::validate_pong_response(&sent_req, &recv_resp).is_ok());
+            let recv_resp = PingMessage::deserialize(sent_resp_s.as_ref()).unwrap();
+            assert!(ControlMessage::validate_pong_response(&sent_req, &Pong(recv_resp)).is_ok());
         }
     }
 }
