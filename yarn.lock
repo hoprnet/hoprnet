@@ -808,7 +808,7 @@ __metadata:
     "@types/mocha": 9.1.1
     "@types/sinon": 10.0.13
     async-mutex: 0.3.2
-    bn.js: 5.2.0
+    bn.js: 5.2.1
     chai: 4.3.7
     chalk: 5.0.1
     debug: 4.3.4
@@ -849,7 +849,7 @@ __metadata:
     "@types/chai-as-promised": 7.1.5
     "@types/mocha": 9.1.1
     "@types/semver": ^7
-    bn.js: 5.2.0
+    bn.js: 5.2.1
     chai: 4.3.7
     chai-as-promised: 7.1.1
     datastore-level: ^8.0.0
@@ -909,7 +909,7 @@ __metadata:
     abortable-iterator: 4.0.2
     bignumber.js: 9.0.2
     bl: 5.0.0
-    bn.js: 5.2.0
+    bn.js: 5.2.1
     chai: 4.3.7
     chalk: 5.0.1
     debug: 4.3.4
@@ -950,7 +950,7 @@ __metadata:
     "@types/mocha": 9.1.1
     "@types/supertest": ^2.0.11
     "@types/uuid": ^9
-    bn.js: 5.2.0
+    bn.js: 5.2.1
     body-parser: 1.20.2
     chai: 4.3.7
     chai-as-promised: 7.1.1
@@ -2914,10 +2914,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"bn.js@npm:5.2.0":
-  version: 5.2.0
-  resolution: "bn.js@npm:5.2.0"
-  checksum: 6117170393200f68b35a061ecbf55d01dd989302e7b3c798a3012354fa638d124f0b2f79e63f77be5556be80322a09c40339eda6413ba7468524c0b6d4b4cb7a
+"bn.js@npm:5.2.1, bn.js@npm:^5.0.0, bn.js@npm:^5.1.1, bn.js@npm:^5.2.1":
+  version: 5.2.1
+  resolution: "bn.js@npm:5.2.1"
+  checksum: 3dd8c8d38055fedfa95c1d5fc3c99f8dd547b36287b37768db0abab3c239711f88ff58d18d155dd8ad902b0b0cee973747b7ae20ea12a09473272b0201c9edd3
   languageName: node
   linkType: hard
 
@@ -2925,13 +2925,6 @@ __metadata:
   version: 4.12.0
   resolution: "bn.js@npm:4.12.0"
   checksum: 39afb4f15f4ea537b55eaf1446c896af28ac948fdcf47171961475724d1bb65118cca49fa6e3d67706e4790955ec0e74de584e45c8f1ef89f46c812bee5b5a12
-  languageName: node
-  linkType: hard
-
-"bn.js@npm:^5.0.0, bn.js@npm:^5.1.1, bn.js@npm:^5.2.1":
-  version: 5.2.1
-  resolution: "bn.js@npm:5.2.1"
-  checksum: 3dd8c8d38055fedfa95c1d5fc3c99f8dd547b36287b37768db0abab3c239711f88ff58d18d155dd8ad902b0b0cee973747b7ae20ea12a09473272b0201c9edd3
   languageName: node
   linkType: hard
 
