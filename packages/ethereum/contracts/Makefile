@@ -37,7 +37,7 @@ check-sc-bindings: ## Only create types for Hopr* contracts
 .PHONY: anvil-deploy-erc1820
 anvil-deploy-erc1820: ensure-environment-is-set
 anvil-deploy-erc1820: ## deploy ERC1820 contracts
-	if [ "$(cast code 0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24)" != "" ]; then \
+	if [ -n "$(cast code 0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24)" ]; then \
 	  echo "ERC1820 contract already deployed, skipping"; \
 	else \
 		cast send 0xa990077c3205cbDf861e17Fa532eeB069cE9fF96 --value 0.8ether --from 0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266 && \
