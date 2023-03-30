@@ -403,10 +403,11 @@ mod tests {
 
     // Testing override
     pub async fn send_ping(msg: Box<[u8]>, peer: String) -> Result<Box<[u8]>, String> {
-        let chall = PingMessage::deserialize(msg.as_ref()).unwrap();
-        let mut reply = ControlMessage::generate_pong_response(
-            &ControlMessage::Ping(chall)
-        ).unwrap().get_ping_message().unwrap().serialize();
+        let mut reply = PingMessage::deserialize(msg.as_ref())
+            .map_err(|_| DecodingError)
+            .and_then(|chall| ControlMessage::generate_pong_response(&ControlMessage::Ping(chall)))
+            .and_then(|msg| msg.get_ping_message().map(PingMessage::serialize))
+            .unwrap();
 
         match peer.as_str() {
             BAD_PEER => {
