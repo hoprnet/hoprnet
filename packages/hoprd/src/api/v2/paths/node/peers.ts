@@ -15,7 +15,7 @@ export type PeerInfo = {
   lastSeen: number
   quality: number
   backoff: number
-  isNew: boolean,
+  isNew: boolean
   reportedVersion: string
 }
 
@@ -172,7 +172,8 @@ const PEER_INFO_DOC: any = {
     reportedVersion: {
       type: 'string',
       example: '1.92.12',
-      description: 'HOPR protocol version as determined from the successful ping in the Major.Minor.Patch format or "unknown"'
+      description:
+        'HOPR protocol version as determined from the successful ping in the Major.Minor.Patch format or "unknown"'
     }
   }
 }

@@ -121,7 +121,7 @@ pub struct PeerStatus {
     pub heartbeats_sent: u64,
     pub heartbeats_succeeded: u64,
     pub backoff: f64,
-    metadata: HashMap<String, String>
+    metadata: HashMap<String, String>,
 }
 
 impl PeerStatus {
@@ -135,7 +135,7 @@ impl PeerStatus {
             last_seen: 0,
             backoff,
             quality: 0.0,
-            metadata: HashMap::new()
+            metadata: HashMap::new(),
         }
     }
 
@@ -279,7 +279,12 @@ impl Network {
     }
 
     /// Update the PeerId record in the network (with optional metadata entries that will be merged into the existing ones)
-    pub fn update_with_metadata(&mut self, peer: &PeerId, ping_result: crate::types::Result, metadata: Option<HashMap<String, String>>) {
+    pub fn update_with_metadata(
+        &mut self,
+        peer: &PeerId,
+        ping_result: crate::types::Result,
+        metadata: Option<HashMap<String, String>>,
+    ) {
         if let Some(existing) = self.entries.get(peer.to_string().as_str()) {
             let mut entry = existing.clone();
             entry.heartbeats_sent = entry.heartbeats_sent + 1;
@@ -287,10 +292,12 @@ impl Network {
 
             // Upsert metadata if any
             if let Some(mm) = metadata {
-                mm.into_iter().for_each(|(k, v)| {
-                    match entry.metadata.entry(k) {
-                        Entry::Occupied(val) => {*val.into_mut() = v.clone();},
-                        Entry::Vacant(vac) => {vac.insert(v);}
+                mm.into_iter().for_each(|(k, v)| match entry.metadata.entry(k) {
+                    Entry::Occupied(val) => {
+                        *val.into_mut() = v.clone();
+                    }
+                    Entry::Vacant(vac) => {
+                        vac.insert(v);
                     }
                 });
             }
@@ -492,11 +499,9 @@ pub mod wasm {
         #[wasm_bindgen(js_name = "metadata")]
         pub fn _metadata(&self) -> js_sys::Map {
             let ret = js_sys::Map::new();
-            self.metadata
-                .iter()
-                .for_each(|(k,v)| {
-                    ret.set(&JsValue::from(k.clone()), &JsValue::from(v.clone()));
-                });
+            self.metadata.iter().for_each(|(k, v)| {
+                ret.set(&JsValue::from(k.clone()), &JsValue::from(v.clone()));
+            });
             ret
         }
     }
@@ -504,11 +509,19 @@ pub mod wasm {
     #[wasm_bindgen]
     impl PeerStatus {
         #[wasm_bindgen]
-        pub fn build(peer: JsString,
-                     origin: PeerOrigin, is_public: bool, last_seen: u64,
-                     quality: f64, heartbeats_sent: u64, heartbeats_succeeded: u64,
-                     backoff: f64, peer_metadata: &js_sys::Map) -> Self {
-            let peer = peer.as_string()
+        pub fn build(
+            peer: JsString,
+            origin: PeerOrigin,
+            is_public: bool,
+            last_seen: u64,
+            quality: f64,
+            heartbeats_sent: u64,
+            heartbeats_succeeded: u64,
+            backoff: f64,
+            peer_metadata: &js_sys::Map,
+        ) -> Self {
+            let peer = peer
+                .as_string()
                 .ok_or_else(|| "Own peer id was not passed as a string".to_owned())
                 .and_then(|peer| PeerId::from_str(peer.as_str()).map_err(|e| e.to_string()))
                 .map_err(|e| panic!("Failed to parse PeerId from string: {}", e.to_string()))
@@ -523,7 +536,7 @@ pub mod wasm {
                 heartbeats_sent,
                 heartbeats_succeeded,
                 backoff,
-                metadata: js_map_to_hash_map(peer_metadata).unwrap_or(HashMap::new())
+                metadata: js_map_to_hash_map(peer_metadata).unwrap_or(HashMap::new()),
             }
         }
     }
@@ -811,7 +824,11 @@ mod tests {
 
         let proto_version = ("protocol_version".to_string(), "1.2.3".to_string());
 
-        peers.add_with_metadata(&expected, PeerOrigin::IncomingConnection, Some([ proto_version.clone() ].into()));
+        peers.add_with_metadata(
+            &expected,
+            PeerOrigin::IncomingConnection,
+            Some([proto_version.clone()].into()),
+        );
 
         assert_eq!(1, peers.length());
         assert!(peers.has(&expected));
@@ -878,7 +895,11 @@ mod tests {
         {
             let proto_version = ("protocol_version".to_string(), "1.2.3".to_string());
 
-            peers.add_with_metadata(&peer, PeerOrigin::IncomingConnection, Some([ proto_version.clone(), other_metadata_1.clone() ].into()));
+            peers.add_with_metadata(
+                &peer,
+                PeerOrigin::IncomingConnection,
+                Some([proto_version.clone(), other_metadata_1.clone()].into()),
+            );
 
             let status = peers.get_peer_status(&peer).unwrap();
 
@@ -893,7 +914,11 @@ mod tests {
         {
             let proto_version = ("protocol_version".to_string(), "1.2.4".to_string());
 
-            peers.update_with_metadata(&peer, Ok(ts.clone()), Some([proto_version.clone(), other_metadata_2.clone()].into()));
+            peers.update_with_metadata(
+                &peer,
+                Ok(ts.clone()),
+                Some([proto_version.clone(), other_metadata_2.clone()].into()),
+            );
 
             let status = peers.get_peer_status(&peer).unwrap();
 

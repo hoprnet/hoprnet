@@ -1,4 +1,5 @@
-use crate::errors::{GeneralError::ParseError, Result};
+use crate::errors::GeneralError::ParseError;
+use crate::errors::Result;
 use libp2p_identity::PeerId;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -17,7 +18,7 @@ pub trait ToHex {
 /// A type that can be serialized and deserialized to a binary form.
 /// Implementing this trait automatically implements ToHex trait
 /// which then uses the serialize method.
-pub trait BinarySerializable<'a> : Sized {
+pub trait BinarySerializable<'a>: Sized {
     /// Minimum size of this type in bytes.
     const SIZE: usize;
 
@@ -36,7 +37,9 @@ pub trait AutoBinarySerializable<'a>: Serialize + Deserialize<'a> {
 }
 
 impl<'a, T> BinarySerializable<'a> for T
-where T: AutoBinarySerializable<'a> {
+where
+    T: AutoBinarySerializable<'a>,
+{
     const SIZE: usize = Self::SIZE;
 
     /// Deserializes the type from a binary blob.
@@ -51,7 +54,9 @@ where T: AutoBinarySerializable<'a> {
 }
 
 impl<'a, T> ToHex for T
-where T: BinarySerializable<'a> {
+where
+    T: BinarySerializable<'a>,
+{
     fn to_hex(&self) -> String {
         hex::encode(&self.serialize())
     }

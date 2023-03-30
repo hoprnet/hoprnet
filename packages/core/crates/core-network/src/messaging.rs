@@ -1,7 +1,7 @@
-use serde::{Deserialize, Serialize};
-use core_crypto::derivation::derive_ping_pong;
-use utils_types::traits::{AutoBinarySerializable, BinarySerializable};
 use crate::errors::NetworkingError::MessagingError;
+use core_crypto::derivation::derive_ping_pong;
+use serde::{Deserialize, Serialize};
+use utils_types::traits::{AutoBinarySerializable, BinarySerializable};
 
 use crate::errors::Result;
 
@@ -31,7 +31,7 @@ impl ControlMessage {
                 pong.nonce.copy_from_slice(&derive_ping_pong(Some(ping.nonce())));
                 Ok(Self::Pong(pong))
             }
-            ControlMessage::Pong(_) => Err(MessagingError("invalid ping message".into()))
+            ControlMessage::Pong(_) => Err(MessagingError("invalid ping message".into())),
         }
     }
 
@@ -40,13 +40,11 @@ impl ControlMessage {
     pub fn validate_pong_response(request: &ControlMessage, response: &ControlMessage) -> Result<()> {
         if let Self::Pong(expected_pong) = Self::generate_pong_response(request).unwrap() {
             match response {
-                ControlMessage::Pong(received_pong) => {
-                    match expected_pong.nonce.eq(&received_pong.nonce) {
-                        true => Ok(()),
-                        false => Err(MessagingError("pong response does not match the challenge".into()))
-                    }
-                }
-                ControlMessage::Ping(_) => Err(MessagingError("invalid pong response".into()))
+                ControlMessage::Pong(received_pong) => match expected_pong.nonce.eq(&received_pong.nonce) {
+                    true => Ok(()),
+                    false => Err(MessagingError("pong response does not match the challenge".into())),
+                },
+                ControlMessage::Ping(_) => Err(MessagingError("invalid pong response".into())),
             }
         } else {
             Err(MessagingError("request is not a valid ping message".into()))
@@ -62,7 +60,7 @@ impl ControlMessage {
     }
 }
 
-impl AutoBinarySerializable<'_> for ControlMessage { }
+impl AutoBinarySerializable<'_> for ControlMessage {}
 
 #[derive(Clone, Debug, Eq, PartialEq, Default, Serialize, Deserialize)]
 pub struct PingMessage {
@@ -77,7 +75,9 @@ impl PingMessage {
 }
 
 #[cfg(not(feature = "compat-ping"))]
-impl AutoBinarySerializable<'_> for PingMessage { const SIZE: usize = core_crypto::parameters::PING_PONG_NONCE_SIZE; }
+impl AutoBinarySerializable<'_> for PingMessage {
+    const SIZE: usize = core_crypto::parameters::PING_PONG_NONCE_SIZE;
+}
 
 #[cfg(feature = "compat-ping")]
 impl BinarySerializable<'_> for PingMessage {
@@ -101,8 +101,8 @@ impl BinarySerializable<'_> for PingMessage {
 
 #[cfg(test)]
 mod tests {
-    use utils_types::traits::BinarySerializable;
     use crate::messaging::ControlMessage;
+    use utils_types::traits::BinarySerializable;
 
     #[test]
     fn test_ping_pong_roundtrip() {

@@ -16,10 +16,10 @@ use utils_metrics::histogram_start_measure;
 use utils_metrics::metrics::SimpleCounter;
 use utils_metrics::metrics::SimpleHistogram;
 
-use utils_types::traits::BinarySerializable;
 use crate::errors::NetworkingError;
 use crate::errors::NetworkingError::{DecodingError, Other, Timeout};
 use crate::messaging::ControlMessage;
+use utils_types::traits::BinarySerializable;
 
 #[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::sleep;
@@ -183,21 +183,21 @@ impl Ping {
             };
 
             let timeout = sleep(std::cmp::min(timeout_duration, self.config.timeout)).fuse();
-            let ping = async {
-                send_msg(sent_ping.serialize(), destination.to_string()).await
-            }.fuse();
+            let ping = async { send_msg(sent_ping.serialize(), destination.to_string()).await }.fuse();
 
             pin_mut!(timeout, ping);
 
-            let ping_result: Result<(), NetworkingError> = match select(
-                timeout, ping).await
-            {
+            let ping_result: Result<(), NetworkingError> = match select(timeout, ping).await {
                 Either::Left(_) => Err(Timeout(timeout_duration.as_secs())),
                 Either::Right((v, _)) => match v {
                     Ok(received) => ControlMessage::deserialize(received.as_ref())
                         .map_err(|_| DecodingError)
                         .and_then(|deserialized| ControlMessage::validate_pong_response(&sent_ping, &deserialized)),
-                    Err(description) => Err(Other(format!("Error during ping to peer '{}': {}", destination.to_string(), description)))
+                    Err(description) => Err(Other(format!(
+                        "Error during ping to peer '{}': {}",
+                        destination.to_string(),
+                        description
+                    ))),
                 },
             };
 
@@ -401,8 +401,7 @@ mod tests {
     // Testing override
     pub async fn send_ping(msg: Box<[u8]>, peer: String) -> Result<Box<[u8]>, String> {
         let chall = ControlMessage::deserialize(msg.as_ref()).unwrap();
-        let mut reply = BinarySerializable::serialize(&ControlMessage::generate_pong_response(&chall)
-            .unwrap());
+        let mut reply = BinarySerializable::serialize(&ControlMessage::generate_pong_response(&chall).unwrap());
 
         match peer.as_str() {
             BAD_PEER => {
