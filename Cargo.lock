@@ -2539,6 +2539,7 @@ dependencies = [
  "serde-wasm-bindgen 0.4.5",
  "serde_json",
  "serde_yaml",
+ "tempfile 3.3.0",
  "utils-log",
  "utils-misc",
  "utils-proc-macros",
