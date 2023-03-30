@@ -895,7 +895,7 @@ __metadata:
     futoin-hkdf: 1.5.0
     hjson: 3.2.2
     it-pipe: 2.0.3
-    jsonschema: 1.4.0
+    jsonschema: 1.4.1
     leveldown: 6.1.1
     levelup: 5.1.1
     libp2p: 0.37.3
@@ -7120,10 +7120,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"jsonschema@npm:1.4.0":
-  version: 1.4.0
-  resolution: "jsonschema@npm:1.4.0"
-  checksum: a2f96b5154658f5567b064d6f25fa4cb7e38b923d5dce9dad8d2566a07dd94abc4acedf234333a91f31bc9934e9dd57c270dcc51e5656b4c104408196c768580
+"jsonschema@npm:1.4.1":
+  version: 1.4.1
+  resolution: "jsonschema@npm:1.4.1"
+  checksum: 1ef02a6cd9bc32241ec86bbf1300bdbc3b5f2d8df6eb795517cf7d1cd9909e7beba1e54fdf73990fd66be98a182bda9add9607296b0cb00b1348212988e424b2
   languageName: node
   linkType: hard
 
