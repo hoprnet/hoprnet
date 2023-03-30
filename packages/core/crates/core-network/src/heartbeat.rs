@@ -20,6 +20,7 @@ pub mod wasm {
     use utils_types::traits::BinarySerializable;
     use wasm_bindgen::prelude::*;
     use wasm_bindgen_futures::stream::JsStream;
+    use crate::errors::NetworkingError;
 
     #[wasm_bindgen]
     impl HeartbeatConfig {
@@ -54,9 +55,10 @@ pub mod wasm {
     /// Used to pre-compute ping responses
     #[wasm_bindgen]
     pub fn generate_ping_response(u8a: &[u8]) -> JsResult<Box<[u8]>> {
-        ok_or_jserr!(PingMessage::deserialize(u8a))
-            .and_then(|req| ok_or_jserr!(ControlMessage::generate_pong_response(&Ping(req))))
-            .map(|msg| msg.get_ping_message().unwrap().serialize())
+        ok_or_jserr!(PingMessage::deserialize(u8a)
+            .map_err(|_| NetworkingError::DecodingError)
+            .and_then(|req| ControlMessage::generate_pong_response(&Ping(req)))
+            .and_then(|msg| msg.get_ping_message().map(PingMessage::serialize)))
     }
 
     #[wasm_bindgen]
