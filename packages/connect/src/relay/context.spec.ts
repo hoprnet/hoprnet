@@ -532,28 +532,36 @@ describe('relay switch context - falsy streams', function () {
   })
 
   // FIXME: find a way to catch this error in Rust
-  //   it('falsy sink', async function () {
-  //     const relayToNode = pair<StreamType>()
-  //     const falsySourceError = 'falsy source error'
-  //     const ctx = new Server(
-  //       {
-  //         source: (async function* () {
-  //           throw new Error(falsySourceError)
-  //         })(),
-  //         sink: relayToNode.sink
-  //       },
-  //       {
-  //         onClose: () => {},
-  //         onUpgrade: () => {}
-  //       },
-  //       {
-  //         relayFreeTimeout: 1
-  //       }
-  //     )
-  //
-  //     await assert.rejects(
-  //       (ctx.source as AsyncIterable<StreamType>)[Symbol.asyncIterator]().next(),
-  //       Error(falsySourceError)
-  //     )
-  //   })
+  // it('falsy sink source', async function () {
+  //   const [relayToNode, nodeToRelay] = duplexPair<StreamType>()
+  //   const errorInSource = 'error in source'
+  //   const ctx = new Server(
+  //     nodeToRelay as IStream,
+  //     {
+  //       onClose: () => {},
+  //       onUpgrade: () => {}
+  //     },
+  //     {
+  //       relayFreeTimeout: 1
+  //     }
+  //   )
+
+  //   const sinkPromise = ctx.sink(
+  //     (async function* () {
+  //       throw Error(errorInSource)
+  //     })()
+  //   )
+
+  //   // const destinationShaker = handshake(ctx as any)
+  //   // destinationShaker.read()
+
+  //   // start stream
+  //   const sourcePromise = (relayToNode.source as AsyncIterable<StreamType>)[Symbol.asyncIterator]().next()
+
+  //   await assert.rejects(sinkPromise, Error(errorInSource))
+  //   console.log('after throwing')
+
+  //   // make sure that stream ends
+  //   await sourcePromise
+  // })
 })
