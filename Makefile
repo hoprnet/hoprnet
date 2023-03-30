@@ -11,6 +11,9 @@ WORKSPACES_WITH_RUST_MODULES := $(filter-out ./packages/ethereum/crates,$(wildca
 # Gets all individual crates such that they can get built
 CRATES := $(foreach crate,${WORKSPACES_WITH_RUST_MODULES},$(dir $(wildcard $(crate)/*/Cargo.toml)))
 
+# base names of all crates
+CRATES_NAMES := $(foreach crate,${CRATES},$(shell basename $(crate)))
+
 # define specific crate for hopli which is a native helper
 HOPLI_CRATE := ./packages/hopli
 
@@ -53,6 +56,12 @@ endif
 
 all: help
 
+.PHONY: init
+init: ## initialize repository (idempotent operation)
+	for gh in `find .githooks/ -type f`; do \
+		ln -sf "../../$${gh}" .git/hooks/; \
+	done
+
 .PHONY: $(CRATES)
 $(CRATES): ## builds all Rust crates with wasm-pack (except for hopli)
 # --out-dir is relative to working directory
@@ -89,14 +98,15 @@ endif
 
 .PHONY: deps
 deps: ## Installs dependencies for development setup
-	[[ "${name}" =~ nix-shell* ]] || corepack enable
-	command -v rustup && rustup update || echo "No rustup installed, ignoring"
+	if [[ ! "${name}" =~ nix-shell* ]]; then \
+		corepack enable; \
+		command -v rustup && rustup update || echo "No rustup installed, ignoring"; \
+	fi
 # we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op
 	mkdir -p .cargo/bin
 	$(MAKE) cargo-update
 	command -v wasm-opt || $(cargo) install wasm-opt
 	command -v wasm-pack || $(cargo) install wasm-pack
-	command -v wasm-bindgen || $(cargo) install wasm-bindgen
 	yarn workspaces focus ${YARNFLAGS}
 # install foundry (cast + forge + anvil)
 	$(MAKE) install-foundry
@@ -217,13 +227,29 @@ endif
 smart-contract-test: # forge test smart contracts
 	$(MAKE) -C packages/ethereum/contracts/ sc-test
 
-.PHONY: lint-check
-lint-check: ## run linter in check mode
+.PHONY: lint
+lint: lint-ts lint-rust
+lint: ## run linter for TS and Rust
+
+.PHONY: lint-ts
+lint-ts: ## run linter for TS
 	npx prettier --check .
 
-.PHONY: lint-fix
-lint-fix: ## run linter in fix mode
+.PHONY: lint-rust
+lint-rust: ## run linter for Rust
+	$(foreach c, $(CRATES_NAMES), cargo fmt --check -p $(c) && ) echo ""
+
+.PHONY: fmt
+fmt: fmt-ts fmt-rust
+fmt: ## run code formatter for TS and Rust
+
+.PHONY: fmt-ts
+fmt-ts: ## run code formatter for TS
 	npx prettier --write .
+
+.PHONY: fmt-rust
+fmt-rust: ## run code formatter for Rust
+	$(foreach c, $(CRATES_NAMES), cargo fmt -p $(c) && ) echo ""
 
 .PHONY: run-anvil
 run-anvil: args=""
@@ -240,13 +266,26 @@ kill-anvil: ## kill process running at port 8545 (default port of anvil)
 	lsof -i :8545 -s TCP:LISTEN -t | xargs -I {} -n 1 kill {} || :
 
 .PHONY: run-local
+run-local: args=
 run-local: ## run HOPRd from local repo
 	env NODE_OPTIONS="--experimental-wasm-modules" NODE_ENV=development DEBUG="hopr*" node \
 		packages/hoprd/lib/main.cjs --init --api \
 		--password="local" --identity=`pwd`/.identity-local.id \
 		--environment anvil-localhost --announce \
 		--testUseWeakCrypto --testAnnounceLocalAddresses \
-		--testPreferLocalAddresses --disableApiAuthentication
+		--testPreferLocalAddresses --disableApiAuthentication \
+		$(args)
+
+run-local-dev-compose: ## run local development Compose setup
+	echo "Starting Anvil on host"
+	make kill-anvil
+	ETHERSCAN_API_KEY=anykey make run-anvil
+	echo "Starting Compose setup (grafana, prometheus)"
+	cd scripts/compose && docker compose -f docker-compose.local-dev.yml up -d
+	echo "Starting Hoprd from source on host"
+	# hoprd must listen on the Docker bridge interface for Prometheus to be able
+	# to connect to it
+	make run-local args="--apiHost=0.0.0.0"
 
 .PHONY: fund-local-all
 fund-local-all: id_dir=/tmp/

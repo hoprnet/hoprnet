@@ -48,7 +48,7 @@ Stops the given timer and discards the measured duration in seconds and returns 
 
 #### Defined in
 
-lib/utils_metrics.d.ts:312
+utils/lib/utils_metrics.d.ts:307
 
 ___
 
@@ -62,7 +62,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:296
+utils/lib/utils_metrics.d.ts:291
 
 ___
 
@@ -78,7 +78,7 @@ Get all samples count
 
 #### Defined in
 
-lib/utils_metrics.d.ts:317
+utils/lib/utils_metrics.d.ts:312
 
 ___
 
@@ -94,7 +94,7 @@ Get all samples sum
 
 #### Defined in
 
-lib/utils_metrics.d.ts:322
+utils/lib/utils_metrics.d.ts:317
 
 ___
 
@@ -110,7 +110,7 @@ Returns the name of the histogram given at construction.
 
 #### Defined in
 
-lib/utils_metrics.d.ts:327
+utils/lib/utils_metrics.d.ts:322
 
 ___
 
@@ -132,7 +132,7 @@ Records a value observation to the histogram.
 
 #### Defined in
 
-lib/utils_metrics.d.ts:301
+utils/lib/utils_metrics.d.ts:296
 
 ___
 
@@ -154,7 +154,7 @@ Stops the given timer and records the elapsed duration in seconds to the histogr
 
 #### Defined in
 
-lib/utils_metrics.d.ts:306
+utils/lib/utils_metrics.d.ts:301
 
 ___
 
@@ -168,4 +168,4 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:331
+utils/lib/utils_metrics.d.ts:326

@@ -3,6 +3,7 @@ name = "core-mixer"
 version = "0.1.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
+license = "GPL-3.0-only"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -13,7 +14,7 @@ wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:getra
 
 [dependencies]
 async-std = { version = "1.12.0", features = ["attributes"] }
-futures = "0.3.26"
+futures = "0.3.27"
 futures-lite = "1.12.0"
 rand = "0.8.5"
 pin-project = "1.0.12"

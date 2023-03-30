@@ -2,29 +2,29 @@ use std::time::Duration;
 
 use futures::{
     future::{
+        select,
         Either,
-        FutureExt,      // .fuse()
-        select
+        FutureExt, // .fuse()
     },
     pin_mut,
-    stream::{FuturesUnordered, StreamExt}
+    stream::{FuturesUnordered, StreamExt},
 };
 use libp2p::PeerId;
 
-use utils_log::{debug,info,error};
+use utils_log::{debug, error, info};
+use utils_metrics::histogram_start_measure;
 use utils_metrics::metrics::SimpleCounter;
 use utils_metrics::metrics::SimpleHistogram;
-use utils_metrics::histogram_start_measure;
 
+#[cfg(any(not(feature = "wasm"), test))]
+use async_std::task::sleep;
 #[cfg(any(not(feature = "wasm"), test))]
 use utils_misc::time::native::current_timestamp;
-#[cfg(any(not(feature = "wasm"), test))]
-use async_std::task::sleep as sleep;
 
 #[cfg(all(feature = "wasm", not(test)))]
-use utils_misc::time::wasm::current_timestamp;
+use gloo_timers::future::sleep;
 #[cfg(all(feature = "wasm", not(test)))]
-use gloo_timers::future::sleep as sleep;
+use utils_misc::time::wasm::current_timestamp;
 
 const PINGS_MAX_PARALLEL: usize = 14;
 
@@ -36,7 +36,6 @@ pub trait PingExternalAPI {
 /// Basic type used for internally aggregating ping results to be further processed in the
 /// PingExternalAPI callbacks.
 type PingMeasurement = (PeerId, crate::types::Result);
-
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PingConfig {
@@ -67,30 +66,37 @@ impl Ping {
         Ping {
             _protocol_heartbeat: [
                 // new
-                format!("/hopr/{}/heartbeat/{}", &config.environment_id, &config.normalized_version),
+                format!(
+                    "/hopr/{}/heartbeat/{}",
+                    &config.environment_id, &config.normalized_version
+                ),
                 // deprecated
-                format!("/hopr/{}/heartbeat", &config.environment_id)
+                format!("/hopr/{}/heartbeat", &config.environment_id),
             ],
             config,
             external_api,
             metric_time_to_heartbeat: SimpleHistogram::new(
                 "core_histogram_heartbeat_time_seconds",
                 "Measures total time it takes to probe all other nodes (in seconds)",
-                vec![0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0, 60.0, 90.0, 120.0, 300.0]
-            ).ok(),
+                vec![0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0, 60.0, 90.0, 120.0, 300.0],
+            )
+            .ok(),
             metric_time_to_ping: SimpleHistogram::new(
                 "core_histogram_ping_time_seconds",
                 "Measures total time it takes to ping a single node (seconds)",
-                vec![0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0, 60.0, 90.0, 120.0, 300.0]
-            ).ok(),
+                vec![0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0, 60.0, 90.0, 120.0, 300.0],
+            )
+            .ok(),
             metric_successful_ping_count: SimpleCounter::new(
                 "core_counter_heartbeat_successful_pings",
-                "Total number of successful pings"
-            ).ok(),
+                "Total number of successful pings",
+            )
+            .ok(),
             metric_failed_ping_count: SimpleCounter::new(
                 "core_counter_heartbeat_failed_pings",
-                "Total number of failed pings"
-            ).ok(),
+                "Total number of failed pings",
+            )
+            .ok(),
         }
     }
 
@@ -105,10 +111,9 @@ impl Ping {
     ///
     /// * `peers` - A vector of PeerId objects referencing the peers to be pinged
     /// * `send_msg` - The send function producing a Future with the reply of the pinged peer
-    pub async fn ping_peers<F>(&self, mut peers: Vec<PeerId>,
-                                 send_msg: &impl Fn(Box<[u8]>, String) -> F)
+    pub async fn ping_peers<F>(&self, mut peers: Vec<PeerId>, send_msg: &impl Fn(Box<[u8]>, String) -> F)
     where
-        F: futures::Future<Output =  Result<Box<[u8]>, String>>
+        F: futures::Future<Output = Result<Box<[u8]>, String>>,
     {
         if peers.is_empty() {
             debug!("Received an empty peer list, not pinging any peers");
@@ -118,18 +123,21 @@ impl Ping {
         let _ping_peers_timer = match &self.metric_time_to_heartbeat {
             Some(metric_time_to_heartbeat) => {
                 let timer = histogram_start_measure!(metric_time_to_heartbeat);
-                Some(scopeguard::guard((), move |_| { metric_time_to_heartbeat.cancel_measure(timer); }))
-            },
-            None => None
+                Some(scopeguard::guard((), move |_| {
+                    metric_time_to_heartbeat.cancel_measure(timer);
+                }))
+            }
+            None => None,
         };
 
         let remainder = peers.split_off(self.config.max_parallel_pings.min(peers.len()));
 
         let start = current_timestamp();
         let mut futs = to_futures_unordered(
-            peers.iter()
-                .map(|x| { self.ping_peer(x.clone(), self.config.timeout, send_msg)})
-                .collect::<Vec<_>>()
+            peers
+                .iter()
+                .map(|x| self.ping_peer(x.clone(), self.config.timeout, send_msg))
+                .collect::<Vec<_>>(),
         );
 
         let mut waiting = remainder.iter();
@@ -146,14 +154,18 @@ impl Ping {
     }
 
     /// Ping a single peer respecting a specified timeout duration.
-    async fn ping_peer<F>(&self, destination: PeerId, timeout_duration: Duration,
-                       send_msg: &impl Fn(Box<[u8]>, String) -> F) -> PingMeasurement
+    async fn ping_peer<F>(
+        &self,
+        destination: PeerId,
+        timeout_duration: Duration,
+        send_msg: &impl Fn(Box<[u8]>, String) -> F,
+    ) -> PingMeasurement
     where
-        F: futures::Future<Output = Result<Box<[u8]>, String>>
+        F: futures::Future<Output = Result<Box<[u8]>, String>>,
     {
         info!("Pinging peer '{}'", destination);
 
-        use rand::{RngCore,SeedableRng};
+        use rand::{RngCore, SeedableRng};
         let mut challenge = Box::new([0u8; 16]);
         rand::rngs::StdRng::from_entropy().fill_bytes(&mut challenge.as_mut_slice());
 
@@ -161,33 +173,37 @@ impl Ping {
             let _ping_peer_timer = match &self.metric_time_to_ping {
                 Some(metric_time_to_ping) => {
                     let timer = histogram_start_measure!(metric_time_to_ping);
-                    Some(scopeguard::guard((), move |_| { metric_time_to_ping.cancel_measure(timer); }))
-                },
-                None => None
+                    Some(scopeguard::guard((), move |_| {
+                        metric_time_to_ping.cancel_measure(timer);
+                    }))
+                }
+                None => None,
             };
 
             let timeout = sleep(std::cmp::min(timeout_duration, self.config.timeout)).fuse();
-            let ping = async {
-                send_msg(challenge.clone(), destination.to_string()).await
-            }.fuse();
+            let ping = async { send_msg(challenge.clone(), destination.to_string()).await }.fuse();
 
             pin_mut!(timeout, ping);
 
-            let ping_result: Result<(), String> = match select(
-                timeout, ping).await
-            {
+            let ping_result: Result<(), String> = match select(timeout, ping).await {
                 Either::Left(_) => Err(format!("The ping timed out {}s", timeout_duration.as_secs())),
                 Either::Right((v, _)) => match v {
                     Ok(received) => {
                         let expected = crate::heartbeat::generate_ping_response(challenge.clone());
                         match compare(expected.as_ref(), received.as_ref()) {
                             std::cmp::Ordering::Equal => Ok(()),
-                            _ => Err(format!("Received incorrect reply for challenge, expected '{:x?}', but received: {:x?}", expected.as_ref(), received.as_ref()))
+                            _ => Err(format!(
+                                "Received incorrect reply for challenge, expected '{:x?}', but received: {:x?}",
+                                expected.as_ref(),
+                                received.as_ref()
+                            )),
                         }
                     }
-                    Err(description) => {
-                        Err(format!("Error during ping to peer '{}': {}", destination.to_string(), description))
-                    }
+                    Err(description) => Err(format!(
+                        "Error during ping to peer '{}': {}",
+                        destination.to_string(),
+                        description
+                    )),
                 },
             };
 
@@ -195,7 +211,11 @@ impl Ping {
 
             (
                 destination,
-                if ping_result.is_ok() { Ok(current_timestamp()) } else { Err(()) }
+                if ping_result.is_ok() {
+                    Ok(current_timestamp())
+                } else {
+                    Err(())
+                },
             )
         };
 
@@ -235,19 +255,18 @@ fn compare(a: &[u8], b: &[u8]) -> std::cmp::Ordering {
     for (ai, bi) in a.iter().zip(b.iter()) {
         match ai.cmp(&bi) {
             std::cmp::Ordering::Equal => continue,
-            ord => return ord
+            ord => return ord,
         }
     }
 
     a.len().cmp(&b.len())
 }
 
-
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use super::*;
-    use std::str::FromStr;
     use js_sys::JsString;
+    use std::str::FromStr;
     use wasm_bindgen::prelude::*;
     use wasm_bindgen::JsCast;
 
@@ -271,10 +290,12 @@ pub mod wasm {
             };
 
             if let Err(err) = self.on_finished_ping_cb.call2(&this, &peer, &res) {
-                error!("Failed to perform on peer offline operation with: {}",
+                error!(
+                    "Failed to perform on peer offline operation with: {}",
                     err.as_string()
-                    .unwrap_or_else(|| "Unspecified error occurred on registering the ping result".to_owned())
-                    .as_str())
+                        .unwrap_or_else(|| { "Unspecified error occurred on registering the ping result".to_owned() })
+                        .as_str()
+                )
             };
         }
     }
@@ -290,9 +311,12 @@ pub mod wasm {
     #[wasm_bindgen]
     impl Pinger {
         #[wasm_bindgen]
-        pub fn build(environment_id: String, version: String,
-                     on_finished_ping_cb: js_sys::Function,
-                     send_msg_cb: js_sys::Function) -> Self {
+        pub fn build(
+            environment_id: String,
+            version: String,
+            on_finished_ping_cb: js_sys::Function,
+            send_msg_cb: js_sys::Function,
+        ) -> Self {
             let api = Box::new(WasmPingApi {
                 _environment_id: environment_id.clone(),
                 _version: version.clone(),
@@ -303,12 +327,12 @@ pub mod wasm {
                 environment_id,
                 normalized_version: version,
                 max_parallel_pings: PINGS_MAX_PARALLEL,
-                timeout: Duration::from_secs(30)
+                timeout: Duration::from_secs(30),
             };
 
             Self {
                 pinger: Ping::new(config, api),
-                send_msg_cb
+                send_msg_cb,
             }
         }
 
@@ -319,43 +343,55 @@ pub mod wasm {
         /// * `peers` - Vector of String representations of the PeerIds to be pinged.
         #[wasm_bindgen]
         pub async fn ping(&self, mut peers: Vec<JsString>) {
-            let converted = peers.drain(..)
+            let converted = peers
+                .drain(..)
                 .filter_map(|x| {
                     let x: String = x.into();
                     PeerId::from_str(&x).ok()
                 })
                 .collect::<Vec<_>>();
 
-            let message_transport = |msg: Box<[u8]>, peer: String| -> std::pin::Pin<Box<dyn futures::Future<Output = Result<Box<[u8]>,String>>>> {
-                Box::pin(async move {
-                    let this = JsValue::null();
-                    let data: JsValue = js_sys::Uint8Array::from(msg.as_ref()).into();
-                    let peer: JsValue = JsString::from(peer.as_str()).into();
+            let message_transport =
+                |msg: Box<[u8]>,
+                 peer: String|
+                 -> std::pin::Pin<Box<dyn futures::Future<Output = Result<Box<[u8]>, String>>>> {
+                    Box::pin(async move {
+                        let this = JsValue::null();
+                        let data: JsValue = js_sys::Uint8Array::from(msg.as_ref()).into();
+                        let peer: JsValue = JsString::from(peer.as_str()).into();
 
-                    // call a send_msg_cb producing a JS promise that is further converted to a Future
-                    // holding the reply of the pinged peer for the ping message.
-                    match self.send_msg_cb.call2(&this, &data, &peer) {
-                        Ok(r) => {
-                            let promise = js_sys::Promise::from(r);
-                            let data =
-                                wasm_bindgen_futures::JsFuture::from(promise).await
+                        // call a send_msg_cb producing a JS promise that is further converted to a Future
+                        // holding the reply of the pinged peer for the ping message.
+                        match self.send_msg_cb.call2(&this, &data, &peer) {
+                            Ok(r) => {
+                                let promise = js_sys::Promise::from(r);
+                                let data = wasm_bindgen_futures::JsFuture::from(promise)
+                                    .await
                                     .map(|x| js_sys::Array::from(x.as_ref()).get(0))
                                     .map(|x| js_sys::Uint8Array::new(&x).to_vec().into_boxed_slice())
-                                    .map_err(|x| x.dyn_ref::<JsString>()
-                                        .map_or("Failed to send ping message".to_owned(), |x| -> String { x.into() }));
+                                    .map_err(|x| {
+                                        x.dyn_ref::<JsString>()
+                                            .map_or("Failed to send ping message".to_owned(), |x| -> String {
+                                                x.into()
+                                            })
+                                    });
 
-                            data
-                        },
-                        Err(e) => {
-                            error!("The message transport could not be established: {}",
-                                e.as_string()
-                                .unwrap_or_else(|| "The message transport failed with unknown error".to_owned())
-                                .as_str());
-                            Err(format!("Failed to extract transport error as string: {:?}", e))
+                                data
+                            }
+                            Err(e) => {
+                                error!(
+                                    "The message transport could not be established: {}",
+                                    e.as_string()
+                                        .unwrap_or_else(|| {
+                                            "The message transport failed with unknown error".to_owned()
+                                        })
+                                        .as_str()
+                                );
+                                Err(format!("Failed to extract transport error as string: {:?}", e))
+                            }
                         }
-                    }
-                })
-            };
+                    })
+                };
 
             self.pinger.ping_peers(converted, &message_transport).await;
         }
@@ -396,12 +432,12 @@ mod tests {
                         *x = *x + 1;
                     }
                 }
-            },
-            PEER_DELAYED_1_MS =>  std::thread::sleep(Duration::from_millis(1)),
-            PEER_DELAYED_2_MS =>  std::thread::sleep(Duration::from_millis(2)),
-            PEER_DELAYED_10_MS =>  std::thread::sleep(Duration::from_millis(10)),
-            PEER_DELAYED_11_MS =>  std::thread::sleep(Duration::from_millis(11)),
-            _ => ()
+            }
+            PEER_DELAYED_1_MS => std::thread::sleep(Duration::from_millis(1)),
+            PEER_DELAYED_2_MS => std::thread::sleep(Duration::from_millis(2)),
+            PEER_DELAYED_10_MS => std::thread::sleep(Duration::from_millis(10)),
+            PEER_DELAYED_11_MS => std::thread::sleep(Duration::from_millis(11)),
+            _ => (),
         }
 
         Ok(reply)
@@ -411,10 +447,7 @@ mod tests {
     async fn test_ping_peers_with_no_peers_should_not_do_any_api_calls() {
         let mock = MockPingExternalAPI::new();
 
-        let pinger = Ping::new(
-            simple_ping_config(),
-            Box::new(mock)
-        );
+        let pinger = Ping::new(simple_ping_config(), Box::new(mock));
         pinger.ping_peers(vec![], &send_ping).await;
     }
 
@@ -424,25 +457,31 @@ mod tests {
 
         let mut mock = MockPingExternalAPI::new();
         mock.expect_on_finished_ping()
-            .with(predicate::eq(peer), predicate::function(|x: &crate::types::Result| x.is_ok()))
+            .with(
+                predicate::eq(peer),
+                predicate::function(|x: &crate::types::Result| x.is_ok()),
+            )
             .return_const(());
 
-        let pinger = Ping::new(
-            simple_ping_config(),
-            Box::new(mock) );
+        let pinger = Ping::new(simple_ping_config(), Box::new(mock));
         pinger.ping_peers(vec![peer.clone()], &send_ping).await;
     }
 
     #[async_std::test]
     async fn test_ping_should_invoke_a_failed_ping_reply_for_an_incorrect_reply() {
-        let bad_peer = PeerId::from_str("1Ank4EeHLAd3bwwtJma1WsXYSmiGgqmjkQoCUpevx67ix8").ok().unwrap();
+        let bad_peer = PeerId::from_str("1Ank4EeHLAd3bwwtJma1WsXYSmiGgqmjkQoCUpevx67ix8")
+            .ok()
+            .unwrap();
 
         let mut mock = MockPingExternalAPI::new();
         mock.expect_on_finished_ping()
-            .with(predicate::eq(bad_peer), predicate::function(|x: &crate::types::Result| x.is_err()))
+            .with(
+                predicate::eq(bad_peer),
+                predicate::function(|x: &crate::types::Result| x.is_err()),
+            )
             .return_const(());
 
-        let pinger = Ping::new(simple_ping_config(), Box::new(mock) );
+        let pinger = Ping::new(simple_ping_config(), Box::new(mock));
         pinger.ping_peers(vec![bad_peer.clone()], &send_ping).await;
     }
 
@@ -454,17 +493,20 @@ mod tests {
 
         let mut mock = MockPingExternalAPI::new();
         mock.expect_on_finished_ping()
-            .with(predicate::eq(peer), predicate::function(|x: &crate::types::Result| x.is_err()))
+            .with(
+                predicate::eq(peer),
+                predicate::function(|x: &crate::types::Result| x.is_err()),
+            )
             .return_const(());
 
-        let pinger = Ping::new(ping_config, Box::new(mock) );
+        let pinger = Ping::new(ping_config, Box::new(mock));
         pinger.ping_peers(vec![peer.clone()], &send_ping).await;
     }
 
     #[async_std::test]
     async fn test_ping_peers_empty_list_will_not_trigger_any_pinging() {
         let mock = MockPingExternalAPI::new();
-        let pinger = Ping::new(simple_ping_config(), Box::new(mock) );
+        let pinger = Ping::new(simple_ping_config(), Box::new(mock));
 
         pinger.ping_peers(vec![], &send_ping).await;
     }
@@ -473,18 +515,24 @@ mod tests {
     async fn test_ping_peers_multiple_peers_are_pinged_in_parallel() {
         let peers = vec![
             PeerId::from_str(PEER_DELAYED_1_MS).ok().unwrap(),
-            PeerId::from_str(PEER_DELAYED_2_MS).ok().unwrap()
+            PeerId::from_str(PEER_DELAYED_2_MS).ok().unwrap(),
         ];
 
         let mut mock = MockPingExternalAPI::new();
         mock.expect_on_finished_ping()
-            .with(predicate::eq(peers[0].clone()), predicate::function(|x: &crate::types::Result| x.is_ok()))
+            .with(
+                predicate::eq(peers[0].clone()),
+                predicate::function(|x: &crate::types::Result| x.is_ok()),
+            )
             .return_const(());
         mock.expect_on_finished_ping()
-            .with(predicate::eq(peers[1].clone()), predicate::function(|x: &crate::types::Result| x.is_ok()))
+            .with(
+                predicate::eq(peers[1].clone()),
+                predicate::function(|x: &crate::types::Result| x.is_ok()),
+            )
             .return_const(());
 
-        let pinger = Ping::new(simple_ping_config(), Box::new(mock) );
+        let pinger = Ping::new(simple_ping_config(), Box::new(mock));
         pinger.ping_peers(peers, &send_ping).await;
     }
 
@@ -498,18 +546,24 @@ mod tests {
 
         let peers = vec![
             PeerId::from_str(PEER_DELAYED_10_MS).ok().unwrap(),
-            PeerId::from_str(PEER_DELAYED_11_MS).ok().unwrap()
+            PeerId::from_str(PEER_DELAYED_11_MS).ok().unwrap(),
         ];
 
         let mut mock = MockPingExternalAPI::new();
         mock.expect_on_finished_ping()
-            .with(predicate::eq(peers[0].clone()), predicate::function(|x: &crate::types::Result| x.is_ok()))
+            .with(
+                predicate::eq(peers[0].clone()),
+                predicate::function(|x: &crate::types::Result| x.is_ok()),
+            )
             .return_const(());
         mock.expect_on_finished_ping()
-            .with(predicate::eq(peers[1].clone()), predicate::function(|x: &crate::types::Result| x.is_ok()))
+            .with(
+                predicate::eq(peers[1].clone()),
+                predicate::function(|x: &crate::types::Result| x.is_ok()),
+            )
             .return_const(());
 
-        let pinger = Ping::new(config, Box::new(mock) );
+        let pinger = Ping::new(config, Box::new(mock));
 
         let start = current_timestamp();
         pinger.ping_peers(peers, &send_ping).await;
@@ -526,15 +580,18 @@ mod tests {
 
         let peers = vec![
             PeerId::from_str(PEER_DELAYED_10_MS).ok().unwrap(),
-            PeerId::from_str(PEER_DELAYED_11_MS).ok().unwrap()
+            PeerId::from_str(PEER_DELAYED_11_MS).ok().unwrap(),
         ];
 
         let mut mock = MockPingExternalAPI::new();
         mock.expect_on_finished_ping()
-            .with(predicate::eq(peers[0].clone()), predicate::function(|x: &crate::types::Result| x.is_ok()))
+            .with(
+                predicate::eq(peers[0].clone()),
+                predicate::function(|x: &crate::types::Result| x.is_ok()),
+            )
             .return_const(());
 
-        let pinger = Ping::new(config, Box::new(mock) );
+        let pinger = Ping::new(config, Box::new(mock));
 
         pinger.ping_peers(peers, &send_ping).await;
     }

@@ -21,7 +21,7 @@ Describes status of a channel
 
 #### Defined in
 
-lib/utils_types.d.ts:45
+core/lib/core_types.d.ts:119
 
 ___
 
@@ -31,7 +31,7 @@ ___
 
 #### Defined in
 
-lib/utils_types.d.ts:47
+core/lib/core_types.d.ts:121
 
 ___
 
@@ -41,7 +41,7 @@ ___
 
 #### Defined in
 
-lib/utils_types.d.ts:48
+core/lib/core_types.d.ts:122
 
 ___
 
@@ -51,4 +51,4 @@ ___
 
 #### Defined in
 
-lib/utils_types.d.ts:46
+core/lib/core_types.d.ts:120

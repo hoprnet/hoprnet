@@ -3,6 +3,7 @@ name = "core-network"
 version = "0.1.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
+license = "GPL-3.0-only"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -14,7 +15,7 @@ wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:getrandom", "dep:js
 [dependencies]
 async-std = { version = "1.12.0", features = ["attributes"] }
 blake2 = "0.10.4"
-futures = "0.3.26"
+futures = "0.3.27"
 libp2p = { version = "0.50.0", features = ["async-std", "wasm-bindgen", "wasm-ext"] }
 rand = { version = "0.8.5", features = ["std_rng"] }
 scopeguard = "1.1.0"

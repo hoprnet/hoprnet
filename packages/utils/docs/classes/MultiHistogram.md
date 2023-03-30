@@ -48,7 +48,7 @@ Stops the given timer and discards the measured duration in seconds and returns 
 
 #### Defined in
 
-lib/utils_metrics.d.ts:206
+utils/lib/utils_metrics.d.ts:201
 
 ___
 
@@ -62,7 +62,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:195
+utils/lib/utils_metrics.d.ts:190
 
 ___
 
@@ -82,7 +82,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:226
+utils/lib/utils_metrics.d.ts:221
 
 ___
 
@@ -102,7 +102,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:231
+utils/lib/utils_metrics.d.ts:226
 
 ___
 
@@ -118,7 +118,7 @@ Returns the name of the histogram given at construction.
 
 #### Defined in
 
-lib/utils_metrics.d.ts:211
+utils/lib/utils_metrics.d.ts:206
 
 ___
 
@@ -139,7 +139,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:216
+utils/lib/utils_metrics.d.ts:211
 
 ___
 
@@ -161,7 +161,7 @@ Stops the given timer and records the elapsed duration in seconds to the multi-h
 
 #### Defined in
 
-lib/utils_metrics.d.ts:200
+utils/lib/utils_metrics.d.ts:195
 
 ___
 
@@ -181,4 +181,4 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:221
+utils/lib/utils_metrics.d.ts:216

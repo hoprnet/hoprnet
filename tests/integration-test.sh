@@ -263,7 +263,7 @@ log "Node 2 ping node 3"
 result=$(api_ping "${api2}" ${addr3} "\"latency\":")
 log "-- ${result}"
 
-log "Node 7 should not be able to talk to Node 1 (different environment id)"
+# log "Node 7 should not be able to talk to Node 1 (different environment id)"
 result=$(api_ping "${api6}" ${addr1} "TIMEOUT")
 log "-- ${result}"
 
@@ -272,11 +272,11 @@ result=$(api_ping "${api1}" ${addr7} "Connection to node is not allowed")
 log "-- ${result}"
 
 # log "Node 7 should not be able to talk to Node 1 (Node 7 is not in the register)"
-# result=$(ping "${api7}" ${addr1} "TIMEOUT")
+# result=$(api_ping "${api7}" ${addr1} "TIMEOUT")
 # log "-- ${result}"
 
 # log "Node 1 should not be able to talk to Node 7 (Node 7 is not in the register)"
-# result=$(ping "${api1}" ${addr7} "TIMEOUT")
+# result=$(api_ping "${api1}" ${addr7} "TIMEOUT")
 # log "-- ${result}"
 
 log "Node 2 has no unredeemed ticket value"

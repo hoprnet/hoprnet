@@ -37,7 +37,7 @@ Wrapper for IntCounter type
 
 #### Defined in
 
-lib/utils_metrics.d.ts:238
+utils/lib/utils_metrics.d.ts:233
 
 ___
 
@@ -53,7 +53,7 @@ Retrieves the value of the counter
 
 #### Defined in
 
-lib/utils_metrics.d.ts:243
+utils/lib/utils_metrics.d.ts:238
 
 ___
 
@@ -69,7 +69,7 @@ Increments the counter by 1
 
 #### Defined in
 
-lib/utils_metrics.d.ts:252
+utils/lib/utils_metrics.d.ts:247
 
 ___
 
@@ -91,7 +91,7 @@ Increments the counter by the given number.
 
 #### Defined in
 
-lib/utils_metrics.d.ts:248
+utils/lib/utils_metrics.d.ts:243
 
 ___
 
@@ -107,4 +107,4 @@ Returns the name of the counter given at construction.
 
 #### Defined in
 
-lib/utils_metrics.d.ts:257
+utils/lib/utils_metrics.d.ts:252

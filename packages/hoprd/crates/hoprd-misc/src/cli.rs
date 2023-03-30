@@ -6,17 +6,19 @@ use clap::{Arg, ArgAction, ArgMatches, Args, Command, FromArgMatches as _};
 use core_ethereum_misc::constants::DEFAULT_CONFIRMATIONS;
 use core_misc::constants::{
     DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_INTERVAL_VARIANCE, DEFAULT_HEARTBEAT_THRESHOLD,
-    DEFAULT_NETWORK_QUALITY_THRESHOLD, DEFAULT_MAX_PARALLEL_CONNECTIONS, DEFAULT_MAX_PARALLEL_CONNECTION_PUBLIC_RELAY
+    DEFAULT_MAX_PARALLEL_CONNECTIONS, DEFAULT_MAX_PARALLEL_CONNECTION_PUBLIC_RELAY, DEFAULT_NETWORK_QUALITY_THRESHOLD,
 };
 use core_misc::environment::{Environment, FromJsonFile, PackageJsonFile, ProtocolConfig};
-use core_strategy::{passive::PassiveStrategy, random::RandomStrategy, promiscuous::PromiscuousStrategy, generic::ChannelStrategy};
+use core_strategy::{
+    generic::ChannelStrategy, passive::PassiveStrategy, promiscuous::PromiscuousStrategy, random::RandomStrategy,
+};
+use hex;
 use proc_macro_regex::regex;
 use real_base::real;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use utils_misc::ok_or_str;
 use utils_proc_macros::wasm_bindgen_if;
-use hex;
 
 pub const DEFAULT_API_HOST: &str = "localhost";
 pub const DEFAULT_API_PORT: u16 = 3001;
@@ -55,7 +57,7 @@ fn parse_private_key(s: &str) -> Result<Box<[u8]>, String> {
 
         let priv_key = match s.strip_prefix("0x") {
             Some(priv_without_prefix) => priv_without_prefix,
-            None => s
+            None => s,
         };
 
         // no errors because filtered by regex
@@ -141,12 +143,12 @@ struct CliArgs {
     pub data: String,
 
     #[arg(
-        long, 
+        long,
         default_value_t = Host {
             ip: DEFAULT_HOST.to_string(),
             port: DEFAULT_PORT
-        }, 
-        env = "HOPRD_HOST", 
+        },
+        env = "HOPRD_HOST",
         help = "Host to listen on for P2P connections",
         value_parser = ValueParser::new(parse_host),
     )]
@@ -485,11 +487,10 @@ impl CliArgs {
         mono_repo_path: &str,
         home_path: &str,
     ) -> Result<Self, String> {
-        let envs: Vec<Environment> = ProtocolConfig::from_json_file(mono_repo_path)
-            .and_then(|c| c.supported_environments(mono_repo_path))?;
+        let envs: Vec<Environment> =
+            ProtocolConfig::from_json_file(mono_repo_path).and_then(|c| c.supported_environments(mono_repo_path))?;
 
-        let version =
-            PackageJsonFile::from_json_file(mono_repo_path).and_then(|p| p.coerced_version())?;
+        let version = PackageJsonFile::from_json_file(mono_repo_path).and_then(|p| p.coerced_version())?;
 
         let maybe_default_environment = get_default_environment(mono_repo_path);
 
@@ -499,9 +500,7 @@ impl CliArgs {
             .env("HOPRD_ENVIRONMENT")
             .value_name("ENVIRONMENT")
             .help("Environment id which the node shall run on")
-            .value_parser(PossibleValuesParser::new(
-                envs.iter().map(|e| e.id.to_owned()),
-            ));
+            .value_parser(PossibleValuesParser::new(envs.iter().map(|e| e.id.to_owned())));
 
         if let Some(default_environment) = &maybe_default_environment {
             // Add default value if we got one
@@ -530,9 +529,7 @@ impl CliArgs {
 
         cmd.update_env_from(env_vars);
 
-        let derived_matches = cmd
-            .try_get_matches_from(cli_args)
-            .map_err(|e| e.to_string())?;
+        let derived_matches = cmd.try_get_matches_from(cli_args).map_err(|e| e.to_string())?;
 
         let mut args = ok_or_str!(Self::from_arg_matches(&derived_matches))?;
 
@@ -549,8 +546,7 @@ struct DefaultEnvironmentFile {
 
 impl FromJsonFile for DefaultEnvironmentFile {
     fn from_json_file(mono_repo_path: &str) -> Result<Self, String> {
-        let default_environment_json_path: String =
-            format!("{}/default-environment.json", mono_repo_path);
+        let default_environment_json_path: String = format!("{}/default-environment.json", mono_repo_path);
         let data = ok_or_str!(real::read_file(default_environment_json_path.as_str()))?;
 
         ok_or_str!(serde_json::from_slice::<DefaultEnvironmentFile>(&data))
@@ -568,10 +564,7 @@ fn get_default_environment(mono_repo_path: &str) -> Option<String> {
 /// Gets the default path where the database is stored at
 fn get_data_path(mono_repo_path: &str, maybe_default_environment: Option<String>) -> String {
     match maybe_default_environment {
-        Some(default_environment) => format!(
-            "{}/packages/hoprd/hoprd-db/{}",
-            mono_repo_path, default_environment
-        ),
+        Some(default_environment) => format!("{}/packages/hoprd/hoprd-db/{}", mono_repo_path, default_environment),
         None => format!("{}/packages/hoprd/hoprd-db", mono_repo_path),
     }
 }
@@ -579,43 +572,61 @@ fn get_data_path(mono_repo_path: &str, maybe_default_environment: Option<String>
 #[cfg(test)]
 mod tests {
     #[test]
-    fn parse_private_key () {
-        let parsed = super::parse_private_key("cd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e0317").unwrap();
+    fn parse_private_key() {
+        let parsed =
+            super::parse_private_key("cd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e0317").unwrap();
 
-        let priv_key: Vec<u8> = vec![205, 9, 249, 41, 63, 253, 214, 155, 233, 120, 3, 44, 83, 59, 107, 205, 2, 223, 213, 217, 55, 201, 135, 190, 222, 195, 226, 141, 224, 126, 3, 23];
+        let priv_key: Vec<u8> = vec![
+            205, 9, 249, 41, 63, 253, 214, 155, 233, 120, 3, 44, 83, 59, 107, 205, 2, 223, 213, 217, 55, 201, 135, 190,
+            222, 195, 226, 141, 224, 126, 3, 23,
+        ];
 
         assert_eq!(parsed, priv_key.into())
     }
 
     #[test]
-    fn parse_private_key_with_prefix () {
-        let parsed_with_prefix = super::parse_private_key("cd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e0317").unwrap();
+    fn parse_private_key_with_prefix() {
+        let parsed_with_prefix =
+            super::parse_private_key("cd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e0317").unwrap();
 
-        let priv_key: Vec<u8> = vec![205, 9, 249, 41, 63, 253, 214, 155, 233, 120, 3, 44, 83, 59, 107, 205, 2, 223, 213, 217, 55, 201, 135, 190, 222, 195, 226, 141, 224, 126, 3, 23];
+        let priv_key: Vec<u8> = vec![
+            205, 9, 249, 41, 63, 253, 214, 155, 233, 120, 3, 44, 83, 59, 107, 205, 2, 223, 213, 217, 55, 201, 135, 190,
+            222, 195, 226, 141, 224, 126, 3, 23,
+        ];
 
         assert_eq!(parsed_with_prefix, priv_key.into())
     }
 
     #[test]
-    fn parse_too_short_private_key () {
-        let parsed = super::parse_private_key("cd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e031").unwrap_err();
+    fn parse_too_short_private_key() {
+        let parsed =
+            super::parse_private_key("cd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e031").unwrap_err();
 
-        assert_eq!(parsed, "Given string is not a private key. A private key must contain 64 hex chars.")
+        assert_eq!(
+            parsed,
+            "Given string is not a private key. A private key must contain 64 hex chars."
+        )
     }
 
     #[test]
-    fn parse_too_long_private_key () {
-        let parsed = super::parse_private_key("cd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e03177").unwrap_err();
+    fn parse_too_long_private_key() {
+        let parsed =
+            super::parse_private_key("cd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e03177").unwrap_err();
 
-        assert_eq!(parsed, "Given string is not a private key. A private key must contain 64 hex chars.")
+        assert_eq!(
+            parsed,
+            "Given string is not a private key. A private key must contain 64 hex chars."
+        )
     }
 
     #[test]
-    fn parse_non_hex_values () {
+    fn parse_non_hex_values() {
         let parsed = super::parse_private_key("really not a private key").unwrap_err();
 
-        assert_eq!(parsed, "Given string is not a private key. A private key must contain 64 hex chars.")
-
+        assert_eq!(
+            parsed,
+            "Given string is not a private key. A private key must contain 64 hex chars."
+        )
     }
 }
 
@@ -641,26 +652,14 @@ pub mod wasm {
 
         // wasm_bindgen receives Strings but to
         // comply with Rust standard, turn them into OsStrings
-        let string_envs = ok_or_jserr!(serde_wasm_bindgen::from_value::<HashMap<String, String>>(
-            envs.into(),
-        ))?;
+        let string_envs = ok_or_jserr!(serde_wasm_bindgen::from_value::<HashMap<String, String>>(envs.into(),))?;
 
         let mut env_map: HashMap<OsString, OsString> = HashMap::new();
         for (ref k, ref v) in string_envs {
-            let key = OsString::from_str(k).or_else(|e| {
-                Err(format!(
-                    "Could not convert key {} to OsString: {}",
-                    k,
-                    e.to_string()
-                ))
-            })?;
-            let value = OsString::from_str(v).or_else(|e| {
-                Err(format!(
-                    "Could not convert value {} to OsString: {}",
-                    v,
-                    e.to_string()
-                ))
-            })?;
+            let key = OsString::from_str(k)
+                .or_else(|e| Err(format!("Could not convert key {} to OsString: {}", k, e.to_string())))?;
+            let value = OsString::from_str(v)
+                .or_else(|e| Err(format!("Could not convert value {} to OsString: {}", v, e.to_string())))?;
 
             env_map.insert(key, value);
         }

@@ -42,7 +42,7 @@
 
 #### Defined in
 
-[src/types/solidity.ts:4](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L4)
+[utils/src/types/solidity.ts:4](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L4)
 
 ## Properties
 
@@ -52,7 +52,7 @@
 
 #### Defined in
 
-[src/types/solidity.ts:4](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L4)
+[utils/src/types/solidity.ts:4](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L4)
 
 ## Accessors
 
@@ -66,7 +66,7 @@
 
 #### Defined in
 
-[src/types/solidity.ts:44](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L44)
+[utils/src/types/solidity.ts:44](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L44)
 
 ___
 
@@ -80,7 +80,7 @@ ___
 
 #### Defined in
 
-[src/types/solidity.ts:48](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L48)
+[utils/src/types/solidity.ts:48](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L48)
 
 ## Methods
 
@@ -100,7 +100,7 @@ ___
 
 #### Defined in
 
-[src/types/solidity.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L26)
+[utils/src/types/solidity.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L26)
 
 ___
 
@@ -120,7 +120,7 @@ ___
 
 #### Defined in
 
-[src/types/solidity.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L22)
+[utils/src/types/solidity.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L22)
 
 ___
 
@@ -134,7 +134,7 @@ ___
 
 #### Defined in
 
-[src/types/solidity.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L14)
+[utils/src/types/solidity.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L14)
 
 ___
 
@@ -148,7 +148,7 @@ ___
 
 #### Defined in
 
-[src/types/solidity.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L6)
+[utils/src/types/solidity.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L6)
 
 ___
 
@@ -162,7 +162,7 @@ ___
 
 #### Defined in
 
-[src/types/solidity.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L18)
+[utils/src/types/solidity.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L18)
 
 ___
 
@@ -182,7 +182,7 @@ ___
 
 #### Defined in
 
-[src/types/solidity.ts:10](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L10)
+[utils/src/types/solidity.ts:10](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L10)
 
 ___
 
@@ -202,7 +202,7 @@ ___
 
 #### Defined in
 
-[src/types/solidity.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L34)
+[utils/src/types/solidity.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L34)
 
 ___
 
@@ -222,4 +222,4 @@ ___
 
 #### Defined in
 
-[src/types/solidity.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L30)
+[utils/src/types/solidity.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L30)

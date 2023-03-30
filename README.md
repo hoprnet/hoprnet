@@ -23,12 +23,10 @@
 - [Getting Started](#getting-started)
 - [Install](#install)
   - [Install via Docker](#install-via-docker)
-  - [Install via NPM](#install-via-npm)
   - [Install via Nix package manager](#install-via-nix-package-manager)
 - [Using](#using)
   - [Using Docker](#using-docker)
   - [Using Docker Compose with extended monitoring](#using-docker-compose-with-extended-hopr-node-monitoring)
-  - [Using NPM](#using-npm)
 - [Testnet accessibility](#testnet-accessibility)
 - [Migrating between releases](#migrating-between-releases)
 - [Develop](#develop)
@@ -38,7 +36,6 @@
   - [Github Actions CI](#github-actions-ci)
   - [End-to-End Testing](#end-to-end-testing)
     - [Running Tests Locally](#running-tests-locally)
-    - [Running Tests on Google Cloud Platform](#running-tests-on-google-cloud-platform)
 - [Deploy](#deploy)
   - [Using Google Cloud Platform](#using-google-cloud-platform)
   - [Using Google Cloud Platform and a Default Topology](#using-google-cloud-platform-and-a-default-topology)
@@ -87,40 +84,18 @@ HOPRD_DATA_DIR=${HOME}/.hoprd-better-db-folder eval hoprd
 
 Also all ports are mapped to your localhost, assuming you stick to the default port numbers.
 
-### Install via NPM
-
-Please make sure you are running a compatible version of Node.js.
-
-```sh
-node --version
-# v16.15.0
-```
-
-To always use the right version of Node.js, we recommend to install [Fast Node.js Manager (fnm)](https://github.com/Schniz/fnm) and run `fnm use`.
-
-```sh
-fnm use
-# Using Node v16.15.0
-```
-
-Using the [hoprd npm package][6]:
-
-```sh
-mkdir MY_NEW_HOPR_TEST_FOLDER
-cd MY_NEW_HOPR_TEST_FOLDER
-npm install @hoprnet/hoprd@1.88
-```
-
 ### Install via [Nix package manager][1]
 
 NOTE: This setup should only be used for development or if you know what you
 are doing and don't need further support. Otherwise you should use the `npm`
 or `docker` setup.
 
-You will need to clone the `hoprnet` repo first:
+You will need to clone and initialize the `hoprnet` repo first:
 
 ```sh
 git clone https://github.com/hoprnet/hoprnet
+cd hoprnet
+make init
 ```
 
 If you have [direnv][2] set up properly your `nix-shell` will be
@@ -257,26 +232,6 @@ about the HOPR network as perceived from your node plus some additional runtime 
 
 The default username for Grafana is `admin` with password `hopr`.
 
-### Using NPM
-
-The following command assumes you've setup a local installation like described in [Install via NPM](#install-via-npm).
-
-```sh
-cd MY_NEW_HOPR_TEST_FOLDER
-DEBUG=hopr* npx hoprd --init --announce --identity .hopr-identity --password switzerland --apiToken <MY_TOKEN>
-```
-
-Here is a short break-down of each argument.
-
-```sh
-hoprd
-  --init 				              # initialize the database and identity if not present
-  --announce 				          # announce the node to other nodes in the network and act as relay if publicly reachable
-  --identity .hopr-identity   # store your node identity information in your test folder
-  --password switzerland   	  # set the encryption password for your identity
-  --apiToken <MY_TOKEN>       # specify password for accessing REST API (REQUIRED)
-```
-
 ## Testnet accessibility
 
 Currently, to be able to participate in a public testnet or public staging environment, you need to satisfy certain criteria to be eligible to join. See [Network Registry](NETWORK_REGISTRY.md) for details.
@@ -409,7 +364,7 @@ Tests are using the `pytest` infrastructure that can be set up inside a virtuale
 ```sh
 python3 -m venv .venv
 source .venv/bin/activate
-python3 -m pip install -r tests/integration/requirements.txt
+python3 -m pip install -r tests/requirements.txt
 ```
 
 To deactivate the activated testing environment if no longer needed:
@@ -424,53 +379,6 @@ With the environment activated, execute the tests locally:
 
 ```sh
 python3 -m pytest tests/
-```
-
-#### NPM local testing alternative
-
-An alternative to using the local source code is running the tests against
-a NPM package.
-
-```sh
-./scripts/run-integration-tests-npm.sh
-```
-
-If no parameter is given the NPM package which correlates to the most recent Git
-tag will be used, otherwise the first parameter is used as the NPM package
-version to test.
-
-Read the full help information of the script in case of questions:
-
-```sh
-./scripts/run-integration-tests-npm.sh --help
-```
-
-#### Running Tests on Google Cloud Platform
-
-In some unique cases, some bugs might not have been picked up by our end-to-end
-testing and instead only show up when deployed to production. To avoid having
-to see these only after a time-consuming build, a cluster of nodes can be
-deployed to Google Cloud Platform which is then used to run tests against it.
-
-A requirement for this setup is a working `gcloud` configuration locally.
-The easiest approach would be to authenticate with `gcloud auth login`.
-
-The cluster creation and tests can be run with:
-
-```sh
-FUNDING_PRIV_KEY=mysecretaccountprivkey \
-  ./scripts/run-integration-tests-gcloud.sh
-```
-
-The given account private key is used to fund the test nodes to be able to
-perform throughout the tests. Thus the account must have enough funds available.
-
-The test instantiated by this script will also include nodes behind NAT.
-
-Read the full help information of the script in case of questions:
-
-```sh
-./scripts/run-integration-tests-gcloud.sh --help
 ```
 
 ## Deploy
