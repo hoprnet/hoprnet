@@ -115,7 +115,7 @@ const GET: Operation = [
     const { includingClosed, fullTopology } = req.query
 
     try {
-      let channels;
+      let channels
       if (fullTopology === 'true') {
         channels = await getAllChannels(node)
       } else {
@@ -150,8 +150,7 @@ GET.apiDoc = {
     {
       in: 'query',
       name: 'fullTopology',
-      description:
-        'Get the full payment channel graph indexed by the node.',
+      description: 'Get the full payment channel graph indexed by the node.',
       schema: {
         type: 'string',
         example: 'false'
