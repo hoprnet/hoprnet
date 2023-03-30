@@ -762,7 +762,7 @@ __metadata:
     "@hoprnet/hopr-utils": "workspace:packages/utils"
     "@libp2p/interface-connection": 1.0.1
     "@libp2p/interface-connection-manager": 1.1.0
-    "@libp2p/interface-peer-discovery": 1.0.0
+    "@libp2p/interface-peer-discovery": 1.0.5
     "@libp2p/interface-peer-id": 1.0.2
     "@libp2p/interface-registrar": 1.1.0
     "@libp2p/interface-transport": 1.0.0
@@ -1130,13 +1130,13 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@libp2p/interface-peer-discovery@npm:1.0.0":
-  version: 1.0.0
-  resolution: "@libp2p/interface-peer-discovery@npm:1.0.0"
+"@libp2p/interface-peer-discovery@npm:1.0.5":
+  version: 1.0.5
+  resolution: "@libp2p/interface-peer-discovery@npm:1.0.5"
   dependencies:
     "@libp2p/interface-peer-info": ^1.0.0
     "@libp2p/interfaces": ^3.0.0
-  checksum: 8afba918f60f01e5d1f585af859da30625502d3d3246ca141f34b263da1a483f1503abde4ba56cfdc2ff9532810bac180aab6d376f4d8e24f1b3205d18b8ed9c
+  checksum: afe86f440d1bc5f17c017c03dcb3bbcefbfe7e1d0e650a91333c2db42cd2bc261f5c9fe5946d4ab3ba702ecfbf1f512490d61a46364629f654a4dedb0bd35c11
   languageName: node
   linkType: hard
 
