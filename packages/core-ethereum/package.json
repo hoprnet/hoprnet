@@ -29,7 +29,7 @@
     "@hoprnet/hopr-utils": "workspace:packages/utils",
     "@libp2p/crypto": "1.0.0",
     "@libp2p/interface-peer-id": "1.0.5",
-    "@libp2p/peer-id": "1.1.16",
+    "@libp2p/peer-id": "1.1.18",
     "@multiformats/multiaddr": "10.3.3",
     "@sinonjs/referee": "9.1.1",
     "async-mutex": "0.3.2",
