@@ -230,7 +230,7 @@ components:
           $ref: '#/components/schemas/ChannelStatus'
         balance:
           $ref: '#/components/schemas/HoprBalance'
-    TopologyChannel:
+    ChannelTopology:
       type: object
       properties:
         channelId:
