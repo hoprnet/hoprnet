@@ -1,5 +1,5 @@
 // @ts-ignore
-import { RelayContext, DEFAULT_PING_TIMEOUT } from './context.js'
+//import { RelayContext, DEFAULT_PING_TIMEOUT } from './context.js'
 import { ConnectionStatusMessages, RelayPrefix, StatusMessages } from '../constants.js'
 import { u8aEquals, defer } from '@hoprnet/hopr-utils'
 import { pair } from 'it-pair'
@@ -144,7 +144,7 @@ describe('relay switch context', function () {
     // Should not produce infinite loops
     nodeShaker.rest()
 
-    assert(pingResponse >= 0 && pingResponse <= DEFAULT_PING_TIMEOUT)
+    assert(pingResponse >= 0 && pingResponse <= 300)
   })
 
   it('ping timeout', async function () {
