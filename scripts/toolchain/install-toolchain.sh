@@ -261,10 +261,7 @@ if ${install_all}; then
     # launch rustc once so it installs updated components
     rustc --version
 
-    # Do not install wasm-opt directly since wasm-pack takes care of that if
-    # needed.
-    # install_wasm_opt
-
+    install_wasm_opt
     install_wasm_pack
     install_protobuf
     install_node_js

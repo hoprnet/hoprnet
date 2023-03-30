@@ -894,6 +894,7 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-bindgen-test",
+ "wasm-opt",
  "wasm-pack",
 ]
 
@@ -981,6 +982,7 @@ dependencies = [
  "utils-proc-macros",
  "wasm-bindgen",
  "wasm-bindgen-test",
+ "wasm-opt",
  "wasm-pack",
 ]
 
@@ -1013,6 +1015,7 @@ dependencies = [
  "utils-proc-macros",
  "wasm-bindgen",
  "wasm-bindgen-test",
+ "wasm-opt",
  "wasm-pack",
 ]
 
@@ -1079,6 +1082,7 @@ dependencies = [
  "utils-types",
  "wasm-bindgen",
  "wasm-bindgen-test",
+ "wasm-opt",
  "wasm-pack",
 ]
 
@@ -2457,6 +2461,7 @@ dependencies = [
  "utils-proc-macros",
  "wasm-bindgen",
  "wasm-bindgen-test",
+ "wasm-opt",
  "wasm-pack",
 ]
 
@@ -4217,6 +4222,7 @@ dependencies = [
  "thiserror",
  "wasm-bindgen",
  "wasm-bindgen-test",
+ "wasm-opt",
  "wasm-pack",
 ]
 
@@ -5453,6 +5459,7 @@ dependencies = [
  "log",
  "wasm-bindgen",
  "wasm-bindgen-test",
+ "wasm-opt",
  "wasm-pack",
 ]
 
@@ -5467,6 +5474,7 @@ dependencies = [
  "utils-misc",
  "wasm-bindgen",
  "wasm-bindgen-test",
+ "wasm-opt",
  "wasm-pack",
 ]
 
@@ -5484,6 +5492,7 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-bindgen-test",
+ "wasm-opt",
  "wasm-pack",
 ]
 
@@ -5525,6 +5534,7 @@ dependencies = [
  "utils-misc",
  "wasm-bindgen",
  "wasm-bindgen-test",
+ "wasm-opt",
  "wasm-pack",
 ]
 
@@ -5706,6 +5716,46 @@ checksum = "4683da3dfc016f704c9f82cf401520c4f1cb3ee440f7f52b3d6ac29506a49ca7"
 dependencies = [
  "proc-macro2",
  "quote",
+]
+
+[[package]]
+name = "wasm-opt"
+version = "0.112.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "87fef6d0d508f08334e0ab0e6877feb4c0ecb3956bcf2cb950699b22fedf3e9c"
+dependencies = [
+ "anyhow",
+ "libc",
+ "strum",
+ "strum_macros",
+ "tempfile",
+ "thiserror",
+ "wasm-opt-cxx-sys",
+ "wasm-opt-sys",
+]
+
+[[package]]
+name = "wasm-opt-cxx-sys"
+version = "0.112.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc816bbc1596c8f2e8127e137a760c798023ef3d378f2ae51f0f1840e2dfa445"
+dependencies = [
+ "anyhow",
+ "cxx",
+ "cxx-build",
+ "wasm-opt-sys",
+]
+
+[[package]]
+name = "wasm-opt-sys"
+version = "0.112.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "40199e4f68ef1071b3c6d0bd8026a12b481865d4b9e49c156932ea9a6234dd14"
+dependencies = [
+ "anyhow",
+ "cc",
+ "cxx",
+ "cxx-build",
 ]
 
 [[package]]
