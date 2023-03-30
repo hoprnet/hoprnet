@@ -13,7 +13,9 @@ import {
 import { STATUS_CODES } from '../../utils.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import type Hopr from '@hoprnet/hopr-core'
-import { PeerOrigin, PeerStatus } from '@hoprnet/hopr-core'
+import { PeerOrigin, PeerStatus, PEER_METADATA_PROTOCOL_VERSION } from '@hoprnet/hopr-core'
+
+const meta: Map<string,string> = new Map([[PEER_METADATA_PROTOCOL_VERSION, "1.2.3"]]);
 
 const ALICE_ENTRY = PeerStatus.build(
   ALICE_PEER_ID.toString(),
@@ -24,7 +26,7 @@ const ALICE_ENTRY = PeerStatus.build(
   BigInt(10),
   BigInt(10),
   0,
-  undefined
+  meta
 )
 
 const BOB_ENTRY = PeerStatus.build(
@@ -36,7 +38,7 @@ const BOB_ENTRY = PeerStatus.build(
   BigInt(0),
   BigInt(0),
   0,
-  undefined
+  meta
 )
 
 const CHARLIE_ENTRY = PeerStatus.build(
@@ -48,7 +50,7 @@ const CHARLIE_ENTRY = PeerStatus.build(
   BigInt(10),
   BigInt(8),
   0,
-  undefined
+  meta
 )
 
 function toJsonDict(peer: PeerStatus, isNew: boolean, multiaddr: string | undefined) {
@@ -62,7 +64,8 @@ function toJsonDict(peer: PeerStatus, isNew: boolean, multiaddr: string | undefi
       lastSeen: Number(peer.last_seen),
       quality: peer.quality,
       backoff: peer.backoff,
-      isNew: isNew
+      isNew: isNew,
+      reportedVersion: peer.metadata().get(PEER_METADATA_PROTOCOL_VERSION) ?? 'unknown'
     }
   } else {
     return {
@@ -75,7 +78,8 @@ function toJsonDict(peer: PeerStatus, isNew: boolean, multiaddr: string | undefi
       lastSeen: Number(peer.last_seen),
       quality: peer.quality,
       backoff: peer.backoff,
-      isNew: isNew
+      isNew: isNew,
+      reportedVersion: peer.metadata().get(PEER_METADATA_PROTOCOL_VERSION) ?? 'unknown'
     }
   }
 }
