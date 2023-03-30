@@ -1,5 +1,4 @@
 // @ts-ignore
-//import { RelayContext, DEFAULT_PING_TIMEOUT } from './context.js'
 import { ConnectionStatusMessages, RelayPrefix, StatusMessages } from '../constants.js'
 import { u8aEquals, defer } from '@hoprnet/hopr-utils'
 import { pair } from 'it-pair'
