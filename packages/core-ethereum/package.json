@@ -36,7 +36,7 @@
     "bn.js": "5.2.0",
     "chalk": "5.0.1",
     "debug": "4.3.4",
-    "ethers": "5.7.0",
+    "ethers": "5.7.2",
     "heap-js": "2.2.0",
     "multiaddr": "10.0.1",
     "retimer": "3.0.0",
