@@ -689,6 +689,8 @@ pub mod wasm {
     ///
     /// This especially means turning the `futures::Stream` trait implemntation
     /// ```rust
+    /// use std::pin::Pin;
+    /// use std::task::{Context, Poll};
     /// trait Stream {
     ///     type Item;
     ///     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Box<[u8]>>>;
@@ -696,6 +698,8 @@ pub mod wasm {
     /// ```
     /// futures::Sink` trait implementation
     /// ```rust
+    /// use std::pin::Pin;
+    /// use std::task::{Context, Poll};
     /// pub trait Sink<Item> {
     ///   fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), String>>;
     ///   fn start_send(self: Pin<&mut Self>, item: Box<[u8]>) -> Result<(), String>;
