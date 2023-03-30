@@ -76,11 +76,6 @@ done
 # move /usr/local/bin to beginning of PATH
 export PATH="${usr_local_bin}:${PATH//:\/usr\/local\/bin/}"
 
-if [[ "${PATH}" =~ "${usr_local_bin}" ]]; then
-    echo "Cannot install utilities. \"${usr_local_bin}\" is not part of home-path. ${PATH}"
-    exit 1
-fi
-
 if ! [ -w "${usr_local_bin}" ]; then
     echo "Cannot install utilities. \"${usr_local_bin}\" is not writable."
     exit 1
