@@ -765,7 +765,7 @@ __metadata:
     "@libp2p/interface-peer-discovery": 1.0.0
     "@libp2p/interface-peer-id": 1.0.2
     "@libp2p/interface-registrar": 1.1.0
-    "@libp2p/interface-transport": 1.0.0
+    "@libp2p/interface-transport": 1.0.4
     "@libp2p/interfaces": 2.0.4
     "@libp2p/peer-id": 1.1.16
     "@multiformats/multiaddr": 10.3.3
@@ -1200,15 +1200,15 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@libp2p/interface-transport@npm:1.0.0":
-  version: 1.0.0
-  resolution: "@libp2p/interface-transport@npm:1.0.0"
+"@libp2p/interface-transport@npm:1.0.4":
+  version: 1.0.4
+  resolution: "@libp2p/interface-transport@npm:1.0.4"
   dependencies:
-    "@libp2p/interface-connection": ^1.0.0
+    "@libp2p/interface-connection": ^3.0.0
     "@libp2p/interfaces": ^3.0.0
-    "@multiformats/multiaddr": ^10.2.0
+    "@multiformats/multiaddr": ^11.0.0
     it-stream-types: ^1.0.4
-  checksum: 2f28d31763a90b7bf10c2b2c9ad3d946f066bc5e8ce886950849ee808e44cc5c3e6ef831dcac49f0c3e2ee07a9dd4fd18f83fe1e197897c48ca2035fdcb82d40
+  checksum: 54db6755486aca68f2cb5e84167f83b72fb40d58803e3c26f2f3eb1ff20b6a9915c9e5b5111633ec2b90da1d388d0729f724ce6d0cd50802ccba90db560984e9
   languageName: node
   linkType: hard
 
