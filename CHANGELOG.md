@@ -9,6 +9,7 @@
 - Migrate server-side relay code to Rust ([#4726](https://github.com/hoprnet/hoprnet/pull/4726))
 - Added Rust implementations of all the cryptographic functionality used in the HOPR protocol ([#3842](https://github.com/hoprnet/hoprnet/pull/3842))
 - Extend the Grafana dashboards with the new mixer metrics (current mixer queue size & average mixer delay) ([4768(https://github.com/hoprnet/hoprnet/pull/4768))
+- Add reported HOPR protocol version information to `ping` and `peers` endpoints ([#4777](https://github.com/hoprnet/hoprnet/pull/4777))
 
 <a name="1.92"></a>
 
