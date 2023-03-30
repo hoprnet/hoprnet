@@ -1,8 +1,8 @@
-use std::str::FromStr;
-use libp2p_identity::PeerId;
-use serde::{Deserialize, Serialize};
 use crate::errors::GeneralError::ParseError;
 use crate::errors::Result;
+use libp2p_identity::PeerId;
+use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 
 // NOTE on wasm_bindgen: since #[wasm_bindgen] attributes cannot be used
 // on trait impl blocks, the trait inherited methods need to be re-implemented
@@ -18,7 +18,7 @@ pub trait ToHex {
 /// A type that can be serialized and deserialized to a binary form.
 /// Implementing this trait automatically implements ToHex trait
 /// which then uses the serialize method.
-pub trait BinarySerializable<'a> : Sized {
+pub trait BinarySerializable<'a>: Sized {
     /// Minimum size of this type in bytes.
     const SIZE: usize;
 
@@ -37,7 +37,9 @@ pub trait AutoBinarySerializable<'a>: Serialize + Deserialize<'a> {
 }
 
 impl<'a, T> BinarySerializable<'a> for T
-where T: AutoBinarySerializable<'a> {
+where
+    T: AutoBinarySerializable<'a>,
+{
     const SIZE: usize = Self::SIZE;
 
     /// Deserializes the type from a binary blob.
@@ -52,14 +54,16 @@ where T: AutoBinarySerializable<'a> {
 }
 
 impl<'a, T> ToHex for T
-where T: BinarySerializable<'a> {
+where
+    T: BinarySerializable<'a>,
+{
     fn to_hex(&self) -> String {
         hex::encode(&self.serialize())
     }
 }
 
 /// A generic type which can be equivalently and completely represented by a PeerID
-pub trait PeerIdLike : Sized {
+pub trait PeerIdLike: Sized {
     /// Creates type from a PeerID representation
     fn from_peerid(peer_id: &PeerId) -> Result<Self>;
 
@@ -68,7 +72,7 @@ pub trait PeerIdLike : Sized {
 
     /// Creates instance from base-58 PeerId representation
     fn from_peerid_str(peer_id: &str) -> Result<Self> {
-        Self::from_peerid(&PeerId::from_str(peer_id).map_err(|_|ParseError)?)
+        Self::from_peerid(&PeerId::from_str(peer_id).map_err(|_| ParseError)?)
     }
 
     /// Outputs base-58 PeerId representation

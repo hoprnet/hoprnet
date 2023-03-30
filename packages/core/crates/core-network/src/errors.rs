@@ -12,7 +12,7 @@ pub enum NetworkingError {
     DecodingError,
 
     #[error("unknown error or low-level error: {0}")]
-    Other(String)
+    Other(String),
 }
 
 pub type Result<T> = core::result::Result<T, NetworkingError>;

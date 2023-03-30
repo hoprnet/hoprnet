@@ -11,15 +11,15 @@ pub struct HeartbeatConfig {
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use crate::heartbeat::HeartbeatConfig;
+    use crate::messaging::ControlMessage;
     use futures::stream::{Stream, StreamExt};
     use js_sys::AsyncIterator;
     use utils_misc::async_iterable::wasm::{to_box_u8_stream, to_jsvalue_stream};
-    use wasm_bindgen::prelude::*;
-    use wasm_bindgen_futures::stream::JsStream;
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use utils_types::traits::BinarySerializable;
-    use crate::messaging::ControlMessage;
+    use wasm_bindgen::prelude::*;
+    use wasm_bindgen_futures::stream::JsStream;
 
     #[wasm_bindgen]
     impl HeartbeatConfig {
@@ -61,11 +61,11 @@ pub mod wasm {
 
     #[wasm_bindgen]
     pub fn reply_to_ping(stream: AsyncIterator) -> JsResult<AsyncIterableHelperCoreHeartbeat> {
-        let stream = JsStream::from(stream)
-            .map(to_box_u8_stream)
-            .map(|res| res.and_then(|rq| generate_ping_response(rq.as_ref())
-                .map_err(|e| e.as_string().unwrap_or("not a string".into())))
-            );
+        let stream = JsStream::from(stream).map(to_box_u8_stream).map(|res| {
+            res.and_then(|rq| {
+                generate_ping_response(rq.as_ref()).map_err(|e| e.as_string().unwrap_or("not a string".into()))
+            })
+        });
 
         Ok(AsyncIterableHelperCoreHeartbeat {
             stream: Box::new(stream),

@@ -20,11 +20,11 @@ describe('POST /node/ping', () => {
   })
 
   it('should ping successfuly', async () => {
-    let meta = new Map<string, string>();
+    let meta = new Map<string, string>()
     meta.set(PEER_METADATA_PROTOCOL_VERSION, '1.2.3')
 
     node.ping = sinon.fake.returns({ latency: 10 })
-    node.getConnectionInfo = sinon.fake.returns( { metadata: () => meta })
+    node.getConnectionInfo = sinon.fake.returns({ metadata: () => meta })
 
     const res = await request(service).post(`/api/v2/node/ping`).send({ peerId: ALICE_PEER_ID.toString() })
     expect(res.status).to.equal(200)

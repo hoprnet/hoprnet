@@ -15,7 +15,7 @@ import type { PeerId } from '@libp2p/interface-peer-id'
 import type Hopr from '@hoprnet/hopr-core'
 import { PeerOrigin, PeerStatus, PEER_METADATA_PROTOCOL_VERSION } from '@hoprnet/hopr-core'
 
-const meta: Map<string,string> = new Map([[PEER_METADATA_PROTOCOL_VERSION, "1.2.3"]]);
+const meta: Map<string, string> = new Map([[PEER_METADATA_PROTOCOL_VERSION, '1.2.3']])
 
 const ALICE_ENTRY = PeerStatus.build(
   ALICE_PEER_ID.toString(),
