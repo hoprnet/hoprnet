@@ -160,7 +160,7 @@ function setup_node() {
   log "Additional args: \"${additional_args}\""
 
   env \
-    DEBUG="hopr*" \
+    DEBUG="hopr*,libp2p*" \
     NODE_ENV="${node_env}" \
     HOPRD_HEARTBEAT_INTERVAL=2500 \
     HOPRD_HEARTBEAT_THRESHOLD=2500 \
@@ -330,39 +330,44 @@ for endpoint in ${endpoints}; do
 done
 # }}}
 
+log "NOTE:"
+log ""
+log "\tThe following links expect HOPR Admin to run at http://localhost:3000"
+log "\tYou may use \`make run-hopr-admin\`"
+log ""
 log "Node port info"
 log "\tnode1"
 log "\t\tPeer Id:\t${peers[0]}"
 log "\t\tRest API:\thttp://localhost:13301/api/v2/_swagger"
-log "\t\tAdmin UI:\thttp://localhost:19501/?apiEndpoint=http://localhost:13301&apiToken=${api_token}"
+log "\t\tAdmin UI:\thttp://localhost:3000/?apiEndpoint=http://localhost:13301&apiToken=${api_token}"
 log "\t\tHealthcheck:\thttp://localhost:18081/"
 log "\t\tWebSocket:\tws://localhost:13301/api/v2/messages/websocket?apiToken=${api_token}"
 log "\t\tMyne Chat:\t${myne_chat_url}/?apiEndpoint=http://localhost:13301&apiToken=${api_token}"
 log "\tnode2"
 log "\t\tPeer Id:\t${peers[1]}"
 log "\t\tRest API:\thttp://localhost:13302/api/v2/_swagger"
-log "\t\tAdmin UI:\thttp://localhost:19502/?apiEndpoint=http://localhost:13302&apiToken=${api_token}"
+log "\t\tAdmin UI:\thttp://localhost:3000/?apiEndpoint=http://localhost:13302&apiToken=${api_token}"
 log "\t\tHealthcheck:\thttp://localhost:18082/"
 log "\t\tWebSocket:\tws://localhost:13302/api/v2/messages/websocket?apiToken=${api_token}"
 log "\t\tMyne Chat:\t${myne_chat_url}/?apiEndpoint=http://localhost:13302&apiToken=${api_token}"
 log "\tnode3"
 log "\t\tPeer Id:\t${peers[2]}"
 log "\t\tRest API:\thttp://localhost:13303/api/v2/_swagger"
-log "\t\tAdmin UI:\thttp://localhost:19503/?apiEndpoint=http://localhost:13303&apiToken=${api_token}"
+log "\t\tAdmin UI:\thttp://localhost:3000/?apiEndpoint=http://localhost:13303&apiToken=${api_token}"
 log "\t\tHealthcheck:\thttp://localhost:18083/"
 log "\t\tWebSocket:\tws://localhost:13303/api/v2/messages/websocket?apiToken=${api_token}"
 log "\t\tMyne Chat:\t${myne_chat_url}/?apiEndpoint=http://localhost:13303&apiToken=${api_token}"
 log "\tnode4"
 log "\t\tPeer Id:\t${peers[3]}"
 log "\t\tRest API:\thttp://localhost:13304/api/v2/_swagger"
-log "\t\tAdmin UI:\thttp://localhost:19504/?apiEndpoint=http://localhost:13304&apiToken=${api_token}"
+log "\t\tAdmin UI:\thttp://localhost:3000/?apiEndpoint=http://localhost:13304&apiToken=${api_token}"
 log "\t\tHealthcheck:\thttp://localhost:18084/"
 log "\t\tWebSocket:\tws://localhost:13304/api/v2/messages/websocket?apiToken=${api_token}"
 log "\t\tMyne Chat:\t${myne_chat_url}/?apiEndpoint=http://localhost:13304&apiToken=${api_token}"
 log "\tnode5"
 log "\t\tPeer Id:\t${peers[4]}"
 log "\t\tRest API:\thttp://localhost:13305/api/v2/_swagger"
-log "\t\tAdmin UI:\thttp://localhost:19505/?apiEndpoint=http://localhost:13305&apiToken=${api_token}"
+log "\t\tAdmin UI:\thttp://localhost:3000/?apiEndpoint=http://localhost:13305&apiToken=${api_token}"
 log "\t\tHealthcheck:\thttp://localhost:18085/"
 log "\t\tWebSocket:\tws://localhost:13305/api/v2/messages/websocket?apiToken=${api_token}"
 log "\t\tMyne Chat:\t${myne_chat_url}/?apiEndpoint=http://localhost:13305&apiToken=${api_token}"
