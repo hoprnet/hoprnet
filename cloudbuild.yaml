@@ -1,5 +1,5 @@
 steps:
-  - name: 'gcr.io/kaniko-project/executor:v1.9.1'
+  - name: 'gcr.io/kaniko-project/executor:v1.9.2'
     id: buildHoprToolchain
     args:
       - --dockerfile=scripts/toolchain/Dockerfile
@@ -9,7 +9,7 @@ steps:
       - --cache-ttl=168h
     timeout: 1200s
     waitFor: ['-']
-  - name: 'gcr.io/kaniko-project/executor:v1.9.1'
+  - name: 'gcr.io/kaniko-project/executor:v1.9.2'
     id: buildHoprd
     args:
       - --build-arg=HOPR_TOOLCHAIN_IMAGE=gcr.io/${PROJECT_ID}/hopr-toolchain:${_IMAGE_VERSION}
@@ -20,7 +20,7 @@ steps:
     timeout: 1200s
     waitFor:
       - buildHoprToolchain
-  - name: 'gcr.io/kaniko-project/executor:v1.9.1'
+  - name: 'gcr.io/kaniko-project/executor:v1.9.2'
     id: buildHoprdNat
     args:
       - --build-arg=HOPR_TOOLCHAIN_IMAGE=gcr.io/${PROJECT_ID}/hopr-toolchain:${_IMAGE_VERSION}
@@ -32,7 +32,7 @@ steps:
     timeout: 1200s
     waitFor:
       - buildHoprd
-  - name: 'gcr.io/kaniko-project/executor:v1.9.1'
+  - name: 'gcr.io/kaniko-project/executor:v1.9.2'
     id: buildAnvil
     args:
       - --build-arg=HOPR_TOOLCHAIN_IMAGE=gcr.io/${PROJECT_ID}/hopr-toolchain:${_IMAGE_VERSION}
@@ -43,7 +43,7 @@ steps:
     timeout: 1200s
     waitFor:
       - buildHoprToolchain
-  - name: 'gcr.io/kaniko-project/executor:v1.9.1'
+  - name: 'gcr.io/kaniko-project/executor:v1.9.2'
     id: buildHopli
     args:
       - --build-arg=HOPR_TOOLCHAIN_IMAGE=gcr.io/${PROJECT_ID}/hopr-toolchain:${_IMAGE_VERSION}
@@ -71,7 +71,7 @@ steps:
       - buildHoprdNat
       - buildAnvil
       - buildHopli
-  - name: 'gcr.io/kaniko-project/executor:v1.9.1'
+  - name: 'gcr.io/kaniko-project/executor:v1.9.2'
     id: buildPluto
     args:
       - --dockerfile=scripts/pluto/Dockerfile
