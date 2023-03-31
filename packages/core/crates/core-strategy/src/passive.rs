@@ -4,6 +4,7 @@ use utils_types::primitives::Balance;
 use crate::generic::{ChannelStrategy, OutgoingChannelStatus, StrategyTickResult};
 
 /// Implements passive strategy which does nothing.
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct PassiveStrategy;
 
 impl ChannelStrategy for PassiveStrategy {
@@ -47,38 +48,26 @@ pub mod wasm {
     use utils_types::primitives::Balance;
 
     use crate::generic::wasm::StrategyTickResult;
-
-    #[wasm_bindgen]
-    pub struct PassiveStrategy {
-        w: super::PassiveStrategy,
-    }
+    use crate::passive::PassiveStrategy;
+    use crate::strategy_tick;
 
     #[wasm_bindgen]
     impl PassiveStrategy {
-        #[wasm_bindgen(constructor)]
-        pub fn new() -> Self {
-            PassiveStrategy {
-                w: super::PassiveStrategy {},
-            }
+
+        #[wasm_bindgen(getter, js_name = "name")]
+        pub fn _name(&self) -> String {
+            self.name().into()
         }
 
-        pub fn configure(&mut self, _settings: JsValue) -> JsResult<()> {
-            Ok(())
-        }
-
-        #[wasm_bindgen(getter)]
-        pub fn name(&self) -> String {
-            self.w.name().into()
-        }
-
-        pub fn tick(
+        #[wasm_bindgen(js_name = "tick")]
+        pub fn _tick(
             &mut self,
             balance: Balance,
             peer_ids: &js_sys::Iterator,
             outgoing_channels: JsValue,
             quality_of: &js_sys::Function,
         ) -> JsResult<StrategyTickResult> {
-            crate::generic::wasm::tick_wrap(&mut self.w, balance, peer_ids, outgoing_channels, quality_of)
+            strategy_tick!(self, balance, peer_ids, outgoing_channels, quality_of)
         }
     }
 }
