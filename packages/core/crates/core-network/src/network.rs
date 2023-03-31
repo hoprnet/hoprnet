@@ -433,6 +433,12 @@ pub mod wasm {
     use wasm_bindgen::prelude::*;
 
     #[wasm_bindgen]
+    pub fn health_to_string(h: Health) -> String
+    {
+        format!("{:?}", h)
+    }
+
+    #[wasm_bindgen]
     impl PeerStatus {
         #[wasm_bindgen]
         pub fn peer_id(&self) -> String {

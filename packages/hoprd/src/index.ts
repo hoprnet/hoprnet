@@ -12,6 +12,7 @@ import {
 } from '@hoprnet/hopr-utils'
 import {
   Health,
+  health_to_string,
   createHoprNode,
   default as Hopr,
   type HoprOptions,
@@ -191,8 +192,8 @@ async function main() {
 
   const networkHealthChanged = (oldState: Health, newState: Health): void => {
     // Log the network health indicator state change (goes over the WS as well)
-    logs.log(`Network health indicator changed: ${oldState} -> ${newState}`)
-    logs.log(`NETWORK HEALTH: ${newState}`)
+    logs.log(`Network health indicator changed: ${health_to_string(oldState)} -> ${health_to_string(newState)}`)
+    logs.log(`NETWORK HEALTH: ${health_to_string(newState)}`)
     if (metric_timerToGreen && newState == Health.GREEN) {
       metric_timeToGreen.record_measure(metric_timerToGreen)
       metric_timerToGreen = undefined
