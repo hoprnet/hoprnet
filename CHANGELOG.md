@@ -1,6 +1,5 @@
 # Changelog
 
-
 <a name="1.93"></a>
 
 ## [1.93](https://github.com/hoprnet/hoprnet/compare/release/riga...hoprnet:release/bratislava)
