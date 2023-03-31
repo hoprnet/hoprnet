@@ -51,6 +51,11 @@ pub mod wasm {
 
     #[wasm_bindgen]
     impl RandomStrategy {
+        #[wasm_bindgen(constructor)]
+        pub fn _new() -> Self {
+            Self { }
+        }
+
         #[wasm_bindgen(getter)]
         pub fn name(&self) -> String {
             Self::NAME.into()
