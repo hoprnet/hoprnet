@@ -84,17 +84,17 @@ impl ChannelStrategy for PromiscuousStrategy {
             if let Some(channel) = channel_with_peer {
                 if quality <= self.network_quality_threshold {
                     // Need to close the channel, because quality has dropped
-                    debug!("will close channel with {} (quality {})", peer_id, quality);
+                    debug!("new channel closure candidate with {} (quality {})", peer_id, quality);
                     to_close.push(peer_id);
                 } else if channel.stake.lt(&self.minimum_channel_balance) {
                     // Need to re-open channel, because channel stake has dropped
-                    debug!("will close & re-stake channel with {}", peer_id);
+                    debug!("new channel closure & re-stake candidate with {}", peer_id);
                     to_close.push(peer_id.clone());
                     new_channel_candidates.push((peer_id, quality));
                 }
             } else if quality >= self.network_quality_threshold {
                 // Try to open channel with this peer, because it is high-quality
-                debug!("will open a new channel to {} with quality {}", peer_id, quality);
+                debug!("new channel opening candidate {} with quality {}", peer_id, quality);
                 new_channel_candidates.push((peer_id, quality));
             }
 
