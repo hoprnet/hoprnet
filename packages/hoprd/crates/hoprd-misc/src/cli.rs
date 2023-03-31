@@ -414,6 +414,7 @@ pub(crate) struct CliArgs {
         required = true,
         help = "Path to a file containing the entire HOPRd configuration",
         value_name = "CONFIG_FILE_PATH",
+        value_parser = clap::value_parser ! (String),
         env = "HOPRD_CONFIGURATION_FILE_PATH"
     )]
     pub configuration_file_path: String,

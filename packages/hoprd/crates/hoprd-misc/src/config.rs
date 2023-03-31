@@ -534,4 +534,31 @@ test:
 
         Ok(())
     }
+
+    #[test]
+    fn test_config_is_extractable_from_the_cli_arguments() -> Result<(), Box<dyn std::error::Error>> {
+        let pwnd = "rpc://pawned!";
+
+        let mut config_file = NamedTempFile::new()?;
+
+        let mut cfg = example_cfg();
+        cfg.chain.provider = Some(pwnd.to_owned());
+
+        let yaml = serde_yaml::to_string(&cfg)?;
+        config_file.write_all(yaml.as_bytes())?;
+        let cfg_file_path = config_file.path().to_str().unwrap().to_string();
+
+        let cli_args = vec!["hoprd", "--configurationFilePath", cfg_file_path.as_str()];
+
+        let mut cmd = Command::new("hoprd").version("0.0.0");
+        cmd = crate::cli::CliArgs::augment_args(cmd);
+        let derived_matches = cmd.try_get_matches_from(cli_args).map_err(|e| e.to_string())?;
+        let args = crate::cli::CliArgs::from_arg_matches(&derived_matches)?;
+
+        let cfg: HoprdConfig = args.into();
+
+        assert_eq!(cfg.chain.provider, Some(pwnd.to_owned()));
+
+        Ok(())
+    }
 }

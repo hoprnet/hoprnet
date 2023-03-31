@@ -1106,6 +1106,7 @@ dependencies = [
  "mockall",
  "more-asserts",
  "rand 0.8.5",
+ "scopeguard 1.1.0",
  "serde",
  "thiserror",
  "utils-log",
@@ -2542,7 +2543,7 @@ dependencies = [
  "serde-wasm-bindgen 0.4.5",
  "serde_json",
  "serde_yaml",
- "tempfile",
+ "tempfile 3.3.0",
  "utils-log",
  "utils-misc",
  "utils-proc-macros",
@@ -4748,21 +4749,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f82e6c8c047aa50a7328632d067bcae6ef38772a79e28daf32f735e0e4f3dd10"
 dependencies = [
  "indexmap",
- "itoa",
+ "itoa 1.0.5",
  "ryu",
  "serde",
  "unsafe-libyaml",
-]
-
-[[package]]
-name = "sha1"
-version = "0.10.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f04293dc80c3993519f2d7f6f511707ee7094fe0c6d3406feb330cdb3540eba3"
-dependencies = [
- "cfg-if",
- "cpufeatures",
- "digest 0.10.6",
 ]
 
 [[package]]
@@ -5683,12 +5673,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32ad5bf234c7d3ad1042e5252b7eddb2c4669ee23f32c7dd0e9b7705f07ef591"
 dependencies = [
  "idna 0.2.3",
- "lazy_static",
+ "lazy_static 1.4.0",
  "regex",
  "serde",
  "serde_derive",
  "serde_json",
- "url",
+ "url 2.3.1",
  "validator_derive",
 ]
 
@@ -5699,7 +5689,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc44ca3088bb3ba384d9aecf40c6a23a676ce23e09bdaca2073d99c207f864af"
 dependencies = [
  "if_chain",
- "lazy_static",
+ "lazy_static 1.4.0",
  "proc-macro-error",
  "proc-macro2",
  "quote",
