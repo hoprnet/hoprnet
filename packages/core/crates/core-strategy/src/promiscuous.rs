@@ -24,6 +24,7 @@ pub struct PromiscuousStrategy {
     pub minimum_node_balance: Balance,
     pub max_channels: Option<usize>,
     pub auto_redeem_tickets: bool,
+    pub enforce_max_channels: bool,
     sma: SimpleMovingAvg,
 }
 
@@ -38,6 +39,7 @@ impl PromiscuousStrategy {
             minimum_node_balance: Balance::from_str("100000000000000000", BalanceType::HOPR),
             max_channels: None,
             auto_redeem_tickets: false,
+            enforce_max_channels: true,
             sma: SimpleMovingAvg::new(),
         }
     }
@@ -138,7 +140,7 @@ impl ChannelStrategy for PromiscuousStrategy {
 
         // If there is still more channels opened than we allow, close some
         // lowest-quality ones which passed the threshold
-        if occupied > max_auto_channels {
+        if occupied > max_auto_channels && self.enforce_max_channels {
             warn!("there are {} opened channels, but the strategy allows only {}", occupied, max_auto_channels);
 
             let mut sorted_channels: Vec<OutgoingChannelStatus> = outgoing_channels
@@ -149,17 +151,15 @@ impl ChannelStrategy for PromiscuousStrategy {
 
             // Sort by quality, lowest-quality first
             sorted_channels.sort_unstable_by(|p1, p2| {
-                    let q1 = quality_of_peer(p1.peer_id.as_str())
-                        .expect(format!("failed to retrieve quality of {}", p1.peer_id).as_str());
-                    let q2 = quality_of_peer(p2.peer_id.as_str())
-                        .expect(format!("failed to retrieve quality of {}", p2.peer_id).as_str());
-                    q1.partial_cmp(&q2).unwrap()
+                    quality_of_peer(p1.peer_id.as_str()).zip(quality_of_peer(p2.peer_id.as_str()))
+                        .and_then(|(q1, q2)| q1.partial_cmp(&q2))
+                        .expect(format!("failed to retrieve quality of {} or {}", p1.peer_id, p2.peer_id).as_str())
             });
 
             // Close the lowest-quality channels (those we did not mark for closing yet)
             sorted_channels
                 .into_iter()
-                .take(occupied-max_auto_channels)
+                .take(occupied - max_auto_channels)
                 .for_each(|c| to_close.push(c.peer_id));
         }
 
@@ -169,7 +169,7 @@ impl ChannelStrategy for PromiscuousStrategy {
             // Shuffle first, so the equal candidates are randomized and then use unstable sorting for that purpose.
             new_channel_candidates.shuffle(&mut OsRng);
             new_channel_candidates.sort_unstable_by(|(_, q1), (_, q2)| q1.partial_cmp(q2).unwrap().reverse());
-            new_channel_candidates.truncate(max_auto_channels - (count_opened - to_close.len()));
+            new_channel_candidates.truncate(max_auto_channels - occupied);
             debug!("got {} new channel candidates", new_channel_candidates.len());
 
             // Go through the new candidates for opening channels allow them to open based on our available node balance
@@ -212,9 +212,10 @@ impl ChannelStrategy for PromiscuousStrategy {
 mod tests {
     use super::*;
     use std::collections::HashMap;
+    use vector_assertions::assert_vec_eq;
 
     #[test]
-    fn test_promiscuous_basic() {
+    fn test_promiscuous_strategy_basic() {
         let mut strat = PromiscuousStrategy::new();
 
         assert_eq!(strat.name(), "promiscuous");
@@ -272,6 +273,46 @@ mod tests {
         assert_eq!(results.to_open()[0].peer_id, "Gustave".to_string());
         assert_eq!(results.to_open()[1].peer_id, "Eugene".to_string());
         assert_eq!(results.to_open()[2].peer_id, "Bob".to_string());
+    }
+
+    #[test]
+    fn test_promiscuous_strategy_more_channels_than_allowed()
+    {
+        let mut strat = PromiscuousStrategy::new();
+        let balance = Balance::from_str("1000000000000000000", BalanceType::HOPR);
+
+        let mut peers = HashMap::new();
+        for i in 0..100 {
+            peers.insert(format!("peer_{0}", i), 0.9 - i as f64 * 0.02);
+        }
+
+        let mut outgoing_channels = vec![];
+        for i in 0..20 {
+            outgoing_channels.push(OutgoingChannelStatus {
+                peer_id: format!("peer_{0}", i),
+                stake: Balance::from_str("100000000000000000", BalanceType::HOPR),
+                status: Open
+            })
+        }
+
+        // Add fake samples to allow the test to run
+        strat.sma.add_sample(peers.len());
+        strat.sma.add_sample(peers.len());
+
+        let results = strat.tick(balance, peers.iter().map(|x| x.0.clone()), outgoing_channels.clone(), |s| {
+            peers.get(s).copied()
+        });
+
+        assert_eq!(results.max_auto_channels(), 10);
+        assert_eq!(results.to_open().len(), 0);
+        assert_eq!(results.to_close().len(), 10);
+
+        // Only the last 10 lowest quality channels get closed
+        assert_vec_eq!(results.to_close(), outgoing_channels.into_iter()
+            .rev()
+            .map(|s| s.peer_id)
+            .take(10)
+            .collect::<Vec<String>>());
     }
 }
 
