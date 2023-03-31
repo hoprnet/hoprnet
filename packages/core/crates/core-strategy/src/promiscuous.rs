@@ -152,7 +152,7 @@ impl ChannelStrategy for PromiscuousStrategy {
             .max_channels
             .unwrap_or((self.sma.get_average() as f64).sqrt().ceil() as usize);
         debug!(
-            "current upper bound for maximum number of auto-channels if {}",
+            "current upper bound for maximum number of auto-channels is {}",
             max_auto_channels
         );
 
