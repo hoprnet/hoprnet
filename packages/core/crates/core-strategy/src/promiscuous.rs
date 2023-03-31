@@ -357,9 +357,9 @@ pub mod wasm {
             Self::default()
         }
 
-        #[wasm_bindgen(getter, js_name = "name")]
-        pub fn _name(&self) -> String {
-            self.name().into()
+        #[wasm_bindgen(getter)]
+        pub fn name(&self) -> String {
+            Self::NAME.into()
         }
 
         #[wasm_bindgen(js_name = "tick")]

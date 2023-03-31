@@ -31,8 +31,7 @@ mod tests {
 
     #[test]
     fn test_random() {
-        let strat = RandomStrategy {};
-        assert_eq!("random", strat.name());
+        assert_eq!("random", RandomStrategy::NAME);
     }
 }
 
@@ -52,9 +51,9 @@ pub mod wasm {
 
     #[wasm_bindgen]
     impl RandomStrategy {
-        #[wasm_bindgen(getter, js_name = "name")]
-        pub fn _name(&self) -> String {
-            self.name().into()
+        #[wasm_bindgen(getter)]
+        pub fn name(&self) -> String {
+            Self::NAME.into()
         }
 
         #[wasm_bindgen(js_name = "tick")]
