@@ -15,17 +15,40 @@ pub const SMA_WINDOW_SIZE: usize = 3;
 type SimpleMovingAvg = SumTreeSMA<usize, usize, SMA_WINDOW_SIZE>;
 
 /// Implements promiscuous strategy.
-/// This strategy opens channels to peers, which have quality above a given threshold.
-/// At the same time, it closes channels opened to peers whose quality dropped below this threshold.
+/// This strategy opens outgoing channels to peers, which have quality above a given threshold.
+/// At the same time, it closes outgoing channels opened to peers whose quality dropped below this threshold.
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct PromiscuousStrategy {
+    /// A quality threshold between 0 and 1 used to determine whether the strategy should open channel with the peer.
+    /// Defaults to 0.5
     pub network_quality_threshold: f64,
+
+    /// A stake of tokens that should be allocated to a channel opened by the strategy.
+    /// Defaults to 0.1 HOPR
     pub new_channel_stake: Balance,
+
+    /// A minimum channel token stake. If reached, the channel will be closed and re-opened with `new_channel_stake`.
+    /// Defaults to 0.01 HOPR
     pub minimum_channel_balance: Balance,
+
+    /// Minimum token balance of the node. When reached, the strategy will not open any new channels.
+    /// Defaults to 0.01 HOPR
     pub minimum_node_balance: Balance,
+
+    /// Maximum number of opened channels the strategy should maintain.
+    /// Defaults to square-root of the sampled network size.
     pub max_channels: Option<usize>,
+
+    /// Determines if the strategy should automatically redeem tickets.
+    /// Defaults to false
     pub auto_redeem_tickets: bool,
+
+    /// If set, the strategy will aggressively close channels (even with peers above the `network_quality_threshold`)
+    /// if the number of opened outgoing channels (regardless if opened by the strategy or manually) exceeds the
+    /// `max_channels` limit.
+    /// Defaults to true
     pub enforce_max_channels: bool,
+
     sma: SimpleMovingAvg,
 }
 
@@ -219,14 +242,14 @@ mod tests {
 
         let alice = PeerId::random();
         let bob = PeerId::random();
-        let c = PeerId::random();
+        let charlie = PeerId::random();
         let eugene = PeerId::random();
         let gustave = PeerId::random();
 
         let peers = HashMap::from([
             (alice.clone(), 0.1),
             (bob.clone(), 0.7),
-            (c.clone(), 0.9),
+            (charlie.clone(), 0.9),
             (PeerId::random(), 0.1),
             (eugene.clone(), 0.8),
             (PeerId::random(), 0.3),
@@ -246,7 +269,7 @@ mod tests {
                 status: Open,
             },
             OutgoingChannelStatus {
-                peer_id: c.clone(),
+                peer_id: charlie.clone(),
                 stake: balance.clone(),
                 status: Open,
             },
