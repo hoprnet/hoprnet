@@ -451,6 +451,7 @@ jobs:
           HOPRD_PASSWORD: ${{ secrets.BS_PASSWORD }}
           HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
           FAUCET_SECRET_API_KEY: ${{ secrets.FAUCET_SECRET_API_KEY }}
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN }}
 
       - name: Run deploy script for public nodes (staging-only)
         if: ${{ startsWith(github.ref, 'refs/heads/staging/') && !env.ACT }}
@@ -461,6 +462,7 @@ jobs:
           HOPRD_PASSWORD: ${{ secrets.BS_PASSWORD }}
           HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
           FAUCET_SECRET_API_KEY: ${{ secrets.FAUCET_SECRET_API_KEY }}
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN }}
 
       - name: Send cluster info to Matrix
         if: ${{ success() && !env.ACT }}

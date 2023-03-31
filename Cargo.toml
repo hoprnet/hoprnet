@@ -22,7 +22,7 @@ members = [
 ]
 
 [workspace.dependencies]
-wasm-pack = "0.11.0"
+wasm-pack = "0.10.3"
 wasm-opt = "0.112.0"
 wasm-bindgen = "0.2.84"
 
