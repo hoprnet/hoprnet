@@ -381,10 +381,12 @@ async function fetchCircuitAddressesAndDial(
       relay = await nextRelay
     }
 
-    if (!relay.done) {
-      // Initiate query for next relay but don't await its result
-      nextRelay = dhtIterator.next()
+    if (relay.done) {
+      break
     }
+
+    // Initiate query for next relay but don't await its result
+    nextRelay = dhtIterator.next()
 
     // Make sure we don't use self as relay
     if (relay.value.equals(components.getPeerId())) {
