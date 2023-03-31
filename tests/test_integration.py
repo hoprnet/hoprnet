@@ -22,7 +22,7 @@ def test_hoprd_protocol_integration_tests(setup_7_nodes):
 
     nodes_api_as_str = " ".join(list(map(lambda x: f"\"localhost:{x['api_port']}\"", setup_7_nodes.values())))
 
-    subprocess.run(f'./tests/integration-test.sh {nodes_api_as_str}',
+    subprocess.run(f'./tests/integration-test.sh {nodes_api_as_str} >| /tmp/integration_test_out 2>&1',
                    shell=True,
                    capture_output=True,
                    env=env_vars,
