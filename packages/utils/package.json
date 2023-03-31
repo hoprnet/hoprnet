@@ -37,7 +37,7 @@
     "bn.js": "5.2.0",
     "chalk": "5.0.1",
     "debug": "4.3.4",
-    "ethers": "5.7.0",
+    "ethers": "5.7.2",
     "futoin-hkdf": "1.5.0",
     "hjson": "3.2.2",
     "it-pipe": "2.0.3",
