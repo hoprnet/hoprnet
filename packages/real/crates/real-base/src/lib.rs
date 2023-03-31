@@ -2,6 +2,7 @@ use wasm_bindgen::prelude::*;
 
 pub mod error;
 pub mod real;
+pub mod file;
 
 /// Dummy function to test WASM.
 #[wasm_bindgen]

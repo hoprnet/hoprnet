@@ -301,16 +301,22 @@ impl Default for HoprdConfig {
     }
 }
 
+#[cfg(any(not(feature = "wasm"), test))]
+use real_base::file::native::read_to_string;
+
+#[cfg(all(feature = "wasm", not(test)))]
+use real_base::file::wasm::read_to_string;
+
+
+
 impl From<crate::cli::CliArgs> for HoprdConfig {
     fn from(cli_args: crate::cli::CliArgs) -> Self {
-        // // use WASM
-        // use std::io::Read;
-        // let mut file = std::fs::File::open(cli_args.configuration_file_path).unwrap();
-        // let mut contents = String::new();
-        // file.read_to_string(&mut contents).unwrap();
-        // let mut cfg: HoprdConfig = serde_yaml::from_str(&buf).unwrap();
-
-        let mut cfg = HoprdConfig::default();
+        // TODO: fail on incorrect path? Or use default?
+        // let mut cfg = HoprdConfig::default();
+        let yaml_configuration = read_to_string(cli_args.configuration_file_path.as_str())
+            .unwrap_or_else(|e| panic!("Failed to read the configuration file: {}", e.to_string()));
+        let mut cfg: HoprdConfig = serde_yaml::from_str(&yaml_configuration)
+            .unwrap_or_else(|e| panic!("Failed to deserialize the configuration: {}", e.to_string()));
 
         cfg.environment = cli_args.environment;
 
@@ -379,17 +385,6 @@ impl From<crate::cli::CliArgs> for HoprdConfig {
     }
 }
 
-
-// #[wasm_bindgen(module = "/foo.js")]
-// extern "C" {
-//     #[wasm_bindgen(catch)]
-//     fn read_file(path: &str) -> Result<String, JsValue>;
-//  }
-//     // foo.js
-//     const fs = require("fs");
-//     export function read_file(path) {
-//         return fs.readFileSync(path, { encoding: "utf8" });
-//     }
 
 #[cfg(test)]
 mod tests {
