@@ -184,6 +184,7 @@
 - [isPrivateAddress](modules.md#isprivateaddress)
 - [isReservedAddress](modules.md#isreservedaddress)
 - [isSecp256k1PeerId](modules.md#issecp256k1peerid)
+- [iterableToArray](modules.md#iterabletoarray)
 - [iterateHash](modules.md#iteratehash)
 - [keyShareTransform](modules.md#keysharetransform)
 - [libp2pSendMessage](modules.md#libp2psendmessage)
@@ -2560,6 +2561,36 @@ whether embedded privKey is a secp256k1 key
 #### Defined in
 
 [utils/src/libp2p/index.ts:90](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L90)
+
+___
+
+### iterableToArray
+
+▸ **iterableToArray**<`T`\>(`iter`): `Promise`<`T`[]\>
+
+Convert an async iterator to an array
+
+#### Type parameters
+
+| Name |
+| :------ |
+| `T` |
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `iter` | `AsyncIterable`<`T`\> | generator |
+
+#### Returns
+
+`Promise`<`T`[]\>
+
+array of promises
+
+#### Defined in
+
+[utils/src/utils.ts:61](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/utils.ts#L61)
 
 ___
 

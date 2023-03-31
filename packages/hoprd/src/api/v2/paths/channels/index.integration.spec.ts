@@ -6,6 +6,7 @@ import {
   createTestApiInstance,
   ALICE_PEER_ID,
   BOB_PEER_ID,
+  CHARLIE_PEER_ID,
   ALICE_NATIVE_ADDR,
   INVALID_PEER_ID
 } from '../../fixtures.js'
@@ -43,16 +44,28 @@ describe('GET /channels', function () {
   const outgoing = new ChannelEntry(
     PublicKey.fromPeerId(BOB_PEER_ID),
     PublicKey.fromPeerId(ALICE_PEER_ID),
-    new Balance(new BN(1)),
+    new Balance(new BN(2)),
     Hash.create(),
-    new UINT256(new BN(1)),
-    new UINT256(new BN(1)),
+    new UINT256(new BN(2)),
+    new UINT256(new BN(2)),
     ChannelStatus.Closed,
-    new UINT256(new BN(1)),
-    new UINT256(new BN(1))
+    new UINT256(new BN(2)),
+    new UINT256(new BN(2))
+  )
+  const otherChannel = new ChannelEntry(
+    PublicKey.fromPeerId(BOB_PEER_ID),
+    PublicKey.fromPeerId(CHARLIE_PEER_ID),
+    new Balance(new BN(3)),
+    Hash.create(),
+    new UINT256(new BN(3)),
+    new UINT256(new BN(3)),
+    ChannelStatus.WaitingForCommitment,
+    new UINT256(new BN(3)),
+    new UINT256(new BN(3))
   )
   node.getChannelsFrom = sinon.fake.returns(Promise.resolve([outgoing]))
   node.getChannelsTo = sinon.fake.returns(Promise.resolve([incoming]))
+  node.getAllChannels = sinon.fake.returns(Promise.resolve([incoming, outgoing, otherChannel]))
 
   let service: any
   before(async function () {
@@ -70,6 +83,7 @@ describe('GET /channels', function () {
     expect(res).to.satisfyApiSpec
     expect(res.body.incoming.length).to.be.equal(1)
     expect(res.body.outgoing.length).to.be.equal(1)
+    // expect(res.body.all.length).to.be.equal(0)
     expect(res.body.incoming[0].channelId).to.deep.equal(incoming.getId().toHex())
     expect(res.body.outgoing[0].channelId).to.deep.equal(outgoing.getId().toHex())
   })
@@ -79,6 +93,18 @@ describe('GET /channels', function () {
     expect(res).to.satisfyApiSpec
     expect(res.body.incoming.length).to.be.equal(0)
     expect(res.body.outgoing.length).to.be.equal(0)
+    // expect(res.body.all.length).to.be.equal(0)
+  })
+  it('should get all the channels', async function () {
+    const res = await request(service).get('/api/v2/channels?fullTopology=true')
+    expect(res.status).to.equal(200)
+    expect(res).to.satisfyApiSpec
+    expect(res.body.incoming.length).to.be.equal(0)
+    expect(res.body.outgoing.length).to.be.equal(0)
+    expect(res.body.all.length).to.be.equal(3)
+    expect(res.body.all[0].channelId).to.deep.equal(incoming.getId().toHex())
+    expect(res.body.all[1].channelId).to.deep.equal(outgoing.getId().toHex())
+    expect(res.body.all[2].channelId).to.deep.equal(otherChannel.getId().toHex())
   })
 })
 
