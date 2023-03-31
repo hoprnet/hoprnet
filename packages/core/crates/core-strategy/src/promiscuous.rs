@@ -16,6 +16,7 @@ type SimpleMovingAvg = SumTreeSMA<usize, usize, SMA_WINDOW_SIZE>;
 /// Implements promiscuous strategy.
 /// This strategy opens channels to peers, which have quality above a given threshold.
 /// At the same time, it closes channels opened to peers whose quality dropped below this threshold.
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct PromiscuousStrategy {
     pub network_quality_threshold: f64,
     pub new_channel_stake: Balance,
@@ -26,7 +27,9 @@ pub struct PromiscuousStrategy {
     sma: SimpleMovingAvg,
 }
 
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl PromiscuousStrategy {
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new() -> Self {
         PromiscuousStrategy {
             network_quality_threshold: 0.5,
@@ -53,6 +56,7 @@ impl ChannelStrategy for PromiscuousStrategy {
     where
         Q: Fn(&str) -> Option<f64>,
     {
+        let mut to_open: Vec<OutgoingChannelStatus> = vec![];
         let mut to_close: Vec<String> = vec![];
         let mut new_channel_candidates: Vec<(String, f64)> = vec![];
         let mut network_size: usize = 0;
@@ -130,37 +134,66 @@ impl ChannelStrategy for PromiscuousStrategy {
 
         // Count all the opened channels
         let count_opened = outgoing_channels.iter().filter(|c| c.status == Open).count();
+        let occupied = count_opened - to_close.len();
 
-        // Sort the new channel candidates by best quality first, then truncate to the number of available slots
-        // This way, we'll prefer candidates with higher quality, when we don't have enough node balance
-        // Shuffle first, so the equal candidates are randomized and then use unstable sorting for that purpose.
-        new_channel_candidates.shuffle(&mut OsRng);
-        new_channel_candidates.sort_unstable_by(|(_, q1), (_, q2)| q1.partial_cmp(q2).unwrap().reverse());
-        new_channel_candidates.truncate(max_auto_channels - (count_opened - to_close.len()));
-        debug!("got {} new channel candidates", new_channel_candidates.len());
+        // If there is still more channels opened than we allow, close some
+        // lowest-quality ones which passed the threshold
+        if occupied > max_auto_channels {
+            warn!("there are {} opened channels, but the strategy allows only {}", occupied, max_auto_channels);
 
-        // Go through the new candidates for opening channels allow them to open based on our available node balance
-        let mut to_open: Vec<OutgoingChannelStatus> = vec![];
-        let mut remaining_balance = balance.clone();
-        for peer_id in new_channel_candidates.into_iter().map(|(p, _)| p) {
-            // Stop if we ran out of balance
-            if remaining_balance.lte(&self.minimum_node_balance) {
-                warn!(
+            let mut sorted_channels: Vec<OutgoingChannelStatus> = outgoing_channels
+                .iter()
+                .filter(|c| !to_close.contains(&c.peer_id))
+                .cloned()
+                .collect();
+
+            // Sort by quality, lowest-quality first
+            sorted_channels.sort_unstable_by(|p1, p2| {
+                    let q1 = quality_of_peer(p1.peer_id.as_str())
+                        .expect(format!("failed to retrieve quality of {}", p1.peer_id).as_str());
+                    let q2 = quality_of_peer(p2.peer_id.as_str())
+                        .expect(format!("failed to retrieve quality of {}", p2.peer_id).as_str());
+                    q1.partial_cmp(&q2).unwrap()
+            });
+
+            // Close the lowest-quality channels (those we did not mark for closing yet)
+            sorted_channels
+                .into_iter()
+                .take(occupied-max_auto_channels)
+                .for_each(|c| to_close.push(c.peer_id));
+        }
+
+        if max_auto_channels > occupied {
+            // Sort the new channel candidates by best quality first, then truncate to the number of available slots
+            // This way, we'll prefer candidates with higher quality, when we don't have enough node balance
+            // Shuffle first, so the equal candidates are randomized and then use unstable sorting for that purpose.
+            new_channel_candidates.shuffle(&mut OsRng);
+            new_channel_candidates.sort_unstable_by(|(_, q1), (_, q2)| q1.partial_cmp(q2).unwrap().reverse());
+            new_channel_candidates.truncate(max_auto_channels - (count_opened - to_close.len()));
+            debug!("got {} new channel candidates", new_channel_candidates.len());
+
+            // Go through the new candidates for opening channels allow them to open based on our available node balance
+            let mut remaining_balance = balance.clone();
+            for peer_id in new_channel_candidates.into_iter().map(|(p, _)| p) {
+                // Stop if we ran out of balance
+                if remaining_balance.lte(&self.minimum_node_balance) {
+                    warn!(
                     "strategy ran out of allowed node balance - balance is {}",
                     remaining_balance.to_string()
                 );
-                break;
-            }
+                    break;
+                }
 
-            // If we haven't added this peer id yet, add it to the list for channel opening
-            if to_open.iter().find(|&p| p.peer_id.eq(&peer_id)).is_none() {
-                debug!("promoting peer {} for channel opening", peer_id);
-                to_open.push(OutgoingChannelStatus {
-                    peer_id,
-                    stake: self.new_channel_stake.clone(),
-                    status: Open,
-                });
-                remaining_balance = balance.sub(&self.new_channel_stake);
+                // If we haven't added this peer id yet, add it to the list for channel opening
+                if to_open.iter().find(|&p| p.peer_id.eq(&peer_id)).is_none() {
+                    debug!("promoting peer {} for channel opening", peer_id);
+                    to_open.push(OutgoingChannelStatus {
+                        peer_id,
+                        stake: self.new_channel_stake.clone(),
+                        status: Open,
+                    });
+                    remaining_balance = balance.sub(&self.new_channel_stake);
+                }
             }
         }
 
@@ -245,72 +278,32 @@ mod tests {
 /// WASM bindings
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use serde::Deserialize;
     use wasm_bindgen::prelude::*;
 
     use utils_misc::utils::wasm::JsResult;
-    use utils_types::primitives::{Balance, BalanceType};
+    use utils_types::primitives::Balance;
 
     use crate::generic::wasm::StrategyTickResult;
     use crate::generic::ChannelStrategy;
-
-    #[derive(Deserialize)]
-    struct PromiscuousSettings {
-        pub network_quality_threshold: Option<f64>,
-        pub new_channel_stake: Option<String>,
-        pub minimum_channel_balance: Option<String>,
-        pub minimum_node_balance: Option<String>,
-        pub max_channels: Option<u32>,
-        pub auto_redeem_tickets: Option<bool>,
-    }
-
-    #[wasm_bindgen]
-    pub struct PromiscuousStrategy {
-        w: super::PromiscuousStrategy,
-    }
+    use crate::promiscuous::PromiscuousStrategy;
+    use crate::strategy_tick;
 
     #[wasm_bindgen]
     impl PromiscuousStrategy {
-        #[wasm_bindgen(constructor)]
-        pub fn new() -> Self {
-            PromiscuousStrategy {
-                w: super::PromiscuousStrategy::new(),
-            }
+        #[wasm_bindgen(getter, js_name = "name")]
+        pub fn _name(&self) -> String {
+            self.name().into()
         }
 
-        pub fn configure(&mut self, settings: JsValue) -> JsResult<()> {
-            let cfg: PromiscuousSettings = serde_wasm_bindgen::from_value(settings)?;
-            if let Some(option) = cfg.network_quality_threshold {
-                self.w.network_quality_threshold = option;
-            }
-            if let Some(option) = cfg.minimum_node_balance {
-                self.w.minimum_node_balance = Balance::from_str(option.as_str(), BalanceType::HOPR);
-            }
-            if let Some(option) = cfg.new_channel_stake {
-                self.w.new_channel_stake = Balance::from_str(option.as_str(), BalanceType::HOPR);
-            }
-            if let Some(option) = cfg.minimum_channel_balance {
-                self.w.minimum_channel_balance = Balance::from_str(option.as_str(), BalanceType::HOPR);
-            }
-            self.w.max_channels = cfg.max_channels.map(|c| c as usize);
-            self.w.auto_redeem_tickets = cfg.auto_redeem_tickets.unwrap_or(false);
-
-            Ok(())
-        }
-
-        #[wasm_bindgen(getter)]
-        pub fn name(&self) -> String {
-            self.w.name().into()
-        }
-
-        pub fn tick(
+        #[wasm_bindgen(js_name = "tick")]
+        pub fn _tick(
             &mut self,
             balance: Balance,
             peer_ids: &js_sys::Iterator,
             outgoing_channels: JsValue,
             quality_of: &js_sys::Function,
         ) -> JsResult<StrategyTickResult> {
-            crate::generic::wasm::tick_wrap(&mut self.w, balance, peer_ids, outgoing_channels, quality_of)
+            strategy_tick!(self, balance, peer_ids, outgoing_channels, quality_of)
         }
     }
 }

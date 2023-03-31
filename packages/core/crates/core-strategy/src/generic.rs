@@ -36,6 +36,7 @@ pub trait ChannelStrategy {
 }
 
 /// Represents a request to open a channel with a stake.
+#[derive(Clone, Debug)]
 pub struct OutgoingChannelStatus {
     pub peer_id: String,
     pub stake: Balance,
@@ -97,11 +98,8 @@ pub mod wasm {
     use wasm_bindgen::prelude::wasm_bindgen;
     use wasm_bindgen::JsValue;
 
-    use crate::generic::ChannelStrategy;
-
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
-    use utils_types::primitives::Balance;
 
     use core_types::channels::ChannelStatus;
     use serde::{Deserialize, Serialize};
@@ -167,29 +165,26 @@ pub mod wasm {
 
     /// Generic binding for all strategies to use in WASM wrappers
     /// Since wasm_bindgen annotation is not supported on trait impls, the WASM-wrapped strategies cannot implement a common trait.
-    pub fn tick_wrap<S: ChannelStrategy>(
-        strategy: &mut S,
-        balance: Balance,
-        peer_ids: &js_sys::Iterator,
-        outgoing_channels: JsValue,
-        quality_of: &js_sys::Function,
-    ) -> JsResult<StrategyTickResult> {
-        Ok(StrategyTickResult {
-            w: strategy.tick(
-                balance,
-                peer_ids.into_iter().map(|v| v.unwrap().as_string().unwrap()),
-                serde_wasm_bindgen::from_value::<Vec<OutgoingChannelStatus>>(outgoing_channels)?
-                    .iter()
-                    .map(|c| super::OutgoingChannelStatus::from(c))
-                    .collect(),
-                |peer_id: &str| {
-                    quality_of
-                        .call1(&JsValue::null(), &JsString::from(peer_id))
-                        .ok()
-                        .map(|q| q.as_f64())
-                        .flatten()
-                },
-            ),
-        })
+    #[macro_export]
+    macro_rules! strategy_tick {
+        ($strategy:ident, $balance:ident, $peer_ids:ident, $outgoing_channels:ident, $quality_of:ident) => {
+            Ok(StrategyTickResult {
+                w: $strategy.tick(
+                    $balance,
+                    $peer_ids.into_iter().map(|v| v.and_then(|v| v.as_string().ok_or(wasm_bindgen::JsValue::from("not a string"))).unwrap()),
+                    serde_wasm_bindgen::from_value::<Vec<crate::generic::wasm::OutgoingChannelStatus>>($outgoing_channels)?
+                        .iter()
+                        .map(|c| crate::generic::OutgoingChannelStatus::from(c))
+                        .collect(),
+                    |peer_id: &str| {
+                        $quality_of
+                            .call1(&wasm_bindgen::JsValue::null(), &js_sys::JsString::from(peer_id))
+                            .ok()
+                            .map(|q| q.as_f64())
+                            .flatten()
+                    },
+                )
+            })
+        };
     }
 }
