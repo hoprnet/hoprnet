@@ -22,6 +22,43 @@ export interface ChannelInfo {
   balance: string
 }
 
+export interface ChannelTopologyInfo {
+  channelId: string
+  sourcePeerId: string
+  destinationPeerId: string
+  sourceAddress: string
+  destinationAddress: string
+  balance: string
+  status: string
+  commitment: string
+  ticketEpoch: string
+  ticketIndex: string
+  channelEpoch: string
+  closureTime: string
+}
+
+/**
+ * Format channel entries
+ * @param channel channelEntry entity saved in the database
+ * @returns stringified fields from ChannelEntry and both peer id and address for source/destination
+ */
+export const formatChannelTopologyInfo = (channel: ChannelEntry): ChannelTopologyInfo => {
+  return {
+    channelId: channel.getId().toHex(),
+    sourcePeerId: channel.source.toPeerId().toString(),
+    destinationPeerId: channel.destination.toPeerId().toString(),
+    sourceAddress: channel.source.toAddress().toHex(),
+    destinationAddress: channel.destination.toAddress().toHex(),
+    balance: channel.balance.toBN().toString(),
+    status: channelStatusToString(channel.status),
+    commitment: channel.commitment.toHex(),
+    ticketEpoch: channel.ticketEpoch.toBN().toString(),
+    ticketIndex: channel.ticketIndex.toBN().toString(),
+    channelEpoch: channel.channelEpoch.toBN().toString(),
+    closureTime: channel.closureTime.toBN().toString()
+  }
+}
+
 export const formatOutgoingChannel = (channel: ChannelEntry): ChannelInfo => {
   return {
     type: 'outgoing',
@@ -59,16 +96,32 @@ export const getChannels = async (node: Hopr, includingClosed: boolean) => {
     .filter((channel) => includingClosed || channel.status !== ChannelStatus.Closed)
     .map(formatIncomingChannel)
 
-  return { incoming: channelsTo, outgoing: channelsFrom }
+  return { incoming: channelsTo, outgoing: channelsFrom, all: [] }
+}
+
+/**
+ * @returns List of all the channels
+ */
+export const getAllChannels = async (node: Hopr) => {
+  const channels = await node.getAllChannels()
+  const channelTopology: ChannelTopologyInfo[] = channels.map(formatChannelTopologyInfo)
+
+  return { incoming: [], outgoing: [], all: channelTopology }
 }
 
 const GET: Operation = [
   async (req, res, _next) => {
     const { node } = req.context
-    const { includingClosed } = req.query
+    const { includingClosed, fullTopology } = req.query
 
     try {
-      const channels = await getChannels(node, includingClosed === 'true')
+      let channels
+      if (fullTopology === 'true') {
+        channels = await getAllChannels(node)
+      } else {
+        channels = await getChannels(node, includingClosed === 'true')
+      }
+
       return res.status(200).send(channels)
     } catch (err) {
       return res
@@ -93,11 +146,20 @@ GET.apiDoc = {
         type: 'string',
         example: 'false'
       }
+    },
+    {
+      in: 'query',
+      name: 'fullTopology',
+      description: 'Get the full payment channel graph indexed by the node.',
+      schema: {
+        type: 'string',
+        example: 'false'
+      }
     }
   ],
   responses: {
     '200': {
-      description: 'Channels fetched succesfully.',
+      description: 'Channels fetched successfully.',
       content: {
         'application/json': {
           schema: {
@@ -114,6 +176,11 @@ GET.apiDoc = {
                 items: { $ref: '#/components/schemas/Channel' },
                 description:
                   'Outgoing channels are the ones that were opened by this node and is using other node as relay.'
+              },
+              all: {
+                type: 'array',
+                items: { $ref: '#/components/schemas/ChannelTopology' },
+                description: 'All the channels indexed by the node in the current network.'
               }
             }
           }
