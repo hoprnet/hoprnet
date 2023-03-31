@@ -1,3 +1,4 @@
+use libp2p_identity::PeerId;
 use utils_log::debug;
 use utils_types::primitives::Balance;
 
@@ -13,7 +14,7 @@ impl ChannelStrategy for PassiveStrategy {
     fn tick<Q>(
         &mut self,
         _balance: Balance,
-        _peer_ids: impl Iterator<Item = String>,
+        _peer_ids: impl Iterator<Item = PeerId>,
         _outgoing_channel_peer_ids: Vec<OutgoingChannelStatus>,
         _quality_of: Q,
     ) -> StrategyTickResult

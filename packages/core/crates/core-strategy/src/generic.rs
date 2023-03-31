@@ -1,3 +1,5 @@
+use std::str::FromStr;
+use libp2p_identity::PeerId;
 use core_types::channels::ChannelStatus;
 use utils_types::primitives::{Balance, BalanceType};
 
@@ -22,7 +24,7 @@ pub trait ChannelStrategy {
     fn tick<Q>(
         &mut self,
         balance: Balance,
-        peer_ids: impl Iterator<Item = String>,
+        peer_ids: impl Iterator<Item = PeerId>,
         outgoing_channels: Vec<OutgoingChannelStatus>,
         quality_of_peer: Q,
     ) -> StrategyTickResult
@@ -38,7 +40,7 @@ pub trait ChannelStrategy {
 /// Represents a request to open a channel with a stake.
 #[derive(Clone, Debug)]
 pub struct OutgoingChannelStatus {
-    pub peer_id: String,
+    pub peer_id: PeerId,
     pub stake: Balance,
     pub status: ChannelStatus,
 }
@@ -47,7 +49,7 @@ pub struct OutgoingChannelStatus {
 impl From<&wasm::OutgoingChannelStatus> for OutgoingChannelStatus {
     fn from(x: &wasm::OutgoingChannelStatus) -> Self {
         OutgoingChannelStatus {
-            peer_id: x.peer_id.clone(),
+            peer_id: PeerId::from_str(&x.peer_id).expect("invalid peer id given"),
             stake: Balance::from_str(x.stake_str.as_str(), BalanceType::HOPR),
             status: x.status.clone(),
         }
@@ -61,12 +63,12 @@ impl From<&wasm::OutgoingChannelStatus> for OutgoingChannelStatus {
 pub struct StrategyTickResult {
     max_auto_channels: usize,
     to_open: Vec<OutgoingChannelStatus>,
-    to_close: Vec<String>,
+    to_close: Vec<PeerId>,
 }
 
 impl StrategyTickResult {
     /// Constructor for the strategy tick result.
-    pub fn new(max_auto_channels: usize, to_open: Vec<OutgoingChannelStatus>, to_close: Vec<String>) -> Self {
+    pub fn new(max_auto_channels: usize, to_open: Vec<OutgoingChannelStatus>, to_close: Vec<PeerId>) -> Self {
         StrategyTickResult {
             max_auto_channels,
             to_open,
@@ -86,7 +88,7 @@ impl StrategyTickResult {
     }
 
     /// Peer IDs to which any open channels should be closed according to this strategy.
-    pub fn to_close(&self) -> &Vec<String> {
+    pub fn to_close(&self) -> &Vec<PeerId> {
         &self.to_close
     }
 }
@@ -94,7 +96,9 @@ impl StrategyTickResult {
 /// WASM bindings for the generic strategy-related classes
 #[cfg(feature = "wasm")]
 pub mod wasm {
+    use std::str::FromStr;
     use js_sys::JsString;
+    use libp2p_identity::PeerId;
     use wasm_bindgen::prelude::wasm_bindgen;
     use wasm_bindgen::JsValue;
 
@@ -114,7 +118,7 @@ pub mod wasm {
     impl From<&super::OutgoingChannelStatus> for OutgoingChannelStatus {
         fn from(x: &crate::generic::OutgoingChannelStatus) -> Self {
             OutgoingChannelStatus {
-                peer_id: x.peer_id.clone(),
+                peer_id: x.peer_id.to_base58(),
                 stake_str: x.stake.to_string(),
                 status: x.status.clone(),
             }
@@ -137,7 +141,9 @@ pub mod wasm {
                         .into_iter()
                         .map(|x| super::OutgoingChannelStatus::from(&x))
                         .collect(),
-                    to_close.iter().map(String::from).collect(),
+                    to_close.iter()
+                        .map(|s| PeerId::from_str(String::from(s).as_str()).expect(format!("invalid peer id given: {0}", s).as_str()))
+                        .collect(),
                 ),
             })
         }
@@ -159,7 +165,7 @@ pub mod wasm {
         }
 
         pub fn to_close(&self) -> Vec<JsString> {
-            self.w.to_close().iter().map(|s| JsString::from(s.clone())).collect()
+            self.w.to_close().iter().map(|s| JsString::from(s.to_base58())).collect()
         }
     }
 
@@ -171,7 +177,10 @@ pub mod wasm {
             Ok(StrategyTickResult {
                 w: $strategy.tick(
                     $balance,
-                    $peer_ids.into_iter().map(|v| v.and_then(|v| v.as_string().ok_or(wasm_bindgen::JsValue::from("not a string"))).unwrap()),
+                    $peer_ids.into_iter().map(|v| v.and_then(|v| v.as_string()
+                        .ok_or(wasm_bindgen::JsValue::from("not a string"))
+                        .and_then(|s| utils_misc::ok_or_jserr!(<libp2p_identity::PeerId as std::str::FromStr>::from_str(&s)))
+                    ).unwrap()),
                     serde_wasm_bindgen::from_value::<Vec<crate::generic::wasm::OutgoingChannelStatus>>($outgoing_channels)?
                         .iter()
                         .map(|c| crate::generic::OutgoingChannelStatus::from(c))
