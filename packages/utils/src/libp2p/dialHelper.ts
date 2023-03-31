@@ -366,13 +366,32 @@ async function fetchCircuitAddressesAndDial(
         conn: Connection
       })
 
-  for await (const relay of queryDHT(components, destination)) {
+  // Start the iterator
+  const dhtIterator = queryDHT(components, destination)[Symbol.asyncIterator]()
+
+  let relay: IteratorResult<PeerId, any>
+  let nextRelay: Promise<IteratorResult<PeerId, any>>
+
+  // Eagerly queries potential relays from the DHT while
+  // attempting to establish relayed connections
+  while (relay == undefined || !relay.done) {
+    if (relay == undefined) {
+      relay = await dhtIterator.next()
+    } else {
+      relay = await nextRelay
+    }
+
+    if (!relay.done) {
+      // Initiate query for next relay but don't await its result
+      nextRelay = dhtIterator.next()
+    }
+
     // Make sure we don't use self as relay
-    if (relay.equals(components.getPeerId())) {
+    if (relay.value.equals(components.getPeerId())) {
       continue
     }
 
-    const circuitAddress = createCircuitAddress(relay)
+    const circuitAddress = createCircuitAddress(relay.value)
 
     // Filter out the circuit addresses that were tried using the previous attempt
     if (knownCircuitAddressSet.has(circuitAddress.toString())) {
