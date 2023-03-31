@@ -50,7 +50,7 @@ IDENTITY_PASSWORD=local \
 PRIVATE_KEY=<bank_private_key> \
 hopli faucet \
     --environment-name anvil-localhost \
-    --use-local-identities --identity-directory "/app/.hoprd-db-riga" \
+    --use-local-identities --identity-directory "/app/.hoprd-db" \
     --address 0x0aa7420c43b8c1a7b165d216948870c8ecfe1ee1 \
     --contracts-root "../ethereum/contracts" \
     --hopr-amount 10 --native-amount 0.1

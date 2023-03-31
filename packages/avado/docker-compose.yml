@@ -11,13 +11,13 @@ services:
         UPSTREAM_VERSION: '%UPSTREAM_VERSION%'
         PROMETHEUS_VERSION: 2.41.0
         GRAFANA_VERSION: 9.3.2
-        HOPR_ADMIN_VERSION: riga
+        HOPR_ADMIN_VERSION: bratislava
     # Lines between *_JSON_EXPORT are intentionally also a valid JSON
     # Info: a hoprd node should never consume more than 1GByte of memory
     # DO NOT REMOVE
     # BEGIN_JSON_EXPORT
     #{
-    'volumes': ['db:/app/hoprd-db']
+    'volumes': [ 'db:/app/hoprd-db' ]
     'environment':
       [
         'DEBUG=hopr*',
@@ -39,7 +39,15 @@ services:
         'HOPRD_ALLOW_PRIVATE_NODE_CONNECTIONS=false',
         'HOPRD_PROVIDER=%PROVIDER_URL%'
       ]
-    'ports': ['3000:3000/tcp', '3030:3030/tcp', '3001:3001/tcp', '8080:8080/tcp', '9091:9091/tcp', '9091:9091/udp']
+    'ports':
+      [
+        '3000:3000/tcp',
+        '3030:3030/tcp',
+        '3001:3001/tcp',
+        '8080:8080/tcp',
+        '9091:9091/tcp',
+        '9091:9091/udp'
+      ]
     'deploy': { 'resources': { 'limits': { 'memory': '1G' } } }
     'restart': 'always'
     #}
