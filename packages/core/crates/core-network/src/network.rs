@@ -82,15 +82,16 @@ impl std::fmt::Display for PeerOrigin {
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Health {
-    UNKNOWN = 0,
+    /// Unknown health, on application startup
+    Unknown = 0,
     /// No connection, default
-    RED = 1,
+    Red = 1,
     /// Low quality connection to at least 1 public relay
-    ORANGE = 2,
+    Orange = 2,
     /// High quality connection to at least 1 public relay
-    YELLOW = 3,
+    Yellow = 3,
     /// High quality connection to at least 1 public relay and 1 NAT node
-    GREEN = 4,
+    Green = 4,
 }
 
 impl std::fmt::Display for Health {
@@ -201,7 +202,7 @@ impl Network {
             bad_quality_public: HashSet::new(),
             good_quality_non_public: HashSet::new(),
             bad_quality_non_public: HashSet::new(),
-            last_health: Health::UNKNOWN,
+            last_health: Health::Unknown,
             network_actions_api,
             metric_network_health: SimpleGauge::new("core_gauge_network_health", "Connectivity health indicator").ok(),
             metric_peers_by_quality: MultiGauge::new(
@@ -352,17 +353,17 @@ impl Network {
         let good_non_public = self.good_quality_non_public.len();
         let bad_public = self.bad_quality_public.len();
         let bad_non_public = self.bad_quality_non_public.len();
-        let mut health = Health::RED;
+        let mut health = Health::Red;
 
         if bad_public > 0 {
-            health = Health::ORANGE;
+            health = Health::Orange;
         }
 
         if good_public > 0 {
             health = if good_non_public > 0 || self.network_actions_api.is_public(&self.me) {
-                Health::GREEN
+                Health::Green
             } else {
-                Health::YELLOW
+                Health::Yellow
             };
         }
 
@@ -487,6 +488,11 @@ pub mod wasm {
                 Some(ret)
             }
         }
+    }
+
+    #[wasm_bindgen]
+    pub fn health_to_string(h: Health) -> String {
+        format!("{:?}", h)
     }
 
     #[wasm_bindgen]
@@ -785,11 +791,11 @@ mod tests {
 
     #[test]
     fn test_network_health_should_be_ordered_numerically_for_metrics_output() {
-        assert_eq!(Health::UNKNOWN as i32, 0);
-        assert_eq!(Health::RED as i32, 1);
-        assert_eq!(Health::ORANGE as i32, 2);
-        assert_eq!(Health::YELLOW as i32, 3);
-        assert_eq!(Health::GREEN as i32, 4);
+        assert_eq!(Health::Unknown as i32, 0);
+        assert_eq!(Health::Red as i32, 1);
+        assert_eq!(Health::Orange as i32, 2);
+        assert_eq!(Health::Yellow as i32, 3);
+        assert_eq!(Health::Green as i32, 4);
     }
 
     #[test]
@@ -994,7 +1000,7 @@ mod tests {
     fn test_network_should_have_no_knowledge_about_health_without_any_registered_peers() {
         let peers = basic_network(&PeerId::random());
 
-        assert_eq!(peers.health(), Health::UNKNOWN);
+        assert_eq!(peers.health(), Health::Unknown);
     }
 
     #[test]
@@ -1005,7 +1011,7 @@ mod tests {
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
 
-        assert_eq!(peers.health(), Health::RED);
+        assert_eq!(peers.health(), Health::Red);
     }
 
     #[test]
@@ -1018,7 +1024,7 @@ mod tests {
         let _ = peers.health();
         peers.remove(&peer);
 
-        assert_eq!(peers.health(), Health::RED);
+        assert_eq!(peers.health(), Health::Red);
     }
 
     #[test]
@@ -1033,7 +1039,7 @@ mod tests {
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
 
-        assert_eq!(peers.health(), Health::RED);
+        assert_eq!(peers.health(), Health::Red);
     }
 
     #[test]
@@ -1050,7 +1056,7 @@ mod tests {
 
         peers.update(&peer, Ok(current_timestamp()));
 
-        assert_eq!(peers.health(), Health::ORANGE);
+        assert_eq!(peers.health(), Health::Orange);
     }
 
     #[test]
@@ -1090,7 +1096,7 @@ mod tests {
             peers.update(&peer, Ok(current_timestamp()));
         }
 
-        assert_eq!(peers.health(), Health::GREEN);
+        assert_eq!(peers.health(), Health::Green);
     }
 
     #[test]
@@ -1114,6 +1120,6 @@ mod tests {
             peers.update(&peer, Ok(current_timestamp()));
         }
 
-        assert_eq!(peers.health(), Health::GREEN);
+        assert_eq!(peers.health(), Health::Green);
     }
 }

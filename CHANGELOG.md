@@ -12,8 +12,10 @@
 - Use simple moving average for smoothing network peer numbers presented to the Promiscuous strategy, add more logging ([#4763](https://github.com/hoprnet/hoprnet/pull/4763))
 - Migrate server-side relay code to Rust ([#4726](https://github.com/hoprnet/hoprnet/pull/4726))
 - Added Rust implementations of all the cryptographic functionality used in the HOPR protocol ([#3842](https://github.com/hoprnet/hoprnet/pull/3842))
-- Extend the Grafana dashboards with the new mixer metrics (current mixer queue size & average mixer delay) ([4768(https://github.com/hoprnet/hoprnet/pull/4768))
 - Add reported HOPR protocol version information to `ping` and `peers` endpoints ([#4777](https://github.com/hoprnet/hoprnet/pull/4777))
+- Extend the Grafana dashboards with the new mixer metrics (current mixer queue size & average mixer delay) ([#4768](https://github.com/hoprnet/hoprnet/pull/4768))
+- Expose full payment channel graph in `/channels` API ([#4756](https://github.com/hoprnet/hoprnet/pull/4756))
+- Fixed issue with too many channels being opened by the Promiscuous strategy, added option to enforce the maximum number of opened channels ([#4827](https://github.com/hoprnet/hoprnet/pull/4827))
 
 <a name="1.92"></a>
 
