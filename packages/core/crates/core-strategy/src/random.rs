@@ -53,7 +53,7 @@ pub mod wasm {
     impl RandomStrategy {
         #[wasm_bindgen(constructor)]
         pub fn _new() -> Self {
-            Self { }
+            Self {}
         }
 
         #[wasm_bindgen(getter)]

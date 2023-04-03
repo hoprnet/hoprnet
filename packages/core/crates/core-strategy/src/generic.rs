@@ -1,6 +1,6 @@
-use std::str::FromStr;
-use libp2p_identity::PeerId;
 use core_types::channels::ChannelStatus;
+use libp2p_identity::PeerId;
+use std::str::FromStr;
 use utils_types::primitives::{Balance, BalanceType};
 
 /// Basic strategy trait that all strategies must implement.
@@ -91,9 +91,9 @@ impl StrategyTickResult {
 /// WASM bindings for the generic strategy-related classes
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use std::str::FromStr;
     use js_sys::JsString;
     use libp2p_identity::PeerId;
+    use std::str::FromStr;
     use wasm_bindgen::prelude::wasm_bindgen;
     use wasm_bindgen::JsValue;
 
@@ -136,8 +136,12 @@ pub mod wasm {
                         .into_iter()
                         .map(|x| super::OutgoingChannelStatus::from(&x))
                         .collect(),
-                    to_close.iter()
-                        .map(|s| PeerId::from_str(String::from(s).as_str()).expect(format!("invalid peer id given: {0}", s).as_str()))
+                    to_close
+                        .iter()
+                        .map(|s| {
+                            PeerId::from_str(String::from(s).as_str())
+                                .expect(format!("invalid peer id given: {0}", s).as_str())
+                        })
                         .collect(),
                 ),
             })
@@ -160,7 +164,11 @@ pub mod wasm {
         }
 
         pub fn to_close(&self) -> Vec<JsString> {
-            self.w.to_close().iter().map(|s| JsString::from(s.to_base58())).collect()
+            self.w
+                .to_close()
+                .iter()
+                .map(|s| JsString::from(s.to_base58()))
+                .collect()
         }
     }
 
@@ -172,14 +180,24 @@ pub mod wasm {
             Ok(StrategyTickResult {
                 w: $strategy.tick(
                     $balance,
-                    $peer_ids.into_iter().map(|v| v.and_then(|v| v.as_string()
-                        .ok_or(wasm_bindgen::JsValue::from("not a string"))
-                        .and_then(|s| utils_misc::ok_or_jserr!(<libp2p_identity::PeerId as std::str::FromStr>::from_str(&s)))
-                    ).unwrap()),
-                    serde_wasm_bindgen::from_value::<Vec<crate::generic::wasm::OutgoingChannelStatus>>($outgoing_channels)?
-                        .iter()
-                        .map(|c| crate::generic::OutgoingChannelStatus::from(c))
-                        .collect(),
+                    $peer_ids.into_iter().map(|v| {
+                        v.and_then(|v| {
+                            v.as_string()
+                                .ok_or(wasm_bindgen::JsValue::from("not a string"))
+                                .and_then(|s| {
+                                    utils_misc::ok_or_jserr!(<libp2p_identity::PeerId as std::str::FromStr>::from_str(
+                                        &s
+                                    ))
+                                })
+                        })
+                        .unwrap()
+                    }),
+                    serde_wasm_bindgen::from_value::<Vec<crate::generic::wasm::OutgoingChannelStatus>>(
+                        $outgoing_channels,
+                    )?
+                    .iter()
+                    .map(|c| crate::generic::OutgoingChannelStatus::from(c))
+                    .collect(),
                     |peer_id: &str| {
                         $quality_of
                             .call1(&wasm_bindgen::JsValue::null(), &js_sys::JsString::from(peer_id))
@@ -187,7 +205,7 @@ pub mod wasm {
                             .map(|q| q.as_f64())
                             .flatten()
                     },
-                )
+                ),
             })
         };
     }

@@ -157,12 +157,19 @@ impl ChannelStrategy for PromiscuousStrategy {
 
         // Count all the opened channels
         let count_opened = outgoing_channels.iter().filter(|c| c.status == Open).count();
-        let occupied = if count_opened > to_close.len() { count_opened - to_close.len() } else { 0 };
+        let occupied = if count_opened > to_close.len() {
+            count_opened - to_close.len()
+        } else {
+            0
+        };
 
         // If there is still more channels opened than we allow, close some
         // lowest-quality ones which passed the threshold
         if occupied > max_auto_channels && self.enforce_max_channels {
-            warn!("there are {} opened channels, but the strategy allows only {}", occupied, max_auto_channels);
+            warn!(
+                "there are {} opened channels, but the strategy allows only {}",
+                occupied, max_auto_channels
+            );
 
             let mut sorted_channels: Vec<OutgoingChannelStatus> = outgoing_channels
                 .iter()
@@ -172,9 +179,10 @@ impl ChannelStrategy for PromiscuousStrategy {
 
             // Sort by quality, lowest-quality first
             sorted_channels.sort_unstable_by(|p1, p2| {
-                    quality_of_peer(&p1.peer_id.to_base58()).zip(quality_of_peer(&p2.peer_id.to_base58()))
-                        .and_then(|(q1, q2)| q1.partial_cmp(&q2))
-                        .expect(format!("failed to retrieve quality of {} or {}", p1.peer_id, p2.peer_id).as_str())
+                quality_of_peer(&p1.peer_id.to_base58())
+                    .zip(quality_of_peer(&p2.peer_id.to_base58()))
+                    .and_then(|(q1, q2)| q1.partial_cmp(&q2))
+                    .expect(format!("failed to retrieve quality of {} or {}", p1.peer_id, p2.peer_id).as_str())
             });
 
             // Close the lowest-quality channels (those we did not mark for closing yet)
@@ -198,7 +206,10 @@ impl ChannelStrategy for PromiscuousStrategy {
             for peer_id in new_channel_candidates.into_iter().map(|(p, _)| p) {
                 // Stop if we ran out of balance
                 if remaining_balance.lte(&self.minimum_node_balance) {
-                    warn!("strategy ran out of allowed node balance - balance is {}", remaining_balance.to_string());
+                    warn!(
+                        "strategy ran out of allowed node balance - balance is {}",
+                        remaining_balance.to_string()
+                    );
                     break;
                 }
 
@@ -283,7 +294,7 @@ mod tests {
         strat.sma.add_sample(peers.len());
         strat.sma.add_sample(peers.len());
 
-        let results = strat.tick(balance, peers.iter().map(|(x,_)| x.clone()), outgoing_channels, |s| {
+        let results = strat.tick(balance, peers.iter().map(|(x, _)| x.clone()), outgoing_channels, |s| {
             peers.get(&PeerId::from_str(s).unwrap()).copied()
         });
 
@@ -292,8 +303,15 @@ mod tests {
         assert_eq!(results.to_close().len(), 2);
         assert_eq!(results.to_open().len(), 3);
 
-        assert_vec_eq!(results.to_close(), vec![ alice, gustave ]);
-        assert_vec_eq!(results.to_open().into_iter().map(|r| r.peer_id).collect::<Vec<PeerId>>(), vec![gustave, eugene, bob]);
+        assert_vec_eq!(results.to_close(), vec![alice, gustave]);
+        assert_vec_eq!(
+            results
+                .to_open()
+                .into_iter()
+                .map(|r| r.peer_id)
+                .collect::<Vec<PeerId>>(),
+            vec![gustave, eugene, bob]
+        );
     }
 
     #[test]
@@ -308,7 +326,7 @@ mod tests {
                 outgoing_channels.push(OutgoingChannelStatus {
                     peer_id: peerid,
                     stake: Balance::from_str("100000000000000000", BalanceType::HOPR),
-                    status: Open
+                    status: Open,
                 });
             }
         }
@@ -317,22 +335,27 @@ mod tests {
         strat.sma.add_sample(peers.len());
         strat.sma.add_sample(peers.len());
 
-        let results = strat.tick(Balance::from_str("1000000000000000000", BalanceType::HOPR),
-                                 peers.iter().map(|(&x, _)| x.clone()),
-                                 outgoing_channels.clone(), |s| {
-                                    peers.get(&PeerId::from_str(s).unwrap()).copied()
-            });
+        let results = strat.tick(
+            Balance::from_str("1000000000000000000", BalanceType::HOPR),
+            peers.iter().map(|(&x, _)| x.clone()),
+            outgoing_channels.clone(),
+            |s| peers.get(&PeerId::from_str(s).unwrap()).copied(),
+        );
 
         assert_eq!(results.max_auto_channels(), 10);
         assert_eq!(results.to_open().len(), 0);
         assert_eq!(results.to_close().len(), 10);
 
         // Only the last 10 lowest quality channels get closed
-        assert_vec_eq!(results.to_close(), outgoing_channels.into_iter()
-            .rev()
-            .map(|s| s.peer_id)
-            .take(10)
-            .collect::<Vec<PeerId>>());
+        assert_vec_eq!(
+            results.to_close(),
+            outgoing_channels
+                .into_iter()
+                .rev()
+                .map(|s| s.peer_id)
+                .take(10)
+                .collect::<Vec<PeerId>>()
+        );
     }
 }
 

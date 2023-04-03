@@ -55,7 +55,7 @@ pub mod wasm {
     impl PassiveStrategy {
         #[wasm_bindgen(constructor)]
         pub fn _new() -> Self {
-            Self { }
+            Self {}
         }
 
         #[wasm_bindgen(getter)]
