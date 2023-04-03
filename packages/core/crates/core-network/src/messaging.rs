@@ -1,6 +1,7 @@
 use crate::errors::NetworkingError::MessagingError;
 use core_crypto::derivation::derive_ping_pong;
 use serde::{Deserialize, Serialize};
+use utils_types::errors::GeneralError::ParseError;
 use utils_types::traits::{BinarySerializable};
 
 use crate::errors::Result;
@@ -82,10 +83,14 @@ impl BinarySerializable<'_> for PingMessage {
     // This implementation is backwards compatible with older HOPR versions
 
     fn deserialize(data: &[u8]) -> utils_types::errors::Result<Self> {
-        let mut ret = PingMessage::default();
-        let mut buf: Vec<u8> = data.into();
-        ret.nonce.copy_from_slice(buf.drain(0..Self::SIZE).as_ref());
-        Ok(ret)
+        if data.len() >= Self::SIZE {
+            let mut ret = PingMessage::default();
+            let mut buf: Vec<u8> = data.into();
+            ret.nonce.copy_from_slice(buf.drain(0..Self::SIZE).as_ref());
+            Ok(ret)
+        } else {
+            Err(ParseError)
+        }
     }
 
     fn serialize(&self) -> Box<[u8]> {
