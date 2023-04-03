@@ -51,7 +51,7 @@
     "express-openapi": "12.1.0",
     "rlp": "3.0.0",
     "semver": "7.3.7",
-    "swagger-ui-express": "4.6.0",
+    "swagger-ui-express": "4.6.2",
     "trace-unhandled": "2.0.1",
     "uuid": "^9.0.0",
     "ws": "8.12.0"
