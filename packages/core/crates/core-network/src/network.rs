@@ -434,8 +434,7 @@ pub mod wasm {
     use wasm_bindgen::prelude::*;
 
     #[wasm_bindgen]
-    pub fn health_to_string(h: Health) -> String
-    {
+    pub fn health_to_string(h: Health) -> String {
         format!("{:?}", h)
     }
 
