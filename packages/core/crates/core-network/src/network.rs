@@ -470,8 +470,8 @@ pub mod wasm {
     use super::*;
     use js_sys::JsString;
     use std::str::FromStr;
-    use wasm_bindgen::prelude::*;
     use utils_misc::utils::wasm::js_map_to_hash_map;
+    use wasm_bindgen::prelude::*;
 
     #[wasm_bindgen]
     pub fn health_to_string(h: Health) -> String {

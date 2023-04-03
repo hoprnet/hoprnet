@@ -26,11 +26,11 @@ use async_std::task::sleep;
 #[cfg(any(not(feature = "wasm"), test))]
 use utils_misc::time::native::current_timestamp;
 
+use crate::messaging::ControlMessage::Pong;
 #[cfg(all(feature = "wasm", not(test)))]
 use gloo_timers::future::sleep;
 #[cfg(all(feature = "wasm", not(test)))]
 use utils_misc::time::wasm::current_timestamp;
-use crate::messaging::ControlMessage::Pong;
 
 const PINGS_MAX_PARALLEL: usize = 14;
 
@@ -184,7 +184,14 @@ impl Ping {
             };
 
             let timeout = sleep(std::cmp::min(timeout_duration, self.config.timeout)).fuse();
-            let ping = async { send_msg(sent_ping.get_ping_message().unwrap().serialize(), destination.to_string()).await }.fuse();
+            let ping = async {
+                send_msg(
+                    sent_ping.get_ping_message().unwrap().serialize(),
+                    destination.to_string(),
+                )
+                .await
+            }
+            .fuse();
 
             pin_mut!(timeout, ping);
 
@@ -193,7 +200,9 @@ impl Ping {
                 Either::Right((v, _)) => match v {
                     Ok(received) => PingMessage::deserialize(received.as_ref())
                         .map_err(|_| DecodingError)
-                        .and_then(|deserialized| ControlMessage::validate_pong_response(&sent_ping, &Pong(deserialized))),
+                        .and_then(|deserialized| {
+                            ControlMessage::validate_pong_response(&sent_ping, &Pong(deserialized))
+                        }),
                     Err(description) => Err(Other(format!(
                         "Ping to peer '{}' failed with: {}",
                         destination.to_string(),
@@ -204,7 +213,7 @@ impl Ping {
 
             match &ping_result {
                 Ok(_) => info!("Successfully pinged peer {}", destination),
-                Err(e) => error!("Ping to peer {} failed with error: {}", destination, e)
+                Err(e) => error!("Ping to peer {} failed with error: {}", destination, e),
             }
 
             (
@@ -383,11 +392,11 @@ pub mod wasm {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::messaging::ControlMessage;
+    use crate::ping::Ping;
     use mockall::*;
     use more_asserts::*;
     use std::str::FromStr;
-    use crate::messaging::ControlMessage;
-    use crate::ping::Ping;
 
     fn simple_ping_config() -> PingConfig {
         PingConfig {

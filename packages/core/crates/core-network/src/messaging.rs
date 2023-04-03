@@ -2,7 +2,7 @@ use crate::errors::NetworkingError::MessagingError;
 use core_crypto::derivation::derive_ping_pong;
 use serde::{Deserialize, Serialize};
 use utils_types::errors::GeneralError::ParseError;
-use utils_types::traits::{BinarySerializable};
+use utils_types::traits::BinarySerializable;
 
 use crate::errors::Result;
 
@@ -74,7 +74,7 @@ impl PingMessage {
 }
 
 #[cfg(not(feature = "compat-ping"))]
-impl utils_types::traits::AutoBinarySerializable<'_> for PingMessage { }
+impl utils_types::traits::AutoBinarySerializable<'_> for PingMessage {}
 
 #[cfg(feature = "compat-ping")]
 impl BinarySerializable<'_> for PingMessage {
@@ -102,9 +102,9 @@ impl BinarySerializable<'_> for PingMessage {
 
 #[cfg(test)]
 mod tests {
+    use crate::messaging::ControlMessage::{Ping, Pong};
     use crate::messaging::{ControlMessage, PingMessage};
     use utils_types::traits::BinarySerializable;
-    use crate::messaging::ControlMessage::{Ping, Pong};
 
     #[test]
     fn test_ping_pong_roundtrip() {

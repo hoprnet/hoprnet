@@ -10,6 +10,7 @@ pub struct HeartbeatConfig {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
+    use crate::errors::NetworkingError;
     use crate::heartbeat::HeartbeatConfig;
     use crate::messaging::{ControlMessage, ControlMessage::Ping, PingMessage};
     use futures::stream::{Stream, StreamExt};
@@ -20,7 +21,6 @@ pub mod wasm {
     use utils_types::traits::BinarySerializable;
     use wasm_bindgen::prelude::*;
     use wasm_bindgen_futures::stream::JsStream;
-    use crate::errors::NetworkingError;
 
     #[wasm_bindgen]
     impl HeartbeatConfig {

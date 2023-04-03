@@ -21,8 +21,8 @@ pub fn get_package_version(package_file: &str) -> Result<String, RealError> {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use std::collections::HashMap;
     use crate::ok_or_jserr;
+    use std::collections::HashMap;
     use wasm_bindgen::prelude::*;
 
     pub type JsResult<T> = Result<T, JsValue>;
