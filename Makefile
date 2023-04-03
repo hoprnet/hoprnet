@@ -227,6 +227,11 @@ else
 	yarn workspace @hoprnet/${package} run test:wasm
 endif
 
+.PHONY: smoke-test
+smoke-test: ## run smoke tests
+	source .venv/bin/activate && python3 -m pytest tests/
+
+
 .PHONY: smart-contract-test
 smart-contract-test: # forge test smart contracts
 	$(MAKE) -C packages/ethereum/contracts/ sc-test
