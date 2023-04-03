@@ -102,8 +102,7 @@ impl ChannelStrategy for PromiscuousStrategy {
             // Also get channels we have opened with it
             let channel_with_peer = outgoing_channels
                 .iter()
-                .filter(|c| c.status == Open)
-                .find(|c| c.peer_id == peer_id);
+                .find(|c| c.status == Open && c.peer_id == peer_id);
 
             if let Some(channel) = channel_with_peer {
                 if quality <= self.network_quality_threshold {
@@ -158,7 +157,7 @@ impl ChannelStrategy for PromiscuousStrategy {
 
         // Count all the opened channels
         let count_opened = outgoing_channels.iter().filter(|c| c.status == Open).count();
-        let occupied = count_opened - to_close.len();
+        let occupied = if count_opened > to_close.len() { count_opened - to_close.len() } else { 0 };
 
         // If there is still more channels opened than we allow, close some
         // lowest-quality ones which passed the threshold
