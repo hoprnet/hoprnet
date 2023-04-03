@@ -26,7 +26,7 @@ elliptic-curve = "0.13"
 generic-array = "0.14.6"
 getrandom = { version = "0.2.8", features = ["js"] }
 hex = "0.4"
-hex-literal = "0.3"
+hex-literal = "0.4"
 hkdf = "0.12"
 hmac = "0.12"
 js-sys = { version = "0.3.60", optional = true }
