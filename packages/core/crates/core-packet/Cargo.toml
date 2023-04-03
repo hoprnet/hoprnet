@@ -17,9 +17,12 @@ wasm = []
 
 [dependencies]
 core-crypto = { path = "../core-crypto" }
+core-types = { path = "../core-types" }
 js-sys = { version = "0.3.60", optional = true }
+libp2p-identity = { version = "0.1.1", features = ["secp256k1", "peerid"] }
 thiserror = "1.0"
 utils-log = { path = "../../../utils/crates/utils-log" }
+utils-metrics = { path = "../../../utils/crates/utils-metrics" }
 utils-types = { path = "../../../utils/crates/utils-types" }
 wasm-bindgen = { workspace = true, optional = true }
 
@@ -28,7 +31,3 @@ console_error_panic_hook = { version = "0.1.7", optional = true }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.33"
-
-[profile.release]
-# Tell `rustc` to optimize for small code size.
-opt-level = "s"

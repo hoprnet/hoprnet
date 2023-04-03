@@ -106,7 +106,7 @@ pub fn create_tagged_mac(secret: &[u8], data: &[u8]) -> Result<Box<[u8]>> {
 
 #[cfg(test)]
 mod tests {
-    use crate::parameters::SECRET_KEY_LENGTH;
+    use crate::parameters::{MAC_LENGTH, SECRET_KEY_LENGTH};
     use crate::primitives::wasm::create_tagged_mac;
     use crate::primitives::SimpleStreamCipher;
     use hex_literal::hex;
@@ -149,6 +149,7 @@ mod tests {
         let mac = create_tagged_mac(&key, &data).unwrap();
 
         let expected = hex!("a52161fd19f576948f13effe9fb66b5705607e626f5a6621c20c828495639d04");
+        assert_eq!(MAC_LENGTH, mac.len());
         assert_eq!(expected, mac.as_ref())
     }
 }

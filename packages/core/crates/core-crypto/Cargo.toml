@@ -1,6 +1,6 @@
 [package]
 name = "core-crypto"
-version = "0.1.0"
+version = "0.2.0"
 description = "Core cryptographic primitives and functions used in the HOPR protocol"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
@@ -13,7 +13,6 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 default = ["console_error_panic_hook", "wasm"]
-ed25519 = [ ]
 wasm = ["dep:wasm-bindgen", "dep:js-sys"]
 
 [dependencies]
@@ -21,6 +20,7 @@ aes = "0.8"
 blake2 = "0.10"
 chacha20 = "0.9"
 ctr = "0.9"
+curve25519-dalek-ng = "4.1"
 digest = "0.10"
 elliptic-curve = "0.13"
 generic-array = "0.14.6"

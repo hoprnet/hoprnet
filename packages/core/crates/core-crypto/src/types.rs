@@ -83,6 +83,7 @@ impl CurvePoint {
         PublicKey::from_privkey(exponent).map(CurvePoint::from)
     }
 
+    /// Creates a curve point from the affine point representation
     pub fn from_affine(affine: AffinePoint) -> Self {
         Self { affine }
     }

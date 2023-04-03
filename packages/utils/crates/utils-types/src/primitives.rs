@@ -280,6 +280,14 @@ impl U256 {
             value: u256::from_str_radix(value, 10).expect("invalid decimal number string"),
         }
     }
+
+    pub fn zero() -> Self {
+        U256 { value: u256::ZERO }
+    }
+
+    pub fn one() -> Self {
+        U256 { value: u256::ONE }
+    }
 }
 
 impl BinarySerializable for U256 {

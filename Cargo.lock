@@ -1052,13 +1052,14 @@ dependencies = [
 
 [[package]]
 name = "core-crypto"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "aes",
  "blake2",
  "chacha20",
  "console_error_panic_hook",
  "ctr",
+ "curve25519-dalek-ng",
  "digest 0.10.6",
  "elliptic-curve 0.13.2",
  "generic-array 0.14.6",
@@ -1179,9 +1180,12 @@ version = "0.1.0"
 dependencies = [
  "console_error_panic_hook",
  "core-crypto",
+ "core-types",
  "js-sys",
+ "libp2p-identity",
  "thiserror",
  "utils-log",
+ "utils-metrics",
  "utils-types",
  "wasm-bindgen",
  "wasm-bindgen-test",
@@ -1210,7 +1214,7 @@ dependencies = [
 
 [[package]]
 name = "core-types"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "console_error_panic_hook",
  "core-crypto",
@@ -1419,6 +1423,19 @@ dependencies = [
  "digest 0.9.0",
  "rand_core 0.5.1",
  "subtle",
+ "zeroize",
+]
+
+[[package]]
+name = "curve25519-dalek-ng"
+version = "4.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1c359b7249347e46fb28804470d071c921156ad62b3eef5d34e2ba867533dec8"
+dependencies = [
+ "byteorder",
+ "digest 0.9.0",
+ "rand_core 0.6.4",
+ "subtle-ng",
  "zeroize",
 ]
 
@@ -5773,6 +5790,12 @@ name = "subtle"
 version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6bdef32e8150c2a081110b42772ffe7d7c9032b606bc226c8260fd97e0976601"
+
+[[package]]
+name = "subtle-ng"
+version = "2.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "734676eb262c623cec13c3155096e08d1f8f29adce39ba17948b18dad1e54142"
 
 [[package]]
 name = "syn"

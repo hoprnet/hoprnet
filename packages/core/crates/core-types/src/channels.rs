@@ -277,6 +277,19 @@ impl Ticket {
         }
     }
 
+    /// Convenience method for creating a zero-hop ticket
+    pub fn create_zero_hop(destination: PublicKey, challenge: Challenge, private_key: &[u8]) -> Self {
+        Self::create(destination.to_address(),
+                     challenge,
+                     U256::zero(),
+                     U256::zero(),
+                     Balance::new(0.into(), BalanceType::HOPR),
+                    U256::zero(),
+                     U256::zero(),
+                    private_key
+        )
+    }
+
     /// Serializes the ticket except the signature
     pub fn serialize_unsigned(&self) -> Box<[u8]> {
         Self::serialize_unsigned_aux(

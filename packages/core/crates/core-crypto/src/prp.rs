@@ -3,6 +3,7 @@ use crate::errors::CryptoError::InvalidInputValue;
 use crate::errors::Result;
 
 use crate::primitives::{calculate_mac, SimpleStreamCipher};
+use crate::utils;
 
 // Module-specific constants
 const PRP_INTERMEDIATE_KEY_LENGTH: usize = 32;
@@ -124,21 +125,13 @@ impl PRP {
 
     fn xor_hash(data: &mut [u8], key: &[u8], iv: &[u8]) -> Result<()> {
         let res = calculate_mac([key, iv].concat().as_slice(), &data[PRP_MIN_LENGTH..])?;
-        Self::xor_inplace(data, res.as_ref());
+        utils::xor_inplace(data, res.as_ref());
         Ok(())
-    }
-
-    fn xor_inplace(a: &mut [u8], b: &[u8]) {
-        let bound = if a.len() > b.len() { b.len() } else { a.len() };
-        // TODO: Certainly space for SIMD optimization
-        for i in 0..bound {
-            a[i] = a[i] ^ b[i];
-        }
     }
 
     fn xor_keystream(data: &mut [u8], key: &[u8], iv: &[u8]) -> Result<()> {
         let mut key_cpy = Vec::from(key);
-        Self::xor_inplace(key_cpy.as_mut_slice(), &data[0..PRP_MIN_LENGTH]);
+        utils::xor_inplace(key_cpy.as_mut_slice(), &data[0..PRP_MIN_LENGTH]);
 
         let mut cipher = SimpleStreamCipher::new(key_cpy.as_slice(), &iv[4..iv.len()])?;
 
