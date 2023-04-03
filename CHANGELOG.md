@@ -1,5 +1,9 @@
 # Changelog
 
+<a name="1.93"></a>
+
+## [1.93](https://github.com/hoprnet/hoprnet/compare/release/riga...hoprnet:release/bratislava)
+
 - Migrate the `Heartbeat`, `Ping` and `Network` functionality into Rust ([#4568](https://github.com/hoprnet/hoprnet/pull/4658))
 - Rebrand `foundry-tool` to `hopli` and allow it to interact with identities and network-registry ([#4652](https://github.com/hoprnet/hoprnet/pull/4652))
 - Migrate mixer code to Rust ([#4567](https://github.com/hoprnet/hoprnet/pull/4567))
