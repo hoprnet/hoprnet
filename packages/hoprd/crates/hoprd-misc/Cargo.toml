@@ -1,6 +1,6 @@
 [package]
 name = "hoprd-misc"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Rust WASM modules for HOPRd"
@@ -30,6 +30,7 @@ proc-macro-regex = "~1.1.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 serde_json = "1.0"
+thiserror = "1.0"
 serde-wasm-bindgen = { version = "0.4", optional = true }
 utils-log = { path = "../../../utils/crates/utils-log" }
 utils-misc = { path = "../../../utils/crates/utils-misc" }

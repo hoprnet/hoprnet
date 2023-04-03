@@ -1,6 +1,4 @@
 use proc_macro_regex::regex;
-use utils_log::error;
-
 use serde::{Deserialize, Serialize};
 use validator::{Validate, ValidationError};
 
@@ -28,17 +26,21 @@ fn validate_ipv4_address(s: &str) -> Result<(), ValidationError> {
     if validator::validate_ip(s) {
         Ok(())
     } else {
-        error!("Validation failed: '{}' is not a valid IPv4", s);
         Err(ValidationError::new("Invalid IPv4 address provided"))
     }
 }
 
-fn validate_api_token(token: Option<&str>) -> Result<(), ValidationError> {
-    // TODO: should be only alphanumeric?
-    if token.is_some() && token.unwrap().len() < MINIMAL_API_TOKEN_LENGTH {
-        Err(ValidationError::new("The validation token is too short"))
-    } else {
-        Ok(())
+fn validate_api_auth(token: &Auth) -> Result<(), ValidationError> {
+    match &token {
+        Auth::None => Ok(()),
+        Auth::Token(token) => {
+            if token.len() >= MINIMAL_API_TOKEN_LENGTH {
+                // TODO: add more token limitations? alhpanumeric?
+                Ok(())
+            } else {
+                Err(ValidationError::new("The validation token is too short"))
+            }
+        }
     }
 }
 
@@ -47,20 +49,8 @@ fn validate_api_token(token: Option<&str>) -> Result<(), ValidationError> {
 pub struct Host {
     #[validate(custom = "validate_ipv4_address")]
     pub ip: String,
+    #[validate(range(min = 1u16))]
     pub port: u16,
-}
-
-fn parse_host(s: &str) -> Result<Host, String> {
-    if !validator::validate_ip_v4(s) {
-        return Err(format!(
-            "Given string {} is not a valid host, Example: {}:{}",
-            s,
-            DEFAULT_HOST.to_string(),
-            DEFAULT_PORT.to_string()
-        ));
-    }
-
-    Host::from_ipv4_host_string(s)
 }
 
 impl Host {
@@ -85,57 +75,48 @@ impl ToString for Host {
     }
 }
 
-fn parse_api_token(mut s: &str) -> Result<String, String> {
-    if s.len() < MINIMAL_API_TOKEN_LENGTH {
-        return Err(format!(
-            "Length of API token is too short, minimally required {} but given {}",
-            MINIMAL_API_TOKEN_LENGTH.to_string(),
-            s.len()
-        ));
-    }
-
-    match (s.starts_with("'"), s.ends_with("'")) {
-        (true, true) => {
-            s = s.strip_prefix("'").unwrap();
-            s = s.strip_suffix("'").unwrap();
-
-            Ok(s.into())
-        }
-        (true, false) => Err(format!("Found leading quote but no trailing quote")),
-        (false, true) => Err(format!("Found trailing quote but no leading quote")),
-        (false, false) => Ok(s.into()),
-    }
-}
-
-use clap::builder::{PossibleValuesParser, ValueParser};
-use clap::{Arg, ArgAction, ArgMatches, Args, Command, FromArgMatches as _};
-
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub enum Auth {
     None,
-    Token, // To change into proper type string once wasm_bindgen disappears
+    Token(String),
 }
 
 #[wasm_bindgen_if(getter_with_clone)]
-#[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
+#[derive(Debug, Validate, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Api {
     pub enabled: bool,
-    pub auth: Auth,
-    pub token: Option<String>,
+    /// Auth enum holding the API auth configuration
+    ///
+    /// The auth enum cannot be made public due to incompatibility with the wasm_bindgen.
+    #[validate(custom = "validate_api_auth")]
+    auth: Auth,
+    #[validate]
     pub host: Host,
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+impl Api {
+    pub fn is_auth_disabled(&self) -> bool {
+        self.auth == Auth::None
+    }
+
+    pub fn auth_token(&self) -> Option<String> {
+        match &self.auth {
+            Auth::None => None,
+            Auth::Token(token) => Some(token.clone()),
+        }
+    }
 }
 
 impl Default for Api {
     fn default() -> Self {
         Self {
             enabled: false,
-            auth: Auth::Token,
-            token: None,
+            auth: Auth::Token("".to_owned()),
             host: Host {
                 ip: DEFAULT_API_HOST.to_string(),
                 port: DEFAULT_API_PORT,
-            }
+            },
         }
     }
 }
@@ -153,7 +134,7 @@ impl Default for HealthCheck {
         Self {
             enabled: false,
             host: DEFAULT_HEALTH_CHECK_HOST.to_string(),
-            port: DEFAULT_HEALTH_CHECK_PORT
+            port: DEFAULT_HEALTH_CHECK_PORT,
         }
     }
 }
@@ -180,7 +161,6 @@ impl Default for Heartbeat {
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct Network {
     pub announce: bool,
-    pub heartbeat: Heartbeat,
     pub allow_local_node_connections: bool,
     pub allow_private_node_connections: bool,
     pub max_parallel_connections: u32,
@@ -191,11 +171,10 @@ impl Default for Network {
     fn default() -> Self {
         Self {
             announce: false,
-            heartbeat: Heartbeat::default(),
             allow_local_node_connections: false,
             allow_private_node_connections: false,
             max_parallel_connections: DEFAULT_MAX_PARALLEL_CONNECTIONS,
-            network_quality_threshold: DEFAULT_NETWORK_QUALITY_THRESHOLD
+            network_quality_threshold: DEFAULT_NETWORK_QUALITY_THRESHOLD,
         }
     }
 }
@@ -213,7 +192,7 @@ impl Default for Chain {
         Self {
             provider: None,
             check_unrealized_balance: false,
-            on_chain_confirmations: DEFAULT_CONFIRMATIONS
+            on_chain_confirmations: DEFAULT_CONFIRMATIONS,
         }
     }
 }
@@ -221,6 +200,7 @@ impl Default for Chain {
 #[wasm_bindgen_if(getter_with_clone)]
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct Strategy {
+    // TODO: implement checks
     pub name: Option<String>,
     pub max_auto_channels: Option<u32>,
     pub auto_redeem_tickets: bool,
@@ -236,19 +216,69 @@ impl Default for Strategy {
     }
 }
 
+fn validate_file_path(s: &str) -> Result<(), ValidationError> {
+    if std::path::Path::new(s).is_file() {
+        Ok(())
+    } else {
+        Err(ValidationError::new("Invalid file path specified"))
+    }
+}
+
+fn validate_password(s: &str) -> Result<(), ValidationError> {
+    if !s.is_empty() {
+        Ok(())
+    } else {
+        Err(ValidationError::new("No password could be found"))
+    }
+}
+
+regex!(is_private_key "^[a-fA-F0-9]{64}$");
+regex!(is_prefixed_private_key "^0x[a-fA-F0-9]{64}$");
+
+pub(crate) fn validate_private_key(s: &str) -> Result<(), ValidationError> {
+    if is_private_key(s) || is_prefixed_private_key(s) {
+        Ok(())
+    } else {
+        Err(ValidationError::new("No valid private key could be found"))
+    }
+}
+
 #[wasm_bindgen_if(getter_with_clone)]
-#[derive(Debug, Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
+#[derive(Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct Identity {
+    #[validate(custom = "validate_file_path")]      // TODO: works in wasm?
     pub file: String,
-    // path
-    pub password: Option<String>,
-    pub private_key: Option<Box<[u8]>>,
+    #[validate(custom = "validate_password")]
+    pub password: String,
+    #[validate(custom = "validate_private_key")]
+    pub private_key: String,
+}
+
+impl std::fmt::Debug for Identity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let obfuscated: String = "<REDACTED>".into();
+
+        f.debug_struct("Identity")
+            .field("file", &self.file)
+            .field("password", &obfuscated)
+            .field("private_key", &obfuscated)
+            .finish()
+    }
+}
+
+fn validate_directory_path(s: &str) -> Result<(), ValidationError> {
+    if std::path::Path::new(s).is_dir() {
+        Ok(())
+    } else {
+        Err(ValidationError::new("Invalid directory path specified"))
+    }
 }
 
 #[wasm_bindgen_if(getter_with_clone)]
 #[derive(Debug, Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct Db {
     /// Path to the directory containing the database
+    #[validate(custom = "validate_directory_path")]      // TODO: works in wasm?
     pub data: String,
     pub init: bool,
     pub force_init: bool,
@@ -266,18 +296,29 @@ pub struct Testing {
 }
 
 #[wasm_bindgen_if(getter_with_clone)]
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct HoprdConfig {
+    #[validate]
     pub host: Host,
+    #[validate]
     pub identity: Identity,
+    #[validate]
     pub db: Db,
+    #[validate]
     pub api: Api,
+    #[validate]
     pub strategy: Strategy,
+    #[validate]
+    pub heartbeat: Heartbeat,
+    #[validate]
     pub network: Network,
+    #[validate]
     pub healthcheck: HealthCheck,
     pub environment: String,
+    #[validate]
     pub chain: Chain,
 
+    #[validate]
     pub test: Testing,
 }
 
@@ -286,12 +327,13 @@ impl Default for HoprdConfig {
         Self {
             host: Host {
                 ip: DEFAULT_HOST.to_string(),
-                port: DEFAULT_PORT
+                port: DEFAULT_PORT,
             },
             identity: Identity::default(),
             db: Db::default(),
             api: Api::default(),
             strategy: Strategy::default(),
+            heartbeat: Heartbeat::default(),
             network: Network::default(),
             healthcheck: HealthCheck::default(),
             environment: String::default(),
@@ -308,15 +350,16 @@ use real_base::file::native::read_to_string;
 use real_base::file::wasm::read_to_string;
 
 
-
-impl From<crate::cli::CliArgs> for HoprdConfig {
-    fn from(cli_args: crate::cli::CliArgs) -> Self {
-        // TODO: fail on incorrect path? Or use default?
-        // let mut cfg = HoprdConfig::default();
-        let yaml_configuration = read_to_string(cli_args.configuration_file_path.as_str())
-            .unwrap_or_else(|e| panic!("Failed to read the configuration file: {}", e.to_string()));
-        let mut cfg: HoprdConfig = serde_yaml::from_str(&yaml_configuration)
-            .unwrap_or_else(|e| panic!("Failed to deserialize the configuration: {}", e.to_string()));
+impl HoprdConfig {
+    pub fn from_cli_args(cli_args: crate::cli::CliArgs, skip_validation: bool) -> crate::errors::Result<HoprdConfig> {
+        let mut cfg: HoprdConfig = if let Some(cfg_path) = cli_args.configuration_file_path {
+            let yaml_configuration = read_to_string(cfg_path.as_str())
+                .map_err(|e| crate::errors::HoprdConfigError::FileError(e.to_string()))?;
+            serde_yaml::from_str(&yaml_configuration)
+                .map_err(|e| crate::errors::HoprdConfigError::SerializationError(e.to_string()))?
+        } else {
+            HoprdConfig::default()
+        };
 
         cfg.environment = cli_args.environment;
 
@@ -331,16 +374,22 @@ impl From<crate::cli::CliArgs> for HoprdConfig {
         // api
         if let Some(x) = cli_args.api { cfg.api.enabled = x };
         if let Some(x) = cli_args.disable_api_authentication {
-            cfg.api.auth = if x { Auth::None } else { Auth::Token };
+            if !x {
+                if &cfg.api.auth != &Auth::None {
+                    cfg.api.auth = Auth::None;
+                }
+            }
         };
-        if let Some(x) = cli_args.api_token { cfg.api.token = Some(x) };
+        if let Some(x) = cli_args.api_token {
+            cfg.api.auth = Auth::Token(x);
+        };
         if let Some(x) = cli_args.api_host { cfg.api.host.ip = x };
         if let Some(x) = cli_args.api_port { cfg.api.host.port = x };
 
         // heartbeat
-        if let Some(x) = cli_args.heartbeat_interval { cfg.network.heartbeat.interval = x };
-        if let Some(x) = cli_args.heartbeat_threshold { cfg.network.heartbeat.threshold = x };
-        if let Some(x) = cli_args.heartbeat_variance { cfg.network.heartbeat.variance = x };
+        if let Some(x) = cli_args.heartbeat_interval { cfg.heartbeat.interval = x };
+        if let Some(x) = cli_args.heartbeat_threshold { cfg.heartbeat.threshold = x };
+        if let Some(x) = cli_args.heartbeat_variance { cfg.heartbeat.variance = x };
 
         // network
         if let Some(x) = cli_args.announce { cfg.network.announce = x };
@@ -360,8 +409,8 @@ impl From<crate::cli::CliArgs> for HoprdConfig {
 
         // identity
         cfg.identity.file = cli_args.identity;
-        if let Some(x) = cli_args.password { cfg.identity.password = Some(x) };
-        if let Some(x) = cli_args.private_key { cfg.identity.private_key = Some(x) };
+        if let Some(x) = cli_args.password { cfg.identity.password = x };
+        if let Some(x) = cli_args.private_key { cfg.identity.private_key = x };
 
         // strategy
         if let Some(x) = cli_args.default_strategy { cfg.strategy.name = Some(x) };
@@ -381,7 +430,42 @@ impl From<crate::cli::CliArgs> for HoprdConfig {
         if let Some(x) = cli_args.test_no_direct_connections { cfg.test.no_direct_connections = x };
         if let Some(x) = cli_args.test_use_weak_crypto { cfg.test.use_weak_crypto = x };
 
-        cfg
+        if skip_validation {
+            Ok(cfg)
+        } else {
+            match cfg.validate() {
+                Ok(_) => Ok(cfg),
+                Err(e) => Err(crate::errors::HoprdConfigError::ValidationError(e.to_string()))
+            }
+        }
+    }
+}
+
+#[cfg(feature = "wasm")]
+pub mod wasm {
+    use wasm_bindgen::prelude::*;
+    use wasm_bindgen::JsValue;
+    use utils_misc::{ok_or_jserr};
+    use crate::config::HoprdConfig;
+
+    #[wasm_bindgen]
+    impl HoprdConfig {
+        #[wasm_bindgen]
+        pub fn as_string(&self) -> String {
+            let output = serde_json::to_string(&self);
+            match output {
+                Ok(o) => o,
+                Err(e) => e.to_string()
+            }
+        }
+    }
+
+    #[wasm_bindgen]
+    pub fn fetch_configuration(
+        cli_args: crate::cli::CliArgs,
+    ) -> Result<JsValue, JsValue> {
+        let cfg = HoprdConfig::from_cli_args(cli_args, false);
+        ok_or_jserr!(serde_wasm_bindgen::to_value(&cfg))
     }
 }
 
@@ -389,8 +473,9 @@ impl From<crate::cli::CliArgs> for HoprdConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::{self, Read, Write};
+    use std::io::{Read, Write};
     use tempfile::NamedTempFile;
+    use clap::{Args, Command, FromArgMatches};
 
     pub fn example_cfg() -> HoprdConfig {
         HoprdConfig {
@@ -400,8 +485,8 @@ mod tests {
             },
             identity: Identity {
                 file: "identity".to_string(),
-                password: None,
-                private_key: None,
+                password: "".to_owned(),
+                private_key: "".to_owned(),
             },
             strategy: Strategy {
                 name: None,
@@ -416,19 +501,18 @@ mod tests {
             api: Api {
                 enabled: false,
                 auth: Auth::None,
-                token: None,
                 host: Host {
                     ip: "127.0.0.1".to_string(),
                     port: 1233,
                 },
             },
+            heartbeat: Heartbeat {
+                interval: 0,
+                threshold: 0,
+                variance: 0,
+            },
             network: Network {
                 announce: false,
-                heartbeat: Heartbeat {
-                    interval: 0,
-                    threshold: 0,
-                    variance: 0,
-                },
                 allow_local_node_connections: false,
                 allow_private_node_connections: false,
                 max_parallel_connections: 0,
@@ -461,8 +545,8 @@ mod tests {
   port: 47462
 identity:
   file: identity
-  password: null
-  private_key: null
+  password: ''
+  private_key: ''
 db:
   data: /tmp/db
   init: false
@@ -470,7 +554,6 @@ db:
 api:
   enabled: false
   auth: None
-  token: null
   host:
     ip: 127.0.0.1
     port: 1233
@@ -478,12 +561,12 @@ strategy:
   name: null
   max_auto_channels: null
   auto_redeem_tickets: false
+heartbeat:
+  interval: 0
+  threshold: 0
+  variance: 0
 network:
   announce: false
-  heartbeat:
-    interval: 0
-    threshold: 0
-    variance: 0
   allow_local_node_connections: false
   allow_private_node_connections: false
   max_parallel_connections: 0
@@ -517,8 +600,7 @@ test:
     }
 
     #[test]
-    fn test_config_should_be_deserializable_from_a_string_in_a_file(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn test_config_should_be_deserializable_from_a_string_in_a_file() -> Result<(), Box<dyn std::error::Error>> {
         let mut config_file = NamedTempFile::new()?;
         let mut prepared_config_file = config_file.reopen()?;
 
@@ -555,7 +637,12 @@ test:
         let derived_matches = cmd.try_get_matches_from(cli_args).map_err(|e| e.to_string())?;
         let args = crate::cli::CliArgs::from_arg_matches(&derived_matches)?;
 
-        let cfg: HoprdConfig = args.into();
+        // skipping validation
+        let cfg = HoprdConfig::from_cli_args(args, true);
+
+        assert!(cfg.is_ok());
+
+        let cfg = cfg.unwrap();
 
         assert_eq!(cfg.chain.provider, Some(pwnd.to_owned()));
 

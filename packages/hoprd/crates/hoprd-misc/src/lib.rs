@@ -1,5 +1,6 @@
 pub mod cli;
 pub mod config;
+pub mod errors;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {

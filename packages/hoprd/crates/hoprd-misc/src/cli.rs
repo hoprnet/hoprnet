@@ -3,11 +3,6 @@ use std::ffi::OsString;
 
 use clap::builder::{PossibleValuesParser, ValueParser};
 use clap::{Arg, ArgAction, ArgMatches, Args, Command, FromArgMatches as _};
-use core_ethereum_misc::constants::DEFAULT_CONFIRMATIONS;
-use core_misc::constants::{
-    DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_INTERVAL_VARIANCE, DEFAULT_HEARTBEAT_THRESHOLD,
-    DEFAULT_MAX_PARALLEL_CONNECTIONS, DEFAULT_MAX_PARALLEL_CONNECTION_PUBLIC_RELAY, DEFAULT_NETWORK_QUALITY_THRESHOLD,
-};
 use core_misc::environment::{Environment, FromJsonFile, PackageJsonFile, ProtocolConfig};
 use core_strategy::{
     generic::ChannelStrategy, passive::PassiveStrategy, promiscuous::PromiscuousStrategy, random::RandomStrategy,
@@ -33,9 +28,6 @@ pub const MINIMAL_API_TOKEN_LENGTH: usize = 8;
 
 regex!(is_ipv4_host "^[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}[:]{1}[0-9]{1,6}$");
 
-// no lookaround support
-regex!(is_private_key "^[a-fA-F0-9]{64}$");
-regex!(is_prefixed_private_key "^0x[a-fA-F0-9]{64}$");
 
 fn parse_host(s: &str) -> Result<crate::config::Host, String> {
     if !is_ipv4_host(s) {
@@ -51,8 +43,9 @@ fn parse_host(s: &str) -> Result<crate::config::Host, String> {
 }
 
 /// Parse a hex string private key to a boxed u8 slice
-fn parse_private_key(s: &str) -> Result<Box<[u8]>, String> {
-    if is_private_key(s) || is_prefixed_private_key(s) {
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+pub fn parse_private_key(s: &str) -> Result<Box<[u8]>, String> {
+    if crate::config::validate_private_key(s).is_ok() {
         let mut decoded = [0u8; 32];
 
         let priv_key = match s.strip_prefix("0x") {
@@ -99,7 +92,7 @@ fn parse_api_token(mut s: &str) -> Result<String, String> {
 #[derive(Serialize, Args, Clone)]
 #[command(about = "HOPRd")]
 #[wasm_bindgen_if(getter_with_clone)]
-pub(crate) struct CliArgs {
+pub struct CliArgs {
     /// Environment
     // Filled by Builder API at runtime
     #[arg(skip)]
@@ -282,9 +275,8 @@ pub(crate) struct CliArgs {
         help = "A private key to be used for the node",
         env = "HOPRD_PRIVATE_KEY",
         value_name = "PRIVATE_KEY",
-        value_parser = ValueParser::new(parse_private_key)
     )]
-    pub private_key: Option<Box<[u8]>>,
+    pub private_key: Option<String>,
 
     #[arg(
         long = "allowLocalNodeConnections",
@@ -411,13 +403,13 @@ pub(crate) struct CliArgs {
 
     #[arg(
         long = "configurationFilePath",
-        required = true,
+        required = false,
         help = "Path to a file containing the entire HOPRd configuration",
         value_name = "CONFIG_FILE_PATH",
         value_parser = clap::value_parser ! (String),
         env = "HOPRD_CONFIGURATION_FILE_PATH"
     )]
-    pub configuration_file_path: String,
+    pub configuration_file_path: Option<String>,
 }
 
 impl CliArgs {
