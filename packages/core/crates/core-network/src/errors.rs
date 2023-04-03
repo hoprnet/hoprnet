@@ -11,7 +11,7 @@ pub enum NetworkingError {
     #[error("error while decoding message data")]
     DecodingError,
 
-    #[error("unknown error or low-level error: {0}")]
+    #[error("{0}")]
     Other(String),
 }
 

@@ -195,14 +195,17 @@ impl Ping {
                         .map_err(|_| DecodingError)
                         .and_then(|deserialized| ControlMessage::validate_pong_response(&sent_ping, &Pong(deserialized))),
                     Err(description) => Err(Other(format!(
-                        "Error during ping to peer '{}': {}",
+                        "Ping to peer '{}' failed with: {}",
                         destination.to_string(),
                         description
                     ))),
                 },
             };
 
-            info!("Ping finished for peer {} with: {:?}", destination, ping_result);
+            match &ping_result {
+                Ok(_) => info!("Successfully pinged peer {}", destination),
+                Err(e) => error!("Ping to peer {} failed with error: {}", destination, e)
+            }
 
             (
                 destination,
