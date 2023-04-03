@@ -194,7 +194,7 @@ async function main() {
     // Log the network health indicator state change (goes over the WS as well)
     logs.log(`Network health indicator changed: ${health_to_string(oldState)} -> ${health_to_string(newState)}`)
     logs.log(`NETWORK HEALTH: ${health_to_string(newState)}`)
-    if (metric_timerToGreen && newState == Health.GREEN) {
+    if (metric_timerToGreen && newState == Health.Green) {
       metric_timeToGreen.record_measure(metric_timerToGreen)
       metric_timerToGreen = undefined
     }
