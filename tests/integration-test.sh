@@ -255,12 +255,12 @@ test_aliases ${api1} ${addr2}
 
 for node in ${addr2} ${addr3} ${addr4} ${addr5}; do
   log "Node 1 ping other node ${node}"
-  result=$(api_ping "${api1}" ${node} "\"latency\":")
+  result=$(api_ping "${api1}" ${node} "\"latency\":[0-9]+,\"reportedVersion\":")
   log "-- ${result}"
 done
 
 log "Node 2 ping node 3"
-result=$(api_ping "${api2}" ${addr3} "\"latency\":")
+result=$(api_ping "${api2}" ${addr3} "\"latency\":[0-9]+,\"reportedVersion\":")
 log "-- ${result}"
 
 # log "Node 7 should not be able to talk to Node 1 (different environment id)"
@@ -439,7 +439,7 @@ test_get_all_channels() {
 
   [[ "${channels_count}" -ge "${channels_with_closed_count}" ]] && { msg "There should be more channels returned with includeClosed flag: ${channels_count} !< ${channels_with_closed_count}"; exit 1; }
   [[ "${channels_with_closed}" != *"Closed"* ]] && { msg "Channels fetched with includeClosed flag should return channels with closed status: ${channels_with_closed}"; exit 1; }
-  echo "Get all channels successfull"
+  echo "Get all channels successful"
 }
 
 test_get_all_channels "${api1}"

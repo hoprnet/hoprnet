@@ -20,3 +20,5 @@ export const MAX_PARALLEL_PINGS = 14
 
 export const CHECK_TIMEOUT = 60000
 export const ACKNOWLEDGEMENT_TIMEOUT = 2000
+
+export const PEER_METADATA_PROTOCOL_VERSION = 'protocol_version'

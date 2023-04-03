@@ -21,10 +21,29 @@ pub fn get_package_version(package_file: &str) -> Result<String, RealError> {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
+    use std::collections::HashMap;
     use crate::ok_or_jserr;
     use wasm_bindgen::prelude::*;
 
     pub type JsResult<T> = Result<T, JsValue>;
+
+    /// Helper function to convert between js_sys::Map (possibly undefined) and Rust HashMap
+    pub fn js_map_to_hash_map(map: &js_sys::Map) -> Option<HashMap<String, String>> {
+        match map.is_undefined() {
+            true => None,
+            false => {
+                let mut ret = HashMap::<String, String>::new();
+                map.for_each(&mut |value, key| {
+                    if let Some(key) = key.as_string() {
+                        if let Some(value) = value.as_string() {
+                            ret.insert(key, value);
+                        }
+                    }
+                });
+                Some(ret)
+            }
+        }
+    }
 
     /// Reads the given package.json file and determines its version.
     #[wasm_bindgen]

@@ -3,6 +3,7 @@ import type { Multiaddr } from '@multiformats/multiaddr'
 import type Hopr from '@hoprnet/hopr-core'
 import { peerIdFromString } from '@libp2p/peer-id'
 import { STATUS_CODES } from '../../utils.js'
+import { PEER_METADATA_PROTOCOL_VERSION } from '@hoprnet/hopr-core'
 
 export type PeerInfo = {
   peerId: string
@@ -15,6 +16,7 @@ export type PeerInfo = {
   quality: number
   backoff: number
   isNew: boolean
+  reportedVersion: string
 }
 
 /**
@@ -34,7 +36,8 @@ function toPeerInfoFormat(info: ReturnType<Hopr['getConnectionInfo']>, multiaddr
     lastSeen: Number(info.last_seen),
     quality: info.quality,
     backoff: info.backoff,
-    isNew: info.heartbeats_sent === BigInt(0)
+    isNew: info.heartbeats_sent === BigInt(0),
+    reportedVersion: info.metadata().get(PEER_METADATA_PROTOCOL_VERSION) ?? 'unknown'
   }
 }
 
@@ -165,6 +168,12 @@ const PEER_INFO_DOC: any = {
     isNew: {
       type: 'boolean',
       description: 'True if the node is new (no heartbeats sent yet).'
+    },
+    reportedVersion: {
+      type: 'string',
+      example: '1.92.12',
+      description:
+        'HOPR protocol version as determined from the successful ping in the Major.Minor.Patch format or "unknown"'
     }
   }
 }
