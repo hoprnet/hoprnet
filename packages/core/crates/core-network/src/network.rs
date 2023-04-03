@@ -470,24 +470,7 @@ pub mod wasm {
     use js_sys::JsString;
     use std::str::FromStr;
     use wasm_bindgen::prelude::*;
-
-    /// Helper function to convert between js_sys::Map (possibly undefined) and Rust HashMap
-    fn js_map_to_hash_map(map: &js_sys::Map) -> Option<HashMap<String, String>> {
-        match map.is_undefined() {
-            true => None,
-            false => {
-                let mut ret = HashMap::<String, String>::new();
-                map.for_each(&mut |value, key| {
-                    if let Some(key) = key.as_string() {
-                        if let Some(value) = value.as_string() {
-                            ret.insert(key, value);
-                        }
-                    }
-                });
-                Some(ret)
-            }
-        }
-    }
+    use utils_misc::utils::wasm::js_map_to_hash_map;
 
     #[wasm_bindgen]
     impl PeerStatus {

@@ -73,9 +73,7 @@ impl PingMessage {
 }
 
 #[cfg(not(feature = "compat-ping"))]
-impl utils_types::traits::AutoBinarySerializable<'_> for PingMessage {
-    const SIZE: usize = core_crypto::parameters::PING_PONG_NONCE_SIZE;
-}
+impl utils_types::traits::AutoBinarySerializable<'_> for PingMessage { }
 
 #[cfg(feature = "compat-ping")]
 impl BinarySerializable<'_> for PingMessage {
