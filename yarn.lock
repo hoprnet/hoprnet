@@ -941,7 +941,7 @@ __metadata:
     express-openapi: 12.1.0
     mocha: 9.2.2
     rlp: 3.0.0
-    semver: 7.3.7
+    semver: 7.3.8
     sinon: 12.0.1
     supertest: ^6.2.2
     swagger-ui-express: 4.6.2
@@ -10174,17 +10174,6 @@ __metadata:
   bin:
     semver: ./bin/semver
   checksum: 57fd0acfd0bac382ee87cd52cd0aaa5af086a7dc8d60379dfe65fea491fb2489b6016400813930ecd61fd0952dae75c115287a1b16c234b1550887117744dfaf
-  languageName: node
-  linkType: hard
-
-"semver@npm:7.3.7":
-  version: 7.3.7
-  resolution: "semver@npm:7.3.7"
-  dependencies:
-    lru-cache: ^6.0.0
-  bin:
-    semver: bin/semver.js
-  checksum: 2fa3e877568cd6ce769c75c211beaed1f9fce80b28338cadd9d0b6c40f2e2862bafd62c19a6cff42f3d54292b7c623277bcab8816a2b5521cf15210d43e75232
   languageName: node
   linkType: hard
 
