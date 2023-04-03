@@ -163,8 +163,6 @@ impl<'a, St> Stream for NextStream<St> {
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let this = self.project();
 
-        info!("next stream, poll_next called");
-
         match this.next_stream.take() {
             Some(stream) => Poll::Ready(Some(stream)),
             None => {
@@ -258,8 +256,6 @@ impl<St: DuplexStream, Cbs: RelayServerCbs> Server<St, Cbs> {
     /// an optional custom timeout. If none is supplied, a default
     /// timeout is used.
     async fn ping(&mut self, maybe_timeout: Option<u64>) -> Result<u64, String> {
-        self.log("server: ping called");
-
         let random_value: [u8; 4] = [0u8; 4];
 
         // FIXME: enable once client code is migrated
@@ -287,14 +283,11 @@ impl<St: DuplexStream, Cbs: RelayServerCbs> Server<St, Cbs> {
             Either::Right((Ok(()), _)) => (),
             Either::Right((Err(e), _)) => return Err(e),
         };
-        self.log("server: after sending PING message");
 
         // TODO: move this up to catch all
         let response_timeout = sleep(std::time::Duration::from_millis(timeout_duration as u64)).fuse();
         // cannot clone futures
         let ping = self.ping_requests.get_mut(&random_value).unwrap();
-
-        info!("from map {:?}", ping);
 
         pin_mut!(response_timeout);
 
@@ -316,8 +309,6 @@ impl<St: DuplexStream, Cbs: RelayServerCbs> Server<St, Cbs> {
     /// method takes the *fresh* connections and attaches it to the existing relay
     /// connection pipeline.
     pub fn update(&mut self, new_stream: St) -> Result<(), String> {
-        self.log(format!("server: Initiating stream handover").as_str());
-
         let res = self.next_stream.take_stream(new_stream);
         if let Some(item) = self.poll_next_waker.take() {
             item.wake()
@@ -345,8 +336,6 @@ impl<'b, St: DuplexStream, Cbs: RelayServerCbs> Stream for Server<St, Cbs> {
     type Item = Result<Box<[u8]>, String>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        self.log("server: poll_next called");
-
         let mut this = self.project();
 
         *this.poll_next_waker = Some(cx.waker().clone());
@@ -373,15 +362,11 @@ impl<'b, St: DuplexStream, Cbs: RelayServerCbs> Stream for Server<St, Cbs> {
             }
 
             if this.stream.is_none() {
-                info!("source: no stream set");
                 return Poll::Pending;
             }
 
             match this.stream.as_mut().as_pin_mut().unwrap().poll_next(cx) {
-                Poll::Pending => {
-                    info!("server: stream pending");
-                    return Poll::Pending;
-                }
+                Poll::Pending => return Poll::Pending,
                 Poll::Ready(Some(item)) => {
                     let item = match item {
                         Ok(good) => good,
@@ -392,7 +377,6 @@ impl<'b, St: DuplexStream, Cbs: RelayServerCbs> Stream for Server<St, Cbs> {
                             return Poll::Ready(None);
                         }
                     };
-                    info!("item received {:?}", item);
                     match item.get(0) {
                         Some(prefix) if *prefix == MessagePrefix::ConnectionStatus as u8 => {
                             match item.get(1) {
@@ -474,7 +458,6 @@ impl<'b, St: DuplexStream, Cbs: RelayServerCbs> Stream for Server<St, Cbs> {
                     };
                 }
                 Poll::Ready(None) => {
-                    info!("stream ended");
                     break None;
                 }
             }
@@ -496,14 +479,12 @@ impl<St: DuplexStream, Cbs: RelayServerCbs> Sink<Box<[u8]>> for Server<St, Cbs> 
     type Error = String;
 
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), String>> {
-        self.log("server: poll_ready called");
         let mut this = self.project();
 
         *this.poll_ready_waker = Some(cx.waker().clone());
 
         match this.next_stream.as_mut().poll_next(cx) {
             Poll::Ready(new_stream) => {
-                info!("sink switched");
                 *this.stream_switched = true;
                 this.stream.set(new_stream)
             }
@@ -526,14 +507,12 @@ impl<St: DuplexStream, Cbs: RelayServerCbs> Sink<Box<[u8]>> for Server<St, Cbs> 
                 match this.status_messages_rx.as_mut().as_pin_mut().unwrap().poll_next(cx) {
                     Poll::Pending => break,
                     Poll::Ready(None) => {
-                        info!("status message stream is closed");
+                        error!("status message stream is closed");
                         break;
                     }
                     Poll::Ready(Some(item)) => item,
                 }
             };
-
-            info!("status_message_to_send {:?}", status_message_to_send);
 
             if status_message_to_send.len() == 0 {
                 error!("fatal error: prevented sending of empty status message");
@@ -553,7 +532,6 @@ impl<St: DuplexStream, Cbs: RelayServerCbs> Sink<Box<[u8]>> for Server<St, Cbs> 
                     ]
                     .contains(status_message_to_send.get(1).unwrap())
                     {
-                        info!("restart received closed");
                         this.stream.as_mut().as_pin_mut().unwrap().close();
                         return Poll::Ready(Err("closed".into()));
                     }
@@ -581,18 +559,14 @@ impl<St: DuplexStream, Cbs: RelayServerCbs> Sink<Box<[u8]>> for Server<St, Cbs> 
                         }
                     };
 
-                    info!("initiated sending of status message");
-
                     match this.stream.as_mut().as_pin_mut().unwrap().poll_flush(cx) {
                         Poll::Pending => return Poll::Pending,
                         // FIXME
                         Poll::Ready(Ok(())) => (),
                         Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
                     };
-                    info!("status message flushed")
                 }
             }
-            info!("loop iteration");
         }
 
         match this.stream.as_mut().as_pin_mut().unwrap().poll_ready(cx) {
@@ -607,8 +581,6 @@ impl<St: DuplexStream, Cbs: RelayServerCbs> Sink<Box<[u8]>> for Server<St, Cbs> 
     }
 
     fn start_send(self: Pin<&mut Self>, item: Box<[u8]>) -> Result<(), String> {
-        self.log(format!("server: start_send {:?}", item).as_str());
-
         let mut this = self.project();
 
         if item.len() > 0 {
@@ -769,13 +741,10 @@ pub mod wasm {
         /// ```
         #[wasm_bindgen(getter)]
         pub fn source(&mut self) -> AsyncIterable {
-            self.w.log("source called");
-
             let this = unsafe { std::mem::transmute::<&mut Self, &mut Self>(self) };
             let iterator_obj = Object::new();
 
             let iterator_fn = Closure::<dyn FnMut() -> Promise>::new(move || {
-                info!("rs: iterator code called");
                 let promise = Promise::new(&mut |resolve, reject| {
                     let fut = unsafe {
                         std::mem::transmute::<
@@ -784,7 +753,6 @@ pub mod wasm {
                         >(this.w.next())
                     };
                     let fut = fut.map(to_jsvalue_stream).then(|x| async move {
-                        info!("source future executed");
                         resolve.call1(&JsValue::undefined(), &x.unwrap());
                     });
 
@@ -836,8 +804,6 @@ pub mod wasm {
         /// ```
         #[wasm_bindgen]
         pub fn sink(&mut self, source: AsyncIterable) -> js_sys::Promise {
-            self.w.log("sink called");
-
             let promise = Promise::new(&mut |resolve, reject| {
                 let this = unsafe { std::mem::transmute::<&mut Self, &mut Self>(self) };
 
@@ -874,7 +840,6 @@ pub mod wasm {
 
                 wasm_bindgen_futures::spawn_local(async move {
                     loop {
-                        info!("iteration");
                         match async_it.next().map(JsFuture::from) {
                             Ok(chunk_fut) => {
                                 // Initiates call to underlying JS functions
@@ -888,16 +853,12 @@ pub mod wasm {
                                     }
                                 };
                                 let next = chunk.unchecked_into::<Uint8ArrayIteratorNext>();
-                                info!("sink: next chunk {:?}", next);
                                 if next.done() {
                                     resolve.call0(&JsValue::undefined());
                                     this.w.close().await;
                                     break;
                                 } else {
-                                    // Uint8Array -> Box
                                     this.w.send(next.value()).await;
-
-                                    this.w.log("after sending");
                                 }
                             }
                             Err(e) => {
