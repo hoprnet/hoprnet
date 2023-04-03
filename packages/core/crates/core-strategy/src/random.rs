@@ -1,8 +1,10 @@
+use libp2p_identity::PeerId;
 use utils_types::primitives::Balance;
 
 use crate::generic::{ChannelStrategy, OutgoingChannelStatus, StrategyTickResult};
 
 /// Implements random strategy (cover traffic)
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct RandomStrategy;
 
 impl ChannelStrategy for RandomStrategy {
@@ -11,7 +13,7 @@ impl ChannelStrategy for RandomStrategy {
     fn tick<Q>(
         &mut self,
         _balance: Balance,
-        _peer_ids: impl Iterator<Item = String>,
+        _peer_ids: impl Iterator<Item = PeerId>,
         _outgoing_channel_peer_ids: Vec<OutgoingChannelStatus>,
         _quality_of: Q,
     ) -> StrategyTickResult
@@ -29,8 +31,7 @@ mod tests {
 
     #[test]
     fn test_random() {
-        let strat = RandomStrategy {};
-        assert_eq!("random", strat.name());
+        assert_eq!("random", RandomStrategy::NAME);
     }
 }
 
@@ -45,34 +46,30 @@ pub mod wasm {
     use utils_types::primitives::Balance;
 
     use crate::generic::wasm::StrategyTickResult;
-
-    #[wasm_bindgen]
-    pub struct RandomStrategy {
-        w: super::RandomStrategy,
-    }
+    use crate::random::RandomStrategy;
+    use crate::strategy_tick;
 
     #[wasm_bindgen]
     impl RandomStrategy {
         #[wasm_bindgen(constructor)]
-        pub fn new() -> Self {
-            RandomStrategy {
-                w: super::RandomStrategy {},
-            }
+        pub fn _new() -> Self {
+            Self { }
         }
 
         #[wasm_bindgen(getter)]
         pub fn name(&self) -> String {
-            self.w.name().into()
+            Self::NAME.into()
         }
 
-        pub fn tick(
+        #[wasm_bindgen(js_name = "tick")]
+        pub fn _tick(
             &mut self,
             balance: Balance,
             peer_ids: &js_sys::Iterator,
             outgoing_channels: JsValue,
             quality_of: &js_sys::Function,
         ) -> JsResult<StrategyTickResult> {
-            crate::generic::wasm::tick_wrap(&mut self.w, balance, peer_ids, outgoing_channels, quality_of)
+            strategy_tick!(self, balance, peer_ids, outgoing_channels, quality_of)
         }
     }
 }
