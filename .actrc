@@ -1,3 +1,5 @@
 # use image with standard tools installed
 -P ubuntu-latest=catthehacker/ubuntu:custom-22.04-20230322
+-P ubuntu-latest-4-core=catthehacker/ubuntu:custom-22.04-20230322
+-P ubuntu-latest-8-core=catthehacker/ubuntu:custom-22.04-20230322
 -P ubuntu-latest-16-core=catthehacker/ubuntu:custom-22.04-20230322
