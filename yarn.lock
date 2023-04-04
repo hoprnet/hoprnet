@@ -780,7 +780,7 @@ __metadata:
     "@libp2p/interface-peer-id": 1.0.5
     "@libp2p/peer-id": 1.1.16
     "@multiformats/multiaddr": 10.3.3
-    "@sinonjs/referee": 9.1.1
+    "@sinonjs/referee": 9.1.2
     "@types/bn.js": ^5.1.1
     "@types/chai": 4.3.4
     "@types/mocha": 9.1.1
@@ -1841,6 +1841,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@sinonjs/commons@npm:^2.0.0":
+  version: 2.0.0
+  resolution: "@sinonjs/commons@npm:2.0.0"
+  dependencies:
+    type-detect: 4.0.8
+  checksum: 5023ba17edf2b85ed58262313b8e9b59e23c6860681a9af0200f239fe939e2b79736d04a260e8270ddd57196851dde3ba754d7230be5c5234e777ae2ca8af137
+  languageName: node
+  linkType: hard
+
 "@sinonjs/fake-timers@npm:>=5":
   version: 9.1.2
   resolution: "@sinonjs/fake-timers@npm:9.1.2"
@@ -1859,16 +1868,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@sinonjs/referee@npm:9.1.1":
-  version: 9.1.1
-  resolution: "@sinonjs/referee@npm:9.1.1"
+"@sinonjs/referee@npm:9.1.2":
+  version: 9.1.2
+  resolution: "@sinonjs/referee@npm:9.1.2"
   dependencies:
-    "@sinonjs/commons": ^1.8.3
+    "@sinonjs/commons": ^2.0.0
     "@sinonjs/samsam": ^6.0.2
     event-emitter: ^0.3.5
     lodash.isarguments: ^3.1.0
     util: ^0.12.3
-  checksum: 17c4981c33c3f1d134fb5310f0e184e324c4737c18bb809eb916cbb68562060230f90c78f800189f22c856539c29762355a9cd87ee0b4b1a2f630640debfede6
+  checksum: 3265deb1fde1afa9358add93ff65d11f116909e546cf3f1de5553efc558cde93989869787be0a045f14ff168a40996597890eb43a75357994a16beb13d36e1a5
   languageName: node
   linkType: hard
 

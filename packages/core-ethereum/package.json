@@ -31,7 +31,7 @@
     "@libp2p/interface-peer-id": "1.0.5",
     "@libp2p/peer-id": "1.1.16",
     "@multiformats/multiaddr": "10.3.3",
-    "@sinonjs/referee": "9.1.1",
+    "@sinonjs/referee": "9.1.2",
     "async-mutex": "0.3.2",
     "bn.js": "5.2.1",
     "chalk": "5.0.1",
