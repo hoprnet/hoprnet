@@ -157,7 +157,7 @@ pub fn forward_transform_header(secret: &[u8], pre_header: &[u8], mac: &[u8], ma
 
         header.copy_within(routing_info_len.., 0);
         let key_stream = prg.digest(header_len, header_len + routing_info_len);
-        header[..header_len - routing_info_len].copy_from_slice(&key_stream);
+        header[header_len - routing_info_len..].copy_from_slice(&key_stream);
 
         Ok(RelayNode {
             next_node: next_node_pk.serialize(true),
