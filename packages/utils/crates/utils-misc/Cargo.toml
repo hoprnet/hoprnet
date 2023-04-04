@@ -25,7 +25,7 @@ js-sys = { version = "0.3.60", optional = true }
 utils-proc-macros = { path = "../../../utils/crates/utils-proc-macros" }
 wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen-futures = { version = "0.4.33", optional = true, features = ["futures-core-03-stream"] }
-console_error_panic_hook = { version = "0.1.6", optional = true }
+console_error_panic_hook = { version = "0.1.7", optional = true }
 #wee_alloc = { version = "0.4.5", optional = true }
 
 [dev-dependencies]
