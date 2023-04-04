@@ -236,8 +236,8 @@ smart-contract-test: # forge test smart contracts
 	$(MAKE) -C packages/ethereum/contracts/ sc-test
 
 .PHONY: lint
-lint: lint-ts lint-rust
-lint: ## run linter for TS and Rust
+lint: lint-ts lint-rust lint-python
+lint: ## run linter for TS, Rust and Python
 
 .PHONY: lint-ts
 lint-ts: ## run linter for TS
@@ -247,9 +247,13 @@ lint-ts: ## run linter for TS
 lint-rust: ## run linter for Rust
 	$(foreach c, $(CRATES_NAMES), cargo fmt --check -p $(c) && ) echo ""
 
+.PHONY: lint-python
+lint-python: ## run linter for Python
+	source .venv/bin/activate && black --check tests/
+
 .PHONY: fmt
-fmt: fmt-ts fmt-rust
-fmt: ## run code formatter for TS and Rust
+fmt: fmt-ts fmt-rust fmt-python
+fmt: ## run code formatter for TS, Rust and Python
 
 .PHONY: fmt-ts
 fmt-ts: ## run code formatter for TS
@@ -258,6 +262,10 @@ fmt-ts: ## run code formatter for TS
 .PHONY: fmt-rust
 fmt-rust: ## run code formatter for Rust
 	$(foreach c, $(CRATES_NAMES), cargo fmt -p $(c) && ) echo ""
+
+.PHONY: fmt-python
+fmt-python: ## run code formatter for Python
+	source .venv/bin/activate && black tests/
 
 .PHONY: run-anvil
 run-anvil: args=
