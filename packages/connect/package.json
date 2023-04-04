@@ -59,7 +59,7 @@
     "@types/node": "16",
     "@types/simple-peer": "9.11.5",
     "it-pair": "2.0.4",
-    "it-pipe": "2.0.3",
+    "it-pipe": "2.0.5",
     "it-pushable": "3.0.0",
     "mocha": "9.2.2",
     "typescript": "4.9.5"
