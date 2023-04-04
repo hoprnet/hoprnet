@@ -13,7 +13,7 @@ path = "src/lib.rs"
 crate-type = ["cdylib", "rlib"] # rlib is necessary to run integration tests
 
 [dependencies]
-thiserror = "1.0.38"
+thiserror = "1.0.40"
 wasm-bindgen = { workspace = true }
 
 [dev-dependencies]
