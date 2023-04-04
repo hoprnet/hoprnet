@@ -33,7 +33,7 @@ RUN make deps-docker package=hopr-cover-traffic-daemon && \
     PRODUCTION=true make deps-docker package=hopr-cover-traffic-daemon
 
 # Alpine 3.16 x86_64 https://hub.docker.com/layers/library/alpine/3.16.3/images/sha256-3d426b0bfc361d6e8303f51459f17782b219dece42a1c7fe463b6014b189c86d
-FROM alpine:3.16@sha256:3d426b0bfc361d6e8303f51459f17782b219dece42a1c7fe463b6014b189c86d as runtime
+FROM alpine:3.17@sha256:b6ca290b6b4cdcca5b3db3ffa338ee0285c11744b4a6abaa9627746ee3291d8d as runtime
 
 WORKDIR /app/hoprnet
 
