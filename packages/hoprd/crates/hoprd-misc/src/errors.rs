@@ -1,5 +1,5 @@
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use serde::{Serialize,Deserialize};
 
 #[derive(Error, Debug, Serialize, Deserialize)]
 pub enum HoprdConfigError {

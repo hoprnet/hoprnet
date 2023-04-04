@@ -5,8 +5,7 @@ use validator::{Validate, ValidationError};
 use core_ethereum_misc::constants::DEFAULT_CONFIRMATIONS;
 use core_misc::constants::{
     DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_INTERVAL_VARIANCE, DEFAULT_HEARTBEAT_THRESHOLD,
-    DEFAULT_MAX_PARALLEL_CONNECTIONS, DEFAULT_MAX_PARALLEL_CONNECTION_PUBLIC_RELAY,
-    DEFAULT_NETWORK_QUALITY_THRESHOLD,
+    DEFAULT_MAX_PARALLEL_CONNECTIONS, DEFAULT_MAX_PARALLEL_CONNECTION_PUBLIC_RELAY, DEFAULT_NETWORK_QUALITY_THRESHOLD,
 };
 
 use utils_proc_macros::wasm_bindgen_if;
@@ -246,7 +245,7 @@ pub(crate) fn validate_private_key(s: &str) -> Result<(), ValidationError> {
 #[wasm_bindgen_if(getter_with_clone)]
 #[derive(Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct Identity {
-    #[validate(custom = "validate_file_path")]      // TODO: works in wasm?
+    #[validate(custom = "validate_file_path")] // TODO: works in wasm?
     pub file: String,
     #[validate(custom = "validate_password")]
     pub password: String,
@@ -278,7 +277,7 @@ fn validate_directory_path(s: &str) -> Result<(), ValidationError> {
 #[derive(Debug, Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct Db {
     /// Path to the directory containing the database
-    #[validate(custom = "validate_directory_path")]      // TODO: works in wasm?
+    #[validate(custom = "validate_directory_path")] // TODO: works in wasm?
     pub data: String,
     pub init: bool,
     pub force_init: bool,
@@ -349,7 +348,6 @@ use real_base::file::native::read_to_string;
 #[cfg(all(feature = "wasm", not(test)))]
 use real_base::file::wasm::read_to_string;
 
-
 impl HoprdConfig {
     pub fn from_cli_args(cli_args: crate::cli::CliArgs, skip_validation: bool) -> crate::errors::Result<HoprdConfig> {
         let mut cfg: HoprdConfig = if let Some(cfg_path) = cli_args.configuration_file_path {
@@ -364,15 +362,23 @@ impl HoprdConfig {
         cfg.environment = cli_args.environment;
 
         // host
-        if let Some(x) = cli_args.host { cfg.host = x };
+        if let Some(x) = cli_args.host {
+            cfg.host = x
+        };
 
         // db
         cfg.db.data = cli_args.data;
-        if let Some(x) = cli_args.init { cfg.db.init = x };
-        if let Some(x) = cli_args.force_init { cfg.db.force_init = x };
+        if let Some(x) = cli_args.init {
+            cfg.db.init = x
+        };
+        if let Some(x) = cli_args.force_init {
+            cfg.db.force_init = x
+        };
 
         // api
-        if let Some(x) = cli_args.api { cfg.api.enabled = x };
+        if let Some(x) = cli_args.api {
+            cfg.api.enabled = x
+        };
         if let Some(x) = cli_args.disable_api_authentication {
             if !x {
                 if &cfg.api.auth != &Auth::None {
@@ -383,59 +389,111 @@ impl HoprdConfig {
         if let Some(x) = cli_args.api_token {
             cfg.api.auth = Auth::Token(x);
         };
-        if let Some(x) = cli_args.api_host { cfg.api.host.ip = x };
-        if let Some(x) = cli_args.api_port { cfg.api.host.port = x };
+        if let Some(x) = cli_args.api_host {
+            cfg.api.host.ip = x
+        };
+        if let Some(x) = cli_args.api_port {
+            cfg.api.host.port = x
+        };
 
         // heartbeat
-        if let Some(x) = cli_args.heartbeat_interval { cfg.heartbeat.interval = x };
-        if let Some(x) = cli_args.heartbeat_threshold { cfg.heartbeat.threshold = x };
-        if let Some(x) = cli_args.heartbeat_variance { cfg.heartbeat.variance = x };
+        if let Some(x) = cli_args.heartbeat_interval {
+            cfg.heartbeat.interval = x
+        };
+        if let Some(x) = cli_args.heartbeat_threshold {
+            cfg.heartbeat.threshold = x
+        };
+        if let Some(x) = cli_args.heartbeat_variance {
+            cfg.heartbeat.variance = x
+        };
 
         // network
-        if let Some(x) = cli_args.announce { cfg.network.announce = x };
-        if let Some(x) = cli_args.allow_local_node_connections { cfg.network.allow_local_node_connections = x };
-        if let Some(x) = cli_args.allow_private_node_connections { cfg.network.allow_private_node_connections = x };
+        if let Some(x) = cli_args.announce {
+            cfg.network.announce = x
+        };
+        if let Some(x) = cli_args.allow_local_node_connections {
+            cfg.network.allow_local_node_connections = x
+        };
+        if let Some(x) = cli_args.allow_private_node_connections {
+            cfg.network.allow_private_node_connections = x
+        };
         if let Some(x) = cli_args.max_parallel_connections {
             cfg.network.max_parallel_connections = x
         } else if cfg.network.announce {
             cfg.network.max_parallel_connections = DEFAULT_MAX_PARALLEL_CONNECTION_PUBLIC_RELAY
         };
-        if let Some(x) = cli_args.network_quality_threshold { cfg.network.network_quality_threshold = x };
+        if let Some(x) = cli_args.network_quality_threshold {
+            cfg.network.network_quality_threshold = x
+        };
 
         // healthcheck
-        if let Some(x) = cli_args.health_check { cfg.healthcheck.enabled = x };
-        if let Some(x) = cli_args.health_check_host { cfg.healthcheck.host = x };
-        if let Some(x) = cli_args.health_check_port { cfg.healthcheck.port = x };
+        if let Some(x) = cli_args.health_check {
+            cfg.healthcheck.enabled = x
+        };
+        if let Some(x) = cli_args.health_check_host {
+            cfg.healthcheck.host = x
+        };
+        if let Some(x) = cli_args.health_check_port {
+            cfg.healthcheck.port = x
+        };
 
         // identity
         cfg.identity.file = cli_args.identity;
-        if let Some(x) = cli_args.password { cfg.identity.password = x };
-        if let Some(x) = cli_args.private_key { cfg.identity.private_key = x };
+        if let Some(x) = cli_args.password {
+            cfg.identity.password = x
+        };
+        if let Some(x) = cli_args.private_key {
+            cfg.identity.private_key = x
+        };
 
         // strategy
-        if let Some(x) = cli_args.default_strategy { cfg.strategy.name = Some(x) };
-        if let Some(x) = cli_args.max_auto_channels { cfg.strategy.max_auto_channels = Some(x) };
-        if let Some(x) = cli_args.auto_redeem_tickets { cfg.strategy.auto_redeem_tickets = x };
+        if let Some(x) = cli_args.default_strategy {
+            cfg.strategy.name = Some(x)
+        };
+        if let Some(x) = cli_args.max_auto_channels {
+            cfg.strategy.max_auto_channels = Some(x)
+        };
+        if let Some(x) = cli_args.auto_redeem_tickets {
+            cfg.strategy.auto_redeem_tickets = x
+        };
 
         // chain
-        if let Some(x) = cli_args.provider { cfg.chain.provider = Some(x) };
-        if let Some(x) = cli_args.check_unrealized_balance { cfg.chain.check_unrealized_balance = x };
-        if let Some(x) = cli_args.on_chain_confirmations { cfg.chain.on_chain_confirmations = x };
+        if let Some(x) = cli_args.provider {
+            cfg.chain.provider = Some(x)
+        };
+        if let Some(x) = cli_args.check_unrealized_balance {
+            cfg.chain.check_unrealized_balance = x
+        };
+        if let Some(x) = cli_args.on_chain_confirmations {
+            cfg.chain.on_chain_confirmations = x
+        };
 
         // test
-        if let Some(x) = cli_args.test_announce_local_addresses { cfg.test.announce_local_addresses = x };
-        if let Some(x) = cli_args.test_prefer_local_addresses { cfg.test.prefer_local_addresses = x };
-        if let Some(x) = cli_args.test_local_mode_stun { cfg.test.local_mode_stun = x };
-        if let Some(x) = cli_args.test_no_webrtc_upgrade { cfg.test.no_webrtc_upgrade = x };
-        if let Some(x) = cli_args.test_no_direct_connections { cfg.test.no_direct_connections = x };
-        if let Some(x) = cli_args.test_use_weak_crypto { cfg.test.use_weak_crypto = x };
+        if let Some(x) = cli_args.test_announce_local_addresses {
+            cfg.test.announce_local_addresses = x
+        };
+        if let Some(x) = cli_args.test_prefer_local_addresses {
+            cfg.test.prefer_local_addresses = x
+        };
+        if let Some(x) = cli_args.test_local_mode_stun {
+            cfg.test.local_mode_stun = x
+        };
+        if let Some(x) = cli_args.test_no_webrtc_upgrade {
+            cfg.test.no_webrtc_upgrade = x
+        };
+        if let Some(x) = cli_args.test_no_direct_connections {
+            cfg.test.no_direct_connections = x
+        };
+        if let Some(x) = cli_args.test_use_weak_crypto {
+            cfg.test.use_weak_crypto = x
+        };
 
         if skip_validation {
             Ok(cfg)
         } else {
             match cfg.validate() {
                 Ok(_) => Ok(cfg),
-                Err(e) => Err(crate::errors::HoprdConfigError::ValidationError(e.to_string()))
+                Err(e) => Err(crate::errors::HoprdConfigError::ValidationError(e.to_string())),
             }
         }
     }
@@ -443,10 +501,10 @@ impl HoprdConfig {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
+    use crate::config::HoprdConfig;
+    use utils_misc::ok_or_jserr;
     use wasm_bindgen::prelude::*;
     use wasm_bindgen::JsValue;
-    use utils_misc::{ok_or_jserr};
-    use crate::config::HoprdConfig;
 
     #[wasm_bindgen]
     impl HoprdConfig {
@@ -455,27 +513,24 @@ pub mod wasm {
             let output = serde_json::to_string(&self);
             match output {
                 Ok(o) => o,
-                Err(e) => e.to_string()
+                Err(e) => e.to_string(),
             }
         }
     }
 
     #[wasm_bindgen]
-    pub fn fetch_configuration(
-        cli_args: crate::cli::CliArgs,
-    ) -> Result<JsValue, JsValue> {
+    pub fn fetch_configuration(cli_args: crate::cli::CliArgs) -> Result<JsValue, JsValue> {
         let cfg = HoprdConfig::from_cli_args(cli_args, false);
         ok_or_jserr!(serde_wasm_bindgen::to_value(&cfg))
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use clap::{Args, Command, FromArgMatches};
     use std::io::{Read, Write};
     use tempfile::NamedTempFile;
-    use clap::{Args, Command, FromArgMatches};
 
     pub fn example_cfg() -> HoprdConfig {
         HoprdConfig {

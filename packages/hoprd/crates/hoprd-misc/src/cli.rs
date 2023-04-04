@@ -28,7 +28,6 @@ pub const MINIMAL_API_TOKEN_LENGTH: usize = 8;
 
 regex!(is_ipv4_host "^[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}[:]{1}[0-9]{1,6}$");
 
-
 fn parse_host(s: &str) -> Result<crate::config::Host, String> {
     if !is_ipv4_host(s) {
         return Err(format!(
@@ -178,7 +177,7 @@ pub struct CliArgs {
         long = "healthCheckHost",
         value_name = "HOST",
         help = "Updates the host for the healthcheck server",
-        env = "HOPRD_HEALTH_CHECK_HOST",
+        env = "HOPRD_HEALTH_CHECK_HOST"
     )]
     pub health_check_host: Option<String>,
 
@@ -274,7 +273,7 @@ pub struct CliArgs {
         hide = true,
         help = "A private key to be used for the node",
         env = "HOPRD_PRIVATE_KEY",
-        value_name = "PRIVATE_KEY",
+        value_name = "PRIVATE_KEY"
     )]
     pub private_key: Option<String>,
 

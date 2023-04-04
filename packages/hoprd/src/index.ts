@@ -21,7 +21,13 @@ import {
   resolveEnvironment
 } from '@hoprnet/hopr-core'
 
-import { parse_cli_arguments, fetch_configuration, parse_private_key, HoprdConfig, type CliArgs } from '../lib/hoprd_misc.js'
+import {
+  parse_cli_arguments,
+  fetch_configuration,
+  parse_private_key,
+  HoprdConfig,
+  type CliArgs
+} from '../lib/hoprd_misc.js'
 import type { State } from './types.js'
 import setupAPI from './api/index.js'
 import setupHealthcheck from './healthcheck.js'
@@ -218,7 +224,7 @@ async function main() {
     process.exit(1)
   }
 
-  console.log("Node configuration: " + cfg.as_string())
+  console.log('Node configuration: ' + cfg.as_string())
   if (argv.dry_run) {
     process.exit(0)
   }
