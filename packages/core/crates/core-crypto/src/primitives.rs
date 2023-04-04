@@ -3,7 +3,7 @@ use blake2::Blake2s256;
 use chacha20::cipher::KeyIvInit;
 use chacha20::cipher::{IvSizeUser, KeySizeUser, StreamCipher, StreamCipherSeek};
 use chacha20::ChaCha20;
-use digest::FixedOutputReset;
+use digest::{FixedOutputReset, Output};
 use hmac::{Mac, SimpleHmac};
 
 use crate::errors::CryptoError::{InvalidInputValue, InvalidParameterSize};
@@ -18,6 +18,9 @@ pub struct SimpleMac {
 }
 
 impl SimpleMac {
+    /// Size of the MAC output.
+    pub const SIZE: usize = 32;
+
     /// Create new instance of the MAC using the given secret key.
     pub fn new(key: &[u8]) -> Result<Self> {
         Ok(Self {
@@ -31,6 +34,14 @@ impl SimpleMac {
     /// Update the internal state of the MAC using the given input data.
     pub fn update(&mut self, data: &[u8]) {
         self.instance.update(data);
+    }
+
+    /// Retrieve the final MAC into a prepared buffer and reset this instance so it could be reused for
+    /// a new MAC computation.
+    pub fn finalize_into(&mut self, out: &mut [u8]) {
+        assert_eq!(Self::SIZE, out.len(), "output has invalid size");
+        let output = Output::<SimpleHmac::<Blake2s256>>::from_mut_slice(out);
+        self.instance.finalize_into_reset(output);
     }
 
     /// Retrieve the final MAC and reset this instance so it could be reused for

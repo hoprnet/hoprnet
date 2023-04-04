@@ -12,6 +12,9 @@ pub enum CryptoError {
     #[error("secret scalar results in an invalid EC point")]
     InvalidSecretScalar,
 
+    #[error("mac or authentication tag did not match")]
+    TagMismatch,
+    
     #[error("elliptic curve error: {0}")]
     EllipticCurveError(#[from] elliptic_curve::Error),
 
