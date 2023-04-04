@@ -16,7 +16,7 @@ on:
 jobs:
   docs:
     name: Generate API docs
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-16-core
     steps:
       - uses: actions/checkout@v3
 
