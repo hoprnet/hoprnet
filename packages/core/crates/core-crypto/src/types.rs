@@ -38,7 +38,19 @@ impl CurvePoint {
 
 impl From<PublicKey> for CurvePoint {
     fn from(pubkey: PublicKey) -> Self {
-        CurvePoint::from_affine(pubkey.key.as_affine().clone())
+        CurvePoint::from_affine(*pubkey.key.as_affine())
+    }
+}
+
+impl From<&PublicKey> for CurvePoint {
+    fn from(pubkey: &PublicKey) -> Self {
+        CurvePoint::from_affine(*pubkey.key.as_affine())
+    }
+}
+
+impl From<AffinePoint> for CurvePoint {
+    fn from(affine: AffinePoint) -> Self {
+        Self { affine }
     }
 }
 
@@ -52,9 +64,9 @@ impl FromStr for CurvePoint {
 
 impl PeerIdLike for CurvePoint {
     fn from_peerid(peer_id: &PeerId) -> utils_types::errors::Result<Self> {
-        Ok(CurvePoint::deserialize(
+        CurvePoint::deserialize(
             &PublicKey::from_peerid(peer_id)?.serialize(false),
-        )?)
+        )
     }
 
     fn to_peerid(&self) -> PeerId {
@@ -91,6 +103,11 @@ impl CurvePoint {
     /// Converts the curve point to a representation suitable for calculations
     pub fn to_projective_point(&self) -> ProjectivePoint<Secp256k1> {
         ProjectivePoint::<Secp256k1>::from(&self.affine)
+    }
+
+    /// Serializes the curve point into a compressed form. This is a cheap operation.
+    pub fn serialize_compressed(&self) -> Box<[u8]>  {
+        self.affine.to_encoded_point(true).to_bytes()
     }
 }
 
@@ -360,11 +377,15 @@ impl PublicKey {
     pub const SIZE_UNCOMPRESSED: usize = 65;
 
     pub fn deserialize(data: &[u8]) -> utils_types::errors::Result<Self> {
-        let key = elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(data).map_err(|_| ParseError)?;
-        Ok(PublicKey {
-            key,
-            compressed: key.to_encoded_point(true).to_bytes(),
-        })
+        if data.len() == Self::SIZE_COMPRESSED || data.len() == Self::SIZE_UNCOMPRESSED {
+            let key = elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(data).map_err(|_| ParseError)?;
+            Ok(PublicKey {
+                key,
+                compressed: if data.len() == Self::SIZE_COMPRESSED { data.into() } else { key.to_encoded_point(true).to_bytes() },
+            })
+        } else {
+            Err(ParseError)
+        }
     }
 
     pub fn from_privkey(private_key: &[u8]) -> Result<PublicKey> {

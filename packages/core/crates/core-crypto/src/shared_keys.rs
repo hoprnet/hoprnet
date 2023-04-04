@@ -3,11 +3,11 @@ use std::ops::Mul;
 
 use elliptic_curve::rand_core::{CryptoRng, RngCore};
 use elliptic_curve::sec1::ToEncodedPoint;
-use elliptic_curve::{Group, ProjectivePoint};
+use elliptic_curve::{Group};
 
 use generic_array::GenericArray;
 
-use k256::{AffinePoint, NonZeroScalar, Secp256k1};
+use k256::{NonZeroScalar};
 
 use crate::errors::CryptoError::{CalculationError, InvalidSecretScalar};
 use hkdf::SimpleHkdf;
@@ -24,29 +24,23 @@ use crate::types::{CurvePoint, PublicKey};
 pub type KeyBytes = GenericArray<u8, typenum::U32>;
 
 /// Extract a keying material from an EC point using HKDF extract
-fn extract_key_from_group_element(group_element: &AffinePoint, salt: &[u8]) -> KeyBytes {
+fn extract_key_from_group_element(group_element: &CurvePoint, salt: &[u8]) -> KeyBytes {
     // Create the compressed EC point representation first
-    let compressed_element = group_element.to_encoded_point(true);
-    SimpleHkdf::<Blake2s256>::extract(Some(salt), compressed_element.as_bytes()).0
+    let compressed_element = group_element.serialize_compressed();
+    SimpleHkdf::<Blake2s256>::extract(Some(salt), &compressed_element).0
 }
 
 /// Performs KDF expansion from the given EC point using HKDF expand
-fn expand_key_from_group_element(group_element: &AffinePoint, salt: &[u8]) -> KeyBytes {
+fn expand_key_from_group_element(group_element: &CurvePoint, salt: &[u8]) -> KeyBytes {
     // Create the compressed EC point representation first
-    let compressed_element = group_element.to_encoded_point(true);
+    let compressed_element = group_element.serialize_compressed();
 
     let mut out = [0u8; parameters::SECRET_KEY_LENGTH];
-    SimpleHkdf::<Blake2s256>::new(Some(salt), compressed_element.as_bytes())
+    SimpleHkdf::<Blake2s256>::new(Some(salt), &compressed_element)
         .expand(b"", &mut out)
         .unwrap(); // Cannot panic, unless the constants are wrong
 
     out.into()
-}
-
-/// Decodes the public key and converts it into an EC point in projective coordinates
-fn decode_public_key_to_point(encoded_public_key: &[u8]) -> Result<ProjectivePoint<Secp256k1>> {
-    let curve_point: CurvePoint = PublicKey::deserialize(encoded_public_key)?.into();
-    Ok(curve_point.to_projective_point())
 }
 
 /// Checks if the given key bytes can form a scalar for EC point
@@ -59,14 +53,14 @@ fn to_checked_secret_scalar(secret_scalar: KeyBytes) -> Result<NonZeroScalar> {
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct SharedKeys {
     alpha: Vec<u8>,
-    secrets: Vec<Vec<u8>>,
+    secrets: Vec<Box<[u8]>>,
 }
 
 impl SharedKeys {
     /// Generates shared secrets given the peer public keys array.
     /// The order of the peer public keys is preserved for resulting shared keys.
     /// The specified random number generator will be used.
-    pub fn generate(rng: &mut (impl CryptoRng + RngCore), peer_public_keys: Vec<Box<[u8]>>) -> Result<SharedKeys> {
+    pub fn generate(rng: &mut (impl CryptoRng + RngCore), peer_public_keys: &[PublicKey]) -> Result<SharedKeys> {
         let mut shared_keys = Vec::new();
 
         // This becomes: x * b_0 * b_1 * b_2 * ...
@@ -78,28 +72,29 @@ impl SharedKeys {
         let alpha = alpha_prev.to_encoded_point(true);
 
         // Iterate through all the given peer public keys
-        for (i, pk) in peer_public_keys.iter().enumerate() {
+        let pubkeys_len = peer_public_keys.len();
+        for (i, cp) in peer_public_keys.iter().map(CurvePoint::from).enumerate() {
             // Try to decode the given public key point & multiply by the current coefficient
-            let decoded_proj_point = decode_public_key_to_point(pk)?;
-            let shared_secret = (decoded_proj_point * coeff_prev.as_ref()).to_affine();
+            let shared_secret = (cp.to_projective_point() * coeff_prev.as_ref()).to_affine();
 
             // Extract the shared secret from the computed EC point and copy it into the shared keys structure
-            let shared_pk = extract_key_from_group_element(&shared_secret, pk);
-            shared_keys.push(shared_pk.to_vec());
+            let shared_pk = extract_key_from_group_element(&shared_secret.into(), &cp.serialize_compressed());
+            shared_keys.push(shared_pk.to_vec().into_boxed_slice());
 
             // Stop here, we don't need to compute anything more
-            if i == peer_public_keys.len() - 1 {
+            if i == pubkeys_len - 1 {
                 break;
             }
 
             // Compute the new blinding factor b_k (alpha needs compressing first)
             let enc_alpha_prev = alpha_prev.to_encoded_point(true);
-            let b_k = expand_key_from_group_element(&shared_secret, enc_alpha_prev.as_bytes());
+            let b_k = expand_key_from_group_element(&shared_secret.into(), enc_alpha_prev.as_bytes());
             let b_k_checked = to_checked_secret_scalar(b_k)?;
 
             // Update coeff prev and alpha
             coeff_prev = coeff_prev.mul(b_k_checked);
             alpha_prev = alpha_prev * b_k_checked.as_ref();
+
             if alpha_prev.is_identity().unwrap_u8() != 0 {
                 return Err(CalculationError);
             }
@@ -112,45 +107,48 @@ impl SharedKeys {
     }
 
     /// Calculates the forward transformation for the given peer public key.
-    pub fn forward_transform(alpha: &[u8], public_key: &[u8], private_key: &[u8]) -> Result<SharedKeys> {
+    pub fn forward_transform(alpha: &[u8], public_key: &PublicKey, private_key: &[u8]) -> Result<SharedKeys> {
         let priv_key = to_checked_secret_scalar(KeyBytes::clone_from_slice(&private_key[0..private_key.len()]))?;
-        let alpha_proj = decode_public_key_to_point(alpha)?;
+        let alpha_proj = CurvePoint::from(PublicKey::deserialize(alpha)?).to_projective_point();
 
         let s_k = (alpha_proj * priv_key.as_ref()).to_affine();
-        let secret = extract_key_from_group_element(&s_k, public_key);
+        let secret = extract_key_from_group_element(&s_k.into(), &public_key.serialize(true));
 
-        let b_k = expand_key_from_group_element(&s_k, alpha);
+        let b_k = expand_key_from_group_element(&s_k.into(), alpha);
         let b_k_checked = to_checked_secret_scalar(b_k)?;
 
         let alpha_new = (alpha_proj * b_k_checked.as_ref()).to_affine().to_encoded_point(true);
 
         Ok(SharedKeys {
             alpha: alpha_new.as_bytes().into(),
-            secrets: vec![secret.to_vec()],
+            secrets: vec![secret.to_vec().into_boxed_slice()],
         })
+    }
+
+    pub fn alpha(&self) -> &[u8] {
+        &self.alpha
+    }
+
+    pub fn secrets(&self) -> &Vec<Box<[u8]>> {
+        &self.secrets
     }
 }
 
 /// Unit tests of the Rust code
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
     use elliptic_curve::group::prime::PrimeCurveAffine;
     use elliptic_curve::rand_core::OsRng;
     use hex_literal::hex;
-
-    #[test]
-    fn test_decode_point() {
-        let point = hex!("0253f6e72ad23de294466b830619448d6d9059a42050141cd83bac4e3ee82c3f1e");
-        decode_public_key_to_point(&point).unwrap();
-    }
+    use k256::AffinePoint;
 
     #[test]
     fn test_extract_key_from_group_element() {
         let salt = [0xde, 0xad, 0xbe, 0xef];
         let pt = AffinePoint::generator();
 
-        let key = extract_key_from_group_element(&pt, &salt);
+        let key = extract_key_from_group_element(&pt.into(), &salt);
         assert_eq!(parameters::SECRET_KEY_LENGTH, key.len());
 
         let res = hex!("54BF34178075E153F481CE05B113C1530ECC45A2F1F13A3366D4389F65470DE6");
@@ -162,11 +160,18 @@ mod tests {
         let salt = [0xde, 0xad, 0xbe, 0xef];
         let pt = AffinePoint::generator();
 
-        let key = expand_key_from_group_element(&pt, &salt);
+        let key = expand_key_from_group_element(&pt.into(), &salt);
         assert_eq!(parameters::SECRET_KEY_LENGTH, key.len());
 
         let res = hex!("D138D9367474911F7124B95BE844D2F8A6D34E962694E37E8717BDBD3C15690B");
         assert_eq!(res, key.as_slice());
+    }
+
+    pub fn generate_random_keypairs(count: usize) -> (Vec<Box<[u8]>>, Vec<PublicKey>) {
+        (0..count)
+            .map(|_| NonZeroScalar::random(&mut OsRng))
+            .map(|s|(s.to_bytes().as_slice().into(), CurvePoint::from_exponent(s.to_bytes().as_slice()).and_then(PublicKey::try_from).unwrap()))
+            .unzip()
     }
 
     #[test]
@@ -178,47 +183,40 @@ mod tests {
         let mut used_rng = OsRng;
 
         // Generate some random key pairs
-        let (priv_keys, pub_keys): (Vec<Box<[u8]>>, Vec<Box<[u8]>>) = (0..COUNT_KEYPAIRS)
-            .map(|_i| NonZeroScalar::random(&mut used_rng))
-            .map(|s| (s, k256::ProjectivePoint::GENERATOR * s.as_ref()))
-            .map(|p| (p.0, p.1.to_encoded_point(true)))
-            .map(|p| (p.0.to_bytes(), p.1))
-            .map(|p| (Box::from(p.0.as_slice()), Box::from(p.1.as_bytes())))
-            .unzip();
+        let (priv_keys, pub_keys) = generate_random_keypairs(COUNT_KEYPAIRS);
 
         // Now generate the key shares for the public keys
-        let generated_shares = SharedKeys::generate(&mut used_rng, pub_keys.clone()).unwrap();
+        let generated_shares = SharedKeys::generate(&mut used_rng, &pub_keys).unwrap();
 
-        let mut alpha_cpy = generated_shares.alpha.clone();
+        let mut alpha_cpy: Box<[u8]> = generated_shares.alpha().into();
         for i in 0..COUNT_KEYPAIRS {
             let priv_key = priv_keys[i].to_vec();
-            let pub_key = pub_keys[i].to_vec();
+            let pub_key = &pub_keys[i];
 
             let shared_key =
-                SharedKeys::forward_transform(alpha_cpy.as_slice(), pub_key.as_slice(), priv_key.as_slice()).unwrap();
+                SharedKeys::forward_transform(&alpha_cpy, pub_key, priv_key.as_slice()).unwrap();
 
-            assert_eq!(&shared_key.secrets[0], &generated_shares.secrets[i]);
+            assert_eq!(&shared_key.secrets()[0], &generated_shares.secrets()[i]);
 
-            alpha_cpy = shared_key.alpha.clone();
+            alpha_cpy = shared_key.alpha().into();
         }
     }
 
     #[test]
     fn test_key_shares() {
-        let pub_keys: Vec<Box<[u8]>> = vec![
-            Box::new(hex!(
-                "0253f6e72ad23de294466b830619448d6d9059a42050141cd83bac4e3ee82c3f1e"
-            )),
-            Box::new(hex!(
-                "035fc5660f59059c263d3946d7abaf33fa88181e27bf298fcc5a9fa493bec9110b"
-            )),
-            Box::new(hex!(
-                "038d2b50a77fd43eeae9b37856358c7f1aee773b3e3c9d26f30b8706c02cbbfbb6"
-            )),
-        ];
+        let pub_keys =
+        [
+            hex!("0253f6e72ad23de294466b830619448d6d9059a42050141cd83bac4e3ee82c3f1e"),
+            hex!("035fc5660f59059c263d3946d7abaf33fa88181e27bf298fcc5a9fa493bec9110b"),
+            hex!("038d2b50a77fd43eeae9b37856358c7f1aee773b3e3c9d26f30b8706c02cbbfbb6"),
+        ]
+        .into_iter()
+        .map(|p|PublicKey::deserialize(&p))
+        .collect::<utils_types::errors::Result<Vec<_>>>()
+        .unwrap();
 
-        let keyshares = SharedKeys::generate(&mut OsRng, pub_keys).unwrap();
-        assert_eq!(3, keyshares.secrets.len());
+        let keyshares = SharedKeys::generate(&mut OsRng, &pub_keys).unwrap();
+        assert_eq!(3, keyshares.secrets().len());
     }
 }
 
@@ -234,6 +232,7 @@ pub mod wasm {
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use wasm_bindgen::prelude::*;
+    use crate::types::PublicKey;
 
     #[wasm_bindgen]
     impl SharedKeys {
@@ -246,7 +245,7 @@ pub mod wasm {
         /// The indices are assigned in the same order as they were given to the
         /// [`generate`] function.
         pub fn get_peer_shared_key(&self, peer_idx: usize) -> Option<Uint8Array> {
-            self.secrets.get(peer_idx).map(|k| Uint8Array::from(k.as_slice()))
+            self.secrets.get(peer_idx).map(|k| Uint8Array::from(k.as_ref()))
         }
 
         /// Returns the number of shared keys generated in this structure.
@@ -255,17 +254,17 @@ pub mod wasm {
         }
 
         #[wasm_bindgen(js_name = "forward_transform")]
-        pub fn _forward_transform(alpha: &[u8], public_key: &[u8], private_key: &[u8]) -> JsResult<SharedKeys> {
+        pub fn _forward_transform(alpha: &[u8], public_key: &PublicKey, private_key: &[u8]) -> JsResult<SharedKeys> {
             ok_or_jserr!(super::SharedKeys::forward_transform(alpha, public_key, private_key))
         }
 
         /// Generate shared keys given the peer public keys
         #[wasm_bindgen(js_name = "generate")]
         pub fn _generate(peer_public_keys: Vec<Uint8Array>) -> JsResult<SharedKeys> {
-            ok_or_jserr!(super::SharedKeys::generate(
-                &mut OsRng,
-                peer_public_keys.iter().map(|v| v.to_vec().into_boxed_slice()).collect()
-            ))
+            let public_keys = ok_or_jserr!(peer_public_keys.into_iter()
+                    .map(|v| PublicKey::deserialize(&v.to_vec()))
+                    .collect::<utils_types::errors::Result<Vec<PublicKey>>>())?;
+            ok_or_jserr!(super::SharedKeys::generate(&mut OsRng, &public_keys))
         }
     }
 }

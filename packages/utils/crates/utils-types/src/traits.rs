@@ -54,4 +54,9 @@ pub trait PeerIdLike: Sized {
     fn to_peerid_str(&self) -> String {
         self.to_peerid().to_base58()
     }
+
+    /// Convenience method that creates a new instance of this type from a random PeerId.
+    fn generate_from_random_peerid() -> Self {
+        Self::from_peerid(&PeerId::random()).unwrap()
+    }
 }
