@@ -16,9 +16,7 @@ on:
 jobs:
   build_and_test:
     name: Build & Test
-    runs-on:
-      group: ubuntu-latest-large-runners
-
+    runs-on: ubuntu-latest-8-cores
     steps:
       - uses: actions/checkout@v3
         with:
@@ -79,6 +77,6 @@ jobs:
         run: nix develop -c make -j build
 
       - name: Test
-        run: make -j test
+        run: nix develop -c make -j test
         env:
           HOPR_ENVIRONMENT_ID: anvil-localhost
