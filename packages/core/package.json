@@ -44,7 +44,7 @@
     "@libp2p/peer-id": "1.1.16",
     "@libp2p/peer-id-factory": "1.0.18",
     "@multiformats/multiaddr": "10.3.3",
-    "bn.js": "5.2.0",
+    "bn.js": "5.2.1",
     "datastore-level": "^8.0.0",
     "debug": "4.3.4",
     "err-code": "3.0.1",
