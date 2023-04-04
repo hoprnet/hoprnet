@@ -19,13 +19,9 @@ on:
 
 jobs:
   source-e2e:
-    runs-on: ${{ matrix.os }}
+    runs-on:
+      group: ubuntu-latest-large-runners
     timeout-minutes: 30
-
-    strategy:
-      matrix:
-        os: ['ubuntu-latest-4-core']
-
     steps:
       - uses: actions/checkout@v3
 
@@ -34,14 +30,6 @@ jobs:
         run: |
           echo "SCCACHE_GHA_ENABLED=false" >> $GITHUB_ENV
           echo "RUSTC_WRAPPER=" >> $GITHUB_ENV
-
-      - name: Configure Cache Env
-        if: ${{ !env.ACT }}
-        uses: actions/github-script@v6
-        with:
-          script: |
-            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
-            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
 
       - name: Sccache Setup
         if: ${{ !env.ACT }}

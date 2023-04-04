@@ -254,14 +254,6 @@ jobs:
           echo "SCCACHE_GHA_ENABLED=false" >> $GITHUB_ENV
           echo "RUSTC_WRAPPER=" >> $GITHUB_ENV
 
-      - name: Configure Cache Env
-        if: ${{ !env.ACT }}
-        uses: actions/github-script@v6
-        with:
-          script: |
-            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
-            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
-
       - name: Sccache Setup
         if: ${{ !env.ACT }}
         uses: mozilla-actions/sccache-action@v0.0.1
