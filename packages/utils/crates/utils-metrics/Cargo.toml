@@ -19,7 +19,7 @@ console_error_panic_hook = [ "dep:console_error_panic_hook" ]
 [dependencies]
 console_error_panic_hook = { version = "0.1.7", optional = true }
 js-sys = { version = "0.3.60", optional = true }
-prometheus = "0.13.2"
+prometheus = "0.13"
 regex = "1"
 utils-misc = { path = "../../../utils/crates/utils-misc" }
 wasm-bindgen = { workspace = true, optional = true }

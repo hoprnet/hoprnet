@@ -1,9 +1,9 @@
-use libp2p_identity::PeerId;
 use crate::parameters::{MAC_LENGTH, SECRET_KEY_LENGTH};
 use crate::prg::{PRG, PRGParameters};
-use crate::primitives::SimpleMac;
 use crate::types::PublicKey;
 use crate::utils;
+
+const RELAYER_END_PREFIX: u8 = 0xff;
 
 fn generate_filler(max_hops: usize, routing_info_len: usize, routing_info_last_hop_len: usize, secrets: &[&[u8]]) -> Box<[u8]> {
     assert!(secrets.len() >= 2, "too few secrets given");
@@ -43,9 +43,24 @@ impl RoutingInfo {
         assert!(secrets.len() <= max_hops, "too many secrets given");
         assert!(additional_data_relayer.iter().all(|r| r.len() == additional_data_relayer_len), "invalid relayer data length");
 
+        // TODO: check the public key and curve point abstraction
+        let routing_info_len = additional_data_relayer_len + MAC_LENGTH + PublicKey::SIZE_COMPRESSED;
+        let last_hop_len = additional_data_last_hop.map(|d| d.len()).unwrap_or(0) + 1; // end prefix length
 
-        let routing_info_len = additional_data_relayer_len + MAC_LENGTH +
+        let header_len = last_hop_len + (max_hops - 1) * routing_info_len;
+        let extended_header_len = last_hop_len + max_hops * routing_info_len;
 
+        let mut extended_header = vec![0u8; extended_header_len];
+
+        let mut mac =
+        for idx in 0..secrets.len() {
+
+        }
+
+        Self {
+            routing_information: Box::new(&extended_header[0..header_len]),
+            mac
+        }
     }
 }
 

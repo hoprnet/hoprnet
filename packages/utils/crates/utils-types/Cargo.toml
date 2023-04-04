@@ -18,9 +18,9 @@ console_error_panic_hook = [ "dep:console_error_panic_hook" ]
 [dependencies]
 ethnum = { version = "1.3.2", features = ["serde"] }
 getrandom = { version = "0.2.8", features = ["js"] }
-hex = "0.4.3"
+hex = "0.4"
 js-sys = { version = "0.3", optional = true}
-libp2p-identity = { version = "0.1.0", features = ["secp256k1", "peerid"] }
+libp2p-identity = { version = "0.1.1", features = ["secp256k1", "peerid"] }
 serde = "1.0"
 thiserror = "1.0"
 utils-log = { path = "../../../utils/crates/utils-log" }
