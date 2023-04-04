@@ -759,7 +759,7 @@ __metadata:
     heap-js: 2.2.0
     it-handshake: 4.0.0
     it-pair: 2.0.4
-    it-pipe: 2.0.3
+    it-pipe: 2.0.5
     it-pushable: 3.0.0
     mocha: 9.2.2
     multiformats: 9.6.5
@@ -894,7 +894,7 @@ __metadata:
     ethers: 5.7.2
     futoin-hkdf: 1.5.0
     hjson: 3.2.2
-    it-pipe: 2.0.3
+    it-pipe: 2.0.5
     jsonschema: 1.4.1
     leveldown: 6.1.1
     levelup: 5.1.1
@@ -6803,6 +6803,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"it-merge@npm:^2.0.0":
+  version: 2.0.1
+  resolution: "it-merge@npm:2.0.1"
+  dependencies:
+    it-pushable: ^3.1.0
+  checksum: 059cbac979909587059ed10b7c2933a109d3c1476848abee05d3138700a081d24a990355f5d002f8378d25200fa19f36ffb9a4f57e732fc307566f034cee5486
+  languageName: node
+  linkType: hard
+
 "it-pair@npm:2.0.4":
   version: 2.0.4
   resolution: "it-pair@npm:2.0.4"
@@ -6851,14 +6860,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"it-pipe@npm:2.0.3, it-pipe@npm:^2.0.3":
-  version: 2.0.3
-  resolution: "it-pipe@npm:2.0.3"
+"it-pipe@npm:2.0.5":
+  version: 2.0.5
+  resolution: "it-pipe@npm:2.0.5"
   dependencies:
-    it-merge: ^1.0.4
-    it-pushable: ^2.0.0
+    it-merge: ^2.0.0
+    it-pushable: ^3.1.0
     it-stream-types: ^1.0.3
-  checksum: 4e52ca9ff281f3c0387be41081646c7ede2486e9118aece164ace8cd949179009506792fa21db265a70f1bb7f48f6d916411447e5b4ceb1df15dbb1fe5dadbb7
+  checksum: 845db9e3ba5e380ba2edbe6dad5c542454770eed0d481ce7f031aa4a1e3fa0f4bba2be2e72178930e45c271e98f0e3e856b5bcbb2410d40e0984373be0afa5e6
   languageName: node
   linkType: hard
 
@@ -6866,6 +6875,17 @@ __metadata:
   version: 1.1.0
   resolution: "it-pipe@npm:1.1.0"
   checksum: d653078f1543851f55070e38426dbbebad1303e9adde5238e4192b8b38ac7e4a1dcc149ccf3e4269759d1cbdd00be98b346fc8db81117c81017f09577f050e8e
+  languageName: node
+  linkType: hard
+
+"it-pipe@npm:^2.0.3":
+  version: 2.0.3
+  resolution: "it-pipe@npm:2.0.3"
+  dependencies:
+    it-merge: ^1.0.4
+    it-pushable: ^2.0.0
+    it-stream-types: ^1.0.3
+  checksum: 4e52ca9ff281f3c0387be41081646c7ede2486e9118aece164ace8cd949179009506792fa21db265a70f1bb7f48f6d916411447e5b4ceb1df15dbb1fe5dadbb7
   languageName: node
   linkType: hard
 
@@ -6896,6 +6916,13 @@ __metadata:
   version: 3.1.0
   resolution: "it-pushable@npm:3.1.0"
   checksum: dbc857b2366490cb979e4512f69420cf8c5f4529b9baaa95ddc81cf5bbedf3017275d3e422c54a8393c8cd92c27aed71643ef959d7e417085d24fa6c01550c85
+  languageName: node
+  linkType: hard
+
+"it-pushable@npm:^3.1.0":
+  version: 3.1.2
+  resolution: "it-pushable@npm:3.1.2"
+  checksum: ef60d122cd641637648fd3e13f1c8eb0fc0688343da264014a80f188b53d302b4367214666087ebae5dcf5b115fa36efb8231ede687afc64b68fec8c7e55c35e
   languageName: node
   linkType: hard
 
