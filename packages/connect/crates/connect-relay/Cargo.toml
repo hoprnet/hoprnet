@@ -29,7 +29,7 @@ utils-misc = { path = "../../../utils/crates/utils-misc" }
 wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen-futures = { version = "0.4.33", optional = true }
 
-console_error_panic_hook = { version = "0.1.6", optional = true }
+console_error_panic_hook = { version = "0.1.7", optional = true }
 # wee_alloc = { version = "0.4.5", optional = true }
 
 [dev-dependencies]
