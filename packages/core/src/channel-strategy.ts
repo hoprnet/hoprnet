@@ -72,7 +72,7 @@ export interface ChannelStrategyInterface {
  * At present this does not take gas into consideration.
  */
 export abstract class SaneDefaults {
-  protected autoRedeemTickets: boolean = false
+  protected autoRedeemTickets: boolean = true
 
   async onAckedTicket(ackTicket: AcknowledgedTicket) {
     if (this.autoRedeemTickets) {
@@ -134,7 +134,7 @@ class RustStrategyWrapper<T extends RustStrategyInterface> extends SaneDefaults 
   }
 
   configure(settings: any) {
-    this.autoRedeemTickets = settings.auto_redeem_tickets ?? false
+    this.autoRedeemTickets = settings.auto_redeem_tickets ?? true
     this.strategy.configure(settings)
   }
 
