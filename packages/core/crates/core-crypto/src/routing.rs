@@ -64,7 +64,7 @@ impl RoutingInfo {
 
         for idx in 0..secrets.len() {
             let inverted_idx = secrets.len() - idx - 1;
-            let secret = secrets[idx];
+            let secret = secrets[inverted_idx];
             let prg = PRG::from_parameters(PRGParameters::new(secret));
 
             if idx == 0 {
@@ -84,7 +84,7 @@ impl RoutingInfo {
 
                 if secrets.len() > 1 {
                     let filler = generate_filler(max_hops, routing_info_len, last_hop_len, secrets);
-                    extended_header[last_hop_len + padding_len .. filler.len()].copy_from_slice(&filler);
+                    extended_header[last_hop_len + padding_len .. last_hop_len + padding_len + filler.len()].copy_from_slice(&filler);
                 }
             } else {
                 extended_header.copy_within(0..header_len, routing_info_len);
@@ -124,56 +124,56 @@ pub enum ForwardedHeader {
     }
 }
 
-impl ForwardedHeader {
-    pub fn new(secret: &[u8], pre_header: &[u8], mac: &[u8], max_hops: usize,
-                                    additional_data_relayer_len: usize, additional_data_last_hop_len: usize) -> Result<Self> {
-        assert_eq!(SECRET_KEY_LENGTH, secret.len(), "invalid secret length");
-        assert_eq!(SimpleMac::SIZE, mac.len(), "invalid mac length");
+pub fn forward_header(secret: &[u8], header: &mut [u8], mac: &[u8], max_hops: usize,
+                additional_data_relayer_len: usize, additional_data_last_hop_len: usize) -> Result<ForwardedHeader> {
+    assert_eq!(SECRET_KEY_LENGTH, secret.len(), "invalid secret length");
+    assert_eq!(SimpleMac::SIZE, mac.len(), "invalid mac length");
 
-        let routing_info_len = additional_data_relayer_len + PublicKey::SIZE_COMPRESSED + SimpleMac::SIZE;
-        let last_hop_len = additional_data_last_hop_len + 1; // end prefix
+    let routing_info_len = additional_data_relayer_len + PublicKey::SIZE_COMPRESSED + SimpleMac::SIZE;
+    let last_hop_len = additional_data_last_hop_len + 1; // end prefix
 
-        let header_len = last_hop_len + (max_hops - 1) * routing_info_len;
-        let mut header: Vec<u8> = pre_header.into();
+    let header_len = last_hop_len + (max_hops - 1) * routing_info_len;
 
-        assert_eq!(header_len, pre_header.len(), "invalid pre-header length");
+    assert_eq!(header_len, header.len(), "invalid pre-header length");
 
-        let choice = create_tagged_mac(secret, &header).unwrap().as_ref().ct_eq(mac).not();
-        if choice.into() {
-            return Err(TagMismatch)
-        }
-
-        // Unmask the header using the keystream
-        let prg = PRG::from_parameters(PRGParameters::new(secret));
-        let key_stream = prg.digest(0, header_len);
-        xor_inplace(&mut header, &key_stream);
-
-        if header[0] != RELAYER_END_PREFIX {
-            // Try to deserialize the public key to validate it
-            let next_node = PublicKey::deserialize(&header[..PublicKey::SIZE_COMPRESSED])
-                .map_err(|_| CryptoError::CalculationError)?;
-
-            let mac: Box<[u8]> = (&header[PublicKey::SIZE_COMPRESSED..PublicKey::SIZE_COMPRESSED + SimpleMac::SIZE]).into();
-            let additional_info: Box<[u8]> = (&header[PublicKey::SIZE_COMPRESSED + SimpleMac::SIZE..
-                PublicKey::SIZE_COMPRESSED + SimpleMac::SIZE + additional_data_relayer_len]).into();
-
-            header.copy_within(routing_info_len.., 0);
-            let key_stream = prg.digest(header_len, header_len + routing_info_len);
-            header[header_len - routing_info_len..].copy_from_slice(&key_stream);
-
-            Ok(RelayNode {
-                header: (&header[..header_len]).into(),
-                mac,
-                next_node,
-                additional_info,
-            })
-        } else {
-            Ok(FinalNode {
-                additional_data: (&header[1..1 + additional_data_last_hop_len]).into()
-            })
-        }
+    let computed_mac = create_tagged_mac(secret, header).unwrap();
+    let choice = computed_mac.as_ref().ct_eq(mac).not();
+    if choice.into() {
+        return Err(TagMismatch)
     }
 
+    // Unmask the header using the keystream
+    let prg = PRG::from_parameters(PRGParameters::new(secret));
+    let key_stream = prg.digest(0, header_len);
+    xor_inplace(header, &key_stream);
+
+    if header[0] != RELAYER_END_PREFIX {
+        // Try to deserialize the public key to validate it
+        let next_node = PublicKey::deserialize(&header[..PublicKey::SIZE_COMPRESSED])
+            .map_err(|_| CryptoError::CalculationError)?;
+
+        let mac: Box<[u8]> = (&header[PublicKey::SIZE_COMPRESSED..PublicKey::SIZE_COMPRESSED + SimpleMac::SIZE]).into();
+        let additional_info: Box<[u8]> = (&header[PublicKey::SIZE_COMPRESSED + SimpleMac::SIZE..
+            PublicKey::SIZE_COMPRESSED + SimpleMac::SIZE + additional_data_relayer_len]).into();
+
+        header.copy_within(routing_info_len.., 0);
+        let key_stream = prg.digest(header_len, header_len + routing_info_len);
+        header[header_len - routing_info_len..].copy_from_slice(&key_stream);
+
+        Ok(RelayNode {
+            header: (&header[..header_len]).into(),
+            mac,
+            next_node,
+            additional_info,
+        })
+    } else {
+        Ok(FinalNode {
+            additional_data: (&header[1..1 + additional_data_last_hop_len]).into()
+        })
+    }
+}
+
+impl ForwardedHeader {
     pub fn is_final(&self) -> bool {
         match self {
             RelayNode { .. } => false,
@@ -185,8 +185,7 @@ impl ForwardedHeader {
 #[cfg(test)]
 pub mod tests {
     use rand::rngs::OsRng;
-    use utils_types::traits::PeerIdLike;
-    use crate::routing::{ForwardedHeader, RoutingInfo};
+    use crate::routing::{forward_header, ForwardedHeader, RoutingInfo};
     use crate::shared_keys::SharedKeys;
     use crate::types::PublicKey;
 
@@ -203,18 +202,20 @@ pub mod tests {
 
         let pub_keys = (0..AMOUNT)
             .into_iter()
-            .map(|_| PublicKey::generate_from_random_peerid())
+            .map(|_| PublicKey::random())
             .collect::<Vec<_>>();
 
         let shares = SharedKeys::generate(&mut OsRng, &pub_keys).unwrap();
 
         let rinfo = RoutingInfo::new(MAX_HOPS, &pub_keys,
                          &shares.secrets().iter().map(|s| s.as_ref()).collect::<Vec<_>>(),
-                         0, additional_data, Some(&[]));
+                         0, additional_data, None);
+
+        let mut header: Vec<u8> = rinfo.routing_information.into();
 
         let mut last_mac: Box<[u8]> = rinfo.mac;
         for (i, secret) in shares.secrets().iter().enumerate() {
-            let fwd = ForwardedHeader::new(secret, &rinfo.routing_information, &last_mac,
+            let fwd = forward_header(secret, &mut header, &last_mac,
                                            MAX_HOPS, 0, 0)
                 .unwrap();
 

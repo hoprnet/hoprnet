@@ -19,6 +19,7 @@ use utils_types::traits::{BinarySerializable, PeerIdLike};
 
 use crate::errors::CryptoError::InvalidInputValue;
 use crate::errors::{CryptoError, CryptoError::CalculationError, Result};
+use crate::random::random_group_element;
 
 /// Represent an uncompressed elliptic curve point on the secp256k1 curve
 #[derive(Clone, Eq, PartialEq, Debug)]
@@ -308,12 +309,21 @@ pub struct PublicKey {
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl PublicKey {
+    /// Generates a new random public key.
+    /// Because the corresponding private key is discarded, this might be useful only for testing purposes.
+    pub fn random() -> Self {
+        let (_, cp) = random_group_element();
+        PublicKey::try_from(cp).unwrap()
+    }
+
+    /// Converts the public key to an Ethereum address
     pub fn to_address(&self) -> Address {
         let uncompressed = self.serialize(false);
         let serialized = Hash::create(&[&uncompressed[1..]]).serialize();
         Address::new(&serialized[12..])
     }
 
+    /// Serializes the public key to a binary form.
     pub fn serialize(&self, compressed: bool) -> Box<[u8]> {
         if compressed {
             self.compressed.clone()
@@ -322,6 +332,7 @@ impl PublicKey {
         }
     }
 
+    /// Serializes the public key to a binary form and converts it to hexadecimal string representation.
     pub fn to_hex(&self, compressed: bool) -> String {
         hex::encode(self.serialize(compressed))
     }
