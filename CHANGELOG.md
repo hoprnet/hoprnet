@@ -16,6 +16,7 @@
 - Extend the Grafana dashboards with the new mixer metrics (current mixer queue size & average mixer delay) ([#4768](https://github.com/hoprnet/hoprnet/pull/4768))
 - Expose full payment channel graph in `/channels` API ([#4756](https://github.com/hoprnet/hoprnet/pull/4756))
 - Fixed issue with too many channels being opened by the Promiscuous strategy, added option to enforce the maximum number of opened channels ([#4827](https://github.com/hoprnet/hoprnet/pull/4827))
+- Fixed incorrect recording of some Ping metrics ([#4867](https://github.com/hoprnet/hoprnet/pull/4867))
 
 <a name="1.92"></a>
 
