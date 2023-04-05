@@ -126,14 +126,10 @@ impl Ping {
             ()
         }
 
-        let _ping_peers_timer = match &self.metric_time_to_heartbeat {
-            Some(metric_time_to_heartbeat) => {
-                let timer = histogram_start_measure!(metric_time_to_heartbeat);
-                Some(scopeguard::guard((), move |_| {
-                    metric_time_to_heartbeat.cancel_measure(timer);
-                }))
-            }
-            None => None,
+        let heartbeat_round_timer = if let Some(metric_time_to_heartbeat) = &self.metric_time_to_heartbeat {
+            Some(histogram_start_measure!(metric_time_to_heartbeat))
+        } else {
+            None
         };
 
         let remainder = peers.split_off(self.config.max_parallel_pings.min(peers.len()));
@@ -157,6 +153,10 @@ impl Ping {
 
             self.external_api.on_finished_ping(&heartbeat.0, heartbeat.1);
         }
+
+        if let Some(metric_time_to_heartbeat) = &self.metric_time_to_heartbeat {
+            metric_time_to_heartbeat.cancel_measure(heartbeat_round_timer.unwrap());
+        };
     }
 
     /// Ping a single peer respecting a specified timeout duration.
@@ -173,14 +173,10 @@ impl Ping {
         let sent_ping = ControlMessage::generate_ping_request();
 
         let ping_result: PingMeasurement = {
-            let _ping_peer_timer = match &self.metric_time_to_ping {
-                Some(metric_time_to_ping) => {
-                    let timer = histogram_start_measure!(metric_time_to_ping);
-                    Some(scopeguard::guard((), move |_| {
-                        metric_time_to_ping.cancel_measure(timer);
-                    }))
-                }
-                None => None,
+            let ping_peer_timer = if let Some(metric_time_to_ping) = &self.metric_time_to_ping {
+                Some(histogram_start_measure!(metric_time_to_ping))
+            } else {
+                None
             };
 
             let timeout = sleep(std::cmp::min(timeout_duration, self.config.timeout)).fuse();
@@ -210,6 +206,10 @@ impl Ping {
                     ))),
                 },
             };
+
+            if let Some(metric_time_to_ping) = &self.metric_time_to_ping {
+                metric_time_to_ping.cancel_measure(ping_peer_timer.unwrap());
+            }
 
             match &ping_result {
                 Ok(_) => info!("Successfully pinged peer {}", destination),
