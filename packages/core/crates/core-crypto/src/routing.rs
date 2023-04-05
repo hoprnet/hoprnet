@@ -1,3 +1,5 @@
+use std::ops::Not;
+use subtle::ConstantTimeEq;
 use crate::derivation::derive_mac_key;
 use crate::errors::CryptoError;
 use crate::errors::CryptoError::TagMismatch;
@@ -51,7 +53,6 @@ impl RoutingInfo {
         assert!(additional_data_relayer.iter().all(|r| r.len() == additional_data_relayer_len), "invalid relayer data length");
         assert!(additional_data_last_hop.is_none() || !additional_data_last_hop.unwrap().is_empty(), "invalid additional data for last hop");
 
-        // TODO: check the public key and curve point abstraction
         let routing_info_len = additional_data_relayer_len + SimpleMac::SIZE + PublicKey::SIZE_COMPRESSED;
         let last_hop_len = additional_data_last_hop.map(|d| d.len()).unwrap_or(0) + 1; // end prefix length
 
@@ -114,7 +115,7 @@ pub enum ForwardedHeader {
     RelayNode {
         header: Box<[u8]>,
         mac: Box<[u8]>,
-        next_node: Box<[u8]>,
+        next_node: PublicKey,
         additional_info: Box<[u8]>
     },
 
@@ -137,8 +138,8 @@ impl ForwardedHeader {
 
         assert_eq!(header_len, pre_header.len(), "invalid pre-header length");
 
-        // TODO: make this constant time equal
-        if create_tagged_mac(secret, &header).unwrap().as_ref() != mac {
+        let choice = create_tagged_mac(secret, &header).unwrap().as_ref().ct_eq(mac).not();
+        if choice.into() {
             return Err(TagMismatch)
         }
 
@@ -149,7 +150,7 @@ impl ForwardedHeader {
 
         if header[0] != RELAYER_END_PREFIX {
             // Try to deserialize the public key to validate it
-            let next_node_pk = PublicKey::deserialize(&header[..PublicKey::SIZE_COMPRESSED])
+            let next_node = PublicKey::deserialize(&header[..PublicKey::SIZE_COMPRESSED])
                 .map_err(|_| CryptoError::CalculationError)?;
 
             let mac: Box<[u8]> = (&header[PublicKey::SIZE_COMPRESSED..PublicKey::SIZE_COMPRESSED + SimpleMac::SIZE]).into();
@@ -161,9 +162,9 @@ impl ForwardedHeader {
             header[header_len - routing_info_len..].copy_from_slice(&key_stream);
 
             Ok(RelayNode {
-                next_node: next_node_pk.serialize(true),
                 header: (&header[..header_len]).into(),
                 mac,
+                next_node,
                 additional_info,
             })
         } else {
@@ -198,6 +199,7 @@ pub mod tests {
     fn test_generate_routing_info_and_forward() {
         const AMOUNT: usize = 3;
         const MAX_HOPS: usize = 3;
+        let additional_data: &[&[u8]] = &[&[],&[],&[]];
 
         let pub_keys = (0..AMOUNT)
             .into_iter()
@@ -206,15 +208,27 @@ pub mod tests {
 
         let shares = SharedKeys::generate(&mut OsRng, &pub_keys).unwrap();
 
-        let additional_data: &[&[u8]] = &[&[],&[],&[]];
-
         let rinfo = RoutingInfo::new(MAX_HOPS, &pub_keys,
                          &shares.secrets().iter().map(|s| s.as_ref()).collect::<Vec<_>>(),
                          0, additional_data, Some(&[]));
 
-        /*let mac: Box<[u8]> = rinfo.mac;
-        for secret in shares.secrets() {
-            fwd = ForwardedHeader::new(secret, &rinfo.routing_information, if fwd.is_final() { rinfo.mac } else { fwd } ).unwrap();
-        }*/
+        let mut last_mac: Box<[u8]> = rinfo.mac;
+        for (i, secret) in shares.secrets().iter().enumerate() {
+            let fwd = ForwardedHeader::new(secret, &rinfo.routing_information, &last_mac,
+                                           MAX_HOPS, 0, 0)
+                .unwrap();
+
+            match &fwd {
+                ForwardedHeader::RelayNode { mac, next_node , .. } => {
+                    last_mac = mac.clone();
+                    assert!(i < shares.secrets().len() - 1);
+                    assert_eq!(&pub_keys[i + 1], next_node);
+                },
+                ForwardedHeader::FinalNode { additional_data } => {
+                    assert_eq!(shares.secrets().len() - 1, i);
+                    assert_eq!(0, additional_data.len());
+                }
+            }
+        }
     }
 }

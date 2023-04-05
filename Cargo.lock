@@ -1073,6 +1073,7 @@ dependencies = [
  "libp2p-identity",
  "rand 0.8.5",
  "sha3",
+ "subtle",
  "thiserror",
  "typenum",
  "utils-log",
