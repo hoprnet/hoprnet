@@ -257,7 +257,7 @@ struct CliArgs {
 
     #[arg(
         long = "autoRedeemTickets",
-        default_value_t = false,
+        default_value_t = true,
         env = "HOPRD_AUTO_REDEEEM_TICKETS",
         help = "If enabled automatically redeems winning tickets.",
         action = ArgAction::SetTrue
@@ -266,7 +266,7 @@ struct CliArgs {
 
     #[arg(
         long = "checkUnrealizedBalance",
-        default_value_t = false,
+        default_value_t = true,
         env = "HOPRD_CHECK_UNREALIZED_BALANCE",
         help = "Determines if unrealized balance shall be checked first before validating unacknowledged tickets.",
         action = ArgAction::SetTrue
