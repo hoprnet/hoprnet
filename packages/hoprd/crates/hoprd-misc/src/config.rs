@@ -8,8 +8,6 @@ use core_misc::constants::{
     DEFAULT_MAX_PARALLEL_CONNECTIONS, DEFAULT_MAX_PARALLEL_CONNECTION_PUBLIC_RELAY, DEFAULT_NETWORK_QUALITY_THRESHOLD,
 };
 
-use utils_proc_macros::wasm_bindgen_if;
-
 pub const DEFAULT_API_HOST: &str = "localhost";
 pub const DEFAULT_API_PORT: u16 = 3001;
 
@@ -43,7 +41,7 @@ fn validate_api_auth(token: &Auth) -> Result<(), ValidationError> {
     }
 }
 
-#[wasm_bindgen_if(getter_with_clone)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct Host {
     #[validate(custom = "validate_ipv4_address")]
@@ -80,7 +78,7 @@ pub enum Auth {
     Token(String),
 }
 
-#[wasm_bindgen_if(getter_with_clone)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Validate, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Api {
     pub enabled: bool,
@@ -120,7 +118,7 @@ impl Default for Api {
     }
 }
 
-#[wasm_bindgen_if(getter_with_clone)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct HealthCheck {
     pub enabled: bool,
@@ -138,7 +136,7 @@ impl Default for HealthCheck {
     }
 }
 
-#[wasm_bindgen_if(getter_with_clone)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct Heartbeat {
     pub interval: u32,
@@ -156,7 +154,7 @@ impl Default for Heartbeat {
     }
 }
 
-#[wasm_bindgen_if(getter_with_clone)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct Network {
     pub announce: bool,
@@ -178,7 +176,7 @@ impl Default for Network {
     }
 }
 
-#[wasm_bindgen_if(getter_with_clone)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct Chain {
     pub provider: Option<String>,
@@ -196,7 +194,7 @@ impl Default for Chain {
     }
 }
 
-#[wasm_bindgen_if(getter_with_clone)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct Strategy {
     // TODO: implement checks
@@ -215,6 +213,8 @@ impl Default for Strategy {
     }
 }
 
+/// Does not work in the WASM environment
+#[allow(dead_code)]
 fn validate_file_path(s: &str) -> Result<(), ValidationError> {
     if std::path::Path::new(s).is_file() {
         Ok(())
@@ -231,21 +231,19 @@ fn validate_password(s: &str) -> Result<(), ValidationError> {
     }
 }
 
-regex!(is_private_key "^[a-fA-F0-9]{64}$");
-regex!(is_prefixed_private_key "^0x[a-fA-F0-9]{64}$");
+regex!(is_private_key "^(0[xX])?[a-fA-F0-9]{64}$");
 
 pub(crate) fn validate_private_key(s: &str) -> Result<(), ValidationError> {
-    if is_private_key(s) || is_prefixed_private_key(s) {
+    if is_private_key(s) {
         Ok(())
     } else {
         Err(ValidationError::new("No valid private key could be found"))
     }
 }
 
-#[wasm_bindgen_if(getter_with_clone)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct Identity {
-    #[validate(custom = "validate_file_path")] // TODO: works in wasm?
     pub file: String,
     #[validate(custom = "validate_password")]
     pub password: String,
@@ -265,6 +263,8 @@ impl std::fmt::Debug for Identity {
     }
 }
 
+/// Does not work in the WASM environment
+#[allow(dead_code)]
 fn validate_directory_path(s: &str) -> Result<(), ValidationError> {
     if std::path::Path::new(s).is_dir() {
         Ok(())
@@ -273,17 +273,16 @@ fn validate_directory_path(s: &str) -> Result<(), ValidationError> {
     }
 }
 
-#[wasm_bindgen_if(getter_with_clone)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct Db {
     /// Path to the directory containing the database
-    #[validate(custom = "validate_directory_path")] // TODO: works in wasm?
     pub data: String,
     pub init: bool,
     pub force_init: bool,
 }
 
-#[wasm_bindgen_if(getter_with_clone)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct Testing {
     pub announce_local_addresses: bool,
@@ -294,7 +293,7 @@ pub struct Testing {
     pub local_mode_stun: bool,
 }
 
-#[wasm_bindgen_if(getter_with_clone)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct HoprdConfig {
     #[validate]
@@ -595,7 +594,7 @@ mod tests {
         }
     }
 
-    const DEFAULT_YAML: &'static str = r#"host:
+    const EXAMPLE_YAML: &'static str = r#"host:
   ip: 127.0.0.1
   port: 47462
 identity:
@@ -649,7 +648,7 @@ test:
         let cfg = example_cfg();
 
         let yaml = serde_yaml::to_string(&cfg)?;
-        assert_eq!(yaml, DEFAULT_YAML);
+        assert_eq!(yaml, EXAMPLE_YAML);
 
         Ok(())
     }

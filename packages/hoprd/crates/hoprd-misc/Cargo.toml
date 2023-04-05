@@ -34,7 +34,6 @@ thiserror = "1.0"
 serde-wasm-bindgen = { version = "0.4", optional = true }
 utils-log = { path = "../../../utils/crates/utils-log" }
 utils-misc = { path = "../../../utils/crates/utils-misc" }
-utils-proc-macros = { path = "../../../utils/crates/utils-proc-macros" }
 validator = { version = "0.16.0", features = ["derive"] }
 wasm-bindgen = { workspace = true, optional = true }
 

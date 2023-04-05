@@ -1091,7 +1091,7 @@ dependencies = [
 
 [[package]]
 name = "core-network"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-std",
  "bincode",
@@ -2547,7 +2547,6 @@ dependencies = [
  "thiserror",
  "utils-log",
  "utils-misc",
- "utils-proc-macros",
  "validator",
  "wasm-bindgen",
  "wasm-bindgen-test",

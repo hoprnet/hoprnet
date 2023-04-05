@@ -13,7 +13,6 @@ use real_base::real;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use utils_misc::ok_or_str;
-use utils_proc_macros::wasm_bindgen_if;
 
 pub const DEFAULT_API_HOST: &str = "localhost";
 pub const DEFAULT_API_PORT: u16 = 3001;
@@ -90,7 +89,7 @@ fn parse_api_token(mut s: &str) -> Result<String, String> {
 /// file contents need be specified using `clap`s builder API
 #[derive(Serialize, Args, Clone)]
 #[command(about = "HOPRd")]
-#[wasm_bindgen_if(getter_with_clone)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct CliArgs {
     /// Environment
     // Filled by Builder API at runtime
@@ -148,7 +147,7 @@ pub struct CliArgs {
 
     #[arg(
         long = "disableApiAuthentication",
-        help = "completely disables the token authentication for the API, overrides any apiToken if set",
+        help = "Completely disables the token authentication for the API, overrides any apiToken if set",
         action = ArgAction::SetTrue,
         env = "HOPRD_DISABLE_API_AUTHENTICATION",
         hide = true
@@ -240,7 +239,6 @@ pub struct CliArgs {
     )]
     pub provider: Option<String>,
 
-    // TODO: pass separately to the layer above
     #[arg(
         long = "dryRun",
         help = "List all the options used to run the HOPR node, but quit instead of starting",
