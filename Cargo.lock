@@ -1071,6 +1071,7 @@ dependencies = [
  "js-sys",
  "k256 0.13.0",
  "libp2p-identity",
+ "parameterized",
  "rand 0.8.5",
  "sha3",
  "subtle",
@@ -4140,6 +4141,27 @@ checksum = "a1914cd452d8fccd6f9db48147b29fd4ae05bea9dc5d9ad578509f72415de282"
 dependencies = [
  "cfg-if 1.0.0",
  "libm",
+]
+
+[[package]]
+name = "parameterized"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bae5c87ace1829bb3dcbadaf9d099c62beb05ca19ab4b26389eaa33ced9db11b"
+dependencies = [
+ "parameterized-macro",
+]
+
+[[package]]
+name = "parameterized-macro"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1def6e0adb9bf9daf2d352cba8407b5eaa204f77e02de149ad690e816d7fac14"
+dependencies = [
+ "indexmap",
+ "proc-macro2",
+ "quote",
+ "syn 1.0.107",
 ]
 
 [[package]]

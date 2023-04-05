@@ -184,23 +184,57 @@ impl ForwardedHeader {
 
 #[cfg(test)]
 pub mod tests {
+    use parameterized::parameterized;
     use rand::rngs::OsRng;
-    use crate::routing::{forward_header, ForwardedHeader, RoutingInfo};
+    use crate::parameters::SECRET_KEY_LENGTH;
+    use crate::prg::{PRG, PRGParameters};
+    use crate::random::random_bytes;
+    use crate::routing::{forward_header, ForwardedHeader, generate_filler, RoutingInfo};
     use crate::shared_keys::SharedKeys;
     use crate::types::PublicKey;
+    use crate::utils::xor_inplace;
 
     #[test]
     fn test_filler_generate_verify() {
+        let per_hop = 3;
+        let last_hop = 5;
+        let hops = 3;
+        let max_hops = hops;
+
+        let secrets = (0..hops).map(|_| random_bytes::<SECRET_KEY_LENGTH>()).collect::<Vec<_>>();
+        let extended_header_len = per_hop * max_hops + last_hop;
+        let header_len = per_hop * (max_hops - 1) + last_hop;
+
+        let mut extended_header = vec![0u8; per_hop * max_hops + last_hop];
+        let filler = generate_filler(max_hops, per_hop, last_hop,
+                                     &secrets.iter().map(|s| s.as_ref()).collect::<Vec<_>>());
+        extended_header[last_hop..filler.len()].copy_from_slice(&filler);
+        extended_header.copy_within(0..header_len, per_hop);
+
+        for i in 0 ..hops - 1 {
+            let idx = secrets.len() - i - 2;
+            let mask = PRG::from_parameters(PRGParameters::new(&secrets[idx]))
+                .digest(0, extended_header_len);
+
+            xor_inplace(&mut extended_header, &mask);
+
+            assert!(extended_header[header_len..].iter().all(|x| *x == 0), "xor blinding must erase last bits");
+
+            extended_header.copy_within(0..header_len, per_hop);
+        }
 
     }
 
-    #[test]
-    fn test_generate_routing_info_and_forward() {
-        const AMOUNT: usize = 3;
+    #[parameterized(amount = { 3, 2, 1 })]
+    fn test_generate_routing_info_and_forward(amount: usize) {
         const MAX_HOPS: usize = 3;
-        let additional_data: &[&[u8]] = &[&[],&[],&[]];
+        let mut additional_data: Vec<&[u8]> = Vec::with_capacity(amount);
+        for _ in 0..amount {
+            let e: &[u8] = &[];
+            additional_data.push(e);
+        }
 
-        let pub_keys = (0..AMOUNT)
+        let pub_keys = (0..amount)
             .into_iter()
             .map(|_| PublicKey::random())
             .collect::<Vec<_>>();
@@ -209,7 +243,7 @@ pub mod tests {
 
         let rinfo = RoutingInfo::new(MAX_HOPS, &pub_keys,
                          &shares.secrets().iter().map(|s| s.as_ref()).collect::<Vec<_>>(),
-                         0, additional_data, None);
+                         0, &additional_data, None);
 
         let mut header: Vec<u8> = rinfo.routing_information.into();
 
@@ -232,4 +266,5 @@ pub mod tests {
             }
         }
     }
+
 }
