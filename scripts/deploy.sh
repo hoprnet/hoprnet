@@ -82,7 +82,8 @@ for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entr
       log "\tcluster name: ${cluster_name}"
       log "\tcluster template name: ${cluster_template_name}"
 
-      if [ "${cluster_tag}" = "-nat" ]; then
+      # check if the tag ends with -nat
+      if [[ "${cluster_tag}" =~ "-nat$" ]]; then
         log "\tNATed node, no announcements"
         ${mydir}/setup-gcloud-cluster.sh \
           "${environment_id}" \
