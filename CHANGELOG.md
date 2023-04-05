@@ -1,5 +1,11 @@
 # Changelog
 
+<a name="2.00"></a>
+
+## [2.00](https://github.com/hoprnet/hoprnet/compare/release/bratislava...hoprnet:master)
+
+- Introduce the possibility of using YAML configuration file and revamp the configuration infrastructure to make the YAML a default base for all configuration types (env vars, cmd line args)  ([#4796](https://github.com/hoprnet/hoprnet/pull/4796))
+
 <a name="1.93"></a>
 
 ## [1.93](https://github.com/hoprnet/hoprnet/compare/release/riga...hoprnet:release/bratislava)
