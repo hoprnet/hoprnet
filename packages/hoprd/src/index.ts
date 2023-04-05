@@ -174,7 +174,7 @@ async function main() {
     settings: {
       includeRecipient: false,
       strategy: 'passive',
-      autoRedeemTickets: false,
+      autoRedeemTickets: true,
       maxAutoChannels: undefined
     }
   }

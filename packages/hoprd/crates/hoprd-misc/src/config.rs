@@ -190,7 +190,7 @@ impl Default for Chain {
     fn default() -> Self {
         Self {
             provider: None,
-            check_unrealized_balance: false,
+            check_unrealized_balance: true,
             on_chain_confirmations: DEFAULT_CONFIRMATIONS,
         }
     }
@@ -210,7 +210,7 @@ impl Default for Strategy {
         Self {
             name: Some("passive".to_owned()),
             max_auto_channels: None,
-            auto_redeem_tickets: false,
+            auto_redeem_tickets: true,
         }
     }
 }
@@ -546,7 +546,7 @@ mod tests {
             strategy: Strategy {
                 name: None,
                 max_auto_channels: None,
-                auto_redeem_tickets: false,
+                auto_redeem_tickets: true,
             },
             db: Db {
                 data: "/tmp/db".to_owned(),
@@ -581,7 +581,7 @@ mod tests {
             environment: "testing".to_string(),
             chain: Chain {
                 provider: None,
-                check_unrealized_balance: false,
+                check_unrealized_balance: true,
                 on_chain_confirmations: 0,
             },
             test: Testing {
@@ -615,7 +615,7 @@ api:
 strategy:
   name: null
   max_auto_channels: null
-  auto_redeem_tickets: false
+  auto_redeem_tickets: true
 heartbeat:
   interval: 0
   threshold: 0
@@ -633,7 +633,7 @@ healthcheck:
 environment: testing
 chain:
   provider: null
-  check_unrealized_balance: false
+  check_unrealized_balance: true
   on_chain_confirmations: 0
 test:
   announce_local_addresses: false
