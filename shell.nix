@@ -33,7 +33,6 @@ let
 
     # integration testing utilities
     python310Packages.pip
-    python310Packages.black
 
     # testing utilities
     jq # v1.6
