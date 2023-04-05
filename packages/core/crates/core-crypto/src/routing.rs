@@ -15,7 +15,10 @@ use crate::routing::ForwardedHeader::{FinalNode, RelayNode};
 const RELAYER_END_PREFIX: u8 = 0xff;
 
 fn generate_filler(max_hops: usize, routing_info_len: usize, routing_info_last_hop_len: usize, secrets: &[&[u8]]) -> Box<[u8]> {
-    assert!(secrets.len() >= 2, "too few secrets given");
+    if secrets.len() < 2 {
+        return vec![].into_boxed_slice();
+    }
+
     assert!(max_hops >= secrets.len(), "too few hops");
     assert!(routing_info_len > 0, "invalid routing info length");
 
@@ -194,11 +197,10 @@ pub mod tests {
     use crate::types::PublicKey;
     use crate::utils::xor_inplace;
 
-    #[test]
-    fn test_filler_generate_verify() {
+    #[parameterized(hops = { 3, 4 })]
+    fn test_filler_generate_verify(hops: usize) {
         let per_hop = 3;
         let last_hop = 5;
-        let hops = 3;
         let max_hops = hops;
 
         let secrets = (0..hops).map(|_| random_bytes::<SECRET_KEY_LENGTH>()).collect::<Vec<_>>();
@@ -206,9 +208,11 @@ pub mod tests {
         let header_len = per_hop * (max_hops - 1) + last_hop;
 
         let mut extended_header = vec![0u8; per_hop * max_hops + last_hop];
+
         let filler = generate_filler(max_hops, per_hop, last_hop,
                                      &secrets.iter().map(|s| s.as_ref()).collect::<Vec<_>>());
-        extended_header[last_hop..filler.len()].copy_from_slice(&filler);
+
+        extended_header[last_hop..last_hop + filler.len()].copy_from_slice(&filler);
         extended_header.copy_within(0..header_len, per_hop);
 
         for i in 0 ..hops - 1 {
@@ -222,7 +226,23 @@ pub mod tests {
 
             extended_header.copy_within(0..header_len, per_hop);
         }
+    }
 
+    #[test]
+    fn test_filler_edge_case() {
+        let per_hop = 23;
+        let last_hop = 31;
+        let hops = 1;
+        let max_hops = hops;
+
+        let secrets = (0..hops).map(|_| random_bytes::<SECRET_KEY_LENGTH>()).collect::<Vec<_>>();
+
+        let first_filler = generate_filler(max_hops, per_hop, last_hop,
+                                           &secrets.iter().map(|s| s.as_ref()).collect::<Vec<_>>());
+        assert_eq!(0, first_filler.len());
+
+        let second_filler = generate_filler(0, per_hop, last_hop, &[]);
+        assert_eq!(0, second_filler.len());
     }
 
     #[parameterized(amount = { 3, 2, 1 })]
