@@ -4,7 +4,7 @@
 
 ## [2.00](https://github.com/hoprnet/hoprnet/compare/release/bratislava...hoprnet:master)
 
-- Make automatic ticket redemption and unrealized balance check enabled per default ([]())
+- Make automatic ticket redemption and unrealized balance check enabled per default ([#4857](https://github.com/hoprnet/hoprnet/pull/4857))
 
 
 <a name="1.93"></a>
