@@ -17,7 +17,7 @@ The current process is as follows when a new version needs to be published:
 9. On GH page of https://github.com/dappnode/DAppNodePackage-Hopr, go to the newly created release and click the link that takes you to the pre-filled release signing form.
 10. In Site setting for this page make sure you allow Insecure content (it usually does an HTTP request to your Dappnode while itself being behind HTTPS).
 11. Make sure the developer address in the form corresponds to the `Dappnode HOPR Repository Owner`, change it if not.
-10. In MetaMask, load the `Dappnode HOPR Repository Owner` wallet on Mainnet and click `Connect MetaMask` in the form.
-11. Click `Sign release` to sign the release (confirm in MM). New IPFS hash is created with the signed release, changes automatically in the Release hash field in the form.
-12. Click `Publish release` to publish the signed release (confirm transaction in MM).
-13. On the forked repo https://github.com/hoprnet/DAppNodePackage-Hopr GH page, do a Sync of the `main` branches from the Upstream repo.
+12. In MetaMask, load the `Dappnode HOPR Repository Owner` wallet on Mainnet and click `Connect MetaMask` in the form.
+13. Click `Sign release` to sign the release (confirm in MM). New IPFS hash is created with the signed release, changes automatically in the Release hash field in the form.
+14. Click `Publish release` to publish the signed release (confirm transaction in MM).
+15. On the forked repo https://github.com/hoprnet/DAppNodePackage-Hopr GH page, do a Sync of the `main` branches from the Upstream repo.
