@@ -4,6 +4,7 @@ import { randomInteger, debug, retimer, pickVersion } from '@hoprnet/hopr-utils'
 import type { Components } from '@libp2p/interfaces/components'
 
 import type { SendMessage } from '../index.js'
+import { PEER_METADATA_PROTOCOL_VERSION } from '../index.js'
 import { pipe } from 'it-pipe'
 import { reply_to_ping, HeartbeatConfig, Network, Pinger, PeerOrigin } from '../../lib/core_network.js'
 import { core_network_set_panic_hook } from '../../lib/core_network.js'
@@ -18,6 +19,11 @@ import pkg from '../../package.json' assert { type: 'json' }
 import { peerIdFromString } from '@libp2p/peer-id'
 
 const NORMALIZED_VERSION = pickVersion(pkg.version)
+
+function versionFromProtocol(protocol: string): string {
+  let parts = protocol.split('/')
+  return parts.length == 5 ? parts[4] : 'unknown'
+}
 
 export default class Heartbeat {
   private stopHeartbeatInterval: (() => void) | undefined
@@ -58,12 +64,16 @@ export default class Heartbeat {
   }
 
   public async start() {
-    this.libp2pComponents.getRegistrar().handle(this.protocolHeartbeat, async ({ connection, stream }) => {
+    this.libp2pComponents.getRegistrar().handle(this.protocolHeartbeat, async ({ protocol, connection, stream }) => {
       let remote = connection.remotePeer.toString()
+
+      let peer_metadata = new Map<string, string>()
+      peer_metadata.set(PEER_METADATA_PROTOCOL_VERSION, versionFromProtocol(protocol))
+
       if (this.networkPeers.contains(remote)) {
-        this.networkPeers.refresh(remote, Date.now())
+        this.networkPeers.refresh_with_metadata(remote, Date.now(), peer_metadata)
       } else {
-        this.networkPeers.register(remote, PeerOrigin.IncomingConnection)
+        this.networkPeers.register_with_metadata(remote, PeerOrigin.IncomingConnection, peer_metadata)
       }
 
       try {
