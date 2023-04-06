@@ -486,6 +486,7 @@ impl PublicKey {
 #[derive(Clone, Eq, PartialEq, Debug)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Signature {
+    // TODO: The signature will be secp256k1 only, it will not accept Ed25519 public keys
     signature: [u8; Self::SIZE],
     recovery: u8,
 }

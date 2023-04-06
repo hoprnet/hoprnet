@@ -1,18 +1,21 @@
-use crate::errors::CryptoError::{InvalidInputValue, InvalidParameterSize};
+use crate::errors::CryptoError::{CalculationError, InvalidInputValue, InvalidParameterSize};
 use blake2::Blake2s256;
-use digest::{Digest, FixedOutput};
 use hkdf::SimpleHkdf;
+use subtle::CtOption;
+use utils_types::traits::BinarySerializable;
 
 use crate::errors::Result;
 use crate::parameters::{PACKET_TAG_LENGTH, PING_PONG_NONCE_SIZE, SECRET_KEY_LENGTH};
-use crate::primitives::calculate_mac;
+use crate::primitives::{calculate_mac, DigestLike, SimpleDigest};
 use crate::random::random_fill;
-use crate::types::HalfKey;
+use crate::types::{HalfKey, PublicKey};
 
 // Module-specific constants
 const HASH_KEY_COMMITMENT_SEED: &str = "HASH_KEY_COMMITMENT_SEED";
 const HASH_KEY_HMAC: &str = "HASH_KEY_HMAC";
 const HASH_KEY_PACKET_TAG: &str = "HASH_KEY_PACKET_TAG";
+const HASH_KEY_OWN_KEY: &str = "HASH_KEY_OWN_KEY";
+const HASH_KEY_ACK_KEY: &str = "HASH_KEY_ACK_KEY";
 
 /// Helper function to expand an already cryptographically strong key material using the HKDF expand function
 fn hkdf_expand_from_prk<const OUT_LENGTH: usize>(secret: &[u8], tag: &[u8]) -> Result<[u8; OUT_LENGTH]> {
@@ -35,10 +38,10 @@ pub fn derive_ping_pong(challenge: Option<&[u8]>) -> Box<[u8]> {
     match challenge {
         None => random_fill(&mut ret),
         Some(chal) => {
-            let mut digest = Blake2s256::default();
+            let mut digest = SimpleDigest::default();
             digest.update(chal);
             // Finalize requires enough space for the hash value, so this needs an extra copy
-            let hash = digest.finalize_fixed().to_vec();
+            let hash = digest.finalize();
             ret.copy_from_slice(&hash[0..PING_PONG_NONCE_SIZE]);
         }
     }
@@ -91,10 +94,45 @@ pub(crate) fn generate_key_iv(secret: &[u8], info: &[u8], key: &mut [u8], iv: &m
     Ok(())
 }
 
-/*pub fn sample_field_element(secret: &[u8], hash_key: &str) -> HalfKey {
+/// Sample a random field element from the group given by the secp256k1 elliptic curve.
+/// SECURITY WARNING for the current implementation (until replaced with Ed25519):
+/// 1. this does not give a uniform distribution in the elliptic curve group.
+/// 2. this is a potentially lengthy operation
+/// 3. it does not guarantee the result
+pub fn sample_field_element(secret: &[u8], tag: &str) -> Result<HalfKey> {
+    // TODO: with Ed25519 replace this with constant-time Elligator 2 map
+    const MAX_ITERATIONS: usize = 1000;
 
-    //let mut
-}*/
+    // Pre-allocate space for all the iterations
+    let mut suffix = String::with_capacity(tag.len() + MAX_ITERATIONS + 1);
+    suffix += tag;
+
+    let mut ret: CtOption<HalfKey> = CtOption::new(HalfKey::new(&[0u8; HalfKey::SIZE]), 0.into());
+
+    for _ in 0..MAX_ITERATIONS {
+        let candidate = hkdf_expand_from_prk::<SECRET_KEY_LENGTH>(secret, suffix.as_bytes()).unwrap();
+
+        // A primitive attempt to make this mess at least close to constant-time
+        let ok: u8 = PublicKey::from_privkey(&candidate).is_ok().into();
+        ret = CtOption::new(HalfKey::new(&candidate), ok.into());
+
+        suffix += "_";
+    }
+
+    Option::from(ret).ok_or(CalculationError)
+}
+
+pub fn derive_own_key_share(secret: &[u8]) -> HalfKey {
+    assert_eq!(SECRET_KEY_LENGTH, secret.len());
+
+    sample_field_element(secret, HASH_KEY_OWN_KEY).expect("failed to sample own key share")
+}
+
+pub fn derive_ack_key_share(secret: &[u8]) -> HalfKey {
+    assert_eq!(SECRET_KEY_LENGTH, secret.len());
+
+    sample_field_element(secret, HASH_KEY_ACK_KEY).expect("failed to sample ack key share")
+}
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
@@ -150,5 +188,11 @@ mod tests {
 
         let r = hex!("7f656daaf7c2e64bcfc1386f8af273890e863dec63b410967a5652630617b09b");
         assert_eq!(r, tag.as_ref());
+    }
+
+    #[test]
+    fn test_sample_field_element() {
+        let secret = [1u8; SECRET_KEY_LENGTH];
+        assert!(sample_field_element(&secret, "TEST_TAG").is_ok());
     }
 }
