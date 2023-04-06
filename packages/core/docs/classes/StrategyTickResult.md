@@ -34,7 +34,7 @@
 
 #### Defined in
 
-packages/core/lib/core_strategy.d.ts:1065
+packages/core/lib/core_strategy.d.ts:1099
 
 ## Properties
 
@@ -44,7 +44,7 @@ packages/core/lib/core_strategy.d.ts:1065
 
 #### Defined in
 
-packages/core/lib/core_strategy.d.ts:1076
+packages/core/lib/core_strategy.d.ts:1110
 
 ## Methods
 
@@ -58,7 +58,7 @@ packages/core/lib/core_strategy.d.ts:1076
 
 #### Defined in
 
-packages/core/lib/core_strategy.d.ts:1059
+packages/core/lib/core_strategy.d.ts:1093
 
 ___
 
@@ -72,7 +72,7 @@ ___
 
 #### Defined in
 
-packages/core/lib/core_strategy.d.ts:1073
+packages/core/lib/core_strategy.d.ts:1107
 
 ___
 
@@ -86,4 +86,4 @@ ___
 
 #### Defined in
 
-packages/core/lib/core_strategy.d.ts:1069
+packages/core/lib/core_strategy.d.ts:1103
