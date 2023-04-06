@@ -642,8 +642,8 @@ impl Signature {
     }
 
     /// Verifies this signature against the given message and a public key object
-    pub fn verify_hash_with_pubkey(&self, message: &[u8], public_key: &PublicKey) -> bool {
-        self.verify_hash(message, &public_key.serialize(false))
+    pub fn verify_hash_with_pubkey(&self, hash: &[u8], public_key: &PublicKey) -> bool {
+        self.verify_hash(hash, &public_key.serialize(false))
     }
 
     pub fn raw_signature(&self) -> Box<[u8]> {

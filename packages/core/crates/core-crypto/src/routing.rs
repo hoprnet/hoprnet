@@ -14,6 +14,13 @@ use crate::routing::ForwardedHeader::{FinalNode, RelayNode};
 
 const RELAYER_END_PREFIX: u8 = 0xff;
 
+pub const fn header_length(max_hops: usize, additional_data_relayer_len: usize, additional_data_last_hop_len: usize) -> usize {
+    let per_hop = PublicKey::SIZE_COMPRESSED + SimpleMac::SIZE + additional_data_relayer_len;
+    let last_hop = 1 + additional_data_last_hop_len;
+
+    last_hop + (max_hops - 1) * per_hop
+}
+
 fn generate_filler(max_hops: usize, routing_info_len: usize, routing_info_last_hop_len: usize, secrets: &[&[u8]]) -> Box<[u8]> {
     if secrets.len() < 2 {
         return vec![].into_boxed_slice();

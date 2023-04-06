@@ -1,9 +1,10 @@
-use core_crypto::types::{Challenge, Hash, PublicKey, Response, Signature};
+use core_crypto::types::{Challenge, HalfKey, HalfKeyChallenge, Hash, PublicKey, Response, Signature};
 use enum_iterator::{all, Sequence};
 use ethnum::u256;
 use serde_repr::*;
 use std::ops::{Div, Mul, Sub};
-use utils_types::errors::{GeneralError::ParseError, Result};
+use core_crypto::primitives::{DigestLike, SimpleDigest};
+use utils_types::errors::{GeneralError, GeneralError::ParseError, Result};
 use utils_types::primitives::{Address, Balance, BalanceType, EthereumChallenge, U256};
 
 #[cfg(all(feature = "wasm", not(test)))]
@@ -52,6 +53,61 @@ pub struct AcknowledgedTicket {
     pub response: Response,
     pub pre_image: Hash,
     pub signer: PublicKey,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
+pub struct AcknowledgementChallenge {
+    pub ack_challenge: HalfKeyChallenge,
+    pub signature: Signature
+}
+
+fn hash_challenge(challenge: &HalfKeyChallenge) -> Box<[u8]> {
+    let mut digest = SimpleDigest::default();
+    digest.update(&challenge.serialize());
+    let hash = digest.finalize();
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
+impl AcknowledgementChallenge {
+    pub fn new(ack_challenge: HalfKeyChallenge, private_key: &[u8]) -> Self {
+        let hash = hash_challenge(&ack_challenge);
+        Self { ack_challenge, signature: Signature::sign_hash(&hash, private_key) }
+    }
+
+    pub fn solve(&self, secret: &[u8]) -> bool {
+        self.ack_challenge.eq(&HalfKey::new(secret).to_challenge())
+    }
+
+    pub fn verify(public_key: &PublicKey, signature: &Signature, challenge: &HalfKeyChallenge) -> bool {
+        let hash = hash_challenge(challenge);
+        signature.verify_hash_with_pubkey(&hash, public_key)
+    }
+
+    pub fn serialize(&self) -> Box<[u8]> {
+        self.signature.serialize()
+    }
+
+    pub fn size() -> usize {
+        Self::size()
+    }
+}
+
+impl AcknowledgementChallenge {
+    const SIZE: usize = Signature::SIZE;
+
+    fn deserialize(data: &[u8], ack_challenge: HalfKeyChallenge, public_key: &PublicKey) -> Result<Self> {
+        if data.len() == Self::SIZE {
+            let signature = Signature::deserialize(data)?;
+            if Self::verify(public_key, &signature, &ack_challenge) {
+                Ok(AcknowledgementChallenge { ack_challenge, signature })
+            } else {
+                Err(ParseError)
+            }
+        } else {
+            Err(ParseError)
+        }
+    }
 }
 
 /// Overall description of a channel
