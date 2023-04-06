@@ -1,5 +1,5 @@
 pub mod packet;
-mod por;
+pub mod por;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {

@@ -1,4 +1,4 @@
-use core_crypto::types::{Challenge, Hash, PublicKey, Signature};
+use core_crypto::types::{Challenge, Hash, PublicKey, Response, Signature};
 use enum_iterator::{all, Sequence};
 use ethnum::u256;
 use serde_repr::*;
@@ -152,42 +152,6 @@ pub fn generate_channel_id(source: &Address, destination: &Address) -> Hash {
     Hash::create(&[&source.serialize(), &destination.serialize()])
 }
 
-/// Contains a response upon ticket acknowledgement
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-pub struct Response {
-    response: [u8; Self::SIZE],
-}
-
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-impl Response {
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
-    pub fn new(data: &[u8]) -> Self {
-        assert_eq!(data.len(), Self::SIZE);
-        let mut ret = Response {
-            response: [0u8; Self::SIZE],
-        };
-        ret.response.copy_from_slice(data);
-        ret
-    }
-}
-
-impl BinarySerializable for Response {
-    const SIZE: usize = 32;
-
-    fn deserialize(data: &[u8]) -> Result<Self> {
-        if data.len() == Self::SIZE {
-            Ok(Response::new(data))
-        } else {
-            Err(ParseError)
-        }
-    }
-
-    fn serialize(&self) -> Box<[u8]> {
-        self.response.into()
-    }
-}
-
 /// Contains the overall description of a ticket with a signature
 #[derive(Clone, PartialEq, Debug)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
@@ -283,7 +247,7 @@ impl Ticket {
                      challenge,
                      U256::zero(),
                      U256::zero(),
-                     Balance::new(0.into(), BalanceType::HOPR),
+                     Balance::new(0u8.into(), BalanceType::HOPR),
                     U256::zero(),
                      U256::zero(),
                     private_key
@@ -482,25 +446,18 @@ pub mod tests {
             "invalid path pos"
         );
     }
-
-    #[test]
-    pub fn response_test() {
-        let r1 = Response::new(&[0u8; Response::SIZE]);
-        let r2 = Response::deserialize(&r1.serialize()).unwrap();
-        assert_eq!(r1, r2, "deserialized response does not match");
-    }
 }
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use core_crypto::types::{Hash, PublicKey, Signature};
+    use core_crypto::types::{Hash, PublicKey, Response, Signature};
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use utils_types::primitives::{Address, Balance, EthereumChallenge, U256};
-    use utils_types::traits::{BinarySerializable, ToHex};
+    use utils_types::traits::{BinarySerializable};
     use wasm_bindgen::prelude::wasm_bindgen;
 
-    use crate::channels::{AcknowledgedTicket, ChannelEntry, ChannelStatus, Response, Ticket};
+    use crate::channels::{AcknowledgedTicket, ChannelEntry, ChannelStatus, Ticket};
 
     #[wasm_bindgen]
     pub fn channel_status_to_number(status: ChannelStatus) -> u8 {
@@ -565,28 +522,6 @@ pub mod wasm {
         #[wasm_bindgen(js_name = "serialize")]
         pub fn _serialize(&self) -> Box<[u8]> {
             self.serialize()
-        }
-    }
-
-    #[wasm_bindgen]
-    impl Response {
-        #[wasm_bindgen(js_name = "deserialize")]
-        pub fn _deserialize(data: &[u8]) -> JsResult<Response> {
-            ok_or_jserr!(Response::deserialize(data))
-        }
-
-        #[wasm_bindgen(js_name = "serialize")]
-        pub fn _serialize(&self) -> Box<[u8]> {
-            self.serialize()
-        }
-
-        #[wasm_bindgen(js_name = "to_hex")]
-        pub fn _to_hex(&self) -> String {
-            self.to_hex()
-        }
-
-        pub fn size() -> u32 {
-            Self::SIZE as u32
         }
     }
 

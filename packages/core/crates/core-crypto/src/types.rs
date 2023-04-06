@@ -1,11 +1,11 @@
-use elliptic_curve::ProjectivePoint;
+use elliptic_curve::{NonZeroScalar, ProjectivePoint};
 use k256::ecdsa::signature::hazmat::PrehashVerifier;
 use k256::ecdsa::signature::Verifier;
 use k256::ecdsa::{RecoveryId, Signature as ECDSASignature, SigningKey, VerifyingKey};
 use k256::elliptic_curve::generic_array::GenericArray;
 use k256::elliptic_curve::sec1::{FromEncodedPoint, ToEncodedPoint};
 use k256::elliptic_curve::CurveArithmetic;
-use k256::{ecdsa, elliptic_curve, AffinePoint, NonZeroScalar, Secp256k1};
+use k256::{ecdsa, elliptic_curve, AffinePoint, Secp256k1};
 use libp2p_identity::{secp256k1::PublicKey as lp2p_k256_PublicKey, PeerId, PublicKey as lp2p_PublicKey};
 use sha3::{digest::DynDigest, Keccak256};
 use std::ops::Add;
@@ -133,13 +133,32 @@ impl Challenge {
             &PublicKey::deserialize(&hint.hkc)?,
         ])
         .into();
-        Ok(Self { curve_point })
+        Ok(curve_point.into())
     }
 
     pub fn from_own_share_and_half_key(own_share: &HalfKeyChallenge, half_key: &HalfKey) -> Result<Self> {
         let curve_point: CurvePoint =
             PublicKey::tweak_add(&PublicKey::deserialize(&own_share.hkc)?, &half_key.serialize()).into();
-        Ok(Self { curve_point })
+        Ok(curve_point.into())
+    }
+}
+
+impl From<CurvePoint> for Challenge {
+    fn from(curve_point: CurvePoint) -> Self {
+        Self { curve_point }
+    }
+}
+
+impl BinarySerializable for Challenge {
+    const SIZE: usize = CurvePoint::SIZE;
+
+    fn deserialize(data: &[u8]) -> utils_types::errors::Result<Self> {
+        CurvePoint::deserialize(data)
+            .map(|curve_point| Challenge {curve_point})
+    }
+
+    fn serialize(&self) -> Box<[u8]> {
+        self.curve_point.serialize()
     }
 }
 
@@ -158,8 +177,14 @@ impl HalfKey {
         let mut ret = Self {
             hkey: [0u8; Self::SIZE],
         };
-        ret.hkey.copy_from_slice(&half_key);
+        ret.hkey.copy_from_slice(half_key);
         ret
+    }
+
+    pub fn to_challenge(&self) -> HalfKeyChallenge {
+        PublicKey::from_privkey(&self.hkey)
+            .map(|pk| HalfKeyChallenge::new(&pk.serialize(true)))
+            .expect("invalid public key")
     }
 }
 
@@ -171,7 +196,7 @@ impl BinarySerializable for HalfKey {
             let mut ret = Self {
                 hkey: [0u8; Self::SIZE],
             };
-            ret.hkey.copy_from_slice(&data);
+            ret.hkey.copy_from_slice(data);
             Ok(ret)
         } else {
             Err(ParseError)
@@ -196,7 +221,7 @@ impl HalfKeyChallenge {
     pub fn new(half_key_challenge: &[u8]) -> Self {
         assert_eq!(half_key_challenge.len(), Self::SIZE, "invalid length");
         let mut ret = Self { hkc: [0u8; Self::SIZE] };
-        ret.hkc.copy_from_slice(&half_key_challenge);
+        ret.hkc.copy_from_slice(half_key_challenge);
         ret
     }
 
@@ -213,7 +238,7 @@ impl BinarySerializable for HalfKeyChallenge {
     fn deserialize(data: &[u8]) -> utils_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
             let mut ret = Self { hkc: [0u8; Self::SIZE] };
-            ret.hkc.copy_from_slice(&data);
+            ret.hkc.copy_from_slice(data);
             Ok(ret)
         } else {
             Err(ParseError)
@@ -400,7 +425,7 @@ impl PublicKey {
     }
 
     pub fn from_privkey(private_key: &[u8]) -> Result<PublicKey> {
-        let secret_scalar = NonZeroScalar::try_from(private_key).map_err(|_| ParseError)?;
+        let secret_scalar = NonZeroScalar::<Secp256k1>::try_from(private_key).map_err(|_| ParseError)?;
 
         let key = elliptic_curve::PublicKey::<Secp256k1>::from_secret_scalar(&secret_scalar);
         Ok(PublicKey {
@@ -465,7 +490,7 @@ impl PublicKey {
     /// Adds the public key with tweak times generator, producing a new public key.
     /// Panics if reaches infinity (EC identity point), which is an invalid public key.
     pub fn tweak_add(key: &PublicKey, tweak: &[u8]) -> PublicKey {
-        let scalar = NonZeroScalar::try_from(tweak).expect("zero tweak provided");
+        let scalar = NonZeroScalar::<Secp256k1>::try_from(tweak).expect("zero tweak provided");
 
         let new_pk = (key.key.to_projective()
             + <Secp256k1 as CurveArithmetic>::ProjectivePoint::GENERATOR * scalar.as_ref())
@@ -476,6 +501,59 @@ impl PublicKey {
                 .expect("combination results into ec identity (which is an invalid pub key)"),
             compressed: new_pk.to_encoded_point(true).to_bytes(),
         }
+    }
+}
+
+/// Contains a response upon ticket acknowledgement
+/// Half-key is equivalent to a non-zero secret scalar (EC private key).
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+pub struct Response {
+    response: [u8; Self::SIZE],
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+impl Response {
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
+    pub fn new(data: &[u8]) -> Self {
+        assert_eq!(data.len(), Self::SIZE);
+        let mut ret = Response {
+            response: [0u8; Self::SIZE],
+        };
+        ret.response.copy_from_slice(data);
+        ret
+    }
+
+    pub fn from_half_keys(first: &HalfKey, second: &HalfKey) -> Self {
+        let res = NonZeroScalar::<Secp256k1>::try_from(first.serialize().as_ref())
+            .and_then(|s1| NonZeroScalar::<Secp256k1>::try_from(second.serialize().as_ref())
+                .map(|s2| s1 * s2))
+            .expect("half keys represent invalid non-zero scalars");
+
+        Response::new(res.to_bytes().as_slice())
+    }
+
+    pub fn to_challenge(&self) -> Challenge {
+        Challenge {
+            curve_point: CurvePoint::from_exponent(&self.response)
+                .expect("response represent invalid non-zero scalar")
+        }
+    }
+}
+
+impl BinarySerializable for Response {
+    const SIZE: usize = 32;
+
+    fn deserialize(data: &[u8]) -> utils_types::errors::Result<Self> {
+        if data.len() == Self::SIZE {
+            Ok(Response::new(data))
+        } else {
+            Err(ParseError)
+        }
+    }
+
+    fn serialize(&self) -> Box<[u8]> {
+        self.response.into()
     }
 }
 
@@ -581,7 +659,7 @@ impl BinarySerializable for Signature {
             // Read & clear the top-most bit in S
             let mut ret = Signature {
                 signature: [0u8; Self::SIZE],
-                recovery: if data[Self::SIZE / 2] & 0x80 != 0 { 1 } else { 0 },
+                recovery: (data[Self::SIZE / 2] & 0x80 != 0).into(),
             };
             ret.signature.copy_from_slice(data);
             ret.signature[Self::SIZE / 2] &= 0x7f;
@@ -612,7 +690,7 @@ pub mod tests {
     use utils_types::primitives::Address;
     use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
 
-    use crate::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, Hash, PublicKey, Signature};
+    use crate::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, Hash, PublicKey, Response, Signature};
 
     const PUBLIC_KEY: [u8; 33] = hex!("021464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8");
     const PRIVATE_KEY: [u8; 32] = hex!("e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8");
@@ -749,6 +827,13 @@ pub mod tests {
     }
 
     #[test]
+    pub fn response_test() {
+        let r1 = Response::new(&[0u8; Response::SIZE]);
+        let r2 = Response::deserialize(&r1.serialize()).unwrap();
+        assert_eq!(r1, r2, "deserialized response does not match");
+    }
+
+    #[test]
     fn curve_point_test() {
         let scalar = NonZeroScalar::from_uint(U256::from_u8(100)).unwrap();
         let test_point = (<Secp256k1 as CurveArithmetic>::ProjectivePoint::GENERATOR * scalar.as_ref()).to_affine();
@@ -833,7 +918,7 @@ pub mod wasm {
     use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
     use wasm_bindgen::prelude::*;
 
-    use crate::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, Hash, PublicKey, Signature};
+    use crate::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, Hash, PublicKey, Response, Signature};
 
     #[wasm_bindgen]
     impl CurvePoint {
@@ -1052,6 +1137,28 @@ pub mod wasm {
 
         pub fn size_uncompressed() -> u32 {
             Self::SIZE_UNCOMPRESSED as u32
+        }
+    }
+
+    #[wasm_bindgen]
+    impl Response {
+        #[wasm_bindgen(js_name = "deserialize")]
+        pub fn _deserialize(data: &[u8]) -> JsResult<Response> {
+            ok_or_jserr!(Response::deserialize(data))
+        }
+
+        #[wasm_bindgen(js_name = "serialize")]
+        pub fn _serialize(&self) -> Box<[u8]> {
+            self.serialize()
+        }
+
+        #[wasm_bindgen(js_name = "to_hex")]
+        pub fn _to_hex(&self) -> String {
+            self.to_hex()
+        }
+
+        pub fn size() -> u32 {
+            Self::SIZE as u32
         }
     }
 

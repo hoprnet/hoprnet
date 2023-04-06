@@ -13,7 +13,7 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 default = ["console_error_panic_hook", "wasm"]
-wasm = []
+wasm = ["dep:wasm-bindgen"]
 
 [dependencies]
 core-crypto = { path = "../core-crypto" }
