@@ -37,7 +37,7 @@
     "@libp2p/peer-id": "1.1.16",
     "@multiformats/multiaddr": "10.3.3",
     "bignumber.js": "9.0.2",
-    "bn.js": "5.2.0",
+    "bn.js": "5.2.1",
     "express": "4.17.3",
     "yargs": "17.5.1"
   },

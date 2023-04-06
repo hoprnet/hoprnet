@@ -9,7 +9,7 @@ use futures::{
     pin_mut,
     stream::{FuturesUnordered, StreamExt},
 };
-use libp2p::PeerId;
+use libp2p_identity::PeerId;
 
 use utils_log::{debug, error, info};
 use utils_metrics::histogram_start_measure;

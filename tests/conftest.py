@@ -3,7 +3,7 @@ import subprocess
 
 import pytest
 
-DEFAULT_API_TOKEN = 'e2e-API-token^^'
+DEFAULT_API_TOKEN = "e2e-API-token^^"
 PASSWORD = "e2e-test"
 NODES = {
     "1": {
@@ -50,15 +50,16 @@ def setup_node(*args, **kwargs):
 
 
 def test_sanity():
-    assert len(NODES.keys()) == len(set([i['private_key'] for i in NODES.values()])), "All private keys must be unique"
+    assert len(NODES.keys()) == len(set([i["private_key"] for i in NODES.values()])), "All private keys must be unique"
 
-    assert len(NODES.keys()) == len(set([i['api_port'] for i in NODES.values()])), "All API ports must be unique"
+    assert len(NODES.keys()) == len(set([i["api_port"] for i in NODES.values()])), "All API ports must be unique"
 
-    assert len(NODES.keys()) == len(set([i['p2p_port'] for i in NODES.values()])), "All p2p ports must be unique"
+    assert len(NODES.keys()) == len(set([i["p2p_port"] for i in NODES.values()])), "All p2p ports must be unique"
 
 
 def check_socket(address, port):
     import socket
+
     s = socket.socket()
     try:
         s.connect((address, port))
@@ -73,14 +74,18 @@ def check_socket(address, port):
 def setup_7_nodes():
     try:
         logging.info("Creating a 7 node cluster from source")
-        subprocess.run('./scripts/fixture_local_test_setup.sh --skip-cleanup',
-                       shell=True,
-                       capture_output=True,
-                       check=True)
+        subprocess.run(
+            "./scripts/fixture_local_test_setup.sh --skip-cleanup",
+            shell=True,
+            capture_output=True,
+            check=True,
+        )
         yield NODES
     finally:
         logging.info("Tearing down the 7 node cluster from source")
-        subprocess.run('./scripts/fixture_local_test_setup.sh --just-cleanup',
-                       shell=True,
-                       capture_output=True,
-                       check=True)
+        subprocess.run(
+            "./scripts/fixture_local_test_setup.sh --just-cleanup",
+            shell=True,
+            capture_output=True,
+            check=True,
+        )

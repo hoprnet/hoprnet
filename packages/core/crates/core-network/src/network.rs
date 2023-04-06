@@ -2,7 +2,7 @@ use std::collections::hash_map::{Entry, HashMap};
 use std::collections::hash_set::HashSet;
 use std::time::Duration;
 
-use libp2p::PeerId;
+use libp2p_identity::PeerId;
 
 use utils_log::{error, info, warn};
 use utils_metrics::metrics::{MultiGauge, SimpleGauge};

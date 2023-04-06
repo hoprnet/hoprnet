@@ -17,6 +17,12 @@ packages/*/docs
 node_modules/
 packages/*/node_modules/
 
+# ignore cargo metadata
+/.cargo/
+
+# ignore generated wasm crate files
+/packages/*/crates/*/pkg/package.json
+
 # Conflicts with dappnode tool
 packages/avado/dappnode_package.json
 packages/avado/releases.json

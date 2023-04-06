@@ -19,13 +19,8 @@ on:
 
 jobs:
   source-e2e:
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest-8-cores
     timeout-minutes: 30
-
-    strategy:
-      matrix:
-        os: ['ubuntu-latest']
-
     steps:
       - uses: actions/checkout@v3
 
@@ -43,8 +38,6 @@ jobs:
 
       - name: Install Nix
         uses: cachix/install-nix-action@v17
-        with:
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: cachix/cachix-action@v12
         if: ${{ !env.ACT }}
@@ -87,7 +80,7 @@ jobs:
 
       - name: Test with pytest
         run: |
-          nix develop -c python3 -m pytest tests/
+          nix develop -c make smoke-test
         env:
           ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN }}
 

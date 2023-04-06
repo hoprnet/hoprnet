@@ -16,12 +16,7 @@ on:
 jobs:
   build_and_test:
     name: Build & Test
-    runs-on: ${{ matrix.os }}
-
-    strategy:
-      matrix:
-        os: ['ubuntu-latest']
-
+    runs-on: ubuntu-latest-8-cores
     steps:
       - uses: actions/checkout@v3
         with:
@@ -41,8 +36,6 @@ jobs:
 
       - name: Install Nix
         uses: cachix/install-nix-action@v17
-        with:
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: cachix/cachix-action@v12
         if: ${{ !env.ACT }}
@@ -84,6 +77,6 @@ jobs:
         run: nix develop -c make -j build
 
       - name: Test
-        run: nix develop -c "source .venv/bin/activate && make -j test"
+        run: nix develop -c make -j test
         env:
           HOPR_ENVIRONMENT_ID: anvil-localhost
