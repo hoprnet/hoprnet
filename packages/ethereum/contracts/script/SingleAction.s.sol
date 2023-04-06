@@ -6,6 +6,10 @@ import 'forge-std/Test.sol';
 import './utils/EnvironmentConfig.s.sol';
 import './utils/BoostUtilsLib.sol';
 
+/// Failed to read balance of a token contract
+/// @param token token address.
+error FailureInReadBalance(address token);
+
 /**
  * @dev script to interact with contract(s) of a given envirionment where the msg.sender comes from the environment variable `PRIVATE_KEY`
  * Private key of the caller must be saved under the envrionment variable `PRIVATE_KEY`
@@ -420,9 +424,15 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
   }
 
   /**
-   * @dev On network registry contract, deregister peers associated with the calling wallet.
+   * @dev This function funds a recipient wallet with HOPR tokens and native tokens, but only when the recipient has not yet received
+   * enough value.
+   * First, HOPR tokens are prioritized to be transferred than minted to the recipient
+   * Native tokens are transferred to the recipient
+   * @param recipient The address of the recipient wallet.
+   * @param hoprTokenAmountInWei, The amount of HOPR tokens that recipient is desired to receive
+   * @param nativeTokenAmountInWei The amount of native tokens that recipient is desired to receive
    */
-  function transferOrMintHoprAndSendNative(
+  function transferOrMintHoprAndSendNativeToAmount(
     address recipient,
     uint256 hoprTokenAmountInWei,
     uint256 nativeTokenAmountInWei
@@ -430,21 +440,20 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
     // 1. get environment and msg.sender
     getEnvironmentAndMsgSender();
 
-    // 2. transfer some Hopr tokens to the recipient, or mint tokens
-    if (hoprTokenAmountInWei > 0) {
-      // check the hopr token balance
-      (bool successReadOwnedHoprTokens, bytes memory returndataReadOwnedHoprTokens) = currentEnvironmentDetail
-        .hoprTokenContractAddress
-        .staticcall(abi.encodeWithSignature('balanceOf(address)', msgSender));
-      if (!successReadOwnedHoprTokens) {
-        revert('Cannot read Hopr token balance.');
-      }
-      uint256 ownedHoprTokens = abi.decode(returndataReadOwnedHoprTokens, (uint256));
+    // 2. get recipient balance
+    uint256 recipientTokenBalance = getTokenBalanceOf(currentEnvironmentDetail.hoprTokenContractAddress, recipient);
 
-      if (ownedHoprTokens >= hoprTokenAmountInWei) {
+    // 2. transfer some Hopr tokens to the recipient, or mint tokens
+    if (hoprTokenAmountInWei > recipientTokenBalance) {
+      // get the difference to transfer
+      uint256 hoprTokenToTransfer = hoprTokenAmountInWei - recipientTokenBalance;
+      // check the hopr token balance
+      uint256 senderHoprTokenBalance = getTokenBalanceOf(currentEnvironmentDetail.hoprTokenContractAddress, msgSender);
+
+      if (senderHoprTokenBalance >= hoprTokenToTransfer) {
         // call transfer
         (bool successTransfserTokens, ) = currentEnvironmentDetail.hoprTokenContractAddress.call(
-          abi.encodeWithSignature('transfer(address,uint256)', recipient, hoprTokenAmountInWei)
+          abi.encodeWithSignature('transfer(address,uint256)', recipient, hoprTokenToTransfer)
         );
         if (!successTransfserTokens) {
           emit log_string('Cannot transfer HOPR tokens to the recipient');
@@ -462,13 +471,7 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
         require(isMinter, 'Caller is not a minter');
 
         (bool successMintTokens, ) = currentEnvironmentDetail.hoprTokenContractAddress.call(
-          abi.encodeWithSignature(
-            'mint(address,uint256,bytes,bytes)',
-            recipient,
-            hoprTokenAmountInWei,
-            hex'00',
-            hex'00'
-          )
+          abi.encodeWithSignature('mint(address,uint256,bytes,bytes)', recipient, hoprTokenToTransfer, hex'00', hex'00')
         );
         if (!successMintTokens) {
           emit log_string('Cannot mint HOPR tokens to the recipient');
@@ -477,10 +480,23 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
     }
 
     // 3. transfer native balance to the recipient
-    if (nativeTokenAmountInWei > 0) {
-      (bool nativeTokenTransferSuccess, ) = recipient.call{value: nativeTokenAmountInWei}('');
+    if (nativeTokenAmountInWei > recipient.balance) {
+      (bool nativeTokenTransferSuccess, ) = recipient.call{value: nativeTokenAmountInWei - recipient.balance}('');
       require(nativeTokenTransferSuccess, 'Cannot send native tokens to the recipient');
     }
     vm.stopBroadcast();
+  }
+
+  /**
+   * Get the token balance of a wallet
+   */
+  function getTokenBalanceOf(address tokenAddress, address wallet) internal view returns (uint256) {
+    (bool successReadOwnedTokens, bytes memory returndataReadOwnedTokens) = tokenAddress.staticcall(
+      abi.encodeWithSignature('balanceOf(address)', wallet)
+    );
+    if (!successReadOwnedTokens) {
+      revert FailureInReadBalance(tokenAddress);
+    }
+    return abi.decode(returndataReadOwnedTokens, (uint256));
   }
 }

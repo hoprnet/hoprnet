@@ -80,12 +80,12 @@ endif
 # E.g. make faucet environment-name=anvil-localhost environment-type=development recipient=0x2402da10A6172ED018AEEa22CA60EDe1F766655C hopramount=100000000000000000000
 .PHONY: faucet
 faucet: ensure-environment-is-set ensure-privatekey-is-set
-faucet: ## Mint some (default: 20000) HOPR tokens and send some (default value: 10) native tokens to the recipient hopramount. Token value should be in 18 decimals
+faucet: ## Mint some HOPR tokens to the desired amount (default: 20000) and send some native tokens to the recipient until it reaches certain hopramount (default value: 10). Token value should be in 18 decimals
 ifeq ($(recipient),)
 	echo "parameter <recipient> missing" >&2 && exit 1
 endif
 	$(forge-script) script/SingleAction.s.sol:SingleActionFromPrivateKeyScript \
-        --broadcast --sig "transferOrMintHoprAndSendNative(address,uint256,uint256)" \
+        --broadcast --sig "transferOrMintHoprAndSendNativeToAmount(address,uint256,uint256)" \
         $(recipient) $(or $(hopramount),20000000000000000000000) $(or $(nativeamount),10000000000000000000)
 
 # E.g. make request-nrnft environment-name=anvil-localhost environment-type=development recipient=0x2402da10A6172ED018AEEa22CA60EDe1F766655C nftrank=developer

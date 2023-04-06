@@ -28,27 +28,20 @@ pub fn build_path(environment_name: &str, environment_type: &str) -> String {
 /// * `contracts_root` - Directory to the foundry project
 /// * `foundry_profile` - Value of FOUNDRY_PROFILE variable
 /// * `environment_name` - Name of the environment that nodes run in
-pub fn set_process_path_env(
-    contracts_root: &Option<String>,
-    environment_name: &String,
-) -> Result<(), HelperErrors> {
+pub fn set_process_path_env(contracts_root: &Option<String>, environment_name: &String) -> Result<(), HelperErrors> {
     // run in the repo where the make target is saved
     if let Some(new_root) = contracts_root {
         let root = Path::new(OsStr::new(&new_root));
         match env::set_current_dir(&root) {
-            Ok(_) => println!(
-                "Successfully changed working directory to {}!",
-                root.display()
-            ),
+            Ok(_) => println!("Successfully changed working directory to {}!", root.display()),
             Err(_) => return Err(HelperErrors::UnableToSetFoundryRoot),
         }
     }
 
     // get environment_type and set it as FOUNDRY_PROFILE
-    if let Ok(foundry_profile) = environment_config::get_environment_type_from_name(
-        &env::current_dir().unwrap(),
-        environment_name,
-    ) {
+    if let Ok(foundry_profile) =
+        environment_config::get_environment_type_from_name(&env::current_dir().unwrap(), environment_name)
+    {
         env::set_var("FOUNDRY_PROFILE", foundry_profile.to_string());
     } else {
         return Err(HelperErrors::UnableToSetFoundryRoot);
@@ -82,7 +75,7 @@ pub fn child_process_call_foundry_faucet(
         "script/SingleAction.s.sol:SingleActionFromPrivateKeyScript",
         "--broadcast",
         "--sig",
-        "transferOrMintHoprAndSendNative(address,uint256,uint256)",
+        "transferOrMintHoprAndSendNativeToAmount(address,uint256,uint256)",
         &addresses_str,
         &hopr_amount_str,
         &native_amount_str,
@@ -98,10 +91,7 @@ pub fn child_process_call_foundry_faucet(
 /// * `environment_name` - Name of the environment that nodes run in
 /// * `environment_type` - Type of the environment that nodes run in
 /// * `peer_id` - Peer Ids of HOPR nodes to be registered under the caller
-pub fn child_process_call_foundry_self_register(
-    environment_name: &str,
-    peer_ids: &String,
-) -> Result<(), HelperErrors> {
+pub fn child_process_call_foundry_self_register(environment_name: &str, peer_ids: &String) -> Result<(), HelperErrors> {
     // add brackets to around the string
     let peer_id_string = vec!["[", &peer_ids, "]"].concat();
     let self_register_args = vec![
@@ -122,10 +112,7 @@ pub fn child_process_call_foundry_self_register(
 ///
 /// * `environment_name` - Name of the environment that nodes run in
 /// * `forge_args` - arguments to be passed to `forge`
-pub fn child_process_call_foundry<T>(
-    environment_name: &str,
-    forge_args: &[T],
-) -> Result<(), HelperErrors>
+pub fn child_process_call_foundry<T>(environment_name: &str, forge_args: &[T]) -> Result<(), HelperErrors>
 where
     T: AsRef<OsStr>,
 {
