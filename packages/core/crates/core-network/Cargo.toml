@@ -21,7 +21,6 @@ blake2 = "0.10.4"
 futures = "0.3.27"
 libp2p = { version = "0.51.1", features = ["async-std", "wasm-bindgen", "wasm-ext"] }
 rand = { version = "0.8.5", features = ["std_rng"] }
-scopeguard = "1.1.0"
 serde = "1"
 thiserror = "1.0"
 utils-log = { path = "../../../utils/crates/utils-log"}
