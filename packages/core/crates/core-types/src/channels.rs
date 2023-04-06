@@ -4,7 +4,7 @@ use ethnum::u256;
 use serde_repr::*;
 use std::ops::{Div, Mul, Sub};
 use core_crypto::primitives::{DigestLike, SimpleDigest};
-use utils_types::errors::{GeneralError, GeneralError::ParseError, Result};
+use utils_types::errors::{GeneralError::ParseError, Result};
 use utils_types::primitives::{Address, Balance, BalanceType, EthereumChallenge, U256};
 
 #[cfg(all(feature = "wasm", not(test)))]
@@ -65,10 +65,10 @@ pub struct AcknowledgementChallenge {
 fn hash_challenge(challenge: &HalfKeyChallenge) -> Box<[u8]> {
     let mut digest = SimpleDigest::default();
     digest.update(&challenge.serialize());
-    let hash = digest.finalize();
+    digest.finalize()
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl AcknowledgementChallenge {
     pub fn new(ack_challenge: HalfKeyChallenge, private_key: &[u8]) -> Self {
         let hash = hash_challenge(&ack_challenge);
@@ -89,14 +89,14 @@ impl AcknowledgementChallenge {
     }
 
     pub fn size() -> usize {
-        Self::size()
+        Self::SIZE
     }
 }
 
 impl AcknowledgementChallenge {
     const SIZE: usize = Signature::SIZE;
 
-    fn deserialize(data: &[u8], ack_challenge: HalfKeyChallenge, public_key: &PublicKey) -> Result<Self> {
+    pub fn deserialize(data: &[u8], ack_challenge: HalfKeyChallenge, public_key: &PublicKey) -> Result<Self> {
         if data.len() == Self::SIZE {
             let signature = Signature::deserialize(data)?;
             if Self::verify(public_key, &signature, &ack_challenge) {
