@@ -7,6 +7,7 @@ use crate::errors::Result;
 use crate::parameters::{PACKET_TAG_LENGTH, PING_PONG_NONCE_SIZE, SECRET_KEY_LENGTH};
 use crate::primitives::calculate_mac;
 use crate::random::random_fill;
+use crate::types::HalfKey;
 
 // Module-specific constants
 const HASH_KEY_COMMITMENT_SEED: &str = "HASH_KEY_COMMITMENT_SEED";
@@ -89,6 +90,11 @@ pub(crate) fn generate_key_iv(secret: &[u8], info: &[u8], key: &mut [u8], iv: &m
 
     Ok(())
 }
+
+/*pub fn sample_field_element(secret: &[u8], hash_key: &str) -> HalfKey {
+
+    //let mut
+}*/
 
 #[cfg(feature = "wasm")]
 pub mod wasm {

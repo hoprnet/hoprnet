@@ -5,7 +5,7 @@ use crate::errors::CryptoError;
 use crate::errors::CryptoError::TagMismatch;
 use crate::parameters::SECRET_KEY_LENGTH;
 use crate::prg::{PRG, PRGParameters};
-use crate::primitives::{create_tagged_mac, SimpleMac};
+use crate::primitives::{create_tagged_mac, DigestLike, SimpleMac};
 use crate::random::random_fill;
 use crate::types::PublicKey;
 use crate::utils::xor_inplace;
