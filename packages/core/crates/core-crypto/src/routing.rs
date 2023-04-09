@@ -52,7 +52,16 @@ fn generate_filler(max_hops: usize, routing_info_len: usize, routing_info_last_h
 
 pub struct RoutingInfo {
     pub routing_information: Box<[u8]>,
-    pub mac: Box<[u8]>
+    pub mac: [u8; SimpleMac::SIZE]
+}
+
+impl Default for RoutingInfo {
+    fn default() -> Self {
+        Self {
+            routing_information: Box::default(),
+            mac: [0u8; SimpleMac::SIZE]
+        }
+    }
 }
 
 impl RoutingInfo {
@@ -70,7 +79,7 @@ impl RoutingInfo {
         let extended_header_len = last_hop_len + max_hops * routing_info_len;
 
         let mut extended_header = vec![0u8; extended_header_len];
-        let mut mac = [0u8; SimpleMac::SIZE];
+        let mut ret = RoutingInfo::default();
 
         for idx in 0..secrets.len() {
             let inverted_idx = secrets.len() - idx - 1;
@@ -81,7 +90,7 @@ impl RoutingInfo {
                 extended_header[0] = RELAYER_END_PREFIX;
 
                 if let Some(data) = additional_data_last_hop {
-                    extended_header[1..data.len()].copy_from_slice(data);
+                    extended_header[1 .. data.len()].copy_from_slice(data);
                 }
 
                 let padding_len = (max_hops - secrets.len()) * routing_info_len;
@@ -93,17 +102,23 @@ impl RoutingInfo {
                 xor_inplace(&mut extended_header[0..last_hop_len + padding_len], &key_stream);
 
                 if secrets.len() > 1 {
-                    let filler = generate_filler(max_hops, routing_info_len, last_hop_len, secrets);
-                    extended_header[last_hop_len + padding_len .. last_hop_len + padding_len + filler.len()].copy_from_slice(&filler);
+                    let filler = generate_filler(max_hops, routing_info_len,
+                                                 last_hop_len, secrets);
+                    extended_header[last_hop_len + padding_len .. last_hop_len + padding_len +
+                        filler.len()].copy_from_slice(&filler);
                 }
             } else {
                 extended_header.copy_within(0..header_len, routing_info_len);
-                extended_header[0..PublicKey::SIZE_COMPRESSED].copy_from_slice(&path[inverted_idx + 1].serialize(true));
-                extended_header[PublicKey::SIZE_COMPRESSED..PublicKey::SIZE_COMPRESSED + SimpleMac::SIZE].copy_from_slice(&mac);
+                extended_header[0 .. PublicKey::SIZE_COMPRESSED].copy_from_slice(
+                    &path[inverted_idx + 1].serialize(true)
+                );
+                extended_header[PublicKey::SIZE_COMPRESSED .. PublicKey::SIZE_COMPRESSED
+                    + SimpleMac::SIZE].copy_from_slice(&ret.mac);
 
-                extended_header[PublicKey::SIZE_COMPRESSED + SimpleMac::SIZE..PublicKey::SIZE_COMPRESSED +
-                    SimpleMac::SIZE + additional_data_relayer[inverted_idx].len()]
-                    .copy_from_slice(additional_data_relayer[inverted_idx]);
+                extended_header[PublicKey::SIZE_COMPRESSED + SimpleMac::SIZE ..
+                    PublicKey::SIZE_COMPRESSED + SimpleMac::SIZE
+                        + additional_data_relayer[inverted_idx].len()
+                    ].copy_from_slice(additional_data_relayer[inverted_idx]);
 
                 let key_stream = prg.digest(0, header_len);
                 xor_inplace(&mut extended_header, &key_stream);
@@ -111,13 +126,11 @@ impl RoutingInfo {
 
             let mut m = derive_mac_key(secret).and_then(|k| SimpleMac::new(&k)).unwrap();
             m.update(&extended_header[0..header_len]);
-            m.finalize_into(&mut mac);
+            m.finalize_into(&mut ret.mac);
         }
 
-        Self {
-            routing_information: Box::from(&extended_header[0..header_len]),
-            mac: mac.into()
-        }
+        ret.routing_information = (&extended_header[0..header_len]).into();
+        ret
     }
 
     pub fn serialize(&self) -> Box<[u8]>{
@@ -166,16 +179,18 @@ pub fn forward_header(secret: &[u8], header: &mut [u8], mac: &[u8], max_hops: us
 
     if header[0] != RELAYER_END_PREFIX {
         // Try to deserialize the public key to validate it
-        let next_node = PublicKey::deserialize(&header[..PublicKey::SIZE_COMPRESSED])
+        let next_node = PublicKey::deserialize(&header[0 .. PublicKey::SIZE_COMPRESSED])
             .map_err(|_| CryptoError::CalculationError)?;
 
-        let mac: Box<[u8]> = (&header[PublicKey::SIZE_COMPRESSED..PublicKey::SIZE_COMPRESSED + SimpleMac::SIZE]).into();
+        let mac: Box<[u8]> = (&header[PublicKey::SIZE_COMPRESSED .. PublicKey::SIZE_COMPRESSED
+            + SimpleMac::SIZE]).into();
+
         let additional_info: Box<[u8]> = (&header[PublicKey::SIZE_COMPRESSED + SimpleMac::SIZE..
             PublicKey::SIZE_COMPRESSED + SimpleMac::SIZE + additional_data_relayer_len]).into();
 
-        header.copy_within(routing_info_len.., 0);
+        header.copy_within(routing_info_len .., 0);
         let key_stream = prg.digest(header_len, header_len + routing_info_len);
-        header[header_len - routing_info_len..].copy_from_slice(&key_stream);
+        header[header_len - routing_info_len ..].copy_from_slice(&key_stream);
 
         Ok(RelayNode {
             header: (&header[..header_len]).into(),
@@ -185,7 +200,7 @@ pub fn forward_header(secret: &[u8], header: &mut [u8], mac: &[u8], max_hops: us
         })
     } else {
         Ok(FinalNode {
-            additional_data: (&header[1..1 + additional_data_last_hop_len]).into()
+            additional_data: (&header[1 .. 1 + additional_data_last_hop_len]).into()
         })
     }
 }
@@ -205,6 +220,7 @@ pub mod tests {
     use rand::rngs::OsRng;
     use crate::parameters::SECRET_KEY_LENGTH;
     use crate::prg::{PRG, PRGParameters};
+    use crate::primitives::{DigestLike, SimpleMac};
     use crate::random::random_bytes;
     use crate::routing::{forward_header, ForwardedHeader, generate_filler, RoutingInfo};
     use crate::shared_keys::SharedKeys;
@@ -281,7 +297,9 @@ pub mod tests {
 
         let mut header: Vec<u8> = rinfo.routing_information.into();
 
-        let mut last_mac: Box<[u8]> = rinfo.mac;
+        let mut last_mac = [0u8; SimpleMac::SIZE];
+        last_mac.copy_from_slice(&rinfo.mac);
+
         for (i, secret) in shares.secrets().iter().enumerate() {
             let fwd = forward_header(secret, &mut header, &last_mac,
                                            MAX_HOPS, 0, 0)
@@ -289,7 +307,7 @@ pub mod tests {
 
             match &fwd {
                 ForwardedHeader::RelayNode { mac, next_node , .. } => {
-                    last_mac = mac.clone();
+                    last_mac.copy_from_slice(&mac);
                     assert!(i < shares.secrets().len() - 1);
                     assert_eq!(&pub_keys[i + 1], next_node);
                 },
