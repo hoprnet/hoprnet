@@ -119,6 +119,13 @@ impl RoutingInfo {
             mac: mac.into()
         }
     }
+
+    pub fn serialize(&self) -> Box<[u8]>{
+        let mut ret = Vec::<u8>::with_capacity(self.mac.len() + self.routing_information.len());
+        ret.extend_from_slice(&self.routing_information);
+        ret.extend_from_slice(&self.mac);
+        ret.into_boxed_slice()
+    }
 }
 
 pub enum ForwardedHeader {

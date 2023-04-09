@@ -21,14 +21,15 @@ fn add_padding(msg: &[u8]) -> Box<[u8]> {
     assert!(msg.len() <= PAYLOAD_SIZE - PADDING_TAG.len(), "message too long for padding");
     let mut ret = vec![0u8; PAYLOAD_SIZE];
     ret[PAYLOAD_SIZE - msg.len() .. PAYLOAD_SIZE].copy_from_slice(msg);
-    ret[PAYLOAD_SIZE - msg.len() - PADDING_TAG .. PADDING_TAG].copy_from_slice(PADDING_TAG);
+    ret[PAYLOAD_SIZE - msg.len() - PADDING_TAG.len() .. PAYLOAD_SIZE - msg.len()]
+        .copy_from_slice(PADDING_TAG);
     ret.into_boxed_slice()
 }
 
 fn remove_padding(msg: &[u8]) -> Option<&[u8]> {
     assert_eq!(PAYLOAD_SIZE, msg.len(), "padded message must be PAYLOAD_SIZE long");
     let pos = msg.windows(PADDING_TAG.len()).position(|window| window == PADDING_TAG)?;
-    Some(msg.split_at(pos)[1][PADDING_TAG..])
+    Some(&msg.split_at(pos).1[PADDING_TAG.len() ..])
 }
 
 
@@ -49,9 +50,10 @@ fn encode_packet(secrets: &[&[u8]], alpha: &[u8], msg: &[u8], path: &[PeerId], m
     let padded = add_padding(msg);
 
     let routing_info = RoutingInfo::new(max_hops,
-                                        path.iter()
-                                            .map(|peer| PublicKey::from_peerid(peer))
-                                            .collect(),
+                                        &path.iter()
+                                            .map(|peer| PublicKey::from_peerid(peer)
+                                                .expect("invalid peer id given"))
+                                            .collect::<Vec<_>>(),
                                         secrets, additional_relayer_data_len,
                                         additional_data_relayer, additional_data_last_hop);
 
@@ -97,5 +99,25 @@ impl BinarySerializable for Packet {
 
     fn serialize(&self) -> Box<[u8]> {
         todo!()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::packet::{add_padding, PADDING_TAG, remove_padding};
+
+    #[test]
+    fn test_padding() {
+        let data = b"test";
+        let padded = add_padding(data);
+
+        let mut expected = vec![0u8; 492];
+        expected.extend_from_slice(PADDING_TAG);
+        expected.extend_from_slice(data);
+        assert_eq!(&expected, padded.as_ref());
+
+        let unpadded = remove_padding(&padded);
+        assert!(unpadded.is_some());
+        assert_eq!(data, &unpadded.unwrap());
     }
 }
