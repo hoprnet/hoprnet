@@ -405,6 +405,15 @@ impl TryFrom<CurvePoint> for PublicKey {
     }
 }
 
+impl From<elliptic_curve::PublicKey<Secp256k1>> for PublicKey {
+    fn from(key: elliptic_curve::PublicKey<Secp256k1>) -> Self {
+        Self {
+            key,
+            compressed: key.to_encoded_point(true).to_bytes(),
+        }
+    }
+}
+
 impl PublicKey {
     /// Size of the compressed public key in bytes
     pub const SIZE_COMPRESSED: usize = 33;
