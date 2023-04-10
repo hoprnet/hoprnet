@@ -1,6 +1,9 @@
 use crate::errors::CryptoError::{CalculationError, InvalidInputValue, InvalidParameterSize};
 use blake2::Blake2s256;
+use elliptic_curve::hash2curve::{ExpandMsgXmd, GroupDigest};
+use elliptic_curve::ProjectivePoint;
 use hkdf::SimpleHkdf;
+use k256::Secp256k1;
 use subtle::CtOption;
 use utils_types::traits::BinarySerializable;
 
@@ -94,32 +97,12 @@ pub(crate) fn generate_key_iv(secret: &[u8], info: &[u8], key: &mut [u8], iv: &m
     Ok(())
 }
 
-/// Sample a random field element from the group given by the secp256k1 elliptic curve.
-/// SECURITY WARNING for the current implementation (until replaced with Ed25519):
-/// 1. this does not give a uniform distribution in the elliptic curve group.
-/// 2. this is a potentially lengthy operation
-/// 3. it does not guarantee the result
+/// Sample a random secp256k1 field element that can represent a valid secp256k1 point.
 pub fn sample_field_element(secret: &[u8], tag: &str) -> Result<HalfKey> {
-    // TODO: with Ed25519 replace this with constant-time Elligator 2 map
-    const MAX_ITERATIONS: usize = 1000;
-
-    // Pre-allocate space for all the iterations
-    let mut suffix = String::with_capacity(tag.len() + MAX_ITERATIONS + 1);
-    suffix += tag;
-
-    let mut ret: CtOption<HalfKey> = CtOption::new(HalfKey::new(&[0u8; HalfKey::SIZE]), 0.into());
-
-    for _ in 0..MAX_ITERATIONS {
-        let candidate = hkdf_expand_from_prk::<SECRET_KEY_LENGTH>(secret, suffix.as_bytes()).unwrap();
-
-        // A primitive attempt to make this mess at least close to constant-time
-        let ok: u8 = PublicKey::from_privkey(&candidate).is_ok().into();
-        ret = CtOption::new(HalfKey::new(&candidate), ok.into());
-
-        suffix += "_";
-    }
-
-    Option::from(ret).ok_or(CalculationError)
+    let scalar = Secp256k1::hash_to_scalar::<ExpandMsgXmd<sha3::Sha3_256>>(&[secret, tag.as_bytes()],
+                                                                        &[b"secp256k1_XMD:SHA3-256_SSWU_RO_"])
+        .map_err(|_| CalculationError)?;
+    Ok(HalfKey::new(scalar.to_bytes().as_ref()))
 }
 
 pub fn derive_own_key_share(secret: &[u8]) -> HalfKey {

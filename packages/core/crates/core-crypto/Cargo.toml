@@ -30,7 +30,7 @@ hex-literal = "0.4"
 hkdf = "0.12"
 hmac = "0.12"
 js-sys = { version = "0.3.60", optional = true }
-k256 = { version = "0.13.0", features = ["arithmetic", "ecdh"] }
+k256 = { version = "0.13.0", features = ["arithmetic", "ecdh", "hash2curve"] }
 libp2p-identity = { version = "0.1.1", features = ["secp256k1", "peerid"] }
 rand = "0.8.5"
 sha3 = "0.10"
