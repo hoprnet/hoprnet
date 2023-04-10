@@ -7,7 +7,6 @@ use k256::elliptic_curve::sec1::{FromEncodedPoint, ToEncodedPoint};
 use k256::elliptic_curve::CurveArithmetic;
 use k256::{ecdsa, elliptic_curve, AffinePoint, Secp256k1};
 use libp2p_identity::{secp256k1::PublicKey as lp2p_k256_PublicKey, PeerId, PublicKey as lp2p_PublicKey};
-use sha3::{digest::DynDigest, Keccak256};
 use std::ops::Add;
 use std::str::FromStr;
 use utils_log::warn;
@@ -19,6 +18,7 @@ use utils_types::traits::{BinarySerializable, PeerIdLike};
 
 use crate::errors::CryptoError::InvalidInputValue;
 use crate::errors::{CryptoError, CryptoError::CalculationError, Result};
+use crate::primitives::{DigestLike, EthDigest};
 use crate::random::random_group_element;
 
 /// Represent an uncompressed elliptic curve point on the secp256k1 curve
@@ -30,6 +30,7 @@ pub struct CurvePoint {
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl CurvePoint {
+    /// Converts the uncompressed representation of the curve point to Ethereum address.
     pub fn to_address(&self) -> Address {
         let serialized = self.serialize();
         let hash = Hash::create(&[&serialized[1..]]).serialize();
@@ -76,9 +77,10 @@ impl PeerIdLike for CurvePoint {
 }
 
 impl BinarySerializable for CurvePoint {
-    const SIZE: usize = 65;
+    const SIZE: usize = 65; // Stores uncompressed data
 
     fn deserialize(bytes: &[u8]) -> utils_types::errors::Result<Self> {
+        // Deserializes both compressed and uncompressed
         elliptic_curve::sec1::EncodedPoint::<Secp256k1>::from_bytes(bytes)
             .map_err(|_| ParseError)
             .and_then(|encoded| Option::from(AffinePoint::from_encoded_point(&encoded)).ok_or(ParseError))
@@ -92,27 +94,30 @@ impl BinarySerializable for CurvePoint {
 
 impl CurvePoint {
     /// Creates a curve point from a non-zero scalar.
+    /// The given exponent must represent a non-zero scalar and must result into
+    /// a secp256k1 identity point.
     pub fn from_exponent(exponent: &[u8]) -> Result<Self> {
         PublicKey::from_privkey(exponent).map(CurvePoint::from)
     }
 
-    /// Creates a curve point from the affine point representation
+    /// Creates a curve point from the affine point representation.
     pub fn from_affine(affine: AffinePoint) -> Self {
         Self { affine }
     }
 
-    /// Converts the curve point to a representation suitable for calculations
+    /// Converts the curve point to a representation suitable for calculations.
     pub fn to_projective_point(&self) -> ProjectivePoint<Secp256k1> {
         ProjectivePoint::<Secp256k1>::from(&self.affine)
     }
 
     /// Serializes the curve point into a compressed form. This is a cheap operation.
-    pub fn serialize_compressed(&self) -> Box<[u8]>  {
+    pub fn serialize_compressed(&self) -> Box<[u8]> {
         self.affine.to_encoded_point(true).to_bytes()
     }
 }
 
-/// Natural extension of the Curve Point to the PoR challenge
+/// Natural extension of the Curve Point to the Proof-of-Relay challenge.
+/// Proof-of-Relay challenge is a secp256k1 curve point.
 #[derive(Clone, Eq, PartialEq, Debug)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct Challenge {
@@ -121,12 +126,16 @@ pub struct Challenge {
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl Challenge {
+    /// Converts the PoR challenge to an Ethereum challenge.
+    /// This is a one-way (lossy) operation, since the corresponding curve point is hashed
+    /// with the hash value then truncated.
     pub fn to_ethereum_challenge(&self) -> EthereumChallenge {
         EthereumChallenge::new(&self.curve_point.to_address().serialize())
     }
 }
 
 impl Challenge {
+    /// Obtains the PoR challenge by adding the two EC points represented by the half-key challenges
     pub fn from_hint_and_share(own_share: &HalfKeyChallenge, hint: &HalfKeyChallenge) -> Result<Self> {
         let curve_point: CurvePoint = PublicKey::combine(&[
             &PublicKey::deserialize(&own_share.hkc)?,
@@ -136,10 +145,10 @@ impl Challenge {
         Ok(curve_point.into())
     }
 
+    /// Obtains the PoR challenge by converting the given HalfKey into a secp256k1 point and
+    /// adding it with the given HalfKeyChallenge (which already represents a secp256k1 point).
     pub fn from_own_share_and_half_key(own_share: &HalfKeyChallenge, half_key: &HalfKey) -> Result<Self> {
-        let curve_point: CurvePoint =
-            PublicKey::tweak_add(&PublicKey::deserialize(&own_share.hkc)?, &half_key.serialize()).into();
-        Ok(curve_point.into())
+        Self::from_hint_and_share(own_share, &half_key.to_challenge())
     }
 }
 
@@ -149,24 +158,45 @@ impl From<CurvePoint> for Challenge {
     }
 }
 
+impl From<Response> for Challenge {
+    fn from(response: Response) -> Self {
+        response.to_challenge()
+    }
+}
+
 impl BinarySerializable for Challenge {
-    const SIZE: usize = CurvePoint::SIZE;
+    const SIZE: usize = PublicKey::SIZE_COMPRESSED;
 
     fn deserialize(data: &[u8]) -> utils_types::errors::Result<Self> {
+        // Accepts both compressed and uncompressed points
         CurvePoint::deserialize(data)
             .map(|curve_point| Challenge {curve_point})
     }
 
     fn serialize(&self) -> Box<[u8]> {
-        self.curve_point.serialize()
+        // Serializes only compressed points
+        self.curve_point.serialize_compressed()
     }
 }
 
 /// Represents a half-key used for Proof of Relay
+/// Half-key is equivalent to a non-zero scalar in the field used by secp256k1, but the type
+/// itself does not validate nor enforce this fact,
 #[derive(Clone, Eq, PartialEq, Debug)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct HalfKey {
     hkey: [u8; Self::SIZE],
+}
+
+impl Default for HalfKey {
+    fn default() -> Self {
+        let mut ret = Self {
+            hkey: [0u8; Self::SIZE],
+        };
+        ret.hkey.copy_from_slice(&NonZeroScalar::<Secp256k1>::from_uint(1u16.into())
+            .unwrap().to_bytes().as_slice());
+        ret
+    }
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -174,16 +204,16 @@ impl HalfKey {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(half_key: &[u8]) -> Self {
         assert_eq!(half_key.len(), Self::SIZE, "invalid length");
-        let mut ret = Self {
-            hkey: [0u8; Self::SIZE],
-        };
+        let mut ret = Self::default();
         ret.hkey.copy_from_slice(half_key);
         ret
     }
 
+    /// Converts the non-zero scalar represented by this half-key into the half-key challenge.
+    /// This operation naturally enforces the underlying scalar to be non-zero.
     pub fn to_challenge(&self) -> HalfKeyChallenge {
-        PublicKey::from_privkey(&self.hkey)
-            .map(|pk| HalfKeyChallenge::new(&pk.serialize(true)))
+        CurvePoint::from_exponent(&self.hkey)
+            .map(|cp| HalfKeyChallenge::new(&cp.serialize_compressed()))
             .expect("invalid public key")
     }
 }
@@ -193,9 +223,7 @@ impl BinarySerializable for HalfKey {
 
     fn deserialize(data: &[u8]) -> utils_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
-            let mut ret = Self {
-                hkey: [0u8; Self::SIZE],
-            };
+            let mut ret = HalfKey::default();
             ret.hkey.copy_from_slice(data);
             Ok(ret)
         } else {
@@ -208,11 +236,27 @@ impl BinarySerializable for HalfKey {
     }
 }
 
-/// Represents a challange for the half-key in Proof of Relay
+/// Represents a challenge for the half-key in Proof of Relay.
+/// Half-key challenge is equivalent to a secp256k1 curve point.
+/// Therefore, HalfKeyChallenge can be obtained from a HalfKey.
 #[derive(Clone, Eq, PartialEq, Debug)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct HalfKeyChallenge {
     hkc: [u8; Self::SIZE],
+}
+
+impl Default for HalfKeyChallenge {
+    fn default() -> Self {
+        // Note that the default HalfKeyChallenge is the identity point on secp256k1, therefore
+        // will fail all public key checks, which is intended.
+        let mut ret = Self {
+            hkc: [0u8; Self::SIZE]
+        };
+        if let Some(b) = ret.hkc.last_mut() {
+            *b = 1;
+        }
+        ret
+    }
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -220,7 +264,7 @@ impl HalfKeyChallenge {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(half_key_challenge: &[u8]) -> Self {
         assert_eq!(half_key_challenge.len(), Self::SIZE, "invalid length");
-        let mut ret = Self { hkc: [0u8; Self::SIZE] };
+        let mut ret = Self::default();
         ret.hkc.copy_from_slice(half_key_challenge);
         ret
     }
@@ -233,11 +277,11 @@ impl HalfKeyChallenge {
 }
 
 impl BinarySerializable for HalfKeyChallenge {
-    const SIZE: usize = 33; // Size of the compressed secp256k1 point.
+    const SIZE: usize = PublicKey::SIZE_COMPRESSED; // Size of the compressed secp256k1 point.
 
     fn deserialize(data: &[u8]) -> utils_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
-            let mut ret = Self { hkc: [0u8; Self::SIZE] };
+            let mut ret = HalfKeyChallenge::default();
             ret.hkc.copy_from_slice(data);
             Ok(ret)
         } else {
@@ -268,7 +312,13 @@ impl FromStr for HalfKeyChallenge {
     }
 }
 
-/// Represents a 256-bit hash value
+impl From<HalfKey> for HalfKeyChallenge {
+    fn from(half_key: HalfKey) -> Self {
+        half_key.to_challenge()
+    }
+}
+
+/// Represents an Ethereum 256-bit hash value
 /// This implementation instantiates the hash via Keccak256 digest.
 #[derive(Clone, Eq, PartialEq, Debug)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -276,14 +326,18 @@ pub struct Hash {
     hash: [u8; Self::SIZE],
 }
 
+impl Default for Hash {
+    fn default() -> Self {
+        Self { hash: [0u8; Self::SIZE]}
+    }
+}
+
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl Hash {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(hash: &[u8]) -> Self {
         assert_eq!(hash.len(), Self::SIZE, "invalid length");
-        let mut ret = Hash {
-            hash: [0u8; Self::SIZE],
-        };
+        let mut ret = Hash::default();
         ret.hash.copy_from_slice(hash);
         ret
     }
@@ -313,12 +367,12 @@ impl Hash {
     /// Takes all the byte slices and computes hash of their concatenated value.
     /// Uses the Keccak256 digest.
     pub fn create(inputs: &[&[u8]]) -> Self {
-        let mut hash = Keccak256::default();
+        let mut hash = EthDigest::default();
         inputs.into_iter().for_each(|v| hash.update(*v));
         let mut ret = Hash {
             hash: [0u8; Self::SIZE],
         };
-        hash.finalize_into(&mut ret.hash).unwrap();
+        hash.finalize_into(&mut ret.hash);
         ret
     }
 }
@@ -496,10 +550,11 @@ impl PublicKey {
         }
     }
 
-    /// Adds the public key with tweak times generator, producing a new public key.
+    /// Adds the given public key with `tweak` times secp256k1 generator, producing a new public key.
     /// Panics if reaches infinity (EC identity point), which is an invalid public key.
     pub fn tweak_add(key: &PublicKey, tweak: &[u8]) -> PublicKey {
-        let scalar = NonZeroScalar::<Secp256k1>::try_from(tweak).expect("zero tweak provided");
+        let scalar = NonZeroScalar::<Secp256k1>::try_from(tweak)
+            .expect("zero tweak provided");
 
         let new_pk = (key.key.to_projective()
             + <Secp256k1 as CurveArithmetic>::ProjectivePoint::GENERATOR * scalar.as_ref())
@@ -514,11 +569,22 @@ impl PublicKey {
 }
 
 /// Contains a response upon ticket acknowledgement
-/// Half-key is equivalent to a non-zero secret scalar (EC private key).
+/// It is equivalent to a non-zero secret scalar on secp256k1 (EC private key).
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Response {
     response: [u8; Self::SIZE],
+}
+
+impl Default for Response {
+    fn default() -> Self {
+        let mut ret = Self {
+            response: [0u8; Self::SIZE],
+        };
+        ret.response.copy_from_slice(&NonZeroScalar::<Secp256k1>::from_uint(1u16.into())
+            .unwrap().to_bytes().as_slice());
+        ret
+    }
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -526,26 +592,28 @@ impl Response {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(data: &[u8]) -> Self {
         assert_eq!(data.len(), Self::SIZE);
-        let mut ret = Response {
-            response: [0u8; Self::SIZE],
-        };
+        let mut ret = Self::default();
         ret.response.copy_from_slice(data);
         ret
     }
 
+    /// Derives the response from two half-keys.
+    /// This is done by multiplying the two non-zero scalars that the given half-keys represent.
     pub fn from_half_keys(first: &HalfKey, second: &HalfKey) -> Self {
         let res = NonZeroScalar::<Secp256k1>::try_from(first.serialize().as_ref())
             .and_then(|s1| NonZeroScalar::<Secp256k1>::try_from(second.serialize().as_ref())
                 .map(|s2| s1 * s2))
-            .expect("half keys represent invalid non-zero scalars");
+            .expect("multiplication resulted to an invalid non-zero scalar"); // = something was 0
 
         Response::new(res.to_bytes().as_slice())
     }
 
+    /// Converts this response to the PoR challenge by turning the non-zero scalar
+    /// represented by this response into a secp256k1 curve point (public key)
     pub fn to_challenge(&self) -> Challenge {
         Challenge {
             curve_point: CurvePoint::from_exponent(&self.response)
-                .expect("response represent invalid non-zero scalar")
+                .expect("response represents an invalid non-zero scalar")
         }
     }
 }
