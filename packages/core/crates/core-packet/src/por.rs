@@ -113,15 +113,17 @@ mod tests {
         let second_por_string = create_por_string(&secrets[2], Some(&secrets[3]));
 
         // Computation result of the first relayer before receiving an acknowledgement from the second relayer
-        let first_result = pre_verify(&secrets[0], &first_por_string, first_challenge.ticket_challenge.to_ethereum_challenge())
-            .expect("Challenge must be plausible");
+        let first_challenge_eth = first_challenge.ticket_challenge.to_ethereum_challenge();
+        let first_result = pre_verify(&secrets[0], &first_por_string, first_challenge_eth)
+            .expect("First challenge must be plausible");
 
         let expected_hkc = derive_ack_key_share(&secrets[1]).to_challenge();
         assert_eq!(expected_hkc, first_result.ack_challenge);
 
         // Simulates the transformation done by the first relayer
         let (expected_next_ticket_challenge, _) = decode_por_bytes(&first_por_string).unwrap();
-        assert_eq!(expected_next_ticket_challenge, first_result.next_ticket_challenge, "Forward logic must extract correct challenge for next downstream node");
+        assert_eq!(expected_next_ticket_challenge, first_result.next_ticket_challenge,
+                   "Forward logic must extract correct challenge for the next downstream node");
 
         // Computes the cryptographic material that is part of the acknowledgement
         let first_ack = derive_ack_key_share(&secrets[1]);
@@ -129,7 +131,8 @@ mod tests {
                 "Acknowledgement must solve the challenge");
 
         // Simulates the transformation as done by the second relayer
-        let second_result =  pre_verify(&secrets[1], &second_por_string, first_result.next_ticket_challenge.to_ethereum_challenge())
+        let first_result_challenge_eth = first_result.next_ticket_challenge.to_ethereum_challenge();
+        let second_result =  pre_verify(&secrets[1], &second_por_string, first_result_challenge_eth)
             .expect("Second challenge must be plausible");
 
         let second_ack = derive_ack_key_share(&secrets[2]);
