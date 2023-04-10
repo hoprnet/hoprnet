@@ -16,6 +16,7 @@ use crate::parameters::SECRET_KEY_LENGTH;
 /// Defines the `update` and `finalize` operations to produce digest value of arbitrary data.
 pub trait DigestLike<T>
 where T: Update + FixedOutputReset + OutputSizeUser {
+    /// Length of the digest in bytes
     const SIZE: usize = T::OutputSize::USIZE;
 
     /// Access to the internal state of the digest-like operation.

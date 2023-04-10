@@ -67,8 +67,8 @@ impl Default for RoutingInfo {
 impl RoutingInfo {
     pub fn new(max_hops: usize, path: &[PublicKey], secrets: &[&[u8]], additional_data_relayer_len: usize,
                additional_data_relayer: &[&[u8]], additional_data_last_hop: Option<&[u8]>) -> Self {
+        assert!(secrets.len() <= max_hops && !secrets.is_empty(), "invalid number of secrets given");
         assert!(secrets.iter().all(|s| s.len() == SECRET_KEY_LENGTH), "invalid secret length");
-        assert!(secrets.len() <= max_hops, "too many secrets given");
         assert!(additional_data_relayer.iter().all(|r| r.len() == additional_data_relayer_len), "invalid relayer data length");
         assert!(additional_data_last_hop.is_none() || !additional_data_last_hop.unwrap().is_empty(), "invalid additional data for last hop");
 
