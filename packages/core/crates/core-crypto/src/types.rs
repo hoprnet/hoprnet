@@ -93,6 +93,9 @@ impl BinarySerializable for CurvePoint {
 }
 
 impl CurvePoint {
+    /// Size of the point if serialized via `serialize_compressed`.
+    pub const SIZE_COMPRESSED: usize = 33;
+
     /// Creates a curve point from a non-zero scalar.
     /// The given exponent must represent a non-zero scalar and must result into
     /// a secp256k1 identity point.

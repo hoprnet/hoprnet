@@ -94,7 +94,7 @@ impl AcknowledgementChallenge {
 }
 
 impl AcknowledgementChallenge {
-    const SIZE: usize = Signature::SIZE;
+    pub const SIZE: usize = Signature::SIZE;
 
     pub fn deserialize(data: &[u8], ack_challenge: HalfKeyChallenge, public_key: &PublicKey) -> Result<Self> {
         if data.len() == Self::SIZE {

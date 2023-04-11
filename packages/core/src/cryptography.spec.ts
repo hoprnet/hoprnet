@@ -190,7 +190,6 @@ describe('cryptographic correspondence tests', async function () {
     for (let i = 0; i < AMOUNT; i++) {
       let fwd_keyshare_rs = SharedKeys.forward_transform(
         alpha,
-        keyPairs[i].publicKey.slice(4),
         keyPairs[i].privateKey.slice(4)
       )
 

@@ -13,7 +13,7 @@ use crate::errors::CryptoError::{CalculationError, InvalidSecretScalar};
 use hkdf::SimpleHkdf;
 use libp2p_identity::PeerId;
 use rand::rngs::OsRng;
-use utils_types::traits::PeerIdLike;
+use utils_types::traits::{BinarySerializable, PeerIdLike};
 
 use crate::parameters;
 
@@ -55,7 +55,7 @@ fn to_checked_secret_scalar(secret_scalar: KeyBytes) -> Result<NonZeroScalar> {
 /// The members are exposed only using specialized methods.
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct SharedKeys {
-    alpha: Vec<u8>,
+    alpha: CurvePoint,
     secrets: Vec<Box<[u8]>>,
 }
 
@@ -80,7 +80,7 @@ impl SharedKeys {
         // This becomes: x * b_0 * b_1 * b_2 * ... * G
         // We remain in projective coordinates to save some cycles
         let mut alpha_prev = k256::ProjectivePoint::GENERATOR * coeff_prev.as_ref();
-        let alpha = alpha_prev.to_encoded_point(true);
+        let alpha = alpha_prev;
 
         // Iterate through all the given peer public keys
         for (i, cp) in peer_public_keys.iter().map(CurvePoint::from).enumerate() {
@@ -111,32 +111,33 @@ impl SharedKeys {
         }
 
         Ok(SharedKeys {
-            alpha: alpha.as_bytes().into(),
+            alpha: alpha.to_affine().into(),
             secrets: shared_keys,
         })
     }
 
     /// Calculates the forward transformation for the given peer public key.
-    pub fn forward_transform(alpha: &[u8], public_key: &PublicKey, private_key: &[u8]) -> Result<SharedKeys> {
-        let priv_key = to_checked_secret_scalar(KeyBytes::clone_from_slice(&private_key[0..private_key.len()]))?;
-        let alpha_proj = CurvePoint::from(PublicKey::deserialize(alpha)?).to_projective_point();
+    pub fn forward_transform(alpha: &[u8], private_key: &[u8]) -> Result<SharedKeys> {
+        let public_key = PublicKey::from_privkey(private_key)?;
+        let private_scalar = to_checked_secret_scalar(KeyBytes::clone_from_slice(&private_key[..]))?;
+        let alpha_projective = CurvePoint::deserialize(alpha)?.to_projective_point();
 
-        let s_k = (alpha_proj * priv_key.as_ref()).to_affine();
+        let s_k = (alpha_projective * private_scalar.as_ref()).to_affine();
         let secret = extract_key_from_group_element(&s_k.into(), &public_key.serialize(true));
 
         let b_k = expand_key_from_group_element(&s_k.into(), alpha);
         let b_k_checked = to_checked_secret_scalar(b_k)?;
 
-        let alpha_new = (alpha_proj * b_k_checked.as_ref()).to_affine().to_encoded_point(true);
+        let alpha_new = (alpha_projective * b_k_checked.as_ref()).to_affine();
 
         Ok(SharedKeys {
-            alpha: alpha_new.as_bytes().into(),
+            alpha: alpha_new.into(),
             secrets: vec![secret.to_vec().into_boxed_slice()],
         })
     }
 
-    pub fn alpha(&self) -> &[u8] {
-        &self.alpha
+    pub fn alpha(&self) -> Box<[u8]> {
+        self.alpha.serialize_compressed()
     }
 
     pub fn secrets(&self) -> Vec<&[u8]> {
@@ -198,17 +199,15 @@ pub mod tests {
         // Now generate the key shares for the public keys
         let generated_shares = SharedKeys::generate(&mut used_rng, &pub_keys).unwrap();
 
-        let mut alpha_cpy: Box<[u8]> = generated_shares.alpha().into();
-        for i in 0..COUNT_KEYPAIRS {
-            let priv_key = priv_keys[i].to_vec();
-            let pub_key = &pub_keys[i];
+        let mut alpha_cpy: Box<[u8]> = generated_shares.alpha();
+        for (i, priv_key) in priv_keys.iter().enumerate() {
 
             let shared_key =
-                SharedKeys::forward_transform(&alpha_cpy, pub_key, priv_key.as_slice()).unwrap();
+                SharedKeys::forward_transform(&alpha_cpy, priv_key).unwrap();
 
             assert_eq!(&shared_key.secrets()[0], &generated_shares.secrets()[i]);
 
-            alpha_cpy = shared_key.alpha().into();
+            alpha_cpy = shared_key.alpha();
         }
     }
 
@@ -248,7 +247,7 @@ pub mod wasm {
     impl SharedKeys {
         /// Get the `alpha` value of the derived shared secrets.
         pub fn get_alpha(&self) -> Uint8Array {
-            self.alpha.as_slice().into()
+            self.alpha().as_ref().into()
         }
 
         /// Gets the shared secret of the peer on the given index.
@@ -264,8 +263,8 @@ pub mod wasm {
         }
 
         #[wasm_bindgen(js_name = "forward_transform")]
-        pub fn _forward_transform(alpha: &[u8], public_key: &PublicKey, private_key: &[u8]) -> JsResult<SharedKeys> {
-            ok_or_jserr!(super::SharedKeys::forward_transform(alpha, public_key, private_key))
+        pub fn _forward_transform(alpha: &[u8], private_key: &[u8]) -> JsResult<SharedKeys> {
+            ok_or_jserr!(super::SharedKeys::forward_transform(alpha, private_key))
         }
 
         /// Generate shared keys given the peer public keys
