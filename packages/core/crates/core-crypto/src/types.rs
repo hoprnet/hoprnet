@@ -134,6 +134,12 @@ impl Challenge {
     }
 }
 
+impl From<Challenge> for EthereumChallenge {
+    fn from(challenge: Challenge) -> Self {
+        challenge.to_ethereum_challenge()
+    }
+}
+
 impl Challenge {
     /// Obtains the PoR challenge by adding the two EC points represented by the half-key challenges
     pub fn from_hint_and_share(own_share: &HalfKeyChallenge, hint: &HalfKeyChallenge) -> Result<Self> {
@@ -598,11 +604,11 @@ impl Response {
     }
 
     /// Derives the response from two half-keys.
-    /// This is done by multiplying the two non-zero scalars that the given half-keys represent.
+    /// This is done by adding the two non-zero scalars that the given half-keys represent.
     pub fn from_half_keys(first: &HalfKey, second: &HalfKey) -> Self {
         let res = NonZeroScalar::<Secp256k1>::try_from(first.serialize().as_ref())
             .and_then(|s1| NonZeroScalar::<Secp256k1>::try_from(second.serialize().as_ref())
-                .map(|s2| s1 * s2))
+                .map(|s2| s1.as_ref() + s2.as_ref()))
             .expect("multiplication resulted to an invalid non-zero scalar"); // = something was 0
 
         Response::new(res.to_bytes().as_slice())

@@ -52,7 +52,7 @@ pub struct ProofOfRelayOutput {
 
 pub fn decode_por_bytes(por_bytes: &[u8]) -> Result<(Challenge, HalfKeyChallenge), GeneralError> {
     if por_bytes.len() == POR_SECRET_LENGTH {
-        let (next_ticket_challenge, hint) = por_bytes.split_at(PublicKey::SIZE_COMPRESSED);
+        let (next_ticket_challenge, hint) = por_bytes.split_at(POR_SECRET_LENGTH / 2);
         Ok((CurvePoint::deserialize(next_ticket_challenge)?.into(), HalfKeyChallenge::new(hint)))
     } else {
         Err(ParseError)
