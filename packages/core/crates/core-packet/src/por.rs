@@ -102,7 +102,7 @@ pub struct ProofOfRelayOutput {
 /// * `secret` shared secret with the creator of the packet
 /// * `por_bytes` serialized `ProofOfRelayString` as included within the packet
 /// * `challenge` ticket challenge of the incoming ticket
-pub fn pre_verify(secret: &[u8], por_bytes: &[u8], challenge: EthereumChallenge) -> Result<ProofOfRelayOutput> {
+pub fn pre_verify(secret: &[u8], por_bytes: &[u8], challenge: &EthereumChallenge) -> Result<ProofOfRelayOutput> {
     assert_eq!(SECRET_KEY_LENGTH, secret.len(), "invalid secret length");
     assert_eq!(POR_SECRET_LENGTH, por_bytes.len(), "invalid por bytes length");
 
@@ -111,7 +111,7 @@ pub fn pre_verify(secret: &[u8], por_bytes: &[u8], challenge: EthereumChallenge)
     let own_key = derive_own_key_share(secret);
     let own_share = own_key.to_challenge();
 
-    if Challenge::from_hint_and_share(&own_share, &pors.hint)?.to_ethereum_challenge() == challenge {
+    if Challenge::from_hint_and_share(&own_share, &pors.hint)?.to_ethereum_challenge().eq(challenge) {
         Ok(ProofOfRelayOutput {
             next_ticket_challenge: pors.next_ticket_challenge,
             ack_challenge: pors.hint,
@@ -173,7 +173,7 @@ mod tests {
 
         // Computation result of the first relayer before receiving an acknowledgement from the second relayer
         let first_challenge_eth = first_challenge.ticket_challenge.to_ethereum_challenge();
-        let first_result = pre_verify(&secrets[0], &first_por_string.serialize(), first_challenge_eth)
+        let first_result = pre_verify(&secrets[0], &first_por_string.serialize(), &first_challenge_eth)
             .expect("First challenge must be plausible");
 
         let expected_hkc = derive_ack_key_share(&secrets[1]).to_challenge();
@@ -191,7 +191,7 @@ mod tests {
 
         // Simulates the transformation as done by the second relayer
         let first_result_challenge_eth = first_result.next_ticket_challenge.to_ethereum_challenge();
-        let second_result =  pre_verify(&secrets[1], &second_por_string.serialize(), first_result_challenge_eth)
+        let second_result =  pre_verify(&secrets[1], &second_por_string.serialize(), &first_result_challenge_eth)
             .expect("Second challenge must be plausible");
 
         let second_ack = derive_ack_key_share(&secrets[2]);
@@ -214,7 +214,7 @@ mod tests {
                                        &first_challenge.own_key, &ack), "Challenge must be solved");
 
         assert!(validate_por_response(&first_challenge.ticket_challenge.to_ethereum_challenge(),
-        &Response::from_half_keys(&first_challenge.own_key, &ack)),
+        &Response::from_half_keys(&first_challenge.own_key, &ack).unwrap()),
             "Returned response must solve the challenge");
     }
 }

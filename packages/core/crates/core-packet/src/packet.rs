@@ -1,17 +1,18 @@
 use libp2p_identity::PeerId;
-use core_crypto::derivation::derive_packet_tag;
+use core_crypto::derivation::{derive_ack_key_share, derive_packet_tag};
 use core_crypto::primitives::{DigestLike, SimpleMac};
 use core_crypto::prp::{PRP, PRPParameters};
 use core_crypto::routing::{forward_header, ForwardedHeader, header_length, RoutingInfo};
 use core_crypto::shared_keys::SharedKeys;
-use core_crypto::types::{CurvePoint, HalfKeyChallenge, PublicKey};
+use core_crypto::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, PublicKey};
 use core_types::channels::{AcknowledgementChallenge, Ticket};
 use utils_types::traits::{BinarySerializable, PeerIdLike};
 use crate::errors::PacketError::PacketDecodingError;
 
-use crate::por::{POR_SECRET_LENGTH, ProofOfRelayString, ProofOfRelayValues};
+use crate::por::{POR_SECRET_LENGTH, pre_verify, ProofOfRelayString, ProofOfRelayValues};
 use crate::errors::Result;
 use crate::packet::ForwardedPacket::{FinalNodePacket, RelayedPacket};
+use crate::packet::PacketState::{Final, Forwarded, Outgoing};
 
 pub const INTERMEDIATE_HOPS: usize = 3; // 3 relayers and 1 destination
 pub const PAYLOAD_SIZE: usize = 500;
@@ -117,7 +118,6 @@ pub enum ForwardedPacket {
     }
 }
 
-
 pub fn forward_packet(private_key: &[u8], packet: &[u8], additional_data_relayer_len: usize,
                       additional_data_last_hop_len: usize, max_hops: usize) -> Result<ForwardedPacket> {
     let header_len = header_length(max_hops, additional_data_relayer_len, additional_data_last_hop_len);
@@ -160,14 +160,44 @@ pub fn forward_packet(private_key: &[u8], packet: &[u8], additional_data_relayer
     }
 }
 
+/// Information on a packet that is being forwarded
+pub struct IntermediatePacketInfo {
+
+}
+
+/// Indicates if the packet is supposed to be forwarded to the next hop or if it is intended for us.
+pub enum PacketState {
+    /// Packet is intended for us
+    Final {
+        packet_tag: Box<[u8]>,
+        ack_key: HalfKey,
+        previous_hop: PublicKey,
+        plain_text: Box<[u8]>,
+    },
+    /// Packet must be forwarded
+    Forwarded {
+        ack_challenge: HalfKeyChallenge,
+        packet_tag: Box<[u8]>,
+        ack_key: HalfKey,
+        previous_hop: PublicKey,
+        own_key: HalfKey,
+        own_share: HalfKeyChallenge,
+        next_hop: PublicKey,
+        next_challenge: Challenge,
+        old_challenge: Option<Challenge>,
+    },
+    /// Packet that is being sent out by us
+    Outgoing {
+        ack_challenge: HalfKeyChallenge,
+    }
+}
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Packet {
     packet: Box<[u8]>,
     challenge: AcknowledgementChallenge,
-    ack_challenge: HalfKeyChallenge,
-    ready_to_forward: bool,
     ticket: Ticket,
+    state: PacketState
 }
 
 impl Packet {
@@ -192,29 +222,71 @@ impl Packet {
 
         Ok(Self {
             challenge: AcknowledgementChallenge::new(porv.ack_challenge.clone(), private_key),
-            ack_challenge: porv.ack_challenge,
             packet: encode_packet(shared_keys, msg, path, INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, &por_strings
                 .iter()
                 .map(|pors| pors.as_ref())
                 .collect::<Vec<_>>(), None),
-            ready_to_forward: true,
-            ticket
+            ticket,
+            state: Outgoing {
+                ack_challenge: porv.ack_challenge
+            }
         })
     }
 
-    /*pub fn deserialize(pre: &[u8], private_key: &[u8], sender: &PeerId) -> Result<Self> {
+    pub fn deserialize(pre: &[u8], private_key: &[u8], sender: &PeerId) -> Result<Self> {
         if pre.len() == Self::SIZE {
             let (packet, r0) = pre.split_at(PACKET_LENGTH);
             let (pre_challenge, pre_ticket) = r0.split_at(AcknowledgementChallenge::SIZE);
+            let previous_hop = PublicKey::from_peerid(sender)?;
 
-
-
-            Ok(())
+            match forward_packet(private_key, packet, POR_SECRET_LENGTH, 0, INTERMEDIATE_HOPS + 1)? {
+                RelayedPacket { derived_secret, additional_info, packet_tag, next_node, .. } => {
+                    let ack_key = derive_ack_key_share(&derived_secret);
+                    let challenge = AcknowledgementChallenge::deserialize(pre_challenge,
+                                                                          ack_key.to_challenge(),
+                                                                          &previous_hop)?;
+                    let ticket = Ticket::deserialize(pre_ticket)?;
+                    let verification_output = pre_verify(&derived_secret, &additional_info, &ticket.challenge)?;
+                    Ok(Self {
+                        packet: packet.into(),
+                        challenge,
+                        ticket,
+                        state: Forwarded {
+                            packet_tag,
+                            ack_key,
+                            previous_hop,
+                            own_key: verification_output.own_key,
+                            own_share: verification_output.own_share,
+                            next_hop: next_node,
+                            next_challenge: verification_output.next_ticket_challenge,
+                            ack_challenge: verification_output.ack_challenge,
+                            old_challenge: None,
+                        }
+                    })
+                }
+                FinalNodePacket { packet_tag, plain_text, derived_secret, .. } => {
+                    let ack_key = derive_ack_key_share(&derived_secret);
+                    let challenge = AcknowledgementChallenge::deserialize(pre_challenge,
+                                                                          ack_key.to_challenge(),
+                                                                          &previous_hop)?;
+                    let ticket = Ticket::deserialize(pre_ticket)?;
+                    Ok(Self {
+                        packet: packet.into(),
+                        challenge,
+                        ticket,
+                        state: Final {
+                            packet_tag,
+                            ack_key,
+                            previous_hop,
+                            plain_text,
+                        }
+                    })
+                }
+            }
         } else {
             Err(PacketDecodingError)
         }
-    }*/
-
+    }
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
