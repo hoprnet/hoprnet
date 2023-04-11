@@ -2,6 +2,12 @@ import assert from 'assert'
 import { StrategyFactory } from './channel-strategy.js'
 import BN from 'bn.js'
 import { ChannelStatus } from '@hoprnet/hopr-utils'
+import { privKeyToPeerId, u8aToHex } from '@hoprnet/hopr-utils'
+import { randomBytes } from 'crypto'
+
+function createPeerId(): string {
+  return privKeyToPeerId(u8aToHex(randomBytes(32))).toString()
+}
 
 describe('test strategies', async function () {
   it('perform basic promiscuous strategy test', async function () {
@@ -13,22 +19,28 @@ describe('test strategies', async function () {
 
     const stake = '1000000000000000000'
 
+    let alice = createPeerId()
+    let bob = createPeerId()
+    let charlie = createPeerId()
+    let gustave = createPeerId()
+    let eugene = createPeerId()
+
     let peers = new Map<string, number>()
-    peers.set('Alice', 0.1)
-    peers.set('Bob', 0.7)
-    peers.set('Charlie', 0.9)
-    peers.set('Dahlia', 0.1)
-    peers.set('Eugene', 0.8)
-    peers.set('Felicia', 0.3)
-    peers.set('Gustave', 1.0)
-    peers.set('Heather', 0.1)
-    peers.set('Ian', 0.2)
-    peers.set('Joe', 0.3)
+    peers.set(alice, 0.1)
+    peers.set(bob, 0.7)
+    peers.set(charlie, 0.9)
+    peers.set(createPeerId(), 0.1)
+    peers.set(eugene, 0.8)
+    peers.set(createPeerId(), 0.3)
+    peers.set(gustave, 1.0)
+    peers.set(createPeerId(), 0.1)
+    peers.set(createPeerId(), 0.2)
+    peers.set(createPeerId(), 0.3)
 
     let outgoing_channels = [
-      { peer_id: 'Alice', stake_str: stake, status: ChannelStatus.Open },
-      { peer_id: 'Charlie', stake_str: stake, status: ChannelStatus.Open },
-      { peer_id: 'Gustave', stake_str: '1000000000000000', status: ChannelStatus.Open }
+      { peer_id: alice, stake_str: stake, status: ChannelStatus.Open },
+      { peer_id: charlie, stake_str: stake, status: ChannelStatus.Open },
+      { peer_id: gustave, stake_str: '1000000000000000', status: ChannelStatus.Open }
     ]
 
     // Do some dummy ticks to add some samples
@@ -42,12 +54,12 @@ describe('test strategies', async function () {
       assert.equal(res.to_close().length, 2)
       assert.equal(res.to_open().length, 3)
 
-      assert(res.to_close().includes('Alice'))
-      assert(res.to_close().includes('Gustave'))
+      assert(res.to_close().includes(alice))
+      assert(res.to_close().includes(gustave))
 
-      assert.equal(res.to_open()[0].peer_id, 'Gustave')
-      assert.equal(res.to_open()[1].peer_id, 'Eugene')
-      assert.equal(res.to_open()[2].peer_id, 'Bob')
+      assert.equal(res.to_open()[0].peer_id, gustave)
+      assert.equal(res.to_open()[1].peer_id, eugene)
+      assert.equal(res.to_open()[2].peer_id, bob)
     }
 
     // Now reconfigure the strategy and tick again with same inputs
@@ -63,10 +75,10 @@ describe('test strategies', async function () {
       assert.equal(res.to_close().length, 2)
       assert.equal(res.to_open().length, 1)
 
-      assert(res.to_close().includes('Alice'))
-      assert(res.to_close().includes('Gustave'))
+      assert(res.to_close().includes(alice))
+      assert(res.to_close().includes(gustave))
 
-      assert.equal(res.to_open()[0].peer_id, 'Gustave')
+      assert.equal(res.to_open()[0].peer_id, gustave)
     }
   })
 })

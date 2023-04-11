@@ -64,6 +64,7 @@ import {
   PeerStatus,
   PeerOrigin,
   Health,
+  health_to_string,
   HeartbeatConfig,
   core_network_set_panic_hook,
   core_network_gather_metrics
@@ -1548,6 +1549,7 @@ export {
   PeerOrigin,
   PeerStatus,
   Health,
+  health_to_string,
   type ChannelStrategyInterface
 }
 export { resolveEnvironment, supportedEnvironments, type ResolvedEnvironment } from './environment.js'
