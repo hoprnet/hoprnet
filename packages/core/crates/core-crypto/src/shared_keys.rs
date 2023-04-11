@@ -11,6 +11,9 @@ use k256::{NonZeroScalar};
 
 use crate::errors::CryptoError::{CalculationError, InvalidSecretScalar};
 use hkdf::SimpleHkdf;
+use libp2p_identity::PeerId;
+use rand::rngs::OsRng;
+use utils_types::traits::PeerIdLike;
 
 use crate::parameters;
 
@@ -57,6 +60,14 @@ pub struct SharedKeys {
 }
 
 impl SharedKeys {
+    /// Generates shared secrets for the given path of peers.
+    pub fn new(path: &[&PeerId]) -> Result<Self> {
+        Self::generate(&mut OsRng, &path
+            .iter()
+            .map(|peer_id| PublicKey::from_peerid(peer_id))
+            .collect::<utils_types::errors::Result<Vec<_>>>()?)
+    }
+
     /// Generates shared secrets given the peer public keys array.
     /// The order of the peer public keys is preserved for resulting shared keys.
     /// The specified random number generator will be used.
@@ -72,7 +83,6 @@ impl SharedKeys {
         let alpha = alpha_prev.to_encoded_point(true);
 
         // Iterate through all the given peer public keys
-        let pubkeys_len = peer_public_keys.len();
         for (i, cp) in peer_public_keys.iter().map(CurvePoint::from).enumerate() {
             // Try to decode the given public key point & multiply by the current coefficient
             let shared_secret = (cp.to_projective_point() * coeff_prev.as_ref()).to_affine();
@@ -82,7 +92,7 @@ impl SharedKeys {
             shared_keys.push(shared_pk.to_vec().into_boxed_slice());
 
             // Stop here, we don't need to compute anything more
-            if i == pubkeys_len - 1 {
+            if i == peer_public_keys.len() - 1 {
                 break;
             }
 
@@ -129,8 +139,8 @@ impl SharedKeys {
         &self.alpha
     }
 
-    pub fn secrets(&self) -> &Vec<Box<[u8]>> {
-        &self.secrets
+    pub fn secrets(&self) -> Vec<&[u8]> {
+        self.secrets.iter().map(Box::as_ref).collect()
     }
 }
 

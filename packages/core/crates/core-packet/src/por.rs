@@ -6,6 +6,8 @@ use utils_types::errors::GeneralError::ParseError;
 use utils_types::primitives::EthereumChallenge;
 use utils_types::traits::BinarySerializable;
 
+use crate::errors::{PacketError, Result};
+
 /// Proof of Relay secret length is twice the size of secp256k1 public key
 pub const POR_SECRET_LENGTH: usize = 2 * PublicKey::SIZE_COMPRESSED;
 
@@ -26,7 +28,9 @@ impl ProofOfRelayValues {
 
         Self {
             ack_challenge: derive_ack_key_share(secret_b).to_challenge(),
-            ticket_challenge: Response::from_half_keys(&s0, &s1).to_challenge(),
+            ticket_challenge: Response::from_half_keys(&s0, &s1)
+                .expect("failed to derive response")
+                .to_challenge(),
             own_key: s0
         }
     }
@@ -51,7 +55,9 @@ impl ProofOfRelayString {
         let s2 = derive_ack_key_share(secret_d.unwrap_or(&random_bytes::<SECRET_KEY_LENGTH>()));
 
         Self {
-            next_ticket_challenge: Response::from_half_keys(&s1, &s2).to_challenge(),
+            next_ticket_challenge: Response::from_half_keys(&s1, &s2)
+                .expect("failed to derive response")
+                .to_challenge(),
             hint: s0.to_challenge()
         }
     }
@@ -96,41 +102,49 @@ pub struct ProofOfRelayOutput {
 /// * `secret` shared secret with the creator of the packet
 /// * `por_bytes` serialized `ProofOfRelayString` as included within the packet
 /// * `challenge` ticket challenge of the incoming ticket
-pub fn pre_verify(secret: &[u8], por_bytes: &[u8], challenge: EthereumChallenge) -> Result<ProofOfRelayOutput, ()> {
+pub fn pre_verify(secret: &[u8], por_bytes: &[u8], challenge: EthereumChallenge) -> Result<ProofOfRelayOutput> {
     assert_eq!(SECRET_KEY_LENGTH, secret.len(), "invalid secret length");
     assert_eq!(POR_SECRET_LENGTH, por_bytes.len(), "invalid por bytes length");
 
-    let pors = ProofOfRelayString::deserialize(por_bytes).map_err(|_|())?;
+    let pors = ProofOfRelayString::deserialize(por_bytes)?;
 
     let own_key = derive_own_key_share(secret);
     let own_share = own_key.to_challenge();
 
-    if Challenge::from_hint_and_share(&own_share, &pors.hint).map_err(|_|())?.to_ethereum_challenge() == challenge {
+    if Challenge::from_hint_and_share(&own_share, &pors.hint)?.to_ethereum_challenge() == challenge {
         Ok(ProofOfRelayOutput {
             next_ticket_challenge: pors.next_ticket_challenge,
             ack_challenge: pors.hint,
             own_key, own_share,
         })
     } else {
-        Err(())
+        Err(PacketError::PoRVerificationError)
     }
 }
 
 /// Checks if the given acknowledgement solves the given challenge.
 pub fn validate_por_half_keys(ethereum_challenge: &EthereumChallenge, own_key: &HalfKey, ack: &HalfKey) -> bool {
-    Response::from_half_keys(own_key, ack).to_challenge().to_ethereum_challenge() == ethereum_challenge
+    Response::from_half_keys(own_key, ack)
+        .map(|response| validate_por_response(ethereum_challenge, &response))
+        .unwrap_or_else(|_| {
+            // TODO: log error here
+            false
+        })
 }
 
 /// Checks if the given response solves the given challenge.
 pub fn validate_por_response(ethereum_challenge: &EthereumChallenge, response: &Response) -> bool {
-    response.to_challenge().to_ethereum_challenge() == ethereum_challenge
+    response.to_challenge().to_ethereum_challenge().eq(ethereum_challenge)
 }
 
 /// Checks if the given acknowledgement solves the given challenge.
 pub fn validate_por_hint(ethereum_challenge: &EthereumChallenge, own_share: &HalfKeyChallenge, ack: &HalfKey) -> bool {
     Challenge::from_own_share_and_half_key(own_share, ack)
-        .map(|c| c.to_ethereum_challenge() == ethereum_challenge)
-        .unwrap_or(false)
+        .map(|c| c.to_ethereum_challenge().eq(ethereum_challenge))
+        .unwrap_or_else(|_| {
+            // TODO: log error here
+            false
+        })
 }
 
 #[cfg(test)]

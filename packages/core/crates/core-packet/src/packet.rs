@@ -2,10 +2,13 @@ use libp2p_identity::PeerId;
 use core_crypto::primitives::{DigestLike, SimpleMac};
 use core_crypto::prp::{PRP, PRPParameters};
 use core_crypto::routing::{header_length, RoutingInfo};
-use core_crypto::types::PublicKey;
+use core_crypto::shared_keys::SharedKeys;
+use core_crypto::types::{HalfKeyChallenge, PublicKey};
 use core_types::channels::{AcknowledgementChallenge, Ticket};
 use utils_types::traits::{BinarySerializable, PeerIdLike};
-use crate::por::POR_SECRET_LENGTH;
+
+use crate::por::{POR_SECRET_LENGTH, ProofOfRelayString, ProofOfRelayValues};
+use crate::errors::Result;
 
 pub const INTERMEDIATE_HOPS: usize = 3; // 3 relayers and 1 destination
 pub const PAYLOAD_SIZE: usize = 500;
@@ -87,7 +90,42 @@ enum ForwardedPacket<'a> {
 pub struct Packet {
     packet: Box<[u8]>,
     challenge: AcknowledgementChallenge,
-    ticket: Ticket
+    ack_challenge: HalfKeyChallenge,
+    ready_to_forward: bool,
+    ticket: Ticket,
+}
+
+impl Packet {
+    pub fn new(msg: &[u8], path: &[&PeerId], private_key: &[u8], ticket: Ticket) -> Result<Self> {
+        assert!(!path.is_empty(), "path must not be empty");
+
+        let shared_keys = SharedKeys::new(path)?;
+        let secrets = shared_keys.secrets();
+
+        let porv = ProofOfRelayValues::new(&secrets[0], secrets.get(1).map(|s| *s));
+
+        let mut por_strings = Vec::with_capacity(path.len() - 1);
+        for i in 0..path.len() - 1 {
+            let has_other = i + 2 < path.len();
+            por_strings.push(ProofOfRelayString::new(secrets[i + 1], has_other.then_some(secrets[i + 2])).serialize())
+        }
+
+        Ok(Self {
+            challenge: AcknowledgementChallenge::new(porv.ack_challenge.clone(), private_key),
+            ack_challenge: porv.ack_challenge,
+            packet: Self::create(shared_keys, msg, path, INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, &por_strings
+                .iter()
+                .map(|pors| pors.as_ref())
+                .collect::<Vec<_>>(), None),
+            ready_to_forward: true,
+            ticket
+        })
+    }
+
+    fn create(shares: SharedKeys, msg: &[u8], path: &[&PeerId], max_hops: usize, additional_relayer_len: usize,
+              additional_data_relayer: &[&[u8]], additional_data_last_hop: Option<&[u8]>) -> Box<[u8]> {
+        todo!()
+    }
 }
 
 impl BinarySerializable for Packet {

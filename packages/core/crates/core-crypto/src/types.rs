@@ -603,17 +603,6 @@ impl Response {
         ret
     }
 
-    /// Derives the response from two half-keys.
-    /// This is done by adding the two non-zero scalars that the given half-keys represent.
-    pub fn from_half_keys(first: &HalfKey, second: &HalfKey) -> Self {
-        let res = NonZeroScalar::<Secp256k1>::try_from(first.serialize().as_ref())
-            .and_then(|s1| NonZeroScalar::<Secp256k1>::try_from(second.serialize().as_ref())
-                .map(|s2| s1.as_ref() + s2.as_ref()))
-            .expect("multiplication resulted to an invalid non-zero scalar"); // = something was 0
-
-        Response::new(res.to_bytes().as_slice())
-    }
-
     /// Converts this response to the PoR challenge by turning the non-zero scalar
     /// represented by this response into a secp256k1 curve point (public key)
     pub fn to_challenge(&self) -> Challenge {
@@ -621,6 +610,19 @@ impl Response {
             curve_point: CurvePoint::from_exponent(&self.response)
                 .expect("response represents an invalid non-zero scalar")
         }
+    }
+}
+
+impl Response {
+    /// Derives the response from two half-keys.
+    /// This is done by adding the two non-zero scalars that the given half-keys represent.
+    pub fn from_half_keys(first: &HalfKey, second: &HalfKey) -> Result<Self> {
+        let res = NonZeroScalar::<Secp256k1>::try_from(first.serialize().as_ref())
+            .and_then(|s1| NonZeroScalar::<Secp256k1>::try_from(second.serialize().as_ref())
+                .map(|s2| s1.as_ref() + s2.as_ref()))
+            .map_err(|_| CalculationError)?; // One of the scalars was 0
+
+        Ok(Response::new(res.to_bytes().as_slice()))
     }
 }
 
@@ -1040,9 +1042,14 @@ pub mod wasm {
             self.serialize()
         }
 
+        #[wasm_bindgen(js_name = "serialize_compressed")]
+        pub fn _serialize_compressed(&self) -> Box<[u8]> {
+            self.serialize_compressed()
+        }
+
         #[wasm_bindgen(js_name = "eq")]
         pub fn _eq(&self, other: &CurvePoint) -> bool {
-            self.eq(&other)
+            self.eq(other)
         }
 
         pub fn size() -> u32 {
@@ -1238,6 +1245,11 @@ pub mod wasm {
         #[wasm_bindgen(js_name = "to_hex")]
         pub fn _to_hex(&self) -> String {
             self.to_hex()
+        }
+
+        #[wasm_bindgen(js_name = "from_half_keys")]
+        pub fn _from_half_keys(first: &HalfKey, second: &HalfKey) -> JsResult<Response> {
+            ok_or_jserr!(Response::from_half_keys(first, second))
         }
 
         pub fn size() -> u32 {
