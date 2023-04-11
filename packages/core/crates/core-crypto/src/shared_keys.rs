@@ -143,6 +143,10 @@ impl SharedKeys {
     pub fn secrets(&self) -> Vec<&[u8]> {
         self.secrets.iter().map(Box::as_ref).collect()
     }
+
+    pub fn secret(&self, idx: usize) -> &[u8] {
+        &self.secrets[idx]
+    }
 }
 
 /// Unit tests of the Rust code

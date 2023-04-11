@@ -50,6 +50,7 @@ fn generate_filler(max_hops: usize, routing_info_len: usize, routing_info_last_h
     ret.into_boxed_slice()
 }
 
+/// Carries routing information for the mixnet packet.
 pub struct RoutingInfo {
     pub routing_information: Box<[u8]>,
     pub mac: [u8; SimpleMac::SIZE]
@@ -65,6 +66,14 @@ impl Default for RoutingInfo {
 }
 
 impl RoutingInfo {
+    /// Creates the routing information of the mixnet packet
+    /// # Arguments
+    /// * `max_hops` maximal number of hops
+    /// * `path` IDs of the nodes along the path
+    /// * `secrets` shared secrets with the nodes along the path
+    /// * `additional_data_relayer_len` length of each additional data for all relayers
+    /// * `additional_data_relayer` additional data for each relayer
+    /// * `additional_data_last_hop` additional data for the final recipient
     pub fn new(max_hops: usize, path: &[PublicKey], secrets: &[&[u8]], additional_data_relayer_len: usize,
                additional_data_relayer: &[&[u8]], additional_data_last_hop: Option<&[u8]>) -> Self {
         assert!(secrets.len() <= max_hops && !secrets.is_empty(), "invalid number of secrets given");
@@ -141,19 +150,40 @@ impl RoutingInfo {
     }
 }
 
+/// Enum carry information about the packet based on whether it is destined for the current node (`FinalNode`)
+/// or if the packet is supposed to be only relayed (`RelayNode`).
 pub enum ForwardedHeader {
+    /// Packet is supposed to be relayed
     RelayNode {
+        /// Transformed header
         header: Box<[u8]>,
+        /// Authentication tag
         mac: Box<[u8]>,
+        /// Public key of the next node
         next_node: PublicKey,
+        /// Additional data for the relayer
         additional_info: Box<[u8]>
     },
 
+    /// Packet is at its final destination
     FinalNode {
+        /// Additional data for the final destination
         additional_data: Box<[u8]>
     }
 }
 
+/// Applies the forward transformation to the header.
+/// If the packet is destined for this node, returns the additional data
+/// for the final destination (`FinalNode`), otherwise it returns the transformed header, the
+/// next authentication tag, the public key of the next node, and the additional data
+/// for the relayer (`RelayNode`).
+/// # Arguments
+/// * `secret` shared secret with the creator of the packet
+/// * `header` u8a containing the header
+/// * `mac` current mac
+/// * `max_hops` maximal number of hops
+/// * `additional_data_relayer_len` length of the additional data for each relayer
+/// * `additional_data_last_hop_len` length of the additional data for the final destination
 pub fn forward_header(secret: &[u8], header: &mut [u8], mac: &[u8], max_hops: usize,
                 additional_data_relayer_len: usize, additional_data_last_hop_len: usize) -> Result<ForwardedHeader> {
     assert_eq!(SECRET_KEY_LENGTH, secret.len(), "invalid secret length");
@@ -206,6 +236,7 @@ pub fn forward_header(secret: &[u8], header: &mut [u8], mac: &[u8], max_hops: us
 }
 
 impl ForwardedHeader {
+    /// Convenience method to determine if the packet is at its final destination.
     pub fn is_final(&self) -> bool {
         match self {
             RelayNode { .. } => false,

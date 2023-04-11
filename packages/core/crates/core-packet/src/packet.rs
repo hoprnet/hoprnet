@@ -1,15 +1,17 @@
 use libp2p_identity::PeerId;
+use core_crypto::derivation::derive_packet_tag;
 use core_crypto::primitives::{DigestLike, SimpleMac};
 use core_crypto::prp::{PRP, PRPParameters};
-use core_crypto::routing::{header_length, RoutingInfo};
+use core_crypto::routing::{forward_header, ForwardedHeader, header_length, RoutingInfo};
 use core_crypto::shared_keys::SharedKeys;
 use core_crypto::types::{CurvePoint, HalfKeyChallenge, PublicKey};
 use core_types::channels::{AcknowledgementChallenge, Ticket};
 use utils_types::traits::{BinarySerializable, PeerIdLike};
+use crate::errors::PacketError::PacketDecodingError;
 
 use crate::por::{POR_SECRET_LENGTH, ProofOfRelayString, ProofOfRelayValues};
 use crate::errors::Result;
-use crate::errors::PacketError::PacketDecodingError;
+use crate::packet::ForwardedPacket::{FinalNodePacket, RelayedPacket};
 
 pub const INTERMEDIATE_HOPS: usize = 3; // 3 relayers and 1 destination
 pub const PAYLOAD_SIZE: usize = 500;
@@ -99,35 +101,63 @@ impl<'a> PacketHeader<'a> {
     }
 }
 
-/*enum ForwardedPacket {
+pub enum ForwardedPacket {
     RelayedPacket {
-        _chunk: Box<[u8]>,
-        packet: &'a [u8],
-        next_hop: &'a [u8],
-        additional_relay_data: &'a [u8],
-        derived_secret: &'a [u8],
-        packet_tag: &'a [u8]
+        packet: Box<[u8]>,
+        next_node: PublicKey,
+        additional_info: Box<[u8]>,
+        derived_secret: Box<[u8]>,
+        packet_tag: Box<[u8]>
     },
     FinalNodePacket {
-        _chunk: Box<[u8]>,
-        plaintext: &'a [u8],
-        additional_data: &'a [u8],
-        derived_secret: &'a [u8],
-        packet_tag: &'a [u8]
+        plain_text: Box<[u8]>,
+        additional_data: Box<[u8]>,
+        derived_secret: Box<[u8]>,
+        packet_tag: Box<[u8]>
     }
-}*/
-
-pub enum ForwardedPacket {
-
 }
+
 
 pub fn forward_packet(private_key: &[u8], packet: &[u8], additional_data_relayer_len: usize,
                       additional_data_last_hop_len: usize, max_hops: usize) -> Result<ForwardedPacket> {
     let header_len = header_length(max_hops, additional_data_relayer_len, additional_data_last_hop_len);
     let decoded = PacketHeader::deserialize(packet, header_len);
 
-    SharedKeys::forward_transform(decoded.alpha, private_key);
-    todo!()
+    let shared_keys = SharedKeys::forward_transform(decoded.alpha, private_key)?;
+    let secret = shared_keys.secret(0);
+
+    let mut routing_info_mut: Vec<u8> = decoded.routing_info.into();
+    let fwd_header = forward_header(secret, &mut routing_info_mut, decoded.mac, max_hops,
+                                additional_data_relayer_len, additional_data_last_hop_len)?;
+
+    let prp = PRP::from_parameters(PRPParameters::new(secret));
+    let plain_text = prp.inverse(decoded.cipher_text)?;
+
+    match fwd_header {
+        ForwardedHeader::RelayNode { header, mac, next_node, additional_info } => {
+            let packet = PacketHeader {
+                alpha: &shared_keys.alpha(),
+                routing_info: &header,
+                mac: &mac,
+                cipher_text: &plain_text
+            };
+
+            Ok(RelayedPacket {
+                packet: packet.serialize(),
+                packet_tag: derive_packet_tag(secret)?,
+                derived_secret: secret.into(),
+                next_node, additional_info
+            })
+        }
+        ForwardedHeader::FinalNode { additional_data } => {
+            Ok(FinalNodePacket {
+                packet_tag: derive_packet_tag(secret)?,
+                derived_secret: secret.into(),
+                plain_text: remove_padding(&plain_text).ok_or(PacketDecodingError)?.into(),
+                additional_data
+            })
+        }
+    }
 }
 
 
@@ -147,14 +177,17 @@ impl Packet {
         assert!(!path.is_empty(), "path must not be empty");
 
         let shared_keys = SharedKeys::new(path)?;
-        let secrets = shared_keys.secrets();
 
-        let porv = ProofOfRelayValues::new(&secrets[0], secrets.get(1).map(|s| *s));
+        let porv = ProofOfRelayValues::new(shared_keys.secret(0),
+                                           (shared_keys.count_shared_keys() > 1).then_some(shared_keys.secret(1))
+        );
 
         let mut por_strings = Vec::with_capacity(path.len() - 1);
         for i in 0..path.len() - 1 {
             let has_other = i + 2 < path.len();
-            por_strings.push(ProofOfRelayString::new(secrets[i + 1], has_other.then_some(secrets[i + 2])).serialize())
+            por_strings.push(ProofOfRelayString::new(shared_keys.secret(i + 1),
+                                                     has_other.then_some(shared_keys.secret(i + 2)))
+                .serialize())
         }
 
         Ok(Self {
