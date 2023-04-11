@@ -116,17 +116,20 @@ pub fn pre_verify(secret: &[u8], por_bytes: &[u8], challenge: EthereumChallenge)
     }
 }
 
+/// Checks if the given acknowledgement solves the given challenge.
 pub fn validate_por_half_keys(ethereum_challenge: &EthereumChallenge, own_key: &HalfKey, ack: &HalfKey) -> bool {
-    Response::from_half_keys(own_key, ack).to_challenge().to_ethereum_challenge().eq(ethereum_challenge)
+    Response::from_half_keys(own_key, ack).to_challenge().to_ethereum_challenge() == ethereum_challenge
 }
 
+/// Checks if the given response solves the given challenge.
 pub fn validate_por_response(ethereum_challenge: &EthereumChallenge, response: &Response) -> bool {
-    response.to_challenge().to_ethereum_challenge().eq(ethereum_challenge)
+    response.to_challenge().to_ethereum_challenge() == ethereum_challenge
 }
 
+/// Checks if the given acknowledgement solves the given challenge.
 pub fn validate_por_hint(ethereum_challenge: &EthereumChallenge, own_share: &HalfKeyChallenge, ack: &HalfKey) -> bool {
     Challenge::from_own_share_and_half_key(own_share, ack)
-        .map(|c| c.to_ethereum_challenge().eq(ethereum_challenge))
+        .map(|c| c.to_ethereum_challenge() == ethereum_challenge)
         .unwrap_or(false)
 }
 
