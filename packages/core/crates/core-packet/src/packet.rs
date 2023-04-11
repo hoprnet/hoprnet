@@ -5,7 +5,8 @@ use core_crypto::prp::{PRP, PRPParameters};
 use core_crypto::routing::{forward_header, ForwardedHeader, header_length, RoutingInfo};
 use core_crypto::shared_keys::SharedKeys;
 use core_crypto::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, PublicKey};
-use core_types::channels::{AcknowledgementChallenge, Ticket};
+use core_types::acknowledgment::AcknowledgementChallenge;
+use core_types::channels::Ticket;
 use utils_types::traits::{BinarySerializable, PeerIdLike};
 use crate::errors::PacketError::PacketDecodingError;
 
@@ -242,9 +243,10 @@ impl Packet {
             match forward_packet(private_key, packet, POR_SECRET_LENGTH, 0, INTERMEDIATE_HOPS + 1)? {
                 RelayedPacket { derived_secret, additional_info, packet_tag, next_node, .. } => {
                     let ack_key = derive_ack_key_share(&derived_secret);
-                    let challenge = AcknowledgementChallenge::deserialize(pre_challenge,
-                                                                          ack_key.to_challenge(),
-                                                                          &previous_hop)?;
+                    let mut challenge = AcknowledgementChallenge::deserialize(pre_challenge)?;
+                    challenge.validate(ack_key.to_challenge(),
+                                       &previous_hop).then(|| ()).ok_or(PacketDecodingError)?;
+
                     let ticket = Ticket::deserialize(pre_ticket)?;
                     let verification_output = pre_verify(&derived_secret, &additional_info, &ticket.challenge)?;
                     Ok(Self {
@@ -266,9 +268,10 @@ impl Packet {
                 }
                 FinalNodePacket { packet_tag, plain_text, derived_secret, .. } => {
                     let ack_key = derive_ack_key_share(&derived_secret);
-                    let challenge = AcknowledgementChallenge::deserialize(pre_challenge,
-                                                                          ack_key.to_challenge(),
-                                                                          &previous_hop)?;
+                    let mut challenge = AcknowledgementChallenge::deserialize(pre_challenge)?;
+                    challenge.validate(ack_key.to_challenge(),
+                                       &previous_hop).then(|| ()).ok_or(PacketDecodingError)?;
+
                     let ticket = Ticket::deserialize(pre_ticket)?;
                     Ok(Self {
                         packet: packet.into(),
