@@ -8,13 +8,13 @@ use core_misc::constants::{
     DEFAULT_MAX_PARALLEL_CONNECTIONS, DEFAULT_MAX_PARALLEL_CONNECTION_PUBLIC_RELAY, DEFAULT_NETWORK_QUALITY_THRESHOLD,
 };
 
-pub const DEFAULT_API_HOST: &str = "localhost";
+pub const DEFAULT_API_HOST: &str = "127.0.0.1";
 pub const DEFAULT_API_PORT: u16 = 3001;
 
 pub const DEFAULT_HOST: &str = "0.0.0.0";
 pub const DEFAULT_PORT: u16 = 9091;
 
-pub const DEFAULT_HEALTH_CHECK_HOST: &str = "localhost";
+pub const DEFAULT_HEALTH_CHECK_HOST: &str = "127.0.0.1";
 pub const DEFAULT_HEALTH_CHECK_PORT: u16 = 8080;
 
 pub const MINIMAL_API_TOKEN_LENGTH: usize = 8;
@@ -81,7 +81,7 @@ pub enum Auth {
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Validate, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Api {
-    pub enabled: bool,
+    pub enable: bool,
     /// Auth enum holding the API auth configuration
     ///
     /// The auth enum cannot be made public due to incompatibility with the wasm_bindgen.
@@ -108,7 +108,7 @@ impl Api {
 impl Default for Api {
     fn default() -> Self {
         Self {
-            enabled: false,
+            enable: false,
             auth: Auth::Token("".to_owned()),
             host: Host {
                 ip: DEFAULT_API_HOST.to_string(),
@@ -121,7 +121,7 @@ impl Default for Api {
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct HealthCheck {
-    pub enabled: bool,
+    pub enable: bool,
     pub host: String,
     pub port: u16,
 }
@@ -129,7 +129,7 @@ pub struct HealthCheck {
 impl Default for HealthCheck {
     fn default() -> Self {
         Self {
-            enabled: false,
+            enable: false,
             host: DEFAULT_HEALTH_CHECK_HOST.to_string(),
             port: DEFAULT_HEALTH_CHECK_PORT,
         }
@@ -198,7 +198,7 @@ impl Default for Chain {
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct Strategy {
     // TODO: implement checks
-    pub name: Option<String>,
+    pub name: String,
     pub max_auto_channels: Option<u32>,
     pub auto_redeem_tickets: bool,
 }
@@ -206,7 +206,7 @@ pub struct Strategy {
 impl Default for Strategy {
     fn default() -> Self {
         Self {
-            name: Some("passive".to_owned()),
+            name: "passive".to_owned(),
             max_auto_channels: None,
             auto_redeem_tickets: true,
         }
@@ -241,14 +241,18 @@ pub(crate) fn validate_private_key(s: &str) -> Result<(), ValidationError> {
     }
 }
 
+fn validate_optional_private_key(s: &String) -> Result<(), ValidationError> {
+    validate_private_key(s.as_str())
+}
+
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct Identity {
     pub file: String,
     #[validate(custom = "validate_password")]
     pub password: String,
-    #[validate(custom = "validate_private_key")]
-    pub private_key: String,
+    #[validate(custom = "validate_optional_private_key")]
+    pub private_key: Option<String>,
 }
 
 impl std::fmt::Debug for Identity {
@@ -278,8 +282,8 @@ fn validate_directory_path(s: &str) -> Result<(), ValidationError> {
 pub struct Db {
     /// Path to the directory containing the database
     pub data: String,
-    pub init: bool,
-    pub force_init: bool,
+    pub initialize: bool,
+    pub force_initialize: bool,
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
@@ -368,18 +372,18 @@ impl HoprdConfig {
         // db
         cfg.db.data = cli_args.data;
         if let Some(x) = cli_args.init {
-            cfg.db.init = x
+            cfg.db.initialize = x
         };
         if let Some(x) = cli_args.force_init {
-            cfg.db.force_init = x
+            cfg.db.force_initialize = x
         };
 
         // api
         if let Some(x) = cli_args.api {
-            cfg.api.enabled = x
+            cfg.api.enable = x
         };
         if let Some(x) = cli_args.disable_api_authentication {
-            if !x {
+            if x {
                 if &cfg.api.auth != &Auth::None {
                     cfg.api.auth = Auth::None;
                 }
@@ -427,7 +431,7 @@ impl HoprdConfig {
 
         // healthcheck
         if let Some(x) = cli_args.health_check {
-            cfg.healthcheck.enabled = x
+            cfg.healthcheck.enable = x
         };
         if let Some(x) = cli_args.health_check_host {
             cfg.healthcheck.host = x
@@ -442,12 +446,12 @@ impl HoprdConfig {
             cfg.identity.password = x
         };
         if let Some(x) = cli_args.private_key {
-            cfg.identity.private_key = x
+            cfg.identity.private_key = Some(x)
         };
 
         // strategy
         if let Some(x) = cli_args.default_strategy {
-            cfg.strategy.name = Some(x)
+            cfg.strategy.name = x
         };
         if let Some(x) = cli_args.max_auto_channels {
             cfg.strategy.max_auto_channels = Some(x)
@@ -508,8 +512,15 @@ pub mod wasm {
     #[wasm_bindgen]
     impl HoprdConfig {
         #[wasm_bindgen]
-        pub fn as_string(&self) -> String {
-            let output = serde_json::to_string(&self);
+        pub fn as_redacted_string(&self) -> String {
+            // redacting sensitive information
+            let mut redacted_cfg = self.clone();
+            if let Some(_) = redacted_cfg.identity.private_key {
+                redacted_cfg.identity.private_key = Some("<REDACTED>".to_owned());
+            }
+            redacted_cfg.identity.password = "<REDACTED>".to_owned();
+
+            let output = serde_json::to_string(&redacted_cfg);
             match output {
                 Ok(o) => o,
                 Err(e) => e.to_string(),
@@ -518,8 +529,9 @@ pub mod wasm {
     }
 
     #[wasm_bindgen]
-    pub fn fetch_configuration(cli_args: crate::cli::CliArgs) -> Result<JsValue, JsValue> {
-        let cfg = HoprdConfig::from_cli_args(cli_args, false);
+    pub fn fetch_configuration(cli_args: JsValue) -> Result<JsValue, JsValue> {
+        let args: crate::cli::CliArgs = serde_wasm_bindgen::from_value(cli_args)?;
+        let cfg = HoprdConfig::from_cli_args(args, false).map_err(|e| wasm_bindgen::JsValue::from(e.to_string()))?;
         ok_or_jserr!(serde_wasm_bindgen::to_value(&cfg))
     }
 }
@@ -540,20 +552,20 @@ mod tests {
             identity: Identity {
                 file: "identity".to_string(),
                 password: "".to_owned(),
-                private_key: "".to_owned(),
+                private_key: Some("".to_owned()),
             },
             strategy: Strategy {
-                name: None,
+                name: "passive".to_owned(),
                 max_auto_channels: None,
                 auto_redeem_tickets: true,
             },
             db: Db {
                 data: "/tmp/db".to_owned(),
-                init: false,
-                force_init: false,
+                initialize: false,
+                force_initialize: false,
             },
             api: Api {
-                enabled: false,
+                enable: false,
                 auth: Auth::None,
                 host: Host {
                     ip: "127.0.0.1".to_string(),
@@ -573,7 +585,7 @@ mod tests {
                 network_quality_threshold: 0.0,
             },
             healthcheck: HealthCheck {
-                enabled: false,
+                enable: false,
                 host: "127.0.0.1".to_string(),
                 port: 0,
             },
@@ -603,16 +615,16 @@ identity:
   private_key: ''
 db:
   data: /tmp/db
-  init: false
-  force_init: false
+  initialize: false
+  force_initialize: false
 api:
-  enabled: false
+  enable: false
   auth: None
   host:
     ip: 127.0.0.1
     port: 1233
 strategy:
-  name: null
+  name: passive
   max_auto_channels: null
   auto_redeem_tickets: true
 heartbeat:
@@ -626,7 +638,7 @@ network:
   max_parallel_connections: 0
   network_quality_threshold: 0.0
 healthcheck:
-  enabled: false
+  enable: false
   host: 127.0.0.1
   port: 0
 environment: testing

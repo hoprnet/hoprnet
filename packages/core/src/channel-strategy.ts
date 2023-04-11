@@ -26,7 +26,7 @@ export { StrategyTickResult } from '../lib/core_strategy.js'
 import { ChannelStatus } from '@hoprnet/hopr-utils'
 
 const STRATEGIES = ['passive', 'promiscuous', 'random']
-export type Strategy = (typeof STRATEGIES)[number]
+export type Strategy = typeof STRATEGIES[number]
 
 export function isStrategy(str: string): str is Strategy {
   return STRATEGIES.includes(str)
@@ -132,7 +132,7 @@ class RustStrategyWrapper<T extends RustStrategyInterface> extends SaneDefaults 
   }
 
   configure(settings: any) {
-    for (const [key, value] of Object.entries(settings.strategy)) {
+    for (const [key, value] of Object.entries(settings)) {
       if (key in this.strategy) {
         this.strategy[key] = value
       }

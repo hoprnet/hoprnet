@@ -1106,14 +1106,12 @@ dependencies = [
  "mockall",
  "more-asserts",
  "rand 0.8.5",
- "scopeguard 1.1.0",
  "serde",
  "thiserror",
  "utils-log",
  "utils-metrics",
  "utils-misc",
  "utils-types",
- "scopeguard 1.1.0",
  "validator",
  "wasm-bindgen",
  "wasm-bindgen-futures",
@@ -2543,7 +2541,7 @@ dependencies = [
  "serde-wasm-bindgen 0.4.5",
  "serde_json",
  "serde_yaml",
- "tempfile 3.3.0",
+ "tempfile 3.5.0",
  "thiserror",
  "utils-log",
  "utils-misc",
@@ -2771,6 +2769,12 @@ dependencies = [
  "unicode-bidi",
  "unicode-normalization",
 ]
+
+[[package]]
+name = "if_chain"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cb56e1aa765b4b4f3aadfab769793b7087bb03a4ea4920644a6d238e2df5b9ed"
 
 [[package]]
 name = "impl-codec"
@@ -4749,7 +4753,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f82e6c8c047aa50a7328632d067bcae6ef38772a79e28daf32f735e0e4f3dd10"
 dependencies = [
  "indexmap",
- "itoa 1.0.5",
+ "itoa 1.0.6",
  "ryu",
  "serde",
  "unsafe-libyaml",
@@ -5665,7 +5669,6 @@ dependencies = [
  "getrandom 0.2.8",
 ]
 
-
 [[package]]
 name = "validator"
 version = "0.16.0"
@@ -5694,7 +5697,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "regex",
- "syn",
+ "syn 1.0.109",
  "validator_types",
 ]
 
@@ -5705,7 +5708,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "111abfe30072511849c5910134e8baf8dc05de4c0e5903d681cbd5c9c4d611e3"
 dependencies = [
  "proc-macro2",
- "syn",
+ "syn 1.0.109",
 ]
 
 [[package]]

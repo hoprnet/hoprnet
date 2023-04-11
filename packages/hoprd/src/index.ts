@@ -77,7 +77,7 @@ function generateNodeOptions(cfg: HoprdConfig, environment: ResolvedEnvironment)
   }
 
   let options: HoprOptions = {
-    createDbIfNotExist: cfg.db.init,
+    createDbIfNotExist: cfg.db.initialize,
     announce: cfg.network.announce,
     dataPath: cfg.db.data,
     hosts: { ip4: cfg.host },
@@ -100,7 +100,7 @@ function generateNodeOptions(cfg: HoprdConfig, environment: ResolvedEnvironment)
     },
     password: cfg.identity.password,
     strategy,
-    forceCreateDB: cfg.db.force_init
+    forceCreateDB: cfg.db.force_initialize
   }
 
   if (isStrategy(cfg.strategy.name)) {
@@ -218,13 +218,15 @@ async function main() {
   const argv = parseCliArguments(process.argv.slice(1))
   let cfg: HoprdConfig
   try {
-    cfg = fetch_configuration(argv) as HoprdConfig
+    cfg = fetch_configuration(argv as CliArgs) as HoprdConfig
   } catch (err) {
     console.error(err)
     process.exit(1)
   }
 
-  console.log('Node configuration: ' + cfg.as_string())
+  console.log('Node configuration:')
+  console.log(cfg.as_redacted_string())
+
   if (argv.dry_run) {
     process.exit(0)
   }
@@ -255,11 +257,11 @@ async function main() {
 
     // 1. Find or create an identity
     const peerId = await getIdentity({
-      initialize: cfg.db.init,
+      initialize: cfg.db.initialize,
       idPath: cfg.identity.file,
       password: cfg.identity.password,
       useWeakCrypto: cfg.test.use_weak_crypto,
-      privateKey: parse_private_key(cfg.identity.private_key)
+      privateKey: cfg.identity.private_key === undefined ? undefined : parse_private_key(cfg.identity.private_key)
     })
 
     // 2. Create node instance
@@ -290,9 +292,9 @@ async function main() {
         }
       )
       // start API server only if API flag is true
-      if (cfg.api.enabled) startApiListen()
+      if (cfg.api.enable) startApiListen()
 
-      if (cfg.healthcheck.enabled) {
+      if (cfg.healthcheck.enable) {
         setupHealthcheck(node, logs, cfg.healthcheck.host, cfg.healthcheck.port)
       }
 

@@ -87,7 +87,7 @@ fn parse_api_token(mut s: &str) -> Result<String, String> {
 /// Takes all CLI arguments whose structure is known at compile-time.
 /// Arguments whose structure, e.g. their default values depend on
 /// file contents need be specified using `clap`s builder API
-#[derive(Serialize, Args, Clone)]
+#[derive(Serialize, Deserialize, Args, Clone)]
 #[command(about = "HOPRd")]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct CliArgs {
