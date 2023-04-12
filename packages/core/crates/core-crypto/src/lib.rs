@@ -1,3 +1,4 @@
+pub mod checksum;
 pub mod derivation;
 pub mod errors;
 pub mod iterated_hash;
