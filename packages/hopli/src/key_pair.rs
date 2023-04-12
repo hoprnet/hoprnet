@@ -100,7 +100,7 @@ pub fn read_identities(
 /// * `dir_name` - Directory to the storage of an identity file
 /// * `password` - Password to encrypt the identity file
 /// * `name` - Prefix of identity files.
-pub fn create_identity(dir_name: &str, password: &str, name: &Option<String>) -> Result<Address, std::io::Error> {
+pub fn create_identity(dir_name: &str, password: &str, name: &Option<String>) -> Result<NodeIdentity, std::io::Error> {
     // create dir if not exist
     fs::create_dir_all(dir_name)?;
 
@@ -127,7 +127,7 @@ pub fn create_identity(dir_name: &str, password: &str, name: &Option<String>) ->
         .map_err(|err| println!("{:?}", err))
         .ok();
 
-    Ok(wallet.address())
+    Ok(NodeIdentity::new(wallet))
 }
 
 #[cfg(test)]
@@ -152,11 +152,14 @@ mod tests {
     fn read_identities_from_directory_with_id_files() {
         let path = "./tmp_1";
         let pwd = "password";
-        create_identity(path, pwd, &None).unwrap();
-        match read_identities(path, &pwd.to_string(), &None) {
-            Ok(val) => assert_eq!(val.len(), 1),
-            _ => assert!(false),
-        }
+        let created_id = create_identity(path, pwd, &None).unwrap();
+
+        // created and the read id is identical
+        let read_id = read_identities(path, &pwd.to_string(), &None).unwrap();
+        assert_eq!(read_id.len(), 1);
+        assert_eq!(read_id[0].ethereum_address, created_id.ethereum_address);
+        assert_eq!(read_id[0].peer_id, created_id.peer_id);
+
         remove_json_keystore(path).map_err(|err| println!("{:?}", err)).ok();
     }
 

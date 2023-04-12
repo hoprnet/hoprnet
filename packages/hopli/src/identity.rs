@@ -79,10 +79,10 @@ impl IdentityArgs {
             Err(e) => return Err(e),
         };
 
+        let mut node_identities = Vec::new();
+
         match action {
             IdentityActionType::Create => {
-                let mut addresses = Vec::new();
-
                 for _n in 1..=number {
                     // build file name
                     let id_name = match name {
@@ -94,25 +94,21 @@ impl IdentityArgs {
                     };
 
                     match create_identity(&directory, &pwd, &id_name) {
-                        Ok(addr) => addresses.push(addr),
+                        Ok(identity) => node_identities.push(identity),
                         Err(_) => return Err(HelperErrors::UnableToCreateIdentity),
                     }
                 }
-                println!("Addresses from identities: {:?}", addresses);
-                Ok(())
             }
             IdentityActionType::Read => {
-                let mut node_identities = Vec::new();
-
                 // read ids
                 match read_identities(&directory, &pwd, &name) {
                     Ok(identities) => node_identities.extend(identities),
                     Err(_) => return Err(HelperErrors::UnableToReadIdentity),
                 }
-                println!("Identities: {:?}", node_identities);
-                Ok(())
             }
         }
+        println!("Identities: {:?}", node_identities);
+        Ok(())
     }
 }
 
