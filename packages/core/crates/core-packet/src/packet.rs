@@ -226,7 +226,7 @@ impl Packet {
         ticket.challenge = porv.ticket_challenge.to_ethereum_challenge();
 
         Ok(Self {
-            challenge: AcknowledgementChallenge::new(porv.ack_challenge.clone(), private_key),
+            challenge: AcknowledgementChallenge::new(&porv.ack_challenge, private_key),
             packet: encode_packet(shared_keys, msg, path, INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, &por_strings
                 .iter()
                 .map(|pors| pors.as_ref())
@@ -296,11 +296,22 @@ impl Packet {
         }
     }
 
+    pub fn forward(&mut self, private_key: &[u8], next_ticket: Ticket) {
+        match &mut self.state {
+            Forwarded { old_challenge, ack_challenge, .. } => {
+                let _ = old_challenge.insert(self.challenge.clone());
+                self.challenge = AcknowledgementChallenge::new(ack_challenge, private_key);
+                self.ticket = next_ticket;
+            }
+            _ => panic!("invalid packet state")
+        }
+    }
+
     pub fn create_acknowledgement(&self, private_key: &[u8]) -> Option<Acknowledgement> {
         match &self.state {
             Final { ack_key, old_challenge, .. } |
             Forwarded { ack_key, old_challenge, .. } => {
-              Some(Acknowledgement::new(self.old_challenge.unwrap_or(self.challenge.clone())
+              Some(Acknowledgement::new(old_challenge.clone().unwrap_or(self.challenge.clone())
                                         , ack_key.clone(), private_key))
             },
             Outgoing { .. } => None
@@ -351,7 +362,7 @@ mod tests {
     }
 
     fn mock_ticket(next_peer: &PeerId, path_len: usize, private_key: &[u8]) -> Ticket {
-
+        todo!()
     }
 
     #[test]
@@ -359,10 +370,10 @@ mod tests {
         const AMOUNT: usize = INTERMEDIATE_HOPS + 1;
         let mut keypairs = (0 .. AMOUNT)
             .map(|_| Keypair::generate_secp256k1())
-            .map(|kp| (kp.into_secp256k1().unwrap().secret().to_bytes(), kp.public().to_peer_id()))
+            .map(|kp| (kp.clone().into_secp256k1().unwrap().secret().to_bytes(), kp.public().to_peer_id()))
             .collect::<Vec<_>>();
 
-        let (private_key, public_key) = keypairs.drain(1)
+        let (private_key, public_key) = keypairs.drain(..1)
             .map(|kp| (kp.0, PublicKey::from_peerid(&kp.1).unwrap()))
             .last()
             .unwrap();
@@ -376,21 +387,29 @@ mod tests {
         let ticket = mock_ticket(&keypairs[0].1, keypairs.len(), &private_key);
 
         let test_message = b"some testing message";
-        let mut packet = Packet::new(&test_message, path, &private_key, ticket)
+        let mut packet = Packet::new(test_message, path, &private_key, ticket)
             .expect("failed to construct packet");
 
+        match &packet.state() {
+            PacketState::Outgoing { .. } => {},
+            _ => panic!("invalid packet initial state")
+        }
+
         for (i, (node_private, node_id)) in keypairs.iter().enumerate() {
-            let sender = if i == 0 { &public_key.to_peerid() } else { &path[i - 1] };
-            packet = Packet::deserialize(&packet.serialize(), node_private, sender)
-                .expect(format!("failed to deserialize packet at hop {}", i).into());
+            let sender = if i == 0 { public_key.to_peerid() } else { path[i - 1].clone() };
+            packet = Packet::deserialize(&packet.serialize(), node_private, &sender)
+                .expect(&format!("failed to deserialize packet at hop {}", i));
 
             match packet.state() {
                 PacketState::Final { plain_text, .. } => {
                     assert_eq!(path.len() - 1, i);
-                    assert_eq!(test_message, plain_text);
+                    assert_eq!(&test_message, &plain_text.as_ref());
                 }
-                PacketState::Forwarded { .. } => {}
-                PacketState::Outgoing { .. } => {}
+                PacketState::Forwarded { .. } => {
+                    let ticket = mock_ticket(&node_id, keypairs.len() - 1, node_private);
+                    packet.forward(node_private, ticket);
+                }
+                PacketState::Outgoing { .. } => panic!("invalid packet state")
             }
         }
     }

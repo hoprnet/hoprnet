@@ -397,12 +397,6 @@ pub struct PublicKey {
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl PublicKey {
-    /// Generates new random keypair (private key, public key)
-    pub fn random_keypair() -> (Box<[u8]>, Self) {
-        let (private, cp) = random_group_element();
-        (private, PublicKey::try_from(cp).unwrap())
-    }
-
     /// Generates a new random public key.
     /// Because the corresponding private key is discarded, this might be useful only for testing purposes.
     pub fn random() -> Self {
@@ -489,6 +483,12 @@ impl PublicKey {
 
     /// Size of the uncompressed public key in bytes
     pub const SIZE_UNCOMPRESSED: usize = 65;
+
+    /// Generates new random keypair (private key, public key)
+    pub fn random_keypair() -> (Box<[u8]>, PublicKey) {
+        let (private, cp) = random_group_element();
+        (private, PublicKey::try_from(cp).unwrap())
+    }
 
     pub fn deserialize(data: &[u8]) -> utils_types::errors::Result<Self> {
         if data.len() == Self::SIZE_COMPRESSED || data.len() == Self::SIZE_UNCOMPRESSED {

@@ -99,9 +99,9 @@ fn hash_challenge(challenge: &HalfKeyChallenge) -> Box<[u8]> {
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl AcknowledgementChallenge {
-    pub fn new(ack_challenge: HalfKeyChallenge, private_key: &[u8]) -> Self {
+    pub fn new(ack_challenge: &HalfKeyChallenge, private_key: &[u8]) -> Self {
         let hash = hash_challenge(&ack_challenge);
-        Self { ack_challenge: Some(ack_challenge), signature: Signature::sign_hash(&hash, private_key) }
+        Self { ack_challenge: Some(ack_challenge.clone()), signature: Signature::sign_hash(&hash, private_key) }
     }
 
     pub fn solve(&self, secret: &[u8]) -> bool {
