@@ -147,6 +147,176 @@ function deserializePendingAcknowledgement(data: Uint8Array): PendingAckowledgem
   }
 }
 
+export async function newLevelDb(publicKey: string, dbPath: string, environmentId: string, initialize: boolean, forceCreate: boolean = false): Promise<LevelDb> {
+  let leveldb = new LevelDb(publicKey)
+  await leveldb.init(initialize, dbPath, forceCreate, environmentId)
+  return leveldb
+}
+
+export class LevelDb {
+  private db: LevelUp
+  private id: PublicKey
+
+  constructor(publicKey: string) {
+    this.id = PublicKey.fromString(publicKey)
+  }
+
+  async init(initialize: boolean, dbPath: string, forceCreate: boolean = false, environmentId: string) {
+    let setEnvironment = false
+
+    log(`using db at ${dbPath}`)
+    if (forceCreate) {
+      log('force create - wipe old database and create a new')
+      await rm(dbPath, { recursive: true, force: true })
+      await mkdir(dbPath, { recursive: true })
+      setEnvironment = true
+    } else {
+      let exists = false
+
+      try {
+        exists = !(await stat(dbPath)).isDirectory()
+      } catch (err: any) {
+        if (err.code === 'ENOENT') {
+          exists = false
+        } else {
+          // Unexpected error, therefore throw it
+          throw err
+        }
+      }
+
+      if (!exists) {
+        log('db directory does not exist, creating?:', initialize)
+        if (initialize) {
+          await mkdir(dbPath, { recursive: true })
+          setEnvironment = true
+        } else {
+          throw new Error(`Database does not exist: ${dbPath}`)
+        }
+      }
+    }
+
+    // CommonJS / ESM issue
+    // @ts-ignore
+    this.db = levelup(leveldown(dbPath))
+
+    // Fully initialize database
+    await this.db.open()
+
+    log(`namespacing db by public key: ${this.id.toCompressedPubKeyHex()}`)
+    if (setEnvironment) {
+      log(`setting environment id ${environmentId} to db`)
+      await this.setEnvironmentId(environmentId)
+    } else {
+      const hasEnvironmentKey = await this.verifyEnvironmentId(environmentId)
+
+      if (!hasEnvironmentKey) {
+        const storedId = await this.getEnvironmentId()
+
+        throw new Error(`invalid db environment id: ${storedId} (expected: ${environmentId})`)
+      }
+    }
+  }
+
+  public async has(key: Uint8Array): Promise<boolean> {
+    try {
+      await this.db.get(Buffer.from(this.keyOf(key)))
+
+      return true
+    } catch (err) {
+      if (err.type === 'NotFoundError' || err.notFound) {
+        return false
+      } else {
+        throw err
+      }
+    }
+  }
+
+  protected async put(key: Uint8Array, value: Uint8Array): Promise<void> {
+    const keyU8a = this.keyOf(key)
+    await this.db.put(
+        Buffer.from(keyU8a.buffer, keyU8a.byteOffset, keyU8a.byteLength),
+        Buffer.from(value.buffer, value.byteOffset, value.byteLength)
+    )
+  }
+
+  protected async get(key: Uint8Array): Promise<Uint8Array> {
+    const keyU8a = this.keyOf(key)
+    const value = await this.db.get(Buffer.from(keyU8a.buffer, keyU8a.byteOffset, keyU8a.byteLength))
+
+    return new Uint8Array(value.buffer, value.byteOffset, value.byteLength)
+  }
+
+  public dump(destFile: string) {
+    log(`Dumping current database to ${destFile}`)
+    let dumpFile = fs.createWriteStream(destFile, { flags: 'a' })
+    this.db
+        .createReadStream({ keys: true, keyAsBuffer: true, values: true, valueAsBuffer: true })
+        .on('data', (d) => {
+          // Skip the public key prefix in each key
+          let key = (d.key as Buffer).subarray(PublicKey.SIZE_COMPRESSED)
+          let keyString = ''
+          let isHex = false
+          let sawDelimiter = false
+          for (const b of key) {
+            if (!sawDelimiter && b >= 32 && b <= 126) {
+              // Print sequences of ascii chars normally
+              let cc = String.fromCharCode(b)
+              keyString += (isHex ? ' ' : '') + cc
+              isHex = false
+              // Once a delimiter is encountered, always print as hex since then
+              sawDelimiter = sawDelimiter || cc == '-' || cc == ':'
+            } else {
+              // Print sequences of non-ascii chars as hex
+              keyString += (!isHex ? '0x' : '') + (b as number).toString(16)
+              isHex = true
+            }
+          }
+          dumpFile.write(keyString + ':' + d.value.toString('hex') + '\n')
+        })
+        .on('end', function () {
+          dumpFile.close()
+        })
+  }
+
+  public async remove(key: Uint8Array): Promise<void> {
+    const keyU8a = this.keyOf(key)
+    await this.db.del(Buffer.from(keyU8a.buffer, keyU8a.byteOffset, keyU8a.byteLength))
+  }
+
+  private keyOf(...segments: Uint8Array[]): Uint8Array {
+    return u8aConcat(this.id.serializeCompressed(), ...segments)
+  }
+
+  private async maybeGet(key: Uint8Array): Promise<Uint8Array | undefined> {
+    try {
+      return await this.get(key)
+    } catch (err) {
+      if (err.type === 'NotFoundError' || err.notFound) {
+        return undefined
+      }
+      throw err
+    }
+  }
+
+  public async setEnvironmentId(environment_id: string): Promise<void> {
+    await this.put(ENVIRONMENT_KEY, encoder.encode(environment_id))
+  }
+
+  public async getEnvironmentId(): Promise<string> {
+    return decoder.decode(await this.maybeGet(ENVIRONMENT_KEY))
+  }
+
+  public async verifyEnvironmentId(expectedId: string): Promise<boolean> {
+    const storedId = await this.getEnvironmentId()
+
+    if (storedId == undefined) {
+      return false
+    }
+
+    return storedId === expectedId
+  }
+}
+
 export class HoprDB {
   private db: LevelUp
 

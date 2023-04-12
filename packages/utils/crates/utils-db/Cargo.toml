@@ -1,5 +1,5 @@
 [package]
-name = "utils-storage"
+name = "utils-db"
 version = "0.1.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
@@ -10,16 +10,19 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 default = ["console_error_panic_hook", "wasm"]
-wasm = ["dep:wasm-bindgen"]
+wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys"]
 
 [dependencies]
-pickledb = "0.5.1"      # pure Rust
-serde = { version = "1.0", features = ["derive"] }      # pickledb
+async-trait = "0.1"
+serde = { version = "1.0", features = ["derive"] }
+js-sys = { version = "0.3.60", optional = true }
 wasm-bindgen = { workspace = true, optional = true }
+wasm-bindgen-futures = { version = "0.4.33", optional = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }
 #wee_alloc = { version = "0.4.5", optional = true }
 
 [dev-dependencies]
 scopeguard = "1.1.0"
+async-std = { version = "1.12.0", features = ["attributes"] }
 tempfile = "3.5.0"
 wasm-bindgen-test = "0.3.34"

@@ -1,8 +1,11 @@
-pub mod storage;
+pub mod hashmap;
+pub mod traits;
+pub mod leveldb;
+
+pub use traits::KVStorage;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-
     use wasm_bindgen::prelude::*;
 
     // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global allocator.

@@ -1026,6 +1026,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "core-db"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "console_error_panic_hook",
+ "core-crypto",
+ "utils-db",
+ "utils-misc",
+ "wasm-bindgen",
+ "wasm-bindgen-test",
+ "wasm-opt",
+ "wasm-pack",
+]
+
+[[package]]
 name = "core-ethereum-misc"
 version = "0.1.0"
 dependencies = [
@@ -3774,16 +3789,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pickledb"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c53a5ade47760e8cc4986bdc5e72daeffaaaee64cbc374f9cfe0a00c1cd87b1f"
-dependencies = [
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "pin-project"
 version = "1.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5621,6 +5626,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "711b9620af191e0cdc7468a8d14e709c3dcdb115b36f838e601583af800a370a"
 
 [[package]]
+name = "utils-db"
+version = "0.1.0"
+dependencies = [
+ "async-std",
+ "async-trait",
+ "console_error_panic_hook",
+ "js-sys",
+ "serde",
+ "tempfile 3.5.0",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "wasm-bindgen-test",
+]
+
+[[package]]
 name = "utils-log"
 version = "0.1.0"
 dependencies = [
@@ -5672,19 +5692,6 @@ version = "1.0.0"
 dependencies = [
  "quote",
  "wasm-bindgen-macro-support",
-]
-
-[[package]]
-name = "utils-storage"
-version = "0.1.0"
-dependencies = [
- "console_error_panic_hook",
- "pickledb",
- "scopeguard 1.1.0",
- "serde",
- "tempfile 3.5.0",
- "wasm-bindgen",
- "wasm-bindgen-test",
 ]
 
 [[package]]
