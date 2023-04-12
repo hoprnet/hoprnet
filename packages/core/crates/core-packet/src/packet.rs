@@ -343,11 +343,10 @@ impl Packet {
 
 #[cfg(test)]
 mod tests {
-    use std::ops::Mul;
     use libp2p_identity::{Keypair, PeerId};
-    use core_crypto::types::{Challenge, PublicKey};
+    use core_crypto::types::PublicKey;
     use core_types::channels::Ticket;
-    use utils_types::primitives::{Address, Balance, BalanceType, U256};
+    use utils_types::primitives::{Balance, BalanceType, U256};
     use utils_types::traits::PeerIdLike;
     use crate::packet::{add_padding, INTERMEDIATE_HOPS, Packet, PacketState, PADDING_TAG, remove_padding};
 
