@@ -397,11 +397,17 @@ pub struct PublicKey {
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl PublicKey {
+    /// Generates new random keypair (private key, public key)
+    pub fn random_keypair() -> (Box<[u8]>, Self) {
+        let (private, cp) = random_group_element();
+        (private, PublicKey::try_from(cp).unwrap())
+    }
+
     /// Generates a new random public key.
     /// Because the corresponding private key is discarded, this might be useful only for testing purposes.
     pub fn random() -> Self {
-        let (_, cp) = random_group_element();
-        PublicKey::try_from(cp).unwrap()
+        let (_, pk) = Self::random_keypair();
+        pk
     }
 
     /// Converts the public key to an Ethereum address

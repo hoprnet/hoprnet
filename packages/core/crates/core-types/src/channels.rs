@@ -196,7 +196,7 @@ impl Ticket {
     }
 
     /// Creates a new Ticket given the raw Challenge and signs it using the given key.
-    pub fn create(
+    pub fn new(
         counterparty: Address,
         challenge: Challenge,
         epoch: U256,
@@ -232,8 +232,8 @@ impl Ticket {
     }
 
     /// Convenience method for creating a zero-hop ticket
-    pub fn create_zero_hop(destination: PublicKey, challenge: Challenge, private_key: &[u8]) -> Self {
-        Self::create(destination.to_address(),
+    pub fn new_zero_hop(destination: PublicKey, challenge: Challenge, private_key: &[u8]) -> Self {
+        Self::new(destination.to_address(),
                      challenge,
                      U256::zero(),
                      U256::zero(),
@@ -404,7 +404,7 @@ pub mod tests {
         ))
         .unwrap();
 
-        let ticket1 = Ticket::create(
+        let ticket1 = Ticket::new(
             Address::new(&[0u8; Address::SIZE]),
             Challenge { curve_point },
             U256::new("1"),
@@ -505,7 +505,7 @@ pub mod wasm {
     #[wasm_bindgen]
     impl Ticket {
         #[wasm_bindgen(constructor)]
-        pub fn new(
+        pub fn _new(
             counterparty: Address,
             challenge: EthereumChallenge,
             epoch: U256,

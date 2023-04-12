@@ -5,7 +5,7 @@ use core_crypto::prp::{PRP, PRPParameters};
 use core_crypto::routing::{forward_header, ForwardedHeader, header_length, RoutingInfo};
 use core_crypto::shared_keys::SharedKeys;
 use core_crypto::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, PublicKey};
-use core_types::acknowledgment::AcknowledgementChallenge;
+use core_types::acknowledgment::{Acknowledgement, AcknowledgementChallenge};
 use core_types::channels::Ticket;
 use utils_types::traits::{BinarySerializable, PeerIdLike};
 use crate::errors::PacketError::PacketDecodingError;
@@ -15,17 +15,22 @@ use crate::errors::Result;
 use crate::packet::ForwardedPacket::{FinalNodePacket, RelayedPacket};
 use crate::packet::PacketState::{Final, Forwarded, Outgoing};
 
-pub const INTERMEDIATE_HOPS: usize = 3; // 3 relayers and 1 destination
+/// Number of intermediate hops: 3 relayers and 1 destination
+pub const INTERMEDIATE_HOPS: usize = 3;
+
+/// Maximum size of the packet payload
 pub const PAYLOAD_SIZE: usize = 500;
+
+/// Length of the packet including header and the payload
+pub const PACKET_LENGTH: usize = packet_length(INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0);
+
+/// Tag used to separate padding from data
+const PADDING_TAG: &[u8] = b"HOPR";
 
 pub const fn packet_length(max_hops: usize, additional_data_relayer_len: usize, additional_data_last_hop_len: usize) -> usize {
     PublicKey::SIZE_COMPRESSED + header_length(max_hops, additional_data_relayer_len, additional_data_last_hop_len) +
         SimpleMac::SIZE + PAYLOAD_SIZE
 }
-
-pub const PACKET_LENGTH: usize = packet_length(INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0);
-
-const PADDING_TAG: &[u8] = b"HOPR";
 
 fn add_padding(msg: &[u8]) -> Box<[u8]> {
     assert!(msg.len() <= PAYLOAD_SIZE - PADDING_TAG.len(), "message too long for padding");
@@ -103,7 +108,7 @@ impl<'a> PacketHeader<'a> {
     }
 }
 
-pub enum ForwardedPacket {
+enum ForwardedPacket {
     RelayedPacket {
         packet: Box<[u8]>,
         next_node: PublicKey,
@@ -119,7 +124,7 @@ pub enum ForwardedPacket {
     }
 }
 
-pub fn forward_packet(private_key: &[u8], packet: &[u8], additional_data_relayer_len: usize,
+fn forward_packet(private_key: &[u8], packet: &[u8], additional_data_relayer_len: usize,
                       additional_data_last_hop_len: usize, max_hops: usize) -> Result<ForwardedPacket> {
     let header_len = header_length(max_hops, additional_data_relayer_len, additional_data_last_hop_len);
     let decoded = PacketHeader::deserialize(packet, header_len);
@@ -161,11 +166,6 @@ pub fn forward_packet(private_key: &[u8], packet: &[u8], additional_data_relayer
     }
 }
 
-/// Information on a packet that is being forwarded
-pub struct IntermediatePacketInfo {
-
-}
-
 /// Indicates if the packet is supposed to be forwarded to the next hop or if it is intended for us.
 pub enum PacketState {
     /// Packet is intended for us
@@ -174,6 +174,7 @@ pub enum PacketState {
         ack_key: HalfKey,
         previous_hop: PublicKey,
         plain_text: Box<[u8]>,
+        old_challenge: Option<AcknowledgementChallenge>,
     },
     /// Packet must be forwarded
     Forwarded {
@@ -185,7 +186,7 @@ pub enum PacketState {
         own_share: HalfKeyChallenge,
         next_hop: PublicKey,
         next_challenge: Challenge,
-        old_challenge: Option<Challenge>,
+        old_challenge: Option<AcknowledgementChallenge>,
     },
     /// Packet that is being sent out by us
     Outgoing {
@@ -204,7 +205,7 @@ pub struct Packet {
 impl Packet {
     pub const SIZE: usize = PACKET_LENGTH + AcknowledgementChallenge::SIZE + Ticket::SIZE;
 
-    pub fn new(msg: &[u8], path: &[&PeerId], private_key: &[u8], ticket: Ticket) -> Result<Self> {
+    pub fn new(msg: &[u8], path: &[&PeerId], private_key: &[u8], created_ticket: Ticket) -> Result<Self> {
         assert!(!path.is_empty(), "path must not be empty");
 
         let shared_keys = SharedKeys::new(path)?;
@@ -220,6 +221,9 @@ impl Packet {
                                                      has_other.then_some(shared_keys.secret(i + 2)))
                 .serialize())
         }
+
+        let mut ticket = created_ticket;
+        ticket.challenge = porv.ticket_challenge.to_ethereum_challenge();
 
         Ok(Self {
             challenge: AcknowledgementChallenge::new(porv.ack_challenge.clone(), private_key),
@@ -282,6 +286,7 @@ impl Packet {
                             ack_key,
                             previous_hop,
                             plain_text,
+                            old_challenge: None,
                         }
                     })
                 }
@@ -289,6 +294,25 @@ impl Packet {
         } else {
             Err(PacketDecodingError)
         }
+    }
+
+    pub fn create_acknowledgement(&self, private_key: &[u8]) -> Option<Acknowledgement> {
+        match &self.state {
+            Final { ack_key, old_challenge, .. } |
+            Forwarded { ack_key, old_challenge, .. } => {
+              Some(Acknowledgement::new(self.old_challenge.unwrap_or(self.challenge.clone())
+                                        , ack_key.clone(), private_key))
+            },
+            Outgoing { .. } => None
+        }
+    }
+
+    pub fn state(&self) -> &PacketState {
+        &self.state
+    }
+
+    pub fn ticket(&self) -> &Ticket {
+        &self.ticket
     }
 }
 
@@ -305,7 +329,11 @@ impl Packet {
 
 #[cfg(test)]
 mod tests {
-    use crate::packet::{add_padding, PADDING_TAG, remove_padding};
+    use libp2p_identity::{Keypair, PeerId};
+    use core_crypto::types::PublicKey;
+    use core_types::channels::Ticket;
+    use utils_types::traits::PeerIdLike;
+    use crate::packet::{add_padding, INTERMEDIATE_HOPS, Packet, PADDING_TAG, remove_padding};
 
     #[test]
     fn test_padding() {
@@ -320,5 +348,37 @@ mod tests {
         let unpadded = remove_padding(&padded);
         assert!(unpadded.is_some());
         assert_eq!(data, &unpadded.unwrap());
+    }
+
+    fn mock_ticket(next_peer: &PeerId, path_len: usize, private_key: &[u8]) -> Ticket {
+
+    }
+
+    #[test]
+    fn test_packet_create_and_transform() {
+        const AMOUNT: usize = INTERMEDIATE_HOPS + 1;
+        let mut keypairs = (0 .. AMOUNT)
+            .map(|_| Keypair::generate_secp256k1())
+            .map(|kp| (kp.into_secp256k1().unwrap().secret().to_bytes(), kp.public().to_peer_id()))
+            .collect::<Vec<_>>();
+
+        let (private_key, public_key) = keypairs.drain(1)
+            .map(|kp| (kp.0, PublicKey::from_peerid(&kp.1).unwrap()))
+            .last()
+            .unwrap();
+
+        let path = &keypairs
+            .iter()
+            .map(|kp| &kp.1)
+            .collect::<Vec<_>>();
+
+        // Create ticket for the first peer on the path
+        let ticket = mock_ticket(&keypairs[0].1, keypairs.len(), &private_key);
+
+        let test_message = b"some testing message";
+        let packet = Packet::new(&test_message, path, &private_key, ticket)
+            .expect("failed to construct packet");
+
+
     }
 }
