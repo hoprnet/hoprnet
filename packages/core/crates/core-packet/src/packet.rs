@@ -296,6 +296,9 @@ impl Packet {
         }
     }
 
+    /// Forwards the packet to the next hop.
+    /// Requires private key of the local node and prepared ticket for the next recipient.
+    /// Panics if the packet is not meant to be forwarded.
     pub fn forward(&mut self, private_key: &[u8], next_ticket: Ticket) {
         match &mut self.state {
             Forwarded { old_challenge, ack_challenge, .. } => {
@@ -340,9 +343,11 @@ impl Packet {
 
 #[cfg(test)]
 mod tests {
+    use std::ops::Mul;
     use libp2p_identity::{Keypair, PeerId};
-    use core_crypto::types::PublicKey;
+    use core_crypto::types::{Challenge, PublicKey};
     use core_types::channels::Ticket;
+    use utils_types::primitives::{Address, Balance, BalanceType, U256};
     use utils_types::traits::PeerIdLike;
     use crate::packet::{add_padding, INTERMEDIATE_HOPS, Packet, PacketState, PADDING_TAG, remove_padding};
 
@@ -362,12 +367,20 @@ mod tests {
     }
 
     fn mock_ticket(next_peer: &PeerId, path_len: usize, private_key: &[u8]) -> Ticket {
-        todo!()
+        const PRICE_PER_PACKET: u128 = 10000000000000000u128;
+        const INVERSE_TICKET_WIN_PROB: u128 = 1;
+
+        Ticket::new(PublicKey::from_peerid(next_peer).unwrap().to_address(),
+        None, U256::zero(), U256::zero(),
+                    Balance::new((PRICE_PER_PACKET * INVERSE_TICKET_WIN_PROB * (path_len - 1) as u128).into(),
+                                 BalanceType::HOPR),
+                U256::one(), U256::zero(), private_key)
     }
 
     #[test]
     fn test_packet_create_and_transform() {
         const AMOUNT: usize = INTERMEDIATE_HOPS + 1;
+
         let mut keypairs = (0 .. AMOUNT)
             .map(|_| Keypair::generate_secp256k1())
             .map(|kp| (kp.clone().into_secp256k1().unwrap().secret().to_bytes(), kp.public().to_peer_id()))
@@ -406,7 +419,7 @@ mod tests {
                     assert_eq!(&test_message, &plain_text.as_ref());
                 }
                 PacketState::Forwarded { .. } => {
-                    let ticket = mock_ticket(&node_id, keypairs.len() - 1, node_private);
+                    let ticket = mock_ticket(&node_id, keypairs.len() - i, node_private);
                     packet.forward(node_private, ticket);
                 }
                 PacketState::Outgoing { .. } => panic!("invalid packet state")

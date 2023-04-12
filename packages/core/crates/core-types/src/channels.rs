@@ -198,7 +198,7 @@ impl Ticket {
     /// Creates a new Ticket given the raw Challenge and signs it using the given key.
     pub fn new(
         counterparty: Address,
-        challenge: Challenge,
+        challenge: Option<Challenge>,
         epoch: U256,
         index: U256,
         amount: Balance,
@@ -206,7 +206,10 @@ impl Ticket {
         channel_epoch: U256,
         signing_key: &[u8],
     ) -> Self {
-        let encoded_challenge = challenge.to_ethereum_challenge();
+        let encoded_challenge = challenge
+            .map(|c| c.to_ethereum_challenge())
+            .unwrap_or(EthereumChallenge::default());
+
         let hashed_ticket = Hash::create(&[&Self::serialize_unsigned_aux(
             &counterparty,
             &encoded_challenge,
@@ -232,7 +235,7 @@ impl Ticket {
     }
 
     /// Convenience method for creating a zero-hop ticket
-    pub fn new_zero_hop(destination: PublicKey, challenge: Challenge, private_key: &[u8]) -> Self {
+    pub fn new_zero_hop(destination: PublicKey, challenge: Option<Challenge>, private_key: &[u8]) -> Self {
         Self::new(destination.to_address(),
                      challenge,
                      U256::zero(),
