@@ -194,6 +194,7 @@ pub enum PacketState {
     }
 }
 
+/// Represents a HOPR packet
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Packet {
     packet: Box<[u8]>,
@@ -203,9 +204,16 @@ pub struct Packet {
 }
 
 impl Packet {
+    /// Size of the packet including header, payload, ticket and ack challenge.
     pub const SIZE: usize = PACKET_LENGTH + AcknowledgementChallenge::SIZE + Ticket::SIZE;
 
-    pub fn new(msg: &[u8], path: &[&PeerId], private_key: &[u8], created_ticket: Ticket) -> Result<Self> {
+    /// Constructs new outgoing packet with the given path.
+    /// # Arguments
+    /// * `msg` packet payload
+    /// * `path` complete path for the packet to take
+    /// * `private_key` private key of the local node
+    /// * `first_ticket` ticket for the first hop on the path
+    pub fn new(msg: &[u8], path: &[&PeerId], private_key: &[u8], first_ticket: Ticket) -> Result<Self> {
         assert!(!path.is_empty(), "path must not be empty");
 
         let shared_keys = SharedKeys::new(path)?;
@@ -222,7 +230,7 @@ impl Packet {
                 .serialize())
         }
 
-        let mut ticket = created_ticket;
+        let mut ticket = first_ticket;
         ticket.challenge = porv.ticket_challenge.to_ethereum_challenge();
 
         Ok(Self {
@@ -238,9 +246,9 @@ impl Packet {
         })
     }
 
-    pub fn deserialize(pre: &[u8], private_key: &[u8], sender: &PeerId) -> Result<Self> {
-        if pre.len() == Self::SIZE {
-            let (packet, r0) = pre.split_at(PACKET_LENGTH);
+    pub fn deserialize(data: &[u8], private_key: &[u8], sender: &PeerId) -> Result<Self> {
+        if data.len() == Self::SIZE {
+            let (packet, r0) = data.split_at(PACKET_LENGTH);
             let (pre_challenge, pre_ticket) = r0.split_at(AcknowledgementChallenge::SIZE);
             let previous_hop = PublicKey::from_peerid(sender)?;
 
@@ -310,6 +318,8 @@ impl Packet {
         }
     }
 
+    /// Creates an acknowledgement for this packet.
+    /// Returns None if this packet is sent by us.
     pub fn create_acknowledgement(&self, private_key: &[u8]) -> Option<Acknowledgement> {
         match &self.state {
             Final { ack_key, old_challenge, .. } |
