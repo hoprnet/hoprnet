@@ -1,15 +1,13 @@
 use core_crypto::checksum::to_checksum;
 use core_crypto::types::PublicKey;
-use ethers::core::k256::elliptic_curve::sec1::ToEncodedPoint;
-use ethers::core::{
-    k256::{ecdsa::SigningKey, PublicKey as K256PublicKey},
-    rand::thread_rng,
-    types::H256,
+use ethers::{
+    core::{
+        k256::{ecdsa::SigningKey, elliptic_curve::sec1::ToEncodedPoint, PublicKey as K256PublicKey},
+        rand::thread_rng,
+        // types::H256,
+    },
+    signers::Wallet,
 };
-use ethers::prelude::k256::ecdsa::VerifyingKey;
-use ethers::signers::Signer;
-use ethers::signers::Wallet;
-use ethers::types::Address;
 use std::{
     fmt, fs,
     path::{Path, PathBuf},
