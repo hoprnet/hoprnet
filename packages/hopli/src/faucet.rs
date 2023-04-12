@@ -2,11 +2,13 @@ use crate::key_pair::read_identities;
 use crate::password::PasswordArgs;
 use crate::process::{child_process_call_foundry_faucet, set_process_path_env};
 use clap::Parser;
+use core_crypto::checksum::to_checksum;
 use ethers::{
-    types::{Address, U256},
+    types::U256,
     utils::parse_units, //, types::U256, utils::format_units, ParseUnits
 };
 use std::env;
+use utils_types::primitives::Address;
 
 use crate::utils::{Cmd, HelperErrors};
 
@@ -103,8 +105,9 @@ impl FaucetArgs {
         let mut addresses_all = Vec::new();
         if let Some(addr) = address {
             // parse provided address string into `Address` type
-            match addr.parse::<Address>() {
-                Ok(parsed_addr) => addresses_all.push(parsed_addr),
+            match Address::from_str(&addr) {
+                // match addr.parse::<Address>() {
+                Ok(parsed_addr) => addresses_all.push(to_checksum(parsed_addr)),
                 // TODO: Consider accept peer id here
                 Err(_) => return Err(HelperErrors::UnableToParseAddress(addr.to_string())),
             }
@@ -121,8 +124,8 @@ impl FaucetArgs {
             // read all the files from the directory
             if let Some(id_dir) = identity_directory {
                 match read_identities(&id_dir.as_str(), &pwd, &identity_prefix) {
-                    Ok(addresses_from_identities) => {
-                        addresses_all.extend(addresses_from_identities);
+                    Ok(node_identities) => {
+                        addresses_all.extend(node_identities.iter().map(|ni| ni.ethereum_address.clone()));
                     }
                     Err(e) => return Err(HelperErrors::UnableToReadIdentitiesFromPath(e)),
                 }

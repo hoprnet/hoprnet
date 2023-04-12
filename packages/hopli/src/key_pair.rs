@@ -10,12 +10,15 @@ use ethers::prelude::k256::ecdsa::VerifyingKey;
 use ethers::signers::Signer;
 use ethers::signers::Wallet;
 use ethers::types::Address;
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::{
+    fmt, fs,
+    path::{Path, PathBuf},
+};
 
+#[derive(Debug)]
 pub struct NodeIdentity {
-    peer_id: String,
-    ethereum_address: String,
+    pub peer_id: String,
+    pub ethereum_address: String,
 }
 
 impl NodeIdentity {
@@ -37,6 +40,12 @@ impl NodeIdentity {
     }
 }
 
+impl fmt::Display for NodeIdentity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "PeerId: {}, Address: {}", self.peer_id, self.ethereum_address)
+    }
+}
+
 /// Decrypt identity files and returns an vec of PeerIds and Ethereum Addresses
 ///
 /// # Arguments
@@ -44,7 +53,7 @@ impl NodeIdentity {
 /// * `identity_directory` - Directory to all the identity files
 /// * `password` - Password to unlock all the identity files
 /// * `identity_prefix` - Prefix of identity files. Only identity files with the provided are decrypted with the password
-pub fn read_complete_identities(
+pub fn read_identities(
     identity_directory: &str,
     password: &String,
     identity_prefix: &Option<String>,
@@ -82,46 +91,6 @@ pub fn read_complete_identities(
     let results: Vec<NodeIdentity> = signing_keys.into_iter().map(|r| NodeIdentity::new(r)).collect();
 
     Ok(results)
-}
-
-/// Decrypt identity files and returns an vec of ethereum addresses
-/// FIXME: old method of read_identities. Keep so nothing is broken
-///
-/// # Arguments
-///
-/// * `identity_directory` - Directory to all the identity files
-/// * `password` - Password to unlock all the identity files
-/// * `identity_prefix` - Prefix of identity files. Only identity files with the provided are decrypted with the password
-pub fn read_identities(
-    identity_directory: &str,
-    password: &String,
-    identity_prefix: &Option<String>,
-) -> Result<Vec<Address>, std::io::Error> {
-    match fs::read_dir(Path::new(identity_directory)) {
-        Ok(directory) => {
-            let addresses: Vec<Address> = directory
-                .into_iter() // read all the files from the directory
-                .filter(|r| r.is_ok()) // Get rid of Err variants for Result<DirEntry>
-                .map(|r| r.unwrap().path()) // Read all the files from the given directory
-                .filter(|r| r.is_file()) // Filter out folders
-                .filter(|r| r.to_str().unwrap().contains("id")) // file name should contain "id"
-                .filter(|r| match &identity_prefix {
-                    Some(identity_prefix) => r
-                        .file_stem()
-                        .unwrap()
-                        .to_str()
-                        .unwrap()
-                        .starts_with(identity_prefix.as_str()),
-                    _ => true,
-                }) // TODO: Now it is a loose check on contain but not strict on the prefix
-                .filter_map(|r| Wallet::<SigningKey>::decrypt_keystore(r, password).ok()) // read keystore and return non-error results
-                .map(|r| r.address()) // read keystore and return address
-                .collect();
-
-            Ok(addresses)
-        }
-        Err(e) => Err(e),
-    }
 }
 
 /// Create one identity file and return the ethereum address
@@ -276,7 +245,7 @@ mod tests {
         // save the keystore as file
         fs::write(PathBuf::from(path).join(&name), weak_crypto_alice_keystore.as_bytes());
 
-        let val = read_complete_identities(path, &pwd.to_string(), &None).unwrap();
+        let val = read_identities(path, &pwd.to_string(), &None).unwrap();
         assert_eq!(val.len(), 1);
         assert_eq!(val[0].peer_id, alice_peer_id);
         assert_eq!(val[0].ethereum_address, alice_address);

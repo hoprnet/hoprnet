@@ -2476,6 +2476,7 @@ dependencies = [
  "ethers",
  "serde",
  "serde_json",
+ "utils-types",
 ]
 
 [[package]]

@@ -15,4 +15,4 @@ ethers = { version = "1.0.2" }
 serde = "1.0"
 serde_json = "1.0"
 core-crypto = { path = "../core/crates/core-crypto"}
-# utils-types = { path = "../utils/crates/utils-types"}
+utils-types = { path = "../utils/crates/utils-types"}

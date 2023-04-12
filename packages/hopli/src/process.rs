@@ -62,13 +62,13 @@ pub fn set_process_path_env(contracts_root: &Option<String>, environment_name: &
 /// * `native_amount` - Amount of native tokens to be funded
 pub fn child_process_call_foundry_faucet(
     environment_name: &str,
-    address: &Address,
+    address: &String,
     hopr_amount: &str,
     native_amount: &str,
 ) -> Result<(), HelperErrors> {
     let hopr_amount_str = hopr_amount.to_string();
     let native_amount_str = native_amount.to_string();
-    let addresses_str = format!("{:#x}", &address);
+    // let addresses_str = format!("{:#x}", &address);
 
     let faucet_args = vec![
         "script",
@@ -76,7 +76,7 @@ pub fn child_process_call_foundry_faucet(
         "--broadcast",
         "--sig",
         "transferOrMintHoprAndSendNativeToAmount(address,uint256,uint256)",
-        &addresses_str,
+        &address,
         &hopr_amount_str,
         &native_amount_str,
     ];

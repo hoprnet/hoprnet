@@ -49,11 +49,7 @@ pub struct IdentityArgs {
     )]
     directory: String,
 
-    #[clap(
-        help = "Prefix of the identity file to create/read",
-        long,
-        default_value = "node_"
-    )]
+    #[clap(help = "Prefix of the identity file to create/read", long, default_value = "node_")]
     name: Option<String>,
 
     #[clap(
@@ -83,19 +79,16 @@ impl IdentityArgs {
             Err(e) => return Err(e),
         };
 
-        let mut addresses = Vec::new();
-
         match action {
             IdentityActionType::Create => {
+                let mut addresses = Vec::new();
+
                 for _n in 1..=number {
                     // build file name
                     let id_name = match name {
                         Some(ref provided_name) => Some(
                             provided_name.to_owned()
-                                + &SystemTime::now()
-                                    .duration_since(UNIX_EPOCH)?
-                                    .as_secs()
-                                    .to_string(),
+                                + &SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs().to_string(),
                         ),
                         None => None,
                     };
@@ -105,18 +98,21 @@ impl IdentityArgs {
                         Err(_) => return Err(HelperErrors::UnableToCreateIdentity),
                     }
                 }
+                println!("Addresses from identities: {:?}", addresses);
+                Ok(())
             }
             IdentityActionType::Read => {
+                let mut node_identities = Vec::new();
+
                 // read ids
                 match read_identities(&directory, &pwd, &name) {
-                    Ok(addrs) => addresses.extend(addrs),
+                    Ok(identities) => node_identities.extend(identities),
                     Err(_) => return Err(HelperErrors::UnableToReadIdentity),
                 }
+                println!("Identities: {:?}", node_identities);
+                Ok(())
             }
         }
-
-        println!("Addresses from identities: {:?}", addresses);
-        Ok(())
     }
 }
 
