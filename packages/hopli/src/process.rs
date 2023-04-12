@@ -1,4 +1,3 @@
-use ethers::types::Address;
 use std::{
     env,
     ffi::OsStr,

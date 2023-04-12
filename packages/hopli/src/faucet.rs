@@ -105,9 +105,15 @@ impl FaucetArgs {
         let mut addresses_all = Vec::new();
         if let Some(addr) = address {
             // parse provided address string into `Address` type
-            match Address::from_str(&addr) {
+            let parsed_addr = if addr.starts_with("0x") {
+                addr.strip_prefix("0x").unwrap_or(&addr)
+            } else {
+                &addr
+            };
+
+            match Address::from_str(parsed_addr) {
                 // match addr.parse::<Address>() {
-                Ok(parsed_addr) => addresses_all.push(to_checksum(parsed_addr)),
+                Ok(checksumed_addr) => addresses_all.push(to_checksum(checksumed_addr)),
                 // TODO: Consider accept peer id here
                 Err(_) => return Err(HelperErrors::UnableToParseAddress(addr.to_string())),
             }
@@ -127,7 +133,7 @@ impl FaucetArgs {
                     Ok(node_identities) => {
                         addresses_all.extend(node_identities.iter().map(|ni| ni.ethereum_address.clone()));
                     }
-                    Err(e) => return Err(HelperErrors::UnableToReadIdentitiesFromPath(e)),
+                    Err(e) => return Err(e),
                 }
             }
         }

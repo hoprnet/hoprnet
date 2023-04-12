@@ -1,13 +1,11 @@
+use crate::utils::HelperErrors;
 use core_crypto::checksum::to_checksum;
 use core_crypto::types::PublicKey;
-use ethers::{
-    core::{
-        k256::{ecdsa::SigningKey, elliptic_curve::sec1::ToEncodedPoint, PublicKey as K256PublicKey},
-        rand::thread_rng,
-        // types::H256,
-    },
-    signers::Wallet,
-};
+use elliptic_curve::rand_core::{CryptoRng, RngCore};
+use eth_keystore;
+use ethers::core::rand::thread_rng;
+use generic_array::GenericArray;
+use k256::ecdsa::{SigningKey, VerifyingKey};
 use std::{
     fmt, fs,
     path::{Path, PathBuf},
@@ -20,9 +18,7 @@ pub struct NodeIdentity {
 }
 
 impl NodeIdentity {
-    // pub fn new(verifying_key: VerifyingKey) -> Self {
-    pub fn new(signing_key: Wallet<SigningKey>) -> Self {
-        let verifying_key = signing_key.signer().verifying_key();
+    pub fn new(verifying_key: VerifyingKey) -> Self {
         let public_key = PublicKey::deserialize(&verifying_key.to_encoded_point(false).to_bytes()).unwrap();
 
         // derive PeerId
@@ -55,7 +51,7 @@ pub fn read_identities(
     identity_directory: &str,
     password: &String,
     identity_prefix: &Option<String>,
-) -> Result<Vec<NodeIdentity>, std::io::Error> {
+) -> Result<Vec<NodeIdentity>, HelperErrors> {
     // early return if failed in reading identity directory
     let directory = fs::read_dir(Path::new(identity_directory))?;
 
@@ -80,15 +76,36 @@ pub fn read_identities(
         .collect();
 
     // get the verifying key from each file
-    let signing_keys: Vec<Wallet<SigningKey>> = files
+    let signing_keys: Vec<VerifyingKey> = files
         .into_iter()
-        .filter_map(|r| Wallet::<SigningKey>::decrypt_keystore(r, password).ok())
+        .filter_map(|r| decrypt_keystore(r, password).ok())
         .collect();
 
     // convert verifying_keys to NodeIdentity
     let results: Vec<NodeIdentity> = signing_keys.into_iter().map(|r| NodeIdentity::new(r)).collect();
 
     Ok(results)
+}
+
+fn decrypt_keystore<P, S>(keypath: P, password: S) -> Result<VerifyingKey, HelperErrors>
+where
+    P: AsRef<Path>,
+    S: AsRef<[u8]>,
+{
+    let secret = eth_keystore::decrypt_key(keypath, password)?;
+    let signer = SigningKey::from_bytes(GenericArray::from_slice(&secret))?;
+    Ok(*signer.verifying_key())
+}
+
+fn new_keystore<P, R, S>(dir: P, rng: &mut R, password: S) -> Result<(VerifyingKey, String), HelperErrors>
+where
+    P: AsRef<Path>,
+    R: CryptoRng + RngCore,
+    S: AsRef<[u8]>,
+{
+    let (secret, uuid) = eth_keystore::new(dir, rng, password, None)?;
+    let signer = SigningKey::from_bytes(GenericArray::from_slice(&secret))?;
+    Ok((*signer.verifying_key(), uuid))
 }
 
 /// Create one identity file and return the ethereum address
@@ -98,12 +115,12 @@ pub fn read_identities(
 /// * `dir_name` - Directory to the storage of an identity file
 /// * `password` - Password to encrypt the identity file
 /// * `name` - Prefix of identity files.
-pub fn create_identity(dir_name: &str, password: &str, name: &Option<String>) -> Result<NodeIdentity, std::io::Error> {
+pub fn create_identity(dir_name: &str, password: &str, name: &Option<String>) -> Result<NodeIdentity, HelperErrors> {
     // create dir if not exist
     fs::create_dir_all(dir_name)?;
 
     // create identity with the given password
-    let (wallet, uuid) = Wallet::new_keystore(Path::new(dir_name), &mut thread_rng(), password, None).unwrap();
+    let (verifying_key, uuid) = new_keystore(Path::new(dir_name), &mut thread_rng(), password)?;
 
     // Rename keystore from uuid to uuid.id (or `name.id`, if provided)
     let old_file_path = vec![dir_name, "/", &*uuid].concat();
@@ -125,14 +142,11 @@ pub fn create_identity(dir_name: &str, password: &str, name: &Option<String>) ->
         .map_err(|err| println!("{:?}", err))
         .ok();
 
-    Ok(NodeIdentity::new(wallet))
+    Ok(NodeIdentity::new(verifying_key))
 }
 
 #[cfg(test)]
 mod tests {
-
-    use std::{fs::File, io::Write};
-
     use super::*;
 
     #[test]
@@ -244,7 +258,7 @@ mod tests {
         // create dir if not exist.
         fs::create_dir_all(path).unwrap();
         // save the keystore as file
-        fs::write(PathBuf::from(path).join(&name), weak_crypto_alice_keystore.as_bytes());
+        fs::write(PathBuf::from(path).join(&name), weak_crypto_alice_keystore.as_bytes()).unwrap();
 
         let val = read_identities(path, &pwd.to_string(), &None).unwrap();
         assert_eq!(val.len(), 1);
@@ -254,8 +268,11 @@ mod tests {
         remove_json_keystore(path).map_err(|err| println!("{:?}", err)).ok();
     }
 
-    fn remove_json_keystore(path: &str) -> Result<(), std::io::Error> {
+    fn remove_json_keystore(path: &str) -> Result<(), HelperErrors> {
         println!("remove_json_keystore {:?}", path);
-        fs::remove_dir_all(path)
+        match fs::remove_dir_all(path) {
+            Ok(_) => Ok(()),
+            _ => Err(HelperErrors::UnableToDeleteIdentity),
+        }
     }
 }

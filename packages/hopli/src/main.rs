@@ -3,7 +3,6 @@ use crate::identity::IdentityArgs;
 use crate::network_registry::RegisterInNetworkRegistryArgs;
 use crate::utils::{Cmd, HelperErrors};
 use clap::{Parser, Subcommand};
-// use ethers::types::Address;
 pub mod environment_config;
 pub mod faucet;
 pub mod identity;
@@ -30,9 +29,7 @@ struct Cli {
 enum Commands {
     #[clap(about = "Create and store identity files")]
     Identity(IdentityArgs),
-    #[clap(
-        about = "Fund given address and/or addressed derived from identity files native tokens or HOPR tokens"
-    )]
+    #[clap(about = "Fund given address and/or addressed derived from identity files native tokens or HOPR tokens")]
     Faucet(FaucetArgs),
     #[clap(about = "Registry some nodes peer ids to the network registery contract")]
     RegisterInNetworkRegistry(RegisterInNetworkRegistryArgs),
