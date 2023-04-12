@@ -2472,6 +2472,7 @@ name = "hopli"
 version = "0.2.0"
 dependencies = [
  "clap 4.0.32",
+ "core-crypto",
  "ethers",
  "serde",
  "serde_json",
