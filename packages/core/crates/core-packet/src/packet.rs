@@ -333,7 +333,7 @@ mod tests {
     use core_crypto::types::PublicKey;
     use core_types::channels::Ticket;
     use utils_types::traits::PeerIdLike;
-    use crate::packet::{add_padding, INTERMEDIATE_HOPS, Packet, PADDING_TAG, remove_padding};
+    use crate::packet::{add_padding, INTERMEDIATE_HOPS, Packet, PacketState, PADDING_TAG, remove_padding};
 
     #[test]
     fn test_padding() {
@@ -376,9 +376,22 @@ mod tests {
         let ticket = mock_ticket(&keypairs[0].1, keypairs.len(), &private_key);
 
         let test_message = b"some testing message";
-        let packet = Packet::new(&test_message, path, &private_key, ticket)
+        let mut packet = Packet::new(&test_message, path, &private_key, ticket)
             .expect("failed to construct packet");
 
+        for (i, (node_private, node_id)) in keypairs.iter().enumerate() {
+            let sender = if i == 0 { &public_key.to_peerid() } else { &path[i - 1] };
+            packet = Packet::deserialize(&packet.serialize(), node_private, sender)
+                .expect(format!("failed to deserialize packet at hop {}", i).into());
 
+            match packet.state() {
+                PacketState::Final { plain_text, .. } => {
+                    assert_eq!(path.len() - 1, i);
+                    assert_eq!(test_message, plain_text);
+                }
+                PacketState::Forwarded { .. } => {}
+                PacketState::Outgoing { .. } => {}
+            }
+        }
     }
 }
