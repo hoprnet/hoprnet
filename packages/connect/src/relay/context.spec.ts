@@ -19,10 +19,8 @@ describe('relay switch context', function () {
 
     const ctx = new Server(
       nodeToRelay as IStream,
-      {
-        onClose: () => {},
-        onUpgrade: () => {}
-      },
+      () => {},
+      () => {},
       {
         relayFreeTimeout: 1
       }
@@ -62,10 +60,8 @@ describe('relay switch context', function () {
 
     const ctx = new Server(
       nodeToRelay as IStream,
-      {
-        onClose: () => {},
-        onUpgrade: () => {}
-      },
+      () => {},
+      () => {},
       {
         relayFreeTimeout: 1
       }
@@ -107,10 +103,8 @@ describe('relay switch context', function () {
 
     const ctx = new Server(
       nodeToRelay as IStream,
-      {
-        onClose: () => {},
-        onUpgrade: () => {}
-      },
+      () => {},
+      () => {},
       {
         relayFreeTimeout: 1
       }
@@ -151,10 +145,8 @@ describe('relay switch context', function () {
 
     const ctx = new Server(
       nodeToRelay as IStream,
-      {
-        onClose: () => {},
-        onUpgrade: () => {}
-      },
+      () => {},
+      () => {},
       {
         relayFreeTimeout: 1
       }
@@ -201,10 +193,8 @@ describe('relay switch context', function () {
 
     const ctx = new Server(
       nodeToRelay as IStream,
-      {
-        onClose: () => {},
-        onUpgrade: () => {}
-      },
+      () => {},
+      () => {},
       {
         relayFreeTimeout: 1
       }
@@ -231,10 +221,8 @@ describe('relay switch context', function () {
 
     const ctx = new Server(
       nodeToRelay as IStream,
-      {
-        onClose: () => {},
-        onUpgrade: () => {}
-      },
+      () => {},
+      () => {},
       {
         relayFreeTimeout: 1
       }
@@ -355,10 +343,8 @@ describe('relay switch context - falsy streams', function () {
           throw Error(falsySinkError)
         }
       } as IStream,
-      {
-        onClose: () => {},
-        onUpgrade: () => {}
-      },
+      () => {},
+      () => {},
       {
         relayFreeTimeout: 1
       }
@@ -406,10 +392,8 @@ describe('relay switch context - falsy streams', function () {
         source: undefined as any,
         sink: () => Promise.reject(Error(falsySinkError))
       },
-      {
-        onClose: () => {},
-        onUpgrade: () => {}
-      },
+      () => {},
+      () => {},
       {
         relayFreeTimeout: 1
       }
@@ -514,10 +498,9 @@ describe('relay switch context - falsy streams', function () {
           return Promise.reject(Error(falsySinkError))
         }
       } as any,
-      {
-        onClose: () => {},
-        onUpgrade: () => {}
-      },
+
+      () => {},
+      () => {},
       {
         relayFreeTimeout: 1
       }

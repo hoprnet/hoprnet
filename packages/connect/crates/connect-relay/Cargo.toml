@@ -23,6 +23,7 @@ getrandom = { version = "0.2.8", features = ["js"] }
 gloo-timers = { version = "0.2.6", optional = true , features = ["futures"]}
 hex = "0.4.3"
 js-sys = { version = "0.3.60", optional = true }
+libp2p = { version = "0.51.1", features = ["async-std", "wasm-bindgen", "wasm-ext"] }
 pin-project-lite = "0.2.9"
 utils-log = { path = "../../../utils/crates/utils-log" }
 utils-misc = { path = "../../../utils/crates/utils-misc" }

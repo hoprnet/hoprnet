@@ -1,4 +1,5 @@
 pub mod constants;
+pub mod connection_manager;
 pub mod server;
 pub mod traits;
 

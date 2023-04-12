@@ -157,7 +157,8 @@ class RelayState {
         sink: toSource.sink
       },
       // toSource as IStream,
-      { onClose: this.cleanListener(source, destination), onUpgrade: this.cleanListener(source, destination) },
+      this.cleanListener(source, destination),
+      this.cleanListener(source, destination),
       this.options
     )
     const toDestinationContext = new Server(
@@ -173,7 +174,8 @@ class RelayState {
         })(),
         sink: toDestination.sink
       },
-      { onClose: this.cleanListener(destination, source), onUpgrade: this.cleanListener(destination, source) },
+      this.cleanListener(destination, source),
+      this.cleanListener(destination, source),
       this.options
     )
 

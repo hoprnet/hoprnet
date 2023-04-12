@@ -46,11 +46,6 @@ pub enum ConnectionStatusMessage {
     Upgraded = 0x02,
 }
 
-pub trait RelayServerCbs {
-    fn on_close(&self) -> () {}
-    fn on_upgrade(&self) -> () {}
-}
-
 pin_project! {
     /// In order to test the liveness of a relayed connection, the relay management
     /// code issues ping requests, which are encaspsulated in this struct.
@@ -189,8 +184,8 @@ pin_project! {
     /// to one of the participants. Once there is a reconnects, a new
     /// connection can get attached and the server does a stream handover
     /// to the newly attached connection.
-    #[derive(Debug)]
-    struct Server<St: DuplexStream, Cbs: RelayServerCbs> {
+    // #[derive(Debug)]
+    pub struct Server<St> {
         // the underlying Stream / Sink struct
         // FIXME: make it work for pure Rust *and* WebAssembly
         #[pin]
@@ -218,16 +213,18 @@ pin_project! {
         poll_next_waker: Option<Waker>,
         // wake sink after reconnect
         poll_ready_waker: Option<Waker>,
-        // signal events to management code
-        callbacks: Option<Cbs>
+        // called once stream receives a CLOSE message
+        on_close: Box<dyn Fn() -> ()>,
+        // called once stream receives a UPGRADE message
+        on_upgrade: Box<dyn Fn() -> ()>
     }
 }
 
-impl<St: DuplexStream, Cbs: RelayServerCbs> Server<St, Cbs> {
+impl<'a, St: DuplexStream> Server<St> {
     /// Takes a stream to one of the endpoints and callbacks to the relay
     /// management code and creates a new instance server-side relay stream
     /// state management instance.
-    fn new(stream: St, callbacks: Cbs) -> Server<St, Cbs> {
+    pub(crate) fn new(stream: St, on_close: Box<dyn Fn() -> ()>, on_upgrade: Box<dyn Fn() -> ()>) -> Server<St> {
         let (status_messages_tx, status_messages_rx) = mpsc::unbounded::<Box<[u8]>>();
 
         let mut id = [0u8; 4];
@@ -248,14 +245,15 @@ impl<St: DuplexStream, Cbs: RelayServerCbs> Server<St, Cbs> {
             id: Box::from(id),
             poll_next_waker: None,
             poll_ready_waker: None,
-            callbacks: Some(callbacks),
+            on_close,
+            on_upgrade,
         }
     }
 
     /// Used to test whether the relayed connection is alive, takes
     /// an optional custom timeout. If none is supplied, a default
     /// timeout is used.
-    async fn ping(&mut self, maybe_timeout: Option<u64>) -> Result<u64, String> {
+    pub(crate) async fn ping(&mut self, maybe_timeout: Option<u64>) -> Result<u64, String> {
         let random_value: [u8; 4] = [0u8; 4];
 
         // FIXME: enable once client code is migrated
@@ -300,7 +298,7 @@ impl<St: DuplexStream, Cbs: RelayServerCbs> Server<St, Cbs> {
     /// To test if the relayed connection is alive, the relay management code
     /// issues low-level ping requests. Each ping request gets a unique identifier.
     /// This method returns all currently open ping requests, mainly used for testing.
-    pub fn get_pending_ping_requests(&self) -> Vec<[u8; 4]> {
+    pub(crate) fn get_pending_ping_requests(&self) -> Vec<[u8; 4]> {
         self.ping_requests.keys().copied().collect()
     }
 
@@ -308,7 +306,7 @@ impl<St: DuplexStream, Cbs: RelayServerCbs> Server<St, Cbs> {
     /// towards the destination. Each side can break. Once one side reconnects, this
     /// method takes the *fresh* connections and attaches it to the existing relay
     /// connection pipeline.
-    pub fn update(&mut self, new_stream: St) -> Result<(), String> {
+    pub(crate) fn update(&mut self, new_stream: St) -> Result<(), String> {
         let res = self.next_stream.take_stream(new_stream);
         if let Some(item) = self.poll_next_waker.take() {
             item.wake()
@@ -332,7 +330,7 @@ impl<St: DuplexStream, Cbs: RelayServerCbs> Server<St, Cbs> {
     }
 }
 
-impl<'b, St: DuplexStream, Cbs: RelayServerCbs> Stream for Server<St, Cbs> {
+impl<'b, St: DuplexStream> Stream for Server<St> {
     type Item = Result<Box<[u8]>, String>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
@@ -389,11 +387,13 @@ impl<'b, St: DuplexStream, Cbs: RelayServerCbs> Stream for Server<St, Cbs> {
                                 {
                                     break if *inner_prefix == ConnectionStatusMessage::Stop as u8 {
                                         // Connection has ended, mark it ended for next iteration
-                                        this.callbacks.as_mut().unwrap().on_close();
+                                        (this.on_close)();
+                                        // this.callbacks.as_mut().unwrap().on_close();
                                         *this.ended = true;
                                         Some(Ok(item))
                                     } else {
-                                        this.callbacks.as_mut().unwrap().on_upgrade();
+                                        (this.on_upgrade)();
+                                        // this.callbacks.as_mut().unwrap().on_upgrade();
                                         // swallow message and go for next one
                                         continue;
                                     };
@@ -469,13 +469,13 @@ impl<'b, St: DuplexStream, Cbs: RelayServerCbs> Stream for Server<St, Cbs> {
     }
 }
 
-impl<St: DuplexStream + FusedStream, Cbs: RelayServerCbs> FusedStream for Server<St, Cbs> {
+impl<St: DuplexStream + FusedStream> FusedStream for Server<St> {
     fn is_terminated(&self) -> bool {
         self.stream.as_ref().unwrap().is_terminated()
     }
 }
 
-impl<St: DuplexStream, Cbs: RelayServerCbs> Sink<Box<[u8]>> for Server<St, Cbs> {
+impl<St: DuplexStream> Sink<Box<[u8]>> for Server<St> {
     type Error = String;
 
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), String>> {
@@ -621,7 +621,6 @@ pub mod wasm {
     use js_sys::{AsyncIterator, Function, Number, Object, Promise, Reflect, Symbol, Uint8Array};
     use utils_misc::async_iterable::wasm::to_jsvalue_stream;
 
-    use utils_log::info;
     use wasm_bindgen::{prelude::*, JsCast};
     use wasm_bindgen_futures::JsFuture;
 
@@ -632,29 +631,6 @@ pub mod wasm {
 
         #[wasm_bindgen(getter, js_name = "relayFreeTimeout")]
         pub fn relay_free_timeout() -> u32;
-    }
-
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-    extern "C" {
-        #[wasm_bindgen]
-        #[derive(Clone, Debug)]
-        pub type RelayServerCbs;
-
-        #[wasm_bindgen(js_name = "onClose", structural, method)]
-        pub fn js_on_close(this: &RelayServerCbs);
-
-        #[wasm_bindgen(js_name = "onUpgrade", structural, method)]
-        pub fn js_on_upgrade(this: &RelayServerCbs);
-    }
-
-    impl super::RelayServerCbs for RelayServerCbs {
-        fn on_close(&self) -> () {
-            self.js_on_close()
-        }
-
-        fn on_upgrade(&self) -> () {
-            self.js_on_upgrade()
-        }
     }
 
     /// Wraps a server instance to make its API accessible by Javascript.
@@ -689,7 +665,7 @@ pub mod wasm {
     /// ```
     #[wasm_bindgen]
     pub struct Server {
-        w: super::Server<StreamingIterable, RelayServerCbs>,
+        w: super::Server<StreamingIterable>,
     }
 
     #[wasm_bindgen]
@@ -697,9 +673,22 @@ pub mod wasm {
         /// Assign duplex stream endpoint and create a new instance
         /// of server-side relay stream state management code
         #[wasm_bindgen(constructor)]
-        pub fn new(stream: JsStreamingIterable, signals: RelayServerCbs, _options: RelayServerOpts) -> Self {
+        pub fn new(
+            stream: JsStreamingIterable,
+            on_close: Function,
+            on_upgrade: Function,
+            _options: RelayServerOpts,
+        ) -> Self {
             Self {
-                w: super::Server::new(StreamingIterable::from(stream), signals),
+                w: super::Server::new(
+                    StreamingIterable::from(stream),
+                    Box::new(move || {
+                        on_close.call0(&JsValue::undefined()).unwrap();
+                    }),
+                    Box::new(move || {
+                        on_upgrade.call0(&JsValue::undefined()).unwrap();
+                    }),
+                ),
             }
         }
 
@@ -748,8 +737,8 @@ pub mod wasm {
                 let promise = Promise::new(&mut |resolve, reject| {
                     let fut = unsafe {
                         std::mem::transmute::<
-                            Next<'_, super::Server<StreamingIterable, RelayServerCbs>>,
-                            Next<'_, super::Server<StreamingIterable, RelayServerCbs>>,
+                            Next<'_, super::Server<StreamingIterable>>,
+                            Next<'_, super::Server<StreamingIterable>>,
                         >(this.w.next())
                     };
                     let fut = fut.map(to_jsvalue_stream).then(|x| async move {

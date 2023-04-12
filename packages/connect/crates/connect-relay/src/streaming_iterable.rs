@@ -1,6 +1,6 @@
 /// Converts from duplex JS stream to Rust `futures::Stream` / `futures::Sink`
 use crate::traits::DuplexStream;
-use core::{panic, pin::Pin, task::Waker};
+use core::{pin::Pin, task::Waker};
 
 use futures::{
     stream::FusedStream,
