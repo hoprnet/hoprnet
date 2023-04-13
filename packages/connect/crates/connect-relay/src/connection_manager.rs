@@ -6,7 +6,7 @@ use core::{
 };
 use futures::{stream::FusedStream, Future, Sink, Stream};
 use std::{cell::RefCell, cmp::Ordering, collections::HashMap, rc::Rc};
-use utils_log::error;
+use utils_log::{error, info};
 
 use libp2p::PeerId;
 
@@ -21,12 +21,6 @@ struct RelayConnection<St> {
     buffered_a: Option<Box<[u8]>>,
     conn_b: Server<St>,
     buffered_b: Option<Box<[u8]>>,
-}
-
-#[derive(Copy, Clone, Eq)]
-struct RelayConnectionIdentifier {
-    id_a: PeerId,
-    id_b: PeerId,
 }
 
 impl<'a, St> RelayConnection<St> {
@@ -150,6 +144,12 @@ impl<St: DuplexStream> Future for RelayConnection<St> {
     }
 }
 
+#[derive(Copy, Clone, Eq)]
+struct RelayConnectionIdentifier {
+    id_a: PeerId,
+    id_b: PeerId,
+}
+
 impl ToString for RelayConnectionIdentifier {
     fn to_string(&self) -> String {
         format!("{}:{}", self.id_a.to_string(), self.id_b.to_string())
@@ -174,11 +174,11 @@ impl TryFrom<(PeerId, PeerId)> for RelayConnectionIdentifier {
     fn try_from(val: (PeerId, PeerId)) -> Result<Self, Self::Error> {
         match val.0.cmp(&val.1) {
             Ordering::Equal => Err("Keys must not be equal".into()),
-            Ordering::Less => Ok(RelayConnectionIdentifier {
+            Ordering::Greater => Ok(RelayConnectionIdentifier {
                 id_a: val.0,
                 id_b: val.1,
             }),
-            Ordering::Greater => Ok(RelayConnectionIdentifier {
+            Ordering::Less => Ok(RelayConnectionIdentifier {
                 id_a: val.1,
                 id_b: val.0,
             }),
@@ -194,11 +194,11 @@ fn get_key_and_value<St>(
 ) -> Result<(RelayConnectionIdentifier, RelayConnection<St>), String> {
     match id_a.cmp(&id_b) {
         Ordering::Equal => Err("Keys must not be equal".into()),
-        Ordering::Less => Ok((
+        Ordering::Greater => Ok((
             RelayConnectionIdentifier { id_a, id_b },
             RelayConnection::new(conn_a, conn_b),
         )),
-        Ordering::Greater => Ok((
+        Ordering::Less => Ok((
             RelayConnectionIdentifier { id_a: id_b, id_b: id_a },
             RelayConnection::new(conn_b, conn_a),
         )),
@@ -225,43 +225,51 @@ impl<St> ToString for RelayConnections<St> {
 }
 
 impl<St: DuplexStream> RelayConnections<St> {
+    pub fn new() -> Self {
+        Self {
+            conns: Rc::new(RefCell::new(HashMap::new())),
+        }
+    }
+
     pub fn create_new(&'static mut self, id_a: PeerId, stream_a: St, id_b: PeerId, stream_b: St) -> Result<(), String> {
         let id1: RelayConnectionIdentifier = (id_a, id_b).try_into().unwrap();
 
-        let bar = self.conns.as_ref();
+        {
+            let conns = &self.conns;
 
-        let conn_a = Server::new(
-            stream_a,
-            Box::new(move || {
-                bar.borrow_mut().remove(&id1);
-            }),
-            Box::new(move || {
-                bar.borrow_mut().remove(&id1);
-            }),
-        );
+            let conn_a = Server::new(
+                stream_a,
+                Box::new(move || {
+                    conns.borrow_mut().remove(&id1);
+                }),
+                Box::new(move || {
+                    conns.borrow_mut().remove(&id1);
+                }),
+            );
 
-        let conn_b = Server::new(
-            stream_b,
-            Box::new(move || {
-                bar.borrow_mut().remove(&id1);
-            }),
-            Box::new(move || {
-                bar.borrow_mut().remove(&id1);
-            }),
-        );
+            let conn_b = Server::new(
+                stream_b,
+                Box::new(move || {
+                    conns.borrow_mut().remove(&id1);
+                }),
+                Box::new(move || {
+                    conns.borrow_mut().remove(&id1);
+                }),
+            );
 
-        let (id, conn) = get_key_and_value(id_a, conn_a, id_b, conn_b)?;
+            let (id, conn) = get_key_and_value(id_a, conn_a, id_b, conn_b)?;
 
-        let conn = bar.borrow_mut().insert(id, conn).unwrap();
+            conns.borrow_mut().insert(id, conn);
+        }
 
-        spawn_local(async {
-            match conn.await {
+        let conns = &self.conns;
+        let id = id1.clone();
+
+        spawn_local(async move {
+            match conns.borrow_mut().get_mut(&id).unwrap().await {
                 Ok(()) => (),
                 Err(e) => {
-                    let id1: RelayConnectionIdentifier = (PeerId::random(), PeerId::random()).try_into().unwrap();
-
-                    bar.borrow_mut().remove(&id1);
-                    // self.conns.remove_entry(&id);
+                    conns.borrow_mut().remove(&id);
                     error!("{}", e)
                 }
             }
@@ -353,6 +361,18 @@ impl<St: DuplexStream> RelayConnections<St> {
             }
         }
     }
+
+    pub fn exists(&self, source: PeerId, destination: PeerId) -> bool {
+        let id: RelayConnectionIdentifier = match (source, destination).try_into() {
+            Ok(x) => x,
+            Err(e) => {
+                error!("{}", e);
+                return false;
+            }
+        };
+
+        self.conns.borrow().contains_key(&id)
+    }
 }
 
 #[cfg(feature = "wasm")]
@@ -366,7 +386,7 @@ pub mod wasm {
     use wasm_bindgen::prelude::*;
 
     #[wasm_bindgen]
-    struct RelayState {
+    pub struct RelayState {
         w: super::RelayConnections<StreamingIterable>,
     }
 
@@ -379,7 +399,33 @@ pub mod wasm {
     }
 
     #[wasm_bindgen]
+    extern "C" {
+        #[wasm_bindgen]
+        pub type RelayStateOps;
+
+        #[wasm_bindgen(getter, js_name = "relayFreeTimeout")]
+        pub fn relay_free_timeout() -> u32;
+    }
+
+    #[wasm_bindgen(js_name = "getId")]
+    pub fn get_id(source: JsPeerId, destination: JsPeerId) -> Result<JsValue, JsValue> {
+        let source = ok_or_jserr!(PeerId::from_str(source.to_string().as_str()))?;
+        let destination = ok_or_jserr!(PeerId::from_str(destination.to_string().as_str()))?;
+
+        let id = ok_or_jserr!(super::RelayConnectionIdentifier::try_from((source, destination)))?;
+
+        Ok(JsValue::from(id.to_string()))
+    }
+
+    #[wasm_bindgen]
     impl RelayState {
+        #[wasm_bindgen(constructor)]
+        pub fn new(_ops: RelayStateOps) -> RelayState {
+            RelayState {
+                w: super::RelayConnections::new(),
+            }
+        }
+
         #[wasm_bindgen(js_name = "createNew")]
         pub fn create_new(
             &mut self,
@@ -398,14 +444,9 @@ pub mod wasm {
                 >(&mut self.w)
             };
 
-            match this.create_new(
-                source,
-                StreamingIterable::from(to_source),
-                destination,
-                StreamingIterable::from(to_destination),
-            ) {
+            match this.create_new(source, to_source.into(), destination, to_destination.into()) {
                 Ok(()) => Ok(JsValue::undefined()),
-                Err(e) => Err(JsValue::from(e)),
+                Err(e) => Err(e.into()),
             }
         }
 
@@ -424,7 +465,7 @@ pub mod wasm {
                 .is_active(source, destination, timeout.map(|n| n.value_of() as u64))
                 .await;
 
-            Ok(JsValue::from(res))
+            Ok(res.into())
         }
 
         #[wasm_bindgen(js_name = "updateExisting")]
@@ -437,10 +478,17 @@ pub mod wasm {
             let source = ok_or_jserr!(PeerId::from_str(source.to_string().as_str()))?;
             let destination = ok_or_jserr!(PeerId::from_str(destination.to_string().as_str()))?;
 
-            self.w
-                .update_existing(source, destination, StreamingIterable::from(to_source));
+            self.w.update_existing(source, destination, to_source.into());
 
             Ok(JsValue::undefined())
+        }
+
+        #[wasm_bindgen]
+        pub fn exists(&self, source: JsPeerId, destination: JsPeerId) -> Result<JsValue, JsValue> {
+            let source = ok_or_jserr!(PeerId::from_str(source.to_string().as_str()))?;
+            let destination = ok_or_jserr!(PeerId::from_str(destination.to_string().as_str()))?;
+
+            Ok(self.w.exists(source, destination).into())
         }
     }
 }

@@ -184,7 +184,6 @@ pin_project! {
     /// to one of the participants. Once there is a reconnects, a new
     /// connection can get attached and the server does a stream handover
     /// to the newly attached connection.
-    // #[derive(Debug)]
     pub struct Server<St> {
         // the underlying Stream / Sink struct
         // FIXME: make it work for pure Rust *and* WebAssembly
@@ -681,7 +680,7 @@ pub mod wasm {
         ) -> Self {
             Self {
                 w: super::Server::new(
-                    StreamingIterable::from(stream),
+                    stream.into(),
                     Box::new(move || {
                         on_close.call0(&JsValue::undefined()).unwrap();
                     }),
@@ -695,7 +694,7 @@ pub mod wasm {
         /// After a reconnect, assign a new stream
         #[wasm_bindgen]
         pub fn update(&mut self, new_stream: JsStreamingIterable) -> Result<(), String> {
-            self.w.update(StreamingIterable::from(new_stream))
+            self.w.update(new_stream.into())
         }
 
         /// Issues a new low-level ping request
@@ -705,8 +704,8 @@ pub mod wasm {
 
             wasm_bindgen_futures::future_to_promise(this.w.ping(timeout.map(|f| f.value_of() as u64)).map(
                 |r| match r {
-                    Ok(u) => Ok(JsValue::from(u)),
-                    Err(e) => Err(JsValue::from(e)),
+                    Ok(u) => Ok(u.into()),
+                    Err(e) => Err(e.into()),
                 },
             ))
         }
@@ -803,7 +802,7 @@ pub mod wasm {
                     Err(e) => {
                         self.w
                             .error(format!("Error access Symbol.asyncIterator {:?}", e).as_str());
-                        reject.call1(&JsValue::undefined(), &JsValue::from(e)).unwrap();
+                        reject.call1(&JsValue::undefined(), &e.into()).unwrap();
                         return;
                     }
                 };
@@ -813,7 +812,7 @@ pub mod wasm {
                     Err(e) => {
                         self.w
                             .error(format!("Cannot perform dynamic convertion {:?}", e).as_str());
-                        reject.call1(&JsValue::undefined(), &JsValue::from(e)).unwrap();
+                        reject.call1(&JsValue::undefined(), &e.into()).unwrap();
                         return;
                     }
                 };
@@ -822,7 +821,7 @@ pub mod wasm {
                     Ok(x) => x,
                     Err(e) => {
                         self.w.error(format!("Cannot call iterable function {:?}", e).as_str());
-                        reject.call1(&JsValue::undefined(), &JsValue::from(e)).unwrap();
+                        reject.call1(&JsValue::undefined(), &e.into()).unwrap();
                         return;
                     }
                 };
@@ -837,7 +836,7 @@ pub mod wasm {
                                     Err(e) => {
                                         this.w.error(format!("error handling next() future {:?}", e).as_str());
                                         this.w.stream.as_mut().unwrap().close().await;
-                                        reject.call1(&JsValue::undefined(), &JsValue::from(e)).unwrap();
+                                        reject.call1(&JsValue::undefined(), &e.into()).unwrap();
                                         return;
                                     }
                                 };

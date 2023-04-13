@@ -204,7 +204,26 @@ export async function negotiateRelayHandshake(
       shakerWrite(shaker, RelayHandshakeMessage.OK)
 
       // Relayed connection could have been closed meanwhile
-      if (state.updateExisting(source, destination, shaker.stream)) {
+      if (
+        state.updateExisting(
+          source,
+          destination,
+          // Some libp2p modules produces Buffer streams but
+          // WASM requires Uint8Array streams
+          {
+            source: (async function* () {
+              for await (const maybeBuf of shaker.stream.source) {
+                if (Buffer.isBuffer(maybeBuf)) {
+                  yield new Uint8Array(maybeBuf.buffer, maybeBuf.byteOffset, maybeBuf.length)
+                } else {
+                  yield maybeBuf
+                }
+              }
+            })(),
+            sink: shaker.stream.sink
+          }
+        )
+      ) {
         // Updated connection, so everything done
         return
       }
@@ -276,7 +295,38 @@ export async function negotiateRelayHandshake(
       shakerWrite(shaker, RelayHandshakeMessage.OK)
       destinationShaker.rest()
 
-      state.createNew(source, destination, shaker.stream, destinationShaker.stream, options.relayFreeTimeout)
+      state.createNew(
+        source,
+        destination,
+        // Some libp2p modules produces Buffer streams but
+        // WASM requires Uint8Array streams
+        {
+          source: (async function* () {
+            for await (const maybeBuf of shaker.stream.source) {
+              if (Buffer.isBuffer(maybeBuf)) {
+                yield new Uint8Array(maybeBuf.buffer, maybeBuf.byteOffset, maybeBuf.length)
+              } else {
+                yield maybeBuf
+              }
+            }
+          })(),
+          sink: shaker.stream.sink
+        },
+        // Some libp2p modules produces Buffer streams but
+        // WASM requires Uint8Array streams
+        {
+          source: (async function* () {
+            for await (const maybeBuf of destinationShaker.stream.source) {
+              if (Buffer.isBuffer(maybeBuf)) {
+                yield new Uint8Array(maybeBuf.buffer, maybeBuf.byteOffset, maybeBuf.length)
+              } else {
+                yield maybeBuf
+              }
+            }
+          })(),
+          sink: destinationShaker.stream.sink
+        }
+      )
       break
     default:
       log(`Counterparty replied with ${destinationAnswer} but expected ${RelayHandshakeMessage.OK}`)

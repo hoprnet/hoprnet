@@ -101,8 +101,8 @@ pin_project! {
 }
 
 // Turn this into an arc
-impl StreamingIterable {
-    pub fn from(stream: JsStreamingIterable) -> StreamingIterable {
+impl From<JsStreamingIterable> for StreamingIterable {
+    fn from(stream: JsStreamingIterable) -> StreamingIterable {
         StreamingIterable {
             js_stream: stream,
             stream_done: false,

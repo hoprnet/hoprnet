@@ -136,13 +136,13 @@ class RelayState {
    * @param toDestination duplex stream to destination
    * @param __relayFreeTimeout
    */
-  async createNew(
+  createNew(
     source: PeerId,
     destination: PeerId,
     toSource: Stream,
     toDestination: Stream,
     __relayFreeTimeout?: number
-  ): Promise<void> {
+  ): void {
     const toSourceContext = new Server(
       {
         source: (async function* () {
