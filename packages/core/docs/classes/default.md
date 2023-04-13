@@ -77,6 +77,7 @@
 - [listenerCount](default.md#listenercount)
 - [listeners](default.md#listeners)
 - [maybeEmitFundsEmptyEvent](default.md#maybeemitfundsemptyevent)
+- [maybeEnableDhtServerMode](default.md#maybeenabledhtservermode)
 - [maybeLogProfilingToGCloud](default.md#maybelogprofilingtogcloud)
 - [off](default.md#off)
 - [on](default.md#on)
@@ -88,6 +89,8 @@
 - [ping](default.md#ping)
 - [prependListener](default.md#prependlistener)
 - [prependOnceListener](default.md#prependoncelistener)
+- [printAvailableAddresses](default.md#printavailableaddresses)
+- [printAvailableProtocols](default.md#printavailableprotocols)
 - [rawListeners](default.md#rawlisteners)
 - [redeemAllTickets](default.md#redeemalltickets)
 - [redeemTicketsInChannel](default.md#redeemticketsinchannel)
@@ -139,7 +142,7 @@ EventEmitter.constructor
 
 #### Defined in
 
-[packages/core/src/index.ts:256](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L256)
+[packages/core/src/index.ts:258](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L258)
 
 ## Properties
 
@@ -149,7 +152,7 @@ EventEmitter.constructor
 
 #### Defined in
 
-[packages/core/src/index.ts:235](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L235)
+[packages/core/src/index.ts:237](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L237)
 
 ___
 
@@ -161,7 +164,7 @@ used to persist protocol state
 
 #### Defined in
 
-[packages/core/src/index.ts:258](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L258)
+[packages/core/src/index.ts:260](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L260)
 
 ___
 
@@ -171,7 +174,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:241](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L241)
+[packages/core/src/index.ts:243](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L243)
 
 ___
 
@@ -181,7 +184,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:234](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L234)
+[packages/core/src/index.ts:236](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L236)
 
 ___
 
@@ -191,7 +194,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:233](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L233)
+[packages/core/src/index.ts:235](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L235)
 
 ___
 
@@ -203,7 +206,7 @@ PeerId to use, determines node address
 
 #### Defined in
 
-[packages/core/src/index.ts:257](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L257)
+[packages/core/src/index.ts:259](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L259)
 
 ___
 
@@ -213,7 +216,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:243](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L243)
+[packages/core/src/index.ts:245](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L245)
 
 ___
 
@@ -223,7 +226,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:239](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L239)
+[packages/core/src/index.ts:241](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L241)
 
 ___
 
@@ -233,7 +236,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:236](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L236)
+[packages/core/src/index.ts:238](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L238)
 
 ___
 
@@ -243,7 +246,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:232](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L232)
+[packages/core/src/index.ts:234](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L234)
 
 ___
 
@@ -253,7 +256,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:259](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L259)
+[packages/core/src/index.ts:261](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L261)
 
 ___
 
@@ -263,7 +266,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:238](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L238)
+[packages/core/src/index.ts:240](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L240)
 
 ___
 
@@ -275,7 +278,7 @@ used to pass information about newly announced nodes to transport module
 
 #### Defined in
 
-[packages/core/src/index.ts:260](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L260)
+[packages/core/src/index.ts:262](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L262)
 
 ___
 
@@ -285,7 +288,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:228](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L228)
+[packages/core/src/index.ts:230](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L230)
 
 ___
 
@@ -307,7 +310,7 @@ It should not assume any other components are running when it is called.
 
 #### Defined in
 
-[packages/core/src/index.ts:237](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L237)
+[packages/core/src/index.ts:239](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L239)
 
 ___
 
@@ -325,7 +328,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:230](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L230)
+[packages/core/src/index.ts:232](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L232)
 
 ___
 
@@ -335,7 +338,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:231](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L231)
+[packages/core/src/index.ts:233](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L233)
 
 ___
 
@@ -460,7 +463,7 @@ a Promise that resolves once announce transaction has been published
 
 #### Defined in
 
-[packages/core/src/index.ts:1103](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1103)
+[packages/core/src/index.ts:1169](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1169)
 
 ___
 
@@ -481,7 +484,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:1275](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1275)
+[packages/core/src/index.ts:1341](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1341)
 
 ___
 
@@ -505,7 +508,7 @@ Similar to `libp2p.hangUp` but catching all errors.
 
 #### Defined in
 
-[packages/core/src/index.ts:1028](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1028)
+[packages/core/src/index.ts:1094](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1094)
 
 ___
 
@@ -526,7 +529,7 @@ us and various nodes
 
 #### Defined in
 
-[packages/core/src/index.ts:1048](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1048)
+[packages/core/src/index.ts:1114](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1114)
 
 ___
 
@@ -613,7 +616,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:1067](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1067)
+[packages/core/src/index.ts:1133](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1133)
 
 ___
 
@@ -675,7 +678,7 @@ Fund a payment channel
 
 #### Defined in
 
-[packages/core/src/index.ts:1250](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1250)
+[packages/core/src/index.ts:1316](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1316)
 
 ___
 
@@ -693,7 +696,7 @@ a list of announced multi addresses
 
 #### Defined in
 
-[packages/core/src/index.ts:1010](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1010)
+[packages/core/src/index.ts:1076](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1076)
 
 ___
 
@@ -720,7 +723,7 @@ returned list can change at runtime
 
 #### Defined in
 
-[packages/core/src/index.ts:823](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L823)
+[packages/core/src/index.ts:889](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L889)
 
 ___
 
@@ -734,7 +737,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:1392](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1392)
+[packages/core/src/index.ts:1458](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1458)
 
 ___
 
@@ -748,7 +751,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:1335](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1335)
+[packages/core/src/index.ts:1401](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1401)
 
 ___
 
@@ -762,7 +765,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:1185](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1185)
+[packages/core/src/index.ts:1251](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1251)
 
 ___
 
@@ -787,7 +790,7 @@ the channel entry of those two nodes
 
 #### Defined in
 
-[packages/core/src/index.ts:1388](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1388)
+[packages/core/src/index.ts:1454](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1454)
 
 ___
 
@@ -801,7 +804,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:1181](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1181)
+[packages/core/src/index.ts:1247](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1247)
 
 ___
 
@@ -821,7 +824,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:1396](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1396)
+[packages/core/src/index.ts:1462](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1462)
 
 ___
 
@@ -841,7 +844,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:1400](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1400)
+[packages/core/src/index.ts:1466](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1466)
 
 ___
 
@@ -857,7 +860,7 @@ a list connected peerIds
 
 #### Defined in
 
-[packages/core/src/index.ts:993](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L993)
+[packages/core/src/index.ts:1059](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1059)
 
 ___
 
@@ -879,7 +882,7 @@ various information about the connection
 
 #### Defined in
 
-[packages/core/src/index.ts:1018](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1018)
+[packages/core/src/index.ts:1084](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1084)
 
 ___
 
@@ -895,7 +898,7 @@ Recalculates and retrieves the current connectivity health indicator.
 
 #### Defined in
 
-[packages/core/src/index.ts:776](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L776)
+[packages/core/src/index.ts:842](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L842)
 
 ___
 
@@ -909,7 +912,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:1408](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1408)
+[packages/core/src/index.ts:1474](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1474)
 
 ___
 
@@ -923,7 +926,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:1427](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1427)
+[packages/core/src/index.ts:1493](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1493)
 
 ___
 
@@ -939,7 +942,7 @@ Gets the peer ID of this HOPR node.
 
 #### Defined in
 
-[packages/core/src/index.ts:813](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L813)
+[packages/core/src/index.ts:879](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L879)
 
 ___
 
@@ -964,7 +967,7 @@ that will relay that message before it reaches its destination.
 
 #### Defined in
 
-[packages/core/src/index.ts:1466](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1466)
+[packages/core/src/index.ts:1532](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1532)
 
 ___
 
@@ -980,7 +983,7 @@ List the addresses on which the node is listening
 
 #### Defined in
 
-[packages/core/src/index.ts:852](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L852)
+[packages/core/src/index.ts:918](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L918)
 
 ___
 
@@ -1019,7 +1022,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:1189](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1189)
+[packages/core/src/index.ts:1255](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1255)
 
 ___
 
@@ -1041,7 +1044,7 @@ Gets the observed addresses of a given peer.
 
 #### Defined in
 
-[packages/core/src/index.ts:866](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L866)
+[packages/core/src/index.ts:932](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L932)
 
 ___
 
@@ -1061,7 +1064,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:1404](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1404)
+[packages/core/src/index.ts:1470](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1470)
 
 ___
 
@@ -1075,7 +1078,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:1350](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1350)
+[packages/core/src/index.ts:1416](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1416)
 
 ___
 
@@ -1095,7 +1098,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:1339](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1339)
+[packages/core/src/index.ts:1405](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1405)
 
 ___
 
@@ -1111,7 +1114,7 @@ Returns the version of hopr-core.
 
 #### Defined in
 
-[packages/core/src/index.ts:769](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L769)
+[packages/core/src/index.ts:835](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L835)
 
 ___
 
@@ -1133,7 +1136,7 @@ true if allowed access
 
 #### Defined in
 
-[packages/core/src/index.ts:1454](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1454)
+[packages/core/src/index.ts:1520](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1520)
 
 ___
 
@@ -1224,7 +1227,25 @@ If error provided is considered an out of funds error
 
 #### Defined in
 
-[packages/core/src/index.ts:585](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L585)
+[packages/core/src/index.ts:651](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L651)
+
+___
+
+### maybeEnableDhtServerMode
+
+▸ `Private` **maybeEnableDhtServerMode**(): `Promise`<`void`\>
+
+Checks if we are announcing public addresses to the DHT.
+If so, switch DHT to `server`-mode such that the node will
+reply to DHT queries of other nodes
+
+#### Returns
+
+`Promise`<`void`\>
+
+#### Defined in
+
+[packages/core/src/index.ts:576](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L576)
 
 ___
 
@@ -1238,7 +1259,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:534](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L534)
+[packages/core/src/index.ts:600](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L600)
 
 ___
 
@@ -1344,7 +1365,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:553](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L553)
+[packages/core/src/index.ts:619](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L619)
 
 ___
 
@@ -1364,7 +1385,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:574](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L574)
+[packages/core/src/index.ts:640](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L640)
 
 ___
 
@@ -1388,7 +1409,7 @@ Called whenever a peer is announced
 
 #### Defined in
 
-[packages/core/src/index.ts:603](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L603)
+[packages/core/src/index.ts:669](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L669)
 
 ___
 
@@ -1464,7 +1485,7 @@ Open a payment channel
 
 #### Defined in
 
-[packages/core/src/index.ts:1210](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1210)
+[packages/core/src/index.ts:1276](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1276)
 
 ___
 
@@ -1488,7 +1509,7 @@ latency
 
 #### Defined in
 
-[packages/core/src/index.ts:968](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L968)
+[packages/core/src/index.ts:1034](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1034)
 
 ___
 
@@ -1574,6 +1595,38 @@ node_modules/@types/node/events.d.ts:613
 
 ___
 
+### printAvailableAddresses
+
+▸ `Private` **printAvailableAddresses**(): `string`
+
+Pretty-print available addresses
+
+#### Returns
+
+`string`
+
+#### Defined in
+
+[packages/core/src/index.ts:538](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L538)
+
+___
+
+### printAvailableProtocols
+
+▸ `Private` **printAvailableProtocols**(): `string`
+
+Pretty-print available addresses
+
+#### Returns
+
+`string`
+
+#### Defined in
+
+[packages/core/src/index.ts:556](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L556)
+
+___
+
 ### rawListeners
 
 ▸ **rawListeners**(`eventName`): `Function`[]
@@ -1639,7 +1692,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:1371](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1371)
+[packages/core/src/index.ts:1437](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1437)
 
 ___
 
@@ -1659,7 +1712,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:1375](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1375)
+[packages/core/src/index.ts:1441](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1441)
 
 ___
 
@@ -1824,7 +1877,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:914](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L914)
+[packages/core/src/index.ts:980](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L980)
 
 ___
 
@@ -1844,7 +1897,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:1168](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1168)
+[packages/core/src/index.ts:1234](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1234)
 
 ___
 
@@ -1899,7 +1952,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:1416](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1416)
+[packages/core/src/index.ts:1482](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1482)
 
 ___
 
@@ -1921,7 +1974,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:1194](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1194)
+[packages/core/src/index.ts:1260](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1260)
 
 ___
 
@@ -1962,7 +2015,7 @@ If the node is not funded, it will throw.
 
 #### Defined in
 
-[packages/core/src/index.ts:296](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L296)
+[packages/core/src/index.ts:298](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L298)
 
 ___
 
@@ -1976,7 +2029,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:1071](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1071)
+[packages/core/src/index.ts:1137](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1137)
 
 ___
 
@@ -1992,7 +2045,7 @@ Shuts down the node and saves keys and peerBook in the database
 
 #### Defined in
 
-[packages/core/src/index.ts:784](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L784)
+[packages/core/src/index.ts:850](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L850)
 
 ___
 
@@ -2012,7 +2065,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:662](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L662)
+[packages/core/src/index.ts:728](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L728)
 
 ___
 
@@ -2032,7 +2085,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:643](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L643)
+[packages/core/src/index.ts:709](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L709)
 
 ___
 
@@ -2053,7 +2106,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:1064](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1064)
+[packages/core/src/index.ts:1130](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1130)
 
 ___
 
@@ -2067,7 +2120,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:707](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L707)
+[packages/core/src/index.ts:773](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L773)
 
 ___
 
@@ -2081,7 +2134,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:672](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L672)
+[packages/core/src/index.ts:738](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L738)
 
 ___
 
@@ -2105,7 +2158,7 @@ Throws an error if some channel is not opened.
 
 #### Defined in
 
-[packages/core/src/index.ts:877](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L877)
+[packages/core/src/index.ts:943](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L943)
 
 ___
 
@@ -2123,7 +2176,7 @@ MAX_DELAY is reached, this function will reject.
 
 #### Defined in
 
-[packages/core/src/index.ts:1486](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1486)
+[packages/core/src/index.ts:1552](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1552)
 
 ___
 
@@ -2137,7 +2190,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:1531](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1531)
+[packages/core/src/index.ts:1597](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1597)
 
 ___
 
@@ -2161,7 +2214,7 @@ Withdraw on-chain assets to a given address
 
 #### Defined in
 
-[packages/core/src/index.ts:1438](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1438)
+[packages/core/src/index.ts:1504](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L1504)
 
 ___
 
