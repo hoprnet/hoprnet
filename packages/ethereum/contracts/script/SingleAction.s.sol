@@ -383,7 +383,7 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
     }
     uint256 ownedNftBalance = abi.decode(returndataOwnedNftBalance, (uint256));
     // get the desired nft uri hash
-    bytes32 desiredHaashedTokenUri = keccak256(bytes(abi.encodePacked(NETWORK_REGISTRY_TYPE_NAME, '/', nftRank)));
+    bytes32 desiredTokenUriPart = string(abi.encodePacked(NETWORK_REGISTRY_TYPE_NAME, '/', nftRank));
 
     // 2. Loop through balance and compare token URI
     uint256 index;
@@ -401,8 +401,9 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
       if (!successTokenUri) {
         revert('Cannot read token URI of the given ID.');
       }
+      string memory tokenUri = abi.decode(returndataTokenUri, (string));
 
-      if (desiredHaashedTokenUri == keccak256(bytes(abi.decode(returndataTokenUri, (string))))) {
+      if (_hasSubstring(tokenUri, desiredTokenUriPart)) {
         // 3. find the tokenId, perform safeTransferFrom
         (bool successStakeNft, ) = boostContractAddr.call(
           abi.encodeWithSignature('safeTransferFrom(address,address,uint256)', sender, recipient, ownedNftTokenId)
@@ -482,5 +483,53 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
       require(nativeTokenTransferSuccess, 'Cannot send native tokens to the recipient');
     }
     vm.stopBroadcast();
+  }
+
+  /**
+   * ported from HoprStakeBase.sol
+   * @dev if the given `tokenURI` end with `/substring`
+   * @param tokenURI string URI of the HoprBoost NFT. E.g. "https://stake.hoprnet.org/PuzzleHunt_v2/Bronze - Week 5"
+   * @param substring string of the `boostRank` or `boostType/boostRank`. E.g. "Bronze - Week 5", "PuzzleHunt_v2/Bronze - Week 5"
+   */
+  function _hasSubstring(string memory tokenURI, string memory substring) internal pure returns (bool) {
+    // convert string to bytes
+    bytes memory tokenURIInBytes = bytes(tokenURI);
+    bytes memory substringInBytes = bytes(substring);
+
+    // lenghth of tokenURI is the sum of substringLen and restLen, where
+    // - `substringLen` is the length of the part that is extracted and compared with the provided substring
+    // - `restLen` is the length of the baseURI and boostType, which will be offset
+    uint256 substringLen = substringInBytes.length;
+    uint256 restLen = tokenURIInBytes.length - substringLen;
+    // one byte before the supposed substring, to see if it's the start of `substring`
+    bytes1 slashPositionContent = tokenURIInBytes[restLen - 1];
+
+    if (slashPositionContent != 0x2f) {
+      // if this position is not a `/`, substring in the tokenURI is for sure neither `boostRank` nor `boostType/boostRank`
+      return false;
+    }
+
+    // offset so that value from the next calldata (`substring`) is removed, so bitwise it needs to shift
+    // log2(16) * (32 - substringLen) * 2
+    uint256 offset = (32 - substringLen) * 8;
+
+    bytes32 trimed; // left-padded extracted `boostRank` from the `tokenURI`
+    bytes32 substringInBytes32 = bytes32(substringInBytes); // convert substring in to bytes32
+    bytes32 shifted; // shift the substringInBytes32 from right-padded to left-padded
+
+    bool result;
+    assembly {
+      // assuming `boostRank` or `boostType/boostRank` will never exceed 32 bytes
+      // left-pad the `boostRank` extracted from the `tokenURI`, so that possible
+      // extra pieces of `substring` is not included
+      // 32 jumps the storage of bytes length and restLen offsets the `baseURI`
+      trimed := shr(offset, mload(add(add(tokenURIInBytes, 32), restLen)))
+      // tokenURIInBytes32 := mload(add(add(tokenURIInBytes, 32), restLen))
+      // left-pad `substring`
+      shifted := shr(offset, substringInBytes32)
+      // compare results
+      result := eq(trimed, shifted)
+    }
+    return result;
   }
 }
