@@ -70,6 +70,7 @@ jobs:
         with:
           name: hoprnet
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+        continue-on-error: true
 
       - name: get yarn cache directory path
         id: yarn-cache-dir-path
@@ -199,6 +200,7 @@ jobs:
         with:
           name: hoprnet
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+        continue-on-error: true
 
       - name: Set up Google Cloud Credentials
         uses: google-github-actions/auth@v0
@@ -260,6 +262,7 @@ jobs:
         with:
           name: hoprnet
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+        continue-on-error: true
 
       - name: get yarn cache directory path
         id: yarn-cache-dir-path
@@ -505,6 +508,7 @@ jobs:
         with:
           name: hoprnet
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+        continue-on-error: true
 
       - name: get yarn cache directory path
         id: yarn-cache-dir-path
