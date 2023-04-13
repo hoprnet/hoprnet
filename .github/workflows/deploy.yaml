@@ -569,23 +569,24 @@ jobs:
 
       - name: Run deploy script for nodes behind NAT
         if: ${{ !startsWith(github.ref, 'refs/heads/staging/') && !env.ACT }}
-        run: |
-          ./scripts/deploy.sh "gcr.io/hoprassociation/hoprd" 2 "-nat"
+        run: ./scripts/deploy.sh "gcr.io/hoprassociation/hoprd" 2 "-nat"
         env:
           DEPLOYER_PRIVATE_KEY: ${{ secrets.DEPLOYER_WALLET_PRIVATE_KEY }}
           HOPRD_PASSWORD: ${{ secrets.BS_PASSWORD }}
           HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
           FAUCET_SECRET_API_KEY: ${{ secrets.FAUCET_SECRET_API_KEY }}
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN }}
 
       - name: Run deploy script for nodes behind NAT (staging-only)
         if: ${{ startsWith(github.ref, 'refs/heads/staging/') && !env.ACT }}
-        run: |
-          HOPRD_SKIP_UNSTAKED=true ./scripts/deploy.sh "gcr.io/hoprassociation/hoprd" 1 "-nat"
+        run: ./scripts/deploy.sh "gcr.io/hoprassociation/hoprd" 1 "-nat"
         env:
+          HOPRD_SKIP_UNSTAKED: true
           DEPLOYER_PRIVATE_KEY: ${{ secrets.DEPLOYER_WALLET_PRIVATE_KEY }}
           HOPRD_PASSWORD: ${{ secrets.BS_PASSWORD }}
           HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
           FAUCET_SECRET_API_KEY: ${{ secrets.FAUCET_SECRET_API_KEY }}
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN }}
 
       - name: Send cluster info to Matrix
         if: ${{ success() && !env.ACT }}
