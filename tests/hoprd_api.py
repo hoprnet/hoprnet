@@ -109,17 +109,12 @@ class HoprdAPI(object):
         data = json.dumps({})
         return await self.call_api("node/peers", "GET", bytes(data, "utf-8"))
 
-    async def get_address(self) :
+    async def get_address(self):
         data = json.dumps({})
         return await self.call_api(f"account/addresses", "GET", bytes(data, "utf-8"))
+
     async def send_message(self, destination, message, hops):
         assert isinstance(hops, list)
 
-        data = json.dumps(
-            {
-                "body": message,
-                "path": hops,
-                "recipient": destination
-            }
-        )
+        data = json.dumps({"body": message, "path": hops, "recipient": destination})
         return await self.call_api("messages", "POST", bytes(data, "utf-8"))

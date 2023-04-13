@@ -3,20 +3,24 @@ import subprocess
 
 import pytest
 
+
 def pytest_addoption(parser):
     parser.addoption(
-        '--stress-seq-request-count', action='store', default=200, help='Number of sequential requests in the stress test'
+        "--stress-seq-request-count",
+        action="store",
+        default=200,
+        help="Number of sequential requests in the stress test",
     )
     parser.addoption(
-        '--stress-par-request-count', action='store', default=200, help='Number of parallel requests in the stress test'
+        "--stress-par-request-count", action="store", default=200, help="Number of parallel requests in the stress test"
     )
 
 
 @pytest.fixture
 def cmd_line_args(request):
     args = {}
-    args['stress_seq_request_count'] = request.config.getoption('--stress-seq-request-count')
-    args['stress_par_request_count'] = request.config.getoption('--stress-par-request-count')
+    args["stress_seq_request_count"] = request.config.getoption("--stress-seq-request-count")
+    args["stress_par_request_count"] = request.config.getoption("--stress-par-request-count")
     return args
 
 
