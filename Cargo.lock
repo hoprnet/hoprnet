@@ -951,6 +951,7 @@ dependencies = [
  "gloo-timers",
  "hex 0.4.3",
  "js-sys",
+ "libp2p",
  "pin-project-lite",
  "utils-log",
  "utils-misc",
