@@ -291,13 +291,7 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
 
     // 3. stake the difference, if allowed
     uint256 amountToStake = stakeTarget - stakedAmount;
-    (bool successReadBalance, bytes memory returndataReadBalance) = currentEnvironmentDetail
-      .xhoprTokenContractAddress
-      .staticcall(abi.encodeWithSignature('balanceOf(address)', msgSender));
-    if (!successReadBalance) {
-      revert('Cannot read token balance on xHOPR token contract.');
-    }
-    uint256 balance = abi.decode(returndataReadBalance, (uint256));
+    uint256 balance = getTokenBalanceOf(currentEnvironmentDetail.xhoprTokenContractAddress, msgSender);
     if (stakedAmount >= stakeTarget) {
       emit log_string('Stake target has reached');
       return;
@@ -440,48 +434,19 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
     address recipient,
     string calldata nftRank
   ) private {
-    // 1. Check sender's Network_registry NFT balance
-    (bool successOwnedNftBalance, bytes memory returndataOwnedNftBalance) = boostContractAddr.staticcall(
-      abi.encodeWithSignature('balanceOf(address)', sender)
-    );
-    if (!successOwnedNftBalance) {
-      revert('Cannot read if the amount of Network_registry NFTs owned by the caller.');
-    }
-    uint256 ownedNftBalance = abi.decode(returndataOwnedNftBalance, (uint256));
-    // get the desired nft uri hash
-    bytes32 desiredHaashedTokenUri = keccak256(bytes(abi.encodePacked(NETWORK_REGISTRY_TYPE_NAME, '/', nftRank)));
+    // check if the sender owns the desired nft rank
+    (bool ownsNft, uint256 tokenId) = hasNetworkRegistryNft(boostContractAddr, sender, nftRank);
 
-    // 2. Loop through balance and compare token URI
-    uint256 index;
-    for (index = 0; index < ownedNftBalance; index++) {
-      (bool successOwnedNftTokenId, bytes memory returndataOwnedNftTokenId) = boostContractAddr.staticcall(
-        abi.encodeWithSignature('tokenOfOwnerByIndex(address,uint256)', sender, index)
-      );
-      if (!successOwnedNftTokenId) {
-        revert('Cannot read owned NFT at a given index.');
-      }
-      uint256 ownedNftTokenId = abi.decode(returndataOwnedNftTokenId, (uint256));
-      (bool successTokenUri, bytes memory returndataTokenUri) = boostContractAddr.staticcall(
-        abi.encodeWithSignature('tokenURI(uint256)', ownedNftTokenId)
-      );
-      if (!successTokenUri) {
-        revert('Cannot read token URI of the given ID.');
-      }
-
-      if (desiredHaashedTokenUri == keccak256(bytes(abi.decode(returndataTokenUri, (string))))) {
-        // 3. find the tokenId, perform safeTransferFrom
-        (bool successStakeNft, ) = boostContractAddr.call(
-          abi.encodeWithSignature('safeTransferFrom(address,address,uint256)', sender, recipient, ownedNftTokenId)
-        );
-        if (!successStakeNft) {
-          revert('Cannot stake the NFT');
-        }
-        break;
-      }
-    }
-
-    if (index >= ownedNftBalance) {
+    if (!ownsNft) {
       revert('Failed to find the owned NFT');
+    }
+
+    // found the tokenId, perform safeTransferFrom
+    (bool successStakeNft, ) = boostContractAddr.call(
+      abi.encodeWithSignature('safeTransferFrom(address,address,uint256)', sender, recipient, tokenId)
+    );
+    if (!successStakeNft) {
+      revert('Cannot stake the NFT');
     }
   }
 
@@ -550,6 +515,47 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
   }
 
   /**
+   * @dev private function to check if an account owns a Network Registry NFT of nftRank
+   */
+  function hasNetworkRegistryNft(
+    address boostContractAddr,
+    address account,
+    string calldata nftRank
+  ) private returns (bool ownsNft, uint256 tokenId) {
+    // 1. Check account's Network_registry NFT balance
+    uint256 ownedNftBalance = getTokenBalanceOf(boostContractAddr, account);
+    // get the desired nft uri hash
+    string memory desiredTokenUriPart = string(abi.encodePacked(NETWORK_REGISTRY_TYPE_NAME, '/', nftRank));
+
+    // 2. Loop through balance and compare token URI
+    uint256 index;
+    for (index = 0; index < ownedNftBalance; index++) {
+      (bool successOwnedNftTokenId, bytes memory returndataOwnedNftTokenId) = boostContractAddr.staticcall(
+        abi.encodeWithSignature('tokenOfOwnerByIndex(address,uint256)', account, index)
+      );
+      if (!successOwnedNftTokenId) {
+        revert('Cannot read owned NFT at a given index.');
+      }
+      uint256 ownedNftTokenId = abi.decode(returndataOwnedNftTokenId, (uint256));
+      (bool successTokenUri, bytes memory returndataTokenUri) = boostContractAddr.staticcall(
+        abi.encodeWithSignature('tokenURI(uint256)', ownedNftTokenId)
+      );
+      if (!successTokenUri) {
+        revert('Cannot read token URI of the given ID.');
+      }
+      string memory tokenUri = abi.decode(returndataTokenUri, (string));
+
+      if (_hasSubstring(tokenUri, desiredTokenUriPart)) {
+        // 3. find the tokenId
+        ownsNft = true;
+        tokenId = ownedNftTokenId;
+        break;
+      }
+    }
+    return (ownsNft, tokenId);
+  }
+
+  /**
    * Get the token balance of a wallet
    */
   function getTokenBalanceOf(address tokenAddress, address wallet) internal view returns (uint256) {
@@ -560,5 +566,53 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
       revert FailureInReadBalance(tokenAddress);
     }
     return abi.decode(returndataReadOwnedTokens, (uint256));
+  }
+
+  /**
+   * ported from HoprStakeBase.sol
+   * @dev if the given `tokenURI` end with `/substring`
+   * @param tokenURI string URI of the HoprBoost NFT. E.g. "https://stake.hoprnet.org/PuzzleHunt_v2/Bronze - Week 5"
+   * @param substring string of the `boostRank` or `boostType/boostRank`. E.g. "Bronze - Week 5", "PuzzleHunt_v2/Bronze - Week 5"
+   */
+  function _hasSubstring(string memory tokenURI, string memory substring) internal pure returns (bool) {
+    // convert string to bytes
+    bytes memory tokenURIInBytes = bytes(tokenURI);
+    bytes memory substringInBytes = bytes(substring);
+
+    // lenghth of tokenURI is the sum of substringLen and restLen, where
+    // - `substringLen` is the length of the part that is extracted and compared with the provided substring
+    // - `restLen` is the length of the baseURI and boostType, which will be offset
+    uint256 substringLen = substringInBytes.length;
+    uint256 restLen = tokenURIInBytes.length - substringLen;
+    // one byte before the supposed substring, to see if it's the start of `substring`
+    bytes1 slashPositionContent = tokenURIInBytes[restLen - 1];
+
+    if (slashPositionContent != 0x2f) {
+      // if this position is not a `/`, substring in the tokenURI is for sure neither `boostRank` nor `boostType/boostRank`
+      return false;
+    }
+
+    // offset so that value from the next calldata (`substring`) is removed, so bitwise it needs to shift
+    // log2(16) * (32 - substringLen) * 2
+    uint256 offset = (32 - substringLen) * 8;
+
+    bytes32 trimed; // left-padded extracted `boostRank` from the `tokenURI`
+    bytes32 substringInBytes32 = bytes32(substringInBytes); // convert substring in to bytes32
+    bytes32 shifted; // shift the substringInBytes32 from right-padded to left-padded
+
+    bool result;
+    assembly {
+      // assuming `boostRank` or `boostType/boostRank` will never exceed 32 bytes
+      // left-pad the `boostRank` extracted from the `tokenURI`, so that possible
+      // extra pieces of `substring` is not included
+      // 32 jumps the storage of bytes length and restLen offsets the `baseURI`
+      trimed := shr(offset, mload(add(add(tokenURIInBytes, 32), restLen)))
+      // tokenURIInBytes32 := mload(add(add(tokenURIInBytes, 32), restLen))
+      // left-pad `substring`
+      shifted := shr(offset, substringInBytes32)
+      // compare results
+      result := eq(trimed, shifted)
+    }
+    return result;
   }
 }
