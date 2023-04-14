@@ -25,13 +25,14 @@ class HoprdAPI(object):
                 },
                 content=data,
             )
+
             try:
                 response = await client.send(request)
                 response.raise_for_status()
             except httpx.HTTPError as exc:
                 logging.error(f"HTTP Exception for {exc.request.url} - {exc}")
-
-            return response
+            finally:
+                return response
 
     async def withdraw(self, currency, amount, recipient):
         data = json.dumps(
