@@ -90,6 +90,37 @@ pub fn child_process_call_foundry_faucet(
 /// * `environment_name` - Name of the environment that nodes run in
 /// * `environment_type` - Type of the environment that nodes run in
 /// * `peer_id` - Peer Ids of HOPR nodes to be registered under the caller
+pub fn child_process_call_foundry_express_initialization(
+    environment_name: &str,
+    ethereum_address: &String,
+    hopr_amount: &str,
+    native_amount: &str,
+    peer_ids: &String,
+) -> Result<(), HelperErrors> {
+    // add brackets to around the string
+    let peer_id_string = vec!["[", &peer_ids, "]"].concat();
+    let self_register_args = vec![
+        "script",
+        "script/SingleAction.s.sol:SingleActionFromPrivateKeyScript",
+        "--broadcast",
+        "--sig",
+        "expressInitialization(address[],uint256,uint256,string[])",
+        &ethereum_address,
+        &hopr_amount,
+        &native_amount,
+        &peer_id_string,
+    ];
+
+    child_process_call_foundry(environment_name, &self_register_args)
+}
+
+/// Launch a child process to call foundry  command
+///
+/// # Arguments
+///
+/// * `environment_name` - Name of the environment that nodes run in
+/// * `environment_type` - Type of the environment that nodes run in
+/// * `peer_id` - Peer Ids of HOPR nodes to be registered under the caller
 pub fn child_process_call_foundry_self_register(environment_name: &str, peer_ids: &String) -> Result<(), HelperErrors> {
     // add brackets to around the string
     let peer_id_string = vec!["[", &peer_ids, "]"].concat();

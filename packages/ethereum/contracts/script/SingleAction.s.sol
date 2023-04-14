@@ -20,6 +20,7 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
   using BoostUtilsLib for address;
 
   address msgSender;
+  string[] private unregisteredIds;
 
   function getEnvironmentAndMsgSender() private {
     // 1. Environment check
@@ -32,6 +33,48 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
     uint256 privateKey = vm.envUint('PRIVATE_KEY');
     msgSender = vm.addr(privateKey);
     vm.startBroadcast(privateKey);
+  }
+
+  /**
+   * @dev express node initialization
+   * - Check with network registery on the registeration status of a list of peer ids, return the unregistered ones.
+   * - If not all the peer ids are registered, check if the caller can do selfRegister
+   */
+  function expressInitialization(
+    address[] calldata nodeAddrs,
+    uint256 hoprTokenAmountInWei,
+    uint256 nativeTokenAmountInWei,
+    string[] calldata peerIds
+  ) external {
+    // 1. get environment and msg.sender
+    getEnvironmentAndMsgSender();
+
+    // 2. loop through nodes and check its registration status
+    for (uint256 index = 0; index < peerIds.length; index++) {
+      (bool successCheck, bytes memory returndataCheck) = currentEnvironmentDetail
+        .networkRegistryContractAddress
+        .staticcall(abi.encodeWithSignature('nodePeerIdToAccount(string)', peerIds[index]));
+      if (!successCheck) {
+        revert('Cannot read nodePeerIdToAccount from network registry contract.');
+      }
+      address stakingAccount = abi.decode(returndataCheck, (address));
+      if (stakingAccount == address(0)) {
+        unregisteredIds.push(peerIds[index]);
+      }
+    }
+    if (unregisteredIds.length == 0) {
+      return;
+    }
+
+    // 3. check if the caller can register nodes
+    uint256 allowedRegistration = getMaxAllowedRegistrations(
+      currentEnvironmentDetail.networkRegistryProxyContractAddress,
+      msgSender
+    );
+    if (allowedRegistration < unregisteredIds.length) {
+      // try to register developer NFT, community NFT or stake mHOPR tokens
+    }
+    vm.stopBroadcast();
   }
 
   /**
@@ -286,23 +329,7 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
     getEnvironmentAndMsgSender();
 
     // 2. Check if the msg.sender has staked Network_registry NFT
-    (bool successHasStaked, bytes memory returndataHasStaked) = currentEnvironmentDetail
-      .stakeContractAddress
-      .staticcall(
-        abi.encodeWithSignature(
-          'isNftTypeAndRankRedeemed2(uint256,string,address)',
-          NETWORK_REGISTRY_NFT_INDEX,
-          nftRank,
-          msgSender
-        )
-      );
-    if (!successHasStaked) {
-      revert('Cannot read if caller has staked Network_registry NFTs.');
-    }
-    bool hasStaked = abi.decode(returndataHasStaked, (bool));
-    if (hasStaked) {
-      return;
-    }
+    if (checkHasStakedNetworkRegistryNft(currentEnvironmentDetail.stakeContractAddress, msgSender, nftRank)) return;
 
     // 3. Check if msg.sender has Network_registry NFT
     safeTransferNetworkRegistryNft(
@@ -367,6 +394,41 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
     // 2. Check if msg.sender has Network_registry NFT
     safeTransferNetworkRegistryNft(currentEnvironmentDetail.hoprBoostContractAddress, msgSender, recipient, nftRank);
     vm.stopBroadcast();
+  }
+
+  /**
+   * @dev Check if the address has staked Network_registry NFT
+   */
+  function checkHasStakedNetworkRegistryNft(
+    address stakeContractAddr,
+    address stakingAccount,
+    string calldata nftRank
+  ) private view returns (bool) {
+    (bool successHasStaked, bytes memory returndataHasStaked) = stakeContractAddr.staticcall(
+      abi.encodeWithSignature(
+        'isNftTypeAndRankRedeemed2(uint256,string,address)',
+        NETWORK_REGISTRY_NFT_INDEX,
+        nftRank,
+        stakingAccount
+      )
+    );
+    if (!successHasStaked) {
+      revert('Cannot read if the staking account has staked Network_registry NFTs.');
+    }
+    return abi.decode(returndataHasStaked, (bool));
+  }
+
+  /**
+   * @dev Check if the address has staked Network_registry NFT
+   */
+  function getMaxAllowedRegistrations(address proxyAddr, address stakingAccount) private view returns (uint256) {
+    (bool successMaxAllowed, bytes memory returndataMaxAllowed) = proxyAddr.staticcall(
+      abi.encodeWithSignature('maxAllowedRegistrations(address)', stakingAccount)
+    );
+    if (!successMaxAllowed) {
+      revert('Cannot read maxAllowedRegistrations for staking account.');
+    }
+    return abi.decode(returndataMaxAllowed, (uint256));
   }
 
   /**

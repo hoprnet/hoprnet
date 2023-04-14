@@ -1,11 +1,13 @@
 use crate::faucet::FaucetArgs;
 use crate::identity::IdentityArgs;
+use crate::initialize_node::InitializeNodeArgs;
 use crate::network_registry::RegisterInNetworkRegistryArgs;
 use crate::utils::{Cmd, HelperErrors};
 use clap::{Parser, Subcommand};
 pub mod environment_config;
 pub mod faucet;
 pub mod identity;
+pub mod initialize_node;
 pub mod key_pair;
 pub mod network_registry;
 pub mod password;
@@ -33,6 +35,8 @@ enum Commands {
     Faucet(FaucetArgs),
     #[clap(about = "Registry some nodes peer ids to the network registery contract")]
     RegisterInNetworkRegistry(RegisterInNetworkRegistryArgs),
+    #[clap(about = "Necessary steps to initiate a node (network registery, stake, fund)")]
+    InitializeNode(InitializeNodeArgs),
 }
 
 fn main() -> Result<(), HelperErrors> {
@@ -46,6 +50,9 @@ fn main() -> Result<(), HelperErrors> {
             opt.run()?;
         }
         Commands::RegisterInNetworkRegistry(opt) => {
+            opt.run()?;
+        }
+        Commands::InitializeNode(opt) => {
             opt.run()?;
         }
     }
