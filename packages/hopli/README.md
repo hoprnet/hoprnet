@@ -68,6 +68,18 @@ hopli register-in-network-registry \
     --contracts-root "../ethereum/contracts"
 ```
 
+with node identities in the network registry contract
+
+```
+PRIVATE_KEY=<bank_private_key> \
+IDENTITY_PASSWORD=switzerland \
+hopli register-in-network-registry \
+    --environment-name anvil-localhost \
+    --use-local-identities --identity-directory "/tmp" \
+    --peer-ids 16Uiu2HAmC9CRFeuF2cTf6955ECFmgDw6d27jLows7bftMqat5Woz,16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12 \
+    --contracts-root "../ethereum/contracts"
+```
+
 ## Development
 
 ### Run local development
@@ -119,6 +131,19 @@ PRIVATE_KEY=<bank_private_key> \
     --peer-ids 16Uiu2HAmC9CRFeuF2cTf6955ECFmgDw6d27jLows7bftMqat5Woz,16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12 \
     --contracts-root "../ethereum/contracts"
 ```
+
+Register some peer ids as well as some node identities in the network registry contract
+
+```
+PRIVATE_KEY=<bank_private_key> \
+IDENTITY_PASSWORD=local \
+    cargo run -- register-in-network-registry --environment-name anvil-localhost \
+    --use-local-identities --identity-directory "/tmp" \
+    --peer-ids 16Uiu2HAmC9CRFeuF2cTf6955ECFmgDw6d27jLows7bftMqat5Woz,16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12 \
+    --contracts-root "../ethereum/contracts"
+```
+
+> If foundry returns error that contains "HoprNetworkRegistry: Registry is disabled", run `cast send $(jq '.environments."anvil-localhost".network_registry_contract_address' ../ethereum/contracts/contracts-addresses.json) 'enableRegistry()' --rpc-url localhost:8545 --private-key $PRIVATE_KEY`
 
 ### Test
 

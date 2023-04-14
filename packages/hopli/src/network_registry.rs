@@ -45,7 +45,7 @@ pub struct RegisterInNetworkRegistryArgs {
     identity_prefix: Option<String>,
 
     #[clap(flatten)]
-    password: Option<PasswordArgs>,
+    password: PasswordArgs,
 
     #[clap(
         help = "Specify path pointing to the contracts root",
@@ -75,11 +75,7 @@ impl RegisterInNetworkRegistryArgs {
             return Err(HelperErrors::UnableToReadPrivateKey);
         }
 
-        // set directory and environment variables
-        if let Err(e) = set_process_path_env(&contracts_root, &environment_name) {
-            return Err(e);
-        }
-
+        // collect all the peer ids
         let mut all_peer_ids = Vec::new();
         // add peer_ids from CLI, if there's one
         if let Some(provided_peer_ids) = peer_ids {
@@ -89,23 +85,32 @@ impl RegisterInNetworkRegistryArgs {
         // get peer ids and stringinfy them
         if use_local_identities {
             // check if password is provided
-            let pwd = match password.unwrap().read_password() {
+            let pwd = match password.read_password() {
                 Ok(read_pwd) => read_pwd,
                 Err(e) => return Err(e),
             };
 
             // read all the identities from the directory
             if let Some(id_dir) = identity_directory {
-                match read_identities(&id_dir.as_str(), &pwd, &identity_prefix) {
+                match read_identities(&id_dir, &pwd, &identity_prefix) {
                     Ok(node_identities) => {
                         all_peer_ids.extend(node_identities.iter().map(|ni| ni.peer_id.clone()));
                     }
-                    Err(e) => return Err(e),
+                    Err(e) => {
+                        println!("error {:?}", e);
+                        return Err(e);
+                    }
                 }
             }
         }
 
         println!("merged peer_ids {:?}", all_peer_ids.join(","));
+
+        // set directory and environment variables
+        if let Err(e) = set_process_path_env(&contracts_root, &environment_name) {
+            return Err(e);
+        }
+
         // iterate and collect execution result. If error occurs, the entire operation failes.
         child_process_call_foundry_self_register(&environment_name, &all_peer_ids.join(","))
     }
