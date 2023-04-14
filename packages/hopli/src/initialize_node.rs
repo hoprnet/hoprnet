@@ -46,7 +46,7 @@ pub struct InitializeNodeArgs {
     contracts_root: Option<String>,
 
     #[clap(
-        help = "Hopr amount in ether, e.g. 10",
+        help = "Hopr amount in ether, to be funded for each identity, e.g. 10",
         long,
         short = 't',
         value_parser = clap::value_parser!(f64),
@@ -55,7 +55,7 @@ pub struct InitializeNodeArgs {
     hopr_amount: f64,
 
     #[clap(
-        help = "Native token amount in ether, e.g. 1",
+        help = "Native token amount in ether, to be funded for each identity, e.g. 1",
         long,
         short = 'n',
         value_parser = clap::value_parser!(f64),
@@ -125,9 +125,10 @@ impl InitializeNodeArgs {
         // iterate and collect execution result. If error occurs, the entire operation failes.
         child_process_call_foundry_express_initialization(
             &environment_name,
-            &all_node_addresses.join(","),
+            &format!("[{}]", &&all_node_addresses.join(",")),
             &hopr_amount_uint256_string,
             &native_amount_uint256_string,
+            // &format!("[{}]", &all_peer_ids.join(",")),
             &all_peer_ids.join(","),
         )
     }

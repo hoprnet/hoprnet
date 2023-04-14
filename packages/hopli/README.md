@@ -80,6 +80,17 @@ hopli register-in-network-registry \
     --contracts-root "../ethereum/contracts"
 ```
 
+Express stake + register + fund
+
+```
+PRIVATE_KEY=<bank_private_key> \
+hopli initialize-node --environment-name anvil-localhost \
+    --identity-directory "/tmp" \
+    --password-path "/tmp/.pwd" \
+    --hopr-amount 1 --native-amount 0.1 \
+    --contracts-root "../ethereum/contracts"
+```
+
 ## Development
 
 ### Run local development
@@ -144,6 +155,17 @@ IDENTITY_PASSWORD=local \
 ```
 
 > If foundry returns error that contains "HoprNetworkRegistry: Registry is disabled", run `cast send $(jq '.environments."anvil-localhost".network_registry_contract_address' ../ethereum/contracts/contracts-addresses.json) 'enableRegistry()' --rpc-url localhost:8545 --private-key $PRIVATE_KEY`
+
+Express stake + registry + fund for node identity
+
+```
+PRIVATE_KEY=<bank_private_key> \
+    cargo run -- initialize-node --environment-name anvil-localhost \
+    --identity-directory "./test" \
+    --password-path "/test/.pwd" \
+    --hopr-amount 1 --native-amount 0.1 \
+    --contracts-root "../ethereum/contracts"
+```
 
 ### Test
 

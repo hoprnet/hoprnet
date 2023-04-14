@@ -64,8 +64,9 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
     }
     uint256 numUnRegisteredIds = unregisteredIds.length;
 
-    // 3. check if need to perform node registeration
-    if (numUnRegisteredIds > 0) {
+    // 3. check if need to perform node registeration.
+    // As NR is disabled in development, skip it
+    if (numUnRegisteredIds > 0 && currentEnvironmentType != EnvironmentType.DEVELOPMENT) {
       // check if the caller can register nodes
       uint256 allowedRegistration = getMaxAllowedRegistrations(
         currentEnvironmentDetail.networkRegistryProxyContractAddress,
