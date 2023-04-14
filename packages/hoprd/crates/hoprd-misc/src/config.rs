@@ -511,28 +511,25 @@ pub mod wasm {
 
     #[wasm_bindgen]
     impl HoprdConfig {
-        #[wasm_bindgen]
-        pub fn as_redacted_string(&self) -> String {
-            // redacting sensitive information
+        pub fn as_redacted_string(&self) -> Result<String, JsValue> {
             let mut redacted_cfg = self.clone();
+
+            // redacting sensitive information
             if let Some(_) = redacted_cfg.identity.private_key {
                 redacted_cfg.identity.private_key = Some("<REDACTED>".to_owned());
             }
             redacted_cfg.identity.password = "<REDACTED>".to_owned();
 
-            let output = serde_json::to_string(&redacted_cfg);
-            match output {
-                Ok(o) => o,
-                Err(e) => e.to_string(),
-            }
+            ok_or_jserr!(serde_json::to_string(&redacted_cfg))
         }
     }
 
     #[wasm_bindgen]
-    pub fn fetch_configuration(cli_args: JsValue) -> Result<JsValue, JsValue> {
+    pub fn fetch_configuration(cli_args: JsValue) -> Result<HoprdConfig, JsValue> {
         let args: crate::cli::CliArgs = serde_wasm_bindgen::from_value(cli_args)?;
-        let cfg = HoprdConfig::from_cli_args(args, false).map_err(|e| wasm_bindgen::JsValue::from(e.to_string()))?;
-        ok_or_jserr!(serde_wasm_bindgen::to_value(&cfg))
+        HoprdConfig::from_cli_args(args, false).map_err(|e| wasm_bindgen::JsValue::from(e.to_string()))
+        // let cfg = HoprdConfig::from_cli_args(args, false).map_err(|e| wasm_bindgen::JsValue::from(e.to_string()))?;
+        // ok_or_jserr!(serde_wasm_bindgen::to_value(&cfg))
     }
 }
 

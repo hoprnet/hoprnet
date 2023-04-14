@@ -26,6 +26,7 @@ import {
   fetch_configuration,
   parse_private_key,
   HoprdConfig,
+  type Api,
   type CliArgs
 } from '../lib/hoprd_misc.js'
 import type { State } from './types.js'
@@ -224,8 +225,7 @@ async function main() {
     process.exit(1)
   }
 
-  console.log('Node configuration:')
-  console.log(cfg.as_redacted_string())
+  console.log('Node configuration: ' + cfg.as_redacted_string())
 
   if (argv.dry_run) {
     process.exit(0)
@@ -280,15 +280,17 @@ async function main() {
     node.once('hopr:monitoring:start', async () => {
       // 3. start all monitoring services, and continue with the rest of the setup.
 
+      let api = cfg.api as Api
+      console.log(JSON.stringify(api, null, 2))
       const startApiListen = setupAPI(
         node,
         logs,
         { getState, setState },
         {
-          disableApiAuthentication: !cfg.api.is_auth_disabled(),
-          apiHost: cfg.api.host.ip,
-          apiPort: cfg.api.host.port,
-          apiToken: cfg.api.is_auth_disabled() ? null : cfg.api.auth_token()
+          disableApiAuthentication: api.is_auth_disabled(),
+          apiHost: api.host.ip,
+          apiPort: api.host.port,
+          apiToken: api.is_auth_disabled() ? null : api.auth_token()
         }
       )
       // start API server only if API flag is true
