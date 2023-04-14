@@ -10,7 +10,9 @@ pub const DEFAULT_HEARTBEAT_INTERVAL_VARIANCE: u32 = 2000;
 /// available enough to be used
 pub const DEFAULT_NETWORK_QUALITY_THRESHOLD: f32 = 0.5;
 /// Number of parallel connection handled by js-libp2p
-pub const DEFAULT_MAX_PARALLEL_CONNECTIONS: u32 = 100;
+/// pub const DEFAULT_MAX_PARALLEL_CONNECTIONS: u32 = 100;
+/// FIXME: reduce default again once connection recyclying was fixed
+pub const DEFAULT_MAX_PARALLEL_CONNECTIONS: u32 = 50_000;
 /// Number of parallel connection handled by js-libp2p
 /// when running as a public relay node (i.e. the --announce flag is set)
 pub const DEFAULT_MAX_PARALLEL_CONNECTION_PUBLIC_RELAY: u32 = 50_000;

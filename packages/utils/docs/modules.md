@@ -1786,7 +1786,7 @@ Runs through the dial strategy and handles possible errors
 
 #### Defined in
 
-[utils/src/libp2p/dialHelper.ts:411](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L411)
+[utils/src/libp2p/dialHelper.ts:432](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L432)
 
 ___
 
