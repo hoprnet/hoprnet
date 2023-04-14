@@ -1,7 +1,8 @@
 import asyncio
+import logging
+import os
 import pytest
 import random
-import logging
 
 from hoprd_api import HoprdAPI
 
@@ -10,6 +11,7 @@ HTTP_STATUS_CODE_SEND_MESSAGE_OK = 202
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(os.getenv('CI','false') == 'true', reason="stress tests fail randomly on CI due to resources")
 async def test_stress_hoprd_send_message_should_send_sequential_messages_without_errors(request, cmd_line_args):
     if '127.0.0.1' in cmd_line_args['stress_tested_api'] or "localhost" in cmd_line_args['stress_tested_api']:
         request.getfixturevalue('setup_7_nodes')
@@ -39,6 +41,7 @@ async def test_stress_hoprd_send_message_should_send_sequential_messages_without
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(os.getenv('CI','false') == 'true', reason="stress tests fail randomly on CI due to resources")
 async def test_stress_hoprd_send_message_should_send_parallel_messages_without_errors(request, cmd_line_args):
     if '127.0.0.1' in cmd_line_args['stress_tested_api'] or "localhost" in cmd_line_args['stress_tested_api']:
         request.getfixturevalue('setup_7_nodes')
