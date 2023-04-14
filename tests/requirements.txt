@@ -3,3 +3,4 @@ waiting==1.4.1
 requests==2.28.2
 websocket-client==1.5.1
 httpx==0.23.3
+pytest-asyncio==0.21.0
