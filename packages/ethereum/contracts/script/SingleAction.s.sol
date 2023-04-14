@@ -62,18 +62,62 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
         unregisteredIds.push(peerIds[index]);
       }
     }
-    if (unregisteredIds.length == 0) {
-      return;
+    uint256 numUnRegisteredIds = unregisteredIds.length;
+
+    // 3. check if need to perform node registeration
+    if (numUnRegisteredIds > 0) {
+      // check if the caller can register nodes
+      uint256 allowedRegistration = getMaxAllowedRegistrations(
+        currentEnvironmentDetail.networkRegistryProxyContractAddress,
+        msgSender
+      );
+      if (allowedRegistration < numUnRegisteredIds) {
+        // try to register developer NFT, community NFT or stake HOPR tokens
+        // check if the caller owns developer NFT
+        uint256 nftTokenId;
+        (bool ownsDevNft, uint256 devTokenId) = _hasNetworkRegistryNft(
+          currentEnvironmentDetail.hoprBoostContractAddress,
+          msgSender,
+          NETWORK_REGISTRY_RANK1_NAME
+        );
+        (bool ownsComNft, uint256 comTokenId) = _hasNetworkRegistryNft(
+          currentEnvironmentDetail.hoprBoostContractAddress,
+          msgSender,
+          NETWORK_REGISTRY_RANK2_NAME
+        );
+        uint256 hoprBalance = _getTokenBalanceOf(currentEnvironmentDetail.hoprTokenContractAddress, msgSender);
+
+        if (!ownsDevNft && !ownsComNft) {
+          // try to stake HOPR tokens
+          _stakeXHopr(currentEnvironmentDetail.xhoprTokenContractAddress, 1000 ether * numUnRegisteredIds);
+        } else {
+          // try to stake NFT
+          nftTokenId = ownsDevNft ? devTokenId : comTokenId;
+          _stakeNft(
+            currentEnvironmentDetail.hoprBoostContractAddress,
+            msgSender,
+            currentEnvironmentDetail.stakeContractAddress,
+            nftTokenId
+          );
+        }
+      }
+      // try again registration
+      _selfRegisterNodes(currentEnvironmentDetail.networkRegistryContractAddress, peerIds);
     }
 
-    // 3. check if the caller can register nodes
-    uint256 allowedRegistration = getMaxAllowedRegistrations(
-      currentEnvironmentDetail.networkRegistryProxyContractAddress,
-      msgSender
-    );
-    if (allowedRegistration < unregisteredIds.length) {
-      // try to register developer NFT, community NFT or stake mHOPR tokens
+    // 4. loop again and check if need to fund nodes
+    for (uint256 nodeIndex = 0; nodeIndex < nodeAddrs.length; nodeIndex++) {
+      address recipient = nodeAddrs[nodeIndex];
+      // transfer or mint hopr tokens
+      _transferOrMintHoprToAmount(currentEnvironmentDetail.hoprTokenContractAddress, recipient, hoprTokenAmountInWei);
+
+      // 3. transfer native balance to the unregisteredIds[numUnRegisteredIndex]
+      if (nativeTokenAmountInWei > recipient.balance) {
+        (bool nativeTokenTransferSuccess, ) = recipient.call{value: nativeTokenAmountInWei - recipient.balance}('');
+        require(nativeTokenTransferSuccess, 'Cannot send native tokens to the recipient');
+      }
     }
+
     vm.stopBroadcast();
   }
 
@@ -85,13 +129,8 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
     getEnvironmentAndMsgSender();
 
     // 2. call hoprNetworkRegistry.selfRegister(peerIds);
-    (bool successSelfRegister, ) = currentEnvironmentDetail.networkRegistryContractAddress.call(
-      abi.encodeWithSignature('selfRegister(string[])', peerIds)
-    );
-    if (!successSelfRegister) {
-      emit log_string('Cannot register peers');
-      revert('Cannot register peers');
-    }
+    _selfRegisterNodes(currentEnvironmentDetail.networkRegistryContractAddress, peerIds);
+
     vm.stopBroadcast();
   }
 
@@ -291,7 +330,7 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
 
     // 3. stake the difference, if allowed
     uint256 amountToStake = stakeTarget - stakedAmount;
-    uint256 balance = getTokenBalanceOf(currentEnvironmentDetail.xhoprTokenContractAddress, msgSender);
+    uint256 balance = _getTokenBalanceOf(currentEnvironmentDetail.xhoprTokenContractAddress, msgSender);
     if (stakedAmount >= stakeTarget) {
       emit log_string('Stake target has reached');
       return;
@@ -299,18 +338,7 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
     if (balance < amountToStake) {
       revert('Not enough xHOPR token balance to stake to the target.');
     } else {
-      (bool successStakeXhopr, ) = currentEnvironmentDetail.xhoprTokenContractAddress.call(
-        abi.encodeWithSignature(
-          'transferAndCall(address,uint256,bytes)',
-          currentEnvironmentDetail.stakeContractAddress,
-          amountToStake,
-          hex'00'
-        )
-      );
-      if (!successStakeXhopr) {
-        emit log_string('Cannot stake amountToStake');
-        revert('Cannot stake amountToStake');
-      }
+      _stakeXHopr(currentEnvironmentDetail.xhoprTokenContractAddress, amountToStake);
     }
     vm.stopBroadcast();
   }
@@ -435,19 +463,14 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
     string calldata nftRank
   ) private {
     // check if the sender owns the desired nft rank
-    (bool ownsNft, uint256 tokenId) = hasNetworkRegistryNft(boostContractAddr, sender, nftRank);
+    (bool ownsNft, uint256 tokenId) = _hasNetworkRegistryNft(boostContractAddr, sender, nftRank);
 
     if (!ownsNft) {
       revert('Failed to find the owned NFT');
     }
 
     // found the tokenId, perform safeTransferFrom
-    (bool successStakeNft, ) = boostContractAddr.call(
-      abi.encodeWithSignature('safeTransferFrom(address,address,uint256)', sender, recipient, tokenId)
-    );
-    if (!successStakeNft) {
-      revert('Cannot stake the NFT');
-    }
+    _stakeNft(boostContractAddr, sender, recipient, tokenId);
   }
 
   /**
@@ -467,44 +490,8 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
     // 1. get environment and msg.sender
     getEnvironmentAndMsgSender();
 
-    // 2. get recipient balance
-    uint256 recipientTokenBalance = getTokenBalanceOf(currentEnvironmentDetail.hoprTokenContractAddress, recipient);
-
-    // 2. transfer some Hopr tokens to the recipient, or mint tokens
-    if (hoprTokenAmountInWei > recipientTokenBalance) {
-      // get the difference to transfer
-      uint256 hoprTokenToTransfer = hoprTokenAmountInWei - recipientTokenBalance;
-      // check the hopr token balance
-      uint256 senderHoprTokenBalance = getTokenBalanceOf(currentEnvironmentDetail.hoprTokenContractAddress, msgSender);
-
-      if (senderHoprTokenBalance >= hoprTokenToTransfer) {
-        // call transfer
-        (bool successTransfserTokens, ) = currentEnvironmentDetail.hoprTokenContractAddress.call(
-          abi.encodeWithSignature('transfer(address,uint256)', recipient, hoprTokenToTransfer)
-        );
-        if (!successTransfserTokens) {
-          emit log_string('Cannot transfer HOPR tokens to the recipient');
-        }
-      } else {
-        // if transfer cannot be called, try minting token as a minter
-        bytes32 MINTER_ROLE = keccak256('MINTER_ROLE');
-        (bool successHasRole, bytes memory returndataHasRole) = currentEnvironmentDetail
-          .hoprTokenContractAddress
-          .staticcall(abi.encodeWithSignature('hasRole(bytes32,address)', MINTER_ROLE, msgSender));
-        if (!successHasRole) {
-          revert('Cannot check role for Hopr token.');
-        }
-        bool isMinter = abi.decode(returndataHasRole, (bool));
-        require(isMinter, 'Caller is not a minter');
-
-        (bool successMintTokens, ) = currentEnvironmentDetail.hoprTokenContractAddress.call(
-          abi.encodeWithSignature('mint(address,uint256,bytes,bytes)', recipient, hoprTokenToTransfer, hex'00', hex'00')
-        );
-        if (!successMintTokens) {
-          emit log_string('Cannot mint HOPR tokens to the recipient');
-        }
-      }
-    }
+    // 2. transfer or mint hopr tokens
+    _transferOrMintHoprToAmount(currentEnvironmentDetail.hoprTokenContractAddress, recipient, hoprTokenAmountInWei);
 
     // 3. transfer native balance to the recipient
     if (nativeTokenAmountInWei > recipient.balance) {
@@ -517,13 +504,13 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
   /**
    * @dev private function to check if an account owns a Network Registry NFT of nftRank
    */
-  function hasNetworkRegistryNft(
+  function _hasNetworkRegistryNft(
     address boostContractAddr,
     address account,
-    string calldata nftRank
+    string memory nftRank
   ) private returns (bool ownsNft, uint256 tokenId) {
     // 1. Check account's Network_registry NFT balance
-    uint256 ownedNftBalance = getTokenBalanceOf(boostContractAddr, account);
+    uint256 ownedNftBalance = _getTokenBalanceOf(boostContractAddr, account);
     // get the desired nft uri hash
     string memory desiredTokenUriPart = string(abi.encodePacked(NETWORK_REGISTRY_TYPE_NAME, '/', nftRank));
 
@@ -558,7 +545,7 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
   /**
    * Get the token balance of a wallet
    */
-  function getTokenBalanceOf(address tokenAddress, address wallet) internal view returns (uint256) {
+  function _getTokenBalanceOf(address tokenAddress, address wallet) internal view returns (uint256) {
     (bool successReadOwnedTokens, bytes memory returndataReadOwnedTokens) = tokenAddress.staticcall(
       abi.encodeWithSignature('balanceOf(address)', wallet)
     );
@@ -614,5 +601,85 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
       result := eq(trimed, shifted)
     }
     return result;
+  }
+
+  function _stakeXHopr(address xhoprTokenContract, uint256 amountToStake) private {
+    (bool successStakeXhopr, ) = currentEnvironmentDetail.xhoprTokenContractAddress.call(
+      abi.encodeWithSignature(
+        'transferAndCall(address,uint256,bytes)',
+        currentEnvironmentDetail.stakeContractAddress,
+        amountToStake,
+        hex'00'
+      )
+    );
+    if (!successStakeXhopr) {
+      emit log_string('Cannot stake amountToStake');
+      revert('Cannot stake amountToStake');
+    }
+  }
+
+  function _stakeNft(address boostContractAddr, address sender, address recipient, uint256 tokenId) private {
+    (bool successStakeNft, ) = boostContractAddr.call(
+      abi.encodeWithSignature('safeTransferFrom(address,address,uint256)', sender, recipient, tokenId)
+    );
+    if (!successStakeNft) {
+      revert('Cannot stake the NFT');
+    }
+  }
+
+  function _selfRegisterNodes(address networkRegistryContractAddress, string[] calldata peerIds) private {
+    // 2. call hoprNetworkRegistry.selfRegister(peerIds);
+    (bool successSelfRegister, ) = networkRegistryContractAddress.call(
+      abi.encodeWithSignature('selfRegister(string[])', peerIds)
+    );
+    if (!successSelfRegister) {
+      emit log_string('Cannot register peers');
+      revert('Cannot register peers');
+    }
+  }
+
+  function _transferOrMintHoprToAmount(
+    address hoprTokenContractAddress,
+    address recipient,
+    uint256 hoprTokenAmountInWei
+  ) private {
+    // 1. get recipient balance
+    uint256 recipientTokenBalance = _getTokenBalanceOf(hoprTokenContractAddress, recipient);
+
+    // 2. transfer some Hopr tokens to the recipient, or mint tokens
+    if (hoprTokenAmountInWei > recipientTokenBalance) {
+      // get the difference to transfer
+      uint256 hoprTokenToTransfer = hoprTokenAmountInWei - recipientTokenBalance;
+      // check the hopr token balance
+      uint256 senderHoprTokenBalance = _getTokenBalanceOf(hoprTokenContractAddress, msgSender);
+
+      if (senderHoprTokenBalance >= hoprTokenToTransfer) {
+        // call transfer
+        (bool successTransfserTokens, ) = hoprTokenContractAddress.call(
+          abi.encodeWithSignature('transfer(address,uint256)', recipient, hoprTokenToTransfer)
+        );
+        if (!successTransfserTokens) {
+          emit log_string('Cannot transfer HOPR tokens to the recipient');
+        }
+      } else {
+        // if transfer cannot be called, try minting token as a minter
+        bytes32 MINTER_ROLE = keccak256('MINTER_ROLE');
+        (bool successHasRole, bytes memory returndataHasRole) = hoprTokenContractAddress.staticcall(
+          abi.encodeWithSignature('hasRole(bytes32,address)', MINTER_ROLE, msgSender)
+        );
+        if (!successHasRole) {
+          revert('Cannot check role for Hopr token.');
+        }
+        bool isMinter = abi.decode(returndataHasRole, (bool));
+        require(isMinter, 'Caller is not a minter');
+
+        (bool successMintTokens, ) = hoprTokenContractAddress.call(
+          abi.encodeWithSignature('mint(address,uint256,bytes,bytes)', recipient, hoprTokenToTransfer, hex'00', hex'00')
+        );
+        if (!successMintTokens) {
+          emit log_string('Cannot mint HOPR tokens to the recipient');
+        }
+      }
+    }
   }
 }
