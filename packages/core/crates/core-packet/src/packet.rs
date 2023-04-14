@@ -69,14 +69,14 @@ fn onion_encrypt(data: &[u8], secrets: &[&[u8]]) -> Box<[u8]> {
     input
 }
 
-struct PacketHeader<'a> {
+struct MetaPacket<'a> {
     alpha: &'a [u8],
     routing_info: &'a [u8],
     mac: &'a [u8],
     cipher_text: &'a [u8],
 }
 
-fn encode_packet(
+fn encode_meta_packet(
     shared_keys: SharedKeys,
     msg: &[u8],
     path: &[&PeerId],
@@ -101,7 +101,7 @@ fn encode_packet(
         additional_data_last_hop,
     );
 
-    PacketHeader {
+    MetaPacket {
         alpha: &shared_keys.alpha(),
         routing_info: &routing_info.serialize(),
         mac: &routing_info.mac,
@@ -110,8 +110,8 @@ fn encode_packet(
     .serialize()
 }
 
-impl<'a> PacketHeader<'a> {
-    pub fn deserialize(packet: &'a [u8], header_len: usize) -> PacketHeader<'a> {
+impl<'a> MetaPacket<'a> {
+    pub fn deserialize(packet: &'a [u8], header_len: usize) -> MetaPacket<'a> {
         Self {
             alpha: &packet[..CurvePoint::SIZE_COMPRESSED],
             routing_info: &packet[CurvePoint::SIZE_COMPRESSED..CurvePoint::SIZE_COMPRESSED + header_len],
@@ -147,7 +147,7 @@ enum ForwardedPacket {
     },
 }
 
-fn forward_packet(
+fn forward_meta_packet(
     private_key: &[u8],
     packet: &[u8],
     additional_data_relayer_len: usize,
@@ -155,7 +155,7 @@ fn forward_packet(
     max_hops: usize,
 ) -> Result<ForwardedPacket> {
     let header_len = header_length(max_hops, additional_data_relayer_len, additional_data_last_hop_len);
-    let decoded = PacketHeader::deserialize(packet, header_len);
+    let decoded = MetaPacket::deserialize(packet, header_len);
 
     let shared_keys = SharedKeys::forward_transform(decoded.alpha, private_key)?;
     let secret = shared_keys.secret(0).unwrap();
@@ -180,7 +180,7 @@ fn forward_packet(
             next_node,
             additional_info,
         } => {
-            let packet = PacketHeader {
+            let packet = MetaPacket {
                 alpha: &shared_keys.alpha(),
                 routing_info: &header,
                 mac: &mac,
@@ -198,13 +198,14 @@ fn forward_packet(
         ForwardedHeader::FinalNode { additional_data } => Ok(FinalNodePacket {
             packet_tag: derive_packet_tag(secret)?,
             derived_secret: secret.into(),
-            plain_text: remove_padding(&plain_text).ok_or(PacketDecodingError)?.into(),
+            plain_text: remove_padding(&plain_text).ok_or(PacketDecodingError("couldn't remove padding".into()))?.into(),
             additional_data,
         }),
     }
 }
 
 /// Indicates if the packet is supposed to be forwarded to the next hop or if it is intended for us.
+#[derive(Debug)]
 pub enum PacketState {
     /// Packet is intended for us
     Final {
@@ -232,6 +233,7 @@ pub enum PacketState {
 
 /// Represents a HOPR packet
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+#[derive(Debug)]
 pub struct Packet {
     packet: Box<[u8]>,
     challenge: AcknowledgementChallenge,
@@ -275,7 +277,7 @@ impl Packet {
 
         Ok(Self {
             challenge: AcknowledgementChallenge::new(&porv.ack_challenge, private_key),
-            packet: encode_packet(
+            packet: encode_meta_packet(
                 shared_keys,
                 msg,
                 path,
@@ -293,12 +295,13 @@ impl Packet {
 
     pub fn deserialize(data: &[u8], private_key: &[u8], sender: &PeerId) -> Result<Self> {
         if data.len() == Self::SIZE {
-            let (packet, r0) = data.split_at(PACKET_LENGTH);
+            let (pre_packet, r0) = data.split_at(PACKET_LENGTH);
             let (pre_challenge, pre_ticket) = r0.split_at(AcknowledgementChallenge::SIZE);
             let previous_hop = PublicKey::from_peerid(sender)?;
 
-            match forward_packet(private_key, packet, POR_SECRET_LENGTH, 0, INTERMEDIATE_HOPS + 1)? {
+            match forward_meta_packet(private_key, pre_packet, POR_SECRET_LENGTH, 0, INTERMEDIATE_HOPS + 1)? {
                 RelayedPacket {
+                    packet,
                     derived_secret,
                     additional_info,
                     packet_tag,
@@ -310,7 +313,7 @@ impl Packet {
                     challenge
                         .validate(ack_key.to_challenge(), &previous_hop)
                         .then(|| ())
-                        .ok_or(PacketDecodingError)?;
+                        .ok_or(PacketDecodingError("couldn't validate acknowledgement challenge on the relayed packet".into()))?;
 
                     let ticket = Ticket::deserialize(pre_ticket)?;
                     let verification_output = pre_verify(&derived_secret, &additional_info, &ticket.challenge)?;
@@ -342,11 +345,11 @@ impl Packet {
                     challenge
                         .validate(ack_key.to_challenge(), &previous_hop)
                         .then(|| ())
-                        .ok_or(PacketDecodingError)?;
+                        .ok_or(PacketDecodingError("couldn't validate acknowledgement challenge on the final packet".into()))?;
 
                     let ticket = Ticket::deserialize(pre_ticket)?;
                     Ok(Self {
-                        packet: packet.into(),
+                        packet: pre_packet.into(),
                         challenge,
                         ticket,
                         state: Final {
@@ -360,7 +363,7 @@ impl Packet {
                 }
             }
         } else {
-            Err(PacketDecodingError)
+            Err(PacketDecodingError("packet has invalid size".into()))
         }
     }
 
@@ -512,7 +515,7 @@ mod tests {
                 path[i - 1].clone()
             };
             packet = Packet::deserialize(&packet.serialize(), node_private, &sender)
-                .expect(&format!("failed to deserialize packet at hop {}", i));
+                .unwrap_or_else(|e| panic!("failed to deserialize packet at hop {}: {}", i, e));
 
             match packet.state() {
                 PacketState::Final { plain_text, .. } => {

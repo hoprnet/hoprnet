@@ -4,8 +4,8 @@ use utils_types::errors::GeneralError;
 
 #[derive(Error, Debug)]
 pub enum PacketError {
-    #[error("failed to decode packet")]
-    PacketDecodingError,
+    #[error("failed to decode packet: {0}")]
+    PacketDecodingError(String),
 
     #[error("failed to construct packet")]
     PacketConstructionError,
