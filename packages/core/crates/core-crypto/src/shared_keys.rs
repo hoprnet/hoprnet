@@ -3,11 +3,11 @@ use std::ops::Mul;
 
 use elliptic_curve::rand_core::{CryptoRng, RngCore};
 use elliptic_curve::sec1::ToEncodedPoint;
-use elliptic_curve::{Group};
+use elliptic_curve::Group;
 
 use generic_array::GenericArray;
 
-use k256::{NonZeroScalar};
+use k256::NonZeroScalar;
 
 use crate::errors::CryptoError::{CalculationError, InvalidSecretScalar};
 use hkdf::SimpleHkdf;
@@ -62,10 +62,13 @@ pub struct SharedKeys {
 impl SharedKeys {
     /// Generates shared secrets for the given path of peers.
     pub fn new(path: &[&PeerId]) -> Result<Self> {
-        Self::generate(&mut OsRng, &path
-            .iter()
-            .map(|peer_id| PublicKey::from_peerid(peer_id))
-            .collect::<utils_types::errors::Result<Vec<_>>>()?)
+        Self::generate(
+            &mut OsRng,
+            &path
+                .iter()
+                .map(|peer_id| PublicKey::from_peerid(peer_id))
+                .collect::<utils_types::errors::Result<Vec<_>>>()?,
+        )
     }
 
     /// Generates shared secrets given the peer public keys array.
@@ -185,7 +188,14 @@ pub mod tests {
     pub fn generate_random_keypairs(count: usize) -> (Vec<Box<[u8]>>, Vec<PublicKey>) {
         (0..count)
             .map(|_| NonZeroScalar::random(&mut OsRng))
-            .map(|s|(s.to_bytes().as_slice().into(), CurvePoint::from_exponent(s.to_bytes().as_slice()).and_then(PublicKey::try_from).unwrap()))
+            .map(|s| {
+                (
+                    s.to_bytes().as_slice().into(),
+                    CurvePoint::from_exponent(s.to_bytes().as_slice())
+                        .and_then(PublicKey::try_from)
+                        .unwrap(),
+                )
+            })
             .unzip()
     }
 
@@ -205,9 +215,7 @@ pub mod tests {
 
         let mut alpha_cpy: Box<[u8]> = generated_shares.alpha();
         for (i, priv_key) in priv_keys.iter().enumerate() {
-
-            let shared_key =
-                SharedKeys::forward_transform(&alpha_cpy, priv_key).unwrap();
+            let shared_key = SharedKeys::forward_transform(&alpha_cpy, priv_key).unwrap();
 
             assert_eq!(&shared_key.secrets()[0], &generated_shares.secrets()[i]);
 
@@ -217,14 +225,13 @@ pub mod tests {
 
     #[test]
     fn test_key_shares() {
-        let pub_keys =
-        [
+        let pub_keys = [
             hex!("0253f6e72ad23de294466b830619448d6d9059a42050141cd83bac4e3ee82c3f1e"),
             hex!("035fc5660f59059c263d3946d7abaf33fa88181e27bf298fcc5a9fa493bec9110b"),
             hex!("038d2b50a77fd43eeae9b37856358c7f1aee773b3e3c9d26f30b8706c02cbbfbb6"),
         ]
         .into_iter()
-        .map(|p|PublicKey::deserialize(&p))
+        .map(|p| PublicKey::deserialize(&p))
         .collect::<utils_types::errors::Result<Vec<_>>>()
         .unwrap();
 
@@ -240,12 +247,12 @@ pub mod tests {
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use crate::shared_keys::SharedKeys;
+    use crate::types::PublicKey;
     use elliptic_curve::rand_core::OsRng;
     use js_sys::Uint8Array;
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use wasm_bindgen::prelude::*;
-    use crate::types::PublicKey;
 
     #[wasm_bindgen]
     impl SharedKeys {
@@ -274,9 +281,10 @@ pub mod wasm {
         /// Generate shared keys given the peer public keys
         #[wasm_bindgen(js_name = "generate")]
         pub fn _generate(peer_public_keys: Vec<Uint8Array>) -> JsResult<SharedKeys> {
-            let public_keys = ok_or_jserr!(peer_public_keys.into_iter()
-                    .map(|v| PublicKey::deserialize(&v.to_vec()))
-                    .collect::<utils_types::errors::Result<Vec<PublicKey>>>())?;
+            let public_keys = ok_or_jserr!(peer_public_keys
+                .into_iter()
+                .map(|v| PublicKey::deserialize(&v.to_vec()))
+                .collect::<utils_types::errors::Result<Vec<PublicKey>>>())?;
             ok_or_jserr!(super::SharedKeys::generate(&mut OsRng, &public_keys))
         }
     }

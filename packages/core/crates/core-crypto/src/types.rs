@@ -66,9 +66,7 @@ impl FromStr for CurvePoint {
 
 impl PeerIdLike for CurvePoint {
     fn from_peerid(peer_id: &PeerId) -> utils_types::errors::Result<Self> {
-        CurvePoint::deserialize(
-            &PublicKey::from_peerid(peer_id)?.serialize(false),
-        )
+        CurvePoint::deserialize(&PublicKey::from_peerid(peer_id)?.serialize(false))
     }
 
     fn to_peerid(&self) -> PeerId {
@@ -178,8 +176,7 @@ impl BinarySerializable<'_> for Challenge {
 
     fn deserialize(data: &[u8]) -> utils_types::errors::Result<Self> {
         // Accepts both compressed and uncompressed points
-        CurvePoint::deserialize(data)
-            .map(|curve_point| Challenge {curve_point})
+        CurvePoint::deserialize(data).map(|curve_point| Challenge { curve_point })
     }
 
     fn serialize(&self) -> Box<[u8]> {
@@ -202,8 +199,12 @@ impl Default for HalfKey {
         let mut ret = Self {
             hkey: [0u8; Self::SIZE],
         };
-        ret.hkey.copy_from_slice(&NonZeroScalar::<Secp256k1>::from_uint(1u16.into())
-            .unwrap().to_bytes().as_slice());
+        ret.hkey.copy_from_slice(
+            &NonZeroScalar::<Secp256k1>::from_uint(1u16.into())
+                .unwrap()
+                .to_bytes()
+                .as_slice(),
+        );
         ret
     }
 }
@@ -258,9 +259,7 @@ impl Default for HalfKeyChallenge {
     fn default() -> Self {
         // Note that the default HalfKeyChallenge is the identity point on secp256k1, therefore
         // will fail all public key checks, which is intended.
-        let mut ret = Self {
-            hkc: [0u8; Self::SIZE]
-        };
+        let mut ret = Self { hkc: [0u8; Self::SIZE] };
         if let Some(b) = ret.hkc.last_mut() {
             *b = 1;
         }
@@ -337,7 +336,9 @@ pub struct Hash {
 
 impl Default for Hash {
     fn default() -> Self {
-        Self { hash: [0u8; Self::SIZE]}
+        Self {
+            hash: [0u8; Self::SIZE],
+        }
     }
 }
 
@@ -495,7 +496,11 @@ impl PublicKey {
             let key = elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(data).map_err(|_| ParseError)?;
             Ok(PublicKey {
                 key,
-                compressed: if data.len() == Self::SIZE_COMPRESSED { data.into() } else { key.to_encoded_point(true).to_bytes() },
+                compressed: if data.len() == Self::SIZE_COMPRESSED {
+                    data.into()
+                } else {
+                    key.to_encoded_point(true).to_bytes()
+                },
             })
         } else {
             Err(ParseError)
@@ -568,8 +573,7 @@ impl PublicKey {
     /// Adds the given public key with `tweak` times secp256k1 generator, producing a new public key.
     /// Panics if reaches infinity (EC identity point), which is an invalid public key.
     pub fn tweak_add(key: &PublicKey, tweak: &[u8]) -> PublicKey {
-        let scalar = NonZeroScalar::<Secp256k1>::try_from(tweak)
-            .expect("zero tweak provided");
+        let scalar = NonZeroScalar::<Secp256k1>::try_from(tweak).expect("zero tweak provided");
 
         let new_pk = (key.key.to_projective()
             + <Secp256k1 as CurveArithmetic>::ProjectivePoint::GENERATOR * scalar.as_ref())
@@ -596,8 +600,12 @@ impl Default for Response {
         let mut ret = Self {
             response: [0u8; Self::SIZE],
         };
-        ret.response.copy_from_slice(&NonZeroScalar::<Secp256k1>::from_uint(1u16.into())
-            .unwrap().to_bytes().as_slice());
+        ret.response.copy_from_slice(
+            &NonZeroScalar::<Secp256k1>::from_uint(1u16.into())
+                .unwrap()
+                .to_bytes()
+                .as_slice(),
+        );
         ret
     }
 }
@@ -617,7 +625,7 @@ impl Response {
     pub fn to_challenge(&self) -> Challenge {
         Challenge {
             curve_point: CurvePoint::from_exponent(&self.response)
-                .expect("response represents an invalid non-zero scalar")
+                .expect("response represents an invalid non-zero scalar"),
         }
     }
 }
@@ -627,8 +635,9 @@ impl Response {
     /// This is done by adding the two non-zero scalars that the given half-keys represent.
     pub fn from_half_keys(first: &HalfKey, second: &HalfKey) -> Result<Self> {
         let res = NonZeroScalar::<Secp256k1>::try_from(first.serialize().as_ref())
-            .and_then(|s1| NonZeroScalar::<Secp256k1>::try_from(second.serialize().as_ref())
-                .map(|s2| s1.as_ref() + s2.as_ref()))
+            .and_then(|s1| {
+                NonZeroScalar::<Secp256k1>::try_from(second.serialize().as_ref()).map(|s2| s1.as_ref() + s2.as_ref())
+            })
             .map_err(|_| CalculationError)?; // One of the scalars was 0
 
         Ok(Response::new(res.to_bytes().as_slice()))

@@ -236,14 +236,15 @@ impl Ticket {
 
     /// Convenience method for creating a zero-hop ticket
     pub fn new_zero_hop(destination: PublicKey, challenge: Option<Challenge>, private_key: &[u8]) -> Self {
-        Self::new(destination.to_address(),
-                     challenge,
-                     U256::zero(),
-                     U256::zero(),
-                     Balance::new(0u8.into(), BalanceType::HOPR),
-                    U256::zero(),
-                     U256::zero(),
-                    private_key
+        Self::new(
+            destination.to_address(),
+            challenge,
+            U256::zero(),
+            U256::zero(),
+            Balance::new(0u8.into(), BalanceType::HOPR),
+            U256::zero(),
+            U256::zero(),
+            private_key,
         )
     }
 

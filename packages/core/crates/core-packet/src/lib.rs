@@ -1,6 +1,6 @@
+pub mod errors;
 pub mod packet;
 pub mod por;
-pub mod errors;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {

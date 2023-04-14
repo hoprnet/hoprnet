@@ -16,7 +16,7 @@ pub const POR_SECRET_LENGTH: usize = 2 * PublicKey::SIZE_COMPRESSED;
 pub struct ProofOfRelayValues {
     pub ack_challenge: HalfKeyChallenge,
     pub ticket_challenge: Challenge,
-    pub own_key: HalfKey
+    pub own_key: HalfKey,
 }
 
 impl ProofOfRelayValues {
@@ -31,7 +31,7 @@ impl ProofOfRelayValues {
             ticket_challenge: Response::from_half_keys(&s0, &s1)
                 .expect("failed to derive response")
                 .to_challenge(),
-            own_key: s0
+            own_key: s0,
         }
     }
 }
@@ -41,7 +41,7 @@ impl ProofOfRelayValues {
 #[derive(Clone)]
 pub struct ProofOfRelayString {
     pub next_ticket_challenge: Challenge,
-    pub hint: HalfKeyChallenge
+    pub hint: HalfKeyChallenge,
 }
 
 impl ProofOfRelayString {
@@ -58,7 +58,7 @@ impl ProofOfRelayString {
             next_ticket_challenge: Response::from_half_keys(&s1, &s2)
                 .expect("failed to derive response")
                 .to_challenge(),
-            hint: s0.to_challenge()
+            hint: s0.to_challenge(),
         }
     }
 }
@@ -71,7 +71,7 @@ impl BinarySerializable<'_> for ProofOfRelayString {
             let (next_ticket_challenge, hint) = data.split_at(POR_SECRET_LENGTH / 2);
             Ok(Self {
                 next_ticket_challenge: CurvePoint::deserialize(next_ticket_challenge)?.into(),
-                hint: HalfKeyChallenge::new(hint)
+                hint: HalfKeyChallenge::new(hint),
             })
         } else {
             Err(ParseError)
@@ -93,7 +93,7 @@ pub struct ProofOfRelayOutput {
     pub own_key: HalfKey,
     pub own_share: HalfKeyChallenge,
     pub next_ticket_challenge: Challenge,
-    pub ack_challenge: HalfKeyChallenge
+    pub ack_challenge: HalfKeyChallenge,
 }
 
 /// Verifies that an incoming packet contains all values that are necessary to reconstruct the response to redeem the
@@ -111,11 +111,15 @@ pub fn pre_verify(secret: &[u8], por_bytes: &[u8], challenge: &EthereumChallenge
     let own_key = derive_own_key_share(secret);
     let own_share = own_key.to_challenge();
 
-    if Challenge::from_hint_and_share(&own_share, &pors.hint)?.to_ethereum_challenge().eq(challenge) {
+    if Challenge::from_hint_and_share(&own_share, &pors.hint)?
+        .to_ethereum_challenge()
+        .eq(challenge)
+    {
         Ok(ProofOfRelayOutput {
             next_ticket_challenge: pors.next_ticket_challenge,
             ack_challenge: pors.hint,
-            own_key, own_share,
+            own_key,
+            own_share,
         })
     } else {
         Err(PacketError::PoRVerificationError)
@@ -149,18 +153,23 @@ pub fn validate_por_hint(ethereum_challenge: &EthereumChallenge, own_share: &Hal
 
 #[cfg(test)]
 mod tests {
+    use crate::por::{
+        pre_verify, validate_por_half_keys, validate_por_hint, validate_por_response, ProofOfRelayString,
+        ProofOfRelayValues,
+    };
     use core_crypto::derivation::derive_ack_key_share;
-    use core_crypto::random::random_bytes;
     use core_crypto::parameters::SECRET_KEY_LENGTH;
+    use core_crypto::random::random_bytes;
     use core_crypto::types::Response;
     use utils_types::traits::BinarySerializable;
-    use crate::por::{pre_verify, ProofOfRelayString, ProofOfRelayValues, validate_por_half_keys, validate_por_hint, validate_por_response};
 
     #[test]
     fn test_por_preverify_validate() {
         const AMOUNT: usize = 4;
 
-        let secrets = (0..AMOUNT).map(|_| random_bytes::<SECRET_KEY_LENGTH>()).collect::<Vec<_>>();
+        let secrets = (0..AMOUNT)
+            .map(|_| random_bytes::<SECRET_KEY_LENGTH>())
+            .collect::<Vec<_>>();
 
         // Generated challenge
         let first_challenge = ProofOfRelayValues::new(&secrets[0], Some(&secrets[1]));
@@ -181,40 +190,72 @@ mod tests {
 
         // Simulates the transformation done by the first relayer
         let expected_pors = ProofOfRelayString::deserialize(&first_por_string.serialize()).unwrap();
-        assert_eq!(expected_pors.next_ticket_challenge, first_result.next_ticket_challenge,
-                   "Forward logic must extract correct challenge for the next downstream node");
+        assert_eq!(
+            expected_pors.next_ticket_challenge, first_result.next_ticket_challenge,
+            "Forward logic must extract correct challenge for the next downstream node"
+        );
 
         // Computes the cryptographic material that is part of the acknowledgement
         let first_ack = derive_ack_key_share(&secrets[1]);
-        assert!(validate_por_half_keys(&first_challenge.ticket_challenge.to_ethereum_challenge(), &first_result.own_key, &first_ack),
-                "Acknowledgement must solve the challenge");
+        assert!(
+            validate_por_half_keys(
+                &first_challenge.ticket_challenge.to_ethereum_challenge(),
+                &first_result.own_key,
+                &first_ack
+            ),
+            "Acknowledgement must solve the challenge"
+        );
 
         // Simulates the transformation as done by the second relayer
         let first_result_challenge_eth = first_result.next_ticket_challenge.to_ethereum_challenge();
-        let second_result =  pre_verify(&secrets[1], &second_por_string.serialize(), &first_result_challenge_eth)
+        let second_result = pre_verify(&secrets[1], &second_por_string.serialize(), &first_result_challenge_eth)
             .expect("Second challenge must be plausible");
 
         let second_ack = derive_ack_key_share(&secrets[2]);
-        assert!(validate_por_half_keys(&first_result.next_ticket_challenge.to_ethereum_challenge(), &second_result.own_key, &second_ack),
-                "Second acknowledgement must solve the challenge");
+        assert!(
+            validate_por_half_keys(
+                &first_result.next_ticket_challenge.to_ethereum_challenge(),
+                &second_result.own_key,
+                &second_ack
+            ),
+            "Second acknowledgement must solve the challenge"
+        );
 
-        assert!(validate_por_hint(&first_result.next_ticket_challenge.to_ethereum_challenge(), &second_result.own_share, &second_ack),
-                "Second acknowledgement must solve the challenge");
+        assert!(
+            validate_por_hint(
+                &first_result.next_ticket_challenge.to_ethereum_challenge(),
+                &second_result.own_share,
+                &second_ack
+            ),
+            "Second acknowledgement must solve the challenge"
+        );
     }
 
     #[test]
     fn test_challenge_and_response_solving() {
         const AMOUNT: usize = 2;
-        let secrets = (0..AMOUNT).map(|_| random_bytes::<SECRET_KEY_LENGTH>()).collect::<Vec<_>>();
+        let secrets = (0..AMOUNT)
+            .map(|_| random_bytes::<SECRET_KEY_LENGTH>())
+            .collect::<Vec<_>>();
 
         let first_challenge = ProofOfRelayValues::new(&secrets[0], Some(&secrets[1]));
         let ack = derive_ack_key_share(&secrets[1]);
 
-        assert!(validate_por_half_keys(&first_challenge.ticket_challenge.to_ethereum_challenge(),
-                                       &first_challenge.own_key, &ack), "Challenge must be solved");
+        assert!(
+            validate_por_half_keys(
+                &first_challenge.ticket_challenge.to_ethereum_challenge(),
+                &first_challenge.own_key,
+                &ack
+            ),
+            "Challenge must be solved"
+        );
 
-        assert!(validate_por_response(&first_challenge.ticket_challenge.to_ethereum_challenge(),
-        &Response::from_half_keys(&first_challenge.own_key, &ack).unwrap()),
-            "Returned response must solve the challenge");
+        assert!(
+            validate_por_response(
+                &first_challenge.ticket_challenge.to_ethereum_challenge(),
+                &Response::from_half_keys(&first_challenge.own_key, &ack).unwrap()
+            ),
+            "Returned response must solve the challenge"
+        );
     }
 }

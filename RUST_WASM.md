@@ -1,4 +1,3 @@
-
 # Documentation of our usage of Rust & WASM
 
 This file documents how we're using our Rust toolchain to build WASM compatible crates that are used in

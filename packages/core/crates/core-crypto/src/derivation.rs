@@ -101,10 +101,11 @@ pub(crate) fn generate_key_iv(secret: &[u8], info: &[u8], key: &mut [u8], iv: &m
 /// https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-13.html#name-hashing-to-a-finite-field
 /// The `tag` parameter will be used as an additional Domain Separation Tag.
 pub fn sample_field_element(secret: &[u8], tag: &str) -> Result<HalfKey> {
-    let scalar = Secp256k1::hash_to_scalar::<ExpandMsgXmd<sha3::Sha3_256>>(&[secret],
-                                                                        &[b"secp256k1_XMD:SHA3-256_SSWU_RO_",
-                                                                            tag.as_bytes()])
-        .map_err(|_| CalculationError)?;
+    let scalar = Secp256k1::hash_to_scalar::<ExpandMsgXmd<sha3::Sha3_256>>(
+        &[secret],
+        &[b"secp256k1_XMD:SHA3-256_SSWU_RO_", tag.as_bytes()],
+    )
+    .map_err(|_| CalculationError)?;
     Ok(HalfKey::new(scalar.to_bytes().as_ref()))
 }
 

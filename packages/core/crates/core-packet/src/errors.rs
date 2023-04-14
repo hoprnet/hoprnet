@@ -1,10 +1,9 @@
-use thiserror::Error;
 use core_crypto::errors::CryptoError;
+use thiserror::Error;
 use utils_types::errors::GeneralError;
 
 #[derive(Error, Debug)]
 pub enum PacketError {
-
     #[error("failed to decode packet")]
     PacketDecodingError,
 
@@ -18,7 +17,7 @@ pub enum PacketError {
     CryptographicError(#[from] CryptoError),
 
     #[error(transparent)]
-    Other(#[from] GeneralError)
+    Other(#[from] GeneralError),
 }
 
 pub type Result<T> = std::result::Result<T, PacketError>;

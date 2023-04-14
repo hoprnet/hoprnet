@@ -32,7 +32,7 @@ pub fn iterate_hash(seed: &[u8], iterations: usize, step_size: usize) -> Iterate
     hash.finalize_into(&mut intermediate);
     intermediates.push(Intermediate {
         iteration: 0,
-        intermediate: seed.into()
+        intermediate: seed.into(),
     });
 
     for iteration in 1..iterations {

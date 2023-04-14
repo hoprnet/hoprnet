@@ -15,7 +15,9 @@ use crate::parameters::SECRET_KEY_LENGTH;
 /// Generalization of digest-like operation (MAC, Digest,...)
 /// Defines the `update` and `finalize` operations to produce digest value of arbitrary data.
 pub trait DigestLike<T>
-where T: Update + FixedOutputReset + OutputSizeUser {
+where
+    T: Update + FixedOutputReset + OutputSizeUser,
+{
     /// Length of the digest in bytes
     const SIZE: usize = T::OutputSize::USIZE;
 
@@ -54,7 +56,7 @@ where T: Update + FixedOutputReset + OutputSizeUser {
 /// Currently this instance is using Blake2s256.
 #[derive(Default, Clone)]
 pub struct SimpleDigest {
-    instance: Blake2s256
+    instance: Blake2s256,
 }
 
 impl DigestLike<Blake2s256> for SimpleDigest {
@@ -68,7 +70,7 @@ impl DigestLike<Blake2s256> for SimpleDigest {
 /// Currently this instance is using Keccak256.
 #[derive(Default, Clone)]
 pub struct EthDigest {
-    instance: Keccak256
+    instance: Keccak256,
 }
 
 impl DigestLike<Keccak256> for EthDigest {
@@ -82,7 +84,7 @@ impl DigestLike<Keccak256> for EthDigest {
 /// Currently this instance is computing HMAC based on Blake2s256.
 #[derive(Clone)]
 pub struct SimpleMac {
-    instance: SimpleHmac<Blake2s256>
+    instance: SimpleHmac<Blake2s256>,
 }
 
 impl SimpleMac {

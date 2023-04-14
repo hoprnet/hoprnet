@@ -1,9 +1,9 @@
+use crate::channels::Ticket;
 use core_crypto::primitives::{DigestLike, SimpleDigest};
 use core_crypto::types::{HalfKey, HalfKeyChallenge, Hash, PublicKey, Response, Signature};
 use utils_types::errors;
 use utils_types::errors::GeneralError::ParseError;
 use utils_types::traits::BinarySerializable;
-use crate::channels::Ticket;
 
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
@@ -11,7 +11,7 @@ pub struct Acknowledgement {
     ack_signature: Signature,
     challenge_signature: Signature,
     ack_key_share: HalfKey,
-    validated: bool
+    validated: bool,
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -25,7 +25,7 @@ impl Acknowledgement {
             ack_signature: Signature::sign_hash(&digest.finalize(), private_key),
             challenge_signature: ack_challenge.signature,
             ack_key_share,
-            validated: true
+            validated: true,
         }
     }
 
@@ -34,11 +34,16 @@ impl Acknowledgement {
     pub fn validate(&mut self, own_public_key: &PublicKey, sender_public_key: &PublicKey) -> bool {
         let mut digest = SimpleDigest::default();
         digest.update(&self.ack_key_share.to_challenge().serialize());
-        self.validated = self.challenge_signature.verify_hash_with_pubkey(&digest.finalize(), own_public_key);
+        self.validated = self
+            .challenge_signature
+            .verify_hash_with_pubkey(&digest.finalize(), own_public_key);
 
         digest.update(&self.challenge_signature.serialize());
         digest.update(&self.ack_key_share.serialize());
-        self.validated = self.validated && self.ack_signature.verify_hash_with_pubkey(&digest.finalize(), sender_public_key);
+        self.validated = self.validated
+            && self
+                .ack_signature
+                .verify_hash_with_pubkey(&digest.finalize(), sender_public_key);
 
         self.validated
     }
@@ -58,7 +63,12 @@ impl BinarySerializable<'_> for Acknowledgement {
             let ack_signature = Signature::deserialize(buf.drain(..Signature::SIZE).as_ref())?;
             let challenge_signature = Signature::deserialize(buf.drain(..AcknowledgementChallenge::SIZE).as_ref())?;
             let ack_key_share = HalfKey::deserialize(buf.drain(..HalfKey::SIZE).as_ref())?;
-            Ok(Self { ack_signature, challenge_signature, ack_key_share, validated: false })
+            Ok(Self {
+                ack_signature,
+                challenge_signature,
+                ack_key_share,
+                validated: false,
+            })
         } else {
             Err(ParseError)
         }
@@ -101,7 +111,10 @@ fn hash_challenge(challenge: &HalfKeyChallenge) -> Box<[u8]> {
 impl AcknowledgementChallenge {
     pub fn new(ack_challenge: &HalfKeyChallenge, private_key: &[u8]) -> Self {
         let hash = hash_challenge(&ack_challenge);
-        Self { ack_challenge: Some(ack_challenge.clone()), signature: Signature::sign_hash(&hash, private_key) }
+        Self {
+            ack_challenge: Some(ack_challenge.clone()),
+            signature: Signature::sign_hash(&hash, private_key),
+        }
     }
 
     pub fn solve(&self, secret: &[u8]) -> bool {
@@ -137,7 +150,7 @@ impl BinarySerializable<'_> for AcknowledgementChallenge {
         if data.len() == Self::SIZE {
             Ok(AcknowledgementChallenge {
                 ack_challenge: None,
-                signature: Signature::deserialize(data)?
+                signature: Signature::deserialize(data)?,
             })
         } else {
             Err(ParseError)
@@ -152,10 +165,10 @@ impl BinarySerializable<'_> for AcknowledgementChallenge {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use wasm_bindgen::prelude::*;
-    use core_crypto::types::{Hash, PublicKey, Response};
     use crate::acknowledgment::AcknowledgedTicket;
     use crate::channels::Ticket;
+    use core_crypto::types::{Hash, PublicKey, Response};
+    use wasm_bindgen::prelude::*;
 
     #[wasm_bindgen]
     impl AcknowledgedTicket {
