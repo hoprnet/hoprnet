@@ -44,6 +44,7 @@
 - [PACKET\_SIZE](modules.md#packet_size)
 - [PATH\_RANDOMNESS](modules.md#path_randomness)
 - [PEER\_METADATA\_PROTOCOL\_VERSION](modules.md#peer_metadata_protocol_version)
+- [PEER\_METADATA\_PROTOCOL\_VERSION](modules.md#peer_metadata_protocol_version)
 - [VERSION](modules.md#version)
 - [sampleOptions](modules.md#sampleoptions)
 
@@ -52,6 +53,7 @@
 - [CONSTANTS](modules.md#constants)
 - [createHoprNode](modules.md#createhoprnode)
 - [findPath](modules.md#findpath)
+- [health\_to\_string](modules.md#health_to_string)
 - [health\_to\_string](modules.md#health_to_string)
 - [isStrategy](modules.md#isstrategy)
 - [resolveEnvironment](modules.md#resolveenvironment)
@@ -99,7 +101,7 @@
 
 #### Defined in
 
-[packages/core/src/index.ts:151](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L151)
+[packages/core/src/index.ts:153](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L153)
 
 ___
 
@@ -109,7 +111,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:203](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L203)
+[packages/core/src/index.ts:205](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L205)
 
 ___
 
@@ -119,7 +121,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:218](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L218)
+[packages/core/src/index.ts:220](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L220)
 
 ___
 
@@ -139,7 +141,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:205](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L205)
+[packages/core/src/index.ts:207](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L207)
 
 ## Variables
 
@@ -263,6 +265,16 @@ ___
 
 ___
 
+### PEER\_METADATA\_PROTOCOL\_VERSION
+
+• `Const` **PEER\_METADATA\_PROTOCOL\_VERSION**: ``"protocol_version"``
+
+#### Defined in
+
+[packages/core/src/constants.ts:24](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L24)
+
+___
+
 ### VERSION
 
 • `Const` **VERSION**: `string`
@@ -318,7 +330,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/main.ts:213](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L213)
+[packages/core/src/main.ts:226](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L226)
 
 ___
 
@@ -374,6 +386,26 @@ packages/core/lib/core_network.d.ts:25
 
 ___
 
+### health\_to\_string
+
+▸ **health_to_string**(`h`): `string`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `h` | `number` |
+
+#### Returns
+
+`string`
+
+#### Defined in
+
+packages/core/lib/core_network.d.ts:25
+
+___
+
 ### isStrategy
 
 ▸ **isStrategy**(`str`): str is string
@@ -390,6 +422,7 @@ str is string
 
 #### Defined in
 
+[packages/core/src/channel-strategy.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L30)
 [packages/core/src/channel-strategy.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L30)
 
 ___
