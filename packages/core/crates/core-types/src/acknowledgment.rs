@@ -49,7 +49,7 @@ impl Acknowledgement {
     }
 }
 
-impl BinarySerializable for Acknowledgement {
+impl BinarySerializable<'_> for Acknowledgement {
     const SIZE: usize = Signature::SIZE + AcknowledgementChallenge::SIZE + HalfKey::SIZE;
 
     fn deserialize(data: &[u8]) -> errors::Result<Self> {
@@ -130,7 +130,7 @@ impl AcknowledgementChallenge {
     }
 }
 
-impl BinarySerializable for AcknowledgementChallenge {
+impl BinarySerializable<'_> for AcknowledgementChallenge {
     const SIZE: usize = Signature::SIZE;
 
     fn deserialize(data: &[u8]) -> errors::Result<Self> {

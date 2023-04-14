@@ -63,7 +63,7 @@ impl ProofOfRelayString {
     }
 }
 
-impl BinarySerializable for ProofOfRelayString {
+impl BinarySerializable<'_> for ProofOfRelayString {
     const SIZE: usize = POR_SECRET_LENGTH;
 
     fn deserialize(data: &[u8]) -> utils_types::errors::Result<Self> {

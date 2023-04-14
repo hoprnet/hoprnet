@@ -173,7 +173,7 @@ impl From<Response> for Challenge {
     }
 }
 
-impl BinarySerializable for Challenge {
+impl BinarySerializable<'_> for Challenge {
     const SIZE: usize = PublicKey::SIZE_COMPRESSED;
 
     fn deserialize(data: &[u8]) -> utils_types::errors::Result<Self> {
@@ -635,7 +635,7 @@ impl Response {
     }
 }
 
-impl BinarySerializable for Response {
+impl BinarySerializable<'_> for Response {
     const SIZE: usize = 32;
 
     fn deserialize(data: &[u8]) -> utils_types::errors::Result<Self> {
