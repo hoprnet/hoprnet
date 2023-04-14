@@ -147,8 +147,8 @@ impl SharedKeys {
         self.secrets.iter().map(Box::as_ref).collect()
     }
 
-    pub fn secret(&self, idx: usize) -> &[u8] {
-        &self.secrets[idx]
+    pub fn secret(&self, idx: usize) -> Option<&[u8]> {
+        self.secrets.get(idx).map(|x| x.as_ref())
     }
 }
 

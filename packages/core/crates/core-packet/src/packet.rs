@@ -27,6 +27,7 @@ pub const PACKET_LENGTH: usize = packet_length(INTERMEDIATE_HOPS + 1, POR_SECRET
 /// Tag used to separate padding from data
 const PADDING_TAG: &[u8] = b"HOPR";
 
+/// Determines the total length (header + payload) of the packet given the header information.
 pub const fn packet_length(
     max_hops: usize,
     additional_data_relayer_len: usize,
@@ -157,7 +158,7 @@ fn forward_packet(
     let decoded = PacketHeader::deserialize(packet, header_len);
 
     let shared_keys = SharedKeys::forward_transform(decoded.alpha, private_key)?;
-    let secret = shared_keys.secret(0);
+    let secret = shared_keys.secret(0).unwrap();
 
     let mut routing_info_mut: Vec<u8> = decoded.routing_info.into();
     let fwd_header = forward_header(
@@ -254,17 +255,16 @@ impl Packet {
         let shared_keys = SharedKeys::new(path)?;
 
         let porv = ProofOfRelayValues::new(
-            shared_keys.secret(0),
-            (shared_keys.count_shared_keys() > 1).then_some(shared_keys.secret(1)),
+            shared_keys.secret(0).unwrap(),
+            shared_keys.secret(1),
         );
 
         let mut por_strings = Vec::with_capacity(path.len() - 1);
         for i in 0..path.len() - 1 {
-            let has_other = i + 2 < path.len();
             por_strings.push(
                 ProofOfRelayString::new(
-                    shared_keys.secret(i + 1),
-                    has_other.then_some(shared_keys.secret(i + 2)),
+                    shared_keys.secret(i + 1).unwrap(),
+                    shared_keys.secret(i + 2),
                 )
                 .serialize(),
             )
@@ -370,13 +370,17 @@ impl Packet {
     pub fn forward(&mut self, private_key: &[u8], next_ticket: Ticket) {
         match &mut self.state {
             Forwarded {
+                next_challenge,
                 old_challenge,
                 ack_challenge,
                 ..
             } => {
+                let mut ticket = next_ticket;
+                ticket.challenge = next_challenge.to_ethereum_challenge();
+                self.ticket = ticket;
+
                 let _ = old_challenge.insert(self.challenge.clone());
                 self.challenge = AcknowledgementChallenge::new(ack_challenge, private_key);
-                self.ticket = next_ticket;
             }
             _ => panic!("invalid packet state"),
         }
@@ -422,7 +426,7 @@ impl Packet {
 
 #[cfg(test)]
 mod tests {
-    use crate::packet::{add_padding, remove_padding, Packet, PacketState, INTERMEDIATE_HOPS, PADDING_TAG};
+    use crate::packet::{add_padding, remove_padding, Packet, PacketState, PADDING_TAG};
     use core_crypto::types::PublicKey;
     use core_types::channels::Ticket;
     use libp2p_identity::{Keypair, PeerId};
@@ -445,29 +449,34 @@ mod tests {
     }
 
     fn mock_ticket(next_peer: &PeerId, path_len: usize, private_key: &[u8]) -> Ticket {
+        assert!(path_len > 0);
         const PRICE_PER_PACKET: u128 = 10000000000000000u128;
         const INVERSE_TICKET_WIN_PROB: u128 = 1;
 
-        Ticket::new(
-            PublicKey::from_peerid(next_peer).unwrap().to_address(),
-            None,
-            U256::zero(),
-            U256::zero(),
-            Balance::new(
-                (PRICE_PER_PACKET * INVERSE_TICKET_WIN_PROB * (path_len - 1) as u128).into(),
-                BalanceType::HOPR,
-            ),
-            U256::one(),
-            U256::zero(),
-            private_key,
-        )
+        if path_len > 1 {
+            Ticket::new(
+                PublicKey::from_peerid(next_peer).unwrap().to_address(),
+                None,
+                U256::zero(),
+                U256::zero(),
+                Balance::new(
+                    (PRICE_PER_PACKET * INVERSE_TICKET_WIN_PROB * (path_len - 1) as u128).into(),
+                    BalanceType::HOPR,
+                ),
+                U256::one(),
+                U256::zero(),
+                private_key,
+            )
+        } else {
+            Ticket::new_zero_hop(PublicKey::from_peerid(next_peer).unwrap(), None, private_key)
+        }
     }
 
+    //#[parameterized(amount = { 4, 3, 2 })]
     #[test]
-    fn test_packet_create_and_transform() {
-        const AMOUNT: usize = INTERMEDIATE_HOPS + 1;
-
-        let mut keypairs = (0..AMOUNT)
+    fn test_packet_create_and_transform(/*amount: usize*/) {
+        let amount = 4;
+        let mut keypairs = (0..amount)
             .map(|_| Keypair::generate_secp256k1())
             .map(|kp| {
                 (
@@ -511,7 +520,7 @@ mod tests {
                     assert_eq!(&test_message, &plain_text.as_ref());
                 }
                 PacketState::Forwarded { .. } => {
-                    let ticket = mock_ticket(&node_id, keypairs.len() - i, node_private);
+                    let ticket = mock_ticket(&node_id, keypairs.len() - i - 1, node_private);
                     packet.forward(node_private, ticket);
                 }
                 PacketState::Outgoing { .. } => panic!("invalid packet state"),

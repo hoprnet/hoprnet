@@ -14,6 +14,7 @@ use subtle::ConstantTimeEq;
 
 const RELAYER_END_PREFIX: u8 = 0xff;
 
+/// Returns the size of the packet header given the information about the number of hops and additional relayer info.
 pub const fn header_length(
     max_hops: usize,
     additional_data_relayer_len: usize,
