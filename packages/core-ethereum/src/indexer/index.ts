@@ -160,7 +160,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       for await (const block of orderedBlocks.iterator()) {
         await this.onNewBlock(block.value, true, true) // exceptions are handled (for real)
       }
-    }).call(this)
+    }.call(this))
 
     // Do not process new blocks before querying old blocks has finished
     const newBlocks = ordered<number>()
@@ -190,7 +190,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       for await (const newBlock of newBlocks.iterator()) {
         orderedBlocks.push(newBlock) // exceptions are handled
       }
-    }).call(this)
+    }.call(this))
 
     log('Subscribing to events from block %d', fromBlock)
 
