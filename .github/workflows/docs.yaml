@@ -16,7 +16,7 @@ on:
 jobs:
   docs:
     name: Generate API docs
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-8-cores
     steps:
       - uses: actions/checkout@v3
 
@@ -37,14 +37,13 @@ jobs:
 
       - name: Install Nix
         uses: cachix/install-nix-action@v17
-        with:
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: cachix/cachix-action@v12
         if: ${{ !env.ACT }}
         with:
           name: hoprnet
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+        continue-on-error: true
 
       - name: get yarn cache directory path
         id: yarn-cache-dir-path

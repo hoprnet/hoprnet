@@ -83,7 +83,7 @@ impl ChannelEntry {
     }
 }
 
-impl BinarySerializable for ChannelEntry {
+impl BinarySerializable<'_> for ChannelEntry {
     const SIZE: usize = PublicKey::SIZE_UNCOMPRESSED
         + PublicKey::SIZE_UNCOMPRESSED
         + Balance::SIZE
@@ -307,7 +307,7 @@ impl Ticket {
     }
 }
 
-impl BinarySerializable for Ticket {
+impl BinarySerializable<'_> for Ticket {
     const SIZE: usize =
         Address::SIZE + EthereumChallenge::SIZE + 2 * U256::SIZE + Balance::SIZE + 2 * U256::SIZE + Signature::SIZE;
 

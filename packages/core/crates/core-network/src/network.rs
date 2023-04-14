@@ -1,8 +1,8 @@
-use std::collections::hash_map::HashMap;
+use std::collections::hash_map::{Entry, HashMap};
 use std::collections::hash_set::HashSet;
 use std::time::Duration;
 
-use libp2p::PeerId;
+use libp2p_identity::PeerId;
 
 use utils_log::{error, info, warn};
 use utils_metrics::metrics::{MultiGauge, SimpleGauge};
@@ -82,15 +82,16 @@ impl std::fmt::Display for PeerOrigin {
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Health {
-    UNKNOWN = 0,
+    /// Unknown health, on application startup
+    Unknown = 0,
     /// No connection, default
-    RED = 1,
+    Red = 1,
     /// Low quality connection to at least 1 public relay
-    ORANGE = 2,
+    Orange = 2,
     /// High quality connection to at least 1 public relay
-    YELLOW = 3,
+    Yellow = 3,
     /// High quality connection to at least 1 public relay and 1 NAT node
-    GREEN = 4,
+    Green = 4,
 }
 
 impl std::fmt::Display for Health {
@@ -121,6 +122,7 @@ pub struct PeerStatus {
     pub heartbeats_sent: u64,
     pub heartbeats_succeeded: u64,
     pub backoff: f64,
+    metadata: HashMap<String, String>,
 }
 
 impl PeerStatus {
@@ -134,7 +136,13 @@ impl PeerStatus {
             last_seen: 0,
             backoff,
             quality: 0.0,
+            metadata: HashMap::new(),
         }
+    }
+
+    /// Gets metadata associated with the peer
+    pub fn metadata(&self) -> &HashMap<String, String> {
+        &self.metadata
     }
 }
 
@@ -194,7 +202,7 @@ impl Network {
             bad_quality_public: HashSet::new(),
             good_quality_non_public: HashSet::new(),
             bad_quality_non_public: HashSet::new(),
-            last_health: Health::UNKNOWN,
+            last_health: Health::Unknown,
             network_actions_api,
             metric_network_health: SimpleGauge::new("core_gauge_network_health", "Connectivity health indicator").ok(),
             metric_peers_by_quality: MultiGauge::new(
@@ -218,6 +226,13 @@ impl Network {
     ///
     /// Each PeerId must have an origin specification.
     pub fn add(&mut self, peer: &PeerId, origin: PeerOrigin) {
+        self.add_with_metadata(peer, origin, None)
+    }
+
+    /// Add a new PeerId into the network (with optional metadata entries)
+    ///
+    /// Each PeerId must have an origin specification.
+    pub fn add_with_metadata(&mut self, peer: &PeerId, origin: PeerOrigin, metadata: Option<HashMap<String, String>>) {
         let id = peer.to_string();
         let now = current_timestamp();
 
@@ -241,6 +256,9 @@ impl Network {
             if !has_entry && !is_ignored {
                 let mut entry = PeerStatus::new(peer.clone(), origin, self.cfg.backoff_min);
                 entry.is_public = self.network_actions_api.is_public(&peer);
+                if let Some(m) = metadata {
+                    entry.metadata.extend(m);
+                }
                 self.refresh_network_status(&entry);
 
                 if let Some(x) = self.entries.insert(peer.to_string(), entry) {
@@ -258,10 +276,32 @@ impl Network {
 
     /// Update the PeerId record in the network
     pub fn update(&mut self, peer: &PeerId, ping_result: crate::types::Result) {
+        self.update_with_metadata(peer, ping_result, None)
+    }
+
+    /// Update the PeerId record in the network (with optional metadata entries that will be merged into the existing ones)
+    pub fn update_with_metadata(
+        &mut self,
+        peer: &PeerId,
+        ping_result: crate::types::Result,
+        metadata: Option<HashMap<String, String>>,
+    ) {
         if let Some(existing) = self.entries.get(peer.to_string().as_str()) {
             let mut entry = existing.clone();
             entry.heartbeats_sent = entry.heartbeats_sent + 1;
             entry.is_public = self.network_actions_api.is_public(&peer);
+
+            // Upsert metadata if any
+            if let Some(mm) = metadata {
+                mm.into_iter().for_each(|(k, v)| match entry.metadata.entry(k) {
+                    Entry::Occupied(val) => {
+                        *val.into_mut() = v.clone();
+                    }
+                    Entry::Vacant(vac) => {
+                        vac.insert(v);
+                    }
+                });
+            }
 
             if ping_result.is_err() {
                 entry.backoff = self.cfg.backoff_max.max(entry.backoff.powf(self.cfg.backoff_exponent));
@@ -313,17 +353,17 @@ impl Network {
         let good_non_public = self.good_quality_non_public.len();
         let bad_public = self.bad_quality_public.len();
         let bad_non_public = self.bad_quality_non_public.len();
-        let mut health = Health::RED;
+        let mut health = Health::Red;
 
         if bad_public > 0 {
-            health = Health::ORANGE;
+            health = Health::Orange;
         }
 
         if good_public > 0 {
             health = if good_non_public > 0 || self.network_actions_api.is_public(&self.me) {
-                Health::GREEN
+                Health::Green
             } else {
-                Health::YELLOW
+                Health::Yellow
             };
         }
 
@@ -430,13 +470,28 @@ pub mod wasm {
     use super::*;
     use js_sys::JsString;
     use std::str::FromStr;
+    use utils_misc::utils::wasm::js_map_to_hash_map;
     use wasm_bindgen::prelude::*;
+
+    #[wasm_bindgen]
+    pub fn health_to_string(h: Health) -> String {
+        format!("{:?}", h)
+    }
 
     #[wasm_bindgen]
     impl PeerStatus {
         #[wasm_bindgen]
         pub fn peer_id(&self) -> String {
             self.id.to_base58()
+        }
+
+        #[wasm_bindgen(js_name = "metadata")]
+        pub fn _metadata(&self) -> js_sys::Map {
+            let ret = js_sys::Map::new();
+            self.metadata.iter().for_each(|(k, v)| {
+                ret.set(&JsValue::from(k.clone()), &JsValue::from(v.clone()));
+            });
+            ret
         }
     }
 
@@ -452,6 +507,7 @@ pub mod wasm {
             heartbeats_sent: u64,
             heartbeats_succeeded: u64,
             backoff: f64,
+            peer_metadata: &js_sys::Map,
         ) -> Self {
             let peer = peer
                 .as_string()
@@ -469,6 +525,7 @@ pub mod wasm {
                 heartbeats_sent,
                 heartbeats_succeeded,
                 backoff,
+                metadata: js_map_to_hash_map(peer_metadata).unwrap_or(HashMap::new()),
             }
         }
     }
@@ -584,9 +641,14 @@ pub mod wasm {
 
         #[wasm_bindgen]
         pub fn register(&mut self, peer: JsString, origin: PeerOrigin) {
+            self.register_with_metadata(peer, origin, &js_sys::Map::from(JsValue::undefined()))
+        }
+
+        #[wasm_bindgen]
+        pub fn register_with_metadata(&mut self, peer: JsString, origin: PeerOrigin, metadata: &js_sys::Map) {
             let peer: String = peer.into();
             match PeerId::from_str(&peer) {
-                Ok(p) => self.add(&p, origin),
+                Ok(p) => self.add_with_metadata(&p, origin, js_map_to_hash_map(metadata)),
                 Err(err) => {
                     warn!(
                         "Failed to parse peer id {}, network ignores the register attempt: {}",
@@ -614,6 +676,11 @@ pub mod wasm {
 
         #[wasm_bindgen]
         pub fn refresh(&mut self, peer: JsString, timestamp: JsValue) {
+            self.refresh_with_metadata(peer, timestamp, &js_sys::Map::from(JsValue::undefined()))
+        }
+
+        #[wasm_bindgen]
+        pub fn refresh_with_metadata(&mut self, peer: JsString, timestamp: JsValue, metadata: &js_sys::Map) {
             let peer: String = peer.into();
             let result: crate::types::Result = if timestamp.is_undefined() {
                 Err(())
@@ -621,7 +688,7 @@ pub mod wasm {
                 timestamp.as_f64().map(|v| v as u64).ok_or(())
             };
             match PeerId::from_str(&peer) {
-                Ok(p) => self.update(&p, result),
+                Ok(p) => self.update_with_metadata(&p, result, js_map_to_hash_map(metadata)),
                 Err(err) => {
                     warn!(
                         "Failed to parse peer id {}, network ignores the regresh attempt: {}",
@@ -707,11 +774,11 @@ mod tests {
 
     #[test]
     fn test_network_health_should_be_ordered_numerically_for_metrics_output() {
-        assert_eq!(Health::UNKNOWN as i32, 0);
-        assert_eq!(Health::RED as i32, 1);
-        assert_eq!(Health::ORANGE as i32, 2);
-        assert_eq!(Health::YELLOW as i32, 3);
-        assert_eq!(Health::GREEN as i32, 4);
+        assert_eq!(Health::Unknown as i32, 0);
+        assert_eq!(Health::Red as i32, 1);
+        assert_eq!(Health::Orange as i32, 2);
+        assert_eq!(Health::Yellow as i32, 3);
+        assert_eq!(Health::Green as i32, 4);
     }
 
     #[test]
@@ -736,6 +803,28 @@ mod tests {
 
         assert_eq!(1, peers.length());
         assert!(peers.has(&expected))
+    }
+
+    #[test]
+    fn test_network_should_add_metadata() {
+        let expected = PeerId::random();
+
+        let mut peers = basic_network(&PeerId::random());
+
+        let proto_version = ("protocol_version".to_string(), "1.2.3".to_string());
+
+        peers.add_with_metadata(
+            &expected,
+            PeerOrigin::IncomingConnection,
+            Some([proto_version.clone()].into()),
+        );
+
+        assert_eq!(1, peers.length());
+        assert!(peers.has(&expected));
+
+        let status = peers.get_peer_status(&expected).unwrap();
+        assert!(status.metadata().contains_key(&proto_version.0));
+        assert_eq!(&proto_version.1, status.metadata().get(&proto_version.0).unwrap());
     }
 
     #[test]
@@ -781,6 +870,52 @@ mod tests {
         assert!(actual.contains("heartbeats sent=1"));
         assert!(actual.contains("heartbeats succeeded=1"));
         assert!(actual.contains(format!("last seen on={}", ts).as_str()))
+    }
+
+    #[test]
+    fn test_network_update_should_merge_metadata() {
+        let peer = PeerId::random();
+
+        let mut peers = basic_network(&PeerId::random());
+
+        let other_metadata_1 = ("other_1".to_string(), "efgh".to_string());
+        let other_metadata_2 = ("other_2".to_string(), "abcd".to_string());
+
+        {
+            let proto_version = ("protocol_version".to_string(), "1.2.3".to_string());
+
+            peers.add_with_metadata(
+                &peer,
+                PeerOrigin::IncomingConnection,
+                Some([proto_version.clone(), other_metadata_1.clone()].into()),
+            );
+
+            let status = peers.get_peer_status(&peer).unwrap();
+
+            assert_eq!(2, status.metadata().len());
+            assert_eq!(&proto_version.1, status.metadata().get(&proto_version.0).unwrap());
+            assert_eq!(&other_metadata_1.1, status.metadata().get(&other_metadata_1.0).unwrap());
+            assert!(status.metadata().get(&other_metadata_2.0).is_none());
+        }
+
+        let ts = current_timestamp();
+
+        {
+            let proto_version = ("protocol_version".to_string(), "1.2.4".to_string());
+
+            peers.update_with_metadata(
+                &peer,
+                Ok(ts.clone()),
+                Some([proto_version.clone(), other_metadata_2.clone()].into()),
+            );
+
+            let status = peers.get_peer_status(&peer).unwrap();
+
+            assert_eq!(3, status.metadata().len());
+            assert_eq!(&proto_version.1, status.metadata().get(&proto_version.0).unwrap());
+            assert_eq!(&other_metadata_1.1, status.metadata().get(&other_metadata_1.0).unwrap());
+            assert_eq!(&other_metadata_2.1, status.metadata().get(&other_metadata_2.0).unwrap());
+        }
     }
 
     #[test]
@@ -848,7 +983,7 @@ mod tests {
     fn test_network_should_have_no_knowledge_about_health_without_any_registered_peers() {
         let peers = basic_network(&PeerId::random());
 
-        assert_eq!(peers.health(), Health::UNKNOWN);
+        assert_eq!(peers.health(), Health::Unknown);
     }
 
     #[test]
@@ -859,7 +994,7 @@ mod tests {
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
 
-        assert_eq!(peers.health(), Health::RED);
+        assert_eq!(peers.health(), Health::Red);
     }
 
     #[test]
@@ -872,7 +1007,7 @@ mod tests {
         let _ = peers.health();
         peers.remove(&peer);
 
-        assert_eq!(peers.health(), Health::RED);
+        assert_eq!(peers.health(), Health::Red);
     }
 
     #[test]
@@ -887,7 +1022,7 @@ mod tests {
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
 
-        assert_eq!(peers.health(), Health::RED);
+        assert_eq!(peers.health(), Health::Red);
     }
 
     #[test]
@@ -904,7 +1039,7 @@ mod tests {
 
         peers.update(&peer, Ok(current_timestamp()));
 
-        assert_eq!(peers.health(), Health::ORANGE);
+        assert_eq!(peers.health(), Health::Orange);
     }
 
     #[test]
@@ -944,7 +1079,7 @@ mod tests {
             peers.update(&peer, Ok(current_timestamp()));
         }
 
-        assert_eq!(peers.health(), Health::GREEN);
+        assert_eq!(peers.health(), Health::Green);
     }
 
     #[test]
@@ -968,6 +1103,6 @@ mod tests {
             peers.update(&peer, Ok(current_timestamp()));
         }
 
-        assert_eq!(peers.health(), Health::GREEN);
+        assert_eq!(peers.health(), Health::Green);
     }
 }

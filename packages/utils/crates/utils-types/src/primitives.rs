@@ -36,7 +36,7 @@ impl Address {
     // }
 }
 
-impl BinarySerializable for Address {
+impl BinarySerializable<'_> for Address {
     const SIZE: usize = 20;
 
     fn deserialize(data: &[u8]) -> Result<Self> {
@@ -216,7 +216,7 @@ impl EthereumChallenge {
     }
 }
 
-impl BinarySerializable for EthereumChallenge {
+impl BinarySerializable<'_> for EthereumChallenge {
     const SIZE: usize = 20;
 
     fn deserialize(data: &[u8]) -> Result<Self> {
@@ -253,7 +253,7 @@ impl Snapshot {
     }
 }
 
-impl BinarySerializable for Snapshot {
+impl BinarySerializable<'_> for Snapshot {
     const SIZE: usize = 3 * U256::SIZE;
 
     fn deserialize(data: &[u8]) -> Result<Self> {
@@ -302,7 +302,7 @@ impl U256 {
     }
 }
 
-impl BinarySerializable for U256 {
+impl BinarySerializable<'_> for U256 {
     const SIZE: usize = 32;
 
     fn deserialize(data: &[u8]) -> Result<Self> {

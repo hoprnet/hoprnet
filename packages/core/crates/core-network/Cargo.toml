@@ -1,6 +1,6 @@
 [package]
 name = "core-network"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 license = "GPL-3.0-only"
@@ -9,19 +9,24 @@ license = "GPL-3.0-only"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = ["console_error_panic_hook", "wasm"]
+default = ["console_error_panic_hook", "wasm", "compat-ping"]
 wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:getrandom", "dep:js-sys", "dep:gloo-timers"]
+compat-ping = []
 
 [dependencies]
 async-std = { version = "1.12.0", features = ["attributes"] }
+core-crypto = { path = "../core-crypto" }
+bincode = "1.3.3"
 blake2 = "0.10.4"
 futures = "0.3.28"
-libp2p = { version = "0.50.0", features = ["async-std", "wasm-bindgen", "wasm-ext"] }
+libp2p-identity = { version = "0.1.1", features = ["secp256k1", "peerid"] }
 rand = { version = "0.8.5", features = ["std_rng"] }
-scopeguard = "1.1.0"
+serde = "1"
+thiserror = "1.0"
 utils-log = { path = "../../../utils/crates/utils-log"}
 utils-misc = { path = "../../../utils/crates/utils-misc"}
 utils-metrics = { path = "../../../utils/crates/utils-metrics"}
+utils-types = { path = "../../../utils/crates/utils-types"}
 gloo-timers = { version = "0.2.6", optional = true , features = ["futures"]}
 console_error_panic_hook = { version = "0.1.7", optional = true }
 getrandom = { version = "0.2.8", features = ["js"], optional = true }

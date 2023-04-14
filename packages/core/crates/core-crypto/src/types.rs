@@ -76,7 +76,7 @@ impl PeerIdLike for CurvePoint {
     }
 }
 
-impl BinarySerializable for CurvePoint {
+impl BinarySerializable<'_> for CurvePoint {
     const SIZE: usize = 65; // Stores uncompressed data
 
     fn deserialize(bytes: &[u8]) -> utils_types::errors::Result<Self> {
@@ -227,7 +227,7 @@ impl HalfKey {
     }
 }
 
-impl BinarySerializable for HalfKey {
+impl BinarySerializable<'_> for HalfKey {
     const SIZE: usize = 32;
 
     fn deserialize(data: &[u8]) -> utils_types::errors::Result<Self> {
@@ -285,7 +285,7 @@ impl HalfKeyChallenge {
     }
 }
 
-impl BinarySerializable for HalfKeyChallenge {
+impl BinarySerializable<'_> for HalfKeyChallenge {
     const SIZE: usize = PublicKey::SIZE_COMPRESSED; // Size of the compressed secp256k1 point.
 
     fn deserialize(data: &[u8]) -> utils_types::errors::Result<Self> {
@@ -352,7 +352,7 @@ impl Hash {
     }
 }
 
-impl BinarySerializable for Hash {
+impl BinarySerializable<'_> for Hash {
     const SIZE: usize = 32; // Defined by Keccak256.
 
     fn deserialize(data: &[u8]) -> utils_types::errors::Result<Self> {
@@ -745,7 +745,7 @@ impl Signature {
     }
 }
 
-impl BinarySerializable for Signature {
+impl BinarySerializable<'_> for Signature {
     const SIZE: usize = 64;
 
     fn deserialize(data: &[u8]) -> utils_types::errors::Result<Self> {

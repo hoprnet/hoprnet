@@ -9,18 +9,24 @@ use futures::{
     pin_mut,
     stream::{FuturesUnordered, StreamExt},
 };
-use libp2p::PeerId;
+use libp2p_identity::PeerId;
 
 use utils_log::{debug, error, info};
 use utils_metrics::histogram_start_measure;
 use utils_metrics::metrics::SimpleCounter;
 use utils_metrics::metrics::SimpleHistogram;
 
+use crate::errors::NetworkingError;
+use crate::errors::NetworkingError::{DecodingError, Other, Timeout};
+use crate::messaging::{ControlMessage, PingMessage};
+use utils_types::traits::BinarySerializable;
+
 #[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::sleep;
 #[cfg(any(not(feature = "wasm"), test))]
 use utils_misc::time::native::current_timestamp;
 
+use crate::messaging::ControlMessage::Pong;
 #[cfg(all(feature = "wasm", not(test)))]
 use gloo_timers::future::sleep;
 #[cfg(all(feature = "wasm", not(test)))]
@@ -120,14 +126,10 @@ impl Ping {
             ()
         }
 
-        let _ping_peers_timer = match &self.metric_time_to_heartbeat {
-            Some(metric_time_to_heartbeat) => {
-                let timer = histogram_start_measure!(metric_time_to_heartbeat);
-                Some(scopeguard::guard((), move |_| {
-                    metric_time_to_heartbeat.cancel_measure(timer);
-                }))
-            }
-            None => None,
+        let heartbeat_round_timer = if let Some(metric_time_to_heartbeat) = &self.metric_time_to_heartbeat {
+            Some(histogram_start_measure!(metric_time_to_heartbeat))
+        } else {
+            None
         };
 
         let remainder = peers.split_off(self.config.max_parallel_pings.min(peers.len()));
@@ -151,6 +153,10 @@ impl Ping {
 
             self.external_api.on_finished_ping(&heartbeat.0, heartbeat.1);
         }
+
+        if let Some(metric_time_to_heartbeat) = &self.metric_time_to_heartbeat {
+            metric_time_to_heartbeat.cancel_measure(heartbeat_round_timer.unwrap());
+        };
     }
 
     /// Ping a single peer respecting a specified timeout duration.
@@ -164,50 +170,51 @@ impl Ping {
         F: futures::Future<Output = Result<Box<[u8]>, String>>,
     {
         info!("Pinging peer '{}'", destination);
-
-        use rand::{RngCore, SeedableRng};
-        let mut challenge = Box::new([0u8; 16]);
-        rand::rngs::StdRng::from_entropy().fill_bytes(&mut challenge.as_mut_slice());
+        let sent_ping = ControlMessage::generate_ping_request();
 
         let ping_result: PingMeasurement = {
-            let _ping_peer_timer = match &self.metric_time_to_ping {
-                Some(metric_time_to_ping) => {
-                    let timer = histogram_start_measure!(metric_time_to_ping);
-                    Some(scopeguard::guard((), move |_| {
-                        metric_time_to_ping.cancel_measure(timer);
-                    }))
-                }
-                None => None,
+            let ping_peer_timer = if let Some(metric_time_to_ping) = &self.metric_time_to_ping {
+                Some(histogram_start_measure!(metric_time_to_ping))
+            } else {
+                None
             };
 
             let timeout = sleep(std::cmp::min(timeout_duration, self.config.timeout)).fuse();
-            let ping = async { send_msg(challenge.clone(), destination.to_string()).await }.fuse();
+            let ping = async {
+                send_msg(
+                    sent_ping.get_ping_message().unwrap().serialize(),
+                    destination.to_string(),
+                )
+                .await
+            }
+            .fuse();
 
             pin_mut!(timeout, ping);
 
-            let ping_result: Result<(), String> = match select(timeout, ping).await {
-                Either::Left(_) => Err(format!("The ping timed out {}s", timeout_duration.as_secs())),
+            let ping_result: Result<(), NetworkingError> = match select(timeout, ping).await {
+                Either::Left(_) => Err(Timeout(timeout_duration.as_secs())),
                 Either::Right((v, _)) => match v {
-                    Ok(received) => {
-                        let expected = crate::heartbeat::generate_ping_response(challenge.clone());
-                        match compare(expected.as_ref(), received.as_ref()) {
-                            std::cmp::Ordering::Equal => Ok(()),
-                            _ => Err(format!(
-                                "Received incorrect reply for challenge, expected '{:x?}', but received: {:x?}",
-                                expected.as_ref(),
-                                received.as_ref()
-                            )),
-                        }
-                    }
-                    Err(description) => Err(format!(
-                        "Error during ping to peer '{}': {}",
+                    Ok(received) => PingMessage::deserialize(received.as_ref())
+                        .map_err(|_| DecodingError)
+                        .and_then(|deserialized| {
+                            ControlMessage::validate_pong_response(&sent_ping, &Pong(deserialized))
+                        }),
+                    Err(description) => Err(Other(format!(
+                        "Ping to peer '{}' failed with: {}",
                         destination.to_string(),
                         description
-                    )),
+                    ))),
                 },
             };
 
-            info!("Ping finished for peer {} with: {:?}", destination, ping_result);
+            if let Some(metric_time_to_ping) = &self.metric_time_to_ping {
+                metric_time_to_ping.cancel_measure(ping_peer_timer.unwrap());
+            }
+
+            match &ping_result {
+                Ok(_) => info!("Successfully pinged peer {}", destination),
+                Err(e) => error!("Ping to peer {} failed with error: {}", destination, e),
+            }
 
             (
                 destination,
@@ -244,22 +251,6 @@ fn to_futures_unordered<F>(mut fs: Vec<F>) -> FuturesUnordered<F> {
     }
 
     futures
-}
-
-/// Compare functions to create ordering result for array of u8s
-fn compare(a: &[u8], b: &[u8]) -> std::cmp::Ordering {
-    if a.len() != b.len() {
-        return a.len().cmp(&b.len());
-    }
-
-    for (ai, bi) in a.iter().zip(b.iter()) {
-        match ai.cmp(&bi) {
-            std::cmp::Ordering::Equal => continue,
-            ord => return ord,
-        }
-    }
-
-    a.len().cmp(&b.len())
 }
 
 #[cfg(feature = "wasm")]
@@ -401,6 +392,8 @@ pub mod wasm {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::messaging::ControlMessage;
+    use crate::ping::Ping;
     use mockall::*;
     use more_asserts::*;
     use std::str::FromStr;
@@ -422,7 +415,11 @@ mod tests {
 
     // Testing override
     pub async fn send_ping(msg: Box<[u8]>, peer: String) -> Result<Box<[u8]>, String> {
-        let mut reply = crate::heartbeat::generate_ping_response(msg);
+        let mut reply = PingMessage::deserialize(msg.as_ref())
+            .map_err(|_| DecodingError)
+            .and_then(|chall| ControlMessage::generate_pong_response(&ControlMessage::Ping(chall)))
+            .and_then(|msg| msg.get_ping_message().map(PingMessage::serialize))
+            .unwrap();
 
         match peer.as_str() {
             BAD_PEER => {

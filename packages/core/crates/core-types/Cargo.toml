@@ -3,6 +3,8 @@ name = "core-types"
 version = "0.1.1"
 authors = ["NumberFour8 <lukas.pohanka@inina.net>"]
 edition = "2021"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
 
 [lib]
