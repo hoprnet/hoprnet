@@ -1,6 +1,8 @@
 # Changelog
 
-<a name="1.93"></a>
+- Extend hopli so it can derive peer ID from identity files. Add `initiate-node` to perform all the necessary on-chain operations before launching a HOPR node. ([#4894](https://github.com/hoprnet/hoprnet/pull/4894))
+
+  <a name="1.93"></a>
 
 ## [1.93](https://github.com/hoprnet/hoprnet/compare/release/riga...hoprnet:release/bratislava)
 

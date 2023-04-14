@@ -2518,10 +2518,10 @@ version = "0.2.0"
 dependencies = [
  "clap 4.0.32",
  "core-crypto",
- "elliptic-curve 0.13.2",
+ "elliptic-curve 0.13.3",
  "eth-keystore",
  "ethers",
- "generic-array 0.14.6",
+ "generic-array 0.14.7",
  "k256 0.13.0",
  "serde",
  "serde_json",
