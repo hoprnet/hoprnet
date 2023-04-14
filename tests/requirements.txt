@@ -23,3 +23,4 @@ tomli==2.0.1
 urllib3==1.26.15
 waiting==1.4.1
 websocket-client==1.5.1
+pytest-asyncio==0.21.0
