@@ -59,88 +59,14 @@ fn remove_padding(msg: &[u8]) -> Option<&[u8]> {
     Some(&msg.split_at(pos).1[PADDING_TAG.len()..])
 }
 
-struct MetaPacket<'a> {
-    alpha: &'a [u8],
-    routing_info: &'a [u8],
-    mac: &'a [u8],
-    cipher_text: &'a [u8],
-}
-
-fn encode_meta_packet(
-    shared_keys: SharedKeys,
-    msg: &[u8],
-    path: &[&PeerId],
-    max_hops: usize,
-    additional_relayer_data_len: usize,
-    additional_data_relayer: &[&[u8]],
-    additional_data_last_hop: Option<&[u8]>,
-) -> Box<[u8]> {
-    assert!(msg.len() <= PAYLOAD_SIZE, "message too long to fit into a packet");
-
-    let mut padded = add_padding(msg);
-    let secrets = shared_keys.secrets();
-    let routing_info = RoutingInfo::new(
-        max_hops,
-        &path
-            .iter()
-            .map(|peer| PublicKey::from_peerid(peer)
-                .unwrap_or_else(|e| panic!("invalid peer id given: {e}")))
-            .collect::<Vec<_>>(),
-        &secrets,
-        additional_relayer_data_len,
-        additional_data_relayer,
-        additional_data_last_hop,
-    );
-
-    // Encrypt packet payload using the derived shared secrets
-    for secret in secrets.iter().rev() {
-        let prp = PRP::from_parameters(PRPParameters::new(secret));
-        prp.forward_inplace(&mut padded)
-            .unwrap_or_else(|e| panic!("onion encryption error {e}"))
-    }
-
-    MetaPacket {
-        alpha: &shared_keys.alpha(),
-        routing_info: &routing_info.routing_information,
-        mac: &routing_info.mac,
-        cipher_text: &padded
-    }
-    .serialize()
-}
-
-impl<'a> MetaPacket<'a> {
-    pub const fn size(header_len: usize) -> usize {
-        CurvePoint::SIZE_COMPRESSED + header_len + SimpleMac::SIZE + PAYLOAD_SIZE
-    }
-
-    pub fn deserialize(packet: &'a [u8], header_len: usize) -> utils_types::errors::Result<MetaPacket<'a>> {
-        if packet.len() == Self::size(header_len) {
-            Ok(Self {
-                alpha: &packet[..CurvePoint::SIZE_COMPRESSED],
-                routing_info: &packet[CurvePoint::SIZE_COMPRESSED..CurvePoint::SIZE_COMPRESSED + header_len],
-                mac: &packet
-                    [CurvePoint::SIZE_COMPRESSED + header_len..CurvePoint::SIZE_COMPRESSED + header_len + SimpleMac::SIZE],
-                cipher_text: &packet[CurvePoint::SIZE_COMPRESSED + header_len + SimpleMac::SIZE
-                    ..CurvePoint::SIZE_COMPRESSED + header_len + SimpleMac::SIZE + PAYLOAD_SIZE],
-            })
-        } else {
-            Err(ParseError)
-        }
-    }
-
-    pub fn serialize(&self) -> Box<[u8]> {
-        let mut ret = Vec::with_capacity(Self::size(self.routing_info.len()));
-        ret.extend_from_slice(&self.alpha);
-        ret.extend_from_slice(&self.routing_info);
-        ret.extend_from_slice(&self.mac);
-        ret.extend_from_slice(&self.cipher_text);
-        ret.into_boxed_slice()
-    }
+struct MetaPacket {
+    packet: Box<[u8]>,
+    header_len: usize,
 }
 
 enum ForwardedPacket {
     RelayedPacket {
-        packet: Box<[u8]>,
+        packet: MetaPacket,
         next_node: PublicKey,
         additional_info: Box<[u8]>,
         derived_secret: Box<[u8]>,
@@ -154,64 +80,142 @@ enum ForwardedPacket {
     },
 }
 
-fn forward_meta_packet(
-    private_key: &[u8],
-    packet: &[u8],
-    max_hops: usize,
-    additional_data_relayer_len: usize,
-    additional_data_last_hop_len: usize,
-) -> Result<ForwardedPacket> {
-    let header_len = header_length(max_hops, additional_data_relayer_len, additional_data_last_hop_len);
-    let decoded = MetaPacket::deserialize(packet, header_len)?;
 
-    let shared_keys = SharedKeys::forward_transform(decoded.alpha, private_key)?;
-    let secret = shared_keys.secret(0).unwrap();
+impl MetaPacket {
+    pub fn new(
+        shared_keys: SharedKeys,
+        msg: &[u8],
+        path: &[&PeerId],
+        max_hops: usize,
+        additional_relayer_data_len: usize,
+        additional_data_relayer: &[&[u8]],
+        additional_data_last_hop: Option<&[u8]>,
+    ) -> MetaPacket {
+        assert!(msg.len() <= PAYLOAD_SIZE, "message too long to fit into a packet");
 
-    let mut routing_info_mut: Vec<u8> = decoded.routing_info.into();
-    let fwd_header = forward_header(
-        secret,
-        &mut routing_info_mut,
-        decoded.mac,
-        max_hops,
-        additional_data_relayer_len,
-        additional_data_last_hop_len,
-    )?;
+        let mut padded = add_padding(msg);
+        let secrets = shared_keys.secrets();
+        let routing_info = RoutingInfo::new(
+            max_hops,
+            &path
+                .iter()
+                .map(|peer| PublicKey::from_peerid(peer)
+                    .unwrap_or_else(|e| panic!("invalid peer id given: {e}")))
+                .collect::<Vec<_>>(),
+            &secrets,
+            additional_relayer_data_len,
+            additional_data_relayer,
+            additional_data_last_hop,
+        );
 
-    let prp = PRP::from_parameters(PRPParameters::new(secret));
-    let decrypted = prp.inverse(decoded.cipher_text)?;
+        // Encrypt packet payload using the derived shared secrets
+        for secret in secrets.iter().rev() {
+            let prp = PRP::from_parameters(PRPParameters::new(secret));
+            prp.forward_inplace(&mut padded)
+                .unwrap_or_else(|e| panic!("onion encryption error {e}"))
+        }
 
-    match fwd_header {
-        ForwardedHeader::RelayNode {
-            header,
-            mac,
-            next_node,
-            additional_info,
-        } => {
-            let packet = MetaPacket {
-                alpha: &shared_keys.alpha(),
-                routing_info: &header,
-                mac: &mac,
-                cipher_text: &decrypted,
-            };
+        MetaPacket::new_from_parts(&shared_keys.alpha(), &routing_info.routing_information, &routing_info.mac, &padded)
+    }
 
-            Ok(RelayedPacket {
-                packet: packet.serialize(),
-                packet_tag: derive_packet_tag(secret)?,
-                derived_secret: secret.into(),
+    fn new_from_parts(alpha: &[u8], routing_info: &[u8], mac: &[u8], payload: &[u8]) -> Self {
+        assert_eq!(CurvePoint::SIZE_COMPRESSED, alpha.len());
+        assert!(routing_info.len() > 0);
+        assert_eq!(SimpleMac::SIZE, mac.len());
+        assert_eq!(PAYLOAD_SIZE, payload.len());
+
+        let mut packet = Vec::with_capacity(Self::size(routing_info.len()));
+        packet.extend_from_slice(alpha);
+        packet.extend_from_slice(routing_info);
+        packet.extend_from_slice(mac);
+        packet.extend_from_slice(payload);
+
+        Self { packet: packet.into_boxed_slice(), header_len: routing_info.len() }
+    }
+
+    pub fn alpha(&self) -> &[u8] {
+        &self.packet[..CurvePoint::SIZE_COMPRESSED]
+    }
+
+    pub fn routing_info(&self) -> &[u8] {
+        &self.packet[CurvePoint::SIZE_COMPRESSED..CurvePoint::SIZE_COMPRESSED + self.header_len]
+    }
+
+    pub fn mac(&self) -> &[u8] {
+        &self.packet[CurvePoint::SIZE_COMPRESSED + self.header_len..CurvePoint::SIZE_COMPRESSED + self.header_len + SimpleMac::SIZE]
+    }
+
+    pub fn payload(&self) -> &[u8] {
+        &self.packet[CurvePoint::SIZE_COMPRESSED + self.header_len + SimpleMac::SIZE
+            ..CurvePoint::SIZE_COMPRESSED + self.header_len + SimpleMac::SIZE + PAYLOAD_SIZE]
+    }
+
+    pub const fn size(header_len: usize) -> usize {
+        CurvePoint::SIZE_COMPRESSED + header_len + SimpleMac::SIZE + PAYLOAD_SIZE
+    }
+
+    pub fn deserialize(packet: &[u8], header_len: usize) -> utils_types::errors::Result<MetaPacket> {
+        if packet.len() == Self::size(header_len) {
+            Ok(Self {packet: packet.into(), header_len})
+        } else {
+            Err(ParseError)
+        }
+    }
+
+    pub fn serialize(&self) -> &[u8] {
+        &self.packet
+    }
+
+    pub fn forward(&self,
+        private_key: &[u8],
+        max_hops: usize,
+        additional_data_relayer_len: usize,
+        additional_data_last_hop_len: usize,
+    ) -> Result<ForwardedPacket> {
+        let shared_keys = SharedKeys::forward_transform(self.alpha(), private_key)?;
+        let secret = shared_keys.secret(0).unwrap();
+
+        let mut routing_info_mut: Vec<u8> = self.routing_info().into();
+        let fwd_header = forward_header(
+            secret,
+            &mut routing_info_mut,
+            self.mac(),
+            max_hops,
+            additional_data_relayer_len,
+            additional_data_last_hop_len,
+        )?;
+
+        let prp = PRP::from_parameters(PRPParameters::new(secret));
+        let decrypted = prp.inverse(self.payload())?;
+
+        match fwd_header {
+            ForwardedHeader::RelayNode {
+                header,
+                mac,
                 next_node,
                 additional_info,
-            })
+            } => {
+                Ok(RelayedPacket {
+                    packet: MetaPacket::new_from_parts(&shared_keys.alpha(),&header,&mac,&decrypted),
+                    packet_tag: derive_packet_tag(secret)?,
+                    derived_secret: secret.into(),
+                    next_node,
+                    additional_info,
+                })
+            }
+            ForwardedHeader::FinalNode { additional_data } => Ok(FinalPacket {
+                packet_tag: derive_packet_tag(secret)?,
+                derived_secret: secret.into(),
+                plain_text: remove_padding(&decrypted)
+                    .ok_or(PacketDecodingError("couldn't remove padding".into()))?
+                    .into(),
+                additional_data,
+            }),
         }
-        ForwardedHeader::FinalNode { additional_data } => Ok(FinalPacket {
-            packet_tag: derive_packet_tag(secret)?,
-            derived_secret: secret.into(),
-            plain_text: remove_padding(&decrypted)
-                .ok_or(PacketDecodingError("couldn't remove padding".into()))?
-                .into(),
-            additional_data,
-        }),
     }
 }
+
+
 
 /// Indicates if the packet is supposed to be forwarded to the next hop or if it is intended for us.
 #[derive(Debug)]
@@ -242,9 +246,8 @@ pub enum PacketState {
 
 /// Represents a HOPR packet
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-#[derive(Debug)]
 pub struct Packet {
-    packet: Box<[u8]>,
+    packet: MetaPacket,
     challenge: AcknowledgementChallenge,
     ticket: Ticket,
     state: PacketState,
@@ -282,7 +285,7 @@ impl Packet {
 
         Ok(Self {
             challenge: AcknowledgementChallenge::new(&por_values.ack_challenge, private_key),
-            packet: encode_meta_packet(
+            packet: MetaPacket::new(
                 shared_keys,
                 msg,
                 path,
@@ -304,7 +307,10 @@ impl Packet {
             let (pre_challenge, pre_ticket) = r0.split_at(AcknowledgementChallenge::SIZE);
             let previous_hop = PublicKey::from_peerid(sender)?;
 
-            match forward_meta_packet(private_key, pre_packet, INTERMEDIATE_HOPS + 1,POR_SECRET_LENGTH, 0)? {
+            let header_len = header_length(INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0);
+            let mp = MetaPacket::deserialize(pre_packet, header_len)?;
+
+            match mp.forward(private_key,INTERMEDIATE_HOPS + 1,POR_SECRET_LENGTH, 0)? {
                 RelayedPacket {
                     packet,
                     derived_secret,
@@ -323,7 +329,7 @@ impl Packet {
                     let ticket = Ticket::deserialize(pre_ticket)?;
                     let verification_output = pre_verify(&derived_secret, &additional_info, &ticket.challenge)?;
                     Ok(Self {
-                        packet: packet.into(),
+                        packet,
                         challenge,
                         ticket,
                         state: Forwarded {
@@ -354,7 +360,7 @@ impl Packet {
 
                     let ticket = Ticket::deserialize(pre_ticket)?;
                     Ok(Self {
-                        packet: pre_packet.into(),
+                        packet: mp,
                         challenge,
                         ticket,
                         state: Final {
@@ -425,7 +431,7 @@ impl Packet {
 impl Packet {
     pub fn serialize(&self) -> Box<[u8]> {
         let mut ret = Vec::with_capacity(Self::SIZE);
-        ret.extend_from_slice(&self.packet);
+        ret.extend_from_slice(self.packet.serialize());
         ret.extend_from_slice(&self.challenge.serialize());
         ret.extend_from_slice(&self.ticket.serialize());
         ret.into_boxed_slice()
@@ -434,7 +440,7 @@ impl Packet {
 
 #[cfg(test)]
 mod tests {
-    use crate::packet::{add_padding, remove_padding, Packet, PacketState, PADDING_TAG, encode_meta_packet, INTERMEDIATE_HOPS, forward_meta_packet, ForwardedPacket};
+    use crate::packet::{add_padding, remove_padding, Packet, PacketState, PADDING_TAG, INTERMEDIATE_HOPS, ForwardedPacket, MetaPacket};
     use core_crypto::types::PublicKey;
     use core_types::channels::Ticket;
     use libp2p_identity::{Keypair, PeerId};
@@ -484,7 +490,7 @@ mod tests {
 
         let msg = b"some random test message";
 
-        let mut mp = encode_meta_packet(shared_keys,
+        let mut mp = MetaPacket::new(shared_keys,
                                     msg,
                                     &path.iter().collect::<Vec<_>>(),
                                     INTERMEDIATE_HOPS + 1,
@@ -493,8 +499,7 @@ mod tests {
                                     None);
 
         for (i, secret) in secrets.iter().enumerate() {
-            let fwd = forward_meta_packet(secret,
-                                          &mp,
+            let fwd = mp.forward(secret,
                                           INTERMEDIATE_HOPS + 1,
                                           POR_SECRET_LENGTH,
                                           0)
