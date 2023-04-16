@@ -12,7 +12,7 @@ use utils_types::errors::GeneralError::ParseError;
 use utils_types::traits::{BinarySerializable, PeerIdLike};
 
 use crate::errors::Result;
-use crate::packet::ForwardedPacket::{FinalNodePacket, RelayedPacket};
+use crate::packet::ForwardedPacket::{FinalPacket, RelayedPacket};
 use crate::packet::PacketState::{Final, Forwarded, Outgoing};
 use crate::por::{pre_verify, ProofOfRelayString, ProofOfRelayValues, POR_SECRET_LENGTH};
 
@@ -146,7 +146,7 @@ enum ForwardedPacket {
         derived_secret: Box<[u8]>,
         packet_tag: Box<[u8]>,
     },
-    FinalNodePacket {
+    FinalPacket {
         plain_text: Box<[u8]>,
         additional_data: Box<[u8]>,
         derived_secret: Box<[u8]>,
@@ -157,9 +157,9 @@ enum ForwardedPacket {
 fn forward_meta_packet(
     private_key: &[u8],
     packet: &[u8],
+    max_hops: usize,
     additional_data_relayer_len: usize,
     additional_data_last_hop_len: usize,
-    max_hops: usize,
 ) -> Result<ForwardedPacket> {
     let header_len = header_length(max_hops, additional_data_relayer_len, additional_data_last_hop_len);
     let decoded = MetaPacket::deserialize(packet, header_len)?;
@@ -178,7 +178,7 @@ fn forward_meta_packet(
     )?;
 
     let prp = PRP::from_parameters(PRPParameters::new(secret));
-    let plain_text = prp.inverse(decoded.cipher_text)?;
+    let decrypted = prp.inverse(decoded.cipher_text)?;
 
     match fwd_header {
         ForwardedHeader::RelayNode {
@@ -191,7 +191,7 @@ fn forward_meta_packet(
                 alpha: &shared_keys.alpha(),
                 routing_info: &header,
                 mac: &mac,
-                cipher_text: &plain_text,
+                cipher_text: &decrypted,
             };
 
             Ok(RelayedPacket {
@@ -202,10 +202,12 @@ fn forward_meta_packet(
                 additional_info,
             })
         }
-        ForwardedHeader::FinalNode { additional_data } => Ok(FinalNodePacket {
+        ForwardedHeader::FinalNode { additional_data } => Ok(FinalPacket {
             packet_tag: derive_packet_tag(secret)?,
             derived_secret: secret.into(),
-            plain_text: remove_padding(&plain_text).ok_or(PacketDecodingError("couldn't remove padding".into()))?.into(),
+            plain_text: remove_padding(&decrypted)
+                .ok_or(PacketDecodingError("couldn't remove padding".into()))?
+                .into(),
             additional_data,
         }),
     }
@@ -302,7 +304,7 @@ impl Packet {
             let (pre_challenge, pre_ticket) = r0.split_at(AcknowledgementChallenge::SIZE);
             let previous_hop = PublicKey::from_peerid(sender)?;
 
-            match forward_meta_packet(private_key, pre_packet, POR_SECRET_LENGTH, 0, INTERMEDIATE_HOPS + 1)? {
+            match forward_meta_packet(private_key, pre_packet, INTERMEDIATE_HOPS + 1,POR_SECRET_LENGTH, 0)? {
                 RelayedPacket {
                     packet,
                     derived_secret,
@@ -337,11 +339,11 @@ impl Packet {
                         },
                     })
                 }
-                FinalNodePacket {
+                FinalPacket {
                     packet_tag,
                     plain_text,
                     derived_secret,
-                    ..
+                    additional_data: _
                 } => {
                     let ack_key = derive_ack_key_share(&derived_secret);
                     let mut challenge = AcknowledgementChallenge::deserialize(pre_challenge)?;
@@ -471,11 +473,8 @@ mod tests {
 
     #[parameterized(amount = { 4, 3, 2 })]
     fn test_meta_packet(amount: usize) {
-        //let amount = 4;
         let (secrets, path) = generate_keypairs(amount);
-
         let shared_keys = SharedKeys::new(&path.iter().collect::<Vec<_>>()).unwrap();
-
         let por_strings = (1..path.len())
             .map(|i|ProofOfRelayString::new(
                 shared_keys.secret(i).unwrap(),
@@ -496,18 +495,19 @@ mod tests {
         for (i, secret) in secrets.iter().enumerate() {
             let fwd = forward_meta_packet(secret,
                                           &mp,
+                                          INTERMEDIATE_HOPS + 1,
                                           POR_SECRET_LENGTH,
-                                          0,
-                                          INTERMEDIATE_HOPS + 1)
+                                          0)
                 .expect(&format!("failed to unwrap at {i}"));
             match fwd {
                 ForwardedPacket::RelayedPacket { packet, .. } => {
                     assert!(i < path.len() - 1);
                     mp = packet;
                 },
-                ForwardedPacket::FinalNodePacket { plain_text, .. } => {
+                ForwardedPacket::FinalPacket { plain_text, additional_data, .. } => {
                     assert_eq!(path.len() - 1, i);
                     assert_eq!(msg, plain_text.as_ref());
+                    assert!(additional_data.is_empty());
                 }
             }
         }
@@ -540,7 +540,6 @@ mod tests {
 
     #[parameterized(amount = { 4, 3, 2 })]
     fn test_packet_create_and_transform(amount: usize) {
-        //let amount = 4;
         let (mut node_private_keys, mut path)  = generate_keypairs(amount);
 
         let private_key = node_private_keys.drain(..1).last().unwrap();
