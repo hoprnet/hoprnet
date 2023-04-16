@@ -483,8 +483,10 @@ mod tests {
             ).serialize())
             .collect::<Vec<_>>();
 
+        let msg = b"some random test message";
+
         let mut mp = encode_meta_packet(shared_keys,
-                                    b"test",
+                                    msg,
                                     &path.iter().collect::<Vec<_>>(),
                                     INTERMEDIATE_HOPS + 1,
                                     POR_SECRET_LENGTH,
@@ -503,7 +505,10 @@ mod tests {
                     assert!(i < path.len() - 1);
                     mp = packet;
                 },
-                ForwardedPacket::FinalNodePacket { .. } => assert_eq!(path.len() - 1, i)
+                ForwardedPacket::FinalNodePacket { plain_text, .. } => {
+                    assert_eq!(path.len() - 1, i);
+                    assert_eq!(msg, plain_text.as_ref());
+                }
             }
         }
 
@@ -533,10 +538,9 @@ mod tests {
         }
     }
 
-    //#[parameterized(amount = { 4, 3, 2 })]
-    #[test]
-    fn test_packet_create_and_transform(/*amount: usize*/) {
-        let amount = 4;
+    #[parameterized(amount = { 4, 3, 2 })]
+    fn test_packet_create_and_transform(amount: usize) {
+        //let amount = 4;
         let (mut node_private_keys, mut path)  = generate_keypairs(amount);
 
         let private_key = node_private_keys.drain(..1).last().unwrap();
@@ -555,10 +559,10 @@ mod tests {
         }
 
         for (i, (node_private, node_id)) in node_private_keys.iter().zip(path.iter()).enumerate() {
-            let sender = path.get(i - 1).unwrap_or(&public_key);
+            let sender = (i == 0).then_some(&public_key).unwrap_or_else(|| path.get(i - 1).unwrap());
 
             packet = Packet::deserialize(&packet.serialize(), node_private, &sender)
-                .unwrap_or_else(|e| panic!("failed to deserialize packet at hop {}: {}", i, e));
+                .unwrap_or_else(|e| panic!("failed to deserialize packet at hop {i}: {e}"));
 
             match packet.state() {
                 PacketState::Final { plain_text, .. } => {
