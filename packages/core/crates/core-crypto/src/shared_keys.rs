@@ -5,8 +5,6 @@ use elliptic_curve::rand_core::{CryptoRng, RngCore};
 use elliptic_curve::sec1::ToEncodedPoint;
 use elliptic_curve::Group;
 
-use generic_array::GenericArray;
-
 use k256::NonZeroScalar;
 
 use crate::errors::CryptoError::{CalculationError, InvalidSecretScalar};
@@ -24,17 +22,18 @@ use crate::types::{CurvePoint, PublicKey};
 /// The GenericArray<..> is mostly deprecated since Rust 1.51 and it's introduction of const generics,
 /// but we need to use it because elliptic_curves and all RustCrypto crates mostly expose it in their
 /// public interfaces.
-pub type KeyBytes = GenericArray<u8, typenum::U32>;
+//pub type KeyBytes = GenericArray<u8, typenum::U32>;
 
 /// Extract a keying material from an EC point using HKDF extract
-fn extract_key_from_group_element(group_element: &CurvePoint, salt: &[u8]) -> KeyBytes {
+fn extract_key_from_group_element(group_element: &CurvePoint, salt: &[u8]) -> Box<[u8]> {
     // Create the compressed EC point representation first
     let compressed_element = group_element.serialize_compressed();
-    SimpleHkdf::<Blake2s256>::extract(Some(salt), &compressed_element).0
+    let ret = SimpleHkdf::<Blake2s256>::extract(Some(salt), &compressed_element).0;
+    ret.as_slice().into()
 }
 
 /// Performs KDF expansion from the given EC point using HKDF expand
-fn expand_key_from_group_element(group_element: &CurvePoint, salt: &[u8]) -> KeyBytes {
+fn expand_key_from_group_element(group_element: &CurvePoint, salt: &[u8]) -> Box<[u8]> {
     // Create the compressed EC point representation first
     let compressed_element = group_element.serialize_compressed();
 
@@ -47,8 +46,8 @@ fn expand_key_from_group_element(group_element: &CurvePoint, salt: &[u8]) -> Key
 }
 
 /// Checks if the given key bytes can form a scalar for EC point
-fn to_checked_secret_scalar(secret_scalar: KeyBytes) -> Result<NonZeroScalar> {
-    Option::from(NonZeroScalar::from_repr(secret_scalar)).ok_or(InvalidSecretScalar)
+fn to_checked_secret_scalar(secret_scalar: &[u8]) -> Result<NonZeroScalar> {
+    NonZeroScalar::try_from(secret_scalar).map_err(|_| InvalidSecretScalar)
 }
 
 /// Structure containing shared keys for peers.
@@ -102,7 +101,7 @@ impl SharedKeys {
             // Compute the new blinding factor b_k (alpha needs compressing first)
             let enc_alpha_prev = alpha_prev.to_encoded_point(true);
             let b_k = expand_key_from_group_element(&shared_secret.into(), enc_alpha_prev.as_bytes());
-            let b_k_checked = to_checked_secret_scalar(b_k)?;
+            let b_k_checked = to_checked_secret_scalar(&b_k)?;
 
             // Update coeff prev and alpha
             coeff_prev = coeff_prev.mul(b_k_checked);
@@ -122,20 +121,20 @@ impl SharedKeys {
     /// Calculates the forward transformation for the given peer public key.
     pub fn forward_transform(alpha: &[u8], private_key: &[u8]) -> Result<SharedKeys> {
         let public_key = PublicKey::from_privkey(private_key)?;
-        let private_scalar = to_checked_secret_scalar(KeyBytes::clone_from_slice(&private_key[..]))?;
+        let private_scalar = to_checked_secret_scalar(&private_key)?;
         let alpha_projective = CurvePoint::deserialize(alpha)?.to_projective_point();
 
         let s_k = (alpha_projective * private_scalar.as_ref()).to_affine();
         let secret = extract_key_from_group_element(&s_k.into(), &public_key.serialize(true));
 
         let b_k = expand_key_from_group_element(&s_k.into(), alpha);
-        let b_k_checked = to_checked_secret_scalar(b_k)?;
+        let b_k_checked = to_checked_secret_scalar(&b_k)?;
 
         let alpha_new = (alpha_projective * b_k_checked.as_ref()).to_affine();
 
         Ok(SharedKeys {
             alpha: alpha_new.into(),
-            secrets: vec![secret.to_vec().into_boxed_slice()],
+            secrets: vec![secret],
         })
     }
 
@@ -170,7 +169,7 @@ pub mod tests {
         assert_eq!(parameters::SECRET_KEY_LENGTH, key.len());
 
         let res = hex!("54BF34178075E153F481CE05B113C1530ECC45A2F1F13A3366D4389F65470DE6");
-        assert_eq!(res, key.as_slice());
+        assert_eq!(res, key.as_ref());
     }
 
     #[test]
@@ -182,7 +181,7 @@ pub mod tests {
         assert_eq!(parameters::SECRET_KEY_LENGTH, key.len());
 
         let res = hex!("D138D9367474911F7124B95BE844D2F8A6D34E962694E37E8717BDBD3C15690B");
-        assert_eq!(res, key.as_slice());
+        assert_eq!(res, key.as_ref());
     }
 
     pub fn generate_random_keypairs(count: usize) -> (Vec<Box<[u8]>>, Vec<PublicKey>) {

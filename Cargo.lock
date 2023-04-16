@@ -1129,6 +1129,7 @@ dependencies = [
  "core-types",
  "js-sys",
  "libp2p-identity",
+ "parameterized",
  "thiserror",
  "utils-log",
  "utils-metrics",

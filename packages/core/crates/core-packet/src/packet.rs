@@ -8,7 +8,6 @@ use core_crypto::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, Publi
 use core_types::acknowledgment::{Acknowledgement, AcknowledgementChallenge};
 use core_types::channels::Ticket;
 use libp2p_identity::PeerId;
-use utils_types::errors::GeneralError;
 use utils_types::errors::GeneralError::ParseError;
 use utils_types::traits::{BinarySerializable, PeerIdLike};
 
@@ -60,14 +59,6 @@ fn remove_padding(msg: &[u8]) -> Option<&[u8]> {
     Some(&msg.split_at(pos).1[PADDING_TAG.len()..])
 }
 
-fn onion_encrypt(data: &mut [u8], secrets: &[&[u8]]) {
-    for &secret in secrets.iter().rev() {
-        let prp = PRP::from_parameters(PRPParameters::new(secret));
-        prp.forward_inplace(data)
-           .unwrap_or_else(|e| panic!("onion encryption error {}", e))
-    }
-}
-
 struct MetaPacket<'a> {
     alpha: &'a [u8],
     routing_info: &'a [u8],
@@ -92,7 +83,8 @@ fn encode_meta_packet(
         max_hops,
         &path
             .iter()
-            .map(|peer| PublicKey::from_peerid(peer).unwrap_or_else(|e| panic!("invalid peer id given: {}", e)))
+            .map(|peer| PublicKey::from_peerid(peer)
+                .unwrap_or_else(|e| panic!("invalid peer id given: {e}")))
             .collect::<Vec<_>>(),
         &secrets,
         additional_relayer_data_len,
@@ -100,11 +92,16 @@ fn encode_meta_packet(
         additional_data_last_hop,
     );
 
-    onion_encrypt(&mut padded, &secrets);
+    // Encrypt packet payload using the derived shared secrets
+    for secret in secrets.iter().rev() {
+        let prp = PRP::from_parameters(PRPParameters::new(secret));
+        prp.forward_inplace(&mut padded)
+            .unwrap_or_else(|e| panic!("onion encryption error {e}"))
+    }
 
     MetaPacket {
         alpha: &shared_keys.alpha(),
-        routing_info: &routing_info.serialize(),
+        routing_info: &routing_info.routing_information,
         mac: &routing_info.mac,
         cipher_text: &padded
     }
@@ -112,8 +109,12 @@ fn encode_meta_packet(
 }
 
 impl<'a> MetaPacket<'a> {
+    pub const fn size(header_len: usize) -> usize {
+        CurvePoint::SIZE_COMPRESSED + header_len + SimpleMac::SIZE + PAYLOAD_SIZE
+    }
+
     pub fn deserialize(packet: &'a [u8], header_len: usize) -> utils_types::errors::Result<MetaPacket<'a>> {
-        if packet.len() == CurvePoint::SIZE_COMPRESSED + header_len + SimpleMac::SIZE + PAYLOAD_SIZE {
+        if packet.len() == Self::size(header_len) {
             Ok(Self {
                 alpha: &packet[..CurvePoint::SIZE_COMPRESSED],
                 routing_info: &packet[CurvePoint::SIZE_COMPRESSED..CurvePoint::SIZE_COMPRESSED + header_len],
@@ -128,9 +129,10 @@ impl<'a> MetaPacket<'a> {
     }
 
     pub fn serialize(&self) -> Box<[u8]> {
-        let mut ret = Vec::with_capacity(self.alpha.len() + self.routing_info.len());
+        let mut ret = Vec::with_capacity(Self::size(self.routing_info.len()));
         ret.extend_from_slice(&self.alpha);
         ret.extend_from_slice(&self.routing_info);
+        ret.extend_from_slice(&self.mac);
         ret.extend_from_slice(&self.cipher_text);
         ret.into_boxed_slice()
     }
@@ -266,16 +268,12 @@ impl Packet {
             shared_keys.secret(1),
         );
 
-        let mut por_strings = Vec::with_capacity(path.len() - 1);
-        for i in 0..path.len() - 1 {
-            por_strings.push(
-                ProofOfRelayString::new(
-                    shared_keys.secret(i + 1).unwrap(),
-                    shared_keys.secret(i + 2),
-                )
-                .serialize(),
-            )
-        }
+        let por_strings = (1..path.len())
+            .map(|i|ProofOfRelayString::new(
+                shared_keys.secret(i).unwrap(),
+                shared_keys.secret(i + 1)
+            ).serialize())
+            .collect::<Vec<_>>();
 
         let mut ticket = first_ticket;
         ticket.challenge = porv.ticket_challenge.to_ethereum_challenge();
@@ -434,15 +432,15 @@ impl Packet {
 
 #[cfg(test)]
 mod tests {
-    use crate::packet::{add_padding, remove_padding, Packet, PacketState, PADDING_TAG, MetaPacket, encode_meta_packet, INTERMEDIATE_HOPS};
+    use crate::packet::{add_padding, remove_padding, Packet, PacketState, PADDING_TAG, encode_meta_packet, INTERMEDIATE_HOPS, forward_meta_packet, ForwardedPacket};
     use core_crypto::types::PublicKey;
     use core_types::channels::Ticket;
     use libp2p_identity::{Keypair, PeerId};
-    use core_crypto::routing::header_length;
     use core_crypto::shared_keys::SharedKeys;
     use utils_types::primitives::{Balance, BalanceType, U256};
     use utils_types::traits::{BinarySerializable, PeerIdLike};
     use crate::por::{POR_SECRET_LENGTH, ProofOfRelayString};
+    use parameterized::parameterized;
 
     #[test]
     fn test_padding() {
@@ -459,29 +457,56 @@ mod tests {
         assert_eq!(data, &unpadded.unwrap());
     }
 
-    #[test]
-    fn test_meta_packet() {
-        let path = (0..3)
-            .map(|_| Keypair::generate_secp256k1().public().to_peer_id())
-            .collect::<Vec<_>>();
+    fn generate_keypairs(amount: usize) -> (Vec<[u8; 32]>, Vec<PeerId>) {
+        (0..amount)
+            .map(|_| Keypair::generate_secp256k1())
+            .map(|kp| {
+                (
+                    kp.clone().into_secp256k1().unwrap().secret().to_bytes(),
+                    kp.public().to_peer_id(),
+                )
+            })
+            .unzip()
+    }
+
+    #[parameterized(amount = { 4, 3, 2 })]
+    fn test_meta_packet(amount: usize) {
+        //let amount = 4;
+        let (secrets, path) = generate_keypairs(amount);
+
         let shared_keys = SharedKeys::new(&path.iter().collect::<Vec<_>>()).unwrap();
 
-        let mut por_strings = Vec::with_capacity(path.len() - 1);
-        for i in 0..path.len() - 1 {
-            por_strings.push(
-                ProofOfRelayString::new(
-                    shared_keys.secret(i + 1).unwrap(),
-                    shared_keys.secret(i + 2),
-                )
-                .serialize(),
-            )
+        let por_strings = (1..path.len())
+            .map(|i|ProofOfRelayString::new(
+                shared_keys.secret(i).unwrap(),
+                shared_keys.secret(i + 1)
+            ).serialize())
+            .collect::<Vec<_>>();
+
+        let mut mp = encode_meta_packet(shared_keys,
+                                    b"test",
+                                    &path.iter().collect::<Vec<_>>(),
+                                    INTERMEDIATE_HOPS + 1,
+                                    POR_SECRET_LENGTH,
+                                    &por_strings.iter().map(|pors| pors.as_ref()).collect::<Vec<_>>(),
+                                    None);
+
+        for (i, secret) in secrets.iter().enumerate() {
+            let fwd = forward_meta_packet(secret,
+                                          &mp,
+                                          POR_SECRET_LENGTH,
+                                          0,
+                                          INTERMEDIATE_HOPS + 1)
+                .expect(&format!("failed to unwrap at {i}"));
+            match fwd {
+                ForwardedPacket::RelayedPacket { packet, .. } => {
+                    assert!(i < path.len() - 1);
+                    mp = packet;
+                },
+                ForwardedPacket::FinalNodePacket { .. } => assert_eq!(path.len() - 1, i)
+            }
         }
 
-        let mp = encode_meta_packet(shared_keys, b"test", &path.iter().collect::<Vec<_>>(), INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH,  &por_strings.iter().map(|pors| pors.as_ref()).collect::<Vec<_>>(),
-                           None);
-
-        let mp = MetaPacket::deserialize(&mp, header_length(INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0))
-            .unwrap();
     }
 
     fn mock_ticket(next_peer: &PeerId, path_len: usize, private_key: &[u8]) -> Ticket {
@@ -512,41 +537,26 @@ mod tests {
     #[test]
     fn test_packet_create_and_transform(/*amount: usize*/) {
         let amount = 4;
-        let mut keypairs = (0..amount)
-            .map(|_| Keypair::generate_secp256k1())
-            .map(|kp| {
-                (
-                    kp.clone().into_secp256k1().unwrap().secret().to_bytes(),
-                    kp.public().to_peer_id(),
-                )
-            })
-            .collect::<Vec<_>>();
+        let (mut node_private_keys, mut path)  = generate_keypairs(amount);
 
-        let (private_key, public_key) = keypairs
-            .drain(..1)
-            .map(|kp| (kp.0, PublicKey::from_peerid(&kp.1).unwrap()))
-            .last()
-            .unwrap();
-
-        let path = &keypairs.iter().map(|kp| &kp.1).collect::<Vec<_>>();
+        let private_key = node_private_keys.drain(..1).last().unwrap();
+        let public_key = path.drain(..1).last().unwrap();
 
         // Create ticket for the first peer on the path
-        let ticket = mock_ticket(&keypairs[0].1, keypairs.len(), &private_key);
+        let ticket = mock_ticket(&path[0], path.len(), &private_key);
 
         let test_message = b"some testing message";
-        let mut packet = Packet::new(test_message, path, &private_key, ticket).expect("failed to construct packet");
+        let mut packet = Packet::new(test_message, &path.iter().collect::<Vec<_>>(), &private_key, ticket)
+            .expect("failed to construct packet");
 
         match &packet.state() {
             PacketState::Outgoing { .. } => {}
             _ => panic!("invalid packet initial state"),
         }
 
-        for (i, (node_private, node_id)) in keypairs.iter().enumerate() {
-            let sender = if i == 0 {
-                public_key.to_peerid()
-            } else {
-                path[i - 1].clone()
-            };
+        for (i, (node_private, node_id)) in node_private_keys.iter().zip(path.iter()).enumerate() {
+            let sender = path.get(i - 1).unwrap_or(&public_key);
+
             packet = Packet::deserialize(&packet.serialize(), node_private, &sender)
                 .unwrap_or_else(|e| panic!("failed to deserialize packet at hop {}: {}", i, e));
 
@@ -556,7 +566,7 @@ mod tests {
                     assert_eq!(&test_message, &plain_text.as_ref());
                 }
                 PacketState::Forwarded { .. } => {
-                    let ticket = mock_ticket(&node_id, keypairs.len() - i - 1, node_private);
+                    let ticket = mock_ticket(&node_id, path.len() - i - 1, node_private);
                     packet.forward(node_private, ticket);
                 }
                 PacketState::Outgoing { .. } => panic!("invalid packet state"),

@@ -1,3 +1,7 @@
-# Template for custom Rust WASM module
+# core-packet
 
-This is a starter template for Rust WASM module that uses `wasm-bindgen`.
+This crate contains the main packet processing functionality for the HOPR protocol.
+It implements the following important protocol building blocks:
+- SPHINX packet format
+- Proof of Relay
+
