@@ -265,7 +265,7 @@ impl Packet {
 
         let shared_keys = SharedKeys::new(path)?;
 
-        let porv = ProofOfRelayValues::new(
+        let por_values = ProofOfRelayValues::new(
             shared_keys.secret(0).unwrap(),
             shared_keys.secret(1),
         );
@@ -278,22 +278,22 @@ impl Packet {
             .collect::<Vec<_>>();
 
         let mut ticket = first_ticket;
-        ticket.challenge = porv.ticket_challenge.to_ethereum_challenge();
+        ticket.challenge = por_values.ticket_challenge.to_ethereum_challenge();
 
         Ok(Self {
-            challenge: AcknowledgementChallenge::new(&porv.ack_challenge, private_key),
+            challenge: AcknowledgementChallenge::new(&por_values.ack_challenge, private_key),
             packet: encode_meta_packet(
                 shared_keys,
                 msg,
                 path,
                 INTERMEDIATE_HOPS + 1,
                 POR_SECRET_LENGTH,
-                &por_strings.iter().map(|pors| pors.as_ref()).collect::<Vec<_>>(),
+                &por_strings.iter().map(Box::as_ref).collect::<Vec<_>>(),
                 None,
             ),
             ticket,
             state: Outgoing {
-                ack_challenge: porv.ack_challenge,
+                ack_challenge: por_values.ack_challenge,
             },
         })
     }
