@@ -12,7 +12,7 @@ use utils_types::errors::GeneralError::ParseError;
 use utils_types::traits::{BinarySerializable, PeerIdLike};
 
 use crate::errors::Result;
-use crate::packet::ForwardedPacket::{FinalPacket, RelayedPacket};
+use crate::packet::ForwardedMetaPacket::{FinalPacket, RelayedPacket};
 use crate::packet::PacketState::{Final, Forwarded, Outgoing};
 use crate::por::{pre_verify, ProofOfRelayString, ProofOfRelayValues, POR_SECRET_LENGTH};
 
@@ -64,7 +64,7 @@ struct MetaPacket {
     header_len: usize,
 }
 
-enum ForwardedPacket {
+enum ForwardedMetaPacket {
     RelayedPacket {
         packet: MetaPacket,
         next_node: PublicKey,
@@ -170,7 +170,7 @@ impl MetaPacket {
         max_hops: usize,
         additional_data_relayer_len: usize,
         additional_data_last_hop_len: usize,
-    ) -> Result<ForwardedPacket> {
+    ) -> Result<ForwardedMetaPacket> {
         let (alpha, secret) = SharedKeys::forward_transform(CurvePoint::deserialize(self.alpha())?, private_key)?;
 
         let mut routing_info_mut: Vec<u8> = self.routing_info().into();
@@ -438,7 +438,7 @@ impl Packet {
 
 #[cfg(test)]
 mod tests {
-    use crate::packet::{add_padding, remove_padding, Packet, PacketState, PADDING_TAG, INTERMEDIATE_HOPS, ForwardedPacket, MetaPacket};
+    use crate::packet::{add_padding, remove_padding, Packet, PacketState, PADDING_TAG, INTERMEDIATE_HOPS, ForwardedMetaPacket, MetaPacket};
     use core_crypto::types::PublicKey;
     use core_types::channels::Ticket;
     use libp2p_identity::{Keypair, PeerId};
@@ -503,11 +503,11 @@ mod tests {
                                           0)
                 .expect(&format!("failed to unwrap at {i}"));
             match fwd {
-                ForwardedPacket::RelayedPacket { packet, .. } => {
+                ForwardedMetaPacket::RelayedPacket { packet, .. } => {
                     assert!(i < path.len() - 1);
                     mp = packet;
                 },
-                ForwardedPacket::FinalPacket { plain_text, additional_data, .. } => {
+                ForwardedMetaPacket::FinalPacket { plain_text, additional_data, .. } => {
                     assert_eq!(path.len() - 1, i);
                     assert_eq!(msg, plain_text.as_ref());
                     assert!(additional_data.is_empty());
