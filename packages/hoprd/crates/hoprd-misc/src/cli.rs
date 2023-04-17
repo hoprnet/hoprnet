@@ -3,11 +3,6 @@ use std::ffi::OsString;
 
 use clap::builder::{PossibleValuesParser, ValueParser};
 use clap::{Arg, ArgAction, ArgMatches, Args, Command, FromArgMatches as _};
-use core_ethereum_misc::constants::DEFAULT_CONFIRMATIONS;
-use core_misc::constants::{
-    DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_INTERVAL_VARIANCE, DEFAULT_HEARTBEAT_THRESHOLD,
-    DEFAULT_MAX_PARALLEL_CONNECTIONS, DEFAULT_MAX_PARALLEL_CONNECTION_PUBLIC_RELAY, DEFAULT_NETWORK_QUALITY_THRESHOLD,
-};
 use core_misc::environment::{Environment, FromJsonFile, PackageJsonFile, ProtocolConfig};
 use core_strategy::{
     generic::ChannelStrategy, passive::PassiveStrategy, promiscuous::PromiscuousStrategy, random::RandomStrategy,
@@ -18,7 +13,6 @@ use real_base::real;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use utils_misc::ok_or_str;
-use utils_proc_macros::wasm_bindgen_if;
 
 pub const DEFAULT_API_HOST: &str = "localhost";
 pub const DEFAULT_API_PORT: u16 = 3001;
@@ -33,11 +27,7 @@ pub const MINIMAL_API_TOKEN_LENGTH: usize = 8;
 
 regex!(is_ipv4_host "^[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}[:]{1}[0-9]{1,6}$");
 
-// no lookaround support
-regex!(is_private_key "^[a-fA-F0-9]{64}$");
-regex!(is_prefixed_private_key "^0x[a-fA-F0-9]{64}$");
-
-fn parse_host(s: &str) -> Result<Host, String> {
+fn parse_host(s: &str) -> Result<crate::config::Host, String> {
     if !is_ipv4_host(s) {
         return Err(format!(
             "Given string {} is not a valid host, Example: {}:{}",
@@ -47,12 +37,13 @@ fn parse_host(s: &str) -> Result<Host, String> {
         ));
     }
 
-    Host::from_ipv4_host_string(s)
+    crate::config::Host::from_ipv4_host_string(s)
 }
 
 /// Parse a hex string private key to a boxed u8 slice
-fn parse_private_key(s: &str) -> Result<Box<[u8]>, String> {
-    if is_private_key(s) || is_prefixed_private_key(s) {
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+pub fn parse_private_key(s: &str) -> Result<Box<[u8]>, String> {
+    if crate::config::validate_private_key(s).is_ok() {
         let mut decoded = [0u8; 32];
 
         let priv_key = match s.strip_prefix("0x") {
@@ -93,42 +84,13 @@ fn parse_api_token(mut s: &str) -> Result<String, String> {
     }
 }
 
-#[derive(Serialize, Clone)]
-#[wasm_bindgen_if(getter_with_clone)]
-pub struct Host {
-    pub ip: String,
-    pub port: u16,
-}
-
-impl Host {
-    fn from_ipv4_host_string(s: &str) -> Result<Self, String> {
-        let (ip, str_port) = match s.split_once(":") {
-            None => return Err(format!("Invalid host")),
-            Some(splitted) => splitted,
-        };
-
-        let port = u16::from_str_radix(str_port, 10).map_err(|e| e.to_string())?;
-
-        Ok(Self {
-            ip: ip.to_owned(),
-            port,
-        })
-    }
-}
-
-impl ToString for Host {
-    fn to_string(&self) -> String {
-        format!("{}:{}", self.ip, self.port)
-    }
-}
-
 /// Takes all CLI arguments whose structure is known at compile-time.
 /// Arguments whose structure, e.g. their default values depend on
 /// file contents need be specified using `clap`s builder API
-#[derive(Serialize, Args, Clone)]
+#[derive(Serialize, Deserialize, Args, Clone)]
 #[command(about = "HOPRd")]
-#[wasm_bindgen_if(getter_with_clone)]
-struct CliArgs {
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
+pub struct CliArgs {
     /// Environment
     // Filled by Builder API at runtime
     #[arg(skip)]
@@ -144,51 +106,53 @@ struct CliArgs {
 
     #[arg(
         long,
-        default_value_t = Host {
-            ip: DEFAULT_HOST.to_string(),
-            port: DEFAULT_PORT
-        },
         env = "HOPRD_HOST",
         help = "Host to listen on for P2P connections",
         value_parser = ValueParser::new(parse_host),
     )]
-    pub host: Host,
+    pub host: Option<crate::config::Host>,
 
     #[arg(
         long,
-        default_value_t = false,
         env = "HOPRD_ANNOUNCE",
         help = "Run as a Public Relay Node (PRN)",
         action = ArgAction::SetTrue
     )]
-    pub announce: bool,
+    pub announce: Option<bool>,
 
     #[arg(
         long,
-        default_value_t = false,
-        env = "HOPRD_API", 
-        help = format!("Expose the API on {}:{}", DEFAULT_API_HOST, DEFAULT_API_PORT), 
+        env = "HOPRD_API",
+        help = "Enable the internal API",
         action = ArgAction::SetTrue,
     )]
-    pub api: bool,
+    pub api: Option<bool>,
 
     #[arg(
         long = "apiHost",
-        default_value_t = DEFAULT_API_HOST.to_string(),
         value_name = "HOST",
         help = "Set host IP to which the API server will bind",
         env = "HOPRD_API_HOST"
     )]
-    pub api_host: String,
+    pub api_host: Option<String>,
+
     #[arg(
         long = "apiPort",
-        default_value_t = DEFAULT_API_PORT,
-        value_parser = clap::value_parser!(u16),
+        value_parser = clap::value_parser ! (u16),
         value_name = "PORT",
         help = "Set port to which the API server will bind",
         env = "HOPRD_API_PORT"
     )]
-    pub api_port: u16,
+    pub api_port: Option<u16>,
+
+    #[arg(
+        long = "disableApiAuthentication",
+        help = "Completely disables the token authentication for the API, overrides any apiToken if set",
+        action = ArgAction::SetTrue,
+        env = "HOPRD_DISABLE_API_AUTHENTICATION",
+        hide = true
+    )]
+    pub disable_api_authentication: Option<bool>,
 
     #[arg(
         long = "apiToken",
@@ -202,31 +166,28 @@ struct CliArgs {
 
     #[arg(
         long = "healthCheck",
-        default_value_t = false,
         env = "HOPRD_HEALTH_CHECK",
-        help = format!("Run a health check end point on {}:{}", DEFAULT_HEALTH_CHECK_HOST, DEFAULT_HEALTH_CHECK_PORT),
+        help = "Run a health check end point",
         action = ArgAction::SetTrue
     )]
-    pub health_check: bool,
+    pub health_check: Option<bool>,
 
     #[arg(
         long = "healthCheckHost",
-        default_value_t = DEFAULT_HEALTH_CHECK_HOST.to_string(),
         value_name = "HOST",
         help = "Updates the host for the healthcheck server",
-        env = "HOPRD_HEALTH_CHECK_HOST",
+        env = "HOPRD_HEALTH_CHECK_HOST"
     )]
-    pub health_check_host: String,
+    pub health_check_host: Option<String>,
 
     #[arg(
         long = "healthCheckPort",
-        default_value_t = DEFAULT_HEALTH_CHECK_PORT,
         value_name = "PORT",
-        value_parser = clap::value_parser!(u16),
+        value_parser = clap::value_parser ! (u16),
         help = "Updates the port for the healthcheck server",
         env = "HOPRD_HEALTH_CHECK_PORT"
     )]
-    pub health_check_port: u16,
+    pub health_check_port: Option<u16>,
 
     #[arg(
         long,
@@ -241,7 +202,6 @@ struct CliArgs {
         help = "Default channel strategy to use after node starts up",
         env = "HOPRD_DEFAULT_STRATEGY",
         value_name = "DEFAULT_STRATEGY",
-        default_value = "passive",
         value_parser = PossibleValuesParser::new([PromiscuousStrategy::NAME, PassiveStrategy::NAME, RandomStrategy::NAME])
     )]
     pub default_strategy: Option<String>,
@@ -251,27 +211,25 @@ struct CliArgs {
         help = "Maximum number of channel a strategy can open. If not specified, square root of number of available peers is used.",
         env = "HOPRD_MAX_AUTO_CHANNELS",
         value_name = "MAX_AUTO_CHANNELS",
-        value_parser = clap::value_parser!(u32)
+        value_parser = clap::value_parser ! (u32)
     )]
     pub max_auto_channels: Option<u32>, // Make this a string if we want to supply functions instead in the future.
 
     #[arg(
         long = "autoRedeemTickets",
-        default_value_t = false,
         env = "HOPRD_AUTO_REDEEEM_TICKETS",
         help = "If enabled automatically redeems winning tickets.",
         action = ArgAction::SetTrue
     )]
-    pub auto_redeem_tickets: bool,
+    pub auto_redeem_tickets: Option<bool>,
 
     #[arg(
         long = "checkUnrealizedBalance",
-        default_value_t = false,
         env = "HOPRD_CHECK_UNREALIZED_BALANCE",
         help = "Determines if unrealized balance shall be checked first before validating unacknowledged tickets.",
         action = ArgAction::SetTrue
     )]
-    pub check_unrealized_balance: bool,
+    pub check_unrealized_balance: Option<bool>,
 
     #[arg(
         long,
@@ -295,80 +253,69 @@ struct CliArgs {
         help = "initialize a database if it doesn't already exist",
         action = ArgAction::SetTrue,
         env = "HOPRD_INIT",
-        default_value_t = false,
         action = ArgAction::SetTrue
     )]
-    pub init: bool,
+    pub init: Option<bool>,
 
     #[arg(
         long = "forceInit",
         help = "initialize a database, even if it already exists",
         action = ArgAction::SetTrue,
         env = "HOPRD_FORCE_INIT",
-        default_value_t = false,
         action = ArgAction::SetTrue
     )]
-    pub force_init: bool,
+    pub force_init: Option<bool>,
 
     #[arg(
         long = "privateKey",
         hide = true,
         help = "A private key to be used for the node",
         env = "HOPRD_PRIVATE_KEY",
-        value_name = "PRIVATE_KEY",
-        value_parser = ValueParser::new(parse_private_key)
+        value_name = "PRIVATE_KEY"
     )]
-    pub private_key: Option<Box<[u8]>>,
+    pub private_key: Option<String>,
 
     #[arg(
         long = "allowLocalNodeConnections",
         env = "HOPRD_ALLOW_LOCAL_NODE_CONNECTIONS",
         action = ArgAction::SetTrue,
         help = "Allow connections to other nodes running on localhost",
-        default_value_t = false
     )]
-    pub allow_local_node_connections: bool,
+    pub allow_local_node_connections: Option<bool>,
 
     #[arg(
         long = "allowPrivateNodeConnections",
         env = "HOPRD_ALLOW_PRIVATE_NODE_CONNECTIONS",
         action = ArgAction::SetTrue,
-        default_value_t = false,
         help = "Allow connections to other nodes running on private addresses",
     )]
-    pub allow_private_node_connections: bool,
+    pub allow_private_node_connections: Option<bool>,
 
     #[arg(
         long = "maxParallelConnections",
-        default_value_t = DEFAULT_MAX_PARALLEL_CONNECTIONS,
-        default_value_ifs = [
-            ("announce", "true", DEFAULT_MAX_PARALLEL_CONNECTION_PUBLIC_RELAY.to_string()),
-        ],
-        value_parser = clap::value_parser!(u32).range(1..),
+        value_parser = clap::value_parser ! (u32).range(1..),
         value_name = "CONNECTIONS",
         help = "Set maximum parallel connections",
         env = "HOPRD_MAX_PARALLEL_CONNECTIONS"
     )]
-    pub max_parallel_connections: u32,
+    pub max_parallel_connections: Option<u32>,
 
     #[arg(
         long = "testAnnounceLocalAddresses",
         env = "HOPRD_TEST_ANNOUNCE_LOCAL_ADDRESSES",
         help = "For testing local testnets. Announce local addresses",
         action = ArgAction::SetTrue,
-        default_value_t = false
     )]
-    pub test_announce_local_addresses: bool,
+    pub test_announce_local_addresses: Option<bool>,
 
     #[arg(
         long = "testPreferLocalAddresses",
         env = "HOPRD_TEST_PREFER_LOCAL_ADDRESSES",
         action = ArgAction::SetTrue,
         help = "For testing local testnets. Prefer local peers to remote",
-        default_value_t = false,
         hide = true
     )]
-    pub test_prefer_local_addresses: bool,
+    pub test_prefer_local_addresses: Option<bool>,
 
     #[arg(
         long = "testUseWeakCrypto",
@@ -376,100 +323,90 @@ struct CliArgs {
         action = ArgAction::SetTrue,
         help = "weaker crypto for faster node startup",
         hide = true,
-        default_value_t = false
     )]
-    pub test_use_weak_crypto: bool,
-
-    #[arg(
-        long = "disableApiAuthentication",
-        help = "completely disables the token authentication for the API, overrides any apiToken if set",
-        action = ArgAction::SetTrue,
-        env = "HOPRD_DISABLE_API_AUTHENTICATION",
-        default_value_t = false,
-        hide = true
-    )]
-    pub disable_api_authentication: bool,
+    pub test_use_weak_crypto: Option<bool>,
 
     #[arg(
         long = "testNoDirectConnections",
         help = "NAT traversal testing: prevent nodes from establishing direct TCP connections",
         env = "HOPRD_TEST_NO_DIRECT_CONNECTIONS",
-        default_value_t = false,
         action = ArgAction::SetTrue,
         hide = true
     )]
-    pub test_no_direct_connections: bool,
+    pub test_no_direct_connections: Option<bool>,
 
     #[arg(
         long = "testNoWebRTCUpgrade",
         help = "NAT traversal testing: prevent nodes from establishing direct TCP connections",
         env = "HOPRD_TEST_NO_WEBRTC_UPGRADE",
-        default_value_t = false,
         action = ArgAction::SetTrue,
         hide = true
     )]
-    pub test_no_webrtc_upgrade: bool,
+    pub test_no_webrtc_upgrade: Option<bool>,
 
     #[arg(
         long = "testLocalModeStun",
         help = "Transport testing: use full-featured STUN with local addresses",
         env = "HOPRD_TEST_LOCAL_MODE_STUN",
-        default_value_t = false,
         action = ArgAction::SetTrue,
         hide = true
     )]
-    pub test_local_mode_stun: bool,
+    pub test_local_mode_stun: Option<bool>,
 
     #[arg(
         long = "heartbeatInterval",
         help = "Interval in milliseconds in which the availability of other nodes get measured",
         value_name = "MILLISECONDS",
-        value_parser = clap::value_parser!(u32),
-        default_value_t = DEFAULT_HEARTBEAT_INTERVAL,
+        value_parser = clap::value_parser ! (u32),
         env = "HOPRD_HEARTBEAT_INTERVAL",
     )]
-    pub heartbeat_interval: u32,
+    pub heartbeat_interval: Option<u32>,
 
     #[arg(
         long = "heartbeatThreshold",
         help = "Timeframe in milliseconds after which a heartbeat to another peer is performed, if it hasn't been seen since",
         value_name = "MILLISECONDS",
-        value_parser = clap::value_parser!(u32),
-        default_value_t = DEFAULT_HEARTBEAT_THRESHOLD,
+        value_parser = clap::value_parser ! (u32),
         env = "HOPRD_HEARTBEAT_THRESHOLD",
     )]
-    pub heartbeat_threshold: u32,
+    pub heartbeat_threshold: Option<u32>,
 
     #[arg(
         long = "heartbeatVariance",
         help = "Upper bound for variance applied to heartbeat interval in milliseconds",
         value_name = "MILLISECONDS",
-        value_parser = clap::value_parser!(u32),
-        default_value_t = DEFAULT_HEARTBEAT_INTERVAL_VARIANCE,
+        value_parser = clap::value_parser ! (u32),
         env = "HOPRD_HEARTBEAT_VARIANCE"
     )]
-    pub heartbeat_variance: u32,
+    pub heartbeat_variance: Option<u32>,
 
     #[arg(
         long = "onChainConfirmations",
         help = "Number of confirmations required for on-chain transactions",
         value_name = "CONFIRMATIONS",
-        value_parser = clap::value_parser!(u32),
-        default_value_t = DEFAULT_CONFIRMATIONS,
+        value_parser = clap::value_parser ! (u32),
         env = "HOPRD_ON_CHAIN_CONFIRMATIONS",
-
     )]
-    pub on_chain_confirmations: u32,
+    pub on_chain_confirmations: Option<u32>,
 
     #[arg(
         long = "networkQualityThreshold",
-        help = "Miniumum quality of a peer connection to be considered usable",
+        help = "Minimum quality of a peer connection to be considered usable",
         value_name = "THRESHOLD",
-        value_parser = clap::value_parser!(f32),
-        default_value_t = DEFAULT_NETWORK_QUALITY_THRESHOLD,
+        value_parser = clap::value_parser ! (f32),
         env = "HOPRD_NETWORK_QUALITY_THRESHOLD"
     )]
-    pub network_quality_threshold: f32,
+    pub network_quality_threshold: Option<f32>,
+
+    #[arg(
+        long = "configurationFilePath",
+        required = false,
+        help = "Path to a file containing the entire HOPRd configuration",
+        value_name = "CONFIG_FILE_PATH",
+        value_parser = clap::value_parser ! (String),
+        env = "HOPRD_CONFIGURATION_FILE_PATH"
+    )]
+    pub configuration_file_path: Option<String>,
 }
 
 impl CliArgs {
@@ -508,21 +445,21 @@ impl CliArgs {
         }
 
         let mut cmd = Command::new("hoprd")
-        .about("HOPRd")
-        .bin_name("index.cjs")
-        .after_help("All CLI options can be configured through environment variables as well. CLI parameters have precedence over environment variables.")
-        .version(&version)
-        .arg(env_arg)
-        .arg(Arg::new("identity")
-            .long("identity")
-            .help("The path to the identity file")
-            .env("HOPRD_IDENTITY")
-            .default_value(format!("{}/.hopr-identity", home_path)))
-        .arg(Arg::new("data")
-            .long("data")
-            .help("manually specify the data directory to use")
-            .env("HOPRD_DATA")
-            .default_value(get_data_path(mono_repo_path, maybe_default_environment)));
+            .about("HOPRd")
+            .bin_name("index.cjs")
+            .after_help("All CLI options can be configured through environment variables as well. CLI parameters have precedence over environment variables.")
+            .version(&version)
+            .arg(env_arg)
+            .arg(Arg::new("identity")
+                .long("identity")
+                .help("The path to the identity file")
+                .env("HOPRD_IDENTITY")
+                .default_value(format!("{}/.hopr-identity", home_path)))
+            .arg(Arg::new("data")
+                .long("data")
+                .help("manually specify the data directory to use")
+                .env("HOPRD_DATA")
+                .default_value(get_data_path(mono_repo_path, maybe_default_environment)));
 
         // Add compile args to runtime-time args
         cmd = Self::augment_args(cmd);

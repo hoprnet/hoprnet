@@ -1,7 +1,11 @@
+use serde::{Deserialize, Serialize};
+use validator::Validate;
+
 /// Configuration of the Heartbeat
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Validate, Serialize, Deserialize)]
 pub struct HeartbeatConfig {
+    /// The maximum number of concurrent heartbeats
     pub max_parallel_heartbeats: usize,
     pub heartbeat_variance: f32,
     pub heartbeat_interval: u32,

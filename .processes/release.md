@@ -268,7 +268,7 @@ Once the upgraded release is deployed, the Staging deployment must be updated as
   git checkout -b merge-back-release-${RELEASE_NAME}
   git merge master
 
-  packages=(connect core-ethereum core cover-traffic-daemon ethereum hoprd real utils)
+  packages=(connect core-ethereum core cover-traffic-daemon hoprd real utils)
   for package in "${packages[@]}"; do
     changes=$(git diff packages/$package/package.json  | grep @@ | wc -l)
     if [ "$changes" -eq "1" ]; then
