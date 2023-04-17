@@ -390,7 +390,7 @@ str is string
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L30)
+[packages/core/src/channel-strategy.ts:31](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L31)
 
 ___
 

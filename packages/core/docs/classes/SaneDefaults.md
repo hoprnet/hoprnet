@@ -33,7 +33,7 @@
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:73](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L73)
+[packages/core/src/channel-strategy.ts:74](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L74)
 
 ___
 
@@ -43,7 +43,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:112](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L112)
+[packages/core/src/channel-strategy.ts:113](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L113)
 
 ## Methods
 
@@ -63,7 +63,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:75](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L75)
+[packages/core/src/channel-strategy.ts:76](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L76)
 
 ___
 
@@ -85,7 +85,7 @@ When an incoming channel is going to be closed, auto redeem tickets
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:89](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L89)
+[packages/core/src/channel-strategy.ts:90](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L90)
 
 ___
 
@@ -105,4 +105,4 @@ ___
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:107](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L107)
+[packages/core/src/channel-strategy.ts:108](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L108)
