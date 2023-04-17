@@ -9,7 +9,7 @@ import { webcrypto } from 'node:crypto'
 // @ts-ignore
 globalThis.crypto = webcrypto
 connect_relay_set_panic_hook()
-import { ConnectionStatusMessages, RelayPrefix /*, StatusMessages */ } from '../constants.js'
+import { ConnectionStatusMessages, RelayPrefix, StatusMessages } from '../constants.js'
 import { u8aEquals, privKeyToPeerId } from '@hoprnet/hopr-utils'
 // import { pipe } from 'it-pipe'
 
@@ -57,8 +57,8 @@ const destination = privKeyToPeerId('0x7fb0147c1872c39818c88a3b08e93f314ce826138
 
 describe('relay state management', function () {
   it('identifier generation', function () {
-    assert(getId(initiator, relay) === `${initiator.toString()}:${relay.toString()}`)
-    assert(getId(relay, destination) === `${relay.toString()}:${destination.toString()}`)
+    assert(getId(initiator, relay) === `${initiator.toString()} <-> ${relay.toString()}`)
+    assert(getId(relay, destination) === `${relay.toString()} <-> ${destination.toString()}`)
 
     assert(getId(initiator, relay) === getId(relay, initiator))
 
@@ -87,31 +87,31 @@ describe('relay state management', function () {
     state.createNew(initiator, destination, relayToInitiator as IStream, relayToDestination as IStream)
 
     // for (let i = 0; i < 3; i++) {
-    //   const destinationIsActivePromise = state.isActive(initiator, destination)
+    const destinationIsActivePromise = state.isActive(initiator, destination)
 
-    //   assert(
-    //     u8aEquals(
-    //       ((await destinationShaker.read()) as Uint8Array).slice(),
-    //       Uint8Array.of(RelayPrefix.STATUS_MESSAGE, StatusMessages.PING)
-    //     )
-    //   )
+    assert(
+      u8aEquals(
+        ((await destinationShaker.read()) as Uint8Array).slice(),
+        Uint8Array.of(RelayPrefix.STATUS_MESSAGE, StatusMessages.PING)
+      )
+    )
 
-    //   destinationShaker.write(Uint8Array.of(RelayPrefix.STATUS_MESSAGE, StatusMessages.PONG))
+    destinationShaker.write(Uint8Array.of(RelayPrefix.STATUS_MESSAGE, StatusMessages.PONG))
 
-    //   assert((await destinationIsActivePromise) === true, `link to destination must be active`)
+    assert((await destinationIsActivePromise) === true, `link to destination must be active`)
 
-    //   const initiatorIsActivePromise = state.isActive(destination, initiator)
+    const initiatorIsActivePromise = state.isActive(destination, initiator)
 
-    //   assert(
-    //     u8aEquals(
-    //       ((await initiatorShaker.read()) as Uint8Array).slice(),
-    //       Uint8Array.of(RelayPrefix.STATUS_MESSAGE, StatusMessages.PING)
-    //     )
-    //   )
+    assert(
+      u8aEquals(
+        ((await initiatorShaker.read()) as Uint8Array).slice(),
+        Uint8Array.of(RelayPrefix.STATUS_MESSAGE, StatusMessages.PING)
+      )
+    )
 
-    //   initiatorShaker.write(Uint8Array.of(RelayPrefix.STATUS_MESSAGE, StatusMessages.PONG))
+    initiatorShaker.write(Uint8Array.of(RelayPrefix.STATUS_MESSAGE, StatusMessages.PONG))
 
-    //   assert((await initiatorIsActivePromise) === true, `link to initiator must be active`)
+    assert((await initiatorIsActivePromise) === true, `link to initiator must be active`)
     // }
 
     // for (let i = 0; i < 5; i++) {
