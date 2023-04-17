@@ -18,6 +18,7 @@
 - Fixed issue with too many channels being opened by the Promiscuous strategy, added option to enforce the maximum number of opened channels ([#4827](https://github.com/hoprnet/hoprnet/pull/4827))
 - Added mitigation for connection leakage to prevent DHT and p2p connection failures ([#4870](https://github.com/hoprnet/hoprnet/pull/4870))
 - Fixed incorrect recording of some Ping metrics ([#4867](https://github.com/hoprnet/hoprnet/pull/4867))
+- Enforced 1 GB memory usage limit of HOPRd on Avado ([#4898](https://github.com/hoprnet/hoprnet/pull/4898))
 
 <a name="1.92"></a>
 
