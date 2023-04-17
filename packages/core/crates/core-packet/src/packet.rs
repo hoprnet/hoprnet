@@ -115,17 +115,16 @@ impl MetaPacket {
                 .unwrap_or_else(|e| panic!("onion encryption error {e}"))
         }
 
-        MetaPacket::new_from_parts(&shared_keys.alpha(), &routing_info.routing_information, &routing_info.mac, &padded)
+        MetaPacket::new_from_parts(shared_keys.alpha(), &routing_info.routing_information, &routing_info.mac, &padded)
     }
 
-    fn new_from_parts(alpha: &[u8], routing_info: &[u8], mac: &[u8], payload: &[u8]) -> Self {
-        assert_eq!(CurvePoint::SIZE_COMPRESSED, alpha.len());
+    fn new_from_parts(alpha: &CurvePoint, routing_info: &[u8], mac: &[u8], payload: &[u8]) -> Self {
         assert!(routing_info.len() > 0);
         assert_eq!(SimpleMac::SIZE, mac.len());
         assert_eq!(PAYLOAD_SIZE, payload.len());
 
         let mut packet = Vec::with_capacity(Self::size(routing_info.len()));
-        packet.extend_from_slice(alpha);
+        packet.extend_from_slice(&alpha.serialize_compressed());
         packet.extend_from_slice(routing_info);
         packet.extend_from_slice(mac);
         packet.extend_from_slice(payload);
@@ -172,12 +171,11 @@ impl MetaPacket {
         additional_data_relayer_len: usize,
         additional_data_last_hop_len: usize,
     ) -> Result<ForwardedPacket> {
-        let shared_keys = SharedKeys::forward_transform(self.alpha(), private_key)?;
-        let secret = shared_keys.secret(0).unwrap();
+        let (alpha, secret) = SharedKeys::forward_transform(CurvePoint::deserialize(self.alpha())?, private_key)?;
 
         let mut routing_info_mut: Vec<u8> = self.routing_info().into();
         let fwd_header = forward_header(
-            secret,
+            &secret,
             &mut routing_info_mut,
             self.mac(),
             max_hops,
@@ -185,7 +183,7 @@ impl MetaPacket {
             additional_data_last_hop_len,
         )?;
 
-        let prp = PRP::from_parameters(PRPParameters::new(secret));
+        let prp = PRP::from_parameters(PRPParameters::new(&secret));
         let decrypted = prp.inverse(self.payload())?;
 
         match fwd_header {
@@ -196,15 +194,15 @@ impl MetaPacket {
                 additional_info,
             } => {
                 Ok(RelayedPacket {
-                    packet: MetaPacket::new_from_parts(&shared_keys.alpha(),&header,&mac,&decrypted),
-                    packet_tag: derive_packet_tag(secret)?,
+                    packet: MetaPacket::new_from_parts(&alpha,&header,&mac,&decrypted),
+                    packet_tag: derive_packet_tag(&secret)?,
                     derived_secret: secret.into(),
                     next_node,
                     additional_info,
                 })
             }
             ForwardedHeader::FinalNode { additional_data } => Ok(FinalPacket {
-                packet_tag: derive_packet_tag(secret)?,
+                packet_tag: derive_packet_tag(&secret)?,
                 derived_secret: secret.into(),
                 plain_text: remove_padding(&decrypted)
                     .ok_or(PacketDecodingError("couldn't remove padding".into()))?
