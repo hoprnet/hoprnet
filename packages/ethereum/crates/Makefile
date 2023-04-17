@@ -10,11 +10,11 @@ JS_FILES = $(foreach package,$(PACKAGES),$(package)/pkg/$(subst -,_,$(package)).
 all: $(JS_FILES)
 
 test: $(JS_FILES)
-	$(foreach pkg,$(PACKAGES),cargo test -p $(pkg) && wasm-pack test --node `pwd`/$(pkg) && ) true
+	$(foreach pkg,$(PACKAGES),cargo test -p $(pkg) && WASM_BINDGEN_WEAKREF=1 wasm-pack test --node `pwd`/$(pkg) && ) true
 
 $(JS_FILES):
 	mkdir -p $(@D)
-	wasm-pack build --target=bundler `pwd`/$(@D)/..
+	WASM_BINDGEN_WEAKREF=1 wasm-pack build --target=bundler `pwd`/$(@D)/..
 
 install:
 ifneq ($(PACKAGES),)

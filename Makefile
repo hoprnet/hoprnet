@@ -66,7 +66,7 @@ init: ## initialize repository (idempotent operation)
 $(CRATES): ## builds all Rust crates with wasm-pack (except for hopli)
 # --out-dir is relative to working directory
 	echo "use wasm-pack build"
-	wasm-pack build --target=bundler --out-dir ./pkg $@
+	WASM_BINDGEN_WEAKREF=1 wasm-pack build --target=bundler --out-dir ./pkg $@
 
 .PHONY: $(HOPLI_CRATE)
 $(HOPLI_CRATE): ## builds hopli Rust crates with cargo
