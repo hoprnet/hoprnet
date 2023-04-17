@@ -49,7 +49,7 @@ pub struct IdentityArgs {
     )]
     directory: String,
 
-    #[clap(help = "Prefix of the identity file to create/read", long, default_value = "node_")]
+    #[clap(help = "Prefix of the identity file to create/read", long)]
     name: Option<String>,
 
     #[clap(
