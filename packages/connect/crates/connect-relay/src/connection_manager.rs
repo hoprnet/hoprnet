@@ -4,9 +4,10 @@ use core::{
     pin::Pin,
     task::{Context, Poll},
 };
-use futures::{stream::FusedStream, Future, Sink, Stream};
+use futures::{stream::FusedStream, Future, Sink, Stream, StreamExt};
+use pin_project_lite::pin_project;
 use std::{cell::RefCell, cmp::Ordering, collections::HashMap, rc::Rc};
-use utils_log::{error, info};
+use utils_log::error;
 
 use libp2p::PeerId;
 
@@ -16,14 +17,18 @@ use wasm_bindgen_futures::spawn_local;
 #[cfg(not(feature = "wasm"))]
 use async_std::task::spawn_local;
 
-struct RelayConnection<St> {
-    conn_a: Server<St>,
-    buffered_a: Option<Box<[u8]>>,
-    conn_b: Server<St>,
-    buffered_b: Option<Box<[u8]>>,
+pin_project! {
+    struct RelayConnection<St> {
+        #[pin]
+        conn_a: Server<St>,
+        buffered_a: Option<Box<[u8]>>,
+        #[pin]
+        conn_b: Server<St>,
+        buffered_b: Option<Box<[u8]>>,
+    }
 }
 
-impl<'a, St> RelayConnection<St> {
+impl<St> RelayConnection<St> {
     fn new(conn_a: Server<St>, conn_b: Server<St>) -> Self {
         Self {
             conn_a,
@@ -34,107 +39,147 @@ impl<'a, St> RelayConnection<St> {
     }
 }
 
-impl<St: DuplexStream> RelayConnection<St> {
-    fn try_start_send_a(&mut self, cx: &mut Context<'_>, item: Box<[u8]>) -> Poll<Result<(), String>> {
-        match Pin::new(&mut self.conn_a).poll_ready(cx)? {
-            Poll::Ready(()) => Poll::Ready(Pin::new(&mut self.conn_a).start_send(item)),
-            Poll::Pending => {
-                self.buffered_a = Some(item);
-                Poll::Pending
-            }
-        }
+pin_project! {
+    struct SomeFuture<'a, St> {
+        foo: & 'a mut  RelayConnection<St>,
     }
+}
 
-    fn try_start_send_b(&mut self, cx: &mut Context<'_>, item: Box<[u8]>) -> Poll<Result<(), String>> {
-        match Pin::new(&mut self.conn_b).poll_ready(cx)? {
-            Poll::Ready(()) => Poll::Ready(Pin::new(&mut self.conn_b).start_send(item)),
-            Poll::Pending => {
-                self.buffered_b = Some(item);
-                Poll::Pending
-            }
-        }
+impl<'a, St: DuplexStream> Future for SomeFuture<'a, St> {
+    type Output = ();
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let mut this = self.project();
+
+        let foo = &mut this.foo.conn_a;
+
+        Pin::new(foo).poll_next(cx);
+        // if !th<is.foo.conn_a.is_terminated() {
+        //     match this.foo.conn_b.poll_next(cx) {
+        //         Poll::Ready(Some(item)) => match this.conn_a.as_mut().poll_ready(cx) {
+        //             Poll::Ready(Ok(())) => match this.conn_a.as_mut().start_send(item.unwrap()) {
+        //                 Ok(()) => (),
+        //                 Err(e) => return Poll::Ready(Err(e)),
+        //             },
+        //             Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
+        //             Poll::Pending => {
+        //                 *this.buffered_a = Some(item.unwrap());
+        //                 b_next_pending = true;
+        //             }
+        //         },
+        //         Poll::Ready(None) => match this.conn_a.as_mut().poll_flush(cx) {
+        //             Poll::Ready(Ok(())) => (),
+        //             Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
+        //             Poll::Pending => {
+        //                 b_next_pending = true;
+        //             }
+        //         },
+        //         Poll::Pending => b_next_pending = true,
+        //     };
+        // }>
+
+        Poll::Ready(())
     }
 }
 
 impl<St: DuplexStream> Future for RelayConnection<St> {
     type Output = Result<(), String>;
 
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let this = &mut *self;
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let mut this = self.project();
 
-        let mut a_pending = false;
+        let mut a_send_pending = false;
 
         if let Some(item) = this.buffered_a.take() {
-            match this.try_start_send_a(cx, item) {
-                Poll::Ready(Ok(())) => (),
-                Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
-                Poll::Pending => a_pending = true,
-            };
-        }
-
-        if let Some(item) = this.buffered_b.take() {
-            match this.try_start_send_b(cx, item) {
-                Poll::Ready(Ok(())) => (),
+            match this.conn_a.as_mut().poll_ready(cx) {
+                Poll::Ready(Ok(())) => match this.conn_a.as_mut().start_send(item) {
+                    Ok(()) => (),
+                    Err(e) => return Poll::Ready(Err(e)),
+                },
                 Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
                 Poll::Pending => {
-                    if a_pending {
-                        return Poll::Pending;
-                    }
+                    *this.buffered_a = Some(item);
+                    a_send_pending = true;
                 }
             };
         }
 
-        let mut a_next_pending: bool;
+        if let Some(item) = this.buffered_b.take() {
+            match this.conn_b.as_mut().poll_ready(cx) {
+                Poll::Ready(Ok(())) => match this.conn_b.as_mut().start_send(item) {
+                    Ok(()) => (),
+                    Err(e) => return Poll::Ready(Err(e)),
+                },
+                Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
+                Poll::Pending => {
+                    *this.buffered_b = Some(item);
+                    if a_send_pending {
+                        // FIXME: This might produce a dead-lock
+                        return Poll::Pending;
+                    }
+                }
+            }
+        }
+
+        let mut b_next_pending: bool;
 
         loop {
-            a_next_pending = false;
+            b_next_pending = false;
 
             if this.conn_a.is_terminated() && this.conn_b.is_terminated() {
                 break Poll::Ready(Ok(()));
             }
 
             if !this.conn_a.is_terminated() {
-                match Pin::new(&mut this.conn_a).poll_next(cx) {
-                    Poll::Ready(Some(item)) => match this.try_start_send_a(cx, item.unwrap()) {
+                match this.conn_b.as_mut().poll_next(cx) {
+                    Poll::Ready(Some(item)) => match this.conn_a.as_mut().poll_ready(cx) {
+                        Poll::Ready(Ok(())) => match this.conn_a.as_mut().start_send(item.unwrap()) {
+                            Ok(()) => (),
+                            Err(e) => return Poll::Ready(Err(e)),
+                        },
+                        Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
+                        Poll::Pending => {
+                            *this.buffered_a = Some(item.unwrap());
+                            b_next_pending = true;
+                        }
+                    },
+                    Poll::Ready(None) => match this.conn_a.as_mut().poll_flush(cx) {
                         Poll::Ready(Ok(())) => (),
                         Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
                         Poll::Pending => {
-                            a_next_pending = true;
+                            b_next_pending = true;
                         }
                     },
-                    Poll::Ready(None) => match Pin::new(&mut this.conn_a).poll_flush(cx) {
-                        Poll::Ready(Ok(())) => (),
-                        Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
-                        Poll::Pending => {
-                            a_next_pending = true;
-                        }
-                    },
-                    Poll::Pending => a_next_pending = true,
+                    Poll::Pending => b_next_pending = true,
                 };
             }
 
             if !this.conn_b.is_terminated() {
-                match Pin::new(&mut this.conn_b).poll_next(cx) {
-                    Poll::Ready(Some(item)) => match this.try_start_send_b(cx, item.unwrap()) {
-                        Poll::Ready(Ok(())) => (),
+                match this.conn_a.as_mut().poll_next(cx) {
+                    Poll::Ready(Some(item)) => match this.conn_b.as_mut().poll_ready(cx) {
+                        Poll::Ready(Ok(())) => match this.conn_b.as_mut().start_send(item.unwrap()) {
+                            Ok(()) => (),
+                            Err(e) => return Poll::Ready(Err(e)),
+                        },
                         Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
                         Poll::Pending => {
-                            if a_next_pending {
+                            *this.buffered_b = Some(item.unwrap());
+                            if b_next_pending {
+                                // FIXME: This might produce a dead-lock
                                 return Poll::Pending;
                             }
                         }
                     },
-                    Poll::Ready(None) => match Pin::new(&mut this.conn_b).poll_flush(cx) {
+                    Poll::Ready(None) => match this.conn_b.as_mut().poll_flush(cx) {
                         Poll::Ready(Ok(())) => (),
                         Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
                         Poll::Pending => {
-                            if a_next_pending {
+                            if b_next_pending {
                                 return Poll::Pending;
                             }
                         }
                     },
                     Poll::Pending => {
-                        if a_next_pending {
+                        if b_next_pending {
                             return Poll::Pending;
                         }
                     }
@@ -152,7 +197,7 @@ struct RelayConnectionIdentifier {
 
 impl ToString for RelayConnectionIdentifier {
     fn to_string(&self) -> String {
-        format!("{}:{}", self.id_a.to_string(), self.id_b.to_string())
+        format!("{} <-> {}", self.id_a.to_string(), self.id_b.to_string())
     }
 }
 
@@ -206,7 +251,7 @@ fn get_key_and_value<St>(
 }
 
 struct RelayConnections<St> {
-    conns: Rc<RefCell<HashMap<RelayConnectionIdentifier, RelayConnection<St>>>>,
+    conns: Rc<RefCell<HashMap<RelayConnectionIdentifier, Option<RelayConnection<St>>>>>,
 }
 
 impl<St> ToString for RelayConnections<St> {
@@ -259,21 +304,51 @@ impl<St: DuplexStream> RelayConnections<St> {
 
             let (id, conn) = get_key_and_value(id_a, conn_a, id_b, conn_b)?;
 
-            conns.borrow_mut().insert(id, conn);
+            // let ptr = SomeFuture { foo: &mut conn };
+            // spawn_local(ptr);
+            let mut foo = None;
+            let bar = foo.insert(conn);
+
+            conns.borrow_mut().insert(id, foo);
+
+            // spawn_local(async move {
+
+            //     conns.borrow().get(&id).
+            //     let foo = bar;
+            //     // match bar.await {
+            //     //     Ok(()) => (),
+            //     //     Err(e) => {
+            //     //         // conns.borrow_mut().remove(&id);
+            //     //         error!("{}", e)
+            //     //     }
+            //     // }
+            // });
+
+            // conns.borrow_mut().insert(id, conn);
+
+            // spawn_local(async move {
+            //     match conn.await {
+            //         Ok(()) => (),
+            //         Err(e) => {
+            //             // conns.borrow_mut().remove(&id);
+            //             error!("{}", e)
+            //         }
+            //     }
+            // });
         }
 
         let conns = &self.conns;
         let id = id1.clone();
 
-        spawn_local(async move {
-            match conns.borrow_mut().get_mut(&id).unwrap().await {
-                Ok(()) => (),
-                Err(e) => {
-                    conns.borrow_mut().remove(&id);
-                    error!("{}", e)
-                }
-            }
-        });
+        // spawn_local(async move {
+        //     match conns.borrow_mut().get_mut(&id).as_mut().unwrap().await {
+        //         Ok(()) => (),
+        //         Err(e) => {
+        //             conns.borrow_mut().remove(&id);
+        //             error!("{}", e)
+        //         }
+        //     }
+        // });
 
         Ok(())
     }
@@ -287,6 +362,7 @@ impl<St: DuplexStream> RelayConnections<St> {
             }
         };
 
+        // FIXME: no need for a mutable borrow
         let mut conns = self.conns.borrow_mut();
 
         let relay_conn = match conns.get_mut(&id) {
@@ -300,7 +376,7 @@ impl<St: DuplexStream> RelayConnections<St> {
         match source.cmp(&destination) {
             Ordering::Equal => panic!("must not happen"),
             Ordering::Greater => {
-                return match relay_conn.conn_b.ping(maybe_timeout).await {
+                return match relay_conn.as_mut().unwrap().conn_b.ping(maybe_timeout).await {
                     Ok(_) => true,
                     Err(e) => {
                         error!("{}", e);
@@ -309,7 +385,7 @@ impl<St: DuplexStream> RelayConnections<St> {
                 }
             }
             Ordering::Less => {
-                return match relay_conn.conn_a.ping(maybe_timeout).await {
+                return match relay_conn.as_mut().unwrap().conn_a.ping(maybe_timeout).await {
                     Ok(_) => true,
                     Err(e) => {
                         error!("{}", e);
@@ -342,7 +418,7 @@ impl<St: DuplexStream> RelayConnections<St> {
         match source.cmp(&destination) {
             Ordering::Equal => panic!("must not happen"),
             Ordering::Greater => {
-                return match relay_conn.conn_b.update(to_source) {
+                return match relay_conn.as_mut().unwrap().conn_b.update(to_source) {
                     Ok(_) => true,
                     Err(e) => {
                         error!("{}", e);
@@ -351,7 +427,7 @@ impl<St: DuplexStream> RelayConnections<St> {
                 }
             }
             Ordering::Less => {
-                return match relay_conn.conn_a.update(to_source) {
+                return match relay_conn.as_mut().unwrap().conn_a.update(to_source) {
                     Ok(_) => true,
                     Err(e) => {
                         error!("{}", e);
