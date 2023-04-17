@@ -58,8 +58,8 @@ source .env
 // This verifies contract on sourcify
 FOUNDRY_PROFILE=staging ENVIRONMENT_NAME=debug-staging forge script --broadcast --verify --verifier sourcify script/DeployAll.s.sol:DeployAllContractsScript
 
-// This deploys contract to staging environment and verifies contracts on etherscan
-FOUNDRY_PROFILE=staging ENVIRONMENT_NAME=debug-staging forge script --broadcast --verify --verifier etherscan --verifier-url "https://api.gnosisscan.io/api" --chain gnosis --compiler-version <specify_if_other_than_that_in_config> script/DeployAll.s.sol:DeployAllContractsScript
+// This deploys contract to staging environment and verifies contracts on Gnosisscan
+FOUNDRY_PROFILE=staging ENVIRONMENT_NAME=debug-staging forge script --broadcast --verify --verifier etherscan --verifier-url "https://api.gnosisscan.io/api" --chain 100 --compiler-version <specify_if_other_than_that_in_config> script/DeployAll.s.sol:DeployAllContractsScript
 ```
 
 #### Production
