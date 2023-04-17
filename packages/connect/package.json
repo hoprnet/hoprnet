@@ -30,6 +30,7 @@
   },
   "dependencies": {
     "@hoprnet/hopr-utils": "workspace:packages/utils",
+    "@koush/wrtc": "0.5.3",
     "@libp2p/interface-peer-discovery": "1.0.0",
     "@libp2p/interface-peer-id": "1.0.5",
     "@libp2p/interface-transport": "1.0.0",
@@ -46,8 +47,7 @@
     "retimer": "3.0.0",
     "simple-peer": "9.11.1",
     "stream-to-it": "0.2.4",
-    "stun": "2.1.0",
-    "wrtc": "0.4.7"
+    "stun": "2.1.0"
   },
   "devDependencies": {
     "@libp2p/interface-connection": "1.0.1",
