@@ -52,7 +52,7 @@
   "devDependencies": {
     "@chainsafe/libp2p-noise": "7.0.0",
     "@libp2p/interface-connection": "1.0.1",
-    "@libp2p/interface-connection-manager": "1.1.0",
+    "@libp2p/interface-connection-manager": "1.5.0",
     "@libp2p/interface-keys": "1.0.3",
     "@libp2p/interface-peer-store": "1.0.0",
     "@libp2p/interface-registrar": "1.1.0",
