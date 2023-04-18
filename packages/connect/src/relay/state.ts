@@ -3,11 +3,7 @@ import type { PeerId } from '@libp2p/interface-peer-id'
 import { unmarshalPublicKey } from '@libp2p/crypto/keys'
 
 import { nAtATime, u8aCompare } from '@hoprnet/hopr-utils'
-import { IStream, Server, connect_relay_set_panic_hook } from '../../lib/connect_relay.js'
-import { webcrypto } from 'node:crypto'
-// @ts-ignore
-globalThis.crypto = webcrypto
-connect_relay_set_panic_hook()
+import { RelayContext, type RelayContextInterface } from './context.js'
 
 import debug from 'debug'
 
@@ -17,7 +13,7 @@ const verbose = debug(DEBUG_PREFIX.concat(':verbose'))
 const error = debug(DEBUG_PREFIX.concat(':error'))
 
 type RelayConnections = {
-  [id: string]: Server
+  [id: string]: RelayContextInterface
 }
 
 /**
@@ -97,7 +93,7 @@ class RelayState {
       return false
     }
 
-    context[source.toString()].update(toSource as IStream)
+    context[source.toString()].update(toSource)
 
     return true
   }
@@ -119,7 +115,7 @@ class RelayState {
    * Performs an operation for each relay context in the current set.
    * @param action
    */
-  async forEach(action: (dst: string, ctx: Server) => Promise<void>) {
+  async forEach(action: (dst: string, ctx: RelayContextInterface) => Promise<void>) {
     await nAtATime(
       action,
       this,
@@ -143,37 +139,17 @@ class RelayState {
     toDestination: Stream,
     __relayFreeTimeout?: number
   ): Promise<void> {
-    const toSourceContext = new Server(
-      {
-        source: (async function* () {
-          for await (const maybeBuf of toSource.source) {
-            if (Buffer.isBuffer(maybeBuf)) {
-              yield new Uint8Array(maybeBuf.buffer, maybeBuf.byteOffset, maybeBuf.length)
-            } else {
-              yield maybeBuf
-            }
-          }
-        })(),
-        sink: toSource.sink
-      },
-      // toSource as IStream,
+    const toSourceContext = RelayContext(
+      toSource,
       { onClose: this.cleanListener(source, destination), onUpgrade: this.cleanListener(source, destination) },
       this.options
     )
-    const toDestinationContext = new Server(
+    const toDestinationContext = RelayContext(
+      toDestination,
       {
-        source: (async function* () {
-          for await (const maybeBuf of toDestination.source) {
-            if (Buffer.isBuffer(maybeBuf)) {
-              yield new Uint8Array(maybeBuf.buffer, maybeBuf.byteOffset, maybeBuf.length)
-            } else {
-              yield maybeBuf
-            }
-          }
-        })(),
-        sink: toDestination.sink
+        onClose: this.cleanListener(destination, source),
+        onUpgrade: this.cleanListener(destination, source)
       },
-      { onClose: this.cleanListener(destination, source), onUpgrade: this.cleanListener(destination, source) },
       this.options
     )
 
