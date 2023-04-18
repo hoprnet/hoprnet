@@ -2,6 +2,9 @@
 
 # Class: MultiGauge
 
+Represents a vector of gauges with floating point values.
+Wrapper for GaugeVec type
+
 ## Table of contents
 
 ### Constructors
@@ -16,7 +19,6 @@
 - [get](MultiGauge.md#get)
 - [increment](MultiGauge.md#increment)
 - [increment\_by](MultiGauge.md#increment_by)
-- [labels](MultiGauge.md#labels)
 - [name](MultiGauge.md#name)
 - [set](MultiGauge.md#set)
 
@@ -44,7 +46,7 @@
 
 #### Defined in
 
-lib/utils_metrics.d.ts:164
+utils/lib/utils_metrics.d.ts:173
 
 ___
 
@@ -65,7 +67,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:160
+utils/lib/utils_metrics.d.ts:169
 
 ___
 
@@ -79,7 +81,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:146
+utils/lib/utils_metrics.d.ts:150
 
 ___
 
@@ -99,7 +101,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:174
+utils/lib/utils_metrics.d.ts:183
 
 ___
 
@@ -119,7 +121,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:155
+utils/lib/utils_metrics.d.ts:164
 
 ___
 
@@ -140,21 +142,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:151
-
-___
-
-### labels
-
-▸ **labels**(): `string`[]
-
-#### Returns
-
-`string`[]
-
-#### Defined in
-
-lib/utils_metrics.d.ts:182
+utils/lib/utils_metrics.d.ts:160
 
 ___
 
@@ -162,13 +150,15 @@ ___
 
 ▸ **name**(): `string`
 
+Returns the name of the gauge vector given at construction.
+
 #### Returns
 
 `string`
 
 #### Defined in
 
-lib/utils_metrics.d.ts:178
+utils/lib/utils_metrics.d.ts:155
 
 ___
 
@@ -189,4 +179,4 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:169
+utils/lib/utils_metrics.d.ts:178

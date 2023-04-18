@@ -29,7 +29,7 @@ describe('DELETE /tokens/{id}', function () {
   beforeEach(async function () {
     // test token which should be deleted
     const caps = [{ endpoint: 'tokensCreate' }]
-    token = await createToken(node.db, caps)
+    token = await createToken(node.db, undefined, caps)
     await storeToken(node.db, token)
   })
 
@@ -57,7 +57,7 @@ describe('DELETE /tokens/{id}', function () {
   it('should fail with unauthenticated error when using token with missing capability', async function () {
     // create token with wrong capability
     const caps = [{ endpoint: 'tokensCreate' }]
-    const wrongToken = await createToken(node.db, caps)
+    const wrongToken = await createToken(node.db, undefined, caps)
     await storeToken(node.db, wrongToken)
 
     const res = await request(service).delete(`/api/v2/tokens/${token.id}`).set('x-auth-token', wrongToken.id)
@@ -68,7 +68,7 @@ describe('DELETE /tokens/{id}', function () {
   it('should succeed when using token with correct capability', async function () {
     // create token with correct capability
     const caps = [{ endpoint: 'tokensDelete' }]
-    const correctToken = await createToken(node.db, caps)
+    const correctToken = await createToken(node.db, undefined, caps)
     await storeToken(node.db, correctToken)
 
     const res = await request(service).delete(`/api/v2/tokens/${token.id}`).set('x-auth-token', correctToken.id)

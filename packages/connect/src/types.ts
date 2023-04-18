@@ -98,4 +98,6 @@ export type HoprConnectTestingOptions = {
   // Local mode: only use local address, i.e. don't try to
   // determine any external / public IP addresses
   __preferLocalAddresses?: boolean
+  // Local mode STUN: used for unit testing and e2e testing
+  __localModeStun?: boolean
 }

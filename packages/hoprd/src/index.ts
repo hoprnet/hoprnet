@@ -11,16 +11,24 @@ import {
   pickVersion
 } from '@hoprnet/hopr-utils'
 import {
+  Health,
+  health_to_string,
   createHoprNode,
   default as Hopr,
   type HoprOptions,
   isStrategy,
-  NetworkHealthIndicator,
   ResolvedEnvironment,
   resolveEnvironment
 } from '@hoprnet/hopr-core'
 
-import { parse_cli_arguments, type CliArgs } from '../lib/hoprd_misc.js'
+import {
+  parse_cli_arguments,
+  fetch_configuration,
+  parse_private_key,
+  HoprdConfig,
+  type Api,
+  type CliArgs
+} from '../lib/hoprd_misc.js'
 import type { State } from './types.js'
 import setupAPI from './api/index.js'
 import setupHealthcheck from './healthcheck.js'
@@ -56,42 +64,52 @@ const packageFile = path.normalize(new URL('../package.json', import.meta.url).p
 const version = get_package_version(packageFile)
 const on_avado = (process.env.AVADO ?? 'false').toLowerCase() === 'true'
 
-function generateNodeOptions(argv: CliArgs, environment: ResolvedEnvironment): HoprOptions {
+function generateNodeOptions(cfg: HoprdConfig, environment: ResolvedEnvironment): HoprOptions {
   let strategy: ChannelStrategyInterface
 
-  if (isStrategy(argv.default_strategy)) {
-    strategy = StrategyFactory.getStrategy(argv.default_strategy)
+  if (isStrategy(cfg.strategy.name)) {
+    strategy = StrategyFactory.getStrategy(cfg.strategy.name)
     strategy.configure({
-      auto_redeem_tickets: argv.auto_redeem_tickets ?? false,
-      max_channels: argv.max_auto_channels ?? undefined
+      auto_redeem_tickets: cfg.strategy.auto_redeem_tickets,
+      max_channels: cfg.strategy.max_auto_channels ?? undefined
     })
   } else {
     throw Error(`Invalid strategy selected`)
   }
 
   let options: HoprOptions = {
-    createDbIfNotExist: argv.init,
-    announce: argv.announce,
-    dataPath: argv.data,
-    hosts: { ip4: argv.host },
+    createDbIfNotExist: cfg.db.initialize,
+    announce: cfg.network.announce,
+    dataPath: cfg.db.data,
+    hosts: { ip4: cfg.host },
     environment,
-    allowLocalConnections: argv.allow_local_node_connections,
-    allowPrivateConnections: argv.allow_private_node_connections,
-    heartbeatInterval: argv.heartbeat_interval,
-    heartbeatThreshold: argv.heartbeat_threshold,
-    heartbeatVariance: argv.heartbeat_variance,
-    networkQualityThreshold: argv.network_quality_threshold,
-    onChainConfirmations: argv.on_chain_confirmations,
-    checkUnrealizedBalance: argv.check_unrealized_balance,
+    allowLocalConnections: cfg.network.allow_local_node_connections,
+    allowPrivateConnections: cfg.network.allow_private_node_connections,
+    heartbeatInterval: cfg.heartbeat.interval,
+    heartbeatThreshold: cfg.heartbeat.threshold,
+    heartbeatVariance: cfg.heartbeat.variance,
+    networkQualityThreshold: cfg.network.network_quality_threshold,
+    onChainConfirmations: cfg.chain.on_chain_confirmations,
+    checkUnrealizedBalance: cfg.chain.check_unrealized_balance,
+    maxParallelConnections: cfg.network.max_parallel_connections,
     testing: {
-      announceLocalAddresses: argv.test_announce_local_addresses,
-      preferLocalAddresses: argv.test_prefer_local_addresses,
-      noWebRTCUpgrade: argv.test_no_webrtc_upgrade,
-      noDirectConnections: argv.test_no_direct_connections
+      announceLocalAddresses: cfg.test.announce_local_addresses,
+      preferLocalAddresses: cfg.test.prefer_local_addresses,
+      noWebRTCUpgrade: cfg.test.no_webrtc_upgrade,
+      noDirectConnections: cfg.test.no_direct_connections,
+      localModeStun: cfg.test.local_mode_stun
     },
-    password: argv.password,
+    password: cfg.identity.password,
     strategy,
-    forceCreateDB: argv.force_init
+    forceCreateDB: cfg.db.force_initialize
+  }
+
+  if (isStrategy(cfg.strategy.name)) {
+    options.strategy = StrategyFactory.getStrategy(cfg.strategy.name)
+    options.strategy.configure({
+      auto_redeem_tickets: cfg.strategy.auto_redeem_tickets,
+      max_channels: cfg.strategy.max_auto_channels ?? undefined
+    })
   }
 
   return options
@@ -116,10 +134,7 @@ export function parseCliArguments(args: string[]) {
     console.error(err)
     process.exit(1)
   }
-  if (argv.private_key) {
-    // wasm-bindgen returns number array but does not call the Uint8Array constructor
-    argv.private_key = new Uint8Array(argv.private_key)
-  }
+
   return argv
 }
 
@@ -160,7 +175,7 @@ async function main() {
     settings: {
       includeRecipient: false,
       strategy: 'passive',
-      autoRedeemTickets: false,
+      autoRedeemTickets: true,
       maxAutoChannels: undefined
     }
   }
@@ -175,11 +190,11 @@ async function main() {
 
   let metric_timerToGreen = metric_timeToGreen.start_measure()
 
-  const networkHealthChanged = (oldState: NetworkHealthIndicator, newState: NetworkHealthIndicator): void => {
+  const networkHealthChanged = (oldState: Health, newState: Health): void => {
     // Log the network health indicator state change (goes over the WS as well)
-    logs.log(`Network health indicator changed: ${oldState} -> ${newState}`)
-    logs.log(`NETWORK HEALTH: ${newState}`)
-    if (metric_timerToGreen && newState == NetworkHealthIndicator.GREEN) {
+    logs.log(`Network health indicator changed: ${health_to_string(oldState)} -> ${health_to_string(newState)}`)
+    logs.log(`NETWORK HEALTH: ${health_to_string(newState)}`)
+    if (metric_timerToGreen && newState == Health.Green) {
       metric_timeToGreen.record_measure(metric_timerToGreen)
       metric_timerToGreen = undefined
     }
@@ -202,31 +217,35 @@ async function main() {
   }
 
   const argv = parseCliArguments(process.argv.slice(1))
-
-  if (argv.default_strategy) {
-    state.settings.strategy = argv.default_strategy
+  let cfg: HoprdConfig
+  try {
+    cfg = fetch_configuration(argv as CliArgs) as HoprdConfig
+  } catch (err) {
+    console.error(err)
+    process.exit(1)
   }
 
-  if (argv.auto_redeem_tickets) {
-    state.settings.autoRedeemTickets = argv.auto_redeem_tickets
-  }
+  console.log('Node configuration: ' + cfg.as_redacted_string())
 
-  if (argv.max_auto_channels) {
-    state.settings.maxAutoChannels = argv.max_auto_channels
-  }
-
-  if (!argv.disable_api_authentication && argv.api) {
-    if (argv.api_token == null) {
-      throw Error(`Must provide --apiToken when --api is specified`)
-    }
-  }
-
-  const environment = resolveEnvironment(argv.environment, argv.provider)
-  let options = generateNodeOptions(argv, environment)
   if (argv.dry_run) {
-    console.log(JSON.stringify(options, undefined, 2))
     process.exit(0)
   }
+
+  if (cfg.strategy.name) {
+    state.settings.strategy = cfg.strategy.name
+  }
+
+  if (cfg.strategy.auto_redeem_tickets) {
+    state.settings.autoRedeemTickets = cfg.strategy.auto_redeem_tickets
+  }
+
+  if (cfg.strategy.max_auto_channels) {
+    state.settings.maxAutoChannels = cfg.strategy.max_auto_channels
+  }
+
+  const environment = resolveEnvironment(cfg.environment, cfg.chain.provider)
+
+  let options = generateNodeOptions(cfg, environment)
 
   try {
     logs.log(`This is HOPRd version ${version}`)
@@ -238,11 +257,11 @@ async function main() {
 
     // 1. Find or create an identity
     const peerId = await getIdentity({
-      initialize: argv.init,
-      idPath: argv.identity,
-      password: argv.password,
-      useWeakCrypto: argv.test_use_weak_crypto,
-      privateKey: argv.private_key
+      initialize: cfg.db.initialize,
+      idPath: cfg.identity.file,
+      password: cfg.identity.password,
+      useWeakCrypto: cfg.test.use_weak_crypto,
+      privateKey: cfg.identity.private_key === undefined ? undefined : parse_private_key(cfg.identity.private_key)
     })
 
     // 2. Create node instance
@@ -261,22 +280,24 @@ async function main() {
     node.once('hopr:monitoring:start', async () => {
       // 3. start all monitoring services, and continue with the rest of the setup.
 
+      let api = cfg.api as Api
+      console.log(JSON.stringify(api, null, 2))
       const startApiListen = setupAPI(
         node,
         logs,
         { getState, setState },
         {
-          disableApiAuthentication: argv.disable_api_authentication,
-          apiHost: argv.api_host,
-          apiPort: argv.api_port,
-          apiToken: argv.disable_api_authentication ? null : argv.api_token
+          disableApiAuthentication: api.is_auth_disabled(),
+          apiHost: api.host.ip,
+          apiPort: api.host.port,
+          apiToken: api.is_auth_disabled() ? null : api.auth_token()
         }
       )
       // start API server only if API flag is true
-      if (argv.api) startApiListen()
+      if (cfg.api.enable) startApiListen()
 
-      if (argv.health_check) {
-        setupHealthcheck(node, logs, argv.health_check_host, argv.health_check_port)
+      if (cfg.healthcheck.enable) {
+        setupHealthcheck(node, logs, cfg.healthcheck.host, cfg.healthcheck.port)
       }
 
       logs.log(`Node address: ${node.getId().toString()}`)

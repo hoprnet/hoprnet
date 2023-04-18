@@ -36,7 +36,7 @@
 
 #### Defined in
 
-[src/types/halfKey.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKey.ts#L6)
+[utils/src/types/halfKey.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKey.ts#L6)
 
 ## Properties
 
@@ -46,7 +46,7 @@
 
 #### Defined in
 
-[src/types/halfKey.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKey.ts#L6)
+[utils/src/types/halfKey.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKey.ts#L6)
 
 ___
 
@@ -56,7 +56,7 @@ ___
 
 #### Defined in
 
-[src/types/halfKey.ts:41](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKey.ts#L41)
+[utils/src/types/halfKey.ts:41](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKey.ts#L41)
 
 ## Methods
 
@@ -70,7 +70,7 @@ ___
 
 #### Defined in
 
-[src/types/halfKey.ts:36](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKey.ts#L36)
+[utils/src/types/halfKey.ts:36](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKey.ts#L36)
 
 ___
 
@@ -90,7 +90,7 @@ ___
 
 #### Defined in
 
-[src/types/halfKey.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKey.ts#L28)
+[utils/src/types/halfKey.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKey.ts#L28)
 
 ___
 
@@ -104,7 +104,7 @@ ___
 
 #### Defined in
 
-[src/types/halfKey.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKey.ts#L20)
+[utils/src/types/halfKey.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKey.ts#L20)
 
 ___
 
@@ -118,7 +118,7 @@ ___
 
 #### Defined in
 
-[src/types/halfKey.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKey.ts#L16)
+[utils/src/types/halfKey.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKey.ts#L16)
 
 ___
 
@@ -132,7 +132,7 @@ ___
 
 #### Defined in
 
-[src/types/halfKey.ts:24](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKey.ts#L24)
+[utils/src/types/halfKey.ts:24](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKey.ts#L24)
 
 ___
 
@@ -152,4 +152,4 @@ ___
 
 #### Defined in
 
-[src/types/halfKey.ts:32](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKey.ts#L32)
+[utils/src/types/halfKey.ts:32](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKey.ts#L32)

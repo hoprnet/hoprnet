@@ -7,6 +7,9 @@ env:
   MATRIX_CLUSTER_INFO_ROOM: ${{ secrets.MATRIX_CLUSTER_INFO_ROOM }}
   MATRIX_SERVER: ${{ secrets.MATRIX_SERVER }}
   MATRIX_ACCESS_TOKEN: ${{ secrets.MATRIX_ACCESS_TOKEN }}
+  RUST_BACKTRACE: "1"
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: "sccache"
 
 on:
   push:
@@ -47,8 +50,27 @@ jobs:
       - name: "[SETUP] Configure Git info"
         run: ./scripts/configure-git-info.sh
 
-      - name: install toolchain
-        run: ./scripts/toolchain/install-toolchain.sh
+      - name: Disable sccache (act-only)
+        if: ${{ env.ACT }}
+        run: |
+          echo "SCCACHE_GHA_ENABLED=false" >> $GITHUB_ENV
+          echo "RUSTC_WRAPPER=" >> $GITHUB_ENV
+
+      - name: Sccache Setup
+        if: ${{ !env.ACT }}
+        uses: mozilla-actions/sccache-action@v0.0.3
+        with:
+          version: "v0.4.0"
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v17
+
+      - uses: cachix/cachix-action@v12
+        if: ${{ !env.ACT }}
+        with:
+          name: hoprnet
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+        continue-on-error: true
 
       - name: get yarn cache directory path
         id: yarn-cache-dir-path
@@ -79,8 +101,8 @@ jobs:
 
       - name: "[BUILD] Install dependencies / link / build"
         run: |
-          make -j deps-ci
-          make -j build
+          nix develop -c make -j deps-ci
+          nix develop -c make -j build
 
       - name: "Cache built artifacts (for later use)"
         uses: actions/cache@v3
@@ -99,14 +121,14 @@ jobs:
       - name: "[SMART-CONTRACTS] Commit & push changes"
         if: ${{ !env.ACT }}
         run: |
-          make lint-fix
+          nix develop -c make fmt
           ./scripts/commit-and-push-all-changes.sh
         env:
           HOPR_GIT_MSG: "chore(release): update smart contract deployments"
 
       - name: "[NPM] Publish prerelease version (On pushes to master, debug-deploy/* or staging/*)"
         if: ${{ (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/debug-deploy/')  || startsWith(github.ref, 'refs/heads/staging/')) && !env.ACT }}
-        run: ./scripts/publish-version.sh prerelease
+        run: nix develop -c ./scripts/publish-version.sh prerelease
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -114,7 +136,7 @@ jobs:
       # accordance with semver.
       - name: "[NPM] Publish patch version (On pushes to release branches)"
         if: ${{ startsWith(github.ref, 'refs/heads/release/') && !env.ACT }}
-        run: ./scripts/publish-version.sh patch
+        run: nix develop -c ./scripts/publish-version.sh patch
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -170,6 +192,16 @@ jobs:
       - name: Configure Git info
         run: ./scripts/configure-git-info.sh
 
+      - name: Install Nix
+        uses: cachix/install-nix-action@v17
+
+      - uses: cachix/cachix-action@v12
+        if: ${{ !env.ACT }}
+        with:
+          name: hoprnet
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+        continue-on-error: true
+
       - name: Set up Google Cloud Credentials
         uses: google-github-actions/auth@v0
         with:
@@ -190,7 +222,7 @@ jobs:
           git pull origin "${branch}" --rebase
 
       - name: Build Docker images
-        run: ./scripts/build-docker.sh
+        run: nix develop -c ./scripts/build-docker.sh
 
       - name: Send notification if anything failed on master or release/staging branches
         if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/') || startsWith(github.ref, 'refs/heads/staging/')) && !env.ACT }}
@@ -210,8 +242,27 @@ jobs:
       - name: "[SETUP] Configure Git info"
         run: ./scripts/configure-git-info.sh
 
-      - name: install toolchain
-        run: ./scripts/toolchain/install-toolchain.sh
+      - name: Disable sccache (act-only)
+        if: ${{ env.ACT }}
+        run: |
+          echo "SCCACHE_GHA_ENABLED=false" >> $GITHUB_ENV
+          echo "RUSTC_WRAPPER=" >> $GITHUB_ENV
+
+      - name: Sccache Setup
+        if: ${{ !env.ACT }}
+        uses: mozilla-actions/sccache-action@v0.0.3
+        with:
+          version: "v0.4.0"
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v17
+
+      - uses: cachix/cachix-action@v12
+        if: ${{ !env.ACT }}
+        with:
+          name: hoprnet
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+        continue-on-error: true
 
       - name: get yarn cache directory path
         id: yarn-cache-dir-path
@@ -252,13 +303,14 @@ jobs:
         env:
           HOPR_PACKAGE: hoprd
 
+      - name: Install dependencies
+        run: nix develop -c make -j deps-ci
+
       - name: Build Avado
         env:
           HOPR_GITHUB_REF: ${{ github.ref }}
           AVADO_VERSION: ${{ steps.set-version.outputs.vsn }}
-        run: |
-          make deps-ci
-          ./scripts/build-avado.sh ${AVADO_VERSION}
+        run: nix develop -c ./scripts/build-avado.sh ${AVADO_VERSION}
 
       - name: Commit & Push changes
         if: ${{ !env.ACT }}
@@ -313,8 +365,26 @@ jobs:
       - name: "[SETUP] Configure Git info"
         run: ./scripts/configure-git-info.sh
 
-      - name: install toolchain
-        run: ./scripts/toolchain/install-toolchain.sh
+      - name: Disable sccache (act-only)
+        if: ${{ env.ACT }}
+        run: |
+          echo "SCCACHE_GHA_ENABLED=false" >> $GITHUB_ENV
+          echo "RUSTC_WRAPPER=" >> $GITHUB_ENV
+
+      - name: Sccache Setup
+        if: ${{ !env.ACT }}
+        uses: mozilla-actions/sccache-action@v0.0.3
+        with:
+          version: "v0.4.0"
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v17
+
+      - uses: cachix/cachix-action@v12
+        if: ${{ !env.ACT }}
+        with:
+          name: hoprnet
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
 
       - name: get yarn cache directory path
         id: yarn-cache-dir-path
@@ -359,7 +429,7 @@ jobs:
           # get latest version
           git pull
           # need to build our packages which might by used by the scripts, such as the fund script
-          make -j deps-ci
+          nix develop -c make -j deps-ci
 
       - name: Restore built artifacts
         uses: actions/cache@v3
@@ -376,6 +446,7 @@ jobs:
           HOPRD_PASSWORD: ${{ secrets.BS_PASSWORD }}
           HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
           FAUCET_SECRET_API_KEY: ${{ secrets.FAUCET_SECRET_API_KEY }}
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN }}
 
       - name: Run deploy script for public nodes (staging-only)
         if: ${{ startsWith(github.ref, 'refs/heads/staging/') && !env.ACT }}
@@ -386,6 +457,7 @@ jobs:
           HOPRD_PASSWORD: ${{ secrets.BS_PASSWORD }}
           HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
           FAUCET_SECRET_API_KEY: ${{ secrets.FAUCET_SECRET_API_KEY }}
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN }}
 
       - name: Send cluster info to Matrix
         if: ${{ success() && !env.ACT }}
@@ -416,8 +488,27 @@ jobs:
       - name: "[SETUP] Configure Git info"
         run: ./scripts/configure-git-info.sh
 
-      - name: install toolchain
-        run: ./scripts/toolchain/install-toolchain.sh
+      - name: Disable sccache (act-only)
+        if: ${{ env.ACT }}
+        run: |
+          echo "SCCACHE_GHA_ENABLED=false" >> $GITHUB_ENV
+          echo "RUSTC_WRAPPER=" >> $GITHUB_ENV
+
+      - name: Sccache Setup
+        if: ${{ !env.ACT }}
+        uses: mozilla-actions/sccache-action@v0.0.3
+        with:
+          version: "v0.4.0"
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v17
+
+      - uses: cachix/cachix-action@v12
+        if: ${{ !env.ACT }}
+        with:
+          name: hoprnet
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+        continue-on-error: true
 
       - name: get yarn cache directory path
         id: yarn-cache-dir-path
@@ -462,7 +553,7 @@ jobs:
           # get latest version
           git pull
           # need to build our packages which might by used by the scripts, such as the fund script
-          make -j deps-ci
+          nix develop -c make -j deps-ci
 
       - name: Restore built artifacts
         uses: actions/cache@v3
@@ -472,23 +563,24 @@ jobs:
 
       - name: Run deploy script for nodes behind NAT
         if: ${{ !startsWith(github.ref, 'refs/heads/staging/') && !env.ACT }}
-        run: |
-          ./scripts/deploy.sh "gcr.io/hoprassociation/hoprd" 2 "-nat"
+        run: ./scripts/deploy.sh "gcr.io/hoprassociation/hoprd" 2 "-nat"
         env:
           DEPLOYER_PRIVATE_KEY: ${{ secrets.DEPLOYER_WALLET_PRIVATE_KEY }}
           HOPRD_PASSWORD: ${{ secrets.BS_PASSWORD }}
           HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
           FAUCET_SECRET_API_KEY: ${{ secrets.FAUCET_SECRET_API_KEY }}
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN }}
 
       - name: Run deploy script for nodes behind NAT (staging-only)
         if: ${{ startsWith(github.ref, 'refs/heads/staging/') && !env.ACT }}
-        run: |
-          HOPRD_SKIP_UNSTAKED=true ./scripts/deploy.sh "gcr.io/hoprassociation/hoprd" 1 "-nat"
+        run: ./scripts/deploy.sh "gcr.io/hoprassociation/hoprd" 1 "-nat"
         env:
+          HOPRD_SKIP_UNSTAKED: true
           DEPLOYER_PRIVATE_KEY: ${{ secrets.DEPLOYER_WALLET_PRIVATE_KEY }}
           HOPRD_PASSWORD: ${{ secrets.BS_PASSWORD }}
           HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
           FAUCET_SECRET_API_KEY: ${{ secrets.FAUCET_SECRET_API_KEY }}
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN }}
 
       - name: Send cluster info to Matrix
         if: ${{ success() && !env.ACT }}

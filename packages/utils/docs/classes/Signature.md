@@ -46,7 +46,7 @@ as this makes interop with the underlying ECDSA library simpler.
 
 #### Defined in
 
-[src/types/primitives.ts:119](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L119)
+[utils/src/types/primitives.ts:119](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L119)
 
 ## Properties
 
@@ -56,7 +56,7 @@ as this makes interop with the underlying ECDSA library simpler.
 
 #### Defined in
 
-[src/types/primitives.ts:119](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L119)
+[utils/src/types/primitives.ts:119](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L119)
 
 ___
 
@@ -66,7 +66,7 @@ ___
 
 #### Defined in
 
-[src/types/primitives.ts:119](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L119)
+[utils/src/types/primitives.ts:119](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L119)
 
 ___
 
@@ -76,7 +76,7 @@ ___
 
 #### Defined in
 
-[src/types/primitives.ts:162](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L162)
+[utils/src/types/primitives.ts:162](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L162)
 
 ## Methods
 
@@ -90,7 +90,7 @@ ___
 
 #### Defined in
 
-[src/types/primitives.ts:147](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L147)
+[utils/src/types/primitives.ts:147](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L147)
 
 ___
 
@@ -104,7 +104,7 @@ ___
 
 #### Defined in
 
-[src/types/primitives.ts:158](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L158)
+[utils/src/types/primitives.ts:158](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L158)
 
 ___
 
@@ -125,7 +125,7 @@ ___
 
 #### Defined in
 
-[src/types/primitives.ts:154](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L154)
+[utils/src/types/primitives.ts:154](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L154)
 
 ___
 
@@ -146,7 +146,7 @@ ___
 
 #### Defined in
 
-[src/types/primitives.ts:142](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L142)
+[utils/src/types/primitives.ts:142](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L142)
 
 ___
 
@@ -166,4 +166,4 @@ ___
 
 #### Defined in
 
-[src/types/primitives.ts:128](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L128)
+[utils/src/types/primitives.ts:128](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L128)

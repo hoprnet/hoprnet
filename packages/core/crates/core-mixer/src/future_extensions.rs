@@ -21,10 +21,10 @@ pub struct ThenConcurrent<St, Fut: Future, F> {
 }
 
 impl<St, Fut, F> Stream for ThenConcurrent<St, Fut, F>
-    where
-        St: Stream,
-        Fut: Future<Output = St::Item>,
-        F: FnMut(Fut::Output) -> Fut,
+where
+    St: Stream,
+    Fut: Future<Output = St::Item>,
+    F: FnMut(Fut::Output) -> Fut,
 {
     type Item = Fut::Output;
 
@@ -68,18 +68,18 @@ pub trait StreamThenConcurrentExt: Stream {
     /// stream is polled concurrently with the futures returned by `f`. An unbounded number of
     /// futures corresponding to past stream values is kept via `FuturesUnordered`.
     fn then_concurrent<Fut, F>(self, f: F) -> ThenConcurrent<Self, Fut, F>
-        where
-            Self: Sized,
-            Fut: Future,
-            F: FnMut(Self::Item) -> Fut;
+    where
+        Self: Sized,
+        Fut: Future,
+        F: FnMut(Self::Item) -> Fut;
 }
 
 impl<S: Stream> StreamThenConcurrentExt for S {
     fn then_concurrent<Fut, F>(self, f: F) -> ThenConcurrent<Self, Fut, F>
-        where
-            Self: Sized,
-            Fut: Future,
-            F: FnMut(Self::Item) -> Fut,
+    where
+        Self: Sized,
+        Fut: Future,
+        F: FnMut(Self::Item) -> Fut,
     {
         ThenConcurrent {
             stream: self,
@@ -88,4 +88,3 @@ impl<S: Stream> StreamThenConcurrentExt for S {
         }
     }
 }
-

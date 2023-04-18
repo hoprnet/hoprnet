@@ -1,23 +1,27 @@
+use libp2p_identity::PeerId;
+use utils_log::debug;
 use utils_types::primitives::Balance;
 
 use crate::generic::{ChannelStrategy, OutgoingChannelStatus, StrategyTickResult};
 
 /// Implements passive strategy which does nothing.
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct PassiveStrategy;
 
 impl ChannelStrategy for PassiveStrategy {
     const NAME: &'static str = "passive";
 
     fn tick<Q>(
-        &self,
+        &mut self,
         _balance: Balance,
-        _peer_ids: impl Iterator<Item = String>,
+        _peer_ids: impl Iterator<Item = PeerId>,
         _outgoing_channel_peer_ids: Vec<OutgoingChannelStatus>,
         _quality_of: Q,
     ) -> StrategyTickResult
     where
         Q: Fn(&str) -> Option<f64>,
     {
+        debug!("using passive strategy that does nothing");
         StrategyTickResult::new(0, vec![], vec![])
     }
 }
@@ -29,8 +33,7 @@ mod tests {
 
     #[test]
     fn test_passive() {
-        let strat = PassiveStrategy {};
-        assert_eq!("passive", strat.name());
+        assert_eq!("passive", PassiveStrategy::NAME);
     }
 }
 
@@ -42,47 +45,33 @@ pub mod wasm {
     use wasm_bindgen::JsValue;
 
     use utils_misc::utils::wasm::JsResult;
-    use utils_types::primitives::wasm::Balance;
+    use utils_types::primitives::Balance;
 
     use crate::generic::wasm::StrategyTickResult;
-
-    #[wasm_bindgen]
-    pub struct PassiveStrategy {
-        w: super::PassiveStrategy,
-    }
+    use crate::passive::PassiveStrategy;
+    use crate::strategy_tick;
 
     #[wasm_bindgen]
     impl PassiveStrategy {
         #[wasm_bindgen(constructor)]
-        pub fn new() -> Self {
-            PassiveStrategy {
-                w: super::PassiveStrategy {},
-            }
-        }
-
-        pub fn configure(&mut self, _settings: JsValue) -> JsResult<()> {
-            Ok(())
+        pub fn _new() -> Self {
+            Self {}
         }
 
         #[wasm_bindgen(getter)]
         pub fn name(&self) -> String {
-            self.w.name().into()
+            Self::NAME.into()
         }
 
-        pub fn tick(
-            &self,
+        #[wasm_bindgen(js_name = "tick")]
+        pub fn _tick(
+            &mut self,
             balance: Balance,
             peer_ids: &js_sys::Iterator,
             outgoing_channels: JsValue,
             quality_of: &js_sys::Function,
         ) -> JsResult<StrategyTickResult> {
-            crate::generic::wasm::tick_wrap(
-                &self.w,
-                balance,
-                peer_ids,
-                outgoing_channels,
-                quality_of,
-            )
+            strategy_tick!(self, balance, peer_ids, outgoing_channels, quality_of)
         }
     }
 }

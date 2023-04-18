@@ -193,16 +193,12 @@ impl ResolvedEnvironment {
         maybe_custom_provider: Option<&str>,
     ) -> Result<Self, String> {
         let mut protocol_config = ProtocolConfig::from_json_file(mono_repo_path)?;
-        let version =
-            PackageJsonFile::from_json_file(mono_repo_path).and_then(|c| c.coerced_version())?;
+        let version = PackageJsonFile::from_json_file(mono_repo_path).and_then(|c| c.coerced_version())?;
 
-        let environment = protocol_config
-            .environments
-            .get_mut(environment_id)
-            .ok_or(format!(
-                "Could not find environment {} in protocol config",
-                environment_id
-            ))?;
+        let environment = protocol_config.environments.get_mut(environment_id).ok_or(format!(
+            "Could not find environment {} in protocol config",
+            environment_id
+        ))?;
 
         let network = protocol_config
             .networks
@@ -227,26 +223,17 @@ impl ResolvedEnvironment {
                 xhopr_contract_address: environment.xhopr_contract_address.to_owned(),
                 boost_contract_address: environment.boost_contract_address.to_owned(),
                 stake_contract_address: environment.stake_contract_address.to_owned(),
-                network_registry_contract_address: environment
-                    .network_registry_contract_address
-                    .to_owned(),
-                network_registry_proxy_contract_address: environment
-                    .network_registry_proxy_contract_address
-                    .to_owned(),
+                network_registry_contract_address: environment.network_registry_contract_address.to_owned(),
+                network_registry_proxy_contract_address: environment.network_registry_proxy_contract_address.to_owned(),
             }),
-            Ok(false) => protocol_config
-                .supported_environments(mono_repo_path)
-                .and_then(|envs| {
-                    Err(format!(
-                        "environment {} is not supported, supported environments {:?}",
-                        environment_id,
-                        envs.iter()
-                            .map(|e| e.id.to_owned())
-                            .collect::<Vec<String>>()
-                            .join(", ")
-                    )
-                    .into())
-                }),
+            Ok(false) => protocol_config.supported_environments(mono_repo_path).and_then(|envs| {
+                Err(format!(
+                    "environment {} is not supported, supported environments {:?}",
+                    environment_id,
+                    envs.iter().map(|e| e.id.to_owned()).collect::<Vec<String>>().join(", ")
+                )
+                .into())
+            }),
             Err(e) => Err(e.to_string()),
         }
     }

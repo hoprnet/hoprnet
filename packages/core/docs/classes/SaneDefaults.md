@@ -15,8 +15,8 @@
 
 ### Methods
 
+- [onAckedTicket](SaneDefaults.md#onackedticket)
 - [onChannelWillClose](SaneDefaults.md#onchannelwillclose)
-- [onWinningTicket](SaneDefaults.md#onwinningticket)
 - [shouldCommitToChannel](SaneDefaults.md#shouldcommittochannel)
 
 ## Constructors
@@ -29,7 +29,7 @@
 
 ### autoRedeemTickets
 
-• `Protected` **autoRedeemTickets**: `boolean` = `false`
+• `Protected` **autoRedeemTickets**: `boolean` = `true`
 
 #### Defined in
 
@@ -46,6 +46,26 @@ ___
 [packages/core/src/channel-strategy.ts:113](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L113)
 
 ## Methods
+
+### onAckedTicket
+
+▸ **onAckedTicket**(`ackTicket`): `Promise`<`void`\>
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `ackTicket` | `AcknowledgedTicket` |
+
+#### Returns
+
+`Promise`<`void`\>
+
+#### Defined in
+
+[packages/core/src/channel-strategy.ts:76](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L76)
+
+___
 
 ### onChannelWillClose
 
@@ -66,26 +86,6 @@ When an incoming channel is going to be closed, auto redeem tickets
 #### Defined in
 
 [packages/core/src/channel-strategy.ts:90](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L90)
-
-___
-
-### onWinningTicket
-
-▸ **onWinningTicket**(`ackTicket`): `Promise`<`void`\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `ackTicket` | `AcknowledgedTicket` |
-
-#### Returns
-
-`Promise`<`void`\>
-
-#### Defined in
-
-[packages/core/src/channel-strategy.ts:76](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L76)
 
 ___
 

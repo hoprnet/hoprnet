@@ -15,6 +15,7 @@ import {
   PassiveStrategy,
   StrategyTickResult,
   Balance,
+  BalanceType,
   utils_misc_set_panic_hook
 } from '../lib/core_strategy.js'
 
@@ -25,12 +26,11 @@ export { StrategyTickResult } from '../lib/core_strategy.js'
 import { ChannelStatus } from '@hoprnet/hopr-utils'
 
 const STRATEGIES = ['passive', 'promiscuous', 'random']
-export type Strategy = typeof STRATEGIES[number]
+export type Strategy = (typeof STRATEGIES)[number]
 
 export function isStrategy(str: string): str is Strategy {
   return STRATEGIES.includes(str)
 }
-
 export interface OutgoingChannelStatus {
   peer_id: string
   stake_str: string
@@ -59,7 +59,7 @@ export interface ChannelStrategyInterface {
   ): StrategyTickResult
 
   onChannelWillClose(channel: ChannelEntry): Promise<void> // Before a channel closes
-  onWinningTicket(t: AcknowledgedTicket): Promise<void>
+  onAckedTicket(t: AcknowledgedTicket): Promise<void>
   shouldCommitToChannel(c: ChannelEntry): boolean
 
   tickInterval: number
@@ -71,9 +71,9 @@ export interface ChannelStrategyInterface {
  * At present this does not take gas into consideration.
  */
 export abstract class SaneDefaults {
-  protected autoRedeemTickets: boolean = false
+  protected autoRedeemTickets: boolean = true
 
-  async onWinningTicket(ackTicket: AcknowledgedTicket) {
+  async onAckedTicket(ackTicket: AcknowledgedTicket) {
     if (this.autoRedeemTickets) {
       const counterparty = ackTicket.signer
       log(`auto redeeming tickets in channel to ${counterparty.toPeerId().toString()}`)
@@ -114,7 +114,6 @@ export abstract class SaneDefaults {
 }
 
 interface RustStrategyInterface {
-  configure: (settings: any) => void
   tick: (
     balance: Balance,
     network_peer_ids: Iterator<string>,
@@ -133,8 +132,12 @@ class RustStrategyWrapper<T extends RustStrategyInterface> extends SaneDefaults 
   }
 
   configure(settings: any) {
+    for (const [key, value] of Object.entries(settings)) {
+      if (key in this.strategy) {
+        this.strategy[key] = value
+      }
+    }
     this.autoRedeemTickets = settings.auto_redeem_tickets ?? false
-    this.strategy.configure(settings)
   }
 
   tick(
@@ -143,7 +146,12 @@ class RustStrategyWrapper<T extends RustStrategyInterface> extends SaneDefaults 
     outgoing_channels: OutgoingChannelStatus[],
     peer_quality: (string: string) => number
   ): StrategyTickResult {
-    return this.strategy.tick(new Balance(balance.toString()), network_peer_ids, outgoing_channels, peer_quality)
+    return this.strategy.tick(
+      new Balance(balance.toString(), BalanceType.HOPR),
+      network_peer_ids,
+      outgoing_channels,
+      peer_quality
+    )
   }
 
   get name() {

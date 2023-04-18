@@ -52,3 +52,16 @@ export function validateData(data: any, schema: any) {
     throw new Error(`validation failed`)
   }
 }
+
+/**
+ * Convert an async iterator to an array
+ * @param iter generator
+ * @returns array of promises
+ */
+export async function iterableToArray<T>(iter: AsyncIterable<T>): Promise<T[]> {
+  const output: T[] = []
+  for await (const x of iter) {
+    output.push(x)
+  }
+  return output
+}

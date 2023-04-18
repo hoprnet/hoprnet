@@ -1,21 +1,14 @@
-
-#[cfg(not(wasm))]
-pub fn current_timestamp() -> u64 {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    match SystemTime::now().duration_since(UNIX_EPOCH) {
-        Ok(d) => d.as_millis() as u64,
-        Err(_) => 1,
+pub mod native {
+    pub fn current_timestamp() -> u64 {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0u64)
     }
 }
 
-
-#[cfg(wasm)]
-use wasm::current_timestamp;
-
-
-#[cfg(wasm)]
-mod wasm {
+pub mod wasm {
     pub fn current_timestamp() -> u64 {
-        (js_sys::Date::now() / 1000.0) as u64
+        js_sys::Date::now() as u64
     }
 }

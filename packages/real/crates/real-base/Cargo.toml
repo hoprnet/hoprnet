@@ -6,7 +6,7 @@ edition = "2021"
 description = "Rust WASM modules for HOPR"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
-license = "LGPL-3.0-only"
+license = "GPL-3.0-only"
 
 [lib]
 path = "src/lib.rs"
@@ -14,7 +14,7 @@ crate-type = ["cdylib", "rlib"] # rlib is necessary to run integration tests
 
 [dependencies]
 thiserror = "1.0.38"
-wasm-bindgen = "0.2.83"
+wasm-bindgen = { workspace = true }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.30"

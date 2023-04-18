@@ -6,11 +6,12 @@
 
 ### Enumerations
 
-- [NetworkHealthIndicator](enums/NetworkHealthIndicator.md)
-- [NetworkPeersOrigin](enums/NetworkPeersOrigin.md)
+- [Health](enums/Health.md)
+- [PeerOrigin](enums/PeerOrigin.md)
 
 ### Classes
 
+- [PeerStatus](classes/PeerStatus.md)
 - [ResolvedEnvironment](classes/ResolvedEnvironment.md)
 - [SaneDefaults](classes/SaneDefaults.md)
 - [StrategyFactory](classes/StrategyFactory.md)
@@ -37,10 +38,12 @@
 - [INTERMEDIATE\_HOPS](modules.md#intermediate_hops)
 - [MAX\_HOPS](modules.md#max_hops)
 - [MAX\_NEW\_CHANNELS\_PER\_TICK](modules.md#max_new_channels_per_tick)
+- [MAX\_PARALLEL\_PINGS](modules.md#max_parallel_pings)
 - [MAX\_PATH\_ITERATIONS](modules.md#max_path_iterations)
 - [NETWORK\_QUALITY\_THRESHOLD](modules.md#network_quality_threshold)
 - [PACKET\_SIZE](modules.md#packet_size)
 - [PATH\_RANDOMNESS](modules.md#path_randomness)
+- [PEER\_METADATA\_PROTOCOL\_VERSION](modules.md#peer_metadata_protocol_version)
 - [VERSION](modules.md#version)
 - [sampleOptions](modules.md#sampleoptions)
 
@@ -49,6 +52,7 @@
 - [CONSTANTS](modules.md#constants)
 - [createHoprNode](modules.md#createhoprnode)
 - [findPath](modules.md#findpath)
+- [health\_to\_string](modules.md#health_to_string)
 - [isStrategy](modules.md#isstrategy)
 - [resolveEnvironment](modules.md#resolveenvironment)
 - [supportedEnvironments](modules.md#supportedenvironments)
@@ -66,24 +70,26 @@
 | `allowLocalConnections` | `boolean` |
 | `allowPrivateConnections` | `boolean` |
 | `announce` | `boolean` |
-| `checkUnrealizedBalance` | `boolean` |
+| `checkUnrealizedBalance?` | `boolean` |
 | `connector?` | `HoprCoreEthereum` |
 | `createDbIfNotExist` | `boolean` |
 | `dataPath` | `string` |
 | `environment` | [`ResolvedEnvironment`](classes/ResolvedEnvironment.md) |
 | `forceCreateDB` | `boolean` |
-| `heartbeatInterval` | `number` |
-| `heartbeatThreshold` | `number` |
-| `heartbeatVariance` | `number` |
+| `heartbeatInterval?` | `number` |
+| `heartbeatThreshold?` | `number` |
+| `heartbeatVariance?` | `number` |
 | `hosts` | { `ip4?`: `NetOptions` ; `ip6?`: `NetOptions`  } |
 | `hosts.ip4?` | `NetOptions` |
 | `hosts.ip6?` | `NetOptions` |
-| `networkQualityThreshold` | `number` |
-| `onChainConfirmations` | `number` |
+| `maxParallelConnections?` | `number` |
+| `networkQualityThreshold?` | `number` |
+| `onChainConfirmations?` | `number` |
 | `password` | `string` |
 | `strategy` | [`ChannelStrategyInterface`](interfaces/ChannelStrategyInterface.md) |
-| `testing?` | { `announceLocalAddresses?`: `boolean` ; `mockedDHT?`: `Map`<`string`, `string`[]\> ; `mockedNetwork?`: `Libp2pEmitter`<`any`\> ; `noDirectConnections?`: `boolean` ; `noWebRTCUpgrade?`: `boolean` ; `preferLocalAddresses?`: `boolean` ; `useMockedLibp2p?`: `boolean`  } |
+| `testing?` | { `announceLocalAddresses?`: `boolean` ; `localModeStun?`: `boolean` ; `mockedDHT?`: `Map`<`string`, `string`[]\> ; `mockedNetwork?`: `Libp2pEmitter`<`any`\> ; `noDirectConnections?`: `boolean` ; `noWebRTCUpgrade?`: `boolean` ; `preferLocalAddresses?`: `boolean` ; `useMockedLibp2p?`: `boolean`  } |
 | `testing.announceLocalAddresses?` | `boolean` |
+| `testing.localModeStun?` | `boolean` |
 | `testing.mockedDHT?` | `Map`<`string`, `string`[]\> |
 | `testing.mockedNetwork?` | `Libp2pEmitter`<`any`\> |
 | `testing.noDirectConnections?` | `boolean` |
@@ -93,7 +99,7 @@
 
 #### Defined in
 
-[packages/core/src/index.ts:136](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L136)
+[packages/core/src/index.ts:151](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L151)
 
 ___
 
@@ -103,7 +109,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:184](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L184)
+[packages/core/src/index.ts:203](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L203)
 
 ___
 
@@ -113,7 +119,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:199](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L199)
+[packages/core/src/index.ts:218](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L218)
 
 ___
 
@@ -123,7 +129,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L28)
+[packages/core/src/channel-strategy.ts:29](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L29)
 
 ___
 
@@ -133,7 +139,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:186](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L186)
+[packages/core/src/index.ts:205](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L205)
 
 ## Variables
 
@@ -143,7 +149,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L20)
+[packages/core/src/constants.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L22)
 
 ___
 
@@ -153,13 +159,13 @@ ___
 
 #### Defined in
 
-[packages/core/src/constants.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L19)
+[packages/core/src/constants.ts:21](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L21)
 
 ___
 
 ### FULL\_VERSION
 
-• `Const` **FULL\_VERSION**: `any` = `pkg.version`
+• `Const` **FULL\_VERSION**: `string` = `pkg.version`
 
 #### Defined in
 
@@ -194,6 +200,16 @@ ___
 #### Defined in
 
 [packages/core/src/constants.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L16)
+
+___
+
+### MAX\_PARALLEL\_PINGS
+
+• `Const` **MAX\_PARALLEL\_PINGS**: ``14``
+
+#### Defined in
+
+[packages/core/src/constants.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L19)
 
 ___
 
@@ -237,6 +253,16 @@ ___
 
 ___
 
+### PEER\_METADATA\_PROTOCOL\_VERSION
+
+• `Const` **PEER\_METADATA\_PROTOCOL\_VERSION**: ``"protocol_version"``
+
+#### Defined in
+
+[packages/core/src/constants.ts:24](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L24)
+
+___
+
 ### VERSION
 
 • `Const` **VERSION**: `string`
@@ -270,7 +296,7 @@ because Rust does not support exporting constants to WASM
 
 #### Defined in
 
-packages/core/lib/core_misc.d.ts:19
+packages/core/lib/core_misc.d.ts:23
 
 ___
 
@@ -292,7 +318,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/main.ts:212](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L212)
+[packages/core/src/main.ts:213](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L213)
 
 ___
 
@@ -328,6 +354,26 @@ destination
 
 ___
 
+### health\_to\_string
+
+▸ **health_to_string**(`h`): `string`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `h` | `number` |
+
+#### Returns
+
+`string`
+
+#### Defined in
+
+packages/core/lib/core_network.d.ts:25
+
+___
+
 ### isStrategy
 
 ▸ **isStrategy**(`str`): str is string
@@ -344,7 +390,7 @@ str is string
 
 #### Defined in
 
-[packages/core/src/channel-strategy.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L30)
+[packages/core/src/channel-strategy.ts:31](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/channel-strategy.ts#L31)
 
 ___
 

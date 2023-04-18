@@ -1,5 +1,10 @@
 name: HOPR Test
 
+env:
+  RUST_BACKTRACE: "1"
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: "sccache"
+
 on:
   push:
     branches: ['**']
@@ -11,19 +16,33 @@ on:
 jobs:
   build_and_test:
     name: Build & Test
-    runs-on: ${{ matrix.os }}
-
-    strategy:
-      matrix:
-        os: ['ubuntu-latest']
-
+    runs-on: ubuntu-latest-8-cores
     steps:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
-      - name: install toolchain
-        run: ./scripts/toolchain/install-toolchain.sh
+      - name: Disable sccache (act-only)
+        if: ${{ env.ACT }}
+        run: |
+          echo "SCCACHE_GHA_ENABLED=false" >> $GITHUB_ENV
+          echo "RUSTC_WRAPPER=" >> $GITHUB_ENV
+
+      - name: Sccache Setup
+        if: ${{ !env.ACT }}
+        uses: mozilla-actions/sccache-action@v0.0.3
+        with:
+          version: "v0.4.0"
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v17
+
+      - uses: cachix/cachix-action@v12
+        if: ${{ !env.ACT }}
+        with:
+          name: hoprnet
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+        continue-on-error: true
 
       - name: get yarn cache directory path
         id: yarn-cache-dir-path
@@ -53,12 +72,12 @@ jobs:
             .foundry/bin/
 
       - name: Install dependencies
-        run: make -j deps-ci
+        run: nix develop -c make -j deps-ci
 
       - name: Build
-        run: make -j build
+        run: nix develop -c make -j build
 
       - name: Test
-        run: make -j test
+        run: nix develop -c make -j test
         env:
           HOPR_ENVIRONMENT_ID: anvil-localhost

@@ -1,3 +1,0 @@
-load("@prelude//erlang:erlang_otp_application.bzl", "gen_otp_applications")
-
-gen_otp_applications()

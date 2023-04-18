@@ -13,72 +13,85 @@ import {
 import { STATUS_CODES } from '../../utils.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import type Hopr from '@hoprnet/hopr-core'
-import { NetworkPeersOrigin } from '@hoprnet/hopr-core'
+import { PeerOrigin, PeerStatus, PEER_METADATA_PROTOCOL_VERSION } from '@hoprnet/hopr-core'
 
-const ALICE_ENTRY = {
-  id: ALICE_PEER_ID,
-  heartbeatsSent: 10,
-  heartbeatsSuccess: 10,
-  lastSeen: 1646410980793,
-  backoff: 0,
-  quality: 1,
-  origin: NetworkPeersOrigin.TESTING
-}
-const ALICE_PEER_INFO = {
-  peerId: ALICE_PEER_ID.toString(),
-  multiAddr: ALICE_MULTI_ADDR.toString(),
-  heartbeats: {
-    sent: ALICE_ENTRY.heartbeatsSent,
-    success: ALICE_ENTRY.heartbeatsSuccess
-  },
-  lastSeen: ALICE_ENTRY.lastSeen,
-  quality: ALICE_ENTRY.quality,
-  backoff: ALICE_ENTRY.backoff,
-  isNew: false
+const meta: Map<string, string> = new Map([[PEER_METADATA_PROTOCOL_VERSION, '1.2.3']])
+
+const ALICE_ENTRY = PeerStatus.build(
+  ALICE_PEER_ID.toString(),
+  PeerOrigin.Initialization,
+  false,
+  BigInt(1646410980793),
+  1.0,
+  BigInt(10),
+  BigInt(10),
+  0,
+  meta
+)
+
+const BOB_ENTRY = PeerStatus.build(
+  BOB_PEER_ID.toString(),
+  PeerOrigin.Initialization,
+  false,
+  BigInt(1646410680793),
+  0.2,
+  BigInt(0),
+  BigInt(0),
+  0,
+  meta
+)
+
+const CHARLIE_ENTRY = PeerStatus.build(
+  CHARLIE_PEER_ID.toString(),
+  PeerOrigin.Initialization,
+  false,
+  BigInt(1646410980993),
+  0.8,
+  BigInt(10),
+  BigInt(8),
+  0,
+  meta
+)
+
+function toJsonDict(peer: PeerStatus, isNew: boolean, multiaddr: string | undefined) {
+  if (multiaddr === undefined) {
+    return {
+      peerId: peer.peer_id(),
+      heartbeats: {
+        sent: Number(peer.heartbeats_sent),
+        success: Number(peer.heartbeats_succeeded)
+      },
+      lastSeen: Number(peer.last_seen),
+      quality: peer.quality,
+      backoff: peer.backoff,
+      isNew: isNew,
+      reportedVersion: peer.metadata().get(PEER_METADATA_PROTOCOL_VERSION) ?? 'unknown'
+    }
+  } else {
+    return {
+      peerId: peer.peer_id(),
+      multiAddr: multiaddr,
+      heartbeats: {
+        sent: Number(peer.heartbeats_sent),
+        success: Number(peer.heartbeats_succeeded)
+      },
+      lastSeen: Number(peer.last_seen),
+      quality: peer.quality,
+      backoff: peer.backoff,
+      isNew: isNew,
+      reportedVersion: peer.metadata().get(PEER_METADATA_PROTOCOL_VERSION) ?? 'unknown'
+    }
+  }
 }
 
-const BOB_ENTRY = {
-  id: BOB_PEER_ID,
-  heartbeatsSent: 0,
-  heartbeatsSuccess: 0,
-  lastSeen: 1646410680793,
-  backoff: 0,
-  quality: 0.2,
-  origin: NetworkPeersOrigin.TESTING
-}
-const BOB_PEER_INFO = {
-  peerId: BOB_PEER_ID.toString(),
-  multiAddr: BOB_MULTI_ADDR.toString(),
-  heartbeats: {
-    sent: BOB_ENTRY.heartbeatsSent,
-    success: BOB_ENTRY.heartbeatsSuccess
-  },
-  lastSeen: BOB_ENTRY.lastSeen,
-  quality: BOB_ENTRY.quality,
-  backoff: BOB_ENTRY.backoff,
-  isNew: true
+// sinon.fake always attempts to deserialize types, but it deserializes BigInt as a string
+;(BigInt.prototype as any).toJSON = function () {
+  return Number(this)
 }
 
-const CHARLIE_ENTRY = {
-  id: CHARLIE_PEER_ID,
-  heartbeatsSent: 10,
-  heartbeatsSuccess: 8,
-  lastSeen: 1646410980993,
-  backoff: 0,
-  quality: 0.8,
-  origin: NetworkPeersOrigin.TESTING
-}
-const CHARLIE_PEER_INFO = {
-  peerId: CHARLIE_PEER_ID.toString(),
-  heartbeats: {
-    sent: CHARLIE_ENTRY.heartbeatsSent,
-    success: CHARLIE_ENTRY.heartbeatsSuccess
-  },
-  lastSeen: CHARLIE_ENTRY.lastSeen,
-  quality: CHARLIE_ENTRY.quality,
-  backoff: CHARLIE_ENTRY.backoff,
-  isNew: false
-}
+const ALICE_PEER_INFO = toJsonDict(ALICE_ENTRY, false, ALICE_MULTI_ADDR.toString())
+const BOB_PEER_INFO = toJsonDict(BOB_ENTRY, true, BOB_MULTI_ADDR.toString())
+const CHARLIE_PEER_INFO = toJsonDict(CHARLIE_ENTRY, false, undefined)
 
 let node = sinon.fake() as any as Hopr
 node.getConnectedPeers = sinon.fake.returns([ALICE_PEER_ID, BOB_PEER_ID, CHARLIE_PEER_ID])

@@ -1,8 +1,12 @@
 [package]
 name = "core-strategy"
-version = "0.1.0"
+version = "0.2.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
+description = "Contains implementations of different (automatic) HOPR payment channel strategies"
 edition = "2021"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -13,19 +17,27 @@ wasm = ["dep:wasm-bindgen", "dep:js-sys", "dep:serde-wasm-bindgen"]
 console_error_panic_hook = [ "dep:console_error_panic_hook" ]
 
 [dependencies]
+core-types = { path = "../core-types" }
 getrandom = { version = "0.2.8", features = ["js"] }
 js-sys = { version = "0.3.60", optional = true }
+libp2p-identity = { version = "0.1.1", features = ["peerid"] }
 rand = "0.8.5"
 serde = { version = "1.0", features = ["derive"] }
-serde-wasm-bindgen = { version = "0.4.5", optional = true }
+serde-wasm-bindgen = { version = "0.5.0", optional = true }
+simple_moving_average = "0.1.2"
+utils-log = { path = "../../../utils/crates/utils-log" }
 utils-misc = { path = "../../../utils/crates/utils-misc" }
 utils-types = { path = "../../../utils/crates/utils-types" }
-wasm-bindgen = { version = "0.2.83", optional = true }
+wasm-bindgen = { workspace = true, optional = true }
 
 console_error_panic_hook = { version = "0.1.7", optional = true }
 #wee_alloc = { version = "0.4.5", optional = true }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.33"
+vector_assertions = "0.1.0"
 
+[target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
+wasm-pack = { workspace = true }
+wasm-opt = { workspace = true }
 

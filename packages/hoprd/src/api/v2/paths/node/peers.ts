@@ -3,6 +3,7 @@ import type { Multiaddr } from '@multiformats/multiaddr'
 import type Hopr from '@hoprnet/hopr-core'
 import { peerIdFromString } from '@libp2p/peer-id'
 import { STATUS_CODES } from '../../utils.js'
+import { PEER_METADATA_PROTOCOL_VERSION } from '@hoprnet/hopr-core'
 
 export type PeerInfo = {
   peerId: string
@@ -15,6 +16,7 @@ export type PeerInfo = {
   quality: number
   backoff: number
   isNew: boolean
+  reportedVersion: string
 }
 
 /**
@@ -25,16 +27,17 @@ export type PeerInfo = {
  */
 function toPeerInfoFormat(info: ReturnType<Hopr['getConnectionInfo']>, multiaddr?: Multiaddr): PeerInfo {
   return {
-    peerId: info.id.toString(),
+    peerId: info.peer_id(),
     multiAddr: multiaddr ? multiaddr.toString() : undefined,
     heartbeats: {
-      sent: info.heartbeatsSent,
-      success: info.heartbeatsSuccess
+      sent: Number(info.heartbeats_sent),
+      success: Number(info.heartbeats_succeeded)
     },
-    lastSeen: info.lastSeen,
+    lastSeen: Number(info.last_seen),
     quality: info.quality,
     backoff: info.backoff,
-    isNew: info.heartbeatsSent === 0
+    isNew: info.heartbeats_sent === BigInt(0),
+    reportedVersion: info.metadata().get(PEER_METADATA_PROTOCOL_VERSION) ?? 'unknown'
   }
 }
 
@@ -62,7 +65,7 @@ export async function getPeers(
       try {
         const info = node.getConnectionInfo(peerId)
         // exclude if quality is lesser than the one wanted
-        if (info.quality < quality) {
+        if (info === undefined || info.quality < quality) {
           continue
         }
         announcedMap.set(peerId.toString(), toPeerInfoFormat(info, addr))
@@ -81,7 +84,7 @@ export async function getPeers(
             try {
               const info = node.getConnectionInfo(peerId)
               // exclude if quality is less than the one wanted
-              if (info.quality < quality) {
+              if (info === undefined || info.quality < quality) {
                 continue
               }
               yield toPeerInfoFormat(info)
@@ -165,6 +168,12 @@ const PEER_INFO_DOC: any = {
     isNew: {
       type: 'boolean',
       description: 'True if the node is new (no heartbeats sent yet).'
+    },
+    reportedVersion: {
+      type: 'string',
+      example: '1.92.12',
+      description:
+        'HOPR protocol version as determined from the successful ping in the Major.Minor.Patch format or "unknown"'
     }
   }
 }

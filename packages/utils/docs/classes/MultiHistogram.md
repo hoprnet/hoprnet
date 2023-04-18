@@ -2,6 +2,9 @@
 
 # Class: MultiHistogram
 
+Represents a vector of histograms with floating point values.
+Wrapper for HistogramVec type
+
 ## Table of contents
 
 ### Constructors
@@ -14,7 +17,6 @@
 - [free](MultiHistogram.md#free)
 - [get\_sample\_count](MultiHistogram.md#get_sample_count)
 - [get\_sample\_sum](MultiHistogram.md#get_sample_sum)
-- [labels](MultiHistogram.md#labels)
 - [name](MultiHistogram.md#name)
 - [observe](MultiHistogram.md#observe)
 - [record\_measure](MultiHistogram.md#record_measure)
@@ -32,6 +34,8 @@
 
 ▸ **cancel_measure**(`timer`): `number`
 
+Stops the given timer and discards the measured duration in seconds and returns it.
+
 #### Parameters
 
 | Name | Type |
@@ -44,7 +48,7 @@
 
 #### Defined in
 
-lib/utils_metrics.d.ts:206
+utils/lib/utils_metrics.d.ts:201
 
 ___
 
@@ -58,7 +62,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:187
+utils/lib/utils_metrics.d.ts:190
 
 ___
 
@@ -78,7 +82,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:211
+utils/lib/utils_metrics.d.ts:221
 
 ___
 
@@ -98,21 +102,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:216
-
-___
-
-### labels
-
-▸ **labels**(): `string`[]
-
-#### Returns
-
-`string`[]
-
-#### Defined in
-
-lib/utils_metrics.d.ts:224
+utils/lib/utils_metrics.d.ts:226
 
 ___
 
@@ -120,13 +110,15 @@ ___
 
 ▸ **name**(): `string`
 
+Returns the name of the histogram given at construction.
+
 #### Returns
 
 `string`
 
 #### Defined in
 
-lib/utils_metrics.d.ts:220
+utils/lib/utils_metrics.d.ts:206
 
 ___
 
@@ -147,13 +139,15 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:192
+utils/lib/utils_metrics.d.ts:211
 
 ___
 
 ### record\_measure
 
 ▸ **record_measure**(`timer`): `void`
+
+Stops the given timer and records the elapsed duration in seconds to the multi-histogram.
 
 #### Parameters
 
@@ -167,7 +161,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:201
+utils/lib/utils_metrics.d.ts:195
 
 ___
 
@@ -187,4 +181,4 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:197
+utils/lib/utils_metrics.d.ts:216

@@ -2,6 +2,9 @@
 
 # Class: MultiCounter
 
+Represents a vector of named monotonic unsigned integer counters.
+Wrapper for IntCounterVec type
+
 ## Table of contents
 
 ### Constructors
@@ -14,7 +17,6 @@
 - [get](MultiCounter.md#get)
 - [increment](MultiCounter.md#increment)
 - [increment\_by](MultiCounter.md#increment_by)
-- [labels](MultiCounter.md#labels)
 - [name](MultiCounter.md#name)
 
 ## Constructors
@@ -35,7 +37,7 @@
 
 #### Defined in
 
-lib/utils_metrics.d.ts:119
+utils/lib/utils_metrics.d.ts:124
 
 ___
 
@@ -55,7 +57,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:133
+utils/lib/utils_metrics.d.ts:143
 
 ___
 
@@ -75,7 +77,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:128
+utils/lib/utils_metrics.d.ts:138
 
 ___
 
@@ -96,21 +98,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:124
-
-___
-
-### labels
-
-▸ **labels**(): `string`[]
-
-#### Returns
-
-`string`[]
-
-#### Defined in
-
-lib/utils_metrics.d.ts:141
+utils/lib/utils_metrics.d.ts:134
 
 ___
 
@@ -118,10 +106,12 @@ ___
 
 ▸ **name**(): `string`
 
+Returns the name of the counter vector given at construction.
+
 #### Returns
 
 `string`
 
 #### Defined in
 
-lib/utils_metrics.d.ts:137
+utils/lib/utils_metrics.d.ts:129

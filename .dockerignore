@@ -1,4 +1,5 @@
 /node_modules
+/packages/*/node_modules
 **/.DS_Store
 /.bin
 /build
@@ -47,7 +48,12 @@ packages/*/crates/*/pkg
 # ethereum anvil artifacts
 /packages/ethereum/contracts/out
 /packages/ethereum/contracts/cache
-/package/ethereum/target
+/packages/ethereum/contracts/broadcast/*.*/*/*
+!/packages/ethereum/contracts/broadcast/*.*/*/run-latest.json
+/packages/ethereum/contracts/broadcast/*.*/31337
+/packages/ethereum/contracts/build-info/
+
+**/target
 
 # docusaurus builds
 /docs/hopr-documentation/build
@@ -78,3 +84,19 @@ packages/*/crates/*/pkg
 /scripts/**/*.cjs
 !/packages/connect/src/@types/*.d.ts
 !/packages/hoprd/src/main.cts
+
+# Avado package builds
+/packages/avado/build_*
+
+# local foundry installation
+/.foundry/
+/target-install/
+
+# cargo files
+/.cargo/lib
+/.cargo/bin
+/.cargo/.package-cache
+/.cargo/.crates.toml
+/.cargo/.crates2.json
+
+.venv/

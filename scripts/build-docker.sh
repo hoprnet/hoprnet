@@ -74,49 +74,56 @@ build_and_tag_images() {
   cd "${mydir}/.."
 
   if [ "${local_build:-}" = "true" ]; then
-    log "Building Docker toolchain image"
-    docker build -q -t hopr-toolchain-local \
+    log "Building Docker image hopr-toolchain-local:latest"
+    docker build -q -t hopr-toolchain-local:latest \
       -f scripts/toolchain/Dockerfile . &
 
-    log "Waiting for toolchain image to finish"
+    log "Waiting for Docker builds (part 1) to finish"
     wait
 
     if [ -z "${image_name}" ] || \
        [ "${image_name}" = "hoprd" ] || \
        [ "${image_name}" = "hoprd-nat" ] || \
        [ "${image_name}" = "pluto-complete" ]; then
-      log "Building Docker image hoprd-local"
-      docker build -q -t hoprd-local \
-        --build-arg=HOPR_TOOLCHAIN_IMAGE="hopr-toolchain-local" \
+      log "Building Docker image hoprd-local:latest"
+      docker build -q -t hoprd-local:latest \
+        --build-arg=HOPR_TOOLCHAIN_IMAGE="hopr-toolchain-local:latest" \
         -f packages/hoprd/Dockerfile . &
     fi
 
     if [ -z "${image_name}" ] || [ "${image_name}" = "hoprd-nat" ]; then
-      log "Building Docker image hoprd-nat-local"
-      docker build -q -t hoprd-nat-local \
+      log "Building Docker image hoprd-nat-local:latest"
+      docker build -q -t hoprd-nat-local:latest \
         --build-arg=HOPRD_RELEASE="${image_version}" \
         scripts/nat &
     fi
 
     if [ -z "${image_name}" ] || [ "${image_name}" = "anvil" ] || [ "${image_name}" = "pluto-complete" ]; then
-      log "Building Docker image hopr-anvil-local"
-      docker build -t hopr-anvil-local \
-        --build-arg=HOPR_TOOLCHAIN_IMAGE="hopr-toolchain-local" \
+      log "Building Docker image hopr-anvil-local:latest"
+      docker build -t hopr-anvil-local:latest \
+        --build-arg=HOPR_TOOLCHAIN_IMAGE="hopr-toolchain-local:latest" \
         -f packages/ethereum/Dockerfile.anvil . &
     fi
 
-    log "Waiting for Docker builds (part 1) to finish"
-    wait
-
-    if [ -z "${image_name}" ] || [ "${image_name}" = "pluto" ] || [ "${image_name}" = "pluto-complete" ]; then
-      log "Building Docker image hopr-pluto-local"
-      docker build -q -t hopr-pluto-local \
-        --build-arg=ANVIL_IMAGE="hopr-anvil-local" \
-        --build-arg=HOPRD_IMAGE="hoprd-local" \
-        -f scripts/pluto/Dockerfile . &
+    if [ -z "${image_name}" ] || [ "${image_name}" = "hopli" ]; then
+      log "Building Docker image hopli-local:latest"
+      docker build -t hopli-local:latest \
+        --build-arg=HOPR_TOOLCHAIN_IMAGE="hopr-toolchain-local:latest" \
+        -f packages/hopli/Dockerfile . &
     fi
 
     log "Waiting for Docker builds (part 2) to finish"
+    wait
+
+    if [ -z "${image_name}" ] || [ "${image_name}" = "pluto" ] || [ "${image_name}" = "pluto-complete" ]; then
+      log "Building Docker image hopr-pluto-local:latest"
+      docker build -q -t hopr-pluto-local:latest \
+        --build-arg=ANVIL_IMAGE="hopr-anvil-local:latest" \
+        --build-arg=HOPRD_IMAGE="hoprd-local:latest" \
+        -f scripts/pluto/Dockerfile . &
+    fi
+
+    log "Waiting for Docker builds (part 3) to finish"
     wait
   else
     gcloud builds submit --config cloudbuild.yaml \

@@ -41,6 +41,9 @@ function usage() {
 export CARGO_BIN_DIR="${mydir}/../../.cargo/bin"
 export PATH=${PATH}:${CARGO_BIN_DIR}
 
+declare usr_local="/usr/local"
+declare usr_local_bin="${usr_local}/bin"
+
 declare install_all with_yarn
 install_all="true"
 with_yarn="false"
@@ -70,16 +73,17 @@ while (( "$#" )); do
   esac
 done
 
-if [[ "${PATH}" =~ "/usr/local/bin" ]]; then
-    echo "Cannot install utilities. \"/usr/local/bin\" is not part of home-path."
-fi
+# move /usr/local/bin to beginning of PATH
+export PATH="${usr_local_bin}:${PATH//:\/usr\/local\/bin/}"
 
-if ! [ -w "/usr/local/bin" ]; then
-    echo "Cannot install utilities. \"/usr/local/bin\" is not writable."
+if ! [ -w "${usr_local_bin}" ]; then
+    echo "Cannot install utilities. \"${usr_local_bin}\" is not writable."
+    exit 1
 fi
 
 if ! [ -d "/opt" ] && ! [ -w "/opt" ] || ! [ -w "/" ]; then
     echo "Cannot install utilities. \"/opt\" does not exist or is not writable."
+    exit 1
 fi
 
 declare download_dir="/tmp/hopr-toolchain/download"
@@ -197,34 +201,49 @@ function install_protobuf() {
 
 
 function install_node_js() {
-    if ! command -v node; then
+    local nvmrc_path="${mydir}/../../.nvmrc"
+    local node_js_version=$(sed -En 's/^v*([0-9.])/\1/p' ${nvmrc_path})
+    if ! command -v node || [[ ! "$(node -v)" =~ ^v${node_js_version}\..+$ ]]; then
         cd ${download_dir}
         # Downloads Node.js version specified in `.nvmrc` file
-        local nvmrc_path="${mydir}/../../.nvmrc"
-        local node_js_version=$(sed -En 's/^v*([0-9.])/\1/p' ${nvmrc_path})
         echo "Installing Node.js v${node_js_version}"
         local node_release=$(curl 'https://unofficial-builds.nodejs.org/download/release/index.json' | jq -r "[.[] | .version | select(. | startswith(\"v${node_js_version}\"))][0]")
-	# using linux x64 builds by default
-	local node_download_url="https://nodejs.org/download/release/${node_release}/node-${node_release}-linux-x64.tar.xz"
-	if is_alpine; then
+        # using linux x64 builds by default
+        local node_download_url="https://nodejs.org/download/release/${node_release}/node-${node_release}-linux-x64.tar.xz"
+        if is_alpine; then
             # Using musl builds for alpine
-	    node_download_url="https://unofficial-builds.nodejs.org/download/release/${node_release}/node-${node_release}-linux-x64-musl.tar.xz"
-	fi
-	curl -fsSL --compressed "${node_download_url}" > node.tar.xz
-        tar -xJf node.tar.xz -C /usr/local --strip-components=1 --no-same-owner
+            node_download_url="https://unofficial-builds.nodejs.org/download/release/${node_release}/node-${node_release}-linux-x64-musl.tar.xz"
+        fi
+        curl -fsSL --compressed "${node_download_url}" > node.tar.xz
+        # ensure older installations are uninstalled first
+        rm -rf \
+          /usr/local/bin/node \
+          /usr/local/bin/npx \
+          /usr/local/bin/npm \
+          /usr/local/bin/corepack \
+          /usr/local/share/systemtap/tapset/node.stp \
+          /usr/local/share/doc/node \
+          /usr/local/share/man/man1/node.1 \
+          /usr/local/include/node \
+          /usr/local/lib/node_modules
+        tar -xJf node.tar.xz -C ${usr_local} \
+          --strip-components=1 --no-same-owner \
+          --exclude README.md \
+          --exclude LICENSE \
+          --exclude CHANGELOG.md
         cd ${mydir}
     fi
 }
 
 # Install legacy version of yarn that supports handover to yarn 2+
 function install_yarn() {
+    local yarn_release="1.22.19"
     if ! command -v yarn; then
         cd ${download_dir}
-        local yarn_release="1.22.19"
         curl -fsSLO --compressed "https://yarnpkg.com/downloads/${yarn_release}/yarn-v${yarn_release}.tar.gz"
         mkdir -p /opt
         tar -xzf "yarn-v${yarn_release}.tar.gz" -C /opt
-        ln -s /opt/yarn-v${yarn_release}/bin/yarn /usr/local/bin/yarn
+        ln -s /opt/yarn-v${yarn_release}/bin/yarn ${usr_local_bin}/yarn
         cd ${mydir}
     fi
 }

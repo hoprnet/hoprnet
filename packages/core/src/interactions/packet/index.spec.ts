@@ -253,7 +253,6 @@ describe('packet acknowledgement', function () {
         }
       },
       () => {},
-      () => {},
       {
         id: 'testing'
       } as ResolvedEnvironment
@@ -264,7 +263,6 @@ describe('packet acknowledgement', function () {
       libp2pCounterparty.components,
       COUNTERPARTY,
       dbs[1],
-      () => {},
       () => {},
       () => {},
       {
@@ -323,7 +321,6 @@ describe('packet acknowledgement', function () {
       () => {
         ackReceived.resolve()
       },
-      () => {},
       {
         id: 'testing'
       } as ResolvedEnvironment
@@ -334,7 +331,6 @@ describe('packet acknowledgement', function () {
       libp2pCounterparty.components,
       COUNTERPARTY,
       dbs[2],
-      () => {},
       () => {},
       () => {},
       {
@@ -433,7 +429,6 @@ describe('packet relaying interaction', function () {
         components,
         pId,
         dbs[index],
-        () => {},
         () => {},
         () => {},
         {

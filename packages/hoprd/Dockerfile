@@ -12,7 +12,7 @@ RUN mv /app/hoprnet-toolchain/.cargo . && \
 COPY .cargo/config.toml .cargo/
 COPY vendor vendor/
 COPY packages packages/
-COPY Makefile Cargo.toml Cargo.lock .yarnrc.yml yarn.lock package.json tsconfig.build.json tsconfig.json tsconfig.scripts.json yarn.lock rust-toolchain.toml ./
+COPY Makefile Cargo.toml Cargo.lock .yarnrc.yml yarn.lock package.json tsconfig.build.json tsconfig.json yarn.lock rust-toolchain.toml ./
 
 LABEL description="Launches a hoprd node"
 
@@ -20,11 +20,13 @@ RUN make deps-docker package=hoprd && \
     # Remove all tests
     find ./packages -type f -name '*.spec.ts' -delete && \
     # Only build hoprd + dependencies
-    make -j build package=hoprd && \
+    NO_HOPLI=true make -j build package=hoprd && \
     # Remove all typescript files
     find ./packages -type f -name '*.ts' -delete && \
     # No need for these packages
     rm -R packages/avado packages/cover-traffic-daemon && \
+    # Everything that we don't need in ethereum package
+    rm -R packages/ethereum/contracts && \
     # Remove node_modules as they include devDependencies
     rm -R node_modules && \
     # As we are on *nix, use hardlinks in node_modules to save some space
@@ -44,7 +46,7 @@ COPY scripts/toolchain/install-toolchain.sh ./scripts/toolchain
 
 RUN apt-get update \
  && apt-get install -y \
-      bash curl jq tini ca-certificates tar xz-utils \
+ bash curl jq tini ca-certificates tar xz-utils \
  && rm -rf /var/lib/apt/lists/* \
  && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
  # Install Node.js
@@ -57,9 +59,6 @@ RUN apt-get update \
 
 COPY --from=build /app/hoprnet/packages ./packages
 COPY --from=build /app/hoprnet/node_modules ./node_modules
-
-# we copy hopli over since we might need it at some point as a binary
-COPY --from=build /app/hoprnet/.cargo/bin/hopli .cargo/bin/
 
 # set volume which can be mapped by users on the host system
 VOLUME ["/app/hoprnet/hoprd-db"]
@@ -89,7 +88,8 @@ EXPOSE 3000
 EXPOSE 3001
 # Healthcheck server
 EXPOSE 8080
-# p2p
-EXPOSE 9091
+# p2p UDP + TCP
+EXPOSE 9091/udp
+EXPOSE 9091/tcp
 
 ENTRYPOINT ["/usr/bin/tini", "--", "node", "./lib/main.cjs"]

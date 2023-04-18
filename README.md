@@ -3,7 +3,7 @@
   <a href="https://hoprnet.org" target="_blank" rel="noopener noreferrer">
     <img width="100" src="https://github.com/hoprnet/hopr-assets/blob/master/v1/logo/hopr_logo_padded.png?raw=true" alt="HOPR Logo">
   </a>
-  
+
   <!-- Title Placeholder -->
   <h3 align="center">HOPR</h3>
   <p align="center">
@@ -23,12 +23,10 @@
 - [Getting Started](#getting-started)
 - [Install](#install)
   - [Install via Docker](#install-via-docker)
-  - [Install via NPM](#install-via-npm)
   - [Install via Nix package manager](#install-via-nix-package-manager)
 - [Using](#using)
   - [Using Docker](#using-docker)
   - [Using Docker Compose with extended monitoring](#using-docker-compose-with-extended-hopr-node-monitoring)
-  - [Using NPM](#using-npm)
 - [Testnet accessibility](#testnet-accessibility)
 - [Migrating between releases](#migrating-between-releases)
 - [Develop](#develop)
@@ -38,7 +36,6 @@
   - [Github Actions CI](#github-actions-ci)
   - [End-to-End Testing](#end-to-end-testing)
     - [Running Tests Locally](#running-tests-locally)
-    - [Running Tests on Google Cloud Platform](#running-tests-on-google-cloud-platform)
 - [Deploy](#deploy)
   - [Using Google Cloud Platform](#using-google-cloud-platform)
   - [Using Google Cloud Platform and a Default Topology](#using-google-cloud-platform-and-a-default-topology)
@@ -64,19 +61,19 @@ The preferred way of installation should be via Docker.
 
 All our docker images can be found in [our Google Cloud Container Registry][4].
 Each image is prefixed with `gcr.io/hoprassociation/$PROJECT:$RELEASE`.
-The `master-staging` tag represents the `master` branch, while the `riga` tag
+The `master-staging` tag represents the `master` branch, while the `bratislava` tag
 represents the most recent `release/*` branch.
 
 You can pull the Docker image like so:
 
 ```sh
-docker pull gcr.io/hoprassociation/hoprd:riga
+docker pull gcr.io/hoprassociation/hoprd:bratislava
 ```
 
 For ease of use you can set up a shell alias to run the latest release as a docker container:
 
 ```sh
-alias hoprd='docker run --pull always -m 2g -ti -v ${HOPRD_DATA_DIR:-$HOME/.hoprd-db}:/app/db -p 9091:9091 -p 3001:3001 gcr.io/hoprassociation/hoprd:riga'
+alias hoprd='docker run --pull always -m 2g -ti -v ${HOPRD_DATA_DIR:-$HOME/.hoprd-db}:/app/db -p 9091:9091/tcp -p 9091:9091/udp -p 3001:3001 gcr.io/hoprassociation/hoprd:bratislava'
 ```
 
 **IMPORTANT:** Using the above command will map the database folder used by hoprd to a local folder called `.hoprd-db` in your home directory. You can customize the location of that folder further by executing the following command:
@@ -87,40 +84,18 @@ HOPRD_DATA_DIR=${HOME}/.hoprd-better-db-folder eval hoprd
 
 Also all ports are mapped to your localhost, assuming you stick to the default port numbers.
 
-### Install via NPM
-
-Please make sure you are running a compatible version of Node.js.
-
-```sh
-node --version
-# v16.15.0
-```
-
-To always use the right version of Node.js, we recommend to install [Fast Node.js Manager (fnm)](https://github.com/Schniz/fnm) and run `fnm use`.
-
-```sh
-fnm use
-# Using Node v16.15.0
-```
-
-Using the [hoprd npm package][6]:
-
-```sh
-mkdir MY_NEW_HOPR_TEST_FOLDER
-cd MY_NEW_HOPR_TEST_FOLDER
-npm install @hoprnet/hoprd@1.88
-```
-
 ### Install via [Nix package manager][1]
 
 NOTE: This setup should only be used for development or if you know what you
 are doing and don't need further support. Otherwise you should use the `npm`
 or `docker` setup.
 
-You will need to clone the `hoprnet` repo first:
+You will need to clone and initialize the `hoprnet` repo first:
 
 ```sh
 git clone https://github.com/hoprnet/hoprnet
+cd hoprnet
+make init
 ```
 
 If you have [direnv][2] set up properly your `nix-shell` will be
@@ -132,6 +107,13 @@ nix develop
 ```
 
 Now you may follow the instructions in [Develop](#develop).
+
+Alternatively you may use a development Docker container which uses the same Nix
+setup.
+
+```
+make run-docker-dev
+```
 
 ## Using
 
@@ -239,7 +221,7 @@ have an extended monitoring of the HOPR node's activity (using Prometheus + Graf
 To startup a HOPRd node with monitoring, you can use the following command:
 
 ```shell
-docker compose --env-file scripts/compose/default.env --file scripts/compose/docker-compose.yaml up -d
+docker compose --file scripts/compose/docker-compose.yml up -d
 ```
 
 The configuration of the HOPRd node can be changed in the `scripts/compose/default.env` file.
@@ -248,25 +230,7 @@ Once the configuration starts up, the HOPRd Admin UI is accessible as usual via 
 accessible via `localhost:3030` and is provisioned with a dashboard that contains useful metrics and information
 about the HOPR network as perceived from your node plus some additional runtime information.
 
-### Using NPM
-
-The following command assumes you've setup a local installation like described in [Install via NPM](#install-via-npm).
-
-```sh
-cd MY_NEW_HOPR_TEST_FOLDER
-DEBUG=hopr* npx hoprd --init --announce --identity .hopr-identity --password switzerland --apiToken <MY_TOKEN>
-```
-
-Here is a short break-down of each argument.
-
-```sh
-hoprd
-  --init 				              # initialize the database and identity if not present
-  --announce 				          # announce the node to other nodes in the network and act as relay if publicly reachable
-  --identity .hopr-identity   # store your node identity information in your test folder
-  --password switzerland   	  # set the encryption password for your identity
-  --apiToken <MY_TOKEN>       # specify password for accessing REST API (REQUIRED)
-```
+The default username for Grafana is `admin` with password `hopr`.
 
 ## Testnet accessibility
 
@@ -316,8 +280,6 @@ make fund-local-all
 # start local HOPR admin in a container (and put into background)
 make run-hopr-admin &
 ```
-
-##
 
 ## Local cluster
 
@@ -395,67 +357,28 @@ For more information please refer to [act][8]'s documentation.
 
 #### Running Tests Locally
 
-End-to-end testing is usually performed by the CI, but can also be performed
-locally by executing:
+##### Testing environment
+
+Tests are using the `pytest` infrastructure that can be set up inside a virtualenv using as:
 
 ```sh
-./scripts/run-integration-tests-source.sh
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install -r tests/requirements.txt
 ```
 
-Read the full help information of the script in case of questions:
+To deactivate the activated testing environment if no longer needed:
 
 ```sh
-./scripts/run-integration-tests-source.sh --help
+deactivate
 ```
 
-That command will spawn multiple `hoprd` nodes locally from the local
-source code and run the tests against this cluster of nodes. The tests can be
-found in the files `test/*.sh`. The script will clean up all nodes once completed
-unless instructed otherwise.
+##### Test execution
 
-An alternative to using the local source code is running the tests against
-a NPM package.
+With the environment activated, execute the tests locally:
 
 ```sh
-./scripts/run-integration-tests-npm.sh
-```
-
-If no parameter is given the NPM package which correlates to the most recent Git
-tag will be used, otherwise the first parameter is used as the NPM package
-version to test.
-
-Read the full help information of the script in case of questions:
-
-```sh
-./scripts/run-integration-tests-npm.sh --help
-```
-
-#### Running Tests on Google Cloud Platform
-
-In some unique cases, some bugs might not have been picked up by our end-to-end
-testing and instead only show up when deployed to production. To avoid having
-to see these only after a time-consuming build, a cluster of nodes can be
-deployed to Google Cloud Platform which is then used to run tests against it.
-
-A requirement for this setup is a working `gcloud` configuration locally.
-The easiest approach would be to authenticate with `gcloud auth login`.
-
-The cluster creation and tests can be run with:
-
-```sh
-FUNDING_PRIV_KEY=mysecretaccountprivkey \
-  ./scripts/run-integration-tests-gcloud.sh
-```
-
-The given account private key is used to fund the test nodes to be able to
-perform throughout the tests. Thus the account must have enough funds available.
-
-The test instantiated by this script will also include nodes behind NAT.
-
-Read the full help information of the script in case of questions:
-
-```sh
-./scripts/run-integration-tests-gcloud.sh --help
+python3 -m pytest tests/
 ```
 
 ## Deploy
@@ -522,7 +445,7 @@ script to the creation script:
 ```sh
 ./scripts/setup-gcloud-cluster.sh \
   my-custom-cluster-without-name \
-  gcr.io/hoprassociation/hoprd:riga \
+  gcr.io/hoprassociation/hoprd:bratislava \
   `pwd`/scripts/topologies/full_interconnected_cluster.sh
 ```
 

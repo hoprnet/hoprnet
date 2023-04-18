@@ -1,6 +1,29 @@
 # Changelog
 
+<a name="2.00"></a>
+
+## [2.00](https://github.com/hoprnet/hoprnet/compare/release/bratislava...hoprnet:master)
+
+- Introduce the possibility of using YAML configuration file and revamp the configuration infrastructure to make the YAML a default base for all configuration types (env vars, cmd line args) ([#4796](https://github.com/hoprnet/hoprnet/pull/4796))
+
+<a name="1.93"></a>
+
+## [1.93](https://github.com/hoprnet/hoprnet/compare/release/riga...hoprnet:release/bratislava)
+
+- Migrate the `Heartbeat`, `Ping` and `Network` functionality into Rust ([#4568](https://github.com/hoprnet/hoprnet/pull/4658))
 - Rebrand `foundry-tool` to `hopli` and allow it to interact with identities and network-registry ([#4652](https://github.com/hoprnet/hoprnet/pull/4652))
+- Migrate mixer code to Rust ([#4567](https://github.com/hoprnet/hoprnet/pull/4567))
+- Fix initial network peer registration from the Peer Store ([#4741](https://github.com/hoprnet/hoprnet/pull/4741))
+- `hopli` accepts floating number for the amount of tokens to be transferred/minted. Loosen requirement on the identity file. ([#4723](https://github.com/hoprnet/hoprnet/pull/4723))
+- Use simple moving average for smoothing network peer numbers presented to the Promiscuous strategy, add more logging ([#4763](https://github.com/hoprnet/hoprnet/pull/4763))
+- Migrate server-side relay code to Rust ([#4726](https://github.com/hoprnet/hoprnet/pull/4726))
+- Added Rust implementations of all the cryptographic functionality used in the HOPR protocol ([#3842](https://github.com/hoprnet/hoprnet/pull/3842))
+- Add reported HOPR protocol version information to `ping` and `peers` endpoints ([#4777](https://github.com/hoprnet/hoprnet/pull/4777))
+- Extend the Grafana dashboards with the new mixer metrics (current mixer queue size & average mixer delay) ([#4768](https://github.com/hoprnet/hoprnet/pull/4768))
+- Expose full payment channel graph in `/channels` API ([#4756](https://github.com/hoprnet/hoprnet/pull/4756))
+- Fixed issue with too many channels being opened by the Promiscuous strategy, added option to enforce the maximum number of opened channels ([#4827](https://github.com/hoprnet/hoprnet/pull/4827))
+- Added mitigation for connection leakage to prevent DHT and p2p connection failures ([#4870](https://github.com/hoprnet/hoprnet/pull/4870))
+- Fixed incorrect recording of some Ping metrics ([#4867](https://github.com/hoprnet/hoprnet/pull/4867))
 
 <a name="1.92"></a>
 
@@ -24,7 +47,13 @@
 - Automatic ticket redemption disabled by default, added `--autoTicketRedemption` CLI option to enable it explicitly ([#4565](https://github.com/hoprnet/hoprnet/pull/4565))
 - Return explict message for unsupported closing incoming channel ([#4551](https://github.com/hoprnet/hoprnet/pull/4551)) with a fix in admin UI ([hopr-admin/#3](https://github.com/hoprnet/hopr-admin/pull/3))
 - Bring back `fund` command, to open outgoing and incoming channels with counterpart ([#4566](https://github.com/hoprnet/hoprnet/pull/4566))
+- Improve Grafana dashboards & compose setup ([#4479](https://github.com/hoprnet/hoprnet/pull/4479))
+- API: Prevent API privilege escalation ([#4625](https://github.com/hoprnet/hoprnet/pull/4625))
+- Assign commitent at ticket redemption, so that tickets can be redeemed with a gap in ticket index ([#4643](https://github.com/hoprnet/hoprnet/pull/4643))
+- Make maximum parallel connections configurable (#[4675](https://github.com/hoprnet/hoprnet/pull/4675))
+- Reduce overall connection timeout from 10s to 3s (#[4680](https://github.com/hoprnet/hoprnet/pull/4680))
 - Migrate mixer code to Rust ([#4567](https://github.com/hoprnet/hoprnet/pull/4567))
+- Primitive & basic types re-created in Rust ([#4645](https://github.com/hoprnet/hoprnet/pull/4645)))
 
 <a name="1.91"></a>
 
