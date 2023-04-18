@@ -34,6 +34,7 @@ Learn more about how subgraphs work by checking out [The Graph's official docume
 | HOPR Token                           | `https://thegraph.com/explorer/subgraphs/njToE7kpetd3P9sJdYQPSq6yQjBs7w9DahQpBj6WAoD`  |
 | HOPR Channels (`monte_rosa` release) | `https://thegraph.com/explorer/subgraphs/Feg6Jero3aQzesVYuqk253NNLyNAZZppbDPKFYEGJ1Hj` |
 | Stake Season6                        | `https://thegraph.com/explorer/subgraphs/C7cu6NvvMxgjdaK9pKSGezZ3EgRCmM4tWrmTtGUDG15t` |
+| Staking Seasons                      | `https://thegraph.com/explorer/subgraphs/DrkbaCvNGVcNH1RghepLRy6NSHFi8Dmwp4T2LN3LqcjY` |
 
 ## GraphQL Endpoint Links
 
@@ -41,6 +42,7 @@ Learn more about how subgraphs work by checking out [The Graph's official docume
 - HOPR Token (Gnosis): `https://gateway.thegraph.com/api/[api-key]/subgraphs/id/njToE7kpetd3P9sJdYQPSq6yQjBs7w9DahQpBj6WAoD`
 - HOPR Channels: `https://gateway.thegraph.com/api/[api-key]/subgraphs/id/Feg6Jero3aQzesVYuqk253NNLyNAZZppbDPKFYEGJ1Hj`
 - Stake Season6: `https://gateway.thegraph.com/api/[api-key]/subgraphs/id/C7cu6NvvMxgjdaK9pKSGezZ3EgRCmM4tWrmTtGUDG15t`
+- Staking Seasons: `https://gateway.thegraph.com/api/[api-key]/subgraphs/id/DrkbaCvNGVcNH1RghepLRy6NSHFi8Dmwp4T2LN3LqcjY`
 
 ## Helpful Resources
 
