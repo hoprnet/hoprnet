@@ -210,19 +210,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     // TODO: perform ping as well, right now just prints out connection info
     if (this.relayState.relayedConnectionCount() > 0) {
       let outConns = `Current relay connections:\n`
-
-      let outConnIds: string[] = []
-      await this.relayState.forEach(async (dst) => {
-        outConnIds.push(dst)
-      })
-
-      outConnIds.sort()
-
-      for (const outConnId of outConnIds) {
-        outConns += `- ${outConnId}\n`
-      }
-
-      // Remove occurence of last `\n`
+      outConns += await this.relayState.printIds()
       log(outConns.substring(0, outConns.length - 1))
     }
     metric_countRelayedConns.set(this.relayState.relayedConnectionCount())

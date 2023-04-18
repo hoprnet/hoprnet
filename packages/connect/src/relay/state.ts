@@ -1,8 +1,7 @@
 import type { HoprConnectOptions, Stream } from '../types.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
-import { unmarshalPublicKey } from '@libp2p/crypto/keys'
 
-import { nAtATime, u8aCompare } from '@hoprnet/hopr-utils'
+import { nAtATime } from '@hoprnet/hopr-utils'
 import { RelayContext, type RelayContextInterface } from './context.js'
 
 import debug from 'debug'
@@ -123,6 +122,23 @@ class RelayState {
     )
   }
 
+  async printIds() {
+    let ret: string[] = []
+    for await (let [cid, _] of this.relayedConnections.entries()) {
+      ret.push(cid)
+    }
+    return ret.join(',')
+  }
+
+  /**
+   * Deletes the inactive relay entry given the source and destination
+   * @param source
+   * @param destination
+   */
+  delete(source: PeerId, destination: PeerId) {
+    this.relayedConnections.delete(RelayState.getId(source, destination))
+  }
+
   /**
    * Creates and stores a new relayed connection
    * This function returns only when the relay connection is terminated.
@@ -196,10 +212,11 @@ class RelayState {
    * @returns the identifier
    */
   static getId(a: PeerId, b: PeerId): string {
-    const cmpResult = u8aCompare(
+    /*const cmpResult = u8aCompare(
       unmarshalPublicKey(a.publicKey as Uint8Array).marshal(),
       unmarshalPublicKey(b.publicKey as Uint8Array).marshal()
-    )
+    )*/
+    const cmpResult = a.toString().localeCompare(b.toString())
 
     // human-readable ID
     switch (cmpResult) {
