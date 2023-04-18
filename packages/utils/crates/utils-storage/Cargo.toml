@@ -23,3 +23,9 @@ console_error_panic_hook = { version = "0.1.7", optional = true }
 scopeguard = "1.1.0"
 tempfile = "3.3.0"
 wasm-bindgen-test = "0.3.33"
+
+[package.metadata.wasm-pack.profile.dev]
+wasm-opt = false
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ['-O', '--enable-reference-types']
