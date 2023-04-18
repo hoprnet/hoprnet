@@ -7,6 +7,7 @@ use clap::{Parser, Subcommand};
 pub mod environment_config;
 pub mod faucet;
 pub mod identity;
+pub mod identity_input;
 pub mod initialize_node;
 pub mod key_pair;
 pub mod network_registry;

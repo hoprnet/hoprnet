@@ -1,12 +1,13 @@
+use crate::identity_input::LocalIdentityFromDirectoryArgs;
 use crate::key_pair::{create_identity, read_identities};
 use crate::password::PasswordArgs;
+use crate::utils::{Cmd, HelperErrors};
 use clap::{builder::RangedU64ValueParser, Parser};
+use log::{log, Level};
 use std::{
     str::FromStr,
     time::{SystemTime, UNIX_EPOCH},
 };
-
-use crate::utils::{Cmd, HelperErrors};
 
 #[derive(clap::ValueEnum, Debug, Clone, PartialEq, Eq)]
 pub enum IdentityActionType {
@@ -41,17 +42,19 @@ pub struct IdentityArgs {
     #[clap(flatten)]
     password: PasswordArgs,
 
-    #[clap(
-        help = "Path to the directory that stores identity files",
-        long,
-        short,
-        default_value = "/tmp/hopli"
-    )]
-    directory: String,
+    #[clap(flatten)]
+    local_identity: LocalIdentityFromDirectoryArgs,
 
-    #[clap(help = "Prefix of the identity file to create/read", long)]
-    name: Option<String>,
+    // #[clap(
+    //     help = "Path to the directory that stores identity files",
+    //     long,
+    //     short,
+    //     default_value = "/tmp/hopli"
+    // )]
+    // directory: String,
 
+    // #[clap(help = "Prefix of the identity file to create/read", long)]
+    // name: Option<String>,
     #[clap(
         help = "Number of identities to be generated, e.g. 1",
         long,
@@ -68,8 +71,9 @@ impl IdentityArgs {
         let IdentityArgs {
             action,
             password,
-            directory,
-            name,
+            local_identity,
+            // directory,
+            // name,
             number,
         } = self;
 
@@ -85,7 +89,7 @@ impl IdentityArgs {
             IdentityActionType::Create => {
                 for _n in 1..=number {
                     // build file name
-                    let id_name = match name {
+                    match local_identity.identity_prefix {
                         Some(ref provided_name) => Some(
                             provided_name.to_owned()
                                 + &SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs().to_string(),
@@ -93,7 +97,11 @@ impl IdentityArgs {
                         None => None,
                     };
 
-                    match create_identity(&directory, &pwd, &id_name) {
+                    match create_identity(
+                        &local_identity.identity_directory,
+                        &pwd,
+                        &local_identity.identity_prefix,
+                    ) {
                         Ok(identity) => node_identities.push(identity),
                         Err(_) => return Err(HelperErrors::UnableToCreateIdentity),
                     }
@@ -101,13 +109,14 @@ impl IdentityArgs {
             }
             IdentityActionType::Read => {
                 // read ids
-                match read_identities(&directory, &pwd, &name) {
+                let files = local_identity.get_files().unwrap();
+                match read_identities(files, &pwd) {
                     Ok(identities) => node_identities.extend(identities),
                     Err(_) => return Err(HelperErrors::UnableToReadIdentity),
                 }
             }
         }
-        println!("Identities: {:?}", node_identities);
+        log!(target: "identity", Level::Info, "Identities: {:?}", node_identities);
         Ok(())
     }
 }

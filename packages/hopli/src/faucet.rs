@@ -1,3 +1,4 @@
+use crate::identity_input::LocalIdentityArgs;
 use crate::key_pair::read_identities;
 use crate::password::PasswordArgs;
 use crate::process::{child_process_call_foundry_faucet, set_process_path_env};
@@ -7,6 +8,7 @@ use ethers::{
     types::U256,
     utils::parse_units, //, types::U256, utils::format_units, ParseUnits
 };
+use log::{log, Level};
 use std::env;
 use utils_types::primitives::Address;
 
@@ -29,29 +31,8 @@ pub struct FaucetArgs {
     #[clap(flatten)]
     password: PasswordArgs,
 
-    #[clap(
-        help = "Forge faucet script access and extract addresses from local identity files",
-        long,
-        short,
-        default_value = "false"
-    )]
-    use_local_identities: bool,
-
-    #[clap(
-        help = "Path to the directory that stores identity files",
-        long,
-        short = 'd',
-        default_value = "/tmp"
-    )]
-    identity_directory: Option<String>,
-
-    #[clap(
-        help = "Only use identity files with prefix",
-        long,
-        short = 'x',
-        default_value = None
-    )]
-    identity_prefix: Option<String>,
+    #[clap(flatten)]
+    local_identity: LocalIdentityArgs,
 
     #[clap(
         help = "Specify path pointing to the contracts root",
@@ -88,9 +69,7 @@ impl FaucetArgs {
             environment_name,
             address,
             password,
-            use_local_identities,
-            identity_directory,
-            identity_prefix,
+            local_identity,
             contracts_root,
             hopr_amount,
             native_amount,
@@ -119,26 +98,24 @@ impl FaucetArgs {
             }
         }
 
-        // Check if local identity files should be used. Push all the read identities.
-        if use_local_identities {
+        // if local identity dirs/path is provided, read files
+        let local_files = local_identity.get_files();
+        if local_files.len() > 0 {
             // check if password is provided
             let pwd = match password.read_password() {
                 Ok(read_pwd) => read_pwd,
                 Err(e) => return Err(e),
             };
 
-            // read all the files from the directory
-            if let Some(id_dir) = identity_directory {
-                match read_identities(&id_dir.as_str(), &pwd, &identity_prefix) {
-                    Ok(node_identities) => {
-                        addresses_all.extend(node_identities.iter().map(|ni| ni.ethereum_address.clone()));
-                    }
-                    Err(e) => return Err(e),
+            match read_identities(local_files, &pwd) {
+                Ok(node_identities) => {
+                    addresses_all.extend(node_identities.iter().map(|ni| ni.ethereum_address.clone()));
                 }
+                Err(e) => return Err(e),
             }
         }
 
-        println!("All the addresses: {:?}", addresses_all);
+        log!(target: "faucet", Level::Info, "All the addresses: {:?}", addresses_all);
 
         // set directory and environment variables
         if let Err(e) = set_process_path_env(&contracts_root, &environment_name) {

@@ -47,34 +47,7 @@ impl fmt::Display for NodeIdentity {
 /// * `identity_directory` - Directory to all the identity files
 /// * `password` - Password to unlock all the identity files
 /// * `identity_prefix` - Prefix of identity files. Only identity files with the provided are decrypted with the password
-pub fn read_identities(
-    identity_directory: &str,
-    password: &String,
-    identity_prefix: &Option<String>,
-) -> Result<Vec<NodeIdentity>, HelperErrors> {
-    // early return if failed in reading identity directory
-    let directory = fs::read_dir(Path::new(identity_directory))?;
-
-    // read all the files from the directory that contains
-    // 1) "id" in its name
-    // 2) the provided idetity_prefix
-    let files: Vec<PathBuf> = directory
-        .into_iter() // read all the files from the directory
-        .filter(|r| r.is_ok()) // Get rid of Err variants for Result<DirEntry>
-        .map(|r| r.unwrap().path()) // Read all the files from the given directory
-        .filter(|r| r.is_file()) // Filter out folders
-        .filter(|r| r.to_str().unwrap().contains("id")) // file name should contain "id"
-        .filter(|r| match &identity_prefix {
-            Some(identity_prefix) => r
-                .file_stem()
-                .unwrap()
-                .to_str()
-                .unwrap()
-                .starts_with(identity_prefix.as_str()),
-            _ => true,
-        })
-        .collect();
-
+pub fn read_identities(files: Vec<PathBuf>, password: &String) -> Result<Vec<NodeIdentity>, HelperErrors> {
     // get the verifying key from each file
     let signing_keys: Vec<VerifyingKey> = files
         .into_iter()
@@ -167,7 +140,8 @@ mod tests {
         let created_id = create_identity(path, pwd, &None).unwrap();
 
         // created and the read id is identical
-        let read_id = read_identities(path, &pwd.to_string(), &None).unwrap();
+        let files = get_files(path, &None);
+        let read_id = read_identities(files, &pwd.to_string()).unwrap();
         assert_eq!(read_id.len(), 1);
         assert_eq!(read_id[0].ethereum_address, created_id.ethereum_address);
         assert_eq!(read_id[0].peer_id, created_id.peer_id);
@@ -181,7 +155,8 @@ mod tests {
         let pwd = "password";
         let wrong_pwd = "wrong_password";
         create_identity(path, pwd, &None).unwrap();
-        match read_identities(path, &wrong_pwd.to_string(), &None) {
+        let files = get_files(path, &None);
+        match read_identities(files, &wrong_pwd.to_string()) {
             Ok(val) => assert_eq!(val.len(), 0),
             _ => assert!(false),
         }
@@ -191,7 +166,8 @@ mod tests {
     #[test]
     fn read_identities_from_directory_without_id_files() {
         let path = "./";
-        match read_identities(path, &"".to_string(), &None) {
+        let files = get_files(path, &None);
+        match read_identities(files, &"".to_string()) {
             Ok(val) => assert_eq!(val.len(), 0),
             _ => assert!(false),
         }
@@ -202,7 +178,8 @@ mod tests {
         let path = "./tmp_4";
         let pwd = "local";
         create_identity(path, pwd, &Some(String::from("local-alice"))).unwrap();
-        match read_identities(path, &pwd.to_string(), &None) {
+        let files = get_files(path, &None);
+        match read_identities(files, &pwd.to_string()) {
             Ok(val) => assert_eq!(val.len(), 1),
             _ => assert!(false),
         }
@@ -214,7 +191,8 @@ mod tests {
         let path = "./tmp_5";
         let pwd = "local";
         create_identity(path, pwd, &Some(String::from("local-alice"))).unwrap();
-        match read_identities(path, &pwd.to_string(), &Some("local".to_string())) {
+        let files = get_files(path, &Some("local".to_string()));
+        match read_identities(files, &pwd.to_string()) {
             Ok(val) => assert_eq!(val.len(), 1),
             _ => assert!(false),
         }
@@ -226,7 +204,8 @@ mod tests {
         let path = "./tmp_6";
         let pwd = "local";
         create_identity(path, pwd, &Some(String::from("local-alice"))).unwrap();
-        match read_identities(path, &pwd.to_string(), &Some("npm-".to_string())) {
+        let files = get_files(path, &Some("npm-".to_string()));
+        match read_identities(files, &pwd.to_string()) {
             Ok(val) => assert_eq!(val.len(), 0),
             _ => assert!(false),
         }
@@ -238,7 +217,9 @@ mod tests {
         let path = "./tmp_7";
         let pwd = "local";
         create_identity(path, pwd, &Some(String::from("local-alice"))).unwrap();
-        match read_identities(path, &pwd.to_string(), &Some("alice".to_string())) {
+
+        let files = get_files(path, &Some("alice".to_string()));
+        match read_identities(files, &pwd.to_string()) {
             Ok(val) => assert_eq!(val.len(), 0),
             _ => assert!(false),
         }
@@ -260,7 +241,8 @@ mod tests {
         // save the keystore as file
         fs::write(PathBuf::from(path).join(&name), weak_crypto_alice_keystore.as_bytes()).unwrap();
 
-        let val = read_identities(path, &pwd.to_string(), &None).unwrap();
+        let files = get_files(path, &None);
+        let val = read_identities(files, &pwd.to_string()).unwrap();
         assert_eq!(val.len(), 1);
         assert_eq!(val[0].peer_id, alice_peer_id);
         assert_eq!(val[0].ethereum_address, alice_address);
@@ -274,5 +256,31 @@ mod tests {
             Ok(_) => Ok(()),
             _ => Err(HelperErrors::UnableToDeleteIdentity),
         }
+    }
+
+    fn get_files(identity_directory: &str, identity_prefix: &Option<String>) -> Vec<PathBuf> {
+        // early return if failed in reading identity directory
+        let directory = fs::read_dir(Path::new(identity_directory)).unwrap();
+
+        // read all the files from the directory that contains
+        // 1) "id" in its name
+        // 2) the provided idetity_prefix
+        let files: Vec<PathBuf> = directory
+            .into_iter() // read all the files from the directory
+            .filter(|r| r.is_ok()) // Get rid of Err variants for Result<DirEntry>
+            .map(|r| r.unwrap().path()) // Read all the files from the given directory
+            .filter(|r| r.is_file()) // Filter out folders
+            .filter(|r| r.to_str().unwrap().contains("id")) // file name should contain "id"
+            .filter(|r| match &identity_prefix {
+                Some(identity_prefix) => r
+                    .file_stem()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .starts_with(identity_prefix.as_str()),
+                _ => true,
+            })
+            .collect();
+        files
     }
 }

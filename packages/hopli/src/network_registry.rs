@@ -1,10 +1,11 @@
+use crate::identity_input::LocalIdentityArgs;
 use crate::key_pair::read_identities;
 use crate::password::PasswordArgs;
 use crate::process::{child_process_call_foundry_self_register, set_process_path_env};
-use clap::Parser;
-use std::env;
-
 use crate::utils::{Cmd, HelperErrors};
+use clap::Parser;
+use log::{log, Level};
+use std::env;
 
 /// CLI arguments for `hopli register-in-network-registry`
 #[derive(Parser, Default, Debug)]
@@ -20,29 +21,8 @@ pub struct RegisterInNetworkRegistryArgs {
     )]
     peer_ids: Option<String>,
 
-    #[clap(
-        help = "Extract peer ids from local identity files",
-        long,
-        short,
-        default_value = "false"
-    )]
-    use_local_identities: bool,
-
-    #[clap(
-        help = "Path to the directory that stores identity files",
-        long,
-        short = 'd',
-        default_value = "/tmp"
-    )]
-    identity_directory: Option<String>,
-
-    #[clap(
-        help = "Only use identity files with prefix",
-        long,
-        short = 'x',
-        default_value = None
-    )]
-    identity_prefix: Option<String>,
+    #[clap(flatten)]
+    local_identity: LocalIdentityArgs,
 
     #[clap(flatten)]
     password: PasswordArgs,
@@ -62,10 +42,8 @@ impl RegisterInNetworkRegistryArgs {
     fn execute_self_register(self) -> Result<(), HelperErrors> {
         let RegisterInNetworkRegistryArgs {
             environment_name,
+            local_identity,
             peer_ids,
-            use_local_identities,
-            identity_directory,
-            identity_prefix,
             password,
             contracts_root,
         } = self;
@@ -82,8 +60,10 @@ impl RegisterInNetworkRegistryArgs {
             all_peer_ids.push(provided_peer_ids);
         }
 
+        // read all the identities from the directory
+        let local_files = local_identity.get_files();
         // get peer ids and stringinfy them
-        if use_local_identities {
+        if local_files.len() > 0 {
             // check if password is provided
             let pwd = match password.read_password() {
                 Ok(read_pwd) => read_pwd,
@@ -91,20 +71,18 @@ impl RegisterInNetworkRegistryArgs {
             };
 
             // read all the identities from the directory
-            if let Some(id_dir) = identity_directory {
-                match read_identities(&id_dir, &pwd, &identity_prefix) {
-                    Ok(node_identities) => {
-                        all_peer_ids.extend(node_identities.iter().map(|ni| ni.peer_id.clone()));
-                    }
-                    Err(e) => {
-                        println!("error {:?}", e);
-                        return Err(e);
-                    }
+            match read_identities(local_files, &pwd) {
+                Ok(node_identities) => {
+                    all_peer_ids.extend(node_identities.iter().map(|ni| ni.peer_id.clone()));
+                }
+                Err(e) => {
+                    println!("error {:?}", e);
+                    return Err(e);
                 }
             }
         }
 
-        println!("merged peer_ids {:?}", all_peer_ids.join(","));
+        log!(target: "network_registry", Level::Info, "merged peer_ids {:?}", all_peer_ids.join(","));
 
         // set directory and environment variables
         if let Err(e) = set_process_path_env(&contracts_root, &environment_name) {

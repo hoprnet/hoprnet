@@ -21,3 +21,4 @@ k256 = { version = "0.13.0", features = ["arithmetic", "ecdh"] }
 elliptic-curve = "0.13"
 thiserror = "1.0"
 generic-array = "0.14.6"
+log = "0.4.17"

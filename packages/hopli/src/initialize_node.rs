@@ -1,3 +1,5 @@
+use crate::identity_input::LocalIdentityArgs;
+use crate::utils::{Cmd, HelperErrors};
 use crate::{
     key_pair::read_identities,
     password::PasswordArgs,
@@ -8,9 +10,8 @@ use ethers::{
     types::U256,
     utils::parse_units, //, types::U256, utils::format_units, ParseUnits
 };
+use log::{log, Level};
 use std::env;
-
-use crate::utils::{Cmd, HelperErrors};
 
 /// CLI arguments for `hopli register-in-network-registry`
 #[derive(Parser, Default, Debug)]
@@ -18,21 +19,8 @@ pub struct InitializeNodeArgs {
     #[clap(help = "Environment name. E.g. monte_rosa", long)]
     environment_name: String,
 
-    #[clap(
-        help = "Path to the directory that stores identity files",
-        long,
-        short = 'd',
-        default_value = "/tmp"
-    )]
-    identity_directory: Option<String>,
-
-    #[clap(
-        help = "Only use identity files with prefix",
-        long,
-        short = 'x',
-        default_value = None
-    )]
-    identity_prefix: Option<String>,
+    #[clap(flatten)]
+    local_identity: LocalIdentityArgs,
 
     #[clap(flatten)]
     password: PasswordArgs,
@@ -75,8 +63,7 @@ impl InitializeNodeArgs {
     fn execute_express_initialization(self) -> Result<(), HelperErrors> {
         let InitializeNodeArgs {
             environment_name,
-            identity_directory,
-            identity_prefix,
+            local_identity,
             password,
             contracts_root,
             hopr_amount,
@@ -97,19 +84,21 @@ impl InitializeNodeArgs {
             Ok(read_pwd) => read_pwd,
             Err(e) => return Err(e),
         };
+
         // read all the identities from the directory
-        if let Some(id_dir) = identity_directory {
-            match read_identities(&id_dir, &pwd, &identity_prefix) {
-                Ok(node_identities) => {
-                    all_peer_ids = node_identities.iter().map(|ni| ni.peer_id.clone()).collect();
-                    all_node_addresses = node_identities.iter().map(|ni| ni.ethereum_address.clone()).collect();
-                }
-                Err(e) => {
-                    println!("error {:?}", e);
-                    return Err(e);
-                }
+        let files = local_identity.get_files();
+        match read_identities(files, &pwd) {
+            Ok(node_identities) => {
+                all_peer_ids = node_identities.iter().map(|ni| ni.peer_id.clone()).collect();
+                all_node_addresses = node_identities.iter().map(|ni| ni.ethereum_address.clone()).collect();
+            }
+            Err(e) => {
+                println!("error {:?}", e);
+                return Err(e);
             }
         }
+        log!(target: "initialize_node", Level::Info, "PeerIds {:?}", all_peer_ids.join(","));
+        log!(target: "initialize_node", Level::Info, "NodeAddresses {:?}", all_node_addresses.join(","));
 
         // set directory and environment variables
         if let Err(e) = set_process_path_env(&contracts_root, &environment_name) {
@@ -122,6 +111,7 @@ impl InitializeNodeArgs {
         let native_amount_uint256 = parse_units(native_amount, "ether").unwrap();
         let native_amount_uint256_string = U256::from(native_amount_uint256).to_string();
 
+        log!(target: "initialize_node", Level::Debug, "Calling foundry...");
         // iterate and collect execution result. If error occurs, the entire operation failes.
         child_process_call_foundry_express_initialization(
             &environment_name,
