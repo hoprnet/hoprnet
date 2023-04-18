@@ -14,6 +14,7 @@ mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 # Installs all toolchain utilities that are required to build hoprnet monorepo, including
 # - Node.js -> /usr/local/bin
 # - Yarn -> /usr/local/bin + /opt/yarn-v${version}
+# - protoc -> /usr/local/bin
 # - Typescript + related utilities, such as ts-node -> ${mydir}/node_modules
 # - Rust (rustc, cargo) -> ./../../.cargo/bin
 # - wasm-pack + wasm-opt, necessary to build WebAssembly modules -> ./../../.cargo/bin
@@ -83,6 +84,11 @@ fi
 
 declare download_dir="/tmp/hopr-toolchain/download"
 mkdir -p ${download_dir}
+
+function is_alpine() {
+    local os_id=$(grep -E '^ID=' /etc/os-release | tr -d 'ID=')
+    [ "${os_id}" = "alpine" ]
+}
 
 function install_rustup() {
     if ! command -v rustup; then
@@ -165,6 +171,31 @@ function install_wasm_opt() {
     fi
 }
 
+# used by rust libp2p to compile objects
+function install_protobuf() {
+  local protobuf_version=21.12
+  echo "Installing protobuf version 3.${protobuf_version}"
+  local ostype="$(uname -s)"
+  local cputype="$(uname -m)"
+  case "${ostype}" in
+      Linux | linux)
+          ostype="linux"
+          ;;
+      Darwin)
+          ostype="macos"
+          ;;
+      *)
+          echo "no precompiled binaries available for OS: ${ostype}"
+      ;;
+  esac
+  PB_REL="https://github.com/protocolbuffers/protobuf/releases"
+  curl -o /tmp/protoc-${protobuf_version}.zip -fsSLO "${PB_REL}/download/v${protobuf_version}/protoc-${protobuf_version}-${ostype}-${cputype}.zip"
+  mkdir -p /opt/protoc-${protobuf_version}-${ostype}-${cputype}
+  unzip /tmp/protoc-${protobuf_version}.zip -d /opt/protoc-${protobuf_version}-${ostype}-${cputype}
+  ln -sf /opt/protoc-${protobuf_version}-${ostype}-${cputype}/bin/protoc /usr/local/bin/protoc
+}
+
+
 function install_node_js() {
     if ! command -v node; then
         cd ${download_dir}
@@ -172,10 +203,15 @@ function install_node_js() {
         local nvmrc_path="${mydir}/../../.nvmrc"
         local node_js_version=$(sed -En 's/^v*([0-9.])/\1/p' ${nvmrc_path})
         echo "Installing Node.js v${node_js_version}"
-        # Using musl builds for alpine
         local node_release=$(curl 'https://unofficial-builds.nodejs.org/download/release/index.json' | jq -r "[.[] | .version | select(. | startswith(\"v${node_js_version}\"))][0]")
-        curl -fsSLO --compressed "https://unofficial-builds.nodejs.org/download/release/${node_release}/node-${node_release}-linux-x64-musl.tar.xz"
-        tar -xJf "node-${node_release}-linux-x64-musl.tar.xz" -C /usr/local --strip-components=1 --no-same-owner
+	# using linux x64 builds by default
+	local node_download_url="https://nodejs.org/download/release/${node_release}/node-${node_release}-linux-x64.tar.xz"
+	if is_alpine; then
+            # Using musl builds for alpine
+	    node_download_url="https://unofficial-builds.nodejs.org/download/release/${node_release}/node-${node_release}-linux-x64-musl.tar.xz"
+	fi
+	curl -fsSL --compressed "${node_download_url}" > node.tar.xz
+        tar -xJf node.tar.xz -C /usr/local --strip-components=1 --no-same-owner
         cd ${mydir}
     fi
 }
@@ -206,8 +242,9 @@ if ${install_all}; then
     # launch rustc once so it installs updated components
     rustc --version
 
-    install_wasm_pack
     install_wasm_opt
+    install_wasm_pack
+    install_protobuf
     install_node_js
     install_yarn
     install_javascript_utilities
@@ -235,6 +272,7 @@ command -v wasm-pack >/dev/null && wasm-pack --version
 command -v wasm-opt >/dev/null && wasm-opt --version
 command -v node >/dev/null && echo "node $(node --version)"
 command -v yarn >/dev/null && echo "yarn $(yarn --version)"
+command -v protoc >/dev/null && protoc --version
 npx --no tsc --version >/dev/null && echo "Typescript $(npx tsc --version)"
 echo ""
 

@@ -2,21 +2,24 @@
 
 members = [
     "packages/core/crates/core-misc",
+    "packages/core/crates/core-mixer",
+    "packages/core/crates/core-network",
     "packages/core/crates/core-strategy",
     "packages/core-ethereum/crates/core-ethereum-misc",
     "packages/ethereum/crates/bindings",
-    "packages/ethereum/foundry-tool",
+    "packages/hopli",
     "packages/real/crates/real-base",
     "packages/hoprd/crates/hoprd-misc",
     "packages/utils/crates/utils-misc",
     "packages/utils/crates/utils-proc-macros",
     "packages/utils/crates/utils-metrics",
+    "packages/utils/crates/utils-storage",
     "packages/utils/crates/utils-types"
 ]
 
 [workspace.dependencies]
 wasm-pack = "0.10.3"
-wasm-opt = "0.110.2"
+wasm-opt = "0.111.0"
 
 [profile.release]
 # Tell `rustc` to optimize for small code size.

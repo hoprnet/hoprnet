@@ -1,5 +1,11 @@
 # Changelog
 
+- Rebrand `foundry-tool` to `hopli` and allow it to interact with identities and network-registry ([#4652](https://github.com/hoprnet/hoprnet/pull/4652))
+
+<a name="1.92"></a>
+
+## [1.92](https://github.com/hoprnet/hoprnet/compare/release/bogota...hoprnet:release/riga)
+
 - Removal of HOPR admin from `hoprd` ([#4420](https://github.com/hoprnet/hoprnet/pull/4420))
 - Includes removal of CLI option `--admin`, `--adminHost` and `--adminPort`
 - HOPR admin may now be used as a stand-alone component, see https://github.com/hoprnet/hopr-admin
@@ -13,6 +19,12 @@
 - Fix of ticket validation to be order-independent, thus not rejecting older tickets ([#4527](<(https://github.com/hoprnet/hoprnet/pull/4527)>)
 - Migrate `heartbeat` ping network interaction to Rust using Rust `futures::stream::Stream` ([#4539](https://github.com/hoprnet/hoprnet/pull/4539))
 - Added strategy related metrics, refactoring of the strategy code ([#4537](https://github.com/hoprnet/hoprnet/pull/4537))
+- API: Allow user to specify number of intermediate hops when sending a message ([#4563](https://github.com/hoprnet/hoprnet/pull/4563))
+- API: Add capability-based authorization ([#4560](https://github.com/hoprnet/hoprnet/pull/4560))
+- Automatic ticket redemption disabled by default, added `--autoTicketRedemption` CLI option to enable it explicitly ([#4565](https://github.com/hoprnet/hoprnet/pull/4565))
+- Return explict message for unsupported closing incoming channel ([#4551](https://github.com/hoprnet/hoprnet/pull/4551)) with a fix in admin UI ([hopr-admin/#3](https://github.com/hoprnet/hopr-admin/pull/3))
+- Bring back `fund` command, to open outgoing and incoming channels with counterpart ([#4566](https://github.com/hoprnet/hoprnet/pull/4566))
+- Migrate mixer code to Rust ([#4567](https://github.com/hoprnet/hoprnet/pull/4567))
 
 <a name="1.91"></a>
 

@@ -24,7 +24,39 @@ externalDocs:
   description: Find out more about HOPR and HOPRd.
   url: 'http://docs.hoprnet.org'
 components:
+  responses:
+    NotFound:
+      description: The specified resource was not found
+    Unauthorized:
+      description: authentication failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: authorization failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    UnknownFailure:
+      description: Unknown failure
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
   schemas:
+    # Schema for error response body
+    Error:
+      type: object
+      properties:
+        status:
+          type: string
+        error:
+          type: string
+      required:
+        - status
+        - error
     RequestStatus:
       type: object
       properties:
@@ -33,6 +65,109 @@ components:
           description: Status declaring success/failure of the request.
       example:
         status: success
+    Token:
+      type: object
+      required:
+        - id
+        - capabilities
+      properties:
+        id:
+          type: string
+          description: Unique ID of the token
+        description:
+          type: string
+          description: Some description for the token
+        valid_until:
+          type: integer
+          description: Seconds since epoch until the token is valid
+        capabilities:
+          type: array
+          description: Array of capabilities associated with the token
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/TokenCapability'
+      example:
+        id: someTOKENid1223
+        description: this is an interesting token
+        capabilities:
+          - endpoint: 'tokensGetToken'
+            limits:
+              - type: calls
+                conditions:
+                  max: 100
+    TokenCapabilityLimit:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          description: Limit type
+        conditions:
+          type: object
+          description: Limit conditions, if any
+          properties:
+            max:
+              type: integer
+              description: Upper ceiling. Applies to limit type calls.
+      example:
+        type: calls
+        conditions:
+          max: 100
+    TokenCapability:
+      type: object
+      required:
+        - endpoint
+      properties:
+        endpoint:
+          type: string
+          description: Short reference of the operation this capability is tied to.
+          enum:
+            - tokensCreate
+            - tokensGetToken
+            - ticketsGetStatistics
+            - ticketsRedeemTickets
+            - ticketsGetTickets
+            - settingsGetSettings
+            - nodeGetVersion
+            - nodeStreamWebsocket
+            - nodePing
+            - nodeGetPeers
+            - nodeGetMetrics
+            - nodeGetInfo
+            - nodeGetEntryNodes
+            - messagesWebsocket
+            - messagesSign
+            - messagesSendMessage
+            - messageSign
+            - channelsOpenChannel
+            - channelsGetChannels
+            - aliasesGetAliases
+            - aliasesSetAlias
+            - accountWithdraw
+            - accountGetBalances
+            - accountGetAddresses
+            - accountGetAddress
+            - tokensDelete
+            - settingsSetSetting
+            - peerInfoGetPeerInfo
+            - channelsRedeemTickets
+            - channelsGetTickets
+            - channelsCloseChannel
+            - channelsGetChannel
+            - aliasesGetAlias
+            - aliasesRemoveAlias
+        limits:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/TokenCapabilityLimit'
+      example:
+        endpoint: 'tokensGetToken'
+        limits:
+          - type: calls
+            conditions:
+              max: 100
     Signature:
       type: string
       description: Signature from requested message.
@@ -143,7 +278,7 @@ components:
       type: apiKey
       name: x-auth-token
       in: header
-      description: A valid API token which had been configured at node startup.
+      description: A valid API token which had been configured at node startup or through the token API.
     passwordScheme:
       type: http
       scheme: basic

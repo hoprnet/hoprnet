@@ -23,7 +23,7 @@ You can run a HOPR cluster locally or use [Playground](https://playground.hoprne
 ## Use the latest release
 
 Due to the rapid development done on the project, you might be better off using a stable
-release. The latest stable release known at the time of writing is [`Valencia`](https://github.com/hoprnet/hoprnet/archive/refs/heads/release/valencia.zip).
+release. The latest stable release known at the time of writing is [`Bogota`](https://github.com/hoprnet/hoprnet/archive/refs/heads/release/bogota.zip).
 
 ## Which setup should I use?
 
@@ -40,13 +40,13 @@ Your ideal setup will depend on your personal preferences and what operating sys
 Running a local setup will give you a similar setup to the one the HOPR team works with on a daily basis. After all dependencies are installed,
 this configuration will allow you to develop HOPR apps offline.
 
-1. **Download the latest version of the repository**: Download a local version of our [GitHub repository monorepo](https://github.com/hoprnet/hoprnet/tree/release/valencia)
-   with the latest release (`valencia` at the time of writing) and unzip it in your local folder (roughly `~30 Mb` at the time of writing). For the next tasks, we will assume you are within that folder.
+1. **Download the latest version of the repository**: Download a local version of our [GitHub repository monorepo](https://github.com/hoprnet/hoprnet/tree/release/bogota)
+   with the latest release (`bogota` at the time of writing) and unzip it in your local folder (roughly `~30 Mb` at the time of writing). For the next tasks, we will assume you are within that folder.
 
 ```bash
-wget https://github.com/hoprnet/hoprnet/archive/refs/heads/release/valencia.zip
-unzip valencia.zip
-cd hoprnet-release-valencia
+wget https://github.com/hoprnet/hoprnet/archive/refs/heads/release/bogota.zip
+unzip bogota.zip
+cd hoprnet-release-bogota
 ```
 
 2. **Install the dependencies of the project and build it**:

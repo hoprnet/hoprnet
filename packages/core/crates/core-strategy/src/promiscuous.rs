@@ -15,6 +15,7 @@ pub struct PromiscuousStrategy {
     pub minimum_channel_balance: Balance,
     pub minimum_node_balance: Balance,
     pub max_channels: Option<usize>,
+    pub auto_redeem_tickets: bool
 }
 
 impl PromiscuousStrategy {
@@ -24,7 +25,8 @@ impl PromiscuousStrategy {
             new_channel_stake: Balance::from_str("100000000000000000").unwrap(),
             minimum_channel_balance: Balance::from_str("10000000000000000").unwrap(),
             minimum_node_balance: Balance::from_str("100000000000000000").unwrap(),
-            max_channels: None
+            max_channels: None,
+            auto_redeem_tickets: false
         }
     }
 }
@@ -216,6 +218,7 @@ pub mod wasm {
         pub minimum_channel_balance: Option<String>,
         pub minimum_node_balance: Option<String>,
         pub max_channels: Option<u32>,
+        pub auto_redeem_tickets: Option<bool>,
     }
 
     #[wasm_bindgen]
@@ -247,6 +250,7 @@ pub mod wasm {
                 self.w.minimum_channel_balance = super::Balance::from_str(option.as_str())?;
             }
             self.w.max_channels = cfg.max_channels.map(|c| c as usize);
+            self.w.auto_redeem_tickets = cfg.auto_redeem_tickets.unwrap_or(false);
 
             Ok(())
         }

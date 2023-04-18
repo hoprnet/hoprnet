@@ -49,7 +49,7 @@ ___
 
 ### configure
 
-▸ **configure**(`settings`): `any`
+▸ **configure**(`settings`): `void`
 
 #### Parameters
 
@@ -59,7 +59,7 @@ ___
 
 #### Returns
 
-`any`
+`void`
 
 #### Defined in
 
@@ -69,14 +69,13 @@ ___
 
 ### onChannelWillClose
 
-▸ **onChannelWillClose**(`channel`, `chain`): `Promise`<`void`\>
+▸ **onChannelWillClose**(`channel`): `Promise`<`void`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `channel` | `ChannelEntry` |
-| `chain` | `default` |
 
 #### Returns
 
@@ -90,14 +89,13 @@ ___
 
 ### onWinningTicket
 
-▸ **onWinningTicket**(`t`, `chain`): `Promise`<`void`\>
+▸ **onWinningTicket**(`t`): `Promise`<`void`\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `t` | `AcknowledgedTicket` |
-| `chain` | `default` |
 
 #### Returns
 
@@ -140,7 +138,7 @@ ___
 | `balance` | `BN` |
 | `network_peer_ids` | `Iterator`<`string`, `any`, `undefined`\> |
 | `outgoing_channel` | `OutgoingChannelStatus`[] |
-| `peer_quality` | (`string`: `any`) => `number` |
+| `peer_quality` | (`string`: `string`) => `number` |
 
 #### Returns
 

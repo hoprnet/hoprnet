@@ -125,27 +125,27 @@ particular branch to deploy on every change.
 ### Release Cycle
 
 ```
-   hotfix/patch-bogota    staging/bogota         release/bogota           master
+   hotfix/patch-riga    staging/riga         release/riga           master
 
          x                   x                       x  create new release  x
-         x                   x                       x◄─────────────────────x 1.91.0-next.44
-         x                   x   create new staging  x 1.91.0               x
+         x                   x                       x◄─────────────────────x 1.92.0-next.44
+         x                   x   create new staging  x 1.92.0               x
          x                   │ ◄─────────────────────│                      x
          x                   │                       │   first merge-back   x
-         x                   │                       │ ──────────────────►  x 1.92.0-next.0
-         x                   │ 1.91.0-next.0         │                      x
+         x                   │                       │ ──────────────────►  x 1.93.0-next.0
+         x                   │ 1.92.0-next.0         │                      x
          x                   │                       │                      x
          x  start hotfix     ▼                       │                      x
          ┌◄──────────────────x                       │                      x
          │                   x                       │                      x
          │  hotfix merge     x                       │                      x
-         ▼──────────────────►┐ 1.91.0-next.1         │                      x
+         ▼──────────────────►┐ 1.92.0-next.1         │                      x
          x                   │                       │                      x
                              │   release upgrade     │                      x
-         x                   ▼──────────────────────►┐ 1.91.1               x
+         x                   ▼──────────────────────►┐ 1.92.1               x
          x                   x   staging upgrade     │                      x
          x                   x ◄─────────────────────│                      x
-         x                   x 1.91.1-next.0         │                      x
+         x                   x 1.92.1-next.0         │                      x
          x                   x                       │   next merge-back    x
          x                   x                       │ ──────────────────►  x
 
@@ -153,15 +153,16 @@ particular branch to deploy on every change.
 
 1. Setup some environment variables:
 
-- Give a name to the release like `paleochora`, `valencia`. For instance : `export RELEASE_NAME=bogota`.
-- Give a name to the previous release: `export OLD_RELEASE_NAME=valencia`
+- Give a name to the release. For instance : `export RELEASE_NAME=riga`.
+- Give a name to the previous release: `export OLD_RELEASE_NAME=bogota`
 - Give a name to the target environment of the release. For instance: `export ENVIRONMENT_NAME=monte_rosa`
 
-2. Create a release tracking issue on GitHub. Use previous issues as [templates](https://github.com/hoprnet/hoprnet/issues/4275)
+2. Create a release tracking issue on GitHub. Use previous issues as [templates](https://github.com/hoprnet/hoprnet/issues/4487)
 3. On the `master` branch, and before the creation of the release branch, there should be an entry in `packages/hoprd/releases.json` for the new release name.
 
 - If the release will run in its own environment ($RELEASENAME == $ENVIRONMENT_NAME) then a new entry in `packages/core/protocol-config.json` should be created for the network.
-- If the release will run in a multienvironment network like `monte_rosa` then update the monte_rosa entry to accespt the new `version_range` of the new release.
+- If the release will run in a multienvironment network like `monte_rosa` then update the file `packages/core/protocol-config.json` for the `monte_rosa` entry to accept the new `version_range` of the new release.
+- Create a PR and merge it into master
 
 4. On the `master` branch, create the release branch locally by executing `git checkout -b release/${RELEASE_NAME}`.
 5. On the `release/${RELEASE_NAME}` branch, and before pushing the branch to GitHub, some release-specific changes should be applied to ensure the resulting CD artifacts actually are proper release artifacts.
@@ -226,9 +227,17 @@ Once the upgraded release is deployed, the Staging deployment must be updated as
 
 1. (on `staging/${RELEASE_NAME}`) create branch `release-upgrade-${RELEASE_NAME}`: `git checkout -b release-upgrade-${RELEASE_NAME}`
 2. (on `release-upgrade-${RELEASE_NAME}`) merge `release/${RELEASE_NAME}` into the branch: `git merge release/${RELEASE_NAME}`.
-   In case of a merge conflict, the changes from the `release-upgrade-${RELEASE_NAME}` branch take precedence.
-3. Create a PR of `release-upgrade-${RELEASE_NAME}` and ask for a peer review.
+   In case of a merge conflict, the changes from the `release-upgrade-${RELEASE_NAME}` branch take precedence. For the conflict on the package.json version attribute, it should be taken the one comming from the `release/${RELEASE_NAME}` branch which does not have the suffix `-next.X`.
+3. Create a PR of `release-upgrade-${RELEASE_NAME}` and target to `release/${RELEASE_NAME}` and ask for a peer review.
    Each of such PR merges will trigger a new release version, and re-build our infrastructure.
+   ```
+    git checkout release/${RELEASE_NAME}
+    git pull
+    git checkout staging/${RELEASE_NAME}
+    git pull
+    git checkout -b release-upgrade-${RELEASE_NAME}
+    git merge release/${RELEASE_NAME}
+   ```
 4. Wait for the CI to deploy upgraded Release. Then perform the following steps for Staging upgrade.
 5. (on `staging/${RELEASE_NAME}`) create branch `staging-upgrade-${RELEASE_NAME}`: `git checkout -b staging-upgrade-${RELEASE_NAME}`
 6. (on `staging-upgrade-${RELEASE_NAME}`) merge `release/${RELEASE_NAME}` into the branch: `git merge release/${RELEASE_NAME}`.
@@ -249,6 +258,35 @@ Once the upgraded release is deployed, the Staging deployment must be updated as
       In regards to version naming convention for the merge-back:
    - If it is the first merge-back, then the version number to be used should be the one being used in the release branch which does not have the suffix `-next.XX`.
    - If it is other merge-back, then the version number to be used should be the one being used in the master branch which it has the suffix `-next.XX`.
+
+```
+  git checkout master
+  git pull
+  git branch -D merge-back-release-${RELEASE_NAME}
+  git checkout release/${RELEASE_NAME}
+  git pull
+  git checkout -b merge-back-release-${RELEASE_NAME}
+  git merge master
+
+  packages=(connect core-ethereum core cover-traffic-daemon ethereum hoprd real utils)
+  for package in "${packages[@]}"; do
+    changes=$(git diff packages/$package/package.json  | grep @@ | wc -l)
+    if [ "$changes" -eq "1" ]; then
+      echo "git checkout --theirs packages/$package/package.json"
+      echo "git add packages/$package/package.json"
+    else
+      echo "Review changes manully for ./packages/$package/package.json"
+    fi
+  done
+
+  echo "Resolving clonficts on Vscode for the package.json it would be similar to perform a 'Accept incomming change'"
+
+  git status
+
+  git commit -m "Merge branch 'master' into merge-back-release-${RELEASE_NAME}"
+  git push --set-upstream origin merge-back-release-${RELEASE_NAME}
+```
+
 4. Modify the above created PR to add reviewers, and labels accordingly. Wait for the review before merge the `merge-back-release-${RELEASE_NAME}` branch to `master`.
 5. If the release runs in a new environment, then redeploy `api.hoprnet.org` in Vercel to pickup release specific changes from the `protocol-config.json`.
 6. Remind that the release must be merged-back every week (Friday) to minimise conflicts whenever we want to merge a hotfix back to master.
@@ -289,8 +327,8 @@ The following are a series of manual tasks that are needed to be executed for th
 
 - [ ] Create a DNS alias for each node (cloud, cover-traffic, topology), to be accessed via our `hoprnet.link` domain (e.g. ct-1-$release.hoprnet.link)
 - [ ] Tag a distribution manually $release on npm and on Docker Hub.
-  - `npm login`, `npm dist-tag add @hoprnet/hoprd@$version $mountain/$city`
-  - `docker login`, `docker tag gcr.io/hoprassociation/hoprd:latest hopr/hoprd:$city/$mountain`
+- `npm login`, `npm dist-tag add @hoprnet/hoprd@$version $mountain/$city`
+- `docker login`, `docker tag gcr.io/hoprassociation/hoprd:latest hopr/hoprd:$city/$mountain`
 
 #### Per $chain
 
@@ -306,7 +344,7 @@ The following are a series of manual tasks that are needed to be executed for th
 
 ```
 CT_PRIV_KEY=14e6...a6a5 \
-  ./scripts/setup-ct-gcloud-cluster.sh athens
+./scripts/setup-ct-gcloud-cluster.sh athens
 ```
 
 #### `topology` deployment script
@@ -321,7 +359,11 @@ export HOPRD_API_TOKEN=^binary6wire6GLEEMAN9urbanebetween1watch^
 
 HOPRD_PERFORM_CLEANUP=false \
 HOPRD_SHOW_PRESTART_INFO=true \
-./scripts/setup-gcloud-cluster.sh monte_rosa `pwd`/scripts/topologies/full_interconnected_cluster.sh bogota-topology-1-91 gcr.io/hoprassociation/hoprd:bogota 6 bogota-topology-1-91 true
+./scripts/setup-gcloud-cluster.sh monte_rosa `pwd`/scripts/topologies/full_interconnected_cluster.sh ${RELEASE_NAME}-topology-1-92 gcr.io/hoprassociation/hoprd:${RELEASE_NAME} 6 ${RELEASE_NAME}-topology-1-92 true
 
+
+```
+
+```
 
 ```

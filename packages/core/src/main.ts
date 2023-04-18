@@ -231,7 +231,7 @@ export async function createHoprNode(
   }
 
   log(`using provider URL: ${options.environment.network.default_provider}`)
-  const chain = new HoprCoreEthereum(
+  const chain = HoprCoreEthereum.createInstance(
     db,
     PublicKey.fromPeerId(peerId),
     keysPBM.PrivateKey.decode(peerId.privateKey as Uint8Array).Data,
@@ -254,5 +254,5 @@ export async function createHoprNode(
   // Initialize connection to the blockchain
   await chain.initializeChainWrapper(resolvedContractAddresses)
 
-  return new Hopr(peerId, db, chain, options)
+  return new Hopr(peerId, db, options)
 }

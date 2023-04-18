@@ -13,7 +13,7 @@ HOPR has multiple GraphQL API Endpoints hosted by [The Graph](https://thegraph.c
 
 These subgraphs can be used to query on-chain HOPR data. The subgraphs data are serviced by a decentralized group of server operators called [Indexers](https://thegraph.com/docs/en/network/indexing/).
 
-The HOPR subgraphs work by listening for events emitted by one or more data sources (Smart Contracts) on the various chains. They handle the indexing and caching of data which can later be queried using the GraphQL API Endpoint, providing an excellent developer experience.
+The HOPR subgraphs work by listening for events emitted by one or more data sources (Smart Contracts) on the various chains. They handle the indexing and caching of data, which can later be queried using the GraphQL API Endpoint, providing an excellent developer experience.
 
 ## Get Started
 
