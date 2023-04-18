@@ -41,3 +41,8 @@ vector_assertions = "0.1.0"
 wasm-pack = { workspace = true }
 wasm-opt = { workspace = true }
 
+[package.metadata.wasm-pack.profile.dev]
+wasm-opt = false
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ['-O', '--enable-reference-types']
