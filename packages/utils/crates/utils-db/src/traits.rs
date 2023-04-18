@@ -1,21 +1,23 @@
 use async_trait::async_trait;
+use crate::errors::{DbError,Result};
 
-#[async_trait]
+// not placing the `Send` trait limitations on the trait
+#[async_trait(?Send)]
 pub trait AsyncKVStorage {
     type Key;
     type Value;
 
     #[must_use]
-    async fn get(&self, key: &Self::Key) -> Option<Self::Value>;
+    async fn get(&self, key: Self::Key) -> Option<Self::Value>;
 
     async fn set(&mut self, key: Self::Key, value: Self::Value) -> Option<Self::Value>;
 
     #[must_use]
-    async fn contains(&self, key: &Self::Key) -> bool;
+    async fn contains(&self, key: Self::Key) -> bool;
 
-    async fn remove(&mut self, key: &Self::Key) -> Option<Self::Value>;
+    async fn remove(&mut self, key: Self::Key) -> Option<Self::Value>;
 
-    async fn dump(&self) -> Result<(), std::fmt::Error>;
+    async fn dump(&self, destination: String) -> Result<()>;
 }
 
 pub trait KVStorage {
@@ -32,5 +34,5 @@ pub trait KVStorage {
 
     fn remove(&mut self, key: &Self::Key) -> Option<Self::Value>;
 
-    fn dump(&self) -> Result<(), std::fmt::Error>;
+    fn dump(&self) -> crate::errors::Result<()>;
 }

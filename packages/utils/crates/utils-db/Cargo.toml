@@ -16,6 +16,7 @@ wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys"]
 async-trait = "0.1"
 serde = { version = "1.0", features = ["derive"] }
 js-sys = { version = "0.3.60", optional = true }
+thiserror = "1.0"
 wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen-futures = { version = "0.4.33", optional = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }

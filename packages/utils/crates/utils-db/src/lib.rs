@@ -1,6 +1,7 @@
 pub mod hashmap;
 pub mod traits;
 pub mod leveldb;
+pub mod errors;
 
 pub use traits::KVStorage;
 

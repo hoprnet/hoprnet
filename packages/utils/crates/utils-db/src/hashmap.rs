@@ -1,3 +1,4 @@
+use crate::errors::DbError;
 use crate::traits::KVStorage;
 
 pub struct InMemoryHashMapStorage<K, V>
@@ -22,7 +23,7 @@ where
 
 impl<K, V> KVStorage for InMemoryHashMapStorage<K, V>
 where
-    K: std::cmp::Eq + std::hash::Hash,
+    K: Eq + std::hash::Hash,
     V: Clone,
 {
     type Key = K;
@@ -44,7 +45,7 @@ where
         self.data.remove(key)
     }
 
-    fn dump(&self) -> Result<(), std::fmt::Error> {
+    fn dump(&self) -> Result<(), DbError> {
         Ok(())
     }
 }
