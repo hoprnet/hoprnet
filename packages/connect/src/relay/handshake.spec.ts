@@ -20,6 +20,7 @@ const destination = privKeyToPeerId('0xf2462c7eec43cde144e025c8feeac547d8f87fb9a
 
 function getRelayState(existing: boolean = false): Parameters<typeof negotiateRelayHandshake>[3] {
   return {
+    delete: () => {},
     exists: () => existing,
     isActive: async () => false,
     updateExisting: () => false,
