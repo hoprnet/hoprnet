@@ -1,18 +1,11 @@
-use blake2::{Blake2s256, Digest};
-
-/// Takes a ping request message and returns a ping response message
-pub fn generate_ping_response(req: Box<[u8]>) -> Box<[u8]> {
-    let mut hasher = Blake2s256::new();
-
-    hasher.update(req);
-
-    hasher.finalize().to_vec().into_boxed_slice()
-}
+use serde::{Deserialize, Serialize};
+use validator::Validate;
 
 /// Configuration of the Heartbeat
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Validate, Serialize, Deserialize)]
 pub struct HeartbeatConfig {
+    /// The maximum number of concurrent heartbeats
     pub max_parallel_heartbeats: usize,
     pub heartbeat_variance: f32,
     pub heartbeat_interval: u32,
@@ -21,10 +14,15 @@ pub struct HeartbeatConfig {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
+    use crate::errors::NetworkingError;
     use crate::heartbeat::HeartbeatConfig;
+    use crate::messaging::{ControlMessage, ControlMessage::Ping, PingMessage};
     use futures::stream::{Stream, StreamExt};
     use js_sys::AsyncIterator;
     use utils_misc::async_iterable::wasm::{to_box_u8_stream, to_jsvalue_stream};
+    use utils_misc::ok_or_jserr;
+    use utils_misc::utils::wasm::JsResult;
+    use utils_types::traits::BinarySerializable;
     use wasm_bindgen::prelude::*;
     use wasm_bindgen_futures::stream::JsStream;
 
@@ -53,25 +51,30 @@ pub mod wasm {
 
     #[wasm_bindgen]
     impl AsyncIterableHelperCoreHeartbeat {
-        pub async fn next(&mut self) -> Result<JsValue, JsValue> {
+        pub async fn next(&mut self) -> JsResult<JsValue> {
             to_jsvalue_stream(self.stream.as_mut().next().await)
         }
     }
 
+    /// Used to pre-compute ping responses
     #[wasm_bindgen]
-    pub fn reply_to_ping(stream: AsyncIterator) -> Result<AsyncIterableHelperCoreHeartbeat, JsValue> {
-        let stream = JsStream::from(stream)
-            .map(to_box_u8_stream)
-            .map(|req| req.map(super::generate_ping_response));
+    pub fn generate_ping_response(u8a: &[u8]) -> JsResult<Box<[u8]>> {
+        ok_or_jserr!(PingMessage::deserialize(u8a)
+            .map_err(|_| NetworkingError::DecodingError)
+            .and_then(|req| ControlMessage::generate_pong_response(&Ping(req)))
+            .and_then(|msg| msg.get_ping_message().map(PingMessage::serialize)))
+    }
+
+    #[wasm_bindgen]
+    pub fn reply_to_ping(stream: AsyncIterator) -> JsResult<AsyncIterableHelperCoreHeartbeat> {
+        let stream = JsStream::from(stream).map(to_box_u8_stream).map(|res| {
+            res.and_then(|rq| {
+                generate_ping_response(rq.as_ref()).map_err(|e| e.as_string().unwrap_or("not a string".into()))
+            })
+        });
 
         Ok(AsyncIterableHelperCoreHeartbeat {
             stream: Box::new(stream),
         })
-    }
-
-    /// Used to pre-compute ping responses
-    #[wasm_bindgen]
-    pub fn generate_ping_response(u8a: &[u8]) -> Box<[u8]> {
-        super::generate_ping_response(u8a.into())
     }
 }

@@ -1,6 +1,7 @@
 import type Hopr from '@hoprnet/hopr-core'
 import type { Operation } from 'express-openapi'
 import { STATUS_CODES } from '../../utils.js'
+import { health_to_string } from '@hoprnet/hopr-core'
 
 /**
  * @returns Information about the HOPR Node, including any options it started with.
@@ -19,7 +20,7 @@ export const getInfo = async (node: Hopr) => {
       hoprChannels: hoprChannelsAddress,
       hoprNetworkRegistry: hoprNetworkRegistryAddress,
       isEligible: await node.isAllowedAccessToNetwork(node.getId()),
-      connectivityStatus: node.getConnectivityHealth().toString(),
+      connectivityStatus: health_to_string(node.getConnectivityHealth()),
       channelClosurePeriod: Math.ceil(channelClosureSecs / 60)
     }
   } catch (error) {

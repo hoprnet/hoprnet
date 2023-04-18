@@ -31,7 +31,6 @@ export type Strategy = (typeof STRATEGIES)[number]
 export function isStrategy(str: string): str is Strategy {
   return STRATEGIES.includes(str)
 }
-
 export interface OutgoingChannelStatus {
   peer_id: string
   stake_str: string
@@ -72,7 +71,7 @@ export interface ChannelStrategyInterface {
  * At present this does not take gas into consideration.
  */
 export abstract class SaneDefaults {
-  protected autoRedeemTickets: boolean = false
+  protected autoRedeemTickets: boolean = true
 
   async onAckedTicket(ackTicket: AcknowledgedTicket) {
     if (this.autoRedeemTickets) {
@@ -115,7 +114,6 @@ export abstract class SaneDefaults {
 }
 
 interface RustStrategyInterface {
-  configure: (settings: any) => void
   tick: (
     balance: Balance,
     network_peer_ids: Iterator<string>,
@@ -134,8 +132,12 @@ class RustStrategyWrapper<T extends RustStrategyInterface> extends SaneDefaults 
   }
 
   configure(settings: any) {
+    for (const [key, value] of Object.entries(settings)) {
+      if (key in this.strategy) {
+        this.strategy[key] = value
+      }
+    }
     this.autoRedeemTickets = settings.auto_redeem_tickets ?? false
-    this.strategy.configure(settings)
   }
 
   tick(

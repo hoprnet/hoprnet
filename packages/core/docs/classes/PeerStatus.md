@@ -21,6 +21,7 @@
 ### Methods
 
 - [free](PeerStatus.md#free)
+- [metadata](PeerStatus.md#metadata)
 - [peer\_id](PeerStatus.md#peer_id)
 - [build](PeerStatus.md#build)
 
@@ -38,7 +39,7 @@
 
 #### Defined in
 
-packages/core/lib/core_network.d.ts:412
+packages/core/lib/core_network.d.ts:1009
 
 ___
 
@@ -48,7 +49,7 @@ ___
 
 #### Defined in
 
-packages/core/lib/core_network.d.ts:415
+packages/core/lib/core_network.d.ts:1012
 
 ___
 
@@ -58,7 +59,7 @@ ___
 
 #### Defined in
 
-packages/core/lib/core_network.d.ts:418
+packages/core/lib/core_network.d.ts:1015
 
 ___
 
@@ -68,7 +69,7 @@ ___
 
 #### Defined in
 
-packages/core/lib/core_network.d.ts:421
+packages/core/lib/core_network.d.ts:1018
 
 ___
 
@@ -78,7 +79,7 @@ ___
 
 #### Defined in
 
-packages/core/lib/core_network.d.ts:424
+packages/core/lib/core_network.d.ts:1021
 
 ___
 
@@ -88,7 +89,7 @@ ___
 
 #### Defined in
 
-packages/core/lib/core_network.d.ts:427
+packages/core/lib/core_network.d.ts:1024
 
 ___
 
@@ -98,7 +99,7 @@ ___
 
 #### Defined in
 
-packages/core/lib/core_network.d.ts:430
+packages/core/lib/core_network.d.ts:1027
 
 ## Methods
 
@@ -112,7 +113,21 @@ packages/core/lib/core_network.d.ts:430
 
 #### Defined in
 
-packages/core/lib/core_network.d.ts:393
+packages/core/lib/core_network.d.ts:985
+
+___
+
+### metadata
+
+▸ **metadata**(): `Map`<`any`, `any`\>
+
+#### Returns
+
+`Map`<`any`, `any`\>
+
+#### Defined in
+
+packages/core/lib/core_network.d.ts:993
 
 ___
 
@@ -126,13 +141,13 @@ ___
 
 #### Defined in
 
-packages/core/lib/core_network.d.ts:397
+packages/core/lib/core_network.d.ts:989
 
 ___
 
 ### build
 
-▸ `Static` **build**(`peer`, `origin`, `is_public`, `last_seen`, `quality`, `heartbeats_sent`, `heartbeats_succeeded`, `backoff`): [`PeerStatus`](PeerStatus.md)
+▸ `Static` **build**(`peer`, `origin`, `is_public`, `last_seen`, `quality`, `heartbeats_sent`, `heartbeats_succeeded`, `backoff`, `peer_metadata`): [`PeerStatus`](PeerStatus.md)
 
 #### Parameters
 
@@ -146,6 +161,7 @@ ___
 | `heartbeats_sent` | `bigint` |
 | `heartbeats_succeeded` | `bigint` |
 | `backoff` | `number` |
+| `peer_metadata` | `Map`<`any`, `any`\> |
 
 #### Returns
 
@@ -153,4 +169,4 @@ ___
 
 #### Defined in
 
-packages/core/lib/core_network.d.ts:409
+packages/core/lib/core_network.d.ts:1006

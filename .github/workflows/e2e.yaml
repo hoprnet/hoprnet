@@ -32,7 +32,7 @@ jobs:
 
       - name: Sccache Setup
         if: ${{ !env.ACT }}
-        uses: mozilla-actions/sccache-action@v0.0.1
+        uses: mozilla-actions/sccache-action@v0.0.3
         with:
           version: "v0.4.0"
 
@@ -44,6 +44,7 @@ jobs:
         with:
           name: hoprnet
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+        continue-on-error: true
 
       - name: get yarn cache directory path
         id: yarn-cache-dir-path

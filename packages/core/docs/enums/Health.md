@@ -6,66 +6,68 @@
 
 ### Enumeration Members
 
-- [GREEN](Health.md#green)
-- [ORANGE](Health.md#orange)
-- [RED](Health.md#red)
-- [UNKNOWN](Health.md#unknown)
-- [YELLOW](Health.md#yellow)
+- [Green](Health.md#green)
+- [Orange](Health.md#orange)
+- [Red](Health.md#red)
+- [Unknown](Health.md#unknown)
+- [Yellow](Health.md#yellow)
 
 ## Enumeration Members
 
-### GREEN
+### Green
 
-• **GREEN** = ``4``
+• **Green** = ``4``
 
 High quality connection to at least 1 public relay and 1 NAT node
 
 #### Defined in
 
-packages/core/lib/core_network.d.ts:139
+packages/core/lib/core_network.d.ts:218
 
 ___
 
-### ORANGE
+### Orange
 
-• **ORANGE** = ``2``
+• **Orange** = ``2``
 
 Low quality connection to at least 1 public relay
 
 #### Defined in
 
-packages/core/lib/core_network.d.ts:131
+packages/core/lib/core_network.d.ts:210
 
 ___
 
-### RED
+### Red
 
-• **RED** = ``1``
+• **Red** = ``1``
 
 No connection, default
 
 #### Defined in
 
-packages/core/lib/core_network.d.ts:127
+packages/core/lib/core_network.d.ts:206
 
 ___
 
-### UNKNOWN
+### Unknown
 
-• **UNKNOWN** = ``0``
+• **Unknown** = ``0``
+
+Unknown health, on application startup
 
 #### Defined in
 
-packages/core/lib/core_network.d.ts:123
+packages/core/lib/core_network.d.ts:202
 
 ___
 
-### YELLOW
+### Yellow
 
-• **YELLOW** = ``3``
+• **Yellow** = ``3``
 
 High quality connection to at least 1 public relay
 
 #### Defined in
 
-packages/core/lib/core_network.d.ts:135
+packages/core/lib/core_network.d.ts:214
