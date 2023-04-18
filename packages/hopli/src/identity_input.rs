@@ -14,7 +14,7 @@ pub struct LocalIdentityFromDirectoryArgs {
         short = 'd',
         value_hint = ValueHint::DirPath,
     )]
-    pub identity_directory: String,
+    pub identity_directory: Option<String>,
 
     #[clap(
         help = "Only use identity files with prefix",
@@ -28,21 +28,21 @@ pub struct LocalIdentityFromDirectoryArgs {
 #[derive(Debug, Clone, Parser)]
 pub struct LocalIdentityArgs {
     #[clap(help = "Get identity file(s) from a directory", flatten)]
-    identity_from_directory: Option<LocalIdentityFromDirectoryArgs>,
+    pub identity_from_directory: Option<LocalIdentityFromDirectoryArgs>,
 
     #[clap(
         long,
         help = "The path to an identity file",
         value_hint = ValueHint::FilePath,
-        name = "identity_file_path"
+        name = "identity_from_path"
     )]
-    identity_from_path: Option<PathBuf>,
+    pub identity_from_path: Option<PathBuf>,
 }
 
 impl Default for LocalIdentityFromDirectoryArgs {
     fn default() -> Self {
         LocalIdentityFromDirectoryArgs {
-            identity_directory: "/tmp".to_string(),
+            identity_directory: None,
             identity_prefix: None,
         }
     }
@@ -55,10 +55,13 @@ impl LocalIdentityFromDirectoryArgs {
             identity_directory,
             identity_prefix,
         } = self;
-        log!(target: "identity_reader", Level::Debug, "Reading dir {}", &identity_directory);
+        let files: Vec<PathBuf> = Vec::new();
+        let id_dir = identity_directory.unwrap();
+
+        log!(target: "identity_reader", Level::Debug, "Reading dir {}", &id_dir);
 
         // early return if failed in reading identity directory
-        let directory = fs::read_dir(Path::new(&identity_directory))?;
+        let directory = fs::read_dir(Path::new(&id_dir))?;
         // read all the files from the directory that contains
         // 1) "id" in its name
         // 2) the provided idetity_prefix
@@ -121,7 +124,7 @@ mod tests {
     fn revert_get_dir_from_non_existing_dir() {
         let path = "./tmp_non_exist";
         let dir_args = LocalIdentityFromDirectoryArgs {
-            identity_directory: path.to_string(),
+            identity_directory: Some(path.to_string()),
             identity_prefix: None,
         };
 
@@ -136,7 +139,7 @@ mod tests {
         let path = "./tmp_exist_1";
         create_file(path, None, 0);
         let dir_args = LocalIdentityFromDirectoryArgs {
-            identity_directory: path.to_string(),
+            identity_directory: Some(path.to_string()),
             identity_prefix: None,
         };
 
@@ -152,7 +155,7 @@ mod tests {
         let path = "./tmp_exist_2";
         create_file(path, None, 4);
         let dir_args = LocalIdentityFromDirectoryArgs {
-            identity_directory: path.to_string(),
+            identity_directory: Some(path.to_string()),
             identity_prefix: None,
         };
 

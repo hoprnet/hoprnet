@@ -25,6 +25,9 @@ pub enum HelperErrors {
     #[error("unable to read identity")]
     UnableToReadIdentity,
 
+    #[error("unable to read identity directory")]
+    MissingIdentityDirectory,
+
     #[error("unable to delete identity")]
     UnableToDeleteIdentity,
 

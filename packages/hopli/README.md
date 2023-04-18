@@ -21,14 +21,40 @@ cargo install --path .
 
 ## Commands
 
+### General arguments
+
+#### Identity directory or path
+
+Identities can be read from a directory or directly from a path.
+
+When reading from a directory, identity files MUST contain "id" in their file name to be considered as an identity file.
+An additional parameter which specifies its prefix can also be passed.
+
+```
+    --identity-directory "./test" \
+    --identity-prefix node_ \
+```
+
+When reading from a path, use `--identity-from-path "./test/hopr.id"`
+
+Path and directory can be passed at the same time.
+
+Note: when CREATing identities, you must pass `--identity-directory`. `--identity-from-path` is not accepted
+
+#### Password
+
+Password can be passed either as an env variable `IDENTITY_PASSWORD`, or via a path to the password file `--password-path`, e.g. `--password-path ./.pwd`
+
+### Create/Read identities
+
 To create some identities with password as env variable. Alternatively, a path to the password file can be provided with `--password-path`, e.g. `--password-path ./.pwd`
 
 ```
 IDENTITY_PASSWORD=local \
     hopli identity \
     --action create \
-    --directory "./test" \
-    --name node_ \
+    --identity-directory "./test" \
+    --identity-prefix node_ \
     --number 3
 ```
 
@@ -38,8 +64,8 @@ Read ethereum addresses from identities
 IDENTITY_PASSWORD=switzerland \
     hopli identity \
     --action read \
-    --directory "./test" \
-    --name node_
+    --identity-directory "./test" \
+    --identity-prefix node_
 
 ```
 
@@ -104,21 +130,33 @@ cargo run -- -h
 Create 3 identity files in `./test` folder where password is saved in `.pwd` file
 
 ```
-cargo run -- identity --action create --password-path ./.pwd --directory "./test" --name node_ --number 3
+cargo run -- identity \
+    --action create \
+    --password-path ./.pwd \
+    --identity-directory "./test" \
+    --identity-prefix node_ \
+    --number 3
 ```
 
 Create 2 identity files in `./test` folder where password is stored as an environment variable `IDENTITY_PASSWORD`
 
 ```
 IDENTITY_PASSWORD=switzerland \
-cargo run -- identity --action create --directory "./test" --name node_ --number 2
+cargo run -- identity \
+    --action create \
+    --identity-directory "./test" \
+    --identity-prefix node_ \
+    --number 2
 ```
 
 Read ethereum addresses from identities
 
 ```
 IDENTITY_PASSWORD=switzerland \
-cargo run -- identity --action read --directory "./test" --name node_
+cargo run -- identity \
+    --action read \
+    --identity-directory "./test" \
+    --identity-prefix node_
 
 ```
 
