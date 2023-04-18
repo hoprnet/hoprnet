@@ -18,6 +18,8 @@
 - Added mitigation for connection leakage to prevent DHT and p2p connection failures ([#4870](https://github.com/hoprnet/hoprnet/pull/4870))
 - Fixed incorrect recording of some Ping metrics ([#4867](https://github.com/hoprnet/hoprnet/pull/4867))
 - Enforced 1 GB memory usage limit of HOPRd on Avado ([#4898](https://github.com/hoprnet/hoprnet/pull/4898))
+- Added RelayState cleanup which prevents excessive connection leakage on public relay nodes ([#4912](https://github.com/hoprnet/hoprnet/pull/4912))
+- Reduced maximum number of relay connections to 2000 ([#4912](https://github.com/hoprnet/hoprnet/pull/4912))
 
 <a name="1.92"></a>
 

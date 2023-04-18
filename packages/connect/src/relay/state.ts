@@ -123,11 +123,11 @@ class RelayState {
   }
 
   async printIds() {
-    let ret: string[] = [];
+    let ret: string[] = []
     for await (let [cid, _] of this.relayedConnections.entries()) {
       ret.push(cid)
     }
-    return ret.join(",")
+    return ret.join(',')
   }
 
   /**
