@@ -37,7 +37,7 @@ jobs:
           repository: hoprnet/gitops
           path: "./gitops"
           token: ${{ secrets.COMMIT_BOT_ACCESS_TOKEN }}
-          ref: ${GITOPS_BRANCH}
+          ref: ${{ env.GITOPS_BRANCH }}
           fetch-depth: 0
 
       - name: Set up environment
@@ -48,7 +48,7 @@ jobs:
           echo "NETWORK=${network}" >> $GITHUB_ENV
           echo "NETWORK_DASH=${network/_/-}" >> $GITHUB_ENV
           echo git checkout -b undeployments/${network/_/-}-pr-${{ github.event.pull_request.number }}
-          ./scripts/sync-deployment.sh undeploy -e ${GITOPS_ENVIRONMENT} -pr ${{ github.event.pull_request.number }}
+          ./scripts/sync-deployment.sh undeploy -e ${{ env.GITOPS_ENVIRONMENT }} -pr ${{ github.event.pull_request.number }}
         working-directory: "./gitops"
       - name: Create Undeploy Pull Request
         uses: peter-evans/create-pull-request@v5
