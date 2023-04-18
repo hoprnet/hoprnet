@@ -11,9 +11,19 @@
 
 [package]
 edition = "2018"
+<<<<<<< HEAD
+<<<<<<<< HEAD:vendor/cargo/windows_aarch64_gnullvm-0.48.0/Cargo.toml
 
 name = "windows_aarch64_gnullvm"
 version = "0.48.0"
+========
+name = "windows_x86_64_gnu"
+version = "0.42.2"
+>>>>>>>> master:vendor/cargo/windows_x86_64_gnu-0.42.2/Cargo.toml
+=======
+name = "windows_aarch64_gnullvm"
+version = "0.48.0"
+>>>>>>> master
 authors = ["Microsoft"]
 description = "Import lib for Windows"
 license = "MIT OR Apache-2.0"
