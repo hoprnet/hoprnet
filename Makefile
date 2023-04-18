@@ -249,7 +249,7 @@ lint-rust: ## run linter for Rust
 
 .PHONY: lint-python
 lint-python: ## run linter for Python
-	source .venv/bin/activate && black --check tests/
+	source .venv/bin/activate && ruff --fix . && black --check tests/
 
 .PHONY: fmt
 fmt: fmt-ts fmt-rust fmt-python
