@@ -80,14 +80,6 @@ class HoprdAPI(object):
         data = json.dumps({})
         return await self.call_api(f"/channels?includingClosed=${include_closed}", "GET", bytes(data, "utf-8"))
 
-    async def get_all_channels(self, include_closed: bool):
-        data = json.dumps({})
-        return await self.call_api(f"/channels?includingClosed=${include_closed}", "GET", bytes(data, "utf-8"))
-
-    async def get_tickets_in_channel(self, peer_id):
-        data = json.dumps({})
-        return await self.call_api(f"/channels/{peer_id}/tickets", "GET", bytes(data, "utf-8"))
-
     async def redeem_tickets_in_channel(self, peer_id):
         """Redeeming tickets can take up to 5 minutes"""
         data = json.dumps({})
@@ -96,7 +88,7 @@ class HoprdAPI(object):
     async def redeem_tickets(self):
         """Redeeming tickets can take up to 5 minutes"""
         data = json.dumps({})
-        return await self.call_api(f"tickets/redeem", "POST", bytes(data, "utf-8"))
+        return await self.call_api("tickets/redeem", "POST", bytes(data, "utf-8"))
 
     async def ping(self, peer_id):
         data = json.dumps(
@@ -104,7 +96,7 @@ class HoprdAPI(object):
                 "peerId": f"{peer_id}",
             }
         )
-        return await self.call_api(f"node/ping", "POST", bytes(data, "utf-8"))
+        return await self.call_api("node/ping", "POST", bytes(data, "utf-8"))
 
     async def peers(self):
         data = json.dumps({})
@@ -112,7 +104,7 @@ class HoprdAPI(object):
 
     async def get_address(self):
         data = json.dumps({})
-        return await self.call_api(f"account/addresses", "GET", bytes(data, "utf-8"))
+        return await self.call_api("account/addresses", "GET", bytes(data, "utf-8"))
 
     async def send_message(self, destination, message, hops):
         assert isinstance(hops, list)
