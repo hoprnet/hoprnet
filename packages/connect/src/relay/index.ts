@@ -180,7 +180,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     this.stopKeepAlive = retimer(
       periodicKeepAlive,
       // TODO: Make these values configurable
-      () => randomInteger(10000, 10000 + 3000)
+      () => randomInteger(25_000, 40_000)
     )
 
     this._isStarted = true
@@ -207,8 +207,9 @@ class Relay implements Initializable, ConnectInitializable, Startable {
   }
 
   protected async keepAliveRelayConnection(): Promise<void> {
-    // TODO: perform ping as well, right now just prints out connection info
     if (this.relayState.relayedConnectionCount() > 0) {
+      await this.relayState.prune()
+
       let outConns = `Current relay connections:\n`
       outConns += await this.relayState.printIds()
       log(outConns.substring(0, outConns.length - 1))
@@ -392,7 +393,6 @@ class Relay implements Initializable, ConnectInitializable, Startable {
 
     log(`handling relay request from ${conn.connection.remotePeer.toString()}`)
     log(`relayed connection count: ${this.relayState.relayedConnectionCount()}`)
-
     try {
       if (this.relayState.relayedConnectionCount() >= (this.options.maxRelayedConnections as number)) {
         log(`relayed request rejected, already at max capacity (${this.options.maxRelayedConnections as number})`)

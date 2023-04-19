@@ -204,6 +204,29 @@ class RelayState {
     }.bind(this)
   }
 
+  public async prune(timeout?: number) {
+    let markedForDeletion: string[] = []
+    await Promise.all(Array.from(this.relayedConnections.entries()).map(async([id, ctx]) => {
+      for (let [_, conn] of Object.entries(ctx)) {
+        try {
+          if (await conn.ping(timeout) < 0) {
+            markedForDeletion.push(id);
+            verbose(`${id} relayed connection is inactive and will be evicted from the relay state`)
+            break;
+          }
+        }
+        catch (err) {
+          error(err)
+        }
+      }
+    }))
+
+    for (let del in markedForDeletion) {
+      this.relayedConnections.delete(del)
+    }
+    verbose(`${markedForDeletion.length} relay entries were evicted due to inactivity`)
+  }
+
   /**
    * Creates an identifier that is used to store the relayed connection
    * instance.
