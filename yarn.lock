@@ -752,7 +752,7 @@ __metadata:
     "@types/mocha": 9.1.1
     "@types/node": 16
     "@types/simple-peer": 9.11.5
-    abortable-iterator: 4.0.2
+    abortable-iterator: 4.0.3
     chalk: 5.0.1
     debug: 4.3.4
     err-code: 3.0.1
@@ -797,7 +797,7 @@ __metadata:
     retimer: 3.0.0
     secp256k1: 4.0.3
     sinon: 12.0.1
-    typedoc: 0.23.28
+    typedoc: 0.24.4
     typedoc-plugin-markdown: 3.14.0
     typescript: 4.9.5
   languageName: unknown
@@ -843,7 +843,7 @@ __metadata:
     retimer: 3.0.0
     secp256k1: 4.0.3
     sinon: 12.0.1
-    typedoc: 0.23.28
+    typedoc: 0.24.4
     typedoc-plugin-markdown: 3.14.0
     typescript: 4.9.5
   languageName: unknown
@@ -856,7 +856,7 @@ __metadata:
     "@types/mocha": 9.1.1
     mocha: 9.2.2
     semver: 7.3.8
-    typedoc: 0.23.28
+    typedoc: 0.24.4
     typedoc-plugin-markdown: 3.14.0
     typescript: 4.9.5
   languageName: unknown
@@ -884,7 +884,7 @@ __metadata:
     "@multiformats/multiaddr": 10.3.3
     "@types/chai": 4.3.4
     "@types/mocha": 9.1.1
-    abortable-iterator: 4.0.2
+    abortable-iterator: 4.0.3
     bignumber.js: 9.0.2
     bl: 5.0.0
     bn.js: 5.2.1
@@ -906,7 +906,7 @@ __metadata:
     secp256k1: 4.0.3
     sinon: 12.0.1
     timeout-abort-controller: 3.0.0
-    typedoc: 0.23.28
+    typedoc: 0.24.4
     typedoc-plugin-markdown: 3.14.0
     typescript: 4.9.5
   languageName: unknown
@@ -947,7 +947,7 @@ __metadata:
     swagger-ui-express: 4.6.2
     trace-unhandled: 2.0.1
     ts-node: ^10.9.1
-    typedoc: 0.23.28
+    typedoc: 0.24.4
     typedoc-plugin-markdown: 3.14.0
     typescript: 4.9.5
     uuid: ^9.0.0
@@ -2392,7 +2392,17 @@ __metadata:
   languageName: node
   linkType: hard
 
-"abortable-iterator@npm:4.0.2, abortable-iterator@npm:^4.0.2":
+"abortable-iterator@npm:4.0.3":
+  version: 4.0.3
+  resolution: "abortable-iterator@npm:4.0.3"
+  dependencies:
+    get-iterator: ^2.0.0
+    it-stream-types: ^1.0.3
+  checksum: 2a63559053316ff5f77951c1306b751a5e81c022784fa27e8fa826474686e385cfdaa9c6d2f3476544a23265ed26844e864a61f5769cd6736c48e3e618c7bc9e
+  languageName: node
+  linkType: hard
+
+"abortable-iterator@npm:^4.0.2":
   version: 4.0.2
   resolution: "abortable-iterator@npm:4.0.2"
   dependencies:
@@ -7773,12 +7783,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"marked@npm:^4.2.12":
-  version: 4.2.12
-  resolution: "marked@npm:4.2.12"
+"marked@npm:^4.3.0":
+  version: 4.3.0
+  resolution: "marked@npm:4.3.0"
   bin:
     marked: bin/marked.js
-  checksum: bd551cd61028ee639d4ca2ccdfcc5a6ba4227c1b143c4538f3cde27f569dcb57df8e6313560394645b418b84a7336c07ab1e438b89b6324c29d7d8cdd3102d63
+  checksum: 0db6817893952c3ec710eb9ceafb8468bf5ae38cb0f92b7b083baa13d70b19774674be04db5b817681fa7c5c6a088f61300815e4dd75a59696f4716ad69f6260
   languageName: node
   linkType: hard
 
@@ -7991,12 +8001,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"minimatch@npm:^7.1.3":
-  version: 7.4.3
-  resolution: "minimatch@npm:7.4.3"
+"minimatch@npm:^9.0.0":
+  version: 9.0.0
+  resolution: "minimatch@npm:9.0.0"
   dependencies:
     brace-expansion: ^2.0.1
-  checksum: daa954231b6859e3ba0e5fbd2486986d3cae283bb69acb7ed3833c84a293f8d7edb8514360ea62c01426ba791446b2a1e1cc0d718bed15c0212cef35c59a6b95
+  checksum: 7bd57899edd1d1b0560f50b5b2d1ea4ad2a366c5a2c8e0a943372cf2f200b64c256bae45a87a80915adbce27fa36526264296ace0da57b600481fe5ea3e372e5
   languageName: node
   linkType: hard
 
@@ -11307,19 +11317,19 @@ __metadata:
   languageName: node
   linkType: hard
 
-"typedoc@npm:0.23.28":
-  version: 0.23.28
-  resolution: "typedoc@npm:0.23.28"
+"typedoc@npm:0.24.4":
+  version: 0.24.4
+  resolution: "typedoc@npm:0.24.4"
   dependencies:
     lunr: ^2.3.9
-    marked: ^4.2.12
-    minimatch: ^7.1.3
+    marked: ^4.3.0
+    minimatch: ^9.0.0
     shiki: ^0.14.1
   peerDependencies:
     typescript: 4.6.x || 4.7.x || 4.8.x || 4.9.x || 5.0.x
   bin:
     typedoc: bin/typedoc
-  checksum: 40eb4e207aac1b734e09400cf03f543642cc7b11000895198dd5a0d3166315759ccf4ac30a2915153597c5c186101c72bac2f1fc12b428184a9274d3a0e44c5e
+  checksum: c6762aff2b40eb574fc348c82921471fa1c1dc8a83adc284457aab30ea61768770be469f424340ab646944472653290578fd8e6308d55ec2e611577472067dae
   languageName: node
   linkType: hard
 
