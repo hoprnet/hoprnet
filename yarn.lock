@@ -752,7 +752,7 @@ __metadata:
     "@types/mocha": 9.1.1
     "@types/node": 16
     "@types/simple-peer": 9.11.5
-    abortable-iterator: 4.0.2
+    abortable-iterator: 4.0.3
     chalk: 5.0.1
     debug: 4.3.4
     err-code: 3.0.1
@@ -884,7 +884,7 @@ __metadata:
     "@multiformats/multiaddr": 10.3.3
     "@types/chai": 4.3.4
     "@types/mocha": 9.1.1
-    abortable-iterator: 4.0.2
+    abortable-iterator: 4.0.3
     bignumber.js: 9.0.2
     bl: 5.0.0
     bn.js: 5.2.1
@@ -2392,7 +2392,17 @@ __metadata:
   languageName: node
   linkType: hard
 
-"abortable-iterator@npm:4.0.2, abortable-iterator@npm:^4.0.2":
+"abortable-iterator@npm:4.0.3":
+  version: 4.0.3
+  resolution: "abortable-iterator@npm:4.0.3"
+  dependencies:
+    get-iterator: ^2.0.0
+    it-stream-types: ^1.0.3
+  checksum: 2a63559053316ff5f77951c1306b751a5e81c022784fa27e8fa826474686e385cfdaa9c6d2f3476544a23265ed26844e864a61f5769cd6736c48e3e618c7bc9e
+  languageName: node
+  linkType: hard
+
+"abortable-iterator@npm:^4.0.2":
   version: 4.0.2
   resolution: "abortable-iterator@npm:4.0.2"
   dependencies:
