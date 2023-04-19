@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use crate::errors::{DbError,Result};
+use crate::errors::Result;
 
 // not placing the `Send` trait limitations on the trait
 #[async_trait(?Send)]

@@ -63,6 +63,33 @@ function createMockedTicket(signerPrivKey: Uint8Array, counterparty: Address) {
   )
 }
 
+import { u8aToHex } from '../u8a/toHex.js'
+import { privKeyToPeerId } from '../libp2p/privKeyToPeerId.js'
+
+export function randomPeerId(): PeerId {
+  return privKeyToPeerId(u8aToHex(randomBytes(32)))
+}
+
+import { LevelDb } from './db.js'
+import {db_sanity_test} from "../../lib/utils_db.js";
+import {PeerId} from "@libp2p/interface-peer-id";
+describe('db shim tests', function() {
+  it('basic DB operations are performed in Rust correctly', async function () {
+    let randomPublicKey = PublicKey.fromPeerId(randomPeerId()).toCompressedPubKeyHex()  // toUncompressedPubKeyHex()
+
+    let db = new LevelDb(randomPublicKey)
+    await db.init(true, '/tmp/test-shim.db', true, 'monte_rosa')
+
+    try {
+      let result = await db_sanity_test(db)
+      assert(result)
+    } catch (e) {
+      assert("", e.toString())
+    }
+  })
+})
+
+
 describe(`database tests`, function () {
   let db: TestingDB
 

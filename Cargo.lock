@@ -1034,6 +1034,7 @@ dependencies = [
  "core-crypto",
  "utils-db",
  "utils-misc",
+ "utils-types",
  "wasm-bindgen",
  "wasm-bindgen-test",
  "wasm-opt",

@@ -23,6 +23,7 @@ core-crypto = { path = "../core-crypto" }
 #serde_json = "1.0"
 utils-db = { path = "../../../utils/crates/utils-db"}
 utils-misc = { path = "../../../utils/crates/utils-misc"}
+utils-types = { path = "../../../utils/crates/utils-types"}
 #serde-wasm-bindgen = { version = "0.4", optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 

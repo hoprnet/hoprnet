@@ -1,7 +1,9 @@
-use core_crypto::types::{HalfKeyChallenge, Hash, PublicKey, Ticket};
+use async_trait::async_trait;
+
+use core_crypto::types::{HalfKeyChallenge, Hash, PublicKey};
 use utils_types::primitives::{Address, Balance};
 
-pub type Result<T> = std::result::Result<T, std::error::Error>;
+pub type Result<T> = std::result::Result<T, utils_db::errors::DbError>;
 
 // TODO: placeholder for the non-existent types
 type Ticket = u128;
@@ -9,7 +11,7 @@ type UnacknowledgedTicket = u128;
 type ChannelEntry = u128;
 
 
-// TODO: packat interaction only
+// TODO: packet interaction only
 #[async_trait]
 pub trait HoprCoreDbActions {
     // TODO: update u128 to u256
