@@ -165,7 +165,7 @@ jobs:
           network=master-staging
           echo "NETWORK_DASH=${network/_/-}" >> $GITHUB_ENV
       - name: Executing remote SSH command
-        uses: appleboy/ssh-action@v0.1.9
+        uses: appleboy/ssh-action@v0.1.10
         with:
           host: ${{ secrets.K8S_SSH_SERVICE_HOST }}
           username: ${{ secrets.K8S_SSH_SERVICE_USERNAME }}
