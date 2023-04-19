@@ -20,6 +20,7 @@
 - Enforced 1 GB memory usage limit of HOPRd on Avado ([#4898](https://github.com/hoprnet/hoprnet/pull/4898))
 - Added RelayState cleanup which prevents excessive connection leakage on public relay nodes ([#4912](https://github.com/hoprnet/hoprnet/pull/4912))
 - Reduced maximum number of relay connections to 2000 ([#4912](https://github.com/hoprnet/hoprnet/pull/4912))
+- Add pruning in the relay connections keep-alive mechanism ([#4916](https://github.com/hoprnet/hoprnet/pull/4916))
 
 <a name="1.92"></a>
 

@@ -124,7 +124,7 @@ class RelayState {
 
   async printIds() {
     let ret: string[] = []
-    for await (let [cid, _] of this.relayedConnections.entries()) {
+    for await (let cid of this.relayedConnections.keys()) {
       ret.push(cid)
     }
     return ret.join(',')
@@ -204,6 +204,32 @@ class RelayState {
     }.bind(this)
   }
 
+  public async prune(timeout?: number) {
+    if (this.relayedConnections.size == 0) return 0
+
+    let pruned = 0
+    await Promise.all(
+      Array.from(this.relayedConnections.entries()).map(async ([id, ctx]) => {
+        for (let [_, conn] of Object.entries(ctx)) {
+          try {
+            if ((await conn.ping(timeout)) < 0) {
+              if (this.relayedConnections.delete(id)) {
+                ++pruned
+              } else {
+                error(`could not delete ${id} inactive relayed connection from the relay state`)
+              }
+              break
+            }
+          } catch (err) {
+            error(err)
+          }
+        }
+      })
+    )
+
+    return pruned
+  }
+
   /**
    * Creates an identifier that is used to store the relayed connection
    * instance.
@@ -212,18 +238,17 @@ class RelayState {
    * @returns the identifier
    */
   static getId(a: PeerId, b: PeerId): string {
-    /*const cmpResult = u8aCompare(
-      unmarshalPublicKey(a.publicKey as Uint8Array).marshal(),
-      unmarshalPublicKey(b.publicKey as Uint8Array).marshal()
-    )*/
-    const cmpResult = a.toString().localeCompare(b.toString())
+    let aStr = a.toString()
+    let bStr = b.toString()
+
+    const cmpResult = aStr.localeCompare(bStr)
 
     // human-readable ID
     switch (cmpResult) {
       case 1:
-        return `${a.toString()}-${b.toString()}`
+        return `${aStr}-${bStr}`
       case -1:
-        return `${b.toString()}-${a.toString()}`
+        return `${bStr}-${aStr}`
       default:
         throw Error(`Invalid compare result. Loopbacks are not allowed.`)
     }

@@ -321,7 +321,7 @@ function RelayContext(
     }
 
     const iterator: Stream['source'] = (async function* () {
-      log(`source called`)
+      //log(`source called`)
 
       let leave = false
       flow(`FLOW: relay_incoming: started loop`)
@@ -386,12 +386,12 @@ function RelayContext(
                 flow(`FLOW: relay_incoming: got PING or PONG, continue`)
                 switch (SUFFIX[0]) {
                   case StatusMessages.PING:
-                    verbose(`PING received`)
+                    //verbose(`PING received`)
                     queueStatusMessage(Uint8Array.of(RelayPrefix.STATUS_MESSAGE, StatusMessages.PONG))
                     // Don't forward ping
                     break
                   case StatusMessages.PONG:
-                    verbose(`PONG received`)
+                    //verbose(`PONG received`)
 
                     state._pingResponsePromise?.resolve({
                       type: ConnectionEventTypes.PING_RESPONSE
@@ -479,7 +479,7 @@ function RelayContext(
    * is attached yet.
    */
   const createSink = async (): Promise<void> => {
-    log(`createSink called`)
+    //log(`createSink called`)
     let currentSink = stream.sink
 
     let nextMessagePromise: Promise<PayloadEvent> | undefined
