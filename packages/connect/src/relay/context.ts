@@ -321,7 +321,7 @@ function RelayContext(
     }
 
     const iterator: Stream['source'] = (async function* () {
-      log(`source called`)
+      //log(`source called`)
 
       let leave = false
       flow(`FLOW: relay_incoming: started loop`)
@@ -479,7 +479,7 @@ function RelayContext(
    * is attached yet.
    */
   const createSink = async (): Promise<void> => {
-    log(`createSink called`)
+    //log(`createSink called`)
     let currentSink = stream.sink
 
     let nextMessagePromise: Promise<PayloadEvent> | undefined

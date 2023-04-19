@@ -180,7 +180,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     this.stopKeepAlive = retimer(
       periodicKeepAlive,
       // TODO: Make these values configurable
-      () => randomInteger(25_000, 40_000)
+      () => randomInteger(15_000, 35_000)
     )
 
     this._isStarted = true
@@ -207,14 +207,9 @@ class Relay implements Initializable, ConnectInitializable, Startable {
   }
 
   protected async keepAliveRelayConnection(): Promise<void> {
-    if (this.relayState.relayedConnectionCount() > 0) {
-      await this.relayState.prune()
-
-      let outConns = `Current relay connections:\n`
-      outConns += await this.relayState.printIds()
-      log(outConns.substring(0, outConns.length - 1))
-    }
+    await this.relayState.prune()
     metric_countRelayedConns.set(this.relayState.relayedConnectionCount())
+    log(`Current relay connections:\n ${await this.relayState.printIds()}`)
 
     let outRelays = `Currently tracked connections to relays:\n`
     for (const relayPeerId of this.connectedToRelays) {
