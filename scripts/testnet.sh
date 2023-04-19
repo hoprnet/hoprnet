@@ -42,7 +42,7 @@ disk_name() {
 # $1=environment id
 get_network() {
   local environment_id="${1}"
-  jq -r ".environments.\"${environment_id}\".network_id" "${mydir}/../packages/core/protocol-config.json"
+  jq -r ".environments.\"${environment_id}\".chain" "${mydir}/../packages/core/protocol-config.json"
 }
 
 # $1=environment id
@@ -54,10 +54,10 @@ get_environment_type() {
 
 # $1=environment id
 get_rpc() {
-  local network_id
-  network_id="$(get_network "${1}")"
+  local chain
+  chain="$(get_network "${1}")"
 
-  jq -r ".networks.\"${network_id}\".default_provider" "${mydir}/../packages/core/protocol-config.json" | envsubst
+  jq -r ".networks.\"${chain}\".default_provider" "${mydir}/../packages/core/protocol-config.json" | envsubst
 }
 
 # $1 = environment

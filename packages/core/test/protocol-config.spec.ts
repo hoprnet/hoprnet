@@ -12,8 +12,8 @@ describe('protocol config', async function () {
 
   it('should be internally consistent', async function () {
     for (const env of Object.values(data.environments)) {
-      if (!data.networks[env.network_id]) {
-        throw new Error(`no such network: ${env.network_id}`)
+      if (!data.networks[env.chain]) {
+        throw new Error(`no such network: ${env.chain}`)
       }
     }
   })

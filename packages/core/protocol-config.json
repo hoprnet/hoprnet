@@ -1,7 +1,7 @@
 {
   "environments": {
     "anvil-localhost": {
-      "network_id": "anvil",
+      "chain": "anvil",
       "environment_type": "development",
       "version_range": "*",
       "indexer_start_block_number": 3,
@@ -15,7 +15,7 @@
       "tags": []
     },
     "anvil-localhost2": {
-      "network_id": "anvil",
+      "chain": "anvil",
       "environment_type": "development",
       "version_range": "*",
       "indexer_start_block_number": 3,
@@ -29,7 +29,7 @@
       "tags": []
     },
     "master-staging": {
-      "network_id": "xdai",
+      "chain": "xdai",
       "environment_type": "staging",
       "version_range": "*",
       "indexer_start_block_number": 26356392,
@@ -43,7 +43,7 @@
       "tags": ["etherscan"]
     },
     "debug-staging": {
-      "network_id": "xdai",
+      "chain": "xdai",
       "environment_type": "staging",
       "version_range": "*",
       "indexer_start_block_number": 26356264,
@@ -58,7 +58,7 @@
     },
     "tuttlingen": {
       "environment_type": "production",
-      "network_id": "xdai",
+      "chain": "xdai",
       "version_range": "1.83",
       "indexer_start_block_number": 0,
       "token_contract_address": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
@@ -71,7 +71,7 @@
       "tags": []
     },
     "prague": {
-      "network_id": "xdai",
+      "chain": "xdai",
       "environment_type": "production",
       "version_range": "1.84",
       "indexer_start_block_number": 0,
@@ -85,7 +85,7 @@
       "tags": []
     },
     "budapest": {
-      "network_id": "xdai",
+      "chain": "xdai",
       "environment_type": "production",
       "version_range": "1.85",
       "indexer_start_block_number": 0,
@@ -99,7 +99,7 @@
       "tags": []
     },
     "athens": {
-      "network_id": "xdai",
+      "chain": "xdai",
       "environment_type": "production",
       "version_range": "1.86",
       "indexer_start_block_number": 0,
@@ -113,7 +113,7 @@
       "tags": []
     },
     "lisbon": {
-      "network_id": "xdai",
+      "chain": "xdai",
       "environment_type": "production",
       "version_range": "1.87",
       "indexer_start_block_number": 0,
@@ -127,7 +127,7 @@
       "tags": []
     },
     "ouagadougou": {
-      "network_id": "xdai",
+      "chain": "xdai",
       "environment_type": "production",
       "version_range": "1.88",
       "indexer_start_block_number": 0,
@@ -141,7 +141,7 @@
       "tags": []
     },
     "paleochora": {
-      "network_id": "xdai",
+      "chain": "xdai",
       "environment_type": "production",
       "version_range": "1.89",
       "indexer_start_block_number": 0,
@@ -155,7 +155,7 @@
       "tags": ["etherscan"]
     },
     "monte_rosa": {
-      "network_id": "xdai",
+      "chain": "xdai",
       "environment_type": "production",
       "version_range": "1.89||1.90||1.91||1.92||1.93",
       "indexer_start_block_number": 24097267,

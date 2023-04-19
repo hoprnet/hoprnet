@@ -216,7 +216,7 @@ Note that deployment for `HoprDistributor` and `HoprWrapper` are skipped; ERC182
 - It does not need "networks" attribute
 - In "environment" attribute:
   ```
-  - "network_id": "goerli",
+  - "chain": "goerli",
   - "version_range": "*",
   - "channel_contract_deploy_block": 0,
   + "stake_season": 5,

@@ -60,9 +60,9 @@ if ! [[ $avado_version =~ [0-9]{1,}\.[0-9]{1,}\.[0-9]{1,}$ ]]; then
 fi
 
 # Retrieve the provider URL for the given environment ID from protocol-config.json
-declare provider_url=$(jq -r ".environments.\"${environment_id}\".network_id as \$envid | .networks[\$envid].default_provider // \"\"" "${mydir}/../packages/core/protocol-config.json")
+declare provider_url=$(jq -r ".environments.\"${environment_id}\".chain as \$envid | .networks[\$envid].default_provider // \"\"" "${mydir}/../packages/core/protocol-config.json")
 if [ -z "${provider_url}" ]; then
-  msg "Environment ${environment_id} has invalid network_id"
+  msg "Environment ${environment_id} has invalid chain"
   exit 1
 fi
 

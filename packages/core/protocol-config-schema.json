@@ -7,7 +7,7 @@
         "^[a-z0-9-]+$": {
           "type": "object",
           "properties": {
-            "network_id": {
+            "chain": {
               "type": "string"
             },
             "environment_type": {
@@ -51,7 +51,7 @@
             }
           },
           "required": [
-            "network_id",
+            "chain",
             "environment_type",
             "version_range",
             "indexer_start_block_number",

@@ -63,7 +63,7 @@ pub struct Environment {
     #[serde(skip_deserializing)]
     pub id: String,
     /// must match one of the Network.id
-    pub network_id: String,
+    pub chain: String,
     pub environment_type: EnvironmentType,
     // Node.js-fashioned semver string
     pub version_range: String,
@@ -200,13 +200,10 @@ impl ResolvedEnvironment {
             environment_id
         ))?;
 
-        let network = protocol_config
-            .networks
-            .get_mut(&environment.network_id)
-            .ok_or(format!(
-                "Invalid network_id {} for environment {}",
-                environment.network_id, environment_id
-            ))?;
+        let network = protocol_config.networks.get_mut(&environment.chain).ok_or(format!(
+            "Invalid chain {} for environment {}",
+            environment.chain, environment_id
+        ))?;
 
         if let Some(custom_provider) = maybe_custom_provider {
             network.default_provider = custom_provider.into();
