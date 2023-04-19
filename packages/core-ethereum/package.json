@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core-ethereum",
-  "version": "1.94.0-next.16",
+  "version": "1.94.0-next.23",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -46,7 +46,7 @@
     "@types/bn.js": "^5.1.1",
     "@types/chai": "4.3.4",
     "@types/mocha": "9.1.1",
-    "@types/sinon": "10.0.13",
+    "@types/sinon": "10.0.14",
     "chai": "4.3.7",
     "mocha": "9.2.2",
     "sinon": "12.0.1",

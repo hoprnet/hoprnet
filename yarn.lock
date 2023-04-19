@@ -784,7 +784,7 @@ __metadata:
     "@types/bn.js": ^5.1.1
     "@types/chai": 4.3.4
     "@types/mocha": 9.1.1
-    "@types/sinon": 10.0.13
+    "@types/sinon": 10.0.14
     async-mutex: 0.3.2
     bn.js: 5.2.1
     chai: 4.3.7
@@ -2297,12 +2297,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/sinon@npm:10.0.13":
-  version: 10.0.13
-  resolution: "@types/sinon@npm:10.0.13"
+"@types/sinon@npm:10.0.14":
+  version: 10.0.14
+  resolution: "@types/sinon@npm:10.0.14"
   dependencies:
     "@types/sinonjs__fake-timers": "*"
-  checksum: 46a14c888db50f0098ec53d451877e0111d878ec4a653b9e9ed7f8e54de386d6beb0e528ddc3e95cd3361a8ab9ad54e4cca33cd88d45b9227b83e9fc8fb6688a
+  checksum: b6e1d46bfb03fa5c11ba4a84790795dcb72dae4e599318ca6983affff106bf56874a0b1b5e263ca15319c7e7bd92132d6db30fa62890ffb2ee29b011bdd5d548
   languageName: node
   linkType: hard
 

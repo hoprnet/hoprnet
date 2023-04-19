@@ -29,7 +29,7 @@
 
 ### autoRedeemTickets
 
-• `Protected` **autoRedeemTickets**: `boolean` = `false`
+• `Protected` **autoRedeemTickets**: `boolean` = `true`
 
 #### Defined in
 
