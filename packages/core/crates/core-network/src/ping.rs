@@ -51,19 +51,18 @@ pub struct PingConfig {
     pub timeout: Duration,
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-pub struct Ping {
+pub struct Ping<Actions> {
     config: PingConfig,
     _protocol_heartbeat: [String; 2],
-    external_api: Box<dyn PingExternalAPI>,
+    external_api: Actions,
     metric_time_to_heartbeat: Option<SimpleHistogram>,
     metric_time_to_ping: Option<SimpleHistogram>,
     metric_successful_ping_count: Option<SimpleCounter>,
     metric_failed_ping_count: Option<SimpleCounter>,
 }
 
-impl Ping {
-    pub fn new(config: PingConfig, external_api: Box<dyn PingExternalAPI>) -> Ping {
+impl<Actions: PingExternalAPI> Ping<Actions> {
+    pub fn new(config: PingConfig, external_api: Actions) -> Self {
         let config = PingConfig {
             max_parallel_pings: config.max_parallel_pings.min(PINGS_MAX_PARALLEL),
             ..config
@@ -262,7 +261,7 @@ pub mod wasm {
     use wasm_bindgen::JsCast;
 
     #[wasm_bindgen]
-    struct WasmPingApi {
+    pub struct WasmPingApi {
         _environment_id: String,
         _version: String,
         on_finished_ping_cb: js_sys::Function,
@@ -288,103 +287,6 @@ pub mod wasm {
                         .as_str()
                 )
             };
-        }
-    }
-
-    /// WASM wrapper for the Ping that accepts a JS function for sending a ping message and returing
-    /// a Future for the peer reply.
-    #[wasm_bindgen]
-    pub struct Pinger {
-        pinger: Ping,
-        send_msg_cb: js_sys::Function,
-    }
-
-    #[wasm_bindgen]
-    impl Pinger {
-        #[wasm_bindgen]
-        pub fn build(
-            environment_id: String,
-            version: String,
-            on_finished_ping_cb: js_sys::Function,
-            send_msg_cb: js_sys::Function,
-        ) -> Self {
-            let api = Box::new(WasmPingApi {
-                _environment_id: environment_id.clone(),
-                _version: version.clone(),
-                on_finished_ping_cb,
-            });
-
-            let config = PingConfig {
-                environment_id,
-                normalized_version: version,
-                max_parallel_pings: PINGS_MAX_PARALLEL,
-                timeout: Duration::from_secs(30),
-            };
-
-            Self {
-                pinger: Ping::new(config, api),
-                send_msg_cb,
-            }
-        }
-
-        /// Ping the peers represented as a Vec<JsString> values that are converted into usable
-        /// PeerIds.
-        ///
-        /// # Arguments
-        /// * `peers` - Vector of String representations of the PeerIds to be pinged.
-        #[wasm_bindgen]
-        pub async fn ping(&self, mut peers: Vec<JsString>) {
-            let converted = peers
-                .drain(..)
-                .filter_map(|x| {
-                    let x: String = x.into();
-                    PeerId::from_str(&x).ok()
-                })
-                .collect::<Vec<_>>();
-
-            let message_transport =
-                |msg: Box<[u8]>,
-                 peer: String|
-                 -> std::pin::Pin<Box<dyn futures::Future<Output = Result<Box<[u8]>, String>>>> {
-                    Box::pin(async move {
-                        let this = JsValue::null();
-                        let data: JsValue = js_sys::Uint8Array::from(msg.as_ref()).into();
-                        let peer: JsValue = JsString::from(peer.as_str()).into();
-
-                        // call a send_msg_cb producing a JS promise that is further converted to a Future
-                        // holding the reply of the pinged peer for the ping message.
-                        match self.send_msg_cb.call2(&this, &data, &peer) {
-                            Ok(r) => {
-                                let promise = js_sys::Promise::from(r);
-                                let data = wasm_bindgen_futures::JsFuture::from(promise)
-                                    .await
-                                    .map(|x| js_sys::Array::from(x.as_ref()).get(0))
-                                    .map(|x| js_sys::Uint8Array::new(&x).to_vec().into_boxed_slice())
-                                    .map_err(|x| {
-                                        x.dyn_ref::<JsString>()
-                                            .map_or("Failed to send ping message".to_owned(), |x| -> String {
-                                                x.into()
-                                            })
-                                    });
-
-                                data
-                            }
-                            Err(e) => {
-                                error!(
-                                    "The message transport could not be established: {}",
-                                    e.as_string()
-                                        .unwrap_or_else(|| {
-                                            "The message transport failed with unknown error".to_owned()
-                                        })
-                                        .as_str()
-                                );
-                                Err(format!("Failed to extract transport error as string: {:?}", e))
-                            }
-                        }
-                    })
-                };
-
-            self.pinger.ping_peers(converted, &message_transport).await;
         }
     }
 }

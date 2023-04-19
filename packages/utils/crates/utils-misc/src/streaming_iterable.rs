@@ -1,7 +1,6 @@
 /// Converts from duplex JS stream to Rust `futures::Stream` / `futures::Sink`
-use crate::traits::DuplexStream;
+use crate::{async_iterable::wasm::to_jsvalue_iterator, traits::DuplexStream};
 use core::{panic, pin::Pin, task::Waker};
-
 use futures::{
     stream::FusedStream,
     task::{Context, Poll},
@@ -10,9 +9,7 @@ use futures::{
 use js_sys::{AsyncIterator, Function, Object, Promise, Reflect, Symbol};
 use pin_project_lite::pin_project;
 use utils_log::{error, info};
-use utils_misc::async_iterable::wasm::to_jsvalue_iterator;
-use wasm_bindgen::{closure::Closure, JsValue};
-use wasm_bindgen::{prelude::*, JsCast};
+use wasm_bindgen::{closure::Closure, prelude::*, JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 
 /// Typing of the Javascrip duplex stream

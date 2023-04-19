@@ -1,7 +1,6 @@
-use core::pin::Pin;
-use std::collections::HashMap;
+use std::{collections::HashMap, pin::Pin, task::Waker};
 
-use crate::{constants::DEFAULT_RELAYED_CONNECTION_PING_TIMEOUT, traits::DuplexStream};
+use crate::constants::DEFAULT_RELAYED_CONNECTION_PING_TIMEOUT;
 use futures::{
     channel::mpsc::{self, UnboundedReceiver, UnboundedSender},
     future::{select, Either},
@@ -12,8 +11,8 @@ use futures::{
 };
 use getrandom::getrandom;
 use pin_project_lite::pin_project;
-use std::task::Waker;
 use utils_log::{error, info};
+use utils_misc::traits::DuplexStream;
 
 #[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::sleep;
@@ -616,10 +615,12 @@ impl<St: DuplexStream, Cbs: RelayServerCbs> Sink<Box<[u8]>> for Server<St, Cbs> 
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use crate::streaming_iterable::{AsyncIterable, JsStreamingIterable, StreamingIterable, Uint8ArrayIteratorNext};
     use futures::{stream::Next, FutureExt, SinkExt, StreamExt};
     use js_sys::{AsyncIterator, Function, Number, Object, Promise, Reflect, Symbol, Uint8Array};
-    use utils_misc::async_iterable::wasm::to_jsvalue_stream;
+    use utils_misc::{
+        async_iterable::wasm::to_jsvalue_stream,
+        streaming_iterable::{AsyncIterable, JsStreamingIterable, StreamingIterable, Uint8ArrayIteratorNext},
+    };
 
     use utils_log::info;
     use wasm_bindgen::{prelude::*, JsCast};
