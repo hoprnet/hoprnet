@@ -758,7 +758,7 @@ __metadata:
     err-code: 3.0.1
     heap-js: 2.2.0
     it-handshake: 4.0.0
-    it-pair: 2.0.4
+    it-pair: 2.0.6
     it-pipe: 2.0.5
     it-pushable: 3.0.0
     mocha: 9.2.2
@@ -6812,13 +6812,13 @@ __metadata:
   languageName: node
   linkType: hard
 
-"it-pair@npm:2.0.4":
-  version: 2.0.4
-  resolution: "it-pair@npm:2.0.4"
+"it-pair@npm:2.0.6":
+  version: 2.0.6
+  resolution: "it-pair@npm:2.0.6"
   dependencies:
-    it-stream-types: ^1.0.3
+    it-stream-types: ^2.0.1
     p-defer: ^4.0.0
-  checksum: 7eedc5712c860b3741a26efdbfb747b9757acd328b7ffd48c73f46710f76b3e0462e4649044ca3210f9e6cae1a5f011bcf2b603ff3ef3ac6c3c5ce91f951804c
+  checksum: aadd87d4f6c4e3281dc6d77758252c32c55f8646b19d87b8273437a48ecd2f37aa8b3363aeeddc161466005df0f63ff3515245fe835c4a38d6a22988ea16285a
   languageName: node
   linkType: hard
 
@@ -6958,6 +6958,13 @@ __metadata:
   version: 1.0.4
   resolution: "it-stream-types@npm:1.0.4"
   checksum: efd1ff5fa968ff11b39c47ed1ce8131e44c61c5adc811d627c3149da1e08c83f3e73fe33942dad94bceb225b9ea4c4056eb24d9cf4f0c15313ab50c86ece35c9
+  languageName: node
+  linkType: hard
+
+"it-stream-types@npm:^2.0.1":
+  version: 2.0.1
+  resolution: "it-stream-types@npm:2.0.1"
+  checksum: 14c5a13dbef08ae3a9b824ae9d05a8f3eb25ef46994ede25f763472f8367498395bd4be13c88b93846fd4b56c9a4763beb268ef8fa26575b17ef8f9327f9bf77
   languageName: node
   linkType: hard
 
