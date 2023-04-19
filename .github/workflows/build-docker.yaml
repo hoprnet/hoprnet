@@ -33,10 +33,19 @@ jobs:
         id: changeset
         # Set outputs using the command.
         run: |
-          echo "toolchain=$(git diff --name-only --diff-filter=ACMRT ${{ github.event.pull_request.base.ref }} ${{ github.event.pull_request.head.ref }} | grep -e ^scripts/ -e ^Makefile$ -e ^package.json$ -e ^.yarnrc.yml$ -e ^rust-toolchain.toml$ -e ^.nvmrc -e ^yarn.lock$ -e ^Cargo.toml$ | xargs)" >> $GITHUB_OUTPUT
-          echo "hopli=$(git diff --name-only --diff-filter=ACMRT ${{ github.event.pull_request.base.ref }} ${{ github.event.pull_request.head.ref }} | grep ^packages/hopli/ | xargs)" >> $GITHUB_OUTPUT
-          echo "hoprd=$(git diff --name-only --diff-filter=ACMRT ${{ github.event.pull_request.base.ref }} ${{ github.event.pull_request.head.ref }} | grep -v ^.github/ | grep ^packages/hopli/ | grep -v ^scripts | grep -v ^.processes | grep -v ^docs/ | grep -v .md  | xargs)" >> $GITHUB_OUTPUT
-
+          echo "Comparing  ${{ github.event.pull_request.base.sha }} against ${{ github.event.pull_request.head.sha }}"
+          if git diff --name-only --diff-filter=ACMRT ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} | grep -e ^scripts/ -e ^Makefile$ -e ^package.json$ -e ^.yarnrc.yml$ -e ^rust-toolchain.toml$ -e ^.nvmrc -e ^yarn.lock$ -e ^Cargo.toml 1> /dev/null; then
+            echo "Changes detected on Toolchain"
+            echo "toolchain=true" >> $GITHUB_OUTPUT
+          fi
+          if git diff --name-only --diff-filter=ACMRT ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} | grep ^packages/hopli/ 1> /dev/null; then
+            echo "Changes detected on Hopli"
+            echo "hopli=true" >> $GITHUB_OUTPUT
+          fi
+          if git diff --name-only --diff-filter=ACMRT ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} | grep -v ^.github/ | grep ^packages/hopli/ | grep -v ^scripts | grep -v ^.processes | grep -v ^docs/ | grep -v .md 1> /dev/null; then
+            echo "Changes detected on Hoprd"
+            echo "hoprd=true" >> $GITHUB_OUTPUT
+          fi
   build_toolchain_image:
     name: Build toolchain docker image
     runs-on: ubuntu-latest
@@ -119,7 +128,7 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - change_set
-    if: ${{needs.change_set.outputs.hoprd}} and contains(github.event.pull_request.labels.*.name, 'deploy_nodes')
+    if: ${{needs.change_set.outputs.hoprd && contains(github.event.pull_request.labels.*.name, 'deploy_nodes') }}
     steps:
       - name: Checkout hoprnet
         uses: actions/checkout@v3
@@ -156,7 +165,7 @@ jobs:
     name: Restart deployment
     runs-on: ubuntu-latest
     needs: build_hoprd_image
-    if: ${{needs.change_set.outputs.hoprd}} and contains(github.event.pull_request.labels.*.name, 'deploy_nodes')
+    if: ${{needs.change_set.outputs.hoprd && contains(github.event.pull_request.labels.*.name, 'deploy_nodes') }}
     steps:
       - name: "Setup environment"
         run: |
