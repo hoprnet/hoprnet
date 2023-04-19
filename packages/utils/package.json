@@ -1,7 +1,7 @@
 {
   "name": "@hoprnet/hopr-utils",
   "description": "HOPR-based utilities to process multiple data structures",
-  "version": "1.94.0-next.15",
+  "version": "1.94.0-next.26",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "GPL-3.0",
@@ -32,7 +32,7 @@
     "@libp2p/interface-peer-id": "1.0.5",
     "@libp2p/peer-id": "1.1.16",
     "@multiformats/multiaddr": "10.3.3",
-    "abortable-iterator": "4.0.2",
+    "abortable-iterator": "4.0.3",
     "bignumber.js": "9.0.2",
     "bn.js": "5.2.1",
     "chalk": "5.0.1",

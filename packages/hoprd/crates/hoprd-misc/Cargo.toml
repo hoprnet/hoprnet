@@ -1,6 +1,6 @@
 [package]
 name = "hoprd-misc"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Rust WASM modules for HOPRd"
@@ -20,6 +20,7 @@ console_error_panic_hook = [ "dep:console_error_panic_hook" ]
 # using own fork until the PR was merged
 clap = { git = "https://github.com/hoprnet/clap", branch = "robertkiel/update-env-from", features = ["derive", "env", "string"] }
 core-misc = { path = "../../../core/crates/core-misc" }
+core-network = { path = "../../../core/crates/core-network" }
 core-strategy = { path = "../../../core/crates/core-strategy" }
 core-ethereum-misc = { path = "../../../core-ethereum/crates/core-ethereum-misc" }
 hex = "0.4.3"
@@ -27,16 +28,20 @@ js-sys = "0.3.60"
 real-base = { path = "../../../real/crates/real-base" }
 proc-macro-regex = "~1.1.0"
 serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.9"
 serde_json = "1.0"
+thiserror = "1.0"
 serde-wasm-bindgen = { version = "0.4", optional = true }
+utils-log = { path = "../../../utils/crates/utils-log" }
 utils-misc = { path = "../../../utils/crates/utils-misc" }
-utils-proc-macros = { path = "../../../utils/crates/utils-proc-macros" }
+validator = { version = "0.16.0", features = ["derive"] }
 wasm-bindgen = { workspace = true, optional = true }
 
 console_error_panic_hook = { version = "0.1.7", optional = true }
 #wee_alloc = { version = "0.4.5", optional = true }
 
 [dev-dependencies]
+tempfile = "3"
 wasm-bindgen-test = "0.3.30"
 
 [target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
