@@ -50,6 +50,10 @@ const verbose = debug(DEBUG_PREFIX.concat(':verbose'))
 const metric_countUsedRelays = create_gauge('connect_gauge_used_relays', 'Number of used relays')
 const metric_countConnsToRelays = create_gauge('connect_gauge_conns_to_relays', 'Number of connections to relays')
 const metric_countRelayedConns = create_gauge('connect_gauge_relayed_conns', 'Number of currently relayed connections')
+const metric_evictedRelayedConns = create_gauge(
+  'connect_gauge_evicted_relayed_conns',
+  'Number of inactive relayed connections which were last removed from the relay state'
+)
 const metric_countSuccessfulIncomingRelayReqs = create_counter(
   'connect_counter_successful_relay_reqs',
   'Number of successful incoming relay requests'
@@ -207,8 +211,10 @@ class Relay implements Initializable, ConnectInitializable, Startable {
   }
 
   protected async keepAliveRelayConnection(): Promise<void> {
-    await this.relayState.prune()
+    let pruned = await this.relayState.prune()
     metric_countRelayedConns.set(this.relayState.relayedConnectionCount())
+    metric_evictedRelayedConns.set(pruned)
+    log(`evicted ${pruned} inactive relay entries from the relay state`)
     log(`Current relay connections:\n ${await this.relayState.printIds()}`)
 
     let outRelays = `Currently tracked connections to relays:\n`

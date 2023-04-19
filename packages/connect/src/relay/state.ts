@@ -205,7 +205,7 @@ class RelayState {
   }
 
   public async prune(timeout?: number) {
-    if (this.relayedConnections.size == 0) return
+    if (this.relayedConnections.size == 0) return 0
 
     let pruned = 0
     await Promise.all(
@@ -227,7 +227,7 @@ class RelayState {
       })
     )
 
-    verbose(`Evicted ${pruned} inactive relay entries from the relay state`)
+    return pruned
   }
 
   /**
