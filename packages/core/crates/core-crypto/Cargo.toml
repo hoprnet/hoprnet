@@ -29,7 +29,7 @@ hex = "0.4"
 hex-literal = "0.3"
 hkdf = "0.12"
 hmac = "0.12"
-js-sys = { version = "0.3.60", optional = true }
+js-sys = { version = "0.3.61", optional = true }
 k256 = { version = "0.13.0", features = ["arithmetic", "ecdh"] }
 libp2p-identity = { version = "0.1.1", features = ["secp256k1", "peerid"] }
 rand = "0.8.5"
@@ -46,5 +46,5 @@ console_error_panic_hook = { version = "0.1.7", optional = true }
 #wee_alloc = { version = "0.4.5", optional = true }
 
 [dev-dependencies]
-wasm-bindgen-test = "0.3.33"
+wasm-bindgen-test = "0.3.34"
 

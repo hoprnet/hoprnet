@@ -22,4 +22,4 @@ console_error_panic_hook = { version = "0.1.7", optional = true }
 [dev-dependencies]
 scopeguard = "1.1.0"
 tempfile = "3.3.0"
-wasm-bindgen-test = "0.3.33"
+wasm-bindgen-test = "0.3.34"
