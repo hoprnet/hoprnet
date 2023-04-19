@@ -205,26 +205,27 @@ class RelayState {
   }
 
   public async prune(timeout?: number) {
-    if (this.relayedConnections.size == 0) return;
+    if (this.relayedConnections.size == 0) return
 
-    let pruned = 0;
-    await Promise.all(Array.from(this.relayedConnections.entries()).map(async([id, ctx]) => {
-      for (let [_, conn] of Object.entries(ctx)) {
-        try {
-          if (await conn.ping(timeout) < 0) {
-            if (this.relayedConnections.delete(id)) {
-              ++pruned
-            } else {
-              error(`could not delete ${id} inactive relayed connection from the relay state`)
+    let pruned = 0
+    await Promise.all(
+      Array.from(this.relayedConnections.entries()).map(async ([id, ctx]) => {
+        for (let [_, conn] of Object.entries(ctx)) {
+          try {
+            if ((await conn.ping(timeout)) < 0) {
+              if (this.relayedConnections.delete(id)) {
+                ++pruned
+              } else {
+                error(`could not delete ${id} inactive relayed connection from the relay state`)
+              }
+              break
             }
-            break;
+          } catch (err) {
+            error(err)
           }
         }
-        catch (err) {
-          error(err)
-        }
-      }
-    }))
+      })
+    )
 
     verbose(`Evicted ${pruned} inactive relay entries from the relay state`)
   }
@@ -237,8 +238,8 @@ class RelayState {
    * @returns the identifier
    */
   static getId(a: PeerId, b: PeerId): string {
-    let aStr = a.toString();
-    let bStr = b.toString();
+    let aStr = a.toString()
+    let bStr = b.toString()
 
     const cmpResult = aStr.localeCompare(bStr)
 
