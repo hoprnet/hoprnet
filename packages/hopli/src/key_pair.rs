@@ -23,15 +23,12 @@ impl NodeIdentity {
         let public_key = PublicKey::deserialize(&verifying_key.to_encoded_point(false).to_bytes()).unwrap();
 
         // derive PeerId
-        let id = public_key.to_peerid_str();
+        let peer_id = public_key.to_peerid_str();
 
         // derive ethereum address
-        let address = public_key.to_address().to_checksum();
+        let ethereum_address = public_key.to_address().to_checksum();
 
-        Self {
-            peer_id: id,
-            ethereum_address: address,
-        }
+        Self { peer_id, ethereum_address }
     }
 }
 
