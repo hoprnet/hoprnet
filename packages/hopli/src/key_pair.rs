@@ -5,13 +5,14 @@ use eth_keystore;
 use ethers::core::rand::thread_rng;
 use generic_array::GenericArray;
 use k256::ecdsa::{SigningKey, VerifyingKey};
+use serde::{Deserialize, Serialize};
 use std::{
     fmt, fs,
     path::{Path, PathBuf},
 };
 use utils_types::traits::PeerIdLike;
+#[derive(Debug, Deserialize, Serialize)]
 
-#[derive(Debug)]
 pub struct NodeIdentity {
     pub peer_id: String,
     pub ethereum_address: String,
@@ -36,7 +37,7 @@ impl NodeIdentity {
 
 impl fmt::Display for NodeIdentity {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "PeerId: {}, Address: {}", self.peer_id, self.ethereum_address)
+        write!(f, "(peerid: {}, address: {})", self.peer_id, self.ethereum_address)
     }
 }
 
@@ -145,6 +146,10 @@ mod tests {
         assert_eq!(read_id.len(), 1);
         assert_eq!(read_id[0].ethereum_address, created_id.ethereum_address);
         assert_eq!(read_id[0].peer_id, created_id.peer_id);
+
+        // print the read id
+        println!("Debug {:#?}", read_id);
+        println!("Display {}", read_id[0]);
 
         remove_json_keystore(path).map_err(|err| println!("{:?}", err)).ok();
     }

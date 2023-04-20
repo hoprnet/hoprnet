@@ -108,7 +108,7 @@ impl IdentityArgs {
             }
         }
         info!("Identities: {:?}", node_identities);
-        println!("Identities are {:?}", node_identities);
+        println!("Identities are {:?}", serde_json::to_string(&node_identities).unwrap());
         Ok(())
     }
 }
