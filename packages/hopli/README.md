@@ -71,6 +71,8 @@ IDENTITY_PASSWORD=switzerland \
 
 To fund nodes with password from env variable `IDENTITY_PASSWORD`. Alternatively, a path to the password file can be provided with `--password-path`, e.g. `--password-path ./.pwd`
 
+`--hopr-amount` and `native-amount` can be floating number
+
 ```
 IDENTITY_PASSWORD=local \
 PRIVATE_KEY=<bank_private_key> \
@@ -113,7 +115,7 @@ PRIVATE_KEY=<bank_private_key> \
 hopli initialize-node --environment-name anvil-localhost \
     --identity-directory "/tmp" \
     --password-path "/tmp/.pwd" \
-    --hopr-amount 1 --native-amount 0.1 \
+    --hopr-amount 10 --native-amount 0.1 \
     --contracts-root "../ethereum/contracts"
 ```
 
@@ -201,7 +203,7 @@ PRIVATE_KEY=<bank_private_key> \
     cargo run -- initialize-node --environment-name anvil-localhost \
     --identity-directory "./test" \
     --password-path "/test/.pwd" \
-    --hopr-amount 1 --native-amount 0.1 \
+    --hopr-amount 10 --native-amount 0.1 \
     --contracts-root "../ethereum/contracts"
 ```
 

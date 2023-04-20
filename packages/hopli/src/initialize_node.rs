@@ -38,7 +38,7 @@ pub struct InitializeNodeArgs {
         long,
         short = 't',
         value_parser = clap::value_parser!(f64),
-        default_value_t = 2000.0
+        default_value_t = 10.0
     )]
     hopr_amount: f64,
 
