@@ -574,14 +574,15 @@ pub trait ToChecksum {
 
 impl ToChecksum for Address {
     fn to_checksum(&self) -> String {
-        let address_hex = &self._to_hex();
+        let address_hex = self.to_hex();
         let mut hasher = Keccak256::default();
         hasher.update(address_hex.as_bytes());
         let hash = hasher.finalize_reset();
 
-        let mut ret = String::from("0x");
+        let mut ret = String::with_capacity(Self::SIZE * 2 + 2);
+        ret.push_str("0x");
 
-        for (i, c) in self.to_hex().chars().enumerate() {
+        for (i, c) in address_hex.chars().enumerate() {
             let nibble = hash[i / 2] >> (((i + 1) % 2) * 4) & 0xf;
             if nibble >= 8 {
                 ret.push(c.to_ascii_uppercase());
