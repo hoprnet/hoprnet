@@ -39,15 +39,15 @@ function stopGracefully(signal: number) {
   process.exit()
 }
 
-export type DefaultEnvironment = {
+export type DefaultNetwork = {
   id?: string
 }
 
-function defaultEnvironment(): string {
+function defaultNetwork(): string {
   try {
     // Don't do typechecks on JSON files
     // @ts-ignore
-    const config = loadJson('../default-network.json') as DefaultEnvironment
+    const config = loadJson('../default-network.json') as DefaultNetwork
     return config?.id || ''
   } catch (error) {
     // its ok if the file isn't there or cannot be read
@@ -56,7 +56,7 @@ function defaultEnvironment(): string {
 }
 
 // Use network-specific default data path
-const defaultDataPath = path.join(process.cwd(), 'hopr-cover-traffic-daemon-db', defaultEnvironment())
+const defaultDataPath = path.join(process.cwd(), 'hopr-cover-traffic-daemon-db', defaultNetwork())
 
 // reading the version manually to ensure the path is read correctly
 const packageFile = path.normalize(new URL('../package.json', import.meta.url).pathname)
@@ -77,7 +77,7 @@ const argv = yargsInstance
     string: true,
     describe: 'Network id which the node shall run on (HOPR_CTD_ENVIRONMENT)',
     choices: supportedNetworks().map((env) => env.id),
-    default: defaultEnvironment()
+    default: defaultNetwork()
   })
   .option('privateKey', {
     describe: 'A private key to be used for the node [env: HOPR_CTD_PRIVATE_KEY]',
