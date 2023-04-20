@@ -8,14 +8,14 @@ pub trait AsyncKVStorage {
     type Value;
 
     #[must_use]
-    async fn get(&self, key: Self::Key) -> Option<Self::Value>;
+    async fn get(&self, key: Self::Key) -> Result<Self::Value>;
 
-    async fn set(&mut self, key: Self::Key, value: Self::Value) -> Option<Self::Value>;
+    async fn set(&mut self, key: Self::Key, value: Self::Value) -> Result<Option<Self::Value>>;
 
     #[must_use]
     async fn contains(&self, key: Self::Key) -> bool;
 
-    async fn remove(&mut self, key: Self::Key) -> Option<Self::Value>;
+    async fn remove(&mut self, key: Self::Key) -> Result<Option<Self::Value>>;
 
     async fn dump(&self, destination: String) -> Result<()>;
 }

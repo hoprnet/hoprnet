@@ -13,12 +13,6 @@ use wasm_bindgen::prelude::*;
 extern "C" {
     pub type LevelDb;
 
-    // #[wasm_bindgen(constructor)]
-    // fn new(public_key: String) -> WrappedLevelDb;
-
-    #[wasm_bindgen(method, catch)]
-    async fn init(this: &LevelDb, initialize: bool, dbPath: String, force_create: bool, environment_id: String) -> Result<(), JsValue>;
-
     #[wasm_bindgen(method, catch)]
     async fn has(this: &LevelDb, key: Box<[u8]>) -> Result<JsValue, JsValue>;     // bool;
 
@@ -39,6 +33,72 @@ extern "C" {
     fn dump(this: &LevelDb, destination: String) -> Result<(), JsValue>;
 }
 
+
+
+pub struct LevelDbShim
+{
+    db: LevelDb,
+}
+
+impl LevelDbShim {
+    pub fn new(db: LevelDb) -> LevelDbShim {
+        LevelDbShim { db }
+    }
+}
+
+#[async_trait(? Send)]
+impl AsyncKVStorage for LevelDbShim {
+    type Key = Box<[u8]>;
+    type Value = Box<[u8]>;
+
+    async fn get(&self, key: Self::Key) -> crate::errors::Result<Self::Value> {
+        self.db
+            .get(key).await
+            .map_err(|_| DbError::GenericError("Encountered error on DB get operation".to_string()))
+            .and_then(|v| {
+                if v.is_undefined() {
+                    Err(DbError::NotFound)
+                } else {
+                    Ok(js_sys::Uint8Array::new(&v).to_vec().into_boxed_slice())
+                }
+            })
+    }
+
+    async fn set(&mut self, key: Self::Key, value: Self::Value) -> crate::errors::Result<Option<Self::Value>> {
+        self.db
+            .put(key, value).await
+            .map(|v| None)              // NOTE: The LevelDB API does not allow to return an evicted value
+            .map_err(|_| DbError::GenericError("Encountered error on DB put operation".to_string()))
+    }
+
+    async fn contains(&self, key: Self::Key) -> bool {
+        self.db
+            .has(key).await
+            .map(|v| v.as_bool().unwrap())
+            .unwrap_or(false)
+    }
+
+    async fn remove(&mut self, key: Self::Key) -> crate::errors::Result<Option<Self::Value>> {
+        self.db
+            .remove(key).await
+            .map(|v| {
+                if v.is_undefined() {
+                    // NOTE: The LevelDB API does not allow to return an evicted value
+                    None
+                } else {
+                    Some(js_sys::Uint8Array::new(&v).to_vec().into_boxed_slice())
+                }
+            })
+            .map_err(|_| DbError::GenericError("Encountered error on DB remove operation".to_string()))
+    }
+
+    async fn dump(&self, destination: String) -> crate::errors::Result<()> {
+        self.db
+            .dump(destination.clone())
+            .map_err(|_| DbError::DumpError(format!("Failed to dump DB into {}", destination)))
+    }
+}
+
 #[cfg(feature = "wasm")]
 #[wasm_bindgen]
 pub async fn db_sanity_test(db: LevelDb) -> Result<bool, JsValue> {
@@ -47,7 +107,7 @@ pub async fn db_sanity_test(db: LevelDb) -> Result<bool, JsValue> {
     // let key_2 = "2";
     // let value_2 = "def";
 
-    let mut kv_storage = LevelDB::new(db);
+    let mut kv_storage = LevelDbShim::new(db);
     if kv_storage.contains(key_1.as_bytes().to_vec().into_boxed_slice()).await {
         return Err::<bool, JsValue>(
             JsValue::from(JsError::new("Test #1 failed: empty DB should not contain any data")))
@@ -78,69 +138,12 @@ pub async fn db_sanity_test(db: LevelDb) -> Result<bool, JsValue> {
     Ok(true)
 }
 
-pub struct LevelDB
-{
-    db: LevelDb,
-}
-
-impl LevelDB {
-    pub fn new(db: LevelDb) -> LevelDB {
-        LevelDB { db }
-    }
-}
-
-#[async_trait(? Send)]
-impl AsyncKVStorage for LevelDB {
-    type Key = Box<[u8]>;
-    type Value = Box<[u8]>;
-
-    async fn get(&self, key: Self::Key) -> Option<Self::Value> {
-        match self.db.get(key).await {
-            Ok(v) => {
-                if v.is_undefined() {
-                    None
-                } else {
-                    Some(js_sys::Uint8Array::new(&v).to_vec().into_boxed_slice())
-                }
-            }
-            Err(_) => {
-                None
-            }
-        }
-    }
-
-    async fn set(&mut self, key: Self::Key, value: Self::Value) -> Option<Self::Value> {
-        let _ = self.db.put(key, value).await;
-
-        // NOTE: The LevelDB API does not allow to return an evicted value
-        None
-    }
-
-    async fn contains(&self, key: Self::Key) -> bool {
-        match self.db.has(key).await {
-            Ok(v) => v.as_bool().unwrap(),
-            Err(_) => false,
-        }
-    }
-
-    async fn remove(&mut self, key: Self::Key) -> Option<Self::Value> {
-        let _ = self.db.remove(key).await;
-        // NOTE: The LevelDB API does not allow to return an evicted value
-        None
-    }
-
-    async fn dump(&self, destination: String) -> crate::errors::Result<()> {
-        self.db.dump(destination.clone())
-            .map_err(|_| DbError::DumpError(format!("Failed to dump DB into {}", destination)))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     // use super::*;
-
-    #[test]
-    fn test_leveldb() {
-        assert!(true);
-    }
+    //
+    // #[test]
+    // fn test_leveldb() {
+    //     assert!(true);
+    // }
 }
