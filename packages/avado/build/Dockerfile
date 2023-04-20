@@ -32,9 +32,11 @@ WORKDIR /app/hoprnet/packages/hoprd
 
 RUN apt-get update \
  && apt-get install -y \
-      supervisor \
+      pip \
  && rm -rf /var/lib/apt/lists/* \
  && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false
+
+RUN pip install supervisor superlance
 
 COPY supervisord.conf /etc/supervisord.conf
 
