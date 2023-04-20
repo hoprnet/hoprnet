@@ -4,8 +4,9 @@ use crate::{
     network::{wasm::WasmNetworkApi, Health, Network, PeerOrigin, PeerStatus},
     ping::{wasm::WasmPingApi, Ping, PingConfig},
 };
+use core_crypto::random::random_integer;
 use gloo_timers::future::sleep;
-use js_sys::{Array, Date, Function, JsString, Map, Number, Promise, Reflect, Symbol, Uint8Array};
+use js_sys::{Array, Date, Function, JsString, Map, Number, Promise, Uint8Array};
 use libp2p::PeerId;
 use std::{collections::HashMap, pin::Pin, str::FromStr, time::Duration};
 use utils_log::{error, info, warn};
@@ -27,48 +28,19 @@ pub fn version_from_protocol(protocol: String) -> String {
         Some(v) => v.into(),
     }
 }
-#[wasm_bindgen]
-extern "C" {
-    #[wasm_bindgen(is_type_of = AsyncIterable::looks_like_async_iterable, typescript_type = "AsyncIterable<Uint8Array>")]
-    pub type AsyncIterable;
-}
 
-impl AsyncIterable {
-    fn looks_like_async_iterable(it: &JsValue) -> bool {
-        if !it.is_object() {
-            return false;
-        }
-
-        let async_sym = Symbol::async_iterator();
-        let async_iter_fn = match Reflect::get(it, async_sym.as_ref()) {
-            Ok(f) => f,
-            Err(_) => return false,
-        };
-
-        async_iter_fn.is_function()
-    }
-}
-
-/// Special-purpose version of js_sys::IteratorNext for Uint8Arrays
-#[wasm_bindgen]
-extern "C" {
-    #[derive(Clone, Debug)]
-    #[wasm_bindgen]
-    pub type Uint8ArrayIteratorNext;
-
-    #[wasm_bindgen(method, getter, structural)]
-    pub fn done(this: &Uint8ArrayIteratorNext) -> bool;
-
-    #[wasm_bindgen(method, getter, structural)]
-    pub fn value(this: &Uint8ArrayIteratorNext) -> Box<[u8]>;
-}
+// Add PeerId import to typing file
+#[wasm_bindgen(typescript_custom_section)]
+const TS_APPEND_CONTENT: &'static str = r#"
+import { PeerId } from '@libp2p/interface-peer-id'
+"#;
 
 #[wasm_bindgen]
 extern "C" {
     #[wasm_bindgen]
     pub type JsConnection;
 
-    #[wasm_bindgen(method, getter, structural)]
+    #[wasm_bindgen(method, getter, structural, js_name = "remotePeer")]
     pub fn remote_peer(this: &JsConnection) -> JsPeerId;
 }
 
@@ -221,6 +193,9 @@ impl CoreNetwork {
         .await
         .expect("Could not register heartbeat handler");
 
+        // Leave callback to JS garbage collector
+        cb.forget();
+
         let this_ref = unsafe { std::mem::transmute::<&mut Self, &'static Self>(self) };
 
         let message_transport =
@@ -238,7 +213,7 @@ impl CoreNetwork {
                             let data = JsFuture::from(promise)
                                 .await
                                 .map(|x| Array::from(x.as_ref()).get(0))
-                                .map(|x| Uint8Array::new(&x).to_vec().into_boxed_slice())
+                                .map(|x| Uint8Array::from(x).to_vec().into_boxed_slice())
                                 .map_err(|x| {
                                     x.dyn_ref::<JsString>()
                                         .map_or("Failed to send ping message".to_owned(), |x| -> String { x.into() })
@@ -263,25 +238,28 @@ impl CoreNetwork {
 
         spawn_local(async move {
             while !this.heartbeat.ended {
-                sleep(Duration::from_millis(this.heartbeat.config.heartbeat_interval as u64)).await;
+                let next_interval = random_integer(
+                    this.heartbeat.config.heartbeat_interval as u64,
+                    Some(
+                        this.heartbeat.config.heartbeat_interval as u64
+                            + this.heartbeat.config.heartbeat_variance as u64,
+                    ),
+                )
+                .expect("Failed to compute next heartbeat interval");
+
+                sleep(Duration::from_millis(next_interval)).await;
                 let threshold = Date::now() as u64 - this.heartbeat.config.heartbeat_threshold;
                 info!("Checking nodes since {}", threshold);
                 this.pinger
                     .ping_peers(this.network.find_peers_to_ping(threshold), &message_transport);
             }
         });
-
-        // Leave callback to JS garbage collector
-        cb.forget();
     }
 
     #[wasm_bindgen]
     pub async fn stop(&mut self) {
         self.heartbeat.ended = true;
     }
-
-    #[wasm_bindgen(js_name = "pingNode")]
-    pub async fn ping_node() {}
 
     /// Ping the peers represented as a Vec<JsString> values that are converted into usable
     /// PeerIds.
@@ -313,7 +291,7 @@ impl CoreNetwork {
                             let data = JsFuture::from(promise)
                                 .await
                                 .map(|x| js_sys::Array::from(x.as_ref()).get(0))
-                                .map(|x| js_sys::Uint8Array::new(&x).to_vec().into_boxed_slice())
+                                .map(|x| js_sys::Uint8Array::from(x).to_vec().into_boxed_slice())
                                 .map_err(|x| {
                                     x.dyn_ref::<JsString>()
                                         .map_or("Failed to send ping message".to_owned(), |x| -> String { x.into() })
@@ -343,11 +321,11 @@ impl CoreNetwork {
     }
 
     #[wasm_bindgen(js_name = "registerWithMetadata")]
-    pub fn register_with_metadata(&mut self, peer: JsPeerId, origin: PeerOrigin, metadata: &js_sys::Map) {
+    pub fn register_with_metadata(&mut self, peer: JsPeerId, origin: PeerOrigin, metadata: &Map) {
         match PeerId::from_str(&peer.to_string().to_owned()) {
             Ok(p) => self
                 .network
-                .add_with_metadata(&p, origin, js_map_to_hash_map(&Map::new())),
+                .add_with_metadata(&p, origin, js_map_to_hash_map(&metadata)),
             Err(err) => {
                 warn!(
                     "Failed to parse peer id {}, network ignores the register attempt: {}",
@@ -367,14 +345,13 @@ impl CoreNetwork {
     }
 
     #[wasm_bindgen]
-    pub fn contains(&self, peer: JsString) -> bool {
-        let peer: String = peer.into();
-        match PeerId::from_str(&peer) {
+    pub fn contains(&self, peer: JsPeerId) -> bool {
+        match PeerId::from_str(&peer.to_string()) {
             Ok(p) => self.network.has(&p),
             Err(err) => {
                 warn!(
                     "Failed to parse peer id {}, network assumes it is not present: {}",
-                    peer,
+                    peer.to_string(),
                     err.to_string()
                 );
                 false

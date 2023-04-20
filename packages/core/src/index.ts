@@ -399,12 +399,10 @@ class Hopr extends EventEmitter {
 
     // initialize with all the peers identified in the peer store
     const peers: Peer[] = await this.libp2pComponents.getPeerStore().all()
-    peers
-      .map((peer) => peer.id.toString())
-      .forEach((peerId) => {
-        this.coreNetwork.register(peerId, PeerOrigin.Initialization)
-        log(`peer store: loaded peer ${peerId}`)
-      })
+    peers.forEach((peer) => {
+      this.coreNetwork.register(peer.id, PeerOrigin.Initialization)
+      log(`peer store: loaded peer ${peer.id.toString()}`)
+    })
 
     // react when network registry is enabled / disabled
     connector.indexer.on('network-registry-status-changed', async (enabled: boolean) => {
@@ -432,7 +430,7 @@ class Hopr extends EventEmitter {
         // otherwise there is nothing to do
         if (!eligible) {
           for (const node of nodes) {
-            this.coreNetwork.unregister(node.toPeerId().toString())
+            this.coreNetwork.unregister(node.toPeerId())
 
             for (const conn of this.libp2pComponents.getConnectionManager().getConnections(node.toPeerId())) {
               try {
@@ -447,7 +445,7 @@ class Hopr extends EventEmitter {
     )
 
     this.libp2pComponents.getConnectionManager().addEventListener('peer:connect', (event: CustomEvent<Connection>) => {
-      this.coreNetwork.register(event.detail.remotePeer.toString(), PeerOrigin.IncomingConnection)
+      this.coreNetwork.register(event.detail.remotePeer, PeerOrigin.IncomingConnection)
     })
 
     this.acknowledgements = new AcknowledgementInteraction(
@@ -708,7 +706,7 @@ class Hopr extends EventEmitter {
       const stake = new BN(status.stake_str)
 
       if (await this.isAllowedAccessToNetwork(destination)) {
-        this.coreNetwork.register(destination.toString(), PeerOrigin.StrategyNewChannel)
+        this.coreNetwork.register(destination, PeerOrigin.StrategyNewChannel)
 
         const hash = await this.openChannel(destination, stake)
         verbose('- opened channel', destination, hash)
@@ -782,7 +780,7 @@ class Hopr extends EventEmitter {
       await Promise.all(
         outgoingChannels.map(async (channel) => {
           if (await this.isAllowedAccessToNetwork(channel.destination.toPeerId())) {
-            this.coreNetwork.register(channel.destination.toPeerId().toString(), PeerOrigin.StrategyExistingChannel)
+            this.coreNetwork.register(channel.destination.toPeerId(), PeerOrigin.StrategyExistingChannel)
           } else {
             error(`Protocol error: Strategy is monitoring non-registered peer ${channel.destination.toString()}`)
           }
@@ -800,7 +798,7 @@ class Hopr extends EventEmitter {
             status: c.status
           }
         }),
-        (peer_id_str: string) => this.coreNetwork.qualityOf(peer_id_str)
+        (peer_id_str: string) => this.coreNetwork.qualityOf(peerIdFromString(peer_id_str))
       )
       metric_strategyTicks.increment()
       metric_strategyMaxChannels.set(tickResult.max_auto_channels)
@@ -1034,14 +1032,13 @@ class Hopr extends EventEmitter {
       throw Error(`Connection to node is not allowed`)
     }
 
-    let dest = destination.toString()
-    if (!this.coreNetwork.contains(dest)) {
-      this.coreNetwork.register(dest, PeerOrigin.ManualPing)
+    if (!this.coreNetwork.contains(destination)) {
+      this.coreNetwork.register(destination, PeerOrigin.ManualPing)
     }
 
     await this.coreNetwork.ping([destination.toString()])
 
-    let peer_info = this.coreNetwork.getPeerInfo(destination.toString())
+    let peer_info = this.coreNetwork.getPeerInfo(destination)
     if (peer_info !== undefined && peer_info.last_seen >= 0) {
       return { latency: Number(peer_info.last_seen) - start }
     } else {
@@ -1078,7 +1075,7 @@ class Hopr extends EventEmitter {
    * @returns various information about the connection
    */
   public getConnectionInfo(peerId: PeerId): PeerStatus | undefined {
-    return this.coreNetwork.getPeerInfo(peerId.toString())
+    return this.coreNetwork.getPeerInfo(peerId)
   }
 
   /**
@@ -1535,7 +1532,7 @@ class Hopr extends EventEmitter {
       PublicKey.fromPeerId(this.getId()),
       destination,
       hops,
-      (p: PublicKey) => this.coreNetwork.qualityOf(p.toPeerId().toString()),
+      (p: PublicKey) => this.coreNetwork.qualityOf(p.toPeerId()),
       HoprCoreEthereum.getInstance().getOpenChannelsFrom.bind(HoprCoreEthereum.getInstance())
     )
   }
