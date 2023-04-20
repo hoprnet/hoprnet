@@ -9,6 +9,7 @@ use std::{
     fmt, fs,
     path::{Path, PathBuf},
 };
+use utils_types::traits::PeerIdLike;
 
 #[derive(Debug)]
 pub struct NodeIdentity {
@@ -21,7 +22,7 @@ impl NodeIdentity {
         let public_key = PublicKey::deserialize(&verifying_key.to_encoded_point(false).to_bytes()).unwrap();
 
         // derive PeerId
-        let id = public_key._to_peerid_str();
+        let id = public_key.to_peerid_str();
 
         // derive ethereum address
         let address = public_key.to_address().to_checksum();

@@ -118,7 +118,6 @@ impl InitializeNodeArgs {
             &format!("[{}]", &&all_node_addresses.join(",")),
             &hopr_amount_uint256_string,
             &native_amount_uint256_string,
-            // &format!("[{}]", &all_peer_ids.join(",")),
             &all_peer_ids.join(","),
         )
     }
