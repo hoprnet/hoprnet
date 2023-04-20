@@ -55,7 +55,6 @@ impl LocalIdentityFromDirectoryArgs {
             identity_directory,
             identity_prefix,
         } = self;
-        let files: Vec<PathBuf> = Vec::new();
         let id_dir = identity_directory.unwrap();
 
         log!(target: "identity_reader", Level::Debug, "Reading dir {}", &id_dir);

@@ -6,12 +6,13 @@ use eth_keystore;
 use ethers::core::rand::thread_rng;
 use generic_array::GenericArray;
 use k256::ecdsa::{SigningKey, VerifyingKey};
+use serde::Serialize;
 use std::{
     fmt, fs,
     path::{Path, PathBuf},
 };
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct NodeIdentity {
     pub peer_id: String,
     pub ethereum_address: String,
@@ -36,7 +37,11 @@ impl NodeIdentity {
 
 impl fmt::Display for NodeIdentity {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "PeerId: {}, Address: {}", self.peer_id, self.ethereum_address)
+        write!(
+            f,
+            "peer_id: {}, ethereum_address: {}",
+            self.peer_id, self.ethereum_address
+        )
     }
 }
 
