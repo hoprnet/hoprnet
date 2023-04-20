@@ -2515,7 +2515,7 @@ dependencies = [
 
 [[package]]
 name = "hopli"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "clap 4.0.32",
  "core-crypto",
