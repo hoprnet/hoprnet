@@ -447,7 +447,7 @@ impl<Actions: NetworkExternalActions> Network<Actions> {
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use super::*;
-    use js_sys::JsString;
+    use js_sys::{Function, JsString};
     use std::str::FromStr;
     use utils_misc::utils::wasm::js_map_to_hash_map;
     use wasm_bindgen::prelude::*;
@@ -511,10 +511,26 @@ pub mod wasm {
 
     #[wasm_bindgen]
     pub struct WasmNetworkApi {
-        pub(crate) on_peer_offline_cb: js_sys::Function,
-        pub(crate) on_network_health_change_cb: js_sys::Function,
-        pub(crate) is_public_cb: js_sys::Function,
-        pub(crate) close_connection_cb: js_sys::Function,
+        on_peer_offline_cb: Function,
+        on_network_health_change_cb: Function,
+        is_public_cb: Function,
+        close_connection_cb: Function,
+    }
+
+    impl WasmNetworkApi {
+        pub fn new(
+            on_peer_offline_cb: Function,
+            on_network_health_change_cb: Function,
+            is_public_cb: Function,
+            close_connection_cb: Function,
+        ) -> Self {
+            Self {
+                on_peer_offline_cb,
+                on_network_health_change_cb,
+                is_public_cb,
+                close_connection_cb,
+            }
+        }
     }
 
     impl NetworkExternalActions for WasmNetworkApi {

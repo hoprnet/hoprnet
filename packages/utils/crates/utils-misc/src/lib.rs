@@ -1,4 +1,6 @@
+#[cfg(feature = "wasm")]
 pub mod async_iterable;
+#[cfg(feature = "wasm")]
 pub mod streaming_iterable;
 pub mod time;
 pub mod traits;

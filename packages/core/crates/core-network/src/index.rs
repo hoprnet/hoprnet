@@ -1,27 +1,28 @@
 // use crate::heartbeat::Heartbeat;
 use crate::{
-    heartbeat::HeartbeatRequest,
+    heartbeat::{Heartbeat, HeartbeatConfig, HeartbeatRequest},
     network::{wasm::WasmNetworkApi, Health, Network, PeerOrigin, PeerStatus},
     ping::{wasm::WasmPingApi, Ping, PingConfig},
 };
-use js_sys::{Date, Function, JsString, Map, Number, Promise, Reflect, Symbol};
+use gloo_timers::future::sleep;
+use js_sys::{Array, Date, Function, JsString, Map, Number, Promise, Reflect, Symbol, Uint8Array};
 use libp2p::PeerId;
 use std::{collections::HashMap, pin::Pin, str::FromStr, time::Duration};
-use utils_log::{error, warn};
+use utils_log::{error, info, warn};
 use utils_misc::{streaming_iterable::JsStreamingIterable, utils::wasm::js_map_to_hash_map};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::{spawn_local, JsFuture};
 
 /// Extracts version from the protocol identifier
 /// ```rust
-/// let protocol: &str = "`/hopr/mont_blanc/heartbeat/2.1.0"
+/// # use core_network::index::version_from_protocol;
+/// let protocol: &str = "`/hopr/mont_blanc/heartbeat/2.1.0";
 ///
-/// assert_eq!(version_from_protocol(protocol.into(), "2.1.0".into()))
+/// assert_eq!(version_from_protocol(protocol.into()), String::from("2.1.0"));
 /// ```
 pub fn version_from_protocol(protocol: String) -> String {
     let mut parts = protocol.as_str().split("/");
-
-    match parts.nth(5) {
+    match parts.nth(4) {
         None => "unknown".into(),
         Some(v) => v.into(),
     }
@@ -73,7 +74,7 @@ extern "C" {
 
 #[wasm_bindgen]
 extern "C" {
-    #[wasm_bindgen]
+    #[wasm_bindgen(typescript_type = "PeerId")]
     pub type JsPeerId;
 
     #[wasm_bindgen(structural, method, js_name = "toString")]
@@ -115,16 +116,18 @@ extern "C" {
 }
 
 #[wasm_bindgen]
-pub struct NetworkWrapper {
+pub struct CoreNetwork {
     components: JsLibp2p,
     network: Network<WasmNetworkApi>,
     pinger: Ping<WasmPingApi>,
+    heartbeat: Heartbeat,
+    send_message_cb: Function,
 }
 
 static PEER_METADATA_PROTOCOL_VERSION: &str = "protocol_version";
 
 #[wasm_bindgen]
-impl NetworkWrapper {
+impl CoreNetwork {
     #[wasm_bindgen(constructor)]
     pub fn new(
         me: JsPeerId,
@@ -137,40 +140,46 @@ impl NetworkWrapper {
         version: String,
         environment_id: String,
         components: JsLibp2p, // used to call handle
-        send_message: Function,
+        send_message_cb: Function,
         max_parallel_pings: Number,
         heartbeat_variance: Number,
         heartbeat_interval: Number,
         heartbeat_threshold: Number,
     ) -> Self {
         let me: PeerId = PeerId::from_str(me.to_string().as_str()).unwrap();
-        let network_api = WasmNetworkApi {
+        let network_api = WasmNetworkApi::new(
             on_peer_offline_cb,
             on_network_health_change_cb,
             is_public_cb,
             close_connection_cb,
-        };
+        );
 
-        let ping_api = WasmPingApi {
-            on_finished_ping_cb,
-            _environment_id: environment_id,
-            _version: version,
-        };
+        let ping_api = WasmPingApi::new(environment_id.to_owned(), version.to_owned(), on_finished_ping_cb);
 
-        let ping_config = PingConfig {
-            max_parallel_pings: max_parallel_pings.value_of() as usize,
+        let ping_config = PingConfig::new(
+            max_parallel_pings.value_of() as usize,
             environment_id,
-            normalized_version: version,
-            timeout: Duration::from_secs(30),
-        };
+            version,
+            Duration::from_secs(30),
+        );
+
+        let heartbeat_config = HeartbeatConfig::new(
+            max_parallel_pings.value_of() as usize,
+            heartbeat_variance.value_of() as u32,
+            heartbeat_interval.value_of() as u32,
+            heartbeat_threshold.value_of() as u64,
+        );
 
         let pinger = Ping::new(ping_config, ping_api);
         let network = Network::new(me, quality_threshold.as_f64().unwrap(), network_api);
+        let heartbeat = Heartbeat::new(heartbeat_config);
 
         Self {
             components,
             network,
             pinger,
+            heartbeat,
+            send_message_cb,
         }
     }
 
@@ -196,7 +205,10 @@ impl NetworkWrapper {
             }
 
             spawn_local(async move {
-                HeartbeatRequest::new(incoming.stream()).await;
+                match HeartbeatRequest::from(incoming.stream()).await {
+                    Err(e) => error!("Failed processing heartbeat request {}", e),
+                    Ok(()) => (),
+                }
             });
         });
 
@@ -206,14 +218,67 @@ impl NetworkWrapper {
                 .expect("Libp2p instance without registrar")
                 .handle(&cb),
         )
-        .await;
+        .await
+        .expect("Could not register heartbeat handler");
+
+        let this_ref = unsafe { std::mem::transmute::<&mut Self, &'static Self>(self) };
+
+        let message_transport =
+            move |msg: Box<[u8]>, peer: String| -> Pin<Box<dyn futures::Future<Output = Result<Box<[u8]>, String>>>> {
+                Box::pin(async move {
+                    let js_this = JsValue::null();
+                    let data: JsValue = js_sys::Uint8Array::from(msg.as_ref()).into();
+                    let peer: JsValue = JsString::from(peer.as_str()).into();
+
+                    // call a send_msg_cb producing a JS promise that is further converted to a Future
+                    // holding the reply of the pinged peer for the ping message.
+                    match this_ref.send_message_cb.call2(&js_this, &data, &peer) {
+                        Ok(r) => {
+                            let promise = Promise::from(r);
+                            let data = JsFuture::from(promise)
+                                .await
+                                .map(|x| Array::from(x.as_ref()).get(0))
+                                .map(|x| Uint8Array::new(&x).to_vec().into_boxed_slice())
+                                .map_err(|x| {
+                                    x.dyn_ref::<JsString>()
+                                        .map_or("Failed to send ping message".to_owned(), |x| -> String { x.into() })
+                                });
+
+                            data
+                        }
+                        Err(e) => {
+                            error!(
+                                "The message transport could not be established: {}",
+                                e.as_string()
+                                    .unwrap_or_else(|| { "The message transport failed with unknown error".to_owned() })
+                                    .as_str()
+                            );
+                            Err(format!("Failed to extract transport error as string: {:?}", e))
+                        }
+                    }
+                })
+            };
+
+        let this = unsafe { std::mem::transmute::<&mut Self, &'static mut Self>(self) };
+
+        spawn_local(async move {
+            while !this.heartbeat.ended {
+                sleep(Duration::from_millis(this.heartbeat.config.heartbeat_interval as u64)).await;
+                let threshold = Date::now() as u64 - this.heartbeat.config.heartbeat_threshold;
+                info!("Checking nodes since {}", threshold);
+                this.pinger
+                    .ping_peers(this.network.find_peers_to_ping(threshold), &message_transport);
+            }
+        });
 
         // Leave callback to JS garbage collector
         cb.forget();
     }
 
     #[wasm_bindgen]
-    pub async fn stop() {}
+    pub async fn stop(&mut self) {
+        self.heartbeat.ended = true;
+    }
 
     #[wasm_bindgen(js_name = "pingNode")]
     pub async fn ping_node() {}
@@ -242,7 +307,7 @@ impl NetworkWrapper {
 
                     // call a send_msg_cb producing a JS promise that is further converted to a Future
                     // holding the reply of the pinged peer for the ping message.
-                    match self.send_msg_cb.call2(&this, &data, &peer) {
+                    match self.send_message_cb.call2(&this, &data, &peer) {
                         Ok(r) => {
                             let promise = js_sys::Promise::from(r);
                             let data = JsFuture::from(promise)
@@ -271,6 +336,7 @@ impl NetworkWrapper {
 
         self.pinger.ping_peers(converted, &message_transport).await;
     }
+
     #[wasm_bindgen]
     pub fn register(&mut self, peer: JsPeerId, origin: PeerOrigin) {
         self.register_with_metadata(peer, origin, &Map::new())
@@ -291,34 +357,6 @@ impl NetworkWrapper {
             }
         }
     }
-
-    #[wasm_bindgen]
-    pub fn refresh(&mut self, peer: JsString, timestamp: JsValue) {
-        self.refresh_with_metadata(peer, timestamp, &Map::new())
-    }
-
-    #[wasm_bindgen(js_name = "refreshWithMetadata")]
-    pub fn refresh_with_metadata(&mut self, peer: JsString, timestamp: JsValue, metadata: &js_sys::Map) {
-        let peer: String = peer.into();
-        let result: crate::types::Result = if timestamp.is_undefined() {
-            Err(())
-        } else {
-            timestamp.as_f64().map(|v| v as u64).ok_or(())
-        };
-        match PeerId::from_str(&peer) {
-            Ok(p) => self
-                .network
-                .update_with_metadata(&p, result, js_map_to_hash_map(metadata)),
-            Err(err) => {
-                warn!(
-                    "Failed to parse peer id {}, network ignores the regresh attempt: {}",
-                    peer,
-                    err.to_string()
-                );
-            }
-        }
-    }
-
     #[wasm_bindgen(js_name = "peersToPing")]
     pub fn peers_to_ping(&self, threshold: u64) -> Vec<JsString> {
         self.network

@@ -45,10 +45,26 @@ type PingMeasurement = (PeerId, crate::types::Result);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PingConfig {
-    pub max_parallel_pings: usize,
-    pub environment_id: String,
-    pub normalized_version: String,
-    pub timeout: Duration,
+    max_parallel_pings: usize,
+    environment_id: String,
+    normalized_version: String,
+    timeout: Duration,
+}
+
+impl PingConfig {
+    pub fn new(
+        max_parallel_pings: usize,
+        environment_id: String,
+        normalized_version: String,
+        timeout: Duration,
+    ) -> Self {
+        Self {
+            max_parallel_pings,
+            environment_id,
+            normalized_version,
+            timeout,
+        }
+    }
 }
 
 pub struct Ping<Actions> {
@@ -255,16 +271,24 @@ fn to_futures_unordered<F>(mut fs: Vec<F>) -> FuturesUnordered<F> {
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use super::*;
-    use js_sys::JsString;
-    use std::str::FromStr;
+    use js_sys::Function;
     use wasm_bindgen::prelude::*;
-    use wasm_bindgen::JsCast;
 
     #[wasm_bindgen]
     pub struct WasmPingApi {
         _environment_id: String,
         _version: String,
-        on_finished_ping_cb: js_sys::Function,
+        on_finished_ping_cb: Function,
+    }
+
+    impl WasmPingApi {
+        pub fn new(environment_id: String, version: String, on_finished_ping_cb: Function) -> Self {
+            Self {
+                _environment_id: environment_id,
+                _version: version,
+                on_finished_ping_cb,
+            }
+        }
     }
 
     impl PingExternalAPI for WasmPingApi {
@@ -346,7 +370,7 @@ mod tests {
     async fn test_ping_peers_with_no_peers_should_not_do_any_api_calls() {
         let mock = MockPingExternalAPI::new();
 
-        let pinger = Ping::new(simple_ping_config(), Box::new(mock));
+        let pinger = Ping::new(simple_ping_config(), mock);
         pinger.ping_peers(vec![], &send_ping).await;
     }
 
@@ -362,7 +386,7 @@ mod tests {
             )
             .return_const(());
 
-        let pinger = Ping::new(simple_ping_config(), Box::new(mock));
+        let pinger = Ping::new(simple_ping_config(), mock);
         pinger.ping_peers(vec![peer.clone()], &send_ping).await;
     }
 
@@ -380,7 +404,7 @@ mod tests {
             )
             .return_const(());
 
-        let pinger = Ping::new(simple_ping_config(), Box::new(mock));
+        let pinger = Ping::new(simple_ping_config(), mock);
         pinger.ping_peers(vec![bad_peer.clone()], &send_ping).await;
     }
 
@@ -398,14 +422,14 @@ mod tests {
             )
             .return_const(());
 
-        let pinger = Ping::new(ping_config, Box::new(mock));
+        let pinger = Ping::new(ping_config, mock);
         pinger.ping_peers(vec![peer.clone()], &send_ping).await;
     }
 
     #[async_std::test]
     async fn test_ping_peers_empty_list_will_not_trigger_any_pinging() {
         let mock = MockPingExternalAPI::new();
-        let pinger = Ping::new(simple_ping_config(), Box::new(mock));
+        let pinger = Ping::new(simple_ping_config(), mock);
 
         pinger.ping_peers(vec![], &send_ping).await;
     }
@@ -431,7 +455,7 @@ mod tests {
             )
             .return_const(());
 
-        let pinger = Ping::new(simple_ping_config(), Box::new(mock));
+        let pinger = Ping::new(simple_ping_config(), mock);
         pinger.ping_peers(peers, &send_ping).await;
     }
 
@@ -462,7 +486,7 @@ mod tests {
             )
             .return_const(());
 
-        let pinger = Ping::new(config, Box::new(mock));
+        let pinger = Ping::new(config, mock);
 
         let start = current_timestamp();
         pinger.ping_peers(peers, &send_ping).await;
@@ -490,7 +514,7 @@ mod tests {
             )
             .return_const(());
 
-        let pinger = Ping::new(config, Box::new(mock));
+        let pinger = Ping::new(config, mock);
 
         pinger.ping_peers(peers, &send_ping).await;
     }
