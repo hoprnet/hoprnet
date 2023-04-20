@@ -29,7 +29,7 @@
     "@ethersproject/wallet": "5.7.0",
     "@hoprnet/hopr-real": "workspace:packages/real",
     "@libp2p/crypto": "1.0.0",
-    "@libp2p/interface-peer-id": "1.0.5",
+    "@libp2p/interface-peer-id": "1.1.2",
     "@libp2p/peer-id": "1.1.16",
     "@multiformats/multiaddr": "10.3.3",
     "abortable-iterator": "4.0.3",

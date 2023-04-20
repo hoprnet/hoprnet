@@ -742,7 +742,7 @@ __metadata:
     "@libp2p/interface-connection": 1.0.1
     "@libp2p/interface-connection-manager": 1.1.0
     "@libp2p/interface-peer-discovery": 1.0.0
-    "@libp2p/interface-peer-id": 1.0.2
+    "@libp2p/interface-peer-id": 1.1.2
     "@libp2p/interface-registrar": 1.1.0
     "@libp2p/interface-transport": 1.0.0
     "@libp2p/interfaces": 2.0.4
@@ -777,7 +777,7 @@ __metadata:
   dependencies:
     "@hoprnet/hopr-utils": "workspace:packages/utils"
     "@libp2p/crypto": 1.0.0
-    "@libp2p/interface-peer-id": 1.0.5
+    "@libp2p/interface-peer-id": 1.1.2
     "@libp2p/peer-id": 1.1.16
     "@multiformats/multiaddr": 10.3.3
     "@sinonjs/referee": 9.1.2
@@ -814,7 +814,7 @@ __metadata:
     "@hoprnet/hopr-utils": "workspace:packages/utils"
     "@libp2p/crypto": 1.0.0
     "@libp2p/interface-content-routing": 1.0.2
-    "@libp2p/interface-peer-id": 1.0.5
+    "@libp2p/interface-peer-id": 1.1.2
     "@libp2p/interface-registrar": 1.1.0
     "@libp2p/interfaces": 2.0.4
     "@libp2p/kad-dht": 1.0.16
@@ -873,7 +873,7 @@ __metadata:
     "@libp2p/interface-connection": 1.0.1
     "@libp2p/interface-connection-manager": 1.1.0
     "@libp2p/interface-keys": 1.0.3
-    "@libp2p/interface-peer-id": 1.0.5
+    "@libp2p/interface-peer-id": 1.1.2
     "@libp2p/interface-peer-store": 1.0.0
     "@libp2p/interface-registrar": 1.1.0
     "@libp2p/kad-dht": 1.0.16
@@ -919,7 +919,7 @@ __metadata:
     "@hoprnet/hopr-core": "workspace:packages/core"
     "@hoprnet/hopr-real": "workspace:packages/real"
     "@hoprnet/hopr-utils": "workspace:packages/utils"
-    "@libp2p/interface-peer-id": 1.0.5
+    "@libp2p/interface-peer-id": 1.1.2
     "@libp2p/peer-id": 1.1.16
     "@multiformats/multiaddr": 10.3.3
     "@types/chai": 4.3.4
@@ -1134,16 +1134,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@libp2p/interface-peer-id@npm:1.0.2":
-  version: 1.0.2
-  resolution: "@libp2p/interface-peer-id@npm:1.0.2"
+"@libp2p/interface-peer-id@npm:1.1.2":
+  version: 1.1.2
+  resolution: "@libp2p/interface-peer-id@npm:1.1.2"
   dependencies:
-    multiformats: ^9.6.3
-  checksum: c2a16c4fa8907dd3477c82e0d1a6c98450496a452b6ae34c82d18e27fe9f9e5bda23eec7b53ce2f382165f2a42201732a6004859a831f0c8835958eaadcbdf00
+    multiformats: ^10.0.0
+  checksum: 6f332fbacc2934c255877a021e5ef52cf1dec72dd51eb0899ca34a54ca1c1b5d7c160c5b3f8fa23a8e53551ef84028d7f6acde34171d0c91a300642a9cb5d06c
   languageName: node
   linkType: hard
 
-"@libp2p/interface-peer-id@npm:1.0.5, @libp2p/interface-peer-id@npm:^1.0.0, @libp2p/interface-peer-id@npm:^1.0.2":
+"@libp2p/interface-peer-id@npm:^1.0.0, @libp2p/interface-peer-id@npm:^1.0.2":
   version: 1.0.5
   resolution: "@libp2p/interface-peer-id@npm:1.0.5"
   dependencies:
