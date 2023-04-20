@@ -36,7 +36,7 @@
     "@libp2p/interface-transport": "1.0.0",
     "@libp2p/interfaces": "2.0.4",
     "@libp2p/peer-id": "1.1.16",
-    "@multiformats/multiaddr": "10.3.3",
+    "@multiformats/multiaddr": "10.5.0",
     "abortable-iterator": "4.0.3",
     "chalk": "5.0.1",
     "debug": "4.3.4",

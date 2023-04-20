@@ -747,7 +747,7 @@ __metadata:
     "@libp2p/interface-transport": 1.0.0
     "@libp2p/interfaces": 2.0.4
     "@libp2p/peer-id": 1.1.16
-    "@multiformats/multiaddr": 10.3.3
+    "@multiformats/multiaddr": 10.5.0
     "@types/debug": 4.1.7
     "@types/mocha": 9.1.1
     "@types/node": 16
@@ -779,7 +779,7 @@ __metadata:
     "@libp2p/crypto": 1.0.0
     "@libp2p/interface-peer-id": 1.0.5
     "@libp2p/peer-id": 1.1.16
-    "@multiformats/multiaddr": 10.3.3
+    "@multiformats/multiaddr": 10.5.0
     "@sinonjs/referee": 9.1.2
     "@types/bn.js": ^5.1.1
     "@types/chai": 4.3.4
@@ -822,7 +822,7 @@ __metadata:
     "@libp2p/peer-id": 1.1.16
     "@libp2p/peer-id-factory": 1.0.18
     "@libp2p/tcp": 1.0.11
-    "@multiformats/multiaddr": 10.3.3
+    "@multiformats/multiaddr": 10.5.0
     "@types/chai": 4.3.4
     "@types/chai-as-promised": 7.1.5
     "@types/mocha": 9.1.1
@@ -881,7 +881,7 @@ __metadata:
     "@libp2p/peer-id": 1.1.16
     "@libp2p/peer-id-factory": 1.0.18
     "@libp2p/tcp": 1.0.11
-    "@multiformats/multiaddr": 10.3.3
+    "@multiformats/multiaddr": 10.5.0
     "@types/chai": 4.3.4
     "@types/mocha": 9.1.1
     abortable-iterator: 4.0.3
@@ -921,7 +921,7 @@ __metadata:
     "@hoprnet/hopr-utils": "workspace:packages/utils"
     "@libp2p/interface-peer-id": 1.0.5
     "@libp2p/peer-id": 1.1.16
-    "@multiformats/multiaddr": 10.3.3
+    "@multiformats/multiaddr": 10.5.0
     "@types/chai": 4.3.4
     "@types/chai-as-promised": 7.1.5
     "@types/cors": 2.8.13
@@ -1543,7 +1543,21 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@multiformats/multiaddr@npm:10.3.3, @multiformats/multiaddr@npm:^10.1.1, @multiformats/multiaddr@npm:^10.1.5, @multiformats/multiaddr@npm:^10.1.8, @multiformats/multiaddr@npm:^10.2.0":
+"@multiformats/multiaddr@npm:10.5.0":
+  version: 10.5.0
+  resolution: "@multiformats/multiaddr@npm:10.5.0"
+  dependencies:
+    dns-over-http-resolver: ^2.1.0
+    err-code: ^3.0.1
+    is-ip: ^5.0.0
+    multiformats: ^9.4.5
+    uint8arrays: ^3.0.0
+    varint: ^6.0.0
+  checksum: 9ed158df80ac3611f53b91d0de4a75a761bc749ae0026b303c4779a49fe680fd7d3626fa3ffaaa82e38a5f421f2b09af8a6d855a8465242107055fcb2a547678
+  languageName: node
+  linkType: hard
+
+"@multiformats/multiaddr@npm:^10.1.1, @multiformats/multiaddr@npm:^10.1.5, @multiformats/multiaddr@npm:^10.1.8, @multiformats/multiaddr@npm:^10.2.0":
   version: 10.3.3
   resolution: "@multiformats/multiaddr@npm:10.3.3"
   dependencies:

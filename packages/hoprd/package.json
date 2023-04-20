@@ -38,7 +38,7 @@
     "@hoprnet/hopr-utils": "workspace:packages/utils",
     "@libp2p/interface-peer-id": "1.0.5",
     "@libp2p/peer-id": "1.1.16",
-    "@multiformats/multiaddr": "10.3.3",
+    "@multiformats/multiaddr": "10.5.0",
     "@types/chai-as-promised": "7.1.5",
     "bn.js": "5.2.1",
     "body-parser": "1.20.2",

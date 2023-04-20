@@ -43,7 +43,7 @@
     "@libp2p/mplex": "1.2.2",
     "@libp2p/peer-id": "1.1.16",
     "@libp2p/peer-id-factory": "1.0.18",
-    "@multiformats/multiaddr": "10.3.3",
+    "@multiformats/multiaddr": "10.5.0",
     "bn.js": "5.2.1",
     "datastore-level": "^8.0.0",
     "debug": "4.3.4",
