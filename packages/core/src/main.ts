@@ -249,9 +249,7 @@ export async function createHoprNode(
 
   // get contract data for the given envirionment id and pass it on to create chain wrapper
   const resolvedContractAddresses = getContractData(options.network.id)
-  log(
-    `[DEBUG] resolvedContractAddresses ${options.network.id} ${JSON.stringify(resolvedContractAddresses, null, 2)}`
-  )
+  log(`[DEBUG] resolvedContractAddresses ${options.network.id} ${JSON.stringify(resolvedContractAddresses, null, 2)}`)
   // Initialize connection to the blockchain
   await chain.initializeChainWrapper(resolvedContractAddresses)
 

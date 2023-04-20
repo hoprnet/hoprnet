@@ -5,13 +5,7 @@ import path from 'path'
 import BN from 'bn.js'
 import yargs from 'yargs/yargs'
 import { hideBin } from 'yargs/helpers'
-import {
-  createHoprNode,
-  resolveNetwork,
-  supportedNetworks,
-  type ResolvedNetwork,
-  CONSTANTS
-} from '@hoprnet/hopr-core'
+import { createHoprNode, resolveNetwork, supportedNetworks, type ResolvedNetwork, CONSTANTS } from '@hoprnet/hopr-core'
 
 import {
   type ChannelEntry,
