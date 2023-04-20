@@ -1,6 +1,5 @@
 use crate::utils::HelperErrors;
-use core_crypto::checksum::to_checksum;
-use core_crypto::types::PublicKey;
+use core_crypto::types::{PublicKey, ToChecksum};
 use elliptic_curve::rand_core::{CryptoRng, RngCore};
 use eth_keystore;
 use ethers::core::rand::thread_rng;
@@ -25,7 +24,7 @@ impl NodeIdentity {
         let id = public_key._to_peerid_str();
 
         // derive ethereum address
-        let address = to_checksum(public_key.to_address());
+        let address = public_key.to_address().to_checksum();
 
         Self {
             peer_id: id,
