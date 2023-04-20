@@ -27,6 +27,7 @@ import { ChannelStatus } from '@hoprnet/hopr-utils'
 
 const STRATEGIES = ['passive', 'promiscuous', 'random']
 export type Strategy = typeof STRATEGIES[number]
+
 export function isStrategy(str: string): str is Strategy {
   return STRATEGIES.includes(str)
 }
