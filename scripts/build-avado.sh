@@ -26,6 +26,8 @@ usage() {
   msg "\trelease: Release for which the package is built."
   msg "\tupstream_version: hoprd Docker image version to be used. Inferred if not set."
   msg "\tapi_token: API token which is set in the Avado package."
+  msg "You can also use the 'DRY_RUN=true' environment variable to only generate the Docker compose file,"
+  msg "without triggering the build."
   msg
 }
 
