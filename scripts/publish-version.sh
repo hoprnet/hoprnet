@@ -35,7 +35,7 @@ cleanup() {
 
   # delete default environments
   rm -f \
-    "${mydir}/../packages/hoprd/default-environment.json"
+    "${mydir}/../packages/hoprd/default-network.json"
 }
 
 # return early with help info when requested
@@ -78,10 +78,10 @@ if [[ "${version_type}" = "prerelease" && "${branch}" != "staging/"* ]]; then
   fi
 fi
 
-log "get default environment id"
+log "get default network id"
 
 declare environment_id
-environment_id="$("${mydir}/get-default-environment.sh")"
+environment_id="$("${mydir}/get-default-network.sh")"
 
 log "using version template ${current_version} + ${version_type}"
 declare new_version
@@ -132,9 +132,9 @@ if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
 
   trap cleanup SIGINT SIGTERM ERR
 
-  # set default environments
-  log "adding default environment ${environment_id} to hoprd package"
-  echo "{\"id\": \"${environment_id}\"}" > "${mydir}/../packages/hoprd/default-environment.json"
+  # set default networks
+  log "adding default network ${environment_id} to hoprd package"
+  echo "{\"id\": \"${environment_id}\"}" > "${mydir}/../packages/hoprd/default-network.json"
 
   # special treatment for end-of-chain packages
   # to create lockfiles with resolution overrides

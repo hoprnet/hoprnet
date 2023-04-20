@@ -66,7 +66,7 @@
       },
       "additionalProperties": false
     },
-    "networks": {
+    "chains": {
       "type": "object",
       "patternProperties": {
         "^[a-z0-9]+$": {
@@ -118,5 +118,5 @@
       }
     }
   },
-  "required": ["environments", "networks"]
+  "required": ["environments", "chains"]
 }

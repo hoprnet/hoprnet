@@ -27,7 +27,7 @@ import { AcknowledgementChallenge, Packet, Acknowledgement } from '../../message
 import { PacketForwardInteraction } from './forward.js'
 import { initializeCommitment } from '@hoprnet/hopr-core-ethereum'
 import { ChannelCommitmentInfo } from '@hoprnet/hopr-core-ethereum'
-import type { ResolvedEnvironment } from '../../environment.js'
+import type { ResolvedNetwork } from '../../network.js'
 import type { HoprOptions } from '../../index.js'
 import type { Components } from '@libp2p/interfaces/components'
 import type { Connection, Stream } from '@libp2p/interfaces/connection'
@@ -53,7 +53,7 @@ const nodes: PeerId[] = [SELF, RELAY0, RELAY1, RELAY2, COUNTERPARTY]
 const TestingSnapshot = new Snapshot(new BN(0), new BN(0), new BN(0))
 
 const TestOptions = {
-  environment: undefined,
+  network: undefined,
   dataPath: '',
   checkUnrealizedBalance: false
 } as HoprOptions
@@ -255,7 +255,7 @@ describe('packet acknowledgement', function () {
       () => {},
       {
         id: 'testing'
-      } as ResolvedEnvironment
+      } as ResolvedNetwork
     )
 
     const ackInterationCounterparty = new AcknowledgementInteraction(
@@ -267,7 +267,7 @@ describe('packet acknowledgement', function () {
       () => {},
       {
         id: 'testing'
-      } as ResolvedEnvironment
+      } as ResolvedNetwork
     )
 
     await ackInteration.start()
@@ -323,7 +323,7 @@ describe('packet acknowledgement', function () {
       },
       {
         id: 'testing'
-      } as ResolvedEnvironment
+      } as ResolvedNetwork
     )
 
     const ackCounterpartyInteraction = new AcknowledgementInteraction(
@@ -335,7 +335,7 @@ describe('packet acknowledgement', function () {
       () => {},
       {
         id: 'testing'
-      } as ResolvedEnvironment
+      } as ResolvedNetwork
     )
 
     await ackCounterpartyInteraction.start()
@@ -351,7 +351,7 @@ describe('packet acknowledgement', function () {
       dbs[1],
       {
         id: 'testing'
-      } as ResolvedEnvironment,
+      } as ResolvedNetwork,
       ackRelay0Interaction,
       TestOptions
     )
@@ -433,7 +433,7 @@ describe('packet relaying interaction', function () {
         () => {},
         {
           id: 'testing'
-        } as ResolvedEnvironment
+        } as ResolvedNetwork
       )
 
       const interaction = new PacketForwardInteraction(
@@ -444,7 +444,7 @@ describe('packet relaying interaction', function () {
         dbs[index],
         {
           id: 'testing'
-        } as ResolvedEnvironment,
+        } as ResolvedNetwork,
         acknowledgementInteraction,
         TestOptions
       )

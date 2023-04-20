@@ -161,9 +161,9 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     }
 
     // Requires registrar to be started first
-    const protocolsDelivery = DELIVERY_PROTOCOLS(this.options.environment, this.options.supportedEnvironments)
-    const protocolsRelay = RELAY_PROTOCOLS(this.options.environment, this.options.supportedEnvironments)
-    const protocolsCanRelay = CAN_RELAY_PROTOCOLS(this.options.environment, this.options.supportedEnvironments)
+    const protocolsDelivery = DELIVERY_PROTOCOLS(this.options.network, this.options.supportedNetworks)
+    const protocolsRelay = RELAY_PROTOCOLS(this.options.network, this.options.supportedNetworks)
+    const protocolsCanRelay = CAN_RELAY_PROTOCOLS(this.options.network, this.options.supportedNetworks)
     await this.components.getRegistrar().handle(protocolsDelivery, this.onDelivery)
     await this.components.getRegistrar().handle(protocolsRelay, this.onRelay)
     await this.components.getRegistrar().handle(protocolsCanRelay, this.onCanRelay)
@@ -257,7 +257,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     const response = await dial(
       this.getComponents(),
       relay,
-      RELAY_PROTOCOLS(this.options.environment, this.options.supportedEnvironments),
+      RELAY_PROTOCOLS(this.options.network, this.options.supportedNetworks),
       false
     )
 

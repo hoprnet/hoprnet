@@ -7,9 +7,9 @@ import yargs from 'yargs/yargs'
 import { hideBin } from 'yargs/helpers'
 import {
   createHoprNode,
-  resolveEnvironment,
-  supportedEnvironments,
-  type ResolvedEnvironment,
+  resolveNetwork,
+  supportedNetworks,
+  type ResolvedNetwork,
   CONSTANTS
 } from '@hoprnet/hopr-core'
 
@@ -76,7 +76,7 @@ const argv = yargsInstance
   .option('environment', {
     string: true,
     describe: 'Environment id which the node shall run on (HOPR_CTD_ENVIRONMENT)',
-    choices: supportedEnvironments().map((env) => env.id),
+    choices: supportedNetworks().map((env) => env.id),
     default: defaultEnvironment()
   })
   .option('privateKey', {
@@ -146,7 +146,7 @@ const argv = yargsInstance
   .wrap(Math.min(120, yargsInstance.terminalWidth()))
   .parseSync()
 
-function generateNodeOptions(environment: ResolvedEnvironment): HoprOptions {
+function generateNodeOptions(environment: ResolvedNetwork): HoprOptions {
   const options: HoprOptions = {
     announce: false,
     createDbIfNotExist: true,
@@ -168,7 +168,7 @@ function generateNodeOptions(environment: ResolvedEnvironment): HoprOptions {
 }
 
 export async function main(update: (State: State) => void, peerId?: PeerId) {
-  const environment = resolveEnvironment(argv.environment, argv.provider)
+  const environment = resolveNetwork(argv.environment, argv.provider)
   const options = generateNodeOptions(environment)
   if (!peerId) {
     peerId = privKeyToPeerId(argv.privateKey)

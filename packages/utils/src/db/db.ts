@@ -152,7 +152,7 @@ export class HoprDB {
 
   constructor(private id: PublicKey) {}
 
-  async init(initialize: boolean, dbPath: string, forceCreate: boolean = false, environmentId: string) {
+  async init(initialize: boolean, dbPath: string, forceCreate: boolean = false, networkName: string) {
     let setEnvironment = false
 
     log(`using db at ${dbPath}`)
@@ -195,15 +195,15 @@ export class HoprDB {
 
     log(`namespacing db by public key: ${this.id.toCompressedPubKeyHex()}`)
     if (setEnvironment) {
-      log(`setting environment id ${environmentId} to db`)
-      await this.setEnvironmentId(environmentId)
+      log(`setting network id ${networkName} to db`)
+      await this.setEnvironmentId(networkName)
     } else {
-      const hasEnvironmentKey = await this.verifyEnvironmentId(environmentId)
+      const hasEnvironmentKey = await this.verifyEnvironmentId(networkName)
 
       if (!hasEnvironmentKey) {
         const storedId = await this.getEnvironmentId()
 
-        throw new Error(`invalid db environment id: ${storedId} (expected: ${environmentId})`)
+        throw new Error(`invalid db network id: ${storedId} (expected: ${networkName})`)
       }
     }
   }

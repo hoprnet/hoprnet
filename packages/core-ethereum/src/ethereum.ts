@@ -75,8 +75,8 @@ export async function createChainWrapper(
     chainId: number
     maxFeePerGas: string
     maxPriorityFeePerGas: string
+    chain: string
     network: string
-    environment: string
   },
   privateKey: Uint8Array,
   checkDuplicate: Boolean = true,
@@ -294,7 +294,7 @@ export async function createChainWrapper(
       feeData = await provider.getFeeData()
     } catch (error) {
       log('Transaction with nonce %d failed to getFeeData', nonce, error)
-      // TODO: find an API for fee data per environment
+      // TODO: find an API for fee data per network
       feeData = {
         lastBaseFeePerGas: null,
         maxFeePerGas: defaultMaxFeePerGas,
@@ -867,7 +867,7 @@ export async function createChainWrapper(
     getPrivateKey: () => privateKey,
     getPublicKey: () => publicKey,
     getInfo: () => ({
-      network: networkInfo.network,
+      chain: networkInfo.chain,
       hoprTokenAddress: deploymentExtract.hoprTokenAddress,
       hoprChannelsAddress: deploymentExtract.hoprChannelsAddress,
       hoprNetworkRegistryAddress: deploymentExtract.hoprNetworkRegistryAddress,

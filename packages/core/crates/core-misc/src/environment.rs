@@ -33,7 +33,7 @@ impl ToString for EnvironmentType {
 #[derive(Deserialize, Serialize, Clone)]
 #[serde(deny_unknown_fields)]
 #[wasm_bindgen(getter_with_clone)]
-pub struct NetworkOptions {
+pub struct ChainOptions {
     #[serde(skip_deserializing)]
     pub id: String,
     pub description: String,
@@ -54,12 +54,12 @@ pub struct NetworkOptions {
     pub tags: Option<Vec<String>>,
 }
 
-/// Holds all information about the protocol environment
+/// Holds all information about the protocol network
 /// to be used by the client
 #[derive(Deserialize, Serialize, Clone)]
 #[serde(deny_unknown_fields)]
 #[wasm_bindgen(getter_with_clone)]
-pub struct Environment {
+pub struct Network {
     #[serde(skip_deserializing)]
     pub id: String,
     /// must match one of the Network.id
@@ -91,8 +91,8 @@ pub struct Environment {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProtocolConfig {
-    pub environments: std::collections::HashMap<String, Environment>,
-    pub networks: std::collections::HashMap<String, NetworkOptions>,
+    pub networks: std::collections::HashMap<String, Network>,
+    pub chains: std::collections::HashMap<String, ChainOptions>,
 }
 
 impl FromJsonFile for ProtocolConfig {
@@ -104,7 +104,7 @@ impl FromJsonFile for ProtocolConfig {
 
         let mut protocol_config = ok_or_str!(serde_json::from_slice::<ProtocolConfig>(&data))?;
 
-        for (id, env) in protocol_config.environments.iter_mut() {
+        for (id, env) in protocol_config.networks.iter_mut() {
             env.id = id.to_owned();
         }
 
@@ -118,13 +118,13 @@ impl FromJsonFile for ProtocolConfig {
 
 impl ProtocolConfig {
     /// Returns a list of environments which the node is able to work with
-    pub fn supported_environments(&self, mono_repo_path: &str) -> Result<Vec<Environment>, String> {
+    pub fn supported_networks(&self, mono_repo_path: &str) -> Result<Vec<Network>, String> {
         let version = PackageJsonFile::from_json_file(&mono_repo_path)
             .and_then(|p| ok_or_str!(real::coerce_version(p.version.as_str())))?;
 
-        let mut allowed: Vec<Environment> = vec![];
+        let mut allowed: Vec<Network> = vec![];
 
-        for (_, env) in self.environments.iter() {
+        for (_, env) in self.networks.iter() {
             let range = env.version_range.to_owned();
 
             if let Ok(true) = real::satisfies(version.as_str(), range.as_str()) {
@@ -163,10 +163,10 @@ impl PackageJsonFile {
 
 #[derive(Serialize, Clone)]
 #[wasm_bindgen(getter_with_clone)]
-pub struct ResolvedEnvironment {
-    /// the environment identifier, e.g. monte_rosa
+pub struct ResolvedNetwork {
+    /// the network identifier, e.g. monte_rosa
     pub id: String,
-    pub network: NetworkOptions,
+    pub chain: ChainOptions,
     pub environment_type: EnvironmentType,
     /// an Ethereum address
     pub channels_contract_address: String,
@@ -185,48 +185,44 @@ pub struct ResolvedEnvironment {
     pub network_registry_contract_address: String,
 }
 
-impl ResolvedEnvironment {
-    /// Returns the environment details, returns an error if environment is not supported
-    pub fn new(
-        mono_repo_path: &str,
-        environment_id: &str,
-        maybe_custom_provider: Option<&str>,
-    ) -> Result<Self, String> {
+impl ResolvedNetwork {
+    /// Returns the network details, returns an error if network is not supported
+    pub fn new(mono_repo_path: &str, network_name: &str, maybe_custom_provider: Option<&str>) -> Result<Self, String> {
         let mut protocol_config = ProtocolConfig::from_json_file(mono_repo_path)?;
         let version = PackageJsonFile::from_json_file(mono_repo_path).and_then(|c| c.coerced_version())?;
 
-        let environment = protocol_config.environments.get_mut(environment_id).ok_or(format!(
-            "Could not find environment {} in protocol config",
-            environment_id
-        ))?;
+        let network = protocol_config
+            .networks
+            .get_mut(network_name)
+            .ok_or(format!("Could not find network {} in protocol config", network_name))?;
 
-        let network = protocol_config.networks.get_mut(&environment.chain).ok_or(format!(
-            "Invalid chain {} for environment {}",
-            environment.chain, environment_id
-        ))?;
+        let chain = protocol_config
+            .chains
+            .get_mut(&network.chain)
+            .ok_or(format!("Invalid chain {} for network {}", network.chain, network_name))?;
 
         if let Some(custom_provider) = maybe_custom_provider {
-            network.default_provider = custom_provider.into();
+            chain.default_provider = custom_provider.into();
         }
 
-        match real::satisfies(version.as_str(), environment.version_range.as_str()) {
-            Ok(true) => Ok(ResolvedEnvironment {
-                id: environment_id.into(),
-                network: network.to_owned(),
-                environment_type: environment.environment_type,
-                channel_contract_deploy_block: environment.indexer_start_block_number,
-                token_contract_address: environment.token_contract_address.to_owned(),
-                channels_contract_address: environment.channels_contract_address.to_owned(),
-                xhopr_contract_address: environment.xhopr_contract_address.to_owned(),
-                boost_contract_address: environment.boost_contract_address.to_owned(),
-                stake_contract_address: environment.stake_contract_address.to_owned(),
-                network_registry_contract_address: environment.network_registry_contract_address.to_owned(),
-                network_registry_proxy_contract_address: environment.network_registry_proxy_contract_address.to_owned(),
+        match real::satisfies(version.as_str(), network.version_range.as_str()) {
+            Ok(true) => Ok(ResolvedNetwork {
+                id: network_name.into(),
+                chain: chain.to_owned(),
+                environment_type: network.environment_type,
+                channel_contract_deploy_block: network.indexer_start_block_number,
+                token_contract_address: network.token_contract_address.to_owned(),
+                channels_contract_address: network.channels_contract_address.to_owned(),
+                xhopr_contract_address: network.xhopr_contract_address.to_owned(),
+                boost_contract_address: network.boost_contract_address.to_owned(),
+                stake_contract_address: network.stake_contract_address.to_owned(),
+                network_registry_contract_address: network.network_registry_contract_address.to_owned(),
+                network_registry_proxy_contract_address: network.network_registry_proxy_contract_address.to_owned(),
             }),
-            Ok(false) => protocol_config.supported_environments(mono_repo_path).and_then(|envs| {
+            Ok(false) => protocol_config.supported_networks(mono_repo_path).and_then(|envs| {
                 Err(format!(
-                    "environment {} is not supported, supported environments {:?}",
-                    environment_id,
+                    "network {} is not supported, supported networks {:?}",
+                    network_name,
                     envs.iter().map(|e| e.id.to_owned()).collect::<Vec<String>>().join(", ")
                 )
                 .into())
@@ -246,26 +242,26 @@ pub mod wasm {
     pub type JsResult<T> = Result<T, JsValue>;
 
     #[wasm_bindgen]
-    pub fn supported_environments(mono_repo_path: &str) -> JsResult<JsValue> {
+    pub fn supported_networks(mono_repo_path: &str) -> JsResult<JsValue> {
         clean_mono_repo_path!(mono_repo_path, cleaned_mono_repo_path);
 
         let supported_envs = super::ProtocolConfig::from_json_file(cleaned_mono_repo_path)
-            .and_then(|c| c.supported_environments(cleaned_mono_repo_path))?;
+            .and_then(|c| c.supported_networks(cleaned_mono_repo_path))?;
 
         ok_or_jserr!(serde_wasm_bindgen::to_value(&supported_envs))
     }
 
     #[wasm_bindgen]
-    pub fn resolve_environment(
+    pub fn resolve_network(
         mono_repo_path: &str,
-        environment_id: &str,
+        network_name: &str,
         maybe_custom_provider: Option<String>,
     ) -> JsResult<JsValue> {
         clean_mono_repo_path!(mono_repo_path, cleaned_mono_repo_path);
 
-        let resolved_environment = super::ResolvedEnvironment::new(
+        let resolved_environment = super::ResolvedNetwork::new(
             cleaned_mono_repo_path,
-            environment_id,
+            network_name,
             maybe_custom_provider.as_ref().map(|c| c.as_str()),
         )?;
 

@@ -92,7 +92,7 @@ import { AcknowledgementInteraction } from './interactions/packet/acknowledgemen
 import { PacketForwardInteraction } from './interactions/packet/forward.js'
 
 import { Packet } from './messages/index.js'
-import type { ResolvedEnvironment } from './environment.js'
+import type { ResolvedNetwork } from './network.js'
 import { createLibp2pInstance } from './main.js'
 import type { EventEmitter as Libp2pEmitter } from '@libp2p/interfaces/events'
 import { utils as ethersUtils } from 'ethers/lib/ethers.js'
@@ -149,7 +149,7 @@ type PeerStoreAddress = {
 }
 
 export type HoprOptions = {
-  environment: ResolvedEnvironment
+  network: ResolvedNetwork
   announce: boolean
   dataPath: string
   createDbIfNotExist: boolean
@@ -238,7 +238,7 @@ class Hopr extends EventEmitter {
   private pubKey: PublicKey
   private knownPublicNodesCache = new Set()
 
-  public environment: ResolvedEnvironment
+  public network: ResolvedNetwork
 
   public indexer: Indexer
 
@@ -264,8 +264,8 @@ class Hopr extends EventEmitter {
     if (!id.privateKey || !isSecp256k1PeerId(id)) {
       throw new Error('Hopr Node must be initialized with an id with a secp256k1 private key')
     }
-    this.environment = options.environment
-    log(`using environment: ${this.environment.id}`)
+    this.network = options.network
+    log(`using network: ${this.network.id}`)
     this.indexer = HoprCoreEthereum.getInstance().indexer // TODO temporary
     this.pubKey = PublicKey.fromPeerId(id)
   }
@@ -444,7 +444,7 @@ class Hopr extends EventEmitter {
       this.networkPeers,
       this.libp2pComponents,
       sendMessage,
-      this.environment.id,
+      this.network.id,
       heartbeat_config
     )
 
@@ -463,7 +463,7 @@ class Hopr extends EventEmitter {
         this.emit('hopr:message-acknowledged', ackChallenge.toHex())
       },
       (ack: AcknowledgedTicket) => connector.emit('ticket:acknowledged', ack),
-      this.environment
+      this.network
     )
 
     const onMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
@@ -473,7 +473,7 @@ class Hopr extends EventEmitter {
       this.getId(),
       onMessage,
       this.db,
-      this.environment,
+      this.network,
       this.acknowledgements,
       this.options
     )
@@ -1192,7 +1192,7 @@ class Hopr extends EventEmitter {
   }
 
   public smartContractInfo(): {
-    network: string
+    chain: string
     hoprTokenAddress: string
     hoprChannelsAddress: string
     hoprNetworkRegistryAddress: string
@@ -1552,6 +1552,6 @@ export {
   health_to_string,
   type ChannelStrategyInterface
 }
-export { resolveEnvironment, supportedEnvironments, type ResolvedEnvironment } from './environment.js'
+export { resolveNetwork, supportedNetworks, type ResolvedNetwork } from './network.js'
 export { CORE_CONSTANTS as CONSTANTS } from '../lib/core_misc.js'
 export { sampleOptions } from './index.mock.js'

@@ -36,20 +36,20 @@ export default class Heartbeat {
     protected networkPeers: Network, // protected for testing
     private libp2pComponents: Components,
     protected sendMessage: SendMessage,
-    environmentId: string,
+    networkName: string,
     config: HeartbeatConfig
   ) {
     this.config = config
 
     this.protocolHeartbeat = [
       // current
-      `/hopr/${environmentId}/heartbeat/${NORMALIZED_VERSION}`,
+      `/hopr/${networkName}/heartbeat/${NORMALIZED_VERSION}`,
       // deprecated
-      `/hopr/${environmentId}/heartbeat`
+      `/hopr/${networkName}/heartbeat`
     ]
 
     this.pinger = Pinger.build(
-      environmentId,
+      networkName,
       NORMALIZED_VERSION,
       (peer: string, result: number | undefined) => this.networkPeers.refresh(peer, result),
       (msg: Uint8Array, dest: string): Promise<Uint8Array[]> =>

@@ -54,7 +54,7 @@ async function getPeer(
   port: number,
   testingOptions?: HoprConnectTestingOptions
 ) {
-  const relay = new Relay({ environment: `testingEnvironment` }, testingOptions ?? { __noWebRTCUpgrade: true })
+  const relay = new Relay({ network: `testingEnvironment` }, testingOptions ?? { __noWebRTCUpgrade: true })
 
   relay.init(
     await createFakeComponents(peerId, network, {

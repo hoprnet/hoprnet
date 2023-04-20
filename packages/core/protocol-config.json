@@ -171,7 +171,7 @@
   },
   "networks": {
     "anvil": {
-      "description": "Local Ethereum node, akin to Ganache, Hardhat network",
+      "description": "Local Ethereum node, akin to Ganache, Hardhat chain",
       "chain_id": 31337,
       "live": false,
       "max_fee_per_gas": "1 gwei",

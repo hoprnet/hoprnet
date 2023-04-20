@@ -55,7 +55,7 @@ export type Stream<T = StreamType> = {
 
 export type StreamResult = IteratorResult<StreamType, any>
 
-export type Environment = {
+export type Network = {
   id: string
   versionRange: string
 }
@@ -76,8 +76,8 @@ export type HoprConnectOptions = {
   initialNodes?: PeerStoreType[]
   interface?: string
   maxRelayedConnections?: number
-  environment?: string
-  supportedEnvironments?: Environment[]
+  network?: string
+  supportedNetworks?: Network[]
   relayFreeTimeout?: number
   dhtRenewalTimeout?: number
   entryNodeReconnectBaseTimeout?: number

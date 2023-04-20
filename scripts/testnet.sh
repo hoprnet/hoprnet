@@ -57,7 +57,7 @@ get_rpc() {
   local chain
   chain="$(get_network "${1}")"
 
-  jq -r ".networks.\"${chain}\".default_provider" "${mydir}/../packages/core/protocol-config.json" | envsubst
+  jq -r ".chains.\"${chain}\".default_provider" "${mydir}/../packages/core/protocol-config.json" | envsubst
 }
 
 # $1 = environment

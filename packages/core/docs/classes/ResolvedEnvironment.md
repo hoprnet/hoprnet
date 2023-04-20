@@ -90,9 +90,9 @@ packages/core/lib/core_misc.d.ts:219
 
 ___
 
-### network
+### chain
 
-• **network**: `NetworkOptions`
+• **chain**: `ChainOptions`
 
 #### Defined in
 

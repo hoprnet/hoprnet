@@ -211,9 +211,9 @@ Notes on Test cases:
 
 Note that deployment for `HoprDistributor` and `HoprWrapper` are skipped; ERC1820Registry is not deployed in production envirionment.
 
-8. The temporary `contract=address.json` has the following differences compared with `protocol-config.json`
+8. The temporary `contract-address.json` has the following differences compared with `protocol-config.json`
 
-- It does not need "networks" attribute
+- It does not need "chains" attribute
 - In "environment" attribute:
   ```
   - "chain": "goerli",

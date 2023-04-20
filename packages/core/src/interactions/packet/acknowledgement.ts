@@ -13,7 +13,7 @@ import type { PeerId } from '@libp2p/interface-peer-id'
 import { ACKNOWLEDGEMENT_TIMEOUT } from '../../constants.js'
 import { Acknowledgement, Packet } from '../../messages/index.js'
 import { Pushable, pushable } from 'it-pushable'
-import type { ResolvedEnvironment } from '../../environment.js'
+import type { ResolvedNetwork } from '../../network.js'
 import type { Components } from '@libp2p/interfaces/components'
 
 const log = debug('hopr-core:acknowledgement')
@@ -58,16 +58,16 @@ export class AcknowledgementInteraction {
     private db: HoprDB,
     private onAcknowledgement: OnAcknowledgement,
     private onAckedTicket: OnAckedTicket,
-    private environment: ResolvedEnvironment
+    private network: ResolvedNetwork
   ) {
     this.incomingAcks = pushable<Incoming>({ objectMode: true })
     this.outgoingAcks = pushable<Outgoing>({ objectMode: true })
 
     this.protocols = [
       // current
-      `/hopr/${this.environment.id}/ack/${NORMALIZED_VERSION}`,
+      `/hopr/${this.network.id}/ack/${NORMALIZED_VERSION}`,
       // deprecated
-      `/hopr/${this.environment.id}/ack`
+      `/hopr/${this.network.id}/ack`
     ]
 
     this.handleAcknowledgement = this.handleAcknowledgement.bind(this)

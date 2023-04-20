@@ -59,7 +59,7 @@ for git_ref in $(cat "${release_config}" | jq -r "to_entries[] | .value.git_ref"
       declare chain=$(cat "${protocol_config}" | jq -r ".environments.\"${environment_id}\".chain")
       declare environment_type=$(cat "${deployments_summary}" | jq -r ".environments.\"${environment_id}\".environment_type")
 
-      log "deploying for environment ${environment_id} on network ${chain} of type ${environment_type}"
+      log "deploying for environment ${environment_id} on chain ${chain} of type ${environment_type}"
 
       make -C "${mydir}/../packages/ethereum/contracts/" anvil-deploy-contracts environment-name="${environment_id}" environment-type="${environment_type}"
 
