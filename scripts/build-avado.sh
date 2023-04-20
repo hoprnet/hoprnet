@@ -15,7 +15,7 @@ source "${mydir}/utils.sh"
 
 usage() {
   msg
-  msg "Usage: $0 [-h|--help] version [environment] [release] [api_token] [upstream_version]"
+  msg "Usage: $0 [-h|--help] version [environment] [release] [upstream_version] [api_token]"
   msg
   msg "This script builds and uploads an Avado package based on the given parameters."
   msg
@@ -24,8 +24,8 @@ usage() {
   msg "\tname: Version of the Avado package."
   msg "\tenvironment: Default environment which will be set in the package. Inferred if not set."
   msg "\trelease: Release for which the package is built."
-  msg "\tapi_token: API token which is set in the Avado package."
   msg "\tupstream_version: hoprd Docker image version to be used. Inferred if not set."
+  msg "\tapi_token: API token which is set in the Avado package."
   msg
 }
 
@@ -44,8 +44,13 @@ fi
 declare avado_version="${1}"
 declare environment_id="${2:-"$(${mydir}/get-default-environment.sh)"}"
 declare release_id="${3:-"$(${mydir}/get-default-environment.sh --release)"}"
-declare api_token="${4:-"!5qxc9Lp1BE7IFQ-nrtttU"}" # <- Default AVADO API token
-declare upstream_version="${5:-$avado_version}"
+declare upstream_version="${4:-$avado_version}"
+declare api_token="${5:-"!5qxc9Lp1BE7IFQ-nrtttU"}" # <- Default AVADO API token
+declare dry_run="${DRY_RUN}"
+
+if [ "${dry_run}" = true ]; then
+  msg "!! This is a DRY RUN !!"
+fi
 
 # Validate environment and release ids
 if [[ -z "${environment_id}" ]] || [[ -z "${release_id}" ]]; then
@@ -74,9 +79,11 @@ function cleanup {
   set +Eeuo pipefail
 
   # Undo changes restoring backups
-  mv ./docker-compose.bak ./docker-compose.yml
-  mv ./dappnode_package.bak ./dappnode_package.json
-  mv ./build/Dockerfile.bak ./build/Dockerfile
+  if [ "${dry_run}" = false ]  ; then
+  	mv ./docker-compose.bak ./docker-compose.yml
+  	mv ./dappnode_package.bak ./dappnode_package.json
+  	mv ./build/Dockerfile.bak ./build/Dockerfile
+  fi
 
   exit $EC
 }
@@ -120,7 +127,10 @@ sed -E "s/%TOKEN%/${api_token}/g" ./dappnode_package.json \
 
 ###
 
-# build actual image and store it on IPFS
-npx avadosdk build --provider http://80.208.229.228:5001
+if [ "${dry_run}" = false ]; then
+
+	# build actual image and store it on IPFS
+	npx avadosdk build --provider http://80.208.229.228:5001
+fi
 
 # http://go.ava.do/install/<IPFS HASH>
