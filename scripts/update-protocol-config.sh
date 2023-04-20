@@ -28,7 +28,7 @@ while (( "$#" )); do
       usage
       exit 0
       ;;
-    -e|--network_id)
+    -n|--network_id)
       network_id="${2}"
       : ${network_id?"parameter <network_id> must not be empty"}
       shift 2
