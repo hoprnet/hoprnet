@@ -47,7 +47,7 @@ function defaultEnvironment(): string {
   try {
     // Don't do typechecks on JSON files
     // @ts-ignore
-    const config = loadJson('../default-environment.json') as DefaultEnvironment
+    const config = loadJson('../default-network.json') as DefaultEnvironment
     return config?.id || ''
   } catch (error) {
     // its ok if the file isn't there or cannot be read
@@ -55,7 +55,7 @@ function defaultEnvironment(): string {
   }
 }
 
-// Use environment-specific default data path
+// Use network-specific default data path
 const defaultDataPath = path.join(process.cwd(), 'hopr-cover-traffic-daemon-db', defaultEnvironment())
 
 // reading the version manually to ensure the path is read correctly
@@ -73,9 +73,9 @@ const argv = yargsInstance
     'All CLI options can be configured through environment variables as well. CLI parameters have precedence over environment variables.'
   )
   .version(version)
-  .option('environment', {
+  .option('network', {
     string: true,
-    describe: 'Environment id which the node shall run on (HOPR_CTD_ENVIRONMENT)',
+    describe: 'Network id which the node shall run on (HOPR_CTD_ENVIRONMENT)',
     choices: supportedNetworks().map((env) => env.id),
     default: defaultEnvironment()
   })

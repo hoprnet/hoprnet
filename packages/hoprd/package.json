@@ -13,7 +13,7 @@
     "lib",
     "npm-shrinkwrap.json",
     "releases.json",
-    "default-environment.json",
+    "default-network.json",
     "rest-api-v2-spec.yaml"
   ],
   "engines": {
@@ -28,7 +28,7 @@
     "test": "NODE_OPTIONS=\"--experimental-wasm-modules\" mocha --reporter=tap --full-trace --exit . test",
     "prebuild": "next telemetry disable",
     "start": "NODE_OPTIONS=\"--experimental-wasm-modules\" node lib/main.cjs --init --api",
-    "dev": "NODE_ENV=development yarn start --environment anvil-localhost --password='local' --announce --testUseWeakCrypto --testAnnounceLocalAddresses --testPreferLocalAddresses --disableApiAuthentication",
+    "dev": "NODE_ENV=development yarn start --network anvil-localhost --password='local' --announce --testUseWeakCrypto --testAnnounceLocalAddresses --testPreferLocalAddresses --disableApiAuthentication",
     "docs:generate": "typedoc",
     "docs:watch": "typedoc --watch"
   },

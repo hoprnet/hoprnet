@@ -15,14 +15,14 @@ source "${mydir}/utils.sh"
 
 usage() {
   msg
-  msg "Usage: $0 [-h|--help] version [environment] [release] [api_token] [upstream_version]"
+  msg "Usage: $0 [-h|--help] version [network] [release] [api_token] [upstream_version]"
   msg
   msg "This script builds and uploads an Avado package based on the given parameters."
   msg
   msg "Parameters:"
   msg
   msg "\tname: Version of the Avado package."
-  msg "\tenvironment: Default environment which will be set in the package. Inferred if not set."
+  msg "\tnetwork: Default network which will be set in the package. Inferred if not set."
   msg "\trelease: Release for which the package is built."
   msg "\tapi_token: API token which is set in the Avado package."
   msg "\tupstream_version: hoprd Docker image version to be used. Inferred if not set."
@@ -42,14 +42,14 @@ fi
 
 # Get/set default values of parameters
 declare avado_version="${1}"
-declare environment_id="${2:-"$(${mydir}/get-default-environment.sh)"}"
-declare release_id="${3:-"$(${mydir}/get-default-environment.sh --release)"}"
+declare network_id="${2:-"$(${mydir}/get-default-network.sh)"}"
+declare release_id="${3:-"$(${mydir}/get-default-network.sh --release)"}"
 declare api_token="${4:-"!5qxc9Lp1BE7IFQ-nrtttU"}" # <- Default AVADO API token
 declare upstream_version="${5:-$avado_version}"
 
-# Validate environment and release ids
-if [[ -z "${environment_id}" ]] || [[ -z "${release_id}" ]]; then
-  msg "Could not determine default environment or release id"
+# Validate network and release ids
+if [[ -z "${network_id}" ]] || [[ -z "${release_id}" ]]; then
+  msg "Could not determine default network or release id"
   exit 1
 fi
 
@@ -59,10 +59,10 @@ if ! [[ $avado_version =~ [0-9]{1,}\.[0-9]{1,}\.[0-9]{1,}$ ]]; then
   exit 1
 fi
 
-# Retrieve the provider URL for the given environment ID from protocol-config.json
-declare provider_url=$(jq -r ".environments.\"${environment_id}\".chain as \$envid | .chains[\$envid].default_provider // \"\"" "${mydir}/../packages/core/protocol-config.json")
+# Retrieve the provider URL for the given network ID from protocol-config.json
+declare provider_url=$(jq -r ".networks.\"${network_id}\".chain as \$envid | .chains[\$envid].default_provider // \"\"" "${mydir}/../packages/core/protocol-config.json")
 if [ -z "${provider_url}" ]; then
-  msg "Environment ${environment_id} has invalid chain"
+  msg "Network ${network_id} has invalid chain"
   exit 1
 fi
 
@@ -91,7 +91,7 @@ if [[ "${avado_version}" = "0.200.0" ]]; then
   upstream_version="staging-${release_id}"
 fi
 
-msg "Building Avado v. ${avado_version} for release ${release_id} (upstream v. ${upstream_version}) using environment ${environment_id} with default provider ${provider_url}"
+msg "Building Avado v. ${avado_version} for release ${release_id} (upstream v. ${upstream_version}) using network ${network_id} with default provider ${provider_url}"
 
 # Create backups
 cp ./docker-compose.yml ./docker-compose.bak
@@ -102,7 +102,7 @@ trap cleanup SIGINT SIGTERM ERR EXIT
 
 ### Update docker-compose.yaml
 sed -E "s/%AVADO_VERSION%/${avado_version}/g ; s/%TOKEN%/${api_token}/g ; s/%UPSTREAM_VERSION%/${upstream_version}/g ; \
- s/%ENV_ID%/${environment_id}/g ; s|%PROVIDER_URL%|${provider_url}|g" ./docker-compose.yml \
+ s/%ENV_ID%/${network_id}/g ; s|%PROVIDER_URL%|${provider_url}|g" ./docker-compose.yml \
   > ./docker-compose.yml.tmp && mv ./docker-compose.yml.tmp ./docker-compose.yml
 
 ###
