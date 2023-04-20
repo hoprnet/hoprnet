@@ -14,19 +14,18 @@ The purpose of this process is to document how crypto wallets are created and st
 | `0xD7682Ef1180f5Fc496CF6981e4854738a57c593E` | NFT Minter                                    | Used for minting NFTs when `mint`ing role is given. It renounces it shortly after |
 | `0x4f50ab4e931289344a57f2fe4bbd10546a6fdc17` | HOPR Association Gnosis Wallet Mainnet        | Used for paying services to all different parties involved with HOPR Association  |
 | `0x5E1c4e7004B7411bA27Dc354330fab31147DFeF1` | HOPR Asociation Gnosis Wallet Gnosis Chain    | Same as “HOPR Association Gnosis Wallet” wallet but on the xDAI network           |
-| `0x752af2bf9dbbc1105a83d2ca1ee8f1046d85b702` | HOPR Association Gnosis Safe Mainnet          | Same as “HOPR Association Gnosis Wallet” wallet but using the new Gnosis Safe     |
-| `0xE9131488563776DE7FEa238d6112c5dA46be9a9F` | HOPR Association Gnosis Safe Gnosis Chain     | Same as “HOPR Association Gnosis Safe” wallet but on the xDAI network             |
-| `0x2D8E358487FeDa42629274CE041F98629Bf65cF3` | HOPR DAO Gnosis Safe Mainnet                  | Used to ratify actions on behalf of HOPR's DAO and holding Uniswap Liquidity fees |
-| `0xE9131488563776DE7FEa238d6112c5dA46be9a9F` | HOPR Association Gnosis Safe Gnosis Chain     | Used to ratify actions on behalf of HOPR's DAO                                    |
-| `0xcB2Ce4E13518e7Bb830D594fC1755B0A8802cd65` | HOPR DAO Gnosis Safe Gnosis Chain             | Used to ratify actions on behalf of HOPR's DAO                                    |
+| `0x752af2bf9dbbc1105a83d2ca1ee8f1046d85b702` | HOPR Association Safe Mainnet                 | Same as “HOPR Association Gnosis Wallet” wallet but using the new Safe     |
+| `0xE9131488563776DE7FEa238d6112c5dA46be9a9F` | HOPR Association Safe Gnosis Chain            | Same as “HOPR Association Safe” wallet but on the xDAI network             |
+| `0x2D8E358487FeDa42629274CE041F98629Bf65cF3` | HOPR DAO Safe Mainnet                         | Used to ratify actions on behalf of HOPR's DAO and holding Uniswap Liquidity fees |
+| `0xcB2Ce4E13518e7Bb830D594fC1755B0A8802cd65` | HOPR DAO Safe Gnosis Chain                    | Used to ratify actions on behalf of HOPR's DAO                                    |
 | `0x8f7a2AbbC8741572427e3426538cD516A41102f3` | HOPR Minter                                   | Main net minter account & HOPR Association and DAO multisig representative        |
-| `0x5AB4f2a41DEb3B925B23a3f7E00F206BED18ABB3` | Multisig n1                                   | HOPR Association representative n1 (both Gnosis Wallet + Gnosis Safe              |
-| `0x93bC372b4cC142dA75a365C5cB45be996347bfeC` | Multisig n2                                   | HOPR Association representative n2 (only Gnosis Safe)                             |
+| `0x5AB4f2a41DEb3B925B23a3f7E00F206BED18ABB3` | Multisig n1                                   | HOPR Association representative n1 (both Gnosis Wallet +  Safe              |
+| `0x93bC372b4cC142dA75a365C5cB45be996347bfeC` | Multisig n2                                   | HOPR Association representative n2 (only Safe)                             |
 | `0x50677B7e720102c5126e17f4485149208d3fce71` | Multisig n3                                   | HOPR Association representative n3 (only Gnosis Wallet)                           |
 | `0x850F27C03508e8d75D69Df70e6a58F63f945F1f9` | Gitcoin Operator n1                           | HOPR Gitcoin Operator n1                                                          |
 | `0xC288484eF7f6BaC61BD9A47747428a480e5c326a` | Gitcoin Operator n2                           | HOPR Gitcoin Operator n2                                                          |
-| `0xD9a00176Cf49dFB9cA3Ef61805a2850F45Cb1D05` | HOPR Commercial team Gnosis Safe Gnosis Chain | HOPR commercial team Gnosis Safe wallet on Gnosis Chain (aka xDai)                |
-| `0x217a6d29ABbacEAfB36207b4cB25ACc148E1fc65` | HOPR Commercial team Gnosis Safe Mainnet      | HOPR commercial team Gnosis Safe wallet on Mainnet                                |
+| `0xD9a00176Cf49dFB9cA3Ef61805a2850F45Cb1D05` | HOPR Commercial team Safe Gnosis Chain        | HOPR commercial team Safe wallet on Gnosis Chain (aka xDai)                |
+| `0x217a6d29ABbacEAfB36207b4cB25ACc148E1fc65` | HOPR Commercial team Safe Mainnet             | HOPR commercial team  Safe wallet on Mainnet                                |
 | `0x8C9877a1279192448cAbeC9e8C4697b159cF645e` | CI/CD funding                                 | Used in our CI/CD pipelines to fund nodes automatically for testing.              |
 | `0x7305356ad936A06c4ea5DF45AD5E5C3ff9Db818E` | Dappnode HOPR Repository Owner Mainnet        | Used to sign & publish releases in the Dappnode Public repository                 |
 | `0x8C9877a1279192448cAbeC9e8C4697b159cF645e` | Faucet API                                    | Used to fund nodes started by the CI                                              |
