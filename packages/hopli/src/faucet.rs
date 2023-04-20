@@ -3,7 +3,6 @@ use crate::key_pair::read_identities;
 use crate::password::PasswordArgs;
 use crate::process::{child_process_call_foundry_faucet, set_process_path_env};
 use clap::Parser;
-use core_crypto::checksum::to_checksum;
 use ethers::{
     types::U256,
     utils::parse_units, //, types::U256, utils::format_units, ParseUnits
@@ -13,6 +12,7 @@ use std::env;
 use utils_types::primitives::Address;
 
 use crate::utils::{Cmd, HelperErrors};
+use core_crypto::types::ToChecksum;
 
 /// CLI arguments for `hopli faucet`
 #[derive(Parser, Default, Debug)]
@@ -92,7 +92,7 @@ impl FaucetArgs {
 
             match Address::from_str(parsed_addr) {
                 // match addr.parse::<Address>() {
-                Ok(checksumed_addr) => addresses_all.push(to_checksum(checksumed_addr)),
+                Ok(checksumed_addr) => addresses_all.push(checksumed_addr.to_checksum()),
                 // TODO: Consider accept peer id here
                 Err(_) => return Err(HelperErrors::UnableToParseAddress(addr.to_string())),
             }

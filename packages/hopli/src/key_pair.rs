@@ -1,6 +1,5 @@
 use crate::utils::HelperErrors;
-use core_crypto::checksum::to_checksum;
-use core_crypto::types::PublicKey;
+use core_crypto::types::{PublicKey, ToChecksum};
 use elliptic_curve::rand_core::{CryptoRng, RngCore};
 use eth_keystore;
 use ethers::core::rand::thread_rng;
@@ -11,6 +10,7 @@ use std::{
     fmt, fs,
     path::{Path, PathBuf},
 };
+use utils_types::traits::PeerIdLike;
 
 #[derive(Debug, Serialize)]
 pub struct NodeIdentity {
@@ -23,10 +23,10 @@ impl NodeIdentity {
         let public_key = PublicKey::deserialize(&verifying_key.to_encoded_point(false).to_bytes()).unwrap();
 
         // derive PeerId
-        let id = public_key._to_peerid_str();
+        let id = public_key.to_peerid_str();
 
         // derive ethereum address
-        let address = to_checksum(public_key.to_address());
+        let address = public_key.to_address().to_checksum();
 
         Self {
             peer_id: id,
@@ -150,6 +150,10 @@ mod tests {
         assert_eq!(read_id.len(), 1);
         assert_eq!(read_id[0].ethereum_address, created_id.ethereum_address);
         assert_eq!(read_id[0].peer_id, created_id.peer_id);
+
+        // print the read id
+        println!("Debug {:#?}", read_id);
+        println!("Display {}", read_id[0]);
 
         remove_json_keystore(path).map_err(|err| println!("{:?}", err)).ok();
     }
