@@ -6,6 +6,10 @@ import 'forge-std/Test.sol';
 import './utils/EnvironmentConfig.s.sol';
 import './utils/BoostUtilsLib.sol';
 
+/// Failed to read balance of a token contract
+/// @param token token address.
+error FailureInReadBalance(address token);
+
 /**
  * @dev script to interact with contract(s) of a given envirionment where the msg.sender comes from the environment variable `PRIVATE_KEY`
  * Private key of the caller must be saved under the envrionment variable `PRIVATE_KEY`
@@ -16,6 +20,7 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
   using BoostUtilsLib for address;
 
   address msgSender;
+  string[] private unregisteredIds;
 
   function getEnvironmentAndMsgSender() private {
     // 1. Environment check
@@ -31,6 +36,93 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
   }
 
   /**
+   * @dev express node initialization
+   * - Check with network registery on the registeration status of a list of peer ids, return the unregistered ones.
+   * - If not all the peer ids are registered, check if the caller can do selfRegister
+   */
+  function expressInitialization(
+    address[] calldata nodeAddrs,
+    uint256 hoprTokenAmountInWei,
+    uint256 nativeTokenAmountInWei,
+    string[] calldata peerIds
+  ) external {
+    // 1. get environment and msg.sender
+    getEnvironmentAndMsgSender();
+
+    // 2. loop through nodes and check its registration status
+    for (uint256 index = 0; index < peerIds.length; index++) {
+      (bool successCheck, bytes memory returndataCheck) = currentEnvironmentDetail
+        .networkRegistryContractAddress
+        .staticcall(abi.encodeWithSignature('nodePeerIdToAccount(string)', peerIds[index]));
+      if (!successCheck) {
+        revert('Cannot read nodePeerIdToAccount from network registry contract.');
+      }
+      address stakingAccount = abi.decode(returndataCheck, (address));
+      if (stakingAccount == address(0)) {
+        unregisteredIds.push(peerIds[index]);
+      }
+    }
+    uint256 numUnRegisteredIds = unregisteredIds.length;
+
+    // 3. check if need to perform node registeration.
+    // As NR is disabled in development, skip it
+    if (numUnRegisteredIds > 0 && currentEnvironmentType != EnvironmentType.DEVELOPMENT) {
+      // check if the caller can register nodes
+      uint256 allowedRegistration = getMaxAllowedRegistrations(
+        currentEnvironmentDetail.networkRegistryProxyContractAddress,
+        msgSender
+      );
+      if (allowedRegistration < numUnRegisteredIds) {
+        // try to register developer NFT, community NFT or stake HOPR tokens
+        // check if the caller owns developer NFT
+        uint256 nftTokenId;
+        (bool ownsDevNft, uint256 devTokenId) = _hasNetworkRegistryNft(
+          currentEnvironmentDetail.hoprBoostContractAddress,
+          msgSender,
+          NETWORK_REGISTRY_RANK1_NAME
+        );
+        (bool ownsComNft, uint256 comTokenId) = _hasNetworkRegistryNft(
+          currentEnvironmentDetail.hoprBoostContractAddress,
+          msgSender,
+          NETWORK_REGISTRY_RANK2_NAME
+        );
+        uint256 hoprBalance = _getTokenBalanceOf(currentEnvironmentDetail.hoprTokenContractAddress, msgSender);
+
+        if (!ownsDevNft && !ownsComNft) {
+          // try to stake HOPR tokens
+          _stakeXHopr(currentEnvironmentDetail.xhoprTokenContractAddress, 1000 ether * numUnRegisteredIds);
+        } else {
+          // try to stake NFT
+          nftTokenId = ownsDevNft ? devTokenId : comTokenId;
+          _stakeNft(
+            currentEnvironmentDetail.hoprBoostContractAddress,
+            msgSender,
+            currentEnvironmentDetail.stakeContractAddress,
+            nftTokenId
+          );
+        }
+      }
+      // try again registration
+      _selfRegisterNodes(currentEnvironmentDetail.networkRegistryContractAddress, peerIds);
+    }
+
+    // 4. loop again and check if need to fund nodes
+    for (uint256 nodeIndex = 0; nodeIndex < nodeAddrs.length; nodeIndex++) {
+      address recipient = nodeAddrs[nodeIndex];
+      // transfer or mint hopr tokens
+      _transferOrMintHoprToAmount(currentEnvironmentDetail.hoprTokenContractAddress, recipient, hoprTokenAmountInWei);
+
+      // 3. transfer native balance to the unregisteredIds[numUnRegisteredIndex]
+      if (nativeTokenAmountInWei > recipient.balance) {
+        (bool nativeTokenTransferSuccess, ) = recipient.call{value: nativeTokenAmountInWei - recipient.balance}('');
+        require(nativeTokenTransferSuccess, 'Cannot send native tokens to the recipient');
+      }
+    }
+
+    vm.stopBroadcast();
+  }
+
+  /**
    * @dev On network registry contract, register peers associated with the calling wallet.
    */
   function selfRegisterNodes(string[] calldata peerIds) external {
@@ -38,13 +130,8 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
     getEnvironmentAndMsgSender();
 
     // 2. call hoprNetworkRegistry.selfRegister(peerIds);
-    (bool successSelfRegister, ) = currentEnvironmentDetail.networkRegistryContractAddress.call(
-      abi.encodeWithSignature('selfRegister(string[])', peerIds)
-    );
-    if (!successSelfRegister) {
-      emit log_string('Cannot register peers');
-      revert('Cannot register peers');
-    }
+    _selfRegisterNodes(currentEnvironmentDetail.networkRegistryContractAddress, peerIds);
+
     vm.stopBroadcast();
   }
 
@@ -244,13 +331,7 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
 
     // 3. stake the difference, if allowed
     uint256 amountToStake = stakeTarget - stakedAmount;
-    (bool successReadBalance, bytes memory returndataReadBalance) = currentEnvironmentDetail
-      .xhoprTokenContractAddress
-      .staticcall(abi.encodeWithSignature('balanceOf(address)', msgSender));
-    if (!successReadBalance) {
-      revert('Cannot read token balance on xHOPR token contract.');
-    }
-    uint256 balance = abi.decode(returndataReadBalance, (uint256));
+    uint256 balance = _getTokenBalanceOf(currentEnvironmentDetail.xhoprTokenContractAddress, msgSender);
     if (stakedAmount >= stakeTarget) {
       emit log_string('Stake target has reached');
       return;
@@ -258,18 +339,7 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
     if (balance < amountToStake) {
       revert('Not enough xHOPR token balance to stake to the target.');
     } else {
-      (bool successStakeXhopr, ) = currentEnvironmentDetail.xhoprTokenContractAddress.call(
-        abi.encodeWithSignature(
-          'transferAndCall(address,uint256,bytes)',
-          currentEnvironmentDetail.stakeContractAddress,
-          amountToStake,
-          hex'00'
-        )
-      );
-      if (!successStakeXhopr) {
-        emit log_string('Cannot stake amountToStake');
-        revert('Cannot stake amountToStake');
-      }
+      _stakeXHopr(currentEnvironmentDetail.xhoprTokenContractAddress, amountToStake);
     }
     vm.stopBroadcast();
   }
@@ -282,23 +352,7 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
     getEnvironmentAndMsgSender();
 
     // 2. Check if the msg.sender has staked Network_registry NFT
-    (bool successHasStaked, bytes memory returndataHasStaked) = currentEnvironmentDetail
-      .stakeContractAddress
-      .staticcall(
-        abi.encodeWithSignature(
-          'isNftTypeAndRankRedeemed2(uint256,string,address)',
-          NETWORK_REGISTRY_NFT_INDEX,
-          nftRank,
-          msgSender
-        )
-      );
-    if (!successHasStaked) {
-      revert('Cannot read if caller has staked Network_registry NFTs.');
-    }
-    bool hasStaked = abi.decode(returndataHasStaked, (bool));
-    if (hasStaked) {
-      return;
-    }
+    if (checkHasStakedNetworkRegistryNft(currentEnvironmentDetail.stakeContractAddress, msgSender, nftRank)) return;
 
     // 3. Check if msg.sender has Network_registry NFT
     safeTransferNetworkRegistryNft(
@@ -366,6 +420,41 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
   }
 
   /**
+   * @dev Check if the address has staked Network_registry NFT
+   */
+  function checkHasStakedNetworkRegistryNft(
+    address stakeContractAddr,
+    address stakingAccount,
+    string calldata nftRank
+  ) private view returns (bool) {
+    (bool successHasStaked, bytes memory returndataHasStaked) = stakeContractAddr.staticcall(
+      abi.encodeWithSignature(
+        'isNftTypeAndRankRedeemed2(uint256,string,address)',
+        NETWORK_REGISTRY_NFT_INDEX,
+        nftRank,
+        stakingAccount
+      )
+    );
+    if (!successHasStaked) {
+      revert('Cannot read if the staking account has staked Network_registry NFTs.');
+    }
+    return abi.decode(returndataHasStaked, (bool));
+  }
+
+  /**
+   * @dev Check if the address has staked Network_registry NFT
+   */
+  function getMaxAllowedRegistrations(address proxyAddr, address stakingAccount) private view returns (uint256) {
+    (bool successMaxAllowed, bytes memory returndataMaxAllowed) = proxyAddr.staticcall(
+      abi.encodeWithSignature('maxAllowedRegistrations(address)', stakingAccount)
+    );
+    if (!successMaxAllowed) {
+      revert('Cannot read maxAllowedRegistrations for staking account.');
+    }
+    return abi.decode(returndataMaxAllowed, (uint256));
+  }
+
+  /**
    * @dev private function to transfer a NR NFT of nftRank from sender to recipient.
    */
   function safeTransferNetworkRegistryNft(
@@ -374,22 +463,63 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
     address recipient,
     string calldata nftRank
   ) private {
-    // 1. Check sender's Network_registry NFT balance
-    (bool successOwnedNftBalance, bytes memory returndataOwnedNftBalance) = boostContractAddr.staticcall(
-      abi.encodeWithSignature('balanceOf(address)', sender)
-    );
-    if (!successOwnedNftBalance) {
-      revert('Cannot read if the amount of Network_registry NFTs owned by the caller.');
+    // check if the sender owns the desired nft rank
+    (bool ownsNft, uint256 tokenId) = _hasNetworkRegistryNft(boostContractAddr, sender, nftRank);
+
+    if (!ownsNft) {
+      revert('Failed to find the owned NFT');
     }
-    uint256 ownedNftBalance = abi.decode(returndataOwnedNftBalance, (uint256));
+
+    // found the tokenId, perform safeTransferFrom
+    _stakeNft(boostContractAddr, sender, recipient, tokenId);
+  }
+
+  /**
+   * @dev This function funds a recipient wallet with HOPR tokens and native tokens, but only when the recipient has not yet received
+   * enough value.
+   * First, HOPR tokens are prioritized to be transferred than minted to the recipient
+   * Native tokens are transferred to the recipient
+   * @param recipient The address of the recipient wallet.
+   * @param hoprTokenAmountInWei, The amount of HOPR tokens that recipient is desired to receive
+   * @param nativeTokenAmountInWei The amount of native tokens that recipient is desired to receive
+   */
+  function transferOrMintHoprAndSendNativeToAmount(
+    address recipient,
+    uint256 hoprTokenAmountInWei,
+    uint256 nativeTokenAmountInWei
+  ) external payable {
+    // 1. get environment and msg.sender
+    getEnvironmentAndMsgSender();
+
+    // 2. transfer or mint hopr tokens
+    _transferOrMintHoprToAmount(currentEnvironmentDetail.hoprTokenContractAddress, recipient, hoprTokenAmountInWei);
+
+    // 3. transfer native balance to the recipient
+    if (nativeTokenAmountInWei > recipient.balance) {
+      (bool nativeTokenTransferSuccess, ) = recipient.call{value: nativeTokenAmountInWei - recipient.balance}('');
+      require(nativeTokenTransferSuccess, 'Cannot send native tokens to the recipient');
+    }
+    vm.stopBroadcast();
+  }
+
+  /**
+   * @dev private function to check if an account owns a Network Registry NFT of nftRank
+   */
+  function _hasNetworkRegistryNft(
+    address boostContractAddr,
+    address account,
+    string memory nftRank
+  ) private returns (bool ownsNft, uint256 tokenId) {
+    // 1. Check account's Network_registry NFT balance
+    uint256 ownedNftBalance = _getTokenBalanceOf(boostContractAddr, account);
     // get the desired nft uri hash
-    bytes32 desiredHaashedTokenUri = keccak256(bytes(abi.encodePacked(NETWORK_REGISTRY_TYPE_NAME, '/', nftRank)));
+    string memory desiredTokenUriPart = string(abi.encodePacked(NETWORK_REGISTRY_TYPE_NAME, '/', nftRank));
 
     // 2. Loop through balance and compare token URI
     uint256 index;
     for (index = 0; index < ownedNftBalance; index++) {
       (bool successOwnedNftTokenId, bytes memory returndataOwnedNftTokenId) = boostContractAddr.staticcall(
-        abi.encodeWithSignature('tokenOfOwnerByIndex(address,uint256)', sender, index)
+        abi.encodeWithSignature('tokenOfOwnerByIndex(address,uint256)', account, index)
       );
       if (!successOwnedNftTokenId) {
         revert('Cannot read owned NFT at a given index.');
@@ -401,50 +531,133 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
       if (!successTokenUri) {
         revert('Cannot read token URI of the given ID.');
       }
+      string memory tokenUri = abi.decode(returndataTokenUri, (string));
 
-      if (desiredHaashedTokenUri == keccak256(bytes(abi.decode(returndataTokenUri, (string))))) {
-        // 3. find the tokenId, perform safeTransferFrom
-        (bool successStakeNft, ) = boostContractAddr.call(
-          abi.encodeWithSignature('safeTransferFrom(address,address,uint256)', sender, recipient, ownedNftTokenId)
-        );
-        if (!successStakeNft) {
-          revert('Cannot stake the NFT');
-        }
+      if (_hasSubstring(tokenUri, desiredTokenUriPart)) {
+        // 3. find the tokenId
+        ownsNft = true;
+        tokenId = ownedNftTokenId;
         break;
       }
     }
-
-    if (index >= ownedNftBalance) {
-      revert('Failed to find the owned NFT');
-    }
+    return (ownsNft, tokenId);
   }
 
   /**
-   * @dev On network registry contract, deregister peers associated with the calling wallet.
+   * Get the token balance of a wallet
    */
-  function transferOrMintHoprAndSendNative(
+  function _getTokenBalanceOf(address tokenAddress, address wallet) internal view returns (uint256) {
+    (bool successReadOwnedTokens, bytes memory returndataReadOwnedTokens) = tokenAddress.staticcall(
+      abi.encodeWithSignature('balanceOf(address)', wallet)
+    );
+    if (!successReadOwnedTokens) {
+      revert FailureInReadBalance(tokenAddress);
+    }
+    return abi.decode(returndataReadOwnedTokens, (uint256));
+  }
+
+  /**
+   * ported from HoprStakeBase.sol
+   * @dev if the given `tokenURI` end with `/substring`
+   * @param tokenURI string URI of the HoprBoost NFT. E.g. "https://stake.hoprnet.org/PuzzleHunt_v2/Bronze - Week 5"
+   * @param substring string of the `boostRank` or `boostType/boostRank`. E.g. "Bronze - Week 5", "PuzzleHunt_v2/Bronze - Week 5"
+   */
+  function _hasSubstring(string memory tokenURI, string memory substring) internal pure returns (bool) {
+    // convert string to bytes
+    bytes memory tokenURIInBytes = bytes(tokenURI);
+    bytes memory substringInBytes = bytes(substring);
+
+    // lenghth of tokenURI is the sum of substringLen and restLen, where
+    // - `substringLen` is the length of the part that is extracted and compared with the provided substring
+    // - `restLen` is the length of the baseURI and boostType, which will be offset
+    uint256 substringLen = substringInBytes.length;
+    uint256 restLen = tokenURIInBytes.length - substringLen;
+    // one byte before the supposed substring, to see if it's the start of `substring`
+    bytes1 slashPositionContent = tokenURIInBytes[restLen - 1];
+
+    if (slashPositionContent != 0x2f) {
+      // if this position is not a `/`, substring in the tokenURI is for sure neither `boostRank` nor `boostType/boostRank`
+      return false;
+    }
+
+    // offset so that value from the next calldata (`substring`) is removed, so bitwise it needs to shift
+    // log2(16) * (32 - substringLen) * 2
+    uint256 offset = (32 - substringLen) * 8;
+
+    bytes32 trimed; // left-padded extracted `boostRank` from the `tokenURI`
+    bytes32 substringInBytes32 = bytes32(substringInBytes); // convert substring in to bytes32
+    bytes32 shifted; // shift the substringInBytes32 from right-padded to left-padded
+
+    bool result;
+    assembly {
+      // assuming `boostRank` or `boostType/boostRank` will never exceed 32 bytes
+      // left-pad the `boostRank` extracted from the `tokenURI`, so that possible
+      // extra pieces of `substring` is not included
+      // 32 jumps the storage of bytes length and restLen offsets the `baseURI`
+      trimed := shr(offset, mload(add(add(tokenURIInBytes, 32), restLen)))
+      // tokenURIInBytes32 := mload(add(add(tokenURIInBytes, 32), restLen))
+      // left-pad `substring`
+      shifted := shr(offset, substringInBytes32)
+      // compare results
+      result := eq(trimed, shifted)
+    }
+    return result;
+  }
+
+  function _stakeXHopr(address xhoprTokenContract, uint256 amountToStake) private {
+    (bool successStakeXhopr, ) = currentEnvironmentDetail.xhoprTokenContractAddress.call(
+      abi.encodeWithSignature(
+        'transferAndCall(address,uint256,bytes)',
+        currentEnvironmentDetail.stakeContractAddress,
+        amountToStake,
+        hex'00'
+      )
+    );
+    if (!successStakeXhopr) {
+      emit log_string('Cannot stake amountToStake');
+      revert('Cannot stake amountToStake');
+    }
+  }
+
+  function _stakeNft(address boostContractAddr, address sender, address recipient, uint256 tokenId) private {
+    (bool successStakeNft, ) = boostContractAddr.call(
+      abi.encodeWithSignature('safeTransferFrom(address,address,uint256)', sender, recipient, tokenId)
+    );
+    if (!successStakeNft) {
+      revert('Cannot stake the NFT');
+    }
+  }
+
+  function _selfRegisterNodes(address networkRegistryContractAddress, string[] calldata peerIds) private {
+    // 2. call hoprNetworkRegistry.selfRegister(peerIds);
+    (bool successSelfRegister, ) = networkRegistryContractAddress.call(
+      abi.encodeWithSignature('selfRegister(string[])', peerIds)
+    );
+    if (!successSelfRegister) {
+      emit log_string('Cannot register peers');
+      revert('Cannot register peers');
+    }
+  }
+
+  function _transferOrMintHoprToAmount(
+    address hoprTokenContractAddress,
     address recipient,
-    uint256 hoprTokenAmountInWei,
-    uint256 nativeTokenAmountInWei
-  ) external payable {
-    // 1. get environment and msg.sender
-    getEnvironmentAndMsgSender();
+    uint256 hoprTokenAmountInWei
+  ) private {
+    // 1. get recipient balance
+    uint256 recipientTokenBalance = _getTokenBalanceOf(hoprTokenContractAddress, recipient);
 
     // 2. transfer some Hopr tokens to the recipient, or mint tokens
-    if (hoprTokenAmountInWei > 0) {
+    if (hoprTokenAmountInWei > recipientTokenBalance) {
+      // get the difference to transfer
+      uint256 hoprTokenToTransfer = hoprTokenAmountInWei - recipientTokenBalance;
       // check the hopr token balance
-      (bool successReadOwnedHoprTokens, bytes memory returndataReadOwnedHoprTokens) = currentEnvironmentDetail
-        .hoprTokenContractAddress
-        .staticcall(abi.encodeWithSignature('balanceOf(address)', msgSender));
-      if (!successReadOwnedHoprTokens) {
-        revert('Cannot read Hopr token balance.');
-      }
-      uint256 ownedHoprTokens = abi.decode(returndataReadOwnedHoprTokens, (uint256));
+      uint256 senderHoprTokenBalance = _getTokenBalanceOf(hoprTokenContractAddress, msgSender);
 
-      if (ownedHoprTokens >= hoprTokenAmountInWei) {
+      if (senderHoprTokenBalance >= hoprTokenToTransfer) {
         // call transfer
-        (bool successTransfserTokens, ) = currentEnvironmentDetail.hoprTokenContractAddress.call(
-          abi.encodeWithSignature('transfer(address,uint256)', recipient, hoprTokenAmountInWei)
+        (bool successTransfserTokens, ) = hoprTokenContractAddress.call(
+          abi.encodeWithSignature('transfer(address,uint256)', recipient, hoprTokenToTransfer)
         );
         if (!successTransfserTokens) {
           emit log_string('Cannot transfer HOPR tokens to the recipient');
@@ -452,35 +665,22 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
       } else {
         // if transfer cannot be called, try minting token as a minter
         bytes32 MINTER_ROLE = keccak256('MINTER_ROLE');
-        (bool successHasRole, bytes memory returndataHasRole) = currentEnvironmentDetail
-          .hoprTokenContractAddress
-          .staticcall(abi.encodeWithSignature('hasRole(bytes32,address)', MINTER_ROLE, msgSender));
+        (bool successHasRole, bytes memory returndataHasRole) = hoprTokenContractAddress.staticcall(
+          abi.encodeWithSignature('hasRole(bytes32,address)', MINTER_ROLE, msgSender)
+        );
         if (!successHasRole) {
           revert('Cannot check role for Hopr token.');
         }
         bool isMinter = abi.decode(returndataHasRole, (bool));
         require(isMinter, 'Caller is not a minter');
 
-        (bool successMintTokens, ) = currentEnvironmentDetail.hoprTokenContractAddress.call(
-          abi.encodeWithSignature(
-            'mint(address,uint256,bytes,bytes)',
-            recipient,
-            hoprTokenAmountInWei,
-            hex'00',
-            hex'00'
-          )
+        (bool successMintTokens, ) = hoprTokenContractAddress.call(
+          abi.encodeWithSignature('mint(address,uint256,bytes,bytes)', recipient, hoprTokenToTransfer, hex'00', hex'00')
         );
         if (!successMintTokens) {
           emit log_string('Cannot mint HOPR tokens to the recipient');
         }
       }
     }
-
-    // 3. transfer native balance to the recipient
-    if (nativeTokenAmountInWei > 0) {
-      (bool nativeTokenTransferSuccess, ) = recipient.call{value: nativeTokenAmountInWei}('');
-      require(nativeTokenTransferSuccess, 'Cannot send native tokens to the recipient');
-    }
-    vm.stopBroadcast();
   }
 }

@@ -992,7 +992,7 @@ dependencies = [
 
 [[package]]
 name = "core-crypto"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "aes",
  "blake2",
@@ -2515,12 +2515,20 @@ dependencies = [
 
 [[package]]
 name = "hopli"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "clap 4.0.32",
+ "core-crypto",
+ "elliptic-curve 0.13.3",
+ "eth-keystore",
  "ethers",
+ "generic-array 0.14.7",
+ "k256 0.13.0",
+ "log",
  "serde",
  "serde_json",
+ "thiserror",
+ "utils-types",
 ]
 
 [[package]]
