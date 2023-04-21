@@ -757,7 +757,7 @@ __metadata:
     debug: 4.3.4
     err-code: 3.0.1
     heap-js: 2.2.0
-    it-handshake: 4.0.0
+    it-handshake: 4.1.3
     it-pair: 2.0.4
     it-pipe: 2.0.5
     it-pushable: 3.0.0
@@ -6745,16 +6745,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"it-handshake@npm:4.0.0":
-  version: 4.0.0
-  resolution: "it-handshake@npm:4.0.0"
+"it-handshake@npm:4.1.3":
+  version: 4.1.3
+  resolution: "it-handshake@npm:4.1.3"
   dependencies:
-    it-map: ^1.0.6
-    it-pushable: ^3.0.0
-    it-reader: ^5.0.0
-    it-stream-types: ^1.0.4
+    it-pushable: ^3.1.0
+    it-reader: ^6.0.1
+    it-stream-types: ^2.0.1
     p-defer: ^4.0.0
-  checksum: 45cb0e2d5e61ee452c6adc0cde71f784a9907f2cca5dcdafd8c4c242293e5af4e9b3dde17369f9fbde0ccf86e5e16176c359dbc4e4e47b4157e3c895a2610672
+    uint8arraylist: ^2.0.0
+  checksum: 508a33e09da02c16ede4453a669bf23fb49d8cc96f3ac85eb36111530da9817c5ada73e7647706400f0f60865afe6164cc51bd39187b786e6736db4b0e587b2f
   languageName: node
   linkType: hard
 
@@ -6955,6 +6955,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"it-reader@npm:^6.0.1":
+  version: 6.0.4
+  resolution: "it-reader@npm:6.0.4"
+  dependencies:
+    it-stream-types: ^2.0.1
+    uint8arraylist: ^2.0.0
+  checksum: c2f89362bd7379814bcfe324361ee88e958d311a1f1c2d3cd5395e16517fbafb626b87d3a8aefb7a9d649e719c892f5e3f12aee214d03b0c28a983bb83b249e1
+  languageName: node
+  linkType: hard
+
 "it-sort@npm:^1.0.0, it-sort@npm:^1.0.1":
   version: 1.0.1
   resolution: "it-sort@npm:1.0.1"
@@ -6968,6 +6978,13 @@ __metadata:
   version: 1.0.4
   resolution: "it-stream-types@npm:1.0.4"
   checksum: efd1ff5fa968ff11b39c47ed1ce8131e44c61c5adc811d627c3149da1e08c83f3e73fe33942dad94bceb225b9ea4c4056eb24d9cf4f0c15313ab50c86ece35c9
+  languageName: node
+  linkType: hard
+
+"it-stream-types@npm:^2.0.1":
+  version: 2.0.1
+  resolution: "it-stream-types@npm:2.0.1"
+  checksum: 14c5a13dbef08ae3a9b824ae9d05a8f3eb25ef46994ede25f763472f8367498395bd4be13c88b93846fd4b56c9a4763beb268ef8fa26575b17ef8f9327f9bf77
   languageName: node
   linkType: hard
 
