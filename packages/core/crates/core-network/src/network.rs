@@ -1,6 +1,11 @@
-use std::collections::hash_map::{Entry, HashMap};
-use std::collections::hash_set::HashSet;
-use std::time::Duration;
+use std::{
+    cell::RefCell,
+    collections::{
+        hash_map::{Entry, HashMap},
+        hash_set::HashSet,
+    },
+    time::Duration,
+};
 
 use libp2p::PeerId;
 
@@ -156,14 +161,14 @@ impl std::fmt::Display for PeerStatus {
 pub struct Network<Actions> {
     me: PeerId,
     cfg: NetworkConfig,
-    pub(crate) entries: HashMap<String, PeerStatus>,
-    ignored: HashMap<String, u64>, // timestamp
+    entries: RefCell<HashMap<String, PeerStatus>>,
+    ignored: RefCell<HashMap<String, u64>>, // timestamp
     excluded: HashSet<String>,
-    good_quality_public: HashSet<PeerId>,
-    bad_quality_public: HashSet<PeerId>,
-    good_quality_non_public: HashSet<PeerId>,
-    bad_quality_non_public: HashSet<PeerId>,
-    pub(crate) last_health: Health,
+    good_quality_public: RefCell<HashSet<PeerId>>,
+    bad_quality_public: RefCell<HashSet<PeerId>>,
+    good_quality_non_public: RefCell<HashSet<PeerId>>,
+    bad_quality_non_public: RefCell<HashSet<PeerId>>,
+    last_health: RefCell<Health>,
     network_actions_api: Actions,
     metric_network_health: Option<SimpleGauge>,
     metric_peers_by_quality: Option<MultiGauge>,
@@ -190,14 +195,14 @@ impl<Actions: NetworkExternalActions> Network<Actions> {
         let instance = Network {
             me: my_peer_id,
             cfg,
-            entries: HashMap::new(),
-            ignored: HashMap::new(),
+            entries: RefCell::new(HashMap::new()),
+            ignored: RefCell::new(HashMap::new()),
             excluded,
-            good_quality_public: HashSet::new(),
-            bad_quality_public: HashSet::new(),
-            good_quality_non_public: HashSet::new(),
-            bad_quality_non_public: HashSet::new(),
-            last_health: Health::Unknown,
+            good_quality_public: RefCell::new(HashSet::new()),
+            bad_quality_public: RefCell::new(HashSet::new()),
+            good_quality_non_public: RefCell::new(HashSet::new()),
+            bad_quality_non_public: RefCell::new(HashSet::new()),
+            last_health: RefCell::new(Health::Unknown),
             network_actions_api,
             metric_network_health: SimpleGauge::new("core_gauge_network_health", "Connectivity health indicator").ok(),
             metric_peers_by_quality: MultiGauge::new(
@@ -214,32 +219,33 @@ impl<Actions: NetworkExternalActions> Network<Actions> {
 
     /// Check whether the PeerId is present in the network
     pub fn has(&self, peer: &PeerId) -> bool {
-        self.entries.contains_key(peer.to_string().as_str())
+        self.entries.borrow().contains_key(peer.to_string().as_str())
     }
 
     /// Add a new PeerId into the network
     ///
     /// Each PeerId must have an origin specification.
-    pub fn add(&mut self, peer: &PeerId, origin: PeerOrigin) {
+    pub fn add(&self, peer: &PeerId, origin: PeerOrigin) {
         self.add_with_metadata(peer, origin, None)
     }
 
     /// Add a new PeerId into the network (with optional metadata entries)
     ///
     /// Each PeerId must have an origin specification.
-    pub fn add_with_metadata(&mut self, peer: &PeerId, origin: PeerOrigin, metadata: Option<HashMap<String, String>>) {
+    pub fn add_with_metadata(&self, peer: &PeerId, origin: PeerOrigin, metadata: Option<HashMap<String, String>>) {
         let id = peer.to_string();
         let now = current_timestamp();
 
         // assumes disjoint sets
-        let has_entry = self.entries.contains_key(id.as_str());
+        let has_entry = self.entries.borrow().contains_key(id.as_str());
         let is_excluded = !has_entry && self.excluded.contains(id.as_str());
 
         if !is_excluded {
-            let is_ignored = if !has_entry && self.ignored.contains_key(id.as_str()) {
-                let timestamp = self.ignored.get(id.as_str()).unwrap();
+            let is_ignored = if !has_entry && self.ignored.borrow().contains_key(id.as_str()) {
+                let mut inner_ignored = self.ignored.borrow_mut();
+                let timestamp = inner_ignored.get(id.as_str()).unwrap();
                 if Duration::from_millis(now - timestamp) > self.cfg.ignore_timeframe {
-                    self.ignored.remove(id.as_str());
+                    inner_ignored.remove(id.as_str());
                     false
                 } else {
                     true
@@ -256,7 +262,7 @@ impl<Actions: NetworkExternalActions> Network<Actions> {
                 }
                 self.refresh_network_status(&entry);
 
-                if let Some(x) = self.entries.insert(peer.to_string(), entry) {
+                if let Some(x) = self.entries.borrow_mut().insert(peer.to_string(), entry) {
                     warn!("Evicting an existing record for {}, this should not happen!", &x);
                 }
             }
@@ -264,24 +270,25 @@ impl<Actions: NetworkExternalActions> Network<Actions> {
     }
 
     /// Remove PeerId from the network
-    pub fn remove(&mut self, peer: &PeerId) {
+    pub fn remove(&self, peer: &PeerId) {
         self.prune_from_network_status(&peer);
-        self.entries.remove(peer.to_string().as_str());
+        self.entries.borrow_mut().remove(peer.to_string().as_str());
     }
 
     /// Update the PeerId record in the network
-    pub fn update(&mut self, peer: &PeerId, ping_result: crate::types::Result) {
+    pub fn update(&self, peer: &PeerId, ping_result: crate::types::Result) {
         self.update_with_metadata(peer, ping_result, None)
     }
 
     /// Update the PeerId record in the network (with optional metadata entries that will be merged into the existing ones)
     pub fn update_with_metadata(
-        &mut self,
+        &self,
         peer: &PeerId,
         ping_result: crate::types::Result,
         metadata: Option<HashMap<String, String>>,
     ) {
-        if let Some(existing) = self.entries.get(peer.to_string().as_str()) {
+        let mut entries_mut = self.entries.borrow_mut();
+        if let Some(existing) = entries_mut.get(peer.to_string().as_str()) {
             let mut entry = existing.clone();
             entry.heartbeats_sent = entry.heartbeats_sent + 1;
             entry.is_public = self.network_actions_api.is_public(&peer);
@@ -305,10 +312,12 @@ impl<Actions: NetworkExternalActions> Network<Actions> {
                 if entry.quality < (self.cfg.quality_step / 2.0) {
                     self.network_actions_api.close_connection(&entry.id);
                     self.prune_from_network_status(&entry.id);
-                    self.entries.remove(entry.id.to_string().as_str());
+                    entries_mut.remove(entry.id.to_string().as_str());
                     return;
                 } else if entry.quality < self.cfg.quality_bad_threshold {
-                    self.ignored.insert(entry.id.to_string(), current_timestamp());
+                    self.ignored
+                        .borrow_mut()
+                        .insert(entry.id.to_string(), current_timestamp());
                 } else if entry.quality < self.cfg.quality_offline_threshold {
                     self.network_actions_api.on_peer_offline(&entry.id);
                 }
@@ -320,34 +329,36 @@ impl<Actions: NetworkExternalActions> Network<Actions> {
             }
 
             self.refresh_network_status(&entry);
-            self.entries.insert(entry.id.to_string(), entry);
+            entries_mut.insert(entry.id.to_string(), entry);
         } else {
             info!("Ignoring update request for unknown peer {:?}", peer);
         }
     }
 
     /// Update the internally perceived network status that is processed to the network health
-    fn refresh_network_status(&mut self, entry: &PeerStatus) {
+    fn refresh_network_status(&self, entry: &PeerStatus) {
         self.prune_from_network_status(&entry.id);
 
-        if entry.quality < self.cfg.quality_offline_threshold {
-            if entry.is_public {
-                self.bad_quality_public.insert(entry.id.clone());
+        {
+            if entry.quality < self.cfg.quality_offline_threshold {
+                if entry.is_public {
+                    self.bad_quality_public.borrow_mut().insert(entry.id.clone());
+                } else {
+                    self.bad_quality_non_public.borrow_mut().insert(entry.id.clone());
+                }
             } else {
-                self.bad_quality_non_public.insert(entry.id.clone());
-            }
-        } else {
-            if entry.is_public {
-                self.good_quality_public.insert(entry.id.clone());
-            } else {
-                self.good_quality_non_public.insert(entry.id.clone());
+                if entry.is_public {
+                    self.good_quality_public.borrow_mut().insert(entry.id.clone());
+                } else {
+                    self.good_quality_non_public.borrow_mut().insert(entry.id.clone());
+                }
             }
         }
 
-        let good_public = self.good_quality_public.len();
-        let good_non_public = self.good_quality_non_public.len();
-        let bad_public = self.bad_quality_public.len();
-        let bad_non_public = self.bad_quality_non_public.len();
+        let good_public = self.good_quality_public.borrow().len();
+        let good_non_public = self.good_quality_non_public.borrow().len();
+        let bad_public = self.bad_quality_public.borrow().len();
+        let bad_non_public = self.bad_quality_non_public.borrow().len();
         let mut health = Health::Red;
 
         if bad_public > 0 {
@@ -362,11 +373,15 @@ impl<Actions: NetworkExternalActions> Network<Actions> {
             };
         }
 
-        if health != self.last_health {
-            info!("Network health changed from {} to {}", self.last_health, health);
+        if health != *self.last_health.borrow() {
+            info!(
+                "Network health changed from {} to {}",
+                self.last_health.borrow().to_owned(),
+                health
+            );
             self.network_actions_api
-                .on_network_health_change(self.last_health, health);
-            self.last_health = health;
+                .on_network_health_change(self.last_health.borrow().to_owned(), health);
+            *self.last_health.borrow_mut() = health;
         }
 
         // metrics
@@ -387,15 +402,15 @@ impl<Actions: NetworkExternalActions> Network<Actions> {
     }
 
     /// Remove the PeerId from network status observed variables
-    fn prune_from_network_status(&mut self, peer: &PeerId) {
-        self.good_quality_public.remove(&peer);
-        self.good_quality_non_public.remove(&peer);
-        self.good_quality_public.remove(&peer);
-        self.bad_quality_non_public.remove(&peer);
+    fn prune_from_network_status(&self, peer: &PeerId) {
+        self.good_quality_public.borrow_mut().remove(&peer);
+        self.good_quality_non_public.borrow_mut().remove(&peer);
+        self.bad_quality_public.borrow_mut().remove(&peer);
+        self.bad_quality_non_public.borrow_mut().remove(&peer);
     }
 
     pub fn get_peer_status(&self, peer: &PeerId) -> Option<PeerStatus> {
-        return match self.entries.get(peer.to_string().as_str()) {
+        return match self.entries.borrow().get(peer.to_string().as_str()) {
             Some(entry) => Some(entry.clone()),
             None => None,
         };
@@ -407,6 +422,7 @@ impl<Actions: NetworkExternalActions> Network<Actions> {
         F: FnMut(&&PeerStatus) -> bool,
     {
         self.entries
+            .borrow()
             .values()
             .filter(f)
             .map(|x| x.id.clone())
@@ -421,8 +437,8 @@ impl<Actions: NetworkExternalActions> Network<Actions> {
             (v.last_seen + (delay.as_millis() as u64)) < threshold
         });
         data.sort_by(|a, b| {
-            if self.entries.get(a.to_string().as_str()).unwrap().last_seen
-                < self.entries.get(b.to_string().as_str()).unwrap().last_seen
+            if self.entries.borrow().get(a.to_string().as_str()).unwrap().last_seen
+                < self.entries.borrow().get(b.to_string().as_str()).unwrap().last_seen
             {
                 std::cmp::Ordering::Less
             } else {
@@ -436,11 +452,19 @@ impl<Actions: NetworkExternalActions> Network<Actions> {
     pub fn debug_output(&self) -> String {
         let mut output = "".to_string();
 
-        for (_, entry) in &self.entries {
+        for (_, entry) in self.entries.borrow().iter() {
             output.push_str(format!("{}\n", entry).as_str());
         }
 
         output
+    }
+
+    pub fn get_health(&self) -> Health {
+        self.last_health.borrow().to_owned()
+    }
+
+    pub fn get_entries_length(&self) -> usize {
+        self.entries.borrow().len()
     }
 }
 
@@ -628,11 +652,11 @@ mod tests {
     fn test_network_should_not_contain_the_self_reference() {
         let me = PeerId::random();
 
-        let mut peers = basic_network(&me);
+        let peers = basic_network(&me);
 
         peers.add(&me, PeerOrigin::IncomingConnection);
 
-        assert_eq!(0, peers.entries.len());
+        assert_eq!(0, peers.entries.borrow().len());
         assert!(!peers.has(&me))
     }
 
@@ -640,11 +664,11 @@ mod tests {
     fn test_network_should_contain_a_registered_peer() {
         let expected = PeerId::random();
 
-        let mut peers = basic_network(&PeerId::random());
+        let peers = basic_network(&PeerId::random());
 
         peers.add(&expected, PeerOrigin::IncomingConnection);
 
-        assert_eq!(1, peers.entries.len());
+        assert_eq!(1, peers.entries.borrow().len());
         assert!(peers.has(&expected))
     }
 
@@ -652,7 +676,7 @@ mod tests {
     fn test_network_should_add_metadata() {
         let expected = PeerId::random();
 
-        let mut peers = basic_network(&PeerId::random());
+        let peers = basic_network(&PeerId::random());
 
         let proto_version = ("protocol_version".to_string(), "1.2.3".to_string());
 
@@ -662,7 +686,7 @@ mod tests {
             Some([proto_version.clone()].into()),
         );
 
-        assert_eq!(1, peers.entries.len());
+        assert_eq!(1, peers.entries.borrow().len());
         assert!(peers.has(&expected));
 
         let status = peers.get_peer_status(&expected).unwrap();
@@ -674,13 +698,13 @@ mod tests {
     fn test_network_should_remove_a_peer_on_unregistration() {
         let peer = PeerId::random();
 
-        let mut peers = basic_network(&PeerId::random());
+        let peers = basic_network(&PeerId::random());
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
 
         peers.remove(&peer);
 
-        assert_eq!(0, peers.entries.len());
+        assert_eq!(0, peers.entries.borrow().len());
         assert!(!peers.has(&peer))
     }
 
@@ -688,11 +712,11 @@ mod tests {
     fn test_network_should_ingore_heartbeat_updates_for_peers_that_were_not_registered() {
         let peer = PeerId::random();
 
-        let mut peers = basic_network(&PeerId::random());
+        let peers = basic_network(&PeerId::random());
 
         peers.update(&peer, Ok(current_timestamp()));
 
-        assert_eq!(0, peers.entries.len());
+        assert_eq!(0, peers.entries.borrow().len());
         assert!(!peers.has(&peer))
     }
 
@@ -700,7 +724,7 @@ mod tests {
     fn test_network_should_be_able_to_register_a_succeeded_heartbeat_result() {
         let peer = PeerId::random();
 
-        let mut peers = basic_network(&PeerId::random());
+        let peers = basic_network(&PeerId::random());
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
 
@@ -719,7 +743,7 @@ mod tests {
     fn test_network_update_should_merge_metadata() {
         let peer = PeerId::random();
 
-        let mut peers = basic_network(&PeerId::random());
+        let peers = basic_network(&PeerId::random());
 
         let other_metadata_1 = ("other_1".to_string(), "efgh".to_string());
         let other_metadata_2 = ("other_2".to_string(), "abcd".to_string());
@@ -765,7 +789,7 @@ mod tests {
     fn test_network_should_ignore_a_peer_that_has_reached_lower_thresholds_a_specified_amount_of_time() {
         let peer = PeerId::random();
 
-        let mut peers = basic_network(&PeerId::random());
+        let peers = basic_network(&PeerId::random());
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
 
@@ -785,7 +809,7 @@ mod tests {
     #[test]
     fn test_network_should_be_able_to_register_a_failed_heartbeat_result() {
         let peer = PeerId::random();
-        let mut peers = basic_network(&PeerId::random());
+        let peers = basic_network(&PeerId::random());
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
 
@@ -803,7 +827,7 @@ mod tests {
     fn test_network_should_be_listed_for_the_ping_if_last_recorded_later_than_reference() {
         let first = PeerId::random();
         let second = PeerId::random();
-        let mut peers = basic_network(&PeerId::random());
+        let peers = basic_network(&PeerId::random());
 
         peers.add(&first, PeerOrigin::IncomingConnection);
         peers.add(&second, PeerOrigin::IncomingConnection);
@@ -826,31 +850,31 @@ mod tests {
     fn test_network_should_have_no_knowledge_about_health_without_any_registered_peers() {
         let peers = basic_network(&PeerId::random());
 
-        assert_eq!(peers.last_health, Health::Unknown);
+        assert_eq!(*peers.last_health.borrow(), Health::Unknown);
     }
 
     #[test]
     fn test_network_should_be_unhealthy_without_any_heartbeat_updates() {
         let peer = PeerId::random();
 
-        let mut peers = basic_network(&PeerId::random());
+        let peers = basic_network(&PeerId::random());
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
 
-        assert_eq!(peers.last_health, Health::Red);
+        assert_eq!(*peers.last_health.borrow(), Health::Red);
     }
 
     #[test]
     fn test_network_should_be_unhealthy_without_any_peers_once_the_health_was_known() {
         let peer = PeerId::random();
 
-        let mut peers = basic_network(&PeerId::random());
+        let peers = basic_network(&PeerId::random());
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
         let _ = peers.last_health;
         peers.remove(&peer);
 
-        assert_eq!(peers.last_health, Health::Red);
+        assert_eq!(*peers.last_health.borrow(), Health::Red);
     }
 
     #[test]
@@ -861,11 +885,11 @@ mod tests {
         mock.expect_is_public().times(1).returning(|_| false);
         mock.expect_on_network_health_change().times(1).return_const(());
 
-        let mut peers = Network::new(PeerId::random(), 0.6, mock);
+        let peers = Network::new(PeerId::random(), 0.6, mock);
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
 
-        assert_eq!(peers.last_health, Health::Red);
+        assert_eq!(*peers.last_health.borrow(), Health::Red);
     }
 
     #[test]
@@ -876,13 +900,13 @@ mod tests {
         let mut mock = MockNetworkExternalActions::new();
         mock.expect_is_public().times(2).returning(move |x| x == &public);
         mock.expect_on_network_health_change().times(1).return_const(());
-        let mut peers = Network::new(PeerId::random(), 0.6, mock);
+        let peers = Network::new(PeerId::random(), 0.6, mock);
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
 
         peers.update(&peer, Ok(current_timestamp()));
 
-        assert_eq!(peers.last_health, Health::Orange);
+        assert_eq!(*peers.last_health.borrow(), Health::Orange);
     }
 
     #[test]
@@ -895,7 +919,7 @@ mod tests {
         mock.expect_on_network_health_change().times(1).return_const(());
         mock.expect_close_connection().times(1).return_const(());
 
-        let mut peers = Network::new(PeerId::random(), 0.6, mock);
+        let peers = Network::new(PeerId::random(), 0.6, mock);
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
 
@@ -914,7 +938,7 @@ mod tests {
         let mut mock = MockNetworkExternalActions::new();
         mock.expect_is_public().times(5).returning(move |x| public.contains(&x));
         mock.expect_on_network_health_change().times(2).return_const(());
-        let mut peers = Network::new(me, 0.3, mock);
+        let peers = Network::new(me, 0.3, mock);
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
 
@@ -922,7 +946,7 @@ mod tests {
             peers.update(&peer, Ok(current_timestamp()));
         }
 
-        assert_eq!(peers.last_health, Health::Green);
+        assert_eq!(*peers.last_health.borrow(), Health::Green);
     }
 
     #[test]
@@ -936,7 +960,7 @@ mod tests {
 
         mock.expect_is_public().times(8).returning(move |x| public.contains(&x));
         mock.expect_on_network_health_change().times(2).return_const(());
-        let mut peers = Network::new(PeerId::random(), 0.3, mock);
+        let peers = Network::new(PeerId::random(), 0.3, mock);
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
         peers.add(&peer2, PeerOrigin::IncomingConnection);
@@ -946,6 +970,6 @@ mod tests {
             peers.update(&peer, Ok(current_timestamp()));
         }
 
-        assert_eq!(peers.last_health, Health::Green);
+        assert_eq!(*peers.last_health.borrow(), Health::Green);
     }
 }

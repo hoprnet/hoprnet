@@ -14,6 +14,7 @@ wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:getrandom", "dep:js
 compat-ping = []
 
 [dependencies]
+async-trait = "0.1.68"
 async-std = { version = "1.12.0", features = ["attributes"] }
 core-crypto = { path = "../core-crypto" }
 bincode = "1.3.3"

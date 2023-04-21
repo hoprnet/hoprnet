@@ -2,13 +2,13 @@
 use crate::{
     heartbeat::{Heartbeat, HeartbeatConfig, HeartbeatRequest},
     network::{wasm::WasmNetworkApi, Health, Network, PeerOrigin, PeerStatus},
-    ping::{wasm::WasmPingApi, Ping, PingConfig},
+    ping::{Ping, PingConfig, WasmPingApi},
 };
 use core_crypto::random::random_integer;
 use gloo_timers::future::sleep;
-use js_sys::{Array, Date, Function, JsString, Map, Number, Promise, Uint8Array};
+use js_sys::{Date, Function, JsString, Map, Number, Promise};
 use libp2p::PeerId;
-use std::{collections::HashMap, pin::Pin, str::FromStr, time::Duration};
+use std::{collections::HashMap, rc::Rc, str::FromStr, time::Duration};
 use utils_log::{error, info, warn};
 use utils_misc::{streaming_iterable::JsStreamingIterable, utils::wasm::js_map_to_hash_map};
 use wasm_bindgen::prelude::*;
@@ -90,10 +90,9 @@ extern "C" {
 #[wasm_bindgen]
 pub struct CoreNetwork {
     components: JsLibp2p,
-    network: Network<WasmNetworkApi>,
-    pinger: Ping<WasmPingApi>,
-    heartbeat: Heartbeat,
-    send_message_cb: Function,
+    network: Rc<Network<WasmNetworkApi>>,
+    pinger: Rc<Ping<WasmPingApi>>,
+    heartbeat: Rc<Heartbeat>,
 }
 
 static PEER_METADATA_PROTOCOL_VERSION: &str = "protocol_version";
@@ -108,7 +107,6 @@ impl CoreNetwork {
         on_network_health_change_cb: Function,
         is_public_cb: Function,
         close_connection_cb: Function,
-        on_finished_ping_cb: Function,
         version: String,
         environment_id: String,
         components: JsLibp2p, // used to call handle
@@ -126,8 +124,6 @@ impl CoreNetwork {
             close_connection_cb,
         );
 
-        let ping_api = WasmPingApi::new(environment_id.to_owned(), version.to_owned(), on_finished_ping_cb);
-
         let ping_config = PingConfig::new(
             max_parallel_pings.value_of() as usize,
             environment_id,
@@ -142,123 +138,98 @@ impl CoreNetwork {
             heartbeat_threshold.value_of() as u64,
         );
 
-        let pinger = Ping::new(ping_config, ping_api);
-        let network = Network::new(me, quality_threshold.as_f64().unwrap(), network_api);
-        let heartbeat = Heartbeat::new(heartbeat_config);
+        let network = Rc::new(Network::new(me, quality_threshold.as_f64().unwrap(), network_api));
+
+        let wasm_ping_api = WasmPingApi::new(send_message_cb);
+        let network_to_move = network.clone();
+        let pinger = Rc::new(Ping::new(
+            ping_config,
+            move |peer: &PeerId, result: crate::types::Result| network_to_move.update(peer, result),
+            wasm_ping_api,
+        ));
+
+        let heartbeat = Rc::new(Heartbeat::new(heartbeat_config));
 
         Self {
             components,
             network,
             pinger,
             heartbeat,
-            send_message_cb,
         }
     }
 
     #[wasm_bindgen]
     pub async fn start(&mut self) {
-        // Cast to 'static to use in Closure
-        let this = unsafe { std::mem::transmute::<&mut Self, &'static mut Self>(self) };
-        let cb = Closure::<dyn FnMut(IncomingConnection) -> ()>::new(move |incoming: IncomingConnection| {
-            let mut peer_metadata = HashMap::<String, String>::new();
+        let network_to_move = self.network.clone();
 
-            let proto_version = version_from_protocol(incoming.protocol());
+        let handle_heartbeat =
+            Closure::<dyn FnMut(IncomingConnection) -> ()>::new(move |incoming: IncomingConnection| {
+                let mut peer_metadata = HashMap::<String, String>::new();
 
-            peer_metadata.insert(PEER_METADATA_PROTOCOL_VERSION.to_owned(), proto_version);
+                let proto_version = version_from_protocol(incoming.protocol());
 
-            let remote = PeerId::from_str(incoming.connection().remote_peer().to_string().as_str()).unwrap();
+                peer_metadata.insert(PEER_METADATA_PROTOCOL_VERSION.to_owned(), proto_version);
 
-            if this.network.has(&remote) {
-                this.network
-                    .update_with_metadata(&remote, Ok(Date::now() as u64), Some(peer_metadata))
-            } else {
-                this.network
-                    .add_with_metadata(&remote, PeerOrigin::IncomingConnection, Some(peer_metadata));
-            }
+                let remote = PeerId::from_str(incoming.connection().remote_peer().to_string().as_str()).unwrap();
 
-            spawn_local(async move {
-                match HeartbeatRequest::from(incoming.stream()).await {
-                    Err(e) => error!("Failed processing heartbeat request {}", e),
-                    Ok(()) => (),
+                if network_to_move.has(&remote) {
+                    network_to_move.update_with_metadata(&remote, Ok(Date::now() as u64), Some(peer_metadata))
+                } else {
+                    network_to_move.add_with_metadata(&remote, PeerOrigin::IncomingConnection, Some(peer_metadata));
                 }
+
+                spawn_local(async move {
+                    match HeartbeatRequest::from(incoming.stream()).await {
+                        Err(e) => error!("Failed processing heartbeat request {}", e),
+                        Ok(()) => (),
+                    }
+                });
             });
-        });
 
         JsFuture::from(
             self.components
                 .get_registrar()
                 .expect("Libp2p instance without registrar")
-                .handle(&cb),
+                .handle(&handle_heartbeat),
         )
         .await
         .expect("Could not register heartbeat handler");
 
         // Leave callback to JS garbage collector
-        cb.forget();
+        handle_heartbeat.forget();
 
-        let this_ref = unsafe { std::mem::transmute::<&mut Self, &'static Self>(self) };
-
-        let message_transport =
-            move |msg: Box<[u8]>, peer: String| -> Pin<Box<dyn futures::Future<Output = Result<Box<[u8]>, String>>>> {
-                Box::pin(async move {
-                    let js_this = JsValue::null();
-                    let data: JsValue = js_sys::Uint8Array::from(msg.as_ref()).into();
-                    let peer: JsValue = JsString::from(peer.as_str()).into();
-
-                    // call a send_msg_cb producing a JS promise that is further converted to a Future
-                    // holding the reply of the pinged peer for the ping message.
-                    match this_ref.send_message_cb.call2(&js_this, &data, &peer) {
-                        Ok(r) => {
-                            let promise = Promise::from(r);
-                            let data = JsFuture::from(promise)
-                                .await
-                                .map(|x| Array::from(x.as_ref()).get(0))
-                                .map(|x| Uint8Array::from(x).to_vec().into_boxed_slice())
-                                .map_err(|x| {
-                                    x.dyn_ref::<JsString>()
-                                        .map_or("Failed to send ping message".to_owned(), |x| -> String { x.into() })
-                                });
-
-                            data
-                        }
-                        Err(e) => {
-                            error!(
-                                "The message transport could not be established: {}",
-                                e.as_string()
-                                    .unwrap_or_else(|| { "The message transport failed with unknown error".to_owned() })
-                                    .as_str()
-                            );
-                            Err(format!("Failed to extract transport error as string: {:?}", e))
-                        }
-                    }
-                })
-            };
-
-        let this = unsafe { std::mem::transmute::<&mut Self, &'static mut Self>(self) };
+        // FIXME: makes this thread-safe
+        let network_to_move = self.network.clone();
+        let heartbeat_to_move = self.heartbeat.clone();
+        let ping_to_move = self.pinger.clone();
 
         spawn_local(async move {
-            while !this.heartbeat.ended {
+            while !heartbeat_to_move.has_ended() {
                 let next_interval = random_integer(
-                    this.heartbeat.config.heartbeat_interval as u64,
+                    heartbeat_to_move.get_config().heartbeat_interval as u64,
                     Some(
-                        this.heartbeat.config.heartbeat_interval as u64
-                            + this.heartbeat.config.heartbeat_variance as u64,
+                        heartbeat_to_move.get_config().heartbeat_interval as u64
+                            + heartbeat_to_move.get_config().heartbeat_variance as u64,
                     ),
                 )
                 .expect("Failed to compute next heartbeat interval");
 
                 sleep(Duration::from_millis(next_interval)).await;
-                let threshold = Date::now() as u64 - this.heartbeat.config.heartbeat_threshold;
+                let threshold = Date::now() as u64 - heartbeat_to_move.get_config().heartbeat_threshold;
                 info!("Checking nodes since {}", threshold);
-                this.pinger
-                    .ping_peers(this.network.find_peers_to_ping(threshold), &message_transport);
+                ping_to_move
+                    .ping_peers(network_to_move.find_peers_to_ping(threshold))
+                    .await;
             }
         });
     }
 
     #[wasm_bindgen]
     pub async fn stop(&mut self) {
-        self.heartbeat.ended = true;
+        match self.heartbeat.set_ended() {
+            Ok(()) => (),
+            Err(e) => info!("Could not end heartbeat mechanism due to {}", e),
+        }
     }
 
     /// Ping the peers represented as a Vec<JsString> values that are converted into usable
@@ -276,43 +247,7 @@ impl CoreNetwork {
             })
             .collect::<Vec<_>>();
 
-        let message_transport =
-            |msg: Box<[u8]>, peer: String| -> Pin<Box<dyn futures::Future<Output = Result<Box<[u8]>, String>>>> {
-                Box::pin(async move {
-                    let this = JsValue::null();
-                    let data: JsValue = js_sys::Uint8Array::from(msg.as_ref()).into();
-                    let peer: JsValue = JsString::from(peer.as_str()).into();
-
-                    // call a send_msg_cb producing a JS promise that is further converted to a Future
-                    // holding the reply of the pinged peer for the ping message.
-                    match self.send_message_cb.call2(&this, &data, &peer) {
-                        Ok(r) => {
-                            let promise = js_sys::Promise::from(r);
-                            let data = JsFuture::from(promise)
-                                .await
-                                .map(|x| js_sys::Array::from(x.as_ref()).get(0))
-                                .map(|x| js_sys::Uint8Array::from(x).to_vec().into_boxed_slice())
-                                .map_err(|x| {
-                                    x.dyn_ref::<JsString>()
-                                        .map_or("Failed to send ping message".to_owned(), |x| -> String { x.into() })
-                                });
-
-                            data
-                        }
-                        Err(e) => {
-                            error!(
-                                "The message transport could not be established: {}",
-                                e.as_string()
-                                    .unwrap_or_else(|| { "The message transport failed with unknown error".to_owned() })
-                                    .as_str()
-                            );
-                            Err(format!("Failed to extract transport error as string: {:?}", e))
-                        }
-                    }
-                })
-            };
-
-        self.pinger.ping_peers(converted, &message_transport).await;
+        self.pinger.ping_peers(converted).await;
     }
 
     #[wasm_bindgen]
@@ -360,7 +295,7 @@ impl CoreNetwork {
     }
 
     #[wasm_bindgen]
-    pub fn unregister(&mut self, peer: JsPeerId) {
+    pub fn unregister(&self, peer: JsPeerId) {
         let peer: String = peer.to_string().into();
         match PeerId::from_str(&peer) {
             Ok(p) => self.network.remove(&p),
@@ -420,13 +355,13 @@ impl CoreNetwork {
     /// Returns the quality of the network as a network health indicator.
     #[wasm_bindgen]
     pub fn health(&self) -> Health {
-        self.network.last_health
+        self.network.get_health()
     }
 
     /// Total count of the peers observed withing the network
     #[wasm_bindgen]
     pub fn length(&self) -> usize {
-        self.network.entries.len()
+        self.network.get_entries_length()
     }
 
     #[wasm_bindgen]

@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use utils_misc::{
     streaming_iterable::{JsStreamingIterable, StreamingIterable},
     traits::DuplexStream,
@@ -21,7 +22,7 @@ use utils_types::traits::BinarySerializable;
 
 /// Configuration of the Heartbeat
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct HeartbeatConfig {
     pub max_parallel_heartbeats: usize,
     pub heartbeat_variance: u32,
@@ -46,16 +47,32 @@ impl HeartbeatConfig {
 }
 
 pub struct Heartbeat {
-    pub(crate) ended: bool,
-    pub(crate) config: HeartbeatConfig,
+    ended: RefCell<bool>,
+    config: HeartbeatConfig,
 }
 
 impl Heartbeat {
     pub fn new(config: HeartbeatConfig) -> Self {
-        Self { ended: false, config }
+        Self {
+            ended: RefCell::new(false),
+            config,
+        }
     }
-    pub fn start(&mut self) {
-        let this = unsafe { std::mem::transmute::<&mut Self, &'static mut Self>(self) };
+    pub fn start(&mut self) {}
+
+    pub fn has_ended(&self) -> bool {
+        *self.ended.borrow()
+    }
+
+    pub fn set_ended(&self) -> Result<(), String> {
+        match self.ended.try_borrow_mut() {
+            Ok(_) => Ok(()),
+            Err(e) => Err(e.to_string()),
+        }
+    }
+
+    pub fn get_config(&self) -> HeartbeatConfig {
+        self.config
     }
 }
 pin_project! {

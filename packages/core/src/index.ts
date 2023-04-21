@@ -379,7 +379,6 @@ class Hopr extends EventEmitter {
         return false
       },
       (peer: string) => this.closeConnectionsTo(peerIdFromString(peer)),
-      () => {},
       '',
       this.options.environment.id,
       this.libp2pComponents,
@@ -389,13 +388,6 @@ class Hopr extends EventEmitter {
       this.options.heartbeatInterval,
       this.options.heartbeatThreshold
     )
-    // this.networkPeers = Network.build(
-    //   this.id.toString(),
-    //   this.options.networkQualityThreshold,
-    //   ,
-    //   ,
-    //   )
-    // )
 
     // initialize with all the peers identified in the peer store
     const peers: Peer[] = await this.libp2pComponents.getPeerStore().all()
