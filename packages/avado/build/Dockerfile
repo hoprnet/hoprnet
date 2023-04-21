@@ -32,7 +32,7 @@ WORKDIR /app/hoprnet/packages/hoprd
 
 RUN apt-get update \
  && apt-get install -y \
-      pip \
+      pip procps \
  && rm -rf /var/lib/apt/lists/* \
  && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false
 
