@@ -16,6 +16,7 @@
 - Fix initial network peer registration from the Peer Store ([#4741](https://github.com/hoprnet/hoprnet/pull/4741))
 - `hopli` accepts floating number for the amount of tokens to be transferred/minted. Loosen requirement on the identity file. ([#4723](https://github.com/hoprnet/hoprnet/pull/4723))
 - Use simple moving average for smoothing network peer numbers presented to the Promiscuous strategy, add more logging ([#4763](https://github.com/hoprnet/hoprnet/pull/4763))
+- Migrate server-side relay code to Rust ([#4726](https://github.com/hoprnet/hoprnet/pull/4726))
 - Added Rust implementations of all the cryptographic functionality used in the HOPR protocol ([#3842](https://github.com/hoprnet/hoprnet/pull/3842))
 - Add reported HOPR protocol version information to `ping` and `peers` endpoints ([#4777](https://github.com/hoprnet/hoprnet/pull/4777))
 - Extend the Grafana dashboards with the new mixer metrics (current mixer queue size & average mixer delay) ([#4768](https://github.com/hoprnet/hoprnet/pull/4768))

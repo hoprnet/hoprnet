@@ -882,6 +882,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "connect-relay"
+version = "0.1.0"
+dependencies = [
+ "async-std",
+ "console_error_panic_hook",
+ "futures 0.3.28",
+ "getrandom 0.2.9",
+ "gloo-timers",
+ "hex 0.4.3",
+ "js-sys",
+ "pin-project-lite",
+ "utils-log",
+ "utils-misc",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "wasm-bindgen-test",
+ "wasm-opt",
+ "wasm-pack",
+]
+
+[[package]]
 name = "console"
 version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"

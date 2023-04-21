@@ -1,5 +1,5 @@
 # Append here when new Rust WASM crate is added (the list is space separated)
-PACKAGES =
+PACKAGES = connect-relay
 ##########################################
 
 PKG_DIRS = $(addsuffix /pkg, $(PACKAGES))
