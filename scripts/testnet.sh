@@ -41,15 +41,15 @@ disk_name() {
 
 # $1=environment id
 get_network() {
-  local environment_id="${1}"
-  jq -r ".environments.\"${environment_id}\".chain" "${mydir}/../packages/core/protocol-config.json"
+  local network_id="${1}"
+  jq -r ".networks.\"${network_id}\".chain" "${mydir}/../packages/core/protocol-config.json"
 }
 
 # $1=environment id
 get_environment_type() {
-  local environment_id="${1}"
+  local network_id="${1}"
   # use `contracts-addresses.json` because it stores 
-  jq -r ".environments.\"${environment_id}\".environment_type" "${mydir}/../packages/ethereum/contracts/contracts-addresses.json"
+  jq -r ".networks.\"${network_id}\".environment_type" "${mydir}/../packages/ethereum/contracts/contracts-addresses.json"
 }
 
 # $1=environment id

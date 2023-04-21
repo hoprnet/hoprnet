@@ -12,11 +12,10 @@ library BoostUtilsLib {
    * hasIndex bool check if index is occupied
    * boostType string name of boost
    */
-  function getBoostTypeAtIndex(address hoprBoostAddr, uint256 index)
-    public
-    view
-    returns (bool hasIndex, string memory boostType)
-  {
+  function getBoostTypeAtIndex(
+    address hoprBoostAddr,
+    uint256 index
+  ) public view returns (bool hasIndex, string memory boostType) {
     HoprBoost hoprBoost = HoprBoost(hoprBoostAddr);
 
     // Option 1: use contract type
@@ -34,7 +33,7 @@ library BoostUtilsLib {
     }
 
     // Option 2: pure static method
-    // (bool successReadTypeAtIndex, bytes memory returndataReadTypeAtIndex) = currentEnvironmentDetail.hoprBoostContractAddress.staticcall(abi.encodeWithSignature("typeAt()", index));
+    // (bool successReadTypeAtIndex, bytes memory returndataReadTypeAtIndex) = currentNetworkDetail.hoprBoostContractAddress.staticcall(abi.encodeWithSignature("typeAt()", index));
     // if (!successReadTypeAtIndex) {
     //     emit log_string("Cannot read Boost type at index");
     // } else {

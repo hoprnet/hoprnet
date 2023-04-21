@@ -8,7 +8,7 @@ use crate::utils::{Cmd, HelperErrors};
 #[derive(Parser, Default, Debug)]
 pub struct RegisterInNetworkRegistryArgs {
     #[clap(help = "Environment name. E.g. monte_rosa", long)]
-    environment_name: String,
+    network_name: String,
 
     #[clap(
         help = "Comma sperated node peer ids",
@@ -32,7 +32,7 @@ impl RegisterInNetworkRegistryArgs {
     /// `PRIVATE_KEY` env variable is required to send on-chain transactions
     fn execute_self_register(self) -> Result<(), HelperErrors> {
         let RegisterInNetworkRegistryArgs {
-            environment_name,
+            network_name,
             peer_ids,
             contracts_root,
         } = self;
@@ -43,12 +43,12 @@ impl RegisterInNetworkRegistryArgs {
         }
 
         // set directory and environment variables
-        if let Err(e) = set_process_path_env(&contracts_root, &environment_name) {
+        if let Err(e) = set_process_path_env(&contracts_root, &network_name) {
             return Err(e);
         }
 
         // iterate and collect execution result. If error occurs, the entire operation failes.
-        child_process_call_foundry_self_register(&environment_name, &peer_ids)
+        child_process_call_foundry_self_register(&network_name, &peer_ids)
     }
 }
 

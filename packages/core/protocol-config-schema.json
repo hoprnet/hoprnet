@@ -1,7 +1,7 @@
 {
   "type": "object",
   "properties": {
-    "environments": {
+    "networks": {
       "type": "object",
       "patternProperties": {
         "^[a-z0-9-]+$": {
@@ -118,5 +118,5 @@
       }
     }
   },
-  "required": ["environments", "chains"]
+  "required": ["networks", "chains"]
 }

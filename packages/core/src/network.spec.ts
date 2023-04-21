@@ -10,7 +10,7 @@ describe('test network and flags', async function () {
     assert.equal(resolvedNetwork.chain.default_provider, customProvider, 'provider')
   })
 
-  it('should get supported environments', function () {
+  it('should get supported networks', function () {
     // Assuming that `anvil-localhost` is always supported
     assert(supportedNetworks().length > 0)
   })

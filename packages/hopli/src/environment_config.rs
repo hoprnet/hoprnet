@@ -25,7 +25,7 @@ impl fmt::Display for EnvironmentType {
 
 /// Contract addresses and configuration associated with a environment
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EnvironmentDetail {
+pub struct NetworkDetail {
     /// number of the staking season used in the environment
     pub stake_season: u8,
     /// block number from which the indexer starts
@@ -48,18 +48,18 @@ pub struct EnvironmentDetail {
     pub token_contract_address: String,
 }
 
-/// mapping of environments with its details
+/// mapping of networks with its details
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
-pub struct EnvironmentConfig {
+pub struct NetworkConfig {
     // #[serde(flatten)]
-    environments: HashMap<String, EnvironmentDetail>,
+    networks: HashMap<String, NetworkDetail>,
 }
 
-/// ensures that the environment_name and environment_type exist
+/// ensures that the network_name and environment_type exist
 /// in `contracts-addresses.json` and are matched
 pub fn ensure_environment_is_set(
     make_root_dir_path: &PathBuf,
-    environment_name: &str,
+    network_name: &str,
     environment_type: &str,
 ) -> Result<bool, String> {
     // read `contracts-addresses.json` at make_root_dir_path
@@ -68,12 +68,12 @@ pub fn ensure_environment_is_set(
     let file_read = std::fs::read_to_string(contract_environment_config_path)
         .expect("Unable to read contracts-addresses.json file");
 
-    let env_config = serde_json::from_str::<EnvironmentConfig>(&file_read)
-        .expect("Unable to deserialize environment config");
+    let env_config =
+        serde_json::from_str::<NetworkConfig>(&file_read).expect("Unable to deserialize environment config");
 
     let env_detail = env_config
-        .environments
-        .get(environment_name)
+        .networks
+        .get(network_name)
         .expect("Unable to find environment details");
 
     if env_detail.environment_type.to_string() == environment_type {
@@ -87,7 +87,7 @@ pub fn ensure_environment_is_set(
 /// according to `contracts-addresses.json`
 pub fn get_environment_type_from_name(
     make_root_dir_path: &PathBuf,
-    environment_name: &str,
+    network_name: &str,
 ) -> Result<EnvironmentType, String> {
     // read `contracts-addresses.json` at make_root_dir_path
     let contract_environment_config_path = make_root_dir_path.join("contracts-addresses.json");
@@ -95,12 +95,12 @@ pub fn get_environment_type_from_name(
     let file_read = std::fs::read_to_string(contract_environment_config_path)
         .expect("Unable to read contracts-addresses.json file");
 
-    let env_config = serde_json::from_str::<EnvironmentConfig>(&file_read)
-        .expect("Unable to deserialize environment config");
+    let env_config =
+        serde_json::from_str::<NetworkConfig>(&file_read).expect("Unable to deserialize environment config");
 
     let env_detail = env_config
-        .environments
-        .get(environment_name)
+        .networks
+        .get(network_name)
         .expect("Unable to find environment details");
 
     return Ok(env_detail.environment_type);
@@ -119,9 +119,9 @@ mod tests {
             .unwrap()
             .join("ethereum")
             .join("contracts");
-        let environment_name = "anvil-localhost";
+        let network_name = "anvil-localhost";
         let environment_type = "development";
-        match ensure_environment_is_set(correct_dir, environment_name, environment_type) {
+        match ensure_environment_is_set(correct_dir, network_name, environment_type) {
             Ok(result) => assert_eq!(result, true),
             _ => assert!(false),
         }
@@ -130,11 +130,9 @@ mod tests {
     #[test]
     fn read_anvil_localhost_at_wrong_path() {
         let wrong_dir = &std::env::current_dir().unwrap();
-        let environment_name = "anvil-localhost";
+        let network_name = "anvil-localhost";
         let environment_type = "development";
-        let result = std::panic::catch_unwind(|| {
-            ensure_environment_is_set(wrong_dir, environment_name, environment_type)
-        });
+        let result = std::panic::catch_unwind(|| ensure_environment_is_set(wrong_dir, network_name, environment_type));
         assert!(result.is_err());
     }
 
@@ -147,9 +145,7 @@ mod tests {
             .join("ethereum")
             .join("contracts");
 
-        let result = std::panic::catch_unwind(|| {
-            ensure_environment_is_set(correct_dir, "non-existing", "development")
-        });
+        let result = std::panic::catch_unwind(|| ensure_environment_is_set(correct_dir, "non-existing", "development"));
         assert!(result.is_err());
     }
 
@@ -161,9 +157,9 @@ mod tests {
             .unwrap()
             .join("ethereum")
             .join("contracts");
-        let environment_name = "anvil-localhost";
+        let network_name = "anvil-localhost";
         let environment_type = "production";
-        match ensure_environment_is_set(correct_dir, environment_name, environment_type) {
+        match ensure_environment_is_set(correct_dir, network_name, environment_type) {
             Ok(result) => assert_eq!(result, false),
             _ => assert!(false),
         }

@@ -140,11 +140,11 @@ const argv = yargsInstance
   .wrap(Math.min(120, yargsInstance.terminalWidth()))
   .parseSync()
 
-function generateNodeOptions(environment: ResolvedNetwork): HoprOptions {
+function generateNodeOptions(network: ResolvedNetwork): HoprOptions {
   const options: HoprOptions = {
     announce: false,
     createDbIfNotExist: true,
-    environment,
+    network,
     forceCreateDB: false,
     password: '',
     dataPath: argv.data,
@@ -162,8 +162,8 @@ function generateNodeOptions(environment: ResolvedNetwork): HoprOptions {
 }
 
 export async function main(update: (State: State) => void, peerId?: PeerId) {
-  const environment = resolveNetwork(argv.environment, argv.provider)
-  const options = generateNodeOptions(environment)
+  const network = resolveNetwork(argv.network, argv.provider)
+  const options = generateNodeOptions(network)
   if (!peerId) {
     peerId = privKeyToPeerId(argv.privateKey)
   }

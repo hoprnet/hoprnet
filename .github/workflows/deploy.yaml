@@ -112,7 +112,7 @@ jobs:
           path: packages/
           key: hoprnet-build-${{ github.run_id }}
 
-      - name: "[SMART-CONTRACTS] Deploy for known environments"
+      - name: "[SMART-CONTRACTS] Deploy for known networks"
         if: ${{ !env.ACT }}
         run: ./scripts/deploy-smart-contracts.sh
         env:

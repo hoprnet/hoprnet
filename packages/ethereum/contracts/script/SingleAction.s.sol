@@ -3,26 +3,26 @@ pragma solidity >=0.8.0 <0.9.0;
 
 import 'forge-std/Script.sol';
 import 'forge-std/Test.sol';
-import './utils/EnvironmentConfig.s.sol';
+import './utils/NetworkConfig.s.sol';
 import './utils/BoostUtilsLib.sol';
 
 /**
  * @dev script to interact with contract(s) of a given envirionment where the msg.sender comes from the environment variable `PRIVATE_KEY`
  * Private key of the caller must be saved under the envrionment variable `PRIVATE_KEY`
- * Wrapper of contracts (incl. NetworkRegistery, HoprStake) with detection of contract address per environment_name/environment_type
+ * Wrapper of contracts (incl. NetworkRegistery, HoprStake) with detection of contract address per network_name/environment_type
  */
-contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
+contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
   using stdJson for string;
   using BoostUtilsLib for address;
 
   address msgSender;
 
-  function getEnvironmentAndMsgSender() private {
-    // 1. Environment check
+  function getNetworkAndMsgSender() private {
+    // 1. Network check
     // get envirionment of the script
-    getEnvironment();
+    getNetwork();
     // read records of deployed files
-    readCurrentEnvironment();
+    readCurrentNetwork();
 
     // 2. Get private key of caller
     uint256 privateKey = vm.envUint('PRIVATE_KEY');
@@ -34,11 +34,11 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
    * @dev On network registry contract, register peers associated with the calling wallet.
    */
   function selfRegisterNodes(string[] calldata peerIds) external {
-    // 1. get environment and msg.sender
-    getEnvironmentAndMsgSender();
+    // 1. get network and msg.sender
+    getNetworkAndMsgSender();
 
     // 2. call hoprNetworkRegistry.selfRegister(peerIds);
-    (bool successSelfRegister, ) = currentEnvironmentDetail.networkRegistryContractAddress.call(
+    (bool successSelfRegister, ) = currentNetworkDetail.networkRegistryContractAddress.call(
       abi.encodeWithSignature('selfRegister(string[])', peerIds)
     );
     if (!successSelfRegister) {
@@ -52,11 +52,11 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
    * @dev On network registry contract, deregister peers associated with the calling wallet.
    */
   function selfDeregisterNodes(string[] calldata peerIds) external {
-    // 1. get environment and msg.sender
-    getEnvironmentAndMsgSender();
+    // 1. get network and msg.sender
+    getNetworkAndMsgSender();
 
     // 2. call hoprNetworkRegistry.selfDeregister(peerIds);
-    (bool successSelfDeregister, ) = currentEnvironmentDetail.networkRegistryContractAddress.call(
+    (bool successSelfDeregister, ) = currentNetworkDetail.networkRegistryContractAddress.call(
       abi.encodeWithSignature('selfDeregister(string[])', peerIds)
     );
     if (!successSelfDeregister) {
@@ -72,13 +72,13 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
   function registerNodes(address[] calldata stakingAddresses, string[] calldata peerIds) external {
     require(stakingAddresses.length == peerIds.length, 'Input lengths are different');
 
-    // 1. get environment and msg.sender
-    getEnvironmentAndMsgSender();
+    // 1. get network and msg.sender
+    getNetworkAndMsgSender();
 
     // 2. owner registers nodes, depending on the envirionment
     if (currentEnvironmentType == EnvironmentType.DEVELOPMENT) {
       // call register accounts on HoprDummyProxyForNetworkRegistry
-      (bool successRegisterNodesOnDummyProxy, ) = currentEnvironmentDetail.networkRegistryProxyContractAddress.call(
+      (bool successRegisterNodesOnDummyProxy, ) = currentNetworkDetail.networkRegistryProxyContractAddress.call(
         abi.encodeWithSignature('ownerBatchAddAccounts(address[])', stakingAddresses)
       );
       if (!successRegisterNodesOnDummyProxy) {
@@ -87,7 +87,7 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
       }
     }
     // actual register nodes
-    (bool successRegisterNodes, ) = currentEnvironmentDetail.networkRegistryContractAddress.call(
+    (bool successRegisterNodes, ) = currentNetworkDetail.networkRegistryContractAddress.call(
       abi.encodeWithSignature('ownerRegister(address[],string[])', stakingAddresses, peerIds)
     );
     if (!successRegisterNodes) {
@@ -101,13 +101,13 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
    * @dev On network registry contract, deregister nodes from a set of addresses. This function should only be called by the owner
    */
   function deregisterNodes(address[] calldata stakingAddresses, string[] calldata peerIds) external {
-    // 1. get environment and msg.sender
-    getEnvironmentAndMsgSender();
+    // 1. get network and msg.sender
+    getNetworkAndMsgSender();
 
     // 2. owner registers nodes, depending on the envirionment
     if (currentEnvironmentType == EnvironmentType.DEVELOPMENT) {
       // call deregister accounts on HoprDummyProxyForNetworkRegistry
-      (bool successDeregisterNodesOnDummyProxy, ) = currentEnvironmentDetail.networkRegistryProxyContractAddress.call(
+      (bool successDeregisterNodesOnDummyProxy, ) = currentNetworkDetail.networkRegistryProxyContractAddress.call(
         abi.encodeWithSignature('ownerBatchRemoveAccounts(address[])', stakingAddresses)
       );
       if (!successDeregisterNodesOnDummyProxy) {
@@ -116,7 +116,7 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
       }
     }
     // actual deregister nodes
-    (bool successDeregisterNodes, ) = currentEnvironmentDetail.networkRegistryContractAddress.call(
+    (bool successDeregisterNodes, ) = currentNetworkDetail.networkRegistryContractAddress.call(
       abi.encodeWithSignature('ownerDeregister(string[])', peerIds)
     );
     if (!successDeregisterNodes) {
@@ -130,11 +130,11 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
    * @dev On network registry contract, disable it. This function should only be called by the owner
    */
   function disableNetworkRegistry() external {
-    // 1. get environment and msg.sender
-    getEnvironmentAndMsgSender();
+    // 1. get network and msg.sender
+    getNetworkAndMsgSender();
 
     // 2. check if current NR is enabled.
-    (bool successReadEnabled, bytes memory returndataReadEnabled) = currentEnvironmentDetail
+    (bool successReadEnabled, bytes memory returndataReadEnabled) = currentNetworkDetail
       .networkRegistryContractAddress
       .staticcall(abi.encodeWithSignature('enabled()'));
     if (!successReadEnabled) {
@@ -144,7 +144,7 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
 
     // 3. disable if needed
     if (isEnabled) {
-      (bool successDisableNetworkRegistry, ) = currentEnvironmentDetail.networkRegistryContractAddress.call(
+      (bool successDisableNetworkRegistry, ) = currentNetworkDetail.networkRegistryContractAddress.call(
         abi.encodeWithSignature('disableRegistry()')
       );
       if (!successDisableNetworkRegistry) {
@@ -159,11 +159,11 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
    * @dev On network registry contract, enable it. This function should only be called by the owner
    */
   function enableNetworkRegistry() external {
-    // 1. get environment and msg.sender
-    getEnvironmentAndMsgSender();
+    // 1. get network and msg.sender
+    getNetworkAndMsgSender();
 
     // 2. check if current NR is enabled.
-    (bool successReadEnabled, bytes memory returndataReadEnabled) = currentEnvironmentDetail
+    (bool successReadEnabled, bytes memory returndataReadEnabled) = currentNetworkDetail
       .networkRegistryContractAddress
       .staticcall(abi.encodeWithSignature('enabled()'));
     if (!successReadEnabled) {
@@ -173,7 +173,7 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
 
     // 3. enable if needed
     if (!isEnabled) {
-      (bool successEnableNetworkRegistry, ) = currentEnvironmentDetail.networkRegistryContractAddress.call(
+      (bool successEnableNetworkRegistry, ) = currentNetworkDetail.networkRegistryContractAddress.call(
         abi.encodeWithSignature('enableRegistry()')
       );
       if (!successEnableNetworkRegistry) {
@@ -190,11 +190,11 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
   function forceEligibilityUpdate(address[] calldata stakingAddresses, bool[] calldata eligibility) external {
     require(stakingAddresses.length == eligibility.length, 'Input lengths are different');
 
-    // 1. get environment and msg.sender
-    getEnvironmentAndMsgSender();
+    // 1. get network and msg.sender
+    getNetworkAndMsgSender();
 
     // 2. update emit EligibilityUpdate events by the owner
-    (bool successForceEligibilityUpdate, ) = currentEnvironmentDetail.networkRegistryContractAddress.call(
+    (bool successForceEligibilityUpdate, ) = currentNetworkDetail.networkRegistryContractAddress.call(
       abi.encodeWithSignature('ownerForceEligibility(address[],bool[])', stakingAddresses, eligibility)
     );
     if (!successForceEligibilityUpdate) {
@@ -208,11 +208,11 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
    * @dev On network registry contract, sync eligibility of some staking addresses. This function should only be called by the owner
    */
   function syncEligibility(string[] calldata peerIds) external {
-    // 1. get environment and msg.sender
-    getEnvironmentAndMsgSender();
+    // 1. get network and msg.sender
+    getNetworkAndMsgSender();
 
     // 2. sync peers eligibility according to the latest requirement of its current state
-    (bool successSyncEligibility, ) = currentEnvironmentDetail.networkRegistryContractAddress.call(
+    (bool successSyncEligibility, ) = currentNetworkDetail.networkRegistryContractAddress.call(
       abi.encodeWithSignature('sync(string[])', peerIds)
     );
     if (!successSyncEligibility) {
@@ -226,13 +226,13 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
    * @dev On stake contract, stake xHopr to the target value
    */
   function stakeXHopr(uint256 stakeTarget) external {
-    // 1. get environment and msg.sender
-    getEnvironmentAndMsgSender();
+    // 1. get network and msg.sender
+    getNetworkAndMsgSender();
 
     // 2. check the staked value. Return if the target has reached
-    (bool successReadStaked, bytes memory returndataReadStaked) = currentEnvironmentDetail
-      .stakeContractAddress
-      .staticcall(abi.encodeWithSignature('stakedHoprTokens(address)', msgSender));
+    (bool successReadStaked, bytes memory returndataReadStaked) = currentNetworkDetail.stakeContractAddress.staticcall(
+      abi.encodeWithSignature('stakedHoprTokens(address)', msgSender)
+    );
     if (!successReadStaked) {
       revert('Cannot read staked amount on stake contract.');
     }
@@ -244,7 +244,7 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
 
     // 3. stake the difference, if allowed
     uint256 amountToStake = stakeTarget - stakedAmount;
-    (bool successReadBalance, bytes memory returndataReadBalance) = currentEnvironmentDetail
+    (bool successReadBalance, bytes memory returndataReadBalance) = currentNetworkDetail
       .xhoprTokenContractAddress
       .staticcall(abi.encodeWithSignature('balanceOf(address)', msgSender));
     if (!successReadBalance) {
@@ -258,10 +258,10 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
     if (balance < amountToStake) {
       revert('Not enough xHOPR token balance to stake to the target.');
     } else {
-      (bool successStakeXhopr, ) = currentEnvironmentDetail.xhoprTokenContractAddress.call(
+      (bool successStakeXhopr, ) = currentNetworkDetail.xhoprTokenContractAddress.call(
         abi.encodeWithSignature(
           'transferAndCall(address,uint256,bytes)',
-          currentEnvironmentDetail.stakeContractAddress,
+          currentNetworkDetail.stakeContractAddress,
           amountToStake,
           hex'00'
         )
@@ -278,20 +278,18 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
    * @dev On stake contract, stake Network registry NFT to the target value
    */
   function stakeNetworkRegistryNft(string calldata nftRank) external {
-    // 1. get environment and msg.sender
-    getEnvironmentAndMsgSender();
+    // 1. get network and msg.sender
+    getNetworkAndMsgSender();
 
     // 2. Check if the msg.sender has staked Network_registry NFT
-    (bool successHasStaked, bytes memory returndataHasStaked) = currentEnvironmentDetail
-      .stakeContractAddress
-      .staticcall(
-        abi.encodeWithSignature(
-          'isNftTypeAndRankRedeemed2(uint256,string,address)',
-          NETWORK_REGISTRY_NFT_INDEX,
-          nftRank,
-          msgSender
-        )
-      );
+    (bool successHasStaked, bytes memory returndataHasStaked) = currentNetworkDetail.stakeContractAddress.staticcall(
+      abi.encodeWithSignature(
+        'isNftTypeAndRankRedeemed2(uint256,string,address)',
+        NETWORK_REGISTRY_NFT_INDEX,
+        nftRank,
+        msgSender
+      )
+    );
     if (!successHasStaked) {
       revert('Cannot read if caller has staked Network_registry NFTs.');
     }
@@ -302,9 +300,9 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
 
     // 3. Check if msg.sender has Network_registry NFT
     safeTransferNetworkRegistryNft(
-      currentEnvironmentDetail.hoprBoostContractAddress,
+      currentNetworkDetail.hoprBoostContractAddress,
       msgSender,
-      currentEnvironmentDetail.stakeContractAddress,
+      currentNetworkDetail.stakeContractAddress,
       nftRank
     );
 
@@ -315,14 +313,14 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
    * @dev Mint some xHOPR to the recipient
    */
   function mintXHopr(address recipient, uint256 amountInEther) external {
-    // 1. get environment and msg.sender
-    getEnvironmentAndMsgSender();
+    // 1. get network and msg.sender
+    getNetworkAndMsgSender();
 
     address[] memory addrBook = new address[](1);
     addrBook[0] = recipient;
 
     // 2. Check if the msg.sender has staked Network_registry NFT
-    (bool successMintXTokens, ) = currentEnvironmentDetail.xhoprTokenContractAddress.call(
+    (bool successMintXTokens, ) = currentNetworkDetail.xhoprTokenContractAddress.call(
       abi.encodeWithSignature('batchMintInternal(address[],uint256)', addrBook, amountInEther * 1e18)
     );
     if (!successMintXTokens) {
@@ -336,13 +334,13 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
    * @dev send some HOPR tokens to the recipient address
    */
   function mintHopr(address recipient, uint256 tokenamountInEther) external {
-    // 1. get environment and msg.sender
-    getEnvironmentAndMsgSender();
+    // 1. get network and msg.sender
+    getNetworkAndMsgSender();
 
     // 2.Mint some Hopr tokens to the recipient
     if (tokenamountInEther > 0) {
       uint256 hoprTokenAmount = tokenamountInEther * 1 ether;
-      (bool successMintTokens, ) = currentEnvironmentDetail.hoprTokenContractAddress.call(
+      (bool successMintTokens, ) = currentNetworkDetail.hoprTokenContractAddress.call(
         abi.encodeWithSignature('mint(address,uint256,bytes,bytes)', recipient, hoprTokenAmount, hex'00', hex'00')
       );
       if (!successMintTokens) {
@@ -357,11 +355,11 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
    * @dev Check if msgSender owned the requested rank. If so, transfer one to recipient
    */
   function transferNetworkRegistryNft(address recipient, string calldata nftRank) external {
-    // 1. get environment and msg.sender
-    getEnvironmentAndMsgSender();
+    // 1. get network and msg.sender
+    getNetworkAndMsgSender();
 
     // 2. Check if msg.sender has Network_registry NFT
-    safeTransferNetworkRegistryNft(currentEnvironmentDetail.hoprBoostContractAddress, msgSender, recipient, nftRank);
+    safeTransferNetworkRegistryNft(currentNetworkDetail.hoprBoostContractAddress, msgSender, recipient, nftRank);
     vm.stopBroadcast();
   }
 
@@ -427,13 +425,13 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
     uint256 hoprTokenAmountInWei,
     uint256 nativeTokenAmountInWei
   ) external payable {
-    // 1. get environment and msg.sender
-    getEnvironmentAndMsgSender();
+    // 1. get network and msg.sender
+    getNetworkAndMsgSender();
 
     // 2. transfer some Hopr tokens to the recipient, or mint tokens
     if (hoprTokenAmountInWei > 0) {
       // check the hopr token balance
-      (bool successReadOwnedHoprTokens, bytes memory returndataReadOwnedHoprTokens) = currentEnvironmentDetail
+      (bool successReadOwnedHoprTokens, bytes memory returndataReadOwnedHoprTokens) = currentNetworkDetail
         .hoprTokenContractAddress
         .staticcall(abi.encodeWithSignature('balanceOf(address)', msgSender));
       if (!successReadOwnedHoprTokens) {
@@ -443,7 +441,7 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
 
       if (ownedHoprTokens >= hoprTokenAmountInWei) {
         // call transfer
-        (bool successTransfserTokens, ) = currentEnvironmentDetail.hoprTokenContractAddress.call(
+        (bool successTransfserTokens, ) = currentNetworkDetail.hoprTokenContractAddress.call(
           abi.encodeWithSignature('transfer(address,uint256)', recipient, hoprTokenAmountInWei)
         );
         if (!successTransfserTokens) {
@@ -452,7 +450,7 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
       } else {
         // if transfer cannot be called, try minting token as a minter
         bytes32 MINTER_ROLE = keccak256('MINTER_ROLE');
-        (bool successHasRole, bytes memory returndataHasRole) = currentEnvironmentDetail
+        (bool successHasRole, bytes memory returndataHasRole) = currentNetworkDetail
           .hoprTokenContractAddress
           .staticcall(abi.encodeWithSignature('hasRole(bytes32,address)', MINTER_ROLE, msgSender));
         if (!successHasRole) {
@@ -461,7 +459,7 @@ contract SingleActionFromPrivateKeyScript is Test, EnvironmentConfig {
         bool isMinter = abi.decode(returndataHasRole, (bool));
         require(isMinter, 'Caller is not a minter');
 
-        (bool successMintTokens, ) = currentEnvironmentDetail.hoprTokenContractAddress.call(
+        (bool successMintTokens, ) = currentNetworkDetail.hoprTokenContractAddress.call(
           abi.encodeWithSignature(
             'mint(address,uint256,bytes,bytes)',
             recipient,

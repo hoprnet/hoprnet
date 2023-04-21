@@ -18,7 +18,7 @@
         "--disableApiAuthentication",
         "--data=/tmp/debug",
         "--identity=/tmp/debug-identity",
-        "--environment='anvil-localhost'"
+        "--network='anvil-localhost'"
       ],
       "env": {
         "DEBUG": "hopr*"
@@ -35,7 +35,7 @@
       "args": [
         "--privateKey",
         "0xcb1e5d91d46eb54a477a7eefec9c87a1575e3e5384d38f990f19c09aa8ddd332",
-        "--environment",
+        "--network",
         "master-xdai"
       ],
       "outFiles": ["${workspaceFolder}/**/*.js"]

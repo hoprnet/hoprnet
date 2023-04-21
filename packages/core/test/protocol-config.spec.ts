@@ -11,7 +11,7 @@ describe('protocol config', async function () {
   })
 
   it('should be internally consistent', async function () {
-    for (const env of Object.values(data.environments)) {
+    for (const env of Object.values(data.networks)) {
       if (!data.chains[env.chain]) {
         throw new Error(`no such network: ${env.chain}`)
       }
@@ -19,7 +19,7 @@ describe('protocol config', async function () {
   })
 
   it('should contain valid version ranges', async function () {
-    for (const [id, env] of Object.entries(data.environments)) {
+    for (const [id, env] of Object.entries(data.networks)) {
       if (!semver.validRange(env.version_range)) {
         throw new Error(`invalid range in env '${id}': '${env.version_range}'`)
       }
