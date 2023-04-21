@@ -16,12 +16,7 @@ on:
 jobs:
   build_and_test:
     name: Build & Test
-    runs-on: ${{ matrix.os }}
-
-    strategy:
-      matrix:
-        os: ['ubuntu-latest']
-
+    runs-on: ubuntu-latest-8-cores
     steps:
       - uses: actions/checkout@v3
         with:
@@ -35,7 +30,7 @@ jobs:
 
       - name: Sccache Setup
         if: ${{ !env.ACT }}
-        uses: mozilla-actions/sccache-action@v0.0.1
+        uses: mozilla-actions/sccache-action@v0.0.3
         with:
           version: "v0.4.0"
 

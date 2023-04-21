@@ -26,7 +26,7 @@ export { StrategyTickResult } from '../lib/core_strategy.js'
 import { ChannelStatus } from '@hoprnet/hopr-utils'
 
 const STRATEGIES = ['passive', 'promiscuous', 'random']
-export type Strategy = typeof STRATEGIES[number]
+export type Strategy = (typeof STRATEGIES)[number]
 
 export function isStrategy(str: string): str is Strategy {
   return STRATEGIES.includes(str)
@@ -71,7 +71,7 @@ export interface ChannelStrategyInterface {
  * At present this does not take gas into consideration.
  */
 export abstract class SaneDefaults {
-  protected autoRedeemTickets: boolean = false
+  protected autoRedeemTickets: boolean = true
 
   async onAckedTicket(ackTicket: AcknowledgedTicket) {
     if (this.autoRedeemTickets) {

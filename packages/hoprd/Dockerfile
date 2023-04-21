@@ -1,4 +1,4 @@
-ARG HOPR_TOOLCHAIN_IMAGE=${HOPR_TOOLCHAIN_IMAGE:-hopr-toolchain:latest}
+ARG HOPR_TOOLCHAIN_IMAGE=${HOPR_TOOLCHAIN_IMAGE:-gcr.io/hoprassociation/hopr-toolchain:latest}
 
 # Creates a Docker container that encapsulates a horpd node
 

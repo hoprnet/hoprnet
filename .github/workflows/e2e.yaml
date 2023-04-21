@@ -19,13 +19,8 @@ on:
 
 jobs:
   source-e2e:
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest-8-cores
     timeout-minutes: 30
-
-    strategy:
-      matrix:
-        os: ['ubuntu-latest']
-
     steps:
       - uses: actions/checkout@v3
 
@@ -37,7 +32,7 @@ jobs:
 
       - name: Sccache Setup
         if: ${{ !env.ACT }}
-        uses: mozilla-actions/sccache-action@v0.0.1
+        uses: mozilla-actions/sccache-action@v0.0.3
         with:
           version: "v0.4.0"
 

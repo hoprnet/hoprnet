@@ -3,7 +3,50 @@ import subprocess
 
 import pytest
 
-DEFAULT_API_TOKEN = 'e2e-API-token^^'
+LOCALHOST = "127.0.0.1"
+
+
+def pytest_addoption(parser):
+    parser.addoption(
+        "--stress-seq-request-count",
+        action="store",
+        default=200,
+        help="Number of sequential requests in the stress test",
+    )
+    parser.addoption(
+        "--stress-par-request-count", action="store", default=200, help="Number of parallel requests in the stress test"
+    )
+    parser.addoption(
+        "--stress-tested-api",
+        action="store",
+        default=f"http://{LOCALHOST}:{NODES['1']['api_port']}",
+        help="The API towards which the stress test is performed",
+    )
+    parser.addoption(
+        "--stress-tested-api-token",
+        action="store",
+        default=DEFAULT_API_TOKEN,
+        help="The token for the stress tested API",
+    )
+    parser.addoption(
+        "--stress-minimum-peer-count", action="store", default=3, help="The minimum peer count to start the stress test"
+    )
+
+
+@pytest.fixture
+def cmd_line_args(request):
+    args = {
+        "stress_seq_request_count": request.config.getoption("--stress-seq-request-count"),
+        "stress_par_request_count": request.config.getoption("--stress-par-request-count"),
+        "stress_tested_api": request.config.getoption("--stress-tested-api"),
+        "stress_tested_api_token": request.config.getoption("--stress-tested-api-token"),
+        "stress_minimum_peer_count": request.config.getoption("--stress-minimum-peer-count"),
+    }
+
+    return args
+
+
+DEFAULT_API_TOKEN = "e2e-API-token^^"
 PASSWORD = "e2e-test"
 NODES = {
     "1": {
@@ -50,15 +93,16 @@ def setup_node(*args, **kwargs):
 
 
 def test_sanity():
-    assert len(NODES.keys()) == len(set([i['private_key'] for i in NODES.values()])), "All private keys must be unique"
+    assert len(NODES.keys()) == len(set([i["private_key"] for i in NODES.values()])), "All private keys must be unique"
 
-    assert len(NODES.keys()) == len(set([i['api_port'] for i in NODES.values()])), "All API ports must be unique"
+    assert len(NODES.keys()) == len(set([i["api_port"] for i in NODES.values()])), "All API ports must be unique"
 
-    assert len(NODES.keys()) == len(set([i['p2p_port'] for i in NODES.values()])), "All p2p ports must be unique"
+    assert len(NODES.keys()) == len(set([i["p2p_port"] for i in NODES.values()])), "All p2p ports must be unique"
 
 
 def check_socket(address, port):
     import socket
+
     s = socket.socket()
     try:
         s.connect((address, port))
@@ -73,14 +117,18 @@ def check_socket(address, port):
 def setup_7_nodes():
     try:
         logging.info("Creating a 7 node cluster from source")
-        subprocess.run('./scripts/fixture_local_test_setup.sh --skip-cleanup',
-                       shell=True,
-                       capture_output=True,
-                       check=True)
+        subprocess.run(
+            "./scripts/fixture_local_test_setup.sh --skip-cleanup",
+            shell=True,
+            capture_output=True,
+            check=True,
+        )
         yield NODES
     finally:
         logging.info("Tearing down the 7 node cluster from source")
-        subprocess.run('./scripts/fixture_local_test_setup.sh --just-cleanup',
-                       shell=True,
-                       capture_output=True,
-                       check=True)
+        subprocess.run(
+            "./scripts/fixture_local_test_setup.sh --just-cleanup",
+            shell=True,
+            capture_output=True,
+            check=True,
+        )
