@@ -5639,8 +5639,10 @@ version = "0.1.0"
 dependencies = [
  "async-std",
  "async-trait",
+ "bincode",
  "console_error_panic_hook",
  "js-sys",
+ "mockall",
  "scopeguard 1.1.0",
  "serde",
  "tempfile 3.5.0",

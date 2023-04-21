@@ -33,8 +33,6 @@ extern "C" {
     fn dump(this: &LevelDb, destination: String) -> Result<(), JsValue>;
 }
 
-
-
 pub struct LevelDbShim
 {
     db: LevelDb,
@@ -136,14 +134,4 @@ pub async fn db_sanity_test(db: LevelDb) -> Result<bool, JsValue> {
     }
 
     Ok(true)
-}
-
-#[cfg(test)]
-mod tests {
-    // use super::*;
-    //
-    // #[test]
-    // fn test_leveldb() {
-    //     assert!(true);
-    // }
 }

@@ -1,8 +1,9 @@
 use async_trait::async_trait;
 use crate::errors::Result;
 
-// not placing the `Send` trait limitations on the trait
-#[async_trait(?Send)]
+
+#[cfg_attr(test, mockall::automock(type Key=Box<[u8]>; type Value=Box<[u8]>;))]
+#[async_trait(?Send)]           // not placing the `Send` trait limitations on the trait
 pub trait AsyncKVStorage {
     type Key;
     type Value;
@@ -19,6 +20,8 @@ pub trait AsyncKVStorage {
 
     async fn dump(&self, destination: String) -> Result<()>;
 }
+
+pub trait BinaryAsyncKVStorage : AsyncKVStorage<Key=Box<[u8]>, Value=Box<[u8]>> {}
 
 pub trait KVStorage {
     type Key;
