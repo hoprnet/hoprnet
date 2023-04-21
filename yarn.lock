@@ -760,7 +760,7 @@ __metadata:
     it-handshake: 4.0.0
     it-pair: 2.0.4
     it-pipe: 2.0.5
-    it-pushable: 3.0.0
+    it-pushable: 3.1.3
     mocha: 9.2.2
     multiformats: 9.6.5
     retimer: 3.0.0
@@ -834,7 +834,7 @@ __metadata:
     debug: 4.3.4
     err-code: 3.0.1
     heap-js: 2.2.0
-    it-pushable: 3.0.0
+    it-pushable: 3.1.3
     leveldown: 6.1.1
     levelup: 5.1.1
     libp2p: 0.37.3
@@ -6899,10 +6899,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"it-pushable@npm:3.0.0":
-  version: 3.0.0
-  resolution: "it-pushable@npm:3.0.0"
-  checksum: 0986e447f71f03560b82cc3e03178d302fe19ea6e8afe0b057a3583d666484a8a1500b650211760eb1b63e85410eae6af66a6086c7b4a3138b56ad195537ec41
+"it-pushable@npm:3.1.3":
+  version: 3.1.3
+  resolution: "it-pushable@npm:3.1.3"
+  checksum: 128dd12039af7067e7a27eccef52c3d00f32607bf8d1aeef5e62e8f84fe8f9a131afe5d8a6b455ae797bfbfb4cc942a3db100f362ca9698c61dd40478ddefc6b
   languageName: node
   linkType: hard
 
