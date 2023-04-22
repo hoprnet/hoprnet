@@ -177,6 +177,9 @@ contract HoprStakeSeason7Test is Test, ERC1820RegistryFixtureTest, PermittableTo
    */
   function test_batchBlockNfts(uint256[] calldata blockedIndexes) public {
     vm.assume(blockedIndexes.length > 0);
+    for (uint256 k = 0; k < blockedIndexes.length; k++) {
+      vm.assume(blockedIndexes[k] > 23);
+    }
     uint256[] memory storedIndexes = blockedIndexes;
 
     vm.startPrank(OWNER);
@@ -203,22 +206,19 @@ contract HoprStakeSeason7Test is Test, ERC1820RegistryFixtureTest, PermittableTo
    */
   function testRevert_batchBlockNfts(uint256[] calldata blockedIndexes) public {
     vm.assume(blockedIndexes.length > 0);
-    uint256[] memory storedIndexes = blockedIndexes;
-
-    vm.startPrank(OWNER);
-    hoprStakeSeason7.ownerBlockNftType(blockedIndexes[0]);
-
-    for (uint256 i = 0; i < blockedIndexes.length; i++) {
-      for (uint256 j = 0; j < storedIndexes.length; j++) {
-        if (blockedIndexes[i] == storedIndexes[j] && blockedIndexes.length > 1) {
-          // expect revert
-          vm.expectRevert('HoprStake: NFT type is already blocked');
-          hoprStakeSeason7.ownerBatchBlockNftType(blockedIndexes);
-          vm.clearMockedCalls();
-          return;
-        }
+    bool hasBlockedIndex = false;
+    for (uint256 k = 0; k < blockedIndexes.length; k++) {
+      if (hoprStakeSeason7.isBlockedNft(blockedIndexes[k])) {
+        hasBlockedIndex = true;
+        break;
       }
     }
+    vm.assume(hasBlockedIndex);
+
+    vm.startPrank(OWNER);
+    vm.expectRevert('HoprStake: NFT type is already blocked');
+    hoprStakeSeason7.ownerBatchBlockNftType(blockedIndexes);
+    vm.clearMockedCalls();
   }
 
   /**
@@ -238,7 +238,14 @@ contract HoprStakeSeason7Test is Test, ERC1820RegistryFixtureTest, PermittableTo
         }
       }
     }
-    // first block them
+
+    // first block allowed ones
+    for (uint256 k = 0; k < blockedIndexes.length; k++) {
+      if (!hoprStakeSeason7.isBlockedNft(storedIndexes[k])) {
+        delete storedIndexes[k];
+      }
+    }
+
     hoprStakeSeason7.ownerBatchBlockNftType(blockedIndexes);
     for (uint256 index = 0; index < blockedIndexes.length; index++) {
       vm.expectEmit(true, false, false, false, address(hoprStakeSeason7));
@@ -253,7 +260,9 @@ contract HoprStakeSeason7Test is Test, ERC1820RegistryFixtureTest, PermittableTo
    */
   function testRevert_batchUnblockNfts(uint256[] calldata blockedIndexes) public {
     vm.assume(blockedIndexes.length > 0);
-    uint256[] memory storedIndexes = blockedIndexes;
+    for (uint256 k = 0; k < blockedIndexes.length; k++) {
+      vm.assume(blockedIndexes[k] > 23);
+    }
 
     vm.startPrank(OWNER);
     // expect revert
