@@ -26,7 +26,7 @@ contract HoprStakeSeason7 is HoprStakeBase {
     address _nftAddress,
     address _lockToken,
     address _rewardToken
-  ) HoprStakeBase(_newOwner, 1674738000, 1682510400, 396, 25e22, _nftAddress, _lockToken, _rewardToken) {}
+  ) HoprStakeBase(_newOwner, 1682510400, 1690372800, 396, 25e22, _nftAddress, _lockToken, _rewardToken) {}
 
   /**
    * @dev allow the owner to stake tokens for some accounts
