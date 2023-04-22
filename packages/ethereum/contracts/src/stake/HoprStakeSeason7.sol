@@ -15,6 +15,9 @@ contract HoprStakeSeason7 is HoprStakeBase {
    * Staking season 7 starts at 1682510400 2pm CET 26th April 2023 and ends at 1690372800 2pm CET 26th July 2023
    * Basic APY is 1.25 % (= 1.25 / 100 * 1e12 / (365 * 24 * 60 * 60))
    * the boost cap is 250k xHOPR (25e22)
+  * It blocks HODLr, DAO_v2, Surveyor, Wildhorn_v2, PuzzleHunt_v1, PuzzleHunt_v2, PuzzleHunt_v3, ETH_Denver, 
+   * Lucky NFTs, PuzzleHunt_v3, Matterhorn, DAO_v3, AMA_zing, Restaker, QV_game, Meme_master, Tokenlon_AMA, 
+   * TokenlonAMA, Meme_master_v2 and Metadata_games at start
    * @param _newOwner address Address of the new owner. In production, it's 0xD9a00176Cf49dFB9cA3Ef61805a2850F45Cb1D05
    * @param _nftAddress address Address of the NFT contract. In production, it's 0x43d13D7B83607F14335cF2cB75E87dA369D056c7
    * @param _lockToken address Address of the stake token xHOPR. In production, it's 0xD057604A14982FE8D88c5fC25Aac3267eA142a08
@@ -26,7 +29,29 @@ contract HoprStakeSeason7 is HoprStakeBase {
     address _nftAddress,
     address _lockToken,
     address _rewardToken
-  ) HoprStakeBase(_newOwner, 1682510400, 1690372800, 396, 25e22, _nftAddress, _lockToken, _rewardToken) {}
+  ) HoprStakeBase(_newOwner, 1682510400, 1690372800, 396, 25e22, _nftAddress, _lockToken, _rewardToken) {
+    // block a selection of HoprBoost NFTs
+    _ownerBlockNftType(2); // HODLr
+    _ownerBlockNftType(3); // Wildhorn_v1
+    _ownerBlockNftType(4); // PuzzleHunt_v1
+    _ownerBlockNftType(7); // PuzzleHunt_v2
+    _ownerBlockNftType(8); // Wildhorn_v2
+    _ownerBlockNftType(9); // DAO_v2
+    _ownerBlockNftType(10); // Surveyor
+    _ownerBlockNftType(11); // ETH_Denver
+    _ownerBlockNftType(12); // Lucky
+    _ownerBlockNftType(13); // PuzzleHunt_v3
+    _ownerBlockNftType(14); // Matterhorn
+    _ownerBlockNftType(15); // DAO_v3
+    _ownerBlockNftType(16); // AMA_zing
+    _ownerBlockNftType(17); // Restaker
+    _ownerBlockNftType(18); // QV_game
+    _ownerBlockNftType(19); // Meme_master
+    _ownerBlockNftType(20); // Tokenlon_AMA
+    _ownerBlockNftType(21); // TokenlonAMA
+    _ownerBlockNftType(22); // Meme_master_v2
+    _ownerBlockNftType(23); // Metadata_games
+  }
 
   /**
    * @dev allow the owner to stake tokens for some accounts
