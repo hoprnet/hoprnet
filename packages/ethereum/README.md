@@ -84,6 +84,27 @@ To check the verification result, use
 forge verify-check --chain-id <number> <GUID>
 ```
 
+#### Deploy new staking season contract
+
+1. Create a new season contract from `HoprStakeBase.sol` and update the parameters (start, end timestamp) accordingly
+2. Change the `"stake_season":` to the number of the new season, for `master-staging`, `debug-staging` and the running production environment.
+3. Deploy for each environment with
+   - `debug-staging`: `FOUNDRY_PROFILE=staging ENVIRONMENT_NAME=debug-staging forge script --broadcast --verify --verifier etherscan --verifier-url "https://api.gnosisscan.io/api" --chain 100 script/DeployAll.s.sol:DeployAllContractsScript`
+   - `master-staging`: FOUNDRY_PROFILE=staging ENVIRONMENT_NAME=master-staging forge script --broadcast --verify --verifier etherscan --verifier-url "https://api.gnosisscan.io/api" --chain 100 script/DeployAll.s.sol:DeployAllContractsScript` `FOUNDRY_PROFILE=production
+   - `monte_rosa`: _Temporarily update the `token_contract_address` to wxHOPR. Then run_ ENVIRONMENT_NAME=monte_rosa forge script --broadcast --verify --verifier etherscan --verifier-url "https://api.gnosisscan.io/api" --chain 100 script/DeployAll.s.sol:DeployAllContractsScrip`
+4. Switch back `token_contract_address` for `monte_rosa`
+5. Commit contract changes and make a PR
+6. Transfer contract ownership to COMM multisig with `cast send 0x5041668ede2107b88e1c63e17690b7ddc2f457fc "transferOwnership(address)" 0xD9a00176Cf49dFB9cA3Ef61805a2850F45Cb1D05 --rpc-url https://provider-proxy.hoprnet.workers.dev/xdai_mainnet --private-key $PRIVATE_KEY`
+7. Run `scripts/update-protocol-config.sh -e master-staging`, `scripts/update-protocol-config.sh -e debug-staging` and `scripts/update-protocol-config.sh -e monte_rosa`
+8. Create a branch (e.g. `feature/staking-s7-contract-update`) from `master` which contains changes in `contracts-addresses.json` and `protocol-config.json` and make a PR
+9. Extend "hopr-stake-all-season" subgraph with the production stake season contract and deploy it
+10. Create an issue in `hoprnet/hopr-devrel` repo with actions to check:
+    > Only after Sx starts (time)
+    >
+    > - [ ] Merge Update staking Sx contract addresses <contract address update PR>, so that procotol-config.json is updated with latest addresses.
+    > - [ ] Important staking accounts (e.g. DevBank, CI, Operator) unstake from S6 and stake their NR NFTs to Sx
+    > - [ ] Owner of `NetworkRegistryProxy` update the stake contract (`updateStakeContract()`) with the new season contract address
+
 ### Note
 
 1. Three solc versions are needed
