@@ -90,8 +90,8 @@ forge verify-check --chain-id <number> <GUID>
 2. Change the `"stake_season":` to the number of the new season, for `master-staging`, `debug-staging` and the running production environment.
 3. Deploy for each environment with
    - `debug-staging`: `FOUNDRY_PROFILE=staging ENVIRONMENT_NAME=debug-staging forge script --broadcast --verify --verifier etherscan --verifier-url "https://api.gnosisscan.io/api" --chain 100 script/DeployAll.s.sol:DeployAllContractsScript`
-   - `master-staging`: FOUNDRY_PROFILE=staging ENVIRONMENT_NAME=master-staging forge script --broadcast --verify --verifier etherscan --verifier-url "https://api.gnosisscan.io/api" --chain 100 script/DeployAll.s.sol:DeployAllContractsScript` `FOUNDRY_PROFILE=production
-   - `monte_rosa`: _Temporarily update the `token_contract_address` to wxHOPR. Then run_ ENVIRONMENT_NAME=monte_rosa forge script --broadcast --verify --verifier etherscan --verifier-url "https://api.gnosisscan.io/api" --chain 100 script/DeployAll.s.sol:DeployAllContractsScrip`
+   - `master-staging`: FOUNDRY_PROFILE=staging ENVIRONMENT_NAME=master-staging forge script --broadcast --verify --verifier etherscan --verifier-url "https://api.gnosisscan.io/api" --chain 100 script/DeployAll.s.sol:DeployAllContractsScript`
+   - `monte_rosa`: _Temporarily update the `token_contract_address` to wxHOPR. Then run_ `FOUNDRY_PROFILE=production ENVIRONMENT_NAME=monte_rosa forge script --broadcast --verify --verifier etherscan --verifier-url "https://api.gnosisscan.io/api" --chain 100 script/DeployAll.s.sol:DeployAllContractsScript`
 4. Switch back `token_contract_address` for `monte_rosa`
 5. Commit contract changes and make a PR
 6. Transfer contract ownership to COMM multisig with `cast send 0x5041668ede2107b88e1c63e17690b7ddc2f457fc "transferOwnership(address)" 0xD9a00176Cf49dFB9cA3Ef61805a2850F45Cb1D05 --rpc-url https://provider-proxy.hoprnet.workers.dev/xdai_mainnet --private-key $PRIVATE_KEY`
