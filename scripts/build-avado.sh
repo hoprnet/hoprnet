@@ -48,7 +48,7 @@ declare environment_id="${2:-"$(${mydir}/get-default-environment.sh)"}"
 declare release_id="${3:-"$(${mydir}/get-default-environment.sh --release)"}"
 declare upstream_version="${4:-$avado_version}"
 declare api_token="${5:-"!5qxc9Lp1BE7IFQ-nrtttU"}" # <- Default AVADO API token
-declare dry_run="${DRY_RUN}"
+declare dry_run="${DRY_RUN:-"false"}"
 
 if [ "${dry_run}" = true ]; then
   msg "!! This is a DRY RUN !!"
