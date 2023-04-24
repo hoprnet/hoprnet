@@ -22,6 +22,7 @@
 - Reduced maximum number of relay connections to 2000 ([#4912](https://github.com/hoprnet/hoprnet/pull/4912))
 - Add pruning in the relay connections keep-alive mechanism ([#4916](https://github.com/hoprnet/hoprnet/pull/4916))
 - Enforce closing and clean-up of libp2p2 connections ([#4957](https://github.com/hoprnet/hoprnet/pull/4957))
+- Wipe libp2p's AddressManager cache when publishing new addresses to the DHT ([#4958](https://github.com/hoprnet/hoprnet/pull/4958))
 
 <a name="1.92"></a>
 
