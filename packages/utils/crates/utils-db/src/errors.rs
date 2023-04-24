@@ -9,7 +9,7 @@ pub enum DbError {
     #[error("key not found")]
     NotFound,
 
-    #[error("failed DB operation:")]
+    #[error("failed DB operation: {0}")]
     GenericError(String),
 }
 

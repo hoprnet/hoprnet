@@ -239,11 +239,39 @@ export class LevelDb {
     )
   }
 
-  protected async get(key: Uint8Array): Promise<Uint8Array> {
+  public async get(key: Uint8Array): Promise<Uint8Array> {
     const keyU8a = this.keyOf(key)
     const value = await this.db.get(Buffer.from(keyU8a.buffer, keyU8a.byteOffset, keyU8a.byteLength))
 
     return new Uint8Array(value.buffer, value.byteOffset, value.byteLength)
+  }
+
+  public async remove(key: Uint8Array): Promise<void> {
+    const keyU8a = this.keyOf(key)
+    await this.db.del(Buffer.from(keyU8a.buffer, keyU8a.byteOffset, keyU8a.byteLength))
+  }
+
+  public async batch(ops: Array<any>, wait_for_write= false): Promise<void> {
+    const options: { sync: boolean } = {
+      sync: wait_for_write,
+    }
+
+    let batch = this.db.batch()
+    for (const op of ops) {
+      if (!op.hasOwnProperty('type') || !op.hasOwnProperty('key')) {
+        throw new Error('Invalid operation, missing key or type: ' + JSON.stringify(op))
+      }
+
+      if (op.type === 'put') {
+        batch.put(Buffer.from(op.key), Buffer.from(op.value))
+      } else if (op.type === 'del') {
+        batch.del(Buffer.from(op.key))
+      } else {
+        throw new Error('Unsupported operation type: ' + JSON.stringify(op))
+      }
+    }
+
+    await batch.write(options)
   }
 
   public dump(destFile: string) {
@@ -276,11 +304,6 @@ export class LevelDb {
         .on('end', function () {
           dumpFile.close()
         })
-  }
-
-  public async remove(key: Uint8Array): Promise<void> {
-    const keyU8a = this.keyOf(key)
-    await this.db.del(Buffer.from(keyU8a.buffer, keyU8a.byteOffset, keyU8a.byteLength))
   }
 
   private keyOf(...segments: Uint8Array[]): Uint8Array {
@@ -377,7 +400,7 @@ export class HoprDB {
       }
     }
   }
-
+f
   private keyOf(...segments: Uint8Array[]): Uint8Array {
     return u8aConcat(this.id.serializeCompressed(), ...segments)
   }

@@ -1,7 +1,33 @@
 use serde::{Serialize, Deserialize, de::DeserializeOwned};
 
 use crate::errors::Result;
-use crate::traits::{MockAsyncKVStorage, BinaryAsyncKVStorage};
+use crate::traits::BinaryAsyncKVStorage;
+
+
+pub struct Batch {
+    pub ops: Vec<crate::traits::BatchOperation<Box<[u8]>,Box<[u8]>>>,
+}
+
+impl Batch {
+    pub fn new() -> Self {
+        Self {
+            ops: Vec::with_capacity(10)
+        }
+    }
+
+    pub fn put<T: Serialize, U: Serialize>(&mut self, key: T, value: U) {
+        let key: Box<[u8]> = bincode::serialize(&key).unwrap().into_boxed_slice();
+        let value: Box<[u8]> = bincode::serialize(&value).unwrap().into_boxed_slice();
+
+        self.ops.push(crate::traits::BatchOperation::put(crate::traits::Put{key, value}));
+    }
+
+    pub fn del<T: Serialize>(&mut self, key: T) {
+        let key: Box<[u8]> = bincode::serialize(&key).unwrap().into_boxed_slice();
+
+        self.ops.push(crate::traits::BatchOperation::del(crate::traits::Del{key}));
+    }
+}
 
 pub struct DB<T: BinaryAsyncKVStorage> {
     backend: T,
@@ -53,6 +79,11 @@ impl<T: BinaryAsyncKVStorage> DB<T> {
                 })
             })
     }
+
+    pub async fn batch(&mut self, batch: Batch, wait_for_write: bool) -> Result<()> {
+        self.backend
+            .batch(batch.ops, wait_for_write).await
+    }
 }
 
 
@@ -61,6 +92,7 @@ mod tests {
     use super::*;
     use mockall::*;
     use crate::errors::DbError;
+    use crate::traits::MockAsyncKVStorage;
 
     impl BinaryAsyncKVStorage for MockAsyncKVStorage {}
 
