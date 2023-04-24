@@ -49,6 +49,7 @@ impl Acknowledgement {
         self.validated
     }
 
+    /// Obtains the acknowledged challenge out of this acknowledgment.
     pub fn ack_challenge(&self) -> HalfKeyChallenge {
         assert!(self.validated, "acknowledgement not validated");
         self.ack_key_share.to_challenge()
@@ -93,6 +94,39 @@ pub struct AcknowledgedTicket {
     pub response: Response,
     pub pre_image: Hash,
     pub signer: PublicKey,
+}
+
+/// Wrapped for an unacknowledged ticket
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
+pub struct UnacknowledgedTicket {
+    pub ticket: Ticket,
+    pub own_key: HalfKey,
+    pub signer: PublicKey
+}
+
+impl BinarySerializable<'_> for UnacknowledgedTicket {
+    const SIZE: usize = Ticket::SIZE + HalfKey::SIZE + PublicKey::SIZE_UNCOMPRESSED;
+
+    fn deserialize(data: &[u8]) -> errors::Result<Self> {
+        if data.len() == Self::SIZE {
+            Ok(Self {
+                ticket: Ticket::deserialize(&data[..Ticket::SIZE])?,
+                own_key: HalfKey::deserialize(&data[Ticket::SIZE..Ticket::SIZE+HalfKey::SIZE])?,
+                signer: PublicKey::deserialize(&data[Ticket::SIZE+HalfKey::SIZE..])?
+            })
+        } else {
+            Err(ParseError)
+        }
+    }
+
+    fn serialize(&self) -> Box<[u8]> {
+        let mut ret = Vec::with_capacity(Self::SIZE);
+        ret.extend_from_slice(&self.ticket.serialize());
+        ret.extend_from_slice(&self.own_key.serialize());
+        ret.extend_from_slice(&self.signer.serialize(false));
+        ret.into_boxed_slice()
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]

@@ -239,15 +239,18 @@ pub enum PacketState {
         old_challenge: Option<AcknowledgementChallenge>,
     },
     /// Packet that is being sent out by us
-    Outgoing { ack_challenge: HalfKeyChallenge },
+    Outgoing {
+        next_hop: PublicKey,
+        ack_challenge: HalfKeyChallenge
+    },
 }
 
 /// Represents a HOPR packet
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct Packet {
     packet: MetaPacket,
-    challenge: AcknowledgementChallenge,
-    ticket: Ticket,
+    pub challenge: AcknowledgementChallenge,
+    pub ticket: Ticket,
     state: PacketState,
 }
 
@@ -294,11 +297,14 @@ impl Packet {
             ),
             ticket,
             state: Outgoing {
+                next_hop: PublicKey::from_peerid(&path[0])?,
                 ack_challenge: por_values.ack_challenge,
             },
         })
     }
 
+    /// Deserializes the packet and performs the forward-transformation, so the
+    /// packet can be further delivered (relayed to the next hop or read).
     pub fn deserialize(data: &[u8], private_key: &[u8], sender: &PeerId) -> Result<Self> {
         if data.len() == Self::SIZE {
             let (pre_packet, r0) = data.split_at(PACKET_LENGTH);
@@ -398,6 +404,22 @@ impl Packet {
         }
     }
 
+    /// State of this packet
+    pub fn state(&self) -> &PacketState {
+        &self.state
+    }
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+impl Packet {
+    pub fn serialize(&self) -> Box<[u8]> {
+        let mut ret = Vec::with_capacity(Self::SIZE);
+        ret.extend_from_slice(self.packet.serialize());
+        ret.extend_from_slice(&self.challenge.serialize());
+        ret.extend_from_slice(&self.ticket.serialize());
+        ret.into_boxed_slice()
+    }
+
     /// Creates an acknowledgement for this packet.
     /// Returns None if this packet is sent by us.
     pub fn create_acknowledgement(&self, private_key: &[u8]) -> Option<Acknowledgement> {
@@ -414,27 +436,6 @@ impl Packet {
             )),
             Outgoing { .. } => None,
         }
-    }
-
-    /// State of this packet
-    pub fn state(&self) -> &PacketState {
-        &self.state
-    }
-
-    /// Ticket used to create this packet
-    pub fn ticket(&self) -> &Ticket {
-        &self.ticket
-    }
-}
-
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-impl Packet {
-    pub fn serialize(&self) -> Box<[u8]> {
-        let mut ret = Vec::with_capacity(Self::SIZE);
-        ret.extend_from_slice(self.packet.serialize());
-        ret.extend_from_slice(&self.challenge.serialize());
-        ret.extend_from_slice(&self.ticket.serialize());
-        ret.into_boxed_slice()
     }
 }
 
@@ -579,8 +580,52 @@ mod tests {
                 }
                 PacketState::Outgoing { .. } => panic!("invalid packet state"),
             }
+        }
+    }
+}
 
-            packet.create_acknowledgement()
+#[cfg(feature = "wasm")]
+pub mod wasm {
+    use core_crypto::types::{HalfKeyChallenge, PublicKey};
+    use core_types::channels::Ticket;
+    use crate::packet::{Packet, PacketState};
+
+    #[wasm_bindgen]
+    impl Packet {
+        pub fn _ack_challenge(&self) -> Option<HalfKeyChallenge> {
+            match &self.state {
+                PacketState::Forwarded { ack_challenge, .. } | PacketState::Outgoing { ack_challenge, .. } => {
+                    Some(ack_challenge.clone())
+                },
+                PacketState::Final { .. } => None
+            }
+        }
+
+        pub fn _next_hop(&self) -> Option<PublicKey> {
+            match &self.state {
+                PacketState::Forwarded { next_hop, .. } | PacketState::Outgoing { next_hop, .. } => {
+                    Some(next_hop.clone())
+                },
+                PacketState::Final { .. } => None
+            }
+        }
+
+        pub fn _previous_hop(&self) -> Option<PublicKey> {
+            match &self.state {
+                PacketState::Final { previous_hop,  .. } | PacketState::Forwarded { previous_hop, .. } => {
+                    Some(previous_hop.clone())
+                }
+                PacketState::Outgoing { .. } => None,
+            }
+        }
+
+        pub fn _packet_tag(&self) -> Option<Box<[u8]>> {
+            match &self.state {
+                PacketState::Final { packet_tag, .. } | PacketState::Forwarded { packet_tag, .. } => {
+                    Some(packet_tag.clone())
+                },
+                PacketState::Outgoing { .. } => None
+            }
         }
     }
 }
