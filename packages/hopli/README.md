@@ -21,14 +21,40 @@ cargo install --path .
 
 ## Commands
 
+### General arguments
+
+#### Identity directory or path
+
+Identities can be read from a directory or directly from a path.
+
+When reading from a directory, identity files MUST contain "id" in their file name to be considered as an identity file.
+An additional parameter which specifies its prefix can also be passed.
+
+```
+    --identity-directory "./test" \
+    --identity-prefix node_ \
+```
+
+When reading from a path, use `--identity-from-path "./test/hopr.id"`
+
+Path and directory can be passed at the same time.
+
+Note: when CREATing identities, you must pass `--identity-directory`. `--identity-from-path` is not accepted
+
+#### Password
+
+Password can be passed either as an env variable `IDENTITY_PASSWORD`, or via a path to the password file `--password-path`, e.g. `--password-path ./.pwd`
+
+### Create/Read identities
+
 To create some identities with password as env variable. Alternatively, a path to the password file can be provided with `--password-path`, e.g. `--password-path ./.pwd`
 
 ```
 IDENTITY_PASSWORD=local \
     hopli identity \
     --action create \
-    --directory "./test" \
-    --name node_ \
+    --identity-directory "./test" \
+    --identity-prefix node_ \
     --number 3
 ```
 
@@ -38,12 +64,14 @@ Read ethereum addresses from identities
 IDENTITY_PASSWORD=switzerland \
     hopli identity \
     --action read \
-    --directory "./test" \
-    --name node_
+    --identity-directory "./test" \
+    --identity-prefix node_
 
 ```
 
 To fund nodes with password from env variable `IDENTITY_PASSWORD`. Alternatively, a path to the password file can be provided with `--password-path`, e.g. `--password-path ./.pwd`
+
+`--hopr-amount` and `native-amount` can be floating number
 
 ```
 IDENTITY_PASSWORD=local \
@@ -68,6 +96,29 @@ hopli register-in-network-registry \
     --contracts-root "../ethereum/contracts"
 ```
 
+with node identities in the network registry contract
+
+```
+PRIVATE_KEY=<bank_private_key> \
+IDENTITY_PASSWORD=switzerland \
+hopli register-in-network-registry \
+    --environment-name anvil-localhost \
+    --use-local-identities --identity-directory "/tmp" \
+    --peer-ids 16Uiu2HAmC9CRFeuF2cTf6955ECFmgDw6d27jLows7bftMqat5Woz,16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12 \
+    --contracts-root "../ethereum/contracts"
+```
+
+Express stake + register + fund
+
+```
+PRIVATE_KEY=<bank_private_key> \
+hopli initialize-node --environment-name anvil-localhost \
+    --identity-directory "/tmp" \
+    --password-path "/tmp/.pwd" \
+    --hopr-amount 10 --native-amount 0.1 \
+    --contracts-root "../ethereum/contracts"
+```
+
 ## Development
 
 ### Run local development
@@ -81,21 +132,33 @@ cargo run -- -h
 Create 3 identity files in `./test` folder where password is saved in `.pwd` file
 
 ```
-cargo run -- identity --action create --password-path ./.pwd --directory "./test" --name node_ --number 3
+cargo run -- identity \
+    --action create \
+    --password-path ./.pwd \
+    --identity-directory "./test" \
+    --identity-prefix node_ \
+    --number 3
 ```
 
 Create 2 identity files in `./test` folder where password is stored as an environment variable `IDENTITY_PASSWORD`
 
 ```
 IDENTITY_PASSWORD=switzerland \
-cargo run -- identity --action create --directory "./test" --name node_ --number 2
+cargo run -- identity \
+    --action create \
+    --identity-directory "./test" \
+    --identity-prefix node_ \
+    --number 2
 ```
 
 Read ethereum addresses from identities
 
 ```
 IDENTITY_PASSWORD=switzerland \
-cargo run -- identity --action read --directory "./test" --name node_
+cargo run -- identity \
+    --action read \
+    --identity-directory "./test" \
+    --identity-prefix node_
 
 ```
 
@@ -117,6 +180,30 @@ Register some peer ids in the network registry contract
 PRIVATE_KEY=<bank_private_key> \
     cargo run -- register-in-network-registry --environment-name anvil-localhost \
     --peer-ids 16Uiu2HAmC9CRFeuF2cTf6955ECFmgDw6d27jLows7bftMqat5Woz,16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12 \
+    --contracts-root "../ethereum/contracts"
+```
+
+Register some peer ids as well as some node identities in the network registry contract
+
+```
+PRIVATE_KEY=<bank_private_key> \
+IDENTITY_PASSWORD=local \
+    cargo run -- register-in-network-registry --environment-name anvil-localhost \
+    --use-local-identities --identity-directory "/tmp" \
+    --peer-ids 16Uiu2HAmC9CRFeuF2cTf6955ECFmgDw6d27jLows7bftMqat5Woz,16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12 \
+    --contracts-root "../ethereum/contracts"
+```
+
+> If foundry returns error that contains "HoprNetworkRegistry: Registry is disabled", run `cast send $(jq '.environments."anvil-localhost".network_registry_contract_address' ../ethereum/contracts/contracts-addresses.json) 'enableRegistry()' --rpc-url localhost:8545 --private-key $PRIVATE_KEY`
+
+Express stake + registry + fund for node identity
+
+```
+PRIVATE_KEY=<bank_private_key> \
+    cargo run -- initialize-node --environment-name anvil-localhost \
+    --identity-directory "./test" \
+    --password-path "/test/.pwd" \
+    --hopr-amount 10 --native-amount 0.1 \
     --contracts-root "../ethereum/contracts"
 ```
 

@@ -624,9 +624,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@google-cloud/profiler@npm:4.1.7":
-  version: 4.1.7
-  resolution: "@google-cloud/profiler@npm:4.1.7"
+"@google-cloud/profiler@npm:4.2.0":
+  version: 4.2.0
+  resolution: "@google-cloud/profiler@npm:4.2.0"
   dependencies:
     "@google-cloud/common": ^3.0.0
     "@google-cloud/logging-min": ^9.6.3
@@ -642,7 +642,7 @@ __metadata:
     protobufjs: ~6.11.0
     semver: ^7.0.0
     teeny-request: ^7.0.0
-  checksum: 5bdde9adbeb613ac130dfe644d13f0e886d3707b204eeeaaf33f54bfdcd945d58a4d2279706490cb02e8cceaf88ab94ec7202756ceb647fe30df78c27576bfaa
+  checksum: b2187ca3d03fe9f0f139259ae90c2b9881246289d98a7adf12609a742e87586c892ab0c0cd68c142e084e9a6ff7e3e78cbf836aed1f7d5946b2989c3742db4c7
   languageName: node
   linkType: hard
 
@@ -785,7 +785,7 @@ __metadata:
     "@types/chai": 4.3.4
     "@types/mocha": 9.1.1
     "@types/sinon": 10.0.14
-    async-mutex: 0.3.2
+    async-mutex: 0.4.0
     bn.js: 5.2.1
     chai: 4.3.7
     chalk: 5.0.1
@@ -797,8 +797,8 @@ __metadata:
     retimer: 3.0.0
     secp256k1: 4.0.3
     sinon: 12.0.1
-    typedoc: 0.23.28
-    typedoc-plugin-markdown: 3.14.0
+    typedoc: 0.24.4
+    typedoc-plugin-markdown: 3.15.2
     typescript: 4.9.5
   languageName: unknown
   linkType: soft
@@ -808,7 +808,7 @@ __metadata:
   resolution: "@hoprnet/hopr-core@workspace:packages/core"
   dependencies:
     "@chainsafe/libp2p-noise": 7.0.0
-    "@google-cloud/profiler": 4.1.7
+    "@google-cloud/profiler": 4.2.0
     "@hoprnet/hopr-connect": "workspace:packages/connect"
     "@hoprnet/hopr-core-ethereum": "workspace:packages/core-ethereum"
     "@hoprnet/hopr-utils": "workspace:packages/utils"
@@ -843,8 +843,8 @@ __metadata:
     retimer: 3.0.0
     secp256k1: 4.0.3
     sinon: 12.0.1
-    typedoc: 0.23.28
-    typedoc-plugin-markdown: 3.14.0
+    typedoc: 0.24.4
+    typedoc-plugin-markdown: 3.15.2
     typescript: 4.9.5
   languageName: unknown
   linkType: soft
@@ -856,8 +856,8 @@ __metadata:
     "@types/mocha": 9.1.1
     mocha: 9.2.2
     semver: 7.3.8
-    typedoc: 0.23.28
-    typedoc-plugin-markdown: 3.14.0
+    typedoc: 0.24.4
+    typedoc-plugin-markdown: 3.15.2
     typescript: 4.9.5
   languageName: unknown
   linkType: soft
@@ -906,8 +906,8 @@ __metadata:
     secp256k1: 4.0.3
     sinon: 12.0.1
     timeout-abort-controller: 3.0.0
-    typedoc: 0.23.28
-    typedoc-plugin-markdown: 3.14.0
+    typedoc: 0.24.4
+    typedoc-plugin-markdown: 3.15.2
     typescript: 4.9.5
   languageName: unknown
   linkType: soft
@@ -947,8 +947,8 @@ __metadata:
     swagger-ui-express: 4.6.2
     trace-unhandled: 2.0.1
     ts-node: ^10.9.1
-    typedoc: 0.23.28
-    typedoc-plugin-markdown: 3.14.0
+    typedoc: 0.24.4
+    typedoc-plugin-markdown: 3.15.2
     typescript: 4.9.5
     uuid: ^9.0.0
     ws: 8.12.0
@@ -2758,12 +2758,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"async-mutex@npm:0.3.2":
-  version: 0.3.2
-  resolution: "async-mutex@npm:0.3.2"
+"async-mutex@npm:0.4.0":
+  version: 0.4.0
+  resolution: "async-mutex@npm:0.4.0"
   dependencies:
-    tslib: ^2.3.1
-  checksum: 620b771dfdea1cad0a6b712915c31a1e3ca880a8cf1eae92b4590f435995e0260929c6ebaae0b9126b1456790ea498064b5bb9a506948cda760f48d3d0dcc4c8
+    tslib: ^2.4.0
+  checksum: 813a71728b35a4fbfd64dba719f04726d9133c67b577fcd951b7028c4a675a13ee34e69beb82d621f87bf81f5d4f135c4c44be0448550c7db728547244ef71fc
   languageName: node
   linkType: hard
 
@@ -5786,7 +5786,7 @@ __metadata:
     "@hoprnet/avadosdk": 0.4.4-rc.1
     "@types/node": 16
     "@types/yargs": ^17.0.23
-    prettier: 2.8.7
+    prettier: 2.8.8
     ts-node: 10.9.1
     typescript: 4.9.5
   languageName: unknown
@@ -7783,12 +7783,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"marked@npm:^4.2.12":
-  version: 4.2.12
-  resolution: "marked@npm:4.2.12"
+"marked@npm:^4.3.0":
+  version: 4.3.0
+  resolution: "marked@npm:4.3.0"
   bin:
     marked: bin/marked.js
-  checksum: bd551cd61028ee639d4ca2ccdfcc5a6ba4227c1b143c4538f3cde27f569dcb57df8e6313560394645b418b84a7336c07ab1e438b89b6324c29d7d8cdd3102d63
+  checksum: 0db6817893952c3ec710eb9ceafb8468bf5ae38cb0f92b7b083baa13d70b19774674be04db5b817681fa7c5c6a088f61300815e4dd75a59696f4716ad69f6260
   languageName: node
   linkType: hard
 
@@ -8001,12 +8001,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"minimatch@npm:^7.1.3":
-  version: 7.4.3
-  resolution: "minimatch@npm:7.4.3"
+"minimatch@npm:^9.0.0":
+  version: 9.0.0
+  resolution: "minimatch@npm:9.0.0"
   dependencies:
     brace-expansion: ^2.0.1
-  checksum: daa954231b6859e3ba0e5fbd2486986d3cae283bb69acb7ed3833c84a293f8d7edb8514360ea62c01426ba791446b2a1e1cc0d718bed15c0212cef35c59a6b95
+  checksum: 7bd57899edd1d1b0560f50b5b2d1ea4ad2a366c5a2c8e0a943372cf2f200b64c256bae45a87a80915adbce27fa36526264296ace0da57b600481fe5ea3e372e5
   languageName: node
   linkType: hard
 
@@ -9445,12 +9445,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"prettier@npm:2.8.7":
-  version: 2.8.7
-  resolution: "prettier@npm:2.8.7"
+"prettier@npm:2.8.8":
+  version: 2.8.8
+  resolution: "prettier@npm:2.8.8"
   bin:
     prettier: bin-prettier.js
-  checksum: fdc8f2616f099f5f0d685907f4449a70595a0fc1d081a88919604375989e0d5e9168d6121d8cc6861f21990b31665828e00472544d785d5940ea08a17660c3a6
+  checksum: b49e409431bf129dd89238d64299ba80717b57ff5a6d1c1a8b1a28b590d998a34e083fa13573bc732bb8d2305becb4c9a4407f8486c81fa7d55100eb08263cf8
   languageName: node
   linkType: hard
 
@@ -11247,10 +11247,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"tslib@npm:^2.3.1":
-  version: 2.4.0
-  resolution: "tslib@npm:2.4.0"
-  checksum: 8c4aa6a3c5a754bf76aefc38026134180c053b7bd2f81338cb5e5ebf96fefa0f417bff221592bf801077f5bf990562f6264fecbc42cd3309b33872cb6fc3b113
+"tslib@npm:^2.4.0":
+  version: 2.5.0
+  resolution: "tslib@npm:2.5.0"
+  checksum: ae3ed5f9ce29932d049908ebfdf21b3a003a85653a9a140d614da6b767a93ef94f460e52c3d787f0e4f383546981713f165037dc2274df212ea9f8a4541004e1
   languageName: node
   linkType: hard
 
@@ -11306,30 +11306,40 @@ __metadata:
   languageName: node
   linkType: hard
 
-"typedoc-plugin-markdown@npm:3.14.0":
-  version: 3.14.0
-  resolution: "typedoc-plugin-markdown@npm:3.14.0"
+"typedoc-plugin-markdown@npm:3.15.2":
+  version: 3.15.2
+  resolution: "typedoc-plugin-markdown@npm:3.15.2"
   dependencies:
     handlebars: ^4.7.7
+    typedoc-plugin-mdn-links: ^3.0.3
   peerDependencies:
-    typedoc: ">=0.23.0"
-  checksum: 6205600052185b4b193ab8a253d9df5ccbc95002c948a07f9024bcd26f0f23fbcc089fda4d6b4c8f4172f4eaca2bf9c32129989f6baaace7261cf4a0e41c976b
+    typedoc: ">=0.24.0"
+  checksum: 231b3125498498249385e42fb5c3e24eed20e4fc72678ef3668a69df13ed4f5a7cd0e54610619ead99efb4a266f72c6658946acb83c3ab89bc034278bb8539a0
   languageName: node
   linkType: hard
 
-"typedoc@npm:0.23.28":
-  version: 0.23.28
-  resolution: "typedoc@npm:0.23.28"
+"typedoc-plugin-mdn-links@npm:^3.0.3":
+  version: 3.0.3
+  resolution: "typedoc-plugin-mdn-links@npm:3.0.3"
+  peerDependencies:
+    typedoc: ">= 0.23.14 || 0.24.x"
+  checksum: 1682f8a65e1eff892f5ae0424919007d0673d9abda7c7f401b294fc73d64ce8fc4e1cbb35e5389170a8c48ed57efe6ee81403f870499c62decb016b689fa6522
+  languageName: node
+  linkType: hard
+
+"typedoc@npm:0.24.4":
+  version: 0.24.4
+  resolution: "typedoc@npm:0.24.4"
   dependencies:
     lunr: ^2.3.9
-    marked: ^4.2.12
-    minimatch: ^7.1.3
+    marked: ^4.3.0
+    minimatch: ^9.0.0
     shiki: ^0.14.1
   peerDependencies:
     typescript: 4.6.x || 4.7.x || 4.8.x || 4.9.x || 5.0.x
   bin:
     typedoc: bin/typedoc
-  checksum: 40eb4e207aac1b734e09400cf03f543642cc7b11000895198dd5a0d3166315759ccf4ac30a2915153597c5c186101c72bac2f1fc12b428184a9274d3a0e44c5e
+  checksum: c6762aff2b40eb574fc348c82921471fa1c1dc8a83adc284457aab30ea61768770be469f424340ab646944472653290578fd8e6308d55ec2e611577472067dae
   languageName: node
   linkType: hard
 
