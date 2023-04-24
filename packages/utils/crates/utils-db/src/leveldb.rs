@@ -65,7 +65,7 @@ impl AsyncKVStorage for LevelDbShim {
     async fn set(&mut self, key: Self::Key, value: Self::Value) -> crate::errors::Result<Option<Self::Value>> {
         self.db
             .put(key, value).await
-            .map(|v| None)              // NOTE: The LevelDB API does not allow to return an evicted value
+            .map(|_| None)              // NOTE: The LevelDB API does not allow to return an evicted value
             .map_err(|_| DbError::GenericError("Encountered error on DB put operation".to_string()))
     }
 
@@ -111,7 +111,7 @@ pub async fn db_sanity_test(db: LevelDb) -> Result<bool, JsValue> {
             JsValue::from(JsError::new("Test #1 failed: empty DB should not contain any data")))
     }
 
-    kv_storage.set(key_1.as_bytes().to_vec().into_boxed_slice(), value_1.as_bytes().to_vec().into_boxed_slice()).await;
+    let _ = kv_storage.set(key_1.as_bytes().to_vec().into_boxed_slice(), value_1.as_bytes().to_vec().into_boxed_slice()).await;
     if !kv_storage.contains(key_1.as_bytes().to_vec().into_boxed_slice()).await {
         return Err::<bool, JsValue>(
             JsValue::from(JsError::new("Test #2 failed: DB should contain the key")))
@@ -126,7 +126,7 @@ pub async fn db_sanity_test(db: LevelDb) -> Result<bool, JsValue> {
             JsValue::from(JsError::new("Test #3.1 failed: DB value after get should be equal to the one before the get")))
     }
 
-    kv_storage.remove(key_1.as_bytes().to_vec().into_boxed_slice());
+    let _ = kv_storage.remove(key_1.as_bytes().to_vec().into_boxed_slice());
 
     if !kv_storage.contains(key_1.as_bytes().to_vec().into_boxed_slice()).await {
         return Err::<bool, JsValue>(

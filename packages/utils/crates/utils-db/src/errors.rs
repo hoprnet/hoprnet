@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq)]
 pub enum DbError {
     #[error("failed to dump database into file: {0}")]
     DumpError(String),
