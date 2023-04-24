@@ -56,7 +56,8 @@ import {
   retimer as intervalTimer,
   retryWithBackoffThenThrow,
   type Ticket,
-  iterableToArray
+  iterableToArray,
+  safeCloseConnection
 } from '@hoprnet/hopr-utils'
 
 import { FULL_VERSION, INTERMEDIATE_HOPS, MAX_HOPS, PACKET_SIZE, VERSION, MAX_PARALLEL_PINGS } from './constants.js'
@@ -378,7 +379,7 @@ class Hopr extends EventEmitter {
 
         return false
       },
-      (peer: string) => this.closeConnectionsTo(peerIdFromString(peer)),
+      (peer: string): Promise<void> => this.closeConnectionsTo(peerIdFromString(peer)),
       '',
       this.options.environment.id,
       this.libp2pComponents,
@@ -404,11 +405,9 @@ class Hopr extends EventEmitter {
         for (const connection of this.libp2pComponents.getConnectionManager().getConnections()) {
           if (!(await this.isAllowedAccessToNetwork(connection.remotePeer))) {
             this.coreNetwork.unregister(connection.remotePeer.toString())
-            try {
-              await connection.close()
-            } catch (err) {
+            await safeCloseConnection(connection, this.libp2pComponents, (_err) => {
               error(`error while closing existing connection to ${connection.remotePeer.toString()}`)
-            }
+            })
           }
         }
       }
@@ -425,11 +424,9 @@ class Hopr extends EventEmitter {
             this.coreNetwork.unregister(node.toPeerId())
 
             for (const conn of this.libp2pComponents.getConnectionManager().getConnections(node.toPeerId())) {
-              try {
-                await conn.close()
-              } catch (err) {
+              await safeCloseConnection(conn, this.libp2pComponents, (_err) => {
                 error(`error while closing existing connection to ${conn.remotePeer.toString()}`)
-              }
+              })
             }
           }
         }
@@ -1076,18 +1073,13 @@ class Hopr extends EventEmitter {
    * Similar to `libp2p.hangUp` but catching all errors.
    * @param peer PeerId of the peer from whom we want to disconnect
    */
-  private closeConnectionsTo(peer: PeerId): void {
+  private async closeConnectionsTo(peer: PeerId): Promise<void> {
     const connections = this.libp2pComponents.getConnectionManager().getConnections(peer)
 
     for (const conn of connections) {
-      // Don't block event loop
-      ;(async function () {
-        try {
-          await conn.close()
-        } catch (err: any) {
-          error(`Error while intentionally closing connection to ${peer.toString()}`, err)
-        }
-      })()
+      await safeCloseConnection(conn, this.libp2pComponents, (err) => {
+        error(`Error while intentionally closing connection to ${peer.toString()}`, err)
+      })
     }
   }
 

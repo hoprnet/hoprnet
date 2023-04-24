@@ -132,6 +132,18 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
         this.connectComponents.getRelay().setUsedRelays(relayPeerIds)
       }
 
+      // Hotfix:
+      // Libp2p's addressManager utilizes an internal cache which contradicts
+      // the address upgrade mechanism.
+      // This wipes the cache on address changes.
+      // @ts-ignore
+      this.components.getAddressManager().announce = new Set()
+
+      // Hotfix:
+      // Wipe observed addresses before publishing new DHT records.
+      // @ts-ignore
+      this.components.getAddressManager().observed = new Set()
+
       this.dispatchEvent(new CustomEvent('listening'))
     }.bind(this)
 

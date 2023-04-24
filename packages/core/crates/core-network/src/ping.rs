@@ -236,7 +236,7 @@ impl<API: PingExternalAPI> Ping<API> {
         }
 
         if let Some(metric_time_to_heartbeat) = &self.metric_time_to_heartbeat {
-            metric_time_to_heartbeat.cancel_measure(heartbeat_round_timer.unwrap());
+            metric_time_to_heartbeat.record_measure(heartbeat_round_timer.unwrap());
         };
     }
 
@@ -280,7 +280,7 @@ impl<API: PingExternalAPI> Ping<API> {
             };
 
             if let Some(metric_time_to_ping) = &self.metric_time_to_ping {
-                metric_time_to_ping.cancel_measure(ping_peer_timer.unwrap());
+                metric_time_to_ping.record_measure(ping_peer_timer.unwrap());
             }
 
             match &ping_result {

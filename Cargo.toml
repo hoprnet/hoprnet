@@ -1,7 +1,6 @@
 [workspace]
 
 members = [
-    "packages/connect/crates/connect-relay",
     "packages/core/crates/core-crypto",
     "packages/core/crates/core-misc",
     "packages/core/crates/core-mixer",
