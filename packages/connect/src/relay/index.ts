@@ -33,7 +33,8 @@ import {
   dial,
   DialStatus,
   randomInteger,
-  retimer
+  retimer,
+  safeCloseConnection
 } from '@hoprnet/hopr-utils'
 
 import { handshake } from 'it-handshake'
@@ -268,11 +269,9 @@ class Relay implements Initializable, ConnectInitializable, Startable {
       // Only close the connection to the relay if it does not perform relay services
       // for us.
       if (this.usedRelays.findIndex((usedRelay: PeerId) => usedRelay.equals(relay)) < 0) {
-        try {
-          await response.resp.conn.close()
-        } catch (err) {
+        await safeCloseConnection(response.resp.conn, this.getComponents(), (err) => {
           error(`Error while closing unused connection to relay ${relay.toString()}`, err)
-        }
+        })
       }
       metric_countFailedConnects.increment()
       return

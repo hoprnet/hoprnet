@@ -1,3 +1,5 @@
+import { peerIdFromString } from '@libp2p/peer-id'
+
 /*
  * Add a more usable API on top of LibP2P
  */
@@ -12,7 +14,7 @@ import { type TimeoutOpts } from '../async/index.js'
 import { debug } from '../process/index.js'
 import { createRelayerKey } from './relayCode.js'
 import { createCircuitAddress } from '../network/index.js'
-import { peerIdFromString } from '@libp2p/peer-id'
+import { safeCloseConnection } from './connection.js'
 
 import { TimeoutController } from 'timeout-abort-controller'
 
@@ -146,17 +148,12 @@ export async function tryExistingConnections(
     )
   }
 
-  // Close dead connections later
-  ;(async function () {
-    for (const deadConnection of deadConnections) {
-      // @fixme does that work?
-      try {
-        await deadConnection.close()
-      } catch (err) {
-        error(`Error while closing dead connection`, err)
-      }
-    }
-  })()
+  // Close dead connections
+  for (const deadConnection of deadConnections) {
+    await safeCloseConnection(deadConnection, components, (err) => {
+      error(`Error while closing dead connection`, err)
+    })
+  }
 
   if (stream != undefined) {
     return { conn, ...stream }
@@ -234,11 +231,9 @@ async function establishNewConnection(
   }
 
   if (stream == undefined || errThrown) {
-    try {
-      await conn.close()
-    } catch (err) {
+    await safeCloseConnection(conn, components, (err) => {
       error(`Error while ending obsolete write stream`, err)
-    }
+    })
     return
   }
 
