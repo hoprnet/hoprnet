@@ -790,9 +790,9 @@ pub trait ToChecksum {
 impl ToChecksum for Address {
     fn to_checksum(&self) -> String {
         let address_hex = self.to_hex();
-        let mut hasher = Keccak256::default();
+        let mut hasher = EthDigest::default();
         hasher.update(address_hex.as_bytes());
-        let hash = hasher.finalize_reset();
+        let hash = hasher.finalize();
 
         let mut ret = String::with_capacity(Self::SIZE * 2 + 2);
         ret.push_str("0x");
