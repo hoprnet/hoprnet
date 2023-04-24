@@ -586,44 +586,53 @@ mod tests {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use core_crypto::types::{HalfKeyChallenge, PublicKey};
+    use wasm_bindgen::prelude::wasm_bindgen;
+    use core_crypto::types::{HalfKey, HalfKeyChallenge, PublicKey};
     use core_types::channels::Ticket;
     use crate::packet::{Packet, PacketState};
 
     #[wasm_bindgen]
     impl Packet {
+        #[wasm_bindgen(js_name = "own_key")]
+        pub fn _own_key(&self) -> Option<HalfKey> {
+            match &self.state {
+                PacketState::Forwarded { own_key, .. } => Some(own_key.clone()),
+                PacketState::Outgoing { .. } | PacketState::Final { .. } => None
+            }
+        }
+
+        #[wasm_bindgen(js_name = "ack_challenge")]
         pub fn _ack_challenge(&self) -> Option<HalfKeyChallenge> {
             match &self.state {
-                PacketState::Forwarded { ack_challenge, .. } | PacketState::Outgoing { ack_challenge, .. } => {
-                    Some(ack_challenge.clone())
-                },
+                PacketState::Forwarded { ack_challenge, .. } |
+                PacketState::Outgoing { ack_challenge, .. } => Some(ack_challenge.clone()),
                 PacketState::Final { .. } => None
             }
         }
 
+        #[wasm_bindgen(js_name = "next_hop")]
         pub fn _next_hop(&self) -> Option<PublicKey> {
             match &self.state {
-                PacketState::Forwarded { next_hop, .. } | PacketState::Outgoing { next_hop, .. } => {
-                    Some(next_hop.clone())
-                },
+                PacketState::Forwarded { next_hop, .. } |
+                PacketState::Outgoing { next_hop, .. } => Some(next_hop.clone()),
                 PacketState::Final { .. } => None
             }
         }
 
+        #[wasm_bindgen(js_name = "previous_hop")]
         pub fn _previous_hop(&self) -> Option<PublicKey> {
             match &self.state {
-                PacketState::Final { previous_hop,  .. } | PacketState::Forwarded { previous_hop, .. } => {
-                    Some(previous_hop.clone())
-                }
+                PacketState::Final { previous_hop,  .. } |
+                PacketState::Forwarded { previous_hop, .. } => Some(previous_hop.clone()),
                 PacketState::Outgoing { .. } => None,
             }
         }
 
+        #[wasm_bindgen(js_name = "packet_tag")]
         pub fn _packet_tag(&self) -> Option<Box<[u8]>> {
             match &self.state {
-                PacketState::Final { packet_tag, .. } | PacketState::Forwarded { packet_tag, .. } => {
-                    Some(packet_tag.clone())
-                },
+                PacketState::Final { packet_tag, .. } |
+                PacketState::Forwarded { packet_tag, .. } => Some(packet_tag.clone()),
                 PacketState::Outgoing { .. } => None
             }
         }
