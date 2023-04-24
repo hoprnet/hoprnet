@@ -416,10 +416,12 @@ impl Packet {
         }
     }
 
+    /// State of this packet
     pub fn state(&self) -> &PacketState {
         &self.state
     }
 
+    /// Ticket used to create this packet
     pub fn ticket(&self) -> &Ticket {
         &self.ticket
     }
@@ -577,6 +579,8 @@ mod tests {
                 }
                 PacketState::Outgoing { .. } => panic!("invalid packet state"),
             }
+
+            packet.create_acknowledgement()
         }
     }
 }

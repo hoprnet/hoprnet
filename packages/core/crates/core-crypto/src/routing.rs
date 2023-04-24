@@ -167,13 +167,6 @@ impl RoutingInfo {
         ret.routing_information = (&extended_header[0..header_len]).into();
         ret
     }
-
-    pub fn serialize(&self) -> Box<[u8]> {
-        let mut ret = Vec::<u8>::with_capacity(self.mac.len() + self.routing_information.len());
-        ret.extend_from_slice(&self.routing_information);
-        ret.extend_from_slice(&self.mac);
-        ret.into_boxed_slice()
-    }
 }
 
 /// Enum carry information about the packet based on whether it is destined for the current node (`FinalNode`)
@@ -264,16 +257,6 @@ pub fn forward_header(
         Ok(FinalNode {
             additional_data: (&header[1..1 + additional_data_last_hop_len]).into(),
         })
-    }
-}
-
-impl ForwardedHeader {
-    /// Convenience method to determine if the packet is at its final destination.
-    pub fn is_final(&self) -> bool {
-        match self {
-            RelayNode { .. } => false,
-            FinalNode { .. } => true,
-        }
     }
 }
 
