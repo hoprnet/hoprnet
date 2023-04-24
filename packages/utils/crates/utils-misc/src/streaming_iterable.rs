@@ -9,7 +9,7 @@ use futures::{
 use js_sys::{AsyncIterator, Function, Object, Promise, Reflect, Symbol};
 use pin_project_lite::pin_project;
 use std::{cell::RefCell, rc::Rc};
-use utils_log::{error, info};
+use utils_log::error;
 use wasm_bindgen::{closure::Closure, prelude::*, JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 
@@ -79,7 +79,7 @@ pin_project! {
         // stream iterator
         iter: RefCell<Option<AsyncIterator>>,
         // stream done
-        stream_done: RefCell< bool>,
+        stream_done: RefCell<bool>,
         // next stream chunk
         next: RefCell<Option<JsFuture>>,
         // sink closed promise
@@ -87,11 +87,11 @@ pin_project! {
         // signals that sink `Sink::poll_close` future can proceed
         close_waker: RefCell<Option<Waker>>,
         // signals that sink `Sink::poll_ready` future can proceed
-        waker: RefCell< Option<Waker>>,
+        waker: RefCell<Option<Waker>>,
         // takes sink chunks
-        resolve: RefCell< Option<Function>>,
+        resolve: RefCell<Option<Function>>,
         // true once `poll_close` has been called
-        sink_done: RefCell< bool>,
+        sink_done: RefCell<bool>,
         // the Javascript StreamingIterable object
         js_stream: JsStreamingIterable,
     }
