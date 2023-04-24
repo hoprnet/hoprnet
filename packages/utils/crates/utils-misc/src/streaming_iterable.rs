@@ -8,6 +8,7 @@ use futures::{
 };
 use js_sys::{AsyncIterator, Function, Object, Promise, Reflect, Symbol};
 use pin_project_lite::pin_project;
+use std::{cell::RefCell, rc::Rc};
 use utils_log::{error, info};
 use wasm_bindgen::{closure::Closure, prelude::*, JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
@@ -74,42 +75,50 @@ pin_project! {
     /// Holds a Javascript Streaming Iterable object and
     /// implements Rust `futures::Sink` and `futures::Stream` trait
     #[derive(Debug)]
-    pub struct StreamingIterable {
+    struct StreamingIterableInner {
         // stream iterator
-        iter: Option<AsyncIterator>,
+        iter: RefCell<Option<AsyncIterator>>,
         // stream done
-        stream_done: bool,
+        stream_done: RefCell< bool>,
         // next stream chunk
-        next: Option<JsFuture>,
+        next: RefCell<Option<JsFuture>>,
         // sink closed promise
-        #[pin]
-        sink_close_future: Option<JsFuture>,
+        sink_close_future: RefCell<Option<JsFuture>>,
         // signals that sink `Sink::poll_close` future can proceed
-        close_waker: Option<Waker>,
+        close_waker: RefCell<Option<Waker>>,
         // signals that sink `Sink::poll_ready` future can proceed
-        waker: Option<Waker>,
+        waker: RefCell< Option<Waker>>,
         // takes sink chunks
-        resolve: Option<Function>,
+        resolve: RefCell< Option<Function>>,
         // true once `poll_close` has been called
-        sink_done: bool,
+        sink_done: RefCell< bool>,
         // the Javascript StreamingIterable object
         js_stream: JsStreamingIterable,
     }
 }
 
+pin_project! {
+    #[derive(Debug)]
+    pub struct StreamingIterable {
+        inner: Rc<StreamingIterableInner>
+    }
+}
+
 // Turn this into an arc
 impl From<JsStreamingIterable> for StreamingIterable {
-    fn from(stream: JsStreamingIterable) -> StreamingIterable {
-        StreamingIterable {
-            js_stream: stream,
-            stream_done: false,
-            next: None,
-            iter: None,
-            waker: None,
-            close_waker: None,
-            sink_close_future: None,
-            resolve: None,
-            sink_done: false,
+    fn from(stream: JsStreamingIterable) -> Self {
+        Self {
+            inner: Rc::new(StreamingIterableInner {
+                js_stream: stream,
+                stream_done: RefCell::new(false),
+                next: RefCell::new(None),
+                iter: RefCell::new(None),
+                waker: RefCell::new(None),
+                close_waker: RefCell::new(None),
+                sink_close_future: RefCell::new(None),
+                resolve: RefCell::new(None),
+                sink_done: RefCell::new(false),
+            }),
         }
     }
 }
@@ -117,16 +126,20 @@ impl From<JsStreamingIterable> for StreamingIterable {
 impl Stream for StreamingIterable {
     type Item = Result<Box<[u8]>, String>;
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        info!("poll_next called");
-        if self.stream_done {
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.project();
+
+        if *this.inner.stream_done.borrow() {
             return Poll::Ready(None);
         }
 
-        if self.iter.is_none() {
+        let mut stream_done_mut = this.inner.stream_done.borrow_mut();
+        let mut iter_mut = this.inner.iter.borrow_mut();
+
+        if iter_mut.is_none() {
             let async_sym = Symbol::async_iterator();
 
-            let initial = self.js_stream.source();
+            let initial = this.inner.js_stream.source();
             let async_iter_fn = match Reflect::get(&initial, async_sym.as_ref()) {
                 Ok(x) => x,
                 Err(_) => return Poll::Ready(None),
@@ -135,8 +148,8 @@ impl Stream for StreamingIterable {
             let async_iter_fn: Function = match async_iter_fn.dyn_into() {
                 Ok(fun) => fun,
                 Err(e) => {
-                    info!("error while dynamic conversion to function {:?}", e);
-                    self.stream_done = true;
+                    error!("error while dynamic conversion to function {:?}", e);
+                    *stream_done_mut = true;
                     return Poll::Ready(None);
                 }
             };
@@ -144,24 +157,26 @@ impl Stream for StreamingIterable {
             let async_it: AsyncIterator = match async_iter_fn.call0(&initial).unwrap().dyn_into() {
                 Ok(x) => x,
                 Err(e) => {
-                    info!("error while dynamic conversion to async iterator {:?}", e);
-                    self.stream_done = true;
+                    error!("error while dynamic conversion to async iterator {:?}", e);
+                    *stream_done_mut = true;
                     return Poll::Ready(None);
                 }
             };
 
-            self.iter = Some(async_it);
+            *iter_mut = Some(async_it);
         }
 
-        let future = match self.next.as_mut() {
+        let mut next_mut = this.inner.next.borrow_mut();
+
+        let future = match next_mut.as_mut() {
             Some(val) => val,
-            None => match self.iter.as_ref().unwrap().next().map(JsFuture::from) {
+            None => match iter_mut.as_ref().unwrap().next().map(JsFuture::from) {
                 Ok(val) => {
-                    self.next = Some(val);
-                    self.next.as_mut().unwrap()
+                    *next_mut = Some(val);
+                    next_mut.as_mut().unwrap()
                 }
                 Err(e) => {
-                    self.stream_done = true;
+                    *stream_done_mut = true;
                     return Poll::Ready(Some(Err(format!("{:?}", e))));
                 }
             },
@@ -170,19 +185,18 @@ impl Stream for StreamingIterable {
         match Pin::new(future).poll(cx) {
             Poll::Ready(res) => match res {
                 Ok(iter_next) => {
-                    info!("received low-level {:?}", iter_next);
                     let next = iter_next.unchecked_into::<Uint8ArrayIteratorNext>();
                     if next.done() {
-                        self.stream_done = true;
+                        *stream_done_mut = true;
                         Poll::Ready(None)
                     } else {
-                        self.next.take();
+                        next_mut.take();
 
                         Poll::Ready(Some(Ok(next.value())))
                     }
                 }
                 Err(e) => {
-                    self.stream_done = true;
+                    *stream_done_mut = true;
                     Poll::Ready(Some(Err(format!("{:?}", e))))
                 }
             },
@@ -193,7 +207,7 @@ impl Stream for StreamingIterable {
 
 impl FusedStream for StreamingIterable {
     fn is_terminated(&self) -> bool {
-        self.stream_done
+        *self.inner.stream_done.borrow()
     }
 }
 
@@ -201,27 +215,34 @@ impl Sink<Box<[u8]>> for StreamingIterable {
     type Error = String;
 
     fn poll_ready(self: Pin<&mut StreamingIterable>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        let mut this =
-            unsafe { std::mem::transmute::<Pin<&mut StreamingIterable>, Pin<&mut StreamingIterable>>(self) }.project();
+        let this = self.project();
 
-        *this.waker = Some(cx.waker().clone());
+        {
+            *this.inner.waker.borrow_mut() = Some(cx.waker().clone());
+            // drop mutable borrow here
+        }
 
-        if *this.sink_done {
+        let mut sink_done_mut = this.inner.sink_done.borrow_mut();
+
+        if *sink_done_mut {
             return Poll::Ready(Err("Cannot send any data. Stream has been closed".into()));
         }
 
-        if this.resolve.is_some() {
+        if this.inner.resolve.borrow().is_some() {
             return Poll::Ready(Ok(()));
         }
 
-        if this.sink_close_future.is_none() {
-            let iterator_cb = Closure::new(move || {
+        let mut sink_close_future_mut = this.inner.sink_close_future.borrow_mut();
+
+        if sink_close_future_mut.is_none() {
+            let self_clone = Rc::clone(this.inner);
+            let iterator_cb = Closure::<dyn Fn() -> Promise>::new(move || {
                 Promise::new(&mut |resolve, _reject| {
                     // TODO: use borrow_mut()
-                    *this.resolve = Some(resolve);
-                    if let Some(waker) = this.close_waker.take() {
+                    *self_clone.resolve.borrow_mut() = Some(resolve);
+                    if let Some(waker) = self_clone.close_waker.borrow_mut().take() {
                         waker.wake();
-                    } else if let Some(waker) = this.waker.take() {
+                    } else if let Some(waker) = self_clone.waker.borrow_mut().take() {
                         waker.wake();
                     }
                 })
@@ -259,7 +280,7 @@ impl Sink<Box<[u8]>> for StreamingIterable {
             // Release closure to JS garbage collector
             iterable_fn.forget();
 
-            let promise = match this.js_stream.sink(&iterable_obj) {
+            let promise = match this.inner.js_stream.sink(&iterable_obj) {
                 Ok(x) => {
                     let promise = x.unchecked_into::<Promise>();
 
@@ -270,14 +291,15 @@ impl Sink<Box<[u8]>> for StreamingIterable {
                     todo!();
                 }
             };
-            this.sink_close_future.set(Some(promise));
 
-            return match this.sink_close_future.as_mut().as_pin_mut().unwrap().poll(cx) {
+            *sink_close_future_mut = Some(promise);
+
+            return match Pin::new(&mut sink_close_future_mut.as_mut().unwrap()).poll(cx) {
                 Poll::Pending => Poll::Pending,
                 Poll::Ready(res) => Poll::Ready(match res {
                     Ok(_) => Ok(()),
                     Err(e) => {
-                        *this.sink_done = true;
+                        *sink_done_mut = true;
                         Err(format!("Stream closed due to error {:?}", e).into())
                     }
                 }),
@@ -290,7 +312,7 @@ impl Sink<Box<[u8]>> for StreamingIterable {
     fn start_send(self: Pin<&mut Self>, item: Box<[u8]>) -> Result<(), String> {
         let this = self.project();
 
-        match this.resolve.take() {
+        match this.inner.resolve.borrow_mut().take() {
             Some(f) => match f.call1(&JsValue::undefined(), &to_jsvalue_iterator(Some(item))) {
                 Ok(_) => Ok(()),
                 Err(e) => {
@@ -303,33 +325,37 @@ impl Sink<Box<[u8]>> for StreamingIterable {
     }
 
     fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        let mut this = self.project();
+        let this = self.project();
 
-        if this.sink_close_future.is_none() {
+        let mut sink_close_future_mut = this.inner.sink_close_future.borrow_mut();
+
+        if sink_close_future_mut.is_none() {
             return Poll::Ready(Err("Uninitialized. Please call and `await` poll_ready first.".into()));
         }
 
-        *this.close_waker = Some(cx.waker().clone());
+        *this.inner.close_waker.borrow_mut() = Some(cx.waker().clone());
 
-        if !*this.sink_done {
-            match this.resolve.take() {
+        let mut sink_done_mut = this.inner.sink_done.borrow_mut();
+
+        if !*sink_done_mut {
+            match this.inner.resolve.take() {
                 None => return Poll::Pending,
                 Some(f) => match f.call1(&JsValue::undefined(), &to_jsvalue_iterator(None)) {
                     Ok(_) => {
-                        *this.sink_done = true;
+                        *sink_done_mut = true;
                     }
                     Err(e) => {
                         // We cannot close stream due to some issue in Javascript,
                         // so mark stream closed to prevent subsequent calls
-                        *this.sink_done = true;
+                        *sink_done_mut = true;
                         return Poll::Ready(Err(format!("{:?}", e).into()));
                     }
                 },
             }
         }
 
-        if let Some(fut) = this.sink_close_future.as_mut().as_pin_mut() {
-            return match fut.poll(cx) {
+        if let Some(fut) = sink_close_future_mut.as_mut() {
+            return match Pin::new(fut).poll(cx) {
                 Poll::Ready(_) => Poll::Ready(Ok(())),
                 Poll::Pending => Poll::Pending,
             };
