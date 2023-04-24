@@ -1134,6 +1134,7 @@ dependencies = [
  "thiserror",
  "utils-log",
  "utils-metrics",
+ "utils-misc",
  "utils-types",
  "wasm-bindgen",
  "wasm-bindgen-test",

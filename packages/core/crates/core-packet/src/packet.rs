@@ -64,6 +64,7 @@ struct MetaPacket {
     header_len: usize,
 }
 
+#[allow(dead_code)]
 enum ForwardedMetaPacket {
     RelayedPacket {
         packet: MetaPacket,
@@ -382,28 +383,6 @@ impl Packet {
         }
     }
 
-    /// Forwards the packet to the next hop.
-    /// Requires private key of the local node and prepared ticket for the next recipient.
-    /// Panics if the packet is not meant to be forwarded.
-    pub fn forward(&mut self, private_key: &[u8], next_ticket: Ticket) {
-        match &mut self.state {
-            Forwarded {
-                next_challenge,
-                old_challenge,
-                ack_challenge,
-                ..
-            } => {
-                let mut ticket = next_ticket;
-                ticket.challenge = next_challenge.to_ethereum_challenge();
-                self.ticket = ticket;
-
-                let _ = old_challenge.insert(self.challenge.clone());
-                self.challenge = AcknowledgementChallenge::new(ack_challenge, private_key);
-            }
-            _ => panic!("invalid packet state"),
-        }
-    }
-
     /// State of this packet
     pub fn state(&self) -> &PacketState {
         &self.state
@@ -435,6 +414,28 @@ impl Packet {
                 private_key,
             )),
             Outgoing { .. } => None,
+        }
+    }
+
+    /// Forwards the packet to the next hop.
+    /// Requires private key of the local node and prepared ticket for the next recipient.
+    /// Panics if the packet is not meant to be forwarded.
+    pub fn forward(&mut self, private_key: &[u8], next_ticket: Ticket) {
+        match &mut self.state {
+            Forwarded {
+                next_challenge,
+                old_challenge,
+                ack_challenge,
+                ..
+            } => {
+                let mut ticket = next_ticket;
+                ticket.challenge = next_challenge.to_ethereum_challenge();
+                self.ticket = ticket;
+
+                let _ = old_challenge.insert(self.challenge.clone());
+                self.challenge = AcknowledgementChallenge::new(ack_challenge, private_key);
+            }
+            _ => panic!("invalid packet state"),
         }
     }
 }
@@ -586,13 +587,34 @@ mod tests {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
+    use std::str::FromStr;
+    use js_sys::JsString;
+    use libp2p_identity::{ParseError, PeerId};
     use wasm_bindgen::prelude::wasm_bindgen;
     use core_crypto::types::{HalfKey, HalfKeyChallenge, PublicKey};
     use core_types::channels::Ticket;
+    use utils_misc::ok_or_jserr;
+    use utils_misc::utils::wasm::JsResult;
     use crate::packet::{Packet, PacketState};
 
     #[wasm_bindgen]
     impl Packet {
+        #[wasm_bindgen(constructor)]
+        pub fn _new(msg: &[u8], path: Vec<JsString>, private_key: &[u8], first_ticket: Ticket) -> JsResult<Packet> {
+            let peers = ok_or_jserr!(path
+                .into_iter()
+                .map(|s| PeerId::from_str(&s.as_string().unwrap()))
+                .collect::<Result<Vec<_>, ParseError>>()
+            )?;
+            ok_or_jserr!(Self::new(msg, &peers.iter().collect::<Vec<_>>(), private_key, first_ticket))
+        }
+
+        #[wasm_bindgen(js_name = "deserialize")]
+        pub fn _deserialize(data: &[u8], private_key: &[u8], sender: &str) -> JsResult<Packet> {
+            let sender = ok_or_jserr!(PeerId::from_str(sender))?;
+            ok_or_jserr!(Self::deserialize(data, private_key, &sender))
+        }
+
         #[wasm_bindgen(js_name = "own_key")]
         pub fn _own_key(&self) -> Option<HalfKey> {
             match &self.state {

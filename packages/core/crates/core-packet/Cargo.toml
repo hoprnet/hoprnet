@@ -13,7 +13,7 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 default = ["console_error_panic_hook", "wasm"]
-wasm = ["dep:wasm-bindgen"]
+wasm = ["dep:wasm-bindgen", "dep:js-sys"]
 
 [dependencies]
 core-crypto = { path = "../core-crypto" }
@@ -23,6 +23,7 @@ libp2p-identity = { version = "0.1.1", features = ["secp256k1", "peerid"] }
 thiserror = "1.0"
 utils-log = { path = "../../../utils/crates/utils-log" }
 utils-metrics = { path = "../../../utils/crates/utils-metrics" }
+utils-misc = { path = "../../../utils/crates/utils-misc" }
 utils-types = { path = "../../../utils/crates/utils-types" }
 wasm-bindgen = { workspace = true, optional = true }
 
