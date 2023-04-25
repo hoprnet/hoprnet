@@ -38,7 +38,7 @@
     "@libp2p/peer-id": "1.1.16",
     "@multiformats/multiaddr": "10.3.3",
     "abortable-iterator": "4.0.3",
-    "chalk": "5.0.1",
+    "chalk": "5.2.0",
     "debug": "4.3.4",
     "err-code": "3.0.1",
     "heap-js": "2.2.0",
