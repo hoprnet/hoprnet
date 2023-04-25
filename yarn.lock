@@ -813,7 +813,7 @@ __metadata:
     "@hoprnet/hopr-core-ethereum": "workspace:packages/core-ethereum"
     "@hoprnet/hopr-utils": "workspace:packages/utils"
     "@libp2p/crypto": 1.0.0
-    "@libp2p/interface-content-routing": 1.0.2
+    "@libp2p/interface-content-routing": 2.0.2
     "@libp2p/interface-peer-id": 1.0.5
     "@libp2p/interface-registrar": 1.1.0
     "@libp2p/interfaces": 2.0.4
@@ -1106,14 +1106,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@libp2p/interface-content-routing@npm:1.0.2":
-  version: 1.0.2
-  resolution: "@libp2p/interface-content-routing@npm:1.0.2"
+"@libp2p/interface-content-routing@npm:2.0.2":
+  version: 2.0.2
+  resolution: "@libp2p/interface-content-routing@npm:2.0.2"
   dependencies:
     "@libp2p/interface-peer-info": ^1.0.0
     "@libp2p/interfaces": ^3.0.0
-    multiformats: ^9.6.3
-  checksum: 205ad6165dcf2a8fc1b4d416eca94c667d43acddb40ade756dea77511631e996b66850579e28e421e1929145a053b8d96b0ce9978c252540c2a39b30f50085b6
+    multiformats: ^11.0.0
+  checksum: 25788da76ca13d3c4c4f928a5e6bb8fcfd267c5706eb26e4d37071838eaaff0f14414beb07cc0942907200acff8390d526411f5be0e385ed6d7145d358976ae8
   languageName: node
   linkType: hard
 
@@ -8281,6 +8281,13 @@ __metadata:
   version: 10.0.0
   resolution: "multiformats@npm:10.0.0"
   checksum: f43c317c997a21c138734883a8fc9c05687e691efe5884aa2854688ea43a2135d4b7daec3d14c7e40f0ae38ca51682054908de374f1d2d7e6a4b53d2d1322669
+  languageName: node
+  linkType: hard
+
+"multiformats@npm:^11.0.0":
+  version: 11.0.2
+  resolution: "multiformats@npm:11.0.2"
+  checksum: e587bbe709f29e42ae3c22458c960070269027d962183afc49a83b8ba26c31525e81ce2ac71082a52ba0a75e9aed4d0d044cac68d32656fdcd5cd340fb367fac
   languageName: node
   linkType: hard
 
