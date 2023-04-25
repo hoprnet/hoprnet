@@ -21,7 +21,7 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
     readCurrentNetwork();
     // Halt if ERC1820Registry has not been deployed.
     mustHaveErc1820Registry();
-    emit log_string(string(abi.encodePacked('Deploying in ', currentNetworkName)));
+    emit log_string(string(abi.encodePacked('Deploying in ', currentNetworkId)));
 
     // 2. Get deployer private key
     uint256 deployerPrivateKey = vm.envUint('DEPLOYER_PRIVATE_KEY');
@@ -31,10 +31,9 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
     // 3. Deploy
     // 3.1. HoprToken Contract
     // Only deploy Token contract when no deployed one is detected.
-    // E.g. always in development envirionment, or should a new token contract be introduced in staging/production.
+    // E.g. always in local envirionment, or should a new token contract be introduced in development/staging/production.
     if (
-      currentEnvironmentType == EnvironmentType.DEVELOPMENT ||
-      !isValidAddress(currentNetworkDetail.hoprTokenContractAddress)
+      currentEnvironmentType == EnvironmentType.LOCAL || !isValidAddress(currentNetworkDetail.hoprTokenContractAddress)
     ) {
       // deploy token contract
       currentNetworkDetail.hoprTokenContractAddress = deployCode('HoprToken.sol');
@@ -56,13 +55,13 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
 
     // 3.2. HoprChannels Contract
     // Only deploy Channels contract when no deployed one is detected.
-    // E.g. always in development envirionment, or should a new channel contract be introduced in staging/production per meta environment.
+    // E.g. always in local envirionment, or should a new channel contract be introduced in development/staging/production per meta environment.
     if (
-      currentEnvironmentType == EnvironmentType.DEVELOPMENT ||
+      currentEnvironmentType == EnvironmentType.LOCAL ||
       !isValidAddress(currentNetworkDetail.hoprChannelsContractAddress)
     ) {
       // deploy channels contract
-      uint256 closure = currentEnvironmentType == EnvironmentType.DEVELOPMENT ? 15 : 5 * 60;
+      uint256 closure = currentEnvironmentType == EnvironmentType.LOCAL ? 15 : 5 * 60;
       currentNetworkDetail.hoprChannelsContractAddress = deployCode(
         'HoprChannels.sol',
         abi.encode(currentNetworkDetail.hoprTokenContractAddress, closure)
@@ -72,9 +71,9 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
 
     // 3.3. xHoprToken Contract
     // Only deploy Token contract when no deployed one is detected.
-    // E.g. always in development envirionment, or should a new token contract be introduced in staging.
+    // E.g. always in local envirionment, or should a new token contract be introduced in development/staging.
     // Production contract should remain 0xD057604A14982FE8D88c5fC25Aac3267eA142a08 TODO: Consider force check on this address
-    if (currentEnvironmentType == EnvironmentType.DEVELOPMENT) {
+    if (currentEnvironmentType == EnvironmentType.LOCAL) {
       // Use the same contract address as in production (HOPR token on xDAI)
       currentNetworkDetail.xhoprTokenContractAddress = 0xD057604A14982FE8D88c5fC25Aac3267eA142a08;
       // set deployed code of permittable token to the address. Set owner and bridge contract of the permittable token
@@ -99,11 +98,10 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
 
     // 3.4. HoprBoost Contract
     // Only deploy Boost contract when no deployed one is detected.
-    // E.g. always in development envirionment, or should a new token contract be introduced in staging.
+    // E.g. always in local envirionment, or should a new token contract be introduced in development/staging.
     // Production contract should remain 0x43d13D7B83607F14335cF2cB75E87dA369D056c7 TODO: Consider force check on this address
     if (
-      currentEnvironmentType == EnvironmentType.DEVELOPMENT ||
-      !isValidAddress(currentNetworkDetail.hoprBoostContractAddress)
+      currentEnvironmentType == EnvironmentType.LOCAL || !isValidAddress(currentNetworkDetail.hoprBoostContractAddress)
     ) {
       // deploy boost contract
       currentNetworkDetail.hoprBoostContractAddress = deployCode('HoprBoost.sol', abi.encode(deployerAddress, ''));
@@ -111,11 +109,8 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
 
     // 3.5. HoprStake Contract
     // Only deply HoprStake contract (of the latest season) when no deployed one is detected.
-    // E.g. always in development environment, or should a new stake contract be introduced in staging.
-    if (
-      currentEnvironmentType == EnvironmentType.DEVELOPMENT ||
-      !isValidAddress(currentNetworkDetail.stakeContractAddress)
-    ) {
+    // E.g. always in local environment, or should a new stake contract be introduced in development/staging.
+    if (currentEnvironmentType == EnvironmentType.LOCAL || !isValidAddress(currentNetworkDetail.stakeContractAddress)) {
       // build the staking season artifact name, based on the stake season number specified in the contract-addresses.json
       string memory stakeArtifactName = string(
         abi.encodePacked('HoprStakeSeason', vm.toString(currentNetworkDetail.stakeSeason), '.sol')
@@ -134,9 +129,9 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
 
     // 3.6. NetworkRegistryProxy Contract
     // Only deploy NetworkRegistryProxy contract when no deployed one is detected.
-    // E.g. Always in development environment, or should a new NetworkRegistryProxy contract be introduced in staging/production
-    if (currentEnvironmentType == EnvironmentType.DEVELOPMENT) {
-      // deploy DummyProxy in DEVELOPMENT envirionment
+    // E.g. Always in local environment, or should a new NetworkRegistryProxy contract be introduced in development/staging/production
+    if (currentEnvironmentType == EnvironmentType.LOCAL) {
+      // deploy DummyProxy in LOCAL envirionment
       currentNetworkDetail.networkRegistryProxyContractAddress = deployCode(
         'HoprDummyProxyForNetworkRegistry.sol',
         abi.encode(deployerAddress)
@@ -203,9 +198,9 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
 
     // 3.7. NetworkRegistry Contract
     // Only deploy NetworkRegistrycontract when no deployed one is detected.
-    // E.g. Always in development environment, or should a new NetworkRegistryProxy contract be introduced in staging/production
+    // E.g. Always in local environment, or should a new NetworkRegistryProxy contract be introduced in development/staging/production
     if (
-      currentEnvironmentType == EnvironmentType.DEVELOPMENT ||
+      currentEnvironmentType == EnvironmentType.LOCAL ||
       !isValidAddress(currentNetworkDetail.networkRegistryContractAddress)
     ) {
       // deploy NetworkRegistry contract
@@ -214,7 +209,7 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
         abi.encode(currentNetworkDetail.networkRegistryProxyContractAddress, deployerAddress)
       );
       // NetworkRegistry should be enabled (default behavior) in staging/production, and disabled in development
-      if (currentEnvironmentType == EnvironmentType.DEVELOPMENT) {
+      if (currentEnvironmentType == EnvironmentType.LOCAL) {
         (bool successDisableRegistry, ) = currentNetworkDetail.networkRegistryContractAddress.call(
           abi.encodeWithSignature('disableRegistry()')
         );
@@ -259,7 +254,7 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
       }
     }
 
-    // 4. Batch mint Network_registry NFTs in development/staging envirionment
+    // 4. Batch mint Network_registry NFTs in local/development/staging envirionment
     // Ensure a "Network_registry" boost type is at the index 26. If not, mint dummy proxies (E.g. "Dummy_1") until index 25 and "Network_registry" at 26
     (bool existAtNetworkRegistryIndex, string memory nameOrError) = currentNetworkDetail
       .hoprBoostContractAddress

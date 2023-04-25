@@ -16,6 +16,7 @@ pub enum EnvironmentType {
     Production,
     Staging,
     Development,
+    Local,
 }
 
 impl ToString for EnvironmentType {
@@ -24,6 +25,7 @@ impl ToString for EnvironmentType {
             Self::Production => "production".into(),
             Self::Staging => "staging".into(),
             Self::Development => "development".into(),
+            Self::Local => "local".into(),
         }
     }
 }

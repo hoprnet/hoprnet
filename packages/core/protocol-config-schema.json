@@ -12,7 +12,7 @@
             },
             "environment_type": {
               "type": "string",
-              "enum": ["production", "staging", "development"]
+              "enum": ["production", "staging", "development", "local"]
             },
             "version_range": {
               "type": "string",

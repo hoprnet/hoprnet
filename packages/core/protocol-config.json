@@ -2,7 +2,7 @@
   "networks": {
     "anvil-localhost": {
       "chain": "anvil",
-      "environment_type": "development",
+      "environment_type": "local",
       "version_range": "*",
       "indexer_start_block_number": 2,
       "token_contract_address": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
@@ -16,7 +16,7 @@
     },
     "anvil-localhost2": {
       "chain": "anvil",
-      "environment_type": "development",
+      "environment_type": "local",
       "version_range": "*",
       "indexer_start_block_number": 3,
       "token_contract_address": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
@@ -30,7 +30,7 @@
     },
     "master-staging": {
       "chain": "xdai",
-      "environment_type": "staging",
+      "environment_type": "development",
       "version_range": "*",
       "indexer_start_block_number": 26356392,
       "token_contract_address": "0xf1aDf07D0d4e1beFdDe79066771d057337e55c08",

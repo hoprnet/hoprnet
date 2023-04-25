@@ -97,7 +97,7 @@ endif
 	DEBUG= CI=true yarn workspaces focus ${YARNFLAGS}
 
 .PHONY: deps
-deps: ## Installs dependencies for development setup
+deps: ## Installs dependencies for local setup
 	if [[ ! "${name}" =~ nix-shell* ]]; then \
 		corepack enable; \
 		command -v rustup && rustup update || echo "No rustup installed, ignoring"; \

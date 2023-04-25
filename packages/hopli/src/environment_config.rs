@@ -11,6 +11,8 @@ pub enum EnvironmentType {
     Staging,
     /// Development environment, on Gnosis chain
     Development,
+    /// Local environment, on anvil-localhost
+    Local,
 }
 
 impl fmt::Display for EnvironmentType {
@@ -19,6 +21,7 @@ impl fmt::Display for EnvironmentType {
             Self::Production => write!(f, "production"),
             Self::Staging => write!(f, "staging"),
             Self::Development => write!(f, "development"),
+            Self::Local => write!(f, "local"),
         }
     }
 }
@@ -120,7 +123,7 @@ mod tests {
             .join("ethereum")
             .join("contracts");
         let network_id = "anvil-localhost";
-        let environment_type = "development";
+        let environment_type = "local";
         match ensure_environment_and_network_are_set(correct_dir, network_id, environment_type) {
             Ok(result) => assert_eq!(result, true),
             _ => assert!(false),
@@ -131,7 +134,7 @@ mod tests {
     fn read_anvil_localhost_at_wrong_path() {
         let wrong_dir = &std::env::current_dir().unwrap();
         let network_id = "anvil-localhost";
-        let environment_type = "development";
+        let environment_type = "local";
         let result = std::panic::catch_unwind(|| {
             ensure_environment_and_network_are_set(wrong_dir, network_id, environment_type)
         });

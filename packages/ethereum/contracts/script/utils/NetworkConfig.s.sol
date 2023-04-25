@@ -11,6 +11,7 @@ contract NetworkConfig is Script {
   using stdJson for string;
 
   enum EnvironmentType {
+    LOCAL,
     DEVELOPMENT,
     STAGING,
     PRODUCTION
@@ -42,7 +43,7 @@ contract NetworkConfig is Script {
   bytes32 constant MINTER_ROLE = keccak256('MINTER_ROLE');
   address constant DEV_BANK_ADDRESS = 0x2402da10A6172ED018AEEa22CA60EDe1F766655C;
 
-  string public currentNetworkName;
+  string public currentNetworkId;
   EnvironmentType public currentEnvironmentType;
   NetworkDetail public currentNetworkDetail;
 
@@ -51,7 +52,7 @@ contract NetworkConfig is Script {
   function getNetwork() public {
     // get envirionment of the script
     string memory profile = vm.envString('FOUNDRY_PROFILE');
-    currentNetworkName = vm.envString('NETWORK_ID');
+    currentNetworkId = vm.envString('NETWORK_ID');
     currentEnvironmentType = parseEnvironmentTypeFromString(profile);
   }
 
@@ -96,7 +97,7 @@ contract NetworkConfig is Script {
   }
 
   function readCurrentNetwork() internal {
-    currentNetworkDetail = readNetwork(currentNetworkName);
+    currentNetworkDetail = readNetwork(currentNetworkId);
   }
 
   function writeNetwork(string memory _networkName, NetworkDetail memory networkDetail) internal {
@@ -110,11 +111,11 @@ contract NetworkConfig is Script {
   }
 
   function writeCurrentNetwork() internal {
-    // if currentNetworkName is anvil-localhost, update both `anvil-localhost` and `anvil-localhost2`
-    if (keccak256(bytes(currentNetworkName)) == keccak256(bytes('anvil-localhost'))) {
+    // if currentNetworkId is anvil-localhost, update both `anvil-localhost` and `anvil-localhost2`
+    if (keccak256(bytes(currentNetworkId)) == keccak256(bytes('anvil-localhost'))) {
       writeNetwork('anvil-localhost2', currentNetworkDetail);
     }
-    writeNetwork(currentNetworkName, currentNetworkDetail);
+    writeNetwork(currentNetworkId, currentNetworkDetail);
   }
 
   // FIXME: remove this temporary method
@@ -190,8 +191,10 @@ contract NetworkConfig is Script {
       return EnvironmentType.PRODUCTION;
     } else if (keccak256(bytes(environmentType)) == keccak256(bytes('staging'))) {
       return EnvironmentType.STAGING;
-    } else {
+    } else if (keccak256(bytes(environmentType)) == keccak256(bytes('development'))) {
       return EnvironmentType.DEVELOPMENT;
+    } else {
+      return EnvironmentType.LOCAL;
     }
   }
 
@@ -200,8 +203,10 @@ contract NetworkConfig is Script {
       return 'production';
     } else if (environmentType == EnvironmentType.STAGING) {
       return 'staging';
-    } else {
+    } else if (environmentType == EnvironmentType.DEVELOPMENT) {
       return 'development';
+    } else {
+      return 'local';
     }
   }
 

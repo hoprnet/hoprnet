@@ -16,7 +16,7 @@ export {
   type Network
 } from '../lib/core_misc.js'
 
-export type EnvironmentType = 'production' | 'staging' | 'development'
+export type EnvironmentType = 'production' | 'staging' | 'development' | 'local'
 
 export type ProtocolConfig = {
   networks: {
