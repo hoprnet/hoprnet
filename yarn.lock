@@ -886,7 +886,7 @@ __metadata:
     "@types/mocha": 9.1.1
     abortable-iterator: 4.0.3
     bignumber.js: 9.0.2
-    bl: 5.0.0
+    bl: 5.1.0
     bn.js: 5.2.1
     chai: 4.3.7
     chalk: 5.2.0
@@ -2884,14 +2884,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"bl@npm:5.0.0":
-  version: 5.0.0
-  resolution: "bl@npm:5.0.0"
+"bl@npm:5.1.0":
+  version: 5.1.0
+  resolution: "bl@npm:5.1.0"
   dependencies:
     buffer: ^6.0.3
     inherits: ^2.0.4
     readable-stream: ^3.4.0
-  checksum: 5dbbcf9cbcf55221dc21f48968bc8cd6d78faea3c653d496ff8e0c382b95e8b6c4b9e818fe67de2f97ed0cd0c219c350ccce42aca91be33e0ad12e698c615061
+  checksum: a7a438ee0bc540e80b8eb68cc1ad759a9c87df06874a99411d701d01cc0b36f30cd20050512ac3e77090138890960e07bfee724f3ee6619bb39a569f5cc3b1bc
   languageName: node
   linkType: hard
 
