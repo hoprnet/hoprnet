@@ -266,14 +266,14 @@ describe(`database tests`, function () {
   })
 
   it('should store environment', async function () {
-    await db.setEnvironmentId('test-env')
-    assert.equal(await db.getEnvironmentId(), 'test-env')
+    await db.setNetworkId('test-env')
+    assert.equal(await db.getNetworkId(), 'test-env')
   })
 
   it('should verify environment', async function () {
-    await db.setEnvironmentId('test-env')
-    assert((await db.verifyEnvironmentId('wrong-id')) === false, `must fail for wrong id`)
-    assert((await db.verifyEnvironmentId('test-env')) === true, `must not fail for correct id`)
+    await db.setNetworkId('test-env')
+    assert((await db.verifyNetworkId('wrong-id')) === false, `must fail for wrong id`)
+    assert((await db.verifyNetworkId('test-env')) === true, `must not fail for correct id`)
   })
 
   it('should store hopr balance', async function () {

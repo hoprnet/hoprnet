@@ -106,7 +106,7 @@ const LOSING_TICKET_COUNT = encoder.encode('statistics:losing:count')
 const NEGLECTED_TICKET_COUNT = encoder.encode('statistics:neglected:count')
 const REJECTED_TICKETS_COUNT = encoder.encode('statistics:rejected:count')
 const REJECTED_TICKETS_VALUE = encoder.encode('statistics:rejected:value')
-const ENVIRONMENT_KEY = encoder.encode('environment_id')
+const NETWORK_KEY = encoder.encode('network_id')
 const HOPR_BALANCE_KEY = encoder.encode('hopr-balance')
 
 enum PendingAcknowledgementPrefix {
@@ -196,12 +196,12 @@ export class HoprDB {
     log(`namespacing db by public key: ${this.id.toCompressedPubKeyHex()}`)
     if (setEnvironment) {
       log(`setting network id ${networkName} to db`)
-      await this.setEnvironmentId(networkName)
+      await this.setNetworkId(networkName)
     } else {
-      const hasEnvironmentKey = await this.verifyEnvironmentId(networkName)
+      const hasEnvironmentKey = await this.verifyNetworkId(networkName)
 
       if (!hasEnvironmentKey) {
-        const storedId = await this.getEnvironmentId()
+        const storedId = await this.getNetworkId()
 
         throw new Error(`invalid db network id: ${storedId} (expected: ${networkName})`)
       }
@@ -852,16 +852,16 @@ export class HoprDB {
     }
   }
 
-  public async setEnvironmentId(environment_id: string): Promise<void> {
-    await this.put(ENVIRONMENT_KEY, encoder.encode(environment_id))
+  public async setNetworkId(network_id: string): Promise<void> {
+    await this.put(NETWORK_KEY, encoder.encode(network_id))
   }
 
-  public async getEnvironmentId(): Promise<string> {
-    return decoder.decode(await this.maybeGet(ENVIRONMENT_KEY))
+  public async getNetworkId(): Promise<string> {
+    return decoder.decode(await this.maybeGet(NETWORK_KEY))
   }
 
-  public async verifyEnvironmentId(expectedId: string): Promise<boolean> {
-    const storedId = await this.getEnvironmentId()
+  public async verifyNetworkId(expectedId: string): Promise<boolean> {
+    const storedId = await this.getNetworkId()
 
     if (storedId == undefined) {
       return false
