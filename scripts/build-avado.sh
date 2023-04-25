@@ -82,7 +82,7 @@ function cleanup {
 }
 
 # For master and debug-deploy builds, we need to use special upstream version, since we do not publish 0.100.0 Docker tag
-if [[ "${avado_version}" = "0.100.0" && ("${release_id}" = "master-staging" || "${release_id}" = "debug-staging") ]]; then
+if [[ "${avado_version}" = "0.100.0" && ("${release_id}" = "master" || "${release_id}" = "debug-staging") ]]; then
   upstream_version="${release_id}"
 fi
 

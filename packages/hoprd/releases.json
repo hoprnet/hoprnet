@@ -1,7 +1,7 @@
 {
-  "master-staging": {
+  "master": {
     "git_ref": "^master$",
-    "network_id": "master-staging"
+    "network_id": "master"
   },
   "valencia": {
     "git_ref": "^(release|staging)/valencia$",
@@ -33,6 +33,6 @@
   },
   "integration-test": {
     "git_ref": "^integration/.*",
-    "network_id": "master-staging"
+    "network_id": "master"
   }
 }

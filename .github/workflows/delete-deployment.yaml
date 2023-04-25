@@ -44,7 +44,7 @@ jobs:
         run: |
           prBase="${{ github.event.pull_request.base.ref }}"
           # The identification of the environment will be made once https://github.com/hoprnet/hoprnet/issues/4835 is finished
-          network=master-staging
+          network=master
           echo "NETWORK=${network}" >> $GITHUB_ENV
           echo "NETWORK_DASH=${network/_/-}" >> $GITHUB_ENV
           echo git checkout -b undeployments/${network/_/-}-pr-${{ github.event.pull_request.number }}
