@@ -57,7 +57,9 @@ import {
   retryWithBackoffThenThrow,
   type Ticket,
   iterableToArray,
-  safeCloseConnection
+  safeCloseConnection,
+  pickVersion,
+  dial // hoprs dialing method
 } from '@hoprnet/hopr-utils'
 
 import { FULL_VERSION, INTERMEDIATE_HOPS, MAX_HOPS, PACKET_SIZE, VERSION, MAX_PARALLEL_PINGS } from './constants.js'
@@ -97,8 +99,10 @@ import { createLibp2pInstance } from './main.js'
 import type { EventEmitter as Libp2pEmitter } from '@libp2p/interfaces/events'
 import { utils as ethersUtils } from 'ethers/lib/ethers.js'
 import { peerIdFromString } from '@libp2p/peer-id'
+import pkg from '../package.json' assert { type: 'json' }
 
 const CODE_P2P = protocols('p2p').code
+const NORMALIZED_VERSION = pickVersion(pkg.version)
 
 const DEBUG_PREFIX = `hopr-core`
 const log = debug(DEBUG_PREFIX)
@@ -380,10 +384,10 @@ class Hopr extends EventEmitter {
         return false
       },
       (peer: string): Promise<void> => this.closeConnectionsTo(peerIdFromString(peer)),
-      '',
+      NORMALIZED_VERSION,
       this.options.environment.id,
       this.libp2pComponents,
-      sendMessage,
+      dial,
       MAX_PARALLEL_PINGS,
       this.options.heartbeatVariance,
       this.options.heartbeatInterval,
