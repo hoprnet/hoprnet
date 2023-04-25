@@ -558,6 +558,8 @@ pub mod wasm {
         }
 
         #[wasm_bindgen(js_name = "to_hex")]
-        pub fn _to_hex(&self) -> String { self.to_hex() }
+        pub fn _to_hex(&self) -> String {
+            self.to_hex()
+        }
     }
 }

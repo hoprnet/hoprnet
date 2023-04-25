@@ -823,7 +823,9 @@ pub mod tests {
     use utils_types::primitives::Address;
     use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
 
-    use crate::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, Hash, PublicKey, Response, Signature, ToChecksum};
+    use crate::types::{
+        Challenge, CurvePoint, HalfKey, HalfKeyChallenge, Hash, PublicKey, Response, Signature, ToChecksum,
+    };
 
     const PUBLIC_KEY: [u8; 33] = hex!("021464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8");
     const PRIVATE_KEY: [u8; 32] = hex!("e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8");
