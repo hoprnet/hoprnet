@@ -434,8 +434,8 @@ impl CliArgs {
         let mut env_arg = Arg::new("network")
             .long("network")
             .required(true)
-            .env("HOPRD_ENVIRONMENT")
-            .value_name("ENVIRONMENT")
+            .env("HOPRD_NETWORK")
+            .value_name("NETWORK")
             .help("Network id which the node shall run on")
             .value_parser(PossibleValuesParser::new(envs.iter().map(|e| e.id.to_owned())));
 

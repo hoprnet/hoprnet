@@ -111,7 +111,7 @@ gcloud_cleanup_docker_images() {
 
 # $1 - template name
 # $2 - container image
-# $3 - optional: environment id
+# $3 - optional: network id
 # $4 - optional: api token
 # $5 - optional: password
 # $6 - optional: announce
@@ -119,7 +119,7 @@ gcloud_cleanup_docker_images() {
 gcloud_create_instance_template() {
   local name="${1}"
   local image="${2}"
-  local environment_id="${3:-}"
+  local network_id="${3:-}"
   # these parameters are only used by hoprd nodes
   local api_token="${4:-}"
   local password="${5:-}"
@@ -149,9 +149,9 @@ gcloud_create_instance_template() {
     metadata_value="${metadata_value},HOPRD_API_TOKEN=${api_token}"
   fi
 
-  # the environment is optional, since each docker image has a default environment set
-  if [ -n "${environment_id}" ]; then
-    metadata_value="${metadata_value},HOPRD_ENVIRONMENT_ID=${environment_id}"
+  # the network is optional, since each docker image has a default network set
+  if [ -n "${network_id}" ]; then
+    metadata_value="${metadata_value},HOPRD_NETWORK_ID=${network_id}"
   fi
 
   if [ -n "${private_key}" ]; then

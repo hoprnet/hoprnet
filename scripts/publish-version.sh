@@ -33,7 +33,7 @@ cleanup() {
   # supposed to interfer with workspaces according to https://yarnpkg.com/configuration/manifest#resolutions
   git restore packages/hoprd/package.json
 
-  # delete default environments
+  # delete default networks
   rm -f \
     "${mydir}/../packages/hoprd/default-network.json"
 }
@@ -80,8 +80,8 @@ fi
 
 log "get default network id"
 
-declare environment_id
-environment_id="$("${mydir}/get-default-network.sh")"
+declare network_id
+network_id="$("${mydir}/get-default-network.sh")"
 
 log "using version template ${current_version} + ${version_type}"
 declare new_version
@@ -133,8 +133,8 @@ if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
   trap cleanup SIGINT SIGTERM ERR
 
   # set default networks
-  log "adding default network ${environment_id} to hoprd package"
-  echo "{\"id\": \"${environment_id}\"}" > "${mydir}/../packages/hoprd/default-network.json"
+  log "adding default network ${network_id} to hoprd package"
+  echo "{\"id\": \"${network_id}\"}" > "${mydir}/../packages/hoprd/default-network.json"
 
   # special treatment for end-of-chain packages
   # to create lockfiles with resolution overrides
