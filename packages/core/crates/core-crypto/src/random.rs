@@ -12,6 +12,7 @@ use crate::types::CurvePoint;
 pub const MAX_RANDOM_INTEGER: u64 = 9007199254740991;
 
 /// Generates a random float uniformly distributed between 0 (inclusive) and 1 (exclusive).
+#[inline]
 pub fn random_float() -> f64 {
     OsRng.gen()
 }
@@ -45,6 +46,7 @@ pub fn random_group_element() -> (Box<[u8]>, CurvePoint) {
 }
 
 /// Fills the specific number of bytes starting from the given offset in the given buffer.
+#[inline]
 pub fn random_fill(buffer: &mut [u8]) {
     OsRng.fill_bytes(buffer);
 }
@@ -74,7 +76,7 @@ mod tests {
     #[test]
     fn test_random_float() {
         let f = random_float();
-        assert!(f >= 0.0 && f < 1.0);
+        assert!((0.0..1.0).contains(&f));
     }
 
     #[test]

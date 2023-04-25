@@ -200,7 +200,7 @@ impl Default for HalfKey {
             hkey: [0u8; Self::SIZE],
         };
         ret.hkey.copy_from_slice(
-            &NonZeroScalar::<Secp256k1>::from_uint(1u16.into())
+            NonZeroScalar::<Secp256k1>::from_uint(1u16.into())
                 .unwrap()
                 .to_bytes()
                 .as_slice(),
@@ -378,7 +378,7 @@ impl Hash {
     /// Uses the Keccak256 digest.
     pub fn create(inputs: &[&[u8]]) -> Self {
         let mut hash = EthDigest::default();
-        inputs.into_iter().for_each(|v| hash.update(*v));
+        inputs.iter().for_each(|v| hash.update(v));
         let mut ret = Hash {
             hash: [0u8; Self::SIZE],
         };
@@ -601,7 +601,7 @@ impl Default for Response {
             response: [0u8; Self::SIZE],
         };
         ret.response.copy_from_slice(
-            &NonZeroScalar::<Secp256k1>::from_uint(1u16.into())
+            NonZeroScalar::<Secp256k1>::from_uint(1u16.into())
                 .unwrap()
                 .to_bytes()
                 .as_slice(),
