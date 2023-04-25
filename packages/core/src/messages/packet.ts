@@ -1,23 +1,23 @@
 import {
-  UnacknowledgedTicket,
   HoprDB,
-  pubKeyToPeerId,
   PRICE_PER_PACKET,
   INVERSE_TICKET_WIN_PROB,
   create_counter, UINT256,
   PublicKey as TsPublicKey,
   Address as TsAddress,
   Balance as TsBalance,
+  ChannelEntry as TsChannelEntry,
 } from '@hoprnet/hopr-utils'
 import type { Hash } from '@hoprnet/hopr-utils'
-import { AcknowledgementChallenge } from './acknowledgementChallenge.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { Acknowledgement } from './acknowledgement.js'
 import { debug } from '@hoprnet/hopr-utils'
 import { keysPBM } from '@libp2p/crypto/keys'
 
-import { Ticket, Balance, BalanceType, ChannelStatus, ChannelEntry, PublicKey, Packet as RustPacket, U256 } from '../../lib/core_packet.js'
+import { Ticket, Balance, BalanceType, ChannelStatus, ChannelEntry, PublicKey, Packet as RustPacket, U256, UnacknowledgedTicket } from '../../lib/core_packet.js'
 import { WasmPacketState } from '../../crates/core-packet/pkg/core_packet.js'
+import { peerIdFromString } from '@libp2p/peer-id'
+import { deserialize } from 'v8'
 
 const log = debug('hopr-core:message:packet')
 
@@ -44,10 +44,11 @@ async function bumpTicketIndex(channelId: Hash, db: HoprDB): Promise<U256> {
  * @dev Due to a missing feature, namely ECMUL, in Ethereum, the
  * challenge is given as an Ethereum address because the signature
  * recovery algorithm is used to perform an EC-point multiplication.
- * @param amount value of the ticket
- * @param challenge challenge to solve in order to redeem the ticket
- * @param winProb the winning probability to use
  * @returns a signed ticket
+ * @param dest
+ * @param pathLength
+ * @param db
+ * @param privKey
  */
 export async function createTicket(
   dest: PublicKey,
@@ -243,19 +244,19 @@ export class Packet {
       throw Error(`Invalid state`)
     }
 
-    const unacknowledged = new UnacknowledgedTicket(this.ticket, this.ownKey, this.previousHop)
+    const unacknowledged = new UnacknowledgedTicket(this.inner.ticket, this.inner.own_key(), this.inner.previous_hop())
 
     log(
-      `Storing unacknowledged ticket. Expecting to receive a preImage for ${this.ackChallenge.toHex()} from ${pubKeyToPeerId(
-        this.nextHop
-      ).toString()}`
+      `Storing unacknowledged ticket. Expecting to receive a preImage for ${this.inner.ack_challenge().to_hex()} from ${
+        this.inner.next_hop().to_peerid_str()
+      }`
     )
 
-    await db.storePendingAcknowledgement(this.ackChallenge, false, unacknowledged)
+    await db.storePendingAcknowledgement(this.inner.ack_challenge(), false, unacknowledged)
   }
 
   async storePendingAcknowledgement(db: HoprDB) {
-    await db.storePendingAcknowledgement(this.ackChallenge, true)
+    await db.storePendingAcknowledgement(this.inner.ack_challenge(), true)
   }
 
   async validateUnacknowledgedTicket(db: HoprDB, checkUnrealizedBalance: boolean) {
@@ -263,15 +264,16 @@ export class Packet {
       throw Error('packet must have previous hop - cannot be outgoing')
     }
 
-    const channel = await db.getChannelFrom(this.previousHop)
+    const channel = await db.getChannelFrom(TsPublicKey.deserialize(this.inner.previous_hop().serialize(false)))
+
 
     try {
       await validateUnacknowledgedTicket(
-        this.previousHop.toPeerId(),
-        PRICE_PER_PACKET,
-        INVERSE_TICKET_WIN_PROB,
-        this.ticket,
-        channel,
+        peerIdFromString(this.inner.previous_hop().to_peerid_str()),
+        new Balance(PRICE_PER_PACKET.toString(), BalanceType.HOPR),
+        new U256(INVERSE_TICKET_WIN_PROB.toString()),
+        this.inner.ticket,
+        ChannelEntry.deserialize(channel.serialize()),
         () =>
           db.getTickets({
             signer: this.previousHop
@@ -279,12 +281,12 @@ export class Packet {
         checkUnrealizedBalance
       )
     } catch (e) {
-      log(`mark ticket as rejected`, this.ticket.toString())
-      await db.markRejected(this.ticket)
+      log(`mark ticket as rejected`, this.inner.ticket.to_hex())
+      await db.markRejected(this.inner.ticket)
       throw e
     }
 
-    await db.setCurrentTicketIndex(channel.getId().hash(), this.ticket.index)
+    await db.setCurrentTicketIndex(channel.getId().hash(), this.inner.ticket.index)
   }
 
   createAcknowledgement(privKey: PeerId) {
@@ -293,9 +295,7 @@ export class Packet {
     }
 
     let private_key = keysPBM.PrivateKey.decode(privKey.privateKey).Data
-    this.inner.create_acknowledgement(private_key)
-
-    return Acknowledgement.create(this.oldChallenge ?? this.challenge, this.ackKey, privKey)
+    return this.inner.create_acknowledgement(private_key)
   }
 
   async forwardTransform(privKey: PeerId, db: HoprDB): Promise<void> {

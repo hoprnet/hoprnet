@@ -96,7 +96,7 @@ impl BinarySerializable<'_> for ChannelEntry {
 
     fn deserialize(data: &[u8]) -> Result<Self> {
         if data.len() == Self::SIZE {
-            let mut b = Vec::from(data);
+            let mut b = data.to_vec();
             let source = PublicKey::deserialize(b.drain(0..PublicKey::SIZE_UNCOMPRESSED).as_ref())?;
             let destination = PublicKey::deserialize(b.drain(0..PublicKey::SIZE_UNCOMPRESSED).as_ref())?;
             let balance = Balance::deserialize(b.drain(0..Balance::SIZE).as_ref(), BalanceType::HOPR)?;
@@ -330,7 +330,7 @@ impl BinarySerializable<'_> for Ticket {
 
     fn deserialize(data: &[u8]) -> Result<Self> {
         if data.len() == Self::SIZE {
-            let mut b = Vec::from(data);
+            let mut b = data.to_vec();
             let counterparty = Address::deserialize(b.drain(0..Address::SIZE).as_ref())?;
             let challenge = EthereumChallenge::deserialize(b.drain(0..EthereumChallenge::SIZE).as_ref())?;
             let epoch = U256::deserialize(b.drain(0..U256::SIZE).as_ref())?;

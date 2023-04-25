@@ -60,7 +60,7 @@ impl BinarySerializable<'_> for Acknowledgement {
     const SIZE: usize = Signature::SIZE + AcknowledgementChallenge::SIZE + HalfKey::SIZE;
 
     fn deserialize(data: &[u8]) -> errors::Result<Self> {
-        let mut buf = Vec::from(data);
+        let mut buf = data.to_vec();
         if data.len() == Self::SIZE {
             let ack_signature = Signature::deserialize(buf.drain(..Signature::SIZE).as_ref())?;
             let challenge_signature = Signature::deserialize(buf.drain(..AcknowledgementChallenge::SIZE).as_ref())?;
@@ -96,7 +96,42 @@ pub struct AcknowledgedTicket {
     pub signer: PublicKey,
 }
 
-/// Wrapped for an unacknowledged ticket
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+impl AcknowledgedTicket {
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
+    pub fn new(ticket: Ticket, response: Response, pre_image: Hash, signer: PublicKey) -> Self {
+        Self { ticket, response, pre_image, signer }
+    }
+}
+
+impl BinarySerializable<'_> for AcknowledgedTicket {
+    const SIZE: usize = Ticket::SIZE + Response::SIZE + Hash::SIZE + PublicKey::SIZE_COMPRESSED;
+
+    fn deserialize(data: &[u8]) -> errors::Result<Self> {
+        if data.len() == Self::SIZE {
+            let mut buf = data.to_vec();
+            let ticket = Ticket::deserialize(buf.drain(..Ticket::SIZE).as_ref())?;
+            let response = Response::deserialize(buf.drain(..Response::SIZE).as_ref())?;
+            let pre_image = Hash::deserialize(buf.drain(..Hash::SIZE).as_ref())?;
+            let signer = PublicKey::deserialize(buf.drain(..PublicKey::SIZE_COMPRESSED).as_ref())?;
+
+            Ok(Self{ ticket, response , pre_image, signer })
+        } else {
+            Err(ParseError)
+        }
+    }
+
+    fn serialize(&self) -> Box<[u8]> {
+        let mut ret = Vec::with_capacity(Self::SIZE);
+        ret.extend_from_slice(&self.ticket.serialize());
+        ret.extend_from_slice(&self.response.serialize());
+        ret.extend_from_slice(&self.pre_image.serialize());
+        ret.extend_from_slice(&self.signer.serialize(true));
+        ret.into_boxed_slice()
+    }
+}
+
+/// Wrapper for an unacknowledged ticket
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct UnacknowledgedTicket {
@@ -105,16 +140,24 @@ pub struct UnacknowledgedTicket {
     pub signer: PublicKey
 }
 
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+impl UnacknowledgedTicket {
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
+    pub fn new(ticket: Ticket, own_key: HalfKey, signer: PublicKey) -> Self {
+        Self { ticket, own_key, signer }
+    }
+}
+
 impl BinarySerializable<'_> for UnacknowledgedTicket {
     const SIZE: usize = Ticket::SIZE + HalfKey::SIZE + PublicKey::SIZE_UNCOMPRESSED;
 
     fn deserialize(data: &[u8]) -> errors::Result<Self> {
         if data.len() == Self::SIZE {
-            Ok(Self {
-                ticket: Ticket::deserialize(&data[..Ticket::SIZE])?,
-                own_key: HalfKey::deserialize(&data[Ticket::SIZE..Ticket::SIZE+HalfKey::SIZE])?,
-                signer: PublicKey::deserialize(&data[Ticket::SIZE+HalfKey::SIZE..])?
-            })
+            let mut buf = data.to_vec();
+            let ticket = Ticket::deserialize(buf.drain(..Ticket::SIZE).as_ref())?;
+            let own_key = HalfKey::deserialize(buf.drain(..HalfKey::SIZE).as_ref())?;
+            let signer = PublicKey::deserialize(buf.drain(..PublicKey::SIZE_COMPRESSED).as_ref())?;
+            Ok(Self { ticket, own_key, signer })
         } else {
             Err(ParseError)
         }
@@ -200,21 +243,48 @@ impl BinarySerializable<'_> for AcknowledgementChallenge {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use crate::acknowledgment::AcknowledgedTicket;
-    use crate::channels::Ticket;
-    use core_crypto::types::{Hash, PublicKey, Response};
+    use crate::acknowledgment::{AcknowledgedTicket, Acknowledgement, UnacknowledgedTicket};
     use wasm_bindgen::prelude::*;
+    use utils_misc::ok_or_jserr;
+    use utils_misc::utils::wasm::JsResult;
+    use utils_types::traits::BinarySerializable;
+
+    #[wasm_bindgen]
+    impl UnacknowledgedTicket {
+        #[wasm_bindgen(js_name = "deserialize")]
+        pub fn _deserialize(data: &[u8]) -> JsResult<UnacknowledgedTicket> {
+            ok_or_jserr!(Self::deserialize(data))
+        }
+
+        #[wasm_bindgen(js_name = "serialize")]
+        pub fn _serialize(&self) -> Box<[u8]> {
+            self.serialize()
+        }
+    }
 
     #[wasm_bindgen]
     impl AcknowledgedTicket {
-        #[wasm_bindgen(constructor)]
-        pub fn new(ticket: Ticket, response: Response, pre_image: Hash, signer: PublicKey) -> Self {
-            AcknowledgedTicket {
-                ticket,
-                response,
-                pre_image,
-                signer,
-            }
+        #[wasm_bindgen(js_name = "deserialize")]
+        pub fn _deserialize(data: &[u8]) -> JsResult<AcknowledgedTicket> {
+            ok_or_jserr!(Self::deserialize(data))
+        }
+
+        #[wasm_bindgen(js_name = "serialize")]
+        pub fn _serialize(&self) -> Box<[u8]> {
+            self.serialize()
+        }
+    }
+
+    #[wasm_bindgen]
+    impl Acknowledgement {
+        #[wasm_bindgen(js_name = "deserialize")]
+        pub fn _deserialize(data: &[u8]) -> JsResult<Acknowledgement> {
+            ok_or_jserr!(Self::deserialize(data))
+        }
+
+        #[wasm_bindgen(js_name = "serialize")]
+        pub fn _serialize(&self) -> Box<[u8]> {
+            self.serialize()
         }
     }
 }

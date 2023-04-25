@@ -156,7 +156,7 @@ impl MetaPacket {
 
     pub fn deserialize(packet: &[u8], header_len: usize) -> utils_types::errors::Result<MetaPacket> {
         if packet.len() == Self::size(header_len) {
-            Ok(Self {packet: packet.into(), header_len})
+            Ok(Self { packet: packet.into(), header_len })
         } else {
             Err(ParseError)
         }
