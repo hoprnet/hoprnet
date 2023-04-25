@@ -234,6 +234,22 @@ impl Ticket {
         }
     }
 
+    /// Signs the ticket using the given private key.
+    pub fn sign(&mut self, signing_key: &[u8]) {
+        let hashed_ticket = Hash::create(&[&Self::serialize_unsigned_aux(
+            &self.counterparty,
+            &self.challenge,
+            &self.epoch,
+            &self.amount,
+            &self.win_prob,
+            &self.index,
+            &self.channel_epoch,
+        )]);
+
+        let msg = ethereum_signed_hash(hashed_ticket.serialize()).serialize();
+        self.signature = Signature::sign_message(&msg, signing_key);
+    }
+
     /// Convenience method for creating a zero-hop ticket
     pub fn new_zero_hop(destination: PublicKey, challenge: Option<Challenge>, private_key: &[u8]) -> Self {
         Self::new(
@@ -448,7 +464,7 @@ pub mod wasm {
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use utils_types::primitives::{Address, Balance, EthereumChallenge, U256};
-    use utils_types::traits::BinarySerializable;
+    use utils_types::traits::{BinarySerializable, ToHex};
     use wasm_bindgen::prelude::wasm_bindgen;
 
     use crate::channels::{ChannelEntry, ChannelStatus, Ticket};
@@ -540,5 +556,8 @@ pub mod wasm {
         pub fn _serialize(&self) -> Box<[u8]> {
             self.serialize()
         }
+
+        #[wasm_bindgen(js_name = "to_hex")]
+        pub fn _to_hex(&self) -> String { self.to_hex() }
     }
 }

@@ -10,6 +10,9 @@ pub enum PacketError {
     #[error("failed to construct packet")]
     PacketConstructionError,
 
+    #[error("packet is in invalid state")]
+    InvalidPacketState,
+
     #[error("Proof of Relay challenge could not be verified")]
     PoRVerificationError,
 

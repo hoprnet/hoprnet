@@ -1,4 +1,4 @@
-use crate::errors::PacketError::PacketDecodingError;
+use crate::errors::PacketError::{InvalidPacketState, PacketDecodingError};
 use core_crypto::derivation::{derive_ack_key_share, derive_packet_tag};
 use core_crypto::primitives::{DigestLike, SimpleMac};
 use core_crypto::prp::{PRPParameters, PRP};
@@ -284,6 +284,7 @@ impl Packet {
 
         let mut ticket = first_ticket;
         ticket.challenge = por_values.ticket_challenge.to_ethereum_challenge();
+        ticket.sign(private_key);
 
         Ok(Self {
             challenge: AcknowledgementChallenge::new(&por_values.ack_challenge, private_key),
@@ -387,6 +388,30 @@ impl Packet {
     pub fn state(&self) -> &PacketState {
         &self.state
     }
+
+    /// Forwards the packet to the next hop.
+    /// Requires private key of the local node and prepared ticket for the next recipient.
+    /// Panics if the packet is not meant to be forwarded.
+    pub fn forward(&mut self, private_key: &[u8], next_ticket: Ticket) -> Result<()> {
+        match &mut self.state {
+            Forwarded {
+                next_challenge,
+                old_challenge,
+                ack_challenge,
+                ..
+            } => {
+                let mut ticket = next_ticket;
+                ticket.challenge = next_challenge.to_ethereum_challenge();
+                ticket.sign(private_key);
+                self.ticket = ticket;
+
+                let _ = old_challenge.insert(self.challenge.clone());
+                self.challenge = AcknowledgementChallenge::new(ack_challenge, private_key);
+                Ok(())
+            }
+            _ => Err(InvalidPacketState),
+        }
+    }
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -414,28 +439,6 @@ impl Packet {
                 private_key,
             )),
             Outgoing { .. } => None,
-        }
-    }
-
-    /// Forwards the packet to the next hop.
-    /// Requires private key of the local node and prepared ticket for the next recipient.
-    /// Panics if the packet is not meant to be forwarded.
-    pub fn forward(&mut self, private_key: &[u8], next_ticket: Ticket) {
-        match &mut self.state {
-            Forwarded {
-                next_challenge,
-                old_challenge,
-                ack_challenge,
-                ..
-            } => {
-                let mut ticket = next_ticket;
-                ticket.challenge = next_challenge.to_ethereum_challenge();
-                self.ticket = ticket;
-
-                let _ = old_challenge.insert(self.challenge.clone());
-                self.challenge = AcknowledgementChallenge::new(ack_challenge, private_key);
-            }
-            _ => panic!("invalid packet state"),
         }
     }
 }
@@ -596,6 +599,12 @@ pub mod wasm {
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use crate::packet::{Packet, PacketState};
+    use crate::packet::wasm::WasmPacketState::{Final, Forwarded, Outgoing};
+
+    #[wasm_bindgen]
+    pub enum WasmPacketState {
+        Final, Forwarded, Outgoing
+    }
 
     #[wasm_bindgen]
     impl Packet {
@@ -613,6 +622,11 @@ pub mod wasm {
         pub fn _deserialize(data: &[u8], private_key: &[u8], sender: &str) -> JsResult<Packet> {
             let sender = ok_or_jserr!(PeerId::from_str(sender))?;
             ok_or_jserr!(Self::deserialize(data, private_key, &sender))
+        }
+
+        #[wasm_bindgen(js_name = "forward")]
+        pub fn _forward(&mut self, private_key: &[u8], next_ticket: Ticket) -> JsResult<()> {
+            ok_or_jserr!(self.forward(private_key, next_ticket))
         }
 
         #[wasm_bindgen(js_name = "own_key")]
@@ -657,6 +671,20 @@ pub mod wasm {
                 PacketState::Forwarded { packet_tag, .. } => Some(packet_tag.clone()),
                 PacketState::Outgoing { .. } => None
             }
+        }
+
+
+        #[wasm_bindgen(js_name = "state")]
+        pub fn _state(&self) -> WasmPacketState {
+            match &self.state {
+                PacketState::Final { .. } => Final,
+                PacketState::Forwarded { .. } => Forwarded,
+                PacketState::Outgoing { .. } => Outgoing
+            }
+        }
+
+        pub fn size() -> u32 {
+            Self::SIZE as u32
         }
     }
 }
