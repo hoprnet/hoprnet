@@ -1,5 +1,5 @@
 # NOTE: This cannot be built as is, it must be built using scripts/build-avado.sh
-# %AVADO_VERSION%, %TOKEN%, %ENV_ID% and %PROVIDER_URL% will be replaced with actual values
+# %AVADO_VERSION%, %TOKEN%, %NETWORK_ID% and %PROVIDER_URL% will be replaced with actual values
 # when built using the above script.
 version: '3.4'
 services:
@@ -21,7 +21,7 @@ services:
     'environment':
       [
         'DEBUG=hopr*',
-        'HOPRD_ENVIRONMENT=%ENV_ID%',
+        'HOPRD_NETWORK=%NETWORK_ID%',
         'HOPRD_HOST=0.0.0.0:9091',
         'HOPRD_ANNOUNCE=false',
         'HOPRD_API=true',
@@ -34,7 +34,7 @@ services:
         'HOPRD_DISABLE_API_AUTHENTICATION=true',
         'HOPRD_API_TOKEN=%TOKEN%',
         'HOPRD_IDENTITY=/app/hoprd-db/.hopr-identity',
-        'HOPRD_DATA=/app/hoprd-db/data-%ENV_ID%',
+        'HOPRD_DATA=/app/hoprd-db/data-%NETWORK_ID%',
         'HOPRD_INIT=true',
         'HOPRD_ALLOW_PRIVATE_NODE_CONNECTIONS=false',
         'HOPRD_PROVIDER=%PROVIDER_URL%'

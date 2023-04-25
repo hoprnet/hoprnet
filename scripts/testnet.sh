@@ -28,9 +28,9 @@ declare min_funds_hopr=1
 # $2=network name
 vm_name() {
   local role="${1}"
-  local network_name="${2}"
+  local network_id="${2}"
 
-  echo "${network_name}-${role}"
+  echo "${network_id}-${role}"
 }
 
 # $1=vm name

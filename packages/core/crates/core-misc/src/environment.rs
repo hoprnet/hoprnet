@@ -187,19 +187,19 @@ pub struct ResolvedNetwork {
 
 impl ResolvedNetwork {
     /// Returns the network details, returns an error if network is not supported
-    pub fn new(mono_repo_path: &str, network_name: &str, maybe_custom_provider: Option<&str>) -> Result<Self, String> {
+    pub fn new(mono_repo_path: &str, network_id: &str, maybe_custom_provider: Option<&str>) -> Result<Self, String> {
         let mut protocol_config = ProtocolConfig::from_json_file(mono_repo_path)?;
         let version = PackageJsonFile::from_json_file(mono_repo_path).and_then(|c| c.coerced_version())?;
 
         let network = protocol_config
             .networks
-            .get_mut(network_name)
-            .ok_or(format!("Could not find network {} in protocol config", network_name))?;
+            .get_mut(network_id)
+            .ok_or(format!("Could not find network {} in protocol config", network_id))?;
 
         let chain = protocol_config
             .chains
             .get_mut(&network.chain)
-            .ok_or(format!("Invalid chain {} for network {}", network.chain, network_name))?;
+            .ok_or(format!("Invalid chain {} for network {}", network.chain, network_id))?;
 
         if let Some(custom_provider) = maybe_custom_provider {
             chain.default_provider = custom_provider.into();
@@ -207,7 +207,7 @@ impl ResolvedNetwork {
 
         match real::satisfies(version.as_str(), network.version_range.as_str()) {
             Ok(true) => Ok(ResolvedNetwork {
-                id: network_name.into(),
+                id: network_id.into(),
                 chain: chain.to_owned(),
                 environment_type: network.environment_type,
                 channel_contract_deploy_block: network.indexer_start_block_number,
@@ -222,7 +222,7 @@ impl ResolvedNetwork {
             Ok(false) => protocol_config.supported_networks(mono_repo_path).and_then(|envs| {
                 Err(format!(
                     "network {} is not supported, supported networks {:?}",
-                    network_name,
+                    network_id,
                     envs.iter().map(|e| e.id.to_owned()).collect::<Vec<String>>().join(", ")
                 )
                 .into())
@@ -254,14 +254,14 @@ pub mod wasm {
     #[wasm_bindgen]
     pub fn resolve_network(
         mono_repo_path: &str,
-        network_name: &str,
+        network_id: &str,
         maybe_custom_provider: Option<String>,
     ) -> JsResult<JsValue> {
         clean_mono_repo_path!(mono_repo_path, cleaned_mono_repo_path);
 
         let resolved_environment = super::ResolvedNetwork::new(
             cleaned_mono_repo_path,
-            network_name,
+            network_id,
             maybe_custom_provider.as_ref().map(|c| c.as_str()),
         )?;
 

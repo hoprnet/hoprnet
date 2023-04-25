@@ -10,8 +10,8 @@ use std::{
 use crate::environment_config;
 use crate::utils::HelperErrors;
 
-pub fn build_path(network_name: &str, environment_type: &str) -> String {
-    let new_path = vec!["./", network_name, "/", &environment_type.to_string()].concat();
+pub fn build_path(network_id: &str, environment_type: &str) -> String {
+    let new_path = vec!["./", network_id, "/", &environment_type.to_string()].concat();
     match Path::new(&new_path).to_str() {
         None => panic!("new path is not a valid UTF-8 sequence"),
         Some(s) => {
@@ -27,8 +27,8 @@ pub fn build_path(network_name: &str, environment_type: &str) -> String {
 ///
 /// * `contracts_root` - Directory to the foundry project
 /// * `foundry_profile` - Value of FOUNDRY_PROFILE variable
-/// * `network_name` - Name of the environment that nodes run in
-pub fn set_process_path_env(contracts_root: &Option<String>, network_name: &String) -> Result<(), HelperErrors> {
+/// * `network_id` - Name of the environment that nodes run in
+pub fn set_process_path_env(contracts_root: &Option<String>, network_id: &String) -> Result<(), HelperErrors> {
     // run in the repo where the make target is saved
     if let Some(new_root) = contracts_root {
         let root = Path::new(OsStr::new(&new_root));
@@ -40,7 +40,7 @@ pub fn set_process_path_env(contracts_root: &Option<String>, network_name: &Stri
 
     // get environment_type and set it as FOUNDRY_PROFILE
     if let Ok(foundry_profile) =
-        environment_config::get_environment_type_from_name(&env::current_dir().unwrap(), network_name)
+        environment_config::get_environment_type_from_name(&env::current_dir().unwrap(), network_id)
     {
         env::set_var("FOUNDRY_PROFILE", foundry_profile.to_string());
     } else {
@@ -48,7 +48,7 @@ pub fn set_process_path_env(contracts_root: &Option<String>, network_name: &Stri
     }
 
     // use cmd to call process
-    env::set_var("NETWORK_NAME", network_name);
+    env::set_var("NETWORK_ID", network_id);
     Ok(())
 }
 
@@ -56,12 +56,12 @@ pub fn set_process_path_env(contracts_root: &Option<String>, network_name: &Stri
 ///
 /// # Arguments
 ///
-/// * `network_name` - Name of the environment that nodes run in
+/// * `network_id` - Name of the environment that nodes run in
 /// * `address` - Address that the tool fund
 /// * `hopr_amount` - Amount of HOPR tokens to be funded
 /// * `native_amount` - Amount of native tokens to be funded
 pub fn child_process_call_foundry_faucet(
-    network_name: &str,
+    network_id: &str,
     address: &Address,
     hopr_amount: &str,
     native_amount: &str,
@@ -81,17 +81,17 @@ pub fn child_process_call_foundry_faucet(
         &native_amount_str,
     ];
 
-    child_process_call_foundry(network_name, &faucet_args)
+    child_process_call_foundry(network_id, &faucet_args)
 }
 
 /// Launch a child process to call foundry self-register command
 ///
 /// # Arguments
 ///
-/// * `network_name` - Name of the environment that nodes run in
+/// * `network_id` - Name of the environment that nodes run in
 /// * `environment_type` - Type of the environment that nodes run in
 /// * `peer_id` - Peer Ids of HOPR nodes to be registered under the caller
-pub fn child_process_call_foundry_self_register(network_name: &str, peer_ids: &String) -> Result<(), HelperErrors> {
+pub fn child_process_call_foundry_self_register(network_id: &str, peer_ids: &String) -> Result<(), HelperErrors> {
     // add brackets to around the string
     let peer_id_string = vec!["[", &peer_ids, "]"].concat();
     let self_register_args = vec![
@@ -103,23 +103,23 @@ pub fn child_process_call_foundry_self_register(network_name: &str, peer_ids: &S
         &peer_id_string,
     ];
 
-    child_process_call_foundry(network_name, &self_register_args)
+    child_process_call_foundry(network_id, &self_register_args)
 }
 
 /// Launch a child process to call a foundry script
 ///
 /// # Arguments
 ///
-/// * `network_name` - Name of the environment that nodes run in
+/// * `network_id` - Name of the environment that nodes run in
 /// * `forge_args` - arguments to be passed to `forge`
-pub fn child_process_call_foundry<T>(network_name: &str, forge_args: &[T]) -> Result<(), HelperErrors>
+pub fn child_process_call_foundry<T>(network_id: &str, forge_args: &[T]) -> Result<(), HelperErrors>
 where
     T: AsRef<OsStr>,
 {
     // check environment is set
     let envrionment_check = environment_config::ensure_environment_and_network_are_set(
         &env::current_dir().unwrap(),
-        network_name,
+        network_id,
         &env::var("FOUNDRY_PROFILE").unwrap(),
     )
     .unwrap();

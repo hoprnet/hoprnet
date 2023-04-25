@@ -38,16 +38,16 @@ export function supportedNetworks(): Network[] {
 }
 
 /**
- * @param network_name network name
+ * @param network_id network id, e.g. monte_rosa
  * @param customProvider
  * @returns the network details, throws if network is not supported
  */
-export function resolveNetwork(network_name: string, customProvider?: string): ResolvedNetwork {
-  return resolve_network(MONO_REPO_PATH, network_name, customProvider)
+export function resolveNetwork(network_id: string, customProvider?: string): ResolvedNetwork {
+  return resolve_network(MONO_REPO_PATH, network_id, customProvider)
 }
 
-export const getContractData = (network_name: string): DeploymentExtract => {
-  const resolvedNetwork = resolveNetwork(network_name)
+export const getContractData = (network_id: string): DeploymentExtract => {
+  const resolvedNetwork = resolveNetwork(network_id)
   return {
     hoprTokenAddress: resolvedNetwork.token_contract_address,
     hoprChannelsAddress: resolvedNetwork.channels_contract_address,

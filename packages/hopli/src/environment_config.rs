@@ -55,11 +55,11 @@ pub struct NetworkConfig {
     networks: HashMap<String, NetworkDetail>,
 }
 
-/// ensures that the network_name and environment_type exist
+/// ensures that the network_id and environment_type exist
 /// in `contracts-addresses.json` and are matched
 pub fn ensure_environment_and_network_are_set(
     make_root_dir_path: &PathBuf,
-    network_name: &str,
+    network_id: &str,
     environment_type: &str,
 ) -> Result<bool, String> {
     // read `contracts-addresses.json` at make_root_dir_path
@@ -73,7 +73,7 @@ pub fn ensure_environment_and_network_are_set(
 
     let env_detail = env_config
         .networks
-        .get(network_name)
+        .get(network_id)
         .expect("Unable to find environment details");
 
     if env_detail.environment_type.to_string() == environment_type {
@@ -87,7 +87,7 @@ pub fn ensure_environment_and_network_are_set(
 /// according to `contracts-addresses.json`
 pub fn get_environment_type_from_name(
     make_root_dir_path: &PathBuf,
-    network_name: &str,
+    network_id: &str,
 ) -> Result<EnvironmentType, String> {
     // read `contracts-addresses.json` at make_root_dir_path
     let contract_environment_config_path = make_root_dir_path.join("contracts-addresses.json");
@@ -100,7 +100,7 @@ pub fn get_environment_type_from_name(
 
     let env_detail = env_config
         .networks
-        .get(network_name)
+        .get(network_id)
         .expect("Unable to find environment details");
 
     return Ok(env_detail.environment_type);
@@ -119,9 +119,9 @@ mod tests {
             .unwrap()
             .join("ethereum")
             .join("contracts");
-        let network_name = "anvil-localhost";
+        let network_id = "anvil-localhost";
         let environment_type = "development";
-        match ensure_environment_and_network_are_set(correct_dir, network_name, environment_type) {
+        match ensure_environment_and_network_are_set(correct_dir, network_id, environment_type) {
             Ok(result) => assert_eq!(result, true),
             _ => assert!(false),
         }
@@ -130,10 +130,10 @@ mod tests {
     #[test]
     fn read_anvil_localhost_at_wrong_path() {
         let wrong_dir = &std::env::current_dir().unwrap();
-        let network_name = "anvil-localhost";
+        let network_id = "anvil-localhost";
         let environment_type = "development";
         let result = std::panic::catch_unwind(|| {
-            ensure_environment_and_network_are_set(wrong_dir, network_name, environment_type)
+            ensure_environment_and_network_are_set(wrong_dir, network_id, environment_type)
         });
         assert!(result.is_err());
     }
@@ -161,9 +161,9 @@ mod tests {
             .unwrap()
             .join("ethereum")
             .join("contracts");
-        let network_name = "anvil-localhost";
+        let network_id = "anvil-localhost";
         let environment_type = "production";
-        match ensure_environment_and_network_are_set(correct_dir, network_name, environment_type) {
+        match ensure_environment_and_network_are_set(correct_dir, network_id, environment_type) {
             Ok(result) => assert_eq!(result, false),
             _ => assert!(false),
         }
