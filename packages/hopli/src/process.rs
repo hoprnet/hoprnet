@@ -168,8 +168,8 @@ where
     println!("Foundry command execution status: {}", faucet_output.status);
 
     if faucet_output.status.success() {
-        return Ok(());
+        Ok(())
     } else {
-        return Err(HelperErrors::ErrorInRunningFoundry);
+        Err(HelperErrors::ErrorInRunningFoundry)
     }
 }
