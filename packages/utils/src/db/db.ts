@@ -147,21 +147,15 @@ function deserializePendingAcknowledgement(data: Uint8Array): PendingAckowledgem
   }
 }
 
-export async function newLevelDb(publicKey: string, dbPath: string, environmentId: string, initialize: boolean, forceCreate: boolean = false): Promise<LevelDb> {
-  let leveldb = new LevelDb(publicKey)
-  await leveldb.init(initialize, dbPath, forceCreate, environmentId)
-  return leveldb
-}
-
 export class LevelDb {
-  private db: LevelUp
-  private id: PublicKey
+  public backend: LevelUp
 
-  constructor(publicKey: string) {
-    this.id = PublicKey.fromString(publicKey)
+  constructor() {
+    // unless initialized with a specific db path, memory version is used
+    this.backend = new levelup(MemDown())
   }
 
-  async init(initialize: boolean, dbPath: string, forceCreate: boolean = false, environmentId: string) {
+  public async init(initialize: boolean, dbPath: string, forceCreate: boolean = false, environmentId: string) {
     let setEnvironment = false
 
     log(`using db at ${dbPath}`)
@@ -197,58 +191,42 @@ export class LevelDb {
 
     // CommonJS / ESM issue
     // @ts-ignore
-    this.db = levelup(leveldown(dbPath))
+    this.backend = levelup(leveldown(dbPath))
 
     // Fully initialize database
-    await this.db.open()
+    await this.backend.open()
 
-    log(`namespacing db by public key: ${this.id.toCompressedPubKeyHex()}`)
     if (setEnvironment) {
       log(`setting environment id ${environmentId} to db`)
-      await this.setEnvironmentId(environmentId)
+      await this.put(ENVIRONMENT_KEY, encoder.encode(environmentId))
     } else {
-      const hasEnvironmentKey = await this.verifyEnvironmentId(environmentId)
+      let storedEnvironmentId = await this.maybeGet(ENVIRONMENT_KEY)
+      let decodedStoredEnvironmentId = (storedEnvironmentId !== undefined) ? undefined : decoder.decode(storedEnvironmentId)
+
+      const hasEnvironmentKey = ((decodedStoredEnvironmentId !== undefined) && (decodedStoredEnvironmentId === environmentId))
 
       if (!hasEnvironmentKey) {
-        const storedId = await this.getEnvironmentId()
-
-        throw new Error(`invalid db environment id: ${storedId} (expected: ${environmentId})`)
+        throw new Error(`invalid db environment id: ${decodedStoredEnvironmentId} (expected: ${environmentId})`)
       }
     }
   }
 
   public async has(key: Uint8Array): Promise<boolean> {
-    try {
-      await this.db.get(Buffer.from(this.keyOf(key)))
-
-      return true
-    } catch (err) {
-      if (err.type === 'NotFoundError' || err.notFound) {
-        return false
-      } else {
-        throw err
-      }
-    }
+    return undefined !== await this.maybeGet(Buffer.from(key))
   }
 
-  protected async put(key: Uint8Array, value: Uint8Array): Promise<void> {
-    const keyU8a = this.keyOf(key)
-    await this.db.put(
-        Buffer.from(keyU8a.buffer, keyU8a.byteOffset, keyU8a.byteLength),
-        Buffer.from(value.buffer, value.byteOffset, value.byteLength)
-    )
+  public async put(key: Uint8Array, value: Uint8Array): Promise<void> {
+    await this.backend.put(Buffer.from(key), Buffer.from(value))
   }
 
   public async get(key: Uint8Array): Promise<Uint8Array> {
-    const keyU8a = this.keyOf(key)
-    const value = await this.db.get(Buffer.from(keyU8a.buffer, keyU8a.byteOffset, keyU8a.byteLength))
+    const value = await this.backend.get(Buffer.from(key))
 
     return new Uint8Array(value.buffer, value.byteOffset, value.byteLength)
   }
 
   public async remove(key: Uint8Array): Promise<void> {
-    const keyU8a = this.keyOf(key)
-    await this.db.del(Buffer.from(keyU8a.buffer, keyU8a.byteOffset, keyU8a.byteLength))
+    await this.backend.del(Buffer.from(key))
   }
 
   public async batch(ops: Array<any>, wait_for_write= false): Promise<void> {
@@ -256,7 +234,7 @@ export class LevelDb {
       sync: wait_for_write,
     }
 
-    let batch = this.db.batch()
+    let batch = this.backend.batch()
     for (const op of ops) {
       if (!op.hasOwnProperty('type') || !op.hasOwnProperty('key')) {
         throw new Error('Invalid operation, missing key or type: ' + JSON.stringify(op))
@@ -274,10 +252,26 @@ export class LevelDb {
     await batch.write(options)
   }
 
+  public async maybeGet(key: Uint8Array): Promise<Uint8Array | undefined> {
+    try {
+      return await this.get(Buffer.from(key))
+    } catch (err) {
+      if (err.type === 'NotFoundError' || err.notFound) {
+        return undefined
+      }
+      throw err
+    }
+  }
+
+  public async close() {
+    log('Closing database')
+    return await this.backend.close()
+  }
+
   public dump(destFile: string) {
     log(`Dumping current database to ${destFile}`)
     let dumpFile = fs.createWriteStream(destFile, { flags: 'a' })
-    this.db
+    this.backend
         .createReadStream({ keys: true, keyAsBuffer: true, values: true, valueAsBuffer: true })
         .on('data', (d) => {
           // Skip the public key prefix in each key
@@ -305,184 +299,54 @@ export class LevelDb {
           dumpFile.close()
         })
   }
-
-  private keyOf(...segments: Uint8Array[]): Uint8Array {
-    return u8aConcat(this.id.serializeCompressed(), ...segments)
-  }
-
-  private async maybeGet(key: Uint8Array): Promise<Uint8Array | undefined> {
-    try {
-      return await this.get(key)
-    } catch (err) {
-      if (err.type === 'NotFoundError' || err.notFound) {
-        return undefined
-      }
-      throw err
-    }
-  }
-
-  public async setEnvironmentId(environment_id: string): Promise<void> {
-    await this.put(ENVIRONMENT_KEY, encoder.encode(environment_id))
-  }
-
-  public async getEnvironmentId(): Promise<string> {
-    return decoder.decode(await this.maybeGet(ENVIRONMENT_KEY))
-  }
-
-  public async verifyEnvironmentId(expectedId: string): Promise<boolean> {
-    const storedId = await this.getEnvironmentId()
-
-    if (storedId == undefined) {
-      return false
-    }
-
-    return storedId === expectedId
-  }
 }
 
+/// Class designated to migrate the functionality to Rust
 export class HoprDB {
-  private db: LevelUp
+  protected db: LevelDb
+  protected id: PublicKey
 
-  constructor(private id: PublicKey) {}
+  constructor(publicKey: PublicKey) {
+    this.db = new LevelDb()
+    this.id = publicKey
+  }
+
+  // ---------- direct access API to be removed after migration to Rust
 
   async init(initialize: boolean, dbPath: string, forceCreate: boolean = false, environmentId: string) {
-    let setEnvironment = false
-
-    log(`using db at ${dbPath}`)
-    if (forceCreate) {
-      log('force create - wipe old database and create a new')
-      await rm(dbPath, { recursive: true, force: true })
-      await mkdir(dbPath, { recursive: true })
-      setEnvironment = true
-    } else {
-      let exists = false
-
-      try {
-        exists = !(await stat(dbPath)).isDirectory()
-      } catch (err: any) {
-        if (err.code === 'ENOENT') {
-          exists = false
-        } else {
-          // Unexpected error, therefore throw it
-          throw err
-        }
-      }
-
-      if (!exists) {
-        log('db directory does not exist, creating?:', initialize)
-        if (initialize) {
-          await mkdir(dbPath, { recursive: true })
-          setEnvironment = true
-        } else {
-          throw new Error(`Database does not exist: ${dbPath}`)
-        }
-      }
-    }
-
-    // CommonJS / ESM issue
-    // @ts-ignore
-    this.db = levelup(leveldown(dbPath))
-
-    // Fully initialize database
-    await this.db.open()
-
-    log(`namespacing db by public key: ${this.id.toCompressedPubKeyHex()}`)
-    if (setEnvironment) {
-      log(`setting environment id ${environmentId} to db`)
-      await this.setEnvironmentId(environmentId)
-    } else {
-      const hasEnvironmentKey = await this.verifyEnvironmentId(environmentId)
-
-      if (!hasEnvironmentKey) {
-        const storedId = await this.getEnvironmentId()
-
-        throw new Error(`invalid db environment id: ${storedId} (expected: ${environmentId})`)
-      }
-    }
-  }
-f
-  private keyOf(...segments: Uint8Array[]): Uint8Array {
-    return u8aConcat(this.id.serializeCompressed(), ...segments)
-  }
-
-  private async has(key: Uint8Array): Promise<boolean> {
-    try {
-      await this.db.get(Buffer.from(this.keyOf(key)))
-
-      return true
-    } catch (err) {
-      if (err.type === 'NotFoundError' || err.notFound) {
-        return false
-      } else {
-        throw err
-      }
-    }
+    await this.db.init(initialize, dbPath, forceCreate, environmentId)
   }
 
   protected async put(key: Uint8Array, value: Uint8Array): Promise<void> {
-    const keyU8a = this.keyOf(key)
-    await this.db.put(
-      Buffer.from(keyU8a.buffer, keyU8a.byteOffset, keyU8a.byteLength),
-      Buffer.from(value.buffer, value.byteOffset, value.byteLength)
-    )
-  }
-
-  public dumpDatabase(destFile: string) {
-    log(`Dumping current database to ${destFile}`)
-    let dumpFile = fs.createWriteStream(destFile, { flags: 'a' })
-    this.db
-      .createReadStream({ keys: true, keyAsBuffer: true, values: true, valueAsBuffer: true })
-      .on('data', (d) => {
-        // Skip the public key prefix in each key
-        let key = (d.key as Buffer).subarray(PublicKey.SIZE_COMPRESSED)
-        let keyString = ''
-        let isHex = false
-        let sawDelimiter = false
-        for (const b of key) {
-          if (!sawDelimiter && b >= 32 && b <= 126) {
-            // Print sequences of ascii chars normally
-            let cc = String.fromCharCode(b)
-            keyString += (isHex ? ' ' : '') + cc
-            isHex = false
-            // Once a delimiter is encountered, always print as hex since then
-            sawDelimiter = sawDelimiter || cc == '-' || cc == ':'
-          } else {
-            // Print sequences of non-ascii chars as hex
-            keyString += (!isHex ? '0x' : '') + (b as number).toString(16)
-            isHex = true
-          }
-        }
-        dumpFile.write(keyString + ':' + d.value.toString('hex') + '\n')
-      })
-      .on('end', function () {
-        dumpFile.close()
-      })
-  }
-
-  private async touch(key: Uint8Array): Promise<void> {
-    return await this.put(key, new Uint8Array())
+    return await this.db.put(key, value)
   }
 
   protected async get(key: Uint8Array): Promise<Uint8Array> {
-    const keyU8a = this.keyOf(key)
-    const value = await this.db.get(Buffer.from(keyU8a.buffer, keyU8a.byteOffset, keyU8a.byteLength))
+    const value = await this.db.get(Buffer.from(key))
 
     return new Uint8Array(value.buffer, value.byteOffset, value.byteLength)
   }
 
-  private async maybeGet(key: Uint8Array): Promise<Uint8Array | undefined> {
-    try {
-      return await this.get(key)
-    } catch (err) {
-      if (err.type === 'NotFoundError' || err.notFound) {
-        return undefined
-      }
-      throw err
-    }
+  public async remove(key: Uint8Array): Promise<void> {
+    await this.db.remove(key)
   }
 
+  public dumpDatabase(destFile: string) {
+    this.db.dump(destFile)
+  }
+
+  private async maybeGet(key: Uint8Array): Promise<Uint8Array | undefined> {
+    return await this.db.maybeGet(key)
+  }
+
+  public async close() {
+    await this.db.close()
+  }
+
+  // ---------- end direct access API to be removed after migration to Rust
+
   private async getCoerced<T>(key: Uint8Array, coerce: (u: Uint8Array) => T) {
-    let u8a = await this.get(key)
+    let u8a = await this.db.get(key)
     return coerce(u8a)
   }
 
@@ -515,13 +379,13 @@ f
     map?: (i: Element) => TransformedElement,
     sorter?: (e1: TransformedElement, e2: TransformedElement) => number
   ): Promise<TransformedElement[]> {
-    const firstPrefixed = this.keyOf(range.prefix, new Uint8Array(range.suffixLength).fill(0x00))
-    const lastPrefixed = this.keyOf(range.prefix, new Uint8Array(range.suffixLength).fill(0xff))
+    const firstPrefixed = u8aConcat(range.prefix, new Uint8Array(range.suffixLength).fill(0x00))
+    const lastPrefixed = u8aConcat(range.prefix, new Uint8Array(range.suffixLength).fill(0xff))
 
     const results: TransformedElement[] = []
 
     // @TODO fix types in @types/levelup package
-    for await (const [_key, chunk] of this.db.iterator({
+    for await (const [_key, chunk] of this.db.backend.iterator({
       gte: Buffer.from(firstPrefixed.buffer, firstPrefixed.byteOffset, firstPrefixed.byteLength),
       lte: Buffer.from(lastPrefixed.buffer, lastPrefixed.byteOffset, lastPrefixed.byteLength),
       keys: false
@@ -554,11 +418,11 @@ f
     filter?: ((o: Element) => boolean) | undefined,
     map?: (i: Element) => TransformedElement
   ): AsyncIterable<TransformedElement> {
-    const firstPrefixed = this.keyOf(range.prefix, new Uint8Array(range.suffixLength).fill(0x00))
-    const lastPrefixed = this.keyOf(range.prefix, new Uint8Array(range.suffixLength).fill(0xff))
+    const firstPrefixed = u8aConcat(range.prefix, new Uint8Array(range.suffixLength).fill(0x00))
+    const lastPrefixed = u8aConcat(range.prefix, new Uint8Array(range.suffixLength).fill(0xff))
 
     // @TODO fix types in @types/levelup package
-    for await (const [_key, chunk] of this.db.iterator({
+    for await (const [_key, chunk] of this.db.backend.iterator({
       gte: Buffer.from(firstPrefixed.buffer, firstPrefixed.byteOffset, firstPrefixed.byteLength),
       lte: Buffer.from(lastPrefixed.buffer, lastPrefixed.byteOffset, lastPrefixed.byteLength),
       keys: false
@@ -575,26 +439,21 @@ f
     }
   }
 
-  private async del(key: Uint8Array): Promise<void> {
-    const keyU8a = this.keyOf(key)
-    await this.db.del(Buffer.from(keyU8a.buffer, keyU8a.byteOffset, keyU8a.byteLength))
-  }
-
   private async increment(key: Uint8Array): Promise<number> {
     let val = await this.getCoercedOrDefault<number>(key, u8aToNumber, 0)
     // Always store using 4 bytes, max value 2**32 - 1
-    await this.put(key, toU8a(val + 1, DEFAULT_SERIALIZED_NUMBER_LENGTH))
+    await this.db.put(key, toU8a(val + 1, DEFAULT_SERIALIZED_NUMBER_LENGTH))
     return val + 1
   }
 
   private async addBalance(key: Uint8Array, amount: Balance): Promise<void> {
     let val = await this.getCoercedOrDefault<Balance>(key, Balance.deserialize, Balance.ZERO)
-    await this.put(key, val.add(amount).serialize())
+    await this.db.put(key, val.add(amount).serialize())
   }
 
   private async subBalance(key: Uint8Array, amount: Balance): Promise<void> {
     let val = await this.getCoercedOrDefault<Balance>(key, Balance.deserialize, Balance.ZERO)
-    await this.put(key, new Balance(val.toBN().sub(amount.toBN())).serialize())
+    await this.db.put(key, new Balance(val.toBN().sub(amount.toBN())).serialize())
   }
 
   /**
@@ -638,7 +497,7 @@ f
     isMessageSender: boolean,
     unackTicket?: UnacknowledgedTicket
   ): Promise<void> {
-    await this.put(
+    await this.db.put(
       createPendingAcknowledgement(halfKeyChallenge),
       serializePendingAcknowledgement(isMessageSender, unackTicket)
     )
@@ -654,7 +513,7 @@ f
     channel?: ChannelEntry
   }): Promise<AcknowledgedTicket[]> {
     const filterFunc = (a: AcknowledgedTicket): boolean => {
-      // if signer provided doesn't match our ticket's signer dont add it to the list
+      // if signer provided doesn't match our ticket's signer don't add it to the list
       if (filter?.signer && !a.signer.eq(filter.signer)) {
         return false
       }
@@ -699,17 +558,16 @@ f
 
     const neglectedTicketsCount = await this.getCoercedOrDefault<number>(NEGLECTED_TICKET_COUNT, u8aToNumber, 0)
 
-    const batch = this.db.batch()
+    const batch = this.db.backend.batch()
 
     for (const ack of tickets) {
-      const keyU8a = this.keyOf(createAcknowledgedTicketKey(ack.ticket.challenge, ack.ticket.channelEpoch))
-      batch.del(Buffer.from(keyU8a.buffer, keyU8a.byteOffset, keyU8a.byteLength))
+      batch.del(Buffer.from(createAcknowledgedTicketKey(ack.ticket.challenge, ack.ticket.channelEpoch)))
     }
 
     // only update count if there has been a change
     if (tickets.length > 0) {
       batch.put(
-        Buffer.from(this.keyOf(NEGLECTED_TICKET_COUNT)),
+        Buffer.from(NEGLECTED_TICKET_COUNT),
         // store updated number in 4 bytes
         Buffer.from(toU8a(neglectedTicketsCount + tickets.length, 4))
       )
@@ -723,18 +581,16 @@ f
    * @param ack acknowledged ticket
    */
   public async delAcknowledgedTicket(ack: AcknowledgedTicket): Promise<void> {
-    await this.del(createAcknowledgedTicketKey(ack.ticket.challenge, ack.ticket.channelEpoch))
+    await this.db.remove(createAcknowledgedTicketKey(ack.ticket.challenge, ack.ticket.channelEpoch))
   }
 
   public async replaceUnAckWithAck(halfKeyChallenge: HalfKeyChallenge, ackTicket: AcknowledgedTicket): Promise<void> {
-    const unAcknowledgedDbKey = this.keyOf(createPendingAcknowledgement(halfKeyChallenge))
-    const acknowledgedDbKey = this.keyOf(
-      createAcknowledgedTicketKey(ackTicket.ticket.challenge, ackTicket.ticket.channelEpoch)
-    )
+    const unAcknowledgedDbKey = createPendingAcknowledgement(halfKeyChallenge)
+    const acknowledgedDbKey = createAcknowledgedTicketKey(ackTicket.ticket.challenge, ackTicket.ticket.channelEpoch)
 
     const serializedTicket = ackTicket.serialize()
 
-    await this.db
+    await this.db.backend
       .batch()
       .del(Buffer.from(unAcknowledgedDbKey.buffer, unAcknowledgedDbKey.byteOffset, unAcknowledgedDbKey.byteLength))
       .put(
@@ -768,25 +624,23 @@ f
    * @returns a Promise that resolves to true if packet tag is present in db
    */
   async checkAndSetPacketTag(packetTag: Uint8Array) {
-    let present = await this.has(createPacketTagKey(packetTag))
+    const packetTagKey = createPacketTagKey(packetTag)
+    let present = await this.db.has(packetTagKey)
+    console.log(`===========> Checking if packet tag ${packetTagKey} is present` + present)
 
     if (!present) {
-      await this.touch(createPacketTagKey(packetTag))
+      // TODO: what is touch? Is this correct?
+      await this.db.put(packetTagKey, new Uint8Array())
     }
 
     return present
   }
 
-  public async close() {
-    log('Closing database')
-    return await this.db.close()
-  }
-
   async storeHashIntermediaries(channelId: Hash, intermediates: Intermediate[]): Promise<void> {
-    let dbBatch = this.db.batch()
+    let dbBatch = this.db.backend.batch()
 
     for (const intermediate of intermediates) {
-      const u8aKey = this.keyOf(createCommitmentKey(channelId, intermediate.iteration))
+      const u8aKey = createCommitmentKey(channelId, intermediate.iteration)
 
       dbBatch = dbBatch.put(
         Buffer.from(u8aKey.buffer, u8aKey.byteOffset, u8aKey.byteLength),
@@ -801,11 +655,11 @@ f
   }
 
   async getCurrentCommitment(channelId: Hash): Promise<Hash> {
-    return new Hash(await this.get(createCurrentCommitmentKey(channelId)))
+    return new Hash(await this.db.get(createCurrentCommitmentKey(channelId)))
   }
 
   async setCurrentCommitment(channelId: Hash, commitment: Hash): Promise<void> {
-    return this.put(createCurrentCommitmentKey(channelId), commitment.serialize())
+    return this.db.put(createCurrentCommitmentKey(channelId), commitment.serialize())
   }
 
   async getCurrentTicketIndex(channelId: Hash): Promise<UINT256 | undefined> {
@@ -817,18 +671,18 @@ f
   }
 
   setCurrentTicketIndex(channelId: Hash, ticketIndex: UINT256): Promise<void> {
-    return this.put(createCurrentTicketIndexKey(channelId), ticketIndex.serialize())
+    return this.db.put(createCurrentTicketIndexKey(channelId), ticketIndex.serialize())
   }
 
   async getLatestBlockNumber(): Promise<number> {
-    if (!(await this.has(LATEST_BLOCK_NUMBER_KEY))) {
+    if (!(await this.db.has(LATEST_BLOCK_NUMBER_KEY))) {
       return 0
     }
-    return new BN(await this.get(LATEST_BLOCK_NUMBER_KEY)).toNumber()
+    return new BN(await this.db.get(LATEST_BLOCK_NUMBER_KEY)).toNumber()
   }
 
   async updateLatestBlockNumber(blockNumber: BN): Promise<void> {
-    await this.put(LATEST_BLOCK_NUMBER_KEY, blockNumber.toBuffer())
+    await this.db.put(LATEST_BLOCK_NUMBER_KEY, blockNumber.toBuffer())
   }
 
   async getLatestConfirmedSnapshotOrUndefined(): Promise<Snapshot | undefined> {
@@ -836,7 +690,7 @@ f
   }
 
   async updateLatestConfirmedSnapshot(snapshot: Snapshot): Promise<void> {
-    await this.put(LATEST_CONFIRMED_SNAPSHOT_KEY, snapshot.serialize())
+    await this.db.put(LATEST_CONFIRMED_SNAPSHOT_KEY, snapshot.serialize())
   }
 
   async getChannel(channelId: Hash): Promise<ChannelEntry> {
@@ -867,11 +721,12 @@ f
 
   async updateChannelAndSnapshot(channelId: Hash, channel: ChannelEntry, snapshot: Snapshot): Promise<void> {
     const serializedChannel = channel.serialize()
-    const keyU8a = this.keyOf(createChannelKey(channelId))
+    const keyU8a = createChannelKey(channelId)
 
     const serializedSnapshot = snapshot.serialize()
 
     await this.db
+      .backend
       .batch()
       .put(
         Buffer.from(keyU8a.buffer, keyU8a.byteOffset, keyU8a.byteLength),
@@ -893,9 +748,10 @@ f
     const serializedSnapshot = snapshot.serialize()
 
     await this.db
+      .backend
       .batch()
       .put(
-        Buffer.from(this.keyOf(createAccountKey(account.getAddress()))),
+        Buffer.from(createAccountKey(account.getAddress())),
         Buffer.from(serializedAccount.buffer, serializedAccount.byteOffset, serializedAccount.byteLength)
       )
       .put(
@@ -930,6 +786,7 @@ f
   public async getRedeemedTicketsValue(): Promise<Balance> {
     return await this.getCoercedOrDefault<Balance>(REDEEMED_TICKETS_VALUE, Balance.deserialize, Balance.ZERO)
   }
+
   public async getRedeemedTicketsCount(): Promise<number> {
     return this.getCoercedOrDefault<number>(REDEEMED_TICKETS_COUNT, u8aToNumber, 0)
   }
@@ -966,9 +823,10 @@ f
     )
 
     const serializedSnapshot = snapshot.serialize()
-    const u8aPendingKey = this.keyOf(createPendingTicketsCountKey(ticket.counterparty))
+    const u8aPendingKey = createPendingTicketsCountKey(ticket.counterparty)
 
     await this.db
+      .backend
       .batch()
       .put(
         Buffer.from(u8aPendingKey.buffer, u8aPendingKey.byteOffset, u8aPendingKey.byteLength),
@@ -997,9 +855,11 @@ f
   public async getRejectedTicketsValue(): Promise<Balance> {
     return await this.getCoercedOrDefault<Balance>(REJECTED_TICKETS_VALUE, Balance.deserialize, Balance.ZERO)
   }
+
   public async getRejectedTicketsCount(): Promise<number> {
     return this.getCoercedOrDefault<number>(REJECTED_TICKETS_COUNT, u8aToNumber, 0)
   }
+
   public async markRejected(t: Ticket): Promise<void> {
     await this.increment(REJECTED_TICKETS_COUNT)
     await this.addBalance(REJECTED_TICKETS_VALUE, t.amount)
@@ -1046,7 +906,7 @@ f
   }
 
   public async setEnvironmentId(environment_id: string): Promise<void> {
-    await this.put(ENVIRONMENT_KEY, encoder.encode(environment_id))
+    await this.db.put(ENVIRONMENT_KEY, encoder.encode(environment_id))
   }
 
   public async getEnvironmentId(): Promise<string> {
@@ -1068,7 +928,7 @@ f
   }
 
   public async setHoprBalance(value: Balance): Promise<void> {
-    return this.put(HOPR_BALANCE_KEY, value.serialize())
+    return this.db.put(HOPR_BALANCE_KEY, value.serialize())
   }
 
   public async addHoprBalance(value: Balance, snapshot: Snapshot): Promise<void> {
@@ -1077,8 +937,9 @@ f
     const serializedSnapshot = snapshot.serialize()
 
     await this.db
+      .backend
       .batch()
-      .put(Buffer.from(this.keyOf(HOPR_BALANCE_KEY)), Buffer.from(val.add(value).serialize()))
+      .put(Buffer.from(HOPR_BALANCE_KEY), Buffer.from(val.add(value).serialize()))
       .put(
         Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY),
         Buffer.from(serializedSnapshot.buffer, serializedSnapshot.byteOffset, serializedSnapshot.byteLength)
@@ -1092,8 +953,9 @@ f
     const serializedSnapshot = snapshot.serialize()
 
     await this.db
+      .backend
       .batch()
-      .put(Buffer.from(this.keyOf(HOPR_BALANCE_KEY)), Buffer.from(val.sub(value).serialize()))
+      .put(Buffer.from(HOPR_BALANCE_KEY), Buffer.from(val.sub(value).serialize()))
       .put(
         Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY),
         Buffer.from(serializedSnapshot.buffer, serializedSnapshot.byteOffset, serializedSnapshot.byteLength)
@@ -1136,15 +998,16 @@ f
     const serializedAccount = account.serialize()
 
     await this.db
+      .backend
       .batch()
       // node public key to address (M->1)
       .put(
-        Buffer.from(this.keyOf(createNetworkRegistryEntryKey(pubKey))),
+        Buffer.from(createNetworkRegistryEntryKey(pubKey)),
         Buffer.from(serializedAccount.buffer, serializedAccount.byteOffset, serializedAccount.byteLength)
       )
       // address to node public keys (1->M) in the format of key -> PublicKey[]
       .put(
-        Buffer.from(this.keyOf(createNetworkRegistryAddressToPublicKeyKey(account))),
+        Buffer.from(createNetworkRegistryAddressToPublicKeyKey(account)),
         Buffer.from(
           serializedRegisteredNodes.buffer,
           serializedRegisteredNodes.byteOffset,
@@ -1203,11 +1066,12 @@ f
     const serializedSnapshot = snapshot.serialize()
 
     await this.db
+      .backend
       .batch()
-      .del(Buffer.from(this.keyOf(entryKey)))
+      .del(Buffer.from(entryKey))
       // address to node public keys (1->M) in the format of key -> PublicKey[]
       .put(
-        Buffer.from(this.keyOf(createNetworkRegistryAddressToPublicKeyKey(account))),
+        Buffer.from(createNetworkRegistryAddressToPublicKeyKey(account)),
         Buffer.from(
           serializedRegisteredNodes.buffer,
           serializedRegisteredNodes.byteOffset,
@@ -1238,12 +1102,13 @@ f
    * @param snapshot
    */
   public async setEligible(account: Address, eligible: boolean, snapshot: Snapshot): Promise<void> {
-    const key = Buffer.from(this.keyOf(createNetworkRegistryAddressEligibleKey(account)))
+    const key = Buffer.from(createNetworkRegistryAddressEligibleKey(account))
 
     const serializedSnapshot = snapshot.serialize()
 
     if (eligible) {
       await this.db
+        .backend
         .batch()
         .put(key, Buffer.from([]))
         .put(
@@ -1253,6 +1118,7 @@ f
         .write()
     } else {
       await this.db
+        .backend
         .batch()
         .del(key)
         .put(
@@ -1280,8 +1146,9 @@ f
     const serializedSnapshot = snapshot.serialize()
 
     await this.db
+      .backend
       .batch()
-      .put(Buffer.from(this.keyOf(NETWORK_REGISTRY_ENABLED_PREFIX)), Buffer.from([enabled ? 1 : 0]))
+      .put(Buffer.from(NETWORK_REGISTRY_ENABLED_PREFIX), Buffer.from([enabled ? 1 : 0]))
       .put(
         Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY),
         Buffer.from(serializedSnapshot.buffer, serializedSnapshot.byteOffset, serializedSnapshot.byteLength)
@@ -1302,7 +1169,7 @@ f
       id: id ?? PublicKey.createMock(),
       // CommonJS / ESM issue
       // @ts-ignore
-      db: levelup(MemDown())
+      db: new LevelDb()
     } as any
     Object.setPrototypeOf(mock, HoprDB.prototype)
 
@@ -1314,7 +1181,7 @@ f
   // @param key Key to identify the object in the namespace.
   // @param object Serialized object.
   public async putSerializedObject(namespace: string, key: string, object: Uint8Array): Promise<void> {
-    return await this.put(createObjectKey(namespace, key), object)
+    return await this.db.put(createObjectKey(namespace, key), object)
   }
 
   // Reads an a serialized object from the database.
@@ -1330,6 +1197,6 @@ f
   // @param namespace Namespace which is used for the object.
   // @param key Key to identify the object in the namespace.
   public async deleteObject(namespace: string, key: string): Promise<void> {
-    await this.del(createObjectKey(namespace, key))
+    await this.db.remove(createObjectKey(namespace, key))
   }
 }
