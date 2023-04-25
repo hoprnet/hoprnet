@@ -24,7 +24,7 @@
     "docs:watch": "typedoc --watch"
   },
   "dependencies": {
-    "semver": "7.3.8"
+    "semver": "7.5.0"
   },
   "devDependencies": {
     "@types/mocha": "9.1.1",
