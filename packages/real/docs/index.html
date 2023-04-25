@@ -14,16 +14,16 @@
 <h2>@hoprnet/hopr-real</h2></div>
 <div class="tsd-panel tsd-typography"><p>This directory contains Rust WASM modules for HOPR.
 Each WASM module corresponds to a Rust crate.</p>
-<a id="md:structure" class="tsd-anchor"></a><h2><a href="#$structure" style="color:inherit;text-decoration:none">Structure</a></h2><p>The package itself consists of two parts:</p>
+<a id="md:structure" class="tsd-anchor"></a><h2><a href="#md:structure">Structure</a></h2><p>The package itself consists of two parts:</p>
 <ul>
 <li>the Typescript code - mostly wrappers for JS functions that cannot be called from WASM modules (IO, sockets,...), sometimes called <code>REAL</code> - see <a href="https://github.com/hoprnet/hoprnet/issues/3823">#3823</a>.</li>
 <li>directories containing Rust crates (currently only <code>hopr-real</code>)</li>
 </ul>
 <p>During build, all the Rust crates are build first using <code>make all</code> (see <code>Makefile</code> in <code>packages/wasm</code>), then the Typescript sources are built as well.</p>
-<a id="md:usage-in-typescript-code" class="tsd-anchor"></a><h2><a href="#$usage-in-typescript-code" style="color:inherit;text-decoration:none">Usage in Typescript code</a></h2><p>Add dependency to <code>@hoprnet/hopr-real</code> to your <code>package.json</code></p>
+<a id="md:usage-in-typescript-code" class="tsd-anchor"></a><h2><a href="#md:usage-in-typescript-code">Usage in Typescript code</a></h2><p>Add dependency to <code>@hoprnet/hopr-real</code> to your <code>package.json</code></p>
 <pre><code class="language-typescript"><span class="hl-0">import</span><span class="hl-1"> { </span><span class="hl-2">dummy_get_one</span><span class="hl-1"> } </span><span class="hl-0">from</span><span class="hl-1"> </span><span class="hl-3">&#39;@hoprnet/hopr-real&#39;</span><br/><br/><span class="hl-0">if</span><span class="hl-1"> (</span><span class="hl-4">dummy_get_one</span><span class="hl-1">() === </span><span class="hl-3">&#39;1&#39;</span><span class="hl-1">) {</span><br/><span class="hl-1">  </span><span class="hl-2">console</span><span class="hl-1">.</span><span class="hl-4">log</span><span class="hl-1">(</span><span class="hl-3">&#39;It works!!&#39;</span><span class="hl-1">)</span><br/><span class="hl-1">}</span>
-</code></pre>
-<a id="md:testing" class="tsd-anchor"></a><h2><a href="#$testing" style="color:inherit;text-decoration:none">Testing</a></h2><p>Each WASM module can have its own unit tests and integration tests.</p>
+</code><button>Copy</button></pre>
+<a id="md:testing" class="tsd-anchor"></a><h2><a href="#md:testing">Testing</a></h2><p>Each WASM module can have its own unit tests and integration tests.</p>
 <ul>
 <li>Unit tests are placed within the module file</li>
 <li>Integration tests are placed in <code>tests/</code> directory next to <code>src/</code></li>

@@ -21,11 +21,6 @@
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Applies the transformation to the header to forward
 it to the next node or deliver it to the user</p>
-
-<h3>Returns</h3><p>whether the packet is valid, if yes returns
-the transformed packet, the public key of the next hop
-and the data next to the routing information. If current
-hop is the final recipient, it returns the plaintext</p>
 </div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
@@ -52,7 +47,11 @@ data for the last hop</p>
 <h5><span class="tsd-kind-parameter">maxHops</span>: <span class="tsd-signature-type">number</span></h5>
 <div class="tsd-comment tsd-typography"><p>maximal amount of hops</p>
 </div></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">LastNodeOutput</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type ">RelayNodeOutput</span></h4><aside class="tsd-sources">
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">LastNodeOutput</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type ">RelayNodeOutput</span></h4><p>whether the packet is valid, if yes returns
+the transformed packet, the public key of the next hop
+and the data next to the routing information. If current
+hop is the final recipient, it returns the plaintext</p>
+<aside class="tsd-sources">
 <ul>
 <li>Defined in <a href="https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/packet/index.ts#L132">utils/src/crypto/packet/index.ts:132</a></li></ul></aside></li></ul></section></div>
 <div class="col-sidebar">
