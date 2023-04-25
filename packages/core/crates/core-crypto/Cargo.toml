@@ -34,7 +34,7 @@ k256 = { version = "0.13.0", features = ["arithmetic", "ecdh"] }
 libp2p-identity = { version = "0.1.1", features = ["secp256k1", "peerid"] }
 rand = "0.8.5"
 sha3 = "0.10"
-typenum = "1.15"
+typenum = "1.16"
 thiserror = "1.0"
 utils-log = { path = "../../../utils/crates/utils-log" }
 utils-misc = { path = "../../../utils/crates/utils-misc" }
