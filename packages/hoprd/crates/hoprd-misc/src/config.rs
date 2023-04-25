@@ -628,7 +628,7 @@ heartbeat:
   interval: 0
   threshold: 0
   variance: 0
-network_option:
+network_options:
   announce: false
   allow_local_node_connections: false
   allow_private_node_connections: false
