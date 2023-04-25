@@ -781,15 +781,17 @@ impl BinarySerializable<'_> for Signature {
     }
 }
 
-/// A method that turns all lowercased hexdeicmal address to a checksum-ed address
+/// A method that turns all lower-cased hexadecimal address to a checksum-ed address
 /// according to https://eips.ethereum.org/EIPS/eip-55
 pub trait ToChecksum {
+    /// Checksum of self according to https://eips.ethereum.org/EIPS/eip-55
     fn to_checksum(&self) -> String;
 }
 
 impl ToChecksum for Address {
     fn to_checksum(&self) -> String {
         let address_hex = self.to_hex();
+
         let mut hasher = EthDigest::default();
         hasher.update(address_hex.as_bytes());
         let hash = hasher.finalize();
