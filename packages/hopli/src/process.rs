@@ -48,7 +48,7 @@ pub fn set_process_path_env(contracts_root: &Option<String>, network_name: &Stri
     }
 
     // use cmd to call process
-    env::set_var("ENVIRONMENT_NAME", network_name);
+    env::set_var("NETWORK_NAME", network_name);
     Ok(())
 }
 

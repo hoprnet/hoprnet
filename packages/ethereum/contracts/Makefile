@@ -10,7 +10,7 @@ SHELL := env PATH=$(PATH) $(shell which bash)
 # utility wrapper for forge script to use same options on every invocation
 forge := time forge
 forge-bind = time forge bind
-forge-script = env ENVIRONMENT_NAME=$(network-name) FOUNDRY_PROFILE=$(environment-type) time forge script
+forge-script = env NETWORK_NAME=$(network-name) FOUNDRY_PROFILE=$(environment-type) time forge script
 
 .PHONY: sc-test
 sc-test:
