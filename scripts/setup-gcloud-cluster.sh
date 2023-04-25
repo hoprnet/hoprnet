@@ -144,7 +144,7 @@ environment_type="$(get_environment_type "${environment}")"
 # - the CI nodes wants to perform `selfRegister`
 # This can be called always, because the "stake" task is idempotent given the same arguments
 # CI wallet stakes a developer NR NFT
-PRIVATE_KEY="${DEPLOYER_PRIVATE_KEY}" make -C "${mydir}/.." stake-nrnft environment="${environment}" nftrank=developer environment_type="${environment_type}"
+PRIVATE_KEY="${DEPLOYER_PRIVATE_KEY}" make -C "${mydir}/.." stake-nrnft network="${environment}" nftrank=developer environment_type="${environment_type}"
 
 # Get names of all instances in this cluster
 # TODO: now `native-addresses` (a.k.a. `hopr_addrs`) doesn't need to contain unique values. The array can contain repetitive addresses
@@ -234,7 +234,7 @@ IFS=','
 
 # use CI wallet to register VM instances. This action may fail if nodes were previously linked to other staking accounts
 PRIVATE_KEY="${DEPLOYER_PRIVATE_KEY}" make -C "${mydir}/.." self-register-node \
-  environment="${environment}" \
+  network="${environment}" \
   peer_ids="${hopr_addrs[*]}" \
   environment_type="${environment_type}"
 unset IFS
