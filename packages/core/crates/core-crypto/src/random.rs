@@ -46,8 +46,14 @@ pub fn random_group_element() -> (Box<[u8]>, CurvePoint) {
 
 /// Fills the specific number of bytes starting from the given offset in the given buffer.
 pub fn random_fill(buffer: &mut [u8]) {
-    //assert!(from + len <= buffer.len());
     OsRng.fill_bytes(buffer);
+}
+
+/// Allocates array of the given size and fills it with random bytes
+pub fn random_bytes<const T: usize>() -> [u8; T] {
+    let mut ret = [0u8; T];
+    random_fill(&mut ret);
+    ret
 }
 
 #[cfg(test)]

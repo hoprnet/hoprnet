@@ -1,4 +1,4 @@
-use core_crypto::types::{Challenge, Hash, PublicKey, Signature};
+use core_crypto::types::{Challenge, Hash, PublicKey, Response, Signature};
 use enum_iterator::{all, Sequence};
 use ethnum::u256;
 use serde_repr::*;
@@ -42,16 +42,6 @@ impl ChannelStatus {
         }
         .to_string()
     }
-}
-
-/// Contains acknowledgment information and the respective ticket
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
-pub struct AcknowledgedTicket {
-    pub ticket: Ticket,
-    pub response: Response,
-    pub pre_image: Hash,
-    pub signer: PublicKey,
 }
 
 /// Overall description of a channel
@@ -106,7 +96,7 @@ impl BinarySerializable<'_> for ChannelEntry {
 
     fn deserialize(data: &[u8]) -> Result<Self> {
         if data.len() == Self::SIZE {
-            let mut b = Vec::from(data);
+            let mut b = data.to_vec();
             let source = PublicKey::deserialize(b.drain(0..PublicKey::SIZE_UNCOMPRESSED).as_ref())?;
             let destination = PublicKey::deserialize(b.drain(0..PublicKey::SIZE_UNCOMPRESSED).as_ref())?;
             let balance = Balance::deserialize(b.drain(0..Balance::SIZE).as_ref(), BalanceType::HOPR)?;
@@ -150,42 +140,6 @@ impl BinarySerializable<'_> for ChannelEntry {
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub fn generate_channel_id(source: &Address, destination: &Address) -> Hash {
     Hash::create(&[&source.serialize(), &destination.serialize()])
-}
-
-/// Contains a response upon ticket acknowledgement
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-pub struct Response {
-    response: [u8; Self::SIZE],
-}
-
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-impl Response {
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
-    pub fn new(data: &[u8]) -> Self {
-        assert_eq!(data.len(), Self::SIZE);
-        let mut ret = Response {
-            response: [0u8; Self::SIZE],
-        };
-        ret.response.copy_from_slice(data);
-        ret
-    }
-}
-
-impl BinarySerializable<'_> for Response {
-    const SIZE: usize = 32;
-
-    fn deserialize(data: &[u8]) -> Result<Self> {
-        if data.len() == Self::SIZE {
-            Ok(Response::new(data))
-        } else {
-            Err(ParseError)
-        }
-    }
-
-    fn serialize(&self) -> Box<[u8]> {
-        self.response.into()
-    }
 }
 
 /// Contains the overall description of a ticket with a signature
@@ -242,9 +196,9 @@ impl Ticket {
     }
 
     /// Creates a new Ticket given the raw Challenge and signs it using the given key.
-    pub fn create(
+    pub fn new(
         counterparty: Address,
-        challenge: Challenge,
+        challenge: Option<Challenge>,
         epoch: U256,
         index: U256,
         amount: Balance,
@@ -252,7 +206,10 @@ impl Ticket {
         channel_epoch: U256,
         signing_key: &[u8],
     ) -> Self {
-        let encoded_challenge = challenge.to_ethereum_challenge();
+        let encoded_challenge = challenge
+            .map(|c| c.to_ethereum_challenge())
+            .unwrap_or(EthereumChallenge::default());
+
         let hashed_ticket = Hash::create(&[&Self::serialize_unsigned_aux(
             &counterparty,
             &encoded_challenge,
@@ -275,6 +232,36 @@ impl Ticket {
             channel_epoch,
             signature,
         }
+    }
+
+    /// Signs the ticket using the given private key.
+    pub fn sign(&mut self, signing_key: &[u8]) {
+        let hashed_ticket = Hash::create(&[&Self::serialize_unsigned_aux(
+            &self.counterparty,
+            &self.challenge,
+            &self.epoch,
+            &self.amount,
+            &self.win_prob,
+            &self.index,
+            &self.channel_epoch,
+        )]);
+
+        let msg = ethereum_signed_hash(hashed_ticket.serialize()).serialize();
+        self.signature = Signature::sign_message(&msg, signing_key);
+    }
+
+    /// Convenience method for creating a zero-hop ticket
+    pub fn new_zero_hop(destination: PublicKey, challenge: Option<Challenge>, private_key: &[u8]) -> Self {
+        Self::new(
+            destination.to_address(),
+            challenge,
+            U256::zero(),
+            U256::zero(),
+            Balance::new(0u8.into(), BalanceType::HOPR),
+            U256::zero(),
+            U256::zero(),
+            private_key,
+        )
     }
 
     /// Serializes the ticket except the signature
@@ -343,7 +330,7 @@ impl BinarySerializable<'_> for Ticket {
 
     fn deserialize(data: &[u8]) -> Result<Self> {
         if data.len() == Self::SIZE {
-            let mut b = Vec::from(data);
+            let mut b = data.to_vec();
             let counterparty = Address::deserialize(b.drain(0..Address::SIZE).as_ref())?;
             let challenge = EthereumChallenge::deserialize(b.drain(0..EthereumChallenge::SIZE).as_ref())?;
             let epoch = U256::deserialize(b.drain(0..U256::SIZE).as_ref())?;
@@ -391,7 +378,7 @@ pub mod tests {
     use utils_types::primitives::{Address, Balance, BalanceType, U256};
     use utils_types::traits::BinarySerializable;
 
-    use crate::channels::{ChannelEntry, ChannelStatus, Response, Ticket};
+    use crate::channels::{ChannelEntry, ChannelStatus, Ticket};
 
     const PUBLIC_KEY_1: [u8; 65] = hex!("0443a3958ac66a3b2ab89fcf90bc948a8b8be0e0478d21574d077ddeb11f4b1e9f2ca21d90bd66cee037255480a514b91afae89e20f7f7fa7353891cc90a52bf6e");
     const PUBLIC_KEY_2: [u8; 65] = hex!("04f16fd6701aea01032716377d52d8213497c118f99cdd1c3c621b2795cac8681606b7221f32a8c5d2ef77aa783bec8d96c11480acccabba9e8ee324ae2dfe92bb");
@@ -437,9 +424,9 @@ pub mod tests {
         ))
         .unwrap();
 
-        let ticket1 = Ticket::create(
+        let ticket1 = Ticket::new(
             Address::new(&[0u8; Address::SIZE]),
-            Challenge { curve_point },
+            Some(Challenge { curve_point }),
             U256::new("1"),
             U256::new("2"),
             Balance::new(
@@ -469,13 +456,6 @@ pub mod tests {
             "invalid path pos"
         );
     }
-
-    #[test]
-    pub fn response_test() {
-        let r1 = Response::new(&[0u8; Response::SIZE]);
-        let r2 = Response::deserialize(&r1.serialize()).unwrap();
-        assert_eq!(r1, r2, "deserialized response does not match");
-    }
 }
 
 #[cfg(feature = "wasm")]
@@ -487,7 +467,7 @@ pub mod wasm {
     use utils_types::traits::{BinarySerializable, ToHex};
     use wasm_bindgen::prelude::wasm_bindgen;
 
-    use crate::channels::{AcknowledgedTicket, ChannelEntry, ChannelStatus, Response, Ticket};
+    use crate::channels::{ChannelEntry, ChannelStatus, Ticket};
 
     #[wasm_bindgen]
     pub fn channel_status_to_number(status: ChannelStatus) -> u8 {
@@ -502,19 +482,6 @@ pub mod wasm {
     #[wasm_bindgen]
     pub fn channel_status_to_string(status: ChannelStatus) -> String {
         status.to_string()
-    }
-
-    #[wasm_bindgen]
-    impl AcknowledgedTicket {
-        #[wasm_bindgen(constructor)]
-        pub fn new(ticket: Ticket, response: Response, pre_image: Hash, signer: PublicKey) -> Self {
-            AcknowledgedTicket {
-                ticket,
-                response,
-                pre_image,
-                signer,
-            }
-        }
     }
 
     #[wasm_bindgen]
@@ -556,31 +523,9 @@ pub mod wasm {
     }
 
     #[wasm_bindgen]
-    impl Response {
-        #[wasm_bindgen(js_name = "deserialize")]
-        pub fn _deserialize(data: &[u8]) -> JsResult<Response> {
-            ok_or_jserr!(Response::deserialize(data))
-        }
-
-        #[wasm_bindgen(js_name = "serialize")]
-        pub fn _serialize(&self) -> Box<[u8]> {
-            self.serialize()
-        }
-
-        #[wasm_bindgen(js_name = "to_hex")]
-        pub fn _to_hex(&self) -> String {
-            self.to_hex()
-        }
-
-        pub fn size() -> u32 {
-            Self::SIZE as u32
-        }
-    }
-
-    #[wasm_bindgen]
     impl Ticket {
         #[wasm_bindgen(constructor)]
-        pub fn new(
+        pub fn _new(
             counterparty: Address,
             challenge: EthereumChallenge,
             epoch: U256,
@@ -611,5 +556,8 @@ pub mod wasm {
         pub fn _serialize(&self) -> Box<[u8]> {
             self.serialize()
         }
+
+        #[wasm_bindgen(js_name = "to_hex")]
+        pub fn _to_hex(&self) -> String { self.to_hex() }
     }
 }

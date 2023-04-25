@@ -3,6 +3,7 @@ use crate::errors::CryptoError::InvalidInputValue;
 use crate::errors::Result;
 
 use crate::primitives::{calculate_mac, SimpleStreamCipher};
+use crate::utils;
 
 // Module-specific constants
 const PRP_INTERMEDIATE_KEY_LENGTH: usize = 32;
@@ -87,58 +88,56 @@ impl PRP {
     /// Applies forward permutation on the given plaintext and returns a new buffer
     /// containing the result.
     pub fn forward(&self, plaintext: &[u8]) -> Result<Box<[u8]>> {
-        if plaintext.len() < PRP_MIN_LENGTH {
-            return Err(InvalidInputValue);
-        }
-
-        let mut out = Vec::from(plaintext);
-        let data = out.as_mut_slice();
-
-        Self::xor_keystream(data, &self.keys[0], &self.ivs[0])?;
-        Self::xor_hash(data, &self.keys[1], &self.ivs[1])?;
-        Self::xor_keystream(data, &self.keys[2], &self.ivs[2])?;
-        Self::xor_hash(data, &self.keys[3], &self.ivs[3])?;
-
+        let mut out: Vec<u8> = plaintext.into();
+        self.forward_inplace(&mut out)?;
         Ok(out.into_boxed_slice())
+    }
+
+    /// Applies forward permutation on the given plaintext and modifies the given buffer in-place.
+    pub fn forward_inplace(&self, plaintext: &mut [u8]) -> Result<()> {
+        if plaintext.len() >= PRP_MIN_LENGTH {
+            Self::xor_keystream(plaintext, &self.keys[0], &self.ivs[0])?;
+            Self::xor_hash(plaintext, &self.keys[1], &self.ivs[1])?;
+            Self::xor_keystream(plaintext, &self.keys[2], &self.ivs[2])?;
+            Self::xor_hash(plaintext, &self.keys[3], &self.ivs[3])?;
+            Ok(())
+        } else {
+            Err(InvalidInputValue)
+        }
     }
 
     /// Applies inverse permutation on the given plaintext and returns a new buffer
     /// containing the result.
     pub fn inverse(&self, ciphertext: &[u8]) -> Result<Box<[u8]>> {
-        if ciphertext.len() < PRP_MIN_LENGTH {
-            return Err(InvalidInputValue);
-        }
-
-        let mut out = Vec::from(ciphertext);
-        let data = out.as_mut_slice();
-
-        Self::xor_hash(data, &self.keys[3], &self.ivs[3])?;
-        Self::xor_keystream(data, &self.keys[2], &self.ivs[2])?;
-        Self::xor_hash(data, &self.keys[1], &self.ivs[1])?;
-        Self::xor_keystream(data, &self.keys[0], &self.ivs[0])?;
-
+        let mut out: Vec<u8> = ciphertext.into();
+        self.inverse_inplace(&mut out)?;
         Ok(out.into_boxed_slice())
+    }
+
+    /// Applies inverse permutation on the given ciphertext and modifies the given buffer in-place.
+    pub fn inverse_inplace(&self, ciphertext: &mut [u8]) -> Result<()> {
+        if ciphertext.len() >= PRP_MIN_LENGTH {
+            Self::xor_hash(ciphertext, &self.keys[3], &self.ivs[3])?;
+            Self::xor_keystream(ciphertext, &self.keys[2], &self.ivs[2])?;
+            Self::xor_hash(ciphertext, &self.keys[1], &self.ivs[1])?;
+            Self::xor_keystream(ciphertext, &self.keys[0], &self.ivs[0])?;
+            Ok(())
+        } else {
+            Err(InvalidInputValue)
+        }
     }
 
     // Internal helper functions
 
     fn xor_hash(data: &mut [u8], key: &[u8], iv: &[u8]) -> Result<()> {
         let res = calculate_mac([key, iv].concat().as_slice(), &data[PRP_MIN_LENGTH..])?;
-        Self::xor_inplace(data, res.as_ref());
+        utils::xor_inplace(data, res.as_ref());
         Ok(())
-    }
-
-    fn xor_inplace(a: &mut [u8], b: &[u8]) {
-        let bound = if a.len() > b.len() { b.len() } else { a.len() };
-        // TODO: Certainly space for SIMD optimization
-        for i in 0..bound {
-            a[i] = a[i] ^ b[i];
-        }
     }
 
     fn xor_keystream(data: &mut [u8], key: &[u8], iv: &[u8]) -> Result<()> {
         let mut key_cpy = Vec::from(key);
-        Self::xor_inplace(key_cpy.as_mut_slice(), &data[0..PRP_MIN_LENGTH]);
+        utils::xor_inplace(key_cpy.as_mut_slice(), &data[0..PRP_MIN_LENGTH]);
 
         let mut cipher = SimpleStreamCipher::new(key_cpy.as_slice(), &iv[4..iv.len()])?;
 

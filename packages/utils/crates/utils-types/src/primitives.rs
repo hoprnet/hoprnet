@@ -11,14 +11,20 @@ pub struct Address {
     addr: [u8; Self::SIZE],
 }
 
+impl Default for Address {
+    fn default() -> Self {
+        Self {
+            addr: [0u8; Self::SIZE],
+        }
+    }
+}
+
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl Address {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(bytes: &[u8]) -> Self {
         assert_eq!(bytes.len(), Self::SIZE, "invalid length");
-        let mut ret = Address {
-            addr: [0u8; Self::SIZE],
-        };
+        let mut ret = Self::default();
         ret.addr.copy_from_slice(bytes);
         ret
     }
@@ -190,15 +196,21 @@ pub struct EthereumChallenge {
     challenge: [u8; Self::SIZE],
 }
 
+impl Default for EthereumChallenge {
+    fn default() -> Self {
+        Self {
+            challenge: [0u8; Self::SIZE],
+        }
+    }
+}
+
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl EthereumChallenge {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(data: &[u8]) -> Self {
         assert_eq!(data.len(), Self::SIZE);
 
-        let mut ret = EthereumChallenge {
-            challenge: [0u8; Self::SIZE],
-        };
+        let mut ret = Self::default();
         ret.challenge.copy_from_slice(data);
         ret
     }
@@ -280,6 +292,16 @@ impl U256 {
             value: u256::from_str_radix(value, 10).expect("invalid decimal number string"),
         }
     }
+
+    pub fn zero() -> Self {
+        U256 { value: u256::ZERO }
+    }
+
+    pub fn one() -> Self {
+        U256 { value: u256::ONE }
+    }
+
+    pub fn to_string(&self) -> String { self.value.to_string() }
 }
 
 impl BinarySerializable<'_> for U256 {
@@ -352,7 +374,7 @@ mod tests {
 
     #[test]
     fn address_tests() {
-        let addr_1 = Address::new(&[0u8; Address::SIZE]);
+        let addr_1 = Address::default();
         let addr_2 = Address::deserialize(&addr_1.serialize()).unwrap();
 
         assert_eq!(addr_1, addr_2, "deserialized address does not match");
@@ -380,7 +402,7 @@ mod tests {
 
     #[test]
     fn eth_challenge_tests() {
-        let e_1 = EthereumChallenge::new(&[0u8; EthereumChallenge::SIZE]);
+        let e_1 = EthereumChallenge::default();
         let e_2 = EthereumChallenge::deserialize(&e_1.serialize()).unwrap();
 
         assert_eq!(e_1, e_2);
@@ -408,6 +430,8 @@ pub mod wasm {
     use crate::primitives::{Address, Balance, BalanceType, EthereumChallenge, Snapshot, U256};
     use crate::traits::{BinarySerializable, ToHex};
     use std::cmp::Ordering;
+    use std::ops::Div;
+    use ethnum::u256;
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use wasm_bindgen::prelude::wasm_bindgen;
@@ -449,6 +473,11 @@ pub mod wasm {
         #[wasm_bindgen(js_name = "eq")]
         pub fn _eq(&self, other: &Balance) -> bool {
             self.eq(other)
+        }
+
+        #[wasm_bindgen(js_name = "to_formatted_string")]
+        pub fn _to_formatted_string(&self) -> String {
+            format!("{} {:?}", self.value.div(&u256::from(10u16).pow(18)), self.balance_type)
         }
     }
 
