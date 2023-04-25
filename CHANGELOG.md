@@ -9,6 +9,7 @@
 - Introduce new types & optimize cryptographic code ([#4974](https://github.com/hoprnet/hoprnet/pull/4974))
 
 <a name="1.93"></a>
+
 ## [1.93](https://github.com/hoprnet/hoprnet/compare/release/riga...hoprnet:release/bratislava)
 
 - Migrate the `Heartbeat`, `Ping` and `Network` functionality into Rust ([#4568](https://github.com/hoprnet/hoprnet/pull/4658))
