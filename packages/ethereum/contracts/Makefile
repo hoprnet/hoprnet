@@ -35,7 +35,7 @@ check-sc-bindings: ## Only create types for Hopr* contracts
 		--crate-name bindings --select '^Hopr.*?(Boost|[^t])$$'
 
 .PHONY: anvil-deploy-erc1820
-anvil-deploy-erc1820: ensure-environment-is-set
+anvil-deploy-erc1820: ensure-environment-and-network-are-set
 anvil-deploy-erc1820: ## deploy ERC1820 contracts
 	if [ -n "$(cast code 0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24)" ]; then \
 	  echo "ERC1820 contract already deployed, skipping"; \
@@ -46,7 +46,7 @@ anvil-deploy-erc1820: ## deploy ERC1820 contracts
 
 # E.g. make anvil-deploy-contracts network-name=anvil-localhost environment-type=development
 .PHONY: anvil-deploy-contracts
-anvil-deploy-contracts: ensure-environment-is-set
+anvil-deploy-contracts: ensure-environment-and-network-are-set
 anvil-deploy-contracts: ## deploy HOPR contracts
 	$(forge-script) --broadcast script/DeployAll.s.sol:DeployAllContractsScript
 
@@ -57,7 +57,7 @@ anvil-deploy-all: ## deploy all contracts
 
 # E.g. make get-account-balances network-name=anvil-localhost environment-type=development account=0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
 .PHONY: get-account-balances
-get-account-balances: ensure-environment-is-set
+get-account-balances: ensure-environment-and-network-are-set
 get-account-balances: ## Get native and token blances of an address
 ifeq ($(account),)
 	echo "parameter <account> missing" >&2 && exit 1
@@ -67,7 +67,7 @@ endif
 
 # E.g. make request-funds network-name=anvil-localhost environment-type=development recipient=0x2402da10A6172ED018AEEa22CA60EDe1F766655C
 .PHONY: request-funds
-request-funds: ensure-environment-is-set ensure-privatekey-is-set
+request-funds: ensure-environment-and-network-are-set ensure-privatekey-is-set
 request-funds: ## Request 1000 xHOPR tokens for the recipient
 ifeq ($(recipient),)
 	echo "parameter <recipient> missing" >&2 && exit 1
@@ -79,7 +79,7 @@ endif
 # E.g. make faucet network-name=anvil-localhost environment-type=development recipient=0x2402da10A6172ED018AEEa22CA60EDe1F766655C nativeamount=10000000000000000000
 # E.g. make faucet network-name=anvil-localhost environment-type=development recipient=0x2402da10A6172ED018AEEa22CA60EDe1F766655C hopramount=100000000000000000000
 .PHONY: faucet
-faucet: ensure-environment-is-set ensure-privatekey-is-set
+faucet: ensure-environment-and-network-are-set ensure-privatekey-is-set
 faucet: ## Mint some (default: 20000) HOPR tokens and send some (default value: 10) native tokens to the recipient hopramount. Token value should be in 18 decimals
 ifeq ($(recipient),)
 	echo "parameter <recipient> missing" >&2 && exit 1
@@ -90,7 +90,7 @@ endif
 
 # E.g. make request-nrnft network-name=anvil-localhost environment-type=development recipient=0x2402da10A6172ED018AEEa22CA60EDe1F766655C nftrank=developer
 .PHONY: request-nrnft
-request-nrnft: ensure-environment-is-set ensure-privatekey-is-set
+request-nrnft: ensure-environment-and-network-are-set ensure-privatekey-is-set
 request-nrnft: ## Request one HoprBoost Network_registry NFT for the recipient given it has none and hasn't staked Network_registry NFT
 ifeq ($(recipient),)
 	echo "parameter <recipient> missing" >&2 && exit 1
@@ -104,14 +104,14 @@ endif
 
 # E.g. make stake-funds network-name=anvil-localhost environment-type=development
 .PHONY: stake-funds
-stake-funds: ensure-environment-is-set ensure-privatekey-is-set
+stake-funds: ensure-environment-and-network-are-set ensure-privatekey-is-set
 stake-funds: ## stake funds (idempotent operation)
 	$(forge-script) script/SingleAction.s.sol:SingleActionFromPrivateKeyScript \
 		--broadcast --sig "stakeXHopr(uint256)" 1000000000000000000000
 
 # E.g. make stake-nrnft network-name=anvil-localhost environment-type=development nftrank=developer
 .PHONY: stake-nrnft
-stake-nrnft: ensure-environment-is-set ensure-privatekey-is-set
+stake-nrnft: ensure-environment-and-network-are-set ensure-privatekey-is-set
 stake-nrnft: ## stake Network_registry NFTs (idempotent operation)
 ifeq ($(nftrank),)
 	echo "parameter <nftrank> missing, it can be either 'developer' or 'community'" >&2 && exit 1
@@ -121,7 +121,7 @@ endif
 
 # E.g. make self-register-node network-name=anvil-localhost environment-type=development peer_ids="[16Uiu2HAmAmXnq8FtFsBAnSyfujaXbU3B5wdVRPYGfN8S99E5azdH,16Uiu2HAky1FmbdyrY4EC2ZmKVH5t1XTqZqkutnqNf5BpSjHuD9nF]"
 .PHONY: self-register-node
-self-register-node: ensure-environment-is-set ensure-privatekey-is-set
+self-register-node: ensure-environment-and-network-are-set ensure-privatekey-is-set
 self-register-node: ## staker register a node in network registry contract
 ifeq ($(peer_ids),)
 	echo "parameter <peer_ids> missing" >&2 && exit 1
@@ -132,7 +132,7 @@ endif
 
 # E.g. make self-deregister-node network-name=anvil-localhost environment-type=development peer_ids="[16Uiu2HAmAmXnq8FtFsBAnSyfujaXbU3B5wdVRPYGfN8S99E5azdH,16Uiu2HAky1FmbdyrY4EC2ZmKVH5t1XTqZqkutnqNf5BpSjHuD9nF]"
 .PHONY: self-deregister-node
-self-deregister-node: ensure-environment-is-set ensure-privatekey-is-set
+self-deregister-node: ensure-environment-and-network-are-set ensure-privatekey-is-set
 self-deregister-node: ## staker deregister a node in network registry contract
 ifeq ($(peer_ids),)
 	echo "parameter <peer_ids> missing" >&2 && exit 1
@@ -142,7 +142,7 @@ endif
 
 # E.g. make register-nodes network-name=anvil-localhost environment-type=development staking_addresses="[0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266,0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266]" peer_ids="[16Uiu2HAmAmXnq8FtFsBAnSyfujaXbU3B5wdVRPYGfN8S99E5azdH,16Uiu2HAky1FmbdyrY4EC2ZmKVH5t1XTqZqkutnqNf5BpSjHuD9nF]"
 .PHONY: register-nodes
-register-nodes: ensure-environment-is-set ensure-privatekey-is-set
+register-nodes: ensure-environment-and-network-are-set ensure-privatekey-is-set
 register-nodes: ## owner register given nodes in network registry contract
 ifeq ($(peer_ids),)
 	echo "parameter <peer_ids> missing" >&2 && exit 1
@@ -156,7 +156,7 @@ endif
 
 # E.g. make deregister-nodes network-name=anvil-localhost environment-type=development staking_addresses="[0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266]" peer_ids="[16Uiu2HAmAmXnq8FtFsBAnSyfujaXbU3B5wdVRPYGfN8S99E5azdH,16Uiu2HAky1FmbdyrY4EC2ZmKVH5t1XTqZqkutnqNf5BpSjHuD9nF]"
 .PHONY: deregister-nodes
-deregister-nodes: ensure-environment-is-set ensure-privatekey-is-set
+deregister-nodes: ensure-environment-and-network-are-set ensure-privatekey-is-set
 deregister-nodes: ## owner deregister given nodes from network registry contract
 ifeq ($(peer_ids),)
 	echo "parameter <peer_ids> missing" >&2 && exit 1
@@ -170,21 +170,21 @@ endif
 
 # E.g. make enable-network-registry network-name=anvil-localhost environment-type=development
 .PHONY: enable-network-registry
-enable-network-registry: ensure-environment-is-set ensure-privatekey-is-set
+enable-network-registry: ensure-environment-and-network-are-set ensure-privatekey-is-set
 enable-network-registry: ## owner enables network registry (smart contract) globally
 	$(forge-script) script/SingleAction.s.sol:SingleActionFromPrivateKeyScript \
 		--broadcast --sig "enableNetworkRegistry()"
 
 # E.g. make disable-network-registry network-name=anvil-localhost environment-type=development
 .PHONY: disable-network-registry
-disable-network-registry: ensure-environment-is-set ensure-privatekey-is-set
+disable-network-registry: ensure-environment-and-network-are-set ensure-privatekey-is-set
 disable-network-registry: ## owner disables network registry (smart contract) globally
 	$(forge-script) script/SingleAction.s.sol:SingleActionFromPrivateKeyScript \
 		--broadcast --sig "disableNetworkRegistry()"
 
 # E.g. make force-eligibility-update network-name=anvil-localhost environment-type=development staking_addresses="[0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266,0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266]" eligibility="[true,false]"
 .PHONY: force-eligibility-update
-force-eligibility-update: ensure-environment-is-set ensure-privatekey-is-set
+force-eligibility-update: ensure-environment-and-network-are-set ensure-privatekey-is-set
 force-eligibility-update: ## owner forces eligibility update
 ifeq ($(staking_addresses),)
 	echo "parameter <staking_addresses> missing" >&2 && exit 1
@@ -198,7 +198,7 @@ endif
 
 # E.g. make sync-eligibility network-name=anvil-localhost environment-type=development peer_ids="[16Uiu2HAmAmXnq8FtFsBAnSyfujaXbU3B5wdVRPYGfN8S99E5azdH,16Uiu2HAky1FmbdyrY4EC2ZmKVH5t1XTqZqkutnqNf5BpSjHuD9nF]"
 .PHONY: sync-eligibility
-sync-eligibility: ensure-environment-is-set ensure-privatekey-is-set
+sync-eligibility: ensure-environment-and-network-are-set ensure-privatekey-is-set
 sync-eligibility: ## owner sync eligibility of peers
 ifeq ($(peer_ids),)
 	echo "parameter <peer_ids> missing" >&2 && exit 1
@@ -206,7 +206,7 @@ endif
 	$(forge-script) script/SingleAction.s.sol:SingleActionFromPrivateKeyScript \
 		--broadcast --sig "syncEligibility(string[])" $(peer_ids)
 
-ensure-environment-is-set:
+ensure-environment-and-network-are-set:
 ifeq ($(network-name),)
 	echo "parameter <network-name> missing" >&2 && exit 1
 else

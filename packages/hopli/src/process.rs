@@ -117,7 +117,7 @@ where
     T: AsRef<OsStr>,
 {
     // check environment is set
-    let envrionment_check = environment_config::ensure_environment_is_set(
+    let envrionment_check = environment_config::ensure_environment_and_network_are_set(
         &env::current_dir().unwrap(),
         network_name,
         &env::var("FOUNDRY_PROFILE").unwrap(),

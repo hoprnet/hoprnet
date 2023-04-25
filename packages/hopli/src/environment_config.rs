@@ -57,7 +57,7 @@ pub struct NetworkConfig {
 
 /// ensures that the network_name and environment_type exist
 /// in `contracts-addresses.json` and are matched
-pub fn ensure_environment_is_set(
+pub fn ensure_environment_and_network_are_set(
     make_root_dir_path: &PathBuf,
     network_name: &str,
     environment_type: &str,
@@ -121,7 +121,7 @@ mod tests {
             .join("contracts");
         let network_name = "anvil-localhost";
         let environment_type = "development";
-        match ensure_environment_is_set(correct_dir, network_name, environment_type) {
+        match ensure_environment_and_network_are_set(correct_dir, network_name, environment_type) {
             Ok(result) => assert_eq!(result, true),
             _ => assert!(false),
         }
@@ -132,7 +132,9 @@ mod tests {
         let wrong_dir = &std::env::current_dir().unwrap();
         let network_name = "anvil-localhost";
         let environment_type = "development";
-        let result = std::panic::catch_unwind(|| ensure_environment_is_set(wrong_dir, network_name, environment_type));
+        let result = std::panic::catch_unwind(|| {
+            ensure_environment_and_network_are_set(wrong_dir, network_name, environment_type)
+        });
         assert!(result.is_err());
     }
 
@@ -145,7 +147,9 @@ mod tests {
             .join("ethereum")
             .join("contracts");
 
-        let result = std::panic::catch_unwind(|| ensure_environment_is_set(correct_dir, "non-existing", "development"));
+        let result = std::panic::catch_unwind(|| {
+            ensure_environment_and_network_are_set(correct_dir, "non-existing", "development")
+        });
         assert!(result.is_err());
     }
 
@@ -159,7 +163,7 @@ mod tests {
             .join("contracts");
         let network_name = "anvil-localhost";
         let environment_type = "production";
-        match ensure_environment_is_set(correct_dir, network_name, environment_type) {
+        match ensure_environment_and_network_are_set(correct_dir, network_name, environment_type) {
             Ok(result) => assert_eq!(result, false),
             _ => assert!(false),
         }
