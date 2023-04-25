@@ -43,7 +43,7 @@
     "err-code": "3.0.1",
     "heap-js": "2.2.0",
     "it-handshake": "4.0.0",
-    "multiformats": "9.6.5",
+    "multiformats": "9.9.0",
     "retimer": "3.0.0",
     "simple-peer": "9.11.1",
     "stream-to-it": "0.2.4",

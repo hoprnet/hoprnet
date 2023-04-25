@@ -45,7 +45,7 @@
     "leveldown": "6.1.1",
     "levelup": "5.1.1",
     "memdown": "6.1.1",
-    "multiformats": "9.6.5",
+    "multiformats": "9.9.0",
     "secp256k1": "4.0.3",
     "timeout-abort-controller": "3.0.0"
   },

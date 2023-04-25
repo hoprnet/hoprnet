@@ -762,7 +762,7 @@ __metadata:
     it-pipe: 2.0.5
     it-pushable: 3.0.0
     mocha: 9.2.2
-    multiformats: 9.6.5
+    multiformats: 9.9.0
     retimer: 3.0.0
     simple-peer: 9.11.1
     stream-to-it: 0.2.4
@@ -901,7 +901,7 @@ __metadata:
     libp2p: 0.37.3
     memdown: 6.1.1
     mocha: 9.2.2
-    multiformats: 9.6.5
+    multiformats: 9.9.0
     rewiremock: 3.14.5
     secp256k1: 4.0.3
     sinon: 12.0.1
@@ -8270,10 +8270,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"multiformats@npm:9.6.5":
-  version: 9.6.5
-  resolution: "multiformats@npm:9.6.5"
-  checksum: f4fce459bf19e1c38e4daa0e6de3aeea55ab000620d23ef599943495ab65d1c0351c5aa53d15eb365181d30a4b0629785a0d8901d17b5d153c48f4f1a683cd47
+"multiformats@npm:9.9.0":
+  version: 9.9.0
+  resolution: "multiformats@npm:9.9.0"
+  checksum: d3e8c1be400c09a014f557ea02251a2710dbc9fca5aa32cc702ff29f636c5471e17979f30bdcb0a9cbb556f162a8591dc2e1219c24fc21394a56115b820bb84e
   languageName: node
   linkType: hard
 
