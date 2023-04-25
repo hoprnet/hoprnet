@@ -69,7 +69,7 @@ const argv = yargsInstance
   .version(version)
   .option('network', {
     string: true,
-    describe: 'Network id which the node shall run on (HOPR_CTD_ENVIRONMENT)',
+    describe: 'Network id which the node shall run on (HOPR_CTD_NETWORK)',
     choices: supportedNetworks().map((env) => env.id),
     default: defaultNetwork()
   })
