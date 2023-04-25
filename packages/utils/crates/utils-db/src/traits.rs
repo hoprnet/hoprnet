@@ -1,21 +1,21 @@
 use async_trait::async_trait;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use crate::errors::Result;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Del<K>
-    where
-        K: Serialize
+where
+    K: Serialize,
 {
     pub key: K,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Put<K, V>
-    where
-        K: Serialize,
-        V: Serialize
+where
+    K: Serialize,
+    V: Serialize,
 {
     pub key: K,
     pub value: V,
@@ -25,16 +25,16 @@ pub struct Put<K, V>
 #[serde(tag = "type")]
 #[allow(non_camel_case_types)]
 pub enum BatchOperation<K, V>
-    where
-        K: Serialize,
-        V: Serialize
+where
+    K: Serialize,
+    V: Serialize,
 {
     del(Del<K>),
     put(Put<K, V>),
 }
 
 #[cfg_attr(test, mockall::automock(type Key = Box < [u8] >; type Value = Box < [u8] >;))]
-#[async_trait(? Send)]           // not placing the `Send` trait limitations on the trait
+#[async_trait(? Send)] // not placing the `Send` trait limitations on the trait
 pub trait AsyncKVStorage {
     type Key: Serialize;
     type Value: Serialize;
@@ -49,10 +49,14 @@ pub trait AsyncKVStorage {
 
     async fn dump(&self, destination: String) -> Result<()>;
 
-    async fn batch(&mut self, operations: Vec<BatchOperation<Self::Key, Self::Value>>, wait_for_write: bool) -> Result<()>;
+    async fn batch(
+        &mut self,
+        operations: Vec<BatchOperation<Self::Key, Self::Value>>,
+        wait_for_write: bool,
+    ) -> Result<()>;
 }
 
-pub trait BinaryAsyncKVStorage: AsyncKVStorage<Key=Box<[u8]>, Value=Box<[u8]>> {}
+pub trait BinaryAsyncKVStorage: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> {}
 
 pub trait KVStorage {
     type Key;

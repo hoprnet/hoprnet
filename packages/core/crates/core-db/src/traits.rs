@@ -10,7 +10,6 @@ type Ticket = u128;
 type UnacknowledgedTicket = u128;
 type ChannelEntry = u128;
 
-
 // TODO: packet interaction only
 #[async_trait]
 pub trait HoprCoreDbActions {
@@ -29,5 +28,10 @@ pub trait HoprCoreDbActions {
 
     async fn check_and_set_packet_tag(&self, tag: Box<[u8]>);
 
-    async fn store_pending_acknowledgment(&self, half_key_challenge: HalfKeyChallenge, is_message_sender: bool, unack_ticket: Option<UnacknowledgedTicket>);
+    async fn store_pending_acknowledgment(
+        &self,
+        half_key_challenge: HalfKeyChallenge,
+        is_message_sender: bool,
+        unack_ticket: Option<UnacknowledgedTicket>,
+    );
 }

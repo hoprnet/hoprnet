@@ -201,9 +201,10 @@ export class LevelDb {
       await this.put(ENVIRONMENT_KEY, encoder.encode(environmentId))
     } else {
       let storedEnvironmentId = await this.maybeGet(ENVIRONMENT_KEY)
-      let decodedStoredEnvironmentId = (storedEnvironmentId !== undefined) ? undefined : decoder.decode(storedEnvironmentId)
+      let decodedStoredEnvironmentId =
+        storedEnvironmentId !== undefined ? undefined : decoder.decode(storedEnvironmentId)
 
-      const hasEnvironmentKey = ((decodedStoredEnvironmentId !== undefined) && (decodedStoredEnvironmentId === environmentId))
+      const hasEnvironmentKey = decodedStoredEnvironmentId !== undefined && decodedStoredEnvironmentId === environmentId
 
       if (!hasEnvironmentKey) {
         throw new Error(`invalid db environment id: ${decodedStoredEnvironmentId} (expected: ${environmentId})`)
@@ -212,7 +213,7 @@ export class LevelDb {
   }
 
   public async has(key: Uint8Array): Promise<boolean> {
-    return undefined !== await this.maybeGet(Buffer.from(key))
+    return undefined !== (await this.maybeGet(Buffer.from(key)))
   }
 
   public async put(key: Uint8Array, value: Uint8Array): Promise<void> {
@@ -229,9 +230,9 @@ export class LevelDb {
     await this.backend.del(Buffer.from(key))
   }
 
-  public async batch(ops: Array<any>, wait_for_write= false): Promise<void> {
+  public async batch(ops: Array<any>, wait_for_write = false): Promise<void> {
     const options: { sync: boolean } = {
-      sync: wait_for_write,
+      sync: wait_for_write
     }
 
     let batch = this.backend.batch()
@@ -272,32 +273,32 @@ export class LevelDb {
     log(`Dumping current database to ${destFile}`)
     let dumpFile = fs.createWriteStream(destFile, { flags: 'a' })
     this.backend
-        .createReadStream({ keys: true, keyAsBuffer: true, values: true, valueAsBuffer: true })
-        .on('data', (d) => {
-          // Skip the public key prefix in each key
-          let key = (d.key as Buffer).subarray(PublicKey.SIZE_COMPRESSED)
-          let keyString = ''
-          let isHex = false
-          let sawDelimiter = false
-          for (const b of key) {
-            if (!sawDelimiter && b >= 32 && b <= 126) {
-              // Print sequences of ascii chars normally
-              let cc = String.fromCharCode(b)
-              keyString += (isHex ? ' ' : '') + cc
-              isHex = false
-              // Once a delimiter is encountered, always print as hex since then
-              sawDelimiter = sawDelimiter || cc == '-' || cc == ':'
-            } else {
-              // Print sequences of non-ascii chars as hex
-              keyString += (!isHex ? '0x' : '') + (b as number).toString(16)
-              isHex = true
-            }
+      .createReadStream({ keys: true, keyAsBuffer: true, values: true, valueAsBuffer: true })
+      .on('data', (d) => {
+        // Skip the public key prefix in each key
+        let key = (d.key as Buffer).subarray(PublicKey.SIZE_COMPRESSED)
+        let keyString = ''
+        let isHex = false
+        let sawDelimiter = false
+        for (const b of key) {
+          if (!sawDelimiter && b >= 32 && b <= 126) {
+            // Print sequences of ascii chars normally
+            let cc = String.fromCharCode(b)
+            keyString += (isHex ? ' ' : '') + cc
+            isHex = false
+            // Once a delimiter is encountered, always print as hex since then
+            sawDelimiter = sawDelimiter || cc == '-' || cc == ':'
+          } else {
+            // Print sequences of non-ascii chars as hex
+            keyString += (!isHex ? '0x' : '') + (b as number).toString(16)
+            isHex = true
           }
-          dumpFile.write(keyString + ':' + d.value.toString('hex') + '\n')
-        })
-        .on('end', function () {
-          dumpFile.close()
-        })
+        }
+        dumpFile.write(keyString + ':' + d.value.toString('hex') + '\n')
+      })
+      .on('end', function () {
+        dumpFile.close()
+      })
   }
 }
 
@@ -725,8 +726,7 @@ export class HoprDB {
 
     const serializedSnapshot = snapshot.serialize()
 
-    await this.db
-      .backend
+    await this.db.backend
       .batch()
       .put(
         Buffer.from(keyU8a.buffer, keyU8a.byteOffset, keyU8a.byteLength),
@@ -747,8 +747,7 @@ export class HoprDB {
     const serializedAccount = account.serialize()
     const serializedSnapshot = snapshot.serialize()
 
-    await this.db
-      .backend
+    await this.db.backend
       .batch()
       .put(
         Buffer.from(createAccountKey(account.getAddress())),
@@ -825,8 +824,7 @@ export class HoprDB {
     const serializedSnapshot = snapshot.serialize()
     const u8aPendingKey = createPendingTicketsCountKey(ticket.counterparty)
 
-    await this.db
-      .backend
+    await this.db.backend
       .batch()
       .put(
         Buffer.from(u8aPendingKey.buffer, u8aPendingKey.byteOffset, u8aPendingKey.byteLength),
@@ -936,8 +934,7 @@ export class HoprDB {
 
     const serializedSnapshot = snapshot.serialize()
 
-    await this.db
-      .backend
+    await this.db.backend
       .batch()
       .put(Buffer.from(HOPR_BALANCE_KEY), Buffer.from(val.add(value).serialize()))
       .put(
@@ -952,8 +949,7 @@ export class HoprDB {
 
     const serializedSnapshot = snapshot.serialize()
 
-    await this.db
-      .backend
+    await this.db.backend
       .batch()
       .put(Buffer.from(HOPR_BALANCE_KEY), Buffer.from(val.sub(value).serialize()))
       .put(
@@ -997,8 +993,7 @@ export class HoprDB {
     const serializedRegisteredNodes = PublicKey.serializeArray(registeredNodes)
     const serializedAccount = account.serialize()
 
-    await this.db
-      .backend
+    await this.db.backend
       .batch()
       // node public key to address (M->1)
       .put(
@@ -1065,8 +1060,7 @@ export class HoprDB {
     const serializedRegisteredNodes = PublicKey.serializeArray(registeredNodes)
     const serializedSnapshot = snapshot.serialize()
 
-    await this.db
-      .backend
+    await this.db.backend
       .batch()
       .del(Buffer.from(entryKey))
       // address to node public keys (1->M) in the format of key -> PublicKey[]
@@ -1107,8 +1101,7 @@ export class HoprDB {
     const serializedSnapshot = snapshot.serialize()
 
     if (eligible) {
-      await this.db
-        .backend
+      await this.db.backend
         .batch()
         .put(key, Buffer.from([]))
         .put(
@@ -1117,8 +1110,7 @@ export class HoprDB {
         )
         .write()
     } else {
-      await this.db
-        .backend
+      await this.db.backend
         .batch()
         .del(key)
         .put(
@@ -1145,8 +1137,7 @@ export class HoprDB {
   public async setNetworkRegistryEnabled(enabled: boolean, snapshot: Snapshot): Promise<void> {
     const serializedSnapshot = snapshot.serialize()
 
-    await this.db
-      .backend
+    await this.db.backend
       .batch()
       .put(Buffer.from(NETWORK_REGISTRY_ENABLED_PREFIX), Buffer.from([enabled ? 1 : 0]))
       .put(

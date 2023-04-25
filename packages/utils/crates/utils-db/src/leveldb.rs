@@ -1,8 +1,7 @@
 use async_trait::async_trait;
 
 use crate::errors::DbError;
-use crate::traits::{AsyncKVStorage,BatchOperation};
-
+use crate::traits::{AsyncKVStorage, BatchOperation};
 
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
@@ -14,16 +13,16 @@ extern "C" {
     pub type LevelDb;
 
     #[wasm_bindgen(method, catch)]
-    async fn has(this: &LevelDb, key: Box<[u8]>) -> Result<JsValue, JsValue>;     // bool;
+    async fn has(this: &LevelDb, key: Box<[u8]>) -> Result<JsValue, JsValue>; // bool;
 
     #[wasm_bindgen(method, catch)]
     async fn put(this: &LevelDb, key: Box<[u8]>, value: Box<[u8]>) -> Result<(), JsValue>;
 
     #[wasm_bindgen(method, catch)]
-    async fn get(this: &LevelDb, key: Box<[u8]>) -> Result<JsValue, JsValue>;          // Option<Box<[u8]>>;
+    async fn get(this: &LevelDb, key: Box<[u8]>) -> Result<JsValue, JsValue>; // Option<Box<[u8]>>;
 
     #[wasm_bindgen(method, catch)]
-    async fn remove(this: &LevelDb, key: Box<[u8]>) -> Result<JsValue, JsValue>;       // Option<Box<[u8]>>;
+    async fn remove(this: &LevelDb, key: Box<[u8]>) -> Result<JsValue, JsValue>; // Option<Box<[u8]>>;
 
     // https://github.com/Level/levelup#dbbatcharray-options-callback-array-form
     #[wasm_bindgen(method, catch)]
@@ -33,8 +32,7 @@ extern "C" {
     fn dump(this: &LevelDb, destination: String) -> Result<(), JsValue>;
 }
 
-pub struct LevelDbShim
-{
+pub struct LevelDbShim {
     db: LevelDb,
 }
 
@@ -51,7 +49,8 @@ impl AsyncKVStorage for LevelDbShim {
 
     async fn get(&self, key: Self::Key) -> crate::errors::Result<Self::Value> {
         self.db
-            .get(key).await
+            .get(key)
+            .await
             .map_err(|_| DbError::GenericError("Encountered error on DB get operation".to_string()))
             .and_then(|v| {
                 if v.is_undefined() {
@@ -64,21 +63,20 @@ impl AsyncKVStorage for LevelDbShim {
 
     async fn set(&mut self, key: Self::Key, value: Self::Value) -> crate::errors::Result<Option<Self::Value>> {
         self.db
-            .put(key, value).await
-            .map(|_| None)              // NOTE: The LevelDB API does not allow to return an evicted value
+            .put(key, value)
+            .await
+            .map(|_| None) // NOTE: The LevelDB API does not allow to return an evicted value
             .map_err(|_| DbError::GenericError("Encountered error on DB put operation".to_string()))
     }
 
     async fn contains(&self, key: Self::Key) -> bool {
-        self.db
-            .has(key).await
-            .map(|v| v.as_bool().unwrap())
-            .unwrap_or(false)
+        self.db.has(key).await.map(|v| v.as_bool().unwrap()).unwrap_or(false)
     }
 
     async fn remove(&mut self, key: Self::Key) -> crate::errors::Result<Option<Self::Value>> {
         self.db
-            .remove(key).await
+            .remove(key)
+            .await
             .map(|v| {
                 if v.is_undefined() {
                     // NOTE: The LevelDB API does not allow to return an evicted value
@@ -90,19 +88,28 @@ impl AsyncKVStorage for LevelDbShim {
             .map_err(|_| DbError::GenericError("Encountered error on DB remove operation".to_string()))
     }
 
-    async fn batch(&mut self, operations: Vec<BatchOperation<Self::Key,Self::Value>>, wait_for_write: bool) -> crate::errors::Result<()> {
-        let ops = operations.into_iter()
+    async fn batch(
+        &mut self,
+        operations: Vec<BatchOperation<Self::Key, Self::Value>>,
+        wait_for_write: bool,
+    ) -> crate::errors::Result<()> {
+        let ops = operations
+            .into_iter()
             .map(|op| serde_wasm_bindgen::to_value(&op))
             .collect::<Vec<_>>();
 
         if ops.iter().any(|i| i.is_err()) {
-            Err(DbError::GenericError("Batch operation contains a deserialization error, aborting".to_string()))
+            Err(DbError::GenericError(
+                "Batch operation contains a deserialization error, aborting".to_string(),
+            ))
         } else {
-            let ops: js_sys::Array = ops.into_iter()
+            let ops: js_sys::Array = ops
+                .into_iter()
                 .filter_map(|op| op.ok().map(|v| JsValue::from(&v)))
                 .collect();
             self.db
-                .batch(ops, wait_for_write).await
+                .batch(ops, wait_for_write)
+                .await
                 .map_err(|e| DbError::GenericError(format!("Batch operation failed to write data: {:?}", e)))
         }
     }
@@ -132,45 +139,59 @@ pub async fn db_sanity_test(db: LevelDb) -> Result<bool, JsValue> {
     // }
 
     if kv_storage.contains(key_1.as_bytes().to_vec().into_boxed_slice()).await {
-        return Err::<bool, JsValue>(
-            JsValue::from(JsError::new("Test #1 failed: empty DB should not contain any data")))
+        return Err::<bool, JsValue>(JsValue::from(JsError::new(
+            "Test #1 failed: empty DB should not contain any data",
+        )));
     }
 
-    let _ = kv_storage.set(key_1.as_bytes().to_vec().into_boxed_slice(), value_1.as_bytes().to_vec().into_boxed_slice()).await;
+    let _ = kv_storage
+        .set(
+            key_1.as_bytes().to_vec().into_boxed_slice(),
+            value_1.as_bytes().to_vec().into_boxed_slice(),
+        )
+        .await;
     if !kv_storage.contains(key_1.as_bytes().to_vec().into_boxed_slice()).await {
-        return Err::<bool, JsValue>(
-            JsValue::from(JsError::new("Test #2 failed: DB should contain the key")))
+        return Err::<bool, JsValue>(JsValue::from(JsError::new("Test #2 failed: DB should contain the key")));
     }
 
-    let value = kv_storage.get(key_1.as_bytes().to_vec().into_boxed_slice()).await.unwrap();
+    let value = kv_storage
+        .get(key_1.as_bytes().to_vec().into_boxed_slice())
+        .await
+        .unwrap();
     let value_converted = std::str::from_utf8(value.as_ref())
         .map_err(|_| JsValue::from(JsError::new("Test #3.0 failed: could not convert the get type")))?;
 
     if value_converted != value_1 {
-        return Err::<bool, JsValue>(
-            JsValue::from(JsError::new("Test #3.1 failed: DB value after get should be equal to the one before the get")))
+        return Err::<bool, JsValue>(JsValue::from(JsError::new(
+            "Test #3.1 failed: DB value after get should be equal to the one before the get",
+        )));
     }
 
     let _ = kv_storage.remove(key_1.as_bytes().to_vec().into_boxed_slice()).await;
 
     if kv_storage.contains(key_1.as_bytes().to_vec().into_boxed_slice()).await {
-        return Err::<bool, JsValue>(
-            JsValue::from(JsError::new("Test #4 failed: removal of key from the DB failed")))
+        return Err::<bool, JsValue>(JsValue::from(JsError::new(
+            "Test #4 failed: removal of key from the DB failed",
+        )));
     }
 
     let batch_data = vec![
-        BatchOperation::put(crate::traits::Put{
+        BatchOperation::put(crate::traits::Put {
             key: key_3.as_bytes().to_vec().into_boxed_slice(),
-            value: value_3.as_bytes().to_vec().into_boxed_slice()}),
-        BatchOperation::put(crate::traits::Put{
+            value: value_3.as_bytes().to_vec().into_boxed_slice(),
+        }),
+        BatchOperation::put(crate::traits::Put {
             key: key_2.as_bytes().to_vec().into_boxed_slice(),
-            value: value_2.as_bytes().to_vec().into_boxed_slice()}),
-        BatchOperation::del(crate::traits::Del{
-            key: key_2.as_bytes().to_vec().into_boxed_slice()})
+            value: value_2.as_bytes().to_vec().into_boxed_slice(),
+        }),
+        BatchOperation::del(crate::traits::Del {
+            key: key_2.as_bytes().to_vec().into_boxed_slice(),
+        }),
     ];
     if let Err(e) = kv_storage.batch(batch_data, true).await {
-        return Err::<bool, JsValue>(
-            JsValue::from(JsError::new(format!("Test #5.0 failed: batch operation failed: {}", e.to_string()).as_str())))
+        return Err::<bool, JsValue>(JsValue::from(JsError::new(
+            format!("Test #5.0 failed: batch operation failed: {}", e.to_string()).as_str(),
+        )));
     }
 
     gloo_timers::future::sleep(std::time::Duration::from_millis(10)).await;
