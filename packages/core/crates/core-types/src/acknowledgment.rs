@@ -4,6 +4,7 @@ use core_crypto::types::{HalfKey, HalfKeyChallenge, Hash, PublicKey, Response, S
 use utils_types::errors;
 use utils_types::errors::GeneralError::ParseError;
 use utils_types::traits::BinarySerializable;
+use crate::acknowledgment::PendingAcknowledgement::{WaitingAsRelayer, WaitingAsSender};
 
 /// Represents packet acknowledgement
 #[derive(Clone, Debug, PartialEq)]
@@ -238,6 +239,61 @@ impl BinarySerializable<'_> for AcknowledgementChallenge {
     fn serialize(&self) -> Box<[u8]> {
         assert!(self.ack_challenge.is_some(), "challenge is invalid");
         self.signature.serialize()
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum PendingAcknowledgement {
+    WaitingAsSender,
+    WaitingAsRelayer(UnacknowledgedTicket)
+}
+
+impl PendingAcknowledgement {
+    const SENDER_PREFIX: u8 = 0;
+    const RELAYER_PREFIX: u8 = 1;
+}
+
+impl BinarySerializable<'_> for PendingAcknowledgement {
+    const SIZE: usize = 1;
+
+    fn deserialize(data: &[u8]) -> errors::Result<Self> {
+        if data.len() >= Self::SIZE {
+            match data[0] {
+                Self::SENDER_PREFIX => Ok(WaitingAsSender),
+                Self::RELAYER_PREFIX => Ok(WaitingAsRelayer(UnacknowledgedTicket::deserialize(&data[1..])?)),
+                _ => Err(ParseError)
+            }
+        } else {
+            Err(ParseError)
+        }
+    }
+
+    fn serialize(&self) -> Box<[u8]> {
+        let mut ret = Vec::with_capacity(Self::SIZE);
+        match &self {
+            WaitingAsSender => ret.push(Self::SENDER_PREFIX),
+            WaitingAsRelayer(unacknowledged) => {
+                ret.push(Self::RELAYER_PREFIX);
+                ret.extend_from_slice(&unacknowledged.serialize());
+            }
+        }
+        ret.into_boxed_slice()
+    }
+}
+
+#[cfg(test)]
+pub mod test {
+    use utils_types::traits::BinarySerializable;
+    use crate::acknowledgment::PendingAcknowledgement;
+
+    // TODO: Add tests to all remaining types
+
+    #[test]
+    fn test_pending_ack() {
+        assert_eq!(PendingAcknowledgement::WaitingAsSender,
+                   PendingAcknowledgement::deserialize(&PendingAcknowledgement::WaitingAsSender.serialize())
+                       .unwrap()
+        );
     }
 }
 
