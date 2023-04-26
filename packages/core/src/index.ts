@@ -1032,11 +1032,11 @@ class Hopr extends EventEmitter {
     await this.coreNetwork.ping([destination])
 
     let peer_info = this.coreNetwork.getPeerInfo(destination)
-    if (peer_info !== undefined && peer_info.last_seen >= 0) {
-      return { latency: Number(peer_info.last_seen) - start }
-    } else {
+    if (peer_info == undefined) {
       return { info: 'failure', latency: -1 }
     }
+
+    return { latency: Number(peer_info.last_seen) - start }
   }
 
   /**

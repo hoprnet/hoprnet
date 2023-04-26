@@ -1,6 +1,6 @@
 use crate::{
     heartbeat::{Heartbeat, HeartbeatConfig, HeartbeatRequest},
-    network::{wasm::WasmNetworkApi, Health, Network, PeerOrigin, PeerStatus},
+    network::{wasm::WasmNetworkApi, Health, Network, PeerOrigin},
     ping::{Ping, PingConfig},
 };
 use core_crypto::random::random_integer;
@@ -9,7 +9,7 @@ use gloo_timers::future::sleep;
 use js_sys::{Array, Date, Function, JsString, Map, Number, Promise};
 use libp2p::PeerId;
 use std::{collections::HashMap, pin::Pin, rc::Rc, str::FromStr, time::Duration};
-use utils_log::{error, info, warn};
+use utils_log::{error, info};
 use utils_misc::{
     streaming_iterable::{JsStreamingIterable, StreamingIterable},
     utils::wasm::js_map_to_hash_map,
@@ -65,7 +65,10 @@ impl TryInto<PeerId> for JsPeerId {
     type Error = String;
 
     fn try_into(self) -> Result<PeerId, Self::Error> {
-        PeerId::from_str(self.to_string().as_str()).map_err(|e| e.to_string())
+        PeerId::from_str(self.to_string().as_str()).map_err(|e| {
+            error!("{}", e);
+            e.to_string()
+        })
     }
 }
 
@@ -335,93 +338,57 @@ impl CoreNetwork {
     /// * `peers` - Vector of String representations of the PeerIds to be pinged.
     #[wasm_bindgen]
     pub async fn ping(&self, peers: Vec<JsPeerId>) {
-        let converted: Vec<PeerId> = peers.into_iter().map(|p| p.try_into().unwrap()).collect();
+        let converted: Vec<PeerId> = peers
+            .into_iter()
+            .map(|p| p.try_into().expect("Failed to parse peer id"))
+            .collect();
 
         self.pinger.ping_peers(converted).await;
     }
 
     #[wasm_bindgen]
-    pub fn register(&mut self, peer: JsPeerId, origin: PeerOrigin) {
+    pub fn register(&self, peer: JsPeerId, origin: PeerOrigin) {
         self.register_with_metadata(peer, origin, &Map::new())
     }
 
     #[wasm_bindgen(js_name = "registerWithMetadata")]
-    pub fn register_with_metadata(&mut self, peer: JsPeerId, origin: PeerOrigin, metadata: &Map) {
-        match PeerId::from_str(&peer.to_string().to_owned()) {
-            Ok(p) => self
-                .network
-                .add_with_metadata(&p, origin, js_map_to_hash_map(&metadata)),
-            Err(err) => {
-                warn!(
-                    "Failed to parse peer id {}, network ignores the register attempt: {}",
-                    peer.to_string(),
-                    err.to_string()
-                );
-            }
-        }
+    pub fn register_with_metadata(&self, peer: JsPeerId, origin: PeerOrigin, metadata: &Map) {
+        self.network.add_with_metadata(
+            &peer.try_into().expect("Failed to parse peer id"),
+            origin,
+            js_map_to_hash_map(metadata),
+        )
     }
 
     #[wasm_bindgen]
     pub fn contains(&self, peer: JsPeerId) -> bool {
-        match PeerId::from_str(&peer.to_string()) {
-            Ok(p) => self.network.has(&p),
-            Err(err) => {
-                warn!(
-                    "Failed to parse peer id {}, network assumes it is not present: {}",
-                    peer.to_string(),
-                    err.to_string()
-                );
-                false
-            }
-        }
+        self.network.has(&peer.try_into().expect("Failed to parse peer id"))
     }
 
     #[wasm_bindgen]
     pub fn unregister(&self, peer: JsPeerId) {
-        let peer: String = peer.to_string().into();
-        match PeerId::from_str(&peer) {
-            Ok(p) => self.network.remove(&p),
-            Err(err) => {
-                warn!(
-                    "Failed to parse peer id {}, network ignores the unregister attempt: {}",
-                    peer,
-                    err.to_string()
-                );
-            }
-        }
+        self.network.remove(&peer.try_into().expect("Failed to parse peer id"));
     }
 
     #[wasm_bindgen(js_name = "getPeerInfo")]
-    pub fn get_peer_info(&self, peer: JsPeerId) -> Option<PeerStatus> {
-        let peer: String = peer.to_string().into();
-        match PeerId::from_str(&peer) {
-            Ok(p) => self.network.get_peer_status(&p),
-            Err(err) => {
-                warn!(
-                    "Failed to parse peer id {}, peer info unavailable: {}",
-                    peer,
-                    err.to_string()
-                );
-                None
-            }
+    pub fn get_peer_info(&self, peer: JsPeerId) -> JsValue {
+        match self
+            .network
+            .get_peer_status(&peer.try_into().expect("Failed to parse peer id"))
+        {
+            Some(status) => JsValue::from(status),
+            None => JsValue::undefined(),
         }
     }
+
     #[wasm_bindgen(js_name = "qualityOf")]
-    pub fn quality_of(&self, peer: JsPeerId) -> f64 {
-        let peer: String = peer.to_string().into();
-        match PeerId::from_str(&peer) {
-            Ok(p) => match self.network.get_peer_status(&p) {
-                Some(v) => v.quality,
-                _ => 0.0f64,
-            },
-            Err(err) => {
-                warn!(
-                    "Failed to parse peer id {}, using lowest possible quality: {}",
-                    peer,
-                    err.to_string()
-                );
-                0.0f64
-            }
+    pub fn quality_of(&self, peer: JsPeerId) -> JsValue {
+        match self
+            .network
+            .get_peer_status(&peer.try_into().expect("Failed to parse peer id"))
+        {
+            Some(v) => JsValue::from(v.quality),
+            None => JsValue::from(0),
         }
     }
 
@@ -437,13 +404,13 @@ impl CoreNetwork {
     /// Returns the quality of the network as a network health indicator.
     #[wasm_bindgen]
     pub fn health(&self) -> Health {
-        self.network.get_health()
+        self.network.health()
     }
 
     /// Total count of the peers observed withing the network
     #[wasm_bindgen]
     pub fn length(&self) -> usize {
-        self.network.get_entries_length()
+        self.network.size()
     }
 
     #[wasm_bindgen]

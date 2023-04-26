@@ -157,14 +157,12 @@ impl<St: DuplexStream> Ping<St> {
         let mut futs = {
             let this = &*self;
 
-            let futs = to_futures_unordered(
+            to_futures_unordered(
                 peers
                     .iter()
                     .map(|x| this.ping_peer(x.clone(), self.config.timeout))
                     .collect::<Vec<_>>(),
-            );
-
-            futs
+            )
         };
 
         let mut waiting = remainder.iter();
@@ -277,214 +275,324 @@ fn to_futures_unordered<F>(mut fs: Vec<F>) -> FuturesUnordered<F> {
     futures
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use crate::messaging::ControlMessage;
-//     use crate::ping::Ping;
-//     use async_trait::async_trait;
-//     use more_asserts::*;
-//     use std::str::FromStr;
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::messaging::ControlMessage;
+    use crate::ping::Ping;
+    use futures::{channel::mpsc, stream::FusedStream, Sink, Stream};
+    use more_asserts::*;
+    use pin_project_lite::pin_project;
+    use std::{str::FromStr, task::Poll};
 
-//     fn simple_ping_config() -> PingConfig {
-//         PingConfig {
-//             max_parallel_pings: 2,
-//             environment_id: "test".to_owned(),
-//             normalized_version: "1.0a".to_owned(),
-//             timeout: Duration::from_millis(150),
-//         }
-//     }
+    fn simple_ping_config() -> PingConfig {
+        PingConfig {
+            max_parallel_pings: 2,
+            environment_id: "test".to_owned(),
+            normalized_version: "1.0a".to_owned(),
+            timeout: Duration::from_millis(150),
+        }
+    }
 
-//     const BAD_PEER: &'static str = "1Ank4EeHLAd3bwwtJma1WsXYSmiGgqmjkQoCUpevx67ix8";
-//     const PEER_DELAYED_1_MS: &'static str = "1AcPsXRKVc3U64NBb4obUUT34jSLWtvAz2JMw192L92QKW";
-//     const PEER_DELAYED_2_MS: &'static str = "1Ag7Agu1thSZFRGyoPWydqCiFS6tJFXLeukpVjCtwy1V8m";
-//     const PEER_DELAYED_10_MS: &'static str = "1AduBfEp4KpymzNGzVAmsoF5RhHReRa8LfSjBoDwwWz96s";
-//     const PEER_DELAYED_11_MS: &'static str = "1AWpJQyRSosNeKKZAGzA9VLue6qdC1yyUv594F6W8Jasjn";
+    const BAD_PEER: &'static str = "1Ank4EeHLAd3bwwtJma1WsXYSmiGgqmjkQoCUpevx67ix8";
+    const PEER_DELAYED_1_MS: &'static str = "1AcPsXRKVc3U64NBb4obUUT34jSLWtvAz2JMw192L92QKW";
+    const PEER_DELAYED_2_MS: &'static str = "1Ag7Agu1thSZFRGyoPWydqCiFS6tJFXLeukpVjCtwy1V8m";
+    const PEER_DELAYED_10_MS: &'static str = "1AduBfEp4KpymzNGzVAmsoF5RhHReRa8LfSjBoDwwWz96s";
+    const PEER_DELAYED_11_MS: &'static str = "1AWpJQyRSosNeKKZAGzA9VLue6qdC1yyUv594F6W8Jasjn";
 
-//     pub struct TestingSendPing {}
+    pin_project! {
+        pub struct TestingSendPing {
+            #[pin]
+            internal_tx: mpsc::UnboundedSender<Result<Box<[u8]>, String>>,
+            #[pin]
+            internal_rx: mpsc::UnboundedReceiver<Result<Box<[u8]>, String>>,
+            destination: PeerId,
+            ended: bool
+        }
 
-//     #[async_trait(?Send)]
-//     impl PingExternalAPI for TestingSendPing {
-//         async fn run(&self, msg: Box<[u8]>, peer: &PeerId) -> Result<Box<[u8]>, String> {
-//             let mut reply = PingMessage::deserialize(msg.as_ref())
-//                 .map_err(|_| DecodingError)
-//                 .and_then(|chall| ControlMessage::generate_pong_response(&ControlMessage::Ping(chall)))
-//                 .and_then(|msg| msg.get_ping_message().map(PingMessage::serialize))
-//                 .unwrap();
+    }
 
-//             match peer.to_string().as_str() {
-//                 BAD_PEER => {
-//                     // let's damage the reply bytes
-//                     for x in reply.iter_mut() {
-//                         if *x < u8::MAX {
-//                             *x = *x + 1;
-//                         }
-//                     }
-//                 }
-//                 PEER_DELAYED_1_MS => std::thread::sleep(Duration::from_millis(1)),
-//                 PEER_DELAYED_2_MS => std::thread::sleep(Duration::from_millis(2)),
-//                 PEER_DELAYED_10_MS => std::thread::sleep(Duration::from_millis(10)),
-//                 PEER_DELAYED_11_MS => std::thread::sleep(Duration::from_millis(11)),
-//                 _ => (),
-//             }
+    impl TestingSendPing {
+        fn new(destination: PeerId) -> Self {
+            let (internal_tx, internal_rx) = mpsc::unbounded::<Result<Box<[u8]>, String>>();
 
-//             Ok(reply)
-//         }
-//     }
+            Self {
+                internal_rx,
+                internal_tx,
+                destination,
+                ended: false,
+            }
+        }
+    }
 
-//     #[async_std::test]
-//     async fn test_ping_peers_with_no_peers_should_not_do_any_api_calls() {
-//         let pinger = Ping::new(
-//             simple_ping_config(),
-//             |_peer: &PeerId, _result: crate::types::Result| {},
-//             TestingSendPing {},
-//         );
-//         pinger.ping_peers(vec![]).await;
-//     }
+    impl Stream for TestingSendPing {
+        type Item = Result<Box<[u8]>, String>;
 
-//     #[async_std::test]
-//     async fn test_ping_peers_with_happy_path_should_trigger_the_desired_external_api_calls() {
-//         let peer = PeerId::random();
+        fn poll_next(
+            self: Pin<&mut Self>,
+            cx: &mut __core::task::Context<'_>,
+        ) -> __core::task::Poll<Option<Self::Item>> {
+            let this = self.project();
 
-//         let pinger = Ping::new(
-//             simple_ping_config(),
-//             move |pinged_peer: &PeerId, result: crate::types::Result| {
-//                 if !peer.eq(pinged_peer) || !result.is_ok() {
-//                     panic!("incorrect arguments")
-//                 }
-//             },
-//             TestingSendPing {},
-//         );
-//         pinger.ping_peers(vec![peer.clone()]).await;
-//     }
+            if *this.ended {
+                return Poll::Ready(None);
+            }
 
-//     #[async_std::test]
-//     async fn test_ping_should_invoke_a_failed_ping_reply_for_an_incorrect_reply() {
-//         let bad_peer = PeerId::from_str("1Ank4EeHLAd3bwwtJma1WsXYSmiGgqmjkQoCUpevx67ix8")
-//             .ok()
-//             .unwrap();
+            match this.internal_rx.poll_next(cx) {
+                Poll::Ready(Some(x)) => Poll::Ready(Some(x)),
+                Poll::Ready(None) => {
+                    *this.ended = true;
+                    Poll::Ready(None)
+                }
+                Poll::Pending => Poll::Pending,
+            }
+        }
 
-//         let pinger = Ping::new(
-//             simple_ping_config(),
-//             move |pinged_peer: &PeerId, result: crate::types::Result| {
-//                 if !bad_peer.eq(pinged_peer) || !result.is_err() {
-//                     panic!("incorrect arguments")
-//                 }
-//             },
-//             TestingSendPing {},
-//         );
-//         pinger.ping_peers(vec![bad_peer.clone()]).await;
-//     }
+        fn size_hint(&self) -> (usize, Option<usize>) {
+            self.internal_rx.size_hint()
+        }
+    }
 
-//     #[async_std::test]
-//     async fn test_ping_peer_invokes_send_message_but_the_time_runs_out() {
-//         let peer = PeerId::random();
-//         let mut ping_config = simple_ping_config();
-//         ping_config.timeout = Duration::from_millis(0);
+    impl FusedStream for TestingSendPing {
+        fn is_terminated(&self) -> bool {
+            self.ended
+        }
+    }
 
-//         let pinger = Ping::new(
-//             ping_config,
-//             move |pinged_peer: &PeerId, result: crate::types::Result| {
-//                 if !peer.eq(pinged_peer) || !result.is_err() {
-//                     panic!("incorrect arguments")
-//                 }
-//             },
-//             TestingSendPing {},
-//         );
-//         pinger.ping_peers(vec![peer.clone()]).await;
-//     }
+    impl Sink<Box<[u8]>> for TestingSendPing {
+        type Error = String;
+        fn poll_ready(
+            self: Pin<&mut Self>,
+            cx: &mut __core::task::Context<'_>,
+        ) -> __core::task::Poll<Result<(), Self::Error>> {
+            let this = self.project();
 
-//     #[async_std::test]
-//     async fn test_ping_peers_empty_list_will_not_trigger_any_pinging() {
-//         let pinger = Ping::new(
-//             simple_ping_config(),
-//             |_pinged_peer: &PeerId, _result: crate::types::Result| {},
-//             TestingSendPing {},
-//         );
+            this.internal_tx.poll_ready(cx).map_err(|e| e.to_string())
+        }
 
-//         pinger.ping_peers(vec![]).await;
-//     }
+        fn start_send(self: Pin<&mut Self>, item: Box<[u8]>) -> Result<(), Self::Error> {
+            let this = self.project();
+            let mut reply = PingMessage::deserialize(item.as_ref())
+                .map_err(|_| DecodingError)
+                .and_then(|chall| ControlMessage::generate_pong_response(&ControlMessage::Ping(chall)))
+                .and_then(|msg| msg.get_ping_message().map(PingMessage::serialize))
+                .unwrap();
 
-//     #[async_std::test]
-//     async fn test_ping_peers_multiple_peers_are_pinged_in_parallel() {
-//         let peers = vec![
-//             PeerId::from_str(PEER_DELAYED_1_MS).ok().unwrap(),
-//             PeerId::from_str(PEER_DELAYED_2_MS).ok().unwrap(),
-//         ];
+            match this.destination.to_string().as_str() {
+                BAD_PEER => {
+                    // let's damage the reply bytes
+                    for x in reply.iter_mut() {
+                        if *x < u8::MAX {
+                            *x = *x + 1;
+                        }
+                    }
+                }
+                PEER_DELAYED_1_MS => std::thread::sleep(Duration::from_millis(1)),
+                PEER_DELAYED_2_MS => std::thread::sleep(Duration::from_millis(2)),
+                PEER_DELAYED_10_MS => std::thread::sleep(Duration::from_millis(10)),
+                PEER_DELAYED_11_MS => std::thread::sleep(Duration::from_millis(11)),
+                _ => (),
+            };
 
-//         let peers_clone = peers.clone();
+            this.internal_tx
+                .unbounded_send(Ok(reply))
+                .expect("sending to channel failed");
 
-//         let pinger = Ping::new(
-//             simple_ping_config(),
-//             move |pinged_peer: &PeerId, result: crate::types::Result| {
-//                 if (!peers_clone[0].eq(pinged_peer) || !result.is_ok())
-//                     && (!peers_clone[1].clone().eq(pinged_peer) || !result.is_ok())
-//                 {
-//                     panic!("incorrect arguments")
-//                 }
-//             },
-//             TestingSendPing {},
-//         );
-//         pinger.ping_peers(peers).await;
-//     }
+            Ok(())
+        }
 
-//     #[async_std::test]
-//     async fn test_ping_peers_should_ping_parallel_only_a_limited_number_of_peers() {
-//         let mut config = simple_ping_config();
-//         config.max_parallel_pings = 1;
+        fn poll_flush(
+            self: Pin<&mut Self>,
+            cx: &mut __core::task::Context<'_>,
+        ) -> __core::task::Poll<Result<(), Self::Error>> {
+            let this = self.project();
 
-//         let ping_delay_first = 10u64;
-//         let ping_delay_second = 10u64;
+            this.internal_tx.poll_flush(cx).map_err(|e| e.to_string())
+        }
 
-//         let peers = vec![
-//             PeerId::from_str(PEER_DELAYED_10_MS).ok().unwrap(),
-//             PeerId::from_str(PEER_DELAYED_11_MS).ok().unwrap(),
-//         ];
+        fn poll_close(
+            self: Pin<&mut Self>,
+            cx: &mut __core::task::Context<'_>,
+        ) -> __core::task::Poll<Result<(), Self::Error>> {
+            let this = self.project();
 
-//         let peers_clone = peers.clone();
+            *this.ended = true;
 
-//         let pinger = Ping::new(
-//             config,
-//             move |pinged_peer: &PeerId, result: crate::types::Result| {
-//                 if (!peers_clone[0].eq(pinged_peer) || !result.is_ok())
-//                     && (!peers_clone[1].clone().eq(pinged_peer) || !result.is_ok())
-//                 {
-//                     panic!("incorrect arguments")
-//                 }
-//             },
-//             TestingSendPing {},
-//         );
+            this.internal_tx.poll_close(cx).map_err(|e| e.to_string())
+        }
+    }
 
-//         let start = current_timestamp();
-//         pinger.ping_peers(peers).await;
-//         let end = current_timestamp();
+    impl DuplexStream for TestingSendPing {}
 
-//         assert_ge!(end - start, ping_delay_first + ping_delay_second)
-//     }
+    #[async_std::test]
+    async fn test_ping_peers_with_no_peers_should_not_do_any_api_calls() {
+        let pinger = Ping::new(
+            simple_ping_config(),
+            |_peer: &PeerId, _result: crate::types::Result| {},
+            |destination: PeerId, _protocols: Vec<String>| {
+                Box::pin(async move { Ok(TestingSendPing::new(destination.clone())) })
+            },
+        );
+        pinger.ping_peers(vec![]).await;
+    }
 
-//     #[async_std::test]
-//     async fn test_ping_peer_should_not_ping_all_peers_if_the_max_timeout_is_reached() {
-//         let mut config = simple_ping_config();
-//         config.timeout = Duration::from_millis(1);
-//         config.max_parallel_pings = 1;
+    #[async_std::test]
+    async fn test_ping_peers_with_happy_path_should_trigger_the_desired_external_api_calls() {
+        let peer = PeerId::random();
 
-//         let peers = vec![
-//             PeerId::from_str(PEER_DELAYED_10_MS).ok().unwrap(),
-//             PeerId::from_str(PEER_DELAYED_11_MS).ok().unwrap(),
-//         ];
+        let pinger = Ping::new(
+            simple_ping_config(),
+            move |pinged_peer: &PeerId, result: crate::types::Result| {
+                if !peer.eq(pinged_peer) || !result.is_ok() {
+                    panic!("incorrect arguments")
+                }
+            },
+            |destination: PeerId, _protocols: Vec<String>| {
+                Box::pin(async move { Ok(TestingSendPing::new(destination.clone())) })
+            },
+        );
+        pinger.ping_peers(vec![peer.clone()]).await;
+    }
 
-//         let peers_clone = peers.clone();
+    #[async_std::test]
+    async fn test_ping_should_invoke_a_failed_ping_reply_for_an_incorrect_reply() {
+        let bad_peer = PeerId::from_str("1Ank4EeHLAd3bwwtJma1WsXYSmiGgqmjkQoCUpevx67ix8")
+            .ok()
+            .unwrap();
 
-//         let pinger = Ping::new(
-//             config,
-//             move |pinged_peer: &PeerId, result: crate::types::Result| {
-//                 if !peers_clone[0].eq(pinged_peer) || !result.is_ok() {
-//                     panic!("incorrect arguments")
-//                 }
-//             },
-//             TestingSendPing {},
-//         );
+        let pinger = Ping::new(
+            simple_ping_config(),
+            move |pinged_peer: &PeerId, result: crate::types::Result| {
+                if !bad_peer.eq(pinged_peer) || !result.is_err() {
+                    panic!("incorrect arguments")
+                }
+            },
+            |destination: PeerId, _protocols: Vec<String>| {
+                Box::pin(async move { Ok(TestingSendPing::new(destination.clone())) })
+            },
+        );
+        pinger.ping_peers(vec![bad_peer.clone()]).await;
+    }
 
-//         pinger.ping_peers(peers).await;
-//     }
-// }
+    #[async_std::test]
+    async fn test_ping_peer_invokes_send_message_but_the_time_runs_out() {
+        let peer = PeerId::random();
+        let mut ping_config = simple_ping_config();
+        ping_config.timeout = Duration::from_millis(0);
+
+        let pinger = Ping::new(
+            ping_config,
+            move |pinged_peer: &PeerId, result: crate::types::Result| {
+                if !peer.eq(pinged_peer) || !result.is_err() {
+                    panic!("incorrect arguments")
+                }
+            },
+            |destination: PeerId, _protocols: Vec<String>| {
+                Box::pin(async move { Ok(TestingSendPing::new(destination.clone())) })
+            },
+        );
+        pinger.ping_peers(vec![peer.clone()]).await;
+    }
+
+    #[async_std::test]
+    async fn test_ping_peers_empty_list_will_not_trigger_any_pinging() {
+        let pinger = Ping::new(
+            simple_ping_config(),
+            |_pinged_peer: &PeerId, _result: crate::types::Result| {},
+            |destination: PeerId, _protocols: Vec<String>| {
+                Box::pin(async move { Ok(TestingSendPing::new(destination.clone())) })
+            },
+        );
+
+        pinger.ping_peers(vec![]).await;
+    }
+
+    #[async_std::test]
+    async fn test_ping_peers_multiple_peers_are_pinged_in_parallel() {
+        let peers = vec![
+            PeerId::from_str(PEER_DELAYED_1_MS).ok().unwrap(),
+            PeerId::from_str(PEER_DELAYED_2_MS).ok().unwrap(),
+        ];
+
+        let peers_clone = peers.clone();
+
+        let pinger = Ping::new(
+            simple_ping_config(),
+            move |pinged_peer: &PeerId, result: crate::types::Result| {
+                if (!peers_clone[0].eq(pinged_peer) || !result.is_ok())
+                    && (!peers_clone[1].clone().eq(pinged_peer) || !result.is_ok())
+                {
+                    panic!("incorrect arguments")
+                }
+            },
+            |destination: PeerId, _protocols: Vec<String>| {
+                Box::pin(async move { Ok(TestingSendPing::new(destination.clone())) })
+            },
+        );
+        pinger.ping_peers(peers).await;
+    }
+
+    #[async_std::test]
+    async fn test_ping_peers_should_ping_parallel_only_a_limited_number_of_peers() {
+        let mut config = simple_ping_config();
+        config.max_parallel_pings = 1;
+
+        let ping_delay_first = 10u64;
+        let ping_delay_second = 10u64;
+
+        let peers = vec![
+            PeerId::from_str(PEER_DELAYED_10_MS).ok().unwrap(),
+            PeerId::from_str(PEER_DELAYED_11_MS).ok().unwrap(),
+        ];
+
+        let peers_clone = peers.clone();
+
+        let pinger = Ping::new(
+            config,
+            move |pinged_peer: &PeerId, result: crate::types::Result| {
+                if (!peers_clone[0].eq(pinged_peer) || !result.is_ok())
+                    && (!peers_clone[1].clone().eq(pinged_peer) || !result.is_ok())
+                {
+                    panic!("incorrect arguments")
+                }
+            },
+            |destination: PeerId, _protocols: Vec<String>| {
+                Box::pin(async move { Ok(TestingSendPing::new(destination.clone())) })
+            },
+        );
+
+        let start = current_timestamp();
+        pinger.ping_peers(peers).await;
+        let end = current_timestamp();
+
+        assert_ge!(end - start, ping_delay_first + ping_delay_second)
+    }
+
+    #[async_std::test]
+    async fn test_ping_peer_should_not_ping_all_peers_if_the_max_timeout_is_reached() {
+        let mut config = simple_ping_config();
+        config.timeout = Duration::from_millis(1);
+        config.max_parallel_pings = 1;
+
+        let peers = vec![
+            PeerId::from_str(PEER_DELAYED_10_MS).ok().unwrap(),
+            PeerId::from_str(PEER_DELAYED_11_MS).ok().unwrap(),
+        ];
+
+        let peers_clone = peers.clone();
+
+        let pinger = Ping::new(
+            config,
+            move |pinged_peer: &PeerId, result: crate::types::Result| {
+                if !peers_clone[0].eq(pinged_peer) || !result.is_ok() {
+                    panic!("incorrect arguments")
+                }
+            },
+            |destination: PeerId, _protocols: Vec<String>| {
+                Box::pin(async move { Ok(TestingSendPing::new(destination.clone())) })
+            },
+        );
+
+        pinger.ping_peers(peers).await;
+    }
+}

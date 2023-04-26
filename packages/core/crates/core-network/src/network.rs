@@ -459,11 +459,11 @@ impl<Actions: NetworkExternalActions> Network<Actions> {
         output
     }
 
-    pub fn get_health(&self) -> Health {
+    pub fn health(&self) -> Health {
         self.last_health.borrow().to_owned()
     }
 
-    pub fn get_entries_length(&self) -> usize {
+    pub fn size(&self) -> usize {
         self.entries.borrow().len()
     }
 }
