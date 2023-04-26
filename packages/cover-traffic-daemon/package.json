@@ -39,13 +39,13 @@
     "bignumber.js": "9.0.2",
     "bn.js": "5.2.1",
     "express": "4.18.2",
-    "yargs": "17.5.1"
+    "yargs": "17.7.1"
   },
   "devDependencies": {
     "@types/chai": "4.3.4",
     "@types/express": "4",
     "@types/mocha": "10.0.1",
-    "@types/yargs": "17.0.10",
+    "@types/yargs": "17.0.24",
     "chai": "4.3.7",
     "mocha": "10.2.0",
     "nyc": "15.1.0",
