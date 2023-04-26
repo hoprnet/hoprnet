@@ -263,9 +263,9 @@ log "Node 2 ping node 3"
 result=$(api_ping "${api2}" ${addr3} "\"latency\":[0-9]+,\"reportedVersion\":")
 log "-- ${result}"
 
-# log "Node 7 should not be able to talk to Node 1 (different environment id)"
-# result=$(api_ping "${api6}" ${addr1} "TIMEOUT")
-# log "-- ${result}"
+log "Node 7 should not be able to talk to Node 1 (different environment id)"
+result=$(api_ping "${api6}" ${addr1} "TIMEOUT")
+log "-- ${result}"
 
 log "Node 1 should not be able to talk to Node 7 (different environment id)"
 result=$(api_ping "${api1}" ${addr7} "Connection to node is not allowed")

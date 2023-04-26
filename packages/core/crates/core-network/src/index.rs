@@ -178,12 +178,13 @@ impl CoreNetwork {
             close_connection_cb,
         );
 
-        let ping_config = PingConfig::new(
-            max_parallel_pings.value_of() as usize,
-            environment_id.to_owned(),
-            version.to_owned(),
-            PING_TIMEOUT,
-        );
+        let ping_config = PingConfig {
+            max_parallel_pings: max_parallel_pings.value_of() as usize,
+            environment_id: environment_id.to_owned(),
+            normalized_version: version.to_owned(),
+            // fixme: split establishing connection and talking ping protocol
+            timeout: PING_TIMEOUT,
+        };
 
         let heartbeat_config = HeartbeatConfig::new(
             max_parallel_pings.value_of() as usize,

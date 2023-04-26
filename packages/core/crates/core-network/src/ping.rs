@@ -43,26 +43,10 @@ type PingMeasurement = (PeerId, crate::types::Result);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PingConfig {
-    max_parallel_pings: usize,
-    environment_id: String,
-    normalized_version: String,
-    timeout: Duration,
-}
-
-impl PingConfig {
-    pub fn new(
-        max_parallel_pings: usize,
-        environment_id: String,
-        normalized_version: String,
-        timeout: Duration,
-    ) -> Self {
-        Self {
-            max_parallel_pings,
-            environment_id,
-            normalized_version,
-            timeout,
-        }
-    }
+    pub max_parallel_pings: usize,
+    pub environment_id: String,
+    pub normalized_version: String,
+    pub timeout: Duration,
 }
 
 pub struct Ping<St> {
@@ -70,8 +54,6 @@ pub struct Ping<St> {
     protocols: [String; 2],
     on_finished_ping: Box<dyn Fn(&PeerId, crate::types::Result) + 'static>,
     dial: Box<dyn (Fn(PeerId, Vec<String>) -> Pin<Box<dyn Future<Output = Result<St, String>>>>) + 'static>,
-
-    // dial: Box<dyn Fn(&PeerId, Vec<String>) -> dyn Future<Output = dyn DuplexStream>>,
     metric_time_to_heartbeat: Option<SimpleHistogram>,
     metric_time_to_ping: Option<SimpleHistogram>,
     metric_successful_ping_count: Option<SimpleCounter>,
