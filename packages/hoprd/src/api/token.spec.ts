@@ -1,6 +1,6 @@
 import { setTimeout } from 'timers/promises'
 import sinon from 'sinon'
-import chai, { expect } from 'chai'
+import chai from 'chai'
 import chaiAsPromised from 'chai-as-promised'
 
 import {
@@ -16,6 +16,7 @@ import { createMockDb } from './v2/fixtures.js'
 import type { default as Hopr } from '@hoprnet/hopr-core'
 import type { Capability } from './token.js'
 
+chai.should()
 chai.use(chaiAsPromised)
 
 describe('authentication token', function () {
@@ -28,54 +29,125 @@ describe('authentication token', function () {
 
   it('should be created if parameters are valid', async function () {
     const caps: Array<Capability> = [{ endpoint: 'tokensCreate' }]
-    expect(await createToken(node.db, caps)).to.have.a.property('id')
+
+    const promise = createToken(node.db, undefined, caps).should.eventually.have.property('id')
+
+    return promise
   })
 
   it('should not be created if parameters are invalid', async function () {
     const caps: Array<Capability> = [{ endpoint: 'tokensCreate2' }]
-    expect(createToken(node.db, caps)).to.eventually.rejectedWith('invalid token capabilities')
+
+    const promise = createToken(node.db, undefined, caps).should.be.rejectedWith('invalid token capabilities')
+
+    return promise
   })
 
   it('should be created but not stored in the database', async function () {
     const caps: Array<Capability> = [{ endpoint: 'tokensCreate' }]
-    const token = await createToken(node.db, caps)
-    expect(token).to.have.a.property('id')
-    expect(token.id).to.not.be.undefined
+    const token = await createToken(node.db, undefined, caps)
 
-    expect(await authenticateToken(node.db, token.id)).to.be.undefined
+    token.should.have.property('id')
+    token.id.should.not.be.undefined
+
+    const promise = authenticateToken(node.db, token.id).should.eventually.be.undefined
+
+    return promise
   })
 
   it('should be stored', async function () {
     const caps: Array<Capability> = [{ endpoint: 'tokensCreate' }]
-    const token = await createToken(node.db, caps)
+    const token = await createToken(node.db, undefined, caps)
 
-    expect(storeToken(node.db, token)).to.eventually.be.fulfilled
-    expect(await authenticateToken(node.db, token.id)).deep.equal(token)
+    await storeToken(node.db, token)
+
+    const promise = authenticateToken(node.db, token.id).should.eventually.be.deep.equal(token)
+
+    return promise
   })
 
   it('should be deleted if exists', async function () {
     const caps: Array<Capability> = [{ endpoint: 'tokensCreate' }]
-    const token = await createToken(node.db, caps)
+    const token = await createToken(node.db, undefined, caps)
     await storeToken(node.db, token)
     await deleteToken(node.db, token.id)
 
-    expect(await authenticateToken(node.db, token.id)).to.be.undefined
+    const promise = authenticateToken(node.db, token.id).should.eventually.be.undefined
+
+    return promise
   })
 
   it('should not fail to be deleted if id is empty', async function () {
-    expect(deleteToken(node.db, '')).to.eventually.be.fulfilled
+    const promise = deleteToken(node.db, '').should.eventually.be.fulfilled
+
+    return promise
+  })
+
+  it('should not be created if lifetime exceeds scopes lifetime', async function () {
+    const caps: Array<Capability> = [{ endpoint: 'tokensGetToken' }]
+
+    const scopeToken = await createToken(node.db, undefined, caps, '', 1000)
+
+    // lifetime too long
+    const promiseTooLong = createToken(node.db, scopeToken, caps, '', 9999).should.be.rejectedWith(
+      'requested token lifetime not allowed'
+    )
+    // lifetime unlimited
+    const promiseUnlimited = createToken(node.db, scopeToken, caps, '', undefined).should.be.rejectedWith(
+      'requested token lifetime not allowed'
+    )
+
+    return Promise.all([promiseTooLong, promiseUnlimited])
+  })
+
+  it('should not be created if capabilities are not a subset of scope', async function () {
+    const caps: Array<Capability> = [{ endpoint: 'tokensGetToken' }, { endpoint: 'messagesSendMessage' }]
+
+    const scopeToken = await createToken(node.db, undefined, caps)
+
+    // no common element
+    const capsNoCommon: Array<Capability> = [{ endpoint: 'messagesSign' }]
+    const promiseNoCommon = createToken(node.db, scopeToken, capsNoCommon).should.be.rejectedWith(
+      'requested token capabilities not allowed'
+    )
+
+    // one common element, but also uncommon element
+    const capsOneCommon: Array<Capability> = [{ endpoint: 'messagesSign' }, { endpoint: 'messagesSendMessage' }]
+    const promiseOneCommon = createToken(node.db, scopeToken, capsOneCommon).should.be.rejectedWith(
+      'requested token capabilities not allowed'
+    )
+
+    return Promise.all([promiseNoCommon, promiseOneCommon])
+  })
+
+  it('should be created if capabilities are a subset of scope', async function () {
+    const caps: Array<Capability> = [{ endpoint: 'tokensGetToken' }, { endpoint: 'messagesSendMessage' }]
+
+    const scopeToken = await createToken(node.db, undefined, caps)
+
+    // partial subset
+    const capsPartial: Array<Capability> = [{ endpoint: 'messagesSendMessage' }]
+    const promisePartial = createToken(node.db, scopeToken, capsPartial).should.eventually.be.fulfilled
+
+    // same caps
+    const capsFull: Array<Capability> = [{ endpoint: 'tokensGetToken' }, { endpoint: 'messagesSendMessage' }]
+    const promiseFull = createToken(node.db, scopeToken, capsFull).should.eventually.be.fulfilled
+
+    return Promise.all([promisePartial, promiseFull])
   })
 })
 
 describe('authentication token capabilities', function () {
   it('should validate if correct - one endpoint', async function () {
     const caps: Array<Capability> = [{ endpoint: 'tokensCreate' }]
-    expect(validateTokenCapabilities(caps)).to.be.true
+
+    validateTokenCapabilities(caps).should.be.true
   })
 
   it('should validate if correct - two endpoint', async function () {
     const caps: Array<Capability> = [{ endpoint: 'tokensCreate' }, { endpoint: 'tokensGetToken' }]
-    expect(validateTokenCapabilities(caps)).to.be.true
+
+    validateTokenCapabilities(caps).should.be.true
   })
 
   it('should validate if correct - two endpoints with limits', async function () {
@@ -83,22 +155,24 @@ describe('authentication token capabilities', function () {
       { endpoint: 'tokensCreate', limits: [{ type: 'calls', conditions: { max: 1 } }] },
       { endpoint: 'tokensGetToken' }
     ]
-    expect(validateTokenCapabilities(caps)).to.be.true
+
+    validateTokenCapabilities(caps).should.be.true
   })
 
   it('should not validate - empty list', async function () {
     const caps: Array<Capability> = []
-    expect(validateTokenCapabilities(caps)).to.be.false
+
+    validateTokenCapabilities(caps).should.be.false
   })
 
   it('should not validate - one endpoint (unknown)', async function () {
     const caps: Array<Capability> = [{ endpoint: 'tokensCreate2' }]
-    expect(validateTokenCapabilities(caps)).to.be.false
+    validateTokenCapabilities(caps).should.be.false
   })
 
   it('should not validate - two endpoints (one unknown)', async function () {
     const caps: Array<Capability> = [{ endpoint: 'tokensCreate' }, { endpoint: 'tokensGetToken2' }]
-    expect(validateTokenCapabilities(caps)).to.be.false
+    validateTokenCapabilities(caps).should.be.false
   })
 
   it('should not validate - two endpoints (one with wrong limits - max)', async function () {
@@ -106,15 +180,35 @@ describe('authentication token capabilities', function () {
       { endpoint: 'tokensCreate', limits: [{ type: 'calls', conditions: { max: 1 } }] },
       { endpoint: 'tokensGetToken', limits: [{ type: 'calls', conditions: { max: 0 } }] }
     ]
-    expect(validateTokenCapabilities(caps)).to.be.false
+
+    validateTokenCapabilities(caps).should.be.false
+  })
+
+  it('should not validate - two endpoints of the same name (one with wrong limits - max)', async function () {
+    const caps: Array<Capability> = [
+      { endpoint: 'tokensGetToken', limits: [{ type: 'calls', conditions: { max: 1 } }] },
+      { endpoint: 'tokensGetToken', limits: [{ type: 'calls', conditions: { max: 0 } }] }
+    ]
+
+    validateTokenCapabilities(caps).should.be.false
+  })
+
+  it('should validate - two endpoints of the same name (both with correct limits - max)', async function () {
+    const caps: Array<Capability> = [
+      { endpoint: 'tokensGetToken', limits: [{ type: 'calls', conditions: { max: 1 } }] },
+      { endpoint: 'tokensGetToken', limits: [{ type: 'calls', conditions: { max: 1 } }] }
+    ]
+
+    validateTokenCapabilities(caps).should.be.true
   })
 
   it('should not validate - two endpoints (one with wrong limits - type)', async function () {
-    const caps: Array<Capability> = [
+    const caps: Array<any> = [
       { endpoint: 'tokensCreate', limits: [{ type: 'calls2', conditions: { max: 1 } }] },
       { endpoint: 'tokensGetToken', limits: [{ type: 'calls', conditions: { max: 1 } }] }
     ]
-    expect(validateTokenCapabilities(caps)).to.be.false
+
+    validateTokenCapabilities(caps).should.be.false
   })
 })
 
@@ -128,55 +222,110 @@ describe('authentication token authorization', function () {
 
   it('should succeed if lifetime is unset', async function () {
     const caps: Array<Capability> = [{ endpoint: 'tokensGetToken' }]
-    let token = await createToken(node.db, caps)
+    let token = await createToken(node.db, undefined, caps)
     await storeToken(node.db, token)
 
-    token = await authenticateToken(node.db, token.id)
-    expect(token).to.not.have.a.property('valid_until')
+    const promise = authenticateToken(node.db, token.id).should.eventually.not.have.property('valid_until')
+
+    return promise
   })
 
   it('should succeed if lifetime is still valid', async function () {
     const caps: Array<Capability> = [{ endpoint: 'tokensGetToken' }]
     const lifetime = 1000
-    let token = await createToken(node.db, caps, '', lifetime)
+    let token = await createToken(node.db, undefined, caps, '', lifetime)
     await storeToken(node.db, token)
 
-    token = await authenticateToken(node.db, token.id)
-    expect(token).to.have.a.property('valid_until')
+    const promise = authenticateToken(node.db, token.id).should.eventually.have.property('valid_until')
+
+    return promise
   })
 
   it('should fail if lifetime has passed', async function () {
     const caps: Array<Capability> = [{ endpoint: 'tokensGetToken' }]
     const lifetime = 1
-    let token = await createToken(node.db, caps, '', lifetime)
+    let token = await createToken(node.db, undefined, caps, '', lifetime)
     await storeToken(node.db, token)
 
     await setTimeout(1001)
 
-    token = await authenticateToken(node.db, token.id)
-    expect(token).to.be.undefined
+    const promise = authenticateToken(node.db, token.id).should.eventually.be.undefined
+
+    return promise
   })
 
   it('should update calls used counter and eventually fail', async function () {
     const caps: Array<Capability> = [
       { endpoint: 'tokensGetToken', limits: [{ type: 'calls', conditions: { max: 2 } }] }
     ]
-    let token = await createToken(node.db, caps)
+    let token = await createToken(node.db, undefined, caps)
+    let authorized: boolean
     await storeToken(node.db, token)
 
     token = await authenticateToken(node.db, token.id)
-    expect(token.capabilities[0].limits[0]).to.not.include({ used: 0 })
+    token.capabilities[0].limits[0].should.not.include({ used: 0 })
 
-    expect(authorizeToken(node.db, token, 'tokensGetToken')).to.eventually.be.true
+    authorized = await authorizeToken(node.db, token, 'tokensGetToken')
+    authorized.should.be.true
     token = await authenticateToken(node.db, token.id)
-    expect(token.capabilities[0].limits[0]).to.include({ used: 1 })
+    token.capabilities[0].limits[0].should.include({ used: 1 })
 
-    expect(authorizeToken(node.db, token, 'tokensGetToken')).to.eventually.be.true
+    authorized = await authorizeToken(node.db, token, 'tokensGetToken')
+    authorized.should.be.true
     token = await authenticateToken(node.db, token.id)
-    expect(token.capabilities[0].limits[0]).to.include({ used: 2 })
+    token.capabilities[0].limits[0].should.include({ used: 2 })
 
-    expect(authorizeToken(node.db, token, 'tokensGetToken')).to.eventually.be.false
+    authorized = await authorizeToken(node.db, token, 'tokensGetToken')
+    authorized.should.be.false
     token = await authenticateToken(node.db, token.id)
-    expect(token.capabilities[0].limits[0]).to.include({ used: 2 })
+    token.capabilities[0].limits[0].should.include({ used: 2 })
+  })
+
+  it('should update calls used counter for used endpoint', async function () {
+    const caps: Array<Capability> = [
+      { endpoint: 'tokensGetToken', limits: [{ type: 'calls', conditions: { max: 2 } }] },
+      { endpoint: 'messagesSendMessage', limits: [{ type: 'calls', conditions: { max: 2 } }] }
+    ]
+    let token = await createToken(node.db, undefined, caps)
+    let authorized: boolean
+    await storeToken(node.db, token)
+
+    token = await authenticateToken(node.db, token.id)
+    token.capabilities[0].limits[0].should.not.include({ used: 0 })
+    token.capabilities[1].limits[0].should.not.include({ used: 0 })
+
+    authorized = await authorizeToken(node.db, token, 'tokensGetToken')
+    authorized.should.be.true
+    token = await authenticateToken(node.db, token.id)
+    token.capabilities.forEach((cap) => {
+      if (cap.endpoint === 'tokenGetToken') {
+        cap.limits[0].should.include({ used: 1 })
+      } else if (cap.endpoint === 'messagesSendMessage') {
+        cap.limits[0].should.not.own.property('used')
+        // include({ used: 1 })
+      }
+    })
+
+    authorized = await authorizeToken(node.db, token, 'tokensGetToken')
+    authorized.should.be.true
+    token = await authenticateToken(node.db, token.id)
+    token.capabilities.forEach((cap) => {
+      if (cap.endpoint === 'tokenGetToken') {
+        cap.limits[0].should.include({ used: 2 })
+      } else if (cap.endpoint === 'messagesSendMessage') {
+        cap.limits[0].should.not.own.property('used')
+      }
+    })
+
+    authorized = await authorizeToken(node.db, token, 'tokensGetToken')
+    authorized.should.be.false
+    token = await authenticateToken(node.db, token.id)
+    token.capabilities.forEach((cap) => {
+      if (cap.endpoint === 'tokenGetToken') {
+        cap.limits[0].should.include({ used: 2 })
+      } else if (cap.endpoint === 'messagesSendMessage') {
+        cap.limits[0].should.not.own.property('used')
+      }
+    })
   })
 })

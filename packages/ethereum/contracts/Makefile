@@ -37,7 +37,7 @@ check-sc-bindings: ## Only create types for Hopr* contracts
 .PHONY: anvil-deploy-erc1820
 anvil-deploy-erc1820: ensure-environment-is-set
 anvil-deploy-erc1820: ## deploy ERC1820 contracts
-	if [ "$(cast code 0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24)" != "" ]; then \
+	if [ -n "$(cast code 0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24)" ]; then \
 	  echo "ERC1820 contract already deployed, skipping"; \
 	else \
 		cast send 0xa990077c3205cbDf861e17Fa532eeB069cE9fF96 --value 0.8ether --from 0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266 && \
@@ -75,18 +75,18 @@ endif
 	$(forge-script) script/SingleAction.s.sol:SingleActionFromPrivateKeyScript \
 		--broadcast --sig "mintXHopr(address,uint256)" $(recipient) 1000
 
-# E.g. make faucet environment-name=anvil-localhost environment-type=development recipient=0x2402da10A6172ED018AEEa22CA60EDe1F766655C hopramount=10 nativeamount=1
-# E.g. make faucet environment-name=anvil-localhost environment-type=development recipient=0x2402da10A6172ED018AEEa22CA60EDe1F766655C nativeamount=1
-# E.g. make faucet environment-name=anvil-localhost environment-type=development recipient=0x2402da10A6172ED018AEEa22CA60EDe1F766655C hopramount=10
+# E.g. make faucet environment-name=anvil-localhost environment-type=development recipient=0x2402da10A6172ED018AEEa22CA60EDe1F766655C hopramount=100000000000000000000 nativeamount=10000000000000000000
+# E.g. make faucet environment-name=anvil-localhost environment-type=development recipient=0x2402da10A6172ED018AEEa22CA60EDe1F766655C nativeamount=10000000000000000000
+# E.g. make faucet environment-name=anvil-localhost environment-type=development recipient=0x2402da10A6172ED018AEEa22CA60EDe1F766655C hopramount=100000000000000000000
 .PHONY: faucet
 faucet: ensure-environment-is-set ensure-privatekey-is-set
-faucet: ## Mint some (default: 20000) HOPR tokens and send some (default value: 10) native tokens to the recipient hopramount
+faucet: ## Mint some (default: 20000) HOPR tokens and send some (default value: 10) native tokens to the recipient hopramount. Token value should be in 18 decimals
 ifeq ($(recipient),)
 	echo "parameter <recipient> missing" >&2 && exit 1
 endif
 	$(forge-script) script/SingleAction.s.sol:SingleActionFromPrivateKeyScript \
-        --broadcast --sig "mintHoprAndSendNative(address,uint256,uint256)" \
-        $(recipient) $(or $(hopramount),20000) $(or $(nativeamount),10)
+        --broadcast --sig "transferOrMintHoprAndSendNative(address,uint256,uint256)" \
+        $(recipient) $(or $(hopramount),20000000000000000000000) $(or $(nativeamount),10000000000000000000)
 
 # E.g. make request-nrnft environment-name=anvil-localhost environment-type=development recipient=0x2402da10A6172ED018AEEa22CA60EDe1F766655C nftrank=developer
 .PHONY: request-nrnft

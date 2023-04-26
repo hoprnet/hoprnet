@@ -45,7 +45,7 @@
 
 #### Defined in
 
-[src/types/halfKeyChallenge.ts:13](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L13)
+[utils/src/types/halfKeyChallenge.ts:13](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L13)
 
 ## Properties
 
@@ -55,7 +55,7 @@
 
 #### Defined in
 
-[src/types/halfKeyChallenge.ts:13](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L13)
+[utils/src/types/halfKeyChallenge.ts:13](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L13)
 
 ## Accessors
 
@@ -69,7 +69,7 @@
 
 #### Defined in
 
-[src/types/halfKeyChallenge.ts:56](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L56)
+[utils/src/types/halfKeyChallenge.ts:56](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L56)
 
 ## Methods
 
@@ -83,7 +83,7 @@
 
 #### Defined in
 
-[src/types/halfKeyChallenge.ts:72](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L72)
+[utils/src/types/halfKeyChallenge.ts:72](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L72)
 
 ___
 
@@ -103,7 +103,7 @@ ___
 
 #### Defined in
 
-[src/types/halfKeyChallenge.ts:76](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L76)
+[utils/src/types/halfKeyChallenge.ts:76](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L76)
 
 ___
 
@@ -117,7 +117,7 @@ ___
 
 #### Defined in
 
-[src/types/halfKeyChallenge.ts:64](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L64)
+[utils/src/types/halfKeyChallenge.ts:64](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L64)
 
 ___
 
@@ -131,7 +131,7 @@ ___
 
 #### Defined in
 
-[src/types/halfKeyChallenge.ts:39](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L39)
+[utils/src/types/halfKeyChallenge.ts:39](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L39)
 
 ___
 
@@ -145,7 +145,7 @@ ___
 
 #### Defined in
 
-[src/types/halfKeyChallenge.ts:68](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L68)
+[utils/src/types/halfKeyChallenge.ts:68](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L68)
 
 ___
 
@@ -159,7 +159,7 @@ ___
 
 #### Defined in
 
-[src/types/halfKeyChallenge.ts:48](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L48)
+[utils/src/types/halfKeyChallenge.ts:48](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L48)
 
 ___
 
@@ -173,7 +173,7 @@ ___
 
 #### Defined in
 
-[src/types/halfKeyChallenge.ts:43](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L43)
+[utils/src/types/halfKeyChallenge.ts:43](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L43)
 
 ___
 
@@ -193,7 +193,7 @@ ___
 
 #### Defined in
 
-[src/types/halfKeyChallenge.ts:60](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L60)
+[utils/src/types/halfKeyChallenge.ts:60](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L60)
 
 ___
 
@@ -213,7 +213,7 @@ ___
 
 #### Defined in
 
-[src/types/halfKeyChallenge.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L19)
+[utils/src/types/halfKeyChallenge.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L19)
 
 ___
 
@@ -233,7 +233,7 @@ ___
 
 #### Defined in
 
-[src/types/halfKeyChallenge.ts:35](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L35)
+[utils/src/types/halfKeyChallenge.ts:35](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L35)
 
 ___
 
@@ -253,7 +253,7 @@ ___
 
 #### Defined in
 
-[src/types/halfKeyChallenge.ts:52](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L52)
+[utils/src/types/halfKeyChallenge.ts:52](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L52)
 
 ___
 
@@ -273,4 +273,4 @@ ___
 
 #### Defined in
 
-[src/types/halfKeyChallenge.ts:27](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L27)
+[utils/src/types/halfKeyChallenge.ts:27](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L27)

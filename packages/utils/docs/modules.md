@@ -59,6 +59,7 @@
 - [Hosts](modules.md#hosts)
 - [LibP2PHandlerArgs](modules.md#libp2phandlerargs)
 - [LibP2PHandlerFunction](modules.md#libp2phandlerfunction)
+- [MetricCollector](modules.md#metriccollector)
 - [Network](modules.md#network)
 - [PRGParameters](modules.md#prgparameters)
 - [PRPParameters](modules.md#prpparameters)
@@ -113,6 +114,7 @@
 - [b58StringRegex](modules.md#b58stringregex)
 - [dbMock](modules.md#dbmock)
 - [durations](modules.md#durations)
+- [metricCollectors](modules.md#metriccollectors)
 
 ### Functions
 
@@ -124,6 +126,7 @@
 - [convertPubKeyFromB58String](modules.md#convertpubkeyfromb58string)
 - [convertPubKeyFromPeerId](modules.md#convertpubkeyfrompeerid)
 - [createCircuitAddress](modules.md#createcircuitaddress)
+- [createMAC](modules.md#createmac)
 - [createPacket](modules.md#createpacket)
 - [createPoRString](modules.md#createporstring)
 - [createPoRValuesForSender](modules.md#createporvaluesforsender)
@@ -140,7 +143,11 @@
 - [decodePoRBytes](modules.md#decodeporbytes)
 - [defer](modules.md#defer)
 - [deriveAckKeyShare](modules.md#deriveackkeyshare)
+- [deriveBlinding](modules.md#deriveblinding)
 - [deriveCommitmentSeed](modules.md#derivecommitmentseed)
+- [derivePRGParameters](modules.md#deriveprgparameters)
+- [derivePRPParameters](modules.md#deriveprpparameters)
+- [derivePacketTag](modules.md#derivepackettag)
 - [deserializeKeyPair](modules.md#deserializekeypair)
 - [dial](modules.md#dial)
 - [expandVars](modules.md#expandvars)
@@ -155,6 +162,7 @@
 - [getHeaderLength](modules.md#getheaderlength)
 - [getLocalAddresses](modules.md#getlocaladdresses)
 - [getLocalHosts](modules.md#getlocalhosts)
+- [getMetricsCollectors](modules.md#getmetricscollectors)
 - [getNetworkPrefix](modules.md#getnetworkprefix)
 - [getPacketLength](modules.md#getpacketlength)
 - [getPrivateAddresses](modules.md#getprivateaddresses)
@@ -176,10 +184,13 @@
 - [isPrivateAddress](modules.md#isprivateaddress)
 - [isReservedAddress](modules.md#isreservedaddress)
 - [isSecp256k1PeerId](modules.md#issecp256k1peerid)
+- [iterableToArray](modules.md#iterabletoarray)
 - [iterateHash](modules.md#iteratehash)
+- [keyShareTransform](modules.md#keysharetransform)
 - [libp2pSendMessage](modules.md#libp2psendmessage)
 - [libp2pSubscribe](modules.md#libp2psubscribe)
 - [loadJson](modules.md#loadjson)
+- [merge\_encoded\_metrics](modules.md#merge_encoded_metrics)
 - [moveDecimalPoint](modules.md#movedecimalpoint)
 - [nAtATime](modules.md#natatime)
 - [oneAtATime](modules.md#oneatatime)
@@ -198,6 +209,7 @@
 - [randomPermutation](modules.md#randompermutation)
 - [randomSubset](modules.md#randomsubset)
 - [recoverIteratedHash](modules.md#recoveriteratedhash)
+- [registerMetricsCollector](modules.md#registermetricscollector)
 - [retimer](modules.md#retimer)
 - [retryWithBackoffThenThrow](modules.md#retrywithbackoffthenthrow)
 - [sampleGroupElement](modules.md#samplegroupelement)
@@ -257,7 +269,7 @@ Renames and re-exports [TimeoutOpts](modules.md#timeoutopts)
 
 #### Defined in
 
-[src/libp2p/addressSorters.ts:35](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/addressSorters.ts#L35)
+[utils/src/libp2p/addressSorters.ts:35](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/addressSorters.ts#L35)
 
 ___
 
@@ -281,7 +293,7 @@ ___
 
 #### Defined in
 
-[src/async/defer.ts:1](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/defer.ts#L1)
+[utils/src/async/defer.ts:1](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/defer.ts#L1)
 
 ___
 
@@ -291,7 +303,7 @@ ___
 
 #### Defined in
 
-[src/libp2p/dialHelper.ts:40](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L40)
+[utils/src/libp2p/dialHelper.ts:40](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L40)
 
 ___
 
@@ -308,7 +320,7 @@ ___
 
 #### Defined in
 
-[src/network/hosts.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/hosts.ts#L6)
+[utils/src/network/hosts.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/hosts.ts#L6)
 
 ___
 
@@ -326,7 +338,7 @@ ___
 
 #### Defined in
 
-[src/libp2p/index.ts:171](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L171)
+[utils/src/libp2p/index.ts:171](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L171)
 
 ___
 
@@ -357,7 +369,25 @@ ___
 
 #### Defined in
 
-[src/libp2p/index.ts:172](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L172)
+[utils/src/libp2p/index.ts:172](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L172)
+
+___
+
+### MetricCollector
+
+Ƭ **MetricCollector**: () => `string`
+
+#### Type declaration
+
+▸ (): `string`
+
+##### Returns
+
+`string`
+
+#### Defined in
+
+[utils/src/index.ts:46](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/index.ts#L46)
 
 ___
 
@@ -375,7 +405,7 @@ ___
 
 #### Defined in
 
-[src/network/constants.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L3)
+[utils/src/network/constants.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L3)
 
 ___
 
@@ -392,7 +422,7 @@ ___
 
 #### Defined in
 
-[src/crypto/prg.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prg.ts#L11)
+[utils/src/crypto/prg.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prg.ts#L11)
 
 ___
 
@@ -409,7 +439,7 @@ ___
 
 #### Defined in
 
-[src/crypto/prp.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L16)
+[utils/src/crypto/prp.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L16)
 
 ___
 
@@ -419,7 +449,7 @@ ___
 
 #### Defined in
 
-[src/db/db.ts:126](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L126)
+[utils/src/db/db.ts:126](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L126)
 
 ___
 
@@ -436,7 +466,7 @@ ___
 
 #### Defined in
 
-[src/async/abortableTimeout.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/abortableTimeout.ts#L8)
+[utils/src/async/abortableTimeout.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/abortableTimeout.ts#L8)
 
 ___
 
@@ -446,7 +476,7 @@ ___
 
 #### Defined in
 
-[src/u8a/index.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/index.ts#L17)
+[utils/src/u8a/index.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/index.ts#L17)
 
 ___
 
@@ -463,7 +493,7 @@ ___
 
 #### Defined in
 
-[src/db/db.ts:121](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L121)
+[utils/src/db/db.ts:121](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L121)
 
 ___
 
@@ -479,7 +509,7 @@ ___
 
 #### Defined in
 
-[src/db/db.ts:117](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L117)
+[utils/src/db/db.ts:117](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L117)
 
 ## Variables
 
@@ -489,7 +519,7 @@ ___
 
 #### Defined in
 
-[src/constants.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L6)
+[utils/src/constants.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L6)
 
 ___
 
@@ -499,7 +529,7 @@ ___
 
 #### Defined in
 
-[src/u8a/u8aCompare.ts:2](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/u8aCompare.ts#L2)
+[utils/src/u8a/u8aCompare.ts:2](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/u8aCompare.ts#L2)
 
 ___
 
@@ -509,7 +539,7 @@ ___
 
 #### Defined in
 
-[src/u8a/u8aCompare.ts:1](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/u8aCompare.ts#L1)
+[utils/src/u8a/u8aCompare.ts:1](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/u8aCompare.ts#L1)
 
 ___
 
@@ -519,7 +549,7 @@ ___
 
 #### Defined in
 
-[src/u8a/u8aCompare.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/u8aCompare.ts#L3)
+[utils/src/u8a/u8aCompare.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/u8aCompare.ts#L3)
 
 ___
 
@@ -529,7 +559,7 @@ ___
 
 #### Defined in
 
-[src/network/constants.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L34)
+[utils/src/network/constants.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L34)
 
 ___
 
@@ -547,7 +577,7 @@ ___
 
 #### Defined in
 
-[src/async/backoff.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/backoff.ts#L9)
+[utils/src/async/backoff.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/backoff.ts#L9)
 
 ___
 
@@ -557,7 +587,7 @@ ___
 
 #### Defined in
 
-[src/constants.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L7)
+[utils/src/constants.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L7)
 
 ___
 
@@ -567,7 +597,7 @@ ___
 
 #### Defined in
 
-[src/constants.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L16)
+[utils/src/constants.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L16)
 
 ___
 
@@ -577,7 +607,7 @@ ___
 
 #### Defined in
 
-[src/u8a/constants.ts:1](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/constants.ts#L1)
+[utils/src/u8a/constants.ts:1](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/constants.ts#L1)
 
 ___
 
@@ -587,7 +617,7 @@ ___
 
 #### Defined in
 
-[src/network/constants.ts:55](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L55)
+[utils/src/network/constants.ts:55](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L55)
 
 ___
 
@@ -597,7 +627,7 @@ ___
 
 #### Defined in
 
-[src/network/constants.ts:69](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L69)
+[utils/src/network/constants.ts:69](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L69)
 
 ___
 
@@ -607,7 +637,7 @@ ___
 
 #### Defined in
 
-[src/constants.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L20)
+[utils/src/constants.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L20)
 
 ___
 
@@ -619,7 +649,7 @@ Maximum random big integer that can be generated using randomInteger function.
 
 #### Defined in
 
-[src/crypto/randomInteger.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/randomInteger.ts#L18)
+[utils/src/crypto/randomInteger.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/randomInteger.ts#L18)
 
 ___
 
@@ -631,7 +661,7 @@ Maximum random integer that can be generated using randomInteger function.
 
 #### Defined in
 
-[src/crypto/randomInteger.ts:144](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/randomInteger.ts#L144)
+[utils/src/crypto/randomInteger.ts:144](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/randomInteger.ts#L144)
 
 ___
 
@@ -641,7 +671,7 @@ ___
 
 #### Defined in
 
-[src/constants.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L18)
+[utils/src/constants.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L18)
 
 ___
 
@@ -651,7 +681,7 @@ ___
 
 #### Defined in
 
-[src/constants.ts:23](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L23)
+[utils/src/constants.ts:23](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L23)
 
 ___
 
@@ -661,7 +691,7 @@ ___
 
 #### Defined in
 
-[src/constants.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L12)
+[utils/src/constants.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L12)
 
 ___
 
@@ -671,7 +701,7 @@ ___
 
 #### Defined in
 
-[src/crypto/por/index.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L8)
+[utils/src/crypto/por/index.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L8)
 
 ___
 
@@ -681,7 +711,7 @@ ___
 
 #### Defined in
 
-[src/crypto/prg.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prg.ts#L7)
+[utils/src/crypto/prg.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prg.ts#L7)
 
 ___
 
@@ -691,7 +721,7 @@ ___
 
 #### Defined in
 
-[src/crypto/prg.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prg.ts#L6)
+[utils/src/crypto/prg.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prg.ts#L6)
 
 ___
 
@@ -701,7 +731,7 @@ ___
 
 #### Defined in
 
-[src/crypto/prg.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prg.ts#L5)
+[utils/src/crypto/prg.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prg.ts#L5)
 
 ___
 
@@ -711,7 +741,7 @@ ___
 
 #### Defined in
 
-[src/constants.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L14)
+[utils/src/constants.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L14)
 
 ___
 
@@ -721,7 +751,7 @@ ___
 
 #### Defined in
 
-[src/constants.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L3)
+[utils/src/constants.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L3)
 
 ___
 
@@ -731,7 +761,7 @@ ___
 
 #### Defined in
 
-[src/network/constants.ts:41](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L41)
+[utils/src/network/constants.ts:41](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L41)
 
 ___
 
@@ -741,7 +771,7 @@ ___
 
 #### Defined in
 
-[src/network/constants.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L9)
+[utils/src/network/constants.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L9)
 
 ___
 
@@ -751,7 +781,7 @@ ___
 
 #### Defined in
 
-[src/network/constants.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L22)
+[utils/src/network/constants.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L22)
 
 ___
 
@@ -761,7 +791,7 @@ ___
 
 #### Defined in
 
-[src/network/constants.ts:15](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L15)
+[utils/src/network/constants.ts:15](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L15)
 
 ___
 
@@ -771,7 +801,7 @@ ___
 
 #### Defined in
 
-[src/network/constants.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L28)
+[utils/src/network/constants.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L28)
 
 ___
 
@@ -781,7 +811,7 @@ ___
 
 #### Defined in
 
-[src/crypto/prp.ts:13](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L13)
+[utils/src/crypto/prp.ts:13](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L13)
 
 ___
 
@@ -791,7 +821,7 @@ ___
 
 #### Defined in
 
-[src/crypto/prp.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L12)
+[utils/src/crypto/prp.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L12)
 
 ___
 
@@ -801,7 +831,7 @@ ___
 
 #### Defined in
 
-[src/crypto/prp.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L14)
+[utils/src/crypto/prp.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L14)
 
 ___
 
@@ -811,7 +841,7 @@ ___
 
 #### Defined in
 
-[src/constants.ts:4](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L4)
+[utils/src/constants.ts:4](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L4)
 
 ___
 
@@ -821,7 +851,7 @@ ___
 
 #### Defined in
 
-[src/network/constants.ts:82](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L82)
+[utils/src/network/constants.ts:82](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/constants.ts#L82)
 
 ___
 
@@ -843,7 +873,7 @@ Several ECDSA on secp256k1 related constants
 
 #### Defined in
 
-[src/crypto/constants.ts:4](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/constants.ts#L4)
+[utils/src/crypto/constants.ts:4](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/constants.ts#L4)
 
 ___
 
@@ -853,7 +883,7 @@ ___
 
 #### Defined in
 
-[src/constants.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L8)
+[utils/src/constants.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L8)
 
 ___
 
@@ -863,7 +893,7 @@ ___
 
 #### Defined in
 
-[src/constants.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L9)
+[utils/src/constants.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L9)
 
 ___
 
@@ -873,7 +903,7 @@ ___
 
 #### Defined in
 
-[src/constants.ts:10](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L10)
+[utils/src/constants.ts:10](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L10)
 
 ___
 
@@ -883,7 +913,7 @@ ___
 
 #### Defined in
 
-[src/constants.ts:27](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L27)
+[utils/src/constants.ts:27](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L27)
 
 ___
 
@@ -893,7 +923,7 @@ ___
 
 #### Defined in
 
-[src/constants.ts:24](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L24)
+[utils/src/constants.ts:24](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L24)
 
 ___
 
@@ -903,7 +933,7 @@ ___
 
 #### Defined in
 
-[src/constants.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L5)
+[utils/src/constants.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/constants.ts#L5)
 
 ___
 
@@ -915,7 +945,7 @@ Regular expresion used to match b58Strings
 
 #### Defined in
 
-[src/libp2p/index.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L30)
+[utils/src/libp2p/index.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L30)
 
 ___
 
@@ -925,7 +955,7 @@ ___
 
 #### Defined in
 
-[src/db/db.mock.ts:13](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.mock.ts#L13)
+[utils/src/db/db.mock.ts:13](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.mock.ts#L13)
 
 ___
 
@@ -944,7 +974,17 @@ ___
 
 #### Defined in
 
-[src/time.ts:1](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/time.ts#L1)
+[utils/src/time.ts:1](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/time.ts#L1)
+
+___
+
+### metricCollectors
+
+• **metricCollectors**: [`MetricCollector`](modules.md#metriccollector)[] = `[]`
+
+#### Defined in
+
+[utils/src/index.ts:48](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/index.ts#L48)
 
 ## Functions
 
@@ -964,7 +1004,7 @@ ___
 
 #### Defined in
 
-[src/collection/fifo.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/collection/fifo.ts#L19)
+[utils/src/collection/fifo.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/collection/fifo.ts#L19)
 
 ___
 
@@ -1000,7 +1040,7 @@ it can pass an AbortController and end the call prematurely.
 
 #### Defined in
 
-[src/async/abortableTimeout.ts:24](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/abortableTimeout.ts#L24)
+[utils/src/async/abortableTimeout.ts:24](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/abortableTimeout.ts#L24)
 
 ___
 
@@ -1033,7 +1073,7 @@ ___
 
 #### Defined in
 
-[src/async/cache.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/cache.ts#L8)
+[utils/src/async/cache.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/cache.ts#L8)
 
 ___
 
@@ -1053,7 +1093,7 @@ ___
 
 #### Defined in
 
-[src/types/channelEntry.ts:31](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L31)
+[utils/src/types/channelEntry.ts:31](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L31)
 
 ___
 
@@ -1083,7 +1123,7 @@ true if address is at least one of the given networks
 
 #### Defined in
 
-[src/network/addrs.ts:97](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L97)
+[utils/src/network/addrs.ts:97](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L97)
 
 ___
 
@@ -1105,7 +1145,7 @@ Takes a B58String and converts them to a PublicKey
 
 #### Defined in
 
-[src/libp2p/index.ts:47](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L47)
+[utils/src/libp2p/index.ts:47](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L47)
 
 ___
 
@@ -1127,7 +1167,7 @@ Takes a peerId and returns its corresponding public key.
 
 #### Defined in
 
-[src/libp2p/index.ts:37](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L37)
+[utils/src/libp2p/index.ts:37](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L37)
 
 ___
 
@@ -1149,7 +1189,33 @@ Create a multiaddress that is a circuit address using given relay to the given d
 
 #### Defined in
 
-[src/network/addrs.ts:314](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L314)
+[utils/src/network/addrs.ts:314](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L314)
+
+___
+
+### createMAC
+
+▸ **createMAC**(`secret`, `header`): `Uint8Array`
+
+Computes the authentication tag to make the integrity of
+the packet header verifiable
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `secret` | `Uint8Array` | shared secret with the creator of the packet |
+| `header` | `Uint8Array` | the packet header |
+
+#### Returns
+
+`Uint8Array`
+
+the authentication tag
+
+#### Defined in
+
+[utils/src/crypto/packet/mac.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/packet/mac.ts#L14)
 
 ___
 
@@ -1180,7 +1246,7 @@ the packet as u8a
 
 #### Defined in
 
-[src/crypto/packet/index.ts:64](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/packet/index.ts#L64)
+[utils/src/crypto/packet/index.ts:69](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/packet/index.ts#L69)
 
 ___
 
@@ -1208,7 +1274,7 @@ information for each relayer
 
 #### Defined in
 
-[src/crypto/por/index.ts:46](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L46)
+[utils/src/crypto/por/index.ts:46](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L46)
 
 ___
 
@@ -1241,7 +1307,7 @@ the challenge for the first ticket sent to the first relayer
 
 #### Defined in
 
-[src/crypto/por/index.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L20)
+[utils/src/crypto/por/index.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L20)
 
 ___
 
@@ -1267,7 +1333,7 @@ the DHT entry key
 
 #### Defined in
 
-[src/libp2p/relayCode.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/relayCode.ts#L16)
+[utils/src/libp2p/relayCode.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/relayCode.ts#L16)
 
 ___
 
@@ -1288,7 +1354,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:8
+utils/lib/utils_metrics.d.ts:23
 
 ___
 
@@ -1309,7 +1375,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:21
+utils/lib/utils_metrics.d.ts:36
 
 ___
 
@@ -1330,7 +1396,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:34
+utils/lib/utils_metrics.d.ts:49
 
 ___
 
@@ -1352,7 +1418,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:41
+utils/lib/utils_metrics.d.ts:56
 
 ___
 
@@ -1374,7 +1440,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:15
+utils/lib/utils_metrics.d.ts:30
 
 ___
 
@@ -1396,7 +1462,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:28
+utils/lib/utils_metrics.d.ts:43
 
 ___
 
@@ -1418,7 +1484,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:48
+utils/lib/utils_metrics.d.ts:63
 
 ___
 
@@ -1441,7 +1507,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:56
+utils/lib/utils_metrics.d.ts:71
 
 ___
 
@@ -1474,7 +1540,7 @@ ___
 
 #### Defined in
 
-[src/process/debug.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/process/debug.ts#L3)
+[utils/src/process/debug.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/process/debug.ts#L3)
 
 ___
 
@@ -1499,7 +1565,7 @@ ___
 
 #### Defined in
 
-[src/crypto/por/index.ts:111](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L111)
+[utils/src/crypto/por/index.ts:111](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L111)
 
 ___
 
@@ -1519,7 +1585,7 @@ ___
 
 #### Defined in
 
-[src/async/defer.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/defer.ts#L8)
+[utils/src/async/defer.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/defer.ts#L8)
 
 ___
 
@@ -1543,7 +1609,32 @@ relayer for transforming and delivering the packet
 
 #### Defined in
 
-[src/crypto/por/keyDerivation.ts:31](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/keyDerivation.ts#L31)
+[utils/src/crypto/por/keyDerivation.ts:31](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/keyDerivation.ts#L31)
+
+___
+
+### deriveBlinding
+
+▸ **deriveBlinding**(`secret`): `Uint8Array`
+
+Derive the blinding that is applied to the group element
+before forwarding the packet
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `secret` | `Uint8Array` | shared secret with the creator of the packet |
+
+#### Returns
+
+`Uint8Array`
+
+the blinding
+
+#### Defined in
+
+[utils/src/crypto/packet/keyDerivation.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/packet/keyDerivation.ts#L20)
 
 ___
 
@@ -1566,7 +1657,75 @@ Derives the initial commitment seed on a newly opened channel.
 
 #### Defined in
 
-[src/crypto/commitment/keyDerivation.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/commitment/keyDerivation.ts#L12)
+[utils/src/crypto/commitment/keyDerivation.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/commitment/keyDerivation.ts#L12)
+
+___
+
+### derivePRGParameters
+
+▸ **derivePRGParameters**(`secret`): [`PRGParameters`](modules.md#prgparameters)
+
+Derive the seed for the pseudo-randomness generator
+by using the secret shared derived from the mixnet packet
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `secret` | `Uint8Array` | shared secret with the creator of the packet |
+
+#### Returns
+
+[`PRGParameters`](modules.md#prgparameters)
+
+the PRG seed
+
+#### Defined in
+
+[utils/src/crypto/packet/keyDerivation.ts:40](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/packet/keyDerivation.ts#L40)
+
+___
+
+### derivePRPParameters
+
+▸ **derivePRPParameters**(`secret`): [`PRPParameters`](modules.md#prpparameters)
+
+Derive the seed for the pseudo-random permutation
+by using the secret shared with the creator of the packet
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `secret` | `Uint8Array` | shared secret with the creator of the packet |
+
+#### Returns
+
+[`PRPParameters`](modules.md#prpparameters)
+
+#### Defined in
+
+[utils/src/crypto/packet/keyDerivation.ts:65](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/packet/keyDerivation.ts#L65)
+
+___
+
+### derivePacketTag
+
+▸ **derivePacketTag**(`secret`): `Uint8Array`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `secret` | `Uint8Array` |
+
+#### Returns
+
+`Uint8Array`
+
+#### Defined in
+
+[utils/src/crypto/packet/keyDerivation.ts:84](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/packet/keyDerivation.ts#L84)
 
 ___
 
@@ -1597,7 +1756,7 @@ reconstructed key pair
 
 #### Defined in
 
-[src/crypto/keyPair.ts:76](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/keyPair.ts#L76)
+[utils/src/crypto/keyPair.ts:76](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/keyPair.ts#L76)
 
 ___
 
@@ -1627,7 +1786,7 @@ Runs through the dial strategy and handles possible errors
 
 #### Defined in
 
-[src/libp2p/dialHelper.ts:411](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L411)
+[utils/src/libp2p/dialHelper.ts:432](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L432)
 
 ___
 
@@ -1650,7 +1809,7 @@ a string with variables resolved to the actual values
 
 #### Defined in
 
-[src/utils.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/utils.ts#L19)
+[utils/src/utils.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/utils.ts#L19)
 
 ___
 
@@ -1682,7 +1841,7 @@ hop is the final recipient, it returns the plaintext
 
 #### Defined in
 
-[src/crypto/packet/index.ts:127](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/packet/index.ts#L127)
+[utils/src/crypto/packet/index.ts:132](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/packet/index.ts#L132)
 
 ___
 
@@ -1696,7 +1855,7 @@ ___
 
 #### Defined in
 
-lib/utils_metrics.d.ts:60
+utils/lib/utils_metrics.d.ts:17
 
 ___
 
@@ -1719,7 +1878,7 @@ Computes the greatest common divisor of two integers
 
 #### Defined in
 
-[src/math/gcd.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/math/gcd.ts#L6)
+[utils/src/math/gcd.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/math/gcd.ts#L6)
 
 ___
 
@@ -1740,7 +1899,7 @@ ___
 
 #### Defined in
 
-[src/types/channelEntry.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L12)
+[utils/src/types/channelEntry.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L12)
 
 ___
 
@@ -1771,7 +1930,7 @@ with the nodes along the path
 
 #### Defined in
 
-[src/crypto/packet/keyShares.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/packet/keyShares.ts#L17)
+[utils/src/crypto/packet/keyShares.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/packet/keyShares.ts#L17)
 
 ___
 
@@ -1793,7 +1952,7 @@ Returns the b58String within a given content. Returns empty string if none is fo
 
 #### Defined in
 
-[src/libp2p/index.ts:74](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L74)
+[utils/src/libp2p/index.ts:74](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L74)
 
 ___
 
@@ -1817,7 +1976,7 @@ Returns the maximal number of retries after which the `retryWithBackoff` throws
 
 #### Defined in
 
-[src/async/backoff.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/backoff.ts#L26)
+[utils/src/async/backoff.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/backoff.ts#L26)
 
 ___
 
@@ -1842,7 +2001,7 @@ once it throws because it ran out of retries.
 
 #### Defined in
 
-[src/async/backoff.ts:48](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/backoff.ts#L48)
+[utils/src/async/backoff.ts:48](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/backoff.ts#L48)
 
 ___
 
@@ -1864,7 +2023,7 @@ ___
 
 #### Defined in
 
-[src/crypto/packet/index.ts:27](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/packet/index.ts#L27)
+[utils/src/crypto/packet/index.ts:32](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/packet/index.ts#L32)
 
 ___
 
@@ -1884,7 +2043,7 @@ ___
 
 #### Defined in
 
-[src/network/addrs.ts:295](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L295)
+[utils/src/network/addrs.ts:295](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L295)
 
 ___
 
@@ -1904,7 +2063,21 @@ ___
 
 #### Defined in
 
-[src/network/addrs.ts:306](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L306)
+[utils/src/network/addrs.ts:306](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L306)
+
+___
+
+### getMetricsCollectors
+
+▸ **getMetricsCollectors**(): [`MetricCollector`](modules.md#metriccollector)[]
+
+#### Returns
+
+[`MetricCollector`](modules.md#metriccollector)[]
+
+#### Defined in
+
+[utils/src/index.ts:51](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/index.ts#L51)
 
 ___
 
@@ -1926,7 +2099,7 @@ ___
 
 #### Defined in
 
-[src/network/addrs.ts:220](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L220)
+[utils/src/network/addrs.ts:220](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L220)
 
 ___
 
@@ -1948,7 +2121,7 @@ ___
 
 #### Defined in
 
-[src/crypto/packet/index.ts:38](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/packet/index.ts#L38)
+[utils/src/crypto/packet/index.ts:43](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/packet/index.ts#L43)
 
 ___
 
@@ -1968,7 +2141,7 @@ ___
 
 #### Defined in
 
-[src/network/addrs.ts:292](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L292)
+[utils/src/network/addrs.ts:292](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L292)
 
 ___
 
@@ -1988,7 +2161,7 @@ ___
 
 #### Defined in
 
-[src/network/addrs.ts:299](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L299)
+[utils/src/network/addrs.ts:299](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L299)
 
 ___
 
@@ -2010,7 +2183,7 @@ Reads the given package.json file and determines its version.
 
 #### Defined in
 
-lib/utils_misc.d.ts:8
+utils/lib/utils_misc.d.ts:8
 
 ___
 
@@ -2032,7 +2205,7 @@ Returns true or false if given string does not contain a b58string
 
 #### Defined in
 
-[src/libp2p/index.ts:57](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L57)
+[utils/src/libp2p/index.ts:57](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L57)
 
 ___
 
@@ -2055,7 +2228,7 @@ ___
 
 #### Defined in
 
-[src/network/addrs.ts:233](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L233)
+[utils/src/network/addrs.ts:233](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L233)
 
 ___
 
@@ -2080,7 +2253,7 @@ Byte representation of the given ip address
 
 #### Defined in
 
-[src/network/addrs.ts:119](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L119)
+[utils/src/network/addrs.ts:119](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L119)
 
 ___
 
@@ -2106,7 +2279,7 @@ Used to filter addresses that get stored into libp2p's peer-store
 
 #### Defined in
 
-[src/network/addrs.ts:329](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L329)
+[utils/src/network/addrs.ts:329](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L329)
 
 ___
 
@@ -2129,7 +2302,7 @@ Checks if given address is any address
 
 #### Defined in
 
-[src/network/addrs.ts:27](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L27)
+[utils/src/network/addrs.ts:27](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L27)
 
 ___
 
@@ -2153,7 +2326,7 @@ Dappnode or AVADO based nodes.
 
 #### Defined in
 
-[src/network/addrs.ts:65](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L65)
+[utils/src/network/addrs.ts:65](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L65)
 
 ___
 
@@ -2173,7 +2346,7 @@ ___
 
 #### Defined in
 
-[src/ethereum/index.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/ethereum/index.ts#L17)
+[utils/src/ethereum/index.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/ethereum/index.ts#L17)
 
 ___
 
@@ -2193,7 +2366,7 @@ ___
 
 #### Defined in
 
-[src/ethereum/index.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/ethereum/index.ts#L11)
+[utils/src/ethereum/index.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/ethereum/index.ts#L11)
 
 ___
 
@@ -2213,7 +2386,7 @@ ___
 
 #### Defined in
 
-[src/ethereum/index.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/ethereum/index.ts#L6)
+[utils/src/ethereum/index.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/ethereum/index.ts#L6)
 
 ___
 
@@ -2239,7 +2412,7 @@ true if it's expired
 
 #### Defined in
 
-[src/time.ts:23](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/time.ts#L23)
+[utils/src/time.ts:23](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/time.ts#L23)
 
 ___
 
@@ -2264,7 +2437,7 @@ true if is link-locale address
 
 #### Defined in
 
-[src/network/addrs.ts:75](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L75)
+[utils/src/network/addrs.ts:75](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L75)
 
 ___
 
@@ -2289,7 +2462,7 @@ true if localhost
 
 #### Defined in
 
-[src/network/addrs.ts:44](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L44)
+[utils/src/network/addrs.ts:44](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L44)
 
 ___
 
@@ -2313,7 +2486,7 @@ true if address is a private ip address
 
 #### Defined in
 
-[src/libp2p/addressSorters.ts:15](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/addressSorters.ts#L15)
+[utils/src/libp2p/addressSorters.ts:15](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/addressSorters.ts#L15)
 
 ___
 
@@ -2338,7 +2511,7 @@ true if private address
 
 #### Defined in
 
-[src/network/addrs.ts:54](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L54)
+[utils/src/network/addrs.ts:54](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L54)
 
 ___
 
@@ -2363,7 +2536,7 @@ true if address is a reserved address
 
 #### Defined in
 
-[src/network/addrs.ts:85](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L85)
+[utils/src/network/addrs.ts:85](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L85)
 
 ___
 
@@ -2387,7 +2560,37 @@ whether embedded privKey is a secp256k1 key
 
 #### Defined in
 
-[src/libp2p/index.ts:90](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L90)
+[utils/src/libp2p/index.ts:90](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L90)
+
+___
+
+### iterableToArray
+
+▸ **iterableToArray**<`T`\>(`iter`): `Promise`<`T`[]\>
+
+Convert an async iterator to an array
+
+#### Type parameters
+
+| Name |
+| :------ |
+| `T` |
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `iter` | `AsyncIterable`<`T`\> | generator |
+
+#### Returns
+
+`Promise`<`T`[]\>
+
+array of promises
+
+#### Defined in
+
+[utils/src/utils.ts:61](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/utils.ts#L61)
 
 ___
 
@@ -2411,7 +2614,38 @@ ___
 
 #### Defined in
 
-[src/crypto/hashIterator.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/hashIterator.ts#L7)
+[utils/src/crypto/hashIterator.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/hashIterator.ts#L7)
+
+___
+
+### keyShareTransform
+
+▸ **keyShareTransform**(`alpha`, `peerId`): `Object`
+
+Applies the forward transformation of the key shares to
+an incoming packet.
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `alpha` | `Uint8Array` | the group element used for the offline Diffie-Hellman key exchange (compressed EC point) |
+| `peerId` | `PeerId` | id of the relayer |
+
+#### Returns
+
+`Object`
+
+Next public key (compressed EC point) and derived secret
+
+| Name | Type |
+| :------ | :------ |
+| `alpha` | `Uint8Array` |
+| `secret` | `Uint8Array` |
+
+#### Defined in
+
+[utils/src/crypto/packet/keyShares.ts:77](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/packet/keyShares.ts#L77)
 
 ___
 
@@ -2446,7 +2680,7 @@ send message. If `includeReply` is set, wait for a response
 
 #### Defined in
 
-[src/libp2p/index.ts:108](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L108)
+[utils/src/libp2p/index.ts:108](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L108)
 
 ___
 
@@ -2479,7 +2713,7 @@ and feeds them to the given handler.
 
 #### Defined in
 
-[src/libp2p/index.ts:239](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L239)
+[utils/src/libp2p/index.ts:239](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L239)
 
 ___
 
@@ -2507,7 +2741,31 @@ object parsed from JSON data
 
 #### Defined in
 
-[src/utils.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/utils.ts#L34)
+[utils/src/utils.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/utils.ts#L34)
+
+___
+
+### merge\_encoded\_metrics
+
+▸ **merge_encoded_metrics**(`metrics1`, `metrics2`): `string`
+
+A naive merging method for two serialized metric registries.
+It performs union of the sets, removing those metrics which have the same name and type.
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `metrics1` | `string` |
+| `metrics2` | `string` |
+
+#### Returns
+
+`string`
+
+#### Defined in
+
+utils/lib/utils_metrics.d.ts:10
 
 ___
 
@@ -2528,7 +2786,7 @@ ___
 
 #### Defined in
 
-[src/math/moveDecimalPoint.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/math/moveDecimalPoint.ts#L3)
+[utils/src/math/moveDecimalPoint.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/math/moveDecimalPoint.ts#L3)
 
 ___
 
@@ -2577,7 +2835,7 @@ an array containing the results
 
 #### Defined in
 
-[src/async/parallel.ts:37](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/parallel.ts#L37)
+[utils/src/async/parallel.ts:37](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/parallel.ts#L37)
 
 ___
 
@@ -2622,7 +2880,7 @@ a limiter that takes additional functions
 
 #### Defined in
 
-[src/async/concurrency.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/concurrency.ts#L14)
+[utils/src/async/concurrency.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/concurrency.ts#L14)
 
 ___
 
@@ -2679,7 +2937,7 @@ an ordered stream
 
 #### Defined in
 
-[src/async/ordering.ts:35](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/ordering.ts#L35)
+[utils/src/async/ordering.ts:35](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/ordering.ts#L35)
 
 ___
 
@@ -2693,7 +2951,7 @@ ___
 
 #### Defined in
 
-[src/network/hosts.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/hosts.ts#L11)
+[utils/src/network/hosts.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/hosts.ts#L11)
 
 ___
 
@@ -2715,7 +2973,7 @@ Parse JSON while recovering all Buffer elements
 
 #### Defined in
 
-[src/parseJSON.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/parseJSON.ts#L5)
+[utils/src/parseJSON.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/parseJSON.ts#L5)
 
 ___
 
@@ -2739,7 +2997,7 @@ major and minor versions, ex: `1.8.5` -> `1.8.0`
 
 #### Defined in
 
-[src/libp2p/pickVersion.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/pickVersion.ts#L6)
+[utils/src/libp2p/pickVersion.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/pickVersion.ts#L6)
 
 ___
 
@@ -2769,7 +3027,7 @@ to create it and the challenge for the next relayer.
 
 #### Defined in
 
-[src/crypto/por/index.ts:82](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L82)
+[utils/src/crypto/por/index.ts:82](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L82)
 
 ___
 
@@ -2793,7 +3051,7 @@ the prefix length, e.g. 24
 
 #### Defined in
 
-[src/network/addrs.ts:168](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L168)
+[utils/src/network/addrs.ts:168](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L168)
 
 ___
 
@@ -2817,7 +3075,7 @@ It equips the generated peerId with private key and public key.
 
 #### Defined in
 
-[src/libp2p/privKeyToPeerId.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/privKeyToPeerId.ts#L20)
+[utils/src/libp2p/privKeyToPeerId.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/privKeyToPeerId.ts#L20)
 
 ___
 
@@ -2845,7 +3103,7 @@ Using `libsecp256k1` directly does not work.
 
 #### Defined in
 
-[src/libp2p/pubKeyToPeerId.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/pubKeyToPeerId.ts#L18)
+[utils/src/libp2p/pubKeyToPeerId.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/pubKeyToPeerId.ts#L18)
 
 ___
 
@@ -2868,7 +3126,7 @@ same as randomInteger, but for BigInts
 
 #### Defined in
 
-[src/crypto/randomInteger.ts:181](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/randomInteger.ts#L181)
+[utils/src/crypto/randomInteger.ts:181](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/randomInteger.ts#L181)
 
 ___
 
@@ -2894,7 +3152,7 @@ ___
 
 #### Defined in
 
-[src/crypto/randomInteger.ts:194](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/randomInteger.ts#L194)
+[utils/src/crypto/randomInteger.ts:194](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/randomInteger.ts#L194)
 
 ___
 
@@ -2908,7 +3166,7 @@ ___
 
 #### Defined in
 
-[src/crypto/randomFloat.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/randomFloat.ts#L3)
+[utils/src/crypto/randomFloat.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/randomFloat.ts#L3)
 
 ___
 
@@ -2942,7 +3200,7 @@ random number between
 
 #### Defined in
 
-[src/crypto/randomInteger.ts:159](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/randomInteger.ts#L159)
+[utils/src/crypto/randomInteger.ts:159](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/randomInteger.ts#L159)
 
 ___
 
@@ -2980,7 +3238,7 @@ randomPermutation([1,2,3,4]);
 
 #### Defined in
 
-[src/collection/randomPermutation.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/collection/randomPermutation.ts#L18)
+[utils/src/collection/randomPermutation.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/collection/randomPermutation.ts#L18)
 
 ___
 
@@ -3016,7 +3274,7 @@ array with at most
 
 #### Defined in
 
-[src/collection/randomSubset.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/collection/randomSubset.ts#L20)
+[utils/src/collection/randomSubset.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/collection/randomSubset.ts#L20)
 
 ___
 
@@ -3041,7 +3299,27 @@ ___
 
 #### Defined in
 
-[src/crypto/hashIterator.ts:55](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/hashIterator.ts#L55)
+[utils/src/crypto/hashIterator.ts:55](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/hashIterator.ts#L55)
+
+___
+
+### registerMetricsCollector
+
+▸ **registerMetricsCollector**(`collector`): `void`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `collector` | [`MetricCollector`](modules.md#metriccollector) |
+
+#### Returns
+
+`void`
+
+#### Defined in
+
+[utils/src/index.ts:54](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/index.ts#L54)
 
 ___
 
@@ -3070,7 +3348,7 @@ Repeatedly apply a function after a timeout
 
 #### Defined in
 
-[src/process/retimer.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/process/retimer.ts#L6)
+[utils/src/process/retimer.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/process/retimer.ts#L6)
 
 ___
 
@@ -3107,7 +3385,7 @@ this function THROWS if retries were not successful
 
 #### Defined in
 
-[src/async/backoff.ts:83](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/backoff.ts#L83)
+[utils/src/async/backoff.ts:83](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/backoff.ts#L83)
 
 ___
 
@@ -3136,7 +3414,7 @@ can be used to derive a secp256k1 keypair
 
 #### Defined in
 
-[src/crypto/sampleGroupElement.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/sampleGroupElement.ts#L11)
+[utils/src/crypto/sampleGroupElement.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/sampleGroupElement.ts#L11)
 
 ___
 
@@ -3171,7 +3449,7 @@ Uint8Array representation
 
 #### Defined in
 
-[src/crypto/keyPair.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/keyPair.ts#L19)
+[utils/src/crypto/keyPair.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/keyPair.ts#L19)
 
 ___
 
@@ -3191,7 +3469,7 @@ ___
 
 #### Defined in
 
-[src/u8a/index.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/index.ts#L19)
+[utils/src/u8a/index.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/index.ts#L19)
 
 ___
 
@@ -3208,7 +3486,7 @@ that are harmless but couldn't be handled for some reason.
 
 #### Defined in
 
-[src/process/promiseRejectionFilter.ts:13](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/process/promiseRejectionFilter.ts#L13)
+[utils/src/process/promiseRejectionFilter.ts:13](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/process/promiseRejectionFilter.ts#L13)
 
 ___
 
@@ -3239,7 +3517,7 @@ a function that stop the resource logger
 
 #### Defined in
 
-[src/process/resourceLogger.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/process/resourceLogger.ts#L26)
+[utils/src/process/resourceLogger.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/process/resourceLogger.ts#L26)
 
 ___
 
@@ -3273,7 +3551,7 @@ Throws an error in case a length was provided and the result does not fit.
 
 #### Defined in
 
-[src/u8a/toU8a.ts:105](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/toU8a.ts#L105)
+[utils/src/u8a/toU8a.ts:105](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/toU8a.ts#L105)
 
 ___
 
@@ -3304,7 +3582,7 @@ a Promise that resolves once the timeout is due or the work is done
 
 #### Defined in
 
-[src/async/timeout.ts:10](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/timeout.ts#L10)
+[utils/src/async/timeout.ts:10](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/timeout.ts#L10)
 
 ___
 
@@ -3324,7 +3602,7 @@ ___
 
 #### Defined in
 
-[src/utils.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/utils.ts#L6)
+[utils/src/utils.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/utils.ts#L6)
 
 ___
 
@@ -3344,7 +3622,7 @@ ___
 
 #### Defined in
 
-[src/network/addrs.ts:266](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L266)
+[utils/src/network/addrs.ts:266](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L266)
 
 ___
 
@@ -3368,7 +3646,7 @@ the desired size.
 
 #### Defined in
 
-[src/u8a/toU8a.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/toU8a.ts#L7)
+[utils/src/u8a/toU8a.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/toU8a.ts#L7)
 
 ___
 
@@ -3399,7 +3677,7 @@ connections unintendedly
 
 #### Defined in
 
-[src/libp2p/dialHelper.ts:99](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L99)
+[utils/src/libp2p/dialHelper.ts:99](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L99)
 
 ___
 
@@ -3432,7 +3710,7 @@ u8aAdd(false, new Uint8Array([0, 1], new Uint8Array([0, 255])) // Uint8Array([1,
 
 #### Defined in
 
-[src/u8a/u8aAdd.ts:13](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/u8aAdd.ts#L13)
+[utils/src/u8a/u8aAdd.ts:13](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/u8aAdd.ts#L13)
 
 ___
 
@@ -3455,7 +3733,7 @@ Converts ip address from byte representation to string
 
 #### Defined in
 
-[src/network/addrs.ts:201](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L201)
+[utils/src/network/addrs.ts:201](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L201)
 
 ___
 
@@ -3482,7 +3760,7 @@ a CIDR string, such as `192.168.1.0/24`
 
 #### Defined in
 
-[src/network/addrs.ts:191](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L191)
+[utils/src/network/addrs.ts:191](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/network/addrs.ts#L191)
 
 ___
 
@@ -3503,7 +3781,7 @@ ___
 
 #### Defined in
 
-[src/u8a/u8aCompare.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/u8aCompare.ts#L5)
+[utils/src/u8a/u8aCompare.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/u8aCompare.ts#L5)
 
 ___
 
@@ -3539,7 +3817,7 @@ u8aConcat(
 
 #### Defined in
 
-[src/u8a/concat.ts:15](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/concat.ts#L15)
+[utils/src/u8a/concat.ts:15](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/concat.ts#L15)
 
 ___
 
@@ -3562,7 +3840,7 @@ one different entry is found.
 
 #### Defined in
 
-[src/u8a/equals.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/equals.ts#L6)
+[utils/src/u8a/equals.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/equals.ts#L6)
 
 ___
 
@@ -3583,7 +3861,7 @@ ___
 
 #### Defined in
 
-[src/u8a/index.ts:33](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/index.ts#L33)
+[utils/src/u8a/index.ts:33](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/index.ts#L33)
 
 ___
 
@@ -3610,7 +3888,7 @@ Mainly used for debugging.
 
 #### Defined in
 
-[src/u8a/toHex.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/toHex.ts#L8)
+[utils/src/u8a/toHex.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/toHex.ts#L8)
 
 ___
 
@@ -3630,7 +3908,7 @@ ___
 
 #### Defined in
 
-[src/u8a/u8aToNumber.ts:41](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/u8aToNumber.ts#L41)
+[utils/src/u8a/u8aToNumber.ts:41](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/u8aToNumber.ts#L41)
 
 ___
 
@@ -3652,7 +3930,7 @@ Converts a Uint8Array to number.
 
 #### Defined in
 
-[src/u8a/u8aToNumber.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/u8aToNumber.ts#L5)
+[utils/src/u8a/u8aToNumber.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/u8aToNumber.ts#L5)
 
 ___
 
@@ -3675,7 +3953,7 @@ Apply an XOR on a list of arrays.
 
 #### Defined in
 
-[src/u8a/xor.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/xor.ts#L7)
+[utils/src/u8a/xor.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/xor.ts#L7)
 
 ___
 
@@ -3701,7 +3979,7 @@ prints errors to the console and throws in case of non-conforming
 
 #### Defined in
 
-[src/utils.ts:46](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/utils.ts#L46)
+[utils/src/utils.ts:46](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/utils.ts#L46)
 
 ___
 
@@ -3723,7 +4001,7 @@ ___
 
 #### Defined in
 
-[src/crypto/por/index.ts:127](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L127)
+[utils/src/crypto/por/index.ts:127](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L127)
 
 ___
 
@@ -3745,7 +4023,7 @@ ___
 
 #### Defined in
 
-[src/crypto/por/index.ts:138](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L138)
+[utils/src/crypto/por/index.ts:138](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L138)
 
 ___
 
@@ -3766,7 +4044,7 @@ ___
 
 #### Defined in
 
-[src/crypto/por/index.ts:132](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L132)
+[utils/src/crypto/por/index.ts:132](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L132)
 
 ___
 
@@ -3796,7 +4074,7 @@ key, but no other tests had been done for additional keys (e.g. Curve25519)
 
 #### Defined in
 
-[src/libp2p/verifySignatureFromPeerId.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/verifySignatureFromPeerId.ts#L16)
+[utils/src/libp2p/verifySignatureFromPeerId.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/verifySignatureFromPeerId.ts#L16)
 
 ___
 
@@ -3816,4 +4094,4 @@ ___
 
 #### Defined in
 
-[src/async/backoff.ts:15](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/backoff.ts#L15)
+[utils/src/async/backoff.ts:15](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/backoff.ts#L15)

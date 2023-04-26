@@ -1,5 +1,9 @@
 .POSIX:
 
+# utility variables
+space := $(subst ,, )
+mydir := $(dir $(abspath $(firstword $(MAKEFILE_LIST))))
+
 # Gets all packages that include a Rust crates
 # Disable automatic compilation of SC bindings. Can still be done manually.
 WORKSPACES_WITH_RUST_MODULES := $(filter-out ./packages/ethereum/crates,$(wildcard $(addsuffix /crates, $(wildcard ./packages/*))))
@@ -7,15 +11,18 @@ WORKSPACES_WITH_RUST_MODULES := $(filter-out ./packages/ethereum/crates,$(wildca
 # Gets all individual crates such that they can get built
 CRATES := $(foreach crate,${WORKSPACES_WITH_RUST_MODULES},$(dir $(wildcard $(crate)/*/Cargo.toml)))
 
+# base names of all crates
+CRATES_NAMES := $(foreach crate,${CRATES},$(shell basename $(crate)))
+
 # define specific crate for hopli which is a native helper
 HOPLI_CRATE := ./packages/hopli
 
 # Set local foundry directory (for binaries) and versions
-FOUNDRY_DIR ?= ${CURDIR}/.foundry
-FOUNDRY_VSN := be7084e
+FOUNDRY_DIR ?= $(mydir)/.foundry
+FOUNDRY_VSN := ed9298d
 
 # Set local cargo directory (for binaries)
-CARGO_DIR := ${CURDIR}/.cargo
+CARGO_DIR := $(mydir)/.cargo
 
 # use custom foundryup to ensure the local directory is used
 foundryup := env FOUNDRY_DIR="${FOUNDRY_DIR}" foundryup
@@ -26,8 +33,8 @@ PATH := $(subst :${CARGO_DIR}/bin,,$(PATH)):${CARGO_DIR}/bin
 PATH := $(subst :${HOME}/.cargo/bin,,$(PATH)):${HOME}/.cargo/bin
 # add local Foundry install path (only once)
 PATH := $(subst :${FOUNDRY_DIR}/bin,,$(PATH)):${FOUNDRY_DIR}/bin
-# use custom PATH in all shell processes
-SHELL := env PATH=$(PATH) $(shell which bash)
+# use custom PATH in all shell processes, escape spaces
+SHELL := env PATH=$(subst $(space),\$(space),$(PATH)) $(shell which bash)
 
 # use custom Cargo config file for each invocation
 cargo := cargo --config ${CARGO_DIR}/config.toml
@@ -48,6 +55,12 @@ ifneq ($(origin PRODUCTION),undefined)
 endif
 
 all: help
+
+.PHONY: init
+init: ## initialize repository (idempotent operation)
+	for gh in `find .githooks/ -type f`; do \
+		ln -sf "../../$${gh}" .git/hooks/; \
+	done
 
 .PHONY: $(CRATES)
 $(CRATES): ## builds all Rust crates with wasm-pack (except for hopli)
@@ -85,8 +98,10 @@ endif
 
 .PHONY: deps
 deps: ## Installs dependencies for development setup
-	[ -n "${NIX_PATH}" ] || corepack enable
-	command -v rustup && rustup update || echo "No rustup installed, ignoring"
+	if [[ ! "${name}" =~ nix-shell* ]]; then \
+		corepack enable; \
+		command -v rustup && rustup update || echo "No rustup installed, ignoring"; \
+	fi
 # we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op
 	mkdir -p .cargo/bin
 	$(MAKE) cargo-update
@@ -113,6 +128,10 @@ install-foundry: ## install foundry
 	else \
 	  echo "foundry binaries already installed under "${FOUNDRY_DIR}/bin", skipping"; \
 	fi
+	@forge --version
+	@anvil --version
+	@chisel --version
+	@cast --version
 
 .PHONY: cargo-update
 cargo-update: ## update vendored Cargo dependencies
@@ -132,10 +151,10 @@ build-solidity-types: ## generate Solidity typings
 	echo "Foundry create binding"
 	$(MAKE) -C packages/ethereum/contracts/ overwrite-sc-bindings
 # Change git = "http://..." into version = "1.0.2"
-	sed -i -e 's/https:\/\/github.com\/gakonst\/ethers-rs/1.0.2/g' ${CURDIR}/packages/ethereum/crates/bindings/Cargo.toml
-	sed -i -e 's/git/version/g' ${CURDIR}/packages/ethereum/crates/bindings/Cargo.toml
+	sed -i -e 's/https:\/\/github.com\/gakonst\/ethers-rs/1.0.2/g' $(mydir)/packages/ethereum/crates/bindings/Cargo.toml
+	sed -i -e 's/git/version/g' $(mydir)/packages/ethereum/crates/bindings/Cargo.toml
 # add [lib] as rlib is necessary to run integration tests
-	echo -e "\n[lib] \ncrate-type = [\"cdylib\", \"rlib\"]" >> ${CURDIR}/packages/ethereum/crates/bindings/Cargo.toml
+	echo -e "\n[lib] \ncrate-type = [\"cdylib\", \"rlib\"]" >> $(mydir)/packages/ethereum/crates/bindings/Cargo.toml
 
 .PHONY: build-yarn
 build-yarn: ## build yarn packages
@@ -162,8 +181,10 @@ ifeq ($(origin NO_CARGO),undefined)
 # Copy bindings to their destination
 # filter out proc-macro crates since they need no compilation
 	$(MAKE) $(filter-out %proc-macros/,$(WORKSPACES_WITH_RUST_MODULES))
+ifeq ($(origin NO_HOPLI),undefined)
 # build hopli
 	$(MAKE) $(HOPLI_CRATE)
+endif
 endif
 
 .PHONY: build-yellowpaper
@@ -171,17 +192,13 @@ build-yellowpaper: ## build the yellowpaper in docs/yellowpaper
 	$(MAKE) -C docs/yellowpaper
 
 .PHONY: build-docs
-build-docs: ## build typedocs, Rest API docs, and docs website
-build-docs: | build-docs-typescript build-docs-website build-docs-api
+build-docs: ## build typedocs, Rest API docs
+build-docs: | build-docs-typescript build-docs-api
 
 .PHONY: build-docs-typescript
 build-docs-typescript: ## build typedocs
 build-docs-typescript: build
 	yarn workspaces foreach -pv run docs:generate
-
-.PHONY: build-docs-website
-build-docs-website: ## build docs website
-	yarn workspace @hoprnet/hopr-docs build
 
 .PHONY: build-docs-api
 build-docs-api: ## build Rest API docs
@@ -210,20 +227,48 @@ else
 	yarn workspace @hoprnet/${package} run test:wasm
 endif
 
+.PHONY: smoke-test
+smoke-test: ## run smoke tests
+	source .venv/bin/activate && (python3 -m pytest tests/ || (cat /tmp/integration_test_out && false))
+
 .PHONY: smart-contract-test
 smart-contract-test: # forge test smart contracts
 	$(MAKE) -C packages/ethereum/contracts/ sc-test
 
-.PHONY: lint-check
-lint-check: ## run linter in check mode
+.PHONY: lint
+lint: lint-ts lint-rust lint-python
+lint: ## run linter for TS, Rust and Python
+
+.PHONY: lint-ts
+lint-ts: ## run linter for TS
 	npx prettier --check .
 
-.PHONY: lint-fix
-lint-fix: ## run linter in fix mode
+.PHONY: lint-rust
+lint-rust: ## run linter for Rust
+	$(foreach c, $(CRATES_NAMES), cargo fmt --check -p $(c) && ) echo ""
+
+.PHONY: lint-python
+lint-python: ## run linter for Python
+	source .venv/bin/activate && black --check tests/
+
+.PHONY: fmt
+fmt: fmt-ts fmt-rust fmt-python
+fmt: ## run code formatter for TS, Rust and Python
+
+.PHONY: fmt-ts
+fmt-ts: ## run code formatter for TS
 	npx prettier --write .
 
+.PHONY: fmt-rust
+fmt-rust: ## run code formatter for Rust
+	$(foreach c, $(CRATES_NAMES), cargo fmt -p $(c) && ) echo ""
+
+.PHONY: fmt-python
+fmt-python: ## run code formatter for Python
+	source .venv/bin/activate && black tests/
+
 .PHONY: run-anvil
-run-anvil: args=""
+run-anvil: args=
 run-anvil: ## spinup a local anvil instance (daemon) and deploy contracts
 	./scripts/run-local-anvil.sh $(args)
 
@@ -237,29 +282,38 @@ kill-anvil: ## kill process running at port 8545 (default port of anvil)
 	lsof -i :8545 -s TCP:LISTEN -t | xargs -I {} -n 1 kill {} || :
 
 .PHONY: run-local
+run-local: args=
 run-local: ## run HOPRd from local repo
 	env NODE_OPTIONS="--experimental-wasm-modules" NODE_ENV=development DEBUG="hopr*" node \
 		packages/hoprd/lib/main.cjs --init --api \
 		--password="local" --identity=`pwd`/.identity-local.id \
 		--environment anvil-localhost --announce \
 		--testUseWeakCrypto --testAnnounceLocalAddresses \
-		--testPreferLocalAddresses --disableApiAuthentication
+		--testPreferLocalAddresses --disableApiAuthentication \
+		$(args)
 
-.PHONY: fund-local
-fund-local: id_dir=.
-fund-local: ## use faucet script to fund local identities
-	IDENTITY_PASSWORD=local PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
-		hopli faucet \
-		--environment-name anvil-localhost \
-		--use-local-identities --identity-directory "${id_dir}" \
-		--contracts-root "./packages/ethereum/contracts"
+run-local-dev-compose: ## run local development Compose setup
+	echo "Starting Anvil on host"
+	make kill-anvil
+	ETHERSCAN_API_KEY=anykey make run-anvil
+	echo "Starting Compose setup (grafana, prometheus)"
+	cd scripts/compose && docker compose -f docker-compose.local-dev.yml up -d
+	echo "Starting Hoprd from source on host"
+	# hoprd must listen on the Docker bridge interface for Prometheus to be able
+	# to connect to it
+	make run-local args="--apiHost=0.0.0.0"
 
 .PHONY: fund-local-all
+fund-local-all: id_dir=/tmp/
+fund-local-all: id_password=local
+fund-local-all: id_prefix=
 fund-local-all: ## use faucet script to fund all the local identities
-	IDENTITY_PASSWORD=local PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+	IDENTITY_PASSWORD="${id_password}" PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
 		hopli faucet \
 		--environment-name anvil-localhost \
-		--use-local-identities --identity-directory "/tmp/" \
+		--use-local-identities \
+		--identity-prefix "${id_prefix}" \
+		--identity-directory "${id_dir}" \
 		--contracts-root "./packages/ethereum/contracts"
 
 .PHONY: docker-build-local
@@ -436,6 +490,13 @@ ifeq ($(environment_type),)
 	echo "could not read environment type info from contracts-addresses.json" >&2 && exit 1
 endif
 endif
+
+.PHONY: run-docker-dev
+run-docker-dev: ## start a local development Docker container
+	docker run -v `pwd`:/src -ti -w "/src" --name hoprd-local-dev nixos/nix nix \
+		--extra-experimental-features nix-command \
+		--extra-experimental-features flakes \
+		develop
 
 .PHONY: run-hopr-admin
 run-hopr-admin: version=07aec21b

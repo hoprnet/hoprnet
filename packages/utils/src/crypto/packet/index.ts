@@ -8,6 +8,11 @@ import { PRP } from '../prp.js'
 import { derivePacketTag, derivePRPParameters } from './keyDerivation.js'
 import { addPadding, removePadding } from './padding.js'
 
+// Temporarily export everything else for correspondence tests with Rust
+export * from './mac.js'
+export * from './keyDerivation.js'
+export { keyShareTransform }
+
 /**
  * Encrypts the plaintext in the reverse order of the path
  * @param text plaintext of the payload

@@ -41,7 +41,7 @@ Represents a snapshot in the blockchain.
 
 #### Defined in
 
-[src/types/snapshot.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/snapshot.ts#L9)
+[utils/src/types/snapshot.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/snapshot.ts#L9)
 
 ## Properties
 
@@ -51,7 +51,7 @@ Represents a snapshot in the blockchain.
 
 #### Defined in
 
-[src/types/snapshot.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/snapshot.ts#L9)
+[utils/src/types/snapshot.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/snapshot.ts#L9)
 
 ___
 
@@ -61,7 +61,7 @@ ___
 
 #### Defined in
 
-[src/types/snapshot.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/snapshot.ts#L9)
+[utils/src/types/snapshot.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/snapshot.ts#L9)
 
 ___
 
@@ -71,7 +71,7 @@ ___
 
 #### Defined in
 
-[src/types/snapshot.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/snapshot.ts#L9)
+[utils/src/types/snapshot.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/snapshot.ts#L9)
 
 ## Accessors
 
@@ -85,7 +85,7 @@ ___
 
 #### Defined in
 
-[src/types/snapshot.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/snapshot.ts#L28)
+[utils/src/types/snapshot.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/snapshot.ts#L28)
 
 ## Methods
 
@@ -99,7 +99,7 @@ ___
 
 #### Defined in
 
-[src/types/snapshot.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/snapshot.ts#L20)
+[utils/src/types/snapshot.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/snapshot.ts#L20)
 
 ___
 
@@ -119,4 +119,4 @@ ___
 
 #### Defined in
 
-[src/types/snapshot.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/snapshot.ts#L11)
+[utils/src/types/snapshot.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/snapshot.ts#L11)

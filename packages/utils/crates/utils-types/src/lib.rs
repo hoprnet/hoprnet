@@ -1,5 +1,8 @@
+extern crate core;
+
+pub mod errors;
 pub mod primitives;
-pub mod channels;
+pub mod traits;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {

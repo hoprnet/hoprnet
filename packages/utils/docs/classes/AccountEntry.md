@@ -44,7 +44,7 @@
 
 #### Defined in
 
-[src/types/accountEntry.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L16)
+[utils/src/types/accountEntry.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L16)
 
 ## Properties
 
@@ -54,7 +54,7 @@
 
 #### Defined in
 
-[src/types/accountEntry.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L18)
+[utils/src/types/accountEntry.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L18)
 
 ___
 
@@ -64,7 +64,7 @@ ___
 
 #### Defined in
 
-[src/types/accountEntry.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L17)
+[utils/src/types/accountEntry.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L17)
 
 ___
 
@@ -74,7 +74,7 @@ ___
 
 #### Defined in
 
-[src/types/accountEntry.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L19)
+[utils/src/types/accountEntry.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L19)
 
 ## Accessors
 
@@ -88,7 +88,7 @@ ___
 
 #### Defined in
 
-[src/types/accountEntry.ts:81](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L81)
+[utils/src/types/accountEntry.ts:81](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L81)
 
 ___
 
@@ -102,7 +102,7 @@ ___
 
 #### Defined in
 
-[src/types/accountEntry.ts:90](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L90)
+[utils/src/types/accountEntry.ts:90](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L90)
 
 ___
 
@@ -116,7 +116,7 @@ ___
 
 #### Defined in
 
-[src/types/accountEntry.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L22)
+[utils/src/types/accountEntry.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L22)
 
 ## Methods
 
@@ -130,7 +130,7 @@ ___
 
 #### Defined in
 
-[src/types/accountEntry.ts:77](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L77)
+[utils/src/types/accountEntry.ts:77](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L77)
 
 ___
 
@@ -144,7 +144,7 @@ ___
 
 #### Defined in
 
-[src/types/accountEntry.ts:73](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L73)
+[utils/src/types/accountEntry.ts:73](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L73)
 
 ___
 
@@ -158,7 +158,7 @@ ___
 
 #### Defined in
 
-[src/types/accountEntry.ts:45](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L45)
+[utils/src/types/accountEntry.ts:45](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L45)
 
 ___
 
@@ -172,7 +172,7 @@ ___
 
 #### Defined in
 
-[src/types/accountEntry.ts:94](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L94)
+[utils/src/types/accountEntry.ts:94](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L94)
 
 ___
 
@@ -192,4 +192,4 @@ ___
 
 #### Defined in
 
-[src/types/accountEntry.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L26)
+[utils/src/types/accountEntry.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L26)

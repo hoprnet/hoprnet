@@ -1,10 +1,21 @@
+import { isDeepStrictEqual } from 'util'
 import { v4 as uuidv4 } from 'uuid'
 import { createHash } from 'crypto'
 
 import { HoprDB } from '@hoprnet/hopr-utils'
 
+// List of endpoints which are supported as capabilitities.
+// Each entry also specifies supported endpoint-specific limits.
+import supportedCapabilities from './../supported-api-capabilities.json' assert { type: 'json' }
+
+enum LimitType {
+  calls
+}
+
+export type LimitTypeString = keyof typeof LimitType
+
 export type Limit = {
-  type: string
+  type: LimitTypeString
   conditions: {
     max?: number
   }
@@ -107,8 +118,8 @@ export async function authorizeToken(db: HoprDB, token: Token, endpointRef: stri
   const tokenAuthorized = capsChecks.every((c) => c === true)
   if (tokenAuthorized) {
     // update limits before returning
-    token.capabilities = endpointCaps.map((c) => {
-      if (c.limits) {
+    token.capabilities = token.capabilities.map((c) => {
+      if (c.endpoint === endpointRef && c.limits) {
         const limits = c.limits.map((l) => {
           if (l.type === 'calls') {
             // Add or increment field 'used'
@@ -129,11 +140,14 @@ export async function authorizeToken(db: HoprDB, token: Token, endpointRef: stri
 
 // Create a token object from the given parameters, but don't store it in the database yet.
 // @param db Reference to a HoprDB instance.
+// @param tokenScope A token which is used when creating this new token. Its
+// used to limit priviledges during token creation. If `undefined`, full priviledges are used.
 // @param capabilities Capabilities which are attached to the token object.
 // @param description Description which is attached to the token object.
 // @param lifetime Number of seconds used to calculate the maximum lifetime of the token.
 export async function createToken(
   db: HoprDB,
+  tokenScope: Token,
   capabilities: Array<Capability>,
   description?: string,
   lifetime?: number
@@ -155,6 +169,16 @@ export async function createToken(
 
   if (lifetime) {
     token.valid_until = Date.now() + lifetime
+  }
+
+  if (tokenScope) {
+    if (!validateScopedTokenCapabilities(tokenScope.capabilities, token.capabilities)) {
+      throw new Error('requested token capabilities not allowed')
+    }
+
+    if (!validateScopedTokenLifetime(tokenScope.valid_until, token.valid_until)) {
+      throw new Error('requested token lifetime not allowed')
+    }
   }
 
   return token
@@ -216,52 +240,13 @@ async function generateNewId(db: HoprDB): Promise<string> {
 }
 
 // Generic limits which are supported on every supported endpoint.
-const genericLimits = {
+const genericLimits: Record<LimitTypeString, any> = {
   calls: {
     max: {
       validityCheck: (v: number): boolean => v > 0,
       runtimeCheck: (v: number, w: number): boolean => v > w
     }
   }
-}
-
-// List of endpoints which are supported as capabilitities.
-// Each entry also specifies supported endpoint-specific limits.
-const supportedCapabilities = {
-  tokensCreate: {},
-  tokensGetToken: {},
-  ticketsGetStatistics: {},
-  ticketsRedeemTickets: {},
-  ticketsGetTickets: {},
-  settingsGetSettings: {},
-  nodeGetVersion: {},
-  nodeStreamWebsocket: {},
-  nodePing: {},
-  nodeGetPeers: {},
-  nodeGetMetrics: {},
-  nodeGetInfo: {},
-  nodeGetEntryNodes: {},
-  messagesWebsocket: {},
-  messagesSign: {},
-  messagesSendMessage: {},
-  messageSign: {},
-  channelsOpenChannel: {},
-  channelsGetChannels: {},
-  aliasesGetAliases: {},
-  aliasesSetAlias: {},
-  accountWithdraw: {},
-  accountGetBalances: {},
-  accountGetAddresses: {},
-  accountGetAddress: {},
-  tokensDelete: {},
-  settingsSetSetting: {},
-  peerInfoGetPeerInfo: {},
-  channelsRedeemTickets: {},
-  channelsGetTickets: {},
-  channelsCloseChannel: {},
-  channelsGetChannel: {},
-  aliasesGetAlias: {},
-  aliasesRemoveAlias: {}
 }
 
 // Validates the given list of capabilities. Fails if the list is empty or any
@@ -315,4 +300,31 @@ export function validateTokenCapabilities(capabilities: Array<Capability>): bool
       return false
     })
   })
+}
+
+export function validateScopedTokenCapabilities(
+  scopeCapabilities: Array<Capability>,
+  capabilities: Array<Capability>
+): boolean {
+  // valid if the target capabilities are a subset of the scope's capabilities
+  return capabilities.every((cap) => {
+    return scopeCapabilities.some((scopeCap) => {
+      return isDeepStrictEqual(scopeCap, cap)
+    })
+  })
+}
+
+export function validateScopedTokenLifetime(scopeValidUntil: number, validUntil: number): boolean {
+  if (!scopeValidUntil) {
+    // valid if the scope has not lifetime
+    return true
+  }
+
+  if (!validUntil) {
+    // invalid if the scope has a lifetime but target does not
+    return false
+  }
+
+  // valid if the scope's lifetime exceeds the target lifetime
+  return scopeValidUntil >= validUntil
 }

@@ -4,6 +4,12 @@ import { u8aAddrToString, u8aToNumber } from '@hoprnet/hopr-utils'
 
 import { CODE_IP4, CODE_IP6, CODE_DNS4, CODE_DNS6 } from '../../constants.js'
 
+import { handleTcpStunRequest, handleUdpStunRequest } from './index.js'
+import { ip6Lookup } from '../../utils/index.js'
+
+import { type AddressInfo, createServer } from 'net'
+import { createSocket } from 'dgram'
+
 export function parseStunAddress(addr: Multiaddr): { address: string; port: number } {
   const tuples = addr.tuples()
 
@@ -37,5 +43,37 @@ export function parseStunAddress(addr: Multiaddr): { address: string; port: numb
   return {
     address,
     port
+  }
+}
+
+/**
+ * Launches a minimal STUN server that is able to handle all Hopr-specific
+ * requestes.
+ * Used to test Hopr nodes automatically.
+ *
+ * @returns a minimal STUN server
+ */
+export async function startStunServer() {
+  const tcpServer = createServer()
+  const udpSocket = createSocket({
+    type: 'udp6',
+    reuseAddr: true,
+    lookup: ip6Lookup
+  })
+
+  await new Promise<void>((resolve) => tcpServer.listen(resolve))
+  const tcpPort = (tcpServer.address() as AddressInfo).port
+
+  await new Promise<void>((resolve) => udpSocket.bind(tcpPort, resolve))
+
+  tcpServer.on('connection', (socket) => handleTcpStunRequest(socket, socket))
+  udpSocket.on('message', (msg, rinfo) => handleUdpStunRequest(udpSocket, msg, rinfo))
+
+  return {
+    tcpPort,
+    close: async () => {
+      await new Promise<any>((resolve) => tcpServer.close(resolve))
+      await new Promise<void>((resolve) => udpSocket.close(resolve))
+    }
   }
 }

@@ -11,7 +11,7 @@ WORKDIR /app/hoprnet-toolchain
 RUN mkdir -p scripts/toolchain
 
 RUN apt-get update \
- && apt-get install -y \
+ && apt-get install -y --no-install-recommends \
       bash \
       build-essential \
       ca-certificates \
@@ -42,3 +42,4 @@ RUN make install-foundry
 
 # Downloads prebuilt toolchain utilities
 RUN ./scripts/toolchain/install-toolchain.sh
+RUN echo "export PATH=${PATH}:${HOME}/.cargo/bin:/app/hoprnet-toolchain/.foundry/bin" >> /root/.bashrc

@@ -10,7 +10,7 @@ COPY .yarn .yarn
 COPY .cargo .cargo/
 COPY vendor vendor/
 COPY packages packages/
-COPY Makefile Cargo.toml Cargo.lock yarn.lock .yarnrc.yml package.json tsconfig.build.json tsconfig.json tsconfig.scripts.json yarn.lock rust-toolchain.toml ./
+COPY Makefile Cargo.toml Cargo.lock yarn.lock .yarnrc.yml package.json tsconfig.build.json tsconfig.json yarn.lock rust-toolchain.toml ./
 
 LABEL description="Launches a cover-traffic node which keeps sending cover-traffic through the hopr network"
 
@@ -72,7 +72,8 @@ ENV NODE_ENV production
 ENV DEBUG 'hopr*'
 ENV NODE_OPTIONS='--max_old_space_size=4096 --experimental-wasm-modules'
 
-# p2p
-EXPOSE 9091
+# p2p UDP + TCP
+EXPOSE 9091/udp
+EXPOSE 9091/tcp
 
 ENTRYPOINT ["/sbin/tini", "--", "node", "lib/main.cjs"]

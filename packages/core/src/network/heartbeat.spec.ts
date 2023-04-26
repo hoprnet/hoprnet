@@ -1,29 +1,24 @@
-import Heartbeat, { type HeartbeatConfig, NetworkHealthIndicator } from './heartbeat.js'
-import NetworkPeers, { NetworkPeersOrigin } from './network-peers.js'
+import Heartbeat from './heartbeat.js'
+import { HeartbeatConfig, Health, Network, PeerOrigin } from '../../lib/core_network.js'
 import { assert } from 'chai'
 import { privKeyToPeerId } from '@hoprnet/hopr-utils'
 import { EventEmitter, once } from 'events'
 import type { PeerId } from '@libp2p/interface-peer-id'
-import { NETWORK_QUALITY_THRESHOLD } from '../constants.js'
+import { MAX_PARALLEL_PINGS, NETWORK_QUALITY_THRESHOLD } from '../constants.js'
 import type { Connection, Stream } from '@libp2p/interfaces/connection'
 import type { Components } from '@libp2p/interfaces/components'
-import sinon from 'sinon'
-import { SendMessage } from '../index.js'
+import { peerIdFromString } from '@libp2p/peer-id'
 
 class TestingHeartbeat extends Heartbeat {
   public async checkNodes() {
-    return await super.checkNodes()
-  }
-}
+    try {
+      // timestamp far in the future to allow pinging immediately after the previous ping in the tests
+      const thresholdTime = Date.now() + 1_000_000
 
-class NetworkHealth {
-  public state: NetworkHealthIndicator = NetworkHealthIndicator.UNKNOWN
-
-  constructor() {
-    this.onHealthChanged = this.onHealthChanged.bind(this)
-  }
-  public onHealthChanged(_oldHealthValue: NetworkHealthIndicator, newHealthValue: NetworkHealthIndicator) {
-    this.state = newHealthValue
+      return await this.pinger.ping(this.networkPeers.peers_to_ping(BigInt(thresholdTime)))
+    } catch (err) {
+      assert.fail('Should not be thrown')
+    }
   }
 }
 
@@ -33,13 +28,6 @@ const Bob = privKeyToPeerId('0xf9bfbad938482b29076932b080fb6ac1e14616ee621fb3f77
 const Charly = privKeyToPeerId('0xfab2610822e8c973bec74c811e2f44b6b4b501e922b1d67f5367a26ce46088ea')
 
 const TESTING_ENVIRONMENT = 'unit-testing'
-
-// Overwrite default timeouts with shorter ones for unit testing
-const SHORT_TIMEOUTS: Partial<HeartbeatConfig> = {
-  heartbeatInterval: 200,
-  heartbeatVariance: 1,
-  networkQualityThreshold: 0.5
-}
 
 /**
  * Used to mock sending messages using events
@@ -118,7 +106,12 @@ function createFakeNetwork() {
   }
 
   // mocks libp2p.dialProtocol
-  const sendMessage = async (self: PeerId, dest: PeerId, protocols: string | string[], msg: Uint8Array) => {
+  const sendMessage = async (
+    self: PeerId,
+    dest: PeerId,
+    protocols: string | string[],
+    msg: Uint8Array
+  ): Promise<Uint8Array[]> => {
     let protocol: string
     if (Array.isArray(protocols)) {
       protocol = protocols[0]
@@ -158,13 +151,22 @@ function createFakeNetwork() {
 
 async function getPeer(
   self: PeerId,
-  network: ReturnType<typeof createFakeNetwork>,
-  netStatEvents: NetworkHealth
-): Promise<{ heartbeat: TestingHeartbeat; peers: NetworkPeers }> {
-  const peers = new NetworkPeers([], [self], 0.3)
+  network: ReturnType<typeof createFakeNetwork>
+): Promise<{ heartbeat: TestingHeartbeat; peers: Network }> {
+  const peers = Network.build(
+    self.toString(),
+    NETWORK_QUALITY_THRESHOLD,
+    (_: string) => {},
+    (_o: Health, _n: Health) => {},
+    (peerId: string) => !peerIdFromString(peerId).equals(Charly) && !peerIdFromString(peerId).equals(Me),
+    (async () => {
+      assert.fail(`must not call hangUp`)
+    }) as any
+  )
+
+  let cfg = HeartbeatConfig.build(MAX_PARALLEL_PINGS, 1, 2000, BigInt(15000))
 
   const heartbeat = new TestingHeartbeat(
-    Me,
     peers,
     {
       getRegistrar() {
@@ -188,18 +190,8 @@ async function getPeer(
     } as Components,
     ((dest: PeerId, protocols: string | string[], msg: Uint8Array) =>
       network.sendMessage(self, dest, protocols, msg)) as any,
-    (async () => {
-      assert.fail(`must not call hangUp`)
-    }) as any,
-    netStatEvents.onHealthChanged,
-    (peerId) => !peerId.equals(Charly) && !peerId.equals(Me),
     TESTING_ENVIRONMENT,
-    {
-      ...SHORT_TIMEOUTS,
-      // Eliminate backoff
-      heartbeatThreshold: -15000,
-      heartbeatInterval: 2000
-    }
+    cfg
   )
 
   await heartbeat.start()
@@ -207,143 +199,28 @@ async function getPeer(
   return { heartbeat, peers }
 }
 
-describe('unit test heartbeat', async () => {
-  it('check nodes is noop with empty store & health indicator is red', async () => {
-    let netHealth = new NetworkHealth()
-    const heartbeat = new TestingHeartbeat(
-      Me,
-      new NetworkPeers([], [Alice], 0.3),
-      (() => {}) as any,
-      (async () => {
-        assert.fail(`must not call send`)
-      }) as any,
-      (async () => {
-        assert.fail(`must not call hangUp`)
-      }) as any,
-      netHealth.onHealthChanged,
-      (_) => true,
-      TESTING_ENVIRONMENT,
-      SHORT_TIMEOUTS
-    )
-    await heartbeat.checkNodes()
-
-    heartbeat.stop()
-
-    assert.equal(netHealth.state, NetworkHealthIndicator.RED)
-  })
-
-  it('check network health state progression', async () => {
+describe('integration test heartbeat', async () => {
+  it('test heartbeat flow with multiple peers', async () => {
     const network = createFakeNetwork()
 
-    const netHealthA = new NetworkHealth()
+    const peerA = await getPeer(Alice, network)
+    const peerB = await getPeer(Bob, network)
+    const peerC = await getPeer(Charly, network)
 
-    const peerA = await getPeer(Alice, network, netHealthA)
-    const peerB = await getPeer(Bob, network, new NetworkHealth())
+    peerA.peers.register(Bob.toString(), PeerOrigin.Initialization)
+    peerA.peers.register(Charly.toString(), PeerOrigin.Initialization)
 
-    peerA.heartbeat.recalculateNetworkHealth()
-
-    assert(peerA.peers.qualityOf(Bob) == 0)
-    assert.equal(netHealthA.state, NetworkHealthIndicator.RED)
-
-    peerA.peers.register(Bob, NetworkPeersOrigin.TESTING)
-
-    peerA.heartbeat.recalculateNetworkHealth()
-
-    assert.equal(peerA.peers.qualityOf(Bob).toFixed(1), '0.2')
-    assert.equal(netHealthA.state, NetworkHealthIndicator.ORANGE)
-
-    for (let i = 0; i < 4; i++) {
-      await peerA.heartbeat.checkNodes()
-    }
-
-    assert.equal(peerA.peers.qualityOf(Bob).toFixed(1), '0.6')
-    assert.equal(netHealthA.state, NetworkHealthIndicator.YELLOW)
-
-    const peerC = await getPeer(Charly, network, new NetworkHealth())
-    peerA.peers.register(Charly, NetworkPeersOrigin.TESTING)
-
-    assert.equal(netHealthA.state, NetworkHealthIndicator.YELLOW)
-
-    for (let i = 0; i < 6; i++) {
-      await peerA.heartbeat.checkNodes()
-    }
-
-    assert.equal(netHealthA.state, NetworkHealthIndicator.GREEN)
-
-    // Losing private node Charly should take us back to yellow
-    network.unsubscribe(Charly)
-    peerC.heartbeat.stop()
-
-    for (let i = 0; i < 6; i++) {
-      await peerA.heartbeat.checkNodes()
-    }
-
-    assert.equal(peerA.heartbeat.recalculateNetworkHealth(), NetworkHealthIndicator.YELLOW)
-    assert.equal(netHealthA.state, NetworkHealthIndicator.YELLOW)
-    ;[peerA, peerB].map((peer) => peer.heartbeat.stop())
-    network.close()
-  })
-
-  it('check nodes does not change quality of newly registered peers', async () => {
-    const network = createFakeNetwork()
-
-    const peerA = await getPeer(Alice, network, new NetworkHealth())
-    const peerB = await getPeer(Bob, network, new NetworkHealth())
-
-    assert(peerA.peers.qualityOf(Bob) == 0)
-
-    peerA.peers.register(Bob, NetworkPeersOrigin.TESTING)
-
-    assert.equal(peerA.peers.qualityOf(Bob).toFixed(1), '0.2')
-
-    await peerA.heartbeat.checkNodes()
-
-    assert.equal(peerA.peers.qualityOf(Bob).toFixed(1), '0.3')
-    ;[peerA, peerB].map((peer) => peer.heartbeat.stop())
-    network.close()
-  })
-
-  it('check nodes does not change quality of offline peer', async () => {
-    const network = createFakeNetwork()
-    const peerA = await getPeer(Alice, network, new NetworkHealth())
-
-    assert(peerA.peers.qualityOf(Charly) == 0)
-
-    peerA.peers.register(Charly, NetworkPeersOrigin.TESTING)
-
-    assert.equal(peerA.peers.qualityOf(Charly).toFixed(1), '0.2', `Should have initial quality`)
-
-    await peerA.heartbeat.checkNodes()
-
-    // Could not ping node, so should be ignored now
-    assert(peerA.peers.qualityOf(Charly) == 0)
-    assert([...peerA.peers.getAllIgnored()].length == 1, `Must contain exactly one ignored entry`)
-    assert([...peerA.peers.getAllIgnored()][0] === Charly.toString(), `Ignored entry must be Charly`)
-
-    peerA.heartbeat.stop()
-    network.close()
-  })
-
-  it('test heartbeat flow', async () => {
-    const network = createFakeNetwork()
-
-    const peerA = await getPeer(Alice, network, new NetworkHealth())
-    const peerB = await getPeer(Bob, network, new NetworkHealth())
-    const peerC = await getPeer(Charly, network, new NetworkHealth())
-
-    peerA.peers.register(Bob, NetworkPeersOrigin.TESTING)
-    peerA.peers.register(Charly, NetworkPeersOrigin.TESTING)
-
-    assert(peerA.peers.has(Charly), `Alice should know about Charly now.`)
-    assert(peerA.peers.has(Bob), `Alice should know about Bob now.`)
+    assert(peerA.peers.contains(Charly.toString()), `Alice should know about Charly now.`)
+    assert(peerA.peers.contains(Bob.toString()), `Alice should know about Bob now.`)
 
     await peerA.heartbeat.checkNodes()
     await peerA.heartbeat.checkNodes()
     await peerA.heartbeat.checkNodes()
     await peerA.heartbeat.checkNodes()
+    await peerA.heartbeat.checkNodes()
 
-    assert.isAbove(peerA.peers.qualityOf(Bob), NETWORK_QUALITY_THRESHOLD)
-    assert.isAbove(peerA.peers.qualityOf(Charly), NETWORK_QUALITY_THRESHOLD)
+    assert.equal(peerA.peers.quality_of(Bob.toString()), NETWORK_QUALITY_THRESHOLD)
+    assert.equal(peerA.peers.quality_of(Charly.toString()), NETWORK_QUALITY_THRESHOLD)
 
     network.unsubscribe(Charly)
     peerC.heartbeat.stop()
@@ -351,58 +228,10 @@ describe('unit test heartbeat', async () => {
     await peerA.heartbeat.checkNodes()
     await peerA.heartbeat.checkNodes()
 
-    assert.isAbove(peerA.peers.qualityOf(Bob), NETWORK_QUALITY_THRESHOLD)
-    assert.isAtMost(peerA.peers.qualityOf(Charly), NETWORK_QUALITY_THRESHOLD)
+    assert.isAbove(peerA.peers.quality_of(Bob.toString()), NETWORK_QUALITY_THRESHOLD)
+    assert.isBelow(peerA.peers.quality_of(Charly.toString()), NETWORK_QUALITY_THRESHOLD)
 
     peerA.heartbeat.stop()
     peerB.heartbeat.stop()
   })
-
-  it('should abort heartbeat but not call closeConnectionsTo, if the ping takes 61 seconds to return', async () => {
-    const sendMessageToMoon = (_dest: PeerId, _protocols: string | string[], msg: Uint8Array, _includeReply: true) =>
-      new Promise((resolve) => setTimeout(() => resolve([msg]), 61000)) as Promise<Uint8Array[]>
-
-    const closeConnectionsToFake = sinon.fake()
-    let netHealth = new NetworkHealth()
-    const myheartbeat = new TestingHeartbeat(
-      Me,
-      new NetworkPeers([], [Alice], 0.3),
-      (() => {}) as any,
-      sendMessageToMoon as SendMessage,
-      closeConnectionsToFake,
-      netHealth.onHealthChanged,
-      (_) => true,
-      TESTING_ENVIRONMENT,
-      SHORT_TIMEOUTS
-    )
-
-    const pingResult = await myheartbeat.pingNode(Alice)
-
-    assert.equal(pingResult.lastSeen, -1)
-    assert(closeConnectionsToFake.notCalled)
-  }).timeout(300000)
-
-  it('should but not call closeConnectionsTo, if the ping timed out ', async () => {
-    const sendMessageToMoon = (_dest: PeerId, _protocols: string | string[], msg: Uint8Array, _includeReply: true) =>
-      new Promise((resolve) => setTimeout(() => resolve([msg]), 1000)) as Promise<Uint8Array[]>
-
-    const closeConnectionsToFake = sinon.fake()
-    let netHealth = new NetworkHealth()
-    const myheartbeat = new TestingHeartbeat(
-      Me,
-      new NetworkPeers([], [Alice], 0.3),
-      (() => {}) as any,
-      sendMessageToMoon as SendMessage,
-      closeConnectionsToFake,
-      netHealth.onHealthChanged,
-      (_) => true,
-      TESTING_ENVIRONMENT,
-      SHORT_TIMEOUTS
-    )
-
-    const pingResult = await myheartbeat.pingNode(Alice)
-
-    assert.notEqual(pingResult.lastSeen, -1)
-    assert(closeConnectionsToFake.notCalled)
-  }).timeout(300000)
 })
