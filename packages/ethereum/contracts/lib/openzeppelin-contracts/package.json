@@ -61,7 +61,7 @@
     "eslint-plugin-import": "^2.20.0",
     "eslint-plugin-mocha-no-only": "^1.1.0",
     "eslint-plugin-node": "^10.0.0",
-    "eslint-plugin-promise": "^4.2.1",
+    "eslint-plugin-promise": "^6.0.0",
     "eslint-plugin-standard": "^4.0.1",
     "eth-sig-util": "^3.0.0",
     "ethereumjs-util": "^7.0.7",
