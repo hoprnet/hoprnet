@@ -271,9 +271,13 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "forward_transform")]
         pub fn _forward_transform(alpha: &[u8], private_key: &[u8]) -> JsResult<SharedKeys> {
-            let (alpha, secret) = ok_or_jserr!(SharedKeys::forward_transform(CurvePoint::_deserialize(alpha)?, private_key))?;
-            Ok(SharedKeys{
-                alpha, secrets: vec![secret]
+            let (alpha, secret) = ok_or_jserr!(SharedKeys::forward_transform(
+                CurvePoint::_deserialize(alpha)?,
+                private_key
+            ))?;
+            Ok(SharedKeys {
+                alpha,
+                secrets: vec![secret],
             })
         }
 

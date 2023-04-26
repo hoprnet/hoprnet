@@ -143,7 +143,7 @@ mod tests {
         };
 
         match dir_args.get_files() {
-            Ok(vp) => assert!(vp.len() == 0),
+            Ok(vp) => assert!(vp.is_empty()),
             Err(_) => assert!(false),
         }
         remove_file(path);
@@ -159,7 +159,7 @@ mod tests {
         };
 
         match dir_args.get_files() {
-            Ok(vp) => assert!(vp.len() == 4),
+            Ok(vp) => assert_eq!(4, vp.len()),
             Err(_) => assert!(false),
         }
         remove_file(path);
@@ -176,7 +176,7 @@ mod tests {
         };
 
         let vp = path_args.get_files();
-        assert!(vp.len() == 1);
+        assert_eq!(1, vp.len());
         remove_file(path);
     }
 
@@ -192,12 +192,12 @@ mod tests {
                 };
 
                 let file_path = PathBuf::from(dir_name).join(file_name);
-                fs::write(&file_path, "Hello");
+                fs::write(&file_path, "Hello").unwrap();
             }
         }
     }
 
     fn remove_file(dir: &str) {
-        fs::remove_dir_all(dir);
+        fs::remove_dir_all(dir).unwrap();
     }
 }

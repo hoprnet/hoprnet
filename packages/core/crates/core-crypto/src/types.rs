@@ -200,7 +200,7 @@ impl Default for HalfKey {
             hkey: [0u8; Self::SIZE],
         };
         ret.hkey.copy_from_slice(
-            &NonZeroScalar::<Secp256k1>::from_uint(1u16.into())
+            NonZeroScalar::<Secp256k1>::from_uint(1u16.into())
                 .unwrap()
                 .to_bytes()
                 .as_slice(),
@@ -378,7 +378,7 @@ impl Hash {
     /// Uses the Keccak256 digest.
     pub fn create(inputs: &[&[u8]]) -> Self {
         let mut hash = EthDigest::default();
-        inputs.into_iter().for_each(|v| hash.update(*v));
+        inputs.iter().for_each(|v| hash.update(v));
         let mut ret = Hash {
             hash: [0u8; Self::SIZE],
         };
@@ -601,7 +601,7 @@ impl Default for Response {
             response: [0u8; Self::SIZE],
         };
         ret.response.copy_from_slice(
-            &NonZeroScalar::<Secp256k1>::from_uint(1u16.into())
+            NonZeroScalar::<Secp256k1>::from_uint(1u16.into())
                 .unwrap()
                 .to_bytes()
                 .as_slice(),
@@ -823,7 +823,9 @@ pub mod tests {
     use utils_types::primitives::Address;
     use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
 
-    use crate::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, Hash, PublicKey, Response, Signature, ToChecksum};
+    use crate::types::{
+        Challenge, CurvePoint, HalfKey, HalfKeyChallenge, Hash, PublicKey, Response, Signature, ToChecksum,
+    };
 
     const PUBLIC_KEY: [u8; 33] = hex!("021464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8");
     const PRIVATE_KEY: [u8; 32] = hex!("e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8");

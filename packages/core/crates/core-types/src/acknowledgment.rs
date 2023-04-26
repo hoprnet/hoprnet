@@ -1,10 +1,10 @@
+use crate::acknowledgment::PendingAcknowledgement::{WaitingAsRelayer, WaitingAsSender};
 use crate::channels::Ticket;
 use core_crypto::primitives::{DigestLike, SimpleDigest};
 use core_crypto::types::{HalfKey, HalfKeyChallenge, Hash, PublicKey, Response, Signature};
 use utils_types::errors;
 use utils_types::errors::GeneralError::ParseError;
 use utils_types::traits::BinarySerializable;
-use crate::acknowledgment::PendingAcknowledgement::{WaitingAsRelayer, WaitingAsSender};
 
 /// Represents packet acknowledgement
 #[derive(Clone, Debug, PartialEq)]
@@ -101,7 +101,12 @@ pub struct AcknowledgedTicket {
 impl AcknowledgedTicket {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(ticket: Ticket, response: Response, pre_image: Hash, signer: PublicKey) -> Self {
-        Self { ticket, response, pre_image, signer }
+        Self {
+            ticket,
+            response,
+            pre_image,
+            signer,
+        }
     }
 }
 
@@ -116,7 +121,12 @@ impl BinarySerializable<'_> for AcknowledgedTicket {
             let pre_image = Hash::deserialize(buf.drain(..Hash::SIZE).as_ref())?;
             let signer = PublicKey::deserialize(buf.drain(..PublicKey::SIZE_COMPRESSED).as_ref())?;
 
-            Ok(Self{ ticket, response , pre_image, signer })
+            Ok(Self {
+                ticket,
+                response,
+                pre_image,
+                signer,
+            })
         } else {
             Err(ParseError)
         }
@@ -138,14 +148,18 @@ impl BinarySerializable<'_> for AcknowledgedTicket {
 pub struct UnacknowledgedTicket {
     pub ticket: Ticket,
     pub own_key: HalfKey,
-    pub signer: PublicKey
+    pub signer: PublicKey,
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl UnacknowledgedTicket {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(ticket: Ticket, own_key: HalfKey, signer: PublicKey) -> Self {
-        Self { ticket, own_key, signer }
+        Self {
+            ticket,
+            own_key,
+            signer,
+        }
     }
 }
 
@@ -158,7 +172,11 @@ impl BinarySerializable<'_> for UnacknowledgedTicket {
             let ticket = Ticket::deserialize(buf.drain(..Ticket::SIZE).as_ref())?;
             let own_key = HalfKey::deserialize(buf.drain(..HalfKey::SIZE).as_ref())?;
             let signer = PublicKey::deserialize(buf.drain(..PublicKey::SIZE_COMPRESSED).as_ref())?;
-            Ok(Self { ticket, own_key, signer })
+            Ok(Self {
+                ticket,
+                own_key,
+                signer,
+            })
         } else {
             Err(ParseError)
         }
@@ -245,7 +263,7 @@ impl BinarySerializable<'_> for AcknowledgementChallenge {
 #[derive(Clone, Debug, PartialEq)]
 pub enum PendingAcknowledgement {
     WaitingAsSender,
-    WaitingAsRelayer(UnacknowledgedTicket)
+    WaitingAsRelayer(UnacknowledgedTicket),
 }
 
 impl PendingAcknowledgement {
@@ -261,7 +279,7 @@ impl BinarySerializable<'_> for PendingAcknowledgement {
             match data[0] {
                 Self::SENDER_PREFIX => Ok(WaitingAsSender),
                 Self::RELAYER_PREFIX => Ok(WaitingAsRelayer(UnacknowledgedTicket::deserialize(&data[1..])?)),
-                _ => Err(ParseError)
+                _ => Err(ParseError),
             }
         } else {
             Err(ParseError)
@@ -283,16 +301,16 @@ impl BinarySerializable<'_> for PendingAcknowledgement {
 
 #[cfg(test)]
 pub mod test {
-    use utils_types::traits::BinarySerializable;
     use crate::acknowledgment::PendingAcknowledgement;
+    use utils_types::traits::BinarySerializable;
 
     // TODO: Add tests to all remaining types
 
     #[test]
     fn test_pending_ack() {
-        assert_eq!(PendingAcknowledgement::WaitingAsSender,
-                   PendingAcknowledgement::deserialize(&PendingAcknowledgement::WaitingAsSender.serialize())
-                       .unwrap()
+        assert_eq!(
+            PendingAcknowledgement::WaitingAsSender,
+            PendingAcknowledgement::deserialize(&PendingAcknowledgement::WaitingAsSender.serialize()).unwrap()
         );
     }
 }
@@ -300,10 +318,10 @@ pub mod test {
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use crate::acknowledgment::{AcknowledgedTicket, Acknowledgement, UnacknowledgedTicket};
-    use wasm_bindgen::prelude::*;
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use utils_types::traits::BinarySerializable;
+    use wasm_bindgen::prelude::*;
 
     #[wasm_bindgen]
     impl UnacknowledgedTicket {

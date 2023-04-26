@@ -212,8 +212,6 @@ Link hoprNode to an ETH address.</p>
 <div class="tsd-comment tsd-typography"><p>Checks whether the given packet tag is present in the database.
 If not, sets the packet tag and return false, otherwise return
 true.</p>
-
-<h3>Returns</h3><p>a Promise that resolves to true if packet tag is present in db</p>
 </div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
@@ -222,7 +220,8 @@ true.</p>
 <h5><span class="tsd-kind-parameter">packetTag</span>: <span class="tsd-signature-type ">Uint8Array</span></h5>
 <div class="tsd-comment tsd-typography"><p>packet tag to check for</p>
 </div></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">&gt;</span></h4><p>a Promise that resolves to true if packet tag is present in db</p>
+<aside class="tsd-sources">
 <ul>
 <li>Defined in <a href="https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L577">utils/src/db/db.ts:577</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member"><a id="close" class="tsd-anchor"></a>
@@ -316,15 +315,14 @@ neglected tickets counter.</p>
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Do a reverse find by searching the stored account to return
 the associated public keys of registered HOPR nodes.</p>
-
-<h3>Returns</h3><p>array of PublicKey of the associated HOPR nodes</p>
 </div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
 <ul class="tsd-parameter-list">
 <li>
 <h5><span class="tsd-kind-parameter">account</span>: <a href="Address.html" class="tsd-signature-type tsd-kind-class">Address</a></h5></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><a href="PublicKey.html" class="tsd-signature-type tsd-kind-class">PublicKey</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><a href="PublicKey.html" class="tsd-signature-type tsd-kind-class">PublicKey</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">&gt;</span></h4><p>array of PublicKey of the associated HOPR nodes</p>
+<aside class="tsd-sources">
 <ul>
 <li>Defined in <a href="https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L974">utils/src/db/db.ts:974</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-protected"><a id="get" class="tsd-anchor"></a>
@@ -360,8 +358,6 @@ the associated public keys of registered HOPR nodes.</p>
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Hopr Network Registry
 Get address associated with hoprNode.</p>
-
-<h3>Returns</h3><p>ETH address</p>
 </div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
@@ -370,7 +366,8 @@ Get address associated with hoprNode.</p>
 <h5><span class="tsd-kind-parameter">hoprNode</span>: <a href="PublicKey.html" class="tsd-signature-type tsd-kind-class">PublicKey</a></h5>
 <div class="tsd-comment tsd-typography"><p>the node to register</p>
 </div></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><a href="Address.html" class="tsd-signature-type tsd-kind-class">Address</a><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><a href="Address.html" class="tsd-signature-type tsd-kind-class">Address</a><span class="tsd-signature-symbol">&gt;</span></h4><p>ETH address</p>
+<aside class="tsd-sources">
 <ul>
 <li>Defined in <a href="https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L1037">utils/src/db/db.ts:1037</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member"><a id="getAccounts" class="tsd-anchor"></a>
@@ -427,8 +424,6 @@ Get address associated with hoprNode.</p>
 <li class="tsd-signature tsd-anchor-link" id="getAcknowledgedTickets.getAcknowledgedTickets-1"><span class="tsd-kind-call-signature">get<wbr/>Acknowledged<wbr/>Tickets</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">filter</span><span class="tsd-signature-symbol">?</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><a href="AcknowledgedTicket.html" class="tsd-signature-type tsd-kind-class">AcknowledgedTicket</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">&gt;</span><a href="#getAcknowledgedTickets.getAcknowledgedTickets-1" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Get acknowledged tickets sorted by ticket index in ascending order.</p>
-
-<h3>Returns</h3><p>an array of all acknowledged tickets</p>
 </div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
@@ -442,7 +437,8 @@ Get address associated with hoprNode.</p>
 <h5><code class="tsd-tag ts-flagOptional">Optional</code> <span class="tsd-kind-property">channel</span><span class="tsd-signature-symbol">?: </span><a href="ChannelEntry.html" class="tsd-signature-type tsd-kind-class">ChannelEntry</a></h5></li>
 <li class="tsd-parameter">
 <h5><code class="tsd-tag ts-flagOptional">Optional</code> <span class="tsd-kind-property">signer</span><span class="tsd-signature-symbol">?: </span><a href="PublicKey.html" class="tsd-signature-type tsd-kind-class">PublicKey</a></h5></li></ul></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><a href="AcknowledgedTicket.html" class="tsd-signature-type tsd-kind-class">AcknowledgedTicket</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><a href="AcknowledgedTicket.html" class="tsd-signature-type tsd-kind-class">AcknowledgedTicket</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">&gt;</span></h4><p>an array of all acknowledged tickets</p>
+<aside class="tsd-sources">
 <ul>
 <li>Defined in <a href="https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L459">utils/src/db/db.ts:459</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-protected"><a id="getAll" class="tsd-anchor"></a>
@@ -452,12 +448,10 @@ Get address associated with hoprNode.</p>
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Gets a elements from the database of a kind.
 Optionally applies <code>filter</code>then <code>map</code> then <code>sort</code> to the result.</p>
-
-<h3>Returns</h3><p>a Promises that resolves with the found elements</p>
 </div>
-<section class="tsd-panel tsd-type-parameters">
+<section class="tsd-panel">
 <h4>Type Parameters</h4>
-<ul class="tsd-type-parameters">
+<ul class="tsd-type-parameter-list">
 <li>
 <h4><span class="tsd-kind-type-parameter">Element</span></h4></li>
 <li>
@@ -538,7 +532,8 @@ Optionally applies <code>filter</code>then <code>map</code> then <code>sort</cod
 <li>
 <h5><span class="tsd-kind-parameter">e2</span>: <span class="tsd-signature-type tsd-kind-type-parameter">TransformedElement</span></h5></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span></h4></li></ul></li></ul></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type tsd-kind-type-parameter">TransformedElement</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type tsd-kind-type-parameter">TransformedElement</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">&gt;</span></h4><p>a Promises that resolves with the found elements</p>
+<aside class="tsd-sources">
 <ul>
 <li>Defined in <a href="https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L315">utils/src/db/db.ts:315</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-protected"><a id="getAllIterable" class="tsd-anchor"></a>
@@ -546,9 +541,9 @@ Optionally applies <code>filter</code>then <code>map</code> then <code>sort</cod
 <ul class="tsd-signatures tsd-is-protected">
 <li class="tsd-signature tsd-anchor-link" id="getAllIterable.getAllIterable-1"><span class="tsd-kind-call-signature">get<wbr/>All<wbr/>Iterable</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type tsd-kind-type-parameter">Element</span><span class="tsd-signature-symbol">, </span><span class="tsd-signature-type tsd-kind-type-parameter">TransformedElement</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">range</span>, <span class="tsd-kind-parameter">deserialize</span>, <span class="tsd-kind-parameter">filter</span><span class="tsd-signature-symbol">?</span>, <span class="tsd-kind-parameter">map</span><span class="tsd-signature-symbol">?</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">AsyncIterable</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type tsd-kind-type-parameter">TransformedElement</span><span class="tsd-signature-symbol">&gt;</span><a href="#getAllIterable.getAllIterable-1" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
 <li class="tsd-description">
-<section class="tsd-panel tsd-type-parameters">
+<section class="tsd-panel">
 <h4>Type Parameters</h4>
-<ul class="tsd-type-parameters">
+<ul class="tsd-type-parameter-list">
 <li>
 <h4><span class="tsd-kind-type-parameter">Element</span></h4></li>
 <li>
@@ -764,9 +759,9 @@ Optionally applies <code>filter</code>then <code>map</code> then <code>sort</cod
 <ul class="tsd-signatures tsd-is-private">
 <li class="tsd-signature tsd-anchor-link" id="getCoerced.getCoerced-1"><span class="tsd-kind-call-signature">get<wbr/>Coerced</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type tsd-kind-type-parameter">T</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">key</span>, <span class="tsd-kind-parameter">coerce</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type tsd-kind-type-parameter">T</span><span class="tsd-signature-symbol">&gt;</span><a href="#getCoerced.getCoerced-1" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
 <li class="tsd-description">
-<section class="tsd-panel tsd-type-parameters">
+<section class="tsd-panel">
 <h4>Type Parameters</h4>
-<ul class="tsd-type-parameters">
+<ul class="tsd-type-parameter-list">
 <li>
 <h4><span class="tsd-kind-type-parameter">T</span></h4></li></ul></section>
 <div class="tsd-parameters">
@@ -795,9 +790,9 @@ Optionally applies <code>filter</code>then <code>map</code> then <code>sort</cod
 <ul class="tsd-signatures tsd-is-private">
 <li class="tsd-signature tsd-anchor-link" id="getCoercedOrDefault.getCoercedOrDefault-1"><span class="tsd-kind-call-signature">get<wbr/>Coerced<wbr/>Or<wbr/>Default</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type tsd-kind-type-parameter">T</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">key</span>, <span class="tsd-kind-parameter">coerce</span>, <span class="tsd-kind-parameter">defaultVal</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type tsd-kind-type-parameter">T</span><span class="tsd-signature-symbol">&gt;</span><a href="#getCoercedOrDefault.getCoercedOrDefault-1" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
 <li class="tsd-description">
-<section class="tsd-panel tsd-type-parameters">
+<section class="tsd-panel">
 <h4>Type Parameters</h4>
-<ul class="tsd-type-parameters">
+<ul class="tsd-type-parameter-list">
 <li>
 <h4><span class="tsd-kind-type-parameter">T</span></h4></li></ul></section>
 <div class="tsd-parameters">
@@ -999,8 +994,6 @@ Optionally applies <code>filter</code>then <code>map</code> then <code>sort</cod
 <li class="tsd-signature tsd-anchor-link" id="getTickets.getTickets-1"><span class="tsd-kind-call-signature">get<wbr/>Tickets</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">filter</span><span class="tsd-signature-symbol">?</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><a href="Ticket.html" class="tsd-signature-type tsd-kind-class">Ticket</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">&gt;</span><a href="#getTickets.getTickets-1" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Get tickets, both unacknowledged and acknowledged</p>
-
-<h3>Returns</h3><p>an array of signed tickets</p>
 </div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
@@ -1012,7 +1005,8 @@ Optionally applies <code>filter</code>then <code>map</code> then <code>sort</cod
 <ul class="tsd-parameters">
 <li class="tsd-parameter">
 <h5><span class="tsd-kind-property">signer</span><span class="tsd-signature-symbol">: </span><a href="PublicKey.html" class="tsd-signature-type tsd-kind-class">PublicKey</a></h5></li></ul></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><a href="Ticket.html" class="tsd-signature-type tsd-kind-class">Ticket</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><a href="Ticket.html" class="tsd-signature-type tsd-kind-class">Ticket</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">&gt;</span></h4><p>an array of signed tickets</p>
+<aside class="tsd-sources">
 <ul>
 <li>Defined in <a href="https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L559">utils/src/db/db.ts:559</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member"><a id="getUnacknowledgedTickets" class="tsd-anchor"></a>
@@ -1021,8 +1015,6 @@ Optionally applies <code>filter</code>then <code>map</code> then <code>sort</cod
 <li class="tsd-signature tsd-anchor-link" id="getUnacknowledgedTickets.getUnacknowledgedTickets-1"><span class="tsd-kind-call-signature">get<wbr/>Unacknowledged<wbr/>Tickets</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">filter</span><span class="tsd-signature-symbol">?</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><a href="UnacknowledgedTicket.html" class="tsd-signature-type tsd-kind-class">UnacknowledgedTicket</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">&gt;</span><a href="#getUnacknowledgedTickets.getUnacknowledgedTickets-1" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Get unacknowledged tickets.</p>
-
-<h3>Returns</h3><p>an array of all unacknowledged tickets</p>
 </div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
@@ -1034,7 +1026,8 @@ Optionally applies <code>filter</code>then <code>map</code> then <code>sort</cod
 <ul class="tsd-parameters">
 <li class="tsd-parameter">
 <h5><span class="tsd-kind-property">signer</span><span class="tsd-signature-symbol">: </span><a href="PublicKey.html" class="tsd-signature-type tsd-kind-class">PublicKey</a></h5></li></ul></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><a href="UnacknowledgedTicket.html" class="tsd-signature-type tsd-kind-class">UnacknowledgedTicket</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><a href="UnacknowledgedTicket.html" class="tsd-signature-type tsd-kind-class">UnacknowledgedTicket</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">&gt;</span></h4><p>an array of all unacknowledged tickets</p>
+<aside class="tsd-sources">
 <ul>
 <li>Defined in <a href="https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L412">utils/src/db/db.ts:412</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-private"><a id="has" class="tsd-anchor"></a>
@@ -1088,8 +1081,6 @@ Optionally applies <code>filter</code>then <code>map</code> then <code>sort</cod
 <li class="tsd-signature tsd-anchor-link" id="isEligible.isEligible-1"><span class="tsd-kind-call-signature">is<wbr/>Eligible</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">account</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">&gt;</span><a href="#isEligible.isEligible-1" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Hopr Network Registry</p>
-
-<h3>Returns</h3><p>true if account is eligible</p>
 </div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
@@ -1098,7 +1089,8 @@ Optionally applies <code>filter</code>then <code>map</code> then <code>sort</cod
 <h5><span class="tsd-kind-parameter">account</span>: <a href="Address.html" class="tsd-signature-type tsd-kind-class">Address</a></h5>
 <div class="tsd-comment tsd-typography"><p>the account that made the transaction</p>
 </div></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">&gt;</span></h4><p>true if account is eligible</p>
+<aside class="tsd-sources">
 <ul>
 <li>Defined in <a href="https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L1078">utils/src/db/db.ts:1078</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member"><a id="isNetworkRegistryEnabled" class="tsd-anchor"></a>
@@ -1107,10 +1099,9 @@ Optionally applies <code>filter</code>then <code>map</code> then <code>sort</cod
 <li class="tsd-signature tsd-anchor-link" id="isNetworkRegistryEnabled.isNetworkRegistryEnabled-1"><span class="tsd-kind-call-signature">is<wbr/>Network<wbr/>Registry<wbr/>Enabled</span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">&gt;</span><a href="#isNetworkRegistryEnabled.isNetworkRegistryEnabled-1" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Check ifs Network registry is enabled</p>
-
-<h3>Returns</h3><p>true if register is enabled or if key is not preset in the dababase</p>
 </div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">&gt;</span></h4><p>true if register is enabled or if key is not preset in the dababase</p>
+<aside class="tsd-sources">
 <ul>
 <li>Defined in <a href="https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L1103">utils/src/db/db.ts:1103</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-private"><a id="keyOf" class="tsd-anchor"></a>

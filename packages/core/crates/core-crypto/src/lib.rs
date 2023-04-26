@@ -11,9 +11,6 @@ pub mod shared_keys;
 pub mod types;
 mod utils;
 
-#[cfg(test)]
-pub(crate) mod dummy_rng;
-
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use wasm_bindgen::prelude::wasm_bindgen;

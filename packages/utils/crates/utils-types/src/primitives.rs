@@ -301,7 +301,9 @@ impl U256 {
         U256 { value: u256::ONE }
     }
 
-    pub fn to_string(&self) -> String { self.value.to_string() }
+    pub fn to_string(&self) -> String {
+        self.value.to_string()
+    }
 }
 
 impl BinarySerializable<'_> for U256 {
@@ -429,9 +431,9 @@ mod tests {
 pub mod wasm {
     use crate::primitives::{Address, Balance, BalanceType, EthereumChallenge, Snapshot, U256};
     use crate::traits::{BinarySerializable, ToHex};
+    use ethnum::u256;
     use std::cmp::Ordering;
     use std::ops::Div;
-    use ethnum::u256;
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use wasm_bindgen::prelude::wasm_bindgen;

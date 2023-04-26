@@ -753,7 +753,7 @@ __metadata:
     "@types/node": 16
     "@types/simple-peer": 9.11.5
     abortable-iterator: 4.0.3
-    chalk: 5.0.1
+    chalk: 5.2.0
     debug: 4.3.4
     err-code: 3.0.1
     heap-js: 2.2.0
@@ -788,7 +788,7 @@ __metadata:
     async-mutex: 0.4.0
     bn.js: 5.2.1
     chai: 4.3.7
-    chalk: 5.0.1
+    chalk: 5.2.0
     debug: 4.3.4
     ethers: 5.7.2
     heap-js: 2.2.0
@@ -797,7 +797,7 @@ __metadata:
     retimer: 3.0.0
     secp256k1: 4.0.3
     sinon: 12.0.1
-    typedoc: 0.24.4
+    typedoc: 0.24.6
     typedoc-plugin-markdown: 3.15.2
     typescript: 4.9.5
   languageName: unknown
@@ -843,7 +843,7 @@ __metadata:
     retimer: 3.0.0
     secp256k1: 4.0.3
     sinon: 12.0.1
-    typedoc: 0.24.4
+    typedoc: 0.24.6
     typedoc-plugin-markdown: 3.15.2
     typescript: 4.9.5
   languageName: unknown
@@ -855,8 +855,8 @@ __metadata:
   dependencies:
     "@types/mocha": 9.1.1
     mocha: 9.2.2
-    semver: 7.3.8
-    typedoc: 0.24.4
+    semver: 7.5.0
+    typedoc: 0.24.6
     typedoc-plugin-markdown: 3.15.2
     typescript: 4.9.5
   languageName: unknown
@@ -886,10 +886,10 @@ __metadata:
     "@types/mocha": 9.1.1
     abortable-iterator: 4.0.3
     bignumber.js: 9.0.2
-    bl: 5.0.0
+    bl: 5.1.0
     bn.js: 5.2.1
     chai: 4.3.7
-    chalk: 5.0.1
+    chalk: 5.2.0
     debug: 4.3.4
     ethers: 5.7.2
     futoin-hkdf: 1.5.0
@@ -906,7 +906,7 @@ __metadata:
     secp256k1: 4.0.3
     sinon: 12.0.1
     timeout-abort-controller: 3.0.0
-    typedoc: 0.24.4
+    typedoc: 0.24.6
     typedoc-plugin-markdown: 3.15.2
     typescript: 4.9.5
   languageName: unknown
@@ -941,17 +941,17 @@ __metadata:
     express-openapi: 12.1.0
     mocha: 9.2.2
     rlp: 3.0.0
-    semver: 7.3.8
+    semver: 7.5.0
     sinon: 12.0.1
     supertest: ^6.2.2
     swagger-ui-express: 4.6.2
     trace-unhandled: 2.0.1
     ts-node: ^10.9.1
-    typedoc: 0.24.4
+    typedoc: 0.24.6
     typedoc-plugin-markdown: 3.15.2
     typescript: 4.9.5
     uuid: ^9.0.0
-    ws: 8.12.0
+    ws: 8.13.0
   bin:
     hoprd: lib/main.cjs
   languageName: unknown
@@ -2233,16 +2233,16 @@ __metadata:
   linkType: hard
 
 "@types/node@npm:*, @types/node@npm:>= 8, @types/node@npm:>=12.12.47, @types/node@npm:>=13.7.0":
-  version: 18.11.10
-  resolution: "@types/node@npm:18.11.10"
-  checksum: 0f60cb090b2ee91fcd3dc4311bc1ed7889b92f14644c0069f100776f86474c12eebbcc6c75bc0d7d96b975a103b4d5d6b3c22b4e88bea6e7f4e2b1bb0daf5ea8
+  version: 18.15.12
+  resolution: "@types/node@npm:18.15.12"
+  checksum: dff7596db8d0a18bcd8da542dc62ed4377cba39546ff53baaa06d106f1482bc3e4e5e03644f5d1e3cef0904ffbe8ebbc244b2b0851f8025ab2a3959ee0ace58f
   languageName: node
   linkType: hard
 
 "@types/node@npm:16":
-  version: 16.18.22
-  resolution: "@types/node@npm:16.18.22"
-  checksum: 0fa5b7ca37855125988eb90207b9ebd50cc9c30a559be6d69e53f7e4cc474ce514994012c806d2e83e03bf1f48705b7e3d1c45a424f6e11ee39818ee4c4c2c2d
+  version: 16.18.24
+  resolution: "@types/node@npm:16.18.24"
+  checksum: 0b221b7f56f3c4911e90dfcc217db3866eb13b7af9390b8f668377f1211b2b3ca808e0128a29d0cef8aa0944523852531e827b923b35e5fa9063db87af7b41a0
   languageName: node
   linkType: hard
 
@@ -2884,14 +2884,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"bl@npm:5.0.0":
-  version: 5.0.0
-  resolution: "bl@npm:5.0.0"
+"bl@npm:5.1.0":
+  version: 5.1.0
+  resolution: "bl@npm:5.1.0"
   dependencies:
     buffer: ^6.0.3
     inherits: ^2.0.4
     readable-stream: ^3.4.0
-  checksum: 5dbbcf9cbcf55221dc21f48968bc8cd6d78faea3c653d496ff8e0c382b95e8b6c4b9e818fe67de2f97ed0cd0c219c350ccce42aca91be33e0ad12e698c615061
+  checksum: a7a438ee0bc540e80b8eb68cc1ad759a9c87df06874a99411d701d01cc0b36f30cd20050512ac3e77090138890960e07bfee724f3ee6619bb39a569f5cc3b1bc
   languageName: node
   linkType: hard
 
@@ -3353,10 +3353,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"chalk@npm:5.0.1":
-  version: 5.0.1
-  resolution: "chalk@npm:5.0.1"
-  checksum: 7b45300372b908f0471fbf7389ce2f5de8d85bb949026fd51a1b95b10d0ed32c7ed5aab36dd5e9d2bf3191867909b4404cef75c5f4d2d1daeeacd301dd280b76
+"chalk@npm:5.2.0":
+  version: 5.2.0
+  resolution: "chalk@npm:5.2.0"
+  checksum: 03d8060277de6cf2fd567dc25fcf770593eb5bb85f460ce443e49255a30ff1242edd0c90a06a03803b0466ff0687a939b41db1757bec987113e83de89a003caa
   languageName: node
   linkType: hard
 
@@ -10218,14 +10218,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"semver@npm:7.3.8, semver@npm:^7.0.0, semver@npm:^7.3.5, semver@npm:^7.3.8":
-  version: 7.3.8
-  resolution: "semver@npm:7.3.8"
+"semver@npm:7.5.0":
+  version: 7.5.0
+  resolution: "semver@npm:7.5.0"
   dependencies:
     lru-cache: ^6.0.0
   bin:
     semver: bin/semver.js
-  checksum: ba9c7cbbf2b7884696523450a61fee1a09930d888b7a8d7579025ad93d459b2d1949ee5bbfeb188b2be5f4ac163544c5e98491ad6152df34154feebc2cc337c1
+  checksum: 2d266937756689a76f124ffb4c1ea3e1bbb2b263219f90ada8a11aebebe1280b13bb76cca2ca96bdee3dbc554cbc0b24752eb895b2a51577aa644427e9229f2b
   languageName: node
   linkType: hard
 
@@ -10235,6 +10235,17 @@ __metadata:
   bin:
     semver: ./bin/semver.js
   checksum: 1b26ecf6db9e8292dd90df4e781d91875c0dcc1b1909e70f5d12959a23c7eebb8f01ea581c00783bbee72ceeaad9505797c381756326073850dc36ed284b21b9
+  languageName: node
+  linkType: hard
+
+"semver@npm:^7.0.0, semver@npm:^7.3.5, semver@npm:^7.3.8":
+  version: 7.3.8
+  resolution: "semver@npm:7.3.8"
+  dependencies:
+    lru-cache: ^6.0.0
+  bin:
+    semver: bin/semver.js
+  checksum: ba9c7cbbf2b7884696523450a61fee1a09930d888b7a8d7579025ad93d459b2d1949ee5bbfeb188b2be5f4ac163544c5e98491ad6152df34154feebc2cc337c1
   languageName: node
   linkType: hard
 
@@ -11327,9 +11338,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"typedoc@npm:0.24.4":
-  version: 0.24.4
-  resolution: "typedoc@npm:0.24.4"
+"typedoc@npm:0.24.6":
+  version: 0.24.6
+  resolution: "typedoc@npm:0.24.6"
   dependencies:
     lunr: ^2.3.9
     marked: ^4.3.0
@@ -11339,7 +11350,7 @@ __metadata:
     typescript: 4.6.x || 4.7.x || 4.8.x || 4.9.x || 5.0.x
   bin:
     typedoc: bin/typedoc
-  checksum: c6762aff2b40eb574fc348c82921471fa1c1dc8a83adc284457aab30ea61768770be469f424340ab646944472653290578fd8e6308d55ec2e611577472067dae
+  checksum: 3911ef6a7736ce6655a4b22fabc5be6df8812412e209d730fd168bfa7797847897f05fed797bc16558f11ce647b20746453748ff8afe85b1375c3efe2d7b57df
   languageName: node
   linkType: hard
 
@@ -11362,11 +11373,11 @@ __metadata:
 
 "typescript@patch:typescript@4.9.5#~builtin<compat/typescript>":
   version: 4.9.5
-  resolution: "typescript@patch:typescript@npm%3A4.9.5#~builtin<compat/typescript>::version=4.9.5&hash=d73830"
+  resolution: "typescript@patch:typescript@npm%3A4.9.5#~builtin<compat/typescript>::version=4.9.5&hash=23ec76"
   bin:
     tsc: bin/tsc
     tsserver: bin/tsserver
-  checksum: 2eee5c37cad4390385db5db5a8e81470e42e8f1401b0358d7390095d6f681b410f2c4a0c496c6ff9ebd775423c7785cdace7bcdad76c7bee283df3d9718c0f20
+  checksum: ab417a2f398380c90a6cf5a5f74badd17866adf57f1165617d6a551f059c3ba0a3e4da0d147b3ac5681db9ac76a303c5876394b13b3de75fdd5b1eaa06181c9d
   languageName: node
   linkType: hard
 
@@ -11894,9 +11905,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"ws@npm:8.12.0":
-  version: 8.12.0
-  resolution: "ws@npm:8.12.0"
+"ws@npm:8.13.0":
+  version: 8.13.0
+  resolution: "ws@npm:8.13.0"
   peerDependencies:
     bufferutil: ^4.0.1
     utf-8-validate: ">=5.0.2"
@@ -11905,7 +11916,7 @@ __metadata:
       optional: true
     utf-8-validate:
       optional: true
-  checksum: 818ff3f8749c172a95a114cceb8b89cedd27e43a82d65c7ad0f7882b1e96a2ee6709e3746a903c3fa88beec0c8bae9a9fcd75f20858b32a166dfb7519316a5d7
+  checksum: 53e991bbf928faf5dc6efac9b8eb9ab6497c69feeb94f963d648b7a3530a720b19ec2e0ec037344257e05a4f35bd9ad04d9de6f289615ffb133282031b18c61c
   languageName: node
   linkType: hard
 
