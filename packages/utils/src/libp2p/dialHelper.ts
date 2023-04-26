@@ -25,7 +25,7 @@ const CODE_P2P = maProtocols('p2p').code
 const log = debug(DEBUG_PREFIX)
 const error = debug(DEBUG_PREFIX.concat(`:error`))
 
-const DEFAULT_DHT_QUERY_TIMEOUT = 20000
+const DEFAULT_DHT_QUERY_TIMEOUT = 15000
 
 // Current types do not expose `dialer` property
 type MyConnectionManager = ConnectionManager & { dialer: Dialer }

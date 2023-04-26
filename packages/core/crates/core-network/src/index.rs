@@ -56,6 +56,25 @@ extern "C" {
     pub fn to_string(this: &JsPeerId) -> String;
 }
 
+#[wasm_bindgen(module = "@libp2p/peer-id")]
+extern "C" {
+    fn peerIdFromString(string: String) -> JsPeerId;
+}
+
+impl TryInto<PeerId> for JsPeerId {
+    type Error = String;
+
+    fn try_into(self) -> Result<PeerId, Self::Error> {
+        PeerId::from_str(self.to_string().as_str()).map_err(|e| e.to_string())
+    }
+}
+
+impl From<PeerId> for JsPeerId {
+    fn from(p: PeerId) -> Self {
+        peerIdFromString(p.to_string())
+    }
+}
+
 #[wasm_bindgen]
 extern "C" {
     #[wasm_bindgen]
@@ -96,12 +115,12 @@ extern "C" {
 #[wasm_bindgen]
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum DialResponseStatus {
-    SUCCESS = "SUCCESS",
-    TIMEOUT = "E_TIMEOUT",
-    ABORTED = "E_ABORTED",
-    DIAL_ERROR = "E_DIAL",
-    DHT_ERROR = "E_DHT_QUERY",
-    NO_DHT = "E_NO_DHT",
+    Success = "SUCCESS",
+    Timeout = "E_TIMEOUT",
+    Aborted = "E_ABORTED",
+    DialError = "E_DIAL",
+    DhtError = "E_DHT_QUERY",
+    NoDht = "E_NO_DHT",
 }
 
 #[wasm_bindgen]
@@ -116,11 +135,6 @@ extern "C" {
     pub fn resp(this: &DialResponse) -> IncomingConnection;
 }
 
-#[wasm_bindgen(module = "@libp2p/peer-id")]
-extern "C" {
-    fn peerIdFromString(string: String) -> JsPeerId;
-}
-
 #[wasm_bindgen]
 pub struct CoreNetwork {
     components: Rc<JsLibp2p>,
@@ -131,31 +145,8 @@ pub struct CoreNetwork {
 
 static PEER_METADATA_PROTOCOL_VERSION: &str = "protocol_version";
 
-// pin_project_lite::pin_project! {
-//     pub struct DialRequest {
-//         destination: PeerId,
-//         protocols: Vec<String>,
-//         dial:  Function,
-//         components: JsLibp2p
-//     }
-// }
-
-// impl DialRequest {
-//     pub fn new(destination: PeerId, protocols: Vec<String>, dial: Function, components: JsLibp2p) -> Self {
-//         Self {
-//             destination,
-//             protocols,
-//             dial,
-//             components,
-//         }
-//     }
-// }
-
-// impl<'a> Future for DialRequest {
-//     type Output = Promise;
-
-//     fn poll(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {}
-// }
+// > 25 secs breaks e2e test timeout
+static PING_TIMEOUT: Duration = Duration::from_secs(20);
 
 #[wasm_bindgen]
 impl CoreNetwork {
@@ -176,7 +167,7 @@ impl CoreNetwork {
         heartbeat_interval: Number,
         heartbeat_threshold: Number,
     ) -> Self {
-        let me: PeerId = PeerId::from_str(me.to_string().as_str()).unwrap();
+        let me: PeerId = me.try_into().unwrap();
         let network_api = WasmNetworkApi::new(
             on_peer_offline_cb,
             on_network_health_change_cb,
@@ -188,7 +179,7 @@ impl CoreNetwork {
             max_parallel_pings.value_of() as usize,
             environment_id.to_owned(),
             version.to_owned(),
-            Duration::from_secs(30),
+            PING_TIMEOUT,
         );
 
         let heartbeat_config = HeartbeatConfig::new(
@@ -202,15 +193,9 @@ impl CoreNetwork {
 
         let network = Rc::new(Network::new(me, quality_threshold.as_f64().unwrap(), network_api));
 
-        // let closure = ;
-
         let send_message_cb = Rc::new(send_message_cb);
         let components = Rc::new(components);
         let components_to_move = components.clone();
-
-        // let wasm_ping_api = WasmPingApi::new(send_message_cb);
-        // let components_to_move = components.clone().dyn_into::<JsLibp2p>().unwrap();
-        // let send_message_to_move = send_message_cb.clone().dyn_into::<Function>().unwrap();
 
         let network_to_move = network.clone();
         let pinger = Rc::new(Ping::new(
@@ -225,25 +210,26 @@ impl CoreNetwork {
                 Box::pin(async move {
                     let this = JsValue::undefined();
 
-                    let peer = peerIdFromString(destination.to_string());
+                    let peer: JsPeerId = destination.into();
                     info!("converted PeerId {:?}", peer.to_string());
                     let protocols: Array = Array::from_iter(protocols.iter().map(|x| JsString::from(x.as_str())));
 
-                    info!("converted protocols {:?}", protocols);
                     match send_message_to_move.call3(&this, &components_to_move, &peer, &protocols) {
                         Ok(obj) => {
+                            // Every Promise is different, so conversion need to be unchecked
                             let promise = obj.unchecked_into::<Promise>();
 
                             let dial_response = JsFuture::from(promise).await;
 
-                            info!("{:?}", dial_response);
+                            info!("connecting to {} {:?}", peer.to_string(), dial_response);
 
                             let dial_response = dial_response.unwrap().unchecked_into::<DialResponse>();
 
-                            if dial_response.status() != DialResponseStatus::SUCCESS {
-                                Err(format!("{:?}", dial_response.status()))
-                            } else {
-                                Ok(StreamingIterable::from(dial_response.resp().stream()))
+                            match dial_response.status() {
+                                DialResponseStatus::Success => {
+                                    Ok(StreamingIterable::from(dial_response.resp().stream()))
+                                }
+                                _ => Err(format!("{:?}", dial_response.status())),
                             }
                         }
                         Err(e) => {
@@ -348,14 +334,8 @@ impl CoreNetwork {
     /// # Arguments
     /// * `peers` - Vector of String representations of the PeerIds to be pinged.
     #[wasm_bindgen]
-    pub async fn ping(&self, mut peers: Vec<JsString>) {
-        let converted = peers
-            .drain(..)
-            .filter_map(|x| {
-                let x: String = x.into();
-                PeerId::from_str(&x).ok()
-            })
-            .collect::<Vec<_>>();
+    pub async fn ping(&self, peers: Vec<JsPeerId>) {
+        let converted: Vec<PeerId> = peers.into_iter().map(|p| p.try_into().unwrap()).collect();
 
         self.pinger.ping_peers(converted).await;
     }
@@ -379,14 +359,6 @@ impl CoreNetwork {
                 );
             }
         }
-    }
-    #[wasm_bindgen(js_name = "peersToPing")]
-    pub fn peers_to_ping(&self, threshold: u64) -> Vec<JsString> {
-        self.network
-            .find_peers_to_ping(threshold)
-            .iter()
-            .map(|x| x.to_base58().into())
-            .collect::<Vec<JsString>>()
     }
 
     #[wasm_bindgen]

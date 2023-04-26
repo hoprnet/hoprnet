@@ -1133,7 +1133,6 @@ name = "core-network"
 version = "0.2.0"
 dependencies = [
  "async-std",
- "async-trait",
  "bincode",
  "blake2",
  "console_error_panic_hook",

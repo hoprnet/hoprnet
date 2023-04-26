@@ -66,7 +66,6 @@ impl Heartbeat {
             config,
         }
     }
-    pub fn start(&mut self) {}
 
     pub fn has_ended(&self) -> bool {
         *self.ended.borrow()
@@ -87,12 +86,17 @@ impl Heartbeat {
         Vec::from(self.protocols.to_owned())
     }
 }
+
 pin_project! {
     pub struct HeartbeatRequest<St> {
         #[pin]
         stream: St,
-        buffered: Option<Box<[u8]>>,
-        ended: bool
+    }
+}
+
+impl From<JsStreamingIterable> for HeartbeatRequest<StreamingIterable> {
+    fn from(x: JsStreamingIterable) -> Self {
+        Self { stream: x.into() }
     }
 }
 
@@ -129,88 +133,9 @@ impl<St: DuplexStream> HeartbeatRequest<St> {
             };
         }
 
-        self.stream.close().await;
+        match self.stream.close().await {
+            Ok(()) => (),
+            Err(e) => error!("{}", e),
+        };
     }
 }
-
-impl From<JsStreamingIterable> for HeartbeatRequest<StreamingIterable> {
-    fn from(x: JsStreamingIterable) -> Self {
-        Self {
-            stream: x.into(),
-            buffered: None,
-            ended: false,
-        }
-    }
-}
-// impl<St: DuplexStream> Future for HeartbeatRequest<St> {
-//     type Output = Result<(), String>;
-//     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-//         let mut this = self.project();
-
-//         self.stream.send_all(&mut mapped);
-
-//         if let Some(item) = this.buffered.take() {
-//             return match this.stream.as_mut().poll_ready(cx) {
-//                 Poll::Ready(_) => match this.stream.as_mut().start_send(item) {
-//                     Ok(()) => Poll::Ready(Ok(())),
-//                     Err(e) => {
-//                         *this.ended = true;
-//                         Poll::Ready(Err(e))
-//                     }
-//                 },
-//                 Poll::Pending => Poll::Pending,
-//             };
-//         }
-
-//         if *this.ended || this.stream.is_terminated() {
-//             return Poll::Ready(Ok(()));
-//         }
-
-//         match this.stream.as_mut().poll_next(cx) {
-//             Poll::Pending => Poll::Pending,
-//             Poll::Ready(None) => {
-//                 *this.ended = true;
-//                 Poll::Ready(Ok(()))
-//             }
-//             Poll::Ready(Some(Err(e))) => {
-//                 *this.ended = true;
-//                 Poll::Ready(Err(e))
-//             }
-//             Poll::Ready(Some(Ok(msg))) => match PingMessage::deserialize(&msg) {
-//                 Err(_) => {
-//                     *this.ended = true;
-//                     return Poll::Ready(Err(NetworkingError::DecodingError.to_string()));
-//                 }
-//                 Ok(req) => match ControlMessage::generate_pong_response(&Ping(req)) {
-//                     Err(e) => {
-//                         *this.ended = true;
-//                         Poll::Ready(Err(e.to_string()))
-//                     }
-//                     Ok(res) => match res {
-//                         Ping(_) => panic!("must not happen"),
-//                         Pong(x) => {
-//                             *this.buffered = Some(x.serialize());
-
-//                             match this.stream.as_mut().poll_ready(cx) {
-//                                 Poll::Pending => Poll::Pending,
-//                                 Poll::Ready(Err(e)) => {
-//                                     *this.ended = true;
-//                                     Poll::Ready(Err(e))
-//                                 }
-//                                 Poll::Ready(Ok(())) => {
-//                                     match this.stream.as_mut().start_send(this.buffered.take().unwrap()) {
-//                                         Err(e) => {
-//                                             *this.ended = true;
-//                                             Poll::Ready(Err(e))
-//                                         }
-//                                         Ok(()) => Poll::Ready(Ok(())),
-//                                     }
-//                                 }
-//                             }
-//                         }
-//                     },
-//                 },
-//             },
-//         }
-//     }
-// }

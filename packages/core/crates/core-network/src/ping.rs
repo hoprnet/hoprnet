@@ -83,7 +83,6 @@ impl<St: DuplexStream> Ping<St> {
         config: PingConfig,
         on_finished_ping: impl Fn(&PeerId, crate::types::Result) + 'static,
         dial: impl (Fn(PeerId, Vec<String>) -> Pin<Box<dyn Future<Output = Result<St, String>>>>) + 'static,
-        // dial: impl (Fn(&PeerId, Vec<String>) -> dyn Future<Output = dyn DuplexStream>) + 'static,
     ) -> Self {
         let config = PingConfig {
             max_parallel_pings: config.max_parallel_pings.min(PINGS_MAX_PARALLEL),
@@ -212,17 +211,7 @@ impl<St: DuplexStream> Ping<St> {
                     },
                     Err(e) => Err(e),
                 }
-
-                // stream.send(sent_ping.get_ping_message().unwrap().serialize()).await;
-                // stream.next().await
             };
-            // let send_message_clone = self.send_msg.clone();
-            // let ping = async move {
-            //     send_message_clone
-            //         .run(sent_ping.get_ping_message().unwrap().serialize(), &destination)
-            //         .await
-            // }
-            // .fuse();
 
             pin_mut!(timeout, ping);
 

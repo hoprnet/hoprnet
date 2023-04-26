@@ -546,7 +546,7 @@ class Hopr extends EventEmitter {
     if (protos == undefined || protos.length == 0) {
       return 'Attention: no protocols registered for listening. Node might not be able communicate.'
     }
-    let out = 'Listening to following protocols:'
+    let out = 'Listening to following protocols:\n'
 
     for (const protocol of this.libp2pComponents.getRegistrar().getProtocols()) {
       out += ` - ${protocol}\n`
@@ -1029,7 +1029,7 @@ class Hopr extends EventEmitter {
       this.coreNetwork.register(destination, PeerOrigin.ManualPing)
     }
 
-    await this.coreNetwork.ping([destination.toString()])
+    await this.coreNetwork.ping([destination])
 
     let peer_info = this.coreNetwork.getPeerInfo(destination)
     if (peer_info !== undefined && peer_info.last_seen >= 0) {
@@ -1048,6 +1048,8 @@ class Hopr extends EventEmitter {
     }
 
     const entries = this.coreNetwork.all()
+
+    // Split huge computation into small chunks
     return (function* () {
       for (const entry of entries) {
         yield peerIdFromString(entry)
