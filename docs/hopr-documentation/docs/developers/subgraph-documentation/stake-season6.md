@@ -13,42 +13,42 @@ title: Entities & Sample Queries
 
 ## Account
 
-| Field                    | Type      | Description                  |
-| ------------------------ | --------- | ---------------------------- |
-| id                       | ID!       | Account address              |
-| actualLockedTokenAmount  | BigInt!   | Actual locked token amount   |
-| airdropLockedTokenAmount | BigInt!   | Airdrop locked token amount  |
-| lastSyncTimestamp        | BigInt!   | Last sync timestamp          |
-| cumulatedRewards         | BigInt!   | Cumulated rewards            |
-| claimedRewards           | BigInt!   | Claimed rewards              |
-| unclaimedRewards         | BigInt!   | Unclaimed rewards            |
-| boostRate                | BigInt!   | Boost rate                   |
-| appliedBoosts            | [Boost!]! | Applied Boosts               |
-| ignoredBoosts            | [Boost!]! | Ignored boosts               |
+| Field                    | Type      | Description                                       |
+| ------------------------ | --------- | ------------------------------------------------- |
+| id                       | ID!       | Account address                                   |
+| actualLockedTokenAmount  | BigInt!   | actual locked token amount for the account        |
+| airdropLockedTokenAmount | BigInt!   | Amount of airdrop locked tokens that the user has |
+| lastSyncTimestamp        | BigInt!   | Timestamp of the last syncronization              |
+| cumulatedRewards         | BigInt!   | Total amount of rewards the user has earned       |
+| claimedRewards           | BigInt!   | Amount of rewards the user has claimed            |
+| unclaimedRewards         | BigInt!   | Amount of rewards the user has claimed            |
+| boostRate                | BigInt!   | Boost rate for the user                           |
+| appliedBoosts            | [Boost!]! | Applied boosts for the user                       |
+| ignoredBoosts            | [Boost!]! | Ignored boosts for the user                       |
 
 ## Boost
 
-| Field          | Type    | Description                    |
-| -------------- | ------- | ------------------------------ |
-| id             | ID!     | Account address                |
-| boostTypeIndex | BigInt! | Boost type index               |
-| uri            | String! | Url to the metadata of the NFT |
-| boostNumerator | BigInt! | Boost numerator                |
-| redeemDeadline | BigInt! | Redeem deadline                |
+| Field          | Type    | Description                                  |
+| -------------- | ------- | -------------------------------------------- |
+| id             | ID!     | Account address                              |
+| boostTypeIndex | BigInt! | Boost type index for the boost               |
+| uri            | String! | Url to the metadata of the NFT               |
+| boostNumerator | BigInt! | Boost numerator for the boost                |
+| redeemDeadline | BigInt! | Deadline by which the boost must be redeemed |
 
 ## Program
 
-| Field                 | Type       | Description               |
-| --------------------- | ---------- | ------------------------- |
-| id                    | ID!        | Account address           |
-| availableReward       | BigInt!    | Available reward          |  
-| totalLocked           | BigInt!    | Total amount locked       |
-| totalAirdrop          | BigInt!    | Total airdrop amount      |
-| totalCumulatedRewards | BigInt!    | Total cumulated rewards   |
-| totalClaimedRewards   | BigInt!    | Total claimed rewards     |
-| totalUnclaimedRewards | BigInt!    | Total unclaimed rewards   |
-| lastSyncTimestamp     | BigInt!    | Last sync timestamp       |
-| blockedTypeIndexes    | [BigInt!]! | Blocked type index        |
+| Field                 | Type       | Description                                           |
+| --------------------- | ---------- | ----------------------------------------------------- |
+| id                    | ID!        | Account address                                       |
+| availableReward       | BigInt!    | Available reward for the program                      |  
+| totalLocked           | BigInt!    | Total amount locked for the program                   |
+| totalAirdrop          | BigInt!    | Total airdrop amount for the program                  |
+| totalCumulatedRewards | BigInt!    | Total cumulated rewards for the program               |
+| totalClaimedRewards   | BigInt!    | Total claimed rewards for the program                 |
+| totalUnclaimedRewards | BigInt!    | Total unclaimed rewards for the program               |
+| lastSyncTimestamp     | BigInt!    | Timestamp of the last synchronization for the program |
+| blockedTypeIndexes    | [BigInt!]! | List of blocked type indexes for the program          |
 
 ## Sample Queries
 

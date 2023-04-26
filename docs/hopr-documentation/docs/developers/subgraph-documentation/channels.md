@@ -15,62 +15,62 @@ title: Entities & Sample Queries
 
 ## Account
 
-| Field             | Type        | Description                                                 |
-| ----------------- | ----------- | ----------------------------------------------------------- |
-| id                | Bytes!      | Account's address                                           |
-| publicKey         | Bytes       | Account's public key                                        |
-| multiaddr         | [Bytes!]!   | Multi address                                               |
-| fromChannels      | [Channel!]! | Channels where the account is the source                    |
-| toChannels        | [Channel!]! | Channels where the account is the destination               |
-| fromChannelsCount | BigInt!     | Number of outgoing channels                                 |
-| toChannelsCount   | BigInt!     | Number of incoming channels                                 |
-| hasAnnounced      | Boolean!    | has the Account set a multiaddr?                            |
-| balance           | BigDecimal! | Sum of the channel balances where the account is the source |
-| isActive          | Boolean!    | Has at least 1 open channel                                 |
-| openChannelsCount | BigInt!     | Number of active channels                                   |
+| Field             | Type        | Description                                                   |
+| ----------------- | ----------- | ------------------------------------------------------------- |
+| id                | Bytes!      | Unique identifier for the account                             |
+| publicKey         | Bytes       | Public key associated with the account                        |
+| multiaddr         | [Bytes!]!   | A list of multi-addresses associated with the account         |
+| fromChannels      | [Channel!]! | Channels where the account is the source                      |
+| toChannels        | [Channel!]! | Channels where the account is the destination                 |
+| fromChannelsCount | BigInt!     | Total number of outgoing channels associated with the account |
+| toChannelsCount   | BigInt!     | Total number of incoming channels associated with the account |
+| hasAnnounced      | Boolean!    | Indicates whether the account has set a multi-address for others to use when establishing channels with it |
+| balance           | BigDecimal! | Sum of the channel balances where the account is the source   |
+| isActive          | Boolean!    | Indicates whether the account has at least one open channel   |
+| openChannelsCount | BigInt!     | Number of active channels associated with the account         |
 
 ## StatusSnapshot
 
-| Field     | Type           | Description                |
-| --------- | -------------- | -------------------------- |
-| id        | String!        | Tx hash - tx index         |
-| channel   | Channel!       | Channel at snapshot        |
-| status    | ChannelStatus! | Status of the channel      |
-| timeStamp | BigInt!        | Timestamp of the snapshot  |
+| Field     | Type           | Description                                              |
+| --------- | -------------- | -------------------------------------------------------- |
+| id        | String!        | Tx hash - tx index                                       |
+| channel   | Channel!       | Channel at snapshot                                      |
+| status    | ChannelStatus! | Status of the channel at the time the snapshot was taken |
+| timeStamp | BigInt!        | Timestamp of the snapshot                                |
 
 ## Ticket
 
-| Field              | Type        | Description                                  |
-| ------------------ | ----------- | -------------------------------------------- |
-| id                 | String!     | Channel epoch - ticket epoch - ticket index  |
-| channel            | Channel!    | Channel opened                               |
-| nextCommitment     | Bytes!      | Next commitment                              |
-| ticketEpoch        | BigInt!     | Ticket epoch                                 |
-| ticketIndex        | BigInt!     | Ticket index                                 |
-| proofOfRelaySecret | Bytes!      | Proof of relay secret                        |
-| amount             | BigDecimal! | Ticket amount                                |
-| winProb            | BigInt!     | Win probability for ticket                   |
-| signature          | Bytes!      | Ticket signature                             |
+| Field              | Type        | Description                                       |
+| ------------------ | ----------- | ------------------------------------------------- |
+| id                 | String!     | Channel epoch - ticket epoch - ticket index       |
+| channel            | Channel!    | Channel in which the ticket was opened            |
+| nextCommitment     | Bytes!      | Next commitment that will be made in the channel  |
+| ticketEpoch        | BigInt!     | Epoch in which the ticket was created             |
+| ticketIndex        | BigInt!     | Index of the ticket within the epoch              |
+| proofOfRelaySecret | Bytes!      | Proof of the relay secret                         |
+| amount             | BigDecimal! | Amount of funds that were committed to the ticket |
+| winProb            | BigInt!     | Win probability for ticket                        |
+| signature          | Bytes!      | Signature that was used to sign the ticket        |
 
 ## Channel
 
-| Field               | Type               | Description                            |
-| ------------------- | ------------------ | -------------------------------------- |
-| id                  | Bytes!             | Tx hash - tx index                     |
-| source              | Account!           | Source account                         |
-| destination         | Account!           | Destinantion account                   |
-| balance             | BigDecimal!        | Channel balance                        |
-| commitment          | Bytes!             | Commitment                             |
-| channelEpoch        | BigInt!            | Channel epoch                          |
-| ticketEpoch         | BigInt!            | Ticket epoch                           |
-| ticketIndex         | BigInt!            | Ticket index                           |
-| status              | ChannelStatus      | Status of the channel                  |
-| commitmentHistory   | [Bytes!]!          | Commitment history                     |
-| statusHistory       | [StatusSnapshot!]! | Status history                         |
-| lastOpenedAt        | BigInt!            | Timestamp when it was opened last time |
-| lastClosedAt        | BigInt!            | Timestamp when it was closed last time |
-| tickets             | [Ticket!]!         | Total tickets received in channel      |
-| redeemedTicketCount | BigInt!            | Number of redeemed tickes              |
+| Field               | Type               | Description                                                     |
+| ------------------- | ------------------ | --------------------------------------------------------------- |
+| id                  | Bytes!             | Tx hash - tx index                                              |
+| source              | Account!           | Account that opened the channel                                 |
+| destination         | Account!           | Account that the channel is connected to                        |
+| balance             | BigDecimal!        | Current balance of the channel                                  |
+| commitment          | Bytes!             | Current commitment for the channel                              |
+| channelEpoch        | BigInt!            | Epoch in which the channel was created                          |
+| ticketEpoch         | BigInt!            | Epoch in which the tickets for this channel can be created      |
+| ticketIndex         | BigInt!            | Index of the next ticket to be created for the channel          |
+| status              | ChannelStatus      | Current status of the channel, such as open, closed, or settled |
+| commitmentHistory   | [Bytes!]!          | History of commitments made for the channel                     |
+| statusHistory       | [StatusSnapshot!]! | History of status changes for the channel                       |
+| lastOpenedAt        | BigInt!            | History of status changes for the channel                       |
+| lastClosedAt        | BigInt!            | Timestamp when the channel was last closed                      |
+| tickets             | [Ticket!]!         | Tickets associated with this channel                            |
+| redeemedTicketCount | BigInt!            | Number of tickets that have been redeemed for this channel      |
 
 ## NetworkRegistry
 
@@ -78,7 +78,7 @@ title: Entities & Sample Queries
 | --------------- | --------- | ------------------------------------------------------- |
 | id              | Bytes!    | Account that registered nodes                           |
 | registeredPeers | String!   | List of HOPR nodes (or peers) registered by the account |
-| eligibility     | Boolean!  | If the account is eligible                              |
+| eligibility     | Boolean!  | Indicates if the account is eligible                    |
 
 ## Sample Queries
 

@@ -11,14 +11,14 @@ title: Entities & Sample Queries
 
 ## Account
 
-| Field         | Type     | Description               |
-| -------------- | --------| ------------------------- |
-| id             | Bytes!  | Account address           |
-| xHoprBalance   | BigInt! | # uint256                 |
-| wxHoprBalance  | BigInt! | # uint256                 |
-| totalBalance   | BigInt! | Total hopr token balance  |
-| blockTimestamp | BigInt! | Block timestamp           |
-| blockNumber    | BigInt! | Block number              |
+| Field         | Type     | Description                                                             |
+| -------------- | --------| ----------------------------------------------------------------------- |
+| id             | Bytes!  | Unique identifier for the account                                       |
+| xHoprBalance   | BigInt! | # uint256 current balance of the account in xHOPR                       |
+| wxHoprBalance  | BigInt! | # uint256 current balance of the account in wxHOPR                      |
+| totalBalance   | BigInt! | Total balance of the account, including both xHOPR and wxHOPR balances  |
+| blockTimestamp | BigInt! | Timestamp of the block in which the account balance was last updated    |
+| blockNumber    | BigInt! | Block number of the block in which the account balance was last updated |
 
 ## Sample Queries
 
