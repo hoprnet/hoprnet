@@ -77,8 +77,8 @@ impl InitializeNodeArgs {
 
         // 2. Calculate the peerID and addresses from the identity file
         // collect all the peer ids
-        let mut all_peer_ids = Vec::new();
-        let mut all_node_addresses = Vec::new();
+        let all_peer_ids: Vec<String>;
+        let all_node_addresses: Vec<String>;
         // check if password is provided
         let pwd = match password.read_password() {
             Ok(read_pwd) => read_pwd,
