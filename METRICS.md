@@ -52,10 +52,11 @@ The following sections document the metrics per package:
 ### core
 
 | Name                                       | Type        | Description                                                    | Note                            |
-| ------------------------------------------ | ----------- | -------------------------------------------------------------- | ------------------------------- |
+|--------------------------------------------|-------------|----------------------------------------------------------------| ------------------------------- |
 | `core_gauge_num_outgoing_channels`         | gauge       | Number of outgoing channels                                    |                                 |
 | `core_gauge_num_incoming_channels`         | gauge       | Number of incoming channels                                    |                                 |
 | `core_counter_sent_messages`               | counter     | Number of sent messages                                        |                                 |
+| `core_counter_failed_send_messages`        | counter     | Number of send message failures                                |                                 |
 | `core_histogram_path_length`               | histogram   | Distribution of number of hops of sent messages                | buckets: 0-4                    |
 | `core_counter_received_successful_acks`    | counter     | Number of received successful message acknowledgements         |                                 |
 | `core_counter_received_failed_acks`        | counter     | Number of received failed message acknowledgements             |                                 |
@@ -98,7 +99,7 @@ The following sections document the metrics per package:
 ### hoprd
 
 | Name                                            | Type        | Description                                                       | Note                                     |
-| ----------------------------------------------- | ----------- | ----------------------------------------------------------------- | ---------------------------------------- |
+| ----------------------------------------------- |-------------| ----------------------------------------------------------------- | ---------------------------------------- |
 | `hoprd_gauge_startup_unix_time_seconds`         | gauge       | The unix timestamp at which the process was started               | seconds since Epoch                      |
 | `hoprd_histogram_startup_time_seconds`          | histogram   | Time it takes for a node to start up                              | unit: seconds                            |
 | `hoprd_histogram_time_to_green_seconds`         | histogram   | Time it takes for a node to transition to the GREEN network state | unit: seconds                            |
@@ -109,6 +110,8 @@ The following sections document the metrics per package:
 | `hoprd_gauge_nodejs_total_available_heap_bytes` | gauge       | V8 total available heap size in bytes                             | unit: bytes                              |
 | `hoprd_gauge_nodejs_num_native_contexts`        | gauge       | V8 number of active top-level native contexts                     | unit: bytes, increase indicates mem leak |
 | `hoprd_gauge_nodejs_num_detached_contexts`      | gauge       | V8 number of detached contexts which are not GCd                  | unit: bytes, non-zero indicates mem leak |
+| `hoprd_counter_api_successful_send_msg`         | counter     | Number of successful API calls to POST message endpoint           |                                          |
+| `hoprd_counter_api_failed_send_msg`             | counter     | Number of failed API calls to POST message endpoint               |                                          |
 
 ### utils
 

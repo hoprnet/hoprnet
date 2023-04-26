@@ -1,8 +1,13 @@
 import type { Operation } from 'express-openapi'
 import { peerIdFromString } from '@libp2p/peer-id'
-import { PublicKey } from '@hoprnet/hopr-utils'
+import { create_counter, PublicKey } from '@hoprnet/hopr-utils'
 import { STATUS_CODES } from '../../utils.js'
 import { encodeMessage } from '../../../utils.js'
+import { RPCH_MESSAGE_REGEXP } from '../../../v2.js'
+import { log } from 'debug'
+
+const metric_successfulSendApiCalls = create_counter('hoprd_counter_api_successful_send_msg', 'Number of successful API calls to POST message endpoint')
+const metric_failedSendApiCalls = create_counter('hoprd_counter_api_failed_send_msg', 'Number of failed API calls to POST message endpoint')
 
 const POST: Operation = [
   async (req, res, _next) => {
@@ -18,8 +23,14 @@ const POST: Operation = [
 
     try {
       let ackChallenge = await req.context.node.sendMessage(message, recipient, path, hops)
+      metric_successfulSendApiCalls.increment()
       return res.status(202).json(ackChallenge)
     } catch (err) {
+      metric_failedSendApiCalls.increment()
+      let msg = req.body.body
+      if (RPCH_MESSAGE_REGEXP.test(msg)) {
+        log(`RPCh: failed to send message [${msg}]`)
+      }
       return res
         .status(422)
         .json({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err instanceof Error ? err.message : 'Unknown error' })
