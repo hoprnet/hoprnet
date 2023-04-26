@@ -1,0 +1,5 @@
+error: expected `fn`
+ --> $DIR/not_a_fn.rs:4:1
+  |
+4 | struct A;
+  | ^^^^^^
