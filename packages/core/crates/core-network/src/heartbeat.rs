@@ -73,7 +73,10 @@ impl Heartbeat {
 
     pub fn set_ended(&self) -> Result<(), String> {
         match self.ended.try_borrow_mut() {
-            Ok(_) => Ok(()),
+            Ok(mut x) => {
+                *x = true;
+                Ok(())
+            }
             Err(e) => Err(e.to_string()),
         }
     }
