@@ -7,8 +7,10 @@ use k256::elliptic_curve::sec1::{FromEncodedPoint, ToEncodedPoint};
 use k256::elliptic_curve::CurveArithmetic;
 use k256::{ecdsa, elliptic_curve, AffinePoint, Secp256k1};
 use libp2p_identity::{secp256k1::PublicKey as lp2p_k256_PublicKey, PeerId, PublicKey as lp2p_PublicKey};
+use serde::{Deserialize, Serialize};
 use std::ops::Add;
 use std::str::FromStr;
+
 use utils_log::warn;
 use utils_types::errors::GeneralError;
 use utils_types::errors::GeneralError::{Other, ParseError};
@@ -20,6 +22,66 @@ use crate::errors::CryptoError::InvalidInputValue;
 use crate::errors::{CryptoError, CryptoError::CalculationError, Result};
 use crate::primitives::{DigestLike, EthDigest};
 use crate::random::random_group_element;
+
+/// Extend support for arbitrary array sizes in serde
+///
+/// Array of arbitrary sizes are not supported in serde due to backwards compatibility.
+/// Read more in: https://github.com/serde-rs/serde/issues/1937
+mod arrays {
+    use std::{convert::TryInto, marker::PhantomData};
+
+    use serde::{
+        de::{SeqAccess, Visitor},
+        ser::SerializeTuple,
+        Deserialize, Deserializer, Serialize, Serializer,
+    };
+    pub fn serialize<S: Serializer, T: Serialize, const N: usize>(data: &[T; N], ser: S) -> Result<S::Ok, S::Error> {
+        let mut s = ser.serialize_tuple(N)?;
+        for item in data {
+            s.serialize_element(item)?;
+        }
+        s.end()
+    }
+
+    struct ArrayVisitor<T, const N: usize>(PhantomData<T>);
+
+    impl<'de, T, const N: usize> Visitor<'de> for ArrayVisitor<T, N>
+    where
+        T: Deserialize<'de>,
+    {
+        type Value = [T; N];
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            formatter.write_str(&format!("an array of length {}", N))
+        }
+
+        #[inline]
+        fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+        where
+            A: SeqAccess<'de>,
+        {
+            // can be optimized using MaybeUninit
+            let mut data = Vec::with_capacity(N);
+            for _ in 0..N {
+                match (seq.next_element())? {
+                    Some(val) => data.push(val),
+                    None => return Err(serde::de::Error::invalid_length(N, &self)),
+                }
+            }
+            match data.try_into() {
+                Ok(arr) => Ok(arr),
+                Err(_) => unreachable!(),
+            }
+        }
+    }
+    pub fn deserialize<'de, D, T, const N: usize>(deserializer: D) -> Result<[T; N], D::Error>
+    where
+        D: Deserializer<'de>,
+        T: Deserialize<'de>,
+    {
+        deserializer.deserialize_tuple(N, ArrayVisitor::<T, N>(PhantomData))
+    }
+}
 
 /// Represent an uncompressed elliptic curve point on the secp256k1 curve
 #[derive(Clone, Eq, PartialEq, Debug)]
@@ -33,7 +95,7 @@ impl CurvePoint {
     /// Converts the uncompressed representation of the curve point to Ethereum address.
     pub fn to_address(&self) -> Address {
         let serialized = self.serialize();
-        let hash = Hash::create(&[&serialized[1..]]).serialize();
+        let hash = <Hash as BinarySerializable>::serialize(&Hash::create(&[&serialized[1..]]));
         Address::new(&hash[12..])
     }
 }
@@ -131,7 +193,7 @@ impl Challenge {
     /// This is a one-way (lossy) operation, since the corresponding curve point is hashed
     /// with the hash value then truncated.
     pub fn to_ethereum_challenge(&self) -> EthereumChallenge {
-        EthereumChallenge::new(&self.curve_point.to_address().serialize())
+        EthereumChallenge::new(&BinarySerializable::serialize(&self.curve_point.to_address()))
     }
 }
 
@@ -188,7 +250,7 @@ impl BinarySerializable<'_> for Challenge {
 /// Represents a half-key used for Proof of Relay
 /// Half-key is equivalent to a non-zero scalar in the field used by secp256k1, but the type
 /// itself does not validate nor enforce this fact,
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct HalfKey {
     hkey: [u8; Self::SIZE],
@@ -249,9 +311,10 @@ impl BinarySerializable<'_> for HalfKey {
 /// Represents a challenge for the half-key in Proof of Relay.
 /// Half-key challenge is equivalent to a secp256k1 curve point.
 /// Therefore, HalfKeyChallenge can be obtained from a HalfKey.
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct HalfKeyChallenge {
+    #[serde(with = "arrays")]
     hkc: [u8; Self::SIZE],
 }
 
@@ -304,7 +367,7 @@ impl BinarySerializable<'_> for HalfKeyChallenge {
 
 impl PeerIdLike for HalfKeyChallenge {
     fn from_peerid(peer_id: &PeerId) -> utils_types::errors::Result<Self> {
-        HalfKeyChallenge::deserialize(&PublicKey::from_peerid(peer_id)?.serialize(true))
+        <HalfKeyChallenge as BinarySerializable>::deserialize(&PublicKey::from_peerid(peer_id)?.serialize(true))
     }
 
     fn to_peerid(&self) -> PeerId {
@@ -316,7 +379,7 @@ impl FromStr for HalfKeyChallenge {
     type Err = GeneralError;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        Self::deserialize(&hex::decode(s).map_err(|_| ParseError)?)
+        <Self as BinarySerializable>::deserialize(&hex::decode(s).map_err(|_| ParseError)?)
     }
 }
 
@@ -328,7 +391,7 @@ impl From<HalfKey> for HalfKeyChallenge {
 
 /// Represents an Ethereum 256-bit hash value
 /// This implementation instantiates the hash via Keccak256 digest.
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Hash {
     hash: [u8; Self::SIZE],
@@ -389,7 +452,7 @@ impl Hash {
 
 /// Represents a secp256k1 public key.
 /// This is a "Schrödinger public key", both compressed and uncompressed to save some cycles.
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct PublicKey {
     key: elliptic_curve::PublicKey<Secp256k1>,
@@ -408,7 +471,7 @@ impl PublicKey {
     /// Converts the public key to an Ethereum address
     pub fn to_address(&self) -> Address {
         let uncompressed = self.serialize(false);
-        let serialized = Hash::create(&[&uncompressed[1..]]).serialize();
+        let serialized = BinarySerializable::serialize(&Hash::create(&[&uncompressed[1..]]));
         Address::new(&serialized[12..])
     }
 
@@ -634,9 +697,10 @@ impl Response {
     /// Derives the response from two half-keys.
     /// This is done by adding the two non-zero scalars that the given half-keys represent.
     pub fn from_half_keys(first: &HalfKey, second: &HalfKey) -> Result<Self> {
-        let res = NonZeroScalar::<Secp256k1>::try_from(first.serialize().as_ref())
+        let res = NonZeroScalar::<Secp256k1>::try_from(<HalfKey as BinarySerializable>::serialize(&first).as_ref())
             .and_then(|s1| {
-                NonZeroScalar::<Secp256k1>::try_from(second.serialize().as_ref()).map(|s2| s1.as_ref() + s2.as_ref())
+                NonZeroScalar::<Secp256k1>::try_from(<HalfKey as BinarySerializable>::serialize(&second).as_ref())
+                    .map(|s2| s1.as_ref() + s2.as_ref())
             })
             .map_err(|_| CalculationError)?; // One of the scalars was 0
 
@@ -664,10 +728,11 @@ impl BinarySerializable<'_> for Response {
 /// This signature encodes the 2-bit recovery information into the
 /// upper-most bits of MSB of the S value, which are never used by this ECDSA
 /// instantiation over secp256k1.
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Signature {
     // TODO: The signature will be secp256k1 only, it will not accept Ed25519 public keys
+    #[serde(with = "arrays")]
     signature: [u8; Self::SIZE],
     recovery: u8,
 }
