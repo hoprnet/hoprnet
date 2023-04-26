@@ -106,7 +106,7 @@ register_nodes() {
   log "Registering nodes"
 
   make -C "${mydir}/.." register-nodes \
-    network=anvil-localhost environment_type=local \
+    network_id=anvil-localhost environment_type=local \
     native_addresses="[${1}]" \
     peer_ids="[${2}]"
 
@@ -118,7 +118,7 @@ sync_nodes_in_network_registry() {
   log "Sync nodes in network registry"
 
   make -C "${mydir}/.." sync-eligibility \
-    network=anvil-localhost environment_type=local \
+    network_id=anvil-localhost environment_type=local \
     peer_ids="[${1}]"
 
   log "Sync nodes in network registry finished"
@@ -128,7 +128,7 @@ enable_network_registry() {
   log "Enabling network registry"
 
   make -C "${mydir}/.." enable-network-registry \
-    network=anvil-localhost environment_type=local
+    network_id=anvil-localhost environment_type=local
 
   log "Enabling network registry finished"
 }

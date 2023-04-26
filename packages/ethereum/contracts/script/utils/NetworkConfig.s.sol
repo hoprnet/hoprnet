@@ -4,8 +4,8 @@ import 'forge-std/Script.sol';
 import 'forge-std/StdJson.sol';
 
 /**
- * Get environment_type from the envrionment variable `FOUNDRY_PROFILE`
- * Get network_id string from the envrionment variable "NETWORK_ID"
+ * Get environment_type from the environment variable `FOUNDRY_PROFILE`
+ * Get network_id string from the environment variable "NETWORK_ID"
  */
 contract NetworkConfig is Script {
   using stdJson for string;

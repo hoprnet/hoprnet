@@ -138,7 +138,7 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
       );
       isHoprNetworkRegistryDeployed = true;
     } else if (!isValidAddress(currentNetworkDetail.networkRegistryProxyContractAddress)) {
-      // deploy StakingProxy in other envrionment types, if no proxy contract is given.
+      // deploy StakingProxy in other environment types, if no proxy contract is given.
       currentNetworkDetail.networkRegistryProxyContractAddress = deployCode(
         'HoprStakingProxyForNetworkRegistry.sol',
         abi.encode(currentNetworkDetail.stakeContractAddress, deployerAddress, 1000 ether)

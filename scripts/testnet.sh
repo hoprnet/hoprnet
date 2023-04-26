@@ -203,7 +203,7 @@ disable_network_registry() {
   log "Disabling register"
   PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
   make -C "../" disable-network-registry \
-  network=anvil-localhost \
+  network_id=anvil-localhost \
   environment_type=local
 
   log "Register disabled"

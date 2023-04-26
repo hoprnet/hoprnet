@@ -77,7 +77,7 @@ for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entr
 
       log "deploying release ${release_id}"
       log "\tversion: ${version_maj_min}"
-      log "\tenvironment ${network_id}"
+      log "\tnetwork id: ${network_id}"
       log "\tdocker image: ${docker_image_full}"
       log "\tcluster name: ${cluster_name}"
       log "\tcluster template name: ${cluster_template_name}"

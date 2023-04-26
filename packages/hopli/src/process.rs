@@ -117,13 +117,13 @@ where
     T: AsRef<OsStr>,
 {
     // check environment is set
-    let envrionment_check = environment_config::ensure_environment_and_network_are_set(
+    let environment_check = environment_config::ensure_environment_and_network_are_set(
         &env::current_dir().unwrap(),
         network_id,
         &env::var("FOUNDRY_PROFILE").unwrap(),
     )
     .unwrap();
-    if !envrionment_check {
+    if !environment_check {
         return Err(HelperErrors::EnvironmentInfoMismatch);
     }
 
