@@ -260,6 +260,7 @@ async function* queryDHT(components: Components, destination: PeerId): AsyncIter
 
   try {
     for await (const dhtResult of components.getContentRouting().findProviders(key as any, options)) {
+      log(`Found DHT entry ${dhtResult.id.toString()}`)
       yield dhtResult.id
     }
   } catch (err) {

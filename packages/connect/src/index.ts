@@ -153,7 +153,7 @@ class HoprConnect implements Transport, Initializable, Startable {
         return false
       }
 
-      log(`closing due to simulated NAT`)
+      log(`closing due to simulated NAT, addr: ${maConn.remoteAddr.toString()}`)
       // log(`remotePeer ${maConn.remotePeer.toB58String()}`)
       // log(`localAddr: ${conn.localAddr?.toString()}`)
       // log(`remotePeer ${conn.localPeer.toB58String()}`)
