@@ -318,8 +318,8 @@ get_authenticated_curl_cmd() {
 
 # $1 - target file
 # $2 - source file
-# $2 - source_network_id environment name of source e.g. anvil-localhost
-# $3 - destination_network_id environment name of destination e.g. anvil-localhost2
+# $2 - source_network_id network name of source e.g. anvil-localhost
+# $3 - destination_network_id network name of destination e.g. anvil-localhost2
 update_protocol_config_addresses() {
   local target_file="${1}"
   local source_file="${2}"

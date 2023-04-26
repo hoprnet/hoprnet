@@ -45,9 +45,9 @@ usage() {
 { [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; } && { usage; exit 0; }
 
 # verify and set parameters
-declare environment="${1?"missing parameter <environment>"}"
-declare test_id="e2e-gcloud-test-${2:-${environment}-${RANDOM}}"
-declare docker_image=${3:-gcr.io/hoprassociation/hoprd:${environment}}
+declare network_id="${1?"missing parameter <network_id>"}"
+declare test_id="e2e-gcloud-test-${2:-${network_id}-${RANDOM}}"
+declare docker_image=${3:-gcr.io/hoprassociation/hoprd:${network_id}}
 declare docker_image_nat="${docker_image%:*}-nat:${docker_image#*:}"
 
 declare api_token="${HOPRD_API_TOKEN:-Token${RANDOM}^${RANDOM}^${RANDOM}Token}"
@@ -89,7 +89,7 @@ if [ "${show_prestartinfo}" = "1" ] || [ "${show_prestartinfo}" = "true" ]; then
   log "\ttest_id: ${test_id}"
   log "\tapi_token: ${api_token}"
   log "\tpassword: ${password}"
-  log "\tenvironment: ${environment}"
+  log "\tnetwork_id: ${network_id}"
   log "\tskip_cleanup: ${skip_cleanup}"
   log "\tshow_prestartinfo: ${show_prestartinfo}"
   log "\trun_cleanup_only: ${run_cleanup_only}"
@@ -100,7 +100,7 @@ fi
 # announce on-chain with routable address
 gcloud_create_instance_template "${test_id}" \
   "${docker_image}" \
-  "${environment}" \
+  "${network_id}" \
   "${api_token}" \
   "${password}" \
   "true"
@@ -108,7 +108,7 @@ gcloud_create_instance_template "${test_id}" \
 # create test specific instance template for NAT nodes
 gcloud_create_instance_template "${test_id}-nat" \
   "${docker_image_nat}" \
-  "${environment}" \
+  "${network_id}" \
   "${api_token}" \
   "${password}"
 #
@@ -133,7 +133,7 @@ declare eth_address
 for ip in "${node_ips_arr[@]}"; do
   wait_until_node_is_ready "${ip}"
   eth_address=$(get_native_address "${api_token}@${ip}:3001")
-  fund_if_empty "${eth_address}" "${environment}"
+  fund_if_empty "${eth_address}" "${network_id}"
 done
 
 # We can only wait for the non-NAT nodes to come up, nodes behind NAT do not expose 9091

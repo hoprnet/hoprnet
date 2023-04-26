@@ -153,8 +153,8 @@ function setup_node() {
 
   log "Run node ${id} on rest port ${api_port} -> ${log}"
 
-  if [[ "${additional_args}" != *"--environment "* ]]; then
-    additional_args="--environment anvil-localhost ${additional_args}"
+  if [[ "${additional_args}" != *"--network-id "* ]]; then
+    additional_args="--network-id anvil-localhost ${additional_args}"
   fi
 
   log "Additional args: \"${additional_args}\""
