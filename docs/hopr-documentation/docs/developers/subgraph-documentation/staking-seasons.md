@@ -14,57 +14,57 @@ title: Entities & Sample Queries
 
 ## StakingParticipation
 
-| Field                    | Type         | Description                                |
-| ------------------------ | ------------ | ------------------------------------------ |
-| id                       | ID!          | Unique identifier for staking particpation |
-| Account                  | Account!     | User account                               |
-| stakingSeason            | StakeSeason! | Staking season                             |
-| actualLockedTokenAmount  | BigInt!      | Actual amount of tokens locked             |
-| virtualLockedTokenAmount | BigInt!      | Amount of virtual locked tokens            |
-| airdropLockedTokenAmount | BigInt!      | Amount of airdrop locked tokens            |
-| lastSyncTimestamp        | BigInt!      | Timestamp of last sync                     |
-| cumulatedRewards         | BigInt!      | Cumulated rewards                          |
-| claimedRewards           | BigInt!      | Rewards claimed                            |
-| unclaimedRewards         | BigInt!      | Unclaimed rewards                          |
-| boostRate                | BigInt!      | Boost rate                                 |
-| appliedBoosts            | [Boost!]!    | Applied boosts                             |
-| ignoredBoosts            | [Boost!]!    | Ignored boosts                             |
+| Field                    | Type         | Description                                                  |
+| ------------------------ | ------------ | ------------------------------------------------------------ |
+| id                       | ID!          | Unique identifier for staking particpation                   |
+| Account                  | Account!     | User account that participates in staking                    |
+| stakingSeason            | StakeSeason! | Staking season during which the user participated in staking |
+| actualLockedTokenAmount  | BigInt!      | Actual amount of tokens that the user locked                 |
+| virtualLockedTokenAmount | BigInt!      | Amount of virtual locked tokens that the user has            |
+| airdropLockedTokenAmount | BigInt!      | Amount of airdrop locked tokens that the user has            |
+| lastSyncTimestamp        | BigInt!      | Timestamp of the last syncronization                         |
+| cumulatedRewards         | BigInt!      | Total amount of rewards the user has earned                  |
+| claimedRewards           | BigInt!      | Amount of rewards the user has claimed                       |
+| unclaimedRewards         | BigInt!      | Amount of rewards the user has not yet claimed               |
+| boostRate                | BigInt!      | Boost rate for the user                                      |
+| appliedBoosts            | [Boost!]!    | Applied boosts for the user                                  |
+| ignoredBoosts            | [Boost!]!    | Ignored boosts for the user                                  |
 
 ## Boost
 
-| Field          | Type     | Description                     |
-| -------------- | -------- | ------------------------------- |
-| id             | ID!      | Unique identifier for the boost |
-| Owner          | Account! | User account                    |
-| boostTypeIndex | BigInt!  | Boost type index                |
-| uri            | String!  | Universal resource identifier   |
-| boostNumerator | BigInt!  | Boost numerator                 |
-| redeemDeadline | BigInt!  | Redeem deadline                 |
+| Field          | Type     | Description                                 |
+| -------------- | -------- | ------------------------------------------- |
+| id             | ID!      | Unique identifier for the boost             |
+| Owner          | Account! | User account that owns the boost            |
+| boostTypeIndex | BigInt!  | Index of the boost type                     |
+| uri            | String!  | Universal resource identifier for the boost |
+| boostNumerator | BigInt!  | Numerator of the boost rate                 |
+| redeemDeadline | BigInt!  | Deadline for redeeming the boost            |
 
 ## StakeSeason
 
-| Field                 | Type                     | Description                        |
-| --------------------- | ------------------------ | ---------------------------------- |
-| id                    | ID!                      | Unique identifier for stake season |
-| seasonNumber          | BigInt!                  | Stake season number                |
-| availableReward       | BigInt!                  | Availabe reward for season         |
-| totalLocked           | BigInt!                  | Total tokens locked                |
-| totalVirtual          | BigInt!                  | Total virtual tokens               |
-| totalAirdrop          | BigInt!                  | Total airdrop tokens               |
-| totalCumulatedRewards | BigInt!                  | Total cumulated rewards for season |
-| totalClaimedRewards   | BigInt!                  | Total claimed rewards for season   |
-| totalUnclaimedRewards | BigInt!                  | Total unclaimed rewards            |
-| lastSyncTimestamp     | BigInt!                  | Timestamp of last sync             |
-| blockedTypeIndexes    | [BigInt!]!               | Number of blocked type indexes     |
-| stakingParticipation  | [StakingParticipation!]! | Derived from field - stakingSeason |
+| Field                 | Type                     | Description                                                      |
+| --------------------- | ------------------------ | ---------------------------------------------------------------- |
+| id                    | ID!                      | Unique identifier for the staking season                         |
+| seasonNumber          | BigInt!                  | Season number of the staking season                              |
+| availableReward       | BigInt!                  | Availabe reward for the staking season                           |
+| totalLocked           | BigInt!                  | Total number of tokens locked during staking season              |
+| totalVirtual          | BigInt!                  | Total number of virtual tokens during the staking season         |
+| totalAirdrop          | BigInt!                  | Total number of airdrop tokens during the staking season         |
+| totalCumulatedRewards | BigInt!                  | Total number of cumulated rewards during the staking season      |
+| totalClaimedRewards   | BigInt!                  | Total number of claimed rewards during the staking season        |
+| totalUnclaimedRewards | BigInt!                  | Total number of unclaimed rewards during the staking season      |
+| lastSyncTimestamp     | BigInt!                  | Timestamp of the last syncronization                             |
+| blockedTypeIndexes    | [BigInt!]!               | Number of blocked type indexes                                   |
+| stakingParticipation  | [StakingParticipation!]! | The staking participation derived from the field - stakingSeason |
 
 ## Account
 
-| Field                | Type                     | Description                   |
-| -------------------- | ------------------------ | ----------------------------- |
-| id                   | ID!                      | Unique identifier for account |
-| stakingParticipation | [StakingParticipation!]! | Derived from field - account  |
-| ownedBoosts          | [Boost!]!                | Derived from field - owner    |
+| Field                | Type                     | Description                                                |
+| -------------------- | ------------------------ | ---------------------------------------------------------- |
+| id                   | ID!                      | Unique identifier for the account                          |
+| stakingParticipation | [StakingParticipation!]! | The staking participation derived from the field - account |
+| ownedBoosts          | [Boost!]!                | Boosts owned by the user                                   |
 
 ## Sample Queries
 
