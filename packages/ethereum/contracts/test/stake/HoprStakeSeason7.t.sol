@@ -231,6 +231,7 @@ contract HoprStakeSeason7Test is Test, ERC1820RegistryFixtureTest, PermittableTo
     vm.startPrank(OWNER);
 
     for (uint256 i = 0; i < blockedIndexes.length; i++) {
+      vm.assume(blockedIndexes[i] > 1);
       for (uint256 j = 0; j < storedIndexes.length; j++) {
         if (blockedIndexes[i] == storedIndexes[j] && blockedIndexes.length > 1) {
           // expect revert
@@ -241,8 +242,8 @@ contract HoprStakeSeason7Test is Test, ERC1820RegistryFixtureTest, PermittableTo
 
     // first block allowed ones
     for (uint256 k = 0; k < blockedIndexes.length; k++) {
-      if (!hoprStakeSeason7.isBlockedNft(storedIndexes[k])) {
-        delete storedIndexes[k];
+      if (!hoprStakeSeason7.isBlockedNft(blockedIndexes[k])) {
+        hoprStakeSeason7.ownerBlockNftType(blockedIndexes[k]);
       }
     }
 
