@@ -7,6 +7,7 @@ import { type PeerId, isPeerId } from '@libp2p/interface-peer-id'
 import type { Connection, ProtocolStream } from '@libp2p/interface-connection'
 import type { ConnectionManager, Dialer } from '@libp2p/interface-connection-manager'
 import type { Components } from '@libp2p/interfaces/components'
+import type { Address } from '@libp2p/interface-peer-store'
 import { type Multiaddr, protocols as maProtocols } from '@multiformats/multiaddr'
 
 import { type TimeoutOpts } from '../async/index.js'
@@ -129,7 +130,9 @@ export async function tryExistingConnections(
     try {
       stream = await conn.newStream(protocols, options)
     } catch (err: any) {
-      error(`Could not open stream to ${destination.toString()} due to "${err?.message}".`)
+      error(
+        `Could not open stream to ${destination.toString()} using connection '${conn.id}' due to "${err?.message}".`
+      )
     } finally {
       timeoutController.clear()
     }
@@ -282,7 +285,7 @@ async function doDirectDial(
   let struct = await tryExistingConnections(components, id, protocols)
 
   if (struct) {
-    log(`Successfully reached ${id.toString()} via existing connection !`)
+    log(`Successfully reached ${id.toString()} via existing connection '${struct.conn.id}'!`)
     return { status: DialStatus.SUCCESS, resp: struct }
   }
 
@@ -294,7 +297,9 @@ async function doDirectDial(
     } already known address${knownAddressesForPeer.length == 1 ? '' : 'es'} for ${id.toString()}:\n`
     // Let's try using the known addresses by connecting directly
 
-    for (const address of knownAddressesForPeer) {
+    for (const address of knownAddressesForPeer.sort((a: Address, b: Address) =>
+      (components.getConnectionManager() as any).dialer.addressSorter(a, b)
+    )) {
       out += `- ${address.multiaddr.toString()}\n`
     }
     // Remove last `\n`
@@ -305,7 +310,7 @@ async function doDirectDial(
   }
 
   if (struct != undefined) {
-    log(`Successfully reached ${id.toString()} via already known addresses !`)
+    log(`Successfully reached ${id.toString()} via already known addresses '${struct.conn.remoteAddr.toString()}!`)
     return { status: DialStatus.SUCCESS, resp: struct }
   }
 
