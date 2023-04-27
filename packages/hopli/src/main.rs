@@ -1,12 +1,14 @@
 use crate::faucet::FaucetArgs;
 use crate::identity::IdentityArgs;
+use crate::initialize_node::InitializeNodeArgs;
 use crate::network_registry::RegisterInNetworkRegistryArgs;
 use crate::utils::{Cmd, HelperErrors};
 use clap::{Parser, Subcommand};
-// use ethers::types::Address;
 pub mod environment_config;
 pub mod faucet;
 pub mod identity;
+pub mod identity_input;
+pub mod initialize_node;
 pub mod key_pair;
 pub mod network_registry;
 pub mod password;
@@ -30,12 +32,12 @@ struct Cli {
 enum Commands {
     #[clap(about = "Create and store identity files")]
     Identity(IdentityArgs),
-    #[clap(
-        about = "Fund given address and/or addressed derived from identity files native tokens or HOPR tokens"
-    )]
+    #[clap(about = "Fund given address and/or addressed derived from identity files native tokens or HOPR tokens")]
     Faucet(FaucetArgs),
     #[clap(about = "Registry some nodes peer ids to the network registery contract")]
     RegisterInNetworkRegistry(RegisterInNetworkRegistryArgs),
+    #[clap(about = "Necessary steps to initiate a node (network registery, stake, fund)")]
+    InitializeNode(InitializeNodeArgs),
 }
 
 fn main() -> Result<(), HelperErrors> {
@@ -49,6 +51,9 @@ fn main() -> Result<(), HelperErrors> {
             opt.run()?;
         }
         Commands::RegisterInNetworkRegistry(opt) => {
+            opt.run()?;
+        }
+        Commands::InitializeNode(opt) => {
             opt.run()?;
         }
     }

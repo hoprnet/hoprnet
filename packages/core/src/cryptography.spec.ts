@@ -188,11 +188,7 @@ describe('cryptographic correspondence tests', async function () {
     const { alpha, secrets } = generateKeyShares(keyPairs)
 
     for (let i = 0; i < AMOUNT; i++) {
-      let fwd_keyshare_rs = SharedKeys.forward_transform(
-        alpha,
-        keyPairs[i].publicKey.slice(4),
-        keyPairs[i].privateKey.slice(4)
-      )
+      let fwd_keyshare_rs = SharedKeys.forward_transform(alpha, keyPairs[i].privateKey.slice(4))
 
       assert.equal(fwd_keyshare_rs.count_shared_keys(), 1)
 

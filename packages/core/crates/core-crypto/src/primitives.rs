@@ -3,16 +3,86 @@ use blake2::Blake2s256;
 use chacha20::cipher::KeyIvInit;
 use chacha20::cipher::{IvSizeUser, KeySizeUser, StreamCipher, StreamCipherSeek};
 use chacha20::ChaCha20;
-use digest::FixedOutputReset;
+use digest::{FixedOutputReset, Output, OutputSizeUser, Update};
 use hmac::{Mac, SimpleHmac};
+use sha3::Keccak256;
+use typenum::Unsigned;
 
 use crate::errors::CryptoError::{InvalidInputValue, InvalidParameterSize};
 use crate::errors::Result;
 use crate::parameters::SECRET_KEY_LENGTH;
 
+/// Generalization of digest-like operation (MAC, Digest,...)
+/// Defines the `update` and `finalize` operations to produce digest value of arbitrary data.
+pub trait DigestLike<T>
+where
+    T: Update + FixedOutputReset + OutputSizeUser,
+{
+    /// Length of the digest in bytes
+    const SIZE: usize = T::OutputSize::USIZE;
+
+    /// Access to the internal state of the digest-like operation.
+    fn internal_state(&mut self) -> &mut T;
+
+    /// Convenience method for creating a properly sized buffer to fit the output digest value.
+    fn create_output() -> Box<[u8]> {
+        vec![0u8; Self::SIZE].into_boxed_slice()
+    }
+
+    /// Update the internal state of the digest-like using the given input data.
+    fn update(&mut self, data: &[u8]) {
+        self.internal_state().update(data);
+    }
+
+    /// Retrieve the final digest value into a prepared buffer and reset this instance so it could be reused for
+    /// a new computation.
+    fn finalize_into(&mut self, out: &mut [u8]) {
+        assert_eq!(Self::SIZE, out.len(), "invalid output size");
+        let output = Output::<T>::from_mut_slice(out);
+        self.internal_state().finalize_into_reset(output);
+    }
+
+    /// Retrieve the final digest value and reset this instance so it could be reused for
+    /// a new computation.
+    fn finalize(&mut self) -> Box<[u8]> {
+        let mut ret = Self::create_output();
+        self.finalize_into(&mut ret);
+        ret
+    }
+}
+
+/// Simple digest computation wrapper.
+/// Use `new`, `update` and `finalize` triplet to produce hash of arbitrary data.
+/// Currently this instance is using Blake2s256.
+#[derive(Default, Clone)]
+pub struct SimpleDigest {
+    instance: Blake2s256,
+}
+
+impl DigestLike<Blake2s256> for SimpleDigest {
+    fn internal_state(&mut self) -> &mut Blake2s256 {
+        &mut self.instance
+    }
+}
+
+/// Computation wrapper for a digest that's compatible with Ethereum digests.
+/// Use `new`, `update` and `finalize` triplet to produce hash of arbitrary data.
+/// Currently this instance is using Keccak256.
+#[derive(Default, Clone)]
+pub struct EthDigest {
+    instance: Keccak256,
+}
+
+impl DigestLike<Keccak256> for EthDigest {
+    fn internal_state(&mut self) -> &mut Keccak256 {
+        &mut self.instance
+    }
+}
+
 /// Simple Message Authentication Code (MAC) computation wrapper
 /// Use `new`, `update` and `finalize` triplet to produce MAC of arbitrary data.
-/// Currently this instance is computing HMAC based on Blake2s256
+/// Currently this instance is computing HMAC based on Blake2s256.
+#[derive(Clone)]
 pub struct SimpleMac {
     instance: SimpleHmac<Blake2s256>,
 }
@@ -27,16 +97,11 @@ impl SimpleMac {
             })?,
         })
     }
+}
 
-    /// Update the internal state of the MAC using the given input data.
-    pub fn update(&mut self, data: &[u8]) {
-        self.instance.update(data);
-    }
-
-    /// Retrieve the final MAC and reset this instance so it could be reused for
-    /// a new MAC computation.
-    pub fn finalize(&mut self) -> Box<[u8]> {
-        self.instance.finalize_fixed_reset().to_vec().into_boxed_slice()
+impl DigestLike<SimpleHmac<Blake2s256>> for SimpleMac {
+    fn internal_state(&mut self) -> &mut SimpleHmac<Blake2s256> {
+        &mut self.instance
     }
 }
 
@@ -108,7 +173,7 @@ pub fn create_tagged_mac(secret: &[u8], data: &[u8]) -> Result<Box<[u8]>> {
 mod tests {
     use crate::parameters::SECRET_KEY_LENGTH;
     use crate::primitives::wasm::create_tagged_mac;
-    use crate::primitives::SimpleStreamCipher;
+    use crate::primitives::{DigestLike, SimpleMac, SimpleStreamCipher};
     use hex_literal::hex;
 
     #[test]
@@ -149,6 +214,7 @@ mod tests {
         let mac = create_tagged_mac(&key, &data).unwrap();
 
         let expected = hex!("a52161fd19f576948f13effe9fb66b5705607e626f5a6621c20c828495639d04");
+        assert_eq!(SimpleMac::SIZE, mac.len());
         assert_eq!(expected, mac.as_ref())
     }
 }

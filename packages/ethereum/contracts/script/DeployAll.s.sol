@@ -111,7 +111,10 @@ contract DeployAllContractsScript is
       !isValidAddress(currentEnvironmentDetail.hoprBoostContractAddress)
     ) {
       // deploy boost contract
-      currentEnvironmentDetail.hoprBoostContractAddress = deployCode('HoprBoost.sol', abi.encode(deployerAddress, ''));
+      currentEnvironmentDetail.hoprBoostContractAddress = deployCode(
+        'HoprBoost.sol',
+        abi.encode(deployerAddress, 'https://')
+      );
     }
 
     // 3.5. HoprStake Contract
@@ -362,11 +365,10 @@ contract DeployAllContractsScript is
   /**
    * @dev Helper function to build payload for "batchMint(address[],string,string,uint256,uint256)"
    */
-  function buildNftBatchMintInternal(address addr1, address addr2)
-    private
-    pure
-    returns (bytes memory devPayload, bytes memory communityPayload)
-  {
+  function buildNftBatchMintInternal(
+    address addr1,
+    address addr2
+  ) private pure returns (bytes memory devPayload, bytes memory communityPayload) {
     address[] memory addrBook = new address[](6);
     addrBook[0] = addr1;
     addrBook[1] = addr1;

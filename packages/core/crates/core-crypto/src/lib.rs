@@ -8,9 +8,7 @@ pub mod prp;
 pub mod random;
 pub mod shared_keys;
 pub mod types;
-
-#[cfg(test)]
-pub(crate) mod dummy_rng;
+mod utils;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {

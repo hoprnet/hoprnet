@@ -1,5 +1,5 @@
 # Append here when new Rust WASM crate is added (the list is space separated)
-PACKAGES = utils-log utils-misc utils-metrics utils-storage utils-types
+PACKAGES = utils-log utils-misc utils-metrics utils-db utils-types
 ##########################################
 
 PKG_DIRS = $(addsuffix /pkg, $(PACKAGES))

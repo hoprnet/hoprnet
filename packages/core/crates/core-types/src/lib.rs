@@ -1,3 +1,4 @@
+pub mod acknowledgment;
 pub mod channels;
 
 #[cfg(feature = "wasm")]
