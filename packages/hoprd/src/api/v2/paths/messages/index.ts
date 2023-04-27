@@ -6,8 +6,14 @@ import { encodeMessage } from '../../../utils.js'
 import { RPCH_MESSAGE_REGEXP } from '../../../v2.js'
 import { log } from 'debug'
 
-const metric_successfulSendApiCalls = create_counter('hoprd_counter_api_successful_send_msg', 'Number of successful API calls to POST message endpoint')
-const metric_failedSendApiCalls = create_counter('hoprd_counter_api_failed_send_msg', 'Number of failed API calls to POST message endpoint')
+const metric_successfulSendApiCalls = create_counter(
+  'hoprd_counter_api_successful_send_msg',
+  'Number of successful API calls to POST message endpoint'
+)
+const metric_failedSendApiCalls = create_counter(
+  'hoprd_counter_api_failed_send_msg',
+  'Number of failed API calls to POST message endpoint'
+)
 
 const POST: Operation = [
   async (req, res, _next) => {

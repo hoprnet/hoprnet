@@ -117,7 +117,10 @@ const metric_channelBalances = create_multi_gauge(
   ['counterparty', 'direction']
 )
 const metric_sentMessageCount = create_counter('core_counter_sent_messages', 'Number of sent messages')
-const metric_sentMessageFailCount = create_counter('core_counter_failed_send_messages', 'Number of sent messages failures')
+const metric_sentMessageFailCount = create_counter(
+  'core_counter_failed_send_messages',
+  'Number of sent messages failures'
+)
 const metric_pathLength = create_histogram_with_buckets(
   'core_histogram_path_length',
   'Distribution of number of hops of sent messages',
@@ -990,10 +993,9 @@ class Hopr extends EventEmitter {
       // Validate the manually specified intermediate path
       try {
         await this.validateIntermediatePath(intermediatePath)
-      }
-      catch (e) {
-          metric_sentMessageFailCount.increment()
-          throw  e
+      } catch (e) {
+        metric_sentMessageFailCount.increment()
+        throw e
       }
     } else {
       intermediatePath = await this.getIntermediateNodes(PublicKey.fromPeerId(destination), hops)
