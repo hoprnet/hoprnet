@@ -56,7 +56,7 @@ impl AsyncKVStorage for LevelDbShim {
                 if v.is_undefined() {
                     Err(DbError::NotFound)
                 } else {
-                    Ok(js_sys::Uint8Array::new(&v).to_vec().into_boxed_slice())
+                    Ok(js_sys::Uint8Array::from(v).to_vec().into_boxed_slice())
                 }
             })
     }
@@ -82,7 +82,7 @@ impl AsyncKVStorage for LevelDbShim {
                     // NOTE: The LevelDB API does not allow to return an evicted value
                     None
                 } else {
-                    Some(js_sys::Uint8Array::new(&v).to_vec().into_boxed_slice())
+                    Some(js_sys::Uint8Array::from(v).to_vec().into_boxed_slice())
                 }
             })
             .map_err(|_| DbError::GenericError("Encountered error on DB remove operation".to_string()))
