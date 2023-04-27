@@ -17,7 +17,7 @@ pub mod wasm {
     /// ```
     pub fn to_box_u8_stream(item: Result<JsValue, JsValue>) -> Result<Box<[u8]>, String> {
         match item {
-            Ok(x) => Ok(Box::from_iter(Uint8Array::from(x).to_vec())),
+            Ok(x) => Ok(Uint8Array::from(x).to_vec().into_boxed_slice()),
             Err(e) => Err(format!("{:?}", e)),
         }
     }
@@ -39,7 +39,7 @@ pub mod wasm {
         match item {
             Some(Ok(m)) => {
                 Reflect::set(&obj, &"done".into(), &JsValue::FALSE).unwrap();
-                Reflect::set(&obj, &"value".into(), &Uint8Array::from(&*m)).unwrap();
+                Reflect::set(&obj, &"value".into(), &Uint8Array::from(m.as_ref())).unwrap();
                 Ok(obj.into())
             }
             Some(Err(e)) => Err(JsValue::from(e)),
@@ -69,7 +69,7 @@ pub mod wasm {
         match item {
             Some(m) => {
                 Reflect::set(&obj, &"done".into(), &JsValue::FALSE).unwrap();
-                Reflect::set(&obj, &"value".into(), &Uint8Array::from(&*m)).unwrap();
+                Reflect::set(&obj, &"value".into(), &Uint8Array::from(m.as_ref())).unwrap();
                 obj.into()
             }
             None => {
