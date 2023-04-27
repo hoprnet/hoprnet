@@ -31,7 +31,7 @@
   "dependencies": {
     "@hoprnet/hopr-utils": "workspace:packages/utils",
     "@koush/wrtc": "0.5.3",
-    "@libp2p/interface-peer-discovery": "1.0.0",
+    "@libp2p/interface-peer-discovery": "1.1.0",
     "@libp2p/interface-peer-id": "1.0.5",
     "@libp2p/interface-transport": "1.0.0",
     "@libp2p/interfaces": "2.0.4",
