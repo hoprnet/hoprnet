@@ -32,7 +32,7 @@
     "@hoprnet/hopr-utils": "workspace:packages/utils",
     "@koush/wrtc": "0.5.3",
     "@libp2p/interface-peer-discovery": "1.0.0",
-    "@libp2p/interface-peer-id": "1.0.5",
+    "@libp2p/interface-peer-id": "2.0.1",
     "@libp2p/interface-transport": "1.0.0",
     "@libp2p/interfaces": "2.0.4",
     "@libp2p/peer-id": "1.1.16",
@@ -52,7 +52,7 @@
   "devDependencies": {
     "@libp2p/interface-connection": "1.0.1",
     "@libp2p/interface-connection-manager": "1.1.0",
-    "@libp2p/interface-peer-id": "1.0.2",
+    "@libp2p/interface-peer-id": "2.0.1",
     "@libp2p/interface-registrar": "1.1.0",
     "@types/debug": "4.1.7",
     "@types/mocha": "10.0.1",

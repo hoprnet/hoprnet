@@ -37,7 +37,7 @@
     "@hoprnet/hopr-core-ethereum": "workspace:packages/core-ethereum",
     "@hoprnet/hopr-utils": "workspace:packages/utils",
     "@libp2p/crypto": "1.0.0",
-    "@libp2p/interface-peer-id": "1.0.5",
+    "@libp2p/interface-peer-id": "2.0.1",
     "@libp2p/interfaces": "2.0.4",
     "@libp2p/kad-dht": "1.0.16",
     "@libp2p/mplex": "1.2.2",
