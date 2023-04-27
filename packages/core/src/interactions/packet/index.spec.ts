@@ -23,7 +23,7 @@ import {
 } from '@hoprnet/hopr-utils'
 import type { HalfKeyChallenge } from '@hoprnet/hopr-utils'
 import assert from 'assert'
-import { AcknowledgementChallenge, Packet, Acknowledgement } from '../../messages/index.js'
+import { AcknowledgementChallenge, Packet, Acknowledgement, PacketHelper } from '../../messages/index.js'
 import { PacketForwardInteraction } from './forward.js'
 import { initializeCommitment } from '@hoprnet/hopr-core-ethereum'
 import { ChannelCommitmentInfo } from '@hoprnet/hopr-core-ethereum'
@@ -43,10 +43,12 @@ const DEFAULT_CHANNEL_EPOCH = new UINT256(new BN(0))
 const DEFAULT_CLOSURE_TIME = new UINT256(new BN(0))
 
 const SELF = privKeyToPeerId(stringToU8a('0x492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775'))
-const RELAY0 = privKeyToPeerId(stringToU8a('0x5bf21ea8cccd69aa784346b07bf79c84dac606e00eecaa68bf8c31aff397b1ca'))
+const RELAY0_priv = stringToU8a('0x5bf21ea8cccd69aa784346b07bf79c84dac606e00eecaa68bf8c31aff397b1ca')
+const RELAY0 = privKeyToPeerId(RELAY0_priv)
 const RELAY1 = privKeyToPeerId(stringToU8a('0x3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa'))
 const RELAY2 = privKeyToPeerId(stringToU8a('0xdb7e3e8fcac4c817aa4cecee1d6e2b4d53da51f9881592c0e1cc303d8a012b92'))
-const COUNTERPARTY = privKeyToPeerId(stringToU8a('0x0726a9704d56a013980a9077d195520a61b5aed28f92d89c50bca6e0e0c48cfc'))
+const COUNTERPARTY_priv = stringToU8a('0x0726a9704d56a013980a9077d195520a61b5aed28f92d89c50bca6e0e0c48cfc')
+const COUNTERPARTY = privKeyToPeerId(COUNTERPARTY_priv)
 
 const nodes: PeerId[] = [SELF, RELAY0, RELAY1, RELAY2, COUNTERPARTY]
 
@@ -305,7 +307,7 @@ describe('packet acknowledgement', function () {
   it('acknowledgement workflow as relayer', async function () {
     const nodes: PeerId[] = [RELAY0, COUNTERPARTY]
 
-    const packet = await Packet.create(TEST_MESSAGE, nodes, SELF, dbs[0])
+    const packet = await PacketHelper.create(TEST_MESSAGE, nodes, SELF, dbs[0])
 
     const libp2pRelay0 = createFakeSendReceive(events, RELAY0)
     const libp2pCounterparty = createFakeSendReceive(events, COUNTERPARTY)
@@ -359,13 +361,13 @@ describe('packet acknowledgement', function () {
 
     libp2pCounterparty.components.getRegistrar().handle(interaction.protocols, async ({ stream }) => {
       for await (const msg of stream.source) {
-        ackCounterpartyInteraction.sendAcknowledgement(Packet.deserialize(msg, COUNTERPARTY, RELAY0), RELAY0)
+        ackCounterpartyInteraction.sendAcknowledgement(Packet.deserialize(msg, COUNTERPARTY_priv, RELAY0.toString()), RELAY0)
         // we're only interested in first acknowledgement
         break
       }
     })
 
-    await interaction.handleMixedPacket(Packet.deserialize(packet.serialize(), RELAY0, SELF))
+    await interaction.handleMixedPacket(Packet.deserialize(packet.serialize(), RELAY0_priv, SELF.toString()))
 
     await ackReceived.promise
 
@@ -403,8 +405,8 @@ describe('packet relaying interaction', function () {
     const allNodes: PeerId[] = [SELF].concat(nodes)
     let senderInteraction: PacketForwardInteraction
 
-    const packet = await Packet.create(TEST_MESSAGE, nodes, SELF, dbs[0])
-    await packet.storePendingAcknowledgement(dbs[0])
+    const packet = await PacketHelper.create(TEST_MESSAGE, nodes, SELF, dbs[0])
+    await PacketHelper.storePendingAcknowledgement(packet, dbs[0])
 
     const forwardInteractions: PacketForwardInteraction[] = []
     const ackInteractions: AcknowledgementInteraction[] = []

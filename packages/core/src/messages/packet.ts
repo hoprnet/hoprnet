@@ -4,9 +4,11 @@ import {
   INVERSE_TICKET_WIN_PROB,
   create_counter, UINT256,
   PublicKey as TsPublicKey,
+  HalfKeyChallenge as TsHalfKeyChallenge,
   Address as TsAddress,
   Balance as TsBalance,
   Ticket as TsTicket,
+  UnacknowledgedTicket as TsUnacknowledgedTicket
 } from '@hoprnet/hopr-utils'
 import type { Hash } from '@hoprnet/hopr-utils'
 import type { PeerId } from '@libp2p/interface-peer-id'
@@ -14,7 +16,7 @@ import { debug } from '@hoprnet/hopr-utils'
 import { keysPBM } from '@libp2p/crypto/keys'
 
 import { Ticket, Balance, BalanceType, ChannelStatus, ChannelEntry, PublicKey, Packet, U256, UnacknowledgedTicket, WasmPacketState } from '../../lib/core_packet.js'
-export { Packet } from '../../lib/core_packet.js'
+export { Packet, WasmPacketState as PacketState } from '../../lib/core_packet.js'
 
 import { peerIdFromString } from '@libp2p/peer-id'
 import BN from 'bn.js'
@@ -50,7 +52,7 @@ async function bumpTicketIndex(channelId: Hash, db: HoprDB): Promise<U256> {
  * @param db
  * @param privKey
  */
-export async function createTicket(
+async function createTicket(
   dest: PublicKey,
   pathLength: number,
   db: HoprDB,
@@ -191,14 +193,21 @@ export async function validateUnacknowledgedTicket(
   }
 }
 
+export function privateKeyFromPeer(peer: PeerId) {
+  if (peer.privateKey == undefined)
+    throw Error('peer id does not contain a private key')
 
-export class PacketHelpers {
+  return keysPBM.PrivateKey.decode(peer.privateKey).Data
+}
 
+
+/**
+ * This is a temporary helper class until the DB functionality is migrated to Rust.
+ */
+export class PacketHelper {
   static async create(msg: Uint8Array, path: PeerId[], privKey: PeerId, db: HoprDB): Promise<Packet> {
 
-    let private_key = keysPBM.PrivateKey.decode(privKey.privateKey).Data
-    if (!private_key)
-      throw Error('invalid private key given at packet construction')
+    let private_key = privateKeyFromPeer(privKey)
 
     let next_peer = PublicKey.from_peerid_str(path[0].toString())
 
@@ -214,9 +223,7 @@ export class PacketHelpers {
     return new Packet(msg, path.map((p) => p.toString()), private_key, ticket)
   }
 
-  //let private_key = keysPBM.PrivateKey.decode(privKey.privateKey).Data
-
-  async checkPacketTag(packet: Packet, db: HoprDB) {
+  static async checkPacketTag(packet: Packet, db: HoprDB) {
     const present = await db.checkAndSetPacketTag(packet.packet_tag())
 
     if (present) {
@@ -224,7 +231,7 @@ export class PacketHelpers {
     }
   }
 
-  async storeUnacknowledgedTicket(packet: Packet, db: HoprDB) {
+  static async storeUnacknowledgedTicket(packet: Packet, db: HoprDB) {
     if (packet.state() != WasmPacketState.Forwarded) {
       throw Error(`Invalid state`)
     }
@@ -237,14 +244,18 @@ export class PacketHelpers {
       }`
     )
 
-    await db.storePendingAcknowledgement(packet.ack_challenge(), false, unacknowledged)
+    await db.storePendingAcknowledgement(TsHalfKeyChallenge.deserialize(packet.ack_challenge().serialize()),
+      false,
+      TsUnacknowledgedTicket.deserialize(unacknowledged.serialize())
+      )
   }
 
-  async storePendingAcknowledgement(packet: Packet, db: HoprDB) {
-    await db.storePendingAcknowledgement(packet.ack_challenge(), true)
+  static async storePendingAcknowledgement(packet: Packet, db: HoprDB) {
+    let hkc = TsHalfKeyChallenge.deserialize(packet.ack_challenge().serialize())
+    await db.storePendingAcknowledgement(hkc, true)
   }
 
-  async validateUnacknowledgedTicket(packet: Packet, db: HoprDB, checkUnrealizedBalance: boolean) {
+  static async validateUnacknowledgedTicket(packet: Packet, db: HoprDB, checkUnrealizedBalance: boolean) {
     if (packet.state() == WasmPacketState.Outgoing) {
       throw Error('packet must have previous hop - cannot be outgoing')
     }
@@ -276,15 +287,15 @@ export class PacketHelpers {
     await db.setCurrentTicketIndex(channel.getId().hash(), new UINT256(new BN(packet.ticket.index.to_string())))
   }
 
-  async forwardTransform(privKey: PeerId, db: HoprDB): Promise<void> {
+  static async forwardTransform(packet: Packet, privKey: PeerId, db: HoprDB): Promise<void> {
     if (privKey.privateKey == null) {
       throw Error(`Invalid arguments`)
     }
 
-    let private_key = keysPBM.PrivateKey.decode(privKey.privateKey).Data
-    const pathPosition = this.inner.ticket.get_path_position(new U256(PRICE_PER_PACKET.toString()), new U256(INVERSE_TICKET_WIN_PROB.toString()))
+    let private_key = privateKeyFromPeer(privKey)
+    const pathPosition = packet.ticket.get_path_position(new U256(PRICE_PER_PACKET.toString()), new U256(INVERSE_TICKET_WIN_PROB.toString()))
 
-    let nextPeer = this.inner.next_hop()
+    let nextPeer = packet.next_hop()
 
     let ticket: Ticket
     if (pathPosition == 1) {
@@ -293,6 +304,6 @@ export class PacketHelpers {
       ticket = await createTicket(nextPeer, pathPosition, db, private_key)
     }
 
-    this.inner.forward(private_key, ticket)
+    packet.forward(private_key, ticket)
   }
 }

@@ -167,6 +167,14 @@ impl Balance {
             balance_type: self.balance_type,
         }
     }
+
+    pub fn to_formatted_string(&self, units: u32) -> String {
+        let precision: usize = units as usize;
+        let exp10 = u256::from(10u8).pow(units);
+        let integer = self.value / exp10;
+        let decimals = (self.value % exp10).to_string();
+        format!("{integer}.{decimals:0>precision$} {:?}", self.balance_type)
+    }
 }
 
 impl Balance {
@@ -399,6 +407,9 @@ mod tests {
         assert!(b3.lt(&b4) && b4.gt(&b3), "lte or lt test failed");
         assert!(b3.lte(&b3) && b4.gte(&b4), "gte or gt test failed");
 
+        let test_bal = Balance::from_str("100000000000000000", BalanceType::HOPR);
+        assert_eq!("0.100000000000000000 HOPR", test_bal.to_formatted_string(18));
+
         //assert!(Balance::new(100_u32.into()).lte(), "lte or lte test failed")
     }
 
@@ -431,9 +442,7 @@ mod tests {
 pub mod wasm {
     use crate::primitives::{Address, Balance, BalanceType, EthereumChallenge, Snapshot, U256};
     use crate::traits::{BinarySerializable, ToHex};
-    use ethnum::u256;
     use std::cmp::Ordering;
-    use std::ops::Div;
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use wasm_bindgen::prelude::wasm_bindgen;
@@ -441,7 +450,7 @@ pub mod wasm {
     #[wasm_bindgen]
     impl Address {
         #[wasm_bindgen(js_name = "deserialize")]
-        pub fn deserialize_address(data: &[u8]) -> JsResult<Address> {
+        pub fn _deserialize(data: &[u8]) -> JsResult<Address> {
             ok_or_jserr!(Address::deserialize(data))
         }
 
@@ -475,11 +484,6 @@ pub mod wasm {
         #[wasm_bindgen(js_name = "eq")]
         pub fn _eq(&self, other: &Balance) -> bool {
             self.eq(other)
-        }
-
-        #[wasm_bindgen(js_name = "to_formatted_string")]
-        pub fn _to_formatted_string(&self) -> String {
-            format!("{} {:?}", self.value.div(&u256::from(10u16).pow(18)), self.balance_type)
         }
     }
 
@@ -529,8 +533,13 @@ pub mod wasm {
 
     #[wasm_bindgen]
     impl U256 {
+        #[wasm_bindgen(js_name = "from")]
+        pub fn _from(value: u32) -> U256 {
+            value.into()
+        }
+
         #[wasm_bindgen(js_name = "deserialize")]
-        pub fn deserialize_u256(data: &[u8]) -> JsResult<U256> {
+        pub fn _deserialize(data: &[u8]) -> JsResult<U256> {
             ok_or_jserr!(U256::deserialize(data))
         }
 
@@ -545,7 +554,7 @@ pub mod wasm {
         }
 
         #[wasm_bindgen(js_name = "from_inverse_probability")]
-        pub fn u256_from_inverse_probability(inverse_prob: &U256) -> JsResult<U256> {
+        pub fn _from_inverse_probability(inverse_prob: &U256) -> JsResult<U256> {
             ok_or_jserr!(U256::from_inverse_probability(inverse_prob.value()))
         }
 

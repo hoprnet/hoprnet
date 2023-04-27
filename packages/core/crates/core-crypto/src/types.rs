@@ -1243,6 +1243,11 @@ pub mod wasm {
             ok_or_jserr!(Self::deserialize(data))
         }
 
+        #[wasm_bindgen(js_name = "serialize")]
+        pub fn _serialize(&self) -> Box<[u8]> {
+            self.serialize()
+        }
+
         #[wasm_bindgen(js_name = "from_str")]
         pub fn _from_str(str: &str) -> JsResult<HalfKeyChallenge> {
             ok_or_jserr!(Self::from_str(str))
@@ -1297,8 +1302,20 @@ pub mod wasm {
         }
     }
 
+    #[wasm_bindgen(getter_with_clone)]
+    pub struct KeyPair {
+        pub private: Box<[u8]>,
+        pub public: PublicKey
+    }
+
     #[wasm_bindgen]
     impl PublicKey {
+        #[wasm_bindgen(js_name = "random_keypair")]
+        pub fn _random_keypair() -> KeyPair {
+            let (private, public) = Self::random_keypair();
+            KeyPair { private, public }
+        }
+
         #[wasm_bindgen(js_name = "deserialize")]
         pub fn _deserialize(bytes: &[u8]) -> JsResult<PublicKey> {
             ok_or_jserr!(PublicKey::deserialize(bytes))

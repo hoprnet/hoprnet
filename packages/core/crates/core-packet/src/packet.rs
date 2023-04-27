@@ -676,7 +676,7 @@ pub mod wasm {
         #[wasm_bindgen(js_name = "plaintext")]
         pub fn _plaintext(&self) -> Option<Box<[u8]>> {
             match &self.state {
-                PacketState::Final { plain_text, .. } => Some(plain_text),
+                PacketState::Final { plain_text, .. } => Some(plain_text.clone()),
                 PacketState::Forwarded { .. } |
                 PacketState::Outgoing { .. } => None
             }
