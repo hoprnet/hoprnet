@@ -16,12 +16,12 @@ use utils_types::traits::BinarySerializable;
 /// Configuration of the Heartbeat
 #[derive(Clone, Debug, PartialEq)]
 pub struct HeartbeatConfig {
-    pub(crate) max_parallel_heartbeats: usize,
-    pub(crate) heartbeat_variance: u32,
-    pub(crate) heartbeat_interval: u32,
-    pub(crate) heartbeat_threshold: u64,
-    pub(crate) environment_id: String,
-    pub(crate) normalized_version: String,
+    pub max_parallel_heartbeats: usize,
+    pub heartbeat_variance: u32,
+    pub heartbeat_interval: u32,
+    pub heartbeat_threshold: u64,
+    pub environment_id: String,
+    pub normalized_version: String,
 }
 
 impl HeartbeatConfig {

@@ -1,3 +1,5 @@
+/// Handles direct integration of `core_network` functionality
+/// into exisiting JS immplementation of `core` package
 use crate::{
     heartbeat::{Heartbeat, HeartbeatConfig, HeartbeatRequest},
     network::{wasm::WasmNetworkApi, Health, Network, PeerOrigin},
@@ -215,7 +217,6 @@ impl CoreNetwork {
                     let this = JsValue::undefined();
 
                     let peer: JsPeerId = destination.into();
-                    info!("converted PeerId {:?}", peer.to_string());
                     let protocols: Array = Array::from_iter(protocols.iter().map(|x| JsString::from(x.as_str())));
 
                     match send_message_to_move.call3(&this, &components_to_move, &peer, &protocols) {
