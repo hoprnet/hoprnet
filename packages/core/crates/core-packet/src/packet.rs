@@ -673,6 +673,14 @@ pub mod wasm {
             }
         }
 
+        #[wasm_bindgen(js_name = "plaintext")]
+        pub fn _plaintext(&self) -> Option<Box<[u8]>> {
+            match &self.state {
+                PacketState::Final { plain_text, .. } => Some(plain_text),
+                PacketState::Forwarded { .. } |
+                PacketState::Outgoing { .. } => None
+            }
+        }
 
         #[wasm_bindgen(js_name = "state")]
         pub fn _state(&self) -> WasmPacketState {

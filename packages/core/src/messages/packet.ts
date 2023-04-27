@@ -6,18 +6,18 @@ import {
   PublicKey as TsPublicKey,
   Address as TsAddress,
   Balance as TsBalance,
-  ChannelEntry as TsChannelEntry,
+  Ticket as TsTicket,
 } from '@hoprnet/hopr-utils'
 import type { Hash } from '@hoprnet/hopr-utils'
 import type { PeerId } from '@libp2p/interface-peer-id'
-import { Acknowledgement } from './acknowledgement.js'
 import { debug } from '@hoprnet/hopr-utils'
 import { keysPBM } from '@libp2p/crypto/keys'
 
-import { Ticket, Balance, BalanceType, ChannelStatus, ChannelEntry, PublicKey, Packet as RustPacket, U256, UnacknowledgedTicket } from '../../lib/core_packet.js'
-import { WasmPacketState } from '../../crates/core-packet/pkg/core_packet.js'
+import { Ticket, Balance, BalanceType, ChannelStatus, ChannelEntry, PublicKey, Packet, U256, UnacknowledgedTicket, WasmPacketState } from '../../lib/core_packet.js'
+export { Packet } from '../../lib/core_packet.js'
+
 import { peerIdFromString } from '@libp2p/peer-id'
-import { deserialize } from 'v8'
+import BN from 'bn.js'
 
 const log = debug('hopr-core:message:packet')
 
@@ -97,7 +97,7 @@ export async function createTicket(
     new U256(channel.channelEpoch.toBN().toString(10)),
     privKey)
 
-  await db.markPending(ticket)
+  await db.markPending(TsTicket.deserialize(ticket.serialize()))
 
   log(`Creating ticket in channel ${channel.getId().toHex()}. Ticket data: \n${ticket.to_hex()}`)
   metric_ticketCounter.increment()
@@ -191,10 +191,8 @@ export async function validateUnacknowledgedTicket(
   }
 }
 
-export class Packet {
-  private constructor(private inner: RustPacket) {
-    metric_packetCounter.increment()
-  }
+
+export class PacketHelpers {
 
   static async create(msg: Uint8Array, path: PeerId[], privKey: PeerId, db: HoprDB): Promise<Packet> {
 
@@ -211,91 +209,71 @@ export class Packet {
         ticket = await createTicket(next_peer, path.length, db, private_key)
     }
 
-    return new Packet(new RustPacket(msg, path.map((p) => p.toString()), private_key, ticket))
+    metric_packetCounter.increment()
+
+    return new Packet(msg, path.map((p) => p.toString()), private_key, ticket)
   }
 
-  serialize(): Uint8Array {
-    return this.inner.serialize()
-  }
+  //let private_key = keysPBM.PrivateKey.decode(privKey.privateKey).Data
 
-  static get SIZE() {
-    return RustPacket.size()
-  }
-
-  static deserialize(preArray: Uint8Array, privKey: PeerId, pubKeySender: PeerId): Packet {
-    if (!privKey.privateKey) {
-      throw Error(`Invalid arguments`)
-    }
-
-    let private_key = keysPBM.PrivateKey.decode(privKey.privateKey).Data
-    return new Packet(RustPacket.deserialize(preArray, private_key, pubKeySender.toString()))
-  }
-
-  async checkPacketTag(db: HoprDB) {
-    const present = await db.checkAndSetPacketTag(this.inner.packet_tag())
+  async checkPacketTag(packet: Packet, db: HoprDB) {
+    const present = await db.checkAndSetPacketTag(packet.packet_tag())
 
     if (present) {
       throw Error(`Potential replay attack detected. Packet tag is already present.`)
     }
   }
 
-  async storeUnacknowledgedTicket(db: HoprDB) {
-    if (this.inner.state() != WasmPacketState.Forwarded) {
+  async storeUnacknowledgedTicket(packet: Packet, db: HoprDB) {
+    if (packet.state() != WasmPacketState.Forwarded) {
       throw Error(`Invalid state`)
     }
 
-    const unacknowledged = new UnacknowledgedTicket(this.inner.ticket, this.inner.own_key(), this.inner.previous_hop())
+    const unacknowledged = new UnacknowledgedTicket(packet.ticket, packet.own_key(), packet.previous_hop())
 
     log(
-      `Storing unacknowledged ticket. Expecting to receive a preImage for ${this.inner.ack_challenge().to_hex()} from ${
-        this.inner.next_hop().to_peerid_str()
+      `Storing unacknowledged ticket. Expecting to receive a preImage for ${packet.ack_challenge().to_hex()} from ${
+        packet.next_hop().to_peerid_str()
       }`
     )
 
-    await db.storePendingAcknowledgement(this.inner.ack_challenge(), false, unacknowledged)
+    await db.storePendingAcknowledgement(packet.ack_challenge(), false, unacknowledged)
   }
 
-  async storePendingAcknowledgement(db: HoprDB) {
-    await db.storePendingAcknowledgement(this.inner.ack_challenge(), true)
+  async storePendingAcknowledgement(packet: Packet, db: HoprDB) {
+    await db.storePendingAcknowledgement(packet.ack_challenge(), true)
   }
 
-  async validateUnacknowledgedTicket(db: HoprDB, checkUnrealizedBalance: boolean) {
-    if (this.inner.state() == WasmPacketState.Outgoing) {
+  async validateUnacknowledgedTicket(packet: Packet, db: HoprDB, checkUnrealizedBalance: boolean) {
+    if (packet.state() == WasmPacketState.Outgoing) {
       throw Error('packet must have previous hop - cannot be outgoing')
     }
 
-    const channel = await db.getChannelFrom(TsPublicKey.deserialize(this.inner.previous_hop().serialize(false)))
-
+    const channel = await db.getChannelFrom(TsPublicKey.deserialize(packet.previous_hop().serialize(false)))
 
     try {
       await validateUnacknowledgedTicket(
-        peerIdFromString(this.inner.previous_hop().to_peerid_str()),
+        peerIdFromString(packet.previous_hop().to_peerid_str()),
         new Balance(PRICE_PER_PACKET.toString(), BalanceType.HOPR),
         new U256(INVERSE_TICKET_WIN_PROB.toString()),
-        this.inner.ticket,
+        packet.ticket,
         ChannelEntry.deserialize(channel.serialize()),
-        () =>
-          db.getTickets({
-            signer: this.previousHop
-          }),
+        async () => {
+          let prev_hop = TsPublicKey.deserialize(packet.previous_hop().serialize(false))
+          let tickets = await db.getTickets({
+            signer: prev_hop
+          })
+          return tickets.map((ts_ticket) => Ticket.deserialize(ts_ticket.serialize()))
+        },
         checkUnrealizedBalance
       )
     } catch (e) {
-      log(`mark ticket as rejected`, this.inner.ticket.to_hex())
-      await db.markRejected(this.inner.ticket)
+      log(`mark ticket as rejected`, packet.ticket.to_hex())
+      await db.markRejected(TsTicket.deserialize(packet.ticket.serialize()))
       throw e
     }
 
-    await db.setCurrentTicketIndex(channel.getId().hash(), this.inner.ticket.index)
-  }
-
-  createAcknowledgement(privKey: PeerId) {
-    if (this.inner.state() == WasmPacketState.Outgoing) {
-      throw Error(`Invalid state`)
-    }
-
-    let private_key = keysPBM.PrivateKey.decode(privKey.privateKey).Data
-    return this.inner.create_acknowledgement(private_key)
+    await db.setCurrentTicketIndex(channel.getId().hash(), new UINT256(new BN(packet.ticket.index.to_string())))
   }
 
   async forwardTransform(privKey: PeerId, db: HoprDB): Promise<void> {
