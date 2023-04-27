@@ -185,11 +185,7 @@ contract HoprNetworkRegistryTest is Test {
    * @dev Register contract for a single time:
    * it can self-register when the requirement is fulfilled and emits true
    */
-  function test_SelfRegisterAddresses(
-    uint256 accountIndex,
-    uint256 addressIndex1,
-    uint256 addressIndex2
-  ) public {
+  function test_SelfRegisterAddresses(uint256 accountIndex, uint256 addressIndex1, uint256 addressIndex2) public {
     _helperMockProxyReturns();
 
     // ensure register accounts' allowance is above 1
@@ -541,7 +537,6 @@ contract HoprNetworkRegistryTest is Test {
     emit Deregistered(vm.addr(accountIndex), nodeIds[0]);
     hoprNetworkRegistry.selfDeregister(nodeIds);
 
-    vm.stopPrank();
     vm.clearMockedCalls();
   }
 

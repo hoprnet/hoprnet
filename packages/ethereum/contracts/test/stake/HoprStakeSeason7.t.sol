@@ -247,12 +247,12 @@ contract HoprStakeSeason7Test is Test, ERC1820RegistryFixtureTest, PermittableTo
       }
     }
 
-    hoprStakeSeason7.ownerBatchBlockNftType(blockedIndexes);
     for (uint256 index = 0; index < blockedIndexes.length; index++) {
       vm.expectEmit(true, false, false, false, address(hoprStakeSeason7));
       emit NftAllowed(blockedIndexes[index]);
     }
     hoprStakeSeason7.ownerBatchUnblockNftType(blockedIndexes);
+    vm.stopPrank();
     vm.clearMockedCalls();
   }
 
