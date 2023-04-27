@@ -4,9 +4,9 @@ import assert from 'assert'
 describe('test network and flags', async function () {
   it('should resolve network with a custom provider', async function () {
     const customProvider = 'https://a-dummy-provider.com'
-    const network_id = 'anvil-localhost'
+    const id = 'anvil-localhost'
 
-    const resolvedNetwork = resolveNetwork(network_id, customProvider)
+    const resolvedNetwork = resolveNetwork(id, customProvider)
     assert.equal(resolvedNetwork.chain.default_provider, customProvider, 'provider')
   })
 

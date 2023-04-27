@@ -5,7 +5,7 @@ import 'forge-std/StdJson.sol';
 
 /**
  * Get environment_type from the environment variable `FOUNDRY_PROFILE`
- * Get network_id string from the environment variable "NETWORK_ID"
+ * Get network string from the environment variable "NETWORK"
  */
 contract NetworkConfig is Script {
   using stdJson for string;
@@ -52,7 +52,7 @@ contract NetworkConfig is Script {
   function getNetwork() public {
     // get envirionment of the script
     string memory profile = vm.envString('FOUNDRY_PROFILE');
-    currentNetworkId = vm.envString('NETWORK_ID');
+    currentNetworkId = vm.envString('NETWORK');
     currentEnvironmentType = parseEnvironmentTypeFromString(profile);
   }
 

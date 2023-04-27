@@ -183,8 +183,8 @@ function setup_node() {
 
   log "Run node ${id} on API port ${api_port} -> ${log}"
 
-  if [[ "${additional_args}" != *"--network-id "* ]]; then
-    additional_args="--network-id anvil-localhost ${additional_args}"
+  if [[ "${additional_args}" != *"--network "* ]]; then
+    additional_args="--network anvil-localhost ${additional_args}"
   fi
 
   if [[ -n "${api_token}" ]]; then
@@ -297,7 +297,7 @@ setup_node 13303 ${default_api_token} 19093 "${node3_dir}" "${node3_log}" "${nod
 setup_node 13304 ${default_api_token} 19094 "${node4_dir}" "${node4_log}" "${node4_id}" "${node4_privkey}" "--testNoDirectConnections"
 setup_node 13305 ${default_api_token} 19095 "${node5_dir}" "${node5_log}" "${node5_id}" "${node5_privkey}" "--testNoDirectConnections"
 # should not be able to talk to the rest
-setup_node 13306 ${default_api_token} 19096 "${node6_dir}" "${node6_log}" "${node6_id}" "${node6_privkey}" "--announce --network-id anvil-localhost2"
+setup_node 13306 ${default_api_token} 19096 "${node6_dir}" "${node6_log}" "${node6_id}" "${node6_privkey}" "--announce --network anvil-localhost2"
 # node n8 will be the only one NOT registered
 setup_node 13307 ${default_api_token} 19097 "${node7_dir}" "${node7_log}" "${node7_id}" "${node7_privkey}" "--announce"
 # }}}

@@ -43,11 +43,11 @@ jobs:
         run: |
           prBase="${{ github.event.pull_request.base.ref }}"
           # The identification of the environment will be made once https://github.com/hoprnet/hoprnet/issues/4835 is finished
-          network_id=master
-          echo "NETWORK=${network_id}" >> $GITHUB_ENV
-          echo "NETWORK_DASH=${network_id/_/-}" >> $GITHUB_ENV
-          echo git checkout -b deployments/${network_id/_/-}-pr-${{ github.event.pull_request.number }}
-          ./scripts/sync-deployment.sh deploy -e ${{ env.GITOPS_ENVIRONMENT }} -n ${network_id} -pr ${{ github.event.pull_request.number }}
+          network=master
+          echo "NETWORK=${network}" >> $GITHUB_ENV
+          echo "NETWORK_DASH=${network/_/-}" >> $GITHUB_ENV
+          echo git checkout -b deployments/${network/_/-}-pr-${{ github.event.pull_request.number }}
+          ./scripts/sync-deployment.sh deploy -e ${{ env.GITOPS_ENVIRONMENT }} -n ${network} -pr ${{ github.event.pull_request.number }}
         working-directory: "./gitops"
       - name: Create Deploy Pull Request
         uses: peter-evans/create-pull-request@v5

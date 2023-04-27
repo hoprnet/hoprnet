@@ -28,12 +28,12 @@ usage() {
   msg "an initial setup script against these nodes. Once testing has"
   msg "completed the script can be used to cleanup the cluster as well."
   msg
-  msg "Usage: $0 <network_id> [<init_script> [<cluster_id> [<docker_image> [<cluster_size> [<instance_template_name> [<announce_on_chain>]]]]]"
+  msg "Usage: $0 <network> [<init_script> [<cluster_id> [<docker_image> [<cluster_size> [<instance_template_name> [<announce_on_chain>]]]]]"
   msg
-  msg "where <network_id>\t\tthe network id from which the smart contract addresses are derived"
+  msg "where <network>\t\tthe network id from which the smart contract addresses are derived"
   msg "      <init_script>\t\tpath to a script which is called with all node API endpoints as parameters"
   msg "      <cluster_id>\t\tuses a random value as default"
-  msg "      <docker_image>\t\tuses 'gcr.io/hoprassociation/hoprd:<network_id>' as default"
+  msg "      <docker_image>\t\tuses 'gcr.io/hoprassociation/hoprd:<network>' as default"
   msg "      <cluster_size>\t\tnumber of nodes in the deployed cluster, default is 6."
   msg "      <instance_template_name>\t\tname of the gcloud instance template to use, default is <cluster_id>"
   msg "      <announce_on_chain>\t\tset to 'true' so started nodes should announce themselves, default is ''"
@@ -62,10 +62,10 @@ usage() {
 : "${FAUCET_SECRET_API_KEY?"Missing environment variable FAUCET_SECRET_API_KEY"}"
 : "${DEPLOYER_PRIVATE_KEY?"Missing environment variable DEPLOYER_PRIVATE_KEY"}"
 
-declare network_id="${1?"missing parameter <network_id>"}"
+declare network="${1?"missing parameter <network>"}"
 declare init_script=${2:-}
-declare cluster_id="${3:-${network_id}-topology-${RANDOM}-${RANDOM}}"
-declare docker_image=${4:-gcr.io/hoprassociation/hoprd:${network_id}}
+declare cluster_id="${3:-${network}-topology-${RANDOM}-${RANDOM}}"
+declare docker_image=${4:-gcr.io/hoprassociation/hoprd:${network}}
 declare cluster_size=${5:-6}
 declare instance_template_name=${6:-${cluster_id}}
 declare announce_on_chain=${7:-}
@@ -77,8 +77,8 @@ declare show_prestartinfo="${HOPRD_SHOW_PRESTART_INFO:-false}"
 declare reset_metadata="${HOPRD_RESET_METADATA:-false}"
 declare skip_unstaked="${HOPRD_SKIP_UNSTAKED:-false}"
 
-# Append network_id as Docker image version, if not specified
-[[ "${docker_image}" != *:* ]] && docker_image="${docker_image}:${network_id}"
+# Append network as Docker image version, if not specified
+[[ "${docker_image}" != *:* ]] && docker_image="${docker_image}:${network}"
 
 function cleanup {
   local EXIT_CODE=$?
@@ -110,7 +110,7 @@ if [[ "${show_prestartinfo}" = "1" ]] || [[ "${show_prestartinfo}" = "true" ]]; 
   log "\tinstance_template_name: ${instance_template_name}"
   log "\tannounce_on_chain: ${announce_on_chain}"
   log "\tinit_script: ${init_script}"
-  log "\tnetwork_id: ${network_id}"
+  log "\tnetwork: ${network}"
   log "\tapi_token: ${api_token}"
   log "\tpassword: ${password}"
   log "\tperform_cleanup: ${perform_cleanup}"
@@ -123,7 +123,7 @@ fi
 gcloud_create_instance_template \
   "${instance_template_name}" \
   "${docker_image}" \
-  "${network_id}" \
+  "${network}" \
   "${api_token}" \
   "${password}" \
   "${announce_on_chain}"
@@ -135,7 +135,7 @@ gcloud_create_or_update_managed_instance_group  \
   "${instance_template_name}"
 
 declare environment_type
-environment_type="$(get_environment_type "${network_id}")"
+environment_type="$(get_environment_type "${network}")"
 
 # Deployer CI wallet should ideally be "eligible". To be eligible:
 # 1. The wallet should have obtained a "Network_registry" NFT of `developer` rank (wallet should already have this)
@@ -144,7 +144,7 @@ environment_type="$(get_environment_type "${network_id}")"
 # - the CI nodes wants to perform `selfRegister`
 # This can be called always, because the "stake" task is idempotent given the same arguments
 # CI wallet stakes a developer NR NFT
-PRIVATE_KEY="${DEPLOYER_PRIVATE_KEY}" make -C "${mydir}/.." stake-nrnft network_id="${network_id}" nftrank=developer environment_type="${environment_type}"
+PRIVATE_KEY="${DEPLOYER_PRIVATE_KEY}" make -C "${mydir}/.." stake-nrnft network="${network}" nftrank=developer environment_type="${environment_type}"
 
 # Get names of all instances in this cluster
 # TODO: now `native-addresses` (a.k.a. `hopr_addrs`) doesn't need to contain unique values. The array can contain repetitive addresses
@@ -226,7 +226,7 @@ for instance_idx in "${!instance_names_arr[@]}" ; do
   fi
 
   # Fund the node as well
-  fund_if_empty "${api_wallet_addr}" "${network_id}"
+  fund_if_empty "${api_wallet_addr}" "${network}"
 done
 
 # Register all nodes in cluster
@@ -234,7 +234,7 @@ IFS=','
 
 # use CI wallet to register VM instances. This action may fail if nodes were previously linked to other staking accounts
 PRIVATE_KEY="${DEPLOYER_PRIVATE_KEY}" make -C "${mydir}/.." self-register-node \
-  network_id="${network_id}" \
+  network="${network}" \
   peer_ids="${hopr_addrs[*]}" \
   environment_type="${environment_type}"
 unset IFS

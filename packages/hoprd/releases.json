@@ -1,38 +1,38 @@
 {
   "master": {
     "git_ref": "^master$",
-    "network_id": "master"
+    "network": "master"
   },
   "valencia": {
     "git_ref": "^(release|staging)/valencia$",
-    "network_id": "monte_rosa",
+    "network": "monte_rosa",
     "version_major": "1",
     "version_minor": "90"
   },
   "bogota": {
     "git_ref": "^(release|staging)/bogota$",
-    "network_id": "monte_rosa",
+    "network": "monte_rosa",
     "version_major": "1",
     "version_minor": "91"
   },
   "riga": {
     "git_ref": "^(release|staging)/riga$",
-    "network_id": "monte_rosa",
+    "network": "monte_rosa",
     "version_major": "1",
     "version_minor": "92"
   },
   "bratislava": {
     "git_ref": "^(release|staging)/bratislava$",
-    "network_id": "monte_rosa",
+    "network": "monte_rosa",
     "version_major": "1",
     "version_minor": "93"
   },
   "debug-staging": {
     "git_ref": "^debug-deploy/.*",
-    "network_id": "debug-staging"
+    "network": "debug-staging"
   },
   "integration-test": {
     "git_ref": "^integration/.*",
-    "network_id": "master"
+    "network": "master"
   }
 }

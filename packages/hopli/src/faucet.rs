@@ -14,7 +14,7 @@ use crate::utils::{Cmd, HelperErrors};
 #[derive(Parser, Default, Debug)]
 pub struct FaucetArgs {
     #[clap(help = "Environment name. E.g. monte_rosa", long)]
-    network_id: String,
+    network: String,
 
     #[clap(
         help = "Ethereum address of node that will receive funds",
@@ -83,7 +83,7 @@ impl FaucetArgs {
     /// `PRIVATE_KEY` env variable is required to send on-chain transactions
     fn execute_faucet(self) -> Result<(), HelperErrors> {
         let FaucetArgs {
-            network_id,
+            network,
             address,
             password,
             use_local_identities,
@@ -132,7 +132,7 @@ impl FaucetArgs {
         println!("All the addresses: {:?}", addresses_all);
 
         // set directory and environment variables
-        if let Err(e) = set_process_path_env(&contracts_root, &network_id) {
+        if let Err(e) = set_process_path_env(&contracts_root, &network) {
             return Err(e);
         }
 
@@ -147,7 +147,7 @@ impl FaucetArgs {
             .into_iter()
             .map(|a| {
                 child_process_call_foundry_faucet(
-                    &network_id,
+                    &network,
                     &a,
                     &hopr_amount_uint256_string,
                     &native_amount_uint256_string,

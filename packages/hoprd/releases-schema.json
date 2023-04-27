@@ -19,7 +19,7 @@
             "type": "string",
             "description": "regex which is matched against git refs and determins if the release is build and deployed"
           },
-          "network_id": {
+          "network": {
             "type": "string",
             "description": "the default network id to run release nodes in, see protocol-config.json"
           },
@@ -34,7 +34,7 @@
             "default": false
           }
         },
-        "required": ["id", "git_ref", "network_id"],
+        "required": ["id", "git_ref", "network"],
         "additionalProperties": false
       }
     }

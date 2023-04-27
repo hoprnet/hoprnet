@@ -85,7 +85,6 @@ contract HoprDummyProxyForNetworkRegistryTest is Test {
     vm.expectRevert('Ownable: caller is not the owner');
     hoprDummyProxyForNetworkRegistry.ownerRemoveAccount(account);
 
-    vm.stopPrank();
     vm.clearMockedCalls();
   }
 

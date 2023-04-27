@@ -14,7 +14,7 @@ declare HOPR_LOG_ID="get-default-network"
 
 source "${mydir}/utils.sh"
 
-declare key_to_extract=".value.network_id"
+declare key_to_extract=".value.network"
 
 if [[ "${1:-}" = "--release" ]] ; then
   log "Getting the release id"
@@ -26,20 +26,20 @@ fi
 log "get default network id"
 declare branch=$(git rev-parse --abbrev-ref HEAD)
 
-declare network_id
+declare network
 for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entries[] | .value.git_ref" | uniq); do
   if [[ "${branch}" =~ ${git_ref} ]]; then
-    network_id=$(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entries[] | select(.value.git_ref==\"${git_ref}\" and .value.default==true) | ${key_to_extract}")
+    network=$(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entries[] | select(.value.git_ref==\"${git_ref}\" and .value.default==true) | ${key_to_extract}")
     # if no default is set we take the first entry
-    if [ -z "${network_id}" ]; then
-      network_id=$(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entries[] | select(.value.git_ref==\"${git_ref}\") | ${key_to_extract}" | sed q)
+    if [ -z "${network}" ]; then
+      network=$(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entries[] | select(.value.git_ref==\"${git_ref}\") | ${key_to_extract}" | sed q)
     fi
     break
   fi
 done
 
-: ${network_id:?"Could not read value for default network id"}
+: ${network:?"Could not read value for default network id"}
 
-log "found default network: ${network_id}"
+log "found default network: ${network}"
 
-echo ${network_id}
+echo ${network}

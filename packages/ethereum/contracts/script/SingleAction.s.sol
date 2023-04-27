@@ -9,7 +9,7 @@ import './utils/BoostUtilsLib.sol';
 /**
  * @dev script to interact with contract(s) of a given envirionment where the msg.sender comes from the environment variable `PRIVATE_KEY`
  * Private key of the caller must be saved under the environment variable `PRIVATE_KEY`
- * Wrapper of contracts (incl. NetworkRegistery, HoprStake) with detection of contract address per network_id/environment_type
+ * Wrapper of contracts (incl. NetworkRegistery, HoprStake) with detection of contract address per network/environment_type
  */
 contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
   using stdJson for string;

@@ -46,7 +46,7 @@ type PingMeasurement = (PeerId, crate::types::Result);
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PingConfig {
     pub max_parallel_pings: usize,
-    pub network_id: String,
+    pub network: String,
     pub normalized_version: String,
     pub timeout: Duration,
 }
@@ -72,9 +72,9 @@ impl Ping {
         Ping {
             _protocol_heartbeat: [
                 // new
-                format!("/hopr/{}/heartbeat/{}", &config.network_id, &config.normalized_version),
+                format!("/hopr/{}/heartbeat/{}", &config.network, &config.normalized_version),
                 // deprecated
-                format!("/hopr/{}/heartbeat", &config.network_id),
+                format!("/hopr/{}/heartbeat", &config.network),
             ],
             config,
             external_api,
@@ -260,7 +260,7 @@ pub mod wasm {
 
     #[wasm_bindgen]
     struct WasmPingApi {
-        _network_id: String,
+        _network: String,
         _version: String,
         on_finished_ping_cb: js_sys::Function,
     }
@@ -300,19 +300,19 @@ pub mod wasm {
     impl Pinger {
         #[wasm_bindgen]
         pub fn build(
-            network_id: String,
+            network: String,
             version: String,
             on_finished_ping_cb: js_sys::Function,
             send_msg_cb: js_sys::Function,
         ) -> Self {
             let api = Box::new(WasmPingApi {
-                _network_id: network_id.clone(),
+                _network: network.clone(),
                 _version: version.clone(),
                 on_finished_ping_cb,
             });
 
             let config = PingConfig {
-                network_id,
+                network,
                 normalized_version: version,
                 max_parallel_pings: PINGS_MAX_PARALLEL,
                 timeout: Duration::from_secs(30),
@@ -398,7 +398,7 @@ mod tests {
     fn simple_ping_config() -> PingConfig {
         PingConfig {
             max_parallel_pings: 2,
-            network_id: "test".to_owned(),
+            network: "test".to_owned(),
             normalized_version: "1.0a".to_owned(),
             timeout: Duration::from_millis(150),
         }

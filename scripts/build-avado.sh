@@ -42,13 +42,13 @@ fi
 
 # Get/set default values of parameters
 declare avado_version="${1}"
-declare network_id="${2:-"$(${mydir}/get-default-network.sh)"}"
+declare network="${2:-"$(${mydir}/get-default-network.sh)"}"
 declare release_id="${3:-"$(${mydir}/get-default-network.sh --release)"}"
 declare api_token="${4:-"!5qxc9Lp1BE7IFQ-nrtttU"}" # <- Default AVADO API token
 declare upstream_version="${5:-$avado_version}"
 
 # Validate network and release ids
-if [[ -z "${network_id}" ]] || [[ -z "${release_id}" ]]; then
+if [[ -z "${network}" ]] || [[ -z "${release_id}" ]]; then
   msg "Could not determine default network or release id"
   exit 1
 fi
@@ -60,9 +60,9 @@ if ! [[ $avado_version =~ [0-9]{1,}\.[0-9]{1,}\.[0-9]{1,}$ ]]; then
 fi
 
 # Retrieve the provider URL for the given network ID from protocol-config.json
-declare provider_url=$(jq -r ".networks.\"${network_id}\".chain as \$envid | .chains[\$envid].default_provider // \"\"" "${mydir}/../packages/core/protocol-config.json")
+declare provider_url=$(jq -r ".networks.\"${network}\".chain as \$envid | .chains[\$envid].default_provider // \"\"" "${mydir}/../packages/core/protocol-config.json")
 if [ -z "${provider_url}" ]; then
-  msg "Network ${network_id} has invalid chain"
+  msg "Network ${network} has invalid chain"
   exit 1
 fi
 
@@ -91,7 +91,7 @@ if [[ "${avado_version}" = "0.200.0" ]]; then
   upstream_version="staging-${release_id}"
 fi
 
-msg "Building Avado v. ${avado_version} for release ${release_id} (upstream v. ${upstream_version}) using network ${network_id} with default provider ${provider_url}"
+msg "Building Avado v. ${avado_version} for release ${release_id} (upstream v. ${upstream_version}) using network ${network} with default provider ${provider_url}"
 
 # Create backups
 cp ./docker-compose.yml ./docker-compose.bak
@@ -102,7 +102,7 @@ trap cleanup SIGINT SIGTERM ERR EXIT
 
 ### Update docker-compose.yaml
 sed -E "s/%AVADO_VERSION%/${avado_version}/g ; s/%TOKEN%/${api_token}/g ; s/%UPSTREAM_VERSION%/${upstream_version}/g ; \
- s/%NETWORK_ID%/${network_id}/g ; s|%PROVIDER_URL%|${provider_url}|g" ./docker-compose.yml \
+ s/%NETWORK%/${network}/g ; s|%PROVIDER_URL%|${provider_url}|g" ./docker-compose.yml \
   > ./docker-compose.yml.tmp && mv ./docker-compose.yml.tmp ./docker-compose.yml
 
 ###

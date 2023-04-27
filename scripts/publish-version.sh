@@ -80,8 +80,8 @@ fi
 
 log "get default network id"
 
-declare network_id
-network_id="$("${mydir}/get-default-network.sh")"
+declare network
+network="$("${mydir}/get-default-network.sh")"
 
 log "using version template ${current_version} + ${version_type}"
 declare new_version
@@ -133,8 +133,8 @@ if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
   trap cleanup SIGINT SIGTERM ERR
 
   # set default networks
-  log "adding default network ${network_id} to hoprd package"
-  echo "{\"id\": \"${network_id}\"}" > "${mydir}/../packages/hoprd/default-network.json"
+  log "adding default network ${network} to hoprd package"
+  echo "{\"id\": \"${network}\"}" > "${mydir}/../packages/hoprd/default-network.json"
 
   # special treatment for end-of-chain packages
   # to create lockfiles with resolution overrides
