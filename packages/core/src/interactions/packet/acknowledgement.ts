@@ -3,16 +3,16 @@ import {
   pickVersion,
   AcknowledgedTicket,
   type HoprDB,
-  type PendingAckowledgement,
   HalfKeyChallenge,
   Hash,
-  create_counter
+  create_counter, serializePendingAcknowledgement
 } from '@hoprnet/hopr-utils'
 import type { SendMessage } from '../../index.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { ACKNOWLEDGEMENT_TIMEOUT } from '../../constants.js'
 import { Packet, privateKeyFromPeer } from '../../messages/index.js'
-import { Acknowledgement } from '../../../lib/core_packet.js'
+import { Acknowledgement, PublicKey, UnacknowledgedTicket } from '../../../lib/core_packet.js'
+import { PendingAcknowledgement } from '../../../lib/core_types.js'
 import { Pushable, pushable } from 'it-pushable'
 import type { ResolvedEnvironment } from '../../environment.js'
 import type { Components } from '@libp2p/interfaces/components'
@@ -28,7 +28,6 @@ type Outgoing = [ack: Uint8Array, destination: PeerId]
 // Do not type-check JSON files
 // @ts-ignore
 import pkg from '../../../package.json' assert { type: 'json' }
-import { PublicKey } from '../../../crates/core-packet/pkg/core_packet.js'
 
 const NORMALIZED_VERSION = pickVersion(pkg.version)
 
@@ -134,14 +133,15 @@ export class AcknowledgementInteraction {
     //    do not wait for any half key
     // 3. The acknowledgement is unexpected and stems from
     //    a protocol bug or an attacker
-    let pending: PendingAckowledgement
+    let pending: PendingAcknowledgement
     try {
-      pending = await this.db.getPendingAcknowledgement(HalfKeyChallenge.deserialize(acknowledgement.ack_challenge().serialize()))
+      let pa = await this.db.getPendingAcknowledgement(HalfKeyChallenge.deserialize(acknowledgement.ack_challenge().serialize()))
+      pending = PendingAcknowledgement.deserialize(serializePendingAcknowledgement(pa.isMessageSender, pa.ticket))
     } catch (err: any) {
       // Protocol bug?
       if (err != undefined && err.notFound) {
         log(
-          `Received unexpected acknowledgement for half key challenge ${acknowledgement.ack_challenge().to_hex()} - half key ${acknowledgement.ackKeyShare.toHex()}`
+          `Received unexpected acknowledgement for half key challenge ${acknowledgement.ack_challenge().to_hex()} - half key ${acknowledgement.ack_key_share.to_hex()}`
         )
       }
       metric_receivedFailedAcks.increment()
@@ -161,7 +161,7 @@ export class AcknowledgementInteraction {
     // Try to unlock our incentive
     const unacknowledged = pending.ticket
 
-    if (!unacknowledged.verifyChallenge(acknowledgement.ackKeyShare)) {
+    if (!unacknowledged.verifyChallenge(acknowledgement.ack_key_share)) {
       metric_receivedFailedAcks.increment()
       throw Error(`The acknowledgement is not sufficient to solve the embedded challenge.`)
     }
@@ -177,7 +177,7 @@ export class AcknowledgementInteraction {
       metric_receivedFailedAcks.increment()
       throw e
     }
-    const response = unacknowledged.getResponse(acknowledgement.ackKeyShare)
+    const response = unacknowledged.get_response(acknowledgement.ack_key_share)
     const ticket = unacknowledged.ticket
 
     // Store the acknowledged ticket, regardless if it's a win or a loss

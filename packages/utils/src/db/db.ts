@@ -125,7 +125,7 @@ export type WaitingAsRelayer = {
 
 export type PendingAckowledgement = WaitingAsSender | WaitingAsRelayer
 
-function serializePendingAcknowledgement(isMessageSender: boolean, unackTicket?: UnacknowledgedTicket) {
+export function serializePendingAcknowledgement(isMessageSender: boolean, unackTicket?: UnacknowledgedTicket) {
   if (isMessageSender) {
     return Uint8Array.from([PendingAcknowledgementPrefix.MessageSender])
   } else {

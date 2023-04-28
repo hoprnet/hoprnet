@@ -12,7 +12,7 @@ use utils_types::traits::BinarySerializable;
 pub struct Acknowledgement {
     ack_signature: Signature,
     challenge_signature: Signature,
-    ack_key_share: HalfKey,
+    pub ack_key_share: HalfKey,
     validated: bool,
 }
 
@@ -161,6 +161,27 @@ impl UnacknowledgedTicket {
             own_key,
             signer,
         }
+    }
+
+    pub fn verify_signature(&self) -> bool {
+        self.ticket.verify(&self.signer)
+    }
+
+    pub fn get_challenge(&self) -> HalfKeyChallenge {
+        self.own_key.to_challenge()
+    }
+}
+
+impl UnacknowledgedTicket {
+    pub fn verify_challenge(&self, acknowledgement: &HalfKey) -> core_crypto::errors::Result<bool> {
+        Ok(Response::from_half_keys(&self.own_key, acknowledgement)?
+            .to_challenge()
+            .to_ethereum_challenge()
+            .eq(&self.ticket.challenge))
+    }
+
+    pub fn get_response(&self, acknowledgement: &HalfKey) -> core_crypto::errors::Result<Response> {
+        Response::from_half_keys(&self.own_key, acknowledgement)
     }
 }
 
@@ -324,6 +345,7 @@ pub mod wasm {
     use utils_misc::utils::wasm::JsResult;
     use utils_types::traits::BinarySerializable;
     use wasm_bindgen::prelude::*;
+    use core_crypto::types::{HalfKey, Response};
 
     #[wasm_bindgen]
     impl UnacknowledgedTicket {
@@ -335,6 +357,16 @@ pub mod wasm {
         #[wasm_bindgen(js_name = "serialize")]
         pub fn _serialize(&self) -> Box<[u8]> {
             self.serialize()
+        }
+
+        #[wasm_bindgen(js_name = "get_response")]
+        pub fn _get_response(&self, acknowledgement: &HalfKey) -> JsResult<Response> {
+            ok_or_jserr!(self.get_response(acknowledgement))
+        }
+
+        #[wasm_bindgen(js_name = "verify_challenge")]
+        pub fn _verify_challenge(&self, acknowledgement: &HalfKey) -> JsResult<bool> {
+            ok_or_jserr!(self.verify_challenge(acknowledgement))
         }
     }
 
