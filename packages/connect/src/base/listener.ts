@@ -46,8 +46,7 @@ enum ListenerState {
 
 type Address = { port: number; address: string }
 
-type NATSituation =
-  { bidirectionalNAT: boolean; externalAddress?: string; externalPort?: number; isExposed?: boolean }
+type NATSituation = { bidirectionalNAT: boolean; externalAddress?: string; externalPort?: number; isExposed?: boolean }
 
 export type ProtocolListener = {
   identifier: string
@@ -248,11 +247,16 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
     const natSituation: NATSituation = await this.checkNATSituation(ownInterface.address, ownInterface.port)
 
     log(`NAT situation detected: `, natSituation)
-    const internalInterfaces = getAddrs(ownInterface.port, {
+
+    // Only expose localhost and private address to the DHT if the node is
+    // configured to also accept connections for these.
+    const addressOptions = {
       useIPv4: true,
-      includePrivateIPv4: true,
-      includeLocalhostIPv4: true
-    })
+      includePrivateIPv4: this.options.allowPrivateConnections,
+      includeLocalhostIPv4: this.options.allowLocalConnections
+    }
+
+    const internalInterfaces = getAddrs(ownInterface.port, addressOptions)
 
     if (!natSituation.bidirectionalNAT && natSituation.isExposed) {
       // If any of the interface addresses is the
