@@ -14,6 +14,8 @@ import type { Components } from '@libp2p/interfaces/components'
 import {
   compareAddressesLocalMode,
   compareAddressesPublicMode,
+  maToClass,
+  AddressClass,
   type HoprConnectConfig,
   PeerConnectionType
 } from '@hoprnet/hopr-connect'
@@ -524,6 +526,11 @@ class Hopr extends EventEmitter {
 
     log(this.printAvailableAddresses())
     log(this.printAvailableProtocols())
+
+    // Enable DHT server-mode if announcing publicly routable addresses to the DHT
+    await this.maybeEnableDhtServerMode()
+
+    await this.maybeLogProfilingToGCloud()
   }
 
   /**
@@ -560,6 +567,54 @@ class Hopr extends EventEmitter {
     }
 
     return out
+  }
+
+  /**
+   * Checks if we are announcing public addresses to the DHT.
+   * If so, switch DHT to `server`-mode such that the node will
+   * reply to DHT queries of other nodes
+   */
+  private async maybeEnableDhtServerMode() {
+    let dht: Components['dht']
+    try {
+      dht = this.libp2pComponents.getDHT()
+    } catch (err) {
+      error(`Cannot switch DHT to server mode:`, err)
+      return
+    }
+
+    if (dht.getMode() === 'server') {
+      // Nothing to do
+      return
+    }
+
+    let announcedAddresses = this.libp2pComponents.getTransportManager().getAddrs()
+
+    for (const addr of announcedAddresses) {
+      if ([AddressClass.Public, AddressClass.Public6].includes(maToClass(addr))) {
+        await dht.setMode('server')
+        break
+      }
+    }
+  }
+
+  private async maybeLogProfilingToGCloud() {
+    if (process.env.GCLOUD) {
+      try {
+        var name = 'hopr_node_' + this.getId().toString().slice(-5).toLowerCase()
+        ;(await import('@google-cloud/profiler'))
+          .start({
+            projectId: 'hoprassociation',
+            serviceContext: {
+              service: name,
+              version: FULL_VERSION
+            }
+          })
+          .catch((e: any) => console.log(e))
+      } catch (e) {
+        console.log(e)
+      }
+    }
   }
 
   private async onChannelWaitingForCommitment(c: ChannelEntry): Promise<void> {
