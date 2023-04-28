@@ -5,7 +5,7 @@ use core_crypto::prp::{PRPParameters, PRP};
 use core_crypto::routing::{forward_header, header_length, ForwardedHeader, RoutingInfo};
 use core_crypto::shared_keys::SharedKeys;
 use core_crypto::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, PublicKey};
-use core_types::acknowledgment::{Acknowledgement, AcknowledgementChallenge};
+use core_types::acknowledgement::{Acknowledgement, AcknowledgementChallenge};
 use core_types::channels::Ticket;
 use libp2p_identity::PeerId;
 use utils_types::errors::GeneralError::ParseError;

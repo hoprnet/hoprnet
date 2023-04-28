@@ -1,4 +1,4 @@
-use crate::acknowledgment::PendingAcknowledgement::{WaitingAsRelayer, WaitingAsSender};
+use crate::acknowledgement::PendingAcknowledgement::{WaitingAsRelayer, WaitingAsSender};
 use crate::channels::Ticket;
 use core_crypto::primitives::{DigestLike, SimpleDigest};
 use core_crypto::types::{HalfKey, HalfKeyChallenge, Hash, PublicKey, Response, Signature};
@@ -303,7 +303,7 @@ impl BinarySerializable<'_> for PendingAcknowledgement {
 
 #[cfg(test)]
 pub mod test {
-    use crate::acknowledgment::PendingAcknowledgement;
+    use crate::acknowledgement::PendingAcknowledgement;
     use utils_types::traits::BinarySerializable;
 
     // TODO: Add tests to all remaining types
@@ -319,7 +319,7 @@ pub mod test {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use crate::acknowledgment::{AcknowledgedTicket, Acknowledgement, UnacknowledgedTicket};
+    use crate::acknowledgement::{AcknowledgedTicket, Acknowledgement, UnacknowledgedTicket};
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use utils_types::traits::BinarySerializable;

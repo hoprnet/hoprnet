@@ -4,14 +4,15 @@ import {
   AcknowledgedTicket,
   type HoprDB,
   type PendingAckowledgement,
-  type HalfKeyChallenge,
+  HalfKeyChallenge,
   Hash,
   create_counter
 } from '@hoprnet/hopr-utils'
 import type { SendMessage } from '../../index.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { ACKNOWLEDGEMENT_TIMEOUT } from '../../constants.js'
-import { Acknowledgement, Packet, privateKeyFromPeer } from '../../messages/index.js'
+import { Packet, privateKeyFromPeer } from '../../messages/index.js'
+import { Acknowledgement } from '../../../lib/core_packet.js'
 import { Pushable, pushable } from 'it-pushable'
 import type { ResolvedEnvironment } from '../../environment.js'
 import type { Components } from '@libp2p/interfaces/components'
@@ -27,6 +28,7 @@ type Outgoing = [ack: Uint8Array, destination: PeerId]
 // Do not type-check JSON files
 // @ts-ignore
 import pkg from '../../../package.json' assert { type: 'json' }
+import { PublicKey } from '../../../crates/core-packet/pkg/core_packet.js'
 
 const NORMALIZED_VERSION = pickVersion(pkg.version)
 
@@ -122,7 +124,8 @@ export class AcknowledgementInteraction {
    * Reserve a preImage for the given ticket if it is a winning ticket.
    */
   async handleAcknowledgement(msg: Uint8Array, remotePeer: PeerId): Promise<void> {
-    const acknowledgement = Acknowledgement.deserialize(msg, this.privKey, remotePeer)
+    const acknowledgement = Acknowledgement.deserialize(msg)
+    acknowledgement.validate(PublicKey.from_peerid_str(this.privKey.toString()), PublicKey.from_peerid_str(remotePeer.toString()))
 
     // There are three cases:
     // 1. There is an unacknowledged ticket and we are
@@ -133,12 +136,12 @@ export class AcknowledgementInteraction {
     //    a protocol bug or an attacker
     let pending: PendingAckowledgement
     try {
-      pending = await this.db.getPendingAcknowledgement(acknowledgement.ackChallenge)
+      pending = await this.db.getPendingAcknowledgement(HalfKeyChallenge.deserialize(acknowledgement.ack_challenge().serialize()))
     } catch (err: any) {
       // Protocol bug?
       if (err != undefined && err.notFound) {
         log(
-          `Received unexpected acknowledgement for half key challenge ${acknowledgement.ackChallenge.toHex()} - half key ${acknowledgement.ackKeyShare.toHex()}`
+          `Received unexpected acknowledgement for half key challenge ${acknowledgement.ack_challenge().to_hex()} - half key ${acknowledgement.ackKeyShare.toHex()}`
         )
       }
       metric_receivedFailedAcks.increment()
@@ -149,7 +152,7 @@ export class AcknowledgementInteraction {
     if (pending.isMessageSender == true) {
       log(`Received acknowledgement as sender. First relayer has processed the packet.`)
       // Resolves `sendMessage()` promise
-      this.onAcknowledgement(acknowledgement.ackChallenge)
+      this.onAcknowledgement(HalfKeyChallenge.deserialize(acknowledgement.ack_challenge().serialize()))
       metric_receivedSuccessfulAcks.increment()
       // nothing else to do
       return
@@ -184,7 +187,7 @@ export class AcknowledgementInteraction {
     // replace the unAcked ticket with Acked ticket.
 
     try {
-      await this.db.replaceUnAckWithAck(acknowledgement.ackChallenge, ack)
+      await this.db.replaceUnAckWithAck(HalfKeyChallenge.deserialize(acknowledgement.ack_challenge().serialize()), ack)
       log(`Stored acknowledged ticket`)
     } catch (err) {
       log(`ERROR: cannot replace an UnAck ticket with Ack ticket, thus dropping ticket`, err)
