@@ -7,13 +7,10 @@ use core_types::channels::{ChannelEntry, Ticket};
 use utils_db::{db::DB, traits::BinaryAsyncKVStorage};
 use utils_types::primitives::{Address, Balance, U256};
 
+use crate::errors::Result;
 use crate::traits::HoprCoreDbActions;
 
 const TICKET_INDEX_PREFIX: &str = "ticketIndex-";
-
-fn prefix_object_with<T: Serialize>(object: &T, prefix: &str) -> Box<[u8]> {
-    Box::new([])
-}
 
 pub struct CoreDb<T>
 where
@@ -24,23 +21,24 @@ where
 
 #[async_trait(? Send)] // not placing the `Send` trait limitations on the trait
 impl<T: BinaryAsyncKVStorage> HoprCoreDbActions for CoreDb<T> {
-    async fn get_current_ticket_index(&self, channel_id: &Hash) -> crate::traits::Result<Option<U256>> {
-        todo!()
-        // let prefixed_key = prefix_object_with(channel_id, TICKET_INDEX_PREFIX);
-        // if self.db.contains(&prefixed_key) {
-        //     let value= self.db.get::<Box<[u8]>,U256>(&prefixed_key).await?;
-        //     Ok(Some(value))
-        // } else {
-        //     Ok(None)
-        // }
+    async fn get_current_ticket_index(&self, channel_id: &Hash) -> Result<Option<U256>> {
+        let prefixed_key = utils_db::db::Key::new_with_prefix(channel_id, TICKET_INDEX_PREFIX)?;
+        if self.db.contains(prefixed_key.clone()).await {
+            let value = self.db.get::<U256>(prefixed_key).await?;
+            Ok(Some(value))
+        } else {
+            Ok(None)
+        }
     }
 
-    async fn set_current_ticket_index(&self, channel_id: &Hash, commitment: U256) -> crate::traits::Result<()> {
-        // return this.db.put(createCurrentTicketIndexKey(channelId), ticketIndex.serialize())
-        todo!()
+    async fn set_current_ticket_index(&mut self, channel_id: &Hash, index: U256) -> Result<()> {
+        let prefixed_key = utils_db::db::Key::new_with_prefix(channel_id, TICKET_INDEX_PREFIX)?;
+        let _evicted = self.db.set(prefixed_key, &index).await?;
+        // Ignoring evicted value as this does not happen with LevelDB
+        Ok(())
     }
 
-    async fn get_tickets(&self, predicate: Box<dyn Fn() -> bool>) -> crate::traits::Result<Vec<Ticket>> {
+    async fn get_tickets(&self, predicate: Box<dyn Fn() -> bool>) -> Result<Vec<Ticket>> {
         todo!()
     }
 

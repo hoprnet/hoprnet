@@ -1,4 +1,5 @@
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Serialize};
+use std::ops::Deref;
 
 use crate::errors::{DbError, Result};
 use crate::traits::BinaryAsyncKVStorage;
@@ -30,6 +31,48 @@ impl Batch {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct Key {
+    key: Box<[u8]>,
+}
+
+impl Key {
+    pub fn new<T: Serialize>(object: &T) -> Result<Self> {
+        let key = bincode::serialize(&object)
+            .map_err(|e| DbError::SerializationError(e.to_string()))?
+            .into_boxed_slice();
+        Ok(Self { key })
+    }
+
+    pub fn new_with_prefix<T: Serialize>(object: &T, prefix: &str) -> Result<Self> {
+        let key = bincode::serialize(&object)
+            .map_err(|e| DbError::SerializationError(e.to_string()))?
+            .into_boxed_slice();
+
+        let mut result = Vec::with_capacity(prefix.len() + key.as_ref().len());
+        result.extend_from_slice(prefix.as_bytes().as_ref());
+        result.extend_from_slice(key.as_ref());
+
+        Ok(Self {
+            key: result.into_boxed_slice(),
+        })
+    }
+}
+
+impl Into<Box<[u8]>> for Key {
+    fn into(self) -> Box<[u8]> {
+        self.key
+    }
+}
+
+impl Deref for Key {
+    type Target = Box<[u8]>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.key
+    }
+}
+
 pub struct DB<T: BinaryAsyncKVStorage> {
     backend: T,
 }
@@ -39,44 +82,43 @@ impl<T: BinaryAsyncKVStorage> DB<T> {
         DB::<T> { backend }
     }
 
-    pub async fn contains<K: Serialize>(&self, key: &K) -> bool {
-        let key: T::Key = bincode::serialize(&key).unwrap().into_boxed_slice();
-        self.backend.contains(key).await
+    pub async fn contains(&self, key: Key) -> bool {
+        self.backend.contains(key.into()).await
     }
 
-    pub async fn get<K: Serialize, V: DeserializeOwned>(&self, key: &K) -> Result<V> {
-        let key: T::Key = bincode::serialize(&key)
-            .map_err(|e| DbError::SerializationError(e.to_string()))?
-            .into_boxed_slice();
+    pub async fn get<V: DeserializeOwned>(&self, key: Key) -> Result<V> {
+        let key: T::Key = key.into();
         self.backend
             .get(key)
             .await
             .and_then(|v| bincode::deserialize(v.as_ref()).map_err(|e| DbError::DeserializationError(e.to_string())))
     }
 
-    pub async fn set<K: Serialize, V: Serialize + DeserializeOwned>(
-        &mut self,
-        key: &K,
-        value: &V,
-    ) -> Result<Option<V>> {
-        let key: T::Key = bincode::serialize(&key).unwrap().into_boxed_slice();
-        let value: T::Value = bincode::serialize(&value).unwrap().into_boxed_slice();
-        self.backend.set(key, value).await.map(move |v| {
-            v.map(move |x| {
-                let value: V = bincode::deserialize(&x).unwrap();
-                value
-            })
-        })
+    pub async fn set<V>(&mut self, key: Key, value: &V) -> Result<Option<V>>
+    where
+        V: Serialize + DeserializeOwned,
+    {
+        let key: T::Key = key.into();
+        let value: T::Value = bincode::serialize(&value)
+            .map_err(|e| DbError::SerializationError(e.to_string()))?
+            .into_boxed_slice();
+
+        match self.backend.set(key, value).await? {
+            Some(v) => bincode::deserialize(v.as_ref())
+                .map(|v| Some(v))
+                .map_err(|e| DbError::DeserializationError(e.to_string())),
+            None => Ok(None),
+        }
     }
 
-    pub async fn remove<U: Serialize, V: DeserializeOwned>(&mut self, key: &U) -> Result<Option<V>> {
-        let key: T::Key = bincode::serialize(&key).unwrap().into_boxed_slice();
-        self.backend.remove(key).await.map(move |v| {
-            v.map(move |x| {
-                let value: V = bincode::deserialize(&x).unwrap();
-                value
-            })
-        })
+    pub async fn remove<V: DeserializeOwned>(&mut self, key: Key) -> Result<Option<V>> {
+        let key: T::Key = key.into();
+        match self.backend.remove(key).await? {
+            Some(v) => bincode::deserialize(v.as_ref())
+                .map(|v| Some(v))
+                .map_err(|e| DbError::DeserializationError(e.to_string())),
+            None => Ok(None),
+        }
     }
 
     pub async fn batch(&mut self, batch: Batch, wait_for_write: bool) -> Result<()> {
@@ -89,7 +131,8 @@ mod tests {
     use super::*;
     use crate::errors::DbError;
     use crate::traits::MockAsyncKVStorage;
-    use mockall::*;
+    use mockall::predicate;
+    use serde::Deserialize;
 
     impl BinaryAsyncKVStorage for MockAsyncKVStorage {}
 
@@ -117,7 +160,7 @@ mod tests {
 
         let db = DB::new(backend);
 
-        assert!(db.contains(&key).await)
+        assert!(db.contains(Key::new(&key).ok().unwrap()).await)
     }
 
     #[async_std::test]
@@ -136,7 +179,7 @@ mod tests {
 
         let db = DB::new(backend);
 
-        assert_eq!(db.get::<_, TestValue>(&key).await, Ok(value))
+        assert_eq!(db.get::<TestValue>(Key::new(&key).ok().unwrap()).await, Ok(value))
     }
 
     #[async_std::test]
@@ -153,7 +196,10 @@ mod tests {
 
         let db = DB::new(backend);
 
-        assert_eq!(db.get::<_, TestValue>(&key).await, Err(DbError::NotFound))
+        assert_eq!(
+            db.get::<TestValue>(Key::new(&key).ok().unwrap()).await,
+            Err(DbError::NotFound)
+        )
     }
 
     #[async_std::test]
@@ -175,7 +221,7 @@ mod tests {
 
         let mut db = DB::new(backend);
 
-        assert_eq!(db.set(&key, &value).await, Ok(None))
+        assert_eq!(db.set(Key::new(&key).ok().unwrap(), &value).await, Ok(None))
     }
 
     #[async_std::test]
@@ -197,7 +243,10 @@ mod tests {
 
         let mut db = DB::new(backend);
 
-        assert_eq!(db.set(&key, &value).await, Err(DbError::NotFound))
+        assert_eq!(
+            db.set(Key::new(&key).ok().unwrap(), &value).await,
+            Err(DbError::NotFound)
+        )
     }
 
     #[async_std::test]
@@ -223,7 +272,7 @@ mod tests {
 
         let mut db = DB::new(backend);
 
-        assert_eq!(db.set(&key, &value).await, Ok(Some(evicted)))
+        assert_eq!(db.set(Key::new(&key).ok().unwrap(), &value).await, Ok(Some(evicted)))
     }
 
     #[async_std::test]
@@ -240,7 +289,7 @@ mod tests {
 
         let mut db = DB::new(backend);
 
-        assert_eq!(db.remove::<_, TestValue>(&key).await, Ok(None))
+        assert_eq!(db.remove::<TestValue>(Key::new(&key).ok().unwrap()).await, Ok(None))
     }
 
     #[async_std::test]
@@ -257,7 +306,10 @@ mod tests {
 
         let mut db = DB::new(backend);
 
-        assert_eq!(db.remove::<_, TestValue>(&key).await, Err(DbError::NotFound))
+        assert_eq!(
+            db.remove::<TestValue>(Key::new(&key).ok().unwrap()).await,
+            Err(DbError::NotFound)
+        )
     }
 
     #[async_std::test]
@@ -278,6 +330,6 @@ mod tests {
 
         let mut db = DB::new(backend);
 
-        assert_eq!(db.remove(&key).await, Ok(Some(evicted)))
+        assert_eq!(db.remove(Key::new(&key).ok().unwrap()).await, Ok(Some(evicted)))
     }
 }

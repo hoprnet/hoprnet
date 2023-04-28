@@ -5,12 +5,12 @@ use core_types::acknowledgement::UnacknowledgedTicket;
 use core_types::channels::{ChannelEntry, Ticket};
 use utils_types::primitives::{Address, Balance, U256};
 
-pub type Result<T> = std::result::Result<T, utils_db::errors::DbError>;
+use crate::errors::Result;
 
 #[async_trait(? Send)] // not placing the `Send` trait limitations on the trait
 pub trait HoprCoreDbActions {
     async fn get_current_ticket_index(&self, channel_id: &Hash) -> Result<Option<U256>>;
-    async fn set_current_ticket_index(&self, channel_id: &Hash, commitment: U256) -> Result<()>;
+    async fn set_current_ticket_index(&mut self, channel_id: &Hash, index: U256) -> Result<()>;
 
     // TODO: trait with generic argument rather than allocated Box
     async fn get_tickets(&self, predicate: Box<dyn Fn() -> bool>) -> Result<Vec<Ticket>>;
