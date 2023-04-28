@@ -11,7 +11,6 @@ import {
   PublicKey,
   UINT256,
   createPoRValuesForSender,
-  deriveAckKeyShare,
   u8aEquals,
   ChannelEntry,
   ChannelStatus,
@@ -23,7 +22,11 @@ import {
 } from '@hoprnet/hopr-utils'
 import type { HalfKeyChallenge } from '@hoprnet/hopr-utils'
 import assert from 'assert'
-import { AcknowledgementChallenge, Packet, Acknowledgement, PacketHelper } from '../../messages/index.js'
+import {
+  Packet,
+  PacketHelper,
+  privateKeyFromPeer
+} from '../../messages/index.js'
 import { PacketForwardInteraction } from './forward.js'
 import { initializeCommitment } from '@hoprnet/hopr-core-ethereum'
 import { ChannelCommitmentInfo } from '@hoprnet/hopr-core-ethereum'
@@ -31,6 +34,8 @@ import type { ResolvedEnvironment } from '../../environment.js'
 import type { HoprOptions } from '../../index.js'
 import type { Components } from '@libp2p/interfaces/components'
 import type { Connection, Stream } from '@libp2p/interfaces/connection'
+
+import { derive_ack_key_share, Acknowledgement, AcknowledgementChallenge } from '../../../lib/core_packet.js'
 
 const SECRET_LENGTH = 32
 
@@ -275,8 +280,10 @@ describe('packet acknowledgement', function () {
     await ackInteration.start()
     await ackInterationCounterparty.start()
 
-    const ackKey = deriveAckKeyShare(secrets[0])
-    const ackMessage = AcknowledgementChallenge.create(ackChallenge, SELF)
+
+
+    const ackKey = derive_ack_key_share(secrets[0])
+    const ackMessage = new AcknowledgementChallenge(ackKey.to_challenge(), privateKeyFromPeer(SELF))
 
     assert(
       ackMessage.solve(ackKey.serialize()),
@@ -285,8 +292,8 @@ describe('packet acknowledgement', function () {
 
     ackInterationCounterparty.sendAcknowledgement(
       {
-        createAcknowledgement: (privKey: PeerId) => {
-          return Acknowledgement.create(ackMessage, ackKey, privKey)
+        create_acknowledgement: (privKey: Uint8Array) => {
+          return new Acknowledgement(ackMessage, ackKey, privKey)
         }
       } as any,
       SELF

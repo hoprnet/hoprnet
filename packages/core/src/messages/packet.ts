@@ -33,6 +33,7 @@ async function bumpTicketIndex(channelId: Hash, db: HoprDB): Promise<U256> {
 
   if (fetchedTicketIndex == undefined) {
     currentTicketIndex = U256.one();
+    fetchedTicketIndex = new UINT256(new BN(1))
   }
 
   await db.setCurrentTicketIndex(channelId, new UINT256(fetchedTicketIndex.toBN().addn(1)))

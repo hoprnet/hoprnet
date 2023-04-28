@@ -1,4 +1,3 @@
-import type { PeerId } from '@libp2p/interface-peer-id'
 import { peerIdFromString } from '@libp2p/peer-id'
 import chaiAsPromised from 'chai-as-promised'
 import chai, { expect } from 'chai'
@@ -11,8 +10,9 @@ import {
   PublicKey,
   U256,
   Ticket,
-  ChannelStatus
-} from '../../crates/core-packet/pkg/core_packet.js'
+  ChannelStatus,
+  Hash
+} from '../../lib/core_packet.js'
 import { stringToU8a } from '@hoprnet/hopr-utils'
 
 chai.use(chaiAsPromised)
@@ -25,50 +25,62 @@ const SENDER_PRIV = stringToU8a('0x3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b
 const SENDER_PUBKEY = PublicKey.from_privkey(SENDER_PRIV)
 
 const TARGET = peerIdFromString(TARGET_PUBKEY.to_peerid_str())
-const TARGET_ADDRESS = TARGET_PUBKEY.to_address()
+//const TARGET_ADDRESS = TARGET_PUBKEY.to_address()
 
 const SENDER = peerIdFromString(SENDER_PUBKEY.to_peerid_str())
 //const SENDER_ADDRESS = PARTY_B.public.to_address()
 
 const createMockTicket = ({
-   targetAddress = TARGET_ADDRESS,
-   amount = new Balance('1', BalanceType.HOPR),
-   winProb = U256.from_inverse_probability(U256.one()),
-   epoch = U256.one(),
-   index = U256.one(),
-   channelEpoch = U256.one()
- }: {
-  sender?: PeerId
+                            targetAddress,
+                            amount,
+                            winProb,
+                            epoch,
+                            index,
+                            channelEpoch
+                          }: {
   targetAddress?: Address
   amount?: Balance
   winProb?: U256
   epoch?: U256
   index?: U256
   channelEpoch?: U256
-}) => Ticket.new(targetAddress, undefined, epoch, index, amount, winProb, channelEpoch, SENDER_PRIV)
+}) => {
+  return Ticket.new(
+    targetAddress ?? PublicKey.from_privkey(TARGET_PRIV).to_address(),
+    undefined,
+    epoch ?? U256.one(),
+    index ?? U256.one(),
+    amount ?? new Balance('1', BalanceType.HOPR),
+    winProb ?? U256.from_inverse_probability(U256.one()),
+    channelEpoch ?? U256.one(),
+    SENDER_PRIV
+  )
+}
 
-const mockChannelEntry = (
-  isChannelOpen: boolean = true,
-  balance: Balance = new Balance('100', BalanceType.HOPR),
-  ticketEpoch = U256.one(),
-  ticketIndex = U256.zero()
-) => new ChannelEntry(
-  TARGET_PUBKEY,
-  TARGET_PUBKEY,
-  balance,
-  null,
-  ticketEpoch,
-  ticketIndex,
-  isChannelOpen ? ChannelStatus.Open : ChannelStatus.Closed,
-  U256.one(),
-  null
-)
+
+function mockChannelEntry (isChannelOpen?: boolean, // true
+  balance?: Balance, // = new Balance('100', BalanceType.HOPR),
+  ticketEpoch?: U256, //= U256.one(),
+  ticketIndex?: U256// = U256.zero()
+) {
+  return new ChannelEntry(
+    PublicKey.from_privkey(TARGET_PRIV),
+    PublicKey.from_privkey(TARGET_PRIV),
+    balance ?? new Balance('100', BalanceType.HOPR),
+    Hash.create([stringToU8a("0xdeadbeef")]),
+    ticketEpoch ?? U256.one(),
+    ticketIndex ?? U256.zero(),
+    (isChannelOpen ?? true) ? ChannelStatus.Open : ChannelStatus.Closed,
+    U256.one(),
+    U256.zero()
+  )
+}
 
 const getTicketsMock = async (): Promise<Ticket[]> => []
 
 describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket', function () {
   it('should pass if ticket is okay', async function () {
-    const signedTicket = createMockTicket({})
+    const signedTicket = createMockTicket({ targetAddress: TARGET_PUBKEY.to_address() })
 
     return expect(
       validateUnacknowledgedTicket(
@@ -233,7 +245,7 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
         true
       )
     ).to.eventually.rejectedWith(
-      'Payment channel 0x434c7d4fdeadfc5b67c251d1a421d2d73e90c81355ade7744af5dddf160c27df does not have enough funds'
+      'Payment channel b7049e3285ed36f84f075549cc34190f42f3ce8ed666400d63e928f10f1d5ed8 does not have enough funds'
     )
   })
 
@@ -256,7 +268,7 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
         true
       )
     ).to.eventually.rejectedWith(
-      'Payment channel 0x434c7d4fdeadfc5b67c251d1a421d2d73e90c81355ade7744af5dddf160c27df does not have enough funds'
+      'Payment channel b7049e3285ed36f84f075549cc34190f42f3ce8ed666400d63e928f10f1d5ed8 does not have enough funds'
     )
   })
 })

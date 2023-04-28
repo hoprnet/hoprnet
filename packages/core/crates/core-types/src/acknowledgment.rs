@@ -18,6 +18,7 @@ pub struct Acknowledgement {
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl Acknowledgement {
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(ack_challenge: AcknowledgementChallenge, ack_key_share: HalfKey, private_key: &[u8]) -> Self {
         let mut digest = SimpleDigest::default();
         digest.update(&ack_challenge.serialize());
@@ -206,6 +207,7 @@ fn hash_challenge(challenge: &HalfKeyChallenge) -> Box<[u8]> {
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl AcknowledgementChallenge {
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(ack_challenge: &HalfKeyChallenge, private_key: &[u8]) -> Self {
         let hash = hash_challenge(&ack_challenge);
         Self {

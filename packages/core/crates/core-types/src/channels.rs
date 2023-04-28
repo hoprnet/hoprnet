@@ -67,19 +67,22 @@ impl ChannelEntry {
     }
 
     /// Checks if the closure time of this channel has passed.
-    pub fn closure_time_passed(&self) -> bool {
+    pub fn closure_time_passed(&self) -> Option<bool> {
         let now_seconds = current_timestamp() / 1000;
-        self.closure_time.value().lt(&u256::from(now_seconds))
+        (!self.closure_time.eq(&U256::zero()))
+            .then(|| self.closure_time.value().lt(&u256::from(now_seconds)))
     }
 
     /// Calculates the remaining channel closure grace period.
-    pub fn remaining_closure_time(&self) -> u64 {
-        let now_seconds = u256::from(current_timestamp());
-        if now_seconds.ge(self.closure_time.value()) {
-            now_seconds.sub(self.closure_time.value()).as_u64()
-        } else {
-            0
-        }
+    pub fn remaining_closure_time(&self) -> Option<u64> {
+        let now_seconds = u256::from(current_timestamp() / 1000);
+        (!self.closure_time.eq(&U256::zero())).then(||
+            if now_seconds.ge(self.closure_time.value()) {
+                now_seconds.sub(self.closure_time.value()).as_u64()
+            } else {
+                0
+            }
+        )
     }
 }
 
