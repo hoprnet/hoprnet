@@ -8,6 +8,12 @@ pub enum DbError {
     #[error("key not found")]
     NotFound,
 
+    #[error("serialization error: {0}")]
+    SerializationError(String),
+
+    #[error("deserialization error: {0}")]
+    DeserializationError(String),
+
     #[error("failed DB operation: {0}")]
     GenericError(String),
 }
