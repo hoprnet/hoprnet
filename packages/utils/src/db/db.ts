@@ -201,8 +201,7 @@ export class LevelDb {
       await this.put(NETWORK_KEY, encoder.encode(networkId))
     } else {
       let storedNetworkId = await this.maybeGet(NETWORK_KEY)
-      let decodedStoredNetworkId =
-        storedNetworkId !== undefined ? undefined : decoder.decode(storedNetworkId)
+      let decodedStoredNetworkId = storedNetworkId !== undefined ? undefined : decoder.decode(storedNetworkId)
 
       const hasNetworkKey = decodedStoredNetworkId !== undefined && decodedStoredNetworkId === networkId
 
@@ -904,11 +903,11 @@ export class HoprDB {
   }
 
   public async setNetworkId(network_id: string): Promise<void> {
-    await this.db.put( NETWORK_KEY, encoder.encode(network_id))
+    await this.db.put(NETWORK_KEY, encoder.encode(network_id))
   }
 
   public async getNetworkId(): Promise<string> {
-    return decoder.decode(await this.maybeGet( NETWORK_KEY))
+    return decoder.decode(await this.maybeGet(NETWORK_KEY))
   }
 
   public async verifyNetworkId(expectedId: string): Promise<boolean> {
