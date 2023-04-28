@@ -104,7 +104,10 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
       currentEnvironmentType == EnvironmentType.LOCAL || !isValidAddress(currentNetworkDetail.hoprBoostContractAddress)
     ) {
       // deploy boost contract
-      currentNetworkDetail.hoprBoostContractAddress = deployCode('HoprBoost.sol', abi.encode(deployerAddress, ''));
+      currentNetworkDetail.hoprBoostContractAddress = deployCode(
+        'HoprBoost.sol',
+        abi.encode(deployerAddress, 'https://')
+      );
     }
 
     // 3.5. HoprStake Contract

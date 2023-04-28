@@ -1,4 +1,3 @@
-use ethers::types::Address;
 use std::{
     env,
     ffi::OsStr,
@@ -62,21 +61,21 @@ pub fn set_process_path_env(contracts_root: &Option<String>, network: &String) -
 /// * `native_amount` - Amount of native tokens to be funded
 pub fn child_process_call_foundry_faucet(
     network: &str,
-    address: &Address,
+    address: &String,
     hopr_amount: &str,
     native_amount: &str,
 ) -> Result<(), HelperErrors> {
     let hopr_amount_str = hopr_amount.to_string();
     let native_amount_str = native_amount.to_string();
-    let addresses_str = format!("{:#x}", &address);
+    // let addresses_str = format!("{:#x}", &address);
 
     let faucet_args = vec![
         "script",
         "script/SingleAction.s.sol:SingleActionFromPrivateKeyScript",
         "--broadcast",
         "--sig",
-        "transferOrMintHoprAndSendNative(address,uint256,uint256)",
-        &addresses_str,
+        "transferOrMintHoprAndSendNativeToAmount(address,uint256,uint256)",
+        &address,
         &hopr_amount_str,
         &native_amount_str,
     ];
@@ -88,7 +87,38 @@ pub fn child_process_call_foundry_faucet(
 ///
 /// # Arguments
 ///
-/// * `network` - Name of the environment that nodes run in
+/// * `network` - Name of the network that nodes run in
+/// * `environment_type` - Type of the environment that nodes run in
+/// * `peer_id` - Peer Ids of HOPR nodes to be registered under the caller
+pub fn child_process_call_foundry_express_initialization(
+    network: &str,
+    ethereum_address: &String,
+    hopr_amount: &str,
+    native_amount: &str,
+    peer_ids: &String,
+) -> Result<(), HelperErrors> {
+    // add brackets to around the string
+    let peer_id_string = vec!["[", &peer_ids, "]"].concat();
+    let self_register_args = vec![
+        "script",
+        "script/SingleAction.s.sol:SingleActionFromPrivateKeyScript",
+        "--broadcast",
+        "--sig",
+        "expressInitialization(address[],uint256,uint256,string[])",
+        &ethereum_address,
+        &hopr_amount,
+        &native_amount,
+        &peer_id_string,
+    ];
+
+    child_process_call_foundry(network, &self_register_args)
+}
+
+/// Launch a child process to call foundry  command
+///
+/// # Arguments
+///
+/// * `network` - Name of the network that nodes run in
 /// * `environment_type` - Type of the environment that nodes run in
 /// * `peer_id` - Peer Ids of HOPR nodes to be registered under the caller
 pub fn child_process_call_foundry_self_register(network: &str, peer_ids: &String) -> Result<(), HelperErrors> {
@@ -110,7 +140,7 @@ pub fn child_process_call_foundry_self_register(network: &str, peer_ids: &String
 ///
 /// # Arguments
 ///
-/// * `network` - Name of the environment that nodes run in
+/// * `network` - Name of the network that nodes run in
 /// * `forge_args` - arguments to be passed to `forge`
 pub fn child_process_call_foundry<T>(network: &str, forge_args: &[T]) -> Result<(), HelperErrors>
 where
@@ -138,8 +168,8 @@ where
     println!("Foundry command execution status: {}", faucet_output.status);
 
     if faucet_output.status.success() {
-        return Ok(());
+        Ok(())
     } else {
-        return Err(HelperErrors::ErrorInRunningFoundry);
+        Err(HelperErrors::ErrorInRunningFoundry)
     }
 }

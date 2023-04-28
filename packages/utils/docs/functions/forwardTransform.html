@@ -21,11 +21,6 @@
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Applies the transformation to the header to forward
 it to the next node or deliver it to the user</p>
-
-<h3>Returns</h3><p>whether the packet is valid, if yes returns
-the transformed packet, the public key of the next hop
-and the data next to the routing information. If current
-hop is the final recipient, it returns the plaintext</p>
 </div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
@@ -52,7 +47,11 @@ data for the last hop</p>
 <h5><span class="tsd-kind-parameter">maxHops</span>: <span class="tsd-signature-type">number</span></h5>
 <div class="tsd-comment tsd-typography"><p>maximal amount of hops</p>
 </div></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">LastNodeOutput</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type ">RelayNodeOutput</span></h4><aside class="tsd-sources">
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">LastNodeOutput</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type ">RelayNodeOutput</span></h4><p>whether the packet is valid, if yes returns
+the transformed packet, the public key of the next hop
+and the data next to the routing information. If current
+hop is the final recipient, it returns the plaintext</p>
+<aside class="tsd-sources">
 <ul>
 <li>Defined in <a href="https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/packet/index.ts#L132">utils/src/crypto/packet/index.ts:132</a></li></ul></aside></li></ul></section></div>
 <div class="col-sidebar">
@@ -88,6 +87,7 @@ data for the last hop</p>
 <li><a href="../classes/HalfKeyChallenge.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-128-path"></use><use href="#icon-128-text"></use></svg><span>Half<wbr/>Key<wbr/>Challenge</span></a></li>
 <li><a href="../classes/Hash.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-128-path"></use><use href="#icon-128-text"></use></svg><span>Hash</span></a></li>
 <li><a href="../classes/HoprDB.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-128-path"></use><use href="#icon-128-text"></use></svg><span>HoprDB</span></a></li>
+<li><a href="../classes/LevelDb.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-128-path"></use><use href="#icon-128-text"></use></svg><span>Level<wbr/>Db</span></a></li>
 <li><a href="../classes/MultiCounter.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-128-path"></use><use href="#icon-128-text"></use></svg><span>Multi<wbr/>Counter</span></a></li>
 <li><a href="../classes/MultiGauge.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-128-path"></use><use href="#icon-128-text"></use></svg><span>Multi<wbr/>Gauge</span></a></li>
 <li><a href="../classes/MultiHistogram.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-128-path"></use><use href="#icon-128-text"></use></svg><span>Multi<wbr/>Histogram</span></a></li>

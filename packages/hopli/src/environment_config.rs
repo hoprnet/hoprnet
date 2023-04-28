@@ -80,9 +80,9 @@ pub fn ensure_environment_and_network_are_set(
         .expect("Unable to find environment details");
 
     if env_detail.environment_type.to_string() == environment_type {
-        return Ok(true);
+        Ok(true)
     } else {
-        return Ok(false);
+        Ok(false)
     }
 }
 

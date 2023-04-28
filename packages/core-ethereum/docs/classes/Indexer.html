@@ -145,8 +145,6 @@ Also keeps track of the latest block number.</p>
 <li class="tsd-signature" id="chain.__type.announce.__type-1.__type-2"><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">multiaddr</span>, <span class="tsd-kind-parameter">txHandler</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></li>
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Initiates a transaction that announces nodes on-chain.</p>
-
-<h3>Returns</h3><p>a Promise that resolves with the transaction hash</p>
 </div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
@@ -170,7 +168,8 @@ Also keeps track of the latest block number.</p>
 <li>
 <h5><span class="tsd-kind-parameter">tx</span>: <span class="tsd-signature-type">string</span></h5></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">DeferType</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></h4></li></ul></li></ul></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></h4></li></ul></li></ul></li>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></h4><p>a Promise that resolves with the transaction hash</p>
+</li></ul></li></ul></li>
 <li class="tsd-parameter">
 <h5><span class="tsd-kind-property">finalize<wbr/>Channel<wbr/>Closure</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">counterparty</span>, <span class="tsd-kind-parameter">txHandler</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">)</span></h5>
 <ul class="tsd-parameters">
@@ -180,8 +179,6 @@ Also keeps track of the latest block number.</p>
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Initiates a transaction that performs the second step to settle
 a payment channel.</p>
-
-<h3>Returns</h3><p>a Promise that resolves with the transaction hash</p>
 </div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
@@ -205,7 +202,8 @@ a payment channel.</p>
 <li>
 <h5><span class="tsd-kind-parameter">tx</span>: <span class="tsd-signature-type">string</span></h5></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">DeferType</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></h4></li></ul></li></ul></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></h4></li></ul></li></ul></li>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></h4><p>a Promise that resolves with the transaction hash</p>
+</li></ul></li></ul></li>
 <li class="tsd-parameter">
 <h5><span class="tsd-kind-property">fund<wbr/>Channel</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">partyA</span>, <span class="tsd-kind-parameter">partyB</span>, <span class="tsd-kind-parameter">fundsA</span>, <span class="tsd-kind-parameter">fundsB</span>, <span class="tsd-kind-parameter">txHandler</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">)</span></h5>
 <ul class="tsd-parameters">
@@ -214,8 +212,6 @@ a payment channel.</p>
 <li class="tsd-signature" id="chain.__type.fundChannel.__type-5.__type-6"><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">partyA</span>, <span class="tsd-kind-parameter">partyB</span>, <span class="tsd-kind-parameter">fundsA</span>, <span class="tsd-kind-parameter">fundsB</span>, <span class="tsd-kind-parameter">txHandler</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></li>
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Initiates a transaction that funds a payment channel</p>
-
-<h3>Returns</h3><p>a Promise that resolves wiht the transaction hash</p>
 </div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
@@ -251,7 +247,8 @@ a payment channel.</p>
 <li>
 <h5><span class="tsd-kind-parameter">tx</span>: <span class="tsd-signature-type">string</span></h5></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">DeferType</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></h4></li></ul></li></ul></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></h4></li></ul></li></ul></li>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></h4><p>a Promise that resolves wiht the transaction hash</p>
+</li></ul></li></ul></li>
 <li class="tsd-parameter">
 <h5><span class="tsd-kind-property">get<wbr/>All<wbr/>Queuing<wbr/>Transaction<wbr/>Requests</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type ">TransactionRequest</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">)</span></h5>
 <ul class="tsd-parameters">
@@ -260,10 +257,9 @@ a payment channel.</p>
 <li class="tsd-signature" id="chain.__type.getAllQueuingTransactionRequests.__type-7.__type-8"><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">TransactionRequest</span><span class="tsd-signature-symbol">[]</span></li>
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Return all the queuing transactions</p>
-
-<h3>Returns</h3><p>Array of transaction hashes</p>
 </div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">TransactionRequest</span><span class="tsd-signature-symbol">[]</span></h4></li></ul></li></ul></li>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">TransactionRequest</span><span class="tsd-signature-symbol">[]</span></h4><p>Array of transaction hashes</p>
+</li></ul></li></ul></li>
 <li class="tsd-parameter">
 <h5><span class="tsd-kind-property">get<wbr/>All<wbr/>Unconfirmed<wbr/>Hash</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">)</span></h5>
 <ul class="tsd-parameters">
@@ -272,10 +268,9 @@ a payment channel.</p>
 <li class="tsd-signature" id="chain.__type.getAllUnconfirmedHash.__type-9.__type-10"><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">[]</span></li>
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Return pending and mined transactions</p>
-
-<h3>Returns</h3><p>Array of transaction hashes</p>
 </div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">[]</span></h4></li></ul></li></ul></li>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">[]</span></h4><p>Array of transaction hashes</p>
+</li></ul></li></ul></li>
 <li class="tsd-parameter">
 <h5><span class="tsd-kind-property">get<wbr/>Balance</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">accountAddress</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type ">Balance</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">)</span></h5>
 <ul class="tsd-parameters">
@@ -284,8 +279,6 @@ a payment channel.</p>
 <li class="tsd-signature" id="chain.__type.getBalance.__type-11.__type-12"><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">accountAddress</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type ">Balance</span><span class="tsd-signature-symbol">&gt;</span></li>
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Gets the token balance of a specific account</p>
-
-<h3>Returns</h3><p>a Promise that resolves with the token balance</p>
 </div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
@@ -294,7 +287,8 @@ a payment channel.</p>
 <h5><span class="tsd-kind-parameter">accountAddress</span>: <span class="tsd-signature-type ">Address</span></h5>
 <div class="tsd-comment tsd-typography"><p>account to query for</p>
 </div></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type ">Balance</span><span class="tsd-signature-symbol">&gt;</span></h4></li></ul></li></ul></li>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type ">Balance</span><span class="tsd-signature-symbol">&gt;</span></h4><p>a Promise that resolves with the token balance</p>
+</li></ul></li></ul></li>
 <li class="tsd-parameter">
 <h5><span class="tsd-kind-property">get<wbr/>Channels</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type ">HoprChannels</span><span class="tsd-signature-symbol">)</span></h5>
 <ul class="tsd-parameters">
@@ -338,10 +332,9 @@ a payment channel.</p>
 <li class="tsd-signature" id="chain.__type.getLatestBlockNumber.__type-20.__type-21"><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">&gt;</span></li>
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Gets the latest block number by explicitly querying the provider</p>
-
-<h3>Returns</h3><p>a Promise that resolves with the latest block number</p>
 </div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">&gt;</span></h4></li></ul></li></ul></li>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">&gt;</span></h4><p>a Promise that resolves with the latest block number</p>
+</li></ul></li></ul></li>
 <li class="tsd-parameter">
 <h5><span class="tsd-kind-property">get<wbr/>Native<wbr/>Balance</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">accountAddress</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type ">Balance</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">)</span></h5>
 <ul class="tsd-parameters">
@@ -350,8 +343,6 @@ a payment channel.</p>
 <li class="tsd-signature" id="chain.__type.getNativeBalance.__type-22.__type-23"><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">accountAddress</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type ">Balance</span><span class="tsd-signature-symbol">&gt;</span></li>
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Gets the native balance of a specific account</p>
-
-<h3>Returns</h3><p>a Promise that resolves with the native balance of the account</p>
 </div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
@@ -360,7 +351,8 @@ a payment channel.</p>
 <h5><span class="tsd-kind-parameter">accountAddress</span>: <span class="tsd-signature-type ">Address</span></h5>
 <div class="tsd-comment tsd-typography"><p>account to query for</p>
 </div></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type ">Balance</span><span class="tsd-signature-symbol">&gt;</span></h4></li></ul></li></ul></li>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type ">Balance</span><span class="tsd-signature-symbol">&gt;</span></h4><p>a Promise that resolves with the native balance of the account</p>
+</li></ul></li></ul></li>
 <li class="tsd-parameter">
 <h5><span class="tsd-kind-property">get<wbr/>Network<wbr/>Registry</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type ">HoprNetworkRegistry</span><span class="tsd-signature-symbol">)</span></h5>
 <ul class="tsd-parameters">
@@ -393,8 +385,6 @@ a payment channel.</p>
 <li class="tsd-signature" id="chain.__type.getTimestamp.__type-30.__type-31"><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">blockNumber</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">&gt;</span></li>
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Gets the timestamp of a block</p>
-
-<h3>Returns</h3><p>a Promise that resolves with the transaction hashes of the requested block</p>
 </div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
@@ -403,7 +393,8 @@ a payment channel.</p>
 <h5><span class="tsd-kind-parameter">blockNumber</span>: <span class="tsd-signature-type">number</span></h5>
 <div class="tsd-comment tsd-typography"><p>block number to look for</p>
 </div></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">&gt;</span></h4></li></ul></li></ul></li>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">&gt;</span></h4><p>a Promise that resolves with the transaction hashes of the requested block</p>
+</li></ul></li></ul></li>
 <li class="tsd-parameter">
 <h5><span class="tsd-kind-property">get<wbr/>Token</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type ">HoprToken</span><span class="tsd-signature-symbol">)</span></h5>
 <ul class="tsd-parameters">
@@ -420,8 +411,6 @@ a payment channel.</p>
 <li class="tsd-signature" id="chain.__type.getTransactionsInBlock.__type-34.__type-35"><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">blockNumber</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">&gt;</span></li>
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Gets the transaction hashes of a specific block</p>
-
-<h3>Returns</h3><p>a Promise that resolves with the transaction hashes of the requested block</p>
 </div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
@@ -430,7 +419,8 @@ a payment channel.</p>
 <h5><span class="tsd-kind-parameter">blockNumber</span>: <span class="tsd-signature-type">number</span></h5>
 <div class="tsd-comment tsd-typography"><p>block number to look for</p>
 </div></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">&gt;</span></h4></li></ul></li></ul></li>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">&gt;</span></h4><p>a Promise that resolves with the transaction hashes of the requested block</p>
+</li></ul></li></ul></li>
 <li class="tsd-parameter">
 <h5><span class="tsd-kind-property">initiate<wbr/>Channel<wbr/>Closure</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">counterparty</span>, <span class="tsd-kind-parameter">txHandler</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">)</span></h5>
 <ul class="tsd-parameters">
@@ -439,8 +429,6 @@ a payment channel.</p>
 <li class="tsd-signature" id="chain.__type.initiateChannelClosure.__type-36.__type-37"><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">counterparty</span>, <span class="tsd-kind-parameter">txHandler</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></li>
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Initiates a transaction that initiates the settlement of a payment channel</p>
-
-<h3>Returns</h3><p>a Promise that resolves with the transaction hash</p>
 </div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
@@ -464,7 +452,8 @@ a payment channel.</p>
 <li>
 <h5><span class="tsd-kind-parameter">tx</span>: <span class="tsd-signature-type">string</span></h5></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">DeferType</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></h4></li></ul></li></ul></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></h4></li></ul></li></ul></li>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></h4><p>a Promise that resolves with the transaction hash</p>
+</li></ul></li></ul></li>
 <li class="tsd-parameter">
 <h5><span class="tsd-kind-property">redeem<wbr/>Ticket</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">counterparty</span>, <span class="tsd-kind-parameter">ackTicket</span>, <span class="tsd-kind-parameter">txHandler</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">)</span></h5>
 <ul class="tsd-parameters">
@@ -473,8 +462,6 @@ a payment channel.</p>
 <li class="tsd-signature" id="chain.__type.redeemTicket.__type-38.__type-39"><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">counterparty</span>, <span class="tsd-kind-parameter">ackTicket</span>, <span class="tsd-kind-parameter">txHandler</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></li>
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Initiates a transaction that redeems an acknowledged ticket</p>
-
-<h3>Returns</h3><p>a Promise that resolve with the transaction hash</p>
 </div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
@@ -502,7 +489,8 @@ a payment channel.</p>
 <li>
 <h5><span class="tsd-kind-parameter">tx</span>: <span class="tsd-signature-type">string</span></h5></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">DeferType</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></h4></li></ul></li></ul></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></h4></li></ul></li></ul></li>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></h4><p>a Promise that resolve with the transaction hash</p>
+</li></ul></li></ul></li>
 <li class="tsd-parameter">
 <h5><span class="tsd-kind-property">send<wbr/>Transaction</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">checkDuplicate</span>, <span class="tsd-kind-parameter">essentialTxPayload</span>, <span class="tsd-kind-parameter">handleTxListener</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type ">SendTransactionReturn</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">)</span></h5>
 <ul class="tsd-parameters">
@@ -513,8 +501,6 @@ a payment channel.</p>
 <div class="tsd-comment tsd-typography"><p>Update nonce-tracker and transaction-manager, broadcast the transaction on chain, and listen
 to the response until reaching block confirmation.
 Transaction is built on essential transaction payload</p>
-
-<h3>Returns</h3><p>Promise of a ContractTransaction</p>
 </div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
@@ -540,7 +526,8 @@ Transaction is built on essential transaction payload</p>
 <li>
 <h5><span class="tsd-kind-parameter">tx</span>: <span class="tsd-signature-type">string</span></h5></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">DeferType</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></h4></li></ul></li></ul></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type ">SendTransactionReturn</span><span class="tsd-signature-symbol">&gt;</span></h4></li></ul></li></ul></li>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type ">SendTransactionReturn</span><span class="tsd-signature-symbol">&gt;</span></h4><p>Promise of a ContractTransaction</p>
+</li></ul></li></ul></li>
 <li class="tsd-parameter">
 <h5><span class="tsd-kind-property">set<wbr/>Commitment</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">counterparty</span>, <span class="tsd-kind-parameter">commitment</span>, <span class="tsd-kind-parameter">txHandler</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">)</span></h5>
 <ul class="tsd-parameters">
@@ -549,8 +536,6 @@ Transaction is built on essential transaction payload</p>
 <li class="tsd-signature" id="chain.__type.setCommitment.__type-42.__type-43"><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">counterparty</span>, <span class="tsd-kind-parameter">commitment</span>, <span class="tsd-kind-parameter">txHandler</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></li>
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Initiates a transaction that sets a commitment</p>
-
-<h3>Returns</h3><p>a Promise that resolves with the transaction hash</p>
 </div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
@@ -578,7 +563,8 @@ Transaction is built on essential transaction payload</p>
 <li>
 <h5><span class="tsd-kind-parameter">tx</span>: <span class="tsd-signature-type">string</span></h5></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">DeferType</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></h4></li></ul></li></ul></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></h4></li></ul></li></ul></li>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></h4><p>a Promise that resolves with the transaction hash</p>
+</li></ul></li></ul></li>
 <li class="tsd-parameter">
 <h5><span class="tsd-kind-property">subscribe<wbr/>Block</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">cb</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">)</span></h5>
 <ul class="tsd-parameters">
@@ -680,8 +666,6 @@ Transaction is built on essential transaction payload</p>
 <li class="tsd-signature" id="chain.__type.withdraw.__type-58.__type-59"><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">currency</span>, <span class="tsd-kind-parameter">recipient</span>, <span class="tsd-kind-parameter">amount</span>, <span class="tsd-kind-parameter">txHandler</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></li>
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Initiates a transaction that withdraws funds of the node</p>
-
-<h3>Returns</h3><p>a Promise that resolves with the transaction hash</p>
 </div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
@@ -713,7 +697,8 @@ Transaction is built on essential transaction payload</p>
 <li>
 <h5><span class="tsd-kind-parameter">tx</span>: <span class="tsd-signature-type">string</span></h5></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">DeferType</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></h4></li></ul></li></ul></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></h4></li></ul></li></ul></li></ul></div><aside class="tsd-sources">
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></h4><p>a Promise that resolves with the transaction hash</p>
+</li></ul></li></ul></li></ul></div><aside class="tsd-sources">
 <ul>
 <li>Defined in <a href="https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L101">packages/core-ethereum/src/indexer/index.ts:101</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member tsd-is-private"><a id="db" class="tsd-anchor"></a>
@@ -1065,8 +1050,6 @@ Transaction is built on essential transaction payload</p>
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Gets all interesting on-chain events, such as Transfer events and payment
 channel events</p>
-
-<h3>Returns</h3><p>all relevant events in the specified block range</p>
 </div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
@@ -1082,7 +1065,8 @@ towards or from the node towards someone else</p>
 </div></li>
 <li>
 <h5><span class="tsd-kind-parameter">fetchTokenTransactions</span>: <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol"> = false</span></h5></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-symbol">{ </span><br/><span>    </span><span class="tsd-kind-property">events</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">TypedEvent</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">, </span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">; </span><br/><span>    </span><span class="tsd-kind-property">success</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">true</span><span class="tsd-signature-symbol">; </span><br/><span class="tsd-signature-symbol">}</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-symbol">{ </span><br/><span>    </span><span class="tsd-kind-property">success</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">false</span><span class="tsd-signature-symbol">; </span><br/><span class="tsd-signature-symbol">}</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-symbol">{ </span><br/><span>    </span><span class="tsd-kind-property">events</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">TypedEvent</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">, </span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">; </span><br/><span>    </span><span class="tsd-kind-property">success</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">true</span><span class="tsd-signature-symbol">; </span><br/><span class="tsd-signature-symbol">}</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-symbol">{ </span><br/><span>    </span><span class="tsd-kind-property">success</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">false</span><span class="tsd-signature-symbol">; </span><br/><span class="tsd-signature-symbol">}</span><span class="tsd-signature-symbol">&gt;</span></h4><p>all relevant events in the specified block range</p>
+<aside class="tsd-sources">
 <ul>
 <li>Defined in <a href="https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L255">packages/core-ethereum/src/indexer/index.ts:255</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member"><a id="getOpenChannelsFrom" class="tsd-anchor"></a>
@@ -1092,8 +1076,6 @@ towards or from the node towards someone else</p>
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Returns peer&#39;s open channels.
 NOTE: channels with status &#39;PENDING_TO_CLOSE&#39; are not included</p>
-
-<h3>Returns</h3><p>peer&#39;s open channels</p>
 </div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
@@ -1102,7 +1084,8 @@ NOTE: channels with status &#39;PENDING_TO_CLOSE&#39; are not included</p>
 <h5><span class="tsd-kind-parameter">source</span>: <span class="tsd-signature-type ">PublicKey</span></h5>
 <div class="tsd-comment tsd-typography"><p>peer</p>
 </div></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><a href="ChannelEntry.html" class="tsd-signature-type tsd-kind-class">ChannelEntry</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><a href="ChannelEntry.html" class="tsd-signature-type tsd-kind-class">ChannelEntry</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">&gt;</span></h4><p>peer&#39;s open channels</p>
+<aside class="tsd-sources">
 <ul>
 <li>Defined in <a href="https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L1057">packages/core-ethereum/src/indexer/index.ts:1057</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member"><a id="getPublicKeyOf" class="tsd-anchor"></a>
@@ -1133,10 +1116,9 @@ NOTE: channels with status &#39;PENDING_TO_CLOSE&#39; are not included</p>
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Returns a random open channel.
 NOTE: channels with status &#39;PENDING_TO_CLOSE&#39; are not included</p>
-
-<h3>Returns</h3><p>an open channel</p>
 </div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><a href="ChannelEntry.html" class="tsd-signature-type tsd-kind-class">ChannelEntry</a><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><a href="ChannelEntry.html" class="tsd-signature-type tsd-kind-class">ChannelEntry</a><span class="tsd-signature-symbol">&gt;</span></h4><p>an open channel</p>
+<aside class="tsd-sources">
 <ul>
 <li>Defined in <a href="https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L1040">packages/core-ethereum/src/indexer/index.ts:1040</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-private"><a id="indexEvent" class="tsd-anchor"></a>
@@ -2002,8 +1984,6 @@ Will restart the indexer if needed.</p>
 <div class="tsd-comment tsd-typography"><p>Query past events, this will loop until it gets all blocks from <code>toBlock</code> to <code>fromBlock</code>.
 If we exceed response pull limit, we switch into quering smaller chunks.
 TODO: optimize DB and fetch requests</p>
-
-<h3>Returns</h3><p>past events and last queried block</p>
 </div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
@@ -2014,7 +1994,8 @@ TODO: optimize DB and fetch requests</p>
 <h5><span class="tsd-kind-parameter">maxToBlock</span>: <span class="tsd-signature-type">number</span></h5></li>
 <li>
 <h5><span class="tsd-kind-parameter">maxBlockRange</span>: <span class="tsd-signature-type">number</span></h5></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">&gt;</span></h4><p>past events and last queried block</p>
+<aside class="tsd-sources">
 <ul>
 <li>Defined in <a href="https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L370">packages/core-ethereum/src/indexer/index.ts:370</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member"><a id="processUnconfirmedEvents" class="tsd-anchor"></a>
@@ -2188,11 +2169,10 @@ confirmed block (latestBlock - confirmationTime)</p>
 <li class="tsd-signature tsd-anchor-link" id="restart.restart-1"><span class="tsd-kind-call-signature">restart</span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">&gt;</span><a href="#restart.restart-1" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Restarts the indexer</p>
-
-<h3>Returns</h3><p>a promise that resolves once the indexer
-has been restarted</p>
 </div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">&gt;</span></h4><p>a promise that resolves once the indexer
+has been restarted</p>
+<aside class="tsd-sources">
 <ul>
 <li>Defined in <a href="https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L227">packages/core-ethereum/src/indexer/index.ts:227</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member"><a id="start" class="tsd-anchor"></a>
@@ -2216,8 +2196,6 @@ has been restarted</p>
 <li class="tsd-signature"><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">multiaddr</span>, <span class="tsd-kind-parameter">txHandler</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></li>
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Initiates a transaction that announces nodes on-chain.</p>
-
-<h3>Returns</h3><p>a Promise that resolves with the transaction hash</p>
 </div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
@@ -2241,7 +2219,8 @@ has been restarted</p>
 <li>
 <h5><span class="tsd-kind-parameter">tx</span>: <span class="tsd-signature-type">string</span></h5></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">DeferType</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></h4></li></ul></li></ul></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></h4></li></ul></li></ul></li>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></h4><p>a Promise that resolves with the transaction hash</p>
+</li></ul></li></ul></li>
 <li class="tsd-parameter">
 <h5><span class="tsd-kind-property">finalize<wbr/>Channel<wbr/>Closure</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">counterparty</span>, <span class="tsd-kind-parameter">txHandler</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">)</span></h5>
 <ul class="tsd-parameters">
@@ -2251,8 +2230,6 @@ has been restarted</p>
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Initiates a transaction that performs the second step to settle
 a payment channel.</p>
-
-<h3>Returns</h3><p>a Promise that resolves with the transaction hash</p>
 </div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
@@ -2276,7 +2253,8 @@ a payment channel.</p>
 <li>
 <h5><span class="tsd-kind-parameter">tx</span>: <span class="tsd-signature-type">string</span></h5></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">DeferType</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></h4></li></ul></li></ul></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></h4></li></ul></li></ul></li>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></h4><p>a Promise that resolves with the transaction hash</p>
+</li></ul></li></ul></li>
 <li class="tsd-parameter">
 <h5><span class="tsd-kind-property">fund<wbr/>Channel</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">partyA</span>, <span class="tsd-kind-parameter">partyB</span>, <span class="tsd-kind-parameter">fundsA</span>, <span class="tsd-kind-parameter">fundsB</span>, <span class="tsd-kind-parameter">txHandler</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">)</span></h5>
 <ul class="tsd-parameters">
@@ -2285,8 +2263,6 @@ a payment channel.</p>
 <li class="tsd-signature"><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">partyA</span>, <span class="tsd-kind-parameter">partyB</span>, <span class="tsd-kind-parameter">fundsA</span>, <span class="tsd-kind-parameter">fundsB</span>, <span class="tsd-kind-parameter">txHandler</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></li>
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Initiates a transaction that funds a payment channel</p>
-
-<h3>Returns</h3><p>a Promise that resolves wiht the transaction hash</p>
 </div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
@@ -2322,7 +2298,8 @@ a payment channel.</p>
 <li>
 <h5><span class="tsd-kind-parameter">tx</span>: <span class="tsd-signature-type">string</span></h5></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">DeferType</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></h4></li></ul></li></ul></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></h4></li></ul></li></ul></li>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></h4><p>a Promise that resolves wiht the transaction hash</p>
+</li></ul></li></ul></li>
 <li class="tsd-parameter">
 <h5><span class="tsd-kind-property">get<wbr/>All<wbr/>Queuing<wbr/>Transaction<wbr/>Requests</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type ">TransactionRequest</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">)</span></h5>
 <ul class="tsd-parameters">
@@ -2331,10 +2308,9 @@ a payment channel.</p>
 <li class="tsd-signature"><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">TransactionRequest</span><span class="tsd-signature-symbol">[]</span></li>
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Return all the queuing transactions</p>
-
-<h3>Returns</h3><p>Array of transaction hashes</p>
 </div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">TransactionRequest</span><span class="tsd-signature-symbol">[]</span></h4></li></ul></li></ul></li>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">TransactionRequest</span><span class="tsd-signature-symbol">[]</span></h4><p>Array of transaction hashes</p>
+</li></ul></li></ul></li>
 <li class="tsd-parameter">
 <h5><span class="tsd-kind-property">get<wbr/>All<wbr/>Unconfirmed<wbr/>Hash</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">)</span></h5>
 <ul class="tsd-parameters">
@@ -2343,10 +2319,9 @@ a payment channel.</p>
 <li class="tsd-signature"><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">[]</span></li>
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Return pending and mined transactions</p>
-
-<h3>Returns</h3><p>Array of transaction hashes</p>
 </div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">[]</span></h4></li></ul></li></ul></li>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">[]</span></h4><p>Array of transaction hashes</p>
+</li></ul></li></ul></li>
 <li class="tsd-parameter">
 <h5><span class="tsd-kind-property">get<wbr/>Balance</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">accountAddress</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type ">Balance</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">)</span></h5>
 <ul class="tsd-parameters">
@@ -2355,8 +2330,6 @@ a payment channel.</p>
 <li class="tsd-signature"><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">accountAddress</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type ">Balance</span><span class="tsd-signature-symbol">&gt;</span></li>
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Gets the token balance of a specific account</p>
-
-<h3>Returns</h3><p>a Promise that resolves with the token balance</p>
 </div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
@@ -2365,7 +2338,8 @@ a payment channel.</p>
 <h5><span class="tsd-kind-parameter">accountAddress</span>: <span class="tsd-signature-type ">Address</span></h5>
 <div class="tsd-comment tsd-typography"><p>account to query for</p>
 </div></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type ">Balance</span><span class="tsd-signature-symbol">&gt;</span></h4></li></ul></li></ul></li>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type ">Balance</span><span class="tsd-signature-symbol">&gt;</span></h4><p>a Promise that resolves with the token balance</p>
+</li></ul></li></ul></li>
 <li class="tsd-parameter">
 <h5><span class="tsd-kind-property">get<wbr/>Channels</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type ">HoprChannels</span><span class="tsd-signature-symbol">)</span></h5>
 <ul class="tsd-parameters">
@@ -2409,10 +2383,9 @@ a payment channel.</p>
 <li class="tsd-signature"><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">&gt;</span></li>
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Gets the latest block number by explicitly querying the provider</p>
-
-<h3>Returns</h3><p>a Promise that resolves with the latest block number</p>
 </div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">&gt;</span></h4></li></ul></li></ul></li>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">&gt;</span></h4><p>a Promise that resolves with the latest block number</p>
+</li></ul></li></ul></li>
 <li class="tsd-parameter">
 <h5><span class="tsd-kind-property">get<wbr/>Native<wbr/>Balance</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">accountAddress</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type ">Balance</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">)</span></h5>
 <ul class="tsd-parameters">
@@ -2421,8 +2394,6 @@ a payment channel.</p>
 <li class="tsd-signature"><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">accountAddress</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type ">Balance</span><span class="tsd-signature-symbol">&gt;</span></li>
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Gets the native balance of a specific account</p>
-
-<h3>Returns</h3><p>a Promise that resolves with the native balance of the account</p>
 </div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
@@ -2431,7 +2402,8 @@ a payment channel.</p>
 <h5><span class="tsd-kind-parameter">accountAddress</span>: <span class="tsd-signature-type ">Address</span></h5>
 <div class="tsd-comment tsd-typography"><p>account to query for</p>
 </div></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type ">Balance</span><span class="tsd-signature-symbol">&gt;</span></h4></li></ul></li></ul></li>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type ">Balance</span><span class="tsd-signature-symbol">&gt;</span></h4><p>a Promise that resolves with the native balance of the account</p>
+</li></ul></li></ul></li>
 <li class="tsd-parameter">
 <h5><span class="tsd-kind-property">get<wbr/>Network<wbr/>Registry</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type ">HoprNetworkRegistry</span><span class="tsd-signature-symbol">)</span></h5>
 <ul class="tsd-parameters">
@@ -2464,8 +2436,6 @@ a payment channel.</p>
 <li class="tsd-signature"><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">blockNumber</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">&gt;</span></li>
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Gets the timestamp of a block</p>
-
-<h3>Returns</h3><p>a Promise that resolves with the transaction hashes of the requested block</p>
 </div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
@@ -2474,7 +2444,8 @@ a payment channel.</p>
 <h5><span class="tsd-kind-parameter">blockNumber</span>: <span class="tsd-signature-type">number</span></h5>
 <div class="tsd-comment tsd-typography"><p>block number to look for</p>
 </div></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">&gt;</span></h4></li></ul></li></ul></li>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">&gt;</span></h4><p>a Promise that resolves with the transaction hashes of the requested block</p>
+</li></ul></li></ul></li>
 <li class="tsd-parameter">
 <h5><span class="tsd-kind-property">get<wbr/>Token</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type ">HoprToken</span><span class="tsd-signature-symbol">)</span></h5>
 <ul class="tsd-parameters">
@@ -2491,8 +2462,6 @@ a payment channel.</p>
 <li class="tsd-signature"><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">blockNumber</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">&gt;</span></li>
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Gets the transaction hashes of a specific block</p>
-
-<h3>Returns</h3><p>a Promise that resolves with the transaction hashes of the requested block</p>
 </div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
@@ -2501,7 +2470,8 @@ a payment channel.</p>
 <h5><span class="tsd-kind-parameter">blockNumber</span>: <span class="tsd-signature-type">number</span></h5>
 <div class="tsd-comment tsd-typography"><p>block number to look for</p>
 </div></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">&gt;</span></h4></li></ul></li></ul></li>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">&gt;</span></h4><p>a Promise that resolves with the transaction hashes of the requested block</p>
+</li></ul></li></ul></li>
 <li class="tsd-parameter">
 <h5><span class="tsd-kind-property">initiate<wbr/>Channel<wbr/>Closure</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">counterparty</span>, <span class="tsd-kind-parameter">txHandler</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">)</span></h5>
 <ul class="tsd-parameters">
@@ -2510,8 +2480,6 @@ a payment channel.</p>
 <li class="tsd-signature"><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">counterparty</span>, <span class="tsd-kind-parameter">txHandler</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></li>
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Initiates a transaction that initiates the settlement of a payment channel</p>
-
-<h3>Returns</h3><p>a Promise that resolves with the transaction hash</p>
 </div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
@@ -2535,7 +2503,8 @@ a payment channel.</p>
 <li>
 <h5><span class="tsd-kind-parameter">tx</span>: <span class="tsd-signature-type">string</span></h5></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">DeferType</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></h4></li></ul></li></ul></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></h4></li></ul></li></ul></li>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></h4><p>a Promise that resolves with the transaction hash</p>
+</li></ul></li></ul></li>
 <li class="tsd-parameter">
 <h5><span class="tsd-kind-property">redeem<wbr/>Ticket</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">counterparty</span>, <span class="tsd-kind-parameter">ackTicket</span>, <span class="tsd-kind-parameter">txHandler</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">)</span></h5>
 <ul class="tsd-parameters">
@@ -2544,8 +2513,6 @@ a payment channel.</p>
 <li class="tsd-signature"><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">counterparty</span>, <span class="tsd-kind-parameter">ackTicket</span>, <span class="tsd-kind-parameter">txHandler</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></li>
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Initiates a transaction that redeems an acknowledged ticket</p>
-
-<h3>Returns</h3><p>a Promise that resolve with the transaction hash</p>
 </div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
@@ -2573,7 +2540,8 @@ a payment channel.</p>
 <li>
 <h5><span class="tsd-kind-parameter">tx</span>: <span class="tsd-signature-type">string</span></h5></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">DeferType</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></h4></li></ul></li></ul></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></h4></li></ul></li></ul></li>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></h4><p>a Promise that resolve with the transaction hash</p>
+</li></ul></li></ul></li>
 <li class="tsd-parameter">
 <h5><span class="tsd-kind-property">send<wbr/>Transaction</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">checkDuplicate</span>, <span class="tsd-kind-parameter">essentialTxPayload</span>, <span class="tsd-kind-parameter">handleTxListener</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type ">SendTransactionReturn</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">)</span></h5>
 <ul class="tsd-parameters">
@@ -2584,8 +2552,6 @@ a payment channel.</p>
 <div class="tsd-comment tsd-typography"><p>Update nonce-tracker and transaction-manager, broadcast the transaction on chain, and listen
 to the response until reaching block confirmation.
 Transaction is built on essential transaction payload</p>
-
-<h3>Returns</h3><p>Promise of a ContractTransaction</p>
 </div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
@@ -2611,7 +2577,8 @@ Transaction is built on essential transaction payload</p>
 <li>
 <h5><span class="tsd-kind-parameter">tx</span>: <span class="tsd-signature-type">string</span></h5></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">DeferType</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></h4></li></ul></li></ul></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type ">SendTransactionReturn</span><span class="tsd-signature-symbol">&gt;</span></h4></li></ul></li></ul></li>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type ">SendTransactionReturn</span><span class="tsd-signature-symbol">&gt;</span></h4><p>Promise of a ContractTransaction</p>
+</li></ul></li></ul></li>
 <li class="tsd-parameter">
 <h5><span class="tsd-kind-property">set<wbr/>Commitment</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">counterparty</span>, <span class="tsd-kind-parameter">commitment</span>, <span class="tsd-kind-parameter">txHandler</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">)</span></h5>
 <ul class="tsd-parameters">
@@ -2620,8 +2587,6 @@ Transaction is built on essential transaction payload</p>
 <li class="tsd-signature"><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">counterparty</span>, <span class="tsd-kind-parameter">commitment</span>, <span class="tsd-kind-parameter">txHandler</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></li>
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Initiates a transaction that sets a commitment</p>
-
-<h3>Returns</h3><p>a Promise that resolves with the transaction hash</p>
 </div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
@@ -2649,7 +2614,8 @@ Transaction is built on essential transaction payload</p>
 <li>
 <h5><span class="tsd-kind-parameter">tx</span>: <span class="tsd-signature-type">string</span></h5></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">DeferType</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></h4></li></ul></li></ul></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></h4></li></ul></li></ul></li>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></h4><p>a Promise that resolves with the transaction hash</p>
+</li></ul></li></ul></li>
 <li class="tsd-parameter">
 <h5><span class="tsd-kind-property">subscribe<wbr/>Block</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">cb</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">)</span></h5>
 <ul class="tsd-parameters">
@@ -2751,8 +2717,6 @@ Transaction is built on essential transaction payload</p>
 <li class="tsd-signature"><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">currency</span>, <span class="tsd-kind-parameter">recipient</span>, <span class="tsd-kind-parameter">amount</span>, <span class="tsd-kind-parameter">txHandler</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></li>
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Initiates a transaction that withdraws funds of the node</p>
-
-<h3>Returns</h3><p>a Promise that resolves with the transaction hash</p>
 </div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
@@ -2784,7 +2748,8 @@ Transaction is built on essential transaction payload</p>
 <li>
 <h5><span class="tsd-kind-parameter">tx</span>: <span class="tsd-signature-type">string</span></h5></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">DeferType</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></h4></li></ul></li></ul></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></h4></li></ul></li></ul></li></ul></li>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></h4><p>a Promise that resolves with the transaction hash</p>
+</li></ul></li></ul></li></ul></li>
 <li>
 <h5><span class="tsd-kind-parameter">genesisBlock</span>: <span class="tsd-signature-type">number</span></h5></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">

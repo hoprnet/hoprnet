@@ -24,14 +24,12 @@ than a given number of workers concurrently.</p>
 
 <h3>Dev</h3><p>Iterative implementation of the functionality</p>
 
-<h3>Returns</h3><p>an array containing the results</p>
-
 <h3>Example</h3><pre><code class="language-ts"><span class="hl-0">import</span><span class="hl-1"> { </span><span class="hl-2">setTimeout</span><span class="hl-1"> } </span><span class="hl-0">from</span><span class="hl-1"> </span><span class="hl-3">&#39;timers/promises&#39;</span><br/><br/><span class="hl-4">const</span><span class="hl-1"> </span><span class="hl-5">result</span><span class="hl-1"> = </span><span class="hl-0">await</span><span class="hl-1"> </span><span class="hl-6">nAtaTime</span><span class="hl-1">(</span><span class="hl-2">setTimeout</span><span class="hl-1">, [[</span><span class="hl-7">300</span><span class="hl-1">, </span><span class="hl-3">&#39;one&#39;</span><span class="hl-1">], [</span><span class="hl-7">200</span><span class="hl-1">, </span><span class="hl-3">&#39;two&#39;</span><span class="hl-1">], [</span><span class="hl-7">100</span><span class="hl-1">, </span><span class="hl-3">&#39;three&#39;</span><span class="hl-1">]], </span><span class="hl-7">2</span><span class="hl-1">)</span><br/><span class="hl-8">// =&gt; [&#39;two&#39;, &#39;one&#39;, &#39;three&#39;]</span>
-</code></pre>
+</code><button>Copy</button></pre>
 </div>
-<section class="tsd-panel tsd-type-parameters">
+<section class="tsd-panel">
 <h4>Type Parameters</h4>
-<ul class="tsd-type-parameters">
+<ul class="tsd-type-parameter-list">
 <li>
 <h4><span class="tsd-kind-type-parameter">ArgType</span></h4></li>
 <li>
@@ -77,7 +75,8 @@ than a given number of workers concurrently.</p>
 <li>
 <h5><span class="tsd-kind-parameter">results</span>: <span class="tsd-signature-symbol">(</span><span class="tsd-signature-type ">Error</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type tsd-kind-type-parameter">Return</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">[]</span></h5></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span></h4></li></ul></li></ul></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-type tsd-kind-type-parameter">Return</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type ">Error</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-type tsd-kind-type-parameter">Return</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type ">Error</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">&gt;</span></h4><p>an array containing the results</p>
+<aside class="tsd-sources">
 <ul>
 <li>Defined in <a href="https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/async/parallel.ts#L37">utils/src/async/parallel.ts:37</a></li></ul></aside></li></ul></section></div>
 <div class="col-sidebar">
@@ -113,6 +112,7 @@ than a given number of workers concurrently.</p>
 <li><a href="../classes/HalfKeyChallenge.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-128-path"></use><use href="#icon-128-text"></use></svg><span>Half<wbr/>Key<wbr/>Challenge</span></a></li>
 <li><a href="../classes/Hash.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-128-path"></use><use href="#icon-128-text"></use></svg><span>Hash</span></a></li>
 <li><a href="../classes/HoprDB.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-128-path"></use><use href="#icon-128-text"></use></svg><span>HoprDB</span></a></li>
+<li><a href="../classes/LevelDb.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-128-path"></use><use href="#icon-128-text"></use></svg><span>Level<wbr/>Db</span></a></li>
 <li><a href="../classes/MultiCounter.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-128-path"></use><use href="#icon-128-text"></use></svg><span>Multi<wbr/>Counter</span></a></li>
 <li><a href="../classes/MultiGauge.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-128-path"></use><use href="#icon-128-text"></use></svg><span>Multi<wbr/>Gauge</span></a></li>
 <li><a href="../classes/MultiHistogram.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-128-path"></use><use href="#icon-128-text"></use></svg><span>Multi<wbr/>Histogram</span></a></li>

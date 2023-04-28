@@ -1,8 +1,8 @@
 [package]
 name = "core-crypto"
-version = "0.1.1"
-authors = ["HOPR Association <tech@hoprnet.org>"]
+version = "0.2.0"
 description = "Core cryptographic primitives and functions used in the HOPR protocol"
+authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
@@ -13,7 +13,6 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 default = ["console_error_panic_hook", "wasm"]
-ed25519 = [ ]
 wasm = ["dep:wasm-bindgen", "dep:js-sys"]
 
 [dependencies]
@@ -21,20 +20,23 @@ aes = "0.8"
 blake2 = "0.10"
 chacha20 = "0.9"
 ctr = "0.9"
+curve25519-dalek = "4.0.0-rc.2"
 digest = "0.10"
-elliptic-curve = "0.13"
-generic-array = "0.14.6"
+elliptic-curve = { version = "0.13", features = ["serde"] }
+generic-array = "0.14.7"
 getrandom = { version = "0.2.8", features = ["js"] }
 hex = "0.4"
-hex-literal = "0.3"
+hex-literal = "0.4"
 hkdf = "0.12"
 hmac = "0.12"
 js-sys = { version = "0.3.61", optional = true }
-k256 = { version = "0.13.0", features = ["arithmetic", "ecdh"] }
+k256 = { version = "0.13.0", features = ["arithmetic", "ecdh", "hash2curve"] }
 libp2p-identity = { version = "0.1.1", features = ["secp256k1", "peerid"] }
 rand = "0.8.5"
+serde = { version = "1.0", features = ["derive"] }
 sha3 = "0.10"
-typenum = "1.15"
+subtle = "2"
+typenum = "1.16"
 thiserror = "1.0"
 utils-log = { path = "../../../utils/crates/utils-log" }
 utils-misc = { path = "../../../utils/crates/utils-misc" }
@@ -46,5 +48,6 @@ console_error_panic_hook = { version = "0.1.7", optional = true }
 #wee_alloc = { version = "0.4.5", optional = true }
 
 [dev-dependencies]
+parameterized = "1.0"
 wasm-bindgen-test = "0.3.34"
 

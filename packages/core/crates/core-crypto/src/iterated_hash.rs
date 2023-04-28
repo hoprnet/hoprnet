@@ -1,8 +1,6 @@
-use digest::{Digest, FixedOutputReset};
-use sha3::Keccak256;
-
 use crate::errors::CryptoError::{CalculationError, InvalidInputValue};
 use crate::errors::Result;
+use crate::primitives::{DigestLike, EthDigest};
 
 /// Contains the complete hash iteration progression
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -22,24 +20,32 @@ pub struct Intermediate {
 /// Performs hash iteration progression from the given seed, the total number of iteration and step size.
 /// The Keccak256 digest is used to perform the hash iteration.
 pub fn iterate_hash(seed: &[u8], iterations: usize, step_size: usize) -> IteratedHash {
-    assert!(seed.len() > 0 && step_size > 0 && iterations > step_size);
+    assert!(!seed.is_empty() && step_size > 0 && iterations > step_size);
 
     let mut intermediates: Vec<Intermediate> = Vec::with_capacity(iterations / step_size + 1);
-    let mut intermediate: Box<[u8]> = Box::from(seed);
-    let mut hash = Keccak256::default();
+    let mut intermediate: Box<[u8]> = EthDigest::create_output();
 
-    for i in 0..iterations {
+    let mut hash = EthDigest::default();
+
+    // Unroll the first iteration, because it uses different input length
+    hash.update(seed);
+    hash.finalize_into(&mut intermediate);
+    intermediates.push(Intermediate {
+        iteration: 0,
+        intermediate: seed.into(),
+    });
+
+    for iteration in 1..iterations {
         hash.update(intermediate.as_ref());
 
-        if i % step_size == 0 {
+        if iteration % step_size == 0 {
             intermediates.push(Intermediate {
-                iteration: i,
-                intermediate,
+                iteration,
+                intermediate: intermediate.clone(),
             });
         }
 
-        let new_intermediate = hash.finalize_fixed_reset().to_vec();
-        intermediate = new_intermediate.into_boxed_slice();
+        hash.finalize_into(&mut intermediate);
     }
 
     IteratedHash {
@@ -62,12 +68,12 @@ pub fn recover_iterated_hash<H>(
 where
     H: Fn(usize) -> Option<Box<[u8]>>,
 {
-    if step_size == 0 || hash_value.len() == 0 || max_iterations == 0 {
+    if step_size == 0 || hash_value.is_empty() || max_iterations == 0 {
         return Err(InvalidInputValue);
     }
 
     let closest_intermediate = index_hint.unwrap_or(max_iterations - (max_iterations % step_size));
-    let mut digest = Keccak256::default();
+    let mut digest = EthDigest::default();
 
     for i in (0..=closest_intermediate).step_by(step_size) {
         // Check if we can get a hint for the current index
@@ -76,17 +82,17 @@ where
             for iteration in 0..step_size {
                 // Compute the hash of current intermediate
                 digest.update(intermediate.as_ref());
-                let hash = digest.finalize_fixed_reset().to_vec();
+                let hash = digest.finalize();
 
                 // Is the computed hash the one we're looking for ?
-                if hash.len() == hash_value.len() && hash == hash_value {
+                if hash.len() == hash_value.len() && hash.as_ref() == hash_value {
                     return Ok(Intermediate {
                         iteration: iteration + pos,
                         intermediate,
                     });
                 }
 
-                intermediate = hash.into_boxed_slice();
+                intermediate = hash;
             }
         }
     }

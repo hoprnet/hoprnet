@@ -23,16 +23,15 @@
 with no concurrency.</p>
 
 <h3>Example</h3><pre><code class="language-ts"><span class="hl-4">let</span><span class="hl-1"> </span><span class="hl-2">limiter</span><span class="hl-1"> = </span><span class="hl-6">oneAtATime</span><span class="hl-1">()</span><br/><span class="hl-6">limiter</span><span class="hl-1">(() </span><span class="hl-4">=&gt;</span><span class="hl-1"> </span><span class="hl-9">Promise</span><span class="hl-1">.</span><span class="hl-6">resolve</span><span class="hl-1">(</span><span class="hl-3">&#39;1&#39;</span><span class="hl-1">))</span><br/><span class="hl-6">limiter</span><span class="hl-1">(() </span><span class="hl-4">=&gt;</span><span class="hl-1"> </span><span class="hl-9">Promise</span><span class="hl-1">.</span><span class="hl-6">resolve</span><span class="hl-1">(</span><span class="hl-3">&#39;2&#39;</span><span class="hl-1">))</span>
-</code></pre>
-
-<h3>Returns</h3><p>a limiter that takes additional functions</p>
+</code><button>Copy</button></pre>
 </div>
-<section class="tsd-panel tsd-type-parameters">
+<section class="tsd-panel">
 <h4>Type Parameters</h4>
-<ul class="tsd-type-parameters">
+<ul class="tsd-type-parameter-list">
 <li>
 <h4><span class="tsd-kind-type-parameter">ReturnType</span></h4></li></ul></section>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">fn</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">)</span></h4>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">fn</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">)</span></h4><p>a limiter that takes additional functions</p>
+
 <ul class="tsd-parameters">
 <li class="tsd-parameter-signature">
 <ul class="tsd-signatures">
@@ -85,6 +84,7 @@ with no concurrency.</p>
 <li><a href="../classes/HalfKeyChallenge.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-128-path"></use><use href="#icon-128-text"></use></svg><span>Half<wbr/>Key<wbr/>Challenge</span></a></li>
 <li><a href="../classes/Hash.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-128-path"></use><use href="#icon-128-text"></use></svg><span>Hash</span></a></li>
 <li><a href="../classes/HoprDB.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-128-path"></use><use href="#icon-128-text"></use></svg><span>HoprDB</span></a></li>
+<li><a href="../classes/LevelDb.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-128-path"></use><use href="#icon-128-text"></use></svg><span>Level<wbr/>Db</span></a></li>
 <li><a href="../classes/MultiCounter.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-128-path"></use><use href="#icon-128-text"></use></svg><span>Multi<wbr/>Counter</span></a></li>
 <li><a href="../classes/MultiGauge.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-128-path"></use><use href="#icon-128-text"></use></svg><span>Multi<wbr/>Gauge</span></a></li>
 <li><a href="../classes/MultiHistogram.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-128-path"></use><use href="#icon-128-text"></use></svg><span>Multi<wbr/>Histogram</span></a></li>
