@@ -21,6 +21,10 @@
 - Added RelayState cleanup which prevents excessive connection leakage on public relay nodes ([#4912](https://github.com/hoprnet/hoprnet/pull/4912))
 - Reduced maximum number of relay connections to 2000 ([#4912](https://github.com/hoprnet/hoprnet/pull/4912))
 - Add pruning in the relay connections keep-alive mechanism ([#4916](https://github.com/hoprnet/hoprnet/pull/4916))
+- Enforce closing and clean-up of libp2p2 connections ([#4957](https://github.com/hoprnet/hoprnet/pull/4957))
+- Wipe libp2p's AddressManager cache when publishing new addresses to the DHT ([#4958](https://github.com/hoprnet/hoprnet/pull/4958))
+- Add metrics & logs relevant for RPCh debugging ([#4995](https://github.com/hoprnet/hoprnet/pull/4995))
+- Enhance debug logs in dialing logic to enhance debugging ([#5004](https://github.com/hoprnet/hoprnet/pull/5004))
 
 <a name="1.92"></a>
 
