@@ -21,7 +21,7 @@
 
 #### Defined in
 
-[utils/src/libp2p/dialHelper.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L34)
+[utils/src/libp2p/dialHelper.ts:37](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L37)
 
 ___
 
@@ -31,7 +31,7 @@ ___
 
 #### Defined in
 
-[utils/src/libp2p/dialHelper.ts:36](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L36)
+[utils/src/libp2p/dialHelper.ts:39](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L39)
 
 ___
 
@@ -41,7 +41,7 @@ ___
 
 #### Defined in
 
-[utils/src/libp2p/dialHelper.ts:35](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L35)
+[utils/src/libp2p/dialHelper.ts:38](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L38)
 
 ___
 
@@ -51,7 +51,7 @@ ___
 
 #### Defined in
 
-[utils/src/libp2p/dialHelper.ts:37](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L37)
+[utils/src/libp2p/dialHelper.ts:40](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L40)
 
 ___
 
@@ -61,7 +61,7 @@ ___
 
 #### Defined in
 
-[utils/src/libp2p/dialHelper.ts:32](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L32)
+[utils/src/libp2p/dialHelper.ts:35](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L35)
 
 ___
 
@@ -71,4 +71,4 @@ ___
 
 #### Defined in
 
-[utils/src/libp2p/dialHelper.ts:33](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L33)
+[utils/src/libp2p/dialHelper.ts:36](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L36)
