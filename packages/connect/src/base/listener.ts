@@ -294,10 +294,10 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
       return
     }
 
-    if (!this.options.announce && natSituation.isExposed) {
+    // if (!this.options.announce && natSituation.isExposed) {
       // skip PN
-      return
-    }
+    //   return
+   //  }
 
     this.connectComponents.getEntryNodes().on(RELAY_CHANGED_EVENT, this._emitListening)
 
