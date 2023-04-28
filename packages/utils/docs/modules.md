@@ -212,6 +212,7 @@
 - [registerMetricsCollector](modules.md#registermetricscollector)
 - [retimer](modules.md#retimer)
 - [retryWithBackoffThenThrow](modules.md#retrywithbackoffthenthrow)
+- [safeCloseConnection](modules.md#safecloseconnection)
 - [sampleGroupElement](modules.md#samplegroupelement)
 - [serializeKeyPair](modules.md#serializekeypair)
 - [serializeToU8a](modules.md#serializetou8a)
@@ -303,7 +304,7 @@ ___
 
 #### Defined in
 
-[utils/src/libp2p/dialHelper.ts:40](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L40)
+[utils/src/libp2p/dialHelper.ts:43](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L43)
 
 ___
 
@@ -338,7 +339,7 @@ ___
 
 #### Defined in
 
-[utils/src/libp2p/index.ts:171](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L171)
+[utils/src/libp2p/index.ts:172](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L172)
 
 ___
 
@@ -369,7 +370,7 @@ ___
 
 #### Defined in
 
-[utils/src/libp2p/index.ts:172](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L172)
+[utils/src/libp2p/index.ts:173](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L173)
 
 ___
 
@@ -945,7 +946,7 @@ Regular expresion used to match b58Strings
 
 #### Defined in
 
-[utils/src/libp2p/index.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L30)
+[utils/src/libp2p/index.ts:31](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L31)
 
 ___
 
@@ -1145,7 +1146,7 @@ Takes a B58String and converts them to a PublicKey
 
 #### Defined in
 
-[utils/src/libp2p/index.ts:47](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L47)
+[utils/src/libp2p/index.ts:48](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L48)
 
 ___
 
@@ -1167,7 +1168,7 @@ Takes a peerId and returns its corresponding public key.
 
 #### Defined in
 
-[utils/src/libp2p/index.ts:37](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L37)
+[utils/src/libp2p/index.ts:38](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L38)
 
 ___
 
@@ -1952,7 +1953,7 @@ Returns the b58String within a given content. Returns empty string if none is fo
 
 #### Defined in
 
-[utils/src/libp2p/index.ts:74](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L74)
+[utils/src/libp2p/index.ts:75](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L75)
 
 ___
 
@@ -2205,7 +2206,7 @@ Returns true or false if given string does not contain a b58string
 
 #### Defined in
 
-[utils/src/libp2p/index.ts:57](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L57)
+[utils/src/libp2p/index.ts:58](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L58)
 
 ___
 
@@ -2560,7 +2561,7 @@ whether embedded privKey is a secp256k1 key
 
 #### Defined in
 
-[utils/src/libp2p/index.ts:90](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L90)
+[utils/src/libp2p/index.ts:91](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L91)
 
 ___
 
@@ -2680,7 +2681,7 @@ send message. If `includeReply` is set, wait for a response
 
 #### Defined in
 
-[utils/src/libp2p/index.ts:108](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L108)
+[utils/src/libp2p/index.ts:109](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L109)
 
 ___
 
@@ -2713,7 +2714,7 @@ and feeds them to the given handler.
 
 #### Defined in
 
-[utils/src/libp2p/index.ts:239](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L239)
+[utils/src/libp2p/index.ts:240](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L240)
 
 ___
 
@@ -3389,6 +3390,28 @@ this function THROWS if retries were not successful
 
 ___
 
+### safeCloseConnection
+
+▸ **safeCloseConnection**(`conn`, `components`, `onErrorFun`): `Promise`<`void`\>
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `conn` | `Connection` |
+| `components` | `Components` |
+| `onErrorFun` | (`err`: `Error`) => `void` |
+
+#### Returns
+
+`Promise`<`void`\>
+
+#### Defined in
+
+[utils/src/libp2p/connection.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/connection.ts#L9)
+
+___
+
 ### sampleGroupElement
 
 ▸ **sampleGroupElement**(`compressed?`): [exponent: Uint8Array, groupElement: Uint8Array]
@@ -3677,7 +3700,7 @@ connections unintendedly
 
 #### Defined in
 
-[utils/src/libp2p/dialHelper.ts:99](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L99)
+[utils/src/libp2p/dialHelper.ts:102](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/dialHelper.ts#L102)
 
 ___
 
