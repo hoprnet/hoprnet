@@ -30,7 +30,7 @@
     "@libp2p/crypto": "1.0.0",
     "@libp2p/interface-peer-id": "1.0.5",
     "@libp2p/peer-id": "1.1.16",
-    "@multiformats/multiaddr": "10.3.3",
+    "@multiformats/multiaddr": "12.1.2",
     "@sinonjs/referee": "9.1.2",
     "async-mutex": "0.4.0",
     "bn.js": "5.2.1",
