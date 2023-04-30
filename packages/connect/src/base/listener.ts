@@ -295,9 +295,9 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
     }
 
     // if (!this.options.announce && natSituation.isExposed) {
-      // skip PN
+    // skip PN
     //   return
-   //  }
+    //  }
 
     this.connectComponents.getEntryNodes().on(RELAY_CHANGED_EVENT, this._emitListening)
 
