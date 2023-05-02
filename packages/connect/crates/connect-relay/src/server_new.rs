@@ -107,10 +107,14 @@ impl PingFuture {
             ended: None,
         }
     }
+
     pub(super) fn wake(&mut self) -> () {
         self.ended = Some(current_timestamp());
         self.done = true;
-        self.waker.take().unwrap().wake();
+
+        if let Some(waker) = self.waker.take() {
+            waker.wake();
+        }
     }
 }
 
@@ -352,5 +356,56 @@ impl<St: DuplexStream> Future for Server<St> {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::str::FromStr;
+
+    const ALICE: &'static str = "1Ank4EeHLAd3bwwtJma1WsXYSmiGgqmjkQoCUpevx67ix8";
+    const BOB: &'static str = "1AcPsXRKVc3U64NBb4obUUT34jSLWtvAz2JMw192L92QKW";
+    // relays need a proper name
+    const RYAN: &'static str = "1Ag7Agu1thSZFRGyoPWydqCiFS6tJFXLeukpVjCtwy1V8m";
+
+    #[async_std::test]
+    async fn wake_ping_future() {
+        let now = current_timestamp();
+
+        let mut ping_fut = PingFuture::new();
+
+        assert!(ping_fut.started >= now);
+        assert!(ping_fut.ended.is_none());
+        assert!(!ping_fut.done);
+
+        ping_fut.wake();
+
+        let res = ping_fut.await;
+
+        assert!(res < 10);
+    }
+
+    #[test]
+    fn identifier() {
+        assert!(
+            (RelayConnectionIdentifier::try_from((PeerId::from_str(ALICE).unwrap(), PeerId::from_str(BOB).unwrap()))
+                .is_ok())
+        );
+
+        assert!(
+            (RelayConnectionIdentifier::try_from((PeerId::from_str(ALICE).unwrap(), PeerId::from_str(ALICE).unwrap()))
+                .is_err())
+        );
+
+        let ab =
+            RelayConnectionIdentifier::try_from((PeerId::from_str(ALICE).unwrap(), PeerId::from_str(BOB).unwrap()))
+                .unwrap();
+
+        let ba =
+            RelayConnectionIdentifier::try_from((PeerId::from_str(BOB).unwrap(), PeerId::from_str(ALICE).unwrap()))
+                .unwrap();
+
+        assert!(ab.eq(&ba))
     }
 }
