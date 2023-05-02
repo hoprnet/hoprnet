@@ -1,4 +1,4 @@
-use crate::acknowledgment::PendingAcknowledgement::{WaitingAsRelayer, WaitingAsSender};
+use crate::acknowledgement::PendingAcknowledgement::{WaitingAsRelayer, WaitingAsSender};
 use crate::channels::Ticket;
 use core_crypto::primitives::{DigestLike, SimpleDigest};
 use core_crypto::types::{HalfKey, HalfKeyChallenge, Hash, PublicKey, Response, Signature};
@@ -12,12 +12,13 @@ use utils_types::traits::BinarySerializable;
 pub struct Acknowledgement {
     ack_signature: Signature,
     challenge_signature: Signature,
-    ack_key_share: HalfKey,
+    pub ack_key_share: HalfKey,
     validated: bool,
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl Acknowledgement {
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(ack_challenge: AcknowledgementChallenge, ack_key_share: HalfKey, private_key: &[u8]) -> Self {
         let mut digest = SimpleDigest::default();
         digest.update(&ack_challenge.serialize());
@@ -161,6 +162,27 @@ impl UnacknowledgedTicket {
             signer,
         }
     }
+
+    pub fn verify_signature(&self) -> bool {
+        self.ticket.verify(&self.signer)
+    }
+
+    pub fn get_challenge(&self) -> HalfKeyChallenge {
+        self.own_key.to_challenge()
+    }
+}
+
+impl UnacknowledgedTicket {
+    pub fn verify_challenge(&self, acknowledgement: &HalfKey) -> core_crypto::errors::Result<bool> {
+        Ok(Response::from_half_keys(&self.own_key, acknowledgement)?
+            .to_challenge()
+            .to_ethereum_challenge()
+            .eq(&self.ticket.challenge))
+    }
+
+    pub fn get_response(&self, acknowledgement: &HalfKey) -> core_crypto::errors::Result<Response> {
+        Response::from_half_keys(&self.own_key, acknowledgement)
+    }
 }
 
 impl BinarySerializable<'_> for UnacknowledgedTicket {
@@ -206,6 +228,7 @@ fn hash_challenge(challenge: &HalfKeyChallenge) -> Box<[u8]> {
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl AcknowledgementChallenge {
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(ack_challenge: &HalfKeyChallenge, private_key: &[u8]) -> Self {
         let hash = hash_challenge(&ack_challenge);
         Self {
@@ -301,7 +324,7 @@ impl BinarySerializable<'_> for PendingAcknowledgement {
 
 #[cfg(test)]
 pub mod test {
-    use crate::acknowledgment::PendingAcknowledgement;
+    use crate::acknowledgement::PendingAcknowledgement;
     use utils_types::traits::BinarySerializable;
 
     // TODO: Add tests to all remaining types
@@ -317,11 +340,47 @@ pub mod test {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use crate::acknowledgment::{AcknowledgedTicket, Acknowledgement, UnacknowledgedTicket};
+    use crate::acknowledgement::{AcknowledgedTicket, Acknowledgement, UnacknowledgedTicket};
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use utils_types::traits::BinarySerializable;
     use wasm_bindgen::prelude::*;
+    use core_crypto::types::{HalfKey, Response};
+
+    #[wasm_bindgen]
+    pub struct PendingAcknowledgement {
+        w: super::PendingAcknowledgement
+    }
+
+    #[wasm_bindgen]
+    impl PendingAcknowledgement {
+        #[wasm_bindgen(constructor)]
+        pub fn new(is_sender: bool, ticket: Option<UnacknowledgedTicket>) -> Self {
+            if is_sender {
+                Self {
+                    w: super::PendingAcknowledgement::WaitingAsSender
+                }
+            } else {
+                Self {
+                    w: super::PendingAcknowledgement::WaitingAsRelayer(ticket.unwrap())
+                }
+            }
+        }
+
+        pub fn is_msg_sender(&self) -> bool {
+            match &self.w {
+                super::PendingAcknowledgement::WaitingAsSender => true,
+                super::PendingAcknowledgement::WaitingAsRelayer(_) => false
+            }
+        }
+
+        pub fn ticket(&self) -> Option<UnacknowledgedTicket> {
+            match &self.w {
+                super::PendingAcknowledgement::WaitingAsSender => None,
+                super::PendingAcknowledgement::WaitingAsRelayer(ticket) => Some(ticket.clone())
+            }
+        }
+    }
 
     #[wasm_bindgen]
     impl UnacknowledgedTicket {
@@ -333,6 +392,16 @@ pub mod wasm {
         #[wasm_bindgen(js_name = "serialize")]
         pub fn _serialize(&self) -> Box<[u8]> {
             self.serialize()
+        }
+
+        #[wasm_bindgen(js_name = "get_response")]
+        pub fn _get_response(&self, acknowledgement: &HalfKey) -> JsResult<Response> {
+            ok_or_jserr!(self.get_response(acknowledgement))
+        }
+
+        #[wasm_bindgen(js_name = "verify_challenge")]
+        pub fn _verify_challenge(&self, acknowledgement: &HalfKey) -> JsResult<bool> {
+            ok_or_jserr!(self.verify_challenge(acknowledgement))
         }
     }
 
