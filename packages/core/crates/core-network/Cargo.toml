@@ -1,6 +1,6 @@
 [package]
 name = "core-network"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 license = "GPL-3.0-only"
@@ -21,6 +21,7 @@ blake2 = "0.10.4"
 futures = "0.3.26"
 libp2p = { version = "0.51.1", features = ["async-std", "wasm-bindgen", "wasm-ext"] }
 rand = { version = "0.8.5", features = ["std_rng"] }
+pin-project-lite = "0.2.9"
 serde = "1"
 thiserror = "1.0"
 utils-log = { path = "../../../utils/crates/utils-log"}

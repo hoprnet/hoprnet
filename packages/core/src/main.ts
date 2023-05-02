@@ -151,11 +151,20 @@ export async function createLibp2pInstance(
         dialTimeout: 3e3
       },
       connectionGater: {
-        denyDialPeer: async (peer: PeerId) => !(await isAllowedToAccessNetwork(peer)),
+        denyDialPeer: async (peer: PeerId) => {
+          if (!(await isAllowedToAccessNetwork(peer))) {
+            log(`Denied outgoing connection to peer ${peer.toString()} because node is not registered`)
+            return true
+          } else {
+            return false
+          }
+        },
         denyInboundEncryptedConnection: async (peer: PeerId, conn: MultiaddrConnection) => {
           const isAllowed = await isAllowedToAccessNetwork(peer)
 
           if (!isAllowed) {
+            log(`Denied incoming connection to peer ${peer.toString()} because node is not registered`)
+
             try {
               // Connection must be closed explicitly because not yet
               // part of any data structure
