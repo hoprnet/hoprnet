@@ -523,6 +523,9 @@ pub mod wasm {
         pub fn _serialize(&self) -> Box<[u8]> {
             self.serialize()
         }
+
+        #[wasm_bindgen(js_name = "eq")]
+        pub fn _eq(&self, other: &ChannelEntry) -> bool { self.eq(other) }
     }
 
     #[wasm_bindgen]
@@ -564,5 +567,8 @@ pub mod wasm {
         pub fn _to_hex(&self) -> String {
             self.to_hex()
         }
+
+        #[wasm_bindgen(js_name = "eq")]
+        pub fn _eq(&self, other: &Ticket) -> bool { self.eq(other) }
     }
 }
