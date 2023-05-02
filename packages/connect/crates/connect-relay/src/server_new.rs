@@ -299,7 +299,7 @@ impl<St: DuplexStream> End<St> {
 }
 
 impl<St: DuplexStream> Server<St> {
-    fn new(stream_a: St, peer_a: PeerId, stream_b: St, peer_b: PeerId) -> Self {
+    fn new(stream_a: St, peer_a: PeerId, stream_b: St, peer_b: PeerId) -> () {
         let (status_ab_tx, status_ab_rx) = mpsc::unbounded::<Box<[u8]>>();
         let (status_ba_tx, status_ba_rx) = mpsc::unbounded::<Box<[u8]>>();
 
@@ -362,6 +362,8 @@ impl<St: DuplexStream> Future for Server<St> {
 
 #[cfg(test)]
 mod tests {
+    use futures::{stream::FusedStream, Sink, Stream};
+
     use super::*;
     use std::str::FromStr;
 
@@ -370,17 +372,82 @@ mod tests {
     // relays need a proper name
     const RYAN: &'static str = "1Ag7Agu1thSZFRGyoPWydqCiFS6tJFXLeukpVjCtwy1V8m";
 
-    struct TestingDuplexStream {
-        rx: UnboundedReceiver<Box<[u8]>>,
-        tx: UnboundedSender<Box<[u8]>>,
+    pin_project! {
+        struct TestingDuplexStream {
+            #[pin]
+            rx: UnboundedReceiver<Box<[u8]>>,
+            #[pin]
+            tx: UnboundedSender<Box<[u8]>>,
+            send: UnboundedSender<Box<[u8]>>,
+            receive: UnboundedReceiver<Box<[u8]>>,
+        }
     }
 
     impl TestingDuplexStream {
         fn new() -> Self {
             let (send_tx, send_rx) = mpsc::unbounded::<Box<[u8]>>();
-            let (
+            let (receive_tx, receive_rx) = mpsc::unbounded::<Box<[u8]>>();
+
+            Self {
+                rx: send_rx,
+                tx: receive_tx,
+                send: send_tx,
+                receive: receive_rx,
+            }
         }
     }
+
+    impl FusedStream for TestingDuplexStream {
+        fn is_terminated(&self) -> bool {
+            self.rx.is_terminated()
+        }
+    }
+
+    impl Stream for TestingDuplexStream {
+        type Item = Result<Box<[u8]>, String>;
+        fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+            let this = self.project();
+
+            match this.rx.poll_next(cx) {
+                Poll::Pending => Poll::Pending,
+                Poll::Ready(Some(x)) => Poll::Ready(Some(Ok(x))),
+                Poll::Ready(None) => Poll::Ready(None),
+            }
+        }
+
+        fn size_hint(&self) -> (usize, Option<usize>) {
+            self.rx.size_hint()
+        }
+    }
+
+    impl Sink<Box<[u8]>> for TestingDuplexStream {
+        type Error = String;
+        fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+            let this = self.project();
+
+            this.tx.poll_ready(cx).map_err(|e| e.to_string())
+        }
+
+        fn start_send(self: Pin<&mut Self>, item: Box<[u8]>) -> Result<(), Self::Error> {
+            let this = self.project();
+
+            this.tx.start_send(item).map_err(|e| e.to_string())
+        }
+
+        fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+            let this = self.project();
+
+            this.tx.poll_flush(cx).map_err(|e| e.to_string())
+        }
+
+        fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+            let this = self.project();
+
+            this.tx.poll_close(cx).map_err(|e| e.to_string())
+        }
+    }
+
+    impl DuplexStream for TestingDuplexStream {}
 
     #[async_std::test]
     async fn wake_ping_future() {
