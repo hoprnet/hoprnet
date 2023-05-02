@@ -7,7 +7,9 @@ use futures::{
 use libp2p::PeerId;
 use pin_project_lite::pin_project;
 use std::{
+    cmp::Ordering,
     collections::HashMap,
+    hash::{Hash, Hasher},
     pin::Pin,
     task::{Context, Poll, Waker},
 };
@@ -23,6 +25,48 @@ use gloo_timers::future::sleep;
 use utils_misc::time::native::current_timestamp;
 #[cfg(all(feature = "wasm", not(test)))]
 use utils_misc::time::wasm::current_timestamp;
+
+#[derive(Copy, Clone, Eq)]
+pub struct RelayConnectionIdentifier {
+    id_a: PeerId,
+    id_b: PeerId,
+}
+
+impl ToString for RelayConnectionIdentifier {
+    fn to_string(&self) -> String {
+        format!("{} <-> {}", self.id_a.to_string(), self.id_b.to_string())
+    }
+}
+
+impl Hash for RelayConnectionIdentifier {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.id_a.hash(state);
+        self.id_b.hash(state);
+    }
+}
+
+impl PartialEq for RelayConnectionIdentifier {
+    fn eq(&self, other: &Self) -> bool {
+        self.id_a.eq(&other.id_a) && self.id_b.eq(&other.id_b)
+    }
+}
+
+impl TryFrom<(PeerId, PeerId)> for RelayConnectionIdentifier {
+    type Error = String;
+    fn try_from(val: (PeerId, PeerId)) -> Result<Self, Self::Error> {
+        match val.0.cmp(&val.1) {
+            Ordering::Equal => Err("Keys must not be equal".into()),
+            Ordering::Greater => Ok(RelayConnectionIdentifier {
+                id_a: val.0,
+                id_b: val.1,
+            }),
+            Ordering::Less => Ok(RelayConnectionIdentifier {
+                id_a: val.1,
+                id_b: val.0,
+            }),
+        }
+    }
+}
 
 #[repr(u8)]
 pub enum MessagePrefix {
@@ -72,6 +116,7 @@ impl PingFuture {
 
 impl Future for PingFuture {
     type Output = u64;
+
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
         if *this.done {
@@ -256,10 +301,17 @@ impl<St: DuplexStream> Server<St> {
         let (new_stream_a_tx, new_stream_a_tr) = mpsc::unbounded::<St>();
         let (new_stream_b_tx, new_stream_b_rx) = mpsc::unbounded::<St>();
     }
+
+    pub fn get_id(&self) -> RelayConnectionIdentifier {
+        assert!(self.a.id.eq(&self.b.id), "Identifier must not be equal");
+
+        (self.a.id.clone(), self.b.id.clone()).try_into().unwrap()
+    }
 }
 
 impl<St: DuplexStream> Future for Server<St> {
     type Output = Result<(), String>;
+
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         loop {
             let mut a_pending = false;
