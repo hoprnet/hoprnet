@@ -37,7 +37,7 @@ Wrapper for IntCounterVec type
 
 #### Defined in
 
-utils/lib/utils_metrics.d.ts:124
+utils/lib/utils_metrics.d.ts:129
 
 ___
 
@@ -57,7 +57,7 @@ ___
 
 #### Defined in
 
-utils/lib/utils_metrics.d.ts:143
+utils/lib/utils_metrics.d.ts:148
 
 ___
 
@@ -77,7 +77,7 @@ ___
 
 #### Defined in
 
-utils/lib/utils_metrics.d.ts:138
+utils/lib/utils_metrics.d.ts:143
 
 ___
 
@@ -98,7 +98,7 @@ ___
 
 #### Defined in
 
-utils/lib/utils_metrics.d.ts:134
+utils/lib/utils_metrics.d.ts:139
 
 ___
 
@@ -114,4 +114,4 @@ Returns the name of the counter vector given at construction.
 
 #### Defined in
 
-utils/lib/utils_metrics.d.ts:129
+utils/lib/utils_metrics.d.ts:134

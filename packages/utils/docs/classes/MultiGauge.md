@@ -46,7 +46,7 @@ Wrapper for GaugeVec type
 
 #### Defined in
 
-utils/lib/utils_metrics.d.ts:173
+utils/lib/utils_metrics.d.ts:178
 
 ___
 
@@ -67,7 +67,7 @@ ___
 
 #### Defined in
 
-utils/lib/utils_metrics.d.ts:169
+utils/lib/utils_metrics.d.ts:174
 
 ___
 
@@ -81,7 +81,7 @@ ___
 
 #### Defined in
 
-utils/lib/utils_metrics.d.ts:150
+utils/lib/utils_metrics.d.ts:155
 
 ___
 
@@ -101,7 +101,7 @@ ___
 
 #### Defined in
 
-utils/lib/utils_metrics.d.ts:183
+utils/lib/utils_metrics.d.ts:188
 
 ___
 
@@ -121,7 +121,7 @@ ___
 
 #### Defined in
 
-utils/lib/utils_metrics.d.ts:164
+utils/lib/utils_metrics.d.ts:169
 
 ___
 
@@ -142,7 +142,7 @@ ___
 
 #### Defined in
 
-utils/lib/utils_metrics.d.ts:160
+utils/lib/utils_metrics.d.ts:165
 
 ___
 
@@ -158,7 +158,7 @@ Returns the name of the gauge vector given at construction.
 
 #### Defined in
 
-utils/lib/utils_metrics.d.ts:155
+utils/lib/utils_metrics.d.ts:160
 
 ___
 
@@ -179,4 +179,4 @@ ___
 
 #### Defined in
 
-utils/lib/utils_metrics.d.ts:178
+utils/lib/utils_metrics.d.ts:183
