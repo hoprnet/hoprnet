@@ -53,6 +53,7 @@ impl PartialEq for RelayConnectionIdentifier {
 
 impl TryFrom<(PeerId, PeerId)> for RelayConnectionIdentifier {
     type Error = String;
+
     fn try_from(val: (PeerId, PeerId)) -> Result<Self, Self::Error> {
         match val.0.cmp(&val.1) {
             Ordering::Equal => Err("Keys must not be equal".into()),
@@ -298,7 +299,7 @@ impl<St: DuplexStream> End<St> {
 }
 
 impl<St: DuplexStream> Server<St> {
-    fn new(stream_a: St, peer_a: PeerId, stream_b: St, peer_b: PeerId) {
+    fn new(stream_a: St, peer_a: PeerId, stream_b: St, peer_b: PeerId) -> Self {
         let (status_ab_tx, status_ab_rx) = mpsc::unbounded::<Box<[u8]>>();
         let (status_ba_tx, status_ba_rx) = mpsc::unbounded::<Box<[u8]>>();
 
@@ -369,6 +370,18 @@ mod tests {
     // relays need a proper name
     const RYAN: &'static str = "1Ag7Agu1thSZFRGyoPWydqCiFS6tJFXLeukpVjCtwy1V8m";
 
+    struct TestingDuplexStream {
+        rx: UnboundedReceiver<Box<[u8]>>,
+        tx: UnboundedSender<Box<[u8]>>,
+    }
+
+    impl TestingDuplexStream {
+        fn new() -> Self {
+            let (send_tx, send_rx) = mpsc::unbounded::<Box<[u8]>>();
+            let (
+        }
+    }
+
     #[async_std::test]
     async fn wake_ping_future() {
         let now = current_timestamp();
@@ -387,7 +400,7 @@ mod tests {
     }
 
     #[test]
-    fn identifier() {
+    fn test_identifier() {
         assert!(
             (RelayConnectionIdentifier::try_from((PeerId::from_str(ALICE).unwrap(), PeerId::from_str(BOB).unwrap()))
                 .is_ok())
