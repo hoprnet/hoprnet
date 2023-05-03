@@ -139,11 +139,9 @@ pin_project! {
         #[pin]
         a: End<St>,
         a_ended: bool,
-        new_stream_a: UnboundedSender<St>,
         #[pin]
         b: End<St>,
         b_ended: bool,
-        new_stream_b: UnboundedSender<St>,
     }
 }
 
@@ -165,12 +163,32 @@ pin_project! {
 }
 
 impl<St: DuplexStream> End<St> {
+    pub fn new(
+        st: St,
+        id: PeerId,
+        status_tx: UnboundedSender<Box<[u8]>>,
+        status_rx: UnboundedReceiver<Box<[u8]>>,
+    ) -> Self {
+        let (new_stream_tx, new_stream_rx) = mpsc::unbounded::<St>();
+
+        Self {
+            ping_requests: HashMap::new(),
+            st: Some(st),
+            buffered: None,
+            id,
+            status_tx,
+            status_rx,
+            new_stream_rx,
+            new_stream_tx,
+            waker: None,
+        }
+    }
+
     pub async fn is_active(&mut self, maybe_timeout: Option<u64>) -> Result<u64, String> {
         let random_value: [u8; 4] = [0u8; 4];
 
         let fut = PingFuture::new();
-
-        let fut = self.ping_requests.insert(random_value, fut).unwrap();
+        self.ping_requests.insert(random_value, fut);
 
         self.status_tx
             .unbounded_send(Box::new([
@@ -179,15 +197,19 @@ impl<St: DuplexStream> End<St> {
             ]))
             .map_err(|e| e.to_string())?;
 
+        println!("sent ping");
         let timeout_duration = maybe_timeout.unwrap_or(DEFAULT_RELAYED_CONNECTION_PING_TIMEOUT as u64);
 
         let response_timeout = sleep(std::time::Duration::from_millis(timeout_duration as u64)).fuse();
 
         pin_mut!(response_timeout);
 
-        match select(fut, response_timeout).await {
+        match select(self.ping_requests.get_mut(&random_value).unwrap(), response_timeout).await {
             Either::Left(x) => Ok(x.0),
-            Either::Right(_) => Err("ping timeout".into()),
+            Either::Right(_) => {
+                println!("ping timeout");
+                Err("ping timeout".into())
+            }
         }
     }
 
@@ -219,7 +241,9 @@ impl<St: DuplexStream> End<St> {
         // 4. check for recent incoming messages
         // -> repeat
         Poll::Ready(loop {
+            println!("loop iteration");
             if let Some(chunk) = this.buffered.take() {
+                println!("taking buffered {:?}", chunk);
                 // other.st.as_mut().as_pin_mut()
                 let mut other_st = Pin::new(other.st.as_mut().unwrap());
                 // let mut other_st = unsafe { Pin::new_unchecked(&mut other.st.as_deref_mut().unwrap()) };
@@ -233,7 +257,11 @@ impl<St: DuplexStream> End<St> {
                 };
             }
 
+            println!("took buffered");
+
             if let Poll::Ready(Some(new_stream)) = this.new_stream_rx.as_mut().poll_next(cx) {
+                println!("polling new stream");
+
                 this.st.set(Some(new_stream));
 
                 // Drop any previously cached message
@@ -244,13 +272,21 @@ impl<St: DuplexStream> End<St> {
                 continue;
             }
 
+            println!("polled new stream");
+
             if let Poll::Ready(Some(status_message)) = this.status_rx.as_mut().poll_next(cx) {
+                println!("polling status message");
+
                 *this.buffered = Some(status_message);
                 continue;
             }
 
+            println!("polled status message");
+
             match ready!(this.st.as_mut().as_pin_mut().unwrap().poll_next(cx)?) {
                 Some(chunk) => {
+                    println!("polling from stream");
+
                     match chunk[0] {
                         x if (x == MessagePrefix::ConnectionStatus as u8
                             && chunk[1] == ConnectionStatusMessage::Stop as u8) =>
@@ -299,12 +335,16 @@ impl<St: DuplexStream> End<St> {
 }
 
 impl<St: DuplexStream> Server<St> {
-    fn new(stream_a: St, peer_a: PeerId, stream_b: St, peer_b: PeerId) -> () {
+    pub fn new(stream_a: St, peer_a: PeerId, stream_b: St, peer_b: PeerId) -> Self {
         let (status_ab_tx, status_ab_rx) = mpsc::unbounded::<Box<[u8]>>();
         let (status_ba_tx, status_ba_rx) = mpsc::unbounded::<Box<[u8]>>();
 
-        let (new_stream_a_tx, new_stream_a_tr) = mpsc::unbounded::<St>();
-        let (new_stream_b_tx, new_stream_b_rx) = mpsc::unbounded::<St>();
+        Self {
+            a: End::new(stream_a, peer_a.clone(), status_ba_tx, status_ab_rx),
+            a_ended: false,
+            b: End::new(stream_b, peer_b.clone(), status_ab_tx, status_ba_rx),
+            b_ended: false,
+        }
     }
 
     pub fn get_id(&self) -> RelayConnectionIdentifier {
@@ -362,7 +402,7 @@ impl<St: DuplexStream> Future for Server<St> {
 
 #[cfg(test)]
 mod tests {
-    use futures::{stream::FusedStream, Sink, Stream};
+    use futures::{stream::FusedStream, Sink, SinkExt, Stream, StreamExt};
 
     use super::*;
     use std::str::FromStr;
@@ -378,22 +418,22 @@ mod tests {
             rx: UnboundedReceiver<Box<[u8]>>,
             #[pin]
             tx: UnboundedSender<Box<[u8]>>,
-            send: UnboundedSender<Box<[u8]>>,
-            receive: UnboundedReceiver<Box<[u8]>>,
         }
     }
 
     impl TestingDuplexStream {
-        fn new() -> Self {
+        fn new() -> (Self, UnboundedSender<Box<[u8]>>, UnboundedReceiver<Box<[u8]>>) {
             let (send_tx, send_rx) = mpsc::unbounded::<Box<[u8]>>();
             let (receive_tx, receive_rx) = mpsc::unbounded::<Box<[u8]>>();
 
-            Self {
-                rx: send_rx,
-                tx: receive_tx,
-                send: send_tx,
-                receive: receive_rx,
-            }
+            (
+                Self {
+                    rx: send_rx,
+                    tx: receive_tx,
+                },
+                send_tx,
+                receive_rx,
+            )
         }
     }
 
@@ -449,6 +489,102 @@ mod tests {
 
     impl DuplexStream for TestingDuplexStream {}
 
+    pin_project! {
+        struct TestingPoll< St> {
+            #[pin]
+            end: End<St>,
+            #[pin]
+            other_end:End<St>,
+        }
+    }
+
+    impl<St: DuplexStream> TestingPoll<St> {
+        fn new(end: End<St>, other_end: End<St>) -> Self {
+            Self { end, other_end }
+        }
+    }
+
+    impl<St: DuplexStream> Future for TestingPoll<St> {
+        type Output = ();
+        fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+            let mut this = self.project();
+
+            match this.end.poll(&mut this.other_end, cx) {
+                Poll::Pending => Poll::Pending,
+                Poll::Ready(x) => Poll::Ready(()),
+            }
+        }
+    }
+
+    pin_project! {
+        struct TestingPollActive<St> {
+            #[pin]
+            end: End<St>,
+            #[pin]
+            other_end:End<St>,
+            st_send: UnboundedSender<Box<[u8]>>
+        }
+    }
+
+    impl<St: DuplexStream> TestingPollActive<St> {
+        fn new(end: End<St>, other_end: End<St>, st_send: UnboundedSender<Box<[u8]>>) -> Self {
+            Self {
+                end,
+                other_end,
+                st_send,
+            }
+        }
+    }
+
+    impl<St: DuplexStream> Future for TestingPollActive<St> {
+        type Output = ();
+        fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+            let mut this = self.project();
+
+            let mut ping_sent = false;
+            loop {
+                let mut active_pending = false;
+
+                if !ping_sent {
+                    ping_sent = true;
+                    match Box::pin(this.end.as_mut().is_active(None)).poll_unpin(cx) {
+                        Poll::Pending => {
+                            active_pending = true;
+                        }
+                        Poll::Ready(_) => {
+                            this.st_send
+                                .unbounded_send(Box::new([
+                                    MessagePrefix::StatusMessage as u8,
+                                    StatusMessage::Pong as u8,
+                                ]))
+                                .unwrap();
+
+                            this.st_send
+                                .unbounded_send(Box::new([
+                                    MessagePrefix::ConnectionStatus as u8,
+                                    ConnectionStatusMessage::Stop as u8,
+                                ]))
+                                .unwrap();
+                        }
+                    }
+                }
+
+                match this.end.as_mut().poll(&mut this.other_end, cx) {
+                    Poll::Pending => {
+                        if active_pending {
+                            return Poll::Pending;
+                        }
+                    }
+                    Poll::Ready(x) => {
+                        if ping_sent {
+                            return Poll::Ready(());
+                        }
+                    }
+                };
+            }
+        }
+    }
+
     #[async_std::test]
     async fn wake_ping_future() {
         let now = current_timestamp();
@@ -486,6 +622,116 @@ mod tests {
             RelayConnectionIdentifier::try_from((PeerId::from_str(BOB).unwrap(), PeerId::from_str(ALICE).unwrap()))
                 .unwrap();
 
-        assert!(ab.eq(&ba))
+        assert!(ab.eq(&ba));
+        assert!(ab.to_string().eq(&ba.to_string()));
+    }
+
+    #[async_std::test]
+    async fn test_connection_end() {
+        let (status_ab_tx, status_ab_rx) = mpsc::unbounded::<Box<[u8]>>();
+        let (status_ba_tx, status_ba_rx) = mpsc::unbounded::<Box<[u8]>>();
+
+        let (st, st_send, st_receive) = TestingDuplexStream::new();
+        let (st_other, st_other_send, st_other_receive) = TestingDuplexStream::new();
+
+        let conn_a = End::new(st, PeerId::from_str(ALICE).unwrap().clone(), status_ba_tx, status_ab_rx);
+        let conn_b = End::new(
+            st_other,
+            PeerId::from_str(ALICE).unwrap().clone(),
+            status_ab_tx,
+            status_ba_rx,
+        );
+
+        st_send
+            .unbounded_send(Box::new([MessagePrefix::Payload as u8, 0, 0, 0, 0]))
+            .unwrap();
+
+        st_send
+            .unbounded_send(Box::new([MessagePrefix::WebRTC as u8, 0, 0, 0, 0]))
+            .unwrap();
+
+        st_send
+            .unbounded_send(Box::new([
+                MessagePrefix::ConnectionStatus as u8,
+                ConnectionStatusMessage::Stop as u8,
+            ]))
+            .unwrap();
+
+        TestingPoll::new(conn_a, conn_b).await;
+
+        assert_eq!(
+            st_other_receive.collect::<Vec<Box<[u8]>>>().await,
+            vec![
+                Box::new([MessagePrefix::Payload as u8, 0, 0, 0, 0]) as Box<[u8]>,
+                Box::new([MessagePrefix::WebRTC as u8, 0, 0, 0, 0]) as Box<[u8]>
+            ]
+        );
+    }
+
+    #[async_std::test]
+    async fn test_stream_upgrade() {
+        let (status_ab_tx, status_ab_rx) = mpsc::unbounded::<Box<[u8]>>();
+        let (status_ba_tx, status_ba_rx) = mpsc::unbounded::<Box<[u8]>>();
+
+        let (st, st_send, st_receive) = TestingDuplexStream::new();
+        let (st_other, st_other_send, st_other_receive) = TestingDuplexStream::new();
+
+        let mut conn_a = End::new(st, PeerId::from_str(ALICE).unwrap().clone(), status_ba_tx, status_ab_rx);
+        let conn_b = End::new(
+            st_other,
+            PeerId::from_str(ALICE).unwrap().clone(),
+            status_ab_tx,
+            status_ba_rx,
+        );
+
+        // Should not forward this message
+        st_send
+            .unbounded_send(Box::new([MessagePrefix::Payload as u8, 0, 0, 0, 0]))
+            .unwrap();
+
+        let (st_next, st_next_send, st_next_receive) = TestingDuplexStream::new();
+
+        assert!(conn_a.update(st_next).is_ok());
+
+        st_next_send
+            .unbounded_send(Box::new([
+                MessagePrefix::ConnectionStatus as u8,
+                ConnectionStatusMessage::Stop as u8,
+            ]))
+            .unwrap();
+
+        TestingPoll::new(conn_a, conn_b).await;
+
+        assert_eq!(
+            st_other_receive.collect::<Vec<Box<[u8]>>>().await,
+            vec![Box::new([
+                MessagePrefix::ConnectionStatus as u8,
+                ConnectionStatusMessage::Restart as u8
+            ]) as Box<[u8]>,]
+        );
+    }
+
+    #[async_std::test]
+    async fn test_is_active() {
+        let (status_ab_tx, status_ab_rx) = mpsc::unbounded::<Box<[u8]>>();
+        let (status_ba_tx, status_ba_rx) = mpsc::unbounded::<Box<[u8]>>();
+
+        let (st, st_send, mut st_receive) = TestingDuplexStream::new();
+        let (st_other, st_other_send, st_other_receive) = TestingDuplexStream::new();
+
+        let conn_a = End::new(st, PeerId::from_str(ALICE).unwrap().clone(), status_ba_tx, status_ab_rx);
+        let conn_b = End::new(
+            st_other,
+            PeerId::from_str(ALICE).unwrap().clone(),
+            status_ab_tx,
+            status_ba_rx,
+        );
+
+        TestingPollActive::new(conn_a, conn_b, st_send).await;
+
+        assert_eq!(
+            st_receive.take(1).collect::<Vec<Box<[u8]>>>().await,
+            vec![Box::new([MessagePrefix::StatusMessage as u8, StatusMessage::Ping as u8]) as Box<[u8]>]
+        );
     }
 }
