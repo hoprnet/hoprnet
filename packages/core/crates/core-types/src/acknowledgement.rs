@@ -65,11 +65,11 @@ impl BinarySerializable<'_> for Acknowledgement {
         let mut buf = data.to_vec();
         if data.len() == Self::SIZE {
             let ack_signature = Signature::deserialize(buf.drain(..Signature::SIZE).as_ref())?;
-            let challenge_signature = Signature::deserialize(buf.drain(..AcknowledgementChallenge::SIZE).as_ref())?;
+            let challenge_signature = AcknowledgementChallenge::deserialize(buf.drain(..AcknowledgementChallenge::SIZE).as_ref())?;
             let ack_key_share = HalfKey::deserialize(buf.drain(..HalfKey::SIZE).as_ref())?;
             Ok(Self {
                 ack_signature,
-                challenge_signature,
+                challenge_signature: challenge_signature.signature,
                 ack_key_share,
                 validated: false,
             })
@@ -279,7 +279,7 @@ impl BinarySerializable<'_> for AcknowledgementChallenge {
 
     fn serialize(&self) -> Box<[u8]> {
         assert!(self.ack_challenge.is_some(), "challenge is invalid");
-        self.signature.serialize()
+        self.signature.raw_signature()
     }
 }
 
@@ -324,8 +324,13 @@ impl BinarySerializable<'_> for PendingAcknowledgement {
 
 #[cfg(test)]
 pub mod test {
-    use crate::acknowledgement::PendingAcknowledgement;
+    use ethnum::u256;
+    use hex_literal::hex;
+    use core_crypto::types::{Challenge, CurvePoint, HalfKey, PublicKey};
+    use utils_types::primitives::{Address, Balance, BalanceType, U256};
+    use crate::acknowledgement::{Acknowledgement, AcknowledgementChallenge, PendingAcknowledgement, UnacknowledgedTicket};
     use utils_types::traits::BinarySerializable;
+    use crate::channels::Ticket;
 
     // TODO: Add tests to all remaining types
 
@@ -336,11 +341,84 @@ pub mod test {
             PendingAcknowledgement::deserialize(&PendingAcknowledgement::WaitingAsSender.serialize()).unwrap()
         );
     }
+
+    #[test]
+    fn test_acknowledgement_challenge() {
+        let hkc = HalfKey::new(&hex!("3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa")).to_challenge();
+        let pk = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
+        let pub_key = PublicKey::from_privkey(&pk).unwrap();
+
+        let mut akc1 = AcknowledgementChallenge::new(&hkc, &pk);
+        assert!(akc1.validate(hkc.clone(), &pub_key));
+
+        let mut akc2 = AcknowledgementChallenge::deserialize(&akc1.serialize()).unwrap();
+        assert!(akc2.validate(hkc.clone(), &pub_key));
+
+        assert_eq!(akc1, akc2);
+    }
+
+    #[test]
+    fn test_acknowledgement() {
+        let pk_1 = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
+        let pub_key_1 = PublicKey::from_privkey(&pk_1).unwrap();
+
+        let pk_2 = hex!("4471496ef88d9a7d86a92b7676f3c8871a60792a37fae6fc3abc347c3aa3b16b");
+        let pub_key_2 = PublicKey::from_privkey(&pk_2).unwrap();
+
+        let ack_key = HalfKey::new(&hex!("3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa"));
+
+        let akc1 = AcknowledgementChallenge::new(&ack_key.to_challenge(), &pk_1);
+
+        let mut ack1 = Acknowledgement::new(akc1, ack_key, &pk_2);
+        assert!(ack1.validate(&pub_key_1, &pub_key_2));
+
+        let mut ack2 = Acknowledgement::deserialize(&ack1.serialize()).unwrap();
+        assert!(ack2.validate(&pub_key_1, &pub_key_2));
+
+        assert_eq!(ack1, ack2);
+    }
+
+    #[test]
+    fn test_unacknowledged_ticket() {
+        let pk_1 = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
+        let pub_key_1 = PublicKey::from_privkey(&pk_1).unwrap();
+
+        let hk1 = HalfKey::new(&hex!("3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa"));
+        let hk2 = HalfKey::new(&hex!("4471496ef88d9a7d86a92b7676f3c8871a60792a37fae6fc3abc347c3aa3b16b"));
+        let cp1: CurvePoint = hk1.to_challenge().into();
+        let cp2: CurvePoint = hk2.to_challenge().into();
+        let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
+
+        let inverse_win_prob = u256::new(1u128); // 100 %
+        let price_per_packet = u256::new(10000000000000000u128); // 0.01 HOPR
+        let path_pos = 5;
+
+        let ticket1 = Ticket::new(
+            Address::new(&[0u8; Address::SIZE]),
+            Some(Challenge::from(cp_sum)),
+            U256::new("1"),
+            U256::new("2"),
+            Balance::new(
+                inverse_win_prob * price_per_packet * path_pos as u128,
+                BalanceType::HOPR,
+            ),
+            U256::from_inverse_probability(&inverse_win_prob).unwrap(),
+            U256::new("4"),
+            &pk_1,
+        );
+
+        let unack1 = UnacknowledgedTicket::new(ticket1, hk1, pub_key_1);
+        assert!(unack1.verify_signature());
+        assert!(unack1.verify_challenge(&hk2).unwrap());
+
+        let unack2 = UnacknowledgedTicket::deserialize(&unack1.serialize()).unwrap();
+        assert_eq!(unack1, unack2);
+    }
 }
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use crate::acknowledgement::{AcknowledgedTicket, Acknowledgement, UnacknowledgedTicket};
+    use crate::acknowledgement::{AcknowledgedTicket, Acknowledgement, AcknowledgementChallenge, UnacknowledgedTicket};
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use utils_types::traits::BinarySerializable;
@@ -403,6 +481,9 @@ pub mod wasm {
         pub fn _verify_challenge(&self, acknowledgement: &HalfKey) -> JsResult<bool> {
             ok_or_jserr!(self.verify_challenge(acknowledgement))
         }
+
+        #[wasm_bindgen(js_name = "eq")]
+        pub fn _eq(&self, other: &UnacknowledgedTicket) -> bool { self.eq(other) }
     }
 
     #[wasm_bindgen]
@@ -416,6 +497,25 @@ pub mod wasm {
         pub fn _serialize(&self) -> Box<[u8]> {
             self.serialize()
         }
+
+        #[wasm_bindgen(js_name = "eq")]
+        pub fn _eq(&self, other: &AcknowledgedTicket) -> bool { self.eq(other) }
+    }
+
+    #[wasm_bindgen]
+    impl AcknowledgementChallenge {
+        #[wasm_bindgen(js_name = "deserialize")]
+        pub fn _deserialize(data: &[u8]) -> JsResult<AcknowledgementChallenge> {
+            ok_or_jserr!(Self::deserialize(data))
+        }
+
+        #[wasm_bindgen(js_name = "serialize")]
+        pub fn _serialize(&self) -> Box<[u8]> {
+            self.serialize()
+        }
+
+        #[wasm_bindgen(js_name = "eq")]
+        pub fn _eq(&self, other: &AcknowledgementChallenge) -> bool { self.eq(other) }
     }
 
     #[wasm_bindgen]
@@ -429,5 +529,8 @@ pub mod wasm {
         pub fn _serialize(&self) -> Box<[u8]> {
             self.serialize()
         }
+
+        #[wasm_bindgen(js_name = "eq")]
+        pub fn _eq(&self, other: &Acknowledgement) -> bool { self.eq(other) }
     }
 }

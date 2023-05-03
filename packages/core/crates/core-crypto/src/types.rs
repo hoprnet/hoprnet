@@ -118,6 +118,12 @@ impl From<AffinePoint> for CurvePoint {
     }
 }
 
+impl From<HalfKeyChallenge> for CurvePoint {
+    fn from(value: HalfKeyChallenge) -> Self {
+        CurvePoint::deserialize(&value.hkc).unwrap()
+    }
+}
+
 impl FromStr for CurvePoint {
     type Err = CryptoError;
 
@@ -176,6 +182,21 @@ impl CurvePoint {
     /// Serializes the curve point into a compressed form. This is a cheap operation.
     pub fn serialize_compressed(&self) -> Box<[u8]> {
         self.affine.to_encoded_point(true).to_bytes()
+    }
+
+    /// Sums all given curve points together, creating a new curve point.
+    pub fn combine(summands: &[&CurvePoint]) -> CurvePoint {
+        // Convert all public keys to EC points in the projective coordinates, which are
+        // more efficient for doing the additions. Then finally make in an affine point
+        let affine: AffinePoint = summands
+            .iter()
+            .map(|p| p.to_projective_point())
+            .fold(<Secp256k1 as CurveArithmetic>::ProjectivePoint::IDENTITY, |acc, x| {
+                acc.add(x)
+            })
+            .to_affine();
+
+        affine.into()
     }
 }
 
@@ -525,7 +546,8 @@ impl TryFrom<CurvePoint> for PublicKey {
     type Error = CryptoError;
 
     fn try_from(value: CurvePoint) -> std::result::Result<Self, Self::Error> {
-        let key = elliptic_curve::PublicKey::<Secp256k1>::from_affine(value.affine).map_err(|_| InvalidInputValue)?;
+        let key = elliptic_curve::PublicKey::<Secp256k1>::from_affine(value.affine)
+            .map_err(|_| InvalidInputValue)?;
         Ok(Self {
             key,
             compressed: key.to_encoded_point(true).to_bytes(),
@@ -617,21 +639,10 @@ impl PublicKey {
     /// Sums all given public keys together, creating a new public key.
     /// Panics if reaches infinity (EC identity point), which is an invalid public key.
     pub fn combine(summands: &[&PublicKey]) -> PublicKey {
-        // Convert all public keys to EC points in the projective coordinates, which are
-        // more efficient for doing the additions. Then finally make in an affine point
-        let affine: AffinePoint = summands
-            .iter()
-            .map(|p| p.key.to_projective())
-            .fold(<Secp256k1 as CurveArithmetic>::ProjectivePoint::IDENTITY, |acc, x| {
-                acc.add(x)
-            })
-            .to_affine();
-
-        Self {
-            key: elliptic_curve::PublicKey::<Secp256k1>::from_affine(affine)
-                .expect("combination results in the ec identity (which is an invalid pub key)"),
-            compressed: affine.to_encoded_point(true).to_bytes(),
-        }
+        let cps = summands.iter().map(|pk| CurvePoint::from(*pk)).collect::<Vec<_>>();
+        let cps_ref = cps.iter().map(|cp| cp).collect::<Vec<_>>();
+        CurvePoint::combine(&cps_ref).try_into()
+            .expect("combination results in the ec identity (which is an invalid pub key)")
     }
 
     /// Adds the given public key with `tweak` times secp256k1 generator, producing a new public key.
@@ -729,7 +740,7 @@ impl BinarySerializable<'_> for Response {
 /// This signature encodes the 2-bit recovery information into the
 /// upper-most bits of MSB of the S value, which are never used by this ECDSA
 /// instantiation over secp256k1.
-#[derive(Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Signature {
     // TODO: The signature will be secp256k1 only, it will not accept Ed25519 public keys
@@ -847,6 +858,14 @@ impl BinarySerializable<'_> for Signature {
         compressed.into_boxed_slice()
     }
 }
+
+impl PartialEq for Signature {
+    fn eq(&self, other: &Self) -> bool {
+        self.signature.eq(&other.signature)
+    }
+}
+
+impl Eq for Signature { }
 
 /// A method that turns all lower-cased hexadecimal address to a checksum-ed address
 /// according to https://eips.ethereum.org/EIPS/eip-55
