@@ -191,11 +191,11 @@ describe('cryptographic correspondence tests', async function () {
     assert(u8aEquals(ts_pub.serializeCompressed(), rs_pub.serialize(true)))
     assert(u8aEquals(ts_pub.serializeUncompressed(), rs_pub.serialize(false)))
     assert.equal(
-      PublicKey.deserialize(ts_pub.serializeCompressed()).to_hex(true),
+      '0x' + PublicKey.deserialize(ts_pub.serializeCompressed()).to_hex(true),
       TsPublicKey.deserialize(rs_pub.serialize(true)).toCompressedPubKeyHex()
     )
     assert.equal(
-      PublicKey.deserialize(ts_pub.serializeUncompressed()).to_hex(true),
+      '0x' + PublicKey.deserialize(ts_pub.serializeUncompressed()).to_hex(false),
       TsPublicKey.deserialize(rs_pub.serialize(false)).toUncompressedPubKeyHex()
     )
   })
@@ -203,14 +203,14 @@ describe('cryptographic correspondence tests', async function () {
   it('signature correspondence tests', async function() {
     let priv_key = stringToU8a('0x492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775')
     let rs_pub = PublicKey.from_privkey(priv_key)
-    let message = stringToU8a('some testing message')
+    let message = Hash.create(stringToU8a('0xdeadbeefcafebabe')).serialize()
 
-    let rs_sgn = Signature.sign_message(message, priv_key)
+    let rs_sgn = Signature.sign_hash(message, priv_key)
     let ts_sgn = TsSignature.deserialize(rs_sgn.serialize())
     assert(ts_sgn.verify(message, TsPublicKey.fromPeerIdString(rs_pub.to_peerid_str())))
 
     let rs_sgn_2 = TsSignature.create(message, priv_key)
-    assert(Signature.deserialize(rs_sgn_2.serialize()).verify_message_with_pubkey(message, rs_pub))
+    assert(Signature.deserialize(rs_sgn_2.serialize()).verify_hash_with_pubkey(message, rs_pub))
   })
 
   it('keyshares correspondence generate key shares in TS and verify them in RS', async function () {

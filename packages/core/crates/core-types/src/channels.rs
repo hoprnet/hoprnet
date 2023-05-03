@@ -381,13 +381,22 @@ pub mod tests {
     use utils_types::primitives::{Address, Balance, BalanceType, U256};
     use utils_types::traits::BinarySerializable;
 
-    use crate::channels::{ChannelEntry, ChannelStatus, Ticket};
+    use crate::channels::{ChannelEntry, ChannelStatus, ethereum_signed_hash, Ticket};
 
     const PUBLIC_KEY_1: [u8; 65] = hex!("0443a3958ac66a3b2ab89fcf90bc948a8b8be0e0478d21574d077ddeb11f4b1e9f2ca21d90bd66cee037255480a514b91afae89e20f7f7fa7353891cc90a52bf6e");
     const PUBLIC_KEY_2: [u8; 65] = hex!("04f16fd6701aea01032716377d52d8213497c118f99cdd1c3c621b2795cac8681606b7221f32a8c5d2ef77aa783bec8d96c11480acccabba9e8ee324ae2dfe92bb");
     const COMMITMENT: [u8; 32] = hex!("ffab46f058090de082a086ea87c535d34525a48871c5a2024f80d0ac850f81ef");
 
     const SGN_PRIVATE_KEY: [u8; 32] = hex!("e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8");
+
+    #[test]
+    pub fn ethereum_signed_hash_test() {
+        let hash = Hash::create(&[&hex!("deadbeef")]);
+        let expected = hex!("3c4fb46e8b00d86ff9ff3a2fcd21c99564d0c8797c2eb05e5eb22b8102e283a5");
+
+        let res = ethereum_signed_hash(&hash.serialize());
+        assert_eq!(&expected, res.serialize().as_ref());
+    }
 
     #[test]
     pub fn channel_entry_test() {
@@ -485,6 +494,11 @@ pub mod wasm {
     #[wasm_bindgen]
     pub fn channel_status_to_string(status: ChannelStatus) -> String {
         status.to_string()
+    }
+
+    #[wasm_bindgen]
+    pub fn ethereum_signed_hash(message: &Hash) -> Hash {
+        super::ethereum_signed_hash(<Hash as BinarySerializable>::serialize(message))
     }
 
     #[wasm_bindgen]

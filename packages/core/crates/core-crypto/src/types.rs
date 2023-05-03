@@ -486,7 +486,8 @@ impl PublicKey {
 
     /// Serializes the public key to a binary form and converts it to hexadecimal string representation.
     pub fn to_hex(&self, compressed: bool) -> String {
-        hex::encode(self.serialize(compressed))
+        let offset = if compressed { 0 } else { 1 };
+        hex::encode(&self.serialize(compressed)[offset..])
     }
 }
 
@@ -814,6 +815,7 @@ impl Signature {
         self.verify_hash(hash, &public_key.serialize(false))
     }
 
+    /// Returns the raw signature, without the encoded public key recovery bit.
     pub fn raw_signature(&self) -> Box<[u8]> {
         self.signature.into()
     }
@@ -924,6 +926,17 @@ pub mod tests {
 
         assert_eq!(pk1, pk2, "pubkeys don't match");
         assert_eq!(pk1.to_peerid_str(), pk2.to_peerid_str(), "peer id strings don't match");
+    }
+
+    #[test]
+    fn public_key_to_hex() {
+        let pk = PublicKey::from_privkey(
+            &hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")
+        ).unwrap();
+
+        assert_eq!("39d1bc2291826eaed86567d225cf243ebc637275e0a5aedb0d6b1dc82136a38e428804340d4c949a029846f682711d046920b4ca8b8ebeb9d1192b5bdaa54dba",
+                   pk.to_hex(false));
+        assert_eq!("0239d1bc2291826eaed86567d225cf243ebc637275e0a5aedb0d6b1dc82136a38e", pk.to_hex(true));
     }
 
     #[test]

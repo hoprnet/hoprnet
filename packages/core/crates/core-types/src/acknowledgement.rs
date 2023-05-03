@@ -81,8 +81,8 @@ impl BinarySerializable<'_> for Acknowledgement {
     fn serialize(&self) -> Box<[u8]> {
         assert!(self.validated, "acknowledgement not validated");
         let mut ret = Vec::with_capacity(Self::SIZE);
-        ret.extend_from_slice(&self.ack_signature.serialize());
-        ret.extend_from_slice(&self.challenge_signature.serialize());
+        ret.extend_from_slice(&self.ack_signature.raw_signature());
+        ret.extend_from_slice(&self.challenge_signature.raw_signature());
         ret.extend_from_slice(&self.ack_key_share.serialize());
         ret.into_boxed_slice()
     }

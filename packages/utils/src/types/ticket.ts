@@ -7,7 +7,7 @@ import { EthereumChallenge } from './ethereumChallenge.js'
 import { PRICE_PER_PACKET, INVERSE_TICKET_WIN_PROB } from '../constants.js'
 
 // Prefix message with "\x19Ethereum Signed Message:\n {length} HOPRnet {message}" and return hash
-function toEthSignedMessageHash(message: Hash): Hash {
+export function toEthSignedMessageHash(message: Hash): Hash {
   const result = ethers.utils.solidityKeccak256(
     ['string', 'bytes'],
     ['\x19Ethereum Signed Message:\n32', message.serialize()]
