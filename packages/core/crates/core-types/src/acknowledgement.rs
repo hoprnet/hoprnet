@@ -193,7 +193,7 @@ impl BinarySerializable<'_> for UnacknowledgedTicket {
             let mut buf = data.to_vec();
             let ticket = Ticket::deserialize(buf.drain(..Ticket::SIZE).as_ref())?;
             let own_key = HalfKey::deserialize(buf.drain(..HalfKey::SIZE).as_ref())?;
-            let signer = PublicKey::deserialize(buf.drain(..PublicKey::SIZE_COMPRESSED).as_ref())?;
+            let signer = PublicKey::deserialize(buf.drain(..PublicKey::SIZE_UNCOMPRESSED).as_ref())?;
             Ok(Self {
                 ticket,
                 own_key,
