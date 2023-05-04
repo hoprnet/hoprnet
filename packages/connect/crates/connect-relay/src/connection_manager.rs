@@ -2,14 +2,15 @@ use crate::{
     server_new::{RelayConnectionIdentifier, Server},
     traits::DuplexStream,
 };
-use core::{
-    hash::{Hash, Hasher},
+use futures::Future;
+use pin_project_lite::pin_project;
+use std::{
+    cell::RefCell,
+    collections::HashMap,
     pin::Pin,
+    rc::Rc,
     task::{Context, Poll},
 };
-use futures::{stream::FusedStream, Future, FutureExt, Sink, Stream, StreamExt};
-use pin_project_lite::pin_project;
-use std::{cell::RefCell, cmp::Ordering, collections::HashMap, rc::Rc};
 use utils_log::error;
 
 use libp2p::PeerId;
@@ -36,14 +37,19 @@ impl<St: DuplexStream> Future for PollBorrow<St> {
 }
 
 struct RelayConnections<St> {
-    conns: HashMap<RelayConnectionIdentifier, Rc<RefCell<Server<St>>>>,
+    conns: Rc<RefCell<HashMap<RelayConnectionIdentifier, Rc<RefCell<Server<St>>>>>>,
 }
 
 impl<St> ToString for RelayConnections<St> {
     fn to_string(&self) -> String {
         let prefix: String = "RelayConnections:\n".into();
 
-        let items: String = self.conns.keys().map(|x| format!("  {}\n", x.to_string())).collect();
+        let items: String = self
+            .conns
+            .borrow()
+            .keys()
+            .map(|x| format!("  {}\n", x.to_string()))
+            .collect();
 
         format!("{} {}", prefix, items)
     }
@@ -51,7 +57,9 @@ impl<St> ToString for RelayConnections<St> {
 
 impl<'a, St: DuplexStream + 'static> RelayConnections<St> {
     pub fn new() -> Self {
-        Self { conns: HashMap::new() }
+        Self {
+            conns: Rc::new(RefCell::new(HashMap::new())),
+        }
     }
 
     pub fn create_new(&mut self, id_a: PeerId, stream_a: St, id_b: PeerId, stream_b: St) -> Result<(), String> {
@@ -59,11 +67,14 @@ impl<'a, St: DuplexStream + 'static> RelayConnections<St> {
 
         let server = Rc::new(RefCell::new(Server::new(stream_a, id_a, stream_b, id_b)));
 
-        self.conns.insert(id1, server.clone());
+        let id1_to_move = id1.clone();
+        self.conns.borrow_mut().insert(id1, server.clone());
 
+        let conn_to_move = self.conns.clone();
         let polling = PollBorrow { st: server };
-        spawn_local(async {
+        spawn_local(async move {
             polling.await;
+            conn_to_move.borrow_mut().remove(&id1_to_move);
         });
 
         Ok(())
@@ -78,7 +89,7 @@ impl<'a, St: DuplexStream + 'static> RelayConnections<St> {
             }
         };
 
-        if let Some(entry) = self.conns.get_mut(&id) {
+        if let Some(entry) = self.conns.borrow_mut().get_mut(&id) {
             return entry.borrow_mut().is_active(source, maybe_timeout).await;
         }
 
@@ -94,7 +105,7 @@ impl<'a, St: DuplexStream + 'static> RelayConnections<St> {
             }
         };
 
-        if let Some(entry) = self.conns.get_mut(&id) {
+        if let Some(entry) = self.conns.borrow_mut().get_mut(&id) {
             entry.borrow_mut().update(source, to_source).unwrap();
             return true;
         }
@@ -111,7 +122,7 @@ impl<'a, St: DuplexStream + 'static> RelayConnections<St> {
             }
         };
 
-        self.conns.contains_key(&id)
+        self.conns.borrow().contains_key(&id)
     }
 }
 
