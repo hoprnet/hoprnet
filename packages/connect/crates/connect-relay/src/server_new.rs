@@ -352,13 +352,34 @@ impl<St: DuplexStream> Server<St> {
 
         (self.a.id.clone(), self.b.id.clone()).try_into().unwrap()
     }
+
+    pub async fn is_active(&mut self, peer: PeerId, maybe_timeout: Option<u64>) -> bool {
+        if peer.eq(&self.a.id) {
+            self.a.is_active(maybe_timeout).await.unwrap();
+        } else if peer.eq(&self.b.id) {
+            self.b.is_active(maybe_timeout).await.unwrap();
+        }
+
+        false
+    }
+
+    pub fn update(&mut self, peer: PeerId, st: St) -> Result<(), String> {
+        if peer.eq(&self.a.id) {
+            return self.a.update(st);
+        } else if peer.eq(&self.b.id) {
+            return self.b.update(st);
+        }
+
+        Err("Incorrect peer. None of the stored peers matches the given peer".into())
+    }
 }
 
 impl<St: DuplexStream> Future for Server<St> {
     type Output = Result<(), String>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        loop {
+        while !self.a_ended && !self.b_ended {
+            println!("server polling iteration");
             let mut a_pending = false;
             if !self.a_ended {
                 let mut this = self.as_mut().project();
@@ -397,12 +418,14 @@ impl<St: DuplexStream> Future for Server<St> {
                 }
             }
         }
+
+        Poll::Ready(Ok(()))
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use futures::{stream::FusedStream, Sink, SinkExt, Stream, StreamExt};
+    use futures::{stream::FusedStream, Sink, Stream, StreamExt};
 
     use super::*;
     use std::str::FromStr;
@@ -716,7 +739,7 @@ mod tests {
         let (status_ab_tx, status_ab_rx) = mpsc::unbounded::<Box<[u8]>>();
         let (status_ba_tx, status_ba_rx) = mpsc::unbounded::<Box<[u8]>>();
 
-        let (st, st_send, mut st_receive) = TestingDuplexStream::new();
+        let (st, st_send, st_receive) = TestingDuplexStream::new();
         let (st_other, st_other_send, st_other_receive) = TestingDuplexStream::new();
 
         let conn_a = End::new(st, PeerId::from_str(ALICE).unwrap().clone(), status_ba_tx, status_ab_rx);
@@ -732,6 +755,67 @@ mod tests {
         assert_eq!(
             st_receive.take(1).collect::<Vec<Box<[u8]>>>().await,
             vec![Box::new([MessagePrefix::StatusMessage as u8, StatusMessage::Ping as u8]) as Box<[u8]>]
+        );
+    }
+
+    #[async_std::test]
+    async fn test_server() {
+        let (st_a, st_a_send, st_a_receive) = TestingDuplexStream::new();
+        let (st_b, st_b_send, st_b_receive) = TestingDuplexStream::new();
+
+        let server = Server::new(
+            st_a,
+            PeerId::from_str(ALICE).unwrap(),
+            st_b,
+            PeerId::from_str(BOB).unwrap(),
+        );
+
+        st_a_send
+            .unbounded_send(Box::new([MessagePrefix::Payload as u8, 0, 0, 0, 0]))
+            .unwrap();
+
+        st_a_send
+            .unbounded_send(Box::new([MessagePrefix::WebRTC as u8, 0, 0, 0, 0]))
+            .unwrap();
+
+        st_a_send
+            .unbounded_send(Box::new([
+                MessagePrefix::ConnectionStatus as u8,
+                ConnectionStatusMessage::Stop as u8,
+            ]))
+            .unwrap();
+
+        st_b_send
+            .unbounded_send(Box::new([MessagePrefix::Payload as u8, 1, 1, 1, 1]))
+            .unwrap();
+
+        st_b_send
+            .unbounded_send(Box::new([MessagePrefix::WebRTC as u8, 1, 1, 1, 1]))
+            .unwrap();
+
+        st_b_send
+            .unbounded_send(Box::new([
+                MessagePrefix::ConnectionStatus as u8,
+                ConnectionStatusMessage::Stop as u8,
+            ]))
+            .unwrap();
+
+        assert!(server.await.is_ok());
+
+        assert_eq!(
+            st_a_receive.collect::<Vec<Box<[u8]>>>().await,
+            vec![
+                Box::new([MessagePrefix::Payload as u8, 1, 1, 1, 1]) as Box<[u8]>,
+                Box::new([MessagePrefix::WebRTC as u8, 1, 1, 1, 1]) as Box<[u8]>
+            ]
+        );
+
+        assert_eq!(
+            st_b_receive.collect::<Vec<Box<[u8]>>>().await,
+            vec![
+                Box::new([MessagePrefix::Payload as u8, 0, 0, 0, 0]) as Box<[u8]>,
+                Box::new([MessagePrefix::WebRTC as u8, 0, 0, 0, 0]) as Box<[u8]>
+            ]
         );
     }
 }
