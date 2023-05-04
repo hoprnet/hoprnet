@@ -14,7 +14,6 @@ COPY vendor vendor/
 COPY packages packages/
 COPY Makefile Cargo.toml Cargo.lock .yarnrc.yml yarn.lock package.json tsconfig.build.json tsconfig.json yarn.lock rust-toolchain.toml ./
 
-RUN ls -alR vendor/cargo/platforms-3.0.2/src
 LABEL description="Launches a hoprd node"
 
 RUN make deps-docker package=hoprd && \
