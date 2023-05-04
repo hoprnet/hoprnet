@@ -147,7 +147,7 @@ describe('Rust - TS serialization/deserialization tests', async function () {
     let bb = u8aToHex(rs_akc.serialize())
     assert.equal(aa, bb)
     let d_akc = AcknowledgementChallenge.deserialize(ts_akc.serialize())
-    d_akc.validate(rs_hk.to_challenge(), pub_key_1)
+    d_akc.validate(rs_hkc, pub_key_1)
     assert(d_akc.eq(rs_akc), "ack challenge serde test failed")
   })
 
