@@ -4,8 +4,7 @@
 /build
 **/target
 **/.idea
-# Testing
-
+**/gha-creds-*.json
 
 # Exclude databases resulting from local execution of hoprd
 /db
