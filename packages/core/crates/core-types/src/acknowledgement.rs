@@ -1,3 +1,4 @@
+use core_crypto::errors::CryptoError::SignatureVerification;
 use crate::acknowledgement::PendingAcknowledgement::{WaitingAsRelayer, WaitingAsSender};
 use crate::channels::Ticket;
 use core_crypto::primitives::{DigestLike, SimpleDigest};
@@ -102,6 +103,8 @@ pub struct AcknowledgedTicket {
 impl AcknowledgedTicket {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(ticket: Ticket, response: Response, pre_image: Hash, signer: PublicKey) -> Self {
+        assert_ne!(ticket.counterparty, signer.to_address(),
+                   "signer must be different from the ticket counterparty");
         Self {
             ticket,
             response,
@@ -143,6 +146,22 @@ impl BinarySerializable<'_> for AcknowledgedTicket {
     }
 }
 
+impl AcknowledgedTicket {
+    /// Verifies if the embedded ticket has been signed by the given issuer and also
+    /// that the challenge on the embedded response matches the challenge on the ticket.
+    pub fn verify(&self, issuer: &PublicKey) -> core_crypto::errors::Result<()> {
+        (
+            self.ticket.verify(issuer).map(|_| true)? &&
+            self.response
+                .to_challenge()
+                .to_ethereum_challenge()
+                .eq(&self.ticket.challenge)
+        )
+        .then_some(())
+        .ok_or(SignatureVerification)
+    }
+}
+
 /// Wrapper for an unacknowledged ticket
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
@@ -163,21 +182,26 @@ impl UnacknowledgedTicket {
         }
     }
 
-    pub fn verify_signature(&self) -> bool {
-        self.ticket.verify(&self.signer)
-    }
-
     pub fn get_challenge(&self) -> HalfKeyChallenge {
         self.own_key.to_challenge()
     }
 }
 
 impl UnacknowledgedTicket {
-    pub fn verify_challenge(&self, acknowledgement: &HalfKey) -> core_crypto::errors::Result<bool> {
-        Ok(Response::from_half_keys(&self.own_key, acknowledgement)?
+    /// Verifies if signature on the embedded ticket using the embedded public key.
+    pub fn verify_signature(&self) -> core_crypto::errors::Result<()> {
+        self.ticket.verify(&self.signer)
+    }
+
+    /// Verifies if the challenge on the embedded ticket matches the solution
+    /// from the given acknowledgement and the embedded half key.
+    pub fn verify_challenge(&self, acknowledgement: &HalfKey) -> core_crypto::errors::Result<()> {
+        self.get_response(acknowledgement)?
             .to_challenge()
             .to_ethereum_challenge()
-            .eq(&self.ticket.challenge))
+            .eq(&self.ticket.challenge)
+            .then(|| ())
+            .ok_or(SignatureVerification)
     }
 
     pub fn get_response(&self, acknowledgement: &HalfKey) -> core_crypto::errors::Result<Response> {
@@ -326,21 +350,38 @@ impl BinarySerializable<'_> for PendingAcknowledgement {
 pub mod test {
     use ethnum::u256;
     use hex_literal::hex;
-    use core_crypto::types::{Challenge, CurvePoint, HalfKey, PublicKey};
+    use core_crypto::types::{Challenge, CurvePoint, HalfKey, Hash, PublicKey, Response};
     use utils_types::primitives::{Address, Balance, BalanceType, U256};
-    use crate::acknowledgement::{Acknowledgement, AcknowledgementChallenge, PendingAcknowledgement, UnacknowledgedTicket};
+    use crate::acknowledgement::{AcknowledgedTicket, Acknowledgement, AcknowledgementChallenge, PendingAcknowledgement, UnacknowledgedTicket};
     use utils_types::traits::BinarySerializable;
     use crate::channels::Ticket;
 
-    // TODO: Add tests to all remaining types
+    fn mock_ticket(pk: &[u8]) -> Ticket {
+        let inverse_win_prob = u256::new(1u128); // 100 %
+        let price_per_packet = u256::new(10000000000000000u128); // 0.01 HOPR
+        let path_pos = 5;
+
+        Ticket::new(
+            Address::new(&[0u8; Address::SIZE]),
+            None,
+            U256::new("1"),
+            U256::new("2"),
+            Balance::new(
+                inverse_win_prob * price_per_packet * path_pos as u128,
+                BalanceType::HOPR,
+            ),
+            U256::from_inverse_probability(&inverse_win_prob).unwrap(),
+            U256::new("4"),
+            pk,
+        )
+    }
 
     #[test]
-    fn test_pending_ack() {
+    fn test_pending_ack_sender() {
         assert_eq!(
             PendingAcknowledgement::WaitingAsSender,
             PendingAcknowledgement::deserialize(&PendingAcknowledgement::WaitingAsSender.serialize()).unwrap()
-        );
-    }
+        ); }
 
     #[test]
     fn test_acknowledgement_challenge() {
@@ -389,31 +430,41 @@ pub mod test {
         let cp2: CurvePoint = hk2.to_challenge().into();
         let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
 
-        let inverse_win_prob = u256::new(1u128); // 100 %
-        let price_per_packet = u256::new(10000000000000000u128); // 0.01 HOPR
-        let path_pos = 5;
-
-        let ticket1 = Ticket::new(
-            Address::new(&[0u8; Address::SIZE]),
-            Some(Challenge::from(cp_sum)),
-            U256::new("1"),
-            U256::new("2"),
-            Balance::new(
-                inverse_win_prob * price_per_packet * path_pos as u128,
-                BalanceType::HOPR,
-            ),
-            U256::from_inverse_probability(&inverse_win_prob).unwrap(),
-            U256::new("4"),
-            &pk_1,
-        );
+        let mut ticket1 = mock_ticket(&pk_1);
+        ticket1.set_challenge(Challenge::from(cp_sum).to_ethereum_challenge(), &pk_1);
 
         let unack1 = UnacknowledgedTicket::new(ticket1, hk1, pub_key_1);
-        assert!(unack1.verify_signature());
-        assert!(unack1.verify_challenge(&hk2).unwrap());
+        assert!(unack1.verify_signature().is_ok());
+        assert!(unack1.verify_challenge(&hk2).is_ok());
 
         let unack2 = UnacknowledgedTicket::deserialize(&unack1.serialize()).unwrap();
         assert_eq!(unack1, unack2);
+
+        let pending_ack_1 = PendingAcknowledgement::WaitingAsRelayer(unack1);
+        let pending_ack_2 = PendingAcknowledgement::deserialize(&pending_ack_1.serialize()).unwrap();
+        assert_eq!(pending_ack_1, pending_ack_2);
     }
+
+    #[test]
+    fn test_acknowledged_ticket() {
+        let pk = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
+        let pub_key = PublicKey::from_privkey(&pk).unwrap();
+        let resp = Response::new(&hex!("4471496ef88d9a7d86a92b7676f3c8871a60792a37fae6fc3abc347c3aa3b16b"));
+
+        let mut ticket1 = mock_ticket(&pk);
+        ticket1.set_challenge(resp.to_challenge().to_ethereum_challenge(), &pk);
+
+        let akt_1 = AcknowledgedTicket::new(ticket1,
+                                                 resp,
+                                                 Hash::create(&[&hex!("deadbeef")]),
+                                                 pub_key.clone()
+        );
+        assert!(akt_1.verify(&pub_key).is_ok());
+
+        let akt_2 = AcknowledgedTicket::deserialize(&akt_1.serialize()).unwrap();
+        assert_eq!(akt_1, akt_2);
+    }
+
 }
 
 #[cfg(feature = "wasm")]
@@ -423,7 +474,7 @@ pub mod wasm {
     use utils_misc::utils::wasm::JsResult;
     use utils_types::traits::BinarySerializable;
     use wasm_bindgen::prelude::*;
-    use core_crypto::types::{HalfKey, Response};
+    use core_crypto::types::{HalfKey, PublicKey, Response};
 
     #[wasm_bindgen]
     pub struct PendingAcknowledgement {
@@ -477,11 +528,6 @@ pub mod wasm {
             ok_or_jserr!(self.get_response(acknowledgement))
         }
 
-        #[wasm_bindgen(js_name = "verify_challenge")]
-        pub fn _verify_challenge(&self, acknowledgement: &HalfKey) -> JsResult<bool> {
-            ok_or_jserr!(self.verify_challenge(acknowledgement))
-        }
-
         #[wasm_bindgen(js_name = "eq")]
         pub fn _eq(&self, other: &UnacknowledgedTicket) -> bool { self.eq(other) }
     }
@@ -500,6 +546,11 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "eq")]
         pub fn _eq(&self, other: &AcknowledgedTicket) -> bool { self.eq(other) }
+
+        #[wasm_bindgen(js_name = "verify")]
+        pub fn _verify(&self, issuer: &PublicKey) -> JsResult<bool> {
+            ok_or_jserr!(self.verify(issuer).map(|_| true))
+        }
     }
 
     #[wasm_bindgen]

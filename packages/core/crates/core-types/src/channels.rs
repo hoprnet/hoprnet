@@ -3,6 +3,7 @@ use enum_iterator::{all, Sequence};
 use ethnum::u256;
 use serde_repr::*;
 use std::ops::{Div, Mul, Sub};
+use core_crypto::errors::CryptoError::SignatureVerification;
 use utils_types::errors::{GeneralError::ParseError, Result};
 use utils_types::primitives::{Address, Balance, BalanceType, EthereumChallenge, U256};
 
@@ -156,7 +157,7 @@ pub struct Ticket {
     pub amount: Balance,
     pub win_prob: U256,
     pub channel_epoch: U256,
-    pub signature: Signature,
+    pub signature: Option<Signature>,
 }
 
 /// Prefix message with "\x19Ethereum Signed Message:\n {length} {message}" and returns its hash
@@ -209,48 +210,28 @@ impl Ticket {
         channel_epoch: U256,
         signing_key: &[u8],
     ) -> Self {
-        let encoded_challenge = challenge
-            .map(|c| c.to_ethereum_challenge())
-            .unwrap_or(EthereumChallenge::default());
-
-        let hashed_ticket = Hash::create(&[&Self::serialize_unsigned_aux(
-            &counterparty,
-            &encoded_challenge,
-            &epoch,
-            &amount,
-            &win_prob,
-            &index,
-            &channel_epoch,
-        )]);
-        let msg = ethereum_signed_hash(hashed_ticket.serialize()).serialize();
-        let signature = Signature::sign_message(&msg, signing_key);
-
-        Self {
+        let mut ret = Self {
             counterparty,
-            challenge: encoded_challenge,
+            challenge: challenge.map_or_else(|| EthereumChallenge::default(), |c| c.to_ethereum_challenge()),
             epoch,
             index,
             amount,
             win_prob,
             channel_epoch,
-            signature,
-        }
+            signature: None,
+        };
+        ret.sign(signing_key);
+        ret
+    }
+
+    pub fn set_challenge(&mut self, challenge: EthereumChallenge, signing_key: &[u8]) {
+        self.challenge = challenge;
+        self.sign(signing_key);
     }
 
     /// Signs the ticket using the given private key.
     pub fn sign(&mut self, signing_key: &[u8]) {
-        let hashed_ticket = Hash::create(&[&Self::serialize_unsigned_aux(
-            &self.counterparty,
-            &self.challenge,
-            &self.epoch,
-            &self.amount,
-            &self.win_prob,
-            &self.index,
-            &self.channel_epoch,
-        )]);
-
-        let msg = ethereum_signed_hash(hashed_ticket.serialize()).serialize();
-        self.signature = Signature::sign_message(&msg, signing_key);
+        self.signature = Some(Signature::sign_message(&<Hash as BinarySerializable>::serialize(&self.get_hash()), signing_key));
     }
 
     /// Convenience method for creating a zero-hop ticket
@@ -284,18 +265,6 @@ impl Ticket {
     /// Computes Ethereum signature hash of the ticket
     pub fn get_hash(&self) -> Hash {
         ethereum_signed_hash(Hash::create(&[&self.serialize_unsigned()]).serialize())
-    }
-
-    /// Recovers the signer public key from the embedded ticket signature.
-    /// This is possible due this specific instantiation of the ECDSA over the secp256k1 curve.
-    pub fn recover_signer(&self) -> PublicKey {
-        PublicKey::from_signature(&self.get_hash().serialize(), &self.signature)
-            .expect("invalid signature on ticket, public key not recoverable")
-    }
-
-    /// Verifies the signature of this ticket
-    pub fn verify(&self, public_key: &PublicKey) -> bool {
-        self.recover_signer().eq(public_key)
     }
 
     /// Computes a candidate check value to verify if this ticket is winning
@@ -351,7 +320,7 @@ impl BinarySerializable<'_> for Ticket {
                 amount,
                 win_prob,
                 channel_epoch,
-                signature,
+                signature: Some(signature),
             })
         } else {
             Err(ParseError)
@@ -359,17 +328,30 @@ impl BinarySerializable<'_> for Ticket {
     }
 
     fn serialize(&self) -> Box<[u8]> {
-        let mut unsigned = Self::serialize_unsigned_aux(
-            &self.counterparty,
-            &self.challenge,
-            &self.epoch,
-            &self.amount,
-            &self.win_prob,
-            &self.index,
-            &self.channel_epoch,
-        );
-        unsigned.extend_from_slice(&self.signature.serialize());
+        let mut unsigned = self.serialize_unsigned().into_vec();
+        unsigned.extend_from_slice(&self.signature
+            .as_ref()
+            .expect("ticket not signed")
+            .serialize());
         unsigned.into_boxed_slice()
+    }
+}
+
+impl Ticket {
+    /// Recovers the signer public key from the embedded ticket signature.
+    /// This is possible due this specific instantiation of the ECDSA over the secp256k1 curve.
+    pub fn recover_signer(&self) -> core_crypto::errors::Result<PublicKey> {
+        PublicKey::from_signature(&self.get_hash().serialize(),
+                              self.signature.as_ref().expect("ticket not signed"))
+    }
+
+    /// Verifies the signature of this ticket.
+    /// The operation can fail if a public key cannot be recovered from the ticket signature.
+    pub fn verify(&self, public_key: &PublicKey) -> core_crypto::errors::Result<()> {
+        let recovered = self.recover_signer()?;
+        recovered.eq(public_key)
+            .then(||())
+            .ok_or(SignatureVerification)
     }
 }
 
@@ -455,7 +437,8 @@ pub mod tests {
         assert_eq!(ticket1, ticket2, "deserialized ticket does not match");
 
         let pub_key = PublicKey::from_privkey(&SGN_PRIVATE_KEY).unwrap();
-        assert!(ticket1.verify(&pub_key), "failed to verify signed ticket");
+        assert!(ticket1.verify(&pub_key).is_ok(), "failed to verify signed ticket 1");
+        assert!(ticket2.verify(&pub_key).is_ok(), "failed to verify signed ticket 2");
 
         assert_eq!(
             ticket1.get_path_position(&price_per_packet.into(), &inverse_win_prob.into()),
@@ -563,8 +546,19 @@ pub mod wasm {
                 amount,
                 win_prob,
                 channel_epoch,
-                signature,
+                signature: Some(signature),
             }
+        }
+
+        #[wasm_bindgen(js_name = "recover_signer")]
+        pub fn _recover_signer(&self) -> JsResult<PublicKey> {
+            ok_or_jserr!(self.recover_signer())
+        }
+
+
+        #[wasm_bindgen(js_name = "verify")]
+        pub fn _verify(&self, public_key: &PublicKey) -> JsResult<bool> {
+            ok_or_jserr!(self.verify(public_key).map(|_| true))
         }
 
         #[wasm_bindgen(js_name = "deserialize")]
