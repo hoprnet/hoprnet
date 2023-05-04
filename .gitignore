@@ -4,6 +4,8 @@
 /build
 **/target
 **/.idea
+# Testing
+
 
 # Exclude databases resulting from local execution of hoprd
 /db
