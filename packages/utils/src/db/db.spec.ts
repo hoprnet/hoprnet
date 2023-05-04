@@ -386,3 +386,20 @@ describe(`database tests`, function () {
     assert(storedObject === undefined, 'storedObject should be undefined')
   })
 })
+
+import { LevelDb } from './db.js'
+import { db_sanity_test } from '../../lib/utils_db.js'
+
+describe('db shim tests', function () {
+  it('basic DB operations are performed in Rust correctly', async function () {
+    let db = new LevelDb()
+    await db.init(true, '/tmp/test-shim.db', true, 'monte_rosa')
+
+    try {
+      let result = await db_sanity_test(db)
+      assert(result)
+    } catch (e) {
+      assert('', e.toString())
+    }
+  })
+})

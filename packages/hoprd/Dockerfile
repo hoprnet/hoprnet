@@ -14,6 +14,7 @@ COPY vendor vendor/
 COPY packages packages/
 COPY Makefile Cargo.toml Cargo.lock .yarnrc.yml yarn.lock package.json tsconfig.build.json tsconfig.json yarn.lock rust-toolchain.toml ./
 
+RUN ls -alR vendor/cargo/platforms-3.0.2/src
 LABEL description="Launches a hoprd node"
 
 RUN make deps-docker package=hoprd && \
@@ -44,18 +45,17 @@ RUN mkdir -p scripts/toolchain
 COPY .nvmrc package.json ./
 COPY scripts/toolchain/install-toolchain.sh ./scripts/toolchain
 
-RUN apt-get update \
- && apt-get install -y \
- bash curl jq tini ca-certificates tar xz-utils \
- && rm -rf /var/lib/apt/lists/* \
- && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
- # Install Node.js
- && ./scripts/toolchain/install-toolchain.sh --runtime-only \
- # Remove unused files and config
- && rm -R scripts .nvmrc \
- # create directory which is later used for the database, so that it inherits
- # permissions when mapped to a volume
- && mkdir -p hoprd-db
+RUN apt-get update && \
+    apt-get install -y bash curl jq tini ca-certificates tar xz-utils && \
+    rm -rf /var/lib/apt/lists/* && \
+    apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false && \
+    # Install Node.js
+    ./scripts/toolchain/install-toolchain.sh --runtime-only && \
+    # Remove unused files and config
+    rm -R scripts .nvmrc && \
+    # create directory which is later used for the database, so that it inherits
+    # permissions when mapped to a volume
+    mkdir -p hoprd-db
 
 COPY --from=build /app/hoprnet/packages ./packages
 COPY --from=build /app/hoprnet/node_modules ./node_modules

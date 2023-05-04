@@ -16,7 +16,7 @@ let
 
     ## node, minimum recommended version is v16, see README for more details
     nodejs-16_x # v16.19.1
-    (yarn.override { nodejs = nodejs-16_x; }) # v3.3.0 (as per local yarn cfg)
+    (yarn.override { nodejs = nodejs-16_x; }) # v3.5.0 (as per local yarn cfg)
 
     ## rust for core development and required utils
     (rust-bin.fromRustupToolchainFile ./rust-toolchain.toml)
