@@ -24,7 +24,8 @@ import {
   negotiateRelayHandshake,
   RelayHandshakeMessage
 } from './handshake.js'
-import { RelayState } from '../../lib/connect_relay.js'
+import { RelayState, connect_relay_set_panic_hook } from '../../lib/connect_relay.js'
+connect_relay_set_panic_hook()
 
 import {
   create_counter,

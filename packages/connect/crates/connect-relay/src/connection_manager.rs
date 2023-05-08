@@ -81,14 +81,9 @@ impl<St> ToString for RelayConnections<St> {
     fn to_string(&self) -> String {
         let prefix: String = "RelayConnections:\n".into();
 
-        let items: String = self
-            .conns
-            .borrow()
-            .keys()
-            .map(|x| format!("  {}\n", x.to_string()))
-            .collect();
+        let items = self.conns.borrow().keys().map(|x| x.to_string()).collect::<Vec<_>>();
 
-        format!("{} {}", prefix, items)
+        format!("{} {}", prefix, items.join("\n  "))
     }
 }
 

@@ -16,7 +16,7 @@ use std::{
     str::FromStr,
     task::{Context, Poll, Waker},
 };
-use utils_log::error;
+use utils_log::{error, info};
 use utils_misc::traits::DuplexStream;
 
 #[cfg(any(not(feature = "wasm"), test))]
