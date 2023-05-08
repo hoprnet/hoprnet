@@ -463,7 +463,7 @@ impl<St: DuplexStream> Server<St> {
         res
     }
 
-    pub fn update(&mut self, peer: PeerId, st: St) -> Result<(), String> {
+    pub fn update(&self, peer: PeerId, st: St) -> Result<(), String> {
         if peer.eq(&self.a.id) {
             return self.a.update(st);
         } else if peer.eq(&self.b.id) {

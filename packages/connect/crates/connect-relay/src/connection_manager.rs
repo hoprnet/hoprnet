@@ -12,7 +12,7 @@ use std::{
     rc::Rc,
     task::{Context, Poll},
 };
-use utils_log::error;
+use utils_log::{error, info};
 use utils_misc::traits::DuplexStream;
 
 use libp2p::PeerId;
@@ -95,24 +95,33 @@ impl<'a, St: DuplexStream + 'static> RelayConnections<St> {
     }
 
     pub fn create_new(&mut self, id_a: PeerId, stream_a: St, id_b: PeerId, stream_b: St) -> Result<(), String> {
-        let id1: RelayConnectionIdentifier = (id_a, id_b).try_into().unwrap();
+        let id: RelayConnectionIdentifier = (id_a, id_b).try_into().unwrap();
 
         let server = Rc::new(RefCell::new(Server::new(stream_a, id_a, stream_b, id_b)));
 
-        let id1_to_move = id1.clone();
-        self.conns.borrow_mut().insert(id1, server.clone());
+        {
+            self.conns.borrow_mut().insert(id, server.clone());
+        }
 
-        let conn_to_move = self.conns.clone();
+        let id_to_move = id.clone();
+        let conns_to_move = self.conns.clone();
         let polling = PollBorrow { st: server };
         spawn_local(async move {
-            polling.await;
-            conn_to_move.borrow_mut().remove(&id1_to_move);
+            match polling.await {
+                Ok(()) => info!("Relayed connection [\"{}>\"] successfully", id_to_move.to_string()),
+                Err(e) => error!(
+                    "Relayed connection [\"{}>\"] ended with error {}",
+                    id_to_move.to_string(),
+                    e
+                ),
+            }
+            conns_to_move.borrow_mut().remove(&id_to_move);
         });
 
         Ok(())
     }
 
-    pub async fn is_active(&mut self, source: PeerId, destination: PeerId, maybe_timeout: Option<u64>) -> bool {
+    pub async fn is_active(&self, source: PeerId, destination: PeerId, maybe_timeout: Option<u64>) -> bool {
         let id: RelayConnectionIdentifier = match (source, destination).try_into() {
             Ok(x) => x,
             Err(e) => {
@@ -121,14 +130,14 @@ impl<'a, St: DuplexStream + 'static> RelayConnections<St> {
             }
         };
 
-        if let Some(entry) = self.conns.borrow_mut().get_mut(&id) {
-            return entry.borrow_mut().is_active(source, maybe_timeout).await;
+        if let Some(entry) = self.conns.borrow().get(&id) {
+            return entry.borrow().is_active(source, maybe_timeout).await;
         }
 
         false
     }
 
-    pub fn update_existing(&mut self, source: PeerId, destination: PeerId, to_source: St) -> bool {
+    pub fn update_existing(&self, source: PeerId, destination: PeerId, to_source: St) -> bool {
         let id: RelayConnectionIdentifier = match (source, destination).try_into() {
             Ok(x) => x,
             Err(e) => {
@@ -137,8 +146,18 @@ impl<'a, St: DuplexStream + 'static> RelayConnections<St> {
             }
         };
 
-        if let Some(entry) = self.conns.borrow_mut().get_mut(&id) {
-            entry.borrow_mut().update(source, to_source).unwrap();
+        if let Some(entry) = self.conns.borrow().get(&id) {
+            match entry.borrow().update(source, to_source) {
+                Ok(()) => info!(
+                    "Successfully replaced old incoming connection for [\"{}>\"]",
+                    id.to_string()
+                ),
+                Err(e) => error!(
+                    "Error while replacing incoming connection for [\"{}>\"] {}",
+                    id.to_string(),
+                    e
+                ),
+            }
             return true;
         }
 
@@ -257,7 +276,7 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "isActive")]
         pub async fn is_active(
-            &mut self,
+            &self,
             source: JsPeerId,
             destination: JsPeerId,
             timeout: Option<Number>,
@@ -275,7 +294,7 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "updateExisting")]
         pub fn update_existing(
-            &mut self,
+            &self,
             source: JsPeerId,
             destination: JsPeerId,
             to_source: JsStreamingIterable,
