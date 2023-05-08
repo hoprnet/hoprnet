@@ -1,8 +1,9 @@
-use crate::{
-    server_new::{RelayConnectionIdentifier, Server},
-    traits::DuplexStream,
+use crate::server_new::{PingFuture, PollBorrow as PollBorrowActive, RelayConnectionIdentifier, Server};
+use async_std::stream::StreamExt;
+use futures::{
+    future::{Future, Join},
+    stream::FuturesUnordered,
 };
-use futures::Future;
 use pin_project_lite::pin_project;
 use std::{
     cell::RefCell,
@@ -12,6 +13,7 @@ use std::{
     task::{Context, Poll},
 };
 use utils_log::error;
+use utils_misc::traits::DuplexStream;
 
 use libp2p::PeerId;
 
@@ -33,6 +35,41 @@ impl<St: DuplexStream> Future for PollBorrow<St> {
         let this = self.project();
 
         Pin::new(&mut *this.st.borrow_mut()).poll(cx)
+    }
+}
+
+pin_project! {
+    struct PollActive<St> {
+        server: Rc<RefCell<Server<St>>>,
+        #[pin]
+        fut: Option<Join<PollBorrowActive<PingFuture>, PollBorrowActive<PingFuture>>>,
+    }
+}
+
+impl<St: DuplexStream> PollActive<St> {
+    pub fn new(server: Rc<RefCell<Server<St>>>) -> Self {
+        Self { server, fut: None }
+    }
+}
+
+impl<St: DuplexStream> Future for PollActive<St> {
+    type Output = Option<RelayConnectionIdentifier>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let mut this = self.project();
+
+        if this.fut.is_none() {
+            *this.fut = Some(this.server.borrow().both_active(None));
+        }
+
+        match this.fut.as_mut().as_pin_mut().unwrap().poll(cx) {
+            Poll::Pending => Poll::Pending,
+            Poll::Ready((a, b)) => Poll::Ready(if a.is_ok() && b.is_ok() {
+                None
+            } else {
+                Some(this.server.borrow().get_id())
+            }),
+        }
     }
 }
 
@@ -124,16 +161,42 @@ impl<'a, St: DuplexStream + 'static> RelayConnections<St> {
 
         self.conns.borrow().contains_key(&id)
     }
+
+    pub fn size(&self) -> usize {
+        self.conns.borrow().len()
+    }
+
+    pub async fn prune(&self) -> usize {
+        let conns = self.conns.borrow();
+
+        let mut futs = FuturesUnordered::from_iter(conns.iter().map(|(_, conn)| PollActive::new(conn.clone())));
+
+        let mut pruned: usize = 0;
+
+        while let Some(x) = futs.next().await {
+            if let Some(id) = x {
+                pruned += 1;
+                self.conns.borrow_mut().remove(&id);
+            }
+        }
+
+        pruned
+    }
+
+    pub fn remove(&self, id: &RelayConnectionIdentifier) {
+        let mut conns = self.conns.borrow_mut();
+
+        conns.remove(&id);
+    }
 }
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use std::str::FromStr;
-
-    use crate::streaming_iterable::{JsStreamingIterable, StreamingIterable};
     use js_sys::Number;
     use libp2p::PeerId;
+    use std::str::FromStr;
     use utils_misc::ok_or_jserr;
+    use utils_misc::streaming_iterable::{JsStreamingIterable, StreamingIterable};
     use wasm_bindgen::prelude::*;
 
     #[wasm_bindgen]
@@ -188,14 +251,10 @@ pub mod wasm {
             let source = ok_or_jserr!(PeerId::from_str(source.to_string().as_str()))?;
             let destination = ok_or_jserr!(PeerId::from_str(destination.to_string().as_str()))?;
 
-            let this = unsafe {
-                std::mem::transmute::<
-                    &mut super::RelayConnections<StreamingIterable>,
-                    &'static mut super::RelayConnections<StreamingIterable>,
-                >(&mut self.w)
-            };
-
-            match this.create_new(source, to_source.into(), destination, to_destination.into()) {
+            match self
+                .w
+                .create_new(source, to_source.into(), destination, to_destination.into())
+            {
                 Ok(()) => Ok(JsValue::undefined()),
                 Err(e) => Err(e.into()),
             }
@@ -240,6 +299,33 @@ pub mod wasm {
             let destination = ok_or_jserr!(PeerId::from_str(destination.to_string().as_str()))?;
 
             Ok(self.w.exists(source, destination).into())
+        }
+
+        #[wasm_bindgen(js_name = "relayedConnectionCount")]
+        pub fn relayed_connection_count(&self) -> Number {
+            // SAFETY: There won't be more than 2**32 - 1 relayed connections
+            Number::from(self.w.size() as u32)
+        }
+
+        #[wasm_bindgen]
+        pub async fn prune(&self) -> Number {
+            // SAFETY: There won't be more than 2**32 - 1 relayed connections
+            Number::from(self.w.prune().await as u32)
+        }
+
+        #[wasm_bindgen(js_name = "toString")]
+        pub fn to_string(&self) -> String {
+            self.w.to_string()
+        }
+
+        #[wasm_bindgen]
+        pub fn remove(&self, source: JsPeerId, destination: JsPeerId) -> Result<JsValue, JsValue> {
+            let source = ok_or_jserr!(PeerId::from_str(source.to_string().as_str()))?;
+            let destination = ok_or_jserr!(PeerId::from_str(destination.to_string().as_str()))?;
+
+            self.w.remove(&(source, destination).try_into()?);
+
+            Ok(JsValue::undefined())
         }
     }
 }

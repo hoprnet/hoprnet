@@ -10,7 +10,6 @@
 - Fix initial network peer registration from the Peer Store ([#4741](https://github.com/hoprnet/hoprnet/pull/4741))
 - `hopli` accepts floating number for the amount of tokens to be transferred/minted. Loosen requirement on the identity file. ([#4723](https://github.com/hoprnet/hoprnet/pull/4723))
 - Use simple moving average for smoothing network peer numbers presented to the Promiscuous strategy, add more logging ([#4763](https://github.com/hoprnet/hoprnet/pull/4763))
-- Migrate server-side relay code to Rust ([#4726](https://github.com/hoprnet/hoprnet/pull/4726))
 - Added Rust implementations of all the cryptographic functionality used in the HOPR protocol ([#3842](https://github.com/hoprnet/hoprnet/pull/3842))
 - Add reported HOPR protocol version information to `ping` and `peers` endpoints ([#4777](https://github.com/hoprnet/hoprnet/pull/4777))
 - Extend the Grafana dashboards with the new mixer metrics (current mixer queue size & average mixer delay) ([#4768](https://github.com/hoprnet/hoprnet/pull/4768))
@@ -18,6 +17,16 @@
 - Fixed issue with too many channels being opened by the Promiscuous strategy, added option to enforce the maximum number of opened channels ([#4827](https://github.com/hoprnet/hoprnet/pull/4827))
 - Added mitigation for connection leakage to prevent DHT and p2p connection failures ([#4870](https://github.com/hoprnet/hoprnet/pull/4870))
 - Fixed incorrect recording of some Ping metrics ([#4867](https://github.com/hoprnet/hoprnet/pull/4867))
+- Enforced 1 GB memory usage limit of HOPRd on Avado ([#4898](https://github.com/hoprnet/hoprnet/pull/4898))
+- Added RelayState cleanup which prevents excessive connection leakage on public relay nodes ([#4912](https://github.com/hoprnet/hoprnet/pull/4912))
+- Reduced maximum number of relay connections to 2000 ([#4912](https://github.com/hoprnet/hoprnet/pull/4912))
+- Add pruning in the relay connections keep-alive mechanism ([#4916](https://github.com/hoprnet/hoprnet/pull/4916))
+- Enforce closing and clean-up of libp2p2 connections ([#4957](https://github.com/hoprnet/hoprnet/pull/4957))
+- Wipe libp2p's AddressManager cache when publishing new addresses to the DHT ([#4958](https://github.com/hoprnet/hoprnet/pull/4958))
+- Migrate `core_network` wiring logic to Rust ([#4963](https://github.com/hoprnet/hoprnet/pull/4963))
+- Add metrics & logs relevant for RPCh debugging ([#4995](https://github.com/hoprnet/hoprnet/pull/4995))
+- Enhance debug logs in dialing logic to enhance debugging ([#5004](https://github.com/hoprnet/hoprnet/pull/5004))
+- Fix address coercion issue in libp2p address handling ([#5020](https://github.com/hoprnet/hoprnet/pull/5020))
 
 <a name="1.92"></a>
 
@@ -48,6 +57,9 @@
 - Reduce overall connection timeout from 10s to 3s (#[4680](https://github.com/hoprnet/hoprnet/pull/4680))
 - Migrate mixer code to Rust ([#4567](https://github.com/hoprnet/hoprnet/pull/4567))
 - Primitive & basic types re-created in Rust ([#4645](https://github.com/hoprnet/hoprnet/pull/4645)))
+- Automatically switch to DHT `server`-mode if node announces public addresses to DHT ([#4685](https://github.com/hoprnet/hoprnet/pull/4685))
+- Enhance address to sorting when dialing nodes ([#4684](https://github.com/hoprnet/hoprnet/pull/4684))
+- Adjust NAT detection mechanism to correctly detect exposed ports on GCP ([#4692](https://github.com/hoprnet/hoprnet/pull/4692))
 
 <a name="1.91"></a>
 

@@ -23,13 +23,13 @@ function getRelayState(existing: boolean = false): Parameters<typeof negotiateRe
     exists: () => existing,
     isActive: async () => false,
     updateExisting: () => false,
-    createNew: async (_source: PeerId, _destination: PeerId, toSource: Stream, toDestination: Stream) => {
+    createNew: (async (_source: PeerId, _destination: PeerId, toSource: Stream, toDestination: Stream) => {
       if (existing) {
         toSource.sink(toDestination.source)
         toDestination.sink(toSource.source)
       }
-    }
-  }
+    }) as any
+  } as any
 }
 
 describe('test relay handshake', function () {

@@ -25,6 +25,7 @@ contract HoprDummyProxyForNetworkRegistryTest is Test {
    * it fails to add account by non-owner
    */
   function testRevert_WhenNotOwnerAddAccount(address caller, address account) public {
+    vm.assume(caller != address(0));
     vm.assume(caller != owner);
     vm.prank(caller);
 
@@ -85,7 +86,6 @@ contract HoprDummyProxyForNetworkRegistryTest is Test {
     vm.expectRevert('Ownable: caller is not the owner');
     hoprDummyProxyForNetworkRegistry.ownerRemoveAccount(account);
 
-    vm.stopPrank();
     vm.clearMockedCalls();
   }
 

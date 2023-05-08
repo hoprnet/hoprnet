@@ -153,7 +153,7 @@ class HoprConnect implements Transport, Initializable, Startable {
         return false
       }
 
-      log(`closing due to simulated NAT`)
+      log(`closing due to simulated NAT, addr: ${maConn.remoteAddr.toString()}`)
       // log(`remotePeer ${maConn.remotePeer.toB58String()}`)
       // log(`localAddr: ${conn.localAddr?.toString()}`)
       // log(`remotePeer ${conn.localPeer.toB58String()}`)
@@ -363,7 +363,7 @@ class HoprConnect implements Transport, Initializable, Startable {
 }
 
 export type { PublicNodesEmitter, HoprConnectConfig }
-export { compareAddressesLocalMode, compareAddressesPublicMode } from './utils/index.js'
+export { compareAddressesLocalMode, compareAddressesPublicMode, maToClass, AddressClass } from './utils/index.js'
 export { startStunServer } from './base/stun/utils.js'
 
 export { HoprConnect, PeerConnectionType }

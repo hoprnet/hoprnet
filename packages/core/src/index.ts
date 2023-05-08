@@ -14,6 +14,8 @@ import type { Components } from '@libp2p/interfaces/components'
 import {
   compareAddressesLocalMode,
   compareAddressesPublicMode,
+  maToClass,
+  AddressClass,
   type HoprConnectConfig,
   PeerConnectionType
 } from '@hoprnet/hopr-connect'
@@ -54,25 +56,25 @@ import {
   retimer as intervalTimer,
   retryWithBackoffThenThrow,
   type Ticket,
-  iterableToArray
+  iterableToArray,
+  safeCloseConnection,
+  pickVersion,
+  dial // hoprs dialing method
 } from '@hoprnet/hopr-utils'
 
 import { FULL_VERSION, INTERMEDIATE_HOPS, MAX_HOPS, PACKET_SIZE, VERSION, MAX_PARALLEL_PINGS } from './constants.js'
 
 import {
-  Network,
+  CoreNetwork,
   PeerStatus,
   PeerOrigin,
   Health,
   health_to_string,
-  HeartbeatConfig,
   core_network_set_panic_hook,
   core_network_gather_metrics
 } from '../lib/core_network.js'
 core_network_set_panic_hook()
 registerMetricsCollector(core_network_gather_metrics)
-
-import Heartbeat from './network/heartbeat.js'
 
 import { findPath } from './path/index.js'
 
@@ -97,8 +99,10 @@ import { createLibp2pInstance } from './main.js'
 import type { EventEmitter as Libp2pEmitter } from '@libp2p/interfaces/events'
 import { utils as ethersUtils } from 'ethers/lib/ethers.js'
 import { peerIdFromString } from '@libp2p/peer-id'
+import pkg from '../package.json' assert { type: 'json' }
 
 const CODE_P2P = protocols('p2p').code
+const NORMALIZED_VERSION = pickVersion(pkg.version)
 
 const DEBUG_PREFIX = `hopr-core`
 const log = debug(DEBUG_PREFIX)
@@ -114,6 +118,10 @@ const metric_channelBalances = create_multi_gauge(
   ['counterparty', 'direction']
 )
 const metric_sentMessageCount = create_counter('core_counter_sent_messages', 'Number of sent messages')
+const metric_sentMessageFailCount = create_counter(
+  'core_counter_failed_send_messages',
+  'Number of sent messages failures'
+)
 const metric_pathLength = create_histogram_with_buckets(
   'core_histogram_path_length',
   'Distribution of number of hops of sent messages',
@@ -229,8 +237,7 @@ class Hopr extends EventEmitter {
 
   private stopPeriodicCheck: (() => void) | undefined
   private strategy: ChannelStrategyInterface
-  private networkPeers: Network
-  private heartbeat: Heartbeat
+  private coreNetwork: CoreNetwork
   private forward: PacketForwardInteraction
   private acknowledgements: AcknowledgementInteraction
   private libp2pComponents: Components
@@ -354,9 +361,8 @@ class Hopr extends EventEmitter {
     ) => libp2pSendMessage(this.libp2pComponents, dest, protocols, msg, includeReply, opts)) as SendMessage // Typescript limitation
 
     // Attach network health measurement functionality
-
-    this.networkPeers = Network.build(
-      this.id.toString(),
+    this.coreNetwork = new CoreNetwork(
+      this.id,
       this.options.networkQualityThreshold,
       (peer: string) => {
         let p = peerIdFromString(peer)
@@ -381,17 +387,23 @@ class Hopr extends EventEmitter {
 
         return false
       },
-      (peer: string) => this.closeConnectionsTo(peerIdFromString(peer))
+      (peer: string): Promise<void> => this.closeConnectionsTo(peerIdFromString(peer)),
+      NORMALIZED_VERSION,
+      this.options.environment.id,
+      this.libp2pComponents,
+      dial,
+      MAX_PARALLEL_PINGS,
+      this.options.heartbeatVariance,
+      this.options.heartbeatInterval,
+      this.options.heartbeatThreshold
     )
 
     // initialize with all the peers identified in the peer store
     const peers: Peer[] = await this.libp2pComponents.getPeerStore().all()
-    peers
-      .map((peer) => peer.id.toString())
-      .forEach((peerId) => {
-        this.networkPeers.register(peerId, PeerOrigin.Initialization)
-        log(`peer store: loaded peer ${peerId}`)
-      })
+    peers.forEach((peer) => {
+      this.coreNetwork.register(peer.id, PeerOrigin.Initialization)
+      log(`peer store: loaded peer ${peer.id.toString()}`)
+    })
 
     // react when network registry is enabled / disabled
     connector.indexer.on('network-registry-status-changed', async (enabled: boolean) => {
@@ -400,12 +412,10 @@ class Hopr extends EventEmitter {
       if (enabled) {
         for (const connection of this.libp2pComponents.getConnectionManager().getConnections()) {
           if (!(await this.isAllowedAccessToNetwork(connection.remotePeer))) {
-            this.networkPeers.unregister(connection.remotePeer.toString())
-            try {
-              await connection.close()
-            } catch (err) {
+            this.coreNetwork.unregister(connection.remotePeer.toString())
+            await safeCloseConnection(connection, this.libp2pComponents, (_err) => {
               error(`error while closing existing connection to ${connection.remotePeer.toString()}`)
-            }
+            })
           }
         }
       }
@@ -419,37 +429,20 @@ class Hopr extends EventEmitter {
         // otherwise there is nothing to do
         if (!eligible) {
           for (const node of nodes) {
-            this.networkPeers.unregister(node.toPeerId().toString())
+            this.coreNetwork.unregister(node.toPeerId())
 
             for (const conn of this.libp2pComponents.getConnectionManager().getConnections(node.toPeerId())) {
-              try {
-                await conn.close()
-              } catch (err) {
+              await safeCloseConnection(conn, this.libp2pComponents, (_err) => {
                 error(`error while closing existing connection to ${conn.remotePeer.toString()}`)
-              }
+              })
             }
           }
         }
       }
     )
 
-    let heartbeat_config = HeartbeatConfig.build(
-      MAX_PARALLEL_PINGS,
-      this.options?.heartbeatVariance,
-      this.options?.heartbeatInterval,
-      BigInt(this.options?.heartbeatThreshold)
-    )
-
-    this.heartbeat = new Heartbeat(
-      this.networkPeers,
-      this.libp2pComponents,
-      sendMessage,
-      this.environment.id,
-      heartbeat_config
-    )
-
     this.libp2pComponents.getConnectionManager().addEventListener('peer:connect', (event: CustomEvent<Connection>) => {
-      this.networkPeers.register(event.detail.remotePeer.toString(), PeerOrigin.IncomingConnection)
+      this.coreNetwork.register(event.detail.remotePeer, PeerOrigin.IncomingConnection)
     })
 
     this.acknowledgements = new AcknowledgementInteraction(
@@ -510,7 +503,7 @@ class Hopr extends EventEmitter {
     this.setChannelStrategy(this.options.strategy || StrategyFactory.getStrategy('passive'))
 
     log('announcing done, starting heartbeat & strategy interval')
-    await this.heartbeat.start()
+    await this.coreNetwork.start()
     this.startPeriodicStrategyCheck()
 
     this.status = 'RUNNING'
@@ -520,15 +513,79 @@ class Hopr extends EventEmitter {
     log('# STARTED NODE')
     log('ID', this.getId().toString())
     log('Protocol version', VERSION)
-    if (this.libp2pComponents.getAddressManager().getAddresses() !== undefined) {
-      log(`Available under the following addresses:`)
-      for (const ma of this.libp2pComponents.getAddressManager().getAddresses()) {
-        log(` - ${ma.toString()}`)
-      }
-    } else {
-      log(`No multiaddrs has been registered.`)
-    }
+
+    log(this.printAvailableAddresses())
+    log(this.printAvailableProtocols())
+
+    // Enable DHT server-mode if announcing publicly routable addresses to the DHT
+    await this.maybeEnableDhtServerMode()
+
     await this.maybeLogProfilingToGCloud()
+  }
+
+  /**
+   * Pretty-print available addresses
+   */
+  private printAvailableAddresses() {
+    const addrs = this.libp2pComponents.getAddressManager().getAddresses()
+
+    if (addrs == undefined || addrs.length == 0) {
+      return 'Attention: no Multiaddr registered for listening. Node might not be able to communicate.'
+    }
+    let out = 'Available under the following addresses:'
+
+    for (const addr of addrs) {
+      out += ` - ${addr.toString()}\n`
+    }
+
+    return out
+  }
+
+  /**
+   * Pretty-print available addresses
+   */
+  private printAvailableProtocols() {
+    const protos = this.libp2pComponents.getRegistrar().getProtocols()
+
+    if (protos == undefined || protos.length == 0) {
+      return 'Attention: no protocols registered for listening. Node might not be able communicate.'
+    }
+    let out = 'Listening to following protocols:\n'
+
+    for (const protocol of this.libp2pComponents.getRegistrar().getProtocols()) {
+      out += ` - ${protocol}\n`
+    }
+
+    return out
+  }
+
+  /**
+   * Checks if we are announcing public addresses to the DHT.
+   * If so, switch DHT to `server`-mode such that the node will
+   * reply to DHT queries of other nodes
+   */
+  private async maybeEnableDhtServerMode() {
+    let dht: Components['dht']
+    try {
+      dht = this.libp2pComponents.getDHT()
+    } catch (err) {
+      error(`Cannot switch DHT to server mode:`, err)
+      return
+    }
+
+    if (dht.getMode() === 'server') {
+      // Nothing to do
+      return
+    }
+
+    let announcedAddresses = this.libp2pComponents.getTransportManager().getAddrs()
+
+    for (const addr of announcedAddresses) {
+      if ([AddressClass.Public, AddressClass.Public6].includes(maToClass(addr))) {
+        await dht.setMode('server')
+        break
+      }
+    }
   }
 
   private async maybeLogProfilingToGCloud() {
@@ -646,7 +703,7 @@ class Hopr extends EventEmitter {
       const stake = new BN(status.stake_str)
 
       if (await this.isAllowedAccessToNetwork(destination)) {
-        this.networkPeers.register(destination.toString(), PeerOrigin.StrategyNewChannel)
+        this.coreNetwork.register(destination, PeerOrigin.StrategyNewChannel)
 
         const hash = await this.openChannel(destination, stake)
         verbose('- opened channel', destination, hash)
@@ -720,7 +777,7 @@ class Hopr extends EventEmitter {
       await Promise.all(
         outgoingChannels.map(async (channel) => {
           if (await this.isAllowedAccessToNetwork(channel.destination.toPeerId())) {
-            this.networkPeers.register(channel.destination.toPeerId().toString(), PeerOrigin.StrategyExistingChannel)
+            this.coreNetwork.register(channel.destination.toPeerId(), PeerOrigin.StrategyExistingChannel)
           } else {
             error(`Protocol error: Strategy is monitoring non-registered peer ${channel.destination.toString()}`)
           }
@@ -730,7 +787,7 @@ class Hopr extends EventEmitter {
       // Perform the strategy tick
       tickResult = this.strategy.tick(
         (await this.getBalance()).toBN(),
-        this.networkPeers.all().values(),
+        this.coreNetwork.all().values(),
         outgoingChannels.map((c) => {
           return {
             peer_id: c.destination.toPeerId().toString(),
@@ -738,7 +795,7 @@ class Hopr extends EventEmitter {
             status: c.status
           }
         }),
-        (peer_id_str: string) => this.networkPeers.quality_of(peer_id_str)
+        (peer_id_str: string) => this.coreNetwork.qualityOf(peerIdFromString(peer_id_str))
       )
       metric_strategyTicks.increment()
       metric_strategyMaxChannels.set(tickResult.max_auto_channels)
@@ -774,7 +831,7 @@ class Hopr extends EventEmitter {
    * Recalculates and retrieves the current connectivity health indicator.
    */
   public getConnectivityHealth() {
-    return this.networkPeers.health()
+    return this.coreNetwork.health()
   }
 
   /**
@@ -791,7 +848,7 @@ class Hopr extends EventEmitter {
     verbose('Stopping checking timeout')
     this.stopPeriodicCheck?.()
     verbose('Stopping heartbeat & indexer')
-    this.heartbeat?.stop()
+    this.coreNetwork?.stop()
 
     verbose('Stopping database')
     await this.db?.close()
@@ -913,20 +970,28 @@ class Hopr extends EventEmitter {
    */
   public async sendMessage(msg: Uint8Array, destination: PeerId, intermediatePath?: PublicKey[], hops?: number) {
     if (this.status != 'RUNNING') {
+      metric_sentMessageFailCount.increment()
       throw new Error('Cannot send message until the node is running')
     }
 
     if (msg.length > PACKET_SIZE) {
+      metric_sentMessageFailCount.increment()
       throw Error(`Message does not fit into one packet. Please split message into chunks of ${PACKET_SIZE} bytes`)
     }
 
     if (intermediatePath != undefined) {
       // Validate the manually specified intermediate path
-      await this.validateIntermediatePath(intermediatePath)
+      try {
+        await this.validateIntermediatePath(intermediatePath)
+      } catch (e) {
+        metric_sentMessageFailCount.increment()
+        throw e
+      }
     } else {
       intermediatePath = await this.getIntermediateNodes(PublicKey.fromPeerId(destination), hops)
 
       if (intermediatePath == null || !intermediatePath.length) {
+        metric_sentMessageFailCount.increment()
         throw Error(`Failed to find automatic path`)
       }
     }
@@ -944,6 +1009,7 @@ class Hopr extends EventEmitter {
       )
     } catch (err) {
       log(`Could not create packet ${err}`)
+      metric_sentMessageFailCount.increment()
       throw Error(`Error while creating packet.`)
     }
 
@@ -953,6 +1019,7 @@ class Hopr extends EventEmitter {
       await this.forward.interact(path[0].toPeerId(), packet)
     } catch (err) {
       log(`Could not send packet ${err}`)
+      metric_sentMessageFailCount.increment()
       throw Error(`Failed to send packet.`)
     }
 
@@ -972,30 +1039,31 @@ class Hopr extends EventEmitter {
       throw Error(`Connection to node is not allowed`)
     }
 
-    let dest = destination.toString()
-    if (!this.networkPeers.contains(dest)) {
-      this.networkPeers.register(dest, PeerOrigin.ManualPing)
+    if (!this.coreNetwork.contains(destination)) {
+      this.coreNetwork.register(destination, PeerOrigin.ManualPing)
     }
 
-    await this.heartbeat.pingNode(destination)
+    await this.coreNetwork.ping([destination])
 
-    let peer_info = this.networkPeers.get_peer_info(destination.toString())
-    if (peer_info !== undefined && peer_info.last_seen >= 0) {
-      return { latency: Number(peer_info.last_seen) - start }
-    } else {
+    let peer_info = this.coreNetwork.getPeerInfo(destination)
+    if (peer_info == undefined) {
       return { info: 'failure', latency: -1 }
     }
+
+    return { latency: Number(peer_info.last_seen) - start }
   }
 
   /**
    * @returns a list connected peerIds
    */
   public getConnectedPeers(): Iterable<PeerId> {
-    if (!this.networkPeers) {
+    if (!this.coreNetwork) {
       return []
     }
 
-    const entries = this.networkPeers.all()
+    const entries = this.coreNetwork.all()
+
+    // Split huge computation into small chunks
     return (function* () {
       for (const entry of entries) {
         yield peerIdFromString(entry)
@@ -1016,7 +1084,7 @@ class Hopr extends EventEmitter {
    * @returns various information about the connection
    */
   public getConnectionInfo(peerId: PeerId): PeerStatus | undefined {
-    return this.networkPeers.get_peer_info(peerId.toString())
+    return this.coreNetwork.getPeerInfo(peerId)
   }
 
   /**
@@ -1025,18 +1093,13 @@ class Hopr extends EventEmitter {
    * Similar to `libp2p.hangUp` but catching all errors.
    * @param peer PeerId of the peer from whom we want to disconnect
    */
-  private closeConnectionsTo(peer: PeerId): void {
+  private async closeConnectionsTo(peer: PeerId): Promise<void> {
     const connections = this.libp2pComponents.getConnectionManager().getConnections(peer)
 
     for (const conn of connections) {
-      // Don't block event loop
-      ;(async function () {
-        try {
-          await conn.close()
-        } catch (err: any) {
-          error(`Error while intentionally closing connection to ${peer.toString()}`, err)
-        }
-      })()
+      await safeCloseConnection(conn, this.libp2pComponents, (err) => {
+        error(`Error while intentionally closing connection to ${peer.toString()}`, err)
+      })
     }
   }
 
@@ -1046,10 +1109,10 @@ class Hopr extends EventEmitter {
    * us and various nodes
    */
   public async connectionReport(): Promise<string> {
-    if (!this.networkPeers) {
+    if (!this.coreNetwork) {
       return 'Node has not started yet'
     }
-    const connected = this.networkPeers.debug_output()
+    const connected = this.coreNetwork.debug_output()
 
     let announced: string[] = []
     for await (const announcement of HoprCoreEthereum.getInstance().indexer.getAddressesAnnouncedOnChain()) {
@@ -1473,7 +1536,7 @@ class Hopr extends EventEmitter {
       PublicKey.fromPeerId(this.getId()),
       destination,
       hops,
-      (p: PublicKey) => this.networkPeers.quality_of(p.toPeerId().toString()),
+      (p: PublicKey) => this.coreNetwork.qualityOf(p.toPeerId()),
       HoprCoreEthereum.getInstance().getOpenChannelsFrom.bind(HoprCoreEthereum.getInstance())
     )
   }

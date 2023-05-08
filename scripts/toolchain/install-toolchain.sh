@@ -98,7 +98,7 @@ function install_rustup() {
     if ! command -v rustup; then
         echo "Installing Rustup"
         # Get rustup but install toolchain later
-        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- ----no-modify-path --default-toolchain none -y
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --no-modify-path --default-toolchain none -y
     fi
 }
 

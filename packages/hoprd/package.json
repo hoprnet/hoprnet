@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hoprd",
-  "version": "1.93.1",
+  "version": "1.93.6-next.1",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -25,9 +25,9 @@
     "test:wasm": "make -C crates test",
     "clean": "yarn clean:wasm && rm -Rf ./lib ./tsconfig.tsbuildinfo ./build ./rest-api-v2-full-spec.json",
     "build": "yarn clean && yarn build:wasm && tsc -p . && chmod u+x lib/*.js",
-    "test": "NODE_OPTIONS=\"--experimental-wasm-modules\" mocha --reporter=tap --full-trace --exit . test",
+    "test": "NODE_OPTIONS=\"--experimental-wasm-modules\" mocha --reporter=tap -n experimental-wasm-reftypes --full-trace --exit . test",
     "prebuild": "next telemetry disable",
-    "start": "NODE_OPTIONS=\"--experimental-wasm-modules\" node lib/main.cjs --init --api",
+    "start": "NODE_OPTIONS=\"--experimental-wasm-modules\" node --experimental-wasm-reftypes lib/main.cjs --init --api",
     "dev": "NODE_ENV=development yarn start --environment anvil-localhost --password='local' --announce --testUseWeakCrypto --testAnnounceLocalAddresses --testPreferLocalAddresses --disableApiAuthentication",
     "docs:generate": "typedoc",
     "docs:watch": "typedoc --watch"

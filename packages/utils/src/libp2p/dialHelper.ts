@@ -1,3 +1,5 @@
+import { peerIdFromString } from '@libp2p/peer-id'
+
 /*
  * Add a more usable API on top of LibP2P
  */
@@ -5,6 +7,7 @@ import { type PeerId, isPeerId } from '@libp2p/interface-peer-id'
 import type { Connection, ProtocolStream } from '@libp2p/interface-connection'
 import type { ConnectionManager, Dialer } from '@libp2p/interface-connection-manager'
 import type { Components } from '@libp2p/interfaces/components'
+import type { Address } from '@libp2p/interface-peer-store'
 import { type Multiaddr, protocols as maProtocols } from '@multiformats/multiaddr'
 
 import { type TimeoutOpts } from '../async/index.js'
@@ -12,7 +15,7 @@ import { type TimeoutOpts } from '../async/index.js'
 import { debug } from '../process/index.js'
 import { createRelayerKey } from './relayCode.js'
 import { createCircuitAddress } from '../network/index.js'
-import { peerIdFromString } from '@libp2p/peer-id'
+import { safeCloseConnection } from './connection.js'
 
 import { TimeoutController } from 'timeout-abort-controller'
 
@@ -23,7 +26,7 @@ const CODE_P2P = maProtocols('p2p').code
 const log = debug(DEBUG_PREFIX)
 const error = debug(DEBUG_PREFIX.concat(`:error`))
 
-const DEFAULT_DHT_QUERY_TIMEOUT = 20000
+const DEFAULT_DHT_QUERY_TIMEOUT = 15000
 
 // Current types do not expose `dialer` property
 type MyConnectionManager = ConnectionManager & { dialer: Dialer }
@@ -127,7 +130,9 @@ export async function tryExistingConnections(
     try {
       stream = await conn.newStream(protocols, options)
     } catch (err: any) {
-      error(`Could not open stream to ${destination.toString()} due to "${err?.message}".`)
+      error(
+        `Could not open stream to ${destination.toString()} using connection '${conn.id}' due to "${err?.message}".`
+      )
     } finally {
       timeoutController.clear()
     }
@@ -146,17 +151,12 @@ export async function tryExistingConnections(
     )
   }
 
-  // Close dead connections later
-  ;(async function () {
-    for (const deadConnection of deadConnections) {
-      // @fixme does that work?
-      try {
-        await deadConnection.close()
-      } catch (err) {
-        error(`Error while closing dead connection`, err)
-      }
-    }
-  })()
+  // Close dead connections
+  for (const deadConnection of deadConnections) {
+    await safeCloseConnection(deadConnection, components, (err) => {
+      error(`Error while closing dead connection`, err)
+    })
+  }
 
   if (stream != undefined) {
     return { conn, ...stream }
@@ -234,11 +234,9 @@ async function establishNewConnection(
   }
 
   if (stream == undefined || errThrown) {
-    try {
-      await conn.close()
-    } catch (err) {
+    await safeCloseConnection(conn, components, (err) => {
       error(`Error while ending obsolete write stream`, err)
-    }
+    })
     return
   }
 
@@ -265,6 +263,7 @@ async function* queryDHT(components: Components, destination: PeerId): AsyncIter
 
   try {
     for await (const dhtResult of components.getContentRouting().findProviders(key as any, options)) {
+      log(`Found DHT entry ${dhtResult.id.toString()}`)
       yield dhtResult.id
     }
   } catch (err) {
@@ -287,7 +286,7 @@ async function doDirectDial(
   let struct = await tryExistingConnections(components, id, protocols)
 
   if (struct) {
-    log(`Successfully reached ${id.toString()} via existing connection !`)
+    log(`Successfully reached ${id.toString()} via existing connection '${struct.conn.id}'!`)
     return { status: DialStatus.SUCCESS, resp: struct }
   }
 
@@ -299,7 +298,9 @@ async function doDirectDial(
     } already known address${knownAddressesForPeer.length == 1 ? '' : 'es'} for ${id.toString()}:\n`
     // Let's try using the known addresses by connecting directly
 
-    for (const address of knownAddressesForPeer) {
+    for (const address of knownAddressesForPeer.sort((a: Address, b: Address) =>
+      (components.getConnectionManager() as any).dialer.addressSorter(a, b)
+    )) {
       out += `- ${address.multiaddr.toString()}\n`
     }
     // Remove last `\n`
@@ -310,7 +311,7 @@ async function doDirectDial(
   }
 
   if (struct != undefined) {
-    log(`Successfully reached ${id.toString()} via already known addresses !`)
+    log(`Successfully reached ${id.toString()} via already known addresses '${struct.conn.remoteAddr.toString()}!`)
     return { status: DialStatus.SUCCESS, resp: struct }
   }
 

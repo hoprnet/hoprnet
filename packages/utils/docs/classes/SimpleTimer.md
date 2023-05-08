@@ -32,4 +32,4 @@ Represents a timer handle.
 
 #### Defined in
 
-utils/lib/utils_metrics.d.ts:332
+utils/lib/utils_metrics.d.ts:337

@@ -25,6 +25,7 @@ import { getAddrs } from './addrs.js'
 import { fromSocket } from './tcp.js'
 import { RELAY_CHANGED_EVENT } from './entry.js'
 import { bindToPort, attemptClose, nodeToMultiaddr, cleanExistingConnections, ip6Lookup } from '../utils/index.js'
+import type { Interface } from './stun/types.js'
 
 import type { Components } from '@libp2p/interfaces/components'
 import type { ConnectComponents } from '../components.js'
@@ -131,6 +132,19 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
         this.connectComponents.getRelay().setUsedRelays(relayPeerIds)
       }
 
+      // Hotfix:
+      // Libp2p's addressManager utilizes an internal cache which contradicts
+      // the address upgrade mechanism.
+      // This wipes the cache on address changes.
+      // @ts-ignore
+      this.components.getAddressManager().announce = new Set()
+
+      // Hotfix:
+      // Wipe observed addresses before publishing new DHT records.
+      // @ts-ignore
+      this.components.getAddressManager().observed = new Set()
+
+      log(`Publishing new list of addresses`, this.getAddrs())
       this.dispatchEvent(new CustomEvent('listening'))
     }.bind(this)
 
@@ -242,7 +256,7 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
       includeLocalhostIPv4: true
     })
 
-    if (!natSituation.bidirectionalNAT) {
+    if (!natSituation.bidirectionalNAT && natSituation.isExposed) {
       // If any of the interface addresses is the
       // external address,
       for (const [index, internalInterface] of internalInterfaces.entries()) {
@@ -434,7 +448,6 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
       } else {
         switch (err.code) {
           case 'ERR_CONNECTION_INTERCEPTED':
-            error(`inbound connection failed. Node is not registered.`)
             break
           case 'ERR_ENCRYPTION_FAILED':
             error(`inbound connection failed because encryption failed. Maybe connected to the wrong node?`)
@@ -484,6 +497,25 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
   }
 
   /**
+   * Initiates a STUN request to keep the UDP port mapped
+   */
+  private async renewUdpPortMapping(): Promise<void> {
+    const multiaddrs = this.getUsableStunServers()
+
+    if (multiaddrs.length < 2) {
+      log(`Postponing re-allocation of NAT UDP mapping because not enough STUN servers known.`)
+      return
+    }
+
+    log(`Re-allocating NAT UDP mapping using ${multiaddrs.length} potential servers`)
+    try {
+      await getExternalIp(multiaddrs, this.udpSocket, this.testingOptions.__preferLocalAddresses)
+    } catch (e) {
+      log(`could not get an external ip ${e}`)
+    }
+  }
+
+  /**
    * *Tries* to determine the node's NAT situation. Note that this
    * is *not* an exact science and can lead to incorrect results.
    *
@@ -491,24 +523,10 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
    * @param ownPort the port on which we are listening
    * @returns Promise that resolves once STUN request came back or STUN timeout was reched
    */
-  async checkNATSituation(ownAddress: string, ownPort: number): Promise<NATSituation> {
+  async checkNATSituation(_ownAddress: string, ownPort: number): Promise<NATSituation> {
     // Continously contacts other stun servers to preserve NAT mapping
     this.stopUdpSocketKeepAliveInterval = retimer(
-      async () => {
-        const multiaddrs = this.getUsableStunServers(ownAddress, ownPort)
-
-        if (multiaddrs.length < 2) {
-          log(`Postponing re-allocation of NAT UDP mapping because not enough STUN servers known.`)
-          return
-        }
-
-        log(`Re-allocating NAT UDP mapping using ${multiaddrs.length} potential servers`)
-        try {
-          await getExternalIp(multiaddrs, this.udpSocket, this.testingOptions.__preferLocalAddresses)
-        } catch (e) {
-          log(`could not get an external ip ${e}`)
-        }
-      },
+      this.renewUdpPortMapping.bind(this),
       // Following recommendations of https://www.rfc-editor.org/rfc/rfc5626
       () => randomInteger(24_000, 29_000)
     )
@@ -525,7 +543,7 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
       }
     }
 
-    const usableStunServers = this.getUsableStunServers(ownAddress, ownPort)
+    const usableStunServers = this.getUsableStunServers()
 
     // allocate UDP port mapping
     let externalInterface = await getExternalIp(
@@ -534,39 +552,44 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
       this.testingOptions.__preferLocalAddresses
     )
 
+    // We can't reach any STUN server or all STUN responses were invalid
     if (externalInterface == undefined) {
       return {
         bidirectionalNAT: true
       }
     }
 
-    log(`External interface seems to be ${externalInterface.address}:${externalInterface.port}`)
+    // We got some STUN requests but ports were ambiguous
+    // let's see if socket port is exposed for some reason
+    if ((externalInterface as Interface).port == undefined) {
+      const ownPortExposed = await this.isExposedHost(ownPort, usableStunServers, `exposed ${ownPort}`)
 
-    const isExposed = await isExposedHost(
-      usableStunServers,
-      (listener: (socket: TCPSocket, stream: AsyncIterable<Uint8Array>) => void): (() => void) => {
-        const identifier = `STUN response ${Date.now()}`
-        this.protocols.push({
-          isProtocol: (data: Uint8Array) => data[0] == 1 && data[1] == 1,
-          identifier,
-          takeStream: listener
-        })
-        return () => {
-          this.protocols.splice(
-            this.protocols.findIndex((protocol: ProtocolListener) => protocol.identifier === identifier),
-            1
-          )
+      if (ownPortExposed) {
+        return {
+          bidirectionalNAT: false,
+          externalAddress: externalInterface.address,
+          externalPort: ownPort,
+          isExposed: true
         }
-      },
-      this.udpSocket,
-      externalInterface.port,
-      this.testingOptions.__localModeStun
+      } else {
+        return {
+          bidirectionalNAT: true
+        }
+      }
+    }
+
+    log(`External interface seems to be ${externalInterface.address}:${(externalInterface as Interface).port}`)
+
+    let isExposed = await this.isExposedHost(
+      (externalInterface as Interface).port,
+      usableStunServers,
+      `exposed ${(externalInterface as Interface).port}`
     )
 
     return {
       bidirectionalNAT: false,
       externalAddress: externalInterface.address,
-      externalPort: externalInterface.port,
+      externalPort: (externalInterface as Interface).port,
       isExposed
     }
   }
@@ -578,7 +601,11 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
    * @param ownHost [optional] the host on which we are listening
    * @returns a list of STUN servers, excluding ourself
    */
-  private getUsableStunServers(ownHost: string, ownPort: number): Multiaddr[] {
+  private getUsableStunServers(interfaceToExculude?: Interface): Multiaddr[] {
+    // By default, use TCP socket address,
+    // alternatively on demand, use different interface to exclude
+    const ownInterface = interfaceToExculude ?? (this.tcpSocket.address() as AddressInfo)
+
     const filtered = []
 
     let usableNodes: PeerStoreType[] = this.connectComponents.getEntryNodes().getAvailabeEntryNodes()
@@ -603,7 +630,7 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
           continue
         }
 
-        if (cOpts.host === ownHost && cOpts.port === ownPort) {
+        if (cOpts.host === ownInterface.address && cOpts.port == ownInterface.port) {
           // Exclude self
           continue
         }
@@ -613,6 +640,35 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
     }
 
     return filtered
+  }
+
+  /**
+   * Checks if given port is reachable by other nodes using RFC 5780 STUN requests
+   * @param port port number to check
+   * @param stunServers array of (RFC5780) STUN servers to use for the request
+   * @param identifier unique identifier to correctly route STUN responses, e.g. "9091 exposed"
+   * @returns Promise that resolves to true if port is reachable by other nodes
+   */
+  private async isExposedHost(port: number, stunServers: Multiaddr[], identifier: string): Promise<boolean> {
+    return await isExposedHost(
+      stunServers,
+      (listener: (socket: TCPSocket, stream: AsyncIterable<Uint8Array>) => void): (() => void) => {
+        this.protocols.push({
+          isProtocol: (data: Uint8Array) => data[0] == 1 && data[1] == 1,
+          identifier,
+          takeStream: listener
+        })
+        return () => {
+          this.protocols.splice(
+            this.protocols.findIndex((protocol: ProtocolListener) => protocol.identifier === identifier),
+            1
+          )
+        }
+      },
+      this.udpSocket,
+      port,
+      this.testingOptions.__localModeStun
+    )
   }
 
   private getAddressForInterface(host: string, family: NetworkInterfaceInfo['family']): string {

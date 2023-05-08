@@ -11,7 +11,12 @@ import type { PeerId } from '@libp2p/interface-peer-id'
 import { keysPBM } from '@libp2p/crypto/keys'
 import type { AddressSorter, Address } from '@libp2p/interfaces/peer-store'
 
-import { HoprConnect, compareAddressesLocalMode, type PublicNodesEmitter } from '@hoprnet/hopr-connect'
+import {
+  HoprConnect,
+  compareAddressesLocalMode,
+  type PublicNodesEmitter,
+  compareAddressesPublicMode
+} from '@hoprnet/hopr-connect'
 import { HoprDB, PublicKey, debug, isAddressWithPeerId } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 
@@ -53,13 +58,13 @@ export async function createLibp2pInstance(
 
     if (options.testing?.preferLocalAddresses) {
       addressSorter = (a: Address, b: Address) => compareAddressesLocalMode(a.multiaddr, b.multiaddr)
-      log('Preferring local addresses')
+      log('Address sorting: prefer local addresses')
     } else {
       // Overwrite address sorter with identity function since
       // libp2p's own address sorter function is unable to handle
       // p2p addresses, e.g. /p2p/<RELAY>/p2p-circuit/p2p/<DESTINATION>
-      addressSorter = (_addr) => 0
-      log('Addresses are sorted by default')
+      addressSorter = (a: Address, b: Address) => compareAddressesPublicMode(a.multiaddr, b.multiaddr)
+      log('Address sorting: start with most promising addresses')
     }
 
     // Store the peerstore on-disk under the main data path. Ensure store is
@@ -93,8 +98,8 @@ export async function createLibp2pInstance(
             supportedEnvironments: supportedEnvironmentsInfo,
             allowLocalConnections: options.allowLocalConnections,
             allowPrivateConnections: options.allowPrivateConnections,
-            // Amount of nodes for which we are willing to act as a relay
-            maxRelayedConnections: 50_000,
+            // Amount of nodes for which we are willing to act as a relay with 2GB memory limit
+            maxRelayedConnections: 2_000,
             announce: options.announce,
             isAllowedToAccessNetwork
           },
@@ -146,11 +151,20 @@ export async function createLibp2pInstance(
         dialTimeout: 3e3
       },
       connectionGater: {
-        denyDialPeer: async (peer: PeerId) => !(await isAllowedToAccessNetwork(peer)),
+        denyDialPeer: async (peer: PeerId) => {
+          if (!(await isAllowedToAccessNetwork(peer))) {
+            log(`Denied outgoing connection to peer ${peer.toString()} because node is not registered`)
+            return true
+          } else {
+            return false
+          }
+        },
         denyInboundEncryptedConnection: async (peer: PeerId, conn: MultiaddrConnection) => {
           const isAllowed = await isAllowedToAccessNetwork(peer)
 
           if (!isAllowed) {
+            log(`Denied incoming connection to peer ${peer.toString()} because node is not registered`)
+
             try {
               // Connection must be closed explicitly because not yet
               // part of any data structure
@@ -176,16 +190,24 @@ export async function createLibp2pInstance(
         enabled: false
       },
       ping: {
-        protocolPrefix
+        // FIXME: libp2p automatically adds a leading `/`
+        // protocolPrefix: protocolPrefix.startsWith('/') ? protocolPrefix.slice(1) : protocolPrefix
+        protocolPrefix // for compatibility
       },
       fetch: {
-        protocolPrefix
+        // FIXME: libp2p automatically adds a leading `/`
+        // protocolPrefix: protocolPrefix.startsWith('/') ? protocolPrefix.slice(1) : protocolPrefix
+        protocolPrefix // for compatibility
       },
       push: {
-        protocolPrefix
+        // FIXME: libp2p automatically adds a leading `/`
+        // protocolPrefix: protocolPrefix.startsWith('/') ? protocolPrefix.slice(1) : protocolPrefix
+        protocolPrefix // for compatibility
       },
       identify: {
-        protocolPrefix
+        // FIXME: libp2p automatically adds a leading `/`
+        // protocolPrefix: protocolPrefix.startsWith('/') ? protocolPrefix.slice(1) : protocolPrefix
+        protocolPrefix // for compatibility
       },
       peerStore: {
         // Prevents peer-store from storing addresses twice, e.g.

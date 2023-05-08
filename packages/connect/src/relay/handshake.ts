@@ -4,9 +4,9 @@ import type { PeerId } from '@libp2p/interface-peer-id'
 import { unmarshalPublicKey } from '@libp2p/crypto/keys'
 
 import chalk from 'chalk'
-import { dial, DialStatus, pubKeyToPeerId } from '@hoprnet/hopr-utils'
+import { dial, DialStatus, pubKeyToPeerId, safeCloseConnection } from '@hoprnet/hopr-utils'
 
-import type { RelayState } from './state.js'
+import type { RelayState } from '../../lib/connect_relay.js'
 
 import debug from 'debug'
 import { DELIVERY_PROTOCOLS } from '../constants.js'
@@ -150,7 +150,7 @@ export async function negotiateRelayHandshake(
   stream: Stream,
   source: PeerId,
   components: Components,
-  state: Pick<RelayState, 'exists' | 'isActive' | 'updateExisting' | 'createNew'>,
+  state: RelayState,
   options: HoprConnectOptions
 ): Promise<void> {
   log(`handling relay request`)
@@ -195,6 +195,7 @@ export async function negotiateRelayHandshake(
   }
 
   const relayedConnectionExists = state.exists(source, destination)
+  log(`checked relay entry existence ${source.toString()} ${destination.toString()}: ${relayedConnectionExists}`)
 
   if (relayedConnectionExists) {
     // Relayed connection could exist but connection is dead
@@ -227,6 +228,9 @@ export async function negotiateRelayHandshake(
         // Updated connection, so everything done
         return
       }
+    } else {
+      state.remove(source, destination)
+      log(`deleted inactive relay entry: ${source.toString()} ${destination.toString()}`)
     }
   }
 
@@ -260,11 +264,9 @@ export async function negotiateRelayHandshake(
   if (errThrown) {
     shakerWrite(shaker, RelayHandshakeMessage.FAIL_COULD_NOT_REACH_COUNTERPARTY)
     destinationShaker.rest()
-    try {
-      await result.resp.conn.close()
-    } catch (err) {
-      error(`Error while closing connection to destination ${destination.toString()}.`, err)
-    }
+    await safeCloseConnection(result.resp.conn, components, (err) => {
+      error(`Error while closing connection to destination ${destination?.toString()}.`, err)
+    })
     return
   }
 
@@ -280,11 +282,9 @@ export async function negotiateRelayHandshake(
     shakerWrite(shaker, RelayHandshakeMessage.FAIL_COULD_NOT_REACH_COUNTERPARTY)
 
     destinationShaker.rest()
-    try {
-      await result.resp.conn.close()
-    } catch (err) {
-      error(`Error while closing connection to destination ${destination.toString()}.`, err)
-    }
+    await safeCloseConnection(result.resp.conn, components, (err) => {
+      error(`Error while closing connection to destination ${destination?.toString()}.`, err)
+    })
     return
   }
 

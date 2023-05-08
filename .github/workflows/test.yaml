@@ -40,7 +40,7 @@ jobs:
           version: "v0.4.0"
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v17
+        uses: cachix/install-nix-action@v20
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -49,6 +49,7 @@ jobs:
         with:
           name: hoprnet
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+        continue-on-error: true
 
       - name: get yarn cache directory path
         id: yarn-cache-dir-path
@@ -84,6 +85,6 @@ jobs:
         run: nix develop -c make -j build
 
       - name: Test
-        run: nix develop -c "source .venv/bin/activate && make -j test"
+        run: nix develop -c make -j test
         env:
           HOPR_ENVIRONMENT_ID: anvil-localhost

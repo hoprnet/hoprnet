@@ -1,6 +1,5 @@
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use futures::stream::{Stream, StreamExt};
     use js_sys::{Object, Reflect, Uint8Array};
     use wasm_bindgen::prelude::*;
 
@@ -18,7 +17,7 @@ pub mod wasm {
     /// ```
     pub fn to_box_u8_stream(item: Result<JsValue, JsValue>) -> Result<Box<[u8]>, String> {
         match item {
-            Ok(x) => Ok(Box::from_iter(Uint8Array::new(&x).to_vec())),
+            Ok(x) => Ok(Uint8Array::from(x).to_vec().into_boxed_slice()),
             Err(e) => Err(format!("{:?}", e)),
         }
     }
@@ -40,7 +39,7 @@ pub mod wasm {
         match item {
             Some(Ok(m)) => {
                 Reflect::set(&obj, &"done".into(), &JsValue::FALSE).unwrap();
-                Reflect::set(&obj, &"value".into(), &Uint8Array::from(&*m)).unwrap();
+                Reflect::set(&obj, &"value".into(), &Uint8Array::from(m.as_ref())).unwrap();
                 Ok(obj.into())
             }
             Some(Err(e)) => Err(JsValue::from(e)),
@@ -70,7 +69,7 @@ pub mod wasm {
         match item {
             Some(m) => {
                 Reflect::set(&obj, &"done".into(), &JsValue::FALSE).unwrap();
-                Reflect::set(&obj, &"value".into(), &Uint8Array::from(&*m)).unwrap();
+                Reflect::set(&obj, &"value".into(), &Uint8Array::from(m.as_ref())).unwrap();
                 obj.into()
             }
             None => {
@@ -78,42 +77,6 @@ pub mod wasm {
                 Reflect::set(&obj, &"value".into(), &JsValue::undefined()).unwrap();
                 obj.into()
             }
-        }
-    }
-
-    /// Helper struct to export Rust Streams into Javascript AsyncIterables
-    ///
-    /// ```
-    /// use futures::stream::{Stream, StreamExt};
-    /// use wasm_bindgen::prelude::*;
-    /// use wasm_bindgen_futures::stream::JsStream;
-    /// use js_sys::AsyncIterator;
-    /// use utils_misc::async_iterable::wasm::to_box_u8_stream;
-    ///
-    /// #[wasm_bindgen]
-    /// pub struct AsyncIterableHelper {
-    ///    stream: Box<dyn Stream<Item = Result<Box<[u8]>, String>> + Unpin>, // must not be pub
-    /// }
-    /// #[wasm_bindgen]
-    /// pub fn async_test(some_async_iterable: AsyncIterator) -> Result<AsyncIterableHelper, JsValue> {
-    ///     let stream = JsStream::from(some_async_iterable);
-    ///
-    ///     let stream = stream.map(to_box_u8_stream);
-    ///
-    ///     Ok(AsyncIterableHelper {
-    ///         stream: Box::new(stream),
-    ///     })
-    /// }
-    /// ```
-    #[wasm_bindgen]
-    pub struct AsyncIterableHelper {
-        stream: Box<dyn Stream<Item = Result<Box<[u8]>, String>> + Unpin>,
-    }
-
-    #[wasm_bindgen]
-    impl AsyncIterableHelper {
-        pub async fn next(&mut self) -> Result<JsValue, JsValue> {
-            to_jsvalue_stream(self.stream.as_mut().next().await)
         }
     }
 }
