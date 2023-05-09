@@ -1,5 +1,6 @@
 pub mod acknowledgment;
 pub mod channels;
+pub mod account;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
