@@ -39,6 +39,7 @@
     "@ethersproject/providers": "https://github.com/hoprnet/ethers-js-provider/archive/refs/tags/v5.7.0-fixed-memory-leak.tar.gz",
     "@libp2p/kad-dht": "https://github.com/hoprnet/js-libp2p-kad-dht/archive/refs/tags/v1.0.17.tar.gz",
     "@overnightjs/logger": "1.2.1",
+    "@multiformats/multiaddr": "10.3.3",
     "colors": "1.4.0",
     "it-length-prefixed": "https://github.com/hoprnet/it-length-prefixed/archive/refs/tags/v7.0.3.tar.gz",
     "libp2p@0.37.3": "patch:libp2p@npm%3A0.37.3#./.yarn/patches/libp2p-npm-0.37.3-ae5be411f2.patch",

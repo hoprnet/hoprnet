@@ -88,13 +88,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@chainsafe/is-ip@npm:^2.0.1":
-  version: 2.0.1
-  resolution: "@chainsafe/is-ip@npm:2.0.1"
-  checksum: c5bbebe58eadc700d12112713fd75e41ae26020eedcac0e8b593fdda16a180239ede1d68d55b500fd8b30189c9a82b5e10769ed86a816e879c83248069152b79
-  languageName: node
-  linkType: hard
-
 "@chainsafe/libp2p-noise@npm:7.0.0":
   version: 7.0.0
   resolution: "@chainsafe/libp2p-noise@npm:7.0.0"
@@ -118,15 +111,6 @@ __metadata:
     uint8arraylist: ^1.4.0
     uint8arrays: ^3.0.0
   checksum: abddeb927c127f5021daabb696ffe7aeceac1db5022ea70ee5a5937bc37e36c1bc8c65af1f7cefac6bb938b326a08e1ba17835d875e1282d95746da28b02ef06
-  languageName: node
-  linkType: hard
-
-"@chainsafe/netmask@npm:^2.0.0":
-  version: 2.0.0
-  resolution: "@chainsafe/netmask@npm:2.0.0"
-  dependencies:
-    "@chainsafe/is-ip": ^2.0.1
-  checksum: 90d27154c11ff878130150766ebfc490c829cd5249a61f7018fa4cefe3a18d92394285bb435c38bd0dbe45261006a82572e95ac201e9b28157de80127a6a3d06
   languageName: node
   linkType: hard
 
@@ -1278,7 +1262,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@libp2p/interfaces@npm:^3.0.0, @libp2p/interfaces@npm:^3.2.0, @libp2p/interfaces@npm:^3.3.1":
+"@libp2p/interfaces@npm:^3.0.0, @libp2p/interfaces@npm:^3.2.0":
   version: 3.3.2
   resolution: "@libp2p/interfaces@npm:3.3.2"
   checksum: 3071fa49dcbb81a4b218248a1f648fba1061fb9c51e4b5edab9b8a7b9425c25afec96fdf3351ea7a469e7039269e59d95265682a934aa9c21630226dfcb67313
@@ -1645,35 +1629,6 @@ __metadata:
     uint8arrays: ^3.0.0
     varint: ^6.0.0
   checksum: 88ee35060ec2b29ee0ede5bab4c544395c3913697e1c8051cc589e097466af14ee137743112065a104d9751cd42e3ce9d441e8d0ef4247be7cb55d86685ac990
-  languageName: node
-  linkType: hard
-
-"@multiformats/multiaddr@npm:^10.1.1, @multiformats/multiaddr@npm:^10.1.5, @multiformats/multiaddr@npm:^10.1.8, @multiformats/multiaddr@npm:^10.2.0":
-  version: 10.5.0
-  resolution: "@multiformats/multiaddr@npm:10.5.0"
-  dependencies:
-    dns-over-http-resolver: ^2.1.0
-    err-code: ^3.0.1
-    is-ip: ^5.0.0
-    multiformats: ^9.4.5
-    uint8arrays: ^3.0.0
-    varint: ^6.0.0
-  checksum: 9ed158df80ac3611f53b91d0de4a75a761bc749ae0026b303c4779a49fe680fd7d3626fa3ffaaa82e38a5f421f2b09af8a6d855a8465242107055fcb2a547678
-  languageName: node
-  linkType: hard
-
-"@multiformats/multiaddr@npm:^12.0.0":
-  version: 12.1.2
-  resolution: "@multiformats/multiaddr@npm:12.1.2"
-  dependencies:
-    "@chainsafe/is-ip": ^2.0.1
-    "@chainsafe/netmask": ^2.0.0
-    "@libp2p/interfaces": ^3.3.1
-    dns-over-http-resolver: ^2.1.0
-    multiformats: ^11.0.0
-    uint8arrays: ^4.0.2
-    varint: ^6.0.0
-  checksum: 976c683501e3f40a9103b4b066e547a90d211b336d9923e7863e3fdd68ad146e0fe8062d980ab0a234832b28a3e71e83d2d38875d682b14dbe5f05a6861a7f21
   languageName: node
   linkType: hard
 
@@ -3784,15 +3739,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"clone-regexp@npm:^3.0.0":
-  version: 3.0.0
-  resolution: "clone-regexp@npm:3.0.0"
-  dependencies:
-    is-regexp: ^3.0.0
-  checksum: cb254bd47ce0aac55771c888211e796b5e2a2ed974d0a7020e4e3805eca597fd19b85a7bcbf2250d319f12626a09c0e4db120e02ce49fec81a61bcd208474651
-  languageName: node
-  linkType: hard
-
 "clone-response@npm:^1.0.2":
   version: 1.0.3
   resolution: "clone-response@npm:1.0.3"
@@ -3949,13 +3895,6 @@ __metadata:
   version: 1.0.5
   resolution: "content-type@npm:1.0.5"
   checksum: 566271e0a251642254cde0f845f9dd4f9856e52d988f4eb0d0dcffbb7a1f8ec98de7a5215fc628f3bce30fe2fb6fd2bc064b562d721658c59b544e2d34ea2766
-  languageName: node
-  linkType: hard
-
-"convert-hrtime@npm:^5.0.0":
-  version: 5.0.0
-  resolution: "convert-hrtime@npm:5.0.0"
-  checksum: 5245ad1ac6dd57b2d87624ae0eeac1d2a74812a6631208c09368bef787a28e7dbfa736cddaa9c8a0c425cb240437ea506afec7b9684ff617004d06a551f26c87
   languageName: node
   linkType: hard
 
@@ -5475,13 +5414,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"function-timeout@npm:^0.1.0":
-  version: 0.1.1
-  resolution: "function-timeout@npm:0.1.1"
-  checksum: 26a05935fde5abf8168f13f2a9d8d8930d12cd076dd694a55d425b3c124384a9d5bf4e254710684addd20749f42268e349acbc333ab7c9622b863a89d392f999
-  languageName: node
-  linkType: hard
-
 "functional-red-black-tree@npm:^1.0.1":
   version: 1.0.1
   resolution: "functional-red-black-tree@npm:1.0.1"
@@ -6570,16 +6502,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"is-ip@npm:^5.0.0":
-  version: 5.0.0
-  resolution: "is-ip@npm:5.0.0"
-  dependencies:
-    ip-regex: ^5.0.0
-    super-regex: ^0.2.0
-  checksum: a6a4e25f6a4c03d6074a153a375f64ba296d8385aa1718d0a1aea8f724fafe8fc4e2866ab16529344b658ecd55339a14b89c4f1d1f4806a571b2b455ec5c0dc4
-  languageName: node
-  linkType: hard
-
 "is-lambda@npm:^1.0.1":
   version: 1.0.1
   resolution: "is-lambda@npm:1.0.1"
@@ -6658,13 +6580,6 @@ __metadata:
   version: 1.0.2
   resolution: "is-property@npm:1.0.2"
   checksum: 33b661a3690bcc88f7e47bb0a21b9e3187e76a317541ea7ec5e8096d954f441b77a46d8930c785f7fbf4ef8dfd624c25495221e026e50f74c9048fe501773be5
-  languageName: node
-  linkType: hard
-
-"is-regexp@npm:^3.0.0":
-  version: 3.1.0
-  resolution: "is-regexp@npm:3.1.0"
-  checksum: d39dbd9892f0a25d01ee1a8e650c3f2e045bf7b1fa87eafb50b31dd29342869aa9135fd372628202254398956bf7f4b62094bdda39283ec2a9bb749fbb7f427c
   languageName: node
   linkType: hard
 
@@ -8690,8 +8605,8 @@ __metadata:
   linkType: hard
 
 "node-fetch@npm:^2.6.1, node-fetch@npm:^2.6.7":
-  version: 2.6.10
-  resolution: "node-fetch@npm:2.6.10"
+  version: 2.6.11
+  resolution: "node-fetch@npm:2.6.11"
   dependencies:
     whatwg-url: ^5.0.0
   peerDependencies:
@@ -8699,7 +8614,7 @@ __metadata:
   peerDependenciesMeta:
     encoding:
       optional: true
-  checksum: 9250e5266ccb4cc43e0ba5a4e23447d65f207a445d8f968420ef5f135cb9db3f03e527647a3762c1ba06872cbd13640e572d9eea63ba6754e936a6e824ed85a3
+  checksum: 249d0666a9497553384d46b5ab296ba223521ac88fed4d8a17d6ee6c2efb0fc890f3e8091cafe7f9fba8151a5b8d925db2671543b3409a56c3cd522b468b47b3
   languageName: node
   linkType: hard
 
@@ -11121,17 +11036,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"super-regex@npm:^0.2.0":
-  version: 0.2.0
-  resolution: "super-regex@npm:0.2.0"
-  dependencies:
-    clone-regexp: ^3.0.0
-    function-timeout: ^0.1.0
-    time-span: ^5.1.0
-  checksum: 99865cb002a7e4af78cbfb51ef9636d51c1678319cf50e3cca8a7ef205eff41732430de1d36f2872949388c11506ef6e9c7dbf220bea6748a80edd98c8170866
-  languageName: node
-  linkType: hard
-
 "superagent@npm:^8.0.5":
   version: 8.0.9
   resolution: "superagent@npm:8.0.9"
@@ -11282,15 +11186,6 @@ __metadata:
   version: 2.3.8
   resolution: "through@npm:2.3.8"
   checksum: a38c3e059853c494af95d50c072b83f8b676a9ba2818dcc5b108ef252230735c54e0185437618596c790bbba8fcdaef5b290405981ffa09dce67b1f1bf190cbd
-  languageName: node
-  linkType: hard
-
-"time-span@npm:^5.1.0":
-  version: 5.1.0
-  resolution: "time-span@npm:5.1.0"
-  dependencies:
-    convert-hrtime: ^5.0.0
-  checksum: 949c45fcb873f2d26fda3db1b7f7161ce65206f6e94a7c6c9bf3a5a07a373570dba57ca5c1f816efa6326adbc3f9e93bb6ef19a7a220f4259a917e1192d49418
   languageName: node
   linkType: hard
 

@@ -81,7 +81,7 @@ def setup_7_nodes(request):
     log_file_path = f"/tmp/hopr-smoke-{request.module.__name__}.log"
     try:
         logging.info("Creating a 7 node cluster from source")
-        res = subprocess.run(
+        subprocess.run(
             f"./scripts/fixture_local_test_setup.sh --skip-cleanup | tee {log_file_path}",
             shell=True,
             capture_output=True,
