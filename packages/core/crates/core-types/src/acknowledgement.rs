@@ -237,6 +237,7 @@ impl BinarySerializable<'_> for UnacknowledgedTicket {
     }
 }
 
+/// Contains cryptographic challenge that needs to be solved for acknowledging a packet.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct AcknowledgementChallenge {
@@ -261,6 +262,7 @@ impl AcknowledgementChallenge {
         }
     }
 
+    /// Checks if the given secret solves this challenge.
     pub fn solve(&self, secret: &[u8]) -> bool {
         self.ack_challenge
             .as_ref()
@@ -307,9 +309,13 @@ impl BinarySerializable<'_> for AcknowledgementChallenge {
     }
 }
 
+/// Contains either unacknowledged ticket if we're waiting for the acknowledgement as a relayer
+/// or information if we wait for the acknowledgement as a sender.
 #[derive(Clone, Debug, PartialEq)]
 pub enum PendingAcknowledgement {
+    /// We're waiting for acknowledgement as a sender
     WaitingAsSender,
+    /// We're waiting for the acknowledgement as a relayer with a ticket
     WaitingAsRelayer(UnacknowledgedTicket),
 }
 
@@ -385,12 +391,17 @@ pub mod test {
 
     #[test]
     fn test_acknowledgement_challenge() {
-        let hkc = HalfKey::new(&hex!("3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa")).to_challenge();
+        let sk = hex!("3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa");
+        let hkc = HalfKey::new(&sk).to_challenge();
         let pk = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
         let pub_key = PublicKey::from_privkey(&pk).unwrap();
 
         let mut akc1 = AcknowledgementChallenge::new(&hkc, &pk);
         assert!(akc1.validate(hkc.clone(), &pub_key));
+
+        assert!(akc1.solve(&sk), "challenge must be solved by its own private key");
+
+        AcknowledgementChallenge::verify(&PublicKey::from_privkey(&sk).unwrap(), &akc1.signature, &hkc);
 
         let mut akc2 = AcknowledgementChallenge::deserialize(&akc1.serialize()).unwrap();
         assert!(akc2.validate(hkc.clone(), &pub_key));
