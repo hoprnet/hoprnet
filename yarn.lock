@@ -1396,7 +1396,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@libp2p/peer-store@npm:^1.0.10":
+"@libp2p/peer-store@npm:1.0.17":
   version: 1.0.17
   resolution: "@libp2p/peer-store@npm:1.0.17"
   dependencies:
@@ -1417,6 +1417,30 @@ __metadata:
     protons-runtime: ^1.0.4
     uint8arrays: ^3.0.0
   checksum: d76cf06bcac54c01a380d395db847c8dafbaaaec0835c3f38586d2851403115331995e16df489f70ad8c0bb6e86ece8eeff1286196dd348852278e9e793c78f4
+  languageName: node
+  linkType: hard
+
+"@libp2p/peer-store@patch:@libp2p/peer-store@npm%3A1.0.17#./.yarn/patches/@libp2p-peer-store-npm-1.0.17-714b0c0ec5.patch::locator=hoprnet%40workspace%3A.":
+  version: 1.0.17
+  resolution: "@libp2p/peer-store@patch:@libp2p/peer-store@npm%3A1.0.17#./.yarn/patches/@libp2p-peer-store-npm-1.0.17-714b0c0ec5.patch::version=1.0.17&hash=7a7966&locator=hoprnet%40workspace%3A."
+  dependencies:
+    "@libp2p/interfaces": ^2.0.0
+    "@libp2p/logger": ^1.1.0
+    "@libp2p/peer-id": ^1.1.0
+    "@libp2p/peer-record": ^1.0.0
+    "@multiformats/multiaddr": ^10.1.5
+    err-code: ^3.0.1
+    interface-datastore: ^6.1.0
+    it-all: ^1.0.6
+    it-filter: ^1.0.3
+    it-foreach: ^0.1.1
+    it-map: ^1.0.6
+    it-pipe: ^2.0.3
+    mortice: ^3.0.0
+    multiformats: ^9.6.3
+    protons-runtime: ^1.0.4
+    uint8arrays: ^3.0.0
+  checksum: edf9126a8fa2f07e82fa4c10d51e75524ed09d7f892b1f8d37d1fa22b138a4045116a66151d86f587cd71750d8c839c9ebf88dec193851dec1992fa54c50d286
   languageName: node
   linkType: hard
 
