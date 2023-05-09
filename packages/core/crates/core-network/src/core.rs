@@ -206,7 +206,13 @@ impl CoreNetwork {
         let network_to_move = network.clone();
         let pinger = Rc::new(Ping::new(
             ping_config,
-            move |peer: &PeerId, result: crate::types::Result| network_to_move.update(peer, result),
+            move |peer: &PeerId, result: crate::types::Result| {
+                if network_to_move.has(peer) {
+                    network_to_move.update(peer, result)
+                } else {
+                    network_to_move.add(peer, PeerOrigin::IncomingConnection)
+                }
+            },
             move |destination: PeerId,
                   protocols: Vec<String>|
                   -> Pin<Box<dyn Future<Output = Result<StreamingIterable, String>>>> {

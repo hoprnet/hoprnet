@@ -365,53 +365,79 @@ impl<St: DuplexStream> End<St> {
                     info!("polling from stream {:?}", chunk);
 
                     match chunk[0] {
-                        x if (x == MessagePrefix::ConnectionStatus as u8
-                            && chunk[1] == ConnectionStatusMessage::Stop as u8) =>
-                        {
-                            info!("stop received {}", x);
+                        x if x == MessagePrefix::ConnectionStatus as u8 => {
+                            if chunk.len() < 2 {
+                                error!("unrecognizable connection status message. message is missing second byte");
+                                continue;
+                            }
 
-                            // Correct?
-                            *this.ended = true;
+                            match chunk[1] {
+                                y if y == ConnectionStatusMessage::Stop as u8 => {
+                                    info!("stop received {}", x);
 
-                            break Ok(None);
-                        }
-                        x if (x == MessagePrefix::StatusMessage as u8 && chunk[1] == StatusMessage::Pong as u8) => {
-                            info!("pong received {}", x);
+                                    // Correct?
+                                    *this.ended = true;
 
-                            let id: [u8; 4] = match chunk.len() {
-                                2 => [0u8; 4],
-                                6 => chunk[2..6].try_into().unwrap(),
-                                _ => {
-                                    error!(
-                                        "Incorrect ping id length. Received {} elements but expected 4",
-                                        chunk.len() - 2
-                                    );
+                                    *this.buffered = Some(chunk);
+
+                                    break Ok(None);
+                                }
+                                y if y == ConnectionStatusMessage::Restart as u8 => {
+                                    *this.buffered = Some(chunk);
                                     continue;
                                 }
-                            };
-
-                            if let Some(entry) = this.ping_requests.borrow().get(&id) {
-                                info!("ping wake");
-                                entry.borrow().wake();
+                                y if y == ConnectionStatusMessage::Upgraded as u8 => {
+                                    // Swallow UPGRADED message for backwards-compatibility
+                                    break Ok(None);
+                                }
+                                y => error!("unrecognizable connection status message [{}]", y),
                             }
                         }
-                        x if (x == MessagePrefix::StatusMessage as u8 && chunk[1] == StatusMessage::Ping as u8) => {
-                            info!("ping received {}", x);
+                        x if x == MessagePrefix::StatusMessage as u8 => {
+                            if chunk.len() < 2 {
+                                error!("unrecognizable status message. message is missing second byte");
+                                continue;
+                            }
 
-                            *this.buffered = Some(Box::new([
-                                MessagePrefix::StatusMessage as u8,
-                                StatusMessage::Pong as u8,
-                            ]));
-                            continue;
+                            match chunk[1] {
+                                y if y == StatusMessage::Pong as u8 => {
+                                    info!("pong received {}", x);
+
+                                    let id: [u8; 4] = match chunk.len() {
+                                        2 => [0u8; 4],
+                                        6 => chunk[2..6].try_into().unwrap(),
+                                        _ => {
+                                            error!(
+                                                "Incorrect ping id length. Received {} elements but expected 4",
+                                                chunk.len() - 2
+                                            );
+                                            continue;
+                                        }
+                                    };
+
+                                    if let Some(entry) = this.ping_requests.borrow().get(&id) {
+                                        info!("ping wake");
+                                        entry.borrow().wake();
+                                    }
+                                }
+                                y if y == StatusMessage::Ping as u8 => {
+                                    info!("ping received {}", x);
+
+                                    *this.buffered = Some(Box::new([
+                                        MessagePrefix::StatusMessage as u8,
+                                        StatusMessage::Pong as u8,
+                                    ]));
+                                    continue;
+                                }
+                                y => error!("Unrecognizable status message [{}]", y),
+                            }
                         }
                         x if (x == MessagePrefix::Payload as u8 || x == MessagePrefix::WebRTC as u8) => {
-                            info!("payload or webrtc received {}", x);
-
                             *this.buffered = Some(chunk);
                             continue;
                         }
-                        _ => {
-                            info!("Received unrecognizable message")
+                        x => {
+                            info!("Received unrecognizable message [{}]", x)
                         }
                     }
                 }
@@ -439,7 +465,7 @@ impl<St: DuplexStream> Server<St> {
     }
 
     pub fn get_id(&self) -> RelayConnectionIdentifier {
-        assert!(self.a.id.eq(&self.b.id), "Identifier must not be equal");
+        assert!(!self.a.id.eq(&self.b.id), "Identifier must not be equal");
 
         (self.a.id.clone(), self.b.id.clone()).try_into().unwrap()
     }

@@ -65,6 +65,7 @@ impl<St: DuplexStream> Future for PollActive<St> {
         match this.fut.as_mut().as_pin_mut().unwrap().poll(cx) {
             Poll::Pending => Poll::Pending,
             Poll::Ready((a, b)) => Poll::Ready(if a.is_ok() && b.is_ok() {
+                // No need to prune anything if connection is alive
                 None
             } else {
                 Some(this.server.borrow().get_id())
@@ -79,11 +80,19 @@ struct RelayConnections<St> {
 
 impl<St> ToString for RelayConnections<St> {
     fn to_string(&self) -> String {
-        let prefix: String = "RelayConnections:\n".into();
-
         let items = self.conns.borrow().keys().map(|x| x.to_string()).collect::<Vec<_>>();
 
-        format!("{} {}", prefix, items.join("\n  "))
+        let prefix: String = "RelayConnections:\n".into();
+
+        format!(
+            "{} {}",
+            prefix,
+            if items.len() == 0 {
+                "  No relayed connections".into()
+            } else {
+                items.join("\n  ")
+            }
+        )
     }
 }
 
@@ -106,9 +115,14 @@ impl<'a, St: DuplexStream + 'static> RelayConnections<St> {
         let id_to_move = id.clone();
         let conns_to_move = self.conns.clone();
         let polling = PollBorrow { st: server };
+
+        // Start the stream but don't await its end
         spawn_local(async move {
             match polling.await {
-                Ok(()) => info!("Relayed connection [\"{}>\"] successfully", id_to_move.to_string()),
+                Ok(()) => info!(
+                    "Relayed connection [\"{}>\"] ended successfully",
+                    id_to_move.to_string()
+                ),
                 Err(e) => error!(
                     "Relayed connection [\"{}>\"] ended with error {}",
                     id_to_move.to_string(),
@@ -341,5 +355,186 @@ pub mod wasm {
 
             Ok(JsValue::undefined())
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::server_new::{ConnectionStatusMessage, MessagePrefix, StatusMessage};
+
+    use super::*;
+    use futures::{
+        channel::mpsc::{self, UnboundedReceiver, UnboundedSender},
+        future::join,
+        stream::{FusedStream, Stream},
+        Sink,
+    };
+    use libp2p::PeerId;
+    use std::str::FromStr;
+
+    const ALICE: &'static str = "1Ank4EeHLAd3bwwtJma1WsXYSmiGgqmjkQoCUpevx67ix8";
+    const BOB: &'static str = "1AcPsXRKVc3U64NBb4obUUT34jSLWtvAz2JMw192L92QKW";
+
+    pin_project! {
+        struct TestingDuplexStream {
+            #[pin]
+            rx: UnboundedReceiver<Box<[u8]>>,
+            #[pin]
+            tx: UnboundedSender<Box<[u8]>>,
+        }
+    }
+
+    impl TestingDuplexStream {
+        fn new() -> (Self, UnboundedSender<Box<[u8]>>, UnboundedReceiver<Box<[u8]>>) {
+            let (send_tx, send_rx) = mpsc::unbounded::<Box<[u8]>>();
+            let (receive_tx, receive_rx) = mpsc::unbounded::<Box<[u8]>>();
+
+            (
+                Self {
+                    rx: send_rx,
+                    tx: receive_tx,
+                },
+                send_tx,
+                receive_rx,
+            )
+        }
+    }
+
+    impl FusedStream for TestingDuplexStream {
+        fn is_terminated(&self) -> bool {
+            self.rx.is_terminated()
+        }
+    }
+
+    impl Stream for TestingDuplexStream {
+        type Item = Result<Box<[u8]>, String>;
+        fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+            let this = self.project();
+
+            match this.rx.poll_next(cx) {
+                Poll::Pending => Poll::Pending,
+                Poll::Ready(Some(x)) => Poll::Ready(Some(Ok(x))),
+                Poll::Ready(None) => Poll::Pending,
+            }
+        }
+
+        fn size_hint(&self) -> (usize, Option<usize>) {
+            self.rx.size_hint()
+        }
+    }
+
+    impl Sink<Box<[u8]>> for TestingDuplexStream {
+        type Error = String;
+        fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+            let this = self.project();
+
+            this.tx.poll_ready(cx).map_err(|e| e.to_string())
+        }
+
+        fn start_send(self: Pin<&mut Self>, item: Box<[u8]>) -> Result<(), Self::Error> {
+            let this = self.project();
+
+            this.tx.start_send(item).map_err(|e| e.to_string())
+        }
+
+        fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+            let this = self.project();
+
+            this.tx.poll_flush(cx).map_err(|e| e.to_string())
+        }
+
+        fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+            let this = self.project();
+
+            this.tx.poll_close(cx).map_err(|e| e.to_string())
+        }
+    }
+
+    impl DuplexStream for TestingDuplexStream {}
+
+    #[async_std::test]
+    async fn check_if_active() {
+        let (stream_a, st_a_send, st_a_receive) = TestingDuplexStream::new();
+        let (stream_b, st_b_send, st_b_receive) = TestingDuplexStream::new();
+
+        let peer_a = PeerId::from_str(ALICE).unwrap();
+        let peer_b = PeerId::from_str(BOB).unwrap();
+
+        let server = Rc::new(RefCell::new(Server::new(stream_a, peer_a, stream_b, peer_b)));
+
+        // Start polling the stream in both directions
+        let polled_borrow = PollBorrow { st: server.clone() };
+        // Issue a ping request in both directions
+        let polled = PollActive::new(server);
+
+        let ((_, res), _) = join(join(polled_borrow, polled), async move {
+            assert_eq!(
+                join(st_a_receive.take(1).next(), st_b_receive.take(1).next()).await,
+                (
+                    Some(Box::new([MessagePrefix::StatusMessage as u8, StatusMessage::Ping as u8,]) as Box<[u8]>),
+                    Some(Box::new([MessagePrefix::StatusMessage as u8, StatusMessage::Ping as u8,]) as Box<[u8]>)
+                )
+            );
+
+            st_a_send
+                .unbounded_send(Box::new([
+                    MessagePrefix::StatusMessage as u8,
+                    StatusMessage::Pong as u8,
+                ]))
+                .unwrap();
+
+            st_b_send
+                .unbounded_send(Box::new([
+                    MessagePrefix::StatusMessage as u8,
+                    StatusMessage::Pong as u8,
+                ]))
+                .unwrap();
+
+            st_a_send
+                .unbounded_send(Box::new([
+                    MessagePrefix::ConnectionStatus as u8,
+                    ConnectionStatusMessage::Stop as u8,
+                ]))
+                .unwrap();
+
+            st_b_send
+                .unbounded_send(Box::new([
+                    MessagePrefix::ConnectionStatus as u8,
+                    ConnectionStatusMessage::Stop as u8,
+                ]))
+                .unwrap();
+        })
+        .await;
+
+        assert!(res.is_none());
+    }
+    #[async_std::test]
+    async fn check_if_active_timeout() {
+        let (stream_a, _, _) = TestingDuplexStream::new();
+        let (stream_b, _, _) = TestingDuplexStream::new();
+
+        let peer_a = PeerId::from_str(ALICE).unwrap();
+        let peer_b = PeerId::from_str(BOB).unwrap();
+
+        let server = Rc::new(RefCell::new(Server::new(stream_a, peer_a, stream_b, peer_b)));
+
+        let polled = PollActive::new(server).await;
+
+        assert!(polled.is_some(), "Passive stream should end in a timeout");
+        assert!(polled.eq(&Some((peer_a, peer_b).try_into().unwrap())))
+    }
+
+    #[test]
+    fn empty_state_manager() {
+        let state = RelayConnections::<TestingDuplexStream>::new();
+
+        let a = PeerId::from_str(ALICE).unwrap();
+        let b = PeerId::from_str(BOB).unwrap();
+
+        assert!(state.size() == 0, "Size of empty state object must be zero");
+        assert!(
+            !state.exists(a, b),
+            "Empty state object must not contain any connection"
+        );
     }
 }
