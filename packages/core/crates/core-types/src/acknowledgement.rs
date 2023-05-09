@@ -1,4 +1,4 @@
-use crate::acknowledgment::PendingAcknowledgement::{WaitingAsRelayer, WaitingAsSender};
+use crate::acknowledgement::PendingAcknowledgement::{WaitingAsRelayer, WaitingAsSender};
 use crate::channels::Ticket;
 use core_crypto::primitives::{DigestLike, SimpleDigest};
 use core_crypto::types::{HalfKey, HalfKeyChallenge, Hash, PublicKey, Response, Signature};
@@ -32,7 +32,7 @@ impl Acknowledgement {
     }
 
     /// Validates the acknowledgement. Must be called immediately after deserialization or otherwise
-    /// any operations with the deserialized acknowledgment will panic.
+    /// any operations with the deserialized acknowledgement will panic.
     pub fn validate(&mut self, own_public_key: &PublicKey, sender_public_key: &PublicKey) -> bool {
         let mut digest = SimpleDigest::default();
         digest.update(&self.ack_key_share.to_challenge().serialize());
@@ -50,7 +50,7 @@ impl Acknowledgement {
         self.validated
     }
 
-    /// Obtains the acknowledged challenge out of this acknowledgment.
+    /// Obtains the acknowledged challenge out of this acknowledgement.
     pub fn ack_challenge(&self) -> HalfKeyChallenge {
         assert!(self.validated, "acknowledgement not validated");
         self.ack_key_share.to_challenge()
@@ -87,7 +87,7 @@ impl BinarySerializable<'_> for Acknowledgement {
     }
 }
 
-/// Contains acknowledgment information and the respective ticket
+/// Contains acknowledgement information and the respective ticket
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct AcknowledgedTicket {
@@ -301,7 +301,7 @@ impl BinarySerializable<'_> for PendingAcknowledgement {
 
 #[cfg(test)]
 pub mod test {
-    use crate::acknowledgment::PendingAcknowledgement;
+    use crate::acknowledgement::PendingAcknowledgement;
     use utils_types::traits::BinarySerializable;
 
     // TODO: Add tests to all remaining types
@@ -317,7 +317,7 @@ pub mod test {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use crate::acknowledgment::{AcknowledgedTicket, Acknowledgement, UnacknowledgedTicket};
+    use crate::acknowledgement::{AcknowledgedTicket, Acknowledgement, UnacknowledgedTicket};
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use utils_types::traits::BinarySerializable;
