@@ -41,7 +41,8 @@
     "@overnightjs/logger": "1.2.1",
     "colors": "1.4.0",
     "it-length-prefixed": "https://github.com/hoprnet/it-length-prefixed/archive/refs/tags/v7.0.3.tar.gz",
-    "libp2p@0.37.3": "patch:libp2p@npm%3A0.37.3#./.yarn/patches/libp2p-npm-0.37.3-ae5be411f2.patch"
+    "libp2p@0.37.3": "patch:libp2p@npm%3A0.37.3#./.yarn/patches/libp2p-npm-0.37.3-ae5be411f2.patch",
+    "@libp2p/peer-store@^1.0.10": "patch:@libp2p/peer-store@npm%3A1.0.17#./.yarn/patches/@libp2p-peer-store-npm-1.0.17-714b0c0ec5.patch"
   },
   "prettier": {
     "tabWidth": 2,
