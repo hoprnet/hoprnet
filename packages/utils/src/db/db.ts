@@ -5,9 +5,8 @@ import { stat, mkdir, rm } from 'fs/promises'
 import { debug } from '../process/index.js'
 import { Intermediate } from '../crypto/index.js'
 import {
-  PendingAcknowledgement,
-  UnacknowledgedTicket,
   AcknowledgedTicket,
+  UnacknowledgedTicket,
   AccountEntry,
   ChannelEntry,
   Snapshot,
@@ -19,8 +18,8 @@ import {
   Ticket,
   Address,
   Hash,
-  generate_channel_id
-} from '@hoprnet/hopr-core'
+  generateChannelId
+} from '../types/index.js'
 import BN from 'bn.js'
 import { u8aToNumber, u8aConcat, toU8a } from '../u8a/index.js'
 import fs from 'fs'
@@ -29,8 +28,6 @@ const log = debug(`hopr-core:db`)
 
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
-
-import {  } from '@hoprnet/hopr-core'
 
 // key seperator:    `:`
 // key query prefix: `-`
@@ -111,6 +108,44 @@ const REJECTED_TICKETS_COUNT = encoder.encode('statistics:rejected:count')
 const REJECTED_TICKETS_VALUE = encoder.encode('statistics:rejected:value')
 const ENVIRONMENT_KEY = encoder.encode('environment_id')
 const HOPR_BALANCE_KEY = encoder.encode('hopr-balance')
+
+enum PendingAcknowledgementPrefix {
+  Relayer = 0,
+  MessageSender = 1
+}
+
+export type WaitingAsSender = {
+  isMessageSender: true
+}
+
+export type WaitingAsRelayer = {
+  isMessageSender: false
+  ticket: UnacknowledgedTicket
+}
+
+export type PendingAckowledgement = WaitingAsSender | WaitingAsRelayer
+
+function serializePendingAcknowledgement(isMessageSender: boolean, unackTicket?: UnacknowledgedTicket) {
+  if (isMessageSender) {
+    return Uint8Array.from([PendingAcknowledgementPrefix.MessageSender])
+  } else {
+    return Uint8Array.from([PendingAcknowledgementPrefix.Relayer, ...unackTicket.serialize()])
+  }
+}
+
+function deserializePendingAcknowledgement(data: Uint8Array): PendingAckowledgement {
+  switch (data[0] as PendingAcknowledgementPrefix) {
+    case PendingAcknowledgementPrefix.MessageSender:
+      return {
+        isMessageSender: true
+      }
+    case PendingAcknowledgementPrefix.Relayer:
+      return {
+        isMessageSender: false,
+        ticket: UnacknowledgedTicket.deserialize(data.slice(1))
+      }
+  }
+}
 
 export class LevelDb {
   public backend: LevelUp

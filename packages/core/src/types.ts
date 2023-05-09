@@ -3,6 +3,7 @@ core_types_set_panic_hook()
 
 export {
   Acknowledgement,
+  AccountEntry,
   AcknowledgementChallenge,
   Address,
   Balance,
@@ -16,7 +17,7 @@ export {
   Hash,
   PublicKey,
   PendingAcknowledgement,
-  Signature, ethereum_signed_hash,
+  Signature, ethereum_signed_hash, generate_channel_id,
   UnacknowledgedTicket
 } from '../lib/core_types.js'
 
