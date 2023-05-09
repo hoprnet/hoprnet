@@ -1,4 +1,3 @@
-use core_crypto::errors::CryptoError::SignatureVerification;
 use crate::acknowledgement::PendingAcknowledgement::{WaitingAsRelayer, WaitingAsSender};
 use crate::channels::Ticket;
 use core_crypto::primitives::{DigestLike, SimpleDigest};
@@ -13,13 +12,12 @@ use utils_types::traits::BinarySerializable;
 pub struct Acknowledgement {
     ack_signature: Signature,
     challenge_signature: Signature,
-    pub ack_key_share: HalfKey,
+    ack_key_share: HalfKey,
     validated: bool,
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl Acknowledgement {
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(ack_challenge: AcknowledgementChallenge, ack_key_share: HalfKey, private_key: &[u8]) -> Self {
         let mut digest = SimpleDigest::default();
         digest.update(&ack_challenge.serialize());
@@ -34,7 +32,7 @@ impl Acknowledgement {
     }
 
     /// Validates the acknowledgement. Must be called immediately after deserialization or otherwise
-    /// any operations with the deserialized acknowledgment will panic.
+    /// any operations with the deserialized acknowledgement will panic.
     pub fn validate(&mut self, own_public_key: &PublicKey, sender_public_key: &PublicKey) -> bool {
         let mut digest = SimpleDigest::default();
         digest.update(&self.ack_key_share.to_challenge().serialize());
@@ -52,7 +50,7 @@ impl Acknowledgement {
         self.validated
     }
 
-    /// Obtains the acknowledged challenge out of this acknowledgment.
+    /// Obtains the acknowledged challenge out of this acknowledgement.
     pub fn ack_challenge(&self) -> HalfKeyChallenge {
         assert!(self.validated, "acknowledgement not validated");
         self.ack_key_share.to_challenge()
@@ -66,11 +64,11 @@ impl BinarySerializable<'_> for Acknowledgement {
         let mut buf = data.to_vec();
         if data.len() == Self::SIZE {
             let ack_signature = Signature::deserialize(buf.drain(..Signature::SIZE).as_ref())?;
-            let challenge_signature = AcknowledgementChallenge::deserialize(buf.drain(..AcknowledgementChallenge::SIZE).as_ref())?;
+            let challenge_signature = Signature::deserialize(buf.drain(..AcknowledgementChallenge::SIZE).as_ref())?;
             let ack_key_share = HalfKey::deserialize(buf.drain(..HalfKey::SIZE).as_ref())?;
             Ok(Self {
                 ack_signature,
-                challenge_signature: challenge_signature.signature,
+                challenge_signature,
                 ack_key_share,
                 validated: false,
             })
@@ -82,14 +80,14 @@ impl BinarySerializable<'_> for Acknowledgement {
     fn serialize(&self) -> Box<[u8]> {
         assert!(self.validated, "acknowledgement not validated");
         let mut ret = Vec::with_capacity(Self::SIZE);
-        ret.extend_from_slice(&self.ack_signature.raw_signature());
-        ret.extend_from_slice(&self.challenge_signature.raw_signature());
+        ret.extend_from_slice(&self.ack_signature.serialize());
+        ret.extend_from_slice(&self.challenge_signature.serialize());
         ret.extend_from_slice(&self.ack_key_share.serialize());
         ret.into_boxed_slice()
     }
 }
 
-/// Contains acknowledgment information and the respective ticket
+/// Contains acknowledgement information and the respective ticket
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct AcknowledgedTicket {
@@ -103,8 +101,6 @@ pub struct AcknowledgedTicket {
 impl AcknowledgedTicket {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(ticket: Ticket, response: Response, pre_image: Hash, signer: PublicKey) -> Self {
-        assert_ne!(ticket.counterparty, signer.to_address(),
-                   "signer must be different from the ticket counterparty");
         Self {
             ticket,
             response,
@@ -146,22 +142,6 @@ impl BinarySerializable<'_> for AcknowledgedTicket {
     }
 }
 
-impl AcknowledgedTicket {
-    /// Verifies if the embedded ticket has been signed by the given issuer and also
-    /// that the challenge on the embedded response matches the challenge on the ticket.
-    pub fn verify(&self, issuer: &PublicKey) -> core_crypto::errors::Result<()> {
-        (
-            self.ticket.verify(issuer).map(|_| true)? &&
-            self.response
-                .to_challenge()
-                .to_ethereum_challenge()
-                .eq(&self.ticket.challenge)
-        )
-        .then_some(())
-        .ok_or(SignatureVerification)
-    }
-}
-
 /// Wrapper for an unacknowledged ticket
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
@@ -181,32 +161,6 @@ impl UnacknowledgedTicket {
             signer,
         }
     }
-
-    pub fn get_challenge(&self) -> HalfKeyChallenge {
-        self.own_key.to_challenge()
-    }
-}
-
-impl UnacknowledgedTicket {
-    /// Verifies if signature on the embedded ticket using the embedded public key.
-    pub fn verify_signature(&self) -> core_crypto::errors::Result<()> {
-        self.ticket.verify(&self.signer)
-    }
-
-    /// Verifies if the challenge on the embedded ticket matches the solution
-    /// from the given acknowledgement and the embedded half key.
-    pub fn verify_challenge(&self, acknowledgement: &HalfKey) -> core_crypto::errors::Result<()> {
-        self.get_response(acknowledgement)?
-            .to_challenge()
-            .to_ethereum_challenge()
-            .eq(&self.ticket.challenge)
-            .then(|| ())
-            .ok_or(SignatureVerification)
-    }
-
-    pub fn get_response(&self, acknowledgement: &HalfKey) -> core_crypto::errors::Result<Response> {
-        Response::from_half_keys(&self.own_key, acknowledgement)
-    }
 }
 
 impl BinarySerializable<'_> for UnacknowledgedTicket {
@@ -217,7 +171,7 @@ impl BinarySerializable<'_> for UnacknowledgedTicket {
             let mut buf = data.to_vec();
             let ticket = Ticket::deserialize(buf.drain(..Ticket::SIZE).as_ref())?;
             let own_key = HalfKey::deserialize(buf.drain(..HalfKey::SIZE).as_ref())?;
-            let signer = PublicKey::deserialize(buf.drain(..PublicKey::SIZE_UNCOMPRESSED).as_ref())?;
+            let signer = PublicKey::deserialize(buf.drain(..PublicKey::SIZE_COMPRESSED).as_ref())?;
             Ok(Self {
                 ticket,
                 own_key,
@@ -237,7 +191,6 @@ impl BinarySerializable<'_> for UnacknowledgedTicket {
     }
 }
 
-/// Contains cryptographic challenge that needs to be solved for acknowledging a packet.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct AcknowledgementChallenge {
@@ -253,7 +206,6 @@ fn hash_challenge(challenge: &HalfKeyChallenge) -> Box<[u8]> {
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl AcknowledgementChallenge {
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(ack_challenge: &HalfKeyChallenge, private_key: &[u8]) -> Self {
         let hash = hash_challenge(&ack_challenge);
         Self {
@@ -262,7 +214,6 @@ impl AcknowledgementChallenge {
         }
     }
 
-    /// Checks if the given secret solves this challenge.
     pub fn solve(&self, secret: &[u8]) -> bool {
         self.ack_challenge
             .as_ref()
@@ -305,17 +256,13 @@ impl BinarySerializable<'_> for AcknowledgementChallenge {
 
     fn serialize(&self) -> Box<[u8]> {
         assert!(self.ack_challenge.is_some(), "challenge is invalid");
-        self.signature.raw_signature()
+        self.signature.serialize()
     }
 }
 
-/// Contains either unacknowledged ticket if we're waiting for the acknowledgement as a relayer
-/// or information if we wait for the acknowledgement as a sender.
 #[derive(Clone, Debug, PartialEq)]
 pub enum PendingAcknowledgement {
-    /// We're waiting for acknowledgement as a sender
     WaitingAsSender,
-    /// We're waiting for the acknowledgement as a relayer with a ticket
     WaitingAsRelayer(UnacknowledgedTicket),
 }
 
@@ -354,183 +301,27 @@ impl BinarySerializable<'_> for PendingAcknowledgement {
 
 #[cfg(test)]
 pub mod test {
-    use ethnum::u256;
-    use hex_literal::hex;
-    use core_crypto::types::{Challenge, CurvePoint, HalfKey, Hash, PublicKey, Response};
-    use utils_types::primitives::{Address, Balance, BalanceType, U256};
-    use crate::acknowledgement::{AcknowledgedTicket, Acknowledgement, AcknowledgementChallenge, PendingAcknowledgement, UnacknowledgedTicket};
+    use crate::acknowledgement::PendingAcknowledgement;
     use utils_types::traits::BinarySerializable;
-    use crate::channels::Ticket;
 
-    fn mock_ticket(pk: &[u8]) -> Ticket {
-        let inverse_win_prob = u256::new(1u128); // 100 %
-        let price_per_packet = u256::new(10000000000000000u128); // 0.01 HOPR
-        let path_pos = 5;
-
-        Ticket::new(
-            Address::new(&[0u8; Address::SIZE]),
-            None,
-            U256::new("1"),
-            U256::new("2"),
-            Balance::new(
-                inverse_win_prob * price_per_packet * path_pos as u128,
-                BalanceType::HOPR,
-            ),
-            U256::from_inverse_probability(&inverse_win_prob).unwrap(),
-            U256::new("4"),
-            pk,
-        )
-    }
+    // TODO: Add tests to all remaining types
 
     #[test]
-    fn test_pending_ack_sender() {
+    fn test_pending_ack() {
         assert_eq!(
             PendingAcknowledgement::WaitingAsSender,
             PendingAcknowledgement::deserialize(&PendingAcknowledgement::WaitingAsSender.serialize()).unwrap()
-        ); }
-
-    #[test]
-    fn test_acknowledgement_challenge() {
-        let sk = hex!("3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa");
-        let hkc = HalfKey::new(&sk).to_challenge();
-        let pk = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
-        let pub_key = PublicKey::from_privkey(&pk).unwrap();
-
-        let mut akc1 = AcknowledgementChallenge::new(&hkc, &pk);
-        assert!(akc1.validate(hkc.clone(), &pub_key));
-
-        assert!(akc1.solve(&sk), "challenge must be solved by its own private key");
-
-        AcknowledgementChallenge::verify(&PublicKey::from_privkey(&sk).unwrap(), &akc1.signature, &hkc);
-
-        let mut akc2 = AcknowledgementChallenge::deserialize(&akc1.serialize()).unwrap();
-        assert!(akc2.validate(hkc.clone(), &pub_key));
-
-        assert_eq!(akc1, akc2);
-    }
-
-    #[test]
-    fn test_acknowledgement() {
-        let pk_1 = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
-        let pub_key_1 = PublicKey::from_privkey(&pk_1).unwrap();
-
-        let pk_2 = hex!("4471496ef88d9a7d86a92b7676f3c8871a60792a37fae6fc3abc347c3aa3b16b");
-        let pub_key_2 = PublicKey::from_privkey(&pk_2).unwrap();
-
-        let ack_key = HalfKey::new(&hex!("3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa"));
-
-        let akc1 = AcknowledgementChallenge::new(&ack_key.to_challenge(), &pk_1);
-
-        let mut ack1 = Acknowledgement::new(akc1, ack_key, &pk_2);
-        assert!(ack1.validate(&pub_key_1, &pub_key_2));
-
-        let mut ack2 = Acknowledgement::deserialize(&ack1.serialize()).unwrap();
-        assert!(ack2.validate(&pub_key_1, &pub_key_2));
-
-        assert_eq!(ack1, ack2);
-    }
-
-    #[test]
-    fn test_unacknowledged_ticket() {
-        let pk_1 = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
-        let pub_key_1 = PublicKey::from_privkey(&pk_1).unwrap();
-
-        let hk1 = HalfKey::new(&hex!("3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa"));
-        let hk2 = HalfKey::new(&hex!("4471496ef88d9a7d86a92b7676f3c8871a60792a37fae6fc3abc347c3aa3b16b"));
-        let cp1: CurvePoint = hk1.to_challenge().into();
-        let cp2: CurvePoint = hk2.to_challenge().into();
-        let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
-
-        let mut ticket1 = mock_ticket(&pk_1);
-        ticket1.set_challenge(Challenge::from(cp_sum).to_ethereum_challenge(), &pk_1);
-
-        let unack1 = UnacknowledgedTicket::new(ticket1, hk1, pub_key_1);
-        assert!(unack1.verify_signature().is_ok());
-        assert!(unack1.verify_challenge(&hk2).is_ok());
-
-        let unack2 = UnacknowledgedTicket::deserialize(&unack1.serialize()).unwrap();
-        assert_eq!(unack1, unack2);
-
-        let pending_ack_1 = PendingAcknowledgement::WaitingAsRelayer(unack1);
-        let pending_ack_2 = PendingAcknowledgement::deserialize(&pending_ack_1.serialize()).unwrap();
-        assert_eq!(pending_ack_1, pending_ack_2);
-    }
-
-    #[test]
-    fn test_acknowledged_ticket() {
-        let pk = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
-        let pub_key = PublicKey::from_privkey(&pk).unwrap();
-        let resp = Response::new(&hex!("4471496ef88d9a7d86a92b7676f3c8871a60792a37fae6fc3abc347c3aa3b16b"));
-
-        let mut ticket1 = mock_ticket(&pk);
-        ticket1.set_challenge(resp.to_challenge().to_ethereum_challenge(), &pk);
-
-        let akt_1 = AcknowledgedTicket::new(ticket1,
-                                                 resp,
-                                                 Hash::create(&[&hex!("deadbeef")]),
-                                                 pub_key.clone()
         );
-        assert!(akt_1.verify(&pub_key).is_ok());
-
-        let akt_2 = AcknowledgedTicket::deserialize(&akt_1.serialize()).unwrap();
-        assert_eq!(akt_1, akt_2);
     }
-
 }
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use crate::acknowledgement::{AcknowledgedTicket, Acknowledgement, AcknowledgementChallenge, UnacknowledgedTicket};
+    use crate::acknowledgement::{AcknowledgedTicket, Acknowledgement, UnacknowledgedTicket};
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use utils_types::traits::BinarySerializable;
     use wasm_bindgen::prelude::*;
-    use core_crypto::types::{HalfKey, PublicKey, Response};
-
-    #[wasm_bindgen]
-    pub struct PendingAcknowledgement {
-        w: super::PendingAcknowledgement
-    }
-
-    #[wasm_bindgen]
-    impl PendingAcknowledgement {
-        #[wasm_bindgen(constructor)]
-        pub fn new(is_sender: bool, ticket: Option<UnacknowledgedTicket>) -> Self {
-            if is_sender {
-                Self {
-                    w: super::PendingAcknowledgement::WaitingAsSender
-                }
-            } else {
-                Self {
-                    w: super::PendingAcknowledgement::WaitingAsRelayer(ticket.unwrap())
-                }
-            }
-        }
-
-        pub fn is_msg_sender(&self) -> bool {
-            match &self.w {
-                super::PendingAcknowledgement::WaitingAsSender => true,
-                super::PendingAcknowledgement::WaitingAsRelayer(_) => false
-            }
-        }
-
-        pub fn ticket(&self) -> Option<UnacknowledgedTicket> {
-            match &self.w {
-                super::PendingAcknowledgement::WaitingAsSender => None,
-                super::PendingAcknowledgement::WaitingAsRelayer(ticket) => Some(ticket.clone())
-            }
-        }
-
-        pub fn deserialize(data: &[u8]) -> JsResult<PendingAcknowledgement> {
-            Ok(Self {
-                w: ok_or_jserr!( super::PendingAcknowledgement::deserialize(data))?
-            })
-        }
-
-        pub fn serialize(&self) -> Box<[u8]> {
-            self.w.serialize()
-        }
-    }
 
     #[wasm_bindgen]
     impl UnacknowledgedTicket {
@@ -543,19 +334,6 @@ pub mod wasm {
         pub fn _serialize(&self) -> Box<[u8]> {
             self.serialize()
         }
-
-        #[wasm_bindgen(js_name = "get_response")]
-        pub fn _get_response(&self, acknowledgement: &HalfKey) -> JsResult<Response> {
-            ok_or_jserr!(self.get_response(acknowledgement))
-        }
-
-        #[wasm_bindgen(js_name = "verify_challenge")]
-        pub fn _verify_challenge(&self, acknowledgement: &HalfKey) -> JsResult<bool> {
-            ok_or_jserr!(self.verify_challenge(acknowledgement).map(|_| true))
-        }
-
-        #[wasm_bindgen(js_name = "eq")]
-        pub fn _eq(&self, other: &UnacknowledgedTicket) -> bool { self.eq(other) }
     }
 
     #[wasm_bindgen]
@@ -569,30 +347,6 @@ pub mod wasm {
         pub fn _serialize(&self) -> Box<[u8]> {
             self.serialize()
         }
-
-        #[wasm_bindgen(js_name = "eq")]
-        pub fn _eq(&self, other: &AcknowledgedTicket) -> bool { self.eq(other) }
-
-        #[wasm_bindgen(js_name = "verify")]
-        pub fn _verify(&self, issuer: &PublicKey) -> JsResult<bool> {
-            ok_or_jserr!(self.verify(issuer).map(|_| true))
-        }
-    }
-
-    #[wasm_bindgen]
-    impl AcknowledgementChallenge {
-        #[wasm_bindgen(js_name = "deserialize")]
-        pub fn _deserialize(data: &[u8]) -> JsResult<AcknowledgementChallenge> {
-            ok_or_jserr!(Self::deserialize(data))
-        }
-
-        #[wasm_bindgen(js_name = "serialize")]
-        pub fn _serialize(&self) -> Box<[u8]> {
-            self.serialize()
-        }
-
-        #[wasm_bindgen(js_name = "eq")]
-        pub fn _eq(&self, other: &AcknowledgementChallenge) -> bool { self.eq(other) }
     }
 
     #[wasm_bindgen]
@@ -606,8 +360,5 @@ pub mod wasm {
         pub fn _serialize(&self) -> Box<[u8]> {
             self.serialize()
         }
-
-        #[wasm_bindgen(js_name = "eq")]
-        pub fn _eq(&self, other: &Acknowledgement) -> bool { self.eq(other) }
     }
 }

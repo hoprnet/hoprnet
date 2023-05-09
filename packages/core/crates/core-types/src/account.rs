@@ -1,10 +1,10 @@
-use std::fmt::{Display, Formatter};
-use multiaddr::Multiaddr;
+use crate::account::AccountType::{Announced, NotAnnounced};
 use core_crypto::types::PublicKey;
+use multiaddr::Multiaddr;
+use std::fmt::{Display, Formatter};
 use utils_types::errors::GeneralError::ParseError;
 use utils_types::primitives::Address;
 use utils_types::traits::{BinarySerializable, PeerIdLike};
-use crate::account::AccountType::{Announced, NotAnnounced};
 
 /// Type of the node account.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -12,9 +12,7 @@ pub enum AccountType {
     /// Node is not announced.
     NotAnnounced,
     /// Node is announced with a multi-address
-    Announced {
-      multiaddr: Multiaddr, updated_block: u32
-    }
+    Announced { multiaddr: Multiaddr, updated_block: u32 },
 }
 
 /// Represents a node announcement entry on the block chain.
@@ -23,7 +21,7 @@ pub enum AccountType {
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct AccountEntry {
     pub public_key: PublicKey,
-    entry_type: AccountType
+    entry_type: AccountType,
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -42,9 +40,7 @@ impl AccountEntry {
     pub fn get_multiaddress_str(&self) -> Option<String> {
         match &self.entry_type {
             NotAnnounced => None,
-            Announced { multiaddr, .. } => {
-                Some(multiaddr.to_string())
-            }
+            Announced { multiaddr, .. } => Some(multiaddr.to_string()),
         }
     }
 
@@ -52,9 +48,7 @@ impl AccountEntry {
     pub fn updated_at(&self) -> Option<u32> {
         match &self.entry_type {
             NotAnnounced => None,
-            Announced { updated_block, .. } => {
-                Some(*updated_block)
-            }
+            Announced { updated_block, .. } => Some(*updated_block),
         }
     }
 
@@ -62,7 +56,7 @@ impl AccountEntry {
     pub fn has_announced(&self) -> bool {
         match &self.entry_type {
             NotAnnounced => false,
-            Announced { .. } => true
+            Announced { .. } => true,
         }
     }
 
@@ -71,12 +65,11 @@ impl AccountEntry {
         match &self.entry_type {
             NotAnnounced => false,
             Announced { multiaddr, .. } => {
-                multiaddr.protocol_stack()
+                multiaddr
+                    .protocol_stack()
                     .find(|p| p == &"ip4" || p == &"ip6")
-                    .is_some() &&
-                multiaddr.protocol_stack()
-                    .find(|p| p == &"tcp")
                     .is_some()
+                    && multiaddr.protocol_stack().find(|p| p == &"tcp").is_some()
             }
         }
     }
@@ -101,7 +94,10 @@ impl Display for AccountEntry {
                 write!(f, " UpdatedAt: not announced")?;
                 write!(f, " RoutingInfo: false")?;
             }
-            Announced { multiaddr, updated_block } => {
+            Announced {
+                multiaddr,
+                updated_block,
+            } => {
                 write!(f, " Multiaddr: {}", multiaddr)?;
                 write!(f, " UpdatedAt: {}", updated_block)?;
                 write!(f, " RoutingInfo: {}", self.contains_routing_info())?;
@@ -112,8 +108,7 @@ impl Display for AccountEntry {
 }
 
 impl BinarySerializable<'_> for AccountEntry {
-    const SIZE: usize = PublicKey::SIZE_UNCOMPRESSED + Self::MA_LENGTH_PREFIX +
-        Self::MAX_MULTI_ADDR_LENGTH + 4;
+    const SIZE: usize = PublicKey::SIZE_UNCOMPRESSED + Self::MA_LENGTH_PREFIX + Self::MAX_MULTI_ADDR_LENGTH + 4;
 
     fn deserialize(data: &[u8]) -> utils_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
@@ -121,11 +116,14 @@ impl BinarySerializable<'_> for AccountEntry {
             let public_key = PublicKey::deserialize(buf.drain(..PublicKey::SIZE_UNCOMPRESSED).as_ref())?;
             let ma_len = u32::from_be_bytes(buf.drain(..Self::MA_LENGTH_PREFIX).as_ref().try_into().unwrap()) as usize;
             let entry_type = if ma_len > 0 {
-                let multiaddr = Multiaddr::try_from(buf.drain(..ma_len).collect::<Vec<u8>>()).map_err(|_| ParseError)?;
+                let multiaddr =
+                    Multiaddr::try_from(buf.drain(..ma_len).collect::<Vec<u8>>()).map_err(|_| ParseError)?;
                 buf.drain(..Self::MAX_MULTI_ADDR_LENGTH - ma_len);
-                Announced{
+                Announced {
                     multiaddr,
-                    updated_block: u32::from_be_bytes(buf.drain(..std::mem::size_of::<u32>()).as_ref().try_into().unwrap())
+                    updated_block: u32::from_be_bytes(
+                        buf.drain(..std::mem::size_of::<u32>()).as_ref().try_into().unwrap(),
+                    ),
                 }
             } else {
                 NotAnnounced
@@ -145,8 +143,11 @@ impl BinarySerializable<'_> for AccountEntry {
                 ret.extend_from_slice(&(0 as u32).to_be_bytes());
                 ret.extend_from_slice(&[0u8; Self::MAX_MULTI_ADDR_LENGTH]);
                 ret.extend_from_slice(&(0 as u32).to_be_bytes());
-            },
-            Announced{multiaddr, updated_block} => {
+            }
+            Announced {
+                multiaddr,
+                updated_block,
+            } => {
                 let ma_bytes = multiaddr.to_vec();
                 assert!(ma_bytes.len() <= Self::MAX_MULTI_ADDR_LENGTH, "multi address too long");
                 ret.extend_from_slice(&(ma_bytes.len() as u32).to_be_bytes());
@@ -162,12 +163,12 @@ impl BinarySerializable<'_> for AccountEntry {
 
 #[cfg(test)]
 mod test {
-    use hex_literal::hex;
-    use multiaddr::Multiaddr;
-    use core_crypto::types::PublicKey;
-    use utils_types::traits::BinarySerializable;
     use crate::account::AccountEntry;
     use crate::account::AccountType::{Announced, NotAnnounced};
+    use core_crypto::types::PublicKey;
+    use hex_literal::hex;
+    use multiaddr::Multiaddr;
+    use utils_types::traits::BinarySerializable;
 
     const PRIVATE_KEY: [u8; 32] = hex!("c14b8faa0a9b8a5fa4453664996f23a7e7de606d42297d723fc4a794f375e260");
 
@@ -175,10 +176,15 @@ mod test {
     fn test_account_entry_non_routable() {
         let pub_key = PublicKey::from_privkey(&PRIVATE_KEY).unwrap();
 
-        let ae1 = AccountEntry::new(pub_key.clone(), Announced {
-            multiaddr: "/p2p/16Uiu2HAm3rUQdpCz53tK1MVUUq9NdMAU6mFgtcXrf71Ltw6AStzk".parse::<Multiaddr>().unwrap(),
-            updated_block: 1
-        });
+        let ae1 = AccountEntry::new(
+            pub_key.clone(),
+            Announced {
+                multiaddr: "/p2p/16Uiu2HAm3rUQdpCz53tK1MVUUq9NdMAU6mFgtcXrf71Ltw6AStzk"
+                    .parse::<Multiaddr>()
+                    .unwrap(),
+                updated_block: 1,
+            },
+        );
 
         assert!(ae1.has_announced());
         assert_eq!(1, ae1.updated_at().unwrap());
@@ -192,10 +198,15 @@ mod test {
     fn test_account_entry_routable() {
         let pub_key = PublicKey::from_privkey(&PRIVATE_KEY).unwrap();
 
-        let ae1 = AccountEntry::new(pub_key.clone(), Announced {
-            multiaddr: "/ip4/34.65.237.196/tcp/9091/p2p/16Uiu2HAm3rUQdpCz53tK1MVUUq9NdMAU6mFgtcXrf71Ltw6AStzk".parse::<Multiaddr>().unwrap(),
-            updated_block: 1
-        });
+        let ae1 = AccountEntry::new(
+            pub_key.clone(),
+            Announced {
+                multiaddr: "/ip4/34.65.237.196/tcp/9091/p2p/16Uiu2HAm3rUQdpCz53tK1MVUUq9NdMAU6mFgtcXrf71Ltw6AStzk"
+                    .parse::<Multiaddr>()
+                    .unwrap(),
+                updated_block: 1,
+            },
+        );
 
         assert!(ae1.has_announced());
         assert_eq!(1, ae1.updated_at().unwrap());
@@ -222,20 +233,24 @@ mod test {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use std::str::FromStr;
-    use multiaddr::Multiaddr;
-    use wasm_bindgen::prelude::wasm_bindgen;
+    use crate::account::AccountEntry;
+    use crate::account::AccountType::{Announced, NotAnnounced};
     use core_crypto::types::PublicKey;
+    use multiaddr::Multiaddr;
+    use std::str::FromStr;
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use utils_types::traits::BinarySerializable;
-    use crate::account::AccountEntry;
-    use crate::account::AccountType::{Announced, NotAnnounced};
+    use wasm_bindgen::prelude::wasm_bindgen;
 
     #[wasm_bindgen]
     impl AccountEntry {
         #[wasm_bindgen(constructor)]
-        pub fn _new(public_key: PublicKey, multiaddr: Option<String>, updated_at: Option<u32>) -> JsResult<AccountEntry> {
+        pub fn _new(
+            public_key: PublicKey,
+            multiaddr: Option<String>,
+            updated_at: Option<u32>,
+        ) -> JsResult<AccountEntry> {
             if (multiaddr.is_some() && updated_at.is_some()) || (multiaddr.is_none() && updated_at.is_none()) {
                 Ok(Self {
                     public_key,
@@ -243,9 +258,9 @@ pub mod wasm {
                         None => NotAnnounced,
                         Some(multiaddr) => Announced {
                             multiaddr: ok_or_jserr!(Multiaddr::from_str(multiaddr.as_str()))?,
-                            updated_block: updated_at.unwrap()
-                        }
-                    }
+                            updated_block: updated_at.unwrap(),
+                        },
+                    },
                 })
             } else {
                 Err("must either specify both: multiaddr and updated_at or none".into())

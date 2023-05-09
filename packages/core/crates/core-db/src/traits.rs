@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 
 use core_crypto::types::{HalfKeyChallenge, Hash, PublicKey};
-use core_types::acknowledgement::{PendingAcknowledgement, UnacknowledgedTicket};
+use core_types::acknowledgement::UnacknowledgedTicket;
 use core_types::channels::{ChannelEntry, Ticket};
 use utils_types::primitives::{Address, Balance, U256};
 
@@ -26,6 +26,7 @@ pub trait HoprCoreDbActions {
     async fn store_pending_acknowledgment(
         &self,
         half_key_challenge: HalfKeyChallenge,
-	pending_ack: PendingAcknowledgement
+        is_message_sender: bool,
+        unack_ticket: Option<UnacknowledgedTicket>,
     );
 }
