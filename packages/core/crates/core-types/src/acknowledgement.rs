@@ -520,6 +520,16 @@ pub mod wasm {
                 super::PendingAcknowledgement::WaitingAsRelayer(ticket) => Some(ticket.clone())
             }
         }
+
+        pub fn deserialize(data: &[u8]) -> JsResult<PendingAcknowledgement> {
+            Ok(Self {
+                w: ok_or_jserr!( super::PendingAcknowledgement::deserialize(data))?
+            })
+        }
+
+        pub fn serialize(&self) -> Box<[u8]> {
+            self.w.serialize()
+        }
     }
 
     #[wasm_bindgen]
@@ -537,6 +547,11 @@ pub mod wasm {
         #[wasm_bindgen(js_name = "get_response")]
         pub fn _get_response(&self, acknowledgement: &HalfKey) -> JsResult<Response> {
             ok_or_jserr!(self.get_response(acknowledgement))
+        }
+
+        #[wasm_bindgen(js_name = "verify_challenge")]
+        pub fn _verify_challenge(&self, acknowledgement: &HalfKey) -> JsResult<bool> {
+            ok_or_jserr!(self.verify_challenge(acknowledgement).map(|_| true))
         }
 
         #[wasm_bindgen(js_name = "eq")]

@@ -1174,6 +1174,7 @@ dependencies = [
  "ethnum",
  "hex-literal 0.3.4",
  "js-sys",
+ "multiaddr",
  "serde",
  "serde_repr",
  "utils-misc",

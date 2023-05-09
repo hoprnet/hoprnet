@@ -5,7 +5,7 @@ import { webcrypto } from 'node:crypto'
 // @ts-ignore
 globalThis.crypto = webcrypto
 
-core_crypto_set_panic_hook()
+c
 export {
   PRG,
   PRGParameters,

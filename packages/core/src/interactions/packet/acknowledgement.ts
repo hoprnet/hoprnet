@@ -1,17 +1,23 @@
 import {
   debug,
   pickVersion,
-  AcknowledgedTicket,
   type HoprDB,
-  type PendingAckowledgement,
-  type HalfKeyChallenge,
-  Hash,
   create_counter
 } from '@hoprnet/hopr-utils'
+
+import {
+  Acknowledgement,
+  PendingAcknowledgement,
+  AcknowledgedTicket,
+  HalfKeyChallenge,
+  PublicKey,
+  Hash
+} from '../../../lib/core_types.js'
+
 import type { SendMessage } from '../../index.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { ACKNOWLEDGEMENT_TIMEOUT } from '../../constants.js'
-import { Acknowledgement, Packet } from '../../messages/index.js'
+import { Packet } from '../../messages/index.js'
 import { Pushable, pushable } from 'it-pushable'
 import type { ResolvedEnvironment } from '../../environment.js'
 import type { Components } from '@libp2p/interfaces/components'
@@ -122,7 +128,8 @@ export class AcknowledgementInteraction {
    * Reserve a preImage for the given ticket if it is a winning ticket.
    */
   async handleAcknowledgement(msg: Uint8Array, remotePeer: PeerId): Promise<void> {
-    const acknowledgement = Acknowledgement.deserialize(msg, this.privKey, remotePeer)
+    const acknowledgement = Acknowledgement.deserialize(msg)
+    acknowledgement.validate(PublicKey.from_peerid_str(this.privKey.toString()), PublicKey.from_peerid_str(remotePeer.toString()))
 
     // There are three cases:
     // 1. There is an unacknowledged ticket and we are
@@ -131,14 +138,14 @@ export class AcknowledgementInteraction {
     //    do not wait for any half key
     // 3. The acknowledgement is unexpected and stems from
     //    a protocol bug or an attacker
-    let pending: PendingAckowledgement
+    let pending: PendingAcknowledgement
     try {
       pending = await this.db.getPendingAcknowledgement(acknowledgement.ackChallenge)
     } catch (err: any) {
       // Protocol bug?
       if (err != undefined && err.notFound) {
         log(
-          `Received unexpected acknowledgement for half key challenge ${acknowledgement.ackChallenge.toHex()} - half key ${acknowledgement.ackKeyShare.toHex()}`
+          `Received unexpected acknowledgement for half key challenge ${acknowledgement.ack_challenge().to_hex()} - half key ${acknowledgement.ack_key_share.to_hex()}`
         )
       }
       metric_receivedFailedAcks.increment()
@@ -146,19 +153,19 @@ export class AcknowledgementInteraction {
     }
 
     // No pending ticket, nothing to do.
-    if (pending.isMessageSender == true) {
+    if (pending.is_msg_sender()) {
       log(`Received acknowledgement as sender. First relayer has processed the packet.`)
       // Resolves `sendMessage()` promise
-      this.onAcknowledgement(acknowledgement.ackChallenge)
+      this.onAcknowledgement(acknowledgement.ack_challenge())
       metric_receivedSuccessfulAcks.increment()
       // nothing else to do
       return
     }
 
     // Try to unlock our incentive
-    const unacknowledged = pending.ticket
+    const unacknowledged = pending.ticket()
 
-    if (!unacknowledged.verifyChallenge(acknowledgement.ackKeyShare)) {
+    if (!unacknowledged.verify_challenge(acknowledgement.ack_key_share)) {
       metric_receivedFailedAcks.increment()
       throw Error(`The acknowledgement is not sufficient to solve the embedded challenge.`)
     }
@@ -174,17 +181,16 @@ export class AcknowledgementInteraction {
       metric_receivedFailedAcks.increment()
       throw e
     }
-    const response = unacknowledged.getResponse(acknowledgement.ackKeyShare)
-    const ticket = unacknowledged.ticket
+    const response = unacknowledged.get_response(acknowledgement.ack_key_share)
 
     // Store the acknowledged ticket, regardless if it's a win or a loss
     // create an acked ticket with a pre image place holder
-    const ack = new AcknowledgedTicket(ticket, response, PREIMAGE_PLACE_HOLDER, unacknowledged.signer)
+    const ack = new AcknowledgedTicket(unacknowledged.ticket, response, PREIMAGE_PLACE_HOLDER, unacknowledged.signer)
     log(`Acknowledging ticket. Using response ${response.toHex()}`)
     // replace the unAcked ticket with Acked ticket.
 
     try {
-      await this.db.replaceUnAckWithAck(acknowledgement.ackChallenge, ack)
+      await this.db.replaceUnAckWithAck(acknowledgement.ack_challenge(), ack)
       log(`Stored acknowledged ticket`)
     } catch (err) {
       log(`ERROR: cannot replace an UnAck ticket with Ack ticket, thus dropping ticket`, err)

@@ -22,7 +22,6 @@ import {
 import retimer from 'retimer'
 
 import {
-  type AcknowledgedTicket,
   type Address,
   Balance,
   type ChannelEntry,
@@ -73,6 +72,8 @@ core_network_set_panic_hook()
 registerMetricsCollector(core_network_gather_metrics)
 
 import Heartbeat from './network/heartbeat.js'
+
+import { AcknowledgedTicket } from './types.js'
 
 import { findPath } from './path/index.js'
 
@@ -1555,3 +1556,5 @@ export {
 export { resolveEnvironment, supportedEnvironments, type ResolvedEnvironment } from './environment.js'
 export { CORE_CONSTANTS as CONSTANTS } from '../lib/core_misc.js'
 export { sampleOptions } from './index.mock.js'
+
+export * from './types.js'
