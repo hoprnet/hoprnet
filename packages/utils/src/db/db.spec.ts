@@ -7,21 +7,26 @@ import {
   Ticket,
   AcknowledgedTicket,
   Balance,
+  BalanceType,
   Hash,
-  UINT256,
+  U256,
   HalfKey,
   Response,
   HalfKeyChallenge,
   ChannelEntry,
   PublicKey,
   Address,
-  Snapshot
-} from '../types/index.js'
+  Snapshot, ChannelStatus
+} from '../types.js'
 import BN from 'bn.js'
 import { SECP256K1_CONSTANTS } from '../crypto/index.js'
-import { u8aEquals } from '../u8a/index.js'
+import { stringToU8a, u8aEquals } from '../u8a/index.js'
 
-const TestingSnapshot = new Snapshot(new BN(0), new BN(0), new BN(0))
+const TestingSnapshot = new Snapshot(U256.zero(), U256.zero(), U256.zero())
+
+const MOCK_PUBLIC_KEY = () => PublicKey.deserialize(stringToU8a('0x021464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8'))
+
+const MOCK_ADDRESS = () => Address.from_string('0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9')
 
 class TestingDB extends HoprDB {
   public async get(key: Uint8Array) {
@@ -51,15 +56,30 @@ class TestingDB extends HoprDB {
 }
 
 function createMockedTicket(signerPrivKey: Uint8Array, counterparty: Address) {
-  return Ticket.create(
+  return Ticket.new(
     counterparty,
-    new Response(Uint8Array.from(randomBytes(32))).toChallenge(),
-    UINT256.fromString('0'),
-    UINT256.fromString('0'),
-    new Balance(new BN(0)),
-    UINT256.fromInverseProbability(new BN(1)),
-    UINT256.fromString('1'),
+    new Response(Uint8Array.from(randomBytes(32))).to_challenge(),
+    U256.zero(),
+    U256.zero(),
+    Balance.zero(BalanceType.HOPR),
+    U256.from_inverse_probability(U256.one()),
+    U256.one(),
     signerPrivKey
+  )
+}
+
+function channelEntryCreateMock(): ChannelEntry {
+  const pub = PublicKey.from_privkey(stringToU8a('0x021464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8'))
+  return new ChannelEntry(
+    pub,
+    pub,
+    new Balance('1', BalanceType.HOPR),
+    Hash.create([]),
+    U256.one(),
+    U256.one(),
+    ChannelStatus.Closed,
+    U256.one(),
+    U256.one()
   )
 }
 
@@ -178,13 +198,13 @@ describe(`database tests`, function () {
   })
 
   it('ticket workflow', async function () {
-    const privKey = randomBytes(SECP256K1_CONSTANTS.PRIVATE_KEY_LENGTH)
-    const pubKey = PublicKey.fromPrivKey(privKey)
+    const privKey = Uint8Array.from(randomBytes(SECP256K1_CONSTANTS.PRIVATE_KEY_LENGTH))
+    const pubKey = PublicKey.from_privkey(privKey)
     // this comes from a Packet
-    const halfKeyChallenge = new HalfKeyChallenge(Uint8Array.from(randomBytes(HalfKeyChallenge.SIZE)))
+    const halfKeyChallenge = new HalfKeyChallenge(Uint8Array.from(randomBytes(HalfKeyChallenge.size())))
     const unAck = new UnacknowledgedTicket(
-      createMockedTicket(privKey, new Address(randomBytes(Address.SIZE))),
-      new HalfKey(Uint8Array.from(randomBytes(HalfKey.SIZE))),
+      createMockedTicket(privKey, new Address(Uint8Array.from(randomBytes(Address.size())))),
+      new HalfKey(Uint8Array.from(randomBytes(HalfKey.size()))),
       pubKey
     )
     await db.storePendingAcknowledgement(halfKeyChallenge, false, unAck)
@@ -192,12 +212,12 @@ describe(`database tests`, function () {
 
     const pending = await db.getPendingAcknowledgement(halfKeyChallenge)
 
-    assert(pending.isMessageSender == false)
+    assert(pending.is_msg_sender() == false)
 
     const ack = new AcknowledgedTicket(
-      pending.ticket.ticket,
-      new Response(Uint8Array.from(randomBytes(Hash.SIZE))),
-      new Hash(Uint8Array.from(randomBytes(Hash.SIZE))),
+      pending.ticket().ticket.clone(),
+      new Response(Uint8Array.from(randomBytes(Hash.size()))),
+      new Hash(Uint8Array.from(randomBytes(Hash.size()))),
       pubKey
     )
     await db.replaceUnAckWithAck(halfKeyChallenge, ack)
@@ -221,28 +241,28 @@ describe(`database tests`, function () {
   })
 
   it('should store ChannelEntry', async function () {
-    const channelEntry = ChannelEntry.createMock()
+    const channelEntry = channelEntryCreateMock()
 
-    await db.updateChannelAndSnapshot(channelEntry.getId(), channelEntry, TestingSnapshot)
+    await db.updateChannelAndSnapshot(channelEntry.get_id(), channelEntry, TestingSnapshot)
 
-    assert(!!(await db.getChannel(channelEntry.getId())), 'did not find channel')
+    assert(!!(await db.getChannel(channelEntry.get_id())), 'did not find channel')
     assert((await db.getChannels()).length === 1, 'did not find channel')
   })
 
   it('should store ticketIndex', async function () {
-    const DUMMY_CHANNEL = new Hash(new Uint8Array(Hash.SIZE).fill(0xff))
-    const DUMMY_INDEX = new UINT256(new BN(1))
+    const DUMMY_CHANNEL = new Hash(new Uint8Array(Hash.size()).fill(0xff))
+    const DUMMY_INDEX = U256.one()
 
     await db.setCurrentTicketIndex(DUMMY_CHANNEL, DUMMY_INDEX)
 
     const fromDb = await db.getCurrentTicketIndex(DUMMY_CHANNEL)
 
-    assert(fromDb.toBN().eq(DUMMY_INDEX.toBN()))
+    assert(fromDb.eq(DUMMY_INDEX))
   })
 
   it('should store current commitment', async function () {
-    const DUMMY_CHANNEL = new Hash(new Uint8Array(Hash.SIZE).fill(0xff))
-    const DUMMY_COMMITMENT = new Hash(new Uint8Array(Hash.SIZE).fill(0xbb))
+    const DUMMY_CHANNEL = new Hash(new Uint8Array(Hash.size()).fill(0xff))
+    const DUMMY_COMMITMENT = new Hash(new Uint8Array(Hash.size()).fill(0xbb))
 
     await db.setCurrentCommitment(DUMMY_CHANNEL, DUMMY_COMMITMENT)
 
@@ -253,16 +273,16 @@ describe(`database tests`, function () {
 
   it('should store rejected tickets statistics', async function () {
     assert.equal(await db.getRejectedTicketsCount(), 0)
-    assert((await db.getRejectedTicketsValue()).toBN().isZero())
+    assert((await db.getRejectedTicketsValue()).eq(Balance.zero(BalanceType.HOPR)))
 
     const amount = new BN(1)
 
     await db.markRejected({
-      amount: new Balance(amount)
+      amount: new Balance(amount.toString(10), BalanceType.HOPR)
     } as Ticket)
 
     assert.equal(await db.getRejectedTicketsCount(), 1)
-    assert((await db.getRejectedTicketsValue()).toBN().eq(amount))
+    assert((await db.getRejectedTicketsValue()).eq(new Balance(amount.toString(10), BalanceType.HOPR)))
   })
 
   it('should store environment', async function () {
@@ -277,21 +297,21 @@ describe(`database tests`, function () {
   })
 
   it('should store hopr balance', async function () {
-    assert((await db.getHoprBalance()).toBN().isZero())
+    assert((await db.getHoprBalance()).eq(Balance.zero(BalanceType.HOPR)))
 
-    await db.setHoprBalance(new Balance(new BN(10)))
+    await db.setHoprBalance(new Balance('10', BalanceType.HOPR))
     assert.equal((await db.getHoprBalance()).toString(), '10')
 
-    await db.addHoprBalance(new Balance(new BN(1)), TestingSnapshot)
+    await db.addHoprBalance(new Balance('1', BalanceType.HOPR), TestingSnapshot)
     assert.equal((await db.getHoprBalance()).toString(), '11')
 
-    await db.subHoprBalance(new Balance(new BN(2)), TestingSnapshot)
+    await db.subHoprBalance(new Balance('2', BalanceType.HOPR), TestingSnapshot)
     assert.equal((await db.getHoprBalance()).toString(), '9')
   })
 
   it('should test registry', async function () {
-    const hoprNode = PublicKey.createMock()
-    const account = Address.createMock()
+    const hoprNode = MOCK_PUBLIC_KEY()
+    const account = MOCK_ADDRESS()
 
     // should be throw when not added
     assert.rejects(() => db.getAccountFromNetworkRegistry(hoprNode), 'should throw when account is not registered')
@@ -322,7 +342,7 @@ describe(`database tests`, function () {
   })
 
   it('should test eligible', async function () {
-    const account = Address.createMock()
+    const account = MOCK_ADDRESS()
 
     // should be false by default
     assert((await db.isEligible(account)) === false, 'account is not eligible by default')

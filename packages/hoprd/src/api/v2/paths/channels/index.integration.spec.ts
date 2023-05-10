@@ -8,19 +8,19 @@ import {
   BOB_PEER_ID,
   CHARLIE_PEER_ID,
   ALICE_NATIVE_ADDR,
-  INVALID_PEER_ID
+  INVALID_PEER_ID, channelEntryCreateMock
 } from '../../fixtures.js'
-import { Balance, ChannelEntry, NativeBalance, PublicKey, UINT256, Hash, ChannelStatus } from '@hoprnet/hopr-utils'
-import BN from 'bn.js'
+import { Balance, ChannelEntry, BalanceType, PublicKey, U256, Hash, ChannelStatus } from '@hoprnet/hopr-utils'
+
 import { STATUS_CODES } from '../../utils.js'
 
 let node = sinon.fake() as any
 node.getId = sinon.fake.returns(ALICE_PEER_ID)
 node.getEthereumAddress = sinon.fake.returns(ALICE_NATIVE_ADDR)
-node.getNativeBalance = sinon.fake.returns(new NativeBalance(new BN(10)))
-node.getBalance = sinon.fake.returns(new Balance(new BN(1)))
+node.getNativeBalance = sinon.fake.returns(new Balance('10', BalanceType.Native))
+node.getBalance = sinon.fake.returns(new Balance('1', BalanceType.HOPR))
 
-const CHANNEL_ID = ChannelEntry.createMock().getId()
+const CHANNEL_ID = channelEntryCreateMock().get_id()
 
 node.openChannel = sinon.fake.returns(
   Promise.resolve({
@@ -31,37 +31,37 @@ node.openChannel = sinon.fake.returns(
 
 describe('GET /channels', function () {
   const incoming = new ChannelEntry(
-    PublicKey.fromPeerId(ALICE_PEER_ID),
-    PublicKey.fromPeerId(BOB_PEER_ID),
-    new Balance(new BN(1)),
-    Hash.create(),
-    new UINT256(new BN(1)),
-    new UINT256(new BN(1)),
+    PublicKey.from_peerid_str(ALICE_PEER_ID.toString()),
+    PublicKey.from_peerid_str(BOB_PEER_ID.toString()),
+    new Balance('1', BalanceType.HOPR),
+    Hash.create([]),
+    U256.one(),
+    U256.one(),
     ChannelStatus.Closed,
-    new UINT256(new BN(1)),
-    new UINT256(new BN(1))
+    U256.one(),
+    U256.one()
   )
   const outgoing = new ChannelEntry(
-    PublicKey.fromPeerId(BOB_PEER_ID),
-    PublicKey.fromPeerId(ALICE_PEER_ID),
-    new Balance(new BN(2)),
-    Hash.create(),
-    new UINT256(new BN(2)),
-    new UINT256(new BN(2)),
+    PublicKey.from_peerid_str(BOB_PEER_ID.toString()),
+    PublicKey.from_peerid_str(ALICE_PEER_ID.toString()),
+    new Balance('2', BalanceType.HOPR),
+    Hash.create([]),
+    new U256('2'),
+    new U256('2'),
     ChannelStatus.Closed,
-    new UINT256(new BN(2)),
-    new UINT256(new BN(2))
+    new U256('2'),
+    new U256('2')
   )
   const otherChannel = new ChannelEntry(
-    PublicKey.fromPeerId(BOB_PEER_ID),
-    PublicKey.fromPeerId(CHARLIE_PEER_ID),
-    new Balance(new BN(3)),
-    Hash.create(),
-    new UINT256(new BN(3)),
-    new UINT256(new BN(3)),
+    PublicKey.from_peerid_str(BOB_PEER_ID.toString()),
+    PublicKey.from_peerid_str(CHARLIE_PEER_ID.toString()),
+    new Balance('3', BalanceType.HOPR),
+    Hash.create([]),
+    new U256('3'),
+    new U256('3'),
     ChannelStatus.WaitingForCommitment,
-    new UINT256(new BN(3)),
-    new UINT256(new BN(3))
+    new U256('3'),
+    new U256('3')
   )
   node.getChannelsFrom = sinon.fake.returns(Promise.resolve([outgoing]))
   node.getChannelsTo = sinon.fake.returns(Promise.resolve([incoming]))
@@ -84,8 +84,8 @@ describe('GET /channels', function () {
     expect(res.body.incoming.length).to.be.equal(1)
     expect(res.body.outgoing.length).to.be.equal(1)
     // expect(res.body.all.length).to.be.equal(0)
-    expect(res.body.incoming[0].channelId).to.deep.equal(incoming.getId().toHex())
-    expect(res.body.outgoing[0].channelId).to.deep.equal(outgoing.getId().toHex())
+    expect(res.body.incoming[0].channelId).to.deep.equal(incoming.get_id().to_hex())
+    expect(res.body.outgoing[0].channelId).to.deep.equal(outgoing.get_id().to_hex())
   })
   it('should get channels list excluding closed', async function () {
     const res = await request(service).get('/api/v2/channels')
@@ -102,9 +102,9 @@ describe('GET /channels', function () {
     expect(res.body.incoming.length).to.be.equal(0)
     expect(res.body.outgoing.length).to.be.equal(0)
     expect(res.body.all.length).to.be.equal(3)
-    expect(res.body.all[0].channelId).to.deep.equal(incoming.getId().toHex())
-    expect(res.body.all[1].channelId).to.deep.equal(outgoing.getId().toHex())
-    expect(res.body.all[2].channelId).to.deep.equal(otherChannel.getId().toHex())
+    expect(res.body.all[0].channelId).to.deep.equal(incoming.get_id().to_hex())
+    expect(res.body.all[1].channelId).to.deep.equal(outgoing.get_id().to_hex())
+    expect(res.body.all[2].channelId).to.deep.equal(otherChannel.get_id().to_hex())
   })
 })
 
@@ -124,7 +124,7 @@ describe('POST /channels', () => {
     expect(res.status).to.equal(201)
     expect(res).to.satisfyApiSpec
     expect(res.body).to.deep.equal({
-      channelId: CHANNEL_ID.toHex(),
+      channelId: CHANNEL_ID.to_hex(),
       receipt: 'testReceipt'
     })
   })

@@ -7,11 +7,12 @@ import {
   validatePoRHint,
   validatePoRResponse
 } from './index.js'
-import { Response } from '../../types/index.js'
+import { Response } from '../../types.js'
 import { randomBytes } from 'crypto'
 import { deriveAckKeyShare } from './keyDerivation.js'
 import assert from 'assert'
 import { SECRET_LENGTH } from './constants.js'
+import { u8aEquals } from '../../u8a/index.js'
 
 describe('PoR - proof of relay', function () {
   it('generate PoR string, preVerify, validate', function () {
@@ -29,15 +30,15 @@ describe('PoR - proof of relay', function () {
 
     // Computation result of the first relayer before
     // receiving an acknowledgement from the second relayer
-    const result = preVerify(secrets[0], firstPorString, firstChallenge.ticketChallenge.toEthereumChallenge())
+    const result = preVerify(secrets[0], firstPorString, firstChallenge.ticketChallenge.to_ethereum_challenge())
 
     assert(result.valid == true, `Challenge must be plausible`)
 
-    assert(result.ackChallenge.eq(deriveAckKeyShare(secrets[1]).toChallenge()))
+    assert(result.ackChallenge.eq(deriveAckKeyShare(secrets[1]).to_challenge()))
 
     // Simulates the transformation done by the first relayer
     assert(
-      result.nextTicketChallenge.eq(decodePoRBytes(firstPorString).nextTicketChallenge),
+      u8aEquals(result.nextTicketChallenge.serialize(),decodePoRBytes(firstPorString).nextTicketChallenge.serialize()),
       `Forward logic must extract correct challenge for next downstream node`
     )
 
@@ -46,25 +47,25 @@ describe('PoR - proof of relay', function () {
     const ack = deriveAckKeyShare(secrets[1])
 
     assert(
-      validatePoRHalfKeys(firstChallenge.ticketChallenge.toEthereumChallenge(), result.ownKey, ack),
+      validatePoRHalfKeys(firstChallenge.ticketChallenge.to_ethereum_challenge(), result.ownKey, ack),
       `Acknowledgement must solve the challenge`
     )
 
     // Simulates the transformation as done by the
     // second relayer
-    const secondResult = preVerify(secrets[1], secondPorString, result.nextTicketChallenge.toEthereumChallenge())
+    const secondResult = preVerify(secrets[1], secondPorString, result.nextTicketChallenge.to_ethereum_challenge())
 
     assert(secondResult.valid == true, `Second challenge must be plausible`)
 
     const secondAck = deriveAckKeyShare(secrets[2])
 
     assert(
-      validatePoRHalfKeys(result.nextTicketChallenge.toEthereumChallenge(), secondResult.ownKey, secondAck),
+      validatePoRHalfKeys(result.nextTicketChallenge.to_ethereum_challenge(), secondResult.ownKey, secondAck),
       `Second acknowledgement must solve the challenge`
     )
 
     assert(
-      validatePoRHint(result.nextTicketChallenge.toEthereumChallenge(), secondResult.ownShare, secondAck),
+      validatePoRHint(result.nextTicketChallenge.to_ethereum_challenge(), secondResult.ownShare, secondAck),
       `Second acknowledgement must solve the challenge`
     )
   })
@@ -77,7 +78,7 @@ describe('PoR - proof of relay', function () {
 
     assert(
       validatePoRHalfKeys(
-        firstChallenge.ticketChallenge.toEthereumChallenge(),
+        firstChallenge.ticketChallenge.to_ethereum_challenge(),
         firstChallenge.ownKey,
         deriveAckKeyShare(secrets[1])
       ),
@@ -86,8 +87,8 @@ describe('PoR - proof of relay', function () {
 
     assert(
       validatePoRResponse(
-        firstChallenge.ticketChallenge.toEthereumChallenge(),
-        Response.fromHalfKeys(firstChallenge.ownKey, deriveAckKeyShare(secrets[1]))
+        firstChallenge.ticketChallenge.to_ethereum_challenge(),
+        Response.from_half_keys(firstChallenge.ownKey, deriveAckKeyShare(secrets[1]))
       ),
       `Returned response must solve the challenge`
     )

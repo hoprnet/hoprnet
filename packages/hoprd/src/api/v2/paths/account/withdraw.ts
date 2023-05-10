@@ -1,7 +1,6 @@
 import type { Operation } from 'express-openapi'
 import type Hopr from '@hoprnet/hopr-core'
-import { Address } from '@hoprnet/hopr-utils'
-import BN from 'bn.js'
+import { Address, Balance, BalanceType } from '@hoprnet/hopr-utils'
 import { STATUS_CODES } from '../../utils.js'
 
 /**
@@ -19,13 +18,13 @@ export const withdraw = async (node: Hopr, currency: 'native' | 'hopr', recipien
   }
 
   try {
-    Address.fromString(recipient)
+    Address.from_string(recipient)
   } catch (_err) {
     throw Error(STATUS_CODES.INVALID_ADDRESS)
   }
 
   const balance = currencyUpperCase === 'NATIVE' ? await node.getNativeBalance() : await node.getBalance()
-  if (balance.toBN().lt(new BN(amount))) {
+  if (balance.lt(new Balance(amount, currencyUpperCase === 'NATIVE' ? BalanceType.Native : BalanceType.HOPR))) {
     throw Error(STATUS_CODES.NOT_ENOUGH_BALANCE)
   }
 

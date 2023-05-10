@@ -35,7 +35,6 @@ import BN from 'bn.js'
 import { toEthSignedMessageHash, UINT256 } from './types/index.js'
 import { stringToU8a, u8aToHex } from './u8a/index.js'
 import { SIGNATURE_LENGTH } from './constants.js'
-import { privKeyToPeerId } from '../lib/index.js'
 
 let private_key_1 = stringToU8a('0x492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775')
 let pub_key_1 = PublicKey.from_privkey(private_key_1)

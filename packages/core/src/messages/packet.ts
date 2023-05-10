@@ -47,7 +47,7 @@ async function bumpTicketIndex(channelId: Hash, db: HoprDB): Promise<U256> {
     currentTicketIndex = U256.one()
   }
 
-  await db.setCurrentTicketIndex(channelId, new U256(currentTicketIndex.addn(1)))
+  await db.setCurrentTicketIndex(channelId, currentTicketIndex.addn(1))
 
   return currentTicketIndex
 }

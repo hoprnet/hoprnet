@@ -11,7 +11,7 @@ import {
   create_tagged_mac,
   PublicKey,
   Signature
-} from './cryptography.js'
+} from '../../core/lib/core_crypto.js'
 
 import {
   generateKeyShares,
@@ -29,9 +29,9 @@ import {
   derivePacketTag,
   derivePRGParameters,
   derivePRPParameters,
-  PublicKey as TsPublicKey,
-  Signature as TsSignature
 } from '@hoprnet/hopr-utils'
+
+import {PublicKey as TsPublicKey, Signature as TsSignature} from './types/index.js'
 
 import assert from 'assert'
 

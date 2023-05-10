@@ -3,17 +3,16 @@ import sinon from 'sinon'
 import chaiResponseValidator from 'chai-openapi-response-validator'
 import chai, { expect } from 'chai'
 import { createTestApiInstance, ALICE_PEER_ID } from '../../fixtures.js'
-import { Balance, NativeBalance, PublicKey } from '@hoprnet/hopr-utils'
-import BN from 'bn.js'
+import { Balance, BalanceType, PublicKey } from '@hoprnet/hopr-utils'
 import { STATUS_CODES } from '../../utils.js'
 
 let node = sinon.fake() as any
 node.withdraw = sinon.fake.returns('receipt')
-node.getNativeBalance = sinon.fake.returns(Promise.resolve(new NativeBalance(new BN('10'))))
-node.getBalance = sinon.fake.returns(Promise.resolve(new Balance(new BN('10'))))
+node.getNativeBalance = sinon.fake.returns(Promise.resolve(new Balance('10', BalanceType.Native)))
+node.getBalance = sinon.fake.returns(Promise.resolve(new Balance('10', BalanceType.HOPR)))
 
 describe('POST /account/withdraw', () => {
-  const ALICE_ETH_ADDRESS = PublicKey.fromPeerId(ALICE_PEER_ID).toAddress()
+  const ALICE_ETH_ADDRESS = () => PublicKey.from_peerid_str(ALICE_PEER_ID.toString()).to_address()
 
   let service: any
   before(async function () {
@@ -29,7 +28,7 @@ describe('POST /account/withdraw', () => {
     const res = await request(service).post('/api/v2/account/withdraw').send({
       currency: 'NATIVE',
       amount: '1',
-      recipient: ALICE_ETH_ADDRESS.toString()
+      recipient: ALICE_ETH_ADDRESS().to_string()
     })
     expect(res.status).to.equal(200)
     expect(res).to.satisfyApiSpec

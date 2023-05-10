@@ -111,6 +111,11 @@ impl Balance {
         self.balance_type
     }
 
+    /// Creates balance of the given value with the same symbol
+    pub fn of_same(&self, value: &str) -> Self {
+        Self::from_str(value, self.balance_type)
+    }
+
     // impl ToHex for Balance {
     pub fn to_hex(&self) -> String {
         hex::encode(self.value().to_be_bytes())
@@ -477,7 +482,7 @@ pub mod wasm {
     use crate::traits::{BinarySerializable, ToHex};
     use ethnum::u256;
     use std::cmp::Ordering;
-    use std::ops::Div;
+    use std::ops::{Add, Div};
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use wasm_bindgen::prelude::wasm_bindgen;
@@ -595,7 +600,7 @@ pub mod wasm {
     #[wasm_bindgen]
     impl U256 {
         #[wasm_bindgen(js_name = "deserialize")]
-        pub fn deserialize_u256(data: &[u8]) -> JsResult<U256> {
+        pub fn _deserialize(data: &[u8]) -> JsResult<U256> {
             ok_or_jserr!(U256::deserialize(data))
         }
 
@@ -610,8 +615,14 @@ pub mod wasm {
         }
 
         #[wasm_bindgen(js_name = "from_inverse_probability")]
-        pub fn u256_from_inverse_probability(inverse_prob: &U256) -> JsResult<U256> {
+        pub fn _from_inverse_probability(inverse_prob: &U256) -> JsResult<U256> {
             ok_or_jserr!(U256::from_inverse_probability(inverse_prob.value()))
+        }
+
+        pub fn addn(&self, amount: u32) -> Self {
+            Self {
+                value: self.value().add(u256::from(amount))
+            }
         }
 
         #[wasm_bindgen(js_name = "eq")]

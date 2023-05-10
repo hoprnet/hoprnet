@@ -1,6 +1,6 @@
 import type { Operation } from 'express-openapi'
 import type { default as Hopr } from '@hoprnet/hopr-core'
-import { defer, generateChannelId, PublicKey, type DeferType } from '@hoprnet/hopr-utils'
+import { defer, generate_channel_id, PublicKey, type DeferType } from '@hoprnet/hopr-utils'
 import { peerIdFromString } from '@libp2p/peer-id'
 import { PeerId } from '@libp2p/interface-peer-id'
 import BN from 'bn.js'
@@ -53,7 +53,7 @@ async function validateFundChannelMultiParameters(
 
   const totalAmount = incomingAmount.add(outgoingAmount)
   const balance = await node.getBalance()
-  if (totalAmount.lten(0) || balance.toBN().lt(totalAmount)) {
+  if (totalAmount.lten(0) || balance.lt(balance.of_same(totalAmount.toString(10)))) {
     return {
       valid: false,
       reason: STATUS_CODES.NOT_ENOUGH_BALANCE
@@ -100,24 +100,24 @@ export async function fundMultiChannels(
     return { success: false, reason: validationResult.reason }
   }
 
-  const outgoingChannelId = generateChannelId(
+  const outgoingChannelId = generate_channel_id(
     node.getEthereumAddress(),
-    PublicKey.fromPeerId(validationResult.counterparty).toAddress()
+    PublicKey.from_peerid_str(validationResult.counterparty.toString()).to_address()
   )
-  const incomingChannelId = generateChannelId(
-    PublicKey.fromPeerId(validationResult.counterparty).toAddress(),
+  const incomingChannelId = generate_channel_id(
+    PublicKey.from_peerid_str(validationResult.counterparty.toString()).to_address(),
     node.getEthereumAddress()
   )
 
-  let fundingOutgoingChannelRequest = fundingRequests.get(outgoingChannelId.toHex())
-  let fundingIncomingChannelRequest = fundingRequests.get(incomingChannelId.toHex())
+  let fundingOutgoingChannelRequest = fundingRequests.get(outgoingChannelId.to_hex())
+  let fundingIncomingChannelRequest = fundingRequests.get(incomingChannelId.to_hex())
 
   if (fundingOutgoingChannelRequest == null && fundingIncomingChannelRequest == null) {
     // when none of the channel has pending request
     fundingOutgoingChannelRequest = defer<void>()
     fundingIncomingChannelRequest = defer<void>()
-    fundingRequests.set(outgoingChannelId.toHex(), fundingOutgoingChannelRequest)
-    fundingRequests.set(incomingChannelId.toHex(), fundingIncomingChannelRequest)
+    fundingRequests.set(outgoingChannelId.to_hex(), fundingOutgoingChannelRequest)
+    fundingRequests.set(incomingChannelId.to_hex(), fundingIncomingChannelRequest)
   } else {
     // wait until both channel requests are resolved
     await Promise.allSettled([fundingOutgoingChannelRequest, fundingIncomingChannelRequest])
@@ -131,15 +131,15 @@ export async function fundMultiChannels(
     )
     return {
       success: true,
-      outgoingChannelId: outgoingChannelId.toHex(),
-      incomingChannelId: incomingChannelId.toHex(),
+      outgoingChannelId: outgoingChannelId.to_hex(),
+      incomingChannelId: incomingChannelId.to_hex(),
       receipt
     }
   } catch (err) {
     return { success: false, reason: STATUS_CODES.UNKNOWN_FAILURE }
   } finally {
-    fundingRequests.delete(outgoingChannelId.toHex())
-    fundingRequests.delete(incomingChannelId.toHex())
+    fundingRequests.delete(outgoingChannelId.to_hex())
+    fundingRequests.delete(incomingChannelId.to_hex())
     fundingOutgoingChannelRequest.resolve()
     fundingIncomingChannelRequest.resolve()
   }

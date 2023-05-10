@@ -8,14 +8,14 @@ export const getTicketsStatistics = async (node: Hopr) => {
   return {
     pending: stats.pending,
     unredeemed: stats.unredeemed,
-    unredeemedValue: stats.unredeemedValue.toBN().toString(),
+    unredeemedValue: stats.unredeemedValue.to_string(),
     redeemed: stats.redeemed,
-    redeemedValue: stats.redeemedValue.toBN().toString(),
+    redeemedValue: stats.redeemedValue.to_string(),
     losingTickets: stats.losing,
     winProportion: stats.winProportion,
     neglected: stats.neglected,
     rejected: stats.rejected,
-    rejectedValue: stats.rejectedValue.toBN().toString()
+    rejectedValue: stats.rejectedValue.to_string()
   }
 }
 
