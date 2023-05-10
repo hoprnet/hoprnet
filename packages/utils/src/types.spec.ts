@@ -8,19 +8,11 @@ import {
   HalfKey as TsHalfKey,
   //HalfKeyChallenge as TsHalfKeyChallenge,
   Signature as TsSignature,
-  SIGNATURE_LENGTH,
-  stringToU8a,
   Ticket as TsTicket,
   UnacknowledgedTicket as TsUnacknowledgedTicket,
-  UINT256, u8aToHex, toEthSignedMessageHash, privKeyToPeerId
-} from '@hoprnet/hopr-utils'
-
-import {AcknowledgementChallenge as TsAcknowledgementChallenge} from './messages/acknowledgementChallenge.js'
-import {Acknowledgement as TsAcknowledgement} from './messages/acknowledgement.js'
+} from './types/index.js'
 
 import {
-  Acknowledgement,
-  AcknowledgementChallenge,
   Address,
   Balance,
   BalanceType,
@@ -34,11 +26,16 @@ import {
   PublicKey,
   Signature, ethereum_signed_hash,
   UnacknowledgedTicket
-} from '../lib/core_types.js'
+} from './types.js'
+
 import assert from 'assert'
 
 import { randomBytes } from 'crypto'
 import BN from 'bn.js'
+import { toEthSignedMessageHash, UINT256 } from './types/index.js'
+import { stringToU8a, u8aToHex } from './u8a/index.js'
+import { SIGNATURE_LENGTH } from './constants.js'
+import { privKeyToPeerId } from '../lib/index.js'
 
 let private_key_1 = stringToU8a('0x492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775')
 let pub_key_1 = PublicKey.from_privkey(private_key_1)
@@ -119,36 +116,6 @@ describe('Rust - TS serialization/deserialization tests', async function () {
     assert.equal(a,b)
 
     assert(ChannelEntry.deserialize(ts_channel_entry.serialize()).eq(rs_channel_entry), "channel entry serde test failed")
-  })
-
-  it('acknowledgment', async function() {
-
-    let rs_hk = new HalfKey(stringToU8a('0x3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa'))
-    let rs_hkc = rs_hk.to_challenge()
-    let rs_akc = new AcknowledgementChallenge(rs_hkc, private_key_1)
-    let rs_ack = new Acknowledgement(new AcknowledgementChallenge(rs_hkc, private_key_1), rs_hk, private_key_2)
-
-    let peer_id_1 = privKeyToPeerId(private_key_1)
-    let peer_id_2 = privKeyToPeerId(private_key_2)
-
-    let ts_hk = new TsHalfKey(stringToU8a('0x3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa'))
-    let ts_hkc = ts_hk.toChallenge()
-    let ts_akc = TsAcknowledgementChallenge.create(ts_hkc, peer_id_1)
-    let ts_ack = TsAcknowledgement.create(ts_akc, ts_hk, peer_id_2)
-
-    let a = u8aToHex(rs_ack.serialize())
-    let b = u8aToHex(ts_ack.serialize())
-    assert.equal(a,b)
-    let d_ack = Acknowledgement.deserialize(ts_ack.serialize())
-    assert(d_ack.validate(pub_key_1, pub_key_2), "couldn't validate acks")
-    assert(d_ack.eq(rs_ack), "ack serde test failed")
-
-    let aa = u8aToHex(ts_akc.serialize())
-    let bb = u8aToHex(rs_akc.serialize())
-    assert.equal(aa, bb)
-    let d_akc = AcknowledgementChallenge.deserialize(ts_akc.serialize())
-    d_akc.validate(rs_hkc, pub_key_1)
-    assert(d_akc.eq(rs_akc), "ack challenge serde test failed")
   })
 
   it('unacknowledged ticket', async function() {

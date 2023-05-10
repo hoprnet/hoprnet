@@ -21,7 +21,7 @@ import {
   generate_channel_id, BalanceType
 } from '../types.js'
 import BN from 'bn.js'
-import { u8aToNumber, u8aConcat, toU8a } from '@hoprnet/hopr-utils'
+import { u8aToNumber, u8aConcat, toU8a, stringToU8a, u8aToHex } from '@hoprnet/hopr-utils'
 import fs from 'fs'
 
 const log = debug(`hopr-core:db`)
@@ -276,7 +276,7 @@ export class LevelDb {
       .createReadStream({ keys: true, keyAsBuffer: true, values: true, valueAsBuffer: true })
       .on('data', (d) => {
         // Skip the public key prefix in each key
-        let key = (d.key as Buffer).subarray(PublicKey.SIZE_COMPRESSED)
+        let key = (d.key as Buffer).subarray(PublicKey.size_compressed())
         let keyString = ''
         let isHex = false
         let sawDelimiter = false
@@ -448,12 +448,12 @@ export class HoprDB {
   }
 
   private async addBalance(key: Uint8Array, amount: Balance): Promise<void> {
-    let val = await this.getCoercedOrDefault<Balance>(key, (u) => Balance.deserialize(u, BalanceType.HOPR), Balance.ZERO)
+    let val = await this.getCoercedOrDefault<Balance>(key, (u) => Balance.deserialize(u, BalanceType.HOPR), Balance.zero(BalanceType.HOPR))
     await this.db.put(key, val.add(amount).serialize_value())
   }
 
   private async subBalance(key: Uint8Array, amount: Balance): Promise<void> {
-    let val = await this.getCoercedOrDefault<Balance>(key, (u) => Balance.deserialize(u, BalanceType.HOPR), Balance.ZERO)
+    let val = await this.getCoercedOrDefault<Balance>(key, (u) => Balance.deserialize(u, BalanceType.HOPR), Balance.zero(BalanceType.HOPR))
     await this.db.put(key, val.sub(amount).serialize_value())
   }
 
@@ -478,7 +478,7 @@ export class HoprDB {
     return await this.getAll<PendingAckowledgement, UnacknowledgedTicket>(
       {
         prefix: PENDING_ACKNOWLEDGEMENTS_PREFIX,
-        suffixLength: HalfKeyChallenge.SIZE
+        suffixLength: HalfKeyChallenge.size()
       },
       deserializePendingAcknowledgement,
       filterFunc,
@@ -783,7 +783,7 @@ export class HoprDB {
   }
 
   public async getRedeemedTicketsValue(): Promise<Balance> {
-    return await this.getCoercedOrDefault<Balance>(REDEEMED_TICKETS_VALUE, (u) => Balance.deserialize(u, BalanceType.HOPR), Balance.ZERO)
+    return await this.getCoercedOrDefault<Balance>(REDEEMED_TICKETS_VALUE, (u) => Balance.deserialize(u, BalanceType.HOPR), Balance.zero(BalanceType.HOPR))
   }
 
   public async getRedeemedTicketsCount(): Promise<number> {
@@ -802,7 +802,7 @@ export class HoprDB {
     return await this.getCoercedOrDefault<Balance>(
       createPendingTicketsCountKey(counterparty),
       (u) => Balance.deserialize(u, BalanceType.HOPR),
-      Balance.ZERO
+      Balance.zero(BalanceType.HOPR)
     )
   }
 
@@ -818,7 +818,7 @@ export class HoprDB {
     let val = await this.getCoercedOrDefault<Balance>(
       createPendingTicketsCountKey(ticket.counterparty),
       (u) => Balance.deserialize(u, BalanceType.HOPR),
-      Balance.ZERO
+      Balance.zero(BalanceType.HOPR)
     )
 
     const serializedSnapshot = snapshot.serialize()
@@ -851,7 +851,7 @@ export class HoprDB {
   }
 
   public async getRejectedTicketsValue(): Promise<Balance> {
-    return await this.getCoercedOrDefault<Balance>(REJECTED_TICKETS_VALUE, (u) => Balance.deserialize(u, BalanceType.HOPR), Balance.ZERO)
+    return await this.getCoercedOrDefault<Balance>(REJECTED_TICKETS_VALUE, (u) => Balance.deserialize(u, BalanceType.HOPR), Balance.zero(BalanceType.HOPR))
   }
 
   public async getRejectedTicketsCount(): Promise<number> {
@@ -922,7 +922,7 @@ export class HoprDB {
   }
 
   public async getHoprBalance(): Promise<Balance> {
-    return this.getCoercedOrDefault<Balance>(HOPR_BALANCE_KEY, (u) => Balance.deserialize(u, BalanceType.HOPR), Balance.ZERO)
+    return this.getCoercedOrDefault<Balance>(HOPR_BALANCE_KEY, (u) => Balance.deserialize(u, BalanceType.HOPR), Balance.zero(BalanceType.HOPR))
   }
 
   public async setHoprBalance(value: Balance): Promise<void> {
@@ -930,7 +930,7 @@ export class HoprDB {
   }
 
   public async addHoprBalance(value: Balance, snapshot: Snapshot): Promise<void> {
-    const val = await this.getCoercedOrDefault<Balance>(HOPR_BALANCE_KEY, (u) => Balance.deserialize(u, BalanceType.HOPR), Balance.ZERO)
+    const val = await this.getCoercedOrDefault<Balance>(HOPR_BALANCE_KEY, (u) => Balance.deserialize(u, BalanceType.HOPR), Balance.zero(BalanceType.HOPR))
 
     const serializedSnapshot = snapshot.serialize()
 
@@ -945,7 +945,7 @@ export class HoprDB {
   }
 
   public async subHoprBalance(value: Balance, snapshot: Snapshot): Promise<void> {
-    const val = await this.getCoercedOrDefault<Balance>(HOPR_BALANCE_KEY, (u) => Balance.deserialize(u, BalanceType.HOPR), Balance.ZERO)
+    const val = await this.getCoercedOrDefault<Balance>(HOPR_BALANCE_KEY, (u) => Balance.deserialize(u, BalanceType.HOPR), Balance.zero(BalanceType.HOPR))
 
     const serializedSnapshot = snapshot.serialize()
 
@@ -957,6 +957,43 @@ export class HoprDB {
         Buffer.from(serializedSnapshot.buffer, serializedSnapshot.byteOffset, serializedSnapshot.byteLength)
       )
       .write()
+  }
+
+  static serializeArrayOfPubKeys(pKeys: PublicKey[]): Uint8Array {
+    return u8aConcat(...pKeys.map((p) => p.serialize(true)))
+  }
+
+  static deserializeArrayOfPubKeys(arr: Uint8Array): PublicKey[] {
+    const result: PublicKey[] = []
+    let SIZE_PUBKEY_COMPRESSED = PublicKey.size_compressed()
+    let SIZE_PUBKEY_UNCOMPRESSED = PublicKey.size_uncompressed()
+    for (let offset = 0; offset < arr.length; ) {
+      switch (arr[offset]) {
+        case 2:
+        case 3:
+          if (arr.length < offset + SIZE_PUBKEY_COMPRESSED) {
+            throw Error(`Invalid array length. U8a has ${offset + SIZE_PUBKEY_COMPRESSED - arr.length} to few elements`)
+          }
+          // clone array
+          result.push(PublicKey.deserialize(arr.slice(offset, offset + SIZE_PUBKEY_COMPRESSED)))
+          offset += SIZE_PUBKEY_COMPRESSED
+          break
+        case 4:
+          if (arr.length < offset + SIZE_PUBKEY_UNCOMPRESSED) {
+            throw Error(
+              `Invalid array length. U8a has ${offset + SIZE_PUBKEY_UNCOMPRESSED - arr.length} to few elements`
+            )
+          }
+          // clone array
+          result.push(PublicKey.deserialize(arr.slice(offset, offset + SIZE_PUBKEY_UNCOMPRESSED)))
+          offset += SIZE_PUBKEY_UNCOMPRESSED
+          break
+        default:
+          throw Error(`Invalid prefix ${u8aToHex(arr.subarray(offset, offset + 1))} at ${offset}`)
+      }
+    }
+
+    return result
   }
 
   /**
@@ -990,7 +1027,7 @@ export class HoprDB {
     // add new node to the list
     registeredNodes.push(pubKey)
 
-    const serializedRegisteredNodes = PublicKey.serializeArray(registeredNodes)
+    const serializedRegisteredNodes = HoprDB.serializeArrayOfPubKeys(registeredNodes)
     const serializedAccount = account.serialize()
 
     await this.db.backend
@@ -1025,7 +1062,7 @@ export class HoprDB {
   public async findHoprNodesUsingAccountInNetworkRegistry(account: Address): Promise<PublicKey[]> {
     const pubKeys = await this.getCoercedOrDefault<PublicKey[]>(
       createNetworkRegistryAddressToPublicKeyKey(account),
-      PublicKey.deserializeArray,
+      HoprDB.deserializeArrayOfPubKeys,
       undefined
     )
 
@@ -1057,7 +1094,7 @@ export class HoprDB {
 
     const entryKey = createNetworkRegistryEntryKey(pubKey)
 
-    const serializedRegisteredNodes = PublicKey.serializeArray(registeredNodes)
+    const serializedRegisteredNodes = HoprDB.serializeArrayOfPubKeys(registeredNodes)
     const serializedSnapshot = snapshot.serialize()
 
     await this.db.backend
@@ -1157,7 +1194,7 @@ export class HoprDB {
 
   static createMock(id?: PublicKey): HoprDB {
     const mock: HoprDB = {
-      id: id ?? PublicKey.createMock(),
+      id: id ?? PublicKey.from_privkey(stringToU8a('0x021464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8')),
       // CommonJS / ESM issue
       // @ts-ignore
       db: new LevelDb()

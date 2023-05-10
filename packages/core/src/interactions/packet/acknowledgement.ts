@@ -2,17 +2,14 @@ import {
   debug,
   pickVersion,
   type HoprDB,
-  create_counter
-} from '@hoprnet/hopr-utils'
-
-import {
+  create_counter,
   Acknowledgement,
   PendingAcknowledgement,
   AcknowledgedTicket,
   HalfKeyChallenge,
   PublicKey,
   Hash
-} from '../../../lib/core_types.js'
+} from '@hoprnet/hopr-utils'
 
 import type { SendMessage } from '../../index.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
@@ -49,7 +46,7 @@ const metric_sentAcks = create_counter('core_counter_sent_acks', 'Number of sent
 
 const metric_ackedTickets = create_counter('core_counter_acked_tickets', 'Number of acknowledged tickets')
 
-const PREIMAGE_PLACE_HOLDER = new Hash(new Uint8Array(Hash.SIZE).fill(0xff))
+const PREIMAGE_PLACE_HOLDER = new Hash(new Uint8Array(Hash.size()).fill(0xff))
 
 export class AcknowledgementInteraction {
   private incomingAcks: Pushable<Incoming>
@@ -186,7 +183,7 @@ export class AcknowledgementInteraction {
     // Store the acknowledged ticket, regardless if it's a win or a loss
     // create an acked ticket with a pre image place holder
     const ack = new AcknowledgedTicket(unacknowledged.ticket, response, PREIMAGE_PLACE_HOLDER, unacknowledged.signer)
-    log(`Acknowledging ticket. Using response ${response.toHex()}`)
+    log(`Acknowledging ticket. Using response ${response.to_hex()}`)
     // replace the unAcked ticket with Acked ticket.
 
     try {

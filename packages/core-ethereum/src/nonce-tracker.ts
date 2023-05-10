@@ -109,7 +109,7 @@ export default class NonceTracker {
     // await global mutex free
     await this._globalMutexFree()
     // await lock free, then take lock
-    const releaseLock = await this._takeMutex(address.toHex())
+    const releaseLock = await this._takeMutex(address.to_hex())
     try {
       // evaluate multiple nextNonce strategies
       const networkNonceResult = await this._getNetworkNextNonce(address)

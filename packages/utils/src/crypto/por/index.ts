@@ -1,6 +1,6 @@
 import { deriveAckKeyShare, deriveOwnKeyShare } from './keyDerivation.js'
 import { SECP256K1_CONSTANTS } from '../constants.js'
-import { HalfKeyChallenge, HalfKey, Challenge, Response, EthereumChallenge } from '../../types/index.js'
+import { HalfKeyChallenge, HalfKey, Challenge, Response, EthereumChallenge } from '../../types.js'
 import { u8aSplit } from '../../u8a/index.js'
 import { randomBytes } from 'crypto'
 import { SECRET_LENGTH } from './constants.js'
@@ -28,8 +28,8 @@ export function createPoRValuesForSender(
   const s0 = deriveOwnKeyShare(secretB)
   const s1 = deriveAckKeyShare(secretC ?? randomBytes(SECRET_LENGTH))
 
-  const ackChallenge = deriveAckKeyShare(secretB).toChallenge()
-  const ticketChallenge = Response.fromHalfKeys(s0, s1).toChallenge()
+  const ackChallenge = deriveAckKeyShare(secretB).to_challenge()
+  const ticketChallenge = Response.from_half_keys(s0, s1).to_challenge()
 
   return { ackChallenge, ticketChallenge, ownKey: s0 }
 }
@@ -53,7 +53,7 @@ export function createPoRString(secretC: Uint8Array, secretD?: Uint8Array): Uint
   const s1 = deriveOwnKeyShare(secretC)
   const s2 = deriveAckKeyShare(secretD ?? randomBytes(SECRET_LENGTH))
 
-  return Uint8Array.from([...createChallenge(s1, s2).serialize(), ...s0.toChallenge().serialize()])
+  return Uint8Array.from([...createChallenge(s1, s2).serialize(), ...s0.to_challenge().serialize()])
 }
 
 type ValidOutput = {
@@ -91,9 +91,9 @@ export function preVerify(
   const { nextTicketChallenge, ackChallenge } = decodePoRBytes(porBytes)
 
   const ownKey = deriveOwnKeyShare(secret)
-  const ownShare = ownKey.toChallenge()
+  const ownShare = ownKey.to_challenge()
 
-  const valid = Challenge.fromHintAndShare(ownShare, ackChallenge).toEthereumChallenge().eq(challenge)
+  const valid = Challenge.from_hint_and_share(ownShare, ackChallenge).to_ethereum_challenge().eq(challenge)
 
   if (valid) {
     return {
@@ -118,19 +118,19 @@ export function decodePoRBytes(porBytes: Uint8Array): {
   ])
 
   return {
-    nextTicketChallenge: new Challenge(nextTicketChallenge),
+    nextTicketChallenge: Challenge.deserialize(nextTicketChallenge),
     ackChallenge: new HalfKeyChallenge(hint)
   }
 }
 
 // @TODO add description
 export function validatePoRHalfKeys(ethereumChallenge: EthereumChallenge, ownKey: HalfKey, ack: HalfKey): boolean {
-  return Response.fromHalfKeys(ownKey, ack).toChallenge().toEthereumChallenge().eq(ethereumChallenge)
+  return Response.from_half_keys(ownKey, ack).to_challenge().to_ethereum_challenge().eq(ethereumChallenge)
 }
 
 // @TODO add description
 export function validatePoRResponse(ethereumChallenge: EthereumChallenge, response: Response): boolean {
-  const challenge = response.toChallenge().toEthereumChallenge()
+  const challenge = response.to_challenge().to_ethereum_challenge()
   return challenge.eq(ethereumChallenge)
 }
 
@@ -140,9 +140,9 @@ export function validatePoRHint(
   ownShare: HalfKeyChallenge,
   ack: HalfKey
 ): boolean {
-  return Challenge.fromOwnShareAndHalfKey(ownShare, ack).toEthereumChallenge().eq(ethereumChallenge)
+  return Challenge.from_own_share_and_half_key(ownShare, ack).to_ethereum_challenge().eq(ethereumChallenge)
 }
 
 function createChallenge(s0: HalfKey, s1: HalfKey): Challenge {
-  return Response.fromHalfKeys(s0, s1).toChallenge()
+  return Response.from_half_keys(s0, s1).to_challenge()
 }

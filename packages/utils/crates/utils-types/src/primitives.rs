@@ -1,6 +1,6 @@
 use ethnum::{u256, AsU256};
 use serde::{Deserialize, Serialize};
-use std::ops::{Add, Sub};
+use std::ops::{Add, Mul, Sub};
 use std::string::ToString;
 
 use crate::errors::{GeneralError::InvalidInput, GeneralError::ParseError, Result};
@@ -29,6 +29,13 @@ impl Address {
         let mut ret = Self::default();
         ret.addr.copy_from_slice(bytes);
         ret
+    }
+
+    pub fn to_bytes32(&self) -> Box<[u8]> {
+        let mut ret = Vec::with_capacity(12 + Self::SIZE);
+        ret.extend_from_slice(&[0u8; 12]);
+        ret.extend_from_slice(&self.addr);
+        ret.into_boxed_slice()
     }
 
     // impl std::string::ToString {
@@ -149,14 +156,14 @@ impl Balance {
 
     pub fn add(&self, other: &Balance) -> Self {
         assert_eq!(self.balance_type(), other.balance_type());
-        Balance {
+        Self {
             value: self.value().add(other.value()),
             balance_type: self.balance_type,
         }
     }
 
     pub fn iadd(&self, amount: u64) -> Self {
-        Balance {
+        Self {
             value: self.value().add(amount.as_u256()),
             balance_type: self.balance_type,
         }
@@ -164,17 +171,36 @@ impl Balance {
 
     pub fn sub(&self, other: &Balance) -> Self {
         assert_eq!(self.balance_type(), other.balance_type());
-        Balance {
+        Self {
             value: self.value().sub(other.value()),
             balance_type: self.balance_type,
         }
     }
 
     pub fn isub(&self, amount: u64) -> Self {
-        Balance {
+        Self {
             value: self.value().sub(amount.as_u256()),
             balance_type: self.balance_type,
         }
+    }
+
+    pub fn mul(&self, other: &Balance) -> Self {
+        assert_eq!(self.balance_type(), other.balance_type());
+        Self {
+            value: self.value().mul(other.value()),
+            balance_type: self.balance_type,
+        }
+    }
+
+    pub fn imul(&self, amount: u64) -> Self {
+        Self {
+            value: self.value().mul(amount.as_u256()),
+            balance_type: self.balance_type,
+        }
+    }
+
+    pub fn amount(&self) -> U256 {
+        self.value.into()
     }
 }
 
@@ -314,6 +340,14 @@ impl U256 {
     pub fn to_string(&self) -> String {
         self.value.to_string()
     }
+
+    pub fn as_u32(&self) -> u32 {
+        self.value.as_u32()
+    }
+
+    pub fn as_u64(&self) -> u64 {
+        self.value.as_u64()
+    }
 }
 
 impl BinarySerializable<'_> for U256 {
@@ -450,6 +484,11 @@ pub mod wasm {
 
     #[wasm_bindgen]
     impl Address {
+        #[wasm_bindgen(js_name = "from_string")]
+        pub fn _from_str(str: &str) -> JsResult<Address> {
+            ok_or_jserr!(Self::from_str(str))
+        }
+
         #[wasm_bindgen(js_name = "deserialize")]
         pub fn deserialize_address(data: &[u8]) -> JsResult<Address> {
             ok_or_jserr!(Address::deserialize(data))

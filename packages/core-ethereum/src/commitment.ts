@@ -4,7 +4,7 @@
 //
 // We need to persist this string of commitments in the database, and support
 // syncing back and forth with those that have been persisted on chain.
-import { debug, Hash, HoprDB, iterateHash, recoverIteratedHash, toU8a, u8aConcat, UINT256 } from '@hoprnet/hopr-utils'
+import { debug, Hash, HoprDB, iterateHash, recoverIteratedHash, toU8a, u8aConcat, U256 } from '@hoprnet/hopr-utils'
 import { deriveCommitmentSeed } from '@hoprnet/hopr-utils'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { keysPBM } from '@libp2p/crypto/keys'
@@ -15,7 +15,7 @@ export const DB_ITERATION_BLOCK_SIZE = 10000
 export const TOTAL_ITERATIONS = 100000
 
 function hashFunction(msg: Uint8Array): Uint8Array {
-  return Hash.create(msg).serialize().slice(0, Hash.SIZE)
+  return Hash.create([msg]).serialize().slice(0, Hash.size())
 }
 
 function searchDBFor(db: HoprDB, channelId: Hash, iteration: number): Promise<Uint8Array | undefined> {
@@ -32,7 +32,7 @@ export async function findCommitmentPreImage(db: HoprDB, channelId: Hash): Promi
     DB_ITERATION_BLOCK_SIZE
   )
   if (result == undefined) {
-    throw Error(`Could not find preImage. Searching for ${currentCommitment.toHex()}`)
+    throw Error(`Could not find preImage. Searching for ${currentCommitment.to_hex()}`)
   }
   return new Hash(Uint8Array.from(result.preImage))
 }
@@ -71,7 +71,7 @@ export class ChannelCommitmentInfo {
     public readonly chainId: number,
     public readonly contractAddress: string,
     public readonly channelId: Hash,
-    public readonly channelEpoch: UINT256
+    public readonly channelEpoch: U256
   ) {}
 
   /**

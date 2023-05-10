@@ -1,5 +1,5 @@
 import { HoprCoreEthereum } from '@hoprnet/hopr-core-ethereum'
-import { debug, ChannelEntry as TsChannelEntry, PublicKey as TsPublicKey } from '@hoprnet/hopr-utils'
+import { debug } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import { CHECK_TIMEOUT } from './constants.js'
 
@@ -23,8 +23,7 @@ utils_misc_set_panic_hook()
 
 export { StrategyTickResult } from '../lib/core_strategy.js'
 
-import { ChannelStatus } from '@hoprnet/hopr-utils'
-import { AcknowledgedTicket, ChannelEntry } from '../lib/core_strategy.js'
+import { ChannelStatus, AcknowledgedTicket, ChannelEntry } from '@hoprnet/hopr-utils'
 
 const STRATEGIES = ['passive', 'promiscuous', 'random']
 export type Strategy = (typeof STRATEGIES)[number]
@@ -96,7 +95,7 @@ export abstract class SaneDefaults {
       if (!counterparty.eq(selfPubKey)) {
         log(`auto redeeming tickets in channel to ${counterparty.to_peerid_str()}`)
         try {
-          await chain.redeemTicketsInChannel(TsChannelEntry.deserialize(channel.serialize()))
+          await chain.redeemTicketsInChannel(channel)
         } catch (err) {
           log(`Could not redeem tickets in channel ${channel.get_id().to_hex()}`, err)
         }

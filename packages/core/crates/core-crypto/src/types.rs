@@ -1279,6 +1279,21 @@ pub mod wasm {
         pub fn _from_own_share_and_half_key(own_share: &HalfKeyChallenge, half_key: &HalfKey) -> JsResult<Challenge> {
             ok_or_jserr!(Self::from_own_share_and_half_key(own_share, half_key))
         }
+
+        #[wasm_bindgen(js_name = "deserialize")]
+        pub fn _deserialize(data: &[u8]) -> JsResult<Challenge> {
+            ok_or_jserr!(Self::deserialize(data))
+        }
+
+        #[wasm_bindgen(js_name = "to_hex")]
+        pub fn _to_hex(&self) -> String {
+            self.to_hex()
+        }
+
+        #[wasm_bindgen(js_name = "serialize")]
+        pub fn _serialize(&self) -> Box<[u8]> {
+            self.serialize()
+        }
     }
 
     #[wasm_bindgen]

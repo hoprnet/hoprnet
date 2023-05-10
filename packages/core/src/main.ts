@@ -228,7 +228,7 @@ export async function createHoprNode(
   options: HoprOptions,
   automaticChainCreation = true
 ): Promise<Hopr> {
-  const db = new HoprDB(PublicKey.fromPeerId(peerId))
+  const db = new HoprDB(PublicKey.from_peerid_str(peerId.toString()))
 
   try {
     const dbPath = path.join(options.dataPath, 'db')
@@ -247,7 +247,7 @@ export async function createHoprNode(
   log(`using provider URL: ${options.environment.network.default_provider}`)
   const chain = HoprCoreEthereum.createInstance(
     db,
-    PublicKey.fromPeerId(peerId),
+    PublicKey.from_peerid_str(peerId.toString()),
     keysPBM.PrivateKey.decode(peerId.privateKey as Uint8Array).Data,
     {
       chainId: options.environment.network.chain_id,

@@ -19,6 +19,7 @@ import {
   debug,
   retryWithBackoffThenThrow,
   Balance,
+  BalanceType,
   ordered,
   u8aToHex,
   FIFO,
@@ -27,7 +28,7 @@ import {
   create_counter,
   create_multi_counter,
   create_gauge,
-  create_multi_gauge
+  create_multi_gauge, U256
 } from '@hoprnet/hopr-utils'
 
 import type { ChainWrapper } from '../ethereum.js'
@@ -312,7 +313,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
           topics: [
             // Token transfer *from* us
             [this.chain.getToken().interface.getEventTopic('Transfer')],
-            [u8aToHex(this.address.toBytes32())]
+            [u8aToHex(this.address.to_bytes32())]
           ]
         }
       })
@@ -323,7 +324,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
             // Token transfer *towards* us
             [this.chain.getToken().interface.getEventTopic('Transfer')],
             null,
-            [u8aToHex(this.address.toBytes32())]
+            [u8aToHex(this.address.to_bytes32())]
           ]
         }
       })
@@ -595,7 +596,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       if (
         // compare the current balance with the minimum balance required at the time of transaction being queued.
         // NB: Both gasLimit and maxFeePerGas requirement may be different due to "drastic" changes in contract state and network condition
-        currentBalance.toBN().gte(minimumBalanceForQueuingTxs)
+        new BN(currentBalance.to_string()).gte(minimumBalanceForQueuingTxs)
       ) {
         try {
           await Promise.all(
@@ -717,9 +718,9 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       // if we find a previous snapshot, compare event's snapshot with last processed
       if (lastDatabaseSnapshot) {
         const lastSnapshotComparison = snapshotComparator(event, {
-          blockNumber: lastDatabaseSnapshot.blockNumber.toNumber(),
-          logIndex: lastDatabaseSnapshot.logIndex.toNumber(),
-          transactionIndex: lastDatabaseSnapshot.transactionIndex.toNumber()
+          blockNumber: lastDatabaseSnapshot.block_number.as_u32(),
+          logIndex: lastDatabaseSnapshot.log_index.as_u32(),
+          transactionIndex: lastDatabaseSnapshot.transaction_index.as_u32()
         })
 
         // check if this is a duplicate or older than last snapshot
@@ -735,9 +736,9 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       const eventName = event.event as EventNames | TokenEventNames | RegistryEventNames
 
       lastDatabaseSnapshot = new Snapshot(
-        new BN(event.blockNumber),
-        new BN(event.transactionIndex),
-        new BN(event.logIndex)
+        new U256(event.blockNumber.toString()),
+        new U256(event.transactionIndex.toString()),
+        new U256(event.logIndex.toString())
       )
 
       log('Event name %s and hash %s', eventName, event.transactionHash)
@@ -811,7 +812,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
 
   private async onAnnouncement(event: Event<'Announcement'>, blockNumber: BN, lastSnapshot: Snapshot): Promise<void> {
     // publicKey given by the SC is verified
-    const publicKey = PublicKey.fromString(event.args.publicKey)
+    const publicKey = PublicKey.deserialize(stringToU8a(event.args.publicKey))
 
     let multiaddr: Multiaddr
     try {
@@ -819,23 +820,23 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
         // remove "p2p" and corresponding peerID
         .decapsulateCode(421)
         // add new peerID
-        .encapsulate(`/p2p/${publicKey.toPeerId().toString()}`)
+        .encapsulate(`/p2p/${publicKey.to_peerid_str()}`)
     } catch (error) {
       log(`Invalid multiaddr '${event.args.multiaddr}' given in event 'onAnnouncement'`)
       log(error)
       return
     }
 
-    const account = new AccountEntry(publicKey, multiaddr, blockNumber)
+    const account = new AccountEntry(publicKey, multiaddr.toString(), blockNumber.toNumber())
 
-    log('New node announced', account.getAddress().toHex(), account.multiAddr.toString())
+    log('New node announced', account.get_address().to_hex(), account.get_multiaddress_str())
     metric_numAnnouncements.increment()
 
     await this.db.updateAccountAndSnapshot(account, lastSnapshot)
 
     this.emit('peer', {
-      id: account.getPeerId(),
-      multiaddrs: [account.multiAddr]
+      id: peerIdFromString(account.get_peer_id_str()),
+      multiaddrs: [new Multiaddr(account.get_multiaddress_str())]
     })
   }
 
@@ -851,14 +852,14 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
 
     let prevState: ChannelEntry
     try {
-      prevState = await this.db.getChannel(channel.getId())
+      prevState = await this.db.getChannel(channel.get_id())
     } catch (e) {
       // Channel is new
     }
 
-    await this.db.updateChannelAndSnapshot(channel.getId(), channel, lastSnapshot)
+    await this.db.updateChannelAndSnapshot(channel.get_id(), channel, lastSnapshot)
 
-    metric_channelStatus.set([channel.getId().toHex()], channel.status)
+    metric_channelStatus.set([channel.get_id().to_hex()], channel.status)
 
     if (prevState && channel.status == ChannelStatus.Closed && prevState.status != ChannelStatus.Closed) {
       log('channel was closed')
@@ -869,10 +870,10 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     verbose('channel-update for channel')
     verbose(channel.toString())
 
-    if (channel.source.toAddress().eq(this.address) || channel.destination.toAddress().eq(this.address)) {
+    if (channel.source.to_address().eq(this.address) || channel.destination.to_address().eq(this.address)) {
       this.emit('own-channel-updated', channel)
 
-      if (channel.destination.toAddress().eq(this.address)) {
+      if (channel.destination.to_address().eq(this.address)) {
         // Channel _to_ us
         if (channel.status === ChannelStatus.WaitingForCommitment) {
           log('channel to us waiting for commitment')
@@ -884,17 +885,17 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   }
 
   private async onTicketRedeemed(event: Event<'TicketRedeemed'>, lastSnapshot: Snapshot) {
-    if (Address.fromString(event.args.source).eq(this.address)) {
+    if (Address.from_string(event.args.source).eq(this.address)) {
       // the node used to lock outstandingTicketBalance
       // rebuild part of the Ticket
       const partialTicket: Partial<Ticket> = {
-        counterparty: Address.fromString(event.args.destination),
-        amount: new Balance(new BN(event.args.amount.toString()))
+        counterparty: Address.from_string(event.args.destination),
+        amount: new Balance(event.args.amount.toString(), BalanceType.HOPR)
       }
       const outstandingBalance = await this.db.getPendingBalanceTo(partialTicket.counterparty)
 
       try {
-        if (!outstandingBalance.toBN().gte(new BN('0'))) {
+        if (!outstandingBalance.gte(Balance.zero(BalanceType.HOPR))) {
           await this.db.resolvePending(partialTicket, lastSnapshot)
         } else {
           await this.db.resolvePending(
@@ -925,7 +926,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     event: RegistryEvent<'EligibilityUpdated'>,
     lastSnapshot: Snapshot
   ): Promise<void> {
-    const account = Address.fromString(event.args.account)
+    const account = Address.from_string(event.args.account)
     await this.db.setEligible(account, event.args.eligibility, lastSnapshot)
     verbose(`network-registry: account ${account} is ${event.args.eligibility ? 'eligible' : 'not eligible'}`)
     // emit event only when eligibility changes on accounts with a HoprNode associated
@@ -947,8 +948,8 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       log(error)
       return
     }
-    const account = Address.fromString(event.args.account)
-    await this.db.addToNetworkRegistry(PublicKey.fromPeerId(hoprNode), account, lastSnapshot)
+    const account = Address.from_string(event.args.account)
+    await this.db.addToNetworkRegistry(PublicKey.from_peerid_str(hoprNode.toString()), account, lastSnapshot)
     verbose(`network-registry: node ${event.args.hoprPeerId} is allowed to connect`)
   }
 
@@ -965,8 +966,8 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       return
     }
     await this.db.removeFromNetworkRegistry(
-      PublicKey.fromPeerId(hoprNode),
-      Address.fromString(event.args.account),
+      PublicKey.from_peerid_str(hoprNode.toString()),
+      Address.from_string(event.args.account),
       lastSnapshot
     )
     verbose(`network-registry: node ${event.args.hoprPeerId} is not allowed to connect`)
@@ -981,8 +982,8 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   }
 
   private async onTransfer(event: TokenEvent<'Transfer'>, lastSnapshot: Snapshot) {
-    const isIncoming = Address.fromString(event.args.to).eq(this.address)
-    const amount = new Balance(new BN(event.args.value.toString()))
+    const isIncoming = Address.from_string(event.args.to).eq(this.address)
+    const amount = new Balance(event.args.value.toString(), BalanceType.HOPR)
 
     if (isIncoming) {
       await this.db.addHoprBalance(amount, lastSnapshot)
@@ -1003,14 +1004,14 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   public async getPublicKeyOf(address: Address): Promise<PublicKey> {
     const account = await this.db.getAccount(address)
     if (account) {
-      return account.publicKey
+      return account.public_key
     }
-    throw new Error('Could not find public key for address - have they announced? -' + address.toHex())
+    throw new Error('Could not find public key for address - have they announced? -' + address.to_hex())
   }
 
   public async *getAddressesAnnouncedOnChain() {
     for await (const account of this.db.getAccountsIterable()) {
-      yield account.multiAddr
+      yield new Multiaddr(account.get_multiaddress_str())
     }
   }
 
@@ -1018,11 +1019,11 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     const result: { id: PeerId; multiaddrs: Multiaddr[] }[] = []
     let out = `Known public nodes:\n`
 
-    for await (const account of this.db.getAccountsIterable((account: AccountEntry) => account.containsRouting)) {
-      out += `  - ${account.getPeerId().toString()} ${account.multiAddr.toString()}\n`
+    for await (const account of this.db.getAccountsIterable((account: AccountEntry) => account.contains_routing_info())) {
+      out += `  - ${account.get_peer_id_str()} ${account.get_multiaddress_str()}\n`
       result.push({
-        id: account.getPeerId(),
-        multiaddrs: [account.multiAddr]
+        id: peerIdFromString(account.get_peer_id_str()),
+        multiaddrs: [new Multiaddr(account.get_multiaddress_str())]
       })
     }
 
@@ -1056,7 +1057,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
    */
   public async getOpenChannelsFrom(source: PublicKey): Promise<ChannelEntry[]> {
     return await this.db
-      .getChannelsFrom(source.toAddress())
+      .getChannelsFrom(source.to_address())
       .then((channels: ChannelEntry[]) => channels.filter((channel) => channel.status === ChannelStatus.Open))
   }
 

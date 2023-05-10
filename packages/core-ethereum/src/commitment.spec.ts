@@ -1,7 +1,7 @@
 import assert from 'assert'
 import { bumpCommitment, ChannelCommitmentInfo, findCommitmentPreImage, initializeCommitment } from './commitment.js'
 import sinon from 'sinon'
-import { Hash, HoprDB, privKeyToPeerId, stringToU8a, UINT256 } from '@hoprnet/hopr-utils'
+import { Hash, HoprDB, privKeyToPeerId, stringToU8a, U256 } from '@hoprnet/hopr-utils'
 import type { PeerId } from '@libp2p/interface-peer-id'
 
 describe('commitment', function () {
@@ -16,8 +16,8 @@ describe('commitment', function () {
     fakeCommInfo = new ChannelCommitmentInfo(
       1,
       'fakeaddress',
-      new Hash(new Uint8Array({ length: Hash.SIZE }).fill(1)),
-      UINT256.fromString('1')
+      new Hash(new Uint8Array({ length: Hash.size() }).fill(1)),
+      U256.one()
     )
   })
 
@@ -33,7 +33,7 @@ describe('commitment', function () {
     await bumpCommitment(fakeDB, fakeCommInfo.channelId, c1)
     let c2 = await findCommitmentPreImage(fakeDB, fakeCommInfo.channelId)
     assert(c2, 'gives current commitment')
-    assert(c2.hash().eq(c1), 'c2 is commitment of c1')
+    assert(c2.eq(c1), 'c2 is commitment of c1')
 
     fakeGet = () => Promise.resolve(c2)
     await initializeCommitment(fakeDB, fakeKey, fakeCommInfo, fakeGet, fakeSet)

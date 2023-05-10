@@ -112,6 +112,10 @@ impl AcknowledgedTicket {
             signer,
         }
     }
+
+    pub fn set_preimage(&mut self, hash: &Hash) {
+        self.pre_image = hash.clone();
+    }
 }
 
 impl BinarySerializable<'_> for AcknowledgedTicket {
