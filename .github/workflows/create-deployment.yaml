@@ -42,8 +42,7 @@ jobs:
       - name: Set up environment
         run: |
           prBase="${{ github.event.pull_request.base.ref }}"
-          # The identification of the environment will be made once https://github.com/hoprnet/hoprnet/issues/4835 is finished
-          network=master
+          network=$(jq -r "to_entries[] | select(.key==\"${prBase/*\/}\").value.network" ../packages/hoprd/releases.json)
           echo "NETWORK=${network}" >> $GITHUB_ENV
           echo "NETWORK_DASH=${network/_/-}" >> $GITHUB_ENV
           echo git checkout -b deployments/${network/_/-}-pr-${{ github.event.pull_request.number }}

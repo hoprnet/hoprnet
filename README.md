@@ -122,8 +122,8 @@ The `hoprd` provides various command-line switches to configure its behaviour. F
 ```sh
 $ hoprd --help
 Options:
-      --environment <ENVIRONMENT>
-          Environment id which the node shall run on [env: HOPRD_ENVIRONMENT=] [possible values: anvil-localhost, master-staging, debug-staging, anvil-localhost2, monte_rosa]
+      --network <NETWORK>
+          Environment id which the node shall run on [env: HOPRD_NETWORK=] [possible values: anvil-localhost, master-staging, debug-staging, anvil-localhost2, monte_rosa]
       --identity <identity>
           The path to the identity file [env: HOPRD_IDENTITY=] [default: /home/tino/.hopr-identity]
       --data <data>
@@ -416,7 +416,7 @@ placeholders replaced accordingly):
 ```sh
 HOPRD_API_TOKEN="<ADMIN_AUTH_HTTP_TOKEN>" \
 HOPRD_PASSWORD="<IDENTITY_FILE_PASSWORD>" \
-  ./scripts/setup-gcloud-cluster.sh environment "" my-custom-cluster-without-name
+  ./scripts/setup-gcloud-cluster.sh network "" my-custom-cluster-without-name
 ```
 
 A previously started cluster can be destroyed, which includes all running nodes,
@@ -424,7 +424,7 @@ by using the same script but setting the cleanup switch:
 
 ```sh
 HOPRD_PERFORM_CLEANUP=true \
-  ./scripts/setup-gcloud-cluster.sh environment "" my-custom-cluster-without-name
+  ./scripts/setup-gcloud-cluster.sh network "" my-custom-cluster-without-name
 ```
 
 The default Docker image in `scripts/setup-gcloud-cluster.sh` deploys GCloud public nodes. If you wish to deploy GCloud nodes
@@ -432,10 +432,8 @@ that are behind NAT, you need to specify a NAT-variant of the `hoprd` image (not
 
 ```sh
 HOPRD_PERFORM_CLEANUP=true \
-  ./scripts/setup-gcloud-cluster.sh environment "" my-nat-cluster gcr.io/hoprassociation/hoprd-nat
+  ./scripts/setup-gcloud-cluster.sh network "" my-nat-cluster gcr.io/hoprassociation/hoprd-nat
 ```
-
-Note that if the Docker image version is not specified, the script will use the `environment` as version.
 
 ### Using Google Cloud Platform and a Default Topology
 
