@@ -73,10 +73,10 @@ describe('test indexer', function () {
 
     await blockProcessed.promise
 
-    const account = await indexer.getAccount(fixtures.PARTY_A.toAddress())
+    const account = await indexer.getAccount(fixtures.PARTY_A().to_address())
     expectAccountsToBeEqual(account, fixtures.PARTY_A_INITIALIZED_ACCOUNT)
 
-    assert.rejects(() => db.getChannel(OPENED_CHANNEL.getId()))
+    assert.rejects(() => db.getChannel(OPENED_CHANNEL.get_id()))
   })
 
   it('should process all past events', async function () {
@@ -96,10 +96,10 @@ describe('test indexer', function () {
 
     await blockProcessed.promise
 
-    const account = await indexer.getAccount(fixtures.PARTY_A.toAddress())
+    const account = await indexer.getAccount(fixtures.PARTY_A().to_address())
     expectAccountsToBeEqual(account, fixtures.PARTY_A_INITIALIZED_ACCOUNT)
 
-    const account2 = await indexer.getAccount(fixtures.PARTY_B.toAddress())
+    const account2 = await indexer.getAccount(fixtures.PARTY_B().to_address())
     expectAccountsToBeEqual(account2, fixtures.PARTY_B_INITIALIZED_ACCOUNT)
   })
 
@@ -126,7 +126,7 @@ describe('test indexer', function () {
 
     await blockProcessed.promise
 
-    const channel = await db.getChannel(OPENED_CHANNEL.getId())
+    const channel = await db.getChannel(OPENED_CHANNEL.get_id())
     expectChannelsToBeEqual(channel, OPENED_CHANNEL)
   })
 
@@ -147,8 +147,8 @@ describe('test indexer', function () {
 
     await blockProcessed.promise
 
-    const pubKey = await indexer.getPublicKeyOf(fixtures.PARTY_A.toAddress())
-    assert(pubKey.eq(fixtures.PARTY_A))
+    const pubKey = await indexer.getPublicKeyOf(fixtures.PARTY_A().to_address())
+    assert(pubKey.eq(fixtures.PARTY_A()))
   })
 
   it('should get all data from DB', async function () {
@@ -168,21 +168,21 @@ describe('test indexer', function () {
 
     await blockProcessed.promise
 
-    const account = await indexer.getAccount(fixtures.PARTY_A.toAddress())
+    const account = await indexer.getAccount(fixtures.PARTY_A().to_address())
     expectAccountsToBeEqual(account, fixtures.PARTY_A_INITIALIZED_ACCOUNT)
 
-    const channel = await db.getChannel(OPENED_CHANNEL.getId())
+    const channel = await db.getChannel(OPENED_CHANNEL.get_id())
     expectChannelsToBeEqual(channel, OPENED_CHANNEL)
 
     const channels = await db.getChannels()
     assert.strictEqual(channels.length, 1, 'expected channels')
     expectChannelsToBeEqual(channels[0], OPENED_CHANNEL)
 
-    const channelsFromPartyA = await db.getChannelsFrom(fixtures.PARTY_A.toAddress())
+    const channelsFromPartyA = await db.getChannelsFrom(fixtures.PARTY_A().to_address())
     assert.strictEqual(channelsFromPartyA.length, 1)
     expectChannelsToBeEqual(channelsFromPartyA[0], OPENED_CHANNEL)
 
-    const channelsOfPartyB = await db.getChannelsFrom(fixtures.PARTY_B.toAddress())
+    const channelsOfPartyB = await db.getChannelsFrom(fixtures.PARTY_B().to_address())
     assert.strictEqual(channelsOfPartyB.length, 0)
   })
 
@@ -269,7 +269,7 @@ describe('test indexer', function () {
     const { indexer, newEvent, newBlock, chain } = await useFixtures({
       latestBlockNumber: 3,
       pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT],
-      id: fixtures.PARTY_A
+      id: fixtures.PARTY_A()
     })
 
     const opened = defer<void>()
@@ -300,11 +300,11 @@ describe('test indexer', function () {
       transactionIndex: 0,
       logIndex: 0,
       args: {
-        source: PARTY_B.toAddress().toHex(),
-        destination: PARTY_A.toAddress().toHex(),
+        source: PARTY_B().to_address().to_hex(),
+        destination: PARTY_A().to_address().to_hex(),
         newState: {
           balance: BigNumber.from('3'),
-          commitment: new Hash(new Uint8Array({ length: Hash.SIZE })).toHex(),
+          commitment: new Hash(new Uint8Array({ length: Hash.size() })).to_hex(),
           ticketEpoch: BigNumber.from('0'),
           ticketIndex: BigNumber.from('0'),
           status: 1,
@@ -328,11 +328,11 @@ describe('test indexer', function () {
       transactionIndex: 0,
       logIndex: 0,
       args: {
-        source: PARTY_B.toAddress().toHex(),
-        destination: PARTY_A.toAddress().toHex(),
+        source: PARTY_B().to_address().to_hex(),
+        destination: PARTY_A().to_address().to_hex(),
         newState: {
           balance: BigNumber.from('3'),
-          commitment: Hash.create(new TextEncoder().encode('commA')).toHex(),
+          commitment: Hash.create([new TextEncoder().encode('commA')]).to_hex(),
           ticketEpoch: BigNumber.from('1'),
           ticketIndex: BigNumber.from('0'),
           status: 3,
@@ -355,11 +355,11 @@ describe('test indexer', function () {
       transactionIndex: 0,
       logIndex: 0,
       args: {
-        source: PARTY_B.toAddress().toHex(),
-        destination: PARTY_A.toAddress().toHex(),
+        source: PARTY_B().to_address().to_hex(),
+        destination: PARTY_A().to_address().to_hex(),
         newState: {
           balance: BigNumber.from('0'),
-          commitment: new Hash(new Uint8Array({ length: Hash.SIZE })).toHex(),
+          commitment: new Hash(new Uint8Array({ length: Hash.size() })).to_hex(),
           ticketEpoch: BigNumber.from('0'),
           ticketIndex: BigNumber.from('0'),
           status: 0,
@@ -403,7 +403,7 @@ describe('test indexer', function () {
 
     await blockProcessed.promise
 
-    const channel = await db.getChannel(COMMITTED_CHANNEL.getId())
+    const channel = await db.getChannel(COMMITTED_CHANNEL.get_id())
     expectChannelsToBeEqual(channel, COMMITTED_CHANNEL)
   })
 
@@ -416,12 +416,12 @@ describe('test indexer', function () {
         fixtures.OPENED_EVENT,
         fixtures.COMMITTED_EVENT
       ],
-      id: fixtures.PARTY_A
+      id: fixtures.PARTY_A()
     })
     // sender node has pending ticket...
     await db.markPending(fixtures.oneLargeTicket)
-    assert.equal((await db.getPendingBalanceTo(PARTY_A.toAddress())).toString(), '0')
-    assert.equal((await db.getPendingBalanceTo(PARTY_B.toAddress())).toString(), '2')
+    assert.equal((await db.getPendingBalanceTo(PARTY_A().to_address())).toString(), '0')
+    assert.equal((await db.getPendingBalanceTo(PARTY_B().to_address())).toString(), '2')
 
     const blockMined = defer<void>()
     indexer.on('block-processed', (blockNumber: number) => {
@@ -439,8 +439,8 @@ describe('test indexer', function () {
     newBlock()
 
     await blockMined.promise
-    assert.equal((await db.getPendingBalanceTo(PARTY_A.toAddress())).toString(), '0')
-    assert.equal((await db.getPendingBalanceTo(PARTY_B.toAddress())).toString(), '0')
+    assert.equal((await db.getPendingBalanceTo(PARTY_A().to_address())).toString(), '0')
+    assert.equal((await db.getPendingBalanceTo(PARTY_B().to_address())).toString(), '0')
   })
 
   it('should process TicketRedeemed event and not reduce outstanding balance for sender when db has no outstanding balance', async function () {
@@ -452,11 +452,11 @@ describe('test indexer', function () {
         fixtures.OPENED_EVENT,
         fixtures.COMMITTED_EVENT
       ],
-      id: fixtures.PARTY_A
+      id: fixtures.PARTY_A()
     })
     // sender node has pending ticket...
-    assert.equal((await db.getPendingBalanceTo(PARTY_A.toAddress())).toString(), '0')
-    assert.equal((await db.getPendingBalanceTo(PARTY_B.toAddress())).toString(), '0')
+    assert.equal((await db.getPendingBalanceTo(PARTY_A().to_address())).to_string(), '0')
+    assert.equal((await db.getPendingBalanceTo(PARTY_B().to_address())).to_string(), '0')
 
     const blockProcessed = defer<void>()
     indexer.on('block-processed', (blockNumber: number) => {
@@ -474,8 +474,8 @@ describe('test indexer', function () {
     newBlock()
 
     await blockProcessed.promise
-    assert.equal((await db.getPendingBalanceTo(PARTY_A.toAddress())).toString(), '0')
-    assert.equal((await db.getPendingBalanceTo(PARTY_B.toAddress())).toString(), '0')
+    assert.equal((await db.getPendingBalanceTo(PARTY_A().to_address())).to_string(), '0')
+    assert.equal((await db.getPendingBalanceTo(PARTY_B().to_address())).to_string(), '0')
   })
 
   it('should process TicketRedeemed event and not reduce outstanding balance for recipient', async function () {
@@ -487,11 +487,11 @@ describe('test indexer', function () {
         fixtures.OPENED_EVENT,
         fixtures.COMMITTED_EVENT
       ],
-      id: fixtures.PARTY_B
+      id: fixtures.PARTY_B()
     })
     // recipient node has no ticket...
-    assert.equal((await db.getPendingBalanceTo(PARTY_A.toAddress())).toString(), '0')
-    assert.equal((await db.getPendingBalanceTo(PARTY_B.toAddress())).toString(), '0')
+    assert.equal((await db.getPendingBalanceTo(PARTY_A().to_address())).to_string(), '0')
+    assert.equal((await db.getPendingBalanceTo(PARTY_B().to_address())).to_string(), '0')
 
     const blockProcessed = defer<void>()
     indexer.on('block-processed', (blockNumber: number) => {
@@ -511,8 +511,8 @@ describe('test indexer', function () {
 
     await blockProcessed.promise
 
-    assert.equal((await db.getPendingBalanceTo(PARTY_A.toAddress())).toString(), '0')
-    assert.equal((await db.getPendingBalanceTo(PARTY_B.toAddress())).toString(), '0')
+    assert.equal((await db.getPendingBalanceTo(PARTY_A().to_address())).to_string(), '0')
+    assert.equal((await db.getPendingBalanceTo(PARTY_B().to_address())).to_string(), '0')
   })
 
   it('should process TicketRedeemed event and not reduce outstanding balance for a third node', async function () {
@@ -526,8 +526,8 @@ describe('test indexer', function () {
       ]
     })
     // recipient node has no ticket...
-    assert.equal((await db.getPendingBalanceTo(PARTY_A.toAddress())).toString(), '0')
-    assert.equal((await db.getPendingBalanceTo(PARTY_B.toAddress())).toString(), '0')
+    assert.equal((await db.getPendingBalanceTo(PARTY_A().to_address())).to_string(), '0')
+    assert.equal((await db.getPendingBalanceTo(PARTY_B().to_address())).to_string(), '0')
 
     const blockProcessed = defer<void>()
     indexer.on('block-processed', (blockNumber: number) => {
@@ -546,8 +546,8 @@ describe('test indexer', function () {
 
     await blockProcessed.promise
 
-    assert.equal((await db.getPendingBalanceTo(PARTY_A.toAddress())).toString(), '0')
-    assert.equal((await db.getPendingBalanceTo(PARTY_B.toAddress())).toString(), '0')
+    assert.equal((await db.getPendingBalanceTo(PARTY_A().to_address())).to_string(), '0')
+    assert.equal((await db.getPendingBalanceTo(PARTY_B().to_address())).to_string(), '0')
   })
 
   it('should process TicketRedeemed event and reduce outstanding balance to zero for sender when some history is missing', async function () {
@@ -559,12 +559,12 @@ describe('test indexer', function () {
         fixtures.OPENED_EVENT,
         fixtures.COMMITTED_EVENT
       ],
-      id: fixtures.PARTY_A
+      id: fixtures.PARTY_A()
     })
     // sender node has some pending tickets, but not the entire history...
     await db.markPending(fixtures.oneSmallTicket)
-    assert.equal((await db.getPendingBalanceTo(PARTY_A.toAddress())).toString(), '0')
-    assert.equal((await db.getPendingBalanceTo(PARTY_B.toAddress())).toString(), '1')
+    assert.equal((await db.getPendingBalanceTo(PARTY_A().to_address())).to_string(), '0')
+    assert.equal((await db.getPendingBalanceTo(PARTY_B().to_address())).to_string(), '1')
 
     const blockProcessed = defer<void>()
     indexer.on('block-processed', (blockNumber: number) => {
@@ -582,15 +582,15 @@ describe('test indexer', function () {
     newBlock()
 
     await blockProcessed.promise
-    assert.equal((await db.getPendingBalanceTo(PARTY_A.toAddress())).toString(), '0')
-    assert.equal((await db.getPendingBalanceTo(PARTY_B.toAddress())).toString(), '0')
+    assert.equal((await db.getPendingBalanceTo(PARTY_A().to_address())).to_string(), '0')
+    assert.equal((await db.getPendingBalanceTo(PARTY_B().to_address())).to_string(), '0')
   })
 
   it('should process Transfer events and reduce balance', async function () {
     const { indexer, chain, newBlock, newTokenEvent, db } = await useFixtures({
       latestBlockNumber: 0,
       pastEvents: [],
-      id: fixtures.PARTY_A
+      id: fixtures.PARTY_A()
     })
 
     const secondBlockProcessed = defer<void>()
@@ -628,7 +628,7 @@ describe('test indexer', function () {
     const { db, chain, indexer, newBlock } = await useFixtures({
       latestBlockNumber: 10,
       pastHoprRegistryEvents: [fixtures.PARTY_A_REGISTERED, fixtures.PARTY_A_ELEGIBLE],
-      id: fixtures.PARTY_A
+      id: fixtures.PARTY_A()
     })
 
     const processed = defer<void>()
@@ -639,15 +639,15 @@ describe('test indexer', function () {
 
     newBlock()
     await processed.promise
-    assert(await db.getAccountFromNetworkRegistry(PublicKey.fromPeerIdString(PARTY_B_MULTIADDR.getPeerId())))
-    assert(await db.isEligible(fixtures.PARTY_A.toAddress()))
+    assert(await db.getAccountFromNetworkRegistry(PublicKey.from_peerid_str(PARTY_B_MULTIADDR.getPeerId())))
+    assert(await db.isEligible(fixtures.PARTY_A().to_address()))
   })
 
   it('should process first 4 registry events and account not be eligible', async function () {
     const { db, chain, indexer, newBlock } = await useFixtures({
       latestBlockNumber: 10,
       pastHoprRegistryEvents: [fixtures.PARTY_A_REGISTERED, fixtures.PARTY_A_ELEGIBLE, fixtures.PARTY_A_NOT_ELEGIBLE],
-      id: fixtures.PARTY_A
+      id: fixtures.PARTY_A()
     })
 
     const processed = defer<void>()
@@ -658,8 +658,8 @@ describe('test indexer', function () {
 
     newBlock()
     await processed.promise
-    assert(await db.getAccountFromNetworkRegistry(PublicKey.fromPeerIdString(PARTY_B_MULTIADDR.getPeerId())))
-    assert((await db.isEligible(fixtures.PARTY_A.toAddress())) === false)
+    assert(await db.getAccountFromNetworkRegistry(PublicKey.from_peerid_str(PARTY_B_MULTIADDR.getPeerId())))
+    assert((await db.isEligible(fixtures.PARTY_A().to_address())) === false)
   })
 
   it('should process all registry events and account not be registered but be eligible', async function () {
@@ -672,7 +672,7 @@ describe('test indexer', function () {
         fixtures.PARTY_A_ELEGIBLE_2,
         fixtures.PARTY_A_DEREGISTERED
       ],
-      id: fixtures.PARTY_A
+      id: fixtures.PARTY_A()
     })
 
     const processed = defer<void>()
@@ -683,15 +683,15 @@ describe('test indexer', function () {
 
     newBlock()
     await processed.promise
-    assert.rejects(() => db.getAccountFromNetworkRegistry(PublicKey.fromPeerIdString(PARTY_B_MULTIADDR.getPeerId())))
-    assert(await db.isEligible(fixtures.PARTY_A.toAddress()))
+    assert.rejects(() => db.getAccountFromNetworkRegistry(PublicKey.from_peerid_str(PARTY_B_MULTIADDR.getPeerId())))
+    assert(await db.isEligible(fixtures.PARTY_A().to_address()))
   })
 
   it('should process register enabled', async function () {
     const { db, chain, indexer, newBlock } = await useFixtures({
       latestBlockNumber: 3,
       pastHoprRegistryEvents: [fixtures.REGISTER_ENABLED],
-      id: fixtures.PARTY_A
+      id: fixtures.PARTY_A()
     })
 
     const processed = defer<void>()
@@ -709,7 +709,7 @@ describe('test indexer', function () {
     const { db, chain, indexer, newBlock } = await useFixtures({
       latestBlockNumber: 3,
       pastHoprRegistryEvents: [fixtures.REGISTER_ENABLED, fixtures.REGISTER_DISABLED],
-      id: fixtures.PARTY_A
+      id: fixtures.PARTY_A()
     })
 
     const processed = defer<void>()
@@ -727,7 +727,7 @@ describe('test indexer', function () {
     const { chain, indexer, newBlock } = await useFixtures({
       latestBlockNumber: 3,
       pastHoprRegistryEvents: [fixtures.REGISTER_ENABLED, fixtures.REGISTER_DISABLED],
-      id: fixtures.PARTY_A
+      id: fixtures.PARTY_A()
     })
 
     let trySendTransaction: boolean = false

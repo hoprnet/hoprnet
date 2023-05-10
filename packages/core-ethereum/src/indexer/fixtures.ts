@@ -44,8 +44,8 @@ export const PARTY_A_INITIALIZED_EVENT = {
   transactionIndex: 0,
   logIndex: 0,
   args: {
-    account: PARTY_A.to_address().to_hex(),
-    publicKey: PARTY_A.to_hex(false),
+    account: PARTY_A().to_address().to_hex(),
+    publicKey: PARTY_A().to_hex(false),
     multiaddr: u8aToHex(PARTY_A_MULTIADDR.bytes)
   }
 } as Event<'Announcement'>
@@ -57,16 +57,16 @@ export const PARTY_B_INITIALIZED_EVENT = {
   transactionIndex: 1,
   logIndex: 0,
   args: {
-    account: PARTY_B.to_address().to_hex(),
-    publicKey: PARTY_B.to_hex(false),
+    account: PARTY_B().to_address().to_hex(),
+    publicKey: PARTY_B().to_hex(false),
     multiaddr: u8aToHex(PARTY_B_MULTIADDR.bytes)
   }
 } as Event<'Announcement'>
 
 // TODO LP: Ensure clone here
-export const PARTY_A_INITIALIZED_ACCOUNT = new AccountEntry(PARTY_A, PARTY_A_MULTIADDR.toString(), 1)
+export const PARTY_A_INITIALIZED_ACCOUNT = new AccountEntry(PARTY_A(), PARTY_A_MULTIADDR.toString(), 1)
 
-export const PARTY_B_INITIALIZED_ACCOUNT = new AccountEntry(PARTY_B, PARTY_B_MULTIADDR.toString(), 1)
+export const PARTY_B_INITIALIZED_ACCOUNT = new AccountEntry(PARTY_B(), PARTY_B_MULTIADDR.toString(), 1)
 
 export const OPENED_EVENT = {
   event: 'ChannelUpdated',
@@ -75,8 +75,8 @@ export const OPENED_EVENT = {
   transactionIndex: 0,
   logIndex: 0,
   args: {
-    source: PARTY_A.to_address().to_hex(),
-    destination: PARTY_B.to_address().to_hex(),
+    source: PARTY_A().to_address().to_hex(),
+    destination: PARTY_B().to_address().to_hex(),
     newState: {
       balance: BigNumber.from('3'),
       commitment: new Hash(new Uint8Array({ length: Hash.size() })).to_hex(),
@@ -96,8 +96,8 @@ export const COMMITTED_EVENT = {
   transactionIndex: 0,
   logIndex: 10,
   args: {
-    source: PARTY_A.to_address().to_hex(),
-    destination: PARTY_B.to_address().to_hex(),
+    source: PARTY_A().to_address().to_hex(),
+    destination: PARTY_B().to_address().to_hex(),
     newState: {
       balance: BigNumber.from('3'),
       commitment: new Hash(new Uint8Array({ length: Hash.size() }).fill(1)).to_hex(),
@@ -117,8 +117,8 @@ export const UPDATED_WHEN_REDEEMED_EVENT = {
   transactionIndex: 0,
   logIndex: 0,
   args: {
-    source: PARTY_A.to_address().to_hex(),
-    destination: PARTY_B.to_address().to_hex(),
+    source: PARTY_A().to_address().to_hex(),
+    destination: PARTY_B().to_address().to_hex(),
     newState: {
       balance: BigNumber.from('1'),
       commitment: new Hash(new Uint8Array({ length: Hash.size() })).to_hex(),
@@ -138,8 +138,8 @@ export const TICKET_REDEEMED_EVENT = {
   transactionIndex: 1,
   logIndex: 0,
   args: {
-    source: PARTY_A.to_address().to_hex(),
-    destination: PARTY_B.to_address().to_hex(),
+    source: PARTY_A().to_address().to_hex(),
+    destination: PARTY_B().to_address().to_hex(),
     nextCommitment: new Hash(new Uint8Array({ length: Hash.size() })).to_hex(),
     ticketEpoch: BigNumber.from('0'),
     ticketIndex: BigNumber.from('1'),
@@ -151,7 +151,7 @@ export const TICKET_REDEEMED_EVENT = {
 } as Event<'TicketRedeemed'>
 
 export const oneLargeTicket = new Ticket(
-  PARTY_B.to_address(),
+  PARTY_B().to_address(),
   Challenge.deserialize(
     stringToU8a('0x03c2aa76d6837c51337001c8b5a60473726064fc35d0a40b8f0e1f068cc8e38e10')
   ).to_ethereum_challenge(),
@@ -163,7 +163,7 @@ export const oneLargeTicket = new Ticket(
   new Signature(new Uint8Array({ length: SIGNATURE_LENGTH }), 0)
 )
 export const oneSmallTicket = new Ticket(
-  PARTY_B.to_address(),
+  PARTY_B().to_address(),
   Challenge.deserialize(
     stringToU8a('0x03c2aa76d6837c51337001c8b5a60473726064fc35d0a40b8f0e1f068cc8e38e10')
   ).to_ethereum_challenge(),
@@ -182,8 +182,8 @@ export const PARTY_A_TRANSFER_INCOMING = {
   transactionIndex: 0,
   logIndex: 0,
   args: {
-    from: PARTY_B.to_address().to_hex(),
-    to: PARTY_A.to_address().to_hex(),
+    from: PARTY_B().to_address().to_hex(),
+    to: PARTY_A().to_address().to_hex(),
     value: BigNumber.from('3')
   } as any
 } as TokenEvent<'Transfer'>
@@ -195,8 +195,8 @@ export const PARTY_A_TRANSFER_OUTGOING = {
   transactionIndex: 0,
   logIndex: 0,
   args: {
-    from: PARTY_A.to_address().to_hex(),
-    to: PARTY_B.to_address().to_hex(),
+    from: PARTY_A().to_address().to_hex(),
+    to: PARTY_B().to_address().to_hex(),
     value: BigNumber.from('1')
   } as any
 } as TokenEvent<'Transfer'>
@@ -230,8 +230,8 @@ export const PARTY_A_REGISTERED = {
   transactionIndex: 1,
   logIndex: 0,
   args: {
-    account: PARTY_A.to_address().to_hex(),
-    hoprPeerId: PARTY_B.to_peerid_str()
+    account: PARTY_A().to_address().to_hex(),
+    hoprPeerId: PARTY_B().to_peerid_str()
   } as any
 } as RegistryEvent<'Registered'>
 
@@ -242,7 +242,7 @@ export const PARTY_A_ELEGIBLE = {
   transactionIndex: 0,
   logIndex: 0,
   args: {
-    account: PARTY_A.to_address().to_hex(),
+    account: PARTY_A().to_address().to_hex(),
     eligibility: true
   } as any
 } as RegistryEvent<'EligibilityUpdated'>
@@ -254,7 +254,7 @@ export const PARTY_A_NOT_ELEGIBLE = {
   transactionIndex: 0,
   logIndex: 0,
   args: {
-    account: PARTY_A.to_address().to_hex(),
+    account: PARTY_A().to_address().to_hex(),
     eligibility: false
   } as any
 } as RegistryEvent<'EligibilityUpdated'>
@@ -266,7 +266,7 @@ export const PARTY_A_ELEGIBLE_2 = {
   transactionIndex: 0,
   logIndex: 0,
   args: {
-    account: PARTY_A.to_address().to_hex(),
+    account: PARTY_A().to_address().to_hex(),
     eligibility: true
   } as any
 } as RegistryEvent<'EligibilityUpdated'>
@@ -278,7 +278,7 @@ export const PARTY_A_DEREGISTERED = {
   transactionIndex: 0,
   logIndex: 0,
   args: {
-    account: PARTY_A.to_address().to_hex(),
-    hoprPeerId: PARTY_B.to_peerid_str()
+    account: PARTY_A().to_address().to_hex(),
+    hoprPeerId: PARTY_B().to_peerid_str()
   } as any
 } as RegistryEvent<'DeregisteredByOwner'>

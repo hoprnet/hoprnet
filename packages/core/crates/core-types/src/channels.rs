@@ -523,6 +523,15 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "eq")]
         pub fn _eq(&self, other: &ChannelEntry) -> bool { self.eq(other) }
+
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> Self {
+            self.clone()
+        }
+
+        pub fn size() -> u32 {
+            Self::SIZE as u32
+        }
     }
 
     #[wasm_bindgen]
@@ -578,5 +587,14 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "eq")]
         pub fn _eq(&self, other: &Ticket) -> bool { self.eq(other) }
+
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> Self {
+            self.clone()
+        }
+
+        pub fn size() -> u32 {
+            Self::SIZE as u32
+        }
     }
 }

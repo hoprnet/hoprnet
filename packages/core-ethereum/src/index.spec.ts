@@ -1,9 +1,9 @@
 import assert from 'assert'
 import sinon from 'sinon'
-import { dbMock, debug, stringToU8a, PublicKey, Address } from '@hoprnet/hopr-utils'
+import { dbMock, debug, stringToU8a } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum, { Indexer, useFixtures } from './index.js'
 import { sampleChainOptions } from './ethereum.mock.js'
-import { ACCOUNT_A, PARTY_A } from './fixtures.js'
+import { ACCOUNT_A, MOCK_ADDRESS, MOCK_PUBLIC_KEY, PARTY_A } from './fixtures.js'
 
 const namespace = 'hopr:test:hopr-ethereum'
 const log = debug(namespace)
@@ -19,7 +19,7 @@ describe(`test HoprEthereum instance creation`, function () {
   })
   it('should instantiate a new class w/o any issues', function () {
     log('starting new instance of HoprEthereum.')
-    HoprCoreEthereum.createInstance(dbMock, PARTY_A, stringToU8a(ACCOUNT_A.privateKey), sampleChainOptions)
+    HoprCoreEthereum.createInstance(dbMock, PARTY_A(), stringToU8a(ACCOUNT_A.privateKey), sampleChainOptions)
     log('successfully created the HoprEthereum instance.')
   })
 })
@@ -27,7 +27,7 @@ describe(`test HoprEthereum instance creation`, function () {
 describe('test HoprEthereum', function () {
   const connector = HoprCoreEthereum.createInstance(
     dbMock,
-    PARTY_A,
+    PARTY_A(),
     stringToU8a(ACCOUNT_A.privateKey),
     sampleChainOptions
   )
@@ -36,8 +36,8 @@ describe('test HoprEthereum', function () {
     // @ts-ignore
     connector.db = sinon.stub()
 
-    const hoprNode = PublicKey.createMock()
-    const account = Address.createMock()
+    const hoprNode = MOCK_PUBLIC_KEY()
+    const account = MOCK_ADDRESS()
 
     // should be false by default
     assert((await connector.isAllowedAccessToNetwork(hoprNode)) === false, 'hoprNode is not eligible by default')

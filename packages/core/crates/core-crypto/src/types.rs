@@ -1263,6 +1263,11 @@ pub mod wasm {
             self.eq(other)
         }
 
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> Self {
+            self.clone()
+        }
+
         pub fn size() -> u32 {
             Self::SIZE as u32
         }
@@ -1294,6 +1299,15 @@ pub mod wasm {
         pub fn _serialize(&self) -> Box<[u8]> {
             self.serialize()
         }
+
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> Self {
+            self.clone()
+        }
+
+        pub fn size() -> u32 {
+            Self::SIZE as u32
+        }
     }
 
     #[wasm_bindgen]
@@ -1314,7 +1328,7 @@ pub mod wasm {
         }
 
         #[wasm_bindgen(js_name = "clone")]
-        pub fn _clone(&self) -> HalfKey {
+        pub fn _clone(&self) -> Self {
             self.clone()
         }
 
@@ -1340,11 +1354,6 @@ pub mod wasm {
             self.eq(other)
         }
 
-        #[wasm_bindgen(js_name = "clone")]
-        pub fn _clone(&self) -> HalfKeyChallenge {
-            self.clone()
-        }
-
         #[wasm_bindgen(js_name = "to_peerid_str")]
         pub fn _to_peerid_str(&self) -> String {
             self.to_peerid_str()
@@ -1368,6 +1377,11 @@ pub mod wasm {
         #[wasm_bindgen(js_name = "serialize")]
         pub fn _serialize(&self) -> Box<[u8]> {
             self.serialize()
+        }
+
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> Self {
+            self.clone()
         }
 
         pub fn size() -> u32 {
@@ -1407,6 +1421,11 @@ pub mod wasm {
         #[wasm_bindgen(js_name = "eq")]
         pub fn _eq(&self, other: &Hash) -> bool {
             self.eq(other)
+        }
+
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> Self {
+            self.clone()
         }
 
         pub fn size() -> u32 {
@@ -1459,6 +1478,11 @@ pub mod wasm {
         pub fn size_uncompressed() -> u32 {
             Self::SIZE_UNCOMPRESSED as u32
         }
+
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> Self {
+            self.clone()
+        }
     }
 
     #[wasm_bindgen]
@@ -1483,6 +1507,11 @@ pub mod wasm {
             ok_or_jserr!(Response::from_half_keys(first, second))
         }
 
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> Self {
+            self.clone()
+        }
+
         pub fn size() -> u32 {
             Self::SIZE as u32
         }
@@ -1503,6 +1532,11 @@ pub mod wasm {
         #[wasm_bindgen(js_name = "serialize")]
         pub fn _serialize(&self) -> Box<[u8]> {
             self.serialize()
+        }
+
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> Self {
+            self.clone()
         }
 
         pub fn size() -> u32 {

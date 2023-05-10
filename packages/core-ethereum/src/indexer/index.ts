@@ -43,7 +43,7 @@ import {
   type IndexerEventEmitter,
   IndexerStatus
 } from './types.js'
-import { isConfirmedBlock, snapshotComparator, type IndexerSnapshot } from './utils.js'
+import { isConfirmedBlock, snapshotComparator, type IndexerSnapshot, channelEntryFromSCEvent } from './utils.js'
 import { BigNumber, type Contract, errors } from 'ethers'
 import { CORE_ETHEREUM_CONSTANTS } from '../../lib/core_ethereum_misc.js'
 import type { TypedEvent, TypedEventFilter } from '../utils/common.js'
@@ -844,7 +844,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     let channel: ChannelEntry
     try {
       log('channel-updated for hash %s', event.transactionHash)
-      channel = await ChannelEntry.fromSCEvent(event, this.getPublicKeyOf.bind(this))
+      channel = await channelEntryFromSCEvent(event, this.getPublicKeyOf.bind(this))
     } catch (err) {
       log(`fatal error: failed to construct new ChannelEntry from the SC event`, err)
       return

@@ -509,9 +509,12 @@ pub mod wasm {
             self.eq(other)
         }
 
-        pub fn size() -> u32 {
-            Self::SIZE as u32
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> Self {
+            self.clone()
         }
+
+        pub fn size() -> u32 { Self::SIZE as u32 }
     }
 
     #[wasm_bindgen]
@@ -530,6 +533,13 @@ pub mod wasm {
         pub fn _to_formatted_string(&self) -> String {
             format!("{} {:?}", self.value.div(&u256::from(10u16).pow(18)), self.balance_type)
         }
+
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> Self {
+            self.clone()
+        }
+
+        pub fn size() -> u32 { Self::SIZE as u32 }
     }
 
     #[wasm_bindgen]
@@ -554,9 +564,12 @@ pub mod wasm {
             self.eq(other)
         }
 
-        pub fn size() -> u32 {
-            Self::SIZE as u32
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> Self {
+            self.clone()
         }
+
+        pub fn size() -> u32 { Self::SIZE as u32 }
     }
 
     #[wasm_bindgen]
@@ -571,9 +584,12 @@ pub mod wasm {
             self.serialize()
         }
 
-        pub fn size() -> u32 {
-            Self::SIZE as u32
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> Self {
+            self.clone()
         }
+
+        pub fn size() -> u32 { Self::SIZE as u32 }
     }
 
     #[wasm_bindgen]
@@ -611,5 +627,12 @@ pub mod wasm {
                 Ordering::Greater => 1,
             }
         }
+
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> Self {
+            self.clone()
+        }
+
+        pub fn size() -> u32 { Self::SIZE as u32 }
     }
 }

@@ -3,7 +3,7 @@ import leveldown from 'leveldown'
 import MemDown from 'memdown'
 import { stat, mkdir, rm } from 'fs/promises'
 import { debug } from 'debug'
-import { Intermediate } from '../cryptography.js'
+import { Intermediate } from '../../../core/lib/core_crypto.js'
 import {
   AcknowledgedTicket,
   UnacknowledgedTicket,
@@ -18,7 +18,7 @@ import {
   Ticket,
   Address,
   Hash,
-  generate_channel_id, BalanceType
+  generate_channel_id, BalanceType, PendingAcknowledgement
 } from '../types.js'
 import BN from 'bn.js'
 import { u8aToNumber, u8aConcat, toU8a, stringToU8a, u8aToHex } from '@hoprnet/hopr-utils'
@@ -108,44 +108,6 @@ const REJECTED_TICKETS_COUNT = encoder.encode('statistics:rejected:count')
 const REJECTED_TICKETS_VALUE = encoder.encode('statistics:rejected:value')
 const ENVIRONMENT_KEY = encoder.encode('environment_id')
 const HOPR_BALANCE_KEY = encoder.encode('hopr-balance')
-
-enum PendingAcknowledgementPrefix {
-  Relayer = 0,
-  MessageSender = 1
-}
-
-export type WaitingAsSender = {
-  isMessageSender: true
-}
-
-export type WaitingAsRelayer = {
-  isMessageSender: false
-  ticket: UnacknowledgedTicket
-}
-
-export type PendingAckowledgement = WaitingAsSender | WaitingAsRelayer
-
-function serializePendingAcknowledgement(isMessageSender: boolean, unackTicket?: UnacknowledgedTicket) {
-  if (isMessageSender) {
-    return Uint8Array.from([PendingAcknowledgementPrefix.MessageSender])
-  } else {
-    return Uint8Array.from([PendingAcknowledgementPrefix.Relayer, ...unackTicket.serialize()])
-  }
-}
-
-function deserializePendingAcknowledgement(data: Uint8Array): PendingAckowledgement {
-  switch (data[0] as PendingAcknowledgementPrefix) {
-    case PendingAcknowledgementPrefix.MessageSender:
-      return {
-        isMessageSender: true
-      }
-    case PendingAcknowledgementPrefix.Relayer:
-      return {
-        isMessageSender: false,
-        ticket: UnacknowledgedTicket.deserialize(data.slice(1))
-      }
-  }
-}
 
 export class LevelDb {
   public backend: LevelUp
@@ -463,33 +425,33 @@ export class HoprDB {
    * @returns an array of all unacknowledged tickets
    */
   public async getUnacknowledgedTickets(filter?: { signer: PublicKey }): Promise<UnacknowledgedTicket[]> {
-    const filterFunc = (pending: PendingAckowledgement): boolean => {
-      if (pending.isMessageSender == true) {
+    const filterFunc = (pending: PendingAcknowledgement): boolean => {
+      if (pending.is_msg_sender() == true) {
         return false
       }
 
       // if signer provided doesn't match our ticket's signer dont add it to the list
-      if (filter?.signer && pending.ticket.signer.eq(filter.signer)) {
+      if (filter?.signer && pending.ticket().signer.eq(filter.signer)) {
         return false
       }
       return true
     }
 
-    return await this.getAll<PendingAckowledgement, UnacknowledgedTicket>(
+    return await this.getAll<PendingAcknowledgement, UnacknowledgedTicket>(
       {
         prefix: PENDING_ACKNOWLEDGEMENTS_PREFIX,
         suffixLength: HalfKeyChallenge.size()
       },
-      deserializePendingAcknowledgement,
+      PendingAcknowledgement.deserialize,
       filterFunc,
-      (pending: WaitingAsRelayer) => pending.ticket
+      (pending: PendingAcknowledgement) => pending.ticket()
     )
   }
 
-  public async getPendingAcknowledgement(halfKeyChallenge: HalfKeyChallenge): Promise<PendingAckowledgement> {
-    return await this.getCoerced<PendingAckowledgement>(
+  public async getPendingAcknowledgement(halfKeyChallenge: HalfKeyChallenge): Promise<PendingAcknowledgement> {
+    return await this.getCoerced<PendingAcknowledgement>(
       createPendingAcknowledgement(halfKeyChallenge),
-      deserializePendingAcknowledgement
+      PendingAcknowledgement.deserialize
     )
   }
 
@@ -500,7 +462,7 @@ export class HoprDB {
   ): Promise<void> {
     await this.db.put(
       createPendingAcknowledgement(halfKeyChallenge),
-      serializePendingAcknowledgement(isMessageSender, unackTicket)
+      new PendingAcknowledgement(isMessageSender, unackTicket).serialize()
     )
   }
 

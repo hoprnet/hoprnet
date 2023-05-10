@@ -279,10 +279,6 @@ impl AcknowledgementChallenge {
         signature.verify_hash_with_pubkey(&hash, public_key)
     }
 
-    pub fn size() -> usize {
-        Self::SIZE
-    }
-
     pub fn validate(&mut self, ack_challenge: HalfKeyChallenge, public_key: &PublicKey) -> bool {
         if self.ack_challenge.is_some() || Self::verify(public_key, &self.signature, &ack_challenge) {
             self.ack_challenge = Some(ack_challenge);
@@ -560,6 +556,13 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "eq")]
         pub fn _eq(&self, other: &UnacknowledgedTicket) -> bool { self.eq(other) }
+
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> Self {
+            self.clone()
+        }
+
+        pub fn size() -> u32 { Self::SIZE as u32 }
     }
 
     #[wasm_bindgen]
@@ -581,6 +584,13 @@ pub mod wasm {
         pub fn _verify(&self, issuer: &PublicKey) -> JsResult<bool> {
             ok_or_jserr!(self.verify(issuer).map(|_| true))
         }
+
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> Self {
+            self.clone()
+        }
+
+        pub fn size() -> u32 { Self::SIZE as u32 }
     }
 
     #[wasm_bindgen]
@@ -597,6 +607,13 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "eq")]
         pub fn _eq(&self, other: &AcknowledgementChallenge) -> bool { self.eq(other) }
+
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> Self {
+            self.clone()
+        }
+
+        pub fn size() -> u32 { Self::SIZE as u32 }
     }
 
     #[wasm_bindgen]
@@ -613,5 +630,12 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "eq")]
         pub fn _eq(&self, other: &Acknowledgement) -> bool { self.eq(other) }
+
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> Self {
+            self.clone()
+        }
+
+        pub fn size() -> u32 { Self::SIZE as u32 }
     }
 }

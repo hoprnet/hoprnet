@@ -22,9 +22,10 @@ import {
   PRICE_PER_PACKET,
   Snapshot
 } from '@hoprnet/hopr-utils'
+import {AcknowledgementChallenge, Acknowledgement } from '../../types.js'
 import type { HalfKeyChallenge } from '@hoprnet/hopr-utils'
 import assert from 'assert'
-import { AcknowledgementChallenge, Packet, Acknowledgement } from '../../messages/index.js'
+import { Packet } from '../../messages/index.js'
 import { PacketForwardInteraction } from './forward.js'
 import { initializeCommitment } from '@hoprnet/hopr-core-ethereum'
 import { ChannelCommitmentInfo } from '@hoprnet/hopr-core-ethereum'
@@ -32,6 +33,7 @@ import type { ResolvedEnvironment } from '../../environment.js'
 import type { HoprOptions } from '../../index.js'
 import type { Components } from '@libp2p/interfaces/components'
 import type { Connection, Stream } from '@libp2p/interfaces/connection'
+import { keysPBM } from '@libp2p/crypto/keys'
 
 const SECRET_LENGTH = 32
 
@@ -275,7 +277,8 @@ describe('packet acknowledgement', function () {
     await ackInterationCounterparty.start()
 
     const ackKey = deriveAckKeyShare(secrets[0])
-    const ackMessage = AcknowledgementChallenge.create(ackChallenge, SELF)
+    let self_pk = keysPBM.PrivateKey.decode(SELF.privateKey).Data
+    const ackMessage = new AcknowledgementChallenge(ackChallenge, self_pk)
 
     assert(
       ackMessage.solve(ackKey.serialize()),
@@ -285,7 +288,8 @@ describe('packet acknowledgement', function () {
     ackInterationCounterparty.sendAcknowledgement(
       {
         createAcknowledgement: (privKey: PeerId) => {
-          return Acknowledgement.create(ackMessage, ackKey, privKey)
+          let pk = keysPBM.PrivateKey.decode(privKey.privateKey).Data
+          return new Acknowledgement(ackMessage, ackKey, pk)
         }
       } as any,
       SELF
