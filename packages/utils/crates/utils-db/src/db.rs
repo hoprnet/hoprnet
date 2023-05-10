@@ -1,6 +1,6 @@
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-use crate::errors::Result;
+use crate::errors::{DbError, Result};
 use crate::traits::BinaryAsyncKVStorage;
 
 pub struct Batch {
@@ -45,11 +45,13 @@ impl<T: BinaryAsyncKVStorage> DB<T> {
     }
 
     pub async fn get<K: Serialize, V: DeserializeOwned>(&self, key: &K) -> Result<V> {
-        let key: T::Key = bincode::serialize(&key).unwrap().into_boxed_slice();
-        self.backend.get(key).await.map(move |v| {
-            let value: V = bincode::deserialize(&v).unwrap();
-            value
-        })
+        let key: T::Key = bincode::serialize(&key)
+            .map_err(|e| DbError::SerializationError(e.to_string()))?
+            .into_boxed_slice();
+        self.backend
+            .get(key)
+            .await
+            .and_then(|v| bincode::deserialize(v.as_ref()).map_err(|e| DbError::DeserializationError(e.to_string())))
     }
 
     pub async fn set<K: Serialize, V: Serialize + DeserializeOwned>(

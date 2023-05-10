@@ -53,8 +53,6 @@ packages/*/crates/*/pkg
 /packages/ethereum/contracts/broadcast/*.*/31337
 /packages/ethereum/contracts/build-info/
 
-**/target
-
 # docusaurus builds
 /docs/hopr-documentation/build
 /docs/hopr-documentation/.docusaurus

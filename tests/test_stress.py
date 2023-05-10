@@ -4,7 +4,7 @@ import os
 import pytest
 import random
 
-from hoprd_api import HoprdAPI
+from hoprd.wrapper import HoprdAPI
 
 HTTP_STATUS_CODE_OK = 200
 HTTP_STATUS_CODE_SEND_MESSAGE_OK = 202

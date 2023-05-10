@@ -1,11 +1,13 @@
-use crate::errors::{GeneralError::InvalidInput, GeneralError::ParseError, Result};
-use crate::traits::{BinarySerializable, ToHex};
 use ethnum::{u256, AsU256};
+use serde::{Deserialize, Serialize};
 use std::ops::{Add, Sub};
 use std::string::ToString;
 
+use crate::errors::{GeneralError::InvalidInput, GeneralError::ParseError, Result};
+use crate::traits::{BinarySerializable, ToHex};
+
 /// Represents an Ethereum address
-#[derive(Clone, Copy, Eq, PartialEq, Debug)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Address {
     addr: [u8; Self::SIZE],
@@ -59,13 +61,13 @@ impl BinarySerializable<'_> for Address {
 impl Address {
     // impl std::str::FromStr for Address {
     pub fn from_str(value: &str) -> Result<Address> {
-        Self::deserialize(&hex::decode(value).map_err(|_| ParseError)?)
+        <Self as BinarySerializable>::deserialize(&hex::decode(value).map_err(|_| ParseError)?)
     }
     // }
 }
 
 /// Represents a type of the balance: native or HOPR tokens.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub enum BalanceType {
     Native,
@@ -73,7 +75,7 @@ pub enum BalanceType {
 }
 
 /// Represents balance of some coin or token.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Balance {
     value: u256,
@@ -190,7 +192,7 @@ impl Balance {
 }
 
 /// Represents and Ethereum challenge.
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct EthereumChallenge {
     challenge: [u8; Self::SIZE],
@@ -259,9 +261,9 @@ impl BinarySerializable<'_> for Snapshot {
     fn deserialize(data: &[u8]) -> Result<Self> {
         if data.len() == Self::SIZE {
             Ok(Self {
-                block_number: U256::deserialize(&data[0..U256::SIZE])?,
-                transaction_index: U256::deserialize(&data[U256::SIZE..2 * U256::SIZE])?,
-                log_index: U256::deserialize(&data[2 * U256::SIZE..3 * U256::SIZE])?,
+                block_number: <U256 as BinarySerializable>::deserialize(&data[0..U256::SIZE])?,
+                transaction_index: <U256 as BinarySerializable>::deserialize(&data[U256::SIZE..2 * U256::SIZE])?,
+                log_index: <U256 as BinarySerializable>::deserialize(&data[2 * U256::SIZE..3 * U256::SIZE])?,
             })
         } else {
             Err(ParseError)
@@ -270,15 +272,16 @@ impl BinarySerializable<'_> for Snapshot {
 
     fn serialize(&self) -> Box<[u8]> {
         let mut ret = Vec::<u8>::with_capacity(Self::SIZE);
-        ret.extend_from_slice(&self.block_number.serialize());
-        ret.extend_from_slice(&self.transaction_index.serialize());
-        ret.extend_from_slice(&self.log_index.serialize());
+
+        ret.extend_from_slice(&<U256 as BinarySerializable>::serialize(&self.block_number));
+        ret.extend_from_slice(&<U256 as BinarySerializable>::serialize(&self.transaction_index));
+        ret.extend_from_slice(&<U256 as BinarySerializable>::serialize(&self.log_index));
         ret.into_boxed_slice()
     }
 }
 
 /// Represents the Ethereum's basic numeric type - unsigned 256-bit integer
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct U256 {
     value: u256,
@@ -377,7 +380,7 @@ mod tests {
     #[test]
     fn address_tests() {
         let addr_1 = Address::default();
-        let addr_2 = Address::deserialize(&addr_1.serialize()).unwrap();
+        let addr_2 = <Address as BinarySerializable>::deserialize(&BinarySerializable::serialize(&addr_1)).unwrap();
 
         assert_eq!(addr_1, addr_2, "deserialized address does not match");
     }
@@ -405,7 +408,7 @@ mod tests {
     #[test]
     fn eth_challenge_tests() {
         let e_1 = EthereumChallenge::default();
-        let e_2 = EthereumChallenge::deserialize(&e_1.serialize()).unwrap();
+        let e_2 = <EthereumChallenge as BinarySerializable>::deserialize(&BinarySerializable::serialize(&e_1)).unwrap();
 
         assert_eq!(e_1, e_2);
     }
@@ -413,7 +416,7 @@ mod tests {
     #[test]
     fn snapshot_tests() {
         let s1 = Snapshot::new(1234_u32.into(), 4567_u32.into(), 102030_u32.into());
-        let s2 = Snapshot::deserialize(&s1.serialize()).unwrap();
+        let s2 = <Snapshot as BinarySerializable>::deserialize(&BinarySerializable::serialize(&s1)).unwrap();
 
         assert_eq!(s1, s2);
     }
@@ -421,7 +424,7 @@ mod tests {
     #[test]
     fn u256_tests() {
         let u_1 = U256::new("1234567899876543210");
-        let u_2 = U256::deserialize(&u_1.serialize()).unwrap();
+        let u_2 = <U256 as BinarySerializable>::deserialize(&BinarySerializable::serialize(&u_1)).unwrap();
 
         assert_eq!(u_1, u_2);
     }

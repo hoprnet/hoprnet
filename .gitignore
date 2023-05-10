@@ -4,6 +4,7 @@
 /build
 **/target
 **/.idea
+**/gha-creds-*.json
 
 # Exclude databases resulting from local execution of hoprd
 /db
@@ -228,3 +229,6 @@ dmypy.json
 
 # Cython debug symbols
 cython_debug/
+
+# Ignore debugging identity file
+debug-identity

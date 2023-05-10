@@ -1014,6 +1014,7 @@ dependencies = [
  "libp2p-identity",
  "parameterized",
  "rand 0.8.5",
+ "serde",
  "sha3",
  "subtle",
  "thiserror",
@@ -1034,6 +1035,7 @@ dependencies = [
  "console_error_panic_hook",
  "core-crypto",
  "core-types",
+ "serde",
  "utils-db",
  "utils-misc",
  "utils-types",
@@ -1621,6 +1623,7 @@ dependencies = [
  "pkcs8 0.10.2",
  "rand_core 0.6.4",
  "sec1 0.7.2",
+ "serdect",
  "subtle",
  "zeroize",
 ]
@@ -4666,6 +4669,7 @@ dependencies = [
  "der 0.7.4",
  "generic-array 0.14.7",
  "pkcs8 0.10.2",
+ "serdect",
  "subtle",
  "zeroize",
 ]
@@ -4840,6 +4844,16 @@ dependencies = [
  "ryu",
  "serde",
  "unsafe-libyaml",
+]
+
+[[package]]
+name = "serdect"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a84f14a19e9a014bb9f4512488d9829a68e04ecabffb0f9904cd1ace94598177"
+dependencies = [
+ "base16ct 0.2.0",
+ "serde",
 ]
 
 [[package]]

@@ -81,6 +81,11 @@ function addressPriorityLocal(addrClass: AddressClass) {
   }
 }
 
+/**
+ * Map a given Multiaddr to a network class, e.g. `Public` address
+ * @param ma Multiaddr to determine class
+ * @returns the assigned class
+ */
 export function maToClass(ma: Multiaddr): AddressClass {
   const tuples = ma.tuples() as [code: number, addr: Uint8Array][]
 
@@ -122,6 +127,11 @@ export function maToClass(ma: Multiaddr): AddressClass {
   }
 }
 
+/**
+ * Comparator used to sort addresses in local-mode, see `addressPriorityLocal` function
+ * @param addrA first Multiaddr
+ * @param addrB second Multiaddr
+ */
 export function compareAddressesLocalMode(addrA: Multiaddr, addrB: Multiaddr): -1 | 0 | 1 {
   const result = addressPriorityLocal(maToClass(addrA)) - addressPriorityLocal(maToClass(addrB))
 
@@ -134,6 +144,12 @@ export function compareAddressesLocalMode(addrA: Multiaddr, addrB: Multiaddr): -
   }
 }
 
+/**
+ * Comparator used to sort adresses according to their priority
+ * defined by `addressPriorityPublic` function
+ * @param addrA first Multiaddr
+ * @param addrB second Multiaddr
+ */
 export function compareAddressesPublicMode(addrA: Multiaddr, addrB: Multiaddr): -1 | 0 | 1 {
   const result = addressPriorityPublic(maToClass(addrA)) - addressPriorityPublic(maToClass(addrB))
 
