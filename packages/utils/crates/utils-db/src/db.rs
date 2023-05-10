@@ -8,6 +8,10 @@ pub struct Batch {
     pub ops: Vec<crate::traits::BatchOperation<Box<[u8]>, Box<[u8]>>>,
 }
 
+pub fn serialize_to_bytes<S: Serialize>(s: &S) -> Result<Vec<u8>> {
+    bincode::serialize(&s).map_err(|e| DbError::SerializationError(e.to_string()))
+}
+
 impl Batch {
     pub fn new() -> Self {
         Self {
@@ -38,6 +42,13 @@ pub struct Key {
 
 impl Key {
     pub fn new<T: Serialize>(object: &T) -> Result<Self> {
+        let key = bincode::serialize(&object)
+            .map_err(|e| DbError::SerializationError(e.to_string()))?
+            .into_boxed_slice();
+        Ok(Self { key })
+    }
+
+    pub fn new_from_str(object: &str) -> Result<Self> {
         let key = bincode::serialize(&object)
             .map_err(|e| DbError::SerializationError(e.to_string()))?
             .into_boxed_slice();

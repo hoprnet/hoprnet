@@ -46,7 +46,7 @@ impl ChannelStatus {
 }
 
 /// Overall description of a channel
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct ChannelEntry {
     pub source: PublicKey,
@@ -240,7 +240,7 @@ impl Ticket {
             challenge,
             U256::zero(),
             U256::zero(),
-            Balance::new(0u8.into(), BalanceType::HOPR),
+            Balance::new(0u32.into(), BalanceType::HOPR),
             U256::zero(),
             U256::zero(),
             private_key,
@@ -291,7 +291,7 @@ impl Ticket {
     /// relates to.
     pub fn get_path_position(&self, price_per_packet: &U256, inverse_ticket_win_prob: &U256) -> u8 {
         let base_unit = price_per_packet.value().mul(inverse_ticket_win_prob.value());
-        self.amount.value().div(base_unit).as_u8()
+        self.amount.value().value().div(base_unit).as_u8()
     }
 }
 
@@ -420,7 +420,7 @@ pub mod tests {
             U256::new("1"),
             U256::new("2"),
             Balance::new(
-                inverse_win_prob * price_per_packet * path_pos as u128,
+                (inverse_win_prob * price_per_packet * path_pos as u128).into(),
                 BalanceType::HOPR,
             ),
             U256::from_inverse_probability(&inverse_win_prob).unwrap(),
