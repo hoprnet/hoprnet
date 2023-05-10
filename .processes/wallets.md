@@ -30,7 +30,7 @@ The purpose of this process is to document how crypto wallets are created and st
 | `0x8C9877a1279192448cAbeC9e8C4697b159cF645e` | CI/CD funding                                 | Used in our CI/CD pipelines to fund nodes automatically for testing.              |
 | `0x7305356ad936A06c4ea5DF45AD5E5C3ff9Db818E` | Dappnode HOPR Repository Owner Mainnet        | Used to sign & publish releases in the Dappnode Public repository                 |
 | `0x8C9877a1279192448cAbeC9e8C4697b159cF645e` | Faucet API                                    | Used to fund nodes started by the CI                                              |
-| `0xB7FB3a8bb24e9369B8Ecfb9E417A52528E0983B2` | HOPR Hats Vault                               | Gnosis Safe wallet for HOPR Hats Bug Bounty Vault                                              |
+| `0xB7FB3a8bb24e9369B8Ecfb9E417A52528E0983B2` | HOPR Hats Vault                               | Gnosis Safe wallet for HOPR Hats Bug Bounty Vault                                 |
 
 There are some additional wallets used for testing, that had been label `[ Unknown ]`. They will be handled in https://github.com/hoprnet/hoprnet/issues/2893.
 
