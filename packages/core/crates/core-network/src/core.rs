@@ -21,7 +21,7 @@ use wasm_bindgen_futures::{spawn_local, JsFuture};
 
 /// Extracts version from the protocol identifier
 /// ```rust
-/// # use core_network::index::version_from_protocol;
+/// use core_network::core::version_from_protocol;
 /// let protocol: &str = "`/hopr/mont_blanc/heartbeat/2.1.0";
 ///
 /// assert_eq!(version_from_protocol(protocol.into()), String::from("2.1.0"));
