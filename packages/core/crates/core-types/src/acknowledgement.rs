@@ -1,6 +1,6 @@
-use core_crypto::errors::CryptoError::SignatureVerification;
 use crate::acknowledgement::PendingAcknowledgement::{WaitingAsRelayer, WaitingAsSender};
 use crate::channels::Ticket;
+use core_crypto::errors::CryptoError::SignatureVerification;
 use core_crypto::primitives::{DigestLike, SimpleDigest};
 use core_crypto::types::{HalfKey, HalfKeyChallenge, Hash, PublicKey, Response, Signature};
 use utils_types::errors;
@@ -66,7 +66,8 @@ impl BinarySerializable<'_> for Acknowledgement {
         let mut buf = data.to_vec();
         if data.len() == Self::SIZE {
             let ack_signature = Signature::deserialize(buf.drain(..Signature::SIZE).as_ref())?;
-            let challenge_signature = AcknowledgementChallenge::deserialize(buf.drain(..AcknowledgementChallenge::SIZE).as_ref())?;
+            let challenge_signature =
+                AcknowledgementChallenge::deserialize(buf.drain(..AcknowledgementChallenge::SIZE).as_ref())?;
             let ack_key_share = HalfKey::deserialize(buf.drain(..HalfKey::SIZE).as_ref())?;
             Ok(Self {
                 ack_signature,
@@ -103,8 +104,11 @@ pub struct AcknowledgedTicket {
 impl AcknowledgedTicket {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(ticket: Ticket, response: Response, pre_image: Hash, signer: PublicKey) -> Self {
-        assert_ne!(ticket.counterparty, signer.to_address(),
-                   "signer must be different from the ticket counterparty");
+        assert_ne!(
+            ticket.counterparty,
+            signer.to_address(),
+            "signer must be different from the ticket counterparty"
+        );
         Self {
             ticket,
             response,
@@ -154,13 +158,12 @@ impl AcknowledgedTicket {
     /// Verifies if the embedded ticket has been signed by the given issuer and also
     /// that the challenge on the embedded response matches the challenge on the ticket.
     pub fn verify(&self, issuer: &PublicKey) -> core_crypto::errors::Result<()> {
-        (
-            self.ticket.verify(issuer).map(|_| true)? &&
-            self.response
+        (self.ticket.verify(issuer).map(|_| true)?
+            && self
+                .response
                 .to_challenge()
                 .to_ethereum_challenge()
-                .eq(&self.ticket.challenge)
-        )
+                .eq(&self.ticket.challenge))
         .then_some(())
         .ok_or(SignatureVerification)
     }
@@ -354,13 +357,15 @@ impl BinarySerializable<'_> for PendingAcknowledgement {
 
 #[cfg(test)]
 pub mod test {
+    use crate::acknowledgement::{
+        AcknowledgedTicket, Acknowledgement, AcknowledgementChallenge, PendingAcknowledgement, UnacknowledgedTicket,
+    };
+    use crate::channels::Ticket;
+    use core_crypto::types::{Challenge, CurvePoint, HalfKey, Hash, PublicKey, Response};
     use ethnum::u256;
     use hex_literal::hex;
-    use core_crypto::types::{Challenge, CurvePoint, HalfKey, Hash, PublicKey, Response};
     use utils_types::primitives::{Address, Balance, BalanceType, U256};
-    use crate::acknowledgement::{AcknowledgedTicket, Acknowledgement, AcknowledgementChallenge, PendingAcknowledgement, UnacknowledgedTicket};
     use utils_types::traits::BinarySerializable;
-    use crate::channels::Ticket;
 
     fn mock_ticket(pk: &[u8]) -> Ticket {
         let inverse_win_prob = u256::new(1u128); // 100 %
@@ -387,7 +392,8 @@ pub mod test {
         assert_eq!(
             PendingAcknowledgement::WaitingAsSender,
             PendingAcknowledgement::deserialize(&PendingAcknowledgement::WaitingAsSender.serialize()).unwrap()
-        ); }
+        );
+    }
 
     #[test]
     fn test_acknowledgement_challenge() {
@@ -417,7 +423,9 @@ pub mod test {
         let pk_2 = hex!("4471496ef88d9a7d86a92b7676f3c8871a60792a37fae6fc3abc347c3aa3b16b");
         let pub_key_2 = PublicKey::from_privkey(&pk_2).unwrap();
 
-        let ack_key = HalfKey::new(&hex!("3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa"));
+        let ack_key = HalfKey::new(&hex!(
+            "3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa"
+        ));
 
         let akc1 = AcknowledgementChallenge::new(&ack_key.to_challenge(), &pk_1);
 
@@ -435,8 +443,12 @@ pub mod test {
         let pk_1 = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
         let pub_key_1 = PublicKey::from_privkey(&pk_1).unwrap();
 
-        let hk1 = HalfKey::new(&hex!("3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa"));
-        let hk2 = HalfKey::new(&hex!("4471496ef88d9a7d86a92b7676f3c8871a60792a37fae6fc3abc347c3aa3b16b"));
+        let hk1 = HalfKey::new(&hex!(
+            "3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa"
+        ));
+        let hk2 = HalfKey::new(&hex!(
+            "4471496ef88d9a7d86a92b7676f3c8871a60792a37fae6fc3abc347c3aa3b16b"
+        ));
         let cp1: CurvePoint = hk1.to_challenge().into();
         let cp2: CurvePoint = hk2.to_challenge().into();
         let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
@@ -460,36 +472,33 @@ pub mod test {
     fn test_acknowledged_ticket() {
         let pk = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
         let pub_key = PublicKey::from_privkey(&pk).unwrap();
-        let resp = Response::new(&hex!("4471496ef88d9a7d86a92b7676f3c8871a60792a37fae6fc3abc347c3aa3b16b"));
+        let resp = Response::new(&hex!(
+            "4471496ef88d9a7d86a92b7676f3c8871a60792a37fae6fc3abc347c3aa3b16b"
+        ));
 
         let mut ticket1 = mock_ticket(&pk);
         ticket1.set_challenge(resp.to_challenge().to_ethereum_challenge(), &pk);
 
-        let akt_1 = AcknowledgedTicket::new(ticket1,
-                                                 resp,
-                                                 Hash::create(&[&hex!("deadbeef")]),
-                                                 pub_key.clone()
-        );
+        let akt_1 = AcknowledgedTicket::new(ticket1, resp, Hash::create(&[&hex!("deadbeef")]), pub_key.clone());
         assert!(akt_1.verify(&pub_key).is_ok());
 
         let akt_2 = AcknowledgedTicket::deserialize(&akt_1.serialize()).unwrap();
         assert_eq!(akt_1, akt_2);
     }
-
 }
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use crate::acknowledgement::{AcknowledgedTicket, Acknowledgement, AcknowledgementChallenge, UnacknowledgedTicket};
+    use core_crypto::types::{HalfKey, PublicKey, Response};
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use utils_types::traits::BinarySerializable;
     use wasm_bindgen::prelude::*;
-    use core_crypto::types::{HalfKey, PublicKey, Response};
 
     #[wasm_bindgen]
     pub struct PendingAcknowledgement {
-        w: super::PendingAcknowledgement
+        w: super::PendingAcknowledgement,
     }
 
     #[wasm_bindgen]
@@ -498,11 +507,11 @@ pub mod wasm {
         pub fn new(is_sender: bool, ticket: Option<UnacknowledgedTicket>) -> Self {
             if is_sender {
                 Self {
-                    w: super::PendingAcknowledgement::WaitingAsSender
+                    w: super::PendingAcknowledgement::WaitingAsSender,
                 }
             } else {
                 Self {
-                    w: super::PendingAcknowledgement::WaitingAsRelayer(ticket.unwrap())
+                    w: super::PendingAcknowledgement::WaitingAsRelayer(ticket.unwrap()),
                 }
             }
         }
@@ -510,20 +519,20 @@ pub mod wasm {
         pub fn is_msg_sender(&self) -> bool {
             match &self.w {
                 super::PendingAcknowledgement::WaitingAsSender => true,
-                super::PendingAcknowledgement::WaitingAsRelayer(_) => false
+                super::PendingAcknowledgement::WaitingAsRelayer(_) => false,
             }
         }
 
         pub fn ticket(&self) -> Option<UnacknowledgedTicket> {
             match &self.w {
                 super::PendingAcknowledgement::WaitingAsSender => None,
-                super::PendingAcknowledgement::WaitingAsRelayer(ticket) => Some(ticket.clone())
+                super::PendingAcknowledgement::WaitingAsRelayer(ticket) => Some(ticket.clone()),
             }
         }
 
         pub fn deserialize(data: &[u8]) -> JsResult<PendingAcknowledgement> {
             Ok(Self {
-                w: ok_or_jserr!( super::PendingAcknowledgement::deserialize(data))?
+                w: ok_or_jserr!(super::PendingAcknowledgement::deserialize(data))?,
             })
         }
 
@@ -555,14 +564,18 @@ pub mod wasm {
         }
 
         #[wasm_bindgen(js_name = "eq")]
-        pub fn _eq(&self, other: &UnacknowledgedTicket) -> bool { self.eq(other) }
+        pub fn _eq(&self, other: &UnacknowledgedTicket) -> bool {
+            self.eq(other)
+        }
 
         #[wasm_bindgen(js_name = "clone")]
         pub fn _clone(&self) -> Self {
             self.clone()
         }
 
-        pub fn size() -> u32 { Self::SIZE as u32 }
+        pub fn size() -> u32 {
+            Self::SIZE as u32
+        }
     }
 
     #[wasm_bindgen]
@@ -578,7 +591,9 @@ pub mod wasm {
         }
 
         #[wasm_bindgen(js_name = "eq")]
-        pub fn _eq(&self, other: &AcknowledgedTicket) -> bool { self.eq(other) }
+        pub fn _eq(&self, other: &AcknowledgedTicket) -> bool {
+            self.eq(other)
+        }
 
         #[wasm_bindgen(js_name = "verify")]
         pub fn _verify(&self, issuer: &PublicKey) -> JsResult<bool> {
@@ -590,7 +605,9 @@ pub mod wasm {
             self.clone()
         }
 
-        pub fn size() -> u32 { Self::SIZE as u32 }
+        pub fn size() -> u32 {
+            Self::SIZE as u32
+        }
     }
 
     #[wasm_bindgen]
@@ -606,14 +623,18 @@ pub mod wasm {
         }
 
         #[wasm_bindgen(js_name = "eq")]
-        pub fn _eq(&self, other: &AcknowledgementChallenge) -> bool { self.eq(other) }
+        pub fn _eq(&self, other: &AcknowledgementChallenge) -> bool {
+            self.eq(other)
+        }
 
         #[wasm_bindgen(js_name = "clone")]
         pub fn _clone(&self) -> Self {
             self.clone()
         }
 
-        pub fn size() -> u32 { Self::SIZE as u32 }
+        pub fn size() -> u32 {
+            Self::SIZE as u32
+        }
     }
 
     #[wasm_bindgen]
@@ -629,13 +650,17 @@ pub mod wasm {
         }
 
         #[wasm_bindgen(js_name = "eq")]
-        pub fn _eq(&self, other: &Acknowledgement) -> bool { self.eq(other) }
+        pub fn _eq(&self, other: &Acknowledgement) -> bool {
+            self.eq(other)
+        }
 
         #[wasm_bindgen(js_name = "clone")]
         pub fn _clone(&self) -> Self {
             self.clone()
         }
 
-        pub fn size() -> u32 { Self::SIZE as u32 }
+        pub fn size() -> u32 {
+            Self::SIZE as u32
+        }
     }
 }

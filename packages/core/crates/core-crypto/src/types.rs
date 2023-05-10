@@ -546,8 +546,7 @@ impl TryFrom<CurvePoint> for PublicKey {
     type Error = CryptoError;
 
     fn try_from(value: CurvePoint) -> std::result::Result<Self, Self::Error> {
-        let key = elliptic_curve::PublicKey::<Secp256k1>::from_affine(value.affine)
-            .map_err(|_| InvalidInputValue)?;
+        let key = elliptic_curve::PublicKey::<Secp256k1>::from_affine(value.affine).map_err(|_| InvalidInputValue)?;
         Ok(Self {
             key,
             compressed: key.to_encoded_point(true).to_bytes(),
@@ -641,7 +640,8 @@ impl PublicKey {
     pub fn combine(summands: &[&PublicKey]) -> PublicKey {
         let cps = summands.iter().map(|pk| CurvePoint::from(*pk)).collect::<Vec<_>>();
         let cps_ref = cps.iter().map(|cp| cp).collect::<Vec<_>>();
-        CurvePoint::combine(&cps_ref).try_into()
+        CurvePoint::combine(&cps_ref)
+            .try_into()
             .expect("combination results in the ec identity (which is an invalid pub key)")
     }
 
@@ -865,7 +865,7 @@ impl PartialEq for Signature {
     }
 }
 
-impl Eq for Signature { }
+impl Eq for Signature {}
 
 /// A method that turns all lower-cased hexadecimal address to a checksum-ed address
 /// according to https://eips.ethereum.org/EIPS/eip-55
@@ -949,13 +949,17 @@ pub mod tests {
 
     #[test]
     fn public_key_to_hex() {
-        let pk = PublicKey::from_privkey(
-            &hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")
-        ).unwrap();
+        let pk = PublicKey::from_privkey(&hex!(
+            "492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"
+        ))
+        .unwrap();
 
         assert_eq!("39d1bc2291826eaed86567d225cf243ebc637275e0a5aedb0d6b1dc82136a38e428804340d4c949a029846f682711d046920b4ca8b8ebeb9d1192b5bdaa54dba",
                    pk.to_hex(false));
-        assert_eq!("0239d1bc2291826eaed86567d225cf243ebc637275e0a5aedb0d6b1dc82136a38e", pk.to_hex(true));
+        assert_eq!(
+            "0239d1bc2291826eaed86567d225cf243ebc637275e0a5aedb0d6b1dc82136a38e",
+            pk.to_hex(true)
+        );
     }
 
     #[test]
