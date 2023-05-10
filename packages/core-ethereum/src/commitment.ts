@@ -4,8 +4,8 @@
 //
 // We need to persist this string of commitments in the database, and support
 // syncing back and forth with those that have been persisted on chain.
-import { debug, Hash, HoprDB, iterateHash, recoverIteratedHash, toU8a, u8aConcat, U256 } from '@hoprnet/hopr-utils'
-import { deriveCommitmentSeed } from '@hoprnet/hopr-utils'
+import { debug, Hash, HoprDB, toU8a, u8aConcat, U256 } from '@hoprnet/hopr-utils'
+import { iterate_hash, recover_iterated_hash, derive_commitment_seed } from '@hoprnet/hopr-core/lib/core_crypto.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { keysPBM } from '@libp2p/crypto/keys'
 
@@ -14,19 +14,14 @@ const log = debug('hopr-core-ethereum:commitment')
 export const DB_ITERATION_BLOCK_SIZE = 10000
 export const TOTAL_ITERATIONS = 100000
 
-function hashFunction(msg: Uint8Array): Uint8Array {
-  return Hash.create([msg]).serialize().slice(0, Hash.size())
-}
-
 function searchDBFor(db: HoprDB, channelId: Hash, iteration: number): Promise<Uint8Array | undefined> {
   return db.getCommitment(channelId, iteration)
 }
 
 export async function findCommitmentPreImage(db: HoprDB, channelId: Hash): Promise<Hash> {
   let currentCommitment = await db.getCurrentCommitment(channelId)
-  let result = await recoverIteratedHash(
+  let result = await recover_iterated_hash(
     currentCommitment.serialize(),
-    hashFunction,
     (i: number) => searchDBFor(db, channelId, i),
     TOTAL_ITERATIONS,
     DB_ITERATION_BLOCK_SIZE
@@ -34,7 +29,7 @@ export async function findCommitmentPreImage(db: HoprDB, channelId: Hash): Promi
   if (result == undefined) {
     throw Error(`Could not find preImage. Searching for ${currentCommitment.to_hex()}`)
   }
-  return new Hash(Uint8Array.from(result.preImage))
+  return new Hash(result.intermediate)
 }
 
 export async function bumpCommitment(db: HoprDB, channelId: Hash, newCommitment: Hash) {
@@ -50,14 +45,13 @@ async function createCommitmentChain(
   initialCommitmentSeed: Uint8Array,
   setChainCommitment: SetCommitment
 ): Promise<void> {
-  const { intermediates, hash } = await iterateHash(
+  let iterated_hash = iterate_hash(
     initialCommitmentSeed,
-    hashFunction,
     TOTAL_ITERATIONS,
     DB_ITERATION_BLOCK_SIZE
   )
-  await db.storeHashIntermediaries(channelId, intermediates)
-  const current = new Hash(Uint8Array.from(hash))
+  await db.storeHashIntermediaries(channelId, iterated_hash)
+  const current = new Hash(iterated_hash.hash())
   await Promise.all([db.setCurrentCommitment(channelId, current), setChainCommitment(current)])
   log('commitment chain initialized')
 }
@@ -96,7 +90,7 @@ export class ChannelCommitmentInfo {
       new TextEncoder().encode(this.contractAddress)
     )
 
-    return deriveCommitmentSeed(keysPBM.PrivateKey.decode(peerId.privateKey).Data, channelSeedInfo)
+    return derive_commitment_seed(keysPBM.PrivateKey.decode(peerId.privateKey).Data, channelSeedInfo)
   }
 }
 

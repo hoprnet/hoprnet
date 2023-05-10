@@ -3,7 +3,7 @@ import leveldown from 'leveldown'
 import MemDown from 'memdown'
 import { stat, mkdir, rm } from 'fs/promises'
 import { debug } from 'debug'
-import { Intermediate } from '../../../core/lib/core_crypto.js'
+
 import {
   AcknowledgedTicket,
   UnacknowledgedTicket,
@@ -23,6 +23,7 @@ import {
 import BN from 'bn.js'
 import fs from 'fs'
 import { stringToU8a, toU8a, u8aConcat, u8aToHex, u8aToNumber } from '../u8a/index.js'
+import { IteratedHash } from '@hoprnet/hopr-core/lib/core_crypto.js'
 
 const log = debug(`hopr-core:db`)
 
@@ -599,10 +600,11 @@ export class HoprDB {
     return present
   }
 
-  async storeHashIntermediaries(channelId: Hash, intermediates: Intermediate[]): Promise<void> {
+  async storeHashIntermediaries(channelId: Hash, intermediates: IteratedHash): Promise<void> {
     let dbBatch = this.db.backend.batch()
 
-    for (const intermediate of intermediates) {
+    for (let i = 0; i < intermediates.count_intermediates(); i++) {
+      let intermediate = intermediates.intermediate(i)
       const u8aKey = createCommitmentKey(channelId, intermediate.iteration)
 
       dbBatch = dbBatch.put(
