@@ -1,6 +1,6 @@
 [package]
 name = "utils-types"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 homepage = "https://hoprnet.org/"
