@@ -21,8 +21,8 @@ import {
   generate_channel_id, BalanceType, PendingAcknowledgement
 } from '../types.js'
 import BN from 'bn.js'
-import { u8aToNumber, u8aConcat, toU8a, stringToU8a, u8aToHex } from '@hoprnet/hopr-utils'
 import fs from 'fs'
+import { stringToU8a, toU8a, u8aConcat, u8aToHex, u8aToNumber } from '../u8a/index.js'
 
 const log = debug(`hopr-core:db`)
 

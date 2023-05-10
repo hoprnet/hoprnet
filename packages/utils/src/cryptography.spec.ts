@@ -15,27 +15,26 @@ import {
 
 import {
   generateKeyShares,
-  Hash,
   iterateHash,
   PRG as TS_PRG,
   PRP as TS_PRP,
   recoverIteratedHash,
-  stringToU8a,
-  u8aEquals,
-  u8aToHex,
-  SECRET_LENGTH,
   createMAC,
   keyShareTransform as forwardTransform,
   derivePacketTag,
   derivePRGParameters,
   derivePRPParameters,
-} from '@hoprnet/hopr-utils'
+} from './crypto/index.js'
+
+import { Hash } from './types/index.js'
 
 import {PublicKey as TsPublicKey, Signature as TsSignature} from './types/index.js'
 
 import assert from 'assert'
 
 import { createSecp256k1PeerId } from '@libp2p/peer-id-factory'
+import { stringToU8a, u8aEquals, u8aToHex } from './u8a/index.js'
+import { SECRET_LENGTH } from './constants.js'
 
 describe('cryptographic correspondence tests', async function () {
   it('digest correspondence', async function () {
