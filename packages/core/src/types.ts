@@ -4,6 +4,7 @@ core_types_set_panic_hook()
 export {
   Acknowledgement,
   AccountEntry,
+  AcknowledgedTicket,
   AcknowledgementChallenge,
   Address,
   Balance,
@@ -12,6 +13,8 @@ export {
   ChannelStatus, HalfKey,
   HalfKeyChallenge,
   Response,
+  Snapshot,
+  EthereumChallenge,
   Ticket,
   U256,
   Hash,

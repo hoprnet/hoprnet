@@ -86,9 +86,16 @@ pub struct Balance {
 impl Balance {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn from_str(value: &str, balance_type: BalanceType) -> Self {
-        Balance {
+        Self {
             value: u256::from_str_radix(value, 10).unwrap(),
             balance_type,
+        }
+    }
+
+    pub fn zero(balance_type: BalanceType) -> Self {
+        Self {
+            value: u256::ZERO,
+            balance_type
         }
     }
 

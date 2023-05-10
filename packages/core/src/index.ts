@@ -24,10 +24,6 @@ import {
 import retimer from 'retimer'
 
 import {
-  type Address,
-  Balance,
-  type ChannelEntry,
-  ChannelStatus,
   convertPubKeyFromPeerId,
   create_counter,
   create_gauge,
@@ -40,9 +36,6 @@ import {
   durations,
   getBackoffRetries,
   getBackoffRetryTimeout,
-  type HalfKeyChallenge,
-  type Hash,
-  type HoprDB,
   isErrorOutOfFunds,
   isMultiaddrLocal,
   isSecp256k1PeerId,
@@ -50,13 +43,15 @@ import {
   libp2pSendMessage,
   MIN_NATIVE_BALANCE,
   NativeBalance,
-  PublicKey,
   registerMetricsCollector,
   retimer as intervalTimer,
   retryWithBackoffThenThrow,
-  type Ticket,
   iterableToArray
 } from '@hoprnet/hopr-utils'
+
+import { Address, ChannelEntry, PublicKey, Ticket, Hash } from './types.js'
+
+import { type HoprDB } from './db/index.js'
 
 import { FULL_VERSION, INTERMEDIATE_HOPS, MAX_HOPS, PACKET_SIZE, VERSION, MAX_PARALLEL_PINGS } from './constants.js'
 

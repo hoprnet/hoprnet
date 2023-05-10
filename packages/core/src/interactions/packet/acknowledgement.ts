@@ -140,7 +140,7 @@ export class AcknowledgementInteraction {
     //    a protocol bug or an attacker
     let pending: PendingAcknowledgement
     try {
-      pending = await this.db.getPendingAcknowledgement(acknowledgement.ackChallenge)
+      pending = await this.db.getPendingAcknowledgement(acknowledgement.ack_challenge())
     } catch (err: any) {
       // Protocol bug?
       if (err != undefined && err.notFound) {

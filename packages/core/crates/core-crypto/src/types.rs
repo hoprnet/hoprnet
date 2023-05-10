@@ -1335,11 +1335,6 @@ pub mod wasm {
             self.to_peerid_str()
         }
 
-        #[wasm_bindgen(js_name = "deserialize")]
-        pub fn _deserialize(data: &[u8]) -> JsResult<HalfKeyChallenge> {
-            ok_or_jserr!(Self::deserialize(data))
-        }
-
         #[wasm_bindgen(js_name = "from_str")]
         pub fn _from_str(str: &str) -> JsResult<HalfKeyChallenge> {
             ok_or_jserr!(Self::from_str(str))
@@ -1348,6 +1343,16 @@ pub mod wasm {
         #[wasm_bindgen(js_name = "from_peerid_str")]
         pub fn _from_peerid_str(peer_id: &str) -> JsResult<HalfKeyChallenge> {
             ok_or_jserr!(Self::from_peerid_str(peer_id))
+        }
+
+        #[wasm_bindgen(js_name = "deserialize")]
+        pub fn _deserialize(data: &[u8]) -> JsResult<HalfKeyChallenge> {
+            ok_or_jserr!(HalfKeyChallenge::deserialize(data))
+        }
+
+        #[wasm_bindgen(js_name = "serialize")]
+        pub fn _serialize(&self) -> Box<[u8]> {
+            self.serialize()
         }
 
         pub fn size() -> u32 {
