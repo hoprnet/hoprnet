@@ -142,7 +142,6 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
       // @ts-ignore
       this.components.getAddressManager().observed = new Set()
 
-      log(`Publishing new list of addresses`, this.getAddrs())
       this.dispatchEvent(new CustomEvent('listening'))
     }.bind(this)
 
@@ -452,6 +451,7 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
       } else {
         switch (err.code) {
           case 'ERR_CONNECTION_INTERCEPTED':
+            error(`inbound connection failed. Node is not registered.`)
             break
           case 'ERR_ENCRYPTION_FAILED':
             error(`inbound connection failed because encryption failed. Maybe connected to the wrong node?`)

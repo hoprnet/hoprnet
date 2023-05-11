@@ -8,7 +8,7 @@ use crate::errors::Result;
 
 /// Implements the Control Message sub-protocol, which currently consists of Ping/Pong
 /// messaging for the HOPR protocol.
-#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum ControlMessage {
     /// Ping challenge
     Ping(PingMessage),
@@ -61,7 +61,7 @@ impl ControlMessage {
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Default, Serialize, Deserialize)]
 pub struct PingMessage {
     nonce: [u8; core_crypto::parameters::PING_PONG_NONCE_SIZE],
 }

@@ -23,7 +23,6 @@
 - Add pruning in the relay connections keep-alive mechanism ([#4916](https://github.com/hoprnet/hoprnet/pull/4916))
 - Enforce closing and clean-up of libp2p2 connections ([#4957](https://github.com/hoprnet/hoprnet/pull/4957))
 - Wipe libp2p's AddressManager cache when publishing new addresses to the DHT ([#4958](https://github.com/hoprnet/hoprnet/pull/4958))
-- Migrate `core_network` wiring logic to Rust ([#4963](https://github.com/hoprnet/hoprnet/pull/4963))
 - Add metrics & logs relevant for RPCh debugging ([#4995](https://github.com/hoprnet/hoprnet/pull/4995))
 - Enhance debug logs in dialing logic to enhance debugging ([#5004](https://github.com/hoprnet/hoprnet/pull/5004))
 - Fix address coercion issue in libp2p address handling ([#5020](https://github.com/hoprnet/hoprnet/pull/5020))

@@ -1,144 +1,76 @@
-use std::cell::RefCell;
-use utils_misc::{
-    streaming_iterable::{JsStreamingIterable, StreamingIterable},
-    traits::DuplexStream,
-};
-
-use crate::messaging::{
-    ControlMessage::{self, Ping},
-    PingMessage,
-};
-use futures::{SinkExt, StreamExt};
-use pin_project_lite::pin_project;
-use utils_log::error;
-use utils_types::traits::BinarySerializable;
-
 /// Configuration of the Heartbeat
-#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct HeartbeatConfig {
     pub max_parallel_heartbeats: usize,
-    pub heartbeat_variance: u32,
+    pub heartbeat_variance: f32,
     pub heartbeat_interval: u32,
     pub heartbeat_threshold: u64,
-    pub environment_id: String,
-    pub normalized_version: String,
 }
 
-impl HeartbeatConfig {
-    pub fn new(
-        max_parallel_heartbeats: usize,
-        heartbeat_variance: u32,
-        heartbeat_interval: u32,
-        heartbeat_threshold: u64,
-        environment_id: String,
-        normalized_version: String,
-    ) -> Self {
-        Self {
-            max_parallel_heartbeats,
-            heartbeat_interval,
-            heartbeat_threshold,
-            heartbeat_variance,
-            environment_id,
-            normalized_version,
-        }
-    }
-}
+#[cfg(feature = "wasm")]
+pub mod wasm {
+    use crate::errors::NetworkingError;
+    use crate::heartbeat::HeartbeatConfig;
+    use crate::messaging::{ControlMessage, ControlMessage::Ping, PingMessage};
+    use futures::stream::{Stream, StreamExt};
+    use js_sys::AsyncIterator;
+    use utils_misc::async_iterable::wasm::{to_box_u8_stream, to_jsvalue_stream};
+    use utils_misc::ok_or_jserr;
+    use utils_misc::utils::wasm::JsResult;
+    use utils_types::traits::BinarySerializable;
+    use wasm_bindgen::prelude::*;
+    use wasm_bindgen_futures::stream::JsStream;
 
-pub struct Heartbeat {
-    ended: RefCell<bool>,
-    config: HeartbeatConfig,
-    protocols: [String; 2],
-}
-
-impl Heartbeat {
-    pub fn new(config: HeartbeatConfig) -> Self {
-        Self {
-            ended: RefCell::new(false),
-            protocols: [
-                // new
-                format!(
-                    "/hopr/{}/heartbeat/{}",
-                    &config.environment_id, &config.normalized_version
-                ),
-                // deprecated
-                format!("/hopr/{}/heartbeat", &config.environment_id),
-            ],
-            config,
-        }
-    }
-
-    pub fn has_ended(&self) -> bool {
-        *self.ended.borrow()
-    }
-
-    pub fn set_ended(&self) -> Result<(), String> {
-        match self.ended.try_borrow_mut() {
-            Ok(mut x) => {
-                *x = true;
-                Ok(())
+    #[wasm_bindgen]
+    impl HeartbeatConfig {
+        #[wasm_bindgen]
+        pub fn build(
+            max_parallel_heartbeats: usize,
+            heartbeat_variance: f32,
+            heartbeat_interval: u32,
+            heartbeat_threshold: u64,
+        ) -> Self {
+            Self {
+                max_parallel_heartbeats,
+                heartbeat_variance,
+                heartbeat_interval,
+                heartbeat_threshold,
             }
-            Err(e) => Err(e.to_string()),
         }
     }
 
-    pub fn get_config(&self) -> HeartbeatConfig {
-        self.config.to_owned()
+    #[wasm_bindgen]
+    pub struct AsyncIterableHelperCoreHeartbeat {
+        stream: Box<dyn Stream<Item = Result<Box<[u8]>, String>> + Unpin>,
     }
 
-    pub fn get_protocols(&self) -> Vec<String> {
-        Vec::from(self.protocols.to_owned())
-    }
-}
-
-pin_project! {
-    pub struct HeartbeatRequest<St> {
-        #[pin]
-        stream: St,
-    }
-}
-
-impl From<JsStreamingIterable> for HeartbeatRequest<StreamingIterable> {
-    fn from(x: JsStreamingIterable) -> Self {
-        Self { stream: x.into() }
-    }
-}
-
-impl<St: DuplexStream> HeartbeatRequest<St> {
-    pub async fn handle(&mut self) -> () {
-        while let Some(msg) = self.stream.next().await {
-            match msg {
-                Ok(msg) => match PingMessage::deserialize(&msg) {
-                    Ok(valid_incoming) => match ControlMessage::generate_pong_response(&Ping(valid_incoming)) {
-                        Ok(response) => match response {
-                            ControlMessage::Ping(_) => continue,
-                            ControlMessage::Pong(x) => match self.stream.send(x.serialize()).await {
-                                Ok(()) => continue,
-                                Err(e) => {
-                                    error!("{}", e);
-                                    break;
-                                }
-                            },
-                        },
-                        Err(e) => {
-                            error!("{}", e);
-                            continue;
-                        }
-                    },
-                    Err(e) => {
-                        error!("{}", e);
-                        continue;
-                    }
-                },
-                Err(e) => {
-                    error!("{}", e);
-                    continue;
-                }
-            };
+    #[wasm_bindgen]
+    impl AsyncIterableHelperCoreHeartbeat {
+        pub async fn next(&mut self) -> JsResult<JsValue> {
+            to_jsvalue_stream(self.stream.as_mut().next().await)
         }
+    }
 
-        match self.stream.close().await {
-            Ok(()) => (),
-            Err(e) => error!("{}", e),
-        };
+    /// Used to pre-compute ping responses
+    #[wasm_bindgen]
+    pub fn generate_ping_response(u8a: &[u8]) -> JsResult<Box<[u8]>> {
+        ok_or_jserr!(PingMessage::deserialize(u8a)
+            .map_err(|_| NetworkingError::DecodingError)
+            .and_then(|req| ControlMessage::generate_pong_response(&Ping(req)))
+            .and_then(|msg| msg.get_ping_message().map(PingMessage::serialize)))
+    }
+
+    #[wasm_bindgen]
+    pub fn reply_to_ping(stream: AsyncIterator) -> JsResult<AsyncIterableHelperCoreHeartbeat> {
+        let stream = JsStream::from(stream).map(to_box_u8_stream).map(|res| {
+            res.and_then(|rq| {
+                generate_ping_response(rq.as_ref()).map_err(|e| e.as_string().unwrap_or("not a string".into()))
+            })
+        });
+
+        Ok(AsyncIterableHelperCoreHeartbeat {
+            stream: Box::new(stream),
+        })
     }
 }
