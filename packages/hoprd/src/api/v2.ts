@@ -21,7 +21,7 @@ import { STATUS_CODES } from './v2/utils.js'
 
 import type { Server } from 'http'
 import type { Application, Request } from 'express'
-import type { WebSocketServer } from 'ws'
+import type { WebSocket, WebSocketServer } from 'ws'
 import type Hopr from '@hoprnet/hopr-core'
 import { SettingKey, StateOps } from '../types.js'
 import type { LogStream } from './../logs.js'
@@ -302,17 +302,39 @@ export function setupWsApi(
     else debugLog('WS client connected [ authentication ENABLED ]')
 
     // upgrade to WS protocol
-    wss.handleUpgrade(req, socket, head, function done(socket_) {
+    wss.handleUpgrade(req, socket, head, (socket_: WebSocket) => {
       wss.emit('connection', socket_, req)
     })
   })
 
-  wss.on('connection', (socket, req) => {
+  wss.on('connection', (socket: WebSocket, req) => {
     debugLog('WS client connected!')
     const path = removeQueryParams(req.url)
 
+    // per-connection tracking of whether the connection is alive using
+    // websocket-native ping/pong
+    // ping messages are sent every 15 seconds
+    let isAlive = true
+
+    const heartbeatReceived = () => (isAlive = true)
+
+    const heartbeatInterval = setInterval(() => {
+      // terminate connection if the previous ping check failed
+      if (isAlive === false) return socket.terminate()
+
+      isAlive = false
+      socket.ping()
+    }, 15000)
+
     socket.on('error', (err: string) => {
       debugLog('WS error', err.toString())
+    })
+
+    // if we receive the pong back, the connection is marked as alive
+    socket.on('pong', heartbeatReceived)
+
+    socket.on('close', () => {
+      clearInterval(heartbeatInterval)
     })
 
     socket.on('message', (data: string) => {

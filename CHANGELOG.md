@@ -27,6 +27,8 @@
 - Add metrics & logs relevant for RPCh debugging ([#4995](https://github.com/hoprnet/hoprnet/pull/4995))
 - Enhance debug logs in dialing logic to enhance debugging ([#5004](https://github.com/hoprnet/hoprnet/pull/5004))
 - Fix address coercion issue in libp2p address handling ([#5020](https://github.com/hoprnet/hoprnet/pull/5020))
+- Ensure public relay nodes don't create relay connections ([#5023](https://github.com/hoprnet/hoprnet/pull/5023))
+- Add heartbeat and cleanup to API websocket connections ([#5023](https://github.com/hoprnet/hoprnet/pull/5023))
 - Add send message over websocket support ([#4882](https://github.com/hoprnet/hoprnet/pull/4882))
 
 <a name="1.92"></a>
