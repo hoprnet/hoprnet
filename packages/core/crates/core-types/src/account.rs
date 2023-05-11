@@ -110,10 +110,10 @@ impl Display for AccountEntry {
 impl BinarySerializable<'_> for AccountEntry {
     const SIZE: usize = PublicKey::SIZE_UNCOMPRESSED + Self::MA_LENGTH_PREFIX + Self::MAX_MULTI_ADDR_LENGTH + 4;
 
-    fn deserialize(data: &[u8]) -> utils_types::errors::Result<Self> {
+    fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
             let mut buf = data.to_vec();
-            let public_key = PublicKey::deserialize(buf.drain(..PublicKey::SIZE_UNCOMPRESSED).as_ref())?;
+            let public_key = PublicKey::from_bytes(buf.drain(..PublicKey::SIZE_UNCOMPRESSED).as_ref())?;
             let ma_len = u32::from_be_bytes(buf.drain(..Self::MA_LENGTH_PREFIX).as_ref().try_into().unwrap()) as usize;
             let entry_type = if ma_len > 0 {
                 let multiaddr =
@@ -134,9 +134,9 @@ impl BinarySerializable<'_> for AccountEntry {
         }
     }
 
-    fn serialize(&self) -> Box<[u8]> {
+    fn to_bytes(&self) -> Box<[u8]> {
         let mut ret = Vec::with_capacity(Self::SIZE);
-        ret.extend_from_slice(&self.public_key.serialize(false));
+        ret.extend_from_slice(&self.public_key.to_bytes(false));
 
         match &self.entry_type {
             NotAnnounced => {
@@ -190,7 +190,7 @@ mod test {
         assert_eq!(1, ae1.updated_at().unwrap());
         assert!(!ae1.contains_routing_info());
 
-        let ae2 = AccountEntry::deserialize(&ae1.serialize()).unwrap();
+        let ae2 = AccountEntry::from_bytes(&ae1.to_bytes()).unwrap();
         assert_eq!(ae1, ae2);
     }
 
@@ -212,7 +212,7 @@ mod test {
         assert_eq!(1, ae1.updated_at().unwrap());
         assert!(ae1.contains_routing_info());
 
-        let ae2 = AccountEntry::deserialize(&ae1.serialize()).unwrap();
+        let ae2 = AccountEntry::from_bytes(&ae1.to_bytes()).unwrap();
         assert_eq!(ae1, ae2);
     }
 
@@ -226,7 +226,7 @@ mod test {
         assert!(ae1.updated_at().is_none());
         assert!(!ae1.contains_routing_info());
 
-        let ae2 = AccountEntry::deserialize(&ae1.serialize()).unwrap();
+        let ae2 = AccountEntry::from_bytes(&ae1.to_bytes()).unwrap();
         assert_eq!(ae1, ae2);
     }
 }
@@ -269,12 +269,12 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "serialize")]
         pub fn _serialize(&self) -> Box<[u8]> {
-            self.serialize()
+            self.to_bytes()
         }
 
         #[wasm_bindgen(js_name = "deserialize")]
         pub fn _deserialize(data: &[u8]) -> JsResult<AccountEntry> {
-            ok_or_jserr!(Self::deserialize(data))
+            ok_or_jserr!(Self::from_bytes(data))
         }
 
         #[wasm_bindgen(js_name = "clone")]
