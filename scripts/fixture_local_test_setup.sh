@@ -10,7 +10,7 @@ set -Eeuo pipefail
 # set log id and use shared log function for readable logs
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
-declare HOPR_LOG_ID="e2e-source-test"
+declare HOPR_LOG_ID="smoke-fixture-setup"
 
 source "${mydir}/testnet.sh"
 source "${mydir}/utils.sh"
@@ -64,7 +64,7 @@ fi
 # find usable tmp dir
 declare tmp="$(find_tmp_dir)"
 
-declare node_prefix="hopr-source-node"
+declare node_prefix="hopr-smoke-test-node"
 
 declare node1_dir="${tmp}/${node_prefix}-1"
 declare node2_dir="${tmp}/${node_prefix}-2"
@@ -100,8 +100,8 @@ declare node7_privkey="0x9b813edd8a85cffbe3cd2e242dc0992cfa04be15caa9f50b0b03b5e
 
 declare password="e2e-test"
 
-declare anvil_rpc_log="${tmp}/hopr-source-anvil-rpc.log"
-declare anvil_cfg_file="${tmp}/hopr-source-anvil.cfg"
+declare anvil_rpc_log="${tmp}/hopr-smoke-test-anvil-rpc.log"
+declare anvil_cfg_file="${tmp}/hopr-smoke-test-anvil.cfg"
 
 # anvil port
 declare -a all_ports=( 8545 )
@@ -316,7 +316,7 @@ wait_for_regex ${node7_log} "please fund this node"
 log "Funding nodes"
 #  --- Fund nodes --- {{{
 make -C "${mydir}/../" fund-local-all \
-  id_password="${password}" id_prefix="${node_prefix}"
+  id_password="${password}" id_prefix="${node_prefix}" id_dir="${tmp}"
 # }}}
 
 log "Waiting for port binding"
@@ -342,4 +342,3 @@ done
 # }}}
 
 log "All nodes came up online"
-

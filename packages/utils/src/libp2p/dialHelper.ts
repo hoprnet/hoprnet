@@ -26,7 +26,7 @@ const CODE_P2P = maProtocols('p2p').code
 const log = debug(DEBUG_PREFIX)
 const error = debug(DEBUG_PREFIX.concat(`:error`))
 
-const DEFAULT_DHT_QUERY_TIMEOUT = 20000
+const DEFAULT_DHT_QUERY_TIMEOUT = 15000
 
 // Current types do not expose `dialer` property
 type MyConnectionManager = ConnectionManager & { dialer: Dialer }
@@ -263,6 +263,7 @@ async function* queryDHT(components: Components, destination: PeerId): AsyncIter
 
   try {
     for await (const dhtResult of components.getContentRouting().findProviders(key as any, options)) {
+      log(`Found DHT entry ${dhtResult.id.toString()}`)
       yield dhtResult.id
     }
   } catch (err) {
