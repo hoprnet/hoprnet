@@ -25,4 +25,4 @@ waiting==1.4.1
 websocket-client==1.5.1
 pytest-asyncio==0.21.0
 ruff==0.0.261
-./wrappers/python/
+hoprd @ git+https://github.com/hoprnet/hoprd-api-python.git@main
