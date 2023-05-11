@@ -51,7 +51,7 @@
       "blockNumber": "0x1a9843a",
       "from": "0x4fF4e61052a4DFb1bE72866aB711AE08DD861976",
       "to": "0x2Fc87247085F4658ADB698cDbF4d732c704f1e06",
-      "cumulativeGasUsed": "0xfc8f2",
+      "cumulativeGasUsed": "0x1fe93d",
       "gasUsed": "0xfc8f2",
       "contractAddress": null,
       "logs": [
@@ -278,6 +278,38 @@
           "transactionHash": "0xe70ef0e60543ab4915ed42688776ded37de83b8b6892743ab204f571b11f0f83",
           "transactionIndex": "0x1",
           "logIndex": "0xc",
+          "removed": false
+        },
+        {
+          "address": "0x2Fc87247085F4658ADB698cDbF4d732c704f1e06",
+          "topics": [
+            "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+            "0x0000000000000000000000000000000000000000000000000000000000000000",
+            "0x0000000000000000000000002402da10a6172ed018aeea22ca60ede1f766655c",
+            "0x000000000000000000000000000000000000000000000000000000000000068f"
+          ],
+          "data": "0x",
+          "blockHash": "0xf257a217e99f3646a57ffa285dcdc3bfdd0ba82747ef2b48044d7a3b4790591f",
+          "blockNumber": "0x1a984f9",
+          "transactionHash": "0x8eee5eee372e20356162d14f0cec21f674e164a691a3b0598f7cf4b78a4b8976",
+          "transactionIndex": "0x4",
+          "logIndex": "0xd",
+          "removed": false
+        },
+        {
+          "address": "0x2Fc87247085F4658ADB698cDbF4d732c704f1e06",
+          "topics": [
+            "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+            "0x0000000000000000000000000000000000000000000000000000000000000000",
+            "0x0000000000000000000000002402da10a6172ed018aeea22ca60ede1f766655c",
+            "0x0000000000000000000000000000000000000000000000000000000000000690"
+          ],
+          "data": "0x",
+          "blockHash": "0xf257a217e99f3646a57ffa285dcdc3bfdd0ba82747ef2b48044d7a3b4790591f",
+          "blockNumber": "0x1a984f9",
+          "transactionHash": "0x8eee5eee372e20356162d14f0cec21f674e164a691a3b0598f7cf4b78a4b8976",
+          "transactionIndex": "0x4",
+          "logIndex": "0xe",
           "removed": false
         },
         {
