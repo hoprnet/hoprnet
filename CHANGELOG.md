@@ -29,6 +29,7 @@
 - Ensure public relay nodes don't create relay connections ([#5023](https://github.com/hoprnet/hoprnet/pull/5023))
 - Add heartbeat and cleanup to API websocket connections ([#5023](https://github.com/hoprnet/hoprnet/pull/5023))
 - Add send message over websocket support ([#4882](https://github.com/hoprnet/hoprnet/pull/4882))
+- Increase Avado memory limit to 2GB ([#5051](https://github.com/hoprnet/hoprnet/pull/5051))
 
 <a name="1.92"></a>
 
