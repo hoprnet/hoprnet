@@ -411,6 +411,15 @@ struct CliArgs {
     pub test_no_webrtc_upgrade: bool,
 
     #[arg(
+        long = "noRelay",
+        help = "disable NAT relay functionality entirely",
+        env = "HOPRD_NO_RELAY",
+        default_value_t = false,
+        action = ArgAction::SetTrue,
+    )]
+    pub no_relay: bool,
+
+    #[arg(
         long = "testLocalModeStun",
         help = "Transport testing: use full-featured STUN with local addresses",
         env = "HOPRD_TEST_LOCAL_MODE_STUN",
