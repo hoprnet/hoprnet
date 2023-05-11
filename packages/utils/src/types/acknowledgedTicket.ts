@@ -28,7 +28,10 @@ export class AcknowledgedTicket {
   }
 
   public verify(ticketIssuer: PublicKey): boolean {
-    const check1 = validatePoRResponse(EthereumChallenge.deserialize(this.ticket.challenge.serialize()), Response.deserialize(this.response.serialize()))
+    const check1 = validatePoRResponse(
+      EthereumChallenge.deserialize(this.ticket.challenge.serialize()),
+      Response.deserialize(this.response.serialize())
+    )
     const check2 = this.ticket.verify(ticketIssuer)
     return check1 && check2
   }

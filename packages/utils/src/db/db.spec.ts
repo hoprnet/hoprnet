@@ -16,7 +16,8 @@ import {
   ChannelEntry,
   PublicKey,
   Address,
-  Snapshot, ChannelStatus
+  Snapshot,
+  ChannelStatus
 } from '../types.js'
 import BN from 'bn.js'
 import { SECP256K1_CONSTANTS } from '../crypto/index.js'
@@ -24,7 +25,8 @@ import { stringToU8a, u8aEquals } from '../u8a/index.js'
 
 const TestingSnapshot = new Snapshot(U256.zero(), U256.zero(), U256.zero())
 
-const MOCK_PUBLIC_KEY = () => PublicKey.deserialize(stringToU8a('0x021464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8'))
+const MOCK_PUBLIC_KEY = () =>
+  PublicKey.deserialize(stringToU8a('0x021464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8'))
 
 const MOCK_ADDRESS = () => Address.from_string('Cf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9')
 

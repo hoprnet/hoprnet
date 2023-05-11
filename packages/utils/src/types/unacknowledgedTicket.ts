@@ -28,7 +28,11 @@ export class UnacknowledgedTicket {
   }
 
   public verifyChallenge(acknowledgement: TSHalfKey): boolean {
-    return validatePoRHalfKeys(EthereumChallenge.deserialize(this.ticket.challenge.serialize()), HalfKey.deserialize(this.ownKey.serialize()), HalfKey.deserialize(acknowledgement.serialize()))
+    return validatePoRHalfKeys(
+      EthereumChallenge.deserialize(this.ticket.challenge.serialize()),
+      HalfKey.deserialize(this.ownKey.serialize()),
+      HalfKey.deserialize(acknowledgement.serialize())
+    )
   }
 
   public verifySignature(): boolean {

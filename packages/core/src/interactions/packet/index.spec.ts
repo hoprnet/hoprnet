@@ -22,7 +22,7 @@ import {
   PRICE_PER_PACKET,
   Snapshot
 } from '@hoprnet/hopr-utils'
-import {AcknowledgementChallenge, Acknowledgement } from '../../types.js'
+import { AcknowledgementChallenge, Acknowledgement } from '../../types.js'
 import type { HalfKeyChallenge } from '@hoprnet/hopr-utils'
 import assert from 'assert'
 import { Packet } from '../../messages/index.js'

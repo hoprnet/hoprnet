@@ -27,8 +27,9 @@ export {
   Hash,
   PublicKey,
   PendingAcknowledgement,
-  Signature, ethereum_signed_hash, generate_channel_id,
+  Signature,
+  ethereum_signed_hash,
+  generate_channel_id,
   UnacknowledgedTicket,
   channel_status_to_string
 } from '../../core/lib/core_types.js'
-

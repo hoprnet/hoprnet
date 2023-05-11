@@ -30,12 +30,12 @@ import {
   keyShareTransform as forwardTransform,
   derivePacketTag,
   derivePRGParameters,
-  derivePRPParameters,
+  derivePRPParameters
 } from './crypto/index.js'
 
 import { Hash } from './types/index.js'
 
-import {PublicKey as TsPublicKey, Signature as TsSignature} from './types/index.js'
+import { PublicKey as TsPublicKey, Signature as TsSignature } from './types/index.js'
 
 import assert from 'assert'
 
@@ -191,9 +191,11 @@ describe('cryptographic correspondence tests', async function () {
     }
   })
 
-  it('secp256k1 public key correspondence', async function() {
+  it('secp256k1 public key correspondence', async function () {
     let ts_pub = TsPublicKey.fromPrivKeyString('0x492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775')
-    let rs_pub = PublicKey.from_privkey(stringToU8a('0x492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775'))
+    let rs_pub = PublicKey.from_privkey(
+      stringToU8a('0x492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775')
+    )
     assert(u8aEquals(ts_pub.serializeCompressed(), rs_pub.serialize(true)))
     assert(u8aEquals(ts_pub.serializeUncompressed(), rs_pub.serialize(false)))
     assert.equal(
@@ -206,7 +208,7 @@ describe('cryptographic correspondence tests', async function () {
     )
   })
 
-  it('signature correspondence tests', async function() {
+  it('signature correspondence tests', async function () {
     let priv_key = stringToU8a('0x492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775')
     let rs_pub = PublicKey.from_privkey(priv_key)
     let message = Hash.create(stringToU8a('0xdeadbeefcafebabe')).serialize()

@@ -9,7 +9,8 @@ import {
   ALICE_PEER_ID,
   ALICE_NATIVE_ADDR,
   BOB_PEER_ID,
-  INVALID_PEER_ID, channelEntryCreateMock
+  INVALID_PEER_ID,
+  channelEntryCreateMock
 } from '../../../../fixtures.js'
 import { getChannel, closeChannel } from './index.js'
 import { formatIncomingChannel, formatOutgoingChannel } from '../../index.js'

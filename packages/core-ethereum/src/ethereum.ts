@@ -648,7 +648,11 @@ export async function createChainWrapper(
     ackTicket: AcknowledgedTicket,
     txHandler: (tx: string) => DeferType<string>
   ): Promise<Receipt> => {
-    log('Redeeming ticket for challenge %s in channel to %s', ackTicket.ticket.challenge.to_hex(), counterparty.to_hex())
+    log(
+      'Redeeming ticket for challenge %s in channel to %s',
+      ackTicket.ticket.challenge.to_hex(),
+      counterparty.to_hex()
+    )
 
     let sendResult: SendTransactionReturn
     let error: unknown

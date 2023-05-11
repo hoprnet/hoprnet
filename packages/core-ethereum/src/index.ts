@@ -354,8 +354,7 @@ export default class HoprCoreEthereum extends EventEmitter {
         if (ticket != undefined && ticket.ticket.index.eq(tickets[0].ticket.index)) {
           // @TODO handle errors
           log(
-            `Could not redeem ticket with index ${ticket.ticket.index
-              .to_string()} in channel ${channelId.to_hex()}. Giving up.`
+            `Could not redeem ticket with index ${ticket.ticket.index.to_string()} in channel ${channelId.to_hex()}. Giving up.`
           )
           break
         }

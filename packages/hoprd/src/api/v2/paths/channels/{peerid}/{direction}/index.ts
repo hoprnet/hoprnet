@@ -41,7 +41,10 @@ export async function closeChannel(
     throw Error(STATUS_CODES.INVALID_PEERID)
   }
 
-  const channelId = generate_channel_id(node.getEthereumAddress(), PublicKey.from_peerid_str(peerId.toString()).to_address())
+  const channelId = generate_channel_id(
+    node.getEthereumAddress(),
+    PublicKey.from_peerid_str(peerId.toString()).to_address()
+  )
 
   let closingRequest = closingRequests.get(channelId.to_hex())
   if (closingRequest == null) {

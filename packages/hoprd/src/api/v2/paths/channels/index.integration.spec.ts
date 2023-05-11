@@ -8,7 +8,8 @@ import {
   BOB_PEER_ID,
   CHARLIE_PEER_ID,
   ALICE_NATIVE_ADDR,
-  INVALID_PEER_ID, channelEntryCreateMock
+  INVALID_PEER_ID,
+  channelEntryCreateMock
 } from '../../fixtures.js'
 import { Balance, ChannelEntry, BalanceType, PublicKey, U256, Hash, ChannelStatus } from '@hoprnet/hopr-utils'
 

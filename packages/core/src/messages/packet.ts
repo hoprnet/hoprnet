@@ -76,7 +76,12 @@ export async function createTicket(
 
   const channel = await db.getChannelTo(dest)
   const currentTicketIndex = await bumpTicketIndex(channel.get_id(), db)
-  const amount = new Balance(PRICE_PER_PACKET.mul(INVERSE_TICKET_WIN_PROB).muln(pathLength - 1).toString(10), BalanceType.HOPR)
+  const amount = new Balance(
+    PRICE_PER_PACKET.mul(INVERSE_TICKET_WIN_PROB)
+      .muln(pathLength - 1)
+      .toString(10),
+    BalanceType.HOPR
+  )
   const winProb = new BN(INVERSE_TICKET_WIN_PROB)
 
   /*
@@ -87,15 +92,15 @@ export async function createTicket(
   const outstandingTicketBalance = await db.getPendingBalanceTo(dest.to_address())
   const balance = channel.balance.sub(outstandingTicketBalance)
   log(
-    `balances ${channel.balance.to_formatted_string()} - ${outstandingTicketBalance.to_formatted_string()} = ${
-      balance.to_formatted_string()} should >= ${amount.to_formatted_string()} in channel open to ${
+    `balances ${channel.balance.to_formatted_string()} - ${outstandingTicketBalance.to_formatted_string()} = ${balance.to_formatted_string()} should >= ${amount.to_formatted_string()} in channel open to ${
       !channel.destination ? '' : channel.destination.toString()
     }`
   )
   if (balance.lt(amount)) {
     throw Error(
       `We don't have enough funds in channel ${channel
-        .get_id().to_hex()} with counterparty ${dest.toString()} to create ticket`
+        .get_id()
+        .to_hex()} with counterparty ${dest.toString()} to create ticket`
     )
   }
 
@@ -338,7 +343,11 @@ export class Packet {
       arr = preArray
     }
 
-    const [packet, preChallenge, preTicket] = u8aSplit(arr, [PACKET_LENGTH, AcknowledgementChallenge.size(), Ticket.size()])
+    const [packet, preChallenge, preTicket] = u8aSplit(arr, [
+      PACKET_LENGTH,
+      AcknowledgementChallenge.size(),
+      Ticket.size()
+    ])
 
     const transformedOutput = forwardTransform(privKey, packet, POR_STRING_LENGTH, 0, INTERMEDIATE_HOPS + 1)
 
@@ -452,7 +461,10 @@ export class Packet {
 
     const nextPeer = PublicKey.deserialize(this.nextHop)
 
-    const pathPosition = this.ticket.get_path_position(new U256(PRICE_PER_PACKET.toString(10)), new U256(INVERSE_TICKET_WIN_PROB.toString(10)))
+    const pathPosition = this.ticket.get_path_position(
+      new U256(PRICE_PER_PACKET.toString(10)),
+      new U256(INVERSE_TICKET_WIN_PROB.toString(10))
+    )
     if (pathPosition == 1) {
       this.ticket = createZeroHopTicket(nextPeer, this.nextChallenge, privKey)
     } else {

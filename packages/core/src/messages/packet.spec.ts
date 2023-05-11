@@ -1,4 +1,4 @@
-import { HoprDB, U256, u8aEquals, Balance,BalanceType,  u8aToHex } from '@hoprnet/hopr-utils'
+import { HoprDB, U256, u8aEquals, Balance, BalanceType, u8aToHex } from '@hoprnet/hopr-utils'
 import { PRICE_PER_PACKET } from '@hoprnet/hopr-utils'
 import { Packet, INTERMEDIATE_HOPS } from './packet.js'
 import { createSecp256k1PeerId } from '@libp2p/peer-id-factory'

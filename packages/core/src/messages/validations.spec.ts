@@ -3,7 +3,16 @@ import BN from 'bn.js'
 import { peerIdFromString } from '@libp2p/peer-id'
 import chaiAsPromised from 'chai-as-promised'
 import chai, { expect } from 'chai'
-import { Address, Balance, BalanceType, PublicKey, U256, Ticket, ChannelEntry, ChannelStatus } from '@hoprnet/hopr-utils'
+import {
+  Address,
+  Balance,
+  BalanceType,
+  PublicKey,
+  U256,
+  Ticket,
+  ChannelEntry,
+  ChannelStatus
+} from '@hoprnet/hopr-utils'
 import { validateUnacknowledgedTicket } from './index.js'
 import { PeerId } from '@libp2p/interface-peer-id'
 
@@ -56,7 +65,7 @@ const mockChannelEntry = (
       TARGET_PUBKEY(),
       TARGET_PUBKEY(),
       balance,
-      Hash.create([stringToU8a("0xdeadbeef")]),
+      Hash.create([stringToU8a('0xdeadbeef')]),
       ticketEpoch,
       ticketIndex,
       isChannelOpen ? ChannelStatus.Open : ChannelStatus.Closed,
@@ -179,12 +188,7 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
 
   it("should not throw if ticket's index is smaller than the last ticket index", async function () {
     const signedTicket = createMockTicket({})
-    const mockChannel = await mockChannelEntry(
-      true,
-      new Balance('100', BalanceType.HOPR),
-      new U256('1'),
-      new U256('2')
-    )
+    const mockChannel = await mockChannelEntry(true, new Balance('100', BalanceType.HOPR), new U256('1'), new U256('2'))
 
     return expect(
       validateUnacknowledgedTicket(SENDER, new BN(1), new BN(1), signedTicket, mockChannel, getTicketsMock, true)
@@ -193,12 +197,7 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
 
   it("should not throw if ticket's index is smaller than the last ticket index when you include unredeemed tickets", async function () {
     const signedTicket = createMockTicket({})
-    const mockChannel = await mockChannelEntry(
-      true,
-      new Balance('200', BalanceType.HOPR),
-      U256.one(),
-      U256.one()
-    )
+    const mockChannel = await mockChannelEntry(true, new Balance('200', BalanceType.HOPR), U256.one(), U256.one())
     const ticketsInDb = [
       createMockTicket({
         amount: new Balance('100', BalanceType.HOPR),

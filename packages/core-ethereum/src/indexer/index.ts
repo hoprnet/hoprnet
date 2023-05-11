@@ -28,7 +28,8 @@ import {
   create_counter,
   create_multi_counter,
   create_gauge,
-  create_multi_gauge, U256
+  create_multi_gauge,
+  U256
 } from '@hoprnet/hopr-utils'
 
 import type { ChainWrapper } from '../ethereum.js'
@@ -1019,7 +1020,9 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     const result: { id: PeerId; multiaddrs: Multiaddr[] }[] = []
     let out = `Known public nodes:\n`
 
-    for await (const account of this.db.getAccountsIterable((account: AccountEntry) => account.contains_routing_info())) {
+    for await (const account of this.db.getAccountsIterable((account: AccountEntry) =>
+      account.contains_routing_info()
+    )) {
       out += `  - ${account.get_peer_id_str()} ${account.get_multiaddress_str()}\n`
       result.push({
         id: peerIdFromString(account.get_peer_id_str()),
