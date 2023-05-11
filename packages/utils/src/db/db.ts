@@ -264,22 +264,13 @@ export class LevelDb {
     }
   }
 
-  /**
-   * Gets a elements from the database of a kind.
-   * Optionally applies `filter`then `map` then `sort` to the result.
-   * @param range.prefix key prefix, such as `channels-`
-   * @param range.suffixLength length of the appended identifier to distinguish elements
-   * @param deserialize function to parse serialized objects
-   * @param filter [optional] filter deserialized objects
-   * @param map [optional] transform deserialized and filtered objects
-   * @param sorter [optional] sort deserialized, filtered and transformed objects
-   * @returns a Promises that resolves with the found elements
-   */
-  public async *iterValues(prefix: Uint8Array, suffixLength: number): AsyncIterable<Uint8Array> {
+  public iterValues(prefix: Uint8Array, suffixLength: number): AsyncIterable<Uint8Array> {
+    return this.iter(prefix, suffixLength)
+  }
+
+  protected async *iter(prefix: Uint8Array, suffixLength: number): AsyncIterable<Uint8Array> {
     const firstPrefixed = u8aConcat(prefix, new Uint8Array(suffixLength).fill(0x00))
     const lastPrefixed = u8aConcat(prefix, new Uint8Array(suffixLength).fill(0xff))
-
-    console.log("========++++> Got here: ")
 
     for await (const [_key, chunk] of this.backend.iterator({
       gte: Buffer.from(firstPrefixed.buffer, firstPrefixed.byteOffset, firstPrefixed.byteLength),
@@ -287,8 +278,6 @@ export class LevelDb {
       keys: false
     }) as any) {
       const obj: Uint8Array = new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.byteLength)
-
-      console.log("========++++> Getting a value: " + JSON.stringify(obj))
 
       yield obj
     }

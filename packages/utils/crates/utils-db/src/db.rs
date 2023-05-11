@@ -132,8 +132,20 @@ impl<T: BinaryAsyncKVStorage> DB<T> {
         }
     }
 
-    // async fn getMulti<V: Serialize + DeserializeOwned>(&self, prefix: Box<[u8]>, suffix_size: u32, filter: Box<dyn Fn(&V) -> bool>) -> Result<Vec<V>> {
-    //     self.backend.iterate(prefix, suffix_size, Box::new(move |v: Box<[u8]>| { (*filter)(v.deserialize::<V()) })).unwrap_or(Vec::new())
+    // async fn get_more<V: Serialize + DeserializeOwned>(&self, prefix: Box<[u8]>, suffix_size: u32, filter: Box<dyn Fn(&V) -> bool>) -> Result<Vec<V>> {
+    //     let data = self.backend.get_more(prefix, suffix_size, Box::new(move |v| {
+    //         let value = bincode::deserialize::<V>(v.as_ref())
+    //             .map_err(|e| DbError::DeserializationError(e.to_string()));
+    //         if value.is_ok() {
+    //             (*filter)(&value.unwrap())
+    //         } else {
+    //             utils_log::error!("Error deserializing in iteration over keys: {}", value.err().unwrap().to_string());
+    //             false
+    //         }
+    //     })).await?;
+    //
+    //     data.into_iter()
+    //         .map(|v| bincode::deserialize::<V>(v.as_ref()))
     // }
 
     pub async fn batch(&mut self, batch: Batch, wait_for_write: bool) -> Result<()> {

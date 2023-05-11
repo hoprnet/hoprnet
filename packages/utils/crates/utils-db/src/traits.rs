@@ -49,7 +49,7 @@ pub trait AsyncKVStorage {
 
     async fn dump(&self, destination: String) -> Result<()>;
 
-    async fn getMore(&self, prefix: Self::Key, suffix_size: u32, filter: Box<dyn Fn(Self::Key) -> bool>) -> Result<Vec<Self::Value>>;
+    async fn get_more(&self, prefix: Self::Key, suffix_size: u32, filter: Box<dyn Fn(Self::Key) -> bool>) -> Result<Vec<Self::Value>>;
 
     async fn batch(
         &mut self,
