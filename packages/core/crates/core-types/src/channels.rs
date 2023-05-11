@@ -1,9 +1,9 @@
+use core_crypto::errors::CryptoError::SignatureVerification;
 use core_crypto::types::{Challenge, Hash, PublicKey, Response, Signature};
 use enum_iterator::{all, Sequence};
 use ethnum::u256;
 use serde_repr::*;
 use std::ops::{Div, Mul, Sub};
-use core_crypto::errors::CryptoError::SignatureVerification;
 use utils_types::errors::{GeneralError::ParseError, Result};
 use utils_types::primitives::{Address, Balance, BalanceType, EthereumChallenge, U256};
 
@@ -70,20 +70,19 @@ impl ChannelEntry {
     /// Checks if the closure time of this channel has passed.
     pub fn closure_time_passed(&self) -> Option<bool> {
         let now_seconds = current_timestamp() / 1000;
-        (!self.closure_time.eq(&U256::zero()))
-            .then(|| self.closure_time.value().lt(&u256::from(now_seconds)))
+        (!self.closure_time.eq(&U256::zero())).then(|| self.closure_time.value().lt(&u256::from(now_seconds)))
     }
 
     /// Calculates the remaining channel closure grace period.
     pub fn remaining_closure_time(&self) -> Option<u64> {
         let now_seconds = u256::from(current_timestamp() / 1000);
-        (!self.closure_time.eq(&U256::zero())).then(||
+        (!self.closure_time.eq(&U256::zero())).then(|| {
             if now_seconds.ge(self.closure_time.value()) {
                 now_seconds.sub(self.closure_time.value()).as_u64()
             } else {
                 0
             }
-        )
+        })
     }
 }
 
@@ -231,7 +230,10 @@ impl Ticket {
 
     /// Signs the ticket using the given private key.
     pub fn sign(&mut self, signing_key: &[u8]) {
-        self.signature = Some(Signature::sign_message(&<Hash as BinarySerializable>::serialize(&self.get_hash()), signing_key));
+        self.signature = Some(Signature::sign_message(
+            &<Hash as BinarySerializable>::serialize(&self.get_hash()),
+            signing_key,
+        ));
     }
 
     /// Convenience method for creating a zero-hop ticket
@@ -329,10 +331,7 @@ impl BinarySerializable<'_> for Ticket {
 
     fn serialize(&self) -> Box<[u8]> {
         let mut unsigned = self.serialize_unsigned().into_vec();
-        unsigned.extend_from_slice(&self.signature
-            .as_ref()
-            .expect("ticket not signed")
-            .serialize());
+        unsigned.extend_from_slice(&self.signature.as_ref().expect("ticket not signed").serialize());
         unsigned.into_boxed_slice()
     }
 }
@@ -341,17 +340,17 @@ impl Ticket {
     /// Recovers the signer public key from the embedded ticket signature.
     /// This is possible due this specific instantiation of the ECDSA over the secp256k1 curve.
     pub fn recover_signer(&self) -> core_crypto::errors::Result<PublicKey> {
-        PublicKey::from_signature(&self.get_hash().serialize(),
-                              self.signature.as_ref().expect("ticket not signed"))
+        PublicKey::from_signature(
+            &self.get_hash().serialize(),
+            self.signature.as_ref().expect("ticket not signed"),
+        )
     }
 
     /// Verifies the signature of this ticket.
     /// The operation can fail if a public key cannot be recovered from the ticket signature.
     pub fn verify(&self, public_key: &PublicKey) -> core_crypto::errors::Result<()> {
         let recovered = self.recover_signer()?;
-        recovered.eq(public_key)
-            .then(||())
-            .ok_or(SignatureVerification)
+        recovered.eq(public_key).then(|| ()).ok_or(SignatureVerification)
     }
 }
 
@@ -363,7 +362,7 @@ pub mod tests {
     use utils_types::primitives::{Address, Balance, BalanceType, U256};
     use utils_types::traits::BinarySerializable;
 
-    use crate::channels::{ChannelEntry, ChannelStatus, ethereum_signed_hash, Ticket};
+    use crate::channels::{ethereum_signed_hash, ChannelEntry, ChannelStatus, Ticket};
 
     const PUBLIC_KEY_1: [u8; 65] = hex!("0443a3958ac66a3b2ab89fcf90bc948a8b8be0e0478d21574d077ddeb11f4b1e9f2ca21d90bd66cee037255480a514b91afae89e20f7f7fa7353891cc90a52bf6e");
     const PUBLIC_KEY_2: [u8; 65] = hex!("04f16fd6701aea01032716377d52d8213497c118f99cdd1c3c621b2795cac8681606b7221f32a8c5d2ef77aa783bec8d96c11480acccabba9e8ee324ae2dfe92bb");
@@ -522,7 +521,9 @@ pub mod wasm {
         }
 
         #[wasm_bindgen(js_name = "eq")]
-        pub fn _eq(&self, other: &ChannelEntry) -> bool { self.eq(other) }
+        pub fn _eq(&self, other: &ChannelEntry) -> bool {
+            self.eq(other)
+        }
 
         #[wasm_bindgen(js_name = "clone")]
         pub fn _clone(&self) -> Self {
@@ -564,7 +565,6 @@ pub mod wasm {
             ok_or_jserr!(self.recover_signer())
         }
 
-
         #[wasm_bindgen(js_name = "verify")]
         pub fn _verify(&self, public_key: &PublicKey) -> JsResult<bool> {
             ok_or_jserr!(self.verify(public_key).map(|_| true))
@@ -586,7 +586,9 @@ pub mod wasm {
         }
 
         #[wasm_bindgen(js_name = "eq")]
-        pub fn _eq(&self, other: &Ticket) -> bool { self.eq(other) }
+        pub fn _eq(&self, other: &Ticket) -> bool {
+            self.eq(other)
+        }
 
         #[wasm_bindgen(js_name = "clone")]
         pub fn _clone(&self) -> Self {

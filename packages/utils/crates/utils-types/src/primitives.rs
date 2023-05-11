@@ -102,7 +102,7 @@ impl Balance {
     pub fn zero(balance_type: BalanceType) -> Self {
         Self {
             value: u256::ZERO,
-            balance_type
+            balance_type,
         }
     }
 
@@ -519,7 +519,9 @@ pub mod wasm {
             self.clone()
         }
 
-        pub fn size() -> u32 { Self::SIZE as u32 }
+        pub fn size() -> u32 {
+            Self::SIZE as u32
+        }
     }
 
     #[wasm_bindgen]
@@ -544,7 +546,9 @@ pub mod wasm {
             self.clone()
         }
 
-        pub fn size() -> u32 { Self::SIZE as u32 }
+        pub fn size() -> u32 {
+            Self::SIZE as u32
+        }
     }
 
     #[wasm_bindgen]
@@ -574,7 +578,9 @@ pub mod wasm {
             self.clone()
         }
 
-        pub fn size() -> u32 { Self::SIZE as u32 }
+        pub fn size() -> u32 {
+            Self::SIZE as u32
+        }
     }
 
     #[wasm_bindgen]
@@ -594,7 +600,9 @@ pub mod wasm {
             self.clone()
         }
 
-        pub fn size() -> u32 { Self::SIZE as u32 }
+        pub fn size() -> u32 {
+            Self::SIZE as u32
+        }
     }
 
     #[wasm_bindgen]
@@ -621,7 +629,7 @@ pub mod wasm {
 
         pub fn addn(&self, amount: u32) -> Self {
             Self {
-                value: self.value().add(u256::from(amount))
+                value: self.value().add(u256::from(amount)),
             }
         }
 
@@ -644,6 +652,8 @@ pub mod wasm {
             self.clone()
         }
 
-        pub fn size() -> u32 { Self::SIZE as u32 }
+        pub fn size() -> u32 {
+            Self::SIZE as u32
+        }
     }
 }

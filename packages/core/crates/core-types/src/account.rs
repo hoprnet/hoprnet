@@ -282,6 +282,8 @@ pub mod wasm {
             self.clone()
         }
 
-        pub fn size() -> u32 { Self::SIZE as u32 }
+        pub fn size() -> u32 {
+            Self::SIZE as u32
+        }
     }
 }
