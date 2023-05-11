@@ -95,7 +95,8 @@ function generateNodeOptions(argv: CliArgs, environment: ResolvedEnvironment): H
     },
     password: argv.password,
     strategy,
-    forceCreateDB: argv.force_init
+    forceCreateDB: argv.force_init,
+    noRelay: argv.no_relay
   }
 
   if (argv.password !== undefined) {
