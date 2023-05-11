@@ -307,12 +307,12 @@ class Hopr extends EventEmitter {
     const balance = await connector.getNativeBalance(false)
 
     verbose(
-      `Ethereum account ${this.getEthereumAddress().to_hex()} has ${balance.toFormattedString()}. Mininum balance is ${new Balance(
+      `Ethereum account ${this.getEthereumAddress().to_hex()} has ${balance.to_formatted_string()}. Mininum balance is ${new Balance(
         MIN_NATIVE_BALANCE.toString(10), BalanceType.Native
       ).to_formatted_string()}`
     )
 
-    if (!balance || balance.toBN().lte(MIN_NATIVE_BALANCE)) {
+    if (!balance || balance.lte(balance.of_same(MIN_NATIVE_BALANCE.toString(10)))) {
       throw new Error('Cannot start node without a funded wallet')
     }
     log('Node has enough to get started, continuing starting payment channels')
@@ -1560,7 +1560,7 @@ class Hopr extends EventEmitter {
               // call connector directly and don't use cache, since this is
               // most likely outdated during node startup
               const nativeBalance = await HoprCoreEthereum.getInstance().getNativeBalance(false)
-              if (nativeBalance.toBN().gte(MIN_NATIVE_BALANCE)) {
+              if (nativeBalance.gte(nativeBalance.of_same(MIN_NATIVE_BALANCE.toString(10)))) {
                 resolve()
               } else {
                 log('still unfunded, trying again soon')
