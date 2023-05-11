@@ -26,7 +26,7 @@ const TestingSnapshot = new Snapshot(U256.zero(), U256.zero(), U256.zero())
 
 const MOCK_PUBLIC_KEY = () => PublicKey.deserialize(stringToU8a('0x021464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8'))
 
-const MOCK_ADDRESS = () => Address.from_string('0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9')
+const MOCK_ADDRESS = () => Address.from_string('Cf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9')
 
 class TestingDB extends HoprDB {
   public async get(key: Uint8Array) {
@@ -69,10 +69,10 @@ function createMockedTicket(signerPrivKey: Uint8Array, counterparty: Address) {
 }
 
 function channelEntryCreateMock(): ChannelEntry {
-  const pub = PublicKey.from_privkey(stringToU8a('0x021464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8'))
+  const pub = PublicKey.from_privkey(stringToU8a('0x1464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8'))
   return new ChannelEntry(
-    pub,
-    pub,
+    pub.clone(),
+    pub.clone(),
     new Balance('1', BalanceType.HOPR),
     Hash.create([]),
     U256.one(),
@@ -205,7 +205,7 @@ describe(`database tests`, function () {
     const unAck = new UnacknowledgedTicket(
       createMockedTicket(privKey, new Address(Uint8Array.from(randomBytes(Address.size())))),
       new HalfKey(Uint8Array.from(randomBytes(HalfKey.size()))),
-      pubKey
+      pubKey.clone()
     )
     await db.storePendingAcknowledgement(halfKeyChallenge, false, unAck)
     assert((await db.getTickets()).length == 1, `DB should find one ticket`)
@@ -218,7 +218,7 @@ describe(`database tests`, function () {
       pending.ticket().ticket.clone(),
       new Response(Uint8Array.from(randomBytes(Hash.size()))),
       new Hash(Uint8Array.from(randomBytes(Hash.size()))),
-      pubKey
+      pubKey.clone()
     )
     await db.replaceUnAckWithAck(halfKeyChallenge, ack)
 
@@ -243,7 +243,7 @@ describe(`database tests`, function () {
   it('should store ChannelEntry', async function () {
     const channelEntry = channelEntryCreateMock()
 
-    await db.updateChannelAndSnapshot(channelEntry.get_id(), channelEntry, TestingSnapshot)
+    await db.updateChannelAndSnapshot(channelEntry.get_id(), channelEntry.clone(), TestingSnapshot)
 
     assert(!!(await db.getChannel(channelEntry.get_id())), 'did not find channel')
     assert((await db.getChannels()).length === 1, 'did not find channel')
@@ -300,13 +300,13 @@ describe(`database tests`, function () {
     assert((await db.getHoprBalance()).eq(Balance.zero(BalanceType.HOPR)))
 
     await db.setHoprBalance(new Balance('10', BalanceType.HOPR))
-    assert.equal((await db.getHoprBalance()).toString(), '10')
+    assert.equal((await db.getHoprBalance()).to_string(), '10')
 
     await db.addHoprBalance(new Balance('1', BalanceType.HOPR), TestingSnapshot)
-    assert.equal((await db.getHoprBalance()).toString(), '11')
+    assert.equal((await db.getHoprBalance()).to_string(), '11')
 
     await db.subHoprBalance(new Balance('2', BalanceType.HOPR), TestingSnapshot)
-    assert.equal((await db.getHoprBalance()).toString(), '9')
+    assert.equal((await db.getHoprBalance()).to_string(), '9')
   })
 
   it('should test registry', async function () {
@@ -348,11 +348,11 @@ describe(`database tests`, function () {
     assert((await db.isEligible(account)) === false, 'account is not eligible by default')
 
     // should be true once set
-    await db.setEligible(account, true, TestingSnapshot)
+    await db.setEligible(account, true, TestingSnapshot.clone())
     assert((await db.isEligible(account)) === true, 'account should be eligible')
 
     // should be false once unset
-    await db.setEligible(account, false, TestingSnapshot)
+    await db.setEligible(account, false, TestingSnapshot.clone())
     assert((await db.isEligible(account)) === false, 'account should be uneligible')
   })
 

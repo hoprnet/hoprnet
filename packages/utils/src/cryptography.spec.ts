@@ -10,8 +10,15 @@ import {
   recover_iterated_hash,
   create_tagged_mac,
   PublicKey,
-  Signature
+  Signature,
+  core_crypto_set_panic_hook
 } from '../../core/lib/core_crypto.js'
+
+core_crypto_set_panic_hook()
+
+import { webcrypto } from 'node:crypto'
+// @ts-ignore
+globalThis.crypto = webcrypto
 
 import {
   generateKeyShares,

@@ -2,7 +2,7 @@ import levelup, { type LevelUp } from 'levelup'
 import leveldown from 'leveldown'
 import MemDown from 'memdown'
 import { stat, mkdir, rm } from 'fs/promises'
-import { debug } from 'debug'
+import { debug } from '../process/index.js'
 
 import {
   AcknowledgedTicket,
@@ -1158,7 +1158,7 @@ export class HoprDB {
 
   static createMock(id?: PublicKey): HoprDB {
     const mock: HoprDB = {
-      id: id ?? PublicKey.from_privkey(stringToU8a('0x021464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8')),
+      id: id ?? PublicKey.from_privkey(stringToU8a('0x1464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8')),
       // CommonJS / ESM issue
       // @ts-ignore
       db: new LevelDb()

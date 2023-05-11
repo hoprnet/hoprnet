@@ -53,7 +53,6 @@ describe('Rust - TS serialization/deserialization tests', async function () {
     assert.equal(ethSigned_1.toHex(), '0x' + ethSigned_2.to_hex())
   })
 
-
   it('ticket serialize/deserialize', async function() {
 
     let challenge = Uint8Array.from(randomBytes(32))
