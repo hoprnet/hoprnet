@@ -126,7 +126,14 @@ export class AcknowledgementInteraction {
    */
   async handleAcknowledgement(msg: Uint8Array, remotePeer: PeerId): Promise<void> {
     const acknowledgement = Acknowledgement.deserialize(msg)
-    acknowledgement.validate(PublicKey.from_peerid_str(this.privKey.toString()), PublicKey.from_peerid_str(remotePeer.toString()))
+    if (
+      !acknowledgement.validate(
+        PublicKey.from_peerid_str(this.privKey.toString()),
+        PublicKey.from_peerid_str(remotePeer.toString())
+      )
+    ) {
+      throw Error(`could not validate received acknowledgement`)
+    }
 
     // There are three cases:
     // 1. There is an unacknowledged ticket and we are
@@ -142,7 +149,9 @@ export class AcknowledgementInteraction {
       // Protocol bug?
       if (err != undefined && err.notFound) {
         log(
-          `Received unexpected acknowledgement for half key challenge ${acknowledgement.ack_challenge().to_hex()} - half key ${acknowledgement.ack_key_share.to_hex()}`
+          `Received unexpected acknowledgement for half key challenge ${acknowledgement
+            .ack_challenge()
+            .to_hex()} - half key ${acknowledgement.ack_key_share.to_hex()}`
         )
       }
       metric_receivedFailedAcks.increment()
@@ -182,7 +191,12 @@ export class AcknowledgementInteraction {
 
     // Store the acknowledged ticket, regardless if it's a win or a loss
     // create an acked ticket with a pre image place holder
-    const ack = new AcknowledgedTicket(unacknowledged.ticket, response, PREIMAGE_PLACE_HOLDER, unacknowledged.signer)
+    const ack = new AcknowledgedTicket(
+      unacknowledged.ticket,
+      response.clone(),
+      PREIMAGE_PLACE_HOLDER.clone(),
+      unacknowledged.signer
+    )
     log(`Acknowledging ticket. Using response ${response.to_hex()}`)
     // replace the unAcked ticket with Acked ticket.
 

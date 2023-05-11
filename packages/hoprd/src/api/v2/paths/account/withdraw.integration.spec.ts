@@ -40,7 +40,7 @@ describe('POST /account/withdraw', () => {
     const res = await request(service).post('/api/v2/account/withdraw').send({
       currency: 'HOPR',
       amount: '1',
-      recipient: ALICE_ETH_ADDRESS.toString()
+      recipient: ALICE_ETH_ADDRESS().to_string()
     })
     expect(res.status).to.equal(200)
     expect(res).to.satisfyApiSpec
@@ -52,7 +52,7 @@ describe('POST /account/withdraw', () => {
     const res = await request(service).post('/api/v2/account/withdraw').send({
       currency: 'invalidCurrency',
       amount: '1',
-      recipient: ALICE_ETH_ADDRESS.toString()
+      recipient: ALICE_ETH_ADDRESS().to_string()
     })
     expect(res.status).to.equal(400)
     expect(res).to.satisfyApiSpec
@@ -64,7 +64,7 @@ describe('POST /account/withdraw', () => {
     const res = await request(service).post('/api/v2/account/withdraw').send({
       currency: 'NATIVE',
       amount: 'invalidAmount',
-      recipient: ALICE_ETH_ADDRESS.toString()
+      recipient: ALICE_ETH_ADDRESS().to_string()
     })
     expect(res.status).to.equal(400)
     expect(res).to.satisfyApiSpec
@@ -89,7 +89,7 @@ describe('POST /account/withdraw', () => {
     const res = await request(service).post('/api/v2/account/withdraw').send({
       currency: 'NATIVE',
       amount: '100000000000000000000000000000000000000000000000000000000000000',
-      recipient: ALICE_ETH_ADDRESS.toString()
+      recipient: ALICE_ETH_ADDRESS().to_string()
     })
     expect(res.status).to.equal(422)
     expect(res).to.satisfyApiSpec

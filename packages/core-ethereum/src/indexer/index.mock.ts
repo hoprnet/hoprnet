@@ -260,14 +260,10 @@ const createChainMock = (
     getAccount: () => {
       chainLogger('getAccount method was called')
       return Promise.resolve(
-        new AccountEntry(
-          fixtures.PARTY_A(),
-          `/ip4/127.0.0.1/tcp/124/p2p/${fixtures.PARTY_A.toString()}`,
-          1
-        )
+        new AccountEntry(fixtures.PARTY_A(), `/ip4/127.0.0.1/tcp/124/p2p/${fixtures.PARTY_A().to_peerid_str()}`, 1)
       )
     },
-    getPublicKey: () => fixtures.PARTY_A,
+    getPublicKey: () => fixtures.PARTY_A(),
     setCommitment: (counterparty: Address, commitment: Hash) =>
       hoprChannels.bumpChannel(counterparty.to_hex(), commitment.to_hex()),
     getAllQueuingTransactionRequests: () => [txRequest],

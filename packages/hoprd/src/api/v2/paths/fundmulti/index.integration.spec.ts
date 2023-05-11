@@ -14,7 +14,7 @@ import { STATUS_CODES } from '../../utils.js'
 
 let node = sinon.fake() as any
 node.getId = sinon.fake.returns(ALICE_PEER_ID)
-node.getEthereumAddress = sinon.fake.returns(ALICE_NATIVE_ADDR)
+node.getEthereumAddress = sinon.fake.returns(ALICE_NATIVE_ADDR())
 node.getNativeBalance = sinon.fake.returns(new Balance('10', BalanceType.Native))
 node.getBalance = sinon.fake.returns(new Balance('5', BalanceType.HOPR))
 

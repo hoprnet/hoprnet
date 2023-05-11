@@ -57,7 +57,8 @@ import {
   Ticket,
   Hash,
   HalfKeyChallenge,
-  Balance, BalanceType
+  Balance,
+  BalanceType
 } from '@hoprnet/hopr-utils'
 
 import { type HoprDB } from '@hoprnet/hopr-utils'
@@ -308,7 +309,8 @@ class Hopr extends EventEmitter {
 
     verbose(
       `Ethereum account ${this.getEthereumAddress().to_hex()} has ${balance.to_formatted_string()}. Mininum balance is ${new Balance(
-        MIN_NATIVE_BALANCE.toString(10), BalanceType.Native
+        MIN_NATIVE_BALANCE.toString(10),
+        BalanceType.Native
       ).to_formatted_string()}`
     )
 
@@ -426,7 +428,9 @@ class Hopr extends EventEmitter {
           for (const node of nodes) {
             this.networkPeers.unregister(node.to_peerid_str())
 
-            for (const conn of this.libp2pComponents.getConnectionManager().getConnections(peerIdFromString(node.to_peerid_str()))) {
+            for (const conn of this.libp2pComponents
+              .getConnectionManager()
+              .getConnections(peerIdFromString(node.to_peerid_str()))) {
               try {
                 await conn.close()
               } catch (err) {
@@ -627,8 +631,7 @@ class Hopr extends EventEmitter {
       } catch (err) {
         // @TODO what to do here? E.g. delete channel from db?
         error(
-          `Couldn't set commitment in channel to ${c.destination.to_peerid_str()} (channelId ${c
-            .get_id().to_hex()})`
+          `Couldn't set commitment in channel to ${c.destination.to_peerid_str()} (channelId ${c.get_id().to_hex()})`
         )
       }
     }
@@ -1294,13 +1297,17 @@ class Hopr extends EventEmitter {
       throw Error(`Invalid 'amountToFund' provided: ${amountToFund.toString(10)}`)
     } else if (amountToFund.gt(new BN(myAvailableTokens.to_string()))) {
       throw Error(
-        `You don't have enough tokens: ${amountToFund.toString(10)}<${myAvailableTokens
-          .to_string()} at address ${this.pubKey.to_address().to_hex()}`
+        `You don't have enough tokens: ${amountToFund.toString(
+          10
+        )}<${myAvailableTokens.to_string()} at address ${this.pubKey.to_address().to_hex()}`
       )
     }
 
     try {
-      return HoprCoreEthereum.getInstance().openChannel(counterpartyPubKey, new Balance(amountToFund.toString(10), BalanceType.HOPR))
+      return HoprCoreEthereum.getInstance().openChannel(
+        counterpartyPubKey,
+        new Balance(amountToFund.toString(10), BalanceType.HOPR)
+      )
     } catch (err) {
       this.maybeEmitFundsEmptyEvent(err)
       throw new Error(`Failed to openChannel: ${err}`)
@@ -1325,14 +1332,18 @@ class Hopr extends EventEmitter {
       throw Error(`Invalid 'totalFund' provided: ${totalFund.toString(10)}`)
     } else if (totalFund.gt(new BN(myBalance.to_string()))) {
       throw Error(
-        `You don't have enough tokens: ${totalFund.toString(10)}<${myBalance
-          .to_string()} at address ${this.pubKey.to_address().to_hex()}`
+        `You don't have enough tokens: ${totalFund.toString(10)}<${myBalance.to_string()} at address ${this.pubKey
+          .to_address()
+          .to_hex()}`
       )
     }
 
     try {
-      return connector.fundChannel(counterpartyPubKey, new Balance(myFund.toString(10), BalanceType.HOPR),
-        new Balance(counterpartyFund.toString(10), BalanceType.HOPR))
+      return connector.fundChannel(
+        counterpartyPubKey,
+        new Balance(myFund.toString(10), BalanceType.HOPR),
+        new Balance(counterpartyFund.toString(10), BalanceType.HOPR)
+      )
     } catch (err) {
       this.maybeEmitFundsEmptyEvent(err)
       throw new Error(`Failed to fundChannel: ${err}`)
@@ -1363,7 +1374,8 @@ class Hopr extends EventEmitter {
     if (direction === 'incoming') {
       log(
         `Incoming channel: ignoring closing channel ${channel
-          .get_id().to_hex()} because current HoprChannels contract does not support closing incoming channels.`
+          .get_id()
+          .to_hex()} because current HoprChannels contract does not support closing incoming channels.`
       )
       throw new Error('Incoming channel: Closing incoming channels currently is not supported.')
     }
@@ -1382,7 +1394,8 @@ class Hopr extends EventEmitter {
         } else {
           log(
             `ignoring finalizing closure of channel ${channel
-              .get_id().to_hex()} because closure window is still active. Need to wait ${channel
+              .get_id()
+              .to_hex()} because closure window is still active. Need to wait ${channel
               .remaining_closure_time()
               .toString(10)} seconds.`
           )
@@ -1451,7 +1464,10 @@ class Hopr extends EventEmitter {
    * @returns the channel entry of those two nodes
    */
   public async getChannel(src: PeerId, dest: PeerId): Promise<ChannelEntry> {
-    return await this.db.getChannelX(PublicKey.from_peerid_str(src.toString()), PublicKey.from_peerid_str(dest.toString()))
+    return await this.db.getChannelX(
+      PublicKey.from_peerid_str(src.toString()),
+      PublicKey.from_peerid_str(dest.toString())
+    )
   }
 
   public async getAllChannels(): Promise<ChannelEntry[]> {

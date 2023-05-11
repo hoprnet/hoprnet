@@ -38,7 +38,7 @@ describe('PoR - proof of relay', function () {
 
     // Simulates the transformation done by the first relayer
     assert(
-      u8aEquals(result.nextTicketChallenge.serialize(),decodePoRBytes(firstPorString).nextTicketChallenge.serialize()),
+      u8aEquals(result.nextTicketChallenge.serialize(), decodePoRBytes(firstPorString).nextTicketChallenge.serialize()),
       `Forward logic must extract correct challenge for next downstream node`
     )
 

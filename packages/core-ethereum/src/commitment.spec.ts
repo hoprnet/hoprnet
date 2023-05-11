@@ -33,7 +33,7 @@ describe('commitment', function () {
     await bumpCommitment(fakeDB, fakeCommInfo.channelId, c1)
     let c2 = await findCommitmentPreImage(fakeDB, fakeCommInfo.channelId)
     assert(c2, 'gives current commitment')
-    assert(c2.eq(c1), 'c2 is commitment of c1')
+    assert(c2.hash().eq(c1), 'c2 is commitment of c1')
 
     fakeGet = () => Promise.resolve(c2)
     await initializeCommitment(fakeDB, fakeKey, fakeCommInfo, fakeGet, fakeSet)

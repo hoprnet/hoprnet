@@ -42,7 +42,7 @@ describe('test pathfinder with some simple topologies', function () {
   const UNRELIABLE_NETWORK = (pubKey: PublicKey) => (testNodeId(pubKey) % 3 == 0 ? 0 : 1) // Node 3 is down
   const STAKE_1 = () => new Balance('1', BalanceType.HOPR)
 
-  const STAKE_N = (pubKey: PublicKey) => new Balance((testNodeId(pubKey) + 0.1).toString(10), BalanceType.HOPR)
+  const STAKE_N = (pubKey: PublicKey) => new Balance((testNodeId(pubKey) + 1).toString(10), BalanceType.HOPR)
 
   // Bidirectional star, all pass through node 0
   const STAR = new Map<PublicKey, PublicKey[]>()

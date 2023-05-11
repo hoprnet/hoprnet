@@ -22,7 +22,7 @@ import {
   PRICE_PER_PACKET,
   Snapshot
 } from '@hoprnet/hopr-utils'
-import {AcknowledgementChallenge, Acknowledgement } from '../../types.js'
+import { AcknowledgementChallenge, Acknowledgement } from '../../types.js'
 import type { HalfKeyChallenge } from '@hoprnet/hopr-utils'
 import assert from 'assert'
 import { Packet } from '../../messages/index.js'
@@ -150,13 +150,13 @@ function getDummyChannel(from: PeerId, to: PeerId): ChannelEntry {
   return new ChannelEntry(
     PublicKey.from_peerid_str(from.toString()),
     PublicKey.from_peerid_str(to.toString()),
-    DEFAULT_FUNDING,
+    DEFAULT_FUNDING.clone(),
     new Hash(Uint8Array.from(randomBytes(32))),
-    DEFAULT_TICKET_EPOCH,
-    DEFAULT_INDEX,
+    DEFAULT_TICKET_EPOCH.clone(),
+    DEFAULT_INDEX.clone(),
     ChannelStatus.Open,
-    DEFAULT_CHANNEL_EPOCH,
-    DEFAULT_CLOSURE_TIME
+    DEFAULT_CHANNEL_EPOCH.clone(),
+    DEFAULT_CLOSURE_TIME.clone()
   )
 }
 

@@ -18,7 +18,9 @@ import {
   Ticket,
   Address,
   Hash,
-  generate_channel_id, BalanceType, PendingAcknowledgement
+  generate_channel_id,
+  BalanceType,
+  PendingAcknowledgement
 } from '../types.js'
 import BN from 'bn.js'
 import fs from 'fs'
@@ -411,12 +413,20 @@ export class HoprDB {
   }
 
   private async addBalance(key: Uint8Array, amount: Balance): Promise<void> {
-    let val = await this.getCoercedOrDefault<Balance>(key, (u) => Balance.deserialize(u, BalanceType.HOPR), Balance.zero(BalanceType.HOPR))
+    let val = await this.getCoercedOrDefault<Balance>(
+      key,
+      (u) => Balance.deserialize(u, BalanceType.HOPR),
+      Balance.zero(BalanceType.HOPR)
+    )
     await this.db.put(key, val.add(amount).serialize_value())
   }
 
   private async subBalance(key: Uint8Array, amount: Balance): Promise<void> {
-    let val = await this.getCoercedOrDefault<Balance>(key, (u) => Balance.deserialize(u, BalanceType.HOPR), Balance.zero(BalanceType.HOPR))
+    let val = await this.getCoercedOrDefault<Balance>(
+      key,
+      (u) => Balance.deserialize(u, BalanceType.HOPR),
+      Balance.zero(BalanceType.HOPR)
+    )
     await this.db.put(key, val.sub(amount).serialize_value())
   }
 
@@ -609,7 +619,11 @@ export class HoprDB {
 
       dbBatch = dbBatch.put(
         Buffer.from(u8aKey.buffer, u8aKey.byteOffset, u8aKey.byteLength),
-        Buffer.from(intermediate.intermediate, intermediate.intermediate.byteOffset, intermediate.intermediate.byteLength)
+        Buffer.from(
+          intermediate.intermediate,
+          intermediate.intermediate.byteOffset,
+          intermediate.intermediate.byteLength
+        )
       )
     }
     await dbBatch.write()
@@ -628,11 +642,7 @@ export class HoprDB {
   }
 
   async getCurrentTicketIndex(channelId: Hash): Promise<U256 | undefined> {
-    return await this.getCoercedOrDefault<U256>(
-      createCurrentTicketIndexKey(channelId),
-      U256.deserialize,
-      undefined
-    )
+    return await this.getCoercedOrDefault<U256>(createCurrentTicketIndexKey(channelId), U256.deserialize, undefined)
   }
 
   setCurrentTicketIndex(channelId: Hash, ticketIndex: U256): Promise<void> {
@@ -747,7 +757,11 @@ export class HoprDB {
   }
 
   public async getRedeemedTicketsValue(): Promise<Balance> {
-    return await this.getCoercedOrDefault<Balance>(REDEEMED_TICKETS_VALUE, (u) => Balance.deserialize(u, BalanceType.HOPR), Balance.zero(BalanceType.HOPR))
+    return await this.getCoercedOrDefault<Balance>(
+      REDEEMED_TICKETS_VALUE,
+      (u) => Balance.deserialize(u, BalanceType.HOPR),
+      Balance.zero(BalanceType.HOPR)
+    )
   }
 
   public async getRedeemedTicketsCount(): Promise<number> {
@@ -815,7 +829,11 @@ export class HoprDB {
   }
 
   public async getRejectedTicketsValue(): Promise<Balance> {
-    return await this.getCoercedOrDefault<Balance>(REJECTED_TICKETS_VALUE, (u) => Balance.deserialize(u, BalanceType.HOPR), Balance.zero(BalanceType.HOPR))
+    return await this.getCoercedOrDefault<Balance>(
+      REJECTED_TICKETS_VALUE,
+      (u) => Balance.deserialize(u, BalanceType.HOPR),
+      Balance.zero(BalanceType.HOPR)
+    )
   }
 
   public async getRejectedTicketsCount(): Promise<number> {
@@ -886,7 +904,11 @@ export class HoprDB {
   }
 
   public async getHoprBalance(): Promise<Balance> {
-    return this.getCoercedOrDefault<Balance>(HOPR_BALANCE_KEY, (u) => Balance.deserialize(u, BalanceType.HOPR), Balance.zero(BalanceType.HOPR))
+    return this.getCoercedOrDefault<Balance>(
+      HOPR_BALANCE_KEY,
+      (u) => Balance.deserialize(u, BalanceType.HOPR),
+      Balance.zero(BalanceType.HOPR)
+    )
   }
 
   public async setHoprBalance(value: Balance): Promise<void> {
@@ -894,7 +916,11 @@ export class HoprDB {
   }
 
   public async addHoprBalance(value: Balance, snapshot: Snapshot): Promise<void> {
-    const val = await this.getCoercedOrDefault<Balance>(HOPR_BALANCE_KEY, (u) => Balance.deserialize(u, BalanceType.HOPR), Balance.zero(BalanceType.HOPR))
+    const val = await this.getCoercedOrDefault<Balance>(
+      HOPR_BALANCE_KEY,
+      (u) => Balance.deserialize(u, BalanceType.HOPR),
+      Balance.zero(BalanceType.HOPR)
+    )
 
     const serializedSnapshot = snapshot.serialize()
 
@@ -909,7 +935,11 @@ export class HoprDB {
   }
 
   public async subHoprBalance(value: Balance, snapshot: Snapshot): Promise<void> {
-    const val = await this.getCoercedOrDefault<Balance>(HOPR_BALANCE_KEY, (u) => Balance.deserialize(u, BalanceType.HOPR), Balance.zero(BalanceType.HOPR))
+    const val = await this.getCoercedOrDefault<Balance>(
+      HOPR_BALANCE_KEY,
+      (u) => Balance.deserialize(u, BalanceType.HOPR),
+      Balance.zero(BalanceType.HOPR)
+    )
 
     const serializedSnapshot = snapshot.serialize()
 
@@ -1158,7 +1188,8 @@ export class HoprDB {
 
   static createMock(id?: PublicKey): HoprDB {
     const mock: HoprDB = {
-      id: id ?? PublicKey.from_privkey(stringToU8a('0x1464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8')),
+      id:
+        id ?? PublicKey.from_privkey(stringToU8a('0x1464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8')),
       // CommonJS / ESM issue
       // @ts-ignore
       db: new LevelDb()

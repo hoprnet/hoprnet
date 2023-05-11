@@ -28,8 +28,8 @@ describe('GET /account/balances', () => {
     expect(res.status).to.equal(200)
     expect(res).to.satisfyApiSpec
     expect(res.body).to.deep.equal({
-      native: nativeBalance.toString(),
-      hopr: balance.toString()
+      native: nativeBalance.to_string(),
+      hopr: balance.to_string()
     })
   })
 

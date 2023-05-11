@@ -8,7 +8,8 @@ import {
   BOB_PEER_ID,
   CHARLIE_PEER_ID,
   ALICE_NATIVE_ADDR,
-  INVALID_PEER_ID, channelEntryCreateMock
+  INVALID_PEER_ID,
+  channelEntryCreateMock
 } from '../../fixtures.js'
 import { Balance, ChannelEntry, BalanceType, PublicKey, U256, Hash, ChannelStatus } from '@hoprnet/hopr-utils'
 
@@ -16,7 +17,7 @@ import { STATUS_CODES } from '../../utils.js'
 
 let node = sinon.fake() as any
 node.getId = sinon.fake.returns(ALICE_PEER_ID)
-node.getEthereumAddress = sinon.fake.returns(ALICE_NATIVE_ADDR)
+node.getEthereumAddress = sinon.fake.returns(ALICE_NATIVE_ADDR())
 node.getNativeBalance = sinon.fake.returns(new Balance('10', BalanceType.Native))
 node.getBalance = sinon.fake.returns(new Balance('1', BalanceType.HOPR))
 

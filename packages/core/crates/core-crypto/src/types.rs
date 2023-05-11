@@ -433,6 +433,11 @@ impl Hash {
         ret.hash.copy_from_slice(hash);
         ret
     }
+
+    /// Convenience method that creates a new hash by hashing this.
+    pub fn hash(&self) -> Self {
+        Self::create(&[&self.hash])
+    }
 }
 
 impl BinarySerializable<'_> for Hash {
@@ -575,7 +580,13 @@ impl PublicKey {
     }
 
     pub fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
-        if [ Self::SIZE_UNCOMPRESSED, Self::SIZE_UNCOMPRESSED-1, Self::SIZE_COMPRESSED ].contains(&data.len()) {
+        if [
+            Self::SIZE_UNCOMPRESSED,
+            Self::SIZE_UNCOMPRESSED - 1,
+            Self::SIZE_COMPRESSED,
+        ]
+        .contains(&data.len())
+        {
             let key;
             if data.len() == Self::SIZE_UNCOMPRESSED - 1 {
                 key = elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(&[&[4u8], &data[..]].concat())
@@ -1152,6 +1163,13 @@ pub mod tests {
 
         let hash2 = Hash::from_bytes(&hash1.to_bytes()).unwrap();
         assert_eq!(hash1, hash2, "failed to match deserialized hash");
+
+        assert_eq!(
+            hash1.hash(),
+            Hash::new(&hex!(
+                "1c4d8d521eccee7225073ea180e0fa075a6443afb7ca06076a9566b07d29470f"
+            ))
+        );
     }
 
     #[test]

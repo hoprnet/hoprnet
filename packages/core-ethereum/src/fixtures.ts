@@ -10,9 +10,10 @@ export const PARTY_B = () => PublicKey.deserialize(stringToU8a(ACCOUNT_B.publicK
 export const PARTY_B_MULTIADDR = new Multiaddr(`/ip4/34.65.237.197/tcp/9091/p2p/${PARTY_B().to_peerid_str()}`)
 export const CHANNEL_ID = '0x6e454104cde7f1c088b14c3ead07945f6f2c1ce72fef4171a7670e528d1a043c'
 
-export const MOCK_PUBLIC_KEY = () => PublicKey.deserialize(stringToU8a('0x021464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8'))
+export const MOCK_PUBLIC_KEY = () =>
+  PublicKey.deserialize(stringToU8a('0x021464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8'))
 
-export const MOCK_ADDRESS = () => Address.from_string('0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9')
+export const MOCK_ADDRESS = () => Address.from_string('Cf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9')
 
 export const SECRET_1 = new Hash(stringToU8a('0xb8b37f62ec82443e5b5557c5a187fe3686790620cc04c06187c48f8636caac89'))
 export const SECRET_2 = new Hash(stringToU8a('0x294549f8629f0eeb2b8e01aca491f701f5386a9662403b485c4efe7d447dfba3'))
