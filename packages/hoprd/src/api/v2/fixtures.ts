@@ -24,20 +24,20 @@ export const CHARLIE_PEER_ID = peerIdFromString('16Uiu2HAmUsJwbECMroQUC29LQZZWsY
 export const INVALID_PEER_ID = 'definetly not a valid peerId'
 
 export const TICKET_MOCK = {
-  counterparty: { toHex: () => '', toBN: () => '' },
-  challenge: { toHex: () => '', toBN: () => '' },
-  epoch: { toHex: () => '', toBN: () => '' },
-  index: { toHex: () => '', toBN: () => '' },
-  amount: { toHex: () => '', toBN: () => '' },
-  winProb: { toHex: () => '', toBN: () => '' },
-  channelEpoch: { toHex: () => '', toBN: () => '' },
-  signature: { toHex: () => '', toBN: () => '' }
+  counterparty: { to_hex: () => '', to_string: () => '' },
+  challenge: { to_hex: () => '', to_string: () => '' },
+  epoch: { to_hex: () => '', to_string: () => '' },
+  index: { to_hex: () => '', to_string: () => '' },
+  amount: { to_hex: () => '', to_string: () => '' },
+  win_prob: { to_hex: () => '', to_string: () => '' },
+  channel_epoch: { to_hex: () => '', to_string: () => '' },
+  signature: { to_hex: () => '', to_string: () => '' }
 }
 
 export function channelEntryCreateMock(): ChannelEntry {
-  const pub = PublicKey.from_privkey(stringToU8a('0x021464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8'))
+  const pub = PublicKey.from_privkey(stringToU8a('0x1464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8'))
   return new ChannelEntry(
-    pub,
+    pub.clone(),
     pub,
     new Balance('1', BalanceType.HOPR),
     Hash.create([]),

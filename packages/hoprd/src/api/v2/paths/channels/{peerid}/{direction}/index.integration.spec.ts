@@ -16,7 +16,7 @@ import { formatIncomingChannel, formatOutgoingChannel } from '../../index.js'
 
 let node = sinon.fake() as any
 node.getId = sinon.fake.returns(ALICE_PEER_ID)
-node.getEthereumAddress = sinon.fake.returns(ALICE_NATIVE_ADDR)
+node.getEthereumAddress = sinon.fake.returns(ALICE_NATIVE_ADDR())
 const outgoingMock = channelEntryCreateMock()
 const incomingMock = channelEntryCreateMock()
 
