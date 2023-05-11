@@ -1441,6 +1441,11 @@ pub mod wasm {
             ok_or_jserr!(PublicKey::from_bytes(bytes))
         }
 
+        #[wasm_bindgen(js_name = "serialize")]
+        pub fn _serialize(&self, compressed: bool) -> Box<[u8]> {
+            self.to_bytes(compressed)
+        }
+
         #[wasm_bindgen(js_name = "from_peerid_str")]
         pub fn _from_peerid_str(peer_id: &str) -> JsResult<PublicKey> {
             ok_or_jserr!(PublicKey::from_peerid_str(peer_id))
