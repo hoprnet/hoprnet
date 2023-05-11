@@ -192,20 +192,20 @@ impl Balance {
     pub fn mul(&self, other: &Balance) -> Self {
         assert_eq!(self.balance_type(), other.balance_type());
         Self {
-            value: self.value().mul(other.value()),
+            value: U256{ value: self.value().value().mul(other.value().value())},
             balance_type: self.balance_type,
         }
     }
 
     pub fn imul(&self, amount: u64) -> Self {
         Self {
-            value: self.value().mul(amount.as_u256()),
+            value: U256{ value: self.value().value().mul(amount.as_u256())},
             balance_type: self.balance_type,
         }
     }
 
     pub fn amount(&self) -> U256 {
-        self.value.into()
+        self.value.clone().into()
     }
 }
 

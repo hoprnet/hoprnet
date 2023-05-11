@@ -2,6 +2,7 @@ use core_crypto::errors::CryptoError::SignatureVerification;
 use core_crypto::types::{Challenge, Hash, PublicKey, Response, Signature};
 use enum_iterator::{all, Sequence};
 use ethnum::u256;
+use serde::{Serialize,Deserialize};
 use serde_repr::*;
 use std::ops::{Div, Mul, Sub};
 use utils_types::errors::{GeneralError::ParseError, Result};
@@ -146,7 +147,7 @@ pub fn generate_channel_id(source: &Address, destination: &Address) -> Hash {
 }
 
 /// Contains the overall description of a ticket with a signature
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct Ticket {
     pub counterparty: Address,

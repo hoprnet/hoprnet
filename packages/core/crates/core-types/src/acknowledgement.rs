@@ -1,3 +1,4 @@
+use serde::{Serialize, Deserialize};
 use crate::acknowledgement::PendingAcknowledgement::{WaitingAsRelayer, WaitingAsSender};
 use crate::channels::Ticket;
 use core_crypto::errors::CryptoError::SignatureVerification;
@@ -170,7 +171,7 @@ impl AcknowledgedTicket {
 }
 
 /// Wrapper for an unacknowledged ticket
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct UnacknowledgedTicket {
     pub ticket: Ticket,

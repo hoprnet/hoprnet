@@ -106,8 +106,8 @@ impl<T: BinaryAsyncKVStorage> DB<T> {
     }
 
     pub async fn set<V>(&mut self, key: Key, value: &V) -> Result<Option<V>>
-    where
-        V: Serialize + DeserializeOwned,
+        where
+            V: Serialize + DeserializeOwned,
     {
         let key: T::Key = key.into();
         let value: T::Value = bincode::serialize(&value)
@@ -131,6 +131,10 @@ impl<T: BinaryAsyncKVStorage> DB<T> {
             None => Ok(None),
         }
     }
+
+    // async fn getMulti<V: Serialize + DeserializeOwned>(&self, prefix: Box<[u8]>, suffix_size: u32, filter: Box<dyn Fn(&V) -> bool>) -> Result<Vec<V>> {
+    //     self.backend.iterate(prefix, suffix_size, Box::new(move |v: Box<[u8]>| { (*filter)(v.deserialize::<V()) })).unwrap_or(Vec::new())
+    // }
 
     pub async fn batch(&mut self, batch: Batch, wait_for_write: bool) -> Result<()> {
         self.backend.batch(batch.ops, wait_for_write).await

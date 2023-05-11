@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use js_sys::Uint8Array;
 
 use crate::errors::DbError;
 use crate::traits::{AsyncKVStorage, BatchOperation};
@@ -27,6 +28,9 @@ extern "C" {
     // https://github.com/Level/levelup#dbbatcharray-options-callback-array-form
     #[wasm_bindgen(method, catch)]
     async fn batch(this: &LevelDb, operations: js_sys::Array, wait_for_write: bool) -> Result<(), JsValue>;
+
+    #[wasm_bindgen(method, catch)]
+    async fn iterValues(this: &LevelDb, prefix: js_sys::Uint8Array, suffix_length: u32) -> Result<JsValue, JsValue>;
 
     #[wasm_bindgen(method, catch)]
     fn dump(this: &LevelDb, destination: String) -> Result<(), JsValue>;
@@ -119,6 +123,34 @@ impl AsyncKVStorage for LevelDbShim {
             .dump(destination.clone())
             .map_err(|_| DbError::DumpError(format!("Failed to dump DB into {}", destination)))
     }
+
+    async fn getMore(&self, prefix: Self::Key, suffix_size: u32, filter: Box<dyn Fn(Self::Key) -> bool>) -> crate::errors::Result<Vec<Self::Value>> {
+        let iterable = self.db
+            .iterValues(js_sys::Uint8Array::from(prefix.as_ref()), suffix_size)
+            .await
+            .map_err(|e| DbError::GenericError(format!("Iteration failed with an exception: {:?}", e)))?;
+
+        let mut out = Vec::with_capacity(10);
+
+        let iterable = js_sys::try_iter(&iterable)
+            .map_err(|_| DbError::GenericError("Encountered a non-iterable on DB iteration".to_string()))?
+            .ok_or_else(|| DbError::GenericError("No iterable present".to_string()))?;
+
+        for x in iterable {
+            let value = x
+                .map(|v| js_sys::Promise::from(v))
+                .map_err(|e| DbError::GenericError(format!("Failed to iterate next: {:?}", e)))?;
+
+            let value = wasm_bindgen_futures::JsFuture::from(value)
+                .await
+                .map(|v| js_sys::Uint8Array::from(v).to_vec().into_boxed_slice())
+                .map_err(|e| DbError::GenericError(format!("Failed to poll the value: {:?}", e)))?;
+
+            out.push(value);
+        }
+
+        Ok(out)
+    }
 }
 
 #[cfg(feature = "wasm")]
@@ -130,6 +162,10 @@ pub async fn db_sanity_test(db: LevelDb) -> Result<bool, JsValue> {
     let value_2 = "def";
     let key_3 = "3";
     let value_3 = "ghi";
+    let prefix = "xy";
+    let prefixed_key_1 = "xya";
+    let prefixed_key_2 = "xyb";
+    let prefixed_key_3 = "xyc";
 
     let mut kv_storage = LevelDbShim::new(db);
 
@@ -194,6 +230,8 @@ pub async fn db_sanity_test(db: LevelDb) -> Result<bool, JsValue> {
         )));
     }
 
+    // ===================================
+
     gloo_timers::future::sleep(std::time::Duration::from_millis(10)).await;
 
     // TODO: levelup api with the passed options to do an immediate write does not perform an immediate write
@@ -201,6 +239,44 @@ pub async fn db_sanity_test(db: LevelDb) -> Result<bool, JsValue> {
     //     return Err::<bool, JsValue>(
     //         JsValue::from(JsError::new("Test #5.1 failed: the key should be present in the DB")))
     // }
+
+    // ===================================
+
+    let _ = kv_storage
+        .set(
+            prefixed_key_1.as_bytes().to_vec().into_boxed_slice(),
+            value_1.as_bytes().to_vec().into_boxed_slice(),
+        )
+        .await;
+    let _ = kv_storage
+        .set(
+            prefixed_key_2.as_bytes().to_vec().into_boxed_slice(),
+            value_2.as_bytes().to_vec().into_boxed_slice(),
+        )
+        .await;
+    let _ = kv_storage
+        .set(
+            prefixed_key_3.as_bytes().to_vec().into_boxed_slice(),
+            value_3.as_bytes().to_vec().into_boxed_slice(),
+        )
+        .await;
+
+    let received = kv_storage.getMore(
+        prefix.as_bytes().to_vec().into_boxed_slice(),
+        (prefixed_key_1.len() - prefix.len()) as u32,
+        Box::new(|_| true)
+    ).await;
+
+    let expected = Ok(vec![
+        value_1.as_bytes().to_vec().into_boxed_slice(),
+        value_2.as_bytes().to_vec().into_boxed_slice(),
+        value_3.as_bytes().to_vec().into_boxed_slice()
+    ]);
+
+    if received != expected {
+        return Err::<bool, JsValue>(
+            JsValue::from(JsError::new(format!("Test #6 failed: db content mismatch {:?} != {:?}", received, expected).as_str())))
+    }
 
     Ok(true)
 }
