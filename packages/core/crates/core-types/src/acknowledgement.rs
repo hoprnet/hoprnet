@@ -22,8 +22,8 @@ impl Acknowledgement {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(ack_challenge: AcknowledgementChallenge, ack_key_share: HalfKey, private_key: &[u8]) -> Self {
         let mut digest = SimpleDigest::default();
-        digest.update(&ack_challenge.serialize());
-        digest.update(&ack_key_share.serialize());
+        digest.update(&ack_challenge.to_bytes());
+        digest.update(&ack_key_share.to_bytes());
 
         Self {
             ack_signature: Signature::sign_hash(&digest.finalize(), private_key),
@@ -37,13 +37,13 @@ impl Acknowledgement {
     /// any operations with the deserialized acknowledgment will panic.
     pub fn validate(&mut self, own_public_key: &PublicKey, sender_public_key: &PublicKey) -> bool {
         let mut digest = SimpleDigest::default();
-        digest.update(&self.ack_key_share.to_challenge().serialize());
+        digest.update(&self.ack_key_share.to_challenge().to_bytes());
         self.validated = self
             .challenge_signature
             .verify_hash_with_pubkey(&digest.finalize(), own_public_key);
 
-        digest.update(&self.challenge_signature.serialize());
-        digest.update(&self.ack_key_share.serialize());
+        digest.update(&self.challenge_signature.to_bytes());
+        digest.update(&self.ack_key_share.to_bytes());
         self.validated = self.validated
             && self
                 .ack_signature
@@ -62,13 +62,13 @@ impl Acknowledgement {
 impl BinarySerializable<'_> for Acknowledgement {
     const SIZE: usize = Signature::SIZE + AcknowledgementChallenge::SIZE + HalfKey::SIZE;
 
-    fn deserialize(data: &[u8]) -> errors::Result<Self> {
+    fn from_bytes(data: &[u8]) -> errors::Result<Self> {
         let mut buf = data.to_vec();
         if data.len() == Self::SIZE {
-            let ack_signature = Signature::deserialize(buf.drain(..Signature::SIZE).as_ref())?;
+            let ack_signature = Signature::from_bytes(buf.drain(..Signature::SIZE).as_ref())?;
             let challenge_signature =
-                AcknowledgementChallenge::deserialize(buf.drain(..AcknowledgementChallenge::SIZE).as_ref())?;
-            let ack_key_share = HalfKey::deserialize(buf.drain(..HalfKey::SIZE).as_ref())?;
+                AcknowledgementChallenge::from_bytes(buf.drain(..AcknowledgementChallenge::SIZE).as_ref())?;
+            let ack_key_share = HalfKey::from_bytes(buf.drain(..HalfKey::SIZE).as_ref())?;
             Ok(Self {
                 ack_signature,
                 challenge_signature: challenge_signature.signature,
@@ -80,12 +80,12 @@ impl BinarySerializable<'_> for Acknowledgement {
         }
     }
 
-    fn serialize(&self) -> Box<[u8]> {
+    fn to_bytes(&self) -> Box<[u8]> {
         assert!(self.validated, "acknowledgement not validated");
         let mut ret = Vec::with_capacity(Self::SIZE);
         ret.extend_from_slice(&self.ack_signature.raw_signature());
         ret.extend_from_slice(&self.challenge_signature.raw_signature());
-        ret.extend_from_slice(&self.ack_key_share.serialize());
+        ret.extend_from_slice(&self.ack_key_share.to_bytes());
         ret.into_boxed_slice()
     }
 }
@@ -125,13 +125,13 @@ impl AcknowledgedTicket {
 impl BinarySerializable<'_> for AcknowledgedTicket {
     const SIZE: usize = Ticket::SIZE + Response::SIZE + Hash::SIZE + PublicKey::SIZE_COMPRESSED;
 
-    fn deserialize(data: &[u8]) -> errors::Result<Self> {
+    fn from_bytes(data: &[u8]) -> errors::Result<Self> {
         if data.len() == Self::SIZE {
             let mut buf = data.to_vec();
-            let ticket = Ticket::deserialize(buf.drain(..Ticket::SIZE).as_ref())?;
-            let response = Response::deserialize(buf.drain(..Response::SIZE).as_ref())?;
-            let pre_image = Hash::deserialize(buf.drain(..Hash::SIZE).as_ref())?;
-            let signer = PublicKey::deserialize(buf.drain(..PublicKey::SIZE_COMPRESSED).as_ref())?;
+            let ticket = Ticket::from_bytes(buf.drain(..Ticket::SIZE).as_ref())?;
+            let response = Response::from_bytes(buf.drain(..Response::SIZE).as_ref())?;
+            let pre_image = Hash::from_bytes(buf.drain(..Hash::SIZE).as_ref())?;
+            let signer = PublicKey::from_bytes(buf.drain(..PublicKey::SIZE_COMPRESSED).as_ref())?;
 
             Ok(Self {
                 ticket,
@@ -144,12 +144,12 @@ impl BinarySerializable<'_> for AcknowledgedTicket {
         }
     }
 
-    fn serialize(&self) -> Box<[u8]> {
+    fn to_bytes(&self) -> Box<[u8]> {
         let mut ret = Vec::with_capacity(Self::SIZE);
-        ret.extend_from_slice(&self.ticket.serialize());
-        ret.extend_from_slice(&self.response.serialize());
-        ret.extend_from_slice(&self.pre_image.serialize());
-        ret.extend_from_slice(&self.signer.serialize(true));
+        ret.extend_from_slice(&self.ticket.to_bytes());
+        ret.extend_from_slice(&self.response.to_bytes());
+        ret.extend_from_slice(&self.pre_image.to_bytes());
+        ret.extend_from_slice(&self.signer.to_bytes(true));
         ret.into_boxed_slice()
     }
 }
@@ -219,12 +219,12 @@ impl UnacknowledgedTicket {
 impl BinarySerializable<'_> for UnacknowledgedTicket {
     const SIZE: usize = Ticket::SIZE + HalfKey::SIZE + PublicKey::SIZE_UNCOMPRESSED;
 
-    fn deserialize(data: &[u8]) -> errors::Result<Self> {
+    fn from_bytes(data: &[u8]) -> errors::Result<Self> {
         if data.len() == Self::SIZE {
             let mut buf = data.to_vec();
-            let ticket = Ticket::deserialize(buf.drain(..Ticket::SIZE).as_ref())?;
-            let own_key = HalfKey::deserialize(buf.drain(..HalfKey::SIZE).as_ref())?;
-            let signer = PublicKey::deserialize(buf.drain(..PublicKey::SIZE_UNCOMPRESSED).as_ref())?;
+            let ticket = Ticket::from_bytes(buf.drain(..Ticket::SIZE).as_ref())?;
+            let own_key = HalfKey::from_bytes(buf.drain(..HalfKey::SIZE).as_ref())?;
+            let signer = PublicKey::from_bytes(buf.drain(..PublicKey::SIZE_UNCOMPRESSED).as_ref())?;
             Ok(Self {
                 ticket,
                 own_key,
@@ -235,11 +235,11 @@ impl BinarySerializable<'_> for UnacknowledgedTicket {
         }
     }
 
-    fn serialize(&self) -> Box<[u8]> {
+    fn to_bytes(&self) -> Box<[u8]> {
         let mut ret = Vec::with_capacity(Self::SIZE);
-        ret.extend_from_slice(&self.ticket.serialize());
-        ret.extend_from_slice(&self.own_key.serialize());
-        ret.extend_from_slice(&self.signer.serialize(false));
+        ret.extend_from_slice(&self.ticket.to_bytes());
+        ret.extend_from_slice(&self.own_key.to_bytes());
+        ret.extend_from_slice(&self.signer.to_bytes(false));
         ret.into_boxed_slice()
     }
 }
@@ -254,7 +254,7 @@ pub struct AcknowledgementChallenge {
 
 fn hash_challenge(challenge: &HalfKeyChallenge) -> Box<[u8]> {
     let mut digest = SimpleDigest::default();
-    digest.update(&challenge.serialize());
+    digest.update(&challenge.to_bytes());
     digest.finalize()
 }
 
@@ -295,18 +295,18 @@ impl AcknowledgementChallenge {
 impl BinarySerializable<'_> for AcknowledgementChallenge {
     const SIZE: usize = Signature::SIZE;
 
-    fn deserialize(data: &[u8]) -> errors::Result<Self> {
+    fn from_bytes(data: &[u8]) -> errors::Result<Self> {
         if data.len() == Self::SIZE {
             Ok(AcknowledgementChallenge {
                 ack_challenge: None,
-                signature: Signature::deserialize(data)?,
+                signature: Signature::from_bytes(data)?,
             })
         } else {
             Err(ParseError)
         }
     }
 
-    fn serialize(&self) -> Box<[u8]> {
+    fn to_bytes(&self) -> Box<[u8]> {
         assert!(self.ack_challenge.is_some(), "challenge is invalid");
         self.signature.raw_signature()
     }
@@ -330,11 +330,11 @@ impl PendingAcknowledgement {
 impl BinarySerializable<'_> for PendingAcknowledgement {
     const SIZE: usize = 1;
 
-    fn deserialize(data: &[u8]) -> errors::Result<Self> {
+    fn from_bytes(data: &[u8]) -> errors::Result<Self> {
         if data.len() >= Self::SIZE {
             match data[0] {
                 Self::SENDER_PREFIX => Ok(WaitingAsSender),
-                Self::RELAYER_PREFIX => Ok(WaitingAsRelayer(UnacknowledgedTicket::deserialize(&data[1..])?)),
+                Self::RELAYER_PREFIX => Ok(WaitingAsRelayer(UnacknowledgedTicket::from_bytes(&data[1..])?)),
                 _ => Err(ParseError),
             }
         } else {
@@ -342,13 +342,13 @@ impl BinarySerializable<'_> for PendingAcknowledgement {
         }
     }
 
-    fn serialize(&self) -> Box<[u8]> {
+    fn to_bytes(&self) -> Box<[u8]> {
         let mut ret = Vec::with_capacity(Self::SIZE);
         match &self {
             WaitingAsSender => ret.push(Self::SENDER_PREFIX),
             WaitingAsRelayer(unacknowledged) => {
                 ret.push(Self::RELAYER_PREFIX);
-                ret.extend_from_slice(&unacknowledged.serialize());
+                ret.extend_from_slice(&unacknowledged.to_bytes());
             }
         }
         ret.into_boxed_slice()
@@ -391,7 +391,7 @@ pub mod test {
     fn test_pending_ack_sender() {
         assert_eq!(
             PendingAcknowledgement::WaitingAsSender,
-            PendingAcknowledgement::deserialize(&PendingAcknowledgement::WaitingAsSender.serialize()).unwrap()
+            PendingAcknowledgement::from_bytes(&PendingAcknowledgement::WaitingAsSender.to_bytes()).unwrap()
         );
     }
 
@@ -409,7 +409,7 @@ pub mod test {
 
         AcknowledgementChallenge::verify(&PublicKey::from_privkey(&sk).unwrap(), &akc1.signature, &hkc);
 
-        let mut akc2 = AcknowledgementChallenge::deserialize(&akc1.serialize()).unwrap();
+        let mut akc2 = AcknowledgementChallenge::from_bytes(&akc1.to_bytes()).unwrap();
         assert!(akc2.validate(hkc.clone(), &pub_key));
 
         assert_eq!(akc1, akc2);
@@ -432,7 +432,7 @@ pub mod test {
         let mut ack1 = Acknowledgement::new(akc1, ack_key, &pk_2);
         assert!(ack1.validate(&pub_key_1, &pub_key_2));
 
-        let mut ack2 = Acknowledgement::deserialize(&ack1.serialize()).unwrap();
+        let mut ack2 = Acknowledgement::from_bytes(&ack1.to_bytes()).unwrap();
         assert!(ack2.validate(&pub_key_1, &pub_key_2));
 
         assert_eq!(ack1, ack2);
@@ -460,11 +460,11 @@ pub mod test {
         assert!(unack1.verify_signature().is_ok());
         assert!(unack1.verify_challenge(&hk2).is_ok());
 
-        let unack2 = UnacknowledgedTicket::deserialize(&unack1.serialize()).unwrap();
+        let unack2 = UnacknowledgedTicket::from_bytes(&unack1.to_bytes()).unwrap();
         assert_eq!(unack1, unack2);
 
         let pending_ack_1 = PendingAcknowledgement::WaitingAsRelayer(unack1);
-        let pending_ack_2 = PendingAcknowledgement::deserialize(&pending_ack_1.serialize()).unwrap();
+        let pending_ack_2 = PendingAcknowledgement::from_bytes(&pending_ack_1.to_bytes()).unwrap();
         assert_eq!(pending_ack_1, pending_ack_2);
     }
 
@@ -482,7 +482,7 @@ pub mod test {
         let akt_1 = AcknowledgedTicket::new(ticket1, resp, Hash::create(&[&hex!("deadbeef")]), pub_key.clone());
         assert!(akt_1.verify(&pub_key).is_ok());
 
-        let akt_2 = AcknowledgedTicket::deserialize(&akt_1.serialize()).unwrap();
+        let akt_2 = AcknowledgedTicket::from_bytes(&akt_1.to_bytes()).unwrap();
         assert_eq!(akt_1, akt_2);
     }
 }
@@ -532,12 +532,12 @@ pub mod wasm {
 
         pub fn deserialize(data: &[u8]) -> JsResult<PendingAcknowledgement> {
             Ok(Self {
-                w: ok_or_jserr!(super::PendingAcknowledgement::deserialize(data))?,
+                w: ok_or_jserr!(super::PendingAcknowledgement::from_bytes(data))?,
             })
         }
 
         pub fn serialize(&self) -> Box<[u8]> {
-            self.w.serialize()
+            self.w.to_bytes()
         }
     }
 
@@ -545,12 +545,12 @@ pub mod wasm {
     impl UnacknowledgedTicket {
         #[wasm_bindgen(js_name = "deserialize")]
         pub fn _deserialize(data: &[u8]) -> JsResult<UnacknowledgedTicket> {
-            ok_or_jserr!(Self::deserialize(data))
+            ok_or_jserr!(Self::from_bytes(data))
         }
 
         #[wasm_bindgen(js_name = "serialize")]
         pub fn _serialize(&self) -> Box<[u8]> {
-            self.serialize()
+            self.to_bytes()
         }
 
         #[wasm_bindgen(js_name = "get_response")]
@@ -582,12 +582,12 @@ pub mod wasm {
     impl AcknowledgedTicket {
         #[wasm_bindgen(js_name = "deserialize")]
         pub fn _deserialize(data: &[u8]) -> JsResult<AcknowledgedTicket> {
-            ok_or_jserr!(Self::deserialize(data))
+            ok_or_jserr!(Self::from_bytes(data))
         }
 
         #[wasm_bindgen(js_name = "serialize")]
         pub fn _serialize(&self) -> Box<[u8]> {
-            self.serialize()
+            self.to_bytes()
         }
 
         #[wasm_bindgen(js_name = "eq")]
@@ -614,12 +614,12 @@ pub mod wasm {
     impl AcknowledgementChallenge {
         #[wasm_bindgen(js_name = "deserialize")]
         pub fn _deserialize(data: &[u8]) -> JsResult<AcknowledgementChallenge> {
-            ok_or_jserr!(Self::deserialize(data))
+            ok_or_jserr!(Self::from_bytes(data))
         }
 
         #[wasm_bindgen(js_name = "serialize")]
         pub fn _serialize(&self) -> Box<[u8]> {
-            self.serialize()
+            self.to_bytes()
         }
 
         #[wasm_bindgen(js_name = "eq")]
@@ -641,12 +641,12 @@ pub mod wasm {
     impl Acknowledgement {
         #[wasm_bindgen(js_name = "deserialize")]
         pub fn _deserialize(data: &[u8]) -> JsResult<Acknowledgement> {
-            ok_or_jserr!(Self::deserialize(data))
+            ok_or_jserr!(Self::from_bytes(data))
         }
 
         #[wasm_bindgen(js_name = "serialize")]
         pub fn _serialize(&self) -> Box<[u8]> {
-            self.serialize()
+            self.to_bytes()
         }
 
         #[wasm_bindgen(js_name = "eq")]

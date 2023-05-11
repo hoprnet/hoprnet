@@ -125,7 +125,7 @@ impl SharedKeys {
         let alpha_projective = alpha.to_projective_point();
 
         let s_k = (alpha_projective * private_scalar.as_ref()).to_affine();
-        let secret = extract_key_from_group_element(&s_k.into(), &public_key.serialize(true));
+        let secret = extract_key_from_group_element(&s_k.into(), &public_key.to_bytes(true));
 
         let b_k = expand_key_from_group_element(&s_k.into(), &alpha.serialize_compressed());
         let b_k_checked = to_checked_secret_scalar(&b_k)?;
@@ -227,7 +227,7 @@ pub mod tests {
             hex!("038d2b50a77fd43eeae9b37856358c7f1aee773b3e3c9d26f30b8706c02cbbfbb6"),
         ]
         .into_iter()
-        .map(|p| PublicKey::deserialize(&p))
+        .map(|p| PublicKey::from_bytes(&p))
         .collect::<utils_types::errors::Result<Vec<_>>>()
         .unwrap();
 
@@ -286,7 +286,7 @@ pub mod wasm {
         pub fn _generate(peer_public_keys: Vec<Uint8Array>) -> JsResult<SharedKeys> {
             let public_keys = ok_or_jserr!(peer_public_keys
                 .into_iter()
-                .map(|v| PublicKey::deserialize(&v.to_vec()))
+                .map(|v| PublicKey::from_bytes(&v.to_vec()))
                 .collect::<utils_types::errors::Result<Vec<PublicKey>>>())?;
             ok_or_jserr!(super::SharedKeys::generate(&mut OsRng, &public_keys))
         }

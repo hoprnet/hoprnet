@@ -20,7 +20,7 @@ pub struct NodeIdentity {
 
 impl NodeIdentity {
     pub fn new(verifying_key: VerifyingKey) -> Self {
-        let public_key = PublicKey::deserialize(&verifying_key.to_encoded_point(false).to_bytes()).unwrap();
+        let public_key = PublicKey::from_bytes(&verifying_key.to_encoded_point(false).to_bytes()).unwrap();
 
         // derive PeerId
         let peer_id = public_key.to_peerid_str();
