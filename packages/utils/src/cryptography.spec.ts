@@ -1,5 +1,4 @@
 import {
-  Hash as Rust_HASH,
   PRG as Rust_PRG,
   PRGParameters as Rust_PRGParameters,
   PRP as Rust_PRP,
@@ -9,8 +8,6 @@ import {
   iterate_hash,
   recover_iterated_hash,
   create_tagged_mac,
-  PublicKey,
-  Signature,
   core_crypto_set_panic_hook
 } from '../../core/lib/core_crypto.js'
 
@@ -33,23 +30,14 @@ import {
   derivePRPParameters,
 } from './crypto/index.js'
 
-import { Hash } from './types/index.js'
-
-import {PublicKey as TsPublicKey, Signature as TsSignature} from './types/index.js'
-
 import assert from 'assert'
 
 import { createSecp256k1PeerId } from '@libp2p/peer-id-factory'
 import { stringToU8a, u8aEquals, u8aToHex } from './u8a/index.js'
 import { SECRET_LENGTH } from './constants.js'
+import { Hash } from './types.js'
 
 describe('cryptographic correspondence tests', async function () {
-  it('digest correspondence', async function () {
-    let data = new Uint8Array(32).fill(1)
-    let h1 = Hash.create(data).serialize()
-    let h2 = Rust_HASH.create([data]).serialize()
-    assert(u8aEquals(h1, h2))
-  })
 
   it('mac correspondence', async function () {
     let data = new Uint8Array(32).fill(1)
@@ -191,34 +179,6 @@ describe('cryptographic correspondence tests', async function () {
     }
   })
 
-  it('secp256k1 public key correspondence', async function() {
-    let ts_pub = TsPublicKey.fromPrivKeyString('0x492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775')
-    let rs_pub = PublicKey.from_privkey(stringToU8a('0x492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775'))
-    assert(u8aEquals(ts_pub.serializeCompressed(), rs_pub.serialize(true)))
-    assert(u8aEquals(ts_pub.serializeUncompressed(), rs_pub.serialize(false)))
-    assert.equal(
-      '0x' + PublicKey.deserialize(ts_pub.serializeCompressed()).to_hex(true),
-      TsPublicKey.deserialize(rs_pub.serialize(true)).toCompressedPubKeyHex()
-    )
-    assert.equal(
-      '0x' + PublicKey.deserialize(ts_pub.serializeUncompressed()).to_hex(false),
-      TsPublicKey.deserialize(rs_pub.serialize(false)).toUncompressedPubKeyHex()
-    )
-  })
-
-  it('signature correspondence tests', async function() {
-    let priv_key = stringToU8a('0x492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775')
-    let rs_pub = PublicKey.from_privkey(priv_key)
-    let message = Hash.create(stringToU8a('0xdeadbeefcafebabe')).serialize()
-
-    let rs_sgn = Signature.sign_hash(message, priv_key)
-    let ts_sgn = TsSignature.deserialize(rs_sgn.serialize())
-    assert(ts_sgn.verify(message, TsPublicKey.fromPeerIdString(rs_pub.to_peerid_str())))
-
-    let rs_sgn_2 = TsSignature.create(message, priv_key)
-    assert(Signature.deserialize(rs_sgn_2.serialize()).verify_hash_with_pubkey(message, rs_pub))
-  })
-
   it('keyshares correspondence generate key shares in TS and verify them in RS', async function () {
     const AMOUNT = 4
     const keyPairs = await Promise.all(Array.from({ length: AMOUNT }).map((_) => createSecp256k1PeerId()))
@@ -241,7 +201,7 @@ describe('cryptographic correspondence tests', async function () {
 
   it('correspondence of iterated hash & recovery', async function () {
     let seed = new Uint8Array(16)
-    let hashFn = (msg: Uint8Array) => Hash.create(msg).serialize().slice(0, Hash.SIZE)
+    let hashFn = (msg: Uint8Array) => Hash.create([msg]).serialize().slice(0, Hash.size())
     let TS_iterated = await iterateHash(seed, hashFn, 1000, 10)
     let RS_iterated = iterate_hash(seed, 1000, 10)
 
