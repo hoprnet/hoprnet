@@ -276,5 +276,14 @@ pub mod wasm {
         pub fn _deserialize(data: &[u8]) -> JsResult<AccountEntry> {
             ok_or_jserr!(Self::deserialize(data))
         }
+
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> Self {
+            self.clone()
+        }
+
+        pub fn size() -> u32 {
+            Self::SIZE as u32
+        }
     }
 }

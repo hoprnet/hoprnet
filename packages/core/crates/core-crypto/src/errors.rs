@@ -21,6 +21,9 @@ pub enum CryptoError {
     #[error("failed to perform cryptographic calculation")]
     CalculationError,
 
+    #[error("signature verification failed")]
+    SignatureVerification,
+
     #[error("lower-level error: {0}")]
     Other(#[from] GeneralError),
 }

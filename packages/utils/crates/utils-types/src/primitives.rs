@@ -1,6 +1,6 @@
 use ethnum::{u256, AsU256};
 use serde::{Deserialize, Serialize};
-use std::ops::{Add, Sub};
+use std::ops::{Add, Mul, Sub};
 use std::string::ToString;
 
 use crate::errors::{GeneralError::InvalidInput, GeneralError::ParseError, Result};
@@ -29,6 +29,13 @@ impl Address {
         let mut ret = Self::default();
         ret.addr.copy_from_slice(bytes);
         ret
+    }
+
+    pub fn to_bytes32(&self) -> Box<[u8]> {
+        let mut ret = Vec::with_capacity(12 + Self::SIZE);
+        ret.extend_from_slice(&[0u8; 12]);
+        ret.extend_from_slice(&self.addr);
+        ret.into_boxed_slice()
     }
 
     // impl std::string::ToString {
@@ -86,8 +93,15 @@ pub struct Balance {
 impl Balance {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn from_str(value: &str, balance_type: BalanceType) -> Self {
-        Balance {
+        Self {
             value: u256::from_str_radix(value, 10).unwrap(),
+            balance_type,
+        }
+    }
+
+    pub fn zero(balance_type: BalanceType) -> Self {
+        Self {
+            value: u256::ZERO,
             balance_type,
         }
     }
@@ -95,6 +109,11 @@ impl Balance {
     /// Retrieves the type (symbol) of the balance
     pub fn balance_type(&self) -> BalanceType {
         self.balance_type
+    }
+
+    /// Creates balance of the given value with the same symbol
+    pub fn of_same(&self, value: &str) -> Self {
+        Self::from_str(value, self.balance_type)
     }
 
     // impl ToHex for Balance {
@@ -142,14 +161,14 @@ impl Balance {
 
     pub fn add(&self, other: &Balance) -> Self {
         assert_eq!(self.balance_type(), other.balance_type());
-        Balance {
+        Self {
             value: self.value().add(other.value()),
             balance_type: self.balance_type,
         }
     }
 
     pub fn iadd(&self, amount: u64) -> Self {
-        Balance {
+        Self {
             value: self.value().add(amount.as_u256()),
             balance_type: self.balance_type,
         }
@@ -157,17 +176,36 @@ impl Balance {
 
     pub fn sub(&self, other: &Balance) -> Self {
         assert_eq!(self.balance_type(), other.balance_type());
-        Balance {
+        Self {
             value: self.value().sub(other.value()),
             balance_type: self.balance_type,
         }
     }
 
     pub fn isub(&self, amount: u64) -> Self {
-        Balance {
+        Self {
             value: self.value().sub(amount.as_u256()),
             balance_type: self.balance_type,
         }
+    }
+
+    pub fn mul(&self, other: &Balance) -> Self {
+        assert_eq!(self.balance_type(), other.balance_type());
+        Self {
+            value: self.value().mul(other.value()),
+            balance_type: self.balance_type,
+        }
+    }
+
+    pub fn imul(&self, amount: u64) -> Self {
+        Self {
+            value: self.value().mul(amount.as_u256()),
+            balance_type: self.balance_type,
+        }
+    }
+
+    pub fn amount(&self) -> U256 {
+        self.value.into()
     }
 }
 
@@ -307,6 +345,14 @@ impl U256 {
     pub fn to_string(&self) -> String {
         self.value.to_string()
     }
+
+    pub fn as_u32(&self) -> u32 {
+        self.value.as_u32()
+    }
+
+    pub fn as_u64(&self) -> u64 {
+        self.value.as_u64()
+    }
 }
 
 impl BinarySerializable<'_> for U256 {
@@ -436,13 +482,18 @@ pub mod wasm {
     use crate::traits::{BinarySerializable, ToHex};
     use ethnum::u256;
     use std::cmp::Ordering;
-    use std::ops::Div;
+    use std::ops::{Add, Div};
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use wasm_bindgen::prelude::wasm_bindgen;
 
     #[wasm_bindgen]
     impl Address {
+        #[wasm_bindgen(js_name = "from_string")]
+        pub fn _from_str(str: &str) -> JsResult<Address> {
+            ok_or_jserr!(Self::from_str(str))
+        }
+
         #[wasm_bindgen(js_name = "deserialize")]
         pub fn deserialize_address(data: &[u8]) -> JsResult<Address> {
             ok_or_jserr!(Address::deserialize(data))
@@ -461,6 +512,11 @@ pub mod wasm {
         #[wasm_bindgen(js_name = "eq")]
         pub fn _eq(&self, other: &Address) -> bool {
             self.eq(other)
+        }
+
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> Self {
+            self.clone()
         }
 
         pub fn size() -> u32 {
@@ -483,6 +539,15 @@ pub mod wasm {
         #[wasm_bindgen(js_name = "to_formatted_string")]
         pub fn _to_formatted_string(&self) -> String {
             format!("{} {:?}", self.value.div(&u256::from(10u16).pow(18)), self.balance_type)
+        }
+
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> Self {
+            self.clone()
+        }
+
+        pub fn size() -> u32 {
+            Self::SIZE as u32
         }
     }
 
@@ -508,6 +573,11 @@ pub mod wasm {
             self.eq(other)
         }
 
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> Self {
+            self.clone()
+        }
+
         pub fn size() -> u32 {
             Self::SIZE as u32
         }
@@ -525,6 +595,11 @@ pub mod wasm {
             self.serialize()
         }
 
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> Self {
+            self.clone()
+        }
+
         pub fn size() -> u32 {
             Self::SIZE as u32
         }
@@ -533,7 +608,7 @@ pub mod wasm {
     #[wasm_bindgen]
     impl U256 {
         #[wasm_bindgen(js_name = "deserialize")]
-        pub fn deserialize_u256(data: &[u8]) -> JsResult<U256> {
+        pub fn _deserialize(data: &[u8]) -> JsResult<U256> {
             ok_or_jserr!(U256::deserialize(data))
         }
 
@@ -548,8 +623,14 @@ pub mod wasm {
         }
 
         #[wasm_bindgen(js_name = "from_inverse_probability")]
-        pub fn u256_from_inverse_probability(inverse_prob: &U256) -> JsResult<U256> {
+        pub fn _from_inverse_probability(inverse_prob: &U256) -> JsResult<U256> {
             ok_or_jserr!(U256::from_inverse_probability(inverse_prob.value()))
+        }
+
+        pub fn addn(&self, amount: u32) -> Self {
+            Self {
+                value: self.value().add(u256::from(amount)),
+            }
         }
 
         #[wasm_bindgen(js_name = "eq")]
@@ -564,6 +645,15 @@ pub mod wasm {
                 Ordering::Equal => 0,
                 Ordering::Greater => 1,
             }
+        }
+
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> Self {
+            self.clone()
+        }
+
+        pub fn size() -> u32 {
+            Self::SIZE as u32
         }
     }
 }
