@@ -94,7 +94,7 @@ impl Balance {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn from_str(value: &str, balance_type: BalanceType) -> Self {
         Self {
-            value: u256::from_str_radix(value, 10).unwrap(),
+            value: u256::from_str_radix(value, 10).expect(&format!("invalid number {}", value)),
             balance_type,
         }
     }
