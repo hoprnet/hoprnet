@@ -27,7 +27,7 @@ import {
   keyShareTransform as forwardTransform,
   derivePacketTag,
   derivePRGParameters,
-  derivePRPParameters,
+  derivePRPParameters
 } from './crypto/index.js'
 
 import assert from 'assert'
@@ -38,7 +38,6 @@ import { SECRET_LENGTH } from './constants.js'
 import { Hash } from './types.js'
 
 describe('cryptographic correspondence tests', async function () {
-
   it('mac correspondence', async function () {
     let data = new Uint8Array(32).fill(1)
     let key = new Uint8Array(32)
