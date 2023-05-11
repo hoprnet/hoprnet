@@ -230,10 +230,7 @@ impl Ticket {
 
     /// Signs the ticket using the given private key.
     pub fn sign(&mut self, signing_key: &[u8]) {
-        self.signature = Some(Signature::sign_message(
-            &self.get_hash().to_bytes(),
-            signing_key,
-        ));
+        self.signature = Some(Signature::sign_message(&self.get_hash().to_bytes(), signing_key));
     }
 
     /// Convenience method for creating a zero-hop ticket

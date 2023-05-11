@@ -362,9 +362,7 @@ impl HalfKeyChallenge {
     }
 
     pub fn to_address(&self) -> Address {
-        PublicKey::from_bytes(&self.hkc)
-            .expect("invalid half-key")
-            .to_address()
+        PublicKey::from_bytes(&self.hkc).expect("invalid half-key").to_address()
     }
 }
 
@@ -711,8 +709,7 @@ impl Response {
     pub fn from_half_keys(first: &HalfKey, second: &HalfKey) -> Result<Self> {
         let res = NonZeroScalar::<Secp256k1>::try_from(HalfKey::to_bytes(&first).as_ref())
             .and_then(|s1| {
-                NonZeroScalar::<Secp256k1>::try_from(second.to_bytes().as_ref())
-                    .map(|s2| s1.as_ref() + s2.as_ref())
+                NonZeroScalar::<Secp256k1>::try_from(second.to_bytes().as_ref()).map(|s2| s1.as_ref() + s2.as_ref())
             })
             .map_err(|_| CalculationError)?; // One of the scalars was 0
 
