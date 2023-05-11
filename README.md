@@ -125,9 +125,9 @@ Options:
       --environment <ENVIRONMENT>
           Environment id which the node shall run on [env: HOPRD_ENVIRONMENT=] [possible values: anvil-localhost, master-staging, debug-staging, anvil-localhost2, monte_rosa]
       --identity <identity>
-          The path to the identity file [env: HOPRD_IDENTITY=] [default: /home/robert/.hopr-identity]
+          The path to the identity file [env: HOPRD_IDENTITY=] [default: <IDENTITY_DIR>]
       --data <data>
-          manually specify the data directory to use [env: HOPRD_DATA=] [default: /home/robert/Documents/Work/hoprnet-new2/hoprnet/packages/hoprd/hoprd-db]
+          manually specify the data directory to use [env: HOPRD_DATA=] [default: <DATA_DIR>]
       --host <HOST>
           Host to listen on for P2P connections [env: HOPRD_HOST=] [default: 0.0.0.0:9091]
       --announce
