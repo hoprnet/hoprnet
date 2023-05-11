@@ -1,9 +1,6 @@
-use crate::server_new::{PingFuture, PollBorrow as PollBorrowActive, RelayConnectionIdentifier, Server};
+use crate::server_new::{RelayConnectionIdentifier, Server};
 use async_std::stream::StreamExt;
-use futures::{
-    future::{Future, Join},
-    stream::FuturesUnordered,
-};
+use futures::{future::Future, stream::FuturesUnordered};
 use pin_project_lite::pin_project;
 use std::{
     cell::RefCell,
@@ -33,44 +30,62 @@ impl<St: DuplexStream> Future for PollBorrow<St> {
     type Output = Result<(), String>;
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
-
-        Pin::new(&mut *this.st.borrow_mut()).poll(cx)
+        info!("PollBorrow called");
+        let mut borrowed = this.st.borrow_mut();
+        Pin::new(&mut *borrowed).poll(cx)
+        // info!("PollBorrow released");
     }
 }
 
 pin_project! {
     struct PollActive<St> {
         server: Rc<RefCell<Server<St>>>,
-        #[pin]
-        fut: Option<Join<PollBorrowActive<PingFuture>, PollBorrowActive<PingFuture>>>,
-    }
-}
-
-impl<St: DuplexStream> PollActive<St> {
-    pub fn new(server: Rc<RefCell<Server<St>>>) -> Self {
-        Self { server, fut: None }
+        peer: PeerId,
+        maybe_timeout: Option<u64>
     }
 }
 
 impl<St: DuplexStream> Future for PollActive<St> {
+    type Output = bool;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.project();
+
+        unsafe { Pin::new_unchecked(&mut *this.server.borrow_mut()) }.poll_active(
+            cx,
+            this.peer.to_owned(),
+            this.maybe_timeout.to_owned(),
+        )
+    }
+}
+
+pin_project! {
+    struct PollBothActive<St> {
+        server: Rc<RefCell<Server<St>>>,
+        id: RelayConnectionIdentifier,
+        maybe_timeout: Option<u64>
+    }
+}
+
+impl<St: DuplexStream> PollBothActive<St> {
+    pub fn new(server: Rc<RefCell<Server<St>>>, id: RelayConnectionIdentifier, maybe_timeout: Option<u64>) -> Self {
+        Self {
+            server,
+            id,
+            maybe_timeout,
+        }
+    }
+}
+
+impl<St: DuplexStream> Future for PollBothActive<St> {
     type Output = Option<RelayConnectionIdentifier>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut this = self.project();
+        let this = self.project();
 
-        if this.fut.is_none() {
-            *this.fut = Some(this.server.borrow().both_active(None));
-        }
-
-        match this.fut.as_mut().as_pin_mut().unwrap().poll(cx) {
-            Poll::Pending => Poll::Pending,
-            Poll::Ready((a, b)) => Poll::Ready(if a.is_ok() && b.is_ok() {
-                // No need to prune anything if connection is alive
-                None
-            } else {
-                Some(this.server.borrow().get_id())
-            }),
-        }
+        unsafe { Pin::new_unchecked(&mut *this.server.borrow_mut()) }
+            .poll_both_active(cx, this.maybe_timeout.to_owned())
+            .map(|active| if active { None } else { Some(this.id.to_owned()) })
     }
 }
 
@@ -144,8 +159,18 @@ impl<'a, St: DuplexStream + 'static> RelayConnections<St> {
             }
         };
 
+        info!(
+            "is active called {:?}",
+            self.conns.borrow().keys().map(|x| x.to_string()).collect::<Vec<_>>()
+        );
+
         if let Some(entry) = self.conns.borrow().get(&id) {
-            return entry.borrow().is_active(source, maybe_timeout).await;
+            return PollActive {
+                server: entry.clone(),
+                peer: destination,
+                maybe_timeout,
+            }
+            .await;
         }
 
         false
@@ -195,9 +220,13 @@ impl<'a, St: DuplexStream + 'static> RelayConnections<St> {
     }
 
     pub async fn prune(&self) -> usize {
-        let conns = self.conns.borrow();
-
-        let mut futs = FuturesUnordered::from_iter(conns.iter().map(|(_, conn)| PollActive::new(conn.clone())));
+        info!("pruning connections");
+        let mut futs = FuturesUnordered::from_iter(
+            self.conns
+                .borrow()
+                .iter()
+                .map(|(id, conn)| PollBothActive::new(conn.clone(), id.clone(), None)),
+        );
 
         let mut pruned: usize = 0;
 
@@ -453,7 +482,7 @@ mod tests {
     impl DuplexStream for TestingDuplexStream {}
 
     #[async_std::test]
-    async fn check_if_active() {
+    async fn check_if_both_active() {
         let (stream_a, st_a_send, st_a_receive) = TestingDuplexStream::new();
         let (stream_b, st_b_send, st_b_receive) = TestingDuplexStream::new();
 
@@ -465,7 +494,7 @@ mod tests {
         // Start polling the stream in both directions
         let polled_borrow = PollBorrow { st: server.clone() };
         // Issue a ping request in both directions
-        let polled = PollActive::new(server);
+        let polled = PollBothActive::new(server, (peer_a, peer_b).try_into().unwrap(), None);
 
         let ((_, res), _) = join(join(polled_borrow, polled), async move {
             assert_eq!(
@@ -518,7 +547,7 @@ mod tests {
 
         let server = Rc::new(RefCell::new(Server::new(stream_a, peer_a, stream_b, peer_b)));
 
-        let polled = PollActive::new(server).await;
+        let polled = PollBothActive::new(server, (peer_a, peer_b).try_into().unwrap(), None).await;
 
         assert!(polled.is_some(), "Passive stream should end in a timeout");
         assert!(polled.eq(&Some((peer_a, peer_b).try_into().unwrap())))
