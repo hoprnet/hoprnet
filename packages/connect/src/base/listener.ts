@@ -286,18 +286,12 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
     this._emitListening()
     this.state = ListenerState.LISTENING
 
-    // If node is supposed to announce with routable address -> don't assign to other relays
-    // If node is running behind bidirectional NAT or deteced as not being exposed -> assign to other relays
-    // If node is not supposed to announce with routable address -> assign to other relays as fallback
-    if (this.options.announce && natSituation.isExposed) {
+    // If node is a PRN (the `--announce` flag is set), disable relay functionality
+    // If node is not supposed to have any relayed connection (the `--noRelay` flag is set), disable relay functionality
+    if (this.options.announce || this.options.noRelay) {
       // skip PRN
       return
     }
-
-    // if (!this.options.announce && natSituation.isExposed) {
-    // skip PN
-    //   return
-    //  }
 
     this.connectComponents.getEntryNodes().on(RELAY_CHANGED_EVENT, this._emitListening)
 
