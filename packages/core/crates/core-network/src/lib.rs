@@ -1,5 +1,3 @@
-#[cfg(feature = "wasm")]
-pub mod core;
 pub mod errors;
 pub mod heartbeat;
 pub mod messaging;
