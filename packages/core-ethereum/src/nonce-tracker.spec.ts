@@ -3,7 +3,7 @@ import NonceTracker, { Transaction } from './nonce-tracker.js'
 import { durations, Address } from '@hoprnet/hopr-utils'
 import { BigNumber } from 'ethers'
 
-const USER_ADDRESS = Address.from_string('0x7d3517b0d011698406d6e0aed8453f0be2697926')
+const USER_ADDRESS = Address.from_string('7d3517b0d011698406d6e0aed8453f0be2697926')
 const MAX_PRIORITY_FEE = BigNumber.from('100')
 
 describe('nonce-tracker', function () {

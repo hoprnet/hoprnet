@@ -420,8 +420,8 @@ describe('test indexer', function () {
     })
     // sender node has pending ticket...
     await db.markPending(fixtures.oneLargeTicket)
-    assert.equal((await db.getPendingBalanceTo(PARTY_A().to_address())).toString(), '0')
-    assert.equal((await db.getPendingBalanceTo(PARTY_B().to_address())).toString(), '2')
+    assert.equal((await db.getPendingBalanceTo(PARTY_A().to_address())).to_string(), '0')
+    assert.equal((await db.getPendingBalanceTo(PARTY_B().to_address())).to_string(), '2')
 
     const blockMined = defer<void>()
     indexer.on('block-processed', (blockNumber: number) => {
@@ -439,8 +439,8 @@ describe('test indexer', function () {
     newBlock()
 
     await blockMined.promise
-    assert.equal((await db.getPendingBalanceTo(PARTY_A().to_address())).toString(), '0')
-    assert.equal((await db.getPendingBalanceTo(PARTY_B().to_address())).toString(), '0')
+    assert.equal((await db.getPendingBalanceTo(PARTY_A().to_address())).to_string(), '0')
+    assert.equal((await db.getPendingBalanceTo(PARTY_B().to_address())).to_string(), '0')
   })
 
   it('should process TicketRedeemed event and not reduce outstanding balance for sender when db has no outstanding balance', async function () {
@@ -606,7 +606,7 @@ describe('test indexer', function () {
 
     await indexer.start(chain, 0)
 
-    assert.equal((await db.getHoprBalance()).toString(), '0')
+    assert.equal((await db.getHoprBalance()).to_string(), '0')
 
     // confirmations == 1
     newBlock()
@@ -621,7 +621,7 @@ describe('test indexer', function () {
 
     await thirdBlockProcessed.promise
 
-    assert.equal((await db.getHoprBalance()).toString(), '2')
+    assert.equal((await db.getHoprBalance()).to_string(), '2')
   })
 
   it('should process first 2 registry events and account be registered and eligible', async function () {

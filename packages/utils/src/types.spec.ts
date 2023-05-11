@@ -10,6 +10,7 @@ import {
   Signature as TsSignature,
   Ticket as TsTicket,
   UnacknowledgedTicket as TsUnacknowledgedTicket,
+  generateChannelId
 } from './types/index.js'
 
 import {
@@ -25,7 +26,8 @@ import {
   Hash,
   PublicKey,
   Signature, ethereum_signed_hash,
-  UnacknowledgedTicket
+  UnacknowledgedTicket,
+  generate_channel_id
 } from './types.js'
 
 import assert from 'assert'
@@ -33,7 +35,7 @@ import assert from 'assert'
 import { randomBytes } from 'crypto'
 import BN from 'bn.js'
 import { toEthSignedMessageHash, UINT256 } from './types/index.js'
-import { stringToU8a, u8aToHex } from './u8a/index.js'
+import { stringToU8a, u8aEquals, u8aToHex } from './u8a/index.js'
 import { SIGNATURE_LENGTH } from './constants.js'
 
 let private_key_1 = stringToU8a('0x492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775')
@@ -82,6 +84,13 @@ describe('Rust - TS serialization/deserialization tests', async function () {
     assert.equal(a,b)
 
     assert(Ticket.deserialize(ts_ticket.serialize()).eq(rs_ticket), "ticket serde test failed")
+  })
+
+  it('channel id', async function() {
+    let id1 = generateChannelId(TsPublicKey.deserialize(pub_key_1.serialize(false)).toAddress(), TsPublicKey.deserialize(pub_key_2.serialize(false)).toAddress())
+    let id2 = generate_channel_id(PublicKey.from_privkey(private_key_1).to_address(), PublicKey.from_privkey(private_key_2).to_address())
+
+    assert(u8aEquals(id1.serialize(), id2.serialize()))
   })
 
   it('channel entry', async function() {

@@ -393,7 +393,7 @@ export class Packet {
       throw Error(`Invalid state`)
     }
 
-    const unacknowledged = new UnacknowledgedTicket(this.ticket, this.ownKey, this.previousHop)
+    const unacknowledged = new UnacknowledgedTicket(this.ticket.clone(), this.ownKey.clone(), this.previousHop.clone())
 
     log(
       `Storing unacknowledged ticket. Expecting to receive a preImage for ${this.ackChallenge.to_hex()} from ${pubKeyToPeerId(

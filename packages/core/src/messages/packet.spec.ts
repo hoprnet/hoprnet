@@ -9,9 +9,9 @@ function createMockTickets() {
   const tags = new Set<string>()
   const db = {
     getChannelTo: () => ({
-      getId: () => ({ toHex: () => '0xdeadbeef' }),
-      ticketEpoch: U256.zero(),
-      channelEpoch: U256.zero(),
+      get_id: () => ({ to_hex: () => '0xdeadbeef' }),
+      ticket_epoch: U256.zero(),
+      channel_epoch: U256.zero(),
       balance: new Balance(new BN(100).mul(PRICE_PER_PACKET).toString(10), BalanceType.HOPR)
     }),
     getCurrentTicketIndex: () => {},
