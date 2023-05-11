@@ -575,7 +575,13 @@ impl PublicKey {
     }
 
     pub fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
-        if [ Self::SIZE_UNCOMPRESSED, Self::SIZE_UNCOMPRESSED-1, Self::SIZE_COMPRESSED ].contains(&data.len()) {
+        if [
+            Self::SIZE_UNCOMPRESSED,
+            Self::SIZE_UNCOMPRESSED - 1,
+            Self::SIZE_COMPRESSED,
+        ]
+        .contains(&data.len())
+        {
             let key;
             if data.len() == Self::SIZE_UNCOMPRESSED - 1 {
                 key = elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(&[&[4u8], &data[..]].concat())

@@ -421,8 +421,8 @@ impl U256 {
 /// Unit tests of pure Rust code
 #[cfg(test)]
 mod tests {
-    use hex_literal::hex;
     use super::*;
+    use hex_literal::hex;
 
     #[test]
     fn address_tests() {
@@ -430,7 +430,10 @@ mod tests {
         let addr_2 = Address::from_bytes(&addr_1.to_bytes()).unwrap();
 
         assert_eq!(addr_1, addr_2, "deserialized address does not match");
-        assert_eq!(addr_1, Address::from_str("Cf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9").unwrap());
+        assert_eq!(
+            addr_1,
+            Address::from_str("Cf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9").unwrap()
+        );
     }
 
     #[test]
