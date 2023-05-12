@@ -19,7 +19,6 @@ core-crypto = { path = "../core-crypto" }
 bincode = "1.3.3"
 blake2 = "0.10.4"
 futures = "0.3.26"
-libp2p = { version = "0.51.2", features = ["async-std", "wasm-bindgen", "wasm-ext"] }
 libp2p-identity = { version = "0.1.2", features = ["secp256k1", "peerid"] }
 rand = { version = "0.8.5", features = ["std_rng"] }
 serde = { version = "1", features = ["derive"] }
