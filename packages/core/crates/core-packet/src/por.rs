@@ -13,6 +13,7 @@ pub const POR_SECRET_LENGTH: usize = 2 * PublicKey::SIZE_COMPRESSED;
 
 /// Type that contains the challenge for the first ticket sent to the first relayer.
 #[derive(Clone)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct ProofOfRelayValues {
     pub ack_challenge: HalfKeyChallenge,
     pub ticket_challenge: Challenge,
@@ -257,5 +258,25 @@ mod tests {
             ),
             "Returned response must solve the challenge"
         );
+    }
+}
+
+#[cfg(feature = "wasm")]
+pub mod wasm {
+    use js_sys::Uint8Array;
+    use wasm_bindgen::prelude::wasm_bindgen;
+    use crate::por::ProofOfRelayValues;
+
+    #[wasm_bindgen]
+    impl ProofOfRelayValues {
+        #[wasm_bindgen(constructor)]
+        pub fn _new(secret_b: &[u8], secret_c: Uint8Array) -> Self {
+            if !secret_c.is_null() && !secret_c.is_undefined() {
+                let c_slice = secret_c.to_vec();
+                Self::new(secret_b, Some(c_slice.as_slice()))
+            } else {
+                Self::new(secret_b, None)
+            }
+        }
     }
 }

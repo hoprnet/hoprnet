@@ -11,17 +11,16 @@ import {
   HoprDB,
   PublicKey,
   U256,
-  createPoRValuesForSender,
   u8aEquals,
   ChannelEntry,
   ChannelStatus,
   privKeyToPeerId,
   stringToU8a,
   Hash,
+  HalfKeyChallenge,
   PRICE_PER_PACKET,
   Snapshot
 } from '@hoprnet/hopr-utils'
-import type { HalfKeyChallenge } from '@hoprnet/hopr-utils'
 import assert from 'assert'
 import {
   Packet,
@@ -36,7 +35,8 @@ import type { HoprOptions } from '../../index.js'
 import type { Components } from '@libp2p/interfaces/components'
 import type { Connection, Stream } from '@libp2p/interfaces/connection'
 
-import { derive_ack_key_share, Acknowledgement, AcknowledgementChallenge } from '../../../lib/core_packet.js'
+import { derive_ack_key_share, ProofOfRelayValues, Acknowledgement,
+  AcknowledgementChallenge } from '../../../lib/core_packet.js'
 
 const SECRET_LENGTH = 32
 
@@ -241,14 +241,14 @@ describe('packet acknowledgement', function () {
   it('acknowledgement workflow as sender', async function () {
     const secrets: Uint8Array[] = Array.from({ length: 2 }, () => Uint8Array.from(randomBytes(SECRET_LENGTH)))
 
-    const { ackChallenge } = createPoRValuesForSender(secrets[0], secrets[1])
+    let porv = new ProofOfRelayValues(secrets[0], secrets[1])
 
     const libp2pSelf = createFakeSendReceive(events, SELF)
     const libp2pCounterparty = createFakeSendReceive(events, COUNTERPARTY)
 
     const ackReceived = defer<void>()
 
-    await dbs[0].storePendingAcknowledgement(ackChallenge, true)
+    await dbs[0].storePendingAcknowledgement(porv.ack_challenge, true)
 
     const ackInteration = new AcknowledgementInteraction(
       libp2pSelf.send as any,
@@ -256,7 +256,7 @@ describe('packet acknowledgement', function () {
       SELF,
       dbs[0],
       (receivedAckChallenge: HalfKeyChallenge) => {
-        if (receivedAckChallenge.eq(ackChallenge)) {
+        if (receivedAckChallenge.eq(HalfKeyChallenge.deserialize(porv.ack_challenge.serialize()))) {
           ackReceived.resolve()
         }
       },
