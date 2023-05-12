@@ -1,0 +1,11 @@
+error: couldn't parse trait item
+
+  = note: expected `trait`
+  = note: the #[auto_impl] attribute can only be applied to traits!
+
+ --> $DIR/attr_on_type.rs:4:1
+  |
+4 | #[auto_impl(&, &mut)]
+  | ^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the attribute macro `auto_impl` (in Nightly builds, run with -Z macro-backtrace for more info)
