@@ -36,3 +36,9 @@ wasm-bindgen-test = "0.3.30"
 [target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
 wasm-pack = { workspace = true }
 wasm-opt = { workspace = true }
+
+[package.metadata.wasm-pack.profile.dev]
+wasm-opt = false
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ['-O', '--enable-reference-types']

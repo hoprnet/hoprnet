@@ -98,8 +98,8 @@ export async function createLibp2pInstance(
             supportedEnvironments: supportedEnvironmentsInfo,
             allowLocalConnections: options.allowLocalConnections,
             allowPrivateConnections: options.allowPrivateConnections,
-            // Amount of nodes for which we are willing to act as a relay
-            maxRelayedConnections: 50_000,
+            // Amount of nodes for which we are willing to act as a relay with 2GB memory limit
+            maxRelayedConnections: 2_000,
             announce: options.announce,
             isAllowedToAccessNetwork
           },

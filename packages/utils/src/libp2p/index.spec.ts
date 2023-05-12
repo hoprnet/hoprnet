@@ -128,7 +128,8 @@ function getFakeLibp2p(
                   } as ProtocolStream['stream'],
                   protocol
                 }),
-              remotePeer: destination
+              remotePeer: destination,
+              remoteAddr: new Multiaddr('/ip4/1.2.3.4/tcp/567')
             } as Connection)
           }
         }

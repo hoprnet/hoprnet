@@ -18,8 +18,9 @@ async-std = { version = "1.12.0", features = ["attributes"] }
 core-crypto = { path = "../core-crypto" }
 bincode = "1.3.3"
 blake2 = "0.10.4"
-futures = "0.3.27"
-libp2p-identity = { version = "0.1.1", features = ["secp256k1", "peerid"] }
+futures = "0.3.26"
+libp2p = { version = "0.51.2", features = ["async-std", "wasm-bindgen", "wasm-ext"] }
+libp2p-identity = { version = "0.1.2", features = ["secp256k1", "peerid"] }
 rand = { version = "0.8.5", features = ["std_rng"] }
 serde = { version = "1", features = ["derive"] }
 thiserror = "1.0"
@@ -39,4 +40,10 @@ wasm-bindgen = { workspace = true, optional = true }
 [dev-dependencies]
 mockall = "0.11.3"
 more-asserts = "0.3.1"
-wasm-bindgen-test = "0.3.34"
+wasm-bindgen-test = "0.3.33"
+
+[package.metadata.wasm-pack.profile.dev]
+wasm-opt = false
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ['-O', '--enable-reference-types']
