@@ -145,10 +145,12 @@ pub enum ConnectionStatusMessage {
 }
 
 pin_project! {
+    /// Runs a timeout against a ping request.
+    /// To be waked up once the pong response has arrived.
     pub struct PingFuture {
-        waker: RefCell<Option<Waker>>,
+        waker: Option<Waker>,
         started: u64,
-        ended: RefCell<Option<u64>>,
+        ended: Option<u64>,
         #[pin]
         timeout: Pin<Box<dyn Future<Output = ()>>>
     }
@@ -157,15 +159,15 @@ pin_project! {
 impl PingFuture {
     pub fn new(timeout: Pin<Box<dyn Future<Output = ()>>>) -> Self {
         Self {
-            waker: RefCell::new(None),
+            waker: None,
             started: current_timestamp(),
-            ended: RefCell::new(None),
+            ended: None,
             timeout,
         }
     }
 
-    pub(super) fn wake(&self) -> () {
-        *self.ended.borrow_mut() = Some(current_timestamp());
+    pub(super) fn wake(&mut self) -> () {
+        self.ended = Some(current_timestamp());
 
         if let Some(waker) = self.waker.take() {
             waker.wake();
@@ -178,7 +180,7 @@ impl Future for PingFuture {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
-        if let Some(end) = *this.ended.borrow() {
+        if let Some(end) = *this.ended {
             return Poll::Ready(Ok(end - *this.started));
         }
 
@@ -186,7 +188,7 @@ impl Future for PingFuture {
             return Poll::Ready(Err("timeout".into()));
         }
 
-        *this.waker.borrow_mut() = Some(cx.waker().clone());
+        *this.waker = Some(cx.waker().clone());
 
         Poll::Pending
     }
@@ -211,22 +213,6 @@ impl<F: Future> Future for PollBorrow<F> {
 }
 
 pin_project! {
-    pub struct Server<St> {
-        #[pin]
-        a: End<St>,
-        a_ended: bool,
-        #[pin]
-        b: End<St>,
-        b_ended: bool,
-        waker: RefCell<Option<Waker>>,
-        #[pin]
-        active_a: Option<PollBorrow<PingFuture>>,
-        #[pin]
-        active_b: Option<PollBorrow<PingFuture>>
-    }
-}
-
-pin_project! {
     pub struct End<St> {
         ping_requests: Rc<RefCell<HashMap<[u8;4],Rc<RefCell<PingFuture>>>>>,
         #[pin]
@@ -239,7 +225,6 @@ pin_project! {
         #[pin]
         new_stream_rx: UnboundedReceiver<St>,
         new_stream_tx: UnboundedSender<St>,
-        waker: RefCell<Option<Waker>>,
         ended: bool,
     }
 }
@@ -262,7 +247,6 @@ impl<St: DuplexStream> End<St> {
             status_rx,
             new_stream_rx,
             new_stream_tx,
-            waker: RefCell::new(None),
             ended: false,
         }
     }
@@ -284,9 +268,6 @@ impl<St: DuplexStream> End<St> {
             ]))
             .map_err(|e| e.to_string())?;
 
-        // if let Some(waker) = self.waker.take() {
-        //     waker.wake()
-        // }
         info!("sent ping");
 
         Ok(PollBorrow { fut })
@@ -298,10 +279,6 @@ impl<St: DuplexStream> End<St> {
             Err(e) => return Err(format!("Failed to queue new stream {}", e.to_string())),
         };
 
-        if let Some(waker) = self.waker.take() {
-            waker.wake()
-        }
-
         Ok(())
     }
 
@@ -311,8 +288,6 @@ impl<St: DuplexStream> End<St> {
         cx: &mut Context<'_>,
     ) -> Poll<Result<Option<()>, String>> {
         let mut this = self.project();
-
-        *this.waker.borrow_mut() = Some(cx.waker().clone());
 
         info!("polling future");
 
@@ -351,7 +326,8 @@ impl<St: DuplexStream> End<St> {
                         }
                     }
                     Poll::Pending => {
-                        info!("poll_ready pending");
+                        // We didn't succeed in sending chunk,
+                        // so keep it for a next attempt
                         *this.buffered = Some(chunk);
                         info!("buffered {:?}", this.buffered);
 
@@ -443,7 +419,7 @@ impl<St: DuplexStream> End<St> {
 
                                     if let Some(entry) = this.ping_requests.borrow().get(&id) {
                                         info!("ping wake");
-                                        entry.borrow().wake();
+                                        entry.borrow_mut().wake();
                                     }
                                 }
                                 y if y == StatusMessage::Ping as u8 => {
@@ -477,6 +453,21 @@ impl<St: DuplexStream> End<St> {
     }
 }
 
+pin_project! {
+    pub struct Server<St> {
+        #[pin]
+        a: End<St>,
+        a_ended: bool,
+        #[pin]
+        b: End<St>,
+        b_ended: bool,
+        #[pin]
+        active_a: Option<PollBorrow<PingFuture>>,
+        #[pin]
+        active_b: Option<PollBorrow<PingFuture>>
+    }
+}
+
 impl<St: DuplexStream> Server<St> {
     pub fn new(stream_a: St, peer_a: PeerId, stream_b: St, peer_b: PeerId) -> Self {
         let (status_ab_tx, status_ab_rx) = mpsc::unbounded::<Box<[u8]>>();
@@ -487,7 +478,6 @@ impl<St: DuplexStream> Server<St> {
             a_ended: false,
             b: End::new(stream_b, peer_b.clone(), status_ab_tx, status_ba_rx),
             b_ended: false,
-            waker: RefCell::new(None),
             active_a: None,
             active_b: None,
         }
@@ -505,11 +495,6 @@ impl<St: DuplexStream> Server<St> {
         peer: PeerId,
         maybe_timeout: Option<u64>,
     ) -> Poll<bool> {
-        if let Some(waker) = self.waker.take() {
-            info!("waking server");
-            waker.wake()
-        }
-
         let mut this = self.project();
 
         if peer.eq(&this.a.id) {
@@ -614,12 +599,6 @@ impl<St: DuplexStream> Future for Server<St> {
     type Output = Result<(), String>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        {
-            let this = self.as_mut().project();
-
-            *this.waker.borrow_mut() = Some(cx.waker().clone());
-        }
-
         Poll::Ready(loop {
             let mut pending = false;
 
@@ -889,7 +868,7 @@ mod tests {
 
         let timeout = sleep(Duration::from_millis(1000));
 
-        let ping_fut = PingFuture::new(Box::pin(timeout));
+        let mut ping_fut = PingFuture::new(Box::pin(timeout));
 
         assert!(ping_fut.started >= now);
 
@@ -1050,7 +1029,13 @@ mod tests {
 
         assert_eq!(
             st_receive.collect::<Vec<Box<[u8]>>>().await,
-            vec![Box::new([MessagePrefix::StatusMessage as u8, StatusMessage::Ping as u8]) as Box<[u8]>]
+            vec![
+                Box::new([MessagePrefix::StatusMessage as u8, StatusMessage::Ping as u8]) as Box<[u8]>,
+                Box::new([
+                    MessagePrefix::ConnectionStatus as u8,
+                    ConnectionStatusMessage::Stop as u8,
+                ]) as Box<[u8]>
+            ]
         );
     }
 
@@ -1102,7 +1087,11 @@ mod tests {
             st_a_receive.collect::<Vec<Box<[u8]>>>().await,
             vec![
                 Box::new([MessagePrefix::Payload as u8, 1, 1, 1, 1]) as Box<[u8]>,
-                Box::new([MessagePrefix::WebRTC as u8, 1, 1, 1, 1]) as Box<[u8]>
+                Box::new([MessagePrefix::WebRTC as u8, 1, 1, 1, 1]) as Box<[u8]>,
+                Box::new([
+                    MessagePrefix::ConnectionStatus as u8,
+                    ConnectionStatusMessage::Stop as u8,
+                ]) as Box<[u8]>
             ]
         );
 
@@ -1110,7 +1099,11 @@ mod tests {
             st_b_receive.collect::<Vec<Box<[u8]>>>().await,
             vec![
                 Box::new([MessagePrefix::Payload as u8, 0, 0, 0, 0]) as Box<[u8]>,
-                Box::new([MessagePrefix::WebRTC as u8, 0, 0, 0, 0]) as Box<[u8]>
+                Box::new([MessagePrefix::WebRTC as u8, 0, 0, 0, 0]) as Box<[u8]>,
+                Box::new([
+                    MessagePrefix::ConnectionStatus as u8,
+                    ConnectionStatusMessage::Stop as u8,
+                ]) as Box<[u8]>
             ]
         );
     }
