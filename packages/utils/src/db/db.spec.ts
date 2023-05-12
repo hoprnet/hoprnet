@@ -20,8 +20,15 @@ import {
   ChannelStatus
 } from '../types.js'
 import BN from 'bn.js'
-import { SECP256K1_CONSTANTS } from '../crypto/index.js'
 import { stringToU8a, u8aEquals } from '../u8a/index.js'
+
+export const SECP256K1_CONSTANTS = {
+  PRIVATE_KEY_LENGTH: 32,
+  COMPRESSED_PUBLIC_KEY_LENGTH: 33,
+  UNCOMPRESSED_PUBLIC_KEY_LENGTH: 65,
+  SIGNATURE_LENGTH: 64,
+  RECOVERABLE_SIGNATURE_LENGTH: 65
+}
 
 const TestingSnapshot = new Snapshot(U256.zero(), U256.zero(), U256.zero())
 
