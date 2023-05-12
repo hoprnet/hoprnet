@@ -302,8 +302,6 @@ export class PacketHelper {
       ticket = await createTicket(nextPeer, pathPosition, db, private_key)
     }
 
-    console.log(`1`)
     packet.forward(private_key, PacketTicket.deserialize(ticket.serialize()))
-    console.log(`2`)
   }
 }
