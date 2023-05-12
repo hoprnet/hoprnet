@@ -7,6 +7,7 @@
 - Introduce the possibility of using YAML configuration file and revamp the configuration infrastructure to make the YAML a default base for all configuration types (env vars, cmd line args) ([#4796](https://github.com/hoprnet/hoprnet/pull/4796))
 - Extend hopli so it can derive peer ID from identity files. Add `initiate-node` to perform all the necessary on-chain operations before launching a HOPR node. Accept identity from path. ([#4894](https://github.com/hoprnet/hoprnet/pull/4894))
 - Introduce new types & optimize cryptographic code ([#4974](https://github.com/hoprnet/hoprnet/pull/4974))
+- Create DB functionality shim in Rust ([#4885](https://github.com/hoprnet/hoprnet/pull/4885))
 
 <a name="1.93"></a>
 
@@ -56,6 +57,9 @@
 - Reduce overall connection timeout from 10s to 3s (#[4680](https://github.com/hoprnet/hoprnet/pull/4680))
 - Migrate mixer code to Rust ([#4567](https://github.com/hoprnet/hoprnet/pull/4567))
 - Primitive & basic types re-created in Rust ([#4645](https://github.com/hoprnet/hoprnet/pull/4645)))
+- Automatically switch to DHT `server`-mode if node announces public addresses to DHT ([#4685](https://github.com/hoprnet/hoprnet/pull/4685))
+- Enhance address to sorting when dialing nodes ([#4684](https://github.com/hoprnet/hoprnet/pull/4684))
+- Adjust NAT detection mechanism to correctly detect exposed ports on GCP ([#4692](https://github.com/hoprnet/hoprnet/pull/4692))
 
 <a name="1.91"></a>
 

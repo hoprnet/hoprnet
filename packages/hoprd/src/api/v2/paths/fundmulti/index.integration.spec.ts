@@ -9,15 +9,14 @@ import {
   ALICE_NATIVE_ADDR,
   INVALID_PEER_ID
 } from '../../fixtures.js'
-import { Balance, NativeBalance } from '@hoprnet/hopr-utils'
-import BN from 'bn.js'
+import { Balance, BalanceType } from '@hoprnet/hopr-utils'
 import { STATUS_CODES } from '../../utils.js'
 
 let node = sinon.fake() as any
 node.getId = sinon.fake.returns(ALICE_PEER_ID)
-node.getEthereumAddress = sinon.fake.returns(ALICE_NATIVE_ADDR)
-node.getNativeBalance = sinon.fake.returns(new NativeBalance(new BN(10)))
-node.getBalance = sinon.fake.returns(new Balance(new BN(5)))
+node.getEthereumAddress = sinon.fake.returns(ALICE_NATIVE_ADDR())
+node.getNativeBalance = sinon.fake.returns(new Balance('10', BalanceType.Native))
+node.getBalance = sinon.fake.returns(new Balance('5', BalanceType.HOPR))
 
 node.fundChannel = sinon.fake.returns(Promise.resolve('testReceipt'))
 

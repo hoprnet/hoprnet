@@ -123,7 +123,7 @@ services:
       - hopr-net
 
   grafana:
-    image: grafana/grafana:9.4.7@sha256:1a359d92f40ef98049b1aac3e43cb4a569f5dc0e552caa883a6b6f4ae1eacded
+    image: grafana/grafana:9.5.1@sha256:00a4d2889c2b32f86c50673b1a82cb5b45349f1c24b0a882d11a53518e2ecae4
     user: '472'
     restart: always
     environment:

@@ -1,18 +1,20 @@
 import {
   debug,
   pickVersion,
-  AcknowledgedTicket,
   type HoprDB,
+  create_counter,
+  Acknowledgement,
+  PendingAcknowledgement,
+  AcknowledgedTicket,
   HalfKeyChallenge,
-  Hash,
-  create_counter, serializePendingAcknowledgement
+  PublicKey,
+  Hash
 } from '@hoprnet/hopr-utils'
+
 import type { SendMessage } from '../../index.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { ACKNOWLEDGEMENT_TIMEOUT } from '../../constants.js'
 import { Packet, privateKeyFromPeer } from '../../messages/index.js'
-import { Acknowledgement, PublicKey, UnacknowledgedTicket } from '../../../lib/core_packet.js'
-import { PendingAcknowledgement } from '../../../lib/core_types.js'
 import { Pushable, pushable } from 'it-pushable'
 import type { ResolvedEnvironment } from '../../environment.js'
 import type { Components } from '@libp2p/interfaces/components'
@@ -44,7 +46,7 @@ const metric_sentAcks = create_counter('core_counter_sent_acks', 'Number of sent
 
 const metric_ackedTickets = create_counter('core_counter_acked_tickets', 'Number of acknowledged tickets')
 
-const PREIMAGE_PLACE_HOLDER = new Hash(new Uint8Array(Hash.SIZE).fill(0xff))
+const PREIMAGE_PLACE_HOLDER = new Hash(new Uint8Array(Hash.size()).fill(0xff))
 
 export class AcknowledgementInteraction {
   private incomingAcks: Pushable<Incoming>
@@ -124,7 +126,14 @@ export class AcknowledgementInteraction {
    */
   async handleAcknowledgement(msg: Uint8Array, remotePeer: PeerId): Promise<void> {
     const acknowledgement = Acknowledgement.deserialize(msg)
-    acknowledgement.validate(PublicKey.from_peerid_str(this.privKey.toString()), PublicKey.from_peerid_str(remotePeer.toString()))
+    if (
+      !acknowledgement.validate(
+        PublicKey.from_peerid_str(this.privKey.toString()),
+        PublicKey.from_peerid_str(remotePeer.toString())
+      )
+    ) {
+      throw Error(`could not validate received acknowledgement`)
+    }
 
     // There are three cases:
     // 1. There is an unacknowledged ticket and we are
@@ -135,13 +144,14 @@ export class AcknowledgementInteraction {
     //    a protocol bug or an attacker
     let pending: PendingAcknowledgement
     try {
-      let pa = await this.db.getPendingAcknowledgement(HalfKeyChallenge.deserialize(acknowledgement.ack_challenge().serialize()))
-      pending = PendingAcknowledgement.deserialize(serializePendingAcknowledgement(pa.isMessageSender, pa.ticket))
+      pending = await this.db.getPendingAcknowledgement(acknowledgement.ack_challenge())
     } catch (err: any) {
       // Protocol bug?
       if (err != undefined && err.notFound) {
         log(
-          `Received unexpected acknowledgement for half key challenge ${acknowledgement.ack_challenge().to_hex()} - half key ${acknowledgement.ack_key_share.to_hex()}`
+          `Received unexpected acknowledgement for half key challenge ${acknowledgement
+            .ack_challenge()
+            .to_hex()} - half key ${acknowledgement.ack_key_share.to_hex()}`
         )
       }
       metric_receivedFailedAcks.increment()
@@ -149,19 +159,19 @@ export class AcknowledgementInteraction {
     }
 
     // No pending ticket, nothing to do.
-    if (pending.isMessageSender == true) {
+    if (pending.is_msg_sender()) {
       log(`Received acknowledgement as sender. First relayer has processed the packet.`)
       // Resolves `sendMessage()` promise
-      this.onAcknowledgement(HalfKeyChallenge.deserialize(acknowledgement.ack_challenge().serialize()))
+      this.onAcknowledgement(acknowledgement.ack_challenge())
       metric_receivedSuccessfulAcks.increment()
       // nothing else to do
       return
     }
 
     // Try to unlock our incentive
-    const unacknowledged = pending.ticket
+    const unacknowledged = pending.ticket()
 
-    if (!unacknowledged.verifyChallenge(acknowledgement.ack_key_share)) {
+    if (!unacknowledged.verify_challenge(acknowledgement.ack_key_share)) {
       metric_receivedFailedAcks.increment()
       throw Error(`The acknowledgement is not sufficient to solve the embedded challenge.`)
     }
@@ -178,16 +188,20 @@ export class AcknowledgementInteraction {
       throw e
     }
     const response = unacknowledged.get_response(acknowledgement.ack_key_share)
-    const ticket = unacknowledged.ticket
 
     // Store the acknowledged ticket, regardless if it's a win or a loss
     // create an acked ticket with a pre image place holder
-    const ack = new AcknowledgedTicket(ticket, response, PREIMAGE_PLACE_HOLDER, unacknowledged.signer)
-    log(`Acknowledging ticket. Using response ${response.toHex()}`)
+    const ack = new AcknowledgedTicket(
+      unacknowledged.ticket,
+      response.clone(),
+      PREIMAGE_PLACE_HOLDER.clone(),
+      unacknowledged.signer
+    )
+    log(`Acknowledging ticket. Using response ${response.to_hex()}`)
     // replace the unAcked ticket with Acked ticket.
 
     try {
-      await this.db.replaceUnAckWithAck(HalfKeyChallenge.deserialize(acknowledgement.ack_challenge().serialize()), ack)
+      await this.db.replaceUnAckWithAck(acknowledgement.ack_challenge(), ack)
       log(`Stored acknowledged ticket`)
     } catch (err) {
       log(`ERROR: cannot replace an UnAck ticket with Ack ticket, thus dropping ticket`, err)

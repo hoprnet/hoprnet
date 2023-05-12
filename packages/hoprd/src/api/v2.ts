@@ -147,7 +147,7 @@ export async function setupRestApi(
       },
       address: (input) => {
         try {
-          Address.fromString(input)
+          Address.from_string(input)
         } catch (err) {
           return false
         }

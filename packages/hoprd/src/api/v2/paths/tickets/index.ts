@@ -5,14 +5,14 @@ import { STATUS_CODES } from '../../utils.js'
 
 export var formatTicket = (ticket: Ticket) => {
   return {
-    counterparty: ticket.counterparty.toHex(),
-    challenge: ticket.challenge.toHex(),
-    epoch: ticket.epoch.toBN().toString(),
-    index: ticket.index.toBN().toString(),
-    amount: ticket.amount.toBN().toString(),
-    winProb: ticket.winProb.toBN().toString(),
-    channelEpoch: ticket.channelEpoch.toBN().toString(),
-    signature: ticket.signature.toHex()
+    counterparty: ticket.counterparty.to_hex(),
+    challenge: ticket.challenge.to_hex(),
+    epoch: ticket.epoch.to_string(),
+    index: ticket.index.to_string(),
+    amount: ticket.amount.to_string(),
+    winProb: ticket.win_prob.to_string(),
+    channelEpoch: ticket.channel_epoch.to_string(),
+    signature: ticket.signature.to_hex()
   }
 }
 

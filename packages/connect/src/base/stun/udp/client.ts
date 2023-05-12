@@ -21,16 +21,11 @@ import {
 import { STUN_UDP_TIMEOUT } from './constants.js'
 import { ip6Lookup } from '../../../utils/index.js'
 import { parseStunAddress } from '../utils.js'
+import type { Interface, InterfaceWithoutPort } from '../types.js'
 
 const log = debug('hopr-connect:stun:udp')
 const error = debug('hopr-connect:stun:udp:error')
 const verbose = debug('hopr-connect:verbose:udp:stun')
-
-type Interface = {
-  family: 'IPv4' | 'IPv6'
-  port: number
-  address: string
-}
 
 type Request = {
   multiaddr: Multiaddr
@@ -246,8 +241,8 @@ export function performSTUNRequests(
   socket: Socket,
   timeout = STUN_UDP_TIMEOUT,
   runningLocally = false
-): Promise<[Interface | undefined, Multiaddr[]]> {
-  return new Promise<[Interface | undefined, Multiaddr[]]>((resolve, reject) => {
+): Promise<[Interface | InterfaceWithoutPort | undefined, Multiaddr[]]> {
+  return new Promise<[Interface | InterfaceWithoutPort | undefined, Multiaddr[]]>((resolve, reject) => {
     let successfulResponses = 0
     const requests: Requests = new Map<string, Request>()
 
@@ -270,7 +265,7 @@ export function performSTUNRequests(
     }
 
     /**
-     * Called on received STUN responses.
+     * Called when receiving STUN responses.
      * Validates response and issues a new request if necessary
      * @param response the STUN response
      */
@@ -284,6 +279,7 @@ export function performSTUNRequests(
       }
 
       request.timeout.clear()
+      // The response is invalid, we can't extract any information from it
       if (response.response == undefined || !isUsableResult(response.response, runningLocally)) {
         requests.delete(tIdString)
 
@@ -291,6 +287,7 @@ export function performSTUNRequests(
         if (result != undefined) {
           usedStunServers.push(result[1])
         }
+
         return
       }
 
@@ -301,7 +298,12 @@ export function performSTUNRequests(
       if (successfulResponses == 2) {
         stopListening()
         resolve([
-          sameResponse(requests, response as Required<typeof response>) != undefined ? response.response : undefined,
+          sameResponse(requests, response as Required<typeof response>) != undefined
+            ? response.response
+            : {
+                family: response.response.family,
+                address: response.response.address
+              },
           usedStunServers
         ])
         return
@@ -330,7 +332,7 @@ export function performSTUNRequests(
  * Checks whether the nodes' interface is reachable from the internet
  * @param multiaddrs usable STUN servers
  * @param socket UDP socket to send requests
- * @param timeout
+ * @param timeout [optional] timeout STUN requests
  * @param stunPort [optional] port to receive the STUN response
  * @param runningLocally [optional] use for e2e tests
  * @returns
@@ -382,6 +384,13 @@ export function isUdpExposedHost(
       return
     }
 
+    if ((secondaryInterface as Interface).port == undefined) {
+      log(`Cannot determine own public port of secondary interface, trying local port`)
+
+      // This might not work
+      ;(secondaryInterface as Interface).port = secondarySocket.address().port
+    }
+
     const it = (function* () {
       yield* usedStunServers
       yield* multiaddrs
@@ -400,7 +409,7 @@ export function isUdpExposedHost(
         requests,
         timeout,
         secondarySocket,
-        secondaryInterface.port,
+        (secondaryInterface as Interface).port,
         onTimeoutSecondary,
         onError,
         STUN_QUERY_STATE.SEARCHING_RFC_5780_STUN_SERVER
@@ -451,7 +460,7 @@ export function isUdpExposedHost(
           requests,
           timeout,
           secondarySocket,
-          secondaryInterface.port,
+          (secondaryInterface as Interface).port,
           onTimeoutSecondary,
           onError,
           STUN_QUERY_STATE.SEARCHING_RFC_5780_STUN_SERVER
@@ -481,7 +490,7 @@ export function isUdpExposedHost(
             requests,
             timeout,
             secondarySocket,
-            secondaryInterface.port,
+            (secondaryInterface as Interface).port,
             onTimeoutSecondary,
             onError,
             STUN_QUERY_STATE.SEARCHING_RFC_5780_STUN_SERVER
@@ -520,7 +529,7 @@ export function isUdpExposedHost(
             requests,
             timeout,
             secondarySocket,
-            secondaryInterface.port,
+            (secondaryInterface as Interface).port,
             onTimeoutSecondary,
             onError,
             STUN_QUERY_STATE.SEARCHING_RFC_5780_STUN_SERVER
@@ -538,7 +547,7 @@ export function isUdpExposedHost(
       requests,
       timeout,
       secondarySocket,
-      secondaryInterface.port,
+      (secondaryInterface as Interface).port,
       onTimeoutSecondary,
       onError,
       STUN_QUERY_STATE.SEARCHING_RFC_5780_STUN_SERVER

@@ -1,4 +1,4 @@
-import { HoprDB, UINT256, u8aEquals, Balance, u8aToHex } from '@hoprnet/hopr-utils'
+import { HoprDB, U256, u8aEquals, Balance, BalanceType, u8aToHex } from '@hoprnet/hopr-utils'
 import { PRICE_PER_PACKET } from '@hoprnet/hopr-utils'
 import { Packet, PacketHelper, PacketState, privateKeyFromPeer } from './packet.js'
 import { createSecp256k1PeerId } from '@libp2p/peer-id-factory'
@@ -10,10 +10,10 @@ function createMockTickets() {
   const tags = new Set<string>()
   const db = {
     getChannelTo: () => ({
-      getId: () => ({ toHex: () => '0xdeadbeef' }),
-      ticketEpoch: new UINT256(new BN(0)),
-      channelEpoch: new UINT256(new BN(0)),
-      balance: new Balance(new BN(100).mul(PRICE_PER_PACKET))
+      get_id: () => ({ to_hex: () => '0xdeadbeef' }),
+      ticket_epoch: U256.zero(),
+      channel_epoch: U256.zero(),
+      balance: new Balance(new BN(100).mul(PRICE_PER_PACKET).toString(10), BalanceType.HOPR)
     }),
     getCurrentTicketIndex: () => {},
     setCurrentTicketIndex: () => {},
@@ -29,7 +29,7 @@ function createMockTickets() {
     },
     storeUnacknowledgedTicket: () => Promise.resolve(),
     markPending: () => Promise.resolve(),
-    getPendingBalanceTo: async () => new Balance(new BN(0)),
+    getPendingBalanceTo: async () => Balance.zero(BalanceType.HOPR),
     storePendingAcknowledgement: () => Promise.resolve()
   }
   return { db: db as any as HoprDB }

@@ -1,11 +1,13 @@
-use crate::errors::{GeneralError::InvalidInput, GeneralError::ParseError, Result};
-use crate::traits::{BinarySerializable, ToHex};
 use ethnum::{u256, AsU256};
-use std::ops::{Add, Sub};
+use serde::{Deserialize, Serialize};
+use std::ops::{Add, Mul, Sub};
 use std::string::ToString;
 
+use crate::errors::{GeneralError::InvalidInput, GeneralError::ParseError, Result};
+use crate::traits::{BinarySerializable, ToHex};
+
 /// Represents an Ethereum address
-#[derive(Clone, Copy, Eq, PartialEq, Debug)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Address {
     addr: [u8; Self::SIZE],
@@ -29,6 +31,13 @@ impl Address {
         ret
     }
 
+    pub fn to_bytes32(&self) -> Box<[u8]> {
+        let mut ret = Vec::with_capacity(12 + Self::SIZE);
+        ret.extend_from_slice(&[0u8; 12]);
+        ret.extend_from_slice(&self.addr);
+        ret.into_boxed_slice()
+    }
+
     // impl std::string::ToString {
     pub fn to_string(&self) -> String {
         self.to_hex()
@@ -39,7 +48,7 @@ impl Address {
 impl BinarySerializable<'_> for Address {
     const SIZE: usize = 20;
 
-    fn deserialize(data: &[u8]) -> Result<Self> {
+    fn from_bytes(data: &[u8]) -> Result<Self> {
         if data.len() == Self::SIZE {
             let mut ret = Address {
                 addr: [0u8; Self::SIZE],
@@ -51,7 +60,7 @@ impl BinarySerializable<'_> for Address {
         }
     }
 
-    fn serialize(&self) -> Box<[u8]> {
+    fn to_bytes(&self) -> Box<[u8]> {
         self.addr.into()
     }
 }
@@ -59,13 +68,13 @@ impl BinarySerializable<'_> for Address {
 impl Address {
     // impl std::str::FromStr for Address {
     pub fn from_str(value: &str) -> Result<Address> {
-        Self::deserialize(&hex::decode(value).map_err(|_| ParseError)?)
+        Self::from_bytes(&hex::decode(value).map_err(|_| ParseError)?)
     }
     // }
 }
 
 /// Represents a type of the balance: native or HOPR tokens.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub enum BalanceType {
     Native,
@@ -73,7 +82,7 @@ pub enum BalanceType {
 }
 
 /// Represents balance of some coin or token.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Balance {
     value: u256,
@@ -84,8 +93,15 @@ pub struct Balance {
 impl Balance {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn from_str(value: &str, balance_type: BalanceType) -> Self {
-        Balance {
-            value: u256::from_str_radix(value, 10).unwrap(),
+        Self {
+            value: u256::from_str_radix(value, 10).expect(&format!("invalid number {}", value)),
+            balance_type,
+        }
+    }
+
+    pub fn zero(balance_type: BalanceType) -> Self {
+        Self {
+            value: u256::ZERO,
             balance_type,
         }
     }
@@ -93,6 +109,11 @@ impl Balance {
     /// Retrieves the type (symbol) of the balance
     pub fn balance_type(&self) -> BalanceType {
         self.balance_type
+    }
+
+    /// Creates balance of the given value with the same symbol
+    pub fn of_same(&self, value: &str) -> Self {
+        Self::from_str(value, self.balance_type)
     }
 
     // impl ToHex for Balance {
@@ -140,14 +161,14 @@ impl Balance {
 
     pub fn add(&self, other: &Balance) -> Self {
         assert_eq!(self.balance_type(), other.balance_type());
-        Balance {
+        Self {
             value: self.value().add(other.value()),
             balance_type: self.balance_type,
         }
     }
 
     pub fn iadd(&self, amount: u64) -> Self {
-        Balance {
+        Self {
             value: self.value().add(amount.as_u256()),
             balance_type: self.balance_type,
         }
@@ -155,25 +176,36 @@ impl Balance {
 
     pub fn sub(&self, other: &Balance) -> Self {
         assert_eq!(self.balance_type(), other.balance_type());
-        Balance {
+        Self {
             value: self.value().sub(other.value()),
             balance_type: self.balance_type,
         }
     }
 
     pub fn isub(&self, amount: u64) -> Self {
-        Balance {
+        Self {
             value: self.value().sub(amount.as_u256()),
             balance_type: self.balance_type,
         }
     }
 
-    pub fn to_formatted_string(&self, units: u32) -> String {
-        let precision: usize = units as usize;
-        let exp10 = u256::from(10u8).pow(units);
-        let integer = self.value / exp10;
-        let decimals = (self.value % exp10).to_string();
-        format!("{integer}.{decimals:0>precision$} {:?}", self.balance_type)
+    pub fn mul(&self, other: &Balance) -> Self {
+        assert_eq!(self.balance_type(), other.balance_type());
+        Self {
+            value: self.value().mul(other.value()),
+            balance_type: self.balance_type,
+        }
+    }
+
+    pub fn imul(&self, amount: u64) -> Self {
+        Self {
+            value: self.value().mul(amount.as_u256()),
+            balance_type: self.balance_type,
+        }
+    }
+
+    pub fn amount(&self) -> U256 {
+        self.value.into()
     }
 }
 
@@ -198,7 +230,7 @@ impl Balance {
 }
 
 /// Represents and Ethereum challenge.
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct EthereumChallenge {
     challenge: [u8; Self::SIZE],
@@ -227,7 +259,7 @@ impl EthereumChallenge {
 impl BinarySerializable<'_> for EthereumChallenge {
     const SIZE: usize = 20;
 
-    fn deserialize(data: &[u8]) -> Result<Self> {
+    fn from_bytes(data: &[u8]) -> Result<Self> {
         if data.len() == Self::SIZE {
             Ok(EthereumChallenge::new(data))
         } else {
@@ -235,7 +267,7 @@ impl BinarySerializable<'_> for EthereumChallenge {
         }
     }
 
-    fn serialize(&self) -> Box<[u8]> {
+    fn to_bytes(&self) -> Box<[u8]> {
         self.challenge.into()
     }
 }
@@ -264,29 +296,30 @@ impl Snapshot {
 impl BinarySerializable<'_> for Snapshot {
     const SIZE: usize = 3 * U256::SIZE;
 
-    fn deserialize(data: &[u8]) -> Result<Self> {
+    fn from_bytes(data: &[u8]) -> Result<Self> {
         if data.len() == Self::SIZE {
             Ok(Self {
-                block_number: U256::deserialize(&data[0..U256::SIZE])?,
-                transaction_index: U256::deserialize(&data[U256::SIZE..2 * U256::SIZE])?,
-                log_index: U256::deserialize(&data[2 * U256::SIZE..3 * U256::SIZE])?,
+                block_number: U256::from_bytes(&data[0..U256::SIZE])?,
+                transaction_index: U256::from_bytes(&data[U256::SIZE..2 * U256::SIZE])?,
+                log_index: U256::from_bytes(&data[2 * U256::SIZE..3 * U256::SIZE])?,
             })
         } else {
             Err(ParseError)
         }
     }
 
-    fn serialize(&self) -> Box<[u8]> {
+    fn to_bytes(&self) -> Box<[u8]> {
         let mut ret = Vec::<u8>::with_capacity(Self::SIZE);
-        ret.extend_from_slice(&self.block_number.serialize());
-        ret.extend_from_slice(&self.transaction_index.serialize());
-        ret.extend_from_slice(&self.log_index.serialize());
+
+        ret.extend_from_slice(&self.block_number.to_bytes());
+        ret.extend_from_slice(&self.transaction_index.to_bytes());
+        ret.extend_from_slice(&self.log_index.to_bytes());
         ret.into_boxed_slice()
     }
 }
 
 /// Represents the Ethereum's basic numeric type - unsigned 256-bit integer
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct U256 {
     value: u256,
@@ -312,18 +345,26 @@ impl U256 {
     pub fn to_string(&self) -> String {
         self.value.to_string()
     }
+
+    pub fn as_u32(&self) -> u32 {
+        self.value.as_u32()
+    }
+
+    pub fn as_u64(&self) -> u64 {
+        self.value.as_u64()
+    }
 }
 
 impl BinarySerializable<'_> for U256 {
     const SIZE: usize = 32;
 
-    fn deserialize(data: &[u8]) -> Result<Self> {
+    fn from_bytes(data: &[u8]) -> Result<Self> {
         Ok(U256 {
             value: u256::from_be_bytes(data.try_into().map_err(|_| ParseError)?),
         })
     }
 
-    fn serialize(&self) -> Box<[u8]> {
+    fn to_bytes(&self) -> Box<[u8]> {
         self.value.to_be_bytes().into()
     }
 }
@@ -381,13 +422,18 @@ impl U256 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use hex_literal::hex;
 
     #[test]
     fn address_tests() {
-        let addr_1 = Address::default();
-        let addr_2 = Address::deserialize(&addr_1.serialize()).unwrap();
+        let addr_1 = Address::from_bytes(&hex!("Cf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9")).unwrap();
+        let addr_2 = Address::from_bytes(&addr_1.to_bytes()).unwrap();
 
         assert_eq!(addr_1, addr_2, "deserialized address does not match");
+        assert_eq!(
+            addr_1,
+            Address::from_str("Cf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9").unwrap()
+        );
     }
 
     #[test]
@@ -407,16 +453,13 @@ mod tests {
         assert!(b3.lt(&b4) && b4.gt(&b3), "lte or lt test failed");
         assert!(b3.lte(&b3) && b4.gte(&b4), "gte or gt test failed");
 
-        let test_bal = Balance::from_str("100000000000000000", BalanceType::HOPR);
-        assert_eq!("0.100000000000000000 HOPR", test_bal.to_formatted_string(18));
-
         //assert!(Balance::new(100_u32.into()).lte(), "lte or lte test failed")
     }
 
     #[test]
     fn eth_challenge_tests() {
         let e_1 = EthereumChallenge::default();
-        let e_2 = EthereumChallenge::deserialize(&e_1.serialize()).unwrap();
+        let e_2 = EthereumChallenge::from_bytes(&e_1.to_bytes()).unwrap();
 
         assert_eq!(e_1, e_2);
     }
@@ -424,7 +467,7 @@ mod tests {
     #[test]
     fn snapshot_tests() {
         let s1 = Snapshot::new(1234_u32.into(), 4567_u32.into(), 102030_u32.into());
-        let s2 = Snapshot::deserialize(&s1.serialize()).unwrap();
+        let s2 = Snapshot::from_bytes(&s1.to_bytes()).unwrap();
 
         assert_eq!(s1, s2);
     }
@@ -432,7 +475,7 @@ mod tests {
     #[test]
     fn u256_tests() {
         let u_1 = U256::new("1234567899876543210");
-        let u_2 = U256::deserialize(&u_1.serialize()).unwrap();
+        let u_2 = U256::from_bytes(&u_1.to_bytes()).unwrap();
 
         assert_eq!(u_1, u_2);
     }
@@ -442,16 +485,23 @@ mod tests {
 pub mod wasm {
     use crate::primitives::{Address, Balance, BalanceType, EthereumChallenge, Snapshot, U256};
     use crate::traits::{BinarySerializable, ToHex};
+    use ethnum::u256;
     use std::cmp::Ordering;
+    use std::ops::{Add, Div};
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use wasm_bindgen::prelude::wasm_bindgen;
 
     #[wasm_bindgen]
     impl Address {
+        #[wasm_bindgen(js_name = "from_string")]
+        pub fn _from_str(str: &str) -> JsResult<Address> {
+            ok_or_jserr!(Self::from_str(str))
+        }
+
         #[wasm_bindgen(js_name = "deserialize")]
         pub fn _deserialize(data: &[u8]) -> JsResult<Address> {
-            ok_or_jserr!(Address::deserialize(data))
+            ok_or_jserr!(Address::from_bytes(data))
         }
 
         #[wasm_bindgen(js_name = "to_hex")]
@@ -461,12 +511,17 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "serialize")]
         pub fn _serialize(&self) -> Box<[u8]> {
-            self.serialize()
+            self.to_bytes()
         }
 
         #[wasm_bindgen(js_name = "eq")]
         pub fn _eq(&self, other: &Address) -> bool {
             self.eq(other)
+        }
+
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> Self {
+            self.clone()
         }
 
         pub fn size() -> u32 {
@@ -485,18 +540,32 @@ pub mod wasm {
         pub fn _eq(&self, other: &Balance) -> bool {
             self.eq(other)
         }
+
+        #[wasm_bindgen(js_name = "to_formatted_string")]
+        pub fn _to_formatted_string(&self) -> String {
+            format!("{} {:?}", self.value.div(&u256::from(10u16).pow(18)), self.balance_type)
+        }
+
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> Self {
+            self.clone()
+        }
+
+        pub fn size() -> u32 {
+            Self::SIZE as u32
+        }
     }
 
     #[wasm_bindgen]
     impl EthereumChallenge {
         #[wasm_bindgen(js_name = "deserialize")]
         pub fn deserialize_challenge(data: &[u8]) -> JsResult<EthereumChallenge> {
-            ok_or_jserr!(EthereumChallenge::deserialize(data))
+            ok_or_jserr!(EthereumChallenge::from_bytes(data))
         }
 
         #[wasm_bindgen(js_name = "serialize")]
         pub fn _serialize(&self) -> Box<[u8]> {
-            self.serialize()
+            self.to_bytes()
         }
 
         #[wasm_bindgen(js_name = "to_hex")]
@@ -509,6 +578,11 @@ pub mod wasm {
             self.eq(other)
         }
 
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> Self {
+            self.clone()
+        }
+
         pub fn size() -> u32 {
             Self::SIZE as u32
         }
@@ -518,12 +592,17 @@ pub mod wasm {
     impl Snapshot {
         #[wasm_bindgen(js_name = "deserialize")]
         pub fn _deserialize(data: &[u8]) -> JsResult<Snapshot> {
-            ok_or_jserr!(Snapshot::deserialize(data))
+            ok_or_jserr!(Snapshot::from_bytes(data))
         }
 
         #[wasm_bindgen(js_name = "serialize")]
         pub fn _serialize(&self) -> Box<[u8]> {
-            self.serialize()
+            self.to_bytes()
+        }
+
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> Self {
+            self.clone()
         }
 
         pub fn size() -> u32 {
@@ -540,12 +619,12 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "deserialize")]
         pub fn _deserialize(data: &[u8]) -> JsResult<U256> {
-            ok_or_jserr!(U256::deserialize(data))
+            ok_or_jserr!(U256::from_bytes(data))
         }
 
         #[wasm_bindgen(js_name = "serialize")]
         pub fn _serialize(&self) -> Box<[u8]> {
-            self.serialize()
+            self.to_bytes()
         }
 
         #[wasm_bindgen(js_name = "to_hex")]
@@ -556,6 +635,12 @@ pub mod wasm {
         #[wasm_bindgen(js_name = "from_inverse_probability")]
         pub fn _from_inverse_probability(inverse_prob: &U256) -> JsResult<U256> {
             ok_or_jserr!(U256::from_inverse_probability(inverse_prob.value()))
+        }
+
+        pub fn addn(&self, amount: u32) -> Self {
+            Self {
+                value: self.value().add(u256::from(amount)),
+            }
         }
 
         #[wasm_bindgen(js_name = "eq")]
@@ -570,6 +655,15 @@ pub mod wasm {
                 Ordering::Equal => 0,
                 Ordering::Greater => 1,
             }
+        }
+
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> Self {
+            self.clone()
+        }
+
+        pub fn size() -> u32 {
+            Self::SIZE as u32
         }
     }
 }

@@ -4,8 +4,8 @@
 //
 // We need to persist this string of commitments in the database, and support
 // syncing back and forth with those that have been persisted on chain.
-import { debug, Hash, HoprDB, iterateHash, recoverIteratedHash, toU8a, u8aConcat, UINT256 } from '@hoprnet/hopr-utils'
-import { deriveCommitmentSeed } from '@hoprnet/hopr-utils'
+import { debug, Hash, HoprDB, toU8a, u8aConcat, U256, recoverIteratedHash, iterateHash } from '@hoprnet/hopr-utils'
+import { derive_commitment_seed } from '@hoprnet/hopr-core/lib/core_crypto.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { keysPBM } from '@libp2p/crypto/keys'
 
@@ -15,7 +15,7 @@ export const DB_ITERATION_BLOCK_SIZE = 10000
 export const TOTAL_ITERATIONS = 100000
 
 function hashFunction(msg: Uint8Array): Uint8Array {
-  return Hash.create(msg).serialize().slice(0, Hash.SIZE)
+  return Hash.create([msg]).serialize().slice(0, Hash.size())
 }
 
 function searchDBFor(db: HoprDB, channelId: Hash, iteration: number): Promise<Uint8Array | undefined> {
@@ -32,7 +32,7 @@ export async function findCommitmentPreImage(db: HoprDB, channelId: Hash): Promi
     DB_ITERATION_BLOCK_SIZE
   )
   if (result == undefined) {
-    throw Error(`Could not find preImage. Searching for ${currentCommitment.toHex()}`)
+    throw Error(`Could not find preImage. Searching for ${currentCommitment.to_hex()}`)
   }
   return new Hash(Uint8Array.from(result.preImage))
 }
@@ -56,7 +56,22 @@ async function createCommitmentChain(
     TOTAL_ITERATIONS,
     DB_ITERATION_BLOCK_SIZE
   )
-  await db.storeHashIntermediaries(channelId, intermediates)
+  // TODO: Faking the WASM object here before the logic for async commitment computation is migrated too
+  let itHashes = {
+    hash: () => hash,
+    count_intermediates: () => intermediates.length,
+    intermediate: (n: number) => {
+      let it = intermediates[n]
+      return {
+        intermediate: it.preImage,
+        iteration: it.iteration,
+        free: () => {}
+      }
+    },
+    free: () => {}
+  }
+
+  await db.storeHashIntermediaries(channelId, itHashes)
   const current = new Hash(Uint8Array.from(hash))
   await Promise.all([db.setCurrentCommitment(channelId, current), setChainCommitment(current)])
   log('commitment chain initialized')
@@ -71,7 +86,7 @@ export class ChannelCommitmentInfo {
     public readonly chainId: number,
     public readonly contractAddress: string,
     public readonly channelId: Hash,
-    public readonly channelEpoch: UINT256
+    public readonly channelEpoch: U256
   ) {}
 
   /**
@@ -96,7 +111,7 @@ export class ChannelCommitmentInfo {
       new TextEncoder().encode(this.contractAddress)
     )
 
-    return deriveCommitmentSeed(keysPBM.PrivateKey.decode(peerId.privateKey).Data, channelSeedInfo)
+    return derive_commitment_seed(keysPBM.PrivateKey.decode(peerId.privateKey).Data, channelSeedInfo)
   }
 }
 

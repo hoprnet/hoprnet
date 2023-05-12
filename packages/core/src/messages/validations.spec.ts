@@ -1,92 +1,90 @@
+import { Hash, stringToU8a } from '@hoprnet/hopr-utils'
+import BN from 'bn.js'
 import { peerIdFromString } from '@libp2p/peer-id'
 import chaiAsPromised from 'chai-as-promised'
 import chai, { expect } from 'chai'
-import { validateUnacknowledgedTicket } from './index.js'
 import {
+  Address,
   Balance,
   BalanceType,
-  ChannelEntry,
-  Address,
   PublicKey,
   U256,
   Ticket,
-  ChannelStatus,
-  Hash
-} from '../../lib/core_packet.js'
-import { stringToU8a } from '@hoprnet/hopr-utils'
+  ChannelEntry,
+  ChannelStatus
+} from '@hoprnet/hopr-utils'
+import { validateUnacknowledgedTicket } from './index.js'
+import { PeerId } from '@libp2p/interface-peer-id'
 
 chai.use(chaiAsPromised)
 
 // target is party A, sender is party B
-const TARGET_PRIV = stringToU8a('0x5bf21ea8cccd69aa784346b07bf79c84dac606e00eecaa68bf8c31aff397b1ca')
-const TARGET_PUBKEY = PublicKey.from_privkey(TARGET_PRIV)
-
-const SENDER_PRIV = stringToU8a('0x3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa')
-const SENDER_PUBKEY = PublicKey.from_privkey(SENDER_PRIV)
-
-const TARGET = peerIdFromString(TARGET_PUBKEY.to_peerid_str())
-//const TARGET_ADDRESS = TARGET_PUBKEY.to_address()
-
-const SENDER = peerIdFromString(SENDER_PUBKEY.to_peerid_str())
-//const SENDER_ADDRESS = PARTY_B.public.to_address()
+const TARGET = peerIdFromString('16Uiu2HAmM9KAPaXA4eAz58Q7Eb3LEkDvLarU4utkyLwDeEK6vM5m')
+const TARGET_PUBKEY = () => PublicKey.from_peerid_str(TARGET.toString())
+const TARGET_ADDRESS = () => new Address(stringToU8a('0x65e78d07acf7b654e5ae6777a93ebbf30f639356'))
+const SENDER = peerIdFromString('16Uiu2HAm5g4fTADcjPQrtp9LtN2wCmPJTQPD7vMnWCZp4kwKCVUT')
+// const SENDER_ADDRESS = new Address(stringToU8a('0xf3a509473be4bcd8af0d1961d75a5a3dc9e47ba0'))
 
 const createMockTicket = ({
-                            targetAddress,
-                            amount,
-                            winProb,
-                            epoch,
-                            index,
-                            channelEpoch
-                          }: {
+  sender = SENDER,
+  targetAddress = TARGET_ADDRESS(),
+  amount = new Balance('1', BalanceType.HOPR),
+  win_prob = U256.from_inverse_probability(U256.one()),
+  epoch = U256.one(),
+  index = U256.one(),
+  channel_epoch = U256.one()
+}: {
+  sender?: PeerId
   targetAddress?: Address
   amount?: Balance
-  winProb?: U256
+  win_prob?: U256
   epoch?: U256
   index?: U256
-  channelEpoch?: U256
+  channel_epoch?: U256
 }) => {
-  return Ticket.new(
-    targetAddress ?? PublicKey.from_privkey(TARGET_PRIV).to_address(),
-    undefined,
-    epoch ?? U256.one(),
-    index ?? U256.one(),
-    amount ?? new Balance('1', BalanceType.HOPR),
-    winProb ?? U256.from_inverse_probability(U256.one()),
-    channelEpoch ?? U256.one(),
-    SENDER_PRIV
-  )
+  return {
+    counterparty: targetAddress,
+    challenge: new Uint8Array(),
+    amount,
+    win_prob,
+    epoch,
+    index,
+    channel_epoch,
+    verify: (pubKey: PublicKey) => pubKey.eq(PublicKey.from_peerid_str(sender.toString()))
+  } as unknown as Ticket
 }
 
-
-function mockChannelEntry (isChannelOpen?: boolean, // true
-  balance?: Balance, // = new Balance('100', BalanceType.HOPR),
-  ticketEpoch?: U256, //= U256.one(),
-  ticketIndex?: U256// = U256.zero()
-) {
-  return new ChannelEntry(
-    PublicKey.from_privkey(TARGET_PRIV),
-    PublicKey.from_privkey(TARGET_PRIV),
-    balance ?? new Balance('100', BalanceType.HOPR),
-    Hash.create([stringToU8a("0xdeadbeef")]),
-    ticketEpoch ?? U256.one(),
-    ticketIndex ?? U256.zero(),
-    (isChannelOpen ?? true) ? ChannelStatus.Open : ChannelStatus.Closed,
-    U256.one(),
-    U256.zero()
+const mockChannelEntry = (
+  isChannelOpen: boolean = true,
+  balance: Balance = new Balance('100', BalanceType.HOPR),
+  ticketEpoch = U256.one(),
+  ticketIndex = U256.zero()
+) =>
+  Promise.resolve(
+    new ChannelEntry(
+      TARGET_PUBKEY(),
+      TARGET_PUBKEY(),
+      balance,
+      Hash.create([stringToU8a('0xdeadbeef')]),
+      ticketEpoch,
+      ticketIndex,
+      isChannelOpen ? ChannelStatus.Open : ChannelStatus.Closed,
+      U256.one(),
+      U256.zero()
+    )
   )
-}
 
 const getTicketsMock = async (): Promise<Ticket[]> => []
 
 describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket', function () {
   it('should pass if ticket is okay', async function () {
-    const signedTicket = createMockTicket({ targetAddress: TARGET_PUBKEY.to_address() })
+    const signedTicket = createMockTicket({})
 
     return expect(
       validateUnacknowledgedTicket(
         SENDER,
-        new Balance('1', BalanceType.HOPR),
-        U256.one(),
+        new BN(1),
+        new BN(1),
         signedTicket,
         await mockChannelEntry(),
         getTicketsMock,
@@ -101,8 +99,8 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
     return expect(
       validateUnacknowledgedTicket(
         TARGET,
-        new Balance('2', BalanceType.HOPR),
-        U256.one(),
+        new BN(2),
+        new BN(1),
         signedTicket,
         await mockChannelEntry(),
         getTicketsMock,
@@ -117,8 +115,8 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
     return expect(
       validateUnacknowledgedTicket(
         SENDER,
-        new Balance('2', BalanceType.HOPR),
-        U256.one(),
+        new BN(2),
+        new BN(1),
         signedTicket,
         await mockChannelEntry(),
         getTicketsMock,
@@ -128,16 +126,15 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
   })
 
   it('should throw when ticket chance is low', async function () {
-
     const signedTicket = createMockTicket({
-      winProb: U256.from_inverse_probability(U256.from(2))
+      win_prob: U256.from_inverse_probability(new U256('2'))
     })
 
     return expect(
       validateUnacknowledgedTicket(
         SENDER,
-        new Balance('1', BalanceType.HOPR),
-        U256.one(),
+        new BN(1),
+        new BN(1),
         signedTicket,
         await mockChannelEntry(),
         getTicketsMock,
@@ -152,8 +149,8 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
     return expect(
       validateUnacknowledgedTicket(
         SENDER,
-        new Balance('1', BalanceType.HOPR),
-        U256.one(),
+        new BN(1),
+        new BN(1),
         signedTicket,
         await mockChannelEntry(false),
         getTicketsMock,
@@ -164,23 +161,23 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
 
   it('should throw if ticket epoch does not match our account epoch', async function () {
     const signedTicket = createMockTicket({})
-    const mockChannel = await mockChannelEntry(true, new Balance('100', BalanceType.HOPR), U256.from(2))
+    const mockChannel = await mockChannelEntry(true, new Balance('100', BalanceType.HOPR), new U256('2'))
 
     return expect(
-      validateUnacknowledgedTicket(SENDER, new Balance('1', BalanceType.HOPR), U256.one(), signedTicket, mockChannel, getTicketsMock, true)
+      validateUnacknowledgedTicket(SENDER, new BN(1), new BN(1), signedTicket, mockChannel, getTicketsMock, true)
     ).to.eventually.rejectedWith('does not match our account epoch')
   })
 
   it("should throw if ticket's channel iteration does not match the current channel iteration", async function () {
     const signedTicket = createMockTicket({
-      channelEpoch: U256.from(2)
+      channel_epoch: new U256('2')
     })
 
     return expect(
       validateUnacknowledgedTicket(
         SENDER,
-        new Balance('1', BalanceType.HOPR),
-        U256.one(),
+        new BN(1),
+        new BN(1),
         signedTicket,
         await mockChannelEntry(),
         getTicketsMock,
@@ -191,38 +188,28 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
 
   it("should not throw if ticket's index is smaller than the last ticket index", async function () {
     const signedTicket = createMockTicket({})
-    const mockChannel = await mockChannelEntry(
-      true,
-      new Balance('100', BalanceType.HOPR),
-      U256.one(),
-      U256.from(2)
-    )
+    const mockChannel = await mockChannelEntry(true, new Balance('100', BalanceType.HOPR), new U256('1'), new U256('2'))
 
     return expect(
-      validateUnacknowledgedTicket(SENDER, new Balance('1', BalanceType.HOPR), U256.one(), signedTicket, mockChannel, getTicketsMock, true)
+      validateUnacknowledgedTicket(SENDER, new BN(1), new BN(1), signedTicket, mockChannel, getTicketsMock, true)
     ).to.not.eventually.rejected
   })
 
   it("should not throw if ticket's index is smaller than the last ticket index when you include unredeemed tickets", async function () {
     const signedTicket = createMockTicket({})
-    const mockChannel = await mockChannelEntry(
-      true,
-      new Balance('200',  BalanceType.HOPR),
-      U256.one(),
-      U256.one()
-    )
+    const mockChannel = await mockChannelEntry(true, new Balance('200', BalanceType.HOPR), U256.one(), U256.one())
     const ticketsInDb = [
       createMockTicket({
         amount: new Balance('100', BalanceType.HOPR),
-        index: U256.from(2)
+        index: new U256('2')
       })
     ]
 
     return expect(
       validateUnacknowledgedTicket(
         SENDER,
-        new Balance('1', BalanceType.HOPR),
-        U256.one(),
+        new BN(1),
+        new BN(1),
         signedTicket,
         mockChannel,
         async () => ticketsInDb,
@@ -237,15 +224,15 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
     return expect(
       validateUnacknowledgedTicket(
         SENDER,
-        new Balance('1', BalanceType.HOPR),
-        U256.one(),
+        new BN(1),
+        new BN(1),
         signedTicket,
-        await mockChannelEntry(true, new Balance('0', BalanceType.HOPR)),
+        await mockChannelEntry(true, Balance.zero(BalanceType.HOPR)),
         getTicketsMock,
         true
       )
     ).to.eventually.rejectedWith(
-      'Payment channel b7049e3285ed36f84f075549cc34190f42f3ce8ed666400d63e928f10f1d5ed8 does not have enough funds'
+      'Payment channel 434c7d4fdeadfc5b67c251d1a421d2d73e90c81355ade7744af5dddf160c27df does not have enough funds'
     )
   })
 
@@ -260,15 +247,15 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
     return expect(
       validateUnacknowledgedTicket(
         SENDER,
-        new Balance('1', BalanceType.HOPR),
-        U256.one(),
+        new BN(1),
+        new BN(1),
         signedTicket,
         await mockChannelEntry(),
         async () => ticketsInDb,
         true
       )
     ).to.eventually.rejectedWith(
-      'Payment channel b7049e3285ed36f84f075549cc34190f42f3ce8ed666400d63e928f10f1d5ed8 does not have enough funds'
+      'Payment channel 434c7d4fdeadfc5b67c251d1a421d2d73e90c81355ade7744af5dddf160c27df does not have enough funds'
     )
   })
 })

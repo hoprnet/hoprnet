@@ -3,6 +3,7 @@
 members = [
     "packages/connect/crates/connect-relay",
     "packages/core/crates/core-crypto",
+    "packages/core/crates/core-db",
     "packages/core/crates/core-misc",
     "packages/core/crates/core-mixer",
     "packages/core/crates/core-network",
@@ -14,11 +15,11 @@ members = [
     "packages/hopli",
     "packages/real/crates/real-base",
     "packages/hoprd/crates/hoprd-misc",
+    "packages/utils/crates/utils-db",
     "packages/utils/crates/utils-log",
     "packages/utils/crates/utils-metrics",
     "packages/utils/crates/utils-misc",
     "packages/utils/crates/utils-proc-macros",
-    "packages/utils/crates/utils-storage",
     "packages/utils/crates/utils-types"
 ]
 

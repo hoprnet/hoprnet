@@ -6,10 +6,11 @@ import BN from 'bn.js'
 import { AcknowledgementInteraction } from './acknowledgement.js'
 import {
   Balance,
+  BalanceType,
   defer,
   HoprDB,
   PublicKey,
-  UINT256,
+  U256,
   createPoRValuesForSender,
   u8aEquals,
   ChannelEntry,
@@ -20,6 +21,7 @@ import {
   PRICE_PER_PACKET,
   Snapshot
 } from '@hoprnet/hopr-utils'
+import { AcknowledgementChallenge, Acknowledgement } from '../../types.js'
 import type { HalfKeyChallenge } from '@hoprnet/hopr-utils'
 import assert from 'assert'
 import {
@@ -34,6 +36,7 @@ import type { ResolvedEnvironment } from '../../environment.js'
 import type { HoprOptions } from '../../index.js'
 import type { Components } from '@libp2p/interfaces/components'
 import type { Connection, Stream } from '@libp2p/interfaces/connection'
+import { keysPBM } from '@libp2p/crypto/keys'
 
 import { derive_ack_key_share, Acknowledgement, AcknowledgementChallenge } from '../../../lib/core_packet.js'
 
@@ -41,11 +44,11 @@ const SECRET_LENGTH = 32
 
 const TEST_MESSAGE = new TextEncoder().encode('test message')
 
-const DEFAULT_FUNDING = new Balance(new BN(1234).mul(PRICE_PER_PACKET))
-const DEFAULT_TICKET_EPOCH = new UINT256(new BN(0))
-const DEFAULT_INDEX = new UINT256(new BN(0))
-const DEFAULT_CHANNEL_EPOCH = new UINT256(new BN(0))
-const DEFAULT_CLOSURE_TIME = new UINT256(new BN(0))
+const DEFAULT_FUNDING = new Balance(new BN(1234).mul(PRICE_PER_PACKET).toString(10), BalanceType.HOPR)
+const DEFAULT_TICKET_EPOCH = U256.zero()
+const DEFAULT_INDEX = U256.zero()
+const DEFAULT_CHANNEL_EPOCH = U256.zero()
+const DEFAULT_CLOSURE_TIME = U256.zero()
 
 const SELF = privKeyToPeerId(stringToU8a('0x492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775'))
 const RELAY0_priv = stringToU8a('0x5bf21ea8cccd69aa784346b07bf79c84dac606e00eecaa68bf8c31aff397b1ca')
@@ -57,7 +60,7 @@ const COUNTERPARTY = privKeyToPeerId(COUNTERPARTY_priv)
 
 const nodes: PeerId[] = [SELF, RELAY0, RELAY1, RELAY2, COUNTERPARTY]
 
-const TestingSnapshot = new Snapshot(new BN(0), new BN(0), new BN(0))
+const TestingSnapshot = new Snapshot(U256.zero(), U256.zero(), U256.zero())
 
 const TestOptions = {
   environment: undefined,
@@ -152,15 +155,15 @@ function createFakeSendReceive(events: EventEmitter, self: PeerId) {
  */
 function getDummyChannel(from: PeerId, to: PeerId): ChannelEntry {
   return new ChannelEntry(
-    PublicKey.fromPeerId(from),
-    PublicKey.fromPeerId(to),
-    DEFAULT_FUNDING,
+    PublicKey.from_peerid_str(from.toString()),
+    PublicKey.from_peerid_str(to.toString()),
+    DEFAULT_FUNDING.clone(),
     new Hash(Uint8Array.from(randomBytes(32))),
-    DEFAULT_TICKET_EPOCH,
-    DEFAULT_INDEX,
+    DEFAULT_TICKET_EPOCH.clone(),
+    DEFAULT_INDEX.clone(),
     ChannelStatus.Open,
-    DEFAULT_CHANNEL_EPOCH,
-    DEFAULT_CLOSURE_TIME
+    DEFAULT_CHANNEL_EPOCH.clone(),
+    DEFAULT_CLOSURE_TIME.clone()
   )
 }
 
@@ -175,7 +178,7 @@ async function createMinimalChannelTopology(dbs: HoprDB[], nodes: PeerId[]): Pro
   let previousChannel: ChannelEntry
 
   for (const [index, peerId] of nodes.entries()) {
-    dbs[index] = HoprDB.createMock(PublicKey.fromPeerId(peerId))
+    dbs[index] = HoprDB.createMock(PublicKey.from_peerid_str(peerId.toString()))
 
     let channel: ChannelEntry
 
@@ -183,18 +186,18 @@ async function createMinimalChannelTopology(dbs: HoprDB[], nodes: PeerId[]): Pro
       channel = getDummyChannel(peerId, nodes[index + 1])
 
       // Store channel entry at source
-      await dbs[index].updateChannelAndSnapshot(channel.getId(), channel, TestingSnapshot)
+      await dbs[index].updateChannelAndSnapshot(channel.get_id(), channel, TestingSnapshot)
     }
 
     if (index > 0) {
       // Store channel entry at destination
-      await dbs[index].updateChannelAndSnapshot(previousChannel.getId(), previousChannel, TestingSnapshot)
+      await dbs[index].updateChannelAndSnapshot(previousChannel.get_id(), previousChannel, TestingSnapshot)
 
       const channelInfo = new ChannelCommitmentInfo(
         1,
         'fakeaddress',
-        previousChannel.getId(),
-        previousChannel.channelEpoch
+        previousChannel.get_id(),
+        previousChannel.channel_epoch
       )
       // Set a commitment if we are the destination
       await initializeCommitment(
@@ -219,7 +222,7 @@ describe('packet acknowledgement', function () {
 
   const events = new EventEmitter()
   let dbs: HoprDB[] = Array.from({ length: nodes.length }, (_, index) =>
-    HoprDB.createMock(PublicKey.fromPeerId(nodes[index]))
+    HoprDB.createMock(PublicKey.from_peerid_str(nodes[index].toString()))
   )
 
   afterEach(async function () {
@@ -279,8 +282,6 @@ describe('packet acknowledgement', function () {
 
     await ackInteration.start()
     await ackInterationCounterparty.start()
-
-
 
     const ackKey = derive_ack_key_share(secrets[0])
     const ackMessage = new AcknowledgementChallenge(ackKey.to_challenge(), privateKeyFromPeer(SELF))
@@ -393,7 +394,7 @@ describe('packet relaying interaction', function () {
 
   const events = new EventEmitter()
   let dbs: HoprDB[] = Array.from({ length: nodes.length }, (_, index) =>
-    HoprDB.createMock(PublicKey.fromPeerId(nodes[index]))
+    HoprDB.createMock(PublicKey.from_peerid_str(nodes[index].toString()))
   )
 
   afterEach(async function () {

@@ -1,7 +1,7 @@
 import hkdf from 'futoin-hkdf'
 import secp256k1 from 'secp256k1'
 import { SECRET_LENGTH, HASH_ALGORITHM, HASH_LENGTH } from './constants.js'
-import { HalfKey } from '../../types/index.js'
+import { HalfKey } from '../../types.js'
 
 const HASH_KEY_OWN_KEY = 'HASH_KEY_OWN_KEY'
 const HASH_KEY_ACK_KEY = 'HASH_KEY_ACK_KEY'

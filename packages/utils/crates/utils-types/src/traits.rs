@@ -23,10 +23,10 @@ pub trait BinarySerializable<'a>: Sized {
     const SIZE: usize;
 
     /// Deserializes the type from a binary blob.
-    fn deserialize(data: &'a [u8]) -> Result<Self>;
+    fn from_bytes(data: &'a [u8]) -> Result<Self>;
 
     /// Serializes the type into a fixed size binary blob.
-    fn serialize(&self) -> Box<[u8]>;
+    fn to_bytes(&self) -> Box<[u8]>;
 }
 
 /// Type implementing this trait has automatic binary serialization/deserialization capability
@@ -43,12 +43,12 @@ where
     const SIZE: usize = Self::SIZE;
 
     /// Deserializes the type from a binary blob.
-    fn deserialize(data: &'a [u8]) -> Result<Self> {
+    fn from_bytes(data: &'a [u8]) -> Result<Self> {
         bincode::deserialize(data).map_err(|_| ParseError)
     }
 
     /// Serializes the type into a fixed size binary blob.
-    fn serialize(&self) -> Box<[u8]> {
+    fn to_bytes(&self) -> Box<[u8]> {
         bincode::serialize(&self).unwrap().into_boxed_slice()
     }
 }
@@ -58,7 +58,7 @@ where
     T: BinarySerializable<'a>,
 {
     fn to_hex(&self) -> String {
-        hex::encode(&self.serialize())
+        hex::encode(&self.to_bytes())
     }
 }
 

@@ -11,7 +11,12 @@ import type { PeerId } from '@libp2p/interface-peer-id'
 import { keysPBM } from '@libp2p/crypto/keys'
 import type { AddressSorter, Address } from '@libp2p/interfaces/peer-store'
 
-import { HoprConnect, compareAddressesLocalMode, type PublicNodesEmitter } from '@hoprnet/hopr-connect'
+import {
+  HoprConnect,
+  compareAddressesLocalMode,
+  type PublicNodesEmitter,
+  compareAddressesPublicMode
+} from '@hoprnet/hopr-connect'
 import { HoprDB, PublicKey, debug, isAddressWithPeerId } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 
@@ -53,13 +58,13 @@ export async function createLibp2pInstance(
 
     if (options.testing?.preferLocalAddresses) {
       addressSorter = (a: Address, b: Address) => compareAddressesLocalMode(a.multiaddr, b.multiaddr)
-      log('Preferring local addresses')
+      log('Address sorting: prefer local addresses')
     } else {
       // Overwrite address sorter with identity function since
       // libp2p's own address sorter function is unable to handle
       // p2p addresses, e.g. /p2p/<RELAY>/p2p-circuit/p2p/<DESTINATION>
-      addressSorter = (_addr) => 0
-      log('Addresses are sorted by default')
+      addressSorter = (a: Address, b: Address) => compareAddressesPublicMode(a.multiaddr, b.multiaddr)
+      log('Address sorting: start with most promising addresses')
     }
 
     // Store the peerstore on-disk under the main data path. Ensure store is
@@ -176,16 +181,24 @@ export async function createLibp2pInstance(
         enabled: false
       },
       ping: {
-        protocolPrefix
+        // FIXME: libp2p automatically adds a leading `/`
+        // protocolPrefix: protocolPrefix.startsWith('/') ? protocolPrefix.slice(1) : protocolPrefix
+        protocolPrefix // for compatibility
       },
       fetch: {
-        protocolPrefix
+        // FIXME: libp2p automatically adds a leading `/`
+        // protocolPrefix: protocolPrefix.startsWith('/') ? protocolPrefix.slice(1) : protocolPrefix
+        protocolPrefix // for compatibility
       },
       push: {
-        protocolPrefix
+        // FIXME: libp2p automatically adds a leading `/`
+        // protocolPrefix: protocolPrefix.startsWith('/') ? protocolPrefix.slice(1) : protocolPrefix
+        protocolPrefix // for compatibility
       },
       identify: {
-        protocolPrefix
+        // FIXME: libp2p automatically adds a leading `/`
+        // protocolPrefix: protocolPrefix.startsWith('/') ? protocolPrefix.slice(1) : protocolPrefix
+        protocolPrefix // for compatibility
       },
       peerStore: {
         // Prevents peer-store from storing addresses twice, e.g.
@@ -215,7 +228,7 @@ export async function createHoprNode(
   options: HoprOptions,
   automaticChainCreation = true
 ): Promise<Hopr> {
-  const db = new HoprDB(PublicKey.fromPeerId(peerId))
+  const db = new HoprDB(PublicKey.from_peerid_str(peerId.toString()))
 
   try {
     const dbPath = path.join(options.dataPath, 'db')
@@ -234,7 +247,7 @@ export async function createHoprNode(
   log(`using provider URL: ${options.environment.network.default_provider}`)
   const chain = HoprCoreEthereum.createInstance(
     db,
-    PublicKey.fromPeerId(peerId),
+    PublicKey.from_peerid_str(peerId.toString()),
     keysPBM.PrivateKey.decode(peerId.privateKey as Uint8Array).Data,
     {
       chainId: options.environment.network.chain_id,
