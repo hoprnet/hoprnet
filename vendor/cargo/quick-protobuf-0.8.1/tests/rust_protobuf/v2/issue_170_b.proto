@@ -1,7 +1,0 @@
-syntax = "proto2";
-
-import "issue_170_common.proto";
-
-message B {
-    Common common = 1;
-}
