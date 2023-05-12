@@ -5623,6 +5623,7 @@ dependencies = [
  "gloo-timers",
  "js-sys",
  "mockall",
+ "pin-project-lite",
  "scopeguard 1.1.0",
  "serde",
  "serde-wasm-bindgen",

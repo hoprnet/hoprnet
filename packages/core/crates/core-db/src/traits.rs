@@ -13,7 +13,7 @@ pub trait HoprCoreDbActions {
     async fn set_current_ticket_index(&mut self, channel_id: &Hash, index: U256) -> Result<()>;
 
     // TODO: trait with generic argument rather than allocated Box
-    async fn get_tickets(&self, predicate: Box<dyn Fn() -> bool>) -> Result<Vec<Ticket>>;
+    async fn get_tickets(&self, predicate: Box<dyn Fn(&PublicKey) -> bool>) -> Result<Vec<Ticket>>;
     async fn mark_pending(&mut self, ticket: &Ticket) -> Result<()>;
     async fn mark_rejected(&mut self, ticket: &Ticket) -> Result<()>;
 

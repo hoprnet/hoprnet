@@ -1,7 +1,6 @@
 use async_trait::async_trait;
-use js_sys::Uint8Array;
 
-use futures_lite::stream::{Stream,StreamExt};
+use futures_lite::stream::StreamExt;
 use crate::errors::DbError;
 use crate::traits::{AsyncKVStorage, BatchOperation};
 
@@ -125,48 +124,15 @@ impl AsyncKVStorage for LevelDbShim {
             .map_err(|_| DbError::DumpError(format!("Failed to dump DB into {}", destination)))
     }
 
-    // async fn iterate(&self, prefix: Self::Key, suffix_size: u32) -> crate::errors::Result<Box<dyn Stream>> {
-    //     let iterable = self.db
-    //         .iterValues(js_sys::Uint8Array::from(prefix.as_ref()), suffix_size)
-    //         .map(|v| js_sys::AsyncIterator::from(v))
-    //         .map_err(|e| DbError::GenericError(format!("Iteration failed with an exception: {:?}", e)))?;
-    //
-    //     let mut out = Vec::with_capacity(10);
-    //
-    //     let mut stream = wasm_bindgen_futures::stream::JsStream::from(iterable);
-    //
-    //     while let Some(value) = stream.next().await {
-    //         let v: Self::Value = value.map(|v| js_sys::Uint8Array::from(v).to_vec().into_boxed_slice())
-    //             .map_err(|e| DbError::GenericError(format!("Failed to poll next value: {:?}", e)))?;
-    //
-    //         if (*filter)(v.clone()) {
-    //             out.push(v);
-    //         }
-    //     }
-    //
-    //     Ok(out)
-    // }
-
-    async fn get_more(&self, prefix: Self::Key, suffix_size: u32, filter: Box<dyn Fn(Self::Key) -> bool>) -> crate::errors::Result<Vec<Self::Value>> {
+    fn iterate(&self, prefix: Self::Key, suffix_size: u32) -> crate::errors::Result<crate::types::BinaryStreamWrapper> {
         let iterable = self.db
             .iterValues(js_sys::Uint8Array::from(prefix.as_ref()), suffix_size)
             .map(|v| js_sys::AsyncIterator::from(v))
             .map_err(|e| DbError::GenericError(format!("Iteration failed with an exception: {:?}", e)))?;
 
-        let mut out = Vec::with_capacity(10);
+        let stream = wasm_bindgen_futures::stream::JsStream::from(iterable);
 
-        let mut stream = wasm_bindgen_futures::stream::JsStream::from(iterable);
-
-        while let Some(value) = stream.next().await {
-            let v: Self::Value = value.map(|v| js_sys::Uint8Array::from(v).to_vec().into_boxed_slice())
-                .map_err(|e| DbError::GenericError(format!("Failed to poll next value: {:?}", e)))?;
-
-            if (*filter)(v.clone()) {
-                out.push(v);
-            }
-        }
-
-        Ok(out)
+        Ok(crate::types::BinaryStreamWrapper::new(stream))
     }
 }
 
@@ -286,21 +252,29 @@ pub async fn db_sanity_test(db: LevelDb) -> Result<bool, JsValue> {
         )
         .await;
 
-    let received = kv_storage.get_more(
-        prefix.as_bytes().to_vec().into_boxed_slice(),
-        (prefixed_key_1.len() - prefix.len()) as u32,
-        Box::new(|x| x.as_ref() != value_2.as_bytes())
-    ).await;
-
-    let expected = Ok(vec![
+    let expected = vec![
         value_1.as_bytes().to_vec().into_boxed_slice(),
-        // value_2.as_bytes().to_vec().into_boxed_slice(),
         value_3.as_bytes().to_vec().into_boxed_slice()
-    ]);
+    ];
+
+    let mut received = Vec::new();
+    let mut data_stream = kv_storage.iterate(prefix.as_bytes().to_vec().into_boxed_slice(),
+             (prefixed_key_1.len() - prefix.len()) as u32)
+        .map_err(|e| JsValue::from(JsError::new(format!("Test #6.1 failed: failed to iterate over DB {:?}", e).as_str())))?;
+
+    while let Some(value) = data_stream.next().await
+    {
+        let v = value.map(|v| js_sys::Uint8Array::from(v.as_ref()).to_vec().into_boxed_slice())
+            .map_err(|e| JsValue::from(JsError::new(format!("Test #6.1 failed: failed to iterate over DB {:?}", e).as_str())))?;
+
+        if v.as_ref() != value_2.as_bytes() {
+            received.push(v);
+        }
+    }
 
     if received != expected {
         return Err::<bool, JsValue>(
-            JsValue::from(JsError::new(format!("Test #6 failed: db content mismatch {:?} != {:?}", received, expected).as_str())))
+            JsValue::from(JsError::new(format!("Test #6.2 failed: db content mismatch {:?} != {:?}", received, expected).as_str())))
     }
 
     Ok(true)

@@ -1,5 +1,7 @@
-use serde::{de::DeserializeOwned, Serialize};
 use std::ops::Deref;
+
+use futures_lite::stream::StreamExt;
+use serde::{de::DeserializeOwned, Serialize};
 
 use crate::errors::{DbError, Result};
 use crate::traits::BinaryAsyncKVStorage;
@@ -132,21 +134,24 @@ impl<T: BinaryAsyncKVStorage> DB<T> {
         }
     }
 
-    // async fn get_more<V: Serialize + DeserializeOwned>(&self, prefix: Box<[u8]>, suffix_size: u32, filter: Box<dyn Fn(&V) -> bool>) -> Result<Vec<V>> {
-    //     let data = self.backend.get_more(prefix, suffix_size, Box::new(move |v| {
-    //         let value = bincode::deserialize::<V>(v.as_ref())
-    //             .map_err(|e| DbError::DeserializationError(e.to_string()));
-    //         if value.is_ok() {
-    //             (*filter)(&value.unwrap())
-    //         } else {
-    //             utils_log::error!("Error deserializing in iteration over keys: {}", value.err().unwrap().to_string());
-    //             false
-    //         }
-    //     })).await?;
-    //
-    //     data.into_iter()
-    //         .map(|v| bincode::deserialize::<V>(v.as_ref()))
-    // }
+    pub async fn get_more<V: Serialize + DeserializeOwned>(&self, prefix: Box<[u8]>, suffix_size: u32, filter: Box<dyn Fn(&V) -> bool>) -> Result<Vec<V>> {
+        let mut output = Vec::new();
+
+        let mut data_stream = self.backend.iterate(prefix, suffix_size)?;
+
+        // fail fast for the first value that cannot be deserialized
+        while let Some(value) = data_stream.next().await
+        {
+            let value = bincode::deserialize::<V>(value?.as_ref())
+                .map_err(|e| DbError::DeserializationError(e.to_string()))?;
+
+            if (*filter)(&value) {
+                output.push(value);
+            }
+        }
+
+        Ok(output)
+    }
 
     pub async fn batch(&mut self, batch: Batch, wait_for_write: bool) -> Result<()> {
         self.backend.batch(batch.ops, wait_for_write).await

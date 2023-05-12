@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 use core_crypto::types::{HalfKeyChallenge, Hash, PublicKey};
-use core_types::acknowledgement::UnacknowledgedTicket;
+use core_types::acknowledgement::{AcknowledgedTicket,UnacknowledgedTicket};
 use core_types::channels::{ChannelEntry, Ticket};
 use utils_db::{
     db::{serialize_to_bytes, DB},
@@ -19,6 +19,7 @@ const REJECTED_TICKETS_COUNT: &str = "statistics:rejected:count";
 const REJECTED_TICKETS_VALUE: &str = "statistics:rejected:value";
 const PACKET_TAG_PREFIX: &str = "packets:tag-";
 const PENDING_ACKNOWLEDGEMENTS_PREFIX: &str = "tickets:pending-acknowledgement-";
+const ACKNOWLEDGED_TICKETS_PREFIX: &str = "tickets:acknowledged-";
 
 #[derive(Serialize, Deserialize)]
 pub enum PendingAcknowledgementPrefix {
@@ -53,8 +54,21 @@ impl<T: BinaryAsyncKVStorage> HoprCoreDbActions for CoreDb<T> {
         Ok(())
     }
 
-    async fn get_tickets(&self, predicate: Box<dyn Fn() -> bool>) -> Result<Vec<Ticket>> {
-        todo!()
+    async fn get_tickets(&self, predicate: Box<dyn Fn(&PublicKey) -> bool>) -> Result<Vec<Ticket>> {
+        // acknowledged tickets
+        let ack_tickets_stream = self.db.get_more(
+            Vec::from(ACKNOWLEDGED_TICKETS_PREFIX.as_bytes()).into_boxed_slice(),
+            1,
+            Box::new(|v: &AcknowledgedTicket| false)).await?;
+
+        // unacknowledged tickets
+        //
+        let ack_tickets_stream = self.db.get_more(
+            Vec::from(ACKNOWLEDGED_TICKETS_PREFIX.as_bytes()).into_boxed_slice(),
+            1,
+            Box::new(|v: &UnacknowledgedTicket| false)).await?;
+
+        Ok(Vec::new())
     }
 
     async fn mark_pending(&mut self, ticket: &Ticket) -> Result<()> {
