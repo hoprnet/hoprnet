@@ -620,49 +620,53 @@ impl<St: DuplexStream> Future for Server<St> {
             *this.waker.borrow_mut() = Some(cx.waker().clone());
         }
 
-        let mut pending = false;
+        Poll::Ready(loop {
+            let mut pending = false;
 
-        if !self.a_ended {
-            let mut this = self.as_mut().project();
+            if !self.a_ended {
+                let mut this = self.as_mut().project();
 
-            match this.a.poll(&mut this.b, cx) {
-                Poll::Pending => {
-                    pending = true;
+                match this.a.poll(&mut this.b, cx) {
+                    Poll::Pending => {
+                        pending = true;
+                    }
+                    Poll::Ready(Err(e)) => {
+                        *this.a_ended = true;
+                        error!("Error iterating on relayed stream {}", e);
+                    }
+                    Poll::Ready(Ok(None)) => {
+                        *this.a_ended = true;
+                    }
+                    Poll::Ready(Ok(Some(()))) => (),
                 }
-                Poll::Ready(Err(e)) => {
-                    *this.a_ended = true;
-                    error!("Error iterating on relayed stream {}", e);
-                }
-                Poll::Ready(Ok(None)) => {
-                    *this.a_ended = true;
-                }
-                Poll::Ready(Ok(Some(()))) => (),
             }
-        }
 
-        if !self.b_ended {
-            let mut this = self.as_mut().project();
+            if !self.b_ended {
+                let mut this = self.as_mut().project();
 
-            match this.b.poll(&mut this.a, cx) {
-                Poll::Pending => {
-                    pending = true;
+                match this.b.poll(&mut this.a, cx) {
+                    Poll::Pending => {
+                        pending = true;
+                    }
+                    Poll::Ready(Err(e)) => {
+                        *this.b_ended = true;
+                        error!("Error iterating on relayed stream {}", e);
+                    }
+                    Poll::Ready(Ok(None)) => {
+                        *this.b_ended = true;
+                    }
+                    Poll::Ready(Ok(Some(()))) => (),
                 }
-                Poll::Ready(Err(e)) => {
-                    *this.b_ended = true;
-                    error!("Error iterating on relayed stream {}", e);
-                }
-                Poll::Ready(Ok(None)) => {
-                    *this.b_ended = true;
-                }
-                Poll::Ready(Ok(Some(()))) => (),
             }
-        }
 
-        if pending {
-            return Poll::Pending;
-        }
+            if pending {
+                return Poll::Pending;
+            }
 
-        Poll::Ready(Ok(()))
+            if self.a_ended && self.b_ended {
+                break Ok(());
+            }
+        })
     }
 }
 
