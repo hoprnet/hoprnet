@@ -154,7 +154,7 @@ impl MetaPacket {
         CurvePoint::SIZE_COMPRESSED + header_len + SimpleMac::SIZE + PAYLOAD_SIZE
     }
 
-    pub fn deserialize(packet: &[u8], header_len: usize) -> utils_types::errors::Result<MetaPacket> {
+    pub fn from_bytes(packet: &[u8], header_len: usize) -> utils_types::errors::Result<MetaPacket> {
         if packet.len() == Self::size(header_len) {
             Ok(Self { packet: packet.into(), header_len })
         } else {
@@ -162,7 +162,7 @@ impl MetaPacket {
         }
     }
 
-    pub fn serialize(&self) -> &[u8] {
+    pub fn to_bytes(&self) -> &[u8] {
         &self.packet
     }
 
@@ -172,7 +172,7 @@ impl MetaPacket {
         additional_data_relayer_len: usize,
         additional_data_last_hop_len: usize,
     ) -> Result<ForwardedMetaPacket> {
-        let (alpha, secret) = SharedKeys::forward_transform(CurvePoint::deserialize(self.alpha())?, private_key)?;
+        let (alpha, secret) = SharedKeys::forward_transform(CurvePoint::from_bytes(self.alpha())?, private_key)?;
 
         let mut routing_info_mut: Vec<u8> = self.routing_info().into();
         let fwd_header = forward_header(
@@ -279,7 +279,7 @@ impl Packet {
             .map(|i|ProofOfRelayString::new(
                 shared_keys.secret(i).unwrap(),
                 shared_keys.secret(i + 1)
-            ).serialize())
+            ).to_bytes())
             .collect::<Vec<_>>();
 
         let mut ticket = first_ticket;
@@ -307,14 +307,14 @@ impl Packet {
 
     /// Deserializes the packet and performs the forward-transformation, so the
     /// packet can be further delivered (relayed to the next hop or read).
-    pub fn deserialize(data: &[u8], private_key: &[u8], sender: &PeerId) -> Result<Self> {
+    pub fn from_bytes(data: &[u8], private_key: &[u8], sender: &PeerId) -> Result<Self> {
         if data.len() == Self::SIZE {
             let (pre_packet, r0) = data.split_at(PACKET_LENGTH);
             let (pre_challenge, pre_ticket) = r0.split_at(AcknowledgementChallenge::SIZE);
             let previous_hop = PublicKey::from_peerid(sender)?;
 
             let header_len = header_length(INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0);
-            let mp = MetaPacket::deserialize(pre_packet, header_len)?;
+            let mp = MetaPacket::from_bytes(pre_packet, header_len)?;
 
             match mp.forward(private_key,INTERMEDIATE_HOPS + 1,POR_SECRET_LENGTH, 0)? {
                 RelayedPacket {
@@ -326,13 +326,13 @@ impl Packet {
                     ..
                 } => {
                     let ack_key = derive_ack_key_share(&derived_secret);
-                    let mut challenge = AcknowledgementChallenge::deserialize(pre_challenge)?;
+                    let mut challenge = AcknowledgementChallenge::from_bytes(pre_challenge)?;
                     challenge
                         .validate(ack_key.to_challenge(), &previous_hop)
                         .then(|| ())
                         .ok_or(PacketDecodingError("couldn't validate acknowledgement challenge on the relayed packet".into()))?;
 
-                    let ticket = Ticket::deserialize(pre_ticket)?;
+                    let ticket = Ticket::from_bytes(pre_ticket)?;
                     let verification_output = pre_verify(&derived_secret, &additional_info, &ticket.challenge)?;
                     Ok(Self {
                         packet,
@@ -358,13 +358,13 @@ impl Packet {
                     additional_data: _
                 } => {
                     let ack_key = derive_ack_key_share(&derived_secret);
-                    let mut challenge = AcknowledgementChallenge::deserialize(pre_challenge)?;
+                    let mut challenge = AcknowledgementChallenge::from_bytes(pre_challenge)?;
                     challenge
                         .validate(ack_key.to_challenge(), &previous_hop)
                         .then(|| ())
                         .ok_or(PacketDecodingError("couldn't validate acknowledgement challenge on the final packet".into()))?;
 
-                    let ticket = Ticket::deserialize(pre_ticket)?;
+                    let ticket = Ticket::from_bytes(pre_ticket)?;
                     Ok(Self {
                         packet: mp,
                         challenge,
@@ -416,11 +416,11 @@ impl Packet {
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl Packet {
-    pub fn serialize(&self) -> Box<[u8]> {
+    pub fn to_bytes(&self) -> Box<[u8]> {
         let mut ret = Vec::with_capacity(Self::SIZE);
-        ret.extend_from_slice(self.packet.serialize());
-        ret.extend_from_slice(&self.challenge.serialize());
-        ret.extend_from_slice(&self.ticket.serialize());
+        ret.extend_from_slice(self.packet.to_bytes());
+        ret.extend_from_slice(&self.challenge.to_bytes());
+        ret.extend_from_slice(&self.ticket.to_bytes());
         ret.into_boxed_slice()
     }
 
@@ -490,7 +490,7 @@ mod tests {
             .map(|i|ProofOfRelayString::new(
                 shared_keys.secret(i).unwrap(),
                 shared_keys.secret(i + 1)
-            ).serialize())
+            ).to_bytes())
             .collect::<Vec<_>>();
 
         let msg = b"some random test message";
@@ -570,7 +570,7 @@ mod tests {
         for (i, (node_private, node_id)) in node_private_keys.iter().zip(path.iter()).enumerate() {
             let sender = (i == 0).then_some(&public_key).unwrap_or_else(|| path.get(i - 1).unwrap());
 
-            packet = Packet::deserialize(&packet.serialize(), node_private, &sender)
+            packet = Packet::from_bytes(&packet.to_bytes(), node_private, &sender)
                 .unwrap_or_else(|e| panic!("failed to deserialize packet at hop {i}: {e}"));
 
             match packet.state() {
@@ -580,7 +580,7 @@ mod tests {
                 }
                 PacketState::Forwarded { .. } => {
                     let ticket = mock_ticket(&node_id, path.len() - i - 1, node_private);
-                    packet.forward(node_private, ticket);
+                    packet.forward(node_private, ticket).unwrap();
                 }
                 PacketState::Outgoing { .. } => panic!("invalid packet state"),
             }
@@ -618,10 +618,15 @@ pub mod wasm {
             ok_or_jserr!(Self::new(msg, &peers.iter().collect::<Vec<_>>(), private_key, first_ticket))
         }
 
+        #[wasm_bindgen(js_name = "serialize")]
+        pub fn _serialize(&self) -> Box<[u8]> {
+            self.to_bytes()
+        }
+
         #[wasm_bindgen(js_name = "deserialize")]
         pub fn _deserialize(data: &[u8], private_key: &[u8], sender: &str) -> JsResult<Packet> {
             let sender = ok_or_jserr!(PeerId::from_str(sender))?;
-            ok_or_jserr!(Self::deserialize(data, private_key, &sender))
+            ok_or_jserr!(Self::from_bytes(data, private_key, &sender))
         }
 
         #[wasm_bindgen(js_name = "forward")]

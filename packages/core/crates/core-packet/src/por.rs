@@ -66,11 +66,11 @@ impl ProofOfRelayString {
 impl BinarySerializable<'_> for ProofOfRelayString {
     const SIZE: usize = POR_SECRET_LENGTH;
 
-    fn deserialize(data: &[u8]) -> utils_types::errors::Result<Self> {
+    fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
         if data.len() == POR_SECRET_LENGTH {
             let (next_ticket_challenge, hint) = data.split_at(POR_SECRET_LENGTH / 2);
             Ok(Self {
-                next_ticket_challenge: CurvePoint::deserialize(next_ticket_challenge)?.into(),
+                next_ticket_challenge: CurvePoint::from_bytes(next_ticket_challenge)?.into(),
                 hint: HalfKeyChallenge::new(hint),
             })
         } else {
@@ -78,10 +78,10 @@ impl BinarySerializable<'_> for ProofOfRelayString {
         }
     }
 
-    fn serialize(&self) -> Box<[u8]> {
+    fn to_bytes(&self) -> Box<[u8]> {
         let mut ret = Vec::<u8>::with_capacity(Self::SIZE);
-        ret.extend_from_slice(&self.next_ticket_challenge.serialize());
-        ret.extend_from_slice(&self.hint.serialize());
+        ret.extend_from_slice(&self.next_ticket_challenge.to_bytes());
+        ret.extend_from_slice(&self.hint.to_bytes());
         ret.into_boxed_slice()
     }
 }
@@ -106,7 +106,7 @@ pub fn pre_verify(secret: &[u8], por_bytes: &[u8], challenge: &EthereumChallenge
     assert_eq!(SECRET_KEY_LENGTH, secret.len(), "invalid secret length");
     assert_eq!(POR_SECRET_LENGTH, por_bytes.len(), "invalid por bytes length");
 
-    let pors = ProofOfRelayString::deserialize(por_bytes)?;
+    let pors = ProofOfRelayString::from_bytes(por_bytes)?;
 
     let own_key = derive_own_key_share(secret);
     let own_share = own_key.to_challenge();
@@ -182,14 +182,14 @@ mod tests {
 
         // Computation result of the first relayer before receiving an acknowledgement from the second relayer
         let first_challenge_eth = first_challenge.ticket_challenge.to_ethereum_challenge();
-        let first_result = pre_verify(&secrets[0], &first_por_string.serialize(), &first_challenge_eth)
+        let first_result = pre_verify(&secrets[0], &first_por_string.to_bytes(), &first_challenge_eth)
             .expect("First challenge must be plausible");
 
         let expected_hkc = derive_ack_key_share(&secrets[1]).to_challenge();
         assert_eq!(expected_hkc, first_result.ack_challenge);
 
         // Simulates the transformation done by the first relayer
-        let expected_pors = ProofOfRelayString::deserialize(&first_por_string.serialize()).unwrap();
+        let expected_pors = ProofOfRelayString::from_bytes(&first_por_string.to_bytes()).unwrap();
         assert_eq!(
             expected_pors.next_ticket_challenge, first_result.next_ticket_challenge,
             "Forward logic must extract correct challenge for the next downstream node"
@@ -208,7 +208,7 @@ mod tests {
 
         // Simulates the transformation as done by the second relayer
         let first_result_challenge_eth = first_result.next_ticket_challenge.to_ethereum_challenge();
-        let second_result = pre_verify(&secrets[1], &second_por_string.serialize(), &first_result_challenge_eth)
+        let second_result = pre_verify(&secrets[1], &second_por_string.to_bytes(), &first_result_challenge_eth)
             .expect("Second challenge must be plausible");
 
         let second_ack = derive_ack_key_share(&secrets[2]);

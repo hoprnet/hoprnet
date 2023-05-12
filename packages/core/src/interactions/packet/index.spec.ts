@@ -21,7 +21,6 @@ import {
   PRICE_PER_PACKET,
   Snapshot
 } from '@hoprnet/hopr-utils'
-import { AcknowledgementChallenge, Acknowledgement } from '../../types.js'
 import type { HalfKeyChallenge } from '@hoprnet/hopr-utils'
 import assert from 'assert'
 import {
@@ -36,7 +35,6 @@ import type { ResolvedEnvironment } from '../../environment.js'
 import type { HoprOptions } from '../../index.js'
 import type { Components } from '@libp2p/interfaces/components'
 import type { Connection, Stream } from '@libp2p/interfaces/connection'
-import { keysPBM } from '@libp2p/crypto/keys'
 
 import { derive_ack_key_share, Acknowledgement, AcknowledgementChallenge } from '../../../lib/core_packet.js'
 

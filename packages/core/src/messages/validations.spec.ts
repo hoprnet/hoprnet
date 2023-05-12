@@ -1,5 +1,4 @@
 import { Hash, stringToU8a } from '@hoprnet/hopr-utils'
-import BN from 'bn.js'
 import { peerIdFromString } from '@libp2p/peer-id'
 import chaiAsPromised from 'chai-as-promised'
 import chai, { expect } from 'chai'
@@ -83,8 +82,8 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
     return expect(
       validateUnacknowledgedTicket(
         SENDER,
-        new BN(1),
-        new BN(1),
+        new Balance('1', BalanceType.HOPR),
+        U256.one(),
         signedTicket,
         await mockChannelEntry(),
         getTicketsMock,
@@ -99,8 +98,8 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
     return expect(
       validateUnacknowledgedTicket(
         TARGET,
-        new BN(2),
-        new BN(1),
+        new Balance('2', BalanceType.HOPR),
+        U256.one(),
         signedTicket,
         await mockChannelEntry(),
         getTicketsMock,
@@ -115,8 +114,8 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
     return expect(
       validateUnacknowledgedTicket(
         SENDER,
-        new BN(2),
-        new BN(1),
+        new Balance('2', BalanceType.HOPR),
+        U256.one(),
         signedTicket,
         await mockChannelEntry(),
         getTicketsMock,
@@ -133,8 +132,8 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
     return expect(
       validateUnacknowledgedTicket(
         SENDER,
-        new BN(1),
-        new BN(1),
+        new Balance('1', BalanceType.HOPR),
+        U256.one(),
         signedTicket,
         await mockChannelEntry(),
         getTicketsMock,
@@ -149,8 +148,8 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
     return expect(
       validateUnacknowledgedTicket(
         SENDER,
-        new BN(1),
-        new BN(1),
+        new Balance('1', BalanceType.HOPR),
+        U256.one(),
         signedTicket,
         await mockChannelEntry(false),
         getTicketsMock,
@@ -164,7 +163,7 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
     const mockChannel = await mockChannelEntry(true, new Balance('100', BalanceType.HOPR), new U256('2'))
 
     return expect(
-      validateUnacknowledgedTicket(SENDER, new BN(1), new BN(1), signedTicket, mockChannel, getTicketsMock, true)
+      validateUnacknowledgedTicket(SENDER, new Balance('1', BalanceType.HOPR), U256.one(), signedTicket, mockChannel, getTicketsMock, true)
     ).to.eventually.rejectedWith('does not match our account epoch')
   })
 
@@ -176,8 +175,8 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
     return expect(
       validateUnacknowledgedTicket(
         SENDER,
-        new BN(1),
-        new BN(1),
+        new Balance('1', BalanceType.HOPR),
+        U256.one(),
         signedTicket,
         await mockChannelEntry(),
         getTicketsMock,
@@ -191,7 +190,7 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
     const mockChannel = await mockChannelEntry(true, new Balance('100', BalanceType.HOPR), new U256('1'), new U256('2'))
 
     return expect(
-      validateUnacknowledgedTicket(SENDER, new BN(1), new BN(1), signedTicket, mockChannel, getTicketsMock, true)
+      validateUnacknowledgedTicket(SENDER, new Balance('1', BalanceType.HOPR), U256.one(), signedTicket, mockChannel, getTicketsMock, true)
     ).to.not.eventually.rejected
   })
 
@@ -208,8 +207,8 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
     return expect(
       validateUnacknowledgedTicket(
         SENDER,
-        new BN(1),
-        new BN(1),
+        new Balance('1', BalanceType.HOPR),
+        U256.one(),
         signedTicket,
         mockChannel,
         async () => ticketsInDb,
@@ -224,8 +223,8 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
     return expect(
       validateUnacknowledgedTicket(
         SENDER,
-        new BN(1),
-        new BN(1),
+        new Balance('1', BalanceType.HOPR),
+        U256.one(),
         signedTicket,
         await mockChannelEntry(true, Balance.zero(BalanceType.HOPR)),
         getTicketsMock,
@@ -247,8 +246,8 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
     return expect(
       validateUnacknowledgedTicket(
         SENDER,
-        new BN(1),
-        new BN(1),
+        new Balance('1', BalanceType.HOPR),
+        U256.one(),
         signedTicket,
         await mockChannelEntry(),
         async () => ticketsInDb,

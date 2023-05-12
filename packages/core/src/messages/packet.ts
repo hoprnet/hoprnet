@@ -2,24 +2,26 @@ import {
   HoprDB,
   PRICE_PER_PACKET,
   INVERSE_TICKET_WIN_PROB,
-  create_counter, UINT256,
-  PublicKey as TsPublicKey,
-  HalfKeyChallenge as TsHalfKeyChallenge,
-  Address as TsAddress,
-  Balance as TsBalance,
-  Ticket as TsTicket,
-  UnacknowledgedTicket as TsUnacknowledgedTicket
+  create_counter,
+  PublicKey,
+  HalfKeyChallenge,
+  Balance,
+  BalanceType,
+  Ticket,
+  U256,
+  ChannelEntry,
+  ChannelStatus,
+  UnacknowledgedTicket, HalfKey
 } from '@hoprnet/hopr-utils'
 import type { Hash } from '@hoprnet/hopr-utils'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { debug } from '@hoprnet/hopr-utils'
 import { keysPBM } from '@libp2p/crypto/keys'
 
-import { Ticket, Balance, BalanceType, ChannelStatus, ChannelEntry, PublicKey, Packet, U256, UnacknowledgedTicket, WasmPacketState } from '../../lib/core_packet.js'
+import { Packet, WasmPacketState as PacketState, Ticket as PacketTicket, U256 as PacketU256 } from '../../lib/core_packet.js'
 export { Packet, WasmPacketState as PacketState } from '../../lib/core_packet.js'
 
 import { peerIdFromString } from '@libp2p/peer-id'
-import BN from 'bn.js'
 
 const log = debug('hopr-core:message:packet')
 
@@ -28,15 +30,13 @@ const metric_ticketCounter = create_counter('core_counter_created_tickets', 'Num
 const metric_packetCounter = create_counter('core_counter_packets', 'Number of created packets')
 
 async function bumpTicketIndex(channelId: Hash, db: HoprDB): Promise<U256> {
-  let fetchedTicketIndex = await db.getCurrentTicketIndex(channelId)
-  let currentTicketIndex: U256
+  let currentTicketIndex = await db.getCurrentTicketIndex(channelId)
 
-  if (fetchedTicketIndex == undefined) {
-    currentTicketIndex = U256.one();
-    fetchedTicketIndex = new UINT256(new BN(1))
+  if (currentTicketIndex == undefined) {
+    currentTicketIndex = U256.one()
   }
 
-  await db.setCurrentTicketIndex(channelId, new UINT256(fetchedTicketIndex.toBN().addn(1)))
+  await db.setCurrentTicketIndex(channelId, currentTicketIndex.addn(1))
 
   return currentTicketIndex
 }
@@ -60,10 +60,8 @@ async function createTicket(
   privKey: Uint8Array
 ): Promise<Ticket> {
 
-  let ts_pk = TsPublicKey.deserialize(dest.serialize(false))
-
-  const channel = await db.getChannelTo(ts_pk)
-  const currentTicketIndex = await bumpTicketIndex(channel.getId(), db)
+  const channel = await db.getChannelTo(dest)
+  const currentTicketIndex = await bumpTicketIndex(channel.get_id(), db)
   const amount = new Balance(PRICE_PER_PACKET.mul(INVERSE_TICKET_WIN_PROB).muln(pathLength - 1).toString(), BalanceType.HOPR)
   const winProb = new U256(INVERSE_TICKET_WIN_PROB.toString(10))
 
@@ -72,37 +70,33 @@ async function createTicket(
    * of our channels, but we can see the bounds based on how many tickets are
    * outstanding.
    */
-  let ts_address = TsAddress.deserialize(dest.to_address().serialize())
-  const outstandingTicketBalance = await db.getPendingBalanceTo(ts_address)
-  const balance_bn = channel.balance.toBN().sub(outstandingTicketBalance.toBN())
-  const balance = new Balance(balance_bn.toString(10), BalanceType.HOPR)
+  const outstandingTicketBalance = await db.getPendingBalanceTo(dest.to_address())
+  const balance = channel.balance.sub(outstandingTicketBalance)
 
   log(
-    `balances ${channel.balance.toFormattedString()} - ${outstandingTicketBalance.toFormattedString()} = ${new TsBalance(
-      balance_bn
-    ).toFormattedString()} should >= ${amount.to_string()} in channel open to ${
+    `balances ${channel.balance.to_formatted_string()} - ${outstandingTicketBalance.to_formatted_string()} = 
+      ${balance.to_formatted_string()} should >= ${amount.to_string()} in channel open to ${
       !channel.destination ? '' : channel.destination.toString()
     }`
   )
   if (balance.lt(amount)) {
     throw Error(
       `We don't have enough funds in channel ${channel
-        .getId()
-        .toHex()} with counterparty ${dest.toString()} to create ticket`
+        .get_id().to_hex()} with counterparty ${dest.toString()} to create ticket`
     )
   }
 
   const ticket = Ticket.new(dest.to_address(), undefined,
-    new U256(channel.ticketEpoch.toBN().toString(10)),
+    new U256(channel.ticket_epoch.to_string()),
     currentTicketIndex,
     amount,
     U256.from_inverse_probability(winProb),
-    new U256(channel.channelEpoch.toBN().toString(10)),
+    new U256(channel.channel_epoch.to_hex()),
     privKey)
 
-  await db.markPending(TsTicket.deserialize(ticket.serialize()))
+  await db.markPending(ticket)
 
-  log(`Creating ticket in channel ${channel.getId().toHex()}. Ticket data: \n${ticket.to_hex()}`)
+  log(`Creating ticket in channel ${channel.get_id().to_hex()}. Ticket data: \n${ticket.to_hex()}`)
   metric_ticketCounter.increment()
 
   return ticket
@@ -201,7 +195,6 @@ export function privateKeyFromPeer(peer: PeerId) {
   return keysPBM.PrivateKey.decode(peer.privateKey).Data
 }
 
-
 /**
  * This is a temporary helper class until the DB functionality is migrated to Rust.
  */
@@ -221,7 +214,7 @@ export class PacketHelper {
 
     metric_packetCounter.increment()
 
-    return new Packet(msg, path.map((p) => p.toString()), private_key, ticket)
+    return new Packet(msg, path.map((p) => p.toString()), private_key, PacketTicket.deserialize(ticket.serialize()))
   }
 
   static async checkPacketTag(packet: Packet, db: HoprDB) {
@@ -233,11 +226,16 @@ export class PacketHelper {
   }
 
   static async storeUnacknowledgedTicket(packet: Packet, db: HoprDB) {
-    if (packet.state() != WasmPacketState.Forwarded) {
+    if (packet.state() != PacketState.Forwarded) {
       throw Error(`Invalid state`)
     }
 
-    const unacknowledged = new UnacknowledgedTicket(packet.ticket, packet.own_key(), packet.previous_hop())
+    // Need to serialize/deserialize to cross the boundary between WASM runtimes
+    const unacknowledged = new UnacknowledgedTicket(
+      Ticket.deserialize(packet.ticket.serialize()),
+      HalfKey.deserialize(packet.own_key().serialize()),
+      PublicKey.deserialize(packet.previous_hop().serialize(false))
+    )
 
     log(
       `Storing unacknowledged ticket. Expecting to receive a preImage for ${packet.ack_challenge().to_hex()} from ${
@@ -245,23 +243,24 @@ export class PacketHelper {
       }`
     )
 
-    await db.storePendingAcknowledgement(TsHalfKeyChallenge.deserialize(packet.ack_challenge().serialize()),
+    await db.storePendingAcknowledgement(HalfKeyChallenge.deserialize(packet.ack_challenge().serialize()),
       false,
-      TsUnacknowledgedTicket.deserialize(unacknowledged.serialize())
-      )
+      unacknowledged)
   }
 
   static async storePendingAcknowledgement(packet: Packet, db: HoprDB) {
-    let hkc = TsHalfKeyChallenge.deserialize(packet.ack_challenge().serialize())
-    await db.storePendingAcknowledgement(hkc, true)
+    await db.storePendingAcknowledgement(
+      HalfKeyChallenge.deserialize(packet.ack_challenge().serialize()),
+      true
+    )
   }
 
   static async validateUnacknowledgedTicket(packet: Packet, db: HoprDB, checkUnrealizedBalance: boolean) {
-    if (packet.state() == WasmPacketState.Outgoing) {
+    if (packet.state() == PacketState.Outgoing) {
       throw Error('packet must have previous hop - cannot be outgoing')
     }
 
-    const channel = await db.getChannelFrom(TsPublicKey.deserialize(packet.previous_hop().serialize(false)))
+    const channel = await db.getChannelFrom(PublicKey.deserialize(packet.previous_hop().serialize(false)))
 
     try {
       await validateUnacknowledgedTicket(
@@ -269,23 +268,19 @@ export class PacketHelper {
         new Balance(PRICE_PER_PACKET.toString(), BalanceType.HOPR),
         new U256(INVERSE_TICKET_WIN_PROB.toString()),
         packet.ticket,
-        ChannelEntry.deserialize(channel.serialize()),
-        async () => {
-          let prev_hop = TsPublicKey.deserialize(packet.previous_hop().serialize(false))
-          let tickets = await db.getTickets({
-            signer: prev_hop
-          })
-          return tickets.map((ts_ticket) => Ticket.deserialize(ts_ticket.serialize()))
-        },
+        channel,
+        async () => await db.getTickets({
+          signer: PublicKey.deserialize(packet.previous_hop().serialize(false))
+        }),
         checkUnrealizedBalance
       )
     } catch (e) {
       log(`mark ticket as rejected`, packet.ticket.to_hex())
-      await db.markRejected(TsTicket.deserialize(packet.ticket.serialize()))
+      await db.markRejected(Ticket.deserialize(packet.ticket.serialize()))
       throw e
     }
 
-    await db.setCurrentTicketIndex(channel.getId().hash(), new UINT256(new BN(packet.ticket.index.to_string())))
+    await db.setCurrentTicketIndex(channel.get_id().hash(), new U256(packet.ticket.index.to_string()))
   }
 
   static async forwardTransform(packet: Packet, privKey: PeerId, db: HoprDB): Promise<void> {
@@ -294,9 +289,9 @@ export class PacketHelper {
     }
 
     let private_key = privateKeyFromPeer(privKey)
-    const pathPosition = packet.ticket.get_path_position(new U256(PRICE_PER_PACKET.toString()), new U256(INVERSE_TICKET_WIN_PROB.toString()))
+    const pathPosition = packet.ticket.get_path_position(new PacketU256(PRICE_PER_PACKET.toString()), new PacketU256(INVERSE_TICKET_WIN_PROB.toString()))
 
-    let nextPeer = packet.next_hop()
+    let nextPeer = PublicKey.deserialize(packet.next_hop().serialize(false))
 
     let ticket: Ticket
     if (pathPosition == 1) {
@@ -305,6 +300,6 @@ export class PacketHelper {
       ticket = await createTicket(nextPeer, pathPosition, db, private_key)
     }
 
-    packet.forward(private_key, ticket)
+    packet.forward(private_key, PacketTicket.deserialize(ticket.serialize()))
   }
 }
