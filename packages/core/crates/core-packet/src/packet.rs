@@ -81,7 +81,6 @@ enum ForwardedMetaPacket {
     },
 }
 
-
 impl MetaPacket {
     pub fn new(
         shared_keys: SharedKeys,
@@ -100,8 +99,7 @@ impl MetaPacket {
             max_hops,
             &path
                 .iter()
-                .map(|peer| PublicKey::from_peerid(peer)
-                    .unwrap_or_else(|e| panic!("invalid peer id given: {e}")))
+                .map(|peer| PublicKey::from_peerid(peer).unwrap_or_else(|e| panic!("invalid peer id given: {e}")))
                 .collect::<Vec<_>>(),
             &secrets,
             additional_relayer_data_len,
@@ -116,7 +114,12 @@ impl MetaPacket {
                 .unwrap_or_else(|e| panic!("onion encryption error {e}"))
         }
 
-        MetaPacket::new_from_parts(shared_keys.alpha(), &routing_info.routing_information, &routing_info.mac, &padded)
+        MetaPacket::new_from_parts(
+            shared_keys.alpha(),
+            &routing_info.routing_information,
+            &routing_info.mac,
+            &padded,
+        )
     }
 
     fn new_from_parts(alpha: &CurvePoint, routing_info: &[u8], mac: &[u8], payload: &[u8]) -> Self {
@@ -130,7 +133,10 @@ impl MetaPacket {
         packet.extend_from_slice(mac);
         packet.extend_from_slice(payload);
 
-        Self { packet: packet.into_boxed_slice(), header_len: routing_info.len() }
+        Self {
+            packet: packet.into_boxed_slice(),
+            header_len: routing_info.len(),
+        }
     }
 
     pub fn alpha(&self) -> &[u8] {
@@ -142,7 +148,8 @@ impl MetaPacket {
     }
 
     pub fn mac(&self) -> &[u8] {
-        &self.packet[CurvePoint::SIZE_COMPRESSED + self.header_len..CurvePoint::SIZE_COMPRESSED + self.header_len + SimpleMac::SIZE]
+        &self.packet[CurvePoint::SIZE_COMPRESSED + self.header_len
+            ..CurvePoint::SIZE_COMPRESSED + self.header_len + SimpleMac::SIZE]
     }
 
     pub fn payload(&self) -> &[u8] {
@@ -156,7 +163,10 @@ impl MetaPacket {
 
     pub fn from_bytes(packet: &[u8], header_len: usize) -> utils_types::errors::Result<MetaPacket> {
         if packet.len() == Self::size(header_len) {
-            Ok(Self { packet: packet.into(), header_len })
+            Ok(Self {
+                packet: packet.into(),
+                header_len,
+            })
         } else {
             Err(ParseError)
         }
@@ -166,7 +176,8 @@ impl MetaPacket {
         &self.packet
     }
 
-    pub fn forward(&self,
+    pub fn forward(
+        &self,
         private_key: &[u8],
         max_hops: usize,
         additional_data_relayer_len: usize,
@@ -193,15 +204,13 @@ impl MetaPacket {
                 mac,
                 next_node,
                 additional_info,
-            } => {
-                Ok(RelayedPacket {
-                    packet: MetaPacket::new_from_parts(&alpha,&header,&mac,&decrypted),
-                    packet_tag: derive_packet_tag(&secret)?,
-                    derived_secret: secret.into(),
-                    next_node,
-                    additional_info,
-                })
-            }
+            } => Ok(RelayedPacket {
+                packet: MetaPacket::new_from_parts(&alpha, &header, &mac, &decrypted),
+                packet_tag: derive_packet_tag(&secret)?,
+                derived_secret: secret.into(),
+                next_node,
+                additional_info,
+            }),
             ForwardedHeader::FinalNode { additional_data } => Ok(FinalPacket {
                 packet_tag: derive_packet_tag(&secret)?,
                 derived_secret: secret.into(),
@@ -213,8 +222,6 @@ impl MetaPacket {
         }
     }
 }
-
-
 
 /// Indicates if the packet is supposed to be forwarded to the next hop or if it is intended for us.
 #[derive(Debug)]
@@ -242,7 +249,7 @@ pub enum PacketState {
     /// Packet that is being sent out by us
     Outgoing {
         next_hop: PublicKey,
-        ack_challenge: HalfKeyChallenge
+        ack_challenge: HalfKeyChallenge,
     },
 }
 
@@ -270,16 +277,10 @@ impl Packet {
 
         let shared_keys = SharedKeys::new(path)?;
 
-        let por_values = ProofOfRelayValues::new(
-            shared_keys.secret(0).unwrap(),
-            shared_keys.secret(1),
-        );
+        let por_values = ProofOfRelayValues::new(shared_keys.secret(0).unwrap(), shared_keys.secret(1));
 
         let por_strings = (1..path.len())
-            .map(|i|ProofOfRelayString::new(
-                shared_keys.secret(i).unwrap(),
-                shared_keys.secret(i + 1)
-            ).to_bytes())
+            .map(|i| ProofOfRelayString::new(shared_keys.secret(i).unwrap(), shared_keys.secret(i + 1)).to_bytes())
             .collect::<Vec<_>>();
 
         let mut ticket = first_ticket;
@@ -316,7 +317,7 @@ impl Packet {
             let header_len = header_length(INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0);
             let mp = MetaPacket::from_bytes(pre_packet, header_len)?;
 
-            match mp.forward(private_key,INTERMEDIATE_HOPS + 1,POR_SECRET_LENGTH, 0)? {
+            match mp.forward(private_key, INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0)? {
                 RelayedPacket {
                     packet,
                     derived_secret,
@@ -330,7 +331,9 @@ impl Packet {
                     challenge
                         .validate(ack_key.to_challenge(), &previous_hop)
                         .then(|| ())
-                        .ok_or(PacketDecodingError("couldn't validate acknowledgement challenge on the relayed packet".into()))?;
+                        .ok_or(PacketDecodingError(
+                            "couldn't validate acknowledgement challenge on the relayed packet".into(),
+                        ))?;
 
                     let ticket = Ticket::from_bytes(pre_ticket)?;
                     let verification_output = pre_verify(&derived_secret, &additional_info, &ticket.challenge)?;
@@ -355,14 +358,16 @@ impl Packet {
                     packet_tag,
                     plain_text,
                     derived_secret,
-                    additional_data: _
+                    additional_data: _,
                 } => {
                     let ack_key = derive_ack_key_share(&derived_secret);
                     let mut challenge = AcknowledgementChallenge::from_bytes(pre_challenge)?;
                     challenge
                         .validate(ack_key.to_challenge(), &previous_hop)
                         .then(|| ())
-                        .ok_or(PacketDecodingError("couldn't validate acknowledgement challenge on the final packet".into()))?;
+                        .ok_or(PacketDecodingError(
+                            "couldn't validate acknowledgement challenge on the final packet".into(),
+                        ))?;
 
                     let ticket = Ticket::from_bytes(pre_ticket)?;
                     Ok(Self {
@@ -445,15 +450,18 @@ impl Packet {
 
 #[cfg(test)]
 mod tests {
-    use crate::packet::{add_padding, remove_padding, Packet, PacketState, PADDING_TAG, INTERMEDIATE_HOPS, ForwardedMetaPacket, MetaPacket};
+    use crate::packet::{
+        add_padding, remove_padding, ForwardedMetaPacket, MetaPacket, Packet, PacketState, INTERMEDIATE_HOPS,
+        PADDING_TAG,
+    };
+    use crate::por::{ProofOfRelayString, POR_SECRET_LENGTH};
+    use core_crypto::shared_keys::SharedKeys;
     use core_crypto::types::PublicKey;
     use core_types::channels::Ticket;
     use libp2p_identity::{Keypair, PeerId};
-    use core_crypto::shared_keys::SharedKeys;
+    use parameterized::parameterized;
     use utils_types::primitives::{Balance, BalanceType, U256};
     use utils_types::traits::{BinarySerializable, PeerIdLike};
-    use crate::por::{POR_SECRET_LENGTH, ProofOfRelayString};
-    use parameterized::parameterized;
 
     #[test]
     fn test_padding() {
@@ -487,41 +495,41 @@ mod tests {
         let (secrets, path) = generate_keypairs(amount);
         let shared_keys = SharedKeys::new(&path.iter().collect::<Vec<_>>()).unwrap();
         let por_strings = (1..path.len())
-            .map(|i|ProofOfRelayString::new(
-                shared_keys.secret(i).unwrap(),
-                shared_keys.secret(i + 1)
-            ).to_bytes())
+            .map(|i| ProofOfRelayString::new(shared_keys.secret(i).unwrap(), shared_keys.secret(i + 1)).to_bytes())
             .collect::<Vec<_>>();
 
         let msg = b"some random test message";
 
-        let mut mp = MetaPacket::new(shared_keys,
-                                    msg,
-                                    &path.iter().collect::<Vec<_>>(),
-                                    INTERMEDIATE_HOPS + 1,
-                                    POR_SECRET_LENGTH,
-                                    &por_strings.iter().map(|pors| pors.as_ref()).collect::<Vec<_>>(),
-                                    None);
+        let mut mp = MetaPacket::new(
+            shared_keys,
+            msg,
+            &path.iter().collect::<Vec<_>>(),
+            INTERMEDIATE_HOPS + 1,
+            POR_SECRET_LENGTH,
+            &por_strings.iter().map(|pors| pors.as_ref()).collect::<Vec<_>>(),
+            None,
+        );
 
         for (i, secret) in secrets.iter().enumerate() {
-            let fwd = mp.forward(secret,
-                                          INTERMEDIATE_HOPS + 1,
-                                          POR_SECRET_LENGTH,
-                                          0)
+            let fwd = mp
+                .forward(secret, INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0)
                 .expect(&format!("failed to unwrap at {i}"));
             match fwd {
                 ForwardedMetaPacket::RelayedPacket { packet, .. } => {
                     assert!(i < path.len() - 1);
                     mp = packet;
-                },
-                ForwardedMetaPacket::FinalPacket { plain_text, additional_data, .. } => {
+                }
+                ForwardedMetaPacket::FinalPacket {
+                    plain_text,
+                    additional_data,
+                    ..
+                } => {
                     assert_eq!(path.len() - 1, i);
                     assert_eq!(msg, plain_text.as_ref());
                     assert!(additional_data.is_empty());
                 }
             }
         }
-
     }
 
     fn mock_ticket(next_peer: &PeerId, path_len: usize, private_key: &[u8]) -> Ticket {
@@ -550,7 +558,7 @@ mod tests {
 
     #[parameterized(amount = { 4, 3, 2 })]
     fn test_packet_create_and_transform(amount: usize) {
-        let (mut node_private_keys, mut path)  = generate_keypairs(amount);
+        let (mut node_private_keys, mut path) = generate_keypairs(amount);
 
         let private_key = node_private_keys.drain(..1).last().unwrap();
         let public_key = path.drain(..1).last().unwrap();
@@ -568,7 +576,9 @@ mod tests {
         }
 
         for (i, (node_private, node_id)) in node_private_keys.iter().zip(path.iter()).enumerate() {
-            let sender = (i == 0).then_some(&public_key).unwrap_or_else(|| path.get(i - 1).unwrap());
+            let sender = (i == 0)
+                .then_some(&public_key)
+                .unwrap_or_else(|| path.get(i - 1).unwrap());
 
             packet = Packet::from_bytes(&packet.to_bytes(), node_private, &sender)
                 .unwrap_or_else(|e| panic!("failed to deserialize packet at hop {i}: {e}"));
@@ -590,20 +600,22 @@ mod tests {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use std::str::FromStr;
-    use js_sys::JsString;
-    use libp2p_identity::{ParseError, PeerId};
-    use wasm_bindgen::prelude::wasm_bindgen;
+    use crate::packet::wasm::WasmPacketState::{Final, Forwarded, Outgoing};
+    use crate::packet::{Packet, PacketState};
     use core_crypto::types::{HalfKey, HalfKeyChallenge, PublicKey};
     use core_types::channels::Ticket;
+    use js_sys::JsString;
+    use libp2p_identity::{ParseError, PeerId};
+    use std::str::FromStr;
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
-    use crate::packet::{Packet, PacketState};
-    use crate::packet::wasm::WasmPacketState::{Final, Forwarded, Outgoing};
+    use wasm_bindgen::prelude::wasm_bindgen;
 
     #[wasm_bindgen]
     pub enum WasmPacketState {
-        Final, Forwarded, Outgoing
+        Final,
+        Forwarded,
+        Outgoing,
     }
 
     #[wasm_bindgen]
@@ -613,9 +625,13 @@ pub mod wasm {
             let peers = ok_or_jserr!(path
                 .into_iter()
                 .map(|s| PeerId::from_str(&s.as_string().unwrap()))
-                .collect::<Result<Vec<_>, ParseError>>()
-            )?;
-            ok_or_jserr!(Self::new(msg, &peers.iter().collect::<Vec<_>>(), private_key, first_ticket))
+                .collect::<Result<Vec<_>, ParseError>>())?;
+            ok_or_jserr!(Self::new(
+                msg,
+                &peers.iter().collect::<Vec<_>>(),
+                private_key,
+                first_ticket
+            ))
         }
 
         #[wasm_bindgen(js_name = "serialize")]
@@ -638,33 +654,36 @@ pub mod wasm {
         pub fn _own_key(&self) -> Option<HalfKey> {
             match &self.state {
                 PacketState::Forwarded { own_key, .. } => Some(own_key.clone()),
-                PacketState::Outgoing { .. } | PacketState::Final { .. } => None
+                PacketState::Outgoing { .. } | PacketState::Final { .. } => None,
             }
         }
 
         #[wasm_bindgen(js_name = "ack_challenge")]
         pub fn _ack_challenge(&self) -> Option<HalfKeyChallenge> {
             match &self.state {
-                PacketState::Forwarded { ack_challenge, .. } |
-                PacketState::Outgoing { ack_challenge, .. } => Some(ack_challenge.clone()),
-                PacketState::Final { .. } => None
+                PacketState::Forwarded { ack_challenge, .. } | PacketState::Outgoing { ack_challenge, .. } => {
+                    Some(ack_challenge.clone())
+                }
+                PacketState::Final { .. } => None,
             }
         }
 
         #[wasm_bindgen(js_name = "next_hop")]
         pub fn _next_hop(&self) -> Option<PublicKey> {
             match &self.state {
-                PacketState::Forwarded { next_hop, .. } |
-                PacketState::Outgoing { next_hop, .. } => Some(next_hop.clone()),
-                PacketState::Final { .. } => None
+                PacketState::Forwarded { next_hop, .. } | PacketState::Outgoing { next_hop, .. } => {
+                    Some(next_hop.clone())
+                }
+                PacketState::Final { .. } => None,
             }
         }
 
         #[wasm_bindgen(js_name = "previous_hop")]
         pub fn _previous_hop(&self) -> Option<PublicKey> {
             match &self.state {
-                PacketState::Final { previous_hop,  .. } |
-                PacketState::Forwarded { previous_hop, .. } => Some(previous_hop.clone()),
+                PacketState::Final { previous_hop, .. } | PacketState::Forwarded { previous_hop, .. } => {
+                    Some(previous_hop.clone())
+                }
                 PacketState::Outgoing { .. } => None,
             }
         }
@@ -672,9 +691,10 @@ pub mod wasm {
         #[wasm_bindgen(js_name = "packet_tag")]
         pub fn _packet_tag(&self) -> Option<Box<[u8]>> {
             match &self.state {
-                PacketState::Final { packet_tag, .. } |
-                PacketState::Forwarded { packet_tag, .. } => Some(packet_tag.clone()),
-                PacketState::Outgoing { .. } => None
+                PacketState::Final { packet_tag, .. } | PacketState::Forwarded { packet_tag, .. } => {
+                    Some(packet_tag.clone())
+                }
+                PacketState::Outgoing { .. } => None,
             }
         }
 
@@ -682,8 +702,7 @@ pub mod wasm {
         pub fn _plaintext(&self) -> Option<Box<[u8]>> {
             match &self.state {
                 PacketState::Final { plain_text, .. } => Some(plain_text.clone()),
-                PacketState::Forwarded { .. } |
-                PacketState::Outgoing { .. } => None
+                PacketState::Forwarded { .. } | PacketState::Outgoing { .. } => None,
             }
         }
 
@@ -692,7 +711,7 @@ pub mod wasm {
             match &self.state {
                 PacketState::Final { .. } => Final,
                 PacketState::Forwarded { .. } => Forwarded,
-                PacketState::Outgoing { .. } => Outgoing
+                PacketState::Outgoing { .. } => Outgoing,
             }
         }
 

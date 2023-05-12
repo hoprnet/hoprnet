@@ -1470,7 +1470,7 @@ pub mod wasm {
     #[wasm_bindgen(getter_with_clone)]
     pub struct KeyPair {
         pub private: Box<[u8]>,
-        pub public: PublicKey
+        pub public: PublicKey,
     }
 
     #[wasm_bindgen]

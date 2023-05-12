@@ -3,7 +3,7 @@ import { iterateHash, recoverIteratedHash } from './hashIterator.js'
 import assert from 'assert'
 import { Hash } from '../types.js'
 
-import {iterate_hash, recover_iterated_hash} from '../../../core/lib/core_types.js'
+import { iterate_hash, recover_iterated_hash } from '../../../core/lib/core_types.js'
 
 describe('test hash iterator', function () {
   const HASH_LENGTH = 4

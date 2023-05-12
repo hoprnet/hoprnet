@@ -234,8 +234,8 @@ pub fn forward_header(
 
     if header[0] != RELAYER_END_PREFIX {
         // Try to deserialize the public key to validate it
-        let next_node = PublicKey::from_bytes(&header[0..PublicKey::SIZE_COMPRESSED])
-            .map_err(|_| CryptoError::CalculationError)?;
+        let next_node =
+            PublicKey::from_bytes(&header[0..PublicKey::SIZE_COMPRESSED]).map_err(|_| CryptoError::CalculationError)?;
 
         let mac: Box<[u8]> = (&header[PublicKey::SIZE_COMPRESSED..PublicKey::SIZE_COMPRESSED + SimpleMac::SIZE]).into();
 

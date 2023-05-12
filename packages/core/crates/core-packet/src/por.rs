@@ -263,9 +263,9 @@ mod tests {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
+    use crate::por::ProofOfRelayValues;
     use js_sys::Uint8Array;
     use wasm_bindgen::prelude::wasm_bindgen;
-    use crate::por::ProofOfRelayValues;
 
     #[wasm_bindgen]
     impl ProofOfRelayValues {

@@ -163,7 +163,15 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
     const mockChannel = await mockChannelEntry(true, new Balance('100', BalanceType.HOPR), new U256('2'))
 
     return expect(
-      validateUnacknowledgedTicket(SENDER, new Balance('1', BalanceType.HOPR), U256.one(), signedTicket, mockChannel, getTicketsMock, true)
+      validateUnacknowledgedTicket(
+        SENDER,
+        new Balance('1', BalanceType.HOPR),
+        U256.one(),
+        signedTicket,
+        mockChannel,
+        getTicketsMock,
+        true
+      )
     ).to.eventually.rejectedWith('does not match our account epoch')
   })
 
@@ -190,7 +198,15 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
     const mockChannel = await mockChannelEntry(true, new Balance('100', BalanceType.HOPR), new U256('1'), new U256('2'))
 
     return expect(
-      validateUnacknowledgedTicket(SENDER, new Balance('1', BalanceType.HOPR), U256.one(), signedTicket, mockChannel, getTicketsMock, true)
+      validateUnacknowledgedTicket(
+        SENDER,
+        new Balance('1', BalanceType.HOPR),
+        U256.one(),
+        signedTicket,
+        mockChannel,
+        getTicketsMock,
+        true
+      )
     ).to.not.eventually.rejected
   })
 

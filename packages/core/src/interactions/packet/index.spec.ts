@@ -22,11 +22,7 @@ import {
   Snapshot
 } from '@hoprnet/hopr-utils'
 import assert from 'assert'
-import {
-  Packet,
-  PacketHelper,
-  privateKeyFromPeer
-} from '../../messages/index.js'
+import { Packet, PacketHelper, privateKeyFromPeer } from '../../messages/index.js'
 import { PacketForwardInteraction } from './forward.js'
 import { initializeCommitment } from '@hoprnet/hopr-core-ethereum'
 import { ChannelCommitmentInfo } from '@hoprnet/hopr-core-ethereum'
@@ -35,8 +31,12 @@ import type { HoprOptions } from '../../index.js'
 import type { Components } from '@libp2p/interfaces/components'
 import type { Connection, Stream } from '@libp2p/interfaces/connection'
 
-import { derive_ack_key_share, ProofOfRelayValues, Acknowledgement,
-  AcknowledgementChallenge } from '../../../lib/core_packet.js'
+import {
+  derive_ack_key_share,
+  ProofOfRelayValues,
+  Acknowledgement,
+  AcknowledgementChallenge
+} from '../../../lib/core_packet.js'
 
 const SECRET_LENGTH = 32
 
@@ -367,7 +367,10 @@ describe('packet acknowledgement', function () {
 
     libp2pCounterparty.components.getRegistrar().handle(interaction.protocols, async ({ stream }) => {
       for await (const msg of stream.source) {
-        ackCounterpartyInteraction.sendAcknowledgement(Packet.deserialize(msg, COUNTERPARTY_priv, RELAY0.toString()), RELAY0)
+        ackCounterpartyInteraction.sendAcknowledgement(
+          Packet.deserialize(msg, COUNTERPARTY_priv, RELAY0.toString()),
+          RELAY0
+        )
         // we're only interested in first acknowledgement
         break
       }

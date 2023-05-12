@@ -5,7 +5,7 @@ import { createSecp256k1PeerId } from '@libp2p/peer-id-factory'
 import assert from 'assert'
 import BN from 'bn.js'
 
-const INTERMEDIATE_HOPS: number = 3;
+const INTERMEDIATE_HOPS: number = 3
 function createMockTickets() {
   const tags = new Set<string>()
   const db = {
