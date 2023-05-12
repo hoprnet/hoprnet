@@ -18,8 +18,10 @@ import type { PeerId } from '@libp2p/interface-peer-id'
 import { debug } from '@hoprnet/hopr-utils'
 import { keysPBM } from '@libp2p/crypto/keys'
 
-import { Packet, WasmPacketState as PacketState, Ticket as PacketTicket, U256 as PacketU256 } from '../../lib/core_packet.js'
+import { Packet, WasmPacketState as PacketState, Ticket as PacketTicket, U256 as PacketU256, core_packet_set_panic_hook } from '../../lib/core_packet.js'
 export { Packet, WasmPacketState as PacketState } from '../../lib/core_packet.js'
+
+core_packet_set_panic_hook()
 
 import { peerIdFromString } from '@libp2p/peer-id'
 
@@ -76,7 +78,7 @@ async function createTicket(
   log(
     `balances ${channel.balance.to_formatted_string()} - ${outstandingTicketBalance.to_formatted_string()} = 
       ${balance.to_formatted_string()} should >= ${amount.to_string()} in channel open to ${
-      !channel.destination ? '' : channel.destination.toString()
+      !channel.destination ? '' : channel.destination.to_hex(true)
     }`
   )
   if (balance.lt(amount)) {
@@ -267,7 +269,7 @@ export class PacketHelper {
         peerIdFromString(packet.previous_hop().to_peerid_str()),
         new Balance(PRICE_PER_PACKET.toString(), BalanceType.HOPR),
         new U256(INVERSE_TICKET_WIN_PROB.toString()),
-        packet.ticket,
+        Ticket.deserialize(packet.ticket.serialize()),
         channel,
         async () => await db.getTickets({
           signer: PublicKey.deserialize(packet.previous_hop().serialize(false))
@@ -300,6 +302,8 @@ export class PacketHelper {
       ticket = await createTicket(nextPeer, pathPosition, db, private_key)
     }
 
+    console.log(`1`)
     packet.forward(private_key, PacketTicket.deserialize(ticket.serialize()))
+    console.log(`2`)
   }
 }
