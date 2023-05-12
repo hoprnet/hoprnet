@@ -413,7 +413,7 @@ impl<St: DuplexStream> End<St> {
                                 }
                                 y if y == ConnectionStatusMessage::Upgraded as u8 => {
                                     // Swallow UPGRADED message for backwards-compatibility
-                                    *this.ended = true;
+                                    // *this.ended = true;
                                     continue;
                                 }
                                 y => error!("unrecognizable connection status message [{}]", y),
@@ -620,45 +620,46 @@ impl<St: DuplexStream> Future for Server<St> {
             *this.waker.borrow_mut() = Some(cx.waker().clone());
         }
 
-        while !self.a_ended && !self.b_ended {
-            info!("server polling iteration");
-            let mut a_pending = false;
-            if !self.a_ended {
-                let mut this = self.as_mut().project();
+        let mut pending = false;
 
-                match this.a.poll(&mut this.b, cx) {
-                    Poll::Pending => a_pending = true,
-                    Poll::Ready(Err(e)) => {
-                        *this.a_ended = true;
-                        error!("Error iterating on relayed stream {}", e);
-                    }
-                    Poll::Ready(Ok(None)) => {
-                        *this.a_ended = true;
-                    }
-                    Poll::Ready(Ok(Some(()))) => (),
+        if !self.a_ended {
+            let mut this = self.as_mut().project();
+
+            match this.a.poll(&mut this.b, cx) {
+                Poll::Pending => {
+                    pending = true;
                 }
-            }
-
-            if !self.b_ended {
-                let mut this = self.as_mut().project();
-
-                match this.b.poll(&mut this.a, cx) {
-                    Poll::Pending => {
-                        if a_pending {
-                            // None of the substreams can make progress
-                            return Poll::Pending;
-                        }
-                    }
-                    Poll::Ready(Err(e)) => {
-                        *this.b_ended = true;
-                        error!("Error iterating on relayed stream {}", e);
-                    }
-                    Poll::Ready(Ok(None)) => {
-                        *this.b_ended = true;
-                    }
-                    Poll::Ready(Ok(Some(()))) => (),
+                Poll::Ready(Err(e)) => {
+                    *this.a_ended = true;
+                    error!("Error iterating on relayed stream {}", e);
                 }
+                Poll::Ready(Ok(None)) => {
+                    *this.a_ended = true;
+                }
+                Poll::Ready(Ok(Some(()))) => (),
             }
+        }
+
+        if !self.b_ended {
+            let mut this = self.as_mut().project();
+
+            match this.b.poll(&mut this.a, cx) {
+                Poll::Pending => {
+                    pending = true;
+                }
+                Poll::Ready(Err(e)) => {
+                    *this.b_ended = true;
+                    error!("Error iterating on relayed stream {}", e);
+                }
+                Poll::Ready(Ok(None)) => {
+                    *this.b_ended = true;
+                }
+                Poll::Ready(Ok(Some(()))) => (),
+            }
+        }
+
+        if pending {
+            return Poll::Pending;
         }
 
         Poll::Ready(Ok(()))
