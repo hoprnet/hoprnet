@@ -1,13 +1,12 @@
 import { type AddressInfo, type Server as TCPServer, isIPv6 } from 'net'
 import type { Socket as UDPSocket } from 'dgram'
 import { lookup } from 'dns'
-import type { Connection, MultiaddrConnection } from '@libp2p/interface-connection'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import type { Components } from '@libp2p/interfaces/components'
 
 import { peerIdFromBytes } from '@libp2p/peer-id'
 
-import { isAnyAddress, randomPermutation } from '@hoprnet/hopr-utils'
+import { isAnyAddress, randomPermutation, safeCloseConnection } from '@hoprnet/hopr-utils'
 
 import { Multiaddr } from '@multiformats/multiaddr'
 import { CODE_CIRCUIT, CODE_P2P } from '../constants.js'
@@ -196,26 +195,6 @@ export function ip6Lookup(...requestArgs: any[]) {
 }
 
 /**
- * Attempts to close the given maConn. If a failure occurs, it will be logged.
- * @private
- * @param maConn
- */
-export async function attemptClose(
-  maConn: MultiaddrConnection | Connection | undefined,
-  logError: (...args: any[]) => void
-) {
-  if (maConn == null) {
-    return
-  }
-
-  try {
-    await maConn.close()
-  } catch (err) {
-    logError?.('an error occurred while closing the connection', err)
-  }
-}
-
-/**
  * Extracts the relay PeerId from a relay address
  * @param ma relay Address
  * @returns
@@ -242,7 +221,7 @@ export function cleanExistingConnections(
       continue
     }
 
-    attemptClose(conn, error)
+    safeCloseConnection(conn, components, error)
   }
 }
 

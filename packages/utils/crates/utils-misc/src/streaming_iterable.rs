@@ -238,7 +238,6 @@ impl Sink<Box<[u8]>> for StreamingIterable {
             let self_clone = Rc::clone(this.inner);
             let iterator_cb = Closure::<dyn Fn() -> Promise>::new(move || {
                 Promise::new(&mut |resolve, _reject| {
-                    // TODO: use borrow_mut()
                     *self_clone.resolve.borrow_mut() = Some(resolve);
                     if let Some(waker) = self_clone.close_waker.borrow_mut().take() {
                         waker.wake();

@@ -536,7 +536,7 @@ export function WebRTCConnection(
     }
 
     if (!migrated) {
-      // Stream has ended but no migration happened
+      log(`relayed Stream has ended but no migration happened`)
       return
     }
 
@@ -614,6 +614,7 @@ export function WebRTCConnection(
    * @returns
    */
   const close = async (err?: Error): Promise<void> => {
+    console.trace('destroying webrtc connection')
     if (err) {
       error(`Error while attempting to close stream to ${remoteAddr}: ${err}`)
     }

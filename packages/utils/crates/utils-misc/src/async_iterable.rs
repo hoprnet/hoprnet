@@ -45,7 +45,6 @@ pub mod wasm {
             Some(Err(e)) => Err(JsValue::from(e)),
             None => {
                 Reflect::set(&obj, &"done".into(), &JsValue::TRUE).unwrap();
-                Reflect::set(&obj, &"value".into(), &JsValue::undefined()).unwrap();
                 Ok(obj.into())
             }
         }
@@ -74,7 +73,6 @@ pub mod wasm {
             }
             None => {
                 Reflect::set(&obj, &"done".into(), &JsValue::TRUE).unwrap();
-                Reflect::set(&obj, &"value".into(), &JsValue::undefined()).unwrap();
                 obj.into()
             }
         }

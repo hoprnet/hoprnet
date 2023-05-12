@@ -111,6 +111,8 @@ export async function tryExistingConnections(
 > {
   const existingConnections = components.getConnectionManager().getConnections(destination)
 
+  log(`existing connections for ${protocols} to ${destination.toString()}`)
+
   if (existingConnections == undefined || existingConnections.length == 0) {
     return
   }
@@ -128,6 +130,7 @@ export async function tryExistingConnections(
     }
 
     try {
+      log(`try to establish stream for ${protocols} to ${destination.toString()}`)
       stream = await conn.newStream(protocols, options)
     } catch (err: any) {
       error(

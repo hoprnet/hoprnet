@@ -221,7 +221,7 @@ export async function negotiateRelayHandshake(
                 }
               }
             })(),
-            sink: shaker.stream.sink
+            sink: shaker.stream.sink.bind(shaker.stream.sink)
           }
         )
       ) {
@@ -233,7 +233,7 @@ export async function negotiateRelayHandshake(
       log(`deleted inactive relay entry: ${source.toString()} ${destination.toString()}`)
     }
   }
-
+  log(`connections to ${destination.toString()} ${components.getConnectionManager().getConnections(destination)}`)
   const result = await dial(
     components,
     destination,
@@ -289,7 +289,7 @@ export async function negotiateRelayHandshake(
   }
 
   const destinationAnswer = destinationChunk.subarray(0, 1)[0]
-
+  log(`creating new connection for ${destination.toString()} and ${source.toString()}`)
   switch (destinationAnswer as RelayHandshakeMessage) {
     case RelayHandshakeMessage.OK:
       shakerWrite(shaker, RelayHandshakeMessage.OK)
@@ -310,7 +310,7 @@ export async function negotiateRelayHandshake(
               }
             }
           })(),
-          sink: shaker.stream.sink
+          sink: shaker.stream.sink.bind(shaker.stream.sink)
         },
         // Some libp2p modules produces Buffer streams but
         // WASM requires Uint8Array streams
@@ -324,7 +324,7 @@ export async function negotiateRelayHandshake(
               }
             }
           })(),
-          sink: destinationShaker.stream.sink
+          sink: destinationShaker.stream.sink.bind(shaker.stream.sink)
         }
       )
       break
@@ -355,6 +355,8 @@ export async function abortRelayHandshake(stream: Stream, reason: RelayHandshake
  */
 export async function handleRelayHandshake(stream: Stream, source: PeerId): Promise<HandleResponse> {
   const shaker = handshake(stream)
+
+  console.log(`before read`)
 
   let chunk: StreamType | undefined
   try {

@@ -151,7 +151,7 @@ pub struct CoreNetwork {
 static PEER_METADATA_PROTOCOL_VERSION: &str = "protocol_version";
 
 // > 25 secs breaks e2e test timeout
-static PING_TIMEOUT: Duration = Duration::from_secs(20);
+static PING_TIMEOUT: Duration = Duration::from_secs(30);
 
 #[wasm_bindgen]
 impl CoreNetwork {

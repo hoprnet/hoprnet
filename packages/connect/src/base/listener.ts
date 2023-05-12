@@ -11,7 +11,7 @@ import Debug from 'debug'
 import { peerIdFromBytes } from '@libp2p/peer-id'
 import { Multiaddr } from '@multiformats/multiaddr'
 
-import { isAnyAddress, randomInteger, retimer, timeout } from '@hoprnet/hopr-utils'
+import { isAnyAddress, randomInteger, retimer, safeCloseConnection, timeout } from '@hoprnet/hopr-utils'
 
 import { CODE_P2P, CODE_IP4, CODE_IP6, CODE_TCP } from '../constants.js'
 import {
@@ -24,7 +24,7 @@ import { handleUdpStunRequest, getExternalIp, isExposedHost, handleTcpStunReques
 import { getAddrs } from './addrs.js'
 import { fromSocket } from './tcp.js'
 import { RELAY_CHANGED_EVENT } from './entry.js'
-import { bindToPort, attemptClose, nodeToMultiaddr, cleanExistingConnections, ip6Lookup } from '../utils/index.js'
+import { bindToPort, nodeToMultiaddr, cleanExistingConnections, ip6Lookup } from '../utils/index.js'
 import type { Interface } from './stun/types.js'
 
 import type { Components } from '@libp2p/interfaces/components'
@@ -327,7 +327,7 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
       return
     }
 
-    await Promise.all(this.__connections.map((conn: Connection) => attemptClose(conn, error)))
+    await Promise.all(this.__connections.map((conn: Connection) => safeCloseConnection(conn, this.components, error)))
 
     const promise = once(this.tcpSocket, 'close')
 
@@ -458,7 +458,13 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
       }
 
       if (maConn != undefined) {
-        return attemptClose(maConn, error)
+        // Cannot use safeCloseConnection because upgrade to connection failed
+        // so we need to use low-level API
+        try {
+          await maConn.close()
+        } catch (err) {
+          error('an error occurred while closing the connection', err)
+        }
       }
 
       return

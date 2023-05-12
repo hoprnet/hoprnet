@@ -100,6 +100,7 @@ import type { EventEmitter as Libp2pEmitter } from '@libp2p/interfaces/events'
 import { utils as ethersUtils } from 'ethers/lib/ethers.js'
 import { peerIdFromString } from '@libp2p/peer-id'
 import pkg from '../package.json' assert { type: 'json' }
+import { setTimeout } from 'timers/promises'
 
 const CODE_P2P = protocols('p2p').code
 const NORMALIZED_VERSION = pickVersion(pkg.version)
@@ -861,7 +862,7 @@ class Hopr extends EventEmitter {
     }
 
     // Give the operating system some extra time to close the sockets
-    await new Promise((resolve) => setTimeout(resolve, 100))
+    await setTimeout(100)
   }
 
   /**

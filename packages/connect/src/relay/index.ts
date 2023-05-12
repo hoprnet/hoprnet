@@ -7,6 +7,7 @@ import type { DialOptions } from '@libp2p/interface-transport'
 import { CustomEvent } from '@libp2p/interfaces/events'
 import type { Stream, HoprConnectOptions, HoprConnectTestingOptions } from '../types.js'
 import type { ConnectComponents, ConnectInitializable } from '../components.js'
+import { setTimeout } from 'timers/promises'
 
 import { peerIdFromString } from '@libp2p/peer-id'
 
@@ -38,8 +39,7 @@ import {
   safeCloseConnection
 } from '@hoprnet/hopr-utils'
 
-import { handshake } from 'it-handshake'
-import { attemptClose, cleanExistingConnections } from '../utils/index.js'
+import { cleanExistingConnections } from '../utils/index.js'
 
 const DEBUG_PREFIX = 'hopr-connect:relay'
 const DEFAULT_MAX_RELAYED_CONNECTIONS = 10
@@ -370,19 +370,32 @@ class Relay implements Initializable, ConnectInitializable, Startable {
    * @param conn incoming connection
    */
   private async onCanRelay(conn: IncomingStreamData) {
-    const shaker = handshake(conn.stream)
+    ;(async function () {
+      for await (const _chunk of conn.stream.source) {
+        // do nothing
+      }
+    })()
 
     try {
-      // Do both operations indedepently from each other
       await Promise.all([
-        // Send answer, but don't end the stream
-        shaker.write(OK),
-        this.announceRelayerKey(conn.connection.remotePeer)
+        this.announceRelayerKey(conn.connection.remotePeer),
+
+        conn.stream.sink(
+          (async function* (): Stream['source'] {
+            yield OK
+
+            while (true) {
+              await setTimeout(1000)
+
+              yield OK
+            }
+          })()
+        )
       ])
     } catch (err) {
       error(`error in can relay protocol`, err)
       // Close the connection because it led to an error
-      attemptClose(conn.connection, error)
+      safeCloseConnection(conn.connection, this.components as Components, error)
     }
   }
 
@@ -464,7 +477,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
       return
     }
 
-    cleanExistingConnections(this.components as Components, upgradedConn.remotePeer, upgradedConn.id, error)
+    // cleanExistingConnections(this.components as Components, upgradedConn.remotePeer, upgradedConn.id, error)
 
     // Merges all tags from `maConn` into `conn` and then make both objects
     // use the *same* array

@@ -6,6 +6,7 @@ import type { Startable } from '@libp2p/interfaces/startable'
 import { Multiaddr } from '@multiformats/multiaddr'
 import { peerIdFromString } from '@libp2p/peer-id'
 import { handshake } from 'it-handshake'
+import { setTimeout } from 'timers/promises'
 
 import errCode from 'err-code'
 import { EventEmitter } from 'events'
@@ -34,9 +35,11 @@ import {
   retryWithBackoffThenThrow,
   durations,
   defer,
-  DialStatus
+  DialStatus,
+  safeCloseConnection
 } from '@hoprnet/hopr-utils'
-import { attemptClose, relayFromRelayAddress } from '../utils/index.js'
+import { relayFromRelayAddress } from '../utils/index.js'
+import { Stream } from '../types.js'
 
 const DEBUG_PREFIX = 'hopr-connect:entry'
 const log = Debug(DEBUG_PREFIX)
@@ -54,12 +57,9 @@ type EntryNodeData = PeerStoreType & {
   latency: number
 }
 
-type ConnectionResult = {
-  entry: EntryNodeData
-  conn?: Connection
-}
+type Grouped = [id: string, results: (EntryNodeConnectionResult | Error | undefined)[]]
 
-type Grouped = [id: string, results: (ConnectionResult | Error | undefined)[]]
+type EntryNodeConnectionResult = { entry: EntryNodeData; conn?: Connection; stream?: Stream }
 
 /**
  * Compare function to sort EntryNodeData ascending in latency
@@ -75,7 +75,7 @@ enum ResultClass {
   UNCHECKED = 3
 }
 
-function connectionResultToNumber(res: ConnectionResult | undefined | Error): ResultClass {
+function connectionResultToNumber(res: EntryNodeConnectionResult | undefined | Error): ResultClass {
   if (res == undefined) {
     return ResultClass.UNCHECKED
   }
@@ -92,14 +92,76 @@ function connectionResultToNumber(res: ConnectionResult | undefined | Error): Re
 }
 
 /**
+ * Transforms an array holding information about entry nodes to a set
+ * for more convenient inclusion checks
+ *
+ * @param entryNodeData
+ * @returns
+ */
+function entryNodeDataToSet(entryNodeData: (EntryNodeData | PeerStoreType)[]): Set<string> {
+  return new Set<string>(
+    (function* (): Iterable<string> {
+      for (const nodeData of entryNodeData) {
+        yield nodeData.id.toString()
+      }
+    })()
+  )
+}
+
+function moveNodeDataToArray(
+  peerString: string,
+  source: (EntryNodeData | PeerStoreType)[],
+  target: (EntryNodeData | PeerStoreType)[],
+  latency?: number
+) {
+  for (const [i, offline] of source.entries()) {
+    if (offline.id.toString() === peerString) {
+      // move from offlne to available
+      if (latency !== undefined) {
+        target.push({
+          ...source.splice(i, 1)[0],
+          latency
+        })
+      } else {
+        target.push(source.splice(i, 1)[0])
+      }
+
+      break
+    }
+  }
+}
+
+function holdConnection(stream: Stream): void {
+  log(`Holding the connection.`)
+  ;(async function () {
+    for await (const _chunk of stream.source) {
+      log('received keep Alive')
+    }
+  })()
+
+  stream.sink(
+    (async function* (): Stream['source'] {
+      while (true) {
+        await setTimeout(1000)
+        log('keep Alive')
+        yield OK
+      }
+    })()
+  )
+}
+
+/**
  * Compare function to sort results, such that:
  *
- * positive latencies, sorted ascending in latency
- * negative latencies (timeout)
- * Error (something went wrong)
- * undefined (break condition reached, no result)
+ * 1. positive latencies, sorted ascending in latency
+ * 2. negative latencies (timeout)
+ * 3. Error (something went wrong)
+ * 4. undefined (break condition reached, no result)
  */
-function compareConnectionResults(a: ConnectionResult | undefined | Error, b: ConnectionResult | undefined | Error) {
+function compareConnectionResults(
+  a: EntryNodeConnectionResult | undefined | Error,
+  b: EntryNodeConnectionResult | undefined | Error
+) {
   const first = connectionResultToNumber(a)
   const second = connectionResultToNumber(b)
 
@@ -115,7 +177,7 @@ function compareConnectionResults(a: ConnectionResult | undefined | Error, b: Co
         case ResultClass.TIMEOUT:
           return first - second
         case ResultClass.AVAILABLE:
-          return (a as ConnectionResult).entry.latency - (b as ConnectionResult).entry.latency
+          return (a as EntryNodeConnectionResult).entry.latency - (b as EntryNodeConnectionResult).entry.latency
         default:
           throw Error(`Invalid result class. Got ${second}`)
       }
@@ -146,9 +208,9 @@ function isUsableRelay(ma: Multiaddr): boolean {
  */
 function groupConnectionResults(
   args: Iterable<Parameters<EntryNodes['connectToRelay']>>,
-  results: Iterable<ConnectionResult | Error | undefined>
+  results: Iterable<EntryNodeConnectionResult | Error | undefined>
 ): Grouped[] {
-  const grouped: { [index: string]: (ConnectionResult | Error | undefined)[] } = {}
+  const grouped: { [index: string]: (EntryNodeConnectionResult | Error | undefined)[] } = {}
 
   const argIterator = args[Symbol.iterator]()
   const resultsIterator = results[Symbol.iterator]()
@@ -480,7 +542,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
 
           if (
             results.every(
-              (result: ConnectionResult | Error | undefined) =>
+              (result: EntryNodeConnectionResult | Error | undefined) =>
                 result == undefined || result instanceof Error || result.entry.latency < 0
             )
           ) {
@@ -521,6 +583,16 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
     }
   }
 
+  /**
+   * Iterates over currently used entry nodes, checks if they are still
+   * available and republishes the updated list to the DHT.
+   *
+   * This is the counterpart to the DHT eviction mechanism that evicts
+   * unused entries after ~24 hours
+   *
+   * If the entry node is not available, rebuild the list of used entry
+   * nodes to end up with at least three registered entry nodes.
+   */
   private async renewDHTEntries() {
     const work: Parameters<EntryNodes['connectToRelay']>[] = []
     log(`Renewing DHT entry for selected entry nodes`)
@@ -557,7 +629,10 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
   }
 
   /**
-   * Start the interval in which the entry in the DHT gets renewed.
+   * The DHT comes with an automatic eviction mechanism that wipes unused
+   * entries.
+   *
+   * This methods starts a timer that refreshes the published DHT entries.
    */
   private startDHTRenewInterval() {
     this.stopDHTRenewal = retimer(
@@ -575,6 +650,13 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
     )
   }
 
+  /**
+   * Connections to entry nodes might break due to temporary entry node
+   * outages.
+   *
+   * This method starts reconnect attempts with exponential backoff to
+   * ultimately reconnect to the previously connected entry node.
+   */
   private startReconnectAttemptInterval() {
     let allowed = false
     let initialDelay = durations.minutes(1)
@@ -806,17 +888,27 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
           }
           // Includes a catch-all block and swallows, but
           // logs all exceptions
-          attemptClose((result as ConnectionResult).conn, error)
+          if (result.conn) {
+            safeCloseConnection(
+              (result as EntryNodeConnectionResult).conn as Connection,
+              this.components as Components,
+              error
+            )
+          }
         }
 
         // Don't add entry node
         break
+      } else {
+        // Hold the connection to entry node since this connection might be the
+        // only way to reach the node.
+        holdConnection(results[0].stream as Stream)
       }
 
       this.usedRelays.push({
         // @TODO take the address that really got used
-        relayDirectAddress: (results[0] as ConnectionResult).entry.multiaddrs[0],
-        ourCircuitAddress: createCircuitAddress((results[0] as ConnectionResult).entry.id)
+        relayDirectAddress: (results[0] as EntryNodeConnectionResult).entry.multiaddrs[0],
+        ourCircuitAddress: createCircuitAddress((results[0] as EntryNodeConnectionResult).entry.id)
       })
     }
   }
@@ -855,27 +947,9 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
    */
   protected updateRecords(groupedResults: Iterable<Grouped>) {
     // @TODO replace this by a more efficient data structure
-    const availableOnes = new Set<string>(
-      function* (this: EntryNodes) {
-        for (const nodeData of this.availableEntryNodes) {
-          yield nodeData.id.toString()
-        }
-      }.call(this)
-    )
-    const uncheckedOnes = new Set<string>(
-      function* (this: EntryNodes) {
-        for (const nodeData of this.uncheckedEntryNodes) {
-          yield nodeData.id.toString()
-        }
-      }.call(this)
-    )
-    const offlineOnes = new Set<string>(
-      function* (this: EntryNodes) {
-        for (const nodeData of this.offlineEntryNodes) {
-          yield nodeData.id.toString()
-        }
-      }.call(this)
-    )
+    const availableOnes = entryNodeDataToSet(this.availableEntryNodes)
+    const uncheckedOnes = entryNodeDataToSet(this.uncheckedEntryNodes)
+    const offlineOnes = entryNodeDataToSet(this.offlineEntryNodes)
 
     for (const [id, results] of groupedResults) {
       if (results.every((result) => result == undefined)) {
@@ -883,23 +957,12 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
         continue
       }
 
+      // Check if at least any of the checked entry nodes is usable
       if (results.every((result) => result instanceof Error || (result != undefined && result.entry.latency < 0))) {
         if (availableOnes.has(id)) {
-          for (const [i, available] of this.availableEntryNodes.entries()) {
-            if (available.id.toString() === id) {
-              // move from available to offline
-              this.offlineEntryNodes.push(this.availableEntryNodes.splice(i, 1)[0])
-              break
-            }
-          }
+          moveNodeDataToArray(id, this.availableEntryNodes, this.offlineEntryNodes)
         } else if (uncheckedOnes.has(id)) {
-          for (const [i, unchecked] of this.uncheckedEntryNodes.entries()) {
-            if (unchecked.id.toString() === id) {
-              // move from unchecked to offline
-              this.offlineEntryNodes.push(this.uncheckedEntryNodes.splice(i, 1)[0])
-              break
-            }
-          }
+          moveNodeDataToArray(id, this.uncheckedEntryNodes, this.offlineEntryNodes)
         }
 
         // none of the results if usable, so move forward
@@ -907,30 +970,13 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
       }
 
       // At least one of the results has been non-negative, now get the lowest one
-      let lowestPositiveLatency = (results[0] as ConnectionResult).entry.latency
+      // which is the first one because results are sorted
+      let lowestPositiveLatency = (results[0] as EntryNodeConnectionResult).entry.latency
 
       if (offlineOnes.has(id)) {
-        for (const [i, offline] of this.offlineEntryNodes.entries()) {
-          if (offline.id.toString() === id) {
-            // move from offlne to available
-            this.availableEntryNodes.push({
-              ...this.offlineEntryNodes.splice(i, 1)[0],
-              latency: lowestPositiveLatency
-            })
-            break
-          }
-        }
+        moveNodeDataToArray(id, this.offlineEntryNodes, this.availableEntryNodes, lowestPositiveLatency)
       } else if (uncheckedOnes.has(id)) {
-        for (const [i, unchecked] of this.uncheckedEntryNodes.entries()) {
-          if (unchecked.id.toString() === id) {
-            // move from unchecked to available
-            this.availableEntryNodes.push({
-              ...this.uncheckedEntryNodes.splice(i, 1)[0],
-              latency: lowestPositiveLatency
-            })
-            break
-          }
-        }
+        moveNodeDataToArray(id, this.uncheckedEntryNodes, this.availableEntryNodes, lowestPositiveLatency)
       }
     }
 
@@ -942,7 +988,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
    * Updates the list of exposed entry nodes.
    * Called at startup and once an entry node is considered offline.
    */
-  async updatePublicNodes(): Promise<void> {
+  public async updatePublicNodes(): Promise<void> {
     log(`Updating list of used relay nodes ...`)
 
     const addrsToContact = await this.getAddrsToContact()
@@ -954,10 +1000,10 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
         this.connectToRelay,
         addrsToContact,
         this.maxParallelDials,
-        (results: (Awaited<ReturnType<EntryNodes['connectToRelay']>> | Error | undefined)[]) => {
+        (results: (Awaited<EntryNodeConnectionResult> | Error | undefined)[]) => {
           let availableNodes = 0
 
-          // @TODO this assumes that there is only address per entry node that leads
+          // @TODO this assumes that there is only one address per entry node that leads
           //       to a usable connection. In some networks, this might not be true.
           for (const result of results) {
             if (result != undefined && !(result instanceof Error) && result.entry.latency >= 0) {
@@ -1028,7 +1074,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
    * @param relay multiaddr to perform the dial
    * @returns a PeerStoreEntry containing the measured latency
    */
-  private async connectToRelay(id: PeerId, relay: Multiaddr): Promise<{ entry: EntryNodeData; conn?: Connection }> {
+  private async connectToRelay(id: PeerId, relay: Multiaddr): Promise<EntryNodeConnectionResult> {
     const result = await dial(
       this.getComponents(),
       id,
@@ -1074,7 +1120,8 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
           id,
           multiaddrs: [relay],
           latency: -1
-        }
+        },
+        conn: result.resp.conn
       }
     }
 
@@ -1083,7 +1130,9 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
         id,
         multiaddrs: [relay],
         latency: Date.now() - start
-      }
+      },
+      stream: shaker.stream,
+      conn: result.resp.conn
     }
   }
 }

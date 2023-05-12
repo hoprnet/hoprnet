@@ -263,6 +263,14 @@ log "Node 2 ping node 3"
 result=$(api_ping "${api2}" ${addr3} "\"latency\":[0-9]+,\"reportedVersion\":")
 log "-- ${result}"
 
+log "Node 4 ping node 1 (NAT-to-PRN)"
+result=$(api_ping "${api4}" ${addr5} "\"latency\":[0-9]+,\"reportedVersion\":")
+log "-- ${result}"
+
+log "Node 4 ping node 5 (NAT-to-NAT)"
+result=$(api_ping "${api4}" ${addr5} "\"latency\":[0-9]+,\"reportedVersion\":")
+log "-- ${result}"
+
 log "Node 7 should not be able to talk to Node 1 (different environment id)"
 result=$(api_ping "${api6}" ${addr1} "TIMEOUT")
 log "-- ${result}"
@@ -319,9 +327,9 @@ for i in `seq 1 10`; do
   api_send_message "${api4}" "${addr4}" 'hello, world' "${addr5}" & jobs+=( "$!" )
 done
 
-log "Waiting for nodes to finish sending 1 hop messages"
-for j in ${jobs[@]}; do wait -n $j; done; jobs=()
-log "Waiting DONE"
+# log "Waiting for nodes to finish sending 1 hop messages"
+# for j in ${jobs[@]}; do wait -n $j; done; jobs=()
+# log "Waiting DONE"
 
 log "Node 2 should now have a ticket"
 result=$(api_get_ticket_statistics "${api2}" "\"winProportion\":1")

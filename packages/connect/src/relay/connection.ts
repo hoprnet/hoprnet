@@ -550,7 +550,6 @@ export function RelayConnection(
             leave = true
             break
           }
-          flow(`FLOW: unrelated status message received, continue`)
           toYield = statusMsg
 
           break

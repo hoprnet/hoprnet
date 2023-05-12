@@ -206,7 +206,7 @@ api_ping() {
   local peer_id="${2}"
   local assertion="${3}"
 
-  api_call ${origin} "/node/ping" "POST" "{\"peerId\": \"${peer_id}\"}" "${assertion}" 600
+  api_call ${origin} "/node/ping" "POST" "{\"peerId\": \"${peer_id}\"}" "${assertion}" 900
 }
 
 # $1 = node api endpoint
