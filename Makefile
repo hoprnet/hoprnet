@@ -66,7 +66,8 @@ init: ## initialize repository (idempotent operation)
 $(CRATES): ## builds all Rust crates with wasm-pack (except for hopli)
 # --out-dir is relative to working directory
 	echo "use wasm-pack build"
-	wasm-pack build --target=bundler --out-dir ./pkg $@
+	env WASM_BINDGEN_WEAKREF=1 WASM_BINDGEN_EXTERNREF=1 \
+		wasm-pack build --target=bundler --out-dir ./pkg $@
 
 .PHONY: $(HOPLI_CRATE)
 $(HOPLI_CRATE): ## builds hopli Rust crates with cargo
@@ -285,6 +286,7 @@ kill-anvil: ## kill process running at port 8545 (default port of anvil)
 run-local: args=
 run-local: ## run HOPRd from local repo
 	env NODE_OPTIONS="--experimental-wasm-modules" NODE_ENV=development DEBUG="hopr*" node \
+		--experimental-wasm-reftypes \
 		packages/hoprd/lib/main.cjs --init --api \
 		--password="local" --identity=`pwd`/.identity-local.id \
 		--environment anvil-localhost --announce \
