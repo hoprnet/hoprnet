@@ -94,7 +94,7 @@ impl Balance {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn from_str(value: &str, balance_type: BalanceType) -> Self {
         Self {
-            value: u256::from_str_radix(value, 10).unwrap(),
+            value: u256::from_str_radix(value, 10).expect(&format!("invalid number {}", value)),
             balance_type,
         }
     }
@@ -422,13 +422,18 @@ impl U256 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use hex_literal::hex;
 
     #[test]
     fn address_tests() {
-        let addr_1 = Address::default();
+        let addr_1 = Address::from_bytes(&hex!("Cf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9")).unwrap();
         let addr_2 = Address::from_bytes(&addr_1.to_bytes()).unwrap();
 
         assert_eq!(addr_1, addr_2, "deserialized address does not match");
+        assert_eq!(
+            addr_1,
+            Address::from_str("Cf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9").unwrap()
+        );
     }
 
     #[test]

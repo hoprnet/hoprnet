@@ -433,6 +433,11 @@ impl Hash {
         ret.hash.copy_from_slice(hash);
         ret
     }
+
+    /// Convenience method that creates a new hash by hashing this.
+    pub fn hash(&self) -> Self {
+        Self::create(&[&self.hash])
+    }
 }
 
 impl BinarySerializable<'_> for Hash {
@@ -575,8 +580,21 @@ impl PublicKey {
     }
 
     pub fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
-        if data.len() == Self::SIZE_COMPRESSED || data.len() == Self::SIZE_UNCOMPRESSED {
-            let key = elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(data).map_err(|_| ParseError)?;
+        if [
+            Self::SIZE_UNCOMPRESSED,
+            Self::SIZE_UNCOMPRESSED - 1,
+            Self::SIZE_COMPRESSED,
+        ]
+        .contains(&data.len())
+        {
+            let key;
+            if data.len() == Self::SIZE_UNCOMPRESSED - 1 {
+                key = elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(&[&[4u8], &data[..]].concat())
+                    .map_err(|_| ParseError)?
+            } else {
+                key = elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(data).map_err(|_| ParseError)?
+            }
+
             Ok(PublicKey {
                 key,
                 compressed: if data.len() == Self::SIZE_COMPRESSED {
@@ -1042,6 +1060,14 @@ pub mod tests {
 
         assert_eq!(pk1, pk2, "pub keys 1 2 don't match");
         assert_eq!(pk2, pk3, "pub keys 2 3 don't match");
+
+        assert_eq!(PublicKey::SIZE_COMPRESSED, pk1.to_bytes(true).len());
+        assert_eq!(PublicKey::SIZE_UNCOMPRESSED, pk1.to_bytes(false).len());
+
+        let shorter = hex!("f85e38b056284626a7aed0acc5d474605a408e6cccf76d7241ec7b4dedb31929b710e034f4f9a7dba97743b01e1cc35a45a60bebb29642cb0ba6a7fe8433316c");
+        let s1 = PublicKey::from_bytes(&shorter).unwrap();
+        let s2 = PublicKey::from_bytes(&s1.to_bytes(false)).unwrap();
+        assert_eq!(s1, s2);
     }
 
     #[test]
@@ -1137,6 +1163,13 @@ pub mod tests {
 
         let hash2 = Hash::from_bytes(&hash1.to_bytes()).unwrap();
         assert_eq!(hash1, hash2, "failed to match deserialized hash");
+
+        assert_eq!(
+            hash1.hash(),
+            Hash::new(&hex!(
+                "1c4d8d521eccee7225073ea180e0fa075a6443afb7ca06076a9566b07d29470f"
+            ))
+        );
     }
 
     #[test]
@@ -1439,6 +1472,11 @@ pub mod wasm {
         #[wasm_bindgen(js_name = "deserialize")]
         pub fn _deserialize(bytes: &[u8]) -> JsResult<PublicKey> {
             ok_or_jserr!(PublicKey::from_bytes(bytes))
+        }
+
+        #[wasm_bindgen(js_name = "serialize")]
+        pub fn _serialize(&self, compressed: bool) -> Box<[u8]> {
+            self.to_bytes(compressed)
         }
 
         #[wasm_bindgen(js_name = "from_peerid_str")]
