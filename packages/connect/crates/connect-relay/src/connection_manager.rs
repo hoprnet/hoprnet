@@ -91,6 +91,11 @@ impl<St: DuplexStream> Future for PollBothActive<St> {
     }
 }
 
+/// Holds relayed connections, can
+/// - check if a connection is active
+/// - overwrite connection endpoint e.g. upon reconnects
+/// - prune stale connections
+/// - produce debug output to see current relay connections
 struct RelayConnections<St> {
     conns: Rc<RefCell<HashMap<RelayConnectionIdentifier, Rc<RefCell<Server<St>>>>>>,
 }
@@ -114,12 +119,15 @@ impl<St> ToString for RelayConnections<St> {
 }
 
 impl<'a, St: DuplexStream + 'static> RelayConnections<St> {
+    /// Initiates the connection manager
     pub fn new() -> Self {
         Self {
             conns: Rc::new(RefCell::new(HashMap::new())),
         }
     }
 
+    /// Assembles two duplex stream to a relayed connection and stores it.
+    /// Starts a background task that polls the streams.
     pub fn create_new(&mut self, id_a: PeerId, stream_a: St, id_b: PeerId, stream_b: St) -> Result<(), String> {
         let id: RelayConnectionIdentifier = (id_a, id_b).try_into().unwrap();
 
@@ -152,6 +160,8 @@ impl<'a, St: DuplexStream + 'static> RelayConnections<St> {
         Ok(())
     }
 
+    /// Checks if the relay connection of `source` and `destination` is active.
+    /// Issues low-level ping requests on both underlying streams.
     pub async fn is_active(&self, source: PeerId, destination: PeerId, maybe_timeout: Option<u64>) -> bool {
         let id: RelayConnectionIdentifier = match (source, destination).try_into() {
             Ok(x) => x,
@@ -178,6 +188,8 @@ impl<'a, St: DuplexStream + 'static> RelayConnections<St> {
         false
     }
 
+    /// Overwrites the duplex stream *to* `source` by the given stream.
+    /// Used to handle reconnects.
     pub fn update_existing(&self, source: PeerId, destination: PeerId, to_source: St) -> bool {
         let id: RelayConnectionIdentifier = match (source, destination).try_into() {
             Ok(x) => x,
@@ -205,6 +217,8 @@ impl<'a, St: DuplexStream + 'static> RelayConnections<St> {
         false
     }
 
+    /// Checks if we have stored a relay connection between `source` and `destination`.
+    /// Does not do any checks if the connection is alive.
     pub fn exists(&self, source: PeerId, destination: PeerId) -> bool {
         let id: RelayConnectionIdentifier = match (source, destination).try_into() {
             Ok(x) => x,
@@ -217,10 +231,14 @@ impl<'a, St: DuplexStream + 'static> RelayConnections<St> {
         self.conns.borrow().contains_key(&id)
     }
 
+    /// Gets the number of the currently stored connections.
+    /// Can include stale connections.
     pub fn size(&self) -> usize {
         self.conns.borrow().len()
     }
 
+    /// Runs through all currently stored connections, checks if they
+    /// are active and drops them if the appear stale.
     pub async fn prune(&self) -> usize {
         info!("pruning connections");
         let mut futs = FuturesUnordered::from_iter(
@@ -242,10 +260,9 @@ impl<'a, St: DuplexStream + 'static> RelayConnections<St> {
         pruned
     }
 
+    /// Manually drops a connections without checking whether it is stale.
     pub fn remove(&self, id: &RelayConnectionIdentifier) {
-        let mut conns = self.conns.borrow_mut();
-
-        conns.remove(&id);
+        self.conns.borrow_mut().remove(&id);
     }
 }
 
@@ -391,7 +408,7 @@ pub mod wasm {
 
 #[cfg(test)]
 mod tests {
-    use crate::server_new::{ConnectionStatusMessage, MessagePrefix, StatusMessage};
+    use crate::server::{ConnectionStatusMessage, MessagePrefix, StatusMessage};
 
     use super::*;
     use futures::{
