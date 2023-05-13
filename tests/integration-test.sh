@@ -253,18 +253,26 @@ test_aliases() {
 
 test_aliases ${api1} ${addr2}
 
-for node in ${addr2} ${addr3} ${addr4} ${addr5}; do
-  log "Node 1 ping other node ${node}"
+for node in ${addr2} ${addr3}; do
+  log "Node 1 ping other node ${node} (PRN-to-PRN)"
   result=$(api_ping "${api1}" ${node} "\"latency\":[0-9]+,\"reportedVersion\":")
   log "-- ${result}"
 done
 
-log "Node 2 ping node 3"
+log "Node 2 ping node 3 (PRN-to-PRN)"
 result=$(api_ping "${api2}" ${addr3} "\"latency\":[0-9]+,\"reportedVersion\":")
 log "-- ${result}"
 
+log "Node 1 ping node 4 (PRN-to-NAT)"
+result=$(api_ping "${api1}" ${addr4} "\"latency\":[0-9]+,\"reportedVersion\":")
+log "-- ${result}"
+
+log "Node 1 ping node 5 (PRN-to-NAT)"
+result=$(api_ping "${api1}" ${addr5} "\"latency\":[0-9]+,\"reportedVersion\":")
+log "-- ${result}"
+
 log "Node 4 ping node 1 (NAT-to-PRN)"
-result=$(api_ping "${api4}" ${addr5} "\"latency\":[0-9]+,\"reportedVersion\":")
+result=$(api_ping "${api4}" ${addr1} "\"latency\":[0-9]+,\"reportedVersion\":")
 log "-- ${result}"
 
 log "Node 4 ping node 5 (NAT-to-NAT)"

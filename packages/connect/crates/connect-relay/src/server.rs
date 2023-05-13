@@ -7,12 +7,9 @@ use futures::{
 use libp2p::PeerId;
 use pin_project_lite::pin_project;
 use std::{
-    cell::RefCell,
     cmp::Ordering,
-    collections::HashMap,
     hash::{Hash, Hasher},
     pin::Pin,
-    rc::Rc,
     str::FromStr,
     task::{Context, Poll, Waker},
 };
@@ -125,107 +122,71 @@ impl TryFrom<(PeerId, PeerId)> for RelayConnectionIdentifier {
 
 #[repr(u8)]
 pub enum MessagePrefix {
+    /// Message is a payload and need to be forwarded
     Payload = 0x00,
+    /// Message is a status message and handles the node <-> relay relationship
     StatusMessage = 0x01,
+    /// Message is a connection status message and handles the state of the
+    /// link between initiator and destination
     ConnectionStatus = 0x02,
+    /// Message contains WebRTC signalling information and need to be forwarded
     WebRTC = 0x03,
 }
 
 #[repr(u8)]
 pub enum StatusMessage {
+    /// Used to see if stream counterparty is active
     Ping = 0x00,
+    /// Used to signal to relay that counterparty is active
     Pong = 0x01,
 }
 
 #[repr(u8)]
 pub enum ConnectionStatusMessage {
+    /// Notifies the relay and the other relay end to end the stream
     Stop = 0x00,
+    /// Notifies the other relay end about a reconnect.
+    /// This is used to redo the end-to-end connection handshake.
     Restart = 0x01,
+    /// Notifies the relay that the connection has been upgraded and the
+    /// relayed connection is no longer needed
     Upgraded = 0x02,
 }
 
 pin_project! {
-    /// Runs a timeout against a ping request.
-    /// To be waked up once the pong response has arrived.
-    pub struct PingFuture {
-        waker: Option<Waker>,
-        started: u64,
-        ended: Option<u64>,
-        #[pin]
-        timeout: Pin<Box<dyn Future<Output = ()>>>
-    }
-}
-
-impl PingFuture {
-    pub fn new(timeout: Pin<Box<dyn Future<Output = ()>>>) -> Self {
-        Self {
-            waker: None,
-            started: current_timestamp(),
-            ended: None,
-            timeout,
-        }
-    }
-
-    pub(super) fn wake(&mut self) -> () {
-        self.ended = Some(current_timestamp());
-
-        if let Some(waker) = self.waker.take() {
-            waker.wake();
-        }
-    }
-}
-
-impl Future for PingFuture {
-    type Output = Result<u64, String>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let this = self.project();
-        if let Some(end) = *this.ended {
-            return Poll::Ready(Ok(end - *this.started));
-        }
-
-        if let Poll::Ready(()) = this.timeout.poll(cx) {
-            return Poll::Ready(Err("timeout".into()));
-        }
-
-        *this.waker = Some(cx.waker().clone());
-
-        Poll::Pending
-    }
-}
-
-pin_project! {
-    pub struct PollBorrow<F> {
-        #[pin]
-        fut: Rc<RefCell<F>>
-    }
-}
-
-impl<F: Future> Future for PollBorrow<F> {
-    type Output = F::Output;
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let this = self.project();
-
-        let mut borrowed = this.fut.borrow_mut();
-
-        unsafe { Pin::new_unchecked(&mut *borrowed) }.poll(cx)
-    }
-}
-
-pin_project! {
+    /// Holds one end of a relayed connections
     pub struct End<St> {
-        ping_requests: Rc<RefCell<HashMap<[u8;4],Rc<RefCell<PingFuture>>>>>,
+        // Holds the stream
+        // to be set and overwritten at runtime
         #[pin]
         st: Option<St>,
+        // chunk fetched from stream
+        // to be sent soon
         buffered: Option<Box<[u8]>>,
+        // PeerId of the destination
         id: PeerId,
+        // send status messages to other end
         status_tx: UnboundedSender<Box<[u8]>>,
         #[pin]
+        // receive status messages from other end
         status_rx: UnboundedReceiver<Box<[u8]>>,
+        // receive a new stream (e.g. after a reconnect)
         #[pin]
         new_stream_rx: UnboundedReceiver<St>,
+        // take a new stream (e.g. after a reconnect)
         new_stream_tx: UnboundedSender<St>,
+        // if true, stream is about to end, i.e. poll_close has been called
+        ending: bool,
+        // if true, stream is done, no more data is expected
         ended: bool,
+        // stores the latest ping timeout
+        ping_timeout: Option<Pin<Box<dyn Future<Output = ()>>>>,
+        // if there is a running ping request, store its start timestamp
+        ping_start: Option<u64>,
+        // once the pong response came back, store the current timestamp
+        ping_ended: Option<u64>,
+        // once the pong response came back, wake the thread to process the result
+        ping_waker: Option<Waker>
     }
 }
 
@@ -239,7 +200,6 @@ impl<St: DuplexStream> End<St> {
         let (new_stream_tx, new_stream_rx) = mpsc::unbounded::<St>();
 
         Self {
-            ping_requests: Rc::new(RefCell::new(HashMap::new())),
             st: Some(st),
             buffered: None,
             id,
@@ -247,32 +207,73 @@ impl<St: DuplexStream> End<St> {
             status_rx,
             new_stream_rx,
             new_stream_tx,
+            ending: false,
             ended: false,
+            ping_timeout: None,
+            ping_ended: None,
+            ping_start: None,
+            ping_waker: None,
         }
     }
 
-    pub fn is_active(&self, maybe_timeout: Option<u64>) -> Result<PollBorrow<PingFuture>, String> {
-        let random_value: [u8; 4] = [0u8; 4];
+    /// Issues a low-level ping to see if the counterparty is responding.
+    /// If the request hits a timeout, the stream is considered stale.
+    pub fn poll_active(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        maybe_timeout: Option<u64>,
+    ) -> Poll<Result<u64, String>> {
+        let this = self.project();
+
+        *this.ping_waker = Some(cx.waker().clone());
+
+        if let Some(ping_start) = this.ping_start.take() {
+            info!("ping active called request present");
+
+            if let Some(ping_end) = this.ping_ended.take() {
+                info!("ping active called request done");
+
+                this.ping_timeout.take();
+                return Poll::Ready(Ok(ping_end - ping_start));
+            }
+
+            return match this.ping_timeout.as_mut().unwrap().as_mut().poll(cx) {
+                Poll::Pending => {
+                    info!("ping active called timeout pending");
+
+                    *this.ping_start = Some(ping_start);
+                    Poll::Pending
+                }
+                Poll::Ready(()) => {
+                    info!("ping active called timeout due");
+
+                    this.ping_timeout.take();
+                    Poll::Ready(Err("timeout".into()))
+                }
+            };
+        }
+
+        info!("ping active called no request");
+
+        *this.ping_start = Some(current_timestamp());
 
         let timeout_duration = maybe_timeout.unwrap_or(DEFAULT_RELAYED_CONNECTION_PING_TIMEOUT as u64);
 
-        let response_timeout = sleep(std::time::Duration::from_millis(timeout_duration as u64)).fuse();
+        *this.ping_timeout = Some(Box::pin(
+            sleep(std::time::Duration::from_millis(timeout_duration as u64)).fuse(),
+        ));
 
-        let fut = Rc::new(RefCell::new(PingFuture::new(Box::pin(response_timeout))));
-        self.ping_requests.borrow_mut().insert(random_value, fut.clone());
-
-        self.status_tx
+        this.status_tx
             .unbounded_send(Box::new([
                 MessagePrefix::StatusMessage as u8,
                 StatusMessage::Ping as u8,
             ]))
             .map_err(|e| e.to_string())?;
 
-        info!("sent ping");
-
-        Ok(PollBorrow { fut })
+        Poll::Pending
     }
 
+    /// Overwrites the incoming stream with a fresh stream, e.g. after a reconnect.
     pub fn update(&self, new_stream: St) -> Result<(), String> {
         match self.new_stream_tx.unbounded_send(new_stream) {
             Ok(()) => (),
@@ -282,7 +283,12 @@ impl<St: DuplexStream> End<St> {
         Ok(())
     }
 
-    pub fn poll(
+    /// Consumes the underlying stream and handles protocol messages and
+    /// forwards all relevant messages to their destination, including payload
+    /// messages.
+    ///
+    /// Returns `Poll::Ready(Ok(None))` once stream has ended.
+    pub fn poll_stream_done(
         self: Pin<&mut Self>,
         other: &mut Pin<&mut End<St>>,
         cx: &mut Context<'_>,
@@ -290,6 +296,10 @@ impl<St: DuplexStream> End<St> {
         let mut this = self.project();
 
         info!("polling future");
+
+        if *this.ended {
+            return Poll::Ready(Ok(None));
+        }
 
         // 1. try to deliver queued message
         // 2. check for reconnected stream
@@ -299,10 +309,14 @@ impl<St: DuplexStream> End<St> {
         loop {
             info!("loop iteration");
 
-            if *this.ended {
+            if *this.ending {
                 let other_st = Pin::new(other.st.as_mut().unwrap());
+                info!("calling poll_close");
                 match other_st.poll_close(cx) {
-                    Poll::Ready(_) => return Poll::Ready(Ok(None)),
+                    Poll::Ready(_) => {
+                        *this.ended = true;
+                        return Poll::Ready(Ok(None));
+                    }
                     Poll::Pending => return Poll::Pending,
                 }
             }
@@ -316,12 +330,12 @@ impl<St: DuplexStream> End<St> {
                             && chunk[0] == MessagePrefix::ConnectionStatus as u8
                             && chunk[1] == ConnectionStatusMessage::Stop as u8
                         {
-                            *this.ended = true;
+                            *this.ending = true;
                         }
                         other_st.as_mut().start_send(chunk).map_err(|e| e.to_string())?;
 
                         // We just sent a STOP message, so close the stream
-                        if *this.ended == true {
+                        if *this.ending == true {
                             continue;
                         }
                     }
@@ -405,21 +419,10 @@ impl<St: DuplexStream> End<St> {
                                 y if y == StatusMessage::Pong as u8 => {
                                     info!("pong received {}", x);
 
-                                    let id: [u8; 4] = match chunk.len() {
-                                        2 => [0u8; 4],
-                                        6 => chunk[2..6].try_into().unwrap(),
-                                        _ => {
-                                            error!(
-                                                "Incorrect ping id length. Received {} elements but expected 4",
-                                                chunk.len() - 2
-                                            );
-                                            continue;
-                                        }
-                                    };
-
-                                    if let Some(entry) = this.ping_requests.borrow().get(&id) {
+                                    if let Some(waker) = this.ping_waker.take() {
                                         info!("ping wake");
-                                        entry.borrow_mut().wake();
+                                        *this.ping_ended = Some(current_timestamp());
+                                        waker.wake();
                                     }
                                 }
                                 y if y == StatusMessage::Ping as u8 => {
@@ -445,7 +448,7 @@ impl<St: DuplexStream> End<St> {
                 }
                 None => {
                     info!("ended");
-                    *this.ended = true;
+                    *this.ending = true;
                     continue;
                 }
             }
@@ -454,82 +457,68 @@ impl<St: DuplexStream> End<St> {
 }
 
 pin_project! {
+    /// Holds two streams that form a relayed connections
+    /// from peer_a <-> relay <-> peer_b
     pub struct Server<St> {
+        // stream from a->b
         #[pin]
         a: End<St>,
-        a_ended: bool,
+        // stream from b->a
         #[pin]
         b: End<St>,
-        b_ended: bool,
-        #[pin]
-        active_a: Option<PollBorrow<PingFuture>>,
-        #[pin]
-        active_b: Option<PollBorrow<PingFuture>>
     }
 }
 
 impl<St: DuplexStream> Server<St> {
+    /// Creates a new relay connection
+    ///
+    /// This method will not `poll` the streams.
     pub fn new(stream_a: St, peer_a: PeerId, stream_b: St, peer_b: PeerId) -> Self {
         let (status_ab_tx, status_ab_rx) = mpsc::unbounded::<Box<[u8]>>();
         let (status_ba_tx, status_ba_rx) = mpsc::unbounded::<Box<[u8]>>();
 
         Self {
             a: End::new(stream_a, peer_a.clone(), status_ba_tx, status_ab_rx),
-            a_ended: false,
             b: End::new(stream_b, peer_b.clone(), status_ab_tx, status_ba_rx),
-            b_ended: false,
-            active_a: None,
-            active_b: None,
         }
     }
 
+    /// Gets the id of the relay connections
     pub fn get_id(&self) -> RelayConnectionIdentifier {
         assert!(!self.a.id.eq(&self.b.id), "Identifier must not be equal");
 
         (self.a.id.clone(), self.b.id.clone()).try_into().unwrap()
     }
 
+    /// Checks if the underlying stream to the given peer is active.
+    /// This issues a low-level ping request to the given peer.
     pub fn poll_active(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         peer: PeerId,
         maybe_timeout: Option<u64>,
     ) -> Poll<bool> {
-        let mut this = self.project();
+        let this = self.project();
 
         if peer.eq(&this.a.id) {
-            Poll::Ready(loop {
-                if let Some(fut) = this.active_a.as_mut().as_pin_mut() {
-                    let active_a = ready!(fut.poll(cx));
-
-                    this.active_a.set(None);
-
-                    break active_a.is_ok();
-                } else {
-                    let active_a = this.a.is_active(maybe_timeout).unwrap();
-
-                    this.active_a.set(Some(active_a));
-                }
-            })
+            match this.a.poll_active(cx, maybe_timeout) {
+                Poll::Pending => Poll::Pending,
+                Poll::Ready(Ok(_)) => Poll::Ready(true),
+                Poll::Ready(Err(_)) => Poll::Ready(false),
+            }
         } else if peer.eq(&this.b.id) {
-            Poll::Ready(loop {
-                if let Some(fut) = this.active_b.as_mut().as_pin_mut() {
-                    let active_b = ready!(fut.poll(cx));
-
-                    this.active_b.set(None);
-
-                    break active_b.is_ok();
-                } else {
-                    let active_b = this.b.is_active(maybe_timeout).unwrap();
-
-                    this.active_b.set(Some(active_b));
-                }
-            })
+            match this.b.poll_active(cx, maybe_timeout) {
+                Poll::Pending => Poll::Pending,
+                Poll::Ready(Ok(_)) => Poll::Ready(true),
+                Poll::Ready(Err(_)) => Poll::Ready(false),
+            }
         } else {
             Poll::Ready(false)
         }
     }
 
+    /// Checks if both streams are active. Used to prune stale connections.
+    /// This issues ping requests send to both peers.
     pub fn poll_both_active(mut self: Pin<&mut Self>, cx: &mut Context<'_>, maybe_timeout: Option<u64>) -> Poll<bool> {
         let mut a_done = false;
         let mut a_active = false; // default
@@ -546,7 +535,8 @@ impl<St: DuplexStream> Server<St> {
                 match self.as_mut().poll_active(cx, peer_a, maybe_timeout) {
                     Poll::Ready(res_a) => {
                         a_done = true;
-                        a_active = res_a
+                        a_active = res_a;
+                        pending = false;
                     }
                     Poll::Pending => {
                         pending = true;
@@ -559,6 +549,7 @@ impl<St: DuplexStream> Server<St> {
                     Poll::Ready(res_b) => {
                         b_done = true;
                         b_active = res_b;
+                        pending = false;
                     }
                     Poll::Pending => {
                         pending = true;
@@ -576,6 +567,7 @@ impl<St: DuplexStream> Server<St> {
         })
     }
 
+    /// Overwrites the stream to the given peer. Used to handle reconnects.
     pub fn update(&self, peer: PeerId, st: St) -> Result<(), String> {
         if peer.eq(&self.a.id) {
             return self.a.update(st);
@@ -585,54 +577,47 @@ impl<St: DuplexStream> Server<St> {
 
         Err("Incorrect peer. None of the stored peers matches the given peer".into())
     }
-
-    pub fn get_id_a(&self) -> PeerId {
-        self.a.id.to_owned()
-    }
-
-    pub fn get_id_b(&self) -> PeerId {
-        self.b.id.to_owned()
-    }
 }
 
 impl<St: DuplexStream> Future for Server<St> {
     type Output = Result<(), String>;
 
+    /// Future that resolves once the connection has ended.
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         Poll::Ready(loop {
             let mut pending = false;
 
-            if !self.a_ended {
+            if !self.a.ended {
                 let mut this = self.as_mut().project();
 
-                match this.a.poll(&mut this.b, cx) {
+                match this.a.poll_stream_done(&mut this.b, cx) {
                     Poll::Pending => {
                         pending = true;
                     }
                     Poll::Ready(Err(e)) => {
-                        *this.a_ended = true;
+                        pending = false;
                         error!("Error iterating on relayed stream {}", e);
                     }
                     Poll::Ready(Ok(None)) => {
-                        *this.a_ended = true;
+                        pending = false;
                     }
                     Poll::Ready(Ok(Some(()))) => (),
                 }
             }
 
-            if !self.b_ended {
+            if !self.b.ended {
                 let mut this = self.as_mut().project();
 
-                match this.b.poll(&mut this.a, cx) {
+                match this.b.poll_stream_done(&mut this.a, cx) {
                     Poll::Pending => {
                         pending = true;
                     }
                     Poll::Ready(Err(e)) => {
-                        *this.b_ended = true;
+                        pending = false;
                         error!("Error iterating on relayed stream {}", e);
                     }
                     Poll::Ready(Ok(None)) => {
-                        *this.b_ended = true;
+                        pending = false;
                     }
                     Poll::Ready(Ok(Some(()))) => (),
                 }
@@ -642,7 +627,7 @@ impl<St: DuplexStream> Future for Server<St> {
                 return Poll::Pending;
             }
 
-            if self.a_ended && self.b_ended {
+            if self.a.ended && self.b.ended {
                 break Ok(());
             }
         })
@@ -654,7 +639,7 @@ mod tests {
     use futures::{stream::FusedStream, Sink, Stream, StreamExt};
 
     use super::*;
-    use std::{str::FromStr, time::Duration};
+    use std::str::FromStr;
 
     const ALICE: &'static str = "1Ank4EeHLAd3bwwtJma1WsXYSmiGgqmjkQoCUpevx67ix8";
     const BOB: &'static str = "1AcPsXRKVc3U64NBb4obUUT34jSLWtvAz2JMw192L92QKW";
@@ -756,7 +741,7 @@ mod tests {
         fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
             let mut this = self.project();
 
-            match this.end.poll(&mut this.other_end, cx) {
+            match this.end.poll_stream_done(&mut this.other_end, cx) {
                 Poll::Pending => Poll::Pending,
                 Poll::Ready(_) => Poll::Ready(()),
             }
@@ -771,8 +756,7 @@ mod tests {
             other_end:End<St>,
             st_send: UnboundedSender<Box<[u8]>>,
             st_other_send: UnboundedSender<Box<[u8]>>,
-            #[pin]
-            ping_fut: Option<PollBorrow<PingFuture>>
+            first_attempt: bool
         }
     }
 
@@ -788,7 +772,7 @@ mod tests {
                 other_end,
                 st_send,
                 st_other_send,
-                ping_fut: None,
+                first_attempt: true,
             }
         }
     }
@@ -801,26 +785,21 @@ mod tests {
             {
                 let mut this = self.as_mut().project();
 
-                if this.ping_fut.is_none() {
-                    *this.ping_fut = Some(this.end.as_mut().is_active(None).unwrap());
-                }
-
-                match this.ping_fut.as_mut().as_pin_mut().unwrap().poll(cx) {
+                match this.end.as_mut().poll_active(cx, None) {
                     Poll::Pending => {
-                        info!("is_active poll::pending");
-
-                        this.st_send
-                            .unbounded_send(Box::new([
-                                MessagePrefix::StatusMessage as u8,
-                                StatusMessage::Pong as u8,
-                            ]))
-                            .unwrap();
+                        if *this.first_attempt {
+                            *this.first_attempt = false;
+                            this.st_send
+                                .unbounded_send(Box::new([
+                                    MessagePrefix::StatusMessage as u8,
+                                    StatusMessage::Pong as u8,
+                                ]))
+                                .unwrap();
+                        }
 
                         pending = true;
                     }
                     Poll::Ready(_) => {
-                        info!("is_active poll::ready");
-
                         this.st_send
                             .unbounded_send(Box::new([
                                 MessagePrefix::ConnectionStatus as u8,
@@ -841,7 +820,7 @@ mod tests {
             {
                 let mut this = self.as_mut().project();
 
-                if let Poll::Pending = this.other_end.poll(&mut this.end, cx) {
+                if let Poll::Pending = this.other_end.poll_stream_done(&mut this.end, cx) {
                     pending = true;
                 }
             }
@@ -849,7 +828,7 @@ mod tests {
             {
                 let mut this = self.as_mut().project();
 
-                if let Poll::Pending = this.end.poll(&mut this.other_end, cx) {
+                if let Poll::Pending = this.end.poll_stream_done(&mut this.other_end, cx) {
                     pending = true;
                 }
             }
@@ -860,34 +839,6 @@ mod tests {
                 Poll::Ready(())
             }
         }
-    }
-
-    #[async_std::test]
-    async fn wake_ping_future() {
-        let now = current_timestamp();
-
-        let timeout = sleep(Duration::from_millis(1000));
-
-        let mut ping_fut = PingFuture::new(Box::pin(timeout));
-
-        assert!(ping_fut.started >= now);
-
-        ping_fut.wake();
-
-        let res = ping_fut.await;
-
-        assert!(res.is_ok(), "Ping must complete");
-    }
-
-    #[async_std::test]
-    async fn timeout_ping() {
-        let timeout = sleep(Duration::from_millis(5));
-
-        let ping_fut = PingFuture::new(Box::pin(timeout));
-
-        let res = ping_fut.await;
-
-        assert!(res.is_err(), "Ping must end up in a timeout");
     }
 
     #[test]

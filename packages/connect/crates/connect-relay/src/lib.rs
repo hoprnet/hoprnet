@@ -1,6 +1,6 @@
 pub mod connection_manager;
 pub mod constants;
-pub mod server_new;
+pub mod server;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {

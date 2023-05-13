@@ -172,7 +172,6 @@ describe('relay state management', function () {
 
     assert(!state.exists(initiator, destination))
     const [initiatorToRelay, relayToInitiator] = duplexPair<StreamType>()
-
     const [destinationToRelay, relayToDestination] = duplexPair<StreamType>()
 
     const initiatorShaker = handshake(initiatorToRelay)
@@ -181,17 +180,22 @@ describe('relay state management', function () {
 
     state.createNew(initiator, destination, relayToInitiator as IStream, destinationToRelay as IStream)
 
-    console.log(state.toString())
-    // initiatorShaker.write(Uint8Array.from([RelayPrefix.PAYLOAD, 0]))
+    let stopPromiseDestination = destinationShaker.read()
+    let stopPromiseInitiator = initiatorShaker.read()
 
-    let stopPromise = destinationShaker.read()
     initiatorShaker.write(Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.STOP))
-
-    console.log(`after writing`)
+    destinationShaker.write(Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.STOP))
 
     assert(
       u8aEquals(
-        (await stopPromise) as Uint8Array,
+        (await stopPromiseDestination) as Uint8Array,
+        Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.STOP)
+      )
+    )
+
+    assert(
+      u8aEquals(
+        (await stopPromiseInitiator) as Uint8Array,
         Uint8Array.of(RelayPrefix.CONNECTION_STATUS, ConnectionStatusMessages.STOP)
       )
     )
@@ -200,6 +204,10 @@ describe('relay state management', function () {
     await setTimeout(100)
 
     for await (const _msg of destinationShaker.stream.source) {
+      // must close the stream
+    }
+
+    for await (const _msg of initiatorShaker.stream.source) {
       // must close the stream
     }
 
@@ -302,6 +310,8 @@ it('webrtc workflow', async function () {
 
   state.createNew(initiator, destination, a_backend as IStream, b_backend as IStream)
 
+  assert(await state.isActive(initiator, destination))
+
   let a_handshake = handshake(a)
   let b_handshake = handshake(b)
 
@@ -315,7 +325,7 @@ it('webrtc workflow', async function () {
   }
 })
 
-it.only('webrtc workflow', async function () {
+it('webrtc workflow', async function () {
   this.timeout(10e3)
   const state = new RelayState({
     relayFreeTimeout: 1
@@ -364,6 +374,8 @@ it.only('webrtc workflow', async function () {
 
   let a_handshake = handshake(a)
   let b_handshake = handshake(b)
+
+  assert(await state.isActive(initiator, destination))
 
   for (let i = 0; i < 4; i++) {
     await setTimeout(200)
