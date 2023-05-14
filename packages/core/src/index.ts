@@ -45,7 +45,8 @@ import {
   registerMetricsCollector,
   retimer as intervalTimer,
   retryWithBackoffThenThrow,
-  iterableToArray
+  iterableToArray,
+  safeCloseConnection
 } from '@hoprnet/hopr-utils'
 
 import {
@@ -120,6 +121,10 @@ const metric_channelBalances = create_multi_gauge(
   ['counterparty', 'direction']
 )
 const metric_sentMessageCount = create_counter('core_counter_sent_messages', 'Number of sent messages')
+const metric_sentMessageFailCount = create_counter(
+  'core_counter_failed_send_messages',
+  'Number of sent messages failures'
+)
 const metric_pathLength = create_histogram_with_buckets(
   'core_histogram_path_length',
   'Distribution of number of hops of sent messages',
@@ -388,7 +393,7 @@ class Hopr extends EventEmitter {
 
         return false
       },
-      (peer: string) => this.closeConnectionsTo(peerIdFromString(peer))
+      (peer: string): Promise<void> => this.closeConnectionsTo(peerIdFromString(peer))
     )
 
     // initialize with all the peers identified in the peer store
@@ -408,11 +413,9 @@ class Hopr extends EventEmitter {
         for (const connection of this.libp2pComponents.getConnectionManager().getConnections()) {
           if (!(await this.isAllowedAccessToNetwork(connection.remotePeer))) {
             this.networkPeers.unregister(connection.remotePeer.toString())
-            try {
-              await connection.close()
-            } catch (err) {
+            await safeCloseConnection(connection, this.libp2pComponents, (_err) => {
               error(`error while closing existing connection to ${connection.remotePeer.toString()}`)
-            }
+            })
           }
         }
       }
@@ -431,11 +434,9 @@ class Hopr extends EventEmitter {
             for (const conn of this.libp2pComponents
               .getConnectionManager()
               .getConnections(peerIdFromString(node.to_peerid_str()))) {
-              try {
-                await conn.close()
-              } catch (err) {
+              await safeCloseConnection(conn, this.libp2pComponents, (_err) => {
                 error(`error while closing existing connection to ${conn.remotePeer.toString()}`)
-              }
+              })
             }
           }
         }
@@ -984,20 +985,28 @@ class Hopr extends EventEmitter {
    */
   public async sendMessage(msg: Uint8Array, destination: PeerId, intermediatePath?: PublicKey[], hops?: number) {
     if (this.status != 'RUNNING') {
+      metric_sentMessageFailCount.increment()
       throw new Error('Cannot send message until the node is running')
     }
 
     if (msg.length > PACKET_SIZE) {
+      metric_sentMessageFailCount.increment()
       throw Error(`Message does not fit into one packet. Please split message into chunks of ${PACKET_SIZE} bytes`)
     }
 
     if (intermediatePath != undefined) {
       // Validate the manually specified intermediate path
-      await this.validateIntermediatePath(intermediatePath)
+      try {
+        await this.validateIntermediatePath(intermediatePath)
+      } catch (e) {
+        metric_sentMessageFailCount.increment()
+        throw e
+      }
     } else {
       intermediatePath = await this.getIntermediateNodes(PublicKey.from_peerid_str(destination.toString()), hops)
 
       if (intermediatePath == null || !intermediatePath.length) {
+        metric_sentMessageFailCount.increment()
         throw Error(`Failed to find automatic path`)
       }
     }
@@ -1015,6 +1024,7 @@ class Hopr extends EventEmitter {
       )
     } catch (err) {
       log(`Could not create packet ${err}`)
+      metric_sentMessageFailCount.increment()
       throw Error(`Error while creating packet.`)
     }
 
@@ -1024,6 +1034,7 @@ class Hopr extends EventEmitter {
       await this.forward.interact(peerIdFromString(path[0].to_peerid_str()), packet)
     } catch (err) {
       log(`Could not send packet ${err}`)
+      metric_sentMessageFailCount.increment()
       throw Error(`Failed to send packet.`)
     }
 
@@ -1096,18 +1107,13 @@ class Hopr extends EventEmitter {
    * Similar to `libp2p.hangUp` but catching all errors.
    * @param peer PeerId of the peer from whom we want to disconnect
    */
-  private closeConnectionsTo(peer: PeerId): void {
+  private async closeConnectionsTo(peer: PeerId): Promise<void> {
     const connections = this.libp2pComponents.getConnectionManager().getConnections(peer)
 
     for (const conn of connections) {
-      // Don't block event loop
-      ;(async function () {
-        try {
-          await conn.close()
-        } catch (err: any) {
-          error(`Error while intentionally closing connection to ${peer.toString()}`, err)
-        }
-      })()
+      await safeCloseConnection(conn, this.libp2pComponents, (err) => {
+        error(`Error while intentionally closing connection to ${peer.toString()}`, err)
+      })
     }
   }
 

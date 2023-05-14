@@ -60,6 +60,8 @@ async function authenticateAndAuthorize(
   return AuthResult.Failed
 }
 
+export const RPCH_MESSAGE_REGEXP = /^(\d+)\|\d+\|\d+\|[\w\W]+$/
+
 // The Rest API v2 is uses JSON for input and output, is validated through a
 // Swagger schema which is also accessible for testing at:
 // http://localhost:3001/api/v2/_swagger
