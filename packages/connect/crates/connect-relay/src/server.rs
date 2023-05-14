@@ -228,25 +228,17 @@ impl<St: DuplexStream> End<St> {
         *this.ping_waker = Some(cx.waker().clone());
 
         if let Some(ping_start) = this.ping_start.take() {
-            info!("ping active called request present");
-
             if let Some(ping_end) = this.ping_ended.take() {
-                info!("ping active called request done");
-
                 this.ping_timeout.take();
                 return Poll::Ready(Ok(ping_end - ping_start));
             }
 
             return match this.ping_timeout.as_mut().unwrap().as_mut().poll(cx) {
                 Poll::Pending => {
-                    info!("ping active called timeout pending");
-
                     *this.ping_start = Some(ping_start);
                     Poll::Pending
                 }
                 Poll::Ready(()) => {
-                    info!("ping active called timeout due");
-
                     this.ping_timeout.take();
                     Poll::Ready(Err("timeout".into()))
                 }
@@ -269,6 +261,9 @@ impl<St: DuplexStream> End<St> {
                 StatusMessage::Ping as u8,
             ]))
             .map_err(|e| e.to_string())?;
+
+        // Poll timeout to register waker
+        ready!(this.ping_timeout.as_mut().unwrap().as_mut().poll(cx));
 
         Poll::Pending
     }
@@ -295,8 +290,6 @@ impl<St: DuplexStream> End<St> {
     ) -> Poll<Result<Option<()>, String>> {
         let mut this = self.project();
 
-        info!("polling future");
-
         if *this.ended {
             return Poll::Ready(Ok(None));
         }
@@ -322,7 +315,7 @@ impl<St: DuplexStream> End<St> {
             }
 
             if let Some(chunk) = this.buffered.take() {
-                info!("taking buffered {:?}", chunk);
+                println!("taking buffered {:?}", chunk);
                 let mut other_st = Pin::new(other.st.as_mut().unwrap());
                 match other_st.as_mut().poll_ready(cx)? {
                     Poll::Ready(()) => {

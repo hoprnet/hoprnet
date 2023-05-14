@@ -69,16 +69,6 @@ pin_project! {
     }
 }
 
-impl<St: DuplexStream> PollBothActive<St> {
-    pub fn new(server: Rc<RefCell<Server<St>>>, id: RelayConnectionIdentifier, maybe_timeout: Option<u64>) -> Self {
-        Self {
-            server,
-            id,
-            maybe_timeout,
-        }
-    }
-}
-
 impl<St: DuplexStream> Future for PollBothActive<St> {
     type Output = Option<RelayConnectionIdentifier>;
 
@@ -241,12 +231,11 @@ impl<'a, St: DuplexStream + 'static> RelayConnections<St> {
     /// are active and drops them if the appear stale.
     pub async fn prune(&self) -> usize {
         info!("pruning connections");
-        let mut futs = FuturesUnordered::from_iter(
-            self.conns
-                .borrow()
-                .iter()
-                .map(|(id, conn)| PollBothActive::new(conn.clone(), id.clone(), None)),
-        );
+        let mut futs = FuturesUnordered::from_iter(self.conns.borrow().iter().map(|(id, conn)| PollBothActive {
+            server: conn.clone(),
+            id: id.clone(),
+            maybe_timeout: None,
+        }));
 
         let mut pruned: usize = 0;
 
@@ -413,7 +402,7 @@ mod tests {
     use super::*;
     use futures::{
         channel::mpsc::{self, UnboundedReceiver, UnboundedSender},
-        future::join,
+        future::join4,
         stream::{FusedStream, Stream},
         Sink,
     };
@@ -502,8 +491,8 @@ mod tests {
 
     #[async_std::test]
     async fn check_if_both_active() {
-        let (stream_a, st_a_send, st_a_receive) = TestingDuplexStream::new();
-        let (stream_b, st_b_send, st_b_receive) = TestingDuplexStream::new();
+        let (stream_a, st_a_send, mut st_a_receive) = TestingDuplexStream::new();
+        let (stream_b, st_b_send, mut st_b_receive) = TestingDuplexStream::new();
 
         let peer_a = PeerId::from_str(ALICE).unwrap();
         let peer_b = PeerId::from_str(BOB).unwrap();
@@ -511,48 +500,75 @@ mod tests {
         let server = Rc::new(RefCell::new(Server::new(stream_a, peer_a, stream_b, peer_b)));
 
         // Start polling the stream in both directions
-        let polled_borrow = PollBorrow { st: server.clone() };
+        let poll_stream_done = PollBorrow { st: server.clone() };
         // Issue a ping request in both directions
-        let polled = PollBothActive::new(server, (peer_a, peer_b).try_into().unwrap(), None);
+        let poll_both_active = PollBothActive {
+            server,
+            id: (peer_a, peer_b).try_into().unwrap(),
+            maybe_timeout: None,
+        };
 
-        let ((_, res), _) = join(join(polled_borrow, polled), async move {
+        let ping_received_a = async {
             assert_eq!(
-                join(st_a_receive.take(1).next(), st_b_receive.take(1).next()).await,
-                (
-                    Some(Box::new([MessagePrefix::StatusMessage as u8, StatusMessage::Ping as u8,]) as Box<[u8]>),
-                    Some(Box::new([MessagePrefix::StatusMessage as u8, StatusMessage::Ping as u8,]) as Box<[u8]>)
-                )
+                st_a_receive.next().await,
+                Some(Box::new([MessagePrefix::StatusMessage as u8, StatusMessage::Ping as u8,]) as Box<[u8]>),
+                "Must receive PING message"
             );
 
-            st_a_send
+            assert!(st_a_send
                 .unbounded_send(Box::new([
                     MessagePrefix::StatusMessage as u8,
                     StatusMessage::Pong as u8,
                 ]))
-                .unwrap();
+                .is_ok(),);
+            assert!(st_a_send
+                .unbounded_send(Box::new([
+                    MessagePrefix::ConnectionStatus as u8,
+                    ConnectionStatusMessage::Stop as u8,
+                ]))
+                .is_ok());
 
-            st_b_send
+            assert_eq!(
+                st_a_receive.next().await,
+                Some(Box::new([
+                    MessagePrefix::ConnectionStatus as u8,
+                    ConnectionStatusMessage::Stop as u8,
+                ]) as Box<[u8]>),
+                "Must receive STOP message"
+            );
+        };
+
+        let ping_received_b = async {
+            assert_eq!(
+                st_b_receive.next().await,
+                Some(Box::new([MessagePrefix::StatusMessage as u8, StatusMessage::Ping as u8,]) as Box<[u8]>),
+                "Must receive PING message"
+            );
+
+            assert!(st_b_send
                 .unbounded_send(Box::new([
                     MessagePrefix::StatusMessage as u8,
                     StatusMessage::Pong as u8,
                 ]))
-                .unwrap();
-
-            st_a_send
+                .is_ok());
+            assert!(st_b_send
                 .unbounded_send(Box::new([
                     MessagePrefix::ConnectionStatus as u8,
                     ConnectionStatusMessage::Stop as u8,
                 ]))
-                .unwrap();
+                .is_ok());
 
-            st_b_send
-                .unbounded_send(Box::new([
+            assert_eq!(
+                st_b_receive.next().await,
+                Some(Box::new([
                     MessagePrefix::ConnectionStatus as u8,
                     ConnectionStatusMessage::Stop as u8,
-                ]))
-                .unwrap();
-        })
-        .await;
+                ]) as Box<[u8]>),
+                "Must receive STOP message"
+            );
+        };
+
+        let (_, res, _, _) = join4(poll_stream_done, poll_both_active, ping_received_a, ping_received_b).await;
 
         assert!(res.is_none());
     }
@@ -566,7 +582,12 @@ mod tests {
 
         let server = Rc::new(RefCell::new(Server::new(stream_a, peer_a, stream_b, peer_b)));
 
-        let polled = PollBothActive::new(server, (peer_a, peer_b).try_into().unwrap(), None).await;
+        let polled = PollBothActive {
+            server,
+            id: (peer_a, peer_b).try_into().unwrap(),
+            maybe_timeout: None,
+        }
+        .await;
 
         assert!(polled.is_some(), "Passive stream should end in a timeout");
         assert!(polled.eq(&Some((peer_a, peer_b).try_into().unwrap())))
