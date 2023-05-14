@@ -263,9 +263,16 @@ impl<St: DuplexStream> End<St> {
             .map_err(|e| e.to_string())?;
 
         // Poll timeout to register waker
-        ready!(this.ping_timeout.as_mut().unwrap().as_mut().poll(cx));
-
-        Poll::Pending
+        match this.ping_timeout.as_mut().unwrap().as_mut().poll(cx) {
+            Poll::Pending => Poll::Pending,
+            Poll::Ready(()) => {
+                // Only happens if timeout set to 0, cleanup stuff
+                this.ping_start.take();
+                this.ping_timeout.take();
+                this.ping_waker.take();
+                Poll::Ready(Err("timeout".into()))
+            }
+        }
     }
 
     /// Overwrites the incoming stream with a fresh stream, e.g. after a reconnect.

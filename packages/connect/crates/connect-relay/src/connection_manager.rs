@@ -593,6 +593,27 @@ mod tests {
         assert!(polled.eq(&Some((peer_a, peer_b).try_into().unwrap())))
     }
 
+    #[async_std::test]
+    async fn check_if_active_timeout_immediate() {
+        let (stream_a, _, _) = TestingDuplexStream::new();
+        let (stream_b, _, _) = TestingDuplexStream::new();
+
+        let peer_a = PeerId::from_str(ALICE).unwrap();
+        let peer_b = PeerId::from_str(BOB).unwrap();
+
+        let server = Rc::new(RefCell::new(Server::new(stream_a, peer_a, stream_b, peer_b)));
+
+        let polled = PollBothActive {
+            server,
+            id: (peer_a, peer_b).try_into().unwrap(),
+            maybe_timeout: Some(0),
+        }
+        .await;
+
+        assert!(polled.is_some(), "Passive stream should end in a timeout");
+        assert!(polled.eq(&Some((peer_a, peer_b).try_into().unwrap())))
+    }
+
     #[test]
     fn empty_state_manager() {
         let state = RelayConnections::<TestingDuplexStream>::new();
