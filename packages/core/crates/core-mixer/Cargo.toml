@@ -32,4 +32,10 @@ wasm-bindgen-futures = { version = "0.4.34", optional = true }
 
 [dev-dependencies]
 more-asserts = "0.3.1"
-wasm-bindgen-test = "0.3.34"
+wasm-bindgen-test = "0.3.33"
+
+[package.metadata.wasm-pack.profile.dev]
+wasm-opt = false
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ['-O', '--enable-reference-types']

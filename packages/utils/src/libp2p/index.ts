@@ -22,6 +22,7 @@ export * from './pubKeyToPeerId.js'
 export * from './privKeyToPeerId.js'
 export * from './relayCode.js'
 export * from './verifySignatureFromPeerId.js'
+export * from './connection.js'
 
 /**
  * Regular expresion used to match b58Strings
