@@ -255,3 +255,22 @@ Note that deployment for `HoprDistributor` and `HoprWrapper` are skipped; ERC182
 - `hardhat accounts` turns into `make get-account-balances environment-name=<name of the meta environment> environment-type=<type of environment, from development, staging, to production> account=<address to check>`
 
 11. `ETHERSCAN_API_KEY` contains the value of "API key for Gnosisscan", as our production and staging environment is on Gnosis chain. The reason why it remains "ETHERSCAN" instead of "GNOSISSCAN" is that foundry reads `ETHERSCAN_API_KEY` as an environment vairable for both `forge verify-contract` and `forge script`, which can not be configured in the foundry.toml file
+
+## Node Management Smart Contracts
+
+The latest node-staking design uses Safe as a center-piece.
+Leveraging its Account-Abstraction design, HOPR node runners can secure node operation with an m-of-n Smart Account.
+
+### Developer Notes:
+
+1. Imported libraries:
+
+Dependencies are vendored directly into the repo. :
+
+- Audited Safe contracts at commit [eb93dbb0f62e2dc1b308ac4c110038062df0a8c9](https://github.com/safe-global/safe-contracts/blob/main/docs/audit_1_4_0.md)
+
+```
+forge install safe-global/safe-contracts@eb93dbb0f62e2dc1b308ac4c110038062df0a8c9 \
+
+--no-git --no-commit
+```
