@@ -59,10 +59,10 @@ pub mod wasm {
     /// Used to pre-compute ping responses
     #[wasm_bindgen]
     pub fn generate_ping_response(u8a: &[u8]) -> JsResult<Box<[u8]>> {
-        ok_or_jserr!(PingMessage::deserialize(u8a)
+        ok_or_jserr!(PingMessage::from_bytes(u8a)
             .map_err(|_| NetworkingError::DecodingError)
             .and_then(|req| ControlMessage::generate_pong_response(&Ping(req)))
-            .and_then(|msg| msg.get_ping_message().map(PingMessage::serialize)))
+            .and_then(|msg| msg.get_ping_message().map(PingMessage::to_bytes)))
     }
 
     #[wasm_bindgen]

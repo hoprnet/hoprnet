@@ -152,7 +152,7 @@ impl Ping {
         }
 
         if let Some(metric_time_to_heartbeat) = &self.metric_time_to_heartbeat {
-            metric_time_to_heartbeat.cancel_measure(heartbeat_round_timer.unwrap());
+            metric_time_to_heartbeat.record_measure(heartbeat_round_timer.unwrap());
         };
     }
 
@@ -179,7 +179,7 @@ impl Ping {
             let timeout = sleep(std::cmp::min(timeout_duration, self.config.timeout)).fuse();
             let ping = async {
                 send_msg(
-                    sent_ping.get_ping_message().unwrap().serialize(),
+                    sent_ping.get_ping_message().unwrap().to_bytes(),
                     destination.to_string(),
                 )
                 .await
@@ -191,7 +191,7 @@ impl Ping {
             let ping_result: Result<(), NetworkingError> = match select(timeout, ping).await {
                 Either::Left(_) => Err(Timeout(timeout_duration.as_secs())),
                 Either::Right((v, _)) => match v {
-                    Ok(received) => PingMessage::deserialize(received.as_ref())
+                    Ok(received) => PingMessage::from_bytes(received.as_ref())
                         .map_err(|_| DecodingError)
                         .and_then(|deserialized| {
                             ControlMessage::validate_pong_response(&sent_ping, &Pong(deserialized))
@@ -205,7 +205,7 @@ impl Ping {
             };
 
             if let Some(metric_time_to_ping) = &self.metric_time_to_ping {
-                metric_time_to_ping.cancel_measure(ping_peer_timer.unwrap());
+                metric_time_to_ping.record_measure(ping_peer_timer.unwrap());
             }
 
             match &ping_result {
@@ -412,10 +412,10 @@ mod tests {
 
     // Testing override
     pub async fn send_ping(msg: Box<[u8]>, peer: String) -> Result<Box<[u8]>, String> {
-        let mut reply = PingMessage::deserialize(msg.as_ref())
+        let mut reply = PingMessage::from_bytes(msg.as_ref())
             .map_err(|_| DecodingError)
             .and_then(|chall| ControlMessage::generate_pong_response(&ControlMessage::Ping(chall)))
-            .and_then(|msg| msg.get_ping_message().map(PingMessage::serialize))
+            .and_then(|msg| msg.get_ping_message().map(PingMessage::to_bytes))
             .unwrap();
 
         match peer.as_str() {

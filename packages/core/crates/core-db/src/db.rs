@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 use core_crypto::types::{HalfKeyChallenge, Hash, PublicKey};
-use core_types::acknowledgment::UnacknowledgedTicket;
+use core_types::acknowledgement::UnacknowledgedTicket;
 use core_types::channels::{ChannelEntry, Ticket};
 use utils_db::{db::DB, traits::BinaryAsyncKVStorage};
 use utils_types::primitives::{Address, Balance, U256};

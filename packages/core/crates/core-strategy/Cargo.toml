@@ -20,7 +20,7 @@ console_error_panic_hook = [ "dep:console_error_panic_hook" ]
 core-types = { path = "../core-types" }
 getrandom = { version = "0.2.8", features = ["js"] }
 js-sys = { version = "0.3.61", optional = true }
-libp2p-identity = { version = "0.1.1", features = ["peerid"] }
+libp2p-identity = { version = "0.1.2", features = ["peerid"] }
 rand = "0.8.5"
 serde = { version = "1.0", features = ["derive"] }
 serde-wasm-bindgen = { version = "0.5", optional = true }
@@ -41,3 +41,8 @@ vector_assertions = "0.1.0"
 wasm-pack = { workspace = true }
 wasm-opt = { workspace = true }
 
+[package.metadata.wasm-pack.profile.dev]
+wasm-opt = false
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ['-O', '--enable-reference-types']

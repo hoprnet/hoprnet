@@ -36,6 +36,7 @@ import { LogStream } from './logs.js'
 import { getIdentity } from './identity.js'
 import { decodeMessage } from './api/utils.js'
 import { type ChannelStrategyInterface, StrategyFactory } from '@hoprnet/hopr-core/lib/channel-strategy.js'
+import { RPCH_MESSAGE_REGEXP } from './api/v2.js'
 
 // Metrics
 const metric_processStartTime = create_gauge(
@@ -207,6 +208,10 @@ async function main() {
       logs.log(`Message: ${decodedMsg.msg}`)
       logs.log(`Latency: ${decodedMsg.latency} ms`)
       metric_latency.observe(decodedMsg.latency)
+
+      if (RPCH_MESSAGE_REGEXP.test(decodedMsg.msg)) {
+        logs.log(`RPCh: received message [${decodedMsg.msg}]`)
+      }
 
       // also send it tagged as message for apps to use
       logs.logMessage(decodedMsg.msg)

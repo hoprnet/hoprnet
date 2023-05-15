@@ -26,27 +26,28 @@ The following sections document the metrics per package:
 
 ### connect
 
-| Name                                       | Type    | Description                                                   | Note                       |
-| ------------------------------------------ | ------- | ------------------------------------------------------------- | :------------------------- |
-| `connect_counter_successful_direct_dials`  | counter | Number of successful direct dials.                            |                            |
-| `connect_counter_failed_direct_dials`      | counter | Number of failed direct dials                                 |                            |
-| `connect_counter_successful_relayed_dials` | counter | Number of successful relayed dials                            |                            |
-| `connect_counter_failed_relayed_dials`     | counter | Number of failed relayed dials                                |                            |
-| `connect_gauge_used_relays`                | gauge   | Number of used relays                                         |                            |
-| `connect_gauge_conns_to_relays`            | gauge   | Number of connections to relays                               |                            |
-| `connect_gauge_relayed_conns`              | gauge   | Number of currently relayed connections                       |                            |
-| `connect_counter_successful_relay_reqs`    | counter | Number of successful incoming relay requests                  |                            |
-| `connect_counter_failed_relay_reqs`        | counter | Number of failed incoming relay requests                      |                            |
-| `connect_counter_relay_reconnects`         | counter | Number of re-established relayed connections                  |                            |
-| `connect_counter_successful_conns`         | counter | Number of successful connection attempts                      |                            |
-| `connect_counter_failed_conns`             | counter | Number of failed connection attempts                          |                            |
-| `connect_counter_udp_stun_requests`        | counter | Number of UDP STUN requests                                   |                            |
-| `connect_counter_tcp_stun_requests`        | counter | Number of TCP STUN requests                                   |                            |
-| `connect_gauge_node_is_exposed`            | gauge   | Shows whether a node believes that it runs on an exposed host | 1: exposed, 0: not exposed |
-| `connect_counter_server_relayed_packets`   | counter | Number of relayed packets (TURN server)                       |                            |
-| `connect_counter_client_relayed_packets`   | counter | Number of relayed packets (TURN client)                       |                            |
-| `connect_counter_direct_packets`           | counter | Number of directly sent packets (TCP)                         |                            |
-| `connect_counter_webrtc_packets`           | counter | Number of directly sent packets (WebRTC)                      |                            |
+| Name                                       | Type    | Description                                                                         | Note                       |
+| ------------------------------------------ | ------- | ----------------------------------------------------------------------------------- | :------------------------- |
+| `connect_counter_successful_direct_dials`  | counter | Number of successful direct dials.                                                  |                            |
+| `connect_counter_failed_direct_dials`      | counter | Number of failed direct dials                                                       |                            |
+| `connect_counter_successful_relayed_dials` | counter | Number of successful relayed dials                                                  |                            |
+| `connect_counter_failed_relayed_dials`     | counter | Number of failed relayed dials                                                      |                            |
+| `connect_gauge_used_relays`                | gauge   | Number of used relays                                                               |                            |
+| `connect_gauge_conns_to_relays`            | gauge   | Number of connections to relays                                                     |                            |
+| `connect_gauge_relayed_conns`              | gauge   | Number of currently relayed connections                                             |                            |
+| `connect_counter_successful_relay_reqs`    | counter | Number of successful incoming relay requests                                        |                            |
+| `connect_counter_failed_relay_reqs`        | counter | Number of failed incoming relay requests                                            |                            |
+| `connect_counter_relay_reconnects`         | counter | Number of re-established relayed connections                                        |                            |
+| `connect_counter_successful_conns`         | counter | Number of successful connection attempts                                            |                            |
+| `connect_counter_failed_conns`             | counter | Number of failed connection attempts                                                |                            |
+| `connect_counter_udp_stun_requests`        | counter | Number of UDP STUN requests                                                         |                            |
+| `connect_counter_tcp_stun_requests`        | counter | Number of TCP STUN requests                                                         |                            |
+| `connect_gauge_node_is_exposed`            | gauge   | Shows whether a node believes that it runs on an exposed host                       | 1: exposed, 0: not exposed |
+| `connect_counter_server_relayed_packets`   | counter | Number of relayed packets (TURN server)                                             |                            |
+| `connect_counter_client_relayed_packets`   | counter | Number of relayed packets (TURN client)                                             |                            |
+| `connect_counter_direct_packets`           | counter | Number of directly sent packets (TCP)                                               |                            |
+| `connect_counter_webrtc_packets`           | counter | Number of directly sent packets (WebRTC)                                            |                            |
+| `connect_gauge_evicted_relayed_conns`      | gauge   | Number of inactive relayed connections which were last removed from the relay state |                            |
 
 ### core
 
@@ -55,6 +56,7 @@ The following sections document the metrics per package:
 | `core_gauge_num_outgoing_channels`         | gauge       | Number of outgoing channels                                    |                                 |
 | `core_gauge_num_incoming_channels`         | gauge       | Number of incoming channels                                    |                                 |
 | `core_counter_sent_messages`               | counter     | Number of sent messages                                        |                                 |
+| `core_counter_failed_send_messages`        | counter     | Number of send message failures                                |                                 |
 | `core_histogram_path_length`               | histogram   | Distribution of number of hops of sent messages                | buckets: 0-4                    |
 | `core_counter_received_successful_acks`    | counter     | Number of received successful message acknowledgements         |                                 |
 | `core_counter_received_failed_acks`        | counter     | Number of received failed message acknowledgements             |                                 |
@@ -108,6 +110,8 @@ The following sections document the metrics per package:
 | `hoprd_gauge_nodejs_total_available_heap_bytes` | gauge       | V8 total available heap size in bytes                             | unit: bytes                              |
 | `hoprd_gauge_nodejs_num_native_contexts`        | gauge       | V8 number of active top-level native contexts                     | unit: bytes, increase indicates mem leak |
 | `hoprd_gauge_nodejs_num_detached_contexts`      | gauge       | V8 number of detached contexts which are not GCd                  | unit: bytes, non-zero indicates mem leak |
+| `hoprd_counter_api_successful_send_msg`         | counter     | Number of successful API calls to POST message endpoint           |                                          |
+| `hoprd_counter_api_failed_send_msg`             | counter     | Number of failed API calls to POST message endpoint               |                                          |
 
 ### utils
 
