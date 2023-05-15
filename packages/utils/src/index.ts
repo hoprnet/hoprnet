@@ -1,6 +1,5 @@
 export * from './async/index.js'
 export * from './collection/index.js'
-export * from './crypto/index.js'
 export * from './libp2p/index.js'
 export * from './math/index.js'
 export * from './network/index.js'
