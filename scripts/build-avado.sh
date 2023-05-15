@@ -67,7 +67,7 @@ if ! [[ $avado_version =~ [0-9]{1,}\.[0-9]{1,}\.[0-9]{1,}$ ]]; then
 fi
 
 # Retrieve the provider URL for the given network ID from protocol-config.json
-declare provider_url=$(jq -r ".networks.\"${network}\".chain as \$envid | .chains[\$envid].default_provider // \"\"" "${mydir}/../packages/core/protocol-config.json")
+declare provider_url=$(jq -r ".networks.\"${network}\".chain as \$chainId | .chains[\$chainId].default_provider // \"\"" "${mydir}/../packages/core/protocol-config.json")
 if [ -z "${provider_url}" ]; then
   msg "Network ${network} has invalid chain"
   exit 1

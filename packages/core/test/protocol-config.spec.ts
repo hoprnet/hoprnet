@@ -13,7 +13,7 @@ describe('protocol config', async function () {
   it('should be internally consistent', async function () {
     for (const env of Object.values(data.networks)) {
       if (!data.chains[env.chain]) {
-        throw new Error(`no such network: ${env.chain}`)
+        throw new Error(`no such chain: ${env.chain}`)
       }
     }
   })
