@@ -32,7 +32,7 @@ import {
   createRelayerKey,
   dial,
   DialStatus,
-  randomInteger,
+  random_integer,
   retimer,
   safeCloseConnection
 } from '@hoprnet/hopr-utils'
@@ -185,7 +185,7 @@ class Relay implements Initializable, ConnectInitializable, Startable {
     this.stopKeepAlive = retimer(
       periodicKeepAlive,
       // TODO: Make these values configurable
-      () => randomInteger(15_000, 35_000)
+      () => random_integer(15_000, 35_000)
     )
 
     this._isStarted = true
