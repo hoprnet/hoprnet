@@ -143,7 +143,7 @@ mod tests {
 
         assert_eq!(recovered.iteration, hint_idx + 7);
         assert_eq!(
-            Hash::create(&[recovered.intermediate.as_ref()]).serialize().as_ref(),
+            Hash::create(&[recovered.intermediate.as_ref()]).to_bytes().as_ref(),
             &target
         );
     }

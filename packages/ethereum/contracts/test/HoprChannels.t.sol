@@ -101,6 +101,21 @@ contract HoprChannelsTest is
       0
     );
 
+    // announc account A and B. Fund multi for A->B and B->A and check emitted events
+    // This block cannot use _helperFundMultiAB or its overwritten version due to extra events.
+    // announc account A and B.
+    _helperAnnounceAB(true, true);
+    vm.prank(address(1));
+    vm.mockCall(
+      vm.addr(1),
+      abi.encodeWithSignature(
+        'transferFrom(address,address,uint256)',
+        address(1),
+        address(hoprChannels),
+        amount1 + amount2
+      ),
+      abi.encode(true)
+    );
     // fund channel for two parties triggers
     vm.expectEmit(true, true, false, true, address(hoprChannels));
     emit ChannelUpdated(accountA.accountAddr, accountB.accountAddr, channelAB);
@@ -110,9 +125,10 @@ contract HoprChannelsTest is
     emit ChannelUpdated(accountB.accountAddr, accountA.accountAddr, channelBA);
     vm.expectEmit(true, true, true, true, address(hoprChannels));
     emit ChannelFunded(address(1), accountB.accountAddr, accountA.accountAddr, amount2);
+    // fund channel A->B and B->A
+    hoprChannels.fundChannelMulti(accountA.accountAddr, accountB.accountAddr, amount1, amount2);
+    vm.clearMockedCalls();
 
-    // announc account A and B. Fund multi for A->B and B->A
-    _helperFundMultiAB(amount1, amount2);
     // check vallidate from channels()
     assertEqChannels(getChannelFromTuple(hoprChannels, channelIdAB), channelAB);
     assertEqChannels(getChannelFromTuple(hoprChannels, channelIdBA), channelBA);
@@ -152,11 +168,7 @@ contract HoprChannelsTest is
     hoprChannels.fundChannelMulti(accountA.accountAddr, address(0), 0, 0);
   }
 
-  function testBumpChannel(
-    uint256 amount1,
-    uint256 amount2,
-    bytes32 secret
-  ) public {
+  function testBumpChannel(uint256 amount1, uint256 amount2, bytes32 secret) public {
     amount1 = bound(amount1, 1, 1e36);
     amount2 = bound(amount2, 1, 1e36);
     vm.assume(secret != bytes32(0));
@@ -197,11 +209,7 @@ contract HoprChannelsTest is
     assertEqChannels(getChannelFromTuple(hoprChannels, channelIdBA), channelBA);
   }
 
-  function testBumpChannelWithPreCommitment(
-    uint256 amount1,
-    uint256 amount2,
-    bytes32 secret
-  ) public {
+  function testBumpChannelWithPreCommitment(uint256 amount1, uint256 amount2, bytes32 secret) public {
     amount1 = bound(amount1, 1, 1e36);
     amount2 = bound(amount2, 1, 1e36);
     vm.assume(secret != bytes32(0));
@@ -229,16 +237,9 @@ contract HoprChannelsTest is
       1,
       0
     );
-    // order of logs matters
-    vm.expectEmit(true, true, false, true, address(hoprChannels));
-    emit ChannelUpdated(accountA.accountAddr, accountB.accountAddr, channelAB);
-    vm.expectEmit(true, false, false, false, address(hoprChannels));
-    emit ChannelOpened(accountB.accountAddr, accountA.accountAddr);
-    vm.expectEmit(true, true, false, true, address(hoprChannels));
-    emit ChannelUpdated(accountB.accountAddr, accountA.accountAddr, channelBA);
 
-    // then fund channel
-    _helperFundMultiAB(amount1, amount2);
+    // fund channel and check emitted events
+    _helperFundMultiAB(amount1, amount2, accountA.accountAddr, accountB.accountAddr, channelAB, channelBA);
 
     // check vallidate from channels()
     assertEqChannels(getChannelFromTuple(hoprChannels, channelIdAB), channelAB);
@@ -251,8 +252,11 @@ contract HoprChannelsTest is
     bytes32 secret1,
     bytes32 secret2
   ) public {
+    vm.assume(amount1 > 0);
+    vm.assume(amount2 > 0);
     amount1 = bound(amount1, 1, 1e36);
     amount2 = bound(amount2, 1, 1e36);
+
     vm.assume(secret1 != bytes32(0));
     vm.assume(secret2 != bytes32(0));
 
@@ -282,16 +286,8 @@ contract HoprChannelsTest is
       1,
       0
     );
-    // order of logs matters
-    vm.expectEmit(true, true, false, true, address(hoprChannels));
-    emit ChannelUpdated(accountA.accountAddr, accountB.accountAddr, channelAB);
-    vm.expectEmit(true, false, false, false, address(hoprChannels));
-    emit ChannelOpened(accountB.accountAddr, accountA.accountAddr);
-    vm.expectEmit(true, true, false, true, address(hoprChannels));
-    emit ChannelUpdated(accountB.accountAddr, accountA.accountAddr, channelBA);
-
-    // then fund channel
-    _helperFundMultiAB(amount1, amount2);
+    // fund channel and check emitted events
+    _helperFundMultiAB(amount1, amount2, accountA.accountAddr, accountB.accountAddr, channelAB, channelBA);
 
     // check vallidate from channels()
     assertEqChannels(getChannelFromTuple(hoprChannels, channelIdAB), channelAB);
@@ -959,12 +955,7 @@ contract HoprChannelsTest is
    * @dev With a reopened channel:
    * it should pass the sanity check
    */
-  function test_SanityCheck(
-    uint256 amount1,
-    uint256 amount2,
-    uint256 reopenAmount1,
-    uint256 reopenAmount2
-  ) public {
+  function test_SanityCheck(uint256 amount1, uint256 amount2, uint256 reopenAmount1, uint256 reopenAmount2) public {
     // channel is funded for at least 10 HoprTokens (Ticket's amount)
     amount1 = bound(amount1, TICKET_AB_WIN.amount, 1e36);
     amount2 = bound(amount2, TICKET_BA_WIN.amount, 1e36);
@@ -1158,14 +1149,15 @@ contract HoprChannelsTest is
    */
   function _helperAnnounceAB(bool annouceA, bool announceB) internal {
     // both accountA and accountB are announced
-    bytes memory multiAddress = hex'1234';
+    bytes memory multiAddressA = hex'1234';
+    bytes memory multiAddressB = hex'4321';
     if (annouceA) {
       vm.prank(accountA.accountAddr);
-      hoprChannels.announce(accountA.publicKey, multiAddress);
+      hoprChannels.announce(accountA.publicKey, multiAddressA);
     }
     if (announceB) {
       vm.prank(accountB.accountAddr);
-      hoprChannels.announce(accountB.publicKey, multiAddress);
+      hoprChannels.announce(accountB.publicKey, multiAddressB);
     }
   }
 
@@ -1188,6 +1180,46 @@ contract HoprChannelsTest is
     );
     // fund channel A->B and B->A
     hoprChannels.fundChannelMulti(accountA.accountAddr, accountB.accountAddr, amount1, amount2);
+    vm.clearMockedCalls();
+  }
+
+  /**
+   * @notice overwrites _helperFundMultiAB with checks on emitted events
+   * @dev Helper function to fund channel A->B and B->A with `fundChannelMulti`
+   * and check event emissios.
+   */
+  function _helperFundMultiAB(
+    uint256 amount1,
+    uint256 amount2,
+    address account1ddr,
+    address account2ddr,
+    HoprChannels.Channel memory channel12,
+    HoprChannels.Channel memory channel21
+  ) internal {
+    // both accountA and accountB are announced
+    _helperAnnounceAB(true, true);
+    vm.prank(address(1));
+    vm.mockCall(
+      vm.addr(1),
+      abi.encodeWithSignature(
+        'transferFrom(address,address,uint256)',
+        address(1),
+        address(hoprChannels),
+        amount1 + amount2
+      ),
+      abi.encode(true)
+    );
+
+    // order of logs matters
+    vm.expectEmit(true, true, false, true, address(hoprChannels));
+    emit ChannelUpdated(account1ddr, account2ddr, channel12);
+    vm.expectEmit(true, false, false, false, address(hoprChannels));
+    emit ChannelOpened(account2ddr, account1ddr);
+    vm.expectEmit(true, true, false, true, address(hoprChannels));
+    emit ChannelUpdated(account2ddr, account1ddr, channel21);
+
+    // fund channel A->B and B->A
+    hoprChannels.fundChannelMulti(account1ddr, account2ddr, amount1, amount2);
     vm.clearMockedCalls();
   }
 

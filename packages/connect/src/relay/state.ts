@@ -1,13 +1,8 @@
 import type { HoprConnectOptions, Stream } from '../types.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
-import { unmarshalPublicKey } from '@libp2p/crypto/keys'
 
-import { nAtATime, u8aCompare } from '@hoprnet/hopr-utils'
-import { IStream, Server, connect_relay_set_panic_hook } from '../../lib/connect_relay.js'
-import { webcrypto } from 'node:crypto'
-// @ts-ignore
-globalThis.crypto = webcrypto
-connect_relay_set_panic_hook()
+import { nAtATime } from '@hoprnet/hopr-utils'
+import { RelayContext, type RelayContextInterface } from './context.js'
 
 import debug from 'debug'
 
@@ -17,7 +12,7 @@ const verbose = debug(DEBUG_PREFIX.concat(':verbose'))
 const error = debug(DEBUG_PREFIX.concat(':error'))
 
 type RelayConnections = {
-  [id: string]: Server
+  [id: string]: RelayContextInterface
 }
 
 /**
@@ -97,7 +92,7 @@ class RelayState {
       return false
     }
 
-    context[source.toString()].update(toSource as IStream)
+    context[source.toString()].update(toSource)
 
     return true
   }
@@ -119,12 +114,29 @@ class RelayState {
    * Performs an operation for each relay context in the current set.
    * @param action
    */
-  async forEach(action: (dst: string, ctx: Server) => Promise<void>) {
+  async forEach(action: (dst: string, ctx: RelayContextInterface) => Promise<void>) {
     await nAtATime(
       action,
       this,
       10 // TODO: Make this configurable or use an existing constant
     )
+  }
+
+  async printIds() {
+    let ret: string[] = []
+    for await (let cid of this.relayedConnections.keys()) {
+      ret.push(cid)
+    }
+    return ret.join(',')
+  }
+
+  /**
+   * Deletes the inactive relay entry given the source and destination
+   * @param source
+   * @param destination
+   */
+  delete(source: PeerId, destination: PeerId) {
+    this.relayedConnections.delete(RelayState.getId(source, destination))
   }
 
   /**
@@ -143,37 +155,17 @@ class RelayState {
     toDestination: Stream,
     __relayFreeTimeout?: number
   ): Promise<void> {
-    const toSourceContext = new Server(
-      {
-        source: (async function* () {
-          for await (const maybeBuf of toSource.source) {
-            if (Buffer.isBuffer(maybeBuf)) {
-              yield new Uint8Array(maybeBuf.buffer, maybeBuf.byteOffset, maybeBuf.length)
-            } else {
-              yield maybeBuf
-            }
-          }
-        })(),
-        sink: toSource.sink
-      },
-      // toSource as IStream,
+    const toSourceContext = RelayContext(
+      toSource,
       { onClose: this.cleanListener(source, destination), onUpgrade: this.cleanListener(source, destination) },
       this.options
     )
-    const toDestinationContext = new Server(
+    const toDestinationContext = RelayContext(
+      toDestination,
       {
-        source: (async function* () {
-          for await (const maybeBuf of toDestination.source) {
-            if (Buffer.isBuffer(maybeBuf)) {
-              yield new Uint8Array(maybeBuf.buffer, maybeBuf.byteOffset, maybeBuf.length)
-            } else {
-              yield maybeBuf
-            }
-          }
-        })(),
-        sink: toDestination.sink
+        onClose: this.cleanListener(destination, source),
+        onUpgrade: this.cleanListener(destination, source)
       },
-      { onClose: this.cleanListener(destination, source), onUpgrade: this.cleanListener(destination, source) },
       this.options
     )
 
@@ -212,6 +204,32 @@ class RelayState {
     }.bind(this)
   }
 
+  public async prune(timeout?: number) {
+    if (this.relayedConnections.size == 0) return 0
+
+    let pruned = 0
+    await Promise.all(
+      Array.from(this.relayedConnections.entries()).map(async ([id, ctx]) => {
+        for (let [_, conn] of Object.entries(ctx)) {
+          try {
+            if ((await conn.ping(timeout)) < 0) {
+              if (this.relayedConnections.delete(id)) {
+                ++pruned
+              } else {
+                error(`could not delete ${id} inactive relayed connection from the relay state`)
+              }
+              break
+            }
+          } catch (err) {
+            error(err)
+          }
+        }
+      })
+    )
+
+    return pruned
+  }
+
   /**
    * Creates an identifier that is used to store the relayed connection
    * instance.
@@ -220,17 +238,17 @@ class RelayState {
    * @returns the identifier
    */
   static getId(a: PeerId, b: PeerId): string {
-    const cmpResult = u8aCompare(
-      unmarshalPublicKey(a.publicKey as Uint8Array).marshal(),
-      unmarshalPublicKey(b.publicKey as Uint8Array).marshal()
-    )
+    let aStr = a.toString()
+    let bStr = b.toString()
+
+    const cmpResult = aStr.localeCompare(bStr)
 
     // human-readable ID
     switch (cmpResult) {
       case 1:
-        return `${a.toString()}-${b.toString()}`
+        return `${aStr}-${bStr}`
       case -1:
-        return `${b.toString()}-${a.toString()}`
+        return `${bStr}-${aStr}`
       default:
         throw Error(`Invalid compare result. Loopbacks are not allowed.`)
     }

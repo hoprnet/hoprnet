@@ -258,6 +258,7 @@ export function disconnectEvent(addr: Multiaddr) {
 function createConnection(self: PeerId, remoteComponents: Components, throwError: boolean = false): Connection {
   const conn = {
     remotePeer: remoteComponents.getPeerId(),
+    remoteAddr: new Multiaddr('/ip4/1.2.3.4/tcp/567'),
     _closed: false,
     close: async () => {
       // @ts-ignore

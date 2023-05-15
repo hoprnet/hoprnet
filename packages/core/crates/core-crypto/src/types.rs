@@ -94,8 +94,8 @@ pub struct CurvePoint {
 impl CurvePoint {
     /// Converts the uncompressed representation of the curve point to Ethereum address.
     pub fn to_address(&self) -> Address {
-        let serialized = self.serialize();
-        let hash = <Hash as BinarySerializable>::serialize(&Hash::create(&[&serialized[1..]]));
+        let serialized = self.to_bytes();
+        let hash = Hash::create(&[&serialized[1..]]).to_bytes();
         Address::new(&hash[12..])
     }
 }
@@ -118,28 +118,34 @@ impl From<AffinePoint> for CurvePoint {
     }
 }
 
+impl From<HalfKeyChallenge> for CurvePoint {
+    fn from(value: HalfKeyChallenge) -> Self {
+        CurvePoint::from_bytes(&value.hkc).unwrap()
+    }
+}
+
 impl FromStr for CurvePoint {
     type Err = CryptoError;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        Ok(CurvePoint::deserialize(&hex::decode(s).map_err(|_| ParseError)?)?)
+        Ok(CurvePoint::from_bytes(&hex::decode(s).map_err(|_| ParseError)?)?)
     }
 }
 
 impl PeerIdLike for CurvePoint {
     fn from_peerid(peer_id: &PeerId) -> utils_types::errors::Result<Self> {
-        CurvePoint::deserialize(&PublicKey::from_peerid(peer_id)?.serialize(false))
+        CurvePoint::from_bytes(&PublicKey::from_peerid(peer_id)?.to_bytes(false))
     }
 
     fn to_peerid(&self) -> PeerId {
-        PublicKey::deserialize(&self.serialize()).unwrap().to_peerid()
+        PublicKey::from_bytes(&self.to_bytes()).unwrap().to_peerid()
     }
 }
 
 impl BinarySerializable<'_> for CurvePoint {
     const SIZE: usize = 65; // Stores uncompressed data
 
-    fn deserialize(bytes: &[u8]) -> utils_types::errors::Result<Self> {
+    fn from_bytes(bytes: &[u8]) -> utils_types::errors::Result<Self> {
         // Deserializes both compressed and uncompressed
         elliptic_curve::sec1::EncodedPoint::<Secp256k1>::from_bytes(bytes)
             .map_err(|_| ParseError)
@@ -147,7 +153,7 @@ impl BinarySerializable<'_> for CurvePoint {
             .map(|affine| Self { affine })
     }
 
-    fn serialize(&self) -> Box<[u8]> {
+    fn to_bytes(&self) -> Box<[u8]> {
         self.affine.to_encoded_point(false).to_bytes()
     }
 }
@@ -177,6 +183,21 @@ impl CurvePoint {
     pub fn serialize_compressed(&self) -> Box<[u8]> {
         self.affine.to_encoded_point(true).to_bytes()
     }
+
+    /// Sums all given curve points together, creating a new curve point.
+    pub fn combine(summands: &[&CurvePoint]) -> CurvePoint {
+        // Convert all public keys to EC points in the projective coordinates, which are
+        // more efficient for doing the additions. Then finally make in an affine point
+        let affine: AffinePoint = summands
+            .iter()
+            .map(|p| p.to_projective_point())
+            .fold(<Secp256k1 as CurveArithmetic>::ProjectivePoint::IDENTITY, |acc, x| {
+                acc.add(x)
+            })
+            .to_affine();
+
+        affine.into()
+    }
 }
 
 /// Natural extension of the Curve Point to the Proof-of-Relay challenge.
@@ -193,7 +214,7 @@ impl Challenge {
     /// This is a one-way (lossy) operation, since the corresponding curve point is hashed
     /// with the hash value then truncated.
     pub fn to_ethereum_challenge(&self) -> EthereumChallenge {
-        EthereumChallenge::new(&BinarySerializable::serialize(&self.curve_point.to_address()))
+        EthereumChallenge::new(&self.curve_point.to_address().to_bytes())
     }
 }
 
@@ -207,8 +228,8 @@ impl Challenge {
     /// Obtains the PoR challenge by adding the two EC points represented by the half-key challenges
     pub fn from_hint_and_share(own_share: &HalfKeyChallenge, hint: &HalfKeyChallenge) -> Result<Self> {
         let curve_point: CurvePoint = PublicKey::combine(&[
-            &PublicKey::deserialize(&own_share.hkc)?,
-            &PublicKey::deserialize(&hint.hkc)?,
+            &PublicKey::from_bytes(&own_share.hkc)?,
+            &PublicKey::from_bytes(&hint.hkc)?,
         ])
         .into();
         Ok(curve_point.into())
@@ -236,12 +257,12 @@ impl From<Response> for Challenge {
 impl BinarySerializable<'_> for Challenge {
     const SIZE: usize = PublicKey::SIZE_COMPRESSED;
 
-    fn deserialize(data: &[u8]) -> utils_types::errors::Result<Self> {
+    fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
         // Accepts both compressed and uncompressed points
-        CurvePoint::deserialize(data).map(|curve_point| Challenge { curve_point })
+        CurvePoint::from_bytes(data).map(|curve_point| Challenge { curve_point })
     }
 
-    fn serialize(&self) -> Box<[u8]> {
+    fn to_bytes(&self) -> Box<[u8]> {
         // Serializes only compressed points
         self.curve_point.serialize_compressed()
     }
@@ -293,7 +314,7 @@ impl HalfKey {
 impl BinarySerializable<'_> for HalfKey {
     const SIZE: usize = 32;
 
-    fn deserialize(data: &[u8]) -> utils_types::errors::Result<Self> {
+    fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
             let mut ret = HalfKey::default();
             ret.hkey.copy_from_slice(data);
@@ -303,7 +324,7 @@ impl BinarySerializable<'_> for HalfKey {
         }
     }
 
-    fn serialize(&self) -> Box<[u8]> {
+    fn to_bytes(&self) -> Box<[u8]> {
         self.hkey.into()
     }
 }
@@ -341,16 +362,14 @@ impl HalfKeyChallenge {
     }
 
     pub fn to_address(&self) -> Address {
-        PublicKey::deserialize(&self.hkc)
-            .expect("invalid half-key")
-            .to_address()
+        PublicKey::from_bytes(&self.hkc).expect("invalid half-key").to_address()
     }
 }
 
 impl BinarySerializable<'_> for HalfKeyChallenge {
     const SIZE: usize = PublicKey::SIZE_COMPRESSED; // Size of the compressed secp256k1 point.
 
-    fn deserialize(data: &[u8]) -> utils_types::errors::Result<Self> {
+    fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
             let mut ret = HalfKeyChallenge::default();
             ret.hkc.copy_from_slice(data);
@@ -360,18 +379,18 @@ impl BinarySerializable<'_> for HalfKeyChallenge {
         }
     }
 
-    fn serialize(&self) -> Box<[u8]> {
+    fn to_bytes(&self) -> Box<[u8]> {
         self.hkc.into()
     }
 }
 
 impl PeerIdLike for HalfKeyChallenge {
     fn from_peerid(peer_id: &PeerId) -> utils_types::errors::Result<Self> {
-        <HalfKeyChallenge as BinarySerializable>::deserialize(&PublicKey::from_peerid(peer_id)?.serialize(true))
+        HalfKeyChallenge::from_bytes(&PublicKey::from_peerid(peer_id)?.to_bytes(true))
     }
 
     fn to_peerid(&self) -> PeerId {
-        PublicKey::deserialize(&self.hkc).expect("invalid half-key").to_peerid()
+        PublicKey::from_bytes(&self.hkc).expect("invalid half-key").to_peerid()
     }
 }
 
@@ -379,7 +398,7 @@ impl FromStr for HalfKeyChallenge {
     type Err = GeneralError;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        <Self as BinarySerializable>::deserialize(&hex::decode(s).map_err(|_| ParseError)?)
+        Self::from_bytes(&hex::decode(s).map_err(|_| ParseError)?)
     }
 }
 
@@ -414,12 +433,17 @@ impl Hash {
         ret.hash.copy_from_slice(hash);
         ret
     }
+
+    /// Convenience method that creates a new hash by hashing this.
+    pub fn hash(&self) -> Self {
+        Self::create(&[&self.hash])
+    }
 }
 
 impl BinarySerializable<'_> for Hash {
     const SIZE: usize = 32; // Defined by Keccak256.
 
-    fn deserialize(data: &[u8]) -> utils_types::errors::Result<Self> {
+    fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
             let mut ret = Self {
                 hash: [0u8; Self::SIZE],
@@ -431,7 +455,7 @@ impl BinarySerializable<'_> for Hash {
         }
     }
 
-    fn serialize(&self) -> Box<[u8]> {
+    fn to_bytes(&self) -> Box<[u8]> {
         self.hash.into()
     }
 }
@@ -470,13 +494,13 @@ impl PublicKey {
 
     /// Converts the public key to an Ethereum address
     pub fn to_address(&self) -> Address {
-        let uncompressed = self.serialize(false);
-        let serialized = BinarySerializable::serialize(&Hash::create(&[&uncompressed[1..]]));
+        let uncompressed = self.to_bytes(false);
+        let serialized = Hash::create(&[&uncompressed[1..]]).to_bytes();
         Address::new(&serialized[12..])
     }
 
     /// Serializes the public key to a binary form.
-    pub fn serialize(&self, compressed: bool) -> Box<[u8]> {
+    pub fn to_bytes(&self, compressed: bool) -> Box<[u8]> {
         if compressed {
             self.compressed.clone()
         } else {
@@ -486,7 +510,8 @@ impl PublicKey {
 
     /// Serializes the public key to a binary form and converts it to hexadecimal string representation.
     pub fn to_hex(&self, compressed: bool) -> String {
-        hex::encode(self.serialize(compressed))
+        let offset = if compressed { 0 } else { 1 };
+        hex::encode(&self.to_bytes(compressed)[offset..])
     }
 }
 
@@ -498,7 +523,7 @@ impl PeerIdLike for PublicKey {
             // Here we explicitly assume non-RSA PeerId, so that multihash bytes are the actual public key
             let pid = peer_id.to_bytes();
             let (_, mh) = pid.split_at(6);
-            Self::deserialize(mh).map_err(|e| Other(e.into()))
+            Self::from_bytes(mh).map_err(|e| Other(e.into()))
         } else if peer_id_str.starts_with("12D") {
             // TODO: support for Ed25519 peer ids needs to be added here
             warn!("Ed25519-based peer id not yet supported");
@@ -554,9 +579,22 @@ impl PublicKey {
         (private, PublicKey::try_from(cp).unwrap())
     }
 
-    pub fn deserialize(data: &[u8]) -> utils_types::errors::Result<Self> {
-        if data.len() == Self::SIZE_COMPRESSED || data.len() == Self::SIZE_UNCOMPRESSED {
-            let key = elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(data).map_err(|_| ParseError)?;
+    pub fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
+        if [
+            Self::SIZE_UNCOMPRESSED,
+            Self::SIZE_UNCOMPRESSED - 1,
+            Self::SIZE_COMPRESSED,
+        ]
+        .contains(&data.len())
+        {
+            let key;
+            if data.len() == Self::SIZE_UNCOMPRESSED - 1 {
+                key = elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(&[&[4u8], &data[..]].concat())
+                    .map_err(|_| ParseError)?
+            } else {
+                key = elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(data).map_err(|_| ParseError)?
+            }
+
             Ok(PublicKey {
                 key,
                 compressed: if data.len() == Self::SIZE_COMPRESSED {
@@ -590,7 +628,7 @@ impl PublicKey {
                 .map_err(|_| ParseError)?;
         let recovered_key = recovery_method(msg, &signature, recid).map_err(|_| CalculationError)?;
 
-        Ok(Self::deserialize(&recovered_key.to_encoded_point(false).to_bytes())?)
+        Ok(Self::from_bytes(&recovered_key.to_encoded_point(false).to_bytes())?)
     }
 
     pub fn from_signature(msg: &[u8], signature: &Signature) -> Result<PublicKey> {
@@ -616,21 +654,11 @@ impl PublicKey {
     /// Sums all given public keys together, creating a new public key.
     /// Panics if reaches infinity (EC identity point), which is an invalid public key.
     pub fn combine(summands: &[&PublicKey]) -> PublicKey {
-        // Convert all public keys to EC points in the projective coordinates, which are
-        // more efficient for doing the additions. Then finally make in an affine point
-        let affine: AffinePoint = summands
-            .iter()
-            .map(|p| p.key.to_projective())
-            .fold(<Secp256k1 as CurveArithmetic>::ProjectivePoint::IDENTITY, |acc, x| {
-                acc.add(x)
-            })
-            .to_affine();
-
-        Self {
-            key: elliptic_curve::PublicKey::<Secp256k1>::from_affine(affine)
-                .expect("combination results in the ec identity (which is an invalid pub key)"),
-            compressed: affine.to_encoded_point(true).to_bytes(),
-        }
+        let cps = summands.iter().map(|pk| CurvePoint::from(*pk)).collect::<Vec<_>>();
+        let cps_ref = cps.iter().map(|cp| cp).collect::<Vec<_>>();
+        CurvePoint::combine(&cps_ref)
+            .try_into()
+            .expect("combination results in the ec identity (which is an invalid pub key)")
     }
 
     /// Adds the given public key with `tweak` times secp256k1 generator, producing a new public key.
@@ -697,10 +725,9 @@ impl Response {
     /// Derives the response from two half-keys.
     /// This is done by adding the two non-zero scalars that the given half-keys represent.
     pub fn from_half_keys(first: &HalfKey, second: &HalfKey) -> Result<Self> {
-        let res = NonZeroScalar::<Secp256k1>::try_from(<HalfKey as BinarySerializable>::serialize(&first).as_ref())
+        let res = NonZeroScalar::<Secp256k1>::try_from(HalfKey::to_bytes(&first).as_ref())
             .and_then(|s1| {
-                NonZeroScalar::<Secp256k1>::try_from(<HalfKey as BinarySerializable>::serialize(&second).as_ref())
-                    .map(|s2| s1.as_ref() + s2.as_ref())
+                NonZeroScalar::<Secp256k1>::try_from(second.to_bytes().as_ref()).map(|s2| s1.as_ref() + s2.as_ref())
             })
             .map_err(|_| CalculationError)?; // One of the scalars was 0
 
@@ -711,7 +738,7 @@ impl Response {
 impl BinarySerializable<'_> for Response {
     const SIZE: usize = 32;
 
-    fn deserialize(data: &[u8]) -> utils_types::errors::Result<Self> {
+    fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
             Ok(Response::new(data))
         } else {
@@ -719,7 +746,7 @@ impl BinarySerializable<'_> for Response {
         }
     }
 
-    fn serialize(&self) -> Box<[u8]> {
+    fn to_bytes(&self) -> Box<[u8]> {
         self.response.into()
     }
 }
@@ -728,7 +755,7 @@ impl BinarySerializable<'_> for Response {
 /// This signature encodes the 2-bit recovery information into the
 /// upper-most bits of MSB of the S value, which are never used by this ECDSA
 /// instantiation over secp256k1.
-#[derive(Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Signature {
     // TODO: The signature will be secp256k1 only, it will not accept Ed25519 public keys
@@ -801,7 +828,7 @@ impl Signature {
 
     /// Verifies this signature against the given message and a public key object
     pub fn verify_message_with_pubkey(&self, message: &[u8], public_key: &PublicKey) -> bool {
-        self.verify_message(message, &public_key.serialize(false))
+        self.verify_message(message, &public_key.to_bytes(false))
     }
 
     /// Verifies this signature against the given hash and a public key (compressed or uncompressed)
@@ -811,9 +838,10 @@ impl Signature {
 
     /// Verifies this signature against the given message and a public key object
     pub fn verify_hash_with_pubkey(&self, hash: &[u8], public_key: &PublicKey) -> bool {
-        self.verify_hash(hash, &public_key.serialize(false))
+        self.verify_hash(hash, &public_key.to_bytes(false))
     }
 
+    /// Returns the raw signature, without the encoded public key recovery bit.
     pub fn raw_signature(&self) -> Box<[u8]> {
         self.signature.into()
     }
@@ -822,7 +850,7 @@ impl Signature {
 impl BinarySerializable<'_> for Signature {
     const SIZE: usize = 64;
 
-    fn deserialize(data: &[u8]) -> utils_types::errors::Result<Self> {
+    fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
             // Read & clear the top-most bit in S
             let mut ret = Signature {
@@ -838,13 +866,21 @@ impl BinarySerializable<'_> for Signature {
         }
     }
 
-    fn serialize(&self) -> Box<[u8]> {
+    fn to_bytes(&self) -> Box<[u8]> {
         let mut compressed = Vec::from(self.signature);
         compressed[Self::SIZE / 2] &= 0x7f;
         compressed[Self::SIZE / 2] |= self.recovery << 7;
         compressed.into_boxed_slice()
     }
 }
+
+impl PartialEq for Signature {
+    fn eq(&self, other: &Self) -> bool {
+        self.signature.eq(&other.signature)
+    }
+}
+
+impl Eq for Signature {}
 
 /// A method that turns all lower-cased hexadecimal address to a checksum-ed address
 /// according to https://eips.ethereum.org/EIPS/eip-55
@@ -903,7 +939,7 @@ pub mod tests {
         assert!(sgn.verify_message(msg, &PUBLIC_KEY));
 
         let extracted_pk = PublicKey::from_signature(msg, &sgn).unwrap();
-        let expected_pk = PublicKey::deserialize(&PUBLIC_KEY).unwrap();
+        let expected_pk = PublicKey::from_bytes(&PUBLIC_KEY).unwrap();
         assert_eq!(expected_pk, extracted_pk, "key extracted from signature does not match");
     }
 
@@ -912,18 +948,33 @@ pub mod tests {
         let msg = b"test000000";
         let sgn = Signature::sign_message(msg, &PRIVATE_KEY);
 
-        let deserialized = Signature::deserialize(&sgn.serialize()).unwrap();
+        let deserialized = Signature::from_bytes(&sgn.to_bytes()).unwrap();
         assert_eq!(sgn, deserialized, "signatures don't match");
     }
 
     #[test]
     fn public_key_peerid_test() {
-        let pk1 = PublicKey::deserialize(&PUBLIC_KEY).expect("failed to deserialize");
+        let pk1 = PublicKey::from_bytes(&PUBLIC_KEY).expect("failed to deserialize");
 
         let pk2 = PublicKey::from_peerid_str(pk1.to_peerid_str().as_str()).expect("peer id serialization failed");
 
         assert_eq!(pk1, pk2, "pubkeys don't match");
         assert_eq!(pk1.to_peerid_str(), pk2.to_peerid_str(), "peer id strings don't match");
+    }
+
+    #[test]
+    fn public_key_to_hex() {
+        let pk = PublicKey::from_privkey(&hex!(
+            "492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"
+        ))
+        .unwrap();
+
+        assert_eq!("39d1bc2291826eaed86567d225cf243ebc637275e0a5aedb0d6b1dc82136a38e428804340d4c949a029846f682711d046920b4ca8b8ebeb9d1192b5bdaa54dba",
+                   pk.to_hex(false));
+        assert_eq!(
+            "0239d1bc2291826eaed86567d225cf243ebc637275e0a5aedb0d6b1dc82136a38e",
+            pk.to_hex(true)
+        );
     }
 
     #[test]
@@ -1003,25 +1054,33 @@ pub mod tests {
 
     #[test]
     fn public_key_serialize_test() {
-        let pk1 = PublicKey::deserialize(&PUBLIC_KEY).expect("failed to deserialize 1");
-        let pk2 = PublicKey::deserialize(&pk1.serialize(true)).expect("failed to deserialize 2");
-        let pk3 = PublicKey::deserialize(&pk1.serialize(false)).expect("failed to deserialize 3");
+        let pk1 = PublicKey::from_bytes(&PUBLIC_KEY).expect("failed to deserialize 1");
+        let pk2 = PublicKey::from_bytes(&pk1.to_bytes(true)).expect("failed to deserialize 2");
+        let pk3 = PublicKey::from_bytes(&pk1.to_bytes(false)).expect("failed to deserialize 3");
 
         assert_eq!(pk1, pk2, "pub keys 1 2 don't match");
         assert_eq!(pk2, pk3, "pub keys 2 3 don't match");
+
+        assert_eq!(PublicKey::SIZE_COMPRESSED, pk1.to_bytes(true).len());
+        assert_eq!(PublicKey::SIZE_UNCOMPRESSED, pk1.to_bytes(false).len());
+
+        let shorter = hex!("f85e38b056284626a7aed0acc5d474605a408e6cccf76d7241ec7b4dedb31929b710e034f4f9a7dba97743b01e1cc35a45a60bebb29642cb0ba6a7fe8433316c");
+        let s1 = PublicKey::from_bytes(&shorter).unwrap();
+        let s2 = PublicKey::from_bytes(&s1.to_bytes(false)).unwrap();
+        assert_eq!(s1, s2);
     }
 
     #[test]
     fn public_key_curve_point() {
-        let cp1: CurvePoint = PublicKey::deserialize(&PUBLIC_KEY).unwrap().into();
-        let cp2 = CurvePoint::deserialize(&cp1.serialize()).unwrap();
+        let cp1: CurvePoint = PublicKey::from_bytes(&PUBLIC_KEY).unwrap().into();
+        let cp2 = CurvePoint::from_bytes(&cp1.to_bytes()).unwrap();
         assert_eq!(cp1, cp2);
     }
 
     #[test]
     fn public_key_from_privkey() {
         let pk1 = PublicKey::from_privkey(&PRIVATE_KEY).expect("failed to convert from private key");
-        let pk2 = PublicKey::deserialize(&PUBLIC_KEY).expect("failed to deserialize");
+        let pk2 = PublicKey::from_bytes(&PUBLIC_KEY).expect("failed to deserialize");
 
         assert_eq!(pk1, pk2, "failed to match deserialized pub key");
     }
@@ -1029,7 +1088,7 @@ pub mod tests {
     #[test]
     pub fn response_test() {
         let r1 = Response::new(&[0u8; Response::SIZE]);
-        let r2 = Response::deserialize(&r1.serialize()).unwrap();
+        let r2 = Response::from_bytes(&r1.to_bytes()).unwrap();
         assert_eq!(r1, r2, "deserialized response does not match");
     }
 
@@ -1040,7 +1099,7 @@ pub mod tests {
 
         let cp1 = CurvePoint::from_str(hex::encode(test_point.to_encoded_point(false).to_bytes()).as_str()).unwrap();
 
-        let cp2 = CurvePoint::deserialize(&cp1.serialize()).unwrap();
+        let cp2 = CurvePoint::from_bytes(&cp1.to_bytes()).unwrap();
 
         assert_eq!(cp1, cp2, "failed to match deserialized curve point");
 
@@ -1067,8 +1126,8 @@ pub mod tests {
         let compressed = uncompressed.compress();
         assert!(compressed.is_compressed(), "failed to compress points");
 
-        let cp3 = CurvePoint::deserialize(uncompressed.as_bytes()).unwrap();
-        let cp4 = CurvePoint::deserialize(compressed.as_bytes()).unwrap();
+        let cp3 = CurvePoint::from_bytes(uncompressed.as_bytes()).unwrap();
+        let cp4 = CurvePoint::from_bytes(compressed.as_bytes()).unwrap();
 
         assert_eq!(
             cp3, cp4,
@@ -1079,16 +1138,16 @@ pub mod tests {
     #[test]
     fn half_key_test() {
         let hk1 = HalfKey::new(&[0u8; HalfKey::SIZE]);
-        let hk2 = HalfKey::deserialize(&hk1.serialize()).unwrap();
+        let hk2 = HalfKey::from_bytes(&hk1.to_bytes()).unwrap();
 
         assert_eq!(hk1, hk2, "failed to match deserialized half-key");
     }
 
     #[test]
     fn half_key_challenge_test() {
-        let peer_id = PublicKey::deserialize(&PUBLIC_KEY).unwrap().to_peerid();
+        let peer_id = PublicKey::from_bytes(&PUBLIC_KEY).unwrap().to_peerid();
         let hkc1 = HalfKeyChallenge::from_peerid(&peer_id).unwrap();
-        let hkc2 = HalfKeyChallenge::deserialize(&hkc1.serialize()).unwrap();
+        let hkc2 = HalfKeyChallenge::from_bytes(&hkc1.to_bytes()).unwrap();
         assert_eq!(hkc1, hkc2, "failed to match deserialized half key challenge");
         assert_eq!(peer_id, hkc2.to_peerid(), "failed to match half-key challenge peer id");
     }
@@ -1102,8 +1161,15 @@ pub mod tests {
             "hash test vector failed to match"
         );
 
-        let hash2 = Hash::deserialize(&hash1.serialize()).unwrap();
+        let hash2 = Hash::from_bytes(&hash1.to_bytes()).unwrap();
         assert_eq!(hash1, hash2, "failed to match deserialized hash");
+
+        assert_eq!(
+            hash1.hash(),
+            Hash::new(&hex!(
+                "1c4d8d521eccee7225073ea180e0fa075a6443afb7ca06076a9566b07d29470f"
+            ))
+        );
     }
 
     #[test]
@@ -1208,7 +1274,7 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "deserialize")]
         pub fn _deserialize(bytes: &[u8]) -> JsResult<CurvePoint> {
-            ok_or_jserr!(Self::deserialize(bytes))
+            ok_or_jserr!(Self::from_bytes(bytes))
         }
 
         #[wasm_bindgen(js_name = "to_hex")]
@@ -1218,7 +1284,7 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "serialize")]
         pub fn _serialize(&self) -> Box<[u8]> {
-            self.serialize()
+            self.to_bytes()
         }
 
         #[wasm_bindgen(js_name = "serialize_compressed")]
@@ -1229,6 +1295,11 @@ pub mod wasm {
         #[wasm_bindgen(js_name = "eq")]
         pub fn _eq(&self, other: &CurvePoint) -> bool {
             self.eq(other)
+        }
+
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> Self {
+            self.clone()
         }
 
         pub fn size() -> u32 {
@@ -1247,13 +1318,10 @@ pub mod wasm {
         pub fn _from_own_share_and_half_key(own_share: &HalfKeyChallenge, half_key: &HalfKey) -> JsResult<Challenge> {
             ok_or_jserr!(Self::from_own_share_and_half_key(own_share, half_key))
         }
-    }
 
-    #[wasm_bindgen]
-    impl HalfKey {
         #[wasm_bindgen(js_name = "deserialize")]
-        pub fn _deserialize(data: &[u8]) -> JsResult<HalfKey> {
-            ok_or_jserr!(Self::deserialize(data))
+        pub fn _deserialize(data: &[u8]) -> JsResult<Challenge> {
+            ok_or_jserr!(Self::from_bytes(data))
         }
 
         #[wasm_bindgen(js_name = "to_hex")]
@@ -1263,11 +1331,38 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "serialize")]
         pub fn _serialize(&self) -> Box<[u8]> {
-            self.serialize()
+            self.to_bytes()
         }
 
         #[wasm_bindgen(js_name = "clone")]
-        pub fn _clone(&self) -> HalfKey {
+        pub fn _clone(&self) -> Self {
+            self.clone()
+        }
+
+        pub fn size() -> u32 {
+            Self::SIZE as u32
+        }
+    }
+
+    #[wasm_bindgen]
+    impl HalfKey {
+        #[wasm_bindgen(js_name = "deserialize")]
+        pub fn _deserialize(data: &[u8]) -> JsResult<HalfKey> {
+            ok_or_jserr!(Self::from_bytes(data))
+        }
+
+        #[wasm_bindgen(js_name = "to_hex")]
+        pub fn _to_hex(&self) -> String {
+            self.to_hex()
+        }
+
+        #[wasm_bindgen(js_name = "serialize")]
+        pub fn _serialize(&self) -> Box<[u8]> {
+            self.to_bytes()
+        }
+
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> Self {
             self.clone()
         }
 
@@ -1293,19 +1388,9 @@ pub mod wasm {
             self.eq(other)
         }
 
-        #[wasm_bindgen(js_name = "clone")]
-        pub fn _clone(&self) -> HalfKeyChallenge {
-            self.clone()
-        }
-
         #[wasm_bindgen(js_name = "to_peerid_str")]
         pub fn _to_peerid_str(&self) -> String {
             self.to_peerid_str()
-        }
-
-        #[wasm_bindgen(js_name = "deserialize")]
-        pub fn _deserialize(data: &[u8]) -> JsResult<HalfKeyChallenge> {
-            ok_or_jserr!(Self::deserialize(data))
         }
 
         #[wasm_bindgen(js_name = "from_str")]
@@ -1316,6 +1401,21 @@ pub mod wasm {
         #[wasm_bindgen(js_name = "from_peerid_str")]
         pub fn _from_peerid_str(peer_id: &str) -> JsResult<HalfKeyChallenge> {
             ok_or_jserr!(Self::from_peerid_str(peer_id))
+        }
+
+        #[wasm_bindgen(js_name = "deserialize")]
+        pub fn _deserialize(data: &[u8]) -> JsResult<HalfKeyChallenge> {
+            ok_or_jserr!(HalfKeyChallenge::from_bytes(data))
+        }
+
+        #[wasm_bindgen(js_name = "serialize")]
+        pub fn _serialize(&self) -> Box<[u8]> {
+            self.to_bytes()
+        }
+
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> Self {
+            self.clone()
         }
 
         pub fn size() -> u32 {
@@ -1339,7 +1439,7 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "deserialize")]
         pub fn _deserialize(data: &[u8]) -> JsResult<Hash> {
-            ok_or_jserr!(Self::deserialize(data))
+            ok_or_jserr!(Self::from_bytes(data))
         }
 
         #[wasm_bindgen(js_name = "to_hex")]
@@ -1349,12 +1449,17 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "serialize")]
         pub fn _serialize(&self) -> Box<[u8]> {
-            self.serialize()
+            self.to_bytes()
         }
 
         #[wasm_bindgen(js_name = "eq")]
         pub fn _eq(&self, other: &Hash) -> bool {
             self.eq(other)
+        }
+
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> Self {
+            self.clone()
         }
 
         pub fn size() -> u32 {
@@ -1366,7 +1471,12 @@ pub mod wasm {
     impl PublicKey {
         #[wasm_bindgen(js_name = "deserialize")]
         pub fn _deserialize(bytes: &[u8]) -> JsResult<PublicKey> {
-            ok_or_jserr!(PublicKey::deserialize(bytes))
+            ok_or_jserr!(PublicKey::from_bytes(bytes))
+        }
+
+        #[wasm_bindgen(js_name = "serialize")]
+        pub fn _serialize(&self, compressed: bool) -> Box<[u8]> {
+            self.to_bytes(compressed)
         }
 
         #[wasm_bindgen(js_name = "from_peerid_str")]
@@ -1407,18 +1517,23 @@ pub mod wasm {
         pub fn size_uncompressed() -> u32 {
             Self::SIZE_UNCOMPRESSED as u32
         }
+
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> Self {
+            self.clone()
+        }
     }
 
     #[wasm_bindgen]
     impl Response {
         #[wasm_bindgen(js_name = "deserialize")]
         pub fn _deserialize(data: &[u8]) -> JsResult<Response> {
-            ok_or_jserr!(Response::deserialize(data))
+            ok_or_jserr!(Response::from_bytes(data))
         }
 
         #[wasm_bindgen(js_name = "serialize")]
         pub fn _serialize(&self) -> Box<[u8]> {
-            self.serialize()
+            self.to_bytes()
         }
 
         #[wasm_bindgen(js_name = "to_hex")]
@@ -1431,6 +1546,11 @@ pub mod wasm {
             ok_or_jserr!(Response::from_half_keys(first, second))
         }
 
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> Self {
+            self.clone()
+        }
+
         pub fn size() -> u32 {
             Self::SIZE as u32
         }
@@ -1440,7 +1560,7 @@ pub mod wasm {
     impl Signature {
         #[wasm_bindgen(js_name = "deserialize")]
         pub fn _deserialize(signature: &[u8]) -> JsResult<Signature> {
-            ok_or_jserr!(Signature::deserialize(signature))
+            ok_or_jserr!(Signature::from_bytes(signature))
         }
 
         #[wasm_bindgen(js_name = "to_hex")]
@@ -1450,7 +1570,12 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "serialize")]
         pub fn _serialize(&self) -> Box<[u8]> {
-            self.serialize()
+            self.to_bytes()
+        }
+
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> Self {
+            self.clone()
         }
 
         pub fn size() -> u32 {
