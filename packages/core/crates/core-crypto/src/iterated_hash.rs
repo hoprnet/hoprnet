@@ -58,15 +58,15 @@ pub fn iterate_hash(seed: &[u8], iterations: usize, step_size: usize) -> Iterate
 /// Hints can be given if some intermediates in the progression are known via the hints lookup function.
 /// The number of iterations and step size correspond to the values with which the progression was originally created.
 /// The Keccak256 digest is used to perform the hash iteration.
-pub fn recover_iterated_hash<H>(
+pub async fn recover_iterated_hash<F>(
     hash_value: &[u8],
-    hints: H,
+    hints: &impl Fn(usize) -> F,
     max_iterations: usize,
     step_size: usize,
     index_hint: Option<usize>,
 ) -> Result<Intermediate>
 where
-    H: Fn(usize) -> Option<Box<[u8]>>,
+    F: futures::Future<Output = core::result::Result<Box<[u8]>, String>>,
 {
     if step_size == 0 || hash_value.is_empty() || max_iterations == 0 {
         return Err(InvalidInputValue);
@@ -78,7 +78,7 @@ where
     for i in (0..=closest_intermediate).step_by(step_size) {
         // Check if we can get a hint for the current index
         let pos = closest_intermediate - i;
-        if let Some(mut intermediate) = hints(pos) {
+        if let Some(mut intermediate) = hints(pos).await {
             for iteration in 0..step_size {
                 // Compute the hash of current intermediate
                 digest.update(intermediate.as_ref());
@@ -128,7 +128,7 @@ mod tests {
 
         let recovered = recover_iterated_hash(
             &target,
-            |i| {
+            |i| async {
                 if i == hint_idx {
                     Some(Box::new(hint_hash))
                 } else {
