@@ -1,5 +1,8 @@
 ARG HOPRD_IMAGE=${HOPRD_IMAGE:-hoprd-local:latest}
+ARG HOPLI_IMAGE=${HOPLI_IMAGE:-hopli-local:latest}
 ARG ANVIL_IMAGE=${ANVIL_IMAGE:-hopr-anvil-local:latest}
+
+FROM ${HOPLI_IMAGE} as hopli
 
 # simply import hoprd image to copy in files later
 FROM ${HOPRD_IMAGE} as hoprd
@@ -14,6 +17,12 @@ RUN apt-get update \
       bash curl jq lsof \
  && rm -rf /var/lib/apt/lists/* \
  && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false
+
+# Get hopli binary from base image
+WORKDIR /app/hopli
+COPY --from=hopli /bin/hopli ./
+# Make sure that hopli can be found
+ENV PATH=${PATH}:/app/hopli
 
 WORKDIR /app/hoprnet
 
