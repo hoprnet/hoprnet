@@ -212,7 +212,7 @@ export async function negotiateRelayHandshake(
           // Some libp2p modules produces Buffer streams but
           // WASM requires Uint8Array streams
           {
-            source: (async function* () {
+            source: (async function* (): AsyncIterable<Uint8Array> {
               for await (const maybeBuf of shaker.stream.source) {
                 if (Buffer.isBuffer(maybeBuf)) {
                   yield new Uint8Array(maybeBuf.buffer, maybeBuf.byteOffset, maybeBuf.length)
@@ -229,7 +229,7 @@ export async function negotiateRelayHandshake(
         return
       }
     } else {
-      state.remove(source, destination)
+      // state.remove(source, destination)
       log(`deleted inactive relay entry: ${source.toString()} ${destination.toString()}`)
     }
   }
@@ -301,7 +301,7 @@ export async function negotiateRelayHandshake(
         // Some libp2p modules produces Buffer streams but
         // WASM requires Uint8Array streams
         {
-          source: (async function* () {
+          source: (async function* (): AsyncIterable<Uint8Array> {
             for await (const maybeBuf of shaker.stream.source) {
               if (Buffer.isBuffer(maybeBuf)) {
                 yield new Uint8Array(maybeBuf.buffer, maybeBuf.byteOffset, maybeBuf.length)
@@ -315,7 +315,7 @@ export async function negotiateRelayHandshake(
         // Some libp2p modules produces Buffer streams but
         // WASM requires Uint8Array streams
         {
-          source: (async function* () {
+          source: (async function* (): AsyncIterable<Uint8Array> {
             for await (const maybeBuf of destinationShaker.stream.source) {
               if (Buffer.isBuffer(maybeBuf)) {
                 yield new Uint8Array(maybeBuf.buffer, maybeBuf.byteOffset, maybeBuf.length)

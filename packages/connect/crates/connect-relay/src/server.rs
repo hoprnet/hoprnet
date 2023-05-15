@@ -6,7 +6,6 @@ use futures::{
 };
 use libp2p::PeerId;
 use pin_project_lite::pin_project;
-use std::marker::PhantomPinned;
 use std::{
     cmp::Ordering,
     hash::{Hash, Hasher},
@@ -467,7 +466,6 @@ pin_project! {
         // stream from b->a
         #[pin]
         b: End<St>,
-        _marker: PhantomPinned
     }
 }
 
@@ -482,7 +480,6 @@ impl<St: DuplexStream> Server<St> {
         Self {
             a: End::new(stream_a, peer_a.clone(), status_ba_tx, status_ab_rx),
             b: End::new(stream_b, peer_b.clone(), status_ab_tx, status_ba_rx),
-            _marker: PhantomPinned,
         }
     }
 
