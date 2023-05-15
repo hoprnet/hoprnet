@@ -2,7 +2,7 @@ use core_crypto::errors::CryptoError::SignatureVerification;
 use core_crypto::types::{Challenge, Hash, PublicKey, Response, Signature};
 use enum_iterator::{all, Sequence};
 use ethnum::u256;
-use serde::{Serialize,Deserialize};
+use serde::{Deserialize, Serialize};
 use serde_repr::*;
 use std::ops::{Div, Mul, Sub};
 use utils_types::errors::{GeneralError::ParseError, Result};
@@ -382,7 +382,7 @@ pub mod tests {
         let ce1 = ChannelEntry::new(
             PublicKey::from_bytes(&PUBLIC_KEY_1).unwrap(),
             PublicKey::from_bytes(&PUBLIC_KEY_2).unwrap(),
-            Balance::new(u256::from(10u8), BalanceType::HOPR),
+            Balance::new(u256::from(10u8).into(), BalanceType::HOPR),
             Hash::new(&COMMITMENT),
             U256::new("0"),
             U256::new("1"),

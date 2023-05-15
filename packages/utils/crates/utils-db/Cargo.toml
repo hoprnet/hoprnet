@@ -23,6 +23,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde-wasm-bindgen = { version = "0.5", optional = true }
 thiserror = "1.0"
 utils-log = { path = "../utils-log" }
+utils-types = { path = "../utils-types" }
 wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen-futures = { version = "0.4.33", features = ["futures-core-03-stream"], optional = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }

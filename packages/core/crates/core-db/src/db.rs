@@ -2,13 +2,16 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 use core_crypto::types::{HalfKeyChallenge, Hash, PublicKey};
-use core_types::acknowledgement::{AcknowledgedTicket,UnacknowledgedTicket};
+use core_types::acknowledgement::{AcknowledgedTicket, PendingAcknowledgement, UnacknowledgedTicket};
 use core_types::channels::{ChannelEntry, Ticket};
 use utils_db::{
     db::{serialize_to_bytes, DB},
     traits::BinaryAsyncKVStorage,
 };
-use utils_types::primitives::{Address, Balance, U256};
+use utils_types::{
+    primitives::{Address, Balance, EthereumChallenge, U256},
+    traits::BinarySerializable,
+};
 
 use crate::errors::Result;
 use crate::traits::HoprCoreDbActions;
@@ -20,12 +23,6 @@ const REJECTED_TICKETS_VALUE: &str = "statistics:rejected:value";
 const PACKET_TAG_PREFIX: &str = "packets:tag-";
 const PENDING_ACKNOWLEDGEMENTS_PREFIX: &str = "tickets:pending-acknowledgement-";
 const ACKNOWLEDGED_TICKETS_PREFIX: &str = "tickets:acknowledged-";
-
-#[derive(Serialize, Deserialize)]
-pub enum PendingAcknowledgementPrefix {
-    Relayer = 0,
-    MessageSender = 1,
-}
 
 pub struct CoreDb<T>
 where
@@ -54,21 +51,41 @@ impl<T: BinaryAsyncKVStorage> HoprCoreDbActions for CoreDb<T> {
         Ok(())
     }
 
-    async fn get_tickets(&self, predicate: Box<dyn Fn(&PublicKey) -> bool>) -> Result<Vec<Ticket>> {
-        // acknowledged tickets
-        let ack_tickets_stream = self.db.get_more(
-            Vec::from(ACKNOWLEDGED_TICKETS_PREFIX.as_bytes()).into_boxed_slice(),
-            1,
-            Box::new(|v: &AcknowledgedTicket| false)).await?;
+    async fn get_tickets(&self, signer: PublicKey) -> Result<Vec<Ticket>> {
+        let mut tickets = self
+            .db
+            .get_more::<AcknowledgedTicket>(
+                Vec::from(ACKNOWLEDGED_TICKETS_PREFIX.as_bytes()).into_boxed_slice(),
+                EthereumChallenge::size(),
+                &|v: &AcknowledgedTicket| signer == v.signer,
+            )
+            .await?
+            .into_iter()
+            .map(|a| a.ticket)
+            .collect::<Vec<Ticket>>();
+        tickets.sort_by(|l, r| l.index.cmp(&r.index));
 
-        // unacknowledged tickets
-        //
-        let ack_tickets_stream = self.db.get_more(
-            Vec::from(ACKNOWLEDGED_TICKETS_PREFIX.as_bytes()).into_boxed_slice(),
-            1,
-            Box::new(|v: &UnacknowledgedTicket| false)).await?;
+        let mut unack_tickets = self
+            .db
+            .get_more::<PendingAcknowledgement>(
+                Vec::from(PENDING_ACKNOWLEDGEMENTS_PREFIX.as_bytes()).into_boxed_slice(),
+                HalfKeyChallenge::size(),
+                &move |v: &PendingAcknowledgement| match v {
+                    PendingAcknowledgement::WaitingAsSender => false,
+                    PendingAcknowledgement::WaitingAsRelayer(unack) => signer == unack.signer,
+                },
+            )
+            .await?
+            .into_iter()
+            .filter_map(|a| match a {
+                PendingAcknowledgement::WaitingAsSender => None,
+                PendingAcknowledgement::WaitingAsRelayer(unack) => Some(unack.ticket),
+            })
+            .collect::<Vec<Ticket>>();
 
-        Ok(Vec::new())
+        tickets.append(&mut unack_tickets);
+
+        Ok(tickets)
     }
 
     async fn mark_pending(&mut self, ticket: &Ticket) -> Result<()> {
@@ -129,7 +146,7 @@ impl<T: BinaryAsyncKVStorage> HoprCoreDbActions for CoreDb<T> {
     }
 
     async fn check_and_set_packet_tag(&mut self, tag: Box<[u8]>) -> Result<bool> {
-        let key = utils_db::db::Key::new_with_prefix(&tag, PACKET_TAG_PREFIX)?;
+        let key = utils_db::db::Key::new_bytes_with_prefix(tag, PACKET_TAG_PREFIX)?;
 
         let has_packet_tag = self.db.contains(key.clone()).await;
         if !has_packet_tag {
@@ -143,21 +160,11 @@ impl<T: BinaryAsyncKVStorage> HoprCoreDbActions for CoreDb<T> {
     async fn store_pending_acknowledgment(
         &mut self,
         half_key_challenge: HalfKeyChallenge,
-        is_message_sender: bool,
-        unack_ticket: Option<UnacknowledgedTicket>,
+        pending_acknowledgment: PendingAcknowledgement,
     ) -> Result<()> {
         let key = utils_db::db::Key::new_with_prefix(&half_key_challenge, PENDING_ACKNOWLEDGEMENTS_PREFIX)?;
 
-        let value = if is_message_sender {
-            serialize_to_bytes(&PendingAcknowledgementPrefix::MessageSender)?
-        } else {
-            let unacked_ticket_se = serialize_to_bytes(&unack_ticket)?;
-            let mut out = serialize_to_bytes(&PendingAcknowledgementPrefix::Relayer)?;
-            out.extend_from_slice(&unacked_ticket_se);
-            out
-        };
-
-        let _ = self.db.set(key, &value).await?;
+        let _ = self.db.set(key, &pending_acknowledgment).await?;
 
         Ok(())
     }
@@ -176,10 +183,30 @@ pub mod wasm {
 
 #[cfg(test)]
 mod tests {
-    // use super::*;
+    use core_crypto::types::HalfKeyChallenge;
+    use utils_db::db::serialize_to_bytes;
+    use utils_types::primitives::EthereumChallenge;
+    use utils_types::traits::BinarySerializable;
 
     #[test]
-    fn test_core_db_is_able_to_set_tickets() {
-        assert!(true)
+    fn test_core_db_iterable_type_EhtereumChallenge_must_have_fixed_key_length() {
+        let challenge = vec![10u8; EthereumChallenge::SIZE];
+        let eth_challenge = EthereumChallenge::new(challenge.as_slice());
+
+        let serialized = serialize_to_bytes(&eth_challenge);
+
+        assert!(serialized.is_ok());
+        assert_eq!(serialized.unwrap().len(), EthereumChallenge::SIZE)
+    }
+
+    #[test]
+    fn test_core_db_iterable_type_HalfKeyChallenge_must_have_fixed_key_length() {
+        let challenge = vec![10u8; HalfKeyChallenge::SIZE];
+        let eth_challenge = HalfKeyChallenge::new(challenge.as_slice());
+
+        let serialized = serialize_to_bytes(&eth_challenge);
+
+        assert!(serialized.is_ok());
+        assert_eq!(serialized.unwrap().len(), HalfKeyChallenge::SIZE)
     }
 }

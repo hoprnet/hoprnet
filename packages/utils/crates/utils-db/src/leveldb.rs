@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 
-use futures_lite::stream::StreamExt;
 use crate::errors::DbError;
 use crate::traits::{AsyncKVStorage, BatchOperation};
+use futures_lite::stream::StreamExt;
 
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
@@ -125,7 +125,8 @@ impl AsyncKVStorage for LevelDbShim {
     }
 
     fn iterate(&self, prefix: Self::Key, suffix_size: u32) -> crate::errors::Result<crate::types::BinaryStreamWrapper> {
-        let iterable = self.db
+        let iterable = self
+            .db
             .iterValues(js_sys::Uint8Array::from(prefix.as_ref()), suffix_size)
             .map(|v| js_sys::AsyncIterator::from(v))
             .map_err(|e| DbError::GenericError(format!("Iteration failed with an exception: {:?}", e)))?;
@@ -254,18 +255,29 @@ pub async fn db_sanity_test(db: LevelDb) -> Result<bool, JsValue> {
 
     let expected = vec![
         value_1.as_bytes().to_vec().into_boxed_slice(),
-        value_3.as_bytes().to_vec().into_boxed_slice()
+        value_3.as_bytes().to_vec().into_boxed_slice(),
     ];
 
     let mut received = Vec::new();
-    let mut data_stream = kv_storage.iterate(prefix.as_bytes().to_vec().into_boxed_slice(),
-             (prefixed_key_1.len() - prefix.len()) as u32)
-        .map_err(|e| JsValue::from(JsError::new(format!("Test #6.1 failed: failed to iterate over DB {:?}", e).as_str())))?;
+    let mut data_stream = kv_storage
+        .iterate(
+            prefix.as_bytes().to_vec().into_boxed_slice(),
+            (prefixed_key_1.len() - prefix.len()) as u32,
+        )
+        .map_err(|e| {
+            JsValue::from(JsError::new(
+                format!("Test #6.1 failed: failed to iterate over DB {:?}", e).as_str(),
+            ))
+        })?;
 
-    while let Some(value) = data_stream.next().await
-    {
-        let v = value.map(|v| js_sys::Uint8Array::from(v.as_ref()).to_vec().into_boxed_slice())
-            .map_err(|e| JsValue::from(JsError::new(format!("Test #6.1 failed: failed to iterate over DB {:?}", e).as_str())))?;
+    while let Some(value) = data_stream.next().await {
+        let v = value
+            .map(|v| js_sys::Uint8Array::from(v.as_ref()).to_vec().into_boxed_slice())
+            .map_err(|e| {
+                JsValue::from(JsError::new(
+                    format!("Test #6.1 failed: failed to iterate over DB {:?}", e).as_str(),
+                ))
+            })?;
 
         if v.as_ref() != value_2.as_bytes() {
             received.push(v);
@@ -273,8 +285,9 @@ pub async fn db_sanity_test(db: LevelDb) -> Result<bool, JsValue> {
     }
 
     if received != expected {
-        return Err::<bool, JsValue>(
-            JsValue::from(JsError::new(format!("Test #6.2 failed: db content mismatch {:?} != {:?}", received, expected).as_str())))
+        return Err::<bool, JsValue>(JsValue::from(JsError::new(
+            format!("Test #6.2 failed: db content mismatch {:?} != {:?}", received, expected).as_str(),
+        )));
     }
 
     Ok(true)

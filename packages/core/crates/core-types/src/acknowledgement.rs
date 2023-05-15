@@ -1,9 +1,9 @@
-use serde::{Serialize, Deserialize};
 use crate::acknowledgement::PendingAcknowledgement::{WaitingAsRelayer, WaitingAsSender};
 use crate::channels::Ticket;
 use core_crypto::errors::CryptoError::SignatureVerification;
 use core_crypto::primitives::{DigestLike, SimpleDigest};
 use core_crypto::types::{HalfKey, HalfKeyChallenge, Hash, PublicKey, Response, Signature};
+use serde::{Deserialize, Serialize};
 use utils_types::errors;
 use utils_types::errors::GeneralError::ParseError;
 use utils_types::traits::BinarySerializable;
@@ -315,7 +315,7 @@ impl BinarySerializable<'_> for AcknowledgementChallenge {
 
 /// Contains either unacknowledged ticket if we're waiting for the acknowledgement as a relayer
 /// or information if we wait for the acknowledgement as a sender.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum PendingAcknowledgement {
     /// We're waiting for acknowledgement as a sender
     WaitingAsSender,
@@ -379,7 +379,7 @@ pub mod test {
             U256::new("1"),
             U256::new("2"),
             Balance::new(
-                inverse_win_prob * price_per_packet * path_pos as u128,
+                (inverse_win_prob * price_per_packet * path_pos as u128).into(),
                 BalanceType::HOPR,
             ),
             U256::from_inverse_probability(&inverse_win_prob).unwrap(),

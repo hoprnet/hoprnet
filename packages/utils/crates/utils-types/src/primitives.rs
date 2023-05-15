@@ -94,14 +94,16 @@ impl Balance {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn from_str(value: &str, balance_type: BalanceType) -> Self {
         Self {
-            value: U256{ value: u256::from_str_radix(value, 10).expect(&format!("invalid number {}", value)) },
+            value: U256 {
+                value: u256::from_str_radix(value, 10).expect(&format!("invalid number {}", value)),
+            },
             balance_type,
         }
     }
 
     pub fn zero(balance_type: BalanceType) -> Self {
         Self {
-            value: U256{ value: u256::ZERO },
+            value: U256 { value: u256::ZERO },
             balance_type,
         }
     }
@@ -162,14 +164,18 @@ impl Balance {
     pub fn add(&self, other: &Balance) -> Self {
         assert_eq!(self.balance_type(), other.balance_type());
         Self {
-            value: U256{ value: self.value().value().add(other.value().value())},
+            value: U256 {
+                value: self.value().value().add(other.value().value()),
+            },
             balance_type: self.balance_type,
         }
     }
 
     pub fn iadd(&self, amount: u64) -> Self {
         Self {
-            value: U256{ value: self.value().value().add(amount.as_u256())},
+            value: U256 {
+                value: self.value().value().add(amount.as_u256()),
+            },
             balance_type: self.balance_type,
         }
     }
@@ -177,14 +183,18 @@ impl Balance {
     pub fn sub(&self, other: &Balance) -> Self {
         assert_eq!(self.balance_type(), other.balance_type());
         Self {
-            value: U256{ value: self.value().value().sub(other.value().value())},
+            value: U256 {
+                value: self.value().value().sub(other.value().value()),
+            },
             balance_type: self.balance_type,
         }
     }
 
     pub fn isub(&self, amount: u64) -> Self {
         Self {
-            value: U256{ value: self.value().value().sub(amount.as_u256())},
+            value: U256 {
+                value: self.value().value().sub(amount.as_u256()),
+            },
             balance_type: self.balance_type,
         }
     }
@@ -192,14 +202,18 @@ impl Balance {
     pub fn mul(&self, other: &Balance) -> Self {
         assert_eq!(self.balance_type(), other.balance_type());
         Self {
-            value: U256{ value: self.value().value().mul(other.value().value())},
+            value: U256 {
+                value: self.value().value().mul(other.value().value()),
+            },
             balance_type: self.balance_type,
         }
     }
 
     pub fn imul(&self, amount: u64) -> Self {
         Self {
-            value: U256{ value: self.value().value().mul(amount.as_u256())},
+            value: U256 {
+                value: self.value().value().mul(amount.as_u256()),
+            },
             balance_type: self.balance_type,
         }
     }
@@ -223,7 +237,9 @@ impl Balance {
 
     pub fn deserialize(data: &[u8], balance_type: BalanceType) -> Result<Balance> {
         Ok(Balance {
-            value: U256{ value: u256::from_be_bytes(data.try_into().map_err(|_| ParseError)?) },
+            value: U256 {
+                value: u256::from_be_bytes(data.try_into().map_err(|_| ParseError)?),
+            },
             balance_type,
         })
     }
@@ -549,7 +565,11 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "to_formatted_string")]
         pub fn _to_formatted_string(&self) -> String {
-            format!("{} {:?}", self.value().value().div(&u256::from(10u16).pow(18)), self.balance_type)
+            format!(
+                "{} {:?}",
+                self.value().value().div(&u256::from(10u16).pow(18)),
+                self.balance_type
+            )
         }
 
         #[wasm_bindgen(js_name = "clone")]

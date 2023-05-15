@@ -3,6 +3,8 @@ use std::ops::Deref;
 use futures_lite::stream::StreamExt;
 use serde::{de::DeserializeOwned, Serialize};
 
+use utils_types::traits::BinarySerializable;
+
 use crate::errors::{DbError, Result};
 use crate::traits::BinaryAsyncKVStorage;
 
@@ -10,8 +12,10 @@ pub struct Batch {
     pub ops: Vec<crate::traits::BatchOperation<Box<[u8]>, Box<[u8]>>>,
 }
 
-pub fn serialize_to_bytes<S: Serialize>(s: &S) -> Result<Vec<u8>> {
-    bincode::serialize(&s).map_err(|e| DbError::SerializationError(e.to_string()))
+// NOTE: The LevelDB implementation's iterator needs to know the precise size of the
+pub fn serialize_to_bytes<'a, S: Serialize + BinarySerializable<'a>>(s: &S) -> Result<Vec<u8>> {
+    Ok(Vec::from(s.to_bytes()))
+    // bincode::serialize(&s).map_err(|e| DbError::SerializationError(e.to_string()))
 }
 
 impl Batch {
@@ -43,28 +47,32 @@ pub struct Key {
 }
 
 impl Key {
-    pub fn new<T: Serialize>(object: &T) -> Result<Self> {
-        let key = bincode::serialize(&object)
-            .map_err(|e| DbError::SerializationError(e.to_string()))?
-            .into_boxed_slice();
-        Ok(Self { key })
+    pub fn new<'a, T: Serialize + BinarySerializable<'a>>(object: &T) -> Result<Self> {
+        Ok(Self { key: object.to_bytes() })
     }
 
     pub fn new_from_str(object: &str) -> Result<Self> {
-        let key = bincode::serialize(&object)
-            .map_err(|e| DbError::SerializationError(e.to_string()))?
-            .into_boxed_slice();
-        Ok(Self { key })
+        Ok(Self {
+            key: Box::from(object.as_bytes()),
+        })
     }
 
-    pub fn new_with_prefix<T: Serialize>(object: &T, prefix: &str) -> Result<Self> {
-        let key = bincode::serialize(&object)
-            .map_err(|e| DbError::SerializationError(e.to_string()))?
-            .into_boxed_slice();
+    pub fn new_with_prefix<'a, T: Serialize + BinarySerializable<'a>>(object: &T, prefix: &str) -> Result<Self> {
+        let key = serialize_to_bytes(object)?;
 
-        let mut result = Vec::with_capacity(prefix.len() + key.as_ref().len());
+        let mut result = Vec::with_capacity(prefix.len() + key.len());
         result.extend_from_slice(prefix.as_bytes().as_ref());
         result.extend_from_slice(key.as_ref());
+
+        Ok(Self {
+            key: result.into_boxed_slice(),
+        })
+    }
+
+    pub fn new_bytes_with_prefix(object: Box<[u8]>, prefix: &str) -> Result<Self> {
+        let mut result = Vec::with_capacity(prefix.len() + object.len());
+        result.extend_from_slice(prefix.as_bytes().as_ref());
+        result.extend_from_slice(object.as_ref());
 
         Ok(Self {
             key: result.into_boxed_slice(),
@@ -108,8 +116,8 @@ impl<T: BinaryAsyncKVStorage> DB<T> {
     }
 
     pub async fn set<V>(&mut self, key: Key, value: &V) -> Result<Option<V>>
-        where
-            V: Serialize + DeserializeOwned,
+    where
+        V: Serialize + DeserializeOwned,
     {
         let key: T::Key = key.into();
         let value: T::Value = bincode::serialize(&value)
@@ -134,16 +142,20 @@ impl<T: BinaryAsyncKVStorage> DB<T> {
         }
     }
 
-    pub async fn get_more<V: Serialize + DeserializeOwned>(&self, prefix: Box<[u8]>, suffix_size: u32, filter: Box<dyn Fn(&V) -> bool>) -> Result<Vec<V>> {
+    pub async fn get_more<V: Serialize + DeserializeOwned>(
+        &self,
+        prefix: Box<[u8]>,
+        suffix_size: u32,
+        filter: &dyn Fn(&V) -> bool,
+    ) -> Result<Vec<V>> {
         let mut output = Vec::new();
 
         let mut data_stream = self.backend.iterate(prefix, suffix_size)?;
 
         // fail fast for the first value that cannot be deserialized
-        while let Some(value) = data_stream.next().await
-        {
-            let value = bincode::deserialize::<V>(value?.as_ref())
-                .map_err(|e| DbError::DeserializationError(e.to_string()))?;
+        while let Some(value) = data_stream.next().await {
+            let value =
+                bincode::deserialize::<V>(value?.as_ref()).map_err(|e| DbError::DeserializationError(e.to_string()))?;
 
             if (*filter)(&value) {
                 output.push(value);
@@ -165,12 +177,31 @@ mod tests {
     use crate::traits::MockAsyncKVStorage;
     use mockall::predicate;
     use serde::Deserialize;
+    use utils_types::traits::BinarySerializable;
 
     impl BinaryAsyncKVStorage for MockAsyncKVStorage {}
 
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
     struct TestKey {
-        v: u16,
+        v: u8,
+    }
+
+    impl BinarySerializable<'_> for TestKey {
+        const SIZE: usize = 1;
+
+        /// Deserializes the type from a binary blob.
+        fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
+            if data.len() != Self::SIZE {
+                Err(utils_types::errors::GeneralError::InvalidInput)
+            } else {
+                Ok(Self { v: data[0] })
+            }
+        }
+
+        /// Serializes the type into a fixed size binary blob.
+        fn to_bytes(&self) -> Box<[u8]> {
+            Box::new([self.v])
+        }
     }
 
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

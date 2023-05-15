@@ -5630,6 +5630,7 @@ dependencies = [
  "tempfile 3.5.0",
  "thiserror",
  "utils-log",
+ "utils-types",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-bindgen-test",
