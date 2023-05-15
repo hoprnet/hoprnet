@@ -89,9 +89,9 @@ describe('test hash iterator', function () {
 
     let TS_hint = TS_iterated.intermediates[98]
     assert.equal(TS_hint.iteration, 980)
-    let RS_recovered = recover_iterated_hash(
+    let RS_recovered = await recover_iterated_hash(
       target_hash,
-      (i: number) => (i == TS_hint.iteration ? TS_hint.preImage : undefined),
+      async (i: number) => (i == TS_hint.iteration ? TS_hint.preImage : undefined),
       1000,
       10,
       undefined
