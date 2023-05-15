@@ -1,6 +1,7 @@
 # HOPR Ethereum Package
 
-Draft readme, for rust migration
+Draft readme, for rust migration.
+Appending node-staking management notes to the end.
 
 ## Installation
 
