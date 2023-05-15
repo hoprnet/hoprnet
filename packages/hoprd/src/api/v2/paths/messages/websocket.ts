@@ -10,7 +10,12 @@ const GET: Operation = [
 // This endpoint only exists to document the websocket's behaviour.
 GET.apiDoc = {
   description: generateWsApiDescription(
-    'This is a websocket endpoint which streams incoming messages from other nodes. Data is streamed in a stringified Uint8Array instance.',
+    `This is a websocket endpoint which exposes a subset of message functions.
+Incoming messages from other nodes are sent to the websocket client in stringified Uint8Array instance of rlp-encoded data.
+A client may also send message by sending the following data:
+  { cmd: "sendmsg", args: { recipient: "SOME_PEER_ID", path: [], hops: 1} }
+The command arguments follow the same semantics as in the dedicated API endpoint for sending messages.
+`,
     '/messages/websocket'
   ),
   tags: ['Messages'],
