@@ -66,7 +66,7 @@ pub async fn recover_iterated_hash<F>(
     index_hint: Option<usize>,
 ) -> Result<Intermediate>
 where
-    F: futures::Future<Output = core::result::Result<Box<[u8]>, String>>,
+    F: futures::Future<Output = Option<Box<[u8]>>>,
 {
     if step_size == 0 || hash_value.is_empty() || max_iterations == 0 {
         return Err(InvalidInputValue);
@@ -120,17 +120,16 @@ mod tests {
         assert_eq!(&expected, hint.intermediate.as_ref())
     }
 
-    #[test]
-    fn test_recovery() {
+    #[async_std::test]
+    async fn test_recovery() {
         let hint_idx = 980;
-        let hint_hash = hex!("a380d145d8612d33912494f1b36571c0b59b9bd459e6bb7d5ea05946be4c256b");
         let target = hex!("16db2cf9913ccaf4976c825d1fd7b8f8e6510f479390c3272ed4e27fa015a537");
 
         let recovered = recover_iterated_hash(
             &target,
-            |i| async {
+            &|i: usize| async move {
                 if i == hint_idx {
-                    Some(Box::new(hint_hash))
+                    Some(hex!("a380d145d8612d33912494f1b36571c0b59b9bd459e6bb7d5ea05946be4c256b").into())
                 } else {
                     None
                 }
@@ -139,7 +138,8 @@ mod tests {
             10,
             None,
         )
-        .unwrap();
+            .await
+            .unwrap();
 
         assert_eq!(recovered.iteration, hint_idx + 7);
         assert_eq!(
@@ -157,6 +157,7 @@ pub mod wasm {
     use utils_misc::utils::wasm::JsResult;
     use wasm_bindgen::prelude::wasm_bindgen;
     use wasm_bindgen::JsValue;
+    use utils_log::error;
 
     #[wasm_bindgen]
     pub struct IteratedHash {
@@ -186,7 +187,7 @@ pub mod wasm {
     }
 
     #[wasm_bindgen]
-    pub fn recover_iterated_hash(
+    pub async fn recover_iterated_hash(
         hash_value: &[u8],
         hints: &js_sys::Function,
         max_iterations: usize,
@@ -195,22 +196,31 @@ pub mod wasm {
     ) -> JsResult<Intermediate> {
         ok_or_jserr!(super::recover_iterated_hash(
             hash_value,
-            |iteration: usize| {
-                hints
-                    .call1(&JsValue::null(), &Number::from(iteration as u32))
-                    .ok()
-                    .and_then(|preimage| {
-                        let arr = Uint8Array::from(preimage);
-                        if !arr.is_undefined() {
+            &|iteration: usize| async move {
+                match hints.call1(&JsValue::null(), &Number::from(iteration as u32)).map(|r| js_sys::Promise::from(r)) {
+                    Ok(promise) => {
+                        let arr = wasm_bindgen_futures::JsFuture::from(promise)
+                            .await
+                            .map(|res| Uint8Array::from(res))
+                            .expect("failed to retrieve iterated hash hint");
+
+                        if !arr.is_undefined() && !arr.is_null() {
                             Some(arr.to_vec().into_boxed_slice())
                         } else {
                             None
                         }
-                    })
+                    },
+                    Err(e) => {
+                        error!("error while evaluating iterated hash hint: {}", e.as_string()
+                            .unwrap_or_else(|| "unknown error".to_owned())
+                            .as_str());
+                        None
+                    }
+                }
             },
             max_iterations,
             step_size,
             index_hint
-        ))
+        ).await)
     }
 }

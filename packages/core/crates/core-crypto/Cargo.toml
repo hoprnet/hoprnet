@@ -13,10 +13,11 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 default = ["console_error_panic_hook", "wasm"]
-wasm = ["dep:wasm-bindgen", "dep:js-sys"]
+wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys"]
 
 [dependencies]
 aes = "0.8"
+async-std = { version = "1.12.0", features = ["attributes"] }
 blake2 = "0.10"
 chacha20 = "0.9"
 ctr = "0.9"

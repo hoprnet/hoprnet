@@ -975,6 +975,7 @@ name = "core-crypto"
 version = "0.3.1"
 dependencies = [
  "aes",
+ "async-std",
  "blake2",
  "chacha20",
  "console_error_panic_hook",
