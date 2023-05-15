@@ -28,7 +28,8 @@ import {
   create_multi_counter,
   create_gauge,
   create_multi_gauge,
-  U256, random_integer
+  U256,
+  random_integer
 } from '@hoprnet/hopr-utils'
 
 import type { ChainWrapper } from '../ethereum.js'

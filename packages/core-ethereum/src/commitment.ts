@@ -45,11 +45,7 @@ async function createCommitmentChain(
   initialCommitmentSeed: Uint8Array,
   setChainCommitment: SetCommitment
 ): Promise<void> {
-  const intermediates = await iterate_hash(
-    initialCommitmentSeed,
-    TOTAL_ITERATIONS,
-    DB_ITERATION_BLOCK_SIZE
-  )
+  const intermediates = await iterate_hash(initialCommitmentSeed, TOTAL_ITERATIONS, DB_ITERATION_BLOCK_SIZE)
 
   await db.storeHashIntermediaries(channelId, intermediates)
   const current = new Hash(intermediates.hash())

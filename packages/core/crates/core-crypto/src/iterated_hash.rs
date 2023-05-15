@@ -138,8 +138,8 @@ mod tests {
             10,
             None,
         )
-            .await
-            .unwrap();
+        .await
+        .unwrap();
 
         assert_eq!(recovered.iteration, hint_idx + 7);
         assert_eq!(
@@ -153,11 +153,11 @@ mod tests {
 pub mod wasm {
     use crate::iterated_hash::Intermediate;
     use js_sys::{Number, Uint8Array};
+    use utils_log::error;
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use wasm_bindgen::prelude::wasm_bindgen;
     use wasm_bindgen::JsValue;
-    use utils_log::error;
 
     #[wasm_bindgen]
     pub struct IteratedHash {
@@ -194,33 +194,40 @@ pub mod wasm {
         step_size: usize,
         index_hint: Option<usize>,
     ) -> JsResult<Intermediate> {
-        ok_or_jserr!(super::recover_iterated_hash(
-            hash_value,
-            &|iteration: usize| async move {
-                match hints.call1(&JsValue::null(), &Number::from(iteration as u32)).map(|r| js_sys::Promise::from(r)) {
-                    Ok(promise) => {
-                        let arr = wasm_bindgen_futures::JsFuture::from(promise)
-                            .await
-                            .map(|res| Uint8Array::from(res))
-                            .expect("failed to retrieve iterated hash hint");
+        ok_or_jserr!(
+            super::recover_iterated_hash(
+                hash_value,
+                &|iteration: usize| async move {
+                    match hints
+                        .call1(&JsValue::null(), &Number::from(iteration as u32))
+                        .map(|r| js_sys::Promise::from(r))
+                    {
+                        Ok(promise) => {
+                            let arr = wasm_bindgen_futures::JsFuture::from(promise)
+                                .await
+                                .map(|res| Uint8Array::from(res))
+                                .expect("failed to retrieve iterated hash hint");
 
-                        if !arr.is_undefined() && !arr.is_null() {
-                            Some(arr.to_vec().into_boxed_slice())
-                        } else {
+                            if !arr.is_undefined() && !arr.is_null() {
+                                Some(arr.to_vec().into_boxed_slice())
+                            } else {
+                                None
+                            }
+                        }
+                        Err(e) => {
+                            error!(
+                                "error while evaluating iterated hash hint: {}",
+                                e.as_string().unwrap_or_else(|| "unknown error".to_owned()).as_str()
+                            );
                             None
                         }
-                    },
-                    Err(e) => {
-                        error!("error while evaluating iterated hash hint: {}", e.as_string()
-                            .unwrap_or_else(|| "unknown error".to_owned())
-                            .as_str());
-                        None
                     }
-                }
-            },
-            max_iterations,
-            step_size,
-            index_hint
-        ).await)
+                },
+                max_iterations,
+                step_size,
+                index_hint
+            )
+            .await
+        )
     }
 }
