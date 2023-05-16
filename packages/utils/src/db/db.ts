@@ -264,6 +264,25 @@ export class LevelDb {
     }
   }
 
+  public iterValues(prefix: Uint8Array, suffixLength: number): AsyncIterable<Uint8Array> {
+    return this.iter(prefix, suffixLength)
+  }
+
+  protected async *iter(prefix: Uint8Array, suffixLength: number): AsyncIterable<Uint8Array> {
+    const firstPrefixed = u8aConcat(prefix, new Uint8Array(suffixLength).fill(0x00))
+    const lastPrefixed = u8aConcat(prefix, new Uint8Array(suffixLength).fill(0xff))
+
+    for await (const [_key, chunk] of this.backend.iterator({
+      gte: Buffer.from(firstPrefixed.buffer, firstPrefixed.byteOffset, firstPrefixed.byteLength),
+      lte: Buffer.from(lastPrefixed.buffer, lastPrefixed.byteOffset, lastPrefixed.byteLength),
+      keys: false
+    }) as any) {
+      const obj: Uint8Array = new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.byteLength)
+
+      yield obj
+    }
+  }
+
   public async close() {
     log('Closing database')
     return await this.backend.close()

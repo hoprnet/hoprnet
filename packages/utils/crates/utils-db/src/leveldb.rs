@@ -2,6 +2,7 @@ use async_trait::async_trait;
 
 use crate::errors::DbError;
 use crate::traits::{AsyncKVStorage, BatchOperation};
+use futures_lite::stream::StreamExt;
 
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
@@ -27,6 +28,9 @@ extern "C" {
     // https://github.com/Level/levelup#dbbatcharray-options-callback-array-form
     #[wasm_bindgen(method, catch)]
     async fn batch(this: &LevelDb, operations: js_sys::Array, wait_for_write: bool) -> Result<(), JsValue>;
+
+    #[wasm_bindgen(method, catch)]
+    fn iterValues(this: &LevelDb, prefix: js_sys::Uint8Array, suffix_length: u32) -> Result<JsValue, JsValue>;
 
     #[wasm_bindgen(method, catch)]
     fn dump(this: &LevelDb, destination: String) -> Result<(), JsValue>;
@@ -119,6 +123,18 @@ impl AsyncKVStorage for LevelDbShim {
             .dump(destination.clone())
             .map_err(|_| DbError::DumpError(format!("Failed to dump DB into {}", destination)))
     }
+
+    fn iterate(&self, prefix: Self::Key, suffix_size: u32) -> crate::errors::Result<crate::types::BinaryStreamWrapper> {
+        let iterable = self
+            .db
+            .iterValues(js_sys::Uint8Array::from(prefix.as_ref()), suffix_size)
+            .map(|v| js_sys::AsyncIterator::from(v))
+            .map_err(|e| DbError::GenericError(format!("Iteration failed with an exception: {:?}", e)))?;
+
+        let stream = wasm_bindgen_futures::stream::JsStream::from(iterable);
+
+        Ok(crate::types::BinaryStreamWrapper::new(stream))
+    }
 }
 
 #[cfg(feature = "wasm")]
@@ -130,6 +146,10 @@ pub async fn db_sanity_test(db: LevelDb) -> Result<bool, JsValue> {
     let value_2 = "def";
     let key_3 = "3";
     let value_3 = "ghi";
+    let prefix = "xy";
+    let prefixed_key_1 = "xya";
+    let prefixed_key_2 = "xyb";
+    let prefixed_key_3 = "xyc";
 
     let mut kv_storage = LevelDbShim::new(db);
 
@@ -144,6 +164,8 @@ pub async fn db_sanity_test(db: LevelDb) -> Result<bool, JsValue> {
         )));
     }
 
+    // ===================================
+
     let _ = kv_storage
         .set(
             key_1.as_bytes().to_vec().into_boxed_slice(),
@@ -153,6 +175,8 @@ pub async fn db_sanity_test(db: LevelDb) -> Result<bool, JsValue> {
     if !kv_storage.contains(key_1.as_bytes().to_vec().into_boxed_slice()).await {
         return Err::<bool, JsValue>(JsValue::from(JsError::new("Test #2 failed: DB should contain the key")));
     }
+
+    // ===================================
 
     let value = kv_storage
         .get(key_1.as_bytes().to_vec().into_boxed_slice())
@@ -167,6 +191,8 @@ pub async fn db_sanity_test(db: LevelDb) -> Result<bool, JsValue> {
         )));
     }
 
+    // ===================================
+
     let _ = kv_storage.remove(key_1.as_bytes().to_vec().into_boxed_slice()).await;
 
     if kv_storage.contains(key_1.as_bytes().to_vec().into_boxed_slice()).await {
@@ -174,6 +200,8 @@ pub async fn db_sanity_test(db: LevelDb) -> Result<bool, JsValue> {
             "Test #4 failed: removal of key from the DB failed",
         )));
     }
+
+    // ===================================
 
     let batch_data = vec![
         BatchOperation::put(crate::traits::Put {
@@ -194,6 +222,8 @@ pub async fn db_sanity_test(db: LevelDb) -> Result<bool, JsValue> {
         )));
     }
 
+    // ===================================
+
     gloo_timers::future::sleep(std::time::Duration::from_millis(10)).await;
 
     // TODO: levelup api with the passed options to do an immediate write does not perform an immediate write
@@ -201,6 +231,64 @@ pub async fn db_sanity_test(db: LevelDb) -> Result<bool, JsValue> {
     //     return Err::<bool, JsValue>(
     //         JsValue::from(JsError::new("Test #5.1 failed: the key should be present in the DB")))
     // }
+
+    // ===================================
+
+    let _ = kv_storage
+        .set(
+            prefixed_key_1.as_bytes().to_vec().into_boxed_slice(),
+            value_1.as_bytes().to_vec().into_boxed_slice(),
+        )
+        .await;
+    let _ = kv_storage
+        .set(
+            prefixed_key_2.as_bytes().to_vec().into_boxed_slice(),
+            value_2.as_bytes().to_vec().into_boxed_slice(),
+        )
+        .await;
+    let _ = kv_storage
+        .set(
+            prefixed_key_3.as_bytes().to_vec().into_boxed_slice(),
+            value_3.as_bytes().to_vec().into_boxed_slice(),
+        )
+        .await;
+
+    let expected = vec![
+        value_1.as_bytes().to_vec().into_boxed_slice(),
+        value_3.as_bytes().to_vec().into_boxed_slice(),
+    ];
+
+    let mut received = Vec::new();
+    let mut data_stream = kv_storage
+        .iterate(
+            prefix.as_bytes().to_vec().into_boxed_slice(),
+            (prefixed_key_1.len() - prefix.len()) as u32,
+        )
+        .map_err(|e| {
+            JsValue::from(JsError::new(
+                format!("Test #6.1 failed: failed to iterate over DB {:?}", e).as_str(),
+            ))
+        })?;
+
+    while let Some(value) = data_stream.next().await {
+        let v = value
+            .map(|v| js_sys::Uint8Array::from(v.as_ref()).to_vec().into_boxed_slice())
+            .map_err(|e| {
+                JsValue::from(JsError::new(
+                    format!("Test #6.1 failed: failed to iterate over DB {:?}", e).as_str(),
+                ))
+            })?;
+
+        if v.as_ref() != value_2.as_bytes() {
+            received.push(v);
+        }
+    }
+
+    if received != expected {
+        return Err::<bool, JsValue>(JsValue::from(JsError::new(
+            format!("Test #6.2 failed: db content mismatch {:?} != {:?}", received, expected).as_str(),
+        )));
+    }
 
     Ok(true)
 }
