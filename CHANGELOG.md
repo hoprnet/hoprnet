@@ -8,6 +8,7 @@
 - Extend hopli so it can derive peer ID from identity files. Add `initiate-node` to perform all the necessary on-chain operations before launching a HOPR node. Accept identity from path. ([#4894](https://github.com/hoprnet/hoprnet/pull/4894))
 - Introduce new types & optimize cryptographic code ([#4974](https://github.com/hoprnet/hoprnet/pull/4974))
 - Create DB functionality shim in Rust ([#4885](https://github.com/hoprnet/hoprnet/pull/4885))
+- Migrate interface for using the DB in core packet processing ([#5025](https://github.com/hoprnet/hoprnet/pull/5025))
 
 <a name="1.93"></a>
 
