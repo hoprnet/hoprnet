@@ -6,7 +6,12 @@ use futures::{
     future::{select, Either},
     pin_mut, StreamExt,
 };
-use std::{cell::RefCell, cmp::Ordering, collections::HashMap, rc::Rc, time::Duration};
+use std::{
+    cmp::Ordering,
+    collections::HashMap,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 use utils_log::{error, info};
 use utils_misc::traits::DuplexStream;
 
@@ -29,12 +34,18 @@ use gloo_timers::future::sleep;
 /// - prune stale connections
 /// - produce debug output to see current relay connections
 struct RelayConnections<St> {
-    conns: Rc<RefCell<HashMap<RelayConnectionIdentifier, RelayConnectionEndpoints<St>>>>,
+    conns: Arc<Mutex<HashMap<RelayConnectionIdentifier, RelayConnectionEndpoints<St>>>>,
 }
 
 impl<St> ToString for RelayConnections<St> {
     fn to_string(&self) -> String {
-        let items = self.conns.borrow().keys().map(|x| x.to_string()).collect::<Vec<_>>();
+        let items = self
+            .conns
+            .lock()
+            .unwrap()
+            .keys()
+            .map(|x| x.to_string())
+            .collect::<Vec<_>>();
 
         let prefix: String = "RelayConnections:\n".into();
 
@@ -54,7 +65,7 @@ impl<'a, St: DuplexStream + 'static> RelayConnections<St> {
     /// Initiates the connection manager
     pub fn new() -> Self {
         Self {
-            conns: Rc::new(RefCell::new(HashMap::new())),
+            conns: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -74,14 +85,18 @@ impl<'a, St: DuplexStream + 'static> RelayConnections<St> {
 
         // Start the stream but don't await its end
         spawn_local(async move {
-            conns_to_move.borrow_mut().insert(id, endpoints);
+            {
+                conns_to_move.lock().unwrap().insert(id, endpoints);
+            }
 
             match server.await {
                 Ok(()) => info!("Relayed connection [\"{}>\"] ended successfully", id.to_string()),
                 Err(e) => error!("Relayed connection [\"{}>\"] ended with error {}", id.to_string(), e),
             }
 
-            conns_to_move.borrow_mut().remove(&id);
+            {
+                conns_to_move.lock().unwrap().remove(&id);
+            }
         });
 
         Ok(())
@@ -100,10 +115,15 @@ impl<'a, St: DuplexStream + 'static> RelayConnections<St> {
 
         info!(
             "is active called {:?}",
-            self.conns.borrow().keys().map(|x| x.to_string()).collect::<Vec<_>>()
+            self.conns
+                .lock()
+                .unwrap()
+                .keys()
+                .map(|x| x.to_string())
+                .collect::<Vec<_>>()
         );
 
-        if let Some(entry) = self.conns.borrow_mut().get_mut(&id) {
+        if let Some(entry) = self.conns.lock().unwrap().get_mut(&id) {
             let timeout = sleep(Duration::from_millis(
                 maybe_timeout.unwrap_or(DEFAULT_RELAYED_CONNECTION_PING_TIMEOUT as u64),
             ));
@@ -173,7 +193,7 @@ impl<'a, St: DuplexStream + 'static> RelayConnections<St> {
             }
         };
 
-        if let Some(entry) = self.conns.borrow().get(&id) {
+        if let Some(entry) = self.conns.lock().unwrap().get(&id) {
             match source.cmp(&destination) {
                 Ordering::Equal => panic!("must not happen"),
                 Ordering::Greater => entry.new_stream_a.unbounded_send(to_source).unwrap(),
@@ -197,13 +217,13 @@ impl<'a, St: DuplexStream + 'static> RelayConnections<St> {
             }
         };
 
-        self.conns.borrow().contains_key(&id)
+        self.conns.lock().unwrap().contains_key(&id)
     }
 
     /// Gets the number of the currently stored connections.
     /// Can include stale connections.
     pub fn size(&self) -> usize {
-        self.conns.borrow().len()
+        self.conns.lock().unwrap().len()
     }
 
     /// Runs through all currently stored connections, checks if they

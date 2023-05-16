@@ -12,7 +12,7 @@ use std::{
     str::FromStr,
     task::{Context, Poll, Waker},
 };
-use utils_log::{error, info};
+use utils_log::error;
 use utils_misc::traits::DuplexStream;
 
 static RELAY_CONNECTION_IDENTIFIER_SEPERATOR: &str = " <-> ";
@@ -231,11 +231,8 @@ impl<St: DuplexStream> End<St> {
         // 4. check for recent incoming messages
         // -> repeat
         loop {
-            info!("loop iteration");
-
             if *this.ending {
                 let other_st = Pin::new(other.st.as_mut().unwrap());
-                info!("calling poll_close");
                 match other_st.poll_close(cx) {
                     Poll::Ready(_) => {
                         *this.ended = true;
@@ -246,7 +243,6 @@ impl<St: DuplexStream> End<St> {
             }
 
             if let Some(chunk) = this.buffered.take() {
-                println!("taking buffered {:?}", chunk);
                 let mut other_st = Pin::new(other.st.as_mut().unwrap());
                 match other_st.as_mut().poll_ready(cx)? {
                     Poll::Ready(()) => {
@@ -267,18 +263,12 @@ impl<St: DuplexStream> End<St> {
                         // We didn't succeed in sending chunk,
                         // so keep it for a next attempt
                         *this.buffered = Some(chunk);
-                        info!("buffered {:?}", this.buffered);
-
                         return Poll::Pending;
                     }
                 };
             }
 
-            info!("took buffered");
-
             if let Poll::Ready(Some(new_stream)) = this.new_stream_rx.as_mut().poll_next(cx) {
-                info!("polling new stream");
-
                 this.st.set(Some(new_stream));
 
                 // Drop any previously cached message
@@ -289,21 +279,13 @@ impl<St: DuplexStream> End<St> {
                 continue;
             }
 
-            info!("polled new stream");
-
             if let Poll::Ready(Some(status_message)) = this.ping_rx.as_mut().poll_next(cx) {
-                info!("polling status message");
-
                 *this.buffered = Some(status_message);
                 continue;
             }
 
-            info!("polled status message");
-
             match ready!(this.st.as_mut().as_pin_mut().unwrap().poll_next(cx)?) {
                 Some(chunk) => {
-                    info!("polling from stream {:?}", chunk);
-
                     match chunk[0] {
                         x if x == MessagePrefix::ConnectionStatus as u8 => {
                             if chunk.len() < 2 {
@@ -313,8 +295,6 @@ impl<St: DuplexStream> End<St> {
 
                             match chunk[1] {
                                 y if y == ConnectionStatusMessage::Stop as u8 => {
-                                    info!("stop received {}", x);
-
                                     // Correct?
 
                                     *this.buffered = Some(chunk);
@@ -327,7 +307,7 @@ impl<St: DuplexStream> End<St> {
                                 }
                                 y if y == ConnectionStatusMessage::Upgraded as u8 => {
                                     // Swallow UPGRADED message for backwards-compatibility
-                                    // *this.ended = true;
+                                    // we might want to free the slot automatically in the future
                                     continue;
                                 }
                                 y => error!("unrecognizable connection status message [{}]", y),
@@ -341,14 +321,10 @@ impl<St: DuplexStream> End<St> {
 
                             match chunk[1] {
                                 y if y == StatusMessage::Pong as u8 => {
-                                    info!("pong received {}", x);
-
                                     this.ping_tx.unbounded_send(chunk).unwrap();
                                     continue;
                                 }
                                 y if y == StatusMessage::Ping as u8 => {
-                                    info!("ping received {}", x);
-
                                     *this.buffered = Some(Box::new([
                                         MessagePrefix::StatusMessage as u8,
                                         StatusMessage::Pong as u8,
@@ -363,12 +339,11 @@ impl<St: DuplexStream> End<St> {
                             continue;
                         }
                         x => {
-                            info!("Received unrecognizable message [{}]", x)
+                            error!("Received unrecognizable message [{}]", x)
                         }
                     }
                 }
                 None => {
-                    info!("ended");
                     *this.ending = true;
                     continue;
                 }
