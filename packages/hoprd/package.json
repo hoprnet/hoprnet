@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hoprd",
-  "version": "1.93.6",
+  "version": "1.93.7-next.2",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -11,9 +11,7 @@
   "bin": "lib/main.cjs",
   "files": [
     "lib",
-    "npm-shrinkwrap.json",
     "releases.json",
-    "default-environment.json",
     "rest-api-v2-spec.yaml"
   ],
   "engines": {
