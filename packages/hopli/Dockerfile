@@ -42,9 +42,5 @@ RUN apt-get update && \
     apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false && \
     rm /root/Makefile
 
-# Make sure that hopli can be found
-ENV PATH=${PATH}:/bin/hopli
-RUN echo "export PATH=${PATH}:/bin/hopli" >> /root/.bashrc
-
 ENTRYPOINT ["/bin/hopli"]
 CMD ["--help"]
