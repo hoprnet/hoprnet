@@ -1,6 +1,7 @@
 use core_crypto::derivation::{derive_ack_key_share, derive_own_key_share};
 use core_crypto::parameters::SECRET_KEY_LENGTH;
 use core_crypto::random::random_bytes;
+use core_crypto::shared_keys::SecretKey;
 use core_crypto::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, PublicKey, Response};
 use utils_types::errors::GeneralError::ParseError;
 use utils_types::primitives::EthereumChallenge;
@@ -23,12 +24,12 @@ pub struct ProofOfRelayValues {
 impl ProofOfRelayValues {
     /// Takes the secrets which the first and the second relayer are able to derive from the packet header
     /// and computes the challenge for the first ticket.
-    pub fn new(secret_b: &[u8], secret_c: Option<&[u8]>) -> Self {
-        let s0 = derive_own_key_share(secret_b);
-        let s1 = derive_ack_key_share(secret_c.unwrap_or(&random_bytes::<SECRET_KEY_LENGTH>()));
+    pub fn new(secret_b: SecretKey, secret_c: Option<SecretKey>) -> Self {
+        let s0 = derive_own_key_share(&secret_b);
+        let s1 = derive_ack_key_share(&secret_c.unwrap_or(random_bytes::<SECRET_KEY_LENGTH>()));
 
         Self {
-            ack_challenge: derive_ack_key_share(secret_b).to_challenge(),
+            ack_challenge: derive_ack_key_share(&secret_b).to_challenge(),
             ticket_challenge: Response::from_half_keys(&s0, &s1)
                 .expect("failed to derive response")
                 .to_challenge(),
@@ -47,13 +48,13 @@ pub struct ProofOfRelayString {
 
 impl ProofOfRelayString {
     /// Creates instance from the shared secrets with node+2 and node+3
-    pub fn new(secret_c: &[u8], secret_d: Option<&[u8]>) -> Self {
+    pub fn new(secret_c: SecretKey, secret_d: Option<SecretKey>) -> Self {
         assert_eq!(SECRET_KEY_LENGTH, secret_c.len(), "invalid secret length");
         assert!(secret_d.is_none() || secret_d.unwrap().len() == SECRET_KEY_LENGTH);
 
-        let s0 = derive_ack_key_share(secret_c);
-        let s1 = derive_own_key_share(secret_c);
-        let s2 = derive_ack_key_share(secret_d.unwrap_or(&random_bytes::<SECRET_KEY_LENGTH>()));
+        let s0 = derive_ack_key_share(&secret_c);
+        let s1 = derive_own_key_share(&secret_c);
+        let s2 = derive_ack_key_share(&secret_d.unwrap_or(random_bytes::<SECRET_KEY_LENGTH>()));
 
         Self {
             next_ticket_challenge: Response::from_half_keys(&s1, &s2)
@@ -273,9 +274,9 @@ pub mod wasm {
         pub fn _new(secret_b: &[u8], secret_c: Uint8Array) -> Self {
             if !secret_c.is_null() && !secret_c.is_undefined() {
                 let c_slice = secret_c.to_vec();
-                Self::new(secret_b, Some(c_slice.as_slice()))
+                Self::new(secret_b.try_into().expect("illegal b size"), Some(c_slice.as_slice().try_into().expect("illegal c size")))
             } else {
-                Self::new(secret_b, None)
+                Self::new(secret_b.try_into().expect("illegal size"), None)
             }
         }
     }

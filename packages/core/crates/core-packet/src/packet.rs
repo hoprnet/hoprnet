@@ -3,7 +3,7 @@ use core_crypto::derivation::{derive_ack_key_share, derive_packet_tag};
 use core_crypto::primitives::{DigestLike, SimpleMac};
 use core_crypto::prp::{PRPParameters, PRP};
 use core_crypto::routing::{forward_header, header_length, ForwardedHeader, RoutingInfo};
-use core_crypto::shared_keys::SharedKeys;
+use core_crypto::shared_keys::Secp256k1SharedKeys;
 use core_crypto::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, PublicKey};
 use core_types::acknowledgement::{Acknowledgement, AcknowledgementChallenge};
 use core_types::channels::Ticket;
@@ -83,7 +83,7 @@ enum ForwardedMetaPacket {
 
 impl MetaPacket {
     pub fn new(
-        shared_keys: SharedKeys,
+        shared_keys: Secp256k1SharedKeys,
         msg: &[u8],
         path: &[&PeerId],
         max_hops: usize,
@@ -94,7 +94,7 @@ impl MetaPacket {
         assert!(msg.len() <= PAYLOAD_SIZE, "message too long to fit into a packet");
 
         let mut padded = add_padding(msg);
-        let secrets = shared_keys.secrets();
+        let secrets = shared_keys.secrets.iter().map(|s| s.as_slice()).collect::<Vec<_>>();
         let routing_info = RoutingInfo::new(
             max_hops,
             &path
@@ -115,7 +115,7 @@ impl MetaPacket {
         }
 
         MetaPacket::new_from_parts(
-            shared_keys.alpha(),
+            &shared_keys.alpha,
             &routing_info.routing_information,
             &routing_info.mac,
             &padded,
@@ -183,7 +183,10 @@ impl MetaPacket {
         additional_data_relayer_len: usize,
         additional_data_last_hop_len: usize,
     ) -> Result<ForwardedMetaPacket> {
-        let (alpha, secret) = SharedKeys::forward_transform(CurvePoint::from_bytes(self.alpha())?, private_key)?;
+        let (alpha, secret) = Secp256k1SharedKeys::forward_transform(
+            CurvePoint::from_bytes(self.alpha())?,
+            private_key.try_into().expect("invalid packet private key")
+        )?;
 
         let mut routing_info_mut: Vec<u8> = self.routing_info().into();
         let fwd_header = forward_header(
@@ -275,12 +278,12 @@ impl Packet {
     pub fn new(msg: &[u8], path: &[&PeerId], private_key: &[u8], first_ticket: Ticket) -> Result<Self> {
         assert!(!path.is_empty(), "path must not be empty");
 
-        let shared_keys = SharedKeys::new(path)?;
+        let shared_keys = Secp256k1SharedKeys::new(path)?;
 
-        let por_values = ProofOfRelayValues::new(shared_keys.secret(0).unwrap(), shared_keys.secret(1));
+        let por_values = ProofOfRelayValues::new(shared_keys.secrets[0], shared_keys.secrets.get(1).cloned());
 
         let por_strings = (1..path.len())
-            .map(|i| ProofOfRelayString::new(shared_keys.secret(i).unwrap(), shared_keys.secret(i + 1)).to_bytes())
+            .map(|i| ProofOfRelayString::new(shared_keys.secrets[i], shared_keys.secrets.get(i + 1).cloned()).to_bytes())
             .collect::<Vec<_>>();
 
         let mut ticket = first_ticket;

@@ -982,6 +982,7 @@ dependencies = [
  "ctr",
  "curve25519-dalek",
  "digest 0.10.6",
+ "ed25519-dalek",
  "elliptic-curve 0.13.4",
  "futures 0.3.28",
  "generic-array 0.14.7",
@@ -1374,6 +1375,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "03d928d978dbec61a1167414f5ec534f24bea0d7a0d24dd9b6233d3d8223e585"
 dependencies = [
  "cfg-if 1.0.0",
+ "digest 0.10.6",
  "fiat-crypto",
  "packed_simd_2",
  "platforms",
@@ -1581,6 +1583,29 @@ dependencies = [
  "elliptic-curve 0.13.4",
  "rfc6979 0.4.0",
  "signature 2.1.0",
+]
+
+[[package]]
+name = "ed25519"
+version = "2.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5fb04eee5d9d907f29e80ee6b0e78f7e2c82342c63e3580d8c4f69d9d5aad963"
+dependencies = [
+ "pkcs8 0.10.2",
+ "signature 2.1.0",
+]
+
+[[package]]
+name = "ed25519-dalek"
+version = "2.0.0-rc.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "798f704d128510932661a3489b08e3f4c934a01d61c5def59ae7b8e48f19665a"
+dependencies = [
+ "curve25519-dalek",
+ "ed25519",
+ "serde",
+ "sha2 0.10.6",
+ "zeroize",
 ]
 
 [[package]]

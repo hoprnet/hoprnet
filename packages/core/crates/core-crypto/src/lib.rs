@@ -9,6 +9,7 @@ pub mod random;
 pub mod routing;
 pub mod shared_keys;
 pub mod types;
+pub mod offchain;
 mod utils;
 
 #[cfg(feature = "wasm")]

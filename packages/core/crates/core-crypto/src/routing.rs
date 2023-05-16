@@ -262,6 +262,7 @@ pub fn forward_header(
 
 #[cfg(test)]
 pub mod tests {
+    use k256::{NonZeroScalar, ProjectivePoint};
     use crate::parameters::SECRET_KEY_LENGTH;
     use crate::prg::{PRGParameters, PRG};
     use crate::primitives::{DigestLike, SimpleMac};
@@ -346,12 +347,12 @@ pub mod tests {
 
         let pub_keys = (0..amount).into_iter().map(|_| PublicKey::random()).collect::<Vec<_>>();
 
-        let shares = SharedKeys::generate(&mut OsRng, &pub_keys).unwrap();
+        let shares = SharedKeys::<NonZeroScalar, ProjectivePoint>::generate(&mut OsRng, &pub_keys).unwrap();
 
         let rinfo = RoutingInfo::new(
             MAX_HOPS,
             &pub_keys,
-            &shares.secrets().iter().map(|s| s.as_ref()).collect::<Vec<_>>(),
+            &shares.secrets.iter().map(|s| s.as_ref()).collect::<Vec<_>>(),
             0,
             &additional_data,
             None,
@@ -362,17 +363,17 @@ pub mod tests {
         let mut last_mac = [0u8; SimpleMac::SIZE];
         last_mac.copy_from_slice(&rinfo.mac);
 
-        for (i, secret) in shares.secrets().iter().enumerate() {
+        for (i, secret) in shares.secrets.iter().enumerate() {
             let fwd = forward_header(secret, &mut header, &last_mac, MAX_HOPS, 0, 0).unwrap();
 
             match &fwd {
                 ForwardedHeader::RelayNode { mac, next_node, .. } => {
                     last_mac.copy_from_slice(&mac);
-                    assert!(i < shares.secrets().len() - 1);
+                    assert!(i < shares.secrets.len() - 1);
                     assert_eq!(&pub_keys[i + 1], next_node);
                 }
                 ForwardedHeader::FinalNode { additional_data } => {
-                    assert_eq!(shares.secrets().len() - 1, i);
+                    assert_eq!(shares.secrets.len() - 1, i);
                     assert_eq!(0, additional_data.len());
                 }
             }
