@@ -166,8 +166,8 @@ struct CliArgs {
     #[arg(
         long,
         default_value_t = false,
-        env = "HOPRD_API", 
-        help = format!("Expose the API on {}:{}", DEFAULT_API_HOST, DEFAULT_API_PORT), 
+        env = "HOPRD_API",
+        help = format!("Expose the API on {}:{}", DEFAULT_API_HOST, DEFAULT_API_PORT),
         action = ArgAction::SetTrue,
     )]
     pub api: bool,

@@ -11,9 +11,7 @@
   "bin": "lib/main.cjs",
   "files": [
     "lib",
-    "npm-shrinkwrap.json",
     "releases.json",
-    "default-environment.json",
     "rest-api-v2-spec.yaml"
   ],
   "engines": {
