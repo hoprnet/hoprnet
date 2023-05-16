@@ -4,12 +4,16 @@ use crate::{
 };
 use futures::{
     future::{select, Either},
-    pin_mut, StreamExt,
+    pin_mut, ready, Future, Stream, StreamExt,
 };
+use pin_project_lite::pin_project;
 use std::{
+    cell::RefCell,
     cmp::Ordering,
     collections::HashMap,
-    sync::{Arc, Mutex},
+    pin::Pin,
+    rc::Rc,
+    task::{Context, Poll},
     time::Duration,
 };
 use utils_log::{error, info};
@@ -28,24 +32,46 @@ use async_std::task::sleep;
 #[cfg(all(feature = "wasm", not(test)))]
 use gloo_timers::future::sleep;
 
+pin_project! {
+    struct PollActive<St> {
+        conns: Rc<RefCell<HashMap<RelayConnectionIdentifier, RelayConnectionEndpoints<St>>>>,
+        source: PeerId,
+        destination: PeerId,
+    }
+}
+
+impl<St> Future for PollActive<St> {
+    type Output = Result<Option<Box<[u8]>>, String>;
+    fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Self::Output> {
+        let this = self.project();
+
+        match this.conns.borrow_mut().get_mut(
+            &(this.source.to_owned(), this.destination.to_owned())
+                .try_into()
+                .unwrap(),
+        ) {
+            Some(endpoints) => match this.source.cmp(&this.destination) {
+                Ordering::Equal => panic!("must not happen"),
+                Ordering::Greater => Poll::Ready(Ok(ready!(Pin::new(&mut endpoints.ping_b_rx).poll_next(cx)))),
+                Ordering::Less => Poll::Ready(Ok(ready!(Pin::new(&mut endpoints.ping_a_rx).poll_next(cx)))),
+            },
+            None => return Poll::Ready(Err("already deleted".into())),
+        }
+    }
+}
+
 /// Holds relayed connections, can
 /// - check if a connection is active
 /// - overwrite connection endpoint e.g. upon reconnects
 /// - prune stale connections
 /// - produce debug output to see current relay connections
 struct RelayConnections<St> {
-    conns: Arc<Mutex<HashMap<RelayConnectionIdentifier, RelayConnectionEndpoints<St>>>>,
+    conns: Rc<RefCell<HashMap<RelayConnectionIdentifier, RelayConnectionEndpoints<St>>>>,
 }
 
 impl<St> ToString for RelayConnections<St> {
     fn to_string(&self) -> String {
-        let items = self
-            .conns
-            .lock()
-            .unwrap()
-            .keys()
-            .map(|x| x.to_string())
-            .collect::<Vec<_>>();
+        let items = self.conns.borrow().keys().map(|x| x.to_string()).collect::<Vec<_>>();
 
         let prefix: String = "RelayConnections:\n".into();
 
@@ -65,7 +91,7 @@ impl<'a, St: DuplexStream + 'static> RelayConnections<St> {
     /// Initiates the connection manager
     pub fn new() -> Self {
         Self {
-            conns: Arc::new(Mutex::new(HashMap::new())),
+            conns: Rc::new(RefCell::new(HashMap::new())),
         }
     }
 
@@ -85,18 +111,14 @@ impl<'a, St: DuplexStream + 'static> RelayConnections<St> {
 
         // Start the stream but don't await its end
         spawn_local(async move {
-            {
-                conns_to_move.lock().unwrap().insert(id, endpoints);
-            }
+            conns_to_move.borrow_mut().insert(id, endpoints);
 
             match server.await {
                 Ok(()) => info!("Relayed connection [\"{}>\"] ended successfully", id.to_string()),
                 Err(e) => error!("Relayed connection [\"{}>\"] ended with error {}", id.to_string(), e),
             }
 
-            {
-                conns_to_move.lock().unwrap().remove(&id);
-            }
+            conns_to_move.borrow_mut().remove(&id);
         });
 
         Ok(())
@@ -115,71 +137,90 @@ impl<'a, St: DuplexStream + 'static> RelayConnections<St> {
 
         info!(
             "is active called {:?}",
-            self.conns
-                .lock()
-                .unwrap()
-                .keys()
-                .map(|x| x.to_string())
-                .collect::<Vec<_>>()
+            self.conns.borrow().keys().map(|x| x.to_string()).collect::<Vec<_>>()
         );
 
-        if let Some(entry) = self.conns.lock().unwrap().get_mut(&id) {
-            let timeout = sleep(Duration::from_millis(
-                maybe_timeout.unwrap_or(DEFAULT_RELAYED_CONNECTION_PING_TIMEOUT as u64),
-            ));
+        let timeout = sleep(Duration::from_millis(
+            maybe_timeout.unwrap_or(DEFAULT_RELAYED_CONNECTION_PING_TIMEOUT as u64),
+        ));
 
-            pin_mut!(timeout);
+        pin_mut!(timeout);
 
-            return match source.cmp(&destination) {
-                Ordering::Equal => panic!("must not happen"),
-                Ordering::Greater => {
-                    entry
+        return match source.cmp(&destination) {
+            Ordering::Equal => panic!("must not happen"),
+            Ordering::Greater => {
+                if let Some(endpoints) = self.conns.borrow().get(&id) {
+                    endpoints
                         .ping_a_tx
                         .unbounded_send(
                             Box::new([MessagePrefix::StatusMessage as u8, StatusMessage::Ping as u8]) as Box<[u8]>,
                         )
                         .unwrap();
+                } else {
+                    return false;
+                }
 
-                    // A: A->B so we will receive from B
-                    match select(entry.ping_b_rx.next(), timeout).await {
-                        Either::Left((Some(chunk), _)) => {
-                            chunk.len() == 2
-                                && chunk[0] == MessagePrefix::StatusMessage as u8
-                                && chunk[1] == StatusMessage::Pong as u8
-                        }
-                        Either::Left((None, _)) => false,
-                        Either::Right(_) => {
-                            info!("low-level timeout");
-                            false
-                        }
+                // A: A->B so we will receive from B
+                match select(
+                    PollActive {
+                        conns: self.conns.clone(),
+                        source,
+                        destination,
+                    },
+                    timeout,
+                )
+                .await
+                {
+                    Either::Left((Ok(Some(chunk)), _)) => {
+                        chunk.len() == 2
+                            && chunk[0] == MessagePrefix::StatusMessage as u8
+                            && chunk[1] == StatusMessage::Pong as u8
+                    }
+                    Either::Left((Ok(None), _)) => false,
+                    Either::Left((Err(_), _)) => false,
+                    Either::Right(_) => {
+                        info!("low-level timeout");
+                        false
                     }
                 }
-                Ordering::Less => {
-                    entry
+            }
+            Ordering::Less => {
+                if let Some(endpoints) = self.conns.borrow().get(&id) {
+                    endpoints
                         .ping_b_tx
                         .unbounded_send(
                             Box::new([MessagePrefix::StatusMessage as u8, StatusMessage::Ping as u8]) as Box<[u8]>,
                         )
                         .unwrap();
+                } else {
+                    return false;
+                }
 
-                    // B: B->A so we will receive from A
-                    match select(entry.ping_a_rx.next(), timeout).await {
-                        Either::Left((Some(chunk), _)) => {
-                            chunk.len() == 2
-                                && chunk[0] == MessagePrefix::StatusMessage as u8
-                                && chunk[1] == StatusMessage::Pong as u8
-                        }
-                        Either::Left((None, _)) => false,
-                        Either::Right(_) => {
-                            info!("low-level timeout");
-                            false
-                        }
+                // B: B->A so we will receive from A
+                match select(
+                    PollActive {
+                        conns: self.conns.clone(),
+                        source,
+                        destination,
+                    },
+                    timeout,
+                )
+                .await
+                {
+                    Either::Left((Ok(Some(chunk)), _)) => {
+                        chunk.len() == 2
+                            && chunk[0] == MessagePrefix::StatusMessage as u8
+                            && chunk[1] == StatusMessage::Pong as u8
+                    }
+                    Either::Left((Ok(None), _)) => false,
+                    Either::Left((Err(_), _)) => false,
+                    Either::Right(_) => {
+                        info!("low-level timeout");
+                        false
                     }
                 }
-            };
-        }
-
-        false
+            }
+        };
     }
 
     /// Overwrites the duplex stream *to* `source` by the given stream.
@@ -193,7 +234,7 @@ impl<'a, St: DuplexStream + 'static> RelayConnections<St> {
             }
         };
 
-        if let Some(entry) = self.conns.lock().unwrap().get(&id) {
+        if let Some(entry) = self.conns.borrow().get(&id) {
             match source.cmp(&destination) {
                 Ordering::Equal => panic!("must not happen"),
                 Ordering::Greater => entry.new_stream_a.unbounded_send(to_source).unwrap(),
@@ -217,13 +258,13 @@ impl<'a, St: DuplexStream + 'static> RelayConnections<St> {
             }
         };
 
-        self.conns.lock().unwrap().contains_key(&id)
+        self.conns.borrow().contains_key(&id)
     }
 
     /// Gets the number of the currently stored connections.
     /// Can include stale connections.
     pub fn size(&self) -> usize {
-        self.conns.lock().unwrap().len()
+        self.conns.borrow().len()
     }
 
     /// Runs through all currently stored connections, checks if they
