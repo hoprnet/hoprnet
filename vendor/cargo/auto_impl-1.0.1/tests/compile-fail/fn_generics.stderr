@@ -1,0 +1,5 @@
+error: the trait 'Greeter' cannot be implemented for Fn-traits: generic arguments are not allowed
+ --> tests/compile-fail/fn_generics.rs:7:14
+  |
+7 |     fn greet<T: Display>(&self, name: T);
+  |              ^
