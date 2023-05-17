@@ -64,5 +64,8 @@ mkShell {
     source .venv/bin/activate
     pip install -r tests/requirements.txt
     deactivate
+
+    echo "Patching additional binaries"
+    patchelf --interpreter `cat $NIX_CC/nix-support/dynamic-linker` .venv/bin/ruff
   '';
 }
