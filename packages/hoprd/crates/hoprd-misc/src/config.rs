@@ -640,6 +640,7 @@ network:
   allow_private_node_connections: false
   max_parallel_connections: 0
   network_quality_threshold: 0.0
+  no_relay: false
 healthcheck:
   enable: false
   host: 127.0.0.1
