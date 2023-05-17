@@ -211,12 +211,14 @@ impl Sink<Box<[u8]>> for StreamingIterable {
     fn poll_ready(self: Pin<&mut StreamingIterable>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         let this = self.project();
 
+        info!("borrow_mut store waker");
         this.clone_stuff.borrow_mut().waker.insert(cx.waker().clone());
 
         if *this.sink_done {
             return Poll::Ready(Err("Cannot send any data. Stream has been closed".into()));
         }
 
+        info!("borrow_mut check if resolve is present");
         if this.clone_stuff.borrow().resolve.is_some() {
             return Poll::Ready(Ok(()));
         }
@@ -226,6 +228,7 @@ impl Sink<Box<[u8]>> for StreamingIterable {
                 let self_clone = Rc::clone(this.clone_stuff);
                 Closure::<dyn Fn() -> Promise>::new(move || {
                     Promise::new(&mut |resolve, _reject| {
+                        info!("borrow_mut inside cb");
                         let mut clone = self_clone.borrow_mut();
 
                         clone.resolve = Some(resolve);
@@ -303,6 +306,7 @@ impl Sink<Box<[u8]>> for StreamingIterable {
         let this = self.project();
 
         let resolve = {
+            info!("borrow_mut take resolve");
             match this.clone_stuff.borrow_mut().resolve.take() {
                 Some(f) => f,
                 None => return Err("Sink is not yet ready. Please call and `await` poll_ready first".into()),
@@ -325,10 +329,12 @@ impl Sink<Box<[u8]>> for StreamingIterable {
             return Poll::Ready(Err("Uninitialized. Please call and `await` poll_ready first.".into()));
         }
 
+        info!("borrow_mut insert close_waker");
         this.clone_stuff.borrow_mut().close_waker.insert(cx.waker().clone());
 
         if !*this.sink_done {
             let resolve = {
+                info!("borrow_mut take resolve close");
                 match this.clone_stuff.borrow_mut().resolve.take() {
                     Some(f) => f,
                     None => return Poll::Pending,
