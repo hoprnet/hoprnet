@@ -122,7 +122,6 @@ pub struct CliArgs {
 
     #[arg(
         long,
-        default_value_t = false,
         env = "HOPRD_API",
         help = format!("Expose the API on {}:{}", DEFAULT_API_HOST, DEFAULT_API_PORT),
         action = ArgAction::SetTrue,
@@ -349,10 +348,9 @@ pub struct CliArgs {
         long = "noRelay",
         help = "disable NAT relay functionality entirely",
         env = "HOPRD_NO_RELAY",
-        default_value_t = false,
         action = ArgAction::SetTrue,
     )]
-    pub no_relay: bool,
+    pub no_relay: Option<bool>,
 
     #[arg(
         long = "testLocalModeStun",

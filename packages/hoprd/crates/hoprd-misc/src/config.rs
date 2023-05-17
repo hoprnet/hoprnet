@@ -162,6 +162,7 @@ pub struct Network {
     pub allow_private_node_connections: bool,
     pub max_parallel_connections: u32,
     pub network_quality_threshold: f32,
+    pub no_relay: bool,
 }
 
 impl Default for Network {
@@ -172,6 +173,7 @@ impl Default for Network {
             allow_private_node_connections: false,
             max_parallel_connections: DEFAULT_MAX_PARALLEL_CONNECTIONS,
             network_quality_threshold: DEFAULT_NETWORK_QUALITY_THRESHOLD,
+            no_relay: false,
         }
     }
 }
