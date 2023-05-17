@@ -11,45 +11,67 @@ use crate::errors::CryptoError::{CalculationError, InvalidSecretScalar};
 use hkdf::SimpleHkdf;
 use libp2p_identity::PeerId;
 use rand::rngs::OsRng;
-use utils_types::traits::{BinarySerializable, PeerIdLike};
+use utils_types::traits::PeerIdLike;
 
 use crate::errors::Result;
 use crate::parameters::SECRET_KEY_LENGTH;
-use crate::types::{CurvePoint, PublicKey};
+use crate::types::{CurvePoint, PublicKey, SecretKey};
 
-pub type SecretKey = [u8; SECRET_KEY_LENGTH];
-
+/// Types representing a valid non-unit exponent for a multiplicative abelian group
+/// or a valid non-zero scalar for an additive abelian group.
 pub trait Exponent: Mul<Output = Self> + Sized {
+    /// Type used to represent this type externally for public APIs
     type Repr: From<SecretKey>;
+
+    /// Converts the exponent from its external representation.
     fn from_repr(repr: Self::Repr) -> Result<Self>;
+
+    /// Converts the exponent to its external representation.
     fn to_repr(&self) -> Self::Repr;
+
+    /// Generates a random exponent using a cryptographically secure RNG.
     fn random(rng: &mut (impl CryptoRng + RngCore)) -> Self;
 }
 
-pub trait GroupElement<'a, E: Exponent>: Clone {
-    type Repr: BinarySerializable<'a> + Clone ;
+/// Trait a representable group element needs to implement in order
+/// to be encodable. The encoding should be space-efficient.
+pub trait GroupEncoding {
+    /// Encodes the group element representation. Encoding should be space efficient.
+    fn encode(&self) -> Box<[u8]>;
+}
 
+/// Generic abelian group element with an associated exponent type.
+/// A group element is considered valid if it is not a neutral or a torsion element of small order.
+pub trait GroupElement<E: Exponent>: Clone {
+    /// Type used to represent the valid elements of this group.
+    type Repr: GroupEncoding + Clone + PeerIdLike;
+
+    /// Represents a valid group element. Panics if the element is not valid.
     fn to_repr(&self) -> Self::Repr;
 
+    /// Creates a group element from a representation.
     fn from_repr(repr: Self::Repr) -> Result<Self>;
 
-    fn from_public_key(public_key: &PublicKey) -> Self;
-
+    /// Create a group element using the group generator and the given exponent
     fn generate(exponent: &E) -> Self;
 
-    fn mul(&self, exponent: &E) -> Self;
+    /// Performs the group law given number of times
+    /// (i.e exponentiation in multiplicative groups, multiplication in additive groups)
+    fn group_law(&self, exponent: &E) -> Self;
 
+    /// Group element is considered valid if it is not a neutral element (0 in additive group or
+    /// 1 in multiplicative groups) and also not a torsion element of small order.
     fn is_valid(&self) -> bool;
 
     /// Extract a keying material from a group element using HKDF extract
     fn extract_key(&self, salt: &[u8]) -> SecretKey {
-        SimpleHkdf::<Blake2s256>::extract(Some(salt), &self.to_repr().to_bytes()).0.into()
+        SimpleHkdf::<Blake2s256>::extract(Some(salt), &self.to_repr().encode()).0.into()
     }
 
-    /// Performs KDF expansion from the given EC point using HKDF expand
+    /// Performs KDF expansion from the given group element using HKDF expand
     fn expand_key(&self, salt: &[u8]) -> SecretKey {
         let mut out = [0u8; SECRET_KEY_LENGTH];
-        SimpleHkdf::<Blake2s256>::new(Some(salt), &self.to_repr().to_bytes())
+        SimpleHkdf::<Blake2s256>::new(Some(salt), &self.to_repr().encode())
             .expand(b"", &mut out)
             .unwrap(); // Cannot panic, unless the constants are wrong
 
@@ -57,68 +79,21 @@ pub trait GroupElement<'a, E: Exponent>: Clone {
     }
 }
 
-impl Exponent for NonZeroScalar {
-    type Repr = [u8; 32];
-
-    fn from_repr(repr: Self::Repr) -> Result<Self> {
-        NonZeroScalar::try_from(repr.as_slice()).map_err(|_| InvalidSecretScalar)
-    }
-
-    fn to_repr(&self) -> Self::Repr {
-        let mut ret = [0u8; 32];
-        ret.copy_from_slice(self.to_bytes().as_slice());
-        ret
-    }
-
-    fn random(rng: &mut (impl CryptoRng + RngCore)) -> Self {
-        NonZeroScalar::random(rng)
-    }
-}
-
-impl GroupElement<'_, NonZeroScalar> for ProjectivePoint {
-    type Repr = CurvePoint;
-
-    fn to_repr(&self) -> Self::Repr {
-        CurvePoint::from_affine(self.to_affine())
-    }
-
-    fn from_repr(repr: Self::Repr) -> Result<Self> {
-        Ok(repr.to_projective_point())
-    }
-
-    fn from_public_key(public_key: &PublicKey) -> Self {
-        CurvePoint::from(public_key).to_projective_point()
-    }
-
-    fn generate(exponent: &NonZeroScalar) -> Self {
-        ProjectivePoint::GENERATOR * exponent.as_ref()
-    }
-
-    fn mul(&self, exponent: &NonZeroScalar) -> Self {
-        Mul::mul(self, exponent.as_ref())
-    }
-
-    fn is_valid(&self) -> bool {
-        self.is_identity().unwrap_u8() == 0
-    }
-}
-
-/// Structure containing shared keys for peers.
-/// The members are exposed only using specialized methods.
-pub struct SharedKeys<'a, E: Exponent, G: GroupElement<'a, E>> {
+/// Structure containing shared keys for peers using the Sphinx algorithm.
+pub struct SharedKeys<E: Exponent, G: GroupElement<E>> {
     pub alpha: G::Repr,
     pub secrets: Vec<SecretKey>,
     exponent_type: PhantomData<E>
 }
 
-impl <'a, E: Exponent, G: GroupElement<'a, E>> SharedKeys<'a, E, G> {
+impl <E: Exponent, G: GroupElement<E>> SharedKeys<E, G> {
     /// Generates shared secrets for the given path of peers.
     pub fn new(path: &[&PeerId]) -> Result<Self> {
         Self::generate(
             &mut OsRng,
-            &path
+            path
                 .iter()
-                .map(|peer_id| PublicKey::from_peerid(peer_id))
+                .map(|peer_id| G::Repr::from_peerid(peer_id))
                 .collect::<utils_types::errors::Result<Vec<_>>>()?,
         )
     }
@@ -126,36 +101,38 @@ impl <'a, E: Exponent, G: GroupElement<'a, E>> SharedKeys<'a, E, G> {
     /// Generates shared secrets given the peer public keys array.
     /// The order of the peer public keys is preserved for resulting shared keys.
     /// The specified random number generator will be used.
-    pub fn generate(rng: &mut (impl CryptoRng + RngCore), peer_public_keys: &[PublicKey]) -> Result<SharedKeys<'a, E, G>> {
+    pub fn generate(rng: &mut (impl CryptoRng + RngCore), peer_public_keys: Vec<G::Repr>) -> Result<SharedKeys<E, G>> {
         let mut shared_keys = Vec::new();
 
         // This becomes: x * b_0 * b_1 * b_2 * ...
         let mut coeff_prev = E::random(rng);
 
         // This becomes: x * b_0 * b_1 * b_2 * ... * G
-        // We remain in projective coordinates to save some cycles
         let mut alpha_prev = G::generate(&coeff_prev);
         let alpha = alpha_prev.to_repr();
 
         // Iterate through all the given peer public keys
-        for (i, group_elem) in peer_public_keys.iter().map(G::from_public_key).enumerate() {
+        let keys_len = peer_public_keys.len();
+        for (i, ge) in peer_public_keys.into_iter().enumerate() {
+            let group_element = G::from_repr(ge)?;
+
             // Try to decode the given public key point & multiply by the current coefficient
-            let shared_secret = group_elem.mul(&coeff_prev);
+            let shared_secret = group_element.group_law(&coeff_prev);
 
             // Extract the shared secret from the computed EC point and copy it into the shared keys structure
-            shared_keys.push(shared_secret.extract_key(&group_elem.to_repr().to_bytes()));
+            shared_keys.push(shared_secret.extract_key(&group_element.to_repr().encode()));
 
             // Stop here, we don't need to compute anything more
-            if i == peer_public_keys.len() - 1 {
+            if i == keys_len - 1 {
                 break;
             }
 
             // Compute the new blinding factor b_k (alpha needs compressing first)
-            let b_k = shared_secret.expand_key(&alpha_prev.to_repr().to_bytes());
+            let b_k = shared_secret.expand_key(&alpha_prev.to_repr().encode());
             let b_k_checked = E::from_repr(b_k.into())?;
 
             // Update coeff prev and alpha
-            alpha_prev = alpha_prev.mul(&b_k_checked);
+            alpha_prev = alpha_prev.group_law(&b_k_checked);
             coeff_prev = coeff_prev.mul(b_k_checked);
 
             if !alpha_prev.is_valid() {
@@ -176,20 +153,72 @@ impl <'a, E: Exponent, G: GroupElement<'a, E>> SharedKeys<'a, E, G> {
         let public_key = G::generate(&private_scalar);
         let alpha_point = G::from_repr(alpha)?;
 
-        let s_k = alpha_point.mul(&private_scalar);
-        let secret = s_k.extract_key(&public_key.to_repr().to_bytes());
+        let s_k = alpha_point.group_law(&private_scalar);
+        let secret = s_k.extract_key(&public_key.to_repr().encode());
 
-        let b_k = s_k.expand_key(&alpha_point.to_repr().to_bytes());
+        let b_k = s_k.expand_key(&alpha_point.to_repr().encode());
         let b_k_checked = E::from_repr(b_k.into())?;
 
-        let alpha_new = alpha_point.mul(&b_k_checked);
+        let alpha_new = alpha_point.group_law(&b_k_checked);
 
         Ok((alpha_new.to_repr(), secret))
     }
 
 }
 
-pub type Secp256k1SharedKeys<'a> = SharedKeys<'a, NonZeroScalar, ProjectivePoint>;
+/// Instantiation of Sphinx shared keys generation using Secp256k1 group
+pub type Secp256k1SharedKeys = SharedKeys<NonZeroScalar, ProjectivePoint>;
+
+/// Non-zero scalars in the underlying field for Secp256k1
+impl Exponent for NonZeroScalar {
+    type Repr = [u8; 32];
+
+    fn from_repr(repr: Self::Repr) -> Result<Self> {
+        NonZeroScalar::try_from(repr.as_slice()).map_err(|_| InvalidSecretScalar)
+    }
+
+    fn to_repr(&self) -> Self::Repr {
+        let mut ret = [0u8; 32];
+        ret.copy_from_slice(self.to_bytes().as_slice());
+        ret
+    }
+
+    fn random(rng: &mut (impl CryptoRng + RngCore)) -> Self {
+        NonZeroScalar::random(rng)
+    }
+}
+
+impl GroupEncoding for PublicKey {
+    fn encode(&self) -> Box<[u8]> {
+        self.to_bytes(true)
+    }
+}
+
+/// Secp256k1 additive group (via projective coordinates) represented as public keys
+impl GroupElement<NonZeroScalar> for ProjectivePoint {
+    type Repr = PublicKey;
+
+    fn to_repr(&self) -> Self::Repr {
+        PublicKey::try_from(CurvePoint::from_affine(self.to_affine()))
+            .expect("group element does not represent a valid public key")
+    }
+
+    fn from_repr(repr: Self::Repr) -> Result<Self> {
+        Ok(CurvePoint::from(repr).to_projective_point())
+    }
+
+    fn generate(exponent: &NonZeroScalar) -> Self {
+        ProjectivePoint::GENERATOR * exponent.as_ref()
+    }
+
+    fn group_law(&self, exponent: &NonZeroScalar) -> Self {
+        Mul::mul(self, exponent.as_ref())
+    }
+
+    fn is_valid(&self) -> bool {
+        self.is_identity().unwrap_u8() == 0
+    }
+}
 
 /// Unit tests of the Rust code
 #[cfg(test)]
@@ -206,7 +235,7 @@ pub mod tests {
         let key = pt.extract_key(&salt);
         assert_eq!(SECRET_KEY_LENGTH, key.len());
 
-        let res = hex!("9e286c3d45fbbe22e570d96ffe83987960a75b4dbe3d3a74b52c96125323ee9a");
+        let res = hex!("54bf34178075e153f481ce05b113c1530ecc45a2f1f13a3366d4389f65470de6");
         assert_eq!(res, key.as_ref());
     }
 
@@ -218,38 +247,28 @@ pub mod tests {
         let key = pt.expand_key(&salt);
         assert_eq!(SECRET_KEY_LENGTH, key.len());
 
-        let res = hex!("cc3caa95b5caa141bbdecfbcc18e7f9ae9492ba02b4a5b5d3261f14157b125ec");
+        let res = hex!("d138d9367474911f7124b95be844d2f8a6d34e962694e37e8717bdbd3c15690b");
         assert_eq!(res, key.as_ref());
     }
 
-    pub fn generate_random_keypairs<'a, E: Exponent, G: GroupElement<'a, E>>(count: usize) -> (Vec<E::Repr>, Vec<PublicKey>) {
+    pub fn generate_random_keypairs<E: Exponent, G: GroupElement<E>>(count: usize) -> (Vec<E::Repr>, Vec<G::Repr>) {
         (0..count)
             .map(|_| E::random(&mut OsRng))
-            .map(|s|
-                (
-                    s.to_repr(),
-                    PublicKey::from_bytes(&G::generate(&s).to_repr().to_bytes()).unwrap()
-                )
-            )
+            .map(|s| (s.to_repr(), G::generate(&s).to_repr()))
             .unzip()
     }
 
-    fn generic_test_shared_keys<'a, E: Exponent, G: GroupElement<'a, E>>() {
-        // DummyRng is useful for deterministic debugging
-        //let mut used_rng = crate::dummy_rng::DummyFixedRng::new();
-
+    pub fn generic_test_shared_keys<E: Exponent, G: GroupElement<E>>() {
         const COUNT_KEYPAIRS: usize = 3;
-        let mut used_rng = OsRng;
-
-        // Generate some random key pairs
-        let (priv_keys, pub_keys) = generate_random_keypairs::<'a, E, G>(COUNT_KEYPAIRS);
+        let (priv_keys, pub_keys) = generate_random_keypairs::<E, G>(COUNT_KEYPAIRS);
 
         // Now generate the key shares for the public keys
-        let generated_shares = SharedKeys::<'a, E, G>::generate(&mut used_rng, &pub_keys).unwrap();
+        let generated_shares = SharedKeys::<E, G>::generate(&mut OsRng, pub_keys).unwrap();
+        assert_eq!(COUNT_KEYPAIRS, generated_shares.secrets.len());
 
         let mut alpha_cpy = generated_shares.alpha.clone();
         for (i, priv_key) in priv_keys.into_iter().enumerate() {
-            let (alpha, secret) = SharedKeys::<'a, E, G>::forward_transform(alpha_cpy, priv_key).unwrap();
+            let (alpha, secret) = SharedKeys::<E, G>::forward_transform(alpha_cpy, priv_key).unwrap();
 
             assert_eq!(secret.as_ref(), generated_shares.secrets[i]);
 
@@ -259,24 +278,9 @@ pub mod tests {
 
     #[test]
     fn test_secp256k1_shared_keys() {
-        generic_test_shared_keys::<'_, NonZeroScalar, ProjectivePoint>()
+        generic_test_shared_keys::<NonZeroScalar, ProjectivePoint>()
     }
 
-    #[test]
-    fn test_key_shares() {
-        let pub_keys = [
-            hex!("0253f6e72ad23de294466b830619448d6d9059a42050141cd83bac4e3ee82c3f1e"),
-            hex!("035fc5660f59059c263d3946d7abaf33fa88181e27bf298fcc5a9fa493bec9110b"),
-            hex!("038d2b50a77fd43eeae9b37856358c7f1aee773b3e3c9d26f30b8706c02cbbfbb6"),
-        ]
-        .into_iter()
-        .map(|p| PublicKey::from_bytes(&p))
-        .collect::<utils_types::errors::Result<Vec<_>>>()
-        .unwrap();
-
-        let keyshares = Secp256k1SharedKeys::generate(&mut OsRng, &pub_keys).unwrap();
-        assert_eq!(3, keyshares.secrets.len());
-    }
 }
 
 

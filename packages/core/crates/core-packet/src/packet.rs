@@ -115,7 +115,7 @@ impl MetaPacket {
         }
 
         MetaPacket::new_from_parts(
-            &shared_keys.alpha,
+            &shared_keys.alpha.into(),
             &routing_info.routing_information,
             &routing_info.mac,
             &padded,
@@ -184,7 +184,7 @@ impl MetaPacket {
         additional_data_last_hop_len: usize,
     ) -> Result<ForwardedMetaPacket> {
         let (alpha, secret) = Secp256k1SharedKeys::forward_transform(
-            CurvePoint::from_bytes(self.alpha())?,
+            PublicKey::from_bytes(self.alpha())?,
             private_key.try_into().expect("invalid packet private key")
         )?;
 
@@ -208,7 +208,7 @@ impl MetaPacket {
                 next_node,
                 additional_info,
             } => Ok(RelayedPacket {
-                packet: MetaPacket::new_from_parts(&alpha, &header, &mac, &decrypted),
+                packet: MetaPacket::new_from_parts(&alpha.into(), &header, &mac, &decrypted),
                 packet_tag: derive_packet_tag(&secret)?,
                 derived_secret: secret.into(),
                 next_node,

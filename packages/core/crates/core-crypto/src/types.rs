@@ -5,8 +5,8 @@ use k256::ecdsa::{RecoveryId, Signature as ECDSASignature, SigningKey, Verifying
 use k256::elliptic_curve::generic_array::GenericArray;
 use k256::elliptic_curve::sec1::{FromEncodedPoint, ToEncodedPoint};
 use k256::elliptic_curve::CurveArithmetic;
-use k256::{ecdsa, elliptic_curve, AffinePoint, Secp256k1};
-use libp2p_identity::{secp256k1::PublicKey as lp2p_k256_PublicKey, PeerId, PublicKey as lp2p_PublicKey};
+use k256::{AffinePoint, ecdsa, elliptic_curve, Secp256k1};
+use libp2p_identity::{PeerId, PublicKey as lp2p_PublicKey, secp256k1::PublicKey as lp2p_k256_PublicKey};
 use serde::{Deserialize, Serialize};
 use std::ops::Add;
 use std::str::FromStr;
@@ -20,8 +20,12 @@ use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
 
 use crate::errors::CryptoError::InvalidInputValue;
 use crate::errors::{CryptoError, CryptoError::CalculationError, Result};
+use crate::parameters::SECRET_KEY_LENGTH;
 use crate::primitives::{DigestLike, EthDigest};
 use crate::random::random_group_element;
+
+/// Represents a secret key of fixed length
+pub type SecretKey = [u8; SECRET_KEY_LENGTH];
 
 /// Extend support for arbitrary array sizes in serde
 ///
@@ -32,8 +36,8 @@ mod arrays {
 
     use serde::{
         de::{SeqAccess, Visitor},
-        ser::SerializeTuple,
-        Deserialize, Deserializer, Serialize, Serializer,
+        Deserialize,
+        Deserializer, ser::SerializeTuple, Serialize, Serializer,
     };
     pub fn serialize<S: Serializer, T: Serialize, const N: usize>(data: &[T; N], ser: S) -> Result<S::Ok, S::Error> {
         let mut s = ser.serialize_tuple(N)?;

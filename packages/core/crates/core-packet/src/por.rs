@@ -1,7 +1,7 @@
 use core_crypto::derivation::{derive_ack_key_share, derive_own_key_share};
 use core_crypto::parameters::SECRET_KEY_LENGTH;
 use core_crypto::random::random_bytes;
-use core_crypto::shared_keys::SecretKey;
+use core_crypto::types::SecretKey;
 use core_crypto::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, PublicKey, Response};
 use utils_types::errors::GeneralError::ParseError;
 use utils_types::primitives::EthereumChallenge;

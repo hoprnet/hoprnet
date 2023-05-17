@@ -347,7 +347,7 @@ pub mod tests {
 
         let pub_keys = (0..amount).into_iter().map(|_| PublicKey::random()).collect::<Vec<_>>();
 
-        let shares = SharedKeys::<NonZeroScalar, ProjectivePoint>::generate(&mut OsRng, &pub_keys).unwrap();
+        let shares = SharedKeys::<NonZeroScalar, ProjectivePoint>::generate(&mut OsRng, pub_keys.clone()).unwrap();
 
         let rinfo = RoutingInfo::new(
             MAX_HOPS,
