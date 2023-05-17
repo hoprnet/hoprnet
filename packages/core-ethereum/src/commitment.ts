@@ -5,9 +5,13 @@
 // We need to persist this string of commitments in the database, and support
 // syncing back and forth with those that have been persisted on chain.
 import { debug, Hash, HoprDB, toU8a, u8aConcat, U256, recoverIteratedHash, iterateHash } from '@hoprnet/hopr-utils'
-import { derive_commitment_seed } from '@hoprnet/hopr-core/lib/core_crypto.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { keysPBM } from '@libp2p/crypto/keys'
+
+// NOTE: Workaround until also this file is converted to Rust
+// Reason being that all cryptography is now in core-crypto, and core-ethereum cannot depend
+// on core (would be a circular dependency)
+import { derive_commitment_seed } from '../../core/lib/core_crypto.js'
 
 const log = debug('hopr-core-ethereum:commitment')
 

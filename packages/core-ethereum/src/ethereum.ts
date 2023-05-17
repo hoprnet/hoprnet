@@ -90,7 +90,7 @@ export async function createChainWrapper(
   const publicKey = PublicKey.from_privkey(privateKey)
   log(`[DEBUG] publicKey ${publicKey}`)
   const address = publicKey.to_address()
-  log(`[DEBUG] address ${address}`)
+  log(`[DEBUG] address ${address.to_string()}`)
   const providerChainId = (await provider.getNetwork()).chainId
   log(`[DEBUG] providerChainId ${providerChainId}`)
 
@@ -446,7 +446,7 @@ export async function createChainWrapper(
         0,
         channels,
         'announce',
-        publicKey.to_hex(true),
+        publicKey.to_hex(false),
         multiaddr.bytes
       )
       sendResult = await sendTransaction(checkDuplicate, confirmationEssentialTxPayload, txHandler)
