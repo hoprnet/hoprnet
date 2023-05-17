@@ -24,20 +24,6 @@ usage() {
   msg
 }
 
-cleanup() {
-  # Remove lock files due to conflicts with workspaces
-  rm -f \
-    "${mydir}/../packages/hoprd/npm-shrinkwrap.json"
-
-  # Don't commit changed package.json files as package resolutions are
-  # supposed to interfer with workspaces according to https://yarnpkg.com/configuration/manifest#resolutions
-  git restore packages/hoprd/package.json
-
-  # delete default environments
-  rm -f \
-    "${mydir}/../packages/hoprd/default-environment.json"
-}
-
 # return early with help info when requested
 { [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; } && { usage; exit 0; }
 
@@ -53,9 +39,12 @@ if [ ! "${version_type}" = "patch" ] &&
   exit 1
 fi
 
-# define packages
+# define packages for versioning
 # does not include ethereum, which isn't a real package anymore, just a folder
 declare -a versioned_packages=( utils connect core-ethereum core real hoprd )
+
+# define packages for publishing
+declare -a published_packages=( utils real )
 
 # ensure local copy is up-to-date with origin
 branch=$(git rev-parse --abbrev-ref HEAD)
@@ -77,11 +66,6 @@ if [[ "${version_type}" = "prerelease" && "${branch}" != "staging/"* ]]; then
     version_type="preminor"
   fi
 fi
-
-log "get default environment id"
-
-declare environment_id
-environment_id="$("${mydir}/get-default-environment.sh")"
 
 log "using version template ${current_version} + ${version_type}"
 declare new_version
@@ -119,30 +103,14 @@ if [ "${CI:-}" = "true" ] && [ -z "${ACT:-}" ]; then
   fi
 
   # pack and publish packages
-  yarn workspaces foreach -piv --topological-dev \
-    --exclude hoprnet --exclude @hoprnet/hopr-docs \
-    --exclude @hoprnet/hoprd \
-    npm publish --access public
+  for p in "${published_packages[@]}"; do
+    yarn workspace @hoprnet/hopr-${p} \
+      npm publish --access public
+  done
 
-  for p in "${versioned_packages[@]}"; do
+  for p in "${published_packages[@]}"; do
     if [ "${p}" != "hoprd" ]; then
       "${mydir}/wait-for-npm-package.sh" "${p}"
     fi
   done
-
-  trap cleanup SIGINT SIGTERM ERR
-
-  # set default environments
-  log "adding default environment ${environment_id} to hoprd package"
-  echo "{\"id\": \"${environment_id}\"}" > "${mydir}/../packages/hoprd/default-environment.json"
-
-  # special treatment for end-of-chain packages
-  # to create lockfiles with resolution overrides
-  "${mydir}/build-lockfiles.sh" hoprd
-
-  # publish hoprd and wait until its available on npm
-  yarn workspace @hoprnet/hoprd npm publish --access public
-  "${mydir}/wait-for-npm-package.sh" hoprd
-
-  cleanup
 fi
