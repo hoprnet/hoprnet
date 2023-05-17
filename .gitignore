@@ -3,6 +3,7 @@
 /.bin
 /build
 **/target
+!/vendor/**/*
 **/.idea
 **/gha-creds-*.json
 
@@ -43,7 +44,6 @@ logs.txt
 /.cargo/.crates2.json
 
 # make sure anything which is vendored is copied
-!/vendor/**/*.log
 
 # ignore local secret env file
 /.secrets
