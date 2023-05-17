@@ -103,7 +103,8 @@ function generateNodeOptions(cfg: HoprdConfig, environment: ResolvedEnvironment)
     },
     password: cfg.identity.password,
     strategy,
-    forceCreateDB: cfg.db.force_initialize
+    forceCreateDB: cfg.db.force_initialize,
+    noRelay: cfg.network.no_relay
   }
 
   if (isStrategy(cfg.strategy.name)) {

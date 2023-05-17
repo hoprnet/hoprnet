@@ -8,6 +8,7 @@
 - Extend hopli so it can derive peer ID from identity files. Add `initiate-node` to perform all the necessary on-chain operations before launching a HOPR node. Accept identity from path. ([#4894](https://github.com/hoprnet/hoprnet/pull/4894))
 - Introduce new types & optimize cryptographic code ([#4974](https://github.com/hoprnet/hoprnet/pull/4974))
 - Create DB functionality shim in Rust ([#4885](https://github.com/hoprnet/hoprnet/pull/4885))
+- Migrate interface for using the DB in core packet processing ([#5025](https://github.com/hoprnet/hoprnet/pull/5025))
 
 <a name="1.93"></a>
 
@@ -34,6 +35,11 @@
 - Wipe libp2p's AddressManager cache when publishing new addresses to the DHT ([#4958](https://github.com/hoprnet/hoprnet/pull/4958))
 - Add metrics & logs relevant for RPCh debugging ([#4995](https://github.com/hoprnet/hoprnet/pull/4995))
 - Enhance debug logs in dialing logic to enhance debugging ([#5004](https://github.com/hoprnet/hoprnet/pull/5004))
+- Fix address coercion issue in libp2p address handling ([#5020](https://github.com/hoprnet/hoprnet/pull/5020))
+- Ensure public relay nodes don't create relay connections ([#5023](https://github.com/hoprnet/hoprnet/pull/5023))
+- Add heartbeat and cleanup to API websocket connections ([#5023](https://github.com/hoprnet/hoprnet/pull/5023))
+- Add send message over websocket support ([#4882](https://github.com/hoprnet/hoprnet/pull/4882))
+- Increase Avado memory limit to 2GB ([#5051](https://github.com/hoprnet/hoprnet/pull/5051))
 
 <a name="1.92"></a>
 

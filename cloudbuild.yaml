@@ -80,8 +80,10 @@ steps:
       - --cache-ttl=96h
       - --build-arg=ANVIL_IMAGE=gcr.io/${PROJECT_ID}/hopr-anvil:${_IMAGE_VERSION}
       - --build-arg=HOPRD_IMAGE=gcr.io/${PROJECT_ID}/hoprd:${_IMAGE_VERSION}
+      - --build-arg=HOPLI_IMAGE=gcr.io/${PROJECT_ID}/hopli:${_IMAGE_VERSION}
     timeout: 1200s
     waitFor:
+      - buildHopli
       - buildHoprd
       - buildAnvil
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -90,7 +92,7 @@ steps:
       #!/usr/bin/env bash
       set -Eeuo pipefail
       [ "${NO_TAGS}" = "true" ] && { exit 0; }
-      for image in hoprd hoprd-nat hopr-anvil hopr-pluto; do
+      for image in hoprd hoprd-nat hopr-anvil hopr-pluto hopli; do
         full_image="gcr.io/${PROJECT_ID}/${image}"
         gcloud container images add-tag ${full_image}:${IMAGE_VERSION} ${full_image}:${PACKAGE_VERSION}
         for release in ${RELEASES}; do
