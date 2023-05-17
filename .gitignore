@@ -3,9 +3,11 @@
 /.bin
 /build
 **/target
-!/vendor/**/*
 **/.idea
 **/gha-creds-*.json
+
+# make sure anything which is vendored is copied
+!/vendor/**/*
 
 # Exclude databases resulting from local execution of hoprd
 /db
@@ -43,7 +45,6 @@ logs.txt
 /.cargo/.crates.toml
 /.cargo/.crates2.json
 
-# make sure anything which is vendored is copied
 
 # ignore local secret env file
 /.secrets
