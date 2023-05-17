@@ -511,7 +511,7 @@ impl PublicKey {
     /// Serializes the public key to a binary form and converts it to hexadecimal string representation.
     pub fn to_hex(&self, compressed: bool) -> String {
         let offset = if compressed { 0 } else { 1 };
-        hex::encode(&self.to_bytes(compressed)[offset..])
+        format!("0x{}", hex::encode(&self.to_bytes(compressed)[offset..]))
     }
 }
 
@@ -969,10 +969,10 @@ pub mod tests {
         ))
         .unwrap();
 
-        assert_eq!("39d1bc2291826eaed86567d225cf243ebc637275e0a5aedb0d6b1dc82136a38e428804340d4c949a029846f682711d046920b4ca8b8ebeb9d1192b5bdaa54dba",
+        assert_eq!("0x39d1bc2291826eaed86567d225cf243ebc637275e0a5aedb0d6b1dc82136a38e428804340d4c949a029846f682711d046920b4ca8b8ebeb9d1192b5bdaa54dba",
                    pk.to_hex(false));
         assert_eq!(
-            "0239d1bc2291826eaed86567d225cf243ebc637275e0a5aedb0d6b1dc82136a38e",
+            "0x0239d1bc2291826eaed86567d225cf243ebc637275e0a5aedb0d6b1dc82136a38e",
             pk.to_hex(true)
         );
     }

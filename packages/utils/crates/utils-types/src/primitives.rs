@@ -68,7 +68,7 @@ impl BinarySerializable<'_> for Address {
 impl Address {
     // impl std::str::FromStr for Address {
     pub fn from_str(value: &str) -> Result<Address> {
-        let decoded = if value.starts_with("0x") {
+        let decoded = if value.starts_with("0x") || value.starts_with("0X") {
             hex::decode(&value[2..])
         } else {
             hex::decode(value)
