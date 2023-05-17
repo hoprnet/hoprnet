@@ -446,7 +446,7 @@ export async function createChainWrapper(
         0,
         channels,
         'announce',
-        publicKey.to_hex(true),
+        '0x' + publicKey.to_hex(true),
         multiaddr.bytes
       )
       sendResult = await sendTransaction(checkDuplicate, confirmationEssentialTxPayload, txHandler)
@@ -869,7 +869,7 @@ export async function createChainWrapper(
     getToken: () => token,
     getNetworkRegistry: () => networkRegistry,
     getPrivateKey: () => privateKey,
-    getPublicKey: () => publicKey,
+    getPublicKey: () => publicKey.clone(),
     getInfo: () => ({
       network: networkInfo.network,
       hoprTokenAddress: deploymentExtract.hoprTokenAddress,
