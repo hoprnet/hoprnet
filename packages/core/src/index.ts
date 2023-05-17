@@ -177,6 +177,8 @@ export type HoprOptions = {
   onChainConfirmations?: number
   checkUnrealizedBalance?: boolean
   maxParallelConnections?: number
+  // disable NAT relay functionality
+  noRelay?: boolean
   testing?: {
     // when true, assume that the node is running in an isolated network and does
     // not need any connection to nodes outside of the subnet
@@ -977,8 +979,14 @@ class Hopr extends EventEmitter {
    * @param destination PeerId of the destination
    * @param intermediatePath optional set path manually
    * @param hops optional number of required intermediate nodes
+   * @returns hex representation of ack challenge
    */
-  public async sendMessage(msg: Uint8Array, destination: PeerId, intermediatePath?: PublicKey[], hops?: number) {
+  public async sendMessage(
+    msg: Uint8Array,
+    destination: PeerId,
+    intermediatePath?: PublicKey[],
+    hops?: number
+  ): Promise<string> {
     if (this.status != 'RUNNING') {
       metric_sentMessageFailCount.increment()
       throw new Error('Cannot send message until the node is running')
