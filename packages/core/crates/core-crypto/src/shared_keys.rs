@@ -17,19 +17,18 @@ use crate::errors::Result;
 use crate::parameters::SECRET_KEY_LENGTH;
 use crate::types::{CurvePoint, PublicKey, SecretKey};
 
-/// Types representing a valid non-unit exponent for a multiplicative abelian group
-/// or a valid non-zero scalar for an additive abelian group.
-pub trait Exponent: Mul<Output = Self> + Sized {
-    /// Type used to represent this type externally for public APIs
+/// Types representing a valid non-zero scalar an additive abelian group.
+pub trait Scalar: Mul<Output = Self> + Sized {
+    /// Type used to represent this type externally.
     type Repr: From<SecretKey>;
 
-    /// Converts the exponent from its external representation.
+    /// Converts the scalar from its external representation.
     fn from_repr(repr: Self::Repr) -> Result<Self>;
 
-    /// Converts the exponent to its external representation.
+    /// Converts the scalar to its external representation.
     fn to_repr(&self) -> Self::Repr;
 
-    /// Generates a random exponent using a cryptographically secure RNG.
+    /// Generates a random scalar using a cryptographically secure RNG.
     fn random(rng: &mut (impl CryptoRng + RngCore)) -> Self;
 }
 
@@ -40,9 +39,9 @@ pub trait GroupEncoding {
     fn encode(&self) -> Box<[u8]>;
 }
 
-/// Generic abelian group element with an associated exponent type.
-/// A group element is considered valid if it is not a neutral or a torsion element of small order.
-pub trait GroupElement<E: Exponent>: Clone {
+/// Generic additive abelian group element with an associated scalar type.
+/// A group element is considered valid if it is not neutral or a torsion element of small order.
+pub trait GroupElement<E: Scalar>: Clone {
     /// Type used to represent the valid elements of this group.
     type Repr: GroupEncoding + Clone + PeerIdLike;
 
@@ -52,15 +51,13 @@ pub trait GroupElement<E: Exponent>: Clone {
     /// Creates a group element from a representation.
     fn from_repr(repr: Self::Repr) -> Result<Self>;
 
-    /// Create a group element using the group generator and the given exponent
-    fn generate(exponent: &E) -> Self;
+    /// Create a group element using the group generator and the given scalar
+    fn generate(scalar: &E) -> Self;
 
-    /// Performs the group law given number of times
-    /// (i.e exponentiation in multiplicative groups, multiplication in additive groups)
-    fn group_law(&self, exponent: &E) -> Self;
+    /// Performs the group law given number of times (i.e multiplication in additive groups)
+    fn group_law(&self, scalar: &E) -> Self;
 
-    /// Group element is considered valid if it is not a neutral element (0 in additive group or
-    /// 1 in multiplicative groups) and also not a torsion element of small order.
+    /// Group element is considered valid if it is not a neutral element and also not a torsion element of small order.
     fn is_valid(&self) -> bool;
 
     /// Extract a keying material from a group element using HKDF extract
@@ -80,13 +77,13 @@ pub trait GroupElement<E: Exponent>: Clone {
 }
 
 /// Structure containing shared keys for peers using the Sphinx algorithm.
-pub struct SharedKeys<E: Exponent, G: GroupElement<E>> {
+pub struct SharedKeys<E: Scalar, G: GroupElement<E>> {
     pub alpha: G::Repr,
     pub secrets: Vec<SecretKey>,
-    exponent_type: PhantomData<E>
+    scalar_type: PhantomData<E>
 }
 
-impl <E: Exponent, G: GroupElement<E>> SharedKeys<E, G> {
+impl <E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
     /// Generates shared secrets for the given path of peers.
     pub fn new(path: &[&PeerId]) -> Result<Self> {
         Self::generate(
@@ -98,10 +95,10 @@ impl <E: Exponent, G: GroupElement<E>> SharedKeys<E, G> {
         )
     }
 
-    /// Generates shared secrets given the peer public keys array.
-    /// The order of the peer public keys is preserved for resulting shared keys.
+    /// Generates shared secrets given the group element of the peers.
+    /// The order of the peer group elements is preserved for resulting shared keys.
     /// The specified random number generator will be used.
-    pub fn generate(rng: &mut (impl CryptoRng + RngCore), peer_public_keys: Vec<G::Repr>) -> Result<SharedKeys<E, G>> {
+    pub fn generate(rng: &mut (impl CryptoRng + RngCore), peer_group_elements: Vec<G::Repr>) -> Result<SharedKeys<E, G>> {
         let mut shared_keys = Vec::new();
 
         // This becomes: x * b_0 * b_1 * b_2 * ...
@@ -112,9 +109,9 @@ impl <E: Exponent, G: GroupElement<E>> SharedKeys<E, G> {
         let alpha = alpha_prev.to_repr();
 
         // Iterate through all the given peer public keys
-        let keys_len = peer_public_keys.len();
-        for (i, ge) in peer_public_keys.into_iter().enumerate() {
-            let group_element = G::from_repr(ge)?;
+        let keys_len = peer_group_elements.len();
+        for (i, ge_repr) in peer_group_elements.into_iter().enumerate() {
+            let group_element = G::from_repr(ge_repr)?;
 
             // Try to decode the given public key point & multiply by the current coefficient
             let shared_secret = group_element.group_law(&coeff_prev);
@@ -143,11 +140,11 @@ impl <E: Exponent, G: GroupElement<E>> SharedKeys<E, G> {
         Ok(SharedKeys {
             alpha,
             secrets: shared_keys,
-            exponent_type: PhantomData,
+            scalar_type: PhantomData,
         })
     }
 
-    /// Calculates the forward transformation for the given peer public key.
+    /// Calculates the forward transformation for the given the local private key.
     pub fn forward_transform(alpha: G::Repr, private_key: E::Repr) -> Result<(G::Repr, SecretKey)> {
         let private_scalar = E::from_repr(private_key)?;
         let public_key = G::generate(&private_scalar);
@@ -170,7 +167,7 @@ impl <E: Exponent, G: GroupElement<E>> SharedKeys<E, G> {
 pub type Secp256k1SharedKeys = SharedKeys<NonZeroScalar, ProjectivePoint>;
 
 /// Non-zero scalars in the underlying field for Secp256k1
-impl Exponent for NonZeroScalar {
+impl Scalar for NonZeroScalar {
     type Repr = [u8; 32];
 
     fn from_repr(repr: Self::Repr) -> Result<Self> {
@@ -207,12 +204,12 @@ impl GroupElement<NonZeroScalar> for ProjectivePoint {
         Ok(CurvePoint::from(repr).to_projective_point())
     }
 
-    fn generate(exponent: &NonZeroScalar) -> Self {
-        ProjectivePoint::GENERATOR * exponent.as_ref()
+    fn generate(scalar: &NonZeroScalar) -> Self {
+        ProjectivePoint::GENERATOR * scalar.as_ref()
     }
 
-    fn group_law(&self, exponent: &NonZeroScalar) -> Self {
-        Mul::mul(self, exponent.as_ref())
+    fn group_law(&self, scalar: &NonZeroScalar) -> Self {
+        Mul::mul(self, scalar.as_ref())
     }
 
     fn is_valid(&self) -> bool {
@@ -251,14 +248,14 @@ pub mod tests {
         assert_eq!(res, key.as_ref());
     }
 
-    pub fn generate_random_keypairs<E: Exponent, G: GroupElement<E>>(count: usize) -> (Vec<E::Repr>, Vec<G::Repr>) {
+    pub fn generate_random_keypairs<E: Scalar, G: GroupElement<E>>(count: usize) -> (Vec<E::Repr>, Vec<G::Repr>) {
         (0..count)
             .map(|_| E::random(&mut OsRng))
             .map(|s| (s.to_repr(), G::generate(&s).to_repr()))
             .unzip()
     }
 
-    pub fn generic_test_shared_keys<E: Exponent, G: GroupElement<E>>() {
+    pub fn generic_test_shared_keys<E: Scalar, G: GroupElement<E>>() {
         const COUNT_KEYPAIRS: usize = 3;
         let (priv_keys, pub_keys) = generate_random_keypairs::<E, G>(COUNT_KEYPAIRS);
 
