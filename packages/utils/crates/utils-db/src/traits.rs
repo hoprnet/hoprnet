@@ -49,6 +49,8 @@ pub trait AsyncKVStorage {
 
     async fn dump(&self, destination: String) -> Result<()>;
 
+    fn iterate(&self, prefix: Self::Key, suffix_size: u32) -> Result<crate::types::BinaryStreamWrapper>;
+
     async fn batch(
         &mut self,
         operations: Vec<BatchOperation<Self::Key, Self::Value>>,

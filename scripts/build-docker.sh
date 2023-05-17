@@ -105,7 +105,7 @@ build_and_tag_images() {
         -f packages/ethereum/Dockerfile.anvil . &
     fi
 
-    if [ -z "${image_name}" ] || [ "${image_name}" = "hopli" ]; then
+    if [ -z "${image_name}" ] || [ "${image_name}" = "hopli" ] || [ "${image_name}" = "pluto" ] || [ "${image_name}" = "pluto-complete" ]; then
       log "Building Docker image hopli-local:latest"
       docker build -t hopli-local:latest \
         --build-arg=HOPR_TOOLCHAIN_IMAGE="hopr-toolchain-local:latest" \
@@ -119,6 +119,7 @@ build_and_tag_images() {
       log "Building Docker image hopr-pluto-local:latest"
       docker build -q -t hopr-pluto-local:latest \
         --build-arg=ANVIL_IMAGE="hopr-anvil-local:latest" \
+        --build-arg=HOPLI_IMAGE="hopli-local:latest" \
         --build-arg=HOPRD_IMAGE="hoprd-local:latest" \
         -f scripts/pluto/Dockerfile . &
     fi
