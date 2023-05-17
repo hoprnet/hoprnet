@@ -9,6 +9,8 @@ import type { PeerId } from '@libp2p/interface-peer-id'
 import { keysPBM } from '@libp2p/crypto/keys'
 
 // NOTE: Workaround until also this file is converted to Rust
+// Reason being that all cryptography is now in core-crypto, and core-ethereum cannot depend
+// on core (would be a circular dependency)
 import { derive_commitment_seed } from '../../core/lib/core_crypto.js'
 
 const log = debug('hopr-core-ethereum:commitment')

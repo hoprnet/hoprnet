@@ -232,7 +232,7 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
         true
       )
     ).to.eventually.rejectedWith(
-      'Payment channel 434c7d4fdeadfc5b67c251d1a421d2d73e90c81355ade7744af5dddf160c27df does not have enough funds'
+      'Payment channel 0x434c7d4fdeadfc5b67c251d1a421d2d73e90c81355ade7744af5dddf160c27df does not have enough funds'
     )
   })
 
@@ -255,7 +255,7 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
         true
       )
     ).to.eventually.rejectedWith(
-      'Payment channel 434c7d4fdeadfc5b67c251d1a421d2d73e90c81355ade7744af5dddf160c27df does not have enough funds'
+      'Payment channel 0x434c7d4fdeadfc5b67c251d1a421d2d73e90c81355ade7744af5dddf160c27df does not have enough funds'
     )
   })
 })

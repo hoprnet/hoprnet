@@ -891,7 +891,7 @@ pub trait ToChecksum {
 
 impl ToChecksum for Address {
     fn to_checksum(&self) -> String {
-        let address_hex = self.to_hex();
+        let address_hex = &self.to_hex()[2..];
 
         let mut hasher = EthDigest::default();
         hasher.update(address_hex.as_bytes());
@@ -1156,7 +1156,7 @@ pub mod tests {
     fn hash_test() {
         let hash1 = Hash::create(&[b"msg"]);
         assert_eq!(
-            "92aef1b955b9de564fc50e31a55b470b0c8cdb931f186485d620729fb03d6f2c",
+            "0x92aef1b955b9de564fc50e31a55b470b0c8cdb931f186485d620729fb03d6f2c",
             hash1.to_hex(),
             "hash test vector failed to match"
         );

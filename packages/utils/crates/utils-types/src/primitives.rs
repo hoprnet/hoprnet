@@ -68,7 +68,12 @@ impl BinarySerializable<'_> for Address {
 impl Address {
     // impl std::str::FromStr for Address {
     pub fn from_str(value: &str) -> Result<Address> {
-        Self::from_bytes(&hex::decode(value).map_err(|_| ParseError)?)
+        let decoded = if value.starts_with("0x") {
+            hex::decode(&value[2..])
+        } else {
+            hex::decode(value)
+        };
+        Self::from_bytes(&decoded.map_err(|_| ParseError)?)
     }
     // }
 }
@@ -434,6 +439,13 @@ mod tests {
             addr_1,
             Address::from_str("Cf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9").unwrap()
         );
+
+        assert_eq!(
+            addr_1,
+            Address::from_str("0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9").unwrap()
+        );
+
+        assert_eq!(addr_1, Address::from_str(&addr_1.to_hex()).unwrap());
     }
 
     #[test]
