@@ -430,6 +430,9 @@ impl HoprdConfig {
         if let Some(x) = cli_args.network_quality_threshold {
             cfg.network.network_quality_threshold = x
         };
+        if let Some(x) = cli_args.no_relay {
+            cfg.network.no_relay = x
+        }
 
         // healthcheck
         if let Some(x) = cli_args.health_check {
@@ -582,6 +585,7 @@ mod tests {
                 allow_private_node_connections: false,
                 max_parallel_connections: 0,
                 network_quality_threshold: 0.0,
+                no_relay: false,
             },
             healthcheck: HealthCheck {
                 enable: false,
