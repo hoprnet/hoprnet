@@ -6,7 +6,7 @@ from conftest import DEFAULT_API_TOKEN
 
 
 def test_hoprd_protocol_integration_tests(setup_7_nodes):
-    with open("/tmp/hopr-source-anvil.cfg") as f:
+    with open('/tmp/hopr-smoke-test-anvil.cfg') as f:
         data = json.load(f)
 
     anvil_private_key = data["private_keys"][0]

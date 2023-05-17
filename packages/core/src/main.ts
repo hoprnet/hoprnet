@@ -101,7 +101,8 @@ export async function createLibp2pInstance(
             // Amount of nodes for which we are willing to act as a relay with 2GB memory limit
             maxRelayedConnections: 2_000,
             announce: options.announce,
-            isAllowedToAccessNetwork
+            isAllowedToAccessNetwork,
+            noRelay: options.noRelay
           },
           testing: {
             // Treat local and private addresses as public addresses

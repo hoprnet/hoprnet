@@ -122,8 +122,9 @@ pub struct CliArgs {
 
     #[arg(
         long,
+        default_value_t = false,
         env = "HOPRD_API",
-        help = "Enable the internal API",
+        help = format!("Expose the API on {}:{}", DEFAULT_API_HOST, DEFAULT_API_PORT),
         action = ArgAction::SetTrue,
     )]
     pub api: Option<bool>,
@@ -343,6 +344,15 @@ pub struct CliArgs {
         hide = true
     )]
     pub test_no_webrtc_upgrade: Option<bool>,
+
+    #[arg(
+        long = "noRelay",
+        help = "disable NAT relay functionality entirely",
+        env = "HOPRD_NO_RELAY",
+        default_value_t = false,
+        action = ArgAction::SetTrue,
+    )]
+    pub no_relay: bool,
 
     #[arg(
         long = "testLocalModeStun",

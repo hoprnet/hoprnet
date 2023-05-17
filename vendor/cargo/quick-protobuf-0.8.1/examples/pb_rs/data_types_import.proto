@@ -1,5 +1,0 @@
-package a.b;
-
-message ImportedMessage {
-    optional bool i = 1;
-}
