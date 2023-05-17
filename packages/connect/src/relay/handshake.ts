@@ -356,8 +356,6 @@ export async function abortRelayHandshake(stream: Stream, reason: RelayHandshake
 export async function handleRelayHandshake(stream: Stream, source: PeerId): Promise<HandleResponse> {
   const shaker = handshake(stream)
 
-  console.log(`before read`)
-
   let chunk: StreamType | undefined
   try {
     chunk = await shaker.read()
