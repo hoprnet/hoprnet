@@ -16,9 +16,7 @@ def url(port):
     return f"ws://{LOCALHOST}:{port}/api/v2/messages/websocket"
 
 
-EXTRA_HEADERS = [
-    ("Cookie", f"X-Auth-Token={DEFAULT_API_TOKEN}")
-]
+EXTRA_HEADERS = [("Cookie", f"X-Auth-Token={DEFAULT_API_TOKEN}")]
 
 
 async def connect_to(port):
@@ -36,12 +34,14 @@ async def web_socket_connection(port):
 
 @pytest.fixture
 async def ws_connections(setup_7_nodes):
-    async with web_socket_connection(setup_7_nodes["1"]["api_port"]) as ws1, \
-        web_socket_connection(setup_7_nodes["2"]["api_port"]) as ws2, \
-        web_socket_connection(setup_7_nodes["3"]["api_port"]) as ws3, \
-        web_socket_connection(setup_7_nodes["4"]["api_port"]) as ws4, \
-        web_socket_connection(setup_7_nodes["5"]["api_port"]) as ws5:
-            yield {"1": ws1, "2": ws2, "3": ws3, "4": ws4, "5": ws5}
+    async with web_socket_connection(setup_7_nodes["1"]["api_port"]) as ws1, web_socket_connection(
+        setup_7_nodes["2"]["api_port"]
+    ) as ws2, web_socket_connection(setup_7_nodes["3"]["api_port"]) as ws3, web_socket_connection(
+        setup_7_nodes["4"]["api_port"]
+    ) as ws4, web_socket_connection(
+        setup_7_nodes["5"]["api_port"]
+    ) as ws5:
+        yield {"1": ws1, "2": ws2, "3": ws3, "4": ws4, "5": ws5}
 
 
 async def test_websocket_send_receive_messages(setup_7_nodes, ws_connections):
