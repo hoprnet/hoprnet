@@ -29,8 +29,7 @@ impl ProofOfRelayValues {
 
         Ok(Self {
             ack_challenge: derive_ack_key_share(secret_b).to_challenge(),
-            ticket_challenge: Response::from_half_keys(&s0, &s1)?
-                .to_challenge(),
+            ticket_challenge: Response::from_half_keys(&s0, &s1)?.to_challenge(),
             own_key: s0,
         })
     }
@@ -55,8 +54,7 @@ impl ProofOfRelayString {
         let s2 = derive_ack_key_share(secret_d.unwrap_or(&random_bytes::<SECRET_KEY_LENGTH>()));
 
         Ok(Self {
-            next_ticket_challenge: Response::from_half_keys(&s1, &s2)?
-                .to_challenge(),
+            next_ticket_challenge: Response::from_half_keys(&s1, &s2)?.to_challenge(),
             hint: s0.to_challenge(),
         })
     }
@@ -263,9 +261,9 @@ mod tests {
 pub mod wasm {
     use crate::por::ProofOfRelayValues;
     use js_sys::Uint8Array;
-    use wasm_bindgen::prelude::wasm_bindgen;
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
+    use wasm_bindgen::prelude::wasm_bindgen;
 
     #[wasm_bindgen]
     impl ProofOfRelayValues {

@@ -280,8 +280,10 @@ impl Packet {
         let por_values = ProofOfRelayValues::new(shared_keys.secret(0).unwrap(), shared_keys.secret(1))?;
 
         let por_strings = (1..path.len())
-            .map(|i| ProofOfRelayString::new(shared_keys.secret(i).unwrap(), shared_keys.secret(i + 1))
-                .map(|pors|pors.to_bytes()))
+            .map(|i| {
+                ProofOfRelayString::new(shared_keys.secret(i).unwrap(), shared_keys.secret(i + 1))
+                    .map(|pors| pors.to_bytes())
+            })
             .collect::<Result<Vec<_>>>()?;
 
         let mut ticket = first_ticket;
@@ -451,12 +453,12 @@ impl Packet {
 
 #[cfg(test)]
 mod tests {
+    use crate::errors::Result;
     use crate::packet::{
         add_padding, remove_padding, ForwardedMetaPacket, MetaPacket, Packet, PacketState, INTERMEDIATE_HOPS,
         PADDING_TAG,
     };
     use crate::por::{ProofOfRelayString, POR_SECRET_LENGTH};
-    use crate::errors::Result;
     use core_crypto::shared_keys::SharedKeys;
     use core_crypto::types::PublicKey;
     use core_types::channels::Ticket;
@@ -497,9 +499,12 @@ mod tests {
         let (secrets, path) = generate_keypairs(amount);
         let shared_keys = SharedKeys::new(&path.iter().collect::<Vec<_>>()).unwrap();
         let por_strings = (1..path.len())
-            .map(|i| ProofOfRelayString::new(shared_keys.secret(i).unwrap(), shared_keys.secret(i + 1))
-                .map(|pors| pors.to_bytes()))
-            .collect::<Result<Vec<_>>>().unwrap();
+            .map(|i| {
+                ProofOfRelayString::new(shared_keys.secret(i).unwrap(), shared_keys.secret(i + 1))
+                    .map(|pors| pors.to_bytes())
+            })
+            .collect::<Result<Vec<_>>>()
+            .unwrap();
 
         let msg = b"some random test message";
 
