@@ -84,6 +84,7 @@
 | `hosts.ip6?` | `NetOptions` |
 | `maxParallelConnections?` | `number` |
 | `networkQualityThreshold?` | `number` |
+| `noRelay?` | `boolean` |
 | `onChainConfirmations?` | `number` |
 | `password` | `string` |
 | `strategy` | [`ChannelStrategyInterface`](interfaces/ChannelStrategyInterface.md) |
@@ -109,7 +110,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:210](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L210)
+[packages/core/src/index.ts:212](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L212)
 
 ___
 
@@ -119,7 +120,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:225](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L225)
+[packages/core/src/index.ts:227](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L227)
 
 ___
 
@@ -139,7 +140,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:212](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L212)
+[packages/core/src/index.ts:214](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L214)
 
 ## Variables
 
@@ -318,7 +319,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/main.ts:226](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L226)
+[packages/core/src/main.ts:227](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/main.ts#L227)
 
 ___
 
