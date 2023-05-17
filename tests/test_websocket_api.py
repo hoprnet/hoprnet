@@ -68,19 +68,19 @@ async def test_websocket_send_receive_messages(setup_7_nodes, ws_connections):
 
         try:
             ack_challenge_msg = await asyncio.wait_for(source_ws.recv(), timeout=5)
-        except:
+        except Exception:
             pytest.fail(f"Timeout when receiving ack-challenge of msg {i} from {source_key} to {target_key}")
         assert re.match(r"^ack-challenge:.*$", ack_challenge_msg)
 
         try:
             inc_msg_rlp = await asyncio.wait_for(target_ws.recv(), timeout=5)
-        except:
+        except Exception:
             pytest.fail(f"Timeout when receiving msg {i} from {source_key} to {target_key}")
         [inc_msg_str, _] = rlp.decode(bytearray([int(c) for c in inc_msg_rlp.split(",")]))
         assert inc_msg_str.decode("unicode_escape") == body
 
         try:
             ack_msg = await asyncio.wait_for(source_ws.recv(), timeout=5)
-        except:
+        except Exception:
             pytest.fail(f"Timeout when receiving ack of msg {i} from {source_key} to {target_key}")
         assert re.match(r"^ack:.*$", ack_msg)
