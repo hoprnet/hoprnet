@@ -207,7 +207,6 @@ pub mod tests {
         assert_eq!(SECRET_KEY_LENGTH, key.len());
 
         let res = hex!("9e286c3d45fbbe22e570d96ffe83987960a75b4dbe3d3a74b52c96125323ee9a");
-        let rs = hex::encode(key.as_slice());
         assert_eq!(res, key.as_ref());
     }
 
@@ -220,7 +219,6 @@ pub mod tests {
         assert_eq!(SECRET_KEY_LENGTH, key.len());
 
         let res = hex!("cc3caa95b5caa141bbdecfbcc18e7f9ae9492ba02b4a5b5d3261f14157b125ec");
-        let rs = hex::encode(key.as_slice());
         assert_eq!(res, key.as_ref());
     }
 

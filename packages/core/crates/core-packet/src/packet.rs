@@ -486,7 +486,7 @@ mod tests {
             .map(|_| Keypair::generate_secp256k1())
             .map(|kp| {
                 (
-                    kp.clone().into_secp256k1().unwrap().secret().to_bytes(),
+                    kp.clone().try_into_secp256k1().unwrap().secret().to_bytes(),
                     kp.public().to_peer_id(),
                 )
             })
@@ -498,7 +498,7 @@ mod tests {
         let (secrets, path) = generate_keypairs(amount);
         let shared_keys = SharedKeys::new(&path.iter().collect::<Vec<_>>()).unwrap();
         let por_strings = (1..path.len())
-            .map(|i| ProofOfRelayString::new(shared_keys.secret(i).unwrap(), shared_keys.secret(i + 1)).to_bytes())
+            .map(|i| ProofOfRelayString::new(shared_keys.secrets[i], shared_keys.secrets.get(i + 1).cloned()).to_bytes())
             .collect::<Vec<_>>();
 
         let msg = b"some random test message";

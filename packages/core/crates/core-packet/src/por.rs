@@ -174,13 +174,13 @@ mod tests {
             .collect::<Vec<_>>();
 
         // Generated challenge
-        let first_challenge = ProofOfRelayValues::new(&secrets[0], Some(&secrets[1]));
+        let first_challenge = ProofOfRelayValues::new(secrets[0], Some(secrets[1]));
 
         // For the first relayer
-        let first_por_string = ProofOfRelayString::new(&secrets[1], Some(&secrets[2]));
+        let first_por_string = ProofOfRelayString::new(secrets[1], Some(secrets[2]));
 
         // For the second relayer
-        let second_por_string = ProofOfRelayString::new(&secrets[2], Some(&secrets[3]));
+        let second_por_string = ProofOfRelayString::new(secrets[2], Some(secrets[3]));
 
         // Computation result of the first relayer before receiving an acknowledgement from the second relayer
         let first_challenge_eth = first_challenge.ticket_challenge.to_ethereum_challenge();
@@ -240,7 +240,7 @@ mod tests {
             .map(|_| random_bytes::<SECRET_KEY_LENGTH>())
             .collect::<Vec<_>>();
 
-        let first_challenge = ProofOfRelayValues::new(&secrets[0], Some(&secrets[1]));
+        let first_challenge = ProofOfRelayValues::new(secrets[0], Some(secrets[1]));
         let ack = derive_ack_key_share(&secrets[1]);
 
         assert!(
