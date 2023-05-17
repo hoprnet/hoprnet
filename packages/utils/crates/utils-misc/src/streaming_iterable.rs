@@ -9,7 +9,7 @@ use futures::{
 use js_sys::{AsyncIterator, Function, Object, Promise, Reflect, Symbol};
 use pin_project_lite::pin_project;
 use std::{cell::RefCell, rc::Rc};
-use utils_log::error;
+use utils_log::{error, info};
 use wasm_bindgen::{closure::Closure, prelude::*, JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 
@@ -211,15 +211,14 @@ impl Sink<Box<[u8]>> for StreamingIterable {
     fn poll_ready(self: Pin<&mut StreamingIterable>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         let this = self.project();
 
-        {
-            this.clone_stuff.borrow_mut().waker = Some(cx.waker().clone());
-            // drop mutable borrow here
-        }
+        info!("borrow_mut store waker");
+        this.clone_stuff.borrow_mut().waker.insert(cx.waker().clone());
 
         if *this.sink_done {
             return Poll::Ready(Err("Cannot send any data. Stream has been closed".into()));
         }
 
+        info!("borrow_mut check if resolve is present");
         if this.clone_stuff.borrow().resolve.is_some() {
             return Poll::Ready(Ok(()));
         }
@@ -229,6 +228,7 @@ impl Sink<Box<[u8]>> for StreamingIterable {
                 let self_clone = Rc::clone(this.clone_stuff);
                 Closure::<dyn Fn() -> Promise>::new(move || {
                     Promise::new(&mut |resolve, _reject| {
+                        info!("borrow_mut inside cb");
                         let mut clone = self_clone.borrow_mut();
 
                         clone.resolve = Some(resolve);
@@ -305,15 +305,20 @@ impl Sink<Box<[u8]>> for StreamingIterable {
     fn start_send(self: Pin<&mut Self>, item: Box<[u8]>) -> Result<(), String> {
         let this = self.project();
 
-        match this.clone_stuff.borrow_mut().resolve.take() {
-            Some(f) => match f.call1(&JsValue::undefined(), &to_jsvalue_iterator(Some(item))) {
-                Ok(_) => Ok(()),
-                Err(e) => {
-                    error!("error while calling resolve function {:?}", e);
-                    Err(format!("error while calling resolve function {:?}", e).into())
-                }
-            },
-            None => Err("Sink is not yet ready. Please call and `await` poll_ready first".into()),
+        let resolve = {
+            info!("borrow_mut take resolve");
+            match this.clone_stuff.borrow_mut().resolve.take() {
+                Some(f) => f,
+                None => return Err("Sink is not yet ready. Please call and `await` poll_ready first".into()),
+            }
+        };
+
+        match resolve.call1(&JsValue::undefined(), &to_jsvalue_iterator(Some(item))) {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                error!("error while calling resolve function {:?}", e);
+                Err(format!("error while calling resolve function {:?}", e).into())
+            }
         }
     }
 
@@ -324,22 +329,28 @@ impl Sink<Box<[u8]>> for StreamingIterable {
             return Poll::Ready(Err("Uninitialized. Please call and `await` poll_ready first.".into()));
         }
 
-        this.clone_stuff.borrow_mut().close_waker = Some(cx.waker().clone());
+        info!("borrow_mut insert close_waker");
+        this.clone_stuff.borrow_mut().close_waker.insert(cx.waker().clone());
 
         if !*this.sink_done {
-            match this.clone_stuff.borrow_mut().resolve.take() {
-                None => return Poll::Pending,
-                Some(f) => match f.call1(&JsValue::undefined(), &to_jsvalue_iterator(None)) {
-                    Ok(_) => {
-                        *this.sink_done = true;
-                    }
-                    Err(e) => {
-                        // We cannot close stream due to some issue in Javascript,
-                        // so mark stream closed to prevent subsequent calls
-                        *this.sink_done = true;
-                        return Poll::Ready(Err(format!("{:?}", e).into()));
-                    }
-                },
+            let resolve = {
+                info!("borrow_mut take resolve close");
+                match this.clone_stuff.borrow_mut().resolve.take() {
+                    Some(f) => f,
+                    None => return Poll::Pending,
+                }
+            };
+
+            match resolve.call1(&JsValue::undefined(), &to_jsvalue_iterator(None)) {
+                Ok(_) => {
+                    *this.sink_done = true;
+                }
+                Err(e) => {
+                    // We cannot close stream due to some issue in Javascript,
+                    // so mark stream closed to prevent subsequent calls
+                    *this.sink_done = true;
+                    return Poll::Ready(Err(format!("{:?}", e).into()));
+                }
             }
         }
 
