@@ -267,20 +267,15 @@ impl<'a, St: DuplexStream + 'static> RelayConnections<St> {
         };
 
         info!("borrow exists {}", id.to_string());
-        // self.conns.borrow().contains_key(&id)
-        false
+        self.conns.borrow().contains_key(&id)
     }
 
     /// Gets the number of the currently stored connections.
     /// Can include stale connections.
     pub fn size(&self) -> usize {
         // TODO: this is weird
-        info!("try_borrow length");
-        0
-        // match self.conns.try_borrow() {
-        //     Ok(x) => x.len(),
-        //     Err(_) => 0,
-        // }
+        info!("borrow length");
+        self.conns.borrow().len()
     }
 
     /// Runs through all currently stored connections, checks if they
