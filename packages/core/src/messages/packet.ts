@@ -102,7 +102,7 @@ async function createTicket(dest: PublicKey, pathLength: number, db: HoprDB, pri
     currentTicketIndex,
     amount,
     U256.from_inverse_probability(winProb),
-    new U256(channel.channel_epoch.to_hex()),
+    new U256(channel.channel_epoch.to_string()),
     privKey
   )
 

@@ -23,17 +23,15 @@ pub struct ProofOfRelayValues {
 impl ProofOfRelayValues {
     /// Takes the secrets which the first and the second relayer are able to derive from the packet header
     /// and computes the challenge for the first ticket.
-    pub fn new(secret_b: &[u8], secret_c: Option<&[u8]>) -> Self {
+    pub fn new(secret_b: &[u8], secret_c: Option<&[u8]>) -> Result<Self> {
         let s0 = derive_own_key_share(secret_b);
         let s1 = derive_ack_key_share(secret_c.unwrap_or(&random_bytes::<SECRET_KEY_LENGTH>()));
 
-        Self {
+        Ok(Self {
             ack_challenge: derive_ack_key_share(secret_b).to_challenge(),
-            ticket_challenge: Response::from_half_keys(&s0, &s1)
-                .expect("failed to derive response")
-                .to_challenge(),
+            ticket_challenge: Response::from_half_keys(&s0, &s1)?.to_challenge(),
             own_key: s0,
-        }
+        })
     }
 }
 
@@ -47,7 +45,7 @@ pub struct ProofOfRelayString {
 
 impl ProofOfRelayString {
     /// Creates instance from the shared secrets with node+2 and node+3
-    pub fn new(secret_c: &[u8], secret_d: Option<&[u8]>) -> Self {
+    pub fn new(secret_c: &[u8], secret_d: Option<&[u8]>) -> Result<Self> {
         assert_eq!(SECRET_KEY_LENGTH, secret_c.len(), "invalid secret length");
         assert!(secret_d.is_none() || secret_d.unwrap().len() == SECRET_KEY_LENGTH);
 
@@ -55,12 +53,10 @@ impl ProofOfRelayString {
         let s1 = derive_own_key_share(secret_c);
         let s2 = derive_ack_key_share(secret_d.unwrap_or(&random_bytes::<SECRET_KEY_LENGTH>()));
 
-        Self {
-            next_ticket_challenge: Response::from_half_keys(&s1, &s2)
-                .expect("failed to derive response")
-                .to_challenge(),
+        Ok(Self {
+            next_ticket_challenge: Response::from_half_keys(&s1, &s2)?.to_challenge(),
             hint: s0.to_challenge(),
-        }
+        })
     }
 }
 
@@ -173,13 +169,13 @@ mod tests {
             .collect::<Vec<_>>();
 
         // Generated challenge
-        let first_challenge = ProofOfRelayValues::new(&secrets[0], Some(&secrets[1]));
+        let first_challenge = ProofOfRelayValues::new(&secrets[0], Some(&secrets[1])).unwrap();
 
         // For the first relayer
-        let first_por_string = ProofOfRelayString::new(&secrets[1], Some(&secrets[2]));
+        let first_por_string = ProofOfRelayString::new(&secrets[1], Some(&secrets[2])).unwrap();
 
         // For the second relayer
-        let second_por_string = ProofOfRelayString::new(&secrets[2], Some(&secrets[3]));
+        let second_por_string = ProofOfRelayString::new(&secrets[2], Some(&secrets[3])).unwrap();
 
         // Computation result of the first relayer before receiving an acknowledgement from the second relayer
         let first_challenge_eth = first_challenge.ticket_challenge.to_ethereum_challenge();
@@ -239,7 +235,7 @@ mod tests {
             .map(|_| random_bytes::<SECRET_KEY_LENGTH>())
             .collect::<Vec<_>>();
 
-        let first_challenge = ProofOfRelayValues::new(&secrets[0], Some(&secrets[1]));
+        let first_challenge = ProofOfRelayValues::new(&secrets[0], Some(&secrets[1])).unwrap();
         let ack = derive_ack_key_share(&secrets[1]);
 
         assert!(
@@ -265,17 +261,19 @@ mod tests {
 pub mod wasm {
     use crate::por::ProofOfRelayValues;
     use js_sys::Uint8Array;
+    use utils_misc::ok_or_jserr;
+    use utils_misc::utils::wasm::JsResult;
     use wasm_bindgen::prelude::wasm_bindgen;
 
     #[wasm_bindgen]
     impl ProofOfRelayValues {
         #[wasm_bindgen(constructor)]
-        pub fn _new(secret_b: &[u8], secret_c: Uint8Array) -> Self {
+        pub fn _new(secret_b: &[u8], secret_c: Uint8Array) -> JsResult<ProofOfRelayValues> {
             if !secret_c.is_null() && !secret_c.is_undefined() {
                 let c_slice = secret_c.to_vec();
-                Self::new(secret_b, Some(c_slice.as_slice()))
+                ok_or_jserr!(Self::new(secret_b, Some(c_slice.as_slice())))
             } else {
-                Self::new(secret_b, None)
+                ok_or_jserr!(Self::new(secret_b, None))
             }
         }
     }

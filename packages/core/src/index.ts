@@ -46,10 +46,7 @@ import {
   retimer as intervalTimer,
   retryWithBackoffThenThrow,
   iterableToArray,
-  safeCloseConnection
-} from '@hoprnet/hopr-utils'
-
-import {
+  safeCloseConnection,
   Address,
   AcknowledgedTicket,
   ChannelStatus,
@@ -59,10 +56,9 @@ import {
   Hash,
   HalfKeyChallenge,
   Balance,
-  BalanceType
+  BalanceType,
+  type HoprDB
 } from '@hoprnet/hopr-utils'
-
-import { type HoprDB } from '@hoprnet/hopr-utils'
 
 import { FULL_VERSION, INTERMEDIATE_HOPS, MAX_HOPS, PACKET_SIZE, VERSION, MAX_PARALLEL_PINGS } from './constants.js'
 
@@ -1642,5 +1638,4 @@ export {
 export { resolveEnvironment, supportedEnvironments, type ResolvedEnvironment } from './environment.js'
 export { CORE_CONSTANTS as CONSTANTS } from '../lib/core_misc.js'
 export { sampleOptions } from './index.mock.js'
-
 export * from './types.js'

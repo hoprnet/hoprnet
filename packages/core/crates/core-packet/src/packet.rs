@@ -277,11 +277,14 @@ impl Packet {
 
         let shared_keys = SharedKeys::new(path)?;
 
-        let por_values = ProofOfRelayValues::new(shared_keys.secret(0).unwrap(), shared_keys.secret(1));
+        let por_values = ProofOfRelayValues::new(shared_keys.secret(0).unwrap(), shared_keys.secret(1))?;
 
         let por_strings = (1..path.len())
-            .map(|i| ProofOfRelayString::new(shared_keys.secret(i).unwrap(), shared_keys.secret(i + 1)).to_bytes())
-            .collect::<Vec<_>>();
+            .map(|i| {
+                ProofOfRelayString::new(shared_keys.secret(i).unwrap(), shared_keys.secret(i + 1))
+                    .map(|pors| pors.to_bytes())
+            })
+            .collect::<Result<Vec<_>>>()?;
 
         let mut ticket = first_ticket;
         ticket.challenge = por_values.ticket_challenge.to_ethereum_challenge();
@@ -450,6 +453,7 @@ impl Packet {
 
 #[cfg(test)]
 mod tests {
+    use crate::errors::Result;
     use crate::packet::{
         add_padding, remove_padding, ForwardedMetaPacket, MetaPacket, Packet, PacketState, INTERMEDIATE_HOPS,
         PADDING_TAG,
@@ -483,7 +487,7 @@ mod tests {
             .map(|_| Keypair::generate_secp256k1())
             .map(|kp| {
                 (
-                    kp.clone().into_secp256k1().unwrap().secret().to_bytes(),
+                    kp.clone().try_into_secp256k1().unwrap().secret().to_bytes(),
                     kp.public().to_peer_id(),
                 )
             })
@@ -495,8 +499,12 @@ mod tests {
         let (secrets, path) = generate_keypairs(amount);
         let shared_keys = SharedKeys::new(&path.iter().collect::<Vec<_>>()).unwrap();
         let por_strings = (1..path.len())
-            .map(|i| ProofOfRelayString::new(shared_keys.secret(i).unwrap(), shared_keys.secret(i + 1)).to_bytes())
-            .collect::<Vec<_>>();
+            .map(|i| {
+                ProofOfRelayString::new(shared_keys.secret(i).unwrap(), shared_keys.secret(i + 1))
+                    .map(|pors| pors.to_bytes())
+            })
+            .collect::<Result<Vec<_>>>()
+            .unwrap();
 
         let msg = b"some random test message";
 
@@ -506,7 +514,7 @@ mod tests {
             &path.iter().collect::<Vec<_>>(),
             INTERMEDIATE_HOPS + 1,
             POR_SECRET_LENGTH,
-            &por_strings.iter().map(|pors| pors.as_ref()).collect::<Vec<_>>(),
+            &por_strings.iter().map(Box::as_ref).collect::<Vec<_>>(),
             None,
         );
 
