@@ -42,9 +42,14 @@ pin_project! {
 
 impl<St> Future for PollActive<St> {
     type Output = Result<Option<Box<[u8]>>, String>;
-    fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Self::Output> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
-
+        info!(
+            "borrow_mut poll {}",
+            RelayConnectionIdentifier::try_from((this.source.to_owned(), this.destination.to_owned()))
+                .unwrap()
+                .to_string()
+        );
         match this.conns.borrow_mut().get_mut(
             &(this.source.to_owned(), this.destination.to_owned())
                 .try_into()
@@ -71,6 +76,7 @@ struct RelayConnections<St> {
 
 impl<St> ToString for RelayConnections<St> {
     fn to_string(&self) -> String {
+        info!("borrow to_string");
         let items = self.conns.borrow().keys().map(|x| x.to_string()).collect::<Vec<_>>();
 
         let prefix: String = "RelayConnections:\n".into();
@@ -98,28 +104,32 @@ impl<'a, St: DuplexStream + 'static> RelayConnections<St> {
     /// Assembles two duplex stream to a relayed connection and stores it.
     /// Starts a background task that polls the streams.
     pub fn create_new(&mut self, id_a: PeerId, stream_a: St, id_b: PeerId, stream_b: St) -> Result<(), String> {
-        let id: RelayConnectionIdentifier = (id_a, id_b).try_into().unwrap();
-
-        let conns_to_move = self.conns.clone();
         let (server, endpoints) = match id_a.cmp(&id_b) {
             Ordering::Equal => panic!("must not happen"),
             Ordering::Greater => Server::new(stream_a, id_a, stream_b, id_b),
             Ordering::Less => Server::new(stream_b, id_b, stream_a, id_a),
         };
 
-        // let polling = PollBorrow { st: server };
+        let start_conn = {
+            let conns_to_move = self.conns.clone();
+            let id: RelayConnectionIdentifier = (id_a, id_b).try_into().unwrap();
+
+            async move {
+                info!("borrow_mut insert {}", id.to_string());
+                conns_to_move.borrow_mut().insert(id, endpoints);
+
+                match server.await {
+                    Ok(()) => info!("Relayed connection [\"{}>\"] ended successfully", id.to_string()),
+                    Err(e) => error!("Relayed connection [\"{}>\"] ended with error {}", id.to_string(), e),
+                }
+
+                info!("borrow_mut remove {}", id.to_string());
+                conns_to_move.borrow_mut().remove(&id);
+            }
+        };
 
         // Start the stream but don't await its end
-        spawn_local(async move {
-            conns_to_move.borrow_mut().insert(id, endpoints);
-
-            match server.await {
-                Ok(()) => info!("Relayed connection [\"{}>\"] ended successfully", id.to_string()),
-                Err(e) => error!("Relayed connection [\"{}>\"] ended with error {}", id.to_string(), e),
-            }
-
-            conns_to_move.borrow_mut().remove(&id);
-        });
+        spawn_local(start_conn);
 
         Ok(())
     }
@@ -135,11 +145,6 @@ impl<'a, St: DuplexStream + 'static> RelayConnections<St> {
             }
         };
 
-        info!(
-            "is active called {:?}",
-            self.conns.borrow().keys().map(|x| x.to_string()).collect::<Vec<_>>()
-        );
-
         let timeout = sleep(Duration::from_millis(
             maybe_timeout.unwrap_or(DEFAULT_RELAYED_CONNECTION_PING_TIMEOUT as u64),
         ));
@@ -149,6 +154,7 @@ impl<'a, St: DuplexStream + 'static> RelayConnections<St> {
         return match source.cmp(&destination) {
             Ordering::Equal => panic!("must not happen"),
             Ordering::Greater => {
+                info!("borrow send ping {}", id.to_string());
                 if let Some(endpoints) = self.conns.borrow().get(&id) {
                     endpoints
                         .ping_a_tx
@@ -185,6 +191,7 @@ impl<'a, St: DuplexStream + 'static> RelayConnections<St> {
                 }
             }
             Ordering::Less => {
+                info!("borrow send ping {}", id.to_string());
                 if let Some(endpoints) = self.conns.borrow().get(&id) {
                     endpoints
                         .ping_b_tx
@@ -234,6 +241,7 @@ impl<'a, St: DuplexStream + 'static> RelayConnections<St> {
             }
         };
 
+        info!("borrow overwrite stream {}", id.to_string());
         if let Some(entry) = self.conns.borrow().get(&id) {
             match source.cmp(&destination) {
                 Ordering::Equal => panic!("must not happen"),
@@ -258,6 +266,7 @@ impl<'a, St: DuplexStream + 'static> RelayConnections<St> {
             }
         };
 
+        info!("borrow exists {}", id.to_string());
         self.conns.borrow().contains_key(&id)
     }
 
@@ -265,6 +274,7 @@ impl<'a, St: DuplexStream + 'static> RelayConnections<St> {
     /// Can include stale connections.
     pub fn size(&self) -> usize {
         // TODO: this is weird
+        info!("try_borrow length");
         match self.conns.try_borrow() {
             Ok(x) => x.len(),
             Err(_) => 0,
