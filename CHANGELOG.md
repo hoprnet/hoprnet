@@ -9,6 +9,8 @@
 - Introduce new types & optimize cryptographic code ([#4974](https://github.com/hoprnet/hoprnet/pull/4974))
 - Create DB functionality shim in Rust ([#4885](https://github.com/hoprnet/hoprnet/pull/4885))
 - Migrate interface for using the DB in core packet processing ([#5025](https://github.com/hoprnet/hoprnet/pull/5025))
+- Migrate all core types to Rust and remove all TypeScript types ([#5039](https://github.com/hoprnet/hoprnet/pull/5039))
+- Migrate packet construction code and all related cryptography to Rust and remove the Typescript implementation ([#4834](https://github.com/hoprnet/hoprnet/pull/4834))
 
 <a name="1.93"></a>
 
