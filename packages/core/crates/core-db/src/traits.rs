@@ -23,6 +23,7 @@ pub trait HoprCoreDbActions {
 
     async fn check_and_set_packet_tag(&mut self, tag: Box<[u8]>) -> Result<bool>;
 
+    async fn get_pending_acknowledgement(&self, half_key_challenge: HalfKeyChallenge) -> Result<Option<PendingAcknowledgement>>;
     async fn store_pending_acknowledgment(
         &mut self,
         half_key_challenge: HalfKeyChallenge,

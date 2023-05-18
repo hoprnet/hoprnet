@@ -157,6 +157,16 @@ impl<T: BinaryAsyncKVStorage> HoprCoreDbActions for CoreDb<T> {
         Ok(has_packet_tag)
     }
 
+    async fn get_pending_acknowledgement(&self, half_key_challenge: HalfKeyChallenge) -> Result<Option<PendingAcknowledgement>> {
+        let key = utils_db::db::Key::new_with_prefix(&half_key_challenge, PENDING_ACKNOWLEDGEMENTS_PREFIX)?;
+        if self.db.contains(key.clone()).await {
+            let value = self.db.get::<PendingAcknowledgement>(key).await?;
+            Ok(Some(value))
+        } else {
+            Ok(None)
+        }
+    }
+
     async fn store_pending_acknowledgment(
         &mut self,
         half_key_challenge: HalfKeyChallenge,
