@@ -4,11 +4,11 @@ import type { HoprChannels, HoprNetworkRegistry, HoprToken, TypedEvent } from '.
 
 import {
   Address,
-  ChannelEntry,
   Hash,
   HoprDB,
-  generateChannelId,
-  NativeBalance,
+  generate_channel_id,
+  Balance,
+  BalanceType,
   SUGGESTED_NATIVE_BALANCE,
   debug,
   AccountEntry,
@@ -20,8 +20,8 @@ import type { ChainWrapper } from '../ethereum.js'
 import type { Event, TokenEvent, RegistryEvent } from './types.js'
 import * as fixtures from './fixtures.js'
 import { ACCOUNT_A, PARTY_A, PARTY_A_MULTIADDR, PARTY_B } from '../fixtures.js'
-import { Multiaddr } from '@multiformats/multiaddr'
-import BN from 'bn.js'
+import { channelEntryFromSCEvent } from './utils.js'
+import { MOCK_PUBLIC_KEY } from './fixtures.js'
 
 //@TODO: Refactor this logger and mock outside of indexer
 const chainLogger = debug(`hopr:mocks:indexer-chain`)
@@ -60,11 +60,11 @@ const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
     if (ev.event == 'ChannelUpdated') {
       const updateEvent = ev as Event<'ChannelUpdated'>
 
-      const eventChannelId = generateChannelId(
-        Address.fromString(updateEvent.args.source),
-        Address.fromString(updateEvent.args.destination)
+      const eventChannelId = generate_channel_id(
+        Address.from_string(updateEvent.args.source),
+        Address.from_string(updateEvent.args.destination)
       )
-      channels[eventChannelId.toHex()] = updateEvent.args.newState
+      channels[eventChannelId.to_hex()] = updateEvent.args.newState
     } else if (ev.event == 'Announce') {
       pubkeys[ev.args.account] = ev.args.multiaddr
     } else {
@@ -88,11 +88,11 @@ const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
         transactionIndex: 0,
         logIndex: 0,
         args: {
-          source: PARTY_B.toAddress().toHex(),
-          destination: PARTY_A.toAddress().toHex(),
+          source: PARTY_B().to_address().to_hex(),
+          destination: PARTY_A().to_address().to_hex(),
           newState: {
             balance: BigNumber.from('3'),
-            commitment: Hash.create(new TextEncoder().encode('commA')).toHex(),
+            commitment: Hash.create([new TextEncoder().encode('commA')]).to_hex(),
             ticketEpoch: BigNumber.from('1'),
             ticketIndex: BigNumber.from('0'),
             status: 2,
@@ -141,8 +141,8 @@ const createHoprTokenMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
         transactionIndex: 0,
         logIndex: 0,
         args: {
-          source: PARTY_A.toAddress().toHex(),
-          destination: PARTY_B.toAddress().toHex(),
+          source: PARTY_A().to_address().to_hex(),
+          destination: PARTY_B().to_address().to_hex(),
           balance: BigNumber.from('1')
         } as any
       } as TokenEvent<'Transfer'>
@@ -252,7 +252,7 @@ const createChainMock = (
     getNativeTokenTransactionInBlock: (_blockNumber: number, _isOutgoing: boolean = true) =>
       Promise.resolve<string[]>([]),
     updateConfirmedTransaction: (_hash: string) => {},
-    getNativeBalance: () => new NativeBalance(SUGGESTED_NATIVE_BALANCE),
+    getNativeBalance: () => new Balance(SUGGESTED_NATIVE_BALANCE.toString(10), BalanceType.Native),
     getChannels: () => hoprChannels,
     getToken: () => hoprToken,
     getNetworkRegistry: () => hoprRegistry,
@@ -260,16 +260,12 @@ const createChainMock = (
     getAccount: () => {
       chainLogger('getAccount method was called')
       return Promise.resolve(
-        new AccountEntry(
-          fixtures.PARTY_A,
-          new Multiaddr(`/ip4/127.0.0.1/tcp/124/p2p/${fixtures.PARTY_A.toString()}`),
-          new BN('1')
-        )
+        new AccountEntry(fixtures.PARTY_A(), `/ip4/127.0.0.1/tcp/124/p2p/${fixtures.PARTY_A().to_peerid_str()}`, 1)
       )
     },
-    getPublicKey: () => fixtures.PARTY_A,
+    getPublicKey: () => fixtures.PARTY_A(),
     setCommitment: (counterparty: Address, commitment: Hash) =>
-      hoprChannels.bumpChannel(counterparty.toHex(), commitment.toHex()),
+      hoprChannels.bumpChannel(counterparty.to_hex(), commitment.to_hex()),
     getAllQueuingTransactionRequests: () => [txRequest],
     getAllUnconfirmedHash: () => [fixtures.OPENED_EVENT.transactionHash]
   } as unknown as ChainWrapper
@@ -313,13 +309,13 @@ export const useFixtures = async (
     newEvent,
     newTokenEvent,
     newRegistryEvent,
-    indexer: new TestingIndexer(!ops.id ? PublicKey.createMock().toAddress() : ops.id.toAddress(), db, 1, 5),
+    indexer: new TestingIndexer(!ops.id ? MOCK_PUBLIC_KEY().to_address() : ops.id.to_address(), db, 1, 5),
     chain,
-    OPENED_CHANNEL: await ChannelEntry.fromSCEvent(fixtures.OPENED_EVENT, (a: Address) =>
-      Promise.resolve(a.eq(PARTY_A.toAddress()) ? PARTY_A : PARTY_B)
+    OPENED_CHANNEL: await channelEntryFromSCEvent(fixtures.OPENED_EVENT, (a: Address) =>
+      Promise.resolve(a.eq(PARTY_A().to_address()) ? PARTY_A() : PARTY_B())
     ),
-    COMMITTED_CHANNEL: await ChannelEntry.fromSCEvent(fixtures.COMMITTED_EVENT, (a: Address) =>
-      Promise.resolve(a.eq(PARTY_A.toAddress()) ? PARTY_A : PARTY_B)
+    COMMITTED_CHANNEL: await channelEntryFromSCEvent(fixtures.COMMITTED_EVENT, (a: Address) =>
+      Promise.resolve(a.eq(PARTY_A().to_address()) ? PARTY_A() : PARTY_B())
     )
   }
 }

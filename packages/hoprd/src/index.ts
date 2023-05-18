@@ -4,7 +4,8 @@ import {
   create_gauge,
   create_multi_gauge,
   get_package_version,
-  NativeBalance,
+  Balance,
+  BalanceType,
   setupPromiseRejectionFilter,
   SUGGESTED_NATIVE_BALANCE,
   create_histogram_with_buckets,
@@ -308,8 +309,8 @@ async function main() {
 
       logs.log(`Node address: ${node.getId().toString()}`)
 
-      const ethAddr = node.getEthereumAddress().toHex()
-      const fundsReq = new NativeBalance(SUGGESTED_NATIVE_BALANCE).toFormattedString()
+      const ethAddr = node.getEthereumAddress().to_hex()
+      const fundsReq = new Balance(SUGGESTED_NATIVE_BALANCE.toString(10), BalanceType.Native).to_formatted_string()
 
       logs.log(`Node is not started, please fund this node ${ethAddr} with at least ${fundsReq}`)
 

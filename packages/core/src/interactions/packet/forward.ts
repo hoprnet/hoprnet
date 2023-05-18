@@ -27,7 +27,7 @@ const metric_recvMessageCount = create_counter('core_counter_received_messages',
 // Do not type-check JSON files
 // @ts-ignore
 import pkg from '../../../package.json' assert { type: 'json' }
-import { peerIdFromBytes } from '@libp2p/peer-id'
+import { peerIdFromBytes, peerIdFromString } from '@libp2p/peer-id'
 
 const NORMALIZED_VERSION = pickVersion(pkg.version)
 
@@ -108,7 +108,7 @@ export class PacketForwardInteraction {
     if (packet.isReceiver) {
       this.emitMessage(packet.plaintext)
       // Send acknowledgements independently
-      this.acknowledgements.sendAcknowledgement(packet, packet.previousHop.toPeerId())
+      this.acknowledgements.sendAcknowledgement(packet, peerIdFromString(packet.previousHop.to_peerid_str()))
       metric_recvMessageCount.increment()
       // Nothing else to do
       return
@@ -139,7 +139,7 @@ export class PacketForwardInteraction {
     }
 
     // Send acknowledgements independently
-    this.acknowledgements.sendAcknowledgement(packet, packet.previousHop.toPeerId())
+    this.acknowledgements.sendAcknowledgement(packet, peerIdFromString(packet.previousHop.to_peerid_str()))
     metric_fwdMessageCount.increment()
   }
 }

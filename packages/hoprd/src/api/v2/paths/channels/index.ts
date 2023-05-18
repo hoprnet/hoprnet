@@ -4,9 +4,9 @@ import {
   type ChannelEntry,
   ChannelStatus,
   defer,
-  generateChannelId,
+  generate_channel_id,
   PublicKey,
-  channelStatusToString,
+  channel_status_to_string,
   type DeferType
 } from '@hoprnet/hopr-utils'
 import { PeerId } from '@libp2p/interface-peer-id'
@@ -44,38 +44,38 @@ export interface ChannelTopologyInfo {
  */
 export const formatChannelTopologyInfo = (channel: ChannelEntry): ChannelTopologyInfo => {
   return {
-    channelId: channel.getId().toHex(),
-    sourcePeerId: channel.source.toPeerId().toString(),
-    destinationPeerId: channel.destination.toPeerId().toString(),
-    sourceAddress: channel.source.toAddress().toHex(),
-    destinationAddress: channel.destination.toAddress().toHex(),
-    balance: channel.balance.toBN().toString(),
-    status: channelStatusToString(channel.status),
-    commitment: channel.commitment.toHex(),
-    ticketEpoch: channel.ticketEpoch.toBN().toString(),
-    ticketIndex: channel.ticketIndex.toBN().toString(),
-    channelEpoch: channel.channelEpoch.toBN().toString(),
-    closureTime: channel.closureTime.toBN().toString()
+    channelId: channel.get_id().to_hex(),
+    sourcePeerId: channel.source.to_peerid_str(),
+    destinationPeerId: channel.destination.to_peerid_str(),
+    sourceAddress: channel.source.to_address().to_hex(),
+    destinationAddress: channel.destination.to_address().to_hex(),
+    balance: channel.balance.to_string(),
+    status: channel_status_to_string(channel.status),
+    commitment: channel.commitment.to_hex(),
+    ticketEpoch: channel.ticket_epoch.to_string(),
+    ticketIndex: channel.ticket_index.to_string(),
+    channelEpoch: channel.channel_epoch.to_string(),
+    closureTime: channel.closure_time.to_string()
   }
 }
 
 export const formatOutgoingChannel = (channel: ChannelEntry): ChannelInfo => {
   return {
     type: 'outgoing',
-    channelId: channel.getId().toHex(),
-    peerId: channel.destination.toPeerId().toString(),
-    status: channelStatusToString(channel.status),
-    balance: channel.balance.toBN().toString()
+    channelId: channel.get_id().to_hex(),
+    peerId: channel.destination.to_peerid_str(),
+    status: channel_status_to_string(channel.status),
+    balance: channel.balance.to_string()
   }
 }
 
 export const formatIncomingChannel = (channel: ChannelEntry): ChannelInfo => {
   return {
     type: 'incoming',
-    channelId: channel.getId().toHex(),
-    peerId: channel.source.toPeerId().toString(),
-    status: channelStatusToString(channel.status),
-    balance: channel.balance.toBN().toString()
+    channelId: channel.get_id().to_hex(),
+    peerId: channel.source.to_peerid_str(),
+    status: channel_status_to_string(channel.status),
+    balance: channel.balance.to_string()
   }
 }
 
@@ -85,8 +85,8 @@ const openingRequests = new Map<string, DeferType<void>>()
  * @returns List of incoming and outgoing channels associated with the node.
  */
 export const getChannels = async (node: Hopr, includingClosed: boolean) => {
-  const selfPubKey = PublicKey.fromPeerId(node.getId())
-  const selfAddress = selfPubKey.toAddress()
+  const selfPubKey = PublicKey.from_peerid_str(node.getId().toString())
+  const selfAddress = selfPubKey.to_address()
 
   const channelsFrom: ChannelInfo[] = (await node.getChannelsFrom(selfAddress))
     .filter((channel) => includingClosed || channel.status !== ChannelStatus.Closed)
@@ -247,7 +247,7 @@ async function validateOpenChannelParameters(
   }
 
   const balance = await node.getBalance()
-  if (amount.lten(0) || balance.toBN().lt(amount)) {
+  if (amount.lten(0) || balance.lt(balance.of_same(amount.toString()))) {
     return {
       valid: false,
       reason: STATUS_CODES.NOT_ENOUGH_BALANCE
@@ -286,23 +286,23 @@ export async function openChannel(
     return { success: false, reason: validationResult.reason }
   }
 
-  const channelId = generateChannelId(
+  const channelId = generate_channel_id(
     node.getEthereumAddress(),
-    PublicKey.fromPeerId(validationResult.counterparty).toAddress()
+    PublicKey.from_peerid_str(validationResult.counterparty.toString()).to_address()
   )
 
-  let openingRequest = openingRequests.get(channelId.toHex())
+  let openingRequest = openingRequests.get(channelId.to_hex())
 
   if (openingRequest == null) {
     openingRequest = defer<void>()
-    openingRequests.set(channelId.toHex(), openingRequest)
+    openingRequests.set(channelId.to_hex(), openingRequest)
   } else {
     await openingRequest.promise
   }
 
   try {
     const { channelId, receipt } = await node.openChannel(validationResult.counterparty, validationResult.amount)
-    return { success: true, channelId: channelId.toHex(), receipt }
+    return { success: true, channelId: channelId.to_hex(), receipt }
   } catch (err) {
     const errString = err instanceof Error ? err.message : err?.toString?.() ?? STATUS_CODES.UNKNOWN_FAILURE
 
@@ -312,7 +312,7 @@ export async function openChannel(
       return { success: false, reason: STATUS_CODES.UNKNOWN_FAILURE }
     }
   } finally {
-    openingRequests.delete(channelId.toHex())
+    openingRequests.delete(channelId.to_hex())
     openingRequest.resolve()
   }
 

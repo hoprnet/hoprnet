@@ -1,5 +1,4 @@
 import {
-  Hash as Rust_HASH,
   PRG as Rust_PRG,
   PRGParameters as Rust_PRGParameters,
   PRP as Rust_PRP,
@@ -8,39 +7,37 @@ import {
   derive_packet_tag,
   iterate_hash,
   recover_iterated_hash,
-  create_tagged_mac
-} from './cryptography.js'
+  create_tagged_mac,
+  core_crypto_set_panic_hook
+} from '../../core/lib/core_crypto.js'
+
+core_crypto_set_panic_hook()
+
+import { webcrypto } from 'node:crypto'
+// @ts-ignore
+globalThis.crypto = webcrypto
 
 import {
   generateKeyShares,
-  Hash,
   iterateHash,
   PRG as TS_PRG,
   PRP as TS_PRP,
   recoverIteratedHash,
-  stringToU8a,
-  u8aEquals,
-  u8aToHex,
-  SECRET_LENGTH,
   createMAC,
   keyShareTransform as forwardTransform,
   derivePacketTag,
   derivePRGParameters,
   derivePRPParameters
-} from '@hoprnet/hopr-utils'
+} from './crypto/index.js'
 
 import assert from 'assert'
 
 import { createSecp256k1PeerId } from '@libp2p/peer-id-factory'
+import { stringToU8a, u8aEquals, u8aToHex } from './u8a/index.js'
+import { SECRET_LENGTH } from './constants.js'
+import { Hash } from './types.js'
 
 describe('cryptographic correspondence tests', async function () {
-  it('digest correspondence', async function () {
-    let data = new Uint8Array(32).fill(1)
-    let h1 = Hash.create(data).serialize()
-    let h2 = Rust_HASH.create([data]).serialize()
-    assert(u8aEquals(h1, h2))
-  })
-
   it('mac correspondence', async function () {
     let data = new Uint8Array(32).fill(1)
     let key = new Uint8Array(32)
@@ -203,7 +200,7 @@ describe('cryptographic correspondence tests', async function () {
 
   it('correspondence of iterated hash & recovery', async function () {
     let seed = new Uint8Array(16)
-    let hashFn = (msg: Uint8Array) => Hash.create(msg).serialize().slice(0, Hash.SIZE)
+    let hashFn = (msg: Uint8Array) => Hash.create([msg]).serialize().slice(0, Hash.size())
     let TS_iterated = await iterateHash(seed, hashFn, 1000, 10)
     let RS_iterated = iterate_hash(seed, 1000, 10)
 
