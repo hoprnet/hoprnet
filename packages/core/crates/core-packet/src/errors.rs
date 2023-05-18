@@ -17,8 +17,8 @@ pub enum PacketError {
     #[error("packet tag already present, possible replay")]
     TagReplay,
 
-    #[error("ticket validation failed, packet dropped")]
-    TicketValidation,
+    #[error("ticket validation failed, packet dropped: {0}")]
+    TicketValidation(String),
 
     #[error("Proof of Relay challenge could not be verified")]
     PoRVerificationError,

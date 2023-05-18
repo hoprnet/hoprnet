@@ -54,7 +54,7 @@ impl<T: HoprCoreDbActions> PacketInteraction<T> {
         todo!("send message")
     }
 
-    async fn internal_validate_unack_ticket(&self,
+    async fn validate_unacknowledged_ticket(&self,
                                             them: &PublicKey,
                                             min_ticket_amount: Balance,
                                             req_inverse_ticket_win_prob: U256,
@@ -115,6 +115,7 @@ impl<T: HoprCoreDbActions> PacketInteraction<T> {
 
         match packet.state() {
             PacketState::Outgoing { .. } => return Err(InvalidPacketState),
+
             PacketState::Final { plain_text, previous_hop, .. } => {
                 // We're the destination of the packet, so emit the packet contents
                 (self.message_emitter)(plain_text.as_ref());
@@ -124,20 +125,23 @@ impl<T: HoprCoreDbActions> PacketInteraction<T> {
                 self.ack_interaction.send_acknowledgement(ack, previous_hop.to_peerid());
                 return Ok(())
             },
+
             PacketState::Forwarded { ack_challenge, previous_hop, own_key, next_hop, .. } => {
+                let inverse_win_prob = U256::new(INVERSE_TICKET_WIN_PROB);
+
                 // Validate the ticket first
                 let channel = self.db.get_channel_from(&previous_hop).await?;
-                if let Err(e) = self.internal_validate_unack_ticket(
+                if let Err(e) = self.validate_unacknowledged_ticket(
                     &previous_hop,
                     Balance::from_str(PRICE_PER_PACKET, BalanceType::HOPR),
-                    U256::new(INVERSE_TICKET_WIN_PROB),
+                    inverse_win_prob,
                     &packet.ticket,
                     &channel,
                     self.check_unrealized_balance
                 ).await {
+                    // Mark as reject and passthrough the error
                     self.db.mark_rejected(&packet.ticket).await?;
-                    error!("ticket validation failed, marked as rejected: {}", e);
-                    return Err(TicketValidation);
+                    return Err(e);
                 }
 
                 // TODO: await self.db.set_current_ticket_index(channel.get_id().hash(), packet_ticket.index);
@@ -154,7 +158,7 @@ impl<T: HoprCoreDbActions> PacketInteraction<T> {
 
                 let path_pos = packet.ticket.get_path_position(
                     U256::new(PRICE_PER_PACKET),
-                    U256::new(INVERSE_TICKET_WIN_PROB)
+                    inverse_win_prob
                 );
 
                 // Create next ticket for the packet
