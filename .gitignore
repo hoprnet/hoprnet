@@ -6,9 +6,6 @@
 **/.idea
 **/gha-creds-*.json
 
-# make sure anything which is vendored is copied
-!/vendor/**/*
-
 # Exclude databases resulting from local execution of hoprd
 /db
 
@@ -232,3 +229,6 @@ cython_debug/
 
 # Ignore debugging identity file
 debug-identity
+
+# make sure anything which is vendored is copied
+!/vendor/**/*

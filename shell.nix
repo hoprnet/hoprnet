@@ -21,7 +21,7 @@ let
     ## rust for core development and required utils
     (rust-bin.fromRustupToolchainFile ./rust-toolchain.toml)
     protobuf # v3.21.12
-    wasm-pack # v0.10.3
+    wasm-pack # v0.11.1
     binaryen # v111 (includes wasm-opt)
     wasm-bindgen-cli # v0.2.83
 
