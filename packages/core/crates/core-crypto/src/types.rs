@@ -1467,8 +1467,20 @@ pub mod wasm {
         }
     }
 
+    #[wasm_bindgen(getter_with_clone)]
+    pub struct KeyPair {
+        pub private: Box<[u8]>,
+        pub public: PublicKey,
+    }
+
     #[wasm_bindgen]
     impl PublicKey {
+        #[wasm_bindgen(js_name = "random_keypair")]
+        pub fn _random_keypair() -> KeyPair {
+            let (private, public) = Self::random_keypair();
+            KeyPair { private, public }
+        }
+
         #[wasm_bindgen(js_name = "deserialize")]
         pub fn _deserialize(bytes: &[u8]) -> JsResult<PublicKey> {
             ok_or_jserr!(PublicKey::from_bytes(bytes))

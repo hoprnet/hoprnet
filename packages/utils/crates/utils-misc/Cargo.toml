@@ -17,7 +17,7 @@ wasm = [ "dep:wasm-bindgen", "dep:js-sys", "dep:wasm-bindgen-futures", "dep:serd
 console_error_panic_hook = [ "dep:console_error_panic_hook" ]
 
 [dependencies]
-futures = "0.3.25"
+futures = "0.3.28"
 real-base = { path = "../../../real/crates/real-base" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -27,7 +27,7 @@ js-sys = { version = "0.3.61", optional = true }
 utils-proc-macros = { path = "../../../utils/crates/utils-proc-macros" }
 wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen-futures = { version = "0.4.34", optional = true, features = ["futures-core-03-stream"] }
-console_error_panic_hook = { version = "0.1.6", optional = true }
+console_error_panic_hook = { version = "0.1.7", optional = true }
 #wee_alloc = { version = "0.4.5", optional = true }
 
 [dev-dependencies]

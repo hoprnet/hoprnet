@@ -534,7 +534,7 @@ pub mod wasm {
         }
 
         #[wasm_bindgen(js_name = "deserialize")]
-        pub fn deserialize_address(data: &[u8]) -> JsResult<Address> {
+        pub fn _deserialize(data: &[u8]) -> JsResult<Address> {
             ok_or_jserr!(Address::from_bytes(data))
         }
 
@@ -650,6 +650,11 @@ pub mod wasm {
 
     #[wasm_bindgen]
     impl U256 {
+        #[wasm_bindgen(js_name = "from")]
+        pub fn _from(value: u32) -> U256 {
+            value.into()
+        }
+
         #[wasm_bindgen(js_name = "deserialize")]
         pub fn _deserialize(data: &[u8]) -> JsResult<U256> {
             ok_or_jserr!(U256::from_bytes(data))

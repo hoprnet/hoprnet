@@ -972,7 +972,7 @@ dependencies = [
 
 [[package]]
 name = "core-crypto"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "aes",
  "blake2",
@@ -1117,6 +1117,25 @@ dependencies = [
  "validator",
  "wasm-bindgen",
  "wasm-bindgen-futures",
+ "wasm-bindgen-test",
+]
+
+[[package]]
+name = "core-packet"
+version = "0.1.0"
+dependencies = [
+ "console_error_panic_hook",
+ "core-crypto",
+ "core-types",
+ "js-sys",
+ "libp2p-identity",
+ "parameterized",
+ "thiserror",
+ "utils-log",
+ "utils-metrics",
+ "utils-misc",
+ "utils-types",
+ "wasm-bindgen",
  "wasm-bindgen-test",
 ]
 

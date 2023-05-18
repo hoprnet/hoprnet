@@ -94,7 +94,7 @@ import {
 import { AcknowledgementInteraction } from './interactions/packet/acknowledgement.js'
 import { PacketForwardInteraction } from './interactions/packet/forward.js'
 
-import { Packet } from './messages/index.js'
+import { Packet, PacketHelper } from './messages/index.js'
 import type { ResolvedEnvironment } from './environment.js'
 import { createLibp2pInstance } from './main.js'
 import type { EventEmitter as Libp2pEmitter } from '@libp2p/interfaces/events'
@@ -1020,7 +1020,7 @@ class Hopr extends EventEmitter {
 
     let packet: Packet
     try {
-      packet = await Packet.create(
+      packet = await PacketHelper.create(
         msg,
         path.map((x) => peerIdFromString(x.to_peerid_str())),
         this.getId(),
@@ -1032,7 +1032,7 @@ class Hopr extends EventEmitter {
       throw Error(`Error while creating packet.`)
     }
 
-    await packet.storePendingAcknowledgement(this.db)
+    await PacketHelper.storePendingAcknowledgement(packet, this.db)
 
     try {
       await this.forward.interact(peerIdFromString(path[0].to_peerid_str()), packet)
@@ -1043,7 +1043,7 @@ class Hopr extends EventEmitter {
     }
 
     metric_sentMessageCount.increment()
-    return packet.ackChallenge.to_hex()
+    return packet.ack_challenge().to_hex()
   }
 
   /**

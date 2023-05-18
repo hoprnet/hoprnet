@@ -14,7 +14,7 @@ import {
 import type { SendMessage } from '../../index.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { ACKNOWLEDGEMENT_TIMEOUT } from '../../constants.js'
-import { Packet } from '../../messages/index.js'
+import { Packet, privateKeyFromPeer } from '../../messages/index.js'
 import { Pushable, pushable } from 'it-pushable'
 import type { ResolvedEnvironment } from '../../environment.js'
 import type { Components } from '@libp2p/interfaces/components'
@@ -116,7 +116,7 @@ export class AcknowledgementInteraction {
     }
   }
   sendAcknowledgement(packet: Packet, destination: PeerId): void {
-    const ack = packet.createAcknowledgement(this.privKey)
+    const ack = packet.create_acknowledgement(privateKeyFromPeer(this.privKey))
     metric_sentAcks.increment()
     this.outgoingAcks.push([ack.serialize(), destination])
   }
