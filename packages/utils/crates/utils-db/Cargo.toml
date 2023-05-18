@@ -1,8 +1,9 @@
 [package]
 name = "utils-db"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
+description = "Generic database backend implementation"
 license = "GPL-3.0-only"
 
 [lib]

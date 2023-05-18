@@ -1,7 +1,7 @@
 [package]
 name = "core-packet"
-version = "0.1.0"
-description = "Contains high-level HOPR protocol building blocks"
+version = "0.2.0"
+description = "Contains high-level HOPR protocol building blocks for packet interaction"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 homepage = "https://hoprnet.org/"
@@ -17,10 +17,13 @@ wasm = ["dep:wasm-bindgen", "dep:js-sys"]
 
 [dependencies]
 core-crypto = { path = "../core-crypto" }
+core-db = { path = "../core-db" }
 core-types = { path = "../core-types" }
+futures = "0.3"
 js-sys = { version = "0.3.60", optional = true }
 libp2p-identity = { version = "0.1.1", features = ["secp256k1", "peerid"] }
 thiserror = "1.0"
+utils-db = { path = "../../../utils/crates/utils-db" }
 utils-log = { path = "../../../utils/crates/utils-log" }
 utils-metrics = { path = "../../../utils/crates/utils-metrics" }
 utils-misc = { path = "../../../utils/crates/utils-misc" }

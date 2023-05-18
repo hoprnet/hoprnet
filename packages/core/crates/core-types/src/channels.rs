@@ -283,14 +283,14 @@ impl Ticket {
     /// Decides whether a ticket is a win or not.
     /// Note that this mimics the on-chain logic.
     /// Purpose of the function is to check the validity of ticket before we submit it to the blockchain.
-    pub fn is_winning(&self, preimage: &Hash, channel_response: &Response, win_prob: &U256) -> bool {
+    pub fn is_winning(&self, preimage: &Hash, channel_response: &Response, win_prob: U256) -> bool {
         let luck = self.get_luck(preimage, channel_response);
         luck.value().le(win_prob.value())
     }
 
     /// Based on the price of this ticket, determines the path position (hop number) this ticket
     /// relates to.
-    pub fn get_path_position(&self, price_per_packet: &U256, inverse_ticket_win_prob: &U256) -> u8 {
+    pub fn get_path_position(&self, price_per_packet: U256, inverse_ticket_win_prob: U256) -> u8 {
         let base_unit = price_per_packet.value().mul(inverse_ticket_win_prob.value());
         self.amount.value().value().div(base_unit).as_u8()
     }

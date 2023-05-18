@@ -879,7 +879,7 @@ dependencies = [
 
 [[package]]
 name = "core-db"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-trait",
  "console_error_panic_hook",
@@ -993,15 +993,18 @@ dependencies = [
 
 [[package]]
 name = "core-packet"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "console_error_panic_hook",
  "core-crypto",
+ "core-db",
  "core-types",
+ "futures",
  "js-sys",
  "libp2p-identity",
  "parameterized",
  "thiserror",
+ "utils-db",
  "utils-log",
  "utils-metrics",
  "utils-misc",
@@ -4685,7 +4688,7 @@ checksum = "711b9620af191e0cdc7468a8d14e709c3dcdb115b36f838e601583af800a370a"
 
 [[package]]
 name = "utils-db"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-std",
  "async-trait",
@@ -4766,7 +4769,7 @@ dependencies = [
 
 [[package]]
 name = "utils-types"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "bincode",
  "console_error_panic_hook",

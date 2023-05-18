@@ -1,6 +1,7 @@
 pub mod errors;
 pub mod packet;
 pub mod por;
+pub mod interaction;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {

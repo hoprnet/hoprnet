@@ -1,9 +1,9 @@
 use ethnum::{u256, AsU256};
 use serde::{Deserialize, Serialize};
-use std::ops::{Add, Mul, Sub};
+use std::ops::{Add, Div, Mul, Sub};
 use std::string::ToString;
 
-use crate::errors::{GeneralError::InvalidInput, GeneralError::ParseError, Result};
+use crate::errors::{GeneralError, GeneralError::InvalidInput, GeneralError::ParseError, Result};
 use crate::traits::{BinarySerializable, ToHex};
 
 /// Represents an Ethereum address
@@ -65,9 +65,10 @@ impl BinarySerializable<'_> for Address {
     }
 }
 
-impl Address {
-    // impl std::str::FromStr for Address {
-    pub fn from_str(value: &str) -> Result<Address> {
+impl std::str::FromStr for Address {
+    type Err = GeneralError;
+
+    fn from_str(value: &str) -> Result<Address> {
         let decoded = if value.starts_with("0x") || value.starts_with("0X") {
             hex::decode(&value[2..])
         } else {
@@ -75,7 +76,6 @@ impl Address {
         };
         Self::from_bytes(&decoded.map_err(|_| ParseError)?)
     }
-    // }
 }
 
 /// Represents a type of the balance: native or HOPR tokens.
@@ -87,7 +87,7 @@ pub enum BalanceType {
 }
 
 /// Represents balance of some coin or token.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Balance {
     value: U256,
@@ -134,6 +134,14 @@ impl Balance {
         self.value.to_string()
     }
     // }
+
+    pub fn to_formatted_string(&self) -> String {
+        format!(
+            "{} {:?}",
+            self.value().value().div(&u256::from(10u16).pow(18)),
+            self.balance_type
+        )
+    }
 
     /// Serializes just the value of the balance (not the symbol)
     pub fn serialize_value(&self) -> Box<[u8]> {
@@ -340,7 +348,7 @@ impl BinarySerializable<'_> for Snapshot {
 }
 
 /// Represents the Ethereum's basic numeric type - unsigned 256-bit integer
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct U256 {
     value: u256,
@@ -356,11 +364,11 @@ impl U256 {
     }
 
     pub fn zero() -> Self {
-        U256 { value: u256::ZERO }
+        Self { value: u256::ZERO }
     }
 
     pub fn one() -> Self {
-        U256 { value: u256::ONE }
+        Self { value: u256::ONE }
     }
 
     pub fn to_string(&self) -> String {
@@ -374,13 +382,23 @@ impl U256 {
     pub fn as_u64(&self) -> u64 {
         self.value.as_u64()
     }
+
+    pub fn muln(&self, n: u32) -> Self { Self { value: self.value * n as u128 } }
+}
+
+impl Mul for U256 {
+    type Output = U256;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        Self { value: self.value.mul(rhs.value) }
+    }
 }
 
 impl BinarySerializable<'_> for U256 {
     const SIZE: usize = 32;
 
     fn from_bytes(data: &[u8]) -> Result<Self> {
-        Ok(U256 {
+        Ok(Self {
             value: u256::from_be_bytes(data.try_into().map_err(|_| ParseError)?),
         })
     }
@@ -431,14 +449,14 @@ impl U256 {
         &self.value
     }
 
-    pub fn from_inverse_probability(inverse_prob: &u256) -> Result<U256> {
+    pub fn from_inverse_probability(inverse_prob: U256) -> Result<U256> {
         let highest_prob = u256::MAX;
-        if inverse_prob.gt(&u256::ZERO) {
-            Ok(U256 {
-                value: highest_prob / inverse_prob,
+        if inverse_prob.value.gt(&u256::ZERO) {
+            Ok(Self {
+                value: highest_prob / inverse_prob.value,
             })
-        } else if inverse_prob.eq(&u256::ZERO) {
-            Ok(U256 { value: highest_prob })
+        } else if inverse_prob.value.eq(&u256::ZERO) {
+            Ok(Self { value: highest_prob })
         } else {
             Err(InvalidInput)
         }
@@ -448,6 +466,7 @@ impl U256 {
 /// Unit tests of pure Rust code
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
     use super::*;
     use hex_literal::hex;
 
@@ -521,7 +540,8 @@ pub mod wasm {
     use crate::traits::{BinarySerializable, ToHex};
     use ethnum::u256;
     use std::cmp::Ordering;
-    use std::ops::{Add, Div};
+    use std::ops::Add;
+    use std::str::FromStr;
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use wasm_bindgen::prelude::wasm_bindgen;
@@ -573,15 +593,6 @@ pub mod wasm {
         #[wasm_bindgen(js_name = "eq")]
         pub fn _eq(&self, other: &Balance) -> bool {
             self.eq(other)
-        }
-
-        #[wasm_bindgen(js_name = "to_formatted_string")]
-        pub fn _to_formatted_string(&self) -> String {
-            format!(
-                "{} {:?}",
-                self.value().value().div(&u256::from(10u16).pow(18)),
-                self.balance_type
-            )
         }
 
         #[wasm_bindgen(js_name = "clone")]
@@ -672,7 +683,7 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "from_inverse_probability")]
         pub fn _from_inverse_probability(inverse_prob: &U256) -> JsResult<U256> {
-            ok_or_jserr!(U256::from_inverse_probability(inverse_prob.value()))
+            ok_or_jserr!(U256::from_inverse_probability(*inverse_prob))
         }
 
         pub fn addn(&self, amount: u32) -> Self {

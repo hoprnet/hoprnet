@@ -69,10 +69,10 @@ impl Key {
         })
     }
 
-    pub fn new_bytes_with_prefix(object: Box<[u8]>, prefix: &str) -> Result<Self> {
+    pub fn new_bytes_with_prefix(object: &[u8], prefix: &str) -> Result<Self> {
         let mut result = Vec::with_capacity(prefix.len() + object.len());
         result.extend_from_slice(prefix.as_bytes().as_ref());
-        result.extend_from_slice(object.as_ref());
+        result.extend_from_slice(object);
 
         Ok(Self {
             key: result.into_boxed_slice(),

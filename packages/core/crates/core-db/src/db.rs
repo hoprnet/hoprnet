@@ -51,13 +51,13 @@ impl<T: BinaryAsyncKVStorage> HoprCoreDbActions for CoreDb<T> {
         Ok(())
     }
 
-    async fn get_tickets(&self, signer: PublicKey) -> Result<Vec<Ticket>> {
+    async fn get_tickets(&self, signer: &PublicKey) -> Result<Vec<Ticket>> {
         let mut tickets = self
             .db
             .get_more::<AcknowledgedTicket>(
                 Vec::from(ACKNOWLEDGED_TICKETS_PREFIX.as_bytes()).into_boxed_slice(),
                 EthereumChallenge::size(),
-                &|v: &AcknowledgedTicket| signer == v.signer,
+                &|v: &AcknowledgedTicket| v.signer.eq(signer),
             )
             .await?
             .into_iter()
@@ -72,7 +72,7 @@ impl<T: BinaryAsyncKVStorage> HoprCoreDbActions for CoreDb<T> {
                 HalfKeyChallenge::size(),
                 &move |v: &PendingAcknowledgement| match v {
                     PendingAcknowledgement::WaitingAsSender => false,
-                    PendingAcknowledgement::WaitingAsRelayer(unack) => signer == unack.signer,
+                    PendingAcknowledgement::WaitingAsRelayer(unack) => unack.signer.eq(signer),
                 },
             )
             .await?
@@ -120,7 +120,7 @@ impl<T: BinaryAsyncKVStorage> HoprCoreDbActions for CoreDb<T> {
     }
 
     /// TODO: missing key prefix?
-    async fn get_channel_to(&self, dest: PublicKey) -> Result<ChannelEntry> {
+    async fn get_channel_to(&self, dest: &PublicKey) -> Result<ChannelEntry> {
         let from = serialize_to_bytes(&self.me.to_address())?;
         let to = serialize_to_bytes(&dest.to_address())?;
 
@@ -130,7 +130,7 @@ impl<T: BinaryAsyncKVStorage> HoprCoreDbActions for CoreDb<T> {
     }
 
     /// TODO: missing key prefix?
-    async fn get_channel_from(&self, origin: PublicKey) -> Result<ChannelEntry> {
+    async fn get_channel_from(&self, origin: &PublicKey) -> Result<ChannelEntry> {
         let to = serialize_to_bytes(&self.me.to_address())?;
         let from = serialize_to_bytes(&origin.to_address())?;
 
@@ -145,7 +145,7 @@ impl<T: BinaryAsyncKVStorage> HoprCoreDbActions for CoreDb<T> {
         self.db.get::<Balance>(key).await
     }
 
-    async fn check_and_set_packet_tag(&mut self, tag: Box<[u8]>) -> Result<bool> {
+    async fn check_and_set_packet_tag(&mut self, tag: &[u8]) -> Result<bool> {
         let key = utils_db::db::Key::new_bytes_with_prefix(tag, PACKET_TAG_PREFIX)?;
 
         let has_packet_tag = self.db.contains(key.clone()).await;
@@ -157,8 +157,8 @@ impl<T: BinaryAsyncKVStorage> HoprCoreDbActions for CoreDb<T> {
         Ok(has_packet_tag)
     }
 
-    async fn get_pending_acknowledgement(&self, half_key_challenge: HalfKeyChallenge) -> Result<Option<PendingAcknowledgement>> {
-        let key = utils_db::db::Key::new_with_prefix(&half_key_challenge, PENDING_ACKNOWLEDGEMENTS_PREFIX)?;
+    async fn get_pending_acknowledgement(&self, half_key_challenge: &HalfKeyChallenge) -> Result<Option<PendingAcknowledgement>> {
+        let key = utils_db::db::Key::new_with_prefix(half_key_challenge, PENDING_ACKNOWLEDGEMENTS_PREFIX)?;
         if self.db.contains(key.clone()).await {
             let value = self.db.get::<PendingAcknowledgement>(key).await?;
             Ok(Some(value))
