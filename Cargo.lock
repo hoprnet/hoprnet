@@ -904,6 +904,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "console_error_panic_hook",
+ "core-crypto",
  "core-types",
  "serde",
  "utils-db",

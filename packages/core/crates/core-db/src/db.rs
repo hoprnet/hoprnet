@@ -7,6 +7,7 @@ use core_types::channels::{ChannelEntry, Ticket};
 use utils_db::{
     db::{serialize_to_bytes, DB},
     traits::BinaryAsyncKVStorage,
+    constants::*
 };
 use utils_types::{
     primitives::{Address, Balance, EthereumChallenge, U256},
@@ -17,15 +18,7 @@ use utils_types::primitives::Snapshot;
 use crate::errors::Result;
 use crate::traits::HoprCoreDbActions;
 
-const CHANNEL_PREFIX: &str = "channel-";
-const TICKET_INDEX_PREFIX: &str = "ticketIndex-";
-const PENDING_TICKETS_COUNT: &str = "statistics:pending:value-";
-const REJECTED_TICKETS_COUNT: &str = "statistics:rejected:count";
-const REJECTED_TICKETS_VALUE: &str = "statistics:rejected:value";
-const PACKET_TAG_PREFIX: &str = "packets:tag-";
-const LATEST_CONFIRMED_SNAPSHOT_KEY: &str = "latestConfirmedSnapshot";
-const PENDING_ACKNOWLEDGEMENTS_PREFIX: &str = "tickets:pending-acknowledgement-";
-const ACKNOWLEDGED_TICKETS_PREFIX: &str = "tickets:acknowledged-";
+
 
 pub struct CoreDb<T>
 where
@@ -179,7 +172,7 @@ impl<T: BinaryAsyncKVStorage> HoprCoreDbActions for CoreDb<T> {
         let mut channel_epoch = serialize_to_bytes(&ack_ticket.ticket.channel_epoch)?;
         ack_key.append(&mut channel_epoch);
 
-        let ack_key = utils_db::db::Key::new_bytes_with_prefix(&ack_key, ACKNOWLEDGED_TICKETS_PREFIX)?;
+        let ack_key = utils_db::db::Key::new_bytes_with_prefix(ack_key.into_boxed_slice(), ACKNOWLEDGED_TICKETS_PREFIX)?;
 
         let mut batch_ops = utils_db::db::Batch::new();
         batch_ops.del(unack_key);
@@ -219,7 +212,7 @@ mod tests {
     use utils_types::traits::BinarySerializable;
 
     #[test]
-    fn test_core_db_iterable_type_EhtereumChallenge_must_have_fixed_key_length() {
+    fn test_core_db_iterable_type_ehtereum_challenge_must_have_fixed_key_length() {
         let challenge = vec![10u8; EthereumChallenge::SIZE];
         let eth_challenge = EthereumChallenge::new(challenge.as_slice());
 
@@ -230,7 +223,7 @@ mod tests {
     }
 
     #[test]
-    fn test_core_db_iterable_type_HalfKeyChallenge_must_have_fixed_key_length() {
+    fn test_core_db_iterable_type_half_key_challenge_must_have_fixed_key_length() {
         let challenge = vec![10u8; HalfKeyChallenge::SIZE];
         let eth_challenge = HalfKeyChallenge::new(challenge.as_slice());
 

@@ -4,6 +4,7 @@ pub mod hashmap;
 pub mod leveldb;
 pub mod traits;
 pub mod types;
+pub mod constants;
 
 pub use traits::KVStorage;
 

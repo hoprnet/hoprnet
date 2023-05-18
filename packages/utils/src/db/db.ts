@@ -195,7 +195,7 @@ export class LevelDb {
     await this.backend.del(Buffer.from(key))
   }
 
-  public async batch(ops: Array<any>, wait_for_write = false): Promise<void> {
+  public async batch(ops: Array<any>, wait_for_write = true): Promise<void> {
     const options: { sync: boolean } = {
       sync: wait_for_write
     }
@@ -283,6 +283,24 @@ export class LevelDb {
       .on('end', function () {
         dumpFile.close()
       })
+  }
+
+  private async setEnvironmentId(environment_id: string): Promise<void> {
+    await this.put(ENVIRONMENT_KEY, encoder.encode(environment_id))
+  }
+
+  private async getEnvironmentId(): Promise<string> {
+    return decoder.decode(await this.maybeGet(ENVIRONMENT_KEY))
+  }
+
+  private async verifyEnvironmentId(expectedId: string): Promise<boolean> {
+    const storedId = await this.getEnvironmentId()
+
+    if (storedId == undefined) {
+      return false
+    }
+
+    return storedId === expectedId
   }
 }
 
@@ -683,9 +701,10 @@ export class HoprDB {
     return await this.getCoercedOrDefault<Snapshot>(LATEST_CONFIRMED_SNAPSHOT_KEY, Snapshot.deserialize, undefined)
   }
 
-  async updateLatestConfirmedSnapshot(snapshot: Snapshot): Promise<void> {
-    await this.db.put(LATEST_CONFIRMED_SNAPSHOT_KEY, snapshot.serialize())
-  }
+  // Unused
+  // async updateLatestConfirmedSnapshot(snapshot: Snapshot): Promise<void> {
+  //   await this.db.put(LATEST_CONFIRMED_SNAPSHOT_KEY, snapshot.serialize())
+  // }
 
   async getChannel(channelId: Hash): Promise<ChannelEntry> {
     return await this.getCoerced<ChannelEntry>(createChannelKey(channelId), ChannelEntry.deserialize)
@@ -902,24 +921,6 @@ export class HoprDB {
         yield channel
       }
     }
-  }
-
-  public async setEnvironmentId(environment_id: string): Promise<void> {
-    await this.db.put(ENVIRONMENT_KEY, encoder.encode(environment_id))
-  }
-
-  public async getEnvironmentId(): Promise<string> {
-    return decoder.decode(await this.maybeGet(ENVIRONMENT_KEY))
-  }
-
-  public async verifyEnvironmentId(expectedId: string): Promise<boolean> {
-    const storedId = await this.getEnvironmentId()
-
-    if (storedId == undefined) {
-      return false
-    }
-
-    return storedId === expectedId
   }
 
   public async getHoprBalance(): Promise<Balance> {

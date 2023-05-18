@@ -115,6 +115,15 @@ impl<T: BinaryAsyncKVStorage> DB<T> {
             .and_then(|v| bincode::deserialize(v.as_ref()).map_err(|e| DbError::DeserializationError(e.to_string())))
     }
 
+    pub async fn get_or_none<V: DeserializeOwned>(&self, key: Key) -> Result<Option<V>> {
+        if self.contains(key.clone()).await {
+            self.get::<V>(key).await
+                .map(|v| Some(v))
+        } else {
+            Ok(None)
+        }
+    }
+
     pub async fn set<V>(&mut self, key: Key, value: &V) -> Result<Option<V>>
     where
         V: Serialize + DeserializeOwned,
