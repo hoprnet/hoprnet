@@ -11,6 +11,7 @@
 - Migrate interface for using the DB in core packet processing ([#5025](https://github.com/hoprnet/hoprnet/pull/5025))
 - Migrate all core types to Rust and remove all TypeScript types ([#5039](https://github.com/hoprnet/hoprnet/pull/5039))
 - Migrate packet construction code and all related cryptography to Rust and remove the Typescript implementation ([#4834](https://github.com/hoprnet/hoprnet/pull/4834))
+- All cryptography related code has been migrated to Rust with TS implementations removed ([#5063](https://github.com/hoprnet/hoprnet/pull/5063))
 
 <a name="1.93"></a>
 
