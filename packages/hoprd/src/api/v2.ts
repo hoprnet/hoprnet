@@ -50,7 +50,7 @@ async function handleWebsocketMessage(node: Hopr, data: string) {
       // only set path if given, otherwise a path will be chosen by hopr core
       let path: PublicKey[]
       if (args['path'] != undefined) {
-        path = args['path'].map((peer: string) => PublicKey.fromPeerId(peerIdFromString(peer)))
+        path = args['path'].map((peer: string) => PublicKey.from_peerid_str(peer))
       }
 
       // send message and return ack challenge over websocket
