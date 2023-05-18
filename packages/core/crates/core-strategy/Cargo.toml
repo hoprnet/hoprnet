@@ -19,7 +19,7 @@ console_error_panic_hook = [ "dep:console_error_panic_hook" ]
 [dependencies]
 core-types = { path = "../core-types" }
 getrandom = { version = "0.2.8", features = ["js"] }
-js-sys = { version = "0.3.61", optional = true }
+js-sys = { version = "0.3.63", optional = true }
 libp2p-identity = { version = "0.1.2", features = ["peerid"] }
 rand = "0.8.5"
 serde = { version = "1.0", features = ["derive"] }
@@ -34,7 +34,7 @@ console_error_panic_hook = { version = "0.1.7", optional = true }
 #wee_alloc = { version = "0.4.5", optional = true }
 
 [dev-dependencies]
-wasm-bindgen-test = "0.3.34"
+wasm-bindgen-test = "0.3.36"
 vector_assertions = "0.1.0"
 
 [target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
