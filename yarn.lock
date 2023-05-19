@@ -871,7 +871,7 @@ __metadata:
     "@libp2p/crypto": 1.0.0
     "@libp2p/interface-connection": 1.0.1
     "@libp2p/interface-connection-manager": 1.1.0
-    "@libp2p/interface-keys": 1.0.3
+    "@libp2p/interface-keys": 1.0.8
     "@libp2p/interface-peer-id": 1.0.5
     "@libp2p/interface-peer-store": 1.0.0
     "@libp2p/interface-registrar": 1.1.0
@@ -1131,14 +1131,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@libp2p/interface-keys@npm:1.0.3":
-  version: 1.0.3
-  resolution: "@libp2p/interface-keys@npm:1.0.3"
-  checksum: 0fb22e9964505c9a81c6a68f6f3714a40a9e097c0eda8a80a85961d15743dc478a58b080fe5f0f1556f6ff45f39e062bb821e705e87cadd4057ecbc5a4e4fade
-  languageName: node
-  linkType: hard
-
-"@libp2p/interface-keys@npm:^1.0.2":
+"@libp2p/interface-keys@npm:1.0.8, @libp2p/interface-keys@npm:^1.0.2":
   version: 1.0.8
   resolution: "@libp2p/interface-keys@npm:1.0.8"
   checksum: 08c2976b3436b6e4e6159d1c817bb9e41af41d159cb94afaa8c63cf0fbf8842b0e5ca758d6c38453a59d8e4e87cec3117e3c574d316b94fed8db842a77f6efb0
