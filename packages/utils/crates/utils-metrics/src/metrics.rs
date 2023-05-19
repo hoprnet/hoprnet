@@ -71,11 +71,30 @@ where
     Ok(metric)
 }
 
+pub trait SimpleMetric: Sized {
+    fn new(name: &str, description: &str) -> prometheus::Result<Self>;
+}
+
+/// Convenience method to construct any simple metric with the given name and description
+pub fn simple_metric<T: SimpleMetric>(name: &str, description: &str) -> T {
+    T::new(name, description).expect(&format!("failed to create simple metric {name}"))
+}
+
+pub trait MultiMetric: Sized {
+    fn new(name: &str, description: &str, labels: &[&str]) -> prometheus::Result<Self>;
+    fn labels(&self) -> &[String];
+}
+
+/// Convenience method to construct any multi metric with the given name, description and labels
+pub fn multi_metric<T: MultiMetric>(name: &str, description: &str, labels: &[&str]) -> T {
+    T::new(name, description, labels).expect(&format!("failed to create multi metric {name}"))
+}
+
 /// Represents a simple monotonic unsigned integer counter.
 /// Wrapper for IntCounter type
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct SimpleCounter {
-    name: String,
+    pub name: String,
     ctr: IntCounter,
 }
 
@@ -96,15 +115,11 @@ impl SimpleCounter {
         self.increment_by(1)
     }
 
-    /// Returns the name of the counter given at construction.
-    pub fn name(&self) -> String {
-        self.name.clone()
-    }
 }
 
-impl SimpleCounter {
+impl SimpleMetric for SimpleCounter {
     /// Creates a new integer counter with given name and description
-    pub fn new(name: &str, description: &str) -> prometheus::Result<Self> {
+    fn new(name: &str, description: &str) -> prometheus::Result<Self> {
         register_metric(name, description, IntCounter::with_opts).map(|m| Self {
             name: name.to_string(),
             ctr: m,
@@ -114,31 +129,29 @@ impl SimpleCounter {
 
 /// Represents a vector of named monotonic unsigned integer counters.
 /// Wrapper for IntCounterVec type
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct MultiCounter {
-    name: String,
+    pub name: String,
     labels: Vec<String>,
     ctr: IntCounterVec,
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-impl MultiCounter {
-    /// Returns the name of the counter vector given at construction.
-    pub fn name(&self) -> String {
-        self.name.clone()
-    }
-}
-
-impl MultiCounter {
+impl MultiMetric for MultiCounter {
     /// Creates a new vector of integer counters with given name, description and counter labels.
-    pub fn new(name: &str, description: &str, labels: &[&str]) -> prometheus::Result<Self> {
+    fn new(name: &str, description: &str, labels: &[&str]) -> prometheus::Result<Self> {
         register_metric_vec(name, description, labels, IntCounterVec::new).map(|m| Self {
             name: name.to_string(),
-            labels: Vec::from(labels).iter().map(|s| String::from(*s)).collect(),
+            labels: Vec::from(labels).into_iter().map(|s| String::from(s)).collect(),
             ctr: m,
         })
     }
 
+    fn labels(&self) -> &[String] {
+        &self.labels
+    }
+}
+
+impl MultiCounter {
     /// Increments counter with given labels by the given number.
     pub fn increment_by(&self, label_values: &[&str], by: u64) {
         if let Ok(c) = self.ctr.get_metric_with_label_values(label_values) {
@@ -158,19 +171,24 @@ impl MultiCounter {
             .map(|c| c.get())
             .ok()
     }
-
-    /// Returns the labels of the counters given at construction.
-    pub fn labels(&self) -> Vec<&str> {
-        self.labels.iter().map(String::as_str).collect()
-    }
 }
 
 /// Represents a simple gauge with floating point values.
 /// Wrapper for Gauge type
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct SimpleGauge {
-    name: String,
+    pub name: String,
     gg: Gauge,
+}
+
+impl SimpleMetric for SimpleGauge {
+    /// Creates a new gauge with given name and description.
+    fn new(name: &str, description: &str) -> prometheus::Result<Self> {
+        register_metric(name, description, Gauge::with_opts).map(|m| Self {
+            name: name.to_string(),
+            gg: m,
+        })
+    }
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -194,49 +212,33 @@ impl SimpleGauge {
     pub fn get(&self) -> f64 {
         self.gg.get()
     }
-
-    /// Returns the name of the gauge given at construction.
-    pub fn name(&self) -> String {
-        self.name.clone()
-    }
-}
-
-impl SimpleGauge {
-    /// Creates a new gauge with given name and description.
-    pub fn new(name: &str, description: &str) -> prometheus::Result<Self> {
-        register_metric(name, description, Gauge::with_opts).map(|m| Self {
-            name: name.to_string(),
-            gg: m,
-        })
-    }
 }
 
 /// Represents a vector of gauges with floating point values.
 /// Wrapper for GaugeVec type
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct MultiGauge {
-    name: String,
+    pub name: String,
     labels: Vec<String>,
     ctr: GaugeVec,
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-impl MultiGauge {
-    /// Returns the name of the gauge vector given at construction.
-    pub fn name(&self) -> String {
-        self.name.clone()
+impl MultiMetric for MultiGauge {
+    /// Creates a new vector of gauges with given name, description and counter labels.
+    fn new(name: &str, description: &str, labels: &[&str]) -> prometheus::Result<Self> {
+        register_metric_vec(name, description, labels, GaugeVec::new).map(|m| Self {
+            name: name.to_string(),
+            labels: Vec::from(labels).into_iter().map(|s| String::from(s)).collect(),
+            ctr: m,
+        })
+    }
+
+    fn labels(&self) -> &[String] {
+        &self.labels
     }
 }
 
 impl MultiGauge {
-    /// Creates a new vector of gauges with given name, description and counter labels.
-    pub fn new(name: &str, description: &str, labels: &[&str]) -> prometheus::Result<Self> {
-        register_metric_vec(name, description, labels, GaugeVec::new).map(|m| Self {
-            name: name.to_string(),
-            labels: Vec::from(labels).iter().map(|s| String::from(*s)).collect(),
-            ctr: m,
-        })
-    }
 
     /// Increments gauge with given labels by the given number.
     pub fn increment(&self, label_values: &[&str], by: f64) {
@@ -265,11 +267,6 @@ impl MultiGauge {
             .get_metric_with_label_values(label_values)
             .map(|c| c.get())
             .ok()
-    }
-
-    /// Returns the labels of the counters given at construction.
-    pub fn labels(&self) -> Vec<&str> {
-        self.labels.iter().map(String::as_str).collect()
     }
 }
 
@@ -316,9 +313,9 @@ pub struct SimpleTimer {
 
 /// Represents a histogram with floating point values.
 /// Wrapper for Histogram type
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct SimpleHistogram {
-    name: String,
+    pub name: String,
     hh: Histogram,
 }
 
@@ -354,10 +351,11 @@ impl SimpleHistogram {
     pub fn get_sample_sum(&self) -> f64 {
         self.hh.get_sample_sum()
     }
+}
 
-    /// Returns the name of the histogram given at construction.
-    pub fn name(&self) -> String {
-        self.name.clone()
+impl SimpleMetric for SimpleHistogram {
+    fn new(name: &str, description: &str) -> prometheus::Result<Self> {
+        SimpleHistogram::new_with_buckets(name, description, Vec::new())
     }
 }
 
@@ -365,7 +363,7 @@ impl SimpleHistogram {
     /// Creates a new histogram with the given name, description and buckets.
     /// If no buckets are specified, they will be defined automatically.
     /// The +Inf bucket is always added automatically.
-    pub fn new(name: &str, description: &str, buckets: Vec<f64>) -> prometheus::Result<Self> {
+    pub fn new_with_buckets(name: &str, description: &str, buckets: Vec<f64>) -> prometheus::Result<Self> {
         let mut opts = HistogramOpts::new(name, description);
         if !buckets.is_empty() {
             opts = opts.buckets(buckets);
@@ -391,11 +389,21 @@ impl SimpleHistogram {
 
 /// Represents a vector of histograms with floating point values.
 /// Wrapper for HistogramVec type
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct MultiHistogram {
-    name: String,
+    pub name: String,
     labels: Vec<String>,
     hh: HistogramVec,
+}
+
+impl MultiMetric for MultiHistogram {
+    fn new(name: &str, description: &str, labels: &[&str]) -> prometheus::Result<Self> {
+        MultiHistogram::new_with_buckets(name, description, Vec::new(), labels)
+    }
+
+    fn labels(&self) -> &[String] {
+        &self.labels
+    }
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -426,18 +434,13 @@ impl MultiHistogram {
             TimerVariant::WASM { start_ts, new_ts, .. } => new_ts() - start_ts,
         }
     }
-
-    /// Returns the name of the histogram given at construction.
-    pub fn name(&self) -> String {
-        self.name.clone()
-    }
 }
 
 impl MultiHistogram {
     /// Creates a new histogram with the given name, description and buckets.
     /// If no buckets are specified, they will be defined automatically.
     /// The +Inf bucket is always added automatically.
-    pub fn new(name: &str, description: &str, buckets: Vec<f64>, labels: &[&str]) -> prometheus::Result<Self> {
+    pub fn new_with_buckets(name: &str, description: &str, buckets: Vec<f64>, labels: &[&str]) -> prometheus::Result<Self> {
         let mut opts = HistogramOpts::new(name, description);
         if !buckets.is_empty() {
             opts = opts.buckets(buckets);
@@ -483,11 +486,6 @@ impl MultiHistogram {
             .map(|c| c.get_sample_sum())
             .ok()
     }
-
-    /// Returns the labels of the counters given at construction.
-    pub fn labels(&self) -> Vec<&str> {
-        self.labels.iter().map(String::as_str).collect()
-    }
 }
 
 #[cfg(test)]
@@ -513,7 +511,7 @@ mod tests {
         let counter = MultiCounter::new("my_mctr", "test multicounter", &["version"]).unwrap();
 
         assert_eq!("my_mctr", counter.name());
-        assert!(counter.labels().contains(&"version"));
+        assert!(counter.labels().contains(&"version".to_string()));
 
         counter.increment_by(&["1.90.1"], 10);
         counter.increment_by(&["1.89.20"], 1);
@@ -553,7 +551,7 @@ mod tests {
         let gauge = MultiGauge::new("my_mgauge", "test multicounter", &["version"]).unwrap();
 
         assert_eq!("my_mgauge", gauge.name());
-        assert!(gauge.labels().contains(&"version"));
+        assert!(gauge.labels().contains(&"version".to_string()));
 
         gauge.increment(&["1.90.1"], 10.0);
         gauge.increment(&["1.89.20"], 5.0);
@@ -595,7 +593,7 @@ mod tests {
 
     #[test]
     fn test_multi_histogram() {
-        let histogram = MultiHistogram::new(
+        let histogram = MultiHistogram::new_with_buckets(
             "my_mhistogram",
             "test histogram",
             vec![1.0, 2.0, 3.0, 4.0, 5.0],
@@ -604,7 +602,7 @@ mod tests {
         .unwrap();
 
         assert_eq!("my_mhistogram", histogram.name());
-        assert!(histogram.labels().contains(&"version"));
+        assert!(histogram.labels().contains(&"version".to_string()));
 
         histogram.observe(&["1.90.0"], 2.0);
         histogram.observe(&["1.90.0"], 2.0);
@@ -684,6 +682,7 @@ pub mod wasm {
     use crate::metrics::TimerVariant::WASM;
     use crate::metrics::{
         MultiCounter, MultiGauge, MultiHistogram, SimpleCounter, SimpleGauge, SimpleHistogram, SimpleTimer,
+        SimpleMetric, MultiMetric
     };
     use js_sys::JsString;
     use utils_misc::utils::wasm::JsResult;
@@ -787,7 +786,7 @@ pub mod wasm {
 
     #[wasm_bindgen]
     pub fn create_histogram_with_buckets(name: &str, description: &str, buckets: &[f64]) -> JsResult<SimpleHistogram> {
-        ok_or_jserr!(SimpleHistogram::new(name, description, buckets.into()))
+        ok_or_jserr!(SimpleHistogram::new_with_buckets(name, description, buckets.into()))
     }
 
     #[wasm_bindgen]
@@ -817,7 +816,7 @@ pub mod wasm {
         labels: Vec<JsString>,
     ) -> JsResult<MultiHistogram> {
         convert_from_jstrvec!(labels, bind);
-        ok_or_jserr!(MultiHistogram::new(name, description, buckets.into(), bind.as_slice()))
+        ok_or_jserr!(MultiHistogram::new_with_buckets(name, description, buckets.into(), bind.as_slice()))
     }
 
     #[wasm_bindgen]
