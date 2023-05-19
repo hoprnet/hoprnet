@@ -29,6 +29,9 @@ pub enum PacketError {
     #[error("channel {0} is out of funds")]
     OutOfFunds(String),
 
+    #[error("underlying transport error while sending packet: {0}")]
+    TransportError(String),
+
     #[error(transparent)]
     CryptographicError(#[from] CryptoError),
 

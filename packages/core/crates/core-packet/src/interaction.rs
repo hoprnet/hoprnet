@@ -1,6 +1,4 @@
-use crate::errors::PacketError::{
-    AcknowledgementValidation, InvalidPacketState, OutOfFunds, TagReplay, TicketValidation,
-};
+use crate::errors::PacketError::{AcknowledgementValidation, InvalidPacketState, OutOfFunds, TagReplay, TicketValidation, TransportError};
 use crate::errors::Result;
 use crate::packet::{Packet, PacketState};
 use crate::path::Path;
@@ -165,31 +163,31 @@ impl Default for PacketMetrics {
     }
 }
 
-pub struct PacketInteraction<T: HoprCoreDbActions> {
-    db: RefCell<T>,
-    ack_interaction: Arc<AcknowledgementInteraction<T>>,
-    message_emitter: fn(&[u8]),
+pub struct PacketInteractionConfig {
     check_unrealized_balance: bool,
-    private_key: Box<[u8]>,
+    private_key: Box<[u8]>
+}
+
+pub struct PacketInteraction<Db>
+where Db: HoprCoreDbActions {
+    db: RefCell<Db>,
+    ack_interaction: Arc<AcknowledgementInteraction<Db>>,
+    message_emitter: fn(&[u8]),
+    cfg: PacketInteractionConfig,
     metrics: PacketMetrics,
 }
 
-impl<T: HoprCoreDbActions> PacketInteraction<T> {
-    async fn check_packet_tag(&self, packet: &Packet) -> Result<()> {
-        match packet.state() {
-            PacketState::Final { packet_tag, .. } | PacketState::Forwarded { packet_tag, .. } => {
-                if self.db.borrow_mut().check_and_set_packet_tag(packet_tag).await? {
-                    Ok(())
-                } else {
-                    Err(TagReplay)
-                }
-            }
-            PacketState::Outgoing { .. } => Err(InvalidPacketState),
-        }
-    }
+impl<Db> PacketInteraction<Db>
+    where Db: HoprCoreDbActions {
 
-    async fn interact(&self, counterparty: PeerId, serialized_packet: &[u8]) -> Result<()> {
-        todo!("send message")
+    pub fn new(db: Db, ack_interaction: Arc<AcknowledgementInteraction<Db>>,  message_emitter: fn(&[u8]), cfg: PacketInteractionConfig) -> Self {
+        Self {
+            db: RefCell::new(db),
+            ack_interaction,
+            message_emitter,
+            cfg,
+            metrics: PacketMetrics::default()
+        }
     }
 
     async fn validate_unacknowledged_ticket(
@@ -199,7 +197,6 @@ impl<T: HoprCoreDbActions> PacketInteraction<T> {
         req_inverse_ticket_win_prob: U256,
         ticket: &Ticket,
         channel: &ChannelEntry,
-        check_unrealized_balance: bool,
     ) -> Result<()> {
         let required_win_prob = U256::from_inverse_probability(req_inverse_ticket_win_prob)?;
 
@@ -251,7 +248,7 @@ impl<T: HoprCoreDbActions> PacketInteraction<T> {
             )));
         }
 
-        if check_unrealized_balance {
+        if self.cfg.check_unrealized_balance {
             info!("checking unrealized balances for channel {}", channel.get_id());
 
             let unrealized_balance = self
@@ -324,7 +321,7 @@ impl<T: HoprCoreDbActions> PacketInteraction<T> {
             amount,
             U256::from_inverse_probability(U256::new(INVERSE_TICKET_WIN_PROB))?,
             channel.channel_epoch,
-            &self.private_key,
+            &self.cfg.private_key,
         );
 
         self.db.borrow_mut().mark_pending(&ticket).await?;
@@ -337,19 +334,20 @@ impl<T: HoprCoreDbActions> PacketInteraction<T> {
         Ok(ticket)
     }
 
-    pub async fn send_outgoing_packet(&self, msg: &[u8], complete_valid_path: Path) -> Result<HalfKeyChallenge> {
+    pub async fn send_outgoing_packet<T,F>(&self, msg: &[u8], complete_valid_path: Path, message_transport: &T) -> Result<HalfKeyChallenge>
+        where T: Fn(Box<[u8]>, String) -> F,
+              F: futures::Future<Output = core::result::Result<(), String>> {
+        // Decide whether to create 0-hop or multihop ticket
         let next_peer = PublicKey::from_peerid(&complete_valid_path.hops()[0])?;
-
         let next_ticket = if complete_valid_path.length() == 1 {
-            Ticket::new_zero_hop(next_peer, None, &self.private_key)
+            Ticket::new_zero_hop(next_peer, None, &self.cfg.private_key)
         } else {
             self.create_multihop_ticket(next_peer, complete_valid_path.length() as u8)
                 .await?
         };
 
-        self.metrics.packets_count.increment();
-
-        let packet = Packet::new(msg, &complete_valid_path.hops(), &self.private_key, next_ticket)?;
+        // Create the packet
+        let packet = Packet::new(msg, &complete_valid_path.hops(), &self.cfg.private_key, next_ticket)?;
         match packet.state() {
             PacketState::Outgoing { ack_challenge, .. } => {
                 self.db
@@ -357,8 +355,12 @@ impl<T: HoprCoreDbActions> PacketInteraction<T> {
                     .store_pending_acknowledgment(ack_challenge.clone(), PendingAcknowledgement::WaitingAsSender)
                     .await?;
 
-                self.interact(complete_valid_path.hops()[0].clone(), &packet.to_bytes())
-                    .await?;
+                self.metrics.packets_count.increment();
+
+                // Send the packet
+                message_transport(packet.to_bytes(), complete_valid_path.hops()[0].to_string())
+                    .await
+                    .map_err(|e| TransportError(e))?;
 
                 Ok(ack_challenge.clone())
             }
@@ -366,8 +368,9 @@ impl<T: HoprCoreDbActions> PacketInteraction<T> {
         }
     }
 
-    pub async fn handle_mixed_packet(&self, mut packet: Packet) -> Result<()> {
-        self.check_packet_tag(&packet).await?;
+    pub async fn handle_mixed_packet<T,F>(&self, mut packet: Packet,message_transport: &T) -> Result<()>
+        where T: Fn(Box<[u8]>, String) -> F,
+              F: futures::Future<Output = core::result::Result<(), String>> {
 
         let next_ticket;
         let previous_peer;
@@ -379,13 +382,18 @@ impl<T: HoprCoreDbActions> PacketInteraction<T> {
             PacketState::Final {
                 plain_text,
                 previous_hop,
-                ..
+                packet_tag, ..
             } => {
+                // Validate if it's not a replayed packet
+                if !self.db.borrow_mut().check_and_set_packet_tag(packet_tag).await? {
+                    return Err(TagReplay)
+                }
+
                 // We're the destination of the packet, so emit the packet contents
                 (self.message_emitter)(plain_text.as_ref());
 
                 // And create acknowledgement
-                let ack = packet.create_acknowledgement(&self.private_key).unwrap();
+                let ack = packet.create_acknowledgement(&self.cfg.private_key).unwrap();
                 self.ack_interaction.send_acknowledgement(ack, previous_hop.to_peerid());
                 self.metrics.recv_message_count.increment();
                 return Ok(());
@@ -396,8 +404,14 @@ impl<T: HoprCoreDbActions> PacketInteraction<T> {
                 previous_hop,
                 own_key,
                 next_hop,
+                packet_tag,
                 ..
             } => {
+                // Validate if it's not a replayed packet
+                if !self.db.borrow_mut().check_and_set_packet_tag(packet_tag).await? {
+                    return Err(TagReplay)
+                }
+
                 let inverse_win_prob = U256::new(INVERSE_TICKET_WIN_PROB);
 
                 // Validate the ticket first
@@ -408,8 +422,7 @@ impl<T: HoprCoreDbActions> PacketInteraction<T> {
                         Balance::from_str(PRICE_PER_PACKET, BalanceType::HOPR),
                         inverse_win_prob,
                         &packet.ticket,
-                        &channel,
-                        self.check_unrealized_balance,
+                        &channel
                     )
                     .await
                 {
@@ -442,7 +455,7 @@ impl<T: HoprCoreDbActions> PacketInteraction<T> {
 
                 // Create next ticket for the packet
                 next_ticket = if path_pos == 1 {
-                    Ticket::new_zero_hop(next_hop.clone(), None, &self.private_key)
+                    Ticket::new_zero_hop(next_hop.clone(), None, &self.cfg.private_key)
                 } else {
                     self.create_multihop_ticket(next_hop.clone(), path_pos).await?
                 };
@@ -452,16 +465,29 @@ impl<T: HoprCoreDbActions> PacketInteraction<T> {
         }
 
         // Transform the packet for forwarding using the next ticket
-        packet.forward(&self.private_key, next_ticket)?;
+        packet.forward(&self.cfg.private_key, next_ticket)?;
 
         // Forward the packet to the next hop
-        self.interact(next_peer, &packet.to_bytes()).await?;
+        message_transport(packet.to_bytes(), next_peer.to_string())
+            .await
+            .map_err(|e| TransportError(e))?;
 
         // Acknowledge to the previous hop that we forwarded the packet
-        let ack = packet.create_acknowledgement(&self.private_key).unwrap();
+        let ack = packet.create_acknowledgement(&self.cfg.private_key).unwrap();
         self.ack_interaction.send_acknowledgement(ack, previous_peer);
         self.metrics.fwd_message_count.increment();
 
         Ok(())
     }
+}
+
+#[cfg(feature = "wasm")]
+pub mod wasm {
+    use core_db::db::CoreDb;
+    use utils_db::leveldb::LevelDbShim;
+    use crate::interaction::PacketInteraction;
+
+    /*pub struct WasmPacketInteraction {
+        w: Box<PacketInteraction<CoreDb<LevelDbShim>, dyn futures::Future<Output = core::result::Result<(), String>>>>,
+    }*/
 }
