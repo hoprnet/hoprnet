@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 use core_crypto::types::{HalfKeyChallenge, Hash, PublicKey};
-use core_types::acknowledgement::{AcknowledgedTicket, PendingAcknowledgement, UnacknowledgedTicket};
+use core_types::acknowledgement::{AcknowledgedTicket, PendingAcknowledgement};
 use core_types::channels::{ChannelEntry, Ticket};
 use utils_db::{
     db::{serialize_to_bytes, DB},
@@ -12,15 +12,18 @@ use utils_types::{
     primitives::{Address, Balance, EthereumChallenge, U256},
     traits::BinarySerializable,
 };
+use utils_types::primitives::Snapshot;
 
 use crate::errors::Result;
 use crate::traits::HoprCoreDbActions;
 
+const CHANNEL_PREFIX: &str = "channel-";
 const TICKET_INDEX_PREFIX: &str = "ticketIndex-";
 const PENDING_TICKETS_COUNT: &str = "statistics:pending:value-";
 const REJECTED_TICKETS_COUNT: &str = "statistics:rejected:count";
 const REJECTED_TICKETS_VALUE: &str = "statistics:rejected:value";
 const PACKET_TAG_PREFIX: &str = "packets:tag-";
+const LATEST_CONFIRMED_SNAPSHOT_KEY: &str = "latestConfirmedSnapshot";
 const PENDING_ACKNOWLEDGEMENTS_PREFIX: &str = "tickets:pending-acknowledgement-";
 const ACKNOWLEDGED_TICKETS_PREFIX: &str = "tickets:acknowledged-";
 
@@ -167,6 +170,33 @@ impl<T: BinaryAsyncKVStorage> HoprCoreDbActions for CoreDb<T> {
         let _ = self.db.set(key, &pending_acknowledgment).await?;
 
         Ok(())
+    }
+
+    async fn replace_unack_with_ack(&mut self, half_key_challenge: &HalfKeyChallenge, ack_ticket: AcknowledgedTicket) -> Result<()> {
+        let unack_key = utils_db::db::Key::new_with_prefix(half_key_challenge, PENDING_ACKNOWLEDGEMENTS_PREFIX)?;
+
+        let mut ack_key = serialize_to_bytes(&ack_ticket.ticket.challenge)?;
+        let mut channel_epoch = serialize_to_bytes(&ack_ticket.ticket.channel_epoch)?;
+        ack_key.append(&mut channel_epoch);
+
+        let ack_key = utils_db::db::Key::new_bytes_with_prefix(&ack_key, ACKNOWLEDGED_TICKETS_PREFIX)?;
+
+        let mut batch_ops = utils_db::db::Batch::new();
+        batch_ops.del(unack_key);
+        batch_ops.put(ack_key, ack_ticket);
+
+        self.db.batch(batch_ops, true).await
+    }
+
+    async fn update_channel_and_snapshot(&mut self, channel_id: &Hash, channel: ChannelEntry, snapshot: Snapshot) -> Result<()> {
+        let channel_key = utils_db::db::Key::new_with_prefix(channel_id, CHANNEL_PREFIX)?;
+        let snapshot_key = utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?;
+
+        let mut batch_ops = utils_db::db::Batch::new();
+        batch_ops.put(channel_key, channel);
+        batch_ops.put(snapshot_key, snapshot);
+
+        self.db.batch(batch_ops, true).await
     }
 }
 
