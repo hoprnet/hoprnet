@@ -1,6 +1,6 @@
-use std::fmt::{Display, Formatter};
 use ethnum::{u256, AsU256};
 use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
 use std::ops::{Add, Div, Mul, Sub};
 
 use crate::errors::{GeneralError, GeneralError::InvalidInput, GeneralError::ParseError, Result};
@@ -218,7 +218,8 @@ impl Balance {
 
 impl Display for Balance {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f,
+        write!(
+            f,
             "{} {:?}",
             self.value().value().div(&u256::from(10u16).pow(18)),
             self.balance_type
@@ -369,9 +370,17 @@ impl U256 {
         self.value.as_u64()
     }
 
-    pub fn addn(&self, n: u32) -> Self { Self { value: self.value + n as u128 } }
+    pub fn addn(&self, n: u32) -> Self {
+        Self {
+            value: self.value + n as u128,
+        }
+    }
 
-    pub fn muln(&self, n: u32) -> Self { Self { value: self.value * n as u128 } }
+    pub fn muln(&self, n: u32) -> Self {
+        Self {
+            value: self.value * n as u128,
+        }
+    }
 }
 
 impl Display for U256 {
@@ -384,7 +393,9 @@ impl Mul for U256 {
     type Output = U256;
 
     fn mul(self, rhs: Self) -> Self::Output {
-        Self { value: self.value.mul(rhs.value) }
+        Self {
+            value: self.value.mul(rhs.value),
+        }
     }
 }
 
@@ -460,9 +471,9 @@ impl U256 {
 /// Unit tests of pure Rust code
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
     use super::*;
     use hex_literal::hex;
+    use std::str::FromStr;
 
     #[test]
     fn address_tests() {

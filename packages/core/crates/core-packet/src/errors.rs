@@ -20,6 +20,9 @@ pub enum PacketError {
     #[error("ticket validation failed, packet dropped: {0}")]
     TicketValidation(String),
 
+    #[error("invalid received acknowledgement: {0}")]
+    AcknowledgementValidation(String),
+
     #[error("Proof of Relay challenge could not be verified")]
     PoRVerificationError,
 
