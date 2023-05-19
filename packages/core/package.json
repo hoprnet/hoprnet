@@ -32,7 +32,6 @@
   ],
   "dependencies": {
     "@chainsafe/libp2p-noise": "7.0.0",
-    "@google-cloud/profiler": "4.2.0",
     "@hoprnet/hopr-connect": "workspace:packages/connect",
     "@hoprnet/hopr-core-ethereum": "workspace:packages/core-ethereum",
     "@hoprnet/hopr-utils": "workspace:packages/utils",
