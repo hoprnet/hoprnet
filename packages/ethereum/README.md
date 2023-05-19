@@ -274,3 +274,23 @@ forge install safe-global/safe-contracts@eb93dbb0f62e2dc1b308ac4c110038062df0a8c
 
 --no-git --no-commit
 ```
+
+2. `SafeSuiteSetupScript` deploys basic Safe suites. We deploy all the contracts with `main-suite` tag, in a deterministic way
+
+|                              | l2  | l2-suite | main-suite | accessors | factory | handlers | libraries | singleton |
+| ---------------------------- | --- | -------- | ---------- | --------- | ------- | -------- | --------- | --------- |
+| SimulateTxAccessor           |     | x        | x          | x         |         |          |           |           |
+| SafeProxyFactory             |     | x        | x          |           | x       |          |           |           |
+| TokenCallbackHandler         |     | x        | x          |           |         | x        |           |           |
+| CompatibilityFallbackHandler |     | x        | x          |           |         | x        |           |           |
+| CreateCall                   |     | x        | x          |           |         |          | x         |           |
+| MultiSend                    |     | x        | x          |           |         |          | x         |           |
+| MultiSendCallOnly            |     | x        | x          |           |         |          | x         |           |
+| SignMessageLib               |     | x        | x          |           |         |          | x         |           |
+| SafeL2                       | x   | x        |            |           |         |          |           |           |
+| Safe                         |     |          | x          |           |         |          |           | x         |
+
+3. deployment starts with a singleton contract. Singleton's deployment details are saved under https://github.com/safe-global/safe-singleton-factory/tree/main/artifacts
+   Specifically, for "anvil-deploy-safe-singleton" target, it follows instruction from [safe-global/safe-singleton-factory/artifacts/31337/deployment.json](https://github.com/safe-global/safe-singleton-factory/blob/6700a7c90ececc8cb9e1a4d97fd70fea1ee4670d/artifacts/31337/deployment.json)
+
+4. when running `make run-anvil`, it also deploys the SafeSingleton which is used as a deployer factory in deterministic deployment.
