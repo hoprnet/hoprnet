@@ -1,22 +1,39 @@
 use std::ops::Mul;
 use std::sync::Arc;
 use libp2p_identity::PeerId;
+use core_crypto::primitives::SimpleMac;
 use core_crypto::types::{Hash, PublicKey};
 use core_db::traits::HoprCoreDbActions;
 use core_types::acknowledgement::{Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket};
 use core_types::channels::{ChannelEntry, ChannelStatus, Ticket};
 use utils_log::{info};
+use utils_metrics::metrics::SimpleCounter;
 use utils_types::primitives::{Balance, BalanceType, U256};
 use utils_types::traits::{PeerIdLike, ToHex};
 use crate::errors::PacketError::{InvalidPacketState, OutOfFunds, TagReplay, TicketValidation};
 use crate::packet::{Packet, PacketState};
 use crate::errors::Result;
 
-pub const PRICE_PER_PACKET: &str = "";
-pub const INVERSE_TICKET_WIN_PROB: &str = "";
+pub const PRICE_PER_PACKET: &str = "10000000000000000";
+pub const INVERSE_TICKET_WIN_PROB: &str = "1";
+
+struct AckMetrics {
+    received_successful_acks: SimpleCounter,
+    received_failed_acks: SimpleCounter,
+    sent_acks: SimpleCounter,
+    acked_tickets: SimpleCounter
+}
+
+impl Default for AckMetrics {
+    fn default() -> Self {
+        Self {
+            received_successful_acks: SimpleCounter::new("core_counter_received_successful_acks", "Number of received successful message acknowledgements").unwrap()
+        }
+    }
+}
 
 pub struct AcknowledgementInteraction {
-
+    metrics: AckMetrics
 }
 
 impl AcknowledgementInteraction {
@@ -26,12 +43,27 @@ impl AcknowledgementInteraction {
     }
 }
 
+struct PacketMetrics {
+    fwd_message_count: SimpleCounter,
+    recv_message_count: SimpleCounter
+}
+
+impl Default for PacketMetrics {
+    fn default() -> Self {
+        Self {
+            fwd_message_count: SimpleCounter::new("core_counter_forwarded_messages", "Number of forwarded messages").unwrap(),
+            recv_message_count: SimpleCounter::new("core_counter_received_messages", "Number of received messages").unwrap()
+        }
+    }
+}
+
 pub struct PacketInteraction<T: HoprCoreDbActions> {
     db: T,
     ack_interaction: Arc<AcknowledgementInteraction>,
     message_emitter: fn(&[u8]),
     check_unrealized_balance: bool,
-    private_key: Box<[u8]>
+    private_key: Box<[u8]>,
+    metrics: PacketMetrics
 }
 
 impl<T: HoprCoreDbActions> PacketInteraction<T> {
@@ -151,7 +183,7 @@ impl<T: HoprCoreDbActions> PacketInteraction<T> {
         Ok(ticket)
     }
 
-    async fn handle_mixed_packet(&mut self, mut packet: Packet) -> Result<()> {
+    pub async fn handle_mixed_packet(&mut self, mut packet: Packet) -> Result<()> {
         self.check_packet_tag(&packet).await?;
 
         let next_ticket;
