@@ -8,7 +8,7 @@ import { createTestApiInstance, ALICE_PEER_ID } from '../../fixtures.js'
 let node = sinon.fake() as any
 
 describe('GET /account/addresses', () => {
-  const ALICE_ETH_ADDRESS = PublicKey.fromPeerId(ALICE_PEER_ID).toAddress()
+  const ALICE_ETH_ADDRESS = () => PublicKey.from_peerid_str(ALICE_PEER_ID.toString()).to_address()
 
   let service: any
   before(async function () {
@@ -21,16 +21,16 @@ describe('GET /account/addresses', () => {
   })
 
   it('should return addresses', async () => {
-    node.getEthereumAddress = sinon.fake.returns(ALICE_ETH_ADDRESS)
+    node.getEthereumAddress = sinon.fake.returns(ALICE_ETH_ADDRESS())
     node.getId = sinon.fake.returns(ALICE_PEER_ID)
 
     const res = await request(service).get('/api/v2/account/addresses')
     expect(res.status).to.equal(200)
     expect(res).to.satisfyApiSpec
     expect(res.body).to.deep.equal({
-      native: ALICE_ETH_ADDRESS.toString(),
+      native: ALICE_ETH_ADDRESS().to_string(),
       hopr: ALICE_PEER_ID.toString(),
-      nativeAddress: ALICE_ETH_ADDRESS.toString(),
+      nativeAddress: ALICE_ETH_ADDRESS().to_string(),
       hoprAddress: ALICE_PEER_ID.toString()
     })
   })

@@ -9,14 +9,19 @@ import { initialize } from 'express-openapi'
 import { peerIdFromString } from '@libp2p/peer-id'
 import BN from 'bn.js'
 
-import { debug, Address, HoprDB } from '@hoprnet/hopr-utils'
-import { authenticateWsConnection, getStatusCodeForInvalidInputInRequest, removeQueryParams } from './utils.js'
+import { debug, Address, HoprDB, PublicKey } from '@hoprnet/hopr-utils'
+import {
+  authenticateWsConnection,
+  getStatusCodeForInvalidInputInRequest,
+  removeQueryParams,
+  encodeMessage
+} from './utils.js'
 import { authenticateToken, authorizeToken, validateTokenCapabilities } from './token.js'
 import { STATUS_CODES } from './v2/utils.js'
 
 import type { Server } from 'http'
 import type { Application, Request } from 'express'
-import type { WebSocketServer } from 'ws'
+import type { WebSocket, WebSocketServer } from 'ws'
 import type Hopr from '@hoprnet/hopr-core'
 import { SettingKey, StateOps } from '../types.js'
 import type { LogStream } from './../logs.js'
@@ -28,6 +33,34 @@ enum AuthResult {
   Failed,
   Authenticated,
   Authorized
+}
+
+async function handleWebsocketMessage(node: Hopr, data: string) {
+  const msg = JSON.parse(data)
+  const cmd = msg['cmd']
+  const args = msg['args']
+
+  // handling custom websocket protocol
+  switch (cmd) {
+    case 'sendmsg':
+      const body = encodeMessage(args['body'])
+      const recipient = peerIdFromString(args['recipient'])
+      const hops = args['hops']
+
+      // only set path if given, otherwise a path will be chosen by hopr core
+      let path: PublicKey[]
+      if (args['path'] != undefined) {
+        path = args['path'].map((peer: string) => PublicKey.from_peerid_str(peer))
+      }
+
+      // send message and return ack challenge over websocket
+      let ackChallenge = await node.sendMessage(body, recipient, path, hops)
+      node.emit('hopr:message-ack-challenge', ackChallenge)
+
+      break
+    default:
+      debugLog(`Ignoring websocket message with command ${cmd}`)
+  }
 }
 
 async function authenticateAndAuthorize(
@@ -149,7 +182,7 @@ export async function setupRestApi(
       },
       address: (input) => {
         try {
-          Address.fromString(input)
+          Address.from_string(input)
         } catch (err) {
           return false
         }
@@ -269,24 +302,58 @@ export function setupWsApi(
     else debugLog('WS client connected [ authentication ENABLED ]')
 
     // upgrade to WS protocol
-    wss.handleUpgrade(req, socket, head, function done(socket_) {
+    wss.handleUpgrade(req, socket, head, (socket_: WebSocket) => {
       wss.emit('connection', socket_, req)
     })
   })
 
-  wss.on('connection', (socket, req) => {
+  wss.on('connection', (socket: WebSocket, req) => {
     debugLog('WS client connected!')
     const path = removeQueryParams(req.url)
+
+    // per-connection tracking of whether the connection is alive using
+    // websocket-native ping/pong
+    // ping messages are sent every 15 seconds
+    let isAlive = true
+
+    const heartbeatReceived = () => (isAlive = true)
+
+    const heartbeatInterval = setInterval(() => {
+      // terminate connection if the previous ping check failed
+      if (isAlive === false) return socket.terminate()
+
+      isAlive = false
+      socket.ping()
+    }, 15000)
 
     socket.on('error', (err: string) => {
       debugLog('WS error', err.toString())
     })
 
+    // if we receive the pong back, the connection is marked as alive
+    socket.on('pong', heartbeatReceived)
+
+    socket.on('close', () => {
+      clearInterval(heartbeatInterval)
+    })
+
+    socket.on('message', (data: string) => {
+      // only MESSAGES path is supported
+      if (path !== WS_PATHS.MESSAGES) return
+      handleWebsocketMessage(node, data)
+    })
+
     if (path === WS_PATHS.MESSAGES) {
       node.on('hopr:message', (msg: Uint8Array) => {
+        // FIXME: change this to send an actual string with a proper prefix in
+        // Providence instead of the string representation of an rlp-encoded
+        // value
         socket.send(msg.toString())
       })
-      node.on(`hopr:message-acknowledged`, (ackChallenge: string) => {
+      node.on('hopr:message-ack-challenge', (ackChallenge: string) => {
+        socket.send(`ack-challenge:${ackChallenge}`)
+      })
+      node.on('hopr:message-acknowledged', (ackChallenge: string) => {
         socket.send(`ack:'${ackChallenge}'`)
       })
     } else if (path === WS_PATHS.LEGACY_STREAM) {

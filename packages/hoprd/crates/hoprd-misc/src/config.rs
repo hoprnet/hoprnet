@@ -162,6 +162,7 @@ pub struct NetworkOptions {
     pub allow_private_node_connections: bool,
     pub max_parallel_connections: u32,
     pub network_quality_threshold: f32,
+    pub no_relay: bool,
 }
 
 impl Default for NetworkOptions {
@@ -172,6 +173,7 @@ impl Default for NetworkOptions {
             allow_private_node_connections: false,
             max_parallel_connections: DEFAULT_MAX_PARALLEL_CONNECTIONS,
             network_quality_threshold: DEFAULT_NETWORK_QUALITY_THRESHOLD,
+            no_relay: false,
         }
     }
 }
@@ -428,6 +430,9 @@ impl HoprdConfig {
         if let Some(x) = cli_args.network_quality_threshold {
             cfg.network_options.network_quality_threshold = x
         };
+        if let Some(x) = cli_args.no_relay {
+            cfg.network.no_relay = x
+        }
 
         // healthcheck
         if let Some(x) = cli_args.health_check {
@@ -580,6 +585,7 @@ mod tests {
                 allow_private_node_connections: false,
                 max_parallel_connections: 0,
                 network_quality_threshold: 0.0,
+                no_relay: false,
             },
             healthcheck: HealthCheck {
                 enable: false,
@@ -634,6 +640,7 @@ network_options:
   allow_private_node_connections: false
   max_parallel_connections: 0
   network_quality_threshold: 0.0
+  no_relay: false
 healthcheck:
   enable: false
   host: 127.0.0.1

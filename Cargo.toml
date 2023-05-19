@@ -6,6 +6,7 @@ members = [
     "packages/core/crates/core-misc",
     "packages/core/crates/core-mixer",
     "packages/core/crates/core-network",
+    "packages/core/crates/core-packet",
     "packages/core/crates/core-strategy",
     "packages/core/crates/core-types",
     "packages/core-ethereum/crates/core-ethereum-misc",
@@ -22,7 +23,7 @@ members = [
 ]
 
 [workspace.dependencies]
-wasm-pack = "0.10.3"
+wasm-pack = "0.11.1"
 wasm-opt = "0.112.0"
 wasm-bindgen = "0.2.84"
 

@@ -18,11 +18,13 @@ CRATES_NAMES := $(foreach crate,${CRATES},$(shell basename $(crate)))
 HOPLI_CRATE := ./packages/hopli
 
 # Set local foundry directory (for binaries) and versions
-FOUNDRY_DIR ?= $(mydir)/.foundry
+# note: $(mydir) ends with '/'
+FOUNDRY_DIR ?= $(mydir).foundry
 FOUNDRY_VSN := ed9298d
 
 # Set local cargo directory (for binaries)
-CARGO_DIR := $(mydir)/.cargo
+# note: $(mydir) ends with '/'
+CARGO_DIR := $(mydir).cargo
 
 # use custom foundryup to ensure the local directory is used
 foundryup := env FOUNDRY_DIR="${FOUNDRY_DIR}" foundryup
@@ -152,10 +154,12 @@ build-solidity-types: ## generate Solidity typings
 	echo "Foundry create binding"
 	$(MAKE) -C packages/ethereum/contracts/ overwrite-sc-bindings
 # Change git = "http://..." into version = "1.0.2"
-	sed -i -e 's/https:\/\/github.com\/gakonst\/ethers-rs/1.0.2/g' $(mydir)/packages/ethereum/crates/bindings/Cargo.toml
-	sed -i -e 's/git/version/g' $(mydir)/packages/ethereum/crates/bindings/Cargo.toml
+# note: $(mydir) ends with '/'
+	sed -i -e 's/https:\/\/github.com\/gakonst\/ethers-rs/1.0.2/g' $(mydir)packages/ethereum/crates/bindings/Cargo.toml
+	sed -i -e 's/git/version/g' $(mydir)packages/ethereum/crates/bindings/Cargo.toml
 # add [lib] as rlib is necessary to run integration tests
-	echo -e "\n[lib] \ncrate-type = [\"cdylib\", \"rlib\"]" >> $(mydir)/packages/ethereum/crates/bindings/Cargo.toml
+# note: $(mydir) ends with '/'
+	echo -e "\n[lib] \ncrate-type = [\"cdylib\", \"rlib\"]" >> $(mydir)packages/ethereum/crates/bindings/Cargo.toml
 
 .PHONY: build-yarn
 build-yarn: ## build yarn packages

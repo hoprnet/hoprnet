@@ -6,6 +6,7 @@ pub mod prg;
 pub mod primitives;
 pub mod prp;
 pub mod random;
+pub mod routing;
 pub mod shared_keys;
 pub mod types;
 mod utils;

@@ -82,6 +82,8 @@ export type HoprConnectOptions = {
   dhtRenewalTimeout?: number
   entryNodeReconnectBaseTimeout?: number
   entryNodeReconnectBackoff?: number
+  // disable NAT relay functionality
+  noRelay?: boolean
   // Set to true whenever node is supposed to announce itself
   announce?: boolean
   // To be removed once NR got removed

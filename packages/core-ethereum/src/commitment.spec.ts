@@ -1,7 +1,7 @@
 import assert from 'assert'
 import { bumpCommitment, ChannelCommitmentInfo, findCommitmentPreImage, initializeCommitment } from './commitment.js'
 import sinon from 'sinon'
-import { Hash, HoprDB, privKeyToPeerId, stringToU8a, UINT256 } from '@hoprnet/hopr-utils'
+import { Hash, HoprDB, privKeyToPeerId, stringToU8a, U256 } from '@hoprnet/hopr-utils'
 import type { PeerId } from '@libp2p/interface-peer-id'
 
 describe('commitment', function () {
@@ -16,8 +16,8 @@ describe('commitment', function () {
     fakeCommInfo = new ChannelCommitmentInfo(
       1,
       'fakeaddress',
-      new Hash(new Uint8Array({ length: Hash.SIZE }).fill(1)),
-      UINT256.fromString('1')
+      new Hash(new Uint8Array({ length: Hash.size() }).fill(1)),
+      U256.one()
     )
   })
 

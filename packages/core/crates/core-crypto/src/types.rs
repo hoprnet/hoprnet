@@ -511,7 +511,7 @@ impl PublicKey {
     /// Serializes the public key to a binary form and converts it to hexadecimal string representation.
     pub fn to_hex(&self, compressed: bool) -> String {
         let offset = if compressed { 0 } else { 1 };
-        hex::encode(&self.to_bytes(compressed)[offset..])
+        format!("0x{}", hex::encode(&self.to_bytes(compressed)[offset..]))
     }
 }
 
@@ -680,7 +680,7 @@ impl PublicKey {
 
 /// Contains a response upon ticket acknowledgement
 /// It is equivalent to a non-zero secret scalar on secp256k1 (EC private key).
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Response {
     response: [u8; Self::SIZE],
@@ -891,7 +891,7 @@ pub trait ToChecksum {
 
 impl ToChecksum for Address {
     fn to_checksum(&self) -> String {
-        let address_hex = self.to_hex();
+        let address_hex = &self.to_hex()[2..];
 
         let mut hasher = EthDigest::default();
         hasher.update(address_hex.as_bytes());
@@ -969,10 +969,10 @@ pub mod tests {
         ))
         .unwrap();
 
-        assert_eq!("39d1bc2291826eaed86567d225cf243ebc637275e0a5aedb0d6b1dc82136a38e428804340d4c949a029846f682711d046920b4ca8b8ebeb9d1192b5bdaa54dba",
+        assert_eq!("0x39d1bc2291826eaed86567d225cf243ebc637275e0a5aedb0d6b1dc82136a38e428804340d4c949a029846f682711d046920b4ca8b8ebeb9d1192b5bdaa54dba",
                    pk.to_hex(false));
         assert_eq!(
-            "0239d1bc2291826eaed86567d225cf243ebc637275e0a5aedb0d6b1dc82136a38e",
+            "0x0239d1bc2291826eaed86567d225cf243ebc637275e0a5aedb0d6b1dc82136a38e",
             pk.to_hex(true)
         );
     }
@@ -1156,7 +1156,7 @@ pub mod tests {
     fn hash_test() {
         let hash1 = Hash::create(&[b"msg"]);
         assert_eq!(
-            "92aef1b955b9de564fc50e31a55b470b0c8cdb931f186485d620729fb03d6f2c",
+            "0x92aef1b955b9de564fc50e31a55b470b0c8cdb931f186485d620729fb03d6f2c",
             hash1.to_hex(),
             "hash test vector failed to match"
         );
@@ -1467,8 +1467,20 @@ pub mod wasm {
         }
     }
 
+    #[wasm_bindgen(getter_with_clone)]
+    pub struct KeyPair {
+        pub private: Box<[u8]>,
+        pub public: PublicKey,
+    }
+
     #[wasm_bindgen]
     impl PublicKey {
+        #[wasm_bindgen(js_name = "random_keypair")]
+        pub fn _random_keypair() -> KeyPair {
+            let (private, public) = Self::random_keypair();
+            KeyPair { private, public }
+        }
+
         #[wasm_bindgen(js_name = "deserialize")]
         pub fn _deserialize(bytes: &[u8]) -> JsResult<PublicKey> {
             ok_or_jserr!(PublicKey::from_bytes(bytes))

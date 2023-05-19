@@ -1,67 +1,75 @@
-import { stringToU8a } from '@hoprnet/hopr-utils'
-import BN from 'bn.js'
-import type { PeerId } from '@libp2p/interface-peer-id'
+import { Hash, stringToU8a } from '@hoprnet/hopr-utils'
 import { peerIdFromString } from '@libp2p/peer-id'
 import chaiAsPromised from 'chai-as-promised'
 import chai, { expect } from 'chai'
-import { Address, Balance, PublicKey, UINT256, Ticket, ChannelEntry, ChannelStatus } from '@hoprnet/hopr-utils'
+import {
+  Address,
+  Balance,
+  BalanceType,
+  PublicKey,
+  U256,
+  Ticket,
+  ChannelEntry,
+  ChannelStatus
+} from '@hoprnet/hopr-utils'
 import { validateUnacknowledgedTicket } from './index.js'
+import { PeerId } from '@libp2p/interface-peer-id'
 
 chai.use(chaiAsPromised)
 
 // target is party A, sender is party B
 const TARGET = peerIdFromString('16Uiu2HAmM9KAPaXA4eAz58Q7Eb3LEkDvLarU4utkyLwDeEK6vM5m')
-const TARGET_PUBKEY = PublicKey.fromPeerId(TARGET)
-const TARGET_ADDRESS = new Address(stringToU8a('0x65e78d07acf7b654e5ae6777a93ebbf30f639356'))
+const TARGET_PUBKEY = () => PublicKey.from_peerid_str(TARGET.toString())
+const TARGET_ADDRESS = () => new Address(stringToU8a('0x65e78d07acf7b654e5ae6777a93ebbf30f639356'))
 const SENDER = peerIdFromString('16Uiu2HAm5g4fTADcjPQrtp9LtN2wCmPJTQPD7vMnWCZp4kwKCVUT')
 // const SENDER_ADDRESS = new Address(stringToU8a('0xf3a509473be4bcd8af0d1961d75a5a3dc9e47ba0'))
 
 const createMockTicket = ({
   sender = SENDER,
-  targetAddress = TARGET_ADDRESS,
-  amount = new Balance(new BN(1)),
-  winProb = UINT256.fromInverseProbability(new BN(1)),
-  epoch = new UINT256(new BN(1)),
-  index = new UINT256(new BN(1)),
-  channelEpoch = new UINT256(new BN(1))
+  targetAddress = TARGET_ADDRESS(),
+  amount = new Balance('1', BalanceType.HOPR),
+  win_prob = U256.from_inverse_probability(U256.one()),
+  epoch = U256.one(),
+  index = U256.one(),
+  channel_epoch = U256.one()
 }: {
   sender?: PeerId
   targetAddress?: Address
   amount?: Balance
-  winProb?: UINT256
-  epoch?: UINT256
-  index?: UINT256
-  channelEpoch?: UINT256
+  win_prob?: U256
+  epoch?: U256
+  index?: U256
+  channel_epoch?: U256
 }) => {
   return {
     counterparty: targetAddress,
     challenge: new Uint8Array(),
     amount,
-    winProb,
+    win_prob,
     epoch,
     index,
-    channelEpoch,
-    verify: (pubKey: PublicKey) => pubKey.eq(PublicKey.fromPeerId(sender))
+    channel_epoch,
+    verify: (pubKey: PublicKey) => pubKey.eq(PublicKey.from_peerid_str(sender.toString()))
   } as unknown as Ticket
 }
 
 const mockChannelEntry = (
   isChannelOpen: boolean = true,
-  balance: Balance = new Balance(new BN(100)),
-  ticketEpoch = new UINT256(new BN(1)),
-  ticketIndex = new UINT256(new BN(0))
+  balance: Balance = new Balance('100', BalanceType.HOPR),
+  ticketEpoch = U256.one(),
+  ticketIndex = U256.zero()
 ) =>
   Promise.resolve(
     new ChannelEntry(
-      TARGET_PUBKEY,
-      TARGET_PUBKEY,
+      TARGET_PUBKEY(),
+      TARGET_PUBKEY(),
       balance,
-      null,
+      Hash.create([stringToU8a('0xdeadbeef')]),
       ticketEpoch,
       ticketIndex,
       isChannelOpen ? ChannelStatus.Open : ChannelStatus.Closed,
-      new UINT256(new BN(1)),
-      null
+      U256.one(),
+      U256.zero()
     )
   )
 
@@ -74,8 +82,8 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
     return expect(
       validateUnacknowledgedTicket(
         SENDER,
-        new BN(1),
-        new BN(1),
+        new Balance('1', BalanceType.HOPR),
+        U256.one(),
         signedTicket,
         await mockChannelEntry(),
         getTicketsMock,
@@ -90,8 +98,8 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
     return expect(
       validateUnacknowledgedTicket(
         TARGET,
-        new BN(2),
-        new BN(1),
+        new Balance('2', BalanceType.HOPR),
+        U256.one(),
         signedTicket,
         await mockChannelEntry(),
         getTicketsMock,
@@ -106,8 +114,8 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
     return expect(
       validateUnacknowledgedTicket(
         SENDER,
-        new BN(2),
-        new BN(1),
+        new Balance('2', BalanceType.HOPR),
+        U256.one(),
         signedTicket,
         await mockChannelEntry(),
         getTicketsMock,
@@ -118,14 +126,14 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
 
   it('should throw when ticket chance is low', async function () {
     const signedTicket = createMockTicket({
-      winProb: UINT256.fromInverseProbability(new BN(2))
+      win_prob: U256.from_inverse_probability(new U256('2'))
     })
 
     return expect(
       validateUnacknowledgedTicket(
         SENDER,
-        new BN(1),
-        new BN(1),
+        new Balance('1', BalanceType.HOPR),
+        U256.one(),
         signedTicket,
         await mockChannelEntry(),
         getTicketsMock,
@@ -140,8 +148,8 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
     return expect(
       validateUnacknowledgedTicket(
         SENDER,
-        new BN(1),
-        new BN(1),
+        new Balance('1', BalanceType.HOPR),
+        U256.one(),
         signedTicket,
         await mockChannelEntry(false),
         getTicketsMock,
@@ -152,23 +160,31 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
 
   it('should throw if ticket epoch does not match our account epoch', async function () {
     const signedTicket = createMockTicket({})
-    const mockChannel = await mockChannelEntry(true, new Balance(new BN(100)), new UINT256(new BN(2)))
+    const mockChannel = await mockChannelEntry(true, new Balance('100', BalanceType.HOPR), new U256('2'))
 
     return expect(
-      validateUnacknowledgedTicket(SENDER, new BN(1), new BN(1), signedTicket, mockChannel, getTicketsMock, true)
+      validateUnacknowledgedTicket(
+        SENDER,
+        new Balance('1', BalanceType.HOPR),
+        U256.one(),
+        signedTicket,
+        mockChannel,
+        getTicketsMock,
+        true
+      )
     ).to.eventually.rejectedWith('does not match our account epoch')
   })
 
   it("should throw if ticket's channel iteration does not match the current channel iteration", async function () {
     const signedTicket = createMockTicket({
-      channelEpoch: new UINT256(new BN(2))
+      channel_epoch: new U256('2')
     })
 
     return expect(
       validateUnacknowledgedTicket(
         SENDER,
-        new BN(1),
-        new BN(1),
+        new Balance('1', BalanceType.HOPR),
+        U256.one(),
         signedTicket,
         await mockChannelEntry(),
         getTicketsMock,
@@ -179,38 +195,36 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
 
   it("should not throw if ticket's index is smaller than the last ticket index", async function () {
     const signedTicket = createMockTicket({})
-    const mockChannel = await mockChannelEntry(
-      true,
-      new Balance(new BN(100)),
-      new UINT256(new BN(1)),
-      new UINT256(new BN(2))
-    )
+    const mockChannel = await mockChannelEntry(true, new Balance('100', BalanceType.HOPR), new U256('1'), new U256('2'))
 
     return expect(
-      validateUnacknowledgedTicket(SENDER, new BN(1), new BN(1), signedTicket, mockChannel, getTicketsMock, true)
+      validateUnacknowledgedTicket(
+        SENDER,
+        new Balance('1', BalanceType.HOPR),
+        U256.one(),
+        signedTicket,
+        mockChannel,
+        getTicketsMock,
+        true
+      )
     ).to.not.eventually.rejected
   })
 
   it("should not throw if ticket's index is smaller than the last ticket index when you include unredeemed tickets", async function () {
     const signedTicket = createMockTicket({})
-    const mockChannel = await mockChannelEntry(
-      true,
-      new Balance(new BN(200)),
-      new UINT256(new BN(1)),
-      new UINT256(new BN(1))
-    )
+    const mockChannel = await mockChannelEntry(true, new Balance('200', BalanceType.HOPR), U256.one(), U256.one())
     const ticketsInDb = [
       createMockTicket({
-        amount: new Balance(new BN(100)),
-        index: new UINT256(new BN(2))
+        amount: new Balance('100', BalanceType.HOPR),
+        index: new U256('2')
       })
     ]
 
     return expect(
       validateUnacknowledgedTicket(
         SENDER,
-        new BN(1),
-        new BN(1),
+        new Balance('1', BalanceType.HOPR),
+        U256.one(),
         signedTicket,
         mockChannel,
         async () => ticketsInDb,
@@ -225,10 +239,10 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
     return expect(
       validateUnacknowledgedTicket(
         SENDER,
-        new BN(1),
-        new BN(1),
+        new Balance('1', BalanceType.HOPR),
+        U256.one(),
         signedTicket,
-        await mockChannelEntry(true, new Balance(new BN(0))),
+        await mockChannelEntry(true, Balance.zero(BalanceType.HOPR)),
         getTicketsMock,
         true
       )
@@ -241,15 +255,15 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
     const signedTicket = createMockTicket({})
     const ticketsInDb = [
       createMockTicket({
-        amount: new Balance(new BN(100))
+        amount: new Balance('100', BalanceType.HOPR)
       })
     ]
 
     return expect(
       validateUnacknowledgedTicket(
         SENDER,
-        new BN(1),
-        new BN(1),
+        new Balance('1', BalanceType.HOPR),
+        U256.one(),
         signedTicket,
         await mockChannelEntry(),
         async () => ticketsInDb,

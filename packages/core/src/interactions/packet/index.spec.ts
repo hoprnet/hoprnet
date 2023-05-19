@@ -6,24 +6,23 @@ import BN from 'bn.js'
 import { AcknowledgementInteraction } from './acknowledgement.js'
 import {
   Balance,
+  BalanceType,
   defer,
   HoprDB,
   PublicKey,
-  UINT256,
-  createPoRValuesForSender,
-  deriveAckKeyShare,
+  U256,
   u8aEquals,
   ChannelEntry,
   ChannelStatus,
   privKeyToPeerId,
   stringToU8a,
   Hash,
+  HalfKeyChallenge,
   PRICE_PER_PACKET,
   Snapshot
 } from '@hoprnet/hopr-utils'
-import type { HalfKeyChallenge } from '@hoprnet/hopr-utils'
 import assert from 'assert'
-import { AcknowledgementChallenge, Packet, Acknowledgement } from '../../messages/index.js'
+import { Packet, PacketHelper, privateKeyFromPeer } from '../../messages/index.js'
 import { PacketForwardInteraction } from './forward.js'
 import { initializeCommitment } from '@hoprnet/hopr-core-ethereum'
 import { ChannelCommitmentInfo } from '@hoprnet/hopr-core-ethereum'
@@ -32,25 +31,34 @@ import type { HoprOptions } from '../../index.js'
 import type { Components } from '@libp2p/interfaces/components'
 import type { Connection, Stream } from '@libp2p/interfaces/connection'
 
+import {
+  derive_ack_key_share,
+  ProofOfRelayValues,
+  Acknowledgement,
+  AcknowledgementChallenge
+} from '../../../lib/core_packet.js'
+
 const SECRET_LENGTH = 32
 
 const TEST_MESSAGE = new TextEncoder().encode('test message')
 
-const DEFAULT_FUNDING = new Balance(new BN(1234).mul(PRICE_PER_PACKET))
-const DEFAULT_TICKET_EPOCH = new UINT256(new BN(0))
-const DEFAULT_INDEX = new UINT256(new BN(0))
-const DEFAULT_CHANNEL_EPOCH = new UINT256(new BN(0))
-const DEFAULT_CLOSURE_TIME = new UINT256(new BN(0))
+const DEFAULT_FUNDING = new Balance(new BN(1234).mul(PRICE_PER_PACKET).toString(10), BalanceType.HOPR)
+const DEFAULT_TICKET_EPOCH = U256.zero()
+const DEFAULT_INDEX = U256.zero()
+const DEFAULT_CHANNEL_EPOCH = U256.zero()
+const DEFAULT_CLOSURE_TIME = U256.zero()
 
 const SELF = privKeyToPeerId(stringToU8a('0x492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775'))
-const RELAY0 = privKeyToPeerId(stringToU8a('0x5bf21ea8cccd69aa784346b07bf79c84dac606e00eecaa68bf8c31aff397b1ca'))
+const RELAY0_priv = stringToU8a('0x5bf21ea8cccd69aa784346b07bf79c84dac606e00eecaa68bf8c31aff397b1ca')
+const RELAY0 = privKeyToPeerId(RELAY0_priv)
 const RELAY1 = privKeyToPeerId(stringToU8a('0x3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa'))
 const RELAY2 = privKeyToPeerId(stringToU8a('0xdb7e3e8fcac4c817aa4cecee1d6e2b4d53da51f9881592c0e1cc303d8a012b92'))
-const COUNTERPARTY = privKeyToPeerId(stringToU8a('0x0726a9704d56a013980a9077d195520a61b5aed28f92d89c50bca6e0e0c48cfc'))
+const COUNTERPARTY_priv = stringToU8a('0x0726a9704d56a013980a9077d195520a61b5aed28f92d89c50bca6e0e0c48cfc')
+const COUNTERPARTY = privKeyToPeerId(COUNTERPARTY_priv)
 
 const nodes: PeerId[] = [SELF, RELAY0, RELAY1, RELAY2, COUNTERPARTY]
 
-const TestingSnapshot = new Snapshot(new BN(0), new BN(0), new BN(0))
+const TestingSnapshot = new Snapshot(U256.zero(), U256.zero(), U256.zero())
 
 const TestOptions = {
   network: undefined,
@@ -145,15 +153,15 @@ function createFakeSendReceive(events: EventEmitter, self: PeerId) {
  */
 function getDummyChannel(from: PeerId, to: PeerId): ChannelEntry {
   return new ChannelEntry(
-    PublicKey.fromPeerId(from),
-    PublicKey.fromPeerId(to),
-    DEFAULT_FUNDING,
+    PublicKey.from_peerid_str(from.toString()),
+    PublicKey.from_peerid_str(to.toString()),
+    DEFAULT_FUNDING.clone(),
     new Hash(Uint8Array.from(randomBytes(32))),
-    DEFAULT_TICKET_EPOCH,
-    DEFAULT_INDEX,
+    DEFAULT_TICKET_EPOCH.clone(),
+    DEFAULT_INDEX.clone(),
     ChannelStatus.Open,
-    DEFAULT_CHANNEL_EPOCH,
-    DEFAULT_CLOSURE_TIME
+    DEFAULT_CHANNEL_EPOCH.clone(),
+    DEFAULT_CLOSURE_TIME.clone()
   )
 }
 
@@ -168,7 +176,7 @@ async function createMinimalChannelTopology(dbs: HoprDB[], nodes: PeerId[]): Pro
   let previousChannel: ChannelEntry
 
   for (const [index, peerId] of nodes.entries()) {
-    dbs[index] = HoprDB.createMock(PublicKey.fromPeerId(peerId))
+    dbs[index] = HoprDB.createMock(PublicKey.from_peerid_str(peerId.toString()))
 
     let channel: ChannelEntry
 
@@ -176,18 +184,18 @@ async function createMinimalChannelTopology(dbs: HoprDB[], nodes: PeerId[]): Pro
       channel = getDummyChannel(peerId, nodes[index + 1])
 
       // Store channel entry at source
-      await dbs[index].updateChannelAndSnapshot(channel.getId(), channel, TestingSnapshot)
+      await dbs[index].updateChannelAndSnapshot(channel.get_id(), channel, TestingSnapshot)
     }
 
     if (index > 0) {
       // Store channel entry at destination
-      await dbs[index].updateChannelAndSnapshot(previousChannel.getId(), previousChannel, TestingSnapshot)
+      await dbs[index].updateChannelAndSnapshot(previousChannel.get_id(), previousChannel, TestingSnapshot)
 
       const channelInfo = new ChannelCommitmentInfo(
         1,
         'fakeaddress',
-        previousChannel.getId(),
-        previousChannel.channelEpoch
+        previousChannel.get_id(),
+        previousChannel.channel_epoch
       )
       // Set a commitment if we are the destination
       await initializeCommitment(
@@ -212,7 +220,7 @@ describe('packet acknowledgement', function () {
 
   const events = new EventEmitter()
   let dbs: HoprDB[] = Array.from({ length: nodes.length }, (_, index) =>
-    HoprDB.createMock(PublicKey.fromPeerId(nodes[index]))
+    HoprDB.createMock(PublicKey.from_peerid_str(nodes[index].toString()))
   )
 
   afterEach(async function () {
@@ -233,14 +241,14 @@ describe('packet acknowledgement', function () {
   it('acknowledgement workflow as sender', async function () {
     const secrets: Uint8Array[] = Array.from({ length: 2 }, () => Uint8Array.from(randomBytes(SECRET_LENGTH)))
 
-    const { ackChallenge } = createPoRValuesForSender(secrets[0], secrets[1])
+    let porv = new ProofOfRelayValues(secrets[0], secrets[1])
 
     const libp2pSelf = createFakeSendReceive(events, SELF)
     const libp2pCounterparty = createFakeSendReceive(events, COUNTERPARTY)
 
     const ackReceived = defer<void>()
 
-    await dbs[0].storePendingAcknowledgement(ackChallenge, true)
+    await dbs[0].storePendingAcknowledgement(porv.ack_challenge, true)
 
     const ackInteration = new AcknowledgementInteraction(
       libp2pSelf.send as any,
@@ -248,7 +256,7 @@ describe('packet acknowledgement', function () {
       SELF,
       dbs[0],
       (receivedAckChallenge: HalfKeyChallenge) => {
-        if (receivedAckChallenge.eq(ackChallenge)) {
+        if (receivedAckChallenge.eq(HalfKeyChallenge.deserialize(porv.ack_challenge.serialize()))) {
           ackReceived.resolve()
         }
       },
@@ -273,8 +281,8 @@ describe('packet acknowledgement', function () {
     await ackInteration.start()
     await ackInterationCounterparty.start()
 
-    const ackKey = deriveAckKeyShare(secrets[0])
-    const ackMessage = AcknowledgementChallenge.create(ackChallenge, SELF)
+    const ackKey = derive_ack_key_share(secrets[0])
+    const ackMessage = new AcknowledgementChallenge(ackKey.to_challenge(), privateKeyFromPeer(SELF))
 
     assert(
       ackMessage.solve(ackKey.serialize()),
@@ -283,8 +291,8 @@ describe('packet acknowledgement', function () {
 
     ackInterationCounterparty.sendAcknowledgement(
       {
-        createAcknowledgement: (privKey: PeerId) => {
-          return Acknowledgement.create(ackMessage, ackKey, privKey)
+        create_acknowledgement: (privKey: Uint8Array) => {
+          return new Acknowledgement(ackMessage, ackKey, privKey)
         }
       } as any,
       SELF
@@ -305,7 +313,7 @@ describe('packet acknowledgement', function () {
   it('acknowledgement workflow as relayer', async function () {
     const nodes: PeerId[] = [RELAY0, COUNTERPARTY]
 
-    const packet = await Packet.create(TEST_MESSAGE, nodes, SELF, dbs[0])
+    const packet = await PacketHelper.create(TEST_MESSAGE, nodes, SELF, dbs[0])
 
     const libp2pRelay0 = createFakeSendReceive(events, RELAY0)
     const libp2pCounterparty = createFakeSendReceive(events, COUNTERPARTY)
@@ -359,13 +367,16 @@ describe('packet acknowledgement', function () {
 
     libp2pCounterparty.components.getRegistrar().handle(interaction.protocols, async ({ stream }) => {
       for await (const msg of stream.source) {
-        ackCounterpartyInteraction.sendAcknowledgement(Packet.deserialize(msg, COUNTERPARTY, RELAY0), RELAY0)
+        ackCounterpartyInteraction.sendAcknowledgement(
+          Packet.deserialize(msg, COUNTERPARTY_priv, RELAY0.toString()),
+          RELAY0
+        )
         // we're only interested in first acknowledgement
         break
       }
     })
 
-    await interaction.handleMixedPacket(Packet.deserialize(packet.serialize(), RELAY0, SELF))
+    await interaction.handleMixedPacket(Packet.deserialize(packet.serialize(), RELAY0_priv, SELF.toString()))
 
     await ackReceived.promise
 
@@ -384,7 +395,7 @@ describe('packet relaying interaction', function () {
 
   const events = new EventEmitter()
   let dbs: HoprDB[] = Array.from({ length: nodes.length }, (_, index) =>
-    HoprDB.createMock(PublicKey.fromPeerId(nodes[index]))
+    HoprDB.createMock(PublicKey.from_peerid_str(nodes[index].toString()))
   )
 
   afterEach(async function () {
@@ -403,8 +414,8 @@ describe('packet relaying interaction', function () {
     const allNodes: PeerId[] = [SELF].concat(nodes)
     let senderInteraction: PacketForwardInteraction
 
-    const packet = await Packet.create(TEST_MESSAGE, nodes, SELF, dbs[0])
-    await packet.storePendingAcknowledgement(dbs[0])
+    const packet = await PacketHelper.create(TEST_MESSAGE, nodes, SELF, dbs[0])
+    await PacketHelper.storePendingAcknowledgement(packet, dbs[0])
 
     const forwardInteractions: PacketForwardInteraction[] = []
     const ackInteractions: AcknowledgementInteraction[] = []

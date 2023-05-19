@@ -1,0 +1,41 @@
+[package]
+name = "core-packet"
+version = "0.1.0"
+description = "Contains high-level HOPR protocol building blocks"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+edition = "2021"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["console_error_panic_hook", "wasm"]
+wasm = ["dep:wasm-bindgen", "dep:js-sys"]
+
+[dependencies]
+core-crypto = { path = "../core-crypto" }
+core-types = { path = "../core-types" }
+js-sys = { version = "0.3.60", optional = true }
+libp2p-identity = { version = "0.1.1", features = ["secp256k1", "peerid"] }
+thiserror = "1.0"
+utils-log = { path = "../../../utils/crates/utils-log" }
+utils-metrics = { path = "../../../utils/crates/utils-metrics" }
+utils-misc = { path = "../../../utils/crates/utils-misc" }
+utils-types = { path = "../../../utils/crates/utils-types" }
+wasm-bindgen = { workspace = true, optional = true }
+
+console_error_panic_hook = { version = "0.1.7", optional = true }
+#wee_alloc = { version = "0.4.5", optional = true }
+
+[dev-dependencies]
+parameterized = "1.0"
+wasm-bindgen-test = "0.3.33"
+
+[package.metadata.wasm-pack.profile.dev]
+wasm-opt = false
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ['-O', '--enable-reference-types']

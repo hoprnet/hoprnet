@@ -1,9 +1,15 @@
 ARG HOPRD_IMAGE=${HOPRD_IMAGE:-hoprd-local:latest}
+ARG HOPLI_IMAGE=${HOPLI_IMAGE:-hopli-local:latest}
 ARG ANVIL_IMAGE=${ANVIL_IMAGE:-hopr-anvil-local:latest}
 
-# simply import hoprd image to copy in files later
+# import hopli image to copy in files later
+FROM ${HOPLI_IMAGE} as hopli
+
+# import hoprd image to copy in files later
 FROM ${HOPRD_IMAGE} as hoprd
 
+# the anvil image is our base runtime image since it includes most relevant
+# tools already
 FROM ${ANVIL_IMAGE} as runtime
 
 LABEL description="Docker image running a HOPR-enabled anvil chain with 5 hoprd nodes using it and being fully interconnected."
@@ -14,6 +20,9 @@ RUN apt-get update \
       bash curl jq lsof \
  && rm -rf /var/lib/apt/lists/* \
  && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false
+
+# Get hopli binary
+COPY --from=hopli /bin/hopli /bin/
 
 WORKDIR /app/hoprnet
 

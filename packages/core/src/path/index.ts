@@ -1,8 +1,10 @@
 import HeapPackage from 'heap-js'
 import { NETWORK_QUALITY_THRESHOLD, MAX_PATH_ITERATIONS, PATH_RANDOMNESS, MAX_HOPS } from '../constants.js'
-import { debug, randomFloat, type ChannelEntry, type PublicKey } from '@hoprnet/hopr-utils'
+import { type ChannelEntry, type PublicKey } from '@hoprnet/hopr-utils'
+import { debug } from '@hoprnet/hopr-utils'
 
 import BN from 'bn.js'
+import { random_float } from '../cryptography.js'
 
 const { Heap } = HeapPackage
 
@@ -22,9 +24,9 @@ const debugPath = (p: ChannelPath) =>
 // Weight a node based on stake, and a random component.
 const defaultWeight = async (edge: ChannelEntry): Promise<BN> => {
   // Minimum is 'stake', therefore weight is monotonically increasing
-  const r = 1 + randomFloat() * PATH_RANDOMNESS
+  const r = 1 + random_float() * PATH_RANDOMNESS
   // Log scale, but minimum 1 weight per edge
-  return edge.balance.toBN().addn(1).muln(r) //log()
+  return new BN(edge.balance.to_string(), 10).addn(1).muln(r) //log()
 }
 
 /**
@@ -45,7 +47,7 @@ export async function findPath(
 ): Promise<Path> {
   log('find path from', start.toString(), 'to ', destination.toString(), 'length', hops)
 
-  // Weight the path with the sum of its' edges weight
+  // Weight the path with the sum of its edges weight
   const pathWeight = async (a: ChannelEntry[]): Promise<BN> => (await Promise.all(a.map(weight))).reduce(sum, new BN(0))
 
   const comparePath = (a: ChannelPath, b: ChannelPath): number => {
@@ -72,13 +74,13 @@ export async function findPath(
         !destination.eq(c.destination) &&
         networkQualityOf(c.destination) > NETWORK_QUALITY_THRESHOLD &&
         filterCycles(c, currentPath) &&
-        !deadEnds.has(c.destination.toUncompressedPubKeyHex())
+        !deadEnds.has(c.destination.to_hex(false))
       )
     })
 
     if (newChannels.length == 0) {
       queue.pop()
-      deadEnds.add(lastPeer.toUncompressedPubKeyHex())
+      deadEnds.add(lastPeer.to_hex(false))
     } else {
       for (let c of newChannels) {
         const toPush = Array.from(currentPath.path)

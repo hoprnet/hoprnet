@@ -24,7 +24,7 @@ const POST: Operation = [
     // only set path if given, otherwise a path will be chosen by hopr core
     let path: PublicKey[]
     if (req.body.path != undefined) {
-      path = req.body.path.map((peer: string) => PublicKey.fromPeerId(peerIdFromString(peer)))
+      path = req.body.path.map((peer: string) => PublicKey.from_peerid_str(peer))
     }
 
     try {

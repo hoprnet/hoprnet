@@ -21,8 +21,8 @@ const GET: Operation = [
     try {
       const { native, hopr } = await getBalances(node)
       return res.status(200).send({
-        native: native.toBN().toString(),
-        hopr: hopr.toBN().toString()
+        native: native.to_string(),
+        hopr: hopr.to_string()
       })
     } catch (err) {
       return res

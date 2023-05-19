@@ -101,7 +101,8 @@ export async function createLibp2pInstance(
             // Amount of nodes for which we are willing to act as a relay with 2GB memory limit
             maxRelayedConnections: 2_000,
             announce: options.announce,
-            isAllowedToAccessNetwork
+            isAllowedToAccessNetwork,
+            noRelay: options.noRelay
           },
           testing: {
             // Treat local and private addresses as public addresses
@@ -228,7 +229,7 @@ export async function createHoprNode(
   options: HoprOptions,
   automaticChainCreation = true
 ): Promise<Hopr> {
-  const db = new HoprDB(PublicKey.fromPeerId(peerId))
+  const db = new HoprDB(PublicKey.from_peerid_str(peerId.toString()))
 
   try {
     const dbPath = path.join(options.dataPath, 'db')
@@ -247,7 +248,7 @@ export async function createHoprNode(
   log(`using provider URL: ${options.network.chain.default_provider}`)
   const chain = HoprCoreEthereum.createInstance(
     db,
-    PublicKey.fromPeerId(peerId),
+    PublicKey.from_peerid_str(peerId.toString()),
     keysPBM.PrivateKey.decode(peerId.privateKey as Uint8Array).Data,
     {
       chainId: options.network.chain.chain_id,
