@@ -15,7 +15,7 @@ pub enum CryptoError {
     #[error("mac or authentication tag did not match")]
     TagMismatch,
 
-    #[error("elliptic curve error: {0}")]
+    #[error("curve error: {0}")]
     EllipticCurveError(#[from] elliptic_curve::Error),
 
     #[error("failed to perform cryptographic calculation")]

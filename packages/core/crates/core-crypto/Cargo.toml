@@ -21,10 +21,10 @@ async-std = { version = "1.12.0", features = ["attributes"] }
 blake2 = "0.10"
 chacha20 = "0.9"
 ctr = "0.9"
-curve25519-dalek = "4.0.0-rc.2"
+ed25519-dalek = "1.0.1"
+curve25519-dalek = { version = "4.0.0-rc.2", features = ["rand_core"]}
 digest = "0.10"
 elliptic-curve = { version = "0.13", features = ["serde"] }
-ed25519-dalek = "2.0.0-rc.2"
 futures = "0.3.28"
 generic-array = "0.14.7"
 getrandom = { version = "0.2.8", features = ["js"] }
@@ -34,7 +34,7 @@ hkdf = "0.12"
 hmac = "0.12"
 js-sys = { version = "0.3.61", optional = true }
 k256 = { version = "0.13.0", features = ["arithmetic", "ecdh", "hash2curve"] }
-libp2p-identity = { version = "0.1.2", features = ["secp256k1", "peerid"] }
+libp2p-identity = { version = "0.1.2", features = ["secp256k1", "peerid", "ed25519"] }
 rand = "0.8.5"
 serde = { version = "1.0", features = ["derive"] }
 sha3 = "0.10"
