@@ -1,6 +1,7 @@
 name: renovate cargo update
 
 env:
+  HOPR_GITHUB_REF: ${{ github.ref }}
   RUST_BACKTRACE: "1"
   SCCACHE_GHA_ENABLED: "true"
   RUSTC_WRAPPER: "sccache"
@@ -19,13 +20,13 @@ jobs:
         run: ./scripts/configure-git-info.sh
 
       - name: Disable sccache (act-only)
-        if: env.ACT
+        if: ${{ env.ACT }}
         run: |
           echo "SCCACHE_GHA_ENABLED=false" >> $GITHUB_ENV
           echo "RUSTC_WRAPPER=" >> $GITHUB_ENV
 
       - name: Sccache Setup
-        if: !env.ACT
+        if: ${{ !env.ACT }}
         uses: mozilla-actions/sccache-action@v0.0.3
         with:
           version: "v0.4.0"
@@ -36,7 +37,7 @@ jobs:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: cachix/cachix-action@v12
-        if: !env.ACT
+        if: ${{ !env.ACT }}
         with:
           name: hoprnet
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
@@ -70,12 +71,12 @@ jobs:
 
       - name: Update vendored cargo dependencies
         run: |
-          nix develop -c make cargo-update
           nix develop -c make cargo-download
+          nix develop -c make cargo-update
 
       - name: Commit changes
         # only commit changes when not running via act
-        if: !env.ACT
+        if: ${{ !env.ACT }}
         run: ./scripts/commit-and-push-all-changes.sh
         env:
           HOPR_GIT_MSG: 'chore(cargo): updated vendored dependencies'
