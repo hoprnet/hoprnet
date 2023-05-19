@@ -56,10 +56,10 @@ source .env
 
 ```
 // This verifies contract on sourcify
-FOUNDRY_PROFILE=staging ENVIRONMENT_NAME=debug-staging forge script --broadcast --verify --verifier sourcify script/DeployAll.s.sol:DeployAllContractsScript
+FOUNDRY_PROFILE=staging NETWORK=debug-staging forge script --broadcast --verify --verifier sourcify script/DeployAll.s.sol:DeployAllContractsScript
 
 // This deploys contract to staging environment and verifies contracts on Gnosisscan
-FOUNDRY_PROFILE=staging ENVIRONMENT_NAME=debug-staging forge script --broadcast --verify --verifier etherscan --verifier-url "https://api.gnosisscan.io/api" --chain 100 --compiler-version <specify_if_other_than_that_in_config> script/DeployAll.s.sol:DeployAllContractsScript
+FOUNDRY_PROFILE=staging NETWORK=debug-staging forge script --broadcast --verify --verifier etherscan --verifier-url "https://api.gnosisscan.io/api" --chain 100 --compiler-version <specify_if_other_than_that_in_config> script/DeployAll.s.sol:DeployAllContractsScript
 ```
 
 #### Production
@@ -67,7 +67,7 @@ FOUNDRY_PROFILE=staging ENVIRONMENT_NAME=debug-staging forge script --broadcast 
 use either of the command below
 
 ```
-FOUNDRY_PROFILE=staging ENVIRONMENT_NAME=debug-staging forge script --broadcast --verify --verifier sourcify script/DeployAll.s.sol:DeployAllContractsScript
+FOUNDRY_PROFILE=staging NETWORK=debug-staging forge script --broadcast --verify --verifier sourcify script/DeployAll.s.sol:DeployAllContractsScript
 ```
 
 If contracts are not properly verified on explorers, please try with the manual verification. E.g.
@@ -88,14 +88,14 @@ forge verify-check --chain-id <number> <GUID>
 
 1. Create a new season contract from `HoprStakeBase.sol` and update the parameters (start, end timestamp) accordingly
 2. Change the `"stake_season":` to the number of the new season, for `master-staging`, `debug-staging` and the running production environment.
-3. Deploy for each environment with
-   - `debug-staging`: `FOUNDRY_PROFILE=staging ENVIRONMENT_NAME=debug-staging forge script --broadcast --verify --verifier etherscan --verifier-url "https://api.gnosisscan.io/api" --chain 100 script/DeployAll.s.sol:DeployAllContractsScript`
-   - `master-staging`: FOUNDRY_PROFILE=staging ENVIRONMENT_NAME=master-staging forge script --broadcast --verify --verifier etherscan --verifier-url "https://api.gnosisscan.io/api" --chain 100 script/DeployAll.s.sol:DeployAllContractsScript`
-   - `monte_rosa`: _Temporarily update the `token_contract_address` to wxHOPR. Then run_ `FOUNDRY_PROFILE=production ENVIRONMENT_NAME=monte_rosa forge script --broadcast --verify --verifier etherscan --verifier-url "https://api.gnosisscan.io/api" --chain 100 script/DeployAll.s.sol:DeployAllContractsScript`
+3. Deploy for each network with
+   - `debug-staging`: `FOUNDRY_PROFILE=staging NETWORK=debug-staging forge script --broadcast --verify --verifier etherscan --verifier-url "https://api.gnosisscan.io/api" --chain 100 script/DeployAll.s.sol:DeployAllContractsScript`
+   - `master-staging`: FOUNDRY_PROFILE=staging NETWORK=master-staging forge script --broadcast --verify --verifier etherscan --verifier-url "https://api.gnosisscan.io/api" --chain 100 script/DeployAll.s.sol:DeployAllContractsScript`
+   - `monte_rosa`: _Temporarily update the `token_contract_address` to wxHOPR. Then run_ `FOUNDRY_PROFILE=production NETWORK=monte_rosa forge script --broadcast --verify --verifier etherscan --verifier-url "https://api.gnosisscan.io/api" --chain 100 script/DeployAll.s.sol:DeployAllContractsScript`
 4. Switch back `token_contract_address` for `monte_rosa`
 5. Commit contract changes and make a PR
 6. Transfer contract ownership to COMM multisig with `cast send <new_stake_season_contract> "transferOwnership(address)" 0xD9a00176Cf49dFB9cA3Ef61805a2850F45Cb1D05 --rpc-url https://provider-proxy.hoprnet.workers.dev/xdai_mainnet --private-key $PRIVATE_KEY`
-7. Run `scripts/update-protocol-config.sh -e master-staging`, `scripts/update-protocol-config.sh -e debug-staging` and `scripts/update-protocol-config.sh -e monte_rosa`
+7. Run `scripts/update-protocol-config.sh -e master`, `scripts/update-protocol-config.sh -e debug-staging` and `scripts/update-protocol-config.sh -e monte_rosa`
 8. Create a branch (e.g. `feature/staking-s7-contract-update`) from `master` which contains changes in `contracts-addresses.json` and `protocol-config.json` and make a PR
 9. Extend "hopr-stake-all-season" subgraph with the production stake season contract and deploy it
 10. Create an issue in `hoprnet/hopr-devrel` repo with actions to check:
@@ -170,7 +170,7 @@ Notes on Test cases:
 - HoprDistributor
 - HoprWrapper
 
-6. <del>writeJson is next inline https://github.com/foundry-rs/foundry/pull/3595, to save deployed addressed used in function `writeEnvironment()` in `contracts/script/utils/EnvironmentConfig.s.sol`</del> As `writeJson` got introduced in the foundry nightly release but its smart contract hasn't been introduced in `forge-std`. The current walk-around is to manually add `serialize*` functions [mentioned in the PR](https://github.com/foundry-rs/foundry/pull/3595) into the `Vm.sol` contract.
+6. <del>writeJson is next inline https://github.com/foundry-rs/foundry/pull/3595, to save deployed addressed used in function `writeNetwork()` in `contracts/script/utils/NetworkConfig.s.sol`</del> As `writeJson` got introduced in the foundry nightly release but its smart contract hasn't been introduced in `forge-std`. The current walk-around is to manually add `serialize*` functions [mentioned in the PR](https://github.com/foundry-rs/foundry/pull/3595) into the `Vm.sol` contract.
    However, to fully unleash the power of `writeJson`, especially for nested arrays, compiler version needs to be bumped to `>=0.8.0`. Therefore, a few contracts bumped to `pragma solidity >=0.6.0 <0.9.0;`, such as
 
 - src/HoprToken.sol (^0.6.0)
@@ -235,7 +235,7 @@ Note that deployment for `HoprDistributor` and `HoprWrapper` are skipped; ERC182
 8. The temporary `contract-address.json` has the following differences compared with `protocol-config.json`
 
 - It does not need "chains" attribute
-- In "environment" attribute:
+- In "network" attribute:
   ```
   - "chain": "goerli",
   - "version_range": "*",
@@ -251,6 +251,6 @@ Note that deployment for `HoprDistributor` and `HoprWrapper` are skipped; ERC182
 
 10. Script migration:
 
-- `hardhat accounts` turns into `make get-account-balances environment-name=<name of the meta environment> environment-type=<type of environment, from development, staging, to production> account=<address to check>`
+- `hardhat accounts` turns into `make get-account-balances network=<name of the network, e.g. "monte_rosa"> environment-type=<type of environment, from development, staging, to production> account=<address to check>`
 
 11. `ETHERSCAN_API_KEY` contains the value of "API key for Gnosisscan", as our production and staging environment is on Gnosis chain. The reason why it remains "ETHERSCAN" instead of "GNOSISSCAN" is that foundry reads `ETHERSCAN_API_KEY` as an environment vairable for both `forge verify-contract` and `forge script`, which can not be configured in the foundry.toml file

@@ -26,7 +26,7 @@ pub fn build_path(network: &str, environment_type: &str) -> String {
 ///
 /// * `contracts_root` - Directory to the foundry project
 /// * `foundry_profile` - Value of FOUNDRY_PROFILE variable
-/// * `network` - Name of the environment that nodes run in
+/// * `network` - Name of the network that nodes run in
 pub fn set_process_path_env(contracts_root: &Option<String>, network: &String) -> Result<(), HelperErrors> {
     // run in the repo where the make target is saved
     if let Some(new_root) = contracts_root {

@@ -17,7 +17,7 @@ use core_crypto::types::ToChecksum;
 /// CLI arguments for `hopli faucet`
 #[derive(Parser, Default, Debug)]
 pub struct FaucetArgs {
-    #[clap(help = "Environment name. E.g. monte_rosa", long)]
+    #[clap(help = "Network name. E.g. monte_rosa", long)]
     network: String,
 
     #[clap(

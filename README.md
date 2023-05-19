@@ -123,7 +123,7 @@ The `hoprd` provides various command-line switches to configure its behaviour. F
 $ hoprd --help
 Options:
       --network <NETWORK>
-          Environment id which the node shall run on [env: HOPRD_NETWORK=] [possible values: anvil-localhost, master-staging, debug-staging, anvil-localhost2, monte_rosa]
+          Network id which the node shall run on [env: HOPRD_NETWORK=] [possible values: anvil-localhost, master, debug-staging, anvil-localhost2, monte_rosa]
       --identity <identity>
           The path to the identity file [env: HOPRD_IDENTITY=] [default: <IDENTITY_DIR>]
       --data <data>
@@ -199,7 +199,7 @@ As you might have noticed running the node without any command-line argument mig
 The following command assumes you've setup an alias like described in [Install via Docker](#install-via-docker).
 
 ```sh
-hoprd --identity /app/hoprd-db/.hopr-identity --password switzerland --init --announce --host "0.0.0.0:9091" --apiToken <MY_TOKEN> --environment monte_rosa
+hoprd --identity /app/hoprd-db/.hopr-identity --password switzerland --init --announce --host "0.0.0.0:9091" --apiToken <MY_TOKEN> --network monte_rosa
 ```
 
 Here is a short breakdown of each argument.
@@ -212,9 +212,9 @@ hoprd
   --announce 				                          # announce the node to other nodes in the network and act as relay if publicly reachable
   --host "0.0.0.0:9091"   	                  # set IP and port of the P2P API to the container's external IP so it can be reached on your host
   --apiToken <MY_TOKEN>                       # specify password for accessing REST API(REQUIRED)
-  --environment monte_rosa                    # an environment is defined as a chain plus a number of deployed smart contract addresses to use on that chain
-                                              # each release has a default environment id set, but the user can override this value
-                                              # nodes from different environments are **not able** to communicate
+  --network monte_rosa                        # an network is defined as a chain plus a number of deployed smart contract addresses to use on that chain
+                                              # each release has a default network id set, but the user can override this value
+                                              # nodes from different networks are **not able** to communicate
 ```
 
 ### Using Docker Compose with extended HOPR node monitoring

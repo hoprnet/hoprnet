@@ -94,7 +94,7 @@ import {
 import { AcknowledgementInteraction } from './interactions/packet/acknowledgement.js'
 import { PacketForwardInteraction } from './interactions/packet/forward.js'
 
-import { Packet， PacketHelper } from './messages/index.js'
+import { Packet, PacketHelper } from './messages/index.js'
 import type { ResolvedNetwork } from './network.js'
 import { createLibp2pInstance } from './main.js'
 import type { EventEmitter as Libp2pEmitter } from '@libp2p/interfaces/events'

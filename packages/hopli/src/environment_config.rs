@@ -86,7 +86,7 @@ pub fn ensure_environment_and_network_are_set(
     }
 }
 
-/// Returns the environment type from the environment name
+/// Returns the environment type from the network name
 /// according to `contracts-addresses.json`
 pub fn get_environment_type_from_name(make_root_dir_path: &PathBuf, network: &str) -> Result<EnvironmentType, String> {
     // read `contracts-addresses.json` at make_root_dir_path
