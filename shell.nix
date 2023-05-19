@@ -53,12 +53,6 @@ mkShell {
     echo "Installing dependencies"
     make deps
 
-    echo "Patching foundry binaries"
-    patchelf --interpreter `cat $NIX_CC/nix-support/dynamic-linker` .foundry/bin/anvil
-    patchelf --interpreter `cat $NIX_CC/nix-support/dynamic-linker` .foundry/bin/cast
-    patchelf --interpreter `cat $NIX_CC/nix-support/dynamic-linker` .foundry/bin/forge
-    patchelf --interpreter `cat $NIX_CC/nix-support/dynamic-linker` .foundry/bin/chisel
-
     echo "Setting up python virtual environment"
     python -m venv .venv
     source .venv/bin/activate
