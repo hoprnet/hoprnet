@@ -59,7 +59,7 @@
     "@libp2p/interface-content-routing": "1.0.2",
     "@libp2p/interface-registrar": "1.1.0",
     "@libp2p/tcp": "1.0.11",
-    "@types/chai": "4.3.4",
+    "@types/chai": "4.3.5",
     "@types/chai-as-promised": "7.1.5",
     "@types/mocha": "10.0.1",
     "@types/semver": "^7",

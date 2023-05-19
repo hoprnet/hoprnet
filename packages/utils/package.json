@@ -60,7 +60,7 @@
     "@libp2p/mplex": "1.2.2",
     "@libp2p/peer-id-factory": "1.0.18",
     "@libp2p/tcp": "1.0.11",
-    "@types/chai": "4.3.4",
+    "@types/chai": "4.3.5",
     "@types/mocha": "10.0.1",
     "bl": "5.1.0",
     "chai": "4.3.7",
