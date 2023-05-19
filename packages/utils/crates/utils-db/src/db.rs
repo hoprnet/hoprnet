@@ -25,16 +25,16 @@ impl Batch {
         }
     }
 
-    pub fn put<T: Serialize, U: Serialize>(&mut self, key: T, value: U) {
-        let key: Box<[u8]> = bincode::serialize(&key).unwrap().into_boxed_slice();
+    pub fn put<U: Serialize>(&mut self, key: Key, value: U) {
+        let key: Box<[u8]> = key.into();
         let value: Box<[u8]> = bincode::serialize(&value).unwrap().into_boxed_slice();
 
         self.ops
             .push(crate::traits::BatchOperation::put(crate::traits::Put { key, value }));
     }
 
-    pub fn del<T: Serialize>(&mut self, key: T) {
-        let key: Box<[u8]> = bincode::serialize(&key).unwrap().into_boxed_slice();
+    pub fn del(&mut self, key: Key) {
+        let key: Box<[u8]> = key.into();
 
         self.ops
             .push(crate::traits::BatchOperation::del(crate::traits::Del { key }));
