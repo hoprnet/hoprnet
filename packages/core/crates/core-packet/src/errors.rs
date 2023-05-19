@@ -23,7 +23,7 @@ pub enum PacketError {
     #[error("Proof of Relay challenge could not be verified")]
     PoRVerificationError,
 
-    #[error("cannot create ticket - channel {0} is out of funds")]
+    #[error("channel {0} is out of funds")]
     OutOfFunds(String),
 
     #[error(transparent)]

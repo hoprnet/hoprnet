@@ -1,7 +1,7 @@
+use std::fmt::{Display, Formatter};
 use ethnum::{u256, AsU256};
 use serde::{Deserialize, Serialize};
 use std::ops::{Add, Div, Mul, Sub};
-use std::string::ToString;
 
 use crate::errors::{GeneralError, GeneralError::InvalidInput, GeneralError::ParseError, Result};
 use crate::traits::{BinarySerializable, ToHex};
@@ -96,6 +96,7 @@ pub struct Balance {
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl Balance {
+    /// Creates new balance of the given type from the base 10 integer string
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn from_str(value: &str, balance_type: BalanceType) -> Self {
         Self {
@@ -106,9 +107,10 @@ impl Balance {
         }
     }
 
+    /// Creates zero balance of the given type
     pub fn zero(balance_type: BalanceType) -> Self {
         Self {
-            value: U256 { value: u256::ZERO },
+            value: U256::zero(),
             balance_type,
         }
     }
@@ -121,26 +123,6 @@ impl Balance {
     /// Creates balance of the given value with the same symbol
     pub fn of_same(&self, value: &str) -> Self {
         Self::from_str(value, self.balance_type)
-    }
-
-    // impl ToHex for Balance {
-    pub fn to_hex(&self) -> String {
-        hex::encode(self.value().value().to_be_bytes())
-    }
-    // }
-
-    // impl std::string::ToString for Balance {
-    pub fn to_string(&self) -> String {
-        self.value.to_string()
-    }
-    // }
-
-    pub fn to_formatted_string(&self) -> String {
-        format!(
-            "{} {:?}",
-            self.value().value().div(&u256::from(10u16).pow(18)),
-            self.balance_type
-        )
     }
 
     /// Serializes just the value of the balance (not the symbol)
@@ -171,8 +153,6 @@ impl Balance {
         assert_eq!(self.balance_type(), other.balance_type());
         self.value().gt(other.value()) || self.value().eq(other.value())
     }
-
-    // }
 
     pub fn add(&self, other: &Balance) -> Self {
         assert_eq!(self.balance_type(), other.balance_type());
@@ -233,6 +213,16 @@ impl Balance {
 
     pub fn amount(&self) -> U256 {
         self.value.clone().into()
+    }
+}
+
+impl Display for Balance {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f,
+            "{} {:?}",
+            self.value().value().div(&u256::from(10u16).pow(18)),
+            self.balance_type
+        )
     }
 }
 
@@ -371,10 +361,6 @@ impl U256 {
         Self { value: u256::ONE }
     }
 
-    pub fn to_string(&self) -> String {
-        self.value.to_string()
-    }
-
     pub fn as_u32(&self) -> u32 {
         self.value.as_u32()
     }
@@ -383,7 +369,15 @@ impl U256 {
         self.value.as_u64()
     }
 
+    pub fn addn(&self, n: u32) -> Self { Self { value: self.value + n as u128 } }
+
     pub fn muln(&self, n: u32) -> Self { Self { value: self.value * n as u128 } }
+}
+
+impl Display for U256 {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.value)
+    }
 }
 
 impl Mul for U256 {
@@ -438,7 +432,7 @@ impl From<u32> for U256 {
     }
 }
 
-impl ethnum::AsU256 for U256 {
+impl AsU256 for U256 {
     fn as_u256(self) -> ethnum::U256 {
         self.value.clone()
     }
@@ -538,9 +532,7 @@ mod tests {
 pub mod wasm {
     use crate::primitives::{Address, Balance, BalanceType, EthereumChallenge, Snapshot, U256};
     use crate::traits::{BinarySerializable, ToHex};
-    use ethnum::u256;
     use std::cmp::Ordering;
-    use std::ops::Add;
     use std::str::FromStr;
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
@@ -588,6 +580,11 @@ pub mod wasm {
         #[wasm_bindgen(js_name = "deserialize")]
         pub fn _deserialize(data: &[u8], balance_type: BalanceType) -> JsResult<Balance> {
             ok_or_jserr!(Balance::deserialize(data, balance_type))
+        }
+
+        #[wasm_bindgen]
+        pub fn to_formatted_string(&self) -> String {
+            self.to_string()
         }
 
         #[wasm_bindgen(js_name = "eq")]
@@ -686,10 +683,9 @@ pub mod wasm {
             ok_or_jserr!(U256::from_inverse_probability(*inverse_prob))
         }
 
-        pub fn addn(&self, amount: u32) -> Self {
-            Self {
-                value: self.value().add(u256::from(amount)),
-            }
+        #[wasm_bindgen(js_name = "to_string")]
+        pub fn _to_string(&self) -> String {
+            self.to_string()
         }
 
         #[wasm_bindgen(js_name = "eq")]

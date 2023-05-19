@@ -1,3 +1,4 @@
+use std::fmt::{Display, Formatter};
 use elliptic_curve::{NonZeroScalar, ProjectivePoint};
 use k256::ecdsa::signature::hazmat::PrehashVerifier;
 use k256::ecdsa::signature::Verifier;
@@ -460,6 +461,12 @@ impl BinarySerializable<'_> for Hash {
     }
 }
 
+impl Display for Hash {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_hex())
+    }
+}
+
 impl Hash {
     /// Takes all the byte slices and computes hash of their concatenated value.
     /// Uses the Keccak256 digest.
@@ -512,6 +519,12 @@ impl PublicKey {
     pub fn to_hex(&self, compressed: bool) -> String {
         let offset = if compressed { 0 } else { 1 };
         format!("0x{}", hex::encode(&self.to_bytes(compressed)[offset..]))
+    }
+}
+
+impl Display for PublicKey {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_hex(true))
     }
 }
 

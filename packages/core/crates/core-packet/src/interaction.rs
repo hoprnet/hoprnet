@@ -4,8 +4,8 @@ use libp2p_identity::PeerId;
 use core_crypto::types::{Hash, PublicKey};
 use core_db::traits::HoprCoreDbActions;
 use core_types::acknowledgement::{Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket};
-use core_types::channels::{ChannelEntry, Ticket};
-use utils_log::{error, info};
+use core_types::channels::{ChannelEntry, ChannelStatus, Ticket};
+use utils_log::{info};
 use utils_types::primitives::{Balance, BalanceType, U256};
 use utils_types::traits::{PeerIdLike, ToHex};
 use crate::errors::PacketError::{InvalidPacketState, OutOfFunds, TagReplay, TicketValidation};
@@ -54,19 +54,65 @@ impl<T: HoprCoreDbActions> PacketInteraction<T> {
         todo!("send message")
     }
 
-    async fn validate_unacknowledged_ticket(&self,
-                                            them: &PublicKey,
-                                            min_ticket_amount: Balance,
-                                            req_inverse_ticket_win_prob: U256,
-                                            ticket: &Ticket,
-                                            channel: &ChannelEntry,
+    async fn validate_unacknowledged_ticket(&self, sender: &PublicKey, min_ticket_amount: Balance,
+                                            req_inverse_ticket_win_prob: U256, ticket: &Ticket, channel: &ChannelEntry,
                                             check_unrealized_balance: bool) -> Result<()> {
-        todo!()
 
+        let required_win_prob = U256::from_inverse_probability(req_inverse_ticket_win_prob)?;
+
+        // ticket signer MUST be the sender
+        ticket.verify(sender)
+            .map_err(|e| TicketValidation(format!("ticket signer does not match the sender: {e}")))?;
+
+        // ticket amount MUST be greater or equal to minTicketAmount
+        if !ticket.amount.gte(&min_ticket_amount) {
+            return Err(TicketValidation(format!("ticket amount {} in not at least {min_ticket_amount}", ticket.amount)))
+        }
+
+        // ticket MUST have match X winning probability
+        if !ticket.win_prob.eq(&required_win_prob) {
+            return Err(TicketValidation(format!("ticket winning probability {} is not equal to {required_win_prob}", ticket.win_prob)))
+        }
+
+        // channel MUST be open or pending to close
+        if channel.status == ChannelStatus::Closed {
+            return Err(TicketValidation(format!("payment channel with {sender} is not opened or pending to close")))
+        }
+
+        // ticket's epoch MUST match our channel's epoch
+        if !ticket.epoch.eq(&channel.ticket_epoch) {
+            return Err(TicketValidation(format!("ticket epoch {} does not match our account epoch {} of channel {}",
+                ticket.epoch, channel.ticket_epoch, channel.get_id())))
+        }
+
+        // ticket's channelEpoch MUST match the current channel's epoch
+        if !ticket.channel_epoch.eq(&channel.channel_epoch) {
+            return Err(TicketValidation(format!("ticket was created for a different channel iteration {} != {} of channel {}",
+                ticket.channel_epoch, channel.channel_epoch, channel.get_id())))
+        }
+
+        if check_unrealized_balance {
+            info!("checking unrealized balances for channel {}", channel.get_id());
+
+            let unrealized_balance = self.db.get_tickets(sender) // all tickets from sender
+                .await?
+                .into_iter()
+                .filter(|t| t.epoch.eq(&channel.ticket_epoch) && t.channel_epoch.eq(&channel.channel_epoch))
+                .fold(channel.balance, |result, t| result.sub(&t.amount));
+
+            // ensure sender has enough funds
+            if ticket.amount.gt(&unrealized_balance) {
+                return Err(OutOfFunds(channel.get_id().to_string()))
+            }
+        }
+
+        Ok(())
     }
 
-    async fn bump_ticket_index(&self, channel_id: &Hash) -> Result<U256> {
-        todo!()
+    async fn bump_ticket_index(&mut self, channel_id: &Hash) -> Result<U256> {
+        let current_ticket_index = self.db.get_current_ticket_index(channel_id).await?.unwrap_or(U256::one());
+        self.db.set_current_ticket_index(channel_id, current_ticket_index.addn(1)).await?;
+        Ok(current_ticket_index)
     }
 
     async fn create_multihop_ticket(&mut self, destination: PublicKey, path_pos: u8) -> Result<Ticket> {
@@ -80,13 +126,12 @@ impl<T: HoprCoreDbActions> PacketInteraction<T> {
         let outstanding_balance = self.db.get_pending_balance_to(&destination.to_address()).await?;
         let channel_balance = channel.balance.sub(&outstanding_balance);
 
-        info!("balances {} - {} = {} should >= {} in channel open to {}",
-            channel.balance.to_formatted_string(), outstanding_balance.to_formatted_string(),
-            channel_balance.to_formatted_string(), amount.to_string(), channel.destination.to_hex(true)
+        info!("balances {} - {outstanding_balance} = {channel_balance} should >= {amount} in channel open to {}",
+            channel.balance, channel.destination
         );
 
         if channel_balance.lt(&amount) {
-            return Err(OutOfFunds(format!("{} with counterparty {}", channel_id.to_hex(), destination.to_hex(true))))
+            return Err(OutOfFunds(format!("{channel_id} with counterparty {destination}")))
         }
 
         let ticket = Ticket::new(
@@ -100,7 +145,7 @@ impl<T: HoprCoreDbActions> PacketInteraction<T> {
             &self.private_key);
 
         self.db.mark_pending(&ticket).await?;
-        info!("Creating ticket in channel {}. Ticket data: {}", channel_id.to_hex(), ticket.to_hex());
+        info!("Creating ticket in channel {channel_id}. Ticket data: {}", ticket.to_hex());
         // TODO: metric_ticketCounter.increment()
 
         Ok(ticket)
@@ -144,7 +189,7 @@ impl<T: HoprCoreDbActions> PacketInteraction<T> {
                     return Err(e);
                 }
 
-                // TODO: await self.db.set_current_ticket_index(channel.get_id().hash(), packet_ticket.index);
+                self.db.set_current_ticket_index(&channel.get_id().hash(), packet.ticket.index).await?;
 
                 // Store the unacknowledged ticket
                 self.db.store_pending_acknowledgment(
