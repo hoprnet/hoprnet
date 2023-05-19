@@ -431,7 +431,7 @@ impl HoprdConfig {
             cfg.network_options.network_quality_threshold = x
         };
         if let Some(x) = cli_args.no_relay {
-            cfg.network.no_relay = x
+            cfg.network_options.no_relay = x
         }
 
         // healthcheck

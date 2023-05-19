@@ -104,7 +104,7 @@ function generateNodeOptions(cfg: HoprdConfig, network: ResolvedNetwork): HoprOp
     password: cfg.identity.password,
     strategy,
     forceCreateDB: cfg.db.force_initialize,
-    noRelay: cfg.network.no_relay
+    noRelay: cfg.network_options.no_relay
   }
 
   if (isStrategy(cfg.strategy.name)) {
