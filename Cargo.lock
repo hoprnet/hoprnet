@@ -995,9 +995,11 @@ dependencies = [
 name = "core-packet"
 version = "0.2.0"
 dependencies = [
+ "async-std",
  "console_error_panic_hook",
  "core-crypto",
  "core-db",
+ "core-mixer",
  "core-types",
  "futures",
  "js-sys",

@@ -3,6 +3,7 @@ use crate::errors::Result;
 use crate::packet::{Packet, PacketState};
 use crate::path::Path;
 use core_crypto::types::{HalfKeyChallenge, Hash, PublicKey};
+use core_mixer::mixer::Mixer;
 use core_db::traits::HoprCoreDbActions;
 use core_types::acknowledgement::{
     AcknowledgedTicket, Acknowledgement, AcknowledgementChallenge, PendingAcknowledgement, UnacknowledgedTicket,
@@ -12,7 +13,8 @@ use libp2p_identity::PeerId;
 use std::cell::RefCell;
 use std::ops::Mul;
 use std::sync::Arc;
-use utils_log::{debug, info};
+use async_std::channel::{Receiver, Sender, unbounded};
+use utils_log::{debug, error, info};
 use utils_metrics::metrics::SimpleCounter;
 use utils_types::primitives::{Balance, BalanceType, U256};
 use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
@@ -20,6 +22,12 @@ use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
 pub const PRICE_PER_PACKET: &str = "10000000000000000";
 pub const INVERSE_TICKET_WIN_PROB: &str = "1";
 const PREIMAGE_PLACE_HOLDER: [u8; Hash::SIZE] = [0xffu8; Hash::SIZE];
+
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+pub struct TransportTask {
+    remote_peer: PeerId,
+    data: Box<[u8]>
+}
 
 struct AckMetrics {
     received_successful_acks: SimpleCounter,
@@ -47,23 +55,65 @@ impl Default for AckMetrics {
     }
 }
 
-pub struct AcknowledgementInteraction<T: HoprCoreDbActions> {
-    db: RefCell<T>,
+pub struct AcknowledgementInteraction<Db: HoprCoreDbActions> {
+    db: RefCell<Db>,
     on_acknowledgement: fn(HalfKeyChallenge),
     on_acknowledged_ticket: fn(AcknowledgedTicket),
     public_key: PublicKey,
+    incoming_channel: (Sender<TransportTask>, Receiver<TransportTask>),
+    outgoing_channel: (Sender<TransportTask>, Receiver<TransportTask>),
     metrics: AckMetrics,
 }
 
-impl<T: HoprCoreDbActions> AcknowledgementInteraction<T> {
-    pub fn send_acknowledgement(&self, acknowledgement: Acknowledgement, destination: PeerId) {
-        // TODO: serialize and push to queue
+impl<Db: HoprCoreDbActions> AcknowledgementInteraction<Db> {
+    pub async fn send_acknowledgement(&self, acknowledgement: Acknowledgement, destination: PeerId) -> Result<()> {
         self.metrics.sent_acks.increment();
-        todo!()
+        self.outgoing_channel.0.send(TransportTask {
+            remote_peer: destination,
+            data: acknowledgement.to_bytes()
+        }).await.map_err(|e| TransportError(e.to_string()))
     }
 
-    pub async fn handle_acknowledgement(&self, mut ack: Acknowledgement, remote_peer: PeerId) -> Result<()> {
-        if !ack.validate(&self.public_key, &PublicKey::from_peerid(&remote_peer)?) {
+    pub async fn handle_incoming_acknowledgements(&self) {
+        while let Ok(ack_task) = self.incoming_channel.1.recv().await {
+            match Acknowledgement::from_bytes(&ack_task.data) {
+                Ok(ack) => {
+                    if let Err(e) = self.handle_acknowledgement(ack, &ack_task.remote_peer).await {
+                        error!("failed to process incoming acknowledgement from {}: {e}", ack_task.remote_peer);
+                    }
+                }
+                Err(e) => {
+                    error!("received unreadable acknowledgement from {}: {e}", ack_task.remote_peer);
+                }
+            }
+        }
+        info!("done processing incoming acknowledgements");
+    }
+
+    pub async fn handle_outgoing_acknowlegements<T, F>(&self, message_transport: &T)
+        where T: Fn(Box<[u8]>, String) -> F,
+              F: futures::Future<Output = core::result::Result<(), String>> {
+        while let Ok(ack_task) = self.outgoing_channel.1.recv().await {
+            if let Err(e) = message_transport(ack_task.data, ack_task.remote_peer.to_string()).await {
+                error!("failed to send acknowledgement to {}: {e}", ack_task.remote_peer);
+            }
+        }
+        info!("done processing outgoing acknowledgements")
+    }
+
+    pub fn start(&self) {
+        unimplemented!("implement this when migrated to rust libp2p")
+    }
+
+    pub fn stop(&self) {
+        self.incoming_channel.0.close();
+        self.incoming_channel.1.close();
+        self.outgoing_channel.0.close();
+        self.outgoing_channel.1.close();
+    }
+
+    async fn handle_acknowledgement(&self, mut ack: Acknowledgement, remote_peer: &PeerId) -> Result<()> {
+        if !ack.validate(&self.public_key, &PublicKey::from_peerid(remote_peer)?) {
             return Err(AcknowledgementValidation(
                 "could not validate the acknowledgement".to_string(),
             ));
@@ -163,6 +213,7 @@ impl Default for PacketMetrics {
     }
 }
 
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct PacketInteractionConfig {
     check_unrealized_balance: bool,
     private_key: Box<[u8]>
@@ -171,6 +222,7 @@ pub struct PacketInteractionConfig {
 pub struct PacketInteraction<Db>
 where Db: HoprCoreDbActions {
     db: RefCell<Db>,
+    channel: (Sender<TransportTask>, Receiver<TransportTask>),
     ack_interaction: Arc<AcknowledgementInteraction<Db>>,
     message_emitter: fn(&[u8]),
     cfg: PacketInteractionConfig,
@@ -183,6 +235,7 @@ impl<Db> PacketInteraction<Db>
     pub fn new(db: Db, ack_interaction: Arc<AcknowledgementInteraction<Db>>,  message_emitter: fn(&[u8]), cfg: PacketInteractionConfig) -> Self {
         Self {
             db: RefCell::new(db),
+            channel: unbounded(),
             ack_interaction,
             message_emitter,
             cfg,
@@ -368,7 +421,7 @@ impl<Db> PacketInteraction<Db>
         }
     }
 
-    pub async fn handle_mixed_packet<T,F>(&self, mut packet: Packet,message_transport: &T) -> Result<()>
+    async fn handle_mixed_packet<T, F>(&self, mut packet: Packet, message_transport: &T) -> Result<()>
         where T: Fn(Box<[u8]>, String) -> F,
               F: futures::Future<Output = core::result::Result<(), String>> {
 
@@ -394,7 +447,7 @@ impl<Db> PacketInteraction<Db>
 
                 // And create acknowledgement
                 let ack = packet.create_acknowledgement(&self.cfg.private_key).unwrap();
-                self.ack_interaction.send_acknowledgement(ack, previous_hop.to_peerid());
+                self.ack_interaction.send_acknowledgement(ack, previous_hop.to_peerid()).await?;
                 self.metrics.recv_message_count.increment();
                 return Ok(());
             }
@@ -474,18 +527,75 @@ impl<Db> PacketInteraction<Db>
 
         // Acknowledge to the previous hop that we forwarded the packet
         let ack = packet.create_acknowledgement(&self.cfg.private_key).unwrap();
-        self.ack_interaction.send_acknowledgement(ack, previous_peer);
+        self.ack_interaction.send_acknowledgement(ack, previous_peer).await?;
         self.metrics.fwd_message_count.increment();
 
         Ok(())
     }
+
+    pub async fn handle_packets<T, F>(&self, message_transport: &T)
+        where T: Fn(Box<[u8]>, String) -> F,
+              F: futures::Future<Output = core::result::Result<(), String>> {
+        let mixer = Mixer::<TransportTask>::default();
+        while let Ok(task) = self.channel.1.recv().await {
+            // Add some random delay via mixer
+            let mixed_packet = mixer.mix(task).await;
+            match Packet::from_bytes(&mixed_packet.data, &self.cfg.private_key, &mixed_packet.remote_peer) {
+                Ok(packet) => {
+                    if let Err(e) = self.handle_mixed_packet(packet, message_transport).await {
+                        error!("failed to handle packet from {}: {e}", mixed_packet.remote_peer);
+                    }
+                }
+                Err(e) => {
+                    error!("received unreadable packet from {}: {e}", mixed_packet.remote_peer);
+                }
+            }
+        }
+        info!("done processing packets")
+    }
+
+    pub async fn push_received_packet(&mut self, packet_task: TransportTask) -> Result<()> {
+        self.channel.0.send(packet_task)
+            .await
+            .map_err(|e| TransportError(e.to_string()))
+    }
+
+    pub fn start(&self) {
+        unimplemented!("implement this when migrated to rust libp2p")
+    }
+
+    pub fn stop(&self) {
+        self.channel.0.close();
+        self.channel.1.close();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
 }
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
+    use std::str::FromStr;
+    use libp2p_identity::PeerId;
+    use wasm_bindgen::prelude::wasm_bindgen;
     use core_db::db::CoreDb;
     use utils_db::leveldb::LevelDbShim;
-    use crate::interaction::PacketInteraction;
+    use utils_misc::ok_or_jserr;
+    use utils_misc::utils::wasm::JsResult;
+    use crate::interaction::{PacketInteraction, TransportTask};
+
+    #[wasm_bindgen]
+    impl TransportTask {
+        #[wasm_bindgen(constructor)]
+        pub fn _new(peer_id: &str, packet_data: Box<[u8]>) -> JsResult<TransportTask> {
+            Ok(Self {
+                remote_peer: ok_or_jserr!(PeerId::from_str(peer_id))?,
+                data: packet_data
+            })
+        }
+    }
 
     /*pub struct WasmPacketInteraction {
         w: Box<PacketInteraction<CoreDb<LevelDbShim>, dyn futures::Future<Output = core::result::Result<(), String>>>>,

@@ -16,8 +16,10 @@ default = ["console_error_panic_hook", "wasm"]
 wasm = ["dep:wasm-bindgen", "dep:js-sys"]
 
 [dependencies]
+async-std = "1.12.0"
 core-crypto = { path = "../core-crypto" }
 core-db = { path = "../core-db" }
+core-mixer = { path = "../core-mixer"}
 core-types = { path = "../core-types" }
 futures = "0.3"
 js-sys = { version = "0.3.60", optional = true }
