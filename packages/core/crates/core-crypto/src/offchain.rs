@@ -82,7 +82,7 @@ impl PeerIdLike for OffchainPublicKey {
     }
 
     fn to_peerid(&self) -> PeerId {
-        PeerId::from_public_key(&lp2p_PublicKey::Ed25519(libp2p_identity::ed25519::PublicKey::decode(self.key.as_bytes()).unwrap()))
+        PeerId::from_public_key(&lp2p_PublicKey::Ed25519(libp2p_identity::ed25519::PublicKey::try_from_bytes(self.key.as_bytes()).unwrap()))
     }
 }
 
