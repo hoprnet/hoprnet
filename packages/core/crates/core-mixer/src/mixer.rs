@@ -81,7 +81,8 @@ impl Default for MixerMetrics {
             average_delay: SimpleGauge::new(
                 "core_gauge_mixer_average_packet_delay",
                 "Average mixer packet delay averaged over a packet window",
-            ).unwrap()
+            )
+            .unwrap(),
         }
     }
 }
@@ -90,7 +91,7 @@ impl Default for MixerMetrics {
 pub struct Mixer<T> {
     pub cfg: MixerConfig,
     metrics: MixerMetrics,
-    _data: PhantomData<T>
+    _data: PhantomData<T>,
 }
 
 impl<T> Default for Mixer<T> {
@@ -98,7 +99,7 @@ impl<T> Default for Mixer<T> {
         Self {
             cfg: MixerConfig::default(),
             metrics: MixerMetrics::default(),
-            _data: PhantomData
+            _data: PhantomData,
         }
     }
 }
@@ -122,7 +123,9 @@ impl<T> Mixer<T> {
         self.metrics.queue_size.decrement(1.0f64);
 
         let weight = 1.0f64 / self.cfg.metric_delay_window as f64;
-        self.metrics.average_delay.set((weight * random_delay.as_millis() as f64) + ((1.0f64 - weight) * self.metrics.average_delay.get()));
+        self.metrics
+            .average_delay
+            .set((weight * random_delay.as_millis() as f64) + ((1.0f64 - weight) * self.metrics.average_delay.get()));
 
         packet
     }

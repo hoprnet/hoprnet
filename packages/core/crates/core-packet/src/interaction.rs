@@ -1,10 +1,13 @@
-use crate::errors::PacketError::{AcknowledgementValidation, InvalidPacketState, OutOfFunds, TagReplay, TicketValidation, TransportError};
+use crate::errors::PacketError::{
+    AcknowledgementValidation, InvalidPacketState, OutOfFunds, TagReplay, TicketValidation, TransportError,
+};
 use crate::errors::Result;
 use crate::packet::{Packet, PacketState};
 use crate::path::Path;
+use async_std::channel::{unbounded, Receiver, Sender};
 use core_crypto::types::{HalfKeyChallenge, Hash, PublicKey};
-use core_mixer::mixer::Mixer;
 use core_db::traits::HoprCoreDbActions;
+use core_mixer::mixer::Mixer;
 use core_types::acknowledgement::{
     AcknowledgedTicket, Acknowledgement, AcknowledgementChallenge, PendingAcknowledgement, UnacknowledgedTicket,
 };
@@ -13,7 +16,6 @@ use libp2p_identity::PeerId;
 use std::cell::RefCell;
 use std::ops::Mul;
 use std::sync::Arc;
-use async_std::channel::{Receiver, Sender, unbounded};
 use utils_log::{debug, error, info};
 use utils_metrics::metrics::SimpleCounter;
 use utils_types::primitives::{Balance, BalanceType, U256};
@@ -26,7 +28,7 @@ const PREIMAGE_PLACE_HOLDER: [u8; Hash::SIZE] = [0xffu8; Hash::SIZE];
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct TransportTask {
     remote_peer: PeerId,
-    data: Box<[u8]>
+    data: Box<[u8]>,
 }
 
 struct AckMetrics {
@@ -57,8 +59,8 @@ impl Default for AckMetrics {
 
 pub struct AcknowledgementInteraction<Db: HoprCoreDbActions> {
     db: RefCell<Db>,
-    on_acknowledgement: fn(HalfKeyChallenge),
-    on_acknowledged_ticket: fn(AcknowledgedTicket),
+    pub on_acknowledgement: fn(HalfKeyChallenge),
+    pub on_acknowledged_ticket: fn(AcknowledgedTicket),
     public_key: PublicKey,
     incoming_channel: (Sender<TransportTask>, Receiver<TransportTask>),
     outgoing_channel: (Sender<TransportTask>, Receiver<TransportTask>),
@@ -66,12 +68,28 @@ pub struct AcknowledgementInteraction<Db: HoprCoreDbActions> {
 }
 
 impl<Db: HoprCoreDbActions> AcknowledgementInteraction<Db> {
+    pub fn new(db: Db, public_key: PublicKey) -> Self {
+        Self {
+            db: RefCell::new(db),
+            public_key,
+            incoming_channel: unbounded(),
+            outgoing_channel: unbounded(),
+            metrics: AckMetrics::default(),
+            on_acknowledgement: |_| {},
+            on_acknowledged_ticket: |_| {},
+        }
+    }
+
     pub async fn send_acknowledgement(&self, acknowledgement: Acknowledgement, destination: PeerId) -> Result<()> {
         self.metrics.sent_acks.increment();
-        self.outgoing_channel.0.send(TransportTask {
-            remote_peer: destination,
-            data: acknowledgement.to_bytes()
-        }).await.map_err(|e| TransportError(e.to_string()))
+        self.outgoing_channel
+            .0
+            .send(TransportTask {
+                remote_peer: destination,
+                data: acknowledgement.to_bytes(),
+            })
+            .await
+            .map_err(|e| TransportError(e.to_string()))
     }
 
     pub async fn handle_incoming_acknowledgements(&self) {
@@ -79,7 +97,10 @@ impl<Db: HoprCoreDbActions> AcknowledgementInteraction<Db> {
             match Acknowledgement::from_bytes(&ack_task.data) {
                 Ok(ack) => {
                     if let Err(e) = self.handle_acknowledgement(ack, &ack_task.remote_peer).await {
-                        error!("failed to process incoming acknowledgement from {}: {e}", ack_task.remote_peer);
+                        error!(
+                            "failed to process incoming acknowledgement from {}: {e}",
+                            ack_task.remote_peer
+                        );
                     }
                 }
                 Err(e) => {
@@ -91,8 +112,10 @@ impl<Db: HoprCoreDbActions> AcknowledgementInteraction<Db> {
     }
 
     pub async fn handle_outgoing_acknowlegements<T, F>(&self, message_transport: &T)
-        where T: Fn(Box<[u8]>, String) -> F,
-              F: futures::Future<Output = core::result::Result<(), String>> {
+    where
+        T: Fn(Box<[u8]>, String) -> F,
+        F: futures::Future<Output = core::result::Result<(), String>>,
+    {
         while let Ok(ack_task) = self.outgoing_channel.1.recv().await {
             if let Err(e) = message_transport(ack_task.data, ack_task.remote_peer.to_string()).await {
                 error!("failed to send acknowledgement to {}: {e}", ack_task.remote_peer);
@@ -216,30 +239,33 @@ impl Default for PacketMetrics {
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct PacketInteractionConfig {
     check_unrealized_balance: bool,
-    private_key: Box<[u8]>
+    private_key: Box<[u8]>,
 }
 
 pub struct PacketInteraction<Db>
-where Db: HoprCoreDbActions {
+where
+    Db: HoprCoreDbActions,
+{
     db: RefCell<Db>,
     channel: (Sender<TransportTask>, Receiver<TransportTask>),
     ack_interaction: Arc<AcknowledgementInteraction<Db>>,
-    message_emitter: fn(&[u8]),
+    pub message_emitter: fn(&[u8]),
     cfg: PacketInteractionConfig,
     metrics: PacketMetrics,
 }
 
 impl<Db> PacketInteraction<Db>
-    where Db: HoprCoreDbActions {
-
-    pub fn new(db: Db, ack_interaction: Arc<AcknowledgementInteraction<Db>>,  message_emitter: fn(&[u8]), cfg: PacketInteractionConfig) -> Self {
+where
+    Db: HoprCoreDbActions,
+{
+    pub fn new(db: Db, ack_interaction: Arc<AcknowledgementInteraction<Db>>, cfg: PacketInteractionConfig) -> Self {
         Self {
             db: RefCell::new(db),
             channel: unbounded(),
             ack_interaction,
-            message_emitter,
+            message_emitter: |_| {},
             cfg,
-            metrics: PacketMetrics::default()
+            metrics: PacketMetrics::default(),
         }
     }
 
@@ -308,7 +334,7 @@ impl<Db> PacketInteraction<Db>
                 .db
                 .borrow()
                 .get_tickets(sender)
-                .await?                         // all tickets from sender
+                .await? // all tickets from sender
                 .into_iter()
                 .filter(|t| t.epoch.eq(&channel.ticket_epoch) && t.channel_epoch.eq(&channel.channel_epoch))
                 .fold(channel.balance, |result, t| result.sub(&t.amount));
@@ -387,9 +413,16 @@ impl<Db> PacketInteraction<Db>
         Ok(ticket)
     }
 
-    pub async fn send_outgoing_packet<T,F>(&self, msg: &[u8], complete_valid_path: Path, message_transport: &T) -> Result<HalfKeyChallenge>
-        where T: Fn(Box<[u8]>, String) -> F,
-              F: futures::Future<Output = core::result::Result<(), String>> {
+    pub async fn send_outgoing_packet<T, F>(
+        &self,
+        msg: &[u8],
+        complete_valid_path: Path,
+        message_transport: &T,
+    ) -> Result<HalfKeyChallenge>
+    where
+        T: Fn(Box<[u8]>, String) -> F,
+        F: futures::Future<Output = core::result::Result<(), String>>,
+    {
         // Decide whether to create 0-hop or multihop ticket
         let next_peer = PublicKey::from_peerid(&complete_valid_path.hops()[0])?;
         let next_ticket = if complete_valid_path.length() == 1 {
@@ -422,9 +455,10 @@ impl<Db> PacketInteraction<Db>
     }
 
     async fn handle_mixed_packet<T, F>(&self, mut packet: Packet, message_transport: &T) -> Result<()>
-        where T: Fn(Box<[u8]>, String) -> F,
-              F: futures::Future<Output = core::result::Result<(), String>> {
-
+    where
+        T: Fn(Box<[u8]>, String) -> F,
+        F: futures::Future<Output = core::result::Result<(), String>>,
+    {
         let next_ticket;
         let previous_peer;
         let next_peer;
@@ -435,11 +469,12 @@ impl<Db> PacketInteraction<Db>
             PacketState::Final {
                 plain_text,
                 previous_hop,
-                packet_tag, ..
+                packet_tag,
+                ..
             } => {
                 // Validate if it's not a replayed packet
                 if !self.db.borrow_mut().check_and_set_packet_tag(packet_tag).await? {
-                    return Err(TagReplay)
+                    return Err(TagReplay);
                 }
 
                 // We're the destination of the packet, so emit the packet contents
@@ -447,7 +482,9 @@ impl<Db> PacketInteraction<Db>
 
                 // And create acknowledgement
                 let ack = packet.create_acknowledgement(&self.cfg.private_key).unwrap();
-                self.ack_interaction.send_acknowledgement(ack, previous_hop.to_peerid()).await?;
+                self.ack_interaction
+                    .send_acknowledgement(ack, previous_hop.to_peerid())
+                    .await?;
                 self.metrics.recv_message_count.increment();
                 return Ok(());
             }
@@ -462,7 +499,7 @@ impl<Db> PacketInteraction<Db>
             } => {
                 // Validate if it's not a replayed packet
                 if !self.db.borrow_mut().check_and_set_packet_tag(packet_tag).await? {
-                    return Err(TagReplay)
+                    return Err(TagReplay);
                 }
 
                 let inverse_win_prob = U256::new(INVERSE_TICKET_WIN_PROB);
@@ -475,7 +512,7 @@ impl<Db> PacketInteraction<Db>
                         Balance::from_str(PRICE_PER_PACKET, BalanceType::HOPR),
                         inverse_win_prob,
                         &packet.ticket,
-                        &channel
+                        &channel,
                     )
                     .await
                 {
@@ -534,8 +571,10 @@ impl<Db> PacketInteraction<Db>
     }
 
     pub async fn handle_packets<T, F>(&self, message_transport: &T)
-        where T: Fn(Box<[u8]>, String) -> F,
-              F: futures::Future<Output = core::result::Result<(), String>> {
+    where
+        T: Fn(Box<[u8]>, String) -> F,
+        F: futures::Future<Output = core::result::Result<(), String>>,
+    {
         let mixer = Mixer::<TransportTask>::default();
         while let Ok(task) = self.channel.1.recv().await {
             // Add some random delay via mixer
@@ -555,7 +594,9 @@ impl<Db> PacketInteraction<Db>
     }
 
     pub async fn push_received_packet(&mut self, packet_task: TransportTask) -> Result<()> {
-        self.channel.0.send(packet_task)
+        self.channel
+            .0
+            .send(packet_task)
             .await
             .map_err(|e| TransportError(e.to_string()))
     }
@@ -571,20 +612,18 @@ impl<Db> PacketInteraction<Db>
 }
 
 #[cfg(test)]
-mod tests {
-
-}
+mod tests {}
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use std::str::FromStr;
-    use libp2p_identity::PeerId;
-    use wasm_bindgen::prelude::wasm_bindgen;
+    use crate::interaction::{PacketInteraction, TransportTask};
     use core_db::db::CoreDb;
+    use libp2p_identity::PeerId;
+    use std::str::FromStr;
     use utils_db::leveldb::LevelDbShim;
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
-    use crate::interaction::{PacketInteraction, TransportTask};
+    use wasm_bindgen::prelude::wasm_bindgen;
 
     #[wasm_bindgen]
     impl TransportTask {
@@ -592,7 +631,7 @@ pub mod wasm {
         pub fn _new(peer_id: &str, packet_data: Box<[u8]>) -> JsResult<TransportTask> {
             Ok(Self {
                 remote_peer: ok_or_jserr!(PeerId::from_str(peer_id))?,
-                data: packet_data
+                data: packet_data,
             })
         }
     }
