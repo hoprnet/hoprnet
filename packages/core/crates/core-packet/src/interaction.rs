@@ -111,7 +111,7 @@ impl<Db: HoprCoreDbActions> AcknowledgementInteraction<Db> {
         info!("done processing incoming acknowledgements");
     }
 
-    pub async fn handle_outgoing_acknowlegements<T, F>(&self, message_transport: &T)
+    pub async fn handle_outgoing_acknowledgements<T, F>(&self, message_transport: &T)
     where
         T: Fn(Box<[u8]>, String) -> F,
         F: futures::Future<Output = core::result::Result<(), String>>,
@@ -612,7 +612,9 @@ where
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+
+}
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
@@ -636,7 +638,7 @@ pub mod wasm {
         }
     }
 
-    /*pub struct WasmPacketInteraction {
-        w: Box<PacketInteraction<CoreDb<LevelDbShim>, dyn futures::Future<Output = core::result::Result<(), String>>>>,
-    }*/
+    pub struct WasmPacketInteraction {
+        w: PacketInteraction<CoreDb<LevelDbShim>>
+    }
 }
