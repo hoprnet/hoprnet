@@ -1426,6 +1426,7 @@ dependencies = [
  "digest 0.10.6",
  "elliptic-curve 0.13.4",
  "rfc6979 0.4.0",
+ "serdect",
  "signature 2.1.0",
 ]
 
@@ -2690,6 +2691,7 @@ dependencies = [
  "ecdsa 0.16.6",
  "elliptic-curve 0.13.4",
  "once_cell",
+ "serdect",
  "sha2 0.10.6",
  "signature 2.1.0",
 ]

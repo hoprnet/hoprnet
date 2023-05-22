@@ -17,5 +17,6 @@ pub const PENDING_ACKNOWLEDGEMENTS_PREFIX: &str = "tickets:pending-acknowledgeme
 pub const ACKNOWLEDGED_TICKETS_PREFIX: &str = "tickets:acknowledged-";
 pub const HOPR_BALANCE_KEY: &str = "hopr-balance";
 pub const NETWORK_REGISTRY_HOPR_NODE_PREFIX: &str = "networkRegistry:hopr-node-";
+pub const NETWORK_REGISTRY_ENABLED_PREFIX: &str = "networkRegistry:enabled";
 pub const NETWORK_REGISTRY_ADDRESS_ELIGIBLE_PREFIX: &str = "networkRegistry:addressEligible-";
 pub const NETWORK_REGISTRY_ADDRESS_PUBLIC_KEY_PREFIX: &str = "networkRegistry:addressPublicKey-";

@@ -1,17 +1,16 @@
 use async_trait::async_trait;
 
-use core_crypto::iterated_hash::Intermediate;
-use core_crypto::{iterated_hash::IteratedHash, types::{HalfKeyChallenge, Hash, PublicKey}};
+use core_crypto::{iterated_hash::IteratedHash, types::{Hash, PublicKey}};
 use core_types::acknowledgement::{AcknowledgedTicket};
 use core_types::{channels::{ChannelEntry, Ticket}, account::AccountEntry};
 use utils_types::primitives::{Address, Balance, Snapshot};
-use utils_db::{db::DB, traits::BinaryAsyncKVStorage};
 
 use crate::errors::Result;
 
+
 #[async_trait(? Send)] // not placing the `Send` trait limitations on the trait
 pub trait HoprCoreEthereumDbActions {
-    async fn get_acknowledged_tickets(&self, filter: ChannelEntry) -> Result<Vec<AcknowledgedTicket>>;
+    async fn get_acknowledged_tickets(&self, filter: Option<ChannelEntry>) -> Result<Vec<AcknowledgedTicket>>;
 
     async fn delete_acknowledged_tickets_from(&mut self, source: ChannelEntry) -> Result<()>;
 
@@ -33,7 +32,9 @@ pub trait HoprCoreEthereumDbActions {
 
     async fn get_channel(&self, channel: &Hash) -> Result<Option<ChannelEntry>>;
 
-    async fn get_channels(&self, filter: ChannelEntry) -> Result<Vec<AcknowledgedTicket>>;
+    async fn get_channels(&self) -> Result<Vec<ChannelEntry>>;
+
+    async fn get_channels_open(&self) -> Result<Vec<ChannelEntry>>;
 
     async fn update_channel_and_snapshot(&mut self, channel_id: &Hash, channel: ChannelEntry, snapshot: Snapshot) -> Result<()>;
 
@@ -59,7 +60,7 @@ pub trait HoprCoreEthereumDbActions {
 
     async fn mark_pending(&mut self, ticket: &Ticket) -> Result<()>;
 
-    async fn resolve_pending(&mut self, ticket: &Ticket, snapshot: Snapshot) -> Result<()>;
+    async fn resolve_pending(&mut self, ticket: &Ticket, snapshot: &Snapshot) -> Result<()>;
 
     async fn mark_redeemeed(&mut self, ticket: &AcknowledgedTicket) -> Result<()>;
 
@@ -79,7 +80,7 @@ pub trait HoprCoreEthereumDbActions {
 
     async fn get_channels_to(&self, address: Address) -> Result<Vec<ChannelEntry>>;
 
-    async fn get_hopr_balance(&self, src: &PublicKey) -> Result<Balance>;
+    async fn get_hopr_balance(&self) -> Result<Balance>;
 
     async fn set_hopr_balance(&mut self, balance: &Balance) -> Result<()>;
 
@@ -87,17 +88,17 @@ pub trait HoprCoreEthereumDbActions {
 
     async fn sub_hopr_balance(&mut self, balance: Balance, snapshot: Snapshot) -> Result<()>;
 
-    async fn is_network_registry_enabled(&self, snapshot: Snapshot) -> Result<bool>;
+    async fn is_network_registry_enabled(&self) -> Result<bool>;
 
     async fn set_network_registry(&mut self, enabled: bool, snapshot: Snapshot) -> Result<()>;
 
-    async fn add_to_network_registry(&mut self, public_key: &PublicKey, account: Address, snapshot: Snapshot) -> Result<()>;
+    async fn add_to_network_registry(&mut self, public_key: &PublicKey, account: &Address, snapshot: Snapshot) -> Result<()>;
 
-    async fn remove_from_network_registry(&mut self, public_key: &PublicKey, account: Address, snapshot: Snapshot) -> Result<()>;
+    async fn remove_from_network_registry(&mut self, public_key: &PublicKey, account: &Address, snapshot: Snapshot) -> Result<()>;
 
     async fn get_account_from_network_registry(&self, public_key: &PublicKey) -> Result<Option<Address>>;
 
-    async fn find_hopr_node_using_account_in_network_registry(&self, account: Address) -> Result<Vec<PublicKey>>;
+    async fn find_hopr_node_using_account_in_network_registry(&self, account: &Address) -> Result<Vec<PublicKey>>;
 
     async fn is_eligible(&self, account: &Address) -> Result<bool>;
 

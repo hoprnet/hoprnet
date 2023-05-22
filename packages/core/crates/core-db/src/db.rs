@@ -1,5 +1,4 @@
 use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
 
 use core_crypto::types::{HalfKeyChallenge, Hash, PublicKey};
 use core_types::acknowledgement::{AcknowledgedTicket, PendingAcknowledgement};
@@ -11,7 +10,6 @@ use utils_db::{
 };
 use utils_types::{
     primitives::{Address, Balance, EthereumChallenge, U256},
-    traits::BinarySerializable,
 };
 use utils_types::primitives::Snapshot;
 
@@ -45,6 +43,22 @@ impl<T: BinaryAsyncKVStorage> HoprCoreDbActions for CoreDb<T> {
         let _evicted = self.db.set(prefixed_key, &index).await?;
         // Ignoring evicted value
         Ok(())
+    }
+
+    async fn get_acknowledged_tickets(&self, filter: Option<ChannelEntry>) -> Result<Vec<AcknowledgedTicket>> {
+        self.db
+            .get_more::<AcknowledgedTicket>(
+                Vec::from(ACKNOWLEDGED_TICKETS_PREFIX.as_bytes()).into_boxed_slice(),
+                EthereumChallenge::size(),
+                &|ack: &AcknowledgedTicket| {
+                    if filter.is_none() {
+                        true
+                    } else {
+                        let f = filter.clone().unwrap();
+                        f.destination.eq(&self.me) && ack.ticket.channel_epoch.eq(&f.channel_epoch)
+                    }
+                },
+            ).await
     }
 
     async fn get_tickets(&self, signer: PublicKey) -> Result<Vec<Ticket>> {

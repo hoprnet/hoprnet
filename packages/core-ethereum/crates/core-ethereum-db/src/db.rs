@@ -1,11 +1,10 @@
 use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
 
-use core_crypto::iterated_hash::Intermediate;
-use core_crypto::{iterated_hash::IteratedHash, types::{HalfKeyChallenge, Hash, PublicKey}};
+use core_crypto::{iterated_hash::IteratedHash, types::{Hash, PublicKey}};
 use core_types::acknowledgement::{AcknowledgedTicket};
-use core_types::{channels::{ChannelEntry, Ticket}, account::AccountEntry};
-use utils_types::primitives::{Address, Balance, BalanceType, Snapshot, U256};
+use core_types::{channels::{generate_channel_id, ChannelEntry, Ticket}, account::AccountEntry};
+use core_types::channels::ChannelStatus;
+use utils_types::primitives::{Address, Balance, BalanceType, EthereumChallenge, Snapshot, U256};
 use utils_db::{constants::*, db::{DB, serialize_to_bytes}, traits::BinaryAsyncKVStorage};
 
 use crate::errors::Result;
@@ -22,17 +21,56 @@ pub struct CoreEthereumDb<T>
 fn to_commitment_key(channel: &Hash, iteration: usize) -> Result<utils_db::db::Key> {
     let mut channel = serialize_to_bytes(channel)?;
     channel.extend_from_slice(&iteration.to_be_bytes());
+
     utils_db::db::Key::new_bytes_with_prefix(channel.into_boxed_slice(), COMMITMENT_PREFIX)
 }
 
+fn to_acknowledged_ticket_key(challenge: &EthereumChallenge, epoch: &U256) -> Result<utils_db::db::Key> {
+    let mut ack_key = serialize_to_bytes(challenge)?;
+    let mut channel_epoch = serialize_to_bytes(epoch)?;
+    ack_key.append(&mut channel_epoch);
+
+    utils_db::db::Key::new_bytes_with_prefix(ack_key.into_boxed_slice(), ACKNOWLEDGED_TICKETS_PREFIX)
+}
+
+
 #[async_trait(? Send)] // not placing the `Send` trait limitations on the trait
 impl<T: BinaryAsyncKVStorage> HoprCoreEthereumDbActions for CoreEthereumDb<T> {
-    async fn get_acknowledged_tickets(&self, filter: ChannelEntry) -> Result<Vec<AcknowledgedTicket>> {
-        todo!()
+    async fn get_acknowledged_tickets(&self, filter: Option<ChannelEntry>) -> Result<Vec<AcknowledgedTicket>> {
+        self.db
+            .get_more::<AcknowledgedTicket>(
+                Vec::from(ACKNOWLEDGED_TICKETS_PREFIX.as_bytes()).into_boxed_slice(),
+                EthereumChallenge::size(),
+                &|ack: &AcknowledgedTicket| {
+                    if filter.is_none() {
+                        true
+                    } else {
+                        let f = filter.clone().unwrap();
+                        f.destination.eq(&self.me) && ack.ticket.channel_epoch.eq(&f.channel_epoch)
+                    }
+                },
+            ).await
     }
 
     async fn delete_acknowledged_tickets_from(&mut self, channel: ChannelEntry) -> Result<()> {
-        todo!()
+        let acknowledged_tickets = self.get_acknowledged_tickets(Some(channel.clone())).await?;
+
+        let key = utils_db::db::Key::new_from_str(NEGLECTED_TICKET_COUNT)?;
+        let neglected_ticket_count = match self.db.get_or_none::<usize>(key.clone()).await? {
+            Some(x) => x,
+            None => 0
+        };
+
+        let mut batch_ops = utils_db::db::Batch::new();
+        for ticket in acknowledged_tickets.iter() {
+            batch_ops.del(to_acknowledged_ticket_key(&ticket.ticket.challenge, &ticket.ticket.channel_epoch)?);
+        }
+
+        if acknowledged_tickets.len() > 0 {
+            batch_ops.put(key, neglected_ticket_count + acknowledged_tickets.len())
+        }
+
+        self.db.batch(batch_ops, true).await
     }
 
     async fn delete_acknowledged_ticket(&mut self, ticket: AcknowledgedTicket) -> Result<()> {
@@ -50,7 +88,7 @@ impl<T: BinaryAsyncKVStorage> HoprCoreEthereumDbActions for CoreEthereumDb<T> {
         let mut batch_ops = utils_db::db::Batch::new();
 
         for intermediate in iterated_hash.intermediates.iter() {
-            batch_ops.put(to_commitment_key(&channel, intermediate.iteration)?, intermediate)
+            batch_ops.put(to_commitment_key(&channel, intermediate.iteration)?, intermediate);
         }
 
         self.db.batch(batch_ops, true).await
@@ -92,8 +130,15 @@ impl<T: BinaryAsyncKVStorage> HoprCoreEthereumDbActions for CoreEthereumDb<T> {
         self.db.get_or_none::<ChannelEntry>(key).await
     }
 
-    async fn get_channels(&self, filter: ChannelEntry) -> Result<Vec<AcknowledgedTicket>> {
-        Ok(Vec::new())
+    async fn get_channels(&self) -> Result<Vec<ChannelEntry>> {
+        self.db.get_more::<ChannelEntry>(Box::from(CHANNEL_PREFIX.as_bytes()), Hash::size(), &|_| true).await
+    }
+
+    async fn get_channels_open(&self) -> Result<Vec<ChannelEntry>> {
+        Ok(self.db.get_more::<ChannelEntry>(Box::from(CHANNEL_PREFIX.as_bytes()), Hash::size(), &|_| true).await?
+            .into_iter()
+            .filter(move |x| x.status == ChannelStatus::Open)
+            .collect())
     }
 
     async fn update_channel_and_snapshot(&mut self, channel_id: &Hash, channel: ChannelEntry, snapshot: Snapshot) -> Result<()> {
@@ -180,16 +225,59 @@ impl<T: BinaryAsyncKVStorage> HoprCoreEthereumDbActions for CoreEthereumDb<T> {
         Ok(())
     }
 
-    async fn resolve_pending(&mut self, ticket: &Ticket, snapshot: Snapshot) -> Result<()> {
-        todo!()
+    async fn resolve_pending(&mut self, ticket: &Ticket, snapshot: &Snapshot) -> Result<()> {
+        let key = utils_db::db::Key::new_with_prefix(&ticket.counterparty, PENDING_TICKETS_COUNT)?;
+        let balance = self.db.get_or_none(key.clone()).await?
+            .unwrap_or(Balance::new(0u32.into(), BalanceType::HOPR));
+
+        let mut batch_ops = utils_db::db::Batch::new();
+        // NOTE: This operation does not make sense, does it mean to zero out? Why not store zero then?
+        batch_ops.put(key.clone(), &balance.sub(&balance));
+        batch_ops.put(utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?, &snapshot);
+
+        self.db.batch(batch_ops, true).await
     }
 
     async fn mark_redeemeed(&mut self, ticket: &AcknowledgedTicket) -> Result<()> {
-        todo!()
+        let key = utils_db::db::Key::new_from_str(REDEEMED_TICKETS_COUNT)?;
+        let count = self.db.get_or_none::<usize>(key.clone()).await?
+            .unwrap_or(0);
+        let _ = self.db.set(key, &(count+1)).await?;
+
+        let key = to_acknowledged_ticket_key(&ticket.ticket.challenge, &ticket.ticket.channel_epoch)?;
+        let _ = self.db.remove::<AcknowledgedTicket>(key).await?;
+
+        let key = utils_db::db::Key::new_from_str(REDEEMED_TICKETS_VALUE)?;
+        let balance = self.db.get_or_none::<Balance>(key.clone()).await?
+            .unwrap_or(Balance::new(0u32.into(), BalanceType::HOPR))
+            .add(&ticket.ticket.amount);
+        let _ = self.db.set(key, &balance).await?;
+
+        let key = utils_db::db::Key::new_with_prefix(&ticket.ticket.counterparty, PENDING_TICKETS_COUNT)?;
+        let balance = self.db.get_or_none::<Balance>(key.clone()).await?
+            .unwrap_or(Balance::new(0u32.into(), BalanceType::HOPR))
+            .sub(&ticket.ticket.amount);
+        let _ = self.db.set(key, &balance).await?;
+
+        Ok(())
     }
 
     async fn mark_losing_acked_ticket(&mut self, ticket: &AcknowledgedTicket) -> Result<()> {
-        todo!()
+        let key = utils_db::db::Key::new_from_str(LOSING_TICKET_COUNT)?;
+        let count = self.db.get_or_none::<usize>(key.clone()).await?
+            .unwrap_or(0);
+        let _ = self.db.set(key, &(count+1)).await?;
+
+        let key = to_acknowledged_ticket_key(&ticket.ticket.challenge, &ticket.ticket.channel_epoch)?;
+        let _ = self.db.remove::<AcknowledgedTicket>(key).await?;
+
+        let key = utils_db::db::Key::new_with_prefix(&ticket.ticket.counterparty, PENDING_TICKETS_COUNT)?;
+        let balance = self.db.get_or_none::<Balance>(key.clone()).await?
+            .unwrap_or(Balance::new(0u32.into(), BalanceType::HOPR))
+            .sub(&ticket.ticket.amount);
+        let _ = self.db.set(key, &balance).await?;
+
+        Ok(())
     }
 
     async fn get_rejected_tickets_value(&self) -> Result<Balance> {
@@ -207,26 +295,38 @@ impl<T: BinaryAsyncKVStorage> HoprCoreEthereumDbActions for CoreEthereumDb<T> {
     }
 
     async fn get_channel_x(&self, src: &PublicKey, dest: &PublicKey) -> Result<Option<ChannelEntry>> {
-        todo!()
+        let key = utils_db::db::Key::new_with_prefix(&generate_channel_id(&src.to_address(), &dest.to_address()),"")?;
+
+        self.db.get_or_none(key).await
     }
 
     async fn get_channel_to(&self, dest: &PublicKey) -> Result<Option<ChannelEntry>> {
-        todo!()
+        let key = utils_db::db::Key::new_with_prefix(&generate_channel_id(&self.me.to_address(), &dest.to_address()),"")?;
+
+        self.db.get_or_none(key).await
     }
 
     async fn get_channel_from(&self, src: &PublicKey) -> Result<Option<ChannelEntry>> {
-        todo!()
+        let key = utils_db::db::Key::new_with_prefix(&generate_channel_id(&src.to_address(), &self.me.to_address()),"")?;
+
+        self.db.get_or_none(key).await
     }
 
     async fn get_channels_from(&self, address: Address) -> Result<Vec<ChannelEntry>> {
-        todo!()
+        Ok(self.db.get_more::<ChannelEntry>(Box::from(CHANNEL_PREFIX.as_bytes()), Hash::size(), &|_| true).await?
+            .into_iter()
+            .filter(move |x| x.source.to_address() == address)
+            .collect())
     }
 
     async fn get_channels_to(&self, address: Address) -> Result<Vec<ChannelEntry>> {
-        todo!()
+        Ok(self.db.get_more::<ChannelEntry>(Box::from(CHANNEL_PREFIX.as_bytes()), Hash::size(), &|_| true).await?
+            .into_iter()
+            .filter(move |x| x.destination.to_address() == address)
+            .collect())
     }
 
-    async fn get_hopr_balance(&self, src: &PublicKey) -> Result<Balance> {
+    async fn get_hopr_balance(&self) -> Result<Balance> {
         let key = utils_db::db::Key::new_from_str(HOPR_BALANCE_KEY)?;
 
         self.db.get_or_none::<Balance>(key).await
@@ -243,39 +343,97 @@ impl<T: BinaryAsyncKVStorage> HoprCoreEthereumDbActions for CoreEthereumDb<T> {
     }
 
     async fn add_hopr_balance(&mut self, balance: Balance, snapshot: Snapshot) -> Result<()> {
-        todo!()
+        let key = utils_db::db::Key::new_from_str(HOPR_BALANCE_KEY)?;
+
+        let current_balance = self.db.get_or_none::<Balance>(key.clone()).await?
+            .unwrap_or(Balance::new(0u32.into(), BalanceType::HOPR));
+
+        let mut batch_ops = utils_db::db::Batch::new();
+        batch_ops.put(key, &current_balance.add(&balance));
+        batch_ops.put(utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?, &snapshot);
+
+        self.db.batch(batch_ops, true).await
     }
 
     async fn sub_hopr_balance(&mut self, balance: Balance, snapshot: Snapshot) -> Result<()> {
-        todo!()
+        let key = utils_db::db::Key::new_from_str(HOPR_BALANCE_KEY)?;
+
+        let current_balance = self.db.get_or_none::<Balance>(key.clone()).await?
+            .unwrap_or(Balance::new(0u32.into(), BalanceType::HOPR));
+
+        let mut batch_ops = utils_db::db::Batch::new();
+        batch_ops.put(key, &current_balance.sub(&balance));
+        batch_ops.put(utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?, &snapshot);
+
+        self.db.batch(batch_ops, true).await
     }
 
-    async fn is_network_registry_enabled(&self, snapshot: Snapshot) -> Result<bool> {
-        todo!()
+    async fn is_network_registry_enabled(&self) -> Result<bool> {
+        let key = utils_db::db::Key::new_from_str(NETWORK_REGISTRY_ENABLED_PREFIX)?;
+        Ok(self.db.get_or_none::<bool>(key.clone()).await?.unwrap_or(false))
     }
 
     async fn set_network_registry(&mut self, enabled: bool, snapshot: Snapshot) -> Result<()> {
-        todo!()
+        let mut batch_ops = utils_db::db::Batch::new();
+        batch_ops.put(utils_db::db::Key::new_from_str(NETWORK_REGISTRY_ENABLED_PREFIX)?, &enabled);
+        batch_ops.put(utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?, &snapshot);
+
+        self.db.batch(batch_ops, true).await
     }
 
-    async fn add_to_network_registry(&mut self, public_key: &PublicKey, account: Address, snapshot: Snapshot) -> Result<()> {
-        todo!()
+    async fn add_to_network_registry(&mut self, public_key: &PublicKey, account: &Address, snapshot: Snapshot) -> Result<()> {
+        let mut public_keys = self.find_hopr_node_using_account_in_network_registry(&account).await?;
+
+        for pk in public_keys.iter() {
+            if public_key == pk {
+                let _ = self.db.set(utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?, &snapshot).await?;
+                return Ok(());
+            }
+        }
+
+        public_keys.push(public_key.clone());
+
+        let mut batch_ops = utils_db::db::Batch::new();
+        // node public key to address (N->1)
+        let curve_point: core_crypto::types::CurvePoint = public_key.into();
+        batch_ops.put(utils_db::db::Key::new_with_prefix(&curve_point,NETWORK_REGISTRY_HOPR_NODE_PREFIX)?, account);
+        // address to node public keys (1->M)
+        batch_ops.put(utils_db::db::Key::new_with_prefix(account,NETWORK_REGISTRY_ADDRESS_PUBLIC_KEY_PREFIX)?, &public_keys);
+        batch_ops.put(utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?, &snapshot);
+
+        self.db.batch(batch_ops, true).await
     }
 
-    async fn remove_from_network_registry(&mut self, public_key: &PublicKey, account: Address, snapshot: Snapshot) -> Result<()> {
-        todo!()
+    async fn remove_from_network_registry(&mut self, public_key: &PublicKey, account: &Address, snapshot: Snapshot) -> Result<()> {
+        let registered_nodes = self.find_hopr_node_using_account_in_network_registry(account).await?
+            .into_iter()
+            .filter(|pk| pk != public_key)
+            .collect::<Vec<_>>();
+
+        let curve_point: core_crypto::types::CurvePoint = public_key.into();
+
+        let mut batch_ops = utils_db::db::Batch::new();
+        batch_ops.del(utils_db::db::Key::new_with_prefix(&curve_point,NETWORK_REGISTRY_HOPR_NODE_PREFIX)?);
+        batch_ops.put(utils_db::db::Key::new_with_prefix(account,NETWORK_REGISTRY_ADDRESS_PUBLIC_KEY_PREFIX)?, &registered_nodes);
+        batch_ops.put(utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?, &snapshot);
+
+        self.db.batch(batch_ops, true).await
     }
 
     async fn get_account_from_network_registry(&self, public_key: &PublicKey) -> Result<Option<Address>> {
-        // TODO: FIX THIS, pubkey is not binary serializable
-        // let key = utils_db::db::Key::new_with_prefix(public_key, NETWORK_REGISTRY_HOPR_NODE_PREFIX)?;
-        let key = utils_db::db::Key::new_from_str(NETWORK_REGISTRY_HOPR_NODE_PREFIX)?;
+        let curve_point: core_crypto::types::CurvePoint = public_key.into();
+        let key = utils_db::db::Key::new_with_prefix(&curve_point, NETWORK_REGISTRY_HOPR_NODE_PREFIX)?;
 
         self.db.get_or_none::<Address>(key).await
     }
 
-    async fn find_hopr_node_using_account_in_network_registry(&self, account: Address) -> Result<Vec<PublicKey>> {
-        todo!()
+    async fn find_hopr_node_using_account_in_network_registry(&self, account: &Address) -> Result<Vec<PublicKey>> {
+        // NOTE: behavioral change, this method does not panic, when no results are found,
+        // its returns an empty Vec instead
+
+        let key = utils_db::db::Key::new_with_prefix(account,NETWORK_REGISTRY_ADDRESS_PUBLIC_KEY_PREFIX)?;
+        self.db.get_or_none::<Vec<PublicKey>>(key).await
+            .map(|v| v.unwrap_or(Vec::new()))
     }
 
     async fn is_eligible(&self, account: &Address) -> Result<bool> {
@@ -286,7 +444,18 @@ impl<T: BinaryAsyncKVStorage> HoprCoreEthereumDbActions for CoreEthereumDb<T> {
     }
 
     async fn set_eligible(&mut self, account: &Address, eligible: bool, snapshot: Snapshot) -> Result<()> {
-        todo!()
+        let key = utils_db::db::Key::new_with_prefix(account,NETWORK_REGISTRY_ADDRESS_ELIGIBLE_PREFIX)?;
+
+        let mut batch_ops = utils_db::db::Batch::new();
+
+        if eligible {
+            batch_ops.put(key, &[0u8;0]);
+        } else {
+            batch_ops.del(key);
+        }
+
+        batch_ops.put(utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?, &snapshot);
+        self.db.batch(batch_ops, true).await
     }
 }
 
@@ -303,12 +472,14 @@ pub mod wasm {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use core_types::channels::ChannelEntry;
     use utils_db::db::serialize_to_bytes;
     use utils_types::primitives::EthereumChallenge;
     use utils_types::traits::BinarySerializable;
 
     #[test]
-    fn test_core_ethereum_db_iterable_type_EhtereumChallenge_must_have_fixed_key_length() {
+    fn test_core_ethereum_db_iterable_type_ethereumchallenge_must_have_fixed_key_length() {
         let challenge = vec![10u8; EthereumChallenge::SIZE];
         let eth_challenge = EthereumChallenge::new(challenge.as_slice());
 
@@ -316,5 +487,21 @@ mod tests {
 
         assert!(serialized.is_ok());
         assert_eq!(serialized.unwrap().len(), EthereumChallenge::SIZE)
+    }
+
+    #[test]
+    fn test_core_ethereum_db_iterable_type_channelentry_must_have_fixed_key_length() {
+        let channel_entry = ChannelEntry::new(
+            PublicKey::random(), PublicKey::random(),
+            Balance::zero(BalanceType::HOPR), Hash::default(),
+            U256::from(0u64), U256::from(0u64),
+            ChannelStatus::Open,
+            U256::from(0u64), U256::from(0u64),
+        );
+
+        let serialized = serialize_to_bytes(&channel_entry);
+
+        assert!(serialized.is_ok());
+        assert_eq!(serialized.unwrap().len(), ChannelEntry::SIZE)
     }
 }
