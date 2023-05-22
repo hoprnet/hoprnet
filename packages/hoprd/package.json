@@ -55,7 +55,7 @@
     "ws": "8.13.0"
   },
   "devDependencies": {
-    "@types/chai": "4.3.4",
+    "@types/chai": "4.3.5",
     "@types/cors": "2.8.13",
     "@types/mocha": "10.0.1",
     "@types/supertest": "^2.0.11",
