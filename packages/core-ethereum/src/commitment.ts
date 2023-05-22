@@ -4,23 +4,20 @@
 //
 // We need to persist this string of commitments in the database, and support
 // syncing back and forth with those that have been persisted on chain.
-import { debug, Hash, HoprDB, toU8a, u8aConcat, U256, recoverIteratedHash, iterateHash } from '@hoprnet/hopr-utils'
+import { debug, Hash, HoprDB, toU8a, u8aConcat, U256 } from '@hoprnet/hopr-utils'
+
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { keysPBM } from '@libp2p/crypto/keys'
 
 // NOTE: Workaround until also this file is converted to Rust
 // Reason being that all cryptography is now in core-crypto, and core-ethereum cannot depend
 // on core (would be a circular dependency)
-import { derive_commitment_seed } from '../../core/lib/core_crypto.js'
+import { derive_commitment_seed, recover_iterated_hash, iterate_hash } from '../../core/lib/core_crypto.js'
 
 const log = debug('hopr-core-ethereum:commitment')
 
 export const DB_ITERATION_BLOCK_SIZE = 10000
 export const TOTAL_ITERATIONS = 100000
-
-function hashFunction(msg: Uint8Array): Uint8Array {
-  return Hash.create([msg]).serialize().slice(0, Hash.size())
-}
 
 function searchDBFor(db: HoprDB, channelId: Hash, iteration: number): Promise<Uint8Array | undefined> {
   return db.getCommitment(channelId, iteration)
@@ -28,9 +25,8 @@ function searchDBFor(db: HoprDB, channelId: Hash, iteration: number): Promise<Ui
 
 export async function findCommitmentPreImage(db: HoprDB, channelId: Hash): Promise<Hash> {
   let currentCommitment = await db.getCurrentCommitment(channelId)
-  let result = await recoverIteratedHash(
+  let result = await recover_iterated_hash(
     currentCommitment.serialize(),
-    hashFunction,
     (i: number) => searchDBFor(db, channelId, i),
     TOTAL_ITERATIONS,
     DB_ITERATION_BLOCK_SIZE
@@ -38,7 +34,7 @@ export async function findCommitmentPreImage(db: HoprDB, channelId: Hash): Promi
   if (result == undefined) {
     throw Error(`Could not find preImage. Searching for ${currentCommitment.to_hex()}`)
   }
-  return new Hash(Uint8Array.from(result.preImage))
+  return new Hash(result.intermediate)
 }
 
 export async function bumpCommitment(db: HoprDB, channelId: Hash, newCommitment: Hash) {
@@ -54,29 +50,10 @@ async function createCommitmentChain(
   initialCommitmentSeed: Uint8Array,
   setChainCommitment: SetCommitment
 ): Promise<void> {
-  const { intermediates, hash } = await iterateHash(
-    initialCommitmentSeed,
-    hashFunction,
-    TOTAL_ITERATIONS,
-    DB_ITERATION_BLOCK_SIZE
-  )
-  // TODO: Faking the WASM object here before the logic for async commitment computation is migrated too
-  let itHashes = {
-    hash: () => hash,
-    count_intermediates: () => intermediates.length,
-    intermediate: (n: number) => {
-      let it = intermediates[n]
-      return {
-        intermediate: it.preImage,
-        iteration: it.iteration,
-        free: () => {}
-      }
-    },
-    free: () => {}
-  }
+  const intermediates = await iterate_hash(initialCommitmentSeed, TOTAL_ITERATIONS, DB_ITERATION_BLOCK_SIZE)
 
-  await db.storeHashIntermediaries(channelId, itHashes)
-  const current = new Hash(Uint8Array.from(hash))
+  await db.storeHashIntermediaries(channelId, intermediates)
+  const current = new Hash(intermediates.hash())
   await Promise.all([db.setCurrentCommitment(channelId, current), setChainCommitment(current)])
   log('commitment chain initialized')
 }

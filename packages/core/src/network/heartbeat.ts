@@ -1,6 +1,6 @@
 import type { PeerId } from '@libp2p/interface-peer-id'
 
-import { randomInteger, debug, retimer, pickVersion } from '@hoprnet/hopr-utils'
+import { random_integer, debug, retimer, pickVersion } from '@hoprnet/hopr-utils'
 import type { Components } from '@libp2p/interfaces/components'
 
 import type { SendMessage } from '../index.js'
@@ -132,7 +132,7 @@ export default class Heartbeat {
       periodicCheck,
       // Prevent nodes from querying each other at the very same time
       () =>
-        randomInteger(this.config.heartbeat_interval, this.config.heartbeat_interval + this.config.heartbeat_variance)
+        random_integer(this.config.heartbeat_interval, this.config.heartbeat_interval + this.config.heartbeat_variance)
     )
   }
 }

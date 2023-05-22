@@ -843,9 +843,10 @@ dependencies = [
 
 [[package]]
 name = "core-crypto"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "aes",
+ "async-std",
  "blake2",
  "chacha20",
  "console_error_panic_hook",
@@ -853,6 +854,7 @@ dependencies = [
  "curve25519-dalek",
  "digest 0.10.6",
  "elliptic-curve 0.13.4",
+ "futures 0.3.28",
  "generic-array 0.14.7",
  "getrandom",
  "hex",
@@ -874,6 +876,7 @@ dependencies = [
  "utils-proc-macros",
  "utils-types",
  "wasm-bindgen",
+ "wasm-bindgen-futures",
  "wasm-bindgen-test",
 ]
 

@@ -23,8 +23,9 @@ def test_hoprd_protocol_integration_tests(setup_7_nodes):
 
     nodes_api_as_str = " ".join(list(map(lambda x: f"\"localhost:{x['api_port']}\"", setup_7_nodes.values())))
 
+    log_file_path = f"/tmp/hopr-smoke-{__name__}.log"
     subprocess.run(
-        f"./tests/integration-test.sh {nodes_api_as_str} >| /tmp/integration_test_out 2>&1",
+        f"./tests/integration-test.sh {nodes_api_as_str} 2>&1 | tee {log_file_path}",
         shell=True,
         capture_output=True,
         env=env_vars,

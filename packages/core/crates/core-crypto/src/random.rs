@@ -139,8 +139,13 @@ pub mod wasm {
     }
 
     #[wasm_bindgen]
-    pub fn random_integer(start: u64, end: Option<u64>) -> JsResult<u64> {
+    pub fn random_big_integer(start: u64, end: Option<u64>) -> JsResult<u64> {
         ok_or_jserr!(crate::random::random_integer(start, end))
+    }
+
+    #[wasm_bindgen]
+    pub fn random_integer(start: u32, end: Option<u32>) -> JsResult<u32> {
+        ok_or_jserr!(crate::random::random_integer(start as u64, end.map(|i| i as u64)).map(|r| r as u32))
     }
 
     #[wasm_bindgen]
