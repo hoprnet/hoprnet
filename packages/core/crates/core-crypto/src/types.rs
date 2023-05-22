@@ -521,20 +521,11 @@ impl PublicKey {
 
 impl PeerIdLike for PublicKey {
     fn from_peerid(peer_id: &PeerId) -> utils_types::errors::Result<Self> {
-        // Workaround for the missing public key API on PeerIds
-        let peer_id_str = peer_id.to_base58();
-        if peer_id_str.starts_with("16U") {
-            // Here we explicitly assume non-RSA PeerId, so that multihash bytes are the actual public key
-            let pid = peer_id.to_bytes();
-            let (_, mh) = pid.split_at(6);
-            Self::from_bytes(mh).map_err(|e| Other(e.into()))
-        } else if peer_id_str.starts_with("12D") {
-            // TODO: support for Ed25519 peer ids needs to be added here
-            warn!("Ed25519-based peer id not yet supported");
-            Err(ParseError)
+        let mh = peer_id.as_ref();
+        if mh.code() == 0 { // = multihash identity code
+            Self::from_bytes(&mh.digest()[4..])
         } else {
-            // RSA-based peer ID might never going to be supported by HOPR
-            warn!("RSA-based peer id encountered");
+            warn!("peer id type not supported: {peer_id}");
             Err(ParseError)
         }
     }
