@@ -20,7 +20,11 @@ HOPLI_CRATE := ./packages/hopli
 # Set local foundry directory (for binaries) and versions
 # note: $(mydir) ends with '/'
 FOUNDRY_DIR ?= $(mydir).foundry
-FOUNDRY_VSN := ed9298d
+# Use custom pinned version of foundry from
+# https://github.com/hoprnet/foundry/tree/hopr-release
+FOUNDRY_REPO := hoprnet/foundry
+FOUNDRY_VSN := v0.0.4
+FOUNDRYUP_VSN := fc64e18
 
 # Set local cargo directory (for binaries)
 # note: $(mydir) ends with '/'
@@ -121,15 +125,22 @@ install-foundry: ## install foundry
 	@if [ -f "${FOUNDRY_DIR}/bin/foundryup" ]; then \
 		echo "foundryup already installed under "${FOUNDRY_DIR}/bin", skipping"; \
 	else \
-		echo "installing foundryup (vsn ${FOUNDRY_VSN})"; \
-		curl -L "https://raw.githubusercontent.com/foundry-rs/foundry/${FOUNDRY_VSN}/foundryup/foundryup" > "${FOUNDRY_DIR}/bin/foundryup"; \
+		echo "installing foundryup (vsn ${FOUNDRYUP_VSN})"; \
+		curl -L "https://raw.githubusercontent.com/${FOUNDRY_REPO}/${FOUNDRYUP_VSN}/foundryup/foundryup" > "${FOUNDRY_DIR}/bin/foundryup"; \
 	  chmod +x "${FOUNDRY_DIR}/bin/foundryup"; \
 	fi
 	@if [ ! -f "${FOUNDRY_DIR}/bin/anvil" ] || [ ! -f "${FOUNDRY_DIR}/bin/cast" ] || [ ! -f "${FOUNDRY_DIR}/bin/forge" ]; then \
 		echo "missing foundry binaries, installing via foundryup"; \
-		$(foundryup); \
+		$(foundryup) --repo ${FOUNDRY_REPO} --version ${FOUNDRY_VSN}; \
 	else \
 	  echo "foundry binaries already installed under "${FOUNDRY_DIR}/bin", skipping"; \
+	fi
+	@if [[ "${name}" =~ nix-shell* ]]; then \
+		echo "Patching foundry binaries"; \
+		patchelf --interpreter `cat ${NIX_CC}/nix-support/dynamic-linker` .foundry/bin/anvil; \
+		patchelf --interpreter `cat ${NIX_CC}/nix-support/dynamic-linker` .foundry/bin/cast; \
+		patchelf --interpreter `cat ${NIX_CC}/nix-support/dynamic-linker` .foundry/bin/forge; \
+		patchelf --interpreter `cat ${NIX_CC}/nix-support/dynamic-linker` .foundry/bin/chisel; \
 	fi
 	@forge --version
 	@anvil --version
@@ -234,7 +245,7 @@ endif
 
 .PHONY: smoke-test
 smoke-test: ## run smoke tests
-	source .venv/bin/activate && (python3 -m pytest tests/ || (cat /tmp/integration_test_out && false))
+	source .venv/bin/activate && (python3 -m pytest tests/ || (cat /tmp/hopr-smoke-test_integration.log && false))
 
 .PHONY: smart-contract-test
 smart-contract-test: # forge test smart contracts

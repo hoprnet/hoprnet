@@ -6,6 +6,10 @@
 import { core_types_set_panic_hook } from '../../core/lib/core_types.js'
 core_types_set_panic_hook()
 
+import { webcrypto } from 'node:crypto'
+// @ts-ignore
+globalThis.crypto = webcrypto
+
 export {
   Acknowledgement,
   AccountEntry,
@@ -31,5 +35,7 @@ export {
   ethereum_signed_hash,
   generate_channel_id,
   UnacknowledgedTicket,
-  channel_status_to_string
+  channel_status_to_string,
+  random_integer,
+  random_big_integer
 } from '../../core/lib/core_types.js'

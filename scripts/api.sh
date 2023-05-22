@@ -171,20 +171,24 @@ api_set_setting() {
 
 # $1 = node api endpoint
 # $2 = counterparty peer id
+# $3 = OPTIONAL: call timeout
 api_redeem_tickets_in_channel() {
   local node_api="${1}"
   local peer_id="${2}"
+  local timeout="${3:-600}"
 
   log "redeeming tickets in specific channel, this can take up to 5 minutes depending on the amount of unredeemed tickets in that channel"
-  api_call ${node_api} "/channels/${peer_id}/tickets/redeem" "POST" "" "" 600 600
+  api_call ${node_api} "/channels/${peer_id}/tickets/redeem" "POST" "" "" ${timeout} ${timeout}
 }
 
 # $1 = node api endpoint
+# $2 = OPTIONAL: call timeout
 api_redeem_tickets() {
   local node_api="${1}"
+  local timeout="${2:-600}"
 
   log "redeeming all tickets, this can take up to 5 minutes depending on the amount of unredeemed tickets"
-  api_call ${node_api} "/tickets/redeem" "POST" "" "" 600 600
+  api_call ${node_api} "/tickets/redeem" "POST" "" "" ${timeout} ${timeout}
 }
 
 # $1 = node api endpoint

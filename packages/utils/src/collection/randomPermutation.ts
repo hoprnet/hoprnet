@@ -1,4 +1,4 @@
-import { randomInteger } from '../crypto/randomInteger.js'
+import { random_integer } from '../types.js'
 
 /**
  * Return a random permutation of the given `array`
@@ -24,7 +24,7 @@ export function randomPermutation<T>(array: T[]): T[] {
   let tmp: T
 
   for (let i = array.length - 1; i > 0; i--) {
-    j = randomInteger(0, i + 1)
+    j = random_integer(0, i + 1)
     tmp = array[i]
     array[i] = array[j]
     array[j] = tmp

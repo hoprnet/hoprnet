@@ -91,10 +91,9 @@ jobs:
         uses: actions/upload-artifact@v3
         if: ${{ always() && runner.os == 'Linux' }}
         with:
-          name: hopr-linux-e2e-source-node-logs
+          name: hopr-linux-smoke-test-logs
           path: |
-            /tmp/hopr-source-node-*.log
-            /tmp/hopr-source-anvil-rpc.log
+            /tmp/hopr-smoke-test*.log
 
       - name: Send notification if anything failed on master or release branches
         if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
