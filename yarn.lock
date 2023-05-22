@@ -671,7 +671,7 @@ __metadata:
     secp256k1: 4.0.3
     sinon: 12.0.1
     typedoc: 0.24.6
-    typedoc-plugin-markdown: 3.15.2
+    typedoc-plugin-markdown: 3.15.3
     typescript: 5.0.4
   languageName: unknown
   linkType: soft
@@ -716,7 +716,7 @@ __metadata:
     secp256k1: 4.0.3
     sinon: 12.0.1
     typedoc: 0.24.6
-    typedoc-plugin-markdown: 3.15.2
+    typedoc-plugin-markdown: 3.15.3
     typescript: 5.0.4
   languageName: unknown
   linkType: soft
@@ -729,7 +729,7 @@ __metadata:
     mocha: 10.2.0
     semver: 7.5.0
     typedoc: 0.24.6
-    typedoc-plugin-markdown: 3.15.2
+    typedoc-plugin-markdown: 3.15.3
     typescript: 5.0.4
   languageName: unknown
   linkType: soft
@@ -779,7 +779,7 @@ __metadata:
     sinon: 12.0.1
     timeout-abort-controller: 3.0.0
     typedoc: 0.24.6
-    typedoc-plugin-markdown: 3.15.2
+    typedoc-plugin-markdown: 3.15.3
     typescript: 5.0.4
   languageName: unknown
   linkType: soft
@@ -820,7 +820,7 @@ __metadata:
     trace-unhandled: 2.0.1
     ts-node: ^10.9.1
     typedoc: 0.24.6
-    typedoc-plugin-markdown: 3.15.2
+    typedoc-plugin-markdown: 3.15.3
     typescript: 5.0.4
     uuid: ^9.0.0
     ws: 8.13.0
@@ -10740,24 +10740,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"typedoc-plugin-markdown@npm:3.15.2":
-  version: 3.15.2
-  resolution: "typedoc-plugin-markdown@npm:3.15.2"
+"typedoc-plugin-markdown@npm:3.15.3":
+  version: 3.15.3
+  resolution: "typedoc-plugin-markdown@npm:3.15.3"
   dependencies:
     handlebars: ^4.7.7
-    typedoc-plugin-mdn-links: ^3.0.3
   peerDependencies:
     typedoc: ">=0.24.0"
-  checksum: 231b3125498498249385e42fb5c3e24eed20e4fc72678ef3668a69df13ed4f5a7cd0e54610619ead99efb4a266f72c6658946acb83c3ab89bc034278bb8539a0
-  languageName: node
-  linkType: hard
-
-"typedoc-plugin-mdn-links@npm:^3.0.3":
-  version: 3.0.3
-  resolution: "typedoc-plugin-mdn-links@npm:3.0.3"
-  peerDependencies:
-    typedoc: ">= 0.23.14 || 0.24.x"
-  checksum: 1682f8a65e1eff892f5ae0424919007d0673d9abda7c7f401b294fc73d64ce8fc4e1cbb35e5389170a8c48ed57efe6ee81403f870499c62decb016b689fa6522
+  checksum: 845d8907948a7ea9f3eed31d8c2f1a4053569fb763f5c5187d06ecbffd247c6a6e532eaf0ec09d11f09eabbf26a3df8646c96fc3ac1a836cc9af273fa0e53413
   languageName: node
   linkType: hard
 
