@@ -285,15 +285,15 @@ export class LevelDb {
       })
   }
 
-  private async setEnvironmentId(environment_id: string): Promise<void> {
+  public async setEnvironmentId(environment_id: string): Promise<void> {
     await this.put(ENVIRONMENT_KEY, encoder.encode(environment_id))
   }
 
-  private async getEnvironmentId(): Promise<string> {
+  public async getEnvironmentId(): Promise<string> {
     return decoder.decode(await this.maybeGet(ENVIRONMENT_KEY))
   }
 
-  private async verifyEnvironmentId(expectedId: string): Promise<boolean> {
+  public async verifyEnvironmentId(expectedId: string): Promise<boolean> {
     const storedId = await this.getEnvironmentId()
 
     if (storedId == undefined) {
