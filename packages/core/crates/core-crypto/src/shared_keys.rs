@@ -55,7 +55,7 @@ pub trait GroupElement<E: Scalar>: Clone {
     fn generate(scalar: &E) -> Self;
 
     /// Performs the group law given number of times (i.e multiplication in additive groups)
-    fn group_law(&self, scalar: &E) -> Self;
+    fn multiply(&self, scalar: &E) -> Self;
 
     /// Group element is considered valid if it is not a neutral element and also not a torsion element of small order.
     fn is_valid(&self) -> bool;
@@ -114,7 +114,7 @@ impl <E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
             let group_element = G::from_repr(ge_repr)?;
 
             // Try to decode the given public key point & multiply by the current coefficient
-            let shared_secret = group_element.group_law(&coeff_prev);
+            let shared_secret = group_element.multiply(&coeff_prev);
 
             // Extract the shared secret from the computed EC point and copy it into the shared keys structure
             shared_keys.push(shared_secret.extract_key(&group_element.to_repr().encode()));
@@ -129,7 +129,7 @@ impl <E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
             let b_k_checked = E::from_repr(b_k.into())?;
 
             // Update coeff prev and alpha
-            alpha_prev = alpha_prev.group_law(&b_k_checked);
+            alpha_prev = alpha_prev.multiply(&b_k_checked);
             coeff_prev = coeff_prev.mul(b_k_checked);
 
             if !alpha_prev.is_valid() {
@@ -150,13 +150,13 @@ impl <E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
         let public_key = G::generate(&private_scalar);
         let alpha_point = G::from_repr(alpha)?;
 
-        let s_k = alpha_point.group_law(&private_scalar);
+        let s_k = alpha_point.multiply(&private_scalar);
         let secret = s_k.extract_key(&public_key.to_repr().encode());
 
         let b_k = s_k.expand_key(&alpha_point.to_repr().encode());
         let b_k_checked = E::from_repr(b_k.into())?;
 
-        let alpha_new = alpha_point.group_law(&b_k_checked);
+        let alpha_new = alpha_point.multiply(&b_k_checked);
 
         Ok((alpha_new.to_repr(), secret))
     }
@@ -208,7 +208,7 @@ impl GroupElement<NonZeroScalar> for ProjectivePoint {
         ProjectivePoint::GENERATOR * scalar.as_ref()
     }
 
-    fn group_law(&self, scalar: &NonZeroScalar) -> Self {
+    fn multiply(&self, scalar: &NonZeroScalar) -> Self {
         Mul::mul(self, scalar.as_ref())
     }
 

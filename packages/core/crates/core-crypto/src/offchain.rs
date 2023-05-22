@@ -50,7 +50,7 @@ impl GroupElement<EdScalar> for EdwardsPoint {
         EdwardsPoint::mul_base(scalar)
     }
 
-    fn group_law(&self, scalar: &curve25519_dalek::Scalar) -> Self {
+    fn multiply(&self, scalar: &curve25519_dalek::Scalar) -> Self {
         self.mul(scalar)
     }
 
@@ -69,7 +69,7 @@ impl PeerIdLike for OffchainPublicKey {
     fn from_peerid(peer_id: &PeerId) -> utils_types::errors::Result<Self> {
         // Workaround for the missing public key API on PeerIds
         let peer_id_str = peer_id.to_base58();
-        if peer_id_str.starts_with("16D") {
+        if peer_id_str.starts_with("12D") {
             // Here we explicitly assume non-RSA PeerId, so that multihash bytes are the actual public key
             let pid = peer_id.to_bytes();
             let (_, mh) = pid.split_at(6);
@@ -114,7 +114,16 @@ impl OffchainPublicKey {
 #[cfg(test)]
 pub mod tests {
     use curve25519_dalek::EdwardsPoint;
+    use utils_types::traits::PeerIdLike;
+    use crate::offchain::OffchainPublicKey;
     use crate::shared_keys::tests::generic_test_shared_keys;
+
+    #[test]
+    fn test_offchain_pubkey_peerid() {
+        let peer_id = "12D3KooWEt8N8XRwrTfHufsUuGpjcVqTiUjSwrXs7Vfx9Rek17qH";
+        let pk1 = OffchainPublicKey::from_peerid_str(peer_id).unwrap();
+        assert_eq!(peer_id.to_string(), pk1.to_peerid_str());
+    }
 
     #[test]
     fn test_secp256k1_shared_keys() {
