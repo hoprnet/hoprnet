@@ -9,7 +9,7 @@ use core_crypto::types::{HalfKeyChallenge, Hash, PublicKey};
 use core_db::traits::HoprCoreDbActions;
 use core_mixer::mixer::Mixer;
 use core_types::acknowledgement::{
-    AcknowledgedTicket, Acknowledgement, AcknowledgementChallenge, PendingAcknowledgement, UnacknowledgedTicket,
+    AcknowledgedTicket, Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket,
 };
 use core_types::channels::{ChannelEntry, ChannelStatus, Ticket};
 use libp2p_identity::PeerId;
@@ -236,10 +236,10 @@ impl Default for PacketMetrics {
     }
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct PacketInteractionConfig {
-    check_unrealized_balance: bool,
-    private_key: Box<[u8]>,
+    pub check_unrealized_balance: bool,
+    pub private_key: Box<[u8]>,
 }
 
 pub struct PacketInteraction<Db>
@@ -618,14 +618,23 @@ mod tests {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use crate::interaction::{PacketInteraction, TransportTask};
+    use std::future::Future;
+    use std::pin::Pin;
+    use crate::interaction::{AcknowledgementInteraction, PacketInteraction, PacketInteractionConfig, TransportTask};
     use core_db::db::CoreDb;
     use libp2p_identity::PeerId;
     use std::str::FromStr;
-    use utils_db::leveldb::LevelDbShim;
+    use std::sync::Arc;
+    use js_sys::JsString;
+    use wasm_bindgen::JsValue;
+    use utils_db::leveldb::{LevelDb, LevelDbShim};
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use wasm_bindgen::prelude::wasm_bindgen;
+    use wasm_bindgen::JsCast;
+    use core_crypto::types::PublicKey;
+    use utils_db::db::DB;
+    use utils_log::error;
 
     #[wasm_bindgen]
     impl TransportTask {
@@ -638,7 +647,123 @@ pub mod wasm {
         }
     }
 
+    #[wasm_bindgen]
+    pub struct WasmAckInteraction {
+        w: Arc<AcknowledgementInteraction<CoreDb<LevelDbShim>>>
+    }
+
+    #[wasm_bindgen]
+    impl WasmAckInteraction {
+        pub fn new(db: LevelDb, chain_key: PublicKey) -> Self {
+            Self {
+                w: Arc::new(AcknowledgementInteraction::new(CoreDb {
+                    db: DB::new(LevelDbShim::new(db)), me: chain_key.clone()
+                }, chain_key))
+            }
+        }
+
+        pub async fn start_handle_incoming_acks(&self) {
+            self.w.handle_incoming_acknowledgements().await
+        }
+
+        pub async fn start_handle_outgoing_acks(&self, transport_cb: &js_sys::Function) {
+            let msg_transport = |msg: Box<[u8]>, peer: String| -> Pin<Box<dyn Future<Output = Result<(), String>>>> {
+                Box::pin(async move {
+                    let this = JsValue::null();
+                    let data: JsValue = js_sys::Uint8Array::from(msg.as_ref()).into();
+                    let peer: JsValue = JsString::from(peer.as_str()).into();
+
+                    match transport_cb.call2(&this, &data, &peer) {
+                        Ok(r) => {
+                            let promise = js_sys::Promise::from(r);
+                            wasm_bindgen_futures::JsFuture::from(promise)
+                                .await
+                                .map(|_| ())
+                                .map_err(|x| {
+                                    x.dyn_ref::<JsString>()
+                                        .map_or("Failed to send ping message".to_owned(), |x| -> String {
+                                            x.into()
+                                        })
+                                })
+                        }
+                        Err(e) => {
+                            error!("The message transport could not be established: {}", e.as_string()
+                                        .unwrap_or_else(|| {
+                                            "The message transport failed with unknown error".to_owned()
+                                        })
+                                        .as_str()
+                                );
+                            Err(format!("Failed to extract transport error as string: {:?}", e))
+                        }
+                    }
+                })
+            };
+            self.w.handle_outgoing_acknowledgements(&msg_transport).await
+        }
+
+        pub fn stop(&self) {
+            self.w.stop()
+        }
+    }
+
+    #[wasm_bindgen]
     pub struct WasmPacketInteraction {
         w: PacketInteraction<CoreDb<LevelDbShim>>
+    }
+
+    #[wasm_bindgen]
+    impl WasmPacketInteraction {
+        #[wasm_bindgen(constructor)]
+        pub fn new(db: LevelDb, cfg: PacketInteractionConfig, ack: &WasmAckInteraction) -> Self {
+            Self {
+                w: PacketInteraction::new(
+                    CoreDb {
+                        db: DB::new(LevelDbShim::new(db)),
+                        me: PublicKey::from_privkey(&cfg.private_key).expect("invalid config")
+                    },
+                    ack.w.clone(),
+                    cfg
+                )
+            }
+        }
+
+        pub async fn handle_packets(&self, transport_cb: &js_sys::Function) {
+            let msg_transport = |msg: Box<[u8]>, peer: String| -> Pin<Box<dyn Future<Output = Result<(), String>>>> {
+                Box::pin(async move {
+                    let this = JsValue::null();
+                    let data: JsValue = js_sys::Uint8Array::from(msg.as_ref()).into();
+                    let peer: JsValue = JsString::from(peer.as_str()).into();
+
+                    match transport_cb.call2(&this, &data, &peer) {
+                        Ok(r) => {
+                            let promise = js_sys::Promise::from(r);
+                            wasm_bindgen_futures::JsFuture::from(promise)
+                                .await
+                                .map(|_| ())
+                                .map_err(|x| {
+                                    x.dyn_ref::<JsString>()
+                                        .map_or("Failed to send ping message".to_owned(), |x| -> String {
+                                            x.into()
+                                        })
+                                })
+                        }
+                        Err(e) => {
+                            error!("The message transport could not be established: {}", e.as_string()
+                                        .unwrap_or_else(|| {
+                                            "The message transport failed with unknown error".to_owned()
+                                        })
+                                        .as_str()
+                                );
+                            Err(format!("Failed to extract transport error as string: {:?}", e))
+                        }
+                    }
+                })
+            };
+            self.w.handle_packets(&msg_transport).await
+        }
+
+        pub fn stop(&self) {
+            self.w.stop()
+        }
     }
 }
