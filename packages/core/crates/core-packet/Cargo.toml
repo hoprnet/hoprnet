@@ -18,7 +18,7 @@ wasm = ["dep:wasm-bindgen", "dep:js-sys"]
 [dependencies]
 core-crypto = { path = "../core-crypto" }
 core-types = { path = "../core-types" }
-js-sys = { version = "0.3.60", optional = true }
+js-sys = { version = "0.3.63", optional = true }
 libp2p-identity = { version = "0.1.1", features = ["secp256k1", "peerid"] }
 thiserror = "1.0"
 utils-log = { path = "../../../utils/crates/utils-log" }
@@ -32,7 +32,7 @@ console_error_panic_hook = { version = "0.1.7", optional = true }
 
 [dev-dependencies]
 parameterized = "1.0"
-wasm-bindgen-test = "0.3.33"
+wasm-bindgen-test = "0.3.36"
 
 [package.metadata.wasm-pack.profile.dev]
 wasm-opt = false
