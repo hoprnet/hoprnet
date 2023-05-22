@@ -854,7 +854,7 @@ dependencies = [
  "curve25519-dalek",
  "digest 0.10.6",
  "elliptic-curve 0.13.4",
- "futures 0.3.28",
+ "futures",
  "generic-array 0.14.7",
  "getrandom",
  "hex",
