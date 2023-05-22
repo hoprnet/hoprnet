@@ -68,10 +68,10 @@ redeem_tickets() {
   [[ ${rejected} -gt 0 ]] && { msg "rejected tickets count on node ${node_id} is ${rejected}"; exit 1; }
   last_redeemed="${redeemed}"
 
-  # Trigger a redemption run, but cap it at 1 minute. We only want to measure
+  # Trigger a redemption run, but cap it at 20 seconds. We only want to measure
   # progress, not redeeem all tickets which takes too long.
   log "Node ${node_id} should redeem all tickets"
-  result=$(api_redeem_tickets ${node_api})
+  result=$(api_redeem_tickets ${node_api} 20)
   log "--${result}"
 
   # Get ticket statistics again and compare with previous state. Ensure we
@@ -84,11 +84,11 @@ redeem_tickets() {
   [[ ${redeemed} -gt 0 && ${redeemed} -gt ${last_redeemed} ]] || { msg "redeemed tickets count on node ${node_id} is ${redeemed}, previously ${last_redeemed}"; exit 1; }
   last_redeemed="${redeemed}"
 
-  # Trigger another redemption run, but cap it at 1 minute. We only want to measure
+  # Trigger another redemption run, but cap it at 20 seconds. We only want to measure
   # progress, not redeeem all tickets which takes too long.
   log "Node ${node_id} should redeem all tickets (again to ensure re-run of operation)"
   # add 60 second timeout
-  result=$(api_redeem_tickets ${node_api})
+  result=$(api_redeem_tickets ${node_api} 20)
   log "--${result}"
 
   # Get final ticket statistics

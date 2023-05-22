@@ -234,7 +234,7 @@ endif
 
 .PHONY: smoke-test
 smoke-test: ## run smoke tests
-	source .venv/bin/activate && (python3 -m pytest tests/ || (cat /tmp/integration_test_out && false))
+	source .venv/bin/activate && (python3 -m pytest tests/ || (cat /tmp/hopr-smoke-test_integration.log && false))
 
 .PHONY: smart-contract-test
 smart-contract-test: # forge test smart contracts
