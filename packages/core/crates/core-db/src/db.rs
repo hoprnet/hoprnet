@@ -8,6 +8,7 @@ use utils_db::{
     db::{serialize_to_bytes, DB},
     traits::BinaryAsyncKVStorage,
 };
+use utils_db::traits::AsyncKVStorage;
 use utils_types::primitives::Snapshot;
 use utils_types::{
     primitives::{Address, Balance, EthereumChallenge, U256},
@@ -29,14 +30,14 @@ const ACKNOWLEDGED_TICKETS_PREFIX: &str = "tickets:acknowledged-";
 
 pub struct CoreDb<T>
 where
-    T: BinaryAsyncKVStorage,
+    T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>,
 {
     db: DB<T>,
     me: PublicKey,
 }
 
 #[async_trait(? Send)] // not placing the `Send` trait limitations on the trait
-impl<T: BinaryAsyncKVStorage> HoprCoreDbActions for CoreDb<T> {
+impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreDbActions for CoreDb<T> {
     async fn get_current_ticket_index(&self, channel_id: &Hash) -> Result<Option<U256>> {
         let prefixed_key = utils_db::db::Key::new_with_prefix(channel_id, TICKET_INDEX_PREFIX)?;
         if self.db.contains(prefixed_key.clone()).await {
