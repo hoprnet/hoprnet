@@ -2,17 +2,16 @@ use std::ops::Mul;
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use curve25519_dalek::EdwardsPoint;
 use curve25519_dalek::traits::IsIdentity;
-use libp2p_identity::{PublicKey as lp2p_PublicKey, ed25519::PublicKey as lp2p_k256_PublicKey};
+use libp2p_identity::{PublicKey as lp2p_PublicKey};
 use libp2p_identity::PeerId;
 use rand::{CryptoRng, RngCore};
 use utils_log::warn;
 use utils_types::errors::GeneralError::ParseError;
 use utils_types::traits::{BinarySerializable, PeerIdLike};
-use crate::errors::CryptoError;
-use crate::errors::CryptoError::{CalculationError, InvalidInputValue, Other};
+use crate::errors::CryptoError::{CalculationError, InvalidSecretScalar};
 use crate::errors::Result;
 use crate::shared_keys::{GroupElement, GroupEncoding, Scalar};
-use crate::types::CurvePoint;
+use crate::types::SecretKey;
 
 pub type EdScalar = curve25519_dalek::Scalar;
 
@@ -20,7 +19,7 @@ impl Scalar for EdScalar {
     type Repr = [u8; 32];
 
     fn from_repr(repr: Self::Repr) -> Result<Self> {
-        Ok(EdScalar::from_bytes_mod_order(repr))
+        Ok(EdScalar::from_bits(repr))
     }
 
     fn to_repr(&self) -> Self::Repr {
@@ -41,58 +40,52 @@ impl GroupElement<EdScalar> for EdwardsPoint {
     }
 
     fn from_repr(repr: Self::Repr) -> Result<Self> {
-        CompressedEdwardsY::from_slice(repr.key.as_bytes())
-            .map_err(|_| InvalidInputValue)
-            .and_then(|p| p.decompress().ok_or(CalculationError))
+        repr.key.decompress().ok_or(CalculationError)
     }
 
     fn generate(scalar: &curve25519_dalek::Scalar) -> Self {
         EdwardsPoint::mul_base(scalar)
     }
 
-    fn group_law(&self, scalar: &curve25519_dalek::Scalar) -> Self {
+    fn multiply(&self, scalar: &curve25519_dalek::Scalar) -> Self {
         self.mul(scalar)
     }
 
     fn is_valid(&self) -> bool {
-        self.is_torsion_free() && !self.is_identity()
+        !self.is_small_order() && !self.is_identity()
     }
 }
 
 
 #[derive(Clone, Debug)]
 pub struct OffchainPublicKey {
-    key: ed25519_dalek::PublicKey
+    key: CompressedEdwardsY
 }
 
 impl PeerIdLike for OffchainPublicKey {
     fn from_peerid(peer_id: &PeerId) -> utils_types::errors::Result<Self> {
-        // Workaround for the missing public key API on PeerIds
-        let peer_id_str = peer_id.to_base58();
-        if peer_id_str.starts_with("16D") {
-            // Here we explicitly assume non-RSA PeerId, so that multihash bytes are the actual public key
-            let pid = peer_id.to_bytes();
-            let (_, mh) = pid.split_at(6);
-            Self::from_bytes(mh)
+        let mh = peer_id.as_ref();
+        if mh.code() == 0 {
+            Self::from_bytes(&mh.digest()[4..])
         } else {
-            // RSA-based peer ID might never going to be supported by HOPR
-            warn!("peer id type not supported: {peer_id_str}");
+            warn!("peer id type not supported: {peer_id}");
             Err(ParseError)
         }
     }
 
     fn to_peerid(&self) -> PeerId {
-        PeerId::from_public_key(&lp2p_PublicKey::Ed25519(libp2p_identity::ed25519::PublicKey::try_from_bytes(self.key.as_bytes()).unwrap()))
+        let k = libp2p_identity::ed25519::PublicKey::try_from_bytes(self.key.as_bytes()).unwrap();
+        PeerId::from_public_key(&lp2p_PublicKey::from(k))
     }
 }
 
 impl BinarySerializable<'_> for OffchainPublicKey {
-    const SIZE: usize = 0;
+    const SIZE: usize = 32;
 
     fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
-        Ok(OffchainPublicKey {
-            key: ed25519_dalek::PublicKey::from_bytes(data.try_into().map_err(|_| ParseError)?).map_err(|_| ParseError)?
-        })
+        CompressedEdwardsY::from_slice(data)
+            .map(|key| Self {key})
+            .map_err(|_| ParseError)
     }
 
     fn to_bytes(&self) -> Box<[u8]> {
@@ -107,7 +100,15 @@ impl GroupEncoding for OffchainPublicKey {
 }
 
 impl OffchainPublicKey {
-
+    pub fn from_privkey(key: SecretKey) -> Result<Self> {
+        let scalar = EdScalar::from_bits_clamped(key);
+        let point = EdwardsPoint::mul_base(&scalar);
+        if !point.is_identity() && !point.is_small_order() {
+            Ok(Self{ key: point.compress() })
+        } else {
+            Err(InvalidSecretScalar)
+        }
+    }
 }
 
 

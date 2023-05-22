@@ -55,10 +55,15 @@ pub trait GroupElement<E: Scalar>: Clone {
     fn generate(scalar: &E) -> Self;
 
     /// Performs the group law given number of times (i.e multiplication in additive groups)
-    fn group_law(&self, scalar: &E) -> Self;
+    fn multiply(&self, scalar: &E) -> Self;
 
     /// Group element is considered valid if it is not a neutral element and also not a torsion element of small order.
     fn is_valid(&self) -> bool;
+
+    fn random_pair(rng: &mut (impl CryptoRng + RngCore)) -> (Self, E) {
+        let scalar = E::random(rng);
+        (Self::generate(&scalar), scalar)
+    }
 
     /// Extract a keying material from a group element using HKDF extract
     fn extract_key(&self, salt: &[u8]) -> SecretKey {
@@ -80,7 +85,7 @@ pub trait GroupElement<E: Scalar>: Clone {
 pub struct SharedKeys<E: Scalar, G: GroupElement<E>> {
     pub alpha: G::Repr,
     pub secrets: Vec<SecretKey>,
-    scalar_type: PhantomData<E>
+    _type: PhantomData<E>
 }
 
 impl <E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
@@ -101,11 +106,11 @@ impl <E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
     pub fn generate(rng: &mut (impl CryptoRng + RngCore), peer_group_elements: Vec<G::Repr>) -> Result<SharedKeys<E, G>> {
         let mut shared_keys = Vec::new();
 
-        // This becomes: x * b_0 * b_1 * b_2 * ...
-        let mut coeff_prev = E::random(rng);
+        // coeff_prev becomes: x * b_0 * b_1 * b_2 * ...
+        // alpha_prev becomes: x * b_0 * b_1 * b_2 * ... * G
+        let (mut alpha_prev, mut coeff_prev) = G::random_pair(rng);
 
-        // This becomes: x * b_0 * b_1 * b_2 * ... * G
-        let mut alpha_prev = G::generate(&coeff_prev);
+        // Save the part of the result
         let alpha = alpha_prev.to_repr();
 
         // Iterate through all the given peer public keys
@@ -114,7 +119,7 @@ impl <E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
             let group_element = G::from_repr(ge_repr)?;
 
             // Try to decode the given public key point & multiply by the current coefficient
-            let shared_secret = group_element.group_law(&coeff_prev);
+            let shared_secret = group_element.multiply(&coeff_prev);
 
             // Extract the shared secret from the computed EC point and copy it into the shared keys structure
             shared_keys.push(shared_secret.extract_key(&group_element.to_repr().encode()));
@@ -128,8 +133,8 @@ impl <E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
             let b_k = shared_secret.expand_key(&alpha_prev.to_repr().encode());
             let b_k_checked = E::from_repr(b_k.into())?;
 
-            // Update coeff prev and alpha
-            alpha_prev = alpha_prev.group_law(&b_k_checked);
+            // Update coeff_prev and alpha
+            alpha_prev = alpha_prev.multiply(&b_k_checked);
             coeff_prev = coeff_prev.mul(b_k_checked);
 
             if !alpha_prev.is_valid() {
@@ -140,7 +145,7 @@ impl <E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
         Ok(SharedKeys {
             alpha,
             secrets: shared_keys,
-            scalar_type: PhantomData,
+            _type: PhantomData,
         })
     }
 
@@ -150,13 +155,13 @@ impl <E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
         let public_key = G::generate(&private_scalar);
         let alpha_point = G::from_repr(alpha)?;
 
-        let s_k = alpha_point.group_law(&private_scalar);
+        let s_k = alpha_point.multiply(&private_scalar);
         let secret = s_k.extract_key(&public_key.to_repr().encode());
 
         let b_k = s_k.expand_key(&alpha_point.to_repr().encode());
         let b_k_checked = E::from_repr(b_k.into())?;
 
-        let alpha_new = alpha_point.group_law(&b_k_checked);
+        let alpha_new = alpha_point.multiply(&b_k_checked);
 
         Ok((alpha_new.to_repr(), secret))
     }
@@ -208,7 +213,7 @@ impl GroupElement<NonZeroScalar> for ProjectivePoint {
         ProjectivePoint::GENERATOR * scalar.as_ref()
     }
 
-    fn group_law(&self, scalar: &NonZeroScalar) -> Self {
+    fn multiply(&self, scalar: &NonZeroScalar) -> Self {
         Mul::mul(self, scalar.as_ref())
     }
 
@@ -248,16 +253,16 @@ pub mod tests {
         assert_eq!(res, key.as_ref());
     }
 
-    pub fn generate_random_keypairs<E: Scalar, G: GroupElement<E>>(count: usize) -> (Vec<E::Repr>, Vec<G::Repr>) {
+    pub fn generate_random_keypairs<E: Scalar, G: GroupElement<E>>(count: usize) -> (Vec<G::Repr>, Vec<E::Repr>) {
         (0..count)
-            .map(|_| E::random(&mut OsRng))
-            .map(|s| (s.to_repr(), G::generate(&s).to_repr()))
+            .map(|_| G::random_pair(&mut OsRng))
+            .map(|(a, b)| (a.to_repr(), b.to_repr()))
             .unzip()
     }
 
     pub fn generic_test_shared_keys<E: Scalar, G: GroupElement<E>>() {
         const COUNT_KEYPAIRS: usize = 3;
-        let (priv_keys, pub_keys) = generate_random_keypairs::<E, G>(COUNT_KEYPAIRS);
+        let (pub_keys, priv_keys) = generate_random_keypairs::<E, G>(COUNT_KEYPAIRS);
 
         // Now generate the key shares for the public keys
         let generated_shares = SharedKeys::<E, G>::generate(&mut OsRng, pub_keys).unwrap();
