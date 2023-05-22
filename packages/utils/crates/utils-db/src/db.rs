@@ -117,8 +117,7 @@ impl<T: BinaryAsyncKVStorage> DB<T> {
 
     pub async fn get_or_none<V: DeserializeOwned>(&self, key: Key) -> Result<Option<V>> {
         if self.contains(key.clone()).await {
-            self.get::<V>(key).await
-                .map(|v| Some(v))
+            self.get::<V>(key).await.map(|v| Some(v))
         } else {
             Ok(None)
         }

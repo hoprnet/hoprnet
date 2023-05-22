@@ -4,19 +4,15 @@ use core_crypto::types::{HalfKeyChallenge, Hash, PublicKey};
 use core_types::acknowledgement::{AcknowledgedTicket, PendingAcknowledgement};
 use core_types::channels::{ChannelEntry, Ticket};
 use utils_db::{
+    constants::*,
     db::{serialize_to_bytes, DB},
     traits::BinaryAsyncKVStorage,
-    constants::*
-};
-use utils_types::{
-    primitives::{Address, Balance, EthereumChallenge, U256},
 };
 use utils_types::primitives::Snapshot;
+use utils_types::primitives::{Address, Balance, EthereumChallenge, U256};
 
 use crate::errors::Result;
 use crate::traits::HoprCoreDbActions;
-
-
 
 pub struct CoreDb<T>
 where
@@ -58,7 +54,8 @@ impl<T: BinaryAsyncKVStorage> HoprCoreDbActions for CoreDb<T> {
                         f.destination.eq(&self.me) && ack.ticket.channel_epoch.eq(&f.channel_epoch)
                     }
                 },
-            ).await
+            )
+            .await
     }
 
     async fn get_tickets(&self, signer: PublicKey) -> Result<Vec<Ticket>> {
@@ -179,14 +176,19 @@ impl<T: BinaryAsyncKVStorage> HoprCoreDbActions for CoreDb<T> {
         Ok(())
     }
 
-    async fn replace_unack_with_ack(&mut self, half_key_challenge: &HalfKeyChallenge, ack_ticket: AcknowledgedTicket) -> Result<()> {
+    async fn replace_unack_with_ack(
+        &mut self,
+        half_key_challenge: &HalfKeyChallenge,
+        ack_ticket: AcknowledgedTicket,
+    ) -> Result<()> {
         let unack_key = utils_db::db::Key::new_with_prefix(half_key_challenge, PENDING_ACKNOWLEDGEMENTS_PREFIX)?;
 
         let mut ack_key = serialize_to_bytes(&ack_ticket.ticket.challenge)?;
         let mut channel_epoch = serialize_to_bytes(&ack_ticket.ticket.channel_epoch)?;
         ack_key.append(&mut channel_epoch);
 
-        let ack_key = utils_db::db::Key::new_bytes_with_prefix(ack_key.into_boxed_slice(), ACKNOWLEDGED_TICKETS_PREFIX)?;
+        let ack_key =
+            utils_db::db::Key::new_bytes_with_prefix(ack_key.into_boxed_slice(), ACKNOWLEDGED_TICKETS_PREFIX)?;
 
         let mut batch_ops = utils_db::db::Batch::new();
         batch_ops.del(unack_key);
@@ -195,7 +197,12 @@ impl<T: BinaryAsyncKVStorage> HoprCoreDbActions for CoreDb<T> {
         self.db.batch(batch_ops, true).await
     }
 
-    async fn update_channel_and_snapshot(&mut self, channel_id: &Hash, channel: ChannelEntry, snapshot: Snapshot) -> Result<()> {
+    async fn update_channel_and_snapshot(
+        &mut self,
+        channel_id: &Hash,
+        channel: ChannelEntry,
+        snapshot: Snapshot,
+    ) -> Result<()> {
         let channel_key = utils_db::db::Key::new_with_prefix(channel_id, CHANNEL_PREFIX)?;
         let snapshot_key = utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?;
 

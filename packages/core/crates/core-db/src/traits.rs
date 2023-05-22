@@ -1,9 +1,9 @@
 use async_trait::async_trait;
 
 use core_crypto::types::{HalfKeyChallenge, Hash, PublicKey};
-use core_types::acknowledgement::{PendingAcknowledgement, AcknowledgedTicket};
+use core_types::acknowledgement::{AcknowledgedTicket, PendingAcknowledgement};
 use core_types::channels::{ChannelEntry, Ticket};
-use utils_types::primitives::{Address, Balance, U256, Snapshot};
+use utils_types::primitives::{Address, Balance, Snapshot, U256};
 
 use crate::errors::Result;
 
@@ -29,7 +29,16 @@ pub trait HoprCoreDbActions {
         pending_acknowledgment: PendingAcknowledgement,
     ) -> Result<()>;
 
-    async fn replace_unack_with_ack(&mut self, half_key_challenge: &HalfKeyChallenge, ack_ticket: AcknowledgedTicket) -> Result<()>;
+    async fn replace_unack_with_ack(
+        &mut self,
+        half_key_challenge: &HalfKeyChallenge,
+        ack_ticket: AcknowledgedTicket,
+    ) -> Result<()>;
 
-    async fn update_channel_and_snapshot(&mut self, channel_id: &Hash, channel: ChannelEntry, snapshot: Snapshot) -> Result<()>;
+    async fn update_channel_and_snapshot(
+        &mut self,
+        channel_id: &Hash,
+        channel: ChannelEntry,
+        snapshot: Snapshot,
+    ) -> Result<()>;
 }

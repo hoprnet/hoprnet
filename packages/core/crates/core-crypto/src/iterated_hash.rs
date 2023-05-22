@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use crate::errors::CryptoError::{CalculationError, InvalidInputValue};
 use crate::errors::Result;

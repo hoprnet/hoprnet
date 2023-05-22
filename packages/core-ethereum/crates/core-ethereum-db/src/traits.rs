@@ -1,12 +1,17 @@
 use async_trait::async_trait;
 
-use core_crypto::{iterated_hash::IteratedHash, types::{Hash, PublicKey}};
-use core_types::acknowledgement::{AcknowledgedTicket};
-use core_types::{channels::{ChannelEntry, Ticket}, account::AccountEntry};
+use core_crypto::{
+    iterated_hash::IteratedHash,
+    types::{Hash, PublicKey},
+};
+use core_types::acknowledgement::AcknowledgedTicket;
+use core_types::{
+    account::AccountEntry,
+    channels::{ChannelEntry, Ticket},
+};
 use utils_types::primitives::{Address, Balance, Snapshot};
 
 use crate::errors::Result;
-
 
 #[async_trait(? Send)] // not placing the `Send` trait limitations on the trait
 pub trait HoprCoreEthereumDbActions {
@@ -36,7 +41,12 @@ pub trait HoprCoreEthereumDbActions {
 
     async fn get_channels_open(&self) -> Result<Vec<ChannelEntry>>;
 
-    async fn update_channel_and_snapshot(&mut self, channel_id: &Hash, channel: ChannelEntry, snapshot: Snapshot) -> Result<()>;
+    async fn update_channel_and_snapshot(
+        &mut self,
+        channel_id: &Hash,
+        channel: ChannelEntry,
+        snapshot: Snapshot,
+    ) -> Result<()>;
 
     async fn get_account(&self, address: &Address) -> Result<Option<AccountEntry>>;
 
@@ -92,9 +102,19 @@ pub trait HoprCoreEthereumDbActions {
 
     async fn set_network_registry(&mut self, enabled: bool, snapshot: Snapshot) -> Result<()>;
 
-    async fn add_to_network_registry(&mut self, public_key: &PublicKey, account: &Address, snapshot: Snapshot) -> Result<()>;
+    async fn add_to_network_registry(
+        &mut self,
+        public_key: &PublicKey,
+        account: &Address,
+        snapshot: Snapshot,
+    ) -> Result<()>;
 
-    async fn remove_from_network_registry(&mut self, public_key: &PublicKey, account: &Address, snapshot: Snapshot) -> Result<()>;
+    async fn remove_from_network_registry(
+        &mut self,
+        public_key: &PublicKey,
+        account: &Address,
+        snapshot: Snapshot,
+    ) -> Result<()>;
 
     async fn get_account_from_network_registry(&self, public_key: &PublicKey) -> Result<Option<Address>>;
 

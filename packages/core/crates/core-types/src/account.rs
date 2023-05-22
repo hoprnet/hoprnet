@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use crate::account::AccountType::{Announced, NotAnnounced};
 use core_crypto::types::PublicKey;

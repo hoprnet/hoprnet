@@ -94,7 +94,7 @@ function channelEntryCreateMock(): ChannelEntry {
 
 import { LevelDb } from './db.js'
 import { db_sanity_test } from '../../lib/utils_db.js'
-import fs from "fs";
+import fs from 'fs'
 
 describe('db shim tests', function () {
   let db: LevelDb
@@ -108,7 +108,7 @@ describe('db shim tests', function () {
   afterEach(async function () {
     await db.close()
 
-    fs.rmSync(db_dir_path, { recursive: true, force: true });
+    fs.rmSync(db_dir_path, { recursive: true, force: true })
   })
 
   it('basic DB operations are performed in Rust correctly', async function () {

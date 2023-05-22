@@ -228,8 +228,9 @@ pub async fn db_sanity_test(db: LevelDb) -> Result<bool, JsValue> {
 
     // TODO: levelup api with the passed options to do an immediate write does not perform an immediate write
     if !kv_storage.contains(key_3.as_bytes().to_vec().into_boxed_slice()).await {
-        return Err::<bool, JsValue>(
-            JsValue::from(JsError::new("Test #5.1 failed: the key should be present in the DB")))
+        return Err::<bool, JsValue>(JsValue::from(JsError::new(
+            "Test #5.1 failed: the key should be present in the DB",
+        )));
     }
 
     // ===================================
