@@ -623,7 +623,7 @@ __metadata:
     "@multiformats/multiaddr": 10.3.3
     "@types/debug": 4.1.7
     "@types/mocha": 10.0.1
-    "@types/node": 16
+    "@types/node": 18
     "@types/simple-peer": 9.11.5
     abortable-iterator: 4.0.3
     chalk: 5.2.0
@@ -2163,10 +2163,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/node@npm:16":
-  version: 16.18.32
-  resolution: "@types/node@npm:16.18.32"
-  checksum: c5966c8e671205b2971ae66ae548ce92235cef89ae1a0f2ecbf118e775923259dc85f57c58cfc56267089d56dfce967700c058276199c6ed9510d0a0b077af2d
+"@types/node@npm:18":
+  version: 18.16.14
+  resolution: "@types/node@npm:18.16.14"
+  checksum: c11cb3c787236414efe58240ae71854971592554d82ff9d201876ce7cafd51c37aaa001c63602d002e8238614d7331bd6d48ac4c1c0caa826799980b6846fb08
   languageName: node
   linkType: hard
 
@@ -5432,7 +5432,7 @@ __metadata:
   dependencies:
     "@ethersproject/cli": 5.7.0
     "@hoprnet/avadosdk": 0.4.4-rc.1
-    "@types/node": 16
+    "@types/node": 18
     "@types/yargs": ^17.0.23
     prettier: 2.8.8
     ts-node: 10.9.1
