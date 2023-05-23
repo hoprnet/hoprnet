@@ -2,15 +2,15 @@
 
 pragma solidity ^0.8.0;
 
-import '@openzeppelin/contracts/access/Ownable.sol';
-import '@openzeppelin/contracts/token/ERC777/IERC777Recipient.sol';
-import '@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol';
-import '@openzeppelin/contracts/utils/introspection/ERC1820Implementer.sol';
-import '@openzeppelin/contracts/security/ReentrancyGuard.sol';
+import 'openzeppelin-contracts-4.4.2/access/Ownable.sol';
+import 'openzeppelin-contracts-4.4.2/token/ERC777/IERC777Recipient.sol';
+import 'openzeppelin-contracts-4.4.2/token/ERC721/IERC721Receiver.sol';
+import 'openzeppelin-contracts-4.4.2/utils/introspection/ERC1820Implementer.sol';
+import 'openzeppelin-contracts-4.4.2/security/ReentrancyGuard.sol';
 import './HoprStake.sol';
 import './HoprBoost.sol';
-import '../../test/mocks/ERC777Mock.sol';
-import '../../test/mocks/ERC677Mock.sol';
+import '../../../test/mocks/ERC777Mock.sol';
+import '../../../test/mocks/ERC677Mock.sol';
 
 /*
   CHECKLIST:

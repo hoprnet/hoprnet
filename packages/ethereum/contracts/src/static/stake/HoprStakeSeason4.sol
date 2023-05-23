@@ -2,20 +2,20 @@
 
 pragma solidity ^0.8.0;
 
-import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
-import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
-import '@openzeppelin/contracts/token/ERC777/IERC777Recipient.sol';
-import '@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol';
-import '@openzeppelin/contracts/security/ReentrancyGuard.sol';
-import '@openzeppelin/contracts/access/Ownable.sol';
-import '@openzeppelin/contracts/utils/introspection/IERC1820Registry.sol';
-import '@openzeppelin/contracts/utils/math/Math.sol';
+import 'openzeppelin-contracts-4.4.2/token/ERC20/IERC20.sol';
+import 'openzeppelin-contracts-4.4.2/token/ERC20/utils/SafeERC20.sol';
+import 'openzeppelin-contracts-4.4.2/token/ERC777/IERC777Recipient.sol';
+import 'openzeppelin-contracts-4.4.2/token/ERC721/IERC721Receiver.sol';
+import 'openzeppelin-contracts-4.4.2/security/ReentrancyGuard.sol';
+import 'openzeppelin-contracts-4.4.2/access/Ownable.sol';
+import 'openzeppelin-contracts-4.4.2/utils/introspection/IERC1820Registry.sol';
+import 'openzeppelin-contracts-4.4.2/utils/math/Math.sol';
 import './IHoprBoost.sol';
 
 /**
  *
  */
-contract HoprStake2 is Ownable, IERC777Recipient, IERC721Receiver, ReentrancyGuard {
+contract HoprStakeSeason4 is Ownable, IERC777Recipient, IERC721Receiver, ReentrancyGuard {
   using SafeERC20 for IERC20;
   using Math for uint256;
 
@@ -27,11 +27,11 @@ contract HoprStake2 is Ownable, IERC777Recipient, IERC721Receiver, ReentrancyGua
     uint256 claimedRewards; // Rewards claimed by the account.
   }
 
-  uint256 public constant PROGRAM_START = 1642424400; // Block timestamp at which incentive program starts. Default value is 1642424400 (Jan 17th 2022 14:00 CET).
-  uint256 public constant PROGRAM_END = 1650974400; // Block timestamp at which incentive program ends. From this timestamp on, tokens can be unlocked. Default value is 1650974400 (Apr 26th 2022 14:00 CET).
+  uint256 public constant PROGRAM_START = 1658836800; // Block timestamp at which incentive program starts. Default value is 1658836800 (July 26th 2022 14:00 CET).
+  uint256 public constant PROGRAM_END = 1666785600; // Block timestamp at which incentive program ends. From this timestamp on, tokens can be unlocked. Default value is 1666785600 (Oct 26th 2022 14:00 CET).
   uint256 public constant FACTOR_DENOMINATOR = 1e12; // Denominator of the “Basic reward factor”. Default value is 1e12.
-  uint256 public constant BASIC_FACTOR_NUMERATOR = 5787; // Numerator of the “Basic reward factor”, for all accounts that participate in the program. Default value is 5787, which corresponds to 5.787/1e9 per second. Its associated denominator is FACTOR_DENOMINATOR.
-  uint256 public constant BOOST_CAP = 1e24; // Cap on actual locked tokens for receiving additional boosts.
+  uint256 public constant BASIC_FACTOR_NUMERATOR = 3171; // Numerator of the “Basic reward factor”, for all accounts that participate in the program. Default value is 3171, which corresponds to 3.171/1e9 per second. Its associated denominator is FACTOR_DENOMINATOR.
+  uint256 public constant BOOST_CAP = 15e22; // Cap on actual locked tokens for receiving additional boosts, 150k (150,000 * 1e18)
 
   address public LOCK_TOKEN = 0xD057604A14982FE8D88c5fC25Aac3267eA142a08; // Token that HOPR holders need to lock to the contract: xHOPR address.
   address public REWARD_TOKEN = 0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1; // Token that HOPR holders can claim as rewards: wxHOPR address
@@ -41,6 +41,7 @@ contract HoprStake2 is Ownable, IERC777Recipient, IERC721Receiver, ReentrancyGua
   mapping(address => uint256) public redeemedNftIndex; // The last index of redeemed NFT of an account. It defines the length of the “redeemedBoostToken mapping.
   mapping(address => mapping(uint256 => uint256)) public redeemedFactor; // Redeemed boost factor per account, structured as “account -> index -> NFT tokenId”.
   mapping(address => uint256) public redeemedFactorIndex; // The last index of redeemed boost factor factor of an account. It defines the length of the “redeemedFactor” mapping.
+  mapping(uint256 => bool) public isBlockedNft; // Type index of HoprBoost NFT that is not accepted in this season
 
   mapping(address => Account) public accounts; // It stores the locked token amount, earned and claimed rewards per account.
   uint256 public totalLocked; // Total amount of tokens being locked in the incentive program.
@@ -56,10 +57,13 @@ contract HoprStake2 is Ownable, IERC777Recipient, IERC721Receiver, ReentrancyGua
   event RewardFueled(uint256 indexed amount);
   event Redeemed(address indexed account, uint256 indexed boostTokenId, bool indexed factorRegistered);
   event Claimed(address indexed account, uint256 indexed rewardAmount);
+  event NftBlocked(uint256 indexed typeIndex);
+  event NftAllowed(uint256 indexed typeIndex);
 
   /**
    * @dev Provide NFT contract address. Transfer owner role to the new owner address.
    * At deployment, it also registers the lock contract as an ERC777 recipient.
+   * Also, it blocks HODLr, DAO_v2, Surveyor, Wildhorn_v2, PuzzleHunt_v1, PuzzleHunt_v2 NFTs
    * @param _nftAddress address Address of the NFT contract.
    * @param _newOwner address Address of the new owner. This new owner can reclaim any ERC20 and ERC721 token being accidentally sent to the lock contract.
    * @param _lockToken address Address of the stake token xHOPR.
@@ -81,6 +85,14 @@ contract HoprStake2 is Ownable, IERC777Recipient, IERC721Receiver, ReentrancyGua
       REWARD_TOKEN = _rewardToken;
       NFT_CONTRACT = IHoprBoost(_nftAddress);
     }
+    // block a selection of HoprBoost NFTs
+    _ownerBlockNftType(2); // HODLr
+    _ownerBlockNftType(3); // Wildhorn_v1
+    _ownerBlockNftType(4); // PuzzleHunt_v1
+    _ownerBlockNftType(7); // PuzzleHunt_v2
+    _ownerBlockNftType(8); // Wildhorn_v2
+    _ownerBlockNftType(9); // DAO_v2
+    _ownerBlockNftType(10); // Surveyor
     transferOwnership(_newOwner);
     ERC1820_REGISTRY.setInterfaceImplementer(address(this), TOKENS_RECIPIENT_INTERFACE_HASH, address(this));
   }
@@ -177,6 +189,25 @@ contract HoprStake2 is Ownable, IERC777Recipient, IERC721Receiver, ReentrancyGua
   }
 
   /**
+   * @dev Owner can block NFTs from being redeemed in the current staking contract by its type name (as in HoprBoost)
+   * @param typeIndex integer Type index to be blocked
+   */
+  function ownerBlockNftType(uint256 typeIndex) external onlyOwner {
+    require(!isBlockedNft[typeIndex], 'HoprStake: NFT type is already blocked');
+    _ownerBlockNftType(typeIndex);
+  }
+
+  /**
+   * @dev Owner can allow blocked NFTs to be redeemable.
+   * @param typeIndex integer Type index to be allowed
+   */
+  function ownerUnblockNftType(uint256 typeIndex) external onlyOwner {
+    require(isBlockedNft[typeIndex], 'HoprStake: NFT type is not blocked');
+    isBlockedNft[typeIndex] = false;
+    emit NftAllowed(typeIndex);
+  }
+
+  /**
    * @dev ERC677 hook. Token holders can send their tokens with `transferAndCall` to the stake contract.
    * After PROGRAM_END, it refuses tokens; Before PROGRAM_END, it accepts tokens xHOPR token, sync
    * Account state, and update totalLocked.
@@ -257,12 +288,14 @@ contract HoprStake2 is Ownable, IERC777Recipient, IERC721Receiver, ReentrancyGua
     // update boost factor
     uint256 typeId = NFT_CONTRACT.typeIndexOf(tokenId);
     (uint256 factor, ) = NFT_CONTRACT.boostOf(tokenId);
+    require(!isBlockedNft[typeId], 'HoprStake: Can only redeem NFTs of allowed types.');
 
     uint256 boostIndex = redeemedFactorIndex[from];
     uint256 index = 0;
     for (index; index < boostIndex; index++) {
       // loop through redeemed factors, replace the factor of the same type, if the current factor is larger.
       uint256 redeemedId = redeemedFactor[from][index];
+      uint256 redeemedIndex = NFT_CONTRACT.typeIndexOf(redeemedId);
       (uint256 redeemedFactorValue, ) = NFT_CONTRACT.boostOf(redeemedId);
 
       if (NFT_CONTRACT.typeIndexOf(redeemedId) == typeId) {
@@ -449,13 +482,14 @@ contract HoprStake2 is Ownable, IERC777Recipient, IERC721Receiver, ReentrancyGua
     Account memory account = accounts[_account];
     // update states
     uint256 amount = account.cumulatedRewards - account.claimedRewards;
-    require(amount > 0, 'HoprStake: Nothing to claim');
-    accounts[_account].claimedRewards = accounts[_account].cumulatedRewards;
-    require(availableReward >= amount, 'HoprStake: Insufficient reward pool.');
-    availableReward -= amount;
-    // send rewards to the account.
-    IERC20(REWARD_TOKEN).safeTransfer(_account, amount);
-    emit Claimed(_account, amount);
+    if (amount > 0) {
+      accounts[_account].claimedRewards = accounts[_account].cumulatedRewards;
+      require(availableReward >= amount, 'HoprStake: Insufficient reward pool.');
+      availableReward -= amount;
+      // send rewards to the account.
+      IERC20(REWARD_TOKEN).safeTransfer(_account, amount);
+      emit Claimed(_account, amount);
+    }
   }
 
   /**
@@ -476,5 +510,14 @@ contract HoprStake2 is Ownable, IERC777Recipient, IERC721Receiver, ReentrancyGua
       NFT_CONTRACT.transferFrom(address(this), _account, redeemedNft[_account][index]);
     }
     emit Released(_account, actualStake);
+  }
+
+  /**
+   * @dev Private function to block an NFT
+   * @param typeIndex integer Type index to be blocked
+   */
+  function _ownerBlockNftType(uint256 typeIndex) private {
+    isBlockedNft[typeIndex] = true;
+    emit NftBlocked(typeIndex);
   }
 }

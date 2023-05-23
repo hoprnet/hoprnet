@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity >=0.8.0 <0.9.0;
 
-import '../../src/stake/HoprBoost.sol';
+import '../../src/static/stake/HoprBoost.sol';
 
 /**
  * library to try catch typeAt() function of HoprBoost

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity >=0.6.0 <0.9.0;
 
-import '../src/HoprDistributor.sol';
-import '../src/HoprToken.sol';
-import './utils/ERC1820Registry.sol';
+import '../../src/static/HoprDistributor.sol';
+import '../../src/static/HoprToken.sol';
+import '../utils/ERC1820Registry.sol';
 import 'forge-std/Test.sol';
 
 contract HoprDistributorTest is Test, ERC1820RegistryFixtureTest {

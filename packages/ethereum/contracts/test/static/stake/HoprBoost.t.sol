@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity >=0.6.0 <0.9.0;
 
-import '../../src/stake/HoprBoost.sol';
+import '../../../src/static/stake/HoprBoost.sol';
 import 'forge-std/Test.sol';
 
 contract HoprBoostTest is Test {
