@@ -1,4 +1,6 @@
 pub mod constants;
+pub mod commitment;
+pub mod errors;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {

@@ -269,7 +269,7 @@ where
         }
     }
 
-    async fn validate_unacknowledged_ticket(
+    pub async fn validate_unacknowledged_ticket(
         &self,
         sender: &PublicKey,
         min_ticket_amount: Balance,

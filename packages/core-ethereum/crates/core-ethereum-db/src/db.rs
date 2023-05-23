@@ -24,7 +24,7 @@ fn to_commitment_key(channel: &Hash, iteration: usize) -> Result<utils_db::db::K
     let mut channel = serialize_to_bytes(channel)?;
     channel.extend_from_slice(&iteration.to_be_bytes());
 
-    utils_db::db::Key::new_bytes_with_prefix(channel.into_boxed_slice(), COMMITMENT_PREFIX)
+    utils_db::db::Key::new_bytes_with_prefix(&channel, COMMITMENT_PREFIX)
 }
 
 fn to_acknowledged_ticket_key(challenge: &EthereumChallenge, epoch: &U256) -> Result<utils_db::db::Key> {
@@ -32,7 +32,7 @@ fn to_acknowledged_ticket_key(challenge: &EthereumChallenge, epoch: &U256) -> Re
     let mut channel_epoch = serialize_to_bytes(epoch)?;
     ack_key.append(&mut channel_epoch);
 
-    utils_db::db::Key::new_bytes_with_prefix(ack_key.into_boxed_slice(), ACKNOWLEDGED_TICKETS_PREFIX)
+    utils_db::db::Key::new_bytes_with_prefix(&ack_key, ACKNOWLEDGED_TICKETS_PREFIX)
 }
 
 pub struct CoreEthereumDb<T>
