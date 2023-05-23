@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 use crate::errors::CryptoError::{CalculationError, InvalidInputValue};
 use crate::errors::Result;
 use crate::primitives::{DigestLike, EthDigest};
@@ -11,7 +13,7 @@ pub struct IteratedHash {
 
 /// Contains the intermediate result in the hash iteration progression
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Intermediate {
     pub iteration: usize,
     pub intermediate: Box<[u8]>,

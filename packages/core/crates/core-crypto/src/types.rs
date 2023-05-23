@@ -84,7 +84,7 @@ mod arrays {
 }
 
 /// Represent an uncompressed elliptic curve point on the secp256k1 curve
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct CurvePoint {
     affine: AffinePoint,
