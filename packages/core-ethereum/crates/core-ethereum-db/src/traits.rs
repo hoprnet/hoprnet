@@ -19,15 +19,15 @@ pub trait HoprCoreEthereumDbActions {
 
     async fn delete_acknowledged_tickets_from(&mut self, source: ChannelEntry) -> Result<()>;
 
-    async fn delete_acknowledged_ticket(&mut self, ticket: AcknowledgedTicket) -> Result<()>;
+    async fn delete_acknowledged_ticket(&mut self, ticket: &AcknowledgedTicket) -> Result<()>;
 
-    async fn store_hash_intermediaries(&mut self, channel: Hash, intermediates: IteratedHash) -> Result<()>;
+    async fn store_hash_intermediaries(&mut self, channel: &Hash, intermediates: &IteratedHash) -> Result<()>;
 
-    async fn get_commitment(&self, channel: Hash, iteration: usize) -> Result<Option<Hash>>;
+    async fn get_commitment(&self, channel: &Hash, iteration: usize) -> Result<Option<Hash>>;
 
-    async fn get_current_commitment(&self, channel: Hash) -> Result<Option<Hash>>;
+    async fn get_current_commitment(&self, channel: &Hash) -> Result<Option<Hash>>;
 
-    async fn set_current_commitment(&mut self, channel: Hash, commitment: Hash) -> Result<()>;
+    async fn set_current_commitment(&mut self, channel: &Hash, commitment: &Hash) -> Result<()>;
 
     async fn get_latest_block_number(&self) -> Result<u32>;
 
@@ -44,15 +44,15 @@ pub trait HoprCoreEthereumDbActions {
     async fn update_channel_and_snapshot(
         &mut self,
         channel_id: &Hash,
-        channel: ChannelEntry,
-        snapshot: Snapshot,
+        channel: &ChannelEntry,
+        snapshot: &Snapshot,
     ) -> Result<()>;
 
     async fn get_account(&self, address: &Address) -> Result<Option<AccountEntry>>;
 
-    async fn update_account_and_snapshot(&mut self, account: AccountEntry, snapshot: Snapshot) -> Result<()>;
+    async fn update_account_and_snapshot(&mut self, account: &AccountEntry, snapshot: &Snapshot) -> Result<()>;
 
-    async fn get_accounts(&self, address: Address) -> Result<Vec<AccountEntry>>;
+    async fn get_accounts(&self) -> Result<Vec<AccountEntry>>;
 
     // getAccountsIterable
 
@@ -94,26 +94,26 @@ pub trait HoprCoreEthereumDbActions {
 
     async fn set_hopr_balance(&mut self, balance: &Balance) -> Result<()>;
 
-    async fn add_hopr_balance(&mut self, balance: Balance, snapshot: Snapshot) -> Result<()>;
+    async fn add_hopr_balance(&mut self, balance: &Balance, snapshot: &Snapshot) -> Result<()>;
 
-    async fn sub_hopr_balance(&mut self, balance: Balance, snapshot: Snapshot) -> Result<()>;
+    async fn sub_hopr_balance(&mut self, balance: &Balance, snapshot: &Snapshot) -> Result<()>;
 
     async fn is_network_registry_enabled(&self) -> Result<bool>;
 
-    async fn set_network_registry(&mut self, enabled: bool, snapshot: Snapshot) -> Result<()>;
+    async fn set_network_registry(&mut self, enabled: bool, snapshot: &Snapshot) -> Result<()>;
 
     async fn add_to_network_registry(
         &mut self,
         public_key: &PublicKey,
         account: &Address,
-        snapshot: Snapshot,
+        snapshot: &Snapshot,
     ) -> Result<()>;
 
     async fn remove_from_network_registry(
         &mut self,
         public_key: &PublicKey,
         account: &Address,
-        snapshot: Snapshot,
+        snapshot: &Snapshot,
     ) -> Result<()>;
 
     async fn get_account_from_network_registry(&self, public_key: &PublicKey) -> Result<Option<Address>>;
@@ -122,5 +122,5 @@ pub trait HoprCoreEthereumDbActions {
 
     async fn is_eligible(&self, account: &Address) -> Result<bool>;
 
-    async fn set_eligible(&mut self, account: &Address, eligible: bool, snapshot: Snapshot) -> Result<()>;
+    async fn set_eligible(&mut self, account: &Address, eligible: bool, snapshot: &Snapshot) -> Result<()>;
 }

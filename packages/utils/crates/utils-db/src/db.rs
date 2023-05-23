@@ -6,7 +6,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use utils_types::traits::BinarySerializable;
 
 use crate::errors::{DbError, Result};
-use crate::traits::BinaryAsyncKVStorage;
+use crate::traits::AsyncKVStorage;
 
 pub struct Batch {
     pub ops: Vec<crate::traits::BatchOperation<Box<[u8]>, Box<[u8]>>>,
@@ -94,11 +94,11 @@ impl Deref for Key {
     }
 }
 
-pub struct DB<T: BinaryAsyncKVStorage> {
+pub struct DB<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> {
     backend: T,
 }
 
-impl<T: BinaryAsyncKVStorage> DB<T> {
+impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
     pub fn new(backend: T) -> Self {
         DB::<T> { backend }
     }
@@ -186,8 +186,6 @@ mod tests {
     use mockall::predicate;
     use serde::Deserialize;
     use utils_types::traits::BinarySerializable;
-
-    impl BinaryAsyncKVStorage for MockAsyncKVStorage {}
 
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
     struct TestKey {

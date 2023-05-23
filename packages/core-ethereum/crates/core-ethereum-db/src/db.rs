@@ -13,20 +13,12 @@ use core_types::{
 use utils_db::{
     constants::*,
     db::{serialize_to_bytes, DB},
-    traits::BinaryAsyncKVStorage,
+    traits::AsyncKVStorage,
 };
 use utils_types::primitives::{Address, Balance, BalanceType, EthereumChallenge, Snapshot, U256};
 
 use crate::errors::Result;
 use crate::traits::HoprCoreEthereumDbActions;
-
-pub struct CoreEthereumDb<T>
-where
-    T: BinaryAsyncKVStorage,
-{
-    db: DB<T>,
-    me: PublicKey,
-}
 
 fn to_commitment_key(channel: &Hash, iteration: usize) -> Result<utils_db::db::Key> {
     let mut channel = serialize_to_bytes(channel)?;
@@ -43,8 +35,16 @@ fn to_acknowledged_ticket_key(challenge: &EthereumChallenge, epoch: &U256) -> Re
     utils_db::db::Key::new_bytes_with_prefix(ack_key.into_boxed_slice(), ACKNOWLEDGED_TICKETS_PREFIX)
 }
 
+pub struct CoreEthereumDb<T>
+where
+    T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>,
+{
+    db: DB<T>,
+    me: PublicKey,
+}
+
 #[async_trait(? Send)] // not placing the `Send` trait limitations on the trait
-impl<T: BinaryAsyncKVStorage> HoprCoreEthereumDbActions for CoreEthereumDb<T> {
+impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbActions for CoreEthereumDb<T> {
     async fn get_acknowledged_tickets(&self, filter: Option<ChannelEntry>) -> Result<Vec<AcknowledgedTicket>> {
         self.db
             .get_more::<AcknowledgedTicket>(
@@ -63,7 +63,7 @@ impl<T: BinaryAsyncKVStorage> HoprCoreEthereumDbActions for CoreEthereumDb<T> {
     }
 
     async fn delete_acknowledged_tickets_from(&mut self, channel: ChannelEntry) -> Result<()> {
-        let acknowledged_tickets = self.get_acknowledged_tickets(Some(channel.clone())).await?;
+        let acknowledged_tickets = self.get_acknowledged_tickets(Some(channel)).await?;
 
         let key = utils_db::db::Key::new_from_str(NEGLECTED_TICKET_COUNT)?;
         let neglected_ticket_count = match self.db.get_or_none::<usize>(key.clone()).await? {
@@ -86,19 +86,13 @@ impl<T: BinaryAsyncKVStorage> HoprCoreEthereumDbActions for CoreEthereumDb<T> {
         self.db.batch(batch_ops, true).await
     }
 
-    async fn delete_acknowledged_ticket(&mut self, ticket: AcknowledgedTicket) -> Result<()> {
-        let mut ack_key = serialize_to_bytes(&ticket.ticket.challenge)?;
-        let mut channel_epoch = serialize_to_bytes(&ticket.ticket.channel_epoch)?;
-        ack_key.append(&mut channel_epoch);
-
-        let ack_key =
-            utils_db::db::Key::new_bytes_with_prefix(ack_key.into_boxed_slice(), ACKNOWLEDGED_TICKETS_PREFIX)?;
-
+    async fn delete_acknowledged_ticket(&mut self, ticket: &AcknowledgedTicket) -> Result<()> {
+        let ack_key = to_acknowledged_ticket_key(&ticket.ticket.challenge, &ticket.ticket.channel_epoch)?;
         let _ = self.db.remove::<AcknowledgedTicket>(ack_key).await?;
         Ok(())
     }
 
-    async fn store_hash_intermediaries(&mut self, channel: Hash, iterated_hash: IteratedHash) -> Result<()> {
+    async fn store_hash_intermediaries(&mut self, channel: &Hash, iterated_hash: &IteratedHash) -> Result<()> {
         let mut batch_ops = utils_db::db::Batch::new();
 
         for intermediate in iterated_hash.intermediates.iter() {
@@ -108,20 +102,20 @@ impl<T: BinaryAsyncKVStorage> HoprCoreEthereumDbActions for CoreEthereumDb<T> {
         self.db.batch(batch_ops, true).await
     }
 
-    async fn get_commitment(&self, channel: Hash, iteration: usize) -> Result<Option<Hash>> {
+    async fn get_commitment(&self, channel: &Hash, iteration: usize) -> Result<Option<Hash>> {
         self.db
-            .get_or_none::<Hash>(to_commitment_key(&channel, iteration)?)
+            .get_or_none::<Hash>(to_commitment_key(channel, iteration)?)
             .await
     }
 
-    async fn get_current_commitment(&self, channel: Hash) -> Result<Option<Hash>> {
-        let key = utils_db::db::Key::new_with_prefix(&channel, CURRENT_COMMITMENT_PREFIX)?;
+    async fn get_current_commitment(&self, channel: &Hash) -> Result<Option<Hash>> {
+        let key = utils_db::db::Key::new_with_prefix(channel, CURRENT_COMMITMENT_PREFIX)?;
         self.db.get_or_none::<Hash>(key).await
     }
 
-    async fn set_current_commitment(&mut self, channel: Hash, commitment: Hash) -> Result<()> {
-        let key = utils_db::db::Key::new_with_prefix(&channel, CURRENT_COMMITMENT_PREFIX)?;
-        let _ = self.db.set(key, &commitment).await?;
+    async fn set_current_commitment(&mut self, channel: &Hash, commitment: &Hash) -> Result<()> {
+        let key = utils_db::db::Key::new_with_prefix(channel, CURRENT_COMMITMENT_PREFIX)?;
+        let _ = self.db.set(key, commitment).await?;
         Ok(())
     }
 
@@ -165,8 +159,8 @@ impl<T: BinaryAsyncKVStorage> HoprCoreEthereumDbActions for CoreEthereumDb<T> {
     async fn update_channel_and_snapshot(
         &mut self,
         channel_id: &Hash,
-        channel: ChannelEntry,
-        snapshot: Snapshot,
+        channel: &ChannelEntry,
+        snapshot: &Snapshot,
     ) -> Result<()> {
         let channel_key = utils_db::db::Key::new_with_prefix(channel_id, CHANNEL_PREFIX)?;
         let snapshot_key = utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?;
@@ -183,7 +177,7 @@ impl<T: BinaryAsyncKVStorage> HoprCoreEthereumDbActions for CoreEthereumDb<T> {
         self.db.get_or_none::<AccountEntry>(key).await
     }
 
-    async fn update_account_and_snapshot(&mut self, account: AccountEntry, snapshot: Snapshot) -> Result<()> {
+    async fn update_account_and_snapshot(&mut self, account: &AccountEntry, snapshot: &Snapshot) -> Result<()> {
         let address_key = utils_db::db::Key::new_with_prefix(&account.get_address(), ACCOUNT_PREFIX)?;
         let snapshot_key = utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?;
 
@@ -194,7 +188,7 @@ impl<T: BinaryAsyncKVStorage> HoprCoreEthereumDbActions for CoreEthereumDb<T> {
         self.db.batch(batch_ops, true).await
     }
 
-    async fn get_accounts(&self, address: Address) -> Result<Vec<AccountEntry>> {
+    async fn get_accounts(&self) -> Result<Vec<AccountEntry>> {
         self.db
             .get_more::<AccountEntry>(Box::from(ACCOUNT_PREFIX.as_bytes()), Address::size(), &|_| true)
             .await
@@ -244,7 +238,6 @@ impl<T: BinaryAsyncKVStorage> HoprCoreEthereumDbActions for CoreEthereumDb<T> {
 
     async fn mark_pending(&mut self, ticket: &Ticket) -> Result<()> {
         let prefixed_key = utils_db::db::Key::new_with_prefix(&ticket.counterparty, PENDING_TICKETS_COUNT)?;
-        // TODO: verify that this balance type is correct
         let balance = self
             .db
             .get::<Balance>(prefixed_key.clone())
@@ -399,7 +392,7 @@ impl<T: BinaryAsyncKVStorage> HoprCoreEthereumDbActions for CoreEthereumDb<T> {
         Ok(())
     }
 
-    async fn add_hopr_balance(&mut self, balance: Balance, snapshot: Snapshot) -> Result<()> {
+    async fn add_hopr_balance(&mut self, balance: &Balance, snapshot: &Snapshot) -> Result<()> {
         let key = utils_db::db::Key::new_from_str(HOPR_BALANCE_KEY)?;
 
         let current_balance = self
@@ -418,7 +411,7 @@ impl<T: BinaryAsyncKVStorage> HoprCoreEthereumDbActions for CoreEthereumDb<T> {
         self.db.batch(batch_ops, true).await
     }
 
-    async fn sub_hopr_balance(&mut self, balance: Balance, snapshot: Snapshot) -> Result<()> {
+    async fn sub_hopr_balance(&mut self, balance: &Balance, snapshot: &Snapshot) -> Result<()> {
         let key = utils_db::db::Key::new_from_str(HOPR_BALANCE_KEY)?;
 
         let current_balance = self
@@ -442,7 +435,7 @@ impl<T: BinaryAsyncKVStorage> HoprCoreEthereumDbActions for CoreEthereumDb<T> {
         Ok(self.db.get_or_none::<bool>(key.clone()).await?.unwrap_or(false))
     }
 
-    async fn set_network_registry(&mut self, enabled: bool, snapshot: Snapshot) -> Result<()> {
+    async fn set_network_registry(&mut self, enabled: bool, snapshot: &Snapshot) -> Result<()> {
         let mut batch_ops = utils_db::db::Batch::new();
         batch_ops.put(
             utils_db::db::Key::new_from_str(NETWORK_REGISTRY_ENABLED_PREFIX)?,
@@ -460,7 +453,7 @@ impl<T: BinaryAsyncKVStorage> HoprCoreEthereumDbActions for CoreEthereumDb<T> {
         &mut self,
         public_key: &PublicKey,
         account: &Address,
-        snapshot: Snapshot,
+        snapshot: &Snapshot,
     ) -> Result<()> {
         let mut public_keys = self.find_hopr_node_using_account_in_network_registry(&account).await?;
 
@@ -470,7 +463,7 @@ impl<T: BinaryAsyncKVStorage> HoprCoreEthereumDbActions for CoreEthereumDb<T> {
                     .db
                     .set(
                         utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?,
-                        &snapshot,
+                        snapshot,
                     )
                     .await?;
                 return Ok(());
@@ -493,7 +486,7 @@ impl<T: BinaryAsyncKVStorage> HoprCoreEthereumDbActions for CoreEthereumDb<T> {
         );
         batch_ops.put(
             utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?,
-            &snapshot,
+            snapshot,
         );
 
         self.db.batch(batch_ops, true).await
@@ -503,7 +496,7 @@ impl<T: BinaryAsyncKVStorage> HoprCoreEthereumDbActions for CoreEthereumDb<T> {
         &mut self,
         public_key: &PublicKey,
         account: &Address,
-        snapshot: Snapshot,
+        snapshot: &Snapshot,
     ) -> Result<()> {
         let registered_nodes = self
             .find_hopr_node_using_account_in_network_registry(account)
@@ -555,7 +548,7 @@ impl<T: BinaryAsyncKVStorage> HoprCoreEthereumDbActions for CoreEthereumDb<T> {
         self.db.get_or_none::<bool>(key).await.map(|v| v.unwrap_or(false))
     }
 
-    async fn set_eligible(&mut self, account: &Address, eligible: bool, snapshot: Snapshot) -> Result<()> {
+    async fn set_eligible(&mut self, account: &Address, eligible: bool, snapshot: &Snapshot) -> Result<()> {
         let key = utils_db::db::Key::new_with_prefix(account, NETWORK_REGISTRY_ADDRESS_ELIGIBLE_PREFIX)?;
 
         let mut batch_ops = utils_db::db::Batch::new();
@@ -568,7 +561,7 @@ impl<T: BinaryAsyncKVStorage> HoprCoreEthereumDbActions for CoreEthereumDb<T> {
 
         batch_ops.put(
             utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?,
-            &snapshot,
+            snapshot,
         );
         self.db.batch(batch_ops, true).await
     }
