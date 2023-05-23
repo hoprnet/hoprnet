@@ -899,6 +899,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "core-ethereum-db"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "console_error_panic_hook",
+ "core-crypto",
+ "core-types",
+ "serde",
+ "utils-db",
+ "utils-misc",
+ "utils-types",
+ "wasm-bindgen",
+ "wasm-bindgen-test",
+ "wasm-opt",
+ "wasm-pack",
+]
+
+[[package]]
 name = "core-ethereum-misc"
 version = "0.1.0"
 dependencies = [
@@ -1414,6 +1432,7 @@ dependencies = [
  "digest 0.10.6",
  "elliptic-curve 0.13.4",
  "rfc6979 0.4.0",
+ "serdect",
  "signature 2.1.0",
 ]
 
@@ -2678,6 +2697,7 @@ dependencies = [
  "ecdsa 0.16.6",
  "elliptic-curve 0.13.4",
  "once_cell",
+ "serdect",
  "sha2 0.10.6",
  "signature 2.1.0",
 ]

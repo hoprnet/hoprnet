@@ -6,7 +6,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use utils_types::traits::BinarySerializable;
 
 use crate::errors::{DbError, Result};
-use crate::traits::{AsyncKVStorage, BinaryAsyncKVStorage};
+use crate::traits::AsyncKVStorage;
 
 pub struct Batch {
     pub ops: Vec<crate::traits::BatchOperation<Box<[u8]>, Box<[u8]>>>,
@@ -115,6 +115,14 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
             .and_then(|v| bincode::deserialize(v.as_ref()).map_err(|e| DbError::DeserializationError(e.to_string())))
     }
 
+    pub async fn get_or_none<V: DeserializeOwned>(&self, key: Key) -> Result<Option<V>> {
+        if self.contains(key.clone()).await {
+            self.get::<V>(key).await.map(|v| Some(v))
+        } else {
+            Ok(None)
+        }
+    }
+
     pub async fn set<V>(&mut self, key: Key, value: &V) -> Result<Option<V>>
     where
         V: Serialize + DeserializeOwned,
@@ -178,8 +186,6 @@ mod tests {
     use mockall::predicate;
     use serde::Deserialize;
     use utils_types::traits::BinarySerializable;
-
-    impl BinaryAsyncKVStorage for MockAsyncKVStorage {}
 
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
     struct TestKey {
