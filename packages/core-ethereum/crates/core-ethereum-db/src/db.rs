@@ -158,7 +158,7 @@ impl<T: BinaryAsyncKVStorage> HoprCoreEthereumDbActions for CoreEthereumDb<T> {
             .get_more::<ChannelEntry>(Box::from(CHANNEL_PREFIX.as_bytes()), Hash::size(), &|_| true)
             .await?
             .into_iter()
-            .filter(move |x| x.status == ChannelStatus::Open)
+            .filter(|x| x.status == ChannelStatus::Open)
             .collect())
     }
 
@@ -206,7 +206,7 @@ impl<T: BinaryAsyncKVStorage> HoprCoreEthereumDbActions for CoreEthereumDb<T> {
         self.db
             .get_or_none::<Balance>(key)
             .await
-            .map(|v| v.unwrap_or(Balance::new(0u32.into(), BalanceType::HOPR)))
+            .map(|v| v.unwrap_or(Balance::zero(BalanceType::HOPR)))
     }
 
     async fn get_redeemed_tickets_count(&self) -> Result<usize> {
@@ -239,7 +239,7 @@ impl<T: BinaryAsyncKVStorage> HoprCoreEthereumDbActions for CoreEthereumDb<T> {
         self.db
             .get_or_none::<Balance>(key)
             .await
-            .map(|v| v.unwrap_or(Balance::new(0u32.into(), BalanceType::HOPR)))
+            .map(|v| v.unwrap_or(Balance::zero(BalanceType::HOPR)))
     }
 
     async fn mark_pending(&mut self, ticket: &Ticket) -> Result<()> {
@@ -249,7 +249,7 @@ impl<T: BinaryAsyncKVStorage> HoprCoreEthereumDbActions for CoreEthereumDb<T> {
             .db
             .get::<Balance>(prefixed_key.clone())
             .await
-            .unwrap_or(Balance::new(U256::from(0u64), ticket.amount.balance_type()));
+            .unwrap_or(Balance::zero(ticket.amount.balance_type()));
 
         let _result = self.db.set(prefixed_key, &balance.add(&ticket.amount)).await?;
         Ok(())
@@ -261,7 +261,7 @@ impl<T: BinaryAsyncKVStorage> HoprCoreEthereumDbActions for CoreEthereumDb<T> {
             .db
             .get_or_none(key.clone())
             .await?
-            .unwrap_or(Balance::new(0u32.into(), BalanceType::HOPR));
+            .unwrap_or(Balance::zero(BalanceType::HOPR));
 
         let mut batch_ops = utils_db::db::Batch::new();
         // NOTE: This operation does not make sense, does it mean to zero out? Why not store zero then?
@@ -287,7 +287,7 @@ impl<T: BinaryAsyncKVStorage> HoprCoreEthereumDbActions for CoreEthereumDb<T> {
             .db
             .get_or_none::<Balance>(key.clone())
             .await?
-            .unwrap_or(Balance::new(0u32.into(), BalanceType::HOPR))
+            .unwrap_or(Balance::zero(BalanceType::HOPR))
             .add(&ticket.ticket.amount);
         let _ = self.db.set(key, &balance).await?;
 
@@ -296,7 +296,7 @@ impl<T: BinaryAsyncKVStorage> HoprCoreEthereumDbActions for CoreEthereumDb<T> {
             .db
             .get_or_none::<Balance>(key.clone())
             .await?
-            .unwrap_or(Balance::new(0u32.into(), BalanceType::HOPR))
+            .unwrap_or(Balance::zero(BalanceType::HOPR))
             .sub(&ticket.ticket.amount);
         let _ = self.db.set(key, &balance).await?;
 
@@ -316,7 +316,7 @@ impl<T: BinaryAsyncKVStorage> HoprCoreEthereumDbActions for CoreEthereumDb<T> {
             .db
             .get_or_none::<Balance>(key.clone())
             .await?
-            .unwrap_or(Balance::new(0u32.into(), BalanceType::HOPR))
+            .unwrap_or(Balance::zero(BalanceType::HOPR))
             .sub(&ticket.ticket.amount);
         let _ = self.db.set(key, &balance).await?;
 
@@ -329,7 +329,7 @@ impl<T: BinaryAsyncKVStorage> HoprCoreEthereumDbActions for CoreEthereumDb<T> {
         self.db
             .get_or_none::<Balance>(key)
             .await
-            .map(|v| v.unwrap_or(Balance::new(0u32.into(), BalanceType::HOPR)))
+            .map(|v| v.unwrap_or(Balance::zero(BalanceType::HOPR)))
     }
 
     async fn get_rejected_tickets_count(&self) -> Result<usize> {
@@ -384,7 +384,7 @@ impl<T: BinaryAsyncKVStorage> HoprCoreEthereumDbActions for CoreEthereumDb<T> {
         self.db
             .get_or_none::<Balance>(key)
             .await
-            .map(|v| v.unwrap_or(Balance::new(0u32.into(), BalanceType::HOPR)))
+            .map(|v| v.unwrap_or(Balance::zero(BalanceType::HOPR)))
     }
 
     async fn set_hopr_balance(&mut self, balance: &Balance) -> Result<()> {
@@ -394,7 +394,7 @@ impl<T: BinaryAsyncKVStorage> HoprCoreEthereumDbActions for CoreEthereumDb<T> {
             .db
             .set::<Balance>(key, balance)
             .await
-            .map(|v| v.unwrap_or(Balance::new(0u32.into(), BalanceType::HOPR)))?;
+            .map(|v| v.unwrap_or(Balance::zero(BalanceType::HOPR)))?;
 
         Ok(())
     }
@@ -406,7 +406,7 @@ impl<T: BinaryAsyncKVStorage> HoprCoreEthereumDbActions for CoreEthereumDb<T> {
             .db
             .get_or_none::<Balance>(key.clone())
             .await?
-            .unwrap_or(Balance::new(0u32.into(), BalanceType::HOPR));
+            .unwrap_or(Balance::zero(BalanceType::HOPR));
 
         let mut batch_ops = utils_db::db::Batch::new();
         batch_ops.put(key, &current_balance.add(&balance));
@@ -425,7 +425,7 @@ impl<T: BinaryAsyncKVStorage> HoprCoreEthereumDbActions for CoreEthereumDb<T> {
             .db
             .get_or_none::<Balance>(key.clone())
             .await?
-            .unwrap_or(Balance::new(0u32.into(), BalanceType::HOPR));
+            .unwrap_or(Balance::zero(BalanceType::HOPR));
 
         let mut batch_ops = utils_db::db::Batch::new();
         batch_ops.put(key, &current_balance.sub(&balance));
