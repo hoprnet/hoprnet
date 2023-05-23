@@ -13,7 +13,7 @@ use std::str::FromStr;
 
 use utils_log::warn;
 use utils_types::errors::GeneralError;
-use utils_types::errors::GeneralError::{Other, ParseError};
+use utils_types::errors::GeneralError::ParseError;
 
 use utils_types::primitives::{Address, EthereumChallenge};
 use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};

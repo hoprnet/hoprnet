@@ -7,10 +7,11 @@ use crate::prg::{PRGParameters, PRG};
 use crate::primitives::{create_tagged_mac, DigestLike, SimpleMac};
 use crate::random::random_fill;
 use crate::routing::ForwardedHeader::{FinalNode, RelayNode};
-use crate::types::PublicKey;
 use crate::utils::xor_inplace;
 use std::ops::Not;
 use subtle::ConstantTimeEq;
+use utils_types::traits::BinarySerializable;
+use crate::offchain::OffchainPublicKey;
 
 const RELAYER_END_PREFIX: u8 = 0xff;
 
@@ -20,7 +21,7 @@ pub const fn header_length(
     additional_data_relayer_len: usize,
     additional_data_last_hop_len: usize,
 ) -> usize {
-    let per_hop = PublicKey::SIZE_COMPRESSED + SimpleMac::SIZE + additional_data_relayer_len;
+    let per_hop = OffchainPublicKey::SIZE + SimpleMac::SIZE + additional_data_relayer_len;
     let last_hop = 1 + additional_data_last_hop_len;
 
     last_hop + (max_hops - 1) * per_hop
@@ -86,7 +87,7 @@ impl RoutingInfo {
     /// * `additional_data_last_hop` additional data for the final recipient
     pub fn new(
         max_hops: usize,
-        path: &[PublicKey],
+        path: &[OffchainPublicKey],
         secrets: &[&[u8]],
         additional_data_relayer_len: usize,
         additional_data_relayer: &[&[u8]],
@@ -111,7 +112,7 @@ impl RoutingInfo {
             "invalid additional data for last hop"
         );
 
-        let routing_info_len = additional_data_relayer_len + SimpleMac::SIZE + PublicKey::SIZE_COMPRESSED;
+        let routing_info_len = additional_data_relayer_len + SimpleMac::SIZE + OffchainPublicKey::SIZE;
         let last_hop_len = additional_data_last_hop.map(|d| d.len()).unwrap_or(0) + 1; // end prefix length
 
         let header_len = last_hop_len + (max_hops - 1) * routing_info_len;
@@ -147,12 +148,12 @@ impl RoutingInfo {
                 }
             } else {
                 extended_header.copy_within(0..header_len, routing_info_len);
-                extended_header[0..PublicKey::SIZE_COMPRESSED].copy_from_slice(&path[inverted_idx + 1].to_bytes(true));
-                extended_header[PublicKey::SIZE_COMPRESSED..PublicKey::SIZE_COMPRESSED + SimpleMac::SIZE]
+                extended_header[0..OffchainPublicKey::SIZE].copy_from_slice(&path[inverted_idx + 1].to_bytes());
+                extended_header[OffchainPublicKey::SIZE..OffchainPublicKey::SIZE + SimpleMac::SIZE]
                     .copy_from_slice(&ret.mac);
 
-                extended_header[PublicKey::SIZE_COMPRESSED + SimpleMac::SIZE
-                    ..PublicKey::SIZE_COMPRESSED + SimpleMac::SIZE + additional_data_relayer[inverted_idx].len()]
+                extended_header[OffchainPublicKey::SIZE + SimpleMac::SIZE
+                    ..OffchainPublicKey::SIZE + SimpleMac::SIZE + additional_data_relayer[inverted_idx].len()]
                     .copy_from_slice(additional_data_relayer[inverted_idx]);
 
                 let key_stream = prg.digest(0, header_len);
@@ -179,7 +180,7 @@ pub enum ForwardedHeader {
         /// Authentication tag
         mac: Box<[u8]>,
         /// Public key of the next node
-        next_node: PublicKey,
+        next_node: OffchainPublicKey,
         /// Additional data for the relayer
         additional_info: Box<[u8]>,
     },
@@ -214,7 +215,7 @@ pub fn forward_header(
     assert_eq!(SECRET_KEY_LENGTH, secret.len(), "invalid secret length");
     assert_eq!(SimpleMac::SIZE, mac.len(), "invalid mac length");
 
-    let routing_info_len = additional_data_relayer_len + PublicKey::SIZE_COMPRESSED + SimpleMac::SIZE;
+    let routing_info_len = additional_data_relayer_len + OffchainPublicKey::SIZE + SimpleMac::SIZE;
     let last_hop_len = additional_data_last_hop_len + 1; // end prefix
 
     let header_len = last_hop_len + (max_hops - 1) * routing_info_len;
@@ -235,12 +236,12 @@ pub fn forward_header(
     if header[0] != RELAYER_END_PREFIX {
         // Try to deserialize the public key to validate it
         let next_node =
-            PublicKey::from_bytes(&header[0..PublicKey::SIZE_COMPRESSED]).map_err(|_| CryptoError::CalculationError)?;
+            OffchainPublicKey::from_bytes(&header[0..OffchainPublicKey::SIZE]).map_err(|_| CryptoError::CalculationError)?;
 
-        let mac: Box<[u8]> = (&header[PublicKey::SIZE_COMPRESSED..PublicKey::SIZE_COMPRESSED + SimpleMac::SIZE]).into();
+        let mac: Box<[u8]> = (&header[OffchainPublicKey::SIZE..OffchainPublicKey::SIZE + SimpleMac::SIZE]).into();
 
-        let additional_info: Box<[u8]> = (&header[PublicKey::SIZE_COMPRESSED + SimpleMac::SIZE
-            ..PublicKey::SIZE_COMPRESSED + SimpleMac::SIZE + additional_data_relayer_len])
+        let additional_info: Box<[u8]> = (&header[OffchainPublicKey::SIZE + SimpleMac::SIZE
+            ..OffchainPublicKey::SIZE + SimpleMac::SIZE + additional_data_relayer_len])
             .into();
 
         header.copy_within(routing_info_len.., 0);
@@ -273,6 +274,7 @@ pub mod tests {
     use crate::utils::xor_inplace;
     use parameterized::parameterized;
     use rand::rngs::OsRng;
+    use crate::offchain::{Ed25519SharedKeys, EdScalar, OffchainPublicKey};
 
     #[parameterized(hops = { 3, 4 })]
     fn test_filler_generate_verify(hops: usize) {
@@ -345,9 +347,9 @@ pub mod tests {
             additional_data.push(e);
         }
 
-        let pub_keys = (0..amount).into_iter().map(|_| PublicKey::random()).collect::<Vec<_>>();
+        let pub_keys = (0..amount).into_iter().map(|_| OffchainPublicKey::random()).collect::<Vec<_>>();
 
-        let shares = SharedKeys::<NonZeroScalar, ProjectivePoint>::generate(&mut OsRng, pub_keys.clone()).unwrap();
+        let shares = Ed25519SharedKeys::generate(&mut OsRng, pub_keys.clone()).unwrap();
 
         let rinfo = RoutingInfo::new(
             MAX_HOPS,

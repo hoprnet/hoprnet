@@ -3,11 +3,12 @@ use core_crypto::derivation::{derive_ack_key_share, derive_packet_tag};
 use core_crypto::primitives::{DigestLike, SimpleMac};
 use core_crypto::prp::{PRPParameters, PRP};
 use core_crypto::routing::{forward_header, header_length, ForwardedHeader, RoutingInfo};
-use core_crypto::shared_keys::Secp256k1SharedKeys;
-use core_crypto::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, PublicKey};
+use core_crypto::shared_keys::GroupEncoding;
+use core_crypto::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge};
 use core_types::acknowledgement::{Acknowledgement, AcknowledgementChallenge};
 use core_types::channels::Ticket;
 use libp2p_identity::PeerId;
+use core_crypto::offchain::{Ed25519SharedKeys, OffchainPublicKey};
 use utils_types::errors::GeneralError::ParseError;
 use utils_types::traits::{BinarySerializable, PeerIdLike};
 
@@ -34,7 +35,7 @@ pub const fn packet_length(
     additional_data_relayer_len: usize,
     additional_data_last_hop_len: usize,
 ) -> usize {
-    PublicKey::SIZE_COMPRESSED
+    OffchainPublicKey::SIZE
         + header_length(max_hops, additional_data_relayer_len, additional_data_last_hop_len)
         + SimpleMac::SIZE
         + PAYLOAD_SIZE
@@ -68,7 +69,7 @@ struct MetaPacket {
 enum ForwardedMetaPacket {
     RelayedPacket {
         packet: MetaPacket,
-        next_node: PublicKey,
+        next_node: OffchainPublicKey,
         additional_info: Box<[u8]>,
         derived_secret: Box<[u8]>,
         packet_tag: Box<[u8]>,
@@ -83,7 +84,7 @@ enum ForwardedMetaPacket {
 
 impl MetaPacket {
     pub fn new(
-        shared_keys: Secp256k1SharedKeys,
+        shared_keys: Ed25519SharedKeys,
         msg: &[u8],
         path: &[&PeerId],
         max_hops: usize,
@@ -99,7 +100,7 @@ impl MetaPacket {
             max_hops,
             &path
                 .iter()
-                .map(|peer| PublicKey::from_peerid(peer).unwrap_or_else(|e| panic!("invalid peer id given: {e}")))
+                .map(|peer| OffchainPublicKey::from_peerid(peer).unwrap_or_else(|e| panic!("invalid peer id given: {e}")))
                 .collect::<Vec<_>>(),
             &secrets,
             additional_relayer_data_len,
@@ -115,20 +116,20 @@ impl MetaPacket {
         }
 
         MetaPacket::new_from_parts(
-            &shared_keys.alpha.into(),
+            &shared_keys.alpha.encode(),
             &routing_info.routing_information,
             &routing_info.mac,
             &padded,
         )
     }
 
-    fn new_from_parts(alpha: &CurvePoint, routing_info: &[u8], mac: &[u8], payload: &[u8]) -> Self {
+    fn new_from_parts(alpha: &[u8], routing_info: &[u8], mac: &[u8], payload: &[u8]) -> Self {
         assert!(routing_info.len() > 0);
         assert_eq!(SimpleMac::SIZE, mac.len());
         assert_eq!(PAYLOAD_SIZE, payload.len());
 
         let mut packet = Vec::with_capacity(Self::size(routing_info.len()));
-        packet.extend_from_slice(&alpha.serialize_compressed());
+        packet.extend_from_slice(alpha);
         packet.extend_from_slice(routing_info);
         packet.extend_from_slice(mac);
         packet.extend_from_slice(payload);
@@ -183,8 +184,8 @@ impl MetaPacket {
         additional_data_relayer_len: usize,
         additional_data_last_hop_len: usize,
     ) -> Result<ForwardedMetaPacket> {
-        let (alpha, secret) = Secp256k1SharedKeys::forward_transform(
-            PublicKey::from_bytes(self.alpha())?,
+        let (alpha, secret) = Ed25519SharedKeys::forward_transform(
+            OffchainPublicKey::from_bytes(self.alpha())?,
             private_key.try_into().expect("invalid packet private key")
         )?;
 
@@ -208,7 +209,7 @@ impl MetaPacket {
                 next_node,
                 additional_info,
             } => Ok(RelayedPacket {
-                packet: MetaPacket::new_from_parts(&alpha.into(), &header, &mac, &decrypted),
+                packet: MetaPacket::new_from_parts(&alpha.encode(), &header, &mac, &decrypted),
                 packet_tag: derive_packet_tag(&secret)?,
                 derived_secret: secret.into(),
                 next_node,
@@ -233,7 +234,7 @@ pub enum PacketState {
     Final {
         packet_tag: Box<[u8]>,
         ack_key: HalfKey,
-        previous_hop: PublicKey,
+        previous_hop: OffchainPublicKey,
         plain_text: Box<[u8]>,
         old_challenge: Option<AcknowledgementChallenge>,
     },
@@ -242,16 +243,16 @@ pub enum PacketState {
         ack_challenge: HalfKeyChallenge,
         packet_tag: Box<[u8]>,
         ack_key: HalfKey,
-        previous_hop: PublicKey,
+        previous_hop: OffchainPublicKey,
         own_key: HalfKey,
         own_share: HalfKeyChallenge,
-        next_hop: PublicKey,
+        next_hop: OffchainPublicKey,
         next_challenge: Challenge,
         old_challenge: Option<AcknowledgementChallenge>,
     },
     /// Packet that is being sent out by us
     Outgoing {
-        next_hop: PublicKey,
+        next_hop: OffchainPublicKey,
         ack_challenge: HalfKeyChallenge,
     },
 }
@@ -278,7 +279,7 @@ impl Packet {
     pub fn new(msg: &[u8], path: &[&PeerId], private_key: &[u8], first_ticket: Ticket) -> Result<Self> {
         assert!(!path.is_empty(), "path must not be empty");
 
-        let shared_keys = Secp256k1SharedKeys::new(path)?;
+        let shared_keys = Ed25519SharedKeys::new(path)?;
 
         let por_values = ProofOfRelayValues::new(shared_keys.secrets[0], shared_keys.secrets.get(1).cloned());
 
@@ -303,7 +304,7 @@ impl Packet {
             ),
             ticket,
             state: Outgoing {
-                next_hop: PublicKey::from_peerid(&path[0])?,
+                next_hop: OffchainPublicKey::from_peerid(&path[0])?,
                 ack_challenge: por_values.ack_challenge,
             },
         })
@@ -315,7 +316,7 @@ impl Packet {
         if data.len() == Self::SIZE {
             let (pre_packet, r0) = data.split_at(PACKET_LENGTH);
             let (pre_challenge, pre_ticket) = r0.split_at(AcknowledgementChallenge::SIZE);
-            let previous_hop = PublicKey::from_peerid(sender)?;
+            let previous_hop = OffchainPublicKey::from_peerid(sender)?;
 
             let header_len = header_length(INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0);
             let mp = MetaPacket::from_bytes(pre_packet, header_len)?;
@@ -459,10 +460,11 @@ mod tests {
     };
     use crate::por::{ProofOfRelayString, POR_SECRET_LENGTH};
     use core_crypto::shared_keys::SharedKeys;
-    use core_crypto::types::PublicKey;
+    use core_crypto::types::{PublicKey, SecretKey};
     use core_types::channels::Ticket;
     use libp2p_identity::{Keypair, PeerId};
     use parameterized::parameterized;
+    use core_crypto::parameters::SECRET_KEY_LENGTH;
     use utils_types::primitives::{Balance, BalanceType, U256};
     use utils_types::traits::{BinarySerializable, PeerIdLike};
 
@@ -481,12 +483,14 @@ mod tests {
         assert_eq!(data, &unpadded.unwrap());
     }
 
-    fn generate_keypairs(amount: usize) -> (Vec<[u8; 32]>, Vec<PeerId>) {
+    fn generate_keypairs(amount: usize) -> (Vec<SecretKey>, Vec<PeerId>) {
         (0..amount)
-            .map(|_| Keypair::generate_secp256k1())
+            .map(|_| Keypair::generate_ed25519())
             .map(|kp| {
+                let mut sk = [0u8; SECRET_KEY_LENGTH];
+                sk.copy_from_slice(kp.clone().try_into_ed25519().unwrap().secret().as_ref());
                 (
-                    kp.clone().try_into_secp256k1().unwrap().secret().to_bytes(),
+                    sk,
                     kp.public().to_peer_id(),
                 )
             })
@@ -605,7 +609,7 @@ mod tests {
 pub mod wasm {
     use crate::packet::wasm::WasmPacketState::{Final, Forwarded, Outgoing};
     use crate::packet::{Packet, PacketState};
-    use core_crypto::types::{HalfKey, HalfKeyChallenge, PublicKey};
+    use core_crypto::types::{HalfKey, HalfKeyChallenge};
     use core_types::channels::Ticket;
     use js_sys::JsString;
     use libp2p_identity::{ParseError, PeerId};
@@ -613,6 +617,7 @@ pub mod wasm {
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use wasm_bindgen::prelude::wasm_bindgen;
+    use core_crypto::offchain::OffchainPublicKey;
 
     #[wasm_bindgen]
     pub enum WasmPacketState {
@@ -672,7 +677,7 @@ pub mod wasm {
         }
 
         #[wasm_bindgen(js_name = "next_hop")]
-        pub fn _next_hop(&self) -> Option<PublicKey> {
+        pub fn _next_hop(&self) -> Option<OffchainPublicKey> {
             match &self.state {
                 PacketState::Forwarded { next_hop, .. } | PacketState::Outgoing { next_hop, .. } => {
                     Some(next_hop.clone())
@@ -682,7 +687,7 @@ pub mod wasm {
         }
 
         #[wasm_bindgen(js_name = "previous_hop")]
-        pub fn _previous_hop(&self) -> Option<PublicKey> {
+        pub fn _previous_hop(&self) -> Option<OffchainPublicKey> {
             match &self.state {
                 PacketState::Final { previous_hop, .. } | PacketState::Forwarded { previous_hop, .. } => {
                     Some(previous_hop.clone())

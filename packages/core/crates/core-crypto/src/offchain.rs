@@ -5,12 +5,13 @@ use curve25519_dalek::traits::IsIdentity;
 use libp2p_identity::{PublicKey as lp2p_PublicKey};
 use libp2p_identity::PeerId;
 use rand::{CryptoRng, RngCore};
+use rand::rngs::OsRng;
 use utils_log::warn;
 use utils_types::errors::GeneralError::ParseError;
 use utils_types::traits::{BinarySerializable, PeerIdLike};
 use crate::errors::CryptoError::{CalculationError, InvalidSecretScalar};
 use crate::errors::Result;
-use crate::shared_keys::{GroupElement, GroupEncoding, Scalar};
+use crate::shared_keys::{GroupElement, GroupEncoding, Scalar, SharedKeys};
 use crate::types::SecretKey;
 
 pub type EdScalar = curve25519_dalek::Scalar;
@@ -57,7 +58,11 @@ impl GroupElement<EdScalar> for EdwardsPoint {
 }
 
 
+/// Instantiation of Sphinx shared keys generation using Ed25519 group
+pub type Ed25519SharedKeys = SharedKeys<EdScalar, EdwardsPoint>;
+
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct OffchainPublicKey {
     key: CompressedEdwardsY
 }
@@ -100,6 +105,13 @@ impl GroupEncoding for OffchainPublicKey {
 }
 
 impl OffchainPublicKey {
+    pub fn random() -> Self {
+        let (pt, _) = EdwardsPoint::random_pair(&mut OsRng);
+        Self {
+            key: pt.compress()
+        }
+    }
+
     pub fn from_privkey(key: SecretKey) -> Result<Self> {
         let scalar = EdScalar::from_bits_clamped(key);
         let point = EdwardsPoint::mul_base(&scalar);
@@ -116,6 +128,11 @@ impl OffchainPublicKey {
 pub mod tests {
     use curve25519_dalek::EdwardsPoint;
     use crate::shared_keys::tests::generic_test_shared_keys;
+
+    #[test]
+    fn test_peerid() {
+
+    }
 
     #[test]
     fn test_secp256k1_shared_keys() {
