@@ -5,7 +5,7 @@ use core_crypto::prp::{PRPParameters, PRP};
 use core_crypto::routing::{forward_header, header_length, ForwardedHeader, RoutingInfo};
 use core_crypto::shared_keys::GroupEncoding;
 use core_crypto::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge};
-use core_types::acknowledgement::{Acknowledgement, AcknowledgementChallenge};
+use core_types::acknowledgement::Acknowledgement;
 use core_types::channels::Ticket;
 use libp2p_identity::PeerId;
 use core_crypto::offchain::{Ed25519SharedKeys, OffchainPublicKey};
@@ -179,14 +179,14 @@ impl MetaPacket {
 
     pub fn forward(
         &self,
-        private_key: &[u8],
+        node_private_key: &[u8],
         max_hops: usize,
         additional_data_relayer_len: usize,
         additional_data_last_hop_len: usize,
     ) -> Result<ForwardedMetaPacket> {
         let (alpha, secret) = Ed25519SharedKeys::forward_transform(
             OffchainPublicKey::from_bytes(self.alpha())?,
-            private_key.try_into().expect("invalid packet private key")
+            node_private_key.try_into().expect("invalid packet private key")
         )?;
 
         let mut routing_info_mut: Vec<u8> = self.routing_info().into();
@@ -236,7 +236,6 @@ pub enum PacketState {
         ack_key: HalfKey,
         previous_hop: OffchainPublicKey,
         plain_text: Box<[u8]>,
-        old_challenge: Option<AcknowledgementChallenge>,
     },
     /// Packet must be forwarded
     Forwarded {
@@ -248,7 +247,6 @@ pub enum PacketState {
         own_share: HalfKeyChallenge,
         next_hop: OffchainPublicKey,
         next_challenge: Challenge,
-        old_challenge: Option<AcknowledgementChallenge>,
     },
     /// Packet that is being sent out by us
     Outgoing {
@@ -261,14 +259,13 @@ pub enum PacketState {
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct Packet {
     packet: MetaPacket,
-    pub challenge: AcknowledgementChallenge,
     pub ticket: Ticket,
     state: PacketState,
 }
 
 impl Packet {
     /// Size of the packet including header, payload, ticket and ack challenge.
-    pub const SIZE: usize = PACKET_LENGTH + AcknowledgementChallenge::SIZE + Ticket::SIZE;
+    pub const SIZE: usize = PACKET_LENGTH + Ticket::SIZE;
 
     /// Constructs new outgoing packet with the given path.
     /// # Arguments
@@ -276,7 +273,7 @@ impl Packet {
     /// * `path` complete path for the packet to take
     /// * `private_key` private key of the local node
     /// * `first_ticket` ticket for the first hop on the path
-    pub fn new(msg: &[u8], path: &[&PeerId], private_key: &[u8], first_ticket: Ticket) -> Result<Self> {
+    pub fn new(msg: &[u8], path: &[&PeerId], channel_private_key: &[u8], mut first_ticket: Ticket) -> Result<Self> {
         assert!(!path.is_empty(), "path must not be empty");
 
         let shared_keys = Ed25519SharedKeys::new(path)?;
@@ -287,12 +284,11 @@ impl Packet {
             .map(|i| ProofOfRelayString::new(shared_keys.secrets[i], shared_keys.secrets.get(i + 1).cloned()).to_bytes())
             .collect::<Vec<_>>();
 
-        let mut ticket = first_ticket;
-        ticket.challenge = por_values.ticket_challenge.to_ethereum_challenge();
-        ticket.sign(private_key);
+        // Update the ticket with the challenge
+        first_ticket.challenge = por_values.ticket_challenge.to_ethereum_challenge();
+        first_ticket.sign(channel_private_key);
 
         Ok(Self {
-            challenge: AcknowledgementChallenge::new(&por_values.ack_challenge, private_key),
             packet: MetaPacket::new(
                 shared_keys,
                 msg,
@@ -302,7 +298,7 @@ impl Packet {
                 &por_strings.iter().map(Box::as_ref).collect::<Vec<_>>(),
                 None,
             ),
-            ticket,
+            ticket: first_ticket,
             state: Outgoing {
                 next_hop: OffchainPublicKey::from_peerid(&path[0])?,
                 ack_challenge: por_values.ack_challenge,
@@ -312,16 +308,15 @@ impl Packet {
 
     /// Deserializes the packet and performs the forward-transformation, so the
     /// packet can be further delivered (relayed to the next hop or read).
-    pub fn from_bytes(data: &[u8], private_key: &[u8], sender: &PeerId) -> Result<Self> {
+    pub fn from_bytes(data: &[u8], node_private_key: &[u8], sender: &PeerId) -> Result<Self> {
         if data.len() == Self::SIZE {
-            let (pre_packet, r0) = data.split_at(PACKET_LENGTH);
-            let (pre_challenge, pre_ticket) = r0.split_at(AcknowledgementChallenge::SIZE);
+            let (pre_packet, pre_ticket) = data.split_at(PACKET_LENGTH);
             let previous_hop = OffchainPublicKey::from_peerid(sender)?;
 
             let header_len = header_length(INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0);
             let mp = MetaPacket::from_bytes(pre_packet, header_len)?;
 
-            match mp.forward(private_key, INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0)? {
+            match mp.forward(node_private_key, INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0)? {
                 RelayedPacket {
                     packet,
                     derived_secret,
@@ -331,19 +326,11 @@ impl Packet {
                     ..
                 } => {
                     let ack_key = derive_ack_key_share(&derived_secret);
-                    let mut challenge = AcknowledgementChallenge::from_bytes(pre_challenge)?;
-                    challenge
-                        .validate(ack_key.to_challenge(), &previous_hop)
-                        .then(|| ())
-                        .ok_or(PacketDecodingError(
-                            "couldn't validate acknowledgement challenge on the relayed packet".into(),
-                        ))?;
 
                     let ticket = Ticket::from_bytes(pre_ticket)?;
                     let verification_output = pre_verify(&derived_secret, &additional_info, &ticket.challenge)?;
                     Ok(Self {
                         packet,
-                        challenge,
                         ticket,
                         state: Forwarded {
                             packet_tag,
@@ -354,7 +341,6 @@ impl Packet {
                             next_hop: next_node,
                             next_challenge: verification_output.next_ticket_challenge,
                             ack_challenge: verification_output.ack_challenge,
-                            old_challenge: None,
                         },
                     })
                 }
@@ -365,25 +351,16 @@ impl Packet {
                     additional_data: _,
                 } => {
                     let ack_key = derive_ack_key_share(&derived_secret);
-                    let mut challenge = AcknowledgementChallenge::from_bytes(pre_challenge)?;
-                    challenge
-                        .validate(ack_key.to_challenge(), &previous_hop)
-                        .then(|| ())
-                        .ok_or(PacketDecodingError(
-                            "couldn't validate acknowledgement challenge on the final packet".into(),
-                        ))?;
 
                     let ticket = Ticket::from_bytes(pre_ticket)?;
                     Ok(Self {
                         packet: mp,
-                        challenge,
                         ticket,
                         state: Final {
                             packet_tag,
                             ack_key,
                             previous_hop,
                             plain_text,
-                            old_challenge: None,
                         },
                     })
                 }
@@ -401,21 +378,15 @@ impl Packet {
     /// Forwards the packet to the next hop.
     /// Requires private key of the local node and prepared ticket for the next recipient.
     /// Panics if the packet is not meant to be forwarded.
-    pub fn forward(&mut self, private_key: &[u8], next_ticket: Ticket) -> Result<()> {
+    pub fn forward(&mut self, node_private_key: &[u8], mut next_ticket: Ticket) -> Result<()> {
         match &mut self.state {
             Forwarded {
                 next_challenge,
-                old_challenge,
-                ack_challenge,
                 ..
             } => {
-                let mut ticket = next_ticket;
-                ticket.challenge = next_challenge.to_ethereum_challenge();
-                ticket.sign(private_key);
-                self.ticket = ticket;
-
-                let _ = old_challenge.insert(self.challenge.clone());
-                self.challenge = AcknowledgementChallenge::new(ack_challenge, private_key);
+                next_ticket.challenge = next_challenge.to_ethereum_challenge();
+                next_ticket.sign(node_private_key);
+                self.ticket = next_ticket;
                 Ok(())
             }
             _ => Err(InvalidPacketState),
@@ -428,24 +399,22 @@ impl Packet {
     pub fn to_bytes(&self) -> Box<[u8]> {
         let mut ret = Vec::with_capacity(Self::SIZE);
         ret.extend_from_slice(self.packet.to_bytes());
-        ret.extend_from_slice(&self.challenge.to_bytes());
         ret.extend_from_slice(&self.ticket.to_bytes());
         ret.into_boxed_slice()
     }
 
     /// Creates an acknowledgement for this packet.
     /// Returns None if this packet is sent by us.
-    pub fn create_acknowledgement(&self, private_key: &[u8]) -> Option<Acknowledgement> {
+    pub fn create_acknowledgement(&self, node_private_key: &[u8]) -> Option<Acknowledgement> {
         match &self.state {
             Final {
-                ack_key, old_challenge, ..
+                ack_key, ..
             }
             | Forwarded {
-                ack_key, old_challenge, ..
+                ack_key, ..
             } => Some(Acknowledgement::new(
-                old_challenge.clone().unwrap_or(self.challenge.clone()),
                 ack_key.clone(),
-                private_key,
+                node_private_key,
             )),
             Outgoing { .. } => None,
         }
