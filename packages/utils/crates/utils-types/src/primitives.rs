@@ -608,6 +608,9 @@ pub mod wasm {
             self.clone()
         }
 
+        #[wasm_bindgen(js_name = "to_string")]
+        pub fn _to_string(&self) -> String { self.to_string() }
+
         pub fn size() -> u32 {
             Self::SIZE as u32
         }

@@ -3,12 +3,12 @@ use async_trait::async_trait;
 use core_crypto::types::{HalfKeyChallenge, Hash, PublicKey};
 use core_types::acknowledgement::{AcknowledgedTicket, PendingAcknowledgement};
 use core_types::channels::{ChannelEntry, Ticket};
+use utils_db::traits::AsyncKVStorage;
 use utils_db::{
     constants::*,
     db::{serialize_to_bytes, DB},
     traits::BinaryAsyncKVStorage,
 };
-use utils_db::traits::AsyncKVStorage;
 use utils_types::primitives::Snapshot;
 use utils_types::primitives::{Address, Balance, EthereumChallenge, U256};
 

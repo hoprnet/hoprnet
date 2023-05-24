@@ -1,14 +1,14 @@
+use crate::errors::CoreEthereumError::{CommitmentError, CryptoError, DbError};
+use crate::errors::Result;
 use async_trait::async_trait;
+use core_crypto::derivation::derive_commitment_seed;
 use core_crypto::iterated_hash::{iterate_hash, recover_iterated_hash};
 use core_crypto::types::Hash;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use futures::FutureExt;
-use core_crypto::derivation::derive_commitment_seed;
 use utils_log::{debug, warn};
 use utils_types::primitives::U256;
 use utils_types::traits::{BinarySerializable, ToHex};
-use crate::errors::CoreEthereumError::{CommitmentError, CryptoError, DbError};
-use crate::errors::Result;
 
 pub const DB_ITERATION_BLOCK_SIZE: usize = 10000;
 pub const TOTAL_ITERATIONS: usize = 100000;
@@ -16,7 +16,9 @@ pub const TOTAL_ITERATIONS: usize = 100000;
 pub async fn find_commitment_preimage<T: HoprCoreEthereumDbActions>(db: &T, channel_id: &Hash) -> Result<Hash> {
     let current_commitment = db.get_current_commitment(channel_id).await?;
     let recovered = recover_iterated_hash(
-        &current_commitment.ok_or(CommitmentError("no current commitment".to_string()))?.to_bytes(),
+        &current_commitment
+            .ok_or(CommitmentError("no current commitment".to_string()))?
+            .to_bytes(),
         &|iteration: usize| async move {
             match db.get_commitment(channel_id, iteration).await {
                 Ok(opt) => opt.map(|hash| hash.to_bytes()),
@@ -28,15 +30,21 @@ pub async fn find_commitment_preimage<T: HoprCoreEthereumDbActions>(db: &T, chan
         },
         TOTAL_ITERATIONS,
         DB_ITERATION_BLOCK_SIZE,
-        None
+        None,
     )
     .await?;
 
     Ok(Hash::new(&recovered.intermediate))
 }
 
-pub async fn bump_commitment<T: HoprCoreEthereumDbActions>(db: &mut T, channel_id: &Hash, new_commitment: &Hash) -> Result<()> {
-    db.set_current_commitment(channel_id, new_commitment).await.map_err(|e| DbError(e))
+pub async fn bump_commitment<T: HoprCoreEthereumDbActions>(
+    db: &mut T,
+    channel_id: &Hash,
+    new_commitment: &Hash,
+) -> Result<()> {
+    db.set_current_commitment(channel_id, new_commitment)
+        .await
+        .map_err(|e| DbError(e))
 }
 
 #[async_trait(? Send)]
@@ -45,8 +53,16 @@ pub trait ChannelCommitter {
     async fn set_commitment(&self, commitment: &Hash) -> String;
 }
 
-pub async fn create_commitment_chain<T, C>(db: &mut T, channel_id: &Hash, initial_commitment_seed: &[u8], committer: &C) -> Result<()>
-where T: HoprCoreEthereumDbActions, C: ChannelCommitter {
+pub async fn create_commitment_chain<T, C>(
+    db: &mut T,
+    channel_id: &Hash,
+    initial_commitment_seed: &[u8],
+    committer: &C,
+) -> Result<()>
+where
+    T: HoprCoreEthereumDbActions,
+    C: ChannelCommitter,
+{
     let intermediates = iterate_hash(initial_commitment_seed, TOTAL_ITERATIONS, DB_ITERATION_BLOCK_SIZE);
 
     db.store_hash_intermediaries(channel_id, &intermediates).await?;
@@ -62,7 +78,7 @@ pub struct ChannelCommitmentInfo {
     pub chain_id: u32,
     pub contract_address: String,
     pub channel_id: Hash,
-    pub channel_epoch: U256
+    pub channel_epoch: U256,
 }
 
 impl ChannelCommitmentInfo {
@@ -79,8 +95,16 @@ impl ChannelCommitmentInfo {
     }
 }
 
-pub async fn initialize_commitment<T, C>(db: &mut T, private_key: &[u8], channel_info: &ChannelCommitmentInfo, committer: &C) -> Result<()>
-where T: HoprCoreEthereumDbActions, C: ChannelCommitter {
+pub async fn initialize_commitment<T, C>(
+    db: &mut T,
+    private_key: &[u8],
+    channel_info: &ChannelCommitmentInfo,
+    committer: &C,
+) -> Result<()>
+where
+    T: HoprCoreEthereumDbActions,
+    C: ChannelCommitter,
+{
     let contains_already = db.get_commitment(&channel_info.channel_id, 0).await?.is_some();
     let chain_commitment = committer.get_commitment().await;
     if contains_already && chain_commitment.is_some() {
@@ -92,13 +116,16 @@ where T: HoprCoreEthereumDbActions, C: ChannelCommitter {
         }
     }
 
-    debug!("reinitializing (db: {contains_already}, chain: {})",
-        chain_commitment.map(|h| h.to_hex()).unwrap_or("false".to_string()));
+    debug!(
+        "reinitializing (db: {contains_already}, chain: {})",
+        chain_commitment.map(|h| h.to_hex()).unwrap_or("false".to_string())
+    );
 
     create_commitment_chain(
         db,
         &channel_info.channel_id,
         &channel_info.create_initial_commitment_seed(private_key)?,
-        committer
-    ).await
+        committer,
+    )
+    .await
 }

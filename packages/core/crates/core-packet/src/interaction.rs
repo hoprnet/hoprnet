@@ -8,9 +8,7 @@ use async_std::channel::{unbounded, Receiver, Sender};
 use core_crypto::types::{HalfKeyChallenge, Hash, PublicKey};
 use core_db::traits::HoprCoreDbActions;
 use core_mixer::mixer::Mixer;
-use core_types::acknowledgement::{
-    AcknowledgedTicket, Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket,
-};
+use core_types::acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket};
 use core_types::channels::{ChannelEntry, ChannelStatus, Ticket};
 use libp2p_identity::PeerId;
 use std::cell::RefCell;
@@ -612,29 +610,27 @@ where
 }
 
 #[cfg(test)]
-mod tests {
-
-}
+mod tests {}
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
+    use crate::interaction::{AcknowledgementInteraction, PacketInteraction, PacketInteractionConfig, TransportTask};
+    use core_crypto::types::PublicKey;
+    use core_db::db::CoreDb;
+    use js_sys::JsString;
+    use libp2p_identity::PeerId;
     use std::future::Future;
     use std::pin::Pin;
-    use crate::interaction::{AcknowledgementInteraction, PacketInteraction, PacketInteractionConfig, TransportTask};
-    use core_db::db::CoreDb;
-    use libp2p_identity::PeerId;
     use std::str::FromStr;
     use std::sync::Arc;
-    use js_sys::JsString;
-    use wasm_bindgen::JsValue;
+    use utils_db::db::DB;
     use utils_db::leveldb::{LevelDb, LevelDbShim};
+    use utils_log::error;
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use wasm_bindgen::prelude::wasm_bindgen;
     use wasm_bindgen::JsCast;
-    use core_crypto::types::PublicKey;
-    use utils_db::db::DB;
-    use utils_log::error;
+    use wasm_bindgen::JsValue;
 
     #[wasm_bindgen]
     impl TransportTask {
@@ -649,16 +645,20 @@ pub mod wasm {
 
     #[wasm_bindgen]
     pub struct WasmAckInteraction {
-        w: Arc<AcknowledgementInteraction<CoreDb<LevelDbShim>>>
+        w: Arc<AcknowledgementInteraction<CoreDb<LevelDbShim>>>,
     }
 
     #[wasm_bindgen]
     impl WasmAckInteraction {
         pub fn new(db: LevelDb, chain_key: PublicKey) -> Self {
             Self {
-                w: Arc::new(AcknowledgementInteraction::new(CoreDb {
-                    db: DB::new(LevelDbShim::new(db)), me: chain_key.clone()
-                }, chain_key))
+                w: Arc::new(AcknowledgementInteraction::new(
+                    CoreDb {
+                        db: DB::new(LevelDbShim::new(db)),
+                        me: chain_key.clone(),
+                    },
+                    chain_key,
+                )),
             }
         }
 
@@ -681,18 +681,16 @@ pub mod wasm {
                                 .map(|_| ())
                                 .map_err(|x| {
                                     x.dyn_ref::<JsString>()
-                                        .map_or("Failed to send ping message".to_owned(), |x| -> String {
-                                            x.into()
-                                        })
+                                        .map_or("Failed to send ping message".to_owned(), |x| -> String { x.into() })
                                 })
                         }
                         Err(e) => {
-                            error!("The message transport could not be established: {}", e.as_string()
-                                        .unwrap_or_else(|| {
-                                            "The message transport failed with unknown error".to_owned()
-                                        })
-                                        .as_str()
-                                );
+                            error!(
+                                "The message transport could not be established: {}",
+                                e.as_string()
+                                    .unwrap_or_else(|| { "The message transport failed with unknown error".to_owned() })
+                                    .as_str()
+                            );
                             Err(format!("Failed to extract transport error as string: {:?}", e))
                         }
                     }
@@ -708,7 +706,7 @@ pub mod wasm {
 
     #[wasm_bindgen]
     pub struct WasmPacketInteraction {
-        w: PacketInteraction<CoreDb<LevelDbShim>>
+        w: PacketInteraction<CoreDb<LevelDbShim>>,
     }
 
     #[wasm_bindgen]
@@ -719,11 +717,11 @@ pub mod wasm {
                 w: PacketInteraction::new(
                     CoreDb {
                         db: DB::new(LevelDbShim::new(db)),
-                        me: PublicKey::from_privkey(&cfg.private_key).expect("invalid config")
+                        me: PublicKey::from_privkey(&cfg.private_key).expect("invalid config"),
                     },
                     ack.w.clone(),
-                    cfg
-                )
+                    cfg,
+                ),
             }
         }
 
@@ -742,18 +740,16 @@ pub mod wasm {
                                 .map(|_| ())
                                 .map_err(|x| {
                                     x.dyn_ref::<JsString>()
-                                        .map_or("Failed to send ping message".to_owned(), |x| -> String {
-                                            x.into()
-                                        })
+                                        .map_or("Failed to send ping message".to_owned(), |x| -> String { x.into() })
                                 })
                         }
                         Err(e) => {
-                            error!("The message transport could not be established: {}", e.as_string()
-                                        .unwrap_or_else(|| {
-                                            "The message transport failed with unknown error".to_owned()
-                                        })
-                                        .as_str()
-                                );
+                            error!(
+                                "The message transport could not be established: {}",
+                                e.as_string()
+                                    .unwrap_or_else(|| { "The message transport failed with unknown error".to_owned() })
+                                    .as_str()
+                            );
                             Err(format!("Failed to extract transport error as string: {:?}", e))
                         }
                     }
