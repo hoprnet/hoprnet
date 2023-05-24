@@ -13,6 +13,7 @@
 - Migrate packet construction code and all related cryptography to Rust and remove the Typescript implementation ([#4834](https://github.com/hoprnet/hoprnet/pull/4834))
 - All cryptography related code has been migrated to Rust with TS implementations removed ([#5063](https://github.com/hoprnet/hoprnet/pull/5063))
 - Migrate interfaces for using the DB in core-ethereum ([#5072](https://github.com/hoprnet/hoprnet/pull/5072))
+- Upgrade OpenZeppelin dependency to 4.8.3 and Solidity to 0.8.19 ([#5094](https://github.com/hoprnet/hoprnet/pull/5094))
 
 <a name="1.93"></a>
 
