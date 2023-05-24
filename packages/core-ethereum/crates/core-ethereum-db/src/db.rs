@@ -39,8 +39,8 @@ pub struct CoreEthereumDb<T>
 where
     T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>,
 {
-    db: DB<T>,
-    me: PublicKey,
+    pub db: DB<T>,
+    pub me: PublicKey,
 }
 
 #[async_trait(? Send)] // not placing the `Send` trait limitations on the trait

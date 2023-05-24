@@ -7,7 +7,6 @@ use utils_db::traits::AsyncKVStorage;
 use utils_db::{
     constants::*,
     db::{serialize_to_bytes, DB},
-    traits::BinaryAsyncKVStorage,
 };
 use utils_types::primitives::Snapshot;
 use utils_types::primitives::{Address, Balance, EthereumChallenge, U256};

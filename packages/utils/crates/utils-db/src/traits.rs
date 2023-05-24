@@ -39,7 +39,6 @@ where
 pub trait AsyncKVStorage {
     type Key: Serialize;
     type Value: Serialize;
-    type Iterator: Stream<Item = Result<Self::Value>>;
 
     async fn get(&self, key: Self::Key) -> Result<Self::Value>;
 
@@ -51,7 +50,7 @@ pub trait AsyncKVStorage {
 
     async fn dump(&self, destination: String) -> Result<()>;
 
-    fn iterate(&self, prefix: Self::Key, suffix_size: u32) -> Result<Self::Iterator>;
+    fn iterate(&self, prefix: Self::Key, suffix_size: u32) -> Result<Box<dyn Stream<Item = crate::errors::Result<Box<[u8]>>>>>;
 
     async fn batch(
         &mut self,
@@ -59,8 +58,6 @@ pub trait AsyncKVStorage {
         wait_for_write: bool,
     ) -> Result<()>;
 }
-
-pub trait BinaryAsyncKVStorage: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>, Iterator = dyn Stream<Item = Result<Box<[u8]>>>> {}
 
 pub trait KVStorage {
     type Key;

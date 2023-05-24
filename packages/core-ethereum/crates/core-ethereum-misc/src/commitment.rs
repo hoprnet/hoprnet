@@ -6,7 +6,8 @@ use core_crypto::iterated_hash::{iterate_hash, recover_iterated_hash};
 use core_crypto::types::Hash;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use futures::FutureExt;
-use utils_log::{debug, warn};
+use mockall::automock;
+use utils_log::{debug, warn, info};
 use utils_types::primitives::U256;
 use utils_types::traits::{BinarySerializable, ToHex};
 
@@ -47,21 +48,22 @@ pub async fn bump_commitment<T: HoprCoreEthereumDbActions>(
         .map_err(|e| DbError(e))
 }
 
+#[automock]
 #[async_trait(? Send)]
-pub trait ChannelCommitter {
+pub trait ChainCommitter {
     async fn get_commitment(&self) -> Option<Hash>;
-    async fn set_commitment(&self, commitment: &Hash) -> String;
+    async fn set_commitment(&mut self, commitment: &Hash) -> String;
 }
 
 pub async fn create_commitment_chain<T, C>(
     db: &mut T,
     channel_id: &Hash,
     initial_commitment_seed: &[u8],
-    committer: &C,
+    committer: &mut C,
 ) -> Result<()>
 where
     T: HoprCoreEthereumDbActions,
-    C: ChannelCommitter,
+    C: ChainCommitter,
 {
     let intermediates = iterate_hash(initial_commitment_seed, TOTAL_ITERATIONS, DB_ITERATION_BLOCK_SIZE);
 
@@ -71,6 +73,7 @@ where
         .then(|_| committer.set_commitment(&current))
         .await;
 
+    info!("commitment chain initialized");
     Ok(())
 }
 
@@ -99,11 +102,11 @@ pub async fn initialize_commitment<T, C>(
     db: &mut T,
     private_key: &[u8],
     channel_info: &ChannelCommitmentInfo,
-    committer: &C,
+    committer: &mut C,
 ) -> Result<()>
 where
     T: HoprCoreEthereumDbActions,
-    C: ChannelCommitter,
+    C: ChainCommitter,
 {
     let contains_already = db.get_commitment(&channel_info.channel_id, 0).await?.is_some();
     let chain_commitment = committer.get_commitment().await;
@@ -128,4 +131,80 @@ where
         committer,
     )
     .await
+}
+
+#[cfg(test)]
+mod tests {
+    use async_std;
+    use hex_literal::hex;
+    use core_crypto::types::{Hash, PublicKey};
+    use core_ethereum_db::db::CoreEthereumDb;
+    use utils_db::db::DB;
+    use utils_db::leveldb::RustyDbShim;
+    use utils_types::primitives::U256;
+    use utils_types::traits::BinarySerializable;
+    use crate::commitment::{bump_commitment, ChannelCommitmentInfo, find_commitment_preimage, initialize_commitment, MockChainCommitter};
+
+    const PRIV_KEY: [u8; 32] = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
+
+    fn create_mock_db() -> CoreEthereumDb<RustyDbShim> {
+        let opt = rusty_leveldb::in_memory();
+        let db = rusty_leveldb::DB::open("test", opt).unwrap();
+
+        CoreEthereumDb {
+            db: DB::new(RustyDbShim::new(db)),
+            me: PublicKey::from_privkey(&PRIV_KEY).unwrap(),
+        }
+    }
+
+    /*
+     await initializeCommitment(fakeDB, fakeKey, fakeCommInfo, fakeGet, fakeSet)
+    let c1 = await findCommitmentPreImage(fakeDB, fakeCommInfo.channelId)
+    assert(c1 != null, 'gives current commitment')
+    assert.strictEqual(fakeGet.callCount, 1, 'should look on chain')
+    assert(fakeSet.callCount == 1, 'should set a new commitment on chain')
+
+    await bumpCommitment(fakeDB, fakeCommInfo.channelId, c1)
+    let c2 = await findCommitmentPreImage(fakeDB, fakeCommInfo.channelId)
+    assert(c2, 'gives current commitment')
+    assert(c2.hash().eq(c1), 'c2 is commitment of c1')
+
+    fakeGet = () => Promise.resolve(c2)
+    await initializeCommitment(fakeDB, fakeKey, fakeCommInfo, fakeGet, fakeSet)
+    let c3 = await findCommitmentPreImage(fakeDB, fakeCommInfo.channelId)
+    assert(c2.eq(c3), 'Repeated initializations should return the same')
+     */
+
+    #[async_std::test]
+    async fn test_should_publish_hash_secret() {
+        let comm_info = ChannelCommitmentInfo {
+            chain_id: 1,
+            contract_address: "fake_address".to_string(),
+            channel_id: Hash::new(&[0u8; Hash::SIZE]),
+            channel_epoch: U256::zero(),
+        };
+        let mut db = create_mock_db();
+
+        let mut committer = MockChainCommitter::new();
+        committer.expect_get_commitment().times(1).return_const(None);
+        committer.expect_set_commitment().times(1).return_const(comm_info.channel_id.to_string());
+
+        initialize_commitment(&mut db, &PRIV_KEY, &comm_info, &mut committer)
+            .await
+            .unwrap();
+
+        let c1 = find_commitment_preimage(&mut db, &comm_info.channel_id).await.unwrap();
+
+        bump_commitment(&mut db, &comm_info.channel_id, &c1).await.unwrap();
+
+        let c2 = find_commitment_preimage(&mut db, &comm_info.channel_id).await.unwrap();
+        assert_eq!(c2.hash(), c1, "c2 is commitment of c1");
+
+        committer.expect_get_commitment().times(1).return_const(Some(c2));
+        initialize_commitment(&mut db, &PRIV_KEY, &comm_info, &mut committer).await.unwrap();
+
+        let c3 = find_commitment_preimage(&mut db, &comm_info.channel_id).await.unwrap();
+        assert_eq!(c2, c3);
+    }
+
 }

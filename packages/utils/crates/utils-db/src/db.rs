@@ -1,5 +1,4 @@
 use std::ops::Deref;
-use futures_lite::Stream;
 
 use futures_lite::stream::StreamExt;
 use serde::{de::DeserializeOwned, Serialize};
@@ -95,11 +94,11 @@ impl Deref for Key {
     }
 }
 
-pub struct DB<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>, Iterator = Box<dyn Stream<Item = Result<Box<[u8]>>>>>> {
+pub struct DB<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> {
     backend: T,
 }
 
-impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>, Iterator = Box<dyn Stream<Item = Result<Box<[u8]>>>>>> DB<T> {
+impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
     pub fn new(backend: T) -> Self {
         DB::<T> { backend }
     }

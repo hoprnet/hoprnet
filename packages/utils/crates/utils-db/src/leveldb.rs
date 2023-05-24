@@ -1,15 +1,15 @@
 use std::cell::RefCell;
 use async_trait::async_trait;
+use futures_lite::Stream;
 
 use crate::errors::DbError;
 use crate::traits::{AsyncKVStorage, BatchOperation};
-use futures_lite::stream::{Iter, iter, StreamExt};
+use futures_lite::stream::{iter, StreamExt};
 use rusty_leveldb::{DBIterator, LdbIterator, WriteBatch};
 
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
 use crate::errors::DbError::{GenericError, NotFound};
-use crate::types::BinaryStreamWrapper;
 
 // https://users.rust-lang.org/t/wasm-web-sys-how-to-manipulate-js-objects-from-rust/36504
 #[cfg(feature = "wasm")]
@@ -54,7 +54,6 @@ impl LevelDbShim {
 impl AsyncKVStorage for LevelDbShim {
     type Key = Box<[u8]>;
     type Value = Box<[u8]>;
-    type Iterator = BinaryStreamWrapper;
 
     async fn get(&self, key: Self::Key) -> crate::errors::Result<Self::Value> {
         self.db
@@ -129,7 +128,7 @@ impl AsyncKVStorage for LevelDbShim {
             .map_err(|_| DbError::DumpError(format!("Failed to dump DB into {}", destination)))
     }
 
-    fn iterate(&self, prefix: Self::Key, suffix_size: u32) -> crate::errors::Result<crate::types::BinaryStreamWrapper> {
+    fn iterate(&self, prefix: Self::Key, suffix_size: u32) -> crate::errors::Result<Box<dyn Stream<Item = crate::errors::Result<Box<[u8]>>>>>{
         let iterable = self
             .db
             .iterValues(js_sys::Uint8Array::from(prefix.as_ref()), suffix_size)
@@ -138,7 +137,7 @@ impl AsyncKVStorage for LevelDbShim {
 
         let stream = wasm_bindgen_futures::stream::JsStream::from(iterable);
 
-        Ok(crate::types::BinaryStreamWrapper::new(stream))
+        Ok(Box::new(crate::types::BinaryStreamWrapper::new(stream)))
     }
 }
 
@@ -188,7 +187,6 @@ impl Iterator for RustDbIterator {
 impl AsyncKVStorage for RustyDbShim {
     type Key = Box<[u8]>;
     type Value = Box<[u8]>;
-    type Iterator = Iter<RustDbIterator>;
 
     async fn get(&self, key: Self::Key) -> crate::errors::Result<Self::Value> {
         self.db.borrow_mut().get(&key).ok_or(NotFound).map(|v| v.into_boxed_slice())
@@ -210,9 +208,9 @@ impl AsyncKVStorage for RustyDbShim {
         Ok(())
     }
 
-    fn iterate(&self, prefix: Self::Key, suffix_size: u32) -> crate::errors::Result<Self::Iterator> {
+    fn iterate(&self, prefix: Self::Key, suffix_size: u32) -> crate::errors::Result<Box<dyn Stream<Item = crate::errors::Result<Box<[u8]>>>>> {
         let i = self.db.borrow_mut().new_iter().map_err(|e| GenericError(e.err))?;
-        Ok(iter(RustDbIterator::new(i, &prefix, suffix_size as usize)))
+        Ok(Box::new(iter(RustDbIterator::new(i, &prefix, suffix_size as usize))))
     }
 
     async fn batch(&mut self, operations: Vec<BatchOperation<Self::Key, Self::Value>>, wait_for_write: bool) -> crate::errors::Result<()> {
@@ -354,7 +352,7 @@ pub async fn db_sanity_test(db: LevelDb) -> Result<bool, JsValue> {
     ];
 
     let mut received = Vec::new();
-    let mut data_stream = kv_storage
+    let mut data_stream = Box::into_pin(kv_storage
         .iterate(
             prefix.as_bytes().to_vec().into_boxed_slice(),
             (prefixed_key_1.len() - prefix.len()) as u32,
@@ -363,7 +361,7 @@ pub async fn db_sanity_test(db: LevelDb) -> Result<bool, JsValue> {
             JsValue::from(JsError::new(
                 format!("Test #6.1 failed: failed to iterate over DB {:?}", e).as_str(),
             ))
-        })?;
+        })?);
 
     while let Some(value) = data_stream.next().await {
         let v = value

@@ -932,6 +932,7 @@ dependencies = [
  "core-crypto",
  "core-ethereum-db",
  "futures",
+ "hex-literal 0.4.1",
  "js-sys",
  "libp2p-identity",
  "mockall",
