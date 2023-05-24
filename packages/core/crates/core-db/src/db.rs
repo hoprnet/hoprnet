@@ -8,8 +8,7 @@ use utils_db::{
     constants::*,
     db::{serialize_to_bytes, DB},
 };
-use utils_types::primitives::{Address, Balance, EthereumChallenge, U256};
-use utils_types::primitives::{BalanceType, Snapshot};
+use utils_types::primitives::{Address, Balance, BalanceType, EthereumChallenge, Snapshot, U256};
 
 use crate::errors::Result;
 use crate::traits::HoprCoreDbActions;
