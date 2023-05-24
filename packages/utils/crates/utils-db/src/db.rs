@@ -1,4 +1,5 @@
 use std::ops::Deref;
+use futures_lite::Stream;
 
 use futures_lite::stream::StreamExt;
 use serde::{de::DeserializeOwned, Serialize};
@@ -94,11 +95,11 @@ impl Deref for Key {
     }
 }
 
-pub struct DB<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> {
+pub struct DB<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>, Iterator = Box<dyn Stream<Item = Result<Box<[u8]>>>>>> {
     backend: T,
 }
 
-impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
+impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>, Iterator = Box<dyn Stream<Item = Result<Box<[u8]>>>>>> DB<T> {
     pub fn new(backend: T) -> Self {
         DB::<T> { backend }
     }
@@ -158,7 +159,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
     ) -> Result<Vec<V>> {
         let mut output = Vec::new();
 
-        let mut data_stream = self.backend.iterate(prefix, suffix_size)?;
+        let mut data_stream = Box::into_pin(self.backend.iterate(prefix, suffix_size)?);
 
         // fail fast for the first value that cannot be deserialized
         while let Some(value) = data_stream.next().await {

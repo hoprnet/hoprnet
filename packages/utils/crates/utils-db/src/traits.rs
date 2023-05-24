@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use futures_lite::Stream;
 use serde::{Deserialize, Serialize};
 
 use crate::errors::Result;
@@ -38,6 +39,7 @@ where
 pub trait AsyncKVStorage {
     type Key: Serialize;
     type Value: Serialize;
+    type Iterator: Stream<Item = Result<Self::Value>>;
 
     async fn get(&self, key: Self::Key) -> Result<Self::Value>;
 
@@ -49,7 +51,7 @@ pub trait AsyncKVStorage {
 
     async fn dump(&self, destination: String) -> Result<()>;
 
-    fn iterate(&self, prefix: Self::Key, suffix_size: u32) -> Result<crate::types::BinaryStreamWrapper>;
+    fn iterate(&self, prefix: Self::Key, suffix_size: u32) -> Result<Self::Iterator>;
 
     async fn batch(
         &mut self,
@@ -58,7 +60,7 @@ pub trait AsyncKVStorage {
     ) -> Result<()>;
 }
 
-pub trait BinaryAsyncKVStorage: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> {}
+pub trait BinaryAsyncKVStorage: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>, Iterator = dyn Stream<Item = Result<Box<[u8]>>>> {}
 
 pub trait KVStorage {
     type Key;

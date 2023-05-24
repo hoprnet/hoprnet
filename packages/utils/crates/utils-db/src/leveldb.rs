@@ -1,11 +1,15 @@
+use std::cell::RefCell;
 use async_trait::async_trait;
 
 use crate::errors::DbError;
 use crate::traits::{AsyncKVStorage, BatchOperation};
-use futures_lite::stream::StreamExt;
+use futures_lite::stream::{Iter, iter, StreamExt};
+use rusty_leveldb::{DBIterator, LdbIterator, WriteBatch};
 
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
+use crate::errors::DbError::{GenericError, NotFound};
+use crate::types::BinaryStreamWrapper;
 
 // https://users.rust-lang.org/t/wasm-web-sys-how-to-manipulate-js-objects-from-rust/36504
 #[cfg(feature = "wasm")]
@@ -50,6 +54,7 @@ impl LevelDbShim {
 impl AsyncKVStorage for LevelDbShim {
     type Key = Box<[u8]>;
     type Value = Box<[u8]>;
+    type Iterator = BinaryStreamWrapper;
 
     async fn get(&self, key: Self::Key) -> crate::errors::Result<Self::Value> {
         self.db
@@ -134,6 +139,95 @@ impl AsyncKVStorage for LevelDbShim {
         let stream = wasm_bindgen_futures::stream::JsStream::from(iterable);
 
         Ok(crate::types::BinaryStreamWrapper::new(stream))
+    }
+}
+
+pub struct RustyDbShim {
+    db: RefCell<rusty_leveldb::DB>
+}
+
+impl RustyDbShim {
+    pub fn new(db: rusty_leveldb::DB) -> Self { Self { db: RefCell::new(db) } }
+}
+
+pub struct RustDbIterator {
+    iter: DBIterator,
+    last_key: Box<[u8]>
+}
+
+impl RustDbIterator {
+    pub fn new(iter: DBIterator, prefix: &[u8], suffix_len: usize) -> Self {
+        let mut first_key: Vec<u8> = prefix.into();
+        first_key.extend((0..suffix_len).map(|_| 0u8));
+
+        let mut last_key: Vec<u8> = prefix.into();
+        last_key.extend((0..suffix_len).map(|_| 0xffu8));
+
+        let mut ret = Self {
+            iter, last_key: last_key.into_boxed_slice()
+        };
+        ret.iter.seek(&first_key);
+        ret
+    }
+}
+
+impl Iterator for RustDbIterator {
+    type Item = crate::errors::Result<Box<[u8]>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let (k,v) = self.iter.next()?;
+        if let std::cmp::Ordering::Less = k.as_slice().cmp(&self.last_key) {
+            Some(Ok(v.into_boxed_slice()))
+        } else {
+            None
+        }
+    }
+}
+
+#[async_trait(?Send)]
+impl AsyncKVStorage for RustyDbShim {
+    type Key = Box<[u8]>;
+    type Value = Box<[u8]>;
+    type Iterator = Iter<RustDbIterator>;
+
+    async fn get(&self, key: Self::Key) -> crate::errors::Result<Self::Value> {
+        self.db.borrow_mut().get(&key).ok_or(NotFound).map(|v| v.into_boxed_slice())
+    }
+
+    async fn set(&mut self, key: Self::Key, value: Self::Value) -> crate::errors::Result<Option<Self::Value>> {
+        self.db.borrow_mut().put(&key, &value).map(|_| None).map_err(|e| GenericError(e.err))
+    }
+
+    async fn contains(&self, key: Self::Key) -> bool {
+        self.db.borrow_mut().get(&key).is_some()
+    }
+
+    async fn remove(&mut self, key: Self::Key) -> crate::errors::Result<Option<Self::Value>> {
+        self.db.borrow_mut().delete(&key).map(|_| None).map_err(|e| GenericError(e.err))
+    }
+
+    async fn dump(&self, _destination: String) -> crate::errors::Result<()> {
+        Ok(())
+    }
+
+    fn iterate(&self, prefix: Self::Key, suffix_size: u32) -> crate::errors::Result<Self::Iterator> {
+        let i = self.db.borrow_mut().new_iter().map_err(|e| GenericError(e.err))?;
+        Ok(iter(RustDbIterator::new(i, &prefix, suffix_size as usize)))
+    }
+
+    async fn batch(&mut self, operations: Vec<BatchOperation<Self::Key, Self::Value>>, wait_for_write: bool) -> crate::errors::Result<()> {
+        let mut wb = WriteBatch::new();
+        for op in operations {
+            match op {
+                BatchOperation::del(x) => {
+                    wb.delete(&x.key)
+                }
+                BatchOperation::put(x) => {
+                    wb.put(&x.key, &x.value)
+                }
+            }
+        }
+        self.db.borrow_mut().write(wb, wait_for_write).map_err(|e| GenericError(e.err))
     }
 }
 
