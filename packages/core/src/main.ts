@@ -23,7 +23,7 @@ import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import Hopr, { type HoprOptions } from './index.js'
 import { getAddrs } from './identity.js'
 import { createLibp2pMock } from './libp2p.mock.js'
-import { getContractData, supportedEnvironments } from './environment.js'
+import { getContractData, supportedNetworks } from './network.js'
 import { MultiaddrConnection } from '@libp2p/interfaces/transport'
 
 const log = debug(`hopr-core:create-hopr`)
@@ -77,11 +77,11 @@ export async function createLibp2pInstance(
     log(`using peerstore at ${datastorePath}`)
 
     // Make libp2p aware of environments
-    const protocolPrefix = `/hopr/${options.environment.id}`
+    const protocolPrefix = `/hopr/${options.network.id}`
 
     // Collect supported environments and versions to be passed to HoprConnect
     // because hopr-connect doesn't have access to the protocol config file
-    const supportedEnvironmentsInfo = supportedEnvironments().map((env) => {
+    const supportedEnvironmentsInfo = supportedNetworks().map((env) => {
       return { id: env.id, versionRange: env.version_range }
     })
 
@@ -94,8 +94,8 @@ export async function createLibp2pInstance(
           config: {
             initialNodes,
             publicNodes,
-            environment: options.environment.id,
-            supportedEnvironments: supportedEnvironmentsInfo,
+            network: options.network.id,
+            supportedNetworks: supportedEnvironmentsInfo,
             allowLocalConnections: options.allowLocalConnections,
             allowPrivateConnections: options.allowPrivateConnections,
             // Amount of nodes for which we are willing to act as a relay with 2GB memory limit
@@ -233,7 +233,7 @@ export async function createHoprNode(
 
   try {
     const dbPath = path.join(options.dataPath, 'db')
-    await db.init(options.createDbIfNotExist, dbPath, options.forceCreateDB, options.environment.id)
+    await db.init(options.createDbIfNotExist, dbPath, options.forceCreateDB, options.network.id)
 
     // Dump entire database to a file if given by the env variable
     const dump_file = process.env.DB_DUMP ?? ''
@@ -245,27 +245,25 @@ export async function createHoprNode(
     throw err
   }
 
-  log(`using provider URL: ${options.environment.network.default_provider}`)
+  log(`using provider URL: ${options.network.chain.default_provider}`)
   const chain = HoprCoreEthereum.createInstance(
     db,
     PublicKey.from_peerid_str(peerId.toString()),
     keysPBM.PrivateKey.decode(peerId.privateKey as Uint8Array).Data,
     {
-      chainId: options.environment.network.chain_id,
-      environment: options.environment.id,
-      maxFeePerGas: options.environment.network.max_fee_per_gas,
-      maxPriorityFeePerGas: options.environment.network.max_priority_fee_per_gas,
-      network: options.environment.network.id,
-      provider: options.environment.network.default_provider
+      chainId: options.network.chain.chain_id,
+      network: options.network.id,
+      maxFeePerGas: options.network.chain.max_fee_per_gas,
+      maxPriorityFeePerGas: options.network.chain.max_priority_fee_per_gas,
+      chain: options.network.chain.id,
+      provider: options.network.chain.default_provider
     },
     automaticChainCreation
   )
 
   // get contract data for the given envirionment id and pass it on to create chain wrapper
-  const resolvedContractAddresses = getContractData(options.environment.id)
-  log(
-    `[DEBUG] resolvedContractAddresses ${options.environment.id} ${JSON.stringify(resolvedContractAddresses, null, 2)}`
-  )
+  const resolvedContractAddresses = getContractData(options.network.id)
+  log(`[DEBUG] resolvedContractAddresses ${options.network.id} ${JSON.stringify(resolvedContractAddresses, null, 2)}`)
   // Initialize connection to the blockchain
   await chain.initializeChainWrapper(resolvedContractAddresses)
 

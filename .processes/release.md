@@ -155,13 +155,13 @@ particular branch to deploy on every change.
 
 - Give a name to the release. For instance : `export RELEASE_NAME=riga`.
 - Give a name to the previous release: `export OLD_RELEASE_NAME=bogota`
-- Give a name to the target environment of the release. For instance: `export ENVIRONMENT_NAME=monte_rosa`
+- Give a name to the target network of the release. For instance: `export NETWORK=monte_rosa`
 
 2. Create a release tracking issue on GitHub. Use previous issues as [templates](https://github.com/hoprnet/hoprnet/issues/4487)
 3. On the `master` branch, and before the creation of the release branch, there should be an entry in `packages/hoprd/releases.json` for the new release name.
 
-- If the release will run in its own environment ($RELEASENAME == $ENVIRONMENT_NAME) then a new entry in `packages/core/protocol-config.json` should be created for the network.
-- If the release will run in a multienvironment network like `monte_rosa` then update the file `packages/core/protocol-config.json` for the `monte_rosa` entry to accept the new `version_range` of the new release.
+- If the release will run in its own network ($RELEASENAME == $NETWORK) then a new entry in `packages/core/protocol-config.json` should be created for the network.
+- If the release will run in a multinetwork network like `monte_rosa` then update the file `packages/core/protocol-config.json` for the `monte_rosa` entry to accept the new `version_range` of the new release.
 - Create a PR and merge it into master
 
 4. On the `master` branch, create the release branch locally by executing `git checkout -b release/${RELEASE_NAME}`.
@@ -170,13 +170,21 @@ particular branch to deploy on every change.
    - Change all occurences of the last release name to the new release name within documentation files and Docker files. Don't touch the `protocol-config.json` and `releases.json` files in this step. Changes should be committed locally.
    - Update `CHANGELOG.md` with the new release's information. Changes should be committed locally.
    - Release owner checks if docs are correctly updated by comparing with the changes in `CHANGELOG.md`.
-   - If the release will run in a new environment then, copy contract deployment files from the old environment by executing these commands:
+   - If the release will run in a new network then, copy create a network entry under the `networks` in `contracts-addresses.json`, like
 
    ```
-   mkdir -p packages/ethereum/deployments/${RELEASE_NAME}/xdai
-   cp packages/ethereum/deployments/${ENVIRONMENT_NAME}/xdai/* packages/ethereum/deployments/${RELEASE_NAME}/xdai/
-   cp packages/ethereum/deployments/${ENVIRONMENT_NAME}/xdai/.chainId packages/ethereum/deployments/${RELEASE_NAME}/xdai/
-   rm packages/ethereum/deployments/${RELEASE_NAME}/xdai/HoprChannels.json
+    "new_network": {
+      "boost_contract_address": "",
+      "channels_contract_address": "",
+      "environment_type": "production",
+      "indexer_start_block_number": 0,
+      "network_registry_contract_address": "",
+      "network_registry_proxy_contract_address": "",
+      "stake_contract_address": "",
+      "stake_season": 7,
+      "token_contract_address": "",
+      "xhopr_contract_address": ""
+    }
    ```
 
    NOTE: Don't include the deployment of HoprChannels, because this will be re-deployed anyway by the CD system.
@@ -187,7 +195,7 @@ particular branch to deploy on every change.
 - Check `gcloud compute instance-groups managed list` for a list and delete the instance groups using
 
 ```sh
-HOPRD_PERFORM_CLEANUP=true ./scripts/setup-gcloud-cluster.sh "${ENVIRONMENT_NAME}" "" "${OLD_RELEASE_NAME}-topology-1-91"
+HOPRD_PERFORM_CLEANUP=true ./scripts/setup-gcloud-cluster.sh "${NETWORK}" "" "${OLD_RELEASE_NAME}-topology-1-91"
 ```
 
 7. On the `release/${RELEASE_NAME}` branch, check that everything is ready and push it to GitHub by executing : `git push origin`. Wait until the [deployment of the cluster](https://github.com/hoprnet/hoprnet/actions/workflows/deploy.yaml) has finished successfully.

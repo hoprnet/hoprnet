@@ -8,14 +8,14 @@ import { health_to_string } from '@hoprnet/hopr-core'
  */
 export const getInfo = async (node: Hopr) => {
   try {
-    const { network, hoprTokenAddress, hoprChannelsAddress, channelClosureSecs, hoprNetworkRegistryAddress } =
+    const { chain, hoprTokenAddress, hoprChannelsAddress, channelClosureSecs, hoprNetworkRegistryAddress } =
       node.smartContractInfo()
 
     return {
-      environment: node.environment.id,
+      network: node.network.id,
       announcedAddress: (await node.getAddressesAnnouncedToDHT()).map((ma) => ma.toString()),
       listeningAddress: node.getListeningAddresses().map((ma) => ma.toString()),
-      network: network,
+      chain: chain,
       hoprToken: hoprTokenAddress,
       hoprChannels: hoprChannelsAddress,
       hoprNetworkRegistry: hoprNetworkRegistryAddress,
@@ -58,10 +58,10 @@ GET.apiDoc = {
           schema: {
             type: 'object',
             properties: {
-              environment: {
+              network: {
                 type: 'string',
                 example: 'anvil-localhost',
-                description: 'Name of the enviroment the node is running on.'
+                description: 'Name of the network the node is running on.'
               },
               announcedAddress: {
                 type: 'array',
@@ -85,7 +85,7 @@ GET.apiDoc = {
                 },
                 example: ['/ip4/0.0.0.0/tcp/9080/p2p/16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit']
               },
-              network: {
+              chain: {
                 type: 'string',
                 example: 'anvil',
                 description: 'Name of the Hopr network this node connects to.'
@@ -93,13 +93,13 @@ GET.apiDoc = {
               hoprToken: {
                 type: 'string',
                 example: '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512',
-                description: 'Contract address of the Hopr token on the ethereum network.'
+                description: 'Contract address of the Hopr token on the ethereum chain.'
               },
               hoprChannels: {
                 type: 'string',
                 example: '0x2a54194c8fe0e3CdeAa39c49B95495aA3b44Db63',
                 description:
-                  'Contract address of the HoprChannels smart contract on ethereum network. This smart contract is used to open payment channels between nodes on blockchain.'
+                  'Contract address of the HoprChannels smart contract on ethereum chain. This smart contract is used to open payment channels between nodes on blockchain.'
               },
               hoprNetworkRegistryAddress: {
                 type: 'string',

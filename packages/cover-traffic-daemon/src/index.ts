@@ -5,13 +5,7 @@ import path from 'path'
 import BN from 'bn.js'
 import yargs from 'yargs/yargs'
 import { hideBin } from 'yargs/helpers'
-import {
-  createHoprNode,
-  resolveEnvironment,
-  supportedEnvironments,
-  type ResolvedEnvironment,
-  CONSTANTS
-} from '@hoprnet/hopr-core'
+import { createHoprNode, resolveNetwork, supportedNetworks, type ResolvedNetwork, CONSTANTS } from '@hoprnet/hopr-core'
 
 import {
   type ChannelEntry,
@@ -39,15 +33,15 @@ function stopGracefully(signal: number) {
   process.exit()
 }
 
-export type DefaultEnvironment = {
+export type DefaultNetwork = {
   id?: string
 }
 
-function defaultEnvironment(): string {
+function defaultNetwork(): string {
   try {
     // Don't do typechecks on JSON files
     // @ts-ignore
-    const config = loadJson('../default-environment.json') as DefaultEnvironment
+    const config = loadJson('../default-network.json') as DefaultNetwork
     return config?.id || ''
   } catch (error) {
     // its ok if the file isn't there or cannot be read
@@ -55,8 +49,8 @@ function defaultEnvironment(): string {
   }
 }
 
-// Use environment-specific default data path
-const defaultDataPath = path.join(process.cwd(), 'hopr-cover-traffic-daemon-db', defaultEnvironment())
+// Use network-specific default data path
+const defaultDataPath = path.join(process.cwd(), 'hopr-cover-traffic-daemon-db', defaultNetwork())
 
 // reading the version manually to ensure the path is read correctly
 const packageFile = path.normalize(new URL('../package.json', import.meta.url).pathname)
@@ -73,11 +67,11 @@ const argv = yargsInstance
     'All CLI options can be configured through environment variables as well. CLI parameters have precedence over environment variables.'
   )
   .version(version)
-  .option('environment', {
+  .option('network', {
     string: true,
-    describe: 'Environment id which the node shall run on (HOPR_CTD_ENVIRONMENT)',
-    choices: supportedEnvironments().map((env) => env.id),
-    default: defaultEnvironment()
+    describe: 'Network id which the node shall run on (HOPR_CTD_NETWORK)',
+    choices: supportedNetworks().map((env) => env.id),
+    default: defaultNetwork()
   })
   .option('privateKey', {
     describe: 'A private key to be used for the node [env: HOPR_CTD_PRIVATE_KEY]',
@@ -146,11 +140,11 @@ const argv = yargsInstance
   .wrap(Math.min(120, yargsInstance.terminalWidth()))
   .parseSync()
 
-function generateNodeOptions(environment: ResolvedEnvironment): HoprOptions {
+function generateNodeOptions(network: ResolvedNetwork): HoprOptions {
   const options: HoprOptions = {
     announce: false,
     createDbIfNotExist: true,
-    environment,
+    network,
     forceCreateDB: false,
     password: '',
     dataPath: argv.data,
@@ -168,8 +162,8 @@ function generateNodeOptions(environment: ResolvedEnvironment): HoprOptions {
 }
 
 export async function main(update: (State: State) => void, peerId?: PeerId) {
-  const environment = resolveEnvironment(argv.environment, argv.provider)
-  const options = generateNodeOptions(environment)
+  const network = resolveNetwork(argv.network, argv.provider)
+  const options = generateNodeOptions(network)
   if (!peerId) {
     peerId = privKeyToPeerId(argv.privateKey)
   }

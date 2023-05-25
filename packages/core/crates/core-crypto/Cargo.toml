@@ -1,6 +1,6 @@
 [package]
 name = "core-crypto"
-version = "0.3.1"
+version = "0.3.2"
 description = "Core cryptographic primitives and functions used in the HOPR protocol"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
@@ -20,8 +20,9 @@ aes = "0.8"
 blake2 = "0.10"
 chacha20 = "0.9"
 ctr = "0.9"
-curve25519-dalek = "4.0.0-rc.2"
+curve25519-dalek = { version = "4.0.0-rc.2", features = ["serde", "rand_core"] }
 digest = "0.10"
+ed25519-dalek = "1.0.1"
 elliptic-curve = { version = "0.13", features = ["serde"] }
 futures = "0.3.28"
 generic-array = "0.14.7"
@@ -32,7 +33,7 @@ hkdf = "0.12"
 hmac = "0.12"
 js-sys = { version = "0.3.63", optional = true }
 k256 = { version = "0.13.0", features = ["arithmetic", "ecdh", "hash2curve", "serde"] }
-libp2p-identity = { version = "0.1.2", features = ["secp256k1", "peerid"] }
+libp2p-identity = { version = "0.1.2", features = ["secp256k1", "peerid", "ed25519"] }
 rand = "0.8.5"
 serde = { version = "1.0", features = ["derive"] }
 sha3 = "0.10"
