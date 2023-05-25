@@ -6,7 +6,6 @@ use core_crypto::iterated_hash::{iterate_hash, recover_iterated_hash};
 use core_crypto::types::Hash;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use futures::FutureExt;
-use mockall::automock;
 use utils_log::{debug, warn, info};
 use utils_types::primitives::U256;
 use utils_types::traits::{BinarySerializable, ToHex};
@@ -48,7 +47,7 @@ pub async fn bump_commitment<T: HoprCoreEthereumDbActions>(
         .map_err(|e| DbError(e))
 }
 
-#[automock]
+#[cfg_attr(test, mockall::automock)]
 #[async_trait(? Send)]
 pub trait ChainCommitter {
     async fn get_commitment(&self) -> Option<Hash>;
@@ -156,24 +155,6 @@ mod tests {
             me: PublicKey::from_privkey(&PRIV_KEY).unwrap(),
         }
     }
-
-    /*
-     await initializeCommitment(fakeDB, fakeKey, fakeCommInfo, fakeGet, fakeSet)
-    let c1 = await findCommitmentPreImage(fakeDB, fakeCommInfo.channelId)
-    assert(c1 != null, 'gives current commitment')
-    assert.strictEqual(fakeGet.callCount, 1, 'should look on chain')
-    assert(fakeSet.callCount == 1, 'should set a new commitment on chain')
-
-    await bumpCommitment(fakeDB, fakeCommInfo.channelId, c1)
-    let c2 = await findCommitmentPreImage(fakeDB, fakeCommInfo.channelId)
-    assert(c2, 'gives current commitment')
-    assert(c2.hash().eq(c1), 'c2 is commitment of c1')
-
-    fakeGet = () => Promise.resolve(c2)
-    await initializeCommitment(fakeDB, fakeKey, fakeCommInfo, fakeGet, fakeSet)
-    let c3 = await findCommitmentPreImage(fakeDB, fakeCommInfo.channelId)
-    assert(c2.eq(c3), 'Repeated initializations should return the same')
-     */
 
     #[async_std::test]
     async fn test_should_publish_hash_secret() {
