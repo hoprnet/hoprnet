@@ -1,7 +1,7 @@
 import { protocols } from '@multiformats/multiaddr'
 import { pickVersion } from '@hoprnet/hopr-utils'
 
-import type { Environment } from './types.js'
+import type { Network } from './types.js'
 
 // Do not type-check JSON files
 // @ts-ignore
@@ -69,43 +69,43 @@ export const MAX_RELAYS_PER_NODE = 5
 export const MIN_RELAYS_PER_NODE = 3
 
 /**
- * @param environment [optional] isolate from nodes running in other environments
+ * @param network [optional] isolate from nodes running in other networks
  * @returns the relay request protocol strings
  */
-export function CAN_RELAY_PROTOCOLS(environment?: string, environments?: Environment[]): string[] {
-  return determine_protocols('can-relay', environment, environments)
+export function CAN_RELAY_PROTOCOLS(network?: string, networks?: Network[]): string[] {
+  return determine_protocols('can-relay', network, networks)
 }
 
 /**
- * @param environment [optional] isolate from nodes running in other environments
+ * @param network [optional] isolate from nodes running in other networks
  * @returns the relay request protocol strings
  */
-export function RELAY_PROTOCOLS(environment?: string, environments?: Environment[]): string[] {
-  return determine_protocols('relay', environment, environments)
+export function RELAY_PROTOCOLS(network?: string, networks?: Network[]): string[] {
+  return determine_protocols('relay', network, networks)
 }
 
 /**
- * @param environment [optional] isolate from nodes running in other environments
+ * @param network [optional] isolate from nodes running in other networks
  * @returns the relay delivery protocol strings
  */
-export function DELIVERY_PROTOCOLS(environment?: string, environments?: Environment[]): string[] {
-  return determine_protocols('delivery', environment, environments)
+export function DELIVERY_PROTOCOLS(network?: string, networks?: Network[]): string[] {
+  return determine_protocols('delivery', network, networks)
 }
 
 /**
  * @param tag protocol tag which should be used
- * @param environment [optional] isolate from nodes running in other environments
- * @param environments [optional] supported environments which can be considered
+ * @param network [optional] isolate from nodes running in other networks
+ * @param networks [optional] supported networks which can be considered
  * @returns the supported protocol strings
  *
- * This function uses the given environments information to determine the
- * supported protocols. If no environment is given, it will return a list with a
+ * This function uses the given networks information to determine the
+ * supported protocols. If no network is given, it will return a list with a
  * single, version-specific entry, e.g.:
  *
  *   /hopr-connect/{TAG}/1.90
  *
- * When an environment is given, multiple protocols are returned. To illustrate
- * this the environment 'monte_rosa' and releases 'paleochora', 'valencia' , 'bogota' and 'riga'
+ * When an network is given, multiple protocols are returned. To illustrate
+ * this the network 'monte_rosa' and releases 'paleochora', 'valencia' , 'bogota' and 'riga'
  * are used here:
  *
  *   /hopr-connect/monte_rosa/{TAG}/1.89
@@ -113,13 +113,13 @@ export function DELIVERY_PROTOCOLS(environment?: string, environments?: Environm
  *   /hopr-connect/monte_rosa/{TAG}/1.91
  *   /hopr-connect/monte_rosa/{TAG}/1.92
  */
-function determine_protocols(tag: string, environment?: string, environments?: Environment[]): string[] {
-  const supportedEnvironmentIds = environments?.map((env) => env.id)
+function determine_protocols(tag: string, network?: string, networks?: Network[]): string[] {
+  const supportedNetworkNames = networks?.map((env) => env.id)
   let protos: string[] = []
 
-  // only add environment-specific protocols if we run a supported environment
-  if (environment && supportedEnvironmentIds && supportedEnvironmentIds.indexOf(environment) > -1) {
-    const env = environments?.find((el) => el.id === environment)
+  // only add network-specific protocols if we run a supported network
+  if (network && supportedNetworkNames && supportedNetworkNames.indexOf(network) > -1) {
+    const env = networks?.find((el) => el.id === network)
     if (env) {
       const versions = env.versionRange.split('||')
       versions.forEach((v: string) => {
@@ -129,12 +129,12 @@ function determine_protocols(tag: string, environment?: string, environments?: E
         }
         if (v === '*') {
           // the placeholder '*' will open up the protocol to the entire
-          // environment, otherwise we pin to the given version
-          proto = `/${NAME}/${environment}/${tag}`
+          // network, otherwise we pin to the given version
+          proto = `/${NAME}/${network}/${tag}`
         } else {
           // pinning each versions allows to support other protocol versions
-          // within the same environment
-          proto = `/${NAME}/${environment}/${tag}/${pickVersion(v)}`
+          // within the same network
+          proto = `/${NAME}/${network}/${tag}/${pickVersion(v)}`
         }
 
         if (proto != '' && protos.indexOf(proto) == -1) {

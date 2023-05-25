@@ -2,7 +2,7 @@ import type { HoprOptions } from './index.js'
 
 export const sampleOptions: Partial<HoprOptions> = {
   // TODO: find better sample options
-  environment: { id: 'local-testnet', network: { id: 'anvil' } as any } as any,
+  network: { id: 'local-testnet', network: { id: 'anvil' } as any } as any,
   hosts: {
     ip4: {
       ip: '0.0.0.0',

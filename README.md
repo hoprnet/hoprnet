@@ -122,8 +122,8 @@ The `hoprd` provides various command-line switches to configure its behaviour. F
 ```sh
 $ hoprd --help
 Options:
-      --environment <ENVIRONMENT>
-          Environment id which the node shall run on [env: HOPRD_ENVIRONMENT=] [possible values: anvil-localhost, master-staging, debug-staging, anvil-localhost2, monte_rosa]
+      --network <NETWORK>
+          Network id which the node shall run on [env: HOPRD_NETWORK=] [possible values: anvil-localhost, master, debug-staging, anvil-localhost2, monte_rosa]
       --identity <identity>
           The path to the identity file [env: HOPRD_IDENTITY=] [default: <IDENTITY_DIR>]
       --data <data>
@@ -199,7 +199,7 @@ As you might have noticed running the node without any command-line argument mig
 The following command assumes you've setup an alias like described in [Install via Docker](#install-via-docker).
 
 ```sh
-hoprd --identity /app/hoprd-db/.hopr-identity --password switzerland --init --announce --host "0.0.0.0:9091" --apiToken <MY_TOKEN> --environment monte_rosa
+hoprd --identity /app/hoprd-db/.hopr-identity --password switzerland --init --announce --host "0.0.0.0:9091" --apiToken <MY_TOKEN> --network monte_rosa
 ```
 
 Here is a short breakdown of each argument.
@@ -212,9 +212,9 @@ hoprd
   --announce 				                          # announce the node to other nodes in the network and act as relay if publicly reachable
   --host "0.0.0.0:9091"   	                  # set IP and port of the P2P API to the container's external IP so it can be reached on your host
   --apiToken <MY_TOKEN>                       # specify password for accessing REST API(REQUIRED)
-  --environment monte_rosa                    # an environment is defined as a chain plus a number of deployed smart contract addresses to use on that chain
-                                              # each release has a default environment id set, but the user can override this value
-                                              # nodes from different environments are **not able** to communicate
+  --network monte_rosa                        # an network is defined as a chain plus a number of deployed smart contract addresses to use on that chain
+                                              # each release has a default network id set, but the user can override this value
+                                              # nodes from different networks are **not able** to communicate
 ```
 
 ### Using Docker Compose with extended HOPR node monitoring
@@ -270,7 +270,7 @@ make -j deps && make -j build
 make run-anvil
 
 # update protocol-config
-scripts/update-protocol-config.sh -e anvil-localhost
+scripts/update-protocol-config.sh -n anvil-localhost
 
 # running normal node alice (separate terminal)
 DEBUG="hopr*" yarn run:hoprd:alice
@@ -420,7 +420,7 @@ placeholders replaced accordingly):
 ```sh
 HOPRD_API_TOKEN="<ADMIN_AUTH_HTTP_TOKEN>" \
 HOPRD_PASSWORD="<IDENTITY_FILE_PASSWORD>" \
-  ./scripts/setup-gcloud-cluster.sh environment "" my-custom-cluster-without-name
+  ./scripts/setup-gcloud-cluster.sh network "" my-custom-cluster-without-name
 ```
 
 A previously started cluster can be destroyed, which includes all running nodes,
@@ -428,7 +428,7 @@ by using the same script but setting the cleanup switch:
 
 ```sh
 HOPRD_PERFORM_CLEANUP=true \
-  ./scripts/setup-gcloud-cluster.sh environment "" my-custom-cluster-without-name
+  ./scripts/setup-gcloud-cluster.sh network "" my-custom-cluster-without-name
 ```
 
 The default Docker image in `scripts/setup-gcloud-cluster.sh` deploys GCloud public nodes. If you wish to deploy GCloud nodes
@@ -436,10 +436,8 @@ that are behind NAT, you need to specify a NAT-variant of the `hoprd` image (not
 
 ```sh
 HOPRD_PERFORM_CLEANUP=true \
-  ./scripts/setup-gcloud-cluster.sh environment "" my-nat-cluster gcr.io/hoprassociation/hoprd-nat
+  ./scripts/setup-gcloud-cluster.sh network "" my-nat-cluster gcr.io/hoprassociation/hoprd-nat
 ```
-
-Note that if the Docker image version is not specified, the script will use the `environment` as version.
 
 ### Using Google Cloud Platform and a Default Topology
 

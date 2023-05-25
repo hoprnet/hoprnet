@@ -22,8 +22,8 @@ See `hoprd --help` for full list.
 ```sh
 $ hoprd --help
 Options:
-      --environment <ENVIRONMENT>
-          Environment id which the node shall run on [env: HOPRD_ENVIRONMENT=] [possible values: anvil-localhost, master-staging, debug-staging, anvil-localhost2, monte_rosa]
+      --network <NETWORK>
+          Network id which the node shall run on [env: HOPRD_NETWORK=] [possible values: anvil-localhost, master, debug-staging, anvil-localhost2, monte_rosa]
       --identity <identity>
           The path to the identity file [env: HOPRD_IDENTITY=] [default: /home/tino/.hopr-identity]
       --data <data>

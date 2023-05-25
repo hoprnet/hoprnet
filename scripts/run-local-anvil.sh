@@ -84,7 +84,7 @@ function cleanup {
   trap - SIGINT SIGTERM ERR
   set +Eeuo pipefail
 
-  log "Stop anvil network"
+  log "Stop anvil chain"
   lsof -i ":8545" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
 
   log "Remove anvil configuration file ${cfg_file}"
@@ -109,12 +109,12 @@ if ! command -v anvil ; then
 fi
 
 if ! lsof -i ":8545" -s TCP:LISTEN; then
-  log "Start local anvil network"
+  log "Start local anvil chain"
   anvil ${flags} > "${log_file}" 2>&1 &
   wait_for_regex ${log_file} "Listening on 0.0.0.0:8545"
-  log "Anvil network started (0.0.0.0:8545)"
+  log "Anvil chain started (0.0.0.0:8545)"
 else
-  log "Anvil network already running, skipping"
+  log "Anvil chain already running, skipping"
 fi
 
 if [ "${skip_deploy}" != "true" ]; then

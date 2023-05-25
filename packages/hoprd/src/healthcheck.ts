@@ -9,7 +9,7 @@ export default function setupHealthcheck(node: Hopr, logs: LogStream, host: stri
   const service = express()
   service.use(cors())
   service.get('/healthcheck/v1/version', (_, res) => res.send(node.getVersion()))
-  service.get('/healthcheck/v1/environment', (_, res) => res.send(node.environment.id))
+  service.get('/healthcheck/v1/network', (_, res) => res.send(node.network.id))
 
   http
     .createServer(service)
