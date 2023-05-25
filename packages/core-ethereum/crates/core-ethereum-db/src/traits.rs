@@ -66,13 +66,13 @@ pub trait HoprCoreEthereumDbActions {
 
     async fn get_losing_tickets_count(&self) -> Result<usize>;
 
-    async fn get_pendings_balance_to(&self, counterparty: &Address) -> Result<Balance>;
+    async fn get_pending_balance_to(&self, counterparty: &Address) -> Result<Balance>;
 
     async fn mark_pending(&mut self, ticket: &Ticket) -> Result<()>;
 
     async fn resolve_pending(&mut self, ticket: &Ticket, snapshot: &Snapshot) -> Result<()>;
 
-    async fn mark_redeemeed(&mut self, ticket: &AcknowledgedTicket) -> Result<()>;
+    async fn mark_redeemed(&mut self, ticket: &AcknowledgedTicket) -> Result<()>;
 
     async fn mark_losing_acked_ticket(&mut self, ticket: &AcknowledgedTicket) -> Result<()>;
 
