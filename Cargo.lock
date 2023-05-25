@@ -984,7 +984,7 @@ dependencies = [
 
 [[package]]
 name = "core-mixer"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-std",
  "console_error_panic_hook",
@@ -993,6 +993,7 @@ dependencies = [
  "getrandom 0.2.9",
  "gloo-timers",
  "js-sys",
+ "lazy_static",
  "more-asserts",
  "pin-project",
  "rand 0.8.5",
