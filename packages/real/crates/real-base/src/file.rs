@@ -16,7 +16,7 @@ pub mod native {
     where
         R: AsRef<[u8]>,
     {
-        fs::write(path, contents).map_err(|e| RealError::GeneralError(e.to_string()))
+        fs::write(path, contents).map_err(|e| RealError::GeneralError(format!("{} {}", path, e.to_string())))
     }
 
     pub fn metadata(path: &str) -> Result<()> {

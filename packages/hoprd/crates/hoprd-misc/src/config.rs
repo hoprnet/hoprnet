@@ -1,12 +1,13 @@
-use proc_macro_regex::regex;
-use serde::{Deserialize, Serialize};
-use validator::{Validate, ValidationError};
-
 use core_ethereum_misc::constants::DEFAULT_CONFIRMATIONS;
 use core_misc::constants::{
     DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_INTERVAL_VARIANCE, DEFAULT_HEARTBEAT_THRESHOLD,
     DEFAULT_MAX_PARALLEL_CONNECTIONS, DEFAULT_MAX_PARALLEL_CONNECTION_PUBLIC_RELAY, DEFAULT_NETWORK_QUALITY_THRESHOLD,
 };
+use hoprd_keypair::key_pair::HoprKeys;
+use proc_macro_regex::regex;
+use serde::{Deserialize, Serialize};
+use utils_log::error;
+use validator::{Validate, ValidationError};
 
 pub const DEFAULT_API_HOST: &str = "127.0.0.1";
 pub const DEFAULT_API_PORT: u16 = 3001;
@@ -233,13 +234,17 @@ fn validate_password(s: &str) -> Result<(), ValidationError> {
     }
 }
 
-regex!(is_private_key "^(0[xX])?[a-fA-F0-9]{64}$");
+// 32 bytes off-chain key, 32 bytes on-chain key
+regex!(is_private_key "^(0[xX])?[a-fA-F0-9]{128}$");
 
 pub(crate) fn validate_private_key(s: &str) -> Result<(), ValidationError> {
-    if is_private_key(s) {
-        Ok(())
-    } else {
-        Err(ValidationError::new("No valid private key could be found"))
+    // Make sure the private keys can be used to derive public keys
+    match HoprKeys::try_from(s) {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            error!("Given private key is not a valid private key. {}", e);
+            Err(ValidationError::new("No valid private key could be found"))
+        }
     }
 }
 

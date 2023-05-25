@@ -24,14 +24,15 @@ core-network = { path = "../../../core/crates/core-network" }
 core-strategy = { path = "../../../core/crates/core-strategy" }
 core-ethereum-misc = { path = "../../../core-ethereum/crates/core-ethereum-misc" }
 hex = "0.4.3"
+hoprd-keypair = { path = "../../../hoprd/crates/hoprd-keypair" }
 js-sys = "0.3.63"
 real-base = { path = "../../../real/crates/real-base" }
 proc-macro-regex = "~1.1.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 serde_json = "1.0"
-thiserror = "1.0"
 serde-wasm-bindgen = { version = "0.5", optional = true }
+thiserror = "1.0"
 utils-log = { path = "../../../utils/crates/utils-log" }
 utils-misc = { path = "../../../utils/crates/utils-misc" }
 validator = { version = "0.16.0", features = ["derive"] }

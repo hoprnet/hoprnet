@@ -1,5 +1,3 @@
-use std::fmt::Debug;
-
 use crate::{
     errors::{KeyPairError, Result},
     keystore::{CipherparamsJson, CryptoJson, EthKeystore, KdfType, KdfparamsType},
@@ -8,18 +6,22 @@ use aes::{
     cipher::{self, InnerIvInit, KeyInit, StreamCipherCore},
     Aes128,
 };
-use core_crypto::types::PublicKey;
+use core_crypto::types::{OffchainPublicKey, PublicKey};
 use getrandom::getrandom;
+use hex;
 use scrypt::{scrypt, Params as ScryptParams};
 use serde_json::{from_str as from_json_string, to_string as to_json_string};
 use sha3::{digest::Update, Digest, Keccak256};
+use std::fmt::Debug;
+use utils_log::error;
+use utils_types::traits::ToHex;
 use uuid::Uuid;
 
 #[cfg(all(feature = "wasm", not(test)))]
-use real_base::file::wasm::{read_to_string, write};
+use real_base::file::wasm::{metadata, read_to_string, write};
 
 #[cfg(any(not(feature = "wasm"), test))]
-use real_base::file::native::{read_to_string, write};
+use real_base::file::native::{metadata, read_to_string, write};
 
 const HOPR_CIPHER: &str = "aes-128-ctr";
 const HOPR_KEY_SIZE: usize = 32usize;
@@ -51,26 +53,185 @@ impl Aes128Ctr {
     }
 }
 
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+pub struct IdentityOptions {
+    initialize: bool,
+    id_path: String,
+    password: String,
+    use_weak_crypto: Option<bool>,
+    private_key: Option<Box<[u8]>>,
+}
+
 pub struct HoprKeys {
-    packet_key: (PacketKey, PublicKey),
+    packet_key: (PacketKey, OffchainPublicKey),
     chain_key: (ChainKey, PublicKey),
 }
 
+impl TryFrom<&str> for HoprKeys {
+    type Error = KeyPairError;
+
+    /// Deserializes HoprKeys from string
+    ///
+    /// ```rust
+    /// use hoprd_keypair::key_pair::HoprKeys;
+    ///
+    /// let priv_keys = "0x56b29cefcdf576eea306ba2fd5f32e651c09e0abbc018c47bdc6ef44f6b7506f1050f95137770478f50b456267f761f1b8b341a13da68bc32e5c96984fcd52ae";
+    /// assert!(HoprKeys::try_from(priv_keys).is_ok());
+    /// ```
+    fn try_from(s: &str) -> std::result::Result<Self, Self::Error> {
+        let maybe_priv_key = match s.strip_prefix("0x") {
+            Some(priv_without_prefix) => priv_without_prefix,
+            None => s,
+        };
+
+        if maybe_priv_key.len() != 2 * (PACKET_KEY_LENGTH + CHAIN_KEY_LENGTH) {
+            return Err(KeyPairError::InvalidPrivateKeySize {
+                actual: maybe_priv_key.len(),
+                expected: 2 * (PACKET_KEY_LENGTH + CHAIN_KEY_LENGTH),
+            });
+        }
+
+        let mut priv_key_raw = [0u8; PACKET_KEY_LENGTH + CHAIN_KEY_LENGTH];
+        hex::decode_to_slice(maybe_priv_key, &mut priv_key_raw[..])?;
+
+        priv_key_raw.try_into()
+    }
+}
+
+impl TryFrom<[u8; CHAIN_KEY_LENGTH + PACKET_KEY_LENGTH]> for HoprKeys {
+    type Error = KeyPairError;
+    /// Deserializes HoprKeys from binary string
+    ///
+    /// ```rust
+    /// use hoprd_keypair::key_pair::HoprKeys;
+    ///
+    /// let priv_keys = [
+    ///     0x56,0xb2,0x9c,0xef,0xcd,0xf5,0x76,0xee,0xa3,0x06,0xba,0x2f,0xd5,0xf3,0x2e,0x65,
+    ///     0x1c,0x09,0xe0,0xab,0xbc,0x01,0x8c,0x47,0xbd,0xc6,0xef,0x44,0xf6,0xb7,0x50,0x6f,
+    ///     0x10,0x50,0xf9,0x51,0x37,0x77,0x04,0x78,0xf5,0x0b,0x45,0x62,0x67,0xf7,0x61,0xf1,
+    ///     0xb8,0xb3,0x41,0xa1,0x3d,0xa6,0x8b,0xc3,0x2e,0x5c,0x96,0x98,0x4f,0xcd,0x52,0xae
+    /// ];
+    /// assert!(HoprKeys::try_from(priv_keys).is_ok());
+    /// ```
+    fn try_from(value: [u8; CHAIN_KEY_LENGTH + PACKET_KEY_LENGTH]) -> std::result::Result<Self, Self::Error> {
+        let mut packet_key = [0u8; PACKET_KEY_LENGTH];
+        packet_key.copy_from_slice(&value[0..32]);
+        let mut chain_key = [0u8; CHAIN_KEY_LENGTH];
+        chain_key.copy_from_slice(&value[32..64]);
+
+        (packet_key, chain_key).try_into()
+    }
+}
+
+impl TryFrom<([u8; PACKET_KEY_LENGTH], [u8; CHAIN_KEY_LENGTH])> for HoprKeys {
+    type Error = KeyPairError;
+
+    /// Deserializes HoprKeys from tuple of two binary private keys
+    ///
+    /// ```rust
+    /// use hoprd_keypair::key_pair::HoprKeys;
+    ///
+    /// let priv_keys = (
+    /// [
+    ///     0x56,0xb2,0x9c,0xef,0xcd,0xf5,0x76,0xee,0xa3,0x06,0xba,0x2f,0xd5,0xf3,0x2e,0x65,
+    ///     0x1c,0x09,0xe0,0xab,0xbc,0x01,0x8c,0x47,0xbd,0xc6,0xef,0x44,0xf6,0xb7,0x50,0x6f,
+    /// ], [
+    ///     0x10,0x50,0xf9,0x51,0x37,0x77,0x04,0x78,0xf5,0x0b,0x45,0x62,0x67,0xf7,0x61,0xf1,
+    ///     0xb8,0xb3,0x41,0xa1,0x3d,0xa6,0x8b,0xc3,0x2e,0x5c,0x96,0x98,0x4f,0xcd,0x52,0xae
+    /// ]);
+    /// assert!(HoprKeys::try_from(priv_keys).is_ok());
+    /// ```
+    fn try_from(value: ([u8; PACKET_KEY_LENGTH], [u8; CHAIN_KEY_LENGTH])) -> std::result::Result<Self, Self::Error> {
+        Ok(HoprKeys {
+            packet_key: (value.0, OffchainPublicKey::from_privkey(&value.0[..])?),
+            chain_key: (value.1, PublicKey::from_privkey(&value.1[..])?),
+        })
+    }
+}
+
+impl PartialEq for HoprKeys {
+    fn eq(&self, other: &Self) -> bool {
+        self.packet_key.eq(&other.packet_key) && self.chain_key.eq(&other.chain_key)
+    }
+}
+
 impl HoprKeys {
-    pub fn new() -> Result<Self> {
+    pub fn new() -> Self {
         let mut packet_priv_key = [0u8; 32];
         let mut chain_priv_key = [0u8; 32];
 
-        let packet_key_raw = PublicKey::random_keypair();
+        let packet_key_raw = OffchainPublicKey::random_keypair();
         packet_priv_key.copy_from_slice(packet_key_raw.0.as_ref());
 
         let chain_key_raw = PublicKey::random_keypair();
         chain_priv_key.copy_from_slice(chain_key_raw.0.as_ref());
 
-        Ok(HoprKeys {
+        HoprKeys {
             packet_key: (packet_priv_key, packet_key_raw.1),
             chain_key: (chain_priv_key, chain_key_raw.1),
-        })
+        }
+    }
+
+    pub fn init(opts: IdentityOptions) -> Result<Self> {
+        let exists = metadata(&opts.id_path).is_ok();
+
+        if !exists || opts.private_key.is_some() {
+            let keys = if let Some(private_key) = opts.private_key {
+                if private_key.len() != PACKET_KEY_LENGTH + CHAIN_KEY_LENGTH {
+                    return Err(KeyPairError::InvalidPrivateKeySize {
+                        actual: private_key.len(),
+                        expected: 64,
+                    });
+                }
+
+                let mut priv_keys = [0u8; PACKET_KEY_LENGTH + CHAIN_KEY_LENGTH];
+                priv_keys.clone_from_slice(&private_key);
+
+                priv_keys.try_into()?
+            } else {
+                HoprKeys::new()
+            };
+            keys.write_eth_keystore(
+                &opts.id_path,
+                &opts.password,
+                if let Some(true) = opts.use_weak_crypto {
+                    true
+                } else {
+                    false
+                },
+            )?;
+
+            return Ok(keys);
+        }
+
+        match HoprKeys::read_eth_keystore(&opts.id_path, &opts.password) {
+            Ok(keys) => return Ok(keys),
+            Err(e) => {
+                error!("{}", e.to_string());
+            }
+        }
+
+        if opts.initialize {
+            let keys = HoprKeys::new();
+            keys.write_eth_keystore(
+                &opts.id_path,
+                &opts.password,
+                if let Some(true) = opts.use_weak_crypto {
+                    true
+                } else {
+                    false
+                },
+            )?;
+
+            return Ok(keys);
+        }
+
+        Err(KeyPairError::GeneralError(
+            String::from("Key store file exists but could not decrypt it. ")
+                + "Maybe using the wrong '--password'? "
+                + "Otherwise try again with '--initialize' to overwrite the existing key store. "
+                + "THIS WILL DESTROY THE PREVIOUS KEY",
+        ))
     }
 
     pub fn read_eth_keystore(path: &str, password: &str) -> Result<Self> {
@@ -120,7 +281,7 @@ impl HoprKeys {
         chain_key.clone_from_slice(&pk.as_slice()[32..64]);
 
         Ok(HoprKeys {
-            packet_key: (packet_key, PublicKey::from_privkey(&packet_key[..]).unwrap()),
+            packet_key: (packet_key, OffchainPublicKey::from_privkey(&packet_key[..]).unwrap()),
             // TODO: change this to off-chain privKey
             chain_key: (chain_key, PublicKey::from_privkey(&chain_key[..]).unwrap()),
         })
@@ -171,7 +332,7 @@ impl HoprKeys {
                 kdf: KdfType::Scrypt,
                 kdfparams: KdfparamsType::Scrypt {
                     dklen: HOPR_KDF_PARAMS_DKLEN,
-                    n: 2u32.pow(HOPR_KDF_PARAMS_LOG_N as u32),
+                    n: 2u32.pow(if use_weak_crypto { 1 } else { HOPR_KDF_PARAMS_LOG_N } as u32),
                     p: HOPR_KDF_PARAMS_P,
                     r: HOPR_KDF_PARAMS_R,
                     salt: salt.to_vec(),
@@ -191,7 +352,7 @@ impl Debug for HoprKeys {
         f.debug_struct("HoprKeys")
             .field(
                 "packet_key",
-                &format_args!("(priv_key: <REDACTED>, pub_key: {}", self.packet_key.1.to_hex(false)),
+                &format_args!("(priv_key: <REDACTED>, pub_key: {}", self.packet_key.1.to_hex()),
             )
             .field(
                 "chain_key",
@@ -206,6 +367,8 @@ pub mod wasm {
     use utils_misc::ok_or_jserr;
     use wasm_bindgen::prelude::*;
 
+    use super::IdentityOptions;
+
     #[wasm_bindgen]
     pub struct HoprKeys {
         w: super::HoprKeys,
@@ -215,8 +378,15 @@ pub mod wasm {
     impl HoprKeys {
         #[wasm_bindgen(constructor)]
         pub fn new() -> std::result::Result<HoprKeys, JsValue> {
-            let keys = ok_or_jserr!(super::HoprKeys::new())?;
+            let keys = super::HoprKeys::new();
             Ok(Self { w: keys })
+        }
+
+        #[wasm_bindgen]
+        pub fn init(identity_options: IdentityOptions) -> Result<HoprKeys, JsValue> {
+            Ok(Self {
+                w: super::HoprKeys::init(identity_options).map_err(|e| JsValue::from(e.to_string()))?,
+            })
         }
 
         #[wasm_bindgen]
@@ -240,10 +410,28 @@ pub mod wasm {
 #[cfg(test)]
 mod tests {
     use super::HoprKeys;
-    use std::fs::File;
+    use tempfile::tempdir;
 
     #[test]
     fn create_keys() {
-        println!("{:?}", HoprKeys::new().unwrap())
+        println!("{:?}", HoprKeys::new())
+    }
+
+    #[test]
+    fn store_keys_and_read_them() {
+        let tmp = tempdir().unwrap();
+
+        let identity_dir = tmp.path().join("hopr-unit-test-identity");
+
+        let keys = HoprKeys::new();
+
+        let password = "dummy password for unit testing";
+
+        keys.write_eth_keystore(identity_dir.to_str().unwrap(), password, true)
+            .unwrap();
+
+        let deserialized = HoprKeys::read_eth_keystore(identity_dir.to_str().unwrap(), password).unwrap();
+
+        assert_eq!(deserialized, keys);
     }
 }
