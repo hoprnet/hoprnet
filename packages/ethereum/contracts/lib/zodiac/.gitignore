@@ -1,0 +1,10 @@
+build/
+artifacts/
+node_modules/
+.DS_Store
+env/
+.env
+.history
+coverage*
+package
+dist/

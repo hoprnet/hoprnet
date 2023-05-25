@@ -268,11 +268,14 @@ Leveraging its Account-Abstraction design, HOPR node runners can secure node ope
 Dependencies are vendored directly into the repo. :
 
 - Audited Safe contracts at commit [eb93dbb0f62e2dc1b308ac4c110038062df0a8c9](https://github.com/safe-global/safe-contracts/blob/main/docs/audit_1_4_0.md)
+- Audited Zodiac Modifier Roles v1 contracts at commit [454be9d3c26f90221ca717518df002d1eca1845f](https://github.com/gnosis/zodiac-modifier-roles-v1/tree/main) After importing the contracts, adjust the pragma for two contracts; and manually imported their imports from Gnosis Safe, e.g. Enum.sol
+- Audited Zodiac Base contract at commit [8a77e7b224af8004bd9f2ff4e2919642e93ffd85](https://github.com/gnosis/zodiac/tree/8a77e7b224af8004bd9f2ff4e2919642e93ffd85)
 
 ```
 forge install safe-global/safe-contracts@eb93dbb0f62e2dc1b308ac4c110038062df0a8c9 \
-
---no-git --no-commit
+   gnosis/zodiac-modifier-roles-v1@454be9d3c26f90221ca717518df002d1eca1845f
+   gnosis/zodiac@8a77e7b224af8004bd9f2ff4e2919642e93ffd85
+   --no-git --no-commit
 ```
 
 2. `SafeSuiteSetupScript` deploys basic Safe suites. We deploy all the contracts with `main-suite` tag, in a deterministic way
