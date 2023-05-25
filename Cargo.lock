@@ -843,7 +843,7 @@ dependencies = [
 
 [[package]]
 name = "core-crypto"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "aes",
  "async-std",
@@ -853,6 +853,7 @@ dependencies = [
  "ctr",
  "curve25519-dalek 4.0.0-rc.2",
  "digest 0.10.6",
+ "ed25519-dalek",
  "elliptic-curve 0.13.4",
  "futures",
  "generic-array 0.14.7",
@@ -1231,6 +1232,8 @@ dependencies = [
  "fiat-crypto",
  "packed_simd_2",
  "platforms",
+ "rand_core 0.6.4",
+ "serde",
  "subtle",
  "zeroize",
 ]
@@ -2390,7 +2393,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "hoprd-key-pair"
+name = "hoprd-keypair"
 version = "0.1.0"
 dependencies = [
  "aes",
@@ -2399,6 +2402,7 @@ dependencies = [
  "ctr",
  "getrandom 0.2.9",
  "hex",
+ "js-sys",
  "k256 0.13.1",
  "libp2p-identity",
  "real-base",
@@ -2408,7 +2412,9 @@ dependencies = [
  "sha3",
  "tempfile",
  "thiserror",
+ "utils-log",
  "utils-misc",
+ "utils-types",
  "uuid 1.3.3",
  "version",
  "wasm-bindgen",
@@ -2427,6 +2433,7 @@ dependencies = [
  "core-network",
  "core-strategy",
  "hex",
+ "hoprd-keypair",
  "js-sys",
  "proc-macro-regex",
  "real-base",
