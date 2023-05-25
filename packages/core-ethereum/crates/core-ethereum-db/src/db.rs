@@ -4,6 +4,7 @@ use core_crypto::{
     iterated_hash::IteratedHash,
     types::{Hash, PublicKey},
 };
+use core_crypto::iterated_hash::Intermediate;
 use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::channels::ChannelStatus;
 use core_types::{
@@ -24,7 +25,7 @@ fn to_commitment_key(channel: &Hash, iteration: usize) -> Result<utils_db::db::K
     let mut channel = serialize_to_bytes(channel)?;
     channel.extend_from_slice(&iteration.to_be_bytes());
 
-    utils_db::db::Key::new_bytes_with_prefix(channel.into_boxed_slice(), COMMITMENT_PREFIX)
+    utils_db::db::Key::new_bytes_with_prefix(&channel, COMMITMENT_PREFIX)
 }
 
 fn to_acknowledged_ticket_key(challenge: &EthereumChallenge, epoch: &U256) -> Result<utils_db::db::Key> {
@@ -32,7 +33,7 @@ fn to_acknowledged_ticket_key(challenge: &EthereumChallenge, epoch: &U256) -> Re
     let mut channel_epoch = serialize_to_bytes(epoch)?;
     ack_key.append(&mut channel_epoch);
 
-    utils_db::db::Key::new_bytes_with_prefix(ack_key.into_boxed_slice(), ACKNOWLEDGED_TICKETS_PREFIX)
+    utils_db::db::Key::new_bytes_with_prefix(&ack_key, ACKNOWLEDGED_TICKETS_PREFIX)
 }
 
 pub struct CoreEthereumDb<T>
@@ -41,6 +42,12 @@ where
 {
     db: DB<T>,
     me: PublicKey,
+}
+
+impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> CoreEthereumDb<T> {
+    pub fn new(db: DB<T>, me: PublicKey) -> Self {
+        Self { db, me }
+    }
 }
 
 #[async_trait(? Send)] // not placing the `Send` trait limitations on the trait
@@ -104,8 +111,9 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
 
     async fn get_commitment(&self, channel: &Hash, iteration: usize) -> Result<Option<Hash>> {
         self.db
-            .get_or_none::<Hash>(to_commitment_key(channel, iteration)?)
+            .get_or_none::<Intermediate>(to_commitment_key(channel, iteration)?)
             .await
+            .map(|opt| opt.map(|i| Hash::new(&i.intermediate)))
     }
 
     async fn get_current_commitment(&self, channel: &Hash) -> Result<Option<Hash>> {

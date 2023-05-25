@@ -1,9 +1,9 @@
 [package]
 name = "core-ethereum-misc"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
-description = "Selected core ethereum modules"
+description = "Core-Ethereum-specific interaction with the backend database"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"

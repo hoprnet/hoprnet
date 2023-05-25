@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 
 use crate::errors::DbError;
-use crate::traits::{AsyncKVStorage, BatchOperation};
+use crate::traits::{AsyncKVStorage, BatchOperation, StorageValueIterator};
 use futures_lite::stream::StreamExt;
 
 #[cfg(feature = "wasm")]
@@ -124,7 +124,11 @@ impl AsyncKVStorage for LevelDbShim {
             .map_err(|_| DbError::DumpError(format!("Failed to dump DB into {}", destination)))
     }
 
-    fn iterate(&self, prefix: Self::Key, suffix_size: u32) -> crate::errors::Result<crate::types::BinaryStreamWrapper> {
+    fn iterate(
+        &self,
+        prefix: Self::Key,
+        suffix_size: u32,
+    ) -> crate::errors::Result<StorageValueIterator<Self::Value>> {
         let iterable = self
             .db
             .iterValues(js_sys::Uint8Array::from(prefix.as_ref()), suffix_size)
@@ -133,7 +137,277 @@ impl AsyncKVStorage for LevelDbShim {
 
         let stream = wasm_bindgen_futures::stream::JsStream::from(iterable);
 
-        Ok(crate::types::BinaryStreamWrapper::new(stream))
+        Ok(Box::new(crate::types::BinaryStreamWrapper::new(stream)))
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub mod rusty {
+    use async_trait::async_trait;
+    use std::cell::RefCell;
+    use std::cmp::Ordering;
+
+    use crate::errors::DbError;
+    use crate::traits::{AsyncKVStorage, BatchOperation, StorageValueIterator};
+    use futures_lite::stream::iter;
+    use rusty_leveldb::{DBIterator, LdbIterator, WriteBatch};
+
+    struct RustyLevelDbIterator {
+        iter: DBIterator,
+        first_key: Box<[u8]>,
+        last_key: Box<[u8]>,
+    }
+
+    impl RustyLevelDbIterator {
+        pub fn new(iter: DBIterator, prefix: &[u8], suffix_len: usize) -> Self {
+            let mut first_key: Vec<u8> = prefix.into();
+            first_key.extend((0..suffix_len).map(|_| 0u8));
+
+            let mut last_key: Vec<u8> = prefix.into();
+            last_key.extend((0..suffix_len).map(|_| 0xffu8));
+
+            // This implementation does not use the `seek` method, because it is not working properly
+            Self {
+                iter,
+                first_key: first_key.into_boxed_slice(),
+                last_key: last_key.into_boxed_slice(),
+            }
+        }
+    }
+
+    impl Iterator for RustyLevelDbIterator {
+        type Item = crate::errors::Result<Box<[u8]>>;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            while let Some((key, value)) = self.iter.next() {
+                let upper_bound = key.as_slice().cmp(&self.last_key);
+                let lower_bound = key.as_slice().cmp(&self.first_key);
+                if upper_bound != Ordering::Greater && lower_bound != Ordering::Less {
+                    return Some(Ok(value.into_boxed_slice()));
+                } else if upper_bound == Ordering::Greater {
+                    return None;
+                }
+            }
+            None
+        }
+    }
+
+    /// Adapter for Rusty Level DB database.
+    pub struct RustyLevelDbShim {
+        db: RefCell<rusty_leveldb::DB>,
+    }
+
+    impl RustyLevelDbShim {
+        /// Create adapter from the given Rusty LevelDB instance.
+        pub fn new(db: rusty_leveldb::DB) -> Self {
+            Self { db: RefCell::new(db) }
+        }
+    }
+
+    #[async_trait(?Send)]
+    impl AsyncKVStorage for RustyLevelDbShim {
+        type Key = Box<[u8]>;
+        type Value = Box<[u8]>;
+
+        async fn get(&self, key: Self::Key) -> crate::errors::Result<Self::Value> {
+            self.db
+                .borrow_mut()
+                .get(&key)
+                .ok_or(DbError::NotFound)
+                .map(|v| v.into_boxed_slice())
+        }
+
+        async fn set(&mut self, key: Self::Key, value: Self::Value) -> crate::errors::Result<Option<Self::Value>> {
+            self.db
+                .borrow_mut()
+                .put(&key, &value)
+                .map(|_| None)
+                .map_err(|e| DbError::GenericError(e.err))
+        }
+
+        async fn contains(&self, key: Self::Key) -> bool {
+            self.db.borrow_mut().get(&key).is_some()
+        }
+
+        async fn remove(&mut self, key: Self::Key) -> crate::errors::Result<Option<Self::Value>> {
+            self.db
+                .borrow_mut()
+                .delete(&key)
+                .map(|_| None)
+                .map_err(|e| DbError::GenericError(e.err))
+        }
+
+        async fn dump(&self, _destination: String) -> crate::errors::Result<()> {
+            Ok(())
+        }
+
+        fn iterate(
+            &self,
+            prefix: Self::Key,
+            suffix_size: u32,
+        ) -> crate::errors::Result<StorageValueIterator<Self::Value>> {
+            let i = self
+                .db
+                .borrow_mut()
+                .new_iter()
+                .map_err(|e| DbError::GenericError(e.err))?;
+            Ok(Box::new(iter(RustyLevelDbIterator::new(
+                i,
+                &prefix,
+                suffix_size as usize,
+            ))))
+        }
+
+        async fn batch(
+            &mut self,
+            operations: Vec<BatchOperation<Self::Key, Self::Value>>,
+            wait_for_write: bool,
+        ) -> crate::errors::Result<()> {
+            let mut wb = WriteBatch::new();
+            for op in operations {
+                match op {
+                    BatchOperation::del(x) => wb.delete(&x.key),
+                    BatchOperation::put(x) => wb.put(&x.key, &x.value),
+                }
+            }
+
+            self.db
+                .borrow_mut()
+                .write(wb, wait_for_write)
+                .map_err(|e| DbError::GenericError(e.err))
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[async_std::test]
+    async fn rusty_leveldb_sanity_test() {
+
+        use futures_lite::StreamExt;
+        use crate::traits::{AsyncKVStorage, BatchOperation};
+
+        let key_1 = "1";
+        let value_1 = "abc";
+        let key_2 = "2";
+        let value_2 = "def";
+        let key_3 = "3";
+        let value_3 = "ghi";
+        let prefix = "xy";
+        let prefixed_key_1 = "xya";
+        let prefixed_key_2 = "xyb";
+        let prefixed_key_3 = "xyc";
+
+        let opt = rusty_leveldb::in_memory();
+        let mut kv_storage = crate::leveldb::rusty::RustyLevelDbShim::new(rusty_leveldb::DB::open("test", opt).unwrap());
+
+        assert!(
+            !kv_storage.contains(key_1.as_bytes().to_vec().into_boxed_slice()).await,
+            "Test #1 failed: empty DB should not contain any data"
+        );
+
+        let _ = kv_storage
+            .set(
+                key_1.as_bytes().to_vec().into_boxed_slice(),
+                value_1.as_bytes().to_vec().into_boxed_slice(),
+            )
+            .await;
+
+        assert!(
+            kv_storage.contains(key_1.as_bytes().to_vec().into_boxed_slice()).await,
+            "Test #2 failed: DB should contain the key"
+        );
+
+        let value = kv_storage
+            .get(key_1.as_bytes().to_vec().into_boxed_slice())
+            .await
+            .unwrap();
+        let value_converted = std::str::from_utf8(value.as_ref()).unwrap();
+
+        assert_eq!(
+            value_converted, value_1,
+            "Test #3 failed: DB value after get should be equal to the one before the get"
+        );
+
+        let _ = kv_storage.remove(key_1.as_bytes().to_vec().into_boxed_slice()).await;
+        assert!(
+            !kv_storage.contains(key_1.as_bytes().to_vec().into_boxed_slice()).await,
+            "Test #4 failed: removal of key from the DB failed"
+        );
+
+        let batch_data = vec![
+            BatchOperation::put(crate::traits::Put {
+                key: key_3.as_bytes().to_vec().into_boxed_slice(),
+                value: value_3.as_bytes().to_vec().into_boxed_slice(),
+            }),
+            BatchOperation::put(crate::traits::Put {
+                key: key_2.as_bytes().to_vec().into_boxed_slice(),
+                value: value_2.as_bytes().to_vec().into_boxed_slice(),
+            }),
+            BatchOperation::del(crate::traits::Del {
+                key: key_2.as_bytes().to_vec().into_boxed_slice(),
+            }),
+        ];
+        assert!(
+            kv_storage.batch(batch_data, true).await.is_ok(),
+            "Test #5.0 failed: batch operation failed"
+        );
+
+        // ===================================
+
+        async_std::task::sleep(std::time::Duration::from_millis(10)).await;
+
+        assert!(
+            kv_storage.contains(key_3.as_bytes().to_vec().into_boxed_slice()).await,
+            "Test #5.1 failed: the key should be present in the DB"
+        );
+
+        // ===================================
+
+        let _ = kv_storage
+            .set(
+                prefixed_key_1.as_bytes().to_vec().into_boxed_slice(),
+                value_1.as_bytes().to_vec().into_boxed_slice(),
+            )
+            .await;
+        let _ = kv_storage
+            .set(
+                prefixed_key_2.as_bytes().to_vec().into_boxed_slice(),
+                value_2.as_bytes().to_vec().into_boxed_slice(),
+            )
+            .await;
+        let _ = kv_storage
+            .set(
+                prefixed_key_3.as_bytes().to_vec().into_boxed_slice(),
+                value_3.as_bytes().to_vec().into_boxed_slice(),
+            )
+            .await;
+
+        let expected = vec![
+            value_1.as_bytes().to_vec().into_boxed_slice(),
+            value_3.as_bytes().to_vec().into_boxed_slice(),
+        ];
+
+        let mut received = Vec::new();
+        let mut data_stream = Box::into_pin(
+            kv_storage
+                .iterate(
+                    prefix.as_bytes().to_vec().into_boxed_slice(),
+                    (prefixed_key_1.len() - prefix.len()) as u32,
+                )
+                .unwrap(),
+        );
+
+        while let Some(value) = data_stream.next().await {
+            let v = value.unwrap();
+
+            if v.as_ref() != value_2.as_bytes() {
+                received.push(v);
+            }
+        }
+        assert_eq!(received, expected, "Test #6 failed: db content mismatch");
     }
 }
 
@@ -260,16 +534,18 @@ pub async fn db_sanity_test(db: LevelDb) -> Result<bool, JsValue> {
     ];
 
     let mut received = Vec::new();
-    let mut data_stream = kv_storage
-        .iterate(
-            prefix.as_bytes().to_vec().into_boxed_slice(),
-            (prefixed_key_1.len() - prefix.len()) as u32,
-        )
-        .map_err(|e| {
-            JsValue::from(JsError::new(
-                format!("Test #6.1 failed: failed to iterate over DB {:?}", e).as_str(),
-            ))
-        })?;
+    let mut data_stream = Box::into_pin(
+        kv_storage
+            .iterate(
+                prefix.as_bytes().to_vec().into_boxed_slice(),
+                (prefixed_key_1.len() - prefix.len()) as u32,
+            )
+            .map_err(|e| {
+                JsValue::from(JsError::new(
+                    format!("Test #6.1 failed: failed to iterate over DB {:?}", e).as_str(),
+                ))
+            })?,
+    );
 
     while let Some(value) = data_stream.next().await {
         let v = value

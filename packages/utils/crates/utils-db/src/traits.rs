@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use futures_lite::Stream;
 use serde::{Deserialize, Serialize};
 
 use crate::errors::Result;
@@ -33,6 +34,8 @@ where
     put(Put<K, V>),
 }
 
+pub type StorageValueIterator<T> = Box<dyn Stream<Item = crate::errors::Result<T>>>;
+
 #[cfg_attr(test, mockall::automock(type Key = Box < [u8] >; type Value = Box < [u8] >;))]
 #[async_trait(? Send)] // not placing the `Send` trait limitations on the trait
 pub trait AsyncKVStorage {
@@ -49,7 +52,11 @@ pub trait AsyncKVStorage {
 
     async fn dump(&self, destination: String) -> Result<()>;
 
-    fn iterate(&self, prefix: Self::Key, suffix_size: u32) -> Result<crate::types::BinaryStreamWrapper>;
+    fn iterate(
+        &self,
+        prefix: Self::Key,
+        suffix_size: u32,
+    ) -> Result<StorageValueIterator<Self::Value>>;
 
     async fn batch(
         &mut self,
@@ -57,8 +64,6 @@ pub trait AsyncKVStorage {
         wait_for_write: bool,
     ) -> Result<()>;
 }
-
-pub trait BinaryAsyncKVStorage: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> {}
 
 pub trait KVStorage {
     type Key;

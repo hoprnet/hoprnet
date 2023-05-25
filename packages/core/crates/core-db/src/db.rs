@@ -6,8 +6,8 @@ use core_types::channels::{ChannelEntry, Ticket};
 use utils_db::{
     constants::*,
     db::{serialize_to_bytes, DB},
-    traits::BinaryAsyncKVStorage,
 };
+use utils_db::traits::AsyncKVStorage;
 use utils_types::primitives::Snapshot;
 use utils_types::primitives::{Address, Balance, EthereumChallenge, U256};
 
@@ -16,14 +16,20 @@ use crate::traits::HoprCoreDbActions;
 
 pub struct CoreDb<T>
 where
-    T: BinaryAsyncKVStorage,
+    T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>,
 {
     db: DB<T>,
     me: PublicKey,
 }
 
+impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> CoreDb<T> {
+    pub fn new(db: DB<T>, me: PublicKey) -> Self {
+        Self { db, me }
+    }
+}
+
 #[async_trait(? Send)] // not placing the `Send` trait limitations on the trait
-impl<T: BinaryAsyncKVStorage> HoprCoreDbActions for CoreDb<T> {
+impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreDbActions for CoreDb<T> {
     async fn get_current_ticket_index(&self, channel_id: &Hash) -> Result<Option<U256>> {
         let prefixed_key = utils_db::db::Key::new_with_prefix(channel_id, TICKET_INDEX_PREFIX)?;
         if self.db.contains(prefixed_key.clone()).await {
@@ -153,7 +159,7 @@ impl<T: BinaryAsyncKVStorage> HoprCoreDbActions for CoreDb<T> {
     }
 
     async fn check_and_set_packet_tag(&mut self, tag: Box<[u8]>) -> Result<bool> {
-        let key = utils_db::db::Key::new_bytes_with_prefix(tag, PACKET_TAG_PREFIX)?;
+        let key = utils_db::db::Key::new_bytes_with_prefix(&tag, PACKET_TAG_PREFIX)?;
 
         let has_packet_tag = self.db.contains(key.clone()).await;
         if !has_packet_tag {
@@ -188,7 +194,7 @@ impl<T: BinaryAsyncKVStorage> HoprCoreDbActions for CoreDb<T> {
         ack_key.append(&mut channel_epoch);
 
         let ack_key =
-            utils_db::db::Key::new_bytes_with_prefix(ack_key.into_boxed_slice(), ACKNOWLEDGED_TICKETS_PREFIX)?;
+            utils_db::db::Key::new_bytes_with_prefix(&ack_key, ACKNOWLEDGED_TICKETS_PREFIX)?;
 
         let mut batch_ops = utils_db::db::Batch::new();
         batch_ops.del(unack_key);
