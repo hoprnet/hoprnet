@@ -12,9 +12,17 @@ license = "GPL-3.0-only"
 path = "src/lib.rs"
 crate-type = ["cdylib", "rlib"] # rlib is necessary to run integration tests
 
+[features]
+default = [ "wasm", "console_error_panic_hook" ]
+console_error_panic_hook = [ "dep:console_error_panic_hook" ]
+wasm = [ "dep:wasm-bindgen", "dep:js-sys" ]
+
 [dependencies]
+console_error_panic_hook = { version = "0.1.7", optional = true }
+js-sys = { version = "0.3.63", optional = true }
 thiserror = "1.0"
-wasm-bindgen = { workspace = true }
+utils-log = { path = "../../../utils/crates/utils-log" }
+wasm-bindgen = { workspace = true, optional = true }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.36"

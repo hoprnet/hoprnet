@@ -1,18 +1,23 @@
-use std::collections::HashMap;
-use std::ffi::OsString;
+use std::{collections::HashMap, ffi::OsString};
 
-use clap::builder::{PossibleValuesParser, ValueParser};
-use clap::{Arg, ArgAction, ArgMatches, Args, Command, FromArgMatches as _};
+use clap::{
+    builder::{PossibleValuesParser, ValueParser},
+    Arg, ArgAction, ArgMatches, Args, Command, FromArgMatches as _,
+};
 use core_misc::environment::{Environment, FromJsonFile, PackageJsonFile, ProtocolConfig};
 use core_strategy::{
     generic::ChannelStrategy, passive::PassiveStrategy, promiscuous::PromiscuousStrategy, random::RandomStrategy,
 };
 use hex;
 use proc_macro_regex::regex;
-use real_base::real;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use utils_misc::ok_or_str;
+
+#[cfg(any(not(feature = "wasm"), test))]
+use real_base::file::native::read_to_string;
+#[cfg(all(feature = "wasm", not(test)))]
+use real_base::file::wasm::read_to_string;
 
 pub const DEFAULT_API_HOST: &str = "localhost";
 pub const DEFAULT_API_PORT: u16 = 3001;
@@ -492,9 +497,9 @@ struct DefaultEnvironmentFile {
 impl FromJsonFile for DefaultEnvironmentFile {
     fn from_json_file(mono_repo_path: &str) -> Result<Self, String> {
         let default_environment_json_path: String = format!("{}/default-environment.json", mono_repo_path);
-        let data = ok_or_str!(real::read_file(default_environment_json_path.as_str()))?;
+        let data = ok_or_str!(read_to_string(default_environment_json_path.as_str()))?;
 
-        ok_or_str!(serde_json::from_slice::<DefaultEnvironmentFile>(&data))
+        ok_or_str!(serde_json::from_str::<DefaultEnvironmentFile>(&data))
     }
 }
 

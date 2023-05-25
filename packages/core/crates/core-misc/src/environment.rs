@@ -1,9 +1,12 @@
-use real_base::real;
 use serde::{Deserialize, Serialize};
 use utils_misc::ok_or_str;
 // import need to be called wasm_bindgen to make field annotations
 // such as `#[wasm_bindgen(skip)]` work
-use utils_proc_macros::wasm_bindgen_if as wasm_bindgen;
+
+#[cfg(any(not(feature = "wasm"), test))]
+use real_base::file::native::read_to_string;
+#[cfg(all(feature = "wasm", not(test)))]
+use real_base::file::wasm::read_to_string;
 
 pub trait FromJsonFile: Sized {
     fn from_json_file(mono_repo_path: &str) -> Result<Self, String>;
@@ -11,7 +14,7 @@ pub trait FromJsonFile: Sized {
 
 #[derive(Deserialize, Serialize, Clone, Copy)]
 #[serde(rename_all(deserialize = "lowercase"))]
-#[wasm_bindgen]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub enum EnvironmentType {
     Production,
     Staging,
@@ -32,7 +35,7 @@ impl ToString for EnvironmentType {
 /// the client is going to use
 #[derive(Deserialize, Serialize, Clone)]
 #[serde(deny_unknown_fields)]
-#[wasm_bindgen(getter_with_clone)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct NetworkOptions {
     #[serde(skip_deserializing)]
     pub id: String,
@@ -58,7 +61,7 @@ pub struct NetworkOptions {
 /// to be used by the client
 #[derive(Deserialize, Serialize, Clone)]
 #[serde(deny_unknown_fields)]
-#[wasm_bindgen(getter_with_clone)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct Environment {
     #[serde(skip_deserializing)]
     pub id: String,
@@ -100,9 +103,9 @@ impl FromJsonFile for ProtocolConfig {
     fn from_json_file(mono_repo_path: &str) -> Result<Self, String> {
         let protocol_config_path = format!("{}/packages/core/protocol-config.json", mono_repo_path);
 
-        let data = ok_or_str!(real::read_file(protocol_config_path.as_str()))?;
+        let data = ok_or_str!(read_to_string(protocol_config_path.as_str()))?;
 
-        let mut protocol_config = ok_or_str!(serde_json::from_slice::<ProtocolConfig>(&data))?;
+        let mut protocol_config = ok_or_str!(serde_json::from_str::<ProtocolConfig>(&data))?;
 
         for (id, env) in protocol_config.environments.iter_mut() {
             env.id = id.to_owned();
@@ -120,14 +123,14 @@ impl ProtocolConfig {
     /// Returns a list of environments which the node is able to work with
     pub fn supported_environments(&self, mono_repo_path: &str) -> Result<Vec<Environment>, String> {
         let version = PackageJsonFile::from_json_file(&mono_repo_path)
-            .and_then(|p| ok_or_str!(real::coerce_version(p.version.as_str())))?;
+            .and_then(|p| ok_or_str!(real_base::real::coerce_version(p.version.as_str())))?;
 
         let mut allowed: Vec<Environment> = vec![];
 
         for (_, env) in self.environments.iter() {
             let range = env.version_range.to_owned();
 
-            if let Ok(true) = real::satisfies(version.as_str(), range.as_str()) {
+            if let Ok(true) = real_base::real::satisfies(version.as_str(), range.as_str()) {
                 allowed.push(env.to_owned())
             }
         }
@@ -145,9 +148,9 @@ impl FromJsonFile for PackageJsonFile {
     fn from_json_file(mono_repo_path: &str) -> Result<Self, String> {
         let package_json_path = format!("{}/packages/hoprd/package.json", mono_repo_path);
 
-        let data = ok_or_str!(real::read_file(package_json_path.as_str()))?;
+        let data = ok_or_str!(read_to_string(package_json_path.as_str()))?;
 
-        ok_or_str!(serde_json::from_slice::<PackageJsonFile>(&data))
+        ok_or_str!(serde_json::from_str::<PackageJsonFile>(&data))
     }
 }
 
@@ -157,12 +160,12 @@ impl PackageJsonFile {
          * Coerced full version using
          * coerce_version('42.6.7.9.3-alpha') // '42.6.7'
          */
-        ok_or_str!(real::coerce_version(self.version.as_str()))
+        ok_or_str!(real_base::real::coerce_version(self.version.as_str()))
     }
 }
 
 #[derive(Serialize, Clone)]
-#[wasm_bindgen(getter_with_clone)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct ResolvedEnvironment {
     /// the environment identifier, e.g. monte_rosa
     pub id: String,
@@ -212,7 +215,7 @@ impl ResolvedEnvironment {
             network.default_provider = custom_provider.into();
         }
 
-        match real::satisfies(version.as_str(), environment.version_range.as_str()) {
+        match real_base::real::satisfies(version.as_str(), environment.version_range.as_str()) {
             Ok(true) => Ok(ResolvedEnvironment {
                 id: environment_id.into(),
                 network: network.to_owned(),

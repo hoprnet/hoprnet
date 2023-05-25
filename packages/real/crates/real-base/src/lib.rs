@@ -1,27 +1,27 @@
-use wasm_bindgen::prelude::*;
-
 pub mod error;
 pub mod file;
 pub mod real;
 
-/// Dummy function to test WASM.
-#[wasm_bindgen]
-pub fn dummy_get_one() -> String {
-    String::from("1")
-}
+/// Only relevant for testing
+#[cfg(feature = "wasm")]
+pub mod wasm {
+    use wasm_bindgen::prelude::wasm_bindgen;
 
-// Unit tests follow
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use wasm_bindgen_test::*;
-
-    #[wasm_bindgen_test]
-    fn test_dummy_get_one() {
-        assert_eq!(dummy_get_one().as_str(), "1");
+    #[allow(dead_code)]
+    #[wasm_bindgen]
+    pub fn real_base_set_panic_hook() {
+        // When the `console_error_panic_hook` feature is enabled, we can call the
+        // `set_panic_hook` function at least once during initialization, and then
+        // we will get better error messages if our code ever panics.
+        //
+        // For more details see
+        // https://github.com/rustwasm/console_error_panic_hook#readme
+        #[cfg(feature = "console_error_panic_hook")]
+        console_error_panic_hook::set_once();
     }
-}
 
-// NOTE: this crate cannot have the `set_console_panic_hook` function, because
-// the crates using this package already have it. There can be at most 1 per WASM module.
+    // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global allocator.
+    #[cfg(feature = "wee_alloc")]
+    #[global_allocator]
+    static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
+}
