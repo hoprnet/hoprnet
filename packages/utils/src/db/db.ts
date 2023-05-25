@@ -283,7 +283,7 @@ export class LevelDb {
         dumpFile.close()
       })
   }
-  
+
   public async setNetworkId(network_id: string): Promise<void> {
     await this.put(NETWORK_KEY, encoder.encode(network_id))
   }

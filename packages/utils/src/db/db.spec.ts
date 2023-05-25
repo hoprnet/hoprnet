@@ -133,7 +133,7 @@ describe(`levelup shim tests`, function () {
   afterEach(async function () {
     await db.close()
   })
-  
+
   it('should store network', async function () {
     await db.setNetworkId('test-env')
     assert.equal(await db.getNetworkId(), 'test-env')
