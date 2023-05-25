@@ -164,7 +164,10 @@ mod tests {
         let opt = rusty_leveldb::in_memory();
         let db = rusty_leveldb::DB::open("test", opt).unwrap();
 
-        CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(db)), PublicKey::from_privkey(&PRIV_KEY).unwrap())
+        CoreEthereumDb::new(
+            DB::new(RustyLevelDbShim::new(db)),
+            PublicKey::from_privkey(&PRIV_KEY).unwrap(),
+        )
     }
 
     #[async_std::test]

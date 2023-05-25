@@ -1,4 +1,3 @@
-use std::fmt::{Display, Formatter};
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use curve25519_dalek::traits::IsIdentity;
 use curve25519_dalek::EdwardsPoint;
@@ -13,6 +12,7 @@ use k256::{ecdsa, elliptic_curve, AffinePoint, Secp256k1};
 use libp2p_identity::{secp256k1::PublicKey as lp2p_k256_PublicKey, PeerId, PublicKey as lp2p_PublicKey};
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
 use std::ops::Add;
 use std::str::FromStr;
 
