@@ -6,13 +6,15 @@ use core_crypto::iterated_hash::{iterate_hash, recover_iterated_hash};
 use core_crypto::types::Hash;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use futures::FutureExt;
-use utils_log::{debug, warn, info};
+use utils_log::{debug, warn, info, error};
 use utils_types::primitives::U256;
 use utils_types::traits::{BinarySerializable, ToHex};
 
-pub const DB_ITERATION_BLOCK_SIZE: usize = 10000;
-pub const TOTAL_ITERATIONS: usize = 100000;
+const DB_ITERATION_BLOCK_SIZE: usize = 10000;
+const TOTAL_ITERATIONS: usize = 100000;
 
+/// Retrieves commitment pre-image for the given channel ID from the database.
+/// Returns `CalculationError` if commitment couldn't be found.
 pub async fn find_commitment_preimage<T: HoprCoreEthereumDbActions>(db: &T, channel_id: &Hash) -> Result<Hash> {
     let current_commitment = db.get_current_commitment(channel_id).await?;
     let recovered = recover_iterated_hash(
@@ -22,8 +24,8 @@ pub async fn find_commitment_preimage<T: HoprCoreEthereumDbActions>(db: &T, chan
         &|iteration: usize| async move {
             match db.get_commitment(channel_id, iteration).await {
                 Ok(opt) => opt.map(|hash| hash.to_bytes()),
-                Err(_) => {
-                    // TODO: log error
+                Err(e) => {
+                    error!("failed to retrieve iteration {channel_id} #{iteration}: {e}");
                     None
                 }
             }
@@ -37,6 +39,7 @@ pub async fn find_commitment_preimage<T: HoprCoreEthereumDbActions>(db: &T, chan
     Ok(Hash::new(&recovered.intermediate))
 }
 
+/// Updates the commitment in the database on the given channel ID with the new value.
 pub async fn bump_commitment<T: HoprCoreEthereumDbActions>(
     db: &mut T,
     channel_id: &Hash,
@@ -47,6 +50,7 @@ pub async fn bump_commitment<T: HoprCoreEthereumDbActions>(
         .map_err(|e| DbError(e))
 }
 
+///
 #[cfg_attr(test, mockall::automock)]
 #[async_trait(? Send)]
 pub trait ChainCommitter {
@@ -54,7 +58,7 @@ pub trait ChainCommitter {
     async fn set_commitment(&mut self, commitment: &Hash) -> String;
 }
 
-pub async fn create_commitment_chain<T, C>(
+async fn create_commitment_chain<T, C>(
     db: &mut T,
     channel_id: &Hash,
     initial_commitment_seed: &[u8],
@@ -76,16 +80,21 @@ where
     Ok(())
 }
 
+/// Holds the commitment information of a specific channel.
 pub struct ChannelCommitmentInfo {
+    /// ID of the blockchain network
     pub chain_id: u32,
+    /// Channel contract address
     pub contract_address: String,
+    /// ID of the channel
     pub channel_id: Hash,
+    /// Channel epoch value
     pub channel_epoch: U256,
 }
 
 impl ChannelCommitmentInfo {
     /// Generate the initial commitment seed using this channel information and the given
-    //  private node key.
+    ///node private key.
     pub fn create_initial_commitment_seed(&self, private_key: &[u8]) -> Result<Box<[u8]>> {
         let mut buf = Vec::with_capacity(U256::SIZE + 4 + Hash::SIZE + self.contract_address.len());
         buf.extend_from_slice(&self.channel_epoch.to_bytes());
@@ -97,6 +106,9 @@ impl ChannelCommitmentInfo {
     }
 }
 
+/// Initializes commitment for the given channel.
+/// The ChainCommitter is used to tell the current state of the channel and to determine if re-initialization is
+/// needed or not.
 pub async fn initialize_commitment<T, C>(
     db: &mut T,
     private_key: &[u8],
@@ -185,7 +197,7 @@ mod tests {
         initialize_commitment(&mut db, &PRIV_KEY, &comm_info, &mut committer).await.unwrap();
 
         let c3 = find_commitment_preimage(&mut db, &comm_info.channel_id).await.unwrap();
-        assert_eq!(c2, c3);
+        assert_eq!(c2, c3, "repeated initializations should return the same commitment");
     }
 
 }
