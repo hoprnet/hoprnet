@@ -151,19 +151,19 @@ mod tests {
     use core_crypto::types::{Hash, PublicKey};
     use core_ethereum_db::db::CoreEthereumDb;
     use utils_db::db::DB;
-    use utils_db::leveldb::RustyDbShim;
+    use utils_db::leveldb::RustyLevelDbShim;
     use utils_types::primitives::U256;
     use utils_types::traits::BinarySerializable;
     use crate::commitment::{bump_commitment, ChannelCommitmentInfo, find_commitment_preimage, initialize_commitment, MockChainCommitter};
 
     const PRIV_KEY: [u8; 32] = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
 
-    fn create_mock_db() -> CoreEthereumDb<RustyDbShim> {
+    fn create_mock_db() -> CoreEthereumDb<RustyLevelDbShim> {
         let opt = rusty_leveldb::in_memory();
         let db = rusty_leveldb::DB::open("test", opt).unwrap();
 
         CoreEthereumDb {
-            db: DB::new(RustyDbShim::new(db)),
+            db: DB::new(RustyLevelDbShim::new(db)),
             me: PublicKey::from_privkey(&PRIV_KEY).unwrap(),
         }
     }
