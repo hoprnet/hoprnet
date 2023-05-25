@@ -170,8 +170,7 @@ jobs:
       - name: "Setup environment"
         run: |
           prBase="${{ github.event.pull_request.base.ref }}"
-          # The identification of the network will be made once https://github.com/hoprnet/hoprnet/issues/4835 is finished
-          network=master-staging
+          network=$(jq -r "to_entries[] | select(.key==\"${prBase/*\/}\").value.network" packages/hoprd/releases.json)
           echo "NETWORK_DASH=${network/_/-}" >> $GITHUB_ENV
       - name: Executing remote SSH command
         uses: appleboy/ssh-action@v0.1.10

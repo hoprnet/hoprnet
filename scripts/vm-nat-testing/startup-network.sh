@@ -10,8 +10,8 @@ declare anvil_rpc_log="/tmp/anvil.logs"
 if [ "$(curl -s -o /dev/null -w ''%{http_code}'' 127.0.0.1:8545)" != "200" ]; then
 	# make sure other node instances are killed
 	sudo pkill node || :
-	# Start the Anvil network on localhost
-	echo "Starting Anvil network..."
+	# Start the Anvil chain on localhost
+	echo "Starting Anvil chain..."
 	make -C "${hopr_dir}" run-anvil
 fi
 
@@ -20,7 +20,7 @@ while [[
 	! -f "${anvil_rpc_log}" ||
   -z "$(grep "Listening on 127.0.0.1:8545" "${anvil_rpc_log}" || echo "")"
 	]] ; do
-	echo "Waiting for anvil network to come up..."
+	echo "Waiting for anvil chain to come up..."
 	sleep 5;
 done
 

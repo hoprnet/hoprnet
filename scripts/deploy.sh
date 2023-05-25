@@ -40,11 +40,11 @@ echo "Looking for releases to deploy from branch ${branch}"
 for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entries[] | .value.git_ref" | uniq); do
   if [[ "${branch}" =~ ${git_ref} ]]; then
     for row in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entries[] | select(.value.git_ref==\"${git_ref}\") | @base64"); do
-      declare release_id deprecated environment_id version_major version_minor docker_image_full
+      declare release_id deprecated network version_major version_minor docker_image_full
 
       release_id=$(_jq "${row}" ".key")
       deprecated=$(_jq "${row}" ".value.deprecated")
-      environment_id=$(_jq "${row}" ".value.environment_id")
+      network=$(_jq "${row}" ".value.network")
       version_major=$(_jq "${row}" ".value.version_major")
       version_minor=$(_jq "${row}" ".value.version_minor")
       docker_image_version=$(_jq "${row}" ".value.docker_image_version")
@@ -77,7 +77,7 @@ for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entr
 
       log "deploying release ${release_id}"
       log "\tversion: ${version_maj_min}"
-      log "\tenvironment ${environment_id}"
+      log "\tnetwork id: ${network}"
       log "\tdocker image: ${docker_image_full}"
       log "\tcluster name: ${cluster_name}"
       log "\tcluster template name: ${cluster_template_name}"
@@ -86,7 +86,7 @@ for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entr
       if [[ "${cluster_tag}" =~ "-nat$" ]]; then
         log "\tNATed node, no announcements"
         ${mydir}/setup-gcloud-cluster.sh \
-          "${environment_id}" \
+          "${network}" \
           "" \
           "${cluster_name}" \
           "${docker_image_full}" \
@@ -96,7 +96,7 @@ for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entr
       else
         # announce on-chain with routable address
         ${mydir}/setup-gcloud-cluster.sh \
-          "${environment_id}" \
+          "${network}" \
           "" \
           "${cluster_name}" \
           "${docker_image_full}" \

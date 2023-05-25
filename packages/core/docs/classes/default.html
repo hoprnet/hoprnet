@@ -321,36 +321,100 @@ regular <code>&#39;error&#39;</code> listener is installed.</p>
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Alias for <code>emitter.on(eventName, listener)</code>.</p>
 
-<h3>Since</h3><p>v0.1.26</p>
-</div>
-<div class="tsd-parameters">
-<h4 class="tsd-parameters-title">Parameters</h4>
-<ul class="tsd-parameter-list">
-<li>
-<h5><span class="tsd-kind-parameter">eventName</span>: <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">symbol</span></h5></li>
-<li>
-<h5><span class="tsd-kind-parameter">listener</span>: <span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">...</span><span class="tsd-kind-parameter">args</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">)</span></h5>
-<ul class="tsd-parameters">
-<li class="tsd-parameter-signature">
-<ul class="tsd-signatures tsd-is-external">
-<li class="tsd-signature"><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">...</span><span class="tsd-kind-parameter">args</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">void</span></li>
-<li class="tsd-description">
-<div class="tsd-parameters">
-<h4 class="tsd-parameters-title">Parameters</h4>
-<ul class="tsd-parameter-list">
-<li>
-<h5><code class="tsd-tag ts-flagRest">Rest</code> <span class="tsd-signature-symbol">...</span><span class="tsd-kind-parameter">args</span>: <span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">[]</span></h5></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4></li></ul></li></ul></li></ul></div>
-<h4 class="tsd-returns-title">Returns <a href="default.html" class="tsd-signature-type tsd-kind-class">default</a></h4><aside class="tsd-sources">
-<p>Inherited from EventEmitter.addListener</p>
-<ul>
-<li>Defined in node_modules/@types/node/events.d.ts:317</li></ul></aside></li></ul></section>
-<section class="tsd-panel tsd-member tsd-is-private"><a id="announce" class="tsd-anchor"></a>
-<h3 class="tsd-anchor-link"><code class="tsd-tag ts-flagPrivate">Private</code> <span>announce</span><a href="#announce" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
-<ul class="tsd-signatures tsd-is-private">
-<li class="tsd-signature tsd-anchor-link" id="announce.announce-1"><span class="tsd-kind-call-signature">announce</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">announceRoutableAddress</span><span class="tsd-signature-symbol">?</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">&gt;</span><a href="#announce.announce-1" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
-<li class="tsd-description">
-<div class="tsd-comment tsd-typography"><p>Announces address of node on-chain to be reachable by other nodes.</p>
+                                <h3>Since</h3>
+                                <p>v0.1.26</p>
+                            </div>
+                            <div class="tsd-parameters">
+                                <h4 class="tsd-parameters-title">Parameters</h4>
+                                <ul class="tsd-parameter-list">
+                                    <li>
+                                        <h5><span class="tsd-kind-parameter">eventName</span>: <span
+                                                class="tsd-signature-type">string</span><span
+                                                class="tsd-signature-symbol"> | </span><span
+                                                class="tsd-signature-type">symbol</span></h5>
+                                    </li>
+                                    <li>
+                                        <h5><span class="tsd-kind-parameter">listener</span>: <span
+                                                class="tsd-signature-symbol">(</span><span
+                                                class="tsd-signature-symbol">(</span><span
+                                                class="tsd-signature-symbol">...</span><span
+                                                class="tsd-kind-parameter">args</span><span
+                                                class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">
+                                                =&gt; </span><span class="tsd-signature-type">void</span><span
+                                                class="tsd-signature-symbol">)</span></h5>
+                                        <ul class="tsd-parameters">
+                                            <li class="tsd-parameter-signature">
+                                                <ul class="tsd-signatures tsd-is-external">
+                                                    <li class="tsd-signature"><span
+                                                            class="tsd-signature-symbol">(</span><span
+                                                            class="tsd-signature-symbol">...</span><span
+                                                            class="tsd-kind-parameter">args</span><span
+                                                            class="tsd-signature-symbol">)</span><span
+                                                            class="tsd-signature-symbol">: </span><span
+                                                            class="tsd-signature-type">void</span></li>
+                                                    <li class="tsd-description">
+                                                        <div class="tsd-parameters">
+                                                            <h4 class="tsd-parameters-title">Parameters</h4>
+                                                            <ul class="tsd-parameter-list">
+                                                                <li>
+                                                                    <h5><code class="tsd-tag ts-flagRest">Rest</code>
+                                                                        <span
+                                                                            class="tsd-signature-symbol">...</span><span
+                                                                            class="tsd-kind-parameter">args</span>:
+                                                                        <span class="tsd-signature-type">any</span><span
+                                                                            class="tsd-signature-symbol">[]</span></h5>
+                                                                </li>
+                                                            </ul>
+                                                        </div>
+                                                        <h4 class="tsd-returns-title">Returns <span
+                                                                class="tsd-signature-type">void</span></h4>
+                                                    </li>
+                                                </ul>
+                                            </li>
+                                        </ul>
+                                    </li>
+                                </ul>
+                            </div>
+                            <h4 class="tsd-returns-title">Returns <a href="default.html"
+                                    class="tsd-signature-type tsd-kind-class">default</a></h4>
+                            <aside class="tsd-sources">
+                                <p>Inherited from EventEmitter.addListener</p>
+                                <ul>
+                                    <li>Defined in node_modules/@types/node/events.d.ts:317</li>
+                                </ul>
+                            </aside>
+                        </li>
+                    </ul>
+                </section>
+                <section class="tsd-panel tsd-member tsd-is-private"><a id="announce" class="tsd-anchor"></a>
+                    <h3 class="tsd-anchor-link"><code class="tsd-tag ts-flagPrivate">Private</code>
+                        <span>announce</span><a href="#announce" aria-label="Permalink" class="tsd-anchor-icon"><svg
+                                class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2"
+                                stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                <use href="#icon-anchor-a"></use>
+                                <use href="#icon-anchor-b"></use>
+                                <use href="#icon-anchor-c"></use>
+                            </svg></a></h3>
+                    <ul class="tsd-signatures tsd-is-private">
+                        <li class="tsd-signature tsd-anchor-link" id="announce.announce-1"><span
+                                class="tsd-kind-call-signature">announce</span><span
+                                class="tsd-signature-symbol">(</span><span
+                                class="tsd-kind-parameter">announceRoutableAddress</span><span
+                                class="tsd-signature-symbol">?</span><span class="tsd-signature-symbol">)</span><span
+                                class="tsd-signature-symbol">: </span><span
+                                class="tsd-signature-type ">Promise</span><span
+                                class="tsd-signature-symbol">&lt;</span><span
+                                class="tsd-signature-type">void</span><span class="tsd-signature-symbol">&gt;</span><a
+                                href="#announce.announce-1" aria-label="Permalink" class="tsd-anchor-icon"><svg
+                                    class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2"
+                                    stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                    <use href="#icon-anchor-a"></use>
+                                    <use href="#icon-anchor-b"></use>
+                                    <use href="#icon-anchor-c"></use>
+                                </svg></a></li>
+                        <li class="tsd-description">
+                            <div class="tsd-comment tsd-typography">
+                                <p>Announces address of node on-chain to be reachable by other nodes.</p>
 
 <h3>Dev</h3><p>Promise resolves before own announcement appears in the indexer</p>
 </div>
@@ -807,26 +871,59 @@ set by <code>emitter.setMaxListeners(n)</code> or defaults to <a href="default.h
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Returns the number of listeners listening to the event named <code>eventName</code>.</p>
 
-<h3>Since</h3><p>v3.2.0</p>
-</div>
-<div class="tsd-parameters">
-<h4 class="tsd-parameters-title">Parameters</h4>
-<ul class="tsd-parameter-list">
-<li>
-<h5><span class="tsd-kind-parameter">eventName</span>: <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">symbol</span></h5>
-<div class="tsd-comment tsd-typography"><p>The name of the event being listened for</p>
-</div></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span></h4><aside class="tsd-sources">
-<p>Inherited from EventEmitter.listenerCount</p>
-<ul>
-<li>Defined in node_modules/@types/node/events.d.ts:579</li></ul></aside></li></ul></section>
-<section class="tsd-panel tsd-member tsd-is-inherited tsd-is-external"><a id="listeners" class="tsd-anchor"></a>
-<h3 class="tsd-anchor-link"><span>listeners</span><a href="#listeners" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
-<ul class="tsd-signatures tsd-is-inherited tsd-is-external">
-<li class="tsd-signature tsd-anchor-link" id="listeners.listeners-1"><span class="tsd-kind-call-signature">listeners</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">eventName</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">Function</span><span class="tsd-signature-symbol">[]</span><a href="#listeners.listeners-1" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
-<li class="tsd-description">
-<div class="tsd-comment tsd-typography"><p>Returns a copy of the array of listeners for the event named <code>eventName</code>.</p>
-<pre><code class="language-js"><span class="hl-6">server</span><span class="hl-1">.</span><span class="hl-3">on</span><span class="hl-1">(</span><span class="hl-4">&#39;connection&#39;</span><span class="hl-1">, (</span><span class="hl-6">stream</span><span class="hl-1">) </span><span class="hl-0">=&gt;</span><span class="hl-1"> {</span><br/><span class="hl-1">  </span><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-4">&#39;someone connected!&#39;</span><span class="hl-1">);</span><br/><span class="hl-1">});</span><br/><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-6">util</span><span class="hl-1">.</span><span class="hl-3">inspect</span><span class="hl-1">(</span><span class="hl-6">server</span><span class="hl-1">.</span><span class="hl-3">listeners</span><span class="hl-1">(</span><span class="hl-4">&#39;connection&#39;</span><span class="hl-1">)));</span><br/><span class="hl-5">// Prints: [ [Function] ]</span>
+                            <h3>Since</h3>
+                            <p>v3.2.0</p>
+                        </div>
+                        <div class="tsd-parameters">
+                            <h4 class="tsd-parameters-title">Parameters</h4>
+                            <ul class="tsd-parameter-list">
+                                <li>
+                                    <h5><span class="tsd-kind-parameter">eventName</span>: <span
+                                            class="tsd-signature-type">string</span><span class="tsd-signature-symbol">
+                                            | </span><span class="tsd-signature-type">symbol</span></h5>
+                                    <div class="tsd-comment tsd-typography">
+                                        <p>The name of the event being listened for</p>
+                                    </div>
+                                </li>
+                            </ul>
+                        </div>
+                        <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span></h4>
+                        <aside class="tsd-sources">
+                            <p>Inherited from EventEmitter.listenerCount</p>
+                            <ul>
+                                <li>Defined in node_modules/@types/node/events.d.ts:579</li>
+                            </ul>
+                        </aside>
+                    </li>
+                </ul>
+            </section>
+            <section class="tsd-panel tsd-member tsd-is-inherited tsd-is-external"><a id="listeners"
+                    class="tsd-anchor"></a>
+                <h3 class="tsd-anchor-link"><span>listeners</span><a href="#listeners" aria-label="Permalink"
+                        class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24"
+                            stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
+                            stroke-linejoin="round">
+                            <use href="#icon-anchor-a"></use>
+                            <use href="#icon-anchor-b"></use>
+                            <use href="#icon-anchor-c"></use>
+                        </svg></a></h3>
+                <ul class="tsd-signatures tsd-is-inherited tsd-is-external">
+                    <li class="tsd-signature tsd-anchor-link" id="listeners.listeners-1"><span
+                            class="tsd-kind-call-signature">listeners</span><span
+                            class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">eventName</span><span
+                            class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span
+                            class="tsd-signature-type ">Function</span><span class="tsd-signature-symbol">[]</span><a
+                            href="#listeners.listeners-1" aria-label="Permalink" class="tsd-anchor-icon"><svg
+                                class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2"
+                                stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                <use href="#icon-anchor-a"></use>
+                                <use href="#icon-anchor-b"></use>
+                                <use href="#icon-anchor-c"></use>
+                            </svg></a></li>
+                    <li class="tsd-description">
+                        <div class="tsd-comment tsd-typography">
+                            <p>Returns a copy of the array of listeners for the event named <code>eventName</code>.</p>
+                            <pre><code class="language-js"><span class="hl-6">server</span><span class="hl-1">.</span><span class="hl-3">on</span><span class="hl-1">(</span><span class="hl-4">&#39;connection&#39;</span><span class="hl-1">, (</span><span class="hl-6">stream</span><span class="hl-1">) </span><span class="hl-0">=&gt;</span><span class="hl-1"> {</span><br/><span class="hl-1">  </span><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-4">&#39;someone connected!&#39;</span><span class="hl-1">);</span><br/><span class="hl-1">});</span><br/><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-6">util</span><span class="hl-1">.</span><span class="hl-3">inspect</span><span class="hl-1">(</span><span class="hl-6">server</span><span class="hl-1">.</span><span class="hl-3">listeners</span><span class="hl-1">(</span><span class="hl-4">&#39;connection&#39;</span><span class="hl-1">)));</span><br/><span class="hl-5">// Prints: [ [Function] ]</span>
 </code><button>Copy</button></pre>
 
 <h3>Since</h3><p>v0.1.26</p>
@@ -887,45 +984,109 @@ reply to DHT queries of other nodes</p>
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Alias for <code>emitter.removeListener()</code>.</p>
 
-<h3>Since</h3><p>v10.0.0</p>
-</div>
-<div class="tsd-parameters">
-<h4 class="tsd-parameters-title">Parameters</h4>
-<ul class="tsd-parameter-list">
-<li>
-<h5><span class="tsd-kind-parameter">eventName</span>: <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">symbol</span></h5></li>
-<li>
-<h5><span class="tsd-kind-parameter">listener</span>: <span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">...</span><span class="tsd-kind-parameter">args</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">)</span></h5>
-<ul class="tsd-parameters">
-<li class="tsd-parameter-signature">
-<ul class="tsd-signatures tsd-is-external">
-<li class="tsd-signature"><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">...</span><span class="tsd-kind-parameter">args</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">void</span></li>
-<li class="tsd-description">
-<div class="tsd-parameters">
-<h4 class="tsd-parameters-title">Parameters</h4>
-<ul class="tsd-parameter-list">
-<li>
-<h5><code class="tsd-tag ts-flagRest">Rest</code> <span class="tsd-signature-symbol">...</span><span class="tsd-kind-parameter">args</span>: <span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">[]</span></h5></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4></li></ul></li></ul></li></ul></div>
-<h4 class="tsd-returns-title">Returns <a href="default.html" class="tsd-signature-type tsd-kind-class">default</a></h4><aside class="tsd-sources">
-<p>Inherited from EventEmitter.off</p>
-<ul>
-<li>Defined in node_modules/@types/node/events.d.ts:462</li></ul></aside></li></ul></section>
-<section class="tsd-panel tsd-member tsd-is-inherited tsd-is-external"><a id="on" class="tsd-anchor"></a>
-<h3 class="tsd-anchor-link"><span>on</span><a href="#on" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
-<ul class="tsd-signatures tsd-is-inherited tsd-is-external">
-<li class="tsd-signature tsd-anchor-link" id="on.on-1"><span class="tsd-kind-call-signature">on</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">eventName</span>, <span class="tsd-kind-parameter">listener</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><a href="default.html" class="tsd-signature-type tsd-kind-class">default</a><a href="#on.on-1" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
-<li class="tsd-description">
-<div class="tsd-comment tsd-typography"><p>Adds the <code>listener</code> function to the end of the listeners array for the
-event named <code>eventName</code>. No checks are made to see if the <code>listener</code> has
-already been added. Multiple calls passing the same combination of <code>eventName</code>and <code>listener</code> will result in the <code>listener</code> being added, and called, multiple
-times.</p>
-<pre><code class="language-js"><span class="hl-6">server</span><span class="hl-1">.</span><span class="hl-3">on</span><span class="hl-1">(</span><span class="hl-4">&#39;connection&#39;</span><span class="hl-1">, (</span><span class="hl-6">stream</span><span class="hl-1">) </span><span class="hl-0">=&gt;</span><span class="hl-1"> {</span><br/><span class="hl-1">  </span><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-4">&#39;someone connected!&#39;</span><span class="hl-1">);</span><br/><span class="hl-1">});</span>
+                            <h3>Since</h3>
+                            <p>v10.0.0</p>
+                        </div>
+                        <div class="tsd-parameters">
+                            <h4 class="tsd-parameters-title">Parameters</h4>
+                            <ul class="tsd-parameter-list">
+                                <li>
+                                    <h5><span class="tsd-kind-parameter">eventName</span>: <span
+                                            class="tsd-signature-type">string</span><span class="tsd-signature-symbol">
+                                            | </span><span class="tsd-signature-type">symbol</span></h5>
+                                </li>
+                                <li>
+                                    <h5><span class="tsd-kind-parameter">listener</span>: <span
+                                            class="tsd-signature-symbol">(</span><span
+                                            class="tsd-signature-symbol">(</span><span
+                                            class="tsd-signature-symbol">...</span><span
+                                            class="tsd-kind-parameter">args</span><span
+                                            class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">
+                                            =&gt; </span><span class="tsd-signature-type">void</span><span
+                                            class="tsd-signature-symbol">)</span></h5>
+                                    <ul class="tsd-parameters">
+                                        <li class="tsd-parameter-signature">
+                                            <ul class="tsd-signatures tsd-is-external">
+                                                <li class="tsd-signature"><span
+                                                        class="tsd-signature-symbol">(</span><span
+                                                        class="tsd-signature-symbol">...</span><span
+                                                        class="tsd-kind-parameter">args</span><span
+                                                        class="tsd-signature-symbol">)</span><span
+                                                        class="tsd-signature-symbol">: </span><span
+                                                        class="tsd-signature-type">void</span></li>
+                                                <li class="tsd-description">
+                                                    <div class="tsd-parameters">
+                                                        <h4 class="tsd-parameters-title">Parameters</h4>
+                                                        <ul class="tsd-parameter-list">
+                                                            <li>
+                                                                <h5><code class="tsd-tag ts-flagRest">Rest</code> <span
+                                                                        class="tsd-signature-symbol">...</span><span
+                                                                        class="tsd-kind-parameter">args</span>: <span
+                                                                        class="tsd-signature-type">any</span><span
+                                                                        class="tsd-signature-symbol">[]</span></h5>
+                                                            </li>
+                                                        </ul>
+                                                    </div>
+                                                    <h4 class="tsd-returns-title">Returns <span
+                                                            class="tsd-signature-type">void</span></h4>
+                                                </li>
+                                            </ul>
+                                        </li>
+                                    </ul>
+                                </li>
+                            </ul>
+                        </div>
+                        <h4 class="tsd-returns-title">Returns <a href="default.html"
+                                class="tsd-signature-type tsd-kind-class">default</a></h4>
+                        <aside class="tsd-sources">
+                            <p>Inherited from EventEmitter.off</p>
+                            <ul>
+                                <li>Defined in node_modules/@types/node/events.d.ts:462</li>
+                            </ul>
+                        </aside>
+                    </li>
+                </ul>
+            </section>
+            <section class="tsd-panel tsd-member tsd-is-inherited tsd-is-external"><a id="on" class="tsd-anchor"></a>
+                <h3 class="tsd-anchor-link"><span>on</span><a href="#on" aria-label="Permalink"
+                        class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24"
+                            stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
+                            stroke-linejoin="round">
+                            <use href="#icon-anchor-a"></use>
+                            <use href="#icon-anchor-b"></use>
+                            <use href="#icon-anchor-c"></use>
+                        </svg></a></h3>
+                <ul class="tsd-signatures tsd-is-inherited tsd-is-external">
+                    <li class="tsd-signature tsd-anchor-link" id="on.on-1"><span
+                            class="tsd-kind-call-signature">on</span><span class="tsd-signature-symbol">(</span><span
+                            class="tsd-kind-parameter">eventName</span>, <span
+                            class="tsd-kind-parameter">listener</span><span class="tsd-signature-symbol">)</span><span
+                            class="tsd-signature-symbol">: </span><a href="default.html"
+                            class="tsd-signature-type tsd-kind-class">default</a><a href="#on.on-1"
+                            aria-label="Permalink" class="tsd-anchor-icon"><svg
+                                class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2"
+                                stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                <use href="#icon-anchor-a"></use>
+                                <use href="#icon-anchor-b"></use>
+                                <use href="#icon-anchor-c"></use>
+                            </svg></a></li>
+                    <li class="tsd-description">
+                        <div class="tsd-comment tsd-typography">
+                            <p>Adds the <code>listener</code> function to the end of the listeners array for the
+                                event named <code>eventName</code>. No checks are made to see if the
+                                <code>listener</code> has
+                                already been added. Multiple calls passing the same combination of
+                                <code>eventName</code>and <code>listener</code> will result in the <code>listener</code>
+                                being added, and called, multiple
+                                times.</p>
+                            <pre><code class="language-js"><span class="hl-6">server</span><span class="hl-1">.</span><span class="hl-3">on</span><span class="hl-1">(</span><span class="hl-4">&#39;connection&#39;</span><span class="hl-1">, (</span><span class="hl-6">stream</span><span class="hl-1">) </span><span class="hl-0">=&gt;</span><span class="hl-1"> {</span><br/><span class="hl-1">  </span><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-4">&#39;someone connected!&#39;</span><span class="hl-1">);</span><br/><span class="hl-1">});</span>
 </code><button>Copy</button></pre>
-<p>Returns a reference to the <code>EventEmitter</code>, so that calls can be chained.</p>
-<p>By default, event listeners are invoked in the order they are added. The<code>emitter.prependListener()</code> method can be used as an alternative to add the
-event listener to the beginning of the listeners array.</p>
-<pre><code class="language-js"><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-2">myEE</span><span class="hl-1"> = </span><span class="hl-0">new</span><span class="hl-1"> </span><span class="hl-3">EventEmitter</span><span class="hl-1">();</span><br/><span class="hl-6">myEE</span><span class="hl-1">.</span><span class="hl-3">on</span><span class="hl-1">(</span><span class="hl-4">&#39;foo&#39;</span><span class="hl-1">, () </span><span class="hl-0">=&gt;</span><span class="hl-1"> </span><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-4">&#39;a&#39;</span><span class="hl-1">));</span><br/><span class="hl-6">myEE</span><span class="hl-1">.</span><span class="hl-3">prependListener</span><span class="hl-1">(</span><span class="hl-4">&#39;foo&#39;</span><span class="hl-1">, () </span><span class="hl-0">=&gt;</span><span class="hl-1"> </span><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-4">&#39;b&#39;</span><span class="hl-1">));</span><br/><span class="hl-6">myEE</span><span class="hl-1">.</span><span class="hl-3">emit</span><span class="hl-1">(</span><span class="hl-4">&#39;foo&#39;</span><span class="hl-1">);</span><br/><span class="hl-5">// Prints:</span><br/><span class="hl-5">//   b</span><br/><span class="hl-5">//   a</span>
+                            <p>Returns a reference to the <code>EventEmitter</code>, so that calls can be chained.</p>
+                            <p>By default, event listeners are invoked in the order they are added.
+                                The<code>emitter.prependListener()</code> method can be used as an alternative to add
+                                the
+                                event listener to the beginning of the listeners array.</p>
+                            <pre><code class="language-js"><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-2">myEE</span><span class="hl-1"> = </span><span class="hl-0">new</span><span class="hl-1"> </span><span class="hl-3">EventEmitter</span><span class="hl-1">();</span><br/><span class="hl-6">myEE</span><span class="hl-1">.</span><span class="hl-3">on</span><span class="hl-1">(</span><span class="hl-4">&#39;foo&#39;</span><span class="hl-1">, () </span><span class="hl-0">=&gt;</span><span class="hl-1"> </span><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-4">&#39;a&#39;</span><span class="hl-1">));</span><br/><span class="hl-6">myEE</span><span class="hl-1">.</span><span class="hl-3">prependListener</span><span class="hl-1">(</span><span class="hl-4">&#39;foo&#39;</span><span class="hl-1">, () </span><span class="hl-0">=&gt;</span><span class="hl-1"> </span><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-4">&#39;b&#39;</span><span class="hl-1">));</span><br/><span class="hl-6">myEE</span><span class="hl-1">.</span><span class="hl-3">emit</span><span class="hl-1">(</span><span class="hl-4">&#39;foo&#39;</span><span class="hl-1">);</span><br/><span class="hl-5">// Prints:</span><br/><span class="hl-5">//   b</span><br/><span class="hl-5">//   a</span>
 </code><button>Copy</button></pre>
 
 <h3>Since</h3><p>v0.1.101</p>
@@ -1013,10 +1174,12 @@ event listener to the beginning of the listeners array.</p>
 next time <code>eventName</code> is triggered, this listener is removed and then invoked.</p>
 <pre><code class="language-js"><span class="hl-6">server</span><span class="hl-1">.</span><span class="hl-3">once</span><span class="hl-1">(</span><span class="hl-4">&#39;connection&#39;</span><span class="hl-1">, (</span><span class="hl-6">stream</span><span class="hl-1">) </span><span class="hl-0">=&gt;</span><span class="hl-1"> {</span><br/><span class="hl-1">  </span><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-4">&#39;Ah, we have our first user!&#39;</span><span class="hl-1">);</span><br/><span class="hl-1">});</span>
 </code><button>Copy</button></pre>
-<p>Returns a reference to the <code>EventEmitter</code>, so that calls can be chained.</p>
-<p>By default, event listeners are invoked in the order they are added. The<code>emitter.prependOnceListener()</code> method can be used as an alternative to add the
-event listener to the beginning of the listeners array.</p>
-<pre><code class="language-js"><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-2">myEE</span><span class="hl-1"> = </span><span class="hl-0">new</span><span class="hl-1"> </span><span class="hl-3">EventEmitter</span><span class="hl-1">();</span><br/><span class="hl-6">myEE</span><span class="hl-1">.</span><span class="hl-3">once</span><span class="hl-1">(</span><span class="hl-4">&#39;foo&#39;</span><span class="hl-1">, () </span><span class="hl-0">=&gt;</span><span class="hl-1"> </span><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-4">&#39;a&#39;</span><span class="hl-1">));</span><br/><span class="hl-6">myEE</span><span class="hl-1">.</span><span class="hl-3">prependOnceListener</span><span class="hl-1">(</span><span class="hl-4">&#39;foo&#39;</span><span class="hl-1">, () </span><span class="hl-0">=&gt;</span><span class="hl-1"> </span><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-4">&#39;b&#39;</span><span class="hl-1">));</span><br/><span class="hl-6">myEE</span><span class="hl-1">.</span><span class="hl-3">emit</span><span class="hl-1">(</span><span class="hl-4">&#39;foo&#39;</span><span class="hl-1">);</span><br/><span class="hl-5">// Prints:</span><br/><span class="hl-5">//   b</span><br/><span class="hl-5">//   a</span>
+                            <p>Returns a reference to the <code>EventEmitter</code>, so that calls can be chained.</p>
+                            <p>By default, event listeners are invoked in the order they are added.
+                                The<code>emitter.prependOnceListener()</code> method can be used as an alternative to
+                                add the
+                                event listener to the beginning of the listeners array.</p>
+                            <pre><code class="language-js"><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-2">myEE</span><span class="hl-1"> = </span><span class="hl-0">new</span><span class="hl-1"> </span><span class="hl-3">EventEmitter</span><span class="hl-1">();</span><br/><span class="hl-6">myEE</span><span class="hl-1">.</span><span class="hl-3">once</span><span class="hl-1">(</span><span class="hl-4">&#39;foo&#39;</span><span class="hl-1">, () </span><span class="hl-0">=&gt;</span><span class="hl-1"> </span><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-4">&#39;a&#39;</span><span class="hl-1">));</span><br/><span class="hl-6">myEE</span><span class="hl-1">.</span><span class="hl-3">prependOnceListener</span><span class="hl-1">(</span><span class="hl-4">&#39;foo&#39;</span><span class="hl-1">, () </span><span class="hl-0">=&gt;</span><span class="hl-1"> </span><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-4">&#39;b&#39;</span><span class="hl-1">));</span><br/><span class="hl-6">myEE</span><span class="hl-1">.</span><span class="hl-3">emit</span><span class="hl-1">(</span><span class="hl-4">&#39;foo&#39;</span><span class="hl-1">);</span><br/><span class="hl-5">// Prints:</span><br/><span class="hl-5">//   b</span><br/><span class="hl-5">//   a</span>
 </code><button>Copy</button></pre>
 
 <h3>Since</h3><p>v0.3.0</p>
@@ -1097,46 +1260,111 @@ already been added. Multiple calls passing the same combination of <code>eventNa
 times.</p>
 <pre><code class="language-js"><span class="hl-6">server</span><span class="hl-1">.</span><span class="hl-3">prependListener</span><span class="hl-1">(</span><span class="hl-4">&#39;connection&#39;</span><span class="hl-1">, (</span><span class="hl-6">stream</span><span class="hl-1">) </span><span class="hl-0">=&gt;</span><span class="hl-1"> {</span><br/><span class="hl-1">  </span><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-4">&#39;someone connected!&#39;</span><span class="hl-1">);</span><br/><span class="hl-1">});</span>
 </code><button>Copy</button></pre>
-<p>Returns a reference to the <code>EventEmitter</code>, so that calls can be chained.</p>
+                            <p>Returns a reference to the <code>EventEmitter</code>, so that calls can be chained.</p>
 
-<h3>Since</h3><p>v6.0.0</p>
-</div>
-<div class="tsd-parameters">
-<h4 class="tsd-parameters-title">Parameters</h4>
-<ul class="tsd-parameter-list">
-<li>
-<h5><span class="tsd-kind-parameter">eventName</span>: <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">symbol</span></h5>
-<div class="tsd-comment tsd-typography"><p>The name of the event.</p>
-</div></li>
-<li>
-<h5><span class="tsd-kind-parameter">listener</span>: <span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">...</span><span class="tsd-kind-parameter">args</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">)</span></h5>
-<div class="tsd-comment tsd-typography"><p>The callback function</p>
-</div>
-<ul class="tsd-parameters">
-<li class="tsd-parameter-signature">
-<ul class="tsd-signatures tsd-is-external">
-<li class="tsd-signature"><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">...</span><span class="tsd-kind-parameter">args</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">void</span></li>
-<li class="tsd-description">
-<div class="tsd-parameters">
-<h4 class="tsd-parameters-title">Parameters</h4>
-<ul class="tsd-parameter-list">
-<li>
-<h5><code class="tsd-tag ts-flagRest">Rest</code> <span class="tsd-signature-symbol">...</span><span class="tsd-kind-parameter">args</span>: <span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">[]</span></h5></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4></li></ul></li></ul></li></ul></div>
-<h4 class="tsd-returns-title">Returns <a href="default.html" class="tsd-signature-type tsd-kind-class">default</a></h4><aside class="tsd-sources">
-<p>Inherited from EventEmitter.prependListener</p>
-<ul>
-<li>Defined in node_modules/@types/node/events.d.ts:597</li></ul></aside></li></ul></section>
-<section class="tsd-panel tsd-member tsd-is-inherited tsd-is-external"><a id="prependOnceListener" class="tsd-anchor"></a>
-<h3 class="tsd-anchor-link"><span>prepend<wbr/>Once<wbr/>Listener</span><a href="#prependOnceListener" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
-<ul class="tsd-signatures tsd-is-inherited tsd-is-external">
-<li class="tsd-signature tsd-anchor-link" id="prependOnceListener.prependOnceListener-1"><span class="tsd-kind-call-signature">prepend<wbr/>Once<wbr/>Listener</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">eventName</span>, <span class="tsd-kind-parameter">listener</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><a href="default.html" class="tsd-signature-type tsd-kind-class">default</a><a href="#prependOnceListener.prependOnceListener-1" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
-<li class="tsd-description">
-<div class="tsd-comment tsd-typography"><p>Adds a <strong>one-time</strong><code>listener</code> function for the event named <code>eventName</code> to the_beginning_ of the listeners array. The next time <code>eventName</code> is triggered, this
-listener is removed, and then invoked.</p>
-<pre><code class="language-js"><span class="hl-6">server</span><span class="hl-1">.</span><span class="hl-3">prependOnceListener</span><span class="hl-1">(</span><span class="hl-4">&#39;connection&#39;</span><span class="hl-1">, (</span><span class="hl-6">stream</span><span class="hl-1">) </span><span class="hl-0">=&gt;</span><span class="hl-1"> {</span><br/><span class="hl-1">  </span><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-4">&#39;Ah, we have our first user!&#39;</span><span class="hl-1">);</span><br/><span class="hl-1">});</span>
+                            <h3>Since</h3>
+                            <p>v6.0.0</p>
+                        </div>
+                        <div class="tsd-parameters">
+                            <h4 class="tsd-parameters-title">Parameters</h4>
+                            <ul class="tsd-parameter-list">
+                                <li>
+                                    <h5><span class="tsd-kind-parameter">eventName</span>: <span
+                                            class="tsd-signature-type">string</span><span class="tsd-signature-symbol">
+                                            | </span><span class="tsd-signature-type">symbol</span></h5>
+                                    <div class="tsd-comment tsd-typography">
+                                        <p>The name of the event.</p>
+                                    </div>
+                                </li>
+                                <li>
+                                    <h5><span class="tsd-kind-parameter">listener</span>: <span
+                                            class="tsd-signature-symbol">(</span><span
+                                            class="tsd-signature-symbol">(</span><span
+                                            class="tsd-signature-symbol">...</span><span
+                                            class="tsd-kind-parameter">args</span><span
+                                            class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">
+                                            =&gt; </span><span class="tsd-signature-type">void</span><span
+                                            class="tsd-signature-symbol">)</span></h5>
+                                    <div class="tsd-comment tsd-typography">
+                                        <p>The callback function</p>
+                                    </div>
+                                    <ul class="tsd-parameters">
+                                        <li class="tsd-parameter-signature">
+                                            <ul class="tsd-signatures tsd-is-external">
+                                                <li class="tsd-signature"><span
+                                                        class="tsd-signature-symbol">(</span><span
+                                                        class="tsd-signature-symbol">...</span><span
+                                                        class="tsd-kind-parameter">args</span><span
+                                                        class="tsd-signature-symbol">)</span><span
+                                                        class="tsd-signature-symbol">: </span><span
+                                                        class="tsd-signature-type">void</span></li>
+                                                <li class="tsd-description">
+                                                    <div class="tsd-parameters">
+                                                        <h4 class="tsd-parameters-title">Parameters</h4>
+                                                        <ul class="tsd-parameter-list">
+                                                            <li>
+                                                                <h5><code class="tsd-tag ts-flagRest">Rest</code> <span
+                                                                        class="tsd-signature-symbol">...</span><span
+                                                                        class="tsd-kind-parameter">args</span>: <span
+                                                                        class="tsd-signature-type">any</span><span
+                                                                        class="tsd-signature-symbol">[]</span></h5>
+                                                            </li>
+                                                        </ul>
+                                                    </div>
+                                                    <h4 class="tsd-returns-title">Returns <span
+                                                            class="tsd-signature-type">void</span></h4>
+                                                </li>
+                                            </ul>
+                                        </li>
+                                    </ul>
+                                </li>
+                            </ul>
+                        </div>
+                        <h4 class="tsd-returns-title">Returns <a href="default.html"
+                                class="tsd-signature-type tsd-kind-class">default</a></h4>
+                        <aside class="tsd-sources">
+                            <p>Inherited from EventEmitter.prependListener</p>
+                            <ul>
+                                <li>Defined in node_modules/@types/node/events.d.ts:597</li>
+                            </ul>
+                        </aside>
+                    </li>
+                </ul>
+            </section>
+            <section class="tsd-panel tsd-member tsd-is-inherited tsd-is-external"><a id="prependOnceListener"
+                    class="tsd-anchor"></a>
+                <h3 class="tsd-anchor-link"><span>prepend<wbr/>Once<wbr/>Listener</span><a href="#prependOnceListener"
+                        aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link"
+                            viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <use href="#icon-anchor-a"></use>
+                            <use href="#icon-anchor-b"></use>
+                            <use href="#icon-anchor-c"></use>
+                        </svg></a></h3>
+                <ul class="tsd-signatures tsd-is-inherited tsd-is-external">
+                    <li class="tsd-signature tsd-anchor-link" id="prependOnceListener.prependOnceListener-1"><span
+                            class="tsd-kind-call-signature">prepend<wbr/>Once<wbr/>Listener</span><span
+                            class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">eventName</span>,
+                        <span class="tsd-kind-parameter">listener</span><span class="tsd-signature-symbol">)</span><span
+                            class="tsd-signature-symbol">: </span><a href="default.html"
+                            class="tsd-signature-type tsd-kind-class">default</a><a
+                            href="#prependOnceListener.prependOnceListener-1" aria-label="Permalink"
+                            class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24"
+                                stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <use href="#icon-anchor-a"></use>
+                                <use href="#icon-anchor-b"></use>
+                                <use href="#icon-anchor-c"></use>
+                            </svg></a></li>
+                    <li class="tsd-description">
+                        <div class="tsd-comment tsd-typography">
+                            <p>Adds a <strong>one-time</strong><code>listener</code> function for the event named
+                                <code>eventName</code> to the_beginning_ of the listeners array. The next time
+                                <code>eventName</code> is triggered, this
+                                listener is removed, and then invoked.</p>
+                            <pre><code class="language-js"><span class="hl-6">server</span><span class="hl-1">.</span><span class="hl-3">prependOnceListener</span><span class="hl-1">(</span><span class="hl-4">&#39;connection&#39;</span><span class="hl-1">, (</span><span class="hl-6">stream</span><span class="hl-1">) </span><span class="hl-0">=&gt;</span><span class="hl-1"> {</span><br/><span class="hl-1">  </span><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-4">&#39;Ah, we have our first user!&#39;</span><span class="hl-1">);</span><br/><span class="hl-1">});</span>
 </code><button>Copy</button></pre>
-<p>Returns a reference to the <code>EventEmitter</code>, so that calls can be chained.</p>
+                            <p>Returns a reference to the <code>EventEmitter</code>, so that calls can be chained.</p>
 
 <h3>Since</h3><p>v6.0.0</p>
 </div>
@@ -1239,45 +1467,86 @@ particularly when the <code>EventEmitter</code> instance was created by some oth
 component or module (e.g. sockets or file streams).</p>
 <p>Returns a reference to the <code>EventEmitter</code>, so that calls can be chained.</p>
 
-<h3>Since</h3><p>v0.1.26</p>
-</div>
-<div class="tsd-parameters">
-<h4 class="tsd-parameters-title">Parameters</h4>
-<ul class="tsd-parameter-list">
-<li>
-<h5><code class="tsd-tag ts-flagOptional">Optional</code> <span class="tsd-kind-parameter">event</span>: <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">symbol</span></h5></li></ul></div>
-<h4 class="tsd-returns-title">Returns <a href="default.html" class="tsd-signature-type tsd-kind-class">default</a></h4><aside class="tsd-sources">
-<p>Inherited from EventEmitter.removeAllListeners</p>
-<ul>
-<li>Defined in node_modules/@types/node/events.d.ts:473</li></ul></aside></li></ul></section>
-<section class="tsd-panel tsd-member tsd-is-inherited tsd-is-external"><a id="removeListener" class="tsd-anchor"></a>
-<h3 class="tsd-anchor-link"><span>remove<wbr/>Listener</span><a href="#removeListener" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
-<ul class="tsd-signatures tsd-is-inherited tsd-is-external">
-<li class="tsd-signature tsd-anchor-link" id="removeListener.removeListener-1"><span class="tsd-kind-call-signature">remove<wbr/>Listener</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">eventName</span>, <span class="tsd-kind-parameter">listener</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><a href="default.html" class="tsd-signature-type tsd-kind-class">default</a><a href="#removeListener.removeListener-1" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
-<li class="tsd-description">
-<div class="tsd-comment tsd-typography"><p>Removes the specified <code>listener</code> from the listener array for the event named<code>eventName</code>.</p>
-<pre><code class="language-js"><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-3">callback</span><span class="hl-1"> = (</span><span class="hl-6">stream</span><span class="hl-1">) </span><span class="hl-0">=&gt;</span><span class="hl-1"> {</span><br/><span class="hl-1">  </span><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-4">&#39;someone connected!&#39;</span><span class="hl-1">);</span><br/><span class="hl-1">};</span><br/><span class="hl-6">server</span><span class="hl-1">.</span><span class="hl-3">on</span><span class="hl-1">(</span><span class="hl-4">&#39;connection&#39;</span><span class="hl-1">, </span><span class="hl-6">callback</span><span class="hl-1">);</span><br/><span class="hl-5">// ...</span><br/><span class="hl-6">server</span><span class="hl-1">.</span><span class="hl-3">removeListener</span><span class="hl-1">(</span><span class="hl-4">&#39;connection&#39;</span><span class="hl-1">, </span><span class="hl-6">callback</span><span class="hl-1">);</span>
+                            <h3>Since</h3>
+                            <p>v0.1.26</p>
+                        </div>
+                        <div class="tsd-parameters">
+                            <h4 class="tsd-parameters-title">Parameters</h4>
+                            <ul class="tsd-parameter-list">
+                                <li>
+                                    <h5><code class="tsd-tag ts-flagOptional">Optional</code> <span
+                                            class="tsd-kind-parameter">event</span>: <span
+                                            class="tsd-signature-type">string</span><span class="tsd-signature-symbol">
+                                            | </span><span class="tsd-signature-type">symbol</span></h5>
+                                </li>
+                            </ul>
+                        </div>
+                        <h4 class="tsd-returns-title">Returns <a href="default.html"
+                                class="tsd-signature-type tsd-kind-class">default</a></h4>
+                        <aside class="tsd-sources">
+                            <p>Inherited from EventEmitter.removeAllListeners</p>
+                            <ul>
+                                <li>Defined in node_modules/@types/node/events.d.ts:473</li>
+                            </ul>
+                        </aside>
+                    </li>
+                </ul>
+            </section>
+            <section class="tsd-panel tsd-member tsd-is-inherited tsd-is-external"><a id="removeListener"
+                    class="tsd-anchor"></a>
+                <h3 class="tsd-anchor-link"><span>remove<wbr/>Listener</span><a href="#removeListener"
+                        aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link"
+                            viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <use href="#icon-anchor-a"></use>
+                            <use href="#icon-anchor-b"></use>
+                            <use href="#icon-anchor-c"></use>
+                        </svg></a></h3>
+                <ul class="tsd-signatures tsd-is-inherited tsd-is-external">
+                    <li class="tsd-signature tsd-anchor-link" id="removeListener.removeListener-1"><span
+                            class="tsd-kind-call-signature">remove<wbr/>Listener</span><span
+                            class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">eventName</span>,
+                        <span class="tsd-kind-parameter">listener</span><span class="tsd-signature-symbol">)</span><span
+                            class="tsd-signature-symbol">: </span><a href="default.html"
+                            class="tsd-signature-type tsd-kind-class">default</a><a
+                            href="#removeListener.removeListener-1" aria-label="Permalink" class="tsd-anchor-icon"><svg
+                                class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2"
+                                stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                <use href="#icon-anchor-a"></use>
+                                <use href="#icon-anchor-b"></use>
+                                <use href="#icon-anchor-c"></use>
+                            </svg></a></li>
+                    <li class="tsd-description">
+                        <div class="tsd-comment tsd-typography">
+                            <p>Removes the specified <code>listener</code> from the listener array for the event
+                                named<code>eventName</code>.</p>
+                            <pre><code class="language-js"><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-3">callback</span><span class="hl-1"> = (</span><span class="hl-6">stream</span><span class="hl-1">) </span><span class="hl-0">=&gt;</span><span class="hl-1"> {</span><br/><span class="hl-1">  </span><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-4">&#39;someone connected!&#39;</span><span class="hl-1">);</span><br/><span class="hl-1">};</span><br/><span class="hl-6">server</span><span class="hl-1">.</span><span class="hl-3">on</span><span class="hl-1">(</span><span class="hl-4">&#39;connection&#39;</span><span class="hl-1">, </span><span class="hl-6">callback</span><span class="hl-1">);</span><br/><span class="hl-5">// ...</span><br/><span class="hl-6">server</span><span class="hl-1">.</span><span class="hl-3">removeListener</span><span class="hl-1">(</span><span class="hl-4">&#39;connection&#39;</span><span class="hl-1">, </span><span class="hl-6">callback</span><span class="hl-1">);</span>
 </code><button>Copy</button></pre>
-<p><code>removeListener()</code> will remove, at most, one instance of a listener from the
-listener array. If any single listener has been added multiple times to the
-listener array for the specified <code>eventName</code>, then <code>removeListener()</code> must be
-called multiple times to remove each instance.</p>
-<p>Once an event is emitted, all listeners attached to it at the
-time of emitting are called in order. This implies that any<code>removeListener()</code> or <code>removeAllListeners()</code> calls <em>after</em> emitting and_before_ the last listener finishes execution will
-not remove them from<code>emit()</code> in progress. Subsequent events behave as expected.</p>
-<pre><code class="language-js"><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-2">myEmitter</span><span class="hl-1"> = </span><span class="hl-0">new</span><span class="hl-1"> </span><span class="hl-3">MyEmitter</span><span class="hl-1">();</span><br/><br/><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-3">callbackA</span><span class="hl-1"> = () </span><span class="hl-0">=&gt;</span><span class="hl-1"> {</span><br/><span class="hl-1">  </span><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-4">&#39;A&#39;</span><span class="hl-1">);</span><br/><span class="hl-1">  </span><span class="hl-6">myEmitter</span><span class="hl-1">.</span><span class="hl-3">removeListener</span><span class="hl-1">(</span><span class="hl-4">&#39;event&#39;</span><span class="hl-1">, </span><span class="hl-6">callbackB</span><span class="hl-1">);</span><br/><span class="hl-1">};</span><br/><br/><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-3">callbackB</span><span class="hl-1"> = () </span><span class="hl-0">=&gt;</span><span class="hl-1"> {</span><br/><span class="hl-1">  </span><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-4">&#39;B&#39;</span><span class="hl-1">);</span><br/><span class="hl-1">};</span><br/><br/><span class="hl-6">myEmitter</span><span class="hl-1">.</span><span class="hl-3">on</span><span class="hl-1">(</span><span class="hl-4">&#39;event&#39;</span><span class="hl-1">, </span><span class="hl-6">callbackA</span><span class="hl-1">);</span><br/><br/><span class="hl-6">myEmitter</span><span class="hl-1">.</span><span class="hl-3">on</span><span class="hl-1">(</span><span class="hl-4">&#39;event&#39;</span><span class="hl-1">, </span><span class="hl-6">callbackB</span><span class="hl-1">);</span><br/><br/><span class="hl-5">// callbackA removes listener callbackB but it will still be called.</span><br/><span class="hl-5">// Internal listener array at time of emit [callbackA, callbackB]</span><br/><span class="hl-6">myEmitter</span><span class="hl-1">.</span><span class="hl-3">emit</span><span class="hl-1">(</span><span class="hl-4">&#39;event&#39;</span><span class="hl-1">);</span><br/><span class="hl-5">// Prints:</span><br/><span class="hl-5">//   A</span><br/><span class="hl-5">//   B</span><br/><br/><span class="hl-5">// callbackB is now removed.</span><br/><span class="hl-5">// Internal listener array [callbackA]</span><br/><span class="hl-6">myEmitter</span><span class="hl-1">.</span><span class="hl-3">emit</span><span class="hl-1">(</span><span class="hl-4">&#39;event&#39;</span><span class="hl-1">);</span><br/><span class="hl-5">// Prints:</span><br/><span class="hl-5">//   A</span>
+                            <p><code>removeListener()</code> will remove, at most, one instance of a listener from the
+                                listener array. If any single listener has been added multiple times to the
+                                listener array for the specified <code>eventName</code>, then
+                                <code>removeListener()</code> must be
+                                called multiple times to remove each instance.</p>
+                            <p>Once an event is emitted, all listeners attached to it at the
+                                time of emitting are called in order. This implies that any<code>removeListener()</code>
+                                or <code>removeAllListeners()</code> calls <em>after</em> emitting and_before_ the last
+                                listener finishes execution will
+                                not remove them from<code>emit()</code> in progress. Subsequent events behave as
+                                expected.</p>
+                            <pre><code class="language-js"><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-2">myEmitter</span><span class="hl-1"> = </span><span class="hl-0">new</span><span class="hl-1"> </span><span class="hl-3">MyEmitter</span><span class="hl-1">();</span><br/><br/><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-3">callbackA</span><span class="hl-1"> = () </span><span class="hl-0">=&gt;</span><span class="hl-1"> {</span><br/><span class="hl-1">  </span><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-4">&#39;A&#39;</span><span class="hl-1">);</span><br/><span class="hl-1">  </span><span class="hl-6">myEmitter</span><span class="hl-1">.</span><span class="hl-3">removeListener</span><span class="hl-1">(</span><span class="hl-4">&#39;event&#39;</span><span class="hl-1">, </span><span class="hl-6">callbackB</span><span class="hl-1">);</span><br/><span class="hl-1">};</span><br/><br/><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-3">callbackB</span><span class="hl-1"> = () </span><span class="hl-0">=&gt;</span><span class="hl-1"> {</span><br/><span class="hl-1">  </span><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-4">&#39;B&#39;</span><span class="hl-1">);</span><br/><span class="hl-1">};</span><br/><br/><span class="hl-6">myEmitter</span><span class="hl-1">.</span><span class="hl-3">on</span><span class="hl-1">(</span><span class="hl-4">&#39;event&#39;</span><span class="hl-1">, </span><span class="hl-6">callbackA</span><span class="hl-1">);</span><br/><br/><span class="hl-6">myEmitter</span><span class="hl-1">.</span><span class="hl-3">on</span><span class="hl-1">(</span><span class="hl-4">&#39;event&#39;</span><span class="hl-1">, </span><span class="hl-6">callbackB</span><span class="hl-1">);</span><br/><br/><span class="hl-5">// callbackA removes listener callbackB but it will still be called.</span><br/><span class="hl-5">// Internal listener array at time of emit [callbackA, callbackB]</span><br/><span class="hl-6">myEmitter</span><span class="hl-1">.</span><span class="hl-3">emit</span><span class="hl-1">(</span><span class="hl-4">&#39;event&#39;</span><span class="hl-1">);</span><br/><span class="hl-5">// Prints:</span><br/><span class="hl-5">//   A</span><br/><span class="hl-5">//   B</span><br/><br/><span class="hl-5">// callbackB is now removed.</span><br/><span class="hl-5">// Internal listener array [callbackA]</span><br/><span class="hl-6">myEmitter</span><span class="hl-1">.</span><span class="hl-3">emit</span><span class="hl-1">(</span><span class="hl-4">&#39;event&#39;</span><span class="hl-1">);</span><br/><span class="hl-5">// Prints:</span><br/><span class="hl-5">//   A</span>
 </code><button>Copy</button></pre>
-<p>Because listeners are managed using an internal array, calling this will
-change the position indices of any listener registered <em>after</em> the listener
-being removed. This will not impact the order in which listeners are called,
-but it means that any copies of the listener array as returned by
-the <code>emitter.listeners()</code> method will need to be recreated.</p>
-<p>When a single function has been added as a handler multiple times for a single
-event (as in the example below), <code>removeListener()</code> will remove the most
-recently added instance. In the example the <code>once(&#39;ping&#39;)</code>listener is removed:</p>
-<pre><code class="language-js"><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-2">ee</span><span class="hl-1"> = </span><span class="hl-0">new</span><span class="hl-1"> </span><span class="hl-3">EventEmitter</span><span class="hl-1">();</span><br/><br/><span class="hl-0">function</span><span class="hl-1"> </span><span class="hl-3">pong</span><span class="hl-1">() {</span><br/><span class="hl-1">  </span><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-4">&#39;pong&#39;</span><span class="hl-1">);</span><br/><span class="hl-1">}</span><br/><br/><span class="hl-6">ee</span><span class="hl-1">.</span><span class="hl-3">on</span><span class="hl-1">(</span><span class="hl-4">&#39;ping&#39;</span><span class="hl-1">, </span><span class="hl-6">pong</span><span class="hl-1">);</span><br/><span class="hl-6">ee</span><span class="hl-1">.</span><span class="hl-3">once</span><span class="hl-1">(</span><span class="hl-4">&#39;ping&#39;</span><span class="hl-1">, </span><span class="hl-6">pong</span><span class="hl-1">);</span><br/><span class="hl-6">ee</span><span class="hl-1">.</span><span class="hl-3">removeListener</span><span class="hl-1">(</span><span class="hl-4">&#39;ping&#39;</span><span class="hl-1">, </span><span class="hl-6">pong</span><span class="hl-1">);</span><br/><br/><span class="hl-6">ee</span><span class="hl-1">.</span><span class="hl-3">emit</span><span class="hl-1">(</span><span class="hl-4">&#39;ping&#39;</span><span class="hl-1">);</span><br/><span class="hl-6">ee</span><span class="hl-1">.</span><span class="hl-3">emit</span><span class="hl-1">(</span><span class="hl-4">&#39;ping&#39;</span><span class="hl-1">);</span>
+                            <p>Because listeners are managed using an internal array, calling this will
+                                change the position indices of any listener registered <em>after</em> the listener
+                                being removed. This will not impact the order in which listeners are called,
+                                but it means that any copies of the listener array as returned by
+                                the <code>emitter.listeners()</code> method will need to be recreated.</p>
+                            <p>When a single function has been added as a handler multiple times for a single
+                                event (as in the example below), <code>removeListener()</code> will remove the most
+                                recently added instance. In the example the <code>once(&#39;ping&#39;)</code>listener is
+                                removed:</p>
+                            <pre><code class="language-js"><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-2">ee</span><span class="hl-1"> = </span><span class="hl-0">new</span><span class="hl-1"> </span><span class="hl-3">EventEmitter</span><span class="hl-1">();</span><br/><br/><span class="hl-0">function</span><span class="hl-1"> </span><span class="hl-3">pong</span><span class="hl-1">() {</span><br/><span class="hl-1">  </span><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-4">&#39;pong&#39;</span><span class="hl-1">);</span><br/><span class="hl-1">}</span><br/><br/><span class="hl-6">ee</span><span class="hl-1">.</span><span class="hl-3">on</span><span class="hl-1">(</span><span class="hl-4">&#39;ping&#39;</span><span class="hl-1">, </span><span class="hl-6">pong</span><span class="hl-1">);</span><br/><span class="hl-6">ee</span><span class="hl-1">.</span><span class="hl-3">once</span><span class="hl-1">(</span><span class="hl-4">&#39;ping&#39;</span><span class="hl-1">, </span><span class="hl-6">pong</span><span class="hl-1">);</span><br/><span class="hl-6">ee</span><span class="hl-1">.</span><span class="hl-3">removeListener</span><span class="hl-1">(</span><span class="hl-4">&#39;ping&#39;</span><span class="hl-1">, </span><span class="hl-6">pong</span><span class="hl-1">);</span><br/><br/><span class="hl-6">ee</span><span class="hl-1">.</span><span class="hl-3">emit</span><span class="hl-1">(</span><span class="hl-4">&#39;ping&#39;</span><span class="hl-1">);</span><br/><span class="hl-6">ee</span><span class="hl-1">.</span><span class="hl-3">emit</span><span class="hl-1">(</span><span class="hl-4">&#39;ping&#39;</span><span class="hl-1">);</span>
 </code><button>Copy</button></pre>
-<p>Returns a reference to the <code>EventEmitter</code>, so that calls can be chained.</p>
+                            <p>Returns a reference to the <code>EventEmitter</code>, so that calls can be chained.</p>
 
 <h3>Since</h3><p>v0.1.26</p>
 </div>
@@ -1596,138 +1865,344 @@ event target. This is useful for debugging and diagnostic purposes.</p>
 <pre><code class="language-js"><span class="hl-0">const</span><span class="hl-1"> { </span><span class="hl-2">getEventListeners</span><span class="hl-1">, </span><span class="hl-2">EventEmitter</span><span class="hl-1"> } = </span><span class="hl-3">require</span><span class="hl-1">(</span><span class="hl-4">&#39;events&#39;</span><span class="hl-1">);</span><br/><br/><span class="hl-1">{</span><br/><span class="hl-1">  </span><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-2">ee</span><span class="hl-1"> = </span><span class="hl-0">new</span><span class="hl-1"> </span><span class="hl-3">EventEmitter</span><span class="hl-1">();</span><br/><span class="hl-1">  </span><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-3">listener</span><span class="hl-1"> = () </span><span class="hl-0">=&gt;</span><span class="hl-1"> </span><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-4">&#39;Events are fun&#39;</span><span class="hl-1">);</span><br/><span class="hl-1">  </span><span class="hl-6">ee</span><span class="hl-1">.</span><span class="hl-3">on</span><span class="hl-1">(</span><span class="hl-4">&#39;foo&#39;</span><span class="hl-1">, </span><span class="hl-6">listener</span><span class="hl-1">);</span><br/><span class="hl-1">  </span><span class="hl-3">getEventListeners</span><span class="hl-1">(</span><span class="hl-6">ee</span><span class="hl-1">, </span><span class="hl-4">&#39;foo&#39;</span><span class="hl-1">); </span><span class="hl-5">// [listener]</span><br/><span class="hl-1">}</span><br/><span class="hl-1">{</span><br/><span class="hl-1">  </span><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-2">et</span><span class="hl-1"> = </span><span class="hl-0">new</span><span class="hl-1"> </span><span class="hl-3">EventTarget</span><span class="hl-1">();</span><br/><span class="hl-1">  </span><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-3">listener</span><span class="hl-1"> = () </span><span class="hl-0">=&gt;</span><span class="hl-1"> </span><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-4">&#39;Events are fun&#39;</span><span class="hl-1">);</span><br/><span class="hl-1">  </span><span class="hl-6">et</span><span class="hl-1">.</span><span class="hl-3">addEventListener</span><span class="hl-1">(</span><span class="hl-4">&#39;foo&#39;</span><span class="hl-1">, </span><span class="hl-6">listener</span><span class="hl-1">);</span><br/><span class="hl-1">  </span><span class="hl-3">getEventListeners</span><span class="hl-1">(</span><span class="hl-6">et</span><span class="hl-1">, </span><span class="hl-4">&#39;foo&#39;</span><span class="hl-1">); </span><span class="hl-5">// [listener]</span><br/><span class="hl-1">}</span>
 </code><button>Copy</button></pre>
 
-<h3>Since</h3><p>v15.2.0</p>
-</div>
-<div class="tsd-parameters">
-<h4 class="tsd-parameters-title">Parameters</h4>
-<ul class="tsd-parameter-list">
-<li>
-<h5><span class="tsd-kind-parameter">emitter</span>: <span class="tsd-signature-type ">EventEmitter</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type ">DOMEventTarget</span></h5></li>
-<li>
-<h5><span class="tsd-kind-parameter">name</span>: <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">symbol</span></h5></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Function</span><span class="tsd-signature-symbol">[]</span></h4><aside class="tsd-sources">
-<p>Inherited from EventEmitter.getEventListeners</p>
-<ul>
-<li>Defined in node_modules/@types/node/events.d.ts:262</li></ul></aside></li></ul></section>
-<section class="tsd-panel tsd-member tsd-is-inherited tsd-is-external"><a id="listenerCount-2" class="tsd-anchor"></a>
-<h3 class="tsd-anchor-link"><code class="tsd-tag ts-flagStatic">Static</code> <span>listener<wbr/>Count</span><a href="#listenerCount-2" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
-<ul class="tsd-signatures tsd-is-inherited tsd-is-external">
-<li class="tsd-signature tsd-anchor-link" id="listenerCount-2.listenerCount-3"><span class="tsd-kind-call-signature">listener<wbr/>Count</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">emitter</span>, <span class="tsd-kind-parameter">eventName</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">number</span><a href="#listenerCount-2.listenerCount-3" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
-<li class="tsd-description">
-<div class="tsd-comment tsd-typography"><p>A class method that returns the number of listeners for the given <code>eventName</code>registered on the given <code>emitter</code>.</p>
-<pre><code class="language-js"><span class="hl-0">const</span><span class="hl-1"> { </span><span class="hl-2">EventEmitter</span><span class="hl-1">, </span><span class="hl-2">listenerCount</span><span class="hl-1"> } = </span><span class="hl-3">require</span><span class="hl-1">(</span><span class="hl-4">&#39;events&#39;</span><span class="hl-1">);</span><br/><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-2">myEmitter</span><span class="hl-1"> = </span><span class="hl-0">new</span><span class="hl-1"> </span><span class="hl-3">EventEmitter</span><span class="hl-1">();</span><br/><span class="hl-6">myEmitter</span><span class="hl-1">.</span><span class="hl-3">on</span><span class="hl-1">(</span><span class="hl-4">&#39;event&#39;</span><span class="hl-1">, () </span><span class="hl-0">=&gt;</span><span class="hl-1"> {});</span><br/><span class="hl-6">myEmitter</span><span class="hl-1">.</span><span class="hl-3">on</span><span class="hl-1">(</span><span class="hl-4">&#39;event&#39;</span><span class="hl-1">, () </span><span class="hl-0">=&gt;</span><span class="hl-1"> {});</span><br/><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-3">listenerCount</span><span class="hl-1">(</span><span class="hl-6">myEmitter</span><span class="hl-1">, </span><span class="hl-4">&#39;event&#39;</span><span class="hl-1">));</span><br/><span class="hl-5">// Prints: 2</span>
+                            <h3>Since</h3>
+                            <p>v15.2.0</p>
+                        </div>
+                        <div class="tsd-parameters">
+                            <h4 class="tsd-parameters-title">Parameters</h4>
+                            <ul class="tsd-parameter-list">
+                                <li>
+                                    <h5><span class="tsd-kind-parameter">emitter</span>: <span
+                                            class="tsd-signature-type ">EventEmitter</span><span
+                                            class="tsd-signature-symbol"> | </span><span
+                                            class="tsd-signature-type ">DOMEventTarget</span></h5>
+                                </li>
+                                <li>
+                                    <h5><span class="tsd-kind-parameter">name</span>: <span
+                                            class="tsd-signature-type">string</span><span class="tsd-signature-symbol">
+                                            | </span><span class="tsd-signature-type">symbol</span></h5>
+                                </li>
+                            </ul>
+                        </div>
+                        <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Function</span><span
+                                class="tsd-signature-symbol">[]</span></h4>
+                        <aside class="tsd-sources">
+                            <p>Inherited from EventEmitter.getEventListeners</p>
+                            <ul>
+                                <li>Defined in node_modules/@types/node/events.d.ts:262</li>
+                            </ul>
+                        </aside>
+                    </li>
+                </ul>
+            </section>
+            <section class="tsd-panel tsd-member tsd-is-inherited tsd-is-external"><a id="listenerCount-2"
+                    class="tsd-anchor"></a>
+                <h3 class="tsd-anchor-link"><code class="tsd-tag ts-flagStatic">Static</code>
+                    <span>listener<wbr/>Count</span><a href="#listenerCount-2" aria-label="Permalink"
+                        class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24"
+                            stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
+                            stroke-linejoin="round">
+                            <use href="#icon-anchor-a"></use>
+                            <use href="#icon-anchor-b"></use>
+                            <use href="#icon-anchor-c"></use>
+                        </svg></a></h3>
+                <ul class="tsd-signatures tsd-is-inherited tsd-is-external">
+                    <li class="tsd-signature tsd-anchor-link" id="listenerCount-2.listenerCount-3"><span
+                            class="tsd-kind-call-signature">listener<wbr/>Count</span><span
+                            class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">emitter</span>, <span
+                            class="tsd-kind-parameter">eventName</span><span class="tsd-signature-symbol">)</span><span
+                            class="tsd-signature-symbol">: </span><span class="tsd-signature-type">number</span><a
+                            href="#listenerCount-2.listenerCount-3" aria-label="Permalink" class="tsd-anchor-icon"><svg
+                                class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2"
+                                stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                <use href="#icon-anchor-a"></use>
+                                <use href="#icon-anchor-b"></use>
+                                <use href="#icon-anchor-c"></use>
+                            </svg></a></li>
+                    <li class="tsd-description">
+                        <div class="tsd-comment tsd-typography">
+                            <p>A class method that returns the number of listeners for the given
+                                <code>eventName</code>registered on the given <code>emitter</code>.</p>
+                            <pre><code class="language-js"><span class="hl-0">const</span><span class="hl-1"> { </span><span class="hl-2">EventEmitter</span><span class="hl-1">, </span><span class="hl-2">listenerCount</span><span class="hl-1"> } = </span><span class="hl-3">require</span><span class="hl-1">(</span><span class="hl-4">&#39;events&#39;</span><span class="hl-1">);</span><br/><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-2">myEmitter</span><span class="hl-1"> = </span><span class="hl-0">new</span><span class="hl-1"> </span><span class="hl-3">EventEmitter</span><span class="hl-1">();</span><br/><span class="hl-6">myEmitter</span><span class="hl-1">.</span><span class="hl-3">on</span><span class="hl-1">(</span><span class="hl-4">&#39;event&#39;</span><span class="hl-1">, () </span><span class="hl-0">=&gt;</span><span class="hl-1"> {});</span><br/><span class="hl-6">myEmitter</span><span class="hl-1">.</span><span class="hl-3">on</span><span class="hl-1">(</span><span class="hl-4">&#39;event&#39;</span><span class="hl-1">, () </span><span class="hl-0">=&gt;</span><span class="hl-1"> {});</span><br/><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-3">listenerCount</span><span class="hl-1">(</span><span class="hl-6">myEmitter</span><span class="hl-1">, </span><span class="hl-4">&#39;event&#39;</span><span class="hl-1">));</span><br/><span class="hl-5">// Prints: 2</span>
 </code><button>Copy</button></pre>
 
-<h3>Since</h3><p>v0.9.12</p>
+                            <h3>Since</h3>
+                            <p>v0.9.12</p>
 
-<h3>Deprecated</h3><p>Since v3.2.0 - Use <code>listenerCount</code> instead.</p>
-</div>
-<div class="tsd-parameters">
-<h4 class="tsd-parameters-title">Parameters</h4>
-<ul class="tsd-parameter-list">
-<li>
-<h5><span class="tsd-kind-parameter">emitter</span>: <span class="tsd-signature-type ">EventEmitter</span></h5>
-<div class="tsd-comment tsd-typography"><p>The emitter to query</p>
-</div></li>
-<li>
-<h5><span class="tsd-kind-parameter">eventName</span>: <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">symbol</span></h5>
-<div class="tsd-comment tsd-typography"><p>The event name</p>
-</div></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span></h4><aside class="tsd-sources">
-<p>Inherited from EventEmitter.listenerCount</p>
-<ul>
-<li>Defined in node_modules/@types/node/events.d.ts:234</li></ul></aside></li></ul></section>
-<section class="tsd-panel tsd-member tsd-is-inherited tsd-is-external"><a id="on-2" class="tsd-anchor"></a>
-<h3 class="tsd-anchor-link"><code class="tsd-tag ts-flagStatic">Static</code> <span>on</span><a href="#on-2" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
-<ul class="tsd-signatures tsd-is-inherited tsd-is-external">
-<li class="tsd-signature tsd-anchor-link" id="on-2.on-3"><span class="tsd-kind-call-signature">on</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">emitter</span>, <span class="tsd-kind-parameter">eventName</span>, <span class="tsd-kind-parameter">options</span><span class="tsd-signature-symbol">?</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">AsyncIterableIterator</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">&gt;</span><a href="#on-2.on-3" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
-<li class="tsd-description">
-<div class="tsd-comment tsd-typography"><pre><code class="language-js"><span class="hl-0">const</span><span class="hl-1"> { </span><span class="hl-2">on</span><span class="hl-1">, </span><span class="hl-2">EventEmitter</span><span class="hl-1"> } = </span><span class="hl-3">require</span><span class="hl-1">(</span><span class="hl-4">&#39;events&#39;</span><span class="hl-1">);</span><br/><br/><span class="hl-1">(</span><span class="hl-0">async</span><span class="hl-1"> () </span><span class="hl-0">=&gt;</span><span class="hl-1"> {</span><br/><span class="hl-1">  </span><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-2">ee</span><span class="hl-1"> = </span><span class="hl-0">new</span><span class="hl-1"> </span><span class="hl-3">EventEmitter</span><span class="hl-1">();</span><br/><br/><span class="hl-1">  </span><span class="hl-5">// Emit later on</span><br/><span class="hl-1">  </span><span class="hl-6">process</span><span class="hl-1">.</span><span class="hl-3">nextTick</span><span class="hl-1">(() </span><span class="hl-0">=&gt;</span><span class="hl-1"> {</span><br/><span class="hl-1">    </span><span class="hl-6">ee</span><span class="hl-1">.</span><span class="hl-3">emit</span><span class="hl-1">(</span><span class="hl-4">&#39;foo&#39;</span><span class="hl-1">, </span><span class="hl-4">&#39;bar&#39;</span><span class="hl-1">);</span><br/><span class="hl-1">    </span><span class="hl-6">ee</span><span class="hl-1">.</span><span class="hl-3">emit</span><span class="hl-1">(</span><span class="hl-4">&#39;foo&#39;</span><span class="hl-1">, </span><span class="hl-7">42</span><span class="hl-1">);</span><br/><span class="hl-1">  });</span><br/><br/><span class="hl-1">  </span><span class="hl-8">for</span><span class="hl-1"> </span><span class="hl-8">await</span><span class="hl-1"> (</span><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-2">event</span><span class="hl-1"> </span><span class="hl-0">of</span><span class="hl-1"> </span><span class="hl-3">on</span><span class="hl-1">(</span><span class="hl-6">ee</span><span class="hl-1">, </span><span class="hl-4">&#39;foo&#39;</span><span class="hl-1">)) {</span><br/><span class="hl-1">    </span><span class="hl-5">// The execution of this inner block is synchronous and it</span><br/><span class="hl-1">    </span><span class="hl-5">// processes one event at a time (even with await). Do not use</span><br/><span class="hl-1">    </span><span class="hl-5">// if concurrent execution is required.</span><br/><span class="hl-1">    </span><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-6">event</span><span class="hl-1">); </span><span class="hl-5">// prints [&#39;bar&#39;] [42]</span><br/><span class="hl-1">  }</span><br/><span class="hl-1">  </span><span class="hl-5">// Unreachable here</span><br/><span class="hl-1">})();</span>
+                            <h3>Deprecated</h3>
+                            <p>Since v3.2.0 - Use <code>listenerCount</code> instead.</p>
+                        </div>
+                        <div class="tsd-parameters">
+                            <h4 class="tsd-parameters-title">Parameters</h4>
+                            <ul class="tsd-parameter-list">
+                                <li>
+                                    <h5><span class="tsd-kind-parameter">emitter</span>: <span
+                                            class="tsd-signature-type ">EventEmitter</span></h5>
+                                    <div class="tsd-comment tsd-typography">
+                                        <p>The emitter to query</p>
+                                    </div>
+                                </li>
+                                <li>
+                                    <h5><span class="tsd-kind-parameter">eventName</span>: <span
+                                            class="tsd-signature-type">string</span><span class="tsd-signature-symbol">
+                                            | </span><span class="tsd-signature-type">symbol</span></h5>
+                                    <div class="tsd-comment tsd-typography">
+                                        <p>The event name</p>
+                                    </div>
+                                </li>
+                            </ul>
+                        </div>
+                        <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span></h4>
+                        <aside class="tsd-sources">
+                            <p>Inherited from EventEmitter.listenerCount</p>
+                            <ul>
+                                <li>Defined in node_modules/@types/node/events.d.ts:234</li>
+                            </ul>
+                        </aside>
+                    </li>
+                </ul>
+            </section>
+            <section class="tsd-panel tsd-member tsd-is-inherited tsd-is-external"><a id="on-2" class="tsd-anchor"></a>
+                <h3 class="tsd-anchor-link"><code class="tsd-tag ts-flagStatic">Static</code> <span>on</span><a
+                        href="#on-2" aria-label="Permalink" class="tsd-anchor-icon"><svg
+                            class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2"
+                            stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                            <use href="#icon-anchor-a"></use>
+                            <use href="#icon-anchor-b"></use>
+                            <use href="#icon-anchor-c"></use>
+                        </svg></a></h3>
+                <ul class="tsd-signatures tsd-is-inherited tsd-is-external">
+                    <li class="tsd-signature tsd-anchor-link" id="on-2.on-3"><span
+                            class="tsd-kind-call-signature">on</span><span class="tsd-signature-symbol">(</span><span
+                            class="tsd-kind-parameter">emitter</span>, <span
+                            class="tsd-kind-parameter">eventName</span>, <span
+                            class="tsd-kind-parameter">options</span><span class="tsd-signature-symbol">?</span><span
+                            class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span
+                            class="tsd-signature-type ">AsyncIterableIterator</span><span
+                            class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">any</span><span
+                            class="tsd-signature-symbol">&gt;</span><a href="#on-2.on-3" aria-label="Permalink"
+                            class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24"
+                                stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <use href="#icon-anchor-a"></use>
+                                <use href="#icon-anchor-b"></use>
+                                <use href="#icon-anchor-c"></use>
+                            </svg></a></li>
+                    <li class="tsd-description">
+                        <div class="tsd-comment tsd-typography">
+                            <pre><code class="language-js"><span class="hl-0">const</span><span class="hl-1"> { </span><span class="hl-2">on</span><span class="hl-1">, </span><span class="hl-2">EventEmitter</span><span class="hl-1"> } = </span><span class="hl-3">require</span><span class="hl-1">(</span><span class="hl-4">&#39;events&#39;</span><span class="hl-1">);</span><br/><br/><span class="hl-1">(</span><span class="hl-0">async</span><span class="hl-1"> () </span><span class="hl-0">=&gt;</span><span class="hl-1"> {</span><br/><span class="hl-1">  </span><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-2">ee</span><span class="hl-1"> = </span><span class="hl-0">new</span><span class="hl-1"> </span><span class="hl-3">EventEmitter</span><span class="hl-1">();</span><br/><br/><span class="hl-1">  </span><span class="hl-5">// Emit later on</span><br/><span class="hl-1">  </span><span class="hl-6">process</span><span class="hl-1">.</span><span class="hl-3">nextTick</span><span class="hl-1">(() </span><span class="hl-0">=&gt;</span><span class="hl-1"> {</span><br/><span class="hl-1">    </span><span class="hl-6">ee</span><span class="hl-1">.</span><span class="hl-3">emit</span><span class="hl-1">(</span><span class="hl-4">&#39;foo&#39;</span><span class="hl-1">, </span><span class="hl-4">&#39;bar&#39;</span><span class="hl-1">);</span><br/><span class="hl-1">    </span><span class="hl-6">ee</span><span class="hl-1">.</span><span class="hl-3">emit</span><span class="hl-1">(</span><span class="hl-4">&#39;foo&#39;</span><span class="hl-1">, </span><span class="hl-7">42</span><span class="hl-1">);</span><br/><span class="hl-1">  });</span><br/><br/><span class="hl-1">  </span><span class="hl-8">for</span><span class="hl-1"> </span><span class="hl-8">await</span><span class="hl-1"> (</span><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-2">event</span><span class="hl-1"> </span><span class="hl-0">of</span><span class="hl-1"> </span><span class="hl-3">on</span><span class="hl-1">(</span><span class="hl-6">ee</span><span class="hl-1">, </span><span class="hl-4">&#39;foo&#39;</span><span class="hl-1">)) {</span><br/><span class="hl-1">    </span><span class="hl-5">// The execution of this inner block is synchronous and it</span><br/><span class="hl-1">    </span><span class="hl-5">// processes one event at a time (even with await). Do not use</span><br/><span class="hl-1">    </span><span class="hl-5">// if concurrent execution is required.</span><br/><span class="hl-1">    </span><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-6">event</span><span class="hl-1">); </span><span class="hl-5">// prints [&#39;bar&#39;] [42]</span><br/><span class="hl-1">  }</span><br/><span class="hl-1">  </span><span class="hl-5">// Unreachable here</span><br/><span class="hl-1">})();</span>
 </code><button>Copy</button></pre>
-<p>Returns an <code>AsyncIterator</code> that iterates <code>eventName</code> events. It will throw
-if the <code>EventEmitter</code> emits <code>&#39;error&#39;</code>. It removes all listeners when
-exiting the loop. The <code>value</code> returned by each iteration is an array
-composed of the emitted event arguments.</p>
-<p>An <code>AbortSignal</code> can be used to cancel waiting on events:</p>
-<pre><code class="language-js"><span class="hl-0">const</span><span class="hl-1"> { </span><span class="hl-2">on</span><span class="hl-1">, </span><span class="hl-2">EventEmitter</span><span class="hl-1"> } = </span><span class="hl-3">require</span><span class="hl-1">(</span><span class="hl-4">&#39;events&#39;</span><span class="hl-1">);</span><br/><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-2">ac</span><span class="hl-1"> = </span><span class="hl-0">new</span><span class="hl-1"> </span><span class="hl-3">AbortController</span><span class="hl-1">();</span><br/><br/><span class="hl-1">(</span><span class="hl-0">async</span><span class="hl-1"> () </span><span class="hl-0">=&gt;</span><span class="hl-1"> {</span><br/><span class="hl-1">  </span><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-2">ee</span><span class="hl-1"> = </span><span class="hl-0">new</span><span class="hl-1"> </span><span class="hl-3">EventEmitter</span><span class="hl-1">();</span><br/><br/><span class="hl-1">  </span><span class="hl-5">// Emit later on</span><br/><span class="hl-1">  </span><span class="hl-6">process</span><span class="hl-1">.</span><span class="hl-3">nextTick</span><span class="hl-1">(() </span><span class="hl-0">=&gt;</span><span class="hl-1"> {</span><br/><span class="hl-1">    </span><span class="hl-6">ee</span><span class="hl-1">.</span><span class="hl-3">emit</span><span class="hl-1">(</span><span class="hl-4">&#39;foo&#39;</span><span class="hl-1">, </span><span class="hl-4">&#39;bar&#39;</span><span class="hl-1">);</span><br/><span class="hl-1">    </span><span class="hl-6">ee</span><span class="hl-1">.</span><span class="hl-3">emit</span><span class="hl-1">(</span><span class="hl-4">&#39;foo&#39;</span><span class="hl-1">, </span><span class="hl-7">42</span><span class="hl-1">);</span><br/><span class="hl-1">  });</span><br/><br/><span class="hl-1">  </span><span class="hl-8">for</span><span class="hl-1"> </span><span class="hl-8">await</span><span class="hl-1"> (</span><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-2">event</span><span class="hl-1"> </span><span class="hl-0">of</span><span class="hl-1"> </span><span class="hl-3">on</span><span class="hl-1">(</span><span class="hl-6">ee</span><span class="hl-1">, </span><span class="hl-4">&#39;foo&#39;</span><span class="hl-1">, { </span><span class="hl-6">signal:</span><span class="hl-1"> </span><span class="hl-6">ac</span><span class="hl-1">.</span><span class="hl-6">signal</span><span class="hl-1"> })) {</span><br/><span class="hl-1">    </span><span class="hl-5">// The execution of this inner block is synchronous and it</span><br/><span class="hl-1">    </span><span class="hl-5">// processes one event at a time (even with await). Do not use</span><br/><span class="hl-1">    </span><span class="hl-5">// if concurrent execution is required.</span><br/><span class="hl-1">    </span><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-6">event</span><span class="hl-1">); </span><span class="hl-5">// prints [&#39;bar&#39;] [42]</span><br/><span class="hl-1">  }</span><br/><span class="hl-1">  </span><span class="hl-5">// Unreachable here</span><br/><span class="hl-1">})();</span><br/><br/><span class="hl-6">process</span><span class="hl-1">.</span><span class="hl-3">nextTick</span><span class="hl-1">(() </span><span class="hl-0">=&gt;</span><span class="hl-1"> </span><span class="hl-6">ac</span><span class="hl-1">.</span><span class="hl-3">abort</span><span class="hl-1">());</span>
+                            <p>Returns an <code>AsyncIterator</code> that iterates <code>eventName</code> events. It
+                                will throw
+                                if the <code>EventEmitter</code> emits <code>&#39;error&#39;</code>. It removes all
+                                listeners when
+                                exiting the loop. The <code>value</code> returned by each iteration is an array
+                                composed of the emitted event arguments.</p>
+                            <p>An <code>AbortSignal</code> can be used to cancel waiting on events:</p>
+                            <pre><code class="language-js"><span class="hl-0">const</span><span class="hl-1"> { </span><span class="hl-2">on</span><span class="hl-1">, </span><span class="hl-2">EventEmitter</span><span class="hl-1"> } = </span><span class="hl-3">require</span><span class="hl-1">(</span><span class="hl-4">&#39;events&#39;</span><span class="hl-1">);</span><br/><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-2">ac</span><span class="hl-1"> = </span><span class="hl-0">new</span><span class="hl-1"> </span><span class="hl-3">AbortController</span><span class="hl-1">();</span><br/><br/><span class="hl-1">(</span><span class="hl-0">async</span><span class="hl-1"> () </span><span class="hl-0">=&gt;</span><span class="hl-1"> {</span><br/><span class="hl-1">  </span><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-2">ee</span><span class="hl-1"> = </span><span class="hl-0">new</span><span class="hl-1"> </span><span class="hl-3">EventEmitter</span><span class="hl-1">();</span><br/><br/><span class="hl-1">  </span><span class="hl-5">// Emit later on</span><br/><span class="hl-1">  </span><span class="hl-6">process</span><span class="hl-1">.</span><span class="hl-3">nextTick</span><span class="hl-1">(() </span><span class="hl-0">=&gt;</span><span class="hl-1"> {</span><br/><span class="hl-1">    </span><span class="hl-6">ee</span><span class="hl-1">.</span><span class="hl-3">emit</span><span class="hl-1">(</span><span class="hl-4">&#39;foo&#39;</span><span class="hl-1">, </span><span class="hl-4">&#39;bar&#39;</span><span class="hl-1">);</span><br/><span class="hl-1">    </span><span class="hl-6">ee</span><span class="hl-1">.</span><span class="hl-3">emit</span><span class="hl-1">(</span><span class="hl-4">&#39;foo&#39;</span><span class="hl-1">, </span><span class="hl-7">42</span><span class="hl-1">);</span><br/><span class="hl-1">  });</span><br/><br/><span class="hl-1">  </span><span class="hl-8">for</span><span class="hl-1"> </span><span class="hl-8">await</span><span class="hl-1"> (</span><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-2">event</span><span class="hl-1"> </span><span class="hl-0">of</span><span class="hl-1"> </span><span class="hl-3">on</span><span class="hl-1">(</span><span class="hl-6">ee</span><span class="hl-1">, </span><span class="hl-4">&#39;foo&#39;</span><span class="hl-1">, { </span><span class="hl-6">signal:</span><span class="hl-1"> </span><span class="hl-6">ac</span><span class="hl-1">.</span><span class="hl-6">signal</span><span class="hl-1"> })) {</span><br/><span class="hl-1">    </span><span class="hl-5">// The execution of this inner block is synchronous and it</span><br/><span class="hl-1">    </span><span class="hl-5">// processes one event at a time (even with await). Do not use</span><br/><span class="hl-1">    </span><span class="hl-5">// if concurrent execution is required.</span><br/><span class="hl-1">    </span><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-6">event</span><span class="hl-1">); </span><span class="hl-5">// prints [&#39;bar&#39;] [42]</span><br/><span class="hl-1">  }</span><br/><span class="hl-1">  </span><span class="hl-5">// Unreachable here</span><br/><span class="hl-1">})();</span><br/><br/><span class="hl-6">process</span><span class="hl-1">.</span><span class="hl-3">nextTick</span><span class="hl-1">(() </span><span class="hl-0">=&gt;</span><span class="hl-1"> </span><span class="hl-6">ac</span><span class="hl-1">.</span><span class="hl-3">abort</span><span class="hl-1">());</span>
 </code><button>Copy</button></pre>
 
-<h3>Since</h3><p>v13.6.0, v12.16.0</p>
-</div>
-<div class="tsd-parameters">
-<h4 class="tsd-parameters-title">Parameters</h4>
-<ul class="tsd-parameter-list">
-<li>
-<h5><span class="tsd-kind-parameter">emitter</span>: <span class="tsd-signature-type ">EventEmitter</span></h5></li>
-<li>
-<h5><span class="tsd-kind-parameter">eventName</span>: <span class="tsd-signature-type">string</span></h5>
-<div class="tsd-comment tsd-typography"><p>The name of the event being listened for</p>
-</div></li>
-<li>
-<h5><code class="tsd-tag ts-flagOptional">Optional</code> <span class="tsd-kind-parameter">options</span>: <span class="tsd-signature-type ">StaticEventEmitterOptions</span></h5></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">AsyncIterableIterator</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">&gt;</span></h4><p>that iterates <code>eventName</code> events emitted by the <code>emitter</code></p>
-<aside class="tsd-sources">
-<p>Inherited from EventEmitter.on</p>
-<ul>
-<li>Defined in node_modules/@types/node/events.d.ts:217</li></ul></aside></li></ul></section>
-<section class="tsd-panel tsd-member tsd-is-inherited tsd-is-external"><a id="once-2" class="tsd-anchor"></a>
-<h3 class="tsd-anchor-link"><code class="tsd-tag ts-flagStatic">Static</code> <span>once</span><a href="#once-2" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
-<ul class="tsd-signatures tsd-is-inherited tsd-is-external">
-<li class="tsd-signature tsd-anchor-link" id="once-2.once-3"><span class="tsd-kind-call-signature">once</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">emitter</span>, <span class="tsd-kind-parameter">eventName</span>, <span class="tsd-kind-parameter">options</span><span class="tsd-signature-symbol">?</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">&gt;</span><a href="#once-2.once-3" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
-<li class="tsd-description">
-<div class="tsd-comment tsd-typography"><p>Creates a <code>Promise</code> that is fulfilled when the <code>EventEmitter</code> emits the given
-event or that is rejected if the <code>EventEmitter</code> emits <code>&#39;error&#39;</code> while waiting.
-The <code>Promise</code> will resolve with an array of all the arguments emitted to the
-given event.</p>
-<p>This method is intentionally generic and works with the web platform <a href="https://dom.spec.whatwg.org/#interface-eventtarget">EventTarget</a> interface, which has no special<code>&#39;error&#39;</code> event
-semantics and does not listen to the <code>&#39;error&#39;</code> event.</p>
-<pre><code class="language-js"><span class="hl-0">const</span><span class="hl-1"> { </span><span class="hl-2">once</span><span class="hl-1">, </span><span class="hl-2">EventEmitter</span><span class="hl-1"> } = </span><span class="hl-3">require</span><span class="hl-1">(</span><span class="hl-4">&#39;events&#39;</span><span class="hl-1">);</span><br/><br/><span class="hl-0">async</span><span class="hl-1"> </span><span class="hl-0">function</span><span class="hl-1"> </span><span class="hl-3">run</span><span class="hl-1">() {</span><br/><span class="hl-1">  </span><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-2">ee</span><span class="hl-1"> = </span><span class="hl-0">new</span><span class="hl-1"> </span><span class="hl-3">EventEmitter</span><span class="hl-1">();</span><br/><br/><span class="hl-1">  </span><span class="hl-6">process</span><span class="hl-1">.</span><span class="hl-3">nextTick</span><span class="hl-1">(() </span><span class="hl-0">=&gt;</span><span class="hl-1"> {</span><br/><span class="hl-1">    </span><span class="hl-6">ee</span><span class="hl-1">.</span><span class="hl-3">emit</span><span class="hl-1">(</span><span class="hl-4">&#39;myevent&#39;</span><span class="hl-1">, </span><span class="hl-7">42</span><span class="hl-1">);</span><br/><span class="hl-1">  });</span><br/><br/><span class="hl-1">  </span><span class="hl-0">const</span><span class="hl-1"> [</span><span class="hl-2">value</span><span class="hl-1">] = </span><span class="hl-8">await</span><span class="hl-1"> </span><span class="hl-3">once</span><span class="hl-1">(</span><span class="hl-6">ee</span><span class="hl-1">, </span><span class="hl-4">&#39;myevent&#39;</span><span class="hl-1">);</span><br/><span class="hl-1">  </span><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-6">value</span><span class="hl-1">);</span><br/><br/><span class="hl-1">  </span><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-2">err</span><span class="hl-1"> = </span><span class="hl-0">new</span><span class="hl-1"> </span><span class="hl-3">Error</span><span class="hl-1">(</span><span class="hl-4">&#39;kaboom&#39;</span><span class="hl-1">);</span><br/><span class="hl-1">  </span><span class="hl-6">process</span><span class="hl-1">.</span><span class="hl-3">nextTick</span><span class="hl-1">(() </span><span class="hl-0">=&gt;</span><span class="hl-1"> {</span><br/><span class="hl-1">    </span><span class="hl-6">ee</span><span class="hl-1">.</span><span class="hl-3">emit</span><span class="hl-1">(</span><span class="hl-4">&#39;error&#39;</span><span class="hl-1">, </span><span class="hl-6">err</span><span class="hl-1">);</span><br/><span class="hl-1">  });</span><br/><br/><span class="hl-1">  </span><span class="hl-8">try</span><span class="hl-1"> {</span><br/><span class="hl-1">    </span><span class="hl-8">await</span><span class="hl-1"> </span><span class="hl-3">once</span><span class="hl-1">(</span><span class="hl-6">ee</span><span class="hl-1">, </span><span class="hl-4">&#39;myevent&#39;</span><span class="hl-1">);</span><br/><span class="hl-1">  } </span><span class="hl-8">catch</span><span class="hl-1"> (</span><span class="hl-6">err</span><span class="hl-1">) {</span><br/><span class="hl-1">    </span><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-4">&#39;error happened&#39;</span><span class="hl-1">, </span><span class="hl-6">err</span><span class="hl-1">);</span><br/><span class="hl-1">  }</span><br/><span class="hl-1">}</span><br/><br/><span class="hl-3">run</span><span class="hl-1">();</span>
+                            <h3>Since</h3>
+                            <p>v13.6.0, v12.16.0</p>
+                        </div>
+                        <div class="tsd-parameters">
+                            <h4 class="tsd-parameters-title">Parameters</h4>
+                            <ul class="tsd-parameter-list">
+                                <li>
+                                    <h5><span class="tsd-kind-parameter">emitter</span>: <span
+                                            class="tsd-signature-type ">EventEmitter</span></h5>
+                                </li>
+                                <li>
+                                    <h5><span class="tsd-kind-parameter">eventName</span>: <span
+                                            class="tsd-signature-type">string</span></h5>
+                                    <div class="tsd-comment tsd-typography">
+                                        <p>The name of the event being listened for</p>
+                                    </div>
+                                </li>
+                                <li>
+                                    <h5><code class="tsd-tag ts-flagOptional">Optional</code> <span
+                                            class="tsd-kind-parameter">options</span>: <span
+                                            class="tsd-signature-type ">StaticEventEmitterOptions</span></h5>
+                                </li>
+                            </ul>
+                        </div>
+                        <h4 class="tsd-returns-title">Returns <span
+                                class="tsd-signature-type ">AsyncIterableIterator</span><span
+                                class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">any</span><span
+                                class="tsd-signature-symbol">&gt;</span></h4>
+                        <p>that iterates <code>eventName</code> events emitted by the <code>emitter</code></p>
+                        <aside class="tsd-sources">
+                            <p>Inherited from EventEmitter.on</p>
+                            <ul>
+                                <li>Defined in node_modules/@types/node/events.d.ts:217</li>
+                            </ul>
+                        </aside>
+                    </li>
+                </ul>
+            </section>
+            <section class="tsd-panel tsd-member tsd-is-inherited tsd-is-external"><a id="once-2"
+                    class="tsd-anchor"></a>
+                <h3 class="tsd-anchor-link"><code class="tsd-tag ts-flagStatic">Static</code> <span>once</span><a
+                        href="#once-2" aria-label="Permalink" class="tsd-anchor-icon"><svg
+                            class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2"
+                            stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                            <use href="#icon-anchor-a"></use>
+                            <use href="#icon-anchor-b"></use>
+                            <use href="#icon-anchor-c"></use>
+                        </svg></a></h3>
+                <ul class="tsd-signatures tsd-is-inherited tsd-is-external">
+                    <li class="tsd-signature tsd-anchor-link" id="once-2.once-3"><span
+                            class="tsd-kind-call-signature">once</span><span class="tsd-signature-symbol">(</span><span
+                            class="tsd-kind-parameter">emitter</span>, <span
+                            class="tsd-kind-parameter">eventName</span>, <span
+                            class="tsd-kind-parameter">options</span><span class="tsd-signature-symbol">?</span><span
+                            class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span
+                            class="tsd-signature-type ">Promise</span><span
+                            class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">any</span><span
+                            class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">&gt;</span><a
+                            href="#once-2.once-3" aria-label="Permalink" class="tsd-anchor-icon"><svg
+                                class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2"
+                                stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                <use href="#icon-anchor-a"></use>
+                                <use href="#icon-anchor-b"></use>
+                                <use href="#icon-anchor-c"></use>
+                            </svg></a></li>
+                    <li class="tsd-description">
+                        <div class="tsd-comment tsd-typography">
+                            <p>Creates a <code>Promise</code> that is fulfilled when the <code>EventEmitter</code> emits
+                                the given
+                                event or that is rejected if the <code>EventEmitter</code> emits
+                                <code>&#39;error&#39;</code> while waiting.
+                                The <code>Promise</code> will resolve with an array of all the arguments emitted to the
+                                given event.</p>
+                            <p>This method is intentionally generic and works with the web platform <a
+                                    href="https://dom.spec.whatwg.org/#interface-eventtarget">EventTarget</a> interface,
+                                which has no special<code>&#39;error&#39;</code> event
+                                semantics and does not listen to the <code>&#39;error&#39;</code> event.</p>
+                            <pre><code class="language-js"><span class="hl-0">const</span><span class="hl-1"> { </span><span class="hl-2">once</span><span class="hl-1">, </span><span class="hl-2">EventEmitter</span><span class="hl-1"> } = </span><span class="hl-3">require</span><span class="hl-1">(</span><span class="hl-4">&#39;events&#39;</span><span class="hl-1">);</span><br/><br/><span class="hl-0">async</span><span class="hl-1"> </span><span class="hl-0">function</span><span class="hl-1"> </span><span class="hl-3">run</span><span class="hl-1">() {</span><br/><span class="hl-1">  </span><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-2">ee</span><span class="hl-1"> = </span><span class="hl-0">new</span><span class="hl-1"> </span><span class="hl-3">EventEmitter</span><span class="hl-1">();</span><br/><br/><span class="hl-1">  </span><span class="hl-6">process</span><span class="hl-1">.</span><span class="hl-3">nextTick</span><span class="hl-1">(() </span><span class="hl-0">=&gt;</span><span class="hl-1"> {</span><br/><span class="hl-1">    </span><span class="hl-6">ee</span><span class="hl-1">.</span><span class="hl-3">emit</span><span class="hl-1">(</span><span class="hl-4">&#39;myevent&#39;</span><span class="hl-1">, </span><span class="hl-7">42</span><span class="hl-1">);</span><br/><span class="hl-1">  });</span><br/><br/><span class="hl-1">  </span><span class="hl-0">const</span><span class="hl-1"> [</span><span class="hl-2">value</span><span class="hl-1">] = </span><span class="hl-8">await</span><span class="hl-1"> </span><span class="hl-3">once</span><span class="hl-1">(</span><span class="hl-6">ee</span><span class="hl-1">, </span><span class="hl-4">&#39;myevent&#39;</span><span class="hl-1">);</span><br/><span class="hl-1">  </span><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-6">value</span><span class="hl-1">);</span><br/><br/><span class="hl-1">  </span><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-2">err</span><span class="hl-1"> = </span><span class="hl-0">new</span><span class="hl-1"> </span><span class="hl-3">Error</span><span class="hl-1">(</span><span class="hl-4">&#39;kaboom&#39;</span><span class="hl-1">);</span><br/><span class="hl-1">  </span><span class="hl-6">process</span><span class="hl-1">.</span><span class="hl-3">nextTick</span><span class="hl-1">(() </span><span class="hl-0">=&gt;</span><span class="hl-1"> {</span><br/><span class="hl-1">    </span><span class="hl-6">ee</span><span class="hl-1">.</span><span class="hl-3">emit</span><span class="hl-1">(</span><span class="hl-4">&#39;error&#39;</span><span class="hl-1">, </span><span class="hl-6">err</span><span class="hl-1">);</span><br/><span class="hl-1">  });</span><br/><br/><span class="hl-1">  </span><span class="hl-8">try</span><span class="hl-1"> {</span><br/><span class="hl-1">    </span><span class="hl-8">await</span><span class="hl-1"> </span><span class="hl-3">once</span><span class="hl-1">(</span><span class="hl-6">ee</span><span class="hl-1">, </span><span class="hl-4">&#39;myevent&#39;</span><span class="hl-1">);</span><br/><span class="hl-1">  } </span><span class="hl-8">catch</span><span class="hl-1"> (</span><span class="hl-6">err</span><span class="hl-1">) {</span><br/><span class="hl-1">    </span><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-4">&#39;error happened&#39;</span><span class="hl-1">, </span><span class="hl-6">err</span><span class="hl-1">);</span><br/><span class="hl-1">  }</span><br/><span class="hl-1">}</span><br/><br/><span class="hl-3">run</span><span class="hl-1">();</span>
 </code><button>Copy</button></pre>
-<p>The special handling of the <code>&#39;error&#39;</code> event is only used when <code>events.once()</code>is used to wait for another event. If <code>events.once()</code> is used to wait for the
-&#39;<code>error&#39;</code> event itself, then it is treated as any other kind of event without
-special handling:</p>
-<pre><code class="language-js"><span class="hl-0">const</span><span class="hl-1"> { </span><span class="hl-2">EventEmitter</span><span class="hl-1">, </span><span class="hl-2">once</span><span class="hl-1"> } = </span><span class="hl-3">require</span><span class="hl-1">(</span><span class="hl-4">&#39;events&#39;</span><span class="hl-1">);</span><br/><br/><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-2">ee</span><span class="hl-1"> = </span><span class="hl-0">new</span><span class="hl-1"> </span><span class="hl-3">EventEmitter</span><span class="hl-1">();</span><br/><br/><span class="hl-3">once</span><span class="hl-1">(</span><span class="hl-6">ee</span><span class="hl-1">, </span><span class="hl-4">&#39;error&#39;</span><span class="hl-1">)</span><br/><span class="hl-1">  .</span><span class="hl-3">then</span><span class="hl-1">(([</span><span class="hl-6">err</span><span class="hl-1">]) </span><span class="hl-0">=&gt;</span><span class="hl-1"> </span><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-4">&#39;ok&#39;</span><span class="hl-1">, </span><span class="hl-6">err</span><span class="hl-1">.</span><span class="hl-6">message</span><span class="hl-1">))</span><br/><span class="hl-1">  .</span><span class="hl-3">catch</span><span class="hl-1">((</span><span class="hl-6">err</span><span class="hl-1">) </span><span class="hl-0">=&gt;</span><span class="hl-1"> </span><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-4">&#39;error&#39;</span><span class="hl-1">, </span><span class="hl-6">err</span><span class="hl-1">.</span><span class="hl-6">message</span><span class="hl-1">));</span><br/><br/><span class="hl-6">ee</span><span class="hl-1">.</span><span class="hl-3">emit</span><span class="hl-1">(</span><span class="hl-4">&#39;error&#39;</span><span class="hl-1">, </span><span class="hl-0">new</span><span class="hl-1"> </span><span class="hl-3">Error</span><span class="hl-1">(</span><span class="hl-4">&#39;boom&#39;</span><span class="hl-1">));</span><br/><br/><span class="hl-5">// Prints: ok boom</span>
+                            <p>The special handling of the <code>&#39;error&#39;</code> event is only used when
+                                <code>events.once()</code>is used to wait for another event. If
+                                <code>events.once()</code> is used to wait for the
+                                &#39;<code>error&#39;</code> event itself, then it is treated as any other kind of event
+                                without
+                                special handling:</p>
+                            <pre><code class="language-js"><span class="hl-0">const</span><span class="hl-1"> { </span><span class="hl-2">EventEmitter</span><span class="hl-1">, </span><span class="hl-2">once</span><span class="hl-1"> } = </span><span class="hl-3">require</span><span class="hl-1">(</span><span class="hl-4">&#39;events&#39;</span><span class="hl-1">);</span><br/><br/><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-2">ee</span><span class="hl-1"> = </span><span class="hl-0">new</span><span class="hl-1"> </span><span class="hl-3">EventEmitter</span><span class="hl-1">();</span><br/><br/><span class="hl-3">once</span><span class="hl-1">(</span><span class="hl-6">ee</span><span class="hl-1">, </span><span class="hl-4">&#39;error&#39;</span><span class="hl-1">)</span><br/><span class="hl-1">  .</span><span class="hl-3">then</span><span class="hl-1">(([</span><span class="hl-6">err</span><span class="hl-1">]) </span><span class="hl-0">=&gt;</span><span class="hl-1"> </span><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-4">&#39;ok&#39;</span><span class="hl-1">, </span><span class="hl-6">err</span><span class="hl-1">.</span><span class="hl-6">message</span><span class="hl-1">))</span><br/><span class="hl-1">  .</span><span class="hl-3">catch</span><span class="hl-1">((</span><span class="hl-6">err</span><span class="hl-1">) </span><span class="hl-0">=&gt;</span><span class="hl-1"> </span><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-4">&#39;error&#39;</span><span class="hl-1">, </span><span class="hl-6">err</span><span class="hl-1">.</span><span class="hl-6">message</span><span class="hl-1">));</span><br/><br/><span class="hl-6">ee</span><span class="hl-1">.</span><span class="hl-3">emit</span><span class="hl-1">(</span><span class="hl-4">&#39;error&#39;</span><span class="hl-1">, </span><span class="hl-0">new</span><span class="hl-1"> </span><span class="hl-3">Error</span><span class="hl-1">(</span><span class="hl-4">&#39;boom&#39;</span><span class="hl-1">));</span><br/><br/><span class="hl-5">// Prints: ok boom</span>
 </code><button>Copy</button></pre>
-<p>An <code>AbortSignal</code> can be used to cancel waiting for the event:</p>
-<pre><code class="language-js"><span class="hl-0">const</span><span class="hl-1"> { </span><span class="hl-2">EventEmitter</span><span class="hl-1">, </span><span class="hl-2">once</span><span class="hl-1"> } = </span><span class="hl-3">require</span><span class="hl-1">(</span><span class="hl-4">&#39;events&#39;</span><span class="hl-1">);</span><br/><br/><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-2">ee</span><span class="hl-1"> = </span><span class="hl-0">new</span><span class="hl-1"> </span><span class="hl-3">EventEmitter</span><span class="hl-1">();</span><br/><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-2">ac</span><span class="hl-1"> = </span><span class="hl-0">new</span><span class="hl-1"> </span><span class="hl-3">AbortController</span><span class="hl-1">();</span><br/><br/><span class="hl-0">async</span><span class="hl-1"> </span><span class="hl-0">function</span><span class="hl-1"> </span><span class="hl-3">foo</span><span class="hl-1">(</span><span class="hl-6">emitter</span><span class="hl-1">, </span><span class="hl-6">event</span><span class="hl-1">, </span><span class="hl-6">signal</span><span class="hl-1">) {</span><br/><span class="hl-1">  </span><span class="hl-8">try</span><span class="hl-1"> {</span><br/><span class="hl-1">    </span><span class="hl-8">await</span><span class="hl-1"> </span><span class="hl-3">once</span><span class="hl-1">(</span><span class="hl-6">emitter</span><span class="hl-1">, </span><span class="hl-6">event</span><span class="hl-1">, { </span><span class="hl-6">signal</span><span class="hl-1"> });</span><br/><span class="hl-1">    </span><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-4">&#39;event emitted!&#39;</span><span class="hl-1">);</span><br/><span class="hl-1">  } </span><span class="hl-8">catch</span><span class="hl-1"> (</span><span class="hl-6">error</span><span class="hl-1">) {</span><br/><span class="hl-1">    </span><span class="hl-8">if</span><span class="hl-1"> (</span><span class="hl-6">error</span><span class="hl-1">.</span><span class="hl-6">name</span><span class="hl-1"> === </span><span class="hl-4">&#39;AbortError&#39;</span><span class="hl-1">) {</span><br/><span class="hl-1">      </span><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">error</span><span class="hl-1">(</span><span class="hl-4">&#39;Waiting for the event was canceled!&#39;</span><span class="hl-1">);</span><br/><span class="hl-1">    } </span><span class="hl-8">else</span><span class="hl-1"> {</span><br/><span class="hl-1">      </span><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">error</span><span class="hl-1">(</span><span class="hl-4">&#39;There was an error&#39;</span><span class="hl-1">, </span><span class="hl-6">error</span><span class="hl-1">.</span><span class="hl-6">message</span><span class="hl-1">);</span><br/><span class="hl-1">    }</span><br/><span class="hl-1">  }</span><br/><span class="hl-1">}</span><br/><br/><span class="hl-3">foo</span><span class="hl-1">(</span><span class="hl-6">ee</span><span class="hl-1">, </span><span class="hl-4">&#39;foo&#39;</span><span class="hl-1">, </span><span class="hl-6">ac</span><span class="hl-1">.</span><span class="hl-6">signal</span><span class="hl-1">);</span><br/><span class="hl-6">ac</span><span class="hl-1">.</span><span class="hl-3">abort</span><span class="hl-1">(); </span><span class="hl-5">// Abort waiting for the event</span><br/><span class="hl-6">ee</span><span class="hl-1">.</span><span class="hl-3">emit</span><span class="hl-1">(</span><span class="hl-4">&#39;foo&#39;</span><span class="hl-1">); </span><span class="hl-5">// Prints: Waiting for the event was canceled!</span>
+                            <p>An <code>AbortSignal</code> can be used to cancel waiting for the event:</p>
+                            <pre><code class="language-js"><span class="hl-0">const</span><span class="hl-1"> { </span><span class="hl-2">EventEmitter</span><span class="hl-1">, </span><span class="hl-2">once</span><span class="hl-1"> } = </span><span class="hl-3">require</span><span class="hl-1">(</span><span class="hl-4">&#39;events&#39;</span><span class="hl-1">);</span><br/><br/><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-2">ee</span><span class="hl-1"> = </span><span class="hl-0">new</span><span class="hl-1"> </span><span class="hl-3">EventEmitter</span><span class="hl-1">();</span><br/><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-2">ac</span><span class="hl-1"> = </span><span class="hl-0">new</span><span class="hl-1"> </span><span class="hl-3">AbortController</span><span class="hl-1">();</span><br/><br/><span class="hl-0">async</span><span class="hl-1"> </span><span class="hl-0">function</span><span class="hl-1"> </span><span class="hl-3">foo</span><span class="hl-1">(</span><span class="hl-6">emitter</span><span class="hl-1">, </span><span class="hl-6">event</span><span class="hl-1">, </span><span class="hl-6">signal</span><span class="hl-1">) {</span><br/><span class="hl-1">  </span><span class="hl-8">try</span><span class="hl-1"> {</span><br/><span class="hl-1">    </span><span class="hl-8">await</span><span class="hl-1"> </span><span class="hl-3">once</span><span class="hl-1">(</span><span class="hl-6">emitter</span><span class="hl-1">, </span><span class="hl-6">event</span><span class="hl-1">, { </span><span class="hl-6">signal</span><span class="hl-1"> });</span><br/><span class="hl-1">    </span><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">log</span><span class="hl-1">(</span><span class="hl-4">&#39;event emitted!&#39;</span><span class="hl-1">);</span><br/><span class="hl-1">  } </span><span class="hl-8">catch</span><span class="hl-1"> (</span><span class="hl-6">error</span><span class="hl-1">) {</span><br/><span class="hl-1">    </span><span class="hl-8">if</span><span class="hl-1"> (</span><span class="hl-6">error</span><span class="hl-1">.</span><span class="hl-6">name</span><span class="hl-1"> === </span><span class="hl-4">&#39;AbortError&#39;</span><span class="hl-1">) {</span><br/><span class="hl-1">      </span><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">error</span><span class="hl-1">(</span><span class="hl-4">&#39;Waiting for the event was canceled!&#39;</span><span class="hl-1">);</span><br/><span class="hl-1">    } </span><span class="hl-8">else</span><span class="hl-1"> {</span><br/><span class="hl-1">      </span><span class="hl-6">console</span><span class="hl-1">.</span><span class="hl-3">error</span><span class="hl-1">(</span><span class="hl-4">&#39;There was an error&#39;</span><span class="hl-1">, </span><span class="hl-6">error</span><span class="hl-1">.</span><span class="hl-6">message</span><span class="hl-1">);</span><br/><span class="hl-1">    }</span><br/><span class="hl-1">  }</span><br/><span class="hl-1">}</span><br/><br/><span class="hl-3">foo</span><span class="hl-1">(</span><span class="hl-6">ee</span><span class="hl-1">, </span><span class="hl-4">&#39;foo&#39;</span><span class="hl-1">, </span><span class="hl-6">ac</span><span class="hl-1">.</span><span class="hl-6">signal</span><span class="hl-1">);</span><br/><span class="hl-6">ac</span><span class="hl-1">.</span><span class="hl-3">abort</span><span class="hl-1">(); </span><span class="hl-5">// Abort waiting for the event</span><br/><span class="hl-6">ee</span><span class="hl-1">.</span><span class="hl-3">emit</span><span class="hl-1">(</span><span class="hl-4">&#39;foo&#39;</span><span class="hl-1">); </span><span class="hl-5">// Prints: Waiting for the event was canceled!</span>
 </code><button>Copy</button></pre>
 
-<h3>Since</h3><p>v11.13.0, v10.16.0</p>
-</div>
-<div class="tsd-parameters">
-<h4 class="tsd-parameters-title">Parameters</h4>
-<ul class="tsd-parameter-list">
-<li>
-<h5><span class="tsd-kind-parameter">emitter</span>: <span class="tsd-signature-type ">NodeEventTarget</span></h5></li>
-<li>
-<h5><span class="tsd-kind-parameter">eventName</span>: <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">symbol</span></h5></li>
-<li>
-<h5><code class="tsd-tag ts-flagOptional">Optional</code> <span class="tsd-kind-parameter">options</span>: <span class="tsd-signature-type ">StaticEventEmitterOptions</span></h5></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
-<p>Inherited from EventEmitter.once</p>
-<ul>
-<li>Defined in node_modules/@types/node/events.d.ts:157</li></ul></aside></li>
-<li class="tsd-signature tsd-anchor-link" id="once-2.once-4"><span class="tsd-kind-call-signature">once</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">emitter</span>, <span class="tsd-kind-parameter">eventName</span>, <span class="tsd-kind-parameter">options</span><span class="tsd-signature-symbol">?</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">&gt;</span><a href="#once-2.once-4" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
-<li class="tsd-description">
-<div class="tsd-parameters">
-<h4 class="tsd-parameters-title">Parameters</h4>
-<ul class="tsd-parameter-list">
-<li>
-<h5><span class="tsd-kind-parameter">emitter</span>: <span class="tsd-signature-type ">DOMEventTarget</span></h5></li>
-<li>
-<h5><span class="tsd-kind-parameter">eventName</span>: <span class="tsd-signature-type">string</span></h5></li>
-<li>
-<h5><code class="tsd-tag ts-flagOptional">Optional</code> <span class="tsd-kind-parameter">options</span>: <span class="tsd-signature-type ">StaticEventEmitterOptions</span></h5></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
-<p>Inherited from EventEmitter.once</p>
-<ul>
-<li>Defined in node_modules/@types/node/events.d.ts:158</li></ul></aside></li></ul></section>
-<section class="tsd-panel tsd-member tsd-is-inherited tsd-is-external"><a id="setMaxListeners-2" class="tsd-anchor"></a>
-<h3 class="tsd-anchor-link"><code class="tsd-tag ts-flagStatic">Static</code> <span>set<wbr/>Max<wbr/>Listeners</span><a href="#setMaxListeners-2" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
-<ul class="tsd-signatures tsd-is-inherited tsd-is-external">
-<li class="tsd-signature tsd-anchor-link" id="setMaxListeners-2.setMaxListeners-3"><span class="tsd-kind-call-signature">set<wbr/>Max<wbr/>Listeners</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">n</span><span class="tsd-signature-symbol">?</span>, <span class="tsd-signature-symbol">...</span><span class="tsd-kind-parameter">eventTargets</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">void</span><a href="#setMaxListeners-2.setMaxListeners-3" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
-<li class="tsd-description">
-<div class="tsd-comment tsd-typography"><pre><code class="language-js"><span class="hl-0">const</span><span class="hl-1"> {</span><br/><span class="hl-1">  </span><span class="hl-2">setMaxListeners</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-2">EventEmitter</span><br/><span class="hl-1">} = </span><span class="hl-3">require</span><span class="hl-1">(</span><span class="hl-4">&#39;events&#39;</span><span class="hl-1">);</span><br/><br/><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-2">target</span><span class="hl-1"> = </span><span class="hl-0">new</span><span class="hl-1"> </span><span class="hl-3">EventTarget</span><span class="hl-1">();</span><br/><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-2">emitter</span><span class="hl-1"> = </span><span class="hl-0">new</span><span class="hl-1"> </span><span class="hl-3">EventEmitter</span><span class="hl-1">();</span><br/><br/><span class="hl-3">setMaxListeners</span><span class="hl-1">(</span><span class="hl-7">5</span><span class="hl-1">, </span><span class="hl-6">target</span><span class="hl-1">, </span><span class="hl-6">emitter</span><span class="hl-1">);</span>
+                            <h3>Since</h3>
+                            <p>v11.13.0, v10.16.0</p>
+                        </div>
+                        <div class="tsd-parameters">
+                            <h4 class="tsd-parameters-title">Parameters</h4>
+                            <ul class="tsd-parameter-list">
+                                <li>
+                                    <h5><span class="tsd-kind-parameter">emitter</span>: <span
+                                            class="tsd-signature-type ">NodeEventTarget</span></h5>
+                                </li>
+                                <li>
+                                    <h5><span class="tsd-kind-parameter">eventName</span>: <span
+                                            class="tsd-signature-type">string</span><span class="tsd-signature-symbol">
+                                            | </span><span class="tsd-signature-type">symbol</span></h5>
+                                </li>
+                                <li>
+                                    <h5><code class="tsd-tag ts-flagOptional">Optional</code> <span
+                                            class="tsd-kind-parameter">options</span>: <span
+                                            class="tsd-signature-type ">StaticEventEmitterOptions</span></h5>
+                                </li>
+                            </ul>
+                        </div>
+                        <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span
+                                class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">any</span><span
+                                class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">&gt;</span>
+                        </h4>
+                        <aside class="tsd-sources">
+                            <p>Inherited from EventEmitter.once</p>
+                            <ul>
+                                <li>Defined in node_modules/@types/node/events.d.ts:157</li>
+                            </ul>
+                        </aside>
+                    </li>
+                    <li class="tsd-signature tsd-anchor-link" id="once-2.once-4"><span
+                            class="tsd-kind-call-signature">once</span><span class="tsd-signature-symbol">(</span><span
+                            class="tsd-kind-parameter">emitter</span>, <span
+                            class="tsd-kind-parameter">eventName</span>, <span
+                            class="tsd-kind-parameter">options</span><span class="tsd-signature-symbol">?</span><span
+                            class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span
+                            class="tsd-signature-type ">Promise</span><span
+                            class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">any</span><span
+                            class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">&gt;</span><a
+                            href="#once-2.once-4" aria-label="Permalink" class="tsd-anchor-icon"><svg
+                                class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2"
+                                stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                <use href="#icon-anchor-a"></use>
+                                <use href="#icon-anchor-b"></use>
+                                <use href="#icon-anchor-c"></use>
+                            </svg></a></li>
+                    <li class="tsd-description">
+                        <div class="tsd-parameters">
+                            <h4 class="tsd-parameters-title">Parameters</h4>
+                            <ul class="tsd-parameter-list">
+                                <li>
+                                    <h5><span class="tsd-kind-parameter">emitter</span>: <span
+                                            class="tsd-signature-type ">DOMEventTarget</span></h5>
+                                </li>
+                                <li>
+                                    <h5><span class="tsd-kind-parameter">eventName</span>: <span
+                                            class="tsd-signature-type">string</span></h5>
+                                </li>
+                                <li>
+                                    <h5><code class="tsd-tag ts-flagOptional">Optional</code> <span
+                                            class="tsd-kind-parameter">options</span>: <span
+                                            class="tsd-signature-type ">StaticEventEmitterOptions</span></h5>
+                                </li>
+                            </ul>
+                        </div>
+                        <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span
+                                class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">any</span><span
+                                class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">&gt;</span>
+                        </h4>
+                        <aside class="tsd-sources">
+                            <p>Inherited from EventEmitter.once</p>
+                            <ul>
+                                <li>Defined in node_modules/@types/node/events.d.ts:158</li>
+                            </ul>
+                        </aside>
+                    </li>
+                </ul>
+            </section>
+            <section class="tsd-panel tsd-member tsd-is-inherited tsd-is-external"><a id="setMaxListeners-2"
+                    class="tsd-anchor"></a>
+                <h3 class="tsd-anchor-link"><code class="tsd-tag ts-flagStatic">Static</code>
+                    <span>set<wbr/>Max<wbr/>Listeners</span><a href="#setMaxListeners-2" aria-label="Permalink"
+                        class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24"
+                            stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
+                            stroke-linejoin="round">
+                            <use href="#icon-anchor-a"></use>
+                            <use href="#icon-anchor-b"></use>
+                            <use href="#icon-anchor-c"></use>
+                        </svg></a></h3>
+                <ul class="tsd-signatures tsd-is-inherited tsd-is-external">
+                    <li class="tsd-signature tsd-anchor-link" id="setMaxListeners-2.setMaxListeners-3"><span
+                            class="tsd-kind-call-signature">set<wbr/>Max<wbr/>Listeners</span><span
+                            class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">n</span><span
+                            class="tsd-signature-symbol">?</span>, <span class="tsd-signature-symbol">...</span><span
+                            class="tsd-kind-parameter">eventTargets</span><span
+                            class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span
+                            class="tsd-signature-type">void</span><a href="#setMaxListeners-2.setMaxListeners-3"
+                            aria-label="Permalink" class="tsd-anchor-icon"><svg
+                                class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2"
+                                stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                <use href="#icon-anchor-a"></use>
+                                <use href="#icon-anchor-b"></use>
+                                <use href="#icon-anchor-c"></use>
+                            </svg></a></li>
+                    <li class="tsd-description">
+                        <div class="tsd-comment tsd-typography">
+                            <pre><code class="language-js"><span class="hl-0">const</span><span class="hl-1"> {</span><br/><span class="hl-1">  </span><span class="hl-2">setMaxListeners</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-2">EventEmitter</span><br/><span class="hl-1">} = </span><span class="hl-3">require</span><span class="hl-1">(</span><span class="hl-4">&#39;events&#39;</span><span class="hl-1">);</span><br/><br/><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-2">target</span><span class="hl-1"> = </span><span class="hl-0">new</span><span class="hl-1"> </span><span class="hl-3">EventTarget</span><span class="hl-1">();</span><br/><span class="hl-0">const</span><span class="hl-1"> </span><span class="hl-2">emitter</span><span class="hl-1"> = </span><span class="hl-0">new</span><span class="hl-1"> </span><span class="hl-3">EventEmitter</span><span class="hl-1">();</span><br/><br/><span class="hl-3">setMaxListeners</span><span class="hl-1">(</span><span class="hl-7">5</span><span class="hl-1">, </span><span class="hl-6">target</span><span class="hl-1">, </span><span class="hl-6">emitter</span><span class="hl-1">);</span>
 </code><button>Copy</button></pre>
 
 <h3>Since</h3><p>v15.4.0</p>
