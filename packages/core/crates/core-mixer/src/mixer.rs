@@ -10,11 +10,22 @@ use crate::future_extensions::StreamThenConcurrentExt;
 use utils_log::debug;
 use utils_metrics::metrics::SimpleGauge;
 
+lazy_static! {
+    static ref METRIC_QUEUE_SIZE: SimpleGauge =
+        SimpleGauge::new("core_gauge_mixer_queue_size", "Current mixer queue size").unwrap();
+    static ref METRIC_AVERAGE_DELAY: SimpleGauge = SimpleGauge::new(
+        "core_gauge_mixer_average_packet_delay",
+        "Average mixer packet delay averaged over a packet window"
+    )
+    .unwrap();
+}
+
 #[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::sleep;
 
 #[cfg(all(feature = "wasm", not(test)))]
 use gloo_timers::future::sleep;
+use lazy_static::lazy_static;
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -66,31 +77,9 @@ impl MixerConfig {
     }
 }
 
-/// Aggregation of all Prometheus metrics exported by the mixer.
-struct MixerMetrics {
-    /// Current mixer queue size
-    pub queue_size: SimpleGauge,
-    /// Running average of the last N packet delays
-    pub average_delay: SimpleGauge,
-}
-
-impl Default for MixerMetrics {
-    fn default() -> Self {
-        MixerMetrics {
-            queue_size: SimpleGauge::new("core_gauge_mixer_queue_size", "Current mixer queue size").unwrap(),
-            average_delay: SimpleGauge::new(
-                "core_gauge_mixer_average_packet_delay",
-                "Average mixer packet delay averaged over a packet window",
-            )
-            .unwrap(),
-        }
-    }
-}
-
 /// Mixer implementation using Async instead of a real queue to provide the packet mixing functionality
 pub struct Mixer<T> {
     pub cfg: MixerConfig,
-    metrics: MixerMetrics,
     _data: PhantomData<T>,
 }
 
@@ -98,7 +87,6 @@ impl<T> Default for Mixer<T> {
     fn default() -> Self {
         Self {
             cfg: MixerConfig::default(),
-            metrics: MixerMetrics::default(),
             _data: PhantomData,
         }
     }
@@ -116,16 +104,15 @@ impl<T> Mixer<T> {
         let random_delay = self.cfg.random_delay();
         debug!("Mixer created a random packet delay of {}ms", random_delay.as_millis());
 
-        self.metrics.queue_size.increment(1.0f64);
+        METRIC_QUEUE_SIZE.increment(1.0f64);
 
         sleep(random_delay).await;
 
-        self.metrics.queue_size.decrement(1.0f64);
+        METRIC_QUEUE_SIZE.decrement(1.0f64);
 
         let weight = 1.0f64 / self.cfg.metric_delay_window as f64;
-        self.metrics
-            .average_delay
-            .set((weight * random_delay.as_millis() as f64) + ((1.0f64 - weight) * self.metrics.average_delay.get()));
+        METRIC_AVERAGE_DELAY
+            .set((weight * random_delay.as_millis() as f64) + ((1.0f64 - weight) * METRIC_AVERAGE_DELAY.get()));
 
         packet
     }
