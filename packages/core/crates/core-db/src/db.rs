@@ -3,11 +3,11 @@ use async_trait::async_trait;
 use core_crypto::types::{HalfKeyChallenge, Hash, PublicKey};
 use core_types::acknowledgement::{AcknowledgedTicket, PendingAcknowledgement};
 use core_types::channels::{ChannelEntry, Ticket};
+use utils_db::traits::AsyncKVStorage;
 use utils_db::{
     constants::*,
     db::{serialize_to_bytes, DB},
 };
-use utils_db::traits::AsyncKVStorage;
 use utils_types::primitives::Snapshot;
 use utils_types::primitives::{Address, Balance, EthereumChallenge, U256};
 
@@ -193,8 +193,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreDbActions fo
         let mut channel_epoch = serialize_to_bytes(&ack_ticket.ticket.channel_epoch)?;
         ack_key.append(&mut channel_epoch);
 
-        let ack_key =
-            utils_db::db::Key::new_bytes_with_prefix(&ack_key, ACKNOWLEDGED_TICKETS_PREFIX)?;
+        let ack_key = utils_db::db::Key::new_bytes_with_prefix(&ack_key, ACKNOWLEDGED_TICKETS_PREFIX)?;
 
         let mut batch_ops = utils_db::db::Batch::new();
         batch_ops.del(unack_key);

@@ -52,11 +52,7 @@ pub trait AsyncKVStorage {
 
     async fn dump(&self, destination: String) -> Result<()>;
 
-    fn iterate(
-        &self,
-        prefix: Self::Key,
-        suffix_size: u32,
-    ) -> Result<StorageValueIterator<Self::Value>>;
+    fn iterate(&self, prefix: Self::Key, suffix_size: u32) -> Result<StorageValueIterator<Self::Value>>;
 
     async fn batch(
         &mut self,

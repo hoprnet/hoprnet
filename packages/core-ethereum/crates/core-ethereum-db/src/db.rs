@@ -1,10 +1,10 @@
 use async_trait::async_trait;
 
+use core_crypto::iterated_hash::Intermediate;
 use core_crypto::{
     iterated_hash::IteratedHash,
     types::{Hash, PublicKey},
 };
-use core_crypto::iterated_hash::Intermediate;
 use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::channels::ChannelStatus;
 use core_types::{

@@ -124,11 +124,7 @@ impl AsyncKVStorage for LevelDbShim {
             .map_err(|_| DbError::DumpError(format!("Failed to dump DB into {}", destination)))
     }
 
-    fn iterate(
-        &self,
-        prefix: Self::Key,
-        suffix_size: u32,
-    ) -> crate::errors::Result<StorageValueIterator<Self::Value>> {
+    fn iterate(&self, prefix: Self::Key, suffix_size: u32) -> crate::errors::Result<StorageValueIterator<Self::Value>> {
         let iterable = self
             .db
             .iterValues(js_sys::Uint8Array::from(prefix.as_ref()), suffix_size)
@@ -285,9 +281,8 @@ mod tests {
     #[cfg(not(target_arch = "wasm32"))]
     #[async_std::test]
     async fn rusty_leveldb_sanity_test() {
-
-        use futures_lite::StreamExt;
         use crate::traits::{AsyncKVStorage, BatchOperation};
+        use futures_lite::StreamExt;
 
         let key_1 = "1";
         let value_1 = "abc";
@@ -301,7 +296,8 @@ mod tests {
         let prefixed_key_3 = "xyc";
 
         let opt = rusty_leveldb::in_memory();
-        let mut kv_storage = crate::leveldb::rusty::RustyLevelDbShim::new(rusty_leveldb::DB::open("test", opt).unwrap());
+        let mut kv_storage =
+            crate::leveldb::rusty::RustyLevelDbShim::new(rusty_leveldb::DB::open("test", opt).unwrap());
 
         assert!(
             !kv_storage.contains(key_1.as_bytes().to_vec().into_boxed_slice()).await,
