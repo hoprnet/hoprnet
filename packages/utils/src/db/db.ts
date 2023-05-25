@@ -109,7 +109,7 @@ const LOSING_TICKET_COUNT = encoder.encode('statistics:losing:count')
 const NEGLECTED_TICKET_COUNT = encoder.encode('statistics:neglected:count')
 const REJECTED_TICKETS_COUNT = encoder.encode('statistics:rejected:count')
 const REJECTED_TICKETS_VALUE = encoder.encode('statistics:rejected:value')
-const ENVIRONMENT_KEY = encoder.encode('environment_id')
+const NETWORK_KEY = encoder.encode('network_id')
 const HOPR_BALANCE_KEY = encoder.encode('hopr-balance')
 
 export class LevelDb {
@@ -120,15 +120,15 @@ export class LevelDb {
     this.backend = new levelup(MemDown())
   }
 
-  public async init(initialize: boolean, dbPath: string, forceCreate: boolean = false, environmentId: string) {
-    let setEnvironment = false
+  public async init(initialize: boolean, dbPath: string, forceCreate: boolean = false, networkId: string) {
+    let setNetwork = false
 
     log(`using db at ${dbPath}`)
     if (forceCreate) {
       log('force create - wipe old database and create a new')
       await rm(dbPath, { recursive: true, force: true })
       await mkdir(dbPath, { recursive: true })
-      setEnvironment = true
+      setNetwork = true
     } else {
       let exists = false
 
@@ -147,7 +147,7 @@ export class LevelDb {
         log('db directory does not exist, creating?:', initialize)
         if (initialize) {
           await mkdir(dbPath, { recursive: true })
-          setEnvironment = true
+          setNetwork = true
         } else {
           throw new Error(`Database does not exist: ${dbPath}`)
         }
@@ -161,18 +161,17 @@ export class LevelDb {
     // Fully initialize database
     await this.backend.open()
 
-    if (setEnvironment) {
-      log(`setting environment id ${environmentId} to db`)
-      await this.put(ENVIRONMENT_KEY, encoder.encode(environmentId))
+    if (setNetwork) {
+      log(`setting network id ${networkId} to db`)
+      await this.put(NETWORK_KEY, encoder.encode(networkId))
     } else {
-      let storedEnvironmentId = await this.maybeGet(ENVIRONMENT_KEY)
-      let decodedStoredEnvironmentId =
-        storedEnvironmentId !== undefined ? undefined : decoder.decode(storedEnvironmentId)
+      let storedNetworkId = await this.maybeGet(NETWORK_KEY)
+      let decodedStoredNetworkId = storedNetworkId !== undefined ? undefined : decoder.decode(storedNetworkId)
 
-      const hasEnvironmentKey = decodedStoredEnvironmentId !== undefined && decodedStoredEnvironmentId === environmentId
+      const hasNetworkKey = decodedStoredNetworkId !== undefined && decodedStoredNetworkId === networkId
 
-      if (!hasEnvironmentKey) {
-        throw new Error(`invalid db environment id: ${decodedStoredEnvironmentId} (expected: ${environmentId})`)
+      if (!hasNetworkKey) {
+        throw new Error(`invalid db network id: ${decodedStoredNetworkId} (expected: ${networkId})`)
       }
     }
   }
@@ -285,16 +284,16 @@ export class LevelDb {
       })
   }
 
-  public async setEnvironmentId(environment_id: string): Promise<void> {
-    await this.put(ENVIRONMENT_KEY, encoder.encode(environment_id))
+  public async setNetworkId(network_id: string): Promise<void> {
+    await this.put(NETWORK_KEY, encoder.encode(network_id))
   }
 
-  public async getEnvironmentId(): Promise<string> {
-    return decoder.decode(await this.maybeGet(ENVIRONMENT_KEY))
+  public async getNetworkId(): Promise<string> {
+    return decoder.decode(await this.maybeGet(NETWORK_KEY))
   }
 
-  public async verifyEnvironmentId(expectedId: string): Promise<boolean> {
-    const storedId = await this.getEnvironmentId()
+  public async verifyNetworkId(expectedId: string): Promise<boolean> {
+    const storedId = await this.getNetworkId()
 
     if (storedId == undefined) {
       return false
@@ -316,8 +315,8 @@ export class HoprDB {
 
   // ---------- direct access API to be removed after migration to Rust
 
-  async init(initialize: boolean, dbPath: string, forceCreate: boolean = false, environmentId: string) {
-    await this.db.init(initialize, dbPath, forceCreate, environmentId)
+  async init(initialize: boolean, dbPath: string, forceCreate: boolean = false, networkId: string) {
+    await this.db.init(initialize, dbPath, forceCreate, networkId)
   }
 
   protected async put(key: Uint8Array, value: Uint8Array): Promise<void> {

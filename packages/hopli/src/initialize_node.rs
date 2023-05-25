@@ -16,8 +16,8 @@ use std::env;
 /// CLI arguments for `hopli register-in-network-registry`
 #[derive(Parser, Default, Debug)]
 pub struct InitializeNodeArgs {
-    #[clap(help = "Environment name. E.g. monte_rosa", long)]
-    environment_name: String,
+    #[clap(help = "Network name. E.g. monte_rosa", long)]
+    network: String,
 
     #[clap(flatten)]
     local_identity: LocalIdentityArgs,
@@ -62,7 +62,7 @@ impl InitializeNodeArgs {
     /// 6. if not, fund it with the minimum amount
     fn execute_express_initialization(self) -> Result<(), HelperErrors> {
         let InitializeNodeArgs {
-            environment_name,
+            network,
             local_identity,
             password,
             contracts_root,
@@ -101,7 +101,7 @@ impl InitializeNodeArgs {
         log!(target: "initialize_node", Level::Info, "NodeAddresses {:?}", all_node_addresses.join(","));
 
         // set directory and environment variables
-        if let Err(e) = set_process_path_env(&contracts_root, &environment_name) {
+        if let Err(e) = set_process_path_env(&contracts_root, &network) {
             return Err(e);
         }
 
@@ -114,7 +114,7 @@ impl InitializeNodeArgs {
         log!(target: "initialize_node", Level::Debug, "Calling foundry...");
         // iterate and collect execution result. If error occurs, the entire operation failes.
         child_process_call_foundry_express_initialization(
-            &environment_name,
+            &network,
             &format!("[{}]", &&all_node_addresses.join(",")),
             &hopr_amount_uint256_string,
             &native_amount_uint256_string,
