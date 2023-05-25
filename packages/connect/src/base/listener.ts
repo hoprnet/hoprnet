@@ -11,7 +11,7 @@ import Debug from 'debug'
 import { peerIdFromBytes } from '@libp2p/peer-id'
 import { Multiaddr } from '@multiformats/multiaddr'
 
-import { isAnyAddress, randomInteger, retimer, timeout } from '@hoprnet/hopr-utils'
+import { isAnyAddress, random_integer, retimer, timeout } from '@hoprnet/hopr-utils'
 
 import { CODE_P2P, CODE_IP4, CODE_IP6, CODE_TCP } from '../constants.js'
 import {
@@ -532,7 +532,7 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
     this.stopUdpSocketKeepAliveInterval = retimer(
       this.renewUdpPortMapping.bind(this),
       // Following recommendations of https://www.rfc-editor.org/rfc/rfc5626
-      () => randomInteger(24_000, 29_000)
+      () => random_integer(24_000, 29_000)
     )
 
     if (this.testingOptions.__preferLocalAddresses && this.testingOptions.__localModeStun !== true) {

@@ -1,6 +1,6 @@
 [package]
 name = "core-crypto"
-version = "0.3.0"
+version = "0.3.1"
 description = "Core cryptographic primitives and functions used in the HOPR protocol"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
@@ -13,7 +13,7 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 default = ["console_error_panic_hook", "wasm"]
-wasm = ["dep:wasm-bindgen", "dep:js-sys"]
+wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys"]
 
 [dependencies]
 aes = "0.8"
@@ -23,14 +23,15 @@ ctr = "0.9"
 curve25519-dalek = "4.0.0-rc.2"
 digest = "0.10"
 elliptic-curve = { version = "0.13", features = ["serde"] }
+futures = "0.3.28"
 generic-array = "0.14.7"
 getrandom = { version = "0.2.8", features = ["js"] }
 hex = "0.4"
 hex-literal = "0.4"
 hkdf = "0.12"
 hmac = "0.12"
-js-sys = { version = "0.3.61", optional = true }
-k256 = { version = "0.13.0", features = ["arithmetic", "ecdh", "hash2curve"] }
+js-sys = { version = "0.3.63", optional = true }
+k256 = { version = "0.13.0", features = ["arithmetic", "ecdh", "hash2curve", "serde"] }
 libp2p-identity = { version = "0.1.2", features = ["secp256k1", "peerid"] }
 rand = "0.8.5"
 serde = { version = "1.0", features = ["derive"] }
@@ -42,14 +43,16 @@ utils-log = { path = "../../../utils/crates/utils-log" }
 utils-misc = { path = "../../../utils/crates/utils-misc" }
 utils-proc-macros = { path = "../../../utils/crates/utils-proc-macros" }
 utils-types = { path = "../../../utils/crates/utils-types" }
+wasm-bindgen-futures = { version = "0.4.34", optional = true, features = ["futures-core-03-stream"] }
 wasm-bindgen = { workspace = true, optional = true }
 
 console_error_panic_hook = { version = "0.1.7", optional = true }
 #wee_alloc = { version = "0.4.5", optional = true }
 
 [dev-dependencies]
+async-std = { version = "1.12.0", features = ["attributes"] }
 parameterized = "1.0"
-wasm-bindgen-test = "0.3.34"
+wasm-bindgen-test = "0.3.36"
 
 [package.metadata.wasm-pack.profile.dev]
 wasm-opt = false

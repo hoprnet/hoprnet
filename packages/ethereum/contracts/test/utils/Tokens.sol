@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity >=0.6.0 <0.9.0;
 
-import "../../src/HoprToken.sol";
+import "../../src/static/HoprToken.sol";
 import "./ERC1820Registry.sol";
 import "./Accounts.sol";
 import "forge-std/Test.sol";

@@ -6,7 +6,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use utils_types::traits::BinarySerializable;
 
 use crate::errors::{DbError, Result};
-use crate::traits::BinaryAsyncKVStorage;
+use crate::traits::AsyncKVStorage;
 
 pub struct Batch {
     pub ops: Vec<crate::traits::BatchOperation<Box<[u8]>, Box<[u8]>>>,
@@ -25,16 +25,16 @@ impl Batch {
         }
     }
 
-    pub fn put<T: Serialize, U: Serialize>(&mut self, key: T, value: U) {
-        let key: Box<[u8]> = bincode::serialize(&key).unwrap().into_boxed_slice();
+    pub fn put<U: Serialize>(&mut self, key: Key, value: U) {
+        let key: Box<[u8]> = key.into();
         let value: Box<[u8]> = bincode::serialize(&value).unwrap().into_boxed_slice();
 
         self.ops
             .push(crate::traits::BatchOperation::put(crate::traits::Put { key, value }));
     }
 
-    pub fn del<T: Serialize>(&mut self, key: T) {
-        let key: Box<[u8]> = bincode::serialize(&key).unwrap().into_boxed_slice();
+    pub fn del(&mut self, key: Key) {
+        let key: Box<[u8]> = key.into();
 
         self.ops
             .push(crate::traits::BatchOperation::del(crate::traits::Del { key }));
@@ -94,11 +94,11 @@ impl Deref for Key {
     }
 }
 
-pub struct DB<T: BinaryAsyncKVStorage> {
+pub struct DB<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> {
     backend: T,
 }
 
-impl<T: BinaryAsyncKVStorage> DB<T> {
+impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
     pub fn new(backend: T) -> Self {
         DB::<T> { backend }
     }
@@ -113,6 +113,14 @@ impl<T: BinaryAsyncKVStorage> DB<T> {
             .get(key)
             .await
             .and_then(|v| bincode::deserialize(v.as_ref()).map_err(|e| DbError::DeserializationError(e.to_string())))
+    }
+
+    pub async fn get_or_none<V: DeserializeOwned>(&self, key: Key) -> Result<Option<V>> {
+        if self.contains(key.clone()).await {
+            self.get::<V>(key).await.map(|v| Some(v))
+        } else {
+            Ok(None)
+        }
     }
 
     pub async fn set<V>(&mut self, key: Key, value: &V) -> Result<Option<V>>
@@ -178,8 +186,6 @@ mod tests {
     use mockall::predicate;
     use serde::Deserialize;
     use utils_types::traits::BinarySerializable;
-
-    impl BinaryAsyncKVStorage for MockAsyncKVStorage {}
 
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
     struct TestKey {

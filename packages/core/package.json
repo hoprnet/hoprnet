@@ -32,7 +32,6 @@
   ],
   "dependencies": {
     "@chainsafe/libp2p-noise": "7.0.0",
-    "@google-cloud/profiler": "4.2.0",
     "@hoprnet/hopr-connect": "workspace:packages/connect",
     "@hoprnet/hopr-core-ethereum": "workspace:packages/core-ethereum",
     "@hoprnet/hopr-utils": "workspace:packages/utils",
@@ -60,7 +59,7 @@
     "@libp2p/interface-content-routing": "1.0.2",
     "@libp2p/interface-registrar": "1.1.0",
     "@libp2p/tcp": "1.0.11",
-    "@types/chai": "4.3.4",
+    "@types/chai": "4.3.5",
     "@types/chai-as-promised": "7.1.5",
     "@types/mocha": "10.0.1",
     "@types/semver": "^7",
@@ -71,7 +70,7 @@
     "retimer": "3.0.0",
     "sinon": "12.0.1",
     "typedoc": "0.24.6",
-    "typedoc-plugin-markdown": "3.15.2",
+    "typedoc-plugin-markdown": "3.15.3",
     "typescript": "5.0.4"
   },
   "mocha": {

@@ -534,8 +534,6 @@ class Hopr extends EventEmitter {
 
     // Enable DHT server-mode if announcing publicly routable addresses to the DHT
     await this.maybeEnableDhtServerMode()
-
-    await this.maybeLogProfilingToGCloud()
   }
 
   /**
@@ -599,25 +597,6 @@ class Hopr extends EventEmitter {
       if ([AddressClass.Public, AddressClass.Public6].includes(maToClass(addr))) {
         await dht.setMode('server')
         break
-      }
-    }
-  }
-
-  private async maybeLogProfilingToGCloud() {
-    if (process.env.GCLOUD) {
-      try {
-        var name = 'hopr_node_' + this.getId().toString().slice(-5).toLowerCase()
-        ;(await import('@google-cloud/profiler'))
-          .start({
-            projectId: 'hoprassociation',
-            serviceContext: {
-              service: name,
-              version: FULL_VERSION
-            }
-          })
-          .catch((e: any) => console.log(e))
-      } catch (e) {
-        console.log(e)
       }
     }
   }

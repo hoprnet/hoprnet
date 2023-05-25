@@ -6,7 +6,6 @@ import chalk from 'chalk'
 import { EventEmitter } from 'events'
 import { Multiaddr } from '@multiformats/multiaddr'
 import {
-  randomChoice,
   defer,
   HoprDB,
   stringToU8a,
@@ -29,7 +28,8 @@ import {
   create_multi_counter,
   create_gauge,
   create_multi_gauge,
-  U256
+  U256,
+  random_integer
 } from '@hoprnet/hopr-utils'
 
 import type { ChainWrapper } from '../ethereum.js'
@@ -1049,7 +1049,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       return undefined
     }
 
-    return randomChoice(channels)
+    return channels[random_integer(0, channels.length)]
   }
 
   /**
