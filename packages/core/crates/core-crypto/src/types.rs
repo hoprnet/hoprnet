@@ -1348,7 +1348,9 @@ pub mod wasm {
     use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
     use wasm_bindgen::prelude::*;
 
-    use crate::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, Hash, PublicKey, Response, Signature};
+    use crate::types::{
+        Challenge, CurvePoint, HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey, PublicKey, Response, Signature,
+    };
 
     #[wasm_bindgen]
     impl CurvePoint {
@@ -1554,6 +1556,48 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "eq")]
         pub fn _eq(&self, other: &Hash) -> bool {
+            self.eq(other)
+        }
+
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> Self {
+            self.clone()
+        }
+
+        pub fn size() -> u32 {
+            Self::SIZE as u32
+        }
+    }
+
+    #[wasm_bindgen]
+    impl OffchainPublicKey {
+        #[wasm_bindgen(js_name = "deserialize")]
+        pub fn _deserialize(bytes: &[u8]) -> JsResult<OffchainPublicKey> {
+            ok_or_jserr!(OffchainPublicKey::from_bytes(bytes))
+        }
+
+        #[wasm_bindgen(js_name = "serialize")]
+        pub fn _serialize(&self) -> Box<[u8]> {
+            self.to_bytes()
+        }
+
+        #[wasm_bindgen(js_name = "from_peerid_str")]
+        pub fn _from_peerid_str(peer_id: &str) -> JsResult<OffchainPublicKey> {
+            ok_or_jserr!(OffchainPublicKey::from_peerid_str(peer_id))
+        }
+
+        #[wasm_bindgen(js_name = "to_peerid_str")]
+        pub fn _to_peerid_str(&self) -> String {
+            self.to_peerid_str()
+        }
+
+        #[wasm_bindgen(js_name = "from_privkey")]
+        pub fn _from_privkey(private_key: &[u8]) -> JsResult<OffchainPublicKey> {
+            ok_or_jserr!(OffchainPublicKey::from_privkey(private_key))
+        }
+
+        #[wasm_bindgen(js_name = "eq")]
+        pub fn _eq(&self, other: &OffchainPublicKey) -> bool {
             self.eq(other)
         }
 
