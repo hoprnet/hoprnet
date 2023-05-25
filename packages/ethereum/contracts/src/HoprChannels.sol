@@ -9,8 +9,9 @@ import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC777/IERC777Recipient.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts/utils/cryptography/ECDSA.sol';
+import './IHoprChannels.sol';
 
-contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
+contract HoprChannels is IHoprChannels, IERC777Recipient, ERC1820Implementer, Multicall {
   using SafeERC20 for IERC20;
 
   // required by ERC1820 spec
@@ -19,6 +20,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
   bytes32 public constant TOKENS_RECIPIENT_INTERFACE_HASH = keccak256('ERC777TokensRecipient');
   // used by {tokensReceived} to distinguish which function to call after tokens are sent
   uint256 public immutable FUND_CHANNEL_MULTI_SIZE = abi.encode(address(0), address(0), uint256(0), uint256(0)).length;
+  bool public constant IS_HOPR_CHANNELS = true;
 
   /**
    * @dev Possible channel states.
@@ -197,12 +199,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
    * @param amount1 amount to fund account1
    * @param amount2 amount to fund account2
    */
-  function fundChannelMulti(
-    address account1,
-    address account2,
-    uint256 amount1,
-    uint256 amount2
-  ) external {
+  function fundChannelMulti(address account1, address account2, uint256 amount1, uint256 amount2) external {
     require(amount1 + amount2 > 0, 'amount must be greater than 0');
 
     // fund channel in direction of: account1 -> account2
