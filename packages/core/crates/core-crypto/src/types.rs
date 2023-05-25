@@ -1,3 +1,6 @@
+use curve25519_dalek::edwards::CompressedEdwardsY;
+use curve25519_dalek::traits::IsIdentity;
+use curve25519_dalek::EdwardsPoint;
 use elliptic_curve::{NonZeroScalar, ProjectivePoint};
 use k256::ecdsa::signature::hazmat::PrehashVerifier;
 use k256::ecdsa::signature::Verifier;
@@ -7,13 +10,10 @@ use k256::elliptic_curve::sec1::{FromEncodedPoint, ToEncodedPoint};
 use k256::elliptic_curve::CurveArithmetic;
 use k256::{ecdsa, elliptic_curve, AffinePoint, Secp256k1};
 use libp2p_identity::{secp256k1::PublicKey as lp2p_k256_PublicKey, PeerId, PublicKey as lp2p_PublicKey};
+use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
 use std::ops::Add;
 use std::str::FromStr;
-use curve25519_dalek::edwards::CompressedEdwardsY;
-use curve25519_dalek::EdwardsPoint;
-use curve25519_dalek::traits::IsIdentity;
-use rand::rngs::OsRng;
 
 use utils_log::warn;
 use utils_types::errors::GeneralError;
@@ -484,7 +484,7 @@ impl Hash {
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct OffchainPublicKey {
-    key: CompressedEdwardsY
+    key: CompressedEdwardsY,
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -503,7 +503,7 @@ impl BinarySerializable<'_> for OffchainPublicKey {
     fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
             Ok(Self {
-                key: CompressedEdwardsY::from_slice(data).map_err(|_| ParseError)?
+                key: CompressedEdwardsY::from_slice(data).map_err(|_| ParseError)?,
             })
         } else {
             Err(ParseError)
@@ -544,7 +544,7 @@ impl OffchainPublicKey {
         let scalar = curve25519_dalek::Scalar::from_bytes_mod_order(key.try_into().map_err(|_| InvalidInputValue)?);
         let point = EdwardsPoint::mul_base(&scalar);
         if !point.is_identity() && !point.is_small_order() {
-            Ok(Self{ key: point.compress() })
+            Ok(Self { key: point.compress() })
         } else {
             Err(InvalidSecretScalar)
         }
@@ -988,12 +988,15 @@ pub mod tests {
     use k256::elliptic_curve::sec1::ToEncodedPoint;
     use k256::elliptic_curve::CurveArithmetic;
     use k256::{NonZeroScalar, Secp256k1, U256};
-    use std::str::FromStr;
     use libp2p_identity::PeerId;
+    use std::str::FromStr;
     use utils_types::primitives::Address;
     use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
 
-    use crate::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey, PublicKey, Response, Signature, ToChecksum};
+    use crate::types::{
+        Challenge, CurvePoint, HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey, PublicKey, Response, Signature,
+        ToChecksum,
+    };
 
     const PUBLIC_KEY: [u8; 33] = hex!("021464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8");
     const PRIVATE_KEY: [u8; 32] = hex!("e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8");
