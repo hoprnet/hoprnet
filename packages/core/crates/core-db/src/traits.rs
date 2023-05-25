@@ -1,9 +1,9 @@
 use async_trait::async_trait;
 
 use core_crypto::types::{HalfKeyChallenge, Hash, PublicKey};
-use core_types::acknowledgement::{PendingAcknowledgement, UnacknowledgedTicket};
+use core_types::acknowledgement::{AcknowledgedTicket, PendingAcknowledgement};
 use core_types::channels::{ChannelEntry, Ticket};
-use utils_types::primitives::{Address, Balance, U256};
+use utils_types::primitives::{Address, Balance, Snapshot, U256};
 
 use crate::errors::Result;
 
@@ -12,7 +12,7 @@ pub trait HoprCoreDbActions {
     async fn get_current_ticket_index(&self, channel_id: &Hash) -> Result<Option<U256>>;
     async fn set_current_ticket_index(&mut self, channel_id: &Hash, index: U256) -> Result<()>;
 
-    // TODO: trait with generic argument rather than allocated Box
+    async fn get_acknowledged_tickets(&self, filter: Option<ChannelEntry>) -> Result<Vec<AcknowledgedTicket>>;
     async fn get_tickets(&self, signer: PublicKey) -> Result<Vec<Ticket>>;
     async fn mark_pending(&mut self, ticket: &Ticket) -> Result<()>;
     async fn mark_rejected(&mut self, ticket: &Ticket) -> Result<()>;
@@ -27,5 +27,18 @@ pub trait HoprCoreDbActions {
         &mut self,
         half_key_challenge: HalfKeyChallenge,
         pending_acknowledgment: PendingAcknowledgement,
+    ) -> Result<()>;
+
+    async fn replace_unack_with_ack(
+        &mut self,
+        half_key_challenge: &HalfKeyChallenge,
+        ack_ticket: AcknowledgedTicket,
+    ) -> Result<()>;
+
+    async fn update_channel_and_snapshot(
+        &mut self,
+        channel_id: &Hash,
+        channel: ChannelEntry,
+        snapshot: Snapshot,
     ) -> Result<()>;
 }

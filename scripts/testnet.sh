@@ -28,9 +28,9 @@ declare min_funds_hopr=1
 # $2=network name
 vm_name() {
   local role="${1}"
-  local network_name="${2}"
+  local network="${2}"
 
-  echo "${network_name}-${role}"
+  echo "${network}-${role}"
 }
 
 # $1=vm name
@@ -39,89 +39,89 @@ disk_name() {
   echo "${vm_name}-dsk"
 }
 
-# $1=environment id
+# $1=network id
 get_network() {
-  local environment_id="${1}"
-  jq -r ".environments.\"${environment_id}\".network_id" "${mydir}/../packages/core/protocol-config.json"
+  local network="${1}"
+  jq -r ".networks.\"${network}\".chain" "${mydir}/../packages/core/protocol-config.json"
 }
 
-# $1=environment id
+# $1=network id
 get_environment_type() {
-  local environment_id="${1}"
+  local network="${1}"
   # use `contracts-addresses.json` because it stores 
-  jq -r ".environments.\"${environment_id}\".environment_type" "${mydir}/../packages/ethereum/contracts/contracts-addresses.json"
+  jq -r ".networks.\"${network}\".environment_type" "${mydir}/../packages/ethereum/contracts/contracts-addresses.json"
 }
 
-# $1=environment id
+# $1=network id
 get_rpc() {
-  local network_id
-  network_id="$(get_network "${1}")"
+  local chain
+  chain="$(get_network "${1}")"
 
-  jq -r ".networks.\"${network_id}\".default_provider" "${mydir}/../packages/core/protocol-config.json" | envsubst
+  jq -r ".chains.\"${chain}\".default_provider" "${mydir}/../packages/core/protocol-config.json" | envsubst
 }
 
-# $1 = environment
+# $1 = network id
 # $2 = token (native | hopr)
 funding_wallet_info() {
-  local environment="${1}"
+  local network="${1}"
   local token="${2}"
   local secret="${FAUCET_SECRET_API_KEY}"
 
   curl -L --silent \
     --header "x-api-key: ${secret}" \
-    "$API_ENDPOINT/api/faucet/$environment/info?text=$token"
+    "$API_ENDPOINT/api/faucet/$network/info?text=$token"
 }
 
-# $1 = environment
+# $1 = network
 # $2 = address
 # $3 = token
 wallet_balance() {
-  local environment="${1}"
+  local network="${1}"
   local address="${2}"
   local token="${3}"
   local secret="${FAUCET_SECRET_API_KEY}"
 
   curl -L --silent \
     --header "x-api-key: ${secret}" \
-    "$API_ENDPOINT/api/balance/$environment/$address/$token?text=true"
+    "$API_ENDPOINT/api/balance/$network/$address/$token?text=true"
 }
 
-# $1 = environment
+# $1 = network
 # $2 = address
 # $3 = token (native | hopr)
 faucet_to_address() {
-  local environment="${1}"
+  local network="${1}"
   local address="${2}"
   local token="${3}"
   local secret="${FAUCET_SECRET_API_KEY}"
 
   curl -L --silent --request POST \
-    "$API_ENDPOINT/api/faucet/$environment/$address/$token" \
+    "$API_ENDPOINT/api/faucet/$network/$address/$token" \
     --header 'Content-Type: application/json' \
     --header "x-api-key: ${secret}"
 }
 
 # $1=account (hex)
-# $2=environment
+# $2=network
 fund_if_empty() {
   local address="${1}"
-  local environment="${2}"
+  local network="${2}"
 
   local faucet_address
-  faucet_address=$(funding_wallet_info "${environment}" "address")
+  faucet_address=$(funding_wallet_info "${network}" "address")
   if [[ ! ${faucet_address} =~  ^0x[a-fA-F0-9]{40}$ ]]; then
     log "Failed to retrieve funding wallet address: ${faucet_address}"
     exit 1
   fi
 
   local faucet_native_balance faucet_hopr_balance
-  faucet_native_balance=$(funding_wallet_info "${environment}" "native")
+  faucet_native_balance=$(funding_wallet_info "${network}" "native")
   if [[ ! ${faucet_native_balance} =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
     log "Failed to retrieve funding wallet native balance: ${faucet_native_balance}"
     exit 1
   fi
 
-  faucet_hopr_balance=$(funding_wallet_info "${environment}" "hopr")
+  faucet_hopr_balance=$(funding_wallet_info "${network}" "hopr")
   if [[ ! ${faucet_hopr_balance} =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
     log "Failed to retrieve funding wallet token balance: ${faucet_hopr_balance}"
     exit 1
@@ -142,10 +142,10 @@ fund_if_empty() {
 
   local address_native_balance address_hopr_balance
   log "Checking balance of the address to fund: ${address}"
-  address_native_balance=$(wallet_balance "${environment}" "${address}" "native")
+  address_native_balance=$(wallet_balance "${network}" "${address}" "native")
 
   log "Checking balance of the address to fund: ${address}"
-  address_hopr_balance=$(wallet_balance "${environment}" "${address}" "hopr")
+  address_hopr_balance=$(wallet_balance "${network}" "${address}" "hopr")
 
   log "Native balance of ${address} is ${address_native_balance}"
   log "HOPR balance of ${address} is ${address_hopr_balance}"
@@ -154,7 +154,7 @@ fund_if_empty() {
     # @TODO: Provide retry by checking balance again.
     log "Hoprd node with peerId ${address} has not enough native balance. Funding native tokens..."
     local tx_hash tx_error tx_res
-    tx_res="$(faucet_to_address "${environment}" "${address}" "native")"
+    tx_res="$(faucet_to_address "${network}" "${address}" "native")"
     tx_error="$(echo "${tx_res}" | jq -r '.err // empty' 2>/dev/null || echo "${tx_res}")"
     tx_hash="$(echo "${tx_res}" | jq -r '.hash // empty' 2>/dev/null || echo "")"
     if [ -n "${tx_error}" ]; then
@@ -168,7 +168,7 @@ fund_if_empty() {
     # @TODO: Provide retry by checking balance again.
     log "${address} has no HOPR tokens. Funding HOPR tokens..."
     local tx_hash tx_error tx_res
-    tx_res="$(faucet_to_address "${environment}" "${address}" "hopr")"
+    tx_res="$(faucet_to_address "${network}" "${address}" "hopr")"
     tx_error="$(echo "${tx_res}" | jq -r '.err // empty' 2>/dev/null || echo "${tx_res}")"
     tx_hash="$(echo "${tx_res}" | jq -r '.hash // empty' 2>/dev/null || echo "")"
     if [ -n "${tx_error}" ]; then
@@ -203,8 +203,8 @@ disable_network_registry() {
   log "Disabling register"
   PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
   make -C "../" disable-network-registry \
-  environment=anvil-localhost \
-  environment_type=development
+  network=anvil-localhost \
+  environment_type=local
 
   log "Register disabled"
 }

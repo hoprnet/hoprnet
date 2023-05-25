@@ -10,8 +10,8 @@ use std::env;
 /// CLI arguments for `hopli register-in-network-registry`
 #[derive(Parser, Default, Debug)]
 pub struct RegisterInNetworkRegistryArgs {
-    #[clap(help = "Environment name. E.g. monte_rosa", long)]
-    environment_name: String,
+    #[clap(help = "Network name. E.g. monte_rosa", long)]
+    network: String,
 
     #[clap(
         help = "Comma sperated node peer ids",
@@ -41,7 +41,7 @@ impl RegisterInNetworkRegistryArgs {
     /// `PRIVATE_KEY` env variable is required to send on-chain transactions
     fn execute_self_register(self) -> Result<(), HelperErrors> {
         let RegisterInNetworkRegistryArgs {
-            environment_name,
+            network,
             local_identity,
             peer_ids,
             password,
@@ -85,12 +85,12 @@ impl RegisterInNetworkRegistryArgs {
         log!(target: "network_registry", Level::Info, "merged peer_ids {:?}", all_peer_ids.join(","));
 
         // set directory and environment variables
-        if let Err(e) = set_process_path_env(&contracts_root, &environment_name) {
+        if let Err(e) = set_process_path_env(&contracts_root, &network) {
             return Err(e);
         }
 
         // iterate and collect execution result. If error occurs, the entire operation failes.
-        child_process_call_foundry_self_register(&environment_name, &all_peer_ids.join(","))
+        child_process_call_foundry_self_register(&network, &all_peer_ids.join(","))
     }
 }
 

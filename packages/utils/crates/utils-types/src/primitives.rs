@@ -294,7 +294,7 @@ impl BinarySerializable<'_> for EthereumChallenge {
 }
 
 /// Represents a snapshot in the blockchain
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct Snapshot {
     pub block_number: U256,
@@ -340,7 +340,7 @@ impl BinarySerializable<'_> for Snapshot {
 }
 
 /// Represents the Ethereum's basic numeric type - unsigned 256-bit integer
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Serialize, Deserialize)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct U256 {
     value: u256,

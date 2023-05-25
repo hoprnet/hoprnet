@@ -24,6 +24,8 @@ let
     wasm-pack # v0.11.1
     binaryen # v112 (includes wasm-opt)
     wasm-bindgen-cli # v0.2.83
+    pkg-config
+    openssl_1_1
 
     ## python is required by node module bcrypto and integration tests
     python3 # v3.10.10

@@ -106,7 +106,7 @@ register_nodes() {
   log "Registering nodes"
 
   make -C "${mydir}/.." register-nodes \
-    environment=anvil-localhost environment_type=development \
+    network=anvil-localhost environment_type=local \
     native_addresses="[${1}]" \
     peer_ids="[${2}]"
 
@@ -118,7 +118,7 @@ sync_nodes_in_network_registry() {
   log "Sync nodes in network registry"
 
   make -C "${mydir}/.." sync-eligibility \
-    environment=anvil-localhost environment_type=development \
+    network=anvil-localhost environment_type=local \
     peer_ids="[${1}]"
 
   log "Sync nodes in network registry finished"
@@ -128,7 +128,7 @@ enable_network_registry() {
   log "Enabling network registry"
 
   make -C "${mydir}/.." enable-network-registry \
-    environment=anvil-localhost environment_type=development
+    network=anvil-localhost environment_type=local
 
   log "Enabling network registry finished"
 }
@@ -267,7 +267,7 @@ log "Node 7 should not be able to talk to Node 1 (different environment id)"
 result=$(api_ping "${api6}" ${addr1} "TIMEOUT")
 log "-- ${result}"
 
-log "Node 1 should not be able to talk to Node 7 (different environment id)"
+log "Node 1 should not be able to talk to Node 7 (different network id)"
 result=$(api_ping "${api1}" ${addr7} "Connection to node is not allowed")
 log "-- ${result}"
 

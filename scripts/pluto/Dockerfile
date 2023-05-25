@@ -12,7 +12,7 @@ FROM ${HOPRD_IMAGE} as hoprd
 # tools already
 FROM ${ANVIL_IMAGE} as runtime
 
-LABEL description="Docker image running a HOPR-enabled anvil network with 5 hoprd nodes using it and being fully interconnected."
+LABEL description="Docker image running a HOPR-enabled anvil chain with 5 hoprd nodes using it and being fully interconnected."
 
 # install tools required within our scripts
 RUN apt-get update \

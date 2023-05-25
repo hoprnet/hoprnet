@@ -14,7 +14,7 @@
 /build
 
 # used only in release and should not be tracked
-/default-environment.json
+/default-network.json
 
 # auto-generated file
 /rest-api-v2-full-spec.json

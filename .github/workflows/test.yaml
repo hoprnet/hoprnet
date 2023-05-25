@@ -82,4 +82,4 @@ jobs:
       - name: Test
         run: nix develop -c make -j test
         env:
-          HOPR_ENVIRONMENT_ID: anvil-localhost
+          HOPR_NETWORK: anvil-localhost

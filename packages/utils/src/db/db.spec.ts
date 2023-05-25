@@ -92,6 +92,60 @@ function channelEntryCreateMock(): ChannelEntry {
   )
 }
 
+import { LevelDb } from './db.js'
+import { db_sanity_test } from '../../lib/utils_db.js'
+import fs from 'fs'
+
+describe('db shim tests', function () {
+  let db: LevelDb
+  let db_dir_path: string
+
+  beforeEach(function () {
+    db = new LevelDb()
+    db_dir_path = '/tmp/test-shim.db'
+  })
+
+  afterEach(async function () {
+    await db.close()
+
+    fs.rmSync(db_dir_path, { recursive: true, force: true })
+  })
+
+  it('basic DB operations are performed in Rust correctly', async function () {
+    await db.init(true, db_dir_path, true, 'monte_rosa')
+
+    try {
+      let result = await db_sanity_test(db)
+      assert(result)
+    } catch (e) {
+      assert('EVERYTHING SHOULD PASS', e.toString())
+    }
+  })
+})
+
+describe(`levelup shim tests`, function () {
+  let db: LevelDb
+
+  beforeEach(function () {
+    db = new LevelDb()
+  })
+
+  afterEach(async function () {
+    await db.close()
+  })
+
+  it('should store network', async function () {
+    await db.setNetworkId('test-env')
+    assert.equal(await db.getNetworkId(), 'test-env')
+  })
+
+  it('should verify network', async function () {
+    await db.setNetworkId('test-env')
+    assert((await db.verifyNetworkId('wrong-id')) === false, `must fail for wrong id`)
+    assert((await db.verifyNetworkId('test-env')) === true, `must not fail for correct id`)
+  })
+})
+
 describe(`database tests`, function () {
   let db: TestingDB
 
@@ -294,17 +348,6 @@ describe(`database tests`, function () {
     assert((await db.getRejectedTicketsValue()).eq(new Balance(amount.toString(10), BalanceType.HOPR)))
   })
 
-  it('should store environment', async function () {
-    await db.setEnvironmentId('test-env')
-    assert.equal(await db.getEnvironmentId(), 'test-env')
-  })
-
-  it('should verify environment', async function () {
-    await db.setEnvironmentId('test-env')
-    assert((await db.verifyEnvironmentId('wrong-id')) === false, `must fail for wrong id`)
-    assert((await db.verifyEnvironmentId('test-env')) === true, `must not fail for correct id`)
-  })
-
   it('should store hopr balance', async function () {
     assert((await db.getHoprBalance()).eq(Balance.zero(BalanceType.HOPR)))
 
@@ -413,22 +456,5 @@ describe(`database tests`, function () {
 
     const storedObject = await db.getSerializedObject(ns, key)
     assert(storedObject === undefined, 'storedObject should be undefined')
-  })
-})
-
-import { LevelDb } from './db.js'
-import { db_sanity_test } from '../../lib/utils_db.js'
-
-describe('db shim tests', function () {
-  it('basic DB operations are performed in Rust correctly', async function () {
-    let db = new LevelDb()
-    await db.init(true, '/tmp/test-shim.db', true, 'monte_rosa')
-
-    try {
-      let result = await db_sanity_test(db)
-      assert(result)
-    } catch (e) {
-      assert('', e.toString())
-    }
   })
 })

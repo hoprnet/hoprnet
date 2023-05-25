@@ -5,7 +5,7 @@ import chai, { expect } from 'chai'
 import { createTestApiInstance } from '../../fixtures.js'
 import { privKeyToPeerId } from '@hoprnet/hopr-utils'
 import type Hopr from '@hoprnet/hopr-core'
-import { Health, ResolvedEnvironment, health_to_string } from '@hoprnet/hopr-core'
+import { Health, ResolvedNetwork, health_to_string } from '@hoprnet/hopr-core'
 import { Multiaddr } from '@multiformats/multiaddr'
 
 const node = sinon.fake() as any as Hopr
@@ -35,9 +35,9 @@ describe('GET /node/info', () => {
   })
 
   it('should get info', async () => {
-    node.environment = { id: 'anvil-localhost' } as ResolvedEnvironment
+    node.network = { id: 'anvil-localhost' } as ResolvedNetwork
     node.smartContractInfo = sinon.fake.returns({
-      network: 'a',
+      chain: 'a',
       hoprTokenAddress: HOPR_TOKEN_ADDRESS,
       hoprChannelsAddress: HOPR_CHANNELS_ADDRESS,
       hoprNetworkRegistryAddress: HOPR_NEWTWORK_REGISTRY_ADDRESS,
@@ -53,10 +53,10 @@ describe('GET /node/info', () => {
     expect(res.status).to.equal(200)
     expect(res).to.satisfyApiSpec
     expect(res.body).to.deep.equal({
-      environment: 'anvil-localhost',
+      network: 'anvil-localhost',
       announcedAddress: DHT_ADDRESSES.map((addr: Multiaddr) => addr.toString()),
       listeningAddress: LISTENING_ADDRS.map((addr: Multiaddr) => addr.toString()),
-      network: 'a',
+      chain: 'a',
       hoprToken: HOPR_TOKEN_ADDRESS,
       hoprChannels: HOPR_CHANNELS_ADDRESS,
       hoprNetworkRegistry: HOPR_NEWTWORK_REGISTRY_ADDRESS,

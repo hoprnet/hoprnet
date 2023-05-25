@@ -1032,7 +1032,7 @@ export class EntryNodes extends EventEmitter implements Initializable, Startable
     const result = await dial(
       this.getComponents(),
       id,
-      CAN_RELAY_PROTOCOLS(this.options.environment, this.options.supportedEnvironments),
+      CAN_RELAY_PROTOCOLS(this.options.network, this.options.supportedNetworks),
       false,
       true
     )

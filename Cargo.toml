@@ -10,6 +10,7 @@ members = [
     "packages/core/crates/core-strategy",
     "packages/core/crates/core-types",
     "packages/core-ethereum/crates/core-ethereum-misc",
+    "packages/core-ethereum/crates/core-ethereum-db",
     "packages/ethereum/crates/bindings",
     "packages/hopli",
     "packages/real/crates/real-base",

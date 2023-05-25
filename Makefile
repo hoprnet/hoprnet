@@ -104,7 +104,7 @@ endif
 	DEBUG= CI=true yarn workspaces focus ${YARNFLAGS}
 
 .PHONY: deps
-deps: ## Installs dependencies for development setup
+deps: ## Installs dependencies for local setup
 	if [[ ! "${name}" =~ nix-shell* ]]; then \
 		corepack enable; \
 		command -v rustup && rustup update || echo "No rustup installed, ignoring"; \
@@ -304,7 +304,7 @@ run-local: ## run HOPRd from local repo
 		--experimental-wasm-reftypes \
 		packages/hoprd/lib/main.cjs --init --api \
 		--password="local" --identity=`pwd`/.identity-local.id \
-		--environment anvil-localhost --announce \
+		--network anvil-localhost --announce \
 		--testUseWeakCrypto --testAnnounceLocalAddresses \
 		--testPreferLocalAddresses --disableApiAuthentication \
 		$(args)
@@ -327,7 +327,7 @@ fund-local-all: id_prefix=
 fund-local-all: ## use faucet script to fund all the local identities
 	IDENTITY_PASSWORD="${id_password}" PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
 		hopli faucet \
-		--environment-name anvil-localhost \
+		--network anvil-localhost \
 		--identity-prefix "${id_prefix}" \
 		--identity-directory "${id_dir}" \
 		--contracts-root "./packages/ethereum/contracts"
@@ -345,7 +345,7 @@ docker-build-gcb: ## build Docker images on Google Cloud Build
 	./scripts/build-docker.sh --no-tags --force
 
 .PHONY: request-funds
-request-funds: ensure-environment-is-set
+request-funds: ensure-environment-and-network-are-set
 request-funds: ## Request 1000 xHOPR tokens for the recipient
 ifeq ($(recipient),)
 	echo "parameter <recipient> missing" >&2 && exit 1
@@ -353,10 +353,10 @@ endif
 ifeq ($(origin PRIVATE_KEY),undefined)
 	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
 endif
-	make -C packages/ethereum/contracts request-funds environment-name=$(environment) environment-type=$(environment_type) recipient=$(recipient)
+	make -C packages/ethereum/contracts request-funds network=$(network) environment-type=$(environment_type) recipient=$(recipient)
 
 .PHONY: request-nrnft
-request-nrnft: ensure-environment-is-set
+request-nrnft: ensure-environment-and-network-are-set
 request-nrnft: ## Request one HoprBoost Network_registry NFT for the recipient given it has none and hasn't staked Network_registry NFT
 ifeq ($(recipient),)
 	echo "parameter <recipient> missing" >&2 && exit 1
@@ -367,34 +367,34 @@ endif
 ifeq ($(origin PRIVATE_KEY),undefined)
 	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
 endif
-	make -C packages/ethereum/contracts request-nrnft environment-name=$(environment) environment-type=$(environment_type) recipient=$(recipient) nftrank=$(nftrank)
+	make -C packages/ethereum/contracts request-nrnft network=$(network) environment-type=$(environment_type) recipient=$(recipient) nftrank=$(nftrank)
 
 .PHONY: stake-funds
-stake-funds: ensure-environment-is-set
+stake-funds: ensure-environment-and-network-are-set
 stake-funds: ## stake funds (idempotent operation)
 ifeq ($(origin PRIVATE_KEY),undefined)
 	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
 endif
-	make -C packages/ethereum/contracts stake-funds environment-name=$(environment) environment-type=$(environment_type)
+	make -C packages/ethereum/contracts stake-funds network=$(network) environment-type=$(environment_type)
 
 .PHONY: stake-nrnft
-stake-nrnft: ensure-environment-is-set
+stake-nrnft: ensure-environment-and-network-are-set
 stake-nrnft: ## stake Network_registry NFTs (idempotent operation)
 ifeq ($(nftrank),)
 	echo "parameter <nftrank> missing, it can be either 'developer' or 'community'" >&2 && exit 1
 endif
-	make -C packages/ethereum/contracts stake-nrnft environment-name=$(environment) environment-type=$(environment_type) nftrank=$(nftrank)
+	make -C packages/ethereum/contracts stake-nrnft network=$(network) environment-type=$(environment_type) nftrank=$(nftrank)
 
 
-enable-network-registry: ensure-environment-is-set
+enable-network-registry: ensure-environment-and-network-are-set
 enable-network-registry: ## owner enables network registry (smart contract) globally
-	make -C packages/ethereum/contracts enable-network-registry environment-name=$(environment) environment-type=$(environment_type)
+	make -C packages/ethereum/contracts enable-network-registry network=$(network) environment-type=$(environment_type)
 
-disable-network-registry: ensure-environment-is-set
+disable-network-registry: ensure-environment-and-network-are-set
 disable-network-registry: ## owner disables network registry (smart contract) globally
-	make -C packages/ethereum/contracts disable-network-registry environment-name=$(environment) environment-type=$(environment_type)
+	make -C packages/ethereum/contracts disable-network-registry network=$(network) environment-type=$(environment_type)
 
-force-eligibility-update: ensure-environment-is-set
+force-eligibility-update: ensure-environment-and-network-are-set
 force-eligibility-update: ## owner forces eligibility update
 ifeq ($(native_addresses),)
 	echo "parameter <native_addresses> missing" >&2 && exit 1
@@ -403,19 +403,19 @@ ifeq ($(eligibility),)
 	echo "parameter <eligibility> missing" >&2 && exit 1
 endif
 	make -C packages/ethereum/contracts force-eligibility-update \
-		environment-name=$(environment) environment-type=$(environment_type) \
+		network=$(network) environment-type=$(environment_type) \
 		staking_addresses="$(native_addresses)" eligibility="$(eligibility)"
 
-sync-eligibility: ensure-environment-is-set
+sync-eligibility: ensure-environment-and-network-are-set
 sync-eligibility: ## owner sync eligibility of peers
 ifeq ($(peer_ids),)
 	echo "parameter <peer_ids> missing" >&2 && exit 1
 endif
 	make -C packages/ethereum/contracts sync-eligibility \
-		environment-name=$(environment) environment-type=$(environment_type) \
+		network=$(network) environment-type=$(environment_type) \
 		peer_ids="$(peer_ids)"
 
-register-nodes: ensure-environment-is-set
+register-nodes: ensure-environment-and-network-are-set
 register-nodes: ## owner register given nodes in network registry contract
 ifeq ($(native_addresses),)
 	echo "parameter <native_addresses> missing" >&2 && exit 1
@@ -424,41 +424,41 @@ ifeq ($(peer_ids),)
 	echo "parameter <peer_ids> missing" >&2 && exit 1
 endif
 	make -C packages/ethereum/contracts register-nodes \
-		environment-name=$(environment) environment-type=$(environment_type) \
+		network=$(network) environment-type=$(environment_type) \
 		staking_addresses="$(native_addresses)" peer_ids="$(peer_ids)"
 
-deregister-nodes: ensure-environment-is-set
+deregister-nodes: ensure-environment-and-network-are-set
 deregister-nodes: ## owner de-register given nodes in network registry contract
 ifeq ($(peer_ids),)
 	echo "parameter <peer_ids> missing" >&2 && exit 1
 endif
 	make -C packages/ethereum/contracts deregister-nodes \
-		environment-name=$(environment) environment-type=$(environment_type) \
+		network=$(network) environment-type=$(environment_type) \
 		staking_addresses="$(native_addresses)" peer_ids="$(peer_ids)"
 
 .PHONY: self-register-node
-self-register-node: ensure-environment-is-set
+self-register-node: ensure-environment-and-network-are-set
 self-register-node: ## staker register a node in network registry contract
 ifeq ($(peer_ids),)
 	echo "parameter <peer_ids> missing" >&2 && exit 1
 endif
 	make -C packages/ethereum/contracts self-register-node \
-		environment-name=$(environment) environment-type=$(environment_type) \
+		network=$(network) environment-type=$(environment_type) \
 		peer_ids="$(peer_ids)"
 
 .PHONY: self-deregister-node
-self-deregister-node: ensure-environment-is-set
+self-deregister-node: ensure-environment-and-network-are-set
 self-deregister-node: ## staker deregister a node in network registry contract
 ifeq ($(peer_ids),)
 	echo "parameter <peer_ids> missing" >&2 && exit 1
 endif
 	make -C packages/ethereum/contracts self-deregister-node \
-		environment-name=$(environment) environment-type=$(environment_type) \
+		network=$(network) environment-type=$(environment_type) \
 		peer_ids="$(peer_ids)"
 
 .PHONY: register-node-with-nft
 # node_api?=localhost:3001 provide endpoint of hoprd, with a default value 'localhost:3001'
-register-node-with-nft: ensure-environment-is-set
+register-node-with-nft: ensure-environment-and-network-are-set
 ifeq ($(endpoint),)
 	echo "parameter <endpoint> is default to localhost:3001" >&2
 endif
@@ -483,7 +483,7 @@ endif
 
 .PHONY: register-node-with-stake
 # node_api?=localhost:3001 provide endpoint of hoprd, with a default value 'localhost:3001'
-register-node-with-stake: ensure-environment-is-set
+register-node-with-stake: ensure-environment-and-network-are-set
 ifeq ($(account),)
 	echo "parameter <account> missing" >&2 && exit 1
 endif
@@ -497,11 +497,11 @@ endif
 	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make stake-funds
 	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node peer_ids=$(shell eval ./scripts/get-hopr-address.sh "$(api_token)" "$(endpoint)")
 
-ensure-environment-is-set:
-ifeq ($(environment),)
-	echo "parameter <environment> missing" >&2 && exit 1
+ensure-environment-and-network-are-set:
+ifeq ($(network),)
+	echo "parameter <network> missing" >&2 && exit 1
 else
-environment_type != jq '.environments."$(environment)".environment_type // empty' packages/ethereum/contracts/contracts-addresses.json
+environment_type != jq '.networks."$(network)".environment_type // empty' packages/ethereum/contracts/contracts-addresses.json
 ifeq ($(environment_type),)
 	echo "could not read environment type info from contracts-addresses.json" >&2 && exit 1
 endif
