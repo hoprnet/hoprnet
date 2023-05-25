@@ -45,8 +45,8 @@ where
 }
 
 impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> CoreEthereumDb<T> {
-    pub fn new(db: DB<T>, me: PublicKey) -> Self {
-        Self { db, me }
+    pub fn new(db: DB<T>, public_key: PublicKey) -> Self {
+        Self { db, me: public_key }
     }
 }
 
@@ -235,7 +235,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         self.db.get_or_none::<usize>(key).await.map(|v| v.unwrap_or(0))
     }
 
-    async fn get_pendings_balance_to(&self, counterparty: &Address) -> Result<Balance> {
+    async fn get_pending_balance_to(&self, counterparty: &Address) -> Result<Balance> {
         let key = utils_db::db::Key::new_with_prefix(counterparty, PENDING_TICKETS_COUNT)?;
 
         self.db
@@ -275,7 +275,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         self.db.batch(batch_ops, true).await
     }
 
-    async fn mark_redeemeed(&mut self, ticket: &AcknowledgedTicket) -> Result<()> {
+    async fn mark_redeemed(&mut self, ticket: &AcknowledgedTicket) -> Result<()> {
         let key = utils_db::db::Key::new_from_str(REDEEMED_TICKETS_COUNT)?;
         let count = self.db.get_or_none::<usize>(key.clone()).await?.unwrap_or(0);
         let _ = self.db.set(key, &(count + 1)).await?;

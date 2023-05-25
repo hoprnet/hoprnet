@@ -2,14 +2,14 @@ use async_trait::async_trait;
 
 use core_crypto::types::{HalfKeyChallenge, Hash, PublicKey};
 use core_types::acknowledgement::{AcknowledgedTicket, PendingAcknowledgement};
-use core_types::channels::{ChannelEntry, Ticket};
+use core_types::channels::{generate_channel_id, ChannelEntry, Ticket};
 use utils_db::traits::AsyncKVStorage;
 use utils_db::{
     constants::*,
     db::{serialize_to_bytes, DB},
 };
-use utils_types::primitives::Snapshot;
 use utils_types::primitives::{Address, Balance, EthereumChallenge, U256};
+use utils_types::primitives::{BalanceType, Snapshot};
 
 use crate::errors::Result;
 use crate::traits::HoprCoreDbActions;
@@ -23,8 +23,8 @@ where
 }
 
 impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> CoreDb<T> {
-    pub fn new(db: DB<T>, me: PublicKey) -> Self {
-        Self { db, me }
+    pub fn new(db: DB<T>, public_key: PublicKey) -> Self {
+        Self { db, me: public_key }
     }
 }
 
@@ -114,48 +114,44 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreDbActions fo
         Ok(())
     }
 
-    /// TODO: missing key prefix?
     async fn mark_rejected(&mut self, ticket: &Ticket) -> Result<()> {
         let count_key = utils_db::db::Key::new_from_str(REJECTED_TICKETS_COUNT)?;
         // always store as 2^32 - 1 options
         let count = self.db.get::<u128>(count_key.clone()).await?;
         self.db.set(count_key, &(count + 1)).await?;
 
-        let prefixed_key = utils_db::db::Key::new_from_str(REJECTED_TICKETS_VALUE)?;
+        let value_key = utils_db::db::Key::new_from_str(REJECTED_TICKETS_VALUE)?;
         let balance = self
             .db
-            .get::<Balance>(prefixed_key.clone())
+            .get::<Balance>(value_key.clone())
             .await
             .unwrap_or(Balance::new(U256::from(0u64), ticket.amount.balance_type()));
 
-        let _result = self.db.set(prefixed_key, &balance.add(&ticket.amount)).await?;
+        let _result = self.db.set(value_key, &balance.add(&ticket.amount)).await?;
         Ok(())
     }
 
-    /// TODO: missing key prefix?
-    async fn get_channel_to(&self, dest: PublicKey) -> Result<ChannelEntry> {
-        let from = serialize_to_bytes(&self.me.to_address())?;
-        let to = serialize_to_bytes(&dest.to_address())?;
+    async fn get_channel_to(&self, dest: &PublicKey) -> Result<Option<ChannelEntry>> {
+        let key =
+            utils_db::db::Key::new_with_prefix(&generate_channel_id(&self.me.to_address(), &dest.to_address()), "")?;
 
-        let key = utils_db::db::Key::new(&Hash::create(&[from.as_ref(), to.as_ref()]))?;
-
-        self.db.get::<ChannelEntry>(key).await
+        self.db.get_or_none(key).await
     }
 
-    /// TODO: missing key prefix?
-    async fn get_channel_from(&self, origin: PublicKey) -> Result<ChannelEntry> {
-        let to = serialize_to_bytes(&self.me.to_address())?;
-        let from = serialize_to_bytes(&origin.to_address())?;
+    async fn get_channel_from(&self, src: &PublicKey) -> Result<Option<ChannelEntry>> {
+        let key =
+            utils_db::db::Key::new_with_prefix(&generate_channel_id(&src.to_address(), &self.me.to_address()), "")?;
 
-        let key = utils_db::db::Key::new(&Hash::create(&[from.as_ref(), to.as_ref()]))?;
-
-        self.db.get::<ChannelEntry>(key).await
+        self.db.get_or_none(key).await
     }
 
     async fn get_pending_balance_to(&self, counterparty: &Address) -> Result<Balance> {
         let key = utils_db::db::Key::new_with_prefix(counterparty, PENDING_TICKETS_COUNT)?;
 
-        self.db.get::<Balance>(key).await
+        self.db
+            .get_or_none::<Balance>(key)
+            .await
+            .map(|v| v.unwrap_or(Balance::zero(BalanceType::HOPR)))
     }
 
     async fn check_and_set_packet_tag(&mut self, tag: Box<[u8]>) -> Result<bool> {
