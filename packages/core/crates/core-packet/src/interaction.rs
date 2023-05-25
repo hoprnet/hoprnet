@@ -1,6 +1,4 @@
-use crate::errors::PacketError::{
-    AcknowledgementValidation, InvalidPacketState, OutOfFunds, TagReplay, TicketValidation, TransportError,
-};
+use crate::errors::PacketError::{AcknowledgementValidation, ChannelNotFound, InvalidPacketState, OutOfFunds, TagReplay, TicketValidation, TransportError};
 use crate::errors::Result;
 use crate::packet::{Packet, PacketState};
 use crate::path::Path;
@@ -363,7 +361,10 @@ where
     }
 
     async fn create_multihop_ticket(&self, destination: PublicKey, path_pos: u8) -> Result<Ticket> {
-        let channel = self.db.borrow().get_channel_to(&destination).await?;
+        let channel = self.db.borrow().get_channel_to(&destination)
+            .await?
+            .ok_or(ChannelNotFound(destination.to_string()))?;
+
         let channel_id = channel.get_id();
         let current_index = self.bump_ticket_index(&channel_id).await?;
         let amount = Balance::new(
@@ -502,8 +503,12 @@ where
 
                 let inverse_win_prob = U256::new(INVERSE_TICKET_WIN_PROB);
 
+                // Find the corresponding channel
+                let channel = self.db.borrow().get_channel_from(&previous_hop)
+                    .await?
+                    .ok_or(ChannelNotFound(previous_hop.to_string()))?;
+
                 // Validate the ticket first
-                let channel = self.db.borrow().get_channel_from(&previous_hop).await?;
                 if let Err(e) = self
                     .validate_unacknowledged_ticket(
                         &previous_hop,

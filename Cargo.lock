@@ -849,7 +849,7 @@ dependencies = [
 
 [[package]]
 name = "core-crypto"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "aes",
  "async-std",
@@ -925,10 +925,24 @@ dependencies = [
 
 [[package]]
 name = "core-ethereum-misc"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
+ "async-std",
+ "async-trait",
  "console_error_panic_hook",
+ "core-crypto",
+ "core-ethereum-db",
+ "futures",
+ "hex-literal 0.4.1",
+ "js-sys",
+ "libp2p-identity",
+ "mockall",
+ "rusty-leveldb",
+ "thiserror",
+ "utils-db",
+ "utils-log",
  "utils-proc-macros",
+ "utils-types",
  "wasm-bindgen",
  "wasm-bindgen-test",
  "wasm-opt",
@@ -1021,20 +1035,26 @@ dependencies = [
 
 [[package]]
 name = "core-packet"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
+ "async-std",
  "console_error_panic_hook",
  "core-crypto",
+ "core-db",
+ "core-mixer",
  "core-types",
+ "futures",
  "js-sys",
  "libp2p-identity",
  "parameterized",
  "thiserror",
+ "utils-db",
  "utils-log",
  "utils-metrics",
  "utils-misc",
  "utils-types",
  "wasm-bindgen",
+ "wasm-bindgen-futures",
  "wasm-bindgen-test",
 ]
 
@@ -4934,7 +4954,7 @@ dependencies = [
 
 [[package]]
 name = "utils-types"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "bincode",
  "console_error_panic_hook",
