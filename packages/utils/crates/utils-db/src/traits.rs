@@ -50,7 +50,11 @@ pub trait AsyncKVStorage {
 
     async fn dump(&self, destination: String) -> Result<()>;
 
-    fn iterate(&self, prefix: Self::Key, suffix_size: u32) -> Result<Box<dyn Stream<Item = crate::errors::Result<Box<[u8]>>>>>;
+    fn iterate(
+        &self,
+        prefix: Self::Key,
+        suffix_size: u32,
+    ) -> Result<Box<dyn Stream<Item = crate::errors::Result<Box<[u8]>>>>>;
 
     async fn batch(
         &mut self,
