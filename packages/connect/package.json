@@ -54,7 +54,7 @@
     "@libp2p/interface-connection-manager": "1.1.0",
     "@libp2p/interface-peer-id": "1.0.2",
     "@libp2p/interface-registrar": "1.1.0",
-    "@types/debug": "4.1.7",
+    "@types/debug": "4.1.8",
     "@types/mocha": "10.0.1",
     "@types/node": "16",
     "@types/simple-peer": "9.11.5",
