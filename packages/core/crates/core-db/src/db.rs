@@ -28,6 +28,12 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> CoreDb<T> {
     }
 }
 
+impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> CoreDb<T> {
+    pub fn new(db: DB<T>, public_key: PublicKey) -> Self {
+        Self { db, me: public_key }
+    }
+}
+
 #[async_trait(? Send)] // not placing the `Send` trait limitations on the trait
 impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreDbActions for CoreDb<T> {
     async fn get_current_ticket_index(&self, channel_id: &Hash) -> Result<Option<U256>> {

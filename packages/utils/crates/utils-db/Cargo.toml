@@ -41,6 +41,9 @@ wasm-bindgen-test = "0.3.36"
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 rusty-leveldb = "1.0"
 
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+rusty-leveldb = "1.0"
+
 [package.metadata.wasm-pack.profile.dev]
 wasm-opt = false
 

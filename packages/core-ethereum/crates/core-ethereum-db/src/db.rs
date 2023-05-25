@@ -50,6 +50,12 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> CoreEthereumDb<T> {
     }
 }
 
+impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> CoreEthereumDb<T> {
+    pub fn new(db: DB<T>, public_key: PublicKey) -> Self {
+        Self { db, me: public_key }
+    }
+}
+
 #[async_trait(? Send)] // not placing the `Send` trait limitations on the trait
 impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbActions for CoreEthereumDb<T> {
     async fn get_acknowledged_tickets(&self, filter: Option<ChannelEntry>) -> Result<Vec<AcknowledgedTicket>> {
