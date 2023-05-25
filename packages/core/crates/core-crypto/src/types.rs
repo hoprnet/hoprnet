@@ -1,3 +1,4 @@
+use std::fmt::{Display, Formatter};
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use curve25519_dalek::traits::IsIdentity;
 use curve25519_dalek::EdwardsPoint;
@@ -464,6 +465,12 @@ impl BinarySerializable<'_> for Hash {
     }
 }
 
+impl Display for Hash {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_hex())
+    }
+}
+
 impl Hash {
     /// Takes all the byte slices and computes hash of their concatenated value.
     /// Uses the Keccak256 digest.
@@ -532,6 +539,12 @@ impl PeerIdLike for OffchainPublicKey {
     }
 }
 
+impl Display for OffchainPublicKey {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_hex())
+    }
+}
+
 impl OffchainPublicKey {
     /// Generates new random keypair (private key, public key)
     pub fn random_keypair() -> ([u8; 32], Self) {
@@ -589,6 +602,12 @@ impl PublicKey {
     pub fn to_hex(&self, compressed: bool) -> String {
         let offset = if compressed { 0 } else { 1 };
         format!("0x{}", hex::encode(&self.to_bytes(compressed)[offset..]))
+    }
+}
+
+impl Display for PublicKey {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_hex(true))
     }
 }
 
