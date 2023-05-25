@@ -17,8 +17,8 @@ pub trait HoprCoreDbActions {
     async fn mark_pending(&mut self, ticket: &Ticket) -> Result<()>;
     async fn mark_rejected(&mut self, ticket: &Ticket) -> Result<()>;
 
-    async fn get_channel_to(&self, dest: &PublicKey) -> Result<ChannelEntry>;
-    async fn get_channel_from(&self, origin: &PublicKey) -> Result<ChannelEntry>;
+    async fn get_channel_to(&self, dest: &PublicKey) -> Result<Option<ChannelEntry>>;
+    async fn get_channel_from(&self, origin: &PublicKey) -> Result<Option<ChannelEntry>>;
     async fn get_pending_balance_to(&self, counterparty: &Address) -> Result<Balance>;
 
     async fn check_and_set_packet_tag(&mut self, tag: &[u8]) -> Result<bool>;

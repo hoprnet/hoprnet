@@ -144,7 +144,7 @@ where
     .await
 }
 
-#[cfg(test)]
+#[cfg(all(not(target_arch = "wasm32"), test))]
 mod tests {
     use crate::commitment::{
         bump_commitment, find_commitment_preimage, initialize_commitment, ChannelCommitmentInfo, MockChainCommitter,
@@ -154,7 +154,7 @@ mod tests {
     use core_ethereum_db::db::CoreEthereumDb;
     use hex_literal::hex;
     use utils_db::db::DB;
-    use utils_db::leveldb::RustyLevelDbShim;
+    use utils_db::leveldb::rusty::RustyLevelDbShim;
     use utils_types::primitives::U256;
     use utils_types::traits::BinarySerializable;
 
@@ -164,10 +164,10 @@ mod tests {
         let opt = rusty_leveldb::in_memory();
         let db = rusty_leveldb::DB::open("test", opt).unwrap();
 
-        CoreEthereumDb {
-            db: DB::new(RustyLevelDbShim::new(db)),
-            me: PublicKey::from_privkey(&PRIV_KEY).unwrap(),
-        }
+        CoreEthereumDb::new(
+            DB::new(RustyLevelDbShim::new(db)),
+            PublicKey::from_privkey(&PRIV_KEY).unwrap(),
+        )
     }
 
     #[async_std::test]

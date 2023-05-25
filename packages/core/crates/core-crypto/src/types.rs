@@ -539,6 +539,12 @@ impl PeerIdLike for OffchainPublicKey {
     }
 }
 
+impl Display for OffchainPublicKey {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_hex())
+    }
+}
+
 impl OffchainPublicKey {
     /// Generates new random keypair (private key, public key)
     pub fn random_keypair() -> ([u8; 32], Self) {
