@@ -775,8 +775,8 @@ mod tests {
         static ref MESSAGES: Mutex<HashMap<PeerId, Vec<(PeerId, Box<[u8]>)>>> = Mutex::new(HashMap::<PeerId, Vec<(PeerId,Box<[u8]>)>>::new());
     }
 
-    pub async fn send_transport_peer_1(msg: Box<[u8]>, dst: String) -> std::result::Result<(), String> {
-        let sender = create_peers()[1];
+    pub async fn send_transport_as_peer<const N: usize>(msg: Box<[u8]>, dst: String) -> std::result::Result<(), String> {
+        let sender = create_peers()[N];
         MESSAGES.lock().unwrap().get_mut(&PeerId::from_str(&dst).unwrap()).expect("non existent channel")
             .push((sender, msg));
         Ok(())
@@ -863,7 +863,7 @@ mod tests {
         // Peer 2: start sending out outgoing acknowledgement
         let ack_2_clone = ack_interaction_counterparty.clone();
         async_std::task::spawn_local(async move {
-            ack_2_clone.handle_outgoing_acknowledgements(&send_transport_peer_1).await;
+            ack_2_clone.handle_outgoing_acknowledgements(&send_transport_as_peer::<1>).await;
         });
 
         ////
