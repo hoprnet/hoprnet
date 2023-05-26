@@ -11,18 +11,19 @@ use core_db::traits::HoprCoreDbActions;
 use core_mixer::mixer::Mixer;
 use core_types::acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket};
 use core_types::channels::{ChannelEntry, ChannelStatus, Ticket};
-use lazy_static::lazy_static;
 use libp2p_identity::PeerId;
 use std::cell::RefCell;
 use std::ops::Mul;
 use std::sync::Arc;
 use utils_log::{debug, error, info};
-use utils_metrics::metrics::SimpleCounter;
 use utils_types::primitives::{Balance, BalanceType, U256};
 use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
 
 #[cfg(all(feature = "prometheus", not(test)))]
-lazy_static! {
+use utils_metrics::metrics::SimpleCounter;
+
+#[cfg(all(feature = "prometheus", not(test)))]
+lazy_static::lazy_static! {
     static ref METRIC_RECEIVED_SUCCESSFUL_ACKS: SimpleCounter = SimpleCounter::new(
         "core_counter_received_successful_acks",
         "Number of received successful acknowledgements"
@@ -622,8 +623,136 @@ where
     }
 }
 
-#[cfg(test)]
-mod tests {}
+#[cfg(all(not(target_arch = "wasm32"), test))]
+mod tests {
+    use crate::errors::PacketError::PacketDbError;
+    use crate::interaction::PRICE_PER_PACKET;
+    use async_trait::async_trait;
+    use core_crypto::random::random_bytes;
+    use core_crypto::types::{Hash, PublicKey};
+    use core_ethereum_db::db::CoreEthereumDb;
+    use core_ethereum_db::traits::HoprCoreEthereumDbActions;
+    use core_ethereum_misc::commitment::{initialize_commitment, ChainCommitter, ChannelCommitmentInfo};
+    use core_types::channels::{ChannelEntry, ChannelStatus};
+    use hex_literal::hex;
+    use libp2p_identity::PeerId;
+    use std::ops::Mul;
+    use std::sync::{Arc, Mutex};
+    use utils_db::db::DB;
+    use utils_db::errors::DbError;
+    use utils_db::leveldb::rusty::RustyLevelDbShim;
+    use utils_types::primitives::{Balance, BalanceType, Snapshot, U256};
+    use utils_types::traits::PeerIdLike;
+
+    fn create_dummy_channel(from: &PeerId, to: &PeerId) -> ChannelEntry {
+        ChannelEntry::new(
+            PublicKey::from_peerid(from).unwrap(),
+            PublicKey::from_peerid(to).unwrap(),
+            Balance::new(U256::new("1234").mul(U256::new(PRICE_PER_PACKET)), BalanceType::HOPR),
+            Hash::new(&random_bytes::<32>()),
+            U256::zero(),
+            U256::zero(),
+            ChannelStatus::Open,
+            U256::zero(),
+            U256::zero(),
+        )
+    }
+
+    const SELF_PRIV: [u8; 32] = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
+    const RELAY0_PRIV: [u8; 32] = hex!("5bf21ea8cccd69aa784346b07bf79c84dac606e00eecaa68bf8c31aff397b1ca");
+    const RELAY1_PRIV: [u8; 32] = hex!("3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa");
+    const REALY2_PRIV: [u8; 32] = hex!("db7e3e8fcac4c817aa4cecee1d6e2b4d53da51f9881592c0e1cc303d8a012b92");
+    const COUNTERPARTY_PRIV: [u8; 32] = hex!("0726a9704d56a013980a9077d195520a61b5aed28f92d89c50bca6e0e0c48cfc");
+
+    fn create_peers() -> Vec<PeerId> {
+        vec![SELF_PRIV, RELAY0_PRIV, RELAY1_PRIV, REALY2_PRIV, COUNTERPARTY_PRIV]
+            .into_iter()
+            .map(|private| PublicKey::from_privkey(&private).unwrap().to_peerid())
+            .collect()
+    }
+
+    fn create_dbs(amount: usize) -> Vec<Arc<Mutex<DB<RustyLevelDbShim>>>> {
+        (0..amount)
+            .map(|i| {
+                Arc::new(Mutex::new(DB::new(RustyLevelDbShim::new(
+                    rusty_leveldb::DB::open(format!("test_db_{i}"), rusty_leveldb::in_memory()).unwrap(),
+                ))))
+            })
+            .collect()
+    }
+
+    struct EmptyChainCommiter {}
+
+    #[async_trait(? Send)]
+    impl ChainCommitter for EmptyChainCommiter {
+        async fn get_commitment(&self) -> Option<Hash> {
+            None
+        }
+
+        async fn set_commitment(&mut self, _commitment: &Hash) -> String {
+            "".to_string()
+        }
+    }
+
+    async fn create_minimal_topology(
+        dbs: &Vec<Arc<Mutex<DB<RustyLevelDbShim>>>>,
+        nodes: &Vec<PeerId>,
+    ) -> crate::errors::Result<()> {
+        let testing_snapshot = Snapshot::new(U256::zero(), U256::zero(), U256::zero());
+        let mut previous_channel: Option<ChannelEntry> = None;
+
+        for (index, peer_id) in nodes.iter().enumerate() {
+            let mut db = CoreEthereumDb::new(dbs[index].clone(), PublicKey::from_peerid(&peer_id).unwrap());
+
+            let mut channel: Option<ChannelEntry> = None;
+
+            if index < nodes.len() - 1 {
+                channel = Some(create_dummy_channel(&peer_id, &nodes[index + 1]));
+
+                db.update_channel_and_snapshot(
+                    &channel.clone().unwrap().get_id(),
+                    &channel.clone().unwrap(),
+                    &testing_snapshot,
+                )
+                .await?;
+            }
+
+            if index > 0 {
+                db.update_channel_and_snapshot(
+                    &previous_channel.clone().unwrap().get_id(),
+                    &previous_channel.clone().unwrap(),
+                    &testing_snapshot,
+                )
+                .await?;
+
+                let channel_info = ChannelCommitmentInfo {
+                    chain_id: 1,
+                    contract_address: "fakeaddress".to_string(),
+                    channel_id: previous_channel.clone().unwrap().get_id().clone(),
+                    channel_epoch: previous_channel.clone().unwrap().channel_epoch.clone(),
+                };
+
+                initialize_commitment(&mut db, &SELF_PRIV, &channel_info, &mut EmptyChainCommiter {})
+                    .await
+                    .map_err(|e| PacketDbError(DbError::GenericError(e.to_string())))?;
+            }
+
+            previous_channel = channel;
+        }
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    pub async fn test_packet_acknowledgement_sender_workflow() {
+        let peers = create_peers();
+        let dbs = create_dbs(peers.len());
+
+        create_minimal_topology(&dbs, &peers)
+            .await
+            .expect("failed to create minimal channel topology");
+    }
+}
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
@@ -635,7 +764,7 @@ pub mod wasm {
     use std::future::Future;
     use std::pin::Pin;
     use std::str::FromStr;
-    use std::sync::Arc;
+    use std::sync::{Arc, Mutex};
     use utils_db::db::DB;
     use utils_db::leveldb::{LevelDb, LevelDbShim};
     use utils_log::error;
@@ -666,10 +795,7 @@ pub mod wasm {
         pub fn new(db: LevelDb, chain_key: PublicKey) -> Self {
             Self {
                 w: Arc::new(AcknowledgementInteraction::new(
-                    CoreDb {
-                        db: DB::new(LevelDbShim::new(db)),
-                        me: chain_key.clone(),
-                    },
+                    CoreDb::new(Arc::new(Mutex::new(DB::new(LevelDbShim::new(db)))), chain_key.clone()),
                     chain_key,
                 )),
             }
@@ -728,10 +854,10 @@ pub mod wasm {
         pub fn new(db: LevelDb, cfg: PacketInteractionConfig, ack: &WasmAckInteraction) -> Self {
             Self {
                 w: PacketInteraction::new(
-                    CoreDb {
-                        db: DB::new(LevelDbShim::new(db)),
-                        me: PublicKey::from_privkey(&cfg.private_key).expect("invalid config"),
-                    },
+                    CoreDb::new(
+                        Arc::new(Mutex::new(DB::new(LevelDbShim::new(db)))),
+                        PublicKey::from_privkey(&cfg.private_key).expect("invalid private key"),
+                    ),
                     ack.w.clone(),
                     cfg,
                 ),

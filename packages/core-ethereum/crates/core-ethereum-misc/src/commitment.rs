@@ -153,6 +153,7 @@ mod tests {
     use core_crypto::types::{Hash, PublicKey};
     use core_ethereum_db::db::CoreEthereumDb;
     use hex_literal::hex;
+    use std::sync::{Arc, Mutex};
     use utils_db::db::DB;
     use utils_db::leveldb::rusty::RustyLevelDbShim;
     use utils_types::primitives::U256;
@@ -165,7 +166,7 @@ mod tests {
         let db = rusty_leveldb::DB::open("test", opt).unwrap();
 
         CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new(db)),
+            Arc::new(Mutex::new(DB::new(RustyLevelDbShim::new(db)))),
             PublicKey::from_privkey(&PRIV_KEY).unwrap(),
         )
     }

@@ -39,8 +39,13 @@ console_error_panic_hook = { version = "0.1.7", optional = true }
 #wee_alloc = { version = "0.4.5", optional = true }
 
 [dev-dependencies]
+async-trait = "0.1.68"
 parameterized = "1.0"
 wasm-bindgen-test = "0.3.36"
+rusty-leveldb = "1.0"
+hex-literal = "0.4.1"
+core-ethereum-db = { path = "../../../core-ethereum/crates/core-ethereum-db" }
+core-ethereum-misc = { path = "../../../core-ethereum/crates/core-ethereum-misc" }
 
 [package.metadata.wasm-pack.profile.dev]
 wasm-opt = false
