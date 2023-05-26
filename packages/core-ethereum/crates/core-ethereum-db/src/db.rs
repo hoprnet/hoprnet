@@ -615,6 +615,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use super::{CoreEthereumDb, HoprCoreEthereumDbActions, PublicKey, DB};
+    use std::sync::{Arc, Mutex};
     use wasm_bindgen::prelude::*;
     use core_crypto::types::Hash;
     use core_types::account::AccountEntry;
@@ -658,257 +659,307 @@ pub mod wasm {
     to_iterable!(WasmVecPublicKey, PublicKey);
 
     #[wasm_bindgen]
-    pub struct CoreEthereumDatabase
+    pub struct Database
     {
-        db: CoreEthereumDb<leveldb::LevelDbShim>,
+        core_ethereum_db: Arc<Mutex<CoreEthereumDb<leveldb::LevelDbShim>>>,
+    }
+
+    impl Database {
+        pub fn core_ethereum_db(&self) -> Arc<Mutex<CoreEthereumDb<leveldb::LevelDbShim>>> {
+            self.core_ethereum_db.clone()
+        }
     }
 
     #[wasm_bindgen]
-    impl CoreEthereumDatabase {
+    impl Database {
         #[wasm_bindgen(constructor)]
-        pub fn new(db: utils_db::leveldb::LevelDb, public_key: PublicKey) -> Self {
+        pub fn new(db: leveldb::LevelDb, public_key: PublicKey) -> Self {
             Self {
-                db: CoreEthereumDb::<leveldb::LevelDbShim>::new(
-                    DB::<leveldb::LevelDbShim>::new(leveldb::LevelDbShim::new(db)), public_key)
+                core_ethereum_db: Arc::new(Mutex::new(CoreEthereumDb::<leveldb::LevelDbShim>::new(
+                    DB::<leveldb::LevelDbShim>::new(leveldb::LevelDbShim::new(db)), public_key.clone())))
             }
         }
     }
 
     #[wasm_bindgen]
-    impl CoreEthereumDatabase  {
+    impl Database {
         #[wasm_bindgen]
         pub async fn get_acknowledged_tickets(&self, filter: Option<ChannelEntry>) -> Result<WasmVecAcknowledgedTicket,JsValue>
         {
-            utils_misc::ok_or_jserr!(self.db.get_acknowledged_tickets(filter).await)
+            let db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.get_acknowledged_tickets(filter).await)
                 .map(|v| WasmVecAcknowledgedTicket::from(v))
         }
 
         #[wasm_bindgen]
         pub async fn delete_acknowledged_tickets_from(&mut self, source: ChannelEntry) -> Result<(),JsValue> {
-            utils_misc::ok_or_jserr!(self.db.delete_acknowledged_tickets_from(source).await)
+            let mut db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.delete_acknowledged_tickets_from(source).await)
         }
 
         #[wasm_bindgen]
         pub async fn delete_acknowledged_ticket(&mut self, ticket: &AcknowledgedTicket) -> Result<(),JsValue> {
-            utils_misc::ok_or_jserr!(self.db.delete_acknowledged_ticket(ticket).await)
+            let mut db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.delete_acknowledged_ticket(ticket).await)
         }
 
         #[wasm_bindgen]
         pub async fn get_commitment(&self, channel: &Hash, iteration: usize) -> Result<Option<Hash>,JsValue> {
-            utils_misc::ok_or_jserr!(self.db.get_commitment(channel, iteration).await)
+            let db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.get_commitment(channel, iteration).await)
         }
 
         #[wasm_bindgen]
         pub async fn get_current_commitment(&self, channel: &Hash) -> Result<Option<Hash>,JsValue> {
-            utils_misc::ok_or_jserr!(self.db.get_current_commitment(channel).await)
+            let db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.get_current_commitment(channel).await)
         }
 
         #[wasm_bindgen]
         pub async fn set_current_commitment(&mut self, channel: &Hash, commitment: &Hash) -> Result<(),JsValue> {
-            utils_misc::ok_or_jserr!(self.db.set_current_commitment(channel, commitment).await)
+            let mut db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.set_current_commitment(channel, commitment).await)
         }
 
         #[wasm_bindgen]
         pub async fn get_latest_block_number(&self) -> Result<u32,JsValue> {
-            utils_misc::ok_or_jserr!(self.db.get_latest_block_number().await)
+            let db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.get_latest_block_number().await)
         }
 
         #[wasm_bindgen]
         pub async fn update_latest_block_number(&mut self, number: u32) -> Result<(),JsValue> {
-            utils_misc::ok_or_jserr!(self.db.update_latest_block_number(number).await)
+            let mut db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.update_latest_block_number(number).await)
         }
 
         #[wasm_bindgen]
         pub async fn get_latest_confirmed_snapshot(&self) -> Result<Option<Snapshot>,JsValue> {
-            utils_misc::ok_or_jserr!(self.db.get_latest_confirmed_snapshot().await)
+            let db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.get_latest_confirmed_snapshot().await)
         }
 
         #[wasm_bindgen]
         pub async fn get_channel(&self, channel: &Hash) -> Result<Option<ChannelEntry>,JsValue> {
-            utils_misc::ok_or_jserr!(self.db.get_channel(channel).await)
+            let db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.get_channel(channel).await)
         }
 
         #[wasm_bindgen]
         pub async fn get_channels(&self) -> Result<WasmVecChannelEntry,JsValue>
         {
-            utils_misc::ok_or_jserr!(self.db.get_channels().await)
+            let db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.get_channels().await)
                 .map(|v| WasmVecChannelEntry::from(v))
         }
 
         pub async fn get_channels_open(&self) -> Result<WasmVecChannelEntry,JsValue>
         {
-            utils_misc::ok_or_jserr!(self.db.get_channels_open().await)
+            let db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.get_channels_open().await)
                 .map(|v| WasmVecChannelEntry::from(v))
         }
 
         #[wasm_bindgen]
         pub async fn update_channel_and_snapshot(&mut self, channel_id: &Hash, channel: &ChannelEntry, snapshot: &Snapshot) -> Result<(),JsValue> {
-            utils_misc::ok_or_jserr!(self.db.update_channel_and_snapshot(channel_id, channel, snapshot).await)
+            let mut db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.update_channel_and_snapshot(channel_id, channel, snapshot).await)
         }
 
         #[wasm_bindgen]
         pub async fn get_account(&self, address: &Address) -> Result<Option<AccountEntry>,JsValue> {
-            utils_misc::ok_or_jserr!(self.db.get_account(address).await)
+            let db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.get_account(address).await)
         }
 
         #[wasm_bindgen]
         pub async fn update_account_and_snapshot(&mut self, account: &AccountEntry, snapshot: &Snapshot) -> Result<(),JsValue> {
-            utils_misc::ok_or_jserr!(self.db.update_account_and_snapshot(account, snapshot).await)
+            let mut db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.update_account_and_snapshot(account, snapshot).await)
         }
 
         #[wasm_bindgen]
-        pub async fn get_accounts(&self) -> Result<WasmVecAccountEntry,JsValue>
-        {
-            utils_misc::ok_or_jserr!(self.db.get_accounts().await)
+        pub async fn get_accounts(&self) -> Result<WasmVecAccountEntry,JsValue> {
+            let db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.get_accounts().await)
                 .map(|v| WasmVecAccountEntry::from(v))
         }
 
         #[wasm_bindgen]
         pub async fn get_redeemed_tickets_value(&self) -> Result<Balance,JsValue> {
-            utils_misc::ok_or_jserr!(self.db.get_redeemed_tickets_value().await)
+            let db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.get_redeemed_tickets_value().await)
         }
 
         #[wasm_bindgen]
         pub async fn get_redeemed_tickets_count(&self) -> Result<usize,JsValue> {
-            utils_misc::ok_or_jserr!(self.db.get_redeemed_tickets_count().await)
+            let db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.get_redeemed_tickets_count().await)
         }
 
         #[wasm_bindgen]
         pub async fn get_neglected_tickets_count(&self) -> Result<usize,JsValue> {
-            utils_misc::ok_or_jserr!(self.db.get_neglected_tickets_count().await)
+            let db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.get_neglected_tickets_count().await)
         }
 
         #[wasm_bindgen]
         pub async fn get_pending_tickets_count(&self) -> Result<usize,JsValue> {
-            utils_misc::ok_or_jserr!(self.db.get_pending_tickets_count().await)
+            let db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.get_pending_tickets_count().await)
         }
 
         #[wasm_bindgen]
         pub async fn get_losing_tickets_count(&self) -> Result<usize,JsValue> {
-            utils_misc::ok_or_jserr!(self.db.get_losing_tickets_count().await)
+            let db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.get_losing_tickets_count().await)
         }
 
         #[wasm_bindgen]
         pub async fn get_pending_balance_to(&self, counterparty: &Address) -> Result<Balance,JsValue> {
-            utils_misc::ok_or_jserr!(self.db.get_pending_balance_to(counterparty).await)
+            let db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.get_pending_balance_to(counterparty).await)
         }
 
         #[wasm_bindgen]
         pub async fn mark_pending(&mut self, ticket: &Ticket) -> Result<(),JsValue> {
-            utils_misc::ok_or_jserr!(self.db.mark_pending(ticket).await)
+            let mut db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.mark_pending(ticket).await)
         }
 
         #[wasm_bindgen]
         pub async fn resolve_pending(&mut self, ticket: &Ticket, snapshot: &Snapshot) -> Result<(),JsValue> {
-            utils_misc::ok_or_jserr!(self.db.resolve_pending(ticket, snapshot).await)
+            let mut db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.resolve_pending(ticket, snapshot).await)
         }
 
         #[wasm_bindgen]
         pub async fn mark_redeemed(&mut self, ticket: &AcknowledgedTicket) -> Result<(),JsValue> {
-            utils_misc::ok_or_jserr!(self.db.mark_redeemed(ticket).await)
+            let mut db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.mark_redeemed(ticket).await)
         }
 
         #[wasm_bindgen]
         pub async fn mark_losing_acked_ticket(&mut self, ticket: &AcknowledgedTicket) -> Result<(),JsValue> {
-            utils_misc::ok_or_jserr!(self.db.mark_losing_acked_ticket(ticket).await)
+            let mut db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.mark_losing_acked_ticket(ticket).await)
         }
 
         #[wasm_bindgen]
         pub async fn get_rejected_tickets_value(&self) -> Result<Balance,JsValue> {
-            utils_misc::ok_or_jserr!(self.db.get_rejected_tickets_value().await)
+            let db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.get_rejected_tickets_value().await)
         }
 
         #[wasm_bindgen]
         pub async fn get_rejected_tickets_count(&self) -> Result<usize,JsValue> {
-            utils_misc::ok_or_jserr!(self.db.get_rejected_tickets_count().await)
+            let db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.get_rejected_tickets_count().await)
         }
 
         #[wasm_bindgen]
         pub async fn get_channel_x(&self, src: &PublicKey, dest: &PublicKey) -> Result<Option<ChannelEntry>,JsValue> {
-            utils_misc::ok_or_jserr!(self.db.get_channel_x(src, dest).await)
+            let db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.get_channel_x(src, dest).await)
         }
 
         #[wasm_bindgen]
         pub async fn get_channel_to(&self, dest: &PublicKey) -> Result<Option<ChannelEntry>,JsValue> {
-            utils_misc::ok_or_jserr!(self.db.get_channel_to(dest).await)
+            let db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.get_channel_to(dest).await)
         }
 
         #[wasm_bindgen]
         pub async fn get_channel_from(&self, src: &PublicKey) -> Result<Option<ChannelEntry>,JsValue> {
-            utils_misc::ok_or_jserr!(self.db.get_channel_from(src).await)
+            let db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.get_channel_from(src).await)
         }
 
         #[wasm_bindgen]
         pub async fn get_channels_from(&self, address: Address) -> Result<WasmVecChannelEntry,JsValue> {
-            utils_misc::ok_or_jserr!(self.db.get_channels_from(address).await)
+            let db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.get_channels_from(address).await)
                 .map(|v| WasmVecChannelEntry::from(v))
         }
 
         #[wasm_bindgen]
         pub async fn get_channels_to(&self, address: Address) -> Result<WasmVecChannelEntry,JsValue> {
-            utils_misc::ok_or_jserr!(self.db.get_channels_to(address).await)
+            let db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.get_channels_to(address).await)
                 .map(|v| WasmVecChannelEntry::from(v))
         }
 
         #[wasm_bindgen]
         pub async fn get_hopr_balance(&self) -> Result<Balance,JsValue> {
-            utils_misc::ok_or_jserr!(self.db.get_hopr_balance().await)
+            let db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.get_hopr_balance().await)
         }
 
         #[wasm_bindgen]
         pub async fn set_hopr_balance(&mut self, balance: &Balance) -> Result<(),JsValue> {
-            utils_misc::ok_or_jserr!(self.db.set_hopr_balance(balance).await)
+            let mut db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.set_hopr_balance(balance).await)
         }
 
         #[wasm_bindgen]
         pub async fn add_hopr_balance(&mut self, balance: &Balance, snapshot: &Snapshot) -> Result<(),JsValue> {
-            utils_misc::ok_or_jserr!(self.db.add_hopr_balance(balance, snapshot).await)
+            let mut db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.add_hopr_balance(balance, snapshot).await)
         }
 
         #[wasm_bindgen]
         pub async fn sub_hopr_balance(&mut self, balance: &Balance, snapshot: &Snapshot) -> Result<(),JsValue> {
-            utils_misc::ok_or_jserr!(self.db.sub_hopr_balance(balance, snapshot).await)
+            let mut db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.sub_hopr_balance(balance, snapshot).await)
         }
 
         #[wasm_bindgen]
         pub async fn is_network_registry_enabled(&self) -> Result<bool,JsValue> {
-            utils_misc::ok_or_jserr!(self.db.is_network_registry_enabled().await)
+            let db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.is_network_registry_enabled().await)
         }
 
         #[wasm_bindgen]
         pub async fn set_network_registry(&mut self, enabled: bool, snapshot: &Snapshot) -> Result<(),JsValue> {
-            utils_misc::ok_or_jserr!(self.db.set_network_registry(enabled, snapshot).await)
+            let mut db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.set_network_registry(enabled, snapshot).await)
         }
 
         #[wasm_bindgen]
         pub async fn add_to_network_registry(&mut self, public_key: &PublicKey, account: &Address, snapshot: &Snapshot) -> Result<(),JsValue> {
-            utils_misc::ok_or_jserr!(self.db.add_to_network_registry(public_key, account, snapshot).await)
+            let mut db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.add_to_network_registry(public_key, account, snapshot).await)
         }
 
         #[wasm_bindgen]
         pub async fn remove_from_network_registry(&mut self, public_key: &PublicKey, account: &Address, snapshot: &Snapshot) -> Result<(),JsValue> {
-            utils_misc::ok_or_jserr!(self.db.remove_from_network_registry(public_key, account, snapshot).await)
+            let mut db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.remove_from_network_registry(public_key, account, snapshot).await)
         }
 
         #[wasm_bindgen]
         pub async fn get_account_from_network_registry(&self, public_key: &PublicKey) -> Result<Option<Address>,JsValue> {
-            utils_misc::ok_or_jserr!(self.db.get_account_from_network_registry(public_key).await)
+            let db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.get_account_from_network_registry(public_key).await)
         }
 
         #[wasm_bindgen]
         pub async fn find_hopr_node_using_account_in_network_registry(&self, account: &Address) -> Result<WasmVecPublicKey,JsValue> {
-            utils_misc::ok_or_jserr!(self.db.find_hopr_node_using_account_in_network_registry(account).await)
+            let db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.find_hopr_node_using_account_in_network_registry(account).await)
                 .map(|v| WasmVecPublicKey::from(v))
         }
 
         #[wasm_bindgen]
         pub async fn is_eligible(&self, account: &Address) -> Result<bool,JsValue> {
-            utils_misc::ok_or_jserr!(self.db.is_eligible(account).await)
+            let db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.is_eligible(account).await)
         }
 
         #[wasm_bindgen]
         pub async fn set_eligible(&mut self, account: &Address, eligible: bool, snapshot: &Snapshot) -> Result<(),JsValue> {
-            utils_misc::ok_or_jserr!(self.db.set_eligible(account, eligible, snapshot).await)
+            let mut db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.set_eligible(account, eligible, snapshot).await)
         }
     }
 }
