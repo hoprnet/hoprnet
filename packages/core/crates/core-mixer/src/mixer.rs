@@ -10,6 +10,7 @@ use crate::future_extensions::StreamThenConcurrentExt;
 use utils_log::debug;
 use utils_metrics::metrics::SimpleGauge;
 
+#[cfg(all(feature = "prometheus", not(test)))]
 lazy_static! {
     static ref METRIC_QUEUE_SIZE: SimpleGauge =
         SimpleGauge::new("core_gauge_mixer_queue_size", "Current mixer queue size").unwrap();
@@ -104,15 +105,19 @@ impl<T> Mixer<T> {
         let random_delay = self.cfg.random_delay();
         debug!("Mixer created a random packet delay of {}ms", random_delay.as_millis());
 
+        #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_QUEUE_SIZE.increment(1.0f64);
 
         sleep(random_delay).await;
 
-        METRIC_QUEUE_SIZE.decrement(1.0f64);
+        #[cfg(all(feature = "prometheus", not(test)))]
+        {
+            METRIC_QUEUE_SIZE.decrement(1.0f64);
 
-        let weight = 1.0f64 / self.cfg.metric_delay_window as f64;
-        METRIC_AVERAGE_DELAY
-            .set((weight * random_delay.as_millis() as f64) + ((1.0f64 - weight) * METRIC_AVERAGE_DELAY.get()));
+            let weight = 1.0f64 / self.cfg.metric_delay_window as f64;
+            METRIC_AVERAGE_DELAY
+                .set((weight * random_delay.as_millis() as f64) + ((1.0f64 - weight) * METRIC_AVERAGE_DELAY.get()));
+        }
 
         packet
     }
