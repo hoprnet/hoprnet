@@ -10,18 +10,20 @@ extern "C" {
 macro_rules! log {
     // log!(target: "my_target", Level::Info; key1 = 42, key2 = true; "a {} event", "log");
     (target: $target:expr, $lvl:expr, $($key:tt = $value:expr),+; $($arg:tt)+) => ({
-        if cfg!(not(test)) {
+        if cfg!(test) {
+            $crate::callbacks::log_natural($lvl, format!($($arg)+).as_str());
+        } else {
             // ignoring the key-value part, none of the production code uses it at this point
-            let ts: String = js_sys::Date::new_0().to_iso_string().into();
-            $crate::macros::js_log(std::format!("{} {} {}", ts.as_str(), $target, format!($arg).as_str()).as_str());
+            $crate::macros::js_log(std::format!("{} {} {}", $crate::callbacks::timestamp_iso().as_str(), $target, format!($arg).as_str()).as_str());
         }
     });
 
     // log!(target: "my_target", Level::Info; "a {} event", "log");
     (target: $target:expr, $lvl:expr, $($arg:tt)+) => ({
-        if cfg!(not(test)) {
-            let ts: String = js_sys::Date::new_0().to_iso_string().into();
-            $crate::macros::js_log(std::format!("{} {} {}", ts.as_str(), $target, format!($($arg)+).as_str()).as_str());
+        if cfg!(test) {
+            $crate::callbacks::log_natural($lvl, format!($($arg)+).as_str());
+        } else {
+            $crate::macros::js_log(std::format!("{} {} {}", $crate::callbacks::timestamp_iso().as_str(), $target, format!($($arg)+).as_str()).as_str());
         }
     });
 
