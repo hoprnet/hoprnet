@@ -1,6 +1,6 @@
-use async_trait::async_trait;
 use crate::errors::DbError;
 use crate::traits::{AsyncKVStorage, BatchOperation, StorageValueIterator};
+use async_trait::async_trait;
 use futures_lite::stream::StreamExt;
 
 #[cfg(feature = "wasm")]

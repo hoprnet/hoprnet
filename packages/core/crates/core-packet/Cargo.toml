@@ -12,8 +12,9 @@ license = "GPL-3.0-only"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = ["console_error_panic_hook", "wasm"]
+default = ["console_error_panic_hook", "wasm", "prometheus"]
 wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys"]
+prometheus = ["dep:utils-metrics"]
 
 [dependencies]
 async-std = "1.12.0"
@@ -23,11 +24,12 @@ core-mixer = { path = "../core-mixer"}
 core-types = { path = "../core-types" }
 futures = "0.3"
 js-sys = { version = "0.3.63", optional = true }
+lazy_static = "1.4"
 libp2p-identity = { version = "0.1.1", features = ["secp256k1", "peerid"] }
 thiserror = "1.0"
 utils-db = { path = "../../../utils/crates/utils-db" }
 utils-log = { path = "../../../utils/crates/utils-log" }
-utils-metrics = { path = "../../../utils/crates/utils-metrics" }
+utils-metrics = { path = "../../../utils/crates/utils-metrics", optional = true }
 utils-misc = { path = "../../../utils/crates/utils-misc" }
 utils-types = { path = "../../../utils/crates/utils-types" }
 wasm-bindgen = { workspace = true, optional = true }

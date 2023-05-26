@@ -1,4 +1,7 @@
-use crate::errors::PacketError::{AcknowledgementValidation, ChannelNotFound, InvalidPacketState, OutOfFunds, TagReplay, TicketValidation, TransportError};
+use crate::errors::PacketError::{
+    AcknowledgementValidation, ChannelNotFound, InvalidPacketState, OutOfFunds, TagReplay, TicketValidation,
+    TransportError,
+};
 use crate::errors::Result;
 use crate::packet::{Packet, PacketState};
 use crate::path::Path;
@@ -8,6 +11,7 @@ use core_db::traits::HoprCoreDbActions;
 use core_mixer::mixer::Mixer;
 use core_types::acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket};
 use core_types::channels::{ChannelEntry, ChannelStatus, Ticket};
+use lazy_static::lazy_static;
 use libp2p_identity::PeerId;
 use std::cell::RefCell;
 use std::ops::Mul;
@@ -16,6 +20,32 @@ use utils_log::{debug, error, info};
 use utils_metrics::metrics::SimpleCounter;
 use utils_types::primitives::{Balance, BalanceType, U256};
 use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
+
+#[cfg(all(feature = "prometheus", not(test)))]
+lazy_static! {
+    static ref METRIC_RECEIVED_SUCCESSFUL_ACKS: SimpleCounter = SimpleCounter::new(
+        "core_counter_received_successful_acks",
+        "Number of received successful acknowledgements"
+    )
+    .unwrap();
+    static ref METRIC_RECEIVED_FAILED_ACKS: SimpleCounter = SimpleCounter::new(
+        "core_counter_received_failed_acks",
+        "Number of received failed acknowledgements"
+    )
+    .unwrap();
+    static ref METRIC_SENT_ACKS: SimpleCounter =
+        SimpleCounter::new("core_counter_sent_acks", "Number of sent message acknowledgements").unwrap();
+    static ref METRIC_ACKED_TICKETS: SimpleCounter =
+        SimpleCounter::new("core_counter_acked_tickets", "Number of acknowledged tickets").unwrap();
+    static ref METRIC_FWD_MESSAGE_COUNT: SimpleCounter =
+        SimpleCounter::new("core_counter_forwarded_messages", "Number of forwarded messages").unwrap();
+    static ref METRIC_RECV_MESSAGE_COUNT: SimpleCounter =
+        SimpleCounter::new("core_counter_received_messages", "Number of received messages").unwrap();
+    static ref METRIC_TICKETS_COUNT: SimpleCounter =
+        SimpleCounter::new("core_counter_created_tickets", "Number of created tickets").unwrap();
+    static ref METRIC_PACKETS_COUNT: SimpleCounter =
+        SimpleCounter::new("core_counter_packets", "Number of created packets").unwrap();
+}
 
 pub const PRICE_PER_PACKET: &str = "10000000000000000";
 pub const INVERSE_TICKET_WIN_PROB: &str = "1";
@@ -27,32 +57,6 @@ pub struct TransportTask {
     data: Box<[u8]>,
 }
 
-struct AckMetrics {
-    received_successful_acks: SimpleCounter,
-    received_failed_acks: SimpleCounter,
-    sent_acks: SimpleCounter,
-    acked_tickets: SimpleCounter,
-}
-
-impl Default for AckMetrics {
-    fn default() -> Self {
-        Self {
-            received_successful_acks: SimpleCounter::new(
-                "core_counter_received_successful_acks",
-                "Number of received successful message acknowledgements",
-            )
-            .unwrap(),
-            received_failed_acks: SimpleCounter::new(
-                "core_counter_received_failed_acks",
-                "Number of received failed message acknowledgements",
-            )
-            .unwrap(),
-            sent_acks: SimpleCounter::new("core_counter_sent_acks", "Number of sent message acknowledgements").unwrap(),
-            acked_tickets: SimpleCounter::new("core_counter_acked_tickets", "Number of acknowledged tickets").unwrap(),
-        }
-    }
-}
-
 pub struct AcknowledgementInteraction<Db: HoprCoreDbActions> {
     db: RefCell<Db>,
     pub on_acknowledgement: fn(HalfKeyChallenge),
@@ -60,7 +64,6 @@ pub struct AcknowledgementInteraction<Db: HoprCoreDbActions> {
     public_key: PublicKey,
     incoming_channel: (Sender<TransportTask>, Receiver<TransportTask>),
     outgoing_channel: (Sender<TransportTask>, Receiver<TransportTask>),
-    metrics: AckMetrics,
 }
 
 impl<Db: HoprCoreDbActions> AcknowledgementInteraction<Db> {
@@ -70,14 +73,15 @@ impl<Db: HoprCoreDbActions> AcknowledgementInteraction<Db> {
             public_key,
             incoming_channel: unbounded(),
             outgoing_channel: unbounded(),
-            metrics: AckMetrics::default(),
             on_acknowledgement: |_| {},
             on_acknowledged_ticket: |_| {},
         }
     }
 
     pub async fn send_acknowledgement(&self, acknowledgement: Acknowledgement, destination: PeerId) -> Result<()> {
-        self.metrics.sent_acks.increment();
+        #[cfg(all(feature = "prometheus", not(test)))]
+        METRIC_SENT_ACKS.increment();
+
         self.outgoing_channel
             .0
             .send(TransportTask {
@@ -154,7 +158,9 @@ impl<Db: HoprCoreDbActions> AcknowledgementInteraction<Db> {
             .get_pending_acknowledgement(&ack.ack_challenge())
             .await?
             .ok_or_else(|| {
-                self.metrics.received_failed_acks.increment();
+                #[cfg(all(feature = "prometheus", not(test)))]
+                METRIC_RECEIVED_FAILED_ACKS.increment();
+
                 return AcknowledgementValidation(format!(
                     "received unexpected acknowledgement for half key challenge {} - half key {}",
                     ack.ack_challenge().to_hex(),
@@ -167,13 +173,17 @@ impl<Db: HoprCoreDbActions> AcknowledgementInteraction<Db> {
                 // No pending ticket, nothing to do.
                 debug!("Received acknowledgement as sender. First relayer has processed the packet.");
                 (self.on_acknowledgement)(ack.ack_challenge());
-                self.metrics.received_successful_acks.increment();
+
+                #[cfg(all(feature = "prometheus", not(test)))]
+                METRIC_RECEIVED_SUCCESSFUL_ACKS.increment();
             }
 
             PendingAcknowledgement::WaitingAsRelayer(unackowledged) => {
                 // Try to unlock our incentive
                 unackowledged.verify_challenge(&ack.ack_key_share).map_err(|e| {
-                    self.metrics.received_failed_acks.increment();
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    METRIC_RECEIVED_FAILED_ACKS.increment();
+
                     return AcknowledgementValidation(format!(
                         "the acknowledgement is not sufficient to solve the embedded challenge, {e}"
                     ));
@@ -184,7 +194,9 @@ impl<Db: HoprCoreDbActions> AcknowledgementInteraction<Db> {
                     .get_channel_from(&unackowledged.signer)
                     .await
                     .map_err(|e| {
-                        self.metrics.received_failed_acks.increment();
+                        #[cfg(all(feature = "prometheus", not(test)))]
+                        METRIC_RECEIVED_FAILED_ACKS.increment();
+
                         return AcknowledgementValidation(format!(
                             "acknowledgement received for channel that does not exist, {e}"
                         ));
@@ -204,31 +216,14 @@ impl<Db: HoprCoreDbActions> AcknowledgementInteraction<Db> {
                     .borrow_mut()
                     .replace_unack_with_ack(&ack.ack_challenge(), ack_ticket.clone())
                     .await?;
-                self.metrics.acked_tickets.increment();
+
+                #[cfg(all(feature = "prometheus", not(test)))]
+                METRIC_ACKED_TICKETS.increment();
+
                 (self.on_acknowledged_ticket)(ack_ticket);
             }
         }
         Ok(())
-    }
-}
-
-struct PacketMetrics {
-    fwd_message_count: SimpleCounter,
-    recv_message_count: SimpleCounter,
-    tickets_count: SimpleCounter,
-    packets_count: SimpleCounter,
-}
-
-impl Default for PacketMetrics {
-    fn default() -> Self {
-        Self {
-            fwd_message_count: SimpleCounter::new("core_counter_forwarded_messages", "Number of forwarded messages")
-                .unwrap(),
-            recv_message_count: SimpleCounter::new("core_counter_received_messages", "Number of received messages")
-                .unwrap(),
-            tickets_count: SimpleCounter::new("core_counter_created_tickets", "Number of created tickets").unwrap(),
-            packets_count: SimpleCounter::new("core_counter_packets", "Number of created packets").unwrap(),
-        }
     }
 }
 
@@ -247,7 +242,6 @@ where
     ack_interaction: Arc<AcknowledgementInteraction<Db>>,
     pub message_emitter: fn(&[u8]),
     cfg: PacketInteractionConfig,
-    metrics: PacketMetrics,
 }
 
 impl<Db> PacketInteraction<Db>
@@ -261,7 +255,6 @@ where
             ack_interaction,
             message_emitter: |_| {},
             cfg,
-            metrics: PacketMetrics::default(),
         }
     }
 
@@ -361,7 +354,10 @@ where
     }
 
     async fn create_multihop_ticket(&self, destination: PublicKey, path_pos: u8) -> Result<Ticket> {
-        let channel = self.db.borrow().get_channel_to(&destination)
+        let channel = self
+            .db
+            .borrow()
+            .get_channel_to(&destination)
             .await?
             .ok_or(ChannelNotFound(destination.to_string()))?;
 
@@ -408,7 +404,10 @@ where
             "Creating ticket in channel {channel_id}. Ticket data: {}",
             ticket.to_hex()
         );
-        self.metrics.tickets_count.increment();
+
+        #[cfg(all(feature = "prometheus", not(test)))]
+        METRIC_TICKETS_COUNT.increment();
+
         Ok(ticket)
     }
 
@@ -440,7 +439,8 @@ where
                     .store_pending_acknowledgment(ack_challenge.clone(), PendingAcknowledgement::WaitingAsSender)
                     .await?;
 
-                self.metrics.packets_count.increment();
+                #[cfg(all(feature = "prometheus", not(test)))]
+                METRIC_PACKETS_COUNT.increment();
 
                 // Send the packet
                 message_transport(packet.to_bytes(), complete_valid_path.hops()[0].to_string())
@@ -484,7 +484,10 @@ where
                 self.ack_interaction
                     .send_acknowledgement(ack, previous_hop.to_peerid())
                     .await?;
-                self.metrics.recv_message_count.increment();
+
+                #[cfg(all(feature = "prometheus", not(test)))]
+                METRIC_RECV_MESSAGE_COUNT.increment();
+
                 return Ok(());
             }
 
@@ -504,7 +507,10 @@ where
                 let inverse_win_prob = U256::new(INVERSE_TICKET_WIN_PROB);
 
                 // Find the corresponding channel
-                let channel = self.db.borrow().get_channel_from(&previous_hop)
+                let channel = self
+                    .db
+                    .borrow()
+                    .get_channel_from(&previous_hop)
                     .await?
                     .ok_or(ChannelNotFound(previous_hop.to_string()))?;
 
@@ -568,7 +574,9 @@ where
         // Acknowledge to the previous hop that we forwarded the packet
         let ack = packet.create_acknowledgement(&self.cfg.private_key).unwrap();
         self.ack_interaction.send_acknowledgement(ack, previous_peer).await?;
-        self.metrics.fwd_message_count.increment();
+
+        #[cfg(all(feature = "prometheus", not(test)))]
+        METRIC_FWD_MESSAGE_COUNT.increment();
 
         Ok(())
     }

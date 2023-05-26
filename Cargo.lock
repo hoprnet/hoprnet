@@ -1046,6 +1046,7 @@ dependencies = [
  "core-types",
  "futures",
  "js-sys",
+ "lazy_static",
  "libp2p-identity",
  "parameterized",
  "thiserror",
