@@ -15,9 +15,11 @@ use libp2p_identity::PeerId;
 use std::cell::RefCell;
 use std::ops::Mul;
 use std::sync::Arc;
-use utils_log::{debug, error, info};
+//use utils_log::{debug, error, info};
 use utils_types::primitives::{Balance, BalanceType, U256};
 use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
+
+
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::SimpleCounter;
@@ -150,6 +152,8 @@ impl<Db: HoprCoreDbActions> AcknowledgementInteraction<Db> {
                 "could not validate the acknowledgement".to_string(),
             ));
         }
+
+        println!("got incoming ack from: {}", remote_peer);
 
         /*
          There are three cases:
@@ -784,6 +788,8 @@ mod tests {
 
     #[async_std::test]
     pub async fn test_packet_acknowledgement_sender_workflow() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
         let peers = create_peers();
         let dbs = create_dbs(peers.len());
 
@@ -834,11 +840,15 @@ mod tests {
             loop {
                 let tt ;
                 {
-                    if let Some(r) = MESSAGES.lock().unwrap().get(&ack_1_clone_1.get_peer_id()) {
-                        tt = r.iter().map(|(sender, data)| TransportTask {
-                            remote_peer: sender.clone(),
-                            data: data.clone()
+                    if let Some(r) = MESSAGES.lock().unwrap().get_mut(&ack_1_clone_1.get_peer_id()) {
+                        tt = r.iter().map(|(sender, data)| {
+                            println!("received ack from {sender}: {}", hex::encode(&data));
+                            TransportTask {
+                                remote_peer: sender.clone(),
+                                data: data.clone()
+                            }
                         }).collect::<Vec<_>>();
+                        r.clear();
                     } else {
                         break;
                     }
@@ -909,7 +919,6 @@ pub mod wasm {
     use std::sync::{Arc, Mutex};
     use utils_db::db::DB;
     use utils_db::leveldb::{LevelDb, LevelDbShim};
-    use utils_log::error;
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use wasm_bindgen::prelude::wasm_bindgen;

@@ -1067,17 +1067,18 @@ dependencies = [
  "core-ethereum-misc",
  "core-mixer",
  "core-types",
+ "env_logger 0.9.3",
  "futures",
  "hex",
  "hex-literal 0.4.1",
  "js-sys",
  "lazy_static",
  "libp2p-identity",
+ "log",
  "parameterized",
  "rusty-leveldb",
  "thiserror",
  "utils-db",
- "utils-log",
  "utils-metrics",
  "utils-misc",
  "utils-types",
@@ -1612,6 +1613,19 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "env_logger"
+version = "0.9.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a12e6657c4c97ebab115a42dcee77225f7f482cdd841cf7088c657a42e9e00e7"
+dependencies = [
+ "atty",
+ "humantime",
+ "log",
+ "regex",
+ "termcolor",
 ]
 
 [[package]]
@@ -2544,6 +2558,12 @@ dependencies = [
  "toml 0.7.3",
  "uuid 1.3.1",
 ]
+
+[[package]]
+name = "humantime"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9a3a5bfb195931eeb336b2a7b4d761daec841b97f947d34394601737a7bba5e4"
 
 [[package]]
 name = "hyper"
@@ -5306,7 +5326,7 @@ dependencies = [
  "console",
  "curl",
  "dialoguer",
- "env_logger",
+ "env_logger 0.10.0",
  "glob",
  "human-panic",
  "log",

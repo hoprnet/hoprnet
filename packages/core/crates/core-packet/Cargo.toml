@@ -28,7 +28,9 @@ lazy_static = "1.4"
 libp2p-identity = { version = "0.1.1", features = ["secp256k1", "peerid"] }
 thiserror = "1.0"
 utils-db = { path = "../../../utils/crates/utils-db" }
-utils-log = { path = "../../../utils/crates/utils-log" }
+#utils-log = { path = "../../../utils/crates/utils-log" }
+log = "0.4.0"
+env_logger = "0.9.0"
 utils-metrics = { path = "../../../utils/crates/utils-metrics", optional = true }
 utils-misc = { path = "../../../utils/crates/utils-misc" }
 utils-types = { path = "../../../utils/crates/utils-types" }

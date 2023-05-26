@@ -4,6 +4,9 @@ pub mod packet;
 pub mod path;
 pub mod por;
 
+#[macro_use]
+extern crate log;
+
 #[cfg(feature = "wasm")]
 pub mod wasm {
 
