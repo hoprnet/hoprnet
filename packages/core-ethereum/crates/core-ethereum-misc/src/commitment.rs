@@ -76,7 +76,7 @@ where
         .then(|_| committer.set_commitment(&current))
         .await;
 
-    info!("commitment chain initialized");
+    //info!("commitment chain initialized");
     Ok(())
 }
 
@@ -130,10 +130,10 @@ where
         }
     }
 
-    debug!(
+    /*debug!(
         "reinitializing (db: {contains_already}, chain: {})",
         chain_commitment.map(|h| h.to_hex()).unwrap_or("false".to_string())
-    );
+    );*/
 
     create_commitment_chain(
         db,
