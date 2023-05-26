@@ -53,13 +53,33 @@ impl Aes128Ctr {
     }
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct IdentityOptions {
-    initialize: bool,
-    id_path: String,
-    password: String,
-    use_weak_crypto: Option<bool>,
-    private_key: Option<Box<[u8]>>,
+    pub initialize: bool,
+    pub id_path: String,
+    pub password: String,
+    pub use_weak_crypto: Option<bool>,
+    pub private_key: Option<Box<[u8]>>,
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+impl IdentityOptions {
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
+    pub fn new(
+        initialize: bool,
+        id_path: String,
+        password: String,
+        use_weak_crypto: Option<bool>,
+        private_key: Option<Box<[u8]>>,
+    ) -> Self {
+        Self {
+            initialize,
+            id_path,
+            password,
+            use_weak_crypto,
+            private_key,
+        }
+    }
 }
 
 pub struct HoprKeys {
@@ -157,18 +177,9 @@ impl PartialEq for HoprKeys {
 
 impl HoprKeys {
     pub fn new() -> Self {
-        let mut packet_priv_key = [0u8; 32];
-        let mut chain_priv_key = [0u8; 32];
-
-        let packet_key_raw = OffchainPublicKey::random_keypair();
-        packet_priv_key.copy_from_slice(packet_key_raw.0.as_ref());
-
-        let chain_key_raw = PublicKey::random_keypair();
-        chain_priv_key.copy_from_slice(chain_key_raw.0.as_ref());
-
-        HoprKeys {
-            packet_key: (packet_priv_key, packet_key_raw.1),
-            chain_key: (chain_priv_key, chain_key_raw.1),
+        Self {
+            packet_key: OffchainPublicKey::random_keypair(),
+            chain_key: PublicKey::random_keypair(),
         }
     }
 
@@ -364,10 +375,20 @@ impl Debug for HoprKeys {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
+    use js_sys::Promise;
     use utils_misc::ok_or_jserr;
     use wasm_bindgen::prelude::*;
 
     use super::IdentityOptions;
+
+    #[wasm_bindgen(module = "@libp2p/peer-id")]
+    extern "C" {
+        #[wasm_bindgen]
+        pub type JsPeerId;
+
+        #[wasm_bindgen(js_name = "peerIdFromKeys")]
+        pub fn peer_id_from_keys(pub_key: Box<[u8]>, priv_key: Box<[u8]>) -> Promise;
+    }
 
     #[wasm_bindgen]
     pub struct HoprKeys {
@@ -377,9 +398,9 @@ pub mod wasm {
     #[wasm_bindgen]
     impl HoprKeys {
         #[wasm_bindgen(constructor)]
-        pub fn new() -> std::result::Result<HoprKeys, JsValue> {
+        pub fn new() -> Self {
             let keys = super::HoprKeys::new();
-            Ok(Self { w: keys })
+            Self { w: keys }
         }
 
         #[wasm_bindgen]
@@ -387,6 +408,21 @@ pub mod wasm {
             Ok(Self {
                 w: super::HoprKeys::init(identity_options).map_err(|e| JsValue::from(e.to_string()))?,
             })
+        }
+
+        #[wasm_bindgen(getter, js_name = "packetKeyPeerId")]
+        pub fn get_packet_key_peer_id(&self) -> Promise {
+            let mut sliced = [0u8; 36];
+            sliced.copy_from_slice(&self.w.packet_key.1.to_peerid().to_bytes()[2..]);
+            peer_id_from_keys(Box::new(sliced), Box::new(self.w.packet_key.0))
+        }
+
+        #[wasm_bindgen(getter, js_name = "chainKeyPeerId")]
+        pub fn get_chain_key_peer_id(&self) -> Promise {
+            let mut sliced = [0u8; 37];
+            sliced.copy_from_slice(&self.w.chain_key.1.to_peerid().to_bytes()[2..]);
+
+            peer_id_from_keys(Box::new(sliced), Box::new(self.w.chain_key.0))
         }
 
         #[wasm_bindgen]

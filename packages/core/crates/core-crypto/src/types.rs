@@ -642,7 +642,7 @@ impl PublicKey {
     pub const SIZE_UNCOMPRESSED: usize = 65;
 
     /// Generates new random keypair (private key, public key)
-    pub fn random_keypair() -> (Box<[u8]>, PublicKey) {
+    pub fn random_keypair() -> ([u8; 32], PublicKey) {
         let (private, cp) = random_group_element();
         (private, PublicKey::try_from(cp).unwrap())
     }
@@ -1622,7 +1622,10 @@ pub mod wasm {
         #[wasm_bindgen(js_name = "random_keypair")]
         pub fn _random_keypair() -> KeyPair {
             let (private, public) = Self::random_keypair();
-            KeyPair { private, public }
+            KeyPair {
+                private: Box::new(private),
+                public,
+            }
         }
 
         #[wasm_bindgen(js_name = "deserialize")]

@@ -34,7 +34,7 @@ import type { State } from './types.js'
 import setupAPI from './api/index.js'
 import setupHealthcheck from './healthcheck.js'
 import { LogStream } from './logs.js'
-import { getIdentity } from './identity.js'
+import { HoprKeys, IdentityOptions } from '../lib/hoprd_keypair.js'
 import { decodeMessage } from './api/utils.js'
 import { type ChannelStrategyInterface, StrategyFactory } from '@hoprnet/hopr-core/lib/channel-strategy.js'
 import { RPCH_MESSAGE_REGEXP } from './api/v2.js'
@@ -263,17 +263,19 @@ async function main() {
     }
 
     // 1. Find or create an identity
-    const peerId = await getIdentity({
-      initialize: cfg.db.initialize,
-      idPath: cfg.identity.file,
-      password: cfg.identity.password,
-      useWeakCrypto: cfg.test.use_weak_crypto,
-      privateKey: cfg.identity.private_key === undefined ? undefined : parse_private_key(cfg.identity.private_key)
-    })
+    const peerId = await HoprKeys.init(
+      new IdentityOptions(
+        cfg.db.initialize,
+        cfg.identity.file,
+        cfg.identity.password,
+        cfg.test.use_weak_crypto,
+        cfg.identity.private_key === undefined ? undefined : parse_private_key(cfg.identity.private_key)
+      )
+    ).chainKeyPeerId
 
     // 2. Create node instance
     logs.log('Creating HOPR Node')
-    node = await createHoprNode(peerId, options, false)
+    node = await createHoprNode(peerId as any, options, false)
     logs.logStatus('PENDING')
 
     // Subscribe to node events
