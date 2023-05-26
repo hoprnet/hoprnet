@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use std::sync::{Arc, Mutex};
 
 use core_crypto::types::{HalfKeyChallenge, Hash, PublicKey};
 use core_types::acknowledgement::{AcknowledgedTicket, PendingAcknowledgement};
@@ -18,12 +19,12 @@ pub struct CoreDb<T>
 where
     T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>,
 {
-    pub db: DB<T>,
-    pub me: PublicKey,
+    db: Arc<Mutex<DB<T>>>,
+    me: PublicKey,
 }
 
 impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> CoreDb<T> {
-    pub fn new(db: DB<T>, public_key: PublicKey) -> Self {
+    pub fn new(db: Arc<Mutex<DB<T>>>, public_key: PublicKey) -> Self {
         Self { db, me: public_key }
     }
 }
@@ -32,8 +33,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> CoreDb<T> {
 impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreDbActions for CoreDb<T> {
     async fn get_current_ticket_index(&self, channel_id: &Hash) -> Result<Option<U256>> {
         let prefixed_key = utils_db::db::Key::new_with_prefix(channel_id, TICKET_INDEX_PREFIX)?;
-        if self.db.contains(prefixed_key.clone()).await {
-            let value = self.db.get::<U256>(prefixed_key).await?;
+        if self.db.lock().unwrap().contains(prefixed_key.clone()).await {
+            let value = self.db.lock().unwrap().get::<U256>(prefixed_key).await?;
             Ok(Some(value))
         } else {
             Ok(None)
@@ -42,13 +43,15 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreDbActions fo
 
     async fn set_current_ticket_index(&mut self, channel_id: &Hash, index: U256) -> Result<()> {
         let prefixed_key = utils_db::db::Key::new_with_prefix(channel_id, TICKET_INDEX_PREFIX)?;
-        let _evicted = self.db.set(prefixed_key, &index).await?;
+        let _evicted = self.db.lock().unwrap().set(prefixed_key, &index).await?;
         // Ignoring evicted value
         Ok(())
     }
 
     async fn get_acknowledged_tickets(&self, filter: Option<ChannelEntry>) -> Result<Vec<AcknowledgedTicket>> {
         self.db
+            .lock()
+            .unwrap()
             .get_more::<AcknowledgedTicket>(
                 Vec::from(ACKNOWLEDGED_TICKETS_PREFIX.as_bytes()).into_boxed_slice(),
                 EthereumChallenge::size(),
@@ -67,6 +70,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreDbActions fo
     async fn get_tickets(&self, signer: &PublicKey) -> Result<Vec<Ticket>> {
         let mut tickets = self
             .db
+            .lock()
+            .unwrap()
             .get_more::<AcknowledgedTicket>(
                 Vec::from(ACKNOWLEDGED_TICKETS_PREFIX.as_bytes()).into_boxed_slice(),
                 EthereumChallenge::size(),
@@ -80,6 +85,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreDbActions fo
 
         let mut unack_tickets = self
             .db
+            .lock()
+            .unwrap()
             .get_more::<PendingAcknowledgement>(
                 Vec::from(PENDING_ACKNOWLEDGEMENTS_PREFIX.as_bytes()).into_boxed_slice(),
                 HalfKeyChallenge::size(),
@@ -106,28 +113,42 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreDbActions fo
         // TODO: verify that this balance type is correct
         let balance = self
             .db
+            .lock()
+            .unwrap()
             .get::<Balance>(prefixed_key.clone())
             .await
             .unwrap_or(Balance::new(U256::from(0u64), ticket.amount.balance_type()));
 
-        let _result = self.db.set(prefixed_key, &balance.add(&ticket.amount)).await?;
+        let _result = self
+            .db
+            .lock()
+            .unwrap()
+            .set(prefixed_key, &balance.add(&ticket.amount))
+            .await?;
         Ok(())
     }
 
     async fn mark_rejected(&mut self, ticket: &Ticket) -> Result<()> {
         let count_key = utils_db::db::Key::new_from_str(REJECTED_TICKETS_COUNT)?;
         // always store as 2^32 - 1 options
-        let count = self.db.get::<u128>(count_key.clone()).await?;
-        self.db.set(count_key, &(count + 1)).await?;
+        let count = self.db.lock().unwrap().get::<u128>(count_key.clone()).await?;
+        self.db.lock().unwrap().set(count_key, &(count + 1)).await?;
 
         let value_key = utils_db::db::Key::new_from_str(REJECTED_TICKETS_VALUE)?;
         let balance = self
             .db
+            .lock()
+            .unwrap()
             .get::<Balance>(value_key.clone())
             .await
             .unwrap_or(Balance::new(U256::from(0u64), ticket.amount.balance_type()));
 
-        let _result = self.db.set(value_key, &balance.add(&ticket.amount)).await?;
+        let _result = self
+            .db
+            .lock()
+            .unwrap()
+            .set(value_key, &balance.add(&ticket.amount))
+            .await?;
         Ok(())
     }
 
@@ -135,20 +156,22 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreDbActions fo
         let key =
             utils_db::db::Key::new_with_prefix(&generate_channel_id(&self.me.to_address(), &dest.to_address()), "")?;
 
-        self.db.get_or_none(key).await
+        self.db.lock().unwrap().get_or_none(key).await
     }
 
     async fn get_channel_from(&self, src: &PublicKey) -> Result<Option<ChannelEntry>> {
         let key =
             utils_db::db::Key::new_with_prefix(&generate_channel_id(&src.to_address(), &self.me.to_address()), "")?;
 
-        self.db.get_or_none(key).await
+        self.db.lock().unwrap().get_or_none(key).await
     }
 
     async fn get_pending_balance_to(&self, counterparty: &Address) -> Result<Balance> {
         let key = utils_db::db::Key::new_with_prefix(counterparty, PENDING_TICKETS_COUNT)?;
 
         self.db
+            .lock()
+            .unwrap()
             .get_or_none::<Balance>(key)
             .await
             .map(|v| v.unwrap_or(Balance::zero(BalanceType::HOPR)))
@@ -157,10 +180,10 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreDbActions fo
     async fn check_and_set_packet_tag(&mut self, tag: &[u8]) -> Result<bool> {
         let key = utils_db::db::Key::new_bytes_with_prefix(tag, PACKET_TAG_PREFIX)?;
 
-        let has_packet_tag = self.db.contains(key.clone()).await;
+        let has_packet_tag = self.db.lock().unwrap().contains(key.clone()).await;
         if !has_packet_tag {
             let empty: [u8; 0] = [];
-            self.db.set(key, &empty).await?;
+            self.db.lock().unwrap().set(key, &empty).await?;
         }
 
         Ok(has_packet_tag)
@@ -171,8 +194,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreDbActions fo
         half_key_challenge: &HalfKeyChallenge,
     ) -> Result<Option<PendingAcknowledgement>> {
         let key = utils_db::db::Key::new_with_prefix(half_key_challenge, PENDING_ACKNOWLEDGEMENTS_PREFIX)?;
-        if self.db.contains(key.clone()).await {
-            let value = self.db.get::<PendingAcknowledgement>(key).await?;
+        if self.db.lock().unwrap().contains(key.clone()).await {
+            let value = self.db.lock().unwrap().get::<PendingAcknowledgement>(key).await?;
             Ok(Some(value))
         } else {
             Ok(None)
@@ -186,7 +209,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreDbActions fo
     ) -> Result<()> {
         let key = utils_db::db::Key::new_with_prefix(&half_key_challenge, PENDING_ACKNOWLEDGEMENTS_PREFIX)?;
 
-        let _ = self.db.set(key, &pending_acknowledgment).await?;
+        let _ = self.db.lock().unwrap().set(key, &pending_acknowledgment).await?;
 
         Ok(())
     }
@@ -208,7 +231,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreDbActions fo
         batch_ops.del(unack_key);
         batch_ops.put(ack_key, ack_ticket);
 
-        self.db.batch(batch_ops, true).await
+        self.db.lock().unwrap().batch(batch_ops, true).await
     }
 
     async fn update_channel_and_snapshot(
@@ -224,7 +247,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreDbActions fo
         batch_ops.put(channel_key, channel);
         batch_ops.put(snapshot_key, snapshot);
 
-        self.db.batch(batch_ops, true).await
+        self.db.lock().unwrap().batch(batch_ops, true).await
     }
 }
 

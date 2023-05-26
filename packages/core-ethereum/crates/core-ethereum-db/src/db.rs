@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use std::sync::{Arc, Mutex};
 
 use core_crypto::iterated_hash::Intermediate;
 use core_crypto::{
@@ -40,12 +41,12 @@ pub struct CoreEthereumDb<T>
 where
     T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>,
 {
-    pub db: DB<T>,
+    pub db: Arc<Mutex<DB<T>>>,
     pub me: PublicKey,
 }
 
 impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> CoreEthereumDb<T> {
-    pub fn new(db: DB<T>, public_key: PublicKey) -> Self {
+    pub fn new(db: Arc<Mutex<DB<T>>>, public_key: PublicKey) -> Self {
         Self { db, me: public_key }
     }
 }
@@ -54,6 +55,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> CoreEthereumDb<T> {
 impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbActions for CoreEthereumDb<T> {
     async fn get_acknowledged_tickets(&self, filter: Option<ChannelEntry>) -> Result<Vec<AcknowledgedTicket>> {
         self.db
+            .lock()
+            .unwrap()
             .get_more::<AcknowledgedTicket>(
                 Vec::from(ACKNOWLEDGED_TICKETS_PREFIX.as_bytes()).into_boxed_slice(),
                 EthereumChallenge::size(),
@@ -73,7 +76,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         let acknowledged_tickets = self.get_acknowledged_tickets(Some(channel)).await?;
 
         let key = utils_db::db::Key::new_from_str(NEGLECTED_TICKET_COUNT)?;
-        let neglected_ticket_count = match self.db.get_or_none::<usize>(key.clone()).await? {
+        let neglected_ticket_count = match self.db.lock().unwrap().get_or_none::<usize>(key.clone()).await? {
             Some(x) => x,
             None => 0,
         };
@@ -90,12 +93,12 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             batch_ops.put(key, neglected_ticket_count + acknowledged_tickets.len())
         }
 
-        self.db.batch(batch_ops, true).await
+        self.db.lock().unwrap().batch(batch_ops, true).await
     }
 
     async fn delete_acknowledged_ticket(&mut self, ticket: &AcknowledgedTicket) -> Result<()> {
         let ack_key = to_acknowledged_ticket_key(&ticket.ticket.challenge, &ticket.ticket.channel_epoch)?;
-        let _ = self.db.remove::<AcknowledgedTicket>(ack_key).await?;
+        let _ = self.db.lock().unwrap().remove::<AcknowledgedTicket>(ack_key).await?;
         Ok(())
     }
 
@@ -106,11 +109,13 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             batch_ops.put(to_commitment_key(&channel, intermediate.iteration)?, intermediate);
         }
 
-        self.db.batch(batch_ops, true).await
+        self.db.lock().unwrap().batch(batch_ops, true).await
     }
 
     async fn get_commitment(&self, channel: &Hash, iteration: usize) -> Result<Option<Hash>> {
         self.db
+            .lock()
+            .unwrap()
             .get_or_none::<Intermediate>(to_commitment_key(channel, iteration)?)
             .await
             .map(|opt| opt.map(|i| Hash::new(&i.intermediate)))
@@ -118,38 +123,45 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
 
     async fn get_current_commitment(&self, channel: &Hash) -> Result<Option<Hash>> {
         let key = utils_db::db::Key::new_with_prefix(channel, CURRENT_COMMITMENT_PREFIX)?;
-        self.db.get_or_none::<Hash>(key).await
+        self.db.lock().unwrap().get_or_none::<Hash>(key).await
     }
 
     async fn set_current_commitment(&mut self, channel: &Hash, commitment: &Hash) -> Result<()> {
         let key = utils_db::db::Key::new_with_prefix(channel, CURRENT_COMMITMENT_PREFIX)?;
-        let _ = self.db.set(key, commitment).await?;
+        let _ = self.db.lock().unwrap().set(key, commitment).await?;
         Ok(())
     }
 
     async fn get_latest_block_number(&self) -> Result<u32> {
         let key = utils_db::db::Key::new_from_str(LATEST_BLOCK_NUMBER_KEY)?;
-        self.db.get_or_none::<u32>(key).await.map(|v| v.unwrap_or(0))
+        self.db
+            .lock()
+            .unwrap()
+            .get_or_none::<u32>(key)
+            .await
+            .map(|v| v.unwrap_or(0))
     }
 
     async fn update_latest_block_number(&mut self, number: u32) -> Result<()> {
         let key = utils_db::db::Key::new_from_str(LATEST_BLOCK_NUMBER_KEY)?;
-        let _ = self.db.set(key, &number).await?;
+        let _ = self.db.lock().unwrap().set(key, &number).await?;
         Ok(())
     }
 
     async fn get_latest_confirmed_snapshot(&self) -> Result<Option<Snapshot>> {
         let key = utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?;
-        self.db.get_or_none::<Snapshot>(key).await
+        self.db.lock().unwrap().get_or_none::<Snapshot>(key).await
     }
 
     async fn get_channel(&self, channel: &Hash) -> Result<Option<ChannelEntry>> {
         let key = utils_db::db::Key::new_with_prefix(channel, CHANNEL_PREFIX)?;
-        self.db.get_or_none::<ChannelEntry>(key).await
+        self.db.lock().unwrap().get_or_none::<ChannelEntry>(key).await
     }
 
     async fn get_channels(&self) -> Result<Vec<ChannelEntry>> {
         self.db
+            .lock()
+            .unwrap()
             .get_more::<ChannelEntry>(Box::from(CHANNEL_PREFIX.as_bytes()), Hash::size(), &|_| true)
             .await
     }
@@ -157,6 +169,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
     async fn get_channels_open(&self) -> Result<Vec<ChannelEntry>> {
         Ok(self
             .db
+            .lock()
+            .unwrap()
             .get_more::<ChannelEntry>(Box::from(CHANNEL_PREFIX.as_bytes()), Hash::size(), &|_| true)
             .await?
             .into_iter()
@@ -177,12 +191,12 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         batch_ops.put(channel_key, channel);
         batch_ops.put(snapshot_key, snapshot);
 
-        self.db.batch(batch_ops, true).await
+        self.db.lock().unwrap().batch(batch_ops, true).await
     }
 
     async fn get_account(&self, address: &Address) -> Result<Option<AccountEntry>> {
         let key = utils_db::db::Key::new_with_prefix(address, ACCOUNT_PREFIX)?;
-        self.db.get_or_none::<AccountEntry>(key).await
+        self.db.lock().unwrap().get_or_none::<AccountEntry>(key).await
     }
 
     async fn update_account_and_snapshot(&mut self, account: &AccountEntry, snapshot: &Snapshot) -> Result<()> {
@@ -193,11 +207,13 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         batch_ops.put(address_key, account);
         batch_ops.put(snapshot_key, snapshot);
 
-        self.db.batch(batch_ops, true).await
+        self.db.lock().unwrap().batch(batch_ops, true).await
     }
 
     async fn get_accounts(&self) -> Result<Vec<AccountEntry>> {
         self.db
+            .lock()
+            .unwrap()
             .get_more::<AccountEntry>(Box::from(ACCOUNT_PREFIX.as_bytes()), Address::size(), &|_| true)
             .await
     }
@@ -206,6 +222,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         let key = utils_db::db::Key::new_from_str(REDEEMED_TICKETS_VALUE)?;
 
         self.db
+            .lock()
+            .unwrap()
             .get_or_none::<Balance>(key)
             .await
             .map(|v| v.unwrap_or(Balance::zero(BalanceType::HOPR)))
@@ -214,31 +232,53 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
     async fn get_redeemed_tickets_count(&self) -> Result<usize> {
         let key = utils_db::db::Key::new_from_str(REDEEMED_TICKETS_COUNT)?;
 
-        self.db.get_or_none::<usize>(key).await.map(|v| v.unwrap_or(0))
+        self.db
+            .lock()
+            .unwrap()
+            .get_or_none::<usize>(key)
+            .await
+            .map(|v| v.unwrap_or(0))
     }
 
     async fn get_neglected_tickets_count(&self) -> Result<usize> {
         let key = utils_db::db::Key::new_from_str(NEGLECTED_TICKET_COUNT)?;
 
-        self.db.get_or_none::<usize>(key).await.map(|v| v.unwrap_or(0))
+        self.db
+            .lock()
+            .unwrap()
+            .get_or_none::<usize>(key)
+            .await
+            .map(|v| v.unwrap_or(0))
     }
 
     async fn get_pending_tickets_count(&self) -> Result<usize> {
         let key = utils_db::db::Key::new_from_str(PENDING_TICKETS_COUNT)?;
 
-        self.db.get_or_none::<usize>(key).await.map(|v| v.unwrap_or(0))
+        self.db
+            .lock()
+            .unwrap()
+            .get_or_none::<usize>(key)
+            .await
+            .map(|v| v.unwrap_or(0))
     }
 
     async fn get_losing_tickets_count(&self) -> Result<usize> {
         let key = utils_db::db::Key::new_from_str(LOSING_TICKET_COUNT)?;
 
-        self.db.get_or_none::<usize>(key).await.map(|v| v.unwrap_or(0))
+        self.db
+            .lock()
+            .unwrap()
+            .get_or_none::<usize>(key)
+            .await
+            .map(|v| v.unwrap_or(0))
     }
 
     async fn get_pending_balance_to(&self, counterparty: &Address) -> Result<Balance> {
         let key = utils_db::db::Key::new_with_prefix(counterparty, PENDING_TICKETS_COUNT)?;
 
         self.db
+            .lock()
+            .unwrap()
             .get_or_none::<Balance>(key)
             .await
             .map(|v| v.unwrap_or(Balance::zero(BalanceType::HOPR)))
@@ -248,11 +288,18 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         let prefixed_key = utils_db::db::Key::new_with_prefix(&ticket.counterparty, PENDING_TICKETS_COUNT)?;
         let balance = self
             .db
+            .lock()
+            .unwrap()
             .get::<Balance>(prefixed_key.clone())
             .await
             .unwrap_or(Balance::zero(ticket.amount.balance_type()));
 
-        let _result = self.db.set(prefixed_key, &balance.add(&ticket.amount)).await?;
+        let _result = self
+            .db
+            .lock()
+            .unwrap()
+            .set(prefixed_key, &balance.add(&ticket.amount))
+            .await?;
         Ok(())
     }
 
@@ -260,6 +307,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         let key = utils_db::db::Key::new_with_prefix(&ticket.counterparty, PENDING_TICKETS_COUNT)?;
         let balance = self
             .db
+            .lock()
+            .unwrap()
             .get_or_none(key.clone())
             .await?
             .unwrap_or(Balance::zero(BalanceType::HOPR));
@@ -272,54 +321,72 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             &snapshot,
         );
 
-        self.db.batch(batch_ops, true).await
+        self.db.lock().unwrap().batch(batch_ops, true).await
     }
 
     async fn mark_redeemed(&mut self, ticket: &AcknowledgedTicket) -> Result<()> {
         let key = utils_db::db::Key::new_from_str(REDEEMED_TICKETS_COUNT)?;
-        let count = self.db.get_or_none::<usize>(key.clone()).await?.unwrap_or(0);
-        let _ = self.db.set(key, &(count + 1)).await?;
+        let count = self
+            .db
+            .lock()
+            .unwrap()
+            .get_or_none::<usize>(key.clone())
+            .await?
+            .unwrap_or(0);
+        let _ = self.db.lock().unwrap().set(key, &(count + 1)).await?;
 
         let key = to_acknowledged_ticket_key(&ticket.ticket.challenge, &ticket.ticket.channel_epoch)?;
-        let _ = self.db.remove::<AcknowledgedTicket>(key).await?;
+        let _ = self.db.lock().unwrap().remove::<AcknowledgedTicket>(key).await?;
 
         let key = utils_db::db::Key::new_from_str(REDEEMED_TICKETS_VALUE)?;
         let balance = self
             .db
+            .lock()
+            .unwrap()
             .get_or_none::<Balance>(key.clone())
             .await?
             .unwrap_or(Balance::zero(BalanceType::HOPR))
             .add(&ticket.ticket.amount);
-        let _ = self.db.set(key, &balance).await?;
+        let _ = self.db.lock().unwrap().set(key, &balance).await?;
 
         let key = utils_db::db::Key::new_with_prefix(&ticket.ticket.counterparty, PENDING_TICKETS_COUNT)?;
         let balance = self
             .db
+            .lock()
+            .unwrap()
             .get_or_none::<Balance>(key.clone())
             .await?
             .unwrap_or(Balance::zero(BalanceType::HOPR))
             .sub(&ticket.ticket.amount);
-        let _ = self.db.set(key, &balance).await?;
+        let _ = self.db.lock().unwrap().set(key, &balance).await?;
 
         Ok(())
     }
 
     async fn mark_losing_acked_ticket(&mut self, ticket: &AcknowledgedTicket) -> Result<()> {
         let key = utils_db::db::Key::new_from_str(LOSING_TICKET_COUNT)?;
-        let count = self.db.get_or_none::<usize>(key.clone()).await?.unwrap_or(0);
-        let _ = self.db.set(key, &(count + 1)).await?;
+        let count = self
+            .db
+            .lock()
+            .unwrap()
+            .get_or_none::<usize>(key.clone())
+            .await?
+            .unwrap_or(0);
+        let _ = self.db.lock().unwrap().set(key, &(count + 1)).await?;
 
         let key = to_acknowledged_ticket_key(&ticket.ticket.challenge, &ticket.ticket.channel_epoch)?;
-        let _ = self.db.remove::<AcknowledgedTicket>(key).await?;
+        let _ = self.db.lock().unwrap().remove::<AcknowledgedTicket>(key).await?;
 
         let key = utils_db::db::Key::new_with_prefix(&ticket.ticket.counterparty, PENDING_TICKETS_COUNT)?;
         let balance = self
             .db
+            .lock()
+            .unwrap()
             .get_or_none::<Balance>(key.clone())
             .await?
             .unwrap_or(Balance::zero(BalanceType::HOPR))
             .sub(&ticket.ticket.amount);
-        let _ = self.db.set(key, &balance).await?;
+        let _ = self.db.lock().unwrap().set(key, &balance).await?;
 
         Ok(())
     }
@@ -328,6 +395,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         let key = utils_db::db::Key::new_from_str(REJECTED_TICKETS_VALUE)?;
 
         self.db
+            .lock()
+            .unwrap()
             .get_or_none::<Balance>(key)
             .await
             .map(|v| v.unwrap_or(Balance::zero(BalanceType::HOPR)))
@@ -336,32 +405,39 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
     async fn get_rejected_tickets_count(&self) -> Result<usize> {
         let key = utils_db::db::Key::new_from_str(REJECTED_TICKETS_COUNT)?;
 
-        self.db.get_or_none::<usize>(key).await.map(|v| v.unwrap_or(0))
+        self.db
+            .lock()
+            .unwrap()
+            .get_or_none::<usize>(key)
+            .await
+            .map(|v| v.unwrap_or(0))
     }
 
     async fn get_channel_x(&self, src: &PublicKey, dest: &PublicKey) -> Result<Option<ChannelEntry>> {
         let key = utils_db::db::Key::new_with_prefix(&generate_channel_id(&src.to_address(), &dest.to_address()), "")?;
 
-        self.db.get_or_none(key).await
+        self.db.lock().unwrap().get_or_none(key).await
     }
 
     async fn get_channel_to(&self, dest: &PublicKey) -> Result<Option<ChannelEntry>> {
         let key =
             utils_db::db::Key::new_with_prefix(&generate_channel_id(&self.me.to_address(), &dest.to_address()), "")?;
 
-        self.db.get_or_none(key).await
+        self.db.lock().unwrap().get_or_none(key).await
     }
 
     async fn get_channel_from(&self, src: &PublicKey) -> Result<Option<ChannelEntry>> {
         let key =
             utils_db::db::Key::new_with_prefix(&generate_channel_id(&src.to_address(), &self.me.to_address()), "")?;
 
-        self.db.get_or_none(key).await
+        self.db.lock().unwrap().get_or_none(key).await
     }
 
     async fn get_channels_from(&self, address: Address) -> Result<Vec<ChannelEntry>> {
         Ok(self
             .db
+            .lock()
+            .unwrap()
             .get_more::<ChannelEntry>(Box::from(CHANNEL_PREFIX.as_bytes()), Hash::size(), &|_| true)
             .await?
             .into_iter()
@@ -372,6 +448,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
     async fn get_channels_to(&self, address: Address) -> Result<Vec<ChannelEntry>> {
         Ok(self
             .db
+            .lock()
+            .unwrap()
             .get_more::<ChannelEntry>(Box::from(CHANNEL_PREFIX.as_bytes()), Hash::size(), &|_| true)
             .await?
             .into_iter()
@@ -383,6 +461,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         let key = utils_db::db::Key::new_from_str(HOPR_BALANCE_KEY)?;
 
         self.db
+            .lock()
+            .unwrap()
             .get_or_none::<Balance>(key)
             .await
             .map(|v| v.unwrap_or(Balance::zero(BalanceType::HOPR)))
@@ -393,6 +473,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
 
         let _ = self
             .db
+            .lock()
+            .unwrap()
             .set::<Balance>(key, balance)
             .await
             .map(|v| v.unwrap_or(Balance::zero(BalanceType::HOPR)))?;
@@ -405,6 +487,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
 
         let current_balance = self
             .db
+            .lock()
+            .unwrap()
             .get_or_none::<Balance>(key.clone())
             .await?
             .unwrap_or(Balance::zero(BalanceType::HOPR));
@@ -416,7 +500,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             &snapshot,
         );
 
-        self.db.batch(batch_ops, true).await
+        self.db.lock().unwrap().batch(batch_ops, true).await
     }
 
     async fn sub_hopr_balance(&mut self, balance: &Balance, snapshot: &Snapshot) -> Result<()> {
@@ -424,6 +508,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
 
         let current_balance = self
             .db
+            .lock()
+            .unwrap()
             .get_or_none::<Balance>(key.clone())
             .await?
             .unwrap_or(Balance::zero(BalanceType::HOPR));
@@ -435,12 +521,18 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             &snapshot,
         );
 
-        self.db.batch(batch_ops, true).await
+        self.db.lock().unwrap().batch(batch_ops, true).await
     }
 
     async fn is_network_registry_enabled(&self) -> Result<bool> {
         let key = utils_db::db::Key::new_from_str(NETWORK_REGISTRY_ENABLED_PREFIX)?;
-        Ok(self.db.get_or_none::<bool>(key.clone()).await?.unwrap_or(false))
+        Ok(self
+            .db
+            .lock()
+            .unwrap()
+            .get_or_none::<bool>(key.clone())
+            .await?
+            .unwrap_or(false))
     }
 
     async fn set_network_registry(&mut self, enabled: bool, snapshot: &Snapshot) -> Result<()> {
@@ -454,7 +546,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             &snapshot,
         );
 
-        self.db.batch(batch_ops, true).await
+        self.db.lock().unwrap().batch(batch_ops, true).await
     }
 
     async fn add_to_network_registry(
@@ -469,6 +561,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             if public_key == pk {
                 let _ = self
                     .db
+                    .lock()
+                    .unwrap()
                     .set(
                         utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?,
                         snapshot,
@@ -497,7 +591,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             snapshot,
         );
 
-        self.db.batch(batch_ops, true).await
+        self.db.lock().unwrap().batch(batch_ops, true).await
     }
 
     async fn remove_from_network_registry(
@@ -529,14 +623,14 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             &snapshot,
         );
 
-        self.db.batch(batch_ops, true).await
+        self.db.lock().unwrap().batch(batch_ops, true).await
     }
 
     async fn get_account_from_network_registry(&self, public_key: &PublicKey) -> Result<Option<Address>> {
         let curve_point: core_crypto::types::CurvePoint = public_key.into();
         let key = utils_db::db::Key::new_with_prefix(&curve_point, NETWORK_REGISTRY_HOPR_NODE_PREFIX)?;
 
-        self.db.get_or_none::<Address>(key).await
+        self.db.lock().unwrap().get_or_none::<Address>(key).await
     }
 
     async fn find_hopr_node_using_account_in_network_registry(&self, account: &Address) -> Result<Vec<PublicKey>> {
@@ -545,6 +639,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
 
         let key = utils_db::db::Key::new_with_prefix(account, NETWORK_REGISTRY_ADDRESS_PUBLIC_KEY_PREFIX)?;
         self.db
+            .lock()
+            .unwrap()
             .get_or_none::<Vec<PublicKey>>(key)
             .await
             .map(|v| v.unwrap_or(Vec::new()))
@@ -553,7 +649,12 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
     async fn is_eligible(&self, account: &Address) -> Result<bool> {
         let key = utils_db::db::Key::new_with_prefix(account, NETWORK_REGISTRY_ADDRESS_ELIGIBLE_PREFIX)?;
 
-        self.db.get_or_none::<bool>(key).await.map(|v| v.unwrap_or(false))
+        self.db
+            .lock()
+            .unwrap()
+            .get_or_none::<bool>(key)
+            .await
+            .map(|v| v.unwrap_or(false))
     }
 
     async fn set_eligible(&mut self, account: &Address, eligible: bool, snapshot: &Snapshot) -> Result<()> {
@@ -571,7 +672,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?,
             snapshot,
         );
-        self.db.batch(batch_ops, true).await
+        self.db.lock().unwrap().batch(batch_ops, true).await
     }
 }
 
