@@ -993,6 +993,7 @@ dependencies = [
  "getrandom 0.2.9",
  "gloo-timers",
  "js-sys",
+ "lazy_static",
  "more-asserts",
  "pin-project",
  "rand 0.8.5",

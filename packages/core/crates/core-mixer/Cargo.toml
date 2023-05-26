@@ -16,6 +16,7 @@ wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:getra
 async-std = { version = "1.12.0", features = ["attributes"] }
 futures = "0.3.28"
 futures-lite = "1.12.0"
+lazy_static = "1.4.0"
 rand = "0.8.5"
 pin-project = "1.0.12"
 utils-log = { path = "../../../utils/crates/utils-log"}
