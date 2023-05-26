@@ -105,6 +105,7 @@ impl<T> Mixer<T> {
         let random_delay = self.cfg.random_delay();
         debug!("Mixer created a random packet delay of {}ms", random_delay.as_millis());
 
+
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_QUEUE_SIZE.increment(1.0f64);
 
