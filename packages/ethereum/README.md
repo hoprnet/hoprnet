@@ -273,8 +273,9 @@ Dependencies are vendored directly into the repo. :
 
 ```
 forge install safe-global/safe-contracts@eb93dbb0f62e2dc1b308ac4c110038062df0a8c9 \
-   gnosis/zodiac-modifier-roles-v1@454be9d3c26f90221ca717518df002d1eca1845f
-   gnosis/zodiac@8a77e7b224af8004bd9f2ff4e2919642e93ffd85
+   gnosis/zodiac-modifier-roles-v1@454be9d3c26f90221ca717518df002d1eca1845f \
+   gnosis/zodiac@8a77e7b224af8004bd9f2ff4e2919642e93ffd85 \
+   OpenZeppelin/openzeppelin-contracts-upgradeable \
    --no-git --no-commit
 ```
 
