@@ -247,10 +247,10 @@ impl BinarySerializable<'_> for UnacknowledgedTicket {
 
 /// Contains cryptographic challenge that needs to be solved for acknowledging a packet.
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct AcknowledgementChallenge {
-    ack_challenge: Option<HalfKeyChallenge>,
-    signature: Signature,
+    pub ack_challenge: Option<HalfKeyChallenge>,
+    pub signature: Signature,
 }
 
 fn hash_challenge(challenge: &HalfKeyChallenge) -> Box<[u8]> {

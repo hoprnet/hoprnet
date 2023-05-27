@@ -826,13 +826,22 @@ mod tests {
 
         // Begin test
 
-        let secrets = (0..2).into_iter().map(|_| random_bytes::<32>()).collect::<Vec<_>>();
-        let porv = ProofOfRelayValues::new(&secrets[0], Some(&secrets[1]))
-            .expect("failed to create Proof of Relay values");
+        const PENDING_ACKS: usize = 5;
+        let mut sent_challenges = Vec::with_capacity(PENDING_ACKS);
+        for _ in 0..PENDING_ACKS {
+            let secrets = (0..2).into_iter().map(|_| random_bytes::<32>()).collect::<Vec<_>>();
+            let porv = ProofOfRelayValues::new(&secrets[0], Some(&secrets[1]))
+                .expect("failed to create Proof of Relay values");
 
-        // Mimics that the packet sender has sent a packet and now it has a pending acknowledgement in it's DB
-        core_dbs[0].store_pending_acknowledgment(porv.ack_challenge, PendingAcknowledgement::WaitingAsSender).await
-            .expect("failed to store pending ack");
+            // Mimics that the packet sender has sent a packet and now it has a pending acknowledgement in it's DB
+            core_dbs[0].store_pending_acknowledgment(porv.ack_challenge.clone(), PendingAcknowledgement::WaitingAsSender).await
+                .expect("failed to store pending ack");
+
+            let ack_key = derive_ack_key_share(&secrets[0]);
+            let ack_msg = AcknowledgementChallenge::new(&porv.ack_challenge, &PEERS_PRIVS[0]);
+
+            sent_challenges.push((ack_key, ack_msg));
+        }
 
 
         // Peer 1: This is mimics the ACK interaction of the packet sender
@@ -840,11 +849,18 @@ mod tests {
 
         // ... which is just waiting to get an acknowledgement from the counterparty
         let (done_tx, done_rx) = async_std::channel::unbounded();
+        let expected_challenges = sent_challenges.clone();
         tmp_ack.on_acknowledgement = Box::new(move |ack| {
             debug!("sender has received acknowledgement: {}", ack.to_hex());
-            if ack == porv.ack_challenge {
+            if let Some((ack_key, ack_msg)) = expected_challenges
+                .iter()
+                .find(|(_, chal)| chal.ack_challenge.unwrap().eq(&ack)) {
+
+                assert!(ack_msg.solve(&ack_key.to_bytes()), "acknowledgement key must solve acknowledgement challenge");
+
                 // If it matches, set a signal that the test has finished
                 done_tx.send_blocking(()).expect("send failed");
+                debug!("peer 1 received expected ack");
             }
         });
 
@@ -886,18 +902,20 @@ mod tests {
 
         ////
 
-        let ack_key = derive_ack_key_share(&secrets[0]);
-        let ack_msg = AcknowledgementChallenge::new(&ack_key.to_challenge(), &PEERS_PRIVS[0]);
-
-        assert!(ack_msg.solve(&ack_key.to_bytes()), "acknowledgement key must solve acknowledgement challenge");
-
-        ack_interaction_counterparty.send_acknowledgement(
-            Acknowledgement::new(ack_msg, ack_key, &PEERS_PRIVS[1]),
-            PEERS[0].clone()
-        ).await.expect("failed to send ack");
+        for (ack_key, ack_msg) in sent_challenges {
+            ack_interaction_counterparty.send_acknowledgement(
+                Acknowledgement::new(ack_msg, ack_key, &PEERS_PRIVS[1]),
+                PEERS[0].clone()
+            ).await.expect("failed to send ack");
+        }
 
 
-        let finish = done_rx.recv();
+        let finish = async move {
+            for i in 1..PENDING_ACKS + 1 {
+                done_rx.recv().await.expect("failed finalize ack");
+                debug!("done ack #{i} out of {PENDING_ACKS}");
+            }
+        };
         let timeout = async_std::task::sleep(Duration::from_secs(10));
         pin_mut!(finish, timeout);
 
