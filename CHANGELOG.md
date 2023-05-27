@@ -5,7 +5,7 @@
 ## [2.00](https://github.com/hoprnet/hoprnet/compare/release/bratislava...hoprnet:master)
 
 - Introduce the possibility of using YAML configuration file and revamp the configuration infrastructure to make the YAML a default base for all configuration types (env vars, cmd line args) ([#4796](https://github.com/hoprnet/hoprnet/pull/4796))
-- Extend hopli so it can derive peer ID from identity files. Add `initiate-node` to perform all the necessary on-chain operations before launching a HOPR node. Accept identity from path. ([#4894](https://github.com/hoprnet/hoprnet/pull/4894))
+- Extend `hopli` so that it can derive peer ID from identity files. Add `initiate-node` to perform all the necessary on-chain operations before launching a HOPR node. Accept identity from path. ([#4894](https://github.com/hoprnet/hoprnet/pull/4894))
 - Introduce new types & optimize cryptographic code ([#4974](https://github.com/hoprnet/hoprnet/pull/4974))
 - Create DB functionality shim in Rust ([#4885](https://github.com/hoprnet/hoprnet/pull/4885))
 - Migrate interface for using the DB in core packet processing ([#5025](https://github.com/hoprnet/hoprnet/pull/5025))
@@ -15,6 +15,7 @@
 - All cryptography related code has been migrated to Rust with TS implementations removed ([#5063](https://github.com/hoprnet/hoprnet/pull/5063))
 - Migrate interfaces for using the DB in core-ethereum ([#5072](https://github.com/hoprnet/hoprnet/pull/5072))
 - Upgrade OpenZeppelin dependency to 4.8.3 and Solidity to 0.8.19 ([#5094](https://github.com/hoprnet/hoprnet/pull/5094))
+- Add support for logs in wasm environment Rust tests ([#5108](https://github.com/hoprnet/hoprnet/pull/5108))
 
 <a name="1.93"></a>
 
