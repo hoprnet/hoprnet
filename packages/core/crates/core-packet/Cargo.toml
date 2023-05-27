@@ -28,9 +28,7 @@ lazy_static = "1.4"
 libp2p-identity = { version = "0.1.1", features = ["secp256k1", "peerid"] }
 thiserror = "1.0"
 utils-db = { path = "../../../utils/crates/utils-db" }
-#utils-log = { path = "../../../utils/crates/utils-log" }
-log = "0.4.0"
-env_logger = "0.9.0"
+utils-log = { path = "../../../utils/crates/utils-log" }
 utils-metrics = { path = "../../../utils/crates/utils-metrics", optional = true }
 utils-misc = { path = "../../../utils/crates/utils-misc" }
 utils-types = { path = "../../../utils/crates/utils-types" }
@@ -44,13 +42,14 @@ console_error_panic_hook = { version = "0.1.7", optional = true }
 async-std = {version = "1.12.0", features = ["unstable"]}
 async-process = "1.7.0"
 async-trait = "0.1.68"
-parameterized = "1.0"
-hex = "0.4.3"
-wasm-bindgen-test = "0.3.36"
-rusty-leveldb = "1.0"
-hex-literal = "0.4.1"
 core-ethereum-db = { path = "../../../core-ethereum/crates/core-ethereum-db" }
 core-ethereum-misc = { path = "../../../core-ethereum/crates/core-ethereum-misc" }
+env_logger = "0.10.0"
+hex = "0.4.3"
+hex-literal = "0.4.1"
+parameterized = "1.0"
+rusty-leveldb = "1.0"
+wasm-bindgen-test = "0.3.36"
 
 [package.metadata.wasm-pack.profile.dev]
 wasm-opt = false

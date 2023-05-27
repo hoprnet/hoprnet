@@ -1068,18 +1068,18 @@ dependencies = [
  "core-ethereum-misc",
  "core-mixer",
  "core-types",
- "env_logger 0.9.3",
+ "env_logger",
  "futures",
  "hex",
  "hex-literal 0.4.1",
  "js-sys",
  "lazy_static",
  "libp2p-identity",
- "log",
  "parameterized",
  "rusty-leveldb",
  "thiserror",
  "utils-db",
+ "utils-log",
  "utils-metrics",
  "utils-misc",
  "utils-types",
@@ -1614,19 +1614,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 1.0.109",
-]
-
-[[package]]
-name = "env_logger"
-version = "0.9.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a12e6657c4c97ebab115a42dcee77225f7f482cdd841cf7088c657a42e9e00e7"
-dependencies = [
- "atty",
- "humantime",
- "log",
- "regex",
- "termcolor",
 ]
 
 [[package]]
@@ -5331,7 +5318,7 @@ dependencies = [
  "console",
  "curl",
  "dialoguer",
- "env_logger 0.10.0",
+ "env_logger",
  "glob",
  "human-panic",
  "log",

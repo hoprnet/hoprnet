@@ -15,6 +15,7 @@ use libp2p_identity::PeerId;
 use std::cell::RefCell;
 use std::ops::Mul;
 use std::sync::Arc;
+use utils_log::{debug, error, info};
 //use utils_log::{debug, error, info};
 use utils_types::primitives::{Balance, BalanceType, U256};
 use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
@@ -665,9 +666,52 @@ mod tests {
     use utils_db::db::DB;
     use utils_db::errors::DbError;
     use utils_db::leveldb::rusty::RustyLevelDbShim;
+    use utils_log::debug;
     use utils_types::primitives::{Balance, BalanceType, Snapshot, U256};
     use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
     use crate::por::ProofOfRelayValues;
+
+    const SELF_PRIV: [u8; 32] = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
+    const RELAY0_PRIV: [u8; 32] = hex!("5bf21ea8cccd69aa784346b07bf79c84dac606e00eecaa68bf8c31aff397b1ca");
+    const RELAY1_PRIV: [u8; 32] = hex!("3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa");
+    const REALY2_PRIV: [u8; 32] = hex!("db7e3e8fcac4c817aa4cecee1d6e2b4d53da51f9881592c0e1cc303d8a012b92");
+    const COUNTERPARTY_PRIV: [u8; 32] = hex!("0726a9704d56a013980a9077d195520a61b5aed28f92d89c50bca6e0e0c48cfc");
+
+    #[derive(Clone, Eq, PartialEq, Debug)]
+    struct Msg<T> {
+        pub from: T,
+        pub to: T,
+        pub data: Box<[u8]>
+    }
+
+    lazy_static! {
+        static ref PEERS: Vec<PeerId> = vec![SELF_PRIV, RELAY0_PRIV, RELAY1_PRIV, REALY2_PRIV, COUNTERPARTY_PRIV]
+            .into_iter()
+            .map(|private| PublicKey::from_privkey(&private).unwrap().to_peerid())
+            .collect();
+
+        static ref MESSAGES: Mutex<HashMap<PeerId, Vec<Msg<PeerId>>>> = Mutex::new(HashMap::new());
+    }
+
+    async fn send_transport_as_peer<const PEER_NUM: usize>(data: Box<[u8]>, dst: String) -> std::result::Result<(), String> {
+        let from = PEERS[PEER_NUM];
+        let to = PeerId::from_str(&dst).expect(&format!("invalid peer id: {dst}"));
+        MESSAGES
+            .lock()
+            .unwrap()
+            .get_mut(&to)
+            .expect(&format!("non existent channel: {to}"))
+            .push(Msg { from, to, data });
+        Ok(())
+    }
+
+    fn retrieve_transport_msgs_as_peer<const PEER_NUM: usize>() -> Option<Vec<Msg<PeerId>>>{
+        let for_peer = PEERS[PEER_NUM];
+        Some(MESSAGES.lock().unwrap().get_mut(&for_peer)?
+            .drain(..)
+            .into_iter()
+            .collect())
+    }
 
     fn create_dummy_channel(from: &PeerId, to: &PeerId) -> ChannelEntry {
         ChannelEntry::new(
@@ -681,19 +725,6 @@ mod tests {
             U256::zero(),
             U256::zero(),
         )
-    }
-
-    const SELF_PRIV: [u8; 32] = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
-    const RELAY0_PRIV: [u8; 32] = hex!("5bf21ea8cccd69aa784346b07bf79c84dac606e00eecaa68bf8c31aff397b1ca");
-    const RELAY1_PRIV: [u8; 32] = hex!("3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa");
-    const REALY2_PRIV: [u8; 32] = hex!("db7e3e8fcac4c817aa4cecee1d6e2b4d53da51f9881592c0e1cc303d8a012b92");
-    const COUNTERPARTY_PRIV: [u8; 32] = hex!("0726a9704d56a013980a9077d195520a61b5aed28f92d89c50bca6e0e0c48cfc");
-
-    fn create_peers() -> Vec<PeerId> {
-        vec![SELF_PRIV, RELAY0_PRIV, RELAY1_PRIV, REALY2_PRIV, COUNTERPARTY_PRIV]
-            .into_iter()
-            .map(|private| PublicKey::from_privkey(&private).unwrap().to_peerid())
-            .collect()
     }
 
     fn create_dbs(amount: usize) -> Vec<Arc<Mutex<DB<RustyLevelDbShim>>>> {
@@ -768,24 +799,6 @@ mod tests {
         Ok(())
     }
 
-    #[derive(Clone, Eq, PartialEq, Debug)]
-    struct Msg<T> {
-        pub from: T,
-        pub to: T,
-        pub data: Box<[u8]>
-    }
-
-    lazy_static! {
-        static ref MESSAGES: Mutex<HashMap<PeerId, Vec<(PeerId, Box<[u8]>)>>> = Mutex::new(HashMap::<PeerId, Vec<(PeerId,Box<[u8]>)>>::new());
-    }
-
-    pub async fn send_transport_as_peer<const N: usize>(msg: Box<[u8]>, dst: String) -> std::result::Result<(), String> {
-        let sender = create_peers()[N];
-        MESSAGES.lock().unwrap().get_mut(&PeerId::from_str(&dst).unwrap()).expect("non existent channel")
-            .push((sender, msg));
-        Ok(())
-    }
-
     #[async_std::test]
     pub async fn test_packet_acknowledgement_sender_workflow() {
         let _ = env_logger::builder().is_test(true).try_init();
@@ -825,7 +838,7 @@ mod tests {
         // ... which is just waiting to get an acknowledgement from the counterparty
         let (done_tx, done_rx) = async_std::channel::unbounded();
         tmp_ack.on_acknowledgement = Box::new(move |ack| {
-            println!("sender has received acknowledgement: {}", ack.to_hex());
+            debug!("sender has received acknowledgement: {}", ack.to_hex());
             if ack == porv.ack_challenge {
                 // If it matches, set a signal that the test has finished
                 done_tx.send_blocking(()).expect("send failed");
@@ -837,25 +850,16 @@ mod tests {
         // Peer 1: hookup receiving of acknowledgements
         let ack_1_clone_1 = ack_interaction_sender.clone();
         async_std::task::spawn_local(async move {
-            loop {
-                let tt ;
-                {
-                    if let Some(r) = MESSAGES.lock().unwrap().get_mut(&ack_1_clone_1.get_peer_id()) {
-                        tt = r.iter().map(|(sender, data)| {
-                            println!("received ack from {sender}: {}", hex::encode(&data));
-                            TransportTask {
-                                remote_peer: sender.clone(),
-                                data: data.clone()
-                            }
-                        }).collect::<Vec<_>>();
-                        r.clear();
-                    } else {
-                        break;
-                    }
-                }
-                for task in tt {
-                    ack_1_clone_1.received_acknowledgement(task).await.expect("failed to receive ack");
-                }
+            while let Some(msgs) = retrieve_transport_msgs_as_peer::<0>() {
+               for task in msgs.into_iter().map(|m| TransportTask {
+                   remote_peer: m.from,
+                   data: m.data
+               }) {
+                   debug!("received ack from {}: {}", task.remote_peer, hex::encode(&task.data));
+                   ack_1_clone_1.received_acknowledgement(task)
+                       .await
+                       .expect("failed to receive ack");
+               }
                 async_std::task::sleep(Duration::from_millis(200)).await;
             }
         });
@@ -869,12 +873,13 @@ mod tests {
         // Peer 2: Recipient of the packet and sender of the acknowledgement
         let ack_interaction_counterparty = Arc::new(AcknowledgementInteraction::new(core_dbs.remove(0), PublicKey::from_peerid(&peers[1]).unwrap()));
 
-
         // Peer 2: start sending out outgoing acknowledgement
         let ack_2_clone = ack_interaction_counterparty.clone();
         async_std::task::spawn_local(async move {
             ack_2_clone.handle_outgoing_acknowledgements(&send_transport_as_peer::<1>).await;
         });
+
+        // Peer 2: does not need to process incoming acknowledgements
 
         ////
 
@@ -893,16 +898,16 @@ mod tests {
         let timeout = async_std::task::sleep(Duration::from_secs(10));
         pin_mut!(finish, timeout);
 
-        match select(finish, timeout).await {
-            Either::Left(_) => {}
-            Either::Right(_) => {
-                panic!("test timed out in 10 seconds")
-            }
-        }
+        let succeeded = match select(finish, timeout).await {
+            Either::Left(_) => true,
+            Either::Right(_) => false,
+        };
 
         MESSAGES.lock().unwrap().clear();
         ack_interaction_sender.stop();
         ack_interaction_counterparty.stop();
+
+        assert!(succeeded, "test timed out after 10 seconds");
     }
 }
 
@@ -925,6 +930,7 @@ pub mod wasm {
     use wasm_bindgen::JsCast;
     use wasm_bindgen::JsValue;
     use core_types::acknowledgement::Acknowledgement;
+    use utils_log::error;
 
     #[wasm_bindgen]
     impl TransportTask {
