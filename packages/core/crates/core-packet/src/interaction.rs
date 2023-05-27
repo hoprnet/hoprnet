@@ -910,6 +910,7 @@ mod tests {
         MESSAGES.lock().unwrap().clear();
         ack_interaction_sender.stop();
         ack_interaction_counterparty.stop();
+        async_std::task::sleep(Duration::from_secs(1)).await; // Let everything shutdown
 
         assert!(succeeded, "test timed out after 10 seconds");
     }
