@@ -76,7 +76,7 @@ where
         .then(|_| committer.set_commitment(&current))
         .await;
 
-    //info!("commitment chain initialized");
+    //info!("commitment chain initialized for {channel_id}");
     Ok(())
 }
 
