@@ -668,26 +668,28 @@ mod tests {
     use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
     use crate::por::ProofOfRelayValues;
 
-    const SELF_PRIV: [u8; 32] = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
-    const RELAY0_PRIV: [u8; 32] = hex!("5bf21ea8cccd69aa784346b07bf79c84dac606e00eecaa68bf8c31aff397b1ca");
-    const RELAY1_PRIV: [u8; 32] = hex!("3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa");
-    const REALY2_PRIV: [u8; 32] = hex!("db7e3e8fcac4c817aa4cecee1d6e2b4d53da51f9881592c0e1cc303d8a012b92");
-    const COUNTERPARTY_PRIV: [u8; 32] = hex!("0726a9704d56a013980a9077d195520a61b5aed28f92d89c50bca6e0e0c48cfc");
+    const PEERS_PRIVS: [[u8; 32]; 5] = [
+        hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"),
+        hex!("5bf21ea8cccd69aa784346b07bf79c84dac606e00eecaa68bf8c31aff397b1ca"),
+        hex!("3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa"),
+        hex!("db7e3e8fcac4c817aa4cecee1d6e2b4d53da51f9881592c0e1cc303d8a012b92"),
+        hex!("0726a9704d56a013980a9077d195520a61b5aed28f92d89c50bca6e0e0c48cfc")
+    ];
+
+    lazy_static! {
+        static ref PEERS: Vec<PeerId> = PEERS_PRIVS
+            .iter()
+            .map(|private| PublicKey::from_privkey(private).unwrap().to_peerid())
+            .collect();
+
+        static ref MESSAGES: Mutex<HashMap<PeerId, Vec<Msg<PeerId>>>> = Mutex::new(HashMap::new());
+    }
 
     #[derive(Clone, Eq, PartialEq, Debug)]
     struct Msg<T> {
         pub from: T,
         pub to: T,
         pub data: Box<[u8]>
-    }
-
-    lazy_static! {
-        static ref PEERS: Vec<PeerId> = vec![SELF_PRIV, RELAY0_PRIV, RELAY1_PRIV, REALY2_PRIV, COUNTERPARTY_PRIV]
-            .into_iter()
-            .map(|private| PublicKey::from_privkey(&private).unwrap().to_peerid())
-            .collect();
-
-        static ref MESSAGES: Mutex<HashMap<PeerId, Vec<Msg<PeerId>>>> = Mutex::new(HashMap::new());
     }
 
     fn init_transport() {
@@ -760,7 +762,7 @@ mod tests {
         let testing_snapshot = Snapshot::new(U256::zero(), U256::zero(), U256::zero());
         let mut previous_channel: Option<ChannelEntry> = None;
 
-        for (index, peer_id) in PEERS.iter().enumerate() {
+        for (index, peer_id) in PEERS.iter().enumerate().take(dbs.len()) {
             let mut db = CoreEthereumDb::new(dbs[index].clone(), PublicKey::from_peerid(&peer_id).unwrap());
 
             let mut channel: Option<ChannelEntry> = None;
@@ -791,7 +793,7 @@ mod tests {
                     channel_epoch: previous_channel.clone().unwrap().channel_epoch.clone(),
                 };
 
-                initialize_commitment(&mut db, &SELF_PRIV, &channel_info, &mut EmptyChainCommiter {})
+                initialize_commitment(&mut db, &PEERS_PRIVS[0], &channel_info, &mut EmptyChainCommiter {})
                     .await
                     .map_err(|e| PacketDbError(DbError::GenericError(e.to_string())))?;
             }
@@ -806,16 +808,13 @@ mod tests {
     pub async fn test_packet_acknowledgement_sender_workflow() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let dbs = create_dbs(PEERS.len());
+        let dbs = create_dbs(2);
 
         create_minimal_topology(&dbs)
             .await
             .expect("failed to create minimal channel topology");
 
         init_transport();
-
-        let PEER_0 = &PEERS[0];
-        let PEER_1 = &PEERS[1];
 
         let mut core_dbs = dbs
             .iter()
@@ -837,7 +836,7 @@ mod tests {
 
 
         // Peer 1: This is mimics the ACK interaction of the packet sender
-        let mut tmp_ack = AcknowledgementInteraction::new(core_dbs.remove(0), PublicKey::from_peerid(PEER_0).unwrap());
+        let mut tmp_ack = AcknowledgementInteraction::new(core_dbs.remove(0), PublicKey::from_peerid(&PEERS[0]).unwrap());
 
         // ... which is just waiting to get an acknowledgement from the counterparty
         let (done_tx, done_rx) = async_std::channel::unbounded();
@@ -875,7 +874,7 @@ mod tests {
         });
 
         // Peer 2: Recipient of the packet and sender of the acknowledgement
-        let ack_interaction_counterparty = Arc::new(AcknowledgementInteraction::new(core_dbs.remove(0), PublicKey::from_peerid(PEER_1).unwrap()));
+        let ack_interaction_counterparty = Arc::new(AcknowledgementInteraction::new(core_dbs.remove(0), PublicKey::from_peerid(&PEERS[1]).unwrap()));
 
         // Peer 2: start sending out outgoing acknowledgement
         let ack_2_clone = ack_interaction_counterparty.clone();
@@ -888,13 +887,13 @@ mod tests {
         ////
 
         let ack_key = derive_ack_key_share(&secrets[0]);
-        let ack_msg = AcknowledgementChallenge::new(&ack_key.to_challenge(), &SELF_PRIV);
+        let ack_msg = AcknowledgementChallenge::new(&ack_key.to_challenge(), &PEERS_PRIVS[0]);
 
         assert!(ack_msg.solve(&ack_key.to_bytes()), "acknowledgement key must solve acknowledgement challenge");
 
         ack_interaction_counterparty.send_acknowledgement(
-            Acknowledgement::new(ack_msg, ack_key, &RELAY0_PRIV),
-            PEER_0.clone()
+            Acknowledgement::new(ack_msg, ack_key, &PEERS_PRIVS[1]),
+            PEERS[0].clone()
         ).await.expect("failed to send ack");
 
 
