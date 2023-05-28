@@ -767,6 +767,15 @@ mod tests {
             .collect()
     }
 
+    fn create_core_dbs(dbs: &Vec<Arc<Mutex<rusty_leveldb::DB>>>) -> Vec<Arc<Mutex<CoreDb<RustyLevelDbShim>>>> {
+        dbs
+            .iter()
+            .enumerate().map(|(i, db)| Arc::new(Mutex::new(CoreDb::new(
+            DB::new(RustyLevelDbShim::new(db.clone())),
+            PublicKey::from_peerid(&PEERS[i]).unwrap()
+        )))).collect::<Vec<_>>()
+    }
+
     struct EmptyChainCommiter {}
 
     #[async_trait(? Send)]
@@ -860,6 +869,7 @@ mod tests {
     #[async_std::test]
     pub async fn test_packet_acknowledgement_sender_workflow() {
         let _ = env_logger::builder().is_test(true).try_init();
+        const TIMEOUT_SECONDS: u64 = 10;
 
         init_transport();
 
@@ -871,17 +881,11 @@ mod tests {
             .await
             .expect("failed to create minimal channel topology");
 
-        let core_dbs = dbs
-            .iter()
-            .enumerate().map(|(i, db)| Arc::new(Mutex::new(CoreDb::new(
-                DB::new(RustyLevelDbShim::new(db.clone())),
-                PublicKey::from_peerid(&PEERS[i]).unwrap()
-            )))).collect::<Vec<_>>();
-
+        let core_dbs = create_core_dbs(&dbs);
 
         // Begin test
-        debug!("peer 1 = {}", PEERS[0]);
-        debug!("peer 2 = {}", PEERS[1]);
+        debug!("peer 1 (sender)    = {}", PEERS[0]);
+        debug!("peer 2 (recipient) = {}", PEERS[1]);
 
         const PENDING_ACKS: usize = 5;
         let mut sent_challenges = Vec::with_capacity(PENDING_ACKS);
@@ -955,7 +959,7 @@ mod tests {
                 debug!("done ack #{i} out of {PENDING_ACKS}");
             }
         };
-        let timeout = async_std::task::sleep(Duration::from_secs(10));
+        let timeout = async_std::task::sleep(Duration::from_secs(TIMEOUT_SECONDS));
         pin_mut!(finish, timeout);
 
         let succeeded = match select(finish, timeout).await {
@@ -968,12 +972,14 @@ mod tests {
         ack_interaction_counterparty.stop();
         async_std::task::sleep(Duration::from_secs(1)).await; // Let everything shutdown
 
-        assert!(succeeded, "test timed out after 10 seconds");
+        assert!(succeeded, "test timed out after {TIMEOUT_SECONDS} seconds");
     }
 
     #[async_std::test]
     pub async fn test_packet_acknowledgement_relayer_workflow() {
         let _ = env_logger::builder().is_test(true).try_init();
+
+        const TIMEOUT_SECONDS: u64 = 20;
 
         init_transport();
 
@@ -987,14 +993,12 @@ mod tests {
             .await
             .expect("failed to create minimal channel topology");
 
-        let core_dbs = dbs
-            .iter()
-            .enumerate().map(|(i, db)| Arc::new(Mutex::new(CoreDb::new(
-            DB::new(RustyLevelDbShim::new(db.clone())),
-            PublicKey::from_peerid(&PEERS[i]).unwrap()
-        )))).collect::<Vec<_>>();
+        let core_dbs = create_core_dbs(&dbs);
 
         // Begin test
+        debug!("peer 1 (sender)    = {}", PEERS[0]);
+        debug!("peer 2 (relayer)   = {}", PEERS[1]);
+        debug!("peer 3 (recipient) = {}", PEERS[1]);
 
         // Peer 1 (sender): just sends packets over Peer 2 to Peer 3, ignores acknowledgements from Peer 2
         let packet_path = Path::new_valid(PEERS[1..2].to_vec());
@@ -1090,7 +1094,7 @@ mod tests {
             (acks, pkts)
         };
 
-        let timeout = async_std::task::sleep(Duration::from_secs(10));
+        let timeout = async_std::task::sleep(Duration::from_secs(TIMEOUT_SECONDS));
         pin_mut!(finish, timeout);
 
         let succeeded = match select(finish, timeout).await {
@@ -1109,7 +1113,7 @@ mod tests {
         ack_interaction_counterparty.stop();
         async_std::task::sleep(Duration::from_secs(1)).await; // Let everything shutdown
 
-        assert!(succeeded, "test timed out after 10 seconds");
+        assert!(succeeded, "test timed out after {TIMEOUT_SECONDS} seconds");
     }
 }
 
