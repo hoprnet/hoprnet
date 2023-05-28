@@ -1,6 +1,7 @@
 use libp2p_identity::PeerId;
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+#[derive(Debug, Clone)]
 pub struct Path {
     hops: Vec<PeerId>,
     valid: bool,
@@ -24,6 +25,23 @@ impl Path {
 
     pub fn valid(&self) -> bool {
         self.valid
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use libp2p_identity::PeerId;
+    use crate::path::Path;
+
+    #[test]
+    fn test_path_validated() {
+        const HOPS: usize = 5;
+        let peer_ids = (0..HOPS).map(|_| PeerId::random()).collect::<Vec<_>>();
+
+        let path = Path::new_valid(peer_ids.clone());
+        assert_eq!(HOPS, path.length());
+        assert_eq!(peer_ids.iter().collect::<Vec<_>>(), path.hops());
+        assert!(path.valid());
     }
 }
 
