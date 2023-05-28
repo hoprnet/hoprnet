@@ -627,7 +627,7 @@ where
         info!("done processing packets")
     }
 
-    pub async fn push_received_packet(&mut self, packet_task: TransportTask) -> Result<()> {
+    pub async fn push_received_packet(&self, packet_task: TransportTask) -> Result<()> {
         self.channel
             .0
             .send(packet_task)
@@ -854,6 +854,24 @@ mod tests {
         });
     }
 
+    fn spawn_pkt_receive<Db: HoprCoreDbActions + 'static, const PEER_NUM: usize>(interaction: Arc<PacketInteraction<Db>>) {
+        async_std::task::spawn_local(async move {
+            while let Some(msgs) = retrieve_transport_msgs_as_peer::<MSG_PROTOCOL, PEER_NUM>() {
+                for task in msgs.into_iter().map(|m| TransportTask {
+                    remote_peer: m.from,
+                    data: m.data
+                }) {
+                    debug!("received packet from {}: {}", task.remote_peer, hex::encode(&task.data));
+                    interaction
+                        .push_received_packet(task)
+                        .await
+                        .expect("failed to receive ack");
+                }
+                async_std::task::sleep(Duration::from_millis(200)).await;
+            }
+        });
+    }
+
     fn spawn_ack_send<Db: HoprCoreDbActions + 'static, const PEER_NUM: usize>(interaction: Arc<AcknowledgementInteraction<Db>>) {
         async_std::task::spawn_local(async move {
             interaction.handle_outgoing_acknowledgements(&send_transport_as_peer::<ACK_PROTOCOL, PEER_NUM>).await;
@@ -998,7 +1016,7 @@ mod tests {
         // Begin test
         debug!("peer 1 (sender)    = {}", PEERS[0]);
         debug!("peer 2 (relayer)   = {}", PEERS[1]);
-        debug!("peer 3 (recipient) = {}", PEERS[1]);
+        debug!("peer 3 (recipient) = {}", PEERS[2]);
 
         // Peer 1 (sender): just sends packets over Peer 2 to Peer 3, ignores acknowledgements from Peer 2
         let packet_path = Path::new_valid(PEERS[1..2].to_vec());
@@ -1030,6 +1048,7 @@ mod tests {
 
         // Peer 2: start packets handling as a relayer
         spawn_pkt_handling::<_, 1>(pkt_interaction_relayer.clone(), ack_interaction_relayer.clone());
+        spawn_pkt_receive::<_, 1>(pkt_interaction_relayer.clone());
 
         // Peer 2: hookup receiving of acknowledgements from Peer 3
         spawn_ack_receive::<_, 1>(ack_interaction_relayer.clone());
@@ -1059,6 +1078,7 @@ mod tests {
 
         // Peer 3: start packet interaction at the recipient
         spawn_pkt_handling::<_, 2>(pkt_interaction_counterparty.clone(), ack_interaction_counterparty.clone());
+        spawn_pkt_receive::<_, 2>(pkt_interaction_counterparty.clone());
 
         // Peer 3: start sending out outgoing acknowledgements
         spawn_ack_send::<_, 2>(ack_interaction_counterparty.clone());
