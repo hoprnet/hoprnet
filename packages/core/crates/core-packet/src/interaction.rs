@@ -12,9 +12,8 @@ use core_mixer::mixer::Mixer;
 use core_types::acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket};
 use core_types::channels::{ChannelEntry, ChannelStatus, Ticket};
 use libp2p_identity::PeerId;
-use std::cell::RefCell;
 use std::ops::Mul;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use utils_log::{debug, error, info};
 //use utils_log::{debug, error, info};
 use utils_types::primitives::{Balance, BalanceType, U256};
@@ -62,7 +61,7 @@ pub struct TransportTask {
 }
 
 pub struct AcknowledgementInteraction<Db: HoprCoreDbActions> {
-    db: RefCell<Db>,
+    db: Arc<Mutex<Db>>,
     pub on_acknowledgement: Box<dyn Fn(HalfKeyChallenge)>,
     pub on_acknowledged_ticket: Box<dyn Fn(AcknowledgedTicket)>,
     public_key: PublicKey,
@@ -71,9 +70,9 @@ pub struct AcknowledgementInteraction<Db: HoprCoreDbActions> {
 }
 
 impl<Db: HoprCoreDbActions> AcknowledgementInteraction<Db> {
-    pub fn new(db: Db, public_key: PublicKey) -> Self {
+    pub fn new(db: Arc<Mutex<Db>>, public_key: PublicKey) -> Self {
         Self {
-            db: RefCell::new(db),
+            db,
             public_key,
             incoming_channel: unbounded(),
             outgoing_channel: unbounded(),
@@ -167,7 +166,8 @@ impl<Db: HoprCoreDbActions> AcknowledgementInteraction<Db> {
 
         let pending = self
             .db
-            .borrow()
+            .lock()
+            .unwrap()
             .get_pending_acknowledgement(&ack.ack_challenge())
             .await?
             .ok_or_else(|| {
@@ -203,7 +203,8 @@ impl<Db: HoprCoreDbActions> AcknowledgementInteraction<Db> {
                 })?;
 
                 self.db
-                    .borrow()
+                    .lock()
+                    .unwrap()
                     .get_channel_from(&unackowledged.signer)
                     .await
                     .map_err(|e| {
@@ -226,7 +227,8 @@ impl<Db: HoprCoreDbActions> AcknowledgementInteraction<Db> {
 
                 // replace the un-acked ticket with acked ticket.
                 self.db
-                    .borrow_mut()
+                    .lock()
+                    .unwrap()
                     .replace_unack_with_ack(&ack.ack_challenge(), ack_ticket.clone())
                     .await?;
 
@@ -250,7 +252,7 @@ pub struct PacketInteraction<Db>
 where
     Db: HoprCoreDbActions,
 {
-    db: RefCell<Db>,
+    db: Arc<Mutex<Db>>,
     channel: (Sender<TransportTask>, Receiver<TransportTask>),
     ack_interaction: Arc<AcknowledgementInteraction<Db>>,
     pub message_emitter: Box<dyn Fn(&[u8])>,
@@ -261,9 +263,9 @@ impl<Db> PacketInteraction<Db>
 where
     Db: HoprCoreDbActions,
 {
-    pub fn new(db: Db, ack_interaction: Arc<AcknowledgementInteraction<Db>>, cfg: PacketInteractionConfig) -> Self {
+    pub fn new(db: Arc<Mutex<Db>>, ack_interaction: Arc<AcknowledgementInteraction<Db>>, cfg: PacketInteractionConfig) -> Self {
         Self {
-            db: RefCell::new(db),
+            db,
             channel: unbounded(),
             ack_interaction,
             message_emitter: Box::new(|_|{}),
@@ -334,7 +336,8 @@ where
 
             let unrealized_balance = self
                 .db
-                .borrow()
+                .lock()
+                .unwrap()
                 .get_tickets(sender)
                 .await? // all tickets from sender
                 .into_iter()
@@ -353,13 +356,15 @@ where
     async fn bump_ticket_index(&self, channel_id: &Hash) -> Result<U256> {
         let current_ticket_index = self
             .db
-            .borrow()
+            .lock()
+            .unwrap()
             .get_current_ticket_index(channel_id)
             .await?
             .unwrap_or(U256::one());
 
         self.db
-            .borrow_mut()
+            .lock()
+            .unwrap()
             .set_current_ticket_index(channel_id, current_ticket_index.addn(1))
             .await?;
 
@@ -369,7 +374,8 @@ where
     async fn create_multihop_ticket(&self, destination: PublicKey, path_pos: u8) -> Result<Ticket> {
         let channel = self
             .db
-            .borrow()
+            .lock()
+            .unwrap()
             .get_channel_to(&destination)
             .await?
             .ok_or(ChannelNotFound(destination.to_string()))?;
@@ -385,7 +391,8 @@ where
 
         let outstanding_balance = self
             .db
-            .borrow()
+            .lock()
+            .unwrap()
             .get_pending_balance_to(&destination.to_address())
             .await?;
 
@@ -411,7 +418,7 @@ where
             &self.cfg.private_key,
         );
 
-        self.db.borrow_mut().mark_pending(&ticket).await?;
+        self.db.lock().unwrap().mark_pending(&ticket).await?;
 
         debug!(
             "Creating ticket in channel {channel_id}. Ticket data: {}",
@@ -448,7 +455,8 @@ where
         match packet.state() {
             PacketState::Outgoing { ack_challenge, .. } => {
                 self.db
-                    .borrow_mut()
+                    .lock()
+                    .unwrap()
                     .store_pending_acknowledgment(ack_challenge.clone(), PendingAcknowledgement::WaitingAsSender)
                     .await?;
 
@@ -485,7 +493,7 @@ where
                 ..
             } => {
                 // Validate if it's not a replayed packet
-                if !self.db.borrow_mut().check_and_set_packet_tag(packet_tag).await? {
+                if !self.db.lock().unwrap().check_and_set_packet_tag(packet_tag).await? {
                     return Err(TagReplay);
                 }
 
@@ -513,7 +521,7 @@ where
                 ..
             } => {
                 // Validate if it's not a replayed packet
-                if !self.db.borrow_mut().check_and_set_packet_tag(packet_tag).await? {
+                if !self.db.lock().unwrap().check_and_set_packet_tag(packet_tag).await? {
                     return Err(TagReplay);
                 }
 
@@ -522,7 +530,8 @@ where
                 // Find the corresponding channel
                 let channel = self
                     .db
-                    .borrow()
+                    .lock()
+                    .unwrap()
                     .get_channel_from(&previous_hop)
                     .await?
                     .ok_or(ChannelNotFound(previous_hop.to_string()))?;
@@ -539,18 +548,20 @@ where
                     .await
                 {
                     // Mark as reject and passthrough the error
-                    self.db.borrow_mut().mark_rejected(&packet.ticket).await?;
+                    self.db.lock().unwrap().mark_rejected(&packet.ticket).await?;
                     return Err(e);
                 }
 
                 self.db
-                    .borrow_mut()
+                    .lock()
+                    .unwrap()
                     .set_current_ticket_index(&channel.get_id().hash(), packet.ticket.index)
                     .await?;
 
                 // Store the unacknowledged ticket
                 self.db
-                    .borrow_mut()
+                    .lock()
+                    .unwrap()
                     .store_pending_acknowledgment(
                         ack_challenge.clone(),
                         PendingAcknowledgement::WaitingAsRelayer(UnacknowledgedTicket::new(
@@ -639,7 +650,7 @@ where
 mod tests {
     use std::collections::HashMap;
     use crate::errors::PacketError::PacketDbError;
-    use crate::interaction::{AcknowledgementInteraction, PRICE_PER_PACKET, TransportTask};
+    use crate::interaction::{AcknowledgementInteraction, PacketInteraction, PacketInteractionConfig, PRICE_PER_PACKET, TransportTask};
     use async_trait::async_trait;
     use core_crypto::random::random_bytes;
     use core_crypto::types::{Hash, PublicKey};
@@ -676,13 +687,16 @@ mod tests {
         hex!("0726a9704d56a013980a9077d195520a61b5aed28f92d89c50bca6e0e0c48cfc")
     ];
 
+    const ACK_PROTOCOL: usize = 0;
+    const MSG_PROTOCOL: usize = 1;
+
     lazy_static! {
         static ref PEERS: Vec<PeerId> = PEERS_PRIVS
             .iter()
             .map(|private| PublicKey::from_privkey(private).unwrap().to_peerid())
             .collect();
 
-        static ref MESSAGES: Mutex<HashMap<PeerId, Vec<Msg<PeerId>>>> = Mutex::new(HashMap::new());
+        static ref MESSAGES: Mutex<[HashMap<PeerId, Vec<Msg<PeerId>>>; 2]> = Mutex::new([ HashMap::new(), HashMap::new()]);
     }
 
     #[derive(Clone, Eq, PartialEq, Debug)]
@@ -694,27 +708,36 @@ mod tests {
 
     fn init_transport() {
         let mut g = MESSAGES.lock().unwrap();
-        g.clear();
+        g[ACK_PROTOCOL].clear();
+        g[MSG_PROTOCOL].clear();
+
         for peer in PEERS.iter() {
-            g.insert(peer.clone(), Vec::new());
+            g[ACK_PROTOCOL].insert( peer.clone(), Vec::new() );
+            g[MSG_PROTOCOL].insert( peer.clone(), Vec::new() );
         }
     }
 
-    async fn send_transport_as_peer<const PEER_NUM: usize>(data: Box<[u8]>, dst: String) -> std::result::Result<(), String> {
+    fn terminate_transport() {
+        let mut g = MESSAGES.lock().unwrap();
+        g[ACK_PROTOCOL].clear();
+        g[MSG_PROTOCOL].clear();
+    }
+
+    async fn send_transport_as_peer<const PROTO: usize, const PEER_NUM: usize>(data: Box<[u8]>, dst: String) -> std::result::Result<(), String> {
         let from = PEERS[PEER_NUM];
         let to = PeerId::from_str(&dst).expect(&format!("invalid peer id: {dst}"));
         MESSAGES
             .lock()
-            .unwrap()
+            .unwrap()[PROTO]
             .get_mut(&to)
             .expect(&format!("non existent channel: {to}"))
             .push(Msg { from, to, data });
         Ok(())
     }
 
-    fn retrieve_transport_msgs_as_peer<const PEER_NUM: usize>() -> Option<Vec<Msg<PeerId>>>{
+    fn retrieve_transport_msgs_as_peer<const PROTO: usize, const PEER_NUM: usize>() -> Option<Vec<Msg<PeerId>>>{
         let for_peer = PEERS[PEER_NUM];
-        Some(MESSAGES.lock().unwrap().get_mut(&for_peer)?
+        Some(MESSAGES.lock().unwrap()[PROTO].get_mut(&for_peer)?
             .drain(..)
             .collect())
     }
@@ -733,12 +756,11 @@ mod tests {
         )
     }
 
-    fn create_dbs(amount: usize) -> Vec<Arc<Mutex<DB<RustyLevelDbShim>>>> {
+    fn create_dbs(amount: usize) -> Vec<Arc<Mutex<rusty_leveldb::DB>>> {
         (0..amount)
-            .map(|i| {
-                Arc::new(Mutex::new(DB::new(RustyLevelDbShim::new(
-                    rusty_leveldb::DB::open(format!("test_db_{i}"), rusty_leveldb::in_memory()).unwrap(),
-                ))))
+            .map(|i| { Arc::new(Mutex::new(
+                rusty_leveldb::DB::open(format!("test_db_{i}"), rusty_leveldb::in_memory()).unwrap(),
+                ))
             })
             .collect()
     }
@@ -757,13 +779,13 @@ mod tests {
     }
 
     async fn create_minimal_topology(
-        dbs: &Vec<Arc<Mutex<DB<RustyLevelDbShim>>>>
+        dbs: &Vec<Arc<Mutex<rusty_leveldb::DB>>>
     ) -> crate::errors::Result<()> {
         let testing_snapshot = Snapshot::new(U256::zero(), U256::zero(), U256::zero());
         let mut previous_channel: Option<ChannelEntry> = None;
 
         for (index, peer_id) in PEERS.iter().enumerate().take(dbs.len()) {
-            let mut db = CoreEthereumDb::new(dbs[index].clone(), PublicKey::from_peerid(&peer_id).unwrap());
+            let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(dbs[index].clone())), PublicKey::from_peerid(&peer_id).unwrap());
 
             let mut channel: Option<ChannelEntry> = None;
 
@@ -808,23 +830,23 @@ mod tests {
     pub async fn test_packet_acknowledgement_sender_workflow() {
         let _ = env_logger::builder().is_test(true).try_init();
 
+        init_transport();
+
         let dbs = create_dbs(2);
 
         create_minimal_topology(&dbs)
             .await
             .expect("failed to create minimal channel topology");
 
-        init_transport();
-
         let mut core_dbs = dbs
             .iter()
-            .enumerate().map(|(i, db)| CoreDb::new(
-                db.clone(),
+            .enumerate().map(|(i, db)| Arc::new(Mutex::new(CoreDb::new(
+                DB::new(RustyLevelDbShim::new(db.clone())),
                 PublicKey::from_peerid(&PEERS[i]).unwrap()
-            )).collect::<Vec<_>>();
+            )))).collect::<Vec<_>>();
 
 
-        // Begin test
+        /// Begin test
 
         const PENDING_ACKS: usize = 5;
         let mut sent_challenges = Vec::with_capacity(PENDING_ACKS);
@@ -834,7 +856,7 @@ mod tests {
                 .expect("failed to create Proof of Relay values");
 
             // Mimics that the packet sender has sent a packet and now it has a pending acknowledgement in it's DB
-            core_dbs[0].store_pending_acknowledgment(porv.ack_challenge.clone(), PendingAcknowledgement::WaitingAsSender).await
+            core_dbs[0].lock().unwrap().store_pending_acknowledgment(porv.ack_challenge.clone(), PendingAcknowledgement::WaitingAsSender).await
                 .expect("failed to store pending ack");
 
             let ack_key = derive_ack_key_share(&secrets[0]);
@@ -845,7 +867,7 @@ mod tests {
 
 
         // Peer 1: This is mimics the ACK interaction of the packet sender
-        let mut tmp_ack = AcknowledgementInteraction::new(core_dbs.remove(0), PublicKey::from_peerid(&PEERS[0]).unwrap());
+        let mut tmp_ack = AcknowledgementInteraction::new(core_dbs[0].clone(), PublicKey::from_peerid(&PEERS[0]).unwrap());
 
         // ... which is just waiting to get an acknowledgement from the counterparty
         let (done_tx, done_rx) = async_std::channel::unbounded();
@@ -869,7 +891,7 @@ mod tests {
         // Peer 1: hookup receiving of acknowledgements
         let ack_1_clone_1 = ack_interaction_sender.clone();
         async_std::task::spawn_local(async move {
-            while let Some(msgs) = retrieve_transport_msgs_as_peer::<0>() {
+            while let Some(msgs) = retrieve_transport_msgs_as_peer::<ACK_PROTOCOL, 0>() {
                for task in msgs.into_iter().map(|m| TransportTask {
                    remote_peer: m.from,
                    data: m.data
@@ -890,12 +912,12 @@ mod tests {
         });
 
         // Peer 2: Recipient of the packet and sender of the acknowledgement
-        let ack_interaction_counterparty = Arc::new(AcknowledgementInteraction::new(core_dbs.remove(0), PublicKey::from_peerid(&PEERS[1]).unwrap()));
+        let ack_interaction_counterparty = Arc::new(AcknowledgementInteraction::new(core_dbs[1].clone(), PublicKey::from_peerid(&PEERS[1]).unwrap()));
 
         // Peer 2: start sending out outgoing acknowledgement
         let ack_2_clone = ack_interaction_counterparty.clone();
         async_std::task::spawn_local(async move {
-            ack_2_clone.handle_outgoing_acknowledgements(&send_transport_as_peer::<1>).await;
+            ack_2_clone.handle_outgoing_acknowledgements(&send_transport_as_peer::<ACK_PROTOCOL, 1>).await;
         });
 
         // Peer 2: does not need to process incoming acknowledgements
@@ -924,13 +946,138 @@ mod tests {
             Either::Right(_) => false,
         };
 
-        MESSAGES.lock().unwrap().clear();
+        terminate_transport();
         ack_interaction_sender.stop();
         ack_interaction_counterparty.stop();
         async_std::task::sleep(Duration::from_secs(1)).await; // Let everything shutdown
 
         assert!(succeeded, "test timed out after 10 seconds");
     }
+
+    /*
+    #[async_std::test]
+    pub async fn test_packet_acknowledgement_relayer_workflow() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        init_transport();
+
+        let dbs = create_dbs(2);
+
+        create_minimal_topology(&dbs)
+            .await
+            .expect("failed to create minimal channel topology");
+
+        let core_dbs = dbs
+            .iter()
+            .enumerate().map(|(i, db)| Arc::new(Mutex::new(CoreDb::new(
+            DB::new(RustyLevelDbShim::new(db.clone())),
+            PublicKey::from_peerid(&PEERS[i]).unwrap()
+        )))).collect::<Vec<_>>();
+
+
+
+        /// Begin test
+
+
+        // Peer 1: This is mimics the ACK interaction of the packet sender
+        let mut tmp_ack = AcknowledgementInteraction::new(core_dbs[0].clone(), PublicKey::from_peerid(&PEERS[0]).unwrap());
+
+        // ... which is just waiting to get an acknowledgement from the counterparty
+        let (done_tx, done_rx) = async_std::channel::unbounded();
+        let expected_challenges = sent_challenges.clone();
+        tmp_ack.on_acknowledgement = Box::new(move |ack| {
+            debug!("sender has received acknowledgement: {}", ack.to_hex());
+            if let Some((ack_key, ack_msg)) = expected_challenges
+                .iter()
+                .find(|(_, chal)| chal.ack_challenge.unwrap().eq(&ack)) {
+
+                assert!(ack_msg.solve(&ack_key.to_bytes()), "acknowledgement key must solve acknowledgement challenge");
+
+                // If it matches, set a signal that the test has finished
+                done_tx.send_blocking(()).expect("send failed");
+                debug!("peer 1 received expected ack");
+            }
+        });
+
+        let ack_interaction_sender = Arc::new(tmp_ack);
+
+        let cfg = PacketInteractionConfig {
+            check_unrealized_balance: true,
+            private_key: Box::new(PEERS_PRIVS[0]),
+        };
+        let packet_sender = PacketInteraction::new(core_dbs[0].clone(), ack_interaction_sender.clone(), cfg);
+
+        const PENDING_PACKETS: usize = 5;
+        let mut sent_challenges = Vec::with_capacity(PENDING_PACKETS);
+        for _ in 0..PENDING_ACKS {
+
+        }
+
+        // Peer 1: hookup receiving of acknowledgements
+        let ack_1_clone_1 = ack_interaction_sender.clone();
+        async_std::task::spawn_local(async move {
+            while let Some(msgs) = retrieve_transport_msgs_as_peer::<ACK_PROTOCOL, 0>() {
+                for task in msgs.into_iter().map(|m| TransportTask {
+                    remote_peer: m.from,
+                    data: m.data
+                }) {
+                    debug!("received ack from {}: {}", task.remote_peer, hex::encode(&task.data));
+                    ack_1_clone_1.received_acknowledgement(task)
+                        .await
+                        .expect("failed to receive ack");
+                }
+                async_std::task::sleep(Duration::from_millis(200)).await;
+            }
+        });
+
+        // Peer 1: start processing incoming acknowledgements on the packet sender
+        let ack_1_clone_2 = ack_interaction_sender.clone();
+        async_std::task::spawn_local(async move {
+            ack_1_clone_2.handle_incoming_acknowledgements().await
+        });
+
+        // Peer 2: Recipient of the packet and sender of the acknowledgement
+        let ack_interaction_counterparty = Arc::new(AcknowledgementInteraction::new(core_dbs.remove(0), PublicKey::from_peerid(&PEERS[1]).unwrap()));
+
+        // Peer 2: start sending out outgoing acknowledgement
+        let ack_2_clone = ack_interaction_counterparty.clone();
+        async_std::task::spawn_local(async move {
+            ack_2_clone.handle_outgoing_acknowledgements(&send_transport_as_peer::<ACK_PROTOCOL, 1>).await;
+        });
+
+        // Peer 2: does not need to process incoming acknowledgements
+
+        ////
+
+        for (ack_key, ack_msg) in sent_challenges {
+            ack_interaction_counterparty.send_acknowledgement(
+                Acknowledgement::new(ack_msg, ack_key, &PEERS_PRIVS[1]),
+                PEERS[0].clone()
+            ).await.expect("failed to send ack");
+        }
+
+
+        let finish = async move {
+            for i in 1..PENDING_ACKS + 1 {
+                done_rx.recv().await.expect("failed finalize ack");
+                debug!("done ack #{i} out of {PENDING_ACKS}");
+            }
+        };
+        let timeout = async_std::task::sleep(Duration::from_secs(10));
+        pin_mut!(finish, timeout);
+
+        let succeeded = match select(finish, timeout).await {
+            Either::Left(_) => true,
+            Either::Right(_) => false,
+        };
+
+        terminate_transport();
+        ack_interaction_sender.stop();
+        ack_interaction_counterparty.stop();
+        async_std::task::sleep(Duration::from_secs(1)).await; // Let everything shutdown
+
+        assert!(succeeded, "test timed out after 10 seconds");
+    }*/
 }
 
 #[cfg(feature = "wasm")]
@@ -944,7 +1091,6 @@ pub mod wasm {
     use std::pin::Pin;
     use std::str::FromStr;
     use std::sync::{Arc, Mutex};
-    use utils_db::db::DB;
     use utils_db::leveldb::{LevelDb, LevelDbShim};
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
@@ -952,6 +1098,7 @@ pub mod wasm {
     use wasm_bindgen::JsCast;
     use wasm_bindgen::JsValue;
     use core_types::acknowledgement::Acknowledgement;
+    use utils_db::db::DB;
     use utils_log::error;
 
     #[wasm_bindgen]
@@ -974,8 +1121,8 @@ pub mod wasm {
     impl WasmAckInteraction {
         pub fn new(db: LevelDb, chain_key: PublicKey) -> Self {
             Self {
-                w: Arc::new(AcknowledgementInteraction::new(
-                    CoreDb::new(Arc::new(Mutex::new(DB::new(LevelDbShim::new(db)))), chain_key.clone()),
+                w: Arc::new(AcknowledgementInteraction::new(Arc::new(Mutex::new(
+                    CoreDb::new(DB::new(LevelDbShim::new(db)), chain_key.clone()))),
                     chain_key,
                 )),
             }
@@ -1041,11 +1188,11 @@ pub mod wasm {
         #[wasm_bindgen(constructor)]
         pub fn new(db: LevelDb, cfg: PacketInteractionConfig, ack: &WasmAckInteraction) -> Self {
             Self {
-                w: PacketInteraction::new(
+                w: PacketInteraction::new(Arc::new(Mutex::new(
                     CoreDb::new(
-                        Arc::new(Mutex::new(DB::new(LevelDbShim::new(db)))),
+                        DB::new(LevelDbShim::new(db)),
                         PublicKey::from_privkey(&cfg.private_key).expect("invalid private key"),
-                    ),
+                    ))),
                     ack.w.clone(),
                     cfg,
                 ),
