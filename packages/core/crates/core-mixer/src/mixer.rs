@@ -8,6 +8,10 @@ use rand::Rng;
 use crate::future_extensions::StreamThenConcurrentExt;
 
 use utils_log::debug;
+
+#[cfg(all(feature = "prometheus", not(test)))]
+use lazy_static::lazy_static;
+#[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::SimpleGauge;
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -26,7 +30,6 @@ use async_std::task::sleep;
 
 #[cfg(all(feature = "wasm", not(test)))]
 use gloo_timers::future::sleep;
-use lazy_static::lazy_static;
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
