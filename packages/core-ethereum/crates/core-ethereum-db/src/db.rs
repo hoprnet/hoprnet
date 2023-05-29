@@ -279,11 +279,11 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         self.db.batch(batch_ops, true).await
     }
 
-    async fn delete_acknowledged_ticket(&mut self, ticket: &AcknowledgedTicket) -> Result<()> {
-        let ack_key = to_acknowledged_ticket_key(&ticket.ticket.challenge, &ticket.ticket.channel_epoch)?;
-        let _ = self.db.remove::<AcknowledgedTicket>(ack_key).await?;
-        Ok(())
-    }
+    // async fn delete_acknowledged_ticket(&mut self, ticket: &AcknowledgedTicket) -> Result<()> {
+    //     let ack_key = to_acknowledged_ticket_key(&ticket.ticket.challenge, &ticket.ticket.channel_epoch)?;
+    //     let _ = self.db.remove::<AcknowledgedTicket>(ack_key).await?;
+    //     Ok(())
+    // }
 
     async fn store_hash_intermediaries(&mut self, channel: &Hash, iterated_hash: &IteratedHash) -> Result<()> {
         let mut batch_ops = utils_db::db::Batch::new();
@@ -372,6 +372,14 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             .await
     }
 
+    async fn get_public_node_accounts(&self) -> Result<Vec<AccountEntry>> {
+        self.db
+            .get_more::<AccountEntry>(Box::from(ACCOUNT_PREFIX.as_bytes()), Address::size(), &|x| {
+                x.contains_routing_info()
+            })
+            .await
+    }
+
     async fn get_redeemed_tickets_value(&self) -> Result<Balance> {
         let key = utils_db::db::Key::new_from_str(REDEEMED_TICKETS_VALUE)?;
 
@@ -405,17 +413,17 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         self.db.get_or_none::<usize>(key).await.map(|v| v.unwrap_or(0))
     }
 
-    async fn resolve_pending(&mut self, ticket: &Ticket, snapshot: &Snapshot) -> Result<()> {
-        let key = utils_db::db::Key::new_with_prefix(&ticket.counterparty, PENDING_TICKETS_COUNT)?;
-        let balance = self
+    async fn resolve_pending(&mut self, address: &Address, balance: &Balance, snapshot: &Snapshot) -> Result<()> {
+        let key = utils_db::db::Key::new_with_prefix(address, PENDING_TICKETS_COUNT)?;
+        let current_balance = self
             .db
             .get_or_none(key.clone())
             .await?
             .unwrap_or(Balance::zero(BalanceType::HOPR));
 
         let mut batch_ops = utils_db::db::Batch::new();
-        // NOTE: This operation does not make sense, does it mean to zero out? Why not store zero then?
-        batch_ops.put(key.clone(), &balance.sub(&balance));
+        // TODO: NOTE: was there a bug in the original implementation in TS? val.sub(val)?
+        batch_ops.put(key.clone(), &current_balance.sub(&balance));
         batch_ops.put(
             utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?,
             &snapshot,
@@ -575,7 +583,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
 
     async fn is_network_registry_enabled(&self) -> Result<bool> {
         let key = utils_db::db::Key::new_from_str(NETWORK_REGISTRY_ENABLED_PREFIX)?;
-        Ok(self.db.get_or_none::<bool>(key.clone()).await?.unwrap_or(false))
+        Ok(self.db.get_or_none::<bool>(key.clone()).await?.unwrap_or(true))
     }
 
     async fn set_network_registry(&mut self, enabled: bool, snapshot: &Snapshot) -> Result<()> {
@@ -713,6 +721,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use super::{CoreEthereumDb, HoprCoreEthereumDbActions, PublicKey, DB};
+    use core_crypto::iterated_hash::IteratedHash;
     use core_crypto::types::Hash;
     use core_types::account::AccountEntry;
     use core_types::acknowledgement::AcknowledgedTicket;
@@ -745,6 +754,20 @@ pub mod wasm {
                         None
                     }
                 }
+
+                #[wasm_bindgen]
+                pub fn at(&self, index: usize) -> Option<$x> {
+                    if index < self.v.len() {
+                        Some(self.v[index].clone())
+                    } else {
+                        None
+                    }
+                }
+
+                #[wasm_bindgen]
+                pub fn len(&self) -> usize {
+                    self.v.len()
+                }
             }
         };
     }
@@ -760,7 +783,7 @@ pub mod wasm {
     }
 
     impl Database {
-        pub fn core_ethereum_db(&self) -> Arc<Mutex<CoreEthereumDb<leveldb::LevelDbShim>>> {
+        pub fn as_ref_counted(&self) -> Arc<Mutex<CoreEthereumDb<leveldb::LevelDbShim>>> {
             self.core_ethereum_db.clone()
         }
     }
@@ -796,10 +819,21 @@ pub mod wasm {
             utils_misc::ok_or_jserr!(db.delete_acknowledged_tickets_from(source).await)
         }
 
+        // #[wasm_bindgen]
+        // pub async fn delete_acknowledged_ticket(&mut self, ticket: &AcknowledgedTicket) -> Result<(), JsValue> {
+        //     let mut db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+        //     utils_misc::ok_or_jserr!(db.delete_acknowledged_ticket(ticket).await)
+        // }
+
         #[wasm_bindgen]
-        pub async fn delete_acknowledged_ticket(&mut self, ticket: &AcknowledgedTicket) -> Result<(), JsValue> {
+        pub async fn store_hash_intermediaries(
+            &mut self,
+            channel: &Hash,
+            iterated_hash: JsValue,
+        ) -> Result<(), JsValue> {
+            let iterated: IteratedHash = utils_misc::ok_or_jserr!(serde_wasm_bindgen::from_value(iterated_hash))?;
             let mut db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
-            utils_misc::ok_or_jserr!(db.delete_acknowledged_ticket(ticket).await)
+            utils_misc::ok_or_jserr!(db.store_hash_intermediaries(channel, &iterated).await)
         }
 
         #[wasm_bindgen]
@@ -822,6 +856,7 @@ pub mod wasm {
 
         #[wasm_bindgen]
         pub async fn get_latest_block_number(&self) -> Result<u32, JsValue> {
+            // NOTE: does not perform conversion: BN(value).toNumber() !!!
             let db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
             utils_misc::ok_or_jserr!(db.get_latest_block_number().await)
         }
@@ -889,6 +924,12 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
+        pub async fn get_public_node_accounts(&self) -> Result<WasmVecAccountEntry, JsValue> {
+            let db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.get_public_node_accounts().await).map(|v| WasmVecAccountEntry::from(v))
+        }
+
+        #[wasm_bindgen]
         pub async fn get_redeemed_tickets_value(&self) -> Result<Balance, JsValue> {
             let db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
             utils_misc::ok_or_jserr!(db.get_redeemed_tickets_value().await)
@@ -931,15 +972,27 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub async fn resolve_pending(&mut self, ticket: &Ticket, snapshot: &Snapshot) -> Result<(), JsValue> {
+        pub async fn resolve_pending(
+            &mut self,
+            address: &Address,
+            balance: &Balance,
+            snapshot: &Snapshot,
+        ) -> Result<(), JsValue> {
             let mut db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
-            utils_misc::ok_or_jserr!(db.resolve_pending(ticket, snapshot).await)
+            utils_misc::ok_or_jserr!(db.resolve_pending(address, balance, snapshot).await)
         }
 
         #[wasm_bindgen]
         pub async fn mark_redeemed(&mut self, ticket: &AcknowledgedTicket) -> Result<(), JsValue> {
             let mut db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
             utils_misc::ok_or_jserr!(db.mark_redeemed(ticket).await)
+        }
+
+        /// NOTE: needed only for testing
+        #[wasm_bindgen]
+        pub async fn mark_rejected(&mut self, ticket: &Ticket) -> Result<(), JsValue> {
+            let mut db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.mark_rejected(ticket).await)
         }
 
         #[wasm_bindgen]

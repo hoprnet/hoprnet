@@ -4,10 +4,11 @@
 //
 // We need to persist this string of commitments in the database, and support
 // syncing back and forth with those that have been persisted on chain.
-import { debug, Hash, HoprDB, toU8a, u8aConcat, U256 } from '@hoprnet/hopr-utils'
+import { debug, Hash, toU8a, u8aConcat, U256 } from '@hoprnet/hopr-utils'
 
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { keysPBM } from '@libp2p/crypto/keys'
+import { Database } from '../lib/core_ethereum_db.js'
 
 // NOTE: Workaround until also this file is converted to Rust
 // Reason being that all cryptography is now in core-crypto, and core-ethereum cannot depend
@@ -19,12 +20,18 @@ const log = debug('hopr-core-ethereum:commitment')
 export const DB_ITERATION_BLOCK_SIZE = 10000
 export const TOTAL_ITERATIONS = 100000
 
-function searchDBFor(db: HoprDB, channelId: Hash, iteration: number): Promise<Uint8Array | undefined> {
-  return db.getCommitment(channelId, iteration)
+// NOTE: this was not an async function
+async function searchDBFor(db: Database, channelId: Hash, iteration: number): Promise<Uint8Array | undefined> {
+  let commitment = await db.get_commitment(channelId, iteration)
+  if (commitment === undefined) {
+    return undefined
+  } else {
+    return commitment.serialize()
+  }
 }
 
-export async function findCommitmentPreImage(db: HoprDB, channelId: Hash): Promise<Hash> {
-  let currentCommitment = await db.getCurrentCommitment(channelId)
+export async function findCommitmentPreImage(db: Database, channelId: Hash): Promise<Hash> {
+  let currentCommitment = await db.get_current_commitment(channelId)
   let result = await recover_iterated_hash(
     currentCommitment.serialize(),
     (i: number) => searchDBFor(db, channelId, i),
@@ -37,24 +44,24 @@ export async function findCommitmentPreImage(db: HoprDB, channelId: Hash): Promi
   return new Hash(result.intermediate)
 }
 
-export async function bumpCommitment(db: HoprDB, channelId: Hash, newCommitment: Hash) {
-  await db.setCurrentCommitment(channelId, newCommitment)
+export async function bumpCommitment(db: Database, channelId: Hash, newCommitment: Hash) {
+  await db.set_current_commitment(channelId, newCommitment)
 }
 
 type GetCommitment = () => Promise<Hash>
 type SetCommitment = (commitment: Hash) => Promise<string>
 
 async function createCommitmentChain(
-  db: HoprDB,
+  db: Database,
   channelId: Hash,
   initialCommitmentSeed: Uint8Array,
   setChainCommitment: SetCommitment
 ): Promise<void> {
   const intermediates = await iterate_hash(initialCommitmentSeed, TOTAL_ITERATIONS, DB_ITERATION_BLOCK_SIZE)
 
-  await db.storeHashIntermediaries(channelId, intermediates)
+  await db.store_hash_intermediaries(channelId, intermediates)
   const current = new Hash(intermediates.hash())
-  await Promise.all([db.setCurrentCommitment(channelId, current), setChainCommitment(current)])
+  await Promise.all([db.set_current_commitment(channelId, current), setChainCommitment(current)])
   log('commitment chain initialized')
 }
 
@@ -97,13 +104,13 @@ export class ChannelCommitmentInfo {
 }
 
 export async function initializeCommitment(
-  db: HoprDB,
+  db: Database,
   peerId: PeerId,
   channelInfo: ChannelCommitmentInfo,
   getChainCommitment: GetCommitment,
   setChainCommitment: SetCommitment
 ) {
-  const dbContainsAlready = (await db.getCommitment(channelInfo.channelId, 0)) != undefined
+  const dbContainsAlready = (await db.get_commitment(channelInfo.channelId, 0)) != undefined
   const chainCommitment = await getChainCommitment()
 
   if (chainCommitment && dbContainsAlready) {

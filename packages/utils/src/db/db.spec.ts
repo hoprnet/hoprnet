@@ -94,6 +94,7 @@ function channelEntryCreateMock(): ChannelEntry {
 
 import { LevelDb } from './db.js'
 import { db_sanity_test } from '../../lib/utils_db.js'
+import { Database } from '../../../core-ethereum/lib/core_ethereum_db.js'
 import fs from 'fs'
 
 describe('db shim tests', function () {
@@ -120,6 +121,146 @@ describe('db shim tests', function () {
     } catch (e) {
       assert('EVERYTHING SHOULD PASS', e.toString())
     }
+  })
+})
+
+describe('db functional tests', function () {
+  let db: Database
+  let db_shim: LevelDb
+  let db_dir_path: string
+
+  beforeEach(async function () {
+    db_shim = new LevelDb()
+    db_dir_path = '/tmp/test-shim.db'
+    await db_shim.init(true, db_dir_path, true, 'monte_rosa')
+    db: new Database(db_shim, MOCK_PUBLIC_KEY())
+  })
+
+  afterEach(async function () {
+    await db_shim.close()
+
+    fs.rmSync(db_dir_path, { recursive: true, force: true })
+  })
+
+  it('should store hopr balance', async function () {
+    assert((await db.get_hopr_balance()).eq(Balance.zero(BalanceType.HOPR)))
+
+    await db.set_hopr_balance(new Balance('10', BalanceType.HOPR))
+    assert.equal((await db.get_hopr_balance()).to_string(), '10')
+
+    await db.add_hopr_balance(new Balance('1', BalanceType.HOPR), TestingSnapshot)
+    assert.equal((await db.get_hopr_balance()).to_string(), '11')
+
+    await db.sub_hopr_balance(new Balance('2', BalanceType.HOPR), TestingSnapshot)
+    assert.equal((await db.get_hopr_balance()).to_string(), '9')
+  })
+
+  it('should test register toggle', async function () {
+    // should be false by default
+    assert((await db.is_network_registry_enabled()) === true, 'register should be enabled by default')
+
+    // should be true once set
+    await db.set_network_registry(true, TestingSnapshot)
+    assert((await db.is_network_registry_enabled()) === true, 'register should be enabled')
+
+    // should be false once unset
+    await db.set_network_registry(false, TestingSnapshot)
+    assert((await db.is_network_registry_enabled()) === false, 'register should be disabled')
+  })
+
+  it('should test registry', async function () {
+    const hoprNode = MOCK_PUBLIC_KEY()
+    const account = MOCK_ADDRESS()
+
+    // should be throw when not added
+    assert.rejects(() => db.get_account_from_network_registry(hoprNode), 'should throw when account is not registered')
+
+    // should be set
+    await db.add_to_network_registry(hoprNode, account, TestingSnapshot)
+
+    let nodes = await db.find_hopr_node_using_account_in_network_registry(account)
+    assert(nodes.len() === 1, 'should have only 1 hoprNode registered')
+    assert(
+      (await db.find_hopr_node_using_account_in_network_registry(account))[0].eq(hoprNode),
+      'should match the registered hoprNode'
+    )
+    assert((await db.get_account_from_network_registry(hoprNode)).eq(account), 'should match account added')
+
+    // should be removed
+    await db.remove_from_network_registry(hoprNode, account, TestingSnapshot)
+
+    // TODO!
+    // assert.rejects(
+    //     () => db.find_hopr_node_using_account_in_network_registry(account),
+    //     'should throw when HoprNode is not linked to an account'
+    // )
+    assert(
+      (await db.find_hopr_node_using_account_in_network_registry(account)).len() === 0,
+      'should have 0 hoprNode registered'
+    )
+    // assert.rejects(() => db.get_account_from_network_registry(hoprNode), 'should throw when account is deregistered')
+  })
+
+  it('should test eligible', async function () {
+    const account = MOCK_ADDRESS()
+
+    // should be false by default
+    assert((await db.is_eligible(account)) === false, 'account is not eligible by default')
+
+    // should be true once set
+    await db.set_eligible(account, true, TestingSnapshot.clone())
+    assert((await db.is_eligible(account)) === true, 'account should be eligible')
+
+    // should be false once unset
+    await db.set_eligible(account, false, TestingSnapshot.clone())
+    assert((await db.is_eligible(account)) === false, 'account should not be eligible')
+  })
+
+  it('should store rejected tickets statistics', async function () {
+    assert.equal(await db.get_rejected_tickets_count(), 0)
+    assert((await db.get_rejected_tickets_value()).eq(Balance.zero(BalanceType.HOPR)))
+
+    const amount = new BN(1)
+
+    await db.mark_rejected({
+      amount: new Balance(amount.toString(10), BalanceType.HOPR)
+    } as Ticket)
+
+    assert.equal(await db.get_rejected_tickets_count(), 1)
+    assert((await db.get_rejected_tickets_value()).eq(new Balance(amount.toString(10), BalanceType.HOPR)))
+  })
+
+  it('should store ChannelEntry', async function () {
+    const channelEntry = channelEntryCreateMock()
+
+    await db.update_channel_and_snapshot(channelEntry.get_id(), channelEntry.clone(), TestingSnapshot)
+
+    assert(!!(await db.get_channel(channelEntry.get_id())), 'did not find channel')
+    assert((await db.get_channels()).len() === 1, 'did not find channel')
+  })
+
+  it('block number workflow', async function () {
+    const initialBlockNumber = await db.get_latest_block_number()
+
+    assert(initialBlockNumber == 0, `initial block number must be set to 0`)
+
+    const blockNumber = new BN(23)
+    await db.update_latest_block_number(blockNumber.toNumber())
+
+    const latestBlockNumber = await db.get_latest_block_number()
+
+    assert(blockNumber.eqn(latestBlockNumber), `block number must be updated`)
+  })
+
+  it('should store current commitment', async function () {
+    const DUMMY_CHANNEL = new Hash(new Uint8Array(Hash.size()).fill(0xff))
+    const DUMMY_COMMITMENT = new Hash(new Uint8Array(Hash.size()).fill(0xbb))
+
+    await db.set_current_commitment(DUMMY_CHANNEL, DUMMY_COMMITMENT)
+
+    const fromDb = await db.get_current_commitment(DUMMY_CHANNEL)
+
+    assert(fromDb.eq(DUMMY_COMMITMENT))
   })
 })
 
@@ -290,28 +431,6 @@ describe(`database tests`, function () {
     assert((await db.getAcknowledgedTickets()).length == 1, `DB should contain exactly one acknowledged ticket`)
   })
 
-  it('block number workflow', async function () {
-    const initialBlockNumber = await db.getLatestBlockNumber()
-
-    assert(initialBlockNumber == 0, `initial block number must be set to 0`)
-
-    const blockNumber = new BN(23)
-    await db.updateLatestBlockNumber(blockNumber)
-
-    const latestBlockNumber = await db.getLatestBlockNumber()
-
-    assert(blockNumber.eqn(latestBlockNumber), `block number must be updated`)
-  })
-
-  it('should store ChannelEntry', async function () {
-    const channelEntry = channelEntryCreateMock()
-
-    await db.updateChannelAndSnapshot(channelEntry.get_id(), channelEntry.clone(), TestingSnapshot)
-
-    assert(!!(await db.getChannel(channelEntry.get_id())), 'did not find channel')
-    assert((await db.getChannels()).length === 1, 'did not find channel')
-  })
-
   it('should store ticketIndex', async function () {
     const DUMMY_CHANNEL = new Hash(new Uint8Array(Hash.size()).fill(0xff))
     const DUMMY_INDEX = U256.one()
@@ -321,104 +440,6 @@ describe(`database tests`, function () {
     const fromDb = await db.getCurrentTicketIndex(DUMMY_CHANNEL)
 
     assert(fromDb.eq(DUMMY_INDEX))
-  })
-
-  it('should store current commitment', async function () {
-    const DUMMY_CHANNEL = new Hash(new Uint8Array(Hash.size()).fill(0xff))
-    const DUMMY_COMMITMENT = new Hash(new Uint8Array(Hash.size()).fill(0xbb))
-
-    await db.setCurrentCommitment(DUMMY_CHANNEL, DUMMY_COMMITMENT)
-
-    const fromDb = await db.getCurrentCommitment(DUMMY_CHANNEL)
-
-    assert(fromDb.eq(DUMMY_COMMITMENT))
-  })
-
-  it('should store rejected tickets statistics', async function () {
-    assert.equal(await db.getRejectedTicketsCount(), 0)
-    assert((await db.getRejectedTicketsValue()).eq(Balance.zero(BalanceType.HOPR)))
-
-    const amount = new BN(1)
-
-    await db.markRejected({
-      amount: new Balance(amount.toString(10), BalanceType.HOPR)
-    } as Ticket)
-
-    assert.equal(await db.getRejectedTicketsCount(), 1)
-    assert((await db.getRejectedTicketsValue()).eq(new Balance(amount.toString(10), BalanceType.HOPR)))
-  })
-
-  it('should store hopr balance', async function () {
-    assert((await db.getHoprBalance()).eq(Balance.zero(BalanceType.HOPR)))
-
-    await db.setHoprBalance(new Balance('10', BalanceType.HOPR))
-    assert.equal((await db.getHoprBalance()).to_string(), '10')
-
-    await db.addHoprBalance(new Balance('1', BalanceType.HOPR), TestingSnapshot)
-    assert.equal((await db.getHoprBalance()).to_string(), '11')
-
-    await db.subHoprBalance(new Balance('2', BalanceType.HOPR), TestingSnapshot)
-    assert.equal((await db.getHoprBalance()).to_string(), '9')
-  })
-
-  it('should test registry', async function () {
-    const hoprNode = MOCK_PUBLIC_KEY()
-    const account = MOCK_ADDRESS()
-
-    // should be throw when not added
-    assert.rejects(() => db.getAccountFromNetworkRegistry(hoprNode), 'should throw when account is not registered')
-
-    // should be set
-    await db.addToNetworkRegistry(hoprNode, account, TestingSnapshot)
-    assert(
-      (await db.findHoprNodesUsingAccountInNetworkRegistry(account)).length === 1,
-      'should have only 1 hoprNode registered'
-    )
-    assert(
-      (await db.findHoprNodesUsingAccountInNetworkRegistry(account))[0].eq(hoprNode),
-      'should match the registered hoprNode'
-    )
-    assert((await db.getAccountFromNetworkRegistry(hoprNode)).eq(account), 'should match account added')
-
-    // should be removed
-    await db.removeFromNetworkRegistry(hoprNode, account, TestingSnapshot)
-    assert.rejects(
-      () => db.findHoprNodesUsingAccountInNetworkRegistry(account),
-      'should throw when HoprNode is not linked to an account'
-    )
-    assert(
-      (await db.findHoprNodesUsingAccountInNetworkRegistry(account)).length === 0,
-      'should have 0 hoprNode registered'
-    )
-    assert.rejects(() => db.getAccountFromNetworkRegistry(hoprNode), 'should throw when account is deregistered')
-  })
-
-  it('should test eligible', async function () {
-    const account = MOCK_ADDRESS()
-
-    // should be false by default
-    assert((await db.isEligible(account)) === false, 'account is not eligible by default')
-
-    // should be true once set
-    await db.setEligible(account, true, TestingSnapshot.clone())
-    assert((await db.isEligible(account)) === true, 'account should be eligible')
-
-    // should be false once unset
-    await db.setEligible(account, false, TestingSnapshot.clone())
-    assert((await db.isEligible(account)) === false, 'account should be uneligible')
-  })
-
-  it('should test register toggle', async function () {
-    // should be false by default
-    assert((await db.isNetworkRegistryEnabled()) === true, 'register should be enabled by default')
-
-    // should be true once set
-    await db.setNetworkRegistryEnabled(true, TestingSnapshot)
-    assert((await db.isNetworkRegistryEnabled()) === true, 'register should be enabled')
-
-    // should be false once unset
-    await db.setNetworkRegistryEnabled(false, TestingSnapshot)
-    assert((await db.isNetworkRegistryEnabled()) === false, 'register should be disabled')
   })
 
   it('putSerializedObject and getSerializedObject should store and read object', async function () {

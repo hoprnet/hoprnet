@@ -5,7 +5,7 @@ use crate::errors::Result;
 use crate::primitives::{DigestLike, EthDigest};
 
 /// Contains the complete hash iteration progression
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct IteratedHash {
     pub hash: Box<[u8]>,
     pub intermediates: Vec<Intermediate>,

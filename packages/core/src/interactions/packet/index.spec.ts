@@ -30,6 +30,7 @@ import type { ResolvedNetwork } from '../../network.js'
 import type { HoprOptions } from '../../index.js'
 import type { Components } from '@libp2p/interfaces/components'
 import type { Connection, Stream } from '@libp2p/interfaces/connection'
+import { Database } from '../../../../core-ethereum/lib/core_ethereum_db.js'
 
 import {
   derive_ack_key_share,
@@ -199,7 +200,7 @@ async function createMinimalChannelTopology(dbs: HoprDB[], nodes: PeerId[]): Pro
       )
       // Set a commitment if we are the destination
       await initializeCommitment(
-        dbs[index],
+        new Database(dbs[index].db, dbs[index].id),
         SELF,
         channelInfo,
         (): any => {},

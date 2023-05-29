@@ -13,7 +13,7 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 default = ["console_error_panic_hook", "wasm"]
-wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures"]
+wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:serde-wasm-bindgen"]
 console_error_panic_hook = [ "dep:console_error_panic_hook" ]
 
 [dependencies]
@@ -27,6 +27,7 @@ utils-misc = { path = "../../../utils/crates/utils-misc"}
 utils-types = { path = "../../../utils/crates/utils-types"}
 wasm-bindgen = { workspace = true, features = ["serde-serialize"], optional = true }
 wasm-bindgen-futures = { version = "0.4.36", features = ["futures-core-03-stream"], optional = true }
+serde-wasm-bindgen = { version = "0.5", optional = true }
 
 console_error_panic_hook = { version = "0.1.6", optional = true }
 # wee_alloc = { version = "0.4.5", optional = true }

@@ -5,16 +5,17 @@ import type { HoprChannels, HoprNetworkRegistry, HoprToken, TypedEvent } from '.
 import {
   Address,
   Hash,
-  HoprDB,
   generate_channel_id,
   Balance,
   BalanceType,
   SUGGESTED_NATIVE_BALANCE,
   debug,
   AccountEntry,
-  PublicKey
+  PublicKey,
+  LevelDb
 } from '@hoprnet/hopr-utils'
 
+import { Database } from '../../../core-ethereum/lib/core_ethereum_db.js'
 import Indexer from './index.js'
 import type { ChainWrapper } from '../ethereum.js'
 import type { Event, TokenEvent, RegistryEvent } from './types.js'
@@ -277,6 +278,49 @@ export class TestingIndexer extends Indexer {
   }
 }
 
+export const useFixturesRs = async (
+  ops: {
+    latestBlockNumber?: number
+    pastEvents?: Event<any>[]
+    pastHoprTokenEvents?: TokenEvent<any>[]
+    pastHoprRegistryEvents?: RegistryEvent<any>[]
+    id?: PublicKey
+  } = {}
+) => {
+  const latestBlockNumber = ops.latestBlockNumber ?? 0
+
+  const db = new Database(new LevelDb(), ops.id)
+  const { provider, newBlock } = createProviderMock({ latestBlockNumber })
+  const { hoprChannels, newEvent } = createHoprChannelsMock({ pastEvents: ops.pastEvents ?? [] })
+  const { hoprToken, newEvent: newTokenEvent } = createHoprTokenMock({
+    pastEvents: ops.pastHoprTokenEvents ?? []
+  })
+  const { hoprRegistry, newEvent: newRegistryEvent } = createHoprRegistryMock({
+    pastEvents: ops.pastHoprRegistryEvents ?? []
+  })
+  const chain = createChainMock(provider, hoprChannels, hoprToken, hoprRegistry)
+
+  return {
+    db,
+    provider,
+    newBlock,
+    hoprChannels,
+    hoprToken,
+    hoprRegistry,
+    newEvent,
+    newTokenEvent,
+    newRegistryEvent,
+    indexer: new TestingIndexer(!ops.id ? MOCK_PUBLIC_KEY().to_address() : ops.id.to_address(), db, 1, 5),
+    chain,
+    OPENED_CHANNEL: await channelEntryFromSCEvent(fixtures.OPENED_EVENT, (a: Address) =>
+      Promise.resolve(a.eq(PARTY_A().to_address()) ? PARTY_A() : PARTY_B())
+    ),
+    COMMITTED_CHANNEL: await channelEntryFromSCEvent(fixtures.COMMITTED_EVENT, (a: Address) =>
+      Promise.resolve(a.eq(PARTY_A().to_address()) ? PARTY_A() : PARTY_B())
+    )
+  }
+}
+
 export const useFixtures = async (
   ops: {
     latestBlockNumber?: number
@@ -288,7 +332,7 @@ export const useFixtures = async (
 ) => {
   const latestBlockNumber = ops.latestBlockNumber ?? 0
 
-  const db = HoprDB.createMock(ops.id)
+  const db = new Database(new LevelDb(), ops.id)
   const { provider, newBlock } = createProviderMock({ latestBlockNumber })
   const { hoprChannels, newEvent } = createHoprChannelsMock({ pastEvents: ops.pastEvents ?? [] })
   const { hoprToken, newEvent: newTokenEvent } = createHoprTokenMock({

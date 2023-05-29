@@ -20,6 +20,7 @@ import {
   AccountEntry,
   create_counter
 } from '@hoprnet/hopr-utils'
+import { Database } from '../lib/core_ethereum_db.js'
 import Indexer from './indexer/index.js'
 import { CORE_ETHEREUM_CONSTANTS } from '../lib/core_ethereum_misc.js'
 import { EventEmitter } from 'events'
@@ -75,6 +76,7 @@ export default class HoprCoreEthereum extends EventEmitter {
 
   private constructor(
     private db: HoprDB,
+    private db_rs: Database,
     private publicKey: PublicKey,
     private privateKey: Uint8Array,
     private options: ChainOptions,
@@ -82,9 +84,11 @@ export default class HoprCoreEthereum extends EventEmitter {
   ) {
     super()
 
+    log(`[DEBUG] initialized Rust DB... ${JSON.stringify(this.db_rs.toString(), null, 2)} `)
+
     this.indexer = new Indexer(
       this.publicKey.to_address(),
-      this.db,
+      this.db_rs,
       this.options.maxConfirmations ?? constants.DEFAULT_CONFIRMATIONS,
       constants.INDEXER_BLOCK_RANGE
     )
@@ -97,7 +101,14 @@ export default class HoprCoreEthereum extends EventEmitter {
     options: ChainOptions,
     automaticChainCreation = true
   ) {
-    HoprCoreEthereum._instance = new HoprCoreEthereum(db, publicKey, privateKey, options, automaticChainCreation)
+    HoprCoreEthereum._instance = new HoprCoreEthereum(
+      db,
+      new Database(db.db, db.id),
+      publicKey,
+      privateKey,
+      options,
+      automaticChainCreation
+    )
     return HoprCoreEthereum._instance
   }
 
@@ -149,7 +160,7 @@ export default class HoprCoreEthereum extends EventEmitter {
         await this.chain.waitUntilReady()
 
         const hoprBalance = await this.chain.getBalance(this.publicKey.to_address())
-        await this.db.setHoprBalance(hoprBalance)
+        await this.db_rs.set_hopr_balance(hoprBalance)
         log(`set own HOPR balance to ${hoprBalance.to_formatted_string()}`)
 
         await this.indexer.start(this.chain, this.chain.getGenesisBlock())
@@ -214,7 +225,7 @@ export default class HoprCoreEthereum extends EventEmitter {
    * @returns HOPR balance
    */
   public async getBalance(useIndexer: boolean = false): Promise<Balance> {
-    return useIndexer ? this.db.getHoprBalance() : this.chain.getBalance(this.publicKey.to_address())
+    return useIndexer ? this.db_rs.get_hopr_balance() : this.chain.getBalance(this.publicKey.to_address())
   }
 
   public getPublicKey(): PublicKey {
@@ -258,7 +269,7 @@ export default class HoprCoreEthereum extends EventEmitter {
         this.setTxHandler(`channel-updated-${txHash}`, txHash)
       )
     }
-    const getCommitment = async () => (await this.db.getChannel(c.get_id())).commitment
+    const getCommitment = async () => (await this.db_rs.get_channel(c.get_id())).commitment
 
     // Get all channel information required to build the initial commitment
     const cci = new ChannelCommitmentInfo(
@@ -268,7 +279,7 @@ export default class HoprCoreEthereum extends EventEmitter {
       c.channel_epoch
     )
 
-    await initializeCommitment(this.db, privKeyToPeerId(this.privateKey), cci, getCommitment, setCommitment)
+    await initializeCommitment(this.db_rs, privKeyToPeerId(this.privateKey), cci, getCommitment, setCommitment)
   }
 
   public async redeemAllTickets(): Promise<void> {
@@ -288,7 +299,9 @@ export default class HoprCoreEthereum extends EventEmitter {
 
   private async redeemAllTicketsInternalLoop(): Promise<void> {
     try {
-      for await (const channel of this.db.getChannelsToIterable(this.publicKey.to_address())) {
+      let channelsTo = await this.db_rs.get_channels_to(this.publicKey.to_address())
+      while (channelsTo.len() > 0) {
+        let channel = channelsTo.next()
         await this.redeemTicketsInChannel(channel)
       }
     } catch (err) {
@@ -300,7 +313,7 @@ export default class HoprCoreEthereum extends EventEmitter {
   }
 
   public async redeemTicketsInChannelByCounterparty(counterparty: PublicKey) {
-    const channel = await this.db.getChannelFrom(counterparty)
+    const channel = await this.db_rs.get_channel_from(counterparty)
     return this.redeemTicketsInChannel(channel)
   }
 
@@ -342,16 +355,17 @@ export default class HoprCoreEthereum extends EventEmitter {
     // those tickets.
 
     const boundRedeemTicket = this.redeemTicket.bind(this)
-    const boundGetAckdTickets = this.db.getAcknowledgedTickets.bind(this.db)
-    const boundMarkLosingAckedTicket = this.db.markLosingAckedTicket.bind(this.db)
+    const boundGetAckdTickets = this.db_rs.get_acknowledged_tickets.bind(this.db)
+    const boundMarkLosingAckedTicket = this.db_rs.mark_losing_acked_ticket.bind(this.db)
 
     // Use an async iterator to make execution interruptable and allow
     // Node.JS to schedule iterations at any time
     const ticketRedeemIterator = async function* () {
       let tickets = await boundGetAckdTickets({ channel })
       let ticket: AcknowledgedTicket
-      while (tickets.length > 0) {
-        if (ticket != undefined && ticket.ticket.index.eq(tickets[0].ticket.index)) {
+      while (tickets.len() > 0) {
+        let fetched = tickets.next()
+        if (ticket != undefined && ticket.ticket.index.eq(fetched.ticket.index)) {
           // @TODO handle errors
           log(
             `Could not redeem ticket with index ${ticket.ticket.index.to_string()} in channel ${channelId.to_hex()}. Giving up.`
@@ -359,7 +373,7 @@ export default class HoprCoreEthereum extends EventEmitter {
           break
         }
 
-        ticket = tickets[0]
+        ticket = fetched
 
         log(
           `redeeming ticket ${ticket.response.to_hex()} in channel from ${channel.source} to ${
@@ -417,7 +431,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     let commitmentPreImage: Hash // actual ackTicket.preImage
 
     try {
-      commitmentPreImage = await findCommitmentPreImage(this.db, channelId)
+      commitmentPreImage = await findCommitmentPreImage(this.db_rs, channelId)
     } catch (err) {
       log(`Channel ${channelId.to_hex()} is out of commitments`)
       // TODO: How should we handle this ticket if it's out of commitment
@@ -473,10 +487,10 @@ export default class HoprCoreEthereum extends EventEmitter {
 
     // bump commitment when on-chain ticket redemption is successful
     // FIXME: bump commitment can fail if channel runs out of commitments
-    await bumpCommitment(this.db, channelId, commitmentPreImage)
+    await bumpCommitment(this.db_rs, channelId, commitmentPreImage)
     log(`Successfully bump local commitment after ${commitmentPreImage.to_hex()}`)
 
-    await this.db.markRedeemeed(ackTicket)
+    await this.db_rs.mark_redeemed(ackTicket)
     this.emit('ticket:redeemed', ackTicket)
     return {
       status: 'SUCCESS',
@@ -491,7 +505,7 @@ export default class HoprCoreEthereum extends EventEmitter {
       throw Error('Initialize incoming channel closure currently is not supported.')
     }
 
-    const c = await this.db.getChannelX(src, dest)
+    const c = await this.db_rs.get_channel_x(src, dest)
     if (c.status !== ChannelStatus.Open && c.status !== ChannelStatus.WaitingForCommitment) {
       throw Error('Channel status is not OPEN or WAITING FOR COMMITMENT')
     }
@@ -505,7 +519,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     if (!this.publicKey.eq(src)) {
       throw Error('Finalizing incoming channel closure currently is not supported.')
     }
-    const c = await this.db.getChannelX(src, dest)
+    const c = await this.db_rs.get_channel_x(src, dest)
     if (c.status !== ChannelStatus.PendingToClose) {
       throw Error('Channel status is not PENDING_TO_CLOSE')
     }
@@ -518,7 +532,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     // channel may not exist, we can still open it
     let c: ChannelEntry
     try {
-      c = await this.db.getChannelTo(dest)
+      c = await this.db_rs.get_channel_to(dest)
     } catch {}
     if (c && c.status !== ChannelStatus.Closed) {
       throw Error('Channel is already opened')
@@ -557,12 +571,12 @@ export default class HoprCoreEthereum extends EventEmitter {
   public async isAllowedAccessToNetwork(hoprNode: PublicKey): Promise<boolean> {
     try {
       // if register is disabled, all nodes are seen as "allowed"
-      const registerEnabled = await this.db.isNetworkRegistryEnabled()
+      const registerEnabled = await this.db_rs.is_network_registry_enabled()
       if (!registerEnabled) return true
       // find hoprNode's linked account
-      const account = await this.db.getAccountFromNetworkRegistry(hoprNode)
+      const account = await this.db_rs.get_account_from_network_registry(hoprNode)
       // check if account is eligible
-      return this.db.isEligible(account)
+      return this.db_rs.is_eligible(account)
     } catch (error) {
       // log unexpected error
       if (!error?.notFound) log('error: could not determine whether node is is allowed access', error)
