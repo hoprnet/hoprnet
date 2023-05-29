@@ -49,7 +49,7 @@ pub struct Key {
 
 impl Display for Key {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.to_hex())
+        write!(f, "{}", hex::encode(self.key))
     }
 }
 
