@@ -907,24 +907,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "core-db"
-version = "0.2.1"
-dependencies = [
- "async-trait",
- "console_error_panic_hook",
- "core-crypto",
- "core-types",
- "serde",
- "utils-db",
- "utils-misc",
- "utils-types",
- "wasm-bindgen",
- "wasm-bindgen-test",
- "wasm-opt",
- "wasm-pack",
-]
-
-[[package]]
 name = "core-ethereum-db"
 version = "0.1.0"
 dependencies = [
@@ -937,6 +919,7 @@ dependencies = [
  "utils-misc",
  "utils-types",
  "wasm-bindgen",
+ "wasm-bindgen-futures",
  "wasm-bindgen-test",
  "wasm-opt",
  "wasm-pack",
@@ -1063,7 +1046,6 @@ dependencies = [
  "async-trait",
  "console_error_panic_hook",
  "core-crypto",
- "core-db",
  "core-ethereum-db",
  "core-ethereum-misc",
  "core-mixer",
@@ -5180,6 +5162,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5bba0e8cb82ba49ff4e229459ff22a191bbe9a1cb3a341610c9c33efc27ddf73"
 dependencies = [
  "cfg-if",
+ "serde",
+ "serde_json",
  "wasm-bindgen-macro",
 ]
 

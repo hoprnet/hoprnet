@@ -91,6 +91,23 @@ impl AsyncKVStorage for LevelDbShim {
             .map_err(|_| DbError::GenericError("Encountered error on DB remove operation".to_string()))
     }
 
+    async fn dump(&self, destination: String) -> crate::errors::Result<()> {
+        self.db
+            .dump(destination.clone())
+            .map_err(|_| DbError::DumpError(format!("Failed to dump DB into {}", destination)))
+    }
+
+    fn iterate(&self, prefix: Self::Key, suffix_size: u32) -> crate::errors::Result<StorageValueIterator<Self::Value>> {
+        let iterable = self
+            .db
+            .iterValues(js_sys::Uint8Array::from(prefix.as_ref()), suffix_size)
+            .map(|v| js_sys::AsyncIterator::from(v))
+            .map_err(|e| DbError::GenericError(format!("Iteration failed with an exception: {:?}", e)))?;
+
+        let stream = wasm_bindgen_futures::stream::JsStream::from(iterable);
+
+        Ok(Box::new(crate::types::BinaryStreamWrapper::new(stream)))
+    }
     async fn batch(
         &mut self,
         operations: Vec<BatchOperation<Self::Key, Self::Value>>,
@@ -115,24 +132,6 @@ impl AsyncKVStorage for LevelDbShim {
                 .await
                 .map_err(|e| DbError::GenericError(format!("Batch operation failed to write data: {:?}", e)))
         }
-    }
-
-    async fn dump(&self, destination: String) -> crate::errors::Result<()> {
-        self.db
-            .dump(destination.clone())
-            .map_err(|_| DbError::DumpError(format!("Failed to dump DB into {}", destination)))
-    }
-
-    fn iterate(&self, prefix: Self::Key, suffix_size: u32) -> crate::errors::Result<StorageValueIterator<Self::Value>> {
-        let iterable = self
-            .db
-            .iterValues(js_sys::Uint8Array::from(prefix.as_ref()), suffix_size)
-            .map(|v| js_sys::AsyncIterator::from(v))
-            .map_err(|e| DbError::GenericError(format!("Iteration failed with an exception: {:?}", e)))?;
-
-        let stream = wasm_bindgen_futures::stream::JsStream::from(iterable);
-
-        Ok(Box::new(crate::types::BinaryStreamWrapper::new(stream)))
     }
 }
 
@@ -301,8 +300,9 @@ mod tests {
         let prefixed_key_3 = "xyc";
 
         let opt = rusty_leveldb::in_memory();
-        let mut kv_storage =
-            crate::leveldb::rusty::RustyLevelDbShim::new(Arc::new(Mutex::new(rusty_leveldb::DB::open("test", opt).unwrap())));
+        let mut kv_storage = crate::leveldb::rusty::RustyLevelDbShim::new(Arc::new(Mutex::new(
+            rusty_leveldb::DB::open("test", opt).unwrap(),
+        )));
 
         assert!(
             !kv_storage.contains(key_1.as_bytes().to_vec().into_boxed_slice()).await,

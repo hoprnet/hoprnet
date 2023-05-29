@@ -19,7 +19,7 @@ prometheus = ["dep:utils-metrics"]
 [dependencies]
 async-std = "1.12.0"
 core-crypto = { path = "../core-crypto" }
-core-db = { path = "../core-db" }
+core-ethereum-db = { path = "../../../core-ethereum/crates/core-ethereum-db" }
 core-mixer = { path = "../core-mixer"}
 core-types = { path = "../core-types" }
 futures = "0.3"
