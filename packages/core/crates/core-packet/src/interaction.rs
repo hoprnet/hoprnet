@@ -85,10 +85,10 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
         self.public_key.to_peerid()
     }
 
-    pub async fn received_acknowledgement(&self, task: Payload) -> Result<()> {
+    pub async fn received_acknowledgement(&self, payload: Payload) -> Result<()> {
         self.incoming_channel
             .0
-            .send(task)
+            .send(payload)
             .await
             .map_err(|e| TransportError(e.to_string()))
     }
@@ -108,18 +108,18 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
     }
 
     pub async fn handle_incoming_acknowledgements(&self) {
-        while let Ok(ack_task) = self.incoming_channel.1.recv().await {
-            match Acknowledgement::from_bytes(&ack_task.data) {
+        while let Ok(payload) = self.incoming_channel.1.recv().await {
+            match Acknowledgement::from_bytes(&payload.data) {
                 Ok(ack) => {
-                    if let Err(e) = self.handle_acknowledgement(ack, &ack_task.remote_peer).await {
+                    if let Err(e) = self.handle_acknowledgement(ack, &payload.remote_peer).await {
                         error!(
                             "failed to process incoming acknowledgement from {}: {e}",
-                            ack_task.remote_peer
+                            payload.remote_peer
                         );
                     }
                 }
                 Err(e) => {
-                    error!("received unreadable acknowledgement from {}: {e}", ack_task.remote_peer);
+                    error!("received unreadable acknowledgement from {}: {e}", payload.remote_peer);
                 }
             }
         }
@@ -131,9 +131,9 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
         T: Fn(Box<[u8]>, String) -> F,
         F: futures::Future<Output = core::result::Result<(), String>>,
     {
-        while let Ok(ack_task) = self.outgoing_channel.1.recv().await {
-            if let Err(e) = message_transport(ack_task.data, ack_task.remote_peer.to_string()).await {
-                error!("failed to send acknowledgement to {}: {e}", ack_task.remote_peer);
+        while let Ok(payload) = self.outgoing_channel.1.recv().await {
+            if let Err(e) = message_transport(payload.data, payload.remote_peer.to_string()).await {
+                error!("failed to send acknowledgement to {}: {e}", payload.remote_peer);
             }
         }
         info!("done processing outgoing acknowledgements")
@@ -620,10 +620,10 @@ where
         T: Fn(Box<[u8]>, String) -> F,
         F: futures::Future<Output = core::result::Result<(), String>>,
     {
-        while let Ok(task) = self.outgoing_packets.1.recv().await {
+        while let Ok(payload) = self.outgoing_packets.1.recv().await {
             // Send the packet
-            if let Err(e) = message_transport(task.data, task.remote_peer.to_string()).await {
-                error!("failed to send packet to {}: {e}", task.remote_peer);
+            if let Err(e) = message_transport(payload.data, payload.remote_peer.to_string()).await {
+                error!("failed to send packet to {}: {e}", payload.remote_peer);
             }
         }
         info!("done sending packets")
@@ -637,9 +637,9 @@ where
         T: Fn(Box<[u8]>, String) -> F,
         F: futures::Future<Output = core::result::Result<(), String>>,
     {
-        while let Ok(task) = self.incoming_packets.1.recv().await {
+        while let Ok(payload) = self.incoming_packets.1.recv().await {
             // Add some random delay via mixer
-            let mixed_packet = self.mixer.mix(task).await;
+            let mixed_packet = self.mixer.mix(payload).await;
             match Packet::from_bytes(&mixed_packet.data, &self.cfg.private_key, &mixed_packet.remote_peer) {
                 Ok(packet) => {
                     if let Err(e) = self
@@ -657,10 +657,10 @@ where
         info!("done processing packets")
     }
 
-    pub async fn received_packet(&self, packet_task: Payload) -> Result<()> {
+    pub async fn received_packet(&self, payload: Payload) -> Result<()> {
         self.incoming_packets
             .0
-            .send(packet_task)
+            .send(payload)
             .await
             .map_err(|e| TransportError(e.to_string()))
     }
@@ -880,13 +880,13 @@ mod tests {
     ) {
         async_std::task::spawn_local(async move {
             while let Some(msgs) = retrieve_transport_msgs_as_peer::<ACK_PROTOCOL, PEER_NUM>() {
-                for task in msgs.into_iter().map(|m| Payload {
+                for payload in msgs.into_iter().map(|m| Payload {
                     remote_peer: m.from,
                     data: m.data,
                 }) {
-                    debug!("received ack from {}: {}", task.remote_peer, hex::encode(&task.data));
+                    debug!("received ack from {}: {}", payload.remote_peer, hex::encode(&payload.data));
                     interaction
-                        .received_acknowledgement(task)
+                        .received_acknowledgement(payload)
                         .await
                         .expect("failed to receive ack");
                 }
@@ -910,12 +910,12 @@ mod tests {
     ) {
         async_std::task::spawn_local(async move {
             while let Some(msgs) = retrieve_transport_msgs_as_peer::<MSG_PROTOCOL, PEER_NUM>() {
-                for task in msgs.into_iter().map(|m| Payload {
+                for payload in msgs.into_iter().map(|m| Payload {
                     remote_peer: m.from,
                     data: m.data,
                 }) {
-                    debug!("received packet from {}: {}", task.remote_peer, hex::encode(&task.data));
-                    interaction.received_packet(task).await.expect("failed to receive ack");
+                    debug!("received packet from {}: {}", payload.remote_peer, hex::encode(&payload.data));
+                    interaction.received_packet(payload).await.expect("failed to receive ack");
                 }
                 async_std::task::sleep(Duration::from_millis(200)).await;
             }
@@ -1478,8 +1478,8 @@ pub mod wasm {
             }
         }
 
-        pub async fn received_acknowledgement(&self, task: Payload) -> JsResult<()> {
-            ok_or_jserr!(self.w.received_acknowledgement(task).await)
+        pub async fn received_acknowledgement(&self, payload: Payload) -> JsResult<()> {
+            ok_or_jserr!(self.w.received_acknowledgement(payload).await)
         }
 
         pub async fn send_acknowledgement(&self, ack: Acknowledgement, dest: String) -> JsResult<()> {
