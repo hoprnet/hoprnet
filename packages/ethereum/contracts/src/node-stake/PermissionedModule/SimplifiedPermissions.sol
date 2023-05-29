@@ -5,27 +5,29 @@ import "safe-contracts/common/Enum.sol";
 
 enum ParameterType {
     Static,
-    Dynamic,
-    Dynamic32
-}
-
-enum Comparison {
-    EqualTo,
-    GreaterThan,
-    LessThan,
-    OneOf
+    Dynamic,    // bytes, string
+    Dynamic32   // non-nested arrays: address[] bytes32[] uint[] etc
 }
 
 enum ExecutionOptions {
     None,
-    Send,
-    DelegateCall,
-    Both
+    Send
 }
 
 enum Clearance {
     None,
     Function
+}
+
+enum HoprChannelPermission {
+    Allowed,
+    Blocked
+}
+
+enum TargetType {
+    Channel,
+    Token,
+    Send
 }
 
 struct TargetAddress {
@@ -34,11 +36,12 @@ struct TargetAddress {
 }
 
 struct Role {
-    mapping(address => bool) members;
-    mapping(address => TargetAddress) targets;
+    mapping(address => bool) members;   // eligible caller. May be able to receive native tokens (e.g. xDAI)
+    mapping(address => address) targetChannels;
+    mapping(address => address) targetTokens;
+    mapping(address => address) targetSend;
     mapping(bytes32 => uint256) functions;
-    mapping(bytes32 => bytes32) compValues;
-    mapping(bytes32 => bytes32[]) compValuesOneOf;
+    mapping(bytes32 => mapping(bytes32 => HoprChannelPermission)) hoprChannelsCapability; // keyForFunctions (bytes32) => channel Id (keccak256(src, dest)) => 
 }
 
 /**
@@ -46,6 +49,17 @@ struct Role {
  * This library supports only one role
  */
 library SimplifiedPermissions {
+    // HoprChannels method ids
+    bytes4 internal constant FUND_CHANNEL_MULTI_SELECTOR = hex"4341abdd";
+    bytes4 internal constant REDEEM_TICKET_SELECTOR = hex"0475568e";
+    bytes4 internal constant REDEEM_TICKETS_SELECTOR = hex"c5ad200d";
+    bytes4 internal constant INITIATE_CHANNEL_CLOSURE_SELECTOR = hex"88d2f3c9";
+    bytes4 internal constant FINALIZE_CHANNEL_CLOSURE_SELECTOR = hex"833aae8d";
+    bytes4 internal constant BUMP_CHANNEL_SELECTOR = hex"c4d93afb";
+    // HoprTokens method ids
+    bytes4 internal constant APPROVE_SELECTOR = hex"095ea7b3";
+    bytes4 internal constant SEND_SELECTOR = hex"9bd9bbc6";
+
     uint256 internal constant SCOPE_MAX_PARAMS = 48;
     event RevokeTarget(address targetAddress);
     event ScopeTarget(address targetAddress);
@@ -105,6 +119,9 @@ library SimplifiedPermissions {
         uint256 resultingScopeConfig
     );
 
+    /// Parameter Type is not supported
+    error ParameterTypeNotSupported();
+
     /// Sender is not a member of the role
     error NoMembership();
 
@@ -129,14 +146,14 @@ library SimplifiedPermissions {
     /// Role not allowed to use bytes for parameter
     error ParameterNotAllowed();
 
-    /// Role not allowed to use bytes for parameter
-    error ParameterNotOneOfAllowed();
+    // /// Role not allowed to use bytes for parameter
+    // error ParameterNotOneOfAllowed();
 
-    /// Role not allowed to use bytes less than value for parameter
-    error ParameterLessThanAllowed();
+    // /// Role not allowed to use bytes less than value for parameter
+    // error ParameterLessThanAllowed();
 
-    /// Role not allowed to use bytes greater than value for parameter
-    error ParameterGreaterThanAllowed();
+    // /// Role not allowed to use bytes greater than value for parameter
+    // error ParameterGreaterThanAllowed();
 
     /// only multisend txs with an offset of 32 bytes are allowed
     error UnacceptableMultiSendOffset();
@@ -162,12 +179,15 @@ library SimplifiedPermissions {
     /// The provided calldata for execution is too short, or an OutOfBounds scoped parameter was configured
     error CalldataOutOfBounds();
 
-    /*
-     *
-     * CHECKERS
-     *
+
+
+    // ======================================================
+    // ---------------------- CHECKERS ----------------------
+    // ======================================================
+
+    /**
+     * @dev checks if the function is allowed to be passed to the avatar
      */
-// TODO:
     function check(
         Role storage role,
         address multisend,
@@ -185,10 +205,12 @@ library SimplifiedPermissions {
             checkTransaction(role, to, value, data, operation);
         }
     }
-// TODO:
-    /// @dev Splits a multisend data blob into transactions and forwards them to be checked.
-    /// @param data the packed transaction data (created by utils function buildMultiSendSafeTx).
-    /// @param role Role to check for.
+
+    /*
+     * @dev Splits a multisend data blob into transactions and forwards them to be checked.
+     * @param data the packed transaction data (created by utils function buildMultiSendSafeTx).
+     * @param role Role to check for.
+     */
     function checkMultisendTransaction(
         Role storage role,
         bytes memory data
@@ -230,11 +252,10 @@ library SimplifiedPermissions {
             checkTransaction(role, to, value, out, operation);
         }
     }
-// TODO:
 
-/**
- * @dev Main transaction to check the permission of transaction execution of a module
- */
+    /** TODO: FIXME: 
+     * @dev Main transaction to check the permission of transaction execution of a module
+     */
     function checkTransaction(
         Role storage role,
         address targetAddress,
@@ -318,73 +339,123 @@ library SimplifiedPermissions {
         }
     }
 
-// TODO:
-    /*
-     * @dev Will revert if a transaction has a parameter that is not allowed
+
+
+    /* FIXME: `paramType` may be removed?
+     * @dev Check parameters for HoprChannels capability
      * @param role reference to role storage
      * @param scopeConfig reference to role storage
      * @param targetAddress Address to check.
      * @param data the transaction data to check
      */
-    function checkParameters(
+    function checkHoprChannelsParameters(
+        Role storage role,
+        ParameterType paramType,
+        address targetAddress,
+        bytes memory data
+    ) internal view {
+        bytes4 functionSig = bytes4(data);
+        bytes32 capabilityKey = keyForFunctions(targetAddress, functionSig);
+
+        if (paramType == ParameterType.Dynamic) {
+            // Not suppose to have Dynamic type
+            revert ParameterTypeNotSupported();
+        }
+        
+        if (paramType == ParameterType.Static) {
+            // Channel source and channel destination addreses are at the first and second places respectively
+            (address src, address dest) = pluckTwoStaticAddresses(data);
+            // check if functions on this channel can be called.
+            compareHoprChannelsPermission(role, capabilityKey, src, dest);
+        } else {
+            // Dynamic32 type
+            address[] memory srcs = pluckDynamicAddresses(data, 0);
+            address[] memory dests = pluckDynamicAddresses(data, 1);
+
+            if (srcs.length != dests.length) {
+                revert ArraysDifferentLength();
+            }
+
+            for (uint256 i = 0; i < srcs.length; i++) {
+                // check if functions on this channel can be called.
+                compareHoprChannelsPermission(role, capabilityKey, srcs[i], dests[i]);
+            }
+        }
+    }
+
+// TODO:
+    /*
+     * @dev Will revert if a transaction has a parameter that is not allowed
+     * @notice This function is invoked on non-HoprChannels contracts (i.e. HoprTokens)
+     * @param role reference to role storage
+     * @param scopeConfig reference to role storage
+     * @param targetAddress Address to check.
+     * @param data the transaction data to check
+     */
+    function checkHoprTokenParameters(
         Role storage role,
         uint256 scopeConfig,
         address targetAddress,
         bytes memory data
     ) internal view {
         bytes4 functionSig = bytes4(data);
-        (, , uint256 length) = unpackFunction(scopeConfig);
+        bytes32 capabilityKey = keyForFunctions(targetAddress, functionSig);
 
-        for (uint256 i = 0; i < length; i++) {
-            (
-                bool isScoped,
-                ParameterType paramType,
-                Comparison paramComp
-            ) = unpackParameter(scopeConfig, i);
+        // check 
 
-            if (!isScoped) {
-                continue;
-            }
 
-            bytes32 value;
-            if (paramType != ParameterType.Static) {
-                value = pluckDynamicValue(data, paramType, i);
-            } else {
-                value = pluckStaticValue(data, i);
-            }
+        // (, , uint256 length) = unpackFunction(scopeConfig);
 
-            bytes32 key = keyForCompValues(targetAddress, functionSig, i);
-            if (paramComp != Comparison.OneOf) {
-                compare(paramComp, role.compValues[key], value);
-            } else {
-                compareOneOf(role.compValuesOneOf[key], value);
-            }
-        }
+        // for (uint256 i = 0; i < length; i++) {
+        //     (
+        //         bool isScoped,
+        //         ParameterType paramType,
+        //         Comparison paramComp
+        //     ) = unpackParameter(scopeConfig, i);
+
+        //     if (!isScoped) {
+        //         continue;
+        //     }
+
+        //     bytes32 value;
+        //     if (paramType != ParameterType.Static) {
+        //         value = pluckDynamicValue(data, paramType, i);
+        //     } else {
+        //         value = pluckStaticValue(data, i);
+        //     }
+
+        //     bytes32 key = keyForCompValues(targetAddress, functionSig, i);
+        //     if (paramComp != Comparison.OneOf) {
+        //         compare(paramComp, role.compValues[key], value);
+        //     } else {
+        //         compareOneOf(role.compValuesOneOf[key], value);
+        //     }
+        // }
     }
-// TODO:
-    function compare(
-        Comparison paramComp,
-        bytes32 compValue,
-        bytes32 value
-    ) internal pure {
-        if (paramComp == Comparison.EqualTo && value != compValue) {
-            revert ParameterNotAllowed();
-        } else if (paramComp == Comparison.GreaterThan && value <= compValue) {
-            revert ParameterLessThanAllowed();
-        } else if (paramComp == Comparison.LessThan && value >= compValue) {
-            revert ParameterGreaterThanAllowed();
-        }
-    }
-// TODO:
-    function compareOneOf(
-        bytes32[] storage compValue,
-        bytes32 value
-    ) internal view {
-        for (uint256 i = 0; i < compValue.length; i++) {
-            if (value == compValue[i]) return;
-        }
-        revert ParameterNotOneOfAllowed();
-    }
+// // TODO:
+//     function compare(
+//         Comparison paramComp,
+//         bytes32 compValue,
+//         bytes32 value
+//     ) internal pure {
+//         if (paramComp == Comparison.EqualTo && value != compValue) {
+//             revert ParameterNotAllowed();
+//         } else if (paramComp == Comparison.GreaterThan && value <= compValue) {
+//             revert ParameterLessThanAllowed();
+//         } else if (paramComp == Comparison.LessThan && value >= compValue) {
+//             revert ParameterGreaterThanAllowed();
+//         }
+//     }
+// // TODO:
+//     function compareOneOf(
+//         bytes32[] storage compValue,
+//         bytes32 value
+//     ) internal view {
+//         for (uint256 i = 0; i < compValue.length; i++) {
+//             if (value == compValue[i]) return;
+//         }
+//         revert ParameterNotOneOfAllowed();
+//     }
 
     /*
      *
@@ -728,12 +799,128 @@ library SimplifiedPermissions {
         }
     }
 
+  /** FIXME:
+   * @param role reference to role storage
+   * @param capabilityKey the id key of function on the target HoprChannels address
+   * @param source the address of source
+   * @param destination the address of destination
+   */
+    function compareHoprChannelsPermission(Role storage role, bytes32 capabilityKey, address source, address destination) internal view returns (bool) {
+        // get chainId
+        bytes32 chainId = keccak256(abi.encodePacked(source, destination));
+        // check if it's allowed to call the channel
+        if (role.hoprChannelsCapability[capabilityKey][chainId] != HoprChannelPermission.Allowed) {
+            // not allowed to call the capability
+            revert ParameterNotAllowed();
+        }
+    }
+
     // TODO:
     /*
      *
      * HELPERS
      *
      */
+//   /** FIXME:
+//    * @param source the address of source
+//    * @param destination the address of destination
+//    * @return the channel id
+//    */
+//   function _getChannelId(address source, address destination) internal pure returns (bytes32) {
+//     return keccak256(abi.encodePacked(source, destination));
+//   }
+
+    /** FIXME:
+     * @dev Pluck first two bytes32 into two addresses
+     */
+    function pluckTwoStaticAddresses(
+        bytes memory data
+    ) internal pure returns (address, address) {
+        // pre-check: is there a word available for the current parameter at argumentsBlock?
+        if (data.length < 4 + 1 * 32 + 32) {
+            revert CalldataOutOfBounds();
+        }
+        address addr0;
+        address addr1;
+        assembly {
+            // add 32 - jump over the length encoding of the data bytes array
+            // offset0 = 4 + 0 * 32;
+            addr0 := mload(add(32, add(data, 4)))
+            // offset1 = 4 + 1 * 32;
+            addr1 := mload(add(32, add(data, 36)))
+        }
+        return (addr0, addr1);
+    }
+    /** FIXME:
+     * @dev pluck array of addresses from data 
+     */
+    function pluckDynamicAddresses(
+        bytes memory data,
+        uint256 index
+    ) internal pure returns (address[] memory decodedAddresses) {
+        // pre-check: is there a word available for the current parameter at argumentsBlock?
+        if (data.length < 4 + index * 32 + 32) {
+            revert CalldataOutOfBounds();
+        }
+
+        /*
+         * Encoded calldata:
+         * 4  bytes -> function selector
+         * 32 bytes -> sequence, one chunk per parameter
+         *
+         * There is one (byte32) chunk per parameter. Depending on type it contains:
+         * Static    -> value encoded inline (not plucked by this function)
+         * Dynamic   -> a byte offset to encoded data payload
+         * Dynamic32 -> a byte offset to encoded data payload
+         * Note: Fixed Sized Arrays (e.g., bool[2]), are encoded inline
+         * Note: Nested types also do not follow the above described rules, and are unsupported
+         * Note: The offset to payload does not include 4 bytes for functionSig
+         *
+         *
+         * At encoded payload, the first 32 bytes are the length encoding of the parameter payload. Depending on ParameterType:
+         * Dynamic   -> length in bytes
+         * Dynamic32 -> length in bytes32
+         * Note: Dynamic types are: bytes, string
+         * Note: Dynamic32 types are non-nested arrays: address[] bytes32[] uint[] etc
+         */
+
+        // the start of the parameter block
+        // 32 bytes - length encoding of the data bytes array
+        // 4  bytes - function sig
+        uint256 argumentsBlock;
+        assembly {
+            argumentsBlock := add(data, 36)
+        }
+
+        // the two offsets are relative to argumentsBlock
+        uint256 offset = index * 32;
+        uint256 offsetPayload;
+        assembly {
+            offsetPayload := mload(add(argumentsBlock, offset))
+        }
+
+        uint256 lengthPayload;
+        assembly {
+            lengthPayload := mload(add(argumentsBlock, offsetPayload))
+        }
+
+        // account for:
+        // 4  bytes - functionSig
+        // 32 bytes - length encoding for the parameter payload
+        // start with length and followed by actual values
+        uint256 start = 4 + offsetPayload;
+        uint256 end = start + lengthPayload * 32 + 32;
+
+        // are we slicing out of bounds?
+        if (data.length < end) {
+            revert CalldataOutOfBounds();
+        }
+
+        // prefix 32 bytes of offset
+        return abi.decode(abi.encodePacked(uint256(32),slice(data, start, end)), (address[]));
+    }
+
+    // TODO:
     function pluckDynamicValue(
         bytes memory data,
         ParameterType paramType,
@@ -989,7 +1176,7 @@ library SimplifiedPermissions {
     }
 
     /**
-     * @dev Get the key
+     * @dev Get the unique key for a function of a given target
      */
     function keyForFunctions(
         address targetAddress,
