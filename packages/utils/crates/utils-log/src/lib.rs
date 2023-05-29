@@ -1,10 +1,8 @@
 #[macro_use]
 pub mod macros;
 
-pub use log::Level;
-
-#[cfg(not(feature = "wasm"))]
-pub use log::{debug, error, info, trace, warn};
+#[cfg(feature = "wasm")]
+pub mod logger;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
