@@ -15,7 +15,7 @@ macro_rules! log {
     });
 
 
-    ($lvl:expr, $($arg:tt)+) => (log::log!(target: std::module_path!(), $lvl, $($arg)+));
+    ($lvl:expr, $($arg:tt)+) => ($crate::downstream_log::log!(target: std::module_path!(), $lvl, $($arg)+));
 }
 
 #[macro_export]

@@ -8,15 +8,20 @@ pub mod random;
 pub mod wasm {
 
     use wasm_bindgen::prelude::*;
+    use utils_log::logger::JsLogger;
 
     // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global allocator.
     #[cfg(feature = "wee_alloc")]
     #[global_allocator]
     static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
+    static LOGGER: JsLogger = JsLogger { };
+
     #[allow(dead_code)]
     #[wasm_bindgen]
     pub fn core_strategy_set_panic_hook() {
+        JsLogger::install(&LOGGER, None).expect("failed to install logger");
+
         // When the `console_error_panic_hook` feature is enabled, we can call the
         // `set_panic_hook` function at least once during initialization, and then
         // we will get better error messages if our code ever panics.

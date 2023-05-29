@@ -14,10 +14,15 @@ mod utils;
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use wasm_bindgen::prelude::wasm_bindgen;
+    use utils_log::logger::JsLogger;
+
+    static LOGGER: JsLogger = JsLogger { };
 
     #[allow(dead_code)]
     #[wasm_bindgen]
     pub fn core_crypto_set_panic_hook() {
+        JsLogger::install(&LOGGER, None).expect("failed to install logger");
+
         // When the `console_error_panic_hook` feature is enabled, we can call the
         // `set_panic_hook` function at least once during initialization, and then
         // we will get better error messages if our code ever panics.

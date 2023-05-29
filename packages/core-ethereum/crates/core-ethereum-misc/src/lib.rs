@@ -5,6 +5,9 @@ pub mod errors;
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use wasm_bindgen::prelude::wasm_bindgen;
+    use utils_log::logger::JsLogger;
+
+    static LOGGER: JsLogger = JsLogger {};
 
     #[allow(dead_code)]
     #[wasm_bindgen]
@@ -17,6 +20,8 @@ pub mod wasm {
         // https://github.com/rustwasm/console_error_panic_hook#readme
         #[cfg(feature = "console_error_panic_hook")]
         console_error_panic_hook::set_once();
+
+        JsLogger::install(&LOGGER, None).expect("failed to install logger");
     }
 
     // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
