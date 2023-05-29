@@ -21,7 +21,7 @@ pub mod wasm {
         #[cfg(feature = "console_error_panic_hook")]
         console_error_panic_hook::set_once();
 
-        JsLogger::install(&LOGGER, None).expect("failed to install logger");
+        let _ = JsLogger::install(&LOGGER, None);
     }
 
     // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global

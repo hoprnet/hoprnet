@@ -1,4 +1,4 @@
-use log::{Level, Log, Metadata, Record};
+use log::{Level, Log, Metadata, Record, SetLoggerError};
 use wasm_bindgen::prelude::wasm_bindgen;
 
 /// Logging backend that passes output to `console.log`
@@ -13,10 +13,8 @@ extern "C" {
 impl JsLogger {
     /// Install this logger as a backend with optional maximum level.
     /// Maximum level defaults to DEBUG if not set (note: ERROR is the lowest, TRACE is the highest)
-    pub fn install(logger: &'static JsLogger, max_level: Option<Level>) -> Result<(), String> {
-        log::set_logger(logger).map_err(|e| e.to_string())?;
-        log::set_max_level(max_level.unwrap_or(Level::Debug).to_level_filter());
-        Ok(())
+    pub fn install(logger: &'static JsLogger, max_level: Option<Level>) -> Result<(), SetLoggerError> {
+        log::set_logger(logger).map(|_| log::set_max_level(max_level.unwrap_or(Level::Debug).to_level_filter()))
     }
 }
 

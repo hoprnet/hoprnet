@@ -17,6 +17,7 @@ A suitable place would be the `xyz_set_panic_hook` in crate's `lib.rs` as this f
 after the WASM binary has been loaded.
 
 Here's an example:
+
 ```rust
 use utils_log::logger::JsLogger;
 
@@ -25,7 +26,7 @@ static LOGGER: JsLogger = JsLogger {};
 #[allow(dead_code)]
 #[wasm_bindgen]
 pub fn my_crate_set_panic_hook() {
-    JsLogger::install(&LOGGER, None).expect("failed to install logger");
+    let _ = JsLogger::install(&LOGGER, None);
 
     // When the `console_error_panic_hook` feature is enabled, we can call the
     // `set_panic_hook` function at least once during initialization, and then

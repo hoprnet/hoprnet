@@ -18,7 +18,7 @@ pub mod wasm {
     #[allow(dead_code)]
     #[wasm_bindgen]
     pub fn core_packet_set_panic_hook() {
-        JsLogger::install(&LOGGER, None).expect("failed to install logger");
+        let _ = JsLogger::install(&LOGGER, None);
 
         // When the `console_error_panic_hook` feature is enabled, we can call the
         // `set_panic_hook` function at least once during initialization, and then
