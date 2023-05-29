@@ -5,7 +5,7 @@ use crate::errors::PacketError::{
 use crate::errors::Result;
 use crate::packet::{Packet, PacketState};
 use crate::path::Path;
-use async_std::channel::{Receiver, Sender, bounded};
+use async_std::channel::{bounded, Receiver, Sender};
 use core_crypto::types::{HalfKeyChallenge, Hash, PublicKey};
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_mixer::mixer::{Mixer, MixerConfig};
@@ -52,7 +52,7 @@ pub const INVERSE_TICKET_WIN_PROB: &str = "1";
 const PREIMAGE_PLACE_HOLDER: [u8; Hash::SIZE] = [0xffu8; Hash::SIZE];
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-pub struct TransportTask {
+pub struct Payload {
     remote_peer: PeerId,
     data: Box<[u8]>,
 }
@@ -65,8 +65,8 @@ pub struct AcknowledgementInteraction<Db: HoprCoreEthereumDbActions> {
     pub on_acknowledgement: Box<dyn Fn(HalfKeyChallenge)>,
     pub on_acknowledged_ticket: Box<dyn Fn(AcknowledgedTicket)>,
     public_key: PublicKey,
-    incoming_channel: (Sender<TransportTask>, Receiver<TransportTask>),
-    outgoing_channel: (Sender<TransportTask>, Receiver<TransportTask>),
+    incoming_channel: (Sender<Payload>, Receiver<Payload>),
+    outgoing_channel: (Sender<Payload>, Receiver<Payload>),
 }
 
 impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
@@ -85,7 +85,7 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
         self.public_key.to_peerid()
     }
 
-    pub async fn received_acknowledgement(&self, task: TransportTask) -> Result<()> {
+    pub async fn received_acknowledgement(&self, task: Payload) -> Result<()> {
         self.incoming_channel
             .0
             .send(task)
@@ -99,7 +99,7 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
 
         self.outgoing_channel
             .0
-            .send(TransportTask {
+            .send(Payload {
                 remote_peer: destination,
                 data: acknowledgement.to_bytes(),
             })
@@ -261,10 +261,10 @@ where
     Db: HoprCoreEthereumDbActions,
 {
     db: Arc<Mutex<Db>>,
-    incoming_packets: (Sender<TransportTask>, Receiver<TransportTask>),
-    outgoing_packets: (Sender<TransportTask>, Receiver<TransportTask>),
+    incoming_packets: (Sender<Payload>, Receiver<Payload>),
+    outgoing_packets: (Sender<Payload>, Receiver<Payload>),
     pub message_emitter: Box<dyn Fn(&[u8])>,
-    pub mixer: Mixer<TransportTask>,
+    pub mixer: Mixer<Payload>,
     cfg: PacketInteractionConfig,
 }
 
@@ -441,11 +441,7 @@ where
         Ok(ticket)
     }
 
-    pub async fn send_outgoing_packet(
-        &self,
-        msg: &[u8],
-        complete_valid_path: Path,
-    ) -> Result<HalfKeyChallenge> {
+    pub async fn send_outgoing_packet(&self, msg: &[u8], complete_valid_path: Path) -> Result<HalfKeyChallenge> {
         // Decide whether to create 0-hop or multihop ticket
         let next_peer = PublicKey::from_peerid(&complete_valid_path.hops()[0])?;
         let next_ticket = if complete_valid_path.length() == 1 {
@@ -468,10 +464,14 @@ where
                 #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_PACKETS_COUNT.increment();
 
-                self.outgoing_packets.0.send(TransportTask {
-                    remote_peer: complete_valid_path.hops()[0].clone(),
-                    data: packet.to_bytes()
-                }).await.map_err(|e| TransportError(e.to_string()))?;
+                self.outgoing_packets
+                    .0
+                    .send(Payload {
+                        remote_peer: complete_valid_path.hops()[0].clone(),
+                        data: packet.to_bytes(),
+                    })
+                    .await
+                    .map_err(|e| TransportError(e.to_string()))?;
 
                 Ok(ack_challenge.clone())
             }
@@ -615,10 +615,8 @@ where
         Ok(())
     }
 
-    pub async fn handle_outgoing_packets<T, F>(
-        &self,
-        message_transport: &T,
-    ) where
+    pub async fn handle_outgoing_packets<T, F>(&self, message_transport: &T)
+    where
         T: Fn(Box<[u8]>, String) -> F,
         F: futures::Future<Output = core::result::Result<(), String>>,
     {
@@ -627,7 +625,6 @@ where
             if let Err(e) = message_transport(task.data, task.remote_peer.to_string()).await {
                 error!("failed to send packet to {}: {e}", task.remote_peer);
             }
-
         }
         info!("done sending packets")
     }
@@ -660,7 +657,7 @@ where
         info!("done processing packets")
     }
 
-    pub async fn received_packet(&self, packet_task: TransportTask) -> Result<()> {
+    pub async fn received_packet(&self, packet_task: Payload) -> Result<()> {
         self.incoming_packets
             .0
             .send(packet_task)
@@ -684,7 +681,7 @@ where
 mod tests {
     use crate::errors::PacketError::PacketDbError;
     use crate::interaction::{
-        AcknowledgementInteraction, PacketInteraction, PacketInteractionConfig, TransportTask, PRICE_PER_PACKET,
+        AcknowledgementInteraction, PacketInteraction, PacketInteractionConfig, Payload, PRICE_PER_PACKET,
     };
     use crate::path::Path;
     use crate::por::ProofOfRelayValues;
@@ -883,7 +880,7 @@ mod tests {
     ) {
         async_std::task::spawn_local(async move {
             while let Some(msgs) = retrieve_transport_msgs_as_peer::<ACK_PROTOCOL, PEER_NUM>() {
-                for task in msgs.into_iter().map(|m| TransportTask {
+                for task in msgs.into_iter().map(|m| Payload {
                     remote_peer: m.from,
                     data: m.data,
                 }) {
@@ -913,15 +910,12 @@ mod tests {
     ) {
         async_std::task::spawn_local(async move {
             while let Some(msgs) = retrieve_transport_msgs_as_peer::<MSG_PROTOCOL, PEER_NUM>() {
-                for task in msgs.into_iter().map(|m| TransportTask {
+                for task in msgs.into_iter().map(|m| Payload {
                     remote_peer: m.from,
                     data: m.data,
                 }) {
                     debug!("received packet from {}: {}", task.remote_peer, hex::encode(&task.data));
-                    interaction
-                        .received_packet(task)
-                        .await
-                        .expect("failed to receive ack");
+                    interaction.received_packet(task).await.expect("failed to receive ack");
                 }
                 async_std::task::sleep(Duration::from_millis(200)).await;
             }
@@ -932,7 +926,9 @@ mod tests {
         interaction: Arc<PacketInteraction<Db>>,
     ) {
         async_std::task::spawn_local(async move {
-            interaction.handle_outgoing_packets(&send_transport_as_peer::<MSG_PROTOCOL, PEER_NUM>).await;
+            interaction
+                .handle_outgoing_packets(&send_transport_as_peer::<MSG_PROTOCOL, PEER_NUM>)
+                .await;
         });
     }
 
@@ -1175,7 +1171,8 @@ mod tests {
 
         // Peer 1: start sending out packets
         for _ in 0..PENDING_PACKETS {
-            packet_sender.send_outgoing_packet(&TEST_MESSAGE, packet_path.clone())
+            packet_sender
+                .send_outgoing_packet(&TEST_MESSAGE, packet_path.clone())
                 .await
                 .unwrap();
         }
@@ -1265,7 +1262,10 @@ mod tests {
         spawn_pkt_send::<_, 0>(packet_sender.clone());
 
         // -------------- Peer 2: relayer
-        let ack_1 = Arc::new(AcknowledgementInteraction::new(core_dbs[1].clone(), PublicKey::from_peerid(&PEERS[1]).unwrap()));
+        let ack_1 = Arc::new(AcknowledgementInteraction::new(
+            core_dbs[1].clone(),
+            PublicKey::from_peerid(&PEERS[1]).unwrap(),
+        ));
         let pkt_1 = Arc::new(PacketInteraction::new(
             core_dbs[1].clone(),
             PacketInteractionConfig {
@@ -1282,7 +1282,10 @@ mod tests {
         spawn_ack_send::<_, 1>(ack_1.clone());
 
         // -------------- Peer 3: relayer
-        let ack_2 = Arc::new(AcknowledgementInteraction::new(core_dbs[2].clone(), PublicKey::from_peerid(&PEERS[2]).unwrap()));
+        let ack_2 = Arc::new(AcknowledgementInteraction::new(
+            core_dbs[2].clone(),
+            PublicKey::from_peerid(&PEERS[2]).unwrap(),
+        ));
         let pkt_2 = Arc::new(PacketInteraction::new(
             core_dbs[2].clone(),
             PacketInteractionConfig {
@@ -1299,7 +1302,10 @@ mod tests {
         spawn_ack_send::<_, 2>(ack_2.clone());
 
         // -------------- Peer 4: relayer
-        let ack_3 = Arc::new(AcknowledgementInteraction::new(core_dbs[3].clone(), PublicKey::from_peerid(&PEERS[3]).unwrap()));
+        let ack_3 = Arc::new(AcknowledgementInteraction::new(
+            core_dbs[3].clone(),
+            PublicKey::from_peerid(&PEERS[3]).unwrap(),
+        ));
         let pkt_3 = Arc::new(PacketInteraction::new(
             core_dbs[3].clone(),
             PacketInteractionConfig {
@@ -1316,7 +1322,10 @@ mod tests {
         spawn_ack_send::<_, 3>(ack_3.clone());
 
         // -------------- Peer 5: recipient
-        let ack_4 = Arc::new(AcknowledgementInteraction::new(core_dbs[4].clone(), PublicKey::from_peerid(&PEERS[4]).unwrap()));
+        let ack_4 = Arc::new(AcknowledgementInteraction::new(
+            core_dbs[4].clone(),
+            PublicKey::from_peerid(&PEERS[4]).unwrap(),
+        ));
         let mut tmp_pkt = PacketInteraction::new(
             core_dbs[4].clone(),
             PacketInteractionConfig {
@@ -1344,17 +1353,14 @@ mod tests {
         // Start sending packets
         for _ in 0..PENDING_PACKETS {
             packet_sender
-                .send_outgoing_packet(
-                    &TEST_MESSAGE,
-                    packet_path.clone()
-                )
+                .send_outgoing_packet(&TEST_MESSAGE, packet_path.clone())
                 .await
                 .unwrap();
         }
 
         // Check that we received all packets
         let finish = async move {
-            for _ in 1 .. PENDING_PACKETS + 1 {
+            for _ in 1..PENDING_PACKETS + 1 {
                 done_rx.recv().await.expect("failed finalize packet");
             }
         };
@@ -1363,7 +1369,7 @@ mod tests {
         pin_mut!(finish, timeout);
 
         let succeeded = match select(finish, timeout).await {
-            Either::Left(_)  => true,
+            Either::Left(_) => true,
             Either::Right(_) => false,
         };
 
@@ -1385,8 +1391,9 @@ mod tests {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use crate::interaction::{AcknowledgementInteraction, PacketInteraction, PacketInteractionConfig, TransportTask};
-    use core_crypto::types::PublicKey;
+    use crate::interaction::{AcknowledgementInteraction, PacketInteraction, PacketInteractionConfig, Payload};
+    use crate::path::Path;
+    use core_crypto::types::{HalfKeyChallenge, PublicKey};
     use core_ethereum_db::db::CoreEthereumDb;
     use core_mixer::mixer::Mixer;
     use core_types::acknowledgement::Acknowledgement;
@@ -1406,14 +1413,50 @@ pub mod wasm {
     use wasm_bindgen::JsValue;
 
     #[wasm_bindgen]
-    impl TransportTask {
+    impl Payload {
         #[wasm_bindgen(constructor)]
-        pub fn _new(peer_id: &str, packet_data: Box<[u8]>) -> JsResult<TransportTask> {
+        pub fn _new(peer_id: &str, packet_data: Box<[u8]>) -> JsResult<Payload> {
             Ok(Self {
                 remote_peer: ok_or_jserr!(PeerId::from_str(peer_id))?,
                 data: packet_data,
             })
         }
+    }
+
+    macro_rules! create_transport_closure {
+        ($transport_cb:ident) => {
+            |msg: Box<[u8]>, peer: String| -> Pin<Box<dyn Future<Output = Result<(), String>>>> {
+                Box::pin(async move {
+                    let this = JsValue::null();
+                    let data: JsValue = js_sys::Uint8Array::from(msg.as_ref()).into();
+                    let peer: JsValue = JsString::from(peer.as_str()).into();
+
+                    match $transport_cb.call2(&this, &data, &peer) {
+                        Ok(r) => {
+                            let promise = js_sys::Promise::from(r);
+                            wasm_bindgen_futures::JsFuture::from(promise)
+                                .await
+                                .map(|_| ())
+                                .map_err(|x| {
+                                    x.dyn_ref::<JsString>()
+                                        .map_or("Failed to send ping message".to_owned(), |x| -> String {
+                                            x.into()
+                                        })
+                                })
+                        }
+                        Err(e) => {
+                            error!(
+                                "The message transport could not be established: {}",
+                                e.as_string()
+                                    .unwrap_or_else(|| { "The message transport failed with unknown error".to_owned() })
+                                    .as_str()
+                            );
+                            Err(format!("Failed to extract transport error as string: {:?}", e))
+                        }
+                    }
+                })
+            }
+        };
     }
 
     #[wasm_bindgen]
@@ -1435,11 +1478,11 @@ pub mod wasm {
             }
         }
 
-        pub async fn received_new_acknowledgement(&self, task: TransportTask) -> JsResult<()> {
+        pub async fn received_acknowledgement(&self, task: Payload) -> JsResult<()> {
             ok_or_jserr!(self.w.received_acknowledgement(task).await)
         }
 
-        pub async fn send_new_acknowledgement(&self, ack: Acknowledgement, dest: String) -> JsResult<()> {
+        pub async fn send_acknowledgement(&self, ack: Acknowledgement, dest: String) -> JsResult<()> {
             ok_or_jserr!(
                 self.w
                     .send_acknowledgement(ack, ok_or_jserr!(PeerId::from_str(&dest))?)
@@ -1447,40 +1490,12 @@ pub mod wasm {
             )
         }
 
-        pub async fn start_handle_incoming_acks(&self) {
+        pub async fn handle_incoming_acknowledgements(&self) {
             self.w.handle_incoming_acknowledgements().await
         }
 
-        pub async fn start_handle_outgoing_acks(&self, transport_cb: &js_sys::Function) {
-            let msg_transport = |msg: Box<[u8]>, peer: String| -> Pin<Box<dyn Future<Output = Result<(), String>>>> {
-                Box::pin(async move {
-                    let this = JsValue::null();
-                    let data: JsValue = js_sys::Uint8Array::from(msg.as_ref()).into();
-                    let peer: JsValue = JsString::from(peer.as_str()).into();
-
-                    match transport_cb.call2(&this, &data, &peer) {
-                        Ok(r) => {
-                            let promise = js_sys::Promise::from(r);
-                            wasm_bindgen_futures::JsFuture::from(promise)
-                                .await
-                                .map(|_| ())
-                                .map_err(|x| {
-                                    x.dyn_ref::<JsString>()
-                                        .map_or("Failed to send ping message".to_owned(), |x| -> String { x.into() })
-                                })
-                        }
-                        Err(e) => {
-                            error!(
-                                "The message transport could not be established: {}",
-                                e.as_string()
-                                    .unwrap_or_else(|| { "The message transport failed with unknown error".to_owned() })
-                                    .as_str()
-                            );
-                            Err(format!("Failed to extract transport error as string: {:?}", e))
-                        }
-                    }
-                })
-            };
+        pub async fn handle_outgoing_acknowledgements(&self, transport_cb: &js_sys::Function) {
+            let msg_transport = create_transport_closure!(transport_cb);
             self.w.handle_outgoing_acknowledgements(&msg_transport).await
         }
 
@@ -1511,37 +1526,28 @@ pub mod wasm {
             Self { w }
         }
 
-        pub async fn handle_packets(&self, ack_interaction: &WasmAckInteraction, transport_cb: &js_sys::Function) {
-            let msg_transport = |msg: Box<[u8]>, peer: String| -> Pin<Box<dyn Future<Output = Result<(), String>>>> {
-                Box::pin(async move {
-                    let this = JsValue::null();
-                    let data: JsValue = js_sys::Uint8Array::from(msg.as_ref()).into();
-                    let peer: JsValue = JsString::from(peer.as_str()).into();
+        pub async fn received_packet(&self, payload: Payload) -> JsResult<()> {
+            ok_or_jserr!(self.w.received_packet(payload).await)
+        }
 
-                    match transport_cb.call2(&this, &data, &peer) {
-                        Ok(r) => {
-                            let promise = js_sys::Promise::from(r);
-                            wasm_bindgen_futures::JsFuture::from(promise)
-                                .await
-                                .map(|_| ())
-                                .map_err(|x| {
-                                    x.dyn_ref::<JsString>()
-                                        .map_or("Failed to send ping message".to_owned(), |x| -> String { x.into() })
-                                })
-                        }
-                        Err(e) => {
-                            error!(
-                                "The message transport could not be established: {}",
-                                e.as_string()
-                                    .unwrap_or_else(|| { "The message transport failed with unknown error".to_owned() })
-                                    .as_str()
-                            );
-                            Err(format!("Failed to extract transport error as string: {:?}", e))
-                        }
-                    }
-                })
-            };
-            self.w.handle_incoming_packets(ack_interaction.w.clone(), &msg_transport).await
+        pub async fn send_packet(&self, msg: &[u8], path: Path) -> JsResult<HalfKeyChallenge> {
+            ok_or_jserr!(self.w.send_outgoing_packet(msg, path).await)
+        }
+
+        pub async fn handle_outgoing_packets(&self, transport_cb: &js_sys::Function) {
+            let msg_transport = create_transport_closure!(transport_cb);
+            self.w.handle_outgoing_packets(&msg_transport).await
+        }
+
+        pub async fn handle_incoming_packets(
+            &self,
+            ack_interaction: &WasmAckInteraction,
+            transport_cb: &js_sys::Function,
+        ) {
+            let msg_transport = create_transport_closure!(transport_cb);
+            self.w
+                .handle_incoming_packets(ack_interaction.w.clone(), &msg_transport)
+                .await
         }
 
         pub fn stop(&self) {
