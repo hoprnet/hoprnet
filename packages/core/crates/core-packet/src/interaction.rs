@@ -675,8 +675,6 @@ mod tests {
     use core_crypto::random::random_bytes;
     use core_crypto::types::{Hash, PublicKey};
     use core_ethereum_db::db::CoreEthereumDb;
-    use core_ethereum_db::db::CoreEthereumDb;
-    use core_ethereum_db::traits::HoprCoreEthereumDbActions;
     use core_ethereum_db::traits::HoprCoreEthereumDbActions;
     use core_ethereum_misc::commitment::{initialize_commitment, ChainCommitter, ChannelCommitmentInfo};
     use core_types::acknowledgement::{Acknowledgement, AcknowledgementChallenge, PendingAcknowledgement};
