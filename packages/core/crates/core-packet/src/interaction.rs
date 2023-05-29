@@ -7,7 +7,7 @@ use crate::packet::{Packet, PacketState};
 use crate::path::Path;
 use async_std::channel::{unbounded, Receiver, Sender};
 use core_crypto::types::{HalfKeyChallenge, Hash, PublicKey};
-use core_db::traits::HoprCoreDbActions;
+use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_mixer::mixer::Mixer;
 use core_types::acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket};
 use core_types::channels::{ChannelEntry, ChannelStatus, Ticket};
@@ -18,8 +18,6 @@ use utils_log::{debug, error, info};
 //use utils_log::{debug, error, info};
 use utils_types::primitives::{Balance, BalanceType, U256};
 use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
-
-
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::SimpleCounter;
@@ -60,7 +58,7 @@ pub struct TransportTask {
     data: Box<[u8]>,
 }
 
-pub struct AcknowledgementInteraction<Db: HoprCoreDbActions> {
+pub struct AcknowledgementInteraction<Db: HoprCoreEthereumDbActions> {
     db: Arc<Mutex<Db>>,
     pub on_acknowledgement: Box<dyn Fn(HalfKeyChallenge)>,
     pub on_acknowledged_ticket: Box<dyn Fn(AcknowledgedTicket)>,
@@ -69,15 +67,15 @@ pub struct AcknowledgementInteraction<Db: HoprCoreDbActions> {
     outgoing_channel: (Sender<TransportTask>, Receiver<TransportTask>),
 }
 
-impl<Db: HoprCoreDbActions> AcknowledgementInteraction<Db> {
+impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
     pub fn new(db: Arc<Mutex<Db>>, public_key: PublicKey) -> Self {
         Self {
             db,
             public_key,
             incoming_channel: unbounded(),
             outgoing_channel: unbounded(),
-            on_acknowledgement: Box::new(|_|{}),
-            on_acknowledged_ticket: Box::new(|_|{}),
+            on_acknowledgement: Box::new(|_| {}),
+            on_acknowledged_ticket: Box::new(|_| {}),
         }
     }
 
@@ -86,7 +84,11 @@ impl<Db: HoprCoreDbActions> AcknowledgementInteraction<Db> {
     }
 
     pub async fn received_acknowledgement(&self, task: TransportTask) -> Result<()> {
-        self.incoming_channel.0.send(task).await.map_err(|e| TransportError(e.to_string()))
+        self.incoming_channel
+            .0
+            .send(task)
+            .await
+            .map_err(|e| TransportError(e.to_string()))
     }
 
     pub async fn send_acknowledgement(&self, acknowledgement: Acknowledgement, destination: PeerId) -> Result<()> {
@@ -147,7 +149,11 @@ impl<Db: HoprCoreDbActions> AcknowledgementInteraction<Db> {
     }
 
     async fn handle_acknowledgement(&self, mut ack: Acknowledgement, remote_peer: &PeerId) -> Result<()> {
-        debug!("own_key = {}, remote = {}", self.public_key, PublicKey::from_peerid(remote_peer).unwrap());
+        debug!(
+            "own_key = {}, remote = {}",
+            self.public_key,
+            PublicKey::from_peerid(remote_peer).unwrap()
+        );
         if !ack.validate(&self.public_key, &PublicKey::from_peerid(remote_peer)?) {
             return Err(AcknowledgementValidation(
                 "could not validate the acknowledgement".to_string(),
@@ -251,7 +257,7 @@ pub struct PacketInteractionConfig {
 
 pub struct PacketInteraction<Db>
 where
-    Db: HoprCoreDbActions,
+    Db: HoprCoreEthereumDbActions,
 {
     db: Arc<Mutex<Db>>,
     channel: (Sender<TransportTask>, Receiver<TransportTask>),
@@ -261,13 +267,13 @@ where
 
 impl<Db> PacketInteraction<Db>
 where
-    Db: HoprCoreDbActions,
+    Db: HoprCoreEthereumDbActions,
 {
     pub fn new(db: Arc<Mutex<Db>>, cfg: PacketInteractionConfig) -> Self {
         Self {
             db,
             channel: unbounded(),
-            message_emitter: Box::new(|_|{}),
+            message_emitter: Box::new(|_| {}),
             cfg,
         }
     }
@@ -473,7 +479,12 @@ where
         }
     }
 
-    async fn handle_mixed_packet<T, F>(&self, mut packet: Packet, ack_interaction: Arc<AcknowledgementInteraction<Db>>, message_transport: &T) -> Result<()>
+    async fn handle_mixed_packet<T, F>(
+        &self,
+        mut packet: Packet,
+        ack_interaction: Arc<AcknowledgementInteraction<Db>>,
+        message_transport: &T,
+    ) -> Result<()>
     where
         T: Fn(Box<[u8]>, String) -> F,
         F: futures::Future<Output = core::result::Result<(), String>>,
@@ -604,8 +615,11 @@ where
         Ok(())
     }
 
-    pub async fn handle_packets<T, F>(&self, ack_interaction: Arc<AcknowledgementInteraction<Db>>, message_transport: &T)
-    where
+    pub async fn handle_packets<T, F>(
+        &self,
+        ack_interaction: Arc<AcknowledgementInteraction<Db>>,
+        message_transport: &T,
+    ) where
         T: Fn(Box<[u8]>, String) -> F,
         F: futures::Future<Output = core::result::Result<(), String>>,
     {
@@ -615,7 +629,10 @@ where
             let mixed_packet = mixer.mix(task).await;
             match Packet::from_bytes(&mixed_packet.data, &self.cfg.private_key, &mixed_packet.remote_peer) {
                 Ok(packet) => {
-                    if let Err(e) = self.handle_mixed_packet(packet, ack_interaction.clone(), message_transport).await {
+                    if let Err(e) = self
+                        .handle_mixed_packet(packet, ack_interaction.clone(), message_transport)
+                        .await
+                    {
                         error!("failed to handle packet from {}: {e}", mixed_packet.remote_peer);
                     }
                 }
@@ -647,44 +664,46 @@ where
 
 #[cfg(all(not(target_arch = "wasm32"), test))]
 mod tests {
-    use std::collections::HashMap;
     use crate::errors::PacketError::PacketDbError;
-    use crate::interaction::{AcknowledgementInteraction, PacketInteraction, PacketInteractionConfig, PRICE_PER_PACKET, TransportTask};
+    use crate::interaction::{
+        AcknowledgementInteraction, PacketInteraction, PacketInteractionConfig, TransportTask, PRICE_PER_PACKET,
+    };
+    use crate::path::Path;
+    use crate::por::ProofOfRelayValues;
     use async_trait::async_trait;
+    use core_crypto::derivation::derive_ack_key_share;
     use core_crypto::random::random_bytes;
     use core_crypto::types::{Hash, PublicKey};
     use core_ethereum_db::db::CoreEthereumDb;
+    use core_ethereum_db::db::CoreEthereumDb;
+    use core_ethereum_db::traits::HoprCoreEthereumDbActions;
     use core_ethereum_db::traits::HoprCoreEthereumDbActions;
     use core_ethereum_misc::commitment::{initialize_commitment, ChainCommitter, ChannelCommitmentInfo};
+    use core_types::acknowledgement::{Acknowledgement, AcknowledgementChallenge, PendingAcknowledgement};
     use core_types::channels::{ChannelEntry, ChannelStatus};
+    use futures::future::{select, Either};
+    use futures::pin_mut;
     use hex_literal::hex;
+    use lazy_static::lazy_static;
     use libp2p_identity::PeerId;
+    use std::collections::HashMap;
     use std::ops::Mul;
     use std::str::FromStr;
     use std::sync::{Arc, Mutex};
     use std::time::Duration;
-    use futures::future::{Either, select};
-    use futures::pin_mut;
-    use lazy_static::lazy_static;
-    use core_crypto::derivation::derive_ack_key_share;
-    use core_db::db::CoreDb;
-    use core_db::traits::HoprCoreDbActions;
-    use core_types::acknowledgement::{Acknowledgement, AcknowledgementChallenge, PendingAcknowledgement};
     use utils_db::db::DB;
     use utils_db::errors::DbError;
     use utils_db::leveldb::rusty::RustyLevelDbShim;
     use utils_log::debug;
     use utils_types::primitives::{Balance, BalanceType, Snapshot, U256};
     use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
-    use crate::path::Path;
-    use crate::por::ProofOfRelayValues;
 
     const PEERS_PRIVS: [[u8; 32]; 5] = [
         hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"),
         hex!("5bf21ea8cccd69aa784346b07bf79c84dac606e00eecaa68bf8c31aff397b1ca"),
         hex!("3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa"),
         hex!("db7e3e8fcac4c817aa4cecee1d6e2b4d53da51f9881592c0e1cc303d8a012b92"),
-        hex!("0726a9704d56a013980a9077d195520a61b5aed28f92d89c50bca6e0e0c48cfc")
+        hex!("0726a9704d56a013980a9077d195520a61b5aed28f92d89c50bca6e0e0c48cfc"),
     ];
 
     const ACK_PROTOCOL: usize = 0;
@@ -697,15 +716,15 @@ mod tests {
             .iter()
             .map(|private| PublicKey::from_privkey(private).unwrap().to_peerid())
             .collect();
-
-        static ref MESSAGES: Mutex<[HashMap<PeerId, Vec<Msg<PeerId>>>; 2]> = Mutex::new([ HashMap::new(), HashMap::new()]);
+        static ref MESSAGES: Mutex<[HashMap<PeerId, Vec<Msg<PeerId>>>; 2]> =
+            Mutex::new([HashMap::new(), HashMap::new()]);
     }
 
     #[derive(Clone, Eq, PartialEq, Debug)]
     struct Msg<T> {
         pub from: T,
         pub to: T,
-        pub data: Box<[u8]>
+        pub data: Box<[u8]>,
     }
 
     fn init_transport() {
@@ -714,8 +733,8 @@ mod tests {
         g[MSG_PROTOCOL].clear();
 
         for peer in PEERS.iter() {
-            g[ACK_PROTOCOL].insert( peer.clone(), Vec::new() );
-            g[MSG_PROTOCOL].insert( peer.clone(), Vec::new() );
+            g[ACK_PROTOCOL].insert(peer.clone(), Vec::new());
+            g[MSG_PROTOCOL].insert(peer.clone(), Vec::new());
         }
     }
 
@@ -725,23 +744,22 @@ mod tests {
         g[MSG_PROTOCOL].clear();
     }
 
-    async fn send_transport_as_peer<const PROTO: usize, const PEER_NUM: usize>(data: Box<[u8]>, dst: String) -> std::result::Result<(), String> {
+    async fn send_transport_as_peer<const PROTO: usize, const PEER_NUM: usize>(
+        data: Box<[u8]>,
+        dst: String,
+    ) -> std::result::Result<(), String> {
         let from = PEERS[PEER_NUM];
         let to = PeerId::from_str(&dst).expect(&format!("invalid peer id: {dst}"));
-        MESSAGES
-            .lock()
-            .unwrap()[PROTO]
+        MESSAGES.lock().unwrap()[PROTO]
             .get_mut(&to)
             .expect(&format!("non existent channel: {to}"))
             .push(Msg { from, to, data });
         Ok(())
     }
 
-    fn retrieve_transport_msgs_as_peer<const PROTO: usize, const PEER_NUM: usize>() -> Option<Vec<Msg<PeerId>>>{
+    fn retrieve_transport_msgs_as_peer<const PROTO: usize, const PEER_NUM: usize>() -> Option<Vec<Msg<PeerId>>> {
         let for_peer = PEERS[PEER_NUM];
-        Some(MESSAGES.lock().unwrap()[PROTO].get_mut(&for_peer)?
-            .drain(..)
-            .collect())
+        Some(MESSAGES.lock().unwrap()[PROTO].get_mut(&for_peer)?.drain(..).collect())
     }
 
     fn create_dummy_channel(from: &PeerId, to: &PeerId) -> ChannelEntry {
@@ -760,20 +778,24 @@ mod tests {
 
     fn create_dbs(amount: usize) -> Vec<Arc<Mutex<rusty_leveldb::DB>>> {
         (0..amount)
-            .map(|i| { Arc::new(Mutex::new(
-                rusty_leveldb::DB::open(format!("test_db_{i}"), rusty_leveldb::in_memory()).unwrap(),
+            .map(|i| {
+                Arc::new(Mutex::new(
+                    rusty_leveldb::DB::open(format!("test_db_{i}"), rusty_leveldb::in_memory()).unwrap(),
                 ))
             })
             .collect()
     }
 
-    fn create_core_dbs(dbs: &Vec<Arc<Mutex<rusty_leveldb::DB>>>) -> Vec<Arc<Mutex<CoreDb<RustyLevelDbShim>>>> {
-        dbs
-            .iter()
-            .enumerate().map(|(i, db)| Arc::new(Mutex::new(CoreDb::new(
-            DB::new(RustyLevelDbShim::new(db.clone())),
-            PublicKey::from_peerid(&PEERS[i]).unwrap()
-        )))).collect::<Vec<_>>()
+    fn create_core_dbs(dbs: &Vec<Arc<Mutex<rusty_leveldb::DB>>>) -> Vec<Arc<Mutex<CoreEthereumDb<RustyLevelDbShim>>>> {
+        dbs.iter()
+            .enumerate()
+            .map(|(i, db)| {
+                Arc::new(Mutex::new(CoreEthereumDb::new(
+                    DB::new(RustyLevelDbShim::new(db.clone())),
+                    PublicKey::from_peerid(&PEERS[i]).unwrap(),
+                )))
+            })
+            .collect::<Vec<_>>()
     }
 
     struct EmptyChainCommiter {}
@@ -789,14 +811,15 @@ mod tests {
         }
     }
 
-    async fn create_minimal_topology(
-        dbs: &Vec<Arc<Mutex<rusty_leveldb::DB>>>
-    ) -> crate::errors::Result<()> {
+    async fn create_minimal_topology(dbs: &Vec<Arc<Mutex<rusty_leveldb::DB>>>) -> crate::errors::Result<()> {
         let testing_snapshot = Snapshot::new(U256::zero(), U256::zero(), U256::zero());
         let mut previous_channel: Option<ChannelEntry> = None;
 
         for (index, peer_id) in PEERS.iter().enumerate().take(dbs.len()) {
-            let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(dbs[index].clone())), PublicKey::from_peerid(&peer_id).unwrap());
+            let mut db = CoreEthereumDb::new(
+                DB::new(RustyLevelDbShim::new(dbs[index].clone())),
+                PublicKey::from_peerid(&peer_id).unwrap(),
+            );
 
             let mut channel: Option<ChannelEntry> = None;
 
@@ -837,15 +860,18 @@ mod tests {
         Ok(())
     }
 
-    fn spawn_ack_receive<Db: HoprCoreDbActions + 'static, const PEER_NUM: usize>(interaction: Arc<AcknowledgementInteraction<Db>>) {
+    fn spawn_ack_receive<Db: HoprCoreEthereumDbActions + 'static, const PEER_NUM: usize>(
+        interaction: Arc<AcknowledgementInteraction<Db>>,
+    ) {
         async_std::task::spawn_local(async move {
             while let Some(msgs) = retrieve_transport_msgs_as_peer::<ACK_PROTOCOL, PEER_NUM>() {
                 for task in msgs.into_iter().map(|m| TransportTask {
                     remote_peer: m.from,
-                    data: m.data
+                    data: m.data,
                 }) {
                     debug!("received ack from {}: {}", task.remote_peer, hex::encode(&task.data));
-                    interaction.received_acknowledgement(task)
+                    interaction
+                        .received_acknowledgement(task)
                         .await
                         .expect("failed to receive ack");
                 }
@@ -854,12 +880,14 @@ mod tests {
         });
     }
 
-    fn spawn_pkt_receive<Db: HoprCoreDbActions + 'static, const PEER_NUM: usize>(interaction: Arc<PacketInteraction<Db>>) {
+    fn spawn_pkt_receive<Db: HoprCoreEthereumDbActions + 'static, const PEER_NUM: usize>(
+        interaction: Arc<PacketInteraction<Db>>,
+    ) {
         async_std::task::spawn_local(async move {
             while let Some(msgs) = retrieve_transport_msgs_as_peer::<MSG_PROTOCOL, PEER_NUM>() {
                 for task in msgs.into_iter().map(|m| TransportTask {
                     remote_peer: m.from,
-                    data: m.data
+                    data: m.data,
                 }) {
                     debug!("received packet from {}: {}", task.remote_peer, hex::encode(&task.data));
                     interaction
@@ -872,15 +900,24 @@ mod tests {
         });
     }
 
-    fn spawn_ack_send<Db: HoprCoreDbActions + 'static, const PEER_NUM: usize>(interaction: Arc<AcknowledgementInteraction<Db>>) {
+    fn spawn_ack_send<Db: HoprCoreEthereumDbActions + 'static, const PEER_NUM: usize>(
+        interaction: Arc<AcknowledgementInteraction<Db>>,
+    ) {
         async_std::task::spawn_local(async move {
-            interaction.handle_outgoing_acknowledgements(&send_transport_as_peer::<ACK_PROTOCOL, PEER_NUM>).await;
+            interaction
+                .handle_outgoing_acknowledgements(&send_transport_as_peer::<ACK_PROTOCOL, PEER_NUM>)
+                .await;
         });
     }
 
-    fn spawn_pkt_handling<Db: HoprCoreDbActions + 'static, const PEER_NUM: usize>(pkt_interaction: Arc<PacketInteraction<Db>>, ack_interaction: Arc<AcknowledgementInteraction<Db>>) {
+    fn spawn_pkt_handling<Db: HoprCoreEthereumDbActions + 'static, const PEER_NUM: usize>(
+        pkt_interaction: Arc<PacketInteraction<Db>>,
+        ack_interaction: Arc<AcknowledgementInteraction<Db>>,
+    ) {
         async_std::task::spawn_local(async move {
-            pkt_interaction.handle_packets(ack_interaction, &send_transport_as_peer::<MSG_PROTOCOL, PEER_NUM>).await;
+            pkt_interaction
+                .handle_packets(ack_interaction, &send_transport_as_peer::<MSG_PROTOCOL, PEER_NUM>)
+                .await;
         });
     }
 
@@ -913,7 +950,11 @@ mod tests {
                 .expect("failed to create Proof of Relay values");
 
             // Mimics that the packet sender has sent a packet and now it has a pending acknowledgement in it's DB
-            core_dbs[0].lock().unwrap().store_pending_acknowledgment(porv.ack_challenge.clone(), PendingAcknowledgement::WaitingAsSender).await
+            core_dbs[0]
+                .lock()
+                .unwrap()
+                .store_pending_acknowledgment(porv.ack_challenge.clone(), PendingAcknowledgement::WaitingAsSender)
+                .await
                 .expect("failed to store pending ack");
 
             let ack_key = derive_ack_key_share(&secrets[0]);
@@ -922,9 +963,9 @@ mod tests {
             sent_challenges.push((ack_key, ack_msg));
         }
 
-
         // Peer 1: This is mimics the ACK interaction of the packet sender
-        let mut tmp_ack = AcknowledgementInteraction::new(core_dbs[0].clone(), PublicKey::from_peerid(&PEERS[0]).unwrap());
+        let mut tmp_ack =
+            AcknowledgementInteraction::new(core_dbs[0].clone(), PublicKey::from_peerid(&PEERS[0]).unwrap());
 
         // ... which is just waiting to get an acknowledgement from the counterparty
         let expected_challenges = sent_challenges.clone();
@@ -932,9 +973,12 @@ mod tests {
             debug!("sender has received acknowledgement: {}", ack.to_hex());
             if let Some((ack_key, ack_msg)) = expected_challenges
                 .iter()
-                .find(|(_, chal)| chal.ack_challenge.unwrap().eq(&ack)) {
-
-                assert!(ack_msg.solve(&ack_key.to_bytes()), "acknowledgement key must solve acknowledgement challenge");
+                .find(|(_, chal)| chal.ack_challenge.unwrap().eq(&ack))
+            {
+                assert!(
+                    ack_msg.solve(&ack_key.to_bytes()),
+                    "acknowledgement key must solve acknowledgement challenge"
+                );
 
                 // If it matches, set a signal that the test has finished
                 done_tx.send_blocking(()).expect("send failed");
@@ -949,27 +993,30 @@ mod tests {
 
         // Peer 1: start processing incoming acknowledgements on the packet sender
         let ack_sender_clone = ack_interaction_sender.clone();
-        async_std::task::spawn_local(async move {
-            ack_sender_clone.handle_incoming_acknowledgements().await
-        });
+        async_std::task::spawn_local(async move { ack_sender_clone.handle_incoming_acknowledgements().await });
 
         // Peer 2: Recipient of the packet and sender of the acknowledgement
-        let ack_interaction_counterparty = Arc::new(AcknowledgementInteraction::new(core_dbs[1].clone(), PublicKey::from_peerid(&PEERS[1]).unwrap()));
+        let ack_interaction_counterparty = Arc::new(AcknowledgementInteraction::new(
+            core_dbs[1].clone(),
+            PublicKey::from_peerid(&PEERS[1]).unwrap(),
+        ));
 
         // Peer 2: start sending out outgoing acknowledgement
-        spawn_ack_send::<_,1>(ack_interaction_counterparty.clone());
+        spawn_ack_send::<_, 1>(ack_interaction_counterparty.clone());
 
         // Peer 2: does not need to process incoming acknowledgements
 
         ////
 
         for (ack_key, ack_msg) in sent_challenges {
-            ack_interaction_counterparty.send_acknowledgement(
-                Acknowledgement::new(ack_msg, ack_key, &PEERS_PRIVS[1]),
-                PEERS[0].clone()
-            ).await.expect("failed to send ack");
+            ack_interaction_counterparty
+                .send_acknowledgement(
+                    Acknowledgement::new(ack_msg, ack_key, &PEERS_PRIVS[1]),
+                    PEERS[0].clone(),
+                )
+                .await
+                .expect("failed to send ack");
         }
-
 
         let finish = async move {
             for i in 1..PENDING_ACKS + 1 {
@@ -1001,7 +1048,10 @@ mod tests {
 
         init_transport();
 
-        enum AckOrPacket { Ack, Packet }
+        enum AckOrPacket {
+            Ack,
+            Packet,
+        }
 
         let (done_tx, done_rx) = async_std::channel::unbounded();
 
@@ -1023,17 +1073,20 @@ mod tests {
         let packet_sender = PacketInteraction::new(
             core_dbs[0].clone(),
             PacketInteractionConfig {
-                    check_unrealized_balance: true,
-                    private_key: PEERS_PRIVS[0].into()
-                }
+                check_unrealized_balance: true,
+                private_key: PEERS_PRIVS[0].into(),
+            },
         );
 
         // Peer 2 (relayer): awaits acknowledgements of relayer packets to Peer 3
-        let mut tmp_ack = AcknowledgementInteraction::new(core_dbs[1].clone(), PublicKey::from_peerid(&PEERS[0]).unwrap());
+        let mut tmp_ack =
+            AcknowledgementInteraction::new(core_dbs[1].clone(), PublicKey::from_peerid(&PEERS[0]).unwrap());
         let done_tx_clone = done_tx.clone();
         tmp_ack.on_acknowledgement = Box::new(move |ack| {
             debug!("relayer has received acknowledgement from recipient: {}", ack.to_hex());
-            done_tx_clone.send_blocking(AckOrPacket::Ack).expect("failed to confirm ack");
+            done_tx_clone
+                .send_blocking(AckOrPacket::Ack)
+                .expect("failed to confirm ack");
         });
 
         // Peer 2: packet interaction for the relayer
@@ -1041,9 +1094,9 @@ mod tests {
         let pkt_interaction_relayer = Arc::new(PacketInteraction::new(
             core_dbs[1].clone(),
             PacketInteractionConfig {
-                    check_unrealized_balance: true,
-                    private_key: PEERS_PRIVS[1].into(),
-                }
+                check_unrealized_balance: true,
+                private_key: PEERS_PRIVS[1].into(),
+            },
         ));
 
         // Peer 2: start packets handling as a relayer
@@ -1055,29 +1108,35 @@ mod tests {
 
         // Peer 2: start processing incoming acknowledgements of the relayed packets
         let ack_relayer_clone = ack_interaction_relayer.clone();
-        async_std::task::spawn_local(async move {
-            ack_relayer_clone.handle_incoming_acknowledgements().await
-        });
+        async_std::task::spawn_local(async move { ack_relayer_clone.handle_incoming_acknowledgements().await });
 
         // Peer 3: Recipient of the packet and sender of the acknowledgement
         let mut tmp_pkt_counterparty = PacketInteraction::new(
             core_dbs[2].clone(),
             PacketInteractionConfig {
-                    check_unrealized_balance: true,
-                    private_key: PEERS_PRIVS[2].into()
-                }
+                check_unrealized_balance: true,
+                private_key: PEERS_PRIVS[2].into(),
+            },
         );
         tmp_pkt_counterparty.message_emitter = Box::new(move |msg: &[u8]| {
             debug!("received message: {}", hex::encode(msg));
             assert_eq!(TEST_MESSAGE, msg, "received packet payload must match");
-            done_tx.send_blocking(AckOrPacket::Packet).expect("failed to confirm pkt");
+            done_tx
+                .send_blocking(AckOrPacket::Packet)
+                .expect("failed to confirm pkt");
         });
 
-        let ack_interaction_counterparty = Arc::new(AcknowledgementInteraction::new(core_dbs[2].clone(), PublicKey::from_peerid(&PEERS[1]).unwrap()));
+        let ack_interaction_counterparty = Arc::new(AcknowledgementInteraction::new(
+            core_dbs[2].clone(),
+            PublicKey::from_peerid(&PEERS[1]).unwrap(),
+        ));
         let pkt_interaction_counterparty = Arc::new(tmp_pkt_counterparty);
 
         // Peer 3: start packet interaction at the recipient
-        spawn_pkt_handling::<_, 2>(pkt_interaction_counterparty.clone(), ack_interaction_counterparty.clone());
+        spawn_pkt_handling::<_, 2>(
+            pkt_interaction_counterparty.clone(),
+            ack_interaction_counterparty.clone(),
+        );
         spawn_pkt_receive::<_, 2>(pkt_interaction_counterparty.clone());
 
         // Peer 3: start sending out outgoing acknowledgements
@@ -1087,9 +1146,11 @@ mod tests {
         const PENDING_PACKETS: usize = 1;
         for _ in 0..PENDING_PACKETS {
             packet_sender
-                .send_outgoing_packet(&TEST_MESSAGE,
-                                      packet_path.clone(),
-                                      &send_transport_as_peer::<MSG_PROTOCOL, 0>)
+                .send_outgoing_packet(
+                    &TEST_MESSAGE,
+                    packet_path.clone(),
+                    &send_transport_as_peer::<MSG_PROTOCOL, 0>,
+                )
                 .await
                 .unwrap();
         }
@@ -1098,13 +1159,13 @@ mod tests {
 
         // Check that we received all acknowledgements and packets
         let finish = async move {
-            let (mut acks, mut pkts) = (0,0);
-            for i in 1 .. 2 * PENDING_PACKETS + 1 {
+            let (mut acks, mut pkts) = (0, 0);
+            for i in 1..2 * PENDING_PACKETS + 1 {
                 match done_rx.recv().await.expect("failed finalize ack") {
                     AckOrPacket::Ack => {
                         debug!("done ack #{i} out of {PENDING_PACKETS}");
                         acks += 1;
-                    },
+                    }
                     AckOrPacket::Packet => {
                         debug!("done msg #{i} out of {PENDING_PACKETS}");
                         pkts += 1;
@@ -1122,7 +1183,7 @@ mod tests {
                 assert_eq!(acks, PENDING_PACKETS, "did not receive all acknowledgements");
                 assert_eq!(pkts, PENDING_PACKETS, "did not receive all packets");
                 true
-            },
+            }
             Either::Right(_) => false,
         };
 
@@ -1141,22 +1202,22 @@ mod tests {
 pub mod wasm {
     use crate::interaction::{AcknowledgementInteraction, PacketInteraction, PacketInteractionConfig, TransportTask};
     use core_crypto::types::PublicKey;
-    use core_db::db::CoreDb;
+    use core_ethereum_db::db::CoreEthereumDb;
+    use core_types::acknowledgement::Acknowledgement;
     use js_sys::JsString;
     use libp2p_identity::PeerId;
     use std::future::Future;
     use std::pin::Pin;
     use std::str::FromStr;
     use std::sync::{Arc, Mutex};
+    use utils_db::db::DB;
     use utils_db::leveldb::{LevelDb, LevelDbShim};
+    use utils_log::error;
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use wasm_bindgen::prelude::wasm_bindgen;
     use wasm_bindgen::JsCast;
     use wasm_bindgen::JsValue;
-    use core_types::acknowledgement::Acknowledgement;
-    use utils_db::db::DB;
-    use utils_log::error;
 
     #[wasm_bindgen]
     impl TransportTask {
@@ -1171,15 +1232,18 @@ pub mod wasm {
 
     #[wasm_bindgen]
     pub struct WasmAckInteraction {
-        w: Arc<AcknowledgementInteraction<CoreDb<LevelDbShim>>>,
+        w: Arc<AcknowledgementInteraction<CoreEthereumDb<LevelDbShim>>>,
     }
 
     #[wasm_bindgen]
     impl WasmAckInteraction {
         pub fn new(db: LevelDb, chain_key: PublicKey) -> Self {
             Self {
-                w: Arc::new(AcknowledgementInteraction::new(Arc::new(Mutex::new(
-                    CoreDb::new(DB::new(LevelDbShim::new(db)), chain_key.clone()))),
+                w: Arc::new(AcknowledgementInteraction::new(
+                    Arc::new(Mutex::new(CoreEthereumDb::new(
+                        DB::new(LevelDbShim::new(db)),
+                        chain_key.clone(),
+                    ))),
                     chain_key,
                 )),
             }
@@ -1190,7 +1254,11 @@ pub mod wasm {
         }
 
         pub async fn send_new_acknowledgement(&self, ack: Acknowledgement, dest: String) -> JsResult<()> {
-            ok_or_jserr!(self.w.send_acknowledgement(ack, ok_or_jserr!(PeerId::from_str(&dest))?).await)
+            ok_or_jserr!(
+                self.w
+                    .send_acknowledgement(ack, ok_or_jserr!(PeerId::from_str(&dest))?)
+                    .await
+            )
         }
 
         pub async fn start_handle_incoming_acks(&self) {
@@ -1237,7 +1305,7 @@ pub mod wasm {
 
     #[wasm_bindgen]
     pub struct WasmPacketInteraction {
-        w: PacketInteraction<CoreDb<LevelDbShim>>,
+        w: PacketInteraction<CoreEthereumDb<LevelDbShim>>,
     }
 
     #[wasm_bindgen]
@@ -1245,8 +1313,8 @@ pub mod wasm {
         #[wasm_bindgen(constructor)]
         pub fn new(db: LevelDb, cfg: PacketInteractionConfig) -> Self {
             Self {
-                w: PacketInteraction::new(Arc::new(Mutex::new(
-                    CoreDb::new(
+                w: PacketInteraction::new(
+                    Arc::new(Mutex::new(CoreEthereumDb::new(
                         DB::new(LevelDbShim::new(db)),
                         PublicKey::from_privkey(&cfg.private_key).expect("invalid private key"),
                     ))),

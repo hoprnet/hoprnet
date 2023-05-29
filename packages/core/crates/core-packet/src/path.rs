@@ -30,8 +30,8 @@ impl Path {
 
 #[cfg(test)]
 mod tests {
-    use libp2p_identity::PeerId;
     use crate::path::Path;
+    use libp2p_identity::PeerId;
 
     #[test]
     fn test_path_validated() {

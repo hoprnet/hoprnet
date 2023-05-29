@@ -300,8 +300,9 @@ mod tests {
         let prefixed_key_3 = "xyc";
 
         let opt = rusty_leveldb::in_memory();
-        let mut kv_storage =
-            crate::leveldb::rusty::RustyLevelDbShim::new(Arc::new(Mutex::new(rusty_leveldb::DB::open("test", opt).unwrap())));
+        let mut kv_storage = crate::leveldb::rusty::RustyLevelDbShim::new(Arc::new(Mutex::new(
+            rusty_leveldb::DB::open("test", opt).unwrap(),
+        )));
 
         assert!(
             !kv_storage.contains(key_1.as_bytes().to_vec().into_boxed_slice()).await,
