@@ -7,8 +7,8 @@ pub mod por;
 #[cfg(feature = "wasm")]
 pub mod wasm {
 
-    use utils_misc::utils::wasm::JsResult;
     use utils_log::logger::JsLogger;
+    use utils_misc::utils::wasm::JsResult;
     use wasm_bindgen::prelude::*;
 
     // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global allocator.

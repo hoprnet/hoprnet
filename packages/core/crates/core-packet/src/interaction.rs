@@ -8,7 +8,7 @@ use crate::path::Path;
 use async_std::channel::{unbounded, Receiver, Sender};
 use core_crypto::types::{HalfKeyChallenge, Hash, PublicKey};
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-use core_mixer::mixer::Mixer;
+use core_mixer::mixer::{Mixer, MixerConfig};
 use core_types::acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket};
 use core_types::channels::{ChannelEntry, ChannelStatus, Ticket};
 use libp2p_identity::PeerId;
@@ -253,6 +253,7 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
 pub struct PacketInteractionConfig {
     pub check_unrealized_balance: bool,
     pub private_key: Box<[u8]>,
+    pub mixer: MixerConfig
 }
 
 pub struct PacketInteraction<Db>
@@ -262,6 +263,7 @@ where
     db: Arc<Mutex<Db>>,
     channel: (Sender<TransportTask>, Receiver<TransportTask>),
     pub message_emitter: Box<dyn Fn(&[u8])>,
+    pub mixer: Mixer<TransportTask>,
     cfg: PacketInteractionConfig,
 }
 
@@ -274,6 +276,7 @@ where
             db,
             channel: unbounded(),
             message_emitter: Box::new(|_| {}),
+            mixer: Mixer::new(cfg.mixer.clone()),
             cfg,
         }
     }
@@ -383,7 +386,7 @@ where
             .unwrap()
             .get_channel_to(&destination)
             .await?
-            .ok_or(ChannelNotFound(destination.to_string()))?;
+            .ok_or(ChannelNotFound(destination.to_peerid().to_string()))?;
 
         let channel_id = channel.get_id();
         let current_index = self.bump_ticket_index(&channel_id).await?;
@@ -503,7 +506,7 @@ where
                 ..
             } => {
                 // Validate if it's not a replayed packet
-                if !self.db.lock().unwrap().check_and_set_packet_tag(packet_tag).await? {
+                if self.db.lock().unwrap().check_and_set_packet_tag(packet_tag).await? {
                     return Err(TagReplay);
                 }
 
@@ -531,7 +534,7 @@ where
                 ..
             } => {
                 // Validate if it's not a replayed packet
-                if !self.db.lock().unwrap().check_and_set_packet_tag(packet_tag).await? {
+                if self.db.lock().unwrap().check_and_set_packet_tag(packet_tag).await? {
                     return Err(TagReplay);
                 }
 
@@ -623,10 +626,9 @@ where
         T: Fn(Box<[u8]>, String) -> F,
         F: futures::Future<Output = core::result::Result<(), String>>,
     {
-        let mixer = Mixer::<TransportTask>::default();
         while let Ok(task) = self.channel.1.recv().await {
             // Add some random delay via mixer
-            let mixed_packet = mixer.mix(task).await;
+            let mixed_packet = self.mixer.mix(task).await;
             match Packet::from_bytes(&mixed_packet.data, &self.cfg.private_key, &mixed_packet.remote_peer) {
                 Ok(packet) => {
                     if let Err(e) = self
@@ -689,6 +691,7 @@ mod tests {
     use std::str::FromStr;
     use std::sync::{Arc, Mutex};
     use std::time::Duration;
+    use core_mixer::mixer::MixerConfig;
     use utils_db::db::DB;
     use utils_db::errors::DbError;
     use utils_db::leveldb::rusty::RustyLevelDbShim;
@@ -1067,21 +1070,24 @@ mod tests {
         debug!("peer 3 (recipient) = {}", PEERS[2]);
 
         // Peer 1 (sender): just sends packets over Peer 2 to Peer 3, ignores acknowledgements from Peer 2
-        let packet_path = Path::new_valid(PEERS[1..2].to_vec());
+        let packet_path = Path::new_valid(PEERS[1..=2].to_vec());
+        assert_eq!(2, packet_path.length(), "path must have length 2");
+
         let packet_sender = PacketInteraction::new(
             core_dbs[0].clone(),
             PacketInteractionConfig {
                 check_unrealized_balance: true,
                 private_key: PEERS_PRIVS[0].into(),
+                mixer: MixerConfig::default(),
             },
         );
 
         // Peer 2 (relayer): awaits acknowledgements of relayer packets to Peer 3
         let mut tmp_ack =
-            AcknowledgementInteraction::new(core_dbs[1].clone(), PublicKey::from_peerid(&PEERS[0]).unwrap());
+            AcknowledgementInteraction::new(core_dbs[1].clone(), PublicKey::from_peerid(&PEERS[1]).unwrap());
         let done_tx_clone = done_tx.clone();
-        tmp_ack.on_acknowledgement = Box::new(move |ack| {
-            debug!("relayer has received acknowledgement from recipient: {}", ack.to_hex());
+        tmp_ack.on_acknowledged_ticket = Box::new(move |ack| {
+            debug!("relayer has received acknowledged ticket from {}", ack.signer);
             done_tx_clone
                 .send_blocking(AckOrPacket::Ack)
                 .expect("failed to confirm ack");
@@ -1094,6 +1100,7 @@ mod tests {
             PacketInteractionConfig {
                 check_unrealized_balance: true,
                 private_key: PEERS_PRIVS[1].into(),
+                mixer: MixerConfig::default(),
             },
         ));
 
@@ -1114,6 +1121,7 @@ mod tests {
             PacketInteractionConfig {
                 check_unrealized_balance: true,
                 private_key: PEERS_PRIVS[2].into(),
+                mixer: MixerConfig::default(),
             },
         );
         tmp_pkt_counterparty.message_emitter = Box::new(move |msg: &[u8]| {
@@ -1126,7 +1134,7 @@ mod tests {
 
         let ack_interaction_counterparty = Arc::new(AcknowledgementInteraction::new(
             core_dbs[2].clone(),
-            PublicKey::from_peerid(&PEERS[1]).unwrap(),
+            PublicKey::from_peerid(&PEERS[2]).unwrap(),
         ));
         let pkt_interaction_counterparty = Arc::new(tmp_pkt_counterparty);
 
@@ -1161,7 +1169,7 @@ mod tests {
             for i in 1..2 * PENDING_PACKETS + 1 {
                 match done_rx.recv().await.expect("failed finalize ack") {
                     AckOrPacket::Ack => {
-                        debug!("done ack #{i} out of {PENDING_PACKETS}");
+                        debug!("done ack tickets #{i} out of {PENDING_PACKETS}");
                         acks += 1;
                     }
                     AckOrPacket::Packet => {
@@ -1216,6 +1224,7 @@ pub mod wasm {
     use wasm_bindgen::prelude::wasm_bindgen;
     use wasm_bindgen::JsCast;
     use wasm_bindgen::JsValue;
+    use core_mixer::mixer::Mixer;
 
     #[wasm_bindgen]
     impl TransportTask {
@@ -1310,15 +1319,17 @@ pub mod wasm {
     impl WasmPacketInteraction {
         #[wasm_bindgen(constructor)]
         pub fn new(db: LevelDb, cfg: PacketInteractionConfig) -> Self {
-            Self {
-                w: PacketInteraction::new(
-                    Arc::new(Mutex::new(CoreEthereumDb::new(
-                        DB::new(LevelDbShim::new(db)),
-                        PublicKey::from_privkey(&cfg.private_key).expect("invalid private key"),
-                    ))),
-                    cfg,
-                ),
-            }
+            // For WASM we need to create mixer with gloo-timers
+            let gloo_mixer = Mixer::new_with_gloo_timers(cfg.mixer.clone());
+            let mut w =  PacketInteraction::new(
+                Arc::new(Mutex::new(CoreEthereumDb::new(
+                    DB::new(LevelDbShim::new(db)),
+                    PublicKey::from_privkey(&cfg.private_key).expect("invalid private key"),
+                ))),
+                cfg,
+            );
+            w.mixer = gloo_mixer;
+            Self { w }
         }
 
         pub async fn handle_packets(&self, ack_interaction: &WasmAckInteraction, transport_cb: &js_sys::Function) {

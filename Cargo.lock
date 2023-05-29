@@ -4921,6 +4921,7 @@ dependencies = [
  "console_error_panic_hook",
  "futures-lite",
  "gloo-timers",
+ "hex",
  "js-sys",
  "mockall",
  "pin-project-lite",

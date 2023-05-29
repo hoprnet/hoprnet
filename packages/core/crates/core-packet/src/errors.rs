@@ -17,7 +17,7 @@ pub enum PacketError {
     #[error("packet tag already present, possible replay")]
     TagReplay,
 
-    #[error("could not find channel with counterparty {0}")]
+    #[error("could not find channel to {0}")]
     ChannelNotFound(String),
 
     #[error("ticket validation failed, packet dropped: {0}")]
