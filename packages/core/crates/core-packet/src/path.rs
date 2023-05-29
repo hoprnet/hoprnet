@@ -1,3 +1,4 @@
+use std::fmt::{Display, Formatter};
 use libp2p_identity::PeerId;
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -25,6 +26,16 @@ impl Path {
 
     pub fn valid(&self) -> bool {
         self.valid
+    }
+}
+
+impl Display for Path {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f,"[{}", if self.valid { " " } else { " !! " })?;
+        for peer in &self.hops {
+            write!(f, "{peer}->")?;
+        }
+        write!(f, " ]")
     }
 }
 

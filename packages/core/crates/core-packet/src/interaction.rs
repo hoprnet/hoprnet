@@ -15,7 +15,6 @@ use libp2p_identity::PeerId;
 use std::ops::Mul;
 use std::sync::{Arc, Mutex};
 use utils_log::{debug, error, info};
-//use utils_log::{debug, error, info};
 use utils_types::primitives::{Balance, BalanceType, U256};
 use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
 
@@ -261,7 +260,7 @@ where
     Db: HoprCoreEthereumDbActions,
 {
     db: Arc<Mutex<Db>>,
-    channel: (Sender<TransportTask>, Receiver<TransportTask>),
+    incoming_packets: (Sender<TransportTask>, Receiver<TransportTask>),
     pub message_emitter: Box<dyn Fn(&[u8])>,
     pub mixer: Mixer<TransportTask>,
     cfg: PacketInteractionConfig,
@@ -274,7 +273,7 @@ where
     pub fn new(db: Arc<Mutex<Db>>, cfg: PacketInteractionConfig) -> Self {
         Self {
             db,
-            channel: unbounded(),
+            incoming_packets: unbounded(),
             message_emitter: Box::new(|_| {}),
             mixer: Mixer::new(cfg.mixer.clone()),
             cfg,
@@ -626,7 +625,7 @@ where
         T: Fn(Box<[u8]>, String) -> F,
         F: futures::Future<Output = core::result::Result<(), String>>,
     {
-        while let Ok(task) = self.channel.1.recv().await {
+        while let Ok(task) = self.incoming_packets.1.recv().await {
             // Add some random delay via mixer
             let mixed_packet = self.mixer.mix(task).await;
             match Packet::from_bytes(&mixed_packet.data, &self.cfg.private_key, &mixed_packet.remote_peer) {
@@ -647,7 +646,7 @@ where
     }
 
     pub async fn push_received_packet(&self, packet_task: TransportTask) -> Result<()> {
-        self.channel
+        self.incoming_packets
             .0
             .send(packet_task)
             .await
@@ -659,8 +658,8 @@ where
     }
 
     pub fn stop(&self) {
-        self.channel.0.close();
-        self.channel.1.close();
+        self.incoming_packets.0.close();
+        self.incoming_packets.1.close();
     }
 }
 
@@ -749,7 +748,7 @@ mod tests {
     async fn send_transport_as_peer<const PROTO: usize, const PEER_NUM: usize>(
         data: Box<[u8]>,
         dst: String,
-    ) -> std::result::Result<(), String> {
+    ) -> Result<(), String> {
         let from = PEERS[PEER_NUM];
         let to = PeerId::from_str(&dst).expect(&format!("invalid peer id: {dst}"));
         MESSAGES.lock().unwrap()[PROTO]
@@ -1078,6 +1077,8 @@ mod tests {
         let packet_path = Path::new_valid(PEERS[1..=2].to_vec());
         assert_eq!(2, packet_path.length(), "path must have length 2");
 
+        const PENDING_PACKETS: usize = 5;
+
         let packet_sender = PacketInteraction::new(
             core_dbs[0].clone(),
             PacketInteractionConfig {
@@ -1147,7 +1148,6 @@ mod tests {
         spawn_ack_send::<_, 2>(ack_interaction_counterparty.clone());
 
         // Peer 1: Start sending out packets
-        const PENDING_PACKETS: usize = 5;
         for _ in 0..PENDING_PACKETS {
             packet_sender
                 .send_outgoing_packet(
@@ -1196,6 +1196,166 @@ mod tests {
         ack_interaction_relayer.stop();
         ack_interaction_relayer.stop();
         ack_interaction_counterparty.stop();
+        async_std::task::sleep(Duration::from_secs(1)).await; // Let everything shutdown
+
+        assert!(succeeded, "test timed out after {TIMEOUT_SECONDS} seconds");
+    }
+
+    #[serial]
+    #[async_std::test]
+    async fn test_packet_interaction_multirelay_workflow() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        const TIMEOUT_SECONDS: u64 = 20;
+
+        init_transport();
+
+        let (done_tx, done_rx) = async_std::channel::unbounded();
+
+        let dbs = create_dbs(5);
+
+        create_minimal_topology(&dbs)
+            .await
+            .expect("failed to create minimal channel topology");
+
+        let core_dbs = create_core_dbs(&dbs);
+
+        // Begin test
+        debug!("peer 1 (sender)    = {}", PEERS[0]);
+        debug!("peer 2 (relayer 1)   = {}", PEERS[1]);
+        debug!("peer 3 (relayer 2)   = {}", PEERS[2]);
+        debug!("peer 4 (relayer 3)   = {}", PEERS[3]);
+        debug!("peer 5 (recipient) = {}", PEERS[4]);
+
+        let packet_path = Path::new_valid(PEERS[1..].to_vec());
+        assert_eq!(4, packet_path.length(), "path must have length 2");
+
+        const PENDING_PACKETS: usize = 1;
+
+        // -------------- Peer 1: sender
+        let packet_sender = PacketInteraction::new(
+            core_dbs[0].clone(),
+            PacketInteractionConfig {
+                check_unrealized_balance: true,
+                private_key: PEERS_PRIVS[0].into(),
+                mixer: MixerConfig::default(),
+            },
+        );
+
+        // -------------- Peer 2: relayer
+        let ack_1 = Arc::new(AcknowledgementInteraction::new(core_dbs[1].clone(), PublicKey::from_peerid(&PEERS[1]).unwrap()));
+        let pkt_1 = Arc::new(PacketInteraction::new(
+            core_dbs[1].clone(),
+            PacketInteractionConfig {
+                check_unrealized_balance: true,
+                private_key: PEERS_PRIVS[1].into(),
+                mixer: MixerConfig::default(),
+            },
+        ));
+
+        spawn_pkt_handling::<_, 1>(pkt_1.clone(), ack_1.clone());
+        spawn_pkt_receive::<_, 1>(pkt_1.clone());
+        spawn_ack_handling(ack_1.clone());
+        spawn_ack_receive::<_, 1>(ack_1.clone());
+        spawn_ack_send::<_, 1>(ack_1.clone());
+
+        // -------------- Peer 3: relayer
+        let ack_2 = Arc::new(AcknowledgementInteraction::new(core_dbs[2].clone(), PublicKey::from_peerid(&PEERS[2]).unwrap()));
+        let pkt_2 = Arc::new(PacketInteraction::new(
+            core_dbs[2].clone(),
+            PacketInteractionConfig {
+                check_unrealized_balance: true,
+                private_key: PEERS_PRIVS[2].into(),
+                mixer: MixerConfig::default(),
+            },
+        ));
+
+        spawn_pkt_handling::<_, 2>(pkt_2.clone(), ack_2.clone());
+        spawn_pkt_receive::<_, 2>(pkt_2.clone());
+        spawn_ack_handling(ack_2.clone());
+        spawn_ack_receive::<_, 2>(ack_2.clone());
+        spawn_ack_send::<_, 2>(ack_2.clone());
+
+        // -------------- Peer 4: relayer
+        let ack_3 = Arc::new(AcknowledgementInteraction::new(core_dbs[3].clone(), PublicKey::from_peerid(&PEERS[3]).unwrap()));
+        let pkt_3 = Arc::new(PacketInteraction::new(
+            core_dbs[3].clone(),
+            PacketInteractionConfig {
+                check_unrealized_balance: true,
+                private_key: PEERS_PRIVS[3].into(),
+                mixer: MixerConfig::default(),
+            },
+        ));
+
+        spawn_pkt_handling::<_, 3>(pkt_3.clone(), ack_3.clone());
+        spawn_pkt_receive::<_, 3>(pkt_3.clone());
+        spawn_ack_handling(ack_3.clone());
+        spawn_ack_receive::<_, 3>(ack_3.clone());
+        spawn_ack_send::<_, 3>(ack_3.clone());
+
+        // -------------- Peer 5: recipient
+        let ack_4 = Arc::new(AcknowledgementInteraction::new(core_dbs[4].clone(), PublicKey::from_peerid(&PEERS[4]).unwrap()));
+        let mut tmp_pkt = PacketInteraction::new(
+            core_dbs[4].clone(),
+            PacketInteractionConfig {
+                check_unrealized_balance: true,
+                private_key: PEERS_PRIVS[4].into(),
+                mixer: MixerConfig::default(),
+            },
+        );
+        tmp_pkt.message_emitter = Box::new(move |data| {
+            assert_eq!(TEST_MESSAGE, data, "message body mismatch");
+            done_tx.send_blocking(()).expect("failed to report message receipt");
+            debug!("received packet at the recipient: {}", hex::encode(data));
+        });
+
+        let pkt_4 = Arc::new(tmp_pkt);
+
+        spawn_pkt_handling::<_, 4>(pkt_4.clone(), ack_4.clone());
+        spawn_pkt_receive::<_, 4>(pkt_4.clone());
+        spawn_ack_handling(ack_4.clone());
+        //spawn_ack_receive::<_, 4>(ack_4.clone());
+        spawn_ack_send::<_, 4>(ack_4.clone());
+
+        // --------------
+
+        // Start sending packets
+        for _ in 0..PENDING_PACKETS {
+            packet_sender
+                .send_outgoing_packet(
+                    &TEST_MESSAGE,
+                    packet_path.clone(),
+                    &send_transport_as_peer::<MSG_PROTOCOL, 0>,
+                )
+                .await
+                .unwrap();
+        }
+
+        // Check that we received all packets
+        let finish = async move {
+            for _ in 1 .. PENDING_PACKETS + 1 {
+                done_rx.recv().await.expect("failed finalize packet");
+            }
+        };
+
+        let timeout = async_std::task::sleep(Duration::from_secs(TIMEOUT_SECONDS));
+        pin_mut!(finish, timeout);
+
+        let succeeded = match select(finish, timeout).await {
+            Either::Left(_)  => true,
+            Either::Right(_) => false,
+        };
+
+        terminate_transport();
+        pkt_1.stop();
+        ack_1.stop();
+        pkt_2.stop();
+        ack_2.stop();
+        pkt_3.stop();
+        ack_3.stop();
+        pkt_4.stop();
+        ack_4.stop();
+
         async_std::task::sleep(Duration::from_secs(1)).await; // Let everything shutdown
 
         assert!(succeeded, "test timed out after {TIMEOUT_SECONDS} seconds");
