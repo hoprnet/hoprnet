@@ -23,14 +23,11 @@
 #[macro_use]
 pub mod macros;
 
-pub use log as downstream_log;
-#[cfg(feature = "wasm")]
-pub mod callbacks;
-
-pub use log::Level;
-
 #[cfg(feature = "wasm")]
 pub mod logger;
+
+pub use log as downstream_log;
+pub use log::Level;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
