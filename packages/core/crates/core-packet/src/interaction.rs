@@ -5,7 +5,7 @@ use crate::errors::PacketError::{
 use crate::errors::Result;
 use crate::packet::{Packet, PacketState};
 use crate::path::Path;
-use async_std::channel::{unbounded, Receiver, Sender};
+use async_std::channel::{Receiver, Sender, bounded};
 use core_crypto::types::{HalfKeyChallenge, Hash, PublicKey};
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_mixer::mixer::{Mixer, MixerConfig};
@@ -57,6 +57,9 @@ pub struct TransportTask {
     data: Box<[u8]>,
 }
 
+const ACK_TX_QUEUE_SIZE: usize = 2048;
+const ACK_RX_QUEUE_SIZE: usize = 2048;
+
 pub struct AcknowledgementInteraction<Db: HoprCoreEthereumDbActions> {
     db: Arc<Mutex<Db>>,
     pub on_acknowledgement: Box<dyn Fn(HalfKeyChallenge)>,
@@ -71,8 +74,8 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
         Self {
             db,
             public_key,
-            incoming_channel: unbounded(),
-            outgoing_channel: unbounded(),
+            incoming_channel: bounded(ACK_RX_QUEUE_SIZE),
+            outgoing_channel: bounded(ACK_TX_QUEUE_SIZE),
             on_acknowledgement: Box::new(|_| {}),
             on_acknowledged_ticket: Box::new(|_| {}),
         }
@@ -250,12 +253,16 @@ pub struct PacketInteractionConfig {
     pub mixer: MixerConfig,
 }
 
+const PACKET_TX_QUEUE_SIZE: usize = 2048;
+const PACKET_RX_QUEUE_SIZE: usize = 2048;
+
 pub struct PacketInteraction<Db>
 where
     Db: HoprCoreEthereumDbActions,
 {
     db: Arc<Mutex<Db>>,
     incoming_packets: (Sender<TransportTask>, Receiver<TransportTask>),
+    outgoing_packets: (Sender<TransportTask>, Receiver<TransportTask>),
     pub message_emitter: Box<dyn Fn(&[u8])>,
     pub mixer: Mixer<TransportTask>,
     cfg: PacketInteractionConfig,
@@ -268,7 +275,8 @@ where
     pub fn new(db: Arc<Mutex<Db>>, cfg: PacketInteractionConfig) -> Self {
         Self {
             db,
-            incoming_packets: unbounded(),
+            incoming_packets: bounded(PACKET_RX_QUEUE_SIZE),
+            outgoing_packets: bounded(PACKET_TX_QUEUE_SIZE),
             message_emitter: Box::new(|_| {}),
             mixer: Mixer::new(cfg.mixer.clone()),
             cfg,
@@ -433,16 +441,11 @@ where
         Ok(ticket)
     }
 
-    pub async fn send_outgoing_packet<T, F>(
+    pub async fn send_outgoing_packet(
         &self,
         msg: &[u8],
         complete_valid_path: Path,
-        message_transport: &T,
-    ) -> Result<HalfKeyChallenge>
-    where
-        T: Fn(Box<[u8]>, String) -> F,
-        F: futures::Future<Output = core::result::Result<(), String>>,
-    {
+    ) -> Result<HalfKeyChallenge> {
         // Decide whether to create 0-hop or multihop ticket
         let next_peer = PublicKey::from_peerid(&complete_valid_path.hops()[0])?;
         let next_ticket = if complete_valid_path.length() == 1 {
@@ -465,10 +468,10 @@ where
                 #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_PACKETS_COUNT.increment();
 
-                // Send the packet
-                message_transport(packet.to_bytes(), complete_valid_path.hops()[0].to_string())
-                    .await
-                    .map_err(|e| TransportError(e))?;
+                self.outgoing_packets.0.send(TransportTask {
+                    remote_peer: complete_valid_path.hops()[0].clone(),
+                    data: packet.to_bytes()
+                }).await.map_err(|e| TransportError(e.to_string()))?;
 
                 Ok(ack_challenge.clone())
             }
@@ -612,7 +615,24 @@ where
         Ok(())
     }
 
-    pub async fn handle_packets<T, F>(
+    pub async fn handle_outgoing_packets<T, F>(
+        &self,
+        message_transport: &T,
+    ) where
+        T: Fn(Box<[u8]>, String) -> F,
+        F: futures::Future<Output = core::result::Result<(), String>>,
+    {
+        while let Ok(task) = self.outgoing_packets.1.recv().await {
+            // Send the packet
+            if let Err(e) = message_transport(task.data, task.remote_peer.to_string()).await {
+                error!("failed to send packet to {}: {e}", task.remote_peer);
+            }
+
+        }
+        info!("done sending packets")
+    }
+
+    pub async fn handle_incoming_packets<T, F>(
         &self,
         ack_interaction: Arc<AcknowledgementInteraction<Db>>,
         message_transport: &T,
@@ -640,7 +660,7 @@ where
         info!("done processing packets")
     }
 
-    pub async fn push_received_packet(&self, packet_task: TransportTask) -> Result<()> {
+    pub async fn received_packet(&self, packet_task: TransportTask) -> Result<()> {
         self.incoming_packets
             .0
             .send(packet_task)
@@ -655,6 +675,8 @@ where
     pub fn stop(&self) {
         self.incoming_packets.0.close();
         self.incoming_packets.1.close();
+        self.outgoing_packets.0.close();
+        self.outgoing_packets.1.close();
     }
 }
 
@@ -876,6 +898,16 @@ mod tests {
         });
     }
 
+    fn spawn_ack_send<Db: HoprCoreEthereumDbActions + 'static, const PEER_NUM: usize>(
+        interaction: Arc<AcknowledgementInteraction<Db>>,
+    ) {
+        async_std::task::spawn_local(async move {
+            interaction
+                .handle_outgoing_acknowledgements(&send_transport_as_peer::<ACK_PROTOCOL, PEER_NUM>)
+                .await;
+        });
+    }
+
     fn spawn_pkt_receive<Db: HoprCoreEthereumDbActions + 'static, const PEER_NUM: usize>(
         interaction: Arc<PacketInteraction<Db>>,
     ) {
@@ -887,7 +919,7 @@ mod tests {
                 }) {
                     debug!("received packet from {}: {}", task.remote_peer, hex::encode(&task.data));
                     interaction
-                        .push_received_packet(task)
+                        .received_packet(task)
                         .await
                         .expect("failed to receive ack");
                 }
@@ -896,13 +928,11 @@ mod tests {
         });
     }
 
-    fn spawn_ack_send<Db: HoprCoreEthereumDbActions + 'static, const PEER_NUM: usize>(
-        interaction: Arc<AcknowledgementInteraction<Db>>,
+    fn spawn_pkt_send<Db: HoprCoreEthereumDbActions + 'static, const PEER_NUM: usize>(
+        interaction: Arc<PacketInteraction<Db>>,
     ) {
         async_std::task::spawn_local(async move {
-            interaction
-                .handle_outgoing_acknowledgements(&send_transport_as_peer::<ACK_PROTOCOL, PEER_NUM>)
-                .await;
+            interaction.handle_outgoing_packets(&send_transport_as_peer::<MSG_PROTOCOL, PEER_NUM>).await;
         });
     }
 
@@ -912,7 +942,7 @@ mod tests {
     ) {
         async_std::task::spawn_local(async move {
             pkt_interaction
-                .handle_packets(ack_interaction, &send_transport_as_peer::<MSG_PROTOCOL, PEER_NUM>)
+                .handle_incoming_packets(ack_interaction, &send_transport_as_peer::<MSG_PROTOCOL, PEER_NUM>)
                 .await;
         });
     }
@@ -1068,20 +1098,21 @@ mod tests {
         debug!("peer 2 (relayer)   = {}", PEERS[1]);
         debug!("peer 3 (recipient) = {}", PEERS[2]);
 
-        // Peer 1 (sender): just sends packets over Peer 2 to Peer 3, ignores acknowledgements from Peer 2
-        let packet_path = Path::new_valid(PEERS[1..=2].to_vec());
-        assert_eq!(2, packet_path.length(), "path must have length 2");
-
         const PENDING_PACKETS: usize = 5;
 
-        let packet_sender = PacketInteraction::new(
+        let packet_path = Path::new_valid(PEERS[1..=2].to_vec());
+        assert_eq!(2, packet_path.length(), "path has invalid length");
+
+        // Peer 1 (sender): just sends packets over Peer 2 to Peer 3, ignores acknowledgements from Peer 2
+        let packet_sender = Arc::new(PacketInteraction::new(
             core_dbs[0].clone(),
             PacketInteractionConfig {
                 check_unrealized_balance: true,
                 private_key: PEERS_PRIVS[0].into(),
                 mixer: MixerConfig::default(),
             },
-        );
+        ));
+        spawn_pkt_send::<_, 0>(packet_sender.clone());
 
         // Peer 2 (relayer): awaits acknowledgements of relayer packets to Peer 3
         let mut tmp_ack =
@@ -1142,14 +1173,9 @@ mod tests {
         spawn_pkt_receive::<_, 2>(pkt_interaction_counterparty.clone());
         spawn_ack_send::<_, 2>(ack_interaction_counterparty.clone());
 
-        // Peer 1: Start sending out packets
+        // Peer 1: start sending out packets
         for _ in 0..PENDING_PACKETS {
-            packet_sender
-                .send_outgoing_packet(
-                    &TEST_MESSAGE,
-                    packet_path.clone(),
-                    &send_transport_as_peer::<MSG_PROTOCOL, 0>,
-                )
+            packet_sender.send_outgoing_packet(&TEST_MESSAGE, packet_path.clone())
                 .await
                 .unwrap();
         }
@@ -1189,7 +1215,7 @@ mod tests {
         terminate_transport();
         pkt_interaction_relayer.stop();
         ack_interaction_relayer.stop();
-        ack_interaction_relayer.stop();
+        pkt_interaction_counterparty.stop();
         ack_interaction_counterparty.stop();
         async_std::task::sleep(Duration::from_secs(1)).await; // Let everything shutdown
 
@@ -1222,20 +1248,21 @@ mod tests {
         debug!("peer 4 (relayer 3)   = {}", PEERS[3]);
         debug!("peer 5 (recipient) = {}", PEERS[4]);
 
-        let packet_path = Path::new_valid(PEERS[1..].to_vec());
-        assert_eq!(4, packet_path.length(), "path must have length 2");
-
         const PENDING_PACKETS: usize = 5;
 
+        let packet_path = Path::new_valid(PEERS[1..].to_vec());
+        assert_eq!(4, packet_path.length(), "path has invalid length");
+
         // -------------- Peer 1: sender
-        let packet_sender = PacketInteraction::new(
+        let packet_sender = Arc::new(PacketInteraction::new(
             core_dbs[0].clone(),
             PacketInteractionConfig {
                 check_unrealized_balance: true,
                 private_key: PEERS_PRIVS[0].into(),
                 mixer: MixerConfig::default(),
             },
-        );
+        ));
+        spawn_pkt_send::<_, 0>(packet_sender.clone());
 
         // -------------- Peer 2: relayer
         let ack_1 = Arc::new(AcknowledgementInteraction::new(core_dbs[1].clone(), PublicKey::from_peerid(&PEERS[1]).unwrap()));
@@ -1319,8 +1346,7 @@ mod tests {
             packet_sender
                 .send_outgoing_packet(
                     &TEST_MESSAGE,
-                    packet_path.clone(),
-                    &send_transport_as_peer::<MSG_PROTOCOL, 0>,
+                    packet_path.clone()
                 )
                 .await
                 .unwrap();
@@ -1515,7 +1541,7 @@ pub mod wasm {
                     }
                 })
             };
-            self.w.handle_packets(ack_interaction.w.clone(), &msg_transport).await
+            self.w.handle_incoming_packets(ack_interaction.w.clone(), &msg_transport).await
         }
 
         pub fn stop(&self) {
