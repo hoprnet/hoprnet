@@ -253,7 +253,7 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
 pub struct PacketInteractionConfig {
     pub check_unrealized_balance: bool,
     pub private_key: Box<[u8]>,
-    pub mixer: MixerConfig
+    pub mixer: MixerConfig,
 }
 
 pub struct PacketInteraction<Db>
@@ -679,6 +679,7 @@ mod tests {
     use core_ethereum_db::db::CoreEthereumDb;
     use core_ethereum_db::traits::HoprCoreEthereumDbActions;
     use core_ethereum_misc::commitment::{initialize_commitment, ChainCommitter, ChannelCommitmentInfo};
+    use core_mixer::mixer::MixerConfig;
     use core_types::acknowledgement::{Acknowledgement, AcknowledgementChallenge, PendingAcknowledgement};
     use core_types::channels::{ChannelEntry, ChannelStatus};
     use futures::future::{select, Either};
@@ -692,7 +693,6 @@ mod tests {
     use std::str::FromStr;
     use std::sync::{Arc, Mutex};
     use std::time::Duration;
-    use core_mixer::mixer::MixerConfig;
     use utils_db::db::DB;
     use utils_db::errors::DbError;
     use utils_db::leveldb::rusty::RustyLevelDbShim;
@@ -923,7 +923,9 @@ mod tests {
         });
     }
 
-    fn spawn_ack_handling<Db: HoprCoreEthereumDbActions + 'static>(ack_interaction: Arc<AcknowledgementInteraction<Db>>) {
+    fn spawn_ack_handling<Db: HoprCoreEthereumDbActions + 'static>(
+        ack_interaction: Arc<AcknowledgementInteraction<Db>>,
+    ) {
         async_std::task::spawn_local(async move { ack_interaction.handle_incoming_acknowledgements().await });
     }
 
@@ -1205,6 +1207,7 @@ pub mod wasm {
     use crate::interaction::{AcknowledgementInteraction, PacketInteraction, PacketInteractionConfig, TransportTask};
     use core_crypto::types::PublicKey;
     use core_ethereum_db::db::CoreEthereumDb;
+    use core_mixer::mixer::Mixer;
     use core_types::acknowledgement::Acknowledgement;
     use js_sys::JsString;
     use libp2p_identity::PeerId;
@@ -1220,7 +1223,6 @@ pub mod wasm {
     use wasm_bindgen::prelude::wasm_bindgen;
     use wasm_bindgen::JsCast;
     use wasm_bindgen::JsValue;
-    use core_mixer::mixer::Mixer;
 
     #[wasm_bindgen]
     impl TransportTask {
@@ -1317,7 +1319,7 @@ pub mod wasm {
         pub fn new(db: LevelDb, cfg: PacketInteractionConfig) -> Self {
             // For WASM we need to create mixer with gloo-timers
             let gloo_mixer = Mixer::new_with_gloo_timers(cfg.mixer.clone());
-            let mut w =  PacketInteraction::new(
+            let mut w = PacketInteraction::new(
                 Arc::new(Mutex::new(CoreEthereumDb::new(
                     DB::new(LevelDbShim::new(db)),
                     PublicKey::from_privkey(&cfg.private_key).expect("invalid private key"),
