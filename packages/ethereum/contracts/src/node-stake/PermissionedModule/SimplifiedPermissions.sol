@@ -57,13 +57,11 @@ library SimplifiedPermissions {
         uint256 resultingScopeConfig
     );
     event ScopeRevokeFunction(
-        uint16 role,
         address targetAddress,
         bytes4 selector,
         uint256 resultingScopeConfig
     );
     event ScopeFunction(
-        uint16 role,
         address targetAddress,
         bytes4 functionSig,
         bool[] isParamScoped,
@@ -233,6 +231,10 @@ library SimplifiedPermissions {
         }
     }
 // TODO:
+
+/**
+ * @dev Main transaction to check the permission of transaction execution of a module
+ */
     function checkTransaction(
         Role storage role,
         address targetAddress,
@@ -249,11 +251,14 @@ library SimplifiedPermissions {
             revert TargetAddressNotAllowed();
         }
 
+        // TODO: remove me, 
         // if (target.clearance == Clearance.Target) {
         //     checkExecutionOptions(value, operation, target.options);
         //     return;
         // }
 
+        // when certain functions of the target address are allowed, 
+        // check if the current transaction is calling one of them
         if (target.clearance == Clearance.Function) {
             uint256 scopeConfig = role.functions[
                 keyForFunctions(targetAddress, bytes4(data))
@@ -263,21 +268,32 @@ library SimplifiedPermissions {
                 revert FunctionNotAllowed();
             }
 
+            // TODO: Replace this unpackFunction so that an addtional bool field for HoprChannels management gets unwrapped
             (ExecutionOptions options, bool isWildcarded, ) = unpackFunction(
                 scopeConfig
             );
 
+
             checkExecutionOptions(value, operation, options);
 
             if (isWildcarded == false) {
-                checkParameters(role, scopeConfig, targetAddress, data);
+                // // FIXME: add conditional route for HoprChannels management
+                // if (isHoprChannelsInteraction == true) {
+                //     checkHoprChannelsParameters(role, scopeConfig, targetAddress, data);
+                // } else {
+                    checkParameters(role, scopeConfig, targetAddress, data);
+                // }
             }
             return;
         }
 
         assert(false);
     }
-// TODO:
+
+    /**
+     * @dev Check if the transaction can send along native tokens
+     * Check if the DelegatedCall is allowed
+     */
     function checkExecutionOptions(
         uint256 value,
         Enum.Operation operation,
@@ -301,11 +317,15 @@ library SimplifiedPermissions {
             revert DelegateCallNotAllowed();
         }
     }
+
 // TODO:
-    /// @dev Will revert if a transaction has a parameter that is not allowed
-    /// @param role reference to role storage
-    /// @param targetAddress Address to check.
-    /// @param data the transaction data to check
+    /*
+     * @dev Will revert if a transaction has a parameter that is not allowed
+     * @param role reference to role storage
+     * @param scopeConfig reference to role storage
+     * @param targetAddress Address to check.
+     * @param data the transaction data to check
+     */
     function checkParameters(
         Role storage role,
         uint256 scopeConfig,
@@ -401,9 +421,9 @@ library SimplifiedPermissions {
         emit ScopeTarget(targetAddress);
     }
 
-    // TODO:
     /**
      * @dev Allows a specific function signature on a scoped target.
+     * This is the default config for all the functions
      */
     function scopeAllowFunction(
         Role storage role,
@@ -431,21 +451,21 @@ library SimplifiedPermissions {
         );
     }
 
-    // TODO:
+    /**
+     * @dev Disallows a specific function signature on a scoped target.
+     */
     function scopeRevokeFunction(
         Role storage role,
-        uint16 roleId,
         address targetAddress,
         bytes4 functionSig
     ) external {
         role.functions[keyForFunctions(targetAddress, functionSig)] = 0;
-        emit ScopeRevokeFunction(roleId, targetAddress, functionSig, 0);
+        emit ScopeRevokeFunction(targetAddress, functionSig, 0);
     }
 
     // TODO:
     function scopeFunction(
         Role storage role,
-        uint16 roleId,
         address targetAddress,
         bytes4 functionSig,
         bool[] memory isScoped,
@@ -506,7 +526,6 @@ library SimplifiedPermissions {
             ] = compressCompValue(paramType[i], compValue[i]);
         }
         emit ScopeFunction(
-            roleId,
             targetAddress,
             functionSig,
             isScoped,
@@ -856,7 +875,9 @@ library SimplifiedPermissions {
         return scopeConfig;
     }
 
-    // TODO:
+    /**
+     * @dev Update the left 16 bits of `scopeConfig` and return the new `scopeConfig`
+     */
     function packLeft(
         uint256 scopeConfig,
         ExecutionOptions options,
@@ -890,7 +911,9 @@ library SimplifiedPermissions {
         return scopeConfig;
     }
 
-    // TODO:
+    /**
+     * @dev Update the right 240 bits of `scopeConfig` and return the new `scopeConfig`
+     */
     function packRight(
         uint256 scopeConfig,
         uint256 index,
@@ -926,7 +949,9 @@ library SimplifiedPermissions {
         return scopeConfig;
     }
 
-    // TODO:
+    /**
+     * @dev Read the left 16 bits of `scopeConfig` and decode to types
+     */
     function unpackFunction(
         uint256 scopeConfig
     )
@@ -941,7 +966,9 @@ library SimplifiedPermissions {
         length = (scopeConfig << 8) >> 248;
     }
 
-// TODO:
+    /**
+     * @dev Read the right 240 bits of `scopeConfig` and decode to types
+     */
     function unpackParameter(
         uint256 scopeConfig,
         uint256 index
@@ -960,7 +987,10 @@ library SimplifiedPermissions {
         );
         paramComp = Comparison((scopeConfig & paramCompMask) >> (index * 2));
     }
-// TODO:
+
+    /**
+     * @dev Get the key
+     */
     function keyForFunctions(
         address targetAddress,
         bytes4 functionSig

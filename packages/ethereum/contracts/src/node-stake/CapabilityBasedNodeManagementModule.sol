@@ -22,6 +22,10 @@ error NotHoprChannelsContract();
  * @title Module to enable HOPR nodes to interact with HOPR Channels contract
  * on behalf of the Safe
  * Only those addresses that are added by the Safe can call execTransactionFromModule
+ * A deployed Multisend contract address is included in the contract
+ * Module can only execute DELEGATECALL to the Multisend contract 
+ * Module can execute CALLs to HoprChannels contracts
+ * Module can execute CALLs to HoprToken contracts
  */
 contract HoprCapabilityBasedNodeManagementModule is SimplifiedModule {
   // Node addresses that can execute transaction for target

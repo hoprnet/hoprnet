@@ -4,6 +4,7 @@ pragma abicoder v2;
 
 // import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 
+// FIXME: update interfaces when HoprChannels contracts get updated
 interface IHoprChannels {
   function IS_HOPR_CHANNELS() external view returns (bool);
   // FIXME:
@@ -11,6 +12,7 @@ interface IHoprChannels {
   function fundChannelMulti(address account1, address account2, uint256 amount1, uint256 amount2) external;
   function redeemTicket(
     address source,
+    address destination,
     bytes32 nextCommitment,
     uint256 ticketEpoch,
     uint256 ticketIndex,
@@ -19,9 +21,19 @@ interface IHoprChannels {
     uint256 winProb,
     bytes memory signature
   ) external;
-  function initiateChannelClosure(address destination) external;
-  function finalizeChannelClosure(address destination) external;
-  function bumpChannel(address source, bytes32 newCommitment) external;
-  // TODO: add close incoming channel
-  // FIXME: update interface when HoprChannels contracts get updated
+  // FIXME: update with the correct functions
+  function redeemTickets(
+    address[] memory source,
+    address[] memory destination,
+    bytes32[] memory nextCommitment,
+    uint256[] memory ticketEpoch,
+    uint256[] memory ticketIndex,
+    bytes32[] memory proofOfRelaySecret,
+    uint256[] memory amount,
+    uint256[] memory winProb,
+    bytes memory signature
+  ) external;
+  function initiateChannelClosure(address source, address destination) external;
+  function finalizeChannelClosure(address source, address destination) external;
+  function bumpChannel(address source, address destination, bytes32 newCommitment) external;
 }
