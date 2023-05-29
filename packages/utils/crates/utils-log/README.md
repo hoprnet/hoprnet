@@ -13,7 +13,7 @@ Add this crate as a dependency and `use` the desired macros.
 #### Installing `JsLogger` backend in WASM context
 
 The `JsLogger` backend should be installed as soon as the crate is loaded in the WASM context.
-A suitable place would be the `xyz_set_panic_hook` in crate's `lib.rs` as this function is typically called immediately
+A suitable place would be the `xyz_initialize_crate` in crate's `lib.rs` as this function is typically called immediately
 after the WASM binary has been loaded.
 
 Here's an example:
@@ -25,7 +25,7 @@ static LOGGER: JsLogger = JsLogger {};
 
 #[allow(dead_code)]
 #[wasm_bindgen]
-pub fn my_crate_set_panic_hook() {
+pub fn my_crate_initialize_crate() {
     let _ = JsLogger::install(&LOGGER, None);
 
     // When the `console_error_panic_hook` feature is enabled, we can call the

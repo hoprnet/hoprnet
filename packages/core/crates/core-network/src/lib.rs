@@ -20,7 +20,7 @@ pub mod wasm {
     static LOGGER: JsLogger = JsLogger {};
 
     #[wasm_bindgen]
-    pub fn core_network_set_panic_hook() {
+    pub fn core_network_initialize_crate() {
         let _ = JsLogger::install(&LOGGER, None);
 
         // When the `console_error_panic_hook` feature is enabled, we can call the

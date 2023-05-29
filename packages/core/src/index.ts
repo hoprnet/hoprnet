@@ -69,10 +69,10 @@ import {
   Health,
   health_to_string,
   HeartbeatConfig,
-  core_network_set_panic_hook,
+  core_network_initialize_crate,
   core_network_gather_metrics
 } from '../lib/core_network.js'
-core_network_set_panic_hook()
+core_network_initialize_crate()
 registerMetricsCollector(core_network_gather_metrics)
 
 import Heartbeat from './network/heartbeat.js'

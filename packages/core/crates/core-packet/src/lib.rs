@@ -17,7 +17,7 @@ pub mod wasm {
 
     #[allow(dead_code)]
     #[wasm_bindgen]
-    pub fn core_packet_set_panic_hook() {
+    pub fn core_packet_initialize_crate() {
         let _ = JsLogger::install(&LOGGER, None);
 
         // When the `console_error_panic_hook` feature is enabled, we can call the

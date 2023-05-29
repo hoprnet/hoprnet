@@ -3,8 +3,8 @@
 // The TS code expects types to be in package `utils`
 // This hack can be removed once more code in other packages is fully migrated to Rust
 
-import { core_types_set_panic_hook } from '../../core/lib/core_types.js'
-core_types_set_panic_hook()
+import { core_types_initialize_crate } from '../../core/lib/core_types.js'
+core_types_initialize_crate()
 
 import { webcrypto } from 'node:crypto'
 // @ts-ignore
