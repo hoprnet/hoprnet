@@ -148,11 +148,6 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
     }
 
     async fn handle_acknowledgement(&self, mut ack: Acknowledgement, remote_peer: &PeerId) -> Result<()> {
-        debug!(
-            "own_key = {}, remote = {}",
-            self.public_key,
-            PublicKey::from_peerid(remote_peer).unwrap()
-        );
         if !ack.validate(&self.public_key, &PublicKey::from_peerid(remote_peer)?) {
             return Err(AcknowledgementValidation(
                 "could not validate the acknowledgement".to_string(),
@@ -1230,7 +1225,7 @@ mod tests {
         let packet_path = Path::new_valid(PEERS[1..].to_vec());
         assert_eq!(4, packet_path.length(), "path must have length 2");
 
-        const PENDING_PACKETS: usize = 1;
+        const PENDING_PACKETS: usize = 5;
 
         // -------------- Peer 1: sender
         let packet_sender = PacketInteraction::new(
