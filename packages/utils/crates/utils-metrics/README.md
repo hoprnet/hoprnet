@@ -147,8 +147,8 @@ passing the `my_crate_gather_metrics` as argument:
 
 ```typescript
 import registerMetricsCollector from '@hoprnet/hopr-utils'
-import { my_crate_set_panic_hook, my_crate_gather_metrics } from '../lib/my_crate.js'
-my_crate_set_panic_hook()
+import { my_crate_initialize_crate, my_crate_gather_metrics } from '../lib/my_crate.js'
+my_crate_initialize_crate()
 registerMetricsCollector(my_crate_gather_metrics)
 ```
 

@@ -8,6 +8,7 @@ pub(crate) mod types;
 #[allow(dead_code)]
 #[cfg(feature = "wasm")]
 pub mod wasm {
+    use utils_log::logger::JsLogger;
     use utils_misc::utils::wasm::JsResult;
     use wasm_bindgen::prelude::*;
 
@@ -16,8 +17,12 @@ pub mod wasm {
     #[global_allocator]
     static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
+    static LOGGER: JsLogger = JsLogger {};
+
     #[wasm_bindgen]
-    pub fn core_network_set_panic_hook() {
+    pub fn core_network_initialize_crate() {
+        let _ = JsLogger::install(&LOGGER, None);
+
         // When the `console_error_panic_hook` feature is enabled, we can call the
         // `set_panic_hook` function at least once during initialization, and then
         // we will get better error messages if our code ever panics.

@@ -1,37 +1,22 @@
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-extern "C" {
-    #[cfg(feature = "wasm")]
-    #[wasm_bindgen(js_namespace = console, js_name = log)]
-    pub fn js_log(s: &str);
-}
-
-#[cfg(feature = "wasm")]
 #[macro_export]
 macro_rules! log {
+    // Just use the "log" crate for now
+
     // log!(target: "my_target", Level::Info; key1 = 42, key2 = true; "a {} event", "log");
-    (target: $target:expr, $lvl:expr, $($key:tt = $value:expr),+; $($arg:tt)+) => ({
-        if cfg!(test) {
-            $crate::callbacks::log_natural($lvl, format!($($arg)+).as_str());
-        } else {
-            // ignoring the key-value part, none of the production code uses it at this point
-            $crate::macros::js_log(std::format!("{} {} {}", $crate::callbacks::timestamp_iso().as_str(), $target, format!($arg).as_str()).as_str());
-        }
-    });
+    (target: $target:expr, $lvl:expr, $($key:tt = $value:expr),+; $($arg:tt)+) => (
+        // ignoring the key-value part, none of the production code uses it at this point
+        log::log!(target: $target, lvl: $lvl, $($arg)+)
+    );
 
     // log!(target: "my_target", Level::Info; "a {} event", "log");
     (target: $target:expr, $lvl:expr, $($arg:tt)+) => ({
-        if cfg!(test) {
-            $crate::callbacks::log_natural($lvl, format!($($arg)+).as_str());
-        } else {
-            $crate::macros::js_log(std::format!("{} {} {}", $crate::callbacks::timestamp_iso().as_str(), $target, format!($($arg)+).as_str()).as_str());
-        }
+        log::log!(target: $target, lvl: $lvl, $($arg)+)
     });
 
-    // log!(Level::Info, "a log event")
-    ($lvl:expr, $($arg:tt)+) => ($crate::log!(target: std::module_path!(), $lvl, $($arg)+));
+
+    ($lvl:expr, $($arg:tt)+) => ($crate::downstream_log::log!(target: std::module_path!(), $lvl, $($arg)+));
 }
 
-#[cfg(feature = "wasm")]
 #[macro_export]
 macro_rules! trace {
     // trace!(target: "my_target", key1 = 42, key2 = true; "a {} event", "log")
@@ -42,7 +27,6 @@ macro_rules! trace {
     ($($arg:tt)+) => ($crate::log!($crate::Level::Trace, $($arg)+))
 }
 
-#[cfg(feature = "wasm")]
 #[macro_export]
 macro_rules! debug {
     // debug!(target: "my_target", key1 = 42, key2 = true; "a {} event", "log")
@@ -53,7 +37,6 @@ macro_rules! debug {
     ($($arg:tt)+) => ($crate::log!($crate::Level::Debug, $($arg)+))
 }
 
-#[cfg(feature = "wasm")]
 #[macro_export]
 macro_rules! info {
     // info!(target: "my_target", key1 = 42, key2 = true; "a {} event", "log")
@@ -64,7 +47,6 @@ macro_rules! info {
     ($($arg:tt)+) => ($crate::log!($crate::Level::Info, $($arg)+))
 }
 
-#[cfg(feature = "wasm")]
 #[macro_export]
 macro_rules! warn {
     // warn!(target: "my_target", key1 = 42, key2 = true; "a {} event", "log")
@@ -75,7 +57,6 @@ macro_rules! warn {
     ($($arg:tt)+) => ($crate::log!($crate::Level::Warn, $($arg)+))
 }
 
-#[cfg(feature = "wasm")]
 #[macro_export]
 macro_rules! error {
     // error!(target: "my_target", key1 = 42, key2 = true; "a {} event", "log")

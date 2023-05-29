@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 use crate::identity_input::LocalIdentityArgs;
 use crate::key_pair::read_identities;
 use crate::password::PasswordArgs;

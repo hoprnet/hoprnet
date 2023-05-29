@@ -15,10 +15,10 @@ import {
   StrategyTickResult,
   Balance,
   BalanceType,
-  utils_misc_set_panic_hook
+  utils_misc_initialize_crate
 } from '../lib/core_strategy.js'
 
-utils_misc_set_panic_hook()
+utils_misc_initialize_crate()
 
 export { StrategyTickResult } from '../lib/core_strategy.js'
 

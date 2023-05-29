@@ -24,11 +24,11 @@ import {
   WasmPacketState as PacketState,
   Ticket as PacketTicket,
   U256 as PacketU256,
-  core_packet_set_panic_hook
+  core_packet_initialize_crate
 } from '../../lib/core_packet.js'
 export { Packet, WasmPacketState as PacketState } from '../../lib/core_packet.js'
 
-core_packet_set_panic_hook()
+core_packet_initialize_crate()
 
 import { peerIdFromString } from '@libp2p/peer-id'
 
