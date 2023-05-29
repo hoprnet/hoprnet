@@ -7,15 +7,15 @@ pub mod traits;
 #[cfg(feature = "wasm")]
 pub mod wasm {
 
-    use wasm_bindgen::prelude::*;
     use utils_log::logger::JsLogger;
+    use wasm_bindgen::prelude::*;
 
     // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global allocator.
     #[cfg(feature = "wee_alloc")]
     #[global_allocator]
     static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
-    static LOGGER: JsLogger = JsLogger { };
+    static LOGGER: JsLogger = JsLogger {};
 
     #[allow(dead_code)]
     #[wasm_bindgen]

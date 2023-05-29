@@ -1,4 +1,3 @@
-
 #[macro_export]
 macro_rules! log {
     // Just use the "log" crate for now

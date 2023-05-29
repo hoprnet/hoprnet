@@ -4,8 +4,8 @@ pub mod errors;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use wasm_bindgen::prelude::wasm_bindgen;
     use utils_log::logger::JsLogger;
+    use wasm_bindgen::prelude::wasm_bindgen;
 
     static LOGGER: JsLogger = JsLogger {};
 

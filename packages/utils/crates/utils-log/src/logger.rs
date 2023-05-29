@@ -28,8 +28,13 @@ impl Log for JsLogger {
 
     fn log(&self, record: &Record) {
         let ts: String = js_sys::Date::new_0().to_iso_string().into();
-        log(&format!("{ts} [{}] {} {}", record.level(), record.target(), record.args()));
+        log(&format!(
+            "{ts} [{}] {} {}",
+            record.level(),
+            record.target(),
+            record.args()
+        ));
     }
 
-    fn flush(&self) { }
+    fn flush(&self) {}
 }
