@@ -1,13 +1,13 @@
 import {
   resolve_network,
-  core_misc_set_panic_hook,
+  core_misc_initialize_crate,
   supported_networks,
   type ChainOptions,
   type ResolvedNetwork,
   type Network
 } from '../lib/core_misc.js'
 import { DeploymentExtract } from '@hoprnet/hopr-core-ethereum/src/utils/utils.js'
-core_misc_set_panic_hook()
+core_misc_initialize_crate()
 export {
   resolve_network,
   supported_networks,
