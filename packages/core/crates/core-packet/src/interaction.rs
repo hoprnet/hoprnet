@@ -190,7 +190,7 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
         match pending {
             PendingAcknowledgement::WaitingAsSender => {
                 // No pending ticket, nothing to do.
-                debug!("Received acknowledgement as sender. First relayer has processed the packet.");
+                debug!("received acknowledgement as sender: first relayer has processed the packet.");
                 (self.on_acknowledgement)(ack.ack_challenge());
 
                 #[cfg(all(feature = "prometheus", not(test)))]
@@ -222,7 +222,7 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
                         ));
                     })?;
                 let response = unackowledged.get_response(&ack.ack_key_share)?;
-                debug!("Acknowledging ticket. Using response {}", response.to_hex());
+                debug!("acknowledging ticket using response {}", response.to_hex());
 
                 let ack_ticket = AcknowledgedTicket::new(
                     unackowledged.ticket,
@@ -686,6 +686,7 @@ mod tests {
     use hex_literal::hex;
     use lazy_static::lazy_static;
     use libp2p_identity::PeerId;
+    use serial_test::serial;
     use std::collections::HashMap;
     use std::ops::Mul;
     use std::str::FromStr;
@@ -922,6 +923,11 @@ mod tests {
         });
     }
 
+    fn spawn_ack_handling<Db: HoprCoreEthereumDbActions + 'static>(ack_interaction: Arc<AcknowledgementInteraction<Db>>) {
+        async_std::task::spawn_local(async move { ack_interaction.handle_incoming_acknowledgements().await });
+    }
+
+    #[serial]
     #[async_std::test]
     pub async fn test_packet_acknowledgement_sender_workflow() {
         let _ = env_logger::builder().is_test(true).try_init();
@@ -987,14 +993,10 @@ mod tests {
             }
         });
 
+        // Peer 1: hookup receiving of acknowledgements and start processing them
         let ack_interaction_sender = Arc::new(tmp_ack);
-
-        // Peer 1: hookup receiving of acknowledgements
         spawn_ack_receive::<_, 0>(ack_interaction_sender.clone());
-
-        // Peer 1: start processing incoming acknowledgements on the packet sender
-        let ack_sender_clone = ack_interaction_sender.clone();
-        async_std::task::spawn_local(async move { ack_sender_clone.handle_incoming_acknowledgements().await });
+        spawn_ack_handling(ack_interaction_sender.clone());
 
         // Peer 2: Recipient of the packet and sender of the acknowledgement
         let ack_interaction_counterparty = Arc::new(AcknowledgementInteraction::new(
@@ -1041,6 +1043,7 @@ mod tests {
         assert!(succeeded, "test timed out after {TIMEOUT_SECONDS} seconds");
     }
 
+    #[serial]
     #[async_std::test]
     pub async fn test_packet_acknowledgement_relayer_workflow() {
         let _ = env_logger::builder().is_test(true).try_init();
@@ -1104,16 +1107,11 @@ mod tests {
             },
         ));
 
-        // Peer 2: start packets handling as a relayer
+        // Peer 2: start packets handling as a relayer and start receiving of incoming acknowledgements
         spawn_pkt_handling::<_, 1>(pkt_interaction_relayer.clone(), ack_interaction_relayer.clone());
         spawn_pkt_receive::<_, 1>(pkt_interaction_relayer.clone());
-
-        // Peer 2: hookup receiving of acknowledgements from Peer 3
+        spawn_ack_handling(ack_interaction_relayer.clone());
         spawn_ack_receive::<_, 1>(ack_interaction_relayer.clone());
-
-        // Peer 2: start processing incoming acknowledgements of the relayed packets
-        let ack_relayer_clone = ack_interaction_relayer.clone();
-        async_std::task::spawn_local(async move { ack_relayer_clone.handle_incoming_acknowledgements().await });
 
         // Peer 3: Recipient of the packet and sender of the acknowledgement
         let mut tmp_pkt_counterparty = PacketInteraction::new(
@@ -1138,18 +1136,16 @@ mod tests {
         ));
         let pkt_interaction_counterparty = Arc::new(tmp_pkt_counterparty);
 
-        // Peer 3: start packet interaction at the recipient
+        // Peer 3: start packet interaction at the recipient and start sending out acknowledgement
         spawn_pkt_handling::<_, 2>(
             pkt_interaction_counterparty.clone(),
             ack_interaction_counterparty.clone(),
         );
         spawn_pkt_receive::<_, 2>(pkt_interaction_counterparty.clone());
-
-        // Peer 3: start sending out outgoing acknowledgements
         spawn_ack_send::<_, 2>(ack_interaction_counterparty.clone());
 
         // Peer 1: Start sending out packets
-        const PENDING_PACKETS: usize = 1;
+        const PENDING_PACKETS: usize = 5;
         for _ in 0..PENDING_PACKETS {
             packet_sender
                 .send_outgoing_packet(
@@ -1166,15 +1162,15 @@ mod tests {
         // Check that we received all acknowledgements and packets
         let finish = async move {
             let (mut acks, mut pkts) = (0, 0);
-            for i in 1..2 * PENDING_PACKETS + 1 {
+            for _ in 1..2 * PENDING_PACKETS + 1 {
                 match done_rx.recv().await.expect("failed finalize ack") {
                     AckOrPacket::Ack => {
-                        debug!("done ack tickets #{i} out of {PENDING_PACKETS}");
                         acks += 1;
+                        debug!("done ack tickets #{acks} out of {PENDING_PACKETS}");
                     }
                     AckOrPacket::Packet => {
-                        debug!("done msg #{i} out of {PENDING_PACKETS}");
                         pkts += 1;
+                        debug!("done msg #{pkts} out of {PENDING_PACKETS}");
                     }
                 }
             }

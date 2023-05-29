@@ -49,6 +49,7 @@ hex = "0.4.3"
 hex-literal = "0.4.1"
 parameterized = "1.0"
 rusty-leveldb = "1.0"
+serial_test = "2.0"
 wasm-bindgen-test = "0.3.36"
 
 [package.metadata.wasm-pack.profile.dev]
