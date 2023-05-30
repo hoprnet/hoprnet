@@ -44,16 +44,16 @@ contract HoprNodeManagementModule is SimplifiedModule {
   // from HoprCapabilityPermissions. This module is a Role where members are NODE_CHAIN_KEYs
   Role internal role;
 
+  event SetMultisendAddress(address multisendAddress);
+  event NodeAdded(address indexed node);
+  event NodeRemoved(address indexed node);
+
   modifier nodeOnly() {
     if (!role.members[_msgSender()]) {
       revert HoprCapabilityPermissions.NoMembership();
     }
     _;
   }
-
-  event SetMultisendAddress(address multisendAddress);
-  event NodeAdded(address indexed node);
-  event NodeRemoved(address indexed node);
 
   // set values to be zero for the singleton
   constructor() {
