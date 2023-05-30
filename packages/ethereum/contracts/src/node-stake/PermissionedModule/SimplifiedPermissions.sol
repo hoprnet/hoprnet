@@ -3,12 +3,6 @@ pragma solidity >=0.7.0 <0.9.0;
 
 import "safe-contracts/common/Enum.sol";
 
-// enum ParameterType {
-//     Static,
-//     Dynamic,    // bytes, string
-//     Dynamic32   // non-nested arrays: address[] bytes32[] uint[] etc
-// }
-
 enum HoprChannelsPermission {
     Allowed,
     Blocked
@@ -127,7 +121,13 @@ library SimplifiedPermissions {
     // ======================================================
 
     /**
-     * @dev checks if the function is allowed to be passed to the avatar
+     * @dev Checks the permission of a transaction execution based on the role membership and transaction details.
+     * @param role The storage reference to the Role struct.
+     * @param multisend The address of the multisend contract.
+     * @param to The recipient address of the transaction.
+     * @param value The value of the transaction.
+     * @param data The transaction data.
+     * @param operation The operation type of the transaction.
      */
     function check(
         Role storage role,
@@ -147,10 +147,10 @@ library SimplifiedPermissions {
         }
     }
 
-    /*
+    /**
      * @dev Splits a multisend data blob into transactions and forwards them to be checked.
-     * @param data the packed transaction data (created by utils function buildMultiSendSafeTx).
-     * @param role Role to check for.
+     * @param role The storage reference to the Role struct.
+     * @param data The packed transaction data (created by the `buildMultiSendSafeTx` utility function).
      */
     function checkMultisendTransaction(
         Role storage role,
@@ -195,8 +195,12 @@ library SimplifiedPermissions {
     }
 
     /**
-     * @dev Main transaction to check the permission of transaction execution of a module
-     * Only transctions to target
+     * @dev Main transaction to check the permission of transaction execution of a module.
+     * @param role The storage reference to the Role struct.
+     * @param targetAddress The address of the target contract.
+     * @param value The value of the transaction.
+     * @param data The transaction data.
+     * @param operation The operation type of the transaction.
      */
     function checkTransaction(
         Role storage role,
@@ -237,8 +241,10 @@ library SimplifiedPermissions {
     }
 
     /**
-     * @dev Check if the transaction can send along native tokens
-     * Check if the DelegatedCall is allowed
+     * @dev Check if the transaction can send along native tokens and if DelegatedCall is allowed.
+     * @param value The value of the transaction.
+     * @param operation The operation type of the transaction.
+     * @param targetType The target type of the transaction.
      */
     function checkExecutionOptions(
         uint256 value,
@@ -281,7 +287,7 @@ library SimplifiedPermissions {
         bytes32 capabilityKey = keyForFunctions(targetAddress, functionSig);
 
         if (functionSig == REDEEM_TICKETS_SELECTOR) {
-            // only redeemTickets function has Dynamic32 type
+            // only redeemTickets function has Dynamic32 type, i.e. non-nested arrays: address[] bytes32[] uint[] etc
             address[] memory srcs = pluckDynamicAddresses(data, 0);
             address[] memory dests = pluckDynamicAddresses(data, 1);
 
@@ -334,13 +340,36 @@ library SimplifiedPermissions {
         }
     }
 
+    /**
+     * @dev Compares the permission for calling a HoprChannels contract.
+     * @param role The storage reference to the Role struct.
+     * @param capabilityKey The key representing the capability.
+     * @param source The source address of the HOPR channel.
+     * @param destination The destination address of the HOPR channel.
+     */
+    function compareHoprChannelsPermission(
+        Role storage role, 
+        bytes32 capabilityKey, 
+        address source, 
+        address destination
+    ) internal view {
+        // get channelId
+        bytes32 channelId = keccak256(abi.encodePacked(source, destination));
+        // check if it's allowed to call the channel
+        if (role.hoprChannelsCapability[capabilityKey][channelId] != HoprChannelsPermission.Allowed) {
+            // not allowed to call the capability
+            revert ParameterNotAllowed();
+        }
+    }
+
     // ======================================================
     // ----------------------- SETTERS ----------------------
     // ======================================================
     
-    /*
-     * @dev Forbid role members to call all the functions of any type (call or delegatecall)
-     * of a given target.
+    /**
+     * @dev Revokes the target address from the Role by setting its clearance and target type to None.
+     * @param role The storage reference to the Role struct.
+     * @param targetAddress The address of the target to be revoked.
      */
     function revokeTarget(
         Role storage role,
@@ -354,7 +383,9 @@ library SimplifiedPermissions {
     }
 
     /**
-     * @dev Allow target address as HoprToken
+     * @dev Allows the target address to be scoped as a HoprToken by setting its clearance and target type accordingly.
+     * @param role The storage reference to the Role struct.
+     * @param targetAddress The address of the target to be scoped as a HoprToken.
      */
     function scopeTargeToken(
         Role storage role,
@@ -368,7 +399,10 @@ library SimplifiedPermissions {
     }
 
     /**
-     * @dev Allow target address as HoprChannel
+     * @dev Allows the target address to be scoped as a HoprChannels contract
+     * by setting its clearance and target type accordingly.
+     * @param role The storage reference to the Role struct.
+     * @param targetAddress The address of the target to be scoped as a HoprChannels.
      */
     function scopeTargetChannels(
         Role storage role,
@@ -382,7 +416,9 @@ library SimplifiedPermissions {
     }
 
     /**
-     * @dev Allow target address as beneficiary of Send
+     * @dev Allows the target address to be scoped as a beneficiary of Send by setting its clearance and target type accordingly.
+     * @param role The storage reference to the Role struct.
+     * @param targetAddress The address of the target to be scoped as a beneficiary of Send.
      */
     function scopeTargetSend(
         Role storage role,
@@ -396,7 +432,12 @@ library SimplifiedPermissions {
     }
 
     /**
-     * @dev Set the permission for a specific function on a scoped HoprChannels target.
+     * @dev Sets the permission for a specific function on a scoped HoprChannels target.
+     * @param role The storage reference to the Role struct.
+     * @param targetAddress The address of the scoped HoprChannels target.
+     * @param functionSig The function signature of the specific function.
+     * @param channelId The channelId of the scoped HoprChannels target.
+     * @param permission The permission to be set for the specific function.
      */
     function scopeChannelCapability(
         Role storage role,
@@ -417,7 +458,12 @@ library SimplifiedPermissions {
     }
 
     /**
-     * @dev Set the permission for a specific function on a scoped HoprToken target.
+     * @dev Sets the permission for a specific function on a scoped HoprToken target.
+     * @param role The storage reference to the Role struct.
+     * @param targetAddress The address of the scoped HoprToken target.
+     * @param functionSig The function signature of the specific function.
+     * @param beneficiary The beneficiary address for the scoped HoprToken target.
+     * @param permission The permission to be set for the specific function.
      */
     function scopeTokenCapability(
         Role storage role,
@@ -438,9 +484,12 @@ library SimplifiedPermissions {
     }
 
     /**
-     * @dev Set the permission for a specific function on a scoped HoprToken target.
+     * @dev Sets the permission for sending native tokens to a specific beneficiary
+     * @param role The storage reference to the Role struct.
+     * @param beneficiary The beneficiary address for the scoped Send target.
+     * @param permission The permission to be set for the specific function.
      */
-    function scopeTokenCapability(
+    function scopeSendCapability(
         Role storage role,
         address beneficiary,
         SendPermission permission
@@ -454,38 +503,15 @@ library SimplifiedPermissions {
     }
 
 
-    // TODO:
-    /*
-     *
-     * HELPERS
-     *
-    */
-    /** FIXME:
-   * @param role reference to role storage
-   * @param capabilityKey the id key of function on the target HoprChannels address
-   * @param source the address of source
-   * @param destination the address of destination
-   */
-    function compareHoprChannelsPermission(Role storage role, bytes32 capabilityKey, address source, address destination) internal view returns (bool) {
-        // get channelId
-        bytes32 channelId = keccak256(abi.encodePacked(source, destination));
-        // check if it's allowed to call the channel
-        if (role.hoprChannelsCapability[capabilityKey][channelId] != HoprChannelsPermission.Allowed) {
-            // not allowed to call the capability
-            revert ParameterNotAllowed();
-        }
-    }
-//   /** FIXME:
-//    * @param source the address of source
-//    * @param destination the address of destination
-//    * @return the channel id
-//    */
-//   function _getChannelId(address source, address destination) internal pure returns (bytes32) {
-//     return keccak256(abi.encodePacked(source, destination));
-//   }
-
-    /** FIXME:
-     * @dev Pluck a bytes32 at index position into address
+    // ======================================================
+    // ----------------------- HELPERS ----------------------
+    // ======================================================
+ 
+    /**
+     * @dev Retrieves a static address value from the given `data` byte array at the specified `index`.
+     * @param data The byte array containing the data.
+     * @param index The index of the static address value to retrieve.
+     * @return addr The static address value at the specified index.
      */
     function pluckOneStaticAddress(
         bytes memory data,
@@ -505,8 +531,11 @@ library SimplifiedPermissions {
         return addr;
     }
 
-    /** FIXME:
-     * @dev Pluck first two bytes32 into two addresses
+    /**
+     * @dev Extracts two addresses from the `data` byte array.
+     * @param data The byte array containing the addresses.
+     * @return addr0 The first address extracted from the `data` byte array.
+     * @return addr1 The second address extracted from the `data` byte array.
      */
     function pluckTwoStaticAddresses(
         bytes memory data
@@ -526,8 +555,12 @@ library SimplifiedPermissions {
         }
         return (addr0, addr1);
     }
-    /** FIXME:
-     * @dev pluck array of addresses from data 
+
+    /**
+     * @dev Returns an array of dynamically sized addresses decoded from a portion of the `data` byte array.
+     * @param data The byte array containing the encoded addresses.
+     * @param index The index of the parameter in the `data` byte array.
+     * @return decodedAddresses An array of decoded addresses.
      */
     function pluckDynamicAddresses(
         bytes memory data,
@@ -537,27 +570,6 @@ library SimplifiedPermissions {
         if (data.length < 4 + index * 32 + 32) {
             revert CalldataOutOfBounds();
         }
-
-        /*
-         * Encoded calldata:
-         * 4  bytes -> function selector
-         * 32 bytes -> sequence, one chunk per parameter
-         *
-         * There is one (byte32) chunk per parameter. Depending on type it contains:
-         * Static    -> value encoded inline (not plucked by this function)
-         * Dynamic   -> a byte offset to encoded data payload
-         * Dynamic32 -> a byte offset to encoded data payload
-         * Note: Fixed Sized Arrays (e.g., bool[2]), are encoded inline
-         * Note: Nested types also do not follow the above described rules, and are unsupported
-         * Note: The offset to payload does not include 4 bytes for functionSig
-         *
-         *
-         * At encoded payload, the first 32 bytes are the length encoding of the parameter payload. Depending on ParameterType:
-         * Dynamic   -> length in bytes
-         * Dynamic32 -> length in bytes32
-         * Note: Dynamic types are: bytes, string
-         * Note: Dynamic32 types are non-nested arrays: address[] bytes32[] uint[] etc
-         */
 
         // the start of the parameter block
         // 32 bytes - length encoding of the data bytes array
@@ -591,11 +603,17 @@ library SimplifiedPermissions {
             revert CalldataOutOfBounds();
         }
 
-        // prefix 32 bytes of offset
+        // prefix 32 bytes of offset which indicates the location of length
         return abi.decode(abi.encodePacked(uint256(32),slice(data, start, end)), (address[]));
     }
 
-    // TODO:
+    /**
+     * @dev Extracts and returns two addresses from a specific portion of the `data` byte array.
+     * @param data The byte array containing the data.
+     * @param index The index of the parameter to extract.
+     * @return a The first address extracted from the specified portion of the `data` byte array.
+     * @return b The second address extracted from the specified portion of the `data` byte array.
+     */
     function pluckSendPayload(
         bytes memory data,
         uint256 index
@@ -628,6 +646,7 @@ library SimplifiedPermissions {
         // account for:
         // 4  bytes - functionSig
         // 32 bytes - length encoding for the parameter payload
+        // Note that the start has skipped length location
         uint256 start = 4 + offsetPayload + 32;
         uint256 end = start + lengthPayload;
 
@@ -640,7 +659,12 @@ library SimplifiedPermissions {
         return (a, b);
     }
 
-    // TODO:
+    /**
+     * @dev Retrieves a static value from a given data byte array at the specified index.
+     * @param data The data byte array.
+     * @param index The index of the value to retrieve.
+     * @return value at the specified index.
+     */
     function pluckStaticValue(
         bytes memory data,
         uint256 index
@@ -659,7 +683,13 @@ library SimplifiedPermissions {
         return value;
     }
 
-    // TODO:
+    /**
+     * @dev Returns a copy of a portion of the `data` byte array.
+     * @param data The byte array to slice.
+     * @param start The starting index of the slice (inclusive).
+     * @param end The ending index of the slice (exclusive).
+     * @return result A new byte array containing the sliced portion.
+     */
     function slice(
         bytes memory data,
         uint256 start,
@@ -672,7 +702,10 @@ library SimplifiedPermissions {
     }
 
     /**
-     * @dev Get the unique key for a function of a given target
+     * @dev Returns the unique key for a function of a given `targetAddress`.
+     * @param targetAddress The address of the target contract.
+     * @param functionSig The function signature of the target function.
+     * @return key The unique key representing the target function.
      */
     function keyForFunctions(
         address targetAddress,
