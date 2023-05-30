@@ -1508,6 +1508,7 @@ pub mod wasm {
 
     #[wasm_bindgen]
     impl WasmAckInteraction {
+        #[wasm_bindgen(constructor)]
         pub fn new(
             db: LevelDb,
             chain_key: PublicKey,
