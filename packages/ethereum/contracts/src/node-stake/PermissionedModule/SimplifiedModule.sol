@@ -1,6 +1,4 @@
 // SPDX-License-Identifier: LGPL-3.0-only
-
-/// @title Module Interface - A contract that can pass messages to a Module Manager contract if enabled by that contract.
 pragma solidity >=0.7.0 <0.9.0;
 
 import "zodiac/interfaces/IAvatar.sol";
@@ -8,14 +6,17 @@ import "zodiac/factory/FactoryFriendly.sol";
 import "zodiac/guard/Guardable.sol";
 
 /**
- * @dev Simplified Zodiac module, which allows to inherit
+ * @title Simplified Module Interface - A contract that can pass messages to a Module Manager contract if enabled by that contract.
+ * @dev Adapted from `Module.sol` at commit 8a77e7b224af8004bd9f2ff4e2919642e93ffd85, which 
+ * was audited https://github.com/gnosis/zodiac/tree/master/audits
+ * This module removes target attribute 
  */
 abstract contract SimplifiedModule is FactoryFriendly, Guardable {
+    /// @dev Address that will ultimately execute function calls.
+    address public avatar; 
+
     /// @dev Emitted each time the avatar is set.
     event AvatarSet(address indexed previousAvatar, address indexed newAvatar);
-
-    /// @dev Address that will ultimately execute function calls.
-    address public avatar;
 
     /// @dev Sets the avatar to a new avatar (`newAvatar`).
     /// @notice Can only be called by the current owner.
