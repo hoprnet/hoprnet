@@ -39,48 +39,7 @@ contract HoprAnnouncements is Multicall {
     bytes32 ed25519_sig_1,
     bytes32 ed25519_pub_key
   ) external {
-    address sender_addr = address(uint160(uint256(keccak256(abi.encodePacked(secp256k1_x, secp256k1_y)))));
-
-    if (msg.sender != sender_addr) {
-      revert PublicKeyDoesNotMatchSender({pubkey: sender_addr, sender: msg.sender});
-    }
-
-    if (uint256(secp256k1_y) % 2 == 1) {
-      emit KeyBindingOdd(secp256k1_x, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key);
-    } else {
-      emit KeyBindingEven(secp256k1_x, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key);
-    }
-  }
-
-  /**
-   * [optional] Announces a IPv4 address with port for the node
-   *
-   * @dev Turns a node into a public relay node (PRN)
-   *
-   * @param ip the IPv4 address to announce
-   * @param port the port to use
-   */
-  function announce4(bytes4 ip, bytes2 port) external {
-    emit AddressAnnouncement4(msg.sender, ip, port);
-  }
-
-  /**
-   * [optional] Announces a IPv6 address with port for the node
-   *
-   * @dev Turns a node into a public relay node (PRN)
-   *
-   * @param ip the IPv6 address to announce
-   * @param port the port to use
-   */
-  function announce6(bytes16 ip, bytes2 port) external {
-    emit AddressAnnouncement6(msg.sender, ip, port);
-  }
-
-  /**
-   * Opts out from acting as a public relay node (PRN)
-   */
-  function revoke() external {
-    emit RevokeAnnouncement(msg.sender);
+    _bindKeys_internal(secp256k1_x, secp256k1_y, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key, msg.sender);
   }
 
   /**
@@ -95,21 +54,8 @@ contract HoprAnnouncements is Multicall {
     bytes4 ip,
     bytes2 port
   ) external {
-    (bool successBind, ) = address(this).delegatecall(
-      abi.encodeCall(
-        HoprAnnouncements.bindKeys,
-        (secp256k1_x, secp256k1_y, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key)
-      )
-    );
-    if (successBind == false) {
-      revert();
-    }
-
-    (bool successAnnounce4, ) = address(this).delegatecall(abi.encodeCall(HoprAnnouncements.announce4, (ip, port)));
-
-    if (successAnnounce4 == false) {
-      revert();
-    }
+    _bindKeys_internal(secp256k1_x, secp256k1_y, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key, msg.sender);
+    _announce4_internal(ip, port, msg.sender);
   }
 
   /**
@@ -124,19 +70,72 @@ contract HoprAnnouncements is Multicall {
     bytes16 ip,
     bytes2 port
   ) external {
-    (bool successBind, ) = address(this).delegatecall(
-      abi.encodeCall(
-        HoprAnnouncements.bindKeys,
-        (secp256k1_x, secp256k1_y, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key)
-      )
-    );
-    if (successBind == false) {
-      revert();
+    _bindKeys_internal(secp256k1_x, secp256k1_y, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key, msg.sender);
+    _announce6_internal(ip, port, msg.sender);
+  }
+
+  /**
+   * [optional] Announces a IPv6 address with port for the node
+   *
+   * @dev Turns a node into a public relay node (PRN)
+   *
+   * @param ip the IPv6 address to announce
+   * @param port the port to use
+   */
+  function announce6(bytes16 ip, bytes2 port) external {
+    _announce6_internal(ip, port, msg.sender);
+  }
+
+  /**
+   * [optional] Announces a IPv4 address with port for the node
+   *
+   * @dev Turns a node into a public relay node (PRN)
+   *
+   * @param ip the IPv4 address to announce
+   * @param port the port to use
+   */
+  function announce4(bytes4 ip, bytes2 port) external {
+    _announce4_internal(ip, port, msg.sender);
+  }
+
+  /**
+   * Opts out from acting as a public relay node (PRN)
+   */
+  function revoke() external {
+    _revoke_internal(msg.sender);
+  }
+
+  function _bindKeys_internal(
+    bytes32 secp256k1_x,
+    bytes32 secp256k1_y,
+    bytes32 ed25519_sig_0,
+    bytes32 ed25519_sig_1,
+    bytes32 ed25519_pub_key,
+    address self
+  ) private {
+    // Derive Ethereum address from uncompressed secp256k1 public key
+    address sender_addr = address(uint160(uint256(keccak256(abi.encodePacked(secp256k1_x, secp256k1_y)))));
+
+    if (self != sender_addr) {
+      revert PublicKeyDoesNotMatchSender({pubkey: sender_addr, sender: msg.sender});
     }
 
-    (bool successAnnounce6, ) = address(this).delegatecall(abi.encodeCall(HoprAnnouncements.announce6, (ip, port)));
-    if (successAnnounce6 == false) {
-      revert();
+    if (uint256(secp256k1_y) % 2 == 1) {
+      emit KeyBindingOdd(secp256k1_x, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key);
+    } else {
+      emit KeyBindingEven(secp256k1_x, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key);
     }
+  }
+
+  function _announce4_internal(bytes4 ip, bytes2 port, address self) private {
+    emit AddressAnnouncement4(self, ip, port);
+  }
+
+  function _announce6_internal(bytes16 ip, bytes2 port, address self) private {
+    emit AddressAnnouncement6(self, ip, port);
+  }
+
+  function _revoke_internal(address self) private {
+    emit RevokeAnnouncement(msg.sender);
   }
 }
