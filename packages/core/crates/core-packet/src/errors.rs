@@ -20,6 +20,9 @@ pub enum PacketError {
     #[error("could not find channel to {0}")]
     ChannelNotFound(String),
 
+    #[error("path for the packet is not valid")]
+    PathNotValid,
+
     #[error("ticket validation failed, packet dropped: {0}")]
     TicketValidation(String),
 
@@ -31,6 +34,9 @@ pub enum PacketError {
 
     #[error("channel {0} is out of funds")]
     OutOfFunds(String),
+
+    #[error("tx queue is full, retry later")]
+    Retry,
 
     #[error("underlying transport error while sending packet: {0}")]
     TransportError(String),

@@ -1,10 +1,8 @@
-use crate::errors::PacketError::{
-    AcknowledgementValidation, ChannelNotFound, InvalidPacketState, OutOfFunds, TagReplay, TransportError,
-};
+use crate::errors::PacketError::{AcknowledgementValidation, ChannelNotFound, InvalidPacketState, OutOfFunds, PathNotValid, Retry, TagReplay, TransportError};
 use crate::errors::Result;
 use crate::packet::{Packet, PacketState};
 use crate::path::Path;
-use async_std::channel::{bounded, Receiver, Sender};
+use async_std::channel::{bounded, Receiver, Sender, TrySendError};
 use core_crypto::types::{HalfKeyChallenge, Hash, PublicKey};
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_mixer::mixer::{Mixer, MixerConfig};
@@ -47,19 +45,34 @@ lazy_static::lazy_static! {
         SimpleCounter::new("core_counter_packets", "Number of created packets").unwrap();
 }
 
+/// Fixed price per packet to 0.01 HOPR
 pub const PRICE_PER_PACKET: &str = "10000000000000000";
+/// Fixed inverse ticket winning probability
 pub const INVERSE_TICKET_WIN_PROB: &str = "1";
+
 const PREIMAGE_PLACE_HOLDER: [u8; Hash::SIZE] = [0xffu8; Hash::SIZE];
 
+/// Represents a payload (packet or acknowledgement) at the transport level.
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Payload {
     remote_peer: PeerId,
     data: Box<[u8]>,
 }
 
+// Default sizes of the acknowledgement queues
 const ACK_TX_QUEUE_SIZE: usize = 2048;
 const ACK_RX_QUEUE_SIZE: usize = 2048;
 
+/// Implements protocol acknowledgement logic
+/// Maintains TX and RX queues of `Payload` with the serialized `Acknowledgement` type.
+/// Processing of each queue can be executed using `handle_incoming_acknowledgement` and
+/// `handle_outgoing_acknowledgements` methods.
+/// When a new acknowledgement is delivered from the transport the `received_acknowledgement`
+/// method is used to push it into the processing queue of incoming acknowledgements.
+/// Whan a new acknowledgement is about to be sent, the `send_acknowledgement` method is used
+/// to push it into the processing queue of outgoing acknowledgements.
+/// When no more processing needs to be done, the instance should be stopped via the `stop` method.
+/// Once the instance is stopped, it cannot be restarted.
 pub struct AcknowledgementInteraction<Db: HoprCoreEthereumDbActions> {
     db: Arc<Mutex<Db>>,
     pub on_acknowledgement: Box<dyn Fn(HalfKeyChallenge)>,
@@ -70,6 +83,8 @@ pub struct AcknowledgementInteraction<Db: HoprCoreEthereumDbActions> {
 }
 
 impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
+
+    /// Creates a new instance given the DB and our public key used to verify the acknowledgements.
     pub fn new(db: Arc<Mutex<Db>>, public_key: PublicKey) -> Self {
         Self {
             db,
@@ -81,10 +96,7 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
         }
     }
 
-    pub fn get_peer_id(&self) -> PeerId {
-        self.public_key.to_peerid()
-    }
-
+    /// Pushes the `Payload` received from the transport layer into procesing.
     pub async fn received_acknowledgement(&self, payload: Payload) -> Result<()> {
         self.incoming_channel
             .0
@@ -93,20 +105,37 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
             .map_err(|e| TransportError(e.to_string()))
     }
 
-    pub async fn send_acknowledgement(&self, acknowledgement: Acknowledgement, destination: PeerId) -> Result<()> {
+    /// Pushes a new outgoing acknowledgement into the processing given its destination.
+    /// If `wait` is `true`, the method waits if the TX queue is full until there's space.
+    /// If `wait` is `false` and the TX queue is full, the method fails with `Err(Retry)`
+    pub async fn send_acknowledgement(&self, acknowledgement: Acknowledgement, destination: PeerId, wait: bool) -> Result<()> {
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_SENT_ACKS.increment();
 
-        self.outgoing_channel
-            .0
-            .send(Payload {
-                remote_peer: destination,
-                data: acknowledgement.to_bytes(),
-            })
-            .await
-            .map_err(|e| TransportError(e.to_string()))
+        if wait {
+            self.outgoing_channel
+                .0
+                .send(Payload {
+                    remote_peer: destination,
+                    data: acknowledgement.to_bytes(),
+                })
+                .await
+                .map_err(|_| TransportError("queue is closed".to_string()))
+        } else {
+            self.outgoing_channel
+                .0
+                .try_send(Payload {
+                    remote_peer: destination,
+                    data: acknowledgement.to_bytes(),
+                })
+                .map_err(|e| match e {
+                    TrySendError::Full(_) => Retry,
+                    TrySendError::Closed(_) => TransportError("queue is closed".to_string())
+                })
+        }
     }
 
+    /// Start processing the incoming acknowledgement queue.
     pub async fn handle_incoming_acknowledgements(&self) {
         while let Ok(payload) = self.incoming_channel.1.recv().await {
             match Acknowledgement::from_bytes(&payload.data) {
@@ -126,6 +155,7 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
         info!("done processing incoming acknowledgements");
     }
 
+    /// Start processing the outgoing acknowledgement queue given the transport function.
     pub async fn handle_outgoing_acknowledgements<T, F>(&self, message_transport: &T)
     where
         T: Fn(Box<[u8]>, String) -> F,
@@ -139,10 +169,8 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
         info!("done processing outgoing acknowledgements")
     }
 
-    pub fn start(&self) {
-        unimplemented!("implement this when migrated to rust libp2p")
-    }
-
+    /// Stop processing of TX and RQ queues.
+    /// Cannot be restarted once stopped.
     pub fn stop(&self) {
         self.incoming_channel.0.close();
         self.incoming_channel.1.close();
@@ -245,6 +273,7 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
     }
 }
 
+/// Configuration parameters for the packet interaction.
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Clone, Debug)]
 pub struct PacketInteractionConfig {
@@ -253,9 +282,20 @@ pub struct PacketInteractionConfig {
     pub mixer: MixerConfig,
 }
 
+// Default sizes of the packet queues
 const PACKET_TX_QUEUE_SIZE: usize = 2048;
 const PACKET_RX_QUEUE_SIZE: usize = 2048;
 
+/// Implements packet processing logic
+/// Maintains TX and RX queues of `Payload` with the serialized `Packet` type.
+/// Processing of each queue can be executed using `handle_incoming_packets` and
+/// `handle_outgoing_packets` methods.
+/// When a new packet is delivered from the transport the `received_packet`
+/// method is used to push it into the processing queue of incoming packets.
+/// Whan a new acknowledgement is about to be sent, the `send_packet` method is used
+/// to push it into the processing queue of outgoing packets.
+/// When no more processing needs to be done, the instance should be stopped via the `stop` method.
+/// Once the instance is stopped, it cannot be restarted.
 pub struct PacketInteraction<Db>
 where
     Db: HoprCoreEthereumDbActions,
@@ -272,6 +312,7 @@ impl<Db> PacketInteraction<Db>
 where
     Db: HoprCoreEthereumDbActions,
 {
+    /// Creates a new instance given the DB and configuration.
     pub fn new(db: Arc<Mutex<Db>>, cfg: PacketInteractionConfig) -> Self {
         Self {
             db,
@@ -360,18 +401,26 @@ where
         Ok(ticket)
     }
 
-    pub async fn send_outgoing_packet(&self, msg: &[u8], complete_valid_path: Path) -> Result<HalfKeyChallenge> {
+    /// Pushes the packet with the given payload for sending via the given valid path.
+    /// If `wait` is `true`, the method waits if the TX queue is full until there's space.
+    /// If `wait` is `false` and the TX queue is full, the method fails with `Err(Retry)`
+    pub async fn send_packet(&self, msg: &[u8], path: Path, wait: bool) -> Result<HalfKeyChallenge> {
+        // Check if the path is valid
+        if !path.valid() {
+            return Err(PathNotValid)
+        }
+
         // Decide whether to create 0-hop or multihop ticket
-        let next_peer = PublicKey::from_peerid(&complete_valid_path.hops()[0])?;
-        let next_ticket = if complete_valid_path.length() == 1 {
+        let next_peer = PublicKey::from_peerid(&path.hops()[0])?;
+        let next_ticket = if path.length() == 1 {
             Ticket::new_zero_hop(next_peer, &self.cfg.private_key)
         } else {
-            self.create_multihop_ticket(next_peer, complete_valid_path.length() as u8)
+            self.create_multihop_ticket(next_peer, path.length() as u8)
                 .await?
         };
 
         // Create the packet
-        let packet = Packet::new(msg, &complete_valid_path.hops(), &self.cfg.private_key, next_ticket)?;
+        let packet = Packet::new(msg, &path.hops(), &self.cfg.private_key, next_ticket)?;
         match packet.state() {
             PacketState::Outgoing { ack_challenge, .. } => {
                 self.db
@@ -383,15 +432,27 @@ where
                 #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_PACKETS_COUNT.increment();
 
-                self.outgoing_packets
-                    .0
-                    .send(Payload {
-                        remote_peer: complete_valid_path.hops()[0].clone(),
-                        data: packet.to_bytes(),
-                    })
-                    .await
-                    .map_err(|e| TransportError(e.to_string()))?;
-
+                if wait {
+                    self.outgoing_packets
+                        .0
+                        .send(Payload {
+                            remote_peer: path.hops()[0].clone(),
+                            data: packet.to_bytes(),
+                        })
+                        .await
+                        .map_err(|_| TransportError("queue is closed".to_string()))?;
+                } else {
+                    self.outgoing_packets
+                        .0
+                        .try_send(Payload {
+                            remote_peer: path.hops()[0].clone(),
+                            data: packet.to_bytes(),
+                        })
+                        .map_err(|e| match e {
+                            TrySendError::Full(_) => Retry,
+                            TrySendError::Closed(_) => TransportError("queue is closed".to_string())
+                        })?;
+                }
                 Ok(ack_challenge.clone())
             }
             _ => panic!("invalid packet state"),
@@ -432,7 +493,7 @@ where
                 // And create acknowledgement
                 let ack = packet.create_acknowledgement(&self.cfg.private_key).unwrap();
                 ack_interaction
-                    .send_acknowledgement(ack, previous_hop.to_peerid())
+                    .send_acknowledgement(ack, previous_hop.to_peerid(), true)
                     .await?;
 
                 #[cfg(all(feature = "prometheus", not(test)))]
@@ -527,7 +588,7 @@ where
 
         // Acknowledge to the previous hop that we forwarded the packet
         let ack = packet.create_acknowledgement(&self.cfg.private_key).unwrap();
-        ack_interaction.send_acknowledgement(ack, previous_peer).await?;
+        ack_interaction.send_acknowledgement(ack, previous_peer, true).await?;
 
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_FWD_MESSAGE_COUNT.increment();
@@ -535,6 +596,7 @@ where
         Ok(())
     }
 
+    /// Starts handling of the outgoing packets using the given transport.
     pub async fn handle_outgoing_packets<T, F>(&self, message_transport: &T)
     where
         T: Fn(Box<[u8]>, String) -> F,
@@ -549,6 +611,8 @@ where
         info!("done sending packets")
     }
 
+    /// Starts handling of the incoming packets using the given transport.
+    /// The given acknowledgement interaction is used perform acknowledgements.
     pub async fn handle_incoming_packets<T, F>(
         &self,
         ack_interaction: Arc<AcknowledgementInteraction<Db>>,
@@ -576,6 +640,7 @@ where
         }
         info!("done processing packets")
     }
+
 
     pub async fn received_packet(&self, payload: Payload) -> Result<()> {
         self.incoming_packets
@@ -970,6 +1035,7 @@ mod tests {
                 .send_acknowledgement(
                     Acknowledgement::new(ack_msg, ack_key, &PEERS_PRIVS[1]),
                     PEERS[0].clone(),
+                    true
                 )
                 .await
                 .expect("failed to send ack");
@@ -1104,7 +1170,7 @@ mod tests {
         // Peer 1: start sending out packets
         for _ in 0..PENDING_PACKETS {
             packet_sender
-                .send_outgoing_packet(&TEST_MESSAGE, packet_path.clone())
+                .send_packet(&TEST_MESSAGE, packet_path.clone(), true)
                 .await
                 .unwrap();
         }
@@ -1295,7 +1361,7 @@ mod tests {
         // Start sending packets
         for _ in 0..PENDING_PACKETS {
             packet_sender
-                .send_outgoing_packet(&TEST_MESSAGE, packet_path.clone())
+                .send_packet(&TEST_MESSAGE, packet_path.clone(), true)
                 .await
                 .unwrap();
         }
@@ -1423,7 +1489,7 @@ pub mod wasm {
         pub async fn send_acknowledgement(&self, ack: Acknowledgement, dest: String) -> JsResult<()> {
             ok_or_jserr!(
                 self.w
-                    .send_acknowledgement(ack, ok_or_jserr!(PeerId::from_str(&dest))?)
+                    .send_acknowledgement(ack, ok_or_jserr!(PeerId::from_str(&dest))?, true)
                     .await
             )
         }
@@ -1469,7 +1535,7 @@ pub mod wasm {
         }
 
         pub async fn send_packet(&self, msg: &[u8], path: Path) -> JsResult<HalfKeyChallenge> {
-            ok_or_jserr!(self.w.send_outgoing_packet(msg, path).await)
+            ok_or_jserr!(self.w.send_packet(msg, path, true).await)
         }
 
         pub async fn handle_outgoing_packets(&self, transport_cb: &js_sys::Function) {
