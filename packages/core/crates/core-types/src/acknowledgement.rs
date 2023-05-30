@@ -375,7 +375,6 @@ pub mod test {
 
         Ticket::new(
             Address::new(&[0u8; Address::SIZE]),
-            None,
             U256::new("1"),
             U256::new("2"),
             Balance::new(
