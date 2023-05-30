@@ -1035,7 +1035,7 @@ mod tests {
                 .send_acknowledgement(
                     Acknowledgement::new(ack_msg, ack_key, &PEERS_PRIVS[1]),
                     PEERS[0].clone(),
-                    true
+                    false
                 )
                 .await
                 .expect("failed to send ack");
@@ -1170,7 +1170,7 @@ mod tests {
         // Peer 1: start sending out packets
         for _ in 0..PENDING_PACKETS {
             packet_sender
-                .send_packet(&TEST_MESSAGE, packet_path.clone(), true)
+                .send_packet(&TEST_MESSAGE, packet_path.clone(), false)
                 .await
                 .unwrap();
         }
@@ -1401,7 +1401,7 @@ pub mod wasm {
     use core_ethereum_db::db::CoreEthereumDb;
     use core_mixer::mixer::Mixer;
     use core_types::acknowledgement::Acknowledgement;
-    use js_sys::JsString;
+    use js_sys::{JsString, Uint8Array};
     use libp2p_identity::PeerId;
     use std::future::Future;
     use std::pin::Pin;
@@ -1415,6 +1415,7 @@ pub mod wasm {
     use wasm_bindgen::prelude::wasm_bindgen;
     use wasm_bindgen::JsCast;
     use wasm_bindgen::JsValue;
+    use utils_types::traits::BinarySerializable;
 
     #[wasm_bindgen]
     impl Payload {
@@ -1470,16 +1471,30 @@ pub mod wasm {
 
     #[wasm_bindgen]
     impl WasmAckInteraction {
-        pub fn new(db: LevelDb, chain_key: PublicKey) -> Self {
-            Self {
-                w: Arc::new(AcknowledgementInteraction::new(
-                    Arc::new(Mutex::new(CoreEthereumDb::new(
-                        DB::new(LevelDbShim::new(db)),
-                        chain_key.clone(),
-                    ))),
-                    chain_key,
-                )),
-            }
+        pub fn new(db: LevelDb, chain_key: PublicKey, on_ack: js_sys::Function, on_ack_ticket: js_sys::Function) -> Self {
+            let mut ack = AcknowledgementInteraction::new(
+                Arc::new(Mutex::new(CoreEthereumDb::new(
+                    DB::new(LevelDbShim::new(db)),
+                    chain_key.clone(),
+                ))),
+                chain_key);
+            ack.on_acknowledgement = Box::new(move |h| {
+                let this = JsValue::null();
+                let param: JsValue = Uint8Array::from(h.to_bytes().as_ref()).into();
+                if let Err(e) = on_ack.call1(&this, &param) {
+                    error!("failed to call on_ack closure: {:?}", e.as_string());
+                }
+            });
+
+            ack.on_acknowledged_ticket = Box::new(move |h| {
+                let this = JsValue::null();
+                let param: JsValue = Uint8Array::from(h.to_bytes().as_ref()).into();
+                if let Err(e) = on_ack_ticket.call1(&this, &param) {
+                    error!("failed to call on_ack_ticket closure: {:?}", e.as_string());
+                }
+            });
+
+            Self { w: Arc::new(ack) }
         }
 
         pub async fn received_acknowledgement(&self, payload: Payload) -> JsResult<()> {
@@ -1516,7 +1531,7 @@ pub mod wasm {
     #[wasm_bindgen]
     impl WasmPacketInteraction {
         #[wasm_bindgen(constructor)]
-        pub fn new(db: LevelDb, cfg: PacketInteractionConfig) -> Self {
+        pub fn new(db: LevelDb, on_msg: js_sys::Function, cfg: PacketInteractionConfig) -> Self {
             // For WASM we need to create mixer with gloo-timers
             let gloo_mixer = Mixer::new_with_gloo_timers(cfg.mixer.clone());
             let mut w = PacketInteraction::new(
@@ -1527,6 +1542,13 @@ pub mod wasm {
                 cfg,
             );
             w.mixer = gloo_mixer;
+            w.message_emitter = Box::new(move |msg| {
+                let this = JsValue::null();
+                let param: JsValue = Uint8Array::from(msg).into();
+                if let Err(e) = on_msg.call1(&this, &param) {
+                    error!("failed to call on_msg closure: {:?}", e.as_string());
+                }
+            });
             Self { w }
         }
 
