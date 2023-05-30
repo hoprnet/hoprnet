@@ -3,15 +3,25 @@ pragma solidity >=0.7.0 <0.9.0;
 
 import "safe-contracts/common/Enum.sol";
 
-enum ParameterType {
-    Static,
-    Dynamic,    // bytes, string
-    Dynamic32   // non-nested arrays: address[] bytes32[] uint[] etc
+// enum ParameterType {
+//     Static,
+//     Dynamic,    // bytes, string
+//     Dynamic32   // non-nested arrays: address[] bytes32[] uint[] etc
+// }
+
+enum HoprChannelsPermission {
+    Allowed,
+    Blocked
 }
 
-enum ExecutionOptions {
-    None,
-    Send
+enum HoprTokenPermission {
+    Blocked,
+    Allowed
+}
+
+enum SendPermission {
+    Blocked,
+    Allowed
 }
 
 enum Clearance {
@@ -19,29 +29,24 @@ enum Clearance {
     Function
 }
 
-enum HoprChannelPermission {
-    Allowed,
-    Blocked
-}
-
 enum TargetType {
-    Channel,
+    None,
     Token,
+    Channels,
     Send
 }
 
 struct TargetAddress {
     Clearance clearance;
-    ExecutionOptions options;
+    TargetType targetType;
 }
 
 struct Role {
-    mapping(address => bool) members;   // eligible caller. May be able to receive native tokens (e.g. xDAI)
-    mapping(address => address) targetChannels;
-    mapping(address => address) targetTokens;
-    mapping(address => address) targetSend;
-    mapping(bytes32 => uint256) functions;
-    mapping(bytes32 => mapping(bytes32 => HoprChannelPermission)) hoprChannelsCapability; // keyForFunctions (bytes32) => channel Id (keccak256(src, dest)) => 
+    mapping(address => bool) members;   // eligible caller. May be able to receive native tokens (e.g. xDAI), if set to allowed
+    mapping(address => TargetAddress) targets;  // target addresses that can be called
+    mapping(bytes32 => mapping(bytes32 => HoprChannelsPermission)) hoprChannelsCapability; // keyForFunctions (bytes32) => channel Id (keccak256(src, dest)) => HoprChannelsPermission
+    mapping(bytes32 => mapping(address => HoprTokenPermission)) hoprTokenCapability; // keyForFunctions (bytes32) => beneficiary address => HoprTokenPermission
+    mapping(address => SendPermission) sendCapability; // beneficiary address => SendPermission
 }
 
 /**
@@ -49,75 +54,39 @@ struct Role {
  * This library supports only one role
  */
 library SimplifiedPermissions {
-    // HoprChannels method ids
+    // HoprChannels method ids (TargetType.Channels)
     bytes4 internal constant FUND_CHANNEL_MULTI_SELECTOR = hex"4341abdd";
     bytes4 internal constant REDEEM_TICKET_SELECTOR = hex"0475568e";
     bytes4 internal constant REDEEM_TICKETS_SELECTOR = hex"c5ad200d";
     bytes4 internal constant INITIATE_CHANNEL_CLOSURE_SELECTOR = hex"88d2f3c9";
     bytes4 internal constant FINALIZE_CHANNEL_CLOSURE_SELECTOR = hex"833aae8d";
     bytes4 internal constant BUMP_CHANNEL_SELECTOR = hex"c4d93afb";
-    // HoprTokens method ids
+    // HoprTokens method ids (TargetType.Token)
     bytes4 internal constant APPROVE_SELECTOR = hex"095ea7b3";
     bytes4 internal constant SEND_SELECTOR = hex"9bd9bbc6";
 
-    uint256 internal constant SCOPE_MAX_PARAMS = 48;
-    event RevokeTarget(address targetAddress);
-    event ScopeTarget(address targetAddress);
+    event RevokedTarget(address targetAddress);
+    event ScopedTargetChannels(address targetAddress);
+    event ScopedTargetToken(address targetAddress);
+    event ScopedTargetSend(address targetAddress);
 
-    event ScopeAllowFunction(
+    event ScopedChannelsCapability(
         address targetAddress,
         bytes4 selector,
-        ExecutionOptions options,
-        uint256 resultingScopeConfig
+        bytes32 channelId,
+        HoprChannelsPermission permission
     );
-    event ScopeRevokeFunction(
+    event ScopedTokenCapability(
         address targetAddress,
         bytes4 selector,
-        uint256 resultingScopeConfig
+        address beneficiary,
+        HoprTokenPermission permission
     );
-    event ScopeFunction(
-        address targetAddress,
-        bytes4 functionSig,
-        bool[] isParamScoped,
-        ParameterType[] paramType,
-        Comparison[] paramComp,
-        bytes[] compValue,
-        ExecutionOptions options,
-        uint256 resultingScopeConfig
+    event ScopedSendCapability(
+        address beneficiary,
+        SendPermission permission
     );
-    event ScopeFunctionExecutionOptions(
-        uint16 role,
-        address targetAddress,
-        bytes4 functionSig,
-        ExecutionOptions options,
-        uint256 resultingScopeConfig
-    );
-    event ScopeParameter(
-        uint16 role,
-        address targetAddress,
-        bytes4 functionSig,
-        uint256 index,
-        ParameterType paramType,
-        Comparison paramComp,
-        bytes compValue,
-        uint256 resultingScopeConfig
-    );
-    event ScopeParameterAsOneOf(
-        uint16 role,
-        address targetAddress,
-        bytes4 functionSig,
-        uint256 index,
-        ParameterType paramType,
-        bytes[] compValues,
-        uint256 resultingScopeConfig
-    );
-    event UnscopeParameter(
-        uint16 role,
-        address targetAddress,
-        bytes4 functionSig,
-        uint256 index,
-        uint256 resultingScopeConfig
-    );
+
 
     /// Parameter Type is not supported
     error ParameterTypeNotSupported();
@@ -130,12 +99,18 @@ library SimplifiedPermissions {
 
     /// Function signature too short
     error FunctionSignatureTooShort();
+    
+    // /// Function signature is not allowed
+    // error FunctionSignatureNotAllowed();
 
     /// Role not allowed to delegate call to target address
     error DelegateCallNotAllowed();
 
     /// Role not allowed to call target address
     error TargetAddressNotAllowed();
+
+    /// Role not allowed to call target when its type is not set
+    error TargetTypeNotSet();
 
     /// Role not allowed to call this function on target address
     error FunctionNotAllowed();
@@ -253,8 +228,9 @@ library SimplifiedPermissions {
         }
     }
 
-    /** TODO: FIXME: 
+    /**
      * @dev Main transaction to check the permission of transaction execution of a module
+     * Only transctions to target
      */
     function checkTransaction(
         Role storage role,
@@ -268,47 +244,30 @@ library SimplifiedPermissions {
         }
 
         TargetAddress storage target = role.targets[targetAddress];
-        if (target.clearance == Clearance.None) {
+        if (target.clearance != Clearance.Function) {
             revert TargetAddressNotAllowed();
         }
 
-        // TODO: remove me, 
-        // if (target.clearance == Clearance.Target) {
-        //     checkExecutionOptions(value, operation, target.options);
-        //     return;
-        // }
+        // delegate call is not allowed; value can only be sent with `Send`
+        checkExecutionOptions(value, operation, target.targetType);
 
-        // when certain functions of the target address are allowed, 
-        // check if the current transaction is calling one of them
-        if (target.clearance == Clearance.Function) {
-            uint256 scopeConfig = role.functions[
-                keyForFunctions(targetAddress, bytes4(data))
-            ];
-
-            if (scopeConfig == 0) {
-                revert FunctionNotAllowed();
-            }
-
-            // TODO: Replace this unpackFunction so that an addtional bool field for HoprChannels management gets unwrapped
-            (ExecutionOptions options, bool isWildcarded, ) = unpackFunction(
-                scopeConfig
-            );
-
-
-            checkExecutionOptions(value, operation, options);
-
-            if (isWildcarded == false) {
-                // // FIXME: add conditional route for HoprChannels management
-                // if (isHoprChannelsInteraction == true) {
-                //     checkHoprChannelsParameters(role, scopeConfig, targetAddress, data);
-                // } else {
-                    checkParameters(role, scopeConfig, targetAddress, data);
-                // }
+        if (target.targetType == TargetType.Token) {
+            // check with HoprToken contract
+            checkHoprTokenParameters(role, targetAddress, data);
+            return;
+        } else if (target.targetType == TargetType.Channels) {
+            // check with HoprChannels contract
+            checkHoprChannelsParameters(role, targetAddress, data);
+            return;
+        } else if (target.targetType == TargetType.Send) {
+            if (role.sendCapability[targetAddress] != SendPermission.Allowed) {
+                // not allowed to call the capability
+                revert ParameterNotAllowed();
             }
             return;
-        }
+        } else {
 
-        assert(false);
+        }
     }
 
     /**
@@ -318,30 +277,29 @@ library SimplifiedPermissions {
     function checkExecutionOptions(
         uint256 value,
         Enum.Operation operation,
-        ExecutionOptions options
+        TargetType targetType
     ) internal pure {
-        // isSend && !canSend
+         // delegate call is not allowed; 
+        if (
+            operation == Enum.Operation.DelegateCall
+        ) {
+            revert DelegateCallNotAllowed();
+        }
+        
+        // send native tokens is only available to a set of addresses
         if (
             value > 0 &&
-            options != ExecutionOptions.Send &&
-            options != ExecutionOptions.Both
+            targetType != TargetType.Send
         ) {
             revert SendNotAllowed();
         }
 
-        // isDelegateCall && !canDelegateCall
-        if (
-            operation == Enum.Operation.DelegateCall &&
-            options != ExecutionOptions.DelegateCall &&
-            options != ExecutionOptions.Both
-        ) {
-            revert DelegateCallNotAllowed();
+        if (targetType == TargetType.None) {
+            revert TargetTypeNotSet();
         }
     }
 
-
-
-    /* FIXME: `paramType` may be removed?
+    /*
      * @dev Check parameters for HoprChannels capability
      * @param role reference to role storage
      * @param scopeConfig reference to role storage
@@ -350,25 +308,14 @@ library SimplifiedPermissions {
      */
     function checkHoprChannelsParameters(
         Role storage role,
-        ParameterType paramType,
         address targetAddress,
         bytes memory data
     ) internal view {
         bytes4 functionSig = bytes4(data);
         bytes32 capabilityKey = keyForFunctions(targetAddress, functionSig);
 
-        if (paramType == ParameterType.Dynamic) {
-            // Not suppose to have Dynamic type
-            revert ParameterTypeNotSupported();
-        }
-        
-        if (paramType == ParameterType.Static) {
-            // Channel source and channel destination addreses are at the first and second places respectively
-            (address src, address dest) = pluckTwoStaticAddresses(data);
-            // check if functions on this channel can be called.
-            compareHoprChannelsPermission(role, capabilityKey, src, dest);
-        } else {
-            // Dynamic32 type
+        if (functionSig == REDEEM_TICKETS_SELECTOR) {
+            // only redeemTickets function has Dynamic32 type
             address[] memory srcs = pluckDynamicAddresses(data, 0);
             address[] memory dests = pluckDynamicAddresses(data, 1);
 
@@ -380,10 +327,14 @@ library SimplifiedPermissions {
                 // check if functions on this channel can be called.
                 compareHoprChannelsPermission(role, capabilityKey, srcs[i], dests[i]);
             }
+        } else {
+            // source and channel destination addreses are at the first and second places respectively
+            (address src, address dest) = pluckTwoStaticAddresses(data);
+            // check if functions on this channel can be called.
+            compareHoprChannelsPermission(role, capabilityKey, src, dest);
         }
     }
 
-// TODO:
     /*
      * @dev Will revert if a transaction has a parameter that is not allowed
      * @notice This function is invoked on non-HoprChannels contracts (i.e. HoprTokens)
@@ -394,74 +345,32 @@ library SimplifiedPermissions {
      */
     function checkHoprTokenParameters(
         Role storage role,
-        uint256 scopeConfig,
         address targetAddress,
         bytes memory data
     ) internal view {
         bytes4 functionSig = bytes4(data);
         bytes32 capabilityKey = keyForFunctions(targetAddress, functionSig);
 
-        // check 
+        // check if the first parameter is allowed
+        address beneficiary = pluckOneStaticAddress(data, 0);  
+        if (role.hoprTokenCapability[capabilityKey][beneficiary] != HoprTokenPermission.Allowed) {
+            // not allowed to call the capability
+            revert ParameterNotAllowed();
+        }
 
-
-        // (, , uint256 length) = unpackFunction(scopeConfig);
-
-        // for (uint256 i = 0; i < length; i++) {
-        //     (
-        //         bool isScoped,
-        //         ParameterType paramType,
-        //         Comparison paramComp
-        //     ) = unpackParameter(scopeConfig, i);
-
-        //     if (!isScoped) {
-        //         continue;
-        //     }
-
-        //     bytes32 value;
-        //     if (paramType != ParameterType.Static) {
-        //         value = pluckDynamicValue(data, paramType, i);
-        //     } else {
-        //         value = pluckStaticValue(data, i);
-        //     }
-
-        //     bytes32 key = keyForCompValues(targetAddress, functionSig, i);
-        //     if (paramComp != Comparison.OneOf) {
-        //         compare(paramComp, role.compValues[key], value);
-        //     } else {
-        //         compareOneOf(role.compValuesOneOf[key], value);
-        //     }
-        // }
+        // if calling `send` method, it is equivalent to calling FUND_CHANNEL_MULTI_SELECTOR
+        if (functionSig == SEND_SELECTOR) {
+            bytes32 sendCapabilityKey = keyForFunctions(targetAddress, FUND_CHANNEL_MULTI_SELECTOR);
+            // source and channel destination addreses are at the first and second places respectively
+            (address src, address dest) = pluckSendPayload(data, 2);
+            // check if functions on this channel can be called.
+            compareHoprChannelsPermission(role, sendCapabilityKey, src, dest);
+        }
     }
-// // TODO:
-//     function compare(
-//         Comparison paramComp,
-//         bytes32 compValue,
-//         bytes32 value
-//     ) internal pure {
-//         if (paramComp == Comparison.EqualTo && value != compValue) {
-//             revert ParameterNotAllowed();
-//         } else if (paramComp == Comparison.GreaterThan && value <= compValue) {
-//             revert ParameterLessThanAllowed();
-//         } else if (paramComp == Comparison.LessThan && value >= compValue) {
-//             revert ParameterGreaterThanAllowed();
-//         }
-//     }
-// // TODO:
-//     function compareOneOf(
-//         bytes32[] storage compValue,
-//         bytes32 value
-//     ) internal view {
-//         for (uint256 i = 0; i < compValue.length; i++) {
-//             if (value == compValue[i]) return;
-//         }
-//         revert ParameterNotOneOfAllowed();
-//     }
 
-    /*
-     *
-     * SETTERS
-     *
-     */
+    // ======================================================
+    // ----------------------- SETTERS ----------------------
+    // ======================================================
     
     /*
      * @dev Forbid role members to call all the functions of any type (call or delegatecall)
@@ -473,354 +382,133 @@ library SimplifiedPermissions {
     ) external {
         role.targets[targetAddress] = TargetAddress(
             Clearance.None,
-            ExecutionOptions.None
+            TargetType.None
         );
-        emit RevokeTarget(targetAddress);
+        emit RevokedTarget(targetAddress);
     }
 
     /**
-     * @dev Allow certain functions of the target address to be called.
+     * @dev Allow target address as HoprToken
      */
-    function scopeTarget(
+    function scopeTargeToken(
         Role storage role,
         address targetAddress
     ) external {
         role.targets[targetAddress] = TargetAddress(
             Clearance.Function,
-            ExecutionOptions.None
+            TargetType.Token
         );
-        emit ScopeTarget(targetAddress);
+        emit ScopedTargetToken(targetAddress);
     }
 
     /**
-     * @dev Allows a specific function signature on a scoped target.
-     * This is the default config for all the functions
+     * @dev Allow target address as HoprChannel
      */
-    function scopeAllowFunction(
+    function scopeTargetChannels(
+        Role storage role,
+        address targetAddress
+    ) external {
+        role.targets[targetAddress] = TargetAddress(
+            Clearance.Function,
+            TargetType.Channels
+        );
+        emit ScopedTargetChannels(targetAddress);
+    }
+
+    /**
+     * @dev Allow target address as beneficiary of Send
+     */
+    function scopeTargetSend(
+        Role storage role,
+        address targetAddress
+    ) external {
+        role.targets[targetAddress] = TargetAddress(
+            Clearance.Function,
+            TargetType.Send
+        );
+        emit ScopedTargetSend(targetAddress);
+    }
+
+    /**
+     * @dev Set the permission for a specific function on a scoped HoprChannels target.
+     */
+    function scopeChannelCapability(
         Role storage role,
         address targetAddress,
         bytes4 functionSig,
-        ExecutionOptions options
+        bytes32 channelId,
+        HoprChannelsPermission permission
     ) external {
-        /*
-         * packLeft(
-         *    0           -> start from a fresh scopeConfig
-         *    options     -> externally provided options
-         *    true        -> mark the function as wildcarded
-         *    0           -> length
-         * )
-         */
-        uint256 scopeConfig = packLeft(0, options, true, 0);
-        role.functions[
-            keyForFunctions(targetAddress, functionSig)
-        ] = scopeConfig;
-        emit ScopeAllowFunction(
+        bytes32 capabilityKey = keyForFunctions(targetAddress, functionSig);
+        role.hoprChannelsCapability[capabilityKey][channelId] = permission;
+
+        emit ScopedChannelsCapability(
             targetAddress,
             functionSig,
-            options,
-            scopeConfig
+            channelId,
+            permission
         );
     }
 
     /**
-     * @dev Disallows a specific function signature on a scoped target.
+     * @dev Set the permission for a specific function on a scoped HoprToken target.
      */
-    function scopeRevokeFunction(
-        Role storage role,
-        address targetAddress,
-        bytes4 functionSig
-    ) external {
-        role.functions[keyForFunctions(targetAddress, functionSig)] = 0;
-        emit ScopeRevokeFunction(targetAddress, functionSig, 0);
-    }
-
-    // TODO:
-    function scopeFunction(
+    function scopeTokenCapability(
         Role storage role,
         address targetAddress,
         bytes4 functionSig,
-        bool[] memory isScoped,
-        ParameterType[] memory paramType,
-        Comparison[] memory paramComp,
-        bytes[] calldata compValue,
-        ExecutionOptions options
+        address beneficiary,
+        HoprTokenPermission permission
     ) external {
-        uint256 length = isScoped.length;
+        bytes32 capabilityKey = keyForFunctions(targetAddress, functionSig);
+        role.hoprTokenCapability[capabilityKey][beneficiary] = permission;
 
-        if (
-            length != paramType.length ||
-            length != paramComp.length ||
-            length != compValue.length
-        ) {
-            revert ArraysDifferentLength();
-        }
-
-        if (length > SCOPE_MAX_PARAMS) {
-            revert ScopeMaxParametersExceeded();
-        }
-
-        for (uint256 i = 0; i < length; i++) {
-            if (isScoped[i]) {
-                enforceComp(paramType[i], paramComp[i]);
-                enforceCompValue(paramType[i], compValue[i]);
-            }
-        }
-
-        /*
-         * packLeft(
-         *    0           -> start from a fresh scopeConfig
-         *    options     -> externally provided options
-         *    false       -> mark the function as not wildcarded
-         *    0           -> length
-         * )
-         */
-        uint256 scopeConfig = packLeft(0, options, false, length);
-        for (uint256 i = 0; i < length; i++) {
-            scopeConfig = packRight(
-                scopeConfig,
-                i,
-                isScoped[i],
-                paramType[i],
-                paramComp[i]
-            );
-        }
-
-        //set scopeConfig
-        role.functions[
-            keyForFunctions(targetAddress, functionSig)
-        ] = scopeConfig;
-
-        //set compValues
-        for (uint256 i = 0; i < length; i++) {
-            role.compValues[
-                keyForCompValues(targetAddress, functionSig, i)
-            ] = compressCompValue(paramType[i], compValue[i]);
-        }
-        emit ScopeFunction(
+        emit ScopedTokenCapability(
             targetAddress,
             functionSig,
-            isScoped,
-            paramType,
-            paramComp,
-            compValue,
-            options,
-            scopeConfig
+            beneficiary,
+            permission
         );
     }
 
-    // TODO:
-    function scopeFunctionExecutionOptions(
+    /**
+     * @dev Set the permission for a specific function on a scoped HoprToken target.
+     */
+    function scopeTokenCapability(
         Role storage role,
-        uint16 roleId,
-        address targetAddress,
-        bytes4 functionSig,
-        ExecutionOptions options
+        address beneficiary,
+        SendPermission permission
     ) external {
-        bytes32 key = keyForFunctions(targetAddress, functionSig);
+        role.sendCapability[beneficiary] = permission;
 
-        //set scopeConfig
-        uint256 scopeConfig = packOptions(role.functions[key], options);
-
-        role.functions[
-            keyForFunctions(targetAddress, functionSig)
-        ] = scopeConfig;
-
-        emit ScopeFunctionExecutionOptions(
-            roleId,
-            targetAddress,
-            functionSig,
-            options,
-            scopeConfig
+        emit ScopedSendCapability(
+            beneficiary,
+            permission
         );
     }
 
-    // TODO:
-    function scopeParameter(
-        Role storage role,
-        uint16 roleId,
-        address targetAddress,
-        bytes4 functionSig,
-        uint256 index,
-        ParameterType paramType,
-        Comparison paramComp,
-        bytes calldata compValue
-    ) external {
-        if (index >= SCOPE_MAX_PARAMS) {
-            revert ScopeMaxParametersExceeded();
-        }
-
-        enforceComp(paramType, paramComp);
-        enforceCompValue(paramType, compValue);
-
-        // set scopeConfig
-        bytes32 key = keyForFunctions(targetAddress, functionSig);
-        uint256 scopeConfig = packParameter(
-            role.functions[key],
-            index,
-            true, // isScoped
-            paramType,
-            paramComp
-        );
-        role.functions[key] = scopeConfig;
-
-        // set compValue
-        role.compValues[
-            keyForCompValues(targetAddress, functionSig, index)
-        ] = compressCompValue(paramType, compValue);
-
-        emit ScopeParameter(
-            roleId,
-            targetAddress,
-            functionSig,
-            index,
-            paramType,
-            paramComp,
-            compValue,
-            scopeConfig
-        );
-    }
-
-    // TODO:
-    function scopeParameterAsOneOf(
-        Role storage role,
-        uint16 roleId,
-        address targetAddress,
-        bytes4 functionSig,
-        uint256 index,
-        ParameterType paramType,
-        bytes[] calldata compValues
-    ) external {
-        if (index >= SCOPE_MAX_PARAMS) {
-            revert ScopeMaxParametersExceeded();
-        }
-
-        if (compValues.length < 2) {
-            revert NotEnoughCompValuesForOneOf();
-        }
-
-        for (uint256 i = 0; i < compValues.length; i++) {
-            enforceCompValue(paramType, compValues[i]);
-        }
-
-        // set scopeConfig
-        bytes32 key = keyForFunctions(targetAddress, functionSig);
-        uint256 scopeConfig = packParameter(
-            role.functions[key],
-            index,
-            true, // isScoped
-            paramType,
-            Comparison.OneOf
-        );
-        role.functions[key] = scopeConfig;
-
-        // set compValue
-        key = keyForCompValues(targetAddress, functionSig, index);
-        role.compValuesOneOf[key] = new bytes32[](compValues.length);
-        for (uint256 i = 0; i < compValues.length; i++) {
-            role.compValuesOneOf[key][i] = compressCompValue(
-                paramType,
-                compValues[i]
-            );
-        }
-
-        emit ScopeParameterAsOneOf(
-            roleId,
-            targetAddress,
-            functionSig,
-            index,
-            paramType,
-            compValues,
-            scopeConfig
-        );
-    }
-
-    // TODO:
-    function unscopeParameter(
-        Role storage role,
-        uint16 roleId,
-        address targetAddress,
-        bytes4 functionSig,
-        uint256 index
-    ) external {
-        if (index >= SCOPE_MAX_PARAMS) {
-            revert ScopeMaxParametersExceeded();
-        }
-
-        // set scopeConfig
-        bytes32 key = keyForFunctions(targetAddress, functionSig);
-        uint256 scopeConfig = packParameter(
-            role.functions[key],
-            index,
-            false, // isScoped
-            ParameterType(0),
-            Comparison(0)
-        );
-        role.functions[key] = scopeConfig;
-
-        emit UnscopeParameter(
-            roleId,
-            targetAddress,
-            functionSig,
-            index,
-            scopeConfig
-        );
-    }
-
-    // TODO:
-    function enforceComp(
-        ParameterType paramType,
-        Comparison paramComp
-    ) internal pure {
-        if (paramComp == Comparison.OneOf) {
-            revert UnsuitableOneOfComparison();
-        }
-
-        if (
-            (paramType != ParameterType.Static) &&
-            (paramComp != Comparison.EqualTo)
-        ) {
-            revert UnsuitableRelativeComparison();
-        }
-    }
-
-    // TODO:
-    function enforceCompValue(
-        ParameterType paramType,
-        bytes calldata compValue
-    ) internal pure {
-        if (paramType == ParameterType.Static && compValue.length != 32) {
-            revert UnsuitableStaticCompValueSize();
-        }
-
-        if (
-            paramType == ParameterType.Dynamic32 && compValue.length % 32 != 0
-        ) {
-            revert UnsuitableDynamic32CompValueSize();
-        }
-    }
-
-  /** FIXME:
-   * @param role reference to role storage
-   * @param capabilityKey the id key of function on the target HoprChannels address
-   * @param source the address of source
-   * @param destination the address of destination
-   */
-    function compareHoprChannelsPermission(Role storage role, bytes32 capabilityKey, address source, address destination) internal view returns (bool) {
-        // get chainId
-        bytes32 chainId = keccak256(abi.encodePacked(source, destination));
-        // check if it's allowed to call the channel
-        if (role.hoprChannelsCapability[capabilityKey][chainId] != HoprChannelPermission.Allowed) {
-            // not allowed to call the capability
-            revert ParameterNotAllowed();
-        }
-    }
 
     // TODO:
     /*
      *
      * HELPERS
      *
-     */
+    */
+    /** FIXME:
+   * @param role reference to role storage
+   * @param capabilityKey the id key of function on the target HoprChannels address
+   * @param source the address of source
+   * @param destination the address of destination
+   */
+    function compareHoprChannelsPermission(Role storage role, bytes32 capabilityKey, address source, address destination) internal view returns (bool) {
+        // get channelId
+        bytes32 channelId = keccak256(abi.encodePacked(source, destination));
+        // check if it's allowed to call the channel
+        if (role.hoprChannelsCapability[capabilityKey][channelId] != HoprChannelsPermission.Allowed) {
+            // not allowed to call the capability
+            revert ParameterNotAllowed();
+        }
+    }
 //   /** FIXME:
 //    * @param source the address of source
 //    * @param destination the address of destination
@@ -829,6 +517,27 @@ library SimplifiedPermissions {
 //   function _getChannelId(address source, address destination) internal pure returns (bytes32) {
 //     return keccak256(abi.encodePacked(source, destination));
 //   }
+
+    /** FIXME:
+     * @dev Pluck a bytes32 at index position into address
+     */
+    function pluckOneStaticAddress(
+        bytes memory data,
+        uint256 index
+    ) internal pure returns (address) {
+        // pre-check: is there a word available for the current parameter at argumentsBlock?
+        if (data.length < 4 + index * 32 + 32) {
+            revert CalldataOutOfBounds();
+        }
+
+        uint256 offset = 4 + index * 32;
+        address addr;
+        assembly {
+            // add 32 - jump over the length encoding of the data bytes array
+            addr := mload(add(32, add(data, offset)))
+        }
+        return addr;
+    }
 
     /** FIXME:
      * @dev Pluck first two bytes32 into two addresses
@@ -921,37 +630,14 @@ library SimplifiedPermissions {
     }
 
     // TODO:
-    function pluckDynamicValue(
+    function pluckSendPayload(
         bytes memory data,
-        ParameterType paramType,
         uint256 index
-    ) internal pure returns (bytes32) {
-        assert(paramType != ParameterType.Static);
+    ) internal pure returns (address, address) {
         // pre-check: is there a word available for the current parameter at argumentsBlock?
         if (data.length < 4 + index * 32 + 32) {
             revert CalldataOutOfBounds();
         }
-
-        /*
-         * Encoded calldata:
-         * 4  bytes -> function selector
-         * 32 bytes -> sequence, one chunk per parameter
-         *
-         * There is one (byte32) chunk per parameter. Depending on type it contains:
-         * Static    -> value encoded inline (not plucked by this function)
-         * Dynamic   -> a byte offset to encoded data payload
-         * Dynamic32 -> a byte offset to encoded data payload
-         * Note: Fixed Sized Arrays (e.g., bool[2]), are encoded inline
-         * Note: Nested types also do not follow the above described rules, and are unsupported
-         * Note: The offset to payload does not include 4 bytes for functionSig
-         *
-         *
-         * At encoded payload, the first 32 bytes are the length encoding of the parameter payload. Depending on ParameterType:
-         * Dynamic   -> length in bytes
-         * Dynamic32 -> length in bytes32
-         * Note: Dynamic types are: bytes, string
-         * Note: Dynamic32 types are non-nested arrays: address[] bytes32[] uint[] etc
-         */
 
         // the start of the parameter block
         // 32 bytes - length encoding of the data bytes array
@@ -977,20 +663,88 @@ library SimplifiedPermissions {
         // 4  bytes - functionSig
         // 32 bytes - length encoding for the parameter payload
         uint256 start = 4 + offsetPayload + 32;
-        uint256 end = start +
-            (
-                paramType == ParameterType.Dynamic32
-                    ? lengthPayload * 32
-                    : lengthPayload
-            );
+        uint256 end = start + lengthPayload;
 
         // are we slicing out of bounds?
         if (data.length < end) {
             revert CalldataOutOfBounds();
         }
 
-        return keccak256(slice(data, start, end));
+        (address a, address b, , ) = abi.decode(slice(data, start, end), (address, address, uint256, uint256));
+        return (a, b);
     }
+
+    // // TODO:
+    // function pluckDynamicValue(
+    //     bytes memory data,
+    //     ParameterType paramType,
+    //     uint256 index
+    // ) internal pure returns (bytes32) {
+    //     assert(paramType != ParameterType.Static);
+    //     // pre-check: is there a word available for the current parameter at argumentsBlock?
+    //     if (data.length < 4 + index * 32 + 32) {
+    //         revert CalldataOutOfBounds();
+    //     }
+
+    //     /*
+    //      * Encoded calldata:
+    //      * 4  bytes -> function selector
+    //      * 32 bytes -> sequence, one chunk per parameter
+    //      *
+    //      * There is one (byte32) chunk per parameter. Depending on type it contains:
+    //      * Static    -> value encoded inline (not plucked by this function)
+    //      * Dynamic   -> a byte offset to encoded data payload
+    //      * Dynamic32 -> a byte offset to encoded data payload
+    //      * Note: Fixed Sized Arrays (e.g., bool[2]), are encoded inline
+    //      * Note: Nested types also do not follow the above described rules, and are unsupported
+    //      * Note: The offset to payload does not include 4 bytes for functionSig
+    //      *
+    //      *
+    //      * At encoded payload, the first 32 bytes are the length encoding of the parameter payload. Depending on ParameterType:
+    //      * Dynamic   -> length in bytes
+    //      * Dynamic32 -> length in bytes32
+    //      * Note: Dynamic types are: bytes, string
+    //      * Note: Dynamic32 types are non-nested arrays: address[] bytes32[] uint[] etc
+    //      */
+
+    //     // the start of the parameter block
+    //     // 32 bytes - length encoding of the data bytes array
+    //     // 4  bytes - function sig
+    //     uint256 argumentsBlock;
+    //     assembly {
+    //         argumentsBlock := add(data, 36)
+    //     }
+
+    //     // the two offsets are relative to argumentsBlock
+    //     uint256 offset = index * 32;
+    //     uint256 offsetPayload;
+    //     assembly {
+    //         offsetPayload := mload(add(argumentsBlock, offset))
+    //     }
+
+    //     uint256 lengthPayload;
+    //     assembly {
+    //         lengthPayload := mload(add(argumentsBlock, offsetPayload))
+    //     }
+
+    //     // account for:
+    //     // 4  bytes - functionSig
+    //     // 32 bytes - length encoding for the parameter payload
+    //     uint256 start = 4 + offsetPayload + 32;
+    //     uint256 end = start +
+    //         (
+    //             paramType == ParameterType.Dynamic32
+    //                 ? lengthPayload * 32
+    //                 : lengthPayload
+    //         );
+
+    //     // are we slicing out of bounds?
+    //     if (data.length < end) {
+    //         revert CalldataOutOfBounds();
+    //     }
+
+    //     return keccak256(slice(data, start, end));
+    // }
 
     // TODO:
     function pluckStaticValue(
@@ -1023,158 +777,6 @@ library SimplifiedPermissions {
         }
     }
 
-    // TODO:
-    /*
-     * pack/unpack are bit helpers for scopeConfig
-     */
-    function packParameter(
-        uint256 scopeConfig,
-        uint256 index,
-        bool isScoped,
-        ParameterType paramType,
-        Comparison paramComp
-    ) internal pure returns (uint256) {
-        (ExecutionOptions options, , uint256 prevLength) = unpackFunction(
-            scopeConfig
-        );
-
-        uint256 nextLength = index + 1 > prevLength ? index + 1 : prevLength;
-
-        return
-            packLeft(
-                packRight(scopeConfig, index, isScoped, paramType, paramComp),
-                options,
-                false, // isWildcarded=false
-                nextLength
-            );
-    }
-
-    // TODO:
-    function packOptions(
-        uint256 scopeConfig,
-        ExecutionOptions options
-    ) internal pure returns (uint256) {
-        uint256 optionsMask = 3 << 254;
-
-        scopeConfig &= ~optionsMask;
-        scopeConfig |= uint256(options) << 254;
-
-        return scopeConfig;
-    }
-
-    /**
-     * @dev Update the left 16 bits of `scopeConfig` and return the new `scopeConfig`
-     */
-    function packLeft(
-        uint256 scopeConfig,
-        ExecutionOptions options,
-        bool isWildcarded,
-        uint256 length
-    ) internal pure returns (uint256) {
-        // LEFT SIDE
-        // 2   bits -> options
-        // 1   bits -> isWildcarded
-        // 5   bits -> unused
-        // 8   bits -> length
-        // RIGHT SIDE
-        // 48  bits -> isScoped
-        // 96  bits -> paramType (2 bits per entry 48*2)
-        // 96  bits -> paramComp (2 bits per entry 48*2)
-
-        // Wipe the LEFT SIDE clean. Start from there
-        scopeConfig = (scopeConfig << 16) >> 16;
-
-        // set options -> 256 - 2 = 254
-        scopeConfig |= uint256(options) << 254;
-
-        // set isWildcarded -> 256 - 2 - 1 = 253
-        if (isWildcarded) {
-            scopeConfig |= 1 << 253;
-        }
-
-        // set Length -> 48 + 96 + 96 = 240
-        scopeConfig |= length << 240;
-
-        return scopeConfig;
-    }
-
-    /**
-     * @dev Update the right 240 bits of `scopeConfig` and return the new `scopeConfig`
-     */
-    function packRight(
-        uint256 scopeConfig,
-        uint256 index,
-        bool isScoped,
-        ParameterType paramType,
-        Comparison paramComp
-    ) internal pure returns (uint256) {
-        // LEFT SIDE
-        // 2   bits -> options
-        // 1   bits -> isWildcarded
-        // 5   bits -> unused
-        // 8   bits -> length
-        // RIGHT SIDE
-        // 48  bits -> isScoped
-        // 96  bits -> paramType (2 bits per entry 48*2)
-        // 96  bits -> paramComp (2 bits per entry 48*2)
-        uint256 isScopedMask = 1 << (index + 96 + 96);
-        uint256 paramTypeMask = 3 << (index * 2 + 96);
-        uint256 paramCompMask = 3 << (index * 2);
-
-        if (isScoped) {
-            scopeConfig |= isScopedMask;
-        } else {
-            scopeConfig &= ~isScopedMask;
-        }
-
-        scopeConfig &= ~paramTypeMask;
-        scopeConfig |= uint256(paramType) << (index * 2 + 96);
-
-        scopeConfig &= ~paramCompMask;
-        scopeConfig |= uint256(paramComp) << (index * 2);
-
-        return scopeConfig;
-    }
-
-    /**
-     * @dev Read the left 16 bits of `scopeConfig` and decode to types
-     */
-    function unpackFunction(
-        uint256 scopeConfig
-    )
-        internal
-        pure
-        returns (ExecutionOptions options, bool isWildcarded, uint256 length)
-    {
-        uint256 isWildcardedMask = 1 << 253;
-
-        options = ExecutionOptions(scopeConfig >> 254);
-        isWildcarded = scopeConfig & isWildcardedMask != 0;
-        length = (scopeConfig << 8) >> 248;
-    }
-
-    /**
-     * @dev Read the right 240 bits of `scopeConfig` and decode to types
-     */
-    function unpackParameter(
-        uint256 scopeConfig,
-        uint256 index
-    )
-        internal
-        pure
-        returns (bool isScoped, ParameterType paramType, Comparison paramComp)
-    {
-        uint256 isScopedMask = 1 << (index + 96 + 96);
-        uint256 paramTypeMask = 3 << (index * 2 + 96);
-        uint256 paramCompMask = 3 << (index * 2);
-
-        isScoped = (scopeConfig & isScopedMask) != 0;
-        paramType = ParameterType(
-            (scopeConfig & paramTypeMask) >> (index * 2 + 96)
-        );
-        paramComp = Comparison((scopeConfig & paramCompMask) >> (index * 2));
-    }
-
     /**
      * @dev Get the unique key for a function of a given target
      */
@@ -1183,24 +785,5 @@ library SimplifiedPermissions {
         bytes4 functionSig
     ) public pure returns (bytes32) {
         return bytes32(abi.encodePacked(targetAddress, functionSig));
-    }
-// TODO:
-    function keyForCompValues(
-        address targetAddress,
-        bytes4 functionSig,
-        uint256 index
-    ) public pure returns (bytes32) {
-        return
-            bytes32(abi.encodePacked(targetAddress, functionSig, uint8(index)));
-    }
-// TODO:
-    function compressCompValue(
-        ParameterType paramType,
-        bytes calldata compValue
-    ) internal pure returns (bytes32) {
-        return
-            paramType == ParameterType.Static
-                ? bytes32(compValue)
-                : keccak256(compValue);
     }
 }

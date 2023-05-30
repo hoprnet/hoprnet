@@ -174,7 +174,7 @@ contract HoprCapabilityBasedNodeManagementModule is SimplifiedModule {
     // address hoprTokenAddress = IHoprChannels(hoprChannelsAddress).token();
 
     // add default scope for hoprChannelsAddress
-    SimplifiedPermissions.scopeTarget(role, hoprChannelsAddress);
+    // SimplifiedPermissions.scopeTarget(role, hoprChannelsAddress);
     // FIXME:
     // SimplifiedPermissions.scopeTarget(role, hoprTokenAddress);
     // add default scopr for hoprTokenAddress
