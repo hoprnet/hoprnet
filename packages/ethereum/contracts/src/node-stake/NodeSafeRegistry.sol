@@ -25,38 +25,29 @@ contract HoprNodeSafeRegistry {
     address nodeChainKeyAddress;
   }
 
-  bytes32 public domainSeparator;
+  // Currently deployed version, starting with 1.0.0
+  string private constant version = '1.0.0';
+
+  bytes32 private immutable domainSeparator;
   mapping(address => address) public nodeToSafe;
-  // NodeSafe type hash. keccak256("NodeSafe(address safeAddress,address nodeChainKeyAddress)");
+  // NodeSafe struct type hash.
+  // keccak256("NodeSafe(address safeAddress,address nodeChainKeyAddress)");
   bytes32 private constant NODE_SAFE_TYPEHASH = hex'6e9a9ee91e0fce141f0eeaf47e1bfe3af5b5f40e5baf2a86acc37a075199c16d';
 
   event RegisteredNodeSafe(address indexed safeAddress, address indexed nodeAddress);
   event DergisteredNodeSafe(address indexed safeAddress, address indexed nodeAddress);
 
-  /**
-   * @param networkName string, e.g. 'monte_rosa_2_0'
-   */
-  constructor(string memory networkName) {
+  constructor() {
+    // following encoding guidelines of EIP712
     domainSeparator = keccak256(
-      abi.encode(
+      abi.encodePacked(
         keccak256('EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)'),
-        keccak256(bytes('NodeStakeStorage')),
-        keccak256(bytes(networkName)),
-        block.chainid,
-        address(this)
+        keccak256(bytes('NodeStakeRegistry')),
+        keccak256(bytes(version)),
+        uint256(block.chainid),
+        uint160(address(this))
       )
     );
-  }
-
-  /**
-   * @dev returns the hashed NodeSafe typed data, which can be signed by the nodeChainKeyAddress
-   * @param nodeSafe NodeSafe struct which contains node address and safe address
-   */
-  function getNodeSafeDigest(NodeSafe memory nodeSafe) public view returns (bytes32) {
-    bytes32 nodeSafeHash = keccak256(
-      abi.encode(NODE_SAFE_TYPEHASH, nodeSafe.safeAddress, nodeSafe.nodeChainKeyAddress)
-    );
-    return keccak256(abi.encodePacked(bytes1(0x19), bytes1(0x01), domainSeparator, nodeSafeHash));
   }
 
   /**
@@ -66,13 +57,16 @@ contract HoprNodeSafeRegistry {
   function registerSafeWithNodeSig(NodeSafe memory nodeSafe, bytes calldata sig) external {
     // check adminKeyAddress has added HOPR tokens to the staking contract.
 
-    // build digest
-    bytes32 onStartHash = keccak256(
-      abi.encodePacked(bytes1(0x19), bytes1(0x01), domainSeparator, getNodeSafeDigest(nodeSafe))
+    // following encoding guidelines of EIP712
+    bytes32 hashStruct = keccak256(
+      abi.encodePacked(NODE_SAFE_TYPEHASH, uint160(nodeSafe.safeAddress), uint160(nodeSafe.nodeChainKeyAddress))
     );
 
+    // build typed digest
+    bytes32 registerHash = keccak256(abi.encodePacked(bytes1(0x19), bytes1(0x01), domainSeparator, hashStruct));
+
     // verify that signatures is from nodeChainKeyAddress. This signature can only be
-    (address recovered, ECDSA.RecoverError error) = ECDSA.tryRecover(onStartHash, sig);
+    (address recovered, ECDSA.RecoverError error) = ECDSA.tryRecover(registerHash, sig);
     if (error != ECDSA.RecoverError.NoError || recovered != nodeSafe.nodeChainKeyAddress) {
       revert NotValidSignatureFromNode();
     }
@@ -133,7 +127,7 @@ contract HoprNodeSafeRegistry {
    * @param safeAddr address of the Safe
    * @param nodeAddr address of the node
    */
-  function ensureNodeIsOwnerAndHasRole(address safeAddr, address nodeAddr) internal {
+  function ensureNodeIsOwnerAndHasRole(address safeAddr, address nodeAddr) internal view {
     // check safeAddress has nodeChainKeyAddress as owner
     address[] memory owners = ISafe(safeAddr).getOwners();
     uint256 index = 0;
