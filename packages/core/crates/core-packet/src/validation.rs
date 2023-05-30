@@ -1,10 +1,10 @@
+use crate::errors::PacketError::{OutOfFunds, TicketValidation};
+use crate::errors::Result;
 use core_crypto::types::PublicKey;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::channels::{ChannelEntry, ChannelStatus, Ticket};
-use utils_log::info;
-use utils_types::primitives::{Balance, U256};
-use crate::errors::Result;
-use crate::errors::PacketError::{OutOfFunds, TicketValidation};
+use utils_log::{debug, info};
+use utils_types::primitives::{Balance, BalanceType, U256};
 
 /// Performs validations of the given unacknowledged ticket and channel.
 pub async fn validate_unacknowledged_ticket<T: HoprCoreEthereumDbActions>(
@@ -14,7 +14,7 @@ pub async fn validate_unacknowledged_ticket<T: HoprCoreEthereumDbActions>(
     sender: &PublicKey,
     min_ticket_amount: Balance,
     req_inverse_ticket_win_prob: U256,
-    check_unrealized_balance: bool
+    check_unrealized_balance: bool,
 ) -> Result<()> {
     let required_win_prob = U256::from_inverse_probability(req_inverse_ticket_win_prob)?;
 
@@ -74,10 +74,20 @@ pub async fn validate_unacknowledged_ticket<T: HoprCoreEthereumDbActions>(
             .await? // all tickets from sender
             .into_iter()
             .filter(|t| t.epoch.eq(&channel.ticket_epoch) && t.channel_epoch.eq(&channel.channel_epoch))
-            .fold(channel.balance, |result, t| result.sub(&t.amount));
+            .fold(Some(channel.balance), |result, t| {
+                result
+                    .and_then(|b| b.value().value().checked_sub(t.amount.value().value().clone()))
+                    .map(|u| Balance::new(u.into(), channel.balance.balance_type()))
+            });
+
+        debug!(
+            "channel balance of {} after subtracting unrealized balance: {}",
+            channel.get_id(),
+            unrealized_balance.unwrap_or(Balance::zero(BalanceType::HOPR))
+        );
 
         // ensure sender has enough funds
-        if ticket.amount.gt(&unrealized_balance) {
+        if unrealized_balance.is_none() || ticket.amount.gt(&unrealized_balance.unwrap()) {
             return Err(OutOfFunds(channel.get_id().to_string()));
         }
     }
@@ -87,23 +97,24 @@ pub async fn validate_unacknowledged_ticket<T: HoprCoreEthereumDbActions>(
 
 #[cfg(test)]
 mod tests {
-    use hex_literal::hex;
+    use crate::errors::PacketError;
+    use crate::validation::validate_unacknowledged_ticket;
     use async_trait::async_trait;
-    use lazy_static::lazy_static;
-    use mockall::mock;
-    use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-    use utils_types::primitives::{Address, Balance, BalanceType, U256, Snapshot};
     use core_crypto::{
         iterated_hash::IteratedHash,
         types::{HalfKeyChallenge, Hash, PublicKey},
     };
+    use core_ethereum_db::traits::HoprCoreEthereumDbActions;
     use core_types::acknowledgement::{AcknowledgedTicket, PendingAcknowledgement};
+    use core_types::channels::ChannelStatus;
     use core_types::{
         account::AccountEntry,
         channels::{ChannelEntry, Ticket},
     };
-    use core_types::channels::ChannelStatus;
-    use crate::validation::validate_unacknowledged_ticket;
+    use hex_literal::hex;
+    use lazy_static::lazy_static;
+    use mockall::mock;
+    use utils_types::primitives::{Address, Balance, BalanceType, Snapshot, U256};
 
     const SENDER_PRIV_KEY: [u8; 32] = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
     const TARGET_PRIV_KEY: [u8; 32] = hex!("5bf21ea8cccd69aa784346b07bf79c84dac606e00eecaa68bf8c31aff397b1ca");
@@ -202,11 +213,29 @@ mod tests {
     }
 
     fn create_valid_ticket() -> Ticket {
-        Ticket::new(TARGET_ADDR.clone(),U256::one(), U256::one(), Balance::new(U256::one(), BalanceType::HOPR), U256::from_inverse_probability(U256::one()).unwrap(), U256::one(), &SENDER_PRIV_KEY)
+        Ticket::new(
+            TARGET_ADDR.clone(),
+            U256::one(),
+            U256::one(),
+            Balance::new(U256::one(), BalanceType::HOPR),
+            U256::from_inverse_probability(U256::one()).unwrap(),
+            U256::one(),
+            &SENDER_PRIV_KEY,
+        )
     }
 
     fn create_channel_entry() -> ChannelEntry {
-        ChannelEntry::new(TARGET_PUB.clone(), TARGET_PUB.clone(), Balance::from_str("100", BalanceType::HOPR), Hash::create(&[&hex!("deadbeef")]), U256::one(), U256::zero(), ChannelStatus::Open, U256::one(), U256::zero())
+        ChannelEntry::new(
+            TARGET_PUB.clone(),
+            TARGET_PUB.clone(),
+            Balance::from_str("100", BalanceType::HOPR),
+            Hash::create(&[&hex!("deadbeef")]),
+            U256::one(),
+            U256::zero(),
+            ChannelStatus::Open,
+            U256::one(),
+            U256::zero(),
+        )
     }
 
     #[async_std::test]
@@ -217,7 +246,314 @@ mod tests {
         let ticket = create_valid_ticket();
         let channel = create_channel_entry();
 
-        let ret = validate_unacknowledged_ticket(&db, &ticket, &channel, &SENDER_PUB, Balance::from_str("1", BalanceType::HOPR), U256::one(), true).await;
+        let ret = validate_unacknowledged_ticket(
+            &db,
+            &ticket,
+            &channel,
+            &SENDER_PUB,
+            Balance::from_str("1", BalanceType::HOPR),
+            U256::one(),
+            true,
+        )
+        .await;
+        assert!(ret.is_ok());
+    }
+
+    #[async_std::test]
+    async fn test_ticket_validation_should_fail_if_signer_not_sender() {
+        let mut db = MockDb::new();
+        db.expect_get_tickets().returning(|_| Ok(Vec::<Ticket>::new()));
+
+        let ticket = create_valid_ticket();
+        let channel = create_channel_entry();
+
+        let ret = validate_unacknowledged_ticket(
+            &db,
+            &ticket,
+            &channel,
+            &TARGET_PUB,
+            Balance::from_str("1", BalanceType::HOPR),
+            U256::one(),
+            true,
+        )
+        .await;
+
+        assert!(ret.is_err());
+        match ret.unwrap_err() {
+            PacketError::TicketValidation(_) => {}
+            _ => panic!("invalid error type"),
+        }
+    }
+
+    #[async_std::test]
+    async fn test_ticket_validation_should_fail_if_ticket_amount_is_low() {
+        let mut db = MockDb::new();
+        db.expect_get_tickets().returning(|_| Ok(Vec::<Ticket>::new()));
+
+        let ticket = create_valid_ticket();
+        let channel = create_channel_entry();
+
+        let ret = validate_unacknowledged_ticket(
+            &db,
+            &ticket,
+            &channel,
+            &SENDER_PUB,
+            Balance::from_str("2", BalanceType::HOPR),
+            U256::one(),
+            true,
+        )
+        .await;
+
+        assert!(ret.is_err());
+        match ret.unwrap_err() {
+            PacketError::TicketValidation(_) => {}
+            _ => panic!("invalid error type"),
+        }
+    }
+
+    #[async_std::test]
+    async fn test_ticket_validation_should_fail_if_ticket_chance_is_low() {
+        let mut db = MockDb::new();
+        db.expect_get_tickets().returning(|_| Ok(Vec::<Ticket>::new()));
+
+        let mut ticket = create_valid_ticket();
+        ticket.win_prob = U256::from_inverse_probability(2u32.into()).unwrap();
+        ticket.sign(&SENDER_PRIV_KEY);
+
+        let channel = create_channel_entry();
+
+        let ret = validate_unacknowledged_ticket(
+            &db,
+            &ticket,
+            &channel,
+            &SENDER_PUB,
+            Balance::from_str("1", BalanceType::HOPR),
+            U256::one(),
+            true,
+        )
+        .await;
+
+        assert!(ret.is_err());
+        match ret.unwrap_err() {
+            PacketError::TicketValidation(_) => {}
+            _ => panic!("invalid error type"),
+        }
+    }
+
+    #[async_std::test]
+    async fn test_ticket_validation_should_fail_if_channel_is_closed() {
+        let mut db = MockDb::new();
+        db.expect_get_tickets().returning(|_| Ok(Vec::<Ticket>::new()));
+
+        let ticket = create_valid_ticket();
+        let mut channel = create_channel_entry();
+        channel.status = ChannelStatus::Closed;
+
+        let ret = validate_unacknowledged_ticket(
+            &db,
+            &ticket,
+            &channel,
+            &SENDER_PUB,
+            Balance::from_str("1", BalanceType::HOPR),
+            U256::one(),
+            true,
+        )
+        .await;
+
+        assert!(ret.is_err());
+        match ret.unwrap_err() {
+            PacketError::TicketValidation(_) => {}
+            _ => panic!("invalid error type"),
+        }
+    }
+
+    #[async_std::test]
+    async fn test_ticket_validation_should_fail_if_ticket_epoch_does_not_match() {
+        let mut db = MockDb::new();
+        db.expect_get_tickets().returning(|_| Ok(Vec::<Ticket>::new()));
+
+        let ticket = create_valid_ticket();
+        let mut channel = create_channel_entry();
+        channel.ticket_epoch = 2u32.into();
+
+        let ret = validate_unacknowledged_ticket(
+            &db,
+            &ticket,
+            &channel,
+            &SENDER_PUB,
+            Balance::from_str("1", BalanceType::HOPR),
+            U256::one(),
+            true,
+        )
+        .await;
+
+        assert!(ret.is_err());
+        match ret.unwrap_err() {
+            PacketError::TicketValidation(_) => {}
+            _ => panic!("invalid error type"),
+        }
+    }
+
+    #[async_std::test]
+    async fn test_ticket_validation_should_fail_if_ticket_epoch_does_not_match_2() {
+        let mut db = MockDb::new();
+        db.expect_get_tickets().returning(|_| Ok(Vec::<Ticket>::new()));
+
+        let mut ticket = create_valid_ticket();
+        ticket.channel_epoch = 2u32.into();
+        ticket.sign(&SENDER_PRIV_KEY);
+
+        let channel = create_channel_entry();
+
+        let ret = validate_unacknowledged_ticket(
+            &db,
+            &ticket,
+            &channel,
+            &SENDER_PUB,
+            Balance::from_str("1", BalanceType::HOPR),
+            U256::one(),
+            true,
+        )
+        .await;
+
+        assert!(ret.is_err());
+        match ret.unwrap_err() {
+            PacketError::TicketValidation(_) => {}
+            _ => panic!("invalid error type"),
+        }
+    }
+
+    #[async_std::test]
+    async fn test_ticket_validation_ok_if_ticket_index_smaller_than_channel_index() {
+        let mut db = MockDb::new();
+        db.expect_get_tickets().returning(|_| Ok(Vec::<Ticket>::new()));
+
+        let ticket = create_valid_ticket();
+        let mut channel = create_channel_entry();
+        channel.ticket_index = 2u32.into();
+
+        let ret = validate_unacknowledged_ticket(
+            &db,
+            &ticket,
+            &channel,
+            &SENDER_PUB,
+            Balance::from_str("1", BalanceType::HOPR),
+            U256::one(),
+            true,
+        )
+        .await;
+
+        assert!(ret.is_ok());
+    }
+
+    #[async_std::test]
+    async fn test_ticket_validation_ok_if_ticket_idx_smaller_than_channel_idx_unredeemed() {
+        let mut db_ticket = create_valid_ticket();
+        db_ticket.amount = Balance::from_str("100", BalanceType::HOPR);
+        db_ticket.index = 2u32.into();
+        db_ticket.sign(&SENDER_PRIV_KEY);
+
+        let mut db = MockDb::new();
+        db.expect_get_tickets().returning(move |_| Ok(vec![db_ticket.clone()]));
+
+        let ticket = create_valid_ticket();
+        let mut channel = create_channel_entry();
+        channel.balance = Balance::from_str("200", BalanceType::HOPR);
+
+        let ret = validate_unacknowledged_ticket(
+            &db,
+            &ticket,
+            &channel,
+            &SENDER_PUB,
+            Balance::from_str("1", BalanceType::HOPR),
+            U256::one(),
+            true,
+        )
+        .await;
+
+        assert!(ret.is_ok());
+    }
+
+    #[async_std::test]
+    async fn test_ticket_validation_fail_if_does_not_have_funds() {
+        let mut db = MockDb::new();
+        db.expect_get_tickets().returning(|_| Ok(Vec::<Ticket>::new()));
+
+        let ticket = create_valid_ticket();
+        let mut channel = create_channel_entry();
+        channel.balance = Balance::zero(BalanceType::HOPR);
+
+        let ret = validate_unacknowledged_ticket(
+            &db,
+            &ticket,
+            &channel,
+            &SENDER_PUB,
+            Balance::from_str("1", BalanceType::HOPR),
+            U256::one(),
+            true,
+        )
+        .await;
+
+        assert!(ret.is_err());
+        match ret.unwrap_err() {
+            PacketError::OutOfFunds(_) => {}
+            _ => panic!("invalid error type"),
+        }
+    }
+
+    #[async_std::test]
+    async fn test_ticket_validation_fail_if_does_not_have_funds_including_unredeemed() {
+        let mut db_ticket = create_valid_ticket();
+        db_ticket.amount = Balance::from_str("200", BalanceType::HOPR);
+        db_ticket.sign(&SENDER_PRIV_KEY);
+
+        let mut db = MockDb::new();
+        db.expect_get_tickets().returning(move |_| Ok(vec![db_ticket.clone()]));
+
+        let ticket = create_valid_ticket();
+        let channel = create_channel_entry();
+
+        let ret = validate_unacknowledged_ticket(
+            &db,
+            &ticket,
+            &channel,
+            &SENDER_PUB,
+            Balance::from_str("1", BalanceType::HOPR),
+            U256::one(),
+            true,
+        )
+        .await;
+
+        assert!(ret.is_err());
+        match ret.unwrap_err() {
+            PacketError::OutOfFunds(_) => {}
+            _ => panic!("invalid error type"),
+        }
+    }
+
+    #[async_std::test]
+    async fn test_ticket_validation_ok_if_does_not_have_funds_including_unredeemed() {
+        let mut db_ticket = create_valid_ticket();
+        db_ticket.amount = Balance::from_str("200", BalanceType::HOPR);
+        db_ticket.sign(&SENDER_PRIV_KEY);
+
+        let mut db = MockDb::new();
+        db.expect_get_tickets().returning(move |_| Ok(vec![db_ticket.clone()]));
+
+        let ticket = create_valid_ticket();
+        let channel = create_channel_entry();
+
+        let ret = validate_unacknowledged_ticket(
+            &db,
+            &ticket,
+            &channel,
+            &SENDER_PUB,
+            Balance::from_str("1", BalanceType::HOPR),
+            U256::one(),
+            false,
+        )
+        .await;
+
         assert!(ret.is_ok());
     }
 }

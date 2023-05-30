@@ -1,6 +1,5 @@
 use crate::errors::PacketError::{
-    AcknowledgementValidation, ChannelNotFound, InvalidPacketState, OutOfFunds, TagReplay,
-    TransportError,
+    AcknowledgementValidation, ChannelNotFound, InvalidPacketState, OutOfFunds, TagReplay, TransportError,
 };
 use crate::errors::Result;
 use crate::packet::{Packet, PacketState};
@@ -18,9 +17,9 @@ use utils_log::{debug, error, info};
 use utils_types::primitives::{Balance, BalanceType, U256};
 use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
 
+use crate::validation::validate_unacknowledged_ticket;
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::SimpleCounter;
-use crate::validation::validate_unacknowledged_ticket;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -467,15 +466,16 @@ where
                     .ok_or(ChannelNotFound(previous_hop.to_string()))?;
 
                 // Validate the ticket first
-                if let Err(e) = validate_unacknowledged_ticket::<Db>(self.db.lock().unwrap().deref(),
-                        &packet.ticket,
-                        &channel,
-                        &previous_hop,
-                        Balance::from_str(PRICE_PER_PACKET, BalanceType::HOPR),
-                        inverse_win_prob,
-                        self.cfg.check_unrealized_balance
-                    )
-                    .await
+                if let Err(e) = validate_unacknowledged_ticket::<Db>(
+                    self.db.lock().unwrap().deref(),
+                    &packet.ticket,
+                    &channel,
+                    &previous_hop,
+                    Balance::from_str(PRICE_PER_PACKET, BalanceType::HOPR),
+                    inverse_win_prob,
+                    self.cfg.check_unrealized_balance,
+                )
+                .await
                 {
                     // Mark as reject and passthrough the error
                     self.db.lock().unwrap().mark_rejected(&packet.ticket).await?;
@@ -620,13 +620,13 @@ mod tests {
     use hex_literal::hex;
     use lazy_static::lazy_static;
     use libp2p_identity::PeerId;
+    use mockall::mock;
     use serial_test::serial;
     use std::collections::HashMap;
     use std::ops::Mul;
     use std::str::FromStr;
     use std::sync::{Arc, Mutex};
     use std::time::Duration;
-    use mockall::mock;
     use utils_db::db::DB;
     use utils_db::errors::DbError;
     use utils_db::leveldb::rusty::RustyLevelDbShim;
@@ -805,7 +805,11 @@ mod tests {
                     remote_peer: m.from,
                     data: m.data,
                 }) {
-                    debug!("received ack from {}: {}", payload.remote_peer, hex::encode(&payload.data));
+                    debug!(
+                        "received ack from {}: {}",
+                        payload.remote_peer,
+                        hex::encode(&payload.data)
+                    );
                     interaction
                         .received_acknowledgement(payload)
                         .await
@@ -835,8 +839,15 @@ mod tests {
                     remote_peer: m.from,
                     data: m.data,
                 }) {
-                    debug!("received packet from {}: {}", payload.remote_peer, hex::encode(&payload.data));
-                    interaction.received_packet(payload).await.expect("failed to receive ack");
+                    debug!(
+                        "received packet from {}: {}",
+                        payload.remote_peer,
+                        hex::encode(&payload.data)
+                    );
+                    interaction
+                        .received_packet(payload)
+                        .await
+                        .expect("failed to receive ack");
                 }
                 async_std::task::sleep(Duration::from_millis(200)).await;
             }
