@@ -96,13 +96,26 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
         }
     }
 
-    /// Pushes the `Payload` received from the transport layer into procesing.
-    pub async fn received_acknowledgement(&self, payload: Payload) -> Result<()> {
-        self.incoming_channel
-            .0
-            .send(payload)
-            .await
-            .map_err(|e| TransportError(e.to_string()))
+    /// Pushes the `Payload` received from the transport layer into processing.
+    /// If `wait` is `true`, the method waits if the RX queue is full until there's space.
+    /// If `wait` is `false` and the RX queue is full, the method fails with `Err(Retry)`. At this point, the
+    /// caller can decide whether to discard the acknowledgement.
+    pub async fn received_acknowledgement(&self, payload: Payload, wait: bool) -> Result<()> {
+        if wait {
+            self.incoming_channel
+                .0
+                .send(payload)
+                .await
+                .map_err(|e| TransportError(e.to_string()))
+        } else {
+            self.incoming_channel
+                .0
+                .try_send(payload)
+                .map_err(|e| match e {
+                    TrySendError::Full(_) => Retry,
+                    TrySendError::Closed(_) => TransportError("queue is closed".to_string())
+                })
+        }
     }
 
     /// Pushes a new outgoing acknowledgement into the processing given its destination.
@@ -641,19 +654,30 @@ where
         info!("done processing packets")
     }
 
-
-    pub async fn received_packet(&self, payload: Payload) -> Result<()> {
-        self.incoming_packets
-            .0
-            .send(payload)
-            .await
-            .map_err(|e| TransportError(e.to_string()))
+    /// Pushes the `Payload` received from the transport layer into processing.
+    /// If `wait` is `true`, the method waits if the RX queue is full until there's space.
+    /// If `wait` is `false` and the RX queue is full, the method fails with `Err(Retry)`. At this point, the
+    /// caller can decide whether to discard the packet.
+    pub async fn received_packet(&self, payload: Payload, wait: bool) -> Result<()> {
+        if wait {
+            self.incoming_packets
+                .0
+                .send(payload)
+                .await
+                .map_err(|e| TransportError(e.to_string()))
+        } else {
+            self.incoming_packets
+                .0
+                .try_send(payload)
+                .map_err(|e| match e {
+                    TrySendError::Full(_) => Retry,
+                    TrySendError::Closed(_) => TransportError("queue is closed".to_string())
+                })
+        }
     }
 
-    pub fn start(&self) {
-        unimplemented!("implement this when migrated to rust libp2p")
-    }
-
+    /// Stop processing of TX and RQ queues.
+    /// Cannot be restarted once stopped.
     pub fn stop(&self) {
         self.incoming_packets.0.close();
         self.incoming_packets.1.close();
@@ -876,7 +900,7 @@ mod tests {
                         hex::encode(&payload.data)
                     );
                     interaction
-                        .received_acknowledgement(payload)
+                        .received_acknowledgement(payload, false)
                         .await
                         .expect("failed to receive ack");
                 }
@@ -910,7 +934,7 @@ mod tests {
                         hex::encode(&payload.data)
                     );
                     interaction
-                        .received_packet(payload)
+                        .received_packet(payload, false)
                         .await
                         .expect("failed to receive ack");
                 }
@@ -1498,13 +1522,13 @@ pub mod wasm {
         }
 
         pub async fn received_acknowledgement(&self, payload: Payload) -> JsResult<()> {
-            ok_or_jserr!(self.w.received_acknowledgement(payload).await)
+            ok_or_jserr!(self.w.received_acknowledgement(payload, false).await)
         }
 
         pub async fn send_acknowledgement(&self, ack: Acknowledgement, dest: String) -> JsResult<()> {
             ok_or_jserr!(
                 self.w
-                    .send_acknowledgement(ack, ok_or_jserr!(PeerId::from_str(&dest))?, true)
+                    .send_acknowledgement(ack, ok_or_jserr!(PeerId::from_str(&dest))?, false)
                     .await
             )
         }
@@ -1553,11 +1577,11 @@ pub mod wasm {
         }
 
         pub async fn received_packet(&self, payload: Payload) -> JsResult<()> {
-            ok_or_jserr!(self.w.received_packet(payload).await)
+            ok_or_jserr!(self.w.received_packet(payload, false).await)
         }
 
         pub async fn send_packet(&self, msg: &[u8], path: Path) -> JsResult<HalfKeyChallenge> {
-            ok_or_jserr!(self.w.send_packet(msg, path, true).await)
+            ok_or_jserr!(self.w.send_packet(msg, path, false).await)
         }
 
         pub async fn handle_outgoing_packets(&self, transport_cb: &js_sys::Function) {
