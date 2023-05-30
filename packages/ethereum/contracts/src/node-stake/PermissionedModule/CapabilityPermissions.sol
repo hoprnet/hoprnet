@@ -44,11 +44,24 @@ struct Role {
 }
 
 /**
- * @dev Simplified zodiac-modifier-roles-v1 Permission.sol contract
- * This library supports only one role, and it's tailor made for interacting
- * with HoprChannels and HoprToken contracts
+ * @dev Drawing inspiration from the `zodiac-modifier-roles-v1` `Permission.sol` contract, 
+ * this library is designed to support a single role and offers a set of helper functions 
+ * derived from it. 
+ *
+ * It is specifically tailored for interaction with HoprChannels and HoprToken contracts. 
+ * Additionally, it enables the transfer of native tokens to designated addresses, 
+ * while restricting the invocation of payable functions.
+ * 
+ * Some difference between this library and the original `Permission.sol` contract are:
+ * - This library is designed to support a single role
+ * - No `DelegateCall` is allowed
+ * - Target must be one of the three types: Token, Channels, Send
+ * - Only scoped functions are allowed. No more wildcard
+ * - Calling payable function is not allowed.
+ * - When calling HoprChannels contracts, permission is check with multiple parameters together
+ * - For Channels targets, the default permission is ALLOWED. However, the default value for other targets is BLOCKED.
  */
-library SimplifiedPermissions {
+library HoprCapabilityPermissions {
     // HoprChannels method ids (TargetType.Channels)
     bytes4 internal constant FUND_CHANNEL_MULTI_SELECTOR = hex"4341abdd";
     bytes4 internal constant REDEEM_TICKET_SELECTOR = hex"0475568e";
@@ -101,7 +114,6 @@ library SimplifiedPermissions {
     /// Role not allowed to call target when its type is not set
     error TargetTypeNotSet();
 
-
     /// Role not allowed to send to target address
     error SendNotAllowed();
 
@@ -113,7 +125,6 @@ library SimplifiedPermissions {
 
     /// The provided calldata for execution is too short, or an OutOfBounds scoped parameter was configured
     error CalldataOutOfBounds();
-
 
 
     // ======================================================
@@ -230,13 +241,8 @@ library SimplifiedPermissions {
             checkHoprChannelsParameters(role, targetAddress, data);
             return;
         } else if (target.targetType == TargetType.Send) {
-            if (role.sendCapability[targetAddress] != SendPermission.Allowed) {
-                // not allowed to call the capability
-                revert ParameterNotAllowed();
-            }
+            checkSendParameters(role, targetAddress, data.length);
             return;
-        } else {
-
         }
     }
 
@@ -337,6 +343,27 @@ library SimplifiedPermissions {
             (address src, address dest) = pluckSendPayload(data, 2);
             // check if functions on this channel can be called.
             compareHoprChannelsPermission(role, sendCapabilityKey, src, dest);
+        }
+    }
+
+    /**
+     * @dev Checks the parameters for sending native tokens.
+     * @param role The Role storage instance.
+     * @param targetAddress The target address for the send operation.
+     * @param dataLength The length of the data associated with the send operation.
+     */
+    function checkSendParameters(
+        Role storage role,
+        address targetAddress,
+        uint256 dataLength
+    ) internal view {
+        if (role.sendCapability[targetAddress] != SendPermission.Allowed) {
+            // not allowed to send
+            revert SendNotAllowed();
+        }
+        if (dataLength > 0) {
+            // not allowed to call payable functions
+            revert ParameterNotAllowed();
         }
     }
 
