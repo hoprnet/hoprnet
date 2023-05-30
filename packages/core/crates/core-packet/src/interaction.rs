@@ -1,4 +1,7 @@
-use crate::errors::PacketError::{AcknowledgementValidation, ChannelNotFound, InvalidPacketState, OutOfFunds, PathNotValid, Retry, TagReplay, TransportError};
+use crate::errors::PacketError::{
+    AcknowledgementValidation, ChannelNotFound, InvalidPacketState, OutOfFunds, PathNotValid, Retry, TagReplay,
+    TransportError,
+};
 use crate::errors::Result;
 use crate::packet::{Packet, PacketState};
 use crate::path::Path;
@@ -83,7 +86,6 @@ pub struct AcknowledgementInteraction<Db: HoprCoreEthereumDbActions> {
 }
 
 impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
-
     /// Creates a new instance given the DB and our public key used to verify the acknowledgements.
     pub fn new(db: Arc<Mutex<Db>>, public_key: PublicKey) -> Self {
         Self {
@@ -108,20 +110,22 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
                 .await
                 .map_err(|e| TransportError(e.to_string()))
         } else {
-            self.incoming_channel
-                .0
-                .try_send(payload)
-                .map_err(|e| match e {
-                    TrySendError::Full(_) => Retry,
-                    TrySendError::Closed(_) => TransportError("queue is closed".to_string())
-                })
+            self.incoming_channel.0.try_send(payload).map_err(|e| match e {
+                TrySendError::Full(_) => Retry,
+                TrySendError::Closed(_) => TransportError("queue is closed".to_string()),
+            })
         }
     }
 
     /// Pushes a new outgoing acknowledgement into the processing given its destination.
     /// If `wait` is `true`, the method waits if the TX queue is full until there's space.
     /// If `wait` is `false` and the TX queue is full, the method fails with `Err(Retry)`
-    pub async fn send_acknowledgement(&self, acknowledgement: Acknowledgement, destination: PeerId, wait: bool) -> Result<()> {
+    pub async fn send_acknowledgement(
+        &self,
+        acknowledgement: Acknowledgement,
+        destination: PeerId,
+        wait: bool,
+    ) -> Result<()> {
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_SENT_ACKS.increment();
 
@@ -143,7 +147,7 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
                 })
                 .map_err(|e| match e {
                     TrySendError::Full(_) => Retry,
-                    TrySendError::Closed(_) => TransportError("queue is closed".to_string())
+                    TrySendError::Closed(_) => TransportError("queue is closed".to_string()),
                 })
         }
     }
@@ -420,7 +424,7 @@ where
     pub async fn send_packet(&self, msg: &[u8], path: Path, wait: bool) -> Result<HalfKeyChallenge> {
         // Check if the path is valid
         if !path.valid() {
-            return Err(PathNotValid)
+            return Err(PathNotValid);
         }
 
         // Decide whether to create 0-hop or multihop ticket
@@ -428,8 +432,7 @@ where
         let next_ticket = if path.length() == 1 {
             Ticket::new_zero_hop(next_peer, &self.cfg.private_key)
         } else {
-            self.create_multihop_ticket(next_peer, path.length() as u8)
-                .await?
+            self.create_multihop_ticket(next_peer, path.length() as u8).await?
         };
 
         // Create the packet
@@ -463,7 +466,7 @@ where
                         })
                         .map_err(|e| match e {
                             TrySendError::Full(_) => Retry,
-                            TrySendError::Closed(_) => TransportError("queue is closed".to_string())
+                            TrySendError::Closed(_) => TransportError("queue is closed".to_string()),
                         })?;
                 }
                 Ok(ack_challenge.clone())
@@ -666,13 +669,10 @@ where
                 .await
                 .map_err(|e| TransportError(e.to_string()))
         } else {
-            self.incoming_packets
-                .0
-                .try_send(payload)
-                .map_err(|e| match e {
-                    TrySendError::Full(_) => Retry,
-                    TrySendError::Closed(_) => TransportError("queue is closed".to_string())
-                })
+            self.incoming_packets.0.try_send(payload).map_err(|e| match e {
+                TrySendError::Full(_) => Retry,
+                TrySendError::Closed(_) => TransportError("queue is closed".to_string()),
+            })
         }
     }
 
@@ -1059,7 +1059,7 @@ mod tests {
                 .send_acknowledgement(
                     Acknowledgement::new(ack_msg, ack_key, &PEERS_PRIVS[1]),
                     PEERS[0].clone(),
-                    false
+                    false,
                 )
                 .await
                 .expect("failed to send ack");
@@ -1436,10 +1436,10 @@ pub mod wasm {
     use utils_log::error;
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
+    use utils_types::traits::BinarySerializable;
     use wasm_bindgen::prelude::wasm_bindgen;
     use wasm_bindgen::JsCast;
     use wasm_bindgen::JsValue;
-    use utils_types::traits::BinarySerializable;
 
     #[wasm_bindgen]
     impl Payload {
@@ -1495,13 +1495,19 @@ pub mod wasm {
 
     #[wasm_bindgen]
     impl WasmAckInteraction {
-        pub fn new(db: LevelDb, chain_key: PublicKey, on_ack: js_sys::Function, on_ack_ticket: js_sys::Function) -> Self {
+        pub fn new(
+            db: LevelDb,
+            chain_key: PublicKey,
+            on_ack: js_sys::Function,
+            on_ack_ticket: js_sys::Function,
+        ) -> Self {
             let mut ack = AcknowledgementInteraction::new(
                 Arc::new(Mutex::new(CoreEthereumDb::new(
                     DB::new(LevelDbShim::new(db)),
                     chain_key.clone(),
                 ))),
-                chain_key);
+                chain_key,
+            );
             ack.on_acknowledgement = Box::new(move |h| {
                 let this = JsValue::null();
                 let param: JsValue = Uint8Array::from(h.to_bytes().as_ref()).into();
