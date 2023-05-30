@@ -1,23 +1,24 @@
 use crate::errors::PacketError::{
-    AcknowledgementValidation, ChannelNotFound, InvalidPacketState, OutOfFunds, TagReplay, TicketValidation,
+    AcknowledgementValidation, ChannelNotFound, InvalidPacketState, OutOfFunds, PathNotValid, Retry, TagReplay,
     TransportError,
 };
 use crate::errors::Result;
 use crate::packet::{Packet, PacketState};
 use crate::path::Path;
-use async_std::channel::{bounded, Receiver, Sender};
+use async_std::channel::{bounded, Receiver, Sender, TrySendError};
 use core_crypto::types::{HalfKeyChallenge, Hash, PublicKey};
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_mixer::mixer::{Mixer, MixerConfig};
 use core_types::acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket};
-use core_types::channels::{ChannelEntry, ChannelStatus, Ticket};
+use core_types::channels::Ticket;
 use libp2p_identity::PeerId;
-use std::ops::Mul;
+use std::ops::{Deref, Mul};
 use std::sync::{Arc, Mutex};
 use utils_log::{debug, error, info};
 use utils_types::primitives::{Balance, BalanceType, U256};
 use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
 
+use crate::validation::validate_unacknowledged_ticket;
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::SimpleCounter;
 
@@ -47,66 +48,117 @@ lazy_static::lazy_static! {
         SimpleCounter::new("core_counter_packets", "Number of created packets").unwrap();
 }
 
+/// Fixed price per packet to 0.01 HOPR
 pub const PRICE_PER_PACKET: &str = "10000000000000000";
+/// Fixed inverse ticket winning probability
 pub const INVERSE_TICKET_WIN_PROB: &str = "1";
+
 const PREIMAGE_PLACE_HOLDER: [u8; Hash::SIZE] = [0xffu8; Hash::SIZE];
 
+/// Represents a payload (packet or acknowledgement) at the transport level.
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Payload {
     remote_peer: PeerId,
     data: Box<[u8]>,
 }
 
+// Default sizes of the acknowledgement queues
 const ACK_TX_QUEUE_SIZE: usize = 2048;
 const ACK_RX_QUEUE_SIZE: usize = 2048;
 
+/// Implements protocol acknowledgement logic
+/// Maintains TX and RX queues of `Payload` with the serialized `Acknowledgement` type.
+/// Processing of each queue can be executed using `handle_incoming_acknowledgement` and
+/// `handle_outgoing_acknowledgements` methods.
+/// When a new acknowledgement is delivered from the transport the `received_acknowledgement`
+/// method is used to push it into the processing queue of incoming acknowledgements.
+/// Whan a new acknowledgement is about to be sent, the `send_acknowledgement` method is used
+/// to push it into the processing queue of outgoing acknowledgements.
+/// When no more processing needs to be done, the instance should be stopped via the `stop` method.
+/// Once the instance is stopped, it cannot be restarted.
 pub struct AcknowledgementInteraction<Db: HoprCoreEthereumDbActions> {
     db: Arc<Mutex<Db>>,
-    pub on_acknowledgement: Box<dyn Fn(HalfKeyChallenge)>,
-    pub on_acknowledged_ticket: Box<dyn Fn(AcknowledgedTicket)>,
+    // TODO: remove closures and use Sender<T> to allow the type to be Send + Sync
+    pub on_acknowledgement: Option<Sender<HalfKeyChallenge>>,
+    pub on_acknowledged_ticket: Option<Sender<AcknowledgedTicket>>,
     public_key: PublicKey,
     incoming_channel: (Sender<Payload>, Receiver<Payload>),
     outgoing_channel: (Sender<Payload>, Receiver<Payload>),
 }
 
 impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
-    pub fn new(db: Arc<Mutex<Db>>, public_key: PublicKey) -> Self {
+    /// Creates a new instance given the DB and our public key used to verify the acknowledgements.
+    pub fn new(
+        db: Arc<Mutex<Db>>,
+        public_key: PublicKey,
+        on_acknowledgement: Option<Sender<HalfKeyChallenge>>,
+        on_acknowledged_ticket: Option<Sender<AcknowledgedTicket>>,
+    ) -> Self {
         Self {
             db,
             public_key,
             incoming_channel: bounded(ACK_RX_QUEUE_SIZE),
             outgoing_channel: bounded(ACK_TX_QUEUE_SIZE),
-            on_acknowledgement: Box::new(|_| {}),
-            on_acknowledged_ticket: Box::new(|_| {}),
+            on_acknowledgement,
+            on_acknowledged_ticket,
         }
     }
 
-    pub fn get_peer_id(&self) -> PeerId {
-        self.public_key.to_peerid()
+    /// Pushes the `Payload` received from the transport layer into processing.
+    /// If `wait` is `true`, the method waits if the RX queue is full until there's space.
+    /// If `wait` is `false` and the RX queue is full, the method fails with `Err(Retry)`. At this point, the
+    /// caller can decide whether to discard the acknowledgement.
+    pub async fn received_acknowledgement(&self, payload: Payload, wait: bool) -> Result<()> {
+        if wait {
+            self.incoming_channel
+                .0
+                .send(payload)
+                .await
+                .map_err(|e| TransportError(e.to_string()))
+        } else {
+            self.incoming_channel.0.try_send(payload).map_err(|e| match e {
+                TrySendError::Full(_) => Retry,
+                TrySendError::Closed(_) => TransportError("queue is closed".to_string()),
+            })
+        }
     }
 
-    pub async fn received_acknowledgement(&self, payload: Payload) -> Result<()> {
-        self.incoming_channel
-            .0
-            .send(payload)
-            .await
-            .map_err(|e| TransportError(e.to_string()))
-    }
-
-    pub async fn send_acknowledgement(&self, acknowledgement: Acknowledgement, destination: PeerId) -> Result<()> {
+    /// Pushes a new outgoing acknowledgement into the processing given its destination.
+    /// If `wait` is `true`, the method waits if the TX queue is full until there's space.
+    /// If `wait` is `false` and the TX queue is full, the method fails with `Err(Retry)`
+    pub async fn send_acknowledgement(
+        &self,
+        acknowledgement: Acknowledgement,
+        destination: PeerId,
+        wait: bool,
+    ) -> Result<()> {
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_SENT_ACKS.increment();
 
-        self.outgoing_channel
-            .0
-            .send(Payload {
-                remote_peer: destination,
-                data: acknowledgement.to_bytes(),
-            })
-            .await
-            .map_err(|e| TransportError(e.to_string()))
+        if wait {
+            self.outgoing_channel
+                .0
+                .send(Payload {
+                    remote_peer: destination,
+                    data: acknowledgement.to_bytes(),
+                })
+                .await
+                .map_err(|_| TransportError("queue is closed".to_string()))
+        } else {
+            self.outgoing_channel
+                .0
+                .try_send(Payload {
+                    remote_peer: destination,
+                    data: acknowledgement.to_bytes(),
+                })
+                .map_err(|e| match e {
+                    TrySendError::Full(_) => Retry,
+                    TrySendError::Closed(_) => TransportError("queue is closed".to_string()),
+                })
+        }
     }
 
+    /// Start processing the incoming acknowledgement queue.
     pub async fn handle_incoming_acknowledgements(&self) {
         while let Ok(payload) = self.incoming_channel.1.recv().await {
             match Acknowledgement::from_bytes(&payload.data) {
@@ -126,6 +178,7 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
         info!("done processing incoming acknowledgements");
     }
 
+    /// Start processing the outgoing acknowledgement queue given the transport function.
     pub async fn handle_outgoing_acknowledgements<T, F>(&self, message_transport: &T)
     where
         T: Fn(Box<[u8]>, String) -> F,
@@ -139,10 +192,8 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
         info!("done processing outgoing acknowledgements")
     }
 
-    pub fn start(&self) {
-        unimplemented!("implement this when migrated to rust libp2p")
-    }
-
+    /// Stop processing of TX and RQ queues.
+    /// Cannot be restarted once stopped.
     pub fn stop(&self) {
         self.incoming_channel.0.close();
         self.incoming_channel.1.close();
@@ -188,7 +239,11 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
             PendingAcknowledgement::WaitingAsSender => {
                 // No pending ticket, nothing to do.
                 debug!("received acknowledgement as sender: first relayer has processed the packet.");
-                (self.on_acknowledgement)(ack.ack_challenge());
+                if let Some(emitter) = &self.on_acknowledgement {
+                    if let Err(e) = emitter.try_send(ack.ack_challenge()) {
+                        error!("failed to emit received acknowledgement: {e}")
+                    }
+                }
 
                 #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_RECEIVED_SUCCESSFUL_ACKS.increment();
@@ -238,13 +293,18 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
                 #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_ACKED_TICKETS.increment();
 
-                (self.on_acknowledged_ticket)(ack_ticket);
+                if let Some(emitter) = &self.on_acknowledged_ticket {
+                    if let Err(e) = emitter.try_send(ack_ticket) {
+                        error!("failed to emit acknowledged ticket: {e}");
+                    }
+                }
             }
         }
         Ok(())
     }
 }
 
+/// Configuration parameters for the packet interaction.
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Clone, Debug)]
 pub struct PacketInteractionConfig {
@@ -253,9 +313,20 @@ pub struct PacketInteractionConfig {
     pub mixer: MixerConfig,
 }
 
+// Default sizes of the packet queues
 const PACKET_TX_QUEUE_SIZE: usize = 2048;
 const PACKET_RX_QUEUE_SIZE: usize = 2048;
 
+/// Implements packet processing logic
+/// Maintains TX and RX queues of `Payload` with the serialized `Packet` type.
+/// Processing of each queue can be executed using `handle_incoming_packets` and
+/// `handle_outgoing_packets` methods.
+/// When a new packet is delivered from the transport the `received_packet`
+/// method is used to push it into the processing queue of incoming packets.
+/// Whan a new acknowledgement is about to be sent, the `send_packet` method is used
+/// to push it into the processing queue of outgoing packets.
+/// When no more processing needs to be done, the instance should be stopped via the `stop` method.
+/// Once the instance is stopped, it cannot be restarted.
 pub struct PacketInteraction<Db>
 where
     Db: HoprCoreEthereumDbActions,
@@ -263,7 +334,7 @@ where
     db: Arc<Mutex<Db>>,
     incoming_packets: (Sender<Payload>, Receiver<Payload>),
     outgoing_packets: (Sender<Payload>, Receiver<Payload>),
-    pub message_emitter: Box<dyn Fn(&[u8])>,
+    pub on_final_packet: Option<Sender<Box<[u8]>>>,
     pub mixer: Mixer<Payload>,
     cfg: PacketInteractionConfig,
 }
@@ -272,95 +343,16 @@ impl<Db> PacketInteraction<Db>
 where
     Db: HoprCoreEthereumDbActions,
 {
-    pub fn new(db: Arc<Mutex<Db>>, cfg: PacketInteractionConfig) -> Self {
+    /// Creates a new instance given the DB and configuration.
+    pub fn new(db: Arc<Mutex<Db>>, on_final_packet: Option<Sender<Box<[u8]>>>, cfg: PacketInteractionConfig) -> Self {
         Self {
             db,
             incoming_packets: bounded(PACKET_RX_QUEUE_SIZE),
             outgoing_packets: bounded(PACKET_TX_QUEUE_SIZE),
-            message_emitter: Box::new(|_| {}),
+            on_final_packet,
             mixer: Mixer::new(cfg.mixer.clone()),
             cfg,
         }
-    }
-
-    pub async fn validate_unacknowledged_ticket(
-        &self,
-        sender: &PublicKey,
-        min_ticket_amount: Balance,
-        req_inverse_ticket_win_prob: U256,
-        ticket: &Ticket,
-        channel: &ChannelEntry,
-    ) -> Result<()> {
-        let required_win_prob = U256::from_inverse_probability(req_inverse_ticket_win_prob)?;
-
-        // ticket signer MUST be the sender
-        ticket
-            .verify(sender)
-            .map_err(|e| TicketValidation(format!("ticket signer does not match the sender: {e}")))?;
-
-        // ticket amount MUST be greater or equal to minTicketAmount
-        if !ticket.amount.gte(&min_ticket_amount) {
-            return Err(TicketValidation(format!(
-                "ticket amount {} in not at least {min_ticket_amount}",
-                ticket.amount
-            )));
-        }
-
-        // ticket MUST have match X winning probability
-        if !ticket.win_prob.eq(&required_win_prob) {
-            return Err(TicketValidation(format!(
-                "ticket winning probability {} is not equal to {required_win_prob}",
-                ticket.win_prob
-            )));
-        }
-
-        // channel MUST be open or pending to close
-        if channel.status == ChannelStatus::Closed {
-            return Err(TicketValidation(format!(
-                "payment channel with {sender} is not opened or pending to close"
-            )));
-        }
-
-        // ticket's epoch MUST match our channel's epoch
-        if !ticket.epoch.eq(&channel.ticket_epoch) {
-            return Err(TicketValidation(format!(
-                "ticket epoch {} does not match our account epoch {} of channel {}",
-                ticket.epoch,
-                channel.ticket_epoch,
-                channel.get_id()
-            )));
-        }
-
-        // ticket's channelEpoch MUST match the current channel's epoch
-        if !ticket.channel_epoch.eq(&channel.channel_epoch) {
-            return Err(TicketValidation(format!(
-                "ticket was created for a different channel iteration {} != {} of channel {}",
-                ticket.channel_epoch,
-                channel.channel_epoch,
-                channel.get_id()
-            )));
-        }
-
-        if self.cfg.check_unrealized_balance {
-            info!("checking unrealized balances for channel {}", channel.get_id());
-
-            let unrealized_balance = self
-                .db
-                .lock()
-                .unwrap()
-                .get_tickets(sender)
-                .await? // all tickets from sender
-                .into_iter()
-                .filter(|t| t.epoch.eq(&channel.ticket_epoch) && t.channel_epoch.eq(&channel.channel_epoch))
-                .fold(channel.balance, |result, t| result.sub(&t.amount));
-
-            // ensure sender has enough funds
-            if ticket.amount.gt(&unrealized_balance) {
-                return Err(OutOfFunds(channel.get_id().to_string()));
-            }
-        }
-
-        Ok(())
     }
 
     async fn bump_ticket_index(&self, channel_id: &Hash) -> Result<U256> {
@@ -419,7 +411,6 @@ where
 
         let ticket = Ticket::new(
             destination.to_address(),
-            None,
             channel.ticket_epoch,
             current_index,
             amount,
@@ -441,18 +432,25 @@ where
         Ok(ticket)
     }
 
-    pub async fn send_outgoing_packet(&self, msg: &[u8], complete_valid_path: Path) -> Result<HalfKeyChallenge> {
+    /// Pushes the packet with the given payload for sending via the given valid path.
+    /// If `wait` is `true`, the method waits if the TX queue is full until there's space.
+    /// If `wait` is `false` and the TX queue is full, the method fails with `Err(Retry)`
+    pub async fn send_packet(&self, msg: &[u8], path: Path, wait: bool) -> Result<HalfKeyChallenge> {
+        // Check if the path is valid
+        if !path.valid() {
+            return Err(PathNotValid);
+        }
+
         // Decide whether to create 0-hop or multihop ticket
-        let next_peer = PublicKey::from_peerid(&complete_valid_path.hops()[0])?;
-        let next_ticket = if complete_valid_path.length() == 1 {
-            Ticket::new_zero_hop(next_peer, None, &self.cfg.private_key)
+        let next_peer = PublicKey::from_peerid(&path.hops()[0])?;
+        let next_ticket = if path.length() == 1 {
+            Ticket::new_zero_hop(next_peer, &self.cfg.private_key)
         } else {
-            self.create_multihop_ticket(next_peer, complete_valid_path.length() as u8)
-                .await?
+            self.create_multihop_ticket(next_peer, path.length() as u8).await?
         };
 
         // Create the packet
-        let packet = Packet::new(msg, &complete_valid_path.hops(), &self.cfg.private_key, next_ticket)?;
+        let packet = Packet::new(msg, &path.hops(), &self.cfg.private_key, next_ticket)?;
         match packet.state() {
             PacketState::Outgoing { ack_challenge, .. } => {
                 self.db
@@ -464,15 +462,27 @@ where
                 #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_PACKETS_COUNT.increment();
 
-                self.outgoing_packets
-                    .0
-                    .send(Payload {
-                        remote_peer: complete_valid_path.hops()[0].clone(),
-                        data: packet.to_bytes(),
-                    })
-                    .await
-                    .map_err(|e| TransportError(e.to_string()))?;
-
+                if wait {
+                    self.outgoing_packets
+                        .0
+                        .send(Payload {
+                            remote_peer: path.hops()[0].clone(),
+                            data: packet.to_bytes(),
+                        })
+                        .await
+                        .map_err(|_| TransportError("queue is closed".to_string()))?;
+                } else {
+                    self.outgoing_packets
+                        .0
+                        .try_send(Payload {
+                            remote_peer: path.hops()[0].clone(),
+                            data: packet.to_bytes(),
+                        })
+                        .map_err(|e| match e {
+                            TrySendError::Full(_) => Retry,
+                            TrySendError::Closed(_) => TransportError("queue is closed".to_string()),
+                        })?;
+                }
                 Ok(ack_challenge.clone())
             }
             _ => panic!("invalid packet state"),
@@ -508,12 +518,17 @@ where
                 }
 
                 // We're the destination of the packet, so emit the packet contents
-                (self.message_emitter)(plain_text.as_ref());
+                if let Some(emitter) = &self.on_final_packet {
+                    // Can we avoid cloning plain_text here ?
+                    if let Err(e) = emitter.try_send(plain_text.clone()) {
+                        error!("failed to emit received final packet: {e}");
+                    }
+                }
 
                 // And create acknowledgement
                 let ack = packet.create_acknowledgement(&self.cfg.private_key).unwrap();
                 ack_interaction
-                    .send_acknowledgement(ack, previous_hop.to_peerid())
+                    .send_acknowledgement(ack, previous_hop.to_peerid(), true)
                     .await?;
 
                 #[cfg(all(feature = "prometheus", not(test)))]
@@ -547,15 +562,16 @@ where
                     .ok_or(ChannelNotFound(previous_hop.to_string()))?;
 
                 // Validate the ticket first
-                if let Err(e) = self
-                    .validate_unacknowledged_ticket(
-                        &previous_hop,
-                        Balance::from_str(PRICE_PER_PACKET, BalanceType::HOPR),
-                        inverse_win_prob,
-                        &packet.ticket,
-                        &channel,
-                    )
-                    .await
+                if let Err(e) = validate_unacknowledged_ticket::<Db>(
+                    self.db.lock().unwrap().deref(),
+                    &packet.ticket,
+                    &channel,
+                    &previous_hop,
+                    Balance::from_str(PRICE_PER_PACKET, BalanceType::HOPR),
+                    inverse_win_prob,
+                    self.cfg.check_unrealized_balance,
+                )
+                .await
                 {
                     // Mark as reject and passthrough the error
                     self.db.lock().unwrap().mark_rejected(&packet.ticket).await?;
@@ -588,7 +604,7 @@ where
 
                 // Create next ticket for the packet
                 next_ticket = if path_pos == 1 {
-                    Ticket::new_zero_hop(next_hop.clone(), None, &self.cfg.private_key)
+                    Ticket::new_zero_hop(next_hop.clone(), &self.cfg.private_key)
                 } else {
                     self.create_multihop_ticket(next_hop.clone(), path_pos).await?
                 };
@@ -607,7 +623,7 @@ where
 
         // Acknowledge to the previous hop that we forwarded the packet
         let ack = packet.create_acknowledgement(&self.cfg.private_key).unwrap();
-        ack_interaction.send_acknowledgement(ack, previous_peer).await?;
+        ack_interaction.send_acknowledgement(ack, previous_peer, true).await?;
 
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_FWD_MESSAGE_COUNT.increment();
@@ -615,6 +631,7 @@ where
         Ok(())
     }
 
+    /// Starts handling of the outgoing packets using the given transport.
     pub async fn handle_outgoing_packets<T, F>(&self, message_transport: &T)
     where
         T: Fn(Box<[u8]>, String) -> F,
@@ -629,6 +646,8 @@ where
         info!("done sending packets")
     }
 
+    /// Starts handling of the incoming packets using the given transport.
+    /// The given acknowledgement interaction is used perform acknowledgements.
     pub async fn handle_incoming_packets<T, F>(
         &self,
         ack_interaction: Arc<AcknowledgementInteraction<Db>>,
@@ -657,18 +676,27 @@ where
         info!("done processing packets")
     }
 
-    pub async fn received_packet(&self, payload: Payload) -> Result<()> {
-        self.incoming_packets
-            .0
-            .send(payload)
-            .await
-            .map_err(|e| TransportError(e.to_string()))
+    /// Pushes the `Payload` received from the transport layer into processing.
+    /// If `wait` is `true`, the method waits if the RX queue is full until there's space.
+    /// If `wait` is `false` and the RX queue is full, the method fails with `Err(Retry)`. At this point, the
+    /// caller can decide whether to discard the packet.
+    pub async fn received_packet(&self, payload: Payload, wait: bool) -> Result<()> {
+        if wait {
+            self.incoming_packets
+                .0
+                .send(payload)
+                .await
+                .map_err(|e| TransportError(e.to_string()))
+        } else {
+            self.incoming_packets.0.try_send(payload).map_err(|e| match e {
+                TrySendError::Full(_) => Retry,
+                TrySendError::Closed(_) => TransportError("queue is closed".to_string()),
+            })
+        }
     }
 
-    pub fn start(&self) {
-        unimplemented!("implement this when migrated to rust libp2p")
-    }
-
+    /// Stop processing of TX and RQ queues.
+    /// Cannot be restarted once stopped.
     pub fn stop(&self) {
         self.incoming_packets.0.close();
         self.incoming_packets.1.close();
@@ -700,6 +728,7 @@ mod tests {
     use hex_literal::hex;
     use lazy_static::lazy_static;
     use libp2p_identity::PeerId;
+    use mockall::mock;
     use serial_test::serial;
     use std::collections::HashMap;
     use std::ops::Mul;
@@ -813,16 +842,12 @@ mod tests {
             .collect::<Vec<_>>()
     }
 
-    struct EmptyChainCommiter {}
-
-    #[async_trait(? Send)]
-    impl ChainCommitter for EmptyChainCommiter {
-        async fn get_commitment(&self) -> Option<Hash> {
-            None
-        }
-
-        async fn set_commitment(&mut self, _commitment: &Hash) -> String {
-            "".to_string()
+    mock! {
+        pub Commiter { }
+        #[async_trait(? Send)]
+        impl ChainCommitter for Commiter {
+            async fn get_commitment(&self) -> Option<Hash>;
+            async fn set_commitment(&mut self, _commitment: &Hash) -> String;
         }
     }
 
@@ -864,7 +889,11 @@ mod tests {
                     channel_epoch: previous_channel.clone().unwrap().channel_epoch.clone(),
                 };
 
-                initialize_commitment(&mut db, &PEERS_PRIVS[0], &channel_info, &mut EmptyChainCommiter {})
+                let mut commiter = MockCommiter::new();
+                commiter.expect_get_commitment().return_const(None);
+                commiter.expect_set_commitment().return_const("");
+
+                initialize_commitment(&mut db, &PEERS_PRIVS[0], &channel_info, &mut commiter)
                     .await
                     .map_err(|e| PacketDbError(DbError::GenericError(e.to_string())))?;
             }
@@ -884,9 +913,13 @@ mod tests {
                     remote_peer: m.from,
                     data: m.data,
                 }) {
-                    debug!("received ack from {}: {}", payload.remote_peer, hex::encode(&payload.data));
+                    debug!(
+                        "received ack from {}: {}",
+                        payload.remote_peer,
+                        hex::encode(&payload.data)
+                    );
                     interaction
-                        .received_acknowledgement(payload)
+                        .received_acknowledgement(payload, false)
                         .await
                         .expect("failed to receive ack");
                 }
@@ -914,8 +947,15 @@ mod tests {
                     remote_peer: m.from,
                     data: m.data,
                 }) {
-                    debug!("received packet from {}: {}", payload.remote_peer, hex::encode(&payload.data));
-                    interaction.received_packet(payload).await.expect("failed to receive ack");
+                    debug!(
+                        "received packet from {}: {}",
+                        payload.remote_peer,
+                        hex::encode(&payload.data)
+                    );
+                    interaction
+                        .received_packet(payload, false)
+                        .await
+                        .expect("failed to receive ack");
                 }
                 async_std::task::sleep(Duration::from_millis(200)).await;
             }
@@ -992,31 +1032,13 @@ mod tests {
             sent_challenges.push((ack_key, ack_msg));
         }
 
-        // Peer 1: This is mimics the ACK interaction of the packet sender
-        let mut tmp_ack =
-            AcknowledgementInteraction::new(core_dbs[0].clone(), PublicKey::from_peerid(&PEERS[0]).unwrap());
-
-        // ... which is just waiting to get an acknowledgement from the counterparty
-        let expected_challenges = sent_challenges.clone();
-        tmp_ack.on_acknowledgement = Box::new(move |ack| {
-            debug!("sender has received acknowledgement: {}", ack.to_hex());
-            if let Some((ack_key, ack_msg)) = expected_challenges
-                .iter()
-                .find(|(_, chal)| chal.ack_challenge.unwrap().eq(&ack))
-            {
-                assert!(
-                    ack_msg.solve(&ack_key.to_bytes()),
-                    "acknowledgement key must solve acknowledgement challenge"
-                );
-
-                // If it matches, set a signal that the test has finished
-                done_tx.send_blocking(()).expect("send failed");
-                debug!("peer 1 received expected ack");
-            }
-        });
-
-        // Peer 1: hookup receiving of acknowledgements and start processing them
-        let ack_interaction_sender = Arc::new(tmp_ack);
+        // Peer 1: ACK interaction of the packet sender, hookup receiving of acknowledgements and start processing them
+        let ack_interaction_sender = Arc::new(AcknowledgementInteraction::new(
+            core_dbs[0].clone(),
+            PublicKey::from_peerid(&PEERS[0]).unwrap(),
+            Some(done_tx),
+            None,
+        ));
         spawn_ack_receive::<_, 0>(ack_interaction_sender.clone());
         spawn_ack_handling(ack_interaction_sender.clone());
 
@@ -1024,6 +1046,8 @@ mod tests {
         let ack_interaction_counterparty = Arc::new(AcknowledgementInteraction::new(
             core_dbs[1].clone(),
             PublicKey::from_peerid(&PEERS[1]).unwrap(),
+            None,
+            None,
         ));
 
         // Peer 2: start sending out outgoing acknowledgement
@@ -1033,11 +1057,12 @@ mod tests {
 
         ////
 
-        for (ack_key, ack_msg) in sent_challenges {
+        for (ack_key, ack_msg) in sent_challenges.clone() {
             ack_interaction_counterparty
                 .send_acknowledgement(
                     Acknowledgement::new(ack_msg, ack_key, &PEERS_PRIVS[1]),
                     PEERS[0].clone(),
+                    false,
                 )
                 .await
                 .expect("failed to send ack");
@@ -1045,7 +1070,20 @@ mod tests {
 
         let finish = async move {
             for i in 1..PENDING_ACKS + 1 {
-                done_rx.recv().await.expect("failed finalize ack");
+                let ack = done_rx.recv().await.expect("failed finalize ack");
+                debug!("sender has received acknowledgement: {}", ack.to_hex());
+                if let Some((ack_key, ack_msg)) = sent_challenges
+                    .iter()
+                    .find(|(_, chal)| chal.ack_challenge.unwrap().eq(&ack))
+                {
+                    assert!(
+                        ack_msg.solve(&ack_key.to_bytes()),
+                        "acknowledgement key must solve acknowledgement challenge"
+                    );
+
+                    // If it matches, set a signal that the test has finished
+                    debug!("peer 1 received expected ack");
+                }
                 debug!("done ack #{i} out of {PENDING_ACKS}");
             }
         };
@@ -1074,12 +1112,8 @@ mod tests {
 
         init_transport();
 
-        enum AckOrPacket {
-            Ack,
-            Packet,
-        }
-
-        let (done_tx, done_rx) = async_std::channel::unbounded();
+        let (pkt_tx, pkt_rx) = async_std::channel::unbounded();
+        let (ack_tx, ack_rx) = async_std::channel::unbounded();
 
         let dbs = create_dbs(3);
 
@@ -1102,6 +1136,7 @@ mod tests {
         // Peer 1 (sender): just sends packets over Peer 2 to Peer 3, ignores acknowledgements from Peer 2
         let packet_sender = Arc::new(PacketInteraction::new(
             core_dbs[0].clone(),
+            None,
             PacketInteractionConfig {
                 check_unrealized_balance: true,
                 private_key: PEERS_PRIVS[0].into(),
@@ -1110,21 +1145,16 @@ mod tests {
         ));
         spawn_pkt_send::<_, 0>(packet_sender.clone());
 
-        // Peer 2 (relayer): awaits acknowledgements of relayer packets to Peer 3
-        let mut tmp_ack =
-            AcknowledgementInteraction::new(core_dbs[1].clone(), PublicKey::from_peerid(&PEERS[1]).unwrap());
-        let done_tx_clone = done_tx.clone();
-        tmp_ack.on_acknowledged_ticket = Box::new(move |ack| {
-            debug!("relayer has received acknowledged ticket from {}", ack.signer);
-            done_tx_clone
-                .send_blocking(AckOrPacket::Ack)
-                .expect("failed to confirm ack");
-        });
-
-        // Peer 2: packet interaction for the relayer
-        let ack_interaction_relayer = Arc::new(tmp_ack);
+        // Peer 2 (relayer): relays packets to Peer 3 and awaits acknowledgements of relayer packets to Peer 3
+        let ack_interaction_relayer = Arc::new(AcknowledgementInteraction::new(
+            core_dbs[1].clone(),
+            PublicKey::from_peerid(&PEERS[1]).unwrap(),
+            None,
+            Some(ack_tx),
+        ));
         let pkt_interaction_relayer = Arc::new(PacketInteraction::new(
             core_dbs[1].clone(),
+            None,
             PacketInteractionConfig {
                 check_unrealized_balance: true,
                 private_key: PEERS_PRIVS[1].into(),
@@ -1139,27 +1169,21 @@ mod tests {
         spawn_ack_receive::<_, 1>(ack_interaction_relayer.clone());
 
         // Peer 3: Recipient of the packet and sender of the acknowledgement
-        let mut tmp_pkt_counterparty = PacketInteraction::new(
+        let ack_interaction_counterparty = Arc::new(AcknowledgementInteraction::new(
             core_dbs[2].clone(),
+            PublicKey::from_peerid(&PEERS[2]).unwrap(),
+            None,
+            None,
+        ));
+        let pkt_interaction_counterparty = Arc::new(PacketInteraction::new(
+            core_dbs[2].clone(),
+            Some(pkt_tx),
             PacketInteractionConfig {
                 check_unrealized_balance: true,
                 private_key: PEERS_PRIVS[2].into(),
                 mixer: MixerConfig::default(),
             },
-        );
-        tmp_pkt_counterparty.message_emitter = Box::new(move |msg: &[u8]| {
-            debug!("received message: {}", hex::encode(msg));
-            assert_eq!(TEST_MESSAGE, msg, "received packet payload must match");
-            done_tx
-                .send_blocking(AckOrPacket::Packet)
-                .expect("failed to confirm pkt");
-        });
-
-        let ack_interaction_counterparty = Arc::new(AcknowledgementInteraction::new(
-            core_dbs[2].clone(),
-            PublicKey::from_peerid(&PEERS[2]).unwrap(),
         ));
-        let pkt_interaction_counterparty = Arc::new(tmp_pkt_counterparty);
 
         // Peer 3: start packet interaction at the recipient and start sending out acknowledgement
         spawn_pkt_handling::<_, 2>(
@@ -1172,7 +1196,7 @@ mod tests {
         // Peer 1: start sending out packets
         for _ in 0..PENDING_PACKETS {
             packet_sender
-                .send_outgoing_packet(&TEST_MESSAGE, packet_path.clone())
+                .send_packet(&TEST_MESSAGE, packet_path.clone(), false)
                 .await
                 .unwrap();
         }
@@ -1183,14 +1207,16 @@ mod tests {
         let finish = async move {
             let (mut acks, mut pkts) = (0, 0);
             for _ in 1..2 * PENDING_PACKETS + 1 {
-                match done_rx.recv().await.expect("failed finalize ack") {
-                    AckOrPacket::Ack => {
+                match select(ack_rx.recv(), pkt_rx.recv()).await {
+                    Either::Left((ack, _)) => {
+                        debug!("relayer has received acknowledged ticket from {}", ack.unwrap().signer);
                         acks += 1;
-                        debug!("done ack tickets #{acks} out of {PENDING_PACKETS}");
                     }
-                    AckOrPacket::Packet => {
+                    Either::Right((pkt, _)) => {
+                        let msg = pkt.unwrap();
+                        debug!("received message: {}", hex::encode(msg.clone()));
+                        assert_eq!(TEST_MESSAGE, msg.as_ref(), "received packet payload must match");
                         pkts += 1;
-                        debug!("done msg #{pkts} out of {PENDING_PACKETS}");
                     }
                 }
             }
@@ -1228,7 +1254,7 @@ mod tests {
 
         init_transport();
 
-        let (done_tx, done_rx) = async_std::channel::unbounded();
+        let (pkt_tx, pkt_rx) = async_std::channel::unbounded();
 
         let dbs = create_dbs(5);
 
@@ -1250,9 +1276,11 @@ mod tests {
         let packet_path = Path::new_valid(PEERS[1..].to_vec());
         assert_eq!(4, packet_path.length(), "path has invalid length");
 
+        let mut interactions = vec![];
         // -------------- Peer 1: sender
         let packet_sender = Arc::new(PacketInteraction::new(
             core_dbs[0].clone(),
+            None,
             PacketInteractionConfig {
                 check_unrealized_balance: true,
                 private_key: PEERS_PRIVS[0].into(),
@@ -1261,13 +1289,18 @@ mod tests {
         ));
         spawn_pkt_send::<_, 0>(packet_sender.clone());
 
+        interactions.push((Some(packet_sender.clone()), None));
+
         // -------------- Peer 2: relayer
         let ack_1 = Arc::new(AcknowledgementInteraction::new(
             core_dbs[1].clone(),
             PublicKey::from_peerid(&PEERS[1]).unwrap(),
+            None,
+            None,
         ));
         let pkt_1 = Arc::new(PacketInteraction::new(
             core_dbs[1].clone(),
+            None,
             PacketInteractionConfig {
                 check_unrealized_balance: true,
                 private_key: PEERS_PRIVS[1].into(),
@@ -1281,13 +1314,18 @@ mod tests {
         spawn_ack_receive::<_, 1>(ack_1.clone());
         spawn_ack_send::<_, 1>(ack_1.clone());
 
+        interactions.push((Some(pkt_1), Some(ack_1)));
+
         // -------------- Peer 3: relayer
         let ack_2 = Arc::new(AcknowledgementInteraction::new(
             core_dbs[2].clone(),
             PublicKey::from_peerid(&PEERS[2]).unwrap(),
+            None,
+            None,
         ));
         let pkt_2 = Arc::new(PacketInteraction::new(
             core_dbs[2].clone(),
+            None,
             PacketInteractionConfig {
                 check_unrealized_balance: true,
                 private_key: PEERS_PRIVS[2].into(),
@@ -1301,13 +1339,18 @@ mod tests {
         spawn_ack_receive::<_, 2>(ack_2.clone());
         spawn_ack_send::<_, 2>(ack_2.clone());
 
+        interactions.push((Some(pkt_2), Some(ack_2)));
+
         // -------------- Peer 4: relayer
         let ack_3 = Arc::new(AcknowledgementInteraction::new(
             core_dbs[3].clone(),
             PublicKey::from_peerid(&PEERS[3]).unwrap(),
+            None,
+            None,
         ));
         let pkt_3 = Arc::new(PacketInteraction::new(
             core_dbs[3].clone(),
+            None,
             PacketInteractionConfig {
                 check_unrealized_balance: true,
                 private_key: PEERS_PRIVS[3].into(),
@@ -1321,26 +1364,24 @@ mod tests {
         spawn_ack_receive::<_, 3>(ack_3.clone());
         spawn_ack_send::<_, 3>(ack_3.clone());
 
+        interactions.push((Some(pkt_3), Some(ack_3)));
+
         // -------------- Peer 5: recipient
         let ack_4 = Arc::new(AcknowledgementInteraction::new(
             core_dbs[4].clone(),
             PublicKey::from_peerid(&PEERS[4]).unwrap(),
+            None,
+            None,
         ));
-        let mut tmp_pkt = PacketInteraction::new(
+        let pkt_4 = Arc::new(PacketInteraction::new(
             core_dbs[4].clone(),
+            Some(pkt_tx),
             PacketInteractionConfig {
                 check_unrealized_balance: true,
                 private_key: PEERS_PRIVS[4].into(),
                 mixer: MixerConfig::default(),
             },
-        );
-        tmp_pkt.message_emitter = Box::new(move |data| {
-            assert_eq!(TEST_MESSAGE, data, "message body mismatch");
-            done_tx.send_blocking(()).expect("failed to report message receipt");
-            debug!("received packet at the recipient: {}", hex::encode(data));
-        });
-
-        let pkt_4 = Arc::new(tmp_pkt);
+        ));
 
         spawn_pkt_handling::<_, 4>(pkt_4.clone(), ack_4.clone());
         spawn_pkt_receive::<_, 4>(pkt_4.clone());
@@ -1348,12 +1389,13 @@ mod tests {
         //spawn_ack_receive::<_, 4>(ack_4.clone());
         spawn_ack_send::<_, 4>(ack_4.clone());
 
+        interactions.push((Some(pkt_4), Some(ack_4)));
         // --------------
 
         // Start sending packets
         for _ in 0..PENDING_PACKETS {
             packet_sender
-                .send_outgoing_packet(&TEST_MESSAGE, packet_path.clone())
+                .send_packet(&TEST_MESSAGE, packet_path.clone(), true)
                 .await
                 .unwrap();
         }
@@ -1361,7 +1403,9 @@ mod tests {
         // Check that we received all packets
         let finish = async move {
             for _ in 1..PENDING_PACKETS + 1 {
-                done_rx.recv().await.expect("failed finalize packet");
+                let data = pkt_rx.recv().await.expect("failed finalize packet");
+                assert_eq!(TEST_MESSAGE, data.as_ref(), "message body mismatch");
+                debug!("received packet at the recipient: {}", hex::encode(data));
             }
         };
 
@@ -1374,14 +1418,10 @@ mod tests {
         };
 
         terminate_transport();
-        pkt_1.stop();
-        ack_1.stop();
-        pkt_2.stop();
-        ack_2.stop();
-        pkt_3.stop();
-        ack_3.stop();
-        pkt_4.stop();
-        ack_4.stop();
+        interactions.into_iter().for_each(|(pkt, ack)| {
+            pkt.map(|v| v.stop());
+            ack.map(|v| v.stop());
+        });
 
         async_std::task::sleep(Duration::from_secs(1)).await; // Let everything shutdown
 
@@ -1393,11 +1433,12 @@ mod tests {
 pub mod wasm {
     use crate::interaction::{AcknowledgementInteraction, PacketInteraction, PacketInteractionConfig, Payload};
     use crate::path::Path;
+    use async_std::channel::unbounded;
     use core_crypto::types::{HalfKeyChallenge, PublicKey};
     use core_ethereum_db::db::CoreEthereumDb;
     use core_mixer::mixer::Mixer;
-    use core_types::acknowledgement::Acknowledgement;
-    use js_sys::JsString;
+    use core_types::acknowledgement::{AcknowledgedTicket, Acknowledgement};
+    use js_sys::{JsString, Uint8Array};
     use libp2p_identity::PeerId;
     use std::future::Future;
     use std::pin::Pin;
@@ -1408,6 +1449,7 @@ pub mod wasm {
     use utils_log::error;
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
+    use utils_types::traits::BinarySerializable;
     use wasm_bindgen::prelude::wasm_bindgen;
     use wasm_bindgen::JsCast;
     use wasm_bindgen::JsValue;
@@ -1466,7 +1508,44 @@ pub mod wasm {
 
     #[wasm_bindgen]
     impl WasmAckInteraction {
-        pub fn new(db: LevelDb, chain_key: PublicKey) -> Self {
+        pub fn new(
+            db: LevelDb,
+            chain_key: PublicKey,
+            on_acknowledgement: Option<js_sys::Function>,
+            on_acknowledged_ticket: Option<js_sys::Function>,
+        ) -> Self {
+            let on_ack = on_acknowledgement.is_some().then(unbounded::<HalfKeyChallenge>).unzip();
+            let on_ack_ticket = on_acknowledged_ticket
+                .is_some()
+                .then(unbounded::<AcknowledgedTicket>)
+                .unzip();
+
+            if let Some(ack_recv) = on_ack.1 {
+                wasm_bindgen_futures::spawn_local(async move {
+                    let this = JsValue::null();
+                    let cb = on_acknowledgement.unwrap();
+                    while let Ok(ack) = ack_recv.recv().await {
+                        let param: JsValue = Uint8Array::from(ack.to_bytes().as_ref()).into();
+                        if let Err(e) = cb.call1(&this, &param) {
+                            error!("failed to call on_ack closure: {:?}", e.as_string());
+                        }
+                    }
+                });
+            }
+
+            if let Some(ack_tkt_recv) = on_ack_ticket.1 {
+                wasm_bindgen_futures::spawn_local(async move {
+                    let this = JsValue::null();
+                    let cb = on_acknowledged_ticket.unwrap();
+                    while let Ok(ack) = ack_tkt_recv.recv().await {
+                        let param: JsValue = Uint8Array::from(ack.to_bytes().as_ref()).into();
+                        if let Err(e) = cb.call1(&this, &param) {
+                            error!("failed to call on_ack_ticket closure: {:?}", e.as_string());
+                        }
+                    }
+                });
+            }
+
             Self {
                 w: Arc::new(AcknowledgementInteraction::new(
                     Arc::new(Mutex::new(CoreEthereumDb::new(
@@ -1474,18 +1553,20 @@ pub mod wasm {
                         chain_key.clone(),
                     ))),
                     chain_key,
+                    on_ack.0,
+                    on_ack_ticket.0,
                 )),
             }
         }
 
         pub async fn received_acknowledgement(&self, payload: Payload) -> JsResult<()> {
-            ok_or_jserr!(self.w.received_acknowledgement(payload).await)
+            ok_or_jserr!(self.w.received_acknowledgement(payload, false).await)
         }
 
         pub async fn send_acknowledgement(&self, ack: Acknowledgement, dest: String) -> JsResult<()> {
             ok_or_jserr!(
                 self.w
-                    .send_acknowledgement(ack, ok_or_jserr!(PeerId::from_str(&dest))?)
+                    .send_acknowledgement(ack, ok_or_jserr!(PeerId::from_str(&dest))?, false)
                     .await
             )
         }
@@ -1512,26 +1593,44 @@ pub mod wasm {
     #[wasm_bindgen]
     impl WasmPacketInteraction {
         #[wasm_bindgen(constructor)]
-        pub fn new(db: LevelDb, cfg: PacketInteractionConfig) -> Self {
+        pub fn new(db: LevelDb, on_final_packet: Option<js_sys::Function>, cfg: PacketInteractionConfig) -> Self {
+            let on_msg = on_final_packet.is_some().then(unbounded::<Box<[u8]>>).unzip();
+
             // For WASM we need to create mixer with gloo-timers
             let gloo_mixer = Mixer::new_with_gloo_timers(cfg.mixer.clone());
+
             let mut w = PacketInteraction::new(
                 Arc::new(Mutex::new(CoreEthereumDb::new(
                     DB::new(LevelDbShim::new(db)),
                     PublicKey::from_privkey(&cfg.private_key).expect("invalid private key"),
                 ))),
+                on_msg.0,
                 cfg,
             );
             w.mixer = gloo_mixer;
+
+            if let Some(on_msg_recv) = on_msg.1 {
+                wasm_bindgen_futures::spawn_local(async move {
+                    let this = JsValue::null();
+                    let cb = on_final_packet.unwrap();
+                    while let Ok(ack) = on_msg_recv.recv().await {
+                        let param: JsValue = Uint8Array::from(ack.as_ref()).into();
+                        if let Err(e) = cb.call1(&this, &param) {
+                            error!("failed to call on_msg closure: {:?}", e.as_string());
+                        }
+                    }
+                });
+            }
+
             Self { w }
         }
 
         pub async fn received_packet(&self, payload: Payload) -> JsResult<()> {
-            ok_or_jserr!(self.w.received_packet(payload).await)
+            ok_or_jserr!(self.w.received_packet(payload, false).await)
         }
 
         pub async fn send_packet(&self, msg: &[u8], path: Path) -> JsResult<HalfKeyChallenge> {
-            ok_or_jserr!(self.w.send_outgoing_packet(msg, path).await)
+            ok_or_jserr!(self.w.send_packet(msg, path, false).await)
         }
 
         pub async fn handle_outgoing_packets(&self, transport_cb: &js_sys::Function) {

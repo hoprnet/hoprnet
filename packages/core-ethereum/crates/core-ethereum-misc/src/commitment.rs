@@ -50,7 +50,7 @@ pub async fn bump_commitment<T: HoprCoreEthereumDbActions>(
         .map_err(|e| DbError(e))
 }
 
-///
+/// Trait for retrieving and setting the commitment information from the chain
 #[cfg_attr(test, mockall::automock)]
 #[async_trait(? Send)]
 pub trait ChainCommitter {

@@ -1058,6 +1058,7 @@ dependencies = [
  "js-sys",
  "lazy_static",
  "libp2p-identity",
+ "mockall",
  "parameterized",
  "rusty-leveldb",
  "serial_test",

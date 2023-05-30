@@ -3,6 +3,7 @@ pub mod interaction;
 pub mod packet;
 pub mod path;
 pub mod por;
+pub mod validation;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {

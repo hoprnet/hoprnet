@@ -1,6 +1,9 @@
 use libp2p_identity::PeerId;
 use std::fmt::{Display, Formatter};
 
+/// Represents a path for a packet.
+/// The type internally carries an information if the path has been already validated or not (since path validation
+/// is potentially an expensive operation).
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug, Clone)]
 pub struct Path {
@@ -9,6 +12,7 @@ pub struct Path {
 }
 
 impl Path {
+    /// Creates an already pre-validated path.
     pub fn new_valid(validated_path: Vec<PeerId>) -> Self {
         Self {
             hops: validated_path,
@@ -16,14 +20,17 @@ impl Path {
         }
     }
 
+    /// Number of hops in the path.
     pub fn length(&self) -> usize {
         self.hops.len()
     }
 
+    /// Individual hops in the path.
     pub fn hops(&self) -> Vec<&PeerId> {
         self.hops.iter().collect::<Vec<_>>()
     }
 
+    /// Determines with the path is valid.
     pub fn valid(&self) -> bool {
         self.valid
     }
