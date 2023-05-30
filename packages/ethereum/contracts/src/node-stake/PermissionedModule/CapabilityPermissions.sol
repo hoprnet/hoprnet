@@ -44,15 +44,18 @@ struct Role {
 }
 
 /**
- * @dev Drawing inspiration from the `zodiac-modifier-roles-v1` `Permission.sol` contract, 
- * this library is designed to support a single role and offers a set of helper functions 
- * derived from it. 
+ * @dev Drawing inspiration from the `zodiac-modifier-roles-v1` `Permissions.sol` contract, 
+ * this library is designed to support a single role and offers a set of specific functions 
+ * for interacting with HoprChannels and HoprToken contracts
+ *
+ * Adapted from `Permissions.sol` at commit 454be9d3c26f90221ca717518df002d1eca1845f, which 
+ * was audited https://github.com/gnosis/zodiac-modifier-roles-v1/tree/main/packages/evm/docs
  *
  * It is specifically tailored for interaction with HoprChannels and HoprToken contracts. 
  * Additionally, it enables the transfer of native tokens to designated addresses, 
  * while restricting the invocation of payable functions.
  * 
- * Some difference between this library and the original `Permission.sol` contract are:
+ * Some difference between this library and the original `Permissions.sol` contract are:
  * - This library is designed to support a single role
  * - No `DelegateCall` is allowed
  * - Target must be one of the three types: Token, Channels, Send
@@ -60,6 +63,9 @@ struct Role {
  * - Calling payable function is not allowed.
  * - When calling HoprChannels contracts, permission is check with multiple parameters together
  * - For Channels targets, the default permission is ALLOWED. However, the default value for other targets is BLOCKED.
+ * - Permissions are not stored bitwise in `scopeConig` (uint256) due to lack of customization
+ * - Utility functions, such as `packLeft`, `packRight`, `unpackFunction`, `unpackParameter`, `checkExecutionOptions` are removed
+ * - Specific helper functions, such as `pluckOneStaticAddress`, `pluckTwoStaticAddresses`, `pluckDynamicAddresses`,  `pluckSendPayload` are derived from `pluckStaticValue` and `pluckDynamicValue`
  */
 library HoprCapabilityPermissions {
     // HoprChannels method ids (TargetType.Channels)
@@ -684,30 +690,6 @@ library HoprCapabilityPermissions {
 
         (address a, address b, , ) = abi.decode(slice(data, start, end), (address, address, uint256, uint256));
         return (a, b);
-    }
-
-    /**
-     * @dev Retrieves a static value from a given data byte array at the specified index.
-     * @param data The data byte array.
-     * @param index The index of the value to retrieve.
-     * @return value at the specified index.
-     */
-    function pluckStaticValue(
-        bytes memory data,
-        uint256 index
-    ) internal pure returns (bytes32) {
-        // pre-check: is there a word available for the current parameter at argumentsBlock?
-        if (data.length < 4 + index * 32 + 32) {
-            revert CalldataOutOfBounds();
-        }
-
-        uint256 offset = 4 + index * 32;
-        bytes32 value;
-        assembly {
-            // add 32 - jump over the length encoding of the data bytes array
-            value := mload(add(32, add(data, offset)))
-        }
-        return value;
     }
 
     /**
