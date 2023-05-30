@@ -5,9 +5,12 @@ import { ChannelEntry, Hash, ChannelStatus, defer, PublicKey } from '@hoprnet/ho
 import { expectAccountsToBeEqual, expectChannelsToBeEqual, PARTY_A, PARTY_B, PARTY_B_MULTIADDR } from './fixtures.js'
 import * as fixtures from './fixtures.js'
 import { type Event, IndexerStatus } from './types.js'
-import { useFixtures, useFixturesRs } from './index.mock.js'
+import { useFixtures } from './index.mock.js'
 import { SendTransactionStatus } from '../ethereum.js'
-// import { Database } from '../../lib/core_ethereum_db.js'
+import {
+  // ChannelEntry as Ethereum_ChannelEntry,
+  Hash as Ethereum_Hash
+} from '../../lib/core_ethereum_db.js'
 
 describe('test indexer', function () {
   it('should start indexer', async function () {
@@ -58,7 +61,7 @@ describe('test indexer', function () {
   })
 
   it('should process 1 past event', async function () {
-    const { indexer, OPENED_CHANNEL, chain, db } = await useFixturesRs({
+    const { indexer, OPENED_CHANNEL, chain, db } = await useFixtures({
       latestBlockNumber: 2,
       pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
     })
@@ -77,7 +80,7 @@ describe('test indexer', function () {
     const account = await indexer.getAccount(fixtures.PARTY_A().to_address())
     expectAccountsToBeEqual(account, fixtures.PARTY_A_INITIALIZED_ACCOUNT)
 
-    assert.rejects(() => db.get_channel(OPENED_CHANNEL.get_id()))
+    assert.rejects(() => db.get_channel(Ethereum_Hash.deserialize(OPENED_CHANNEL.get_id().serialize())))
   })
 
   it('should process all past events', async function () {
@@ -105,7 +108,7 @@ describe('test indexer', function () {
   })
 
   it('should continue processing events', async function () {
-    const { indexer, newEvent, newBlock, OPENED_CHANNEL, chain, db } = await useFixturesRs({
+    const { indexer, newEvent, newBlock, OPENED_CHANNEL, chain, db } = await useFixtures({
       latestBlockNumber: 3,
       pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT]
     })
@@ -127,7 +130,8 @@ describe('test indexer', function () {
 
     await blockProcessed.promise
 
-    const channel = await db.get_channel(OPENED_CHANNEL.get_id())
+    let hash = Ethereum_Hash.deserialize(OPENED_CHANNEL.get_id().serialize())
+    const channel = ChannelEntry.deserialize((await db.get_channel(hash)).serialize())
     expectChannelsToBeEqual(channel, OPENED_CHANNEL)
   })
 
@@ -153,7 +157,7 @@ describe('test indexer', function () {
   })
 
   it('should get all data from DB', async function () {
-    const { indexer, OPENED_CHANNEL, chain, db } = await useFixturesRs({
+    const { indexer, OPENED_CHANNEL, chain, db } = await useFixtures({
       latestBlockNumber: 4,
       pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
     })
@@ -380,7 +384,7 @@ describe('test indexer', function () {
   })
 
   it('should process events in the right order', async function () {
-    const { indexer, newEvent, newBlock, COMMITTED_CHANNEL, chain, db } = await useFixturesRs({
+    const { indexer, newEvent, newBlock, COMMITTED_CHANNEL, chain, db } = await useFixtures({
       latestBlockNumber: 3
     })
     await indexer.start(chain, 0)
@@ -410,7 +414,7 @@ describe('test indexer', function () {
   })
 
   it('should process TicketRedeemed event and reduce outstanding balance for sender', async function () {
-    const { indexer, newEvent, newBlock, chain, db } = await useFixturesRs({
+    const { indexer, newEvent, newBlock, chain, db } = await useFixtures({
       latestBlockNumber: 4,
       pastEvents: [
         fixtures.PARTY_A_INITIALIZED_EVENT,
@@ -446,7 +450,7 @@ describe('test indexer', function () {
   })
 
   it('should process TicketRedeemed event and not reduce outstanding balance for sender when db has no outstanding balance', async function () {
-    const { indexer, newEvent, newBlock, chain, db } = await useFixturesRs({
+    const { indexer, newEvent, newBlock, chain, db } = await useFixtures({
       latestBlockNumber: 4,
       pastEvents: [
         fixtures.PARTY_A_INITIALIZED_EVENT,
@@ -481,7 +485,7 @@ describe('test indexer', function () {
   })
 
   it('should process TicketRedeemed event and not reduce outstanding balance for recipient', async function () {
-    const { indexer, newEvent, newBlock, chain, db } = await useFixturesRs({
+    const { indexer, newEvent, newBlock, chain, db } = await useFixtures({
       latestBlockNumber: 4,
       pastEvents: [
         fixtures.PARTY_A_INITIALIZED_EVENT,
@@ -518,7 +522,7 @@ describe('test indexer', function () {
   })
 
   it('should process TicketRedeemed event and not reduce outstanding balance for a third node', async function () {
-    const { indexer, newEvent, newBlock, chain, db } = await useFixturesRs({
+    const { indexer, newEvent, newBlock, chain, db } = await useFixtures({
       latestBlockNumber: 4,
       pastEvents: [
         fixtures.PARTY_A_INITIALIZED_EVENT,
@@ -553,7 +557,7 @@ describe('test indexer', function () {
   })
 
   it('should process TicketRedeemed event and reduce outstanding balance to zero for sender when some history is missing', async function () {
-    const { indexer, newEvent, newBlock, chain, db } = await useFixturesRs({
+    const { indexer, newEvent, newBlock, chain, db } = await useFixtures({
       latestBlockNumber: 4,
       pastEvents: [
         fixtures.PARTY_A_INITIALIZED_EVENT,
@@ -589,7 +593,7 @@ describe('test indexer', function () {
   })
 
   it('should process Transfer events and reduce balance', async function () {
-    const { indexer, chain, newBlock, newTokenEvent, db } = await useFixturesRs({
+    const { indexer, chain, newBlock, newTokenEvent, db } = await useFixtures({
       latestBlockNumber: 0,
       pastEvents: [],
       id: fixtures.PARTY_A()
@@ -608,7 +612,7 @@ describe('test indexer', function () {
 
     await indexer.start(chain, 0)
 
-    assert.equal((await db.get_hopr_balance()).to_string(), '0')
+    assert.equal((await db.get_hopr_balance()).to_string(), '0 HOPR')
 
     // confirmations == 1
     newBlock()
@@ -623,11 +627,11 @@ describe('test indexer', function () {
 
     await thirdBlockProcessed.promise
 
-    assert.equal((await db.get_hopr_balance()).to_string(), '2')
+    assert.equal((await db.get_hopr_balance()).to_string(), '2 HOPR')
   })
 
   it('should process first 2 registry events and account be registered and eligible', async function () {
-    const { db, chain, indexer, newBlock } = await useFixturesRs({
+    const { db, chain, indexer, newBlock } = await useFixtures({
       latestBlockNumber: 10,
       pastHoprRegistryEvents: [fixtures.PARTY_A_REGISTERED, fixtures.PARTY_A_ELEGIBLE],
       id: fixtures.PARTY_A()
@@ -646,7 +650,7 @@ describe('test indexer', function () {
   })
 
   it('should process first 4 registry events and account not be eligible', async function () {
-    const { db, chain, indexer, newBlock } = await useFixturesRs({
+    const { db, chain, indexer, newBlock } = await useFixtures({
       latestBlockNumber: 10,
       pastHoprRegistryEvents: [fixtures.PARTY_A_REGISTERED, fixtures.PARTY_A_ELEGIBLE, fixtures.PARTY_A_NOT_ELEGIBLE],
       id: fixtures.PARTY_A()
@@ -665,7 +669,7 @@ describe('test indexer', function () {
   })
 
   it('should process all registry events and account not be registered but be eligible', async function () {
-    const { db, chain, indexer, newBlock } = await useFixturesRs({
+    const { db, chain, indexer, newBlock } = await useFixtures({
       latestBlockNumber: 10,
       pastHoprRegistryEvents: [
         fixtures.PARTY_A_REGISTERED,
@@ -690,7 +694,7 @@ describe('test indexer', function () {
   })
 
   it('should process register enabled', async function () {
-    const { db, chain, indexer, newBlock } = await useFixturesRs({
+    const { db, chain, indexer, newBlock } = await useFixtures({
       latestBlockNumber: 3,
       pastHoprRegistryEvents: [fixtures.REGISTER_ENABLED],
       id: fixtures.PARTY_A()
@@ -708,7 +712,7 @@ describe('test indexer', function () {
   })
 
   it('should process register disabled', async function () {
-    const { db, chain, indexer, newBlock } = await useFixturesRs({
+    const { db, chain, indexer, newBlock } = await useFixtures({
       latestBlockNumber: 3,
       pastHoprRegistryEvents: [fixtures.REGISTER_ENABLED, fixtures.REGISTER_DISABLED],
       id: fixtures.PARTY_A()

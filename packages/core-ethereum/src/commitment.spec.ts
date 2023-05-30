@@ -1,18 +1,21 @@
 import assert from 'assert'
 import { bumpCommitment, ChannelCommitmentInfo, findCommitmentPreImage, initializeCommitment } from './commitment.js'
 import sinon from 'sinon'
-import { Hash, HoprDB, privKeyToPeerId, stringToU8a, U256 } from '@hoprnet/hopr-utils'
+import {Hash, LevelDb, privKeyToPeerId, stringToU8a, U256} from '@hoprnet/hopr-utils'
 import type { PeerId } from '@libp2p/interface-peer-id'
+import { Database as Ethereum_Database, PublicKey as Ethereum_PublicKey } from '../lib/core_ethereum_db.js'
 
 describe('commitment', function () {
   let fakeSet: any, fakeGet: any, fakeDB: any
   let fakeKey: PeerId
   let fakeCommInfo: ChannelCommitmentInfo
   beforeEach(async function () {
+    const privateKey = stringToU8a('0x492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775')
+
     fakeSet = sinon.fake.resolves(undefined)
     fakeGet = sinon.fake.resolves(undefined)
-    fakeDB = HoprDB.createMock()
-    fakeKey = privKeyToPeerId(stringToU8a('0x492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775'))
+    fakeDB = new Ethereum_Database(new LevelDb(), Ethereum_PublicKey.from_privkey(privateKey))
+    fakeKey = privKeyToPeerId(privateKey)
     fakeCommInfo = new ChannelCommitmentInfo(
       1,
       'fakeaddress',

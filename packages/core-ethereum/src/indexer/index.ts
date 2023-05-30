@@ -46,7 +46,12 @@ import {
 import { isConfirmedBlock, snapshotComparator, type IndexerSnapshot, channelEntryFromSCEvent } from './utils.js'
 import { BigNumber, type Contract, errors } from 'ethers'
 import { CORE_ETHEREUM_CONSTANTS } from '../../lib/core_ethereum_misc.js'
-import { Database } from '../../lib/core_ethereum_db.js'
+
+import {
+  Database as Ethereum_Database,
+  Address as Ethereum_Address
+} from '../../lib/core_ethereum_db.js'
+
 import type { TypedEvent, TypedEventFilter } from '../utils/common.js'
 
 // @ts-ignore untyped library
@@ -111,7 +116,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
 
   constructor(
     private address: Address,
-    private db: Database,
+    private db: Ethereum_Database,
     private maxConfirmations: number,
     private blockRange: number
   ) {
@@ -502,7 +507,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     this.latestBlock = Math.max(this.latestBlock, blockNumber)
     metric_blockNumber.set(this.latestBlock)
 
-    let lastDatabaseSnapshot = await this.db.get_latest_confirmed_snapshot()
+    let lastDatabaseSnapshot = Snapshot.deserialize((await this.db.get_latest_confirmed_snapshot()).serialize())
 
     // settle transactions before processing events
     if (fetchNativeTxs) {
@@ -597,7 +602,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       if (
         // compare the current balance with the minimum balance required at the time of transaction being queued.
         // NB: Both gasLimit and maxFeePerGas requirement may be different due to "drastic" changes in contract state and network condition
-        new BN(currentBalance.to_string()).gte(minimumBalanceForQueuingTxs)
+        new BN(currentBalance.amount().to_string()).gte(minimumBalanceForQueuingTxs)
       ) {
         try {
           await Promise.all(
@@ -998,11 +1003,11 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   }
 
   public async getAccount(address: Address) {
-    return this.db.get_account(address)
+    return this.db.get_account(Ethereum_Address.deserialize(address.serialize()))
   }
 
   public async getPublicKeyOf(address: Address): Promise<PublicKey> {
-    const account = await this.db.get_account(address)
+    const account = await this.getAccount(address)
     if (account) {
       return account.public_key
     }

@@ -7,6 +7,7 @@ use ethers::{
     types::U256,
     utils::parse_units, //, types::U256, utils::format_units, ParseUnits
 };
+use std::str::FromStr;
 use log::{log, Level};
 use std::env;
 use utils_types::primitives::Address;
