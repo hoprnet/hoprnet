@@ -88,7 +88,12 @@ pub struct AcknowledgementInteraction<Db: HoprCoreEthereumDbActions> {
 
 impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
     /// Creates a new instance given the DB and our public key used to verify the acknowledgements.
-    pub fn new(db: Arc<Mutex<Db>>, public_key: PublicKey, on_acknowledgement: Option<Sender<HalfKeyChallenge>>, on_acknowledged_ticket: Option<Sender<AcknowledgedTicket>>) -> Self {
+    pub fn new(
+        db: Arc<Mutex<Db>>,
+        public_key: PublicKey,
+        on_acknowledgement: Option<Sender<HalfKeyChallenge>>,
+        on_acknowledged_ticket: Option<Sender<AcknowledgedTicket>>,
+    ) -> Self {
         Self {
             db,
             public_key,
@@ -1028,8 +1033,12 @@ mod tests {
         }
 
         // Peer 1: ACK interaction of the packet sender, hookup receiving of acknowledgements and start processing them
-        let ack_interaction_sender =
-            Arc::new(AcknowledgementInteraction::new(core_dbs[0].clone(), PublicKey::from_peerid(&PEERS[0]).unwrap(), Some(done_tx), None));
+        let ack_interaction_sender = Arc::new(AcknowledgementInteraction::new(
+            core_dbs[0].clone(),
+            PublicKey::from_peerid(&PEERS[0]).unwrap(),
+            Some(done_tx),
+            None,
+        ));
         spawn_ack_receive::<_, 0>(ack_interaction_sender.clone());
         spawn_ack_handling(ack_interaction_sender.clone());
 
@@ -1037,7 +1046,8 @@ mod tests {
         let ack_interaction_counterparty = Arc::new(AcknowledgementInteraction::new(
             core_dbs[1].clone(),
             PublicKey::from_peerid(&PEERS[1]).unwrap(),
-            None, None
+            None,
+            None,
         ));
 
         // Peer 2: start sending out outgoing acknowledgement
@@ -1136,7 +1146,12 @@ mod tests {
         spawn_pkt_send::<_, 0>(packet_sender.clone());
 
         // Peer 2 (relayer): relays packets to Peer 3 and awaits acknowledgements of relayer packets to Peer 3
-        let ack_interaction_relayer = Arc::new(AcknowledgementInteraction::new(core_dbs[1].clone(), PublicKey::from_peerid(&PEERS[1]).unwrap(), None, Some(ack_tx)));
+        let ack_interaction_relayer = Arc::new(AcknowledgementInteraction::new(
+            core_dbs[1].clone(),
+            PublicKey::from_peerid(&PEERS[1]).unwrap(),
+            None,
+            Some(ack_tx),
+        ));
         let pkt_interaction_relayer = Arc::new(PacketInteraction::new(
             core_dbs[1].clone(),
             None,
@@ -1156,7 +1171,9 @@ mod tests {
         // Peer 3: Recipient of the packet and sender of the acknowledgement
         let ack_interaction_counterparty = Arc::new(AcknowledgementInteraction::new(
             core_dbs[2].clone(),
-            PublicKey::from_peerid(&PEERS[2]).unwrap(), None, None
+            PublicKey::from_peerid(&PEERS[2]).unwrap(),
+            None,
+            None,
         ));
         let pkt_interaction_counterparty = Arc::new(PacketInteraction::new(
             core_dbs[2].clone(),
@@ -1191,18 +1208,17 @@ mod tests {
             let (mut acks, mut pkts) = (0, 0);
             for _ in 1..2 * PENDING_PACKETS + 1 {
                 match select(ack_rx.recv(), pkt_rx.recv()).await {
-                    Either::Left((ack,_)) => {
+                    Either::Left((ack, _)) => {
                         debug!("relayer has received acknowledged ticket from {}", ack.unwrap().signer);
                         acks += 1;
                     }
-                    Either::Right((pkt,_)) => {
+                    Either::Right((pkt, _)) => {
                         let msg = pkt.unwrap();
                         debug!("received message: {}", hex::encode(msg.clone()));
                         assert_eq!(TEST_MESSAGE, msg.as_ref(), "received packet payload must match");
                         pkts += 1;
                     }
                 }
-
             }
             (acks, pkts)
         };
@@ -1278,7 +1294,9 @@ mod tests {
         // -------------- Peer 2: relayer
         let ack_1 = Arc::new(AcknowledgementInteraction::new(
             core_dbs[1].clone(),
-            PublicKey::from_peerid(&PEERS[1]).unwrap(), None, None
+            PublicKey::from_peerid(&PEERS[1]).unwrap(),
+            None,
+            None,
         ));
         let pkt_1 = Arc::new(PacketInteraction::new(
             core_dbs[1].clone(),
@@ -1302,7 +1320,8 @@ mod tests {
         let ack_2 = Arc::new(AcknowledgementInteraction::new(
             core_dbs[2].clone(),
             PublicKey::from_peerid(&PEERS[2]).unwrap(),
-            None, None
+            None,
+            None,
         ));
         let pkt_2 = Arc::new(PacketInteraction::new(
             core_dbs[2].clone(),
@@ -1326,7 +1345,8 @@ mod tests {
         let ack_3 = Arc::new(AcknowledgementInteraction::new(
             core_dbs[3].clone(),
             PublicKey::from_peerid(&PEERS[3]).unwrap(),
-            None, None
+            None,
+            None,
         ));
         let pkt_3 = Arc::new(PacketInteraction::new(
             core_dbs[3].clone(),
@@ -1349,7 +1369,9 @@ mod tests {
         // -------------- Peer 5: recipient
         let ack_4 = Arc::new(AcknowledgementInteraction::new(
             core_dbs[4].clone(),
-            PublicKey::from_peerid(&PEERS[4]).unwrap(), None, None
+            PublicKey::from_peerid(&PEERS[4]).unwrap(),
+            None,
+            None,
         ));
         let pkt_4 = Arc::new(PacketInteraction::new(
             core_dbs[4].clone(),
@@ -1411,6 +1433,7 @@ mod tests {
 pub mod wasm {
     use crate::interaction::{AcknowledgementInteraction, PacketInteraction, PacketInteractionConfig, Payload};
     use crate::path::Path;
+    use async_std::channel::unbounded;
     use core_crypto::types::{HalfKeyChallenge, PublicKey};
     use core_ethereum_db::db::CoreEthereumDb;
     use core_mixer::mixer::Mixer;
@@ -1421,16 +1444,15 @@ pub mod wasm {
     use std::pin::Pin;
     use std::str::FromStr;
     use std::sync::{Arc, Mutex};
-    use async_std::channel::unbounded;
     use utils_db::db::DB;
     use utils_db::leveldb::{LevelDb, LevelDbShim};
     use utils_log::error;
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
+    use utils_types::traits::BinarySerializable;
     use wasm_bindgen::prelude::wasm_bindgen;
     use wasm_bindgen::JsCast;
     use wasm_bindgen::JsValue;
-    use utils_types::traits::BinarySerializable;
 
     #[wasm_bindgen]
     impl Payload {
@@ -1493,7 +1515,10 @@ pub mod wasm {
             on_acknowledged_ticket: Option<js_sys::Function>,
         ) -> Self {
             let on_ack = on_acknowledgement.is_some().then(unbounded::<HalfKeyChallenge>).unzip();
-            let on_ack_ticket = on_acknowledged_ticket.is_some().then(unbounded::<AcknowledgedTicket>).unzip();
+            let on_ack_ticket = on_acknowledged_ticket
+                .is_some()
+                .then(unbounded::<AcknowledgedTicket>)
+                .unzip();
 
             if let Some(ack_recv) = on_ack.1 {
                 wasm_bindgen_futures::spawn_local(async move {
@@ -1521,14 +1546,16 @@ pub mod wasm {
                 });
             }
 
-            Self { w: Arc::new(AcknowledgementInteraction::new(
-                Arc::new(Mutex::new(CoreEthereumDb::new(
-                    DB::new(LevelDbShim::new(db)),
-                    chain_key.clone(),
-                ))),
-                chain_key,
-                on_ack.0,
-                on_ack_ticket.0))
+            Self {
+                w: Arc::new(AcknowledgementInteraction::new(
+                    Arc::new(Mutex::new(CoreEthereumDb::new(
+                        DB::new(LevelDbShim::new(db)),
+                        chain_key.clone(),
+                    ))),
+                    chain_key,
+                    on_ack.0,
+                    on_ack_ticket.0,
+                )),
             }
         }
 
