@@ -186,7 +186,7 @@ impl HoprKeys {
     pub fn init(opts: IdentityOptions) -> Result<Self> {
         let exists = metadata(&opts.id_path).is_ok();
 
-        if !exists || opts.private_key.is_some() {
+        if !exists && opts.private_key.is_some() {
             let keys = if let Some(private_key) = opts.private_key {
                 if private_key.len() != PACKET_KEY_LENGTH + CHAIN_KEY_LENGTH {
                     return Err(KeyPairError::InvalidPrivateKeySize {
@@ -215,10 +215,12 @@ impl HoprKeys {
             return Ok(keys);
         }
 
-        match HoprKeys::read_eth_keystore(&opts.id_path, &opts.password) {
-            Ok(keys) => return Ok(keys),
-            Err(e) => {
-                error!("{}", e.to_string());
+        if exists {
+            match HoprKeys::read_eth_keystore(&opts.id_path, &opts.password) {
+                Ok(keys) => return Ok(keys),
+                Err(e) => {
+                    error!("{}", e.to_string());
+                }
             }
         }
 
@@ -238,7 +240,7 @@ impl HoprKeys {
         }
 
         Err(KeyPairError::GeneralError(
-            String::from("Key store file exists but could not decrypt it. ")
+            String::from("Key store file does not exist or could not decrypt it. ")
                 + "Maybe using the wrong '--password'? "
                 + "Otherwise try again with '--initialize' to overwrite the existing key store. "
                 + "THIS WILL DESTROY THE PREVIOUS KEY",
@@ -377,6 +379,7 @@ impl Debug for HoprKeys {
 pub mod wasm {
     use js_sys::Promise;
     use utils_misc::ok_or_jserr;
+    use utils_types::traits::PeerIdLike;
     use wasm_bindgen::prelude::*;
 
     use super::IdentityOptions;
