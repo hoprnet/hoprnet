@@ -1,5 +1,5 @@
 use crate::errors::PacketError::{
-    AcknowledgementValidation, ChannelNotFound, InvalidPacketState, OutOfFunds, TagReplay, TicketValidation,
+    AcknowledgementValidation, ChannelNotFound, InvalidPacketState, OutOfFunds, TagReplay,
     TransportError,
 };
 use crate::errors::Result;
@@ -10,9 +10,9 @@ use core_crypto::types::{HalfKeyChallenge, Hash, PublicKey};
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_mixer::mixer::{Mixer, MixerConfig};
 use core_types::acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket};
-use core_types::channels::{ChannelEntry, ChannelStatus, Ticket};
+use core_types::channels::Ticket;
 use libp2p_identity::PeerId;
-use std::ops::Mul;
+use std::ops::{Deref, Mul};
 use std::sync::{Arc, Mutex};
 use utils_log::{debug, error, info};
 use utils_types::primitives::{Balance, BalanceType, U256};
@@ -20,6 +20,7 @@ use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::SimpleCounter;
+use crate::validation::validate_unacknowledged_ticket;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -283,86 +284,6 @@ where
         }
     }
 
-    pub async fn validate_unacknowledged_ticket(
-        &self,
-        sender: &PublicKey,
-        min_ticket_amount: Balance,
-        req_inverse_ticket_win_prob: U256,
-        ticket: &Ticket,
-        channel: &ChannelEntry,
-    ) -> Result<()> {
-        let required_win_prob = U256::from_inverse_probability(req_inverse_ticket_win_prob)?;
-
-        // ticket signer MUST be the sender
-        ticket
-            .verify(sender)
-            .map_err(|e| TicketValidation(format!("ticket signer does not match the sender: {e}")))?;
-
-        // ticket amount MUST be greater or equal to minTicketAmount
-        if !ticket.amount.gte(&min_ticket_amount) {
-            return Err(TicketValidation(format!(
-                "ticket amount {} in not at least {min_ticket_amount}",
-                ticket.amount
-            )));
-        }
-
-        // ticket MUST have match X winning probability
-        if !ticket.win_prob.eq(&required_win_prob) {
-            return Err(TicketValidation(format!(
-                "ticket winning probability {} is not equal to {required_win_prob}",
-                ticket.win_prob
-            )));
-        }
-
-        // channel MUST be open or pending to close
-        if channel.status == ChannelStatus::Closed {
-            return Err(TicketValidation(format!(
-                "payment channel with {sender} is not opened or pending to close"
-            )));
-        }
-
-        // ticket's epoch MUST match our channel's epoch
-        if !ticket.epoch.eq(&channel.ticket_epoch) {
-            return Err(TicketValidation(format!(
-                "ticket epoch {} does not match our account epoch {} of channel {}",
-                ticket.epoch,
-                channel.ticket_epoch,
-                channel.get_id()
-            )));
-        }
-
-        // ticket's channelEpoch MUST match the current channel's epoch
-        if !ticket.channel_epoch.eq(&channel.channel_epoch) {
-            return Err(TicketValidation(format!(
-                "ticket was created for a different channel iteration {} != {} of channel {}",
-                ticket.channel_epoch,
-                channel.channel_epoch,
-                channel.get_id()
-            )));
-        }
-
-        if self.cfg.check_unrealized_balance {
-            info!("checking unrealized balances for channel {}", channel.get_id());
-
-            let unrealized_balance = self
-                .db
-                .lock()
-                .unwrap()
-                .get_tickets(sender)
-                .await? // all tickets from sender
-                .into_iter()
-                .filter(|t| t.epoch.eq(&channel.ticket_epoch) && t.channel_epoch.eq(&channel.channel_epoch))
-                .fold(channel.balance, |result, t| result.sub(&t.amount));
-
-            // ensure sender has enough funds
-            if ticket.amount.gt(&unrealized_balance) {
-                return Err(OutOfFunds(channel.get_id().to_string()));
-            }
-        }
-
-        Ok(())
-    }
-
     async fn bump_ticket_index(&self, channel_id: &Hash) -> Result<U256> {
         let current_ticket_index = self
             .db
@@ -419,7 +340,6 @@ where
 
         let ticket = Ticket::new(
             destination.to_address(),
-            None,
             channel.ticket_epoch,
             current_index,
             amount,
@@ -445,7 +365,7 @@ where
         // Decide whether to create 0-hop or multihop ticket
         let next_peer = PublicKey::from_peerid(&complete_valid_path.hops()[0])?;
         let next_ticket = if complete_valid_path.length() == 1 {
-            Ticket::new_zero_hop(next_peer, None, &self.cfg.private_key)
+            Ticket::new_zero_hop(next_peer, &self.cfg.private_key)
         } else {
             self.create_multihop_ticket(next_peer, complete_valid_path.length() as u8)
                 .await?
@@ -547,13 +467,13 @@ where
                     .ok_or(ChannelNotFound(previous_hop.to_string()))?;
 
                 // Validate the ticket first
-                if let Err(e) = self
-                    .validate_unacknowledged_ticket(
+                if let Err(e) = validate_unacknowledged_ticket::<Db>(self.db.lock().unwrap().deref(),
+                        &packet.ticket,
+                        &channel,
                         &previous_hop,
                         Balance::from_str(PRICE_PER_PACKET, BalanceType::HOPR),
                         inverse_win_prob,
-                        &packet.ticket,
-                        &channel,
+                        self.cfg.check_unrealized_balance
                     )
                     .await
                 {
@@ -588,7 +508,7 @@ where
 
                 // Create next ticket for the packet
                 next_ticket = if path_pos == 1 {
-                    Ticket::new_zero_hop(next_hop.clone(), None, &self.cfg.private_key)
+                    Ticket::new_zero_hop(next_hop.clone(), &self.cfg.private_key)
                 } else {
                     self.create_multihop_ticket(next_hop.clone(), path_pos).await?
                 };
@@ -706,6 +626,7 @@ mod tests {
     use std::str::FromStr;
     use std::sync::{Arc, Mutex};
     use std::time::Duration;
+    use mockall::mock;
     use utils_db::db::DB;
     use utils_db::errors::DbError;
     use utils_db::leveldb::rusty::RustyLevelDbShim;
@@ -813,16 +734,12 @@ mod tests {
             .collect::<Vec<_>>()
     }
 
-    struct EmptyChainCommiter {}
-
-    #[async_trait(? Send)]
-    impl ChainCommitter for EmptyChainCommiter {
-        async fn get_commitment(&self) -> Option<Hash> {
-            None
-        }
-
-        async fn set_commitment(&mut self, _commitment: &Hash) -> String {
-            "".to_string()
+    mock! {
+        pub Commiter { }
+        #[async_trait(? Send)]
+        impl ChainCommitter for Commiter {
+            async fn get_commitment(&self) -> Option<Hash>;
+            async fn set_commitment(&mut self, _commitment: &Hash) -> String;
         }
     }
 
@@ -864,7 +781,11 @@ mod tests {
                     channel_epoch: previous_channel.clone().unwrap().channel_epoch.clone(),
                 };
 
-                initialize_commitment(&mut db, &PEERS_PRIVS[0], &channel_info, &mut EmptyChainCommiter {})
+                let mut commiter = MockCommiter::new();
+                commiter.expect_get_commitment().return_const(None);
+                commiter.expect_set_commitment().return_const("");
+
+                initialize_commitment(&mut db, &PEERS_PRIVS[0], &channel_info, &mut commiter)
                     .await
                     .map_err(|e| PacketDbError(DbError::GenericError(e.to_string())))?;
             }
@@ -1250,6 +1171,7 @@ mod tests {
         let packet_path = Path::new_valid(PEERS[1..].to_vec());
         assert_eq!(4, packet_path.length(), "path has invalid length");
 
+        let mut interactions = vec![];
         // -------------- Peer 1: sender
         let packet_sender = Arc::new(PacketInteraction::new(
             core_dbs[0].clone(),
@@ -1260,6 +1182,8 @@ mod tests {
             },
         ));
         spawn_pkt_send::<_, 0>(packet_sender.clone());
+
+        interactions.push((Some(packet_sender.clone()), None));
 
         // -------------- Peer 2: relayer
         let ack_1 = Arc::new(AcknowledgementInteraction::new(
@@ -1281,6 +1205,8 @@ mod tests {
         spawn_ack_receive::<_, 1>(ack_1.clone());
         spawn_ack_send::<_, 1>(ack_1.clone());
 
+        interactions.push((Some(pkt_1), Some(ack_1)));
+
         // -------------- Peer 3: relayer
         let ack_2 = Arc::new(AcknowledgementInteraction::new(
             core_dbs[2].clone(),
@@ -1301,6 +1227,8 @@ mod tests {
         spawn_ack_receive::<_, 2>(ack_2.clone());
         spawn_ack_send::<_, 2>(ack_2.clone());
 
+        interactions.push((Some(pkt_2), Some(ack_2)));
+
         // -------------- Peer 4: relayer
         let ack_3 = Arc::new(AcknowledgementInteraction::new(
             core_dbs[3].clone(),
@@ -1320,6 +1248,8 @@ mod tests {
         spawn_ack_handling(ack_3.clone());
         spawn_ack_receive::<_, 3>(ack_3.clone());
         spawn_ack_send::<_, 3>(ack_3.clone());
+
+        interactions.push((Some(pkt_3), Some(ack_3)));
 
         // -------------- Peer 5: recipient
         let ack_4 = Arc::new(AcknowledgementInteraction::new(
@@ -1348,6 +1278,7 @@ mod tests {
         //spawn_ack_receive::<_, 4>(ack_4.clone());
         spawn_ack_send::<_, 4>(ack_4.clone());
 
+        interactions.push((Some(pkt_4), Some(ack_4)));
         // --------------
 
         // Start sending packets
@@ -1374,14 +1305,10 @@ mod tests {
         };
 
         terminate_transport();
-        pkt_1.stop();
-        ack_1.stop();
-        pkt_2.stop();
-        ack_2.stop();
-        pkt_3.stop();
-        ack_3.stop();
-        pkt_4.stop();
-        ack_4.stop();
+        interactions.into_iter().for_each(|(pkt, ack)| {
+            pkt.map(|v| v.stop());
+            ack.map(|v| v.stop());
+        });
 
         async_std::task::sleep(Duration::from_secs(1)).await; // Let everything shutdown
 
