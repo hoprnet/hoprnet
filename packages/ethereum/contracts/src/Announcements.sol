@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-pragma solidity ^0.8.19;
+pragma solidity 0.8.19;
+
+error PublicKeyDoesNotMatchSender(address pubkey, address sender);
 
 import 'openzeppelin-contracts-4.8.3/contracts/utils/Multicall.sol';
 
@@ -11,8 +13,6 @@ contract HoprAnnouncements is Multicall {
   event AddressAnnouncement6(address node, bytes16 ip6, bytes2 port);
 
   event RevokeAnnouncement(address node);
-
-  error PublicKeyDoesNotMatchSender(address pubkey, address sender);
 
   /**
    * [mandatory] Registers a node within the Hopr network and cross-signs on-chain and off-chain keys.

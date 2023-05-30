@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8;
-pragma abicoder v2;
+pragma solidity 0.8.19;
 
 import 'openzeppelin-contracts-4.8.3/utils/Multicall.sol';
 import 'openzeppelin-contracts-4.8.3/utils/introspection/IERC1820Registry.sol';
@@ -10,6 +9,12 @@ import 'openzeppelin-contracts-4.8.3/token/ERC777/IERC777Recipient.sol';
 import 'openzeppelin-contracts-4.8.3/token/ERC20/utils/SafeERC20.sol';
 import 'openzeppelin-contracts-4.8.3/utils/cryptography/ECDSA.sol';
 
+error InvalidBalance();
+error BalanceExceedsGlobalPerChannelAllowance();
+
+error SourceEqualsDestination();
+error ZeroAddress(string reason);
+
 contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
   using SafeERC20 for IERC20;
 
@@ -17,8 +22,27 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
   IERC1820Registry internal constant _ERC1820_REGISTRY = IERC1820Registry(0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24);
   // required by ERC777 spec
   bytes32 public constant TOKENS_RECIPIENT_INTERFACE_HASH = keccak256('ERC777TokensRecipient');
+
+  type Balance is uint96;
+  type TicketEpoch is uint32;
+  type TicketIndex is uint64;
+  type ChannelEpoch is uint24;
+  type Timestamp is uint32; // overflows in year 2105
+
+  Balance public constant MAX_BALANCE_PER_CHANNEL = 10 ** 25; // 1% of total supply
+  Balance public constant MIN_BALANCE_PER_CHANNEL = 1; // no empty token transactions
+
+  // Field order created by secp256k1 curve
+  uint256 constant FIELD_ORDER = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141;
+
+  // x-component of base point of secp256k1 curve
+  uint256 constant BASE_POINT_X_COMPONENT = 0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798;
+
+  // encoded sign of y-component of base point of secp256k1 curve
+  uint8 constant BASE_POINT_Y_COMPONENT_SIGN = 27;
+
   // used by {tokensReceived} to distinguish which function to call after tokens are sent
-  uint256 public immutable FUND_CHANNEL_MULTI_SIZE = abi.encode(address(0), address(0), uint256(0), uint256(0)).length;
+  uint256 public immutable FUND_CHANNEL_MULTI_SIZE = abi.encode(address(0), Balance(0), address(0), Balance(0)).length;
 
   /**
    * @dev Possible channel states.
@@ -67,20 +91,15 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
    * @dev A channel struct, used to represent a channel's state
    */
   struct Channel {
-    uint256 balance;
     bytes32 commitment;
-    uint256 ticketEpoch;
-    uint256 ticketIndex;
+    Balance balance;
+    TicketEpoch ticketEpoch;
+    TicketIndex ticketIndex;
     ChannelStatus status;
-    uint256 channelEpoch;
+    ChannelEpoch channelEpoch;
     // the time when the channel can be closed - NB: overloads at year >2105
-    uint32 closureTime;
+    Timestamp closureTime;
   }
-
-  /**
-   * @dev Stored publicKeys keyed by their address
-   */
-  mapping(address => bytes) public publicKeys;
 
   /**
    * @dev Stored channels keyed by their channel ids
@@ -96,27 +115,22 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
    * @dev Seconds it takes until we can finalize channel closure once,
    * channel closure has been initialized.
    */
-  uint32 public immutable secsClosure;
-
-  /**
-   * Emitted on every channel state change.
-   */
-  event ChannelUpdated(address indexed source, address indexed destination, Channel newState);
-
-  /**
-   * Emitted once an account announces.
-   */
-  event Announcement(address indexed account, bytes publicKey, bytes multiaddr);
+  Timestamp public immutable secsClosure;
 
   /**
    * Emitted once a channel if funded.
    */
-  event ChannelFunded(address indexed funder, address indexed source, address indexed destination, uint256 amount);
+  event ChannelFunded(address indexed funder, address indexed source, address indexed destination, Balance amount);
 
   /**
-   * Emitted once a channel is opened.
+   * Emitted once balance of a channel is increased.
    */
-  event ChannelOpened(address indexed source, address indexed destination);
+  event ChannelBalanceIncreased(address indexed source, address indexed destination, Balance newBalance);
+
+  /**
+   * Emitted once balance of a channel is decreased.
+   */
+  event ChannelBalanceDecreased(address indexed source, address indexed destination, Balance newBalance);
 
   /**
    * Emitted once bumpChannel is called.
@@ -125,14 +139,14 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     address indexed source,
     address indexed destination,
     bytes32 newCommitment,
-    uint256 ticketEpoch,
-    uint256 channelBalance
+    TicketEpoch ticketEpoch,
+    Balance channelBalance
   );
 
   /**
    * Emitted once a channel closure is initialized.
    */
-  event ChannelClosureInitiated(address indexed source, address indexed destination, uint32 closureInitiationTime);
+  event ChannelClosureInitiated(address indexed source, address indexed destination, Timestamp closureInitiationTime);
 
   /**
    * Emitted once a channel closure is finalized.
@@ -140,8 +154,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
   event ChannelClosureFinalized(
     address indexed source,
     address indexed destination,
-    uint32 closureFinalizationTime,
-    uint256 channelBalance
+    Timestamp closureFinalizationTime,
+    Balance channelBalance
   );
 
   /**
@@ -151,19 +165,18 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     address indexed source,
     address indexed destination,
     bytes32 nextCommitment,
-    uint256 ticketEpoch,
-    uint256 ticketIndex,
+    TicketEpoch ticketEpoch,
+    TicketIndex ticketIndex,
     bytes32 proofOfRelaySecret,
-    uint256 amount,
-    uint256 winProb,
-    bytes signature
+    Balance amount,
+    uint256 winProb
   );
 
   /**
    * @param _token HoprToken address
    * @param _secsClosure seconds until a channel can be closed
    */
-  constructor(address _token, uint32 _secsClosure) {
+  constructor(address _token, Timestamp _secsClosure) {
     require(_token != address(0), 'token must not be empty');
 
     token = IERC20(_token);
@@ -174,45 +187,43 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
   /**
    * Assert that source and destination are good addresses, and distinct.
    */
-  modifier validateSourceAndDest(address source, address destination) {
-    require(source != destination, 'source and destination must not be the same');
-    require(source != address(0), 'source must not be empty');
-    require(destination != address(0), 'destination must not be empty');
+  modifier validateChannelParties(address source, address destination) {
+    if (source == destination) {
+      revert SourceEqualsDestination();
+    }
+    if (source == address(0)) {
+      revert ZeroAddress({reason: 'source must not be empty'});
+    }
+    if (destination == address(0)) {
+      revert ZeroAddress({reason: 'destination must not be empty'});
+    }
     _;
   }
 
-  /**
-   * @dev Announces msg.sender's publicKey and multiaddress.
-   * Multiaddress confirmation should be done off-chain,
-   * peer id in the multiaddr is discarded in favour of the pubkey derived one.
-   * @param publicKey the msg.sender's public key
-   * @param multiaddr the multiaddress
-   */
-  function announce(bytes calldata publicKey, bytes calldata multiaddr) external {
-    require(
-      address(uint160(uint256(keccak256(publicKey)))) == msg.sender,
-      "publicKey's address does not match senders"
-    );
-    publicKeys[msg.sender] = publicKey;
-    emit Announcement(msg.sender, publicKey, multiaddr);
+  modifier validateBalance(Balance balance) {
+    if (balance == Balance(0)) {
+      revert InvalidBalance();
+    }
+    if (balance > Balance(10 ** 25)) {
+      revert BalanceExceedsGlobalPerChannelAllowance();
+    }
+    _;
   }
 
   /**
    * @dev Funds channels, in both directions, between 2 parties.
    * then emits {ChannelUpdated} event, for each channel.
    * @param account1 the address of account1
-   * @param account2 the address of account2
    * @param amount1 amount to fund account1
+   * @param account2 the address of account2
    * @param amount2 amount to fund account2
    */
   function fundChannelMulti(
     address account1,
+    Balance amount1,
     address account2,
-    uint256 amount1,
-    uint256 amount2
-  ) external {
-    require(amount1 + amount2 > 0, 'amount must be greater than 0');
-
+    Balance amount2
+  ) external validateBalance(amount1 + amount2) validateChannelParties(account1, account2) {
     // fund channel in direction of: account1 -> account2
     if (amount1 > 0) {
       _fundChannel(msg.sender, account1, account2, amount1);
@@ -223,7 +234,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     }
 
     // pull tokens from funder
-    token.transferFrom(msg.sender, address(this), amount1 + amount2);
+    token.safeTransferFrom(msg.sender, address(this), amount1 + amount2);
   }
 
   /**
@@ -235,21 +246,23 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
    * @param proofOfRelaySecret the proof of relay secret
    * @param winProb the winning probability of the ticket
    * @param amount the amount in the ticket
-   * @param signature signature
+   * @param signature_r first part of signature
+   * @param signature_vs second part of signature
    */
   function redeemTicket(
     address source,
     bytes32 nextCommitment,
-    uint256 ticketEpoch,
-    uint256 ticketIndex,
+    TicketEpoch ticketEpoch,
+    TicketIndex ticketIndex,
     bytes32 proofOfRelaySecret,
-    uint256 amount,
+    Balance amount,
     uint256 winProb,
-    bytes memory signature
-  ) external validateSourceAndDest(source, msg.sender) {
+    bytes32 signature_r,
+    bytes32 signature_vs
+  ) external validateChannelParties(source, msg.sender) validateBalance(amount) {
     require(nextCommitment != bytes32(0), 'nextCommitment must not be empty');
-    require(amount != uint256(0), 'amount must not be empty');
-    (, Channel storage spendingChannel) = _getChannel(source, msg.sender);
+
+    Channel storage spendingChannel = _getChannel(source, msg.sender);
     require(
       spendingChannel.status == ChannelStatus.OPEN || spendingChannel.status == ChannelStatus.PENDING_TO_CLOSE,
       'spending channel must be open or pending to close'
@@ -275,16 +288,14 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
       )
     );
 
-    ECDSAParameters memory signatureParams = _ecdsaSignatureParameters(signature);
-    require(ECDSA.recover(ticketHash, signatureParams.r, signatureParams.vs) == source, 'signer must match the counterparty');
+    require(ECDSA.recover(ticketHash, signature_r, signature_vs) == source, 'signer must match the counterparty');
     require(_getTicketLuck(ticketHash, nextCommitment, proofOfRelaySecret) <= winProb, 'ticket must be a win');
 
     spendingChannel.ticketIndex = ticketIndex;
     spendingChannel.commitment = nextCommitment;
     spendingChannel.balance = spendingChannel.balance - amount;
-    (, Channel storage earningChannel) = _getChannel(msg.sender, source);
+    Channel storage earningChannel = _getChannel(msg.sender, source);
 
-    emit ChannelUpdated(source, msg.sender, spendingChannel);
     emit TicketRedeemed(
       source,
       msg.sender,
@@ -293,13 +304,12 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
       ticketIndex,
       proofOfRelaySecret,
       amount,
-      winProb,
-      signature
+      winProb
     );
 
     if (earningChannel.status == ChannelStatus.OPEN) {
       earningChannel.balance = earningChannel.balance + amount;
-      emit ChannelUpdated(msg.sender, source, earningChannel);
+      emit ChannelBalanceIncreased(msg.sender, source, earningChannel.balance);
     } else {
       token.transfer(msg.sender, amount);
     }
@@ -318,15 +328,14 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
    * 'finalizeChannelClosure' which withdraws the stake.
    * @param destination the address of the destination
    */
-  function initiateChannelClosure(address destination) external validateSourceAndDest(msg.sender, destination) {
-    (, Channel storage channel) = _getChannel(msg.sender, destination);
+  function initiateChannelClosure(address destination) external validateChannelParties(msg.sender, destination) {
+    Channel storage channel = _getChannel(msg.sender, destination);
     require(
       channel.status == ChannelStatus.OPEN || channel.status == ChannelStatus.WAITING_FOR_COMMITMENT,
       'channel must be open or waiting for commitment'
     );
     channel.closureTime = _currentBlockTimestamp() + secsClosure;
     channel.status = ChannelStatus.PENDING_TO_CLOSE;
-    emit ChannelUpdated(msg.sender, destination, channel);
     emit ChannelClosureInitiated(msg.sender, destination, _currentBlockTimestamp());
   }
 
@@ -337,16 +346,16 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
    * {ChannelClosureFinalized} event.
    * @param destination the address of the counterparty
    */
-  function finalizeChannelClosure(address destination) external validateSourceAndDest(msg.sender, destination) {
-    (, Channel storage channel) = _getChannel(msg.sender, destination);
+  function finalizeChannelClosure(address destination) external validateChannelParties(msg.sender, destination) {
+    Channel storage channel = _getChannel(msg.sender, destination);
     require(channel.status == ChannelStatus.PENDING_TO_CLOSE, 'channel must be pending to close');
     require(channel.closureTime < _currentBlockTimestamp(), 'closureTime must be before now');
-    uint256 amountToTransfer = channel.balance;
+    Balance amountToTransfer = channel.balance;
     emit ChannelClosureFinalized(msg.sender, destination, channel.closureTime, channel.balance);
     delete channel.balance;
     delete channel.closureTime;
     channel.status = ChannelStatus.CLOSED;
-    emit ChannelUpdated(msg.sender, destination, channel);
+    emit ChannelBalanceDecreased(msg.sender, destination, 0);
 
     if (amountToTransfer > 0) {
       token.transfer(msg.sender, amountToTransfer);
@@ -360,8 +369,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
    * @param source the address of the channel source
    * @param newCommitment, a secret derived from this new commitment
    */
-  function bumpChannel(address source, bytes32 newCommitment) external validateSourceAndDest(source, msg.sender) {
-    (, Channel storage channel) = _getChannel(source, msg.sender);
+  function bumpChannel(address source, bytes32 newCommitment) external validateChannelParties(source, msg.sender) {
+    Channel storage channel = _getChannel(source, msg.sender);
 
     require(newCommitment != bytes32(0), 'Cannot set empty commitment');
     channel.commitment = newCommitment;
@@ -369,7 +378,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     if (channel.status == ChannelStatus.WAITING_FOR_COMMITMENT) {
       channel.status = ChannelStatus.OPEN;
     }
-    emit ChannelUpdated(source, msg.sender, channel);
+
     emit ChannelBumped(source, msg.sender, newCommitment, channel.ticketEpoch, channel.balance);
   }
 
@@ -397,11 +406,12 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     // must be one of our supported functions
     if (userData.length == FUND_CHANNEL_MULTI_SIZE) {
       address account1;
-      address account2;
-      uint256 amount1;
-      uint256 amount2;
+      uint96 amount1;
 
-      (account1, account2, amount1, amount2) = abi.decode(userData, (address, address, uint256, uint256));
+      address account2;
+      uint96 amount2;
+
+      (account1, amount1, account2, amount2) = abi.decode(userData, (address, uint96, address, uint96));
       require(amount == amount1 + amount2, 'amount sent must be equal to amount specified');
 
       // fund channel in direction of: account1 -> account2
@@ -424,17 +434,10 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
    * @param dest the address of the channel destination
    * @param amount amount to fund account1
    */
-  function _fundChannel(
-    address funder,
-    address source,
-    address dest,
-    uint256 amount
-  ) internal validateSourceAndDest(source, dest) {
+  function _fundChannel(address funder, address source, address dest, Balance amount) private {
     require(amount > 0, 'amount must be greater than 0');
-    require(publicKeys[source].length != 0, 'source has not announced');
-    require(publicKeys[dest].length != 0, 'destination has not announced');
 
-    (, Channel storage channel) = _getChannel(source, dest);
+    Channel storage channel = _getChannel(source, dest);
     require(channel.status != ChannelStatus.PENDING_TO_CLOSE, 'Cannot fund a closing channel');
     if (channel.status == ChannelStatus.CLOSED) {
       // We are reopening the channel
@@ -444,14 +447,14 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
 
       if (channel.commitment != bytes32(0)) {
         channel.status = ChannelStatus.OPEN;
-        emit ChannelOpened(source, dest);
+        emit ChannelBalanceIncreased(source, dest, newBalance);
+        (source, dest);
       } else {
         channel.status = ChannelStatus.WAITING_FOR_COMMITMENT;
       }
     }
 
     channel.balance = channel.balance + amount;
-    emit ChannelUpdated(source, dest, channel);
     emit ChannelFunded(funder, source, dest, amount);
   }
 
@@ -460,10 +463,10 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
    * @param destination destination
    * @return a tuple of channelId, channel
    */
-  function _getChannel(address source, address destination) internal view returns (bytes32, Channel storage) {
+  function _getChannel(address source, address destination) private view returns (Channel storage) {
     bytes32 channelId = _getChannelId(source, destination);
     Channel storage channel = channels[channelId];
-    return (channelId, channel);
+    return channel;
   }
 
   /**
@@ -471,14 +474,14 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
    * @param destination the address of destination
    * @return the channel id
    */
-  function _getChannelId(address source, address destination) internal pure returns (bytes32) {
+  function _getChannelId(address source, address destination) private pure returns (bytes32) {
     return keccak256(abi.encodePacked(source, destination));
   }
 
   /**
    * @return the current timestamp
    */
-  function _currentBlockTimestamp() internal view returns (uint32) {
+  function _currentBlockTimestamp() private view returns (uint32) {
     // solhint-disable-next-line
     return uint32(block.timestamp);
   }
@@ -494,19 +497,19 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
    * See https://ethresear.ch/t/you-can-kinda-abuse-ecrecover-to-do-ecmul-in-secp256k1-today/2384
    * @param response response that is used to recompute the challenge
    */
-  function _computeChallenge(bytes32 response) internal pure returns (address) {
-    // Field order of the base field
-    uint256 FIELD_ORDER = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141;
-
+  function _computeChallenge(bytes32 response) private pure returns (address) {
     require(0 < uint256(response), 'Invalid response. Value must be within the field');
     require(uint256(response) < FIELD_ORDER, 'Invalid response. Value must be within the field');
 
     // x-coordinate of the base point
-    uint256 gx = 0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798;
     // y-coordinate of base-point is even, so v is 27
-    uint8 gv = 27;
 
-    address signer = ecrecover(0, gv, bytes32(gx), bytes32(mulmod(uint256(response), gx, FIELD_ORDER)));
+    address signer = ecrecover(
+      0,
+      BASE_POINT_Y_COMPONENT_SIGN,
+      bytes32(BASE_POINT_X_COMPONENT),
+      bytes32(mulmod(uint256(response), BASE_POINT_X_COMPONENT, FIELD_ORDER))
+    );
 
     return signer;
   }
@@ -523,7 +526,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     uint256 amount,
     uint256 ticketIndex,
     uint256 winProb
-  ) internal pure returns (bytes memory) {
+  ) private pure returns (bytes memory) {
     address challenge = _computeChallenge(proofOfRelaySecret);
 
     return abi.encodePacked(recipient, challenge, recipientCounter, amount, winProb, ticketIndex, channelEpoch);
@@ -538,26 +541,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     bytes32 ticketHash,
     bytes32 nextCommitment,
     bytes32 proofOfRelaySecret
-  ) internal pure returns (uint256) {
+  ) private pure returns (uint256) {
     return uint256(keccak256(abi.encodePacked(ticketHash, nextCommitment, proofOfRelaySecret)));
-  }
-
-  /**
-   * @dev Reconstruct signature parameters manually since this functionality
-   * was removed in OZ 4.8.
-   * @return respective signature parameters
-   */
-  function _ecdsaSignatureParameters(bytes memory sig) internal pure returns (ECDSAParameters memory) {
-    bytes32 r;
-    bytes32 vs;
-    assembly {
-      r := mload(add(sig, 0x20))
-      vs := mload(add(sig, 0x40))
-    }
-    ECDSAParameters memory params = ECDSAParameters({
-      r: r,
-      vs: vs
-    });
-    return params;
   }
 }
