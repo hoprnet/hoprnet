@@ -3,6 +3,7 @@ This is a simplified `Permission.sol` contract from `zodiac-modifier-roles-v1`.
 A fundamental difference is that **this library supports only one role**.
 
 - No `DelegateCall` or `Send` is allowed to be executed from the module. Reducing the `ExecutionOptions` to possibly be `None`, which is the ordinary `call`.
+
 ### types
 1. Remove `Target` from `Clearance`, so target addresses can only be scoped (`Clearance.Function`) or not allowed (`Clearance.None`)
 
@@ -19,3 +20,4 @@ A fundamental difference is that **this library supports only one role**.
 - Added NatSpec comments on `packLeft`, `packRight`, `unpackFunction`, `unpackParameter`, `checkExecutionOptions`
 
 - Added specific checks for HoprChannels  `checkHoprChannelsParameters`;
+- checkTrnasaction is adapted so Target Clearance can only be None or Function.

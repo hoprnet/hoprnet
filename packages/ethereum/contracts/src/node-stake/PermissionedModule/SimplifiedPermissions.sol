@@ -51,7 +51,8 @@ struct Role {
 
 /**
  * @dev Simplified zodiac-modifier-roles-v1 Permission.sol contract
- * This library supports only one role
+ * This library supports only one role, and it's tailor made for interacting
+ * with HoprChannels and HoprToken contracts
  */
 library SimplifiedPermissions {
     // HoprChannels method ids (TargetType.Channels)
@@ -88,9 +89,6 @@ library SimplifiedPermissions {
     );
 
 
-    /// Parameter Type is not supported
-    error ParameterTypeNotSupported();
-
     /// Sender is not a member of the role
     error NoMembership();
 
@@ -100,9 +98,6 @@ library SimplifiedPermissions {
     /// Function signature too short
     error FunctionSignatureTooShort();
     
-    // /// Function signature is not allowed
-    // error FunctionSignatureNotAllowed();
-
     /// Role not allowed to delegate call to target address
     error DelegateCallNotAllowed();
 
@@ -112,8 +107,6 @@ library SimplifiedPermissions {
     /// Role not allowed to call target when its type is not set
     error TargetTypeNotSet();
 
-    /// Role not allowed to call this function on target address
-    error FunctionNotAllowed();
 
     /// Role not allowed to send to target address
     error SendNotAllowed();
@@ -121,35 +114,8 @@ library SimplifiedPermissions {
     /// Role not allowed to use bytes for parameter
     error ParameterNotAllowed();
 
-    // /// Role not allowed to use bytes for parameter
-    // error ParameterNotOneOfAllowed();
-
-    // /// Role not allowed to use bytes less than value for parameter
-    // error ParameterLessThanAllowed();
-
-    // /// Role not allowed to use bytes greater than value for parameter
-    // error ParameterGreaterThanAllowed();
-
     /// only multisend txs with an offset of 32 bytes are allowed
     error UnacceptableMultiSendOffset();
-
-    /// OneOf Comparison must be set via dedicated function
-    error UnsuitableOneOfComparison();
-
-    /// Not possible to define gt/lt for Dynamic types
-    error UnsuitableRelativeComparison();
-
-    /// CompValue for static types should have a size of exactly 32 bytes
-    error UnsuitableStaticCompValueSize();
-
-    /// CompValue for Dynamic32 types should be a multiple of exactly 32 bytes
-    error UnsuitableDynamic32CompValueSize();
-
-    /// Exceeds the max number of params supported
-    error ScopeMaxParametersExceeded();
-
-    /// OneOf Comparison requires at least two compValues
-    error NotEnoughCompValuesForOneOf();
 
     /// The provided calldata for execution is too short, or an OutOfBounds scoped parameter was configured
     error CalldataOutOfBounds();
@@ -674,78 +640,6 @@ library SimplifiedPermissions {
         return (a, b);
     }
 
-    // // TODO:
-    // function pluckDynamicValue(
-    //     bytes memory data,
-    //     ParameterType paramType,
-    //     uint256 index
-    // ) internal pure returns (bytes32) {
-    //     assert(paramType != ParameterType.Static);
-    //     // pre-check: is there a word available for the current parameter at argumentsBlock?
-    //     if (data.length < 4 + index * 32 + 32) {
-    //         revert CalldataOutOfBounds();
-    //     }
-
-    //     /*
-    //      * Encoded calldata:
-    //      * 4  bytes -> function selector
-    //      * 32 bytes -> sequence, one chunk per parameter
-    //      *
-    //      * There is one (byte32) chunk per parameter. Depending on type it contains:
-    //      * Static    -> value encoded inline (not plucked by this function)
-    //      * Dynamic   -> a byte offset to encoded data payload
-    //      * Dynamic32 -> a byte offset to encoded data payload
-    //      * Note: Fixed Sized Arrays (e.g., bool[2]), are encoded inline
-    //      * Note: Nested types also do not follow the above described rules, and are unsupported
-    //      * Note: The offset to payload does not include 4 bytes for functionSig
-    //      *
-    //      *
-    //      * At encoded payload, the first 32 bytes are the length encoding of the parameter payload. Depending on ParameterType:
-    //      * Dynamic   -> length in bytes
-    //      * Dynamic32 -> length in bytes32
-    //      * Note: Dynamic types are: bytes, string
-    //      * Note: Dynamic32 types are non-nested arrays: address[] bytes32[] uint[] etc
-    //      */
-
-    //     // the start of the parameter block
-    //     // 32 bytes - length encoding of the data bytes array
-    //     // 4  bytes - function sig
-    //     uint256 argumentsBlock;
-    //     assembly {
-    //         argumentsBlock := add(data, 36)
-    //     }
-
-    //     // the two offsets are relative to argumentsBlock
-    //     uint256 offset = index * 32;
-    //     uint256 offsetPayload;
-    //     assembly {
-    //         offsetPayload := mload(add(argumentsBlock, offset))
-    //     }
-
-    //     uint256 lengthPayload;
-    //     assembly {
-    //         lengthPayload := mload(add(argumentsBlock, offsetPayload))
-    //     }
-
-    //     // account for:
-    //     // 4  bytes - functionSig
-    //     // 32 bytes - length encoding for the parameter payload
-    //     uint256 start = 4 + offsetPayload + 32;
-    //     uint256 end = start +
-    //         (
-    //             paramType == ParameterType.Dynamic32
-    //                 ? lengthPayload * 32
-    //                 : lengthPayload
-    //         );
-
-    //     // are we slicing out of bounds?
-    //     if (data.length < end) {
-    //         revert CalldataOutOfBounds();
-    //     }
-
-    //     return keccak256(slice(data, start, end));
-    // }
-
     // TODO:
     function pluckStaticValue(
         bytes memory data,
@@ -783,7 +677,7 @@ library SimplifiedPermissions {
     function keyForFunctions(
         address targetAddress,
         bytes4 functionSig
-    ) public pure returns (bytes32) {
+    ) internal pure returns (bytes32) {
         return bytes32(abi.encodePacked(targetAddress, functionSig));
     }
 }
