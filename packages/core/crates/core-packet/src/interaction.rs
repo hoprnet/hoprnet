@@ -78,6 +78,7 @@ const ACK_RX_QUEUE_SIZE: usize = 2048;
 /// Once the instance is stopped, it cannot be restarted.
 pub struct AcknowledgementInteraction<Db: HoprCoreEthereumDbActions> {
     db: Arc<Mutex<Db>>,
+    // TODO: remove closures and use Sender<T> to allow the type to be Send + Sync
     pub on_acknowledgement: Box<dyn Fn(HalfKeyChallenge)>,
     pub on_acknowledged_ticket: Box<dyn Fn(AcknowledgedTicket)>,
     public_key: PublicKey,
@@ -320,6 +321,7 @@ where
     db: Arc<Mutex<Db>>,
     incoming_packets: (Sender<Payload>, Receiver<Payload>),
     outgoing_packets: (Sender<Payload>, Receiver<Payload>),
+    // TODO: remove closure and use Sender<T> to allow the type to be Send + Sync
     pub message_emitter: Box<dyn Fn(&[u8])>,
     pub mixer: Mixer<Payload>,
     cfg: PacketInteractionConfig,
