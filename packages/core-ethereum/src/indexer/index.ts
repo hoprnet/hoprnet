@@ -47,7 +47,19 @@ import { isConfirmedBlock, snapshotComparator, type IndexerSnapshot, channelEntr
 import { BigNumber, type Contract, errors } from 'ethers'
 import { CORE_ETHEREUM_CONSTANTS } from '../../lib/core_ethereum_misc.js'
 
-import { Database as Ethereum_Database, Address as Ethereum_Address } from '../../lib/core_ethereum_db.js'
+import {
+  AccountEntry as Ethereum_AccountEntry,
+  Address as Ethereum_Address,
+  Balance as Ethereum_Balance,
+  ChannelEntry as Ethereum_ChannelEntry,
+  Database as Ethereum_Database,
+  Hash as Ethereum_Hash,
+  PublicKey as Ethereum_PublicKey,
+  Snapshot as Ethereum_Snapshot,
+  core_ethereum_db_initialize_crate
+} from '../../lib/core_ethereum_db.js'
+
+core_ethereum_db_initialize_crate()
 
 import type { TypedEvent, TypedEventFilter } from '../utils/common.js'
 
@@ -504,7 +516,8 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     this.latestBlock = Math.max(this.latestBlock, blockNumber)
     metric_blockNumber.set(this.latestBlock)
 
-    let lastDatabaseSnapshot = Snapshot.deserialize((await this.db.get_latest_confirmed_snapshot()).serialize())
+    let fetchedSnapshot = await this.db.get_latest_confirmed_snapshot()
+    let lastDatabaseSnapshot = ((fetchedSnapshot === undefined) ? fetchedSnapshot : Snapshot.deserialize(fetchedSnapshot.serialize()))
 
     // settle transactions before processing events
     if (fetchNativeTxs) {
@@ -835,7 +848,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     log('New node announced', account.get_address().to_hex(), account.get_multiaddress_str())
     metric_numAnnouncements.increment()
 
-    await this.db.update_account_and_snapshot(account, lastSnapshot)
+    await this.db.update_account_and_snapshot(Ethereum_AccountEntry.deserialize(account.serialize()), Ethereum_Snapshot.deserialize(lastSnapshot.serialize()))
 
     this.emit('peer', {
       id: peerIdFromString(account.get_peer_id_str()),
@@ -855,12 +868,15 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
 
     let prevState: ChannelEntry
     try {
-      prevState = await this.db.get_channel(channel.get_id())
+      prevState = Ethereum_ChannelEntry.deserialize((await this.db.get_channel(Ethereum_Hash.deserialize(channel.get_id().serialize()))).serialize())
     } catch (e) {
       // Channel is new
     }
 
-    await this.db.update_channel_and_snapshot(channel.get_id(), channel, lastSnapshot)
+    await this.db.update_channel_and_snapshot(
+        Ethereum_Hash.deserialize(channel.get_id().serialize()),
+        Ethereum_ChannelEntry.deserialize(channel.serialize()),
+        Ethereum_Snapshot.deserialize(lastSnapshot.serialize()))
 
     metric_channelStatus.set([channel.get_id().to_hex()], channel.status)
 
@@ -895,18 +911,22 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
         counterparty: Address.from_string(event.args.destination),
         amount: new Balance(event.args.amount.toString(), BalanceType.HOPR)
       }
-      const outstandingBalance = await this.db.get_pending_balance_to(partialTicket.counterparty)
+      const outstandingBalance = Ethereum_Balance.deserialize(
+          (await this.db.get_pending_balance_to(Ethereum_Address.deserialize(partialTicket.counterparty.serialize()))).serialize_value(),
+          BalanceType.HOPR)
 
       try {
-        if (!outstandingBalance.gte(Balance.zero(BalanceType.HOPR))) {
-          // TODO: is this logic correct?
-          await this.db.resolve_pending(partialTicket.counterparty, Balance.zero(BalanceType.HOPR), lastSnapshot)
-        } else {
-          await this.db.resolve_pending(partialTicket.counterparty, outstandingBalance, lastSnapshot)
-          // It falls into this case when db of sender gets erased while having tickets pending.
-          // TODO: handle this may allow sender to send arbitrary amount of tickets through open
-          // channels with positive balance, before the counterparty initiates closure.
-        }
+        // TODO: is this logic correct?
+        //
+        // Negative case:
+        // It falls into this case when db of sender gets erased while having tickets pending.
+        // TODO: handle this may allow sender to send arbitrary amount of tickets through open
+        // channels with positive balance, before the counterparty initiates closure.
+        const balance = ((!outstandingBalance.gte(Balance.zero(BalanceType.HOPR))) ? Balance.zero(BalanceType.HOPR) : outstandingBalance)
+        await this.db.resolve_pending(
+            Ethereum_Address.deserialize(partialTicket.counterparty.serialize()),
+            Ethereum_Balance.deserialize(balance.serialize_value(), BalanceType.HOPR),
+            Ethereum_Snapshot.deserialize(lastSnapshot.serialize()))
         metric_ticketsRedeemed.increment()
       } catch (error) {
         log(`error in onTicketRedeemed ${error}`)
@@ -916,7 +936,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   }
 
   private async onChannelClosed(channel: ChannelEntry) {
-    await this.db.delete_acknowledged_tickets_from(channel)
+    await this.db.delete_acknowledged_tickets_from(Ethereum_ChannelEntry.deserialize(channel.serialize()))
     this.emit('channel-closed', channel)
   }
 
@@ -925,14 +945,17 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     lastSnapshot: Snapshot
   ): Promise<void> {
     const account = Address.from_string(event.args.account)
-    await this.db.set_eligible(account, event.args.eligibility, lastSnapshot)
+    await this.db.set_eligible(
+        Ethereum_Address.deserialize(account.serialize()),
+        event.args.eligibility,
+        Ethereum_Snapshot.deserialize(lastSnapshot.serialize()))
     verbose(`network-registry: account ${account} is ${event.args.eligibility ? 'eligible' : 'not eligible'}`)
     // emit event only when eligibility changes on accounts with a HoprNode associated
     try {
-      let hoprNodes = await this.db.find_hopr_node_using_account_in_network_registry(account)
+      let hoprNodes = await this.db.find_hopr_node_using_account_in_network_registry(Ethereum_Address.deserialize(account.serialize()))
       let nodes: PublicKey[] = []
       while (hoprNodes.len() > 0) {
-        nodes.push(hoprNodes.next())
+        nodes.push(Ethereum_PublicKey.deserialize(hoprNodes.next().serialize(false)))
       }
       this.emit('network-registry-eligibility-changed', account, nodes, event.args.eligibility)
     } catch {}
@@ -951,7 +974,10 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       return
     }
     const account = Address.from_string(event.args.account)
-    await this.db.add_to_network_registry(PublicKey.from_peerid_str(hoprNode.toString()), account, lastSnapshot)
+    await this.db.add_to_network_registry(
+        Ethereum_PublicKey.from_peerid_str(hoprNode.toString()),
+        Ethereum_Address.deserialize(account.serialize()),
+        Ethereum_Snapshot.deserialize(lastSnapshot.serialize()))
     verbose(`network-registry: node ${event.args.hoprPeerId} is allowed to connect`)
   }
 
@@ -968,9 +994,9 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       return
     }
     await this.db.remove_from_network_registry(
-      PublicKey.from_peerid_str(hoprNode.toString()),
-      Address.from_string(event.args.account),
-      lastSnapshot
+      Ethereum_PublicKey.from_peerid_str(hoprNode.toString()),
+      Ethereum_Address.from_string(event.args.account),
+      Ethereum_Snapshot.deserialize(lastSnapshot.serialize())
     )
     verbose(`network-registry: node ${event.args.hoprPeerId} is not allowed to connect`)
   }
@@ -980,7 +1006,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     lastSnapshot: Snapshot
   ): Promise<void> {
     this.emit('network-registry-status-changed', event.args.isEnabled)
-    await this.db.set_network_registry(event.args.isEnabled, lastSnapshot)
+    await this.db.set_network_registry(event.args.isEnabled, Ethereum_Snapshot.deserialize(lastSnapshot.serialize()))
   }
 
   private async onTransfer(event: TokenEvent<'Transfer'>, lastSnapshot: Snapshot) {
@@ -988,9 +1014,13 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     const amount = new Balance(event.args.value.toString(), BalanceType.HOPR)
 
     if (isIncoming) {
-      await this.db.add_hopr_balance(amount, lastSnapshot)
+      await this.db.add_hopr_balance(
+          Ethereum_Balance.deserialize(amount.serialize_value(), BalanceType.HOPR),
+          Ethereum_Snapshot.deserialize(lastSnapshot.serialize()))
     } else {
-      await this.db.sub_hopr_balance(amount, lastSnapshot)
+      await this.db.sub_hopr_balance(
+          Ethereum_Balance.deserialize(amount.serialize_value(), BalanceType.HOPR),
+          Ethereum_Snapshot.deserialize(lastSnapshot.serialize()))
     }
   }
 
@@ -1000,7 +1030,12 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   }
 
   public async getAccount(address: Address) {
-    return this.db.get_account(Ethereum_Address.deserialize(address.serialize()))
+    let account = await this.db.get_account(Ethereum_Address.deserialize(address.serialize()))
+    if (account !== null) {
+      return AccountEntry.deserialize(account.serialize())
+    }
+
+    return account
   }
 
   public async getPublicKeyOf(address: Address): Promise<PublicKey> {
@@ -1047,7 +1082,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   public async getRandomOpenChannel(): Promise<ChannelEntry> {
     const channels = await this.db.get_channels_open()
 
-    if (channels.len() === 0) {
+    if (channels.len() == 0) {
       log('no open channels exist in indexer')
       return undefined
     }
@@ -1065,7 +1100,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     let allChannels = await this.db.get_channels_from(source.to_address())
     let channels: ChannelEntry[] = []
     while (allChannels.len() > 0) {
-      channels.push(allChannels.next())
+      channels.push(ChannelEntry.deserialize(allChannels.next().serialize()))
     }
     return channels.filter((channel) => channel.status === ChannelStatus.Open)
   }

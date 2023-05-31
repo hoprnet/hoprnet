@@ -8,7 +8,13 @@ import { debug, Hash, toU8a, u8aConcat, U256 } from '@hoprnet/hopr-utils'
 
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { keysPBM } from '@libp2p/crypto/keys'
-import { Database as Ethereum_Database, Hash as Ethereum_Hash } from '../lib/core_ethereum_db.js'
+
+import {
+  Database as Ethereum_Database,
+  Hash as Ethereum_Hash,
+  core_ethereum_db_initialize_crate
+} from '../lib/core_ethereum_db.js'
+core_ethereum_db_initialize_crate()
 
 // NOTE: Workaround until also this file is converted to Rust
 // Reason being that all cryptography is now in core-crypto, and core-ethereum cannot depend
@@ -21,9 +27,30 @@ const log = debug('hopr-core-ethereum:commitment')
 export const DB_ITERATION_BLOCK_SIZE = 10000
 export const TOTAL_ITERATIONS = 100000
 
+
+async function get_commitment(db: Ethereum_Database, id: Hash, iteration: number): Promise<Hash | undefined> {
+  let hash = await db.get_commitment(Ethereum_Hash.deserialize(id.serialize()), iteration)
+  return ((hash === undefined) ? undefined : Hash.deserialize(hash.serialize()))
+}
+
+async function get_current_commitment(db: Ethereum_Database, id: Hash): Promise<Hash | undefined> {
+  let hash = await db.get_current_commitment(Ethereum_Hash.deserialize(id.serialize()))
+  return ((hash === undefined) ? undefined : Hash.deserialize(hash.serialize()))
+}
+
+async function set_current_commitment(db: Ethereum_Database, channel: Hash, commitment: Hash) {
+  await db.set_current_commitment(Ethereum_Hash.deserialize(channel.serialize()), Ethereum_Hash.deserialize(commitment.serialize()))
+}
+
+async function store_hash_intermediaries(db: Ethereum_Database, channel: Hash, intermediaries: any) {
+  await db.store_hash_intermediaries(Ethereum_Hash.deserialize(channel.serialize()), intermediaries)
+}
+
+
+
 // NOTE: this was not an async function
 async function searchDBFor(db: Ethereum_Database, channelId: Hash, iteration: number): Promise<Uint8Array | undefined> {
-  let commitment = await db.get_commitment(Ethereum_Hash.deserialize(channelId.serialize()), iteration)
+  let commitment = await get_commitment(db, Ethereum_Hash.deserialize(channelId.serialize()), iteration)
   if (commitment === undefined) {
     return undefined
   } else {
@@ -32,7 +59,7 @@ async function searchDBFor(db: Ethereum_Database, channelId: Hash, iteration: nu
 }
 
 export async function findCommitmentPreImage(db: Ethereum_Database, channelId: Hash): Promise<Hash> {
-  let currentCommitment = await db.get_current_commitment(Ethereum_Hash.deserialize(channelId.serialize()))
+  let currentCommitment = await get_current_commitment(db, Ethereum_Hash.deserialize(channelId.serialize()))
   let result = await recover_iterated_hash(
     currentCommitment.serialize(),
     (i: number) => searchDBFor(db, channelId, i),
@@ -46,10 +73,7 @@ export async function findCommitmentPreImage(db: Ethereum_Database, channelId: H
 }
 
 export async function bumpCommitment(db: Ethereum_Database, channelId: Hash, newCommitment: Hash) {
-  await db.set_current_commitment(
-    Ethereum_Hash.deserialize(channelId.serialize()),
-    Ethereum_Hash.deserialize(newCommitment.serialize())
-  )
+  await set_current_commitment(db, channelId, newCommitment)
 }
 
 type GetCommitment = () => Promise<Hash>
@@ -63,9 +87,9 @@ async function createCommitmentChain(
 ): Promise<void> {
   const intermediates = await iterate_hash(initialCommitmentSeed, TOTAL_ITERATIONS, DB_ITERATION_BLOCK_SIZE)
 
-  await db.store_hash_intermediaries(Ethereum_Hash.deserialize(channelId.serialize()), intermediates)
+  await store_hash_intermediaries(db, channelId, intermediates)
   const current = new Hash(intermediates.hash())
-  await Promise.all([db.set_current_commitment(channelId, current), setChainCommitment(current)])
+  await Promise.all([set_current_commitment(db, channelId, current), setChainCommitment(current)])
   log('commitment chain initialized')
 }
 
@@ -114,8 +138,7 @@ export async function initializeCommitment(
   getChainCommitment: GetCommitment,
   setChainCommitment: SetCommitment
 ) {
-  const dbContainsAlready =
-    (await db.get_commitment(Ethereum_Hash.deserialize(channelInfo.channelId.serialize()), 0)) != undefined
+  const dbContainsAlready = (await get_commitment(db, channelInfo.channelId, 0)) != undefined
   const chainCommitment = await getChainCommitment()
 
   if (chainCommitment && dbContainsAlready) {
