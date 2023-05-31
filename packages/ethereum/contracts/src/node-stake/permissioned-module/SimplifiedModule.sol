@@ -12,26 +12,31 @@ import "zodiac/guard/Guardable.sol";
  * This module removes target attribute 
  */
 abstract contract SimplifiedModule is FactoryFriendly, Guardable {
-    /// @dev Address that will ultimately execute function calls.
+    // Address that will ultimately execute function calls.
     address public avatar; 
 
-    /// @dev Emitted each time the avatar is set.
+    // Emitted each time the avatar is set.
     event AvatarSet(address indexed previousAvatar, address indexed newAvatar);
 
-    /// @dev Sets the avatar to a new avatar (`newAvatar`).
-    /// @notice Can only be called by the current owner.
+    /**
+     * @dev Sets the avatar to a new avatar (`newAvatar`).
+     * @notice Can only be called by the current owner.
+     * @param _avatar address of the new avatar
+     */
     function setAvatar(address _avatar) external onlyOwner {
         address previousAvatar = avatar;
         avatar = _avatar;
         emit AvatarSet(previousAvatar, _avatar);
     }
 
-    /// @dev Passes a transaction to be executed by the avatar.
-    /// @notice Can only be called by this contract.
-    /// @param to Destination address of module transaction.
-    /// @param value Ether value of module transaction.
-    /// @param data Data payload of module transaction.
-    /// @param operation Operation type of module transaction: 0 == call, 1 == delegate call.
+    /**
+     * @dev Passes a transaction to be executed by the avatar.
+     * @notice Can only be called by this contract.
+     * @param to Destination address of module transaction.
+     * @param value Ether value of module transaction.
+     * @param data Data payload of module transaction.
+     * @param operation Operation type of module transaction: 0 == call, 1 == delegate call.
+     */
     function exec(
         address to,
         uint256 value,
@@ -68,12 +73,14 @@ abstract contract SimplifiedModule is FactoryFriendly, Guardable {
         return success;
     }
 
-    /// @dev Passes a transaction to be executed by the avatar and returns data.
-    /// @notice Can only be called by this contract.
-    /// @param to Destination address of module transaction.
-    /// @param value Ether value of module transaction.
-    /// @param data Data payload of module transaction.
-    /// @param operation Operation type of module transaction: 0 == call, 1 == delegate call.
+    /**
+     * @dev Passes a transaction to be executed by the avatar and returns data.
+     * @notice Can only be called by this contract.
+     * @param to Destination address of module transaction.
+     * @param value Ether value of module transaction.
+     * @param data Data payload of module transaction.
+     * @param operation Operation type of module transaction: 0 == call, 1 == delegate call.
+     */
     function execAndReturnData(
         address to,
         uint256 value,

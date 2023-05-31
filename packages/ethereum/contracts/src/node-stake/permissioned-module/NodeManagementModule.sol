@@ -16,7 +16,6 @@ error AlreadyInitialized();
 error WithMembership();
 // Once module gets created, the ownership cannot be transferred
 error CannotChangeOwner();
-error NotAllowedNode();
 
 /**
  * @title Permissioned capability-based module for HOPR nodes operations
@@ -31,11 +30,6 @@ error NotAllowedNode();
  * Module can execute CALLs to HoprToken contracts
  */
 contract HoprNodeManagementModule is SimplifiedModule {
-  // // Node addresses that can execute transaction for target
-  // mapping(address=>bool) public nodes;
-  // // HoprChannel addresses on which 
-  // mapping(address=>bool) public channels;
-
   // address to send delegated multisend calls to 
   address public multisend;
   // from HoprCapabilityPermissions. This module is a Role where members are NODE_CHAIN_KEYs
@@ -342,10 +336,4 @@ contract HoprNodeManagementModule is SimplifiedModule {
   function transferOwnership(address /*newOwner*/) public override(OwnableUpgradeable) onlyOwner {
     revert CannotChangeOwner();
   }
-
-  // =======================================================
-  // ----------------------- HELPERS -----------------------
-  // =======================================================
-
-
 }

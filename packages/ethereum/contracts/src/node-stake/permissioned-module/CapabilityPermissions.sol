@@ -66,6 +66,7 @@ struct Role {
  * - Permissions are not stored bitwise in `scopeConig` (uint256) due to lack of customization
  * - Utility functions, such as `packLeft`, `packRight`, `unpackFunction`, `unpackParameter`, `checkExecutionOptions` are removed
  * - Specific helper functions, such as `pluckOneStaticAddress`, `pluckTwoStaticAddresses`, `pluckDynamicAddresses`,  `pluckSendPayload` are derived from `pluckStaticValue` and `pluckDynamicValue`
+ * - helper functions to encode array of function signatures and their respective permissions are added.
  */
 library HoprCapabilityPermissions {
     // HoprChannels method ids (TargetType.Channels)
@@ -735,7 +736,7 @@ library HoprCapabilityPermissions {
     function keyForFunctions(
         address targetAddress,
         bytes4 functionSig
-    ) internal pure returns (bytes32) {
+    ) public pure returns (bytes32) {
         return bytes32(abi.encodePacked(targetAddress, functionSig));
     }
 
@@ -747,7 +748,7 @@ library HoprCapabilityPermissions {
      */
     function encodePermissionEnums(
        uint256[] memory permissions
-    ) internal pure returns (uint256 encoded, uint256 length) {
+    ) public pure returns (uint256 encoded, uint256 length) {
         uint256 len = permissions.length;
         if (len > 256) {
             revert ArrayTooLong();
@@ -787,7 +788,7 @@ library HoprCapabilityPermissions {
      */
     function encodeFunctionSigs(
        bytes4[] memory functionSigs
-    ) internal pure returns (bytes32 encoded, uint256 length) {
+    ) public pure returns (bytes32 encoded, uint256 length) {
         uint256 len = functionSigs.length;
         if (len > 7) {
             revert ArrayTooLong();
@@ -834,7 +835,7 @@ library HoprCapabilityPermissions {
     function encodeFunctionSigsAndPermissions(
        bytes4[] memory functionSigs,
        uint256[] memory permissions
-    ) internal pure returns (bytes32 encoded, uint256 length) {
+    ) public pure returns (bytes32 encoded, uint256 length) {
         uint256 len = functionSigs.length;
         if (len > 7) {
             revert ArrayTooLong();
