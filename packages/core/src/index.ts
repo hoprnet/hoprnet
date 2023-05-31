@@ -495,7 +495,7 @@ class Hopr extends EventEmitter {
     }
     this.acknowledgements = new WasmAckInteraction(
       this.db.clone(),
-      PublicKey.from_peerid_str(this.id.toString()),
+      Packet_PublicKey.from_peerid_str(this.id.toString()),
       onAck,
       onAckTicket
     )
