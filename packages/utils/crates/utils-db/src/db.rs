@@ -119,7 +119,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
         self.backend
             .get(key)
             .await
-            .and_then(|v| bincode::deserialize(v.as_ref()).map_err(|e| DbError::DeserializationError(e.to_string())))
+            .and_then(|v| bincode::deserialize(v.as_ref()).map_err(|e| DbError::DeserializationError(format!("during get operation: {}", e.to_string().as_str()))))
     }
 
     pub async fn get_or_none<V: DeserializeOwned>(&self, key: Key) -> Result<Option<V>> {
@@ -142,7 +142,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
         match self.backend.set(key, value).await? {
             Some(v) => bincode::deserialize(v.as_ref())
                 .map(|v| Some(v))
-                .map_err(|e| DbError::DeserializationError(e.to_string())),
+                .map_err(|e| DbError::DeserializationError(format!("during set operation: {}", e.to_string().as_str()))),
             None => Ok(None),
         }
     }
@@ -152,7 +152,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
         match self.backend.remove(key).await? {
             Some(v) => bincode::deserialize(v.as_ref())
                 .map(|v| Some(v))
-                .map_err(|e| DbError::DeserializationError(e.to_string())),
+                .map_err(|e| DbError::DeserializationError(format!("during remove operation: {}", e.to_string().as_str()))),
             None => Ok(None),
         }
     }

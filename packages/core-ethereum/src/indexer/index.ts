@@ -65,6 +65,7 @@ import type { TypedEvent, TypedEventFilter } from '../utils/common.js'
 
 // @ts-ignore untyped library
 import retimer from 'retimer'
+import assert from "assert";
 
 // Exported from Rust
 const constants = CORE_ETHEREUM_CONSTANTS()
@@ -849,6 +850,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     log('New node announced', account.get_address().to_hex(), account.get_multiaddress_str())
     metric_numAnnouncements.increment()
 
+    assert(lastSnapshot !== undefined)
     await this.db.update_account_and_snapshot(
       Ethereum_AccountEntry.deserialize(account.serialize()),
       Ethereum_Snapshot.deserialize(lastSnapshot.serialize())
@@ -871,14 +873,12 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     }
 
     let prevState: ChannelEntry
-    try {
-      prevState = Ethereum_ChannelEntry.deserialize(
-        (await this.db.get_channel(Ethereum_Hash.deserialize(channel.get_id().serialize()))).serialize()
-      )
-    } catch (e) {
-      // Channel is new
+    let channel_entry = await this.db.get_channel(Ethereum_Hash.deserialize(channel.get_id().serialize()))
+    if (channel_entry !== undefined) {
+      prevState = ChannelEntry.deserialize(channel_entry.serialize())
     }
 
+    assert(lastSnapshot !== undefined)
     await this.db.update_channel_and_snapshot(
       Ethereum_Hash.deserialize(channel.get_id().serialize()),
       Ethereum_ChannelEntry.deserialize(channel.serialize()),
@@ -925,6 +925,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
         BalanceType.HOPR
       )
 
+      assert(lastSnapshot !== undefined)
       try {
         // Negative case:
         // It falls into this case when db of sender gets erased while having tickets pending.
@@ -955,6 +956,8 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     event: RegistryEvent<'EligibilityUpdated'>,
     lastSnapshot: Snapshot
   ): Promise<void> {
+    assert(lastSnapshot !== undefined)
+
     const account = Address.from_string(event.args.account)
     await this.db.set_eligible(
       Ethereum_Address.deserialize(account.serialize()),
@@ -987,6 +990,8 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       log(error)
       return
     }
+
+    assert(lastSnapshot !== undefined)
     const account = Address.from_string(event.args.account)
     await this.db.add_to_network_registry(
       Ethereum_PublicKey.from_peerid_str(hoprNode.toString()),
@@ -1008,6 +1013,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       log(error)
       return
     }
+    assert(lastSnapshot !== undefined)
     await this.db.remove_from_network_registry(
       Ethereum_PublicKey.from_peerid_str(hoprNode.toString()),
       Ethereum_Address.from_string(event.args.account),
@@ -1020,6 +1026,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     event: RegistryEvent<'EnabledNetworkRegistry'>,
     lastSnapshot: Snapshot
   ): Promise<void> {
+    assert(lastSnapshot !== undefined)
     this.emit('network-registry-status-changed', event.args.isEnabled)
     await this.db.set_network_registry(event.args.isEnabled, Ethereum_Snapshot.deserialize(lastSnapshot.serialize()))
   }
@@ -1028,6 +1035,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     const isIncoming = Address.from_string(event.args.to).eq(this.address)
     const amount = new Balance(event.args.value.toString(), BalanceType.HOPR)
 
+    assert(lastSnapshot !== undefined)
     if (isIncoming) {
       await this.db.add_hopr_balance(
         Ethereum_Balance.deserialize(amount.serialize_value(), BalanceType.HOPR),
@@ -1046,9 +1054,9 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     this.emit(indexerEvent)
   }
 
-  public async getAccount(address: Address) {
+  public async getAccount(address: Address): Promise<AccountEntry | undefined> {
     let account = await this.db.get_account(Ethereum_Address.deserialize(address.serialize()))
-    if (account !== null) {
+    if (account !== undefined) {
       return AccountEntry.deserialize(account.serialize())
     }
 
@@ -1057,7 +1065,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
 
   public async getPublicKeyOf(address: Address): Promise<PublicKey> {
     const account = await this.getAccount(address)
-    if (account) {
+    if (account !== undefined) {
       return account.public_key
     }
     throw new Error('Could not find public key for address - have they announced? -' + address.to_hex())
@@ -1096,7 +1104,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
    * NOTE: channels with status 'PENDING_TO_CLOSE' are not included
    * @returns an open channel
    */
-  public async getRandomOpenChannel(): Promise<ChannelEntry> {
+  public async getRandomOpenChannel(): Promise<ChannelEntry | undefined> {
     const channels = await this.db.get_channels_open()
 
     if (channels.len() == 0) {
@@ -1104,7 +1112,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       return undefined
     }
 
-    return channels.at(random_integer(0, channels.len()))
+    return ChannelEntry.deserialize(channels.at(random_integer(0, channels.len())).serialize())
   }
 
   /**

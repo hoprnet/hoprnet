@@ -705,7 +705,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         let mut batch_ops = utils_db::db::Batch::new();
 
         if eligible {
-            batch_ops.put(key, &[0u8; 0]);
+            batch_ops.put(key, &true);
         } else {
             batch_ops.del(key);
         }
@@ -882,7 +882,6 @@ pub mod wasm {
 
         #[wasm_bindgen]
         pub async fn get_latest_block_number(&self) -> Result<u32, JsValue> {
-            // NOTE: does not perform conversion: BN(value).toNumber() !!!
             let db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
             utils_misc::ok_or_jserr!(db.get_latest_block_number().await)
         }

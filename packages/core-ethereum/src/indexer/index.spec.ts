@@ -50,7 +50,7 @@ async function get_pending_balance_to(db: Ethereum_Database, address: Address): 
   )
 }
 
-async function get_account_from_network_registry(db: Ethereum_Database, key: PublicKey): Promise<Address> {
+async function get_account_from_network_registry(db: Ethereum_Database, key: PublicKey): Promise<Address | undefined> {
   let address = await db.get_account_from_network_registry(Ethereum_PublicKey.deserialize(key.serialize(false)))
   return address === undefined ? undefined : Address.deserialize(address.serialize())
 }
@@ -58,6 +58,7 @@ async function get_account_from_network_registry(db: Ethereum_Database, key: Pub
 async function is_eligible(db: Ethereum_Database, address: Address): Promise<boolean> {
   return await db.is_eligible(Ethereum_Address.deserialize(address.serialize()))
 }
+
 
 describe('test indexer', function () {
   it('should start indexer', async function () {
@@ -710,6 +711,7 @@ describe('test indexer', function () {
 
     newBlock()
     await processed.promise
+
     assert(await get_account_from_network_registry(db, PublicKey.from_peerid_str(PARTY_B_MULTIADDR.getPeerId())))
     assert((await is_eligible(db, fixtures.PARTY_A().to_address())) === false)
   })
