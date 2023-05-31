@@ -13,7 +13,7 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 default = ["console_error_panic_hook", "wasm"]
-wasm = [ "dep:wasm-bindgen", "dep:js-sys" ]
+wasm = [ "dep:wasm-bindgen", "dep:js-sys", "dep:wasm-bindgen-futures" ]
 console_error_panic_hook = [ "dep:console_error_panic_hook" ]
 
 [dependencies]
@@ -27,9 +27,11 @@ libp2p-identity = "0.1.2"
 thiserror = "1.0"
 utils-db = { path = "../../../utils/crates/utils-db" }
 utils-log = { path = "../../../utils/crates/utils-log" }
+utils-misc = { path = "../../../utils/crates/utils-misc" }
 utils-proc-macros = { path = "../../../utils/crates/utils-proc-macros" }
 utils-types = { path = "../../../utils/crates/utils-types" }
 wasm-bindgen = { workspace = true, optional = true }
+wasm-bindgen-futures = { version = "0.4.36", features = ["futures-core-03-stream"], optional = true }
 
 console_error_panic_hook = { version = "0.1.7", optional = true }
 # wee_alloc = { version = "0.4.5", optional = true }

@@ -1,6 +1,6 @@
 import assert from 'assert'
 import sinon from 'sinon'
-import {debug, LevelDb, stringToU8a} from '@hoprnet/hopr-utils'
+import { debug, LevelDb, stringToU8a } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum, { Indexer, useFixtures } from './index.js'
 import { sampleChainOptions } from './ethereum.mock.js'
 import { ACCOUNT_A, MOCK_ADDRESS, MOCK_PUBLIC_KEY, PARTY_A } from './fixtures.js'
@@ -20,8 +20,12 @@ describe(`test HoprEthereum instance creation`, function () {
   })
   it('should instantiate a new class w/o any issues', function () {
     log('starting new instance of HoprEthereum.')
-    HoprCoreEthereum.createInstance(new Ethereum_Database(new LevelDb(), Ethereum_PublicKey.from_privkey(stringToU8a(ACCOUNT_A.privateKey))), PARTY_A(),
-        stringToU8a(ACCOUNT_A.privateKey), sampleChainOptions)
+    HoprCoreEthereum.createInstance(
+      new Ethereum_Database(new LevelDb(), Ethereum_PublicKey.from_privkey(stringToU8a(ACCOUNT_A.privateKey))),
+      PARTY_A(),
+      stringToU8a(ACCOUNT_A.privateKey),
+      sampleChainOptions
+    )
     log('successfully created the HoprEthereum instance.')
   })
 })

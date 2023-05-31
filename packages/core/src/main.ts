@@ -17,7 +17,7 @@ import {
   type PublicNodesEmitter,
   compareAddressesPublicMode
 } from '@hoprnet/hopr-connect'
-import { HoprDB, PublicKey, debug, isAddressWithPeerId } from '@hoprnet/hopr-utils'
+import { PublicKey, debug, isAddressWithPeerId, LevelDb } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 
 import Hopr, { type HoprOptions } from './index.js'
@@ -25,6 +25,11 @@ import { getAddrs } from './identity.js'
 import { createLibp2pMock } from './libp2p.mock.js'
 import { getContractData, supportedNetworks } from './network.js'
 import { MultiaddrConnection } from '@libp2p/interfaces/transport'
+import { Database as Packet_Database, PublicKey as Packet_PublicKey } from '../lib/core_packet.js'
+import {
+  Database as Ethereum_Database,
+  PublicKey as Ethereum_PublicKey
+} from '../../core-ethereum/lib/core_ethereum_misc.js'
 
 const log = debug(`hopr-core:create-hopr`)
 const error = debug(`hopr-core:error`)
@@ -229,16 +234,16 @@ export async function createHoprNode(
   options: HoprOptions,
   automaticChainCreation = true
 ): Promise<Hopr> {
-  const db = new HoprDB(PublicKey.from_peerid_str(peerId.toString()))
+  let levelDb = new LevelDb()
 
   try {
     const dbPath = path.join(options.dataPath, 'db')
-    await db.init(options.createDbIfNotExist, dbPath, options.forceCreateDB, options.network.id)
+    await levelDb.init(options.createDbIfNotExist, dbPath, options.forceCreateDB, options.network.id)
 
     // Dump entire database to a file if given by the env variable
     const dump_file = process.env.DB_DUMP ?? ''
     if (dump_file.length > 0) {
-      db.dumpDatabase(dump_file)
+      levelDb.dump(dump_file)
     }
   } catch (err: unknown) {
     log(`failed init db:`, err)
@@ -247,7 +252,7 @@ export async function createHoprNode(
 
   log(`using provider URL: ${options.network.chain.default_provider}`)
   const chain = HoprCoreEthereum.createInstance(
-    db,
+    new Ethereum_Database(levelDb, Ethereum_PublicKey.from_peerid_str(peerId.toString())),
     PublicKey.from_peerid_str(peerId.toString()),
     keysPBM.PrivateKey.decode(peerId.privateKey as Uint8Array).Data,
     {
@@ -261,11 +266,11 @@ export async function createHoprNode(
     automaticChainCreation
   )
 
-  // get contract data for the given envirionment id and pass it on to create chain wrapper
+  // get contract data for the given environment id and pass it on to create chain wrapper
   const resolvedContractAddresses = getContractData(options.network.id)
   log(`[DEBUG] resolvedContractAddresses ${options.network.id} ${JSON.stringify(resolvedContractAddresses, null, 2)}`)
   // Initialize connection to the blockchain
   await chain.initializeChainWrapper(resolvedContractAddresses)
 
-  return new Hopr(peerId, db, options)
+  return new Hopr(peerId, new Packet_Database(levelDb, Packet_PublicKey.from_peerid_str(peerId.toString())), options)
 }

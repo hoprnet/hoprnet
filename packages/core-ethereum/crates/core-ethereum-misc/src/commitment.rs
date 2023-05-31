@@ -81,6 +81,7 @@ where
 }
 
 /// Holds the commitment information of a specific channel.
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct ChannelCommitmentInfo {
     /// ID of the blockchain network
     pub chain_id: u32,
@@ -90,6 +91,19 @@ pub struct ChannelCommitmentInfo {
     pub channel_id: Hash,
     /// Channel epoch value
     pub channel_epoch: U256,
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+impl ChannelCommitmentInfo {
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
+    pub fn new(chain_id: u32, contract_address: String, channel_id: Hash, channel_epoch: U256) -> Self {
+        Self {
+            chain_id,
+            contract_address,
+            channel_id,
+            channel_epoch,
+        }
+    }
 }
 
 impl ChannelCommitmentInfo {
@@ -206,5 +220,104 @@ mod tests {
 
         let c3 = find_commitment_preimage(&mut db, &comm_info.channel_id).await.unwrap();
         assert_eq!(c2, c3, "repeated initializations should return the same commitment");
+    }
+}
+
+#[cfg(feature = "wasm")]
+pub mod wasm {
+    use async_trait::async_trait;
+    use core_crypto::types::Hash;
+    use core_ethereum_db::db::wasm::Database;
+    use js_sys::Uint8Array;
+    use std::ops::DerefMut;
+    use utils_log::error;
+    use utils_misc::ok_or_jserr;
+    use utils_misc::utils::wasm::JsResult;
+    use utils_types::traits::BinarySerializable;
+    use wasm_bindgen::prelude::wasm_bindgen;
+    use wasm_bindgen::JsValue;
+
+    use crate::commitment::{ChainCommitter, ChannelCommitmentInfo};
+
+    struct JsCommitter {
+        get_commitment: js_sys::Function,
+        set_commitment: js_sys::Function,
+    }
+
+    #[async_trait(? Send)]
+    impl ChainCommitter for JsCommitter {
+        async fn get_commitment(&self) -> Option<Hash> {
+            let this = JsValue::null();
+            match self.get_commitment.call0(&this) {
+                Ok(r) => {
+                    let promise = js_sys::Promise::from(r);
+                    wasm_bindgen_futures::JsFuture::from(promise)
+                        .await
+                        .map(|v| {
+                            let arr = Uint8Array::from(v);
+                            Hash::new(&arr.to_vec())
+                        })
+                        .map_err(|e| error!("could not get commitment {:?}", e.as_string()))
+                        .ok()
+                }
+                Err(e) => {
+                    error!("not call get commitment {:?}", e.as_string());
+                    None
+                }
+            }
+        }
+
+        async fn set_commitment(&mut self, commitment: &Hash) -> String {
+            let this = JsValue::null();
+            let hash: JsValue = Uint8Array::from(commitment.to_bytes().as_ref()).into();
+            match self.set_commitment.call1(&this, &hash) {
+                Ok(r) => {
+                    let promise = js_sys::Promise::from(r);
+                    wasm_bindgen_futures::JsFuture::from(promise)
+                        .await
+                        .map_err(|e| error!("could not set commitment {:?}", e.as_string()))
+                        .map(|v| v.as_string().unwrap())
+                        .unwrap_or("".to_string())
+                }
+                Err(e) => {
+                    error!("not call set commitment {:?}", e.as_string());
+                    "".to_string()
+                }
+            }
+        }
+    }
+
+    #[wasm_bindgen]
+    pub async fn initialize_commitment(
+        db: &Database,
+        private_key: &[u8],
+        channel_info: &ChannelCommitmentInfo,
+        get_commitment: js_sys::Function, // async () => Uint8Array
+        set_commitment: js_sys::Function, // async (Uint8Array) => String
+    ) -> JsResult<()> {
+        let mut committer = JsCommitter {
+            get_commitment,
+            set_commitment,
+        };
+        let val = db.as_ref_counted();
+        let mut g = val.lock().unwrap();
+        ok_or_jserr!(
+            super::initialize_commitment::<_, JsCommitter>(g.deref_mut(), private_key, channel_info, &mut committer)
+                .await
+        )
+    }
+
+    #[wasm_bindgen]
+    pub async fn find_commitment_preimage(db: &Database, channel_id: &Hash) -> JsResult<Hash> {
+        let val = db.as_ref_counted();
+        let mut g = val.lock().unwrap();
+        ok_or_jserr!(super::find_commitment_preimage(g.deref_mut(), channel_id).await)
+    }
+
+    #[wasm_bindgen]
+    pub async fn bump_commitment(db: &Database, channel_id: &Hash, new_commitment: &Hash) -> JsResult<()> {
+        let val = db.as_ref_counted();
+        let mut g = val.lock().unwrap();
+        ok_or_jserr!(super::bump_commitment(g.deref_mut(), channel_id, new_commitment).await)
     }
 }

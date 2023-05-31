@@ -99,13 +99,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     options: ChainOptions,
     automaticChainCreation = true
   ) {
-    HoprCoreEthereum._instance = new HoprCoreEthereum(
-      db,
-      publicKey,
-      privateKey,
-      options,
-      automaticChainCreation
-    )
+    HoprCoreEthereum._instance = new HoprCoreEthereum(db, publicKey, privateKey, options, automaticChainCreation)
     return HoprCoreEthereum._instance
   }
 

@@ -1,7 +1,7 @@
 import assert from 'assert'
 import { bumpCommitment, ChannelCommitmentInfo, findCommitmentPreImage, initializeCommitment } from './commitment.js'
 import sinon from 'sinon'
-import {Hash, LevelDb, privKeyToPeerId, stringToU8a, U256} from '@hoprnet/hopr-utils'
+import { Hash, LevelDb, privKeyToPeerId, stringToU8a, U256 } from '@hoprnet/hopr-utils'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { Database as Ethereum_Database, PublicKey as Ethereum_PublicKey } from '../lib/core_ethereum_db.js'
 

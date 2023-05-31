@@ -47,10 +47,7 @@ import { isConfirmedBlock, snapshotComparator, type IndexerSnapshot, channelEntr
 import { BigNumber, type Contract, errors } from 'ethers'
 import { CORE_ETHEREUM_CONSTANTS } from '../../lib/core_ethereum_misc.js'
 
-import {
-  Database as Ethereum_Database,
-  Address as Ethereum_Address
-} from '../../lib/core_ethereum_db.js'
+import { Database as Ethereum_Database, Address as Ethereum_Address } from '../../lib/core_ethereum_db.js'
 
 import type { TypedEvent, TypedEventFilter } from '../utils/common.js'
 

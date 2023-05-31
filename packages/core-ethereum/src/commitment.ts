@@ -8,10 +8,7 @@ import { debug, Hash, toU8a, u8aConcat, U256 } from '@hoprnet/hopr-utils'
 
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { keysPBM } from '@libp2p/crypto/keys'
-import {
-  Database as Ethereum_Database,
-  Hash as Ethereum_Hash
-} from '../lib/core_ethereum_db.js'
+import { Database as Ethereum_Database, Hash as Ethereum_Hash } from '../lib/core_ethereum_db.js'
 
 // NOTE: Workaround until also this file is converted to Rust
 // Reason being that all cryptography is now in core-crypto, and core-ethereum cannot depend
@@ -49,7 +46,10 @@ export async function findCommitmentPreImage(db: Ethereum_Database, channelId: H
 }
 
 export async function bumpCommitment(db: Ethereum_Database, channelId: Hash, newCommitment: Hash) {
-  await db.set_current_commitment(Ethereum_Hash.deserialize(channelId.serialize()), Ethereum_Hash.deserialize(newCommitment.serialize()))
+  await db.set_current_commitment(
+    Ethereum_Hash.deserialize(channelId.serialize()),
+    Ethereum_Hash.deserialize(newCommitment.serialize())
+  )
 }
 
 type GetCommitment = () => Promise<Hash>
@@ -114,7 +114,8 @@ export async function initializeCommitment(
   getChainCommitment: GetCommitment,
   setChainCommitment: SetCommitment
 ) {
-  const dbContainsAlready = (await db.get_commitment(Ethereum_Hash.deserialize(channelInfo.channelId.serialize()), 0)) != undefined
+  const dbContainsAlready =
+    (await db.get_commitment(Ethereum_Hash.deserialize(channelInfo.channelId.serialize()), 0)) != undefined
   const chainCommitment = await getChainCommitment()
 
   if (chainCommitment && dbContainsAlready) {
