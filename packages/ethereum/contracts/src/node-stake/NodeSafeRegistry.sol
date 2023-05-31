@@ -40,12 +40,12 @@ contract HoprNodeSafeRegistry {
   constructor() {
     // following encoding guidelines of EIP712
     domainSeparator = keccak256(
-      abi.encodePacked(
+      abi.encode(
         keccak256('EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)'),
         keccak256(bytes('NodeStakeRegistry')),
         keccak256(bytes(version)),
-        uint256(block.chainid),
-        uint160(address(this))
+        block.chainid,
+        address(this)
       )
     );
   }
@@ -58,12 +58,10 @@ contract HoprNodeSafeRegistry {
     // check adminKeyAddress has added HOPR tokens to the staking contract.
 
     // following encoding guidelines of EIP712
-    bytes32 hashStruct = keccak256(
-      abi.encodePacked(NODE_SAFE_TYPEHASH, uint160(nodeSafe.safeAddress), uint160(nodeSafe.nodeChainKeyAddress))
-    );
+    bytes32 hashStruct = keccak256(abi.encode(NODE_SAFE_TYPEHASH, nodeSafe.safeAddress, nodeSafe.nodeChainKeyAddress));
 
     // build typed digest
-    bytes32 registerHash = keccak256(abi.encodePacked(bytes1(0x19), bytes1(0x01), domainSeparator, hashStruct));
+    bytes32 registerHash = keccak256(abi.encode(bytes1(0x19), bytes1(0x01), domainSeparator, hashStruct));
 
     // verify that signatures is from nodeChainKeyAddress. This signature can only be
     (address recovered, ECDSA.RecoverError error) = ECDSA.tryRecover(registerHash, sig);
