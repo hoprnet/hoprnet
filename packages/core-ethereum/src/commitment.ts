@@ -27,26 +27,26 @@ const log = debug('hopr-core-ethereum:commitment')
 export const DB_ITERATION_BLOCK_SIZE = 10000
 export const TOTAL_ITERATIONS = 100000
 
-
 async function get_commitment(db: Ethereum_Database, id: Hash, iteration: number): Promise<Hash | undefined> {
   let hash = await db.get_commitment(Ethereum_Hash.deserialize(id.serialize()), iteration)
-  return ((hash === undefined) ? undefined : Hash.deserialize(hash.serialize()))
+  return hash === undefined ? undefined : Hash.deserialize(hash.serialize())
 }
 
 async function get_current_commitment(db: Ethereum_Database, id: Hash): Promise<Hash | undefined> {
   let hash = await db.get_current_commitment(Ethereum_Hash.deserialize(id.serialize()))
-  return ((hash === undefined) ? undefined : Hash.deserialize(hash.serialize()))
+  return hash === undefined ? undefined : Hash.deserialize(hash.serialize())
 }
 
 async function set_current_commitment(db: Ethereum_Database, channel: Hash, commitment: Hash) {
-  await db.set_current_commitment(Ethereum_Hash.deserialize(channel.serialize()), Ethereum_Hash.deserialize(commitment.serialize()))
+  await db.set_current_commitment(
+    Ethereum_Hash.deserialize(channel.serialize()),
+    Ethereum_Hash.deserialize(commitment.serialize())
+  )
 }
 
 async function store_hash_intermediaries(db: Ethereum_Database, channel: Hash, intermediaries: any) {
   await db.store_hash_intermediaries(Ethereum_Hash.deserialize(channel.serialize()), intermediaries)
 }
-
-
 
 // NOTE: this was not an async function
 async function searchDBFor(db: Ethereum_Database, channelId: Hash, iteration: number): Promise<Uint8Array | undefined> {

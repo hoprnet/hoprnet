@@ -31,12 +31,12 @@ core_ethereum_db_initialize_crate()
 
 // WASM magic - types and DB operations live in a different crate, serde is necessary
 async function get_channels_from(db: Ethereum_Database, address: Address) {
-    return await db.get_channels_from(Ethereum_Address.deserialize(address.serialize()))
+  return await db.get_channels_from(Ethereum_Address.deserialize(address.serialize()))
 }
 
 async function get_channel(db: Ethereum_Database, id: Hash): Promise<ChannelEntry> {
   let channel = await db.get_channel(Ethereum_Hash.deserialize(id.serialize()))
-  return ((channel === undefined) ? undefined : ChannelEntry.deserialize(channel.serialize()))
+  return channel === undefined ? undefined : ChannelEntry.deserialize(channel.serialize())
 }
 
 async function mark_pending(db: Ethereum_Database, ticket: Ticket) {
@@ -44,19 +44,20 @@ async function mark_pending(db: Ethereum_Database, ticket: Ticket) {
 }
 
 async function get_pending_balance_to(db: Ethereum_Database, address: Address): Promise<Balance> {
-  return Balance.deserialize((await db.get_pending_balance_to(Ethereum_Address.deserialize(address.serialize()))).serialize_value(), BalanceType.HOPR)
+  return Balance.deserialize(
+    (await db.get_pending_balance_to(Ethereum_Address.deserialize(address.serialize()))).serialize_value(),
+    BalanceType.HOPR
+  )
 }
 
 async function get_account_from_network_registry(db: Ethereum_Database, key: PublicKey): Promise<Address> {
   let address = await db.get_account_from_network_registry(Ethereum_PublicKey.deserialize(key.serialize(false)))
-  return ((address === undefined) ? undefined : Address.deserialize(address.serialize()))
+  return address === undefined ? undefined : Address.deserialize(address.serialize())
 }
 
 async function is_eligible(db: Ethereum_Database, address: Address): Promise<boolean> {
   return await db.is_eligible(Ethereum_Address.deserialize(address.serialize()))
 }
-
-
 
 describe('test indexer', function () {
   it('should start indexer', async function () {
@@ -690,7 +691,7 @@ describe('test indexer', function () {
 
     newBlock()
     await processed.promise
-    assert(await get_account_from_network_registry(db,PublicKey.from_peerid_str(PARTY_B_MULTIADDR.getPeerId())))
+    assert(await get_account_from_network_registry(db, PublicKey.from_peerid_str(PARTY_B_MULTIADDR.getPeerId())))
     assert(await is_eligible(db, fixtures.PARTY_A().to_address()))
   })
 
@@ -709,7 +710,7 @@ describe('test indexer', function () {
 
     newBlock()
     await processed.promise
-    assert(await get_account_from_network_registry(db,PublicKey.from_peerid_str(PARTY_B_MULTIADDR.getPeerId())))
+    assert(await get_account_from_network_registry(db, PublicKey.from_peerid_str(PARTY_B_MULTIADDR.getPeerId())))
     assert((await is_eligible(db, fixtures.PARTY_A().to_address())) === false)
   })
 
@@ -734,7 +735,10 @@ describe('test indexer', function () {
 
     newBlock()
     await processed.promise
-    assert.equal(await get_account_from_network_registry(db, PublicKey.from_peerid_str(PARTY_B_MULTIADDR.getPeerId())), undefined)
+    assert.equal(
+      await get_account_from_network_registry(db, PublicKey.from_peerid_str(PARTY_B_MULTIADDR.getPeerId())),
+      undefined
+    )
     assert(await is_eligible(db, fixtures.PARTY_A().to_address()))
   })
 

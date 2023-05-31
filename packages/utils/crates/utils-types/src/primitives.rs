@@ -4,7 +4,7 @@ use std::fmt::{Display, Formatter};
 use std::ops::{Add, Mul, Sub};
 
 use crate::errors::{GeneralError, GeneralError::InvalidInput, GeneralError::ParseError, Result};
-use crate::traits::{BinarySerializable, ToHex};
+use crate::traits::{AutoBinarySerializable, BinarySerializable, ToHex};
 
 /// Represents an Ethereum address
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
@@ -460,6 +460,37 @@ impl U256 {
         } else {
             Err(InvalidInput)
         }
+    }
+}
+
+// TODO: move this somewhere more appropriate
+/// Represents an immutable authorization token used by the REST API.
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+pub struct AuthorizationToken {
+    id: String,
+    token: Box<[u8]>,
+}
+
+impl AutoBinarySerializable<'_> for AuthorizationToken {}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+impl AuthorizationToken {
+    /// Creates new token from the serialized data and id
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
+    pub fn new(id: String, data: &[u8]) -> Self {
+        assert!(data.len() < 2048, "invalid token size");
+        Self { id, token: data.into() }
+    }
+
+    /// Gets the id of the token
+    pub fn id(&self) -> String {
+        self.id.clone()
+    }
+
+    /// Gets token binary data
+    pub fn get(&self) -> Box<[u8]> {
+        self.token.clone()
     }
 }
 

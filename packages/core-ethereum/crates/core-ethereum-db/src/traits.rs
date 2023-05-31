@@ -9,7 +9,7 @@ use core_types::{
     account::AccountEntry,
     channels::{ChannelEntry, Ticket},
 };
-use utils_types::primitives::{Address, Balance, Snapshot, U256};
+use utils_types::primitives::{Address, AuthorizationToken, Balance, Snapshot, U256};
 
 use crate::errors::Result;
 
@@ -196,4 +196,13 @@ pub trait HoprCoreEthereumDbActions {
 
     /// Set address as eligible to be operating in the network.
     async fn set_eligible(&mut self, account: &Address, eligible: bool, snapshot: &Snapshot) -> Result<()>;
+
+    /// Stores the REST API token.
+    async fn store_authorization(&mut self, token: AuthorizationToken) -> Result<()>;
+
+    /// Retrieves the REST API token given its ID.
+    async fn retrieve_authorization(&self, id: String) -> Result<AuthorizationToken>;
+
+    /// Deletes the REST API token given its ID.
+    async fn delete_authorization(&mut self, id: String) -> Result<()>;
 }

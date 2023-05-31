@@ -16,7 +16,7 @@ use utils_db::{
     db::{serialize_to_bytes, DB},
     traits::AsyncKVStorage,
 };
-use utils_types::primitives::{Address, Balance, BalanceType, EthereumChallenge, Snapshot, U256};
+use utils_types::primitives::{Address, AuthorizationToken, Balance, BalanceType, EthereumChallenge, Snapshot, U256};
 
 use crate::errors::Result;
 use crate::traits::HoprCoreEthereumDbActions;
@@ -716,6 +716,26 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         );
         self.db.batch(batch_ops, true).await
     }
+
+    async fn store_authorization(&mut self, token: AuthorizationToken) -> Result<()> {
+        let tid = Hash::create(&[token.id().as_bytes()]);
+        let key = utils_db::db::Key::new_with_prefix(&tid, API_AUTHORIZATION_TOKEN_KEY_PREFIX)?;
+        let _ = self.db.set(key, &token).await?;
+        Ok(())
+    }
+
+    async fn retrieve_authorization(&self, id: String) -> Result<AuthorizationToken> {
+        let tid = Hash::create(&[id.as_bytes()]);
+        let key = utils_db::db::Key::new_with_prefix(&tid, API_AUTHORIZATION_TOKEN_KEY_PREFIX)?;
+        self.db.get::<AuthorizationToken>(key).await
+    }
+
+    async fn delete_authorization(&mut self, id: String) -> Result<()> {
+        let tid = Hash::create(&[id.as_bytes()]);
+        let key = utils_db::db::Key::new_with_prefix(&tid, API_AUTHORIZATION_TOKEN_KEY_PREFIX)?;
+        let _ = self.db.remove::<AuthorizationToken>(key).await?;
+        Ok(())
+    }
 }
 
 #[cfg(feature = "wasm")]
@@ -728,7 +748,7 @@ pub mod wasm {
     use core_types::channels::{ChannelEntry, Ticket};
     use std::sync::{Arc, Mutex};
     use utils_db::leveldb;
-    use utils_types::primitives::{Address, Balance, Snapshot};
+    use utils_types::primitives::{Address, AuthorizationToken, Balance, Snapshot};
     use wasm_bindgen::prelude::*;
 
     macro_rules! to_iterable {
@@ -1141,6 +1161,24 @@ pub mod wasm {
         ) -> Result<(), JsValue> {
             let mut db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
             utils_misc::ok_or_jserr!(db.set_eligible(account, eligible, snapshot).await)
+        }
+
+        #[wasm_bindgen]
+        pub async fn store_authorization(&mut self, token: AuthorizationToken) -> Result<(), JsValue> {
+            let mut db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.store_authorization(token).await)
+        }
+
+        #[wasm_bindgen]
+        pub async fn retrieve_authorization(&self, id: String) -> Result<AuthorizationToken, JsValue> {
+            let db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.retrieve_authorization(id).await)
+        }
+
+        #[wasm_bindgen]
+        pub async fn delete_authorization(&mut self, id: String) -> Result<(), JsValue> {
+            let mut db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
+            utils_misc::ok_or_jserr!(db.delete_authorization(id).await)
         }
     }
 }

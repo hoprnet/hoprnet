@@ -5,7 +5,7 @@ import { createHash } from 'crypto'
 // List of endpoints which are supported as capabilitities.
 // Each entry also specifies supported endpoint-specific limits.
 import supportedCapabilities from './../supported-api-capabilities.json' assert { type: 'json' }
-import { Database } from '@hoprnet/hopr-core/lib/core_packet.js'
+import { AuthorizationToken, Database } from '@hoprnet/hopr-core/lib/core_packet.js'
 
 enum LimitType {
   calls
@@ -34,9 +34,6 @@ export type Token = {
   valid_until?: number
 }
 
-// this namespace is used as a prefix for all stored keys
-const ns = 'authenticationTokens'
-
 // Authenticate the given token object, verifying its stored in the database.
 // @param db Reference to a HoprDB instance.
 // @param id Token id which should be authenticated.
@@ -47,7 +44,7 @@ export async function authenticateToken(db: Database, id: string): Promise<Token
   }
 
   // id is used as key, the returned object includes the associated data
-  const token = await db.getSerializedObject(ns, id)
+  const token = await db.retrieve_authorization(id)
 
   // if no token was found, we return directly, otherwise the result is
   // deserialized first
@@ -55,7 +52,7 @@ export async function authenticateToken(db: Database, id: string): Promise<Token
     return undefined
   }
 
-  const deserializedToken = deserializeToken(token)
+  const deserializedToken = deserializeToken(token.get())
 
   // delete token if lifetime has passed, otherwise return
   const now = Date.now()
@@ -188,7 +185,7 @@ export async function createToken(
 // @param id Token object.
 export async function storeToken(db: Database, token: Token): Promise<void> {
   const serializedToken = serializeToken(token)
-  await db.putSerializedObject(ns, token.id, serializedToken)
+  await db.store_authorization(new AuthorizationToken(token.id, serializedToken))
 }
 
 // Delete a token from the database.
@@ -198,7 +195,7 @@ export async function deleteToken(db: Database, id: string): Promise<void> {
   if (!id) {
     return
   }
-  await db.deleteObject(ns, id)
+  await db.delete_authorization(id)
 }
 
 // Serialize the given token object into a byte array.
