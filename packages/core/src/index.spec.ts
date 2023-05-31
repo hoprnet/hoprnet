@@ -57,7 +57,7 @@ describe('hopr core (instance)', function () {
 
     log('Creating hopr node...')
     HoprCoreEthereum.createMockInstance(peerId)
-    const db = new LevelDb();
+    const db = new LevelDb()
     await db.backend.open()
 
     const node = new Hopr(peerId, new Database(db, PublicKey.from_peerid_str(peerId.toString())), opts as HoprOptions)

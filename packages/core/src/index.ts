@@ -151,6 +151,9 @@ const metric_strategyMaxChannels = create_gauge(
   'Maximum number of channels the current strategy can open'
 )
 
+/// Maximum time to wait for a packet to be pushed to the interaction queue
+const PACKET_QUEUE_TIMEOUT_SECONDS = 15n
+
 export function privateKeyFromPeer(peer: PeerId) {
   if (peer.privateKey == undefined) throw Error('peer id does not contain a private key')
 
@@ -1062,7 +1065,7 @@ class Hopr extends EventEmitter {
     const path = new Path([...intermediatePath.map((pk) => pk.to_peerid_str()), destination.toString()])
     metric_pathLength.observe(path.length())
 
-    return (await this.forward.send_packet(msg, path)).to_hex()
+    return (await this.forward.send_packet(msg, path, PACKET_QUEUE_TIMEOUT_SECONDS)).to_hex()
   }
 
   /**

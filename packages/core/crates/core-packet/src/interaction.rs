@@ -1,6 +1,6 @@
 use crate::errors::PacketError::{
     AcknowledgementValidation, ChannelNotFound, InvalidPacketState, OutOfFunds, PathNotValid, Retry, TagReplay,
-    TransportError,
+    Timeout, TransportError,
 };
 use crate::errors::Result;
 use crate::packet::{Packet, PacketState};
@@ -11,9 +11,12 @@ use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_mixer::mixer::{Mixer, MixerConfig};
 use core_types::acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket};
 use core_types::channels::Ticket;
+use futures::future::{select, Either};
+use futures::pin_mut;
 use libp2p_identity::PeerId;
 use std::ops::{Deref, Mul};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use utils_log::{debug, error, info};
 use utils_types::primitives::{Balance, BalanceType, U256};
 use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
@@ -105,7 +108,7 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
     }
 
     /// Pushes the `Payload` received from the transport layer into processing.
-    /// If `wait` is `true`, the method waits if the RX queue is full until there's space.
+    /// If `wait` is `true`, the method waits indefinitely if the RX queue is full until there's space.
     /// If `wait` is `false` and the RX queue is full, the method fails with `Err(Retry)`. At this point, the
     /// caller can decide whether to discard the acknowledgement.
     pub async fn received_acknowledgement(&self, payload: Payload, wait: bool) -> Result<()> {
@@ -124,26 +127,33 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
     }
 
     /// Pushes a new outgoing acknowledgement into the processing given its destination.
-    /// If `wait` is `true`, the method waits if the TX queue is full until there's space.
-    /// If `wait` is `false` and the TX queue is full, the method fails with `Err(Retry)`
+    /// If `timeout` is given, the method waits the given time if the TX queue is full until there's space.
+    /// If the `timeout` is zero, the method waits indefinitely.
+    /// If `timeout` is `None` and the TX queue is full, the method fails with `Err(Retry)`
     pub async fn send_acknowledgement(
         &self,
         acknowledgement: Acknowledgement,
         destination: PeerId,
-        wait: bool,
+        timeout: Option<Duration>,
     ) -> Result<()> {
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_SENT_ACKS.increment();
 
-        if wait {
-            self.outgoing_channel
-                .0
-                .send(Payload {
-                    remote_peer: destination,
-                    data: acknowledgement.to_bytes(),
-                })
-                .await
-                .map_err(|_| TransportError("queue is closed".to_string()))
+        if let Some(timeout_val) = timeout {
+            let push = self.outgoing_channel.0.send(Payload {
+                remote_peer: destination,
+                data: acknowledgement.to_bytes(),
+            });
+            if timeout_val.is_zero() {
+                let timeout = async_std::task::sleep(timeout_val);
+                pin_mut!(push, timeout);
+                match select(push, timeout).await {
+                    Either::Left((res, _)) => res.map_err(|_| TransportError("queue is closed".to_string())),
+                    Either::Right(_) => Err(Timeout(timeout_val.as_secs())),
+                }
+            } else {
+                push.await.map_err(|_| TransportError("queue is closed".to_string()))
+            }
         } else {
             self.outgoing_channel
                 .0
@@ -433,9 +443,10 @@ where
     }
 
     /// Pushes the packet with the given payload for sending via the given valid path.
-    /// If `wait` is `true`, the method waits if the TX queue is full until there's space.
-    /// If `wait` is `false` and the TX queue is full, the method fails with `Err(Retry)`
-    pub async fn send_packet(&self, msg: &[u8], path: Path, wait: bool) -> Result<HalfKeyChallenge> {
+    /// If `timeout` is given, the method waits the given time if the TX queue is full until there's space.
+    /// If `timeout` is zero, the method waits indefinitely.
+    /// If `timeout` is `None` and the TX queue is full, the method fails with `Err(Retry)`
+    pub async fn send_packet(&self, msg: &[u8], path: Path, timeout: Option<Duration>) -> Result<HalfKeyChallenge> {
         // Check if the path is valid
         if !path.valid() {
             return Err(PathNotValid);
@@ -462,15 +473,21 @@ where
                 #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_PACKETS_COUNT.increment();
 
-                if wait {
-                    self.outgoing_packets
-                        .0
-                        .send(Payload {
-                            remote_peer: path.hops()[0].clone(),
-                            data: packet.to_bytes(),
-                        })
-                        .await
-                        .map_err(|_| TransportError("queue is closed".to_string()))?;
+                if let Some(timeout_value) = timeout {
+                    let push = self.outgoing_packets.0.send(Payload {
+                        remote_peer: path.hops()[0].clone(),
+                        data: packet.to_bytes(),
+                    });
+                    if !timeout_value.is_zero() {
+                        let timeout = async_std::task::sleep(timeout_value);
+                        pin_mut!(push, timeout);
+                        match select(push, timeout).await {
+                            Either::Left((res, _)) => res.map_err(|_| TransportError("queue is closed".to_string())),
+                            Either::Right(_) => Err(Timeout(timeout_value.as_secs())),
+                        }
+                    } else {
+                        push.await.map_err(|_| TransportError("queue is closed".to_string()))
+                    }
                 } else {
                     self.outgoing_packets
                         .0
@@ -481,8 +498,9 @@ where
                         .map_err(|e| match e {
                             TrySendError::Full(_) => Retry,
                             TrySendError::Closed(_) => TransportError("queue is closed".to_string()),
-                        })?;
-                }
+                        })
+                }?;
+
                 Ok(ack_challenge.clone())
             }
             _ => panic!("invalid packet state"),
@@ -525,11 +543,14 @@ where
                     }
                 }
 
-                // And create acknowledgement
+                // And create acknowledgement, but do not fail completely if it fails
                 let ack = packet.create_acknowledgement(&self.cfg.private_key).unwrap();
-                ack_interaction
-                    .send_acknowledgement(ack, previous_hop.to_peerid(), true)
-                    .await?;
+                if let Err(e) = ack_interaction
+                    .send_acknowledgement(ack, previous_hop.to_peerid(), None)
+                    .await
+                {
+                    error!("failed acknowledge the final packet: {e}");
+                }
 
                 #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_RECV_MESSAGE_COUNT.increment();
@@ -621,9 +642,11 @@ where
             .await
             .map_err(|e| TransportError(e))?;
 
-        // Acknowledge to the previous hop that we forwarded the packet
+        // Acknowledge to the previous hop that we forwarded the packet, but do not fail if the acknowledgement fails
         let ack = packet.create_acknowledgement(&self.cfg.private_key).unwrap();
-        ack_interaction.send_acknowledgement(ack, previous_peer, true).await?;
+        if let Err(e) = ack_interaction.send_acknowledgement(ack, previous_peer, None).await {
+            error!("failed to acknowledge relayed packet: {e}");
+        }
 
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_FWD_MESSAGE_COUNT.increment();
@@ -677,7 +700,7 @@ where
     }
 
     /// Pushes the `Payload` received from the transport layer into processing.
-    /// If `wait` is `true`, the method waits if the RX queue is full until there's space.
+    /// If `wait` is `true`, the method waits indefinitely if the RX queue is full until there's space.
     /// If `wait` is `false` and the RX queue is full, the method fails with `Err(Retry)`. At this point, the
     /// caller can decide whether to discard the packet.
     pub async fn received_packet(&self, payload: Payload, wait: bool) -> Result<()> {
@@ -1062,7 +1085,7 @@ mod tests {
                 .send_acknowledgement(
                     Acknowledgement::new(ack_msg, ack_key, &PEERS_PRIVS[1]),
                     PEERS[0].clone(),
-                    false,
+                    None,
                 )
                 .await
                 .expect("failed to send ack");
@@ -1196,7 +1219,7 @@ mod tests {
         // Peer 1: start sending out packets
         for _ in 0..PENDING_PACKETS {
             packet_sender
-                .send_packet(&TEST_MESSAGE, packet_path.clone(), false)
+                .send_packet(&TEST_MESSAGE, packet_path.clone(), None)
                 .await
                 .unwrap();
         }
@@ -1395,7 +1418,7 @@ mod tests {
         // Start sending packets
         for _ in 0..PENDING_PACKETS {
             packet_sender
-                .send_packet(&TEST_MESSAGE, packet_path.clone(), true)
+                .send_packet(&TEST_MESSAGE, packet_path.clone(), Some(Duration::from_secs(10)))
                 .await
                 .unwrap();
         }
@@ -1435,6 +1458,7 @@ pub mod wasm {
     use crate::path::Path;
     use async_std::channel::unbounded;
     use core_crypto::types::{HalfKeyChallenge, PublicKey};
+    use core_ethereum_db::db::wasm::Database;
     use core_ethereum_db::db::CoreEthereumDb;
     use core_mixer::mixer::Mixer;
     use core_types::acknowledgement::{AcknowledgedTicket, Acknowledgement};
@@ -1443,9 +1467,9 @@ pub mod wasm {
     use std::future::Future;
     use std::pin::Pin;
     use std::str::FromStr;
-    use std::sync::{Arc, Mutex};
-    use utils_db::db::DB;
-    use utils_db::leveldb::{LevelDb, LevelDbShim};
+    use std::sync::Arc;
+    use std::time::Duration;
+    use utils_db::leveldb::LevelDbShim;
     use utils_log::error;
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
@@ -1510,7 +1534,7 @@ pub mod wasm {
     impl WasmAckInteraction {
         #[wasm_bindgen(constructor)]
         pub fn new(
-            db: LevelDb,
+            db: Database,
             chain_key: PublicKey,
             on_acknowledgement: Option<js_sys::Function>,
             on_acknowledged_ticket: Option<js_sys::Function>,
@@ -1549,10 +1573,7 @@ pub mod wasm {
 
             Self {
                 w: Arc::new(AcknowledgementInteraction::new(
-                    Arc::new(Mutex::new(CoreEthereumDb::new(
-                        DB::new(LevelDbShim::new(db)),
-                        chain_key.clone(),
-                    ))),
+                    db.as_ref_counted(),
                     chain_key,
                     on_ack.0,
                     on_ack_ticket.0,
@@ -1564,10 +1585,19 @@ pub mod wasm {
             ok_or_jserr!(self.w.received_acknowledgement(payload, false).await)
         }
 
-        pub async fn send_acknowledgement(&self, ack: Acknowledgement, dest: String) -> JsResult<()> {
+        pub async fn send_acknowledgement(
+            &self,
+            ack: Acknowledgement,
+            dest: String,
+            timeout_secs: u64,
+        ) -> JsResult<()> {
             ok_or_jserr!(
                 self.w
-                    .send_acknowledgement(ack, ok_or_jserr!(PeerId::from_str(&dest))?, false)
+                    .send_acknowledgement(
+                        ack,
+                        ok_or_jserr!(PeerId::from_str(&dest))?,
+                        Some(Duration::from_secs(timeout_secs))
+                    )
                     .await
             )
         }
@@ -1594,20 +1624,13 @@ pub mod wasm {
     #[wasm_bindgen]
     impl WasmPacketInteraction {
         #[wasm_bindgen(constructor)]
-        pub fn new(db: LevelDb, on_final_packet: Option<js_sys::Function>, cfg: PacketInteractionConfig) -> Self {
+        pub fn new(db: Database, on_final_packet: Option<js_sys::Function>, cfg: PacketInteractionConfig) -> Self {
             let on_msg = on_final_packet.is_some().then(unbounded::<Box<[u8]>>).unzip();
 
             // For WASM we need to create mixer with gloo-timers
             let gloo_mixer = Mixer::new_with_gloo_timers(cfg.mixer.clone());
 
-            let mut w = PacketInteraction::new(
-                Arc::new(Mutex::new(CoreEthereumDb::new(
-                    DB::new(LevelDbShim::new(db)),
-                    PublicKey::from_privkey(&cfg.private_key).expect("invalid private key"),
-                ))),
-                on_msg.0,
-                cfg,
-            );
+            let mut w = PacketInteraction::new(db.as_ref_counted(), on_msg.0, cfg);
             w.mixer = gloo_mixer;
 
             if let Some(on_msg_recv) = on_msg.1 {
@@ -1630,8 +1653,12 @@ pub mod wasm {
             ok_or_jserr!(self.w.received_packet(payload, false).await)
         }
 
-        pub async fn send_packet(&self, msg: &[u8], path: Path) -> JsResult<HalfKeyChallenge> {
-            ok_or_jserr!(self.w.send_packet(msg, path, false).await)
+        pub async fn send_packet(&self, msg: &[u8], path: Path, timeout_secs: u64) -> JsResult<HalfKeyChallenge> {
+            ok_or_jserr!(
+                self.w
+                    .send_packet(msg, path, Some(Duration::from_secs(timeout_secs)))
+                    .await
+            )
         }
 
         pub async fn handle_outgoing_packets(&self, transport_cb: &js_sys::Function) {
