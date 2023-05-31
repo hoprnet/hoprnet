@@ -305,8 +305,9 @@ export class LevelDb {
 
 /// Class designated to migrate the functionality to Rust
 export class HoprDB {
-  protected db: LevelDb
-  protected id: PublicKey
+  // made public to allow access for Rust code
+  public db: LevelDb
+  public id: PublicKey
 
   constructor(publicKey: PublicKey) {
     this.db = new LevelDb()

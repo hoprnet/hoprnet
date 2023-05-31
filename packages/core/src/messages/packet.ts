@@ -97,7 +97,6 @@ async function createTicket(dest: PublicKey, pathLength: number, db: HoprDB, pri
 
   const ticket = Ticket.new(
     dest.to_address(),
-    undefined,
     new U256(channel.ticket_epoch.to_string()),
     currentTicketIndex,
     amount,
@@ -219,7 +218,7 @@ export class PacketHelper {
 
     let ticket: Ticket
     if (path.length == 1) {
-      ticket = Ticket.new_zero_hop(next_peer, undefined, private_key)
+      ticket = Ticket.new_zero_hop(next_peer, private_key)
     } else {
       ticket = await createTicket(next_peer, path.length, db, private_key)
     }
@@ -315,7 +314,7 @@ export class PacketHelper {
 
     let ticket: Ticket
     if (pathPosition == 1) {
-      ticket = Ticket.new_zero_hop(nextPeer, undefined, private_key)
+      ticket = Ticket.new_zero_hop(nextPeer, private_key)
     } else {
       ticket = await createTicket(nextPeer, pathPosition, db, private_key)
     }

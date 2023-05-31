@@ -1,5 +1,5 @@
 use core_crypto::errors::CryptoError::SignatureVerification;
-use core_crypto::types::{Challenge, Hash, PublicKey, Response, Signature};
+use core_crypto::types::{Hash, PublicKey, Response, Signature};
 use enum_iterator::{all, Sequence};
 use ethnum::u256;
 use serde::{Deserialize, Serialize};
@@ -63,6 +63,32 @@ pub struct ChannelEntry {
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl ChannelEntry {
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
+    pub fn new(
+        source: PublicKey,
+        destination: PublicKey,
+        balance: Balance,
+        commitment: Hash,
+        ticket_epoch: U256,
+        ticket_index: U256,
+        status: ChannelStatus,
+        channel_epoch: U256,
+        closure_time: U256,
+    ) -> Self {
+        assert_eq!(BalanceType::HOPR, balance.balance_type(), "invalid balance currency");
+        ChannelEntry {
+            source,
+            destination,
+            balance,
+            commitment,
+            ticket_epoch,
+            ticket_index,
+            status,
+            channel_epoch,
+            closure_time,
+        }
+    }
+
     /// Generates the ticket ID using the source and destination address
     pub fn get_id(&self) -> Hash {
         generate_channel_id(&self.source.to_address(), &self.destination.to_address())
@@ -188,6 +214,7 @@ impl Ticket {
         index: &U256,
         channel_epoch: &U256,
     ) -> Vec<u8> {
+        assert_eq!(BalanceType::HOPR, amount.balance_type(), "invalid balance currency");
         let mut ret = Vec::<u8>::with_capacity(Self::SIZE);
         ret.extend_from_slice(&counterparty.to_bytes());
         ret.extend_from_slice(&challenge.to_bytes());
@@ -202,7 +229,6 @@ impl Ticket {
     /// Creates a new Ticket given the raw Challenge and signs it using the given key.
     pub fn new(
         counterparty: Address,
-        challenge: Option<Challenge>,
         epoch: U256,
         index: U256,
         amount: Balance,
@@ -212,7 +238,7 @@ impl Ticket {
     ) -> Self {
         let mut ret = Self {
             counterparty,
-            challenge: challenge.map_or_else(|| EthereumChallenge::default(), |c| c.to_ethereum_challenge()),
+            challenge: EthereumChallenge::default(),
             epoch,
             index,
             amount,
@@ -235,10 +261,9 @@ impl Ticket {
     }
 
     /// Convenience method for creating a zero-hop ticket
-    pub fn new_zero_hop(destination: PublicKey, challenge: Option<Challenge>, private_key: &[u8]) -> Self {
+    pub fn new_zero_hop(destination: PublicKey, private_key: &[u8]) -> Self {
         Self::new(
             destination.to_address(),
-            challenge,
             U256::zero(),
             U256::zero(),
             Balance::new(0u32.into(), BalanceType::HOPR),
@@ -283,14 +308,14 @@ impl Ticket {
     /// Decides whether a ticket is a win or not.
     /// Note that this mimics the on-chain logic.
     /// Purpose of the function is to check the validity of ticket before we submit it to the blockchain.
-    pub fn is_winning(&self, preimage: &Hash, channel_response: &Response, win_prob: &U256) -> bool {
+    pub fn is_winning(&self, preimage: &Hash, channel_response: &Response, win_prob: U256) -> bool {
         let luck = self.get_luck(preimage, channel_response);
         luck.value().le(win_prob.value())
     }
 
     /// Based on the price of this ticket, determines the path position (hop number) this ticket
     /// relates to.
-    pub fn get_path_position(&self, price_per_packet: &U256, inverse_ticket_win_prob: &U256) -> u8 {
+    pub fn get_path_position(&self, price_per_packet: U256, inverse_ticket_win_prob: U256) -> u8 {
         let base_unit = price_per_packet.value().mul(inverse_ticket_win_prob.value());
         self.amount.value().value().div(base_unit).as_u8()
     }
@@ -354,7 +379,7 @@ impl Ticket {
 
 #[cfg(test)]
 pub mod tests {
-    use core_crypto::types::{Challenge, CurvePoint, Hash, PublicKey};
+    use core_crypto::types::{Hash, PublicKey};
     use ethnum::u256;
     use hex_literal::hex;
     use utils_types::primitives::{Address, Balance, BalanceType, U256};
@@ -410,21 +435,15 @@ pub mod tests {
         let price_per_packet = u256::new(10000000000000000u128); // 0.01 HOPR
         let path_pos = 5u8;
 
-        let curve_point = CurvePoint::from_bytes(&hex!(
-            "03c2aa76d6837c51337001c8b5a60473726064fc35d0a40b8f0e1f068cc8e38e10"
-        ))
-        .unwrap();
-
         let ticket1 = Ticket::new(
             Address::new(&[0u8; Address::SIZE]),
-            Some(Challenge { curve_point }),
             U256::new("1"),
             U256::new("2"),
             Balance::new(
                 (inverse_win_prob * price_per_packet * path_pos as u128).into(),
                 BalanceType::HOPR,
             ),
-            U256::from_inverse_probability(&inverse_win_prob).unwrap(),
+            U256::from_inverse_probability(inverse_win_prob.into()).unwrap(),
             U256::new("4"),
             &SGN_PRIVATE_KEY,
         );
@@ -438,12 +457,12 @@ pub mod tests {
         assert!(ticket2.verify(&pub_key).is_ok(), "failed to verify signed ticket 2");
 
         assert_eq!(
-            ticket1.get_path_position(&price_per_packet.into(), &inverse_win_prob.into()),
+            ticket1.get_path_position(price_per_packet.into(), inverse_win_prob.into()),
             path_pos,
             "invalid path pos"
         );
         assert_eq!(
-            ticket2.get_path_position(&price_per_packet.into(), &inverse_win_prob.into()),
+            ticket2.get_path_position(price_per_packet.into(), inverse_win_prob.into()),
             path_pos,
             "invalid path pos"
         );
@@ -483,31 +502,6 @@ pub mod wasm {
 
     #[wasm_bindgen]
     impl ChannelEntry {
-        #[wasm_bindgen(constructor)]
-        pub fn new(
-            source: PublicKey,
-            destination: PublicKey,
-            balance: Balance,
-            commitment: Hash,
-            ticket_epoch: U256,
-            ticket_index: U256,
-            status: ChannelStatus,
-            channel_epoch: U256,
-            closure_time: U256,
-        ) -> Self {
-            ChannelEntry {
-                source,
-                destination,
-                balance,
-                commitment,
-                ticket_epoch,
-                ticket_index,
-                status,
-                channel_epoch,
-                closure_time,
-            }
-        }
-
         #[wasm_bindgen(js_name = "deserialize")]
         pub fn _deserialize(data: &[u8]) -> JsResult<ChannelEntry> {
             ok_or_jserr!(ChannelEntry::from_bytes(data))

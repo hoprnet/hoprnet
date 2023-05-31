@@ -1,9 +1,9 @@
 use ethnum::{u256, AsU256};
 use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
 use std::ops::{Add, Mul, Sub};
-use std::string::ToString;
 
-use crate::errors::{GeneralError::InvalidInput, GeneralError::ParseError, Result};
+use crate::errors::{GeneralError, GeneralError::InvalidInput, GeneralError::ParseError, Result};
 use crate::traits::{BinarySerializable, ToHex};
 
 /// Represents an Ethereum address
@@ -65,9 +65,10 @@ impl BinarySerializable<'_> for Address {
     }
 }
 
-impl Address {
-    // impl std::str::FromStr for Address {
-    pub fn from_str(value: &str) -> Result<Address> {
+impl std::str::FromStr for Address {
+    type Err = GeneralError;
+
+    fn from_str(value: &str) -> Result<Address> {
         let decoded = if value.starts_with("0x") || value.starts_with("0X") {
             hex::decode(&value[2..])
         } else {
@@ -75,7 +76,6 @@ impl Address {
         };
         Self::from_bytes(&decoded.map_err(|_| ParseError)?)
     }
-    // }
 }
 
 /// Represents a type of the balance: native or HOPR tokens.
@@ -87,7 +87,7 @@ pub enum BalanceType {
 }
 
 /// Represents balance of some coin or token.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Balance {
     value: U256,
@@ -96,6 +96,7 @@ pub struct Balance {
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl Balance {
+    /// Creates new balance of the given type from the base 10 integer string
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn from_str(value: &str, balance_type: BalanceType) -> Self {
         Self {
@@ -106,9 +107,10 @@ impl Balance {
         }
     }
 
+    /// Creates zero balance of the given type
     pub fn zero(balance_type: BalanceType) -> Self {
         Self {
-            value: U256 { value: u256::ZERO },
+            value: U256::zero(),
             balance_type,
         }
     }
@@ -122,18 +124,6 @@ impl Balance {
     pub fn of_same(&self, value: &str) -> Self {
         Self::from_str(value, self.balance_type)
     }
-
-    // impl ToHex for Balance {
-    pub fn to_hex(&self) -> String {
-        hex::encode(self.value().value().to_be_bytes())
-    }
-    // }
-
-    // impl std::string::ToString for Balance {
-    pub fn to_string(&self) -> String {
-        self.value.to_string()
-    }
-    // }
 
     /// Serializes just the value of the balance (not the symbol)
     pub fn serialize_value(&self) -> Box<[u8]> {
@@ -163,8 +153,6 @@ impl Balance {
         assert_eq!(self.balance_type(), other.balance_type());
         self.value().gt(other.value()) || self.value().eq(other.value())
     }
-
-    // }
 
     pub fn add(&self, other: &Balance) -> Self {
         assert_eq!(self.balance_type(), other.balance_type());
@@ -225,6 +213,12 @@ impl Balance {
 
     pub fn amount(&self) -> U256 {
         self.value.clone().into()
+    }
+}
+
+impl Display for Balance {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} {:?}", self.value(), self.balance_type)
     }
 }
 
@@ -356,15 +350,11 @@ impl U256 {
     }
 
     pub fn zero() -> Self {
-        U256 { value: u256::ZERO }
+        Self { value: u256::ZERO }
     }
 
     pub fn one() -> Self {
-        U256 { value: u256::ONE }
-    }
-
-    pub fn to_string(&self) -> String {
-        self.value.to_string()
+        Self { value: u256::ONE }
     }
 
     pub fn as_u32(&self) -> u32 {
@@ -374,13 +364,41 @@ impl U256 {
     pub fn as_u64(&self) -> u64 {
         self.value.as_u64()
     }
+
+    pub fn addn(&self, n: u32) -> Self {
+        Self {
+            value: self.value + n as u128,
+        }
+    }
+
+    pub fn muln(&self, n: u32) -> Self {
+        Self {
+            value: self.value * n as u128,
+        }
+    }
+}
+
+impl Display for U256 {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.value)
+    }
+}
+
+impl Mul for U256 {
+    type Output = U256;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        Self {
+            value: self.value.mul(rhs.value),
+        }
+    }
 }
 
 impl BinarySerializable<'_> for U256 {
     const SIZE: usize = 32;
 
     fn from_bytes(data: &[u8]) -> Result<Self> {
-        Ok(U256 {
+        Ok(Self {
             value: u256::from_be_bytes(data.try_into().map_err(|_| ParseError)?),
         })
     }
@@ -420,7 +438,7 @@ impl From<u32> for U256 {
     }
 }
 
-impl ethnum::AsU256 for U256 {
+impl AsU256 for U256 {
     fn as_u256(self) -> ethnum::U256 {
         self.value.clone()
     }
@@ -431,14 +449,14 @@ impl U256 {
         &self.value
     }
 
-    pub fn from_inverse_probability(inverse_prob: &u256) -> Result<U256> {
+    pub fn from_inverse_probability(inverse_prob: U256) -> Result<U256> {
         let highest_prob = u256::MAX;
-        if inverse_prob.gt(&u256::ZERO) {
-            Ok(U256 {
-                value: highest_prob / inverse_prob,
+        if inverse_prob.value.gt(&u256::ZERO) {
+            Ok(Self {
+                value: highest_prob / inverse_prob.value,
             })
-        } else if inverse_prob.eq(&u256::ZERO) {
-            Ok(U256 { value: highest_prob })
+        } else if inverse_prob.value.eq(&u256::ZERO) {
+            Ok(Self { value: highest_prob })
         } else {
             Err(InvalidInput)
         }
@@ -450,6 +468,7 @@ impl U256 {
 mod tests {
     use super::*;
     use hex_literal::hex;
+    use std::str::FromStr;
 
     #[test]
     fn address_tests() {
@@ -473,7 +492,7 @@ mod tests {
     #[test]
     fn balance_tests() {
         let b_1 = Balance::from_str("10", BalanceType::HOPR);
-        assert_eq!("10".to_string(), b_1.to_string(), "to_string failed");
+        assert_eq!("10 HOPR".to_string(), b_1.to_string(), "to_string failed");
 
         let b_2 = Balance::deserialize(&b_1.serialize_value(), BalanceType::HOPR).unwrap();
         assert_eq!(b_1, b_2, "deserialized balance does not match");
@@ -519,9 +538,8 @@ mod tests {
 pub mod wasm {
     use crate::primitives::{Address, Balance, BalanceType, EthereumChallenge, Snapshot, U256};
     use crate::traits::{BinarySerializable, ToHex};
-    use ethnum::u256;
     use std::cmp::Ordering;
-    use std::ops::{Add, Div};
+    use std::str::FromStr;
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use wasm_bindgen::prelude::wasm_bindgen;
@@ -570,23 +588,24 @@ pub mod wasm {
             ok_or_jserr!(Balance::deserialize(data, balance_type))
         }
 
+        #[wasm_bindgen]
+        pub fn to_formatted_string(&self) -> String {
+            self.to_string()
+        }
+
         #[wasm_bindgen(js_name = "eq")]
         pub fn _eq(&self, other: &Balance) -> bool {
             self.eq(other)
         }
 
-        #[wasm_bindgen(js_name = "to_formatted_string")]
-        pub fn _to_formatted_string(&self) -> String {
-            format!(
-                "{} {:?}",
-                self.value().value().div(&u256::from(10u16).pow(18)),
-                self.balance_type
-            )
-        }
-
         #[wasm_bindgen(js_name = "clone")]
         pub fn _clone(&self) -> Self {
             self.clone()
+        }
+
+        #[wasm_bindgen(js_name = "to_string")]
+        pub fn _to_string(&self) -> String {
+            self.value.to_string()
         }
 
         pub fn size() -> u32 {
@@ -672,13 +691,12 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "from_inverse_probability")]
         pub fn _from_inverse_probability(inverse_prob: &U256) -> JsResult<U256> {
-            ok_or_jserr!(U256::from_inverse_probability(inverse_prob.value()))
+            ok_or_jserr!(U256::from_inverse_probability(*inverse_prob))
         }
 
-        pub fn addn(&self, amount: u32) -> Self {
-            Self {
-                value: self.value().add(u256::from(amount)),
-            }
+        #[wasm_bindgen(js_name = "to_string")]
+        pub fn _to_string(&self) -> String {
+            self.to_string()
         }
 
         #[wasm_bindgen(js_name = "eq")]

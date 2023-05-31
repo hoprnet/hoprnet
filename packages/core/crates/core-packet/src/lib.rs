@@ -1,11 +1,15 @@
 pub mod errors;
+pub mod interaction;
 pub mod packet;
+pub mod path;
 pub mod por;
+pub mod validation;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
 
     use utils_log::logger::JsLogger;
+    use utils_misc::utils::wasm::JsResult;
     use wasm_bindgen::prelude::*;
 
     // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global allocator.
@@ -28,5 +32,10 @@ pub mod wasm {
         // https://github.com/rustwasm/console_error_panic_hook#readme
         #[cfg(feature = "console_error_panic_hook")]
         console_error_panic_hook::set_once();
+    }
+
+    #[wasm_bindgen]
+    pub fn core_packet_gather_metrics() -> JsResult<String> {
+        utils_metrics::metrics::wasm::gather_all_metrics()
     }
 }

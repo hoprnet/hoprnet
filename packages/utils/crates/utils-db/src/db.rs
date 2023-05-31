@@ -1,3 +1,4 @@
+use std::fmt::{Display, Formatter};
 use std::ops::Deref;
 
 use futures_lite::stream::StreamExt;
@@ -44,6 +45,12 @@ impl Batch {
 #[derive(Debug, Clone)]
 pub struct Key {
     key: Box<[u8]>,
+}
+
+impl Display for Key {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", hex::encode(&self.key))
+    }
 }
 
 impl Key {
