@@ -58,7 +58,7 @@ contract HoprNodeSafeRegistry {
     // check adminKeyAddress has added HOPR tokens to the staking contract.
 
     // following encoding guidelines of EIP712
-    bytes32 hashStruct = keccak256(abi.encode(NODE_SAFE_TYPEHASH, nodeSafe.safeAddress, nodeSafe.nodeChainKeyAddress));
+    bytes32 hashStruct = keccak256(abi.encode(NODE_SAFE_TYPEHASH, nodeSafe));
 
     // build typed digest
     bytes32 registerHash = keccak256(abi.encode(bytes1(0x19), bytes1(0x01), domainSeparator, hashStruct));
@@ -70,7 +70,7 @@ contract HoprNodeSafeRegistry {
     }
 
     // store those state, emit events etc.
-    addNodeSafe(nodeSafe.safeAddress, nodeSafe.nodeChainKeyAddress);
+    addNodeSafe(nodeSafe);
   }
 
   /**
@@ -84,7 +84,7 @@ contract HoprNodeSafeRegistry {
     }
 
     // ensure that node is an owner
-    ensureNodeIsOwnerAndHasRole(msg.sender, nodeAddr);
+    ensureNodeIsOwnerAndHasRole(NodeSafe({safeAddress: msg.sender, nodeChainKeyAddress: nodeAddr}));
 
     // update and emit event
     nodeToSafe[nodeAddr] = address(0);
@@ -95,50 +95,49 @@ contract HoprNodeSafeRegistry {
    * @dev register the Safe by the node, directly with call made by the node
    */
   function registerSafeByNode(address safeAddr) external {
-    addNodeSafe(safeAddr, msg.sender);
+    addNodeSafe(NodeSafe({safeAddress: safeAddr, nodeChainKeyAddress: msg.sender}));
   }
 
   /**
    * @dev internal funciton to store safe-node pair and emit events
    */
-  function addNodeSafe(address safeAddr, address nodeAddr) internal {
+  function addNodeSafe(NodeSafe memory nodeSafe) internal {
     // check this node hasn't been registered ower
-    if (nodeToSafe[nodeAddr] != address(0)) {
+    if (nodeToSafe[nodeSafe.nodeChainKeyAddress] != address(0)) {
       revert NodeHasSafe();
     }
     // Safe address cannot be zero
-    if (safeAddr == address(0)) {
+    if (nodeSafe.safeAddress == address(0)) {
       revert InvalidSafeAddress();
     }
 
     // ensure that node is an owner
-    ensureNodeIsOwnerAndHasRole(safeAddr, nodeAddr);
+    ensureNodeIsOwnerAndHasRole(nodeSafe);
 
     // update and emit event
-    nodeToSafe[nodeAddr] = safeAddr;
-    emit RegisteredNodeSafe(safeAddr, nodeAddr);
+    nodeToSafe[nodeSafe.nodeChainKeyAddress] = nodeSafe.safeAddress;
+    emit RegisteredNodeSafe(nodeSafe.safeAddress, nodeSafe.nodeChainKeyAddress);
   }
 
   /**
    * @dev Ensure that the node address is an owner of safe address
    * Ensure that the node address has the NODE_ROLE on the guard of the safe
-   * @param safeAddr address of the Safe
-   * @param nodeAddr address of the node
+   * @param nodeSafe struct to check
    */
-  function ensureNodeIsOwnerAndHasRole(address safeAddr, address nodeAddr) internal view {
+  function ensureNodeIsOwnerAndHasRole(NodeSafe memory nodeSafe) internal view {
     // check safeAddress has nodeChainKeyAddress as owner
-    address[] memory owners = ISafe(safeAddr).getOwners();
+    address[] memory owners = ISafe(nodeSafe.safeAddress).getOwners();
     uint256 index = 0;
     for (index; index < owners.length; index++) {
-      if (owners[index] == nodeAddr) break;
+      if (owners[index] == nodeSafe.nodeChainKeyAddress) break;
     }
     if (index >= owners.length) {
       revert NotValidSafeOwner();
     }
 
     // check nodeChainKeyAddress has NODE_ROLE in safeAddress guard
-    IDualRoleAccess safeGuard = IDualRoleAccess(ISafe(safeAddr).getGuard());
-    if (safeGuard.hasRole(safeGuard.NODE_ROLE(), nodeAddr)) {
+    IDualRoleAccess safeGuard = IDualRoleAccess(ISafe(nodeSafe.safeAddress).getGuard());
+    if (safeGuard.hasRole(safeGuard.NODE_ROLE(), nodeSafe.nodeChainKeyAddress)) {
       revert NotValidGuardRole();
     }
   }
