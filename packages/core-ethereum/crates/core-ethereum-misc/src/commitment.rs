@@ -166,7 +166,7 @@ mod tests {
         let db = rusty_leveldb::DB::open("test", opt).unwrap();
 
         CoreEthereumDb::new(
-            Arc::new(Mutex::new(DB::new(RustyLevelDbShim::new(db)))),
+            DB::new(RustyLevelDbShim::new(Arc::new(Mutex::new(db)))),
             PublicKey::from_privkey(&PRIV_KEY).unwrap(),
         )
     }

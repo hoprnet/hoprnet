@@ -379,7 +379,7 @@ impl Ticket {
 
 #[cfg(test)]
 pub mod tests {
-    use core_crypto::types::{Challenge, CurvePoint, Hash, PublicKey};
+    use core_crypto::types::{Hash, PublicKey};
     use ethnum::u256;
     use hex_literal::hex;
     use utils_types::primitives::{Address, Balance, BalanceType, U256};
@@ -435,11 +435,6 @@ pub mod tests {
         let price_per_packet = u256::new(10000000000000000u128); // 0.01 HOPR
         let path_pos = 5u8;
 
-        let curve_point = CurvePoint::from_bytes(&hex!(
-            "03c2aa76d6837c51337001c8b5a60473726064fc35d0a40b8f0e1f068cc8e38e10"
-        ))
-        .unwrap();
-
         let ticket1 = Ticket::new(
             Address::new(&[0u8; Address::SIZE]),
             U256::new("1"),
@@ -448,7 +443,7 @@ pub mod tests {
                 (inverse_win_prob * price_per_packet * path_pos as u128).into(),
                 BalanceType::HOPR,
             ),
-            U256::from_inverse_probability(&inverse_win_prob).unwrap(),
+            U256::from_inverse_probability(inverse_win_prob.into()).unwrap(),
             U256::new("4"),
             &SGN_PRIVATE_KEY,
         );
@@ -462,12 +457,12 @@ pub mod tests {
         assert!(ticket2.verify(&pub_key).is_ok(), "failed to verify signed ticket 2");
 
         assert_eq!(
-            ticket1.get_path_position(&price_per_packet.into(), &inverse_win_prob.into()),
+            ticket1.get_path_position(price_per_packet.into(), inverse_win_prob.into()),
             path_pos,
             "invalid path pos"
         );
         assert_eq!(
-            ticket2.get_path_position(&price_per_packet.into(), &inverse_win_prob.into()),
+            ticket2.get_path_position(price_per_packet.into(), inverse_win_prob.into()),
             path_pos,
             "invalid path pos"
         );

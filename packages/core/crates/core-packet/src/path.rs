@@ -11,6 +11,19 @@ pub struct Path {
     valid: bool,
 }
 
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+impl Path {
+    /// Number of hops in the path.
+    pub fn length(&self) -> u32 {
+        self.hops.len() as u32
+    }
+
+    /// Determines with the path is valid.
+    pub fn valid(&self) -> bool {
+        self.valid
+    }
+}
+
 impl Path {
     /// Creates an already pre-validated path.
     pub fn new_valid(validated_path: Vec<PeerId>) -> Self {
@@ -20,19 +33,9 @@ impl Path {
         }
     }
 
-    /// Number of hops in the path.
-    pub fn length(&self) -> usize {
-        self.hops.len()
-    }
-
     /// Individual hops in the path.
     pub fn hops(&self) -> Vec<&PeerId> {
         self.hops.iter().collect::<Vec<_>>()
-    }
-
-    /// Determines with the path is valid.
-    pub fn valid(&self) -> bool {
-        self.valid
     }
 }
 
@@ -53,7 +56,7 @@ mod tests {
 
     #[test]
     fn test_path_validated() {
-        const HOPS: usize = 5;
+        const HOPS: u32 = 5;
         let peer_ids = (0..HOPS).map(|_| PeerId::random()).collect::<Vec<_>>();
 
         let path = Path::new_valid(peer_ids.clone());
