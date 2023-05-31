@@ -488,7 +488,7 @@ library HoprCapabilityPermissions {
      * @param channelId The channelId of the scoped HoprChannels target.
      * @param permission The permission to be set for the specific function.
      */
-    function scopeChannelCapability(
+    function scopeChannelsCapability(
         Role storage role,
         address targetAddress,
         bytes4 functionSig,

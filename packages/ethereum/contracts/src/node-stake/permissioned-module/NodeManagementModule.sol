@@ -176,13 +176,13 @@ contract HoprNodeManagementModule is SimplifiedModule {
    * @param channelId The channelId of the scoped HoprChannels target.
    * @param permission The permission to be set for the specific function.
    */
-  function scopeChannelCapability(
+  function scopeChannelsCapability(
     address targetAddress,
     bytes4 functionSig,
     bytes32 channelId,
     HoprChannelsPermission permission
   ) external onlyOwner {
-    HoprCapabilityPermissions.scopeChannelCapability(role, targetAddress, functionSig, channelId, permission);
+    HoprCapabilityPermissions.scopeChannelsCapability(role, targetAddress, functionSig, channelId, permission);
   }
 
   /**
@@ -194,7 +194,7 @@ contract HoprNodeManagementModule is SimplifiedModule {
    * @param encodedSigsPermissions The encoded function signatures and permissions
    * @param channelId The channelId of the scoped HoprChannels target.
    */
-  function batch7ScopeChannelCapability(
+  function batch7ScopeChannelsCapability(
     address targetAddress,
     bytes32 encodedSigsPermissions,
     bytes32 channelId
@@ -203,8 +203,85 @@ contract HoprNodeManagementModule is SimplifiedModule {
 
     for (uint256 i = 0; i < 7; i++) {
       if (functionSigs[i] != bytes4(0)) {
-        HoprCapabilityPermissions.scopeChannelCapability(role, targetAddress, functionSigs[i], channelId, HoprChannelsPermission(permissions[i]));
+        HoprCapabilityPermissions.scopeChannelsCapability(role, targetAddress, functionSigs[i], channelId, HoprChannelsPermission(permissions[i]));
       }
+    }
+  }
+
+  /**
+   * @dev Sets the permission for a specific function on a scoped HoprToken target.
+   * @param targetAddress The address of the scoped HoprToken target.
+   * @param functionSig The function signature of the specific function.
+   * @param beneficiary The beneficiary address for the scoped HoprToken target.
+   * @param permission The permission to be set for the specific function.
+   */
+  function scopeTokenCapability(
+    address targetAddress,
+    bytes4 functionSig,
+    address beneficiary,
+    HoprTokenPermission permission
+  ) external onlyOwner {
+    HoprCapabilityPermissions.scopeTokenCapability(role, targetAddress, functionSig, beneficiary, permission);
+  }
+
+  /**
+   * @dev Sets the permissions for functions on a scoped HoprToken target for different beneficiaries
+   * @notice it can batch maxinum 7 capabilities. 
+   * Encoding of function signatures is right-padded in Big-Eidian format
+   * Encoding of permissions is left-padded in Little-Eidian format
+   * @param targetAddress The address of the scoped HoprToken target.
+   * @param encodedSigsPermissions The encoded function signatures and permissions
+   * @param beneficiaries Array of beneficiary addresses for the scoped HoprToken target.
+   */
+  function batch7ScopeTokenCapability(
+    address targetAddress,
+    bytes32 encodedSigsPermissions,
+    address[] memory beneficiaries
+  ) external onlyOwner {
+    uint256 len = beneficiaries.length;
+    if (len > 7) {
+      revert HoprCapabilityPermissions.ArrayTooLong();
+    }
+    (bytes4[] memory functionSigs, uint256[] memory permissions) = HoprCapabilityPermissions.decodeFunctionSigsAndPermissions(encodedSigsPermissions, len);
+
+    for (uint256 i = 0; i < len; i++) {
+      if (functionSigs[i] != bytes4(0)) {
+        HoprCapabilityPermissions.scopeTokenCapability(role, targetAddress, functionSigs[i], beneficiaries[i], HoprTokenPermission(permissions[i]));
+      }
+    }
+  }
+
+  /**
+   * @dev Sets the permission for sending native tokens to a specific beneficiary
+   * @param beneficiary The beneficiary address for the scoped Send target.
+   * @param permission The permission to be set for the specific function.
+   */
+  function scopeSendCapability(
+    address beneficiary,
+    SendPermission permission
+  ) external onlyOwner {
+    HoprCapabilityPermissions.scopeSendCapability(role, beneficiary, permission);
+  }
+
+  /**
+   * @dev Sets the permission for sending native tokens to a specific for multple beneficiaries
+   * @notice it can batch maxinum 7 capabilities. 
+   * Encoding of permissions is left-padded in Little-Eidian format
+   * @param encodedSigsPermissions The encoded function signatures and permissions
+   * @param beneficiaries Array of beneficiary addresses for the scoped HoprToken target.
+   */
+  function batch7ScopeSendCapability(
+    uint256 encodedSigsPermissions,
+    address[] memory beneficiaries
+  ) external onlyOwner {
+    uint256 len = beneficiaries.length;
+    if (len > 7) {
+      revert HoprCapabilityPermissions.ArrayTooLong();
+    }
+    uint256[] memory permissions = HoprCapabilityPermissions.decodePermissionEnums(encodedSigsPermissions, len);
+
+    for (uint256 i = 0; i < len; i++) {
+      HoprCapabilityPermissions.scopeSendCapability(role, beneficiaries[i], SendPermission(permissions[i]));
     }
   }
 
