@@ -201,7 +201,7 @@ pub trait HoprCoreEthereumDbActions {
     async fn store_authorization(&mut self, token: AuthorizationToken) -> Result<()>;
 
     /// Retrieves the REST API token given its ID.
-    async fn retrieve_authorization(&self, id: String) -> Result<AuthorizationToken>;
+    async fn retrieve_authorization(&self, id: String) -> Result<Option<AuthorizationToken>>;
 
     /// Deletes the REST API token given its ID.
     async fn delete_authorization(&mut self, id: String) -> Result<()>;

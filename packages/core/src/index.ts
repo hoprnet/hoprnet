@@ -111,7 +111,7 @@ import {
 core_packet_initialize_crate()
 registerMetricsCollector(core_packet_gather_metrics)
 
-import pkg from '../package.json'
+import pkg from '../package.json' assert { type: 'json' }
 
 const CODE_P2P = protocols('p2p').code
 

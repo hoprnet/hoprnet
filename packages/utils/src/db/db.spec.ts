@@ -98,7 +98,7 @@ function channelEntryCreateMock(): ChannelEntry {
 
 import { LevelDb } from './db.js'
 import { db_sanity_test } from '../../lib/utils_db.js'
-import { Database } from '../../../core-ethereum/lib/core_ethereum_db.js'
+import { Database, PublicKey as Ethereum_PublicKey } from '../../../core-ethereum/lib/core_ethereum_db.js'
 import fs from 'fs'
 
 describe('db shim tests', function () {
@@ -137,7 +137,7 @@ describe('db functional tests', function () {
     db_shim = new LevelDb()
     db_dir_path = '/tmp/test-shim.db'
     await db_shim.init(true, db_dir_path, true, 'monte_rosa')
-    db: new Database(db_shim, MOCK_PUBLIC_KEY())
+    db: new Database(db_shim, Ethereum_PublicKey.deserialize(MOCK_PUBLIC_KEY().serialize(false)))
   })
 
   afterEach(async function () {

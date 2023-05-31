@@ -724,10 +724,10 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         Ok(())
     }
 
-    async fn retrieve_authorization(&self, id: String) -> Result<AuthorizationToken> {
+    async fn retrieve_authorization(&self, id: String) -> Result<Option<AuthorizationToken>> {
         let tid = Hash::create(&[id.as_bytes()]);
         let key = utils_db::db::Key::new_with_prefix(&tid, API_AUTHORIZATION_TOKEN_KEY_PREFIX)?;
-        self.db.get::<AuthorizationToken>(key).await
+        self.db.get_or_none::<AuthorizationToken>(key).await
     }
 
     async fn delete_authorization(&mut self, id: String) -> Result<()> {
@@ -1170,7 +1170,7 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub async fn retrieve_authorization(&self, id: String) -> Result<AuthorizationToken, JsValue> {
+        pub async fn retrieve_authorization(&self, id: String) -> Result<Option<AuthorizationToken>, JsValue> {
             let db = utils_misc::ok_or_jserr!(self.core_ethereum_db.lock())?;
             utils_misc::ok_or_jserr!(db.retrieve_authorization(id).await)
         }

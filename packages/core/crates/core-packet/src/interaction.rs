@@ -323,6 +323,18 @@ pub struct PacketInteractionConfig {
     pub mixer: MixerConfig,
 }
 
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+impl PacketInteractionConfig {
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
+    pub fn new(private_key: Box<[u8]>) -> Self {
+        Self {
+            private_key,
+            check_unrealized_balance: true,
+            mixer: MixerConfig::default(),
+        }
+    }
+}
+
 // Default sizes of the packet queues
 const PACKET_TX_QUEUE_SIZE: usize = 2048;
 const PACKET_RX_QUEUE_SIZE: usize = 2048;

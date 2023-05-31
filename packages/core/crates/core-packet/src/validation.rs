@@ -209,6 +209,9 @@ mod tests {
             async fn find_hopr_node_using_account_in_network_registry(&self, account: &Address) -> core_ethereum_db::errors::Result<Vec<PublicKey>>;
             async fn is_eligible(&self, account: &Address) -> core_ethereum_db::errors::Result<bool>;
             async fn set_eligible(&mut self, account: &Address, eligible: bool, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
+            async fn store_authorization(&mut self, token: AuthorizationToken) -> core_ethereum_db::errors::Result<()>;
+            async fn retrieve_authorization(&self, id: String) -> core_ethereum_db::errors::Result<Option<AuthorizationToken>>;
+            async fn delete_authorization(&mut self, id: String) -> core_ethereum_db::errors::Result<()>;
         }
     }
 
