@@ -10,16 +10,13 @@ import "./SimplifiedModule.sol";
 import "./CapabilityPermissions.sol";
 import "../../IHoprChannels.sol";
 
-// address is 0x00
-error AddressIsZero();
 // when the contract has already been initialized
 error AlreadyInitialized();
 // when a node is a member of the role
 error WithMembership();
-
+// Once module gets created, the ownership cannot be transferred
 error CannotChangeOwner();
 error NotAllowedNode();
-error NotHoprChannelsContract();
 
 /**
  * @title Permissioned capability-based module for HOPR nodes operations
@@ -70,7 +67,7 @@ contract HoprNodeManagementModule is SimplifiedModule {
 
     // cannot accept a zero address as Safe or multisend contract
     if (_safe == address(0) || _multisend == address(0)) {
-      revert AddressIsZero();
+      revert HoprCapabilityPermissions.AddressIsZero();
     }
 
     // cannot setup again if it's been set up
@@ -111,12 +108,71 @@ contract HoprNodeManagementModule is SimplifiedModule {
     emit NodeRemoved(nodeAddress);
   }
 
-  /**
-   * @dev Override {transferOwnership} so the owner cannot be changed once created
-   */
-  function transferOwnership(address /*newOwner*/) public override(OwnableUpgradeable) onlyOwner {
-    revert CannotChangeOwner();
+  /// @dev Set the address of the expected multisend library
+  /// @notice Only callable by owner.
+  /// @param _multisend address of the multisend library contract
+  function setMultisend(address _multisend) external onlyOwner {
+      multisend = _multisend;
+      emit SetMultisendAddress(multisend);
   }
+  
+  /**
+   * @dev Allows the target address to be scoped as a HoprChannels target
+   * and its token as a HoprToken target. HoprToken address is obtained from 
+   * HoprChannels contract
+   * @param hoprChannelsAddress address of HoprChannels contract to be added to scope
+   */
+  function addChannelsAndTokenTarget(address hoprChannelsAddress) external onlyOwner {
+    // get tokens contract
+    address hoprTokenAddress = IHoprChannels(hoprChannelsAddress).token();
+
+    // add default scope for Channels TargetType
+    HoprCapabilityPermissions.scopeTargetChannels(role, hoprChannelsAddress);
+    // add default scope for Token TargetType
+    HoprCapabilityPermissions.scopeTargeToken(role, hoprTokenAddress);
+  }
+
+  /**
+   * @dev Scopes the target address as a HoprChannels target
+   * @param hoprChannelsAddress address of HoprChannels contract to be added to scope
+   */
+  function scopeTargetChannels(address hoprChannelsAddress) external onlyOwner {
+    HoprCapabilityPermissions.scopeTargetChannels(role, hoprChannelsAddress);
+  }
+
+  /**
+   * @dev Scopes the target address as a HoprToken target
+   * @param hoprTokenAddress address of HoprToken contract to be added to scope
+   */
+  function scopeTargeToken(address hoprTokenAddress) external onlyOwner {
+    HoprCapabilityPermissions.scopeTargeToken(role, hoprTokenAddress);
+  }
+
+  /**
+   * @dev Scopes the target address as a Send target, so native tokens can be 
+   * transferred from the avatar to the target.
+   * @notice Only member is allowed to be a beneficiary
+   * @param beneficiaryAddress address that can receive native tokens
+   */
+  function scopeTargetSend(address beneficiaryAddress) external onlyOwner {
+    if (!role.members[beneficiaryAddress]) {
+      revert HoprCapabilityPermissions.NoMembership();
+    }
+    HoprCapabilityPermissions.scopeTargetSend(role, beneficiaryAddress);
+  }
+
+  /**
+   * @dev Revokes the target address from the scope
+   * @param targetAddress The address of the target to be revoked.
+   */
+  function revokeTarget(address targetAddress) external onlyOwner {
+    HoprCapabilityPermissions.revokeTarget(role, targetAddress);
+  }
+
+
+  // ===========================================================
+  // ----------------------- INHERITANCE -----------------------
+  // ===========================================================
 
   /// @dev Passes a transaction to the modifier.
   /// @param to Destination address of module transaction
@@ -165,20 +221,15 @@ contract HoprNodeManagementModule is SimplifiedModule {
   }
 
   /**
-   * @dev FIXME: add guard of who can call this function
+   * @dev Override {transferOwnership} so the owner cannot be changed once created
    */
-  function _addHoprChannelsAsTarget(address hoprChannelsAddress) internal {
-    if (!IHoprChannels(hoprChannelsAddress).IS_HOPR_CHANNELS()) {
-      // not a channel contract
-      revert NotHoprChannelsContract();
-    }
-    // get tokens contract FIXME:
-    // address hoprTokenAddress = IHoprChannels(hoprChannelsAddress).token();
-
-    // add default scope for hoprChannelsAddress
-    // SimplifiedPermissions.scopeTarget(role, hoprChannelsAddress);
-    // FIXME:
-    // SimplifiedPermissions.scopeTarget(role, hoprTokenAddress);
-    // add default scopr for hoprTokenAddress
+  function transferOwnership(address /*newOwner*/) public override(OwnableUpgradeable) onlyOwner {
+    revert CannotChangeOwner();
   }
+
+  // =======================================================
+  // ----------------------- HELPERS -----------------------
+  // =======================================================
+
+
 }

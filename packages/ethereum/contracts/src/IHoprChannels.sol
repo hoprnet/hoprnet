@@ -6,9 +6,7 @@ pragma abicoder v2;
 
 // FIXME: update interfaces when HoprChannels contracts get updated
 interface IHoprChannels {
-  function IS_HOPR_CHANNELS() external view returns (bool);
-  // FIXME:
-  // function token() external view returns (address);
+  function token() external view returns (address);
   function fundChannelMulti(address account1, address account2, uint256 amount1, uint256 amount2) external;
   function redeemTicket(
     address source,

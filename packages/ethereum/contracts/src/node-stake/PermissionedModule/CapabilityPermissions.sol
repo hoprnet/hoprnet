@@ -108,6 +108,9 @@ library HoprCapabilityPermissions {
     /// Arrays must be the same length
     error ArraysDifferentLength();
 
+    /// Address cannot be zero
+    error AddressIsZero();
+
     /// Function signature too short
     error FunctionSignatureTooShort();
     
@@ -424,6 +427,10 @@ library HoprCapabilityPermissions {
         Role storage role,
         address targetAddress
     ) external {
+        if (targetAddress == address(0)) {
+            revert AddressIsZero();
+        }
+        
         role.targets[targetAddress] = TargetAddress(
             Clearance.Function,
             TargetType.Token
@@ -441,6 +448,9 @@ library HoprCapabilityPermissions {
         Role storage role,
         address targetAddress
     ) external {
+        if (targetAddress == address(0)) {
+            revert AddressIsZero();
+        }
         role.targets[targetAddress] = TargetAddress(
             Clearance.Function,
             TargetType.Channels
@@ -457,6 +467,9 @@ library HoprCapabilityPermissions {
         Role storage role,
         address targetAddress
     ) external {
+        if (targetAddress == address(0)) {
+            revert AddressIsZero();
+        }
         role.targets[targetAddress] = TargetAddress(
             Clearance.Function,
             TargetType.Send

@@ -69,7 +69,7 @@ contract HoprCapabilityBasedGuard is BaseGuard {
   ) external onlySafe {
     // depending on the operation type. Check directly if the
     // guarding targets: this guard and HoprChannels contracts. Relax guard when the tx is for other contracts
-    if (IHoprChannels(to).IS_HOPR_CHANNELS() == false || to != address(this)) return;
+    // if (IHoprChannels(to).IS_HOPR_CHANNELS() == false || to != address(this)) return;
 
     if (to == address(this)) {
       // check if signature has sufficient permission. At least one signer should have ADMIN_ROLE

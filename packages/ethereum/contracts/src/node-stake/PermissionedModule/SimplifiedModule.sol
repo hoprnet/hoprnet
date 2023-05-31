@@ -20,7 +20,7 @@ abstract contract SimplifiedModule is FactoryFriendly, Guardable {
 
     /// @dev Sets the avatar to a new avatar (`newAvatar`).
     /// @notice Can only be called by the current owner.
-    function setAvatar(address _avatar) public onlyOwner {
+    function setAvatar(address _avatar) external onlyOwner {
         address previousAvatar = avatar;
         avatar = _avatar;
         emit AvatarSet(previousAvatar, _avatar);
