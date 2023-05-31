@@ -741,7 +741,8 @@ library HoprCapabilityPermissions {
 
     /**
      * @dev Returns an uint256 that represents the array of permission
-     * @notice that permissions are enums with two bits, 
+     * @notice that permissions are enums with two bits, Encoding is left-padded; 
+     * In Little-Eidian format (Index 0 is the right most and grows to the left)
      * e.g. HoprChannelsPermission, HoprTokenPermission, SendPermission
      */
     function encodePermissionEnums(
@@ -760,7 +761,8 @@ library HoprCapabilityPermissions {
 
     /**
      * @dev Returns an uint256 array which decodes from the encoded permission
-     * @notice that permissions are enums with two bits, 
+     * @notice that permissions are enums with two bits, Encoding is left-padded; 
+     * In Little-Eidian format (Index 0 is the right most and grows to the left)
      * e.g. HoprChannelsPermission, HoprTokenPermission, SendPermission
      */
     function decodePermissionEnums(
@@ -772,7 +774,114 @@ library HoprCapabilityPermissions {
             revert ArrayTooLong();
         }
         for (uint256 i = 0; i < length; i++) {
-            permissions[i] = (encoded << (256 - i - 1)) >> 255;
+            // first left shift 256 - 1 - i = 255 - i bits
+            // then right shift 256 - 1 = 255 bits
+            permissions[i] = (encoded << (255 - i)) >> 255;
+        }
+    }
+
+    /**
+     * @dev Returns arrays of bytes32 that concates function signatures (bytes4)
+     * It can take maxinum 7 function signatures. Encoding is right-padded; 
+     * In Big-Eidian format (Index 0 is the left most and grows to the right)
+     */
+    function encodeFunctionSigs(
+       bytes4[] memory functionSigs
+    ) internal pure returns (bytes32 encoded, uint256 length) {
+        uint256 len = functionSigs.length;
+        if (len > 7) {
+            revert ArrayTooLong();
+        }
+        bytes32 val;
+        for (uint256 i = 0; i < len; i++) {
+            // first right shift (32 - 4) * 8 = 224 bits
+            // then left shift (32 - 4 * i - 4) * 8 = (224 - 32 * i) bits
+            val |= (bytes32(functionSigs[i]) >> 224) << (224 - 32 * i);
+        }
+        return (val, len);
+    }
+
+    /**
+     * @dev Returns an bytes4 array which decodes from the encoded function arrays
+     * It can take maxinum 7 function signatures. Encoding is right-padded; 
+     * In Big-Eidian format (Index 0 is the left most and grows to the right)
+     */
+    function decodeFunctionSigs(
+        bytes32 encoded, 
+        uint256 length
+    ) internal pure returns (bytes4[] memory functionSigs) {
+        functionSigs = new bytes4[](length);
+        if (length > 7) {
+            revert ArrayTooLong();
+        }
+        for (uint256 i = 0; i < length; i++) {
+            // first right shift (32 - 4 * i - 4) * 8 = (224 - 32 * i) bits
+            // then left shift (32 - 4) * 8 = 224 bits
+            functionSigs[i] = bytes4((encoded >> (224 - 32 * i)) << 224);
+        }
+    }
+
+    /**
+     * @dev Returns arrays of bytes32 that concates function signatures (bytes4)
+     * together with permissions
+     * It can take maxinum 7 sets of function signatures and permissions
+     * @notice Signature encoding is right-padded; Index grows from left to the right.
+     * Permission encoding is left-padded; Index grows from right to the left.
+     Returns an bytes4 array which decodes from the encoded function arrays
+     * It can take maxinum 7 function signatures. Encoding is right-padded; 
+     * In Big-Eidian format (Index 0 is the left most and grows to the right)
+     */
+    function encodeFunctionSigsAndPermissions(
+       bytes4[] memory functionSigs,
+       uint256[] memory permissions
+    ) internal pure returns (bytes32 encoded, uint256 length) {
+        uint256 len = functionSigs.length;
+        if (len > 7) {
+            revert ArrayTooLong();
+        }
+        if (functionSigs.length != permissions.length) {
+            revert ArraysDifferentLength();
+        }
+        
+        bytes32 val;
+        // add function signatures
+        for (uint256 i = 0; i < len; i++) {
+            // first right shift (32 - 4) * 8 = 224 bits
+            // then left shift (32 - 4 * i - 4) * 8 = (224 - 32 * i) bits
+            val |= (bytes32(functionSigs[i]) >> 224) << (224 - 32 * i);
+        }
+        for (uint256 i = 0; i < len; i++) {
+            val |= bytes32(permissions[i]) << i;
+        }
+        return (val, len);
+    }
+
+    /**
+     * @dev Returns an bytes4 array which decodes from the combined encoding
+     * of function signature and permissions. It can take maxinum 7 items.
+     * Encoding of function signatures is right-padded in Big-Eidian format
+     * Encoding of permissions is left-padded in Little-Eidian format
+     */
+    function decodeFunctionSigsAndPermissions(
+        bytes32 encoded, 
+        uint256 length
+    ) internal pure returns (bytes4[] memory functionSigs, uint256[] memory permissions) {
+        if (length > 7) {
+            revert ArrayTooLong();
+        }
+        functionSigs = new bytes4[](length);
+        permissions = new uint256[](length);
+        // decode function signature
+        for (uint256 i = 0; i < length; i++) {
+            // first right shift (32 - 4 * i - 4) * 8 = (224 - 32 * i) bits
+            // then left shift (32 - 4) * 8 = 224 bits
+            functionSigs[i] = bytes4((encoded >> (224 - 32 * i)) << 224);
+        }
+        // decode permissions
+        for (uint256 j = 0; j < length; j++) {
+            // first left shift 256 - 1 - j = 255 - j bits
+            // then right shift 256 - 1 = 255 bits
+            permissions[j] = (uint256(encoded) << (255 - j)) >> 255;
         }
     }
 }

@@ -169,6 +169,45 @@ contract HoprNodeManagementModule is SimplifiedModule {
     HoprCapabilityPermissions.revokeTarget(role, targetAddress);
   }
 
+  /**
+   * @dev Sets the permission for a specific function on a scoped HoprChannels target.
+   * @param targetAddress The address of the scoped HoprChannels target.
+   * @param functionSig The function signature of the specific function.
+   * @param channelId The channelId of the scoped HoprChannels target.
+   * @param permission The permission to be set for the specific function.
+   */
+  function scopeChannelCapability(
+    address targetAddress,
+    bytes4 functionSig,
+    bytes32 channelId,
+    HoprChannelsPermission permission
+  ) external onlyOwner {
+    HoprCapabilityPermissions.scopeChannelCapability(role, targetAddress, functionSig, channelId, permission);
+  }
+
+  /**
+   * @dev Sets the permissions for functions on a scoped HoprChannels target for a given channel
+   * @notice it can batch maxinum 7 capabilities. 
+   * Encoding of function signatures is right-padded in Big-Eidian format
+   * Encoding of permissions is left-padded in Little-Eidian format
+   * @param targetAddress The address of the scoped HoprChannels target.
+   * @param encodedSigsPermissions The encoded function signatures and permissions
+   * @param channelId The channelId of the scoped HoprChannels target.
+   */
+  function batch7ScopeChannelCapability(
+    address targetAddress,
+    bytes32 encodedSigsPermissions,
+    bytes32 channelId
+  ) external onlyOwner {
+    (bytes4[] memory functionSigs, uint256[] memory permissions) = HoprCapabilityPermissions.decodeFunctionSigsAndPermissions(encodedSigsPermissions, 7);
+
+    for (uint256 i = 0; i < 7; i++) {
+      if (functionSigs[i] != bytes4(0)) {
+        HoprCapabilityPermissions.scopeChannelCapability(role, targetAddress, functionSigs[i], channelId, HoprChannelsPermission(permissions[i]));
+      }
+    }
+  }
+
 
   // ===========================================================
   // ----------------------- INHERITANCE -----------------------
