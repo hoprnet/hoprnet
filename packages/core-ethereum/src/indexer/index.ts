@@ -926,8 +926,6 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       )
 
       try {
-        // TODO: is this logic correct?
-        //
         // Negative case:
         // It falls into this case when db of sender gets erased while having tickets pending.
         // TODO: handle this may allow sender to send arbitrary amount of tickets through open
