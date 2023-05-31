@@ -471,8 +471,8 @@ describe('test indexer', function () {
     })
     // sender node has pending ticket...
     await mark_pending(db, fixtures.oneLargeTicket)
-    assert.equal((await get_pending_balance_to(db, PARTY_A().to_address())).to_string(), '0 HOPR')
-    assert.equal((await get_pending_balance_to(db, PARTY_B().to_address())).to_string(), '2 HOPR')
+    assert.equal((await get_pending_balance_to(db, PARTY_A().to_address())).amount().as_u32(), 0)
+    assert.equal((await get_pending_balance_to(db, PARTY_B().to_address())).amount().as_u32(), 2)
 
     const blockMined = defer<void>()
     indexer.on('block-processed', (blockNumber: number) => {
@@ -490,8 +490,8 @@ describe('test indexer', function () {
     newBlock()
 
     await blockMined.promise
-    assert.equal((await get_pending_balance_to(db, PARTY_A().to_address())).to_string(), '0 HOPR')
-    assert.equal((await get_pending_balance_to(db, PARTY_B().to_address())).to_string(), '0 HOPR')
+    assert.equal((await get_pending_balance_to(db, PARTY_A().to_address())).amount().as_u32(), 0)
+    assert.equal((await get_pending_balance_to(db, PARTY_B().to_address())).amount().as_u32(), 0)
   })
 
   it('should process TicketRedeemed event and not reduce outstanding balance for sender when db has no outstanding balance', async function () {
@@ -506,8 +506,8 @@ describe('test indexer', function () {
       id: fixtures.PARTY_A()
     })
     // sender node has pending ticket...
-    assert.equal((await get_pending_balance_to(db, PARTY_A().to_address())).to_string(), '0 HOPR')
-    assert.equal((await get_pending_balance_to(db, PARTY_B().to_address())).to_string(), '0 HOPR')
+    assert.equal((await get_pending_balance_to(db, PARTY_A().to_address())).amount().as_u32(), 0)
+    assert.equal((await get_pending_balance_to(db, PARTY_B().to_address())).amount().as_u32(), 0)
 
     const blockProcessed = defer<void>()
     indexer.on('block-processed', (blockNumber: number) => {
@@ -525,8 +525,8 @@ describe('test indexer', function () {
     newBlock()
 
     await blockProcessed.promise
-    assert.equal((await get_pending_balance_to(db, PARTY_A().to_address())).to_string(), '0 HOPR')
-    assert.equal((await get_pending_balance_to(db, PARTY_B().to_address())).to_string(), '0 HOPR')
+    assert.equal((await get_pending_balance_to(db, PARTY_A().to_address())).amount().as_u32(), 0)
+    assert.equal((await get_pending_balance_to(db, PARTY_B().to_address())).amount().as_u32(), 0)
   })
 
   it('should process TicketRedeemed event and not reduce outstanding balance for recipient', async function () {
@@ -541,8 +541,8 @@ describe('test indexer', function () {
       id: fixtures.PARTY_B()
     })
     // recipient node has no ticket...
-    assert.equal((await get_pending_balance_to(db, PARTY_A().to_address())).to_string(), '0 HOPR')
-    assert.equal((await get_pending_balance_to(db, PARTY_B().to_address())).to_string(), '0 HOPR')
+    assert.equal((await get_pending_balance_to(db, PARTY_A().to_address())).amount().as_u32(), 0)
+    assert.equal((await get_pending_balance_to(db, PARTY_B().to_address())).amount().as_u32(), 0)
 
     const blockProcessed = defer<void>()
     indexer.on('block-processed', (blockNumber: number) => {
@@ -562,8 +562,8 @@ describe('test indexer', function () {
 
     await blockProcessed.promise
 
-    assert.equal((await get_pending_balance_to(db, PARTY_A().to_address())).to_string(), '0 HOPR')
-    assert.equal((await get_pending_balance_to(db, PARTY_B().to_address())).to_string(), '0 HOPR')
+    assert.equal((await get_pending_balance_to(db, PARTY_A().to_address())).amount().as_u32(), 0)
+    assert.equal((await get_pending_balance_to(db, PARTY_B().to_address())).amount().as_u32(), 0)
   })
 
   it('should process TicketRedeemed event and not reduce outstanding balance for a third node', async function () {
@@ -577,8 +577,8 @@ describe('test indexer', function () {
       ]
     })
     // recipient node has no ticket...
-    assert.equal((await get_pending_balance_to(db, PARTY_A().to_address())).to_string(), '0 HOPR')
-    assert.equal((await get_pending_balance_to(db, PARTY_B().to_address())).to_string(), '0 HOPR')
+    assert.equal((await get_pending_balance_to(db, PARTY_A().to_address())).amount().as_u32(), 0)
+    assert.equal((await get_pending_balance_to(db, PARTY_B().to_address())).amount().as_u32(), 0)
 
     const blockProcessed = defer<void>()
     indexer.on('block-processed', (blockNumber: number) => {
@@ -597,8 +597,8 @@ describe('test indexer', function () {
 
     await blockProcessed.promise
 
-    assert.equal((await get_pending_balance_to(db, PARTY_A().to_address())).to_string(), '0 HOPR')
-    assert.equal((await get_pending_balance_to(db, PARTY_B().to_address())).to_string(), '0 HOPR')
+    assert.equal((await get_pending_balance_to(db, PARTY_A().to_address())).amount().as_u32(), 0)
+    assert.equal((await get_pending_balance_to(db, PARTY_B().to_address())).amount().as_u32(), 0)
   })
 
   it('should process TicketRedeemed event and reduce outstanding balance to zero for sender when some history is missing', async function () {
@@ -614,8 +614,8 @@ describe('test indexer', function () {
     })
     // sender node has some pending tickets, but not the entire history...
     await mark_pending(db, fixtures.oneSmallTicket)
-    assert.equal((await get_pending_balance_to(db, PARTY_A().to_address())).to_string(), '0 HOPR')
-    assert.equal((await get_pending_balance_to(db, PARTY_B().to_address())).to_string(), '1 HOPR')
+    assert.equal((await get_pending_balance_to(db, PARTY_A().to_address())).amount().as_u32(), 0)
+    assert.equal((await get_pending_balance_to(db, PARTY_B().to_address())).amount().as_u32(), 1)
 
     const blockProcessed = defer<void>()
     indexer.on('block-processed', (blockNumber: number) => {
@@ -633,8 +633,8 @@ describe('test indexer', function () {
     newBlock()
 
     await blockProcessed.promise
-    assert.equal((await get_pending_balance_to(db, PARTY_A().to_address())).to_string(), '0 HOPR')
-    assert.equal((await get_pending_balance_to(db, PARTY_B().to_address())).to_string(), '0 HOPR')
+    assert.equal((await get_pending_balance_to(db, PARTY_A().to_address())).amount().as_u32(), 0)
+    assert.equal((await get_pending_balance_to(db, PARTY_B().to_address())).amount().as_u32(), 0)
   })
 
   it('should process Transfer events and reduce balance', async function () {

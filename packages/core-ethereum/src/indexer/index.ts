@@ -911,18 +911,16 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
         counterparty: Address.from_string(event.args.destination),
         amount: new Balance(event.args.amount.toString(), BalanceType.HOPR)
       }
-      const outstandingBalance = Ethereum_Balance.deserialize(
+      const outstandingBalance = Balance.deserialize(
           (await this.db.get_pending_balance_to(Ethereum_Address.deserialize(partialTicket.counterparty.serialize()))).serialize_value(),
           BalanceType.HOPR)
 
       try {
-        // TODO: is this logic correct?
-        //
         // Negative case:
         // It falls into this case when db of sender gets erased while having tickets pending.
         // TODO: handle this may allow sender to send arbitrary amount of tickets through open
         // channels with positive balance, before the counterparty initiates closure.
-        const balance = ((!outstandingBalance.gte(Balance.zero(BalanceType.HOPR))) ? Balance.zero(BalanceType.HOPR) : outstandingBalance)
+        const balance = ((outstandingBalance.lte(Balance.zero(BalanceType.HOPR))) ? Balance.zero(BalanceType.HOPR) : outstandingBalance)
         await this.db.resolve_pending(
             Ethereum_Address.deserialize(partialTicket.counterparty.serialize()),
             Ethereum_Balance.deserialize(balance.serialize_value(), BalanceType.HOPR),
