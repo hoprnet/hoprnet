@@ -8,8 +8,8 @@ pragma abicoder v2;
  */
 import "./SimplifiedModule.sol";
 import "./CapabilityPermissions.sol";
-import "../../IHoprChannels.sol";
-import "./INodeManagementModule.sol";
+import "../../interfaces/IHoprChannels.sol";
+import "../../interfaces/INodeManagementModule.sol";
 
 // when the contract has already been initialized
 error AlreadyInitialized();

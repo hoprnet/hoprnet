@@ -9,7 +9,7 @@ import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC777/IERC777Recipient.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts/utils/cryptography/ECDSA.sol';
-import './IHoprChannels.sol';
+import './interfaces/IHoprChannels.sol';
 
 // FIXME: Include IHoprChannels when function interfaces are updated
 // contract HoprChannels is IHoprChannels, IERC777Recipient, ERC1820Implementer, Multicall {

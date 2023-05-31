@@ -3,8 +3,8 @@ pragma solidity ^0.8;
 pragma abicoder v2;
 
 import '@openzeppelin/contracts/utils/cryptography/ECDSA.sol';
-import './ISafe.sol';
-import './permissioned-module/INodeManagementModule.sol';
+import '../interfaces/ISafe.sol';
+import '../interfaces/INodeManagementModule.sol';
 
 // Node already has mapped to Safe
 error NodeHasSafe();

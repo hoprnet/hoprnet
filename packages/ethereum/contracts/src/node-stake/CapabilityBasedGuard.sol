@@ -3,8 +3,8 @@ pragma solidity ^0.8;
 pragma abicoder v2;
 
 import 'safe-contracts/base/GuardManager.sol';
-import '../IHoprChannels.sol';
-import './ISafe.sol';
+import '../interfaces/IHoprChannels.sol';
+import '../interfaces/ISafe.sol';
 
 error AddressIsZero();
 error InitializationErrorSafeSet();
