@@ -518,9 +518,8 @@ class Hopr extends EventEmitter {
       }
     })
 
-    let packetCfg = new PacketInteractionConfig()
+    let packetCfg = new PacketInteractionConfig(privateKeyFromPeer(this.id))
     packetCfg.check_unrealized_balance = this.options.checkUnrealizedBalance ?? true
-    packetCfg.private_key = privateKeyFromPeer(this.id)
 
     const onMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
     this.forward = new WasmPacketInteraction(this.db.clone(), onMessage, packetCfg)
