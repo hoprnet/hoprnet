@@ -4,20 +4,28 @@ pragma abicoder v2;
 
 import '@openzeppelin/contracts/utils/cryptography/ECDSA.sol';
 import './ISafe.sol';
-import './IDualRoleAccess.sol';
+import './permissioned-module/INodeManagementModule.sol';
 
+// Node already has mapped to Safe
 error NodeHasSafe();
+
+// Not a valid Safe address;
 error NotValidSafe();
+
+// Not a valid signature from node;
 error NotValidSignatureFromNode();
-error InvalidSafeAddress();
-error NotValidSafeOwner();
-error NotValidGuardRole();
+
+// Safe address is zero
+error SafeAddressZero();
+
+// Provided address is neither an owner of Safe nor a member of an enabled NodeManagementModule
+error NotSafeOwnerNorNode();
 
 /**
  * @title Node safe must prove that the Safe is the only authorized controller of
  * the CHAIN_KEY address. This link between the Safe and node's chain-key address
  * should be registered upon successful verification
- * TODO: This contract can be used by HoprChannels contract or HoprNetworkRegistry
+ * This contract is meant to be deployed as a standalone contract
  */
 contract HoprNodeSafeRegistry {
   struct NodeSafe {
@@ -33,6 +41,10 @@ contract HoprNodeSafeRegistry {
   // NodeSafe struct type hash.
   // keccak256("NodeSafe(address safeAddress,address nodeChainKeyAddress)");
   bytes32 private constant NODE_SAFE_TYPEHASH = hex'6e9a9ee91e0fce141f0eeaf47e1bfe3af5b5f40e5baf2a86acc37a075199c16d';
+  // start and end point for linked list of modules
+  address private constant SENTINEL_MODULES = address(0x1);
+  // page size of querying modules
+  uint256 private constant pageSize = 100;
 
   event RegisteredNodeSafe(address indexed safeAddress, address indexed nodeAddress);
   event DergisteredNodeSafe(address indexed safeAddress, address indexed nodeAddress);
@@ -84,7 +96,7 @@ contract HoprNodeSafeRegistry {
     }
 
     // ensure that node is an owner
-    ensureNodeIsOwnerAndHasRole(NodeSafe({safeAddress: msg.sender, nodeChainKeyAddress: nodeAddr}));
+    ensureNodeIsSafeModuleMember(NodeSafe({safeAddress: msg.sender, nodeChainKeyAddress: nodeAddr}));
 
     // update and emit event
     nodeToSafe[nodeAddr] = address(0);
@@ -108,11 +120,11 @@ contract HoprNodeSafeRegistry {
     }
     // Safe address cannot be zero
     if (nodeSafe.safeAddress == address(0)) {
-      revert InvalidSafeAddress();
+      revert SafeAddressZero();
     }
 
-    // ensure that node is an owner
-    ensureNodeIsOwnerAndHasRole(nodeSafe);
+    // ensure that node is either an owner or a member of the (enabled) NodeManagementModule
+    ensureNodeIsSafeModuleMember(nodeSafe);
 
     // update and emit event
     nodeToSafe[nodeSafe.nodeChainKeyAddress] = nodeSafe.safeAddress;
@@ -120,25 +132,36 @@ contract HoprNodeSafeRegistry {
   }
 
   /**
-   * @dev Ensure that the node address is an owner of safe address
-   * Ensure that the node address has the NODE_ROLE on the guard of the safe
+   * @dev Ensure that the node address is either an owner or a member of 
+   * the enebled node management module of the safe
    * @param nodeSafe struct to check
    */
-  function ensureNodeIsOwnerAndHasRole(NodeSafe memory nodeSafe) internal view {
+  function ensureNodeIsSafeModuleMember(NodeSafe memory nodeSafe) internal view {
     // check safeAddress has nodeChainKeyAddress as owner
     address[] memory owners = ISafe(nodeSafe.safeAddress).getOwners();
     uint256 index = 0;
     for (index; index < owners.length; index++) {
-      if (owners[index] == nodeSafe.nodeChainKeyAddress) break;
-    }
-    if (index >= owners.length) {
-      revert NotValidSafeOwner();
+      if (owners[index] == nodeSafe.nodeChainKeyAddress) return;
     }
 
-    // check nodeChainKeyAddress has NODE_ROLE in safeAddress guard
-    IDualRoleAccess safeGuard = IDualRoleAccess(ISafe(nodeSafe.safeAddress).getGuard());
-    if (safeGuard.hasRole(safeGuard.NODE_ROLE(), nodeSafe.nodeChainKeyAddress)) {
-      revert NotValidGuardRole();
+    // if nodeChainKeyAddress is not an owner, it must be a member of the enabled node management module
+    address nextModule;
+    address[] memory modules;
+    // there may be many modules, loop through them
+    while (nextModule != SENTINEL_MODULES) {
+      // get modules for safe
+      (modules, nextModule) = ISafe(nodeSafe.safeAddress).getModulesPaginated(SENTINEL_MODULES, pageSize);
+      for (uint256 i = 0; i < modules.length; i++) {
+        if (
+          IHoprNodeManagementModule(modules[i]).isHoprNodeManagementModule() &&
+          IHoprNodeManagementModule(modules[i]).isNode(nodeSafe.nodeChainKeyAddress)
+        ) {
+          return;
+        }
+      }
     }
+
+    // if nodeChainKeyAddress is neither an owner nor a member of a valid HoprNodeManagementModule to the safe, revert
+    revert NotSafeOwnerNorNode();
   }
 }

@@ -9,6 +9,7 @@ pragma abicoder v2;
 import "./SimplifiedModule.sol";
 import "./CapabilityPermissions.sol";
 import "../../IHoprChannels.sol";
+import "./INodeManagementModule.sol";
 
 // when the contract has already been initialized
 error AlreadyInitialized();
@@ -29,7 +30,8 @@ error CannotChangeOwner();
  * Module can execute CALLs to HoprChannels contracts
  * Module can execute CALLs to HoprToken contracts
  */
-contract HoprNodeManagementModule is SimplifiedModule {
+contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule {
+  bool public constant isHoprNodeManagementModule = true;
   // address to send delegated multisend calls to 
   address public multisend;
   // from HoprCapabilityPermissions. This module is a Role where members are NODE_CHAIN_KEYs
@@ -76,6 +78,14 @@ contract HoprNodeManagementModule is SimplifiedModule {
     _transferOwnership(_safe);
     emit AvatarSet(address(0), avatar);
     emit SetMultisendAddress(_multisend);
+  }
+
+  /**
+   * @dev check if an address has been included as a member (NODE_CHAIN_KEY)
+   * @param nodeAddress address to be checked
+   */
+  function isNode(address nodeAddress) external view returns (bool) {
+    return role.members[nodeAddress];
   }
 
   /**
@@ -278,7 +288,6 @@ contract HoprNodeManagementModule is SimplifiedModule {
       HoprCapabilityPermissions.scopeSendCapability(role, beneficiaries[i], SendPermission(permissions[i]));
     }
   }
-
 
   // ===========================================================
   // ----------------------- INHERITANCE -----------------------

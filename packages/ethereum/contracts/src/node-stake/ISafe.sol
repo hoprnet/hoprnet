@@ -6,6 +6,6 @@ pragma solidity ^0.8;
  */
 interface ISafe {
   function getOwners() external view returns (address[] memory);
-
-  function getGuard() external view returns (address);
+  
+  function getModulesPaginated(address start, uint256 pageSize) external view returns (address[] memory array, address next);
 }
