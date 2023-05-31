@@ -218,12 +218,7 @@ impl Balance {
 
 impl Display for Balance {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{} {:?}",
-            self.value(),
-            self.balance_type
-        )
+        write!(f, "{} {:?}", self.value(), self.balance_type)
     }
 }
 
