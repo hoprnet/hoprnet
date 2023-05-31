@@ -381,7 +381,7 @@ pub mod test {
                 (inverse_win_prob * price_per_packet * path_pos as u128).into(),
                 BalanceType::HOPR,
             ),
-            U256::from_inverse_probability(&inverse_win_prob).unwrap(),
+            U256::from_inverse_probability(inverse_win_prob.into()).unwrap(),
             U256::new("4"),
             pk,
         )

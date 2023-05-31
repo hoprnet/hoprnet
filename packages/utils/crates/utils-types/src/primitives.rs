@@ -1,7 +1,7 @@
 use ethnum::{u256, AsU256};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
-use std::ops::{Add, Div, Mul, Sub};
+use std::ops::{Add, Mul, Sub};
 
 use crate::errors::{GeneralError, GeneralError::InvalidInput, GeneralError::ParseError, Result};
 use crate::traits::{BinarySerializable, ToHex};
@@ -221,7 +221,7 @@ impl Display for Balance {
         write!(
             f,
             "{} {:?}",
-            self.value().value().div(&u256::from(10u16).pow(18)),
+            self.value(),
             self.balance_type
         )
     }
@@ -497,7 +497,7 @@ mod tests {
     #[test]
     fn balance_tests() {
         let b_1 = Balance::from_str("10", BalanceType::HOPR);
-        assert_eq!("10".to_string(), b_1.to_string(), "to_string failed");
+        assert_eq!("10 HOPR".to_string(), b_1.to_string(), "to_string failed");
 
         let b_2 = Balance::deserialize(&b_1.serialize_value(), BalanceType::HOPR).unwrap();
         assert_eq!(b_1, b_2, "deserialized balance does not match");

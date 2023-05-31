@@ -56,7 +56,7 @@ mod tests {
 
     #[test]
     fn test_path_validated() {
-        const HOPS: usize = 5;
+        const HOPS: u32 = 5;
         let peer_ids = (0..HOPS).map(|_| PeerId::random()).collect::<Vec<_>>();
 
         let path = Path::new_valid(peer_ids.clone());
