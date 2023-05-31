@@ -9,6 +9,7 @@ use ethers::{
 };
 use log::{log, Level};
 use std::env;
+use std::str::FromStr;
 use utils_types::primitives::Address;
 
 use crate::utils::{Cmd, HelperErrors};
