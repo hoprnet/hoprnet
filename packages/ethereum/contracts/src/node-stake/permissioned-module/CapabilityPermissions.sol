@@ -108,6 +108,9 @@ library HoprCapabilityPermissions {
     /// Arrays must be the same length
     error ArraysDifferentLength();
 
+    /// Arrays must not exceed the maximum length
+    error ArrayTooLong();
+
     /// Address cannot be zero
     error AddressIsZero();
 
@@ -423,7 +426,7 @@ library HoprCapabilityPermissions {
      * @param role The storage reference to the Role struct.
      * @param targetAddress The address of the target to be scoped as a HoprToken.
      */
-    function scopeTargeToken(
+    function scopeTargetToken(
         Role storage role,
         address targetAddress
     ) external {
@@ -734,5 +737,42 @@ library HoprCapabilityPermissions {
         bytes4 functionSig
     ) internal pure returns (bytes32) {
         return bytes32(abi.encodePacked(targetAddress, functionSig));
+    }
+
+    /**
+     * @dev Returns an uint256 that represents the array of permission
+     * @notice that permissions are enums with two bits, 
+     * e.g. HoprChannelsPermission, HoprTokenPermission, SendPermission
+     */
+    function encodePermissionEnums(
+       uint256[] memory permissions
+    ) internal pure returns (uint256 encoded, uint256 length) {
+        uint256 len = permissions.length;
+        if (len > 256) {
+            revert ArrayTooLong();
+        }
+        uint256 val;
+        for (uint256 i = 0; i < len; i++) {
+            val |= permissions[i] << i;
+        }
+        return (val, len);
+    }
+
+    /**
+     * @dev Returns an uint256 array which decodes from the encoded permission
+     * @notice that permissions are enums with two bits, 
+     * e.g. HoprChannelsPermission, HoprTokenPermission, SendPermission
+     */
+    function decodePermissionEnums(
+        uint256 encoded, 
+        uint256 length
+    ) internal pure returns (uint256[] memory permissions) {
+        permissions = new uint256[](length);
+        if (length > 256) {
+            revert ArrayTooLong();
+        }
+        for (uint256 i = 0; i < length; i++) {
+            permissions[i] = (encoded << (256 - i - 1)) >> 255;
+        }
     }
 }

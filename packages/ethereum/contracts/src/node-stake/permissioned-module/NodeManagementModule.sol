@@ -129,7 +129,7 @@ contract HoprNodeManagementModule is SimplifiedModule {
     // add default scope for Channels TargetType
     HoprCapabilityPermissions.scopeTargetChannels(role, hoprChannelsAddress);
     // add default scope for Token TargetType
-    HoprCapabilityPermissions.scopeTargeToken(role, hoprTokenAddress);
+    HoprCapabilityPermissions.scopeTargetToken(role, hoprTokenAddress);
   }
 
   /**
@@ -144,8 +144,8 @@ contract HoprNodeManagementModule is SimplifiedModule {
    * @dev Scopes the target address as a HoprToken target
    * @param hoprTokenAddress address of HoprToken contract to be added to scope
    */
-  function scopeTargeToken(address hoprTokenAddress) external onlyOwner {
-    HoprCapabilityPermissions.scopeTargeToken(role, hoprTokenAddress);
+  function scopeTargetToken(address hoprTokenAddress) external onlyOwner {
+    HoprCapabilityPermissions.scopeTargetToken(role, hoprTokenAddress);
   }
 
   /**
