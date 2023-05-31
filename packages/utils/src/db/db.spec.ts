@@ -65,9 +65,8 @@ class TestingDB extends HoprDB {
 }
 
 function createMockedTicket(signerPrivKey: Uint8Array, counterparty: Address) {
-  return Ticket.new(
+  let tkt = Ticket.new(
     counterparty,
-    new Response(Uint8Array.from(randomBytes(32))).to_challenge(),
     U256.zero(),
     U256.zero(),
     Balance.zero(BalanceType.HOPR),
@@ -75,6 +74,8 @@ function createMockedTicket(signerPrivKey: Uint8Array, counterparty: Address) {
     U256.one(),
     signerPrivKey
   )
+  tkt.set_challenge(new Response(Uint8Array.from(randomBytes(32))).to_challenge().to_ethereum_challenge(), signerPrivKey)
+  return tkt
 }
 
 function channelEntryCreateMock(): ChannelEntry {
