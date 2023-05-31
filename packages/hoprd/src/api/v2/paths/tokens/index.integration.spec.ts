@@ -3,10 +3,12 @@ import sinon from 'sinon'
 import chaiResponseValidator from 'chai-openapi-response-validator'
 import chai, { expect } from 'chai'
 
-import { createAuthenticatedTestApiInstance, createMockDb } from './../../fixtures.js'
+import { createAuthenticatedTestApiInstance } from './../../fixtures.js'
 import { STATUS_CODES } from './../../utils.js'
 
 import type { default as Hopr } from '@hoprnet/hopr-core'
+import { LevelDb } from '@hoprnet/hopr-utils'
+import { Database, PublicKey } from '@hoprnet/hopr-core/lib/core_packet.js'
 
 describe('POST /tokens', function () {
   let node: Hopr
@@ -14,7 +16,9 @@ describe('POST /tokens', function () {
 
   before(async function () {
     node = sinon.fake() as any
-    node.db = createMockDb()
+    let db = new LevelDb()
+    await db.backend.open()
+    node.db = new Database(db, PublicKey.from_peerid_str('16Uiu2HAmM9KAPaXA4eAz58Q7Eb3LEkDvLarU4utkyLwDeEK6vM5m'))
 
     const loaded = await createAuthenticatedTestApiInstance(node)
 
