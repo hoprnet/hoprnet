@@ -108,19 +108,14 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
     }
 
     async fn mark_rejected(&mut self, ticket: &Ticket) -> Result<()> {
+        let count = self.get_rejected_tickets_count().await?;
         let count_key = utils_db::db::Key::new_from_str(REJECTED_TICKETS_COUNT)?;
-        // always store as 2^32 - 1 options
-        let count = self.db.get::<u128>(count_key.clone()).await?;
         self.db.set(count_key, &(count + 1)).await?;
 
+        let balance = self.get_rejected_tickets_value().await?;
         let value_key = utils_db::db::Key::new_from_str(REJECTED_TICKETS_VALUE)?;
-        let balance = self
-            .db
-            .get::<Balance>(value_key.clone())
-            .await
-            .unwrap_or(Balance::new(U256::from(0u64), ticket.amount.balance_type()));
-
         let _result = self.db.set(value_key, &balance.add(&ticket.amount)).await?;
+
         Ok(())
     }
 

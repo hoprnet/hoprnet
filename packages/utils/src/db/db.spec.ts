@@ -1,4 +1,5 @@
 import assert from 'assert'
+import { randomBytes } from 'crypto'
 import {
   Ticket,
   Balance,
@@ -10,7 +11,8 @@ import {
   Address,
   Snapshot,
   ChannelStatus,
-  Database
+  Database,
+  Response
 } from '../../../core-ethereum/lib/core_ethereum_db.js'
 import BN from 'bn.js'
 import { stringToU8a } from '../u8a/index.js'
@@ -49,6 +51,23 @@ import { LevelDb } from './db.js'
 import { db_sanity_test } from '../../lib/utils_db.js'
 import fs from 'fs'
 
+function createMockedTicket(signerPrivKey: Uint8Array, counterparty: Address, balance: Balance) {
+  let tkt = Ticket.new(
+      counterparty,
+      U256.zero(),
+      U256.zero(),
+      balance,
+      U256.from_inverse_probability(U256.one()),
+      U256.one(),
+      signerPrivKey
+  )
+  tkt.set_challenge(
+      new Response(Uint8Array.from(randomBytes(32))).to_challenge().to_ethereum_challenge(),
+      signerPrivKey
+  )
+  return tkt
+}
+
 describe('db shim tests', function () {
   let db: LevelDb
   let db_dir_path: string
@@ -76,25 +95,14 @@ describe('db shim tests', function () {
   })
 })
 
+function test_in_memory_db() {
+  return new Database(new LevelDb(), MOCK_PUBLIC_KEY())
+}
+
 describe('db functional tests', function () {
-  let db: Database
-  let db_shim: LevelDb
-  let db_dir_path: string
-
-  beforeEach(async function () {
-    db_shim = new LevelDb()
-    db_dir_path = '/tmp/test-shim.db'
-    await db_shim.init(true, db_dir_path, true, 'monte_rosa')
-    db = new Database(db_shim, MOCK_PUBLIC_KEY())
-  })
-
-  afterEach(async function () {
-    await db_shim.close()
-
-    fs.rmSync(db_dir_path, { recursive: true, force: true })
-  })
-
   it('should store hopr balance', async function () {
+    let db = test_in_memory_db()
+
     assert((await db.get_hopr_balance()).eq(Balance.zero(BalanceType.HOPR)))
 
     await db.set_hopr_balance(new Balance('10', BalanceType.HOPR))
@@ -108,6 +116,8 @@ describe('db functional tests', function () {
   })
 
   it('should test register toggle', async function () {
+    let db = test_in_memory_db()
+
     // should be false by default
     assert((await db.is_network_registry_enabled()) === true, 'register should be enabled by default')
 
@@ -121,11 +131,13 @@ describe('db functional tests', function () {
   })
 
   it('should test registry', async function () {
+    let db = test_in_memory_db()
+
     const hoprNode = MOCK_PUBLIC_KEY()
     const account = MOCK_ADDRESS()
 
     // should be throw when not added
-    assert.rejects(() => db.get_account_from_network_registry(hoprNode), 'should throw when account is not registered')
+    assert.equal(await db.get_account_from_network_registry(hoprNode), undefined)
 
     // should be set
     await db.add_to_network_registry(hoprNode, account, TestingSnapshot)
@@ -133,7 +145,7 @@ describe('db functional tests', function () {
     let nodes = await db.find_hopr_node_using_account_in_network_registry(account)
     assert(nodes.len() === 1, 'should have only 1 hoprNode registered')
     assert(
-      (await db.find_hopr_node_using_account_in_network_registry(account))[0].eq(hoprNode),
+      (await db.find_hopr_node_using_account_in_network_registry(account)).next().eq(hoprNode),
       'should match the registered hoprNode'
     )
     assert((await db.get_account_from_network_registry(hoprNode)).eq(account), 'should match account added')
@@ -141,19 +153,16 @@ describe('db functional tests', function () {
     // should be removed
     await db.remove_from_network_registry(hoprNode, account, TestingSnapshot)
 
-    // TODO!
-    // assert.rejects(
-    //     () => db.find_hopr_node_using_account_in_network_registry(account),
-    //     'should throw when HoprNode is not linked to an account'
-    // )
     assert(
       (await db.find_hopr_node_using_account_in_network_registry(account)).len() === 0,
       'should have 0 hoprNode registered'
     )
-    // assert.rejects(() => db.get_account_from_network_registry(hoprNode), 'should throw when account is deregistered')
+    assert.equal(await db.get_account_from_network_registry(hoprNode), undefined)
   })
 
   it('should test eligible', async function () {
+    let db = test_in_memory_db()
+
     const account = MOCK_ADDRESS()
 
     // should be false by default
@@ -169,29 +178,38 @@ describe('db functional tests', function () {
   })
 
   it('should store rejected tickets statistics', async function () {
+    let db = test_in_memory_db()
+
     assert.equal(await db.get_rejected_tickets_count(), 0)
     assert((await db.get_rejected_tickets_value()).eq(Balance.zero(BalanceType.HOPR)))
 
     const amount = new BN(1)
 
-    await db.mark_rejected({
-      amount: new Balance(amount.toString(10), BalanceType.HOPR)
-    } as Ticket)
+    let ticket =  createMockedTicket(
+        Uint8Array.from(randomBytes(SECP256K1_CONSTANTS.PRIVATE_KEY_LENGTH)),
+        MOCK_ADDRESS(),
+        new Balance(amount.toString(10), BalanceType.HOPR)
+    )
+    await db.mark_rejected(ticket)
 
     assert.equal(await db.get_rejected_tickets_count(), 1)
     assert((await db.get_rejected_tickets_value()).eq(new Balance(amount.toString(10), BalanceType.HOPR)))
   })
 
   it('should store ChannelEntry', async function () {
+    let db = test_in_memory_db()
+
     const channelEntry = channelEntryCreateMock()
 
     await db.update_channel_and_snapshot(channelEntry.get_id(), channelEntry.clone(), TestingSnapshot)
 
-    assert(!!(await db.get_channel(channelEntry.get_id())), 'did not find channel')
-    assert((await db.get_channels()).len() === 1, 'did not find channel')
+    assert((await db.get_channel(channelEntry.get_id())) !== undefined)
+    assert.equal((await db.get_channels()).len(), 1, 'did not find channel')
   })
 
   it('block number workflow', async function () {
+    let db = test_in_memory_db()
+
     const initialBlockNumber = await db.get_latest_block_number()
 
     assert(initialBlockNumber == 0, `initial block number must be set to 0`)
@@ -205,6 +223,8 @@ describe('db functional tests', function () {
   })
 
   it('should store current commitment', async function () {
+    let db = test_in_memory_db()
+
     const DUMMY_CHANNEL = new Hash(new Uint8Array(Hash.size()).fill(0xff))
     const DUMMY_COMMITMENT = new Hash(new Uint8Array(Hash.size()).fill(0xbb))
 
