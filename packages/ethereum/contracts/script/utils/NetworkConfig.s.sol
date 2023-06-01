@@ -27,6 +27,7 @@ contract NetworkConfig is Script {
     address stakeContractAddress;
     address networkRegistryContractAddress;
     address networkRegistryProxyContractAddress;
+    address moduleImplementationAddress;
     uint256 indexerStartBlockNumber;
   }
 
@@ -81,6 +82,9 @@ contract NetworkConfig is Script {
     address networkRegistryAddr = json.readAddress(
       string(abi.encodePacked(levelToNetworkConfig, '.network_registry_contract_address'))
     );
+    address moduleImplementationAddr = json.readAddress(
+      string(abi.encodePacked(levelToNetworkConfig, '.module_implementation_address'))
+    );
 
     networkDetail = NetworkDetail({
       environmentType: envType,
@@ -92,6 +96,7 @@ contract NetworkConfig is Script {
       stakeContractAddress: stakeAddr,
       networkRegistryContractAddress: networkRegistryAddr,
       networkRegistryProxyContractAddress: networkRegistryProxyAddr,
+      moduleImplementationAddress: moduleImplementationAddr,
       indexerStartBlockNumber: indexerStartBlkNum
     });
   }
@@ -175,6 +180,16 @@ contract NetworkConfig is Script {
         )
       )
     );
+    vm.writeLine(
+      filePath,
+      string(
+        abi.encodePacked(
+          '"module_implementation_address": "',
+          vm.toString(networkDetail.moduleImplementationAddress),
+          '"'
+        )
+      )
+    );
   }
 
   // FIXME: remove this temporary method
@@ -221,6 +236,7 @@ contract NetworkConfig is Script {
     json.serialize('boost_contract_address', networkDetail.hoprBoostContractAddress);
     json.serialize('stake_contract_address', networkDetail.stakeContractAddress);
     json.serialize('network_registry_proxy_contract_address', networkDetail.networkRegistryProxyContractAddress);
+    json = json.serialize('module_implementation_address', networkDetail.moduleImplementationAddress);
     json = json.serialize('network_registry_contract_address', networkDetail.networkRegistryContractAddress);
     return json;
   }

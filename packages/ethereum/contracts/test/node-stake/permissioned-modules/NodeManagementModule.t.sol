@@ -13,9 +13,6 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
     /**
     * Manually import events and errors
     */
-    error AlreadyInitialized();
-    error WithMembership();
-    error CannotChangeOwner();
     event SetMultisendAddress(address multisendAddress);
     event NodeAdded(address indexed node);
     event NodeRemoved(address indexed node);
