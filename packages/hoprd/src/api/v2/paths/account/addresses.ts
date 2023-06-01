@@ -11,7 +11,7 @@ export const getAddresses = (
   native: string
   hopr: string
 } => {
-  const native = node.getEthereumAddress().toHex()
+  const native = node.getEthereumAddress().to_hex()
   const hopr = node.getId().toString()
 
   return {

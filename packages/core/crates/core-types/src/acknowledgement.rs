@@ -3,6 +3,7 @@ use crate::channels::Ticket;
 use core_crypto::errors::CryptoError::SignatureVerification;
 use core_crypto::primitives::{DigestLike, SimpleDigest};
 use core_crypto::types::{HalfKey, HalfKeyChallenge, Hash, PublicKey, Response, Signature};
+use serde::{Deserialize, Serialize};
 use utils_types::errors;
 use utils_types::errors::GeneralError::ParseError;
 use utils_types::traits::BinarySerializable;
@@ -91,7 +92,7 @@ impl BinarySerializable<'_> for Acknowledgement {
 }
 
 /// Contains acknowledgment information and the respective ticket
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct AcknowledgedTicket {
     pub ticket: Ticket,
@@ -170,7 +171,7 @@ impl AcknowledgedTicket {
 }
 
 /// Wrapper for an unacknowledged ticket
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct UnacknowledgedTicket {
     pub ticket: Ticket,
@@ -246,10 +247,10 @@ impl BinarySerializable<'_> for UnacknowledgedTicket {
 
 /// Contains cryptographic challenge that needs to be solved for acknowledging a packet.
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct AcknowledgementChallenge {
-    ack_challenge: Option<HalfKeyChallenge>,
-    signature: Signature,
+    pub ack_challenge: Option<HalfKeyChallenge>,
+    pub signature: Signature,
 }
 
 fn hash_challenge(challenge: &HalfKeyChallenge) -> Box<[u8]> {
@@ -314,7 +315,7 @@ impl BinarySerializable<'_> for AcknowledgementChallenge {
 
 /// Contains either unacknowledged ticket if we're waiting for the acknowledgement as a relayer
 /// or information if we wait for the acknowledgement as a sender.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum PendingAcknowledgement {
     /// We're waiting for acknowledgement as a sender
     WaitingAsSender,
@@ -374,14 +375,13 @@ pub mod test {
 
         Ticket::new(
             Address::new(&[0u8; Address::SIZE]),
-            None,
             U256::new("1"),
             U256::new("2"),
             Balance::new(
-                inverse_win_prob * price_per_packet * path_pos as u128,
+                (inverse_win_prob * price_per_packet * path_pos as u128).into(),
                 BalanceType::HOPR,
             ),
-            U256::from_inverse_probability(&inverse_win_prob).unwrap(),
+            U256::from_inverse_probability(inverse_win_prob.into()).unwrap(),
             U256::new("4"),
             pk,
         )

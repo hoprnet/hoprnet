@@ -1,18 +1,18 @@
 import type { PeerId } from '@libp2p/interface-peer-id'
 
-import { durations, pickVersion, pubKeyToPeerId, type HoprDB, create_counter } from '@hoprnet/hopr-utils'
+import { durations, pickVersion, type HoprDB, create_counter } from '@hoprnet/hopr-utils'
 import { debug, registerMetricsCollector } from '@hoprnet/hopr-utils'
 
 import { pushable, type Pushable } from 'it-pushable'
 
-import { Packet } from '../../messages/index.js'
-import { new_mixer, core_mixer_set_panic_hook, core_mixer_gather_metrics } from '../../../lib/core_mixer.js'
-core_mixer_set_panic_hook()
+import { Packet, PacketHelper, PacketState } from '../../messages/index.js'
+import { new_mixer, core_mixer_initialize_crate, core_mixer_gather_metrics } from '../../../lib/core_mixer.js'
+core_mixer_initialize_crate()
 registerMetricsCollector(core_mixer_gather_metrics)
 
 import type { AcknowledgementInteraction } from './acknowledgement.js'
 import type { HoprOptions, SendMessage } from '../../index.js'
-import type { ResolvedEnvironment } from '../../environment.js'
+import type { ResolvedNetwork } from '../../network.js'
 import type { Components } from '@libp2p/interfaces/components'
 
 const log = debug('hopr-core:packet:forward')
@@ -27,7 +27,8 @@ const metric_recvMessageCount = create_counter('core_counter_received_messages',
 // Do not type-check JSON files
 // @ts-ignore
 import pkg from '../../../package.json' assert { type: 'json' }
-import { peerIdFromBytes } from '@libp2p/peer-id'
+import { peerIdFromBytes, peerIdFromString } from '@libp2p/peer-id'
+import { keysPBM } from '@libp2p/crypto/keys'
 
 const NORMALIZED_VERSION = pickVersion(pkg.version)
 
@@ -42,7 +43,7 @@ export class PacketForwardInteraction {
     private privKey: PeerId,
     private emitMessage: (msg: Uint8Array) => void,
     private db: HoprDB,
-    private environment: ResolvedEnvironment,
+    private network: ResolvedNetwork,
     private acknowledgements: AcknowledgementInteraction,
     private options: HoprOptions
   ) {
@@ -50,9 +51,9 @@ export class PacketForwardInteraction {
 
     this.protocols = [
       // current
-      `/hopr/${this.environment.id}/msg/${NORMALIZED_VERSION}`,
+      `/hopr/${this.network.id}/msg/${NORMALIZED_VERSION}`,
       // deprecated
-      `/hopr/${this.environment.id}/msg`
+      `/hopr/${this.network.id}/msg`
     ]
   }
 
@@ -90,7 +91,8 @@ export class PacketForwardInteraction {
       // TODO: this is a temporary quick-and-dirty solution to be used until
       // packet transformation logic has been ported to Rust
       const sender = peerIdFromBytes(chunk.slice(0, 39))
-      const packet = Packet.deserialize(chunk.slice(39), this.privKey, sender)
+      let private_key = keysPBM.PrivateKey.decode(this.privKey.privateKey).Data
+      const packet = Packet.deserialize(chunk.slice(39), private_key, sender.toString())
 
       await this.handleMixedPacket(packet)
     }
@@ -103,12 +105,12 @@ export class PacketForwardInteraction {
   }
 
   async handleMixedPacket(packet: Packet) {
-    await packet.checkPacketTag(this.db)
+    await PacketHelper.checkPacketTag(packet, this.db)
 
-    if (packet.isReceiver) {
-      this.emitMessage(packet.plaintext)
+    if (packet.state() == PacketState.Final) {
+      this.emitMessage(packet.plaintext())
       // Send acknowledgements independently
-      this.acknowledgements.sendAcknowledgement(packet, packet.previousHop.toPeerId())
+      this.acknowledgements.sendAcknowledgement(packet, peerIdFromString(packet.previous_hop().to_peerid_str()))
       metric_recvMessageCount.increment()
       // Nothing else to do
       return
@@ -116,30 +118,30 @@ export class PacketForwardInteraction {
 
     // Packet should be forwarded
     try {
-      await packet.validateUnacknowledgedTicket(this.db, this.options.checkUnrealizedBalance)
+      await PacketHelper.validateUnacknowledgedTicket(packet, this.db, this.options.checkUnrealizedBalance)
     } catch (err) {
       log(`Ticket validation failed. Dropping packet`, err)
       return
     }
 
-    await packet.storeUnacknowledgedTicket(this.db)
+    await PacketHelper.storeUnacknowledgedTicket(packet, this.db)
 
     try {
-      await packet.forwardTransform(this.privKey, this.db)
+      await PacketHelper.forwardTransform(packet, this.privKey, this.db)
     } catch (err) {
       log(`Packet transformation failed. Dropping packet`, err)
       return
     }
 
     try {
-      await this.interact(pubKeyToPeerId(packet.nextHop), packet)
+      await this.interact(peerIdFromString(packet.next_hop().to_peerid_str()), packet)
     } catch (err) {
       log(`Forwarding transformed packet failed.`, err)
       return
     }
 
     // Send acknowledgements independently
-    this.acknowledgements.sendAcknowledgement(packet, packet.previousHop.toPeerId())
+    this.acknowledgements.sendAcknowledgement(packet, peerIdFromString(packet.previous_hop().to_peerid_str()))
     metric_fwdMessageCount.increment()
   }
 }

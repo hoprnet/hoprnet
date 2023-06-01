@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 use crate::account::AccountType::{Announced, NotAnnounced};
 use core_crypto::types::PublicKey;
 use multiaddr::Multiaddr;
@@ -7,7 +9,7 @@ use utils_types::primitives::Address;
 use utils_types::traits::{BinarySerializable, PeerIdLike};
 
 /// Type of the node account.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AccountType {
     /// Node is not announced.
     NotAnnounced,
@@ -17,7 +19,7 @@ pub enum AccountType {
 
 /// Represents a node announcement entry on the block chain.
 /// This contains node's public key and optional announcement information (multiaddress, block number).
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct AccountEntry {
     pub public_key: PublicKey,

@@ -1,5 +1,5 @@
 import { randomPermutation } from './randomPermutation.js'
-import { randomInteger } from '../crypto/randomInteger.js'
+import { random_integer } from '../types.js'
 
 /**
  * Picks @param subsetSize elements at random from @param array .
@@ -38,7 +38,7 @@ export function randomSubset<T>(array: T[], subsetSize: number, filter?: (candid
 
   if (subsetSize == 1) {
     let i = 0
-    let index = randomInteger(0, array.length)
+    let index = random_integer(0, array.length)
 
     while (filter != null && !filter(array[index])) {
       if (i == array.length) {
@@ -60,7 +60,7 @@ export function randomSubset<T>(array: T[], subsetSize: number, filter?: (candid
 
   let index: number
   for (let i = 0; i < subsetSize && !breakUp; i++) {
-    index = randomInteger(0, arrLength)
+    index = random_integer(0, arrLength)
 
     found = false
 

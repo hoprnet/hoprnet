@@ -1,12 +1,17 @@
+pub mod commitment;
 pub mod constants;
+pub mod errors;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
+    use utils_log::logger::JsLogger;
     use wasm_bindgen::prelude::wasm_bindgen;
+
+    static LOGGER: JsLogger = JsLogger {};
 
     #[allow(dead_code)]
     #[wasm_bindgen]
-    pub fn core_ethereum_misc_set_panic_hook() {
+    pub fn core_ethereum_misc_initialize_crate() {
         // When the `console_error_panic_hook` feature is enabled, we can call the
         // `set_panic_hook` function at least once during initialization, and then
         // we will get better error messages if our code ever panics.
@@ -15,6 +20,8 @@ pub mod wasm {
         // https://github.com/rustwasm/console_error_panic_hook#readme
         #[cfg(feature = "console_error_panic_hook")]
         console_error_panic_hook::set_once();
+
+        let _ = JsLogger::install(&LOGGER, None);
     }
 
     // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global

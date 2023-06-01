@@ -5,10 +5,10 @@ import { peerIdFromString } from '@libp2p/peer-id'
 import { STATUS_CODES } from '../../../../utils.js'
 import { ChannelInfo, formatIncomingChannel, formatOutgoingChannel } from '../../index.js'
 import {
-  channelStatusToString,
+  channel_status_to_string,
   ChannelStatus,
   defer,
-  generateChannelId,
+  generate_channel_id,
   PublicKey,
   type DeferType
 } from '@hoprnet/hopr-utils'
@@ -41,12 +41,15 @@ export async function closeChannel(
     throw Error(STATUS_CODES.INVALID_PEERID)
   }
 
-  const channelId = generateChannelId(node.getEthereumAddress(), PublicKey.fromPeerId(peerId).toAddress())
+  const channelId = generate_channel_id(
+    node.getEthereumAddress(),
+    PublicKey.from_peerid_str(peerId.toString()).to_address()
+  )
 
-  let closingRequest = closingRequests.get(channelId.toHex())
+  let closingRequest = closingRequests.get(channelId.to_hex())
   if (closingRequest == null) {
     closingRequest = defer<void>()
-    closingRequests.set(channelId.toHex(), closingRequest)
+    closingRequests.set(channelId.to_hex(), closingRequest)
   } else {
     await closingRequest.promise
   }
@@ -66,7 +69,7 @@ export async function closeChannel(
       return { success: false, reason: STATUS_CODES.UNKNOWN_FAILURE }
     }
   } finally {
-    closingRequests.delete(channelId.toHex())
+    closingRequests.delete(channelId.to_hex())
     closingRequest.resolve()
   }
 }
@@ -81,7 +84,7 @@ const DELETE: Operation = [
     if (closingResult.success == true) {
       res
         .status(200)
-        .send({ receipt: closingResult.receipt, channelStatus: channelStatusToString(closingResult.channelStatus) })
+        .send({ receipt: closingResult.receipt, channelStatus: channel_status_to_string(closingResult.channelStatus) })
     } else {
       res.status(422).send({ status: closingResult.reason })
     }

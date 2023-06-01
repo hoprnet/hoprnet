@@ -13,7 +13,7 @@ import {
 import {
   Address,
   Balance,
-  NativeBalance,
+  BalanceType,
   PublicKey,
   durations,
   type AcknowledgedTicket,
@@ -21,7 +21,7 @@ import {
   type Hash,
   create_counter
 } from '@hoprnet/hopr-utils'
-import BN from 'bn.js'
+
 import NonceTracker from './nonce-tracker.js'
 import TransactionManager, { type TransactionPayload } from './transaction-manager.js'
 import { debug } from '@hoprnet/hopr-utils'
@@ -75,8 +75,8 @@ export async function createChainWrapper(
     chainId: number
     maxFeePerGas: string
     maxPriorityFeePerGas: string
+    chain: string
     network: string
-    environment: string
   },
   privateKey: Uint8Array,
   checkDuplicate: Boolean = true,
@@ -87,10 +87,10 @@ export async function createChainWrapper(
     ? new providers.StaticJsonRpcProvider(networkInfo.provider)
     : new providers.WebSocketProvider(networkInfo.provider)
   log(`[DEBUG] provider ${provider}`)
-  const publicKey = PublicKey.fromPrivKey(privateKey)
+  const publicKey = PublicKey.from_privkey(privateKey)
   log(`[DEBUG] publicKey ${publicKey}`)
-  const address = publicKey.toAddress()
-  log(`[DEBUG] address ${address}`)
+  const address = publicKey.to_address()
+  log(`[DEBUG] address ${address.to_string()}`)
   const providerChainId = (await provider.getNetwork()).chainId
   log(`[DEBUG] providerChainId ${providerChainId}`)
 
@@ -164,7 +164,7 @@ export async function createChainWrapper(
     const RETRIES = 3
     for (let i = 0; i < RETRIES; i++) {
       try {
-        return await provider.getTransactionCount(address.toHex(), blockNumber)
+        return await provider.getTransactionCount(address.to_hex(), blockNumber)
       } catch (err) {
         if (i + 1 < RETRIES) {
           await setImmediatePromise()
@@ -294,7 +294,7 @@ export async function createChainWrapper(
       feeData = await provider.getFeeData()
     } catch (error) {
       log('Transaction with nonce %d failed to getFeeData', nonce, error)
-      // TODO: find an API for fee data per environment
+      // TODO: find an API for fee data per network
       feeData = {
         lastBaseFeePerGas: null,
         maxFeePerGas: defaultMaxFeePerGas,
@@ -446,7 +446,7 @@ export async function createChainWrapper(
         0,
         channels,
         'announce',
-        publicKey.toUncompressedPubKeyHex(),
+        publicKey.to_hex(false),
         multiaddr.bytes
       )
       sendResult = await sendTransaction(checkDuplicate, confirmationEssentialTxPayload, txHandler)
@@ -523,13 +523,13 @@ export async function createChainWrapper(
     fundsB: Balance,
     txHandler: (tx: string) => DeferType<string>
   ): Promise<Receipt> => {
-    const totalFund = fundsA.toBN().add(fundsB.toBN())
+    const totalFund = fundsA.add(fundsB)
     log(
       'Funding channel from %s with %s HOPR to %s with %s HOPR',
-      partyA.toHex(),
-      fundsA.toFormattedString(),
-      partyB.toHex(),
-      fundsB.toFormattedString()
+      partyA.to_hex(),
+      fundsA.to_formatted_string(),
+      partyB.to_hex(),
+      fundsB.to_formatted_string()
     )
     let sendResult: SendTransactionReturn
     let error: unknown
@@ -539,10 +539,10 @@ export async function createChainWrapper(
         token,
         'send',
         channels.address,
-        totalFund.toString(),
+        totalFund.to_string(),
         abiCoder.encode(
           ['address', 'address', 'uint256', 'uint256'],
-          [partyA.toHex(), partyB.toHex(), fundsA.toBN().toString(), fundsB.toBN().toString()]
+          [partyA.to_hex(), partyB.to_hex(), fundsA.to_string(), fundsB.to_string()]
         )
       )
       sendResult = await sendTransaction(checkDuplicate, fundChannelEssentialTxPayload, txHandler)
@@ -570,7 +570,7 @@ export async function createChainWrapper(
     counterparty: Address,
     txHandler: (tx: string) => DeferType<string>
   ): Promise<Receipt> => {
-    log('Initiating channel closure to %s', counterparty.toHex())
+    log('Initiating channel closure to %s', counterparty.to_hex())
     let sendResult: SendTransactionReturn
     let error: unknown
 
@@ -579,7 +579,7 @@ export async function createChainWrapper(
         0,
         channels,
         'initiateChannelClosure',
-        counterparty.toHex()
+        counterparty.to_hex()
       )
       sendResult = await sendTransaction(checkDuplicate, initiateChannelClosureEssentialTxPayload, txHandler)
     } catch (err) {
@@ -609,7 +609,7 @@ export async function createChainWrapper(
     counterparty: Address,
     txHandler: (tx: string) => DeferType<string>
   ): Promise<Receipt> => {
-    log('Finalizing channel closure to %s', counterparty.toHex())
+    log('Finalizing channel closure to %s', counterparty.to_hex())
     let sendResult: SendTransactionReturn
     let error: unknown
 
@@ -618,7 +618,7 @@ export async function createChainWrapper(
         0,
         channels,
         'finalizeChannelClosure',
-        counterparty.toHex()
+        counterparty.to_hex()
       )
       sendResult = await sendTransaction(checkDuplicate, finalizeChannelClosureEssentialTxPayload, txHandler)
     } catch (err) {
@@ -648,7 +648,11 @@ export async function createChainWrapper(
     ackTicket: AcknowledgedTicket,
     txHandler: (tx: string) => DeferType<string>
   ): Promise<Receipt> => {
-    log('Redeeming ticket for challenge %s in channel to %s', ackTicket.ticket.challenge.toHex(), counterparty.toHex())
+    log(
+      'Redeeming ticket for challenge %s in channel to %s',
+      ackTicket.ticket.challenge.to_hex(),
+      counterparty.to_hex()
+    )
 
     let sendResult: SendTransactionReturn
     let error: unknown
@@ -657,14 +661,14 @@ export async function createChainWrapper(
         0,
         channels,
         'redeemTicket',
-        counterparty.toHex(),
-        ackTicket.preImage.toHex(),
-        ackTicket.ticket.epoch.toHex(),
-        ackTicket.ticket.index.toHex(),
-        ackTicket.response.toHex(),
-        ackTicket.ticket.amount.toBN().toString(),
-        ackTicket.ticket.winProb.toBN().toString(),
-        ackTicket.ticket.signature.toHex()
+        counterparty.to_hex(),
+        ackTicket.pre_image.to_hex(),
+        ackTicket.ticket.epoch.to_hex(),
+        ackTicket.ticket.index.to_hex(),
+        ackTicket.response.to_hex(),
+        ackTicket.ticket.amount.to_string(),
+        ackTicket.ticket.win_prob.to_string(),
+        ackTicket.ticket.signature.to_hex()
       )
       sendResult = await sendTransaction(checkDuplicate, redeemTicketEssentialTxPayload, txHandler)
     } catch (err) {
@@ -693,7 +697,7 @@ export async function createChainWrapper(
     commitment: Hash,
     txHandler: (tx: string) => DeferType<string>
   ): Promise<Receipt> => {
-    log('Setting commitment %s in channel to %s', commitment.toHex(), counterparty.toHex())
+    log('Setting commitment %s in channel to %s', commitment.to_hex(), counterparty.to_hex())
     let sendResult: SendTransactionReturn
     let error: unknown
 
@@ -702,8 +706,8 @@ export async function createChainWrapper(
         0,
         channels,
         'bumpChannel',
-        counterparty.toHex(),
-        commitment.toHex()
+        counterparty.to_hex(),
+        commitment.to_hex()
       )
       sendResult = await sendTransaction(checkDuplicate, setCommitmentEssentialTxPayload, txHandler)
     } catch (err) {
@@ -785,7 +789,7 @@ export async function createChainWrapper(
     let rawBalance: BigNumber
     for (let i = 0; i < RETRIES; i++) {
       try {
-        rawBalance = await token.balanceOf(accountAddress.toHex())
+        rawBalance = await token.balanceOf(accountAddress.to_hex())
       } catch (err) {
         if (i + 1 < RETRIES) {
           await setImmediatePromise()
@@ -797,7 +801,7 @@ export async function createChainWrapper(
       }
     }
 
-    return new Balance(new BN(rawBalance.toString()))
+    return new Balance(rawBalance.toString(), BalanceType.HOPR)
   }
 
   /**
@@ -810,7 +814,7 @@ export async function createChainWrapper(
     let rawNativeBalance: BigNumber
     for (let i = 0; i < RETRIES; i++) {
       try {
-        rawNativeBalance = await provider.getBalance(accountAddress.toHex())
+        rawNativeBalance = await provider.getBalance(accountAddress.to_hex())
       } catch (err) {
         if (i + 1 < RETRIES) {
           await setImmediatePromise()
@@ -822,7 +826,7 @@ export async function createChainWrapper(
       }
     }
 
-    return new NativeBalance(new BN(rawNativeBalance.toString()))
+    return new Balance(rawNativeBalance.toString(), BalanceType.Native)
   }
 
   return {
@@ -867,7 +871,7 @@ export async function createChainWrapper(
     getPrivateKey: () => privateKey,
     getPublicKey: () => publicKey,
     getInfo: () => ({
-      network: networkInfo.network,
+      chain: networkInfo.chain,
       hoprTokenAddress: deploymentExtract.hoprTokenAddress,
       hoprChannelsAddress: deploymentExtract.hoprChannelsAddress,
       hoprNetworkRegistryAddress: deploymentExtract.hoprNetworkRegistryAddress,

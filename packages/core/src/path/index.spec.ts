@@ -1,7 +1,7 @@
 import assert from 'assert'
 import { findPath } from './index.js'
 import BN from 'bn.js'
-import { Balance, type ChannelEntry, PublicKey } from '@hoprnet/hopr-utils'
+import { Balance, BalanceType, type ChannelEntry, PublicKey, stringToU8a } from '@hoprnet/hopr-utils'
 
 const pubKeys = [
   '0x0443a3958ac66a3b2ab89fcf90bc948a8b8be0e0478d21574d077ddeb11f4b1e9f2ca21d90bd66cee037255480a514b91afae89e20f7f7fa7353891cc90a52bf6e',
@@ -12,7 +12,7 @@ const pubKeys = [
   '0x04c4d09dbf7233bdc7e27d7ef7f13c924a8dc95f295ef462484cff03030478b18de0e4cae3d9e1d4280ef3aded0f8d366f10f4513482d3972221a8586bf0dce439'
 ]
 
-const TEST_NODES = Array.from({ length: 6 }, (_, index: number) => PublicKey.fromString(pubKeys[index]))
+const TEST_NODES = Array.from({ length: 6 }, (_, index: number) => PublicKey.deserialize(stringToU8a(pubKeys[index])))
 
 function testNodeId(pKey: PublicKey) {
   return TEST_NODES.findIndex((testKey) => testKey.eq(pKey))
@@ -34,15 +34,15 @@ function checkPath(path: PublicKey[], edges: Map<PublicKey, PublicKey[]>) {
 }
 
 async function weight(c: ChannelEntry): Promise<BN> {
-  return c.balance.toBN().addn(1)
+  return new BN(c.balance.to_string()).addn(1)
 }
 
 describe('test pathfinder with some simple topologies', function () {
   const RELIABLE_NETWORK = (_p: PublicKey) => 1
   const UNRELIABLE_NETWORK = (pubKey: PublicKey) => (testNodeId(pubKey) % 3 == 0 ? 0 : 1) // Node 3 is down
-  const STAKE_1 = () => new Balance(new BN(1))
+  const STAKE_1 = () => new Balance('1', BalanceType.HOPR)
 
-  const STAKE_N = (pubKey: PublicKey) => new Balance(new BN(testNodeId(pubKey) + 0.1))
+  const STAKE_N = (pubKey: PublicKey) => new Balance((testNodeId(pubKey) + 1).toString(10), BalanceType.HOPR)
 
   // Bidirectional star, all pass through node 0
   const STAR = new Map<PublicKey, PublicKey[]>()

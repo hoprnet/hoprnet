@@ -122,12 +122,12 @@ The `hoprd` provides various command-line switches to configure its behaviour. F
 ```sh
 $ hoprd --help
 Options:
-      --environment <ENVIRONMENT>
-          Environment id which the node shall run on [env: HOPRD_ENVIRONMENT=] [possible values: anvil-localhost, master-staging, debug-staging, anvil-localhost2, monte_rosa]
+      --network <NETWORK>
+          Network id which the node shall run on [env: HOPRD_NETWORK=] [possible values: anvil-localhost, master, debug-staging, anvil-localhost2, monte_rosa]
       --identity <identity>
-          The path to the identity file [env: HOPRD_IDENTITY=] [default: /home/tino/.hopr-identity]
+          The path to the identity file [env: HOPRD_IDENTITY=] [default: <IDENTITY_DIR>]
       --data <data>
-          manually specify the data directory to use [env: HOPRD_DATA=] [default: /home/tino/work/hopr/hoprnet/packages/hoprd/hoprd-db]
+          manually specify the data directory to use [env: HOPRD_DATA=] [default: <DATA_DIR>]
       --host <HOST>
           Host to listen on for P2P connections [env: HOPRD_HOST=] [default: 0.0.0.0:9091]
       --announce
@@ -140,8 +140,6 @@ Options:
           Set port to which the API server will bind [env: HOPRD_API_PORT=] [default: 3001]
       --apiToken <TOKEN>
           A REST API token and for user authentication [env: HOPRD_API_TOKEN=]
-      --disableApiAuthentication
-          Completely disables the token authentication for the API, overrides any `apiToken` if set [env: HOPRD_DISABLE_API_AUTHENTICATION] [default: false]
       --healthCheck
           Run a health check end point on localhost:8080 [env: HOPRD_HEALTH_CHECK=]
       --healthCheckHost <HOST>
@@ -150,26 +148,32 @@ Options:
           Updates the port for the healthcheck server [env: HOPRD_HEALTH_CHECK_PORT=] [default: 8080]
       --password <PASSWORD>
           A password to encrypt your keys [env: HOPRD_PASSWORD=]
+      --defaultStrategy <DEFAULT_STRATEGY>
+          Default channel strategy to use after node starts up [env: HOPRD_DEFAULT_STRATEGY=] [default: passive] [possible values: promiscuous, passive, random]
+      --maxAutoChannels <MAX_AUTO_CHANNELS>
+          Maximum number of channel a strategy can open. If not specified, square root of number of available peers is used. [env: HOPRD_MAX_AUTO_CHANNELS=]
+      --autoRedeemTickets
+          If enabled automatically redeems winning tickets. [env: HOPRD_AUTO_REDEEEM_TICKETS=]
+      --checkUnrealizedBalance
+          Determines if unrealized balance shall be checked first before validating unacknowledged tickets. [env: HOPRD_CHECK_UNREALIZED_BALANCE=]
       --provider <PROVIDER>
           A custom RPC provider to be used for the node to connect to blockchain [env: HOPRD_PROVIDER=]
-      --defaultStrategy <STRATEGY>
-          Default channel strategy to use when the node is started [env: HOPRD_DEFAULT_STRATEGY=] [default: passive]
-      --maxAutoChannels <NUMBER>
-          Maximum number of channels a strategy can open [env: HOPRD_MAX_AUTOCHANNELS=] [default: square root of the number of active peers]
-      --autoRedeemTickets
-        Enables automatic ticket redemption when received a winning ticket [env: HOPRD_AUTO_REDEEM_TICKETS=] [default: false]
-      --checkUnrealizedBalance
-        Check unrealized balance in the channel when validating unacknowledged tickets [env: HOPRD_CHECK_UNREALIZED_BALANCE=] [default: false]
       --dryRun
           List all the options used to run the HOPR node, but quit instead of starting [env: HOPRD_DRY_RUN=]
       --init
           initialize a database if it doesn't already exist [env: HOPRD_INIT=]
+      --forceInit
+          initialize a database, even if it already exists [env: HOPRD_FORCE_INIT=]
       --allowLocalNodeConnections
           Allow connections to other nodes running on localhost [env: HOPRD_ALLOW_LOCAL_NODE_CONNECTIONS=]
       --allowPrivateNodeConnections
           Allow connections to other nodes running on private addresses [env: HOPRD_ALLOW_PRIVATE_NODE_CONNECTIONS=]
+      --maxParallelConnections <CONNECTIONS>
+          Set maximum parallel connections [env: HOPRD_MAX_PARALLEL_CONNECTIONS=] [default: 50000]
       --testAnnounceLocalAddresses
           For testing local testnets. Announce local addresses [env: HOPRD_TEST_ANNOUNCE_LOCAL_ADDRESSES=]
+      --noRelay
+          disable NAT relay functionality entirely [env: HOPRD_NO_RELAY=]
       --heartbeatInterval <MILLISECONDS>
           Interval in milliseconds in which the availability of other nodes get measured [env: HOPRD_HEARTBEAT_INTERVAL=] [default: 60000]
       --heartbeatThreshold <MILLISECONDS>
@@ -195,7 +199,7 @@ As you might have noticed running the node without any command-line argument mig
 The following command assumes you've setup an alias like described in [Install via Docker](#install-via-docker).
 
 ```sh
-hoprd --identity /app/hoprd-db/.hopr-identity --password switzerland --init --announce --host "0.0.0.0:9091" --apiToken <MY_TOKEN> --environment monte_rosa
+hoprd --identity /app/hoprd-db/.hopr-identity --password switzerland --init --announce --host "0.0.0.0:9091" --apiToken <MY_TOKEN> --network monte_rosa
 ```
 
 Here is a short breakdown of each argument.
@@ -208,9 +212,9 @@ hoprd
   --announce 				                          # announce the node to other nodes in the network and act as relay if publicly reachable
   --host "0.0.0.0:9091"   	                  # set IP and port of the P2P API to the container's external IP so it can be reached on your host
   --apiToken <MY_TOKEN>                       # specify password for accessing REST API(REQUIRED)
-  --environment monte_rosa                    # an environment is defined as a chain plus a number of deployed smart contract addresses to use on that chain
-                                              # each release has a default environment id set, but the user can override this value
-                                              # nodes from different environments are **not able** to communicate
+  --network monte_rosa                        # an network is defined as a chain plus a number of deployed smart contract addresses to use on that chain
+                                              # each release has a default network id set, but the user can override this value
+                                              # nodes from different networks are **not able** to communicate
 ```
 
 ### Using Docker Compose with extended HOPR node monitoring
@@ -266,7 +270,7 @@ make -j deps && make -j build
 make run-anvil
 
 # update protocol-config
-scripts/update-protocol-config.sh -e anvil-localhost
+scripts/update-protocol-config.sh -n anvil-localhost
 
 # running normal node alice (separate terminal)
 DEBUG="hopr*" yarn run:hoprd:alice
@@ -416,7 +420,7 @@ placeholders replaced accordingly):
 ```sh
 HOPRD_API_TOKEN="<ADMIN_AUTH_HTTP_TOKEN>" \
 HOPRD_PASSWORD="<IDENTITY_FILE_PASSWORD>" \
-  ./scripts/setup-gcloud-cluster.sh environment "" my-custom-cluster-without-name
+  ./scripts/setup-gcloud-cluster.sh network "" my-custom-cluster-without-name
 ```
 
 A previously started cluster can be destroyed, which includes all running nodes,
@@ -424,7 +428,7 @@ by using the same script but setting the cleanup switch:
 
 ```sh
 HOPRD_PERFORM_CLEANUP=true \
-  ./scripts/setup-gcloud-cluster.sh environment "" my-custom-cluster-without-name
+  ./scripts/setup-gcloud-cluster.sh network "" my-custom-cluster-without-name
 ```
 
 The default Docker image in `scripts/setup-gcloud-cluster.sh` deploys GCloud public nodes. If you wish to deploy GCloud nodes
@@ -432,10 +436,8 @@ that are behind NAT, you need to specify a NAT-variant of the `hoprd` image (not
 
 ```sh
 HOPRD_PERFORM_CLEANUP=true \
-  ./scripts/setup-gcloud-cluster.sh environment "" my-nat-cluster gcr.io/hoprassociation/hoprd-nat
+  ./scripts/setup-gcloud-cluster.sh network "" my-nat-cluster gcr.io/hoprassociation/hoprd-nat
 ```
-
-Note that if the Docker image version is not specified, the script will use the `environment` as version.
 
 ### Using Google Cloud Platform and a Default Topology
 

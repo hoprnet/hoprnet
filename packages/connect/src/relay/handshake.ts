@@ -218,7 +218,7 @@ export async function negotiateRelayHandshake(
   const result = await dial(
     components,
     destination,
-    DELIVERY_PROTOCOLS(options.environment, options.supportedEnvironments),
+    DELIVERY_PROTOCOLS(options.network, options.supportedNetworks),
     false,
     true
   )

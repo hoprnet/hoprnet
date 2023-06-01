@@ -3,7 +3,7 @@ import leveldown from 'leveldown'
 import MemDown from 'memdown'
 import { stat, mkdir, rm } from 'fs/promises'
 import { debug } from '../process/index.js'
-import { Intermediate } from '../crypto/index.js'
+
 import {
   AcknowledgedTicket,
   UnacknowledgedTicket,
@@ -14,15 +14,18 @@ import {
   Balance,
   HalfKeyChallenge,
   EthereumChallenge,
-  UINT256,
+  U256,
   Ticket,
   Address,
   Hash,
-  generateChannelId
-} from '../types/index.js'
+  generate_channel_id,
+  BalanceType,
+  PendingAcknowledgement
+} from '../types.js'
 import BN from 'bn.js'
-import { u8aToNumber, u8aConcat, toU8a } from '../u8a/index.js'
 import fs from 'fs'
+import { stringToU8a, toU8a, u8aConcat, u8aToHex, u8aToNumber } from '../u8a/index.js'
+import { IteratedHash } from '@hoprnet/hopr-core/lib/core_crypto.js'
 
 const log = debug(`hopr-core:db`)
 
@@ -70,7 +73,7 @@ function createCurrentTicketIndexKey(channelId: Hash): Uint8Array {
 function createPendingTicketsCountKey(address: Address): Uint8Array {
   return Uint8Array.from([...PENDING_TICKETS_COUNT, ...address.serialize()])
 }
-function createAcknowledgedTicketKey(challenge: EthereumChallenge, channelEpoch: UINT256): Uint8Array {
+function createAcknowledgedTicketKey(challenge: EthereumChallenge, channelEpoch: U256): Uint8Array {
   return Uint8Array.from([...ACKNOWLEDGED_TICKETS_PREFIX, ...channelEpoch.serialize(), ...challenge.serialize()])
 }
 function createPendingAcknowledgement(halfKey: HalfKeyChallenge): Uint8Array {
@@ -89,7 +92,7 @@ function createObjectKey(namespace: string, key: string) {
 // is not needed and thus prevents decompression operations when converting from PeerId.
 // This happens e.g. on newly established connections.
 function createNetworkRegistryEntryKey(publicKey: PublicKey): Uint8Array {
-  return Uint8Array.from([...NETWORK_REGISTRY_HOPR_NODE_PREFIX, ...publicKey.serializeCompressed()])
+  return Uint8Array.from([...NETWORK_REGISTRY_HOPR_NODE_PREFIX, ...publicKey.serialize(true)])
 }
 function createNetworkRegistryAddressEligibleKey(address: Address): Uint8Array {
   return Uint8Array.from([...NETWORK_REGISTRY_ADDRESS_ELIGIBLE_PREFIX, ...address.serialize()])
@@ -106,46 +109,8 @@ const LOSING_TICKET_COUNT = encoder.encode('statistics:losing:count')
 const NEGLECTED_TICKET_COUNT = encoder.encode('statistics:neglected:count')
 const REJECTED_TICKETS_COUNT = encoder.encode('statistics:rejected:count')
 const REJECTED_TICKETS_VALUE = encoder.encode('statistics:rejected:value')
-const ENVIRONMENT_KEY = encoder.encode('environment_id')
+const NETWORK_KEY = encoder.encode('network_id')
 const HOPR_BALANCE_KEY = encoder.encode('hopr-balance')
-
-enum PendingAcknowledgementPrefix {
-  Relayer = 0,
-  MessageSender = 1
-}
-
-export type WaitingAsSender = {
-  isMessageSender: true
-}
-
-export type WaitingAsRelayer = {
-  isMessageSender: false
-  ticket: UnacknowledgedTicket
-}
-
-export type PendingAckowledgement = WaitingAsSender | WaitingAsRelayer
-
-function serializePendingAcknowledgement(isMessageSender: boolean, unackTicket?: UnacknowledgedTicket) {
-  if (isMessageSender) {
-    return Uint8Array.from([PendingAcknowledgementPrefix.MessageSender])
-  } else {
-    return Uint8Array.from([PendingAcknowledgementPrefix.Relayer, ...unackTicket.serialize()])
-  }
-}
-
-function deserializePendingAcknowledgement(data: Uint8Array): PendingAckowledgement {
-  switch (data[0] as PendingAcknowledgementPrefix) {
-    case PendingAcknowledgementPrefix.MessageSender:
-      return {
-        isMessageSender: true
-      }
-    case PendingAcknowledgementPrefix.Relayer:
-      return {
-        isMessageSender: false,
-        ticket: UnacknowledgedTicket.deserialize(data.slice(1))
-      }
-  }
-}
 
 export class LevelDb {
   public backend: LevelUp
@@ -155,15 +120,15 @@ export class LevelDb {
     this.backend = new levelup(MemDown())
   }
 
-  public async init(initialize: boolean, dbPath: string, forceCreate: boolean = false, environmentId: string) {
-    let setEnvironment = false
+  public async init(initialize: boolean, dbPath: string, forceCreate: boolean = false, networkId: string) {
+    let setNetwork = false
 
     log(`using db at ${dbPath}`)
     if (forceCreate) {
       log('force create - wipe old database and create a new')
       await rm(dbPath, { recursive: true, force: true })
       await mkdir(dbPath, { recursive: true })
-      setEnvironment = true
+      setNetwork = true
     } else {
       let exists = false
 
@@ -182,7 +147,7 @@ export class LevelDb {
         log('db directory does not exist, creating?:', initialize)
         if (initialize) {
           await mkdir(dbPath, { recursive: true })
-          setEnvironment = true
+          setNetwork = true
         } else {
           throw new Error(`Database does not exist: ${dbPath}`)
         }
@@ -196,18 +161,17 @@ export class LevelDb {
     // Fully initialize database
     await this.backend.open()
 
-    if (setEnvironment) {
-      log(`setting environment id ${environmentId} to db`)
-      await this.put(ENVIRONMENT_KEY, encoder.encode(environmentId))
+    if (setNetwork) {
+      log(`setting network id ${networkId} to db`)
+      await this.put(NETWORK_KEY, encoder.encode(networkId))
     } else {
-      let storedEnvironmentId = await this.maybeGet(ENVIRONMENT_KEY)
-      let decodedStoredEnvironmentId =
-        storedEnvironmentId !== undefined ? undefined : decoder.decode(storedEnvironmentId)
+      let storedNetworkId = await this.maybeGet(NETWORK_KEY)
+      let decodedStoredNetworkId = storedNetworkId !== undefined ? undefined : decoder.decode(storedNetworkId)
 
-      const hasEnvironmentKey = decodedStoredEnvironmentId !== undefined && decodedStoredEnvironmentId === environmentId
+      const hasNetworkKey = decodedStoredNetworkId !== undefined && decodedStoredNetworkId === networkId
 
-      if (!hasEnvironmentKey) {
-        throw new Error(`invalid db environment id: ${decodedStoredEnvironmentId} (expected: ${environmentId})`)
+      if (!hasNetworkKey) {
+        throw new Error(`invalid db network id: ${decodedStoredNetworkId} (expected: ${networkId})`)
       }
     }
   }
@@ -230,7 +194,7 @@ export class LevelDb {
     await this.backend.del(Buffer.from(key))
   }
 
-  public async batch(ops: Array<any>, wait_for_write = false): Promise<void> {
+  public async batch(ops: Array<any>, wait_for_write = true): Promise<void> {
     const options: { sync: boolean } = {
       sync: wait_for_write
     }
@@ -264,6 +228,25 @@ export class LevelDb {
     }
   }
 
+  public iterValues(prefix: Uint8Array, suffixLength: number): AsyncIterable<Uint8Array> {
+    return this.iter(prefix, suffixLength)
+  }
+
+  protected async *iter(prefix: Uint8Array, suffixLength: number): AsyncIterable<Uint8Array> {
+    const firstPrefixed = u8aConcat(prefix, new Uint8Array(suffixLength).fill(0x00))
+    const lastPrefixed = u8aConcat(prefix, new Uint8Array(suffixLength).fill(0xff))
+
+    for await (const [_key, chunk] of this.backend.iterator({
+      gte: Buffer.from(firstPrefixed.buffer, firstPrefixed.byteOffset, firstPrefixed.byteLength),
+      lte: Buffer.from(lastPrefixed.buffer, lastPrefixed.byteOffset, lastPrefixed.byteLength),
+      keys: false
+    }) as any) {
+      const obj: Uint8Array = new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.byteLength)
+
+      yield obj
+    }
+  }
+
   public async close() {
     log('Closing database')
     return await this.backend.close()
@@ -276,7 +259,7 @@ export class LevelDb {
       .createReadStream({ keys: true, keyAsBuffer: true, values: true, valueAsBuffer: true })
       .on('data', (d) => {
         // Skip the public key prefix in each key
-        let key = (d.key as Buffer).subarray(PublicKey.SIZE_COMPRESSED)
+        let key = (d.key as Buffer).subarray(PublicKey.size_compressed())
         let keyString = ''
         let isHex = false
         let sawDelimiter = false
@@ -300,12 +283,31 @@ export class LevelDb {
         dumpFile.close()
       })
   }
+
+  public async setNetworkId(network_id: string): Promise<void> {
+    await this.put(NETWORK_KEY, encoder.encode(network_id))
+  }
+
+  public async getNetworkId(): Promise<string> {
+    return decoder.decode(await this.maybeGet(NETWORK_KEY))
+  }
+
+  public async verifyNetworkId(expectedId: string): Promise<boolean> {
+    const storedId = await this.getNetworkId()
+
+    if (storedId == undefined) {
+      return false
+    }
+
+    return storedId === expectedId
+  }
 }
 
 /// Class designated to migrate the functionality to Rust
 export class HoprDB {
-  protected db: LevelDb
-  protected id: PublicKey
+  // made public to allow access for Rust code
+  public db: LevelDb
+  public id: PublicKey
 
   constructor(publicKey: PublicKey) {
     this.db = new LevelDb()
@@ -314,8 +316,8 @@ export class HoprDB {
 
   // ---------- direct access API to be removed after migration to Rust
 
-  async init(initialize: boolean, dbPath: string, forceCreate: boolean = false, environmentId: string) {
-    await this.db.init(initialize, dbPath, forceCreate, environmentId)
+  async init(initialize: boolean, dbPath: string, forceCreate: boolean = false, networkId: string) {
+    await this.db.init(initialize, dbPath, forceCreate, networkId)
   }
 
   protected async put(key: Uint8Array, value: Uint8Array): Promise<void> {
@@ -448,13 +450,21 @@ export class HoprDB {
   }
 
   private async addBalance(key: Uint8Array, amount: Balance): Promise<void> {
-    let val = await this.getCoercedOrDefault<Balance>(key, Balance.deserialize, Balance.ZERO)
-    await this.db.put(key, val.add(amount).serialize())
+    let val = await this.getCoercedOrDefault<Balance>(
+      key,
+      (u) => Balance.deserialize(u, BalanceType.HOPR),
+      Balance.zero(BalanceType.HOPR)
+    )
+    await this.db.put(key, val.add(amount).serialize_value())
   }
 
   private async subBalance(key: Uint8Array, amount: Balance): Promise<void> {
-    let val = await this.getCoercedOrDefault<Balance>(key, Balance.deserialize, Balance.ZERO)
-    await this.db.put(key, new Balance(val.toBN().sub(amount.toBN())).serialize())
+    let val = await this.getCoercedOrDefault<Balance>(
+      key,
+      (u) => Balance.deserialize(u, BalanceType.HOPR),
+      Balance.zero(BalanceType.HOPR)
+    )
+    await this.db.put(key, val.sub(amount).serialize_value())
   }
 
   /**
@@ -463,33 +473,33 @@ export class HoprDB {
    * @returns an array of all unacknowledged tickets
    */
   public async getUnacknowledgedTickets(filter?: { signer: PublicKey }): Promise<UnacknowledgedTicket[]> {
-    const filterFunc = (pending: PendingAckowledgement): boolean => {
-      if (pending.isMessageSender == true) {
+    const filterFunc = (pending: PendingAcknowledgement): boolean => {
+      if (pending.is_msg_sender() == true) {
         return false
       }
 
       // if signer provided doesn't match our ticket's signer dont add it to the list
-      if (filter?.signer && pending.ticket.signer.eq(filter.signer)) {
+      if (filter?.signer && pending.ticket().signer.eq(filter.signer)) {
         return false
       }
       return true
     }
 
-    return await this.getAll<PendingAckowledgement, UnacknowledgedTicket>(
+    return await this.getAll<PendingAcknowledgement, UnacknowledgedTicket>(
       {
         prefix: PENDING_ACKNOWLEDGEMENTS_PREFIX,
-        suffixLength: HalfKeyChallenge.SIZE
+        suffixLength: HalfKeyChallenge.size()
       },
-      deserializePendingAcknowledgement,
+      PendingAcknowledgement.deserialize,
       filterFunc,
-      (pending: WaitingAsRelayer) => pending.ticket
+      (pending: PendingAcknowledgement) => pending.ticket()
     )
   }
 
-  public async getPendingAcknowledgement(halfKeyChallenge: HalfKeyChallenge): Promise<PendingAckowledgement> {
-    return await this.getCoerced<PendingAckowledgement>(
+  public async getPendingAcknowledgement(halfKeyChallenge: HalfKeyChallenge): Promise<PendingAcknowledgement> {
+    return await this.getCoerced<PendingAcknowledgement>(
       createPendingAcknowledgement(halfKeyChallenge),
-      deserializePendingAcknowledgement
+      PendingAcknowledgement.deserialize
     )
   }
 
@@ -500,7 +510,7 @@ export class HoprDB {
   ): Promise<void> {
     await this.db.put(
       createPendingAcknowledgement(halfKeyChallenge),
-      serializePendingAcknowledgement(isMessageSender, unackTicket)
+      new PendingAcknowledgement(isMessageSender, unackTicket).serialize()
     )
   }
 
@@ -523,7 +533,7 @@ export class HoprDB {
         filter?.channel &&
         (!a.signer.eq(filter.channel.source) ||
           !filter.channel.destination.eq(this.id) ||
-          !a.ticket.channelEpoch.eq(filter.channel.channelEpoch))
+          !a.ticket.channel_epoch.eq(filter.channel.channel_epoch))
       ) {
         return false
       }
@@ -538,7 +548,7 @@ export class HoprDB {
     for await (const ticket of this.getAllIterable<AcknowledgedTicket>(
       {
         prefix: ACKNOWLEDGED_TICKETS_PREFIX,
-        suffixLength: EthereumChallenge.SIZE
+        suffixLength: EthereumChallenge.size()
       },
       AcknowledgedTicket.deserialize,
       filterFunc
@@ -562,7 +572,7 @@ export class HoprDB {
     const batch = this.db.backend.batch()
 
     for (const ack of tickets) {
-      batch.del(Buffer.from(createAcknowledgedTicketKey(ack.ticket.challenge, ack.ticket.channelEpoch)))
+      batch.del(Buffer.from(createAcknowledgedTicketKey(ack.ticket.challenge, ack.ticket.channel_epoch)))
     }
 
     // only update count if there has been a change
@@ -582,12 +592,12 @@ export class HoprDB {
    * @param ack acknowledged ticket
    */
   public async delAcknowledgedTicket(ack: AcknowledgedTicket): Promise<void> {
-    await this.db.remove(createAcknowledgedTicketKey(ack.ticket.challenge, ack.ticket.channelEpoch))
+    await this.db.remove(createAcknowledgedTicketKey(ack.ticket.challenge, ack.ticket.channel_epoch))
   }
 
   public async replaceUnAckWithAck(halfKeyChallenge: HalfKeyChallenge, ackTicket: AcknowledgedTicket): Promise<void> {
     const unAcknowledgedDbKey = createPendingAcknowledgement(halfKeyChallenge)
-    const acknowledgedDbKey = createAcknowledgedTicketKey(ackTicket.ticket.challenge, ackTicket.ticket.channelEpoch)
+    const acknowledgedDbKey = createAcknowledgedTicketKey(ackTicket.ticket.challenge, ackTicket.ticket.channel_epoch)
 
     const serializedTicket = ackTicket.serialize()
 
@@ -637,15 +647,20 @@ export class HoprDB {
     return present
   }
 
-  async storeHashIntermediaries(channelId: Hash, intermediates: Intermediate[]): Promise<void> {
+  async storeHashIntermediaries(channelId: Hash, intermediates: IteratedHash): Promise<void> {
     let dbBatch = this.db.backend.batch()
 
-    for (const intermediate of intermediates) {
+    for (let i = 0; i < intermediates.count_intermediates(); i++) {
+      let intermediate = intermediates.intermediate(i)
       const u8aKey = createCommitmentKey(channelId, intermediate.iteration)
 
       dbBatch = dbBatch.put(
         Buffer.from(u8aKey.buffer, u8aKey.byteOffset, u8aKey.byteLength),
-        Buffer.from(intermediate.preImage.buffer, intermediate.preImage.byteOffset, intermediate.preImage.byteLength)
+        Buffer.from(
+          intermediate.intermediate,
+          intermediate.intermediate.byteOffset,
+          intermediate.intermediate.byteLength
+        )
       )
     }
     await dbBatch.write()
@@ -663,15 +678,11 @@ export class HoprDB {
     return this.db.put(createCurrentCommitmentKey(channelId), commitment.serialize())
   }
 
-  async getCurrentTicketIndex(channelId: Hash): Promise<UINT256 | undefined> {
-    return await this.getCoercedOrDefault<UINT256>(
-      createCurrentTicketIndexKey(channelId),
-      UINT256.deserialize,
-      undefined
-    )
+  async getCurrentTicketIndex(channelId: Hash): Promise<U256 | undefined> {
+    return await this.getCoercedOrDefault<U256>(createCurrentTicketIndexKey(channelId), U256.deserialize, undefined)
   }
 
-  setCurrentTicketIndex(channelId: Hash, ticketIndex: UINT256): Promise<void> {
+  setCurrentTicketIndex(channelId: Hash, ticketIndex: U256): Promise<void> {
     return this.db.put(createCurrentTicketIndexKey(channelId), ticketIndex.serialize())
   }
 
@@ -690,9 +701,10 @@ export class HoprDB {
     return await this.getCoercedOrDefault<Snapshot>(LATEST_CONFIRMED_SNAPSHOT_KEY, Snapshot.deserialize, undefined)
   }
 
-  async updateLatestConfirmedSnapshot(snapshot: Snapshot): Promise<void> {
-    await this.db.put(LATEST_CONFIRMED_SNAPSHOT_KEY, snapshot.serialize())
-  }
+  // Unused
+  // async updateLatestConfirmedSnapshot(snapshot: Snapshot): Promise<void> {
+  //   await this.db.put(LATEST_CONFIRMED_SNAPSHOT_KEY, snapshot.serialize())
+  // }
 
   async getChannel(channelId: Hash): Promise<ChannelEntry> {
     return await this.getCoerced<ChannelEntry>(createChannelKey(channelId), ChannelEntry.deserialize)
@@ -702,7 +714,7 @@ export class HoprDB {
     yield* this.getAllIterable<ChannelEntry>(
       {
         prefix: CHANNEL_PREFIX,
-        suffixLength: Hash.SIZE
+        suffixLength: Hash.size()
       },
       ChannelEntry.deserialize,
       filter
@@ -713,7 +725,7 @@ export class HoprDB {
     return this.getAll<ChannelEntry>(
       {
         prefix: CHANNEL_PREFIX,
-        suffixLength: Hash.SIZE
+        suffixLength: Hash.size()
       },
       ChannelEntry.deserialize,
       filter
@@ -750,7 +762,7 @@ export class HoprDB {
     await this.db.backend
       .batch()
       .put(
-        Buffer.from(createAccountKey(account.getAddress())),
+        Buffer.from(createAccountKey(account.get_address())),
         Buffer.from(serializedAccount.buffer, serializedAccount.byteOffset, serializedAccount.byteLength)
       )
       .put(
@@ -764,7 +776,7 @@ export class HoprDB {
     return this.getAll<AccountEntry>(
       {
         prefix: ACCOUNT_PREFIX,
-        suffixLength: Address.SIZE
+        suffixLength: Address.size()
       },
       AccountEntry.deserialize,
       filter
@@ -775,7 +787,7 @@ export class HoprDB {
     yield* this.getAllIterable<AccountEntry>(
       {
         prefix: ACCOUNT_PREFIX,
-        suffixLength: Address.SIZE
+        suffixLength: Address.size()
       },
       AccountEntry.deserialize,
       filter
@@ -783,7 +795,11 @@ export class HoprDB {
   }
 
   public async getRedeemedTicketsValue(): Promise<Balance> {
-    return await this.getCoercedOrDefault<Balance>(REDEEMED_TICKETS_VALUE, Balance.deserialize, Balance.ZERO)
+    return await this.getCoercedOrDefault<Balance>(
+      REDEEMED_TICKETS_VALUE,
+      (u) => Balance.deserialize(u, BalanceType.HOPR),
+      Balance.zero(BalanceType.HOPR)
+    )
   }
 
   public async getRedeemedTicketsCount(): Promise<number> {
@@ -801,8 +817,8 @@ export class HoprDB {
   public async getPendingBalanceTo(counterparty: Address): Promise<Balance> {
     return await this.getCoercedOrDefault<Balance>(
       createPendingTicketsCountKey(counterparty),
-      Balance.deserialize,
-      Balance.ZERO
+      (u) => Balance.deserialize(u, BalanceType.HOPR),
+      Balance.zero(BalanceType.HOPR)
     )
   }
 
@@ -817,8 +833,8 @@ export class HoprDB {
   public async resolvePending(ticket: Partial<Ticket>, snapshot: Snapshot) {
     let val = await this.getCoercedOrDefault<Balance>(
       createPendingTicketsCountKey(ticket.counterparty),
-      Balance.deserialize,
-      Balance.ZERO
+      (u) => Balance.deserialize(u, BalanceType.HOPR),
+      Balance.zero(BalanceType.HOPR)
     )
 
     const serializedSnapshot = snapshot.serialize()
@@ -828,7 +844,7 @@ export class HoprDB {
       .batch()
       .put(
         Buffer.from(u8aPendingKey.buffer, u8aPendingKey.byteOffset, u8aPendingKey.byteLength),
-        Buffer.from(val.sub(val).serialize())
+        Buffer.from(val.sub(val).serialize_value())
       )
       .put(
         Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY),
@@ -851,7 +867,11 @@ export class HoprDB {
   }
 
   public async getRejectedTicketsValue(): Promise<Balance> {
-    return await this.getCoercedOrDefault<Balance>(REJECTED_TICKETS_VALUE, Balance.deserialize, Balance.ZERO)
+    return await this.getCoercedOrDefault<Balance>(
+      REJECTED_TICKETS_VALUE,
+      (u) => Balance.deserialize(u, BalanceType.HOPR),
+      Balance.zero(BalanceType.HOPR)
+    )
   }
 
   public async getRejectedTicketsCount(): Promise<number> {
@@ -864,26 +884,26 @@ export class HoprDB {
   }
 
   public async getChannelX(src: PublicKey, dest: PublicKey): Promise<ChannelEntry> {
-    return await this.getChannel(generateChannelId(src.toAddress(), dest.toAddress()))
+    return await this.getChannel(generate_channel_id(src.to_address(), dest.to_address()))
   }
 
   public async getChannelTo(dest: PublicKey): Promise<ChannelEntry> {
-    return await this.getChannel(generateChannelId(this.id.toAddress(), dest.toAddress()))
+    return await this.getChannel(generate_channel_id(this.id.to_address(), dest.to_address()))
   }
 
   public async getChannelFrom(src: PublicKey): Promise<ChannelEntry> {
-    return await this.getChannel(generateChannelId(src.toAddress(), this.id.toAddress()))
+    return await this.getChannel(generate_channel_id(src.to_address(), this.id.to_address()))
   }
 
   public async getChannelsFrom(address: Address) {
     return this.getChannels((channel) => {
-      return address.eq(channel.source.toAddress())
+      return address.eq(channel.source.to_address())
     })
   }
 
   public async *getChannelsFromIterable(address: Address) {
     for await (const channel of this.getChannelsIterable()) {
-      if (address.eq(channel.source.toAddress())) {
+      if (address.eq(channel.source.to_address())) {
         yield channel
       }
     }
@@ -891,52 +911,42 @@ export class HoprDB {
 
   public async getChannelsTo(address: Address) {
     return this.getChannels((channel) => {
-      return address.eq(channel.destination.toAddress())
+      return address.eq(channel.destination.to_address())
     })
   }
 
   public async *getChannelsToIterable(address: Address) {
     for await (const channel of this.getChannelsIterable()) {
-      if (address.eq(channel.destination.toAddress())) {
+      if (address.eq(channel.destination.to_address())) {
         yield channel
       }
     }
   }
 
-  public async setEnvironmentId(environment_id: string): Promise<void> {
-    await this.db.put(ENVIRONMENT_KEY, encoder.encode(environment_id))
-  }
-
-  public async getEnvironmentId(): Promise<string> {
-    return decoder.decode(await this.maybeGet(ENVIRONMENT_KEY))
-  }
-
-  public async verifyEnvironmentId(expectedId: string): Promise<boolean> {
-    const storedId = await this.getEnvironmentId()
-
-    if (storedId == undefined) {
-      return false
-    }
-
-    return storedId === expectedId
-  }
-
   public async getHoprBalance(): Promise<Balance> {
-    return this.getCoercedOrDefault<Balance>(HOPR_BALANCE_KEY, Balance.deserialize, Balance.ZERO)
+    return this.getCoercedOrDefault<Balance>(
+      HOPR_BALANCE_KEY,
+      (u) => Balance.deserialize(u, BalanceType.HOPR),
+      Balance.zero(BalanceType.HOPR)
+    )
   }
 
   public async setHoprBalance(value: Balance): Promise<void> {
-    return this.db.put(HOPR_BALANCE_KEY, value.serialize())
+    return this.db.put(HOPR_BALANCE_KEY, value.serialize_value())
   }
 
   public async addHoprBalance(value: Balance, snapshot: Snapshot): Promise<void> {
-    const val = await this.getCoercedOrDefault<Balance>(HOPR_BALANCE_KEY, Balance.deserialize, Balance.ZERO)
+    const val = await this.getCoercedOrDefault<Balance>(
+      HOPR_BALANCE_KEY,
+      (u) => Balance.deserialize(u, BalanceType.HOPR),
+      Balance.zero(BalanceType.HOPR)
+    )
 
     const serializedSnapshot = snapshot.serialize()
 
     await this.db.backend
       .batch()
-      .put(Buffer.from(HOPR_BALANCE_KEY), Buffer.from(val.add(value).serialize()))
+      .put(Buffer.from(HOPR_BALANCE_KEY), Buffer.from(val.add(value).serialize_value()))
       .put(
         Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY),
         Buffer.from(serializedSnapshot.buffer, serializedSnapshot.byteOffset, serializedSnapshot.byteLength)
@@ -945,18 +955,59 @@ export class HoprDB {
   }
 
   public async subHoprBalance(value: Balance, snapshot: Snapshot): Promise<void> {
-    const val = await this.getCoercedOrDefault<Balance>(HOPR_BALANCE_KEY, Balance.deserialize, Balance.ZERO)
+    const val = await this.getCoercedOrDefault<Balance>(
+      HOPR_BALANCE_KEY,
+      (u) => Balance.deserialize(u, BalanceType.HOPR),
+      Balance.zero(BalanceType.HOPR)
+    )
 
     const serializedSnapshot = snapshot.serialize()
 
     await this.db.backend
       .batch()
-      .put(Buffer.from(HOPR_BALANCE_KEY), Buffer.from(val.sub(value).serialize()))
+      .put(Buffer.from(HOPR_BALANCE_KEY), Buffer.from(val.sub(value).serialize_value()))
       .put(
         Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY),
         Buffer.from(serializedSnapshot.buffer, serializedSnapshot.byteOffset, serializedSnapshot.byteLength)
       )
       .write()
+  }
+
+  static serializeArrayOfPubKeys(pKeys: PublicKey[]): Uint8Array {
+    return u8aConcat(...pKeys.map((p) => p.serialize(true)))
+  }
+
+  static deserializeArrayOfPubKeys(arr: Uint8Array): PublicKey[] {
+    const result: PublicKey[] = []
+    let SIZE_PUBKEY_COMPRESSED = PublicKey.size_compressed()
+    let SIZE_PUBKEY_UNCOMPRESSED = PublicKey.size_uncompressed()
+    for (let offset = 0; offset < arr.length; ) {
+      switch (arr[offset]) {
+        case 2:
+        case 3:
+          if (arr.length < offset + SIZE_PUBKEY_COMPRESSED) {
+            throw Error(`Invalid array length. U8a has ${offset + SIZE_PUBKEY_COMPRESSED - arr.length} to few elements`)
+          }
+          // clone array
+          result.push(PublicKey.deserialize(arr.slice(offset, offset + SIZE_PUBKEY_COMPRESSED)))
+          offset += SIZE_PUBKEY_COMPRESSED
+          break
+        case 4:
+          if (arr.length < offset + SIZE_PUBKEY_UNCOMPRESSED) {
+            throw Error(
+              `Invalid array length. U8a has ${offset + SIZE_PUBKEY_UNCOMPRESSED - arr.length} to few elements`
+            )
+          }
+          // clone array
+          result.push(PublicKey.deserialize(arr.slice(offset, offset + SIZE_PUBKEY_UNCOMPRESSED)))
+          offset += SIZE_PUBKEY_UNCOMPRESSED
+          break
+        default:
+          throw Error(`Invalid prefix ${u8aToHex(arr.subarray(offset, offset + 1))} at ${offset}`)
+      }
+    }
+
+    return result
   }
 
   /**
@@ -990,7 +1041,7 @@ export class HoprDB {
     // add new node to the list
     registeredNodes.push(pubKey)
 
-    const serializedRegisteredNodes = PublicKey.serializeArray(registeredNodes)
+    const serializedRegisteredNodes = HoprDB.serializeArrayOfPubKeys(registeredNodes)
     const serializedAccount = account.serialize()
 
     await this.db.backend
@@ -1025,7 +1076,7 @@ export class HoprDB {
   public async findHoprNodesUsingAccountInNetworkRegistry(account: Address): Promise<PublicKey[]> {
     const pubKeys = await this.getCoercedOrDefault<PublicKey[]>(
       createNetworkRegistryAddressToPublicKeyKey(account),
-      PublicKey.deserializeArray,
+      HoprDB.deserializeArrayOfPubKeys,
       undefined
     )
 
@@ -1057,7 +1108,7 @@ export class HoprDB {
 
     const entryKey = createNetworkRegistryEntryKey(pubKey)
 
-    const serializedRegisteredNodes = PublicKey.serializeArray(registeredNodes)
+    const serializedRegisteredNodes = HoprDB.serializeArrayOfPubKeys(registeredNodes)
     const serializedSnapshot = snapshot.serialize()
 
     await this.db.backend
@@ -1157,7 +1208,8 @@ export class HoprDB {
 
   static createMock(id?: PublicKey): HoprDB {
     const mock: HoprDB = {
-      id: id ?? PublicKey.createMock(),
+      id:
+        id ?? PublicKey.from_privkey(stringToU8a('0x1464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8')),
       // CommonJS / ESM issue
       // @ts-ignore
       db: new LevelDb()

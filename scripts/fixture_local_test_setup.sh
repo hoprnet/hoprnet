@@ -10,7 +10,7 @@ set -Eeuo pipefail
 # set log id and use shared log function for readable logs
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
-declare HOPR_LOG_ID="e2e-source-test"
+declare HOPR_LOG_ID="smoke-fixture-setup"
 
 source "${mydir}/testnet.sh"
 source "${mydir}/utils.sh"
@@ -64,7 +64,7 @@ fi
 # find usable tmp dir
 declare tmp="$(find_tmp_dir)"
 
-declare node_prefix="hopr-source-node"
+declare node_prefix="hopr-smoke-test-node"
 
 declare node1_dir="${tmp}/${node_prefix}-1"
 declare node2_dir="${tmp}/${node_prefix}-2"
@@ -100,8 +100,8 @@ declare node7_privkey="0x9b813edd8a85cffbe3cd2e242dc0992cfa04be15caa9f50b0b03b5e
 
 declare password="e2e-test"
 
-declare anvil_rpc_log="${tmp}/hopr-source-anvil-rpc.log"
-declare anvil_cfg_file="${tmp}/hopr-source-anvil.cfg"
+declare anvil_rpc_log="${tmp}/hopr-smoke-test-anvil-rpc.log"
+declare anvil_cfg_file="${tmp}/hopr-smoke-test-anvil.cfg"
 
 # anvil port
 declare -a all_ports=( 8545 )
@@ -183,8 +183,8 @@ function setup_node() {
 
   log "Run node ${id} on API port ${api_port} -> ${log}"
 
-  if [[ "${additional_args}" != *"--environment "* ]]; then
-    additional_args="--environment anvil-localhost ${additional_args}"
+  if [[ "${additional_args}" != *"--network "* ]]; then
+    additional_args="--network anvil-localhost ${additional_args}"
   fi
 
   if [[ -n "${api_token}" ]]; then
@@ -297,7 +297,7 @@ setup_node 13303 ${default_api_token} 19093 "${node3_dir}" "${node3_log}" "${nod
 setup_node 13304 ${default_api_token} 19094 "${node4_dir}" "${node4_log}" "${node4_id}" "${node4_privkey}" "--testNoDirectConnections"
 setup_node 13305 ${default_api_token} 19095 "${node5_dir}" "${node5_log}" "${node5_id}" "${node5_privkey}" "--testNoDirectConnections"
 # should not be able to talk to the rest
-setup_node 13306 ${default_api_token} 19096 "${node6_dir}" "${node6_log}" "${node6_id}" "${node6_privkey}" "--announce --environment anvil-localhost2"
+setup_node 13306 ${default_api_token} 19096 "${node6_dir}" "${node6_log}" "${node6_id}" "${node6_privkey}" "--announce --network anvil-localhost2"
 # node n8 will be the only one NOT registered
 setup_node 13307 ${default_api_token} 19097 "${node7_dir}" "${node7_log}" "${node7_id}" "${node7_privkey}" "--announce"
 # }}}
@@ -316,7 +316,7 @@ wait_for_regex ${node7_log} "please fund this node"
 log "Funding nodes"
 #  --- Fund nodes --- {{{
 make -C "${mydir}/../" fund-local-all \
-  id_password="${password}" id_prefix="${node_prefix}"
+  id_password="${password}" id_prefix="${node_prefix}" id_dir="${tmp}"
 # }}}
 
 log "Waiting for port binding"
@@ -342,4 +342,3 @@ done
 # }}}
 
 log "All nodes came up online"
-

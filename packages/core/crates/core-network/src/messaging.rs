@@ -85,7 +85,7 @@ impl BinarySerializable<'_> for PingMessage {
     fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
         if data.len() >= Self::SIZE {
             let mut ret = PingMessage::default();
-            let mut buf: Vec<u8> = data.into();
+            let mut buf = data.to_vec();
             ret.nonce.copy_from_slice(buf.drain(0..Self::SIZE).as_ref());
             Ok(ret)
         } else {

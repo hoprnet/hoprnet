@@ -68,10 +68,10 @@ redeem_tickets() {
   [[ ${rejected} -gt 0 ]] && { msg "rejected tickets count on node ${node_id} is ${rejected}"; exit 1; }
   last_redeemed="${redeemed}"
 
-  # Trigger a redemption run, but cap it at 1 minute. We only want to measure
+  # Trigger a redemption run, but cap it at 20 seconds. We only want to measure
   # progress, not redeeem all tickets which takes too long.
   log "Node ${node_id} should redeem all tickets"
-  result=$(api_redeem_tickets ${node_api})
+  result=$(api_redeem_tickets ${node_api} 20)
   log "--${result}"
 
   # Get ticket statistics again and compare with previous state. Ensure we
@@ -84,11 +84,11 @@ redeem_tickets() {
   [[ ${redeemed} -gt 0 && ${redeemed} -gt ${last_redeemed} ]] || { msg "redeemed tickets count on node ${node_id} is ${redeemed}, previously ${last_redeemed}"; exit 1; }
   last_redeemed="${redeemed}"
 
-  # Trigger another redemption run, but cap it at 1 minute. We only want to measure
+  # Trigger another redemption run, but cap it at 20 seconds. We only want to measure
   # progress, not redeeem all tickets which takes too long.
   log "Node ${node_id} should redeem all tickets (again to ensure re-run of operation)"
   # add 60 second timeout
-  result=$(api_redeem_tickets ${node_api})
+  result=$(api_redeem_tickets ${node_api} 20)
   log "--${result}"
 
   # Get final ticket statistics
@@ -106,7 +106,7 @@ register_nodes() {
   log "Registering nodes"
 
   make -C "${mydir}/.." register-nodes \
-    environment=anvil-localhost environment_type=development \
+    network=anvil-localhost environment_type=local \
     native_addresses="[${1}]" \
     peer_ids="[${2}]"
 
@@ -118,7 +118,7 @@ sync_nodes_in_network_registry() {
   log "Sync nodes in network registry"
 
   make -C "${mydir}/.." sync-eligibility \
-    environment=anvil-localhost environment_type=development \
+    network=anvil-localhost environment_type=local \
     peer_ids="[${1}]"
 
   log "Sync nodes in network registry finished"
@@ -128,7 +128,7 @@ enable_network_registry() {
   log "Enabling network registry"
 
   make -C "${mydir}/.." enable-network-registry \
-    environment=anvil-localhost environment_type=development
+    network=anvil-localhost environment_type=local
 
   log "Enabling network registry finished"
 }
@@ -267,7 +267,7 @@ log "Node 7 should not be able to talk to Node 1 (different environment id)"
 result=$(api_ping "${api6}" ${addr1} "TIMEOUT")
 log "-- ${result}"
 
-log "Node 1 should not be able to talk to Node 7 (different environment id)"
+log "Node 1 should not be able to talk to Node 7 (different network id)"
 result=$(api_ping "${api1}" ${addr7} "Connection to node is not allowed")
 log "-- ${result}"
 

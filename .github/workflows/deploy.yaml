@@ -112,7 +112,7 @@ jobs:
           path: packages/
           key: hoprnet-build-${{ github.run_id }}
 
-      - name: "[SMART-CONTRACTS] Deploy for known environments"
+      - name: "[SMART-CONTRACTS] Deploy for known networks"
         if: ${{ !env.ACT }}
         run: ./scripts/deploy-smart-contracts.sh
         env:
@@ -212,7 +212,7 @@ jobs:
           credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
 
       - name: Set up Google Cloud SDK
-        uses: google-github-actions/setup-gcloud@v0
+        uses: google-github-actions/setup-gcloud@v1
         with:
           project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
           install_components: beta
@@ -346,7 +346,7 @@ jobs:
           credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
 
       - name: Set up Google Cloud SDK
-        uses: google-github-actions/setup-gcloud@v0
+        uses: google-github-actions/setup-gcloud@v1
         with:
           project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
           install_components: beta
@@ -427,7 +427,7 @@ jobs:
           credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
 
       - name: Set up Google Cloud SDK
-        uses: google-github-actions/setup-gcloud@v0
+        uses: google-github-actions/setup-gcloud@v1
         with:
           project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
           install_components: beta
@@ -553,7 +553,7 @@ jobs:
           credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
 
       - name: Set up Google Cloud SDK
-        uses: google-github-actions/setup-gcloud@v0
+        uses: google-github-actions/setup-gcloud@v1
         with:
           project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
           install_components: beta
@@ -621,7 +621,7 @@ jobs:
           credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
 
       - name: Set up Google Cloud SDK
-        uses: google-github-actions/setup-gcloud@v0
+        uses: google-github-actions/setup-gcloud@v1
         with:
           project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
           install_components: beta

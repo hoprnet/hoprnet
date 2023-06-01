@@ -11,7 +11,7 @@ import Debug from 'debug'
 import { peerIdFromBytes } from '@libp2p/peer-id'
 import { Multiaddr } from '@multiformats/multiaddr'
 
-import { isAnyAddress, randomInteger, retimer, timeout } from '@hoprnet/hopr-utils'
+import { isAnyAddress, random_integer, retimer, timeout } from '@hoprnet/hopr-utils'
 
 import { CODE_P2P, CODE_IP4, CODE_IP6, CODE_TCP } from '../constants.js'
 import {
@@ -46,9 +46,7 @@ enum ListenerState {
 
 type Address = { port: number; address: string }
 
-type NATSituation =
-  | { bidirectionalNAT: true }
-  | { bidirectionalNAT: false; externalAddress: string; externalPort: number; isExposed: boolean }
+type NATSituation = { bidirectionalNAT: boolean; externalAddress?: string; externalPort?: number; isExposed?: boolean }
 
 export type ProtocolListener = {
   identifier: string
@@ -246,14 +244,19 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
 
     this.attachSocketHandlers()
 
-    const natSituation = await this.checkNATSituation(ownInterface.address, ownInterface.port)
+    const natSituation: NATSituation = await this.checkNATSituation(ownInterface.address, ownInterface.port)
 
     log(`NAT situation detected: `, natSituation)
-    const internalInterfaces = getAddrs(ownInterface.port, {
+
+    // Only expose localhost and private address to the DHT if the node is
+    // configured to also accept connections for these.
+    const addressOptions = {
       useIPv4: true,
-      includePrivateIPv4: true,
-      includeLocalhostIPv4: true
-    })
+      includePrivateIPv4: this.options.allowPrivateConnections,
+      includeLocalhostIPv4: this.options.allowLocalConnections
+    }
+
+    const internalInterfaces = getAddrs(ownInterface.port, addressOptions)
 
     if (!natSituation.bidirectionalNAT && natSituation.isExposed) {
       // If any of the interface addresses is the
@@ -266,8 +269,8 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
 
       this.addrs.external = [
         nodeToMultiaddr({
-          address: natSituation.externalAddress,
-          port: natSituation.externalPort,
+          address: natSituation.externalAddress as string,
+          port: natSituation.externalPort as number,
           family: 'IPv4'
         })
       ]
@@ -281,19 +284,20 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
     this.connectComponents.getRelay().start()
 
     this._emitListening()
+    this.state = ListenerState.LISTENING
 
-    // If node is supposed to announce with routable address -> don't assign to other relays
-    // If node is running behind bidirectional NAT or deteced as not being exposed -> assign to other relays
-    // If node is not supposed to announce with routable address -> assign to other relays as fallback
-    if (!this.options.announce || natSituation.bidirectionalNAT || !natSituation.isExposed) {
-      this.connectComponents.getEntryNodes().on(RELAY_CHANGED_EVENT, this._emitListening)
-
-      // Instructs entry node manager to assign to available
-      // entry once startup has finished
-      this.connectComponents.getEntryNodes().enable()
+    // If node is a PRN (the `--announce` flag is set), disable relay functionality
+    // If node is not supposed to have any relayed connection (the `--noRelay` flag is set), disable relay functionality
+    if (this.options.announce || this.options.noRelay) {
+      // skip PRN
+      return
     }
 
-    this.state = ListenerState.LISTENING
+    this.connectComponents.getEntryNodes().on(RELAY_CHANGED_EVENT, this._emitListening)
+
+    // Instructs entry node manager to assign to available
+    // entry once startup has finished
+    this.connectComponents.getEntryNodes().enable()
   }
 
   /**
@@ -528,7 +532,7 @@ class Listener extends EventEmitter<ListenerEvents> implements InterfaceListener
     this.stopUdpSocketKeepAliveInterval = retimer(
       this.renewUdpPortMapping.bind(this),
       // Following recommendations of https://www.rfc-editor.org/rfc/rfc5626
-      () => randomInteger(24_000, 29_000)
+      () => random_integer(24_000, 29_000)
     )
 
     if (this.testingOptions.__preferLocalAddresses && this.testingOptions.__localModeStun !== true) {

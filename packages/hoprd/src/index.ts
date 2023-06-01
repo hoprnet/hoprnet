@@ -4,7 +4,8 @@ import {
   create_gauge,
   create_multi_gauge,
   get_package_version,
-  NativeBalance,
+  Balance,
+  BalanceType,
   setupPromiseRejectionFilter,
   SUGGESTED_NATIVE_BALANCE,
   create_histogram_with_buckets,
@@ -17,8 +18,8 @@ import {
   default as Hopr,
   type HoprOptions,
   isStrategy,
-  ResolvedEnvironment,
-  resolveEnvironment
+  ResolvedNetwork,
+  resolveNetwork
 } from '@hoprnet/hopr-core'
 
 import {
@@ -65,7 +66,7 @@ const packageFile = path.normalize(new URL('../package.json', import.meta.url).p
 const version = get_package_version(packageFile)
 const on_avado = (process.env.AVADO ?? 'false').toLowerCase() === 'true'
 
-function generateNodeOptions(cfg: HoprdConfig, environment: ResolvedEnvironment): HoprOptions {
+function generateNodeOptions(cfg: HoprdConfig, network: ResolvedNetwork): HoprOptions {
   let strategy: ChannelStrategyInterface
 
   if (isStrategy(cfg.strategy.name)) {
@@ -80,19 +81,19 @@ function generateNodeOptions(cfg: HoprdConfig, environment: ResolvedEnvironment)
 
   let options: HoprOptions = {
     createDbIfNotExist: cfg.db.initialize,
-    announce: cfg.network.announce,
+    announce: cfg.network_options.announce,
     dataPath: cfg.db.data,
     hosts: { ip4: cfg.host },
-    environment,
-    allowLocalConnections: cfg.network.allow_local_node_connections,
-    allowPrivateConnections: cfg.network.allow_private_node_connections,
+    network,
+    allowLocalConnections: cfg.network_options.allow_local_node_connections,
+    allowPrivateConnections: cfg.network_options.allow_private_node_connections,
     heartbeatInterval: cfg.heartbeat.interval,
     heartbeatThreshold: cfg.heartbeat.threshold,
     heartbeatVariance: cfg.heartbeat.variance,
-    networkQualityThreshold: cfg.network.network_quality_threshold,
+    networkQualityThreshold: cfg.network_options.network_quality_threshold,
     onChainConfirmations: cfg.chain.on_chain_confirmations,
     checkUnrealizedBalance: cfg.chain.check_unrealized_balance,
-    maxParallelConnections: cfg.network.max_parallel_connections,
+    maxParallelConnections: cfg.network_options.max_parallel_connections,
     testing: {
       announceLocalAddresses: cfg.test.announce_local_addresses,
       preferLocalAddresses: cfg.test.prefer_local_addresses,
@@ -102,7 +103,8 @@ function generateNodeOptions(cfg: HoprdConfig, environment: ResolvedEnvironment)
     },
     password: cfg.identity.password,
     strategy,
-    forceCreateDB: cfg.db.force_initialize
+    forceCreateDB: cfg.db.force_initialize,
+    noRelay: cfg.network_options.no_relay
   }
 
   if (isStrategy(cfg.strategy.name)) {
@@ -248,9 +250,9 @@ async function main() {
     state.settings.maxAutoChannels = cfg.strategy.max_auto_channels
   }
 
-  const environment = resolveEnvironment(cfg.environment, cfg.chain.provider)
+  const network = resolveNetwork(cfg.network, cfg.chain.provider)
 
-  let options = generateNodeOptions(cfg, environment)
+  let options = generateNodeOptions(cfg, network)
 
   try {
     logs.log(`This is HOPRd version ${version}`)
@@ -307,8 +309,8 @@ async function main() {
 
       logs.log(`Node address: ${node.getId().toString()}`)
 
-      const ethAddr = node.getEthereumAddress().toHex()
-      const fundsReq = new NativeBalance(SUGGESTED_NATIVE_BALANCE).toFormattedString()
+      const ethAddr = node.getEthereumAddress().to_hex()
+      const fundsReq = new Balance(SUGGESTED_NATIVE_BALANCE.toString(10), BalanceType.Native).to_formatted_string()
 
       logs.log(`Node is not started, please fund this node ${ethAddr} with at least ${fundsReq}`)
 

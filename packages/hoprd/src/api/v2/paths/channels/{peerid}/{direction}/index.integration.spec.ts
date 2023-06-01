@@ -3,23 +3,23 @@ import sinon from 'sinon'
 import request from 'supertest'
 import chaiResponseValidator from 'chai-openapi-response-validator'
 import chai, { expect } from 'chai'
-import { ChannelEntry } from '@hoprnet/hopr-utils'
 import { STATUS_CODES } from '../../../../utils.js'
 import {
   createTestApiInstance,
   ALICE_PEER_ID,
   ALICE_NATIVE_ADDR,
   BOB_PEER_ID,
-  INVALID_PEER_ID
+  INVALID_PEER_ID,
+  channelEntryCreateMock
 } from '../../../../fixtures.js'
 import { getChannel, closeChannel } from './index.js'
 import { formatIncomingChannel, formatOutgoingChannel } from '../../index.js'
 
 let node = sinon.fake() as any
 node.getId = sinon.fake.returns(ALICE_PEER_ID)
-node.getEthereumAddress = sinon.fake.returns(ALICE_NATIVE_ADDR)
-const outgoingMock = ChannelEntry.createMock()
-const incomingMock = ChannelEntry.createMock()
+node.getEthereumAddress = sinon.fake.returns(ALICE_NATIVE_ADDR())
+const outgoingMock = channelEntryCreateMock()
+const incomingMock = channelEntryCreateMock()
 
 describe('getChannel', function () {
   it('should return no channels', async function () {

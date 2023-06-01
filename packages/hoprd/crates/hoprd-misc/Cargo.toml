@@ -24,7 +24,7 @@ core-network = { path = "../../../core/crates/core-network" }
 core-strategy = { path = "../../../core/crates/core-strategy" }
 core-ethereum-misc = { path = "../../../core-ethereum/crates/core-ethereum-misc" }
 hex = "0.4.3"
-js-sys = "0.3.61"
+js-sys = "0.3.63"
 real-base = { path = "../../../real/crates/real-base" }
 proc-macro-regex = "~1.1.0"
 serde = { version = "1.0", features = ["derive"] }
@@ -37,12 +37,12 @@ utils-misc = { path = "../../../utils/crates/utils-misc" }
 validator = { version = "0.16.0", features = ["derive"] }
 wasm-bindgen = { workspace = true, optional = true }
 
-console_error_panic_hook = { version = "0.1.6", optional = true }
+console_error_panic_hook = { version = "0.1.7", optional = true }
 #wee_alloc = { version = "0.4.5", optional = true }
 
 [dev-dependencies]
 tempfile = "3"
-wasm-bindgen-test = "0.3.34"
+wasm-bindgen-test = "0.3.36"
 
 [target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
 wasm-pack = { workspace = true }

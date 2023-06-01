@@ -1,13 +1,16 @@
+pub mod constants;
 pub mod db;
 pub mod errors;
 pub mod hashmap;
 pub mod leveldb;
 pub mod traits;
+pub mod types;
 
 pub use traits::KVStorage;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
+    use utils_log::logger::JsLogger;
     use wasm_bindgen::prelude::*;
 
     // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global allocator.
@@ -15,9 +18,13 @@ pub mod wasm {
     #[global_allocator]
     static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
+    static LOGGER: JsLogger = JsLogger {};
+
     #[allow(dead_code)]
     #[wasm_bindgen]
-    pub fn core_network_set_panic_hook() {
+    pub fn core_network_initialize_crate() {
+        let _ = JsLogger::install(&LOGGER, None);
+
         // When the `console_error_panic_hook` feature is enabled, we can call the
         // `set_panic_hook` function at least once during initialization, and then
         // we will get better error messages if our code ever panics.

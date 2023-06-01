@@ -1,5 +1,4 @@
 import type { Event, TokenEvent, RegistryEvent } from './types.js'
-import BN from 'bn.js'
 import assert from 'assert'
 import { BigNumber } from 'ethers'
 import {
@@ -10,8 +9,9 @@ import {
   Ticket,
   Challenge,
   stringToU8a,
-  UINT256,
+  U256,
   Balance,
+  BalanceType,
   Signature,
   SIGNATURE_LENGTH
 } from '@hoprnet/hopr-utils'
@@ -21,7 +21,7 @@ export * from '../fixtures.js'
 
 export const expectAccountsToBeEqual = (actual: AccountEntry, expected: AccountEntry) => {
   assert(actual, 'account is null')
-  assert(actual.publicKey.eq(expected.publicKey), 'publicKey')
+  assert(actual.public_key.eq(expected.public_key), 'publicKey')
 }
 
 export const expectChannelsToBeEqual = (actual: ChannelEntry, expected: ChannelEntry) => {
@@ -30,11 +30,11 @@ export const expectChannelsToBeEqual = (actual: ChannelEntry, expected: ChannelE
   assert(actual.destination.eq(expected.destination), 'destination')
   assert(actual.balance.eq(expected.balance), 'balance')
   assert(actual.commitment.eq(expected.commitment), 'commitment')
-  assert(actual.ticketEpoch.eq(expected.ticketEpoch), 'ticketEpoch')
-  assert(actual.ticketIndex.eq(expected.ticketIndex), 'ticketIndex')
+  assert(actual.ticket_epoch.eq(expected.ticket_epoch), 'ticketEpoch')
+  assert(actual.ticket_index.eq(expected.ticket_index), 'ticketIndex')
   assert(actual.status == expected.status, 'status')
-  assert(actual.channelEpoch.eq(expected.channelEpoch), 'channelEpoch')
-  assert(actual.closureTime.eq(expected.closureTime), 'closureTime')
+  assert(actual.channel_epoch.eq(expected.channel_epoch), 'channelEpoch')
+  assert(actual.closure_time.eq(expected.closure_time), 'closureTime')
 }
 
 export const PARTY_A_INITIALIZED_EVENT = {
@@ -44,8 +44,8 @@ export const PARTY_A_INITIALIZED_EVENT = {
   transactionIndex: 0,
   logIndex: 0,
   args: {
-    account: PARTY_A.toAddress().toHex(),
-    publicKey: PARTY_A.toUncompressedPubKeyHex(),
+    account: PARTY_A().to_address().to_hex(),
+    publicKey: PARTY_A().to_hex(false),
     multiaddr: u8aToHex(PARTY_A_MULTIADDR.bytes)
   }
 } as Event<'Announcement'>
@@ -57,15 +57,16 @@ export const PARTY_B_INITIALIZED_EVENT = {
   transactionIndex: 1,
   logIndex: 0,
   args: {
-    account: PARTY_B.toAddress().toHex(),
-    publicKey: PARTY_B.toUncompressedPubKeyHex(),
+    account: PARTY_B().to_address().to_hex(),
+    publicKey: PARTY_B().to_hex(false),
     multiaddr: u8aToHex(PARTY_B_MULTIADDR.bytes)
   }
 } as Event<'Announcement'>
 
-export const PARTY_A_INITIALIZED_ACCOUNT = new AccountEntry(PARTY_A, PARTY_A_MULTIADDR, new BN(1))
+// TODO LP: Ensure clone here
+export const PARTY_A_INITIALIZED_ACCOUNT = new AccountEntry(PARTY_A(), PARTY_A_MULTIADDR.toString(), 1)
 
-export const PARTY_B_INITIALIZED_ACCOUNT = new AccountEntry(PARTY_B, PARTY_B_MULTIADDR, new BN(1))
+export const PARTY_B_INITIALIZED_ACCOUNT = new AccountEntry(PARTY_B(), PARTY_B_MULTIADDR.toString(), 1)
 
 export const OPENED_EVENT = {
   event: 'ChannelUpdated',
@@ -74,11 +75,11 @@ export const OPENED_EVENT = {
   transactionIndex: 0,
   logIndex: 0,
   args: {
-    source: PARTY_A.toAddress().toHex(),
-    destination: PARTY_B.toAddress().toHex(),
+    source: PARTY_A().to_address().to_hex(),
+    destination: PARTY_B().to_address().to_hex(),
     newState: {
       balance: BigNumber.from('3'),
-      commitment: new Hash(new Uint8Array({ length: Hash.SIZE })).toHex(),
+      commitment: new Hash(new Uint8Array({ length: Hash.size() })).to_hex(),
       ticketEpoch: BigNumber.from('0'),
       ticketIndex: BigNumber.from('0'),
       status: 1,
@@ -95,11 +96,11 @@ export const COMMITTED_EVENT = {
   transactionIndex: 0,
   logIndex: 10,
   args: {
-    source: PARTY_A.toAddress().toHex(),
-    destination: PARTY_B.toAddress().toHex(),
+    source: PARTY_A().to_address().to_hex(),
+    destination: PARTY_B().to_address().to_hex(),
     newState: {
       balance: BigNumber.from('3'),
-      commitment: new Hash(new Uint8Array({ length: Hash.SIZE }).fill(1)).toHex(),
+      commitment: new Hash(new Uint8Array({ length: Hash.size() }).fill(1)).to_hex(),
       ticketEpoch: BigNumber.from('0'),
       ticketIndex: BigNumber.from('0'),
       status: 2,
@@ -116,11 +117,11 @@ export const UPDATED_WHEN_REDEEMED_EVENT = {
   transactionIndex: 0,
   logIndex: 0,
   args: {
-    source: PARTY_A.toAddress().toHex(),
-    destination: PARTY_B.toAddress().toHex(),
+    source: PARTY_A().to_address().to_hex(),
+    destination: PARTY_B().to_address().to_hex(),
     newState: {
       balance: BigNumber.from('1'),
-      commitment: new Hash(new Uint8Array({ length: Hash.SIZE })).toHex(),
+      commitment: new Hash(new Uint8Array({ length: Hash.size() })).to_hex(),
       ticketEpoch: BigNumber.from('0'),
       ticketIndex: BigNumber.from('1'),
       status: 2,
@@ -137,40 +138,40 @@ export const TICKET_REDEEMED_EVENT = {
   transactionIndex: 1,
   logIndex: 0,
   args: {
-    source: PARTY_A.toAddress().toHex(),
-    destination: PARTY_B.toAddress().toHex(),
-    nextCommitment: new Hash(new Uint8Array({ length: Hash.SIZE })).toHex(),
+    source: PARTY_A().to_address().to_hex(),
+    destination: PARTY_B().to_address().to_hex(),
+    nextCommitment: new Hash(new Uint8Array({ length: Hash.size() })).to_hex(),
     ticketEpoch: BigNumber.from('0'),
     ticketIndex: BigNumber.from('1'),
-    proofOfRelaySecret: new Hash(new Uint8Array({ length: Hash.SIZE })).toHex(),
+    proofOfRelaySecret: new Hash(new Uint8Array({ length: Hash.size() })).to_hex(),
     amount: BigNumber.from('2'),
     winProb: BigNumber.from('1'),
-    signature: new Hash(new Uint8Array({ length: Hash.SIZE })).toHex()
+    signature: new Hash(new Uint8Array({ length: Hash.size() })).to_hex()
   } as any
 } as Event<'TicketRedeemed'>
 
 export const oneLargeTicket = new Ticket(
-  PARTY_B.toAddress(),
-  new Challenge(
+  PARTY_B().to_address(),
+  Challenge.deserialize(
     stringToU8a('0x03c2aa76d6837c51337001c8b5a60473726064fc35d0a40b8f0e1f068cc8e38e10')
-  ).toEthereumChallenge(),
-  UINT256.fromString('0'),
-  UINT256.fromString('0'),
-  new Balance(new BN('2')),
-  UINT256.fromInverseProbability(new BN(1)),
-  UINT256.fromString('0'),
+  ).to_ethereum_challenge(),
+  U256.zero(),
+  U256.zero(),
+  new Balance('2', BalanceType.HOPR),
+  U256.from_inverse_probability(U256.one()),
+  U256.zero(),
   new Signature(new Uint8Array({ length: SIGNATURE_LENGTH }), 0)
 )
 export const oneSmallTicket = new Ticket(
-  PARTY_B.toAddress(),
-  new Challenge(
+  PARTY_B().to_address(),
+  Challenge.deserialize(
     stringToU8a('0x03c2aa76d6837c51337001c8b5a60473726064fc35d0a40b8f0e1f068cc8e38e10')
-  ).toEthereumChallenge(),
-  UINT256.fromString('0'),
-  UINT256.fromString('0'),
-  new Balance(new BN('1')),
-  UINT256.fromInverseProbability(new BN(1)),
-  UINT256.fromString('0'),
+  ).to_ethereum_challenge(),
+  U256.zero(),
+  U256.zero(),
+  new Balance('1', BalanceType.HOPR),
+  U256.from_inverse_probability(U256.one()),
+  U256.zero(),
   new Signature(new Uint8Array({ length: SIGNATURE_LENGTH }), 0)
 )
 
@@ -181,8 +182,8 @@ export const PARTY_A_TRANSFER_INCOMING = {
   transactionIndex: 0,
   logIndex: 0,
   args: {
-    from: PARTY_B.toAddress().toHex(),
-    to: PARTY_A.toAddress().toHex(),
+    from: PARTY_B().to_address().to_hex(),
+    to: PARTY_A().to_address().to_hex(),
     value: BigNumber.from('3')
   } as any
 } as TokenEvent<'Transfer'>
@@ -194,8 +195,8 @@ export const PARTY_A_TRANSFER_OUTGOING = {
   transactionIndex: 0,
   logIndex: 0,
   args: {
-    from: PARTY_A.toAddress().toHex(),
-    to: PARTY_B.toAddress().toHex(),
+    from: PARTY_A().to_address().to_hex(),
+    to: PARTY_B().to_address().to_hex(),
     value: BigNumber.from('1')
   } as any
 } as TokenEvent<'Transfer'>
@@ -229,8 +230,8 @@ export const PARTY_A_REGISTERED = {
   transactionIndex: 1,
   logIndex: 0,
   args: {
-    account: PARTY_A.toAddress().toHex(),
-    hoprPeerId: PARTY_B.toPeerId().toString()
+    account: PARTY_A().to_address().to_hex(),
+    hoprPeerId: PARTY_B().to_peerid_str()
   } as any
 } as RegistryEvent<'Registered'>
 
@@ -241,7 +242,7 @@ export const PARTY_A_ELEGIBLE = {
   transactionIndex: 0,
   logIndex: 0,
   args: {
-    account: PARTY_A.toAddress().toHex(),
+    account: PARTY_A().to_address().to_hex(),
     eligibility: true
   } as any
 } as RegistryEvent<'EligibilityUpdated'>
@@ -253,7 +254,7 @@ export const PARTY_A_NOT_ELEGIBLE = {
   transactionIndex: 0,
   logIndex: 0,
   args: {
-    account: PARTY_A.toAddress().toHex(),
+    account: PARTY_A().to_address().to_hex(),
     eligibility: false
   } as any
 } as RegistryEvent<'EligibilityUpdated'>
@@ -265,7 +266,7 @@ export const PARTY_A_ELEGIBLE_2 = {
   transactionIndex: 0,
   logIndex: 0,
   args: {
-    account: PARTY_A.toAddress().toHex(),
+    account: PARTY_A().to_address().to_hex(),
     eligibility: true
   } as any
 } as RegistryEvent<'EligibilityUpdated'>
@@ -277,7 +278,7 @@ export const PARTY_A_DEREGISTERED = {
   transactionIndex: 0,
   logIndex: 0,
   args: {
-    account: PARTY_A.toAddress().toHex(),
-    hoprPeerId: PARTY_B.toPeerId().toString()
+    account: PARTY_A().to_address().to_hex(),
+    hoprPeerId: PARTY_B().to_peerid_str()
   } as any
 } as RegistryEvent<'DeregisteredByOwner'>

@@ -21,9 +21,11 @@ let
     ## rust for core development and required utils
     (rust-bin.fromRustupToolchainFile ./rust-toolchain.toml)
     protobuf # v3.21.12
-    wasm-pack # v0.10.3
-    binaryen # v111 (includes wasm-opt)
+    wasm-pack # v0.11.1
+    binaryen # v112 (includes wasm-opt)
     wasm-bindgen-cli # v0.2.83
+    pkg-config
+    openssl_1_1
 
     ## python is required by node module bcrypto and integration tests
     python3 # v3.10.10
@@ -53,16 +55,13 @@ mkShell {
     echo "Installing dependencies"
     make deps
 
-    echo "Patching foundry binaries"
-    patchelf --interpreter `cat $NIX_CC/nix-support/dynamic-linker` .foundry/bin/anvil
-    patchelf --interpreter `cat $NIX_CC/nix-support/dynamic-linker` .foundry/bin/cast
-    patchelf --interpreter `cat $NIX_CC/nix-support/dynamic-linker` .foundry/bin/forge
-    patchelf --interpreter `cat $NIX_CC/nix-support/dynamic-linker` .foundry/bin/chisel
-
     echo "Setting up python virtual environment"
     python -m venv .venv
     source .venv/bin/activate
     pip install -r tests/requirements.txt
     deactivate
+
+    echo "Patching additional binaries"
+    patchelf --interpreter `cat $NIX_CC/nix-support/dynamic-linker` .venv/bin/ruff
   '';
 }

@@ -1,10 +1,22 @@
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
+use std::ops::Deref;
+
+use futures_lite::stream::StreamExt;
+use serde::{de::DeserializeOwned, Serialize};
+
+use utils_types::traits::BinarySerializable;
 
 use crate::errors::{DbError, Result};
-use crate::traits::BinaryAsyncKVStorage;
+use crate::traits::AsyncKVStorage;
 
 pub struct Batch {
     pub ops: Vec<crate::traits::BatchOperation<Box<[u8]>, Box<[u8]>>>,
+}
+
+// NOTE: The LevelDB implementation's iterator needs to know the precise size of the
+pub fn serialize_to_bytes<'a, S: Serialize + BinarySerializable<'a>>(s: &S) -> Result<Vec<u8>> {
+    Ok(Vec::from(s.to_bytes()))
+    // bincode::serialize(&s).map_err(|e| DbError::SerializationError(e.to_string()))
 }
 
 impl Batch {
@@ -14,69 +26,158 @@ impl Batch {
         }
     }
 
-    pub fn put<T: Serialize, U: Serialize>(&mut self, key: T, value: U) {
-        let key: Box<[u8]> = bincode::serialize(&key).unwrap().into_boxed_slice();
+    pub fn put<U: Serialize>(&mut self, key: Key, value: U) {
+        let key: Box<[u8]> = key.into();
         let value: Box<[u8]> = bincode::serialize(&value).unwrap().into_boxed_slice();
 
         self.ops
             .push(crate::traits::BatchOperation::put(crate::traits::Put { key, value }));
     }
 
-    pub fn del<T: Serialize>(&mut self, key: T) {
-        let key: Box<[u8]> = bincode::serialize(&key).unwrap().into_boxed_slice();
+    pub fn del(&mut self, key: Key) {
+        let key: Box<[u8]> = key.into();
 
         self.ops
             .push(crate::traits::BatchOperation::del(crate::traits::Del { key }));
     }
 }
 
-pub struct DB<T: BinaryAsyncKVStorage> {
+#[derive(Debug, Clone)]
+pub struct Key {
+    key: Box<[u8]>,
+}
+
+impl Display for Key {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", hex::encode(&self.key))
+    }
+}
+
+impl Key {
+    pub fn new<'a, T: Serialize + BinarySerializable<'a>>(object: &T) -> Result<Self> {
+        Ok(Self { key: object.to_bytes() })
+    }
+
+    pub fn new_from_str(object: &str) -> Result<Self> {
+        Ok(Self {
+            key: Box::from(object.as_bytes()),
+        })
+    }
+
+    pub fn new_with_prefix<'a, T: Serialize + BinarySerializable<'a>>(object: &T, prefix: &str) -> Result<Self> {
+        let key = serialize_to_bytes(object)?;
+
+        let mut result = Vec::with_capacity(prefix.len() + key.len());
+        result.extend_from_slice(prefix.as_bytes().as_ref());
+        result.extend_from_slice(key.as_ref());
+
+        Ok(Self {
+            key: result.into_boxed_slice(),
+        })
+    }
+
+    pub fn new_bytes_with_prefix(object: &[u8], prefix: &str) -> Result<Self> {
+        let mut result = Vec::with_capacity(prefix.len() + object.len());
+        result.extend_from_slice(prefix.as_bytes().as_ref());
+        result.extend_from_slice(object);
+
+        Ok(Self {
+            key: result.into_boxed_slice(),
+        })
+    }
+}
+
+impl Into<Box<[u8]>> for Key {
+    fn into(self) -> Box<[u8]> {
+        self.key
+    }
+}
+
+impl Deref for Key {
+    type Target = Box<[u8]>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.key
+    }
+}
+
+pub struct DB<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> {
     backend: T,
 }
 
-impl<T: BinaryAsyncKVStorage> DB<T> {
+impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
     pub fn new(backend: T) -> Self {
         DB::<T> { backend }
     }
 
-    pub async fn contains<K: Serialize>(&self, key: &K) -> bool {
-        let key: T::Key = bincode::serialize(&key).unwrap().into_boxed_slice();
-        self.backend.contains(key).await
+    pub async fn contains(&self, key: Key) -> bool {
+        self.backend.contains(key.into()).await
     }
 
-    pub async fn get<K: Serialize, V: DeserializeOwned>(&self, key: &K) -> Result<V> {
-        let key: T::Key = bincode::serialize(&key)
-            .map_err(|e| DbError::SerializationError(e.to_string()))?
-            .into_boxed_slice();
+    pub async fn get<V: DeserializeOwned>(&self, key: Key) -> Result<V> {
+        let key: T::Key = key.into();
         self.backend
             .get(key)
             .await
             .and_then(|v| bincode::deserialize(v.as_ref()).map_err(|e| DbError::DeserializationError(e.to_string())))
     }
 
-    pub async fn set<K: Serialize, V: Serialize + DeserializeOwned>(
-        &mut self,
-        key: &K,
-        value: &V,
-    ) -> Result<Option<V>> {
-        let key: T::Key = bincode::serialize(&key).unwrap().into_boxed_slice();
-        let value: T::Value = bincode::serialize(&value).unwrap().into_boxed_slice();
-        self.backend.set(key, value).await.map(move |v| {
-            v.map(move |x| {
-                let value: V = bincode::deserialize(&x).unwrap();
-                value
-            })
-        })
+    pub async fn get_or_none<V: DeserializeOwned>(&self, key: Key) -> Result<Option<V>> {
+        if self.contains(key.clone()).await {
+            self.get::<V>(key).await.map(|v| Some(v))
+        } else {
+            Ok(None)
+        }
     }
 
-    pub async fn remove<U: Serialize, V: DeserializeOwned>(&mut self, key: &U) -> Result<Option<V>> {
-        let key: T::Key = bincode::serialize(&key).unwrap().into_boxed_slice();
-        self.backend.remove(key).await.map(move |v| {
-            v.map(move |x| {
-                let value: V = bincode::deserialize(&x).unwrap();
-                value
-            })
-        })
+    pub async fn set<V>(&mut self, key: Key, value: &V) -> Result<Option<V>>
+    where
+        V: Serialize + DeserializeOwned,
+    {
+        let key: T::Key = key.into();
+        let value: T::Value = bincode::serialize(&value)
+            .map_err(|e| DbError::SerializationError(e.to_string()))?
+            .into_boxed_slice();
+
+        match self.backend.set(key, value).await? {
+            Some(v) => bincode::deserialize(v.as_ref())
+                .map(|v| Some(v))
+                .map_err(|e| DbError::DeserializationError(e.to_string())),
+            None => Ok(None),
+        }
+    }
+
+    pub async fn remove<V: DeserializeOwned>(&mut self, key: Key) -> Result<Option<V>> {
+        let key: T::Key = key.into();
+        match self.backend.remove(key).await? {
+            Some(v) => bincode::deserialize(v.as_ref())
+                .map(|v| Some(v))
+                .map_err(|e| DbError::DeserializationError(e.to_string())),
+            None => Ok(None),
+        }
+    }
+
+    pub async fn get_more<V: Serialize + DeserializeOwned>(
+        &self,
+        prefix: Box<[u8]>,
+        suffix_size: u32,
+        filter: &dyn Fn(&V) -> bool,
+    ) -> Result<Vec<V>> {
+        let mut output = Vec::new();
+
+        let mut data_stream = Box::into_pin(self.backend.iterate(prefix, suffix_size)?);
+
+        // fail fast for the first value that cannot be deserialized
+        while let Some(value) = data_stream.next().await {
+            let value =
+                bincode::deserialize::<V>(value?.as_ref()).map_err(|e| DbError::DeserializationError(e.to_string()))?;
+
+            if (*filter)(&value) {
+                output.push(value);
+            }
+        }
+
+        Ok(output)
     }
 
     pub async fn batch(&mut self, batch: Batch, wait_for_write: bool) -> Result<()> {
@@ -89,13 +190,31 @@ mod tests {
     use super::*;
     use crate::errors::DbError;
     use crate::traits::MockAsyncKVStorage;
-    use mockall::*;
-
-    impl BinaryAsyncKVStorage for MockAsyncKVStorage {}
+    use mockall::predicate;
+    use serde::Deserialize;
+    use utils_types::traits::BinarySerializable;
 
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
     struct TestKey {
-        v: u16,
+        v: u8,
+    }
+
+    impl BinarySerializable<'_> for TestKey {
+        const SIZE: usize = 1;
+
+        /// Deserializes the type from a binary blob.
+        fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
+            if data.len() != Self::SIZE {
+                Err(utils_types::errors::GeneralError::InvalidInput)
+            } else {
+                Ok(Self { v: data[0] })
+            }
+        }
+
+        /// Serializes the type into a fixed size binary blob.
+        fn to_bytes(&self) -> Box<[u8]> {
+            Box::new([self.v])
+        }
     }
 
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -117,7 +236,7 @@ mod tests {
 
         let db = DB::new(backend);
 
-        assert!(db.contains(&key).await)
+        assert!(db.contains(Key::new(&key).ok().unwrap()).await)
     }
 
     #[async_std::test]
@@ -136,7 +255,7 @@ mod tests {
 
         let db = DB::new(backend);
 
-        assert_eq!(db.get::<_, TestValue>(&key).await, Ok(value))
+        assert_eq!(db.get::<TestValue>(Key::new(&key).ok().unwrap()).await, Ok(value))
     }
 
     #[async_std::test]
@@ -153,7 +272,10 @@ mod tests {
 
         let db = DB::new(backend);
 
-        assert_eq!(db.get::<_, TestValue>(&key).await, Err(DbError::NotFound))
+        assert_eq!(
+            db.get::<TestValue>(Key::new(&key).ok().unwrap()).await,
+            Err(DbError::NotFound)
+        )
     }
 
     #[async_std::test]
@@ -175,7 +297,7 @@ mod tests {
 
         let mut db = DB::new(backend);
 
-        assert_eq!(db.set(&key, &value).await, Ok(None))
+        assert_eq!(db.set(Key::new(&key).ok().unwrap(), &value).await, Ok(None))
     }
 
     #[async_std::test]
@@ -197,7 +319,10 @@ mod tests {
 
         let mut db = DB::new(backend);
 
-        assert_eq!(db.set(&key, &value).await, Err(DbError::NotFound))
+        assert_eq!(
+            db.set(Key::new(&key).ok().unwrap(), &value).await,
+            Err(DbError::NotFound)
+        )
     }
 
     #[async_std::test]
@@ -223,7 +348,7 @@ mod tests {
 
         let mut db = DB::new(backend);
 
-        assert_eq!(db.set(&key, &value).await, Ok(Some(evicted)))
+        assert_eq!(db.set(Key::new(&key).ok().unwrap(), &value).await, Ok(Some(evicted)))
     }
 
     #[async_std::test]
@@ -240,7 +365,7 @@ mod tests {
 
         let mut db = DB::new(backend);
 
-        assert_eq!(db.remove::<_, TestValue>(&key).await, Ok(None))
+        assert_eq!(db.remove::<TestValue>(Key::new(&key).ok().unwrap()).await, Ok(None))
     }
 
     #[async_std::test]
@@ -257,7 +382,10 @@ mod tests {
 
         let mut db = DB::new(backend);
 
-        assert_eq!(db.remove::<_, TestValue>(&key).await, Err(DbError::NotFound))
+        assert_eq!(
+            db.remove::<TestValue>(Key::new(&key).ok().unwrap()).await,
+            Err(DbError::NotFound)
+        )
     }
 
     #[async_std::test]
@@ -278,6 +406,6 @@ mod tests {
 
         let mut db = DB::new(backend);
 
-        assert_eq!(db.remove(&key).await, Ok(Some(evicted)))
+        assert_eq!(db.remove(Key::new(&key).ok().unwrap()).await, Ok(Some(evicted)))
     }
 }
