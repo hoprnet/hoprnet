@@ -300,7 +300,7 @@ pub mod wasm {
             set_commitment,
         };
         let val = db.as_ref_counted();
-        let mut g = val.lock().unwrap();
+        let mut g = val.write().await;
         ok_or_jserr!(
             super::initialize_commitment::<_, JsCommitter>(g.deref_mut(), private_key, channel_info, &mut committer)
                 .await
@@ -310,14 +310,14 @@ pub mod wasm {
     #[wasm_bindgen]
     pub async fn find_commitment_preimage(db: &Database, channel_id: &Hash) -> JsResult<Hash> {
         let val = db.as_ref_counted();
-        let mut g = val.lock().unwrap();
+        let mut g = val.write().await;
         ok_or_jserr!(super::find_commitment_preimage(g.deref_mut(), channel_id).await)
     }
 
     #[wasm_bindgen]
     pub async fn bump_commitment(db: &Database, channel_id: &Hash, new_commitment: &Hash) -> JsResult<()> {
         let val = db.as_ref_counted();
-        let mut g = val.lock().unwrap();
+        let mut g = val.write().await;
         ok_or_jserr!(super::bump_commitment(g.deref_mut(), channel_id, new_commitment).await)
     }
 }

@@ -1,3 +1,5 @@
+use async_lock::RwLock;
+
 use crate::errors::PacketError::{
     AcknowledgementValidation, ChannelNotFound, InvalidPacketState, OutOfFunds, PathNotValid, Retry, TagReplay,
     Timeout, TransportError,
@@ -15,7 +17,7 @@ use futures::future::{select, Either};
 use futures::pin_mut;
 use libp2p_identity::PeerId;
 use std::ops::{Deref, Mul};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 use utils_log::{debug, error, info};
 use utils_types::primitives::{Balance, BalanceType, U256};
@@ -80,7 +82,7 @@ const ACK_RX_QUEUE_SIZE: usize = 2048;
 /// When no more processing needs to be done, the instance should be stopped via the `stop` method.
 /// Once the instance is stopped, it cannot be restarted.
 pub struct AcknowledgementInteraction<Db: HoprCoreEthereumDbActions> {
-    db: Arc<Mutex<Db>>,
+    db: Arc<RwLock<Db>>,
     // TODO: remove closures and use Sender<T> to allow the type to be Send + Sync
     pub on_acknowledgement: Option<Sender<HalfKeyChallenge>>,
     pub on_acknowledged_ticket: Option<Sender<AcknowledgedTicket>>,
@@ -92,7 +94,7 @@ pub struct AcknowledgementInteraction<Db: HoprCoreEthereumDbActions> {
 impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
     /// Creates a new instance given the DB and our public key used to verify the acknowledgements.
     pub fn new(
-        db: Arc<Mutex<Db>>,
+        db: Arc<RwLock<Db>>,
         public_key: PublicKey,
         on_acknowledgement: Option<Sender<HalfKeyChallenge>>,
         on_acknowledged_ticket: Option<Sender<AcknowledgedTicket>>,
@@ -230,8 +232,8 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
 
         let pending = self
             .db
-            .lock()
-            .unwrap()
+            .read()
+            .await
             .get_pending_acknowledgement(&ack.ack_challenge())
             .await?
             .ok_or_else(|| {
@@ -271,8 +273,8 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
                 })?;
 
                 self.db
-                    .lock()
-                    .unwrap()
+                    .read()
+                    .await
                     .get_channel_from(&unackowledged.signer)
                     .await
                     .map_err(|e| {
@@ -295,8 +297,8 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
 
                 // replace the un-acked ticket with acked ticket.
                 self.db
-                    .lock()
-                    .unwrap()
+                    .write()
+                    .await
                     .replace_unack_with_ack(&ack.ack_challenge(), ack_ticket.clone())
                     .await?;
 
@@ -353,7 +355,7 @@ pub struct PacketInteraction<Db>
 where
     Db: HoprCoreEthereumDbActions,
 {
-    db: Arc<Mutex<Db>>,
+    db: Arc<RwLock<Db>>,
     incoming_packets: (Sender<Payload>, Receiver<Payload>),
     outgoing_packets: (Sender<Payload>, Receiver<Payload>),
     pub on_final_packet: Option<Sender<Box<[u8]>>>,
@@ -366,7 +368,7 @@ where
     Db: HoprCoreEthereumDbActions,
 {
     /// Creates a new instance given the DB and configuration.
-    pub fn new(db: Arc<Mutex<Db>>, on_final_packet: Option<Sender<Box<[u8]>>>, cfg: PacketInteractionConfig) -> Self {
+    pub fn new(db: Arc<RwLock<Db>>, on_final_packet: Option<Sender<Box<[u8]>>>, cfg: PacketInteractionConfig) -> Self {
         Self {
             db,
             incoming_packets: bounded(PACKET_RX_QUEUE_SIZE),
@@ -380,15 +382,15 @@ where
     async fn bump_ticket_index(&self, channel_id: &Hash) -> Result<U256> {
         let current_ticket_index = self
             .db
-            .lock()
-            .unwrap()
+            .read()
+            .await
             .get_current_ticket_index(channel_id)
             .await?
             .unwrap_or(U256::one());
 
         self.db
-            .lock()
-            .unwrap()
+            .write()
+            .await
             .set_current_ticket_index(channel_id, current_ticket_index.addn(1))
             .await?;
 
@@ -398,8 +400,8 @@ where
     async fn create_multihop_ticket(&self, destination: PublicKey, path_pos: u8) -> Result<Ticket> {
         let channel = self
             .db
-            .lock()
-            .unwrap()
+            .read()
+            .await
             .get_channel_to(&destination)
             .await?
             .ok_or(ChannelNotFound(destination.to_peerid().to_string()))?;
@@ -415,8 +417,8 @@ where
 
         let outstanding_balance = self
             .db
-            .lock()
-            .unwrap()
+            .read()
+            .await
             .get_pending_balance_to(&destination.to_address())
             .await?;
 
@@ -441,7 +443,7 @@ where
             &self.cfg.private_key,
         );
 
-        self.db.lock().unwrap().mark_pending(&ticket).await?;
+        self.db.write().await.mark_pending(&ticket).await?;
 
         debug!(
             "Creating ticket in channel {channel_id}. Ticket data: {}",
@@ -477,8 +479,8 @@ where
         match packet.state() {
             PacketState::Outgoing { ack_challenge, .. } => {
                 self.db
-                    .lock()
-                    .unwrap()
+                    .write()
+                    .await
                     .store_pending_acknowledgment(ack_challenge.clone(), PendingAcknowledgement::WaitingAsSender)
                     .await?;
 
@@ -543,7 +545,7 @@ where
                 ..
             } => {
                 // Validate if it's not a replayed packet
-                if self.db.lock().unwrap().check_and_set_packet_tag(packet_tag).await? {
+                if self.db.write().await.check_and_set_packet_tag(packet_tag).await? {
                     return Err(TagReplay);
                 }
 
@@ -579,7 +581,7 @@ where
                 ..
             } => {
                 // Validate if it's not a replayed packet
-                if self.db.lock().unwrap().check_and_set_packet_tag(packet_tag).await? {
+                if self.db.write().await.check_and_set_packet_tag(packet_tag).await? {
                     return Err(TagReplay);
                 }
 
@@ -588,15 +590,15 @@ where
                 // Find the corresponding channel
                 let channel = self
                     .db
-                    .lock()
-                    .unwrap()
+                    .read()
+                    .await
                     .get_channel_from(&previous_hop)
                     .await?
                     .ok_or(ChannelNotFound(previous_hop.to_string()))?;
 
                 // Validate the ticket first
                 if let Err(e) = validate_unacknowledged_ticket::<Db>(
-                    self.db.lock().unwrap().deref(),
+                    self.db.read().await.deref(),
                     &packet.ticket,
                     &channel,
                     &previous_hop,
@@ -607,20 +609,20 @@ where
                 .await
                 {
                     // Mark as reject and passthrough the error
-                    self.db.lock().unwrap().mark_rejected(&packet.ticket).await?;
+                    self.db.write().await.mark_rejected(&packet.ticket).await?;
                     return Err(e);
                 }
 
                 self.db
-                    .lock()
-                    .unwrap()
+                    .write()
+                    .await
                     .set_current_ticket_index(&channel.get_id().hash(), packet.ticket.index)
                     .await?;
 
                 // Store the unacknowledged ticket
                 self.db
-                    .lock()
-                    .unwrap()
+                    .write()
+                    .await
                     .store_pending_acknowledgment(
                         ack_challenge.clone(),
                         PendingAcknowledgement::WaitingAsRelayer(UnacknowledgedTicket::new(
@@ -855,7 +857,7 @@ mod tests {
         )
     }
 
-    fn create_dbs(amount: usize) -> Vec<Arc<Mutex<rusty_leveldb::DB>>> {
+    fn create_dbs(amount: usize) -> Vec<Arc<RwLock<rusty_leveldb::DB>>> {
         (0..amount)
             .map(|i| {
                 Arc::new(Mutex::new(
@@ -865,7 +867,7 @@ mod tests {
             .collect()
     }
 
-    fn create_core_dbs(dbs: &Vec<Arc<Mutex<rusty_leveldb::DB>>>) -> Vec<Arc<Mutex<CoreEthereumDb<RustyLevelDbShim>>>> {
+    fn create_core_dbs(dbs: &Vec<Arc<RwLock<rusty_leveldb::DB>>>) -> Vec<Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>> {
         dbs.iter()
             .enumerate()
             .map(|(i, db)| {
@@ -886,7 +888,7 @@ mod tests {
         }
     }
 
-    async fn create_minimal_topology(dbs: &Vec<Arc<Mutex<rusty_leveldb::DB>>>) -> crate::errors::Result<()> {
+    async fn create_minimal_topology(dbs: &Vec<Arc<RwLock<rusty_leveldb::DB>>>) -> crate::errors::Result<()> {
         let testing_snapshot = Snapshot::new(U256::zero(), U256::zero(), U256::zero());
         let mut previous_channel: Option<ChannelEntry> = None;
 
@@ -1055,8 +1057,8 @@ mod tests {
 
             // Mimics that the packet sender has sent a packet and now it has a pending acknowledgement in it's DB
             core_dbs[0]
-                .lock()
-                .unwrap()
+                .write()
+                .await
                 .store_pending_acknowledgment(porv.ack_challenge.clone(), PendingAcknowledgement::WaitingAsSender)
                 .await
                 .expect("failed to store pending ack");
