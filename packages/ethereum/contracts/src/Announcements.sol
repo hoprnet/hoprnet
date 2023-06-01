@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8.19;
 
-import 'openzeppelin-contracts-4.8.3/contracts/utils/Multicall.sol';
+import 'openzeppelin-contracts-4.8.3/utils/Multicall.sol';
 
 contract HoprAnnouncements is Multicall {
   event KeyBindingOdd(bytes32 secp256k1_x, bytes32 ed25519_sig_0, bytes32 ed25519_sig_1, bytes32 ed25519_pub_key);
