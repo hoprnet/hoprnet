@@ -162,7 +162,7 @@ library HoprCapabilityPermissions {
         uint256 value,
         bytes calldata data,
         Enum.Operation operation
-    ) public view {
+    ) internal view {
         if (!role.members[msg.sender]) {
             revert NoMembership();
         }
@@ -738,7 +738,7 @@ library HoprCapabilityPermissions {
     function keyForFunctions(
         address targetAddress,
         bytes4 functionSig
-    ) public pure returns (bytes32) {
+    ) internal pure returns (bytes32) {
         return bytes32(abi.encodePacked(targetAddress, functionSig));
     }
 
@@ -750,7 +750,7 @@ library HoprCapabilityPermissions {
      */
     function encodePermissionEnums(
        uint256[] memory permissions
-    ) public pure returns (uint256 encoded, uint256 length) {
+    ) internal pure returns (uint256 encoded, uint256 length) {
         uint256 len = permissions.length;
         if (len > 256) {
             revert ArrayTooLong();
@@ -790,7 +790,7 @@ library HoprCapabilityPermissions {
      */
     function encodeFunctionSigs(
        bytes4[] memory functionSigs
-    ) public pure returns (bytes32 encoded, uint256 length) {
+    ) internal pure returns (bytes32 encoded, uint256 length) {
         uint256 len = functionSigs.length;
         if (len > 7) {
             revert ArrayTooLong();
@@ -837,7 +837,7 @@ library HoprCapabilityPermissions {
     function encodeFunctionSigsAndPermissions(
        bytes4[] memory functionSigs,
        uint256[] memory permissions
-    ) public pure returns (bytes32 encoded, uint256 length) {
+    ) internal pure returns (bytes32 encoded, uint256 length) {
         uint256 len = functionSigs.length;
         if (len > 7) {
             revert ArrayTooLong();
