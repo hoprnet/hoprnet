@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8;
-pragma abicoder v2;
+pragma solidity >=0.7.0 <0.9.0;
 
 /**
  * This contract follows the principle of `zodiac/core/Module.sol`
@@ -50,7 +49,7 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
 
   /// @custom:oz-upgrades-unsafe-allow constructor
   constructor() {
-      _disableInitializers();
+    _disableInitializers();
   }
 
   function initialize(bytes memory initParams) public initializer {

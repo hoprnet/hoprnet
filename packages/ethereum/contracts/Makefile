@@ -66,7 +66,7 @@ anvil-deploy-contracts: ## deploy HOPR contracts
 .PHONY: anvil-deploy-safe-suite
 anvil-deploy-safe-suite: ensure-environment-is-set
 anvil-deploy-safe-suite: ## deploy HOPR contracts
-	$(forge-script) --broadcast script/utils/SafeSuiteSetup.s.sol:SafeSuiteSetupScript
+	$(forge-script) --broadcast script/SafeSuiteSetup.s.sol:SafeSuiteSetupScript
 
 .PHONY: anvil-deploy-all
 anvil-deploy-all: ## deploy all contracts
