@@ -65,7 +65,7 @@ import type { TypedEvent, TypedEventFilter } from '../utils/common.js'
 
 // @ts-ignore untyped library
 import retimer from 'retimer'
-import assert from "assert";
+import assert from 'assert'
 
 // Exported from Rust
 const constants = CORE_ETHEREUM_CONSTANTS()

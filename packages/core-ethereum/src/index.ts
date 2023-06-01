@@ -18,7 +18,15 @@ import {
   AccountEntry,
   create_counter
 } from '@hoprnet/hopr-utils'
-import { Database as Ethereum_Database, U256 as Ethereum_U256, Hash as Ethereum_Hash, initialize_commitment, find_commitment_preimage, bump_commitment, ChannelCommitmentInfo } from '../lib/core_ethereum_misc.js'
+import {
+  Database as Ethereum_Database,
+  U256 as Ethereum_U256,
+  Hash as Ethereum_Hash,
+  initialize_commitment,
+  find_commitment_preimage,
+  bump_commitment,
+  ChannelCommitmentInfo
+} from '../lib/core_ethereum_misc.js'
 import Indexer from './indexer/index.js'
 import { CORE_ETHEREUM_CONSTANTS } from '../lib/core_ethereum_misc.js'
 import { EventEmitter } from 'events'
@@ -627,10 +635,4 @@ export default class HoprCoreEthereum extends EventEmitter {
 export { useFixtures } from './indexer/index.mock.js'
 export { sampleChainOptions } from './ethereum.mock.js'
 
-export {
-  ChannelEntry,
-  ChannelCommitmentInfo,
-  Indexer,
-  ChainWrapper,
-  createChainWrapper
-}
+export { ChannelEntry, ChannelCommitmentInfo, Indexer, ChainWrapper, createChainWrapper }

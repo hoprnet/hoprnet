@@ -53,17 +53,17 @@ import fs from 'fs'
 
 function createMockedTicket(signerPrivKey: Uint8Array, counterparty: Address, balance: Balance) {
   let tkt = Ticket.new(
-      counterparty,
-      U256.zero(),
-      U256.zero(),
-      balance,
-      U256.from_inverse_probability(U256.one()),
-      U256.one(),
-      signerPrivKey
+    counterparty,
+    U256.zero(),
+    U256.zero(),
+    balance,
+    U256.from_inverse_probability(U256.one()),
+    U256.one(),
+    signerPrivKey
   )
   tkt.set_challenge(
-      new Response(Uint8Array.from(randomBytes(32))).to_challenge().to_ethereum_challenge(),
-      signerPrivKey
+    new Response(Uint8Array.from(randomBytes(32))).to_challenge().to_ethereum_challenge(),
+    signerPrivKey
   )
   return tkt
 }
@@ -185,10 +185,10 @@ describe('db functional tests', function () {
 
     const amount = new BN(1)
 
-    let ticket =  createMockedTicket(
-        Uint8Array.from(randomBytes(SECP256K1_CONSTANTS.PRIVATE_KEY_LENGTH)),
-        MOCK_ADDRESS(),
-        new Balance(amount.toString(10), BalanceType.HOPR)
+    let ticket = createMockedTicket(
+      Uint8Array.from(randomBytes(SECP256K1_CONSTANTS.PRIVATE_KEY_LENGTH)),
+      MOCK_ADDRESS(),
+      new Balance(amount.toString(10), BalanceType.HOPR)
     )
     await db.mark_rejected(ticket)
 
@@ -258,5 +258,3 @@ describe(`levelup shim tests`, function () {
     assert((await db.verifyNetworkId('test-env')) === true, `must not fail for correct id`)
   })
 })
-
-

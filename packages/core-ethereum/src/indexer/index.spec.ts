@@ -59,7 +59,6 @@ async function is_eligible(db: Ethereum_Database, address: Address): Promise<boo
   return await db.is_eligible(Ethereum_Address.deserialize(address.serialize()))
 }
 
-
 describe('test indexer', function () {
   it('should start indexer', async function () {
     const { indexer, chain } = await useFixtures()

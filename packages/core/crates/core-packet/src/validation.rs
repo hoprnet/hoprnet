@@ -97,14 +97,16 @@ pub async fn validate_unacknowledged_ticket<T: HoprCoreEthereumDbActions>(
 
 #[cfg(test)]
 mod tests {
-    use std::sync::{Arc, Mutex};
     use crate::errors::PacketError;
     use crate::validation::validate_unacknowledged_ticket;
     use async_trait::async_trait;
+    use core_crypto::random::random_bytes;
+    use core_crypto::types::{HalfKey, Response};
     use core_crypto::{
         iterated_hash::IteratedHash,
         types::{HalfKeyChallenge, Hash, PublicKey},
     };
+    use core_ethereum_db::db::CoreEthereumDb;
     use core_ethereum_db::traits::HoprCoreEthereumDbActions;
     use core_types::acknowledgement::{AcknowledgedTicket, PendingAcknowledgement, UnacknowledgedTicket};
     use core_types::channels::ChannelStatus;
@@ -115,12 +117,10 @@ mod tests {
     use hex_literal::hex;
     use lazy_static::lazy_static;
     use mockall::mock;
-    use core_crypto::random::random_bytes;
-    use core_crypto::types::{HalfKey, Response};
-    use core_ethereum_db::db::CoreEthereumDb;
+    use std::sync::{Arc, Mutex};
     use utils_db::db::DB;
     use utils_db::leveldb::rusty::RustyLevelDbShim;
-    use utils_types::primitives::{Address, Balance, BalanceType, Snapshot, U256, AuthorizationToken};
+    use utils_types::primitives::{Address, AuthorizationToken, Balance, BalanceType, Snapshot, U256};
     use utils_types::traits::BinarySerializable;
 
     const SENDER_PRIV_KEY: [u8; 32] = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
@@ -570,28 +570,37 @@ mod tests {
 
     #[async_std::test]
     async fn test_ticket_workflow() {
-        let level_db = Arc::new(Mutex::new(rusty_leveldb::DB::open("test", rusty_leveldb::in_memory()).unwrap()));
+        let level_db = Arc::new(Mutex::new(
+            rusty_leveldb::DB::open("test", rusty_leveldb::in_memory()).unwrap(),
+        ));
         let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(level_db)), SENDER_PUB.clone());
 
         let hkc = HalfKeyChallenge::new(&random_bytes::<{ HalfKeyChallenge::SIZE }>());
         let unack = UnacknowledgedTicket::new(
             create_valid_ticket(),
             HalfKey::new(&random_bytes::<{ HalfKey::SIZE }>()),
-            SENDER_PUB.clone()
+            SENDER_PUB.clone(),
         );
 
-        db.store_pending_acknowledgment(hkc.clone(), PendingAcknowledgement::WaitingAsRelayer(unack)).await.unwrap();
+        db.store_pending_acknowledgment(hkc.clone(), PendingAcknowledgement::WaitingAsRelayer(unack))
+            .await
+            .unwrap();
         let num_tickets = db.get_tickets(None).await.unwrap();
         assert_eq!(1, num_tickets.len(), "db should find one ticket");
 
-        let pending = db.get_pending_acknowledgement(&hkc).await.unwrap().expect("db should contain pending ack");
+        let pending = db
+            .get_pending_acknowledgement(&hkc)
+            .await
+            .unwrap()
+            .expect("db should contain pending ack");
         match pending {
             PendingAcknowledgement::WaitingAsSender => panic!("must not be pending as sender"),
             PendingAcknowledgement::WaitingAsRelayer(ticket) => {
-                let ack = AcknowledgedTicket::new(ticket.ticket,
-                                                  Response::new(&random_bytes::<{Response::SIZE}>()),
-                                                  Hash::new(&random_bytes::<{Hash::SIZE}>()),
-                                                  SENDER_PUB.clone()
+                let ack = AcknowledgedTicket::new(
+                    ticket.ticket,
+                    Response::new(&random_bytes::<{ Response::SIZE }>()),
+                    Hash::new(&random_bytes::<{ Hash::SIZE }>()),
+                    SENDER_PUB.clone(),
                 );
                 db.replace_unack_with_ack(&hkc, ack).await.unwrap();
 
@@ -607,16 +616,21 @@ mod tests {
 
     #[async_std::test]
     async fn test_db_should_store_ticket_index() {
-        let level_db = Arc::new(Mutex::new(rusty_leveldb::DB::open("test", rusty_leveldb::in_memory()).unwrap()));
+        let level_db = Arc::new(Mutex::new(
+            rusty_leveldb::DB::open("test", rusty_leveldb::in_memory()).unwrap(),
+        ));
         let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(level_db)), SENDER_PUB.clone());
 
         let dummy_channel = Hash::new(&[0xffu8; Hash::SIZE]);
         let dummy_index = U256::one();
 
         db.set_current_ticket_index(&dummy_channel, dummy_index).await.unwrap();
-        let idx = db.get_current_ticket_index(&dummy_channel).await.unwrap().expect("db must contain ticket index");
+        let idx = db
+            .get_current_ticket_index(&dummy_channel)
+            .await
+            .unwrap()
+            .expect("db must contain ticket index");
 
         assert_eq!(dummy_index, idx, "ticket index mismatch");
     }
-
 }
