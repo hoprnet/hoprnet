@@ -750,6 +750,7 @@ mod tests {
     };
     use crate::path::Path;
     use crate::por::ProofOfRelayValues;
+    use async_std::sync::RwLock;
     use async_trait::async_trait;
     use core_crypto::derivation::derive_ack_key_share;
     use core_crypto::random::random_bytes;
@@ -857,7 +858,7 @@ mod tests {
         )
     }
 
-    fn create_dbs(amount: usize) -> Vec<Arc<RwLock<rusty_leveldb::DB>>> {
+    fn create_dbs(amount: usize) -> Vec<Arc<Mutex<rusty_leveldb::DB>>> {
         (0..amount)
             .map(|i| {
                 Arc::new(Mutex::new(
@@ -867,11 +868,11 @@ mod tests {
             .collect()
     }
 
-    fn create_core_dbs(dbs: &Vec<Arc<RwLock<rusty_leveldb::DB>>>) -> Vec<Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>> {
+    fn create_core_dbs(dbs: &Vec<Arc<Mutex<rusty_leveldb::DB>>>) -> Vec<Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>> {
         dbs.iter()
             .enumerate()
             .map(|(i, db)| {
-                Arc::new(Mutex::new(CoreEthereumDb::new(
+                Arc::new(RwLock::new(CoreEthereumDb::new(
                     DB::new(RustyLevelDbShim::new(db.clone())),
                     PublicKey::from_peerid(&PEERS[i]).unwrap(),
                 )))
@@ -888,7 +889,7 @@ mod tests {
         }
     }
 
-    async fn create_minimal_topology(dbs: &Vec<Arc<RwLock<rusty_leveldb::DB>>>) -> crate::errors::Result<()> {
+    async fn create_minimal_topology(dbs: &Vec<Arc<Mutex<rusty_leveldb::DB>>>) -> crate::errors::Result<()> {
         let testing_snapshot = Snapshot::new(U256::zero(), U256::zero(), U256::zero());
         let mut previous_channel: Option<ChannelEntry> = None;
 

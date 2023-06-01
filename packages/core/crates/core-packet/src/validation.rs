@@ -571,7 +571,7 @@ mod tests {
     #[async_std::test]
     async fn test_ticket_workflow() {
         let level_db = Arc::new(Mutex::new(rusty_leveldb::DB::open("test", rusty_leveldb::in_memory()).unwrap()));
-        let db = Arc::new(Mutex::new(CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(level_db)), SENDER_PUB.clone())));
+        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(level_db)), SENDER_PUB.clone());
 
         let hkc = HalfKeyChallenge::new(&random_bytes::<{ HalfKeyChallenge::SIZE }>());
         let unack = UnacknowledgedTicket::new(
@@ -580,11 +580,11 @@ mod tests {
             SENDER_PUB.clone()
         );
 
-        db.lock().unwrap().store_pending_acknowledgment(hkc.clone(), PendingAcknowledgement::WaitingAsRelayer(unack)).await.unwrap();
-        let num_tickets = db.lock().unwrap().get_tickets(None).await.unwrap();
+        db.store_pending_acknowledgment(hkc.clone(), PendingAcknowledgement::WaitingAsRelayer(unack)).await.unwrap();
+        let num_tickets = db.get_tickets(None).await.unwrap();
         assert_eq!(1, num_tickets.len(), "db should find one ticket");
 
-        let pending = db.lock().unwrap().get_pending_acknowledgement(&hkc).await.unwrap().expect("db should contain pending ack");
+        let pending = db.get_pending_acknowledgement(&hkc).await.unwrap().expect("db should contain pending ack");
         match pending {
             PendingAcknowledgement::WaitingAsSender => panic!("must not be pending as sender"),
             PendingAcknowledgement::WaitingAsRelayer(ticket) => {
@@ -593,11 +593,11 @@ mod tests {
                                                   Hash::new(&random_bytes::<{Hash::SIZE}>()),
                                                   SENDER_PUB.clone()
                 );
-                db.lock().unwrap().replace_unack_with_ack(&hkc, ack).await.unwrap();
+                db.replace_unack_with_ack(&hkc, ack).await.unwrap();
 
-                let num_tickets = db.lock().unwrap().get_tickets(None).await.unwrap().len();
-                let num_unack = db.lock().unwrap().get_unacknowledged_tickets(None).await.unwrap().len();
-                let num_ack = db.lock().unwrap().get_acknowledged_tickets(None).await.unwrap().len();
+                let num_tickets = db.get_tickets(None).await.unwrap().len();
+                let num_unack = db.get_unacknowledged_tickets(None).await.unwrap().len();
+                let num_ack = db.get_acknowledged_tickets(None).await.unwrap().len();
                 assert_eq!(1, num_tickets, "db should find one ticket");
                 assert_eq!(0, num_unack, "db should not contain any unacknowledged tickets");
                 assert_eq!(1, num_ack, "db should contain exactly one acknowledged ticket");
@@ -608,13 +608,13 @@ mod tests {
     #[async_std::test]
     async fn test_db_should_store_ticket_index() {
         let level_db = Arc::new(Mutex::new(rusty_leveldb::DB::open("test", rusty_leveldb::in_memory()).unwrap()));
-        let db = Arc::new(Mutex::new(CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(level_db)), SENDER_PUB.clone())));
+        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(level_db)), SENDER_PUB.clone());
 
         let dummy_channel = Hash::new(&[0xffu8; Hash::SIZE]);
         let dummy_index = U256::one();
 
-        db.lock().unwrap().set_current_ticket_index(&dummy_channel, dummy_index).await.unwrap();
-        let idx = db.lock().unwrap().get_current_ticket_index(&dummy_channel).await.unwrap().expect("db must contain ticket index");
+        db.set_current_ticket_index(&dummy_channel, dummy_index).await.unwrap();
+        let idx = db.get_current_ticket_index(&dummy_channel).await.unwrap().expect("db must contain ticket index");
 
         assert_eq!(dummy_index, idx, "ticket index mismatch");
     }
