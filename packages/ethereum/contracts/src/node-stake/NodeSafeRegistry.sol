@@ -3,7 +3,7 @@ pragma solidity ^0.8;
 pragma abicoder v2;
 
 import '@openzeppelin/contracts/utils/cryptography/ECDSA.sol';
-import '../interfaces/ISafe.sol';
+import '../interfaces/IAvatar.sol';
 import '../interfaces/INodeManagementModule.sol';
 
 // Node already has mapped to Safe
@@ -138,7 +138,7 @@ contract HoprNodeSafeRegistry {
    */
   function ensureNodeIsSafeModuleMember(NodeSafe memory nodeSafe) internal view {
     // check safeAddress has nodeChainKeyAddress as owner
-    address[] memory owners = ISafe(nodeSafe.safeAddress).getOwners();
+    address[] memory owners = IAvatar(nodeSafe.safeAddress).getOwners();
     uint256 index = 0;
     for (index; index < owners.length; index++) {
       if (owners[index] == nodeSafe.nodeChainKeyAddress) return;
@@ -150,7 +150,7 @@ contract HoprNodeSafeRegistry {
     // there may be many modules, loop through them
     while (nextModule != SENTINEL_MODULES) {
       // get modules for safe
-      (modules, nextModule) = ISafe(nodeSafe.safeAddress).getModulesPaginated(SENTINEL_MODULES, pageSize);
+      (modules, nextModule) = IAvatar(nodeSafe.safeAddress).getModulesPaginated(SENTINEL_MODULES, pageSize);
       for (uint256 i = 0; i < modules.length; i++) {
         if (
           IHoprNodeManagementModule(modules[i]).isHoprNodeManagementModule() &&

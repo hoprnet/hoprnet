@@ -54,7 +54,7 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
     multisend = address(0);
   }
 
-  function setUp(bytes memory initParams) public override {
+  function initialize(bytes memory initParams) public {
     (address _safe, address _multisend) = abi.decode(
         initParams,
         (address, address)

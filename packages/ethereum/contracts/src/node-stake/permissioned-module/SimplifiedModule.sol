@@ -1,17 +1,18 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 pragma solidity >=0.7.0 <0.9.0;
 
-import "zodiac/interfaces/IAvatar.sol";
-import "zodiac/factory/FactoryFriendly.sol";
-import "zodiac/guard/Guardable.sol";
+import "../../interfaces/IAvatar.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+
 
 /**
  * @title Simplified Module Interface - A contract that can pass messages to a Module Manager contract if enabled by that contract.
  * @dev Adapted from `Module.sol` at commit 8a77e7b224af8004bd9f2ff4e2919642e93ffd85, which 
  * was audited https://github.com/gnosis/zodiac/tree/master/audits
- * This module removes target attribute 
+ * This module removes target attribute, removes guard, and uses UUPS proxy.
  */
-abstract contract SimplifiedModule is FactoryFriendly, Guardable {
+abstract contract SimplifiedModule is UUPSUpgradeable, OwnableUpgradeable {
     // Address that will ultimately execute function calls.
     address public avatar; 
 
@@ -43,33 +44,12 @@ abstract contract SimplifiedModule is FactoryFriendly, Guardable {
         bytes memory data,
         Enum.Operation operation
     ) internal virtual returns (bool success) {
-        /// check if a transactioon guard is enabled.
-        if (guard != address(0)) {
-            IGuard(guard).checkTransaction(
-                /// Transaction info used by module transactions
-                to,
-                value,
-                data,
-                operation,
-                /// Zero out the redundant transaction information only used for Safe multisig transctions
-                0,
-                0,
-                0,
-                address(0),
-                payable(0),
-                bytes("0x"),
-                address(0)
-            );
-        }
         success = IAvatar(avatar).execTransactionFromModule(
             to,
             value,
             data,
             operation
         );
-        if (guard != address(0)) {
-            IGuard(guard).checkAfterExecution(bytes32("0x"), success);
-        }
         return success;
     }
 
@@ -87,29 +67,13 @@ abstract contract SimplifiedModule is FactoryFriendly, Guardable {
         bytes memory data,
         Enum.Operation operation
     ) internal virtual returns (bool success, bytes memory returnData) {
-        /// check if a transactioon guard is enabled.
-        if (guard != address(0)) {
-            IGuard(guard).checkTransaction(
-                /// Transaction info used by module transactions
-                to,
-                value,
-                data,
-                operation,
-                /// Zero out the redundant transaction information only used for Safe multisig transctions
-                0,
-                0,
-                0,
-                address(0),
-                payable(0),
-                bytes("0x"),
-                address(0)
-            );
-        }
         (success, returnData) = IAvatar(avatar)
             .execTransactionFromModuleReturnData(to, value, data, operation);
-        if (guard != address(0)) {
-            IGuard(guard).checkAfterExecution(bytes32("0x"), success);
-        }
         return (success, returnData);
     }
+
+    /**
+     * @dev Override {_authorizeUpgrade} to only allow owner to upgrade the contract
+     */
+    function _authorizeUpgrade(address) internal override onlyOwner {}
 }

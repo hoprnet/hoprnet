@@ -70,11 +70,13 @@ struct Role {
  */
 library HoprCapabilityPermissions {
     // HoprChannels method ids (TargetType.Channels)
-    bytes4 internal constant FUND_CHANNEL_MULTI_SELECTOR = hex"4341abdd";
+    // low risk (permission checks can be omitted)
     bytes4 internal constant REDEEM_TICKET_SELECTOR = hex"0475568e";
     bytes4 internal constant REDEEM_TICKETS_SELECTOR = hex"c5ad200d";
-    bytes4 internal constant INITIATE_CHANNEL_CLOSURE_SELECTOR = hex"88d2f3c9";
     bytes4 internal constant FINALIZE_CHANNEL_CLOSURE_SELECTOR = hex"833aae8d";
+    // high risk (do permission check)
+    bytes4 internal constant FUND_CHANNEL_MULTI_SELECTOR = hex"4341abdd";
+    bytes4 internal constant INITIATE_CHANNEL_CLOSURE_SELECTOR = hex"88d2f3c9";
     bytes4 internal constant BUMP_CHANNEL_SELECTOR = hex"c4d93afb";
     // HoprTokens method ids (TargetType.Token)
     bytes4 internal constant APPROVE_SELECTOR = hex"095ea7b3";

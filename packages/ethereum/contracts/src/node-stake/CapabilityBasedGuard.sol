@@ -4,7 +4,7 @@ pragma abicoder v2;
 
 import 'safe-contracts/base/GuardManager.sol';
 import '../interfaces/IHoprChannels.sol';
-import '../interfaces/ISafe.sol';
+import '../interfaces/IAvatar.sol';
 
 error AddressIsZero();
 error InitializationErrorSafeSet();
@@ -15,7 +15,7 @@ error GuardTheWrongSafe(address wrongSafe);
  * certain functions on HoprChannels contract.
  */
 contract HoprCapabilityBasedGuard is BaseGuard {
-  ISafe public safe;
+  IAvatar public safe;
 
   modifier onlySafe() {
     if (msg.sender != address(safe)) {
@@ -26,7 +26,7 @@ contract HoprCapabilityBasedGuard is BaseGuard {
 
   // set the safe address to be single
   constructor() {
-    safe = ISafe(address(0));
+    safe = IAvatar(address(0));
   }
 
   function setup(address _safe) external {
@@ -38,7 +38,7 @@ contract HoprCapabilityBasedGuard is BaseGuard {
     if (address(safe) != address(0)) {
       revert InitializationErrorSafeSet();
     }
-    safe = ISafe(_safe);
+    safe = IAvatar(_safe);
   }
 
   // solhint-disable-next-line payable-fallback
@@ -78,7 +78,7 @@ contract HoprCapabilityBasedGuard is BaseGuard {
     }
 
     // Only owners can exec
-    address[] memory owners = ISafe(msg.sender).getOwners();
+    address[] memory owners = IAvatar(msg.sender).getOwners();
   }
 
   // TODO: Implement this function
