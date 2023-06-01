@@ -1194,9 +1194,11 @@ pub mod wasm {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::{Arc, Mutex};
     use super::*;
     use core_types::channels::ChannelEntry;
     use utils_db::db::serialize_to_bytes;
+    use utils_db::leveldb::rusty::RustyLevelDbShim;
     use utils_types::primitives::EthereumChallenge;
     use utils_types::traits::BinarySerializable;
 
@@ -1251,5 +1253,24 @@ mod tests {
 
         assert!(serialized.is_ok());
         assert_eq!(serialized.unwrap().len(), ChannelEntry::SIZE)
+    }
+
+    #[async_std::test]
+    async fn test_token_storage() {
+        let level_db = Arc::new(Mutex::new(rusty_leveldb::DB::open("test", rusty_leveldb::in_memory()).unwrap()));
+        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(level_db)), PublicKey::random());
+
+        let token_id = "test";
+
+        let token = AuthorizationToken::new(token_id.to_string(), &[0xffu8; 100]);
+        db.store_authorization(token.clone()).await.unwrap();
+
+        let token_2 = db.retrieve_authorization(token_id.to_string()).await.unwrap().expect("db should contain a token");
+        assert_eq!(token, token_2, "retrieved token should be equal to the stored one");
+
+        db.delete_authorization(token_id.to_string()).await.expect("db should remove token");
+
+        let nonexistent = db.retrieve_authorization(token_id.to_string()).await.unwrap();
+        assert!(nonexistent.is_none(), "token should be removed from the db");
     }
 }

@@ -911,10 +911,12 @@ name = "core-ethereum-db"
 version = "0.1.0"
 dependencies = [
  "async-lock",
+ "async-std",
  "async-trait",
  "console_error_panic_hook",
  "core-crypto",
  "core-types",
+ "rusty-leveldb",
  "serde",
  "serde-wasm-bindgen",
  "utils-db",

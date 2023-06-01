@@ -34,7 +34,11 @@ console_error_panic_hook = { version = "0.1.6", optional = true }
 # wee_alloc = { version = "0.4.5", optional = true }
 
 [dev-dependencies]
+async-std = { version = "1.12.0", features = ["attributes"] }
 wasm-bindgen-test = "0.3.30"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+rusty-leveldb = "1.0"
 
 [target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
 wasm-pack = { workspace = true }
