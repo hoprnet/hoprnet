@@ -26,6 +26,7 @@ contract EnvironmentConfig is Script {
     address stakeContractAddress;
     address networkRegistryContractAddress;
     address networkRegistryProxyContractAddress;
+    address moduleImplementationAddress;
     uint256 indexerStartBlockNumber;
   }
 
@@ -80,6 +81,9 @@ contract EnvironmentConfig is Script {
     address networkRegistryAddr = json.readAddress(
       string(abi.encodePacked(levelToEnvironmentConfig, '.network_registry_contract_address'))
     );
+    address moduleImplementationAddr = json.readAddress(
+      string(abi.encodePacked(levelToEnvironmentConfig, '.module_implementation_address'))
+    );
 
     envDetail = EnvironmentDetail({
       environmentType: envType,
@@ -91,6 +95,7 @@ contract EnvironmentConfig is Script {
       stakeContractAddress: stakeAddr,
       networkRegistryContractAddress: networkRegistryAddr,
       networkRegistryProxyContractAddress: networkRegistryProxyAddr,
+      moduleImplementationAddress: moduleImplementationAddr,
       indexerStartBlockNumber: indexerStartBlkNum
     });
   }
@@ -170,6 +175,16 @@ contract EnvironmentConfig is Script {
         )
       )
     );
+    vm.writeLine(
+      filePath,
+      string(
+        abi.encodePacked(
+          '"module_implementation_address": "',
+          vm.toString(envDetail.moduleImplementationAddress),
+          '"'
+        )
+      )
+    );
   }
 
   // FIXME: remove this temporary method
@@ -213,6 +228,7 @@ contract EnvironmentConfig is Script {
     json.serialize('stake_contract_address', envDetail.stakeContractAddress);
     json.serialize('network_registry_proxy_contract_address', envDetail.networkRegistryProxyContractAddress);
     json = json.serialize('network_registry_contract_address', envDetail.networkRegistryContractAddress);
+    json = json.serialize('module_implementation_address', envDetail.moduleImplementationAddress);
     return json;
   }
 }

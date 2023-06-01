@@ -48,13 +48,12 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
     _;
   }
 
-  // set values to be zero for the singleton
+  /// @custom:oz-upgrades-unsafe-allow constructor
   constructor() {
-    avatar = address(0);
-    multisend = address(0);
+      _disableInitializers();
   }
 
-  function initialize(bytes memory initParams) public {
+  function initialize(bytes memory initParams) public initializer {
     (address _safe, address _multisend) = abi.decode(
         initParams,
         (address, address)

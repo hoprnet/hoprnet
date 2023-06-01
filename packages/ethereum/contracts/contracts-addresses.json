@@ -10,7 +10,8 @@
       "stake_contract_address": "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318",
       "stake_season": 6,
       "token_contract_address": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
-      "xhopr_contract_address": "0xD057604A14982FE8D88c5fC25Aac3267eA142a08"
+      "xhopr_contract_address": "0xD057604A14982FE8D88c5fC25Aac3267eA142a08",
+      "module_implementation_address": ""
     },
     "anvil-localhost2": {
       "boost_contract_address": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6",
@@ -22,7 +23,8 @@
       "stake_contract_address": "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318",
       "stake_season": 6,
       "token_contract_address": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
-      "xhopr_contract_address": "0xD057604A14982FE8D88c5fC25Aac3267eA142a08"
+      "xhopr_contract_address": "0xD057604A14982FE8D88c5fC25Aac3267eA142a08",
+      "module_implementation_address": ""
     },
     "master-staging": {
       "boost_contract_address": "0x2Fc87247085F4658ADB698cDbF4d732c704f1e06",
@@ -34,7 +36,8 @@
       "stake_contract_address": "0x26d1CEC4Ba2F98Ff35ec549Fcd1b82A90bb32065",
       "stake_season": 7,
       "token_contract_address": "0xf1aDf07D0d4e1beFdDe79066771d057337e55c08",
-      "xhopr_contract_address": "0x4DeCc7e6c63fF6c40630654A3b9C92b937369998"
+      "xhopr_contract_address": "0x4DeCc7e6c63fF6c40630654A3b9C92b937369998",
+      "module_implementation_address": ""
     },
     "debug-staging": {
       "boost_contract_address": "0x2Fc87247085F4658ADB698cDbF4d732c704f1e06",
@@ -46,7 +49,8 @@
       "stake_contract_address": "0xcA7801A1C0Df0EFfC0031330EFE98daE40230d80",
       "stake_season": 7,
       "token_contract_address": "0xf1aDf07D0d4e1beFdDe79066771d057337e55c08",
-      "xhopr_contract_address": "0x4DeCc7e6c63fF6c40630654A3b9C92b937369998"
+      "xhopr_contract_address": "0x4DeCc7e6c63fF6c40630654A3b9C92b937369998",
+      "module_implementation_address": ""
     },
     "monte_rosa": {
       "boost_contract_address": "0x43d13D7B83607F14335cF2cB75E87dA369D056c7",
@@ -58,7 +62,8 @@
       "stake_contract_address": "0x65c39e6BD97f80B5aE5d2120a47644578Fd2B8DC",
       "stake_season": 7,
       "token_contract_address": "0x66225dE86Cac02b32f34992eb3410F59DE416698",
-      "xhopr_contract_address": "0xD057604A14982FE8D88c5fC25Aac3267eA142a08"
+      "xhopr_contract_address": "0xD057604A14982FE8D88c5fC25Aac3267eA142a08",
+      "module_implementation_address": ""
     }
   }
 }
