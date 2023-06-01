@@ -5,7 +5,7 @@ use core_crypto::{
     iterated_hash::IteratedHash,
     types::{HalfKeyChallenge, Hash, PublicKey},
 };
-use core_types::acknowledgement::{AcknowledgedTicket, PendingAcknowledgement};
+use core_types::acknowledgement::{AcknowledgedTicket, PendingAcknowledgement, UnacknowledgedTicket};
 use core_types::channels::ChannelStatus;
 use core_types::{
     account::AccountEntry,
@@ -70,13 +70,13 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         Ok(())
     }
 
-    async fn get_tickets(&self, signer: &PublicKey) -> Result<Vec<Ticket>> {
+    async fn get_tickets(&self, signer: Option<PublicKey>) -> Result<Vec<Ticket>> {
         let mut tickets = self
             .db
             .get_more::<AcknowledgedTicket>(
                 Vec::from(ACKNOWLEDGED_TICKETS_PREFIX.as_bytes()).into_boxed_slice(),
                 EthereumChallenge::size(),
-                &|v: &AcknowledgedTicket| v.signer.eq(signer),
+                &|v: &AcknowledgedTicket| signer.clone().map(|s| v.signer.eq(&s)).unwrap_or(true),
             )
             .await?
             .into_iter()
@@ -91,7 +91,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
                 HalfKeyChallenge::size(),
                 &move |v: &PendingAcknowledgement| match v {
                     PendingAcknowledgement::WaitingAsSender => false,
-                    PendingAcknowledgement::WaitingAsRelayer(unack) => unack.signer.eq(signer),
+                    PendingAcknowledgement::WaitingAsRelayer(unack) => signer.clone().map(|s| unack.signer.eq(&s)).unwrap_or(true)
                 },
             )
             .await?
@@ -187,16 +187,37 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             .get_more::<AcknowledgedTicket>(
                 Vec::from(ACKNOWLEDGED_TICKETS_PREFIX.as_bytes()).into_boxed_slice(),
                 EthereumChallenge::size(),
-                &|ack: &AcknowledgedTicket| {
-                    if filter.is_none() {
-                        true
-                    } else {
-                        let f = filter.clone().unwrap();
+                &|ack: &AcknowledgedTicket|
+                    filter.clone().map(|f| {
                         f.destination.eq(&self.me) && ack.ticket.channel_epoch.eq(&f.channel_epoch)
-                    }
-                },
+                    }).unwrap_or(true),
             )
             .await
+
+    }
+
+    async fn get_unacknowledged_tickets(&self, filter: Option<ChannelEntry>) -> Result<Vec<UnacknowledgedTicket>> {
+        Ok(self.db
+            .get_more::<PendingAcknowledgement>(
+                Vec::from(PENDING_ACKNOWLEDGEMENTS_PREFIX.as_bytes()).into_boxed_slice(),
+                EthereumChallenge::size(),
+                &|pending: &PendingAcknowledgement|
+                    match pending {
+                        PendingAcknowledgement::WaitingAsSender => false,
+                        PendingAcknowledgement::WaitingAsRelayer(unack) => {
+                            filter.clone().map(|f| {
+                                f.destination.eq(&self.me) && unack.ticket.channel_epoch.eq(&f.channel_epoch)
+                            }).unwrap_or(true)
+                        }
+                    }
+            )
+            .await?
+            .into_iter()
+            .filter_map(|a| match a {
+                PendingAcknowledgement::WaitingAsSender => None,
+                PendingAcknowledgement::WaitingAsRelayer(unack) => Some(unack),
+            })
+            .collect::<Vec<UnacknowledgedTicket>>())
     }
 
     async fn mark_pending(&mut self, ticket: &Ticket) -> Result<()> {

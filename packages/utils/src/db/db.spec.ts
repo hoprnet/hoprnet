@@ -1,26 +1,19 @@
-import { HoprDB } from './db.js'
-import { randomBytes } from 'crypto'
-
 import assert from 'assert'
 import {
-  UnacknowledgedTicket,
   Ticket,
-  AcknowledgedTicket,
   Balance,
   BalanceType,
   Hash,
   U256,
-  HalfKey,
-  Response,
-  HalfKeyChallenge,
   ChannelEntry,
   PublicKey,
   Address,
   Snapshot,
-  ChannelStatus
-} from '../types.js'
+  ChannelStatus,
+  Database
+} from '../../../core-ethereum/lib/core_ethereum_db.js'
 import BN from 'bn.js'
-import { stringToU8a, u8aEquals } from '../u8a/index.js'
+import { stringToU8a } from '../u8a/index.js'
 
 export const SECP256K1_CONSTANTS = {
   PRIVATE_KEY_LENGTH: 32,
@@ -36,50 +29,6 @@ const MOCK_PUBLIC_KEY = () =>
   PublicKey.deserialize(stringToU8a('0x021464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8'))
 
 const MOCK_ADDRESS = () => Address.from_string('Cf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9')
-
-class TestingDB extends HoprDB {
-  public async get(key: Uint8Array) {
-    return await super.get(key)
-  }
-
-  public async put(key: Uint8Array, value: Uint8Array) {
-    return await super.put(key, value)
-  }
-
-  public async getAll<T, U = T>(
-    range: {
-      prefix: Uint8Array
-      suffixLength: number
-    },
-    deserialize: (chunk: Uint8Array) => T,
-    filter?: (o: T) => boolean,
-    map?: (i: T) => U,
-    sort?: (e1: U, e2: U) => number
-  ) {
-    return await super.getAll<T, U>(range, deserialize, filter, map, sort)
-  }
-
-  public static createMock(id?: PublicKey) {
-    return super.createMock(id) as TestingDB
-  }
-}
-
-function createMockedTicket(signerPrivKey: Uint8Array, counterparty: Address) {
-  let tkt = Ticket.new(
-    counterparty,
-    U256.zero(),
-    U256.zero(),
-    Balance.zero(BalanceType.HOPR),
-    U256.from_inverse_probability(U256.one()),
-    U256.one(),
-    signerPrivKey
-  )
-  tkt.set_challenge(
-    new Response(Uint8Array.from(randomBytes(32))).to_challenge().to_ethereum_challenge(),
-    signerPrivKey
-  )
-  return tkt
-}
 
 function channelEntryCreateMock(): ChannelEntry {
   const pub = PublicKey.from_privkey(stringToU8a('0x1464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8'))
@@ -98,7 +47,6 @@ function channelEntryCreateMock(): ChannelEntry {
 
 import { LevelDb } from './db.js'
 import { db_sanity_test } from '../../lib/utils_db.js'
-import { Database, PublicKey as Ethereum_PublicKey } from '../../../core-ethereum/lib/core_ethereum_db.js'
 import fs from 'fs'
 
 describe('db shim tests', function () {
@@ -137,7 +85,7 @@ describe('db functional tests', function () {
     db_shim = new LevelDb()
     db_dir_path = '/tmp/test-shim.db'
     await db_shim.init(true, db_dir_path, true, 'monte_rosa')
-    db: new Database(db_shim, Ethereum_PublicKey.deserialize(MOCK_PUBLIC_KEY().serialize(false)))
+    db = new Database(db_shim, MOCK_PUBLIC_KEY())
   })
 
   afterEach(async function () {
@@ -291,195 +239,4 @@ describe(`levelup shim tests`, function () {
   })
 })
 
-describe(`database tests`, function () {
-  let db: TestingDB
 
-  beforeEach(function () {
-    db = TestingDB.createMock()
-  })
-
-  afterEach(async function () {
-    await db.close()
-  })
-
-  it('getAll - basic', async function () {
-    const TEST_KEY = new TextEncoder().encode(`test key`)
-    const TEST_VALUE = new TextEncoder().encode(`test value`)
-    await db.put(TEST_KEY, TEST_VALUE)
-
-    const resultSingle = await db.getAll({ prefix: TEST_KEY, suffixLength: 0 }, (x) => x)
-
-    assert(resultSingle.length == 1)
-    assert(u8aEquals(TEST_VALUE, resultSingle[0]))
-
-    const TEST_KEY_RANGE = Uint8Array.from([...TEST_KEY, 23])
-
-    await db.put(TEST_KEY_RANGE, TEST_VALUE)
-
-    const resultRange = await db.getAll({ prefix: TEST_KEY, suffixLength: 1 }, (x) => x)
-
-    assert(resultRange.length == 1)
-    assert(u8aEquals(TEST_VALUE, resultRange[0]))
-
-    assert((await db.getAll({ prefix: TEST_KEY, suffixLength: 0 }, (x) => x)).length == 1)
-  })
-
-  it('getAll - filter', async function () {
-    const TEST_KEY = new TextEncoder().encode(`test key`)
-    const TEST_VALUE = Uint8Array.from([...new TextEncoder().encode(`test value`), 23])
-
-    await db.put(TEST_KEY, TEST_VALUE)
-
-    const resultTrue = await db.getAll(
-      { prefix: TEST_KEY, suffixLength: 0 },
-      (x) => x,
-      (value: Uint8Array) => value[value.length - 1] == 23
-    )
-
-    assert(resultTrue.length == 1)
-    assert(u8aEquals(TEST_VALUE, resultTrue[0]))
-
-    const resultFalse = await db.getAll(
-      { prefix: TEST_KEY, suffixLength: 0 },
-      (x) => x,
-      (value: Uint8Array) => value[value.length - 1] == 24
-    )
-
-    assert(resultFalse.length == 0)
-  })
-
-  it('getAll - map', async function () {
-    const TEST_KEY = new TextEncoder().encode(`test key`)
-    const TEST_VALUE = Uint8Array.from([...new TextEncoder().encode(`test value`), 23])
-    const MAPPED_VALUE = new TextEncoder().encode(`mapped value`)
-
-    await db.put(TEST_KEY, TEST_VALUE)
-
-    const resultMapped = await db.getAll(
-      { prefix: TEST_KEY, suffixLength: 0 },
-      (x) => x,
-      undefined,
-      (input: Uint8Array) => {
-        if (u8aEquals(input, TEST_VALUE)) {
-          return MAPPED_VALUE
-        } else {
-          return input
-        }
-      }
-    )
-
-    assert(resultMapped.length == 1)
-    assert(u8aEquals(MAPPED_VALUE, resultMapped[0]))
-  })
-
-  it('getAll - sort', async function () {
-    const TEST_KEY = new TextEncoder().encode(`test key`)
-    const TEST_VALUE_FIRST = Uint8Array.from([...new TextEncoder().encode(`test value`), 0])
-    const TEST_VALUE_MIDDLE = Uint8Array.from([...new TextEncoder().encode(`test value`), 1])
-    const TEST_VALUE_LAST = Uint8Array.from([...new TextEncoder().encode(`test value`), 2])
-
-    await db.put(Uint8Array.from([...TEST_KEY, 0]), TEST_VALUE_LAST)
-    await db.put(Uint8Array.from([...TEST_KEY, 1]), TEST_VALUE_FIRST)
-    await db.put(Uint8Array.from([...TEST_KEY, 2]), TEST_VALUE_MIDDLE)
-
-    const resultSorted = await db.getAll(
-      { prefix: TEST_KEY, suffixLength: 1 },
-      (x) => x,
-      undefined,
-      undefined,
-      (a: Uint8Array, b: Uint8Array) => a[a.length - 1] - b[b.length - 1]
-    )
-
-    assert(resultSorted.every((value: Uint8Array, index: number) => value[value.length - 1] == index))
-  })
-
-  it('hasPacket', async function () {
-    const packetTag = Uint8Array.from(randomBytes(16))
-
-    const present = await db.checkAndSetPacketTag(packetTag)
-
-    assert(present == false, `Packet tag must not be present`)
-
-    const secondTry = await db.checkAndSetPacketTag(packetTag)
-
-    assert(secondTry == true, `Packet tag must be set`)
-  })
-
-  it('ticket workflow', async function () {
-    const privKey = Uint8Array.from(randomBytes(SECP256K1_CONSTANTS.PRIVATE_KEY_LENGTH))
-    const pubKey = PublicKey.from_privkey(privKey)
-    // this comes from a Packet
-    const halfKeyChallenge = new HalfKeyChallenge(Uint8Array.from(randomBytes(HalfKeyChallenge.size())))
-    const unAck = new UnacknowledgedTicket(
-      createMockedTicket(privKey, new Address(Uint8Array.from(randomBytes(Address.size())))),
-      new HalfKey(Uint8Array.from(randomBytes(HalfKey.size()))),
-      pubKey.clone()
-    )
-    await db.storePendingAcknowledgement(halfKeyChallenge, false, unAck)
-    assert((await db.getTickets()).length == 1, `DB should find one ticket`)
-
-    const pending = await db.getPendingAcknowledgement(halfKeyChallenge)
-
-    assert(pending.is_msg_sender() == false)
-
-    const ack = new AcknowledgedTicket(
-      pending.ticket().ticket.clone(),
-      new Response(Uint8Array.from(randomBytes(Hash.size()))),
-      new Hash(Uint8Array.from(randomBytes(Hash.size()))),
-      pubKey.clone()
-    )
-    await db.replaceUnAckWithAck(halfKeyChallenge, ack)
-
-    assert((await db.getTickets()).length == 1, `DB should find one ticket`)
-    assert((await db.getUnacknowledgedTickets()).length === 0, `DB should not contain any unacknowledgedTicket`)
-    assert((await db.getAcknowledgedTickets()).length == 1, `DB should contain exactly one acknowledged ticket`)
-  })
-
-  it('should store ticketIndex', async function () {
-    const DUMMY_CHANNEL = new Hash(new Uint8Array(Hash.size()).fill(0xff))
-    const DUMMY_INDEX = U256.one()
-
-    await db.setCurrentTicketIndex(DUMMY_CHANNEL, DUMMY_INDEX)
-
-    const fromDb = await db.getCurrentTicketIndex(DUMMY_CHANNEL)
-
-    assert(fromDb.eq(DUMMY_INDEX))
-  })
-
-  it('putSerializedObject and getSerializedObject should store and read object', async function () {
-    const ns = 'testobjects'
-    const key = '1'
-    const object = Uint8Array.from(randomBytes(32))
-
-    await db.putSerializedObject(ns, key, object)
-    const storedObject = await db.getSerializedObject(ns, key)
-    assert(storedObject !== undefined, 'storedObject should not be undefined')
-    assert(u8aEquals(object, storedObject), 'storedObject should equal object')
-  })
-
-  it('putSerializedObject should update object', async function () {
-    const ns = 'testobjects'
-    const key = '2'
-    const object1 = Uint8Array.from(randomBytes(32))
-    const object2 = Uint8Array.from(randomBytes(32))
-
-    await db.putSerializedObject(ns, key, object1)
-    await db.putSerializedObject(ns, key, object2)
-
-    const storedObject = await db.getSerializedObject(ns, key)
-    assert(storedObject !== undefined, 'storedObject should not be undefined')
-    assert(u8aEquals(object2, storedObject), 'storedObject should equal object2')
-  })
-
-  it('deleteSerializedObject should delete object', async function () {
-    const ns = 'testobjects'
-    const key = '3'
-    const object = Uint8Array.from(randomBytes(32))
-
-    await db.putSerializedObject(ns, key, object)
-    await db.deleteObject(ns, key)
-
-    const storedObject = await db.getSerializedObject(ns, key)
-    assert(storedObject === undefined, 'storedObject should be undefined')
-  })
-})

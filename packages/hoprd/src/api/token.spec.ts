@@ -14,7 +14,8 @@ import {
 
 import type { default as Hopr } from '@hoprnet/hopr-core'
 import type { Capability } from './token.js'
-import { Database, PublicKey } from '@hoprnet/hopr-core/lib/core_packet.js'
+import { Database, PublicKey, core_packet_initialize_crate } from '@hoprnet/hopr-core/lib/core_packet.js'
+core_packet_initialize_crate()
 import { LevelDb } from '@hoprnet/hopr-utils'
 
 chai.should()
@@ -23,7 +24,7 @@ chai.use(chaiAsPromised)
 describe('authentication token', function () {
   let node: Hopr
 
-  before(async function () {
+  beforeEach(async function () {
     node = sinon.fake() as any
     let db = new LevelDb()
     await db.backend.open()

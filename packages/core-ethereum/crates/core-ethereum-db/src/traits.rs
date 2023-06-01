@@ -4,7 +4,7 @@ use core_crypto::{
     iterated_hash::IteratedHash,
     types::{HalfKeyChallenge, Hash, PublicKey},
 };
-use core_types::acknowledgement::{AcknowledgedTicket, PendingAcknowledgement};
+use core_types::acknowledgement::{AcknowledgedTicket, PendingAcknowledgement, UnacknowledgedTicket};
 use core_types::{
     account::AccountEntry,
     channels::{ChannelEntry, Ticket},
@@ -19,7 +19,7 @@ pub trait HoprCoreEthereumDbActions {
     async fn get_current_ticket_index(&self, channel_id: &Hash) -> Result<Option<U256>>;
     async fn set_current_ticket_index(&mut self, channel_id: &Hash, index: U256) -> Result<()>;
 
-    async fn get_tickets(&self, signer: &PublicKey) -> Result<Vec<Ticket>>;
+    async fn get_tickets(&self, signer: Option<PublicKey>) -> Result<Vec<Ticket>>;
 
     async fn mark_rejected(&mut self, ticket: &Ticket) -> Result<()>;
 
@@ -45,6 +45,9 @@ pub trait HoprCoreEthereumDbActions {
     // core and core-ethereum part
     /// Get all acknowledged tickets within the filter criteria.
     async fn get_acknowledged_tickets(&self, filter: Option<ChannelEntry>) -> Result<Vec<AcknowledgedTicket>>;
+
+    /// Get all unacknowledged tickets within the filter criteria.
+    async fn get_unacknowledged_tickets(&self, filter: Option<ChannelEntry>) -> Result<Vec<UnacknowledgedTicket>>;
 
     /// Mark the ticket as pending.
     async fn mark_pending(&mut self, ticket: &Ticket) -> Result<()>;
