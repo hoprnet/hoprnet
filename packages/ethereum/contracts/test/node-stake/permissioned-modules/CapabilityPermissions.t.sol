@@ -2,9 +2,10 @@
 pragma solidity >=0.8.0 <0.9.0;
 
 import '../../../src/node-stake/permissioned-module/CapabilityPermissions.sol';
+import "../../utils/CapabilityLibrary.sol";
 import 'forge-std/Test.sol';
 
-contract HoprCapabilityPermissionsTest is Test {
+contract HoprCapabilityPermissionsTest is Test, CapabilityPermissionsLibFixtureTest {
     Role internal role;
 
     /**
@@ -12,8 +13,6 @@ contract HoprCapabilityPermissionsTest is Test {
     */
     error AddressIsZero();
     event ScopedTargetToken(address targetAddress);
-
-    function setUp() public virtual {}
 
     /**
     * @dev Failes to add token target(s) when the account is not address zero
@@ -28,7 +27,6 @@ contract HoprCapabilityPermissionsTest is Test {
     */
     function testFuzz_AddTargetToken(address account) public {
         vm.assume(account != address(0));
-
         vm.expectEmit(true, false, false, false, address(this));
         emit ScopedTargetToken(account);
         HoprCapabilityPermissions.scopeTargetToken(role, account);
