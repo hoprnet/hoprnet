@@ -55,12 +55,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
     // core only part
     async fn get_current_ticket_index(&self, channel_id: &Hash) -> Result<Option<U256>> {
         let prefixed_key = utils_db::db::Key::new_with_prefix(channel_id, TICKET_INDEX_PREFIX)?;
-        if self.db.contains(prefixed_key.clone()).await {
-            let value = self.db.get::<U256>(prefixed_key).await?;
-            Ok(Some(value))
-        } else {
-            Ok(None)
-        }
+        self.db.get_or_none::<U256>(prefixed_key).await
     }
 
     async fn set_current_ticket_index(&mut self, channel_id: &Hash, index: U256) -> Result<()> {
@@ -138,12 +133,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         half_key_challenge: &HalfKeyChallenge,
     ) -> Result<Option<PendingAcknowledgement>> {
         let key = utils_db::db::Key::new_with_prefix(half_key_challenge, PENDING_ACKNOWLEDGEMENTS_PREFIX)?;
-        if self.db.contains(key.clone()).await {
-            let value = self.db.get::<PendingAcknowledgement>(key).await?;
-            Ok(Some(value))
-        } else {
-            Ok(None)
-        }
+        self.db.get_or_none::<PendingAcknowledgement>(key).await
     }
 
     async fn store_pending_acknowledgment(
@@ -221,8 +211,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         let prefixed_key = utils_db::db::Key::new_with_prefix(&ticket.counterparty, PENDING_TICKETS_COUNT)?;
         let balance = self
             .db
-            .get::<Balance>(prefixed_key.clone())
-            .await
+            .get_or_none::<Balance>(prefixed_key.clone())
+            .await?
             .unwrap_or(Balance::zero(ticket.amount.balance_type()));
 
         let _result = self.db.set(prefixed_key, &balance.add(&ticket.amount)).await?;
