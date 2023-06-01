@@ -18,6 +18,7 @@ console_error_panic_hook = [ "dep:console_error_panic_hook" ]
 
 [dependencies]
 async-trait = "0.1"
+async-lock = "2.7.0"
 core-crypto = { path = "../../../core/crates/core-crypto"}
 core-types = { path = "../../../core/crates/core-types"}
 serde = { version = "1.0", features = ["derive"] }
