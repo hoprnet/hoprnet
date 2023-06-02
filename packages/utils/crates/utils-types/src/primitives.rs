@@ -1,7 +1,7 @@
 use ethnum::{u256, AsU256};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
-use std::ops::{Add, Mul, Sub};
+use std::ops::{Add, Mul};
 
 use crate::errors::{GeneralError, GeneralError::InvalidInput, GeneralError::ParseError, Result};
 use crate::traits::{AutoBinarySerializable, BinarySerializable, ToHex};
@@ -177,7 +177,7 @@ impl Balance {
         assert_eq!(self.balance_type(), other.balance_type());
         Self {
             value: U256 {
-                value: self.value().value().sub(other.value().value()),
+                value: self.value().value().checked_sub(other.value().value().clone()).unwrap_or(u256::ZERO),
             },
             balance_type: self.balance_type,
         }
@@ -186,7 +186,7 @@ impl Balance {
     pub fn isub(&self, amount: u64) -> Self {
         Self {
             value: U256 {
-                value: self.value().value().sub(amount.as_u256()),
+                value: self.value().value().checked_sub(amount.as_u256()).unwrap_or(u256::ZERO),
             },
             balance_type: self.balance_type,
         }
@@ -521,23 +521,35 @@ mod tests {
     }
 
     #[test]
-    fn balance_tests() {
+    fn balance_test_serialize() {
         let b_1 = Balance::from_str("10", BalanceType::HOPR);
         assert_eq!("10 HOPR".to_string(), b_1.to_string(), "to_string failed");
 
         let b_2 = Balance::deserialize(&b_1.serialize_value(), BalanceType::HOPR).unwrap();
         assert_eq!(b_1, b_2, "deserialized balance does not match");
+    }
 
-        let b3 = Balance::new(100_u32.into(), BalanceType::HOPR);
-        let b4 = Balance::new(200_u32.into(), BalanceType::HOPR);
+    #[test]
+    fn balance_test_arithmetic() {
+        let test_1 = 100_u32;
+        let test_2 = 200_u32;
 
-        assert_eq!(300_u32, b3.add(&b4).value().value().as_u32(), "add test failed");
-        assert_eq!(100_u32, b4.sub(&b3).value().value().as_u32(), "sub test failed");
+        let b3 = Balance::new(test_1.into(), BalanceType::HOPR);
+        let b4 = Balance::new(test_2.into(), BalanceType::HOPR);
+
+        assert_eq!(test_1 + test_2, b3.add(&b4).value().value().as_u32(), "add test failed");
+        assert_eq!(test_2 - test_1, b4.sub(&b3).value().value().as_u32(), "sub test failed");
+        assert_eq!(test_2 - 10, b4.isub(10).value().value().as_u32(), "sub test failed");
+
+        assert_eq!(0_u32, b3.sub(&b4).value().value().as_u32(), "negative test failed");
+        assert_eq!(0_u32, b3.isub(test_2 as u64).value().value().as_u32(), "negative test failed");
+
+        assert_eq!(test_1 * test_2, b3.mul(&b4).value().value.as_u32(), "multiplication test failed");
+        assert_eq!(test_2 * test_1, b4.mul(&b3).value().value.as_u32(), "multiplication test failed");
+        assert_eq!(test_2 * test_1, b4.imul(test_1 as u64).value().value.as_u32(), "multiplication test failed");
 
         assert!(b3.lt(&b4) && b4.gt(&b3), "lte or lt test failed");
         assert!(b3.lte(&b3) && b4.gte(&b4), "gte or gt test failed");
-
-        //assert!(Balance::new(100_u32.into()).lte(), "lte or lte test failed")
     }
 
     #[test]

@@ -83,7 +83,6 @@ const ACK_RX_QUEUE_SIZE: usize = 2048;
 /// Once the instance is stopped, it cannot be restarted.
 pub struct AcknowledgementInteraction<Db: HoprCoreEthereumDbActions> {
     db: Arc<RwLock<Db>>,
-    // TODO: remove closures and use Sender<T> to allow the type to be Send + Sync
     pub on_acknowledgement: Option<Sender<HalfKeyChallenge>>,
     pub on_acknowledged_ticket: Option<Sender<AcknowledgedTicket>>,
     public_key: PublicKey,
