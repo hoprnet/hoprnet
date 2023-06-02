@@ -55,7 +55,7 @@ import {
   Ethereum_Database,
   Ethereum_Hash,
   Ethereum_PublicKey,
-  Ethereum_Snapshot,
+  Ethereum_Snapshot
 } from '../db.js'
 
 import type { TypedEvent, TypedEventFilter } from '../utils/common.js'

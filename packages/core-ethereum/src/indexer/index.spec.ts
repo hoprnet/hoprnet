@@ -24,7 +24,7 @@ import {
   Ethereum_Ticket,
   Ethereum_Database,
   Ethereum_Hash,
-  Ethereum_PublicKey,
+  Ethereum_PublicKey
 } from '../db.js'
 
 // WASM magic - types and DB operations live in a different crate, serde is necessary

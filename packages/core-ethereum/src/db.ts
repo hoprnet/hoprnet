@@ -16,7 +16,7 @@ import {
   initialize_commitment,
   find_commitment_preimage,
   bump_commitment,
-  ChannelCommitmentInfo,
+  ChannelCommitmentInfo
 } from '../lib/core_ethereum_misc.js'
 
 export {
@@ -40,4 +40,3 @@ export {
 }
 
 core_ethereum_misc_initialize_crate()
-
