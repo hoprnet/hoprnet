@@ -604,17 +604,11 @@ export default class HoprCoreEthereum extends EventEmitter {
       const registerEnabled = await this.db.is_network_registry_enabled()
       if (!registerEnabled) return true
       // find hoprNode's linked account
-<<<<<<< HEAD
       const account = await this.db.get_account_from_network_registry(Ethereum_PublicKey.deserialize(hoprNode.serialize(false)))
       if (!account) {
         log('error: could not determine whether node has allowed access')
         return false
       }
-=======
-      const account = await this.db.get_account_from_network_registry(
-        Ethereum_PublicKey.deserialize(hoprNode.serialize(false))
-      )
->>>>>>> Fixes to initializing the core-ethereum panic mechanism in TS
       // check if account is eligible
       return this.db.is_eligible(account)
     } catch (error) {
