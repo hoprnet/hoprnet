@@ -12,14 +12,20 @@ import {
   generate_channel_id,
   Hash,
   debug,
-  type ChannelEntry,
+  ChannelEntry,
   type DeferType,
   PublicKey,
   AccountEntry,
   create_counter
 } from '@hoprnet/hopr-utils'
 import {
+  AcknowledgedTicket as Ethereum_AcknowledgedTicket,
+  Address as Ethereum_Address,
   Database as Ethereum_Database,
+  Balance as Ethereum_Balance,
+  BalanceType as Ethereum_BalanceType,
+  ChannelEntry as Ethereum_ChannelEntry,
+  PublicKey as Ethereum_PublicKey,
   U256 as Ethereum_U256,
   Hash as Ethereum_Hash,
   initialize_commitment,
@@ -157,7 +163,7 @@ export default class HoprCoreEthereum extends EventEmitter {
         await this.chain.waitUntilReady()
 
         const hoprBalance = await this.chain.getBalance(this.publicKey.to_address())
-        await this.db.set_hopr_balance(hoprBalance)
+        await this.db.set_hopr_balance(Ethereum_Balance.deserialize(hoprBalance.serialize_value(), Ethereum_BalanceType.HOPR))
         log(`set own HOPR balance to ${hoprBalance.to_formatted_string()}`)
 
         await this.indexer.start(this.chain, this.chain.getGenesisBlock())
@@ -222,7 +228,7 @@ export default class HoprCoreEthereum extends EventEmitter {
    * @returns HOPR balance
    */
   public async getBalance(useIndexer: boolean = false): Promise<Balance> {
-    return useIndexer ? this.db.get_hopr_balance() : this.chain.getBalance(this.publicKey.to_address())
+    return useIndexer ? Balance.deserialize((await this.db.get_hopr_balance()).serialize_value(), BalanceType.HOPR) : this.chain.getBalance(this.publicKey.to_address())
   }
 
   public getPublicKey(): PublicKey {
@@ -266,7 +272,7 @@ export default class HoprCoreEthereum extends EventEmitter {
         this.setTxHandler(`channel-updated-${txHash}`, txHash)
       )
     }
-    const getCommitment = async () => (await this.db.get_channel(c.get_id())).commitment
+    const getCommitment = async () => (ChannelEntry.deserialize((await this.db.get_channel(Ethereum_Hash.deserialize(c.get_id().serialize()))).serialize())).commitment
 
     // Get all channel information required to build the initial commitment
     const cci = new ChannelCommitmentInfo(
@@ -296,10 +302,10 @@ export default class HoprCoreEthereum extends EventEmitter {
 
   private async redeemAllTicketsInternalLoop(): Promise<void> {
     try {
-      let channelsTo = await this.db.get_channels_to(this.publicKey.to_address())
+      let channelsTo = await this.db.get_channels_to(Ethereum_Address.deserialize(this.publicKey.to_address().serialize()))
       while (channelsTo.len() > 0) {
         let channel = channelsTo.next()
-        await this.redeemTicketsInChannel(channel)
+        await this.redeemTicketsInChannel(ChannelEntry.deserialize(channel.serialize()))
       }
     } catch (err) {
       log(`error during redeeming all tickets`, err)
@@ -310,8 +316,8 @@ export default class HoprCoreEthereum extends EventEmitter {
   }
 
   public async redeemTicketsInChannelByCounterparty(counterparty: PublicKey) {
-    const channel = await this.db.get_channel_from(counterparty)
-    return this.redeemTicketsInChannel(channel)
+    const channel = await this.db.get_channel_from(Ethereum_PublicKey.deserialize(counterparty.serialize(false)))
+    return this.redeemTicketsInChannel(ChannelEntry.deserialize(channel.serialize()))
   }
 
   public async redeemTicketsInChannel(channel: ChannelEntry) {
@@ -358,7 +364,8 @@ export default class HoprCoreEthereum extends EventEmitter {
     // Use an async iterator to make execution interruptable and allow
     // Node.JS to schedule iterations at any time
     const ticketRedeemIterator = async function* () {
-      let tickets = await boundGetAckdTickets({ channel })
+      let serdeChannel = Ethereum_ChannelEntry.deserialize(channel.serialize())
+      let tickets = await boundGetAckdTickets({ serdeChannel })
       let ticket: AcknowledgedTicket
       while (tickets.len() > 0) {
         let fetched = tickets.next()
@@ -390,14 +397,14 @@ export default class HoprCoreEthereum extends EventEmitter {
           } else {
             // May fail due to out-of-commits, preimage-is-empty, not-a-winning-ticket
             // Treat those acked tickets as losing tickets, and remove them from the DB.
-            await boundMarkLosingAckedTicket(ticket)
+            await boundMarkLosingAckedTicket(Ethereum_AcknowledgedTicket.deserialize(ticket.serialize()))
             metric_losingTickets.increment()
           }
         }
 
         yield ticket.response
 
-        tickets = await boundGetAckdTickets({ channel })
+        tickets = await boundGetAckdTickets({ serdeChannel })
       }
     }
 
@@ -487,7 +494,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     await bump_commitment(this.db, Ethereum_Hash.deserialize(channelId.serialize()), commitmentPreImage)
     log(`Successfully bump local commitment after ${commitmentPreImage.to_hex()}`)
 
-    await this.db.mark_redeemed(ackTicket)
+    await this.db.mark_redeemed(Ethereum_AcknowledgedTicket.deserialize(ackTicket.serialize()))
     this.emit('ticket:redeemed', ackTicket)
     return {
       status: 'SUCCESS',
@@ -502,7 +509,9 @@ export default class HoprCoreEthereum extends EventEmitter {
       throw Error('Initialize incoming channel closure currently is not supported.')
     }
 
-    const c = await this.db.get_channel_x(src, dest)
+    const c = ChannelEntry.deserialize((await this.db.get_channel_x(
+        Ethereum_PublicKey.deserialize(src.serialize(false)),
+        Ethereum_PublicKey.deserialize(dest.serialize(false)))).serialize())
     if (c.status !== ChannelStatus.Open && c.status !== ChannelStatus.WaitingForCommitment) {
       throw Error('Channel status is not OPEN or WAITING FOR COMMITMENT')
     }
@@ -516,7 +525,9 @@ export default class HoprCoreEthereum extends EventEmitter {
     if (!this.publicKey.eq(src)) {
       throw Error('Finalizing incoming channel closure currently is not supported.')
     }
-    const c = await this.db.get_channel_x(src, dest)
+    const c = ChannelEntry.deserialize((await this.db.get_channel_x(
+        Ethereum_PublicKey.deserialize(src.serialize(false)),
+        Ethereum_PublicKey.deserialize(dest.serialize(false)))).serialize())
     if (c.status !== ChannelStatus.PendingToClose) {
       throw Error('Channel status is not PENDING_TO_CLOSE')
     }
@@ -529,7 +540,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     // channel may not exist, we can still open it
     let c: ChannelEntry
     try {
-      c = await this.db.get_channel_to(dest)
+      c = ChannelEntry.deserialize((await this.db.get_channel_to(Ethereum_PublicKey.deserialize(dest.serialize(false)))).serialize())
     } catch {}
     if (c && c.status !== ChannelStatus.Closed) {
       throw Error('Channel is already opened')
@@ -571,7 +582,7 @@ export default class HoprCoreEthereum extends EventEmitter {
       const registerEnabled = await this.db.is_network_registry_enabled()
       if (!registerEnabled) return true
       // find hoprNode's linked account
-      const account = await this.db.get_account_from_network_registry(hoprNode)
+      const account = await this.db.get_account_from_network_registry(Ethereum_PublicKey.deserialize(hoprNode.serialize(false)))
       // check if account is eligible
       return this.db.is_eligible(account)
     } catch (error) {
