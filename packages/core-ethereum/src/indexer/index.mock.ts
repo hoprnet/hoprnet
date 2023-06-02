@@ -15,7 +15,7 @@ import {
   LevelDb
 } from '@hoprnet/hopr-utils'
 
-import { Database, PublicKey as dbPublicKey } from '../../../core-ethereum/lib/core_ethereum_db.js'
+import { Ethereum_Database as Database, Ethereum_PublicKey as dbPublicKey } from '../db.js'
 import Indexer from './index.js'
 import type { ChainWrapper } from '../ethereum.js'
 import type { Event, TokenEvent, RegistryEvent } from './types.js'

@@ -18,16 +18,14 @@ import { type Event, IndexerStatus } from './types.js'
 import { useFixtures } from './index.mock.js'
 import { SendTransactionStatus } from '../ethereum.js'
 import {
-  Address as Ethereum_Address,
+  Ethereum_Address,
   // Balance as Ethereum_Balance,
   // ChannelEntry as Ethereum_ChannelEntry,
-  Ticket as Ethereum_Ticket,
-  Database as Ethereum_Database,
-  Hash as Ethereum_Hash,
-  PublicKey as Ethereum_PublicKey,
-  core_ethereum_db_initialize_crate
-} from '../../lib/core_ethereum_db.js'
-core_ethereum_db_initialize_crate()
+  Ethereum_Ticket,
+  Ethereum_Database,
+  Ethereum_Hash,
+  Ethereum_PublicKey,
+} from '../db.js'
 
 // WASM magic - types and DB operations live in a different crate, serde is necessary
 async function get_channels_from(db: Ethereum_Database, address: Address) {

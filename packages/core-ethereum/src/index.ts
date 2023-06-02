@@ -19,21 +19,21 @@ import {
   create_counter
 } from '@hoprnet/hopr-utils'
 import {
-  AcknowledgedTicket as Ethereum_AcknowledgedTicket,
-  Address as Ethereum_Address,
-  Database as Ethereum_Database,
-  Balance as Ethereum_Balance,
-  BalanceType as Ethereum_BalanceType,
-  ChannelEntry as Ethereum_ChannelEntry,
-  PublicKey as Ethereum_PublicKey,
-  U256 as Ethereum_U256,
-  Hash as Ethereum_Hash,
+  Ethereum_AcknowledgedTicket,
+  Ethereum_Address,
+  Ethereum_Database,
+  Ethereum_Balance,
+  Ethereum_BalanceType,
+  Ethereum_ChannelEntry,
+  Ethereum_PublicKey,
+  Ethereum_U256,
+  Ethereum_Hash,
   initialize_commitment,
   find_commitment_preimage,
   bump_commitment,
   ChannelCommitmentInfo,
   CORE_ETHEREUM_CONSTANTS
-} from '../lib/core_ethereum_misc.js'
+} from './db.js'
 import Indexer from './indexer/index.js'
 import { EventEmitter } from 'events'
 import type { IndexerEvents } from './indexer/types.js'

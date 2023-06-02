@@ -48,18 +48,15 @@ import { BigNumber, type Contract, errors } from 'ethers'
 
 import {
   CORE_ETHEREUM_CONSTANTS,
-  AccountEntry as Ethereum_AccountEntry,
-  Address as Ethereum_Address,
-  Balance as Ethereum_Balance,
-  ChannelEntry as Ethereum_ChannelEntry,
-  Database as Ethereum_Database,
-  Hash as Ethereum_Hash,
-  PublicKey as Ethereum_PublicKey,
-  Snapshot as Ethereum_Snapshot,
-  core_ethereum_db_initialize_crate
-} from '../../lib/core_ethereum_misc.js'
-
-core_ethereum_db_initialize_crate()
+  Ethereum_AccountEntry,
+  Ethereum_Address,
+  Ethereum_Balance,
+  Ethereum_ChannelEntry,
+  Ethereum_Database,
+  Ethereum_Hash,
+  Ethereum_PublicKey,
+  Ethereum_Snapshot,
+} from '../db.js'
 
 import type { TypedEvent, TypedEventFilter } from '../utils/common.js'
 

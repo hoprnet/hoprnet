@@ -4,7 +4,7 @@ import { debug, LevelDb, stringToU8a } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum, { Indexer, useFixtures } from './index.js'
 import { sampleChainOptions } from './ethereum.mock.js'
 import { ACCOUNT_A, MOCK_ADDRESS, MOCK_PUBLIC_KEY, PARTY_A } from './fixtures.js'
-import { Database as Ethereum_Database, PublicKey as Ethereum_PublicKey } from '../lib/core_ethereum_db.js'
+import { Ethereum_Database, Ethereum_PublicKey } from './db.js'
 
 const namespace = 'hopr:test:hopr-ethereum'
 const log = debug(namespace)
