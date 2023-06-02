@@ -19,6 +19,8 @@ import {
   ChannelCommitmentInfo
 } from '../lib/core_ethereum_misc.js'
 
+core_ethereum_misc_initialize_crate()
+
 export {
   Ethereum_AccountEntry,
   Ethereum_AcknowledgedTicket,
@@ -39,4 +41,3 @@ export {
   CORE_ETHEREUM_CONSTANTS
 }
 
-core_ethereum_misc_initialize_crate()
