@@ -57,7 +57,6 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
         initParams,
         (address, address)
     );
-    __Ownable_init();
 
     // cannot accept a zero address as Safe or multisend contract
     if (_safe == address(0) || _multisend == address(0)) {
@@ -65,7 +64,7 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
     }
 
     // cannot setup again if it's been set up
-    if (address(avatar) != address(0) || _multisend != address(0)) {
+    if (address(avatar) != address(0) || multisend != address(0)) {
       revert AlreadyInitialized();
     }
 

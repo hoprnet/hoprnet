@@ -14,6 +14,5 @@ abstract contract CapabilityPermissionsLibFixtureTest is Test {
     // deploy capability code
     capabilityLibraryLibAddress = deployCode("CapabilityPermissions.sol:HoprCapabilityPermissions"); // 0x5615deb798bb3e4dfa0139dfa1b3d433cc23b72f
     vm.etch(CAPABILITY_LIB_ADDRESS, CAPABILITY_LIB_DEPLOYED_CODE);
-
   }
 }
