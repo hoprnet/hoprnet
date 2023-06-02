@@ -31,10 +31,10 @@ import {
   initialize_commitment,
   find_commitment_preimage,
   bump_commitment,
-  ChannelCommitmentInfo
+  ChannelCommitmentInfo,
+  CORE_ETHEREUM_CONSTANTS
 } from '../lib/core_ethereum_misc.js'
 import Indexer from './indexer/index.js'
-import { CORE_ETHEREUM_CONSTANTS } from '../lib/core_ethereum_misc.js'
 import { EventEmitter } from 'events'
 import type { IndexerEvents } from './indexer/types.js'
 import { DeploymentExtract } from './utils/utils.js'

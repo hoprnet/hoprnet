@@ -45,9 +45,9 @@ import {
 } from './types.js'
 import { isConfirmedBlock, snapshotComparator, type IndexerSnapshot, channelEntryFromSCEvent } from './utils.js'
 import { BigNumber, type Contract, errors } from 'ethers'
-import { CORE_ETHEREUM_CONSTANTS } from '../../lib/core_ethereum_misc.js'
 
 import {
+  CORE_ETHEREUM_CONSTANTS,
   AccountEntry as Ethereum_AccountEntry,
   Address as Ethereum_Address,
   Balance as Ethereum_Balance,
