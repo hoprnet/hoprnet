@@ -783,11 +783,11 @@ class Hopr extends EventEmitter {
   }
 
   private async updateChannelMetrics() {
-    const selfAddr = this.getEthereumAddress()
+    const selfAddr = Packet_Address.deserialize(this.getEthereumAddress().serialize())
 
     try {
       let outgoingChannels = 0
-      let outChannels = await this.db.get_channels_from(selfAddr)
+      let outChannels = await this.db.get_channels_from(selfAddr.clone())
       for (let i = 0; i < outChannels.len(); i++) {
         let channel = outChannels.at(i)
         if (channel.status == ChannelStatus.Open) {
@@ -800,7 +800,7 @@ class Hopr extends EventEmitter {
       }
 
       let incomingChannels = 0
-      let inChannels = await this.db.get_channels_to(selfAddr)
+      let inChannels = await this.db.get_channels_to(selfAddr.clone())
       for (let i = 0; i < inChannels.len(); i++) {
         let channel = outChannels.at(i)
         if (channel.status == ChannelStatus.Open) {

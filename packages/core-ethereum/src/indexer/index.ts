@@ -631,7 +631,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     }
 
     try {
-      await this.db.update_latest_block_number(new BN(blockNumber).toNumber())
+      await this.db.update_latest_block_number(blockNumber)
     } catch (err) {
       log(`error: failed to update database with latest block number ${blockNumber}`, err)
     }
