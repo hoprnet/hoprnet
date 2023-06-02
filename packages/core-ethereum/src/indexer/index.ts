@@ -57,7 +57,7 @@ import {
   PublicKey as Ethereum_PublicKey,
   Snapshot as Ethereum_Snapshot,
   core_ethereum_db_initialize_crate
-} from '../../lib/core_ethereum_db.js'
+} from '../../lib/core_ethereum_misc.js'
 
 core_ethereum_db_initialize_crate()
 
