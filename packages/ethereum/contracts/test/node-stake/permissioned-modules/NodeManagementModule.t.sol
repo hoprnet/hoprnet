@@ -16,6 +16,11 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
     event SetMultisendAddress(address multisendAddress);
     event NodeAdded(address indexed node);
     event NodeRemoved(address indexed node);
+    // // from HoprCapabilityPermissions
+    // event RevokedTarget(address targetAddress);
+    // event ScopedTargetChannels(address targetAddress);
+    // event ScopedTargetToken(address targetAddress);
+    // event ScopedTargetSend(address targetAddress);
 
     function setUp() public virtual override(CapabilityPermissionsLibFixtureTest) {
         super.setUp();
@@ -53,19 +58,41 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         vm.stopPrank();
     }
 
-    // /**
-    // * @dev Add token target(s) when the account is not address zero
-    // */
-    // function testFuzz_AddTargetToken(address account) public {
-    //     vm.assume(account != address(0));
+    /**
+    * @dev Add token target(s) when the account is not address zero
+    */
+    function testFuzz_AddTargetToken(address account) public {
+        vm.assume(account != address(0));
+        address owner = moduleSingleton.owner();
+        vm.startPrank(owner);
 
-    //     vm.expectEmit(true, false, false, false, address(this));
-    //     emit ScopedTargetToken(account);
-    //     HoprCapabilityPermissions.scopeTargetToken(role, account);
+        vm.expectEmit(true, false, false, false, address(moduleSingleton));
+        emit HoprCapabilityPermissions.ScopedTargetToken(account);
+        moduleSingleton.scopeTargetToken(account);
+    }
 
-    //     assertEq(uint256(role.targets[account].clearance), uint256(Clearance.Function), "wrong clearance added");
-    //     assertEq(uint256(role.targets[account].targetType), uint256(TargetType.Token), "wrong target type added");
-    // }
+    /**
+    * @dev Add Channels and Token targets, where channel is vm.addr()
+    */
+    function test_AddChannelsAndTokenTarget() public {
+        address channels = makeAddr("HoprChannels");
+        address token = makeAddr("HoprToken");
+        address owner = moduleSingleton.owner();
+        vm.startPrank(owner);
+
+        vm.mockCall(
+            channels,
+            abi.encodeWithSignature(
+                'token()'
+            ),
+            abi.encode(token)
+        );
+        vm.expectEmit(true, false, false, false, address(moduleSingleton));
+        emit HoprCapabilityPermissions.ScopedTargetChannels(channels);
+        vm.expectEmit(true, false, false, false, address(moduleSingleton));
+        emit HoprCapabilityPermissions.ScopedTargetToken(token);
+        moduleSingleton.addChannelsAndTokenTarget(channels);
+    }
 
     // /**
     // * @dev Encode an array of permission enums into uint256 and vice versa
