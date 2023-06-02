@@ -583,11 +583,13 @@ export default class HoprCoreEthereum extends EventEmitter {
       if (!registerEnabled) return true
       // find hoprNode's linked account
       const account = await this.db.get_account_from_network_registry(Ethereum_PublicKey.deserialize(hoprNode.serialize(false)))
+      if (!account) {
+        log('error: could not determine whether node has allowed access')
+        return false
+      }
       // check if account is eligible
       return this.db.is_eligible(account)
     } catch (error) {
-      // log unexpected error
-      if (!error?.notFound) log('error: could not determine whether node is is allowed access', error)
       return false
     }
   }
