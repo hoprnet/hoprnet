@@ -55,7 +55,7 @@ export type Stream<T = StreamType> = {
 
 export type StreamResult = IteratorResult<StreamType, any>
 
-export type Environment = {
+export type Network = {
   id: string
   versionRange: string
 }
@@ -76,12 +76,14 @@ export type HoprConnectOptions = {
   initialNodes?: PeerStoreType[]
   interface?: string
   maxRelayedConnections?: number
-  environment?: string
-  supportedEnvironments?: Environment[]
+  network?: string
+  supportedNetworks?: Network[]
   relayFreeTimeout?: number
   dhtRenewalTimeout?: number
   entryNodeReconnectBaseTimeout?: number
   entryNodeReconnectBackoff?: number
+  // disable NAT relay functionality
+  noRelay?: boolean
   // Set to true whenever node is supposed to announce itself
   announce?: boolean
   // To be removed once NR got removed

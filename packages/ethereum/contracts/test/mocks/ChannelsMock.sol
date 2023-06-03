@@ -2,7 +2,6 @@
 pragma solidity ^0.8;
 
 import "../../src/HoprChannels.sol";
-import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 contract ChannelsMockTest is HoprChannels {
     constructor(address _token, uint32 _secsClosure)

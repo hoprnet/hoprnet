@@ -1,3 +1,6 @@
+use curve25519_dalek::edwards::CompressedEdwardsY;
+use curve25519_dalek::traits::IsIdentity;
+use curve25519_dalek::EdwardsPoint;
 use elliptic_curve::{NonZeroScalar, ProjectivePoint};
 use k256::ecdsa::signature::hazmat::PrehashVerifier;
 use k256::ecdsa::signature::Verifier;
@@ -8,6 +11,7 @@ use k256::elliptic_curve::CurveArithmetic;
 use k256::{AffinePoint, ecdsa, elliptic_curve, Secp256k1};
 use libp2p_identity::{PeerId, PublicKey as lp2p_PublicKey, secp256k1::PublicKey as lp2p_k256_PublicKey};
 use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
 use std::ops::Add;
 use std::str::FromStr;
 
@@ -18,7 +22,7 @@ use utils_types::errors::GeneralError::ParseError;
 use utils_types::primitives::{Address, EthereumChallenge};
 use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
 
-use crate::errors::CryptoError::InvalidInputValue;
+use crate::errors::CryptoError::{InvalidInputValue, InvalidSecretScalar};
 use crate::errors::{CryptoError, CryptoError::CalculationError, Result};
 use crate::parameters::SECRET_KEY_LENGTH;
 use crate::primitives::{DigestLike, EthDigest};
@@ -88,7 +92,7 @@ mod arrays {
 }
 
 /// Represent an uncompressed elliptic curve point on the secp256k1 curve
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct CurvePoint {
     affine: AffinePoint,
@@ -464,6 +468,12 @@ impl BinarySerializable<'_> for Hash {
     }
 }
 
+impl Display for Hash {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_hex())
+    }
+}
+
 impl Hash {
     /// Takes all the byte slices and computes hash of their concatenated value.
     /// Uses the Keccak256 digest.
@@ -475,6 +485,85 @@ impl Hash {
         };
         hash.finalize_into(&mut ret.hash);
         ret
+    }
+}
+
+/// Represents an Ed25519 public key.
+/// This public key is always internally in a compressed form, and therefore unsuitable for calculations.
+/// Because of this fact, the OffchainPublicKey is BinarySerializable as opposed to PublicKey
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+pub struct OffchainPublicKey {
+    key: CompressedEdwardsY,
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+impl OffchainPublicKey {
+    /// Generates a new random public key.
+    /// Because the corresponding private key is discarded, this might be useful only for testing purposes.
+    pub fn random() -> Self {
+        let (_, pk) = Self::random_keypair();
+        pk
+    }
+}
+
+impl BinarySerializable<'_> for OffchainPublicKey {
+    const SIZE: usize = 32;
+
+    fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
+        if data.len() == Self::SIZE {
+            Ok(Self {
+                key: CompressedEdwardsY::from_slice(data).map_err(|_| ParseError)?,
+            })
+        } else {
+            Err(ParseError)
+        }
+    }
+
+    fn to_bytes(&self) -> Box<[u8]> {
+        self.key.to_bytes().into()
+    }
+}
+
+impl PeerIdLike for OffchainPublicKey {
+    fn from_peerid(peer_id: &PeerId) -> utils_types::errors::Result<Self> {
+        let mh = peer_id.as_ref();
+        if mh.code() == 0 {
+            Self::from_bytes(&mh.digest()[4..])
+        } else {
+            warn!("peer id type not supported: {peer_id}");
+            Err(ParseError)
+        }
+    }
+
+    fn to_peerid(&self) -> PeerId {
+        let k = libp2p_identity::ed25519::PublicKey::try_from_bytes(self.key.as_bytes()).unwrap();
+        PeerId::from_public_key(&lp2p_PublicKey::from(k))
+    }
+}
+
+impl Display for OffchainPublicKey {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_hex())
+    }
+}
+
+impl OffchainPublicKey {
+    /// Generates new random keypair (private key, public key)
+    pub fn random_keypair() -> ([u8; 32], Self) {
+        let scalar = curve25519_dalek::Scalar::random(&mut OsRng);
+        let point = EdwardsPoint::mul_base(&scalar);
+        (scalar.to_bytes(), Self { key: point.compress() })
+    }
+
+    pub fn from_privkey(key: &[u8]) -> Result<Self> {
+        let scalar = curve25519_dalek::Scalar::from_bytes_mod_order(key.try_into().map_err(|_| InvalidInputValue)?);
+        let point = EdwardsPoint::mul_base(&scalar);
+        if !point.is_identity() && !point.is_small_order() {
+            Ok(Self { key: point.compress() })
+        } else {
+            Err(InvalidSecretScalar)
+        }
     }
 }
 
@@ -515,7 +604,13 @@ impl PublicKey {
     /// Serializes the public key to a binary form and converts it to hexadecimal string representation.
     pub fn to_hex(&self, compressed: bool) -> String {
         let offset = if compressed { 0 } else { 1 };
-        hex::encode(&self.to_bytes(compressed)[offset..])
+        format!("0x{}", hex::encode(&self.to_bytes(compressed)[offset..]))
+    }
+}
+
+impl Display for PublicKey {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_hex(true))
     }
 }
 
@@ -675,7 +770,7 @@ impl PublicKey {
 
 /// Contains a response upon ticket acknowledgement
 /// It is equivalent to a non-zero secret scalar on secp256k1 (EC private key).
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Response {
     response: [u8; Self::SIZE],
@@ -886,7 +981,7 @@ pub trait ToChecksum {
 
 impl ToChecksum for Address {
     fn to_checksum(&self) -> String {
-        let address_hex = self.to_hex();
+        let address_hex = &self.to_hex()[2..];
 
         let mut hasher = EthDigest::default();
         hasher.update(address_hex.as_bytes());
@@ -915,12 +1010,14 @@ pub mod tests {
     use k256::elliptic_curve::sec1::ToEncodedPoint;
     use k256::elliptic_curve::CurveArithmetic;
     use k256::{NonZeroScalar, Secp256k1, U256};
+    use libp2p_identity::PeerId;
     use std::str::FromStr;
     use utils_types::primitives::Address;
     use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
 
     use crate::types::{
-        Challenge, CurvePoint, HalfKey, HalfKeyChallenge, Hash, PublicKey, Response, Signature, ToChecksum,
+        Challenge, CurvePoint, HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey, PublicKey, Response, Signature,
+        ToChecksum,
     };
 
     const PUBLIC_KEY: [u8; 33] = hex!("021464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8");
@@ -955,6 +1052,11 @@ pub mod tests {
 
         assert_eq!(pk1, pk2, "pubkeys don't match");
         assert_eq!(pk1.to_peerid_str(), pk2.to_peerid_str(), "peer id strings don't match");
+
+        let invalid_peerid = PeerId::from_str("12D3KooWLYKsvDB4xEELYoHXxeStj2gzaDXjra2uGaFLpKCZkJHs").unwrap();
+        let invalid = PublicKey::from_peerid(&invalid_peerid);
+
+        assert!(invalid.is_err(), "must not work with ed25519 peer ids");
     }
 
     #[test]
@@ -964,10 +1066,10 @@ pub mod tests {
         ))
         .unwrap();
 
-        assert_eq!("39d1bc2291826eaed86567d225cf243ebc637275e0a5aedb0d6b1dc82136a38e428804340d4c949a029846f682711d046920b4ca8b8ebeb9d1192b5bdaa54dba",
+        assert_eq!("0x39d1bc2291826eaed86567d225cf243ebc637275e0a5aedb0d6b1dc82136a38e428804340d4c949a029846f682711d046920b4ca8b8ebeb9d1192b5bdaa54dba",
                    pk.to_hex(false));
         assert_eq!(
-            "0239d1bc2291826eaed86567d225cf243ebc637275e0a5aedb0d6b1dc82136a38e",
+            "0x0239d1bc2291826eaed86567d225cf243ebc637275e0a5aedb0d6b1dc82136a38e",
             pk.to_hex(true)
         );
     }
@@ -1081,6 +1183,31 @@ pub mod tests {
     }
 
     #[test]
+    fn offchain_public_key_test() {
+        let (s, pk1) = OffchainPublicKey::random_keypair();
+
+        let pk2 = OffchainPublicKey::from_privkey(&s).unwrap();
+        assert_eq!(pk1, pk2);
+
+        let pk3 = OffchainPublicKey::from_bytes(&pk1.to_bytes()).unwrap();
+        assert_eq!(pk1, pk3);
+    }
+
+    #[test]
+    fn offchain_pubkc_key_peerid_test() {
+        let peerid = PeerId::from_str("12D3KooWLYKsvDB4xEELYoHXxeStj2gzaDXjra2uGaFLpKCZkJHs").unwrap();
+
+        let pk = OffchainPublicKey::from_peerid(&peerid).unwrap();
+
+        assert_eq!(peerid, pk.to_peerid());
+
+        let invalid_peerid = PeerId::from_str("16Uiu2HAmPHGyJ7y1Rj3kJ64HxJQgM9rASaeT2bWfXF9EiX3Pbp3K").unwrap();
+
+        let invalid = OffchainPublicKey::from_peerid(&invalid_peerid);
+        assert!(invalid.is_err(), "must not work with secp256k1 peer ids");
+    }
+
+    #[test]
     pub fn response_test() {
         let r1 = Response::new(&[0u8; Response::SIZE]);
         let r2 = Response::from_bytes(&r1.to_bytes()).unwrap();
@@ -1151,7 +1278,7 @@ pub mod tests {
     fn hash_test() {
         let hash1 = Hash::create(&[b"msg"]);
         assert_eq!(
-            "92aef1b955b9de564fc50e31a55b470b0c8cdb931f186485d620729fb03d6f2c",
+            "0x92aef1b955b9de564fc50e31a55b470b0c8cdb931f186485d620729fb03d6f2c",
             hash1.to_hex(),
             "hash test vector failed to match"
         );
@@ -1243,7 +1370,9 @@ pub mod wasm {
     use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
     use wasm_bindgen::prelude::*;
 
-    use crate::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, Hash, PublicKey, Response, Signature};
+    use crate::types::{
+        Challenge, CurvePoint, HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey, PublicKey, Response, Signature,
+    };
 
     #[wasm_bindgen]
     impl CurvePoint {
@@ -1449,6 +1578,48 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "eq")]
         pub fn _eq(&self, other: &Hash) -> bool {
+            self.eq(other)
+        }
+
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> Self {
+            self.clone()
+        }
+
+        pub fn size() -> u32 {
+            Self::SIZE as u32
+        }
+    }
+
+    #[wasm_bindgen]
+    impl OffchainPublicKey {
+        #[wasm_bindgen(js_name = "deserialize")]
+        pub fn _deserialize(bytes: &[u8]) -> JsResult<OffchainPublicKey> {
+            ok_or_jserr!(OffchainPublicKey::from_bytes(bytes))
+        }
+
+        #[wasm_bindgen(js_name = "serialize")]
+        pub fn _serialize(&self) -> Box<[u8]> {
+            self.to_bytes()
+        }
+
+        #[wasm_bindgen(js_name = "from_peerid_str")]
+        pub fn _from_peerid_str(peer_id: &str) -> JsResult<OffchainPublicKey> {
+            ok_or_jserr!(OffchainPublicKey::from_peerid_str(peer_id))
+        }
+
+        #[wasm_bindgen(js_name = "to_peerid_str")]
+        pub fn _to_peerid_str(&self) -> String {
+            self.to_peerid_str()
+        }
+
+        #[wasm_bindgen(js_name = "from_privkey")]
+        pub fn _from_privkey(private_key: &[u8]) -> JsResult<OffchainPublicKey> {
+            ok_or_jserr!(OffchainPublicKey::from_privkey(private_key))
+        }
+
+        #[wasm_bindgen(js_name = "eq")]
+        pub fn _eq(&self, other: &OffchainPublicKey) -> bool {
             self.eq(other)
         }
 

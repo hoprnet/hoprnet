@@ -869,7 +869,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
 
     this.emit('channel-update', channel)
     verbose('channel-update for channel')
-    verbose(channel.toString())
+    verbose(channel.get_id().to_hex())
 
     if (channel.source.to_address().eq(this.address) || channel.destination.to_address().eq(this.address)) {
       this.emit('own-channel-updated', channel)

@@ -153,8 +153,8 @@ function setup_node() {
 
   log "Run node ${id} on rest port ${api_port} -> ${log}"
 
-  if [[ "${additional_args}" != *"--environment "* ]]; then
-    additional_args="--environment anvil-localhost ${additional_args}"
+  if [[ "${additional_args}" != *"--network "* ]]; then
+    additional_args="--network anvil-localhost ${additional_args}"
   fi
 
   log "Additional args: \"${additional_args}\""
@@ -249,7 +249,7 @@ update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "
 log "Disable network registry"
 env PRIVATE_KEY="${deployer_private_key}" \
   make -C "${mydir}/.." disable-network-registry \
-  environment=anvil-localhost environment_type=development
+  network=anvil-localhost environment_type=local
 
 #  --- Run nodes --- {{{
 setup_node 13301 19091 18081 "${node1_dir}" "${node1_log}" "${node1_id}" "${listen_host}"

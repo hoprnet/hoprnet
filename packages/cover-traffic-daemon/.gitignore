@@ -15,5 +15,5 @@
 /coverage
 
 # used only in release and should not be tracked
-/default-environment.json
+/default-network.json
 /npm-shrinkwrap.json

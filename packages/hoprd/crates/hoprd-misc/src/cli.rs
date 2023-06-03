@@ -3,7 +3,7 @@ use std::ffi::OsString;
 
 use clap::builder::{PossibleValuesParser, ValueParser};
 use clap::{Arg, ArgAction, ArgMatches, Args, Command, FromArgMatches as _};
-use core_misc::environment::{Environment, FromJsonFile, PackageJsonFile, ProtocolConfig};
+use core_misc::environment::{FromJsonFile, Network, PackageJsonFile, ProtocolConfig};
 use core_strategy::{
     generic::ChannelStrategy, passive::PassiveStrategy, promiscuous::PromiscuousStrategy, random::RandomStrategy,
 };
@@ -91,10 +91,10 @@ fn parse_api_token(mut s: &str) -> Result<String, String> {
 #[command(about = "HOPRd")]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct CliArgs {
-    /// Environment
+    /// network
     // Filled by Builder API at runtime
     #[arg(skip)]
-    pub environment: String,
+    pub network: String,
 
     // Filled by Builder API at runtime
     #[arg(skip)]
@@ -123,7 +123,7 @@ pub struct CliArgs {
     #[arg(
         long,
         env = "HOPRD_API",
-        help = "Enable the internal API",
+        help = format!("Expose the API on {}:{}", DEFAULT_API_HOST, DEFAULT_API_PORT),
         action = ArgAction::SetTrue,
     )]
     pub api: Option<bool>,
@@ -345,6 +345,14 @@ pub struct CliArgs {
     pub test_no_webrtc_upgrade: Option<bool>,
 
     #[arg(
+        long = "noRelay",
+        help = "disable NAT relay functionality entirely",
+        env = "HOPRD_NO_RELAY",
+        action = ArgAction::SetTrue,
+    )]
+    pub no_relay: Option<bool>,
+
+    #[arg(
         long = "testLocalModeStun",
         help = "Transport testing: use full-featured STUN with local addresses",
         env = "HOPRD_TEST_LOCAL_MODE_STUN",
@@ -412,36 +420,36 @@ pub struct CliArgs {
 impl CliArgs {
     /// Add values of those CLI arguments whose structure is known at runtime
     fn augment_runtime_args(&mut self, m: &ArgMatches) {
-        self.environment = m.get_one::<String>("environment").unwrap().to_owned();
+        self.network = m.get_one::<String>("network").unwrap().to_owned();
         self.data = m.get_one::<String>("data").unwrap().to_owned();
         self.identity = m.get_one::<String>("identity").unwrap().to_owned();
     }
 
-    /// Creates a new instance using custom cli_args and custom environment variables
+    /// Creates a new instance using custom cli_args and custom network variables
     fn new_from(
         cli_args: Vec<&str>,
         env_vars: HashMap<OsString, OsString>,
         mono_repo_path: &str,
         home_path: &str,
     ) -> Result<Self, String> {
-        let envs: Vec<Environment> =
-            ProtocolConfig::from_json_file(mono_repo_path).and_then(|c| c.supported_environments(mono_repo_path))?;
+        let envs: Vec<Network> =
+            ProtocolConfig::from_json_file(mono_repo_path).and_then(|c| c.supported_networks(mono_repo_path))?;
 
         let version = PackageJsonFile::from_json_file(mono_repo_path).and_then(|p| p.coerced_version())?;
 
-        let maybe_default_environment = get_default_environment(mono_repo_path);
+        let maybe_default_network = get_default_network(mono_repo_path);
 
-        let mut env_arg = Arg::new("environment")
-            .long("environment")
+        let mut env_arg = Arg::new("network")
+            .long("network")
             .required(true)
-            .env("HOPRD_ENVIRONMENT")
-            .value_name("ENVIRONMENT")
-            .help("Environment id which the node shall run on")
+            .env("HOPRD_NETWORK")
+            .value_name("NETWORK")
+            .help("Network id which the node shall run on")
             .value_parser(PossibleValuesParser::new(envs.iter().map(|e| e.id.to_owned())));
 
-        if let Some(default_environment) = &maybe_default_environment {
+        if let Some(default_network) = &maybe_default_network {
             // Add default value if we got one
-            env_arg = env_arg.default_value(default_environment);
+            env_arg = env_arg.default_value(default_network);
         }
 
         let mut cmd = Command::new("hoprd")
@@ -459,7 +467,7 @@ impl CliArgs {
                 .long("data")
                 .help("manually specify the data directory to use")
                 .env("HOPRD_DATA")
-                .default_value(get_data_path(mono_repo_path, maybe_default_environment)));
+                .default_value(get_data_path(mono_repo_path, maybe_default_network)));
 
         // Add compile args to runtime-time args
         cmd = Self::augment_args(cmd);
@@ -477,31 +485,31 @@ impl CliArgs {
 }
 
 #[derive(Deserialize)]
-struct DefaultEnvironmentFile {
+struct DefaultNetworkFile {
     id: String,
 }
 
-impl FromJsonFile for DefaultEnvironmentFile {
+impl FromJsonFile for DefaultNetworkFile {
     fn from_json_file(mono_repo_path: &str) -> Result<Self, String> {
-        let default_environment_json_path: String = format!("{}/default-environment.json", mono_repo_path);
+        let default_environment_json_path: String = format!("{}/default-network.json", mono_repo_path);
         let data = ok_or_str!(real::read_file(default_environment_json_path.as_str()))?;
 
-        ok_or_str!(serde_json::from_slice::<DefaultEnvironmentFile>(&data))
+        ok_or_str!(serde_json::from_slice::<DefaultNetworkFile>(&data))
     }
 }
 
-/// Checks for `default_environment.json` file and, if present, returns their environment id
-fn get_default_environment(mono_repo_path: &str) -> Option<String> {
-    match DefaultEnvironmentFile::from_json_file(mono_repo_path) {
+/// Checks for `default_network.json` file and, if present, returns their network id
+fn get_default_network(mono_repo_path: &str) -> Option<String> {
+    match DefaultNetworkFile::from_json_file(mono_repo_path) {
         Ok(json) => Some(json.id),
         Err(_) => None,
     }
 }
 
 /// Gets the default path where the database is stored at
-fn get_data_path(mono_repo_path: &str, maybe_default_environment: Option<String>) -> String {
-    match maybe_default_environment {
-        Some(default_environment) => format!("{}/packages/hoprd/hoprd-db/{}", mono_repo_path, default_environment),
+fn get_data_path(mono_repo_path: &str, maybe_default_network: Option<String>) -> String {
+    match maybe_default_network {
+        Some(default_network) => format!("{}/packages/hoprd/hoprd-db/{}", mono_repo_path, default_network),
         None => format!("{}/packages/hoprd/hoprd-db", mono_repo_path),
     }
 }

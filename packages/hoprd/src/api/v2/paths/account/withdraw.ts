@@ -86,7 +86,7 @@ POST.apiDoc = {
   responses: {
     '200': {
       description:
-        'Withdraw successful. Receipt from this response can be used to check details of the transaction on ethereum network.',
+        'Withdraw successful. Receipt from this response can be used to check details of the transaction on ethereum chain.',
       content: {
         'application/json': {
           schema: {
@@ -95,8 +95,7 @@ POST.apiDoc = {
               receipt: {
                 type: 'string',
                 example: '0x37954ca4a630aa28f045df2e8e604cae22071046042e557355acf00f4ef20d2e',
-                description:
-                  'Withdraw txn hash that can be used to check details of the transaction on ethereum network.'
+                description: 'Withdraw txn hash that can be used to check details of the transaction on ethereum chain.'
               }
             }
           }

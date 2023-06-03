@@ -7,8 +7,8 @@ import type { SendMessage } from '../index.js'
 import { PEER_METADATA_PROTOCOL_VERSION } from '../index.js'
 import { pipe } from 'it-pipe'
 import { reply_to_ping, HeartbeatConfig, Network, Pinger, PeerOrigin } from '../../lib/core_network.js'
-import { core_network_set_panic_hook } from '../../lib/core_network.js'
-core_network_set_panic_hook()
+import { core_network_initialize_crate } from '../../lib/core_network.js'
+core_network_initialize_crate()
 
 const log = debug('hopr-core:heartbeat')
 const error = debug('hopr-core:heartbeat:error')
@@ -36,20 +36,20 @@ export default class Heartbeat {
     protected networkPeers: Network, // protected for testing
     private libp2pComponents: Components,
     protected sendMessage: SendMessage,
-    environmentId: string,
+    networkName: string,
     config: HeartbeatConfig
   ) {
     this.config = config
 
     this.protocolHeartbeat = [
       // current
-      `/hopr/${environmentId}/heartbeat/${NORMALIZED_VERSION}`,
+      `/hopr/${networkName}/heartbeat/${NORMALIZED_VERSION}`,
       // deprecated
-      `/hopr/${environmentId}/heartbeat`
+      `/hopr/${networkName}/heartbeat`
     ]
 
     this.pinger = Pinger.build(
-      environmentId,
+      networkName,
       NORMALIZED_VERSION,
       (peer: string, result: number | undefined) => this.networkPeers.refresh(peer, result),
       (msg: Uint8Array, dest: string): Promise<Uint8Array[]> =>

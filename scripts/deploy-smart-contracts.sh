@@ -55,16 +55,16 @@ declare deployments_summary="${mydir}/../packages/ethereum/contracts/contracts-a
 
 for git_ref in $(cat "${release_config}" | jq -r "to_entries[] | .value.git_ref" | uniq); do
   if [[ "${branch}" =~ ${git_ref} ]]; then
-    for environment_id in $(cat "${release_config}" | jq -r "to_entries[] | select(.value.git_ref==\"${git_ref}\") | .value.environment_id"); do
-      declare network_id=$(cat "${protocol_config}" | jq -r ".environments.\"${environment_id}\".network_id")
-      declare environment_type=$(cat "${deployments_summary}" | jq -r ".environments.\"${environment_id}\".environment_type")
+    for network in $(cat "${release_config}" | jq -r "to_entries[] | select(.value.git_ref==\"${git_ref}\") | .value.network"); do
+      declare chain=$(cat "${protocol_config}" | jq -r ".networks.\"${network}\".chain")
+      declare environment_type=$(cat "${deployments_summary}" | jq -r ".networks.\"${network}\".environment_type")
 
-      log "deploying for environment ${environment_id} on network ${network_id} of type ${environment_type}"
+      log "deploying for network ${network} on chain ${chain} of type ${environment_type}"
 
-      make -C "${mydir}/../packages/ethereum/contracts/" anvil-deploy-contracts environment-name="${environment_id}" environment-type="${environment_type}"
+      make -C "${mydir}/../packages/ethereum/contracts/" anvil-deploy-contracts network="${network}" environment-type="${environment_type}"
 
       # update the deployed files in protocol-config
-      update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "${environment_id}" "${environment_id}"
+      update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "${network}" "${network}"
     done
   fi
 done

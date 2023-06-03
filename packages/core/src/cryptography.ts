@@ -1,6 +1,6 @@
 // Load `core-crypto` crate
-import { core_crypto_set_panic_hook } from '../lib/core_crypto.js'
-core_crypto_set_panic_hook()
+import { core_crypto_initialize_crate } from '../lib/core_crypto.js'
+core_crypto_initialize_crate()
 
 import { webcrypto } from 'node:crypto'
 // @ts-ignore

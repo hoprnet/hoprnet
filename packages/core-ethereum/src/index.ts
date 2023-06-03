@@ -50,8 +50,8 @@ export type ChainOptions = {
   chainId: number
   maxFeePerGas: string
   maxPriorityFeePerGas: string
+  chain: string
   network: string
-  environment: string
 }
 
 type ticketRedemtionInChannelOperations = Map<string, Promise<void>>
@@ -237,7 +237,7 @@ export default class HoprCoreEthereum extends EventEmitter {
   }
 
   public smartContractInfo(): {
-    network: string
+    chain: string
     hoprTokenAddress: string
     hoprChannelsAddress: string
     hoprNetworkRegistryAddress: string

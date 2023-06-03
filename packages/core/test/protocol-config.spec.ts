@@ -11,15 +11,15 @@ describe('protocol config', async function () {
   })
 
   it('should be internally consistent', async function () {
-    for (const env of Object.values(data.environments)) {
-      if (!data.networks[env.network_id]) {
-        throw new Error(`no such network: ${env.network_id}`)
+    for (const env of Object.values(data.networks)) {
+      if (!data.chains[env.chain]) {
+        throw new Error(`no such chain: ${env.chain}`)
       }
     }
   })
 
   it('should contain valid version ranges', async function () {
-    for (const [id, env] of Object.entries(data.environments)) {
+    for (const [id, env] of Object.entries(data.networks)) {
       if (!semver.validRange(env.version_range)) {
         throw new Error(`invalid range in env '${id}': '${env.version_range}'`)
       }

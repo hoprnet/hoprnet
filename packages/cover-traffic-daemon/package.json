@@ -42,15 +42,15 @@
     "yargs": "17.7.1"
   },
   "devDependencies": {
-    "@types/chai": "4.3.4",
+    "@types/chai": "4.3.5",
     "@types/express": "4",
     "@types/mocha": "10.0.1",
     "@types/yargs": "17.0.24",
     "chai": "4.3.7",
     "mocha": "10.2.0",
     "nyc": "15.1.0",
-    "typedoc": "0.24.6",
-    "typedoc-plugin-markdown": "3.15.2",
+    "typedoc": "0.24.7",
+    "typedoc-plugin-markdown": "3.15.3",
     "typescript": "5.0.4"
   },
   "mocha": {

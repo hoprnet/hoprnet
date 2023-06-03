@@ -46,7 +46,18 @@ import {
   retimer as intervalTimer,
   retryWithBackoffThenThrow,
   iterableToArray,
-  safeCloseConnection
+  safeCloseConnection,
+  Address,
+  AcknowledgedTicket,
+  ChannelStatus,
+  ChannelEntry,
+  PublicKey,
+  Ticket,
+  Hash,
+  HalfKeyChallenge,
+  Balance,
+  BalanceType,
+  type HoprDB
 } from '@hoprnet/hopr-utils'
 
 import {
@@ -73,10 +84,10 @@ import {
   Health,
   health_to_string,
   HeartbeatConfig,
-  core_network_set_panic_hook,
+  core_network_initialize_crate,
   core_network_gather_metrics
 } from '../lib/core_network.js'
-core_network_set_panic_hook()
+core_network_initialize_crate()
 registerMetricsCollector(core_network_gather_metrics)
 
 import Heartbeat from './network/heartbeat.js'
@@ -99,7 +110,7 @@ import { AcknowledgementInteraction } from './interactions/packet/acknowledgemen
 import { PacketForwardInteraction } from './interactions/packet/forward.js'
 
 import { Packet, PacketHelper } from './messages/index.js'
-import type { ResolvedEnvironment } from './environment.js'
+import type { ResolvedNetwork } from './network.js'
 import { createLibp2pInstance } from './main.js'
 import type { EventEmitter as Libp2pEmitter } from '@libp2p/interfaces/events'
 import { utils as ethersUtils } from 'ethers/lib/ethers.js'
@@ -160,7 +171,7 @@ type PeerStoreAddress = {
 }
 
 export type HoprOptions = {
-  environment: ResolvedEnvironment
+  network: ResolvedNetwork
   announce: boolean
   dataPath: string
   createDbIfNotExist: boolean
@@ -181,6 +192,8 @@ export type HoprOptions = {
   onChainConfirmations?: number
   checkUnrealizedBalance?: boolean
   maxParallelConnections?: number
+  // disable NAT relay functionality
+  noRelay?: boolean
   testing?: {
     // when true, assume that the node is running in an isolated network and does
     // not need any connection to nodes outside of the subnet
@@ -249,7 +262,7 @@ class Hopr extends EventEmitter {
   private pubKey: PublicKey
   private knownPublicNodesCache = new Set()
 
-  public environment: ResolvedEnvironment
+  public network: ResolvedNetwork
 
   public indexer: Indexer
 
@@ -275,8 +288,8 @@ class Hopr extends EventEmitter {
     if (!id.privateKey || !isSecp256k1PeerId(id)) {
       throw new Error('Hopr Node must be initialized with an id with a secp256k1 private key')
     }
-    this.environment = options.environment
-    log(`using environment: ${this.environment.id}`)
+    this.network = options.network
+    log(`using network: ${this.network.id}`)
     this.indexer = HoprCoreEthereum.getInstance().indexer // TODO temporary
     this.pubKey = PublicKey.from_peerid_str(id.toString())
   }
@@ -454,7 +467,7 @@ class Hopr extends EventEmitter {
       this.networkPeers,
       this.libp2pComponents,
       sendMessage,
-      this.environment.id,
+      this.network.id,
       heartbeat_config
     )
 
@@ -473,7 +486,7 @@ class Hopr extends EventEmitter {
         this.emit('hopr:message-acknowledged', ackChallenge.to_hex())
       },
       (ack: AcknowledgedTicket) => connector.emit('ticket:acknowledged', ack),
-      this.environment
+      this.network
     )
 
     const onMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
@@ -483,7 +496,7 @@ class Hopr extends EventEmitter {
       this.getId(),
       onMessage,
       this.db,
-      this.environment,
+      this.network,
       this.acknowledgements,
       this.options
     )
@@ -536,8 +549,6 @@ class Hopr extends EventEmitter {
 
     // Enable DHT server-mode if announcing publicly routable addresses to the DHT
     await this.maybeEnableDhtServerMode()
-
-    await this.maybeLogProfilingToGCloud()
   }
 
   /**
@@ -601,25 +612,6 @@ class Hopr extends EventEmitter {
       if ([AddressClass.Public, AddressClass.Public6].includes(maToClass(addr))) {
         await dht.setMode('server')
         break
-      }
-    }
-  }
-
-  private async maybeLogProfilingToGCloud() {
-    if (process.env.GCLOUD) {
-      try {
-        var name = 'hopr_node_' + this.getId().toString().slice(-5).toLowerCase()
-        ;(await import('@google-cloud/profiler'))
-          .start({
-            projectId: 'hoprassociation',
-            serviceContext: {
-              service: name,
-              version: FULL_VERSION
-            }
-          })
-          .catch((e: any) => console.log(e))
-      } catch (e) {
-        console.log(e)
       }
     }
   }
@@ -982,8 +974,14 @@ class Hopr extends EventEmitter {
    * @param destination PeerId of the destination
    * @param intermediatePath optional set path manually
    * @param hops optional number of required intermediate nodes
+   * @returns hex representation of ack challenge
    */
-  public async sendMessage(msg: Uint8Array, destination: PeerId, intermediatePath?: PublicKey[], hops?: number) {
+  public async sendMessage(
+    msg: Uint8Array,
+    destination: PeerId,
+    intermediatePath?: PublicKey[],
+    hops?: number
+  ): Promise<string> {
     if (this.status != 'RUNNING') {
       metric_sentMessageFailCount.increment()
       throw new Error('Cannot send message until the node is running')
@@ -1269,7 +1267,7 @@ class Hopr extends EventEmitter {
   }
 
   public smartContractInfo(): {
-    network: string
+    chain: string
     hoprTokenAddress: string
     hoprChannelsAddress: string
     hoprNetworkRegistryAddress: string
@@ -1639,8 +1637,9 @@ export {
   health_to_string,
   type ChannelStrategyInterface
 }
-export { resolveEnvironment, supportedEnvironments, type ResolvedEnvironment } from './environment.js'
+export { resolveNetwork, supportedNetworks, type ResolvedNetwork } from './network.js'
 export { CORE_CONSTANTS as CONSTANTS } from '../lib/core_misc.js'
 export { sampleOptions } from './index.mock.js'
+export * from './types.js'
 
 export * from './types.js'

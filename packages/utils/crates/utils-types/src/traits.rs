@@ -58,7 +58,7 @@ where
     T: BinarySerializable<'a>,
 {
     fn to_hex(&self) -> String {
-        hex::encode(&self.to_bytes())
+        format!("0x{}", hex::encode(&self.to_bytes()))
     }
 }
 

@@ -34,7 +34,7 @@ const GET: Operation = [
 
 GET.apiDoc = {
   description:
-    "Get node's HOPR and native balances. HOPR tokens from this balance is used to fund payment channels between this node and other nodes on the network. NATIVE balance is used to pay for the gas fees for the blockchain network.",
+    "Get node's HOPR and native balances. HOPR tokens from this balance is used to fund payment channels between this node and other nodes on the network. NATIVE balance is used to pay for the gas fees for the blockchain.",
   tags: ['Account'],
   operationId: 'accountGetBalances',
   responses: {

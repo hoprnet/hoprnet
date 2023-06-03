@@ -9,6 +9,7 @@ use ethers::{
 };
 use log::{log, Level};
 use std::env;
+use std::str::FromStr;
 use utils_types::primitives::Address;
 
 use crate::utils::{Cmd, HelperErrors};
@@ -17,8 +18,8 @@ use core_crypto::types::ToChecksum;
 /// CLI arguments for `hopli faucet`
 #[derive(Parser, Default, Debug)]
 pub struct FaucetArgs {
-    #[clap(help = "Environment name. E.g. monte_rosa", long)]
-    environment_name: String,
+    #[clap(help = "Network name. E.g. monte_rosa", long)]
+    network: String,
 
     #[clap(
         help = "Ethereum address of node that will receive funds",
@@ -66,7 +67,7 @@ impl FaucetArgs {
     /// `PRIVATE_KEY` env variable is required to send on-chain transactions
     fn execute_faucet(self) -> Result<(), HelperErrors> {
         let FaucetArgs {
-            environment_name,
+            network,
             address,
             password,
             local_identity,
@@ -118,7 +119,7 @@ impl FaucetArgs {
         log!(target: "faucet", Level::Info, "All the addresses: {:?}", addresses_all);
 
         // set directory and environment variables
-        if let Err(e) = set_process_path_env(&contracts_root, &environment_name) {
+        if let Err(e) = set_process_path_env(&contracts_root, &network) {
             return Err(e);
         }
 
@@ -133,7 +134,7 @@ impl FaucetArgs {
             .into_iter()
             .map(|a| {
                 child_process_call_foundry_faucet(
-                    &environment_name,
+                    &network,
                     &a,
                     &hopr_amount_uint256_string,
                     &native_amount_uint256_string,

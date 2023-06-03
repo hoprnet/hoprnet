@@ -6,13 +6,13 @@ import { debug, registerMetricsCollector } from '@hoprnet/hopr-utils'
 import { pushable, type Pushable } from 'it-pushable'
 
 import { Packet, PacketHelper, PacketState } from '../../messages/index.js'
-import { new_mixer, core_mixer_set_panic_hook, core_mixer_gather_metrics } from '../../../lib/core_mixer.js'
-core_mixer_set_panic_hook()
+import { new_mixer, core_mixer_initialize_crate, core_mixer_gather_metrics } from '../../../lib/core_mixer.js'
+core_mixer_initialize_crate()
 registerMetricsCollector(core_mixer_gather_metrics)
 
 import type { AcknowledgementInteraction } from './acknowledgement.js'
 import type { HoprOptions, SendMessage } from '../../index.js'
-import type { ResolvedEnvironment } from '../../environment.js'
+import type { ResolvedNetwork } from '../../network.js'
 import type { Components } from '@libp2p/interfaces/components'
 
 const log = debug('hopr-core:packet:forward')
@@ -43,7 +43,7 @@ export class PacketForwardInteraction {
     private privKey: PeerId,
     private emitMessage: (msg: Uint8Array) => void,
     private db: HoprDB,
-    private environment: ResolvedEnvironment,
+    private network: ResolvedNetwork,
     private acknowledgements: AcknowledgementInteraction,
     private options: HoprOptions
   ) {
@@ -51,9 +51,9 @@ export class PacketForwardInteraction {
 
     this.protocols = [
       // current
-      `/hopr/${this.environment.id}/msg/${NORMALIZED_VERSION}`,
+      `/hopr/${this.network.id}/msg/${NORMALIZED_VERSION}`,
       // deprecated
-      `/hopr/${this.environment.id}/msg`
+      `/hopr/${this.network.id}/msg`
     ]
   }
 

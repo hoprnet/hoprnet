@@ -156,15 +156,16 @@ impl Default for Heartbeat {
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
-pub struct Network {
+pub struct NetworkOptions {
     pub announce: bool,
     pub allow_local_node_connections: bool,
     pub allow_private_node_connections: bool,
     pub max_parallel_connections: u32,
     pub network_quality_threshold: f32,
+    pub no_relay: bool,
 }
 
-impl Default for Network {
+impl Default for NetworkOptions {
     fn default() -> Self {
         Self {
             announce: false,
@@ -172,6 +173,7 @@ impl Default for Network {
             allow_private_node_connections: false,
             max_parallel_connections: DEFAULT_MAX_PARALLEL_CONNECTIONS,
             network_quality_threshold: DEFAULT_NETWORK_QUALITY_THRESHOLD,
+            no_relay: false,
         }
     }
 }
@@ -313,10 +315,10 @@ pub struct HoprdConfig {
     #[validate]
     pub heartbeat: Heartbeat,
     #[validate]
-    pub network: Network,
+    pub network_options: NetworkOptions,
     #[validate]
     pub healthcheck: HealthCheck,
-    pub environment: String,
+    pub network: String,
     #[validate]
     pub chain: Chain,
 
@@ -336,9 +338,9 @@ impl Default for HoprdConfig {
             api: Api::default(),
             strategy: Strategy::default(),
             heartbeat: Heartbeat::default(),
-            network: Network::default(),
+            network_options: NetworkOptions::default(),
             healthcheck: HealthCheck::default(),
-            environment: String::default(),
+            network: String::default(),
             chain: Chain::default(),
             test: Testing::default(),
         }
@@ -362,7 +364,7 @@ impl HoprdConfig {
             HoprdConfig::default()
         };
 
-        cfg.environment = cli_args.environment;
+        cfg.network = cli_args.network;
 
         // host
         if let Some(x) = cli_args.host {
@@ -410,24 +412,27 @@ impl HoprdConfig {
             cfg.heartbeat.variance = x
         };
 
-        // network
+        // network options
         if let Some(x) = cli_args.announce {
-            cfg.network.announce = x
+            cfg.network_options.announce = x
         };
         if let Some(x) = cli_args.allow_local_node_connections {
-            cfg.network.allow_local_node_connections = x
+            cfg.network_options.allow_local_node_connections = x
         };
         if let Some(x) = cli_args.allow_private_node_connections {
-            cfg.network.allow_private_node_connections = x
+            cfg.network_options.allow_private_node_connections = x
         };
         if let Some(x) = cli_args.max_parallel_connections {
-            cfg.network.max_parallel_connections = x
-        } else if cfg.network.announce {
-            cfg.network.max_parallel_connections = DEFAULT_MAX_PARALLEL_CONNECTION_PUBLIC_RELAY
+            cfg.network_options.max_parallel_connections = x
+        } else if cfg.network_options.announce {
+            cfg.network_options.max_parallel_connections = DEFAULT_MAX_PARALLEL_CONNECTION_PUBLIC_RELAY
         };
         if let Some(x) = cli_args.network_quality_threshold {
-            cfg.network.network_quality_threshold = x
+            cfg.network_options.network_quality_threshold = x
         };
+        if let Some(x) = cli_args.no_relay {
+            cfg.network_options.no_relay = x
+        }
 
         // healthcheck
         if let Some(x) = cli_args.health_check {
@@ -574,19 +579,20 @@ mod tests {
                 threshold: 0,
                 variance: 0,
             },
-            network: Network {
+            network_options: NetworkOptions {
                 announce: false,
                 allow_local_node_connections: false,
                 allow_private_node_connections: false,
                 max_parallel_connections: 0,
                 network_quality_threshold: 0.0,
+                no_relay: false,
             },
             healthcheck: HealthCheck {
                 enable: false,
                 host: "127.0.0.1".to_string(),
                 port: 0,
             },
-            environment: "testing".to_string(),
+            network: "testing".to_string(),
             chain: Chain {
                 provider: None,
                 check_unrealized_balance: true,
@@ -628,17 +634,18 @@ heartbeat:
   interval: 0
   threshold: 0
   variance: 0
-network:
+network_options:
   announce: false
   allow_local_node_connections: false
   allow_private_node_connections: false
   max_parallel_connections: 0
   network_quality_threshold: 0.0
+  no_relay: false
 healthcheck:
   enable: false
   host: 127.0.0.1
   port: 0
-environment: testing
+network: testing
 chain:
   provider: null
   check_unrealized_balance: true

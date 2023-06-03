@@ -1,8 +1,9 @@
 [package]
 name = "utils-types"
-version = "0.2.1"
+version = "0.2.3"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
+description = "Generic types used through the entire code base"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
@@ -34,7 +35,7 @@ console_error_panic_hook = { version = "0.1.7", optional = true }
 
 [dev-dependencies]
 hex-literal = "0.3.4"
-wasm-bindgen-test = "0.3.34"
+wasm-bindgen-test = "0.3.36"
 
 [target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
 wasm-pack = { workspace = true }

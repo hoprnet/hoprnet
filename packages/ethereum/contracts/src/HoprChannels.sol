@@ -2,13 +2,13 @@
 pragma solidity ^0.8;
 pragma abicoder v2;
 
-import '@openzeppelin/contracts/utils/Multicall.sol';
-import '@openzeppelin/contracts/utils/introspection/IERC1820Registry.sol';
-import '@openzeppelin/contracts/utils/introspection/ERC1820Implementer.sol';
-import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
-import '@openzeppelin/contracts/token/ERC777/IERC777Recipient.sol';
-import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
-import '@openzeppelin/contracts/utils/cryptography/ECDSA.sol';
+import 'openzeppelin-contracts-4.8.3/utils/Multicall.sol';
+import 'openzeppelin-contracts-4.8.3/utils/introspection/IERC1820Registry.sol';
+import 'openzeppelin-contracts-4.8.3/utils/introspection/ERC1820Implementer.sol';
+import 'openzeppelin-contracts-4.8.3/token/ERC20/IERC20.sol';
+import 'openzeppelin-contracts-4.8.3/token/ERC777/IERC777Recipient.sol';
+import 'openzeppelin-contracts-4.8.3/token/ERC20/utils/SafeERC20.sol';
+import 'openzeppelin-contracts-4.8.3/utils/cryptography/ECDSA.sol';
 
 contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
   using SafeERC20 for IERC20;
@@ -53,6 +53,14 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     WAITING_FOR_COMMITMENT,
     OPEN,
     PENDING_TO_CLOSE
+  }
+
+  /**
+   * @dev Representation of the de-constructed ECDSA signature parameters.
+   */
+  struct ECDSAParameters {
+    bytes32 r;
+    bytes32 vs;
   }
 
   /**
@@ -267,7 +275,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
       )
     );
 
-    require(ECDSA.recover(ticketHash, signature) == source, 'signer must match the counterparty');
+    ECDSAParameters memory signatureParams = _ecdsaSignatureParameters(signature);
+    require(ECDSA.recover(ticketHash, signatureParams.r, signatureParams.vs) == source, 'signer must match the counterparty');
     require(_getTicketLuck(ticketHash, nextCommitment, proofOfRelaySecret) <= winProb, 'ticket must be a win');
 
     spendingChannel.ticketIndex = ticketIndex;
@@ -531,5 +540,24 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     bytes32 proofOfRelaySecret
   ) internal pure returns (uint256) {
     return uint256(keccak256(abi.encodePacked(ticketHash, nextCommitment, proofOfRelaySecret)));
+  }
+
+  /**
+   * @dev Reconstruct signature parameters manually since this functionality
+   * was removed in OZ 4.8.
+   * @return respective signature parameters
+   */
+  function _ecdsaSignatureParameters(bytes memory sig) internal pure returns (ECDSAParameters memory) {
+    bytes32 r;
+    bytes32 vs;
+    assembly {
+      r := mload(add(sig, 0x20))
+      vs := mload(add(sig, 0x40))
+    }
+    ECDSAParameters memory params = ECDSAParameters({
+      r: r,
+      vs: vs
+    });
+    return params;
   }
 }

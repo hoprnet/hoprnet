@@ -24,11 +24,11 @@ import {
   WasmPacketState as PacketState,
   Ticket as PacketTicket,
   U256 as PacketU256,
-  core_packet_set_panic_hook
+  core_packet_initialize_crate
 } from '../../lib/core_packet.js'
 export { Packet, WasmPacketState as PacketState } from '../../lib/core_packet.js'
 
-core_packet_set_panic_hook()
+core_packet_initialize_crate()
 
 import { peerIdFromString } from '@libp2p/peer-id'
 
@@ -97,12 +97,11 @@ async function createTicket(dest: PublicKey, pathLength: number, db: HoprDB, pri
 
   const ticket = Ticket.new(
     dest.to_address(),
-    undefined,
     new U256(channel.ticket_epoch.to_string()),
     currentTicketIndex,
     amount,
     U256.from_inverse_probability(winProb),
-    new U256(channel.channel_epoch.to_hex()),
+    new U256(channel.channel_epoch.to_string()),
     privKey
   )
 
@@ -219,7 +218,7 @@ export class PacketHelper {
 
     let ticket: Ticket
     if (path.length == 1) {
-      ticket = Ticket.new_zero_hop(next_peer, undefined, private_key)
+      ticket = Ticket.new_zero_hop(next_peer, private_key)
     } else {
       ticket = await createTicket(next_peer, path.length, db, private_key)
     }
@@ -315,7 +314,7 @@ export class PacketHelper {
 
     let ticket: Ticket
     if (pathPosition == 1) {
-      ticket = Ticket.new_zero_hop(nextPeer, undefined, private_key)
+      ticket = Ticket.new_zero_hop(nextPeer, private_key)
     } else {
       ticket = await createTicket(nextPeer, pathPosition, db, private_key)
     }
