@@ -1,12 +1,9 @@
-use crate::errors::PacketError::{
-    AcknowledgementValidation, ChannelNotFound, InvalidPacketState, OutOfFunds, PathNotValid, Retry, TagReplay,
-    TransportError,
-};
+use crate::errors::PacketError::{AcknowledgementValidation, ChannelNotFound, InvalidPacketState, OutOfFunds, PacketDecodingError, PathNotValid, Retry, TagReplay, TransportError};
 use crate::errors::Result;
 use crate::packet::{Packet, PacketState};
 use crate::path::Path;
 use async_std::channel::{bounded, Receiver, Sender, TrySendError};
-use core_crypto::types::{HalfKeyChallenge, Hash, PublicKey};
+use core_crypto::types::{HalfKeyChallenge, Hash,  PublicKey};
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_mixer::mixer::{Mixer, MixerConfig};
 use core_types::acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket};
@@ -163,7 +160,7 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
         while let Ok(payload) = self.incoming_channel.1.recv().await {
             match Acknowledgement::from_bytes(&payload.data) {
                 Ok(ack) => {
-                    if let Err(e) = self.handle_acknowledgement(ack, &payload.remote_peer).await {
+                    if let Err(e) = self.handle_acknowledgement(ack).await {
                         error!(
                             "failed to process incoming acknowledgement from {}: {e}",
                             payload.remote_peer
@@ -201,8 +198,8 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
         self.outgoing_channel.1.close();
     }
 
-    async fn handle_acknowledgement(&self, mut ack: Acknowledgement, remote_peer: &PeerId) -> Result<()> {
-        if !ack.validate(&self.public_key, &PublicKey::from_peerid(remote_peer)?) {
+    async fn handle_acknowledgement(&self, mut ack: Acknowledgement) -> Result<()> {
+        if !ack.validate(&self.public_key) {
             return Err(AcknowledgementValidation(
                 "could not validate the acknowledgement".to_string(),
             ));
@@ -552,12 +549,28 @@ where
 
                 let inverse_win_prob = U256::new(INVERSE_TICKET_WIN_PROB);
 
+                let previous_hop_channel_key = self
+                    .db
+                    .lock()
+                    .unwrap()
+                    .get_channel_key(&previous_hop)
+                    .await?
+                    .ok_or(PacketDecodingError(format!("failed to find channel key for packet key {previous_hop} on previous hop")))?;
+
+                let next_hop_channel_key = self
+                    .db
+                    .lock()
+                    .unwrap()
+                    .get_channel_key(&next_hop)
+                    .await?
+                    .ok_or(PacketDecodingError(format!("failed to find channel key for packet key {next_hop} on next hop")))?;
+
                 // Find the corresponding channel
                 let channel = self
                     .db
                     .lock()
                     .unwrap()
-                    .get_channel_from(&previous_hop)
+                    .get_channel_from(&previous_hop_channel_key)
                     .await?
                     .ok_or(ChannelNotFound(previous_hop.to_string()))?;
 
@@ -566,7 +579,7 @@ where
                     self.db.lock().unwrap().deref(),
                     &packet.ticket,
                     &channel,
-                    &previous_hop,
+                    &previous_hop_channel_key,
                     Balance::from_str(PRICE_PER_PACKET, BalanceType::HOPR),
                     inverse_win_prob,
                     self.cfg.check_unrealized_balance,
@@ -593,7 +606,7 @@ where
                         PendingAcknowledgement::WaitingAsRelayer(UnacknowledgedTicket::new(
                             packet.ticket.clone(),
                             own_key.clone(),
-                            previous_hop.clone(),
+                            previous_hop_channel_key,
                         )),
                     )
                     .await?;
@@ -604,9 +617,9 @@ where
 
                 // Create next ticket for the packet
                 next_ticket = if path_pos == 1 {
-                    Ticket::new_zero_hop(next_hop.clone(), &self.cfg.private_key)
+                    Ticket::new_zero_hop(next_hop_channel_key, &self.cfg.private_key)
                 } else {
-                    self.create_multihop_ticket(next_hop.clone(), path_pos).await?
+                    self.create_multihop_ticket(next_hop_channel_key, path_pos).await?
                 };
                 previous_peer = previous_hop.to_peerid();
                 next_peer = next_hop.to_peerid();
@@ -1015,7 +1028,7 @@ mod tests {
         let mut sent_challenges = Vec::with_capacity(PENDING_ACKS);
         for _ in 0..PENDING_ACKS {
             let secrets = (0..2).into_iter().map(|_| random_bytes::<32>()).collect::<Vec<_>>();
-            let porv = ProofOfRelayValues::new(&secrets[0], Some(&secrets[1]))
+            let porv = ProofOfRelayValues::new(secrets[0], Some(secrets[1]))
                 .expect("failed to create Proof of Relay values");
 
             // Mimics that the packet sender has sent a packet and now it has a pending acknowledgement in it's DB
@@ -1060,7 +1073,7 @@ mod tests {
         for (ack_key, ack_msg) in sent_challenges.clone() {
             ack_interaction_counterparty
                 .send_acknowledgement(
-                    Acknowledgement::new(ack_msg, ack_key, &PEERS_PRIVS[1]),
+                    Acknowledgement::new(ack_msg,&PEERS_PRIVS[1]),
                     PEERS[0].clone(),
                     false,
                 )

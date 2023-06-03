@@ -4,6 +4,7 @@ use core_crypto::{
     iterated_hash::IteratedHash,
     types::{HalfKeyChallenge, Hash, PublicKey},
 };
+use core_crypto::types::OffchainPublicKey;
 use core_types::acknowledgement::{AcknowledgedTicket, PendingAcknowledgement};
 use core_types::{
     account::AccountEntry,
@@ -47,6 +48,12 @@ pub trait HoprCoreEthereumDbActions {
     async fn mark_pending(&mut self, ticket: &Ticket) -> Result<()>;
 
     async fn get_pending_balance_to(&self, counterparty: &Address) -> Result<Balance>;
+
+    async fn get_packet_key(&self, channel_key: &PublicKey) -> Result<Option<OffchainPublicKey>>;
+
+    async fn get_channel_key(&self, packet_key: &OffchainPublicKey) -> Result<Option<PublicKey>>;
+
+    async fn link_packet_and_channel_keys(&mut self, channel_key: &PublicKey, packet_key: &OffchainPublicKey) -> Result<()>;
 
     async fn get_channel_to(&self, dest: &PublicKey) -> Result<Option<ChannelEntry>>;
 

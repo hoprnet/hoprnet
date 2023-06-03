@@ -20,3 +20,5 @@ pub const NETWORK_REGISTRY_HOPR_NODE_PREFIX: &str = "networkRegistry:hopr-node-"
 pub const NETWORK_REGISTRY_ENABLED_PREFIX: &str = "networkRegistry:enabled";
 pub const NETWORK_REGISTRY_ADDRESS_ELIGIBLE_PREFIX: &str = "networkRegistry:addressEligible-";
 pub const NETWORK_REGISTRY_ADDRESS_PUBLIC_KEY_PREFIX: &str = "networkRegistry:addressPublicKey-";
+pub const CHANNEL_KEY_PREFIX: &str = "keys:channel-";
+pub const PACKET_KEY_PREFIX: &str = "keys:packet-";

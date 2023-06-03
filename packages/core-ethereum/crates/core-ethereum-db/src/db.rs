@@ -5,6 +5,7 @@ use core_crypto::{
     iterated_hash::IteratedHash,
     types::{HalfKeyChallenge, Hash, PublicKey},
 };
+use core_crypto::types::OffchainPublicKey;
 use core_types::acknowledgement::{AcknowledgedTicket, PendingAcknowledgement};
 use core_types::channels::ChannelStatus;
 use core_types::{
@@ -16,7 +17,9 @@ use utils_db::{
     db::{serialize_to_bytes, DB},
     traits::AsyncKVStorage,
 };
+use utils_db::db::Batch;
 use utils_types::primitives::{Address, Balance, BalanceType, EthereumChallenge, Snapshot, U256};
+use utils_types::traits::BinarySerializable;
 
 use crate::errors::Result;
 use crate::traits::HoprCoreEthereumDbActions;
@@ -218,6 +221,27 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             .get_or_none::<Balance>(key)
             .await
             .map(|v| v.unwrap_or(Balance::zero(BalanceType::HOPR)))
+    }
+
+    async fn get_packet_key(&self, channel_key: &PublicKey) -> Result<Option<OffchainPublicKey>> {
+        let key = utils_db::db::Key::new_with_prefix(&Hash::create(&[&channel_key.to_bytes(true)]), CHANNEL_KEY_PREFIX)?;
+        self.db.get_or_none(key).await
+    }
+
+    async fn get_channel_key(&self, packet_key: &OffchainPublicKey) -> Result<Option<PublicKey>> {
+        let key = utils_db::db::Key::new_with_prefix(&Hash::create(&[&packet_key.to_bytes()]), PACKET_KEY_PREFIX)?;
+        self.db.get_or_none(key).await
+    }
+
+    async fn link_packet_and_channel_keys(&mut self, channel_key: &PublicKey, packet_key: &OffchainPublicKey) -> Result<()> {
+        let mut batch = Batch::new();
+        let ck_key = utils_db::db::Key::new_with_prefix(&Hash::create(&[&channel_key.to_bytes(true)]), CHANNEL_KEY_PREFIX)?;
+        let pk_key = utils_db::db::Key::new_with_prefix(&Hash::create(&[&packet_key.to_bytes()]), PACKET_KEY_PREFIX)?;
+
+        batch.put(ck_key, packet_key);
+        batch.put(pk_key, channel_key);
+
+        self.db.batch(batch, true).await
     }
 
     async fn get_channel_to(&self, dest: &PublicKey) -> Result<Option<ChannelEntry>> {

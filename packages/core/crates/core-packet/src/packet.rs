@@ -8,7 +8,8 @@ use core_crypto::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge};
 use core_types::acknowledgement::Acknowledgement;
 use core_types::channels::Ticket;
 use libp2p_identity::PeerId;
-use core_crypto::offchain::{Ed25519SharedKeys, OffchainPublicKey};
+use core_crypto::offchain::{Ed25519SharedKeys};
+use core_crypto::types::OffchainPublicKey;
 use utils_types::errors::GeneralError::ParseError;
 use utils_types::traits::{BinarySerializable, PeerIdLike};
 
@@ -273,7 +274,7 @@ impl Packet {
     /// * `path` complete path for the packet to take
     /// * `private_key` private key of the local node
     /// * `first_ticket` ticket for the first hop on the path
-    pub fn new(msg: &[u8], path: &[&PeerId], channel_private_key: &[u8], mut first_ticket: Ticket) -> Result<Self> {
+    pub fn new(msg: &[u8], path: &[&PeerId], channel_private_key: &[u8], mut ticket: Ticket) -> Result<Self> {
         assert!(!path.is_empty(), "path must not be empty");
 
         let shared_keys = Ed25519SharedKeys::new(path)?;
@@ -285,8 +286,8 @@ impl Packet {
             .collect::<Vec<_>>();
 
         // Update the ticket with the challenge
-        first_ticket.challenge = por_values.ticket_challenge.to_ethereum_challenge();
-        first_ticket.sign(channel_private_key);
+        ticket.challenge = por_values.ticket_challenge.to_ethereum_challenge();
+        ticket.sign(channel_private_key);
 
         Ok(Self {
             packet: MetaPacket::new(
@@ -298,7 +299,7 @@ impl Packet {
                 &por_strings.iter().map(Box::as_ref).collect::<Vec<_>>(),
                 None,
             ),
-            ticket: first_ticket,
+            ticket,
             state: Outgoing {
                 next_hop: OffchainPublicKey::from_peerid(&path[0])?,
                 ack_challenge: por_values.ack_challenge,
@@ -586,7 +587,7 @@ pub mod wasm {
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use wasm_bindgen::prelude::wasm_bindgen;
-    use core_crypto::offchain::OffchainPublicKey;
+    use core_crypto::types::OffchainPublicKey;
 
     #[wasm_bindgen]
     pub enum WasmPacketState {

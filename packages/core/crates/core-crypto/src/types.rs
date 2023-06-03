@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::ops::Add;
 use std::str::FromStr;
+use rand::rngs::OsRng;
 
 use utils_log::warn;
 use utils_types::errors::GeneralError;
@@ -494,7 +495,7 @@ impl Hash {
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct OffchainPublicKey {
-    key: CompressedEdwardsY,
+    pub(crate) key: CompressedEdwardsY,
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]

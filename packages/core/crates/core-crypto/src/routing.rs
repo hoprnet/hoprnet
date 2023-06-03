@@ -11,7 +11,7 @@ use crate::utils::xor_inplace;
 use std::ops::Not;
 use subtle::ConstantTimeEq;
 use utils_types::traits::BinarySerializable;
-use crate::offchain::OffchainPublicKey;
+use crate::types::OffchainPublicKey;
 
 const RELAYER_END_PREFIX: u8 = 0xff;
 
