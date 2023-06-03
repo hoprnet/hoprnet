@@ -274,7 +274,7 @@ pub mod tests {
     use crate::utils::xor_inplace;
     use parameterized::parameterized;
     use rand::rngs::OsRng;
-    use crate::offchain::{Ed25519SharedKeys, EdScalar, OffchainPublicKey};
+    use crate::ec_groups::{Ed25519SharedKeys, EdScalar, OffchainPublicKey};
 
     #[parameterized(hops = { 3, 4 })]
     fn test_filler_generate_verify(hops: usize) {

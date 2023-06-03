@@ -14,6 +14,7 @@ use rand::rngs::OsRng;
 use utils_types::traits::PeerIdLike;
 
 use crate::errors::Result;
+use crate::ec_groups::{GroupElement, GroupEncoding};
 use crate::parameters::SECRET_KEY_LENGTH;
 use crate::types::{CurvePoint, PublicKey, SecretKey};
 
@@ -168,66 +169,14 @@ impl <E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
 
 }
 
-/// Instantiation of Sphinx shared keys generation using Secp256k1 group
-pub type Secp256k1SharedKeys = SharedKeys<NonZeroScalar, ProjectivePoint>;
-
-/// Non-zero scalars in the underlying field for Secp256k1
-impl Scalar for NonZeroScalar {
-    type Repr = [u8; 32];
-
-    fn from_repr(repr: Self::Repr) -> Result<Self> {
-        NonZeroScalar::try_from(repr.as_slice()).map_err(|_| InvalidSecretScalar)
-    }
-
-    fn to_repr(&self) -> Self::Repr {
-        let mut ret = [0u8; 32];
-        ret.copy_from_slice(self.to_bytes().as_slice());
-        ret
-    }
-
-    fn random(rng: &mut (impl CryptoRng + RngCore)) -> Self {
-        NonZeroScalar::random(rng)
-    }
-}
-
-impl GroupEncoding for PublicKey {
-    fn encode(&self) -> Box<[u8]> {
-        self.to_bytes(true)
-    }
-}
-
-/// Secp256k1 additive group (via projective coordinates) represented as public keys
-impl GroupElement<NonZeroScalar> for ProjectivePoint {
-    type Repr = PublicKey;
-
-    fn to_repr(&self) -> Self::Repr {
-        PublicKey::try_from(CurvePoint::from_affine(self.to_affine()))
-            .expect("group element does not represent a valid public key")
-    }
-
-    fn from_repr(repr: Self::Repr) -> Result<Self> {
-        Ok(CurvePoint::from(repr).to_projective_point())
-    }
-
-    fn generate(scalar: &NonZeroScalar) -> Self {
-        ProjectivePoint::GENERATOR * scalar.as_ref()
-    }
-
-    fn multiply(&self, scalar: &NonZeroScalar) -> Self {
-        Mul::mul(self, scalar.as_ref())
-    }
-
-    fn is_valid(&self) -> bool {
-        self.is_identity().unwrap_u8() == 0
-    }
-}
-
 /// Unit tests of the Rust code
 #[cfg(test)]
 pub mod tests {
+    use curve25519_dalek::EdwardsPoint;
     use super::*;
     use elliptic_curve::rand_core::OsRng;
     use hex_literal::hex;
+    use crate::ec_groups::GroupElement;
 
     #[test]
     fn test_extract_key_from_group_element() {
@@ -283,6 +232,10 @@ pub mod tests {
         generic_test_shared_keys::<NonZeroScalar, ProjectivePoint>()
     }
 
+    #[test]
+    fn test_secp256k1_shared_keys() {
+        generic_test_shared_keys::<curve25519_dalek::Scalar, EdwardsPoint>()
+    }
 }
 
 
