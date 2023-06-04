@@ -4,7 +4,7 @@ use core_crypto::primitives::{DigestLike, SimpleMac};
 use core_crypto::prp::{PRPParameters, PRP};
 use core_crypto::routing::{forward_header, header_length, ForwardedHeader, RoutingInfo};
 use core_crypto::shared_keys::GroupEncoding;
-use core_crypto::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge};
+use core_crypto::types::{Challenge, HalfKey, HalfKeyChallenge};
 use core_types::acknowledgement::Acknowledgement;
 use core_types::channels::Ticket;
 use libp2p_identity::PeerId;
@@ -64,6 +64,7 @@ fn remove_padding(msg: &[u8]) -> Option<&[u8]> {
 struct MetaPacket {
     packet: Box<[u8]>,
     header_len: usize,
+    alpha_len: usize,
 }
 
 #[allow(dead_code)]
@@ -125,11 +126,12 @@ impl MetaPacket {
     }
 
     fn new_from_parts(alpha: &[u8], routing_info: &[u8], mac: &[u8], payload: &[u8]) -> Self {
+        assert!(alpha.len() >= 32);
         assert!(routing_info.len() > 0);
         assert_eq!(SimpleMac::SIZE, mac.len());
         assert_eq!(PAYLOAD_SIZE, payload.len());
 
-        let mut packet = Vec::with_capacity(Self::size(routing_info.len()));
+        let mut packet = Vec::with_capacity(Self::size(alpha.len(),routing_info.len()));
         packet.extend_from_slice(alpha);
         packet.extend_from_slice(routing_info);
         packet.extend_from_slice(mac);
@@ -138,36 +140,38 @@ impl MetaPacket {
         Self {
             packet: packet.into_boxed_slice(),
             header_len: routing_info.len(),
+            alpha_len: alpha.len()
         }
     }
-
+    
     pub fn alpha(&self) -> &[u8] {
-        &self.packet[..CurvePoint::SIZE_COMPRESSED]
+        &self.packet[..self.alpha_len]
     }
 
     pub fn routing_info(&self) -> &[u8] {
-        &self.packet[CurvePoint::SIZE_COMPRESSED..CurvePoint::SIZE_COMPRESSED + self.header_len]
+        &self.packet[self.alpha_len..self.alpha_len + self.header_len]
     }
 
     pub fn mac(&self) -> &[u8] {
-        &self.packet[CurvePoint::SIZE_COMPRESSED + self.header_len
-            ..CurvePoint::SIZE_COMPRESSED + self.header_len + SimpleMac::SIZE]
+        &self.packet[self.alpha_len + self.header_len
+            ..self.alpha_len + self.header_len + SimpleMac::SIZE]
     }
 
     pub fn payload(&self) -> &[u8] {
-        &self.packet[CurvePoint::SIZE_COMPRESSED + self.header_len + SimpleMac::SIZE
-            ..CurvePoint::SIZE_COMPRESSED + self.header_len + SimpleMac::SIZE + PAYLOAD_SIZE]
+        &self.packet[self.alpha_len + self.header_len + SimpleMac::SIZE
+            ..self.alpha_len + self.header_len + SimpleMac::SIZE + PAYLOAD_SIZE]
     }
 
-    pub const fn size(header_len: usize) -> usize {
-        CurvePoint::SIZE_COMPRESSED + header_len + SimpleMac::SIZE + PAYLOAD_SIZE
+    pub const fn size(alpha_len: usize, header_len: usize) -> usize {
+        alpha_len + header_len + SimpleMac::SIZE + PAYLOAD_SIZE
     }
 
-    pub fn from_bytes(packet: &[u8], header_len: usize) -> utils_types::errors::Result<MetaPacket> {
-        if packet.len() == Self::size(header_len) {
+    pub fn from_bytes(packet: &[u8], alpha_len: usize, header_len: usize) -> utils_types::errors::Result<MetaPacket> {
+        if packet.len() == Self::size(alpha_len, header_len) {
             Ok(Self {
                 packet: packet.into(),
                 header_len,
+                alpha_len
             })
         } else {
             Err(ParseError)
@@ -192,10 +196,10 @@ impl MetaPacket {
             node_public_key
         )?;
 
-        let mut routing_info_mut: Vec<u8> = self.routing_info().into();
+        let mut routing_info_cpy: Vec<u8> = self.routing_info().into();
         let fwd_header = forward_header(
             &secret,
-            &mut routing_info_mut,
+            &mut routing_info_cpy,
             self.mac(),
             max_hops,
             additional_data_relayer_len,
@@ -205,28 +209,28 @@ impl MetaPacket {
         let prp = PRP::from_parameters(PRPParameters::new(&secret));
         let decrypted = prp.inverse(self.payload())?;
 
-        match fwd_header {
+        Ok(match fwd_header {
             ForwardedHeader::RelayNode {
                 header,
                 mac,
                 next_node,
                 additional_info,
-            } => Ok(RelayedPacket {
+            } => RelayedPacket {
                 packet: MetaPacket::new_from_parts(&alpha.encode(), &header, &mac, &decrypted),
                 packet_tag: derive_packet_tag(&secret)?,
                 derived_secret: secret.into(),
                 next_node,
                 additional_info,
-            }),
-            ForwardedHeader::FinalNode { additional_data } => Ok(FinalPacket {
+            },
+            ForwardedHeader::FinalNode { additional_data } => FinalPacket {
                 packet_tag: derive_packet_tag(&secret)?,
                 derived_secret: secret.into(),
                 plain_text: remove_padding(&decrypted)
                     .ok_or(PacketDecodingError("couldn't remove padding".into()))?
                     .into(),
                 additional_data,
-            }),
-        }
+            },
+        })
     }
 }
 
@@ -317,7 +321,7 @@ impl Packet {
             let previous_hop = OffchainPublicKey::from_peerid(sender)?;
 
             let header_len = header_length(INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0);
-            let mp = MetaPacket::from_bytes(pre_packet, header_len)?;
+            let mp = MetaPacket::from_bytes(pre_packet, OffchainPublicKey::SIZE, header_len)?;
 
             match mp.forward(node_private_key, node_public_key, INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0)? {
                 RelayedPacket {
@@ -431,12 +435,11 @@ mod tests {
         PADDING_TAG,
     };
     use crate::por::{ProofOfRelayString, POR_SECRET_LENGTH};
-    use core_crypto::shared_keys::SharedKeys;
     use core_crypto::types::{OffchainPublicKey, PublicKey, SecretKey};
     use core_types::channels::Ticket;
-    use libp2p_identity::{Keypair, PeerId};
+    use libp2p_identity::PeerId;
     use parameterized::parameterized;
-    use core_crypto::parameters::SECRET_KEY_LENGTH;
+    use core_crypto::ec_groups::Ed25519SharedKeys;
     use utils_types::primitives::{Balance, BalanceType, U256};
     use utils_types::traits::{BinarySerializable, PeerIdLike};
 
@@ -456,23 +459,17 @@ mod tests {
     }
 
     fn generate_keypairs(amount: usize) -> (Vec<SecretKey>, Vec<PeerId>) {
+        // TODO: make this compatible with generating random ed25519 PeerIds
         (0..amount)
-            .map(|_| Keypair::generate_ed25519())
-            .map(|kp| {
-                let mut sk = [0u8; SECRET_KEY_LENGTH];
-                sk.copy_from_slice(kp.clone().try_into_ed25519().unwrap().secret().as_ref());
-                (
-                    sk,
-                    kp.public().to_peer_id(),
-                )
-            })
+            .map(|_| OffchainPublicKey::random_keypair())
+            .map(|(secret, public)| (secret, public.to_peerid()))
             .unzip()
     }
 
     #[parameterized(amount = { 4, 3, 2 })]
     fn test_meta_packet(amount: usize) {
         let (secrets, path) = generate_keypairs(amount);
-        let shared_keys = SharedKeys::new(&path.iter().collect::<Vec<_>>()).unwrap();
+        let shared_keys = Ed25519SharedKeys::new(&path.iter().collect::<Vec<_>>()).unwrap();
         let por_strings = (1..path.len())
             .map(|i| ProofOfRelayString::new(shared_keys.secrets[i], shared_keys.secrets.get(i + 1).cloned()).to_bytes())
             .collect::<Vec<_>>();
@@ -512,15 +509,14 @@ mod tests {
         }
     }
 
-    fn mock_ticket(next_peer: &PeerId, path_len: usize, private_key: &[u8]) -> Ticket {
+    fn mock_ticket(next_peer_channel_key: &PublicKey, path_len: usize, private_key: &[u8]) -> Ticket {
         assert!(path_len > 0);
         const PRICE_PER_PACKET: u128 = 10000000000000000u128;
         const INVERSE_TICKET_WIN_PROB: u128 = 1;
 
         if path_len > 1 {
             Ticket::new(
-                PublicKey::from_peerid(next_peer).unwrap().to_address(),
-                None,
+                next_peer_channel_key.to_address(),
                 U256::zero(),
                 U256::zero(),
                 Balance::new(
@@ -532,7 +528,7 @@ mod tests {
                 private_key,
             )
         } else {
-            Ticket::new_zero_hop(PublicKey::from_peerid(next_peer).unwrap(), None, private_key)
+            Ticket::new_zero_hop(next_peer_channel_key.clone(), private_key)
         }
     }
 
@@ -540,11 +536,14 @@ mod tests {
     fn test_packet_create_and_transform(amount: usize) {
         let (mut node_private_keys, mut path) = generate_keypairs(amount);
 
+        // Generate random channel public keys
+        let channel_pub_keys = (0..amount).map(|_| PublicKey::random()).collect::<Vec<_>>();
+
         let private_key = node_private_keys.drain(..1).last().unwrap();
         let public_key = path.drain(..1).last().unwrap();
 
         // Create ticket for the first peer on the path
-        let ticket = mock_ticket(&path[0], path.len(), &private_key);
+        let ticket = mock_ticket(&channel_pub_keys[0], path.len(), &private_key);
 
         let test_message = b"some testing message";
         let mut packet = Packet::new(test_message, &path.iter().collect::<Vec<_>>(), &private_key, ticket)
@@ -570,7 +569,7 @@ mod tests {
                     assert_eq!(&test_message, &plain_text.as_ref());
                 }
                 PacketState::Forwarded { .. } => {
-                    let ticket = mock_ticket(&node_id, path.len() - i - 1, node_private);
+                    let ticket = mock_ticket(&channel_pub_keys[i], path.len() - i - 1, node_private);
                     packet.forward(node_private, ticket).unwrap();
                 }
                 PacketState::Outgoing { .. } => panic!("invalid packet state"),
