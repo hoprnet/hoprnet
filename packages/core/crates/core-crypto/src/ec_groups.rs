@@ -54,8 +54,10 @@ impl GroupElement<EdScalar> for EdwardsPoint {
 }
 
 impl GroupEncoding for OffchainPublicKey {
-    fn encode(&self) -> Box<[u8]> {
-        self.to_bytes()
+    const LENGTH: usize = 32;
+
+    fn encode(&self) -> &[u8] {
+        self.key.as_bytes()
     }
 }
 
@@ -82,8 +84,10 @@ impl Scalar for NonZeroScalar {
 }
 
 impl GroupEncoding for PublicKey {
-    fn encode(&self) -> Box<[u8]> {
-        self.to_bytes(true)
+    const LENGTH: usize = PublicKey::SIZE_COMPRESSED;
+
+    fn encode(&self) -> &[u8] {
+        self.compressed.as_bytes()
     }
 }
 
@@ -115,3 +119,23 @@ impl GroupElement<NonZeroScalar> for ProjectivePoint {
 
 /// Instantiation of Sphinx shared keys generation using Secp256k1 group
 pub type Secp256k1SharedKeys = SharedKeys<NonZeroScalar, ProjectivePoint>;
+
+#[cfg(test)]
+mod tests {
+    use curve25519_dalek::EdwardsPoint;
+    use rand::rngs::OsRng;
+    use crate::ec_groups::EdScalar;
+    use crate::shared_keys::{GroupElement, Scalar};
+
+    #[test]
+    fn test_ed_reprs() {
+        let s1 = EdScalar::random(&mut OsRng);
+        let p1 = EdwardsPoint::generate(&s1);
+
+        let p2 = EdwardsPoint::from_repr(p1.to_repr()).unwrap();
+        assert_eq!(p1, p2);
+
+        let s2 = EdScalar::from_repr(s1.to_repr()).unwrap();
+        assert_eq!(s1, s2);
+    }
+}

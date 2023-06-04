@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::ops::Add;
 use std::str::FromStr;
+use elliptic_curve::sec1::EncodedPoint;
 use rand::rngs::OsRng;
 
 use utils_log::warn;
@@ -574,7 +575,7 @@ impl OffchainPublicKey {
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct PublicKey {
     key: elliptic_curve::PublicKey<Secp256k1>,
-    compressed: Box<[u8]>,
+    pub(crate) compressed: EncodedPoint<Secp256k1>,
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -596,7 +597,7 @@ impl PublicKey {
     /// Serializes the public key to a binary form.
     pub fn to_bytes(&self, compressed: bool) -> Box<[u8]> {
         if compressed {
-            self.compressed.clone()
+            self.compressed.to_bytes()
         } else {
             self.key.as_affine().to_encoded_point(false).to_bytes()
         }
@@ -631,7 +632,7 @@ impl PeerIdLike for PublicKey {
     #[allow(deprecated)]
     fn to_peerid(&self) -> PeerId {
         PeerId::from_public_key(&lp2p_PublicKey::Secp256k1(
-            lp2p_k256_PublicKey::decode(&self.compressed).expect("cannot convert this public key to secp256k1 peer id"),
+            lp2p_k256_PublicKey::decode(self.compressed.as_bytes()).expect("cannot convert this public key to secp256k1 peer id"),
         ))
     }
 }
@@ -643,7 +644,7 @@ impl TryFrom<CurvePoint> for PublicKey {
         let key = elliptic_curve::PublicKey::<Secp256k1>::from_affine(value.affine).map_err(|_| InvalidInputValue)?;
         Ok(Self {
             key,
-            compressed: key.to_encoded_point(true).to_bytes(),
+            compressed: key.to_encoded_point(true),
         })
     }
 }
@@ -652,7 +653,7 @@ impl From<elliptic_curve::PublicKey<Secp256k1>> for PublicKey {
     fn from(key: elliptic_curve::PublicKey<Secp256k1>) -> Self {
         Self {
             key,
-            compressed: key.to_encoded_point(true).to_bytes(),
+            compressed: key.to_encoded_point(true),
         }
     }
 }
@@ -689,9 +690,9 @@ impl PublicKey {
             Ok(PublicKey {
                 key,
                 compressed: if data.len() == Self::SIZE_COMPRESSED {
-                    data.into()
+                    EncodedPoint::<Secp256k1>::from_bytes(data).map_err(|_| ParseError)?
                 } else {
-                    key.to_encoded_point(true).to_bytes()
+                    key.to_encoded_point(true)
                 },
             })
         } else {
@@ -705,7 +706,7 @@ impl PublicKey {
         let key = elliptic_curve::PublicKey::<Secp256k1>::from_secret_scalar(&secret_scalar);
         Ok(PublicKey {
             key,
-            compressed: key.to_encoded_point(true).to_bytes(),
+            compressed: key.to_encoded_point(true),
         })
     }
 
@@ -764,7 +765,7 @@ impl PublicKey {
         Self {
             key: elliptic_curve::PublicKey::<Secp256k1>::from_affine(new_pk)
                 .expect("combination results into ec identity (which is an invalid pub key)"),
-            compressed: new_pk.to_encoded_point(true).to_bytes(),
+            compressed: new_pk.to_encoded_point(true),
         }
     }
 }

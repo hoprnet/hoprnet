@@ -17,7 +17,7 @@ use crate::types::{SecretKey};
 /// Types representing a valid non-zero scalar an additive abelian group.
 pub trait Scalar: Mul<Output = Self> + Sized {
     /// Type used to represent this type externally.
-    type Repr: From<SecretKey>;
+    type Repr: From<SecretKey> + AsRef<[u8]>;
 
     /// Converts the scalar from its external representation.
     fn from_repr(repr: Self::Repr) -> Result<Self>;
@@ -30,10 +30,13 @@ pub trait Scalar: Mul<Output = Self> + Sized {
 }
 
 /// Trait a representable group element needs to implement in order
-/// to be encodable. The encoding should be space-efficient.
+/// to be encodable. The encoding should be space-efficient and fixed size.
 pub trait GroupEncoding {
+    /// Length of the encoding.
+    const LENGTH: usize;
+
     /// Encodes the group element representation. Encoding should be space efficient.
-    fn encode(&self) -> Box<[u8]>;
+    fn encode(&self) -> &[u8];
 }
 
 /// Generic additive abelian group element with an associated scalar type.
@@ -119,7 +122,7 @@ impl <E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
             let shared_secret = group_element.multiply(&coeff_prev);
 
             // Extract the shared secret from the computed EC point and copy it into the shared keys structure
-            shared_keys.push(shared_secret.extract_key(&group_element.to_repr().encode()));
+            shared_keys.push(shared_secret.extract_key(group_element.to_repr().encode()));
 
             // Stop here, we don't need to compute anything more
             if i == keys_len - 1 {
@@ -127,7 +130,7 @@ impl <E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
             }
 
             // Compute the new blinding factor b_k (alpha needs compressing first)
-            let b_k = shared_secret.expand_key(&alpha_prev.to_repr().encode());
+            let b_k = shared_secret.expand_key(alpha_prev.to_repr().encode());
             let b_k_checked = E::from_repr(b_k.into())?;
 
             // Update coeff_prev and alpha
@@ -171,7 +174,7 @@ pub mod tests {
     use super::*;
     use elliptic_curve::rand_core::OsRng;
     use hex_literal::hex;
-    use crate::ec_groups::GroupElement;
+    use k256::{NonZeroScalar, ProjectivePoint};
 
     #[test]
     fn test_extract_key_from_group_element() {
@@ -209,12 +212,12 @@ pub mod tests {
         let (pub_keys, priv_keys) = generate_random_keypairs::<E, G>(COUNT_KEYPAIRS);
 
         // Now generate the key shares for the public keys
-        let generated_shares = SharedKeys::<E, G>::generate(&mut OsRng, pub_keys).unwrap();
+        let generated_shares = SharedKeys::<E, G>::generate(&mut OsRng, pub_keys.clone()).unwrap();
         assert_eq!(COUNT_KEYPAIRS, generated_shares.secrets.len());
 
         let mut alpha_cpy = generated_shares.alpha.clone();
         for (i, priv_key) in priv_keys.into_iter().enumerate() {
-            let (alpha, secret) = SharedKeys::<E, G>::forward_transform(alpha_cpy, priv_key).unwrap();
+            let (alpha, secret) = SharedKeys::<E, G>::forward_transform(alpha_cpy, priv_key, &pub_keys[i]).unwrap();
 
             assert_eq!(secret.as_ref(), generated_shares.secrets[i]);
 
@@ -228,7 +231,7 @@ pub mod tests {
     }
 
     #[test]
-    fn test_secp256k1_shared_keys() {
+    fn test_ed25519_shared_keys() {
         generic_test_shared_keys::<curve25519_dalek::Scalar, EdwardsPoint>()
     }
 }

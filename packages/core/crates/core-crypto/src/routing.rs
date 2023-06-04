@@ -263,18 +263,16 @@ pub fn forward_header(
 
 #[cfg(test)]
 pub mod tests {
-    use k256::{NonZeroScalar, ProjectivePoint};
     use crate::parameters::SECRET_KEY_LENGTH;
     use crate::prg::{PRGParameters, PRG};
     use crate::primitives::{DigestLike, SimpleMac};
     use crate::random::random_bytes;
     use crate::routing::{forward_header, generate_filler, ForwardedHeader, RoutingInfo};
-    use crate::shared_keys::SharedKeys;
-    use crate::types::PublicKey;
     use crate::utils::xor_inplace;
     use parameterized::parameterized;
     use rand::rngs::OsRng;
-    use crate::ec_groups::{Ed25519SharedKeys, EdScalar, OffchainPublicKey};
+    use crate::ec_groups::Ed25519SharedKeys;
+    use crate::types::OffchainPublicKey;
 
     #[parameterized(hops = { 3, 4 })]
     fn test_filler_generate_verify(hops: usize) {
