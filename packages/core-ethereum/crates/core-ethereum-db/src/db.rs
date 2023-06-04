@@ -838,289 +838,332 @@ pub mod wasm {
             &self,
             filter: Option<ChannelEntry>,
         ) -> Result<WasmVecAcknowledgedTicket, JsValue> {
-            let db = self.core_ethereum_db.read().await;
+            let data = self.core_ethereum_db.clone();
+            let db = data.read().await;
             utils_misc::ok_or_jserr!(db.get_acknowledged_tickets(filter).await)
                 .map(|v| WasmVecAcknowledgedTicket::from(v))
         }
 
         #[wasm_bindgen]
-        pub async fn delete_acknowledged_tickets_from(&mut self, source: ChannelEntry) -> Result<(), JsValue> {
-            let mut db = self.core_ethereum_db.write().await;
+        pub async fn delete_acknowledged_tickets_from(&self, source: ChannelEntry) -> Result<(), JsValue> {
+            let data = self.core_ethereum_db.clone();
+            let mut db = data.write().await;
             utils_misc::ok_or_jserr!(db.delete_acknowledged_tickets_from(source).await)
         }
 
         #[wasm_bindgen]
         pub async fn store_hash_intermediaries(
-            &mut self,
+            &self,
             channel: &Hash,
             iterated_hash: JsValue,
         ) -> Result<(), JsValue> {
             let iterated: IteratedHash = utils_misc::ok_or_jserr!(serde_wasm_bindgen::from_value(iterated_hash))?;
-            let mut db = self.core_ethereum_db.write().await;
+            let data = self.core_ethereum_db.clone();
+            let mut db = data.write().await;
             utils_misc::ok_or_jserr!(db.store_hash_intermediaries(channel, &iterated).await)
         }
 
         #[wasm_bindgen]
         pub async fn get_commitment(&self, channel: &Hash, iteration: usize) -> Result<Option<Hash>, JsValue> {
-            let db = self.core_ethereum_db.read().await;
+            let data = self.core_ethereum_db.clone();
+            let db = data.read().await;
             utils_misc::ok_or_jserr!(db.get_commitment(channel, iteration).await)
         }
 
         #[wasm_bindgen]
         pub async fn get_current_commitment(&self, channel: &Hash) -> Result<Option<Hash>, JsValue> {
-            let db = self.core_ethereum_db.read().await;
+            let data = self.core_ethereum_db.clone();
+            let db = data.read().await;
             utils_misc::ok_or_jserr!(db.get_current_commitment(channel).await)
         }
 
         #[wasm_bindgen]
-        pub async fn set_current_commitment(&mut self, channel: &Hash, commitment: &Hash) -> Result<(), JsValue> {
-            let mut db = self.core_ethereum_db.write().await;
+        pub async fn set_current_commitment(&self, channel: &Hash, commitment: &Hash) -> Result<(), JsValue> {
+            let data = self.core_ethereum_db.clone();
+            let mut db = data.write().await;
             utils_misc::ok_or_jserr!(db.set_current_commitment(channel, commitment).await)
         }
 
         #[wasm_bindgen]
         pub async fn get_latest_block_number(&self) -> Result<u32, JsValue> {
-            let db = self.core_ethereum_db.read().await;
+            let data = self.core_ethereum_db.clone();
+            let db = data.read().await;
             utils_misc::ok_or_jserr!(db.get_latest_block_number().await)
         }
 
         #[wasm_bindgen]
-        pub async fn update_latest_block_number(&mut self, number: u32) -> Result<(), JsValue> {
-            let mut db = self.core_ethereum_db.write().await;
+        pub async fn update_latest_block_number(&self, number: u32) -> Result<(), JsValue> {
+            let data = self.core_ethereum_db.clone();
+            let mut db = data.write().await;
             utils_misc::ok_or_jserr!(db.update_latest_block_number(number).await)
         }
 
         #[wasm_bindgen]
         pub async fn get_latest_confirmed_snapshot(&self) -> Result<Option<Snapshot>, JsValue> {
-            let db = self.core_ethereum_db.read().await;
+            let data = self.core_ethereum_db.clone();
+            let db = data.read().await;
             utils_misc::ok_or_jserr!(db.get_latest_confirmed_snapshot().await)
         }
 
         #[wasm_bindgen]
         pub async fn get_channel(&self, channel: &Hash) -> Result<Option<ChannelEntry>, JsValue> {
-            let db = self.core_ethereum_db.read().await;
+            let data = self.core_ethereum_db.clone();
+            let db = data.read().await;
             utils_misc::ok_or_jserr!(db.get_channel(channel).await)
         }
 
         #[wasm_bindgen]
         pub async fn get_channels(&self) -> Result<WasmVecChannelEntry, JsValue> {
-            let db = self.core_ethereum_db.read().await;
+            let data = self.core_ethereum_db.clone();
+            let db = data.read().await;
             utils_misc::ok_or_jserr!(db.get_channels().await).map(|v| WasmVecChannelEntry::from(v))
         }
 
         pub async fn get_channels_open(&self) -> Result<WasmVecChannelEntry, JsValue> {
-            let db = self.core_ethereum_db.read().await;
+            let data = self.core_ethereum_db.clone();
+            let db = data.read().await;
             utils_misc::ok_or_jserr!(db.get_channels_open().await).map(|v| WasmVecChannelEntry::from(v))
         }
 
         #[wasm_bindgen]
         pub async fn update_channel_and_snapshot(
-            &mut self,
+            &self,
             channel_id: &Hash,
             channel: &ChannelEntry,
             snapshot: &Snapshot,
         ) -> Result<(), JsValue> {
-            let mut db = self.core_ethereum_db.write().await;
+            let data = self.core_ethereum_db.clone();
+            let mut db = data.write().await;
             utils_misc::ok_or_jserr!(db.update_channel_and_snapshot(channel_id, channel, snapshot).await)
         }
 
         #[wasm_bindgen]
         pub async fn get_account(&self, address: &Address) -> Result<Option<AccountEntry>, JsValue> {
-            let db = self.core_ethereum_db.read().await;
+            let data = self.core_ethereum_db.clone();
+            let db = data.read().await;
             utils_misc::ok_or_jserr!(db.get_account(address).await)
         }
 
         #[wasm_bindgen]
         pub async fn update_account_and_snapshot(
-            &mut self,
+            &self,
             account: &AccountEntry,
             snapshot: &Snapshot,
         ) -> Result<(), JsValue> {
-            let mut db = self.core_ethereum_db.write().await;
+            let data = self.core_ethereum_db.clone();
+            let mut db = data.write().await;
             utils_misc::ok_or_jserr!(db.update_account_and_snapshot(account, snapshot).await)
         }
 
         #[wasm_bindgen]
         pub async fn get_accounts(&self) -> Result<WasmVecAccountEntry, JsValue> {
-            let db = self.core_ethereum_db.read().await;
+            let data = self.core_ethereum_db.clone();
+            let db = data.read().await;
             utils_misc::ok_or_jserr!(db.get_accounts().await).map(|v| WasmVecAccountEntry::from(v))
         }
 
         #[wasm_bindgen]
         pub async fn get_public_node_accounts(&self) -> Result<WasmVecAccountEntry, JsValue> {
-            let db = self.core_ethereum_db.read().await;
+            let data = self.core_ethereum_db.clone();
+            let db = data.read().await;
             utils_misc::ok_or_jserr!(db.get_public_node_accounts().await).map(|v| WasmVecAccountEntry::from(v))
         }
 
         #[wasm_bindgen]
         pub async fn get_redeemed_tickets_value(&self) -> Result<Balance, JsValue> {
-            let db = self.core_ethereum_db.read().await;
+            let data = self.core_ethereum_db.clone();
+            let db = data.read().await;
             utils_misc::ok_or_jserr!(db.get_redeemed_tickets_value().await)
         }
 
         #[wasm_bindgen]
         pub async fn get_redeemed_tickets_count(&self) -> Result<usize, JsValue> {
-            let db = self.core_ethereum_db.read().await;
+            let data = self.core_ethereum_db.clone();
+            let db = data.read().await;
             utils_misc::ok_or_jserr!(db.get_redeemed_tickets_count().await)
         }
 
         #[wasm_bindgen]
         pub async fn get_neglected_tickets_count(&self) -> Result<usize, JsValue> {
-            let db = self.core_ethereum_db.read().await;
+            let data = self.core_ethereum_db.clone();
+            let db = data.read().await;
             utils_misc::ok_or_jserr!(db.get_neglected_tickets_count().await)
         }
 
         #[wasm_bindgen]
         pub async fn get_pending_tickets_count(&self) -> Result<usize, JsValue> {
-            let db = self.core_ethereum_db.read().await;
+            let data = self.core_ethereum_db.clone();
+            let db = data.read().await;
             utils_misc::ok_or_jserr!(db.get_pending_tickets_count().await)
         }
 
         #[wasm_bindgen]
         pub async fn get_losing_tickets_count(&self) -> Result<usize, JsValue> {
-            let db = self.core_ethereum_db.read().await;
+            let data = self.core_ethereum_db.clone();
+            let db = data.read().await;
             utils_misc::ok_or_jserr!(db.get_losing_tickets_count().await)
         }
 
         #[wasm_bindgen]
         pub async fn get_pending_balance_to(&self, counterparty: &Address) -> Result<Balance, JsValue> {
-            let db = self.core_ethereum_db.read().await;
+            let data = self.core_ethereum_db.clone();
+            let db = data.read().await;
             utils_misc::ok_or_jserr!(db.get_pending_balance_to(counterparty).await)
         }
 
         #[wasm_bindgen]
-        pub async fn mark_pending(&mut self, ticket: &Ticket) -> Result<(), JsValue> {
-            let mut db = self.core_ethereum_db.write().await;
+        pub async fn mark_pending(&self, ticket: &Ticket) -> Result<(), JsValue> {
+            let data = self.core_ethereum_db.clone();
+            let mut db = data.write().await;
             utils_misc::ok_or_jserr!(db.mark_pending(ticket).await)
         }
 
         #[wasm_bindgen]
         pub async fn resolve_pending(
-            &mut self,
+            &self,
             address: &Address,
             balance: &Balance,
             snapshot: &Snapshot,
         ) -> Result<(), JsValue> {
-            let mut db = self.core_ethereum_db.write().await;
+            let data = self.core_ethereum_db.clone();
+            let mut db = data.write().await;
             utils_misc::ok_or_jserr!(db.resolve_pending(address, balance, snapshot).await)
         }
 
         #[wasm_bindgen]
-        pub async fn mark_redeemed(&mut self, ticket: &AcknowledgedTicket) -> Result<(), JsValue> {
-            let mut db = self.core_ethereum_db.write().await;
+        pub async fn mark_redeemed(&self, ticket: &AcknowledgedTicket) -> Result<(), JsValue> {
+            let data = self.core_ethereum_db.clone();
+            let mut db = data.write().await;
             utils_misc::ok_or_jserr!(db.mark_redeemed(ticket).await)
         }
 
         /// NOTE: needed only for testing
         #[wasm_bindgen]
-        pub async fn mark_rejected(&mut self, ticket: &Ticket) -> Result<(), JsValue> {
-            let mut db = self.core_ethereum_db.write().await;
+        pub async fn mark_rejected(&self, ticket: &Ticket) -> Result<(), JsValue> {
+            let data = self.core_ethereum_db.clone();
+            let mut db = data.write().await;
             utils_misc::ok_or_jserr!(db.mark_rejected(ticket).await)
         }
 
         #[wasm_bindgen]
-        pub async fn mark_losing_acked_ticket(&mut self, ticket: &AcknowledgedTicket) -> Result<(), JsValue> {
-            let mut db = self.core_ethereum_db.write().await;
+        pub async fn mark_losing_acked_ticket(&self, ticket: &AcknowledgedTicket) -> Result<(), JsValue> {
+            let data = self.core_ethereum_db.clone();
+            let mut db = data.write().await;
             utils_misc::ok_or_jserr!(db.mark_losing_acked_ticket(ticket).await)
         }
 
         #[wasm_bindgen]
         pub async fn get_rejected_tickets_value(&self) -> Result<Balance, JsValue> {
-            let db = self.core_ethereum_db.read().await;
+            let data = self.core_ethereum_db.clone();
+            let db = data.read().await;
             utils_misc::ok_or_jserr!(db.get_rejected_tickets_value().await)
         }
 
         #[wasm_bindgen]
         pub async fn get_rejected_tickets_count(&self) -> Result<usize, JsValue> {
-            let db = self.core_ethereum_db.read().await;
+            let data = self.core_ethereum_db.clone();
+            let db = data.read().await;
             utils_misc::ok_or_jserr!(db.get_rejected_tickets_count().await)
         }
 
         #[wasm_bindgen]
         pub async fn get_channel_x(&self, src: &PublicKey, dest: &PublicKey) -> Result<Option<ChannelEntry>, JsValue> {
-            let db = self.core_ethereum_db.read().await;
+            let data = self.core_ethereum_db.clone();
+            let db = data.read().await;
             utils_misc::ok_or_jserr!(db.get_channel_x(src, dest).await)
         }
 
         #[wasm_bindgen]
         pub async fn get_channel_to(&self, dest: &PublicKey) -> Result<Option<ChannelEntry>, JsValue> {
-            let db = self.core_ethereum_db.read().await;
+            let data = self.core_ethereum_db.clone();
+            let db = data.read().await;
             utils_misc::ok_or_jserr!(db.get_channel_to(dest).await)
         }
 
         #[wasm_bindgen]
         pub async fn get_channel_from(&self, src: &PublicKey) -> Result<Option<ChannelEntry>, JsValue> {
-            let db = self.core_ethereum_db.read().await;
+            let data = self.core_ethereum_db.clone();
+            let db = data.read().await;
             utils_misc::ok_or_jserr!(db.get_channel_from(src).await)
         }
 
         #[wasm_bindgen]
         pub async fn get_channels_from(&self, address: Address) -> Result<WasmVecChannelEntry, JsValue> {
-            let db = self.core_ethereum_db.read().await;
+            let data = self.core_ethereum_db.clone();
+            let db = data.read().await;
             utils_misc::ok_or_jserr!(db.get_channels_from(address).await).map(|v| WasmVecChannelEntry::from(v))
         }
 
         #[wasm_bindgen]
         pub async fn get_channels_to(&self, address: Address) -> Result<WasmVecChannelEntry, JsValue> {
-            let db = self.core_ethereum_db.read().await;
+            let data = self.core_ethereum_db.clone();
+            let db = data.read().await;
             utils_misc::ok_or_jserr!(db.get_channels_to(address).await).map(|v| WasmVecChannelEntry::from(v))
         }
 
         #[wasm_bindgen]
         pub async fn get_hopr_balance(&self) -> Result<Balance, JsValue> {
-            let db = self.core_ethereum_db.read().await;
+            let data = self.core_ethereum_db.clone();
+            let db = data.read().await;
             utils_misc::ok_or_jserr!(db.get_hopr_balance().await)
         }
 
         #[wasm_bindgen]
-        pub async fn set_hopr_balance(&mut self, balance: &Balance) -> Result<(), JsValue> {
-            let mut db = self.core_ethereum_db.write().await;
+        pub async fn set_hopr_balance(&self, balance: &Balance) -> Result<(), JsValue> {
+            let data = self.core_ethereum_db.clone();
+            let mut db = data.write().await;
             utils_misc::ok_or_jserr!(db.set_hopr_balance(balance).await)
         }
 
         #[wasm_bindgen]
-        pub async fn add_hopr_balance(&mut self, balance: &Balance, snapshot: &Snapshot) -> Result<(), JsValue> {
-            let mut db = self.core_ethereum_db.write().await;
+        pub async fn add_hopr_balance(&self, balance: &Balance, snapshot: &Snapshot) -> Result<(), JsValue> {
+            let data = self.core_ethereum_db.clone();
+            let mut db = data.write().await;
             utils_misc::ok_or_jserr!(db.add_hopr_balance(balance, snapshot).await)
         }
 
         #[wasm_bindgen]
-        pub async fn sub_hopr_balance(&mut self, balance: &Balance, snapshot: &Snapshot) -> Result<(), JsValue> {
-            let mut db = self.core_ethereum_db.write().await;
+        pub async fn sub_hopr_balance(&self, balance: &Balance, snapshot: &Snapshot) -> Result<(), JsValue> {
+            let data = self.core_ethereum_db.clone();
+            let mut db = data.write().await;
             utils_misc::ok_or_jserr!(db.sub_hopr_balance(balance, snapshot).await)
         }
 
         #[wasm_bindgen]
         pub async fn is_network_registry_enabled(&self) -> Result<bool, JsValue> {
-            let db = self.core_ethereum_db.read().await;
+            let data = self.core_ethereum_db.clone();
+            let db = data.read().await;
             utils_misc::ok_or_jserr!(db.is_network_registry_enabled().await)
         }
 
         #[wasm_bindgen]
-        pub async fn set_network_registry(&mut self, enabled: bool, snapshot: &Snapshot) -> Result<(), JsValue> {
-            let mut db = self.core_ethereum_db.write().await;
+        pub async fn set_network_registry(&self, enabled: bool, snapshot: &Snapshot) -> Result<(), JsValue> {
+            let data = self.core_ethereum_db.clone();
+            let mut db = data.write().await;
             utils_misc::ok_or_jserr!(db.set_network_registry(enabled, snapshot).await)
         }
 
         #[wasm_bindgen]
         pub async fn add_to_network_registry(
-            &mut self,
+            &self,
             public_key: &PublicKey,
             account: &Address,
             snapshot: &Snapshot,
         ) -> Result<(), JsValue> {
-            let mut db = self.core_ethereum_db.write().await;
+            let data = self.core_ethereum_db.clone();
+            let mut db = data.write().await;
             utils_misc::ok_or_jserr!(db.add_to_network_registry(public_key, account, snapshot).await)
         }
 
         #[wasm_bindgen]
         pub async fn remove_from_network_registry(
-            &mut self,
+            &self,
             public_key: &PublicKey,
             account: &Address,
             snapshot: &Snapshot,
         ) -> Result<(), JsValue> {
-            let mut db = self.core_ethereum_db.write().await;
+            let data = self.core_ethereum_db.clone();
+            let mut db = data.write().await;
             utils_misc::ok_or_jserr!(db.remove_from_network_registry(public_key, account, snapshot).await)
         }
 
@@ -1129,7 +1172,8 @@ pub mod wasm {
             &self,
             public_key: &PublicKey,
         ) -> Result<Option<Address>, JsValue> {
-            let db = self.core_ethereum_db.read().await;
+            let data = self.core_ethereum_db.clone();
+            let db = data.read().await;
             utils_misc::ok_or_jserr!(db.get_account_from_network_registry(public_key).await)
         }
 
@@ -1138,43 +1182,49 @@ pub mod wasm {
             &self,
             account: &Address,
         ) -> Result<WasmVecPublicKey, JsValue> {
-            let db = self.core_ethereum_db.read().await;
+            let data = self.core_ethereum_db.clone();
+            let db = data.read().await;
             utils_misc::ok_or_jserr!(db.find_hopr_node_using_account_in_network_registry(account).await)
                 .map(|v| WasmVecPublicKey::from(v))
         }
 
         #[wasm_bindgen]
         pub async fn is_eligible(&self, account: &Address) -> Result<bool, JsValue> {
-            let db = self.core_ethereum_db.read().await;
+            let data = self.core_ethereum_db.clone();
+            let db = data.read().await;
             utils_misc::ok_or_jserr!(db.is_eligible(account).await)
         }
 
         #[wasm_bindgen]
         pub async fn set_eligible(
-            &mut self,
+            &self,
             account: &Address,
             eligible: bool,
             snapshot: &Snapshot,
         ) -> Result<(), JsValue> {
-            let mut db = self.core_ethereum_db.write().await;
+            let data = self.core_ethereum_db.clone();
+            let mut db = data.write().await;
             utils_misc::ok_or_jserr!(db.set_eligible(account, eligible, snapshot).await)
         }
 
         #[wasm_bindgen]
-        pub async fn store_authorization(&mut self, token: AuthorizationToken) -> Result<(), JsValue> {
-            let mut db = self.core_ethereum_db.write().await;
+        pub async fn store_authorization(&self, token: AuthorizationToken) -> Result<(), JsValue> {
+            let data = self.core_ethereum_db.clone();
+            let mut db = data.write().await;
             utils_misc::ok_or_jserr!(db.store_authorization(token).await)
         }
 
         #[wasm_bindgen]
         pub async fn retrieve_authorization(&self, id: String) -> Result<Option<AuthorizationToken>, JsValue> {
-            let db = self.core_ethereum_db.read().await;
+            let data = self.core_ethereum_db.clone();
+            let db = data.read().await;
             utils_misc::ok_or_jserr!(db.retrieve_authorization(id).await)
         }
 
         #[wasm_bindgen]
-        pub async fn delete_authorization(&mut self, id: String) -> Result<(), JsValue> {
-            let mut db = self.core_ethereum_db.write().await;
+        pub async fn delete_authorization(&self, id: String) -> Result<(), JsValue> {
+            let data = self.core_ethereum_db.clone();
+            let mut db = data.write().await;
             utils_misc::ok_or_jserr!(db.delete_authorization(id).await)
         }
     }
