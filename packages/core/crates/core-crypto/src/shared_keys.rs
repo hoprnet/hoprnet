@@ -3,20 +3,16 @@ use blake2::Blake2s256;
 use std::ops::Mul;
 
 use elliptic_curve::rand_core::{CryptoRng, RngCore};
-use elliptic_curve::Group;
 
-use k256::{NonZeroScalar, ProjectivePoint};
-
-use crate::errors::CryptoError::{CalculationError, InvalidSecretScalar};
+use crate::errors::CryptoError::CalculationError;
 use hkdf::SimpleHkdf;
 use libp2p_identity::PeerId;
 use rand::rngs::OsRng;
 use utils_types::traits::PeerIdLike;
 
 use crate::errors::Result;
-use crate::ec_groups::{GroupElement, GroupEncoding};
 use crate::parameters::SECRET_KEY_LENGTH;
-use crate::types::{CurvePoint, PublicKey, SecretKey};
+use crate::types::{SecretKey};
 
 /// Types representing a valid non-zero scalar an additive abelian group.
 pub trait Scalar: Mul<Output = Self> + Sized {
@@ -151,13 +147,12 @@ impl <E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
     }
 
     /// Calculates the forward transformation for the given the local private key.
-    pub fn forward_transform(alpha: G::Repr, private_key: E::Repr) -> Result<(G::Repr, SecretKey)> {
+    pub fn forward_transform(alpha: G::Repr, private_key: E::Repr, public_key: &G::Repr) -> Result<(G::Repr, SecretKey)> {
         let private_scalar = E::from_repr(private_key)?;
-        let public_key = G::generate(&private_scalar);
-        let alpha_point = G::from_repr(alpha)?;
 
+        let alpha_point = G::from_repr(alpha)?;
         let s_k = alpha_point.multiply(&private_scalar);
-        let secret = s_k.extract_key(&public_key.to_repr().encode());
+        let secret = s_k.extract_key(&public_key.encode());
 
         let b_k = s_k.expand_key(&alpha_point.to_repr().encode());
         let b_k_checked = E::from_repr(b_k.into())?;

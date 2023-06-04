@@ -3,7 +3,7 @@ use crate::errors::Result;
 use crate::packet::{Packet, PacketState};
 use crate::path::Path;
 use async_std::channel::{bounded, Receiver, Sender, TrySendError};
-use core_crypto::types::{HalfKeyChallenge, Hash,  PublicKey};
+use core_crypto::types::{HalfKeyChallenge, Hash, OffchainPublicKey, PublicKey};
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_mixer::mixer::{Mixer, MixerConfig};
 use core_types::acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket};
@@ -669,10 +669,12 @@ where
         T: Fn(Box<[u8]>, String) -> F,
         F: futures::Future<Output = core::result::Result<(), String>>,
     {
+        // Precompute the public key from the private key we were given
+        let public_key = OffchainPublicKey::from_privkey(&self.cfg.private_key).expect("invalid private key given");
         while let Ok(payload) = self.incoming_packets.1.recv().await {
             // Add some random delay via mixer
             let mixed_packet = self.mixer.mix(payload).await;
-            match Packet::from_bytes(&mixed_packet.data, &self.cfg.private_key, &mixed_packet.remote_peer) {
+            match Packet::from_bytes(&mixed_packet.data, &self.cfg.private_key, &public_key,&mixed_packet.remote_peer) {
                 Ok(packet) => {
                     if let Err(e) = self
                         .handle_mixed_packet(packet, ack_interaction.clone(), message_transport)

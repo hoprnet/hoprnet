@@ -3,15 +3,12 @@ use curve25519_dalek::EdwardsPoint;
 use curve25519_dalek::traits::IsIdentity;
 use rand::{CryptoRng, RngCore};
 use k256::{NonZeroScalar, ProjectivePoint};
-use hkdf::SimpleHkdf;
-use blake2::Blake2s256;
 use elliptic_curve::Group;
-use utils_types::traits::{BinarySerializable, PeerIdLike};
+use utils_types::traits::BinarySerializable;
 use crate::errors::CryptoError::{CalculationError, InvalidSecretScalar};
 use crate::errors::Result;
-use crate::parameters::SECRET_KEY_LENGTH;
 use crate::shared_keys::{GroupElement, GroupEncoding, Scalar, SharedKeys};
-use crate::types::{CurvePoint, OffchainPublicKey, PublicKey, SecretKey};
+use crate::types::{CurvePoint, OffchainPublicKey, PublicKey };
 
 pub type EdScalar = curve25519_dalek::Scalar;
 
