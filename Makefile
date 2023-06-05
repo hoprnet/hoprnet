@@ -137,10 +137,10 @@ install-foundry: ## install foundry
 	fi
 	@if [[ "${name}" =~ nix-shell* ]]; then \
 		echo "Patching foundry binaries"; \
-		patchelf --interpreter `cat ${NIX_CC}/nix-support/dynamic-linker` .foundry/bin/anvil; \
-		patchelf --interpreter `cat ${NIX_CC}/nix-support/dynamic-linker` .foundry/bin/cast; \
-		patchelf --interpreter `cat ${NIX_CC}/nix-support/dynamic-linker` .foundry/bin/forge; \
-		patchelf --interpreter `cat ${NIX_CC}/nix-support/dynamic-linker` .foundry/bin/chisel; \
+		patchelf --interpreter `cat ${NIX_CC}/nix-support/dynamic-linker` .foundry/bin/anvil || :; \
+		patchelf --interpreter `cat ${NIX_CC}/nix-support/dynamic-linker` .foundry/bin/cast || :; \
+		patchelf --interpreter `cat ${NIX_CC}/nix-support/dynamic-linker` .foundry/bin/forge || :; \
+		patchelf --interpreter `cat ${NIX_CC}/nix-support/dynamic-linker` .foundry/bin/chisel || :; \
 	fi
 	@forge --version
 	@anvil --version
