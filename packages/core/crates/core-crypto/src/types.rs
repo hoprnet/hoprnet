@@ -1,6 +1,3 @@
-use curve25519_dalek::edwards::CompressedEdwardsY;
-use curve25519_dalek::traits::IsIdentity;
-use curve25519_dalek::EdwardsPoint;
 use elliptic_curve::{NonZeroScalar, ProjectivePoint};
 use k256::ecdsa::signature::hazmat::PrehashVerifier;
 use k256::ecdsa::signature::Verifier;
@@ -15,7 +12,6 @@ use std::fmt::{Display, Formatter};
 use std::ops::Add;
 use std::str::FromStr;
 use elliptic_curve::sec1::EncodedPoint;
-use rand::rngs::OsRng;
 
 use utils_log::warn;
 use utils_types::errors::GeneralError;
@@ -24,11 +20,11 @@ use utils_types::errors::GeneralError::ParseError;
 use utils_types::primitives::{Address, EthereumChallenge};
 use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
 
-use crate::errors::CryptoError::{InvalidInputValue, InvalidSecretScalar};
+use crate::errors::CryptoError::InvalidInputValue;
 use crate::errors::{CryptoError, CryptoError::CalculationError, Result};
 use crate::parameters::SECRET_KEY_LENGTH;
 use crate::primitives::{DigestLike, EthDigest};
-use crate::random::random_group_element;
+use crate::random::{random_bytes, random_group_element};
 
 /// Represents a secret key of fixed length
 pub type SecretKey = [u8; SECRET_KEY_LENGTH];
@@ -496,7 +492,7 @@ impl Hash {
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct OffchainPublicKey {
-    pub(crate) key: CompressedEdwardsY,
+    pub(crate) key: ed25519_dalek::PublicKey,
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -515,7 +511,7 @@ impl BinarySerializable<'_> for OffchainPublicKey {
     fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
             Ok(Self {
-                key: CompressedEdwardsY::from_slice(data).map_err(|_| ParseError)?,
+                key: ed25519_dalek::PublicKey::from_bytes(data).map_err(|_| ParseError)?
             })
         } else {
             Err(ParseError)
@@ -553,19 +549,13 @@ impl Display for OffchainPublicKey {
 impl OffchainPublicKey {
     /// Generates new random keypair (private key, public key)
     pub fn random_keypair() -> ([u8; 32], Self) {
-        let scalar = curve25519_dalek::Scalar::random(&mut OsRng);
-        let point = EdwardsPoint::mul_base(&scalar);
-        (scalar.to_bytes(), Self { key: point.compress() })
+        let sk = ed25519_dalek::SecretKey::from_bytes(&random_bytes::<32>()).unwrap();
+        (sk.to_bytes(), Self { key: (&sk).into() })
     }
 
-    pub fn from_privkey(key: &[u8]) -> Result<Self> {
-        let scalar = curve25519_dalek::Scalar::from_bytes_mod_order(key.try_into().map_err(|_| InvalidInputValue)?);
-        let point = EdwardsPoint::mul_base(&scalar);
-        if !point.is_identity() && !point.is_small_order() {
-            Ok(Self { key: point.compress() })
-        } else {
-            Err(InvalidSecretScalar)
-        }
+    pub fn from_privkey(private_key: &[u8]) -> Result<Self> {
+        let sk = ed25519_dalek::SecretKey::from_bytes(private_key).map_err(|_| InvalidInputValue)?;
+        Ok (Self { key: ed25519_dalek::PublicKey::from(&sk) })
     }
 }
 
