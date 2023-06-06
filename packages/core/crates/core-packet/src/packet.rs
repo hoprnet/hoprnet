@@ -97,28 +97,27 @@ impl MetaPacket {
         assert!(msg.len() <= PAYLOAD_SIZE, "message too long to fit into a packet");
 
         let mut padded = add_padding(msg);
-        let secrets = shared_keys.secrets.iter().map(|s| s.as_slice()).collect::<Vec<_>>();
         let routing_info = RoutingInfo::new(
             max_hops,
             &path
                 .iter()
                 .map(|peer| OffchainPublicKey::from_peerid(peer).unwrap_or_else(|e| panic!("invalid peer id given: {e}")))
                 .collect::<Vec<_>>(),
-            &secrets,
+            &shared_keys.secrets,
             additional_relayer_data_len,
             additional_data_relayer,
             additional_data_last_hop,
         );
 
         // Encrypt packet payload using the derived shared secrets
-        for secret in secrets.iter().rev() {
+        for secret in shared_keys.secrets.iter().rev() {
             let prp = PRP::from_parameters(PRPParameters::new(secret));
             prp.forward_inplace(&mut padded)
                 .unwrap_or_else(|e| panic!("onion encryption error {e}"))
         }
 
         MetaPacket::new_from_parts(
-            &shared_keys.alpha.encode(),
+            &shared_keys.alpha,
             &routing_info.routing_information,
             &routing_info.mac,
             &padded,
@@ -191,7 +190,7 @@ impl MetaPacket {
         additional_data_last_hop_len: usize,
     ) -> Result<ForwardedMetaPacket> {
         let (alpha, secret) = Ed25519SharedKeys::forward_transform(
-            OffchainPublicKey::from_bytes(self.alpha())?,
+            self.alpha(),
             node_private_key.try_into().expect("invalid packet private key"),
             node_public_key
         )?;

@@ -11,6 +11,7 @@ use crate::utils::xor_inplace;
 use std::ops::Not;
 use subtle::ConstantTimeEq;
 use utils_types::traits::BinarySerializable;
+use crate::shared_keys::SharedSecret;
 use crate::types::OffchainPublicKey;
 
 const RELAYER_END_PREFIX: u8 = 0xff;
@@ -31,7 +32,7 @@ fn generate_filler(
     max_hops: usize,
     routing_info_len: usize,
     routing_info_last_hop_len: usize,
-    secrets: &[&[u8]],
+    secrets: &[SharedSecret],
 ) -> Box<[u8]> {
     if secrets.len() < 2 {
         return vec![].into_boxed_slice();
@@ -49,7 +50,7 @@ fn generate_filler(
     let mut start = header_len;
 
     for &secret in secrets.iter().take(secrets.len() - 1) {
-        let prg = PRG::from_parameters(PRGParameters::new(secret));
+        let prg = PRG::from_parameters(PRGParameters::new(&secret));
 
         let digest = prg.digest(start, header_len + routing_info_len);
         xor_inplace(&mut ret[0..length], digest.as_ref());
@@ -88,7 +89,7 @@ impl RoutingInfo {
     pub fn new(
         max_hops: usize,
         path: &[OffchainPublicKey],
-        secrets: &[&[u8]],
+        secrets: &[SharedSecret],
         additional_data_relayer_len: usize,
         additional_data_relayer: &[&[u8]],
         additional_data_last_hop: Option<&[u8]>,
@@ -124,7 +125,7 @@ impl RoutingInfo {
         for idx in 0..secrets.len() {
             let inverted_idx = secrets.len() - idx - 1;
             let secret = secrets[inverted_idx];
-            let prg = PRG::from_parameters(PRGParameters::new(secret));
+            let prg = PRG::from_parameters(PRGParameters::new(&secret));
 
             if idx == 0 {
                 extended_header[0] = RELAYER_END_PREFIX;
@@ -160,7 +161,7 @@ impl RoutingInfo {
                 xor_inplace(&mut extended_header, &key_stream);
             }
 
-            let mut m = derive_mac_key(secret).and_then(|k| SimpleMac::new(&k)).unwrap();
+            let mut m = derive_mac_key(&secret).and_then(|k| SimpleMac::new(&k)).unwrap();
             m.update(&extended_header[0..header_len]);
             m.finalize_into(&mut ret.mac);
         }
@@ -345,7 +346,10 @@ pub mod tests {
             additional_data.push(e);
         }
 
-        let pub_keys = (0..amount).into_iter().map(|_| OffchainPublicKey::random()).collect::<Vec<_>>();
+        let pub_keys = (0..amount)
+            .into_iter()
+            .map(|_| OffchainPublicKey::random())
+            .collect::<Vec<_>>();
 
         let shares = Ed25519SharedKeys::generate(&mut OsRng, pub_keys.clone()).unwrap();
 
