@@ -2,10 +2,11 @@
 fs_permissions = [{ access = "read-write", path = "./"}]
 
 [rpc_endpoints]
-# The RPC URLs below match the StdChains URLs but append a trailing slash for testing.
-mainnet = "https://api.mycryptoapi.com/eth/"
-optimism_goerli = "https://goerli.optimism.io/"
-arbitrum_one_goerli = "https://goerli-rollup.arbitrum.io/rpc/"
+# The RPC URLs are modified versions of the default for testing initialization.
+mainnet = "https://mainnet.infura.io/v3/b1d3925804e74152b316ca7da97060d3" # Different API key.
+optimism_goerli = "https://goerli.optimism.io/" # Adds a trailing slash.
+arbitrum_one_goerli = "https://goerli-rollup.arbitrum.io/rpc/" # Adds a trailing slash.
+needs_undefined_env_var = "${UNDEFINED_RPC_URL_PLACEHOLDER}"
 
 [fmt]
 # These are all the `forge fmt` defaults.

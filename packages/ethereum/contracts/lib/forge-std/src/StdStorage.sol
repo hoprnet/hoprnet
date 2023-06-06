@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.6.2 <0.9.0;
 
-import "./Vm.sol";
+import {Vm} from "./Vm.sol";
 
 struct StdStorage {
     mapping(address => mapping(bytes4 => mapping(bytes32 => uint256))) slots;
@@ -88,7 +88,7 @@ library stdStorageSafe {
                 vm.store(who, reads[i], prev);
             }
         } else {
-            require(false, "stdStorage find(StdStorage): No storage use detected for target.");
+            revert("stdStorage find(StdStorage): No storage use detected for target.");
         }
 
         require(

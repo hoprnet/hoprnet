@@ -3,31 +3,14 @@ pragma solidity >=0.6.2 <0.9.0;
 
 pragma experimental ABIEncoderV2;
 
-import "./StdStorage.sol";
-import "./Vm.sol";
+import {StdStorage, stdStorage} from "./StdStorage.sol";
+import {Vm} from "./Vm.sol";
+import {console2} from "./console2.sol";
 
 abstract contract StdCheatsSafe {
-    VmSafe private constant vm = VmSafe(address(uint160(uint256(keccak256("hevm cheat code")))));
+    Vm private constant vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
 
-    /// @dev To hide constructor warnings across solc versions due to different constructor visibility requirements and
-    /// syntaxes, we put the constructor in a private method and assign an unused return value to a variable. This
-    /// forces the method to run during construction, but without declaring an explicit constructor.
-    uint256 private CONSTRUCTOR = _constructor();
-
-    struct Chain {
-        // The chain name, using underscores as the separator to match `foundry.toml` conventions.
-        string name;
-        // The chain's Chain ID.
-        uint256 chainId;
-        // A default RPC endpoint for this chain.
-        // NOTE: This default RPC URL is included for convenience to facilitate quick tests and
-        // experimentation. Do not use this RPC URL for production test suites, CI, or other heavy
-        // usage as you will be throttled and this is a disservice to others who need this endpoint.
-        string rpcUrl;
-    }
-
-    // Maps from a chain's name (matching what's in the `foundry.toml` file) to chain data.
-    mapping(string => Chain) internal stdChains;
+    bool private gasMeteringOff;
 
     // Data structures to parse Transaction objects from the broadcast artifact
     // that conform to EIP1559. The Raw structs is what is parsed from the JSON
@@ -206,35 +189,33 @@ abstract contract StdCheatsSafe {
         string value;
     }
 
-    function _constructor() private returns (uint256) {
-        // Initialize `stdChains` with the defaults.
-        stdChains["anvil"] = Chain("Anvil", 31337, "http://127.0.0.1:8545");
-        stdChains["hardhat"] = Chain("Hardhat", 31337, "http://127.0.0.1:8545");
-        stdChains["mainnet"] = Chain("Mainnet", 1, "https://api.mycryptoapi.com/eth");
-        stdChains["goerli"] = Chain("Goerli", 5, "https://goerli.infura.io/v3/6770454bc6ea42c58aac12978531b93f");
-        stdChains["sepolia"] = Chain("Sepolia", 11155111, "https://rpc.sepolia.dev");
-        stdChains["optimism"] = Chain("Optimism", 10, "https://mainnet.optimism.io");
-        stdChains["optimism_goerli"] = Chain("Optimism Goerli", 420, "https://goerli.optimism.io");
-        stdChains["arbitrum_one"] = Chain("Arbitrum One", 42161, "https://arb1.arbitrum.io/rpc");
-        stdChains["arbitrum_one_goerli"] = Chain("Arbitrum One Goerli", 421613, "https://goerli-rollup.arbitrum.io/rpc");
-        stdChains["arbitrum_nova"] = Chain("Arbitrum Nova", 42170, "https://nova.arbitrum.io/rpc");
-        stdChains["polygon"] = Chain("Polygon", 137, "https://polygon-rpc.com");
-        stdChains["polygon_mumbai"] = Chain("Polygon Mumbai", 80001, "https://rpc-mumbai.matic.today");
-        stdChains["avalanche"] = Chain("Avalanche", 43114, "https://api.avax.network/ext/bc/C/rpc");
-        stdChains["avalanche_fuji"] = Chain("Avalanche Fuji", 43113, "https://api.avax-test.network/ext/bc/C/rpc");
-        stdChains["bnb_smart_chain"] = Chain("BNB Smart Chain", 56, "https://bsc-dataseed1.binance.org");
-        stdChains["bnb_smart_chain_testnet"] = Chain("BNB Smart Chain Testnet", 97, "https://data-seed-prebsc-1-s1.binance.org:8545");// forgefmt: disable-line
-        stdChains["gnosis_chain"] = Chain("Gnosis Chain", 100, "https://rpc.gnosischain.com");
-
-        // Loop over RPC URLs in the config file to replace the default RPC URLs
-        Vm.Rpc[] memory rpcs = vm.rpcUrlStructs();
-        for (uint256 i = 0; i < rpcs.length; i++) {
-            stdChains[rpcs[i].name].rpcUrl = rpcs[i].url;
-        }
-        return 0;
+    struct Account {
+        address addr;
+        uint256 key;
     }
 
-    function assumeNoPrecompiles(address addr) internal view virtual {
+    // Checks that `addr` is not blacklisted by token contracts that have a blacklist.
+    function assumeNoBlacklisted(address token, address addr) internal virtual {
+        // Nothing to check if `token` is not a contract.
+        uint256 tokenCodeSize;
+        assembly {
+            tokenCodeSize := extcodesize(token)
+        }
+        require(tokenCodeSize > 0, "StdCheats assumeNoBlacklisted(address,address): Token address is not a contract.");
+
+        bool success;
+        bytes memory returnData;
+
+        // 4-byte selector for `isBlacklisted(address)`, used by USDC.
+        (success, returnData) = token.staticcall(abi.encodeWithSelector(0xfe575a87, addr));
+        vm.assume(!success || abi.decode(returnData, (bool)) == false);
+
+        // 4-byte selector for `isBlackListed(address)`, used by USDT.
+        (success, returnData) = token.staticcall(abi.encodeWithSelector(0xe47d6060, addr));
+        vm.assume(!success || abi.decode(returnData, (bool)) == false);
+    }
+
+    function assumeNoPrecompiles(address addr) internal virtual {
         // Assembly required since `block.chainid` was introduced in 0.8.0.
         uint256 chainId;
         assembly {
@@ -243,7 +224,7 @@ abstract contract StdCheatsSafe {
         assumeNoPrecompiles(addr, chainId);
     }
 
-    function assumeNoPrecompiles(address addr, uint256 chainId) internal view virtual {
+    function assumeNoPrecompiles(address addr, uint256 chainId) internal pure virtual {
         // Note: For some chains like Optimism these are technically predeploys (i.e. bytecode placed at a specific
         // address), but the same rationale for excluding them applies so we include those too.
 
@@ -251,13 +232,13 @@ abstract contract StdCheatsSafe {
         vm.assume(addr < address(0x1) || addr > address(0x9));
 
         // forgefmt: disable-start
-        if (chainId == stdChains["optimism"].chainId || chainId == stdChains["optimism_goerli"].chainId) {
+        if (chainId == 10 || chainId == 420) {
             // https://github.com/ethereum-optimism/optimism/blob/eaa371a0184b56b7ca6d9eb9cb0a2b78b2ccd864/op-bindings/predeploys/addresses.go#L6-L21
             vm.assume(addr < address(0x4200000000000000000000000000000000000000) || addr > address(0x4200000000000000000000000000000000000800));
-        } else if (chainId == stdChains["arbitrum_one"].chainId || chainId == stdChains["arbitrum_one_goerli"].chainId) {
+        } else if (chainId == 42161 || chainId == 421613) {
             // https://developer.arbitrum.io/useful-addresses#arbitrum-precompiles-l2-same-on-all-arb-chains
             vm.assume(addr < address(0x0000000000000000000000000000000000000064) || addr > address(0x0000000000000000000000000000000000000068));
-        } else if (chainId == stdChains["avalanche"].chainId || chainId == stdChains["avalanche_fuji"].chainId) {
+        } else if (chainId == 43114 || chainId == 43113) {
             // https://github.com/ava-labs/subnet-evm/blob/47c03fd007ecaa6de2c52ea081596e0a88401f58/precompile/params.go#L18-L59
             vm.assume(addr < address(0x0100000000000000000000000000000000000000) || addr > address(0x01000000000000000000000000000000000000ff));
             vm.assume(addr < address(0x0200000000000000000000000000000000000000) || addr > address(0x02000000000000000000000000000000000000FF));
@@ -315,10 +296,10 @@ abstract contract StdCheatsSafe {
         txDetail.data = rawDetail.data;
         txDetail.from = rawDetail.from;
         txDetail.to = rawDetail.to;
-        txDetail.nonce = bytesToUint(rawDetail.nonce);
-        txDetail.txType = bytesToUint(rawDetail.txType);
-        txDetail.value = bytesToUint(rawDetail.value);
-        txDetail.gas = bytesToUint(rawDetail.gas);
+        txDetail.nonce = _bytesToUint(rawDetail.nonce);
+        txDetail.txType = _bytesToUint(rawDetail.txType);
+        txDetail.value = _bytesToUint(rawDetail.value);
+        txDetail.gas = _bytesToUint(rawDetail.gas);
         txDetail.accessList = rawDetail.accessList;
         return txDetail;
     }
@@ -368,12 +349,12 @@ abstract contract StdCheatsSafe {
         receipt.to = rawReceipt.to;
         receipt.from = rawReceipt.from;
         receipt.contractAddress = rawReceipt.contractAddress;
-        receipt.effectiveGasPrice = bytesToUint(rawReceipt.effectiveGasPrice);
-        receipt.cumulativeGasUsed = bytesToUint(rawReceipt.cumulativeGasUsed);
-        receipt.gasUsed = bytesToUint(rawReceipt.gasUsed);
-        receipt.status = bytesToUint(rawReceipt.status);
-        receipt.transactionIndex = bytesToUint(rawReceipt.transactionIndex);
-        receipt.blockNumber = bytesToUint(rawReceipt.blockNumber);
+        receipt.effectiveGasPrice = _bytesToUint(rawReceipt.effectiveGasPrice);
+        receipt.cumulativeGasUsed = _bytesToUint(rawReceipt.cumulativeGasUsed);
+        receipt.gasUsed = _bytesToUint(rawReceipt.gasUsed);
+        receipt.status = _bytesToUint(rawReceipt.status);
+        receipt.transactionIndex = _bytesToUint(rawReceipt.transactionIndex);
+        receipt.blockNumber = _bytesToUint(rawReceipt.blockNumber);
         receipt.logs = rawToConvertedReceiptLogs(rawReceipt.logs);
         receipt.logsBloom = rawReceipt.logsBloom;
         receipt.transactionHash = rawReceipt.transactionHash;
@@ -390,12 +371,12 @@ abstract contract StdCheatsSafe {
         for (uint256 i; i < rawLogs.length; i++) {
             logs[i].logAddress = rawLogs[i].logAddress;
             logs[i].blockHash = rawLogs[i].blockHash;
-            logs[i].blockNumber = bytesToUint(rawLogs[i].blockNumber);
+            logs[i].blockNumber = _bytesToUint(rawLogs[i].blockNumber);
             logs[i].data = rawLogs[i].data;
-            logs[i].logIndex = bytesToUint(rawLogs[i].logIndex);
+            logs[i].logIndex = _bytesToUint(rawLogs[i].logIndex);
             logs[i].topics = rawLogs[i].topics;
-            logs[i].transactionIndex = bytesToUint(rawLogs[i].transactionIndex);
-            logs[i].transactionLogIndex = bytesToUint(rawLogs[i].transactionLogIndex);
+            logs[i].transactionIndex = _bytesToUint(rawLogs[i].transactionIndex);
+            logs[i].transactionLogIndex = _bytesToUint(rawLogs[i].transactionLogIndex);
             logs[i].removed = rawLogs[i].removed;
         }
         return logs;
@@ -457,6 +438,25 @@ abstract contract StdCheatsSafe {
         (addr,) = makeAddrAndKey(name);
     }
 
+    // Destroys an account immediately, sending the balance to beneficiary.
+    // Destroying means: balance will be zero, code will be empty, and nonce will be 0
+    // This is similar to selfdestruct but not identical: selfdestruct destroys code and nonce
+    // only after tx ends, this will run immediately.
+    function destroyAccount(address who, address beneficiary) internal virtual {
+        uint256 currBalance = who.balance;
+        vm.etch(who, abi.encode());
+        vm.deal(who, 0);
+        vm.resetNonce(who);
+
+        uint256 beneficiaryBalance = beneficiary.balance;
+        vm.deal(beneficiary, currBalance + beneficiaryBalance);
+    }
+
+    // creates a struct containing both a labeled address and the corresponding private key
+    function makeAccount(string memory name) internal virtual returns (Account memory account) {
+        (account.addr, account.key) = makeAddrAndKey(name);
+    }
+
     function deriveRememberKey(string memory mnemonic, uint32 index)
         internal
         virtual
@@ -466,12 +466,55 @@ abstract contract StdCheatsSafe {
         who = vm.rememberKey(privateKey);
     }
 
-    function bytesToUint(bytes memory b) private pure returns (uint256) {
-        uint256 number;
-        for (uint256 i = 0; i < b.length; i++) {
-            number = number + uint256(uint8(b[i])) * (2 ** (8 * (b.length - (i + 1))));
+    function _bytesToUint(bytes memory b) private pure returns (uint256) {
+        require(b.length <= 32, "StdCheats _bytesToUint(bytes): Bytes length exceeds 32.");
+        return abi.decode(abi.encodePacked(new bytes(32 - b.length), b), (uint256));
+    }
+
+    function isFork() internal view virtual returns (bool status) {
+        try vm.activeFork() {
+            status = true;
+        } catch (bytes memory) {}
+    }
+
+    modifier skipWhenForking() {
+        if (!isFork()) {
+            _;
         }
-        return number;
+    }
+
+    modifier skipWhenNotForking() {
+        if (isFork()) {
+            _;
+        }
+    }
+
+    modifier noGasMetering() {
+        vm.pauseGasMetering();
+        // To prevent turning gas monitoring back on with nested functions that use this modifier,
+        // we check if gasMetering started in the off position. If it did, we don't want to turn
+        // it back on until we exit the top level function that used the modifier
+        //
+        // i.e. funcA() noGasMetering { funcB() }, where funcB has noGasMetering as well.
+        // funcA will have `gasStartedOff` as false, funcB will have it as true,
+        // so we only turn metering back on at the end of the funcA
+        bool gasStartedOff = gasMeteringOff;
+        gasMeteringOff = true;
+
+        _;
+
+        // if gas metering was on when this modifier was called, turn it back on at the end
+        if (!gasStartedOff) {
+            gasMeteringOff = false;
+            vm.resumeGasMetering();
+        }
+    }
+
+    // a cheat for fuzzing addresses that are payable only
+    // see https://github.com/foundry-rs/foundry/issues/3631
+    function assumePayable(address addr) internal virtual {
+        (bool success,) = payable(addr).call{value: 0}("");
+        vm.assume(success);
     }
 }
 
@@ -492,52 +535,57 @@ abstract contract StdCheats is StdCheatsSafe {
     }
 
     // Setup a prank from an address that has some ether
-    function hoax(address who) internal virtual {
-        vm.deal(who, 1 << 128);
-        vm.prank(who);
+    function hoax(address msgSender) internal virtual {
+        vm.deal(msgSender, 1 << 128);
+        vm.prank(msgSender);
     }
 
-    function hoax(address who, uint256 give) internal virtual {
-        vm.deal(who, give);
-        vm.prank(who);
+    function hoax(address msgSender, uint256 give) internal virtual {
+        vm.deal(msgSender, give);
+        vm.prank(msgSender);
     }
 
-    function hoax(address who, address origin) internal virtual {
-        vm.deal(who, 1 << 128);
-        vm.prank(who, origin);
+    function hoax(address msgSender, address origin) internal virtual {
+        vm.deal(msgSender, 1 << 128);
+        vm.prank(msgSender, origin);
     }
 
-    function hoax(address who, address origin, uint256 give) internal virtual {
-        vm.deal(who, give);
-        vm.prank(who, origin);
+    function hoax(address msgSender, address origin, uint256 give) internal virtual {
+        vm.deal(msgSender, give);
+        vm.prank(msgSender, origin);
     }
 
     // Start perpetual prank from an address that has some ether
-    function startHoax(address who) internal virtual {
-        vm.deal(who, 1 << 128);
-        vm.startPrank(who);
+    function startHoax(address msgSender) internal virtual {
+        vm.deal(msgSender, 1 << 128);
+        vm.startPrank(msgSender);
     }
 
-    function startHoax(address who, uint256 give) internal virtual {
-        vm.deal(who, give);
-        vm.startPrank(who);
+    function startHoax(address msgSender, uint256 give) internal virtual {
+        vm.deal(msgSender, give);
+        vm.startPrank(msgSender);
     }
 
     // Start perpetual prank from an address that has some ether
     // tx.origin is set to the origin parameter
-    function startHoax(address who, address origin) internal virtual {
-        vm.deal(who, 1 << 128);
-        vm.startPrank(who, origin);
+    function startHoax(address msgSender, address origin) internal virtual {
+        vm.deal(msgSender, 1 << 128);
+        vm.startPrank(msgSender, origin);
     }
 
-    function startHoax(address who, address origin, uint256 give) internal virtual {
-        vm.deal(who, give);
-        vm.startPrank(who, origin);
+    function startHoax(address msgSender, address origin, uint256 give) internal virtual {
+        vm.deal(msgSender, give);
+        vm.startPrank(msgSender, origin);
     }
 
-    function changePrank(address who) internal virtual {
+    function changePrank(address msgSender) internal virtual {
         vm.stopPrank();
-        vm.startPrank(who);
+        vm.startPrank(msgSender);
+    }
+
+    function changePrank(address msgSender, address txOrigin) internal virtual {
+        vm.stopPrank();
+        vm.startPrank(msgSender, txOrigin);
     }
 
     // The same as Vm's `deal`
@@ -552,9 +600,15 @@ abstract contract StdCheats is StdCheatsSafe {
         deal(token, to, give, false);
     }
 
+    // Set the balance of an account for any ERC1155 token
+    // Use the alternative signature to update `totalSupply`
+    function dealERC1155(address token, address to, uint256 id, uint256 give) internal virtual {
+        dealERC1155(token, to, id, give, false);
+    }
+
     function deal(address token, address to, uint256 give, bool adjust) internal virtual {
         // get current balance
-        (, bytes memory balData) = token.call(abi.encodeWithSelector(0x70a08231, to));
+        (, bytes memory balData) = token.staticcall(abi.encodeWithSelector(0x70a08231, to));
         uint256 prevBal = abi.decode(balData, (uint256));
 
         // update balance
@@ -562,7 +616,7 @@ abstract contract StdCheats is StdCheatsSafe {
 
         // update total supply
         if (adjust) {
-            (, bytes memory totSupData) = token.call(abi.encodeWithSelector(0x18160ddd));
+            (, bytes memory totSupData) = token.staticcall(abi.encodeWithSelector(0x18160ddd));
             uint256 totSup = abi.decode(totSupData, (uint256));
             if (give < prevBal) {
                 totSup -= (prevBal - give);
@@ -571,5 +625,52 @@ abstract contract StdCheats is StdCheatsSafe {
             }
             stdstore.target(token).sig(0x18160ddd).checked_write(totSup);
         }
+    }
+
+    function dealERC1155(address token, address to, uint256 id, uint256 give, bool adjust) internal virtual {
+        // get current balance
+        (, bytes memory balData) = token.staticcall(abi.encodeWithSelector(0x00fdd58e, to, id));
+        uint256 prevBal = abi.decode(balData, (uint256));
+
+        // update balance
+        stdstore.target(token).sig(0x00fdd58e).with_key(to).with_key(id).checked_write(give);
+
+        // update total supply
+        if (adjust) {
+            (, bytes memory totSupData) = token.staticcall(abi.encodeWithSelector(0xbd85b039, id));
+            require(
+                totSupData.length != 0,
+                "StdCheats deal(address,address,uint,uint,bool): target contract is not ERC1155Supply."
+            );
+            uint256 totSup = abi.decode(totSupData, (uint256));
+            if (give < prevBal) {
+                totSup -= (prevBal - give);
+            } else {
+                totSup += (give - prevBal);
+            }
+            stdstore.target(token).sig(0xbd85b039).with_key(id).checked_write(totSup);
+        }
+    }
+
+    function dealERC721(address token, address to, uint256 id) internal virtual {
+        // check if token id is already minted and the actual owner.
+        (bool successMinted, bytes memory ownerData) = token.staticcall(abi.encodeWithSelector(0x6352211e, id));
+        require(successMinted, "StdCheats deal(address,address,uint,bool): id not minted.");
+
+        // get owner current balance
+        (, bytes memory fromBalData) =
+            token.staticcall(abi.encodeWithSelector(0x70a08231, abi.decode(ownerData, (address))));
+        uint256 fromPrevBal = abi.decode(fromBalData, (uint256));
+
+        // get new user current balance
+        (, bytes memory toBalData) = token.staticcall(abi.encodeWithSelector(0x70a08231, to));
+        uint256 toPrevBal = abi.decode(toBalData, (uint256));
+
+        // update balances
+        stdstore.target(token).sig(0x70a08231).with_key(abi.decode(ownerData, (address))).checked_write(--fromPrevBal);
+        stdstore.target(token).sig(0x70a08231).with_key(to).checked_write(++toPrevBal);
+
+        // update owner
+        stdstore.target(token).sig(0x6352211e).with_key(id).checked_write(to);
     }
 }
