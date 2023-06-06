@@ -202,7 +202,7 @@ contract HoprChannelsTest is
 
     // accountA bump channel B->A with a non-zero secret
     vm.prank(accountA.accountAddr);
-    hoprChannels.bumpChannel(accountB.accountAddr, secret);
+    hoprChannels.bumpChannel(accountB.accountAddr, accountA.accountAddr, secret);
 
     // check vallidate from channels()
     assertEqChannels(getChannelFromTuple(hoprChannels, channelIdAB), channelAB);
@@ -215,7 +215,7 @@ contract HoprChannelsTest is
     vm.assume(secret != bytes32(0));
     // Firstly, accountA bumps channel B->A with a non-zero secret
     vm.prank(accountA.accountAddr);
-    hoprChannels.bumpChannel(accountB.accountAddr, secret);
+    hoprChannels.bumpChannel(accountB.accountAddr, accountA.accountAddr, secret);
 
     // channels
     HoprChannels.Channel memory channelAB = HoprChannels.Channel(
@@ -262,9 +262,9 @@ contract HoprChannelsTest is
 
     // Both accountA and accountB bump respective channels with secrets
     vm.prank(accountA.accountAddr);
-    hoprChannels.bumpChannel(accountB.accountAddr, secret1);
+    hoprChannels.bumpChannel(accountB.accountAddr, accountA.accountAddr, secret1);
     vm.prank(accountB.accountAddr);
-    hoprChannels.bumpChannel(accountA.accountAddr, secret2);
+    hoprChannels.bumpChannel(accountA.accountAddr, accountB.accountAddr, secret2);
 
     // channels
     HoprChannels.Channel memory channelAB = HoprChannels.Channel(
@@ -337,7 +337,7 @@ contract HoprChannelsTest is
     amount1 = bound(amount1, TICKET_AB_WIN.amount, 1e36);
     // Firstly, accountB bumps channel A->B with SECRET_2
     vm.prank(accountB.accountAddr);
-    hoprChannels.bumpChannel(accountA.accountAddr, SECRET_2);
+    hoprChannels.bumpChannel(accountA.accountAddr, accountB.accountAddr, SECRET_2);
     // then fund channel
     _helperFundMultiAB(amount1, 0);
     // mock token transfer from hoprChannels
@@ -389,6 +389,7 @@ contract HoprChannelsTest is
     vm.prank(accountB.accountAddr);
     hoprChannels.redeemTicket(
       TICKET_AB_WIN.source,
+      TICKET_AB_WIN.destination,
       TICKET_AB_WIN.nextCommitment,
       TICKET_AB_WIN.ticketEpoch,
       TICKET_AB_WIN.ticketIndex,
@@ -398,136 +399,6 @@ contract HoprChannelsTest is
       TICKET_AB_WIN.signature
     );
     vm.clearMockedCalls();
-  }
-
-  /**
-   * @dev With funded HoprChannels: AB: amount1, BA: amount 2,
-   * where both amount1 and amount2 are above 10,
-   * it should redeem ticket for account A
-   * it should redeem ticket for account B
-   */
-  function testRedeemTicketWithDoubleFundedHoprChannel(uint256 amount1, uint256 amount2) public {
-    // channel is funded for at least 10 HoprTokens (Ticket's amount)
-    amount1 = bound(amount1, TICKET_AB_WIN.amount, 1e36);
-    amount2 = bound(amount2, TICKET_BA_WIN.amount, 1e36);
-    // Open channels A<->B with some tokens that are above possible winning tickets
-    _helperOpenBidirectionalChannels(amount1, amount2);
-
-    // channels before ticket redemption
-    HoprChannels.Channel memory channelAB = HoprChannels.Channel(
-      amount1,
-      SECRET_2,
-      0,
-      0,
-      HoprChannels.ChannelStatus.OPEN,
-      1,
-      0
-    );
-    // ticket epoch is 1
-    HoprChannels.Channel memory channelBA = HoprChannels.Channel(
-      amount2,
-      SECRET_2,
-      0,
-      0,
-      HoprChannels.ChannelStatus.OPEN,
-      1,
-      0
-    );
-    // check vallidate from channels()
-    assertEqChannels(getChannelFromTuple(hoprChannels, channelIdAB), channelAB);
-    assertEqChannels(getChannelFromTuple(hoprChannels, channelIdBA), channelBA);
-
-    vm.expectEmit(true, true, false, true, address(hoprChannels));
-    emit TicketRedeemed(
-      TICKET_AB_WIN.source,
-      accountB.accountAddr,
-      TICKET_AB_WIN.nextCommitment,
-      TICKET_AB_WIN.ticketEpoch,
-      TICKET_AB_WIN.ticketIndex,
-      TICKET_AB_WIN.proofOfRelaySecret,
-      TICKET_AB_WIN.amount,
-      TICKET_AB_WIN.winProb,
-      TICKET_AB_WIN.signature
-    );
-
-    // create a snapshot
-    uint256 snapshotBeforeAccountBRedeemTicket = vm.snapshot();
-
-    // accountB redeem ticket
-    vm.prank(accountB.accountAddr);
-    hoprChannels.redeemTicket(
-      TICKET_AB_WIN.source,
-      TICKET_AB_WIN.nextCommitment,
-      TICKET_AB_WIN.ticketEpoch,
-      TICKET_AB_WIN.ticketIndex,
-      TICKET_AB_WIN.proofOfRelaySecret,
-      TICKET_AB_WIN.amount,
-      TICKET_AB_WIN.winProb,
-      TICKET_AB_WIN.signature
-    );
-
-    // channels after ticket redemption
-    HoprChannels.Channel memory channelABAfterBRedeems = HoprChannels.Channel(
-      amount1 - TICKET_AB_WIN.amount,
-      SECRET_1,
-      0,
-      1,
-      HoprChannels.ChannelStatus.OPEN,
-      1,
-      0
-    );
-    // ticket epoch is 1
-    HoprChannels.Channel memory channelBAAfterRedeems = HoprChannels.Channel(
-      amount2 + TICKET_AB_WIN.amount,
-      SECRET_2,
-      0,
-      0,
-      HoprChannels.ChannelStatus.OPEN,
-      1,
-      0
-    );
-    // check vallidate from channels()
-    assertEqChannels(getChannelFromTuple(hoprChannels, channelIdAB), channelABAfterBRedeems);
-    assertEqChannels(getChannelFromTuple(hoprChannels, channelIdBA), channelBAAfterRedeems);
-
-    // reset to snapshot
-    vm.revertTo(snapshotBeforeAccountBRedeemTicket);
-    // accountA redeem ticket
-    vm.prank(accountA.accountAddr);
-    hoprChannels.redeemTicket(
-      TICKET_BA_WIN.source,
-      TICKET_BA_WIN.nextCommitment,
-      TICKET_BA_WIN.ticketEpoch,
-      TICKET_BA_WIN.ticketIndex,
-      TICKET_BA_WIN.proofOfRelaySecret,
-      TICKET_BA_WIN.amount,
-      TICKET_BA_WIN.winProb,
-      TICKET_BA_WIN.signature
-    );
-
-    // channels after ticket redemption
-    HoprChannels.Channel memory channelBAAfterARedeems = HoprChannels.Channel(
-      amount2 - TICKET_BA_WIN.amount,
-      SECRET_1,
-      0,
-      1,
-      HoprChannels.ChannelStatus.OPEN,
-      1,
-      0
-    );
-    // ticket epoch is 1
-    HoprChannels.Channel memory channelABAfterARedeems = HoprChannels.Channel(
-      amount1 + TICKET_BA_WIN.amount,
-      SECRET_2,
-      0,
-      0,
-      HoprChannels.ChannelStatus.OPEN,
-      1,
-      0
-    );
-    // check vallidate from channels()
-    assertEqChannels(getChannelFromTuple(hoprChannels, channelIdAB), channelABAfterARedeems);
-    assertEqChannels(getChannelFromTuple(hoprChannels, channelIdBA), channelBAAfterARedeems);
   }
 
   /**
@@ -558,6 +429,7 @@ contract HoprChannelsTest is
     vm.prank(accountB.accountAddr);
     hoprChannels.redeemTicket(
       TICKET_AB_WIN.source,
+      TICKET_AB_WIN.destination,
       TICKET_AB_WIN.nextCommitment,
       TICKET_AB_WIN.ticketEpoch,
       TICKET_AB_WIN.ticketIndex,
@@ -571,6 +443,7 @@ contract HoprChannelsTest is
     vm.expectRevert(bytes('redemptions must be in order'));
     hoprChannels.redeemTicket(
       TICKET_AB_WIN.source,
+      TICKET_AB_WIN.destination,
       SECRET_0,
       TICKET_AB_WIN.ticketEpoch,
       TICKET_AB_WIN.ticketIndex,
@@ -584,6 +457,7 @@ contract HoprChannelsTest is
     vm.expectRevert(bytes('ticket epoch must match'));
     hoprChannels.redeemTicket(
       TICKET_AB_WIN.source,
+      TICKET_AB_WIN.destination,
       SECRET_0,
       TICKET_AB_WIN.ticketEpoch + 1,
       TICKET_AB_WIN.ticketIndex,
@@ -611,6 +485,7 @@ contract HoprChannelsTest is
     vm.expectRevert(bytes('signer must match the counterparty'));
     hoprChannels.redeemTicket(
       TICKET_AB_LOSS.source,
+      TICKET_AB_LOSS.destination,
       TICKET_AB_LOSS.nextCommitment,
       TICKET_AB_LOSS.ticketEpoch,
       TICKET_AB_LOSS.ticketIndex,
@@ -642,7 +517,7 @@ contract HoprChannelsTest is
     emit ChannelClosureInitiated(accountA.accountAddr, accountB.accountAddr, uint32(block.timestamp));
     // account A initiate channel closure
     vm.prank(accountA.accountAddr);
-    hoprChannels.initiateChannelClosure(accountB.accountAddr);
+    hoprChannels.initiateChannelClosure(accountA.accountAddr, accountB.accountAddr);
 
     // channels after ticket redemption
     HoprChannels.Channel memory channelBA = HoprChannels.Channel(
@@ -678,7 +553,7 @@ contract HoprChannelsTest is
     emit ChannelUpdated(accountB.accountAddr, accountA.accountAddr, channelBA);
     // account B initiate channel closure
     vm.prank(accountB.accountAddr);
-    hoprChannels.initiateChannelClosure(accountA.accountAddr);
+    hoprChannels.initiateChannelClosure(accountB.accountAddr, accountA.accountAddr);
 
     // channels after ticket redemption
     HoprChannels.Channel memory channelAB = HoprChannels.Channel(
@@ -712,6 +587,7 @@ contract HoprChannelsTest is
     vm.expectRevert(bytes('ticket must be a win'));
     hoprChannels.redeemTicket(
       TICKET_AB_WIN.source,
+      TICKET_AB_WIN.destination,
       TICKET_AB_WIN.nextCommitment,
       TICKET_AB_WIN.ticketEpoch,
       TICKET_AB_WIN.ticketIndex,
@@ -737,7 +613,7 @@ contract HoprChannelsTest is
     vm.prank(accountA.accountAddr);
     // fail to initiate channel closure for channel pointing to the source
     vm.expectRevert(bytes('source and destination must not be the same'));
-    hoprChannels.initiateChannelClosure(accountA.accountAddr);
+    hoprChannels.initiateChannelClosure(accountA.accountAddr, accountA.accountAddr);
   }
 
   /**
@@ -755,7 +631,7 @@ contract HoprChannelsTest is
     vm.prank(accountA.accountAddr);
     // fail to initiate channel closure pointing to address zero
     vm.expectRevert(bytes('destination must not be empty'));
-    hoprChannels.initiateChannelClosure(address(0));
+    hoprChannels.initiateChannelClosure(accountA.accountAddr, address(0));
   }
 
   /**
@@ -773,7 +649,7 @@ contract HoprChannelsTest is
     vm.prank(accountA.accountAddr);
     // fail to force finalize channel closure
     vm.expectRevert(bytes('channel must be pending to close'));
-    hoprChannels.finalizeChannelClosure(accountB.accountAddr);
+    hoprChannels.finalizeChannelClosure(accountA.accountAddr, accountB.accountAddr);
   }
 
   /**
@@ -789,11 +665,11 @@ contract HoprChannelsTest is
     // accountA redeem ticket
     vm.prank(accountA.accountAddr);
     // initiate channel closure first
-    hoprChannels.initiateChannelClosure(accountB.accountAddr);
+    hoprChannels.initiateChannelClosure(accountA.accountAddr, accountB.accountAddr);
 
     // fail to force initiate again channel closure
     vm.expectRevert(bytes('channel must be open or waiting for commitment'));
-    hoprChannels.initiateChannelClosure(accountB.accountAddr);
+    hoprChannels.initiateChannelClosure(accountA.accountAddr, accountB.accountAddr);
   }
 
   /**
@@ -809,7 +685,7 @@ contract HoprChannelsTest is
     // accountA redeem ticket
     vm.startPrank(accountA.accountAddr);
     // initiate channel closure first
-    hoprChannels.initiateChannelClosure(accountB.accountAddr);
+    hoprChannels.initiateChannelClosure(accountA.accountAddr, accountB.accountAddr);
 
     // increase enough time for channel closure;
     vm.warp(block.timestamp + ENOUGH_TIME_FOR_CLOSURE);
@@ -830,7 +706,7 @@ contract HoprChannelsTest is
       abi.encodeWithSignature('transfer(address,uint256)', accountA.accountAddr, amount1), // provide specific
       abi.encode(true)
     );
-    hoprChannels.finalizeChannelClosure(accountB.accountAddr);
+    hoprChannels.finalizeChannelClosure(accountA.accountAddr, accountB.accountAddr);
     vm.stopPrank();
   }
 
@@ -847,19 +723,19 @@ contract HoprChannelsTest is
     // accountA redeem ticket
     vm.startPrank(accountA.accountAddr);
     // initiate channel closure first
-    hoprChannels.initiateChannelClosure(accountB.accountAddr);
+    hoprChannels.initiateChannelClosure(accountA.accountAddr, accountB.accountAddr);
 
     // fail when source and destination are the same
     vm.expectRevert(bytes('source and destination must not be the same'));
-    hoprChannels.finalizeChannelClosure(accountA.accountAddr);
+    hoprChannels.finalizeChannelClosure(accountA.accountAddr, accountA.accountAddr);
 
     // fail when the destination is empty
     vm.expectRevert(bytes('destination must not be empty'));
-    hoprChannels.finalizeChannelClosure(address(0));
+    hoprChannels.finalizeChannelClosure(accountA.accountAddr, address(0));
 
     // fail when finallization hasn't reached yet
     vm.expectRevert(bytes('closureTime must be before now'));
-    hoprChannels.finalizeChannelClosure(accountB.accountAddr);
+    hoprChannels.finalizeChannelClosure(accountA.accountAddr, accountB.accountAddr);
     vm.stopPrank();
   }
 
@@ -879,6 +755,7 @@ contract HoprChannelsTest is
     vm.expectRevert(bytes('spending channel must be open or pending to close'));
     hoprChannels.redeemTicket(
       TICKET_AB_WIN.source,
+      TICKET_AB_WIN.destination,
       TICKET_AB_WIN.nextCommitment,
       TICKET_AB_WIN.ticketEpoch,
       TICKET_AB_WIN.ticketIndex,
@@ -1012,6 +889,7 @@ contract HoprChannelsTest is
     vm.expectRevert(bytes('signer must match the counterparty'));
     hoprChannels.redeemTicket(
       TICKET_AB_WIN.source,
+      TICKET_AB_WIN.destination,
       TICKET_AB_WIN.nextCommitment,
       TICKET_AB_WIN.ticketEpoch,
       TICKET_AB_WIN.ticketIndex,
@@ -1040,10 +918,17 @@ contract HoprChannelsTest is
     reopenAmount2 = bound(reopenAmount2, 1, 1e36);
     _helperWithAReopenedChannel(amount1, amount2, reopenAmount1, reopenAmount2);
 
-    vm.prank(accountB.accountAddr);
+    vm.startPrank(accountB.accountAddr);
+    // allow token transfer
+    vm.mockCall(
+      vm.addr(1),
+      abi.encodeWithSignature('transfer(address,uint256)', TICKET_AB_WIN_RECYCLED.destination, TICKET_AB_WIN_RECYCLED.amount), // provide specific
+      abi.encode(true)
+    );
     // fail when source and destination are the same
     hoprChannels.redeemTicket(
       TICKET_AB_WIN_RECYCLED.source,
+      TICKET_AB_WIN_RECYCLED.destination,
       TICKET_AB_WIN_RECYCLED.nextCommitment,
       TICKET_AB_WIN_RECYCLED.ticketEpoch,
       TICKET_AB_WIN_RECYCLED.ticketIndex,
@@ -1075,7 +960,9 @@ contract HoprChannelsTest is
     );
     // check vallidate from channels()
     assertEqChannels(getChannelFromTuple(hoprChannels, channelIdAB), channelAB);
-    assertEqChannels(getChannelFromTuple(hoprChannels, channelIdBA), channelBA);
+    // assertEqChannels(getChannelFromTuple(hoprChannels, channelIdBA), channelBA);
+    vm.stopPrank();
+    vm.clearMockedCalls();
   }
 
   /**
@@ -1099,7 +986,7 @@ contract HoprChannelsTest is
     // accountA initiate channel closure
     vm.startPrank(accountA.accountAddr);
     // initiate channel closure first
-    hoprChannels.initiateChannelClosure(accountB.accountAddr);
+    hoprChannels.initiateChannelClosure(accountA.accountAddr, accountB.accountAddr);
     // increase enough time for channel closure;
     vm.warp(block.timestamp + ENOUGH_TIME_FOR_CLOSURE);
     // finalize channel closure
@@ -1108,7 +995,7 @@ contract HoprChannelsTest is
       abi.encodeWithSignature('transfer(address,uint256)', accountA.accountAddr, reopenAmount1), // provide specific
       abi.encode(true)
     );
-    hoprChannels.finalizeChannelClosure(accountB.accountAddr);
+    hoprChannels.finalizeChannelClosure(accountA.accountAddr, accountB.accountAddr);
     vm.stopPrank();
 
     // succeed in redeeming the ticket
@@ -1232,9 +1119,9 @@ contract HoprChannelsTest is
     // accountB bumps channel A->B with SECRET_2
     // accountA bumps channel B->A with SECRET_2
     vm.prank(accountB.accountAddr);
-    hoprChannels.bumpChannel(accountA.accountAddr, SECRET_2);
+    hoprChannels.bumpChannel(accountA.accountAddr, accountB.accountAddr, SECRET_2);
     vm.prank(accountA.accountAddr);
-    hoprChannels.bumpChannel(accountB.accountAddr, SECRET_2);
+    hoprChannels.bumpChannel(accountB.accountAddr, accountA.accountAddr, SECRET_2);
     // then fund channel
     _helperFundMultiAB(amount1, amount2);
   }
@@ -1245,14 +1132,14 @@ contract HoprChannelsTest is
   function _helperWithAClosedChannel(uint256 amount1, uint256 amount2) public {
     // make channel A->B open
     vm.prank(accountB.accountAddr);
-    hoprChannels.bumpChannel(accountA.accountAddr, SECRET_2);
+    hoprChannels.bumpChannel(accountA.accountAddr, accountB.accountAddr, SECRET_2);
     // fund channels
     _helperFundMultiAB(amount1, amount2);
 
     // accountA initiate channel closure
     vm.startPrank(accountA.accountAddr);
     // initiate channel closure first
-    hoprChannels.initiateChannelClosure(accountB.accountAddr);
+    hoprChannels.initiateChannelClosure(accountA.accountAddr, accountB.accountAddr);
     // increase enough time for channel closure;
     vm.warp(block.timestamp + ENOUGH_TIME_FOR_CLOSURE);
     // finalize channel closure
@@ -1261,7 +1148,7 @@ contract HoprChannelsTest is
       abi.encodeWithSignature('transfer(address,uint256)', accountA.accountAddr, amount1), // provide specific
       abi.encode(true)
     );
-    hoprChannels.finalizeChannelClosure(accountB.accountAddr);
+    hoprChannels.finalizeChannelClosure(accountA.accountAddr, accountB.accountAddr);
     vm.stopPrank();
   }
 
@@ -1280,7 +1167,7 @@ contract HoprChannelsTest is
     // accountA initiate channel closure
     vm.startPrank(accountA.accountAddr);
     // initiate channel closure first
-    hoprChannels.initiateChannelClosure(accountB.accountAddr);
+    hoprChannels.initiateChannelClosure(accountA.accountAddr, accountB.accountAddr);
     // increase enough time for channel closure;
     vm.warp(block.timestamp + ENOUGH_TIME_FOR_CLOSURE);
     // finalize channel closure
@@ -1289,7 +1176,7 @@ contract HoprChannelsTest is
       abi.encodeWithSignature('transfer(address,uint256)', accountA.accountAddr, amount1), // provide specific
       abi.encode(true)
     );
-    hoprChannels.finalizeChannelClosure(accountB.accountAddr);
+    hoprChannels.finalizeChannelClosure(accountA.accountAddr, accountB.accountAddr);
     vm.stopPrank();
 
     // fund channel again

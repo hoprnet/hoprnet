@@ -237,6 +237,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
    */
   function redeemTicket(
     address source,
+    address destination,
     bytes32 nextCommitment,
     uint256 ticketEpoch,
     uint256 ticketIndex,
@@ -244,10 +245,11 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     uint256 amount,
     uint256 winProb,
     bytes memory signature
-  ) external validateSourceAndDest(source, msg.sender) {
+  ) external validateSourceAndDest(source, destination) {
+    // require(condition); // FIXME: check if msg.sender can call on behalf of `destination`
     require(nextCommitment != bytes32(0), 'nextCommitment must not be empty');
     require(amount != uint256(0), 'amount must not be empty');
-    (, Channel storage spendingChannel) = _getChannel(source, msg.sender);
+    (, Channel storage spendingChannel) = _getChannel(source, destination);
     require(
       spendingChannel.status == ChannelStatus.OPEN || spendingChannel.status == ChannelStatus.PENDING_TO_CLOSE,
       'spending channel must be open or pending to close'
@@ -259,10 +261,11 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     require(spendingChannel.ticketEpoch == ticketEpoch, 'ticket epoch must match');
     require(spendingChannel.ticketIndex < ticketIndex, 'redemptions must be in order');
 
+    // _redeemTicket(source, destination, nextCommitment, ticketEpoch, ticketIndex, proofOfRelaySecret, amount, winProb, signature);
     bytes32 ticketHash = ECDSA.toEthSignedMessageHash(
       keccak256(
         _getEncodedTicket(
-          msg.sender,
+          destination,
           spendingChannel.ticketEpoch,
           proofOfRelaySecret,
           spendingChannel.channelEpoch,
@@ -280,12 +283,11 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     spendingChannel.ticketIndex = ticketIndex;
     spendingChannel.commitment = nextCommitment;
     spendingChannel.balance = spendingChannel.balance - amount;
-    (, Channel storage earningChannel) = _getChannel(msg.sender, source);
 
-    emit ChannelUpdated(source, msg.sender, spendingChannel);
+    emit ChannelUpdated(source, destination, spendingChannel);
     emit TicketRedeemed(
       source,
-      msg.sender,
+      destination,
       nextCommitment,
       ticketEpoch,
       ticketIndex,
@@ -295,12 +297,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
       signature
     );
 
-    if (earningChannel.status == ChannelStatus.OPEN) {
-      earningChannel.balance = earningChannel.balance + amount;
-      emit ChannelUpdated(msg.sender, source, earningChannel);
-    } else {
-      token.transfer(msg.sender, amount);
-    }
+    token.transfer(destination, amount);
   }
 
   /**
@@ -316,16 +313,18 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
    * 'finalizeChannelClosure' which withdraws the stake.
    * @param destination the address of the destination
    */
-  function initiateChannelClosure(address destination) external validateSourceAndDest(msg.sender, destination) {
-    (, Channel storage channel) = _getChannel(msg.sender, destination);
+  function initiateChannelClosure(address source, address destination) external validateSourceAndDest(source, destination) {
+    // require(condition); // FIXME: check if msg.sender can call on behalf of `source`
+    
+    (, Channel storage channel) = _getChannel(source, destination);
     require(
       channel.status == ChannelStatus.OPEN || channel.status == ChannelStatus.WAITING_FOR_COMMITMENT,
       'channel must be open or waiting for commitment'
     );
     channel.closureTime = _currentBlockTimestamp() + secsClosure;
     channel.status = ChannelStatus.PENDING_TO_CLOSE;
-    emit ChannelUpdated(msg.sender, destination, channel);
-    emit ChannelClosureInitiated(msg.sender, destination, _currentBlockTimestamp());
+    emit ChannelUpdated(source, destination, channel);
+    emit ChannelClosureInitiated(source, destination, _currentBlockTimestamp());
   }
 
   /**
@@ -335,19 +334,20 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
    * {ChannelClosureFinalized} event.
    * @param destination the address of the counterparty
    */
-  function finalizeChannelClosure(address destination) external validateSourceAndDest(msg.sender, destination) {
-    (, Channel storage channel) = _getChannel(msg.sender, destination);
+  function finalizeChannelClosure(address source, address destination) external validateSourceAndDest(source, destination) {
+    // require(condition); // FIXME: check if msg.sender can call on behalf of `source`
+    (, Channel storage channel) = _getChannel(source, destination);
     require(channel.status == ChannelStatus.PENDING_TO_CLOSE, 'channel must be pending to close');
     require(channel.closureTime < _currentBlockTimestamp(), 'closureTime must be before now');
     uint256 amountToTransfer = channel.balance;
-    emit ChannelClosureFinalized(msg.sender, destination, channel.closureTime, channel.balance);
+    emit ChannelClosureFinalized(source, destination, channel.closureTime, channel.balance);
     delete channel.balance;
     delete channel.closureTime;
     channel.status = ChannelStatus.CLOSED;
-    emit ChannelUpdated(msg.sender, destination, channel);
+    emit ChannelUpdated(source, destination, channel);
 
     if (amountToTransfer > 0) {
-      token.transfer(msg.sender, amountToTransfer);
+      token.transfer(source, amountToTransfer);
     }
   }
 
@@ -358,8 +358,9 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
    * @param source the address of the channel source
    * @param newCommitment, a secret derived from this new commitment
    */
-  function bumpChannel(address source, bytes32 newCommitment) external validateSourceAndDest(source, msg.sender) {
-    (, Channel storage channel) = _getChannel(source, msg.sender);
+  function bumpChannel(address source, address destination, bytes32 newCommitment) external validateSourceAndDest(source, destination) {
+    // require(condition); // FIXME: check if msg.sender can call on behalf of `destination`
+    (, Channel storage channel) = _getChannel(source, destination);
 
     require(newCommitment != bytes32(0), 'Cannot set empty commitment');
     channel.commitment = newCommitment;
@@ -367,8 +368,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     if (channel.status == ChannelStatus.WAITING_FOR_COMMITMENT) {
       channel.status = ChannelStatus.OPEN;
     }
-    emit ChannelUpdated(source, msg.sender, channel);
-    emit ChannelBumped(source, msg.sender, newCommitment, channel.ticketEpoch, channel.balance);
+    emit ChannelUpdated(source, destination, channel);
+    emit ChannelBumped(source, destination, newCommitment, channel.ticketEpoch, channel.balance);
   }
 
   /**

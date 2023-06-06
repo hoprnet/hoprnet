@@ -133,7 +133,7 @@ contract HoprNodeStakeIntegrationTest is Test, ERC1820RegistryFixtureTest, SafeS
 
         vm.startPrank(node1);
         // bump a channel with `bumpChannel`
-        bytes memory bumpChannelTx = abi.encodeWithSignature("bumpChannel(address,bytes32)", node2, newCommitment);
+        bytes memory bumpChannelTx = abi.encodeWithSignature("bumpChannel(address,address,bytes32)", node2, node1, newCommitment);
         uint256 gasCheckpoint2 = gasleft();
         HoprNodeManagementModule(module).execTransactionFromModule(address(hoprChannels), 0, bumpChannelTx, Enum.Operation.Call);
         uint256 gasCheckpoint3 = gasleft();
@@ -143,50 +143,50 @@ contract HoprNodeStakeIntegrationTest is Test, ERC1820RegistryFixtureTest, SafeS
         vm.startPrank(node4); // stop and start prank = vm.changePrank(node3);
 
         uint256 gasCheckpoint4 = gasleft();
-        hoprChannels.bumpChannel(node3, newCommitment);
+        hoprChannels.bumpChannel(node3, node4, newCommitment);
         uint256 gasCheckpoint5 = gasleft();
         emit log_named_uint("Gas Used for bumpChannel in Channels", gasCheckpoint4 - gasCheckpoint5); 
         vm.stopPrank();
     }
 
-    // /**
-    //  * @dev compare initiate channel closure gas cost (through module vs directly with HoprChannels contract)
-    //  */
-    // function test_InitiateChannelClosure() public {
-    //     uint256 safeCreationNonce = 3;
-    //     bytes32 newCommitment = 0x6e6577436f6d6d69746d656e7400000000000000000000000000000000000000;
+    /**
+     * @dev compare initiate channel closure gas cost (through module vs directly with HoprChannels contract)
+     */
+    function test_InitiateChannelClosure() public {
+        uint256 safeCreationNonce = 3;
+        bytes32 newCommitment = 0x6e6577436f6d6d69746d656e7400000000000000000000000000000000000000;
 
-    //     // create node management safe + module; use 
-    //     uint256 gasStart = gasleft();
-    //     (module, safe) = _helperSetupNodeStaking(safeCreationNonce);
-    //     vm.startPrank(caller);
-    //     hoprChannels.fundChannelMulti(node1, node2, 1 ether, 2 ether);
-    //     hoprChannels.fundChannelMulti(node3, node4, 1 ether, 2 ether);
-    //     vm.stopPrank();
-    //     vm.prank(node2);
-    //     hoprChannels.bumpChannel(node1, newCommitment);
-    //     vm.prank(node4);
-    //     hoprChannels.bumpChannel(node3, newCommitment);
-    //     uint256 gasCheckpoint1 = gasleft();
-    //     emit log_named_uint("Gas Used for setup", gasStart - gasCheckpoint1); 
+        // create node management safe + module; use 
+        uint256 gasStart = gasleft();
+        (module, safe) = _helperSetupNodeStaking(safeCreationNonce);
+        vm.startPrank(caller);
+        hoprChannels.fundChannelMulti(node1, node2, 1 ether, 2 ether);
+        hoprChannels.fundChannelMulti(node3, node4, 1 ether, 2 ether);
+        vm.stopPrank();
+        vm.prank(node2);
+        hoprChannels.bumpChannel(node1, node2, newCommitment);
+        vm.prank(node4);
+        hoprChannels.bumpChannel(node3, node4, newCommitment);
+        uint256 gasCheckpoint1 = gasleft();
+        emit log_named_uint("Gas Used for setup", gasStart - gasCheckpoint1); 
 
-    //     vm.startPrank(node1);
-    //     // bump a channel with `bumpChannel`
-    //     bytes memory initiateChannelClosureTx = abi.encodeWithSignature("initiateChannelClosure(address)", node2);
-    //     uint256 gasCheckpoint2 = gasleft();
-    //     HoprNodeManagementModule(module).execTransactionFromModule(address(hoprChannels), 0, initiateChannelClosureTx, Enum.Operation.Call);
-    //     uint256 gasCheckpoint3 = gasleft();
-    //     emit log_named_uint("Gas Used for initiateChannelClosure from module", gasCheckpoint2 - gasCheckpoint3); 
+        vm.startPrank(node1);
+        // bump a channel with `bumpChannel`
+        bytes memory initiateChannelClosureTx = abi.encodeWithSignature("initiateChannelClosure(address,address)", node1, node2);
+        uint256 gasCheckpoint2 = gasleft();
+        HoprNodeManagementModule(module).execTransactionFromModule(address(hoprChannels), 0, initiateChannelClosureTx, Enum.Operation.Call);
+        uint256 gasCheckpoint3 = gasleft();
+        emit log_named_uint("Gas Used for initiateChannelClosure from module", gasCheckpoint2 - gasCheckpoint3); 
         
-    //     vm.stopPrank();
-    //     vm.startPrank(node3); // stop and start prank = vm.changePrank(node3);
+        vm.stopPrank();
+        vm.startPrank(node3); // stop and start prank = vm.changePrank(node3);
 
-    //     uint256 gasCheckpoint4 = gasleft();
-    //     hoprChannels.initiateChannelClosure(node4);
-    //     uint256 gasCheckpoint5 = gasleft();
-    //     emit log_named_uint("Gas Used for initiateChannelClosure in Channels", gasCheckpoint4 - gasCheckpoint5); 
-    //     vm.stopPrank();
-    // }
+        uint256 gasCheckpoint4 = gasleft();
+        hoprChannels.initiateChannelClosure(node3, node4);
+        uint256 gasCheckpoint5 = gasleft();
+        emit log_named_uint("Gas Used for initiateChannelClosure in Channels", gasCheckpoint4 - gasCheckpoint5); 
+        vm.stopPrank();
+    }
 
     /**
      * @dev Give 1000 HOPR token to admin; 10 HOPR to node3; 99999 HOPR token to caller

@@ -8,6 +8,7 @@ import './Accounts.sol';
 contract TicketsUtilsTest is Test, AccountsFixtureTest, ChannelsUtilsTest {
   struct Ticket {
     address source;
+    address destination;
     bytes32 nextCommitment;
     uint256 ticketEpoch;
     uint256 ticketIndex;
@@ -39,6 +40,7 @@ contract TicketsUtilsTest is Test, AccountsFixtureTest, ChannelsUtilsTest {
   Ticket public TICKET_AB_WIN =
     Ticket({
       source: accountA.accountAddr,
+      destination: accountB.accountAddr,
       nextCommitment: SECRET_1,
       ticketEpoch: 0,
       ticketIndex: 1,
@@ -66,6 +68,7 @@ contract TicketsUtilsTest is Test, AccountsFixtureTest, ChannelsUtilsTest {
   Ticket public TICKET_BA_WIN =
     Ticket({
       source: accountB.accountAddr,
+      destination: accountA.accountAddr,
       nextCommitment: SECRET_1,
       ticketEpoch: 0,
       ticketIndex: 1,
@@ -93,6 +96,7 @@ contract TicketsUtilsTest is Test, AccountsFixtureTest, ChannelsUtilsTest {
   Ticket public TICKET_AB_LOSS =
     Ticket({
       source: accountA.accountAddr,
+      destination: accountB.accountAddr,  
       nextCommitment: SECRET_1,
       ticketEpoch: 0,
       ticketIndex: 1,
@@ -120,6 +124,7 @@ contract TicketsUtilsTest is Test, AccountsFixtureTest, ChannelsUtilsTest {
   Ticket public TICKET_AB_WIN_RECYCLED =
     Ticket({
       source: accountA.accountAddr,
+      destination: accountB.accountAddr,
       nextCommitment: SECRET_1,
       ticketEpoch: 0,
       ticketIndex: 1,
