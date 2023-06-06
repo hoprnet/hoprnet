@@ -542,20 +542,8 @@ class Hopr extends EventEmitter {
       }
     })
 
-    const packetInteractionSendMsg = (msg: Uint8Array, dest: string): Promise<void> =>
-      sendMessage(peerIdFromString(dest), packetProtocols, msg, false)
-
-    const acknowledgementInteractionSendMsg = (msg: Uint8Array, dest: string): Promise<void> =>
-      sendMessage(peerIdFromString(dest), acknowledgementProtocols, msg, false)
-
     // Attach socket listener and check availability of entry nodes
     await libp2p.start()
-
-    // Intentionally not awaited to spawn in the background
-    this.forward.handle_incoming_packets(this.acknowledgements, packetInteractionSendMsg)
-    this.forward.handle_outgoing_packets(packetInteractionSendMsg)
-    this.acknowledgements.handle_incoming_acknowledgements()
-    this.acknowledgements.handle_outgoing_acknowledgements(acknowledgementInteractionSendMsg)
 
     log('libp2p started')
 
@@ -598,6 +586,44 @@ class Hopr extends EventEmitter {
 
     // Enable DHT server-mode if announcing publicly routable addresses to the DHT
     await this.maybeEnableDhtServerMode()
+  }
+
+  public async startProcessing() {
+    const sendMessage = ((
+      dest: PeerId,
+      protocols: string | string[],
+      msg: Uint8Array,
+      includeReply: boolean,
+      opts: DialOpts
+    ) => libp2pSendMessage(this.libp2pComponents, dest, protocols, msg, includeReply, opts)) as SendMessage // Typescript limitation
+
+
+    let acknowledgementProtocols = [
+      // current
+      `/hopr/${this.network.id}/ack/${NORMALIZED_VERSION}`,
+      // deprecated
+      `/hopr/${this.network.id}/ack`
+    ]
+
+    let packetProtocols = [
+      // current
+      `/hopr/${this.network.id}/msg/${NORMALIZED_VERSION}`,
+      // deprecated
+      `/hopr/${this.network.id}/msg`
+    ]
+
+    const packetInteractionSendMsg = (msg: Uint8Array, dest: string): Promise<void> =>
+      sendMessage(peerIdFromString(dest), packetProtocols, msg, false)
+
+    const acknowledgementInteractionSendMsg = (msg: Uint8Array, dest: string): Promise<void> =>
+      sendMessage(peerIdFromString(dest), acknowledgementProtocols, msg, false)
+
+    await Promise.all([
+      this.forward.handle_incoming_packets(this.acknowledgements, packetInteractionSendMsg),
+      this.forward.handle_outgoing_packets(packetInteractionSendMsg),
+      this.acknowledgements.handle_incoming_acknowledgements(),
+      this.acknowledgements.handle_outgoing_acknowledgements(acknowledgementInteractionSendMsg)
+    ])
   }
 
   /**
