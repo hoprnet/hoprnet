@@ -1418,6 +1418,11 @@ class Hopr extends EventEmitter {
         ? await this.db.get_channel_x(wrapped_pk, counterpartyPubKey)
         : await this.db.get_channel_x(counterpartyPubKey, wrapped_pk)
 
+    if (channel === undefined) {
+      log(`The requested channel for counterparty ${counterparty.toString()} does not exist`)
+      throw new Error('Requested channel does not exist')
+    }
+
     // TODO: should we wait for confirmation?
     if (channel.status === ChannelStatus.Closed) {
       throw new Error('Channel is already closed')
@@ -1453,8 +1458,8 @@ class Hopr extends EventEmitter {
             `ignoring finalizing closure of channel ${channel
               .get_id()
               .to_hex()} because closure window is still active. Need to wait ${channel
-              .remaining_closure_time()
-              .toString(10)} seconds.`
+                .remaining_closure_time()
+                .toString(10)} seconds.`
           )
         }
       }
