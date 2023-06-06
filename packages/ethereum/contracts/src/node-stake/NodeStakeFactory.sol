@@ -31,7 +31,7 @@ contract HoprNodeStakeFactory  {
     /**
      * @dev Returns the version of Safe deployments
      */
-    function safeVersion() public view returns (string memory) {
+    function safeVersion() public pure returns (string memory) {
         return SafeSuiteLib.SAFE_VERSION;
     }
 
@@ -84,9 +84,9 @@ contract HoprNodeStakeFactory  {
     }
 
     function prepareSafeTx(Safe safe, uint256 nonce, bytes memory data) private {
-        bytes32 dataHash = safe.getTransactionHash(address(safe), 0, data, Enum.Operation.Call, 1000000, 0, 3, address(0), msg.sender, nonce);
+        bytes32 dataHash = safe.getTransactionHash(address(safe), 0, data, Enum.Operation.Call, 0, 0, 0, address(0), msg.sender, nonce);
         safe.approveHash(dataHash);
-        safe.execTransaction(address(safe), 0, data, Enum.Operation.Call, 1000000, 0, 3, address(0), payable(address(msg.sender)), approvalHashSig);
+        safe.execTransaction(address(safe), 0, data, Enum.Operation.Call, 0, 0, 0, address(0), payable(address(msg.sender)), approvalHashSig);
     }
 
     function predictDeterministicAddress(address implementation, bytes32 salt) public view returns (address predicted) {

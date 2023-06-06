@@ -100,7 +100,7 @@ contract HoprCapabilityPermissionsTest is Test, CapabilityPermissionsLibFixtureT
     /**
      * @dev create a permission array that alternates between 0 and 1
      */
-    function _helperCreateHoprChannelsPermissionsArray(uint256 length, bool startWithZero) private returns (uint256[] memory permissions) {
+    function _helperCreateHoprChannelsPermissionsArray(uint256 length, bool startWithZero) private pure returns (uint256[] memory permissions) {
         permissions = new uint256[](length);
         for (uint256 i = 0; i < length; i++) {
             permissions[i] = startWithZero == (i % 2 == 0) ? 0 : 1;
@@ -110,7 +110,7 @@ contract HoprCapabilityPermissionsTest is Test, CapabilityPermissionsLibFixtureT
     /**
      * @dev create an array of funciton sigatures for HoprChannels
      */
-    function _helperCreateHoprChannelsFunctionSigArray() private returns (bytes4[] memory functionSigs) {
+    function _helperCreateHoprChannelsFunctionSigArray() private pure returns (bytes4[] memory functionSigs) {
         functionSigs = new bytes4[](6);
         functionSigs[0] = HoprCapabilityPermissions.FUND_CHANNEL_MULTI_SELECTOR;
         functionSigs[1] = HoprCapabilityPermissions.REDEEM_TICKET_SELECTOR;

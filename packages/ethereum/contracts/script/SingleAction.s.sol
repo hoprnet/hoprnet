@@ -509,7 +509,7 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
     address boostContractAddr,
     address account,
     string memory nftRank
-  ) private returns (bool ownsNft, uint256 tokenId) {
+  ) private view returns (bool ownsNft, uint256 tokenId) {
     // 1. Check account's Network_registry NFT balance
     uint256 ownedNftBalance = _getTokenBalanceOf(boostContractAddr, account);
     // get the desired nft uri hash

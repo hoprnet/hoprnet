@@ -57,7 +57,7 @@ contract NetworkConfig is Script {
     currentEnvironmentType = parseEnvironmentTypeFromString(profile);
   }
 
-  function readNetwork(string memory _networkName) internal view returns (NetworkDetail memory networkDetail) {
+  function readNetwork(string memory _networkName) internal returns (NetworkDetail memory networkDetail) {
     string memory json = vm.readFile(pathToDeploymentFile);
     bytes memory levelToNetworkConfig = abi.encodePacked('.networks.', _networkName);
 

@@ -4,9 +4,11 @@ pragma solidity >=0.8.0 <0.9.0;
 import '../../../src/node-stake/permissioned-module/NodeManagementModule.sol';
 import '../../../src/node-stake/permissioned-module/CapabilityPermissions.sol';
 import "../../utils/CapabilityLibrary.sol";
+import '../../../script/utils/SafeSuiteLib.sol';
+import '../../utils/SafeSingleton.sol';
 import 'forge-std/Test.sol';
 
-contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTest {
+contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTest, SafeSingletonFixtureTest {
     HoprNodeManagementModule public moduleSingleton;
     address public multiaddr;
     address public safe;
@@ -22,7 +24,7 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
     // event ScopedTargetToken(address targetAddress);
     // event ScopedTargetSend(address targetAddress);
 
-    function setUp() public virtual override(CapabilityPermissionsLibFixtureTest) {
+    function setUp() public virtual override(CapabilityPermissionsLibFixtureTest, SafeSingletonFixtureTest) {
         super.setUp();
         multiaddr = vm.addr(100); // make address(100) multiaddr
         safe = vm.addr(101); // make address(101) a safe

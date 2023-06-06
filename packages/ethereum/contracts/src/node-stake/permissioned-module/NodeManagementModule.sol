@@ -339,7 +339,7 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
   /**
    * @dev Override {transferOwnership} so the owner cannot be changed once created
    */
-  function transferOwnership(address /*newOwner*/) public override(OwnableUpgradeable) onlyOwner {
+  function transferOwnership(address /*newOwner*/) public view override(OwnableUpgradeable) onlyOwner {
     revert CannotChangeOwner();
   }
 }
