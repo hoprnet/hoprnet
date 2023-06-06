@@ -500,9 +500,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
     }
 
     async fn get_channel_x(&self, src: &PublicKey, dest: &PublicKey) -> Result<Option<ChannelEntry>> {
-        let key = utils_db::db::Key::new_with_prefix(&generate_channel_id(&src.to_address(), &dest.to_address()), "")?;
-
-        self.db.get_or_none(key).await
+        self.get_channel(&generate_channel_id(&src.to_address(), &dest.to_address()))
+            .await
     }
 
     async fn get_channels_from(&self, address: Address) -> Result<Vec<ChannelEntry>> {
@@ -852,11 +851,7 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub async fn store_hash_intermediaries(
-            &self,
-            channel: &Hash,
-            iterated_hash: JsValue,
-        ) -> Result<(), JsValue> {
+        pub async fn store_hash_intermediaries(&self, channel: &Hash, iterated_hash: JsValue) -> Result<(), JsValue> {
             let iterated: IteratedHash = utils_misc::ok_or_jserr!(serde_wasm_bindgen::from_value(iterated_hash))?;
             let data = self.core_ethereum_db.clone();
             let mut db = data.write().await;

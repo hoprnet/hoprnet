@@ -177,7 +177,11 @@ impl Balance {
         assert_eq!(self.balance_type(), other.balance_type());
         Self {
             value: U256 {
-                value: self.value().value().checked_sub(other.value().value().clone()).unwrap_or(u256::ZERO),
+                value: self
+                    .value()
+                    .value()
+                    .checked_sub(other.value().value().clone())
+                    .unwrap_or(u256::ZERO),
             },
             balance_type: self.balance_type,
         }
@@ -542,11 +546,27 @@ mod tests {
         assert_eq!(test_2 - 10, b4.isub(10).value().value().as_u32(), "sub test failed");
 
         assert_eq!(0_u32, b3.sub(&b4).value().value().as_u32(), "negative test failed");
-        assert_eq!(0_u32, b3.isub(test_2 as u64).value().value().as_u32(), "negative test failed");
+        assert_eq!(
+            0_u32,
+            b3.isub(test_2 as u64).value().value().as_u32(),
+            "negative test failed"
+        );
 
-        assert_eq!(test_1 * test_2, b3.mul(&b4).value().value.as_u32(), "multiplication test failed");
-        assert_eq!(test_2 * test_1, b4.mul(&b3).value().value.as_u32(), "multiplication test failed");
-        assert_eq!(test_2 * test_1, b4.imul(test_1 as u64).value().value.as_u32(), "multiplication test failed");
+        assert_eq!(
+            test_1 * test_2,
+            b3.mul(&b4).value().value.as_u32(),
+            "multiplication test failed"
+        );
+        assert_eq!(
+            test_2 * test_1,
+            b4.mul(&b3).value().value.as_u32(),
+            "multiplication test failed"
+        );
+        assert_eq!(
+            test_2 * test_1,
+            b4.imul(test_1 as u64).value().value.as_u32(),
+            "multiplication test failed"
+        );
 
         assert!(b3.lt(&b4) && b4.gt(&b3), "lte or lt test failed");
         assert!(b3.lte(&b3) && b4.gte(&b4), "gte or gt test failed");

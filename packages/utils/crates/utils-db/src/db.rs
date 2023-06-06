@@ -109,7 +109,7 @@ pub struct DB<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> {
 impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
     pub fn new(backend: T) -> Self {
         Self {
-            backend: RwLock::new(backend)
+            backend: RwLock::new(backend),
         }
     }
 
@@ -132,10 +132,12 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
 
         let db = self.backend.read().await;
         if db.contains(key.clone()).await {
-            db.get(key.into()).await
+            db.get(key.into())
+                .await
                 .and_then(|v| {
-                    bincode::deserialize(v.as_ref())
-                        .map_err(|e| DbError::DeserializationError(format!("during get operation: {}", e.to_string().as_str())))
+                    bincode::deserialize(v.as_ref()).map_err(|e| {
+                        DbError::DeserializationError(format!("during get operation: {}", e.to_string().as_str()))
+                    })
                 })
                 .map(|v| Some(v))
         } else {

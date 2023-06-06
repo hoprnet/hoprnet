@@ -40,4 +40,3 @@ export {
   ChannelCommitmentInfo,
   CORE_ETHEREUM_CONSTANTS
 }
-

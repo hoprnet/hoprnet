@@ -25,14 +25,14 @@ export async function closeChannel(
   direction: ChannelInfo['type']
 ): Promise<
   | {
-      success: false
-      reason: keyof typeof STATUS_CODES
-    }
+    success: false
+    reason: keyof typeof STATUS_CODES
+  }
   | {
-      success: true
-      channelStatus: ChannelStatus
-      receipt: string
-    }
+    success: true
+    channelStatus: ChannelStatus
+    receipt: string
+  }
 > {
   let peerId: PeerId
   try {

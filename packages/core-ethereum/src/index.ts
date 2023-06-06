@@ -605,7 +605,7 @@ export default class HoprCoreEthereum extends EventEmitter {
       if (!registerEnabled) return true
       // find hoprNode's linked account
       const account = await this.db.get_account_from_network_registry(
-          Ethereum_PublicKey.deserialize(hoprNode.serialize(false))
+        Ethereum_PublicKey.deserialize(hoprNode.serialize(false))
       )
       if (!account) {
         log('error: could not determine whether node has allowed access')
