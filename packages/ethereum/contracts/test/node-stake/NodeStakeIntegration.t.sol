@@ -9,11 +9,12 @@ import '../../lib/safe-contracts/contracts/Safe.sol';
 import "../../script/utils/SafeSuiteLib.sol";
 import "../utils/SafeSingleton.sol";
 import "../utils/ERC1820Registry.sol";
+import '../utils/Tickets.sol';
 import "safe-contracts/Safe.sol";
 import "safe-contracts/common/Enum.sol";
 import 'forge-std/Test.sol';
 
-contract HoprNodeStakeIntegrationTest is Test, ERC1820RegistryFixtureTest, SafeSingletonFixtureTest {
+contract HoprNodeStakeIntegrationTest is Test, ERC1820RegistryFixtureTest, SafeSingletonFixtureTest, TicketsUtilsTest {
     // to alter the storage
     using stdStorage for StdStorage;
 
@@ -112,6 +113,7 @@ contract HoprNodeStakeIntegrationTest is Test, ERC1820RegistryFixtureTest, SafeS
         );
         assertEq(abi.decode(returndatChannelsTokenBalance2, (uint256)), 6 ether);
         vm.stopPrank();
+        vm.clearMockedCalls();
     }
 
     /**
@@ -147,6 +149,69 @@ contract HoprNodeStakeIntegrationTest is Test, ERC1820RegistryFixtureTest, SafeS
         uint256 gasCheckpoint5 = gasleft();
         emit log_named_uint("Gas Used for bumpChannel to Channels", gasCheckpoint4 - gasCheckpoint5); 
         vm.stopPrank();
+        vm.clearMockedCalls();
+    }
+
+    /**
+     * @dev compare redeem ticket gas cost (through module vs directly with HoprChannels contract)
+     */
+    function test_RedeemTicket() public {
+        uint256 safeCreationNonce = 3;
+        bytes32 newCommitment = 0x6e6577436f6d6d69746d656e7400000000000000000000000000000000000000;
+
+        // create node management safe + module; use 
+        uint256 gasStart = gasleft();
+        (module, safe) = _helperSetupNodeStaking(safeCreationNonce);
+        // accountB bumps channel A->B with SECRET_2
+        vm.prank(accountB.accountAddr);
+        hoprChannels.bumpChannel(accountA.accountAddr, accountB.accountAddr, SECRET_2);
+        vm.prank(caller);
+        hoprChannels.fundChannelMulti(accountA.accountAddr, accountB.accountAddr, 1 ether, 2 ether);
+        // admin add a node to the safe; equivalent to HoprNodeManagementModule(module).addNode(node1);
+        vm.prank(admin);
+        bytes memory addNodeTx = abi.encodeWithSignature("addNode(address)", accountB.accountAddr);
+        _helperSendSafeTxFromPrivKey(safe, module, 102, addNodeTx);
+        uint256 gasCheckpoint1 = gasleft();
+        emit log_named_uint("Gas Used for setup", gasStart - gasCheckpoint1); 
+
+        uint256 snapshot = vm.snapshot();       // saves the state
+
+        vm.startPrank(accountB.accountAddr);
+        // redeem a ticket for AB
+        bytes memory redeemTicketTx = abi.encodeWithSignature("redeemTicket(address,address,bytes32,uint256,uint256,bytes32,uint256,uint256,bytes)",
+            TICKET_AB_WIN.source,
+            TICKET_AB_WIN.destination,
+            TICKET_AB_WIN.nextCommitment,
+            TICKET_AB_WIN.ticketEpoch,
+            TICKET_AB_WIN.ticketIndex,
+            TICKET_AB_WIN.proofOfRelaySecret,
+            TICKET_AB_WIN.amount,
+            TICKET_AB_WIN.winProb,
+            TICKET_AB_WIN.signature
+        );
+        uint256 gasCheckpoint2 = gasleft();
+        HoprNodeManagementModule(module).execTransactionFromModule(address(hoprChannels), 0, redeemTicketTx, Enum.Operation.Call);
+        uint256 gasCheckpoint3 = gasleft();
+        emit log_named_uint("Gas Used for redeemTicket via Module", gasCheckpoint2 - gasCheckpoint3); 
+        
+        vm.revertTo(snapshot);                  // restores the state
+
+        uint256 gasCheckpoint4 = gasleft();
+        hoprChannels.redeemTicket(
+            TICKET_AB_WIN.source,
+            TICKET_AB_WIN.destination,
+            TICKET_AB_WIN.nextCommitment,
+            TICKET_AB_WIN.ticketEpoch,
+            TICKET_AB_WIN.ticketIndex,
+            TICKET_AB_WIN.proofOfRelaySecret,
+            TICKET_AB_WIN.amount,
+            TICKET_AB_WIN.winProb,
+            TICKET_AB_WIN.signature
+        );
+        uint256 gasCheckpoint5 = gasleft();
+        emit log_named_uint("Gas Used for redeemTicket to Channels", gasCheckpoint4 - gasCheckpoint5); 
+        vm.stopPrank();
+        vm.clearMockedCalls();
     }
 
     /**
@@ -186,6 +251,7 @@ contract HoprNodeStakeIntegrationTest is Test, ERC1820RegistryFixtureTest, SafeS
         uint256 gasCheckpoint5 = gasleft();
         emit log_named_uint("Gas Used for initiateChannelClosure to Channels", gasCheckpoint4 - gasCheckpoint5); 
         vm.stopPrank();
+        vm.clearMockedCalls();
     }
 
     /**
@@ -232,6 +298,7 @@ contract HoprNodeStakeIntegrationTest is Test, ERC1820RegistryFixtureTest, SafeS
         uint256 gasCheckpoint5 = gasleft();
         emit log_named_uint("Gas Used for finalizeChannelClosure to Channels", gasCheckpoint4 - gasCheckpoint5); 
         vm.stopPrank();
+        vm.clearMockedCalls();
     }
 
     /**
@@ -275,6 +342,10 @@ contract HoprNodeStakeIntegrationTest is Test, ERC1820RegistryFixtureTest, SafeS
         hoprChannels.announce(hex"044c8b89f29d8d26461f0962bf65320dde9cb8559bf0886b78c4879d89e349bdb59a110f6f803786c1fef9780d8d7e0e6696ceae3bba9624e5b30709ca4cf7435d", hex"0123");
         vm.prank(node4);
         hoprChannels.announce(hex"04792f788df2ef7763088a388ebb16d6e03147a5f715d4083b51283db23aeb76bf62272e232106a57fc5304fdea1a0686b2da557cbaec37964790dba86842167cd", hex"0123");
+        vm.prank(accountA.accountAddr);
+        hoprChannels.announce(accountA.publicKey, hex"0123");
+        vm.prank(accountB.accountAddr);
+        hoprChannels.announce(accountB.publicKey, hex"0123");
     }
 
     function _helperSetupNodeStaking(
