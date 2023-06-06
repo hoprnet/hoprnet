@@ -9,7 +9,7 @@ import {
   setupPromiseRejectionFilter,
   SUGGESTED_NATIVE_BALANCE,
   create_histogram_with_buckets,
-  pickVersion, defer
+  pickVersion
 } from '@hoprnet/hopr-utils'
 import {
   Health,
@@ -284,58 +284,56 @@ async function main() {
       logs.log('Connector has been loaded properly.')
       node.emit('hopr:monitoring:start')
     })
-
-    let continueStartup = defer<void>()
     node.once('hopr:monitoring:start', async () => {
-      continueStartup.resolve()
-    })
-    await continueStartup.promise
+      // 3. start all monitoring services, and continue with the rest of the setup.
 
-    // 3. start all monitoring services, and continue with the rest of the setup.
-    let api = cfg.api as Api
-    console.log(JSON.stringify(api, null, 2))
-    const startApiListen = setupAPI(
-      node,
-      logs,
-      { getState, setState },
-      {
-        disableApiAuthentication: api.is_auth_disabled(),
-        apiHost: api.host.ip,
-        apiPort: api.host.port,
-        apiToken: api.is_auth_disabled() ? null : api.auth_token()
+      let api = cfg.api as Api
+      console.log(JSON.stringify(api, null, 2))
+      const startApiListen = setupAPI(
+        node,
+        logs,
+        { getState, setState },
+        {
+          disableApiAuthentication: api.is_auth_disabled(),
+          apiHost: api.host.ip,
+          apiPort: api.host.port,
+          apiToken: api.is_auth_disabled() ? null : api.auth_token()
+        }
+      )
+      // start API server only if API flag is true
+      if (cfg.api.enable) startApiListen()
+
+      if (cfg.healthcheck.enable) {
+        setupHealthcheck(node, logs, cfg.healthcheck.host, cfg.healthcheck.port)
       }
-    )
-    // start API server only if API flag is true
-    if (cfg.api.enable) startApiListen()
 
-    if (cfg.healthcheck.enable) {
-      setupHealthcheck(node, logs, cfg.healthcheck.host, cfg.healthcheck.port)
-    }
+      logs.log(`Node address: ${node.getId().toString()}`)
 
-    logs.log(`Node address: ${node.getId().toString()}`)
+      const ethAddr = node.getEthereumAddress().to_hex()
+      const fundsReq = new Balance(SUGGESTED_NATIVE_BALANCE.toString(10), BalanceType.Native).to_formatted_string()
 
-    const ethAddr = node.getEthereumAddress().to_hex()
-    const fundsReq = new Balance(SUGGESTED_NATIVE_BALANCE.toString(10), BalanceType.Native).to_formatted_string()
+      logs.log(`Node is not started, please fund this node ${ethAddr} with at least ${fundsReq}`)
 
-    logs.log(`Node is not started, please fund this node ${ethAddr} with at least ${fundsReq}`)
+      // 2.5 Await funding of wallet.
+      await node.waitForFunds()
+      logs.log('Node has been funded, starting...')
 
-    // 2.5 Await funding of wallet.
-    await node.waitForFunds()
-    logs.log('Node has been funded, starting...')
+      // 3. Start the node.
+      await node.start()
 
-    // alias self
-    state.aliases.set('me', node.getId())
+      // alias self
+      state.aliases.set('me', node.getId())
 
-    logs.logStatus('READY')
-    logs.log('Node has started!')
+      logs.logStatus('READY')
+      logs.log('Node has started!')
+      metric_nodeStartupTime.record_measure(metric_startupTimer)
+    })
 
-    metric_nodeStartupTime.record_measure(metric_startupTimer)
-
-    // 3. Start the node.
-    await node.start()
-
+    // 2.a - Setup connector listener to bubble up to node. Emit connector creation.
+    logs.log(`Ready to request on-chain connector to connect to provider.`)
+    node.emitOnConnector('connector:create')
   } catch (e) {
-    logs.log('Exception during node run:')
+    logs.log('Node failed to start:')
     logs.logFatalError('' + e)
     process.exit(1)
   }

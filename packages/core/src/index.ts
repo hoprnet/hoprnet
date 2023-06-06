@@ -303,7 +303,6 @@ class Hopr extends EventEmitter {
 
   /**
    * Start node
-   * This method returns only once the node is terminated.
    *
    * The node has a fairly complex lifecycle. This method should do all setup
    * required for a node to be functioning.
@@ -552,6 +551,12 @@ class Hopr extends EventEmitter {
     // Attach socket listener and check availability of entry nodes
     await libp2p.start()
 
+    // Intentionally not awaited to spawn in the background
+    this.forward.handle_incoming_packets(this.acknowledgements, packetInteractionSendMsg)
+    this.forward.handle_outgoing_packets(packetInteractionSendMsg)
+    this.acknowledgements.handle_incoming_acknowledgements()
+    this.acknowledgements.handle_outgoing_acknowledgements(acknowledgementInteractionSendMsg)
+
     log('libp2p started')
 
     connector.indexer.on('peer', this.onPeerAnnouncement.bind(this))
@@ -593,17 +598,6 @@ class Hopr extends EventEmitter {
 
     // Enable DHT server-mode if announcing publicly routable addresses to the DHT
     await this.maybeEnableDhtServerMode()
-
-    log(`Ready to request on-chain connector to connect to provider.`)
-    HoprCoreEthereum.getInstance().emit('connector:create')
-
-    // Start all the interactions
-    await Promise.all([
-        this.forward.handle_incoming_packets(this.acknowledgements, packetInteractionSendMsg),
-        this.forward.handle_outgoing_packets(packetInteractionSendMsg),
-        this.acknowledgements.handle_incoming_acknowledgements(),
-        this.acknowledgements.handle_outgoing_acknowledgements(acknowledgementInteractionSendMsg)
-    ])
   }
 
   /**
