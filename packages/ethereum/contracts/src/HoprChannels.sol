@@ -6,7 +6,6 @@ import 'openzeppelin-contracts-4.8.3/utils/introspection/IERC1820Registry.sol';
 import 'openzeppelin-contracts-4.8.3/utils/introspection/ERC1820Implementer.sol';
 import 'openzeppelin-contracts-4.8.3/token/ERC20/IERC20.sol';
 import 'openzeppelin-contracts-4.8.3/token/ERC777/IERC777Recipient.sol';
-import 'openzeppelin-contracts-4.8.3/token/ERC20/utils/SafeERC20.sol';
 import 'openzeppelin-contracts-4.8.3/utils/cryptography/ECDSA.sol';
 
 error InvalidBalance();
@@ -15,9 +14,37 @@ error BalanceExceedsGlobalPerChannelAllowance();
 error SourceEqualsDestination();
 error ZeroAddress(string reason);
 
-contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
-  using SafeERC20 for IERC20;
+error TokenTransferFailed();
+error InvalidNoticePeriod();
+error NoticePeriodNotDue();
 
+error WrongChannelState(string reason);
+
+error InvalidPoRSecret(string reason);
+error InvalidTicketSignature();
+error InvalidCommitmentOpening();
+error InsufficientChannelBalance();
+error InvalidCommitment();
+error TicketIsNotAWin();
+
+/**
+ *      &&&&
+ *      &&&&
+ *      &&&&
+ *      &&&&  &&&&&&&&&       &&&&&&&&&&&&          &&&&&&&&&&/   &&&&.&&&&&&&&&
+ *      &&&&&&&&&   &&&&&   &&&&&&     &&&&&,     &&&&&    &&&&&  &&&&&&&&   &&&&
+ *       &&&&&&      &&&&  &&&&#         &&&&   &&&&&       &&&&& &&&&&&     &&&&&
+ *       &&&&&       &&&&/ &&&&           &&&& #&&&&        &&&&  &&&&&
+ *       &&&&         &&&& &&&&&         &&&&  &&&&        &&&&&  &&&&&
+ *       %%%%        /%%%%   %%%%%%   %%%%%%   %%%%  %%%%%%%%%    %%%%%
+ *      %%%%%        %%%%      %%%%%%%%%%%    %%%%   %%%%%%       %%%%
+ *                                            %%%%
+ *                                            %%%%
+ *                                            %%%%
+ *
+ * Manages mixnet incentives in the hopr network.
+ **/
+contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
   // required by ERC1820 spec
   IERC1820Registry internal constant _ERC1820_REGISTRY = IERC1820Registry(0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24);
   // required by ERC777 spec
@@ -28,6 +55,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
   type TicketIndex is uint64;
   type ChannelEpoch is uint24;
   type Timestamp is uint32; // overflows in year 2105
+  // Using IEEE 754 double precision -> 53 significant bits
+  type WinProb is uint56;
 
   Balance public constant MAX_BALANCE_PER_CHANNEL = 10 ** 25; // 1% of total supply
   Balance public constant MIN_BALANCE_PER_CHANNEL = 1; // no empty token transactions
@@ -44,61 +73,68 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
   // used by {tokensReceived} to distinguish which function to call after tokens are sent
   uint256 public immutable FUND_CHANNEL_MULTI_SIZE = abi.encode(address(0), Balance(0), address(0), Balance(0)).length;
 
+  string public immutable version = '2.0.0';
+
+  bytes32 public immutable domainSeparator;
+  bytes32 public immutable redeemTicketSeparator;
+
   /**
    * @dev Possible channel states.
    *
-   *         finalizeChannelClosure()    +----------------------+
-   *              (After delay)          |                      | initiateChannelClosure()
-   *                    +----------------+   Pending To Close   |<-----------------+
-   *                    |                |                      |                  |
-   *                    |                +----------------------+                  |
-   *                    |                              ^                           |
-   *                    |                              |                           |
-   *                    |                              |  initiateChannelClosure() |
-   *                    |                              |  (If not committed)       |
-   *                    v                              |                           |
-   *             +------------+                        +-+                    +----+-----+
-   *             |            |                          |                    |          |
-   *             |   Closed   +--------------------------+--------------------+   Open   |
-   *             |            |    tokensReceived()      |                    |          |
-   *             +------+-----+ (If already committed) +-+                    +----------+
-   *                    |                              |                           ^
-   *                    |                              |                           |
-   *                    |                              |                           |
-   *   tokensReceived() |                              |                           | bumpChannel()
-   *                    |              +---------------+------------+              |
-   *                    |              |                            |              |
-   *                    +--------------+   Waiting For Commitment   +--------------+
-   *                                   |                            |
-   *                                   +----------------------------+
+   * finalizeChannelClosure()    ┌──────────────────────┐
+   *  (after notice period)      │                      │ initiateChannelClosure()
+   *            ┌────────────────│   Pending To Close   │<─────────────────┐
+   *            │                │                      │                  │
+   *            │                └──────────────────────┘                  │
+   *            v                                                          │
+   *     ┌────────────┐                                               ┌──────────┐
+   *     │            │              tokensReceived()                 │          │
+   *     │   Closed   │──────────────────────────────────────────────>│   Open   │
+   *     │            │                                               │          │
+   *     └────────────┘                                               └──────────┘
    */
   enum ChannelStatus {
     CLOSED,
-    WAITING_FOR_COMMITMENT,
     OPEN,
     PENDING_TO_CLOSE
   }
 
   /**
-   * @dev Representation of the de-constructed ECDSA signature parameters.
+   * Holding a compact ECDSA signature, following ERC-2098
    */
-  struct ECDSAParameters {
+  struct CompactSignature {
     bytes32 r;
     bytes32 vs;
   }
 
   /**
-   * @dev A channel struct, used to represent a channel's state
+   * Represents the state of channel
    */
   struct Channel {
+    // iterated commitment, most recent opening gets revealed when
+    // redeeming a ticket
     bytes32 commitment;
+    // latest balance of the channel, changes whenever a ticket gets redeemed
     Balance balance;
-    TicketEpoch ticketEpoch;
     TicketIndex ticketIndex;
     ChannelStatus status;
     ChannelEpoch channelEpoch;
     // the time when the channel can be closed - NB: overloads at year >2105
     Timestamp closureTime;
+  }
+
+  /**
+   * Represents a ticket that can be redeemed using `redeemTicket` function.
+   *
+   * Aligned to 2 EVM words
+   */
+  struct Ticket {
+    bytes32 channelId;
+    Balance amount;
+    TicketIndex ticketIndex;
+    ChannelEpoch channelEpoch;
+    WinProb winProb;
+    uint16 resered; // for future use
   }
 
   /**
@@ -115,7 +151,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
    * @dev Seconds it takes until we can finalize channel closure once,
    * channel closure has been initialized.
    */
-  Timestamp public immutable secsClosure;
+  Timestamp public immutable noticePeriodChannelClosure;
 
   /**
    * Emitted once a channel if funded.
@@ -177,11 +213,30 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
    * @param _secsClosure seconds until a channel can be closed
    */
   constructor(address _token, Timestamp _secsClosure) {
+    if (_secsClosure == Timestamp(0)) {
+      revert InvalidNoticePeriod();
+    }
+
     require(_token != address(0), 'token must not be empty');
 
     token = IERC20(_token);
-    secsClosure = _secsClosure;
+    noticePeriodChannelClosure = _secsClosure;
     _ERC1820_REGISTRY.setInterfaceImplementer(address(this), TOKENS_RECIPIENT_INTERFACE_HASH, address(this));
+
+    domainSeparator = keccak256(
+      abi.encode(
+        keccak256('EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)'),
+        keccak256(bytes('NodeStakeRegistry')),
+        keccak256(bytes(version)),
+        block.chainid,
+        address(this)
+      )
+    );
+
+    // Non-standard usage of EIP712 due computed property and custom property encoding
+    redeemTicketSeparator = keccak256(
+      'Ticket(bytes32 channelId,uint96 balance,uint64 ticketIndex,uint24 channelEpoch,uint56 winProb,address porChallenge)'
+    );
   }
 
   /**
@@ -210,6 +265,17 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     _;
   }
 
+  modifier validatePoRSecret(bytes32 response) {
+    if (response == uint256(0)) {
+      revert InvalidPoRSecret('Response is 0. Value must be within the field');
+    }
+
+    if (response >= FIELD_ORDER) {
+      revert InvalidPoRSecret('Response greater than field order. Value must be within the field');
+    }
+    _;
+  }
+
   /**
    * @dev Funds channels, in both directions, between 2 parties.
    * then emits {ChannelUpdated} event, for each channel.
@@ -223,96 +289,95 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     Balance amount1,
     address account2,
     Balance amount2
-  ) external validateBalance(amount1 + amount2) validateChannelParties(account1, account2) {
+  ) external validateBalance(amount1) validateBalance(amount2) validateChannelParties(account1, account2) {
+    // pull tokens from funder and handle result
+    if (token.transferFrom(msg.sender, address(this), amount1 + amount2) != true) {
+      // sth. went wrong
+      revert TokenTransferFailed();
+    }
+
     // fund channel in direction of: account1 -> account2
     if (amount1 > 0) {
-      _fundChannel(msg.sender, account1, account2, amount1);
+      _fundChannel(account1, account2, amount1);
     }
     // fund channel in direction of: account2 -> account1
     if (amount2 > 0) {
-      _fundChannel(msg.sender, account2, account1, amount2);
+      _fundChannel(account2, account1, amount2);
     }
-
-    // pull tokens from funder
-    token.safeTransferFrom(msg.sender, address(this), amount1 + amount2);
   }
 
   /**
    * @dev redeem a ticket.
    * If the sender has a channel to the source, the amount will be transferred
    * to that channel, otherwise it will be sent to their address directly.
-   * @param source the source of the ticket
    * @param nextCommitment the commitment that hashes to the redeemers previous commitment
-   * @param proofOfRelaySecret the proof of relay secret
-   * @param winProb the winning probability of the ticket
-   * @param amount the amount in the ticket
-   * @param signature_r first part of signature
-   * @param signature_vs second part of signature
+   * @param signature compact ERC-2098 signature (https://eips.ethereum.org/EIPS/eip-2098)
+   * @param ticket ticket to redeem
    */
   function redeemTicket(
-    address source,
     bytes32 nextCommitment,
-    TicketEpoch ticketEpoch,
-    TicketIndex ticketIndex,
-    bytes32 proofOfRelaySecret,
-    Balance amount,
-    uint256 winProb,
-    bytes32 signature_r,
-    bytes32 signature_vs
-  ) external validateChannelParties(source, msg.sender) validateBalance(amount) {
-    require(nextCommitment != bytes32(0), 'nextCommitment must not be empty');
+    bytes32 por_secret,
+    CompactSignature signature,
+    Ticket ticket
+  ) external validateBalance(ticket.amount) validatePoRSecret(ticket.proofOfRelaySecret) {
+    Channel storage spendingChannel = this.channels(ticket.channelId);
 
-    Channel storage spendingChannel = _getChannel(source, msg.sender);
-    require(
-      spendingChannel.status == ChannelStatus.OPEN || spendingChannel.status == ChannelStatus.PENDING_TO_CLOSE,
-      'spending channel must be open or pending to close'
-    );
-    require(
-      spendingChannel.commitment == keccak256(abi.encodePacked(nextCommitment)),
-      'commitment must be hash of next commitment'
-    );
-    require(spendingChannel.ticketEpoch == ticketEpoch, 'ticket epoch must match');
-    require(spendingChannel.ticketIndex < ticketIndex, 'redemptions must be in order');
+    if (nextCommitment != bytes32(0) || spendingChannel.commitment != keccak256(abi.encodePacked(nextCommitment))) {
+      revert InvalidCommitmentOpening();
+    }
 
-    bytes32 ticketHash = ECDSA.toEthSignedMessageHash(
-      keccak256(
-        _getEncodedTicket(
-          msg.sender,
-          spendingChannel.ticketEpoch,
-          proofOfRelaySecret,
-          spendingChannel.channelEpoch,
-          amount,
-          ticketIndex,
-          winProb
-        )
+    if (spendingChannel.status != ChannelStatus.OPEN && spendingChannel.status != ChannelStatus.PENDING_TO_CLOSE) {
+      revert WrongChannelState({reason: 'spending channel must be open or pending to close'});
+    }
+
+    if (spendingChannel.channelEpoch != ticket.channel_epoch) {
+      revert WrongChannelState({reason: 'channel epoch must match'});
+    }
+
+    if (spendingChannel.ticketIndex >= ticket.ticketIndex) {
+      revert WrongChannelState({reason: 'a ticket with higher ticket index has already been redeemed'});
+    }
+
+    if (spendingChannel.amount < ticket.amount) {
+      revert InsufficientChannelBalance();
+    }
+
+    // Deviates from EIP712 due to computed property and non-standard struct property encoding
+    bytes32 ticketHash = keccak256(
+      abi.encode(
+        domainSeparator,
+        redeemTicketSeparator,
+        keccak256(abi.encode(ticket, this._computeChallenge(por_secret)))
       )
     );
 
-    require(ECDSA.recover(ticketHash, signature_r, signature_vs) == source, 'signer must match the counterparty');
-    require(_getTicketLuck(ticketHash, nextCommitment, proofOfRelaySecret) <= winProb, 'ticket must be a win');
+    require(_getTicketLuck(ticketHash, nextCommitment, ticket.por_secret) <= ticket.win_prob, 'ticket must be a win');
 
-    spendingChannel.ticketIndex = ticketIndex;
-    spendingChannel.commitment = nextCommitment;
-    spendingChannel.balance = spendingChannel.balance - amount;
-    Channel storage earningChannel = _getChannel(msg.sender, source);
-
-    emit TicketRedeemed(
-      source,
-      msg.sender,
-      nextCommitment,
-      ticketEpoch,
-      ticketIndex,
-      proofOfRelaySecret,
-      amount,
-      winProb
-    );
-
-    if (earningChannel.status == ChannelStatus.OPEN) {
-      earningChannel.balance = earningChannel.balance + amount;
-      emit ChannelBalanceIncreased(msg.sender, source, earningChannel.balance);
-    } else {
-      token.transfer(msg.sender, amount);
+    address source = ECDSA.recover(ticketHash, signature.r, ticket.vs);
+    if (this._getChannelId(source, msg.sender) != ticket.channel_id) {
+      revert InvalidTicketSignature();
     }
+
+    spendingChannel.ticketIndex = ticket.ticketIndex;
+    spendingChannel.commitment = nextCommitment;
+    spendingChannel.balance = spendingChannel.balance - ticket.amount;
+    emit ChannelBalanceIncreased(ticket.channelId, spendingChannel.balance);
+
+    bytes32 outgoingChannelId = this._getChannelId(msg.sender, source);
+    Channel storage earningChannel = this.channels(outgoingChannelId);
+
+    if (earningChannel.status == ChannelStatus.CLOSED) {
+      // The other channel does not exist, so we need to transfer funds directly
+      if (token.transfer(msg.sender, ticket.amount) != true) {
+        revert TokenTransferFailed();
+      }
+    } else {
+      earningChannel.balance = earningChannel.balance + ticket.amount;
+      emit ChannelBalanceIncreased(outgoingChannelId, earningChannel.balance);
+    }
+
+    // Informs about new ticketIndex
+    emit TicketRedeemed(ticket.channelId, ticket.ticketIndex);
   }
 
   /**
@@ -326,17 +391,51 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
    * method triggers a {ChannelUpdated} and an {ChannelClosureInitiated} event.
    * After the cool-off period expires, the 'source' can call
    * 'finalizeChannelClosure' which withdraws the stake.
-   * @param destination the address of the destination
+   * @param destination the destination
    */
-  function initiateChannelClosure(address destination) external validateChannelParties(msg.sender, destination) {
-    Channel storage channel = _getChannel(msg.sender, destination);
-    require(
-      channel.status == ChannelStatus.OPEN || channel.status == ChannelStatus.WAITING_FOR_COMMITMENT,
-      'channel must be open or waiting for commitment'
-    );
-    channel.closureTime = _currentBlockTimestamp() + secsClosure;
+  function initiateOutgoingChannelClosure(address destination) external {
+    // We can only initiate closure to outgoing channels
+    bytes32 channelId = this._getChannelId(msg.sender, destination);
+    Channel storage channel = this.channels(channelId);
+
+    // calling initiateClosure on a PENDING_TO_CLOSE channel extends the noticePeriod
+    if (channel.status != ChannelStatus.OPEN && channel.status != ChannelStatus.PENDING_TO_CLOSE) {
+      revert WrongChannelState({reason: 'channel must have state OPEN or PENDING_TO_CLOSE'});
+    }
+
+    channel.closureTime = _currentBlockTimestamp() + noticePeriodChannelClosure;
     channel.status = ChannelStatus.PENDING_TO_CLOSE;
-    emit ChannelClosureInitiated(msg.sender, destination, _currentBlockTimestamp());
+
+    // Inform others at which time the notice period is due
+    emit ChannelClosureInitiated(channelId, channel.closureTime);
+  }
+
+  function closeIncomingChannel(address source) external {
+    // We can only close incoming channels directly
+    bytes32 channelId = this._getChannelId(source, msg.sender);
+
+    Channel storage channel = this.channels(channelId);
+
+    if (channel.status != ChannelStatus.OPEN) {
+      revert WrongChannelState({reason: 'channel must have state OPEN'});
+    }
+
+    // Wipes commitment and gives ~20k gas refund
+    channel.commitment = bytes32(0);
+
+    channel.status = ChannelStatus.CLOSED; // ChannelStatus.CLOSED == 0
+    channel.closureTime = Timestamp(0);
+    channel.ticketIndex = TicketIndex(0);
+
+    // channel.epoch must be kept
+
+    if (channel.balance > 0) {
+      if (token.transfer(msg.sender, channel.balance) != true) {
+        revert TokenTransferFailed();
+      }
+    }
+
+    channel.balance = Balance(0);
   }
 
   /**
@@ -346,40 +445,66 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
    * {ChannelClosureFinalized} event.
    * @param destination the address of the counterparty
    */
-  function finalizeChannelClosure(address destination) external validateChannelParties(msg.sender, destination) {
-    Channel storage channel = _getChannel(msg.sender, destination);
-    require(channel.status == ChannelStatus.PENDING_TO_CLOSE, 'channel must be pending to close');
-    require(channel.closureTime < _currentBlockTimestamp(), 'closureTime must be before now');
-    Balance amountToTransfer = channel.balance;
-    emit ChannelClosureFinalized(msg.sender, destination, channel.closureTime, channel.balance);
-    delete channel.balance;
-    delete channel.closureTime;
-    channel.status = ChannelStatus.CLOSED;
-    emit ChannelBalanceDecreased(msg.sender, destination, 0);
+  function finalizeOutgoingChannelClosure(address destination) external {
+    // We can only finalize closure to outgoing channels
+    bytes32 channelId = this._getChannelId(msg.sender, destination);
+    Channel storage channel = this.channels(channelId);
 
-    if (amountToTransfer > 0) {
-      token.transfer(msg.sender, amountToTransfer);
+    if (channel.status != ChannelStatus.PENDING_TO_CLOSE) {
+      revert WrongChannelState({reason: 'channel must be pending to close'});
     }
+
+    if (channel.closureTime < _currentBlockTimestamp()) {
+      revert NoticePeriodNotDue();
+    }
+
+    // Wipes commitment and gives ~20k gas refund
+    channel.commitment = bytes32(0);
+
+    channel.status = ChannelStatus.CLOSED; // ChannelStatus.CLOSED == 0
+    channel.closureTime = Timestamp(0);
+    channel.ticketIndex = TicketIndex(0);
+
+    // channel.epoch must be kept
+
+    if (channel.balance > 0) {
+      if (token.transfer(msg.sender, channel.balance) != true) {
+        revert TokenTransferFailed();
+      }
+    }
+
+    channel.balance = Balance(0);
   }
 
   /**
-   * @dev Request a channelEpoch bump, so we can make a new set of
-   * commitments
-   * Implies that msg.sender is the destination of the channel.
-   * @param source the address of the channel source
+   * Sets a new iterated commitment for incoming channels.
+   *
+   * @dev this alters the channel state to prevent from
    * @param newCommitment, a secret derived from this new commitment
+   * @param source the address of the source of the channel
    */
-  function bumpChannel(address source, bytes32 newCommitment) external validateChannelParties(source, msg.sender) {
-    Channel storage channel = _getChannel(source, msg.sender);
-
-    require(newCommitment != bytes32(0), 'Cannot set empty commitment');
-    channel.commitment = newCommitment;
-    channel.ticketEpoch = channel.ticketEpoch + 1;
-    if (channel.status == ChannelStatus.WAITING_FOR_COMMITMENT) {
-      channel.status = ChannelStatus.OPEN;
+  function setCommitment(bytes32 newCommitment, address source) external {
+    if (newCommitment == bytes32(0)) {
+      // revert since setting empty commitments is a no-op and therefore unintended
+      revert InvalidCommitment();
     }
 
-    emit ChannelBumped(source, msg.sender, newCommitment, channel.ticketEpoch, channel.balance);
+    // We can only set commitment to incoming channels.
+    bytes32 channelId = this._getChannelId(source, msg.sender);
+    Channel storage channel = this.channels(channelId);
+
+    if (channel.status != ChannelStatus.OPEN) {
+      revert WrongChannelState({reason: 'Cannot set commitments for channels that are not in state OPEN.'});
+    }
+
+    if (channel.commitment != bytes32(0)) {
+      // The party ran out of commitment openings, this is a reset
+      channel.channelEpoch = channel.channelEpoch + 1;
+    }
+
+    channel.commitment = newCommitment;
+
+    emit ChannelBumped(channelId, channel.channelEpoch);
   }
 
   /**
@@ -411,7 +536,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
       address account2;
       uint96 amount2;
 
-      (account1, amount1, account2, amount2) = abi.decode(userData, (address, uint96, address, uint96));
+      (account1, amount1, account2, amount2) = abi.decode(userData, (address, Balance, address, Balance));
       require(amount == amount1 + amount2, 'amount sent must be equal to amount specified');
 
       // fund channel in direction of: account1 -> account2
@@ -434,39 +559,26 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
    * @param dest the address of the channel destination
    * @param amount amount to fund account1
    */
-  function _fundChannel(address funder, address source, address dest, Balance amount) private {
-    require(amount > 0, 'amount must be greater than 0');
+  function _fundChannel(address source, address dest, Balance amount) private validateBalance(amount) {
+    bytes32 channelId = this._getChannelId(source, dest);
+    Channel storage channel = this.channels(channelId);
 
-    Channel storage channel = _getChannel(source, dest);
-    require(channel.status != ChannelStatus.PENDING_TO_CLOSE, 'Cannot fund a closing channel');
+    if (channel.status == ChannelStatus.PENDING_TO_CLOSE) {
+      revert WrongChannelState({reason: 'cannot fund a channel that will close soon'});
+    }
+
     if (channel.status == ChannelStatus.CLOSED) {
-      // We are reopening the channel
+      // We are opening or reoping a channel
       channel.channelEpoch = channel.channelEpoch + 1;
       channel.ticketEpoch = 0; // As we've incremented the channel epoch, we can restart the ticket counter
       channel.ticketIndex = 0;
 
-      if (channel.commitment != bytes32(0)) {
-        channel.status = ChannelStatus.OPEN;
-        emit ChannelBalanceIncreased(source, dest, newBalance);
-        (source, dest);
-      } else {
-        channel.status = ChannelStatus.WAITING_FOR_COMMITMENT;
-      }
+      channel.status = ChannelStatus.OPEN;
+      emit ChannelOpened(source, dest, channel.channelEpoch);
     }
 
     channel.balance = channel.balance + amount;
-    emit ChannelFunded(funder, source, dest, amount);
-  }
-
-  /**
-   * @param source source
-   * @param destination destination
-   * @return a tuple of channelId, channel
-   */
-  function _getChannel(address source, address destination) private view returns (Channel storage) {
-    bytes32 channelId = _getChannelId(source, destination);
-    Channel storage channel = channels[channelId];
-    return channel;
+    emit ChannelBalanceIncreased(channelId, channel.balance);
   }
 
   /**
@@ -481,15 +593,15 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
   /**
    * @return the current timestamp
    */
-  function _currentBlockTimestamp() private view returns (uint32) {
+  function _currentBlockTimestamp() private view returns (Timestamp) {
     // solhint-disable-next-line
-    return uint32(block.timestamp);
+    return Timestamp(block.timestamp);
   }
 
   /**
    * Uses the response to recompute the challenge. This is done
    * by multiplying the base point of the curve with the given response.
-   * Due to the lack of embedded ECMUL functionality in the current
+   * Due to the lack of embedded ECMUL functionality for the secp256k1 curve in the current
    * version of the EVM, this is done by misusing the `ecrecover`
    * functionality. `ecrecover` performs the point multiplication and
    * converts the output to an Ethereum address (sliced hash of the product
@@ -498,12 +610,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
    * @param response response that is used to recompute the challenge
    */
   function _computeChallenge(bytes32 response) private pure returns (address) {
-    require(0 < uint256(response), 'Invalid response. Value must be within the field');
-    require(uint256(response) < FIELD_ORDER, 'Invalid response. Value must be within the field');
-
-    // x-coordinate of the base point
-    // y-coordinate of base-point is even, so v is 27
-
     address signer = ecrecover(
       0,
       BASE_POINT_Y_COMPONENT_SIGN,
@@ -515,24 +621,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
   }
 
   /**
-   * @dev Encode ticket data
-   * @return bytes
-   */
-  function _getEncodedTicket(
-    address recipient,
-    uint256 recipientCounter,
-    bytes32 proofOfRelaySecret,
-    uint256 channelEpoch,
-    uint256 amount,
-    uint256 ticketIndex,
-    uint256 winProb
-  ) private pure returns (bytes memory) {
-    address challenge = _computeChallenge(proofOfRelaySecret);
-
-    return abi.encodePacked(recipient, challenge, recipientCounter, amount, winProb, ticketIndex, channelEpoch);
-  }
-
-  /**
    * @dev Get the ticket's "luck" by
    * hashing provided values.
    * @return luck
@@ -541,7 +629,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     bytes32 ticketHash,
     bytes32 nextCommitment,
     bytes32 proofOfRelaySecret
-  ) private pure returns (uint256) {
-    return uint256(keccak256(abi.encodePacked(ticketHash, nextCommitment, proofOfRelaySecret)));
+  ) private pure returns (WinProb) {
+    // hash function produces 256 bits output but we require only first 56 bits (IEEE 754 double precision means 53 signifcant bits)
+    return WinProb(keccak256(abi.encodePacked(ticketHash, nextCommitment, proofOfRelaySecret)));
   }
 }
