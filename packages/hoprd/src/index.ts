@@ -9,7 +9,8 @@ import {
   setupPromiseRejectionFilter,
   SUGGESTED_NATIVE_BALANCE,
   create_histogram_with_buckets,
-  pickVersion, defer
+  pickVersion,
+  defer
 } from '@hoprnet/hopr-utils'
 import {
   Health,

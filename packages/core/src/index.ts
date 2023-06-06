@@ -597,7 +597,6 @@ class Hopr extends EventEmitter {
       opts: DialOpts
     ) => libp2pSendMessage(this.libp2pComponents, dest, protocols, msg, includeReply, opts)) as SendMessage // Typescript limitation
 
-
     let acknowledgementProtocols = [
       // current
       `/hopr/${this.network.id}/ack/${NORMALIZED_VERSION}`,
