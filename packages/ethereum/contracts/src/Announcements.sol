@@ -121,7 +121,7 @@ contract HoprAnnouncements is Multicall {
     _announce4Internal(msg.sender, ip, port);
   }
 
-  function revoke(address self) external onlySafe {
+  function revokeSafe(address self) external onlySafe {
     _revokeInternal(self);
   }
 
@@ -197,6 +197,6 @@ contract HoprAnnouncements is Multicall {
    * Opts out from acting as a public relay node (PRN)
    */
   function _revokeInternal(address self) private {
-    emit RevokeAnnouncement(msg.sender);
+    emit RevokeAnnouncement(self);
   }
 }
