@@ -48,6 +48,7 @@ pub fn iterate_hash(seed: &[u8], iterations: usize, step_size: usize) -> Iterate
         }
 
         hash.finalize_into(&mut intermediate);
+        // TODO: make this function async and do `async_std::task::yield_now().await` here
     }
 
     IteratedHash {

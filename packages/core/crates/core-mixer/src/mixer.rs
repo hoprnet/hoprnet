@@ -1,4 +1,6 @@
+use std::future::Future;
 use std::marker::PhantomData;
+use std::pin::Pin;
 use std::time::Duration;
 
 use futures::stream::Stream;
@@ -24,12 +26,6 @@ lazy_static! {
     )
     .unwrap();
 }
-
-#[cfg(any(not(feature = "wasm"), test))]
-use async_std::task::sleep;
-
-#[cfg(all(feature = "wasm", not(test)))]
-use gloo_timers::future::sleep;
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -84,19 +80,32 @@ impl MixerConfig {
 /// Mixer implementation using Async instead of a real queue to provide the packet mixing functionality
 pub struct Mixer<T> {
     pub cfg: MixerConfig,
+    sleep: Box<dyn Fn(Duration) -> Box<dyn Future<Output = ()>>>,
     _data: PhantomData<T>,
 }
 
-impl<T> Default for Mixer<T> {
-    fn default() -> Self {
+impl<T> Mixer<T> {
+    /// Creates new mixer with standard sleep function.
+    /// This constructor is not suitable for WASM context and will panic.
+    pub fn new(cfg: MixerConfig) -> Self {
         Self {
-            cfg: MixerConfig::default(),
+            sleep: Box::new(|d| Box::new(async_std::task::sleep(d))),
+            cfg,
             _data: PhantomData,
         }
     }
-}
 
-impl<T> Mixer<T> {
+    /// Creates new Mixer with gloo-timers for sleep method.
+    /// This constructor is suitable for WASM context.
+    #[cfg(feature = "wasm")]
+    pub fn new_with_gloo_timers(cfg: MixerConfig) -> Self {
+        Self {
+            sleep: Box::new(|d| Box::new(gloo_timers::future::sleep(d))),
+            cfg,
+            _data: PhantomData,
+        }
+    }
+
     /// Async mixing operation on the packet.
     ///
     /// # Arguments
@@ -111,7 +120,7 @@ impl<T> Mixer<T> {
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_QUEUE_SIZE.increment(1.0f64);
 
-        sleep(random_delay).await;
+        Pin::from((self.sleep)(random_delay)).await;
 
         #[cfg(all(feature = "prometheus", not(test)))]
         {
@@ -145,7 +154,9 @@ pub mod wasm {
     /// Async closure interaction was inspired by: https://www.fpcomplete.com/blog/captures-closures-async/
     #[wasm_bindgen]
     pub fn new_mixer(packet_input: AsyncIterator) -> Result<AsyncIterableHelperMixer, JsValue> {
-        let mixer = std::sync::Arc::new(Mixer::<Result<Box<[u8]>, String>>::default());
+        let mixer = std::sync::Arc::new(Mixer::<Result<Box<[u8]>, String>>::new_with_gloo_timers(
+            MixerConfig::default(),
+        ));
 
         Ok(AsyncIterableHelperMixer {
             stream: Box::new(
@@ -190,7 +201,7 @@ mod tests {
     #[async_std::test]
     async fn test_then_concurrent_empty_stream_should_not_produce_a_value_if_none_is_ready() {
         let mut stream = futures::stream::iter(random_packets(1)).then_concurrent(|x| async {
-            sleep(TINY_CONSTANT_DELAY * 3).await;
+            async_std::task::sleep(TINY_CONSTANT_DELAY * 3).await;
             x
         });
 
@@ -211,7 +222,7 @@ mod tests {
         let start = std::time::Instant::now();
 
         let stream = futures::stream::iter(expected.clone()).then_concurrent(|x| async move {
-            sleep(constant_delay).await;
+            async_std::task::sleep(constant_delay).await;
             x
         });
 
@@ -230,7 +241,7 @@ mod tests {
         let expected_packets = vec![packet_2, packet_3, packet_1];
 
         let stream = futures::stream::iter(vec![packet_1, packet_2, packet_3]).then_concurrent(|x| async move {
-            sleep(std::time::Duration::from_millis(x)).await;
+            async_std::task::sleep(std::time::Duration::from_millis(x)).await;
             x
         });
         let actual_packets = stream.collect::<Vec<u64>>().await;

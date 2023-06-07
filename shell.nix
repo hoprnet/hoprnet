@@ -31,6 +31,8 @@ let
     python3 # v3.10.10
   ];
   devPkgs = with pkgs; [
+    patchelf
+
     curl # v7.88.0
 
     # integration testing utilities

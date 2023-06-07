@@ -50,7 +50,7 @@ pub async fn bump_commitment<T: HoprCoreEthereumDbActions>(
         .map_err(|e| DbError(e))
 }
 
-///
+/// Trait for retrieving and setting the commitment information from the chain
 #[cfg_attr(test, mockall::automock)]
 #[async_trait(? Send)]
 pub trait ChainCommitter {
@@ -76,7 +76,7 @@ where
         .then(|_| committer.set_commitment(&current))
         .await;
 
-    info!("commitment chain initialized");
+    info!("commitment chain initialized for {channel_id}");
     Ok(())
 }
 
@@ -153,6 +153,7 @@ mod tests {
     use core_crypto::types::{Hash, PublicKey};
     use core_ethereum_db::db::CoreEthereumDb;
     use hex_literal::hex;
+    use std::sync::{Arc, Mutex};
     use utils_db::db::DB;
     use utils_db::leveldb::rusty::RustyLevelDbShim;
     use utils_types::primitives::U256;
@@ -165,7 +166,7 @@ mod tests {
         let db = rusty_leveldb::DB::open("test", opt).unwrap();
 
         CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new(db)),
+            DB::new(RustyLevelDbShim::new(Arc::new(Mutex::new(db)))),
             PublicKey::from_privkey(&PRIV_KEY).unwrap(),
         )
     }
