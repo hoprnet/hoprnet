@@ -5,6 +5,23 @@ error PublicKeyDoesNotMatchSender(address pubkey, address sender);
 
 import 'openzeppelin-contracts-4.8.3/utils/Multicall.sol';
 
+/**
+ *    &&&&
+ *    &&&&
+ *    &&&&
+ *    &&&&  &&&&&&&&&       &&&&&&&&&&&&          &&&&&&&&&&/   &&&&.&&&&&&&&&
+ *    &&&&&&&&&   &&&&&   &&&&&&     &&&&&,     &&&&&    &&&&&  &&&&&&&&   &&&&
+ *     &&&&&&      &&&&  &&&&#         &&&&   &&&&&       &&&&& &&&&&&     &&&&&
+ *     &&&&&       &&&&/ &&&&           &&&& #&&&&        &&&&  &&&&&
+ *     &&&&         &&&& &&&&&         &&&&  &&&&        &&&&&  &&&&&
+ *     %%%%        /%%%%   %%%%%%   %%%%%%   %%%%  %%%%%%%%%    %%%%%
+ *    %%%%%        %%%%      %%%%%%%%%%%    %%%%   %%%%%%       %%%%
+ *                                          %%%%
+ *                                          %%%%
+ *                                          %%%%
+ *
+ * Publishes transport-layer information in the hopr network.
+ **/
 contract HoprAnnouncements is Multicall {
   event KeyBindingOdd(bytes32 secp256k1_x, bytes32 ed25519_sig_0, bytes32 ed25519_sig_1, bytes32 ed25519_pub_key);
   event KeyBindingEven(bytes32 secp256k1_x, bytes32 ed25519_sig_0, bytes32 ed25519_sig_1, bytes32 ed25519_pub_key);
@@ -177,7 +194,7 @@ contract HoprAnnouncements is Multicall {
    * @param ip the IPv4 address to announce
    * @param port the port to use
    */
-  function _announce4Internal(address self, bytes4 ip, bytes2 port) private {
+  function _announce4Internal(address self, bytes4 ip, bytes2 port) internal {
     emit AddressAnnouncement4(self, ip, port);
   }
 
@@ -189,14 +206,14 @@ contract HoprAnnouncements is Multicall {
    * @param ip the IPv6 address to announce
    * @param port the port to use
    */
-  function _announce6Internal(address self, bytes16 ip, bytes2 port) private {
+  function _announce6Internal(address self, bytes16 ip, bytes2 port) internal {
     emit AddressAnnouncement6(self, ip, port);
   }
 
   /**
    * Opts out from acting as a public relay node (PRN)
    */
-  function _revokeInternal(address self) private {
+  function _revokeInternal(address self) internal {
     emit RevokeAnnouncement(self);
   }
 }
