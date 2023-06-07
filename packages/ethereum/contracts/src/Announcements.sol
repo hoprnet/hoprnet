@@ -122,7 +122,7 @@ contract HoprAnnouncements is Multicall {
     _announce6Internal(msg.sender, ip, port);
   }
 
-  function announce6(address self, bytes16 ip, bytes2 port) external onlySafe {
+  function announce6Safe(address self, bytes16 ip, bytes2 port) external onlySafe {
     _announce6Internal(self, ip, port);
   }
 
