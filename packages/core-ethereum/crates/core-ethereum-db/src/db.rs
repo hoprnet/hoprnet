@@ -856,32 +856,32 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub async fn store_hash_intermediaries(&self, channel: Hash, iterated_hash: JsValue) -> Result<(), JsValue> {
+        pub async fn store_hash_intermediaries(&self, channel: &Hash, iterated_hash: JsValue) -> Result<(), JsValue> {
             let iterated: IteratedHash = utils_misc::ok_or_jserr!(serde_wasm_bindgen::from_value(iterated_hash))?;
             let data = self.core_ethereum_db.clone();
             let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.store_hash_intermediaries(&channel, &iterated).await)
+            utils_misc::ok_or_jserr!(db.store_hash_intermediaries(channel, &iterated).await)
         }
 
         #[wasm_bindgen]
-        pub async fn get_commitment(&self, channel: Hash, iteration: usize) -> Result<Option<Hash>, JsValue> {
+        pub async fn get_commitment(&self, channel: &Hash, iteration: usize) -> Result<Option<Hash>, JsValue> {
             let data = self.core_ethereum_db.clone();
             let db = data.read().await;
-            utils_misc::ok_or_jserr!(db.get_commitment(&channel, iteration).await)
+            utils_misc::ok_or_jserr!(db.get_commitment(channel, iteration).await)
         }
 
         #[wasm_bindgen]
-        pub async fn get_current_commitment(&self, channel: Hash) -> Result<Option<Hash>, JsValue> {
+        pub async fn get_current_commitment(&self, channel: &Hash) -> Result<Option<Hash>, JsValue> {
             let data = self.core_ethereum_db.clone();
             let db = data.read().await;
-            utils_misc::ok_or_jserr!(db.get_current_commitment(&channel).await)
+            utils_misc::ok_or_jserr!(db.get_current_commitment(channel).await)
         }
 
         #[wasm_bindgen]
-        pub async fn set_current_commitment(&self, channel: Hash, commitment: Hash) -> Result<(), JsValue> {
+        pub async fn set_current_commitment(&self, channel: &Hash, commitment: &Hash) -> Result<(), JsValue> {
             let data = self.core_ethereum_db.clone();
             let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.set_current_commitment(&channel, &commitment).await)
+            utils_misc::ok_or_jserr!(db.set_current_commitment(channel, commitment).await)
         }
 
         #[wasm_bindgen]
@@ -906,10 +906,10 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub async fn get_channel(&self, channel: Hash) -> Result<Option<ChannelEntry>, JsValue> {
+        pub async fn get_channel(&self, channel: &Hash) -> Result<Option<ChannelEntry>, JsValue> {
             let data = self.core_ethereum_db.clone();
             let db = data.read().await;
-            utils_misc::ok_or_jserr!(db.get_channel(&channel).await)
+            utils_misc::ok_or_jserr!(db.get_channel(channel).await)
         }
 
         #[wasm_bindgen]
@@ -928,31 +928,31 @@ pub mod wasm {
         #[wasm_bindgen]
         pub async fn update_channel_and_snapshot(
             &self,
-            channel_id: Hash,
-            channel: ChannelEntry,
-            snapshot: Snapshot,
+            channel_id: &Hash,
+            channel: &ChannelEntry,
+            snapshot: &Snapshot,
         ) -> Result<(), JsValue> {
             let data = self.core_ethereum_db.clone();
             let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.update_channel_and_snapshot(&channel_id, &channel, &snapshot).await)
+            utils_misc::ok_or_jserr!(db.update_channel_and_snapshot(channel_id, channel, snapshot).await)
         }
 
         #[wasm_bindgen]
-        pub async fn get_account(&self, address: Address) -> Result<Option<AccountEntry>, JsValue> {
+        pub async fn get_account(&self, address: &Address) -> Result<Option<AccountEntry>, JsValue> {
             let data = self.core_ethereum_db.clone();
             let db = data.read().await;
-            utils_misc::ok_or_jserr!(db.get_account(&address).await)
+            utils_misc::ok_or_jserr!(db.get_account(address).await)
         }
 
         #[wasm_bindgen]
         pub async fn update_account_and_snapshot(
             &self,
-            account: AccountEntry,
-            snapshot: Snapshot,
+            account: &AccountEntry,
+            snapshot: &Snapshot,
         ) -> Result<(), JsValue> {
             let data = self.core_ethereum_db.clone();
             let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.update_account_and_snapshot(&account, &snapshot).await)
+            utils_misc::ok_or_jserr!(db.update_account_and_snapshot(account, snapshot).await)
         }
 
         #[wasm_bindgen]
@@ -1012,44 +1012,44 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub async fn mark_pending(&self, ticket: Ticket) -> Result<(), JsValue> {
+        pub async fn mark_pending(&self, ticket: &Ticket) -> Result<(), JsValue> {
             let data = self.core_ethereum_db.clone();
             let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.mark_pending(&ticket).await)
+            utils_misc::ok_or_jserr!(db.mark_pending(ticket).await)
         }
 
         #[wasm_bindgen]
         pub async fn resolve_pending(
             &self,
-            address: Address,
-            balance: Balance,
-            snapshot: Snapshot,
+            address: &Address,
+            balance: &Balance,
+            snapshot: &Snapshot,
         ) -> Result<(), JsValue> {
             let data = self.core_ethereum_db.clone();
             let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.resolve_pending(&address, &balance, &snapshot).await)
+            utils_misc::ok_or_jserr!(db.resolve_pending(address, balance, snapshot).await)
         }
 
         #[wasm_bindgen]
-        pub async fn mark_redeemed(&self, ticket: AcknowledgedTicket) -> Result<(), JsValue> {
+        pub async fn mark_redeemed(&self, ticket: &AcknowledgedTicket) -> Result<(), JsValue> {
             let data = self.core_ethereum_db.clone();
             let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.mark_redeemed(&ticket).await)
+            utils_misc::ok_or_jserr!(db.mark_redeemed(ticket).await)
         }
 
         /// NOTE: needed only for testing
         #[wasm_bindgen]
-        pub async fn mark_rejected(&self, ticket: Ticket) -> Result<(), JsValue> {
+        pub async fn mark_rejected(&self, ticket: &Ticket) -> Result<(), JsValue> {
             let data = self.core_ethereum_db.clone();
             let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.mark_rejected(&ticket).await)
+            utils_misc::ok_or_jserr!(db.mark_rejected(ticket).await)
         }
 
         #[wasm_bindgen]
-        pub async fn mark_losing_acked_ticket(&self, ticket: AcknowledgedTicket) -> Result<(), JsValue> {
+        pub async fn mark_losing_acked_ticket(&self, ticket: &AcknowledgedTicket) -> Result<(), JsValue> {
             let data = self.core_ethereum_db.clone();
             let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.mark_losing_acked_ticket(&ticket).await)
+            utils_misc::ok_or_jserr!(db.mark_losing_acked_ticket(ticket).await)
         }
 
         #[wasm_bindgen]
@@ -1067,24 +1067,24 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub async fn get_channel_x(&self, src: PublicKey, dest: PublicKey) -> Result<Option<ChannelEntry>, JsValue> {
+        pub async fn get_channel_x(&self, src: &PublicKey, dest: &PublicKey) -> Result<Option<ChannelEntry>, JsValue> {
             let data = self.core_ethereum_db.clone();
             let db = data.read().await;
-            utils_misc::ok_or_jserr!(db.get_channel_x(&src, &dest).await)
+            utils_misc::ok_or_jserr!(db.get_channel_x(src, dest).await)
         }
 
         #[wasm_bindgen]
-        pub async fn get_channel_to(&self, dest: PublicKey) -> Result<Option<ChannelEntry>, JsValue> {
+        pub async fn get_channel_to(&self, dest: &PublicKey) -> Result<Option<ChannelEntry>, JsValue> {
             let data = self.core_ethereum_db.clone();
             let db = data.read().await;
-            utils_misc::ok_or_jserr!(db.get_channel_to(&dest).await)
+            utils_misc::ok_or_jserr!(db.get_channel_to(dest).await)
         }
 
         #[wasm_bindgen]
-        pub async fn get_channel_from(&self, src: PublicKey) -> Result<Option<ChannelEntry>, JsValue> {
+        pub async fn get_channel_from(&self, src: &PublicKey) -> Result<Option<ChannelEntry>, JsValue> {
             let data = self.core_ethereum_db.clone();
             let db = data.read().await;
-            utils_misc::ok_or_jserr!(db.get_channel_from(&src).await)
+            utils_misc::ok_or_jserr!(db.get_channel_from(src).await)
         }
 
         #[wasm_bindgen]
@@ -1109,24 +1109,24 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub async fn set_hopr_balance(&self, balance: Balance) -> Result<(), JsValue> {
+        pub async fn set_hopr_balance(&self, balance: &Balance) -> Result<(), JsValue> {
             let data = self.core_ethereum_db.clone();
             let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.set_hopr_balance(&balance).await)
+            utils_misc::ok_or_jserr!(db.set_hopr_balance(balance).await)
         }
 
         #[wasm_bindgen]
-        pub async fn add_hopr_balance(&self, balance: Balance, snapshot: Snapshot) -> Result<(), JsValue> {
+        pub async fn add_hopr_balance(&self, balance: &Balance, snapshot: &Snapshot) -> Result<(), JsValue> {
             let data = self.core_ethereum_db.clone();
             let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.add_hopr_balance(&balance, &snapshot).await)
+            utils_misc::ok_or_jserr!(db.add_hopr_balance(balance, snapshot).await)
         }
 
         #[wasm_bindgen]
-        pub async fn sub_hopr_balance(&self, balance: Balance, snapshot: Snapshot) -> Result<(), JsValue> {
+        pub async fn sub_hopr_balance(&self, balance: &Balance, snapshot: &Snapshot) -> Result<(), JsValue> {
             let data = self.core_ethereum_db.clone();
             let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.sub_hopr_balance(&balance, &snapshot).await)
+            utils_misc::ok_or_jserr!(db.sub_hopr_balance(balance, snapshot).await)
         }
 
         #[wasm_bindgen]
@@ -1137,74 +1137,74 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub async fn set_network_registry(&self, enabled: bool, snapshot: Snapshot) -> Result<(), JsValue> {
+        pub async fn set_network_registry(&self, enabled: bool, snapshot: &Snapshot) -> Result<(), JsValue> {
             let data = self.core_ethereum_db.clone();
             let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.set_network_registry(enabled, &snapshot).await)
+            utils_misc::ok_or_jserr!(db.set_network_registry(enabled, snapshot).await)
         }
 
         #[wasm_bindgen]
         pub async fn add_to_network_registry(
             &self,
-            public_key: PublicKey,
-            account: Address,
-            snapshot: Snapshot,
+            public_key: &PublicKey,
+            account: &Address,
+            snapshot: &Snapshot,
         ) -> Result<(), JsValue> {
             let data = self.core_ethereum_db.clone();
             let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.add_to_network_registry(&public_key, &account, &snapshot).await)
+            utils_misc::ok_or_jserr!(db.add_to_network_registry(public_key, account, snapshot).await)
         }
 
         #[wasm_bindgen]
         pub async fn remove_from_network_registry(
             &self,
-            public_key: PublicKey,
-            account: Address,
-            snapshot: Snapshot,
+            public_key: &PublicKey,
+            account: &Address,
+            snapshot: &Snapshot,
         ) -> Result<(), JsValue> {
             let data = self.core_ethereum_db.clone();
             let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.remove_from_network_registry(&public_key, &account, &snapshot).await)
+            utils_misc::ok_or_jserr!(db.remove_from_network_registry(public_key, account, snapshot).await)
         }
 
         #[wasm_bindgen]
         pub async fn get_account_from_network_registry(
             &self,
-            public_key: PublicKey,
+            public_key: &PublicKey,
         ) -> Result<Option<Address>, JsValue> {
             let data = self.core_ethereum_db.clone();
             let db = data.read().await;
-            utils_misc::ok_or_jserr!(db.get_account_from_network_registry(&public_key).await)
+            utils_misc::ok_or_jserr!(db.get_account_from_network_registry(public_key).await)
         }
 
         #[wasm_bindgen]
         pub async fn find_hopr_node_using_account_in_network_registry(
             &self,
-            account: Address,
+            account: &Address,
         ) -> Result<WasmVecPublicKey, JsValue> {
             let data = self.core_ethereum_db.clone();
             let db = data.read().await;
-            utils_misc::ok_or_jserr!(db.find_hopr_node_using_account_in_network_registry(&account).await)
+            utils_misc::ok_or_jserr!(db.find_hopr_node_using_account_in_network_registry(account).await)
                 .map(|v| WasmVecPublicKey::from(v))
         }
 
         #[wasm_bindgen]
-        pub async fn is_eligible(&self, account: Address) -> Result<bool, JsValue> {
+        pub async fn is_eligible(&self, account: &Address) -> Result<bool, JsValue> {
             let data = self.core_ethereum_db.clone();
             let db = data.read().await;
-            utils_misc::ok_or_jserr!(db.is_eligible(&account).await)
+            utils_misc::ok_or_jserr!(db.is_eligible(account).await)
         }
 
         #[wasm_bindgen]
         pub async fn set_eligible(
             &self,
-            account: Address,
+            account: &Address,
             eligible: bool,
-            snapshot: Snapshot,
+            snapshot: &Snapshot,
         ) -> Result<(), JsValue> {
             let data = self.core_ethereum_db.clone();
             let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.set_eligible(&account, eligible, &snapshot).await)
+            utils_misc::ok_or_jserr!(db.set_eligible(account, eligible, snapshot).await)
         }
 
         #[wasm_bindgen]
