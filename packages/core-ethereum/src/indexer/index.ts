@@ -168,13 +168,13 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
 
     const orderedBlocks = ordered<number>()
 
-    // Starts the asynchronous stream of indexer events
-    // and feeds them to the event listener
-    ;(async function (this: Indexer) {
-      for await (const block of orderedBlocks.iterator()) {
-        await this.onNewBlock(block.value, true, true) // exceptions are handled (for real)
-      }
-    }).call(this)
+      // Starts the asynchronous stream of indexer events
+      // and feeds them to the event listener
+      ; (async function (this: Indexer) {
+        for await (const block of orderedBlocks.iterator()) {
+          await this.onNewBlock(block.value, true, true) // exceptions are handled (for real)
+        }
+      }).call(this)
 
     // Do not process new blocks before querying old blocks has finished
     const newBlocks = ordered<number>()
@@ -199,12 +199,12 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     // get past events
     fromBlock = await this.processPastEvents(fromBlock, latestOnChainBlock, this.blockRange)
 
-    // Feed new blocks to the ordered queue
-    ;(async function (this: Indexer) {
-      for await (const newBlock of newBlocks.iterator()) {
-        orderedBlocks.push(newBlock) // exceptions are handled
-      }
-    }).call(this)
+      // Feed new blocks to the ordered queue
+      ; (async function (this: Indexer) {
+        for await (const newBlock of newBlocks.iterator()) {
+          orderedBlocks.push(newBlock) // exceptions are handled
+        }
+      }).call(this)
 
     log('Subscribing to events from block %d', fromBlock)
 
@@ -272,12 +272,12 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     fetchTokenTransactions = false
   ): Promise<
     | {
-        success: true
-        events: TypedEvent<any, any>[]
-      }
+      success: true
+      events: TypedEvent<any, any>[]
+    }
     | {
-        success: false
-      }
+      success: false
+    }
   > {
     let rawEvents: TypedEvent<any, any>[] = []
 
@@ -566,8 +566,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
 
       for (let i = 0; i < RETRIES; i++) {
         log(
-          `fetchEvents at currentBlock ${currentBlock} startupBlock ${this.startupBlock} maxConfirmations ${
-            this.maxConfirmations
+          `fetchEvents at currentBlock ${currentBlock} startupBlock ${this.startupBlock} maxConfirmations ${this.maxConfirmations
           }. ${currentBlock > this.startupBlock + this.maxConfirmations}`
         )
         if (currentBlock > this.startupBlock) {
@@ -972,7 +971,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
         nodes.push(Ethereum_PublicKey.deserialize(hoprNodes.next().serialize(false)))
       }
       this.emit('network-registry-eligibility-changed', account, nodes, event.args.eligibility)
-    } catch {}
+    } catch { }
   }
 
   private async onRegistered(
