@@ -222,12 +222,22 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     domainSeparator = keccak256(
       abi.encode(
         keccak256('EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)'),
-        keccak256(bytes('NodeStakeRegistry')),
+        keccak256(bytes('HoprChannels')),
         keccak256(bytes(version)),
         block.chainid,
         address(this)
       )
     );
+  }
+
+  modifier onlySafe() {
+    // check if NodeSafeRegistry entry exists
+    _;
+  }
+
+  modifier noSafeSet() {
+    // check if NodeSafeRegistry entry **does not** exist
+    _;
   }
 
   /**
@@ -301,6 +311,25 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     }
   }
 
+  function redeemTicketSafe(
+    address self,
+    bytes32 nextCommitment,
+    bytes32 porSecret,
+    CompactSignature calldata signature,
+    Ticket calldata ticket
+  ) external onlySafe {
+    _redeemTicketInternal(self, nextCommitment, porSecret, signature, ticket);
+  }
+
+  function redeemTicket(
+    bytes32 nextCommitment,
+    bytes32 porSecret,
+    CompactSignature calldata signature,
+    Ticket calldata ticket
+  ) external noSafeSet {
+    _redeemTicketInternal(msg.sender, nextCommitment, porSecret, signature, ticket);
+  }
+
   /**
    * Claims the incentive for relaying a mixnet packet using probabilistic payments.
    *
@@ -314,12 +343,13 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
    * @param signature compact ERC-2098 signature of the ticket issuer for the provided ticket
    * @param ticket the ticket to redeem
    */
-  function redeemTicket(
+  function _redeemTicketInternal(
+    address self,
     bytes32 nextCommitment,
     bytes32 porSecret,
     CompactSignature calldata signature,
     Ticket calldata ticket
-  ) external validateBalance(ticket.amount) validatePoRSecret(porSecret) {
+  ) internal validateBalance(ticket.amount) validatePoRSecret(porSecret) {
     Channel storage spendingChannel = channels[ticket.channelId];
 
     if (nextCommitment != bytes32(0) || spendingChannel.commitment != keccak256(abi.encodePacked(nextCommitment))) {
@@ -357,21 +387,21 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     );
 
     address source = ECDSA.recover(ticketHash, signature.r, signature.vs);
-    if (_getChannelId(source, msg.sender) != ticket.channelId) {
+    if (_getChannelId(source, self) != ticket.channelId) {
       revert InvalidTicketSignature();
     }
 
     spendingChannel.ticketIndex = ticket.ticketIndex;
     spendingChannel.commitment = nextCommitment;
     spendingChannel.balance = Balance.wrap(Balance.unwrap(spendingChannel.balance) - Balance.unwrap(ticket.amount));
-    emit ChannelBalanceIncreased(ticket.channelId, spendingChannel.balance);
+    emit ChannelBalanceDecreased(ticket.channelId, spendingChannel.balance);
 
-    bytes32 outgoingChannelId = _getChannelId(msg.sender, source);
+    bytes32 outgoingChannelId = _getChannelId(self, source);
     Channel storage earningChannel = channels[outgoingChannelId];
 
     if (earningChannel.status == ChannelStatus.CLOSED) {
       // The other channel does not exist, so we need to transfer funds directly
-      if (token.transfer(msg.sender, Balance.unwrap(ticket.amount)) != true) {
+      if (token.transfer(self, Balance.unwrap(ticket.amount)) != true) {
         revert TokenTransferFailed();
       }
     } else {
@@ -383,17 +413,25 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     emit TicketRedeemed(ticket.channelId, ticket.ticketIndex);
   }
 
+  function initiateOutgoingChannelClosureSafe(address self, address destination) external onlySafe {
+    _initiateOutgoingChannelClosureInternal(self, destination);
+  }
+
+  function initiateOutgoingChannelClosure(address destination) external noSafeSet {
+    _initiateOutgoingChannelClosureInternal(msg.sender, destination);
+  }
+
   /**
    * Prepares a channel to pull out funds from an outgoing channel.
    *
    * There is a notice period to give the other end, `destination`, the
    * opportunity to redeem their collected tickets.
    *
-   * @param destination the destination
+   * @param destination destination end of the channel to close
    */
-  function initiateOutgoingChannelClosure(address destination) external {
+  function _initiateOutgoingChannelClosureInternal(address self, address destination) internal {
     // We can only initiate closure to outgoing channels
-    bytes32 channelId = _getChannelId(msg.sender, destination);
+    bytes32 channelId = _getChannelId(self, destination);
     Channel storage channel = channels[channelId];
 
     // calling initiateClosure on a PENDING_TO_CLOSE channel extends the noticePeriod
@@ -410,15 +448,25 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     emit OutgoingChannelClosureInitiated(channelId, channel.closureTime);
   }
 
+  function closeIncomingChannelSafe(address self, address source) external onlySafe {
+    _closeIncomingChannelInternal(self, source);
+  }
+
+  function closeIncomingChannel(address source) external noSafeSet {
+    _closeIncomingChannelInternal(msg.sender, source);
+  }
+
   /**
    * Closes an incoming channel.
    *
    * This can happen immediately since it is up to the caller to
    * redeem their collected tickets.
+   *
+   * @param source source end of the channel to close
    */
-  function closeIncomingChannel(address source) external {
+  function _closeIncomingChannelInternal(address self, address source) internal {
     // We can only close incoming channels directly
-    bytes32 channelId = _getChannelId(source, msg.sender);
+    bytes32 channelId = _getChannelId(source, self);
 
     Channel storage channel = channels[channelId];
 
@@ -446,15 +494,23 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     channel.balance = Balance.wrap(0);
   }
 
+  function finalizeOutgoingChannelClosureSafe(address self, address destination) external onlySafe {
+    _finalizeOutgoingChannelClosureInternal(self, destination);
+  }
+
+  function finalizeOutgoingChannelClosure(address destination) external noSafeSet {
+    _finalizeOutgoingChannelClosureInternal(msg.sender, destination);
+  }
+
   /**
    * Pulls out funds from an outgoing channel. Can be called once
    * notice period is due.
    *
    * @param destination the address of the counterparty
    */
-  function finalizeOutgoingChannelClosure(address destination) external {
+  function _finalizeOutgoingChannelClosureInternal(address self, address destination) internal {
     // We can only finalize closure to outgoing channels
-    bytes32 channelId = _getChannelId(msg.sender, destination);
+    bytes32 channelId = _getChannelId(self, destination);
     Channel storage channel = channels[channelId];
 
     if (channel.status != ChannelStatus.PENDING_TO_CLOSE) {
@@ -475,7 +531,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     // channel.epoch must be kept
 
     if (Balance.unwrap(channel.balance) > 0) {
-      if (token.transfer(msg.sender, Balance.unwrap(channel.balance)) != true) {
+      if (token.transfer(self, Balance.unwrap(channel.balance)) != true) {
         revert TokenTransferFailed();
       }
     }
@@ -483,6 +539,14 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     emit ChannelClosed(channelId);
 
     channel.balance = Balance.wrap(0);
+  }
+
+  function setCommitmentSafe(address self, bytes32 newCommitment, address source) external onlySafe {
+    _setCommitmentInternal(self, newCommitment, source);
+  }
+
+  function setCommitment(bytes32 newCommitment, address source) external noSafeSet {
+    _setCommitmentInternal(msg.sender, newCommitment, source);
   }
 
   /**
@@ -495,14 +559,14 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
    * @param newCommitment, a secret derived from this new commitment
    * @param source the address of the source of the channel
    */
-  function setCommitment(bytes32 newCommitment, address source) external {
+  function _setCommitmentInternal(address self, bytes32 newCommitment, address source) internal {
     if (newCommitment == bytes32(0)) {
       // revert since setting empty commitments is a no-op and therefore unintended
       revert InvalidCommitment();
     }
 
     // We can only set commitment to incoming channels.
-    bytes32 channelId = _getChannelId(source, msg.sender);
+    bytes32 channelId = _getChannelId(source, self);
     Channel storage channel = channels[channelId];
 
     if (channel.status != ChannelStatus.OPEN) {
@@ -571,8 +635,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
   // internal code
 
   /**
-   * @dev Funds a channel, then emits
-   * {ChannelUpdated} event.
+   * Funds and thereby opens a channel `source` -> `dest` with `amount` tokens.
+   *
    * @param source the address of the channel source
    * @param dest the address of the channel destination
    * @param amount amount to fund account1
@@ -611,9 +675,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
   }
 
   /**
-   * Gets the current block timestamp
-   *
-   * @return the current timestamp
+   * Gets the current block timestamp correctly sliced to uint32
    */
   function _currentBlockTimestamp() internal view returns (Timestamp) {
     // solhint-disable-next-line
@@ -650,14 +712,12 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
    * This is done by hashing values that must be revealed when redeeming tickets with
    * a property stated in the signed ticket.
    *
-   * @return luck
+   * @param ticketHash hash of the ticket to check
+   * @param opening the commitment opening used to redeem the ticket
+   * @param porSecret response to challenge stated in ticket
    */
-  function _getTicketLuck(
-    bytes32 ticketHash,
-    bytes32 nextCommitment,
-    bytes32 proofOfRelaySecret
-  ) private pure returns (WinProb) {
+  function _getTicketLuck(bytes32 ticketHash, bytes32 opening, bytes32 porSecret) private pure returns (WinProb) {
     // hash function produces 256 bits output but we require only first 56 bits (IEEE 754 double precision means 53 signifcant bits)
-    return WinProb.wrap(uint56(bytes7(keccak256(abi.encodePacked(ticketHash, nextCommitment, proofOfRelaySecret)))));
+    return WinProb.wrap(uint56(bytes7(keccak256(abi.encodePacked(ticketHash, opening, porSecret)))));
   }
 }
