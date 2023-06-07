@@ -14,6 +14,121 @@ contract HoprAnnouncements is Multicall {
 
   event RevokeAnnouncement(address node);
 
+  modifier onlySafe() {
+    // check if NodeSafeRegistry entry exists
+    _;
+  }
+
+  modifier noSafeSet() {
+    // check if NodeSafeRegistry entry **does not** exist
+    _;
+  }
+
+  function bindKeysSafe(
+    address self,
+    bytes32 secp256k1_x,
+    bytes32 secp256k1_y,
+    bytes32 ed25519_sig_0,
+    bytes32 ed25519_sig_1,
+    bytes32 ed25519_pub_key
+  ) external onlySafe {
+    _bindKeysInternal(self, secp256k1_x, secp256k1_y, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key);
+  }
+
+  function bindKeys(
+    bytes32 secp256k1_x,
+    bytes32 secp256k1_y,
+    bytes32 ed25519_sig_0,
+    bytes32 ed25519_sig_1,
+    bytes32 ed25519_pub_key
+  ) external noSafeSet {
+    _bindKeysInternal(msg.sender, secp256k1_x, secp256k1_y, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key);
+  }
+
+  function bindKeysAnnounce4Safe(
+    address self,
+    bytes32 secp256k1_x,
+    bytes32 secp256k1_y,
+    bytes32 ed25519_sig_0,
+    bytes32 ed25519_sig_1,
+    bytes32 ed25519_pub_key,
+    bytes4 ip,
+    bytes2 port
+  ) external onlySafe {
+    _bindKeysInternal(self, secp256k1_x, secp256k1_y, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key);
+    _announce4Internal(self, ip, port);
+  }
+
+  /**
+   * Convenience method to bind keys and announce a IPv4 address in one call.
+   */
+  function bindKeysAnnounce4(
+    bytes32 secp256k1_x,
+    bytes32 secp256k1_y,
+    bytes32 ed25519_sig_0,
+    bytes32 ed25519_sig_1,
+    bytes32 ed25519_pub_key,
+    bytes4 ip,
+    bytes2 port
+  ) external noSafeSet {
+    _bindKeysInternal(msg.sender, secp256k1_x, secp256k1_y, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key);
+    _announce4Internal(msg.sender, ip, port);
+  }
+
+  function bindKeysAnnounce6Safe(
+    address self,
+    bytes32 secp256k1_x,
+    bytes32 secp256k1_y,
+    bytes32 ed25519_sig_0,
+    bytes32 ed25519_sig_1,
+    bytes32 ed25519_pub_key,
+    bytes16 ip,
+    bytes2 port
+  ) external onlySafe {
+    _bindKeysInternal(self, secp256k1_x, secp256k1_y, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key);
+    _announce6Internal(self, ip, port);
+  }
+
+  /**
+   * Convenience method to bind keys and announce a IPv6 address in one call.
+   */
+  function bindKeysAnnounce6(
+    bytes32 secp256k1_x,
+    bytes32 secp256k1_y,
+    bytes32 ed25519_sig_0,
+    bytes32 ed25519_sig_1,
+    bytes32 ed25519_pub_key,
+    bytes16 ip,
+    bytes2 port
+  ) external noSafeSet {
+    _bindKeysInternal(msg.sender, secp256k1_x, secp256k1_y, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key);
+    _announce6Internal(msg.sender, ip, port);
+  }
+
+  function announce6(address self, bytes16 ip, bytes2 port) external onlySafe {
+    _announce6Internal(self, ip, port);
+  }
+
+  function announce6(bytes16 ip, bytes2 port) external noSafeSet {
+    _announce6Internal(msg.sender, ip, port);
+  }
+
+  function announce4Safe(address self, bytes4 ip, bytes2 port) external onlySafe {
+    _announce4Internal(self, ip, port);
+  }
+
+  function announce4(bytes4 ip, bytes2 port) external noSafeSet {
+    _announce4Internal(msg.sender, ip, port);
+  }
+
+  function revoke(address self) external onlySafe {
+    _revokeInternal(self);
+  }
+
+  function revoke() external noSafeSet {
+    _revokeInternal(msg.sender);
+  }
+
   /**
    * [mandatory] Registers a node within the Hopr network and cross-signs on-chain and off-chain keys.
    *
@@ -32,87 +147,14 @@ contract HoprAnnouncements is Multicall {
    * @param ed25519_sig_1 second component of the EdDSA signature
    * @param ed25519_pub_key EdDSA public key
    */
-  function bindKeys(
+  function _bindKeysInternal(
+    address self,
     bytes32 secp256k1_x,
     bytes32 secp256k1_y,
     bytes32 ed25519_sig_0,
     bytes32 ed25519_sig_1,
     bytes32 ed25519_pub_key
-  ) external {
-    _bindKeys_internal(secp256k1_x, secp256k1_y, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key, msg.sender);
-  }
-
-  /**
-   * Convenience method to bind keys and announce a IPv4 address in one call.
-   */
-  function bindKeysAnnounce4(
-    bytes32 secp256k1_x,
-    bytes32 secp256k1_y,
-    bytes32 ed25519_sig_0,
-    bytes32 ed25519_sig_1,
-    bytes32 ed25519_pub_key,
-    bytes4 ip,
-    bytes2 port
-  ) external {
-    _bindKeys_internal(secp256k1_x, secp256k1_y, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key, msg.sender);
-    _announce4_internal(ip, port, msg.sender);
-  }
-
-  /**
-   * Convenience method to bind keys and announce a IPv6 address in one call.
-   */
-  function bindKeysAnnounce6(
-    bytes32 secp256k1_x,
-    bytes32 secp256k1_y,
-    bytes32 ed25519_sig_0,
-    bytes32 ed25519_sig_1,
-    bytes32 ed25519_pub_key,
-    bytes16 ip,
-    bytes2 port
-  ) external {
-    _bindKeys_internal(secp256k1_x, secp256k1_y, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key, msg.sender);
-    _announce6_internal(ip, port, msg.sender);
-  }
-
-  /**
-   * [optional] Announces a IPv6 address with port for the node
-   *
-   * @dev Turns a node into a public relay node (PRN)
-   *
-   * @param ip the IPv6 address to announce
-   * @param port the port to use
-   */
-  function announce6(bytes16 ip, bytes2 port) external {
-    _announce6_internal(ip, port, msg.sender);
-  }
-
-  /**
-   * [optional] Announces a IPv4 address with port for the node
-   *
-   * @dev Turns a node into a public relay node (PRN)
-   *
-   * @param ip the IPv4 address to announce
-   * @param port the port to use
-   */
-  function announce4(bytes4 ip, bytes2 port) external {
-    _announce4_internal(ip, port, msg.sender);
-  }
-
-  /**
-   * Opts out from acting as a public relay node (PRN)
-   */
-  function revoke() external {
-    _revoke_internal(msg.sender);
-  }
-
-  function _bindKeys_internal(
-    bytes32 secp256k1_x,
-    bytes32 secp256k1_y,
-    bytes32 ed25519_sig_0,
-    bytes32 ed25519_sig_1,
-    bytes32 ed25519_pub_key,
-    address self
-  ) private {
+  ) internal {
     // Derive Ethereum address from uncompressed secp256k1 public key
     address sender_addr = address(uint160(uint256(keccak256(abi.encodePacked(secp256k1_x, secp256k1_y)))));
 
@@ -127,15 +169,34 @@ contract HoprAnnouncements is Multicall {
     }
   }
 
-  function _announce4_internal(bytes4 ip, bytes2 port, address self) private {
+  /**
+   * [optional] Announces a IPv4 address with port for the node
+   *
+   * @dev Turns a node into a public relay node (PRN)
+   *
+   * @param ip the IPv4 address to announce
+   * @param port the port to use
+   */
+  function _announce4Internal(address self, bytes4 ip, bytes2 port) private {
     emit AddressAnnouncement4(self, ip, port);
   }
 
-  function _announce6_internal(bytes16 ip, bytes2 port, address self) private {
+  /**
+   * [optional] Announces a IPv6 address with port for the node
+   *
+   * @dev Turns a node into a public relay node (PRN)
+   *
+   * @param ip the IPv6 address to announce
+   * @param port the port to use
+   */
+  function _announce6Internal(address self, bytes16 ip, bytes2 port) private {
     emit AddressAnnouncement6(self, ip, port);
   }
 
-  function _revoke_internal(address self) private {
+  /**
+   * Opts out from acting as a public relay node (PRN)
+   */
+  function _revokeInternal(address self) private {
     emit RevokeAnnouncement(msg.sender);
   }
 }
