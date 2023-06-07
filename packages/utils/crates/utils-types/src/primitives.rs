@@ -73,8 +73,16 @@ impl std::str::FromStr for Address {
             hex::decode(&value[2..])
         } else {
             hex::decode(value)
-        };
-        Self::from_bytes(&decoded.map_err(|_| ParseError)?)
+        }.map_err(|_| ParseError)?;
+        if decoded.len() == Self::SIZE {
+            let mut res = Self {
+                addr: [0u8; Self::SIZE]
+            };
+            res.addr.copy_from_slice(&decoded);
+            Ok(res)
+        } else {
+            Err(ParseError)
+        }
     }
 }
 
