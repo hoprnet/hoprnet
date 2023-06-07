@@ -1458,8 +1458,8 @@ class Hopr extends EventEmitter {
             `ignoring finalizing closure of channel ${channel
               .get_id()
               .to_hex()} because closure window is still active. Need to wait ${channel
-                .remaining_closure_time()
-                .toString(10)} seconds.`
+              .remaining_closure_time()
+              .toString(10)} seconds.`
           )
         }
       }
