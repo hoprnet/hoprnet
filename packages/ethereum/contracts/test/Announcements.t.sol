@@ -48,7 +48,7 @@ contract AccountTest is Test {
 
   function testKeyBindingError() public {
     vm.expectRevert(
-      abi.encodeWithSelector(HoprAnnouncements.PublicKeyDoesNotMatchSender.selector, odd_addr, even_addr)
+      abi.encodeWithSelector(PublicKeyDoesNotMatchSender.selector, odd_addr, even_addr)
     );
     vm.prank(even_addr);
     announcements.bindKeys(odd_secp256k1_x, odd_secp256k1_y, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key);
