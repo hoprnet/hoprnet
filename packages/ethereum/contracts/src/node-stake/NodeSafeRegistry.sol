@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8;
-pragma abicoder v2;
 
 import 'openzeppelin-contracts-4.8.3/utils/cryptography/ECDSA.sol';
 import '../interfaces/IAvatar.sol';
@@ -132,7 +131,7 @@ contract HoprNodeSafeRegistry {
   }
 
   /**
-   * @dev Ensure that the node address is either an owner or a member of 
+   * @dev Ensure that the node address is either an owner or a member of
    * the enebled node management module of the safe
    * @param nodeSafe struct to check
    */
