@@ -2,6 +2,7 @@
 pragma solidity >=0.7.0 <0.9.0;
 
 import "safe-contracts/common/Enum.sol";
+import "../../interfaces/IChannels.sol";
 
 enum HoprChannelsPermission {
     Allowed,
@@ -71,7 +72,7 @@ struct Role {
 library HoprCapabilityPermissions {
     // HoprChannels method ids (TargetType.Channels)
     // low risk (permission checks can be omitted)
-    bytes4 internal constant REDEEM_TICKET_SELECTOR = hex"0475568e";
+    bytes4 internal constant REDEEM_TICKET_SELECTOR = IChannels.redeemTicketSafe.selector;
     bytes4 internal constant REDEEM_TICKETS_SELECTOR = hex"c5ad200d";
     bytes4 internal constant FINALIZE_CHANNEL_CLOSURE_SELECTOR = hex"833aae8d";
     // high risk (do permission check)
