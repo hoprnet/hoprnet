@@ -10,16 +10,12 @@ import 'openzeppelin-contracts-4.8.3/utils/cryptography/ECDSA.sol';
 
 error InvalidBalance();
 error BalanceExceedsGlobalPerChannelAllowance();
-
 error SourceEqualsDestination();
 error ZeroAddress(string reason);
-
 error TokenTransferFailed();
 error InvalidNoticePeriod();
 error NoticePeriodNotDue();
-
 error WrongChannelState(string reason);
-
 error InvalidPoRSecret(string reason);
 error InvalidTicketSignature();
 error InvalidCommitmentOpening();
@@ -80,7 +76,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
   // Non-standard usage of EIP712 due computed property and custom property encoding
   bytes32 public constant redeemTicketSeparator =
     keccak256(
-      'Ticket(bytes32 channelId,uint96 balance,uint64 ticketIndex,uint24 channelEpoch,uint56 winProb,address porChallenge)'
+      'Ticket(bytes32 channelId,uint96 balance,uint64 ticketIndex,uint24 epoch,uint56 winProb,address porChallenge)'
     );
 
   /**
@@ -373,18 +369,11 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     }
 
     // Deviates from EIP712 due to computed property and non-standard struct property encoding
-    bytes32 ticketHash = keccak256(
-      abi.encode(
-        domainSeparator,
-        redeemTicketSeparator,
-        keccak256(abi.encode(ticket, _scalarTimesBasepoint(porSecret)))
-      )
-    );
+    bytes32 ticketHash = _getTicketHash(ticket, porSecret);
 
-    require(
-      WinProb.unwrap(_getTicketLuck(ticketHash, nextCommitment, porSecret)) <= WinProb.unwrap(ticket.winProb),
-      'ticket must be a win'
-    );
+    if (!_isWinningTicket(ticketHash, nextCommitment, porSecret, ticket.winProb)) {
+      revert TicketIsNotAWin();
+    }
 
     address source = ECDSA.recover(ticketHash, signature.r, signature.vs);
     if (_getChannelId(source, self) != ticket.channelId) {
@@ -704,6 +693,24 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
   }
 
   /**
+   * Gets the non-trivial ticket hash.
+   *
+   * Note that signature is over ticket data and a computed property which implements
+   * a challenge-response mechanism.
+   *
+   * @param ticket the ticket data which gets used to create the hash
+   * @param porSecret the response to fulfill challenge stated in ticket
+   */
+  function _getTicketHash(Ticket calldata ticket, bytes32 porSecret) internal view returns (bytes32) {
+    // Deviates from EIP712 due to computed property and non-standard struct property encoding
+    bytes32 hashStruct = keccak256(
+      abi.encode(redeemTicketSeparator, keccak256(abi.encode(ticket, _scalarTimesBasepoint(porSecret))))
+    );
+
+    return keccak256(abi.encode(bytes1(0x19), bytes1(0x01), domainSeparator, hashStruct));
+  }
+
+  /**
    * Determines whether a ticket is considered a win.
    *
    * This is done by hashing values that must be revealed when redeeming tickets with
@@ -712,9 +719,15 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
    * @param ticketHash hash of the ticket to check
    * @param opening the commitment opening used to redeem the ticket
    * @param porSecret response to challenge stated in ticket
+   * @param winProb winning probability stated in the ticket
    */
-  function _getTicketLuck(bytes32 ticketHash, bytes32 opening, bytes32 porSecret) private pure returns (WinProb) {
+  function _isWinningTicket(
+    bytes32 ticketHash,
+    bytes32 opening,
+    bytes32 porSecret,
+    WinProb winProb
+  ) internal pure returns (bool) {
     // hash function produces 256 bits output but we require only first 56 bits (IEEE 754 double precision means 53 signifcant bits)
-    return WinProb.wrap(uint56(bytes7(keccak256(abi.encodePacked(ticketHash, opening, porSecret)))));
+    return (uint56(bytes7(keccak256(abi.encodePacked(ticketHash, opening, porSecret))))) <= WinProb.unwrap(winProb);
   }
 }
