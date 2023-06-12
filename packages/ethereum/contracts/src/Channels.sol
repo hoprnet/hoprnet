@@ -7,7 +7,6 @@ import 'openzeppelin-contracts-4.8.3/utils/introspection/ERC1820Implementer.sol'
 import 'openzeppelin-contracts-4.8.3/token/ERC20/IERC20.sol';
 import 'openzeppelin-contracts-4.8.3/token/ERC777/IERC777Recipient.sol';
 import 'openzeppelin-contracts-4.8.3/utils/cryptography/ECDSA.sol';
-import './interfaces/IChannels.sol';
 
 error InvalidBalance();
 error BalanceExceedsGlobalPerChannelAllowance();
@@ -45,11 +44,19 @@ error TicketIsNotAWin();
  *
  * Manages mixnet incentives in the hopr network.
  **/
-contract HoprChannels is IHoprChannels, IERC777Recipient, ERC1820Implementer, Multicall {
+contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
   // required by ERC1820 spec
   IERC1820Registry internal constant _ERC1820_REGISTRY = IERC1820Registry(0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24);
   // required by ERC777 spec
   bytes32 public constant TOKENS_RECIPIENT_INTERFACE_HASH = keccak256('ERC777TokensRecipient');
+
+  type Balance is uint96;
+  type TicketEpoch is uint32;
+  type TicketIndex is uint64;
+  type ChannelEpoch is uint24;
+  type Timestamp is uint32; // overflows in year 2105
+  // Using IEEE 754 double precision -> 53 significant bits
+  type WinProb is uint56;
 
   Balance public constant MAX_USED_BALANCE = Balance.wrap(10 ** 25); // 1% of total supply, staking more is not sound
   Balance public constant MIN_USED_BALANCE = Balance.wrap(1); // no empty token transactions
@@ -76,9 +83,6 @@ contract HoprChannels is IHoprChannels, IERC777Recipient, ERC1820Implementer, Mu
       'Ticket(bytes32 channelId,uint96 balance,uint64 ticketIndex,uint24 channelEpoch,uint56 winProb,address porChallenge)'
     );
 
-  type TicketEpoch is uint32;
-  type Timestamp is uint32; // overflows in year 2105
-  
   /**
    * @dev Possible channel states.
    *
@@ -99,6 +103,15 @@ contract HoprChannels is IHoprChannels, IERC777Recipient, ERC1820Implementer, Mu
     OPEN,
     PENDING_TO_CLOSE
   }
+
+  /**
+   * Holds a compact ECDSA signature, following ERC-2098
+   */
+  struct CompactSignature {
+    bytes32 r;
+    bytes32 vs;
+  }
+
   /**
    * Represents the state of a channel
    *
@@ -117,6 +130,20 @@ contract HoprChannels is IHoprChannels, IERC777Recipient, ERC1820Implementer, Mu
     ChannelEpoch epoch;
     // if set, timestamp once we can pull all funds from the channel
     Timestamp closureTime;
+  }
+
+  /**
+   * Represents a ticket that can be redeemed using `redeemTicket` function.
+   *
+   * Aligned to 2 EVM words
+   */
+  struct Ticket {
+    bytes32 channelId;
+    Balance amount;
+    TicketIndex ticketIndex;
+    ChannelEpoch epoch;
+    WinProb winProb;
+    uint16 resered; // for future use
   }
 
   /**
@@ -230,7 +257,7 @@ contract HoprChannels is IHoprChannels, IERC777Recipient, ERC1820Implementer, Mu
   }
 
   modifier validateBalance(Balance balance) {
-    if (Balance.unwrap(balance) == Balance.unwrap(MIN_USED_BALANCE)) {
+    if (Balance.unwrap(balance) < Balance.unwrap(MIN_USED_BALANCE)) {
       revert InvalidBalance();
     }
     if (Balance.unwrap(balance) > Balance.unwrap(MAX_USED_BALANCE)) {
