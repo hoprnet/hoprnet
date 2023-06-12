@@ -7,7 +7,7 @@ pragma solidity >=0.7.0 <0.9.0;
  */
 import "./SimplifiedModule.sol";
 import "./CapabilityPermissions.sol";
-import "../../interfaces/IHoprChannels.sol";
+import "../../Channels.sol";
 import "../../interfaces/INodeManagementModule.sol";
 
 // when the contract has already been initialized
@@ -125,7 +125,7 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
    */
   function addChannelsAndTokenTarget(address hoprChannelsAddress) external onlyOwner {
     // get tokens contract
-    address hoprTokenAddress = IHoprChannels(hoprChannelsAddress).token();
+    address hoprTokenAddress = address(HoprChannels(hoprChannelsAddress).token());
 
     // add default scope for Channels TargetType
     HoprCapabilityPermissions.scopeTargetChannels(role, hoprChannelsAddress);
