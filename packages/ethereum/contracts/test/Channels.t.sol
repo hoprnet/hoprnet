@@ -94,8 +94,8 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, AccountsFixtureTe
   //     signature: hex'43bbf7f4a28786e47be61b6e3c40f4ff95f214e0ac3b43b10d9d962a076e7e0f0a35e4a487ba460af46f9b061e3474c1af399a50033a3f6a48f84a279acdc981'
   //   });
 
-  // bytes32 channelIdAB = hoprChannels._getChannelId(accountA.accountAddr, accountB.accountAddr);
-  // bytes32 channelIdBA = hoprChannels._getChannelId(accountB.accountAddr, accountA.accountAddr);
+  bytes32 channelIdAB;
+  bytes32 channelIdBA;
 
   uint256 constant ENOUGH_TIME_FOR_CLOSURE = 100;
 
@@ -106,21 +106,23 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, AccountsFixtureTe
     // console.logString('here');
     // make vm.addr(1) HoprToken contract
     hoprChannels = new HoprChannels(vm.addr(1), HoprChannels.Timestamp.wrap(15));
+    channelIdAB = hoprChannels._getChannelId(accountA.accountAddr, accountB.accountAddr);
+    channelIdBA = hoprChannels._getChannelId(accountB.accountAddr, accountA.accountAddr);
   }
 
-  function testFundChannelMulti() public {
-    uint256 amount1 = 1;
-    uint256 amount2 = 1;
-    // amount1 = bound(
-    //   amount1,
-    //   HoprChannels.Balance.unwrap(hoprChannels.MIN_USED_BALANCE()),
-    //   HoprChannels.Balance.unwrap(hoprChannels.MAX_USED_BALANCE())
-    // );
-    // amount2 = bound(
-    //   amount2,
-    //   HoprChannels.Balance.unwrap(hoprChannels.MIN_USED_BALANCE()),
-    //   HoprChannels.Balance.unwrap(hoprChannels.MAX_USED_BALANCE())
-    // );
+  function testFundChannelMulti(uint256 amount1, uint256 amount2) public {
+    // uint256 amount1 = 1;
+    // uint256 amount2 = 1;
+    amount1 = bound(
+      amount1,
+      HoprChannels.Balance.unwrap(hoprChannels.MIN_USED_BALANCE()) + 1,
+      HoprChannels.Balance.unwrap(hoprChannels.MAX_USED_BALANCE())
+    );
+    amount2 = bound(
+      amount2,
+      HoprChannels.Balance.unwrap(hoprChannels.MIN_USED_BALANCE()) + 1,
+      HoprChannels.Balance.unwrap(hoprChannels.MAX_USED_BALANCE())
+    );
 
     // channels
     HoprChannels.Channel memory channelAB = HoprChannels.Channel(
@@ -172,13 +174,13 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, AccountsFixtureTe
     // check validity from channels()
     assertEq(
       keccak256(
-        abi.encode(getChannelFromTuple(hoprChannels._getChannelId(accountA.accountAddr, accountB.accountAddr)))
+        abi.encode(getChannelFromTuple(channelIdAB))
       ),
       keccak256(abi.encode(channelAB))
     );
     assertEq(
       keccak256(
-        abi.encode(getChannelFromTuple(hoprChannels._getChannelId(accountB.accountAddr, accountA.accountAddr)))
+        abi.encode(getChannelFromTuple(channelIdBA))
       ),
       keccak256(abi.encode(channelBA))
     );
