@@ -3,13 +3,14 @@ use core_crypto::derivation::{derive_ack_key_share, derive_packet_tag};
 use core_crypto::primitives::{DigestLike, SimpleMac};
 use core_crypto::prp::{PRPParameters, PRP};
 use core_crypto::routing::{forward_header, header_length, ForwardedHeader, RoutingInfo};
-use core_crypto::shared_keys::GroupEncoding;
+use core_crypto::shared_keys::{Alpha, SharedKeys, SphinxSuite};
 use core_crypto::types::{Challenge, HalfKey, HalfKeyChallenge};
 use core_types::acknowledgement::Acknowledgement;
 use core_types::channels::Ticket;
 use libp2p_identity::PeerId;
-use core_crypto::ec_groups::{Ed25519SharedKeys};
+use core_crypto::ec_groups::Ed25519Suite;
 use core_crypto::types::OffchainPublicKey;
+use typenum::marker_traits::Unsigned;
 use utils_types::errors::GeneralError::ParseError;
 use utils_types::traits::{BinarySerializable, PeerIdLike};
 
@@ -61,16 +62,16 @@ fn remove_padding(msg: &[u8]) -> Option<&[u8]> {
     Some(&msg.split_at(pos).1[PADDING_TAG.len()..])
 }
 
-struct MetaPacket {
+struct MetaPacket<S: SphinxSuite> {
     packet: Box<[u8]>,
+    alpha: Alpha<S::A>,
     header_len: usize,
-    alpha_len: usize,
 }
 
 #[allow(dead_code)]
-enum ForwardedMetaPacket {
+enum ForwardedMetaPacket<S: SphinxSuite> {
     RelayedPacket {
-        packet: MetaPacket,
+        packet: MetaPacket<S>,
         next_node: OffchainPublicKey,
         additional_info: Box<[u8]>,
         derived_secret: Box<[u8]>,
@@ -84,16 +85,16 @@ enum ForwardedMetaPacket {
     },
 }
 
-impl MetaPacket {
+impl<S: SphinxSuite> MetaPacket<S> {
     pub fn new(
-        shared_keys: Ed25519SharedKeys,
+        shared_keys: SharedKeys<S::E, S::A, S::G>,
         msg: &[u8],
         path: &[&PeerId],
         max_hops: usize,
         additional_relayer_data_len: usize,
         additional_data_relayer: &[&[u8]],
         additional_data_last_hop: Option<&[u8]>,
-    ) -> MetaPacket {
+    ) -> Self {
         assert!(msg.len() <= PAYLOAD_SIZE, "message too long to fit into a packet");
 
         let mut padded = add_padding(msg);
@@ -116,22 +117,21 @@ impl MetaPacket {
                 .unwrap_or_else(|e| panic!("onion encryption error {e}"))
         }
 
-        MetaPacket::new_from_parts(
-            &shared_keys.alpha,
+        Self::new_from_parts(
+            shared_keys.alpha,
             &routing_info.routing_information,
             &routing_info.mac,
             &padded,
         )
     }
 
-    fn new_from_parts(alpha: &[u8], routing_info: &[u8], mac: &[u8], payload: &[u8]) -> Self {
-        assert!(alpha.len() >= 32);
+    fn new_from_parts(alpha: Alpha<S::A>, routing_info: &[u8], mac: &[u8], payload: &[u8]) -> Self {
         assert!(routing_info.len() > 0);
         assert_eq!(SimpleMac::SIZE, mac.len());
         assert_eq!(PAYLOAD_SIZE, payload.len());
 
-        let mut packet = Vec::with_capacity(Self::size(alpha.len(),routing_info.len()));
-        packet.extend_from_slice(alpha);
+        let mut packet = Vec::with_capacity(Self::size(routing_info.len()));
+        packet.extend_from_slice(&alpha);
         packet.extend_from_slice(routing_info);
         packet.extend_from_slice(mac);
         packet.extend_from_slice(payload);
@@ -139,39 +139,38 @@ impl MetaPacket {
         Self {
             packet: packet.into_boxed_slice(),
             header_len: routing_info.len(),
-            alpha_len: alpha.len()
+            alpha
         }
-    }
-    
-    pub fn alpha(&self) -> &[u8] {
-        &self.packet[..self.alpha_len]
     }
 
     pub fn routing_info(&self) -> &[u8] {
-        &self.packet[self.alpha_len..self.alpha_len + self.header_len]
+        let base = S::A::USIZE;
+        &self.packet[base .. base + self.header_len]
     }
 
     pub fn mac(&self) -> &[u8] {
-        &self.packet[self.alpha_len + self.header_len
-            ..self.alpha_len + self.header_len + SimpleMac::SIZE]
+        let base = S::A::USIZE + self.header_len;
+        &self.packet[base..base + SimpleMac::SIZE]
     }
 
     pub fn payload(&self) -> &[u8] {
-        &self.packet[self.alpha_len + self.header_len + SimpleMac::SIZE
-            ..self.alpha_len + self.header_len + SimpleMac::SIZE + PAYLOAD_SIZE]
+        let base = S::A::USIZE + self.header_len + SimpleMac::SIZE;
+        &self.packet[base..base + PAYLOAD_SIZE]
     }
 
-    pub const fn size(alpha_len: usize, header_len: usize) -> usize {
-        alpha_len + header_len + SimpleMac::SIZE + PAYLOAD_SIZE
+    pub const fn size(header_len: usize) -> usize {
+        S::A::USIZE + header_len + SimpleMac::SIZE + PAYLOAD_SIZE
     }
 
-    pub fn from_bytes(packet: &[u8], alpha_len: usize, header_len: usize) -> utils_types::errors::Result<MetaPacket> {
-        if packet.len() == Self::size(alpha_len, header_len) {
-            Ok(Self {
+    pub fn from_bytes(packet: &[u8], header_len: usize) -> utils_types::errors::Result<Self> {
+        if packet.len() == Self::size(header_len) {
+            let mut ret = Self {
                 packet: packet.into(),
                 header_len,
-                alpha_len
-            })
+                alpha: Default::default(),
+            };
+            ret.alpha.copy_from_slice(&packet[..S::A::USIZE]);
+            Ok(ret)
         } else {
             Err(ParseError)
         }
@@ -184,13 +183,13 @@ impl MetaPacket {
     pub fn forward(
         &self,
         node_private_key: &[u8],
-        node_public_key: &OffchainPublicKey,
+        node_public_key: &S::G,
         max_hops: usize,
         additional_data_relayer_len: usize,
         additional_data_last_hop_len: usize,
-    ) -> Result<ForwardedMetaPacket> {
-        let (alpha, secret) = Ed25519SharedKeys::forward_transform(
-            self.alpha(),
+    ) -> Result<ForwardedMetaPacket<S>> {
+        let (alpha, secret) = SharedKeys::<S::E, S::A, S::G>::forward_transform(
+            &self.alpha,
             node_private_key.try_into().expect("invalid packet private key"),
             node_public_key
         )?;
@@ -215,7 +214,7 @@ impl MetaPacket {
                 next_node,
                 additional_info,
             } => RelayedPacket {
-                packet: MetaPacket::new_from_parts(&alpha.encode(), &header, &mac, &decrypted),
+                packet: Self::new_from_parts(alpha, &header, &mac, &decrypted),
                 packet_tag: derive_packet_tag(&secret)?,
                 derived_secret: secret.into(),
                 next_node,
@@ -262,9 +261,8 @@ pub enum PacketState {
 }
 
 /// Represents a HOPR packet
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct Packet {
-    packet: MetaPacket,
+    packet: MetaPacket<Ed25519Suite>,
     pub ticket: Ticket,
     state: PacketState,
 }
@@ -282,7 +280,7 @@ impl Packet {
     pub fn new(msg: &[u8], path: &[&PeerId], channel_private_key: &[u8], mut ticket: Ticket) -> Result<Self> {
         assert!(!path.is_empty(), "path must not be empty");
 
-        let shared_keys = Ed25519SharedKeys::new(path)?;
+        let shared_keys = Ed25519Suite::new_shared_keys(path)?;
 
         let por_values = ProofOfRelayValues::new(shared_keys.secrets[0], shared_keys.secrets.get(1).cloned());
 
@@ -320,9 +318,9 @@ impl Packet {
             let previous_hop = OffchainPublicKey::from_peerid(sender)?;
 
             let header_len = header_length(INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0);
-            let mp = MetaPacket::from_bytes(pre_packet, OffchainPublicKey::SIZE, header_len)?;
+            let mp = MetaPacket::from_bytes(pre_packet, header_len)?;
 
-            match mp.forward(node_private_key, node_public_key, INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0)? {
+            match mp.forward(node_private_key, node_public_key.as_edwards_point(), INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0)? {
                 RelayedPacket {
                     packet,
                     derived_secret,
@@ -400,7 +398,6 @@ impl Packet {
     }
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl Packet {
     pub fn to_bytes(&self) -> Box<[u8]> {
         let mut ret = Vec::with_capacity(Self::SIZE);

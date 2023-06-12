@@ -1062,6 +1062,7 @@ dependencies = [
  "rusty-leveldb",
  "serial_test",
  "thiserror",
+ "typenum",
  "utils-db",
  "utils-log",
  "utils-metrics",

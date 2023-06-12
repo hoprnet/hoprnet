@@ -1,53 +1,52 @@
 use curve25519_dalek::traits::IsIdentity;
-use elliptic_curve::{Field, Group, PrimeField};
+use elliptic_curve::{Group, PrimeField};
 use libp2p_identity::PeerId;
 use utils_types::traits::{BinarySerializable, PeerIdLike};
 use crate::errors::CryptoError::InvalidInputValue;
 use crate::errors::Result;
-use crate::shared_keys::{Alpha, GroupElement, Scalar, SharedKeys};
+use crate::shared_keys::{Alpha, GroupElement, Scalar, SphinxSuite};
 use crate::types::{CurvePoint, PublicKey };
 
 use curve25519_dalek as dalek;
+use elliptic_curve::ops::MulByGenerator;
 use k256::FieldBytes;
-use rand::{CryptoRng, RngCore};
-use crate::random::random_bytes;
+use crate::random::{random_bytes, random_fill};
 
 impl Scalar for dalek::scalar::Scalar {
-    fn random(rng: &mut (impl CryptoRng + RngCore)) -> Self {
+    fn random() -> Self {
         let bytes = random_bytes::<64>();
         dalek::scalar::Scalar::from_bytes_mod_order_wide(&bytes)
     }
 
     fn from_bytes(sk: &[u8]) -> Result<Self> {
-        dalek::scalar::Scalar::from_bytes(sk)
-    }
-
-    fn as_bytes(&self) -> &[u8] {
-        self.as_bytes()
+        Ok(dalek::scalar::Scalar::from_bits(sk.try_into().map_err(|_| InvalidInputValue)?))
     }
 }
 
 impl Scalar for k256::Scalar {
-    fn random(rng: &mut (impl CryptoRng + RngCore)) -> Self {
-        <k256::Scalar as Field>::random(rng)
+    fn random() -> Self {
+        // Beware this is not constant time
+        let mut bytes = FieldBytes::default();
+        loop {
+            random_fill(&mut bytes);
+            if let Ok(scalar) = Self::from_bytes(&bytes) {
+                return scalar;
+            }
+        }
     }
 
     fn from_bytes(bytes: &[u8]) -> Result<Self> {
         Ok(k256::Scalar::from_repr(*FieldBytes::from_slice(bytes)).unwrap())
     }
-
-    fn as_bytes(&self) -> &[u8] {
-        self.as_bytes()
-    }
 }
 
-impl GroupElement<32, dalek::scalar::Scalar> for dalek::montgomery::MontgomeryPoint {
-    fn to_alpha(&self) -> Alpha<32> {
-        self.0.clone()
+impl GroupElement<typenum::U32, dalek::scalar::Scalar> for dalek::montgomery::MontgomeryPoint {
+    fn to_alpha(&self) -> Alpha<typenum::U32> {
+        self.0.into()
     }
 
-    fn from_alpha(alpha: Alpha<32>) -> Result<Self> {
-        Ok(dalek::montgomery::MontgomeryPoint(alpha))
+    fn from_alpha(alpha: Alpha<typenum::U32>) -> Result<Self> {
+        Ok(dalek::montgomery::MontgomeryPoint(alpha.into()))
     }
 
     fn from_peerid(peer_id: &PeerId) -> Result<Self> {
@@ -69,13 +68,14 @@ impl GroupElement<32, dalek::scalar::Scalar> for dalek::montgomery::MontgomeryPo
     }
 }
 
-impl GroupElement<32, dalek::scalar::Scalar> for dalek::edwards::EdwardsPoint {
-    fn to_alpha(&self) -> Alpha<32> {
-        self.compress().0.clone()
+impl GroupElement<typenum::U32, dalek::scalar::Scalar> for dalek::edwards::EdwardsPoint {
+
+    fn to_alpha(&self) -> Alpha<typenum::U32>{
+        self.compress().0.into()
     }
 
-    fn from_alpha(alpha: Alpha<32>) -> Result<Self> {
-        dalek::edwards::CompressedEdwardsY(alpha).decompress().ok_or(InvalidInputValue)
+    fn from_alpha(alpha: Alpha<typenum::U32>) -> Result<Self> {
+        dalek::edwards::CompressedEdwardsY(alpha.into()).decompress().ok_or(InvalidInputValue)
     }
 
     fn from_peerid(peer_id: &PeerId) -> Result<Self> {
@@ -100,13 +100,15 @@ impl GroupElement<32, dalek::scalar::Scalar> for dalek::edwards::EdwardsPoint {
 }
 
 /// Secp256k1 additive group (via projective coordinates) represented as public keys
-impl GroupElement<{CurvePoint::SIZE_COMPRESSED}, k256::Scalar> for k256::ProjectivePoint {
+impl GroupElement<typenum::U33, k256::Scalar> for k256::ProjectivePoint {
 
-    fn to_alpha(&self) -> Alpha<{CurvePoint::SIZE_COMPRESSED}> {
-        CurvePoint::from_affine(self.to_affine()).serialize_compressed().as_ref().try_into().unwrap()
+    fn to_alpha(&self) -> Alpha<typenum::U33> {
+        let mut ret = Alpha::<typenum::U33>::default();
+        ret.copy_from_slice(CurvePoint::from_affine(self.to_affine()).serialize_compressed().as_ref());
+        ret
     }
 
-    fn from_alpha(alpha: Alpha<{CurvePoint::SIZE_COMPRESSED}>) -> Result<Self> {
+    fn from_alpha(alpha: Alpha<typenum::U33>) -> Result<Self> {
         CurvePoint::from_bytes(&alpha)
             .map(|c| c.to_projective_point())
             .map_err(|_| InvalidInputValue)
@@ -119,7 +121,7 @@ impl GroupElement<{CurvePoint::SIZE_COMPRESSED}, k256::Scalar> for k256::Project
     }
 
     fn generate(scalar: &k256::Scalar) -> Self {
-        k256::ProjectivePoint::GENERATOR * scalar
+        k256::ProjectivePoint::mul_by_generator(scalar)
     }
 
     fn is_valid(&self) -> bool {
@@ -127,17 +129,37 @@ impl GroupElement<{CurvePoint::SIZE_COMPRESSED}, k256::Scalar> for k256::Project
     }
 }
 
-// Instantiation of Sphinx shared keys generation using different EC groups
+pub struct Secp256k1Suite ;
 
-pub type Secp256k1SharedKeys = SharedKeys<k256::Scalar, {CurvePoint::SIZE_COMPRESSED}, k256::ProjectivePoint>;
-pub type X25519SharedKeys = SharedKeys<dalek::scalar::Scalar, 32, dalek::montgomery::MontgomeryPoint>;
-pub type Ed25519SharedKeys = SharedKeys<dalek::scalar::Scalar, 32, dalek::edwards::EdwardsPoint>;
+impl SphinxSuite for Secp256k1Suite {
+    type E = k256::Scalar;
+    type A = typenum::U33;
+    type G = k256::ProjectivePoint;
+}
+
+pub struct Ed25519Suite ;
+
+impl SphinxSuite for Ed25519Suite {
+    type E = dalek::scalar::Scalar;
+    type A = typenum::U32;
+    type G = dalek::edwards::EdwardsPoint;
+}
+
+pub struct X25519Suite ;
+
+impl SphinxSuite for X25519Suite {
+    type E = dalek::scalar::Scalar;
+    type A = typenum::U32;
+    type G = dalek::montgomery::MontgomeryPoint;
+}
 
 #[cfg(test)]
 mod tests {
-    use crate::shared_keys::tests::generic_test_shared_keys;
+    use crate::shared_keys::tests::{generic_sphinx_suite_test, generic_test_shared_keys};
     use curve25519_dalek as dalek;
     use hex_literal::hex;
+    use parameterized::parameterized;
+    use crate::ec_groups::{Ed25519Suite, Secp256k1Suite, X25519Suite};
     use crate::parameters::SECRET_KEY_LENGTH;
     use crate::shared_keys::GroupElement;
     use crate::types::CurvePoint;
@@ -166,18 +188,18 @@ mod tests {
         assert_eq!(res, key.as_ref());
     }
 
-    #[test]
-    fn test_secp256k1_shared_keys() {
-        generic_test_shared_keys::<k256::Scalar, {CurvePoint::SIZE_COMPRESSED}, k256::ProjectivePoint>()
+    #[parameterized(nodes = {4, 3, 2, 1})]
+    fn test_secp256k1_suite(nodes: usize) {
+        generic_sphinx_suite_test::<Secp256k1Suite>(nodes)
     }
 
-    #[test]
-    fn test_ed25519_shared_keys() {
-        generic_test_shared_keys::<dalek::scalar::Scalar, 32, dalek::edwards::EdwardsPoint>()
+    #[parameterized(nodes = {4, 3, 2, 1})]
+    fn test_ed25519_shared_keys(nodes: usize) {
+        generic_sphinx_suite_test::<Ed25519Suite>(nodes)
     }
 
-    #[test]
-    fn test_montgomery_shared_keys() {
-        generic_test_shared_keys::<dalek::scalar::Scalar, 32, dalek::montgomery::MontgomeryPoint>()
+    #[parameterized(nodes = {4, 3, 2, 1})]
+    fn test_montgomery_shared_keys(nodes: usize) {
+        generic_sphinx_suite_test::<X25519Suite>(nodes)
     }
 }
