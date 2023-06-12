@@ -187,6 +187,7 @@ export class LevelDb {
   }
 
   public async put(key: Uint8Array, value: Uint8Array): Promise<void> {
+    // LevelDB does not support Uint8Arrays, always convert to Buffer
     return await this.backend.put(
       Buffer.from(key.buffer, key.byteOffset, key.byteLength),
       Buffer.from(value.buffer, value.byteOffset, value.byteLength)
@@ -194,6 +195,7 @@ export class LevelDb {
   }
 
   public async get(key: Uint8Array): Promise<Uint8Array> {
+    // LevelDB does not support Uint8Arrays, always convert to Buffer
     const value = await this.backend.get(Buffer.from(key.buffer, key.byteOffset, key.byteLength))
 
     return new Uint8Array(value.buffer, value.byteOffset, value.byteLength)
@@ -215,8 +217,10 @@ export class LevelDb {
       }
 
       if (op.type === 'put') {
+        // LevelDB does not support Uint8Arrays, always convert to Buffer
         batch.put(Buffer.from(op.key), Buffer.from(op.value))
       } else if (op.type === 'del') {
+        // LevelDB does not support Uint8Arrays, always convert to Buffer
         batch.del(Buffer.from(op.key))
       } else {
         throw new Error('Unsupported operation type: ' + JSON.stringify(op))
@@ -247,6 +251,7 @@ export class LevelDb {
     const lastPrefixed = u8aConcat(prefix, new Uint8Array(suffixLength).fill(0xff))
 
     for await (const [_key, chunk] of this.backend.iterator({
+      // LevelDB does not support Uint8Arrays, always convert to Buffer
       gte: Buffer.from(firstPrefixed.buffer, firstPrefixed.byteOffset, firstPrefixed.byteLength),
       lte: Buffer.from(lastPrefixed.buffer, lastPrefixed.byteOffset, lastPrefixed.byteLength),
       keys: false
@@ -267,7 +272,7 @@ export class LevelDb {
     let dumpFile = fs.createWriteStream(destFile, { flags: 'a' })
     this.backend
       .createReadStream({ keys: true, keyAsBuffer: true, values: true, valueAsBuffer: true })
-      .on('data', ({ key }) => {
+      .on('data', ({ key, value }: { key: Buffer; value: Buffer }) => {
         let out = ''
         while (key.length > 0) {
           const nextDelimiter = key.findIndex((v: number) => v == 0x2d) // 0x2d ~= '-'
@@ -281,10 +286,10 @@ export class LevelDb {
           if (nextDelimiter < 0) {
             break
           } else {
-            key = (key as Buffer).subarray(nextDelimiter + 1)
+            key = key.subarray(nextDelimiter + 1)
           }
         }
-        dumpFile.write(out + '\n')
+        dumpFile.write(out + ' ' + value.toString('hex') + '\n')
       })
       .on('end', function () {
         dumpFile.close()
