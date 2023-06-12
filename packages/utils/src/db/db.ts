@@ -177,21 +177,24 @@ export class LevelDb {
   }
 
   public async has(key: Uint8Array): Promise<boolean> {
-    return undefined !== (await this.maybeGet(Buffer.from(key)))
+    return undefined !== (await this.maybeGet(key))
   }
 
   public async put(key: Uint8Array, value: Uint8Array): Promise<void> {
-    await this.backend.put(Buffer.from(key), Buffer.from(value))
+    return await this.backend.put(
+      Buffer.from(key.buffer, key.byteOffset, key.byteLength),
+      Buffer.from(value.buffer, value.byteOffset, value.byteLength)
+    )
   }
 
   public async get(key: Uint8Array): Promise<Uint8Array> {
-    const value = await this.backend.get(Buffer.from(key))
+    const value = await this.backend.get(Buffer.from(key.buffer, key.byteOffset, key.byteLength))
 
     return new Uint8Array(value.buffer, value.byteOffset, value.byteLength)
   }
 
   public async remove(key: Uint8Array): Promise<void> {
-    await this.backend.del(Buffer.from(key))
+    await this.backend.del(Buffer.from(key.buffer, key.byteOffset, key.byteLength))
   }
 
   public async batch(ops: Array<any>, wait_for_write = true): Promise<void> {
@@ -219,7 +222,7 @@ export class LevelDb {
 
   public async maybeGet(key: Uint8Array): Promise<Uint8Array | undefined> {
     try {
-      return await this.get(Buffer.from(key))
+      return await this.get(Buffer.from(key.buffer, key.byteOffset, key.byteLength))
     } catch (err) {
       if (err.type === 'NotFoundError' || err.notFound) {
         return undefined
@@ -257,27 +260,24 @@ export class LevelDb {
     let dumpFile = fs.createWriteStream(destFile, { flags: 'a' })
     this.backend
       .createReadStream({ keys: true, keyAsBuffer: true, values: true, valueAsBuffer: true })
-      .on('data', (d) => {
-        // Skip the public key prefix in each key
-        let key = (d.key as Buffer).subarray(PublicKey.size_compressed())
-        let keyString = ''
-        let isHex = false
-        let sawDelimiter = false
-        for (const b of key) {
-          if (!sawDelimiter && b >= 32 && b <= 126) {
-            // Print sequences of ascii chars normally
-            let cc = String.fromCharCode(b)
-            keyString += (isHex ? ' ' : '') + cc
-            isHex = false
-            // Once a delimiter is encountered, always print as hex since then
-            sawDelimiter = sawDelimiter || cc == '-' || cc == ':'
+      .on('data', ({ key }) => {
+        let out = ''
+        while (key.length > 0) {
+          const nextDelimiter = key.findIndex((v: number) => v == 0x2d) // 0x2d ~= '-'
+
+          if (key.subarray(0, nextDelimiter).every((v: number) => v >= 32 && v <= 126)) {
+            out += decoder.decode(key.subarray(0, nextDelimiter))
           } else {
-            // Print sequences of non-ascii chars as hex
-            keyString += (!isHex ? '0x' : '') + (b as number).toString(16)
-            isHex = true
+            out += u8aToHex(key.subarray(0, nextDelimiter))
+          }
+
+          if (nextDelimiter < 0) {
+            break
+          } else {
+            key = (key as Buffer).subarray(nextDelimiter + 1)
           }
         }
-        dumpFile.write(keyString + ':' + d.value.toString('hex') + '\n')
+        dumpFile.write(out + '\n')
       })
       .on('end', function () {
         dumpFile.close()
@@ -981,7 +981,7 @@ export class HoprDB {
     const result: PublicKey[] = []
     let SIZE_PUBKEY_COMPRESSED = PublicKey.size_compressed()
     let SIZE_PUBKEY_UNCOMPRESSED = PublicKey.size_uncompressed()
-    for (let offset = 0; offset < arr.length; ) {
+    for (let offset = 0; offset < arr.length;) {
       switch (arr[offset]) {
         case 2:
         case 3:
@@ -1021,7 +1021,7 @@ export class HoprDB {
     let registeredNodes: PublicKey[] = []
     try {
       registeredNodes = await this.findHoprNodesUsingAccountInNetworkRegistry(account)
-    } catch (error) {}
+    } catch (error) { }
 
     const serializedSnapshot = snapshot.serialize()
 
