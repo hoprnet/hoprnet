@@ -72,15 +72,15 @@ abstract contract ChannelsUtilsTest is Test {
     HoprChannels hoprChannels, 
     bytes32 channelId
   ) public view returns (HoprChannels.Channel memory) {
-    (bytes32 a,HoprChannels.Balance b,HoprChannels.TicketIndex c, HoprChannels.ChannelStatus d,HoprChannels.ChannelEpoch e,HoprChannels.Timestamp f) = hoprChannels.channels(channelId);
+    (bytes32 a,HoprChannels.Balance b,HoprChannels.TicketIndex c, HoprChannels.Timestamp d,HoprChannels.ChannelEpoch e, HoprChannels.ChannelStatus f) = hoprChannels.channels(channelId);
     return
       HoprChannels.Channel({
         commitment: a,
         balance: b,
         ticketIndex: c,
-        status: d,
+        closureTime: d,
         epoch: e,
-        closureTime: f
+        status: f
       });
   }
 
