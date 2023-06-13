@@ -1066,17 +1066,25 @@ pub mod tests {
 
     #[test]
     fn public_key_peerid_test() {
-        let pk1 = PublicKey::from_bytes(&PUBLIC_KEY).expect("failed to deserialize");
-
+        let pk1 = PublicKey::random();
         let pk2 = PublicKey::from_peerid_str(pk1.to_peerid_str().as_str()).expect("peer id serialization failed");
 
         assert_eq!(pk1, pk2, "pubkeys don't match");
         assert_eq!(pk1.to_peerid_str(), pk2.to_peerid_str(), "peer id strings don't match");
 
+        let valid_peerid = PeerId::from_str("16Uiu2HAmPHGyJ7y1Rj3kJ64HxJQgM9rASaeT2bWfXF9EiX3Pbp3K").unwrap();
+        let valid = PublicKey::from_peerid(&valid_peerid).unwrap();
+        assert_eq!(valid_peerid, valid.to_peerid(), "must work for secp256k1 peer ids");
+
         let invalid_peerid = PeerId::from_str("12D3KooWLYKsvDB4xEELYoHXxeStj2gzaDXjra2uGaFLpKCZkJHs").unwrap();
         let invalid = PublicKey::from_peerid(&invalid_peerid);
 
         assert!(invalid.is_err(), "must not work with ed25519 peer ids");
+
+        let invalid_peerid_2 = PeerId::from_str("QmWvEwidPYBbLHfcZN6ATHdm4NPM4KbUx72LZnZRoRNKEN").unwrap();
+
+        let invalid_2 = OffchainPublicKey::from_peerid(&invalid_peerid_2);
+        assert!(invalid_2.is_err(), "must not work with rsa peer ids");
     }
 
     #[test]
@@ -1214,17 +1222,23 @@ pub mod tests {
     }
 
     #[test]
-    fn offchain_pubkc_key_peerid_test() {
-        let peerid = PeerId::from_str("12D3KooWLYKsvDB4xEELYoHXxeStj2gzaDXjra2uGaFLpKCZkJHs").unwrap();
+    fn offchain_public_key_peerid_test() {
+        let pk1 = OffchainPublicKey::random();
+        let pk2 = OffchainPublicKey::from_peerid_str(pk1.to_peerid_str().as_str()).expect("peer id serialization failed");
+        assert_eq!(pk1, pk2, "pubkeys don't match");
+        assert_eq!(pk1.to_peerid_str(), pk2.to_peerid_str(), "peer id strings don't match");
 
-        let pk = OffchainPublicKey::from_peerid(&peerid).unwrap();
-
-        assert_eq!(peerid, pk.to_peerid());
+        let valid_peerid = PeerId::from_str("12D3KooWLYKsvDB4xEELYoHXxeStj2gzaDXjra2uGaFLpKCZkJHs").unwrap();
+        let valid = OffchainPublicKey::from_peerid(&valid_peerid).unwrap();
+        assert_eq!(valid_peerid, valid.to_peerid(), "must work with ed25519 peer ids");
 
         let invalid_peerid = PeerId::from_str("16Uiu2HAmPHGyJ7y1Rj3kJ64HxJQgM9rASaeT2bWfXF9EiX3Pbp3K").unwrap();
-
         let invalid = OffchainPublicKey::from_peerid(&invalid_peerid);
         assert!(invalid.is_err(), "must not work with secp256k1 peer ids");
+
+        let invalid_peerid_2 = PeerId::from_str("QmWvEwidPYBbLHfcZN6ATHdm4NPM4KbUx72LZnZRoRNKEN").unwrap();
+        let invalid_2 = OffchainPublicKey::from_peerid(&invalid_peerid_2);
+        assert!(invalid_2.is_err(), "must not work with rsa peer ids");
     }
 
     #[test]

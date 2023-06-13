@@ -39,7 +39,7 @@ pub const fn packet_length(
     additional_data_last_hop_len: usize,
 ) -> usize {
     OffchainPublicKey::SIZE
-        + header_length(max_hops, additional_data_relayer_len, additional_data_last_hop_len)
+        + header_length::<OffchainPublicKey>(max_hops, additional_data_relayer_len, additional_data_last_hop_len)
         + SimpleMac::SIZE
         + PAYLOAD_SIZE
 }
@@ -327,7 +327,7 @@ impl Packet {
             let (pre_packet, pre_ticket) = data.split_at(PACKET_LENGTH);
             let previous_hop = OffchainPublicKey::from_peerid(sender)?;
 
-            let header_len = header_length(INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0);
+            let header_len = header_length::<OffchainPublicKey>(INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0);
             let mp = MetaPacket::from_bytes(pre_packet, header_len)?;
 
             match mp.forward(node_private_key, node_public_key.as_edwards_point(), INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0)? {
