@@ -323,6 +323,20 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     _redeemTicketInternal(msg.sender, redeemable);
   }
 
+  // TODO: temporarily add the batch redemption feature
+  function batchRedeemTicketsSafe(address self, RedeemableTicket[] calldata redeemable) external onlySafe {
+    for (uint256 index = 0; index < redeemable.length; index++) {
+      _redeemTicketInternal(self, redeemable[index]);
+    }
+  }
+
+  // TODO: temporarily add the batch redemption feature
+  function batchRedeemTickets(RedeemableTicket[] calldata redeemable) external noSafeSet {
+    for (uint256 index = 0; index < redeemable.length; index++) {
+      _redeemTicketInternal(msg.sender, redeemable[index]);
+    }
+  }
+
   /**
    * Claims the incentive for relaying a mixnet packet using probabilistic payments.
    *
