@@ -492,8 +492,8 @@ impl Hash {
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct OffchainPublicKey {
-    key: EdwardsPoint,
-    pub(crate) compressed: CompressedEdwardsY
+    pub(crate) key: EdwardsPoint,
+    compressed: CompressedEdwardsY
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -530,9 +530,14 @@ impl PeerIdLike for OffchainPublicKey {
     fn from_peerid(peer_id: &PeerId) -> utils_types::errors::Result<Self> {
         let mh = peer_id.as_ref();
         if mh.code() == 0 {
-            Self::from_bytes(&mh.digest()[4..])
+            libp2p_identity::PublicKey::try_decode_protobuf(mh.digest())
+                .map_err(|_| ParseError)
+                .and_then(|pk| pk.try_into_ed25519().map_err(|_| ParseError))
+                .and_then(|pk| CompressedEdwardsY::from_slice(&pk.to_bytes())
+                    .decompress()
+                    .ok_or(ParseError))
+                .map(|ed| OffchainPublicKey::from(ed))
         } else {
-            warn!("peer id type not supported: {peer_id}");
             Err(ParseError)
         }
     }
@@ -630,10 +635,12 @@ impl Display for PublicKey {
 impl PeerIdLike for PublicKey {
     fn from_peerid(peer_id: &PeerId) -> utils_types::errors::Result<Self> {
         let mh = peer_id.as_ref();
-        if mh.code() == 0 { // = multihash identity code
-            Self::from_bytes(&mh.digest()[4..])
+        if mh.code() == 0 {
+            libp2p_identity::PublicKey::try_decode_protobuf(mh.digest())
+                .map_err(|_| ParseError)
+                .and_then(|pk| pk.try_into_secp256k1().map_err(|_| ParseError))
+                .and_then(|pk| Self::from_bytes(&pk.to_bytes()))
         } else {
-            warn!("peer id type not supported: {peer_id}");
             Err(ParseError)
         }
     }

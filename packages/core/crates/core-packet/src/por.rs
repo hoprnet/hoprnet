@@ -1,6 +1,7 @@
 use core_crypto::derivation::{derive_ack_key_share, derive_own_key_share};
 use core_crypto::parameters::SECRET_KEY_LENGTH;
 use core_crypto::random::random_bytes;
+use core_crypto::shared_keys::SharedSecret;
 use core_crypto::types::SecretKey;
 use core_crypto::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, PublicKey, Response};
 use utils_types::errors::GeneralError::ParseError;
@@ -62,6 +63,12 @@ impl ProofOfRelayString {
                 .to_challenge(),
             hint: s0.to_challenge(),
         }
+    }
+
+    pub fn from_shared_secrets(secrets: &Vec<SharedSecret>) -> Vec<Box<[u8]>> {
+        (1..secrets.len())
+            .map(|i| ProofOfRelayString::new(secrets[i], secrets.get(i + 1).cloned()).to_bytes())
+            .collect::<Vec<_>>()
     }
 }
 

@@ -271,8 +271,8 @@ pub mod tests {
     use crate::routing::{forward_header, generate_filler, ForwardedHeader, RoutingInfo};
     use crate::utils::xor_inplace;
     use parameterized::parameterized;
-    use rand::rngs::OsRng;
-    use crate::ec_groups::Ed25519SharedKeys;
+    use crate::ec_groups::{Ed25519Suite, X25519Suite};
+    use crate::shared_keys::{SharedSecret, SphinxSuite};
     use crate::types::OffchainPublicKey;
 
     #[parameterized(hops = { 3, 4 })]
@@ -282,7 +282,7 @@ pub mod tests {
         let max_hops = hops;
 
         let secrets = (0..hops)
-            .map(|_| random_bytes::<SECRET_KEY_LENGTH>())
+            .map(|_| random_bytes::<SECRET_KEY_LENGTH>() as SharedSecret)
             .collect::<Vec<_>>();
         let extended_header_len = per_hop * max_hops + last_hop;
         let header_len = per_hop * (max_hops - 1) + last_hop;
@@ -293,7 +293,7 @@ pub mod tests {
             max_hops,
             per_hop,
             last_hop,
-            &secrets.iter().map(|s| s.as_ref()).collect::<Vec<_>>(),
+            &secrets,
         );
 
         extended_header[last_hop..last_hop + filler.len()].copy_from_slice(&filler);
@@ -322,14 +322,14 @@ pub mod tests {
         let max_hops = hops;
 
         let secrets = (0..hops)
-            .map(|_| random_bytes::<SECRET_KEY_LENGTH>())
+            .map(|_| random_bytes::<SECRET_KEY_LENGTH>() as SharedSecret)
             .collect::<Vec<_>>();
 
         let first_filler = generate_filler(
             max_hops,
             per_hop,
             last_hop,
-            &secrets.iter().map(|s| s.as_ref()).collect::<Vec<_>>(),
+            &secrets,
         );
         assert_eq!(0, first_filler.len());
 
@@ -337,26 +337,22 @@ pub mod tests {
         assert_eq!(0, second_filler.len());
     }
 
-    #[parameterized(amount = { 3, 2, 1 })]
-    fn test_generate_routing_info_and_forward(amount: usize) {
+    fn generic_test_generate_routing_info_and_forward<S: SphinxSuite>(path: Vec<(S::G, OffchainPublicKey)>) {
         const MAX_HOPS: usize = 3;
-        let mut additional_data: Vec<&[u8]> = Vec::with_capacity(amount);
-        for _ in 0..amount {
+        let mut additional_data: Vec<&[u8]> = Vec::with_capacity(path.len());
+        for _ in 0..path.len() {
             let e: &[u8] = &[];
             additional_data.push(e);
         }
 
-        let pub_keys = (0..amount)
-            .into_iter()
-            .map(|_| OffchainPublicKey::random())
-            .collect::<Vec<_>>();
+        let (elements, pub_keys): (Vec<_>, Vec<_>) = path.into_iter().unzip();
 
-        let shares = Ed25519SharedKeys::generate(&mut OsRng, pub_keys.clone()).unwrap();
+        let shares = S::new_shared_keys(elements).unwrap();
 
         let rinfo = RoutingInfo::new(
             MAX_HOPS,
             &pub_keys,
-            &shares.secrets.iter().map(|s| s.as_ref()).collect::<Vec<_>>(),
+            &shares.secrets,
             0,
             &additional_data,
             None,
@@ -370,11 +366,11 @@ pub mod tests {
         for (i, secret) in shares.secrets.iter().enumerate() {
             let fwd = forward_header(secret, &mut header, &last_mac, MAX_HOPS, 0, 0).unwrap();
 
-            match &fwd {
+            match fwd {
                 ForwardedHeader::RelayNode { mac, next_node, .. } => {
                     last_mac.copy_from_slice(&mac);
                     assert!(i < shares.secrets.len() - 1);
-                    assert_eq!(&pub_keys[i + 1], next_node);
+                    assert_eq!(pub_keys[i + 1], next_node);
                 }
                 ForwardedHeader::FinalNode { additional_data } => {
                     assert_eq!(shares.secrets.len() - 1, i);
@@ -383,4 +379,29 @@ pub mod tests {
             }
         }
     }
+
+    #[parameterized(amount = { 3, 2, 1 })]
+    fn test_ed25519_generate_routing_info_and_forward(amount: usize) {
+        let path = (0..amount).map(|_| {
+            let key = OffchainPublicKey::random();
+            (key.as_edwards_point().clone(), key)
+        }).collect::<Vec<_>>();
+
+        generic_test_generate_routing_info_and_forward::<Ed25519Suite>(path)
+    }
+
+    #[parameterized(amount = { 3, 2, 1 })]
+    fn test_x25519_generate_routing_info_and_forward(amount: usize) {
+        let path = (0..amount).map(|_| {
+            let key = OffchainPublicKey::random();
+            (key.as_edwards_point().to_montgomery(), key)
+        }).collect::<Vec<_>>();
+
+        generic_test_generate_routing_info_and_forward::<X25519Suite>(path)
+    }
+
+    /*#[parameterized(amount = { 3, 2, 1 })]
+    fn test_secp256k1_generate_routing_info_and_forward(amount: usize) {
+        generic_test_generate_routing_info_and_forward::<Secp256k1Suite>(amount)
+    }*/
 }

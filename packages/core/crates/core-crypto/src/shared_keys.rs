@@ -5,7 +5,6 @@ use generic_array::{ArrayLength, GenericArray};
 
 use crate::errors::CryptoError::CalculationError;
 use hkdf::SimpleHkdf;
-use libp2p_identity::PeerId;
 
 use crate::errors::Result;
 use crate::parameters::SECRET_KEY_LENGTH;
@@ -20,6 +19,9 @@ pub trait Scalar: Mul<Output = Self> + Sized {
 
     /// Create scalar from bytes
     fn from_bytes(bytes: &[u8]) -> Result<Self>;
+
+    /// Convert scalar to bytes.
+    fn to_bytes(&self) -> Box<[u8]>;
 }
 
 pub type Alpha<A> = GenericArray<u8, A>;
@@ -34,9 +36,6 @@ pub trait GroupElement<A: ArrayLength<u8>, E: Scalar>: Clone + for <'a> Mul<&'a 
 
     /// Converts the group element from the binary format representing an Alpha value.
     fn from_alpha(alpha: Alpha<A>) -> Result<Self>;
-
-    /// Converts peer id to the group element
-    fn from_peerid(peer_id: &PeerId) -> Result<Self>;
 
     /// Create a group element using the group generator and the given scalar
     fn generate(scalar: &E) -> Self;
@@ -79,19 +78,9 @@ pub struct SharedKeys<E: Scalar, A: ArrayLength<u8>, G: GroupElement<A, E>> {
 }
 
 impl <E: Scalar, A: ArrayLength<u8>, G: GroupElement<A, E>> SharedKeys<E, A, G> {
-    /// Generates shared secrets for the given path of peers.
-    pub fn new(path: &[&PeerId]) -> Result<Self> {
-        Self::generate(
-            path
-                .iter()
-                .map(|peer_id| G::from_peerid(peer_id))
-                .collect::<Result<Vec<_>>>()?,
-        )
-    }
 
     /// Generates shared secrets given the group element of the peers.
     /// The order of the peer group elements is preserved for resulting shared keys.
-    /// The specified random number generator will be used.
     pub fn generate(peer_group_elements: Vec<G>) -> Result<SharedKeys<E, A, G>> {
         let mut shared_keys = Vec::new();
 
@@ -164,8 +153,9 @@ pub trait SphinxSuite {
     type A: ArrayLength<u8>;
     type G: GroupElement<Self::A, Self::E>;
 
-    fn new_shared_keys(path: &[&PeerId]) -> Result<SharedKeys<Self::E, Self::A, Self::G>> {
-        SharedKeys::<Self::E, Self::A, Self::G>::new(path)
+    /// Convenience function to generate shared keys.
+    fn new_shared_keys(public_group_elements: Vec<Self::G>) -> Result<SharedKeys<Self::E, Self::A, Self::G>> {
+        SharedKeys::generate(public_group_elements)
     }
 }
 
@@ -173,16 +163,11 @@ pub trait SphinxSuite {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use rand::rngs::OsRng;
-
-    pub fn generate_random_for_sphinx<S: SphinxSuite>(count: usize) -> (Vec<S::G>, Vec<S::E>) {
-        (0..count)
-            .map(|_| S::G::random_pair())
-            .unzip()
-    }
 
     pub fn generic_sphinx_suite_test<S: SphinxSuite>(node_count: usize) {
-        let (pub_keys, priv_keys) = generate_random_for_sphinx::<S>(node_count);
+        let (pub_keys, priv_keys): (Vec<S::G>, Vec<S::E>) = (0..node_count)
+            .map(|_| S::G::random_pair())
+            .unzip();
 
         // Now generate the key shares for the public keys
         let generated_shares = SharedKeys::<S::E, S::A, S::G>::generate(pub_keys.clone()).unwrap();
@@ -190,7 +175,7 @@ pub mod tests {
 
         let mut alpha_cpy = generated_shares.alpha.clone();
         for (i, priv_key) in priv_keys.into_iter().enumerate() {
-            let (alpha, secret) = SharedKeys::<S::E, S::A, S::G>::forward_transform(alpha_cpy, priv_key.as_bytes(), &pub_keys[i]).unwrap();
+            let (alpha, secret) = SharedKeys::<S::E, S::A, S::G>::forward_transform(&alpha_cpy, &priv_key.to_bytes(), &pub_keys[i]).unwrap();
 
             assert_eq!(secret.as_ref(), generated_shares.secrets[i]);
 

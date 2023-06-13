@@ -53,7 +53,7 @@ impl Display for Path {
 mod tests {
     use crate::path::Path;
     use libp2p_identity::PeerId;
-
+    
     #[test]
     fn test_path_validated() {
         const HOPS: u32 = 5;
