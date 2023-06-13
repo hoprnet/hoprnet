@@ -68,20 +68,24 @@ struct Role {
  * - Utility functions, such as `packLeft`, `packRight`, `unpackFunction`, `unpackParameter`, `checkExecutionOptions` are removed
  * - Specific helper functions, such as `pluckOneStaticAddress`, `pluckTwoStaticAddresses`, `pluckDynamicAddresses`,  `pluckSendPayload` are derived from `pluckStaticValue` and `pluckDynamicValue`
  * - helper functions to encode array of function signatures and their respective permissions are added.
+ *
+ * @notice Due to the deployed HoprToken.sol imports OpenZeppelin contract library locked at v4.4.2, while
+ * HoprChannels contract imports OpenZeppelin contract of v4.8.3, it's not possible to import both contracts
+ * the same time without creating conflicts. Therefore, two method identifiers of HoprToken contract are
+ * defined with value instead of `.selector`
  */
 library HoprCapabilityPermissions {
     // HoprChannels method ids (TargetType.Channels)
-    // low risk (permission checks can be omitted)
     bytes4 internal constant REDEEM_TICKET_SELECTOR = HoprChannels.redeemTicketSafe.selector;
-    bytes4 internal constant REDEEM_TICKETS_SELECTOR = hex"c5ad200d";
-    bytes4 internal constant FINALIZE_CHANNEL_CLOSURE_SELECTOR = hex"833aae8d";
-    // high risk (do permission check)
-    bytes4 internal constant FUND_CHANNEL_MULTI_SELECTOR = hex"4341abdd";
-    bytes4 internal constant INITIATE_CHANNEL_CLOSURE_SELECTOR = hex"88d2f3c9";
-    bytes4 internal constant BUMP_CHANNEL_SELECTOR = hex"c4d93afb";
-    // HoprTokens method ids (TargetType.Token)
-    bytes4 internal constant APPROVE_SELECTOR = hex"095ea7b3";
-    bytes4 internal constant SEND_SELECTOR = hex"9bd9bbc6";
+    bytes4 internal constant BATCH_REDEEM_TICKETS_SELECTOR = HoprChannels.batchRedeemTicketsSafe.selector;
+    bytes4 internal constant CLOSE_INCOMING_CHANNEL_SELECTOR = HoprChannels.closeIncomingChannelSafe.selector;
+    bytes4 internal constant INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTOR = HoprChannels.initiateOutgoingChannelClosureSafe.selector;
+    bytes4 internal constant FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTOR = HoprChannels.finalizeOutgoingChannelClosureSafe.selector;
+    bytes4 internal constant FUND_CHANNEL_MULTI_SELECTOR = HoprChannels.fundChannelMulti.selector;
+    bytes4 internal constant SET_COMMITMENT_SELECTOR = HoprChannels.setCommitmentSafe.selector;
+    // HoprToken method ids (TargetType.Token). As HoprToken contract is in production, its ABI is static
+    bytes4 internal constant APPROVE_SELECTOR = hex"095ea7b3"; // equivalent to `HoprToken.approve.selector`, for ABI "approve(address,uint256)"
+    bytes4 internal constant SEND_SELECTOR = hex"9bd9bbc6"; // equivalent to `HoprToken.send.selector`, for ABI "send(address,uint256,bytes)"
 
     event RevokedTarget(address targetAddress);
     event ScopedTargetChannels(address targetAddress);
@@ -308,7 +312,7 @@ library HoprCapabilityPermissions {
         bytes4 functionSig = bytes4(data);
         bytes32 capabilityKey = keyForFunctions(targetAddress, functionSig);
 
-        if (functionSig == REDEEM_TICKETS_SELECTOR) {
+        if (functionSig == BATCH_REDEEM_TICKETS_SELECTOR) {
             // only redeemTickets function has Dynamic32 type, i.e. non-nested arrays: address[] bytes32[] uint[] etc
             address[] memory srcs = pluckDynamicAddresses(data, 0);
             address[] memory dests = pluckDynamicAddresses(data, 1);
