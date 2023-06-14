@@ -111,6 +111,8 @@ import {
 core_packet_initialize_crate()
 registerMetricsCollector(core_packet_gather_metrics)
 
+import { Address as Core_Address } from './types.js'
+
 import pkg from '../package.json' assert { type: 'json' }
 
 const CODE_P2P = protocols('p2p').code
@@ -697,9 +699,7 @@ class Hopr extends EventEmitter {
         await retryWithBackoffThenThrow(() => HoprCoreEthereum.getInstance().commitToChannel(c))
       } catch (err) {
         // @TODO what to do here? E.g. delete channel from db?
-        error(
-          `Couldn't set commitment in channel to ${c.destination.to_peerid_str()} (channelId ${c.get_id().to_hex()})`
-        )
+        error(`Couldn't set commitment in channel to ${c.destination.to_string()} (channelId ${c.get_id().to_hex()})`)
       }
     }
   }
@@ -780,20 +780,21 @@ class Hopr extends EventEmitter {
 
   private async strategyOpenChannel(status: OutgoingChannelStatus) {
     try {
-      const destination = peerIdFromString(status.peer_id)
+      const pk = await HoprCoreEthereum.getInstance().indexer.getPublicKeyOf(Core_Address.from_string(status.address))
       const stake = new BN(status.stake_str)
 
-      if (await this.isAllowedAccessToNetwork(destination)) {
-        this.networkPeers.register(destination.toString(), PeerOrigin.StrategyNewChannel)
+      const pId = peerIdFromString(pk.to_peerid_str())
+      if (await this.isAllowedAccessToNetwork(pId)) {
+        this.networkPeers.register(pId.toString(), PeerOrigin.StrategyNewChannel)
 
-        const hash = await this.openChannel(destination, stake)
-        verbose('- opened channel', destination, hash)
+        const hash = await this.openChannel(Address.from_string(status.address), stake)
+        verbose('- opened channel', status.address, hash)
         this.emit('hopr:channel:opened', status)
       } else {
-        error(`Protocol error: strategy wants to open channel to non-registered peer ${destination.toString()}`)
+        error(`Protocol error: strategy wants to open channel to non-registered peer ${pId.toString()}`)
       }
     } catch (e) {
-      error(`strategy could not open channel to ${status.peer_id}`, e)
+      error(`strategy could not open channel to ${status.address}`, e)
     }
   }
 
@@ -817,7 +818,7 @@ class Hopr extends EventEmitter {
         let channel = outChannels.at(i)
         if (channel.status == ChannelStatus.Open) {
           metric_channelBalances.set(
-            [channel.source.to_address().to_hex(), 'out'],
+            [channel.source.to_hex(), 'out'],
             +ethersUtils.formatEther(channel.balance.to_string())
           )
           outgoingChannels++
@@ -830,7 +831,7 @@ class Hopr extends EventEmitter {
         let channel = outChannels.at(i)
         if (channel.status == ChannelStatus.Open) {
           metric_channelBalances.set(
-            [channel.source.to_address().to_hex(), 'in'],
+            [channel.source.to_hex(), 'in'],
             +ethersUtils.formatEther(channel.balance.toString())
           )
           incomingChannels++
@@ -861,10 +862,11 @@ class Hopr extends EventEmitter {
       // Check if all peer ids are still registered
       await Promise.all(
         outgoingChannels.map(async (channel) => {
-          if (await this.isAllowedAccessToNetwork(peerIdFromString(channel.destination.to_peerid_str()))) {
-            this.networkPeers.register(channel.destination.to_peerid_str(), PeerOrigin.StrategyExistingChannel)
+          const pk = await HoprCoreEthereum.getInstance().indexer.getPublicKeyOf(channel.destination)
+          if (await this.isAllowedAccessToNetwork(peerIdFromString(pk.to_peerid_str()))) {
+            this.networkPeers.register(pk.to_peerid_str(), PeerOrigin.StrategyExistingChannel)
           } else {
-            error(`Protocol error: Strategy is monitoring non-registered peer ${channel.destination.to_hex(true)}`)
+            error(`Protocol error: Strategy is monitoring non-registered peer ${channel.destination.to_hex()}`)
           }
         })
       )
@@ -875,7 +877,7 @@ class Hopr extends EventEmitter {
         this.networkPeers.all().values(),
         outgoingChannels.map((c) => {
           return {
-            peer_id: c.destination.to_peerid_str(),
+            address: c.destination.to_string(),
             stake_str: c.balance.to_string(),
             status: c.status
           }
@@ -1031,8 +1033,8 @@ class Hopr extends EventEmitter {
       let channel: ChannelEntry
       try {
         channel = await this.db.get_channel_x(
-          Packet_PublicKey.deserialize(ticketIssuer.serialize(false)),
-          Packet_PublicKey.deserialize(ticketReceiver.serialize(false))
+          Packet_Address.deserialize(ticketIssuer.to_address().serialize()),
+          Packet_Address.deserialize(ticketReceiver.to_address().serialize())
         )
       } catch (err) {
         throw Error(
@@ -1335,17 +1337,16 @@ class Hopr extends EventEmitter {
    * @param amountToFund the amount to fund in HOPR(wei)
    */
   public async openChannel(
-    counterparty: PeerId,
+    counterparty: Address,
     amountToFund: BN
   ): Promise<{
     channelId: Hash
     receipt: string
   }> {
-    if (this.id.equals(counterparty)) {
+    if (PublicKey.from_peerid_str(this.id.toString()).to_address().eq(counterparty)) {
       throw Error('Cannot open channel to self!')
     }
 
-    const counterpartyPubKey = PublicKey.from_peerid_str(counterparty.toString())
     const myAvailableTokens = await HoprCoreEthereum.getInstance().getBalance(true)
 
     // validate 'amountToFund'
@@ -1361,7 +1362,7 @@ class Hopr extends EventEmitter {
 
     try {
       return HoprCoreEthereum.getInstance().openChannel(
-        counterpartyPubKey,
+        counterparty,
         new Balance(amountToFund.toString(10), BalanceType.HOPR)
       )
     } catch (err) {
@@ -1396,7 +1397,7 @@ class Hopr extends EventEmitter {
 
     try {
       return connector.fundChannel(
-        counterpartyPubKey,
+        counterpartyPubKey.to_address(),
         new Balance(myFund.toString(10), BalanceType.HOPR),
         new Balance(counterpartyFund.toString(10), BalanceType.HOPR)
       )
@@ -1415,8 +1416,8 @@ class Hopr extends EventEmitter {
     const wrapped_pk = Packet_PublicKey.deserialize(this.pubKey.serialize(false))
     const channel =
       direction === 'outgoing'
-        ? await this.db.get_channel_x(wrapped_pk, counterpartyPubKey)
-        : await this.db.get_channel_x(counterpartyPubKey, wrapped_pk)
+        ? await this.db.get_channel_x(wrapped_pk.to_address(), counterpartyPubKey.to_address())
+        : await this.db.get_channel_x(counterpartyPubKey.to_address(), wrapped_pk.to_address())
 
     if (channel === undefined) {
       log(`The requested channel for counterparty ${counterparty.toString()} does not exist`)
@@ -1484,7 +1485,7 @@ class Hopr extends EventEmitter {
   public async getTickets(peerId: PeerId): Promise<Ticket[]> {
     const selfPubKey = Packet_PublicKey.from_peerid_str(this.getId().toString())
     const counterpartyPubKey = Packet_PublicKey.from_peerid_str(peerId.toString())
-    const channel = await this.db.get_channel_x(counterpartyPubKey, selfPubKey)
+    const channel = await this.db.get_channel_x(counterpartyPubKey.to_address(), selfPubKey.to_address())
     let list = await this.db.get_acknowledged_tickets(channel)
 
     let ret: Ticket[] = []
@@ -1527,7 +1528,7 @@ class Hopr extends EventEmitter {
   public async redeemTicketsInChannel(peerId: PeerId) {
     const selfPubKey = Packet_PublicKey.from_peerid_str(this.getId().toString())
     const counterpartyPubKey = Packet_PublicKey.from_peerid_str(peerId.toString())
-    const channel = await this.db.get_channel_x(counterpartyPubKey, selfPubKey)
+    const channel = await this.db.get_channel_x(counterpartyPubKey.to_address(), selfPubKey.to_address())
     await HoprCoreEthereum.getInstance().redeemTicketsInChannel(ChannelEntry.deserialize(channel.serialize()))
   }
 
@@ -1541,8 +1542,8 @@ class Hopr extends EventEmitter {
     return ChannelEntry.deserialize(
       (
         await this.db.get_channel_x(
-          Packet_PublicKey.from_peerid_str(src.toString()),
-          Packet_PublicKey.from_peerid_str(dest.toString())
+          Packet_PublicKey.from_peerid_str(src.toString()).to_address(),
+          Packet_PublicKey.from_peerid_str(dest.toString()).to_address()
         )
       ).serialize()
     )
@@ -1643,13 +1644,19 @@ class Hopr extends EventEmitter {
     } else if (![...Array(MAX_HOPS).keys()].map((i) => i + 1).includes(hops)) {
       throw new Error(`the number of intermediate nodes must be an integer between 1 and ${MAX_HOPS} inclusive`)
     }
-    return await findPath(
-      PublicKey.from_peerid_str(this.getId().toString()),
-      destination,
+    const path = await findPath(
+      PublicKey.from_peerid_str(this.getId().toString()).to_address(),
+      destination.to_address(),
       hops,
-      (p: PublicKey) => this.networkPeers.quality_of(p.to_peerid_str()),
+      async (address: Address) => {
+        const pk = await HoprCoreEthereum.getInstance().indexer.getPublicKeyOf(address)
+
+        return this.networkPeers.quality_of(pk.to_peerid_str())
+      },
       HoprCoreEthereum.getInstance().getOpenChannelsFrom.bind(HoprCoreEthereum.getInstance())
     )
+
+    return await Promise.all(path.map((x) => HoprCoreEthereum.getInstance().indexer.getPublicKeyOf(x)))
   }
 
   /**

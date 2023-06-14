@@ -1,1 +1,1 @@
-export { Acknowledgement, AcknowledgementChallenge } from '../../core/lib/core_types.js'
+export { Acknowledgement, AcknowledgementChallenge, Address } from '../../core/lib/core_types.js'

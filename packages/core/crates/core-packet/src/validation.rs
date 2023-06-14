@@ -159,8 +159,8 @@ mod tests {
             async fn get_unacknowledged_tickets(&self, filter: Option<ChannelEntry>) -> core_ethereum_db::errors::Result<Vec<UnacknowledgedTicket>>;
             async fn mark_pending(&mut self, ticket: &Ticket) -> core_ethereum_db::errors::Result<()>;
             async fn get_pending_balance_to(&self, counterparty: &Address) -> core_ethereum_db::errors::Result<Balance>;
-            async fn get_channel_to(&self, dest: &PublicKey) -> core_ethereum_db::errors::Result<Option<ChannelEntry>>;
-            async fn get_channel_from(&self, src: &PublicKey) -> core_ethereum_db::errors::Result<Option<ChannelEntry>>;
+            async fn get_channel_to(&self, dest: &Address) -> core_ethereum_db::errors::Result<Option<ChannelEntry>>;
+            async fn get_channel_from(&self, src: &Address) -> core_ethereum_db::errors::Result<Option<ChannelEntry>>;
             async fn update_channel_and_snapshot(
                 &mut self,
                 channel_id: &Hash,
@@ -191,7 +191,7 @@ mod tests {
             async fn mark_losing_acked_ticket(&mut self, ticket: &AcknowledgedTicket) -> core_ethereum_db::errors::Result<()>;
             async fn get_rejected_tickets_value(&self) -> core_ethereum_db::errors::Result<Balance>;
             async fn get_rejected_tickets_count(&self) -> core_ethereum_db::errors::Result<usize>;
-            async fn get_channel_x(&self, src: &PublicKey, dest: &PublicKey) -> core_ethereum_db::errors::Result<Option<ChannelEntry>>;
+            async fn get_channel_x(&self, src: &Address, dest: &Address) -> core_ethereum_db::errors::Result<Option<ChannelEntry>>;
             async fn get_channels_from(&self, address: Address) -> core_ethereum_db::errors::Result<Vec<ChannelEntry>>;
             async fn get_channels_to(&self, address: Address) -> core_ethereum_db::errors::Result<Vec<ChannelEntry>>;
             async fn get_public_node_accounts(&self) -> core_ethereum_db::errors::Result<Vec<AccountEntry>>;
@@ -237,8 +237,8 @@ mod tests {
 
     fn create_channel_entry() -> ChannelEntry {
         ChannelEntry::new(
-            TARGET_PUB.clone(),
-            TARGET_PUB.clone(),
+            TARGET_PUB.clone().to_address(),
+            TARGET_PUB.clone().to_address(),
             Balance::from_str("100", BalanceType::HOPR),
             Hash::create(&[&hex!("deadbeef")]),
             U256::one(),

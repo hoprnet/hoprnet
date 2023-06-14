@@ -1,6 +1,5 @@
-use libp2p_identity::PeerId;
 use utils_log::debug;
-use utils_types::primitives::Balance;
+use utils_types::primitives::{Address, Balance};
 
 use crate::generic::{ChannelStrategy, OutgoingChannelStatus, StrategyTickResult};
 
@@ -14,8 +13,8 @@ impl ChannelStrategy for PassiveStrategy {
     fn tick<Q>(
         &mut self,
         _balance: Balance,
-        _peer_ids: impl Iterator<Item = PeerId>,
-        _outgoing_channel_peer_ids: Vec<OutgoingChannelStatus>,
+        _addresses: impl Iterator<Item = Address>,
+        _outgoing_channels: Vec<OutgoingChannelStatus>,
         _quality_of: Q,
     ) -> StrategyTickResult
     where
@@ -44,8 +43,9 @@ pub mod wasm {
     use wasm_bindgen::prelude::wasm_bindgen;
     use wasm_bindgen::JsValue;
 
+    use std::str::FromStr;
     use utils_misc::utils::wasm::JsResult;
-    use utils_types::primitives::Balance;
+    use utils_types::primitives::{Address, Balance};
 
     use crate::generic::wasm::StrategyTickResult;
     use crate::passive::PassiveStrategy;
@@ -67,11 +67,11 @@ pub mod wasm {
         pub fn _tick(
             &mut self,
             balance: Balance,
-            peer_ids: &js_sys::Iterator,
+            addresses: &js_sys::Iterator,
             outgoing_channels: JsValue,
             quality_of: &js_sys::Function,
         ) -> JsResult<StrategyTickResult> {
-            strategy_tick!(self, balance, peer_ids, outgoing_channels, quality_of)
+            strategy_tick!(self, balance, addresses, outgoing_channels, quality_of)
         }
     }
 }

@@ -274,7 +274,7 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
                 self.db
                     .read()
                     .await
-                    .get_channel_from(&unackowledged.signer)
+                    .get_channel_from(&unackowledged.signer.to_address())
                     .await
                     .map_err(|e| {
                         #[cfg(all(feature = "prometheus", not(test)))]
@@ -401,7 +401,7 @@ where
             .db
             .read()
             .await
-            .get_channel_to(&destination)
+            .get_channel_to(&destination.to_address())
             .await?
             .ok_or(ChannelNotFound(destination.to_peerid().to_string()))?;
 
@@ -425,7 +425,8 @@ where
 
         info!(
             "balances {} - {outstanding_balance} = {channel_balance} should >= {amount} in channel open to {}",
-            channel.balance, channel.destination
+            channel.balance,
+            channel.destination.to_string()
         );
 
         if channel_balance.lt(&amount) {
@@ -591,7 +592,7 @@ where
                     .db
                     .read()
                     .await
-                    .get_channel_from(&previous_hop)
+                    .get_channel_from(&previous_hop.to_address())
                     .await?
                     .ok_or(ChannelNotFound(previous_hop.to_string()))?;
 
@@ -845,8 +846,8 @@ mod tests {
 
     fn create_dummy_channel(from: &PeerId, to: &PeerId) -> ChannelEntry {
         ChannelEntry::new(
-            PublicKey::from_peerid(from).unwrap(),
-            PublicKey::from_peerid(to).unwrap(),
+            PublicKey::from_peerid(from).unwrap().to_address(),
+            PublicKey::from_peerid(to).unwrap().to_address(),
             Balance::new(U256::new("1234").mul(U256::new(PRICE_PER_PACKET)), BalanceType::HOPR),
             Hash::new(&random_bytes::<32>()),
             U256::zero(),

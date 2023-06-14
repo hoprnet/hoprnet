@@ -28,7 +28,8 @@ import {
   create_gauge,
   create_multi_gauge,
   U256,
-  random_integer
+  random_integer,
+  Hash
 } from '@hoprnet/hopr-utils'
 
 import type { ChainWrapper } from '../ethereum.js'
@@ -43,7 +44,7 @@ import {
   type IndexerEventEmitter,
   IndexerStatus
 } from './types.js'
-import { isConfirmedBlock, snapshotComparator, type IndexerSnapshot, channelEntryFromSCEvent } from './utils.js'
+import { isConfirmedBlock, snapshotComparator, type IndexerSnapshot, numberToChannelStatus } from './utils.js'
 import { BigNumber, type Contract, errors } from 'ethers'
 
 import {
@@ -492,6 +493,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
 
     // Don't process any block if indexer was stopped.
     if (![IndexerStatus.STARTING, IndexerStatus.STARTED].includes(this.status)) {
+      console.log(`RETURNING early`)
       return
     }
 
@@ -578,6 +580,8 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
         }
 
         if (res.success) {
+          console.log(res.events)
+
           this.onNewEvents(res.events)
           break
         } else if (i + 1 < RETRIES) {
@@ -703,7 +707,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
    * @param blockNumber latest on-chain block number
    * @param lastDatabaseSnapshot latest snapshot in database
    */
-  async processUnconfirmedEvents(blockNumber: number, lastDatabaseSnapshot: Snapshot | undefined, blocking: boolean) {
+  async processUnconfirmedEvents(blockNumber: number, lastDatabaseSnapshot: Snapshot | undefined, _blocking: boolean) {
     log(
       'At the new block %d, there are %i unconfirmed events and ready to process %s, because the event was mined at %i (with finality %i)',
       blockNumber,
@@ -715,12 +719,16 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       this.maxConfirmations
     )
 
+    console.log(`unconfirmed events`, this.unconfirmedEvents.toArray())
+
+    const channelsToCommit: ChannelEntry[] = []
     // check unconfirmed events and process them if found
     // to be within a confirmed block
     while (
       this.unconfirmedEvents.size() > 0 &&
       isConfirmedBlock(this.unconfirmedEvents.peek().blockNumber, blockNumber, this.maxConfirmations)
     ) {
+      console.log(`unconfirmed event loop iteration`, this.unconfirmedEvents.size())
       const event = this.unconfirmedEvents.shift()
       log(
         'Processing event %s blockNumber=%s maxConfirmations=%s',
@@ -756,6 +764,8 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
         new U256(event.logIndex.toString())
       )
 
+      log(event)
+
       log('Event name %s and hash %s', eventName, event.transactionHash)
 
       switch (eventName) {
@@ -769,7 +779,11 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
           break
         case 'ChannelUpdated':
         case 'ChannelUpdated(address,address,tuple)':
-          await this.onChannelUpdated(event as Event<'ChannelUpdated'>, lastDatabaseSnapshot)
+          const channelToCommit = await this.onChannelUpdated(event as Event<'ChannelUpdated'>, lastDatabaseSnapshot)
+
+          if (channelToCommit) {
+            channelsToCommit.push(channelToCommit)
+          }
           break
         case 'Transfer':
         case 'Transfer(address,address,uint256)':
@@ -813,15 +827,19 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
 
       metric_unconfirmedBlocks.increment()
 
-      if (
-        !blocking &&
-        this.unconfirmedEvents.size() > 0 &&
-        isConfirmedBlock(this.unconfirmedEvents.peek().blockNumber, blockNumber, this.maxConfirmations)
-      ) {
-        // Give other tasks CPU time to happen
-        // Wait until end of next event loop iteration before starting next db write-back
-        await setImmediatePromise()
-      }
+      // if (
+      //   !blocking &&
+      //   this.unconfirmedEvents.size() > 0 &&
+      //   isConfirmedBlock(this.unconfirmedEvents.peek().blockNumber, blockNumber, this.maxConfirmations)
+      // ) {
+      //   // Give other tasks CPU time to happen
+      //   // Wait until end of next event loop iteration before starting next db write-back
+      //   await setImmediatePromise()
+      // }
+    }
+
+    for (const channelToCommit of channelsToCommit) {
+      this.emit('channel-waiting-for-commitment', channelToCommit)
     }
   }
 
@@ -859,18 +877,27 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     })
   }
 
-  private async onChannelUpdated(event: Event<'ChannelUpdated'>, lastSnapshot: Snapshot): Promise<void> {
-    let channel: ChannelEntry
-    try {
-      log('channel-updated for hash %s', event.transactionHash)
-      channel = await channelEntryFromSCEvent(event, this.getPublicKeyOf.bind(this))
-    } catch (err) {
-      log(`fatal error: failed to construct new ChannelEntry from the SC event`, err)
-      return
-    }
+  private async onChannelUpdated(event: Event<'ChannelUpdated'>, lastSnapshot: Snapshot): Promise<ChannelEntry | void> {
+    const { source, destination, newState } = event.args
+
+    let channel = new ChannelEntry(
+      Address.from_string(source),
+      Address.from_string(destination),
+      new Balance(newState.balance.toString(), BalanceType.HOPR),
+      new Hash(stringToU8a(newState.commitment)),
+      new U256(newState.ticketEpoch.toString()),
+      new U256(newState.ticketIndex.toString()),
+      numberToChannelStatus(newState.status),
+      new U256(newState.channelEpoch.toString()),
+      new U256(newState.closureTime.toString())
+    )
+
+    console.log(`on Channel updated - after getting channel`)
 
     let prevState: ChannelEntry
     let channel_entry = await this.db.get_channel(Ethereum_Hash.deserialize(channel.get_id().serialize()))
+
+    console.log(`on Channel updated - after getting channel`)
     if (channel_entry !== undefined) {
       prevState = ChannelEntry.deserialize(channel_entry.serialize())
     }
@@ -881,6 +908,8 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       Ethereum_ChannelEntry.deserialize(channel.serialize()),
       Ethereum_Snapshot.deserialize(lastSnapshot.serialize())
     )
+
+    console.log(`on Channel updated - after updating snapshot`)
 
     metric_channelStatus.set([channel.get_id().to_hex()], channel.status)
 
@@ -893,15 +922,16 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     verbose('channel-update for channel')
     verbose(channel.get_id().to_hex())
 
-    if (channel.source.to_address().eq(this.address) || channel.destination.to_address().eq(this.address)) {
+    if (channel.source.eq(this.address) || channel.destination.eq(this.address)) {
       this.emit('own-channel-updated', channel)
 
-      if (channel.destination.to_address().eq(this.address)) {
+      if (channel.destination.eq(this.address)) {
         // Channel _to_ us
         if (channel.status === ChannelStatus.WaitingForCommitment) {
           log('channel to us waiting for commitment')
           log(channel.toString())
-          this.emit('channel-waiting-for-commitment', channel)
+
+          return channel
         }
       }
     }
@@ -1118,8 +1148,8 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
    * @param source peer
    * @returns peer's open channels
    */
-  public async getOpenChannelsFrom(source: PublicKey): Promise<ChannelEntry[]> {
-    let allChannels = await this.db.get_channels_from(source.to_address())
+  public async getOpenChannelsFrom(source: Address): Promise<ChannelEntry[]> {
+    let allChannels = await this.db.get_channels_from(source)
     let channels: ChannelEntry[] = []
     while (allChannels.len() > 0) {
       channels.push(ChannelEntry.deserialize(allChannels.next().serialize()))

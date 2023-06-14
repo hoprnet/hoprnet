@@ -1,4 +1,5 @@
 use ethnum::{u256, AsU256};
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::ops::{Add, Mul};
@@ -7,7 +8,7 @@ use crate::errors::{GeneralError, GeneralError::InvalidInput, GeneralError::Pars
 use crate::traits::{AutoBinarySerializable, BinarySerializable, ToHex};
 
 /// Represents an Ethereum address
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Hash)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Address {
     addr: [u8; Self::SIZE],
@@ -29,6 +30,11 @@ impl Address {
         let mut ret = Self::default();
         ret.addr.copy_from_slice(bytes);
         ret
+    }
+
+    pub fn random() -> Self {
+        let addr = rand::thread_rng().gen::<[u8; 20]>();
+        Address { addr }
     }
 
     pub fn to_bytes32(&self) -> Box<[u8]> {
@@ -73,10 +79,11 @@ impl std::str::FromStr for Address {
             hex::decode(&value[2..])
         } else {
             hex::decode(value)
-        }.map_err(|_| ParseError)?;
+        }
+        .map_err(|_| ParseError)?;
         if decoded.len() == Self::SIZE {
             let mut res = Self {
-                addr: [0u8; Self::SIZE]
+                addr: [0u8; Self::SIZE],
             };
             res.addr.copy_from_slice(&decoded);
             Ok(res)

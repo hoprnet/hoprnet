@@ -50,8 +50,8 @@ impl ChannelStatus {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct ChannelEntry {
-    pub source: PublicKey,
-    pub destination: PublicKey,
+    pub source: Address,
+    pub destination: Address,
     pub balance: Balance,
     pub commitment: Hash,
     pub ticket_epoch: U256,
@@ -65,8 +65,8 @@ pub struct ChannelEntry {
 impl ChannelEntry {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(
-        source: PublicKey,
-        destination: PublicKey,
+        source: Address,
+        destination: Address,
         balance: Balance,
         commitment: Hash,
         ticket_epoch: U256,
@@ -91,7 +91,7 @@ impl ChannelEntry {
 
     /// Generates the ticket ID using the source and destination address
     pub fn get_id(&self) -> Hash {
-        generate_channel_id(&self.source.to_address(), &self.destination.to_address())
+        generate_channel_id(&self.source, &self.destination)
     }
 
     /// Checks if the closure time of this channel has passed.
@@ -114,8 +114,8 @@ impl ChannelEntry {
 }
 
 impl BinarySerializable<'_> for ChannelEntry {
-    const SIZE: usize = PublicKey::SIZE_UNCOMPRESSED
-        + PublicKey::SIZE_UNCOMPRESSED
+    const SIZE: usize = Address::SIZE
+        + Address::SIZE
         + Balance::SIZE
         + Hash::SIZE
         + U256::SIZE
@@ -127,8 +127,8 @@ impl BinarySerializable<'_> for ChannelEntry {
     fn from_bytes(data: &[u8]) -> Result<Self> {
         if data.len() == Self::SIZE {
             let mut b = data.to_vec();
-            let source = PublicKey::from_bytes(b.drain(0..PublicKey::SIZE_UNCOMPRESSED).as_ref())?;
-            let destination = PublicKey::from_bytes(b.drain(0..PublicKey::SIZE_UNCOMPRESSED).as_ref())?;
+            let source = Address::from_bytes(b.drain(0..Address::SIZE).as_ref())?;
+            let destination = Address::from_bytes(b.drain(0..Address::SIZE).as_ref())?;
             let balance = Balance::deserialize(b.drain(0..Balance::SIZE).as_ref(), BalanceType::HOPR)?;
             let commitment = Hash::from_bytes(b.drain(0..Hash::SIZE).as_ref())?;
             let ticket_epoch = U256::from_bytes(b.drain(0..U256::SIZE).as_ref())?;
@@ -154,8 +154,8 @@ impl BinarySerializable<'_> for ChannelEntry {
 
     fn to_bytes(&self) -> Box<[u8]> {
         let mut ret = Vec::<u8>::with_capacity(Self::SIZE);
-        ret.extend_from_slice(self.source.to_bytes(false).as_ref());
-        ret.extend_from_slice(self.destination.to_bytes(false).as_ref());
+        ret.extend_from_slice(self.source.to_bytes().as_ref());
+        ret.extend_from_slice(self.destination.to_bytes().as_ref());
         ret.extend_from_slice(self.balance.serialize_value().as_ref());
         ret.extend_from_slice(self.commitment.to_bytes().as_ref());
         ret.extend_from_slice(self.ticket_epoch.to_bytes().as_ref());
@@ -405,8 +405,8 @@ pub mod tests {
     #[test]
     pub fn channel_entry_test() {
         let ce1 = ChannelEntry::new(
-            PublicKey::from_bytes(&PUBLIC_KEY_1).unwrap(),
-            PublicKey::from_bytes(&PUBLIC_KEY_2).unwrap(),
+            PublicKey::from_bytes(&PUBLIC_KEY_1).unwrap().to_address(),
+            PublicKey::from_bytes(&PUBLIC_KEY_2).unwrap().to_address(),
             Balance::new(u256::from(10u8).into(), BalanceType::HOPR),
             Hash::new(&COMMITMENT),
             U256::new("0"),

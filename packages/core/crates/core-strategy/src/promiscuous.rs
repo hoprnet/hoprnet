@@ -1,11 +1,10 @@
-use libp2p_identity::PeerId;
 use rand::rngs::OsRng;
 use rand::seq::SliceRandom;
 use simple_moving_average::{SumTreeSMA, SMA};
 use utils_log::{debug, info, warn};
 
 use core_types::channels::ChannelStatus::{Open, PendingToClose};
-use utils_types::primitives::{Balance, BalanceType};
+use utils_types::primitives::{Address, Balance, BalanceType};
 
 use crate::generic::{ChannelStrategy, OutgoingChannelStatus, StrategyTickResult};
 
@@ -73,7 +72,7 @@ impl ChannelStrategy for PromiscuousStrategy {
     fn tick<Q>(
         &mut self,
         balance: Balance,
-        peer_ids: impl Iterator<Item = PeerId>,
+        addresses: impl Iterator<Item = Address>,
         outgoing_channels: Vec<OutgoingChannelStatus>,
         quality_of_peer: Q,
     ) -> StrategyTickResult
@@ -81,44 +80,52 @@ impl ChannelStrategy for PromiscuousStrategy {
         Q: Fn(&str) -> Option<f64>,
     {
         let mut to_open: Vec<OutgoingChannelStatus> = vec![];
-        let mut to_close: Vec<PeerId> = vec![];
-        let mut new_channel_candidates: Vec<(PeerId, f64)> = vec![];
+        let mut to_close: Vec<Address> = vec![];
+        let mut new_channel_candidates: Vec<(Address, f64)> = vec![];
         let mut network_size: usize = 0;
 
         // Go through all the peer ids we know, get their qualities and find out which channels should be closed and
         // which peer ids should become candidates for a new channel
         // Also re-open all the channels that have dropped under minimum given balance
-        for peer_id in peer_ids {
-            if to_close.contains(&peer_id) || new_channel_candidates.iter().find(|(p, _)| p.eq(&peer_id)).is_some() {
+        for address in addresses {
+            if to_close.contains(&address) || new_channel_candidates.iter().find(|(p, _)| p.eq(&address)).is_some() {
                 // Skip this peer if we already processed it (iterator may have duplicates)
-                debug!("encountered duplicate peer {}", peer_id);
+                debug!("encountered duplicate peer {}", address.to_string());
                 continue;
             }
 
             // Retrieve quality of that peer
-            let quality = quality_of_peer(&peer_id.to_base58())
-                .expect(format!("failed to retrieve quality of {}", peer_id).as_str());
+            let quality = quality_of_peer(&address.to_string())
+                .expect(format!("failed to retrieve quality of {}", address.to_string()).as_str());
 
             // Also get channels we have opened with it
             let channel_with_peer = outgoing_channels
                 .iter()
-                .find(|c| c.status == Open && c.peer_id == peer_id);
+                .find(|c| c.status == Open && c.address == address);
 
             if let Some(channel) = channel_with_peer {
                 if quality <= self.network_quality_threshold {
                     // Need to close the channel, because quality has dropped
-                    debug!("new channel closure candidate with {} (quality {})", peer_id, quality);
-                    to_close.push(peer_id);
+                    debug!(
+                        "new channel closure candidate with {} (quality {})",
+                        address.to_string(),
+                        quality
+                    );
+                    to_close.push(address);
                 } else if channel.stake.lt(&self.minimum_channel_balance) {
                     // Need to re-open channel, because channel stake has dropped
-                    debug!("new channel closure & re-stake candidate with {}", peer_id);
-                    to_close.push(peer_id.clone());
-                    new_channel_candidates.push((peer_id, quality));
+                    debug!("new channel closure & re-stake candidate with {}", address.to_string());
+                    to_close.push(address.clone());
+                    new_channel_candidates.push((address, quality));
                 }
             } else if quality >= self.network_quality_threshold {
                 // Try to open channel with this peer, because it is high-quality
-                debug!("new channel opening candidate {} with quality {}", peer_id, quality);
-                new_channel_candidates.push((peer_id, quality));
+                debug!(
+                    "new channel opening candidate {} with quality {}",
+                    address.to_string(),
+                    quality
+                );
+                new_channel_candidates.push((address, quality));
             }
 
             network_size += 1;
@@ -140,7 +147,7 @@ impl ChannelStrategy for PromiscuousStrategy {
         outgoing_channels
             .iter()
             .filter(|c| c.status == PendingToClose)
-            .for_each(|c| to_close.push(c.peer_id.clone()));
+            .for_each(|c| to_close.push(c.address.clone()));
         debug!(
             "{} channels are in PendingToClose, so strategy will mark them for closing too",
             outgoing_channels.len() - before_pending
@@ -173,23 +180,30 @@ impl ChannelStrategy for PromiscuousStrategy {
 
             let mut sorted_channels: Vec<OutgoingChannelStatus> = outgoing_channels
                 .iter()
-                .filter(|c| !to_close.contains(&c.peer_id))
+                .filter(|c| !to_close.contains(&c.address))
                 .cloned()
                 .collect();
 
             // Sort by quality, lowest-quality first
             sorted_channels.sort_unstable_by(|p1, p2| {
-                quality_of_peer(&p1.peer_id.to_base58())
-                    .zip(quality_of_peer(&p2.peer_id.to_base58()))
+                quality_of_peer(&p1.address.to_string())
+                    .zip(quality_of_peer(&p2.address.to_string()))
                     .and_then(|(q1, q2)| q1.partial_cmp(&q2))
-                    .expect(format!("failed to retrieve quality of {} or {}", p1.peer_id, p2.peer_id).as_str())
+                    .expect(
+                        format!(
+                            "failed to retrieve quality of {} or {}",
+                            p1.address.to_string(),
+                            p2.address.to_string()
+                        )
+                        .as_str(),
+                    )
             });
 
             // Close the lowest-quality channels (those we did not mark for closing yet)
             sorted_channels
                 .into_iter()
                 .take(occupied - max_auto_channels)
-                .for_each(|c| to_close.push(c.peer_id));
+                .for_each(|c| to_close.push(c.address));
         }
 
         if max_auto_channels > occupied {
@@ -203,7 +217,7 @@ impl ChannelStrategy for PromiscuousStrategy {
 
             // Go through the new candidates for opening channels allow them to open based on our available node balance
             let mut remaining_balance = balance.clone();
-            for peer_id in new_channel_candidates.into_iter().map(|(p, _)| p) {
+            for address in new_channel_candidates.into_iter().map(|(p, _)| p) {
                 // Stop if we ran out of balance
                 if remaining_balance.lte(&self.minimum_node_balance) {
                     warn!(
@@ -214,10 +228,10 @@ impl ChannelStrategy for PromiscuousStrategy {
                 }
 
                 // If we haven't added this peer id yet, add it to the list for channel opening
-                if to_open.iter().find(|&p| p.peer_id.eq(&peer_id)).is_none() {
-                    debug!("promoting peer {} for channel opening", peer_id);
+                if to_open.iter().find(|&p| p.address.eq(&address)).is_none() {
+                    debug!("promoting peer {} for channel opening", address.to_string());
                     to_open.push(OutgoingChannelStatus {
-                        peer_id,
+                        address,
                         stake: self.new_channel_stake.clone(),
                         status: Open,
                     });
@@ -250,23 +264,38 @@ mod tests {
 
         assert_eq!(strat.name(), "promiscuous");
 
-        let alice = PeerId::random();
-        let bob = PeerId::random();
-        let charlie = PeerId::random();
-        let eugene = PeerId::random();
-        let gustave = PeerId::random();
+        let alice = Address::from_str("0xd634636f7bd37539a2b132018b2cca4ab0a3887c").expect("incorrect address");
+        let bob = Address::from_str("0x5da6979f9254ea3847662d2aea0b09a9105c09fc").expect("incorrect address");
+        let charlie = Address::from_str("0xc584c2d64a7bf3d03a99c81923d86bda58f523b7").expect("incorrect address");
+        let eugene = Address::from_str("0x730bad1c3533bd2864db81502ba66e415ca8af57").expect("incorrect address");
+        let gustave = Address::from_str("0x4808073da3632f5982b0fcd39df9c52f2946eacd").expect("incorrect address");
 
         let peers = HashMap::from([
             (alice.clone(), 0.1),
             (bob.clone(), 0.7),
             (charlie.clone(), 0.9),
-            (PeerId::random(), 0.1),
+            (
+                Address::from_str("0x3a1022113aa464a71dc98ea4650ad87199fa483d").expect("incorrect address"),
+                0.1,
+            ),
             (eugene.clone(), 0.8),
-            (PeerId::random(), 0.3),
+            (
+                Address::from_str("0x9c76f4f9c053026d8ecdfef4d981a5d982552d9f").expect("incorrect address"),
+                0.3,
+            ),
             (gustave.clone(), 1.0),
-            (PeerId::random(), 0.1),
-            (PeerId::random(), 0.2),
-            (PeerId::random(), 0.3),
+            (
+                Address::from_str("0x4fa70461992e7b91aa4513f10ae111bee8c59d54").expect("incorrect address"),
+                0.1,
+            ),
+            (
+                Address::from_str("0x13a7935869ac7f21bce2f91a99503f0e4d181d2b").expect("incorrect address"),
+                0.2,
+            ),
+            (
+                Address::from_str("0xb6136f8ec9f7f2be0d2f4be2b85d1262d50c9c0e").expect("incorrect address"),
+                0.3,
+            ),
         ]);
 
         let balance = Balance::from_str("1000000000000000000", BalanceType::HOPR);
@@ -274,17 +303,17 @@ mod tests {
 
         let outgoing_channels = vec![
             OutgoingChannelStatus {
-                peer_id: alice.clone(),
+                address: alice.clone(),
                 stake: balance.clone(),
                 status: Open,
             },
             OutgoingChannelStatus {
-                peer_id: charlie.clone(),
+                address: charlie.clone(),
                 stake: balance.clone(),
                 status: Open,
             },
             OutgoingChannelStatus {
-                peer_id: gustave.clone(),
+                address: gustave.clone(),
                 stake: low_balance,
                 status: Open,
             },
@@ -294,9 +323,10 @@ mod tests {
         strat.sma.add_sample(peers.len());
         strat.sma.add_sample(peers.len());
 
-        let results = strat.tick(balance, peers.iter().map(|(x, _)| x.clone()), outgoing_channels, |s| {
-            peers.get(&PeerId::from_str(s).unwrap()).copied()
-        });
+        let results: StrategyTickResult =
+            strat.tick(balance, peers.iter().map(|(x, _)| x.clone()), outgoing_channels, |s| {
+                peers.get(&Address::from_str(s).unwrap()).copied()
+            });
 
         assert_eq!(results.max_auto_channels(), 4);
 
@@ -308,8 +338,8 @@ mod tests {
             results
                 .to_open()
                 .into_iter()
-                .map(|r| r.peer_id)
-                .collect::<Vec<PeerId>>(),
+                .map(|r| r.address)
+                .collect::<Vec<Address>>(),
             vec![gustave, eugene, bob]
         );
     }
@@ -320,11 +350,11 @@ mod tests {
         let mut peers = HashMap::new();
         let mut outgoing_channels = Vec::new();
         for i in 0..100 {
-            let peerid = PeerId::random();
-            peers.insert(peerid.clone(), 0.9 - i as f64 * 0.02);
+            let address = Address::random();
+            peers.insert(address.clone(), 0.9 - i as f64 * 0.02);
             if outgoing_channels.len() < 20 {
                 outgoing_channels.push(OutgoingChannelStatus {
-                    peer_id: peerid,
+                    address,
                     stake: Balance::from_str("100000000000000000", BalanceType::HOPR),
                     status: Open,
                 });
@@ -339,7 +369,7 @@ mod tests {
             Balance::from_str("1000000000000000000", BalanceType::HOPR),
             peers.iter().map(|(&x, _)| x.clone()),
             outgoing_channels.clone(),
-            |s| peers.get(&PeerId::from_str(s).unwrap()).copied(),
+            |s| peers.get(&Address::from_str(s).unwrap()).copied(),
         );
 
         assert_eq!(results.max_auto_channels(), 10);
@@ -352,9 +382,9 @@ mod tests {
             outgoing_channels
                 .into_iter()
                 .rev()
-                .map(|s| s.peer_id)
+                .map(|s| s.address)
                 .take(10)
-                .collect::<Vec<PeerId>>()
+                .collect::<Vec<Address>>()
         );
     }
 }
@@ -364,8 +394,9 @@ mod tests {
 pub mod wasm {
     use wasm_bindgen::prelude::*;
 
+    use std::str::FromStr;
     use utils_misc::utils::wasm::JsResult;
-    use utils_types::primitives::Balance;
+    use utils_types::primitives::{Address, Balance};
 
     use crate::generic::wasm::StrategyTickResult;
     use crate::generic::ChannelStrategy;

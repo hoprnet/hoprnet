@@ -17,15 +17,13 @@ import { STATUS_CODES } from '../../utils.js'
 export interface ChannelInfo {
   type: 'outgoing' | 'incoming'
   channelId: string
-  peerId: string
+  address: string
   status: string
   balance: string
 }
 
 export interface ChannelTopologyInfo {
   channelId: string
-  sourcePeerId: string
-  destinationPeerId: string
   sourceAddress: string
   destinationAddress: string
   balance: string
@@ -45,10 +43,8 @@ export interface ChannelTopologyInfo {
 export const formatChannelTopologyInfo = (channel: ChannelEntry): ChannelTopologyInfo => {
   return {
     channelId: channel.get_id().to_hex(),
-    sourcePeerId: channel.source.to_peerid_str(),
-    destinationPeerId: channel.destination.to_peerid_str(),
-    sourceAddress: channel.source.to_address().to_hex(),
-    destinationAddress: channel.destination.to_address().to_hex(),
+    sourceAddress: channel.source.to_hex(),
+    destinationAddress: channel.destination.to_hex(),
     balance: channel.balance.to_string(),
     status: channel_status_to_string(channel.status),
     commitment: channel.commitment.to_hex(),
@@ -63,7 +59,7 @@ export const formatOutgoingChannel = (channel: ChannelEntry): ChannelInfo => {
   return {
     type: 'outgoing',
     channelId: channel.get_id().to_hex(),
-    peerId: channel.destination.to_peerid_str(),
+    address: channel.destination.to_string(),
     status: channel_status_to_string(channel.status),
     balance: channel.balance.to_string()
   }
@@ -73,7 +69,7 @@ export const formatIncomingChannel = (channel: ChannelEntry): ChannelInfo => {
   return {
     type: 'incoming',
     channelId: channel.get_id().to_hex(),
-    peerId: channel.source.to_peerid_str(),
+    address: channel.source.to_string(),
     status: channel_status_to_string(channel.status),
     balance: channel.balance.to_string()
   }
@@ -286,10 +282,9 @@ export async function openChannel(
     return { success: false, reason: validationResult.reason }
   }
 
-  const channelId = generate_channel_id(
-    node.getEthereumAddress(),
-    PublicKey.from_peerid_str(validationResult.counterparty.toString()).to_address()
-  )
+  const pk = PublicKey.from_peerid_str(validationResult.counterparty.toString())
+
+  const channelId = generate_channel_id(node.getEthereumAddress(), pk.to_address())
 
   let openingRequest = openingRequests.get(channelId.to_hex())
 
@@ -301,7 +296,7 @@ export async function openChannel(
   }
 
   try {
-    const { channelId, receipt } = await node.openChannel(validationResult.counterparty, validationResult.amount)
+    const { channelId, receipt } = await node.openChannel(pk.to_address(), validationResult.amount)
     return { success: true, channelId: channelId.to_hex(), receipt }
   } catch (err) {
     const errString = err instanceof Error ? err.message : err?.toString?.() ?? STATUS_CODES.UNKNOWN_FAILURE

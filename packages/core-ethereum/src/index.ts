@@ -44,18 +44,18 @@ const log = debug('hopr-core-ethereum')
 
 export type RedeemTicketResponse =
   | {
-    status: 'SUCCESS'
-    receipt: string
-    ackTicket: AcknowledgedTicket
-  }
+      status: 'SUCCESS'
+      receipt: string
+      ackTicket: AcknowledgedTicket
+    }
   | {
-    status: 'FAILURE'
-    message: string
-  }
+      status: 'FAILURE'
+      message: string
+    }
   | {
-    status: 'ERROR'
-    error: Error | string
-  }
+      status: 'ERROR'
+      error: Error | string
+    }
 
 export type ChainOptions = {
   provider: string
@@ -208,8 +208,8 @@ export default class HoprCoreEthereum extends EventEmitter {
     return this.indexer.resolvePendingTransaction(evt, tx)
   }
 
-  public getOpenChannelsFrom(p: PublicKey) {
-    return this.indexer.getOpenChannelsFrom(p)
+  public getOpenChannelsFrom(address: Address) {
+    return this.indexer.getOpenChannelsFrom(address)
   }
 
   public async getAccount(addr: Address) {
@@ -271,9 +271,8 @@ export default class HoprCoreEthereum extends EventEmitter {
 
   public async commitToChannel(c: ChannelEntry): Promise<void> {
     log(`committing to channel ${c.get_id().to_hex()}`)
-    log(c.toString())
     const setCommitment = async (commitment: Hash) => {
-      return this.chain.setCommitment(c.source.to_address(), commitment, (txHash: string) =>
+      return this.chain.setCommitment(c.source, commitment, (txHash: string) =>
         this.setTxHandler(`channel-updated-${txHash}`, txHash)
       )
     }
@@ -326,7 +325,7 @@ export default class HoprCoreEthereum extends EventEmitter {
   }
 
   public async redeemTicketsInChannelByCounterparty(counterparty: PublicKey) {
-    const channel = await this.db.get_channel_from(Ethereum_PublicKey.deserialize(counterparty.serialize(false)))
+    const channel = await this.db.get_channel_from(Ethereum_Address.deserialize(counterparty.to_address().serialize()))
     return this.redeemTicketsInChannel(ChannelEntry.deserialize(channel.serialize()))
   }
 
@@ -354,7 +353,7 @@ export default class HoprCoreEthereum extends EventEmitter {
 
   private async redeemTicketsInChannelLoop(channel: ChannelEntry): Promise<void> {
     const channelId = channel.get_id()
-    if (!channel.destination.eq(this.getPublicKey())) {
+    if (!channel.destination.eq(this.getPublicKey().to_address())) {
       // delete operation before returning
       this.ticketRedemtionInChannelOperations.delete(channelId.to_hex())
       throw new Error('Cannot redeem ticket in channel that is not to us')
@@ -390,7 +389,8 @@ export default class HoprCoreEthereum extends EventEmitter {
         ticket = fetched
 
         log(
-          `redeeming ticket ${ticket.response.to_hex()} in channel from ${channel.source} to ${channel.destination
+          `redeeming ticket ${ticket.response.to_hex()} in channel from ${channel.source} to ${
+            channel.destination
           }, preImage ${ticket.pre_image.to_hex()}, porSecret ${ticket.response.to_hex()}`
         )
 
@@ -512,57 +512,57 @@ export default class HoprCoreEthereum extends EventEmitter {
     }
   }
 
-  async initializeClosure(src: PublicKey, dest: PublicKey): Promise<string> {
+  async initializeClosure(src: Address, dest: Address): Promise<string> {
     // TODO: should remove this blocker when https://github.com/hoprnet/hoprnet/issues/4194 gets addressed
-    if (!this.publicKey.eq(src)) {
+    if (this.publicKey.to_address().to_string() !== src.to_string()) {
       throw Error('Initialize incoming channel closure currently is not supported.')
     }
 
     const c = ChannelEntry.deserialize(
       (
         await this.db.get_channel_x(
-          Ethereum_PublicKey.deserialize(src.serialize(false)),
-          Ethereum_PublicKey.deserialize(dest.serialize(false))
+          Ethereum_Address.deserialize(src.serialize()),
+          Ethereum_Address.deserialize(dest.serialize())
         )
       ).serialize()
     )
     if (c.status !== ChannelStatus.Open && c.status !== ChannelStatus.WaitingForCommitment) {
       throw Error('Channel status is not OPEN or WAITING FOR COMMITMENT')
     }
-    return this.chain.initiateChannelClosure(dest.to_address(), (txHash: string) =>
+    return this.chain.initiateChannelClosure(dest, (txHash: string) =>
       this.setTxHandler(`channel-updated-${txHash}`, txHash)
     )
   }
 
-  public async finalizeClosure(src: PublicKey, dest: PublicKey): Promise<string> {
+  public async finalizeClosure(src: Address, dest: Address): Promise<string> {
     // TODO: should remove this blocker when https://github.com/hoprnet/hoprnet/issues/4194 gets addressed
-    if (!this.publicKey.eq(src)) {
+    if (this.publicKey.to_address().to_string() !== src.to_string()) {
       throw Error('Finalizing incoming channel closure currently is not supported.')
     }
     const c = ChannelEntry.deserialize(
       (
         await this.db.get_channel_x(
-          Ethereum_PublicKey.deserialize(src.serialize(false)),
-          Ethereum_PublicKey.deserialize(dest.serialize(false))
+          Ethereum_Address.deserialize(src.serialize()),
+          Ethereum_Address.deserialize(dest.serialize())
         )
       ).serialize()
     )
     if (c.status !== ChannelStatus.PendingToClose) {
       throw Error('Channel status is not PENDING_TO_CLOSE')
     }
-    return await this.chain.finalizeChannelClosure(dest.to_address(), (txHash: string) =>
+    return await this.chain.finalizeChannelClosure(dest, (txHash: string) =>
       this.setTxHandler(`channel-updated-${txHash}`, txHash)
     )
   }
 
-  public async openChannel(dest: PublicKey, amount: Balance): Promise<{ channelId: Hash; receipt: Receipt }> {
+  public async openChannel(dest: Address, amount: Balance): Promise<{ channelId: Hash; receipt: Receipt }> {
     // channel may not exist, we can still open it
     let c: ChannelEntry
     try {
       c = ChannelEntry.deserialize(
-        (await this.db.get_channel_to(Ethereum_PublicKey.deserialize(dest.serialize(false)))).serialize()
+        (await this.db.get_channel_to(Ethereum_Address.deserialize(dest.serialize()))).serialize()
       )
-    } catch { }
+    } catch {}
     if (c && c.status !== ChannelStatus.Closed) {
       throw Error('Channel is already opened')
     }
@@ -572,22 +572,18 @@ export default class HoprCoreEthereum extends EventEmitter {
       throw Error('We do not have enough balance to open a channel')
     }
     const receipt = await this.fundChannel(dest, amount, Balance.zero(BalanceType.HOPR))
-    return { channelId: generate_channel_id(this.publicKey.to_address(), dest.to_address()), receipt }
+    return { channelId: generate_channel_id(this.publicKey.to_address(), dest), receipt }
   }
 
-  public async fundChannel(dest: PublicKey, myFund: Balance, counterpartyFund: Balance): Promise<Receipt> {
+  public async fundChannel(dest: Address, myFund: Balance, counterpartyFund: Balance): Promise<Receipt> {
     const totalFund = myFund.add(counterpartyFund)
     const myBalance = await this.getBalance()
     if (totalFund.gt(myBalance)) {
       throw Error('We do not have enough balance to fund the channel')
     }
-    log('====> fundChannel: src: ' + this.publicKey.to_address() + ' dest: ' + dest.to_address())
-    return this.chain.fundChannel(
-      this.publicKey.to_address(),
-      dest.to_address(),
-      myFund,
-      counterpartyFund,
-      (txHash: string) => this.setTxHandler(`channel-updated-${txHash}`, txHash)
+    log('====> fundChannel: src: ' + this.publicKey.to_address() + ' dest: ' + dest)
+    return this.chain.fundChannel(this.publicKey.to_address(), dest, myFund, counterpartyFund, (txHash: string) =>
+      this.setTxHandler(`channel-updated-${txHash}`, txHash)
     )
   }
 
