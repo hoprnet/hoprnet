@@ -24,7 +24,7 @@
       "token_contract_address": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
       "xhopr_contract_address": "0xD057604A14982FE8D88c5fC25Aac3267eA142a08"
     },
-    "master": {
+    "rotsee": {
       "boost_contract_address": "0x2Fc87247085F4658ADB698cDbF4d732c704f1e06",
       "channels_contract_address": "0xB20ee6e0b714e531CabF2C29fbA147f4e5905B7b",
       "environment_type": "development",

@@ -42,7 +42,7 @@ jobs:
       - name: Set up environment
         run: |
           prBase="${{ github.event.pull_request.base.ref }}"
-          network=$(jq -r "to_entries[] | select(.key==\"${prBase/*\/}\").value.network" ../packages/hoprd/releases.json)
+          network=$(jq -r "to_entries[] | select(.value.git_ref | test(\"${prBase/*\/}\")).value.network" ../packages/hoprd/releases.json)
           echo "NETWORK=${network}" >> $GITHUB_ENV
           echo "NETWORK_DASH=${network/_/-}" >> $GITHUB_ENV
           echo git checkout -b deployments/${network/_/-}-pr-${{ github.event.pull_request.number }}
