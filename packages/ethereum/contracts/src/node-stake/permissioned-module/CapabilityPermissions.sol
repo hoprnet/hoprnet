@@ -1,47 +1,61 @@
 // SPDX-License-Identifier: LGPL-3.0-only
-pragma solidity >=0.7.0 <0.9.0;
+pragma solidity >=0.8.0 <0.9.0;
 
 import "safe-contracts/common/Enum.sol";
 import "../../Channels.sol";
 
-enum HoprChannelsPermission {
-    Allowed,
-    Blocked
-}
-
-enum HoprTokenPermission {
-    Blocked,
-    Allowed
-}
-
-enum SendPermission {
-    Blocked,
-    Allowed
-}
-
 enum Clearance {
-    None,
-    Function
+    NONE,
+    FUNCTION
 }
 
 enum TargetType {
-    None,
-    Token,
-    Channels,
-    Send
+    NONE,
+    TOKEN,
+    CHANNELS,
+    SEND
+}
+
+enum Permission {
+    NONE,
+    ALLOW_ALL,
+    BLOCK_ALL,
+    SPECIFIC_FALLBACK_ALLOW,
+    SPECIFIC_FALLBACK_BLOCK
+}
+
+enum GranularPermission {
+    NONE,
+    ALLOW,
+    BLOCK
+}
+
+struct DefaultPermissions {
+    Permission defaultTargetPermission; // uint8. Default permission for the target
+    Permission defaultRedeemTicketSafeFunctionPermisson; // uint8 (permission for Channels contract)
+    Permission defaultBatchRedeemTicketsSafeFunctionPermisson; // uint8 (permission for Channels contract)
+    Permission defaultCloseIncomingChannelSafeFunctionPermisson; // uint8 (permission for Channels contract)
+    Permission defaultInitiateOutgoingChannelClosureSafeFunctionPermisson; // uint8 (permission for Channels contract)
+    Permission defaultFinalizeOutgoingChannelClosureSafeFunctionPermisson; // uint8 (permission for Channels contract)
+    Permission defaultFundChannelMultiFunctionPermisson; // uint8 (permission for Channels contract)
+    Permission defaultSetCommitmentSafeFunctionPermisson; // uint8 (permission for Channels contract)
+    Permission defaultApproveFunctionPermisson; // uint8 (permission for Token contract)
+    Permission defaultSendFunctionPermisson; // uint8 (permission for Token contract)
 }
 
 struct TargetAddress {
-    Clearance clearance;
-    TargetType targetType;
+    Clearance clearance;    // uint8
+    TargetType targetType;  // uint8
+    DefaultPermissions defaultPermissions; // uint80
 }
 
 struct Role {
     mapping(address => bool) members;   // eligible caller. May be able to receive native tokens (e.g. xDAI), if set to allowed
     mapping(address => TargetAddress) targets;  // target addresses that can be called
-    mapping(bytes32 => mapping(bytes32 => HoprChannelsPermission)) hoprChannelsCapability; // keyForFunctions (bytes32) => channel Id (keccak256(src, dest)) => HoprChannelsPermission
-    mapping(bytes32 => mapping(address => HoprTokenPermission)) hoprTokenCapability; // keyForFunctions (bytes32) => beneficiary address => HoprTokenPermission
-    mapping(address => SendPermission) sendCapability; // beneficiary address => SendPermission
+    // For CHANNELS target: keyForFunctions (bytes32) => channel Id (keccak256(src, dest)) => GranularPermission
+    // For TOKEN target: keyForFunctions (bytes32) => recipient Id (address in bytes32) => GranularPermission
+    // For SEND target:  bytes32(0x00) => recipient Id (address in bytes32) => GranularPermission
+    mapping(bytes32 => mapping(bytes32 => GranularPermission)) capabilities; 
 }
 
 /**
@@ -59,7 +73,7 @@ struct Role {
  * Some difference between this library and the original `Permissions.sol` contract are:
  * - This library is designed to support a single role
  * - No `DelegateCall` is allowed
- * - Target must be one of the three types: Token, Channels, Send
+ * - Target must be one of the three types: Token, Channels, SEND
  * - Only scoped functions are allowed. No more wildcard
  * - Calling payable function is not allowed.
  * - When calling HoprChannels contracts, permission is check with multiple parameters together
@@ -75,7 +89,7 @@ struct Role {
  * defined with value instead of `.selector`
  */
 library HoprCapabilityPermissions {
-    // HoprChannels method ids (TargetType.Channels)
+    // HoprChannels method ids (TargetType.CHANNELS)
     bytes4 internal constant REDEEM_TICKET_SELECTOR = HoprChannels.redeemTicketSafe.selector;
     bytes4 internal constant BATCH_REDEEM_TICKETS_SELECTOR = HoprChannels.batchRedeemTicketsSafe.selector;
     bytes4 internal constant CLOSE_INCOMING_CHANNEL_SELECTOR = HoprChannels.closeIncomingChannelSafe.selector;
@@ -83,32 +97,28 @@ library HoprCapabilityPermissions {
     bytes4 internal constant FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTOR = HoprChannels.finalizeOutgoingChannelClosureSafe.selector;
     bytes4 internal constant FUND_CHANNEL_MULTI_SELECTOR = HoprChannels.fundChannelMulti.selector;
     bytes4 internal constant SET_COMMITMENT_SELECTOR = HoprChannels.setCommitmentSafe.selector;
-    // HoprToken method ids (TargetType.Token). As HoprToken contract is in production, its ABI is static
+    // HoprToken method ids (TargetType.TOKEN). As HoprToken contract is in production, its ABI is static
     bytes4 internal constant APPROVE_SELECTOR = hex"095ea7b3"; // equivalent to `HoprToken.approve.selector`, for ABI "approve(address,uint256)"
     bytes4 internal constant SEND_SELECTOR = hex"9bd9bbc6"; // equivalent to `HoprToken.send.selector`, for ABI "send(address,uint256,bytes)"
 
-    event RevokedTarget(address targetAddress);
-    event ScopedTargetChannels(address targetAddress);
-    event ScopedTargetToken(address targetAddress);
-    event ScopedTargetSend(address targetAddress);
-
-    event ScopedChannelsCapability(
-        address targetAddress,
+    event RevokedTarget(address indexed targetAddress);
+    event ScopedTarget(address indexed targetAddress, TargetType targetType, DefaultPermissions defaultPermission);
+    event ScopedGranularChannelCapability(
+        address indexed targetAddress,
+        bytes32 indexed channelId,
         bytes4 selector,
-        bytes32 channelId,
-        HoprChannelsPermission permission
+        GranularPermission permission
     );
-    event ScopedTokenCapability(
-        address targetAddress,
+    event ScopedGranularTokenCapability(
+        address indexed targetAddress,
+        address indexed recipientAddress,
         bytes4 selector,
-        address beneficiary,
-        HoprTokenPermission permission
+        GranularPermission permission
     );
-    event ScopedSendCapability(
-        address beneficiary,
-        SendPermission permission
+    event ScopedGranularSendCapability(
+        address indexed recipientAddress,
+        GranularPermission permission
     );
-
 
     /// Sender is not a member of the role
     error NoMembership();
@@ -145,6 +155,9 @@ library HoprCapabilityPermissions {
 
     /// The provided calldata for execution is too short, or an OutOfBounds scoped parameter was configured
     error CalldataOutOfBounds();
+
+    // Permission not acquired
+    error PermissionRejected();
 
 
     // ======================================================
@@ -245,26 +258,42 @@ library HoprCapabilityPermissions {
         }
 
         TargetAddress storage target = role.targets[targetAddress];
-        if (target.clearance != Clearance.Function) {
+        if (target.clearance != Clearance.FUNCTION) {
             revert TargetAddressNotAllowed();
         }
 
-        // delegate call is not allowed; value can only be sent with `Send`
+        // delegate call is not allowed; value can only be sent with `SEND`
         checkExecutionOptions(value, operation, target.targetType);
 
-        if (target.targetType == TargetType.Token) {
+        // check default target permission
+        Permission defaultTargetPermission = target.defaultPermissions.defaultTargetPermission;
+        if ( defaultTargetPermission == Permission.NONE || defaultTargetPermission == Permission.BLOCK_ALL) {
+            revert PermissionRejected();
+        } else if (defaultTargetPermission == Permission.ALLOW_ALL) {
+            return;
+        }
+
+        // check function permission
+        if (target.targetType == TargetType.TOKEN) {
             // check with HoprToken contract
-            checkHoprTokenParameters(role, targetAddress, data);
+            checkHoprTokenParameters(role, targetAddress, target.defaultPermissions, data);
             return;
-        } else if (target.targetType == TargetType.Channels) {
+        } else if (target.targetType == TargetType.CHANNELS) {
             // check with HoprChannels contract
-            checkHoprChannelsParameters(role, targetAddress, data);
+            checkHoprChannelsParameters(role, targetAddress, target.defaultPermissions, data);
             return;
-        } else if (target.targetType == TargetType.Send) {
-            checkSendParameters(role, targetAddress, data.length);
+        } else if (target.targetType == TargetType.SEND) {
+            checkSendParameters(role, targetAddress, data.length, target.defaultPermissions);
             return;
         }
     }
+
+    // function getDefaultPermissions(
+    //     DefaultPermissions defaultPermission, 
+    //     bytes4 functionSig
+    // ) internal view returns () {
+
+    // }
 
     /**
      * @dev Check if the transaction can send along native tokens and if DelegatedCall is allowed.
@@ -287,12 +316,12 @@ library HoprCapabilityPermissions {
         // send native tokens is only available to a set of addresses
         if (
             value > 0 &&
-            targetType != TargetType.Send
+            targetType != TargetType.SEND
         ) {
             revert SendNotAllowed();
         }
 
-        if (targetType == TargetType.None) {
+        if (targetType == TargetType.NONE) {
             revert TargetTypeNotSet();
         }
     }
@@ -307,30 +336,44 @@ library HoprCapabilityPermissions {
     function checkHoprChannelsParameters(
         Role storage role,
         address targetAddress,
+        DefaultPermissions storage defaultPermissions,
         bytes memory data
     ) internal view {
         bytes4 functionSig = bytes4(data);
         bytes32 capabilityKey = keyForFunctions(targetAddress, functionSig);
+        Permission defaultFunctionPermission;
+        bytes32 channelId;
 
-        if (functionSig == BATCH_REDEEM_TICKETS_SELECTOR) {
-            // only redeemTickets function has Dynamic32 type, i.e. non-nested arrays: address[] bytes32[] uint[] etc
-            address[] memory srcs = pluckDynamicAddresses(data, 0);
-            address[] memory dests = pluckDynamicAddresses(data, 1);
-
-            if (srcs.length != dests.length) {
-                revert ArraysDifferentLength();
-            }
-
-            for (uint256 i = 0; i < srcs.length; i++) {
-                // check if functions on this channel can be called.
-                compareHoprChannelsPermission(role, capabilityKey, srcs[i], dests[i]);
-            }
+        if (functionSig == REDEEM_TICKET_SELECTOR) {
+            defaultFunctionPermission = defaultPermissions.defaultRedeemTicketSafeFunctionPermisson;
+            (address self, HoprChannels.TicketData memory ticketData) = abi.decode(sliceFrom(data, 4), (address, HoprChannels.TicketData));
+            channelId = ticketData.channelId;
+        } else if (functionSig == BATCH_REDEEM_TICKETS_SELECTOR) {
+            // loop // TODO:
+        } else if (functionSig == CLOSE_INCOMING_CHANNEL_SELECTOR) {
+            defaultFunctionPermission = defaultPermissions.defaultCloseIncomingChannelSafeFunctionPermisson;
+            (address self, address source) = abi.decode(sliceFrom(data, 4), (address, address));
+            channelId = getChannelId(source, self);
+        } else if (functionSig == INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTOR) {
+            defaultFunctionPermission = defaultPermissions.defaultInitiateOutgoingChannelClosureSafeFunctionPermisson;
+            (address self, address destination) = abi.decode(sliceFrom(data, 4), (address, address));
+            channelId = getChannelId(self, destination);
+        } else if (functionSig == FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTOR) {
+            defaultFunctionPermission = defaultPermissions.defaultFinalizeOutgoingChannelClosureSafeFunctionPermisson;
+            (address self, address destination) = abi.decode(sliceFrom(data, 4), (address, address));
+            channelId = getChannelId(self, destination);
+        } else if (functionSig == FUND_CHANNEL_MULTI_SELECTOR) {
+            defaultFunctionPermission = defaultPermissions.defaultFundChannelMultiFunctionPermisson;
+            (, , address source,) = abi.decode(sliceFrom(data, 4), (address, HoprChannels.Balance, address, HoprChannels.Balance));
+            // TODO:
+        } else if (functionSig == SET_COMMITMENT_SELECTOR) {
+            defaultFunctionPermission = defaultPermissions.defaultSetCommitmentSafeFunctionPermisson;
+            (address self, , address source) = abi.decode(sliceFrom(data, 4), (address, bytes32, address));
+            channelId = getChannelId(source, self);
         } else {
-            // source and channel destination addreses are at the first and second places respectively
-            (address src, address dest) = pluckTwoStaticAddresses(data);
-            // check if functions on this channel can be called.
-            compareHoprChannelsPermission(role, capabilityKey, src, dest);
+            revert ParameterNotAllowed();
         }
+        // TODO: compare channelId permission and function permission
     }
 
     /*
@@ -344,26 +387,40 @@ library HoprCapabilityPermissions {
     function checkHoprTokenParameters(
         Role storage role,
         address targetAddress,
+        DefaultPermissions storage defaultPermissions,
         bytes memory data
     ) internal view {
         bytes4 functionSig = bytes4(data);
         bytes32 capabilityKey = keyForFunctions(targetAddress, functionSig);
+        Permission defaultFunctionPermission;
+        // // check if the first parameter is allowed
+        // address beneficiary = pluckOneStaticAddress(data, 0);  
+        // if (role.hoprTokenCapability[capabilityKey][beneficiary] != HoprTokenPermission.Allowed) {
+        //     // not allowed to call the capability
+        //     revert ParameterNotAllowed();
+        // }
 
-        // check if the first parameter is allowed
-        address beneficiary = pluckOneStaticAddress(data, 0);  
-        if (role.hoprTokenCapability[capabilityKey][beneficiary] != HoprTokenPermission.Allowed) {
-            // not allowed to call the capability
+        // // if calling `send` method, it is equivalent to calling FUND_CHANNEL_MULTI_SELECTOR
+        // if (functionSig == SEND_SELECTOR) {
+        //     bytes32 sendCapabilityKey = keyForFunctions(targetAddress, FUND_CHANNEL_MULTI_SELECTOR);
+        //     // source and channel destination addreses are at the first and second places respectively
+        //     (address src, address dest) = pluckSendPayload(data, 2);
+        //     // check if functions on this channel can be called.
+        //     compareHoprChannelsPermission(role, sendCapabilityKey, src, dest);
+        // }
+
+        if (functionSig == APPROVE_SELECTOR) {
+            defaultFunctionPermission = defaultPermissions.defaultApproveFunctionPermisson;
+            // TODO: get beneficiary address
+            // (address self, HoprChannels.TicketData memory ticketData) = abi.decode(sliceFrom(data, 4), (address, HoprChannels.TicketData));
+            // channelId = ticketData.channelId;
+        } else if (functionSig == SEND_SELECTOR) {
+            defaultFunctionPermission = defaultPermissions.defaultSendFunctionPermisson;
+            // TODO: check extract channel Id from send payload 
+        } else {
             revert ParameterNotAllowed();
         }
-
-        // if calling `send` method, it is equivalent to calling FUND_CHANNEL_MULTI_SELECTOR
-        if (functionSig == SEND_SELECTOR) {
-            bytes32 sendCapabilityKey = keyForFunctions(targetAddress, FUND_CHANNEL_MULTI_SELECTOR);
-            // source and channel destination addreses are at the first and second places respectively
-            (address src, address dest) = pluckSendPayload(data, 2);
-            // check if functions on this channel can be called.
-            compareHoprChannelsPermission(role, sendCapabilityKey, src, dest);
-        }
+        // TODO: compare beneficiary permission and function permission
     }
 
     /**
@@ -375,9 +432,13 @@ library HoprCapabilityPermissions {
     function checkSendParameters(
         Role storage role,
         address targetAddress,
-        uint256 dataLength
+        uint256 dataLength,
+        DefaultPermissions storage defaultPermissions
     ) internal view {
-        if (role.sendCapability[targetAddress] != SendPermission.Allowed) {
+        if (
+            role.capabilities[bytes32(0)][bytes32(uint256(uint160(targetAddress)))] == GranularPermission.BLOCK || 
+            (defaultPermissions.defaultTargetPermission == Permission.SPECIFIC_FALLBACK_BLOCK && role.capabilities[bytes32(0)][bytes32(uint256(uint160(targetAddress)))] == GranularPermission.NONE)
+        ) {
             // not allowed to send
             revert SendNotAllowed();
         }
@@ -387,27 +448,27 @@ library HoprCapabilityPermissions {
         }
     }
 
-    /**
-     * @dev Compares the permission for calling a HoprChannels contract.
-     * @param role The storage reference to the Role struct.
-     * @param capabilityKey The key representing the capability.
-     * @param source The source address of the HOPR channel.
-     * @param destination The destination address of the HOPR channel.
-     */
-    function compareHoprChannelsPermission(
-        Role storage role, 
-        bytes32 capabilityKey, 
-        address source, 
-        address destination
-    ) internal view {
-        // get channelId
-        bytes32 channelId = keccak256(abi.encodePacked(source, destination));
-        // check if it's allowed to call the channel
-        if (role.hoprChannelsCapability[capabilityKey][channelId] != HoprChannelsPermission.Allowed) {
-            // not allowed to call the capability
-            revert ParameterNotAllowed();
-        }
-    }
+    // /** FIXME:
+    //  * @dev Compares the permission for calling a HoprChannels contract.
+    //  * @param role The storage reference to the Role struct.
+    //  * @param capabilityKey The key representing the capability.
+    //  * @param source The source address of the HOPR channel.
+    //  * @param destination The destination address of the HOPR channel.
+    //  */
+    // function compareHoprChannelsPermission(
+    //     Role storage role, 
+    //     bytes32 capabilityKey, 
+    //     address source, 
+    //     address destination
+    // ) internal view {
+    //     // get channelId
+    //     bytes32 channelId = keccak256(abi.encodePacked(source, destination));
+    //     // check if it's allowed to call the channel
+    //     if (role.hoprChannelsCapability[capabilityKey][channelId] != HoprChannelsPermission.Allowed) {
+    //         // not allowed to call the capability
+    //         revert ParameterNotAllowed();
+    //     }
+    // }
 
     // ======================================================
     // ----------------------- SETTERS ----------------------
@@ -422,138 +483,217 @@ library HoprCapabilityPermissions {
         Role storage role,
         address targetAddress
     ) external {
-        role.targets[targetAddress] = TargetAddress(
-            Clearance.None,
-            TargetType.None
-        );
+        role.targets[targetAddress] = TargetAddress({
+            clearance: Clearance.NONE,
+            targetType: TargetType.NONE,
+            defaultPermissions: DefaultPermissions({
+                defaultTargetPermission: Permission.NONE,
+                defaultRedeemTicketSafeFunctionPermisson: Permission.NONE,
+                defaultBatchRedeemTicketsSafeFunctionPermisson: Permission.NONE,
+                defaultCloseIncomingChannelSafeFunctionPermisson: Permission.NONE,
+                defaultInitiateOutgoingChannelClosureSafeFunctionPermisson: Permission.NONE,
+                defaultFinalizeOutgoingChannelClosureSafeFunctionPermisson: Permission.NONE,
+                defaultFundChannelMultiFunctionPermisson: Permission.NONE,
+                defaultSetCommitmentSafeFunctionPermisson: Permission.NONE,
+                defaultApproveFunctionPermisson: Permission.NONE,
+                defaultSendFunctionPermisson: Permission.NONE
+            })
+        });
         emit RevokedTarget(targetAddress);
     }
 
     /**
-     * @dev Allows the target address to be scoped as a HoprToken by setting its clearance and target type accordingly.
+     * @dev Allows the target address to be scoped as a HoprToken (TOKEN) 
+     * by setting its clearance and target type accordingly.
      * @param role The storage reference to the Role struct.
-     * @param targetAddress The address of the target to be scoped as a HoprToken.
+     * @param targetAddress The address of the target to be scoped as a TOKEN target.
+     * @param defaultPermissions The default permissions for the TOKEN target
      */
     function scopeTargetToken(
         Role storage role,
-        address targetAddress
+        address targetAddress,
+        DefaultPermissions memory defaultPermissions
     ) external {
-        if (targetAddress == address(0)) {
-            revert AddressIsZero();
-        }
-        
-        role.targets[targetAddress] = TargetAddress(
-            Clearance.Function,
-            TargetType.Token
+        _scopeTarget(
+            role, 
+            targetAddress, 
+            TargetType.TOKEN,
+            DefaultPermissions({
+                defaultTargetPermission: Permission.NONE,
+                defaultRedeemTicketSafeFunctionPermisson: Permission.NONE,
+                defaultBatchRedeemTicketsSafeFunctionPermisson: Permission.NONE,
+                defaultCloseIncomingChannelSafeFunctionPermisson: Permission.NONE,
+                defaultInitiateOutgoingChannelClosureSafeFunctionPermisson: Permission.NONE,
+                defaultFinalizeOutgoingChannelClosureSafeFunctionPermisson: Permission.NONE,
+                defaultFundChannelMultiFunctionPermisson: Permission.NONE,
+                defaultSetCommitmentSafeFunctionPermisson: Permission.NONE,
+                defaultApproveFunctionPermisson: defaultPermissions.defaultApproveFunctionPermisson,
+                defaultSendFunctionPermisson: defaultPermissions.defaultSendFunctionPermisson
+            })
         );
-        emit ScopedTargetToken(targetAddress);
     }
 
     /**
-     * @dev Allows the target address to be scoped as a HoprChannels contract
+     * @dev Allows the target address to be scoped as a HoprChannels contract (CHANNELS)
      * by setting its clearance and target type accordingly.
      * @param role The storage reference to the Role struct.
-     * @param targetAddress The address of the target to be scoped as a HoprChannels.
+     * @param targetAddress The address of the target to be scoped as a CHANNELS target
+     * @param defaultPermissions The default permissions for the CHANNELS target
      */
     function scopeTargetChannels(
         Role storage role,
-        address targetAddress
+        address targetAddress,
+        DefaultPermissions memory defaultPermissions
     ) external {
-        if (targetAddress == address(0)) {
-            revert AddressIsZero();
-        }
-        role.targets[targetAddress] = TargetAddress(
-            Clearance.Function,
-            TargetType.Channels
+        _scopeTarget(
+            role, 
+            targetAddress, 
+            TargetType.CHANNELS,
+            DefaultPermissions({
+                defaultTargetPermission: defaultPermissions.defaultTargetPermission,
+                defaultRedeemTicketSafeFunctionPermisson: defaultPermissions.defaultRedeemTicketSafeFunctionPermisson,
+                defaultBatchRedeemTicketsSafeFunctionPermisson: defaultPermissions.defaultBatchRedeemTicketsSafeFunctionPermisson,
+                defaultCloseIncomingChannelSafeFunctionPermisson: defaultPermissions.defaultCloseIncomingChannelSafeFunctionPermisson,
+                defaultInitiateOutgoingChannelClosureSafeFunctionPermisson: defaultPermissions.defaultInitiateOutgoingChannelClosureSafeFunctionPermisson,
+                defaultFinalizeOutgoingChannelClosureSafeFunctionPermisson: defaultPermissions.defaultFinalizeOutgoingChannelClosureSafeFunctionPermisson,
+                defaultFundChannelMultiFunctionPermisson: defaultPermissions.defaultFundChannelMultiFunctionPermisson,
+                defaultSetCommitmentSafeFunctionPermisson: defaultPermissions.defaultSetCommitmentSafeFunctionPermisson,
+                defaultApproveFunctionPermisson: Permission.NONE,
+                defaultSendFunctionPermisson: Permission.NONE
+            })
         );
-        emit ScopedTargetChannels(targetAddress);
     }
 
     /**
-     * @dev Allows the target address to be scoped as a beneficiary of Send by setting its clearance and target type accordingly.
+     * @dev Allows the target address to be scoped as a beneficiary of SEND by setting its clearance and target type accordingly.
+     * @notice It overwrites the irrelevant fields in DefaultPermissions struct
      * @param role The storage reference to the Role struct.
-     * @param targetAddress The address of the target to be scoped as a beneficiary of Send.
+     * @param targetAddress The address of the target to be scoped as a beneficiary of SEND.
+     * @param defaultPermissions The default permissions for the SEND target
      */
     function scopeTargetSend(
         Role storage role,
-        address targetAddress
+        address targetAddress,
+        DefaultPermissions memory defaultPermissions
     ) external {
-        if (targetAddress == address(0)) {
+        _scopeTarget(
+            role, 
+            targetAddress, 
+            TargetType.SEND,
+            DefaultPermissions({
+                defaultTargetPermission: Permission.NONE,
+                defaultRedeemTicketSafeFunctionPermisson: Permission.NONE,
+                defaultBatchRedeemTicketsSafeFunctionPermisson: Permission.NONE,
+                defaultCloseIncomingChannelSafeFunctionPermisson: Permission.NONE,
+                defaultInitiateOutgoingChannelClosureSafeFunctionPermisson: Permission.NONE,
+                defaultFinalizeOutgoingChannelClosureSafeFunctionPermisson: Permission.NONE,
+                defaultFundChannelMultiFunctionPermisson: Permission.NONE,
+                defaultSetCommitmentSafeFunctionPermisson: Permission.NONE,
+                defaultApproveFunctionPermisson: Permission.NONE,
+                defaultSendFunctionPermisson: Permission.NONE
+            })
+        );
+    }
+
+    /**
+     * @dev Allows the target address to be scoped with a perset permissions.
+     * @param _role The storage reference to the Role struct.
+     * @param _targetAddress The address of the target to be scoped
+     * @param _targetType The type of the target
+     * @param _defaultPermissions The default permissions for target
+     */
+    function _scopeTarget(
+        Role storage _role,
+        address _targetAddress,
+        TargetType _targetType,
+        DefaultPermissions memory _defaultPermissions
+    ) private {
+        if (_targetAddress == address(0)) {
             revert AddressIsZero();
         }
-        role.targets[targetAddress] = TargetAddress(
-            Clearance.Function,
-            TargetType.Send
-        );
-        emit ScopedTargetSend(targetAddress);
+        _role.targets[_targetAddress] = TargetAddress({
+            clearance: Clearance.FUNCTION,
+            targetType: _targetType,
+            defaultPermissions: _defaultPermissions
+        });
+        emit ScopedTarget(_targetAddress, _targetType, _defaultPermissions);
     }
-
+    
     /**
-     * @dev Sets the permission for a specific function on a scoped HoprChannels target.
+     * @dev Sets permissions for a set of max. 7 functions on a scoped CHANNELS target.
      * @param role The storage reference to the Role struct.
-     * @param targetAddress The address of the scoped HoprChannels target.
-     * @param functionSig The function signature of the specific function.
-     * @param channelId The channelId of the scoped HoprChannels target.
-     * @param permission The permission to be set for the specific function.
+     * @param targetAddress The address of the scoped CHANNELS target.
+     * @param channelId The channelId of the scoped CHANNELS target.
+     * @param encodedSigsPermissions encoded permission using encodeFunctionSigsAndPermissions
      */
-    function scopeChannelsCapability(
+    function scopeChannelsCapabilities(
         Role storage role,
         address targetAddress,
-        bytes4 functionSig,
         bytes32 channelId,
-        HoprChannelsPermission permission
+        bytes32 encodedSigsPermissions
     ) external {
-        bytes32 capabilityKey = keyForFunctions(targetAddress, functionSig);
-        role.hoprChannelsCapability[capabilityKey][channelId] = permission;
+        (bytes4[] memory functionSigs, GranularPermission[] memory permissions) = HoprCapabilityPermissions.decodeFunctionSigsAndPermissions(encodedSigsPermissions, 7);
 
-        emit ScopedChannelsCapability(
-            targetAddress,
-            functionSig,
-            channelId,
-            permission
-        );
+        for (uint256 i = 0; i < 7; i++) {
+            if (functionSigs[i] != bytes4(0)) {
+                bytes32 capabilityKey = keyForFunctions(targetAddress, functionSigs[i]);
+                role.capabilities[capabilityKey][channelId] = permissions[i];
+
+                emit ScopedGranularChannelCapability(
+                    targetAddress,
+                    channelId,
+                    functionSigs[i],
+                    permissions[i]
+                );
+            }
+        }
     }
 
     /**
-     * @dev Sets the permission for a specific function on a scoped HoprToken target.
+     * @dev Sets the permission for a specific function on a scoped TOKEN target.
+     * @notice As only two function signatures are allowed, the length is set to 2
      * @param role The storage reference to the Role struct.
-     * @param targetAddress The address of the scoped HoprToken target.
-     * @param functionSig The function signature of the specific function.
-     * @param beneficiary The beneficiary address for the scoped HoprToken target.
-     * @param permission The permission to be set for the specific function.
+     * @param targetAddress The address of the scoped TOKEN target.
+     * @param beneficiary The beneficiary address for the scoped TOKEN target.
+     * @param encodedSigsPermissions encoded permission using encodeFunctionSigsAndPermissions
      */
-    function scopeTokenCapability(
+    function scopeTokenCapabilities(
         Role storage role,
         address targetAddress,
-        bytes4 functionSig,
         address beneficiary,
-        HoprTokenPermission permission
+        bytes32 encodedSigsPermissions
     ) external {
-        bytes32 capabilityKey = keyForFunctions(targetAddress, functionSig);
-        role.hoprTokenCapability[capabilityKey][beneficiary] = permission;
+        (bytes4[] memory functionSigs, GranularPermission[] memory permissions) = HoprCapabilityPermissions.decodeFunctionSigsAndPermissions(encodedSigsPermissions, 2);
 
-        emit ScopedTokenCapability(
-            targetAddress,
-            functionSig,
-            beneficiary,
-            permission
-        );
+        for (uint256 i = 0; i < 2; i++) {
+            if (functionSigs[i] != bytes4(0)) {
+                bytes32 capabilityKey = keyForFunctions(targetAddress, functionSigs[i]);
+                role.capabilities[capabilityKey][bytes32(uint256(uint160(beneficiary)))] = permissions[i];
+
+                emit ScopedGranularTokenCapability(
+                    targetAddress,
+                    beneficiary,
+                    functionSigs[i],
+                    permissions[i]
+                );
+            }
+        }
     }
 
     /**
      * @dev Sets the permission for sending native tokens to a specific beneficiary
-     * @param role The storage reference to the Role struct.
-     * @param beneficiary The beneficiary address for the scoped Send target.
+     * @notice The capability ID for sending native tokens is bytes32(0x00)
+     * @param beneficiary The beneficiary address for the scoped SEND target.
      * @param permission The permission to be set for the specific function.
      */
     function scopeSendCapability(
         Role storage role,
         address beneficiary,
-        SendPermission permission
+        GranularPermission permission
     ) external {
-        role.sendCapability[beneficiary] = permission;
+        role.capabilities[bytes32(0)][bytes32(uint256(uint160(beneficiary)))] = permission;
 
-        emit ScopedSendCapability(
+        emit ScopedGranularSendCapability(
             beneficiary,
             permission
         );
@@ -563,6 +703,10 @@ library HoprCapabilityPermissions {
     // ======================================================
     // ----------------------- HELPERS ----------------------
     // ======================================================
+
+    function getChannelId(address source, address destination) internal pure returns (bytes32) {
+        return keccak256(abi.encodePacked(source, destination));
+    }
  
     /**
      * @dev Retrieves a static address value from the given `data` byte array at the specified `index`.
@@ -735,6 +879,22 @@ library HoprCapabilityPermissions {
     }
 
     /**
+     * @dev Returns a copy of a portion of the `data` byte array.
+     * @param data The byte array to slice.
+     * @param start The starting index of the slice (inclusive).
+     * @return result A new byte array containing the sliced portion.
+     */
+    function sliceFrom(
+        bytes memory data,
+        uint256 start
+    ) internal pure returns (bytes memory result) {
+        result = new bytes(data.length - start);
+        for (uint256 j = start; j < data.length; j++) {
+            result[j - start] = data[j];
+        }
+    }
+
+    /**
      * @dev Returns the unique key for a function of a given `targetAddress`.
      * @param targetAddress The address of the target contract.
      * @param functionSig The function signature of the target function.
@@ -748,100 +908,16 @@ library HoprCapabilityPermissions {
     }
 
     /**
-     * @dev Returns an uint256 that represents the array of permission
-     * @notice that permissions are enums with two bits, Encoding is left-padded; 
-     * In Little-Eidian format (Index 0 is the right most and grows to the left)
-     * e.g. HoprChannelsPermission, HoprTokenPermission, SendPermission
-     */
-    function encodePermissionEnums(
-       uint256[] memory permissions
-    ) internal pure returns (uint256 encoded, uint256 length) {
-        uint256 len = permissions.length;
-        if (len > 256) {
-            revert ArrayTooLong();
-        }
-        uint256 val;
-        for (uint256 i = 0; i < len; i++) {
-            val |= permissions[i] << i;
-        }
-        return (val, len);
-    }
-
-    /**
-     * @dev Returns an uint256 array which decodes from the encoded permission
-     * @notice that permissions are enums with two bits, Encoding is left-padded; 
-     * In Little-Eidian format (Index 0 is the right most and grows to the left)
-     * e.g. HoprChannelsPermission, HoprTokenPermission, SendPermission
-     */
-    function decodePermissionEnums(
-        uint256 encoded, 
-        uint256 length
-    ) internal pure returns (uint256[] memory permissions) {
-        permissions = new uint256[](length);
-        if (length > 256) {
-            revert ArrayTooLong();
-        }
-        for (uint256 i = 0; i < length; i++) {
-            // first left shift 256 - 1 - i = 255 - i bits
-            // then right shift 256 - 1 = 255 bits
-            permissions[i] = (encoded << (255 - i)) >> 255;
-        }
-    }
-
-    /**
-     * @dev Returns arrays of bytes32 that concates function signatures (bytes4)
-     * It can take maxinum 7 function signatures. Encoding is right-padded; 
-     * In Big-Eidian format (Index 0 is the left most and grows to the right)
-     */
-    function encodeFunctionSigs(
-       bytes4[] memory functionSigs
-    ) internal pure returns (bytes32 encoded, uint256 length) {
-        uint256 len = functionSigs.length;
-        if (len > 7) {
-            revert ArrayTooLong();
-        }
-        bytes32 val;
-        for (uint256 i = 0; i < len; i++) {
-            // first right shift (32 - 4) * 8 = 224 bits
-            // then left shift (32 - 4 * i - 4) * 8 = (224 - 32 * i) bits
-            val |= (bytes32(functionSigs[i]) >> 224) << (224 - 32 * i);
-        }
-        return (val, len);
-    }
-
-    /**
-     * @dev Returns an bytes4 array which decodes from the encoded function arrays
-     * It can take maxinum 7 function signatures. Encoding is right-padded; 
-     * In Big-Eidian format (Index 0 is the left most and grows to the right)
-     */
-    function decodeFunctionSigs(
-        bytes32 encoded, 
-        uint256 length
-    ) internal pure returns (bytes4[] memory functionSigs) {
-        functionSigs = new bytes4[](length);
-        if (length > 7) {
-            revert ArrayTooLong();
-        }
-        for (uint256 i = 0; i < length; i++) {
-            // first right shift (32 - 4 * i - 4) * 8 = (224 - 32 * i) bits
-            // then left shift (32 - 4) * 8 = 224 bits
-            functionSigs[i] = bytes4((encoded >> (224 - 32 * i)) << 224);
-        }
-    }
-
-    /**
-     * @dev Returns arrays of bytes32 that concates function signatures (bytes4)
-     * together with permissions
-     * It can take maxinum 7 sets of function signatures and permissions
-     * @notice Signature encoding is right-padded; Index grows from left to the right.
+     * @dev Returns arrays of bytes32 that concates function signatures (bytes4 = 32 bits)
+     * together with granular permissions (per channel id or per beneficiary) (2 bits)
+     * It can take maxinum 7 sets (256 / (32 + 2) ~= 7) of function signatures and permissions
+     * @notice Signature encoding is right-padded; Index 0 is the left most and grows to the right
      * Permission encoding is left-padded; Index grows from right to the left.
-     Returns an bytes4 array which decodes from the encoded function arrays
-     * It can take maxinum 7 function signatures. Encoding is right-padded; 
-     * In Big-Eidian format (Index 0 is the left most and grows to the right)
+     * Returns a bytes32 and length of sigature and permissions
      */
     function encodeFunctionSigsAndPermissions(
        bytes4[] memory functionSigs,
-       uint256[] memory permissions
+       GranularPermission[] memory permissions
     ) internal pure returns (bytes32 encoded, uint256 length) {
         uint256 len = functionSigs.length;
         if (len > 7) {
@@ -859,7 +935,8 @@ library HoprCapabilityPermissions {
             val |= (bytes32(functionSigs[i]) >> 224) << (224 - 32 * i);
         }
         for (uint256 i = 0; i < len; i++) {
-            val |= bytes32(permissions[i]) << i;
+            // shift by two bits
+            val |= bytes32(uint256(permissions[i])) << 2 * i;
         }
         return (val, len);
     }
@@ -867,18 +944,18 @@ library HoprCapabilityPermissions {
     /**
      * @dev Returns an bytes4 array which decodes from the combined encoding
      * of function signature and permissions. It can take maxinum 7 items.
-     * Encoding of function signatures is right-padded in Big-Eidian format
-     * Encoding of permissions is left-padded in Little-Eidian format
+     * Encoding of function signatures is right-padded, where indexes grow from left to right
+     * Encoding of permissions is left-padded, where indexes grow from left to right
      */
     function decodeFunctionSigsAndPermissions(
         bytes32 encoded, 
         uint256 length
-    ) internal pure returns (bytes4[] memory functionSigs, uint256[] memory permissions) {
+    ) internal pure returns (bytes4[] memory functionSigs, GranularPermission[] memory permissions) {
         if (length > 7) {
             revert ArrayTooLong();
         }
         functionSigs = new bytes4[](length);
-        permissions = new uint256[](length);
+        permissions = new GranularPermission[](length);
         // decode function signature
         for (uint256 i = 0; i < length; i++) {
             // first right shift (32 - 4 * i - 4) * 8 = (224 - 32 * i) bits
@@ -887,9 +964,9 @@ library HoprCapabilityPermissions {
         }
         // decode permissions
         for (uint256 j = 0; j < length; j++) {
-            // first left shift 256 - 1 - j = 255 - j bits
-            // then right shift 256 - 1 = 255 bits
-            permissions[j] = (uint256(encoded) << (255 - j)) >> 255;
+            // first left shift 256 - 2 - 2 * j = 254 - 2 * j bits
+            // then right shift 256 - 2 = 254 bits
+            permissions[j] = GranularPermission(uint8((uint256(encoded) << (254 - 2 * j)) >> 254));
         }
     }
 }

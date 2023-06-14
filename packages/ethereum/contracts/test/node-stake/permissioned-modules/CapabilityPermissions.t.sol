@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity >=0.8.0 <0.9.0;
+pragma solidity ^0.8.0;
 
 import '../../../src/node-stake/permissioned-module/CapabilityPermissions.sol';
 import "../../utils/CapabilityLibrary.sol";
@@ -7,19 +7,52 @@ import 'forge-std/Test.sol';
 
 contract HoprCapabilityPermissionsTest is Test, CapabilityPermissionsLibFixtureTest {
     Role internal role;
-
+    DefaultPermissions internal defaultPermissions;
     /**
     * Manually import events and errors
     */
     error AddressIsZero();
-    event ScopedTargetToken(address targetAddress);
+    event RevokedTarget(address indexed targetAddress);
+    event ScopedTarget(address indexed targetAddress, TargetType targetType, DefaultPermissions defaultPermission);
+    event ScopedGranularChannelCapability(
+        address indexed targetAddress,
+        bytes32 indexed channelId,
+        bytes4 selector,
+        GranularPermission permission
+    );
+    event ScopedGranularTokenCapability(
+        address indexed targetAddress,
+        address indexed recipientAddress,
+        bytes4 selector,
+        GranularPermission permission
+    );
+    event ScopedGranularSendCapability(
+        address indexed recipientAddress,
+        GranularPermission permission
+    );
+
+    function setUp() public virtual override(CapabilityPermissionsLibFixtureTest) {
+        super.setUp();
+        defaultPermissions = DefaultPermissions({
+            defaultTargetPermission: Permission.SPECIFIC_FALLBACK_ALLOW,
+            defaultRedeemTicketSafeFunctionPermisson: Permission.SPECIFIC_FALLBACK_ALLOW,
+            defaultBatchRedeemTicketsSafeFunctionPermisson: Permission.SPECIFIC_FALLBACK_ALLOW,
+            defaultCloseIncomingChannelSafeFunctionPermisson: Permission.SPECIFIC_FALLBACK_ALLOW,
+            defaultInitiateOutgoingChannelClosureSafeFunctionPermisson: Permission.SPECIFIC_FALLBACK_ALLOW,
+            defaultFinalizeOutgoingChannelClosureSafeFunctionPermisson: Permission.SPECIFIC_FALLBACK_ALLOW,
+            defaultFundChannelMultiFunctionPermisson: Permission.SPECIFIC_FALLBACK_ALLOW,
+            defaultSetCommitmentSafeFunctionPermisson: Permission.SPECIFIC_FALLBACK_ALLOW,
+            defaultApproveFunctionPermisson: Permission.SPECIFIC_FALLBACK_BLOCK,
+            defaultSendFunctionPermisson: Permission.SPECIFIC_FALLBACK_BLOCK
+        });
+    }
 
     /**
     * @dev Failes to add token target(s) when the account is not address zero
     */
     function testRevert_WhenAddressZeroAddTargetToken() public {
         vm.expectRevert(AddressIsZero.selector);
-        HoprCapabilityPermissions.scopeTargetToken(role, address(0));
+        HoprCapabilityPermissions.scopeTargetToken(role, address(0), defaultPermissions);
     }
 
     /**
@@ -28,48 +61,12 @@ contract HoprCapabilityPermissionsTest is Test, CapabilityPermissionsLibFixtureT
     function testFuzz_AddTargetToken(address account) public {
         vm.assume(account != address(0));
         vm.expectEmit(true, false, false, false, address(this));
-        emit ScopedTargetToken(account);
-        HoprCapabilityPermissions.scopeTargetToken(role, account);
+        
+        emit ScopedTarget(account, TargetType.TOKEN, defaultPermissions);
+        HoprCapabilityPermissions.scopeTargetToken(role, account, defaultPermissions);
 
-        assertEq(uint256(role.targets[account].clearance), uint256(Clearance.Function), "wrong clearance added");
-        assertEq(uint256(role.targets[account].targetType), uint256(TargetType.Token), "wrong target type added");
-    }
-
-    /**
-    * @dev Encode an array of permission enums into uint256 and vice versa
-    */
-    function testFuzz_EncodeAndDecodePermissionEnums(uint256 length, bool startWithZero) public {
-        // length must not exceed 256
-        vm.assume(length <= 256);
-        // create a permission array that alternates between 0 and 1
-        uint256[] memory permissions = _helperCreateHoprChannelsPermissionsArray(length, startWithZero);
-
-        (uint256 encodedValue, uint256 encodedLength) = HoprCapabilityPermissions.encodePermissionEnums(permissions);
-        (uint256[] memory decodedPermissions) = HoprCapabilityPermissions.decodePermissionEnums(encodedValue, encodedLength);
-
-        assertEq(encodedLength, length, "Encoding length is wrong");
-        assertEq(decodedPermissions.length, length, "Decoded length is wrong");
-
-        for (uint256 j = 0; j < length; j++) {
-            assertEq(decodedPermissions[j], permissions[j], "Element changes during the process");
-        }
-    }
-
-    /**
-    * @dev Encode an array of funciton signatures (max. 7) into a bytes32
-    */
-    function test_EncodeAndDecodeFunctionSigs() public {
-        // create an array of funciton sigatures
-        bytes4[] memory functionSigs = _helperCreateHoprChannelsFunctionSigArray();
-
-        (bytes32 encodedValue, uint256 encodedLength) = HoprCapabilityPermissions.encodeFunctionSigs(functionSigs);
-        (bytes4[] memory decoded) = HoprCapabilityPermissions.decodeFunctionSigs(encodedValue, encodedLength);
-
-        assertEq(encodedLength, decoded.length, "Length is wrong");
-
-        for (uint256 j = 0; j < encodedLength; j++) {
-            assertEq(decoded[j], functionSigs[j], "Element changes during the process");
-        }
+        assertEq(uint256(role.targets[account].clearance), uint256(Clearance.FUNCTION), "wrong clearance added");
+        assertEq(uint256(role.targets[account].targetType), uint256(TargetType.TOKEN), "wrong target type added");
     }
 
     /**
@@ -79,11 +76,11 @@ contract HoprCapabilityPermissionsTest is Test, CapabilityPermissionsLibFixtureT
         uint256 length = 6;
         // create an array of funciton sigatures
         bytes4[] memory functionSigs = _helperCreateHoprChannelsFunctionSigArray();
-        uint256[] memory permissions = _helperCreateHoprChannelsPermissionsArray(length, startWithZero);
+        GranularPermission[] memory permissions = _helperCreateHoprChannelsPermissionsArray(length, startWithZero);
 
         (bytes32 encodedValue, uint256 encodedLength) = HoprCapabilityPermissions.encodeFunctionSigsAndPermissions(functionSigs, permissions);
         emit log_named_bytes32("encodedValue", encodedValue);
-        (bytes4[] memory decodedSigs, uint256[] memory decodedPermissions) = HoprCapabilityPermissions.decodeFunctionSigsAndPermissions(encodedValue, encodedLength);
+        (bytes4[] memory decodedSigs, GranularPermission[] memory decodedPermissions) = HoprCapabilityPermissions.decodeFunctionSigsAndPermissions(encodedValue, encodedLength);
 
         assertEq(encodedLength, length, "Encoding length is wrong");
         assertEq(decodedSigs.length, length, "Decoded sigs length is wrong");
@@ -93,17 +90,17 @@ contract HoprCapabilityPermissionsTest is Test, CapabilityPermissionsLibFixtureT
             assertEq(decodedSigs[j], functionSigs[j], "Sig changes during the process");
         }
         for (uint256 k = 0; k < length; k++) {
-            assertEq(decodedPermissions[k], permissions[k], "Permission changes during the process");
+            assertEq(uint256(decodedPermissions[k]), uint256(permissions[k]), "Permission changes during the process");
         }
     }
 
     /**
-     * @dev create a permission array that alternates between 0 and 1
+     * @dev create a permission array that alternates between GranularPermission.ALLOW and GranularPermission.BLOCK
      */
-    function _helperCreateHoprChannelsPermissionsArray(uint256 length, bool startWithZero) private pure returns (uint256[] memory permissions) {
-        permissions = new uint256[](length);
+    function _helperCreateHoprChannelsPermissionsArray(uint256 length, bool startWithZero) private pure returns (GranularPermission[] memory permissions) {
+        permissions = new GranularPermission[](length);
         for (uint256 i = 0; i < length; i++) {
-            permissions[i] = startWithZero == (i % 2 == 0) ? 0 : 1;
+            permissions[i] = startWithZero == (i % 2 == 0) ? GranularPermission.ALLOW : GranularPermission.BLOCK;
         }
     }
 

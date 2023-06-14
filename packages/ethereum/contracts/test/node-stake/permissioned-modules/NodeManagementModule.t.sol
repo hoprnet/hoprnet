@@ -12,17 +12,13 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
     HoprNodeManagementModule public moduleSingleton;
     address public multiaddr;
     address public safe;
+    DefaultPermissions internal defaultPermissions;
     /**
     * Manually import events and errors
     */
     event SetMultisendAddress(address multisendAddress);
     event NodeAdded(address indexed node);
     event NodeRemoved(address indexed node);
-    // // from HoprCapabilityPermissions
-    // event RevokedTarget(address targetAddress);
-    // event ScopedTargetChannels(address targetAddress);
-    // event ScopedTargetToken(address targetAddress);
-    // event ScopedTargetSend(address targetAddress);
 
     function setUp() public virtual override(CapabilityPermissionsLibFixtureTest, SafeSingletonFixtureTest) {
         super.setUp();
@@ -30,8 +26,19 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         safe = vm.addr(101); // make address(101) a safe
 
         moduleSingleton = new HoprNodeManagementModule();
+        defaultPermissions = DefaultPermissions({
+            defaultTargetPermission: Permission.SPECIFIC_FALLBACK_ALLOW,
+            defaultRedeemTicketSafeFunctionPermisson: Permission.SPECIFIC_FALLBACK_ALLOW,
+            defaultBatchRedeemTicketsSafeFunctionPermisson: Permission.SPECIFIC_FALLBACK_ALLOW,
+            defaultCloseIncomingChannelSafeFunctionPermisson: Permission.SPECIFIC_FALLBACK_ALLOW,
+            defaultInitiateOutgoingChannelClosureSafeFunctionPermisson: Permission.SPECIFIC_FALLBACK_ALLOW,
+            defaultFinalizeOutgoingChannelClosureSafeFunctionPermisson: Permission.SPECIFIC_FALLBACK_ALLOW,
+            defaultFundChannelMultiFunctionPermisson: Permission.SPECIFIC_FALLBACK_ALLOW,
+            defaultSetCommitmentSafeFunctionPermisson: Permission.SPECIFIC_FALLBACK_ALLOW,
+            defaultApproveFunctionPermisson: Permission.SPECIFIC_FALLBACK_BLOCK,
+            defaultSendFunctionPermisson: Permission.SPECIFIC_FALLBACK_BLOCK
+        });
     }
-
 
     /**
     * @dev Failes to add token target(s) when the account is not address zero
@@ -63,14 +70,14 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
     /**
     * @dev Add token target(s) when the account is not address zero
     */
-    function testFuzz_AddTargetToken(address account) public {
+    function testFuzz_AddTargetTokenFromModule(address account) public {
         vm.assume(account != address(0));
         address owner = moduleSingleton.owner();
         vm.startPrank(owner);
 
         vm.expectEmit(true, false, false, false, address(moduleSingleton));
-        emit HoprCapabilityPermissions.ScopedTargetToken(account);
-        moduleSingleton.scopeTargetToken(account);
+        emit HoprCapabilityPermissions.ScopedTarget(account, TargetType.TOKEN, defaultPermissions);
+        moduleSingleton.scopeTargetToken(account, defaultPermissions);
     }
 
     /**
@@ -90,10 +97,10 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
             abi.encode(token)
         );
         vm.expectEmit(true, false, false, false, address(moduleSingleton));
-        emit HoprCapabilityPermissions.ScopedTargetChannels(channels);
+        emit HoprCapabilityPermissions.ScopedTarget(channels, TargetType.CHANNELS, defaultPermissions);
         vm.expectEmit(true, false, false, false, address(moduleSingleton));
-        emit HoprCapabilityPermissions.ScopedTargetToken(token);
-        moduleSingleton.addChannelsAndTokenTarget(channels);
+        emit HoprCapabilityPermissions.ScopedTarget(token, TargetType.TOKEN, defaultPermissions);
+        moduleSingleton.addChannelsAndTokenTarget(channels, defaultPermissions);
     }
 
     // /**
