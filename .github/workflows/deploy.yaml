@@ -36,8 +36,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build_deploy_sc_npm:
-    name: Build / Deploy SCs / Publish NPM
+  build:
+    name: Build
     strategy:
       matrix:
         os: ["ubuntu-latest"]
