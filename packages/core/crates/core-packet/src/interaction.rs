@@ -1,4 +1,4 @@
-use crate::errors::PacketError::{AcknowledgementValidation, ChannelNotFound, InvalidPacketState, OutOfFunds, PacketDecodingError, PathNotValid, Retry, TagReplay, TransportError};
+use crate::errors::PacketError::{AcknowledgementValidation, ChannelNotFound, InvalidPacketState, OutOfFunds, PacketConstructionError, PacketDecodingError, PathNotValid, Retry, TagReplay, TransportError};
 use crate::errors::Result;
 use crate::packet::{Packet, PacketState};
 use crate::path::Path;
@@ -75,7 +75,6 @@ const ACK_RX_QUEUE_SIZE: usize = 2048;
 /// Once the instance is stopped, it cannot be restarted.
 pub struct AcknowledgementInteraction<Db: HoprCoreEthereumDbActions> {
     db: Arc<Mutex<Db>>,
-    // TODO: remove closures and use Sender<T> to allow the type to be Send + Sync
     pub on_acknowledgement: Option<Sender<HalfKeyChallenge>>,
     pub on_acknowledged_ticket: Option<Sender<AcknowledgedTicket>>,
     public_key: PublicKey,
@@ -201,7 +200,7 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
     async fn handle_acknowledgement(&self, mut ack: Acknowledgement) -> Result<()> {
         if !ack.validate(&self.public_key) {
             return Err(AcknowledgementValidation(
-                "could not validate the acknowledgement".to_string(),
+                "could not validate the acknowledgement signature".to_string(),
             ));
         }
 
@@ -438,8 +437,14 @@ where
             return Err(PathNotValid);
         }
 
+        let next_peer = self.db
+            .lock()
+            .unwrap()
+            .get_channel_key(&OffchainPublicKey::from_peerid(&path.hops()[0])?)
+            .await?
+            .ok_or(PacketConstructionError)?;
+
         // Decide whether to create 0-hop or multihop ticket
-        let next_peer = PublicKey::from_peerid(&path.hops()[0])?;
         let next_ticket = if path.length() == 1 {
             Ticket::new_zero_hop(next_peer, &self.cfg.private_key)
         } else {
@@ -731,7 +736,7 @@ mod tests {
     use async_trait::async_trait;
     use core_crypto::derivation::derive_ack_key_share;
     use core_crypto::random::random_bytes;
-    use core_crypto::types::{Hash, PublicKey};
+    use core_crypto::types::{Hash, OffchainPublicKey, PublicKey};
     use core_ethereum_db::db::CoreEthereumDb;
     use core_ethereum_db::traits::HoprCoreEthereumDbActions;
     use core_ethereum_misc::commitment::{initialize_commitment, ChainCommitter, ChannelCommitmentInfo};
@@ -750,7 +755,7 @@ mod tests {
     use std::str::FromStr;
     use std::sync::{Arc, Mutex};
     use std::time::Duration;
-    use utils_db::db::DB;
+        use utils_db::db::DB;
     use utils_db::errors::DbError;
     use utils_db::leveldb::rusty::RustyLevelDbShim;
     use utils_log::debug;
@@ -773,7 +778,7 @@ mod tests {
     lazy_static! {
         static ref PEERS: Vec<PeerId> = PEERS_PRIVS
             .iter()
-            .map(|private| PublicKey::from_privkey(private).unwrap().to_peerid())
+            .map(|private| OffchainPublicKey::from_privkey(private).unwrap().to_peerid())
             .collect();
         static ref MESSAGES: Mutex<[HashMap<PeerId, Vec<Msg<PeerId>>>; 2]> =
             Mutex::new([HashMap::new(), HashMap::new()]);
@@ -821,10 +826,15 @@ mod tests {
         Some(MESSAGES.lock().unwrap()[PROTO].get_mut(&for_peer)?.drain(..).collect())
     }
 
-    fn create_dummy_channel(from: &PeerId, to: &PeerId) -> ChannelEntry {
+    async fn create_dummy_channel(db: &CoreEthereumDb<RustyLevelDbShim>, from: &PeerId, to: &PeerId) -> ChannelEntry {
+        let source = db.get_channel_key(&OffchainPublicKey::from_peerid(from).unwrap()).await.unwrap()
+            .expect("failed to retrieve source address");
+        let destination = db.get_channel_key(&OffchainPublicKey::from_peerid(to).unwrap()).await.unwrap()
+            .expect("failed to retrieve destination address");
+
         ChannelEntry::new(
-            PublicKey::from_peerid(from).unwrap(),
-            PublicKey::from_peerid(to).unwrap(),
+            source,
+            destination,
             Balance::new(U256::new("1234").mul(U256::new(PRICE_PER_PACKET)), BalanceType::HOPR),
             Hash::new(&random_bytes::<32>()),
             U256::zero(),
@@ -851,7 +861,7 @@ mod tests {
             .map(|(i, db)| {
                 Arc::new(Mutex::new(CoreEthereumDb::new(
                     DB::new(RustyLevelDbShim::new(db.clone())),
-                    PublicKey::from_peerid(&PEERS[i]).unwrap(),
+                    PublicKey::from_privkey(&PEERS_PRIVS[i]).unwrap(),
                 )))
             })
             .collect::<Vec<_>>()
@@ -870,16 +880,24 @@ mod tests {
         let testing_snapshot = Snapshot::new(U256::zero(), U256::zero(), U256::zero());
         let mut previous_channel: Option<ChannelEntry> = None;
 
-        for (index, peer_id) in PEERS.iter().enumerate().take(dbs.len()) {
+        for (index, peer_key) in PEERS_PRIVS.iter().enumerate().take(dbs.len()) {
             let mut db = CoreEthereumDb::new(
                 DB::new(RustyLevelDbShim::new(dbs[index].clone())),
-                PublicKey::from_peerid(&peer_id).unwrap(),
+                PublicKey::from_privkey(peer_key)?,
             );
 
+            // Link all the node keys and chain keys from the simulated announcements
+            for peer_key in PEERS_PRIVS {
+                let node_key = OffchainPublicKey::from_privkey(&peer_key)?;
+                let chain_key = PublicKey::from_privkey(&peer_key)?;
+                db.link_packet_and_channel_keys(&chain_key, &node_key).await?;
+            }
+
             let mut channel: Option<ChannelEntry> = None;
+            let this_peer = OffchainPublicKey::from_privkey(peer_key)?.to_peerid();
 
             if index < PEERS.len() - 1 {
-                channel = Some(create_dummy_channel(&peer_id, &PEERS[index + 1]));
+                channel = Some(create_dummy_channel(&db,&this_peer, &PEERS[index + 1]).await);
 
                 db.update_channel_and_snapshot(
                     &channel.clone().unwrap().get_id(),
@@ -1049,7 +1067,7 @@ mod tests {
         // Peer 1: ACK interaction of the packet sender, hookup receiving of acknowledgements and start processing them
         let ack_interaction_sender = Arc::new(AcknowledgementInteraction::new(
             core_dbs[0].clone(),
-            PublicKey::from_peerid(&PEERS[0]).unwrap(),
+            PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap(),
             Some(done_tx),
             None,
         ));
@@ -1059,7 +1077,7 @@ mod tests {
         // Peer 2: Recipient of the packet and sender of the acknowledgement
         let ack_interaction_counterparty = Arc::new(AcknowledgementInteraction::new(
             core_dbs[1].clone(),
-            PublicKey::from_peerid(&PEERS[1]).unwrap(),
+            PublicKey::from_privkey(&PEERS_PRIVS[1]).unwrap(),
             None,
             None,
         ));
@@ -1163,7 +1181,7 @@ mod tests {
         // Peer 2 (relayer): relays packets to Peer 3 and awaits acknowledgements of relayer packets to Peer 3
         let ack_interaction_relayer = Arc::new(AcknowledgementInteraction::new(
             core_dbs[1].clone(),
-            PublicKey::from_peerid(&PEERS[1]).unwrap(),
+            PublicKey::from_privkey(&PEERS_PRIVS[1]).unwrap(),
             None,
             Some(ack_tx),
         ));
@@ -1186,7 +1204,7 @@ mod tests {
         // Peer 3: Recipient of the packet and sender of the acknowledgement
         let ack_interaction_counterparty = Arc::new(AcknowledgementInteraction::new(
             core_dbs[2].clone(),
-            PublicKey::from_peerid(&PEERS[2]).unwrap(),
+            PublicKey::from_privkey(&PEERS_PRIVS[2]).unwrap(),
             None,
             None,
         ));
@@ -1309,7 +1327,7 @@ mod tests {
         // -------------- Peer 2: relayer
         let ack_1 = Arc::new(AcknowledgementInteraction::new(
             core_dbs[1].clone(),
-            PublicKey::from_peerid(&PEERS[1]).unwrap(),
+            PublicKey::from_privkey(&PEERS_PRIVS[1]).unwrap(),
             None,
             None,
         ));
@@ -1334,7 +1352,7 @@ mod tests {
         // -------------- Peer 3: relayer
         let ack_2 = Arc::new(AcknowledgementInteraction::new(
             core_dbs[2].clone(),
-            PublicKey::from_peerid(&PEERS[2]).unwrap(),
+            PublicKey::from_privkey(&PEERS_PRIVS[2]).unwrap(),
             None,
             None,
         ));
@@ -1359,7 +1377,7 @@ mod tests {
         // -------------- Peer 4: relayer
         let ack_3 = Arc::new(AcknowledgementInteraction::new(
             core_dbs[3].clone(),
-            PublicKey::from_peerid(&PEERS[3]).unwrap(),
+            PublicKey::from_privkey(&PEERS_PRIVS[3]).unwrap(),
             None,
             None,
         ));
@@ -1384,7 +1402,7 @@ mod tests {
         // -------------- Peer 5: recipient
         let ack_4 = Arc::new(AcknowledgementInteraction::new(
             core_dbs[4].clone(),
-            PublicKey::from_peerid(&PEERS[4]).unwrap(),
+            PublicKey::from_privkey(&PEERS_PRIVS[4]).unwrap(),
             None,
             None,
         ));
