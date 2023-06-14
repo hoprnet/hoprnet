@@ -181,7 +181,7 @@ impl<S: SphinxSuite> MetaPacket<S> {
     pub fn forward(
         &self,
         node_private_key: &[u8],
-        node_public_key: &S::G,
+        node_public_key: &S::P,
         max_hops: usize,
         additional_data_relayer_len: usize,
         additional_data_last_hop_len: usize,
@@ -189,7 +189,7 @@ impl<S: SphinxSuite> MetaPacket<S> {
         let (alpha, secret) = SharedKeys::<S::E, S::A, S::G>::forward_transform(
             &self.alpha,
             node_private_key,
-            node_public_key
+            &(node_public_key.into())
         )?;
 
         let mut routing_info_cpy: Vec<u8> = self.routing_info().into();
@@ -287,7 +287,7 @@ impl Packet {
                 })
             ).collect::<Result<Vec<_>>>()?;
 
-        let shared_keys = Ed25519Suite::new_shared_keys(public_keys_path.clone())?;
+        let shared_keys = Ed25519Suite::new_shared_keys(public_keys_path.iter().collect())?;
         let por_values = ProofOfRelayValues::new(shared_keys.secrets[0], shared_keys.secrets.get(1).cloned());
         let por_strings = ProofOfRelayString::from_shared_secrets(&shared_keys.secrets);
 
@@ -321,9 +321,9 @@ impl Packet {
             let previous_hop = OffchainPublicKey::from_peerid(sender)?;
 
             let header_len = header_length::<Ed25519Suite>(INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0);
-            let mp = MetaPacket::from_bytes(pre_packet, header_len)?;
+            let mp = MetaPacket::<Ed25519Suite>::from_bytes(pre_packet, header_len)?;
 
-            match mp.forward(node_private_key, node_public_key.as_edwards_point(), INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0)? {
+            match mp.forward(node_private_key, node_public_key.into(), INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0)? {
                 RelayedPacket {
                     packet,
                     derived_secret,
@@ -461,7 +461,7 @@ mod tests {
     fn generic_test_meta_packet<S: SphinxSuite>(keypairs: Vec<([u8; 32], S::P)>) {
         let (secrets, path): (Vec<[u8;32]>, Vec<S::P>) = keypairs.into_iter().unzip();
 
-        let shared_keys = S::new_shared_keys(path.clone()).unwrap();
+        let shared_keys = S::new_shared_keys(path.iter().collect()).unwrap();
         let por_strings = ProofOfRelayString::from_shared_secrets(&shared_keys.secrets);
 
         assert_eq!(shared_keys.secrets.len() - 1, por_strings.len());

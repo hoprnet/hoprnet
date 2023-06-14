@@ -122,9 +122,9 @@ impl BinarySerializable<'_> for CompressedPublicKey {
     }
 }
 
-impl From<CompressedPublicKey> for k256::ProjectivePoint {
-    fn from(value: CompressedPublicKey) -> Self {
-        value.0.into()
+impl From<&CompressedPublicKey> for k256::ProjectivePoint {
+    fn from(value: &CompressedPublicKey) -> Self {
+        (&value.0).into()
     }
 }
 
@@ -134,8 +134,8 @@ pub struct Secp256k1Suite ;
 impl SphinxSuite for Secp256k1Suite {
     type E = k256::Scalar;
     type A = typenum::U33;
-    type G = k256::ProjectivePoint;
     type P = CompressedPublicKey;
+    type G = k256::ProjectivePoint;
 }
 
 /// Represents an instantiation of the Sphinx protocol using the ed25519 curve and `OffchainPublicKey`
@@ -144,8 +144,8 @@ pub struct Ed25519Suite ;
 impl SphinxSuite for Ed25519Suite {
     type E = curve25519_dalek::scalar::Scalar;
     type A = typenum::U32;
-    type G = curve25519_dalek::edwards::EdwardsPoint;
     type P = OffchainPublicKey;
+    type G = curve25519_dalek::edwards::EdwardsPoint;
 }
 
 /// Represents an instantiation of the Sphinx protocol using the Curve25519 curve and `OffchainPublicKey`
@@ -154,8 +154,8 @@ pub struct X25519Suite ;
 impl SphinxSuite for X25519Suite {
     type E = curve25519_dalek::scalar::Scalar;
     type A = typenum::U32;
-    type G = curve25519_dalek::montgomery::MontgomeryPoint;
     type P = OffchainPublicKey;
+    type G = curve25519_dalek::montgomery::MontgomeryPoint;
 }
 
 #[cfg(test)]

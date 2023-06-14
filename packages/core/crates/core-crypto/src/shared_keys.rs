@@ -153,20 +153,21 @@ impl <E: Scalar, A: ArrayLength<u8>, G: GroupElement<A, E>> SharedKeys<E, A, G> 
 
 /// Represents an instantiation of the Spinx protocol using the given EC group and corresponding public key object.
 pub trait SphinxSuite {
+
     /// Scalar type supported by the EC group
     type E: Scalar;
 
     /// Length of the Sphinx Alpha value corresponding to the EC group
     type A: ArrayLength<u8>;
 
-    /// EC group
-    type G: GroupElement<Self::A, Self::E>;
-
     /// Public key corresponding to the EC group
-    type P: for <'a> BinarySerializable<'a> + Into<Self::G> + Clone;
+    type P: for <'a> BinarySerializable<'a> + Clone;
+
+    /// EC group
+    type G: GroupElement<Self::A, Self::E> + for<'a> From<&'a Self::P>;
 
     /// Convenience function to generate shared keys from the path of public keys.
-    fn new_shared_keys(public_keys: Vec<Self::P>) -> Result<SharedKeys<Self::E, Self::A, Self::G>> {
+    fn new_shared_keys(public_keys: Vec<&Self::P>) -> Result<SharedKeys<Self::E, Self::A, Self::G>> {
         SharedKeys::generate(public_keys.into_iter().map(|pk| pk.into()).collect())
     }
 }

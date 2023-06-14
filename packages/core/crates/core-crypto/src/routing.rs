@@ -344,7 +344,7 @@ pub mod tests {
             additional_data.push(e);
         }
 
-        let shares = S::new_shared_keys(pub_keys.clone()).unwrap();
+        let shares = S::new_shared_keys(pub_keys.iter().collect()).unwrap();
 
         let rinfo = RoutingInfo::new::<S>(
             MAX_HOPS,

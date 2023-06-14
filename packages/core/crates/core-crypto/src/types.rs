@@ -13,6 +13,7 @@ use std::ops::Add;
 use std::str::FromStr;
 use curve25519_dalek::edwards::{CompressedEdwardsY, EdwardsPoint};
 use curve25519_dalek::montgomery::MontgomeryPoint;
+use ed25519_dalek::Signer;
 use elliptic_curve::sec1::EncodedPoint;
 
 use utils_log::warn;
@@ -26,8 +27,7 @@ use crate::errors::CryptoError::InvalidInputValue;
 use crate::errors::{CryptoError, CryptoError::CalculationError, Result};
 use crate::parameters::SECRET_KEY_LENGTH;
 use crate::primitives::{DigestLike, EthDigest};
-use crate::random::random_group_element;
-use crate::shared_keys::GroupElement;
+use crate::random::{random_bytes, random_group_element};
 
 /// Represents a secret key of fixed length
 pub type SecretKey = [u8; SECRET_KEY_LENGTH];
@@ -493,7 +493,6 @@ impl Hash {
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct OffchainPublicKey {
-    pub(crate) key: EdwardsPoint,
     compressed: CompressedEdwardsY
 }
 
@@ -511,15 +510,7 @@ impl BinarySerializable<'_> for OffchainPublicKey {
     const SIZE: usize = 32;
 
     fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
-        if data.len() == Self::SIZE {
-            let compressed = CompressedEdwardsY::from_slice(data);
-            Ok(Self {
-                key: compressed.decompress().ok_or(ParseError)?,
-                compressed
-            })
-        } else {
-            Err(ParseError)
-        }
+        Ok(Self { compressed: CompressedEdwardsY::from_slice(data) })
     }
 
     fn to_bytes(&self) -> Box<[u8]> {
@@ -534,10 +525,7 @@ impl PeerIdLike for OffchainPublicKey {
             libp2p_identity::PublicKey::try_decode_protobuf(mh.digest())
                 .map_err(|_| ParseError)
                 .and_then(|pk| pk.try_into_ed25519().map_err(|_| ParseError))
-                .and_then(|pk| CompressedEdwardsY::from_slice(&pk.to_bytes())
-                    .decompress()
-                    .ok_or(ParseError))
-                .map(|key| Self { compressed: key.compress(), key })
+                .map(|pk| Self { compressed: CompressedEdwardsY::from_slice(&pk.to_bytes()) })
         } else {
             Err(ParseError)
         }
@@ -555,40 +543,37 @@ impl Display for OffchainPublicKey {
     }
 }
 
-impl From<OffchainPublicKey> for EdwardsPoint {
-    fn from(value: OffchainPublicKey) -> Self {
-        value.key
+impl From<&OffchainPublicKey> for EdwardsPoint {
+    fn from(value: &OffchainPublicKey) -> Self {
+        value.compressed.decompress().unwrap()
     }
 }
 
-impl From<OffchainPublicKey> for MontgomeryPoint {
-    fn from(value: OffchainPublicKey) -> Self {
-        value.key.to_montgomery()
+impl From<&OffchainPublicKey> for MontgomeryPoint {
+    fn from(value: &OffchainPublicKey) -> Self {
+        value.compressed.decompress().unwrap().to_montgomery()
     }
 }
 
 impl OffchainPublicKey {
     /// Generates new random keypair (private key, public key)
-    pub fn random_keypair() -> ([u8; 32], Self) {
-        let (key, scalar) = EdwardsPoint::random_pair();
-        (scalar.to_bytes(), Self {
-            compressed: key.compress(),
-            key
+    pub fn random_keypair() -> ([u8; ed25519_dalek::SECRET_KEY_LENGTH], Self) {
+        let secret = random_bytes::<32>();
+        let sk = ed25519_dalek::SecretKey::from_bytes(&secret).unwrap();
+        let verifying: ed25519_dalek::PublicKey = (&sk).into();
+        (secret, Self {
+            compressed: CompressedEdwardsY::from_slice(verifying.as_bytes())
         })
     }
 
     pub fn from_privkey(private_key: &[u8]) -> Result<Self> {
-        if private_key.len() == 32 {
-            let scalar = curve25519_dalek::scalar::Scalar::from_bits(private_key.try_into().unwrap());
-            let key = EdwardsPoint::generate(&scalar);
-            Ok(Self { compressed: key.compress(), key })
-        } else {
-            Err(InvalidInputValue)
-        }
-    }
+        let verifying = ed25519_dalek::SecretKey::from_bytes(private_key)
+            .map(|sk| ed25519_dalek::PublicKey::from(&sk))
+            .map_err(|_| InvalidInputValue)?;
 
-    pub fn as_edwards_point(&self) -> &EdwardsPoint {
-        &self.key
+        Ok(Self {
+            compressed: CompressedEdwardsY::from_slice(verifying.as_bytes())
+        })
     }
 }
 
@@ -683,8 +668,8 @@ impl From<elliptic_curve::PublicKey<Secp256k1>> for PublicKey {
     }
 }
 
-impl From<PublicKey> for k256::ProjectivePoint {
-    fn from(value: PublicKey) -> Self {
+impl From<&PublicKey> for k256::ProjectivePoint {
+    fn from(value: &PublicKey) -> Self {
         value.key.to_projective()
     }
 }
@@ -874,6 +859,29 @@ impl BinarySerializable<'_> for Response {
     }
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct OffchainSignature {
+    signature: ed25519_dalek::Signature
+}
+
+// TODO: this operation causes decompression to happen twice, From<EdwardsPoint> for ed25591_dalek::PublicKey is needed!
+impl OffchainSignature {
+    pub fn sign_message(msg: &[u8], private_key: &[u8], public_key: &OffchainPublicKey) -> Self {
+        let kp = ed25519_dalek::Keypair {
+            secret: ed25519_dalek::SecretKey::from_bytes(private_key).expect("invalid private key"),
+            public: ed25519_dalek::PublicKey::from_bytes(public_key.compressed.as_bytes()).unwrap(),
+        };
+        Self {
+            signature: kp.sign(msg)
+        }
+    }
+
+    pub fn verify_message(&self, msg: &[u8], public_key: &OffchainPublicKey) -> bool {
+        let pk = ed25519_dalek::PublicKey::from_bytes(public_key.compressed.as_bytes()).unwrap();
+        pk.verify_strict(msg, &self.signature).is_ok()
+    }
+}
+
 /// Represents an ECDSA signature based on the secp256k1 curve with recoverable public key.
 /// This signature encodes the 2-bit recovery information into the
 /// upper-most bits of MSB of the S value, which are never used by this ECDSA
@@ -881,7 +889,6 @@ impl BinarySerializable<'_> for Response {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Signature {
-    // TODO: The signature will be secp256k1 only, it will not accept Ed25519 public keys
     #[serde(with = "arrays")]
     signature: [u8; Self::SIZE],
     recovery: u8,
