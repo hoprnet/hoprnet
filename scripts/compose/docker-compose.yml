@@ -34,7 +34,10 @@ services:
       - HOPRD_API_HOST=0.0.0.0
       - HOPRD_IDENTITY=/app/hoprd-db/.hopr-id
       - HOPRD_DISABLE_API_AUTHENTICATION=true
-      - HOPRD_NETWORK=${HOPRD_NETWORK}
+      # FIXME: must be used as long as release bratislava is set
+      - HOPRD_ENVIRONMENT=${HOPRD_ENVIRONMENT}
+      # FIXME: must be used once release providence is set
+      # - HOPRD_NETWORK=${HOPRD_NETWORK}
       - HOPRD_HEALTH_CHECK=true
       - HOPRD_HEALTH_CHECK_HOST=0.0.0.0
     volumes:
