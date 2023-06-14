@@ -4,21 +4,19 @@ use utils_types::traits::BinarySerializable;
 use crate::errors::CryptoError::InvalidInputValue;
 use crate::errors::Result;
 use crate::shared_keys::{Alpha, GroupElement, Scalar, SphinxSuite};
-use crate::types::CurvePoint;
+use crate::types::{CurvePoint, OffchainPublicKey, PublicKey};
 
-use curve25519_dalek as dalek;
 use elliptic_curve::ops::MulByGenerator;
-use k256::FieldBytes;
 use crate::random::{random_bytes, random_fill};
 
-impl Scalar for dalek::scalar::Scalar {
+impl Scalar for curve25519_dalek::scalar::Scalar {
     fn random() -> Self {
         let bytes = random_bytes::<64>();
-        dalek::scalar::Scalar::from_bytes_mod_order_wide(&bytes)
+        curve25519_dalek::scalar::Scalar::from_bytes_mod_order_wide(&bytes)
     }
 
     fn from_bytes(sk: &[u8]) -> Result<Self> {
-        Ok(dalek::scalar::Scalar::from_bits(sk.try_into().map_err(|_| InvalidInputValue)?))
+        Ok(curve25519_dalek::scalar::Scalar::from_bits(sk.try_into().map_err(|_| InvalidInputValue)?))
     }
 
     fn to_bytes(&self) -> Box<[u8]> {
@@ -29,7 +27,7 @@ impl Scalar for dalek::scalar::Scalar {
 impl Scalar for k256::Scalar {
     fn random() -> Self {
         // Beware this is not constant time
-        let mut bytes = FieldBytes::default();
+        let mut bytes = k256::FieldBytes::default();
         loop {
             random_fill(&mut bytes);
             if let Ok(scalar) = Self::from_bytes(&bytes) {
@@ -39,7 +37,7 @@ impl Scalar for k256::Scalar {
     }
 
     fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        Ok(k256::Scalar::from_repr(*FieldBytes::from_slice(bytes)).unwrap())
+        Ok(k256::Scalar::from_repr(*k256::FieldBytes::from_slice(bytes)).unwrap())
     }
 
     fn to_bytes(&self) -> Box<[u8]> {
@@ -48,16 +46,16 @@ impl Scalar for k256::Scalar {
     }
 }
 
-impl GroupElement<typenum::U32, dalek::scalar::Scalar> for dalek::montgomery::MontgomeryPoint {
+impl GroupElement<typenum::U32, curve25519_dalek::scalar::Scalar> for curve25519_dalek::montgomery::MontgomeryPoint {
     fn to_alpha(&self) -> Alpha<typenum::U32> {
         self.0.into()
     }
 
     fn from_alpha(alpha: Alpha<typenum::U32>) -> Result<Self> {
-        Ok(dalek::montgomery::MontgomeryPoint(alpha.into()))
+        Ok(curve25519_dalek::montgomery::MontgomeryPoint(alpha.into()))
     }
 
-    fn generate(scalar: &dalek::scalar::Scalar) -> Self {
+    fn generate(scalar: &curve25519_dalek::scalar::Scalar) -> Self {
         scalar * &curve25519_dalek::constants::X25519_BASEPOINT
     }
 
@@ -66,18 +64,18 @@ impl GroupElement<typenum::U32, dalek::scalar::Scalar> for dalek::montgomery::Mo
     }
 }
 
-impl GroupElement<typenum::U32, dalek::scalar::Scalar> for dalek::edwards::EdwardsPoint {
+impl GroupElement<typenum::U32, curve25519_dalek::scalar::Scalar> for curve25519_dalek::edwards::EdwardsPoint {
 
     fn to_alpha(&self) -> Alpha<typenum::U32>{
         self.compress().0.into()
     }
 
     fn from_alpha(alpha: Alpha<typenum::U32>) -> Result<Self> {
-        dalek::edwards::CompressedEdwardsY(alpha.into()).decompress().ok_or(InvalidInputValue)
+        curve25519_dalek::edwards::CompressedEdwardsY(alpha.into()).decompress().ok_or(InvalidInputValue)
     }
 
-    fn generate(scalar: &dalek::scalar::Scalar) -> Self {
-        scalar * &dalek::constants::ED25519_BASEPOINT_POINT
+    fn generate(scalar: &curve25519_dalek::scalar::Scalar) -> Self {
+        scalar * &curve25519_dalek::constants::ED25519_BASEPOINT_POINT
     }
 
     fn is_valid(&self) -> bool {
@@ -85,7 +83,6 @@ impl GroupElement<typenum::U32, dalek::scalar::Scalar> for dalek::edwards::Edwar
     }
 }
 
-/// Secp256k1 additive group (via projective coordinates) represented as public keys
 impl GroupElement<typenum::U33, k256::Scalar> for k256::ProjectivePoint {
 
     fn to_alpha(&self) -> Alpha<typenum::U33> {
@@ -109,28 +106,56 @@ impl GroupElement<typenum::U33, k256::Scalar> for k256::ProjectivePoint {
     }
 }
 
+/// Represents a compressed serializable extension of the `PublicKey` using the secp256k1 curve.
+#[derive(PartialEq, Eq, Clone)]
+pub struct CompressedPublicKey(pub PublicKey);
+
+impl BinarySerializable<'_> for CompressedPublicKey {
+    const SIZE: usize = PublicKey::SIZE_COMPRESSED;
+
+    fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
+        PublicKey::from_bytes(data).map(CompressedPublicKey)
+    }
+
+    fn to_bytes(&self) -> Box<[u8]> {
+        self.0.to_bytes(true)
+    }
+}
+
+impl From<CompressedPublicKey> for k256::ProjectivePoint {
+    fn from(value: CompressedPublicKey) -> Self {
+        value.0.into()
+    }
+}
+
+/// Represents an instantiation of the Sphinx protocol using secp256k1 elliptic curve and `CompressedPublicKey`
 pub struct Secp256k1Suite ;
 
 impl SphinxSuite for Secp256k1Suite {
     type E = k256::Scalar;
     type A = typenum::U33;
     type G = k256::ProjectivePoint;
+    type P = CompressedPublicKey;
 }
 
+/// Represents an instantiation of the Sphinx protocol using the ed25519 curve and `OffchainPublicKey`
 pub struct Ed25519Suite ;
 
 impl SphinxSuite for Ed25519Suite {
-    type E = dalek::scalar::Scalar;
+    type E = curve25519_dalek::scalar::Scalar;
     type A = typenum::U32;
-    type G = dalek::edwards::EdwardsPoint;
+    type G = curve25519_dalek::edwards::EdwardsPoint;
+    type P = OffchainPublicKey;
 }
 
+/// Represents an instantiation of the Sphinx protocol using the Curve25519 curve and `OffchainPublicKey`
 pub struct X25519Suite ;
 
 impl SphinxSuite for X25519Suite {
-    type E = dalek::scalar::Scalar;
+    type E = curve25519_dalek::scalar::Scalar;
     type A = typenum::U32;
-    type G = dalek::montgomery::MontgomeryPoint;
+    type G = curve25519_dalek::montgomery::MontgomeryPoint;
+    type P = OffchainPublicKey;
 }
 
 #[cfg(test)]

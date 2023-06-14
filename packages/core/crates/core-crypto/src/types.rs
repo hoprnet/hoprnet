@@ -12,6 +12,7 @@ use std::fmt::{Display, Formatter};
 use std::ops::Add;
 use std::str::FromStr;
 use curve25519_dalek::edwards::{CompressedEdwardsY, EdwardsPoint};
+use curve25519_dalek::montgomery::MontgomeryPoint;
 use elliptic_curve::sec1::EncodedPoint;
 
 use utils_log::warn;
@@ -536,7 +537,7 @@ impl PeerIdLike for OffchainPublicKey {
                 .and_then(|pk| CompressedEdwardsY::from_slice(&pk.to_bytes())
                     .decompress()
                     .ok_or(ParseError))
-                .map(|ed| OffchainPublicKey::from(ed))
+                .map(|key| Self { compressed: key.compress(), key })
         } else {
             Err(ParseError)
         }
@@ -554,27 +555,33 @@ impl Display for OffchainPublicKey {
     }
 }
 
-impl From<EdwardsPoint> for OffchainPublicKey {
-    fn from(key: EdwardsPoint) -> Self {
-        let compressed = key.compress();
-        Self {
-            key,
-            compressed,
-        }
+impl From<OffchainPublicKey> for EdwardsPoint {
+    fn from(value: OffchainPublicKey) -> Self {
+        value.key
+    }
+}
+
+impl From<OffchainPublicKey> for MontgomeryPoint {
+    fn from(value: OffchainPublicKey) -> Self {
+        value.key.to_montgomery()
     }
 }
 
 impl OffchainPublicKey {
     /// Generates new random keypair (private key, public key)
     pub fn random_keypair() -> ([u8; 32], Self) {
-        let (point, scalar) = EdwardsPoint::random_pair();
-        (scalar.to_bytes(), point.into())
+        let (key, scalar) = EdwardsPoint::random_pair();
+        (scalar.to_bytes(), Self {
+            compressed: key.compress(),
+            key
+        })
     }
 
     pub fn from_privkey(private_key: &[u8]) -> Result<Self> {
         if private_key.len() == 32 {
             let scalar = curve25519_dalek::scalar::Scalar::from_bits(private_key.try_into().unwrap());
-            Ok(EdwardsPoint::generate(&scalar).into())
+            let key = EdwardsPoint::generate(&scalar);
+            Ok(Self { compressed: key.compress(), key })
         } else {
             Err(InvalidInputValue)
         }
@@ -676,6 +683,12 @@ impl From<elliptic_curve::PublicKey<Secp256k1>> for PublicKey {
     }
 }
 
+impl From<PublicKey> for k256::ProjectivePoint {
+    fn from(value: PublicKey) -> Self {
+        value.key.to_projective()
+    }
+}
+
 impl PublicKey {
     /// Size of the compressed public key in bytes
     pub const SIZE_COMPRESSED: usize = 33;
@@ -684,7 +697,7 @@ impl PublicKey {
     pub const SIZE_UNCOMPRESSED: usize = 65;
 
     /// Generates new random keypair (private key, public key)
-    pub fn random_keypair() -> (Box<[u8]>, PublicKey) {
+    pub fn random_keypair() -> ([u8; 32], PublicKey) {
         let (private, cp) = random_group_element();
         (private, PublicKey::try_from(cp).unwrap())
     }
@@ -1678,7 +1691,7 @@ pub mod wasm {
         #[wasm_bindgen(js_name = "random_keypair")]
         pub fn _random_keypair() -> KeyPair {
             let (private, public) = Self::random_keypair();
-            KeyPair { private, public }
+            KeyPair { private: private.into(), public }
         }
 
         #[wasm_bindgen(js_name = "deserialize")]

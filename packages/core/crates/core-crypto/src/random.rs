@@ -32,15 +32,17 @@ pub fn random_integer(start: u64, end: Option<u64>) -> Result<u64> {
 
 /// Generates a random elliptic curve point on secp256k1 curve (but not a point in infinity).
 /// Returns the encoded secret scalar and the corresponding point.
-pub fn random_group_element() -> (Box<[u8]>, CurvePoint) {
+pub fn random_group_element() -> ([u8; 32], CurvePoint) {
     let mut scalar: NonZeroScalar<Secp256k1> = NonZeroScalar::<Secp256k1>::from_uint(1u32.into()).unwrap();
     let mut point = ProjectivePoint::<Secp256k1>::IDENTITY;
     while point.is_identity().into() {
         scalar = NonZeroScalar::<Secp256k1>::random(&mut OsRng);
         point = ProjectivePoint::<Secp256k1>::GENERATOR * scalar.as_ref();
     }
+    let mut secret = [0u8; 32];
+    secret.copy_from_slice(&scalar.to_bytes());
     (
-        scalar.to_bytes().as_slice().into(),
+        secret,
         CurvePoint::from_affine(point.to_affine()),
     )
 }
@@ -116,7 +118,7 @@ pub mod wasm {
     impl GroupElement {
         pub fn random() -> GroupElement {
             let (coeff, element) = crate::random::random_group_element();
-            Self { coeff, element }
+            Self { coeff: coeff.into(), element }
         }
 
         pub fn coefficient(&self) -> Uint8Array {

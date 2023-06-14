@@ -27,19 +27,19 @@ pub const INTERMEDIATE_HOPS: usize = 3;
 pub const PAYLOAD_SIZE: usize = 500;
 
 /// Length of the packet including header and the payload
-pub const PACKET_LENGTH: usize = packet_length(INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0);
+pub const PACKET_LENGTH: usize = packet_length::<Ed25519Suite>(INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0);
 
 /// Tag used to separate padding from data
 const PADDING_TAG: &[u8] = b"HOPR";
 
 /// Determines the total length (header + payload) of the packet given the header information.
-pub const fn packet_length(
+pub const fn packet_length<S: SphinxSuite>(
     max_hops: usize,
     additional_data_relayer_len: usize,
     additional_data_last_hop_len: usize,
 ) -> usize {
-    OffchainPublicKey::SIZE
-        + header_length::<OffchainPublicKey>(max_hops, additional_data_relayer_len, additional_data_last_hop_len)
+    S::P::SIZE
+        + header_length::<S>(max_hops, additional_data_relayer_len, additional_data_last_hop_len)
         + SimpleMac::SIZE
         + PAYLOAD_SIZE
 }
@@ -73,7 +73,7 @@ struct MetaPacket<S: SphinxSuite> {
 enum ForwardedMetaPacket<S: SphinxSuite> {
     RelayedPacket {
         packet: MetaPacket<S>,
-        next_node: OffchainPublicKey,
+        next_node: S::P,
         additional_info: Box<[u8]>,
         derived_secret: Box<[u8]>,
         packet_tag: Box<[u8]>,
@@ -90,7 +90,7 @@ impl<S: SphinxSuite> MetaPacket<S> {
     pub fn new(
         shared_keys: SharedKeys<S::E, S::A, S::G>,
         msg: &[u8],
-        path: &Vec<OffchainPublicKey>,
+        path: &Vec<S::P>,
         max_hops: usize,
         additional_relayer_data_len: usize,
         additional_data_relayer: &[&[u8]],
@@ -99,7 +99,7 @@ impl<S: SphinxSuite> MetaPacket<S> {
         assert!(msg.len() <= PAYLOAD_SIZE, "message too long to fit into a packet");
 
         let mut padded = add_padding(msg);
-        let routing_info = RoutingInfo::new(
+        let routing_info = RoutingInfo::new::<S>(
             max_hops,
             path,
             &shared_keys.secrets,
@@ -193,7 +193,7 @@ impl<S: SphinxSuite> MetaPacket<S> {
         )?;
 
         let mut routing_info_cpy: Vec<u8> = self.routing_info().into();
-        let fwd_header = forward_header(
+        let fwd_header = forward_header::<S>(
             &secret,
             &mut routing_info_cpy,
             self.mac(),
@@ -215,7 +215,7 @@ impl<S: SphinxSuite> MetaPacket<S> {
                 packet: Self::new_from_parts(alpha, &header, &mac, &decrypted),
                 packet_tag: derive_packet_tag(&secret)?,
                 derived_secret: secret.into(),
-                next_node,
+                next_node: S::P::from_bytes(&next_node).map_err(|_| PacketDecodingError("couldn't parse next node id".into()))?,
                 additional_info,
             },
             ForwardedHeader::FinalNode { additional_data } => FinalPacket {
@@ -279,22 +279,15 @@ impl Packet {
     pub fn new(msg: &[u8], path: &[&PeerId], channel_private_key: &[u8], mut ticket: Ticket) -> Result<Self> {
         assert!(!path.is_empty(), "path must not be empty");
 
-        let (public_group_elements, public_keys_path) = path
+        let public_keys_path = path
             .iter()
-            .map(|peer_id| {
-                match OffchainPublicKey::from_peerid(peer_id) {
-                    Ok(public_key) => Ok((public_key.as_edwards_point().clone(), public_key)),
-                    Err(_) => {
-                        error!("encountered invalid peer id: {peer_id}");
-                        Err(PacketConstructionError)
-                    }
-                }
-            })
-            .collect::<Result<Vec<_>>>()?
-            .into_iter()
-            .unzip();
+            .map(|peer_id| OffchainPublicKey::from_peerid(peer_id).map_err(|_| {
+                    error!("encountered invalid peer id: {peer_id}");
+                    PacketConstructionError
+                })
+            ).collect::<Result<Vec<_>>>()?;
 
-        let shared_keys = Ed25519Suite::new_shared_keys(public_group_elements)?;
+        let shared_keys = Ed25519Suite::new_shared_keys(public_keys_path.clone())?;
         let por_values = ProofOfRelayValues::new(shared_keys.secrets[0], shared_keys.secrets.get(1).cloned());
         let por_strings = ProofOfRelayString::from_shared_secrets(&shared_keys.secrets);
 
@@ -327,7 +320,7 @@ impl Packet {
             let (pre_packet, pre_ticket) = data.split_at(PACKET_LENGTH);
             let previous_hop = OffchainPublicKey::from_peerid(sender)?;
 
-            let header_len = header_length::<OffchainPublicKey>(INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0);
+            let header_len = header_length::<Ed25519Suite>(INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0);
             let mp = MetaPacket::from_bytes(pre_packet, header_len)?;
 
             match mp.forward(node_private_key, node_public_key.as_edwards_point(), INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0)? {
@@ -445,7 +438,7 @@ mod tests {
     use core_types::channels::Ticket;
     use libp2p_identity::PeerId;
     use parameterized::parameterized;
-    use core_crypto::ec_groups::{Ed25519Suite, X25519Suite};
+    use core_crypto::ec_groups::{CompressedPublicKey, Ed25519Suite, Secp256k1Suite, X25519Suite};
     use core_crypto::shared_keys::SphinxSuite;
     use utils_types::primitives::{Balance, BalanceType, U256};
     use utils_types::traits::PeerIdLike;
@@ -465,12 +458,10 @@ mod tests {
         assert_eq!(data, &unpadded.unwrap());
     }
 
-    fn generic_test_meta_packet<S: SphinxSuite>(keypairs: Vec<([u8; 32], OffchainPublicKey)>, group_elements: Vec<S::G>) {
-        assert_eq!(keypairs.len(), group_elements.len());
+    fn generic_test_meta_packet<S: SphinxSuite>(keypairs: Vec<([u8; 32], S::P)>) {
+        let (secrets, path): (Vec<[u8;32]>, Vec<S::P>) = keypairs.into_iter().unzip();
 
-        let (secrets, path): (Vec<[u8;32]>, Vec<OffchainPublicKey>) = keypairs.into_iter().unzip();
-
-        let shared_keys = S::new_shared_keys(group_elements.clone()).unwrap();
+        let shared_keys = S::new_shared_keys(path.clone()).unwrap();
         let por_strings = ProofOfRelayString::from_shared_secrets(&shared_keys.secrets);
 
         assert_eq!(shared_keys.secrets.len() - 1, por_strings.len());
@@ -489,7 +480,7 @@ mod tests {
 
         for (i, secret) in secrets.iter().enumerate() {
             let fwd = mp
-                .forward(secret, &group_elements[i], INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0)
+                .forward(secret, &path[i].clone().into(), INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0)
                 .expect(&format!("failed to unwrap at {i}"));
 
             match fwd {
@@ -512,30 +503,33 @@ mod tests {
 
     #[parameterized(amount = { 4, 3, 2 })]
     fn test_ed25519_meta_packet(amount: usize) {
-        let (elements, keypairs) = (0..amount)
-            .map(|_| {
-            let kp = OffchainPublicKey::random_keypair();
-            (kp.1.as_edwards_point().clone(), kp)
-        }).unzip();
+        let keypairs = (0..amount)
+            .map(|_| OffchainPublicKey::random_keypair())
+            .collect();
 
-        generic_test_meta_packet::<Ed25519Suite>(keypairs, elements);
+        generic_test_meta_packet::<Ed25519Suite>(keypairs);
     }
 
     #[parameterized(amount = { 4, 3, 2 })]
     fn test_x25519_meta_packet(amount: usize) {
-        let (elements, keypairs) = (0..amount)
-            .map(|_| {
-                let kp = OffchainPublicKey::random_keypair();
-                (kp.1.as_edwards_point().to_montgomery(), kp)
-            }).unzip();
+        let keypairs = (0..amount)
+            .map(|_| OffchainPublicKey::random_keypair())
+            .collect();
 
-        generic_test_meta_packet::<X25519Suite>(keypairs, elements)
+        generic_test_meta_packet::<X25519Suite>(keypairs)
     }
 
-    /*#[parameterized(amount = { 4, 3, 2 })]
+    #[parameterized(amount = { 4, 3, 2 })]
     fn test_secp256k1_meta_packet(amount: usize) {
-        generic_test_meta_packet::<Secp256k1Suite>(amount)
-    }*/
+        let keypairs = (0..amount)
+            .map(|_| {
+                let (secret, pk) = PublicKey::random_keypair();
+                (secret, CompressedPublicKey(pk))
+            })
+            .collect();
+
+        generic_test_meta_packet::<Secp256k1Suite>(keypairs)
+    }
 
     fn mock_ticket(next_peer_channel_key: &PublicKey, path_len: usize, private_key: &[u8]) -> Ticket {
         assert!(path_len > 0);
@@ -564,14 +558,8 @@ mod tests {
     fn test_packet_create_and_transform(amount: usize) {
         // Generate random path with node private keys
         let (mut path, mut node_private_keys) :(Vec<PeerId>, Vec<[u8; 32]>) = (0..amount)
-            .map(|_| libp2p_identity::Keypair::generate_ed25519())
-            .map(|kp| {
-                let public = kp.public();
-                let secret = kp.try_into_ed25519().unwrap().secret();
-                let mut sk = [0u8; 32];
-                sk.copy_from_slice(secret.as_ref());
-                (public.to_peer_id(), sk)
-            })
+            .map(|_| OffchainPublicKey::random_keypair())
+            .map(|(private, public)| (public.to_peerid(), private))
             .unzip();
 
         // Generate random channel public keys

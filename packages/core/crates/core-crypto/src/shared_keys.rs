@@ -5,11 +5,13 @@ use generic_array::{ArrayLength, GenericArray};
 
 use crate::errors::CryptoError::CalculationError;
 use hkdf::SimpleHkdf;
+use utils_types::traits::BinarySerializable;
 
 use crate::errors::Result;
 use crate::parameters::SECRET_KEY_LENGTH;
 use crate::types::SecretKey;
 
+/// Represents a shared secret with a remote peer.
 pub type SharedSecret = [u8; SECRET_KEY_LENGTH];
 
 /// Types representing a valid non-zero scalar an additive abelian group.
@@ -24,6 +26,8 @@ pub trait Scalar: Mul<Output = Self> + Sized {
     fn to_bytes(&self) -> Box<[u8]>;
 }
 
+/// Represents the Alpha value of a certain length in the Sphinx protocol
+/// The length of the alpha value is directly dependent on the group element.
 pub type Alpha<A> = GenericArray<u8, A>;
 
 /// Generic additive abelian group element with an associated scalar type.
@@ -145,21 +149,28 @@ impl <E: Scalar, A: ArrayLength<u8>, G: GroupElement<A, E>> SharedKeys<E, A, G> 
 
         Ok((alpha_new.to_alpha(), secret))
     }
-
 }
 
+/// Represents an instantiation of the Spinx protocol using the given EC group and corresponding public key object.
 pub trait SphinxSuite {
+    /// Scalar type supported by the EC group
     type E: Scalar;
+
+    /// Length of the Sphinx Alpha value corresponding to the EC group
     type A: ArrayLength<u8>;
+
+    /// EC group
     type G: GroupElement<Self::A, Self::E>;
 
-    /// Convenience function to generate shared keys.
-    fn new_shared_keys(public_group_elements: Vec<Self::G>) -> Result<SharedKeys<Self::E, Self::A, Self::G>> {
-        SharedKeys::generate(public_group_elements)
+    /// Public key corresponding to the EC group
+    type P: for <'a> BinarySerializable<'a> + Into<Self::G> + Clone;
+
+    /// Convenience function to generate shared keys from the path of public keys.
+    fn new_shared_keys(public_keys: Vec<Self::P>) -> Result<SharedKeys<Self::E, Self::A, Self::G>> {
+        SharedKeys::generate(public_keys.into_iter().map(|pk| pk.into()).collect())
     }
 }
 
-/// Unit tests of the Rust code
 #[cfg(test)]
 pub mod tests {
     use super::*;
@@ -182,5 +193,4 @@ pub mod tests {
             alpha_cpy = alpha;
         }
     }
-
 }

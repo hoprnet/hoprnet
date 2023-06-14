@@ -1,5 +1,4 @@
 use crate::derivation::derive_mac_key;
-use crate::errors::CryptoError;
 use crate::errors::CryptoError::TagMismatch;
 use crate::errors::Result;
 use crate::parameters::SECRET_KEY_LENGTH;
@@ -11,17 +10,17 @@ use crate::utils::xor_inplace;
 use std::ops::Not;
 use subtle::ConstantTimeEq;
 use utils_types::traits::BinarySerializable;
-use crate::shared_keys::SharedSecret;
+use crate::shared_keys::{SharedSecret, SphinxSuite};
 
 const RELAYER_END_PREFIX: u8 = 0xff;
 
 /// Returns the size of the packet header given the information about the number of hops and additional relayer info.
-pub const fn header_length<I: for <'a> BinarySerializable<'a>>(
+pub const fn header_length<S: SphinxSuite>(
     max_hops: usize,
     additional_data_relayer_len: usize,
     additional_data_last_hop_len: usize,
 ) -> usize {
-    let per_hop = I::SIZE + SimpleMac::SIZE + additional_data_relayer_len;
+    let per_hop = S::P::SIZE + SimpleMac::SIZE + additional_data_relayer_len;
     let last_hop = 1 + additional_data_last_hop_len;
 
     last_hop + (max_hops - 1) * per_hop
@@ -85,9 +84,9 @@ impl RoutingInfo {
     /// * `additional_data_relayer_len` length of each additional data for all relayers
     /// * `additional_data_relayer` additional data for each relayer
     /// * `additional_data_last_hop` additional data for the final recipient
-    pub fn new<I: for <'a> BinarySerializable<'a>>(
+    pub fn new<S: SphinxSuite>(
         max_hops: usize,
-        path: &[I],
+        path: &[S::P],
         secrets: &[SharedSecret],
         additional_data_relayer_len: usize,
         additional_data_relayer: &[&[u8]],
@@ -112,7 +111,7 @@ impl RoutingInfo {
             "invalid additional data for last hop"
         );
 
-        let routing_info_len = additional_data_relayer_len + SimpleMac::SIZE + I::SIZE;
+        let routing_info_len = additional_data_relayer_len + SimpleMac::SIZE + S::P::SIZE;
         let last_hop_len = additional_data_last_hop.map(|d| d.len()).unwrap_or(0) + 1; // end prefix length
 
         let header_len = last_hop_len + (max_hops - 1) * routing_info_len;
@@ -148,12 +147,12 @@ impl RoutingInfo {
                 }
             } else {
                 extended_header.copy_within(0..header_len, routing_info_len);
-                extended_header[0..I::SIZE].copy_from_slice(&path[inverted_idx + 1].to_bytes());
-                extended_header[I::SIZE..I::SIZE + SimpleMac::SIZE]
+                extended_header[0..S::P::SIZE].copy_from_slice(&path[inverted_idx + 1].to_bytes());
+                extended_header[S::P::SIZE..S::P::SIZE + SimpleMac::SIZE]
                     .copy_from_slice(&ret.mac);
 
-                extended_header[I::SIZE + SimpleMac::SIZE
-                    ..I::SIZE + SimpleMac::SIZE + additional_data_relayer[inverted_idx].len()]
+                extended_header[S::P::SIZE + SimpleMac::SIZE
+                    ..S::P::SIZE + SimpleMac::SIZE + additional_data_relayer[inverted_idx].len()]
                     .copy_from_slice(additional_data_relayer[inverted_idx]);
 
                 let key_stream = prg.digest(0, header_len);
@@ -172,7 +171,7 @@ impl RoutingInfo {
 
 /// Enum carry information about the packet based on whether it is destined for the current node (`FinalNode`)
 /// or if the packet is supposed to be only relayed (`RelayNode`).
-pub enum ForwardedHeader<I: for <'a> BinarySerializable<'a>> {
+pub enum ForwardedHeader {
     /// Packet is supposed to be relayed
     RelayNode {
         /// Transformed header
@@ -180,7 +179,7 @@ pub enum ForwardedHeader<I: for <'a> BinarySerializable<'a>> {
         /// Authentication tag
         mac: Box<[u8]>,
         /// Public key of the next node
-        next_node: I,
+        next_node: Box<[u8]>,
         /// Additional data for the relayer
         additional_info: Box<[u8]>,
     },
@@ -204,18 +203,18 @@ pub enum ForwardedHeader<I: for <'a> BinarySerializable<'a>> {
 /// * `max_hops` maximal number of hops
 /// * `additional_data_relayer_len` length of the additional data for each relayer
 /// * `additional_data_last_hop_len` length of the additional data for the final destination
-pub fn forward_header<I: for <'a> BinarySerializable<'a>>(
+pub fn forward_header<S: SphinxSuite>(
     secret: &[u8],
     header: &mut [u8],
     mac: &[u8],
     max_hops: usize,
     additional_data_relayer_len: usize,
     additional_data_last_hop_len: usize,
-) -> Result<ForwardedHeader<I>> {
+) -> Result<ForwardedHeader> {
     assert_eq!(SECRET_KEY_LENGTH, secret.len(), "invalid secret length");
     assert_eq!(SimpleMac::SIZE, mac.len(), "invalid mac length");
 
-    let routing_info_len = additional_data_relayer_len + I::SIZE + SimpleMac::SIZE;
+    let routing_info_len = additional_data_relayer_len + S::P::SIZE + SimpleMac::SIZE;
     let last_hop_len = additional_data_last_hop_len + 1; // end prefix
 
     let header_len = last_hop_len + (max_hops - 1) * routing_info_len;
@@ -235,13 +234,12 @@ pub fn forward_header<I: for <'a> BinarySerializable<'a>>(
 
     if header[0] != RELAYER_END_PREFIX {
         // Try to deserialize the public key to validate it
-        let next_node =
-            I::from_bytes(&header[0..I::SIZE]).map_err(|_| CryptoError::CalculationError)?;
+        let next_node: Box<[u8]> = (&header[0..S::P::SIZE]).into();
 
-        let mac: Box<[u8]> = (&header[I::SIZE..I::SIZE + SimpleMac::SIZE]).into();
+        let mac: Box<[u8]> = (&header[S::P::SIZE..S::P::SIZE + SimpleMac::SIZE]).into();
 
-        let additional_info: Box<[u8]> = (&header[I::SIZE + SimpleMac::SIZE
-            ..I::SIZE + SimpleMac::SIZE + additional_data_relayer_len])
+        let additional_info: Box<[u8]> = (&header[S::P::SIZE + SimpleMac::SIZE
+            ..S::P::SIZE + SimpleMac::SIZE + additional_data_relayer_len])
             .into();
 
         header.copy_within(routing_info_len.., 0);
@@ -263,7 +261,6 @@ pub fn forward_header<I: for <'a> BinarySerializable<'a>>(
 
 #[cfg(test)]
 pub mod tests {
-    use std::fmt::Debug;
     use crate::parameters::SECRET_KEY_LENGTH;
     use crate::prg::{PRGParameters, PRG};
     use crate::primitives::{DigestLike, SimpleMac};
@@ -272,9 +269,9 @@ pub mod tests {
     use crate::utils::xor_inplace;
     use parameterized::parameterized;
     use utils_types::traits::BinarySerializable;
-    use crate::ec_groups::{Ed25519Suite, Secp256k1Suite, X25519Suite};
+    use crate::ec_groups::{CompressedPublicKey, Ed25519Suite, Secp256k1Suite, X25519Suite};
     use crate::shared_keys::{SharedSecret, SphinxSuite};
-    use crate::types::{CurvePoint, OffchainPublicKey, PublicKey};
+    use crate::types::{OffchainPublicKey, PublicKey};
 
     #[parameterized(hops = { 3, 4 })]
     fn test_filler_generate_verify(hops: usize) {
@@ -338,20 +335,18 @@ pub mod tests {
         assert_eq!(0, second_filler.len());
     }
 
-    fn generic_test_generate_routing_info_and_forward<S, I>(path: Vec<(S::G, I)>)
-    where S: SphinxSuite, I: for <'a> BinarySerializable<'a> + PartialEq + Debug {
+    fn generic_test_generate_routing_info_and_forward<S>(pub_keys: Vec<S::P>)
+    where S: SphinxSuite {
         const MAX_HOPS: usize = 3;
-        let mut additional_data: Vec<&[u8]> = Vec::with_capacity(path.len());
-        for _ in 0..path.len() {
+        let mut additional_data: Vec<&[u8]> = Vec::with_capacity(pub_keys.len());
+        for _ in 0..pub_keys.len() {
             let e: &[u8] = &[];
             additional_data.push(e);
         }
 
-        let (elements, pub_keys): (Vec<_>, Vec<_>) = path.into_iter().unzip();
+        let shares = S::new_shared_keys(pub_keys.clone()).unwrap();
 
-        let shares = S::new_shared_keys(elements).unwrap();
-
-        let rinfo = RoutingInfo::new(
+        let rinfo = RoutingInfo::new::<S>(
             MAX_HOPS,
             &pub_keys,
             &shares.secrets,
@@ -366,13 +361,13 @@ pub mod tests {
         last_mac.copy_from_slice(&rinfo.mac);
 
         for (i, secret) in shares.secrets.iter().enumerate() {
-            let fwd = forward_header::<I>(secret, &mut header, &last_mac, MAX_HOPS, 0, 0).unwrap();
+            let fwd = forward_header::<S>(secret, &mut header, &last_mac, MAX_HOPS, 0, 0).unwrap();
 
             match fwd {
                 ForwardedHeader::RelayNode { mac, next_node, .. } => {
                     last_mac.copy_from_slice(&mac);
                     assert!(i < shares.secrets.len() - 1);
-                    assert_eq!(pub_keys[i + 1], next_node);
+                    assert_eq!(pub_keys[i + 1].to_bytes().as_ref(), next_node.as_ref());
                 }
                 ForwardedHeader::FinalNode { additional_data } => {
                     assert_eq!(shares.secrets.len() - 1, i);
@@ -384,44 +379,22 @@ pub mod tests {
 
     #[parameterized(amount = { 3, 2, 1 })]
     fn test_ed25519_generate_routing_info_and_forward(amount: usize) {
-        let path = (0..amount).map(|_| {
-            let key = OffchainPublicKey::random();
-            (key.as_edwards_point().clone(), key)
-        }).collect::<Vec<_>>();
+        let path = (0..amount).map(|_| OffchainPublicKey::random()).collect::<Vec<_>>();
 
-        generic_test_generate_routing_info_and_forward::<Ed25519Suite, OffchainPublicKey>(path)
+        generic_test_generate_routing_info_and_forward::<Ed25519Suite>(path)
     }
 
     #[parameterized(amount = { 3, 2, 1 })]
     fn test_x25519_generate_routing_info_and_forward(amount: usize) {
-        let path = (0..amount).map(|_| {
-            let key = OffchainPublicKey::random();
-            (key.as_edwards_point().to_montgomery(), key)
-        }).collect::<Vec<_>>();
+        let path = (0..amount).map(|_| OffchainPublicKey::random()).collect::<Vec<_>>();
 
-        generic_test_generate_routing_info_and_forward::<X25519Suite, OffchainPublicKey>(path)
-    }
-
-    #[derive(Debug, PartialEq, Eq)]
-    struct PubkeyWrapper(PublicKey);
-    impl<'a> BinarySerializable<'a> for PubkeyWrapper {
-        const SIZE: usize = PublicKey::SIZE_COMPRESSED;
-
-        fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
-            Ok(PubkeyWrapper(PublicKey::from_bytes(data)?))
-        }
-
-        fn to_bytes(&self) -> Box<[u8]> {
-            self.0.to_bytes(true)
-        }
+        generic_test_generate_routing_info_and_forward::<X25519Suite>(path)
     }
 
     #[parameterized(amount = { 3, 2, 1 })]
     fn test_secp256k1_generate_routing_info_and_forward(amount: usize) {
-        let path = (0..amount).map(|_| {
-            let key = PublicKey::random();
-            (CurvePoint::from(key.clone()).to_projective_point(), PubkeyWrapper(key))
-        }).collect::<Vec<_>>();
-        generic_test_generate_routing_info_and_forward::<Secp256k1Suite, PubkeyWrapper>(path)
+        let path = (0..amount).map(|_| CompressedPublicKey(PublicKey::random())).collect::<Vec<_>>();
+
+        generic_test_generate_routing_info_and_forward::<Secp256k1Suite>(path)
     }
 }
