@@ -129,7 +129,7 @@ jobs:
   github_release:
     name: Create Github Release
     runs-on: ubuntu-latest
-    needs: [build_deploy_sc_npm]
+    needs: [build]
     if: ${{ startsWith(github.ref, 'refs/heads/release/') }}
     steps:
       - uses: actions/checkout@v3
@@ -163,7 +163,7 @@ jobs:
     name: Build Docker Images
     timeout-minutes: 30
     runs-on: ubuntu-latest
-    needs: [build_deploy_sc_npm]
+    needs: [build]
     steps:
       - uses: actions/checkout@v3
         with:
@@ -490,7 +490,7 @@ jobs:
   unset_failed_deployment_flag:
     name: "Unset failed deployment flag"
     runs-on: ubuntu-latest
-    needs: [avado, deploy_public_instances, deploy_nat_instances]
+    needs: [deploy_public_instances, deploy_nat_instances]
     steps:
       - uses: actions/checkout@v3
         with:
