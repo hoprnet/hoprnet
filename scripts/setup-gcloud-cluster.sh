@@ -191,14 +191,6 @@ for instance_idx in "${!instance_names_arr[@]}" ; do
   api_peer_id="$(get_hopr_address "${api_token}@${node_ip}:3001")"
 
   if [[ -z "${staking_status}" ]]; then
-    # If the instance does not have metadata yet, we set it once
-
-    # NOTE: We leave only the first public node unstaked
-    if [[ ${instance_idx} -eq 0 && "${instance_template_name}" != *-nat* && "${skip_unstaked}" != "true" ]]; then
-      staking_status="unstaked"
-    else
-      staking_status="staked"
-    fi
 
     # Save the metadata
     declare new_metadata="HOPRD_WALLET_ADDR=${api_wallet_addr},HOPRD_PEER_ID=${api_peer_id},HOPRD_STAKING_STATUS=${staking_status}"
@@ -218,17 +210,14 @@ for instance_idx in "${!instance_names_arr[@]}" ; do
   ip_addrs+=( "${node_ip}" )
 
   # Build an array of hopr_addrs to be staked
-  if [[ "${staking_status}" != "unstaked" ]]; then
-    hopr_addrs+=( "${api_peer_id}" )
-  fi
+  hopr_addrs+=( "${api_peer_id}" )
+
 
   # Fund the node as well
   fund_if_empty "${api_wallet_addr}" "${network}"
 done
 
-
-
-if [[ -z "${hopr_addrs}" ]]; then
+if [ ! -z ${hopr_addrs} ]; then
   # Register all nodes in cluster
   IFS=','
   # use CI wallet to register VM instances. This action may fail if nodes were previously linked to other staking accounts
