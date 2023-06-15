@@ -112,14 +112,6 @@ jobs:
           path: packages/
           key: hoprnet-build-${{ github.run_id }}
 
-      # Pushing a PR to a release branch should increment the patch version in
-      # accordance with semver.
-      - name: "[NPM] Publish patch version (On pushes to release branches)"
-        if: ${{ startsWith(github.ref, 'refs/heads/release/') && !env.ACT }}
-        run: nix develop -c ./scripts/publish-version.sh patch
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
       - name: "[FINISH] Send notification if anything failed on master or release/staging branches"
         if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/') || startsWith(github.ref, 'refs/heads/staging/')) && !env.ACT }}
         run: |
@@ -195,13 +187,8 @@ jobs:
           project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
           install_components: beta
 
-      - name: Pull recent Git changes
-        if: ${{ startsWith(github.ref, 'refs/heads/release/') && !env.ACT }}
-        run: |
-          # need to pull changes because we've updated the package versions in
-          # the job publish_npm beforehand
-          branch=$(git rev-parse --abbrev-ref HEAD)
-          git pull origin "${branch}" --rebase
+      - name: "Rename version to include PR number"
+        run: nix develop -c ./scripts/bump-version.sh ${{ github.event.pull_request.number }}
 
       - name: Build Docker images
         run: nix develop -c ./scripts/build-docker.sh
