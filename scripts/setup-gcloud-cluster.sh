@@ -77,9 +77,6 @@ declare show_prestartinfo="${HOPRD_SHOW_PRESTART_INFO:-false}"
 declare reset_metadata="${HOPRD_RESET_METADATA:-false}"
 declare skip_unstaked="${HOPRD_SKIP_UNSTAKED:-false}"
 
-# Append network as Docker image version, if not specified
-[[ "${docker_image}" != *:* ]] && docker_image="${docker_image}:${network}"
-
 function cleanup {
   local EXIT_CODE=$?
 
@@ -229,15 +226,18 @@ for instance_idx in "${!instance_names_arr[@]}" ; do
   fund_if_empty "${api_wallet_addr}" "${network}"
 done
 
-# Register all nodes in cluster
-IFS=','
 
-# use CI wallet to register VM instances. This action may fail if nodes were previously linked to other staking accounts
-PRIVATE_KEY="${DEPLOYER_PRIVATE_KEY}" make -C "${mydir}/.." self-register-node \
-  network="${network}" \
-  peer_ids="${hopr_addrs[*]}" \
-  environment_type="${environment_type}"
-unset IFS
+
+if [[ -z "${hopr_addrs}" ]]; then
+  # Register all nodes in cluster
+  IFS=','
+  # use CI wallet to register VM instances. This action may fail if nodes were previously linked to other staking accounts
+  PRIVATE_KEY="${DEPLOYER_PRIVATE_KEY}" make -C "${mydir}/.." self-register-node \
+    network="${network}" \
+    peer_ids="${hopr_addrs[*]}" \
+    environment_type="${environment_type}"
+  unset IFS
+fi
 
 # Finally wait for the public nodes to come up, for NAT nodes this isn't possible
 # because the P2P port is not exposed.

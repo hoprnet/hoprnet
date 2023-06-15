@@ -152,7 +152,7 @@ fund_if_empty() {
 
   if (( $(echo "${address_native_balance} < ${min_funds}" | bc -l) )); then
     # @TODO: Provide retry by checking balance again.
-    log "Hoprd node with peerId ${address} has not enough native balance. Funding native tokens..."
+    log "Hoprd node with address ${address} has not enough native balance. Funding native tokens..."
     local tx_hash tx_error tx_res
     tx_res="$(faucet_to_address "${network}" "${address}" "native")"
     tx_error="$(echo "${tx_res}" | jq -r '.err // empty' 2>/dev/null || echo "${tx_res}")"
