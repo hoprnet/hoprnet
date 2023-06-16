@@ -35,8 +35,8 @@ const MOCK_ADDRESS = () => Address.from_string('Cf7Ed3AccA5a467e9e704C703E8D87F6
 function channelEntryCreateMock(): ChannelEntry {
   const pub = PublicKey.from_privkey(stringToU8a('0x1464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8'))
   return new ChannelEntry(
-    pub.clone(),
-    pub.clone(),
+    pub.clone().to_address(),
+    pub.clone().to_address(),
     new Balance('1', BalanceType.HOPR),
     Hash.create([]),
     U256.one(),

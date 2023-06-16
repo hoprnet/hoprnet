@@ -11,8 +11,10 @@ use async_std::channel::{bounded, Receiver, Sender, TrySendError};
 use core_crypto::types::{HalfKeyChallenge, Hash, PublicKey};
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_mixer::mixer::{Mixer, MixerConfig};
-use core_types::acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket};
-use core_types::channels::Ticket;
+use core_types::{
+    acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket},
+    channels::Ticket,
+};
 use futures::future::{select, Either};
 use futures::pin_mut;
 use libp2p_identity::PeerId;
@@ -274,7 +276,7 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
                 self.db
                     .read()
                     .await
-                    .get_channel_from(&unackowledged.signer.to_address())
+                    .get_channel_from(&unackowledged.signer)
                     .await
                     .map_err(|e| {
                         #[cfg(all(feature = "prometheus", not(test)))]
@@ -601,7 +603,7 @@ where
                     self.db.read().await.deref(),
                     &packet.ticket,
                     &channel,
-                    &previous_hop,
+                    &previous_hop.to_address(),
                     Balance::from_str(PRICE_PER_PACKET, BalanceType::HOPR),
                     inverse_win_prob,
                     self.cfg.check_unrealized_balance,
@@ -628,7 +630,7 @@ where
                         PendingAcknowledgement::WaitingAsRelayer(UnacknowledgedTicket::new(
                             packet.ticket.clone(),
                             own_key.clone(),
-                            previous_hop.clone(),
+                            previous_hop.to_address().clone(),
                         )),
                     )
                     .await?;
@@ -1247,7 +1249,10 @@ mod tests {
             for _ in 1..2 * PENDING_PACKETS + 1 {
                 match select(ack_rx.recv(), pkt_rx.recv()).await {
                     Either::Left((ack, _)) => {
-                        debug!("relayer has received acknowledged ticket from {}", ack.unwrap().signer);
+                        debug!(
+                            "relayer has received acknowledged ticket from {}",
+                            ack.unwrap().signer.to_string()
+                        );
                         acks += 1;
                     }
                     Either::Right((pkt, _)) => {

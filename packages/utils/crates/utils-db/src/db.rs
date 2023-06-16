@@ -1,5 +1,7 @@
-use std::fmt::{Display, Formatter};
-use std::ops::Deref;
+use std::{
+    fmt::{Display, Formatter},
+    ops::Deref,
+};
 
 use async_lock::RwLock;
 use futures_lite::stream::StreamExt;
@@ -7,8 +9,10 @@ use serde::{de::DeserializeOwned, Serialize};
 
 use utils_types::traits::BinarySerializable;
 
-use crate::errors::{DbError, Result};
-use crate::traits::AsyncKVStorage;
+use crate::{
+    errors::{DbError, Result},
+    traits::AsyncKVStorage,
+};
 
 pub struct Batch {
     pub ops: Vec<crate::traits::BatchOperation<Box<[u8]>, Box<[u8]>>>,
@@ -118,26 +122,41 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
         db.contains(key.into()).await
     }
 
-    pub async fn get<V: DeserializeOwned>(&self, key: Key) -> Result<V> {
-        let key: T::Key = key.into();
-        let db = self.backend.read().await;
-        db.get(key.into()).await.and_then(|v| {
-            bincode::deserialize(v.as_ref())
-                .map_err(|e| DbError::DeserializationError(format!("during get operation: {}", e.to_string().as_str())))
-        })
-    }
+    // unused and dangerous to use, always use `contains` or `get_or_none`
+    // async fn get<V: DeserializeOwned>(&self, key: Key) -> Result<V> {
+    //     let key: T::Key = key.into();
+    //     let db = self.backend.read().await;
+    //     db.get(key.into()).await.and_then(|v| {
+    //         bincode::deserialize(v.as_ref())
+    //             .map_err(|e| DbError::DeserializationError(format!("during get operation: {}", e.to_string().as_str())))
+    //     })
+    // }
 
-    pub async fn get_or_none<V: DeserializeOwned>(&self, key: Key) -> Result<Option<V>> {
+    pub async fn get_or_none<V: DeserializeOwned + std::fmt::Debug>(&self, key: Key) -> Result<Option<V>> {
         let key: T::Key = key.into();
 
-        let db = self.backend.read().await;
+        let db: async_lock::RwLockReadGuard<'_, T> = self.backend.read().await;
         if db.contains(key.clone()).await {
+            utils_log::debug!("DB contains key");
             db.get(key.into())
                 .await
                 .and_then(|v| {
-                    bincode::deserialize(v.as_ref()).map_err(|e| {
-                        DbError::DeserializationError(format!("during get operation: {}", e.to_string().as_str()))
-                    })
+                    utils_log::debug!("DB got data");
+
+                    match bincode::deserialize(v.as_ref()) {
+                        Ok(sth) => {
+                            utils_log::debug!("deserialized {:?}", sth);
+                            Ok(sth)
+                        }
+                        Err(e) => {
+                            utils_log::debug!("deserializing error {}", e.to_string().as_str());
+                            Err(DbError::DeserializationError(format!(
+                                "during get_or_none operation: {}",
+                                e.to_string().as_str()
+                            )))
+                        }
+                    }
+                    // .map_err(|e| {})
                 })
                 .map(|v| Some(v))
         } else {

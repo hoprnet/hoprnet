@@ -23,6 +23,7 @@ js-sys = { version = "0.3", optional = true }
 multiaddr = "0.17"
 serde = { version = "1.0", features = ["derive"] }
 serde_repr = "0.1"
+utils-log = { path = "../../../utils/crates/utils-log" }
 utils-misc = { path = "../../../utils/crates/utils-misc" }
 utils-types = { path = "../../../utils/crates/utils-types" }
 wasm-bindgen = { workspace = true, optional = true }

@@ -309,9 +309,7 @@ export default class HoprCoreEthereum extends EventEmitter {
 
   private async redeemAllTicketsInternalLoop(): Promise<void> {
     try {
-      let channelsTo = await this.db.get_channels_to(
-        Ethereum_Address.deserialize(this.publicKey.to_address().serialize())
-      )
+      let channelsTo = await this.db.get_channels_to(Address.deserialize(this.publicKey.to_address().serialize()))
       while (channelsTo.len() > 0) {
         let channel = channelsTo.next()
         await this.redeemTicketsInChannel(ChannelEntry.deserialize(channel.serialize()))
@@ -324,8 +322,8 @@ export default class HoprCoreEthereum extends EventEmitter {
     this.redeemingAll = undefined
   }
 
-  public async redeemTicketsInChannelByCounterparty(counterparty: PublicKey) {
-    const channel = await this.db.get_channel_from(Ethereum_Address.deserialize(counterparty.to_address().serialize()))
+  public async redeemTicketsInChannelByCounterparty(counterparty: Address) {
+    const channel = await this.db.get_channel_from(Address.deserialize(counterparty.serialize()))
     return this.redeemTicketsInChannel(ChannelEntry.deserialize(channel.serialize()))
   }
 
@@ -518,6 +516,24 @@ export default class HoprCoreEthereum extends EventEmitter {
       throw Error('Initialize incoming channel closure currently is not supported.')
     }
 
+    console.log(
+      `plain channel id`,
+      Ethereum_Address.deserialize(src.serialize()),
+      Ethereum_Address.deserialize(dest.serialize())
+    )
+
+    try {
+      console.log(
+        `plain channel entry`,
+        await this.db.get_channel_x(
+          Ethereum_Address.deserialize(src.serialize()),
+          Ethereum_Address.deserialize(dest.serialize())
+        )
+      )
+    } catch (err) {
+      console.log(`error when getting from DB`, err)
+    }
+
     const c = ChannelEntry.deserialize(
       (
         await this.db.get_channel_x(
@@ -526,10 +542,12 @@ export default class HoprCoreEthereum extends EventEmitter {
         )
       ).serialize()
     )
+
+    console.log(`channelEntry from DB`, c)
     if (c.status !== ChannelStatus.Open && c.status !== ChannelStatus.WaitingForCommitment) {
       throw Error('Channel status is not OPEN or WAITING FOR COMMITMENT')
     }
-    return this.chain.initiateChannelClosure(dest, (txHash: string) =>
+    return await this.chain.initiateChannelClosure(dest, (txHash: string) =>
       this.setTxHandler(`channel-updated-${txHash}`, txHash)
     )
   }

@@ -76,7 +76,7 @@ export abstract class SaneDefaults {
   async onAckedTicket(ackTicket: AcknowledgedTicket) {
     if (this.autoRedeemTickets) {
       const counterparty = ackTicket.signer
-      log(`auto redeeming tickets in channel to ${counterparty.to_peerid_str()}`)
+      log(`auto redeeming tickets in channel to ${counterparty.to_string()}`)
       await HoprCoreEthereum.getInstance().redeemTicketsInChannelByCounterparty(counterparty)
     } else {
       log(`encountered winning ticket, not auto-redeeming`)

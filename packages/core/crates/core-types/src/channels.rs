@@ -148,6 +148,7 @@ impl BinarySerializable<'_> for ChannelEntry {
                 closure_time,
             })
         } else {
+            utils_log::debug!("DB incorrect size, got {} but expected {}", data.len(), Self::SIZE);
             Err(ParseError)
         }
     }
@@ -371,9 +372,13 @@ impl Ticket {
 
     /// Verifies the signature of this ticket.
     /// The operation can fail if a public key cannot be recovered from the ticket signature.
-    pub fn verify(&self, public_key: &PublicKey) -> core_crypto::errors::Result<()> {
+    pub fn verify(&self, address: &Address) -> core_crypto::errors::Result<()> {
         let recovered = self.recover_signer()?;
-        recovered.eq(public_key).then(|| ()).ok_or(SignatureVerification)
+        recovered
+            .to_address()
+            .eq(address)
+            .then(|| ())
+            .ok_or(SignatureVerification)
     }
 }
 
@@ -453,8 +458,14 @@ pub mod tests {
         assert_eq!(ticket1, ticket2, "deserialized ticket does not match");
 
         let pub_key = PublicKey::from_privkey(&SGN_PRIVATE_KEY).unwrap();
-        assert!(ticket1.verify(&pub_key).is_ok(), "failed to verify signed ticket 1");
-        assert!(ticket2.verify(&pub_key).is_ok(), "failed to verify signed ticket 2");
+        assert!(
+            ticket1.verify(&pub_key.to_address()).is_ok(),
+            "failed to verify signed ticket 1"
+        );
+        assert!(
+            ticket2.verify(&pub_key.to_address()).is_ok(),
+            "failed to verify signed ticket 2"
+        );
 
         assert_eq!(
             ticket1.get_path_position(price_per_packet.into(), inverse_win_prob.into()),
@@ -559,7 +570,7 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "verify")]
         pub fn _verify(&self, public_key: &PublicKey) -> JsResult<bool> {
-            ok_or_jserr!(self.verify(public_key).map(|_| true))
+            ok_or_jserr!(self.verify(&public_key.to_address()).map(|_| true))
         }
 
         #[wasm_bindgen(js_name = "deserialize")]

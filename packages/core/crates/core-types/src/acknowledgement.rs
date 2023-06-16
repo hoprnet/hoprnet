@@ -4,9 +4,11 @@ use core_crypto::errors::CryptoError::SignatureVerification;
 use core_crypto::primitives::{DigestLike, SimpleDigest};
 use core_crypto::types::{HalfKey, HalfKeyChallenge, Hash, PublicKey, Response, Signature};
 use serde::{Deserialize, Serialize};
-use utils_types::errors;
-use utils_types::errors::GeneralError::ParseError;
-use utils_types::traits::BinarySerializable;
+use utils_types::{
+    errors::{self, GeneralError::ParseError},
+    primitives::Address,
+    traits::BinarySerializable,
+};
 
 /// Represents packet acknowledgement
 #[derive(Clone, Debug, PartialEq)]
@@ -98,16 +100,15 @@ pub struct AcknowledgedTicket {
     pub ticket: Ticket,
     pub response: Response,
     pub pre_image: Hash,
-    pub signer: PublicKey,
+    pub signer: Address,
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl AcknowledgedTicket {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
-    pub fn new(ticket: Ticket, response: Response, pre_image: Hash, signer: PublicKey) -> Self {
+    pub fn new(ticket: Ticket, response: Response, pre_image: Hash, signer: Address) -> Self {
         assert_ne!(
-            ticket.counterparty,
-            signer.to_address(),
+            ticket.counterparty, signer,
             "signer must be different from the ticket counterparty"
         );
         Self {
@@ -132,7 +133,7 @@ impl BinarySerializable<'_> for AcknowledgedTicket {
             let ticket = Ticket::from_bytes(buf.drain(..Ticket::SIZE).as_ref())?;
             let response = Response::from_bytes(buf.drain(..Response::SIZE).as_ref())?;
             let pre_image = Hash::from_bytes(buf.drain(..Hash::SIZE).as_ref())?;
-            let signer = PublicKey::from_bytes(buf.drain(..PublicKey::SIZE_COMPRESSED).as_ref())?;
+            let signer = Address::from_bytes(buf.drain(..Address::SIZE).as_ref())?;
 
             Ok(Self {
                 ticket,
@@ -150,7 +151,7 @@ impl BinarySerializable<'_> for AcknowledgedTicket {
         ret.extend_from_slice(&self.ticket.to_bytes());
         ret.extend_from_slice(&self.response.to_bytes());
         ret.extend_from_slice(&self.pre_image.to_bytes());
-        ret.extend_from_slice(&self.signer.to_bytes(true));
+        ret.extend_from_slice(&self.signer.to_bytes());
         ret.into_boxed_slice()
     }
 }
@@ -158,7 +159,7 @@ impl BinarySerializable<'_> for AcknowledgedTicket {
 impl AcknowledgedTicket {
     /// Verifies if the embedded ticket has been signed by the given issuer and also
     /// that the challenge on the embedded response matches the challenge on the ticket.
-    pub fn verify(&self, issuer: &PublicKey) -> core_crypto::errors::Result<()> {
+    pub fn verify(&self, issuer: &Address) -> core_crypto::errors::Result<()> {
         (self.ticket.verify(issuer).map(|_| true)?
             && self
                 .response
@@ -176,13 +177,13 @@ impl AcknowledgedTicket {
 pub struct UnacknowledgedTicket {
     pub ticket: Ticket,
     pub own_key: HalfKey,
-    pub signer: PublicKey,
+    pub signer: Address,
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl UnacknowledgedTicket {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
-    pub fn new(ticket: Ticket, own_key: HalfKey, signer: PublicKey) -> Self {
+    pub fn new(ticket: Ticket, own_key: HalfKey, signer: Address) -> Self {
         Self {
             ticket,
             own_key,
@@ -225,7 +226,7 @@ impl BinarySerializable<'_> for UnacknowledgedTicket {
             let mut buf = data.to_vec();
             let ticket = Ticket::from_bytes(buf.drain(..Ticket::SIZE).as_ref())?;
             let own_key = HalfKey::from_bytes(buf.drain(..HalfKey::SIZE).as_ref())?;
-            let signer = PublicKey::from_bytes(buf.drain(..PublicKey::SIZE_UNCOMPRESSED).as_ref())?;
+            let signer = Address::from_bytes(buf.drain(..Address::SIZE).as_ref())?;
             Ok(Self {
                 ticket,
                 own_key,
@@ -240,7 +241,7 @@ impl BinarySerializable<'_> for UnacknowledgedTicket {
         let mut ret = Vec::with_capacity(Self::SIZE);
         ret.extend_from_slice(&self.ticket.to_bytes());
         ret.extend_from_slice(&self.own_key.to_bytes());
-        ret.extend_from_slice(&self.signer.to_bytes(false));
+        ret.extend_from_slice(&self.signer.to_bytes());
         ret.into_boxed_slice()
     }
 }
@@ -456,7 +457,7 @@ pub mod test {
         let mut ticket1 = mock_ticket(&pk_1);
         ticket1.set_challenge(Challenge::from(cp_sum).to_ethereum_challenge(), &pk_1);
 
-        let unack1 = UnacknowledgedTicket::new(ticket1, hk1, pub_key_1);
+        let unack1 = UnacknowledgedTicket::new(ticket1, hk1, pub_key_1.to_address());
         assert!(unack1.verify_signature().is_ok());
         assert!(unack1.verify_challenge(&hk2).is_ok());
 
@@ -479,8 +480,13 @@ pub mod test {
         let mut ticket1 = mock_ticket(&pk);
         ticket1.set_challenge(resp.to_challenge().to_ethereum_challenge(), &pk);
 
-        let akt_1 = AcknowledgedTicket::new(ticket1, resp, Hash::create(&[&hex!("deadbeef")]), pub_key.clone());
-        assert!(akt_1.verify(&pub_key).is_ok());
+        let akt_1 = AcknowledgedTicket::new(
+            ticket1,
+            resp,
+            Hash::create(&[&hex!("deadbeef")]),
+            pub_key.to_address().clone(),
+        );
+        assert!(akt_1.verify(&pub_key.to_address()).is_ok());
 
         let akt_2 = AcknowledgedTicket::from_bytes(&akt_1.to_bytes()).unwrap();
         assert_eq!(akt_1, akt_2);
@@ -597,7 +603,7 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "verify")]
         pub fn _verify(&self, issuer: &PublicKey) -> JsResult<bool> {
-            ok_or_jserr!(self.verify(issuer).map(|_| true))
+            ok_or_jserr!(self.verify(&issuer.to_address()).map(|_| true))
         }
 
         #[wasm_bindgen(js_name = "clone")]

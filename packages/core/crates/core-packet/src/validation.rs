@@ -1,17 +1,18 @@
-use crate::errors::PacketError::{OutOfFunds, TicketValidation};
-use crate::errors::Result;
-use core_crypto::types::PublicKey;
+use crate::errors::{
+    PacketError::{OutOfFunds, TicketValidation},
+    Result,
+};
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::channels::{ChannelEntry, ChannelStatus, Ticket};
 use utils_log::{debug, info};
-use utils_types::primitives::{Balance, BalanceType, U256};
+use utils_types::primitives::{Address, Balance, BalanceType, U256};
 
 /// Performs validations of the given unacknowledged ticket and channel.
 pub async fn validate_unacknowledged_ticket<T: HoprCoreEthereumDbActions>(
     db: &T,
     ticket: &Ticket,
     channel: &ChannelEntry,
-    sender: &PublicKey,
+    sender: &Address,
     min_ticket_amount: Balance,
     req_inverse_ticket_win_prob: U256,
     check_unrealized_balance: bool,
@@ -42,7 +43,8 @@ pub async fn validate_unacknowledged_ticket<T: HoprCoreEthereumDbActions>(
     // channel MUST be open or pending to close
     if channel.status == ChannelStatus::Closed {
         return Err(TicketValidation(format!(
-            "payment channel with {sender} is not opened or pending to close"
+            "payment channel with {} is not opened or pending to close",
+            sender.to_string()
         )));
     }
 
@@ -138,7 +140,7 @@ mod tests {
         impl HoprCoreEthereumDbActions for Db {
             async fn get_current_ticket_index(&self, channel_id: &Hash) -> core_ethereum_db::errors::Result<Option<U256>>;
             async fn set_current_ticket_index(&mut self, channel_id: &Hash, index: U256) -> core_ethereum_db::errors::Result<()>;
-            async fn get_tickets(&self, signer: Option<PublicKey>) -> core_ethereum_db::errors::Result<Vec<Ticket>>;
+            async fn get_tickets(&self, signer: Option<Address>) -> core_ethereum_db::errors::Result<Vec<Ticket>>;
             async fn mark_rejected(&mut self, ticket: &Ticket) -> core_ethereum_db::errors::Result<()>;
             async fn check_and_set_packet_tag(&mut self, tag: &[u8]) -> core_ethereum_db::errors::Result<bool>;
             async fn get_pending_acknowledgement(
@@ -261,7 +263,7 @@ mod tests {
             &db,
             &ticket,
             &channel,
-            &SENDER_PUB,
+            &SENDER_PUB.to_address(),
             Balance::from_str("1", BalanceType::HOPR),
             U256::one(),
             true,
@@ -282,7 +284,7 @@ mod tests {
             &db,
             &ticket,
             &channel,
-            &TARGET_PUB,
+            &TARGET_PUB.to_address(),
             Balance::from_str("1", BalanceType::HOPR),
             U256::one(),
             true,
@@ -308,7 +310,7 @@ mod tests {
             &db,
             &ticket,
             &channel,
-            &SENDER_PUB,
+            &SENDER_PUB.to_address(),
             Balance::from_str("2", BalanceType::HOPR),
             U256::one(),
             true,
@@ -337,7 +339,7 @@ mod tests {
             &db,
             &ticket,
             &channel,
-            &SENDER_PUB,
+            &SENDER_PUB.to_address(),
             Balance::from_str("1", BalanceType::HOPR),
             U256::one(),
             true,
@@ -364,7 +366,7 @@ mod tests {
             &db,
             &ticket,
             &channel,
-            &SENDER_PUB,
+            &SENDER_PUB.to_address(),
             Balance::from_str("1", BalanceType::HOPR),
             U256::one(),
             true,
@@ -391,7 +393,7 @@ mod tests {
             &db,
             &ticket,
             &channel,
-            &SENDER_PUB,
+            &SENDER_PUB.to_address(),
             Balance::from_str("1", BalanceType::HOPR),
             U256::one(),
             true,
@@ -420,7 +422,7 @@ mod tests {
             &db,
             &ticket,
             &channel,
-            &SENDER_PUB,
+            &SENDER_PUB.to_address(),
             Balance::from_str("1", BalanceType::HOPR),
             U256::one(),
             true,
@@ -447,7 +449,7 @@ mod tests {
             &db,
             &ticket,
             &channel,
-            &SENDER_PUB,
+            &SENDER_PUB.to_address(),
             Balance::from_str("1", BalanceType::HOPR),
             U256::one(),
             true,
@@ -475,7 +477,7 @@ mod tests {
             &db,
             &ticket,
             &channel,
-            &SENDER_PUB,
+            &SENDER_PUB.to_address(),
             Balance::from_str("1", BalanceType::HOPR),
             U256::one(),
             true,
@@ -498,7 +500,7 @@ mod tests {
             &db,
             &ticket,
             &channel,
-            &SENDER_PUB,
+            &SENDER_PUB.to_address(),
             Balance::from_str("1", BalanceType::HOPR),
             U256::one(),
             true,
@@ -528,7 +530,7 @@ mod tests {
             &db,
             &ticket,
             &channel,
-            &SENDER_PUB,
+            &SENDER_PUB.to_address(),
             Balance::from_str("1", BalanceType::HOPR),
             U256::one(),
             true,
@@ -558,7 +560,7 @@ mod tests {
             &db,
             &ticket,
             &channel,
-            &SENDER_PUB,
+            &SENDER_PUB.to_address(),
             Balance::from_str("1", BalanceType::HOPR),
             U256::one(),
             false,
@@ -579,7 +581,7 @@ mod tests {
         let unack = UnacknowledgedTicket::new(
             create_valid_ticket(),
             HalfKey::new(&random_bytes::<{ HalfKey::SIZE }>()),
-            SENDER_PUB.clone(),
+            SENDER_PUB.to_address().clone(),
         );
 
         db.store_pending_acknowledgment(hkc.clone(), PendingAcknowledgement::WaitingAsRelayer(unack))
@@ -600,7 +602,7 @@ mod tests {
                     ticket.ticket,
                     Response::new(&random_bytes::<{ Response::SIZE }>()),
                     Hash::new(&random_bytes::<{ Hash::SIZE }>()),
-                    SENDER_PUB.clone(),
+                    SENDER_PUB.to_address().clone(),
                 );
                 db.replace_unack_with_ack(&hkc, ack).await.unwrap();
 

@@ -1,5 +1,7 @@
-use crate::errors::DbError;
-use crate::traits::{AsyncKVStorage, BatchOperation, StorageValueIterator};
+use crate::{
+    errors::DbError,
+    traits::{AsyncKVStorage, BatchOperation, StorageValueIterator},
+};
 use async_trait::async_trait;
 use futures_lite::stream::StreamExt;
 
@@ -51,17 +53,23 @@ impl AsyncKVStorage for LevelDbShim {
     type Value = Box<[u8]>;
 
     async fn get(&self, key: Self::Key) -> crate::errors::Result<Self::Value> {
-        self.db
-            .get(key)
-            .await
-            .map_err(|_| DbError::GenericError("Encountered error on DB get operation".to_string()))
-            .and_then(|v| {
-                if v.is_undefined() {
-                    Err(DbError::NotFound)
-                } else {
-                    Ok(js_sys::Uint8Array::from(v).to_vec().into_boxed_slice())
-                }
-            })
+        match self.db.get(key).await {
+            Ok(v) => Ok(js_sys::Uint8Array::from(v).to_vec().into_boxed_slice()),
+            Err(e) => {
+                utils_log::debug!("db error {:?}", e);
+                Err(DbError::GenericError(
+                    "Encountered error on DB get operation".to_string(),
+                ))
+            }
+        }
+        // .map_err(|_| DbError::GenericError("Encountered error on DB get operation".to_string()))
+        // .and_then(|v| {
+        //     if v.is_undefined() {
+        //         Err(DbError::NotFound)
+        //     } else {
+        //
+        //     }
+        // })
     }
 
     async fn set(&mut self, key: Self::Key, value: Self::Value) -> crate::errors::Result<Option<Self::Value>> {

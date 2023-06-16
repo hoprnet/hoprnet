@@ -1,15 +1,13 @@
 use async_trait::async_trait;
 
-use core_crypto::iterated_hash::Intermediate;
 use core_crypto::{
-    iterated_hash::IteratedHash,
+    iterated_hash::{Intermediate, IteratedHash},
     types::{HalfKeyChallenge, Hash, PublicKey},
 };
-use core_types::acknowledgement::{AcknowledgedTicket, PendingAcknowledgement, UnacknowledgedTicket};
-use core_types::channels::ChannelStatus;
 use core_types::{
     account::AccountEntry,
-    channels::{generate_channel_id, ChannelEntry, Ticket},
+    acknowledgement::{AcknowledgedTicket, PendingAcknowledgement, UnacknowledgedTicket},
+    channels::{generate_channel_id, ChannelEntry, ChannelStatus, Ticket},
 };
 use utils_db::{
     constants::*,
@@ -65,7 +63,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         Ok(())
     }
 
-    async fn get_tickets(&self, signer: Option<PublicKey>) -> Result<Vec<Ticket>> {
+    async fn get_tickets(&self, signer: Option<Address>) -> Result<Vec<Ticket>> {
         let mut tickets = self
             .db
             .get_more::<AcknowledgedTicket>(
@@ -1071,8 +1069,11 @@ pub mod wasm {
 
         #[wasm_bindgen]
         pub async fn get_channel_x(&self, src: &Address, dest: &Address) -> Result<Option<ChannelEntry>, JsValue> {
+            utils_log::debug!("before read lock");
             let data = self.core_ethereum_db.clone();
             let db = data.read().await;
+            utils_log::debug!("after read lock");
+
             utils_misc::ok_or_jserr!(db.get_channel_x(src, dest).await)
         }
 

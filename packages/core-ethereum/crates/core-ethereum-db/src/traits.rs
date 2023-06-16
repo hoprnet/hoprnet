@@ -4,9 +4,9 @@ use core_crypto::{
     iterated_hash::IteratedHash,
     types::{HalfKeyChallenge, Hash, PublicKey},
 };
-use core_types::acknowledgement::{AcknowledgedTicket, PendingAcknowledgement, UnacknowledgedTicket};
 use core_types::{
     account::AccountEntry,
+    acknowledgement::{AcknowledgedTicket, PendingAcknowledgement, UnacknowledgedTicket},
     channels::{ChannelEntry, Ticket},
 };
 use utils_types::primitives::{Address, AuthorizationToken, Balance, Snapshot, U256};
@@ -19,7 +19,7 @@ pub trait HoprCoreEthereumDbActions {
     async fn get_current_ticket_index(&self, channel_id: &Hash) -> Result<Option<U256>>;
     async fn set_current_ticket_index(&mut self, channel_id: &Hash, index: U256) -> Result<()>;
 
-    async fn get_tickets(&self, signer: Option<PublicKey>) -> Result<Vec<Ticket>>;
+    async fn get_tickets(&self, signer: Option<Address>) -> Result<Vec<Ticket>>;
 
     async fn mark_rejected(&mut self, ticket: &Ticket) -> Result<()>;
 

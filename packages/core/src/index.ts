@@ -1409,68 +1409,73 @@ class Hopr extends EventEmitter {
 
   public async closeChannel(
     counterparty: PeerId,
-    direction: 'incoming' | 'outgoing'
+    _direction: 'incoming' | 'outgoing'
   ): Promise<{ receipt: string; status: ChannelStatus }> {
-    const connector = HoprCoreEthereum.getInstance()
-    const counterpartyPubKey = Packet_PublicKey.from_peerid_str(counterparty.toString())
-    const wrapped_pk = Packet_PublicKey.deserialize(this.pubKey.serialize(false))
-    const channel =
-      direction === 'outgoing'
-        ? await this.db.get_channel_x(wrapped_pk.to_address(), counterpartyPubKey.to_address())
-        : await this.db.get_channel_x(counterpartyPubKey.to_address(), wrapped_pk.to_address())
+    // const connector = HoprCoreEthereum.getInstance()
+    // const counterpartyPubKey = Packet_PublicKey.from_peerid_str(counterparty.toString())
+    // const wrapped_pk = Packet_PublicKey.deserialize(this.pubKey.serialize(false))
+    // const channel =
+    //   direction === 'outgoing'
+    //     ? await this.db.get_channel_x(wrapped_pk.to_address(), counterpartyPubKey.to_address())
+    //     : await this.db.get_channel_x(counterpartyPubKey.to_address(), wrapped_pk.to_address())
 
-    if (channel === undefined) {
-      log(`The requested channel for counterparty ${counterparty.toString()} does not exist`)
-      throw new Error('Requested channel does not exist')
-    }
+    // console.log(`core channel`, channel)
+    // if (channel === undefined) {
+    //   log(`The requested channel for counterparty ${counterparty.toString()} does not exist`)
+    //   throw new Error('Requested channel does not exist')
+    // }
 
-    // TODO: should we wait for confirmation?
-    if (channel.status === ChannelStatus.Closed) {
-      throw new Error('Channel is already closed')
-    }
+    // console.log(`channel status`, channel.status)
+    // // TODO: should we wait for confirmation?
+    // if (channel.status === ChannelStatus.Closed) {
+    //   throw new Error('Channel is already closed')
+    // }
 
-    if (channel.status === ChannelStatus.Open) {
-      await this.strategy.onChannelWillClose(channel)
-    }
+    // if (channel.status === ChannelStatus.Open) {
+    //   await this.strategy.onChannelWillClose(channel)
+    // }
 
-    // TODO: should remove this blocker when https://github.com/hoprnet/hoprnet/issues/4194 gets addressed
-    if (direction === 'incoming') {
-      log(
-        `Incoming channel: ignoring closing channel ${channel
-          .get_id()
-          .to_hex()} because current HoprChannels contract does not support closing incoming channels.`
-      )
-      throw new Error('Incoming channel: Closing incoming channels currently is not supported.')
-    }
+    // // TODO: should remove this blocker when https://github.com/hoprnet/hoprnet/issues/4194 gets addressed
+    // if (direction === 'incoming') {
+    //   log(
+    //     `Incoming channel: ignoring closing channel ${channel
+    //       .get_id()
+    //       .to_hex()} because current HoprChannels contract does not support closing incoming channels.`
+    //   )
+    //   throw new Error('Incoming channel: Closing incoming channels currently is not supported.')
+    // }
 
     let txHash: string
     try {
-      if (channel.status === ChannelStatus.Open || channel.status == ChannelStatus.WaitingForCommitment) {
-        log('initiating closure of channel', channel.get_id().to_hex())
-        txHash = await connector.initializeClosure(channel.source, channel.destination)
-      } else {
-        // verify that we passed the closure waiting period to prevent failing
-        // on-chain transactions
+      // if (channel.status === ChannelStatus.Open || channel.status == ChannelStatus.WaitingForCommitment) {
+      // log('initiating closure of channel', channel.get_id().to_hex())
+      txHash = await HoprCoreEthereum.getInstance().initializeClosure(
+        Packet_PublicKey.deserialize(this.pubKey.serialize(false)).to_address(),
+        Packet_PublicKey.from_peerid_str(counterparty.toString()).to_address()
+      )
+      // } else {
+      //   // verify that we passed the closure waiting period to prevent failing
+      //   // on-chain transactions
 
-        if (channel.closure_time_passed()) {
-          txHash = await connector.finalizeClosure(channel.source, channel.destination)
-        } else {
-          log(
-            `ignoring finalizing closure of channel ${channel
-              .get_id()
-              .to_hex()} because closure window is still active. Need to wait ${channel
-              .remaining_closure_time()
-              .toString(10)} seconds.`
-          )
-        }
-      }
+      //   if (channel.closure_time_passed()) {
+      //     txHash = await connector.finalizeClosure(channel.source, channel.destination)
+      //   } else {
+      //     log(
+      //       `ignoring finalizing closure of channel ${channel
+      //         .get_id()
+      //         .to_hex()} because closure window is still active. Need to wait ${channel
+      //         .remaining_closure_time()
+      //         .toString(10)} seconds.`
+      //     )
+      //   }
+      // }
     } catch (err) {
       log('failed to close channel', err)
       this.maybeEmitFundsEmptyEvent(err)
       throw new Error(`Failed to closeChannel: ${err}`)
     }
 
-    return { receipt: txHash, status: channel.status }
+    return { receipt: txHash, status: ChannelStatus.Open }
   }
 
   public async getAllTickets(): Promise<Ticket[]> {

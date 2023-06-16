@@ -25,7 +25,7 @@ import {
 import BN from 'bn.js'
 import fs from 'fs'
 import { stringToU8a, toU8a, u8aConcat, u8aToHex, u8aToNumber } from '../u8a/index.js'
-import { IteratedHash } from '@hoprnet/hopr-core/lib/core_crypto.js'
+import { IteratedHash } from '../../../core/lib/core_crypto.js'
 
 const log = debug(`hopr-core:db`)
 
@@ -196,7 +196,22 @@ export class LevelDb {
 
   public async get(key: Uint8Array): Promise<Uint8Array> {
     // LevelDB does not support Uint8Arrays, always convert to Buffer
-    const value = await this.backend.get(Buffer.from(key.buffer, key.byteOffset, key.byteLength))
+    let value: Buffer
+    try {
+      value = await this.backend.get(Buffer.from(key.buffer, key.byteOffset, key.byteLength))
+    } catch (err) {
+      let seperator = err.message.indexOf('-')
+      console.log(`js db error`, err.message.slice(0, seperator < 0 ? err.message.length : seperator))
+      throw err
+    }
+
+    let seperator = key.indexOf(0x2d) // 0x2d ~= '-'
+
+    console.log(
+      `returning from db key`,
+      seperator < 0 ? decoder.decode(key) : decoder.decode(key.subarray(0, seperator)),
+      value
+    )
 
     return new Uint8Array(value.buffer, value.byteOffset, value.byteLength)
   }
@@ -338,11 +353,19 @@ export class HoprDB {
     return await this.db.put(key, value)
   }
 
-  protected async get(key: Uint8Array): Promise<Uint8Array> {
-    const value = await this.db.get(key)
+  /**
+   * Tries to find the corresponding key in the database.
+   *
+   * If not, throws an error.
+   *
+   * @param key
+   * @returns
+   */
+  // protected async get(key: Uint8Array): Promise<Uint8Array> {
+  //   const value = await this.db.get(key)
 
-    return new Uint8Array(value.buffer, value.byteOffset, value.byteLength)
-  }
+  //   return new Uint8Array(value.buffer, value.byteOffset, value.byteLength)
+  // }
 
   public async remove(key: Uint8Array): Promise<void> {
     await this.db.remove(key)
@@ -482,7 +505,7 @@ export class HoprDB {
    * @param filter optionally filter by signer
    * @returns an array of all unacknowledged tickets
    */
-  public async getUnacknowledgedTickets(filter?: { signer: PublicKey }): Promise<UnacknowledgedTicket[]> {
+  public async getUnacknowledgedTickets(filter?: { signer: Address }): Promise<UnacknowledgedTicket[]> {
     const filterFunc = (pending: PendingAcknowledgement): boolean => {
       if (pending.is_msg_sender() == true) {
         return false
@@ -530,7 +553,7 @@ export class HoprDB {
    * @returns an array of all acknowledged tickets
    */
   public async getAcknowledgedTickets(filter?: {
-    signer?: PublicKey
+    signer?: Address
     channel?: ChannelEntry
   }): Promise<AcknowledgedTicket[]> {
     const filterFunc = (a: AcknowledgedTicket): boolean => {
@@ -542,7 +565,7 @@ export class HoprDB {
       if (
         filter?.channel &&
         (!a.signer.eq(filter.channel.source) ||
-          !filter.channel.destination.eq(this.id) ||
+          !filter.channel.destination.eq(this.id.to_address()) ||
           !a.ticket.channel_epoch.eq(filter.channel.channel_epoch))
       ) {
         return false
@@ -626,7 +649,7 @@ export class HoprDB {
    * @param filter optionally filter by signer
    * @returns an array of signed tickets
    */
-  public async getTickets(filter?: { signer: PublicKey }): Promise<Ticket[]> {
+  public async getTickets(filter?: { signer: Address }): Promise<Ticket[]> {
     const [unAcks, acks] = await Promise.all([
       this.getUnacknowledgedTickets(filter),
       this.getAcknowledgedTickets(filter)
@@ -911,13 +934,13 @@ export class HoprDB {
 
   public async getChannelsFrom(address: Address) {
     return this.getChannels((channel) => {
-      return address.eq(channel.source.to_address())
+      return address.eq(channel.source)
     })
   }
 
   public async *getChannelsFromIterable(address: Address) {
     for await (const channel of this.getChannelsIterable()) {
-      if (address.eq(channel.source.to_address())) {
+      if (address.eq(channel.source)) {
         yield channel
       }
     }
@@ -925,13 +948,13 @@ export class HoprDB {
 
   public async getChannelsTo(address: Address) {
     return this.getChannels((channel) => {
-      return address.eq(channel.destination.to_address())
+      return address.eq(channel.destination)
     })
   }
 
   public async *getChannelsToIterable(address: Address) {
     for await (const channel of this.getChannelsIterable()) {
-      if (address.eq(channel.destination.to_address())) {
+      if (address.eq(channel.destination)) {
         yield channel
       }
     }
