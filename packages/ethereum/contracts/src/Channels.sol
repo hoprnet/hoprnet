@@ -364,7 +364,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     // Deviates from EIP712 due to computed property and non-standard struct property encoding
     bytes32 ticketHash = _getTicketHash(redeemable);
 
-    if (!_isWinningTicket(ticketHash, redeemable.opening, redeemable.porSecret, redeemable.data.winProb)) {
+    if (!_isWinningTicket(ticketHash, redeemable)) {
       revert TicketIsNotAWin();
     }
 
@@ -716,17 +716,23 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
    * a property stated in the signed ticket.
    *
    * @param ticketHash hash of the ticket to check
-   * @param opening the commitment opening used to redeem the ticket
-   * @param porSecret response to challenge stated in ticket
-   * @param winProb winning probability stated in the ticket
+   * @param redeemable ticket, opening, porSecret, signature
    */
   function _isWinningTicket(
     bytes32 ticketHash,
-    bytes32 opening,
-    bytes32 porSecret,
-    WinProb winProb
+    RedeemableTicket calldata redeemable
   ) public pure returns (bool) {
     // hash function produces 256 bits output but we require only first 56 bits (IEEE 754 double precision means 53 signifcant bits)
-    return (uint56(bytes7(keccak256(abi.encodePacked(ticketHash, opening, porSecret))))) <= WinProb.unwrap(winProb);
+    uint56 ticketProb = (uint56(bytes7(keccak256(abi.encodePacked(
+      // unique due to ticketIndex + ticketEpoch
+      ticketHash, 
+      // entropy + commitment opening ticket redeemer
+      redeemable.opening, 
+      // challenge-response packet sender + next downstream node
+      redeemable.porSecret, 
+      // entropy by ticket issuer
+      redeemable.signature.r, redeemable.signature.vs)))));
+
+    return ticketProb <= WinProb.unwrap(redeemable.data.winProb);
   }
 }
