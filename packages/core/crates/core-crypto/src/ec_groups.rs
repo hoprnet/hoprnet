@@ -11,12 +11,23 @@ use crate::random::{random_bytes, random_fill};
 
 impl Scalar for curve25519_dalek::scalar::Scalar {
     fn random() -> Self {
-        let bytes = random_bytes::<64>();
-        curve25519_dalek::scalar::Scalar::from_bytes_mod_order_wide(&bytes)
+        let bytes = random_bytes::<32>();
+        Self::from_bytes(&bytes).unwrap()
     }
 
     fn from_bytes(sk: &[u8]) -> Result<Self> {
-        Ok(curve25519_dalek::scalar::Scalar::from_bits(sk.try_into().map_err(|_| InvalidInputValue)?))
+        if sk.len() == 32 {
+            // Representation of the scalar is little-endian
+            let mut clamped = [0u8; 32];
+            clamped.copy_from_slice(&sk[..32]);
+            clamped[00] &= 0b1111_1000;  // clear the 3 LSB bits (= multiply by Curve25519's co-factor)
+            clamped[31] &= 0b0111_1111;  // clear the 256-th bit
+            clamped[31] |= 0b0100_0000;  // make it 255-bit number
+
+            Ok(curve25519_dalek::scalar::Scalar::from_bits(clamped))
+        } else {
+            Err(InvalidInputValue)
+        }
     }
 
     fn to_bytes(&self) -> Box<[u8]> {

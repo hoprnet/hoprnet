@@ -6,7 +6,7 @@ use multiaddr::Multiaddr;
 use std::fmt::{Display, Formatter};
 use utils_types::errors::GeneralError::ParseError;
 use utils_types::primitives::Address;
-use utils_types::traits::{BinarySerializable, PeerIdLike};
+use utils_types::traits::BinarySerializable;
 
 /// Type of the node account.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -31,11 +31,6 @@ impl AccountEntry {
     /// Gets public key as an address
     pub fn get_address(&self) -> Address {
         self.public_key.to_address()
-    }
-
-    /// Gets public key as a PeerId string
-    pub fn get_peer_id_str(&self) -> String {
-        self.public_key.to_peerid_str()
     }
 
     /// Gets multiaddress as string if this peer ID has been announced.
@@ -88,7 +83,7 @@ impl AccountEntry {
 
 impl Display for AccountEntry {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "AccountEntry {}:", self.public_key.to_peerid_str())?;
+        write!(f, "AccountEntry:")?;
         write!(f, " PublicKey: {}", self.public_key.to_hex(true))?;
         match &self.entry_type {
             NotAnnounced => {

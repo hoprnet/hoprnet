@@ -3,7 +3,7 @@ use crate::errors::Result;
 use crate::packet::{Packet, PacketState};
 use crate::path::Path;
 use async_std::channel::{bounded, Receiver, Sender, TrySendError};
-use core_crypto::types::{HalfKeyChallenge, Hash, OffchainPublicKey, PublicKey};
+use core_crypto::types::{HalfKeyChallenge, Hash, mangle_secret_key, OffchainPublicKey, PublicKey};
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_mixer::mixer::{Mixer, MixerConfig};
 use core_types::acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket};
@@ -77,7 +77,7 @@ pub struct AcknowledgementInteraction<Db: HoprCoreEthereumDbActions> {
     db: Arc<Mutex<Db>>,
     pub on_acknowledgement: Option<Sender<HalfKeyChallenge>>,
     pub on_acknowledged_ticket: Option<Sender<AcknowledgedTicket>>,
-    public_key: PublicKey,
+    packet_key: OffchainPublicKey,
     incoming_channel: (Sender<Payload>, Receiver<Payload>),
     outgoing_channel: (Sender<Payload>, Receiver<Payload>),
 }
@@ -86,13 +86,13 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
     /// Creates a new instance given the DB and our public key used to verify the acknowledgements.
     pub fn new(
         db: Arc<Mutex<Db>>,
-        public_key: PublicKey,
+        packet_key: OffchainPublicKey,
         on_acknowledgement: Option<Sender<HalfKeyChallenge>>,
         on_acknowledged_ticket: Option<Sender<AcknowledgedTicket>>,
     ) -> Self {
         Self {
             db,
-            public_key,
+            packet_key,
             incoming_channel: bounded(ACK_RX_QUEUE_SIZE),
             outgoing_channel: bounded(ACK_TX_QUEUE_SIZE),
             on_acknowledgement,
@@ -158,12 +158,21 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
     pub async fn handle_incoming_acknowledgements(&self) {
         while let Ok(payload) = self.incoming_channel.1.recv().await {
             match Acknowledgement::from_bytes(&payload.data) {
-                Ok(ack) => {
-                    if let Err(e) = self.handle_acknowledgement(ack).await {
-                        error!(
-                            "failed to process incoming acknowledgement from {}: {e}",
-                            payload.remote_peer
-                        );
+                Ok(mut ack) => {
+                    if let Ok(remote_pk) = OffchainPublicKey::from_peerid(&payload.remote_peer) {
+                        debug!("validating incoming acknowledgement from {}", payload.remote_peer);
+                        if ack.validate(&remote_pk) {
+                            if let Err(e) = self.handle_acknowledgement(ack).await {
+                                error!(
+                                    "failed to process incoming acknowledgement from {}: {e}",
+                                    payload.remote_peer
+                                );
+                            }
+                        } else {
+                            error!("failed to verify signature on acknowledgement from peer {}", payload.remote_peer)
+                        }
+                    } else {
+                        error!("invalid remote peer id {}", payload.remote_peer)
                     }
                 }
                 Err(e) => {
@@ -198,12 +207,6 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
     }
 
     async fn handle_acknowledgement(&self, mut ack: Acknowledgement) -> Result<()> {
-        if !ack.validate(&self.public_key) {
-            return Err(AcknowledgementValidation(
-                "could not validate the acknowledgement signature".to_string(),
-            ));
-        }
-
         /*
          There are three cases:
           1. There is an unacknowledged ticket and we are
@@ -305,7 +308,9 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
 #[derive(Clone, Debug)]
 pub struct PacketInteractionConfig {
     pub check_unrealized_balance: bool,
-    pub private_key: Box<[u8]>,
+    pub packet_private_key: Box<[u8]>,
+    pub packet_key: OffchainPublicKey,
+    pub chain_private_key: Box<[u8]>,
     pub mixer: MixerConfig,
 }
 
@@ -376,7 +381,7 @@ where
             .unwrap()
             .get_channel_to(&destination)
             .await?
-            .ok_or(ChannelNotFound(destination.to_peerid().to_string()))?;
+            .ok_or(ChannelNotFound(destination.to_string()))?;
 
         let channel_id = channel.get_id();
         let current_index = self.bump_ticket_index(&channel_id).await?;
@@ -412,7 +417,7 @@ where
             amount,
             U256::from_inverse_probability(U256::new(INVERSE_TICKET_WIN_PROB))?,
             channel.channel_epoch,
-            &self.cfg.private_key,
+            &self.cfg.packet_private_key,
         );
 
         self.db.lock().unwrap().mark_pending(&ticket).await?;
@@ -446,13 +451,13 @@ where
 
         // Decide whether to create 0-hop or multihop ticket
         let next_ticket = if path.length() == 1 {
-            Ticket::new_zero_hop(next_peer, &self.cfg.private_key)
+            Ticket::new_zero_hop(next_peer, &self.cfg.packet_private_key)
         } else {
             self.create_multihop_ticket(next_peer, path.length() as u8).await?
         };
 
         // Create the packet
-        let packet = Packet::new(msg, &path.hops(), &self.cfg.private_key, next_ticket)?;
+        let packet = Packet::new(msg, &path.hops(), &self.cfg.chain_private_key, next_ticket)?;
         match packet.state() {
             PacketState::Outgoing { ack_challenge, .. } => {
                 self.db
@@ -528,7 +533,7 @@ where
                 }
 
                 // And create acknowledgement
-                let ack = packet.create_acknowledgement(&self.cfg.private_key).unwrap();
+                let ack = packet.create_acknowledgement(&self.cfg.packet_private_key, &self.cfg.packet_key).unwrap();
                 ack_interaction
                     .send_acknowledgement(ack, previous_hop.to_peerid(), true)
                     .await?;
@@ -622,7 +627,7 @@ where
 
                 // Create next ticket for the packet
                 next_ticket = if path_pos == 1 {
-                    Ticket::new_zero_hop(next_hop_channel_key, &self.cfg.private_key)
+                    Ticket::new_zero_hop(next_hop_channel_key, &self.cfg.chain_private_key)
                 } else {
                     self.create_multihop_ticket(next_hop_channel_key, path_pos).await?
                 };
@@ -632,7 +637,7 @@ where
         }
 
         // Transform the packet for forwarding using the next ticket
-        packet.forward(&self.cfg.private_key, next_ticket)?;
+        packet.forward(&self.cfg.packet_private_key, next_ticket)?;
 
         // Forward the packet to the next hop
         message_transport(packet.to_bytes(), next_peer.to_string())
@@ -640,7 +645,7 @@ where
             .map_err(|e| TransportError(e))?;
 
         // Acknowledge to the previous hop that we forwarded the packet
-        let ack = packet.create_acknowledgement(&self.cfg.private_key).unwrap();
+        let ack = packet.create_acknowledgement(&self.cfg.packet_private_key, &self.cfg.packet_key).unwrap();
         ack_interaction.send_acknowledgement(ack, previous_peer, true).await?;
 
         #[cfg(all(feature = "prometheus", not(test)))]
@@ -675,11 +680,11 @@ where
         F: futures::Future<Output = core::result::Result<(), String>>,
     {
         // Precompute the public key from the private key we were given
-        let public_key = OffchainPublicKey::from_privkey(&self.cfg.private_key).expect("invalid private key given");
+        let mangled_private_key = mangle_secret_key(&self.cfg.packet_private_key.as_ref().try_into().unwrap());
         while let Ok(payload) = self.incoming_packets.1.recv().await {
             // Add some random delay via mixer
             let mixed_packet = self.mixer.mix(payload).await;
-            match Packet::from_bytes(&mixed_packet.data, &self.cfg.private_key, &public_key,&mixed_packet.remote_peer) {
+            match Packet::from_bytes(&mixed_packet.data, &mangled_private_key, &self.cfg.packet_key,&mixed_packet.remote_peer) {
                 Ok(packet) => {
                     if let Err(e) = self
                         .handle_mixed_packet(packet, ack_interaction.clone(), message_transport)
@@ -1067,7 +1072,7 @@ mod tests {
         // Peer 1: ACK interaction of the packet sender, hookup receiving of acknowledgements and start processing them
         let ack_interaction_sender = Arc::new(AcknowledgementInteraction::new(
             core_dbs[0].clone(),
-            PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap(),
+            OffchainPublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap(),
             Some(done_tx),
             None,
         ));
@@ -1077,7 +1082,7 @@ mod tests {
         // Peer 2: Recipient of the packet and sender of the acknowledgement
         let ack_interaction_counterparty = Arc::new(AcknowledgementInteraction::new(
             core_dbs[1].clone(),
-            PublicKey::from_privkey(&PEERS_PRIVS[1]).unwrap(),
+            OffchainPublicKey::from_privkey(&PEERS_PRIVS[1]).unwrap(),
             None,
             None,
         ));
@@ -1092,7 +1097,7 @@ mod tests {
         for (ack_key, _) in sent_challenges.iter() {
             ack_interaction_counterparty
                 .send_acknowledgement(
-                    Acknowledgement::new(ack_key.clone(),&PEERS_PRIVS[1]),
+                    Acknowledgement::new(ack_key.clone(),&PEERS_PRIVS[1], &OffchainPublicKey::from_privkey(&PEERS_PRIVS[1]).unwrap()),
                     PEERS[0].clone(),
                     false,
                 )
@@ -1172,7 +1177,9 @@ mod tests {
             None,
             PacketInteractionConfig {
                 check_unrealized_balance: true,
-                private_key: PEERS_PRIVS[0].into(),
+                packet_private_key: PEERS_PRIVS[0].into(),
+                packet_key: OffchainPublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap(),
+                chain_private_key: PEERS_PRIVS[0].into(),
                 mixer: MixerConfig::default(),
             },
         ));
@@ -1181,7 +1188,7 @@ mod tests {
         // Peer 2 (relayer): relays packets to Peer 3 and awaits acknowledgements of relayer packets to Peer 3
         let ack_interaction_relayer = Arc::new(AcknowledgementInteraction::new(
             core_dbs[1].clone(),
-            PublicKey::from_privkey(&PEERS_PRIVS[1]).unwrap(),
+            OffchainPublicKey::from_privkey(&PEERS_PRIVS[1]).unwrap(),
             None,
             Some(ack_tx),
         ));
@@ -1190,7 +1197,9 @@ mod tests {
             None,
             PacketInteractionConfig {
                 check_unrealized_balance: true,
-                private_key: PEERS_PRIVS[1].into(),
+                packet_private_key: PEERS_PRIVS[1].into(),
+                packet_key: OffchainPublicKey::from_privkey(&PEERS_PRIVS[1]).unwrap(),
+                chain_private_key: PEERS_PRIVS[1].into(),
                 mixer: MixerConfig::default(),
             },
         ));
@@ -1204,7 +1213,7 @@ mod tests {
         // Peer 3: Recipient of the packet and sender of the acknowledgement
         let ack_interaction_counterparty = Arc::new(AcknowledgementInteraction::new(
             core_dbs[2].clone(),
-            PublicKey::from_privkey(&PEERS_PRIVS[2]).unwrap(),
+            OffchainPublicKey::from_privkey(&PEERS_PRIVS[2]).unwrap(),
             None,
             None,
         ));
@@ -1213,7 +1222,9 @@ mod tests {
             Some(pkt_tx),
             PacketInteractionConfig {
                 check_unrealized_balance: true,
-                private_key: PEERS_PRIVS[2].into(),
+                packet_private_key: PEERS_PRIVS[2].into(),
+                packet_key: OffchainPublicKey::from_privkey(&PEERS_PRIVS[2]).unwrap(),
+                chain_private_key: PEERS_PRIVS[2].into(),
                 mixer: MixerConfig::default(),
             },
         ));
@@ -1316,7 +1327,9 @@ mod tests {
             None,
             PacketInteractionConfig {
                 check_unrealized_balance: true,
-                private_key: PEERS_PRIVS[0].into(),
+                packet_private_key: PEERS_PRIVS[0].into(),
+                packet_key: OffchainPublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap(),
+                chain_private_key: PEERS_PRIVS[0].into(),
                 mixer: MixerConfig::default(),
             },
         ));
@@ -1327,7 +1340,7 @@ mod tests {
         // -------------- Peer 2: relayer
         let ack_1 = Arc::new(AcknowledgementInteraction::new(
             core_dbs[1].clone(),
-            PublicKey::from_privkey(&PEERS_PRIVS[1]).unwrap(),
+            OffchainPublicKey::from_privkey(&PEERS_PRIVS[1]).unwrap(),
             None,
             None,
         ));
@@ -1336,7 +1349,9 @@ mod tests {
             None,
             PacketInteractionConfig {
                 check_unrealized_balance: true,
-                private_key: PEERS_PRIVS[1].into(),
+                packet_private_key: PEERS_PRIVS[1].into(),
+                packet_key: OffchainPublicKey::from_privkey(&PEERS_PRIVS[1]).unwrap(),
+                chain_private_key: PEERS_PRIVS[1].into(),
                 mixer: MixerConfig::default(),
             },
         ));
@@ -1352,7 +1367,7 @@ mod tests {
         // -------------- Peer 3: relayer
         let ack_2 = Arc::new(AcknowledgementInteraction::new(
             core_dbs[2].clone(),
-            PublicKey::from_privkey(&PEERS_PRIVS[2]).unwrap(),
+            OffchainPublicKey::from_privkey(&PEERS_PRIVS[2]).unwrap(),
             None,
             None,
         ));
@@ -1361,7 +1376,9 @@ mod tests {
             None,
             PacketInteractionConfig {
                 check_unrealized_balance: true,
-                private_key: PEERS_PRIVS[2].into(),
+                packet_private_key: PEERS_PRIVS[2].into(),
+                packet_key: OffchainPublicKey::from_privkey(&PEERS_PRIVS[2]).unwrap(),
+                chain_private_key: PEERS_PRIVS[2].into(),
                 mixer: MixerConfig::default(),
             },
         ));
@@ -1377,7 +1394,7 @@ mod tests {
         // -------------- Peer 4: relayer
         let ack_3 = Arc::new(AcknowledgementInteraction::new(
             core_dbs[3].clone(),
-            PublicKey::from_privkey(&PEERS_PRIVS[3]).unwrap(),
+            OffchainPublicKey::from_privkey(&PEERS_PRIVS[3]).unwrap(),
             None,
             None,
         ));
@@ -1386,7 +1403,9 @@ mod tests {
             None,
             PacketInteractionConfig {
                 check_unrealized_balance: true,
-                private_key: PEERS_PRIVS[3].into(),
+                packet_private_key: PEERS_PRIVS[3].into(),
+                packet_key: OffchainPublicKey::from_privkey(&PEERS_PRIVS[3]).unwrap(),
+                chain_private_key: PEERS_PRIVS[3].into(),
                 mixer: MixerConfig::default(),
             },
         ));
@@ -1402,7 +1421,7 @@ mod tests {
         // -------------- Peer 5: recipient
         let ack_4 = Arc::new(AcknowledgementInteraction::new(
             core_dbs[4].clone(),
-            PublicKey::from_privkey(&PEERS_PRIVS[4]).unwrap(),
+            OffchainPublicKey::from_privkey(&PEERS_PRIVS[4]).unwrap(),
             None,
             None,
         ));
@@ -1411,7 +1430,9 @@ mod tests {
             Some(pkt_tx),
             PacketInteractionConfig {
                 check_unrealized_balance: true,
-                private_key: PEERS_PRIVS[4].into(),
+                packet_private_key: PEERS_PRIVS[4].into(),
+                packet_key: OffchainPublicKey::from_privkey(&PEERS_PRIVS[4]).unwrap(),
+                chain_private_key: PEERS_PRIVS[4].into(),
                 mixer: MixerConfig::default(),
             },
         ));
@@ -1467,7 +1488,7 @@ pub mod wasm {
     use crate::interaction::{AcknowledgementInteraction, PacketInteraction, PacketInteractionConfig, Payload};
     use crate::path::Path;
     use async_std::channel::unbounded;
-    use core_crypto::types::{HalfKeyChallenge, PublicKey};
+    use core_crypto::types::{HalfKeyChallenge, OffchainPublicKey, PublicKey};
     use core_ethereum_db::db::CoreEthereumDb;
     use core_mixer::mixer::Mixer;
     use core_types::acknowledgement::{AcknowledgedTicket, Acknowledgement};
@@ -1545,6 +1566,7 @@ pub mod wasm {
         pub fn new(
             db: LevelDb,
             chain_key: PublicKey,
+            packet_key: OffchainPublicKey,
             on_acknowledgement: Option<js_sys::Function>,
             on_acknowledged_ticket: Option<js_sys::Function>,
         ) -> Self {
@@ -1586,7 +1608,7 @@ pub mod wasm {
                         DB::new(LevelDbShim::new(db)),
                         chain_key.clone(),
                     ))),
-                    chain_key,
+                    packet_key,
                     on_ack.0,
                     on_ack_ticket.0,
                 )),
@@ -1636,7 +1658,7 @@ pub mod wasm {
             let mut w = PacketInteraction::new(
                 Arc::new(Mutex::new(CoreEthereumDb::new(
                     DB::new(LevelDbShim::new(db)),
-                    PublicKey::from_privkey(&cfg.private_key).expect("invalid private key"),
+                    PublicKey::from_privkey(&cfg.chain_private_key).expect("invalid private key"),
                 ))),
                 on_msg.0,
                 cfg,

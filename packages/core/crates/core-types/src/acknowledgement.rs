@@ -1,8 +1,7 @@
 use crate::acknowledgement::PendingAcknowledgement::{WaitingAsRelayer, WaitingAsSender};
 use crate::channels::Ticket;
 use core_crypto::errors::CryptoError::SignatureVerification;
-use core_crypto::primitives::{DigestLike, SimpleDigest};
-use core_crypto::types::{HalfKey, HalfKeyChallenge, Hash, PublicKey, Response, Signature};
+use core_crypto::types::{HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey, OffchainSignature, PublicKey, Response};
 use serde::{Deserialize, Serialize};
 use utils_types::errors;
 use utils_types::errors::GeneralError::ParseError;
@@ -12,7 +11,7 @@ use utils_types::traits::BinarySerializable;
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct Acknowledgement {
-    ack_signature: Signature, // TODO: EdDSA signature
+    ack_signature: OffchainSignature,
     pub ack_key_share: HalfKey,
     validated: bool,
 }
@@ -20,12 +19,9 @@ pub struct Acknowledgement {
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl Acknowledgement {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
-    pub fn new(ack_key_share: HalfKey, node_private_key: &[u8]) -> Self {
-        let mut digest = SimpleDigest::default();
-        digest.update(&ack_key_share.to_bytes());
-
+    pub fn new(ack_key_share: HalfKey, node_private_key: &[u8], node_public_key: &OffchainPublicKey) -> Self {
         Self {
-            ack_signature: Signature::sign_hash(&digest.finalize(), node_private_key),
+            ack_signature: OffchainSignature::sign_message(&ack_key_share.to_bytes(), node_private_key, node_public_key),
             ack_key_share,
             validated: true,
         }
@@ -33,12 +29,10 @@ impl Acknowledgement {
 
     /// Validates the acknowledgement. Must be called immediately after deserialization or otherwise
     /// any operations with the deserialized acknowledgment will panic.
-    pub fn validate(&mut self, sender_node_key: &PublicKey) -> bool {
-        let mut digest = SimpleDigest::default();
-        digest.update(&self.ack_key_share.to_bytes());
+    pub fn validate(&mut self, sender_node_key: &OffchainPublicKey) -> bool {
         self.validated = self
                 .ack_signature
-                .verify_hash_with_pubkey(&digest.finalize(), sender_node_key);
+                .verify_message(&self.ack_key_share.to_bytes(), sender_node_key);
 
         self.validated
     }
@@ -51,12 +45,12 @@ impl Acknowledgement {
 }
 
 impl BinarySerializable<'_> for Acknowledgement {
-    const SIZE: usize = Signature::SIZE + HalfKey::SIZE;
+    const SIZE: usize = OffchainSignature::SIZE + HalfKey::SIZE;
 
     fn from_bytes(data: &[u8]) -> errors::Result<Self> {
         let mut buf = data.to_vec();
         if data.len() == Self::SIZE {
-            let ack_signature = Signature::from_bytes(buf.drain(..Signature::SIZE).as_ref())?;
+            let ack_signature = OffchainSignature::from_bytes(buf.drain(..OffchainSignature::SIZE).as_ref())?;
             let ack_key_share = HalfKey::from_bytes(buf.drain(..HalfKey::SIZE).as_ref())?;
             Ok(Self {
                 ack_signature,
@@ -71,7 +65,7 @@ impl BinarySerializable<'_> for Acknowledgement {
     fn to_bytes(&self) -> Box<[u8]> {
         assert!(self.validated, "acknowledgement not validated");
         let mut ret = Vec::with_capacity(Self::SIZE);
-        ret.extend_from_slice(&self.ack_signature.raw_signature());
+        ret.extend_from_slice(&self.ack_signature.to_bytes());
         ret.extend_from_slice(&self.ack_key_share.to_bytes());
         ret.into_boxed_slice()
     }

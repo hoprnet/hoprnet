@@ -411,7 +411,7 @@ impl Packet {
 
     /// Creates an acknowledgement for this packet.
     /// Returns None if this packet is sent by us.
-    pub fn create_acknowledgement(&self, node_private_key: &[u8]) -> Option<Acknowledgement> {
+    pub fn create_acknowledgement(&self, node_private_key: &[u8], node_public_key: &OffchainPublicKey) -> Option<Acknowledgement> {
         match &self.state {
             Final {
                 ack_key, ..
@@ -421,6 +421,7 @@ impl Packet {
             } => Some(Acknowledgement::new(
                 ack_key.clone(),
                 node_private_key,
+                node_public_key
             )),
             Outgoing { .. } => None,
         }
@@ -434,7 +435,7 @@ mod tests {
         PADDING_TAG,
     };
     use crate::por::{ProofOfRelayString, POR_SECRET_LENGTH};
-    use core_crypto::types::{OffchainPublicKey, PublicKey};
+    use core_crypto::types::{mangle_secret_key, OffchainPublicKey, PublicKey};
     use core_types::channels::Ticket;
     use libp2p_identity::PeerId;
     use parameterized::parameterized;
@@ -505,6 +506,7 @@ mod tests {
     fn test_ed25519_meta_packet(amount: usize) {
         let keypairs = (0..amount)
             .map(|_| OffchainPublicKey::random_keypair())
+            .map(|(sk,pk)| (mangle_secret_key(&sk), pk))
             .collect();
 
         generic_test_meta_packet::<Ed25519Suite>(keypairs);
@@ -514,6 +516,7 @@ mod tests {
     fn test_x25519_meta_packet(amount: usize) {
         let keypairs = (0..amount)
             .map(|_| OffchainPublicKey::random_keypair())
+            .map(|(sk,pk)| (mangle_secret_key(&sk), pk))
             .collect();
 
         generic_test_meta_packet::<X25519Suite>(keypairs)
@@ -559,7 +562,7 @@ mod tests {
         // Generate random path with node private keys
         let (mut path, mut node_private_keys) :(Vec<PeerId>, Vec<[u8; 32]>) = (0..amount)
             .map(|_| OffchainPublicKey::random_keypair())
-            .map(|(private, public)| (public.to_peerid(), private))
+            .map(|(private, public)| (public.to_peerid(), mangle_secret_key(&private)))
             .unzip();
 
         // Generate random channel public keys
