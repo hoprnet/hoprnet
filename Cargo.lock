@@ -1115,6 +1115,7 @@ dependencies = [
  "multiaddr",
  "serde",
  "serde_repr",
+ "utils-log",
  "utils-misc",
  "utils-types",
  "wasm-bindgen",
