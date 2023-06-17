@@ -3,57 +3,15 @@ pragma solidity >=0.8.0 <0.9.0;
 
 import "safe-contracts/common/Enum.sol";
 import "../../Channels.sol";
+import "../../utils/EnumerableTargetSet.sol";
 
-enum Clearance {
-    NONE,
-    FUNCTION
-}
-
-enum TargetType {
-    NONE,
-    TOKEN,
-    CHANNELS,
-    SEND
-}
-
-enum Permission {
-    NONE,
-    ALLOW_ALL,
-    BLOCK_ALL,
-    SPECIFIC_FALLBACK_ALLOW,
-    SPECIFIC_FALLBACK_BLOCK
-}
-
-enum GranularPermission {
-    NONE,
-    ALLOW,
-    BLOCK
-}
-
-struct DefaultPermissions {
-    Permission defaultTargetPermission; // uint8. Default permission for the target
-    Permission defaultRedeemTicketSafeFunctionPermisson; // uint8 (permission for Channels contract)
-    Permission defaultBatchRedeemTicketsSafeFunctionPermisson; // uint8 (permission for Channels contract)
-    Permission defaultCloseIncomingChannelSafeFunctionPermisson; // uint8 (permission for Channels contract)
-    Permission defaultInitiateOutgoingChannelClosureSafeFunctionPermisson; // uint8 (permission for Channels contract)
-    Permission defaultFinalizeOutgoingChannelClosureSafeFunctionPermisson; // uint8 (permission for Channels contract)
-    Permission defaultFundChannelMultiFunctionPermisson; // uint8 (permission for Channels contract)
-    Permission defaultSetCommitmentSafeFunctionPermisson; // uint8 (permission for Channels contract)
-    Permission defaultApproveFunctionPermisson; // uint8 (permission for Token contract)
-    Permission defaultSendFunctionPermisson; // uint8 (permission for Token contract)
-}
-
-struct TargetAddress {
-    Clearance clearance;    // uint8
-    TargetType targetType;  // uint8
-    DefaultPermissions defaultPermissions; // uint80
-}
+enum GranularPermission { NONE, ALLOW, BLOCK }
 
 struct Role {
+    TargetSet targets;  // target addresses that can be called
     mapping(address => bool) members;   // eligible caller. May be able to receive native tokens (e.g. xDAI), if set to allowed
-    mapping(address => TargetAddress) targets;  // target addresses that can be called
-    // For CHANNELS target: keyForFunctions (bytes32) => channel Id (keccak256(src, dest)) => GranularPermission
-    // For TOKEN target: keyForFunctions (bytes32) => recipient Id (address in bytes32) => GranularPermission
+    // For CHANNELS target: capabilityKey (bytes32) => channel Id (keccak256(src, dest)) => GranularPermission
+    // For TOKEN target: capabilityKey (bytes32) => recipient Id (address in bytes32) => GranularPermission
     // For SEND target:  bytes32(0x00) => recipient Id (address in bytes32) => GranularPermission
     mapping(bytes32 => mapping(bytes32 => GranularPermission)) capabilities; 
 }
@@ -89,6 +47,9 @@ struct Role {
  * defined with value instead of `.selector`
  */
 library HoprCapabilityPermissions {
+    using TargetUtils for Target;
+    using EnumerableTargetSet for TargetSet;
+
     // HoprChannels method ids (TargetType.CHANNELS)
     bytes4 internal constant REDEEM_TICKET_SELECTOR = HoprChannels.redeemTicketSafe.selector;
     bytes4 internal constant BATCH_REDEEM_TICKETS_SELECTOR = HoprChannels.batchRedeemTicketsSafe.selector;
@@ -102,7 +63,9 @@ library HoprCapabilityPermissions {
     bytes4 internal constant SEND_SELECTOR = hex"9bd9bbc6"; // equivalent to `HoprToken.send.selector`, for ABI "send(address,uint256,bytes)"
 
     event RevokedTarget(address indexed targetAddress);
-    event ScopedTarget(address indexed targetAddress, TargetType targetType, DefaultPermissions defaultPermission);
+    event ScopedTargetChannels(address indexed targetAddress, Target target);
+    event ScopedTargetToken(address indexed targetAddress, Target target);
+    event ScopedTargetSend(address indexed targetAddress, Target target);
     event ScopedGranularChannelCapability(
         address indexed targetAddress,
         bytes32 indexed channelId,
@@ -141,9 +104,6 @@ library HoprCapabilityPermissions {
     /// Role not allowed to call target address
     error TargetAddressNotAllowed();
 
-    /// Role not allowed to call target when its type is not set
-    error TargetTypeNotSet();
-
     /// Role not allowed to send to target address
     error SendNotAllowed();
 
@@ -158,6 +118,12 @@ library HoprCapabilityPermissions {
 
     // Permission not acquired
     error PermissionRejected();
+
+    // Permission not properly configured
+    error PermissionNotConfigured();
+
+    // target is already scoped
+    error TargetIsScoped();
 
 
     // ======================================================
@@ -257,55 +223,65 @@ library HoprCapabilityPermissions {
             revert FunctionSignatureTooShort();
         }
 
-        TargetAddress storage target = role.targets[targetAddress];
-        if (target.clearance != Clearance.FUNCTION) {
-            revert TargetAddressNotAllowed();
-        }
+        Target target = role.targets.tryGet(targetAddress);
 
-        // delegate call is not allowed; value can only be sent with `SEND`
-        checkExecutionOptions(value, operation, target.targetType);
+        // target is in scope; delegate call is not allowed; value can only be sent with `SEND`
+        checkExecutionOptions(value, operation, target);
 
-        // check default target permission
-        Permission defaultTargetPermission = target.defaultPermissions.defaultTargetPermission;
-        if ( defaultTargetPermission == Permission.NONE || defaultTargetPermission == Permission.BLOCK_ALL) {
+        bytes4 functionSig = bytes4(data);
+
+        // check default permissions and get the fallback permission
+        Permission defaultPermission = getDefaultPermission(target, functionSig);
+        // allow early revert or early return
+        if (defaultPermission == Permission.BLOCK_ALL) {
             revert PermissionRejected();
-        } else if (defaultTargetPermission == Permission.ALLOW_ALL) {
+        } else if (defaultPermission == Permission.ALLOW_ALL) {
             return;
         }
 
+        GranularPermission granularPermission;
         // check function permission
-        if (target.targetType == TargetType.TOKEN) {
+        if (target.getTargetType() == TargetType.TOKEN) {
             // check with HoprToken contract
-            checkHoprTokenParameters(role, targetAddress, target.defaultPermissions, data);
-            return;
-        } else if (target.targetType == TargetType.CHANNELS) {
+            granularPermission = checkHoprTokenParameters(role, keyForFunctions(targetAddress, functionSig), functionSig, sliceFrom(data, 4));
+        } else if (target.getTargetType() == TargetType.CHANNELS) {
             // check with HoprChannels contract
-            checkHoprChannelsParameters(role, targetAddress, target.defaultPermissions, data);
+            granularPermission = checkHoprChannelsParameters(role, keyForFunctions(targetAddress, functionSig), functionSig, sliceFrom(data, 4));
+        } else if (target.getTargetType() == TargetType.SEND) {
+            granularPermission = checkSendParameters(role, targetAddress, data.length);
+        }
+
+        // check permission result
+        if (
+            granularPermission == GranularPermission.BLOCK ||
+            (granularPermission == GranularPermission.NONE && defaultPermission == Permission.SPECIFIC_FALLBACK_BLOCK)
+        ) {
+            revert PermissionRejected();
+        } else if (
+            granularPermission == GranularPermission.ALLOW || 
+            (granularPermission == GranularPermission.NONE && defaultPermission == Permission.SPECIFIC_FALLBACK_ALLOW)
+        ) {
             return;
-        } else if (target.targetType == TargetType.SEND) {
-            checkSendParameters(role, targetAddress, data.length, target.defaultPermissions);
-            return;
+        } else {
+            revert PermissionNotConfigured();
         }
     }
 
-    // function getDefaultPermissions(
-    //     DefaultPermissions defaultPermission, 
-    //     bytes4 functionSig
-    // ) internal view returns () {
-
-    // }
-
     /**
-     * @dev Check if the transaction can send along native tokens and if DelegatedCall is allowed.
+     * @dev Check if target is scoped; if the transaction can send along native tokens; if DelegatedCall is allowed.
      * @param value The value of the transaction.
      * @param operation The operation type of the transaction.
-     * @param targetType The target type of the transaction.
+     * @param target The stored target
      */
     function checkExecutionOptions(
         uint256 value,
         Enum.Operation operation,
-        TargetType targetType
+        Target target
     ) internal pure {
+        if (target.getTargetClearance() != Clearance.FUNCTION) {
+            revert TargetAddressNotAllowed();
+        }
+
          // delegate call is not allowed; 
         if (
             operation == Enum.Operation.DelegateCall
@@ -314,113 +290,125 @@ library HoprCapabilityPermissions {
         }
         
         // send native tokens is only available to a set of addresses
-        if (
-            value > 0 &&
-            targetType != TargetType.SEND
-        ) {
+        if (value > 0 && !target.isTargetType(TargetType.SEND)) {
             revert SendNotAllowed();
-        }
-
-        if (targetType == TargetType.NONE) {
-            revert TargetTypeNotSet();
         }
     }
 
     /*
      * @dev Check parameters for HoprChannels capability
      * @param role reference to role storage
-     * @param scopeConfig reference to role storage
-     * @param targetAddress Address to check.
-     * @param data the transaction data to check
+     * @param capabilityKey Key to the capability.
+     * @param functionSig Function method ID
+     * @param data payload without function signature
      */
     function checkHoprChannelsParameters(
         Role storage role,
-        address targetAddress,
-        DefaultPermissions storage defaultPermissions,
-        bytes memory data
-    ) internal view {
-        bytes4 functionSig = bytes4(data);
-        bytes32 capabilityKey = keyForFunctions(targetAddress, functionSig);
-        Permission defaultFunctionPermission;
+        bytes32 capabilityKey,
+        bytes4 functionSig,
+        bytes memory slicedData
+    ) internal view returns (GranularPermission) {
         bytes32 channelId;
 
         if (functionSig == REDEEM_TICKET_SELECTOR) {
-            defaultFunctionPermission = defaultPermissions.defaultRedeemTicketSafeFunctionPermisson;
-            (address self, HoprChannels.TicketData memory ticketData) = abi.decode(sliceFrom(data, 4), (address, HoprChannels.TicketData));
-            channelId = ticketData.channelId;
+            (, HoprChannels.RedeemableTicket memory redeemableTicket) = abi.decode(slicedData, (address, HoprChannels.RedeemableTicket));
+            channelId = redeemableTicket.data.channelId;
         } else if (functionSig == BATCH_REDEEM_TICKETS_SELECTOR) {
-            // loop // TODO:
+            // loop over tickets
+            checkBatchRedeem(capabilityKey, slicedData);
         } else if (functionSig == CLOSE_INCOMING_CHANNEL_SELECTOR) {
-            defaultFunctionPermission = defaultPermissions.defaultCloseIncomingChannelSafeFunctionPermisson;
-            (address self, address source) = abi.decode(sliceFrom(data, 4), (address, address));
+            (address self, address source) = abi.decode(slicedData, (address, address));
             channelId = getChannelId(source, self);
         } else if (functionSig == INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTOR) {
-            defaultFunctionPermission = defaultPermissions.defaultInitiateOutgoingChannelClosureSafeFunctionPermisson;
-            (address self, address destination) = abi.decode(sliceFrom(data, 4), (address, address));
+            (address self, address destination) = abi.decode(slicedData, (address, address));
             channelId = getChannelId(self, destination);
         } else if (functionSig == FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTOR) {
-            defaultFunctionPermission = defaultPermissions.defaultFinalizeOutgoingChannelClosureSafeFunctionPermisson;
-            (address self, address destination) = abi.decode(sliceFrom(data, 4), (address, address));
+            (address self, address destination) = abi.decode(slicedData, (address, address));
             channelId = getChannelId(self, destination);
         } else if (functionSig == FUND_CHANNEL_MULTI_SELECTOR) {
-            defaultFunctionPermission = defaultPermissions.defaultFundChannelMultiFunctionPermisson;
-            (, , address source,) = abi.decode(sliceFrom(data, 4), (address, HoprChannels.Balance, address, HoprChannels.Balance));
-            // TODO:
+            checkFundChannel(capabilityKey, slicedData);
         } else if (functionSig == SET_COMMITMENT_SELECTOR) {
-            defaultFunctionPermission = defaultPermissions.defaultSetCommitmentSafeFunctionPermisson;
-            (address self, , address source) = abi.decode(sliceFrom(data, 4), (address, bytes32, address));
+            (address self, , address source) = abi.decode(slicedData, (address, bytes32, address));
             channelId = getChannelId(source, self);
         } else {
             revert ParameterNotAllowed();
         }
-        // TODO: compare channelId permission and function permission
+        // return permission set per channel id
+        GranularPermission granularPermission = role.capabilities[capabilityKey][channelId];
+        return granularPermission;
+    }
+
+    function checkBatchRedeem(Role storage role, bytes32 capabilityKey, bytes memory slicedData) private view returns (GranularPermission) {
+        uint256 noneCounter;
+        (, HoprChannels.RedeemableTicket[] memory redeemableTickets) = abi.decode(slicedData, (address, HoprChannels.RedeemableTicket[]));
+        for (uint256 i = 0; i < redeemableTickets.length; i++) {
+            bytes32 channelId = redeemableTickets[i].channelId;
+            GranularPermission granularPermission = role.capabilities[capabilityKey][channelId];
+            if (granularPermission == GranularPermission.NONE) {
+                noneCounter ++;
+            } else if (granularPermission == GranularPermission.BLOCK) {
+                // return BLOCK when at least one exist
+                return GranularPermission.BLOCK;
+            }
+        }
+        return noneCounter > 0 ? GranularPermission.NONE : GranularPermission.ALLOW;
+    }
+
+    function checkFundChannel(Role storage role, bytes32 capabilityKey, bytes memory slicedData) private view returns (GranularPermission) {
+        (address source, HoprChannels.Balance balance1, address destination, HoprChannels.Balance balance2) = abi.decode(slicedData, (address, HoprChannels.Balance, address, HoprChannels.Balance));
+        GranularPermission granularPermission1 = role.capabilities[capabilityKey][getChannelId(source, destination)];
+        GranularPermission granularPermission2 = role.capabilities[capabilityKey][getChannelId(destination, source)];
+        if (HoprChannels.Balance.unwrap(balance1) > 0 && HoprChannels.Balance.unwrap(balance2) == 0) {
+            return granularPermission1;
+        } else if (HoprChannels.Balance.unwrap(balance1) == 0 && HoprChannels.Balance.unwrap(balance2) > 0) {
+            return granularPermission2;
+        }
+
+        // when funding two channels
+        if (
+          granularPermission1 == GranularPermission.BLOCK || 
+          granularPermission2 == GranularPermission.BLOCK
+        ) {
+            return GranularPermission.BLOCK;
+        } else if (
+          granularPermission1 == GranularPermission.ALLOW && 
+          granularPermission2 == GranularPermission.ALLOW
+        ) {
+            return GranularPermission.ALLOW;    
+        } else {
+            return GranularPermission.NONE;
+        }
     }
 
     /*
      * @dev Will revert if a transaction has a parameter that is not allowed
      * @notice This function is invoked on non-HoprChannels contracts (i.e. HoprTokens)
      * @param role reference to role storage
-     * @param scopeConfig reference to role storage
-     * @param targetAddress Address to check.
-     * @param data the transaction data to check
+     * @param capabilityKey Key to the capability.
+     * @param functionSig Function method ID
+     * @param data payload without function signature
      */
     function checkHoprTokenParameters(
         Role storage role,
-        address targetAddress,
-        DefaultPermissions storage defaultPermissions,
-        bytes memory data
-    ) internal view {
-        bytes4 functionSig = bytes4(data);
-        bytes32 capabilityKey = keyForFunctions(targetAddress, functionSig);
-        Permission defaultFunctionPermission;
-        // // check if the first parameter is allowed
-        // address beneficiary = pluckOneStaticAddress(data, 0);  
-        // if (role.hoprTokenCapability[capabilityKey][beneficiary] != HoprTokenPermission.Allowed) {
-        //     // not allowed to call the capability
-        //     revert ParameterNotAllowed();
-        // }
-
-        // // if calling `send` method, it is equivalent to calling FUND_CHANNEL_MULTI_SELECTOR
-        // if (functionSig == SEND_SELECTOR) {
-        //     bytes32 sendCapabilityKey = keyForFunctions(targetAddress, FUND_CHANNEL_MULTI_SELECTOR);
-        //     // source and channel destination addreses are at the first and second places respectively
-        //     (address src, address dest) = pluckSendPayload(data, 2);
-        //     // check if functions on this channel can be called.
-        //     compareHoprChannelsPermission(role, sendCapabilityKey, src, dest);
-        // }
-
+        bytes32 capabilityKey,
+        bytes4 functionSig,
+        bytes memory slicedData
+    ) internal view returns (GranularPermission){
         if (functionSig == APPROVE_SELECTOR) {
-            defaultFunctionPermission = defaultPermissions.defaultApproveFunctionPermisson;
-            // TODO: get beneficiary address
-            // (address self, HoprChannels.TicketData memory ticketData) = abi.decode(sliceFrom(data, 4), (address, HoprChannels.TicketData));
-            // channelId = ticketData.channelId;
+            (address beneficiary, ) = abi.decode(slicedData, (address, uint256));
+            GranularPermission granularPermission = role.capabilities[capabilityKey][bytes32(uint256(uint160(beneficiary)))];
+            return granularPermission;
         } else if (functionSig == SEND_SELECTOR) {
-            defaultFunctionPermission = defaultPermissions.defaultSendFunctionPermisson;
-            // TODO: check extract channel Id from send payload 
+            (address beneficiary, , bytes memory sliceDataFundMulti) = abi.decode(slicedData, (address, uint256, bytes));
+            // beneficiary must be a CHANNELS target, further check the data
+            Target target = role.targets.tryGet(beneficiary);
+            if (!target.isTargetType(TargetType.CHANNELS)) {
+              revert TargetAddressNotAllowed();
+            }
+            checkHoprChannelsParameters(role, keyForFunctions(beneficiary, FUND_CHANNEL_MULTI_SELECTOR), FUND_CHANNEL_MULTI_SELECTOR, sliceDataFundMulti);
         } else {
             revert ParameterNotAllowed();
         }
-        // TODO: compare beneficiary permission and function permission
     }
 
     /**
@@ -432,19 +420,54 @@ library HoprCapabilityPermissions {
     function checkSendParameters(
         Role storage role,
         address targetAddress,
-        uint256 dataLength,
-        DefaultPermissions storage defaultPermissions
+        uint256 dataLength
     ) internal view {
-        if (
-            role.capabilities[bytes32(0)][bytes32(uint256(uint160(targetAddress)))] == GranularPermission.BLOCK || 
-            (defaultPermissions.defaultTargetPermission == Permission.SPECIFIC_FALLBACK_BLOCK && role.capabilities[bytes32(0)][bytes32(uint256(uint160(targetAddress)))] == GranularPermission.NONE)
-        ) {
-            // not allowed to send
-            revert SendNotAllowed();
-        }
         if (dataLength > 0) {
             // not allowed to call payable functions
             revert ParameterNotAllowed();
+        }
+        return role.capabilities[bytes32(0)][bytes32(uint256(uint160(targetAddress)))];
+    }
+
+    /**
+     * @dev check the default target permission for target and for the function
+     * returns the default permission
+     * @param target Taret of the operation
+     * @param functionSig bytes4 method Id of the operation
+     */
+    function getDefaultPermission(
+        Target target, 
+        bytes4 functionSig
+    ) internal view returns (Permission) {
+        // check default target permission
+        Permission defaultTargetPermission = target.getDefaultTargetPermission();
+        Permission defaultFunctionPermission;
+        if (functionSig == REDEEM_TICKET_SELECTOR) {
+            defaultFunctionPermission = target.getDefaultFunctionPermissionAt(0);
+        } else if (functionSig == BATCH_REDEEM_TICKETS_SELECTOR) {
+            defaultFunctionPermission = target.getDefaultFunctionPermissionAt(1);
+        } else if (functionSig == CLOSE_INCOMING_CHANNEL_SELECTOR) {
+            defaultFunctionPermission = target.getDefaultFunctionPermissionAt(2);
+        } else if (functionSig == INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTOR) {
+            defaultFunctionPermission = target.getDefaultFunctionPermissionAt(3);
+        } else if (functionSig == FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTOR) {
+            defaultFunctionPermission = target.getDefaultFunctionPermissionAt(4);
+        } else if (functionSig == FUND_CHANNEL_MULTI_SELECTOR) {
+            defaultFunctionPermission = target.getDefaultFunctionPermissionAt(5);
+        } else if (functionSig == SET_COMMITMENT_SELECTOR) {
+            defaultFunctionPermission = target.getDefaultFunctionPermissionAt(6);
+        } else if (functionSig == APPROVE_SELECTOR) {
+            defaultFunctionPermission = target.getDefaultFunctionPermissionAt(7);
+        } else if (functionSig == SEND_SELECTOR) {
+            defaultFunctionPermission = target.getDefaultFunctionPermissionAt(8);
+        } else {
+            defaultFunctionPermission = Permission.BLOCK_ALL;
+        }
+        // only when function permission is not defined, use target default permission
+        if (defaultFunctionPermission == Permission.NONE) {
+            return defaultTargetPermission;
+        } else {
+            return defaultFunctionPermission;
         }
     }
 
@@ -483,22 +506,7 @@ library HoprCapabilityPermissions {
         Role storage role,
         address targetAddress
     ) external {
-        role.targets[targetAddress] = TargetAddress({
-            clearance: Clearance.NONE,
-            targetType: TargetType.NONE,
-            defaultPermissions: DefaultPermissions({
-                defaultTargetPermission: Permission.NONE,
-                defaultRedeemTicketSafeFunctionPermisson: Permission.NONE,
-                defaultBatchRedeemTicketsSafeFunctionPermisson: Permission.NONE,
-                defaultCloseIncomingChannelSafeFunctionPermisson: Permission.NONE,
-                defaultInitiateOutgoingChannelClosureSafeFunctionPermisson: Permission.NONE,
-                defaultFinalizeOutgoingChannelClosureSafeFunctionPermisson: Permission.NONE,
-                defaultFundChannelMultiFunctionPermisson: Permission.NONE,
-                defaultSetCommitmentSafeFunctionPermisson: Permission.NONE,
-                defaultApproveFunctionPermisson: Permission.NONE,
-                defaultSendFunctionPermisson: Permission.NONE
-            })
-        });
+        role.targets.remove(targetAddress);
         emit RevokedTarget(targetAddress);
     }
 
@@ -506,117 +514,77 @@ library HoprCapabilityPermissions {
      * @dev Allows the target address to be scoped as a HoprToken (TOKEN) 
      * by setting its clearance and target type accordingly.
      * @param role The storage reference to the Role struct.
-     * @param targetAddress The address of the target to be scoped as a TOKEN target.
-     * @param defaultPermissions The default permissions for the TOKEN target
+     * @param target target to be scoped as a beneficiary of SEND.
      */
     function scopeTargetToken(
         Role storage role,
-        address targetAddress,
-        DefaultPermissions memory defaultPermissions
+        Target target
     ) external {
-        _scopeTarget(
-            role, 
-            targetAddress, 
-            TargetType.TOKEN,
-            DefaultPermissions({
-                defaultTargetPermission: Permission.NONE,
-                defaultRedeemTicketSafeFunctionPermisson: Permission.NONE,
-                defaultBatchRedeemTicketsSafeFunctionPermisson: Permission.NONE,
-                defaultCloseIncomingChannelSafeFunctionPermisson: Permission.NONE,
-                defaultInitiateOutgoingChannelClosureSafeFunctionPermisson: Permission.NONE,
-                defaultFinalizeOutgoingChannelClosureSafeFunctionPermisson: Permission.NONE,
-                defaultFundChannelMultiFunctionPermisson: Permission.NONE,
-                defaultSetCommitmentSafeFunctionPermisson: Permission.NONE,
-                defaultApproveFunctionPermisson: defaultPermissions.defaultApproveFunctionPermisson,
-                defaultSendFunctionPermisson: defaultPermissions.defaultSendFunctionPermisson
-            })
-        );
+      address targetAddress = target.getTargetAddress();
+      if (targetAddress) {
+          revert AddressIsZero();
+      }
+      // check targetAddress is not scoped
+      if (role.targets.contains(targetAddress)) {
+        revert TargetIsScoped();
+      }
+
+      // force overwrite irrelevant defaults
+      Target updatedTarget = target.forceWriteAsTargetType(TargetType.TOKEN);
+      role.targets.add(updatedTarget);
+
+      emit ScopedTargetToken(targetAddress, target);
     }
 
     /**
      * @dev Allows the target address to be scoped as a HoprChannels contract (CHANNELS)
      * by setting its clearance and target type accordingly.
      * @param role The storage reference to the Role struct.
-     * @param targetAddress The address of the target to be scoped as a CHANNELS target
-     * @param defaultPermissions The default permissions for the CHANNELS target
+     * @param target target to be scoped as a beneficiary of SEND.
      */
     function scopeTargetChannels(
         Role storage role,
-        address targetAddress,
-        DefaultPermissions memory defaultPermissions
+        Target target
     ) external {
-        _scopeTarget(
-            role, 
-            targetAddress, 
-            TargetType.CHANNELS,
-            DefaultPermissions({
-                defaultTargetPermission: defaultPermissions.defaultTargetPermission,
-                defaultRedeemTicketSafeFunctionPermisson: defaultPermissions.defaultRedeemTicketSafeFunctionPermisson,
-                defaultBatchRedeemTicketsSafeFunctionPermisson: defaultPermissions.defaultBatchRedeemTicketsSafeFunctionPermisson,
-                defaultCloseIncomingChannelSafeFunctionPermisson: defaultPermissions.defaultCloseIncomingChannelSafeFunctionPermisson,
-                defaultInitiateOutgoingChannelClosureSafeFunctionPermisson: defaultPermissions.defaultInitiateOutgoingChannelClosureSafeFunctionPermisson,
-                defaultFinalizeOutgoingChannelClosureSafeFunctionPermisson: defaultPermissions.defaultFinalizeOutgoingChannelClosureSafeFunctionPermisson,
-                defaultFundChannelMultiFunctionPermisson: defaultPermissions.defaultFundChannelMultiFunctionPermisson,
-                defaultSetCommitmentSafeFunctionPermisson: defaultPermissions.defaultSetCommitmentSafeFunctionPermisson,
-                defaultApproveFunctionPermisson: Permission.NONE,
-                defaultSendFunctionPermisson: Permission.NONE
-            })
-        );
+      address targetAddress = target.getTargetAddress();
+      if (targetAddress) {
+          revert AddressIsZero();
+      }
+      // check targetAddress is not scoped
+      if (role.targets.contains(targetAddress)) {
+        revert TargetIsScoped();
+      }
+      // force overwrite irrelevant defaults
+      Target updatedTarget = target.forceWriteAsTargetType(TargetType.CHANNELS);
+      role.targets.add(updatedTarget);
+
+      emit ScopedTargetChannels(targetAddress, target);
     }
 
     /**
      * @dev Allows the target address to be scoped as a beneficiary of SEND by setting its clearance and target type accordingly.
      * @notice It overwrites the irrelevant fields in DefaultPermissions struct
      * @param role The storage reference to the Role struct.
-     * @param targetAddress The address of the target to be scoped as a beneficiary of SEND.
-     * @param defaultPermissions The default permissions for the SEND target
+     * @param target target to be scoped as a beneficiary of SEND.
      */
     function scopeTargetSend(
         Role storage role,
-        address targetAddress,
-        DefaultPermissions memory defaultPermissions
+        Target target
     ) external {
-        _scopeTarget(
-            role, 
-            targetAddress, 
-            TargetType.SEND,
-            DefaultPermissions({
-                defaultTargetPermission: Permission.NONE,
-                defaultRedeemTicketSafeFunctionPermisson: Permission.NONE,
-                defaultBatchRedeemTicketsSafeFunctionPermisson: Permission.NONE,
-                defaultCloseIncomingChannelSafeFunctionPermisson: Permission.NONE,
-                defaultInitiateOutgoingChannelClosureSafeFunctionPermisson: Permission.NONE,
-                defaultFinalizeOutgoingChannelClosureSafeFunctionPermisson: Permission.NONE,
-                defaultFundChannelMultiFunctionPermisson: Permission.NONE,
-                defaultSetCommitmentSafeFunctionPermisson: Permission.NONE,
-                defaultApproveFunctionPermisson: Permission.NONE,
-                defaultSendFunctionPermisson: Permission.NONE
-            })
-        );
-    }
+      address targetAddress = target.getTargetAddress();
+      if (targetAddress) {
+          revert AddressIsZero();
+      }
+      // check targetAddress is not scoped
+      if (role.targets.contains(targetAddress)) {
+        revert TargetIsScoped();
+      }
 
-    /**
-     * @dev Allows the target address to be scoped with a perset permissions.
-     * @param _role The storage reference to the Role struct.
-     * @param _targetAddress The address of the target to be scoped
-     * @param _targetType The type of the target
-     * @param _defaultPermissions The default permissions for target
-     */
-    function _scopeTarget(
-        Role storage _role,
-        address _targetAddress,
-        TargetType _targetType,
-        DefaultPermissions memory _defaultPermissions
-    ) private {
-        if (_targetAddress == address(0)) {
-            revert AddressIsZero();
-        }
-        _role.targets[_targetAddress] = TargetAddress({
-            clearance: Clearance.FUNCTION,
-            targetType: _targetType,
-            defaultPermissions: _defaultPermissions
-        });
-        emit ScopedTarget(_targetAddress, _targetType, _defaultPermissions);
+      // force overwrite irrelevant defaults
+      Target updatedTarget = target.forceWriteAsTargetType(TargetType.SEND);
+      role.targets.add(updatedTarget);
+      
+      emit ScopedTargetSend(targetAddress, target);
     }
     
     /**
@@ -969,4 +937,7 @@ library HoprCapabilityPermissions {
             permissions[j] = GranularPermission(uint8((uint256(encoded) << (254 - 2 * j)) >> 254));
         }
     }
+
+    // TODO: Add encode function for default permissions
+    // TODO: Add decode function for default Target
 }

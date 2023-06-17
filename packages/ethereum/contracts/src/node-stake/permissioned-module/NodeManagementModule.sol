@@ -30,6 +30,8 @@ error CannotChangeOwner();
  * Module can execute CALLs to HoprToken contracts
  */
 contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule {
+  using TargetUtils for Target;
+
   bool public constant isHoprNodeManagementModule = true;
   // address to send delegated multisend calls to 
   address public multisend;
@@ -122,60 +124,55 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
    * and its token as a HoprToken target. HoprToken address is obtained from 
    * HoprChannels contract
    * @param hoprChannelsAddress address of HoprChannels contract to be added to scope
-   * @param defaultPermissions The default permissions for CHANNEL and TOKEN target
+   * @param defaultTarget The default target with default permissions for CHANNELS and TOKEN target
    */
   function addChannelsAndTokenTarget(
     address hoprChannelsAddress,
-    DefaultPermissions calldata defaultPermissions
+    Target defaultTarget
   ) external onlyOwner {
     // get tokens contract
     address hoprTokenAddress = address(HoprChannels(hoprChannelsAddress).token());
 
-    // add default scope for Channels TargetType
-    HoprCapabilityPermissions.scopeTargetChannels(role, hoprChannelsAddress, defaultPermissions);
+    // add default scope for Channels TargetType, with the build target for hoprChannels address
+    HoprCapabilityPermissions.scopeTargetChannels(role, defaultTarget.forceWriteTargetAddress(hoprChannelsAddress));
     // add default scope for Token TargetType
-    HoprCapabilityPermissions.scopeTargetToken(role, hoprTokenAddress, defaultPermissions);
+    HoprCapabilityPermissions.scopeTargetToken(role, defaultTarget.forceWriteTargetAddress(hoprTokenAddress));
   }
 
   /**
    * @dev Scopes the target address as a HoprChannels target
-   * @param hoprChannelsAddress address of HoprChannels contract to be added to scope
-   * @param defaultPermissions The default permissions for CHANNEL and TOKEN target
+   * @param defaultTarget The default target with default permissions for CHANNELS target
    */
   function scopeTargetChannels(
-    address hoprChannelsAddress,
-    DefaultPermissions calldata defaultPermissions
+    Target defaultTarget
   ) external onlyOwner {
-    HoprCapabilityPermissions.scopeTargetChannels(role, hoprChannelsAddress, defaultPermissions);
+    HoprCapabilityPermissions.scopeTargetChannels(role, defaultTarget);
   }
 
   /**
    * @dev Scopes the target address as a HoprToken target
-   * @param hoprTokenAddress address of HoprToken contract to be added to scope
-   * @param defaultPermissions The default permissions for CHANNEL and TOKEN target
+   * @param defaultTarget The default target with default permissions for TOKEN target
    */
   function scopeTargetToken(
-    address hoprTokenAddress,
-    DefaultPermissions calldata defaultPermissions
+    Target defaultTarget
   ) external onlyOwner {
-    HoprCapabilityPermissions.scopeTargetToken(role, hoprTokenAddress, defaultPermissions);
+    HoprCapabilityPermissions.scopeTargetToken(role, defaultTarget);
   }
 
   /**
    * @dev Scopes the target address as a Send target, so native tokens can be 
    * transferred from the avatar to the target.
    * @notice Only member is allowed to be a beneficiary
-   * @param beneficiaryAddress address that can receive native tokens
-   * @param defaultPermissions The default permissions for CHANNEL and TOKEN target
+   * @param defaultTarget The default target with default permissions for SEND target
    */
   function scopeTargetSend(
-    address beneficiaryAddress,
-    DefaultPermissions calldata defaultPermissions
+    Target defaultTarget
   ) external onlyOwner {
+    address beneficiaryAddress = defaultTarget.getTargetAddress();
     if (!role.members[beneficiaryAddress]) {
       revert HoprCapabilityPermissions.NoMembership();
     }
-    HoprCapabilityPermissions.scopeTargetSend(role, beneficiaryAddress, defaultPermissions);
+    HoprCapabilityPermissions.scopeTargetSend(role, defaultTarget);
   }
 
   /**
