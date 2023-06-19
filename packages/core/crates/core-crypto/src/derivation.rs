@@ -55,9 +55,12 @@ pub fn derive_commitment_seed(private_key: &[u8], channel_info: &[u8]) -> Result
         .and_then(|key| calculate_mac(&key, channel_info))
 }
 
+/// Represents a fixed size packet verification tag
+pub type PacketTag = [u8; PACKET_TAG_LENGTH];
+
 /// Derives the packet tag used during packet construction by expanding the given secret.
-pub fn derive_packet_tag(secret: &[u8]) -> Result<Box<[u8]>> {
-    hkdf_expand_from_prk::<PACKET_TAG_LENGTH>(secret, HASH_KEY_PACKET_TAG.as_bytes()).map(Box::from)
+pub fn derive_packet_tag(secret: &[u8]) -> Result<PacketTag> {
+    hkdf_expand_from_prk::<PACKET_TAG_LENGTH>(secret, HASH_KEY_PACKET_TAG.as_bytes())
 }
 
 /// Derives a key for MAC calculation by expanding the given secret.
@@ -125,28 +128,6 @@ pub fn derive_ack_key_share(secret: &[u8]) -> HalfKey {
     assert_eq!(SECRET_KEY_LENGTH, secret.len());
 
     sample_field_element(secret, HASH_KEY_ACK_KEY).expect("failed to sample ack key share")
-}
-
-#[cfg(feature = "wasm")]
-pub mod wasm {
-    use utils_misc::ok_or_jserr;
-    use utils_misc::utils::wasm::JsResult;
-    use wasm_bindgen::prelude::*;
-
-    #[wasm_bindgen]
-    pub fn derive_packet_tag(secret: &[u8]) -> JsResult<Box<[u8]>> {
-        ok_or_jserr!(super::derive_packet_tag(secret))
-    }
-
-    #[wasm_bindgen]
-    pub fn derive_commitment_seed(private_key: &[u8], channel_info: &[u8]) -> JsResult<Box<[u8]>> {
-        ok_or_jserr!(super::derive_commitment_seed(private_key, channel_info))
-    }
-
-    #[wasm_bindgen]
-    pub fn derive_mac_key(secret: &[u8]) -> JsResult<Box<[u8]>> {
-        ok_or_jserr!(super::derive_mac_key(secret))
-    }
 }
 
 #[cfg(test)]

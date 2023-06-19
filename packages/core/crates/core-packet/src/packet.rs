@@ -1,5 +1,5 @@
 use crate::errors::PacketError::{InvalidPacketState, PacketDecodingError};
-use core_crypto::derivation::{derive_ack_key_share, derive_packet_tag};
+use core_crypto::derivation::{derive_ack_key_share, derive_packet_tag, PacketTag};
 use core_crypto::primitives::{DigestLike, SimpleMac};
 use core_crypto::prp::{PRPParameters, PRP};
 use core_crypto::routing::{forward_header, header_length, ForwardedHeader, RoutingInfo};
@@ -76,13 +76,13 @@ enum ForwardedMetaPacket<S: SphinxSuite> {
         next_node: <S::P as Keypair>::Public,
         additional_info: Box<[u8]>,
         derived_secret: SharedSecret,
-        packet_tag: Box<[u8]>,
+        packet_tag: PacketTag,
     },
     FinalPacket {
         plain_text: Box<[u8]>,
         additional_data: Box<[u8]>,
         derived_secret: SharedSecret,
-        packet_tag: Box<[u8]>,
+        packet_tag: PacketTag,
     },
 }
 
@@ -234,7 +234,7 @@ impl<S: SphinxSuite> MetaPacket<S> {
 pub enum PacketState {
     /// Packet is intended for us
     Final {
-        packet_tag: Box<[u8]>,
+        packet_tag: PacketTag,
         ack_key: HalfKey,
         previous_hop: OffchainPublicKey,
         plain_text: Box<[u8]>,
@@ -242,7 +242,7 @@ pub enum PacketState {
     /// Packet must be forwarded
     Forwarded {
         ack_challenge: HalfKeyChallenge,
-        packet_tag: Box<[u8]>,
+        packet_tag: PacketTag,
         ack_key: HalfKey,
         previous_hop: OffchainPublicKey,
         own_key: HalfKey,
