@@ -44,7 +44,7 @@ impl Acknowledgement {
     }
 }
 
-impl BinarySerializable<'_> for Acknowledgement {
+impl BinarySerializable for Acknowledgement {
     const SIZE: usize = OffchainSignature::SIZE + HalfKey::SIZE;
 
     fn from_bytes(data: &[u8]) -> errors::Result<Self> {
@@ -103,7 +103,7 @@ impl AcknowledgedTicket {
     }
 }
 
-impl BinarySerializable<'_> for AcknowledgedTicket {
+impl BinarySerializable for AcknowledgedTicket {
     const SIZE: usize = Ticket::SIZE + Response::SIZE + Hash::SIZE + PublicKey::SIZE_COMPRESSED;
 
     fn from_bytes(data: &[u8]) -> errors::Result<Self> {
@@ -197,7 +197,7 @@ impl UnacknowledgedTicket {
     }
 }
 
-impl BinarySerializable<'_> for UnacknowledgedTicket {
+impl BinarySerializable for UnacknowledgedTicket {
     const SIZE: usize = Ticket::SIZE + HalfKey::SIZE + PublicKey::SIZE_UNCOMPRESSED;
 
     fn from_bytes(data: &[u8]) -> errors::Result<Self> {
@@ -240,7 +240,7 @@ impl PendingAcknowledgement {
     const RELAYER_PREFIX: u8 = 1;
 }
 
-impl BinarySerializable<'_> for PendingAcknowledgement {
+impl BinarySerializable for PendingAcknowledgement {
     const SIZE: usize = 1;
 
     fn from_bytes(data: &[u8]) -> errors::Result<Self> {

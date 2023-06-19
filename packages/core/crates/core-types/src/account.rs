@@ -104,7 +104,7 @@ impl Display for AccountEntry {
     }
 }
 
-impl BinarySerializable<'_> for AccountEntry {
+impl BinarySerializable for AccountEntry {
     const SIZE: usize = PublicKey::SIZE_UNCOMPRESSED + Self::MA_LENGTH_PREFIX + Self::MAX_MULTI_ADDR_LENGTH + 4;
 
     fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {

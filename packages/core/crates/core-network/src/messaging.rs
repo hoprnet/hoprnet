@@ -77,7 +77,7 @@ impl PingMessage {
 impl utils_types::traits::AutoBinarySerializable<'_> for PingMessage {}
 
 #[cfg(feature = "compat-ping")]
-impl BinarySerializable<'_> for PingMessage {
+impl BinarySerializable for PingMessage {
     const SIZE: usize = core_crypto::parameters::PING_PONG_NONCE_SIZE;
 
     // This implementation is backwards compatible with older HOPR versions

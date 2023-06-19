@@ -143,7 +143,7 @@ impl FromStr for CurvePoint {
     }
 }
 
-impl BinarySerializable<'_> for CurvePoint {
+impl BinarySerializable for CurvePoint {
     const SIZE: usize = 65; // Stores uncompressed data
 
     fn from_bytes(bytes: &[u8]) -> utils_types::errors::Result<Self> {
@@ -255,7 +255,7 @@ impl From<Response> for Challenge {
     }
 }
 
-impl BinarySerializable<'_> for Challenge {
+impl BinarySerializable for Challenge {
     const SIZE: usize = PublicKey::SIZE_COMPRESSED;
 
     fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
@@ -312,7 +312,7 @@ impl HalfKey {
     }
 }
 
-impl BinarySerializable<'_> for HalfKey {
+impl BinarySerializable for HalfKey {
     const SIZE: usize = 32;
 
     fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
@@ -367,7 +367,7 @@ impl HalfKeyChallenge {
     }
 }
 
-impl BinarySerializable<'_> for HalfKeyChallenge {
+impl BinarySerializable for HalfKeyChallenge {
     const SIZE: usize = PublicKey::SIZE_COMPRESSED; // Size of the compressed secp256k1 point.
 
     fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
@@ -431,7 +431,7 @@ impl Hash {
     }
 }
 
-impl BinarySerializable<'_> for Hash {
+impl BinarySerializable for Hash {
     const SIZE: usize = 32; // Defined by Keccak256.
 
     fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
@@ -488,7 +488,7 @@ impl OffchainPublicKey {
     }
 }
 
-impl BinarySerializable<'_> for OffchainPublicKey {
+impl BinarySerializable for OffchainPublicKey {
     const SIZE: usize = 32;
 
     fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
@@ -813,7 +813,7 @@ impl Response {
     }
 }
 
-impl BinarySerializable<'_> for Response {
+impl BinarySerializable for Response {
     const SIZE: usize = 32;
 
     fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
@@ -852,7 +852,7 @@ impl OffchainSignature {
     }
 }
 
-impl BinarySerializable<'_> for OffchainSignature {
+impl BinarySerializable for OffchainSignature {
     const SIZE: usize = ed25519_dalek::Signature::BYTE_SIZE;
 
     fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
@@ -961,7 +961,7 @@ impl Signature {
     }
 }
 
-impl BinarySerializable<'_> for Signature {
+impl BinarySerializable for Signature {
     const SIZE: usize = 64;
 
     fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {

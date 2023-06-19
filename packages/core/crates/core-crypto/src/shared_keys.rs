@@ -161,7 +161,7 @@ pub trait SphinxSuite {
     type A: ArrayLength<u8>;
 
     /// Public key corresponding to the EC group
-    type P: for <'a> BinarySerializable<'a> + Clone;
+    type P: BinarySerializable + Clone;
 
     /// EC group
     type G: GroupElement<Self::A, Self::E> + for<'a> From<&'a Self::P>;

@@ -121,7 +121,7 @@ impl GroupElement<typenum::U33, k256::Scalar> for k256::ProjectivePoint {
 #[derive(PartialEq, Eq, Clone)]
 pub struct CompressedPublicKey(pub PublicKey);
 
-impl BinarySerializable<'_> for CompressedPublicKey {
+impl BinarySerializable for CompressedPublicKey {
     const SIZE: usize = PublicKey::SIZE_COMPRESSED;
 
     fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
