@@ -12,7 +12,9 @@ on:
       - opened
       - labeled
       - unlabeled
-
+concurrency:
+  group: ${{ github.head_ref }}-checks
+  cancel-in-progress: true
 jobs:
   check_changeset:
     name: Check changeset
