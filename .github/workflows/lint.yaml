@@ -25,8 +25,6 @@ jobs:
     runs-on: ubuntu-2-core
     steps:
       - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
 
       - name: Disable sccache (act-only)
         if: ${{ env.ACT }}

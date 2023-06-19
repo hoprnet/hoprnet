@@ -22,8 +22,6 @@ jobs:
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
 
       - name: Check PR changes
         id: check_pr_changeset
