@@ -4,11 +4,12 @@ name: Build Toolchain
 
 on:
   workflow_dispatch:
-    branch:
-      description: 'Branch name'
-      required: true
-      type: string
-  pull_request:
+    inputs:
+      branch:
+        description: 'Branch name'
+        required: true
+        type: string
+  # pull_request:
   # workflow_call:
   #   secrets:
   #     GOOGLE_HOPRASSOCIATION_PROJECT:
