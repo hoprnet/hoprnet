@@ -17,7 +17,7 @@ on:
   #     GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY:
   #       required: true
 concurrency:
-  group: ${{ github.head_ref }}
+  group: ${{ inputs.branch }}
   cancel-in-progress: true
 
 jobs:
