@@ -8,6 +8,7 @@ on:
       description: 'Branch name'
       required: true
       type: string
+  pull_request:
   # workflow_call:
   #   secrets:
   #     GOOGLE_HOPRASSOCIATION_PROJECT:

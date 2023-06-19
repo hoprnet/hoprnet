@@ -57,8 +57,9 @@ jobs:
           cat check_pr.log >> $GITHUB_OUTPUT
       - name: Build Toolchain docker image
         run: gh workflow run build-toolchain.yaml --ref ${{ github.event.pull_request.head.ref }} -f branch=${{ github.event.pull_request.head.ref }}
-        # with:
-        #   token: ${{ secrets.access-token }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+
   # build_toolchain:
   #   name: Build Toolchain
   #   needs:
