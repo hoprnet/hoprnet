@@ -73,7 +73,7 @@ fi
 
 # Check wether the pushed commits to the PR involve building docker images
 function check_push() {
-  declare head_branch=`git rev-parse --abbrev-ref HEAD`
+  declare head_branch=`git branch --show-current`
   
   echo "Checking pushed changeset from ${head_branch} against ${base_branch}"
   git diff --name-only --diff-filter=ACMRT ${base_branch} ${head_branch} > changes.txt
