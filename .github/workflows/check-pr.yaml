@@ -38,10 +38,9 @@ jobs:
           event_type=${{ github.event.action }}
           echo "The event fired is: ${event_type}"
           set -x
-          labels=${{ github.event.pull_request.labels }}
+          labels=${{ github.event.pull_request.labels.* }}
           echo "Those are the labels: ${labels[*]}"
-          echo "Those are the labels: ${labels[*].name}"
-          echo "Label 1: ${labels[0].name}"
+          echo "Label 0: ${labels[0].name}"
           current_label=${{ github.event.label.name }}
           echo "This is the affected label: ${current_label}"
           declare params=""
