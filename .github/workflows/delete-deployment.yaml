@@ -2,19 +2,18 @@
 name: Delete deployment
 
 on:
-  pull_request:
-    branches:
-      - master
-      - release/*
-    types:
-      - unlabeled
+  workflow_call:
+    secrets:
+      COMMIT_BOT_ACCESS_TOKEN:
+        required: true
+
 env:
   GITOPS_ENVIRONMENT: prod
   GITOPS_BRANCH: master
 jobs:
   undeploy:
+    name: undeploy
     runs-on: ubuntu-2-core
-    if: github.event.label.name == 'deploy_nodes'
 
     steps:
       - name: Set up Python

@@ -29,3 +29,20 @@ jobs:
           ./scripts/check-pr.sh --event ${{ github.event.action }} --label ${{ github.event.label.name }}
           cat check_pr.log >> $GITHUB_OUTPUT
 
+  create_deployment:
+    name: K8s
+    needs:
+      - check_changeset
+    if: ${{needs.check_changeset.outputs.create_deployment }}
+    uses: ./.github/workflows/create-deployment.yaml
+    secrets:
+      COMMIT_BOT_ACCESS_TOKEN: ${{ secrets.COMMIT_BOT_ACCESS_TOKEN }}
+
+  delete_deployment:
+    name: K8s
+    needs:
+      - check_changeset
+    if: ${{needs.check_changeset.outputs.delete_deployment }}
+    uses: ./.github/workflows/delete-deployment.yaml
+    secrets:
+      COMMIT_BOT_ACCESS_TOKEN: ${{ secrets.COMMIT_BOT_ACCESS_TOKEN }}
