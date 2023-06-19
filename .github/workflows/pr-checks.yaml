@@ -67,7 +67,7 @@ jobs:
       #     GH_TOKEN: ${{ github.token }}
 
   build_toolchain:
-    name: Build Toolchain
+    name: Build
     needs:
       - check_changeset
     if: ${{needs.check_changeset.outputs.build_toolchain }}
@@ -77,7 +77,7 @@ jobs:
       GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
 
   build_hopli:
-    name: Build Hopli
+    name: Build
     needs:
       - check_changeset
     if: ${{needs.check_changeset.outputs.build_hopli }}
@@ -87,7 +87,7 @@ jobs:
       GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
 
   build_hoprd:
-    name: Build Hoprd
+    name: Build
     needs:
       - check_changeset
     if: ${{needs.check_changeset.outputs.build_hoprd }}
@@ -98,3 +98,13 @@ jobs:
       K8S_SSH_SERVICE_HOST: ${{ secrets.K8S_SSH_SERVICE_HOST }}
       K8S_SSH_SERVICE_USERNAME: ${{ secrets.K8S_SSH_SERVICE_USERNAME }}
       K8S_SSH_SERVICE_PASSWORD: ${{ secrets.K8S_SSH_SERVICE_PASSWORD }}
+
+  build_anvil:
+    name: Build
+    needs:
+      - check_changeset
+    if: ${{needs.check_changeset.outputs.build_anvil }}
+    uses: ./.github/workflows/build-anvil.yaml
+    secrets:
+      GOOGLE_HOPRASSOCIATION_PROJECT: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
+      GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}

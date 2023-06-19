@@ -21,7 +21,7 @@ concurrency:
 jobs:
 
   build:
-    name: Build hoprd
+    name: Hoprd
     runs-on: ubuntu-latest
     # concurrency:
     #   group: ${{ inputs.branch }}

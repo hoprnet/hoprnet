@@ -6,8 +6,13 @@ env:
   RUSTC_WRAPPER: "sccache"
 
 on:
-  push:
-    branches: ['**']
+  pull_request:
+    branches:
+      - master
+      - release/*
+    types:
+      - synchronize
+      - opened
     paths-ignore:
       - '.processes/**/*'
       - 'docs/**/*'

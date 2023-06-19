@@ -1,15 +1,8 @@
 ---
 # The goal of this workflow is to build the `hoprd` docker image when a pull request is created or commit push into it and has the label `deploy_nodes`
-name: Build Toolchain
+name: Build Anvil
 
 on:
-  # workflow_dispatch:
-  #   inputs:
-  #     branch:
-  #       description: 'Branch name'
-  #       required: true
-  #       type: string
-  # pull_request:
   workflow_call:
     secrets:
       GOOGLE_HOPRASSOCIATION_PROJECT:
@@ -17,22 +10,18 @@ on:
       GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY:
         required: true
 concurrency:
-  group: ${{ github.head_ref }}-toolchain
+  group: ${{ github.head_ref }}-anvil
   cancel-in-progress: true
 jobs:
 
   build:
-    name: Toolchain
+    name: Build Anvil
     runs-on: ubuntu-latest
-    # concurrency:
-    #   group: ${{ inputs.branch }}
-    #   cancel-in-progress: true
     steps:
       - name: Checkout hoprnet
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-          # ref: ${{ inputs.branch }} 
 
       - id: auth
         name: Set up Google Cloud Credentials
@@ -55,7 +44,7 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           push: true
-          file: scripts/toolchain/Dockerfile
-          cache-from: type=registry,ref=europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-toolchain:buildcache
-          cache-to: type=registry,ref=europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-toolchain:buildcache,mode=max
-          tags: europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-toolchain:pr-${{ github.event.pull_request.number }}
+          file: packages/ethereum/Dockerfile.anvil
+          cache-from: type=registry,ref=europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopli:buildcache
+          cache-to: type=registry,ref=europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopli:buildcache,mode=max
+          tags: europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopli:pr-${{ github.event.pull_request.number }}
