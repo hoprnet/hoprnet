@@ -10,7 +10,7 @@ on:
       - labeled
       - unlabeled
 concurrency:
-  group: ${{ github.head_ref }}-build
+  group: ${{ github.head_ref }}
   cancel-in-progress: true
 jobs:
   check_changeset:

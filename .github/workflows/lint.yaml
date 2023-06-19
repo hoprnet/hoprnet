@@ -18,7 +18,9 @@ on:
       - 'docs/**/*'
       - 'packages/*/docs/**/*'
       - '**/*.md'
-
+concurrency:
+  group: ${{ github.head_ref }}
+  cancel-in-progress: true
 jobs:
   lint:
     name: Linter

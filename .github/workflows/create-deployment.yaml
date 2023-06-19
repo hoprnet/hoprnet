@@ -24,8 +24,6 @@ jobs:
           pip install jinja2-cli
       - name: Checkout hoprnet
         uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
 
       - name: Checkout gitops
         uses: actions/checkout@v3
@@ -34,7 +32,6 @@ jobs:
           path: "./gitops"
           token: ${{ secrets.COMMIT_BOT_ACCESS_TOKEN }}
           ref: ${{ env.GITOPS_BRANCH }}
-          fetch-depth: 0
 
       - name: Set up environment
         run: |
