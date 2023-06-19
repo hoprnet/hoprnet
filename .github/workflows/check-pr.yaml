@@ -1,0 +1,80 @@
+---
+# The goal of this workflow is to build the `hoprd` docker image when a pull request is created or commit push into it and has the label `deploy_nodes`
+name: Check PR
+
+on:
+  pull_request:
+    branches:
+      - master
+      - release/*
+    types:
+      - synchronize
+      - opened
+      - label
+      - unlabeled
+
+concurrency:
+  group: ${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  check_pr:
+    name: Check PR
+    runs-on: ubuntu-latest
+    outputs:
+      toolchain: ${{ steps.changeset.outputs.toolchain}}
+      hopli: ${{ steps.changeset.outputs.hopli}}
+      hoprd: ${{ steps.changeset.outputs.hoprd}}
+    steps:
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Get commit changeSet
+        id: changeset
+        # Set outputs using the command.
+        run: |
+          echo "Comparing  ${{ github.event.pull_request.base.sha }} against ${{ github.event.pull_request.head.sha }}"
+          git diff --name-only --diff-filter=ACMRT ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} > changes.txt
+          if cat changes.txt | grep -e ^scripts/ -e ^Makefile$ -e ^package.json$ -e ^.yarnrc.yml$ -e ^rust-toolchain.toml$ -e ^.nvmrc -e ^yarn.lock$ -e ^Cargo.toml 1> /dev/null; then
+            echo "Changes detected on Toolchain"
+            echo "toolchain=true" >> $GITHUB_OUTPUT
+          fi
+          if cat changes.txt | grep ^packages/hopli/ 1> /dev/null; then
+            echo "Changes detected on Hopli"
+            echo "hopli=true" >> $GITHUB_OUTPUT
+          fi
+          if cat changes.txt | grep -v ^.github/ | grep ^packages/hopli/ | grep -v ^scripts | grep -v ^.processes | grep -v ^docs/ | grep -v .md 1> /dev/null; then
+            echo "Changes detected on Hoprd"
+            echo "hoprd=true" >> $GITHUB_OUTPUT
+          fi
+      - name: Get label changes
+        id: changeset
+        # Set outputs using the command.
+        run: |
+          event_type=${{ github.event.action }}
+          echo "The event fired is: ${event_type}"
+          labels=${{ github.event.pull_request.labels }}
+          echo "Those are the labels: ${labels}"
+          current_label=${{ github.event.label.name }}
+          echo "This is the affected label: ${current_label}"
+          declare params=""
+          case "${event_type}" in
+            synchronize | opened)
+              params="${params} --event push --base ${{ github.event.pull_request.base.ref }}"
+              ;;
+            labeled)
+              params="${params} --event labeled --labels ${current_label}"
+              ;;
+            unlabeled)
+              params="${params} --event unlabeled --labels ${current_label}"
+              ;;
+            *)
+              echo "invalid event: ${event_type}"
+              exit 1
+              ;;
+          esac;
+          ./scripts/check-pr.sh ${params}
+          cat check_pr_results.txt
+

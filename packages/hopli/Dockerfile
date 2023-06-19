@@ -30,6 +30,8 @@ LABEL name="hopli" \
     summary="Hopli cli tool" \
     description="Hopli is a commandline tool that interacts mainly with Foundry"
 
+ENV ETHERSCAN_API_KEY="random_giberish"
+
 # build project sources
 WORKDIR /root
 COPY ./packages/ethereum/contracts /root/contracts

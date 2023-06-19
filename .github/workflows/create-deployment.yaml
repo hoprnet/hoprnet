@@ -13,7 +13,7 @@ env:
   GITOPS_BRANCH: master
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-2-core
     if: contains(github.event.pull_request.labels.*.name, 'deploy_nodes')
 
     steps:

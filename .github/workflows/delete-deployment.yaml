@@ -13,7 +13,7 @@ env:
   GITOPS_BRANCH: master
 jobs:
   undeploy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-2-core
     if: github.event.label.name == 'deploy_nodes'
 
     steps:
