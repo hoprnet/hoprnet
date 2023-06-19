@@ -46,7 +46,7 @@ jobs:
           echo "first_label: ${first_label}"
           current_label=${{ github.event.label.name }}
           echo "This is the affected label: ${current_label}"
-          declare params=""
+          declare params="${label_names}"
           case "${event_type}" in
             synchronize | opened)
               params="${params} --event push --base-branch ${{ github.event.pull_request.base.sha }} --head-branch ${{ github.event.pull_request.head.sha }}"
