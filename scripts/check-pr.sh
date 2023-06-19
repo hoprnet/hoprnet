@@ -91,6 +91,10 @@ function check_push() {
       echo "Changes detected on Hoprd"
       echo "build_hoprd=true" >> ${results_file}
   fi
+  if cat changes.txt | grep -e ^scripts/ -e ^Makefile$ -e ^packages/ethereum/ | grep -v .md 1> /dev/null; then
+      echo "Changes detected on Anvil"
+      echo "build_anvil=true" >> ${results_file}
+  fi
   rm changes.txt
 }
 
