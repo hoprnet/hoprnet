@@ -1,5 +1,8 @@
 use libp2p_identity::PeerId;
 use std::fmt::{Display, Formatter};
+use utils_types::traits::PeerIdLike;
+use crate::errors::PacketError;
+use crate::errors::PacketError::{InvalidPeer, PathNotValid};
 
 /// Represents a path for a packet.
 /// The type internally carries an information if the path has been already validated or not (since path validation
@@ -20,7 +23,7 @@ impl Path {
 
     /// Determines with the path is valid.
     pub fn valid(&self) -> bool {
-        self.valid
+        self.hops.len() > 0 && self.valid
     }
 }
 
@@ -36,6 +39,19 @@ impl Path {
     /// Individual hops in the path.
     pub fn hops(&self) -> &[PeerId] {
         &self.hops
+    }
+}
+
+impl<T> TryFrom<&Path> for Vec<T>
+where T: PeerIdLike {
+    type Error = PacketError;
+
+    fn try_from(value: &Path) -> std::result::Result<Self, Self::Error> {
+        if value.valid() {
+            value.hops().iter().map(|p| T::from_peerid(p).map_err(|_| InvalidPeer(p.to_string()))).collect()
+        } else {
+            Err(PathNotValid)
+        }
     }
 }
 

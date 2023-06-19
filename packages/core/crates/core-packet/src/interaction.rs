@@ -453,7 +453,7 @@ where
         };
 
         // Create the packet
-        let packet = Packet::new(msg, &path.hops(), &self.cfg.chain_keypair, next_ticket)?;
+        let packet = Packet::new(msg, &path, &self.cfg.chain_keypair, next_ticket)?;
         match packet.state() {
             PacketState::Outgoing { ack_challenge, .. } => {
                 self.db

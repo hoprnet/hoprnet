@@ -23,6 +23,9 @@ pub enum PacketError {
     #[error("path for the packet is not valid")]
     PathNotValid,
 
+    #[error("path contains an invalid peer id")]
+    InvalidPeer(String),
+
     #[error("ticket validation failed, packet dropped: {0}")]
     TicketValidation(String),
 

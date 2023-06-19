@@ -570,13 +570,6 @@ impl From<&OffchainPublicKey> for MontgomeryPoint {
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct OffchainKeypair([u8; ed25519_dalek::SECRET_KEY_LENGTH], OffchainPublicKey);
 
-    /*fn from_keypair(kp: libp2p_identity::ed25519::Keypair) -> Self {
-        let mut secret = [0u8; ed25519_dalek::SECRET_KEY_LENGTH];
-        secret.copy_from_slice(kp.secret().as_ref());
-        Self (secret, OffchainPublicKey { compressed: CompressedEdwardsY::from_slice(&kp.public().to_bytes()) })
-    }*/
-
-
 impl Keypair for OffchainKeypair {
     type Secret = [u8; ed25519_dalek::SECRET_KEY_LENGTH];
     type Public = OffchainPublicKey;

@@ -117,7 +117,7 @@ impl GroupElement<typenum::U33, k256::Scalar> for k256::ProjectivePoint {
     }
 }
 
-/// Represents an instantiation of the Sphinx protocol using secp256k1 elliptic curve and `CompressedPublicKey`
+/// Represents an instantiation of the Sphinx protocol using secp256k1 elliptic curve and `ChainKeypair`
 pub struct Secp256k1Suite ;
 
 impl SphinxSuite for Secp256k1Suite {
@@ -127,7 +127,7 @@ impl SphinxSuite for Secp256k1Suite {
     type G = k256::ProjectivePoint;
 }
 
-/// Represents an instantiation of the Sphinx protocol using the ed25519 curve and `OffchainPublicKey`
+/// Represents an instantiation of the Sphinx protocol using the ed25519 curve and `OffchainKeypair`
 pub struct Ed25519Suite ;
 
 impl SphinxSuite for Ed25519Suite {
@@ -137,7 +137,7 @@ impl SphinxSuite for Ed25519Suite {
     type G = curve25519_dalek::edwards::EdwardsPoint;
 }
 
-/// Represents an instantiation of the Sphinx protocol using the Curve25519 curve and `OffchainPublicKey`
+/// Represents an instantiation of the Sphinx protocol using the Curve25519 curve and `OffchainKeypair`
 pub struct X25519Suite ;
 
 impl SphinxSuite for X25519Suite {

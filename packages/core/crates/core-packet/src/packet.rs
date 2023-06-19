@@ -18,6 +18,7 @@ use utils_types::traits::{BinarySerializable, PeerIdLike};
 use crate::errors::Result;
 use crate::packet::ForwardedMetaPacket::{FinalPacket, RelayedPacket};
 use crate::packet::PacketState::{Final, Forwarded, Outgoing};
+use crate::path::Path;
 use crate::por::{pre_verify, ProofOfRelayString, ProofOfRelayValues, POR_SECRET_LENGTH};
 
 /// Number of intermediate hops: 3 relayers and 1 destination
@@ -275,16 +276,8 @@ impl Packet {
     /// * `path` complete path for the packet to take
     /// * `private_key` private key of the local node
     /// * `first_ticket` ticket for the first hop on the path
-    pub fn new(msg: &[u8], path: &[PeerId], chain_keypair: &ChainKeypair, mut ticket: Ticket) -> Result<Self> {
-        assert!(!path.is_empty(), "path must not be empty");
-
-        let public_keys_path = path
-            .iter()
-            .map(|peer_id| OffchainPublicKey::from_peerid(peer_id).map_err(|_| {
-                    error!("encountered invalid peer id: {peer_id}");
-                    PacketConstructionError
-                })
-            ).collect::<Result<Vec<_>>>()?;
+    pub fn new(msg: &[u8], path: &Path, chain_keypair: &ChainKeypair, mut ticket: Ticket) -> Result<Self> {
+        let public_keys_path: Vec<OffchainPublicKey> = path.try_into()?;
 
         let shared_keys = Ed25519Suite::new_shared_keys(&public_keys_path)?;
         let por_values = ProofOfRelayValues::new(shared_keys.secrets[0], shared_keys.secrets.get(1).cloned());
@@ -306,7 +299,7 @@ impl Packet {
             ),
             ticket,
             state: Outgoing {
-                next_hop: OffchainPublicKey::from_peerid(&path[0])?,
+                next_hop: OffchainPublicKey::from_peerid(&path.hops()[0])?,
                 ack_challenge: por_values.ack_challenge,
             },
         })
@@ -440,6 +433,7 @@ mod tests {
     use core_crypto::shared_keys::SphinxSuite;
     use utils_types::primitives::{Balance, BalanceType, U256};
     use utils_types::traits::PeerIdLike;
+    use crate::path::Path;
 
     #[test]
     fn test_padding() {
@@ -558,7 +552,8 @@ mod tests {
         let ticket = mock_ticket(&channel_pairs[0].public().0, keypairs.len(), own_channel_kp.secret());
 
         let test_message = b"some testing message";
-        let mut packet = Packet::new(test_message, &keypairs.iter().map(|kp| kp.public().to_peerid()).collect::<Vec<_>>(), &own_channel_kp, ticket)
+        let path = Path::new_valid(keypairs.iter().map(|kp| kp.public().to_peerid()).collect());
+        let mut packet = Packet::new(test_message, &path, &own_channel_kp, ticket)
             .expect("failed to construct packet");
 
         match &packet.state() {
