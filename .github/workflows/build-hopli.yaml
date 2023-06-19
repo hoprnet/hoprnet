@@ -1,5 +1,4 @@
 ---
-# The goal of this workflow is to build the `hoprd` docker image when a pull request is created or commit push into it and has the label `deploy_nodes`
 name: Build Hopli
 
 on:
@@ -16,7 +15,7 @@ jobs:
 
   build:
     name: docker
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-2-core
     # concurrency:
     #   group: ${{ inputs.branch }}
     #   cancel-in-progress: true

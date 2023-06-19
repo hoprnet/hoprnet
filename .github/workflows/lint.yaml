@@ -17,10 +17,11 @@ on:
     paths-ignore:
       - 'docs/**/*'
       - 'packages/*/docs/**/*'
+      - '**/*.md'
 
 jobs:
   lint:
-    name: Lint
+    name: Linter
     runs-on: ubuntu-2-core
     steps:
       - uses: actions/checkout@v3

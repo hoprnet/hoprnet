@@ -1,15 +1,7 @@
 ---
-# The goal of this workflow is to build the `hoprd` docker image when a pull request is created or commit push into it and has the label `deploy_nodes`
 name: Build Toolchain
 
 on:
-  # workflow_dispatch:
-  #   inputs:
-  #     branch:
-  #       description: 'Branch name'
-  #       required: true
-  #       type: string
-  # pull_request:
   workflow_call:
     secrets:
       GOOGLE_HOPRASSOCIATION_PROJECT:
@@ -23,16 +15,12 @@ jobs:
 
   build:
     name: docker
-    runs-on: ubuntu-latest
-    # concurrency:
-    #   group: ${{ inputs.branch }}
-    #   cancel-in-progress: true
+    runs-on: ubuntu-2-core
     steps:
       - name: Checkout hoprnet
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-          # ref: ${{ inputs.branch }} 
 
       - id: auth
         name: Set up Google Cloud Credentials

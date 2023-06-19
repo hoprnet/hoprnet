@@ -1,0 +1,33 @@
+---
+name: Labels
+
+on:
+  pull_request:
+    branches:
+      - master
+      - release/*
+    types:
+      - labeled
+      - unlabeled
+concurrency:
+  group: ${{ github.head_ref }}-build
+  cancel-in-progress: true
+jobs:
+  check_changeset:
+    name: Check changeset
+    runs-on: ubuntu-latest
+    outputs:
+      create_deployment: ${{ steps.check_pr_changeset.outputs.create_deployment }}
+      delete_deployment: ${{ steps.check_pr_changeset.outputs.delete_deployment }}
+    steps:
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Check PR changes
+        id: check_pr_changeset
+        run: |
+          ./scripts/check-pr.sh --event ${{ github.event.action }} --label ${{ github.event.label.name }}
+          cat check_pr.log >> $GITHUB_OUTPUT
+

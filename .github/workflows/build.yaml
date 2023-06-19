@@ -1,5 +1,4 @@
 ---
-# The goal of this workflow is to build the `hoprd` docker image when a pull request is created or commit push into it and has the label `deploy_nodes`
 name: Build
 
 on:
@@ -10,10 +9,8 @@ on:
     types:
       - synchronize
       - opened
-      - labeled
-      - unlabeled
 concurrency:
-  group: ${{ github.head_ref }}-checks
+  group: ${{ github.head_ref }}-build
   cancel-in-progress: true
 jobs:
   check_changeset:
@@ -23,8 +20,7 @@ jobs:
       build_toolchain: ${{ steps.check_pr_changeset.outputs.build_toolchain }}
       build_hopli: ${{ steps.check_pr_changeset.outputs.build_hopli }}
       build_hoprd: ${{ steps.check_pr_changeset.outputs.build_hoprd }}
-      create_deployment: ${{ steps.check_pr_changeset.outputs.create_deployment }}
-      delete_deployment: ${{ steps.check_pr_changeset.outputs.delete_deployment }}
+      build_anvil: ${{ steps.check_pr_changeset.outputs.build_anvil }}
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v3
@@ -33,41 +29,13 @@ jobs:
 
       - name: Check PR changes
         id: check_pr_changeset
-        # Set outputs using the command.
         run: |
-          event_type=${{ github.event.action }}
-          echo "The event fired is: ${event_type}"
-          label_name=${{ github.event.label.name }}
-          echo "This is the affected label: ${label_name}"
-          declare params=""
-          case "${event_type}" in
-            synchronize | opened)
-              params="${params} --event push --base-branch ${{ github.event.pull_request.base.sha }} --head-branch ${{ github.event.pull_request.head.sha }}"
-              ;;
-            labeled)
-              params="${params} --event labeled --label ${label_name}"
-              ;;
-            unlabeled)
-              params="${params} --event unlabeled --label ${label_name}"
-              ;;
-            *)
-              echo "invalid event: ${event_type}"
-              exit 1
-              ;;
-          esac;
-          ./scripts/check-pr.sh ${params}
+          ./scripts/check-pr.sh --event push --base-branch ${{ github.event.pull_request.base.sha }} --head-branch ${{ github.event.pull_request.head.sha }}
           cat check_pr.log >> $GITHUB_OUTPUT
-      # - name: Build Toolchain docker image
-      #   run: gh workflow run build-toolchain.yaml --ref ${{ github.event.pull_request.head.ref }} -f branch=${{ github.event.pull_request.head.ref }}
-      #   env:
-      #     GH_TOKEN: ${{ github.token }}
-      # - name: Build Hopli docker image
-      #   run: gh workflow run build-hopli.yaml --ref ${{ github.event.pull_request.head.ref }} -f branch=${{ github.event.pull_request.head.ref }}
-      #   env:
-      #     GH_TOKEN: ${{ github.token }}
 
   build_toolchain:
     name: Toolchain
+    runs-on: ubuntu-latest
     needs:
       - check_changeset
     if: ${{needs.check_changeset.outputs.build_toolchain }}
@@ -78,6 +46,7 @@ jobs:
 
   build_hopli:
     name: Hopli
+    runs-on: ubuntu-latest
     needs:
       - check_changeset
     if: ${{needs.check_changeset.outputs.build_hopli }}
@@ -88,6 +57,7 @@ jobs:
 
   build_hoprd:
     name: Hoprd
+    runs-on: ubuntu-latest
     needs:
       - check_changeset
     if: ${{needs.check_changeset.outputs.build_hoprd }}
@@ -101,6 +71,7 @@ jobs:
 
   build_anvil:
     name: Anvil
+    runs-on: ubuntu-latest
     needs:
       - check_changeset
     if: ${{needs.check_changeset.outputs.build_anvil }}
