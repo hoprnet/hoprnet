@@ -16,7 +16,7 @@ jobs:
 
   build:
     name: Build hopli
-    runs-on: ubuntu-2-core
+    runs-on: ubuntu-latest
     # concurrency:
     #   group: ${{ inputs.branch }}
     #   cancel-in-progress: true
