@@ -10,7 +10,7 @@ on:
       GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY:
         required: true
 concurrency:
-  group: ${{ github.head_ref }}
+  group: ${{ github.head_ref }}-hopli
   cancel-in-progress: true
 jobs:
 
