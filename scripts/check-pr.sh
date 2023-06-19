@@ -13,14 +13,14 @@ source "${mydir}/utils.sh"
 # prints usage of the script
 function usage() {
   msg
-  msg "Usage: $0 [-h|--help] [-e|--event event-name] [-l|--labels label-name] [-b|--base-branch base-branch-name] [-hb|--head-branch head-branch-name]"
+  msg "Usage: $0 [-h|--help] [-e|--event event-name] [-l|--label label-name] [-b|--base-branch base-branch-name] [-hb|--head-branch head-branch-name]"
   msg
   msg "This script check the contents of the PR to determine which workflows need to be triggered"
   msg
 }
 
 declare event_type=""
-declare labels=""
+declare label=""
 declare base_branch=""
 declare results_file="check_pr_results.txt"
 
@@ -36,9 +36,9 @@ while (( "$#" )); do
       event_type="${1}"
       shift
       ;;
-    -l|--labels)
+    -l|--label)
       shift
-      labels="${1}"
+      label="${1}"
       shift
       ;;
     -b|--base-branch)
@@ -96,26 +96,22 @@ function check_push() {
 
 # Check how to react against the new labels added
 function check_labeled() {
-  if [ -z "${labels:-}" ]; then
-    log "Parameter 'labels' is required"
+  if [ -z "${label:-}" ]; then
+    log "Parameter 'label' is required"
     usage
     exit 1
   fi
-  declare new_label=""
-  new_label="${1}"
-  echo "Checking adding of label ${new_label}"
+  echo "Checking adding of label ${label}"
 }
 
 # Check how to react against the labels removed
 function check_unlabeled() {
-  if [ -z "${labels:-}" ]; then
-    log "Parameter 'labels' is required"
+  if [ -z "${label:-}" ]; then
+    log "Parameter 'label' is required"
     usage
     exit 1
   fi
-  declare removed_label=""
-  removed_label="${1}"
-  echo "Checking removal of label ${removed_label}"
+  echo "Checking removal of label ${label}"
 }
 
 # Main function to trigger specific action
@@ -129,7 +125,7 @@ function main() {
       check_labeled
       ;;
     unlabeled)
-      check_unlabeled labels[0]
+      check_unlabeled
       ;;
     *)
       usage

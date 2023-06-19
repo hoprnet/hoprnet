@@ -37,25 +37,18 @@ jobs:
         run: |
           event_type=${{ github.event.action }}
           echo "The event fired is: ${event_type}"
-          set -x
-          labels=${{ github.event.pull_request.labels.* }}
-          label_names=${{ github.event.pull_request.labels.*.name }}
-          first_label=${{ github.event.pull_request.labels[0].name }}
-          echo "labels: ${labels[*]}"
-          echo "label_names: ${label_names[*]}"
-          echo "first_label: ${first_label}"
-          current_label=${{ github.event.label.name }}
+          label_name=${{ github.event.label.name }}
           echo "This is the affected label: ${current_label}"
-          declare params="${label_names}"
+          declare params=""
           case "${event_type}" in
             synchronize | opened)
               params="${params} --event push --base-branch ${{ github.event.pull_request.base.sha }} --head-branch ${{ github.event.pull_request.head.sha }}"
               ;;
             labeled)
-              params="${params} --event labeled --labels ${current_label}"
+              params="${params} --event labeled --label ${label_name}"
               ;;
             unlabeled)
-              params="${params} --event unlabeled --labels ${current_label}"
+              params="${params} --event unlabeled --label ${label_name}"
               ;;
             *)
               echo "invalid event: ${event_type}"
