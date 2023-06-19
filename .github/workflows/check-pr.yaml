@@ -41,7 +41,6 @@ jobs:
           echo "Those are the labels: ${labels}"
           current_label=${{ github.event.label.name }}
           echo "This is the affected label: ${current_label}"
-          set -x
           declare params=""
           case "${event_type}" in
             synchronize | opened)
