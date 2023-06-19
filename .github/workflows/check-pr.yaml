@@ -13,13 +13,13 @@ on:
       - labeled
       - unlabeled
 
-concurrency:
-  group: ${{ github.head_ref }}
-  cancel-in-progress: false
+# concurrency:
+#   group: ${{ github.head_ref }}
+#   cancel-in-progress: false
 
 jobs:
-  check_pr:
-    name: Check PR
+  check_changes:
+    name: Check changes
     runs-on: ubuntu-latest
     outputs:
       build_toolchain: ${{ steps.check_pr_changes.outputs.build_toolchain }}
@@ -62,8 +62,8 @@ jobs:
   call_build_toolchain:
     name: Build Toolchain
     needs:
-      - check_pr
-    if: ${{needs.check_pr.outputs.build_toolchain }}
+      - check_changes
+    if: ${{needs.check_changes.outputs.build_toolchain }}
     uses: ./.github/workflows/build-toolchain.yaml
 
 
