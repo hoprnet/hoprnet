@@ -56,7 +56,6 @@ jobs:
               ;;
           esac;
           ./scripts/check-pr.sh ${params}
-          cat check_pr.log
       - name: Build Toolchain docker image
         if: ${{ env.build_toolchain }}
         run: "echo "Building Toolchain"
