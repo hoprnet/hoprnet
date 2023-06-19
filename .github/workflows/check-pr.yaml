@@ -21,10 +21,12 @@ jobs:
   check_pr:
     name: Check PR
     runs-on: ubuntu-latest
-    # outputs:
-    #   toolchain: ${{ steps.changeset.outputs.toolchain}}
-    #   hopli: ${{ steps.changeset.outputs.hopli}}
-    #   hoprd: ${{ steps.changeset.outputs.hoprd}}
+    outputs:
+      build_toolchain: ${{ steps.check_pr_changes.outputs.build_toolchain }}
+      build_hopli: ${{ steps.check_pr_changes.outputs.build_hopli }}
+      build_hoprd: ${{ steps.check_pr_changes.outputs.build_hoprd }}
+      create_deployment: ${{ steps.check_pr_changes.outputs.create_deployment }}
+      delete_deployment: ${{ steps.check_pr_changes.outputs.delete_deployment }}
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v3
@@ -56,23 +58,31 @@ jobs:
               ;;
           esac;
           ./scripts/check-pr.sh ${params}
-          cat check_pr.log >> $GITHUB_ENV
-      - name: Build Toolchain docker image
-        if: ${{ env.build_toolchain }}
-        uses: ./.github/workflows/build-toolchain.yaml
-        # with:
-        #   token: ${{ secrets.access-token }}
-      - name: Build Hopli docker image
-        if: ${{ env.build_hopli }}
-        run: echo "Building Hopli"
-      - name: Build Hoprd docker image
-        if: ${{ env.build_hoprd }}
-        run: echo "Building Hoprd"
-      - name: Create Deployment
-        if: ${{ env.create_deployment }}
-        run: echo "Deploying nodes"
-      - name: Delete Deployment
-        if: ${{ env.delete_deployment }}
-        run: echo "Undeploying nodes"
+          cat check_pr.log >> $GITHUB_OUTPUT
+  call_build_toolchain:
+    name: Build Toolchain
+    needs:
+      - check_pr
+    if: ${{needs.check_pr.outputs.build_toolchain }}
+    uses: ./.github/workflows/build-toolchain.yaml
+
+
+      # - name: Build Toolchain docker image
+
+      #   uses: ./.github/workflows/build-toolchain.yaml
+      #   # with:
+      #   #   token: ${{ secrets.access-token }}
+      # - name: Build Hopli docker image
+      #   if: ${{ env.build_hopli }}
+      #   run: echo "Building Hopli"
+      # - name: Build Hoprd docker image
+      #   if: ${{ env.build_hoprd }}
+      #   run: echo "Building Hoprd"
+      # - name: Create Deployment
+      #   if: ${{ env.create_deployment }}
+      #   run: echo "Deploying nodes"
+      # - name: Delete Deployment
+      #   if: ${{ env.delete_deployment }}
+      #   run: echo "Undeploying nodes"
 
 
