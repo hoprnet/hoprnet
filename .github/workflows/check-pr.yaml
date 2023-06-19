@@ -58,19 +58,19 @@ jobs:
           ./scripts/check-pr.sh ${params}
           cat check_pr.log >> $GITHUB_ENV
       - name: Build Toolchain docker image
-        if: "${{ env.build_toolchain }}"
+        if: ${{ env.build_toolchain }}
         run: "echo "Building Toolchain"
       - name: Build Hopli docker image
-        if: "${{ env.build_hopli }}"
+        if: ${{ env.build_hopli }}
         run: "echo "Building Hopli"
       - name: Build Hoprd docker image
-        if: "${{ env.build_hoprd }}"
+        if: ${{ env.build_hoprd }}
         run: "echo "Building Hoprd"
       - name: Create Deployment
-        if: "${{ env.create_deployment }}"
+        if: ${{ env.create_deployment }}
         run: "echo "Deploying nodes"
       - name: Delete Deployment
-        if: "${{ env.delete_deployment }}"
+        if: ${{ env.delete_deployment }}
         run: "echo "Undeploying nodes"
 
 
