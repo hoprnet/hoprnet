@@ -2,20 +2,17 @@
 name: Create deployment
 
 on:
-  pull_request:
-    branches:
-      - master
-      - release/*
-    types:
-      - labeled
+  workflow_call:
+    # secrets:
+    #   commit-bot-access-token:
+    #     description: 'A token passed from the caller workflow'
+    #     required: true
 env:
   GITOPS_ENVIRONMENT: prod
   GITOPS_BRANCH: master
 jobs:
   deploy:
     runs-on: ubuntu-2-core
-    if: contains(github.event.pull_request.labels.*.name, 'deploy_nodes')
-
     steps:
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -59,4 +56,4 @@ jobs:
           body: "This pull request contains the creation of a ClusterHoprd in Kubernetes for testing PR https://github.com/hoprnet/hoprnet/pull/${{ github.event.pull_request.number }}"
           labels: ClusterHoprd
           assignees: ${{ github.event.pull_request.user.login }}
-          # reviewers: hopr-version-bot
+          reviewers: hopr-version-bot

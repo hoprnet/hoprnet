@@ -38,7 +38,7 @@ jobs:
           event_type=${{ github.event.action }}
           echo "The event fired is: ${event_type}"
           label_name=${{ github.event.label.name }}
-          echo "This is the affected label: ${current_label}"
+          echo "This is the affected label: ${label_name}"
           declare params=""
           case "${event_type}" in
             synchronize | opened)
@@ -56,5 +56,21 @@ jobs:
               ;;
           esac;
           ./scripts/check-pr.sh ${params}
-          cat check_pr_results.txt
+          cat check_pr.log >> $GITHUB_ENV
+      - name: Build Toolchain docker image
+        if: "${{ env.build_toolchain }}"
+        run: "echo "Building Toolchain"
+      - name: Build Hopli docker image
+        if: "${{ env.build_hopli }}"
+        run: "echo "Building Hopli"
+      - name: Build Hoprd docker image
+        if: "${{ env.build_hoprd }}"
+        run: "echo "Building Hoprd"
+      - name: Create Deployment
+        if: "${{ env.create_deployment }}"
+        run: "echo "Deploying nodes"
+      - name: Delete Deployment
+        if: "${{ env.delete_deployment }}"
+        run: "echo "Undeploying nodes"
+
 

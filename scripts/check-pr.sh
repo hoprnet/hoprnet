@@ -22,7 +22,7 @@ function usage() {
 declare event_type=""
 declare label=""
 declare base_branch=""
-declare results_file="check_pr_results.txt"
+declare results_file="check_pr.log"
 
 while (( "$#" )); do
   case "$1" in
@@ -80,18 +80,18 @@ function check_push() {
   git diff --name-only --diff-filter=ACMRT ${base_branch} ${head_branch} > changes.txt
   if cat changes.txt | grep -e ^scripts/ -e ^Makefile$ -e ^package.json$ -e ^.yarnrc.yml$ -e ^rust-toolchain.toml$ -e ^.nvmrc -e ^yarn.lock$ -e ^Cargo.toml 1> /dev/null; then
       echo "Changes detected on Toolchain"
-      echo "toolchain=true" >> ${results_file}
+      echo "build_toolchain=true" >> ${results_file}
   fi
   if cat changes.txt | grep ^packages/hopli/ 1> /dev/null; then
       echo "Changes detected on Hopli"
-      echo "hopli=true" >> ${results_file}
+      echo "build_hopli=true" >> ${results_file}
   fi
 
   if cat changes.txt | grep -v ^packages/hopli/ | grep -v ^scripts | grep -v ^.processes | grep -v ^docs/ | grep -v .md 1> /dev/null; then
       echo "Changes detected on Hoprd"
-      echo "hoprd=true" >> ${results_file}
+      echo "build_hoprd=true" >> ${results_file}
   fi
-  #rm changes.txt
+  rm changes.txt
 }
 
 # Check how to react against the new labels added
@@ -102,6 +102,15 @@ function check_labeled() {
     exit 1
   fi
   echo "Checking adding of label ${label}"
+  case "${label}" in
+    deploy_nodes)
+      echo "create_deployment=true" >> ${results_file}
+      ;;
+    *)
+      echo "Skipping any action with the label added: ${label}"
+      ;;
+  esac
+
 }
 
 # Check how to react against the labels removed
@@ -112,6 +121,14 @@ function check_unlabeled() {
     exit 1
   fi
   echo "Checking removal of label ${label}"
+  case "${label}" in
+    deploy_nodes)
+      echo "delete_deployment=true" >> ${results_file}
+      ;;
+    *)
+      echo "Skipping any action with the label removed: ${label}"
+      ;;
+  esac
 }
 
 # Main function to trigger specific action
