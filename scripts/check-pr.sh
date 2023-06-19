@@ -13,7 +13,7 @@ source "${mydir}/utils.sh"
 # prints usage of the script
 function usage() {
   msg
-  msg "Usage: $0 [-h|--help] [-e|--event event-name] [-l|--labels label-name] [-b|--base-branch base-branch-name]"
+  msg "Usage: $0 [-h|--help] [-e|--event event-name] [-l|--labels label-name] [-b|--base-branch base-branch-name] [-hb|--head-branch head-branch-name]"
   msg
   msg "This script check the contents of the PR to determine which workflows need to be triggered"
   msg
@@ -47,6 +47,11 @@ while (( "$#" )); do
       base_branch="${1}"
       shift
       ;;
+    -hb|--head-branch)
+      shift
+      head_branch="${1}"
+      shift
+      ;;
     -*|--*=)
       usage
       exit 1
@@ -64,16 +69,13 @@ if [ -z "${event_type}" ]; then
   exit 1
 fi
 
-if [ ! -z "${base_branch}" ] && [ ! -z "${labels:-}" ]; then
-  # return early if required parameters have been set
-  log "Parameter 'base_branch' or 'labels' are required"
-  usage
-  exit 1
-fi
-
 # Check wether the pushed commits to the PR involve building docker images
 function check_push() {
-  declare head_branch=`git branch --show-current`
+  if [ -z "${base_branch}" ] || [  -z "${head_branch:-}" ]; then
+    log "Parameter 'base_branch' and 'head_branch' are required"
+    usage
+    exit 1
+  fi
   
   echo "Checking pushed changeset from ${head_branch} against ${base_branch}"
   git diff --name-only --diff-filter=ACMRT ${base_branch} ${head_branch} > changes.txt
@@ -90,11 +92,16 @@ function check_push() {
       echo "Changes detected on Hoprd"
       echo "hoprd=true" >> ${results_file}
   fi
-  rm changes.txt
+  #rm changes.txt
 }
 
 # Check how to react against the new labels added
 function check_labeled() {
+  if [ -z "${labels:-}" ]; then
+    log "Parameter 'labels' is required"
+    usage
+    exit 1
+  fi
   declare new_label=""
   new_label="${1}"
   echo "Checking adding of label ${new_label}"
@@ -102,6 +109,11 @@ function check_labeled() {
 
 # Check how to react against the labels removed
 function check_unlabeled() {
+  if [ -z "${labels:-}" ]; then
+    log "Parameter 'labels' is required"
+    usage
+    exit 1
+  fi
   declare removed_label=""
   removed_label="${1}"
   echo "Checking removal of label ${removed_label}"

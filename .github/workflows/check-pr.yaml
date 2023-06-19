@@ -28,8 +28,8 @@ jobs:
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v3
-        # with:
-        #   fetch-depth: 0
+        with:
+          fetch-depth: 0
 
       - name: Check PR changes
         id: check_pr_changes
@@ -45,7 +45,7 @@ jobs:
           declare params=""
           case "${event_type}" in
             synchronize | opened)
-              params="${params} --event push --base-branch ${{ github.event.pull_request.base.ref }}"
+              params="${params} --event push --base-branch ${{ github.event.pull_request.base.ref }} --head-branch ${{ github.event.pull_request.head.ref }}"
               ;;
             labeled)
               params="${params} --event labeled --labels ${current_label}"
