@@ -3,28 +3,29 @@
 name: Build Hopli
 
 on:
-  workflow_dispatch:
-    inputs:
-      branch:
-        description: 'Branch name'
+  workflow_call:
+    secrets:
+      GOOGLE_HOPRASSOCIATION_PROJECT:
         required: true
-        type: string
-  pull_request:
-
+      GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY:
+        required: true
+concurrency:
+  group: ${{ github.head_ref }}
+  cancel-in-progress: true
 jobs:
 
   build:
     name: Build hopli
-    runs-on: ubuntu-8-core
-    concurrency:
-      group: ${{ inputs.branch }}
-      cancel-in-progress: true
+    runs-on: ubuntu-2-core
+    # concurrency:
+    #   group: ${{ inputs.branch }}
+    #   cancel-in-progress: true
     steps:
       - name: Checkout hoprnet
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-          ref: ${{ inputs.branch }} 
+          # ref: ${{ inputs.branch }} 
 
       - id: auth
         name: Set up Google Cloud Credentials

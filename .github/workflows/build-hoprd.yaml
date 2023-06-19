@@ -1,0 +1,87 @@
+---
+# The goal of this workflow is to build the `hoprd` docker image when a pull request is created or commit push into it and has the label `deploy_nodes`
+name: Build Hoprd
+
+on:
+  workflow_call:
+    secrets:
+      GOOGLE_HOPRASSOCIATION_PROJECT:
+        required: true
+      GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY:
+        required: true
+      K8S_SSH_SERVICE_HOST:
+        required: true
+      K8S_SSH_SERVICE_USERNAME:
+        required: true
+      K8S_SSH_SERVICE_PASSWORD:
+        required: true
+concurrency:
+  group: ${{ github.head_ref }}
+  cancel-in-progress: true
+jobs:
+
+  build:
+    name: Build hoprd
+    runs-on: ubuntu-2-core
+    # concurrency:
+    #   group: ${{ inputs.branch }}
+    #   cancel-in-progress: true
+    steps:
+      - name: Checkout hoprnet
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - id: auth
+        name: Set up Google Cloud Credentials
+        uses: google-github-actions/auth@v1
+        with:
+          token_format: "access_token"
+          credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+
+      - name: Login Google Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: europe-west3-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.auth.outputs.access_token }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build and push docker image
+        uses: docker/build-push-action@v4
+        with:
+          push: true
+          file: packages/hoprd/Dockerfile
+          cache-from: type=registry,ref=europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hoprd:buildcache
+          cache-to: type=registry,ref=europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hoprd:buildcache,mode=max
+          tags: europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hoprd:pr-${{ github.event.pull_request.number }}
+
+  restart_deployment:
+    name: Restart deployment
+    runs-on: ubuntu-latest
+    needs: build_hoprd_image
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'deploy_nodes') }}
+    steps:
+      - name: "Setup environment"
+        run: |
+          prBase="${{ github.event.pull_request.base.ref }}"
+          network=$(jq -r "to_entries[] | select(.value.git_ref | test(\"${prBase/*\/}\")).value.network" packages/hoprd/releases.json)
+          echo "NETWORK_DASH=${network/_/-}" >> $GITHUB_ENV
+      - name: Executing remote SSH command
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.K8S_SSH_SERVICE_HOST }}
+          username: ${{ secrets.K8S_SSH_SERVICE_USERNAME }}
+          password: ${{ secrets.K8S_SSH_SERVICE_PASSWORD }}
+          port: 22
+          sync: true
+          debug: true
+          script: |
+            echo "[INFO] Restarting deployments on ${{ env.NETWORK_DASH }} from pr-${{ github.event.pull_request.number }}"
+            export deployments=($(kubectl get deployments -n ${{ env.NETWORK_DASH }} -l hoprds.hoprnet.org/cluster=hoprd-pr-${{ github.event.pull_request.number }} -o jsonpath="{.items[*].metadata.name}"))
+            for deployment in "${deployments[@]}"; do
+              echo "[INFO] Restarting hoprd node ${deployments}"
+              kubectl rollout restart deployments -n ${{ env.NETWORK_DASH }} $deployment;
+            done
