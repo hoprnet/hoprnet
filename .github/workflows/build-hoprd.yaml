@@ -61,7 +61,7 @@ jobs:
   restart_deployment:
     name: Restart deployment
     runs-on: ubuntu-latest
-    needs: build_hoprd_image
+    needs: build
     if: ${{ contains(github.event.pull_request.labels.*.name, 'deploy_nodes') }}
     steps:
       - name: "Setup environment"
