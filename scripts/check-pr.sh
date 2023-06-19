@@ -19,7 +19,7 @@ function usage() {
   msg
 }
 
-
+set -x
 declare event_type=""
 declare labels=""
 declare base_branch=""
