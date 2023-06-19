@@ -39,8 +39,8 @@ jobs:
           echo "The event fired is: ${event_type}"
           set -x
           labels=${{ github.event.pull_request.labels.* }}
-          label_names=${{ github.event.pull_request.labels.*.names }}
-          first_label=${labels[0]}
+          label_names=${{ github.event.pull_request.labels.*.name }}
+          first_label=${{ github.event.pull_request.labels[0].name] }}
           echo "labels: ${labels}"
           echo "label_names: ${label_names}"
           echo "first_label: ${first_label}"
