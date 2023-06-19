@@ -48,8 +48,8 @@ fn generate_filler(
     let mut length = routing_info_len;
     let mut start = header_len;
 
-    for &secret in secrets.iter().take(secrets.len() - 1) {
-        let prg = PRG::from_parameters(PRGParameters::new(&secret));
+    for secret in secrets.iter().take(secrets.len() - 1) {
+        let prg = PRG::from_parameters(PRGParameters::new(secret.as_ref()));
 
         let digest = prg.digest(start, header_len + routing_info_len);
         xor_inplace(&mut ret[0..length], digest.as_ref());
@@ -98,10 +98,6 @@ impl RoutingInfo {
             "invalid number of secrets given"
         );
         assert!(
-            secrets.iter().all(|s| s.len() == SECRET_KEY_LENGTH),
-            "invalid secret length"
-        );
-        assert!(
             additional_data_relayer
                 .iter()
                 .all(|r| r.len() == additional_data_relayer_len),
@@ -125,8 +121,8 @@ impl RoutingInfo {
 
         for idx in 0..secrets.len() {
             let inverted_idx = secrets.len() - idx - 1;
-            let secret = secrets[inverted_idx];
-            let prg = PRG::from_parameters(PRGParameters::new(&secret));
+            let secret = secrets[inverted_idx].as_ref();
+            let prg = PRG::from_parameters(PRGParameters::new(secret));
 
             if idx == 0 {
                 extended_header[0] = RELAYER_END_PREFIX;
@@ -162,7 +158,7 @@ impl RoutingInfo {
                 xor_inplace(&mut extended_header, &key_stream);
             }
 
-            let mut m = derive_mac_key(&secret).and_then(|k| SimpleMac::new(&k)).unwrap();
+            let mut m = derive_mac_key(secret).and_then(|k| SimpleMac::new(&k)).unwrap();
             m.update(&extended_header[0..header_len]);
             m.finalize_into(&mut ret.mac);
         }
@@ -265,10 +261,8 @@ pub fn forward_header<S: SphinxSuite>(
 
 #[cfg(test)]
 pub mod tests {
-    use crate::parameters::SECRET_KEY_LENGTH;
     use crate::prg::{PRGParameters, PRG};
     use crate::primitives::{DigestLike, SimpleMac};
-    use crate::random::random_bytes;
     use crate::routing::{forward_header, generate_filler, ForwardedHeader, RoutingInfo};
     use crate::utils::xor_inplace;
     use parameterized::parameterized;
@@ -284,7 +278,7 @@ pub mod tests {
         let max_hops = hops;
 
         let secrets = (0..hops)
-            .map(|_| random_bytes::<SECRET_KEY_LENGTH>() as SharedSecret)
+            .map(|_| SharedSecret::random())
             .collect::<Vec<_>>();
         let extended_header_len = per_hop * max_hops + last_hop;
         let header_len = per_hop * (max_hops - 1) + last_hop;
@@ -303,7 +297,7 @@ pub mod tests {
 
         for i in 0..hops - 1 {
             let idx = secrets.len() - i - 2;
-            let mask = PRG::from_parameters(PRGParameters::new(&secrets[idx])).digest(0, extended_header_len);
+            let mask = PRG::from_parameters(PRGParameters::new(secrets[idx].as_ref())).digest(0, extended_header_len);
 
             xor_inplace(&mut extended_header, &mask);
 
@@ -324,7 +318,7 @@ pub mod tests {
         let max_hops = hops;
 
         let secrets = (0..hops)
-            .map(|_| random_bytes::<SECRET_KEY_LENGTH>() as SharedSecret)
+            .map(|_| SharedSecret::random())
             .collect::<Vec<_>>();
 
         let first_filler = generate_filler(
@@ -366,7 +360,7 @@ pub mod tests {
         last_mac.copy_from_slice(&rinfo.mac);
 
         for (i, secret) in shares.secrets.iter().enumerate() {
-            let fwd = forward_header::<S>(secret, &mut header, &last_mac, MAX_HOPS, 0, 0).unwrap();
+            let fwd = forward_header::<S>(secret.as_ref(), &mut header, &last_mac, MAX_HOPS, 0, 0).unwrap();
 
             match fwd {
                 ForwardedHeader::RelayNode { mac, next_node, .. } => {

@@ -1,9 +1,9 @@
-use crate::errors::PacketError::{InvalidPacketState, PacketConstructionError, PacketDecodingError};
+use crate::errors::PacketError::{InvalidPacketState, PacketDecodingError};
 use core_crypto::derivation::{derive_ack_key_share, derive_packet_tag};
 use core_crypto::primitives::{DigestLike, SimpleMac};
 use core_crypto::prp::{PRPParameters, PRP};
 use core_crypto::routing::{forward_header, header_length, ForwardedHeader, RoutingInfo};
-use core_crypto::shared_keys::{Alpha, SharedKeys, SphinxSuite};
+use core_crypto::shared_keys::{Alpha, SharedKeys, SharedSecret, SphinxSuite};
 use core_crypto::types::{ChainKeypair, Challenge, HalfKey, HalfKeyChallenge, Keypair, OffchainKeypair};
 use core_types::acknowledgement::Acknowledgement;
 use core_types::channels::Ticket;
@@ -11,7 +11,6 @@ use libp2p_identity::PeerId;
 use core_crypto::ec_groups::Ed25519Suite;
 use core_crypto::types::OffchainPublicKey;
 use typenum::marker_traits::Unsigned;
-use utils_log::error;
 use utils_types::errors::GeneralError::ParseError;
 use utils_types::traits::{BinarySerializable, PeerIdLike};
 
@@ -58,6 +57,7 @@ fn add_padding(msg: &[u8]) -> Box<[u8]> {
 
 fn remove_padding(msg: &[u8]) -> Option<&[u8]> {
     assert_eq!(PAYLOAD_SIZE, msg.len(), "padded message must be PAYLOAD_SIZE long");
+    // TODO: this fails from time to time, needs investigation
     let pos = msg
         .windows(PADDING_TAG.len())
         .position(|window| window == PADDING_TAG)?;
@@ -76,13 +76,13 @@ enum ForwardedMetaPacket<S: SphinxSuite> {
         packet: MetaPacket<S>,
         next_node: <S::P as Keypair>::Public,
         additional_info: Box<[u8]>,
-        derived_secret: Box<[u8]>,
+        derived_secret: SharedSecret,
         packet_tag: Box<[u8]>,
     },
     FinalPacket {
         plain_text: Box<[u8]>,
         additional_data: Box<[u8]>,
-        derived_secret: Box<[u8]>,
+        derived_secret: SharedSecret,
         packet_tag: Box<[u8]>,
     },
 }
@@ -111,13 +111,13 @@ impl<S: SphinxSuite> MetaPacket<S> {
 
         // Encrypt packet payload using the derived shared secrets
         for secret in shared_keys.secrets.iter().rev() {
-            let prp = PRP::from_parameters(PRPParameters::new(secret));
+            let prp = PRP::from_parameters(PRPParameters::new(secret.as_ref()));
             prp.forward_inplace(&mut padded)
                 .unwrap_or_else(|e| panic!("onion encryption error {e}"))
         }
 
         Self::new_from_parts(
-            shared_keys.alpha,
+            shared_keys.alpha.clone(),
             &routing_info.routing_information,
             &routing_info.mac,
             &padded,
@@ -194,7 +194,7 @@ impl<S: SphinxSuite> MetaPacket<S> {
 
         let mut routing_info_cpy: Vec<u8> = self.routing_info().into();
         let fwd_header = forward_header::<S>(
-            &secret,
+            secret.as_ref(),
             &mut routing_info_cpy,
             self.mac(),
             max_hops,
@@ -202,7 +202,7 @@ impl<S: SphinxSuite> MetaPacket<S> {
             additional_data_last_hop_len,
         )?;
 
-        let prp = PRP::from_parameters(PRPParameters::new(&secret));
+        let prp = PRP::from_parameters(PRPParameters::new(secret.as_ref()));
         let decrypted = prp.inverse(self.payload())?;
 
         Ok(match fwd_header {
@@ -213,14 +213,14 @@ impl<S: SphinxSuite> MetaPacket<S> {
                 additional_info,
             } => RelayedPacket {
                 packet: Self::new_from_parts(alpha, &header, &mac, &decrypted),
-                packet_tag: derive_packet_tag(&secret)?,
-                derived_secret: secret.into(),
+                packet_tag: derive_packet_tag(secret.as_ref())?,
+                derived_secret: secret,
                 next_node: <S::P as Keypair>::Public::from_bytes(&next_node).map_err(|_| PacketDecodingError("couldn't parse next node id".into()))?,
                 additional_info,
             },
             ForwardedHeader::FinalNode { additional_data } => FinalPacket {
-                packet_tag: derive_packet_tag(&secret)?,
-                derived_secret: secret.into(),
+                packet_tag: derive_packet_tag(secret.as_ref())?,
+                derived_secret: secret,
                 plain_text: remove_padding(&decrypted)
                     .ok_or(PacketDecodingError("couldn't remove padding".into()))?
                     .into(),
@@ -280,7 +280,7 @@ impl Packet {
         let public_keys_path: Vec<OffchainPublicKey> = path.try_into()?;
 
         let shared_keys = Ed25519Suite::new_shared_keys(&public_keys_path)?;
-        let por_values = ProofOfRelayValues::new(shared_keys.secrets[0], shared_keys.secrets.get(1).cloned());
+        let por_values = ProofOfRelayValues::new(&shared_keys.secrets[0], shared_keys.secrets.get(1));
         let por_strings = ProofOfRelayString::from_shared_secrets(&shared_keys.secrets);
 
         // Update the ticket with the challenge
@@ -324,10 +324,10 @@ impl Packet {
                     next_node,
                     ..
                 } => {
-                    let ack_key = derive_ack_key_share(&derived_secret);
+                    let ack_key = derive_ack_key_share(derived_secret.as_ref());
 
                     let ticket = Ticket::from_bytes(pre_ticket)?;
-                    let verification_output = pre_verify(&derived_secret, &additional_info, &ticket.challenge)?;
+                    let verification_output = pre_verify(derived_secret.as_ref(), &additional_info, &ticket.challenge)?;
                     Ok(Self {
                         packet,
                         ticket,
@@ -349,7 +349,7 @@ impl Packet {
                     derived_secret,
                     additional_data: _,
                 } => {
-                    let ack_key = derive_ack_key_share(&derived_secret);
+                    let ack_key = derive_ack_key_share(derived_secret.as_ref());
 
                     let ticket = Ticket::from_bytes(pre_ticket)?;
                     Ok(Self {

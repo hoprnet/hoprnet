@@ -754,7 +754,8 @@ mod tests {
     use std::str::FromStr;
     use std::sync::{Arc, Mutex};
     use std::time::Duration;
-        use utils_db::db::DB;
+    use core_crypto::shared_keys::SharedSecret;
+    use utils_db::db::DB;
     use utils_db::errors::DbError;
     use utils_db::leveldb::rusty::RustyLevelDbShim;
     use utils_log::debug;
@@ -1046,8 +1047,8 @@ mod tests {
         const PENDING_ACKS: usize = 5;
         let mut sent_challenges = Vec::with_capacity(PENDING_ACKS);
         for _ in 0..PENDING_ACKS {
-            let secrets = (0..2).into_iter().map(|_| random_bytes::<32>()).collect::<Vec<_>>();
-            let porv = ProofOfRelayValues::new(secrets[0], Some(secrets[1]));
+            let secrets = (0..2).into_iter().map(|_| SharedSecret::random()).collect::<Vec<_>>();
+            let porv = ProofOfRelayValues::new(&secrets[0], Some(&secrets[1]));
 
             // Mimics that the packet sender has sent a packet and now it has a pending acknowledgement in it's DB
             core_dbs[0]
@@ -1058,7 +1059,7 @@ mod tests {
                 .expect("failed to store pending ack");
 
             // This is what counterparty derives and sends back to solve the challenge
-            let ack_key = derive_ack_key_share(&secrets[0]);
+            let ack_key = derive_ack_key_share(secrets[0].as_ref());
 
             sent_challenges.push((ack_key, porv.ack_challenge));
         }

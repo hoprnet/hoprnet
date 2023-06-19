@@ -473,7 +473,8 @@ impl Hash {
 
 /// Represents a generic key pair
 /// The keypair contains a private key and public key.
-/// The type must implement Drop that zeroizes the private key.
+/// The type must implement `Drop` that zeroizes the private key.
+#[allow(drop_bounds)]
 pub trait Keypair: Drop + Sized {
     /// Represents the type of the private (secret) key
     type Secret: Zeroize + AsRef<[u8]>;

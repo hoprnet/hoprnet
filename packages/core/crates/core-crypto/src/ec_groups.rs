@@ -153,7 +153,6 @@ mod tests {
     use hex_literal::hex;
     use parameterized::parameterized;
     use crate::ec_groups::{Ed25519Suite, Secp256k1Suite, X25519Suite};
-    use crate::parameters::SECRET_KEY_LENGTH;
     use crate::shared_keys::GroupElement;
 
     #[test]
@@ -162,7 +161,6 @@ mod tests {
         let pt = k256::ProjectivePoint::GENERATOR;
 
         let key = pt.extract_key(&salt);
-        assert_eq!(SECRET_KEY_LENGTH, key.len());
 
         let res = hex!("54bf34178075e153f481ce05b113c1530ecc45a2f1f13a3366d4389f65470de6");
         assert_eq!(res, key.as_ref());
@@ -174,7 +172,6 @@ mod tests {
         let pt = k256::ProjectivePoint::GENERATOR;
 
         let key = pt.expand_key(&salt);
-        assert_eq!(SECRET_KEY_LENGTH, key.len());
 
         let res = hex!("d138d9367474911f7124b95be844d2f8a6d34e962694e37e8717bdbd3c15690b");
         assert_eq!(res, key.as_ref());

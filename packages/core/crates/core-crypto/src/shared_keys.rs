@@ -3,15 +3,39 @@ use blake2::Blake2s256;
 use std::ops::Mul;
 use generic_array::{ArrayLength, GenericArray};
 
-use crate::errors::CryptoError::CalculationError;
+use crate::errors::CryptoError::{CalculationError, InvalidInputValue};
 use hkdf::SimpleHkdf;
+use zeroize::{ZeroizeOnDrop};
 
-use crate::errors::Result;
+use crate::errors::{CryptoError, Result};
 use crate::parameters::SECRET_KEY_LENGTH;
-use crate::types::{Keypair, SecretKey};
+use crate::random::random_bytes;
+use crate::types::Keypair;
 
 /// Represents a shared secret with a remote peer.
-pub type SharedSecret = [u8; SECRET_KEY_LENGTH];
+#[derive(Debug, PartialEq, Eq, ZeroizeOnDrop)]
+pub struct SharedSecret([u8; SECRET_KEY_LENGTH]);
+
+impl AsRef<[u8]> for SharedSecret {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl TryFrom<&[u8]> for SharedSecret {
+    type Error = CryptoError;
+
+    fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
+        Ok(Self(value.try_into().map_err(|_| InvalidInputValue)?))
+    }
+}
+
+impl SharedSecret {
+    /// Generates a random shared secret, not derived from a public group element
+    pub fn random() -> Self {
+        Self(random_bytes())
+    }
+}
 
 /// Types representing a valid non-zero scalar an additive abelian group.
 pub trait Scalar: Mul<Output = Self> + Sized {
@@ -57,7 +81,7 @@ pub trait GroupElement<A: ArrayLength<u8>, E: Scalar>: Clone + for <'a> Mul<&'a 
     /// Extract a keying material from a group element using HKDF extract
     fn extract_key(&self, salt: &[u8]) -> SharedSecret {
         let ikm = self.to_alpha();
-        SimpleHkdf::<Blake2s256>::extract(Some(&salt), ikm.as_ref()).0.into()
+        SharedSecret(SimpleHkdf::<Blake2s256>::extract(Some(&salt), ikm.as_ref()).0.into())
     }
 
     /// Performs KDF expansion from the given group element using HKDF expand
@@ -68,7 +92,7 @@ pub trait GroupElement<A: ArrayLength<u8>, E: Scalar>: Clone + for <'a> Mul<&'a 
             .expand(b"", &mut out)
             .unwrap(); // Cannot panic, unless the constants are wrong
 
-        out
+        SharedSecret(out)
     }
 }
 
@@ -112,7 +136,7 @@ impl <E: Scalar, A: ArrayLength<u8>, G: GroupElement<A, E>> SharedKeys<E, A, G> 
 
             // Compute the new blinding factor b_k (alpha needs compressing first)
             let b_k = shared_secret.expand_key(&alpha_prev.to_alpha());
-            let b_k_checked = E::from_bytes(&b_k)?;
+            let b_k_checked = E::from_bytes(&b_k.0)?;
 
             // Update coeff_prev and alpha
             alpha_prev = alpha_prev.mul(&b_k_checked);
@@ -133,7 +157,7 @@ impl <E: Scalar, A: ArrayLength<u8>, G: GroupElement<A, E>> SharedKeys<E, A, G> 
 
     /// Calculates the forward transformation for the given the local private key.
     /// The `public_group_element` is a precomputed group element associated to the private key for efficiency.
-    pub fn forward_transform(alpha: &Alpha<A>, private_scalar: &E, public_group_element: &G) -> Result<(Alpha<A>, SecretKey)> {
+    pub fn forward_transform(alpha: &Alpha<A>, private_scalar: &E, public_group_element: &G) -> Result<(Alpha<A>, SharedSecret)> {
         let alpha_point = G::from_alpha(alpha.clone())?;
 
         let s_k = alpha_point.clone().mul(&private_scalar);
@@ -142,7 +166,7 @@ impl <E: Scalar, A: ArrayLength<u8>, G: GroupElement<A, E>> SharedKeys<E, A, G> 
 
         let b_k = s_k.expand_key(alpha);
 
-        let b_k_checked = E::from_bytes(&b_k)?;
+        let b_k_checked = E::from_bytes(&b_k.0)?;
         let alpha_new = alpha_point.mul(&b_k_checked);
 
         Ok((alpha_new.to_alpha(), secret))
@@ -187,7 +211,7 @@ pub mod tests {
         for (i, priv_key) in priv_keys.into_iter().enumerate() {
             let (alpha, secret) = SharedKeys::<S::E, S::A, S::G>::forward_transform(&alpha_cpy, &priv_key, &pub_keys[i]).unwrap();
 
-            assert_eq!(secret.as_ref(), generated_shares.secrets[i]);
+            assert_eq!(secret, generated_shares.secrets[i]);
 
             alpha_cpy = alpha;
         }
