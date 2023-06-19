@@ -4,7 +4,11 @@ name: Build Toolchain
 
 on:
   workflow_call:
-
+    secrets:
+      GOOGLE_HOPRASSOCIATION_PROJECT:
+        required: true
+      GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY:
+        required: true
 concurrency:
   group: ${{ github.head_ref }}
   cancel-in-progress: true

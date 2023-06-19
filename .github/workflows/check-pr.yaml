@@ -59,13 +59,16 @@ jobs:
           esac;
           ./scripts/check-pr.sh ${params}
           cat check_pr.log >> $GITHUB_OUTPUT
-  call_build_toolchain:
+
+  build_toolchain:
     name: Build Toolchain
     needs:
       - check_changes
     if: ${{needs.check_changes.outputs.build_toolchain }}
     uses: ./.github/workflows/build-toolchain.yaml
-
+    secrets:
+      GOOGLE_HOPRASSOCIATION_PROJECT: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
+      GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
 
       # - name: Build Toolchain docker image
 
