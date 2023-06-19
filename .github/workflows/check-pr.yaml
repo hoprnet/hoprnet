@@ -50,7 +50,7 @@ jobs:
             echo "hoprd=true" >> $GITHUB_OUTPUT
           fi
       - name: Get label changes
-        id: changeset
+        id: check_pr
         # Set outputs using the command.
         run: |
           event_type=${{ github.event.action }}
