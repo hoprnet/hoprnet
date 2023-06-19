@@ -5,11 +5,10 @@ use generic_array::{ArrayLength, GenericArray};
 
 use crate::errors::CryptoError::CalculationError;
 use hkdf::SimpleHkdf;
-use utils_types::traits::BinarySerializable;
 
 use crate::errors::Result;
 use crate::parameters::SECRET_KEY_LENGTH;
-use crate::types::SecretKey;
+use crate::types::{Keypair, SecretKey};
 
 /// Represents a shared secret with a remote peer.
 pub type SharedSecret = [u8; SECRET_KEY_LENGTH];
@@ -134,8 +133,7 @@ impl <E: Scalar, A: ArrayLength<u8>, G: GroupElement<A, E>> SharedKeys<E, A, G> 
 
     /// Calculates the forward transformation for the given the local private key.
     /// The `public_group_element` is a precomputed group element associated to the private key for efficiency.
-    pub fn forward_transform(alpha: &Alpha<A>, private_key: &[u8], public_group_element: &G) -> Result<(Alpha<A>, SecretKey)> {
-        let private_scalar = E::from_bytes(private_key)?;
+    pub fn forward_transform(alpha: &Alpha<A>, private_scalar: &E, public_group_element: &G) -> Result<(Alpha<A>, SecretKey)> {
         let alpha_point = G::from_alpha(alpha.clone())?;
 
         let s_k = alpha_point.clone().mul(&private_scalar);
@@ -154,21 +152,21 @@ impl <E: Scalar, A: ArrayLength<u8>, G: GroupElement<A, E>> SharedKeys<E, A, G> 
 /// Represents an instantiation of the Spinx protocol using the given EC group and corresponding public key object.
 pub trait SphinxSuite {
 
-    /// Scalar type supported by the EC group
-    type E: Scalar;
-
     /// Length of the Sphinx Alpha value corresponding to the EC group
     type A: ArrayLength<u8>;
 
-    /// Public key corresponding to the EC group
-    type P: BinarySerializable + Clone;
+    /// Keypair corresponding to the EC group
+    type P: Keypair;
 
-    /// EC group
-    type G: GroupElement<Self::A, Self::E> + for<'a> From<&'a Self::P>;
+    /// Scalar type supported by the EC group
+    type E: Scalar + for <'a> From<&'a Self::P>;
+
+    /// EC group element
+    type G: GroupElement<Self::A, Self::E> + for<'a> From<&'a <Self::P as Keypair>::Public>;
 
     /// Convenience function to generate shared keys from the path of public keys.
-    fn new_shared_keys(public_keys: Vec<&Self::P>) -> Result<SharedKeys<Self::E, Self::A, Self::G>> {
-        SharedKeys::generate(public_keys.into_iter().map(|pk| pk.into()).collect())
+    fn new_shared_keys(public_keys: &Vec<<Self::P as Keypair>::Public>) -> Result<SharedKeys<Self::E, Self::A, Self::G>> {
+        SharedKeys::generate(public_keys.iter().map(|pk| pk.into()).collect())
     }
 }
 
@@ -187,7 +185,7 @@ pub mod tests {
 
         let mut alpha_cpy = generated_shares.alpha.clone();
         for (i, priv_key) in priv_keys.into_iter().enumerate() {
-            let (alpha, secret) = SharedKeys::<S::E, S::A, S::G>::forward_transform(&alpha_cpy, &priv_key.to_bytes(), &pub_keys[i]).unwrap();
+            let (alpha, secret) = SharedKeys::<S::E, S::A, S::G>::forward_transform(&alpha_cpy, &priv_key, &pub_keys[i]).unwrap();
 
             assert_eq!(secret.as_ref(), generated_shares.secrets[i]);
 

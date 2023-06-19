@@ -4,7 +4,7 @@ use utils_types::traits::BinarySerializable;
 use crate::errors::CryptoError::InvalidInputValue;
 use crate::errors::Result;
 use crate::shared_keys::{Alpha, GroupElement, Scalar, SphinxSuite};
-use crate::types::{CurvePoint, OffchainPublicKey, PublicKey};
+use crate::types::{ChainKeypair, CurvePoint, OffchainKeypair};
 
 use elliptic_curve::ops::MulByGenerator;
 use crate::random::{random_bytes, random_fill};
@@ -117,35 +117,13 @@ impl GroupElement<typenum::U33, k256::Scalar> for k256::ProjectivePoint {
     }
 }
 
-/// Represents a compressed serializable extension of the `PublicKey` using the secp256k1 curve.
-#[derive(PartialEq, Eq, Clone)]
-pub struct CompressedPublicKey(pub PublicKey);
-
-impl BinarySerializable for CompressedPublicKey {
-    const SIZE: usize = PublicKey::SIZE_COMPRESSED;
-
-    fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
-        PublicKey::from_bytes(data).map(CompressedPublicKey)
-    }
-
-    fn to_bytes(&self) -> Box<[u8]> {
-        self.0.to_bytes(true)
-    }
-}
-
-impl From<&CompressedPublicKey> for k256::ProjectivePoint {
-    fn from(value: &CompressedPublicKey) -> Self {
-        (&value.0).into()
-    }
-}
-
 /// Represents an instantiation of the Sphinx protocol using secp256k1 elliptic curve and `CompressedPublicKey`
 pub struct Secp256k1Suite ;
 
 impl SphinxSuite for Secp256k1Suite {
-    type E = k256::Scalar;
     type A = typenum::U33;
-    type P = CompressedPublicKey;
+    type P = ChainKeypair;
+    type E = k256::Scalar;
     type G = k256::ProjectivePoint;
 }
 
@@ -153,9 +131,9 @@ impl SphinxSuite for Secp256k1Suite {
 pub struct Ed25519Suite ;
 
 impl SphinxSuite for Ed25519Suite {
-    type E = curve25519_dalek::scalar::Scalar;
     type A = typenum::U32;
-    type P = OffchainPublicKey;
+    type P = OffchainKeypair;
+    type E = curve25519_dalek::scalar::Scalar;
     type G = curve25519_dalek::edwards::EdwardsPoint;
 }
 
@@ -163,9 +141,9 @@ impl SphinxSuite for Ed25519Suite {
 pub struct X25519Suite ;
 
 impl SphinxSuite for X25519Suite {
-    type E = curve25519_dalek::scalar::Scalar;
     type A = typenum::U32;
-    type P = OffchainPublicKey;
+    type P = OffchainKeypair;
+    type E = curve25519_dalek::scalar::Scalar;
     type G = curve25519_dalek::montgomery::MontgomeryPoint;
 }
 

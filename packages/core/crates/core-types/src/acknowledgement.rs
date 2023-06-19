@@ -1,7 +1,7 @@
 use crate::acknowledgement::PendingAcknowledgement::{WaitingAsRelayer, WaitingAsSender};
 use crate::channels::Ticket;
 use core_crypto::errors::CryptoError::SignatureVerification;
-use core_crypto::types::{HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey, OffchainSignature, PublicKey, Response};
+use core_crypto::types::{HalfKey, HalfKeyChallenge, Hash, OffchainKeypair, OffchainPublicKey, OffchainSignature, PublicKey, Response};
 use serde::{Deserialize, Serialize};
 use utils_types::errors;
 use utils_types::errors::GeneralError::ParseError;
@@ -19,9 +19,9 @@ pub struct Acknowledgement {
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl Acknowledgement {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
-    pub fn new(ack_key_share: HalfKey, node_private_key: &[u8], node_public_key: &OffchainPublicKey) -> Self {
+    pub fn new(ack_key_share: HalfKey, node_keypair: &OffchainKeypair) -> Self {
         Self {
-            ack_signature: OffchainSignature::sign_message(&ack_key_share.to_bytes(), node_private_key, node_public_key),
+            ack_signature: OffchainSignature::sign_message(&ack_key_share.to_bytes(), node_keypair),
             ack_key_share,
             validated: true,
         }

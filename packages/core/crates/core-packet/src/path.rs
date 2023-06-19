@@ -34,8 +34,8 @@ impl Path {
     }
 
     /// Individual hops in the path.
-    pub fn hops(&self) -> Vec<&PeerId> {
-        self.hops.iter().collect::<Vec<_>>()
+    pub fn hops(&self) -> &[PeerId] {
+        &self.hops
     }
 }
 
@@ -61,7 +61,7 @@ mod tests {
 
         let path = Path::new_valid(peer_ids.clone());
         assert_eq!(HOPS, path.length());
-        assert_eq!(peer_ids.iter().collect::<Vec<_>>(), path.hops());
+        assert_eq!(&peer_ids, path.hops());
         assert!(path.valid());
     }
 }
