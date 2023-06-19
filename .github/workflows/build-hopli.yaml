@@ -15,7 +15,7 @@ concurrency:
 jobs:
 
   build:
-    name: Hopli
+    name: docker
     runs-on: ubuntu-latest
     # concurrency:
     #   group: ${{ inputs.branch }}

@@ -1,6 +1,6 @@
 ---
 # The goal of this workflow is to build the `hoprd` docker image when a pull request is created or commit push into it and has the label `deploy_nodes`
-name: PR checks
+name: Build
 
 on:
   pull_request:
@@ -67,7 +67,7 @@ jobs:
       #     GH_TOKEN: ${{ github.token }}
 
   build_toolchain:
-    name: Build
+    name: Toolchain
     needs:
       - check_changeset
     if: ${{needs.check_changeset.outputs.build_toolchain }}
@@ -77,7 +77,7 @@ jobs:
       GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
 
   build_hopli:
-    name: Build
+    name: Hopli
     needs:
       - check_changeset
     if: ${{needs.check_changeset.outputs.build_hopli }}
@@ -87,7 +87,7 @@ jobs:
       GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
 
   build_hoprd:
-    name: Build
+    name: Hoprd
     needs:
       - check_changeset
     if: ${{needs.check_changeset.outputs.build_hoprd }}
@@ -100,7 +100,7 @@ jobs:
       K8S_SSH_SERVICE_PASSWORD: ${{ secrets.K8S_SSH_SERVICE_PASSWORD }}
 
   build_anvil:
-    name: Build
+    name: Anvil
     needs:
       - check_changeset
     if: ${{needs.check_changeset.outputs.build_anvil }}

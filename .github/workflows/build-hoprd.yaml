@@ -21,7 +21,7 @@ concurrency:
 jobs:
 
   build:
-    name: Hoprd
+    name: docker
     runs-on: ubuntu-latest
     # concurrency:
     #   group: ${{ inputs.branch }}

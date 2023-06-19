@@ -22,7 +22,7 @@ concurrency:
 jobs:
 
   build:
-    name: Toolchain
+    name: docker
     runs-on: ubuntu-latest
     # concurrency:
     #   group: ${{ inputs.branch }}
