@@ -104,10 +104,11 @@ function check_labeled() {
   echo "Checking adding of label ${label}"
   case "${label}" in
     deploy_nodes)
-      echo "create_deployment=true" >> ${results_file}
+      echo "create_deployment=true" > ${results_file}
       ;;
     *)
       echo "Skipping any action with the label added: ${label}"
+      echo ""  > ${results_file}
       ;;
   esac
 
@@ -123,10 +124,11 @@ function check_unlabeled() {
   echo "Checking removal of label ${label}"
   case "${label}" in
     deploy_nodes)
-      echo "delete_deployment=true" >> ${results_file}
+      echo "delete_deployment=true" > ${results_file}
       ;;
     *)
       echo "Skipping any action with the label removed: ${label}"
+      echo ""  > ${results_file}
       ;;
   esac
 }
