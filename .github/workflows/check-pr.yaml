@@ -59,7 +59,9 @@ jobs:
           cat check_pr.log >> $GITHUB_ENV
       - name: Build Toolchain docker image
         if: ${{ env.build_toolchain }}
-        run: echo "Building Toolchain"
+        uses: ./.github/workflows/build-toolchain.yaml
+        # with:
+        #   token: ${{ secrets.access-token }}
       - name: Build Hopli docker image
         if: ${{ env.build_hopli }}
         run: echo "Building Hopli"
