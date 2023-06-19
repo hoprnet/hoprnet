@@ -1,6 +1,6 @@
 ---
 # The goal of this workflow is to build the `hoprd` docker image when a pull request is created or commit push into it and has the label `deploy_nodes`
-name: Build Toolchain
+name: Build Hopli
 
 on:
   workflow_dispatch:
@@ -9,18 +9,13 @@ on:
         description: 'Branch name'
         required: true
         type: string
-  # pull_request:
-  # workflow_call:
-  #   secrets:
-  #     GOOGLE_HOPRASSOCIATION_PROJECT:
-  #       required: true
-  #     GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY:
-  #       required: true
+  pull_request:
+
 
 jobs:
 
   build:
-    name: Build toolchain
+    name: Build hopli
     runs-on: ubuntu-8-core
     concurrency:
       group: ${{ inputs.branch }}
@@ -53,7 +48,7 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           push: true
-          file: scripts/toolchain/Dockerfile
-          cache-from: type=registry,ref=europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-toolchain:buildcache
-          cache-to: type=registry,ref=europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-toolchain:buildcache,mode=max
-          tags: europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-toolchain:pr-${{ github.event.pull_request.number }}
+          file: packages/hopli/Dockerfile
+          cache-from: type=registry,ref=europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopli:buildcache
+          cache-to: type=registry,ref=europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopli:buildcache,mode=max
+          tags: europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopli:pr-${{ github.event.pull_request.number }}
