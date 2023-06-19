@@ -41,8 +41,8 @@ jobs:
           labels=${{ github.event.pull_request.labels.* }}
           label_names=${{ github.event.pull_request.labels.*.name }}
           first_label=${{ github.event.pull_request.labels[0].name }}
-          echo "labels: ${labels}"
-          echo "label_names: ${label_names}"
+          echo "labels: ${labels[*]}"
+          echo "label_names: ${label_names[*]}"
           echo "first_label: ${first_label}"
           current_label=${{ github.event.label.name }}
           echo "This is the affected label: ${current_label}"
