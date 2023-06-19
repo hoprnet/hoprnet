@@ -57,7 +57,6 @@ fn add_padding(msg: &[u8]) -> Box<[u8]> {
 
 fn remove_padding(msg: &[u8]) -> Option<&[u8]> {
     assert_eq!(PAYLOAD_SIZE, msg.len(), "padded message must be PAYLOAD_SIZE long");
-    // TODO: this fails from time to time, needs investigation
     let pos = msg
         .windows(PADDING_TAG.len())
         .position(|window| window == PADDING_TAG)?;
@@ -222,7 +221,7 @@ impl<S: SphinxSuite> MetaPacket<S> {
                 packet_tag: derive_packet_tag(secret.as_ref())?,
                 derived_secret: secret,
                 plain_text: remove_padding(&decrypted)
-                    .ok_or(PacketDecodingError("couldn't remove padding".into()))?
+                    .ok_or(PacketDecodingError(format!("couldn't remove padding: {}", hex::encode(decrypted.as_ref()))))?
                     .into(),
                 additional_data,
             },
