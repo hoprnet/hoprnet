@@ -1108,7 +1108,7 @@ dependencies = [
 
 [[package]]
 name = "core-types"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "console_error_panic_hook",
  "core-crypto",
@@ -1116,7 +1116,7 @@ dependencies = [
  "ethnum",
  "hex-literal 0.3.4",
  "js-sys",
- "multiaddr",
+ "multiaddr 0.18.0",
  "serde",
  "serde_repr",
  "utils-misc",
@@ -2867,7 +2867,7 @@ dependencies = [
  "bs58 0.4.0",
  "libsecp256k1",
  "log",
- "multiaddr",
+ "multiaddr 0.17.1",
  "multihash 0.17.0",
  "quick-protobuf",
  "rand 0.8.5",
@@ -3074,6 +3074,25 @@ dependencies = [
  "log",
  "multibase",
  "multihash 0.17.0",
+ "percent-encoding",
+ "serde",
+ "static_assertions",
+ "unsigned-varint",
+ "url",
+]
+
+[[package]]
+name = "multiaddr"
+version = "0.18.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "92a651988b3ed3ad1bc8c87d016bb92f6f395b84ed1db9b926b32b1fc5a2c8b5"
+dependencies = [
+ "arrayref",
+ "byteorder",
+ "data-encoding",
+ "libp2p-identity 0.2.0",
+ "multibase",
+ "multihash 0.19.0",
  "percent-encoding",
  "serde",
  "static_assertions",

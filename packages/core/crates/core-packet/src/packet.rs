@@ -8,7 +8,6 @@ use core_crypto::types::{ChainKeypair, Challenge, HalfKey, HalfKeyChallenge, Key
 use core_types::acknowledgement::Acknowledgement;
 use core_types::channels::Ticket;
 use libp2p_identity::PeerId;
-use core_crypto::ec_groups::Ed25519Suite;
 use core_crypto::types::OffchainPublicKey;
 use typenum::marker_traits::Unsigned;
 use utils_types::errors::GeneralError::ParseError;
@@ -20,6 +19,9 @@ use crate::packet::PacketState::{Final, Forwarded, Outgoing};
 use crate::path::Path;
 use crate::por::{pre_verify, ProofOfRelayString, ProofOfRelayValues, POR_SECRET_LENGTH};
 
+/// Currently used ciphersuite for Sphinx
+type CurrentSphinxSuite = core_crypto::ec_groups::X25519Suite;
+
 /// Number of intermediate hops: 3 relayers and 1 destination
 pub const INTERMEDIATE_HOPS: usize = 3;
 
@@ -27,7 +29,7 @@ pub const INTERMEDIATE_HOPS: usize = 3;
 pub const PAYLOAD_SIZE: usize = 500;
 
 /// Length of the packet including header and the payload
-pub const PACKET_LENGTH: usize = packet_length::<Ed25519Suite>(INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0);
+pub const PACKET_LENGTH: usize = packet_length::<CurrentSphinxSuite>(INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0);
 
 /// Tag used to separate padding from data
 const PADDING_TAG: &[u8] = b"HOPR";
@@ -260,7 +262,7 @@ pub enum PacketState {
 /// Represents a HOPR packet.
 /// Packet also defines the conversion between peer ids, off-chain public keys and group elements from Sphinx suite.
 pub struct Packet {
-    packet: MetaPacket<Ed25519Suite>,
+    packet: MetaPacket<CurrentSphinxSuite>,
     pub ticket: Ticket,
     state: PacketState,
 }
@@ -278,7 +280,7 @@ impl Packet {
     pub fn new(msg: &[u8], path: &Path, chain_keypair: &ChainKeypair, mut ticket: Ticket) -> Result<Self> {
         let public_keys_path: Vec<OffchainPublicKey> = path.try_into()?;
 
-        let shared_keys = Ed25519Suite::new_shared_keys(&public_keys_path)?;
+        let shared_keys = CurrentSphinxSuite::new_shared_keys(&public_keys_path)?;
         let por_values = ProofOfRelayValues::new(&shared_keys.secrets[0], shared_keys.secrets.get(1));
         let por_strings = ProofOfRelayString::from_shared_secrets(&shared_keys.secrets);
 
@@ -311,8 +313,8 @@ impl Packet {
             let (pre_packet, pre_ticket) = data.split_at(PACKET_LENGTH);
             let previous_hop = OffchainPublicKey::from_peerid(sender)?;
 
-            let header_len = header_length::<Ed25519Suite>(INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0);
-            let mp = MetaPacket::<Ed25519Suite>::from_bytes(pre_packet, header_len)?;
+            let header_len = header_length::<CurrentSphinxSuite>(INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0);
+            let mp = MetaPacket::<CurrentSphinxSuite>::from_bytes(pre_packet, header_len)?;
 
             match mp.forward(node_keypair, INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0)? {
                 RelayedPacket {
