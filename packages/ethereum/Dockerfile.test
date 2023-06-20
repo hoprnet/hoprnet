@@ -1,6 +1,8 @@
 FROM debian
 
-RUN curl http://www.ifconfig.me
 
-RUN curl -v http://deb.debian.org/debian/dists/bullseye/InRelease
+RUN apt-get update
+#RUN curl http://www.ifconfig.me
+
+#RUN curl -v http://deb.debian.org/debian/dists/bullseye/InRelease
 
