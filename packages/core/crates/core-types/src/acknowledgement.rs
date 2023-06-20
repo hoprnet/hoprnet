@@ -1,8 +1,9 @@
 use crate::acknowledgement::PendingAcknowledgement::{WaitingAsRelayer, WaitingAsSender};
 use crate::channels::Ticket;
 use core_crypto::errors::CryptoError::SignatureVerification;
-use core_crypto::types::{HalfKey, HalfKeyChallenge, Hash, OffchainKeypair, OffchainPublicKey, OffchainSignature, PublicKey, Response};
+use core_crypto::types::{HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey, OffchainSignature, PublicKey, Response};
 use serde::{Deserialize, Serialize};
+use core_crypto::keypairs::OffchainKeypair;
 use utils_types::errors;
 use utils_types::errors::GeneralError::ParseError;
 use utils_types::traits::BinarySerializable;
@@ -274,13 +275,14 @@ pub mod test {
         AcknowledgedTicket, Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket,
     };
     use crate::channels::Ticket;
-    use core_crypto::types::{Challenge, CurvePoint, HalfKey, Hash, Keypair, OffchainKeypair, OffchainPublicKey, PublicKey, Response};
+    use core_crypto::types::{Challenge, CurvePoint, HalfKey, Hash, OffchainPublicKey, Response};
     use ethnum::u256;
     use hex_literal::hex;
+    use core_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
     use utils_types::primitives::{Address, Balance, BalanceType, U256};
     use utils_types::traits::BinarySerializable;
 
-    fn mock_ticket(pk: &[u8]) -> Ticket {
+    fn mock_ticket(pk: &ChainKeypair) -> Ticket {
         let inverse_win_prob = u256::new(1u128); // 100 %
         let price_per_packet = u256::new(10000000000000000u128); // 0.01 HOPR
         let path_pos = 5;
@@ -327,8 +329,8 @@ pub mod test {
 
     #[test]
     fn test_unacknowledged_ticket() {
-        let pk_1 = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
-        let pub_key_1 = PublicKey::from_privkey(&pk_1).unwrap();
+        let pk_1 = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
+        let pub_key_1 = pk_1.public().0.clone();
 
         let hk1 = HalfKey::new(&hex!(
             "3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa"
@@ -357,8 +359,8 @@ pub mod test {
 
     #[test]
     fn test_acknowledged_ticket() {
-        let pk = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
-        let pub_key = PublicKey::from_privkey(&pk).unwrap();
+        let pk = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
+        let pub_key = pk.public().0.clone();
         let resp = Response::new(&hex!(
             "4471496ef88d9a7d86a92b7676f3c8871a60792a37fae6fc3abc347c3aa3b16b"
         ));

@@ -4,9 +4,10 @@ use utils_types::traits::BinarySerializable;
 use crate::errors::CryptoError::InvalidInputValue;
 use crate::errors::Result;
 use crate::shared_keys::{Alpha, GroupElement, Scalar, SphinxSuite};
-use crate::types::{ChainKeypair, CurvePoint, OffchainKeypair};
+use crate::types::CurvePoint;
 
 use elliptic_curve::ops::MulByGenerator;
+use crate::keypairs::{ChainKeypair, OffchainKeypair};
 use crate::random::{random_bytes, random_fill};
 
 impl Scalar for curve25519_dalek::scalar::Scalar {

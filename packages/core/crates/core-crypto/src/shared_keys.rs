@@ -10,7 +10,7 @@ use zeroize::{ZeroizeOnDrop};
 use crate::errors::{CryptoError, Result};
 use crate::parameters::SECRET_KEY_LENGTH;
 use crate::random::random_bytes;
-use crate::types::Keypair;
+use crate::keypairs::Keypair;
 
 /// Represents a shared secret with a remote peer.
 #[derive(Debug, PartialEq, Eq, ZeroizeOnDrop)]

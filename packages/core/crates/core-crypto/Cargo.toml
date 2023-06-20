@@ -47,7 +47,7 @@ utils-proc-macros = { path = "../../../utils/crates/utils-proc-macros" }
 utils-types = { path = "../../../utils/crates/utils-types" }
 wasm-bindgen-futures = { version = "0.4.34", optional = true, features = ["futures-core-03-stream"] }
 wasm-bindgen = { workspace = true, optional = true }
-zeroize = "1.6"
+zeroize = { version = "1.6", features = ["zeroize_derive"] }
 console_error_panic_hook = { version = "0.1.7", optional = true }
 #wee_alloc = { version = "0.4.5", optional = true }
 

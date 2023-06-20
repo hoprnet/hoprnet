@@ -1,6 +1,8 @@
 pub mod derivation;
+pub mod ec_groups;
 pub mod errors;
 pub mod iterated_hash;
+pub mod keypairs;
 pub mod parameters;
 pub mod prg;
 pub mod primitives;
@@ -9,8 +11,8 @@ pub mod random;
 pub mod routing;
 pub mod shared_keys;
 pub mod types;
-pub mod ec_groups;
 mod utils;
+
 
 #[cfg(feature = "wasm")]
 pub mod wasm {

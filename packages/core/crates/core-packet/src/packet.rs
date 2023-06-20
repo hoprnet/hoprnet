@@ -1,15 +1,16 @@
 use crate::errors::PacketError::{InvalidPacketState, PacketDecodingError};
 use core_crypto::derivation::{derive_ack_key_share, derive_packet_tag, PacketTag};
 use core_crypto::primitives::{DigestLike, SimpleMac};
-use core_crypto::prp::{PRPParameters, PRP};
-use core_crypto::routing::{forward_header, header_length, ForwardedHeader, RoutingInfo};
+use core_crypto::prp::{PRP, PRPParameters};
+use core_crypto::routing::{forward_header, ForwardedHeader, header_length, RoutingInfo};
 use core_crypto::shared_keys::{Alpha, SharedKeys, SharedSecret, SphinxSuite};
-use core_crypto::types::{ChainKeypair, Challenge, HalfKey, HalfKeyChallenge, Keypair, OffchainKeypair};
+use core_crypto::types::{Challenge, HalfKey, HalfKeyChallenge};
 use core_types::acknowledgement::Acknowledgement;
 use core_types::channels::Ticket;
 use libp2p_identity::PeerId;
 use core_crypto::types::OffchainPublicKey;
 use typenum::marker_traits::Unsigned;
+use core_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
 use utils_types::errors::GeneralError::ParseError;
 use utils_types::traits::{BinarySerializable, PeerIdLike};
 
@@ -17,7 +18,7 @@ use crate::errors::Result;
 use crate::packet::ForwardedMetaPacket::{FinalPacket, RelayedPacket};
 use crate::packet::PacketState::{Final, Forwarded, Outgoing};
 use crate::path::Path;
-use crate::por::{pre_verify, ProofOfRelayString, ProofOfRelayValues, POR_SECRET_LENGTH};
+use crate::por::{POR_SECRET_LENGTH, pre_verify, ProofOfRelayString, ProofOfRelayValues};
 
 /// Currently used ciphersuite for Sphinx
 type CurrentSphinxSuite = core_crypto::ec_groups::X25519Suite;
@@ -286,7 +287,7 @@ impl Packet {
 
         // Update the ticket with the challenge
         ticket.challenge = por_values.ticket_challenge.to_ethereum_challenge();
-        ticket.sign(chain_keypair.secret());
+        ticket.sign(&chain_keypair);
 
         Ok(Self {
             packet: MetaPacket::new(
@@ -385,7 +386,7 @@ impl Packet {
                 ..
             } => {
                 next_ticket.challenge = next_challenge.to_ethereum_challenge();
-                next_ticket.sign(chain_keypair.secret());
+                next_ticket.sign(&chain_keypair);
                 self.ticket = next_ticket;
                 Ok(())
             }
@@ -423,14 +424,15 @@ impl Packet {
 #[cfg(test)]
 mod tests {
     use crate::packet::{
-        add_padding, remove_padding, ForwardedMetaPacket, MetaPacket, Packet, PacketState, INTERMEDIATE_HOPS,
-        PADDING_TAG,
+        add_padding, ForwardedMetaPacket, INTERMEDIATE_HOPS, MetaPacket, Packet, PacketState, PADDING_TAG,
+        remove_padding,
     };
-    use crate::por::{ProofOfRelayString, POR_SECRET_LENGTH};
-    use core_crypto::types::{ChainKeypair, Keypair, OffchainKeypair, PublicKey};
+    use crate::por::{POR_SECRET_LENGTH, ProofOfRelayString};
+    use core_crypto::types::PublicKey;
     use core_types::channels::Ticket;
     use parameterized::parameterized;
     use core_crypto::ec_groups::{Ed25519Suite, Secp256k1Suite, X25519Suite};
+    use core_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
     use core_crypto::shared_keys::SphinxSuite;
     use utils_types::primitives::{Balance, BalanceType, U256};
     use utils_types::traits::PeerIdLike;
@@ -515,7 +517,7 @@ mod tests {
             .collect())
     }
 
-    fn mock_ticket(next_peer_channel_key: &PublicKey, path_len: usize, private_key: &[u8]) -> Ticket {
+    fn mock_ticket(next_peer_channel_key: &PublicKey, path_len: usize, private_key: &ChainKeypair) -> Ticket {
         assert!(path_len > 0);
         const PRICE_PER_PACKET: u128 = 10000000000000000u128;
         const INVERSE_TICKET_WIN_PROB: u128 = 1;
@@ -550,7 +552,7 @@ mod tests {
         let own_packet_kp = keypairs.drain(..1).last().unwrap();
 
         // Create ticket for the first peer on the path
-        let ticket = mock_ticket(&channel_pairs[0].public().0, keypairs.len(), own_channel_kp.secret());
+        let ticket = mock_ticket(&channel_pairs[0].public().0, keypairs.len(), &own_channel_kp);
 
         let test_message = b"some testing message";
         let path = Path::new_valid(keypairs.iter().map(|kp| kp.public().to_peerid()).collect());
@@ -576,7 +578,7 @@ mod tests {
                     assert_eq!(&test_message, &plain_text.as_ref());
                 }
                 PacketState::Forwarded { .. } => {
-                    let ticket = mock_ticket(&channel_pairs[i + 1].public().0, keypairs.len() - i - 1, path_element.secret());
+                    let ticket = mock_ticket(&channel_pairs[i + 1].public().0, keypairs.len() - i - 1, &channel_pairs[i]);
                     packet.forward(&channel_pairs[i], ticket).unwrap();
                 }
                 PacketState::Outgoing { .. } => panic!("invalid packet state"),

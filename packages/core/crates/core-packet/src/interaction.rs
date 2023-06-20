@@ -3,7 +3,7 @@ use crate::errors::Result;
 use crate::packet::{Packet, PacketState};
 use crate::path::Path;
 use async_std::channel::{bounded, Receiver, Sender, TrySendError};
-use core_crypto::types::{ChainKeypair, HalfKeyChallenge, Hash, Keypair, OffchainKeypair, OffchainPublicKey, PublicKey};
+use core_crypto::types::{HalfKeyChallenge, Hash, OffchainPublicKey, PublicKey};
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_mixer::mixer::{Mixer, MixerConfig};
 use core_types::acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket};
@@ -11,6 +11,7 @@ use core_types::channels::Ticket;
 use libp2p_identity::PeerId;
 use std::ops::{Deref, Mul};
 use std::sync::{Arc, Mutex};
+use core_crypto::keypairs::{ChainKeypair, OffchainKeypair};
 use utils_log::{debug, error, info};
 use utils_types::primitives::{Balance, BalanceType, U256};
 use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
@@ -413,7 +414,7 @@ where
             amount,
             U256::from_inverse_probability(U256::new(INVERSE_TICKET_WIN_PROB))?,
             channel.channel_epoch,
-            self.cfg.chain_keypair.secret(),
+            &self.cfg.chain_keypair,
         );
 
         self.db.lock().unwrap().mark_pending(&ticket).await?;
@@ -447,7 +448,7 @@ where
 
         // Decide whether to create 0-hop or multihop ticket
         let next_ticket = if path.length() == 1 {
-            Ticket::new_zero_hop(next_peer, self.cfg.chain_keypair.secret())
+            Ticket::new_zero_hop(next_peer, &self.cfg.chain_keypair)
         } else {
             self.create_multihop_ticket(next_peer, path.length() as u8).await?
         };
@@ -623,7 +624,7 @@ where
 
                 // Create next ticket for the packet
                 next_ticket = if path_pos == 1 {
-                    Ticket::new_zero_hop(next_hop_channel_key, self.cfg.chain_keypair.secret())
+                    Ticket::new_zero_hop(next_hop_channel_key, &self.cfg.chain_keypair)
                 } else {
                     self.create_multihop_ticket(next_hop_channel_key, path_pos).await?
                 };
@@ -735,14 +736,14 @@ mod tests {
     use async_trait::async_trait;
     use core_crypto::derivation::derive_ack_key_share;
     use core_crypto::random::random_bytes;
-    use core_crypto::types::{ChainKeypair, Hash, Keypair, OffchainKeypair, OffchainPublicKey, PublicKey};
+    use core_crypto::types::{Hash, OffchainPublicKey, PublicKey};
     use core_ethereum_db::db::CoreEthereumDb;
     use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-    use core_ethereum_misc::commitment::{initialize_commitment, ChainCommitter, ChannelCommitmentInfo};
+    use core_ethereum_misc::commitment::{ChainCommitter, ChannelCommitmentInfo, initialize_commitment};
     use core_mixer::mixer::MixerConfig;
     use core_types::acknowledgement::{Acknowledgement, PendingAcknowledgement};
     use core_types::channels::{ChannelEntry, ChannelStatus};
-    use futures::future::{select, Either};
+    use futures::future::{Either, select};
     use futures::pin_mut;
     use hex_literal::hex;
     use lazy_static::lazy_static;
@@ -754,6 +755,7 @@ mod tests {
     use std::str::FromStr;
     use std::sync::{Arc, Mutex};
     use std::time::Duration;
+    use core_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
     use core_crypto::shared_keys::SharedSecret;
     use utils_db::db::DB;
     use utils_db::errors::DbError;
@@ -1468,7 +1470,7 @@ pub mod wasm {
     use crate::interaction::{AcknowledgementInteraction, PacketInteraction, PacketInteractionConfig, Payload};
     use crate::path::Path;
     use async_std::channel::unbounded;
-    use core_crypto::types::{HalfKeyChallenge, Keypair, PublicKey};
+    use core_crypto::types::{HalfKeyChallenge, PublicKey};
     use core_ethereum_db::db::CoreEthereumDb;
     use core_mixer::mixer::Mixer;
     use core_types::acknowledgement::{AcknowledgedTicket, Acknowledgement};
@@ -1487,6 +1489,7 @@ pub mod wasm {
     use wasm_bindgen::prelude::wasm_bindgen;
     use wasm_bindgen::JsCast;
     use wasm_bindgen::JsValue;
+    use core_crypto::keypairs::Keypair;
 
     #[wasm_bindgen]
     impl Payload {

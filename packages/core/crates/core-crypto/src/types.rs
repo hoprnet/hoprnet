@@ -13,9 +13,7 @@ use std::ops::Add;
 use std::str::FromStr;
 use curve25519_dalek::edwards::{CompressedEdwardsY, EdwardsPoint};
 use curve25519_dalek::montgomery::MontgomeryPoint;
-use ed25519_dalek::{Digest, Sha512};
 use elliptic_curve::sec1::EncodedPoint;
-use zeroize::Zeroize;
 
 use utils_log::warn;
 use utils_types::errors::GeneralError;
@@ -26,10 +24,10 @@ use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
 
 use crate::errors::CryptoError::InvalidInputValue;
 use crate::errors::{CryptoError, CryptoError::CalculationError, Result};
+use crate::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
 use crate::parameters::SECRET_KEY_LENGTH;
 use crate::primitives::{DigestLike, EthDigest};
-use crate::random::{random_bytes, random_group_element};
-use crate::shared_keys::Scalar;
+use crate::random::random_group_element;
 
 /// Represents a secret key of fixed length
 pub type SecretKey = [u8; SECRET_KEY_LENGTH];
@@ -471,33 +469,6 @@ impl Hash {
     }
 }
 
-/// Represents a generic key pair
-/// The keypair contains a private key and public key.
-/// The type must implement `Drop` that zeroizes the private key.
-#[allow(drop_bounds)]
-pub trait Keypair: Drop + Sized {
-    /// Represents the type of the private (secret) key
-    type Secret: Zeroize + AsRef<[u8]>;
-
-    /// Represents the type of the public key
-    type Public: BinarySerializable + Clone + PartialEq;
-
-    /// Generates a new random keypair.
-    fn random() -> Self;
-
-    /// Creates a keypair from the given secret key.
-    fn from_secret(bytes: &[u8]) -> Result<Self>;
-
-    /// Returns the private (secret) part of the keypair
-    fn secret(&self) -> &Self::Secret;
-
-    /// Returns the public part of the keypair
-    fn public(&self) -> &Self::Public;
-
-    /// Consumes the instance and produces separated private and public part
-    fn unzip(self) -> (Self::Secret, Self::Public);
-}
-
 /// Represents an Ed25519 public key.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -564,53 +535,6 @@ impl From<&OffchainPublicKey> for EdwardsPoint {
 impl From<&OffchainPublicKey> for MontgomeryPoint {
     fn from(value: &OffchainPublicKey) -> Self {
         value.compressed.decompress().unwrap().to_montgomery()
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-pub struct OffchainKeypair([u8; ed25519_dalek::SECRET_KEY_LENGTH], OffchainPublicKey);
-
-impl Keypair for OffchainKeypair {
-    type Secret = [u8; ed25519_dalek::SECRET_KEY_LENGTH];
-    type Public = OffchainPublicKey;
-
-    fn random() -> Self {
-        Self::from_secret(&random_bytes::<{ed25519_dalek::SECRET_KEY_LENGTH}>()).unwrap()
-    }
-
-    fn from_secret(bytes: &[u8]) -> Result<Self> {
-       Ok(Self(bytes.try_into().map_err(|_| InvalidInputValue)?, OffchainPublicKey::from_privkey(bytes)?))
-    }
-
-    fn secret(&self) -> &Self::Secret {
-        &self.0
-    }
-
-    fn public(&self) -> &Self::Public {
-        &self.1
-    }
-
-    fn unzip(self) -> (Self::Secret, Self::Public) {
-        (self.0, self.1.clone())
-    }
-}
-
-impl Drop for OffchainKeypair {
-    fn drop(&mut self) {
-        self.0.zeroize()
-    }
-}
-
-impl From<&OffchainKeypair> for curve25519_dalek::scalar::Scalar {
-    fn from(value: &OffchainKeypair) -> Self {
-        let mut h: Sha512 = Sha512::new();
-        h.update(&value.0);
-        let hash = h.finalize();
-
-        let mut ret = [0u8; ed25519_dalek::SECRET_KEY_LENGTH];
-        ret.copy_from_slice(&hash[..32]);
-        curve25519_dalek::scalar::Scalar::from_bytes(&ret).unwrap()
     }
 }
 
@@ -801,7 +725,7 @@ impl From<&PublicKey> for k256::ProjectivePoint {
 }
 
 /// Represents a compressed serializable extension of the `PublicKey` using the secp256k1 curve.
-#[derive(PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CompressedPublicKey(pub PublicKey);
 
 impl BinarySerializable for CompressedPublicKey {
@@ -819,51 +743,6 @@ impl BinarySerializable for CompressedPublicKey {
 impl From<&CompressedPublicKey> for k256::ProjectivePoint {
     fn from(value: &CompressedPublicKey) -> Self {
         (&value.0).into()
-    }
-}
-
-#[derive(Clone, PartialEq)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-pub struct ChainKeypair([u8; 32], CompressedPublicKey);
-
-impl Keypair for ChainKeypair {
-    type Secret = [u8; 32];
-    type Public = CompressedPublicKey;
-
-    fn random() -> Self {
-        let (secret, public) = random_group_element();
-        Self (secret, CompressedPublicKey(public.try_into().unwrap()))
-    }
-
-    fn from_secret(bytes: &[u8]) -> Result<Self> {
-        let compressed = PublicKey::from_privkey(bytes)
-            .map(|pk| CompressedPublicKey(pk))?;
-
-        Ok(Self(bytes.try_into().map_err(|_| InvalidInputValue)?, compressed))
-    }
-
-    fn secret(&self) -> &Self::Secret {
-        &self.0
-    }
-
-    fn public(&self) -> &Self::Public {
-        &self.1
-    }
-
-    fn unzip(self) -> (Self::Secret, Self::Public) {
-        (self.0, self.1.clone())
-    }
-}
-
-impl Drop for ChainKeypair {
-    fn drop(&mut self) {
-        self.0.zeroize()
-    }
-}
-
-impl From<&ChainKeypair> for k256::Scalar {
-    fn from(value: &ChainKeypair) -> Self {
-        k256::Scalar::from_bytes(&value.0).unwrap()
     }
 }
 
@@ -940,6 +819,7 @@ impl BinarySerializable for Response {
     }
 }
 
+/// Represents an EdDSA signature using Ed25519 Edwards curve.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OffchainSignature {
     signature: ed25519_dalek::Signature
@@ -1018,16 +898,16 @@ impl Signature {
         ret
     }
 
-    /// Signs the given message using the raw private key.
-    pub fn sign_message(message: &[u8], private_key: &[u8]) -> Signature {
-        Self::sign(message, private_key, |k: &SigningKey, data: &[u8]| {
+    /// Signs the given message using the chain private key.
+    pub fn sign_message(message: &[u8], chain_keypair: &ChainKeypair) -> Signature {
+        Self::sign(message, chain_keypair.secret(), |k: &SigningKey, data: &[u8]| {
             k.sign_recoverable(data)
         })
     }
 
     /// Signs the given hash using the raw private key.
-    pub fn sign_hash(hash: &[u8], private_key: &[u8]) -> Signature {
-        Self::sign(hash, private_key, |k: &SigningKey, data: &[u8]| {
+    pub fn sign_hash(hash: &[u8], chain_keypair: &ChainKeypair) -> Signature {
+        Self::sign(hash, chain_keypair.secret(), |k: &SigningKey, data: &[u8]| {
             k.sign_prehash_recoverable(data)
         })
     }
@@ -1046,24 +926,14 @@ impl Signature {
         }
     }
 
-    /// Verifies this signature against the given message and a public key (compressed or uncompressed)
-    pub fn verify_message(&self, message: &[u8], public_key: &[u8]) -> bool {
-        self.verify(message, public_key, |k, msg, sgn| k.verify(msg, sgn))
-    }
-
     /// Verifies this signature against the given message and a public key object
-    pub fn verify_message_with_pubkey(&self, message: &[u8], public_key: &PublicKey) -> bool {
-        self.verify_message(message, &public_key.to_bytes(false))
+    pub fn verify_message(&self, message: &[u8], public_key: &PublicKey) -> bool {
+        self.verify(message, &public_key.to_bytes(false), |k, msg, sgn| k.verify(msg, sgn))
     }
 
-    /// Verifies this signature against the given hash and a public key (compressed or uncompressed)
-    pub fn verify_hash(&self, hash: &[u8], public_key: &[u8]) -> bool {
-        self.verify(hash, public_key, |k, msg, sgn| k.verify_prehash(msg, sgn))
-    }
-
-    /// Verifies this signature against the given message and a public key object
-    pub fn verify_hash_with_pubkey(&self, hash: &[u8], public_key: &PublicKey) -> bool {
-        self.verify_hash(hash, &public_key.to_bytes(false))
+    /// Verifies this signature against the given hash and a public key object
+    pub fn verify_hash(&self, hash: &[u8], public_key: &PublicKey) -> bool {
+        self.verify(hash, &public_key.to_bytes(false), |k, msg, sgn| k.verify_prehash(msg, sgn))
     }
 
     /// Returns the raw signature, without the encoded public key recovery bit.
@@ -1150,8 +1020,9 @@ pub mod tests {
     use ed25519_dalek::Signer;
     use utils_types::primitives::Address;
     use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
+    use crate::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
 
-    use crate::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, Hash, Keypair, OffchainKeypair, OffchainPublicKey, OffchainSignature, PublicKey, Response, Signature, ToChecksum};
+    use crate::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey, OffchainSignature, PublicKey, Response, Signature, ToChecksum};
 
     const PUBLIC_KEY: [u8; 33] = hex!("021464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8");
     const PRIVATE_KEY: [u8; 32] = hex!("e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8");
@@ -1159,12 +1030,13 @@ pub mod tests {
     #[test]
     fn signature_signing_test() {
         let msg = b"test12345";
-        let sgn = Signature::sign_message(msg, &PRIVATE_KEY);
+        let kp = ChainKeypair::from_secret(&PRIVATE_KEY).unwrap();
+        let sgn = Signature::sign_message(msg, &kp);
 
-        assert!(sgn.verify_message(msg, &PUBLIC_KEY));
+        let expected_pk = PublicKey::from_bytes(&PUBLIC_KEY).unwrap();
+        assert!(sgn.verify_message(msg, &expected_pk));
 
         let extracted_pk = PublicKey::from_signature(msg, &sgn).unwrap();
-        let expected_pk = PublicKey::from_bytes(&PUBLIC_KEY).unwrap();
         assert_eq!(expected_pk, extracted_pk, "key extracted from signature does not match");
     }
 
@@ -1194,7 +1066,8 @@ pub mod tests {
     #[test]
     fn signature_serialize_test() {
         let msg = b"test000000";
-        let sgn = Signature::sign_message(msg, &PRIVATE_KEY);
+        let kp = ChainKeypair::from_secret(&PRIVATE_KEY).unwrap();
+        let sgn = Signature::sign_message(msg, &kp);
 
         let deserialized = Signature::from_bytes(&sgn.to_bytes()).unwrap();
         assert_eq!(sgn, deserialized, "signatures don't match");
@@ -1253,39 +1126,42 @@ pub mod tests {
     fn sign_and_recover_test() {
         let msg = hex!("eff80b9f035b1d369c6a60f362ac7c8b8c3b61b76d151d1be535145ccaa3e83e");
 
-        let signature1 = Signature::sign_message(&msg, &PRIVATE_KEY);
-        let signature2 = Signature::sign_hash(&msg, &PRIVATE_KEY);
+        let kp = ChainKeypair::from_secret(&PRIVATE_KEY).unwrap();
+
+        let signature1 = Signature::sign_message(&msg, &kp);
+        let signature2 = Signature::sign_hash(&msg, &kp);
 
         let pub_key1 = PublicKey::from_privkey(&PRIVATE_KEY).unwrap();
         let pub_key2 = PublicKey::from_signature(&msg, &signature1).unwrap();
         let pub_key3 = PublicKey::from_signature_hash(&msg, &signature2).unwrap();
 
+        assert_eq!(pub_key1, kp.public().0);
         assert_eq!(pub_key1, pub_key2, "recovered public key does not match");
         assert_eq!(pub_key1, pub_key3, "recovered public key does not match");
 
         assert!(
-            signature1.verify_message_with_pubkey(&msg, &pub_key1),
+            signature1.verify_message(&msg, &pub_key1),
             "signature 1 verification failed with pub key 1"
         );
         assert!(
-            signature1.verify_message_with_pubkey(&msg, &pub_key2),
+            signature1.verify_message(&msg, &pub_key2),
             "signature 1 verification failed with pub key 2"
         );
         assert!(
-            signature1.verify_message_with_pubkey(&msg, &pub_key3),
+            signature1.verify_message(&msg, &pub_key3),
             "signature 1 verification failed with pub key 3"
         );
 
         assert!(
-            signature2.verify_hash_with_pubkey(&msg, &pub_key1),
+            signature2.verify_hash(&msg, &pub_key1),
             "signature 2 verification failed with pub key 1"
         );
         assert!(
-            signature2.verify_hash_with_pubkey(&msg, &pub_key2),
+            signature2.verify_hash(&msg, &pub_key2),
             "signature 2 verification failed with pub key 2"
         );
         assert!(
-            signature2.verify_hash_with_pubkey(&msg, &pub_key3),
+            signature2.verify_hash(&msg, &pub_key3),
             "signature 2 verification failed with pub key 3"
         );
     }

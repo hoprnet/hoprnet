@@ -2,7 +2,7 @@ use crate::derivation::derive_mac_key;
 use crate::errors::CryptoError::TagMismatch;
 use crate::errors::Result;
 use crate::parameters::SECRET_KEY_LENGTH;
-use crate::prg::{PRGParameters, PRG};
+use crate::prg::{PRG, PRGParameters};
 use crate::primitives::{create_tagged_mac, DigestLike, SimpleMac};
 use crate::random::random_fill;
 use crate::routing::ForwardedHeader::{FinalNode, RelayNode};
@@ -11,7 +11,7 @@ use std::ops::Not;
 use subtle::ConstantTimeEq;
 use utils_types::traits::BinarySerializable;
 use crate::shared_keys::{SharedSecret, SphinxSuite};
-use crate::types::Keypair;
+use crate::keypairs::Keypair;
 
 const RELAYER_END_PREFIX: u8 = 0xff;
 
@@ -261,15 +261,15 @@ pub fn forward_header<S: SphinxSuite>(
 
 #[cfg(test)]
 pub mod tests {
-    use crate::prg::{PRGParameters, PRG};
+    use crate::prg::{PRG, PRGParameters};
     use crate::primitives::{DigestLike, SimpleMac};
-    use crate::routing::{forward_header, generate_filler, ForwardedHeader, RoutingInfo};
+    use crate::routing::{forward_header, ForwardedHeader, generate_filler, RoutingInfo};
     use crate::utils::xor_inplace;
     use parameterized::parameterized;
     use utils_types::traits::BinarySerializable;
     use crate::ec_groups::{Ed25519Suite, Secp256k1Suite, X25519Suite};
+    use crate::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
     use crate::shared_keys::{SharedSecret, SphinxSuite};
-    use crate::types::{ChainKeypair, Keypair, OffchainKeypair};
 
     #[parameterized(hops = { 3, 4 })]
     fn test_filler_generate_verify(hops: usize) {
