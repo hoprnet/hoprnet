@@ -15,7 +15,7 @@ concurrency:
 jobs:
   check_changeset:
     name: Check changeset
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-2-core
     outputs:
       create_deployment: ${{ steps.check_pr_changeset.outputs.create_deployment }}
       delete_deployment: ${{ steps.check_pr_changeset.outputs.delete_deployment }}

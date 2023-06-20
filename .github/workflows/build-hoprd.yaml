@@ -57,7 +57,7 @@ jobs:
 
   restart_deployment:
     name: Restart deployment
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-2-core
     needs: build
     if: ${{ contains(github.event.pull_request.labels.*.name, 'deploy_nodes') }}
     steps:

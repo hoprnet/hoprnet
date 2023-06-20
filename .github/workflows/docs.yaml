@@ -22,7 +22,7 @@ on:
 jobs:
   api:
     name: API docs
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-2-core
     steps:
       - uses: actions/checkout@v3
 

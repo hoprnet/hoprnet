@@ -12,7 +12,7 @@ on:
 
 jobs:
   cargo-update:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-2-core
     steps:
       - uses: actions/checkout@v3
 

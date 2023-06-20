@@ -8,7 +8,7 @@ on:
 
 jobs:
   stale:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-2-core
     steps:
       - uses: actions/stale@v8
         with:
