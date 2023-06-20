@@ -1,4 +1,4 @@
-name: build yellowpaper
+name: Yellowpaper
 
 env:
   HOPR_GITHUB_REF: ${{ github.ref }}

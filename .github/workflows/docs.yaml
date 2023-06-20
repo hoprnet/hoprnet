@@ -1,4 +1,4 @@
-name: HOPR Generate API docs
+name: Docs
 
 env:
   HOPR_GITHUB_REF: ${{ github.ref }}
@@ -7,15 +7,21 @@ env:
   RUSTC_WRAPPER: "sccache"
 
 on:
-  push:
-    branches: ['**']
+  pull_request:
+    branches:
+      - master
+      - release/*
+    types:
+      - synchronize
+      - opened
     paths-ignore:
-      - 'docs/**/*'
       - '.processes/**/*'
+      - 'docs/**/*'
+      - 'packages/*/docs/**/*'
 
 jobs:
-  docs:
-    name: Generate API docs
+  api:
+    name: API docs
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3

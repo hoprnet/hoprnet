@@ -1,4 +1,4 @@
-name: cleanup caches by a branch
+name: Merge
 on:
   pull_request:
     types:
@@ -6,6 +6,7 @@ on:
 
 jobs:
   cleanup:
+    name: Cleanup cache
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
