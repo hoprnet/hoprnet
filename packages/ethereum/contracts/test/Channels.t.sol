@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity >=0.6.0 <0.9.0;
 
+import 'forge-std/Test.sol';
 import './utils/ERC1820Registry.sol';
 import './utils/Accounts.sol';
 // import './utils/Channels.sol';
 // import './utils/Tickets.sol';
 import '../src/Channels.sol';
-import 'forge-std/Test.sol';
 
 contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, AccountsFixtureTest {
   // Copied from HoprChannels contract
   event ChannelOpened(address indexed source, address indexed destination, HoprChannels.Balance amount);
   event ChannelBalanceIncreased(bytes32 indexed channelId, HoprChannels.Balance newBalance);
   event ChannelBalanceDecreased(bytes32 indexed channelId, HoprChannels.Balance newBalance);
-  event CommitmentSet(bytes32 channelId, HoprChannels.ChannelEpoch epoch);
+  event CommitmentSet(bytes32 indexed channelId, HoprChannels.ChannelEpoch epoch);
   event OutgoingChannelClosureInitiated(bytes32 channelId, HoprChannels.Timestamp closureInitiationTime);
   event ChannelClosed(bytes32 channelId);
   event TicketRedeemed(bytes32 channelId, HoprChannels.TicketIndex newTicketIndex);
@@ -97,51 +97,43 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, AccountsFixtureTe
   bytes32 channelIdAB;
   bytes32 channelIdBA;
 
+  uint256 MIN_USED_BALANCE;
+  uint256 MAX_USED_BALANCE;
+
   uint256 constant ENOUGH_TIME_FOR_CLOSURE = 100;
 
   // uint256 public globalSnapshot;
 
   function setUp() public virtual override {
     super.setUp();
-    // console.logString('here');
     // make vm.addr(1) HoprToken contract
     hoprChannels = new HoprChannels(vm.addr(1), HoprChannels.Timestamp.wrap(15));
     channelIdAB = hoprChannels._getChannelId(accountA.accountAddr, accountB.accountAddr);
     channelIdBA = hoprChannels._getChannelId(accountB.accountAddr, accountA.accountAddr);
+
+    MIN_USED_BALANCE = HoprChannels.Balance.unwrap(hoprChannels.MIN_USED_BALANCE()) + 1;
+    MAX_USED_BALANCE = HoprChannels.Balance.unwrap(hoprChannels.MAX_USED_BALANCE());   
   }
 
-  function testFundChannelMulti(uint256 amount1, uint256 amount2) public {
-    // uint256 amount1 = 1;
-    // uint256 amount2 = 1;
-    amount1 = bound(
-      amount1,
-      HoprChannels.Balance.unwrap(hoprChannels.MIN_USED_BALANCE()) + 1,
-      HoprChannels.Balance.unwrap(hoprChannels.MAX_USED_BALANCE())
-    );
-    amount2 = bound(
-      amount2,
-      HoprChannels.Balance.unwrap(hoprChannels.MIN_USED_BALANCE()) + 1,
-      HoprChannels.Balance.unwrap(hoprChannels.MAX_USED_BALANCE())
-    );
+  function testFundChannelMulti(uint96 amount1, uint96 amount2) public {
+    amount1 = uint96(bound(amount1, MIN_USED_BALANCE ,MAX_USED_BALANCE));
+    amount2 = uint96(bound(amount2, MIN_USED_BALANCE, MAX_USED_BALANCE));
 
-    // channels
     HoprChannels.Channel memory channelAB = HoprChannels.Channel(
       bytes32(0),
       HoprChannels.Balance.wrap(uint96(amount1)),
       HoprChannels.TicketIndex.wrap(0),
-            HoprChannels.Timestamp.wrap(0),
+      HoprChannels.Timestamp.wrap(0),
 
       HoprChannels.ChannelEpoch.wrap(1),
-            HoprChannels.ChannelStatus.OPEN
-
+      HoprChannels.ChannelStatus.OPEN
     );
     HoprChannels.Channel memory channelBA = HoprChannels.Channel(
       bytes32(0),
       HoprChannels.Balance.wrap(uint96(amount2)),
       HoprChannels.TicketIndex.wrap(0),
-            HoprChannels.Timestamp.wrap(0),
+      HoprChannels.Timestamp.wrap(0),
       HoprChannels.ChannelEpoch.wrap(1),
-
       HoprChannels.ChannelStatus.OPEN
     );
 
@@ -165,13 +157,12 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, AccountsFixtureTe
     // fund channel A->B and B->A
     hoprChannels.fundChannelMulti(
       accountA.accountAddr,
-      HoprChannels.Balance.wrap(1),
+      HoprChannels.Balance.wrap(amount1),
       accountB.accountAddr,
-      HoprChannels.Balance.wrap(1)
+      HoprChannels.Balance.wrap(amount2)
     );
     vm.clearMockedCalls();
 
-    // check validity from channels()
     assertEq(
       keccak256(
         abi.encode(getChannelFromTuple(channelIdAB))
@@ -186,165 +177,252 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, AccountsFixtureTe
     );
   }
 
-  // function testFailFundChannelMulti_SameSourceAndDestination(uint256 amount1, uint256 amount2) public {
-  //   amount1 = bound(amount1, 1, 1e36);
-  //   amount2 = bound(amount2, 1, 1e36);
-  //   // accountA is announced
-  //   _helperAnnounceAB(true, false);
-  //   vm.prank(address(1));
-  //   hoprChannels.fundChannelMulti(accountA.accountAddr, accountA.accountAddr, amount1, amount2);
-  // }
+  function testFailFundChannelMulti_SameSourceAndDestination(uint96 amount1, uint96 amount2) public {
+    amount1 = uint96(bound(amount1, MIN_USED_BALANCE ,MAX_USED_BALANCE));
+    amount2 = uint96(bound(amount2, MIN_USED_BALANCE, MAX_USED_BALANCE));
 
-  // function testFailFundChannelMulti_FromSourceZero(uint256 amount1, uint256 amount2) public {
-  //   amount1 = bound(amount1, 1, 1e36);
-  //   amount2 = bound(amount2, 1, 1e36);
-  //   // accountA is announced
-  //   _helperAnnounceAB(true, false);
-  //   vm.prank(address(1));
-  //   hoprChannels.fundChannelMulti(address(0), accountA.accountAddr, amount1, amount2);
-  // }
+    vm.prank(address(1));
+    vm.expectRevert(abi.encodeWithSelector(SourceEqualsDestination.selector, ""));
+    hoprChannels.fundChannelMulti(accountA.accountAddr, HoprChannels.Balance.wrap(amount1), accountA.accountAddr, HoprChannels.Balance.wrap(amount2));
+  }
 
-  // function testFailFundChannelMulti_ToDestinationZero(uint256 amount1, uint256 amount2) public {
-  //   amount1 = bound(amount1, 1, 1e36);
-  //   amount2 = bound(amount2, 1, 1e36);
-  //   // accountA is announced
-  //   _helperAnnounceAB(true, false);
-  //   vm.prank(address(1));
-  //   hoprChannels.fundChannelMulti(accountA.accountAddr, address(0), amount1, amount2);
-  // }
+  function testFailFundChannelMulti_ZeroSource(uint96 amount1, uint96 amount2) public {
+    amount1 = uint96(bound(amount1, MIN_USED_BALANCE, MAX_USED_BALANCE));
+    amount2 = uint96(bound(amount2, MIN_USED_BALANCE, MAX_USED_BALANCE));
 
-  // function testFailFundChannelMulti_AmountZero() public {
-  //   // both accountA and accountB are announced
-  //   _helperAnnounceAB(true, true);
-  //   vm.prank(address(1));
-  //   hoprChannels.fundChannelMulti(accountA.accountAddr, address(0), 0, 0);
-  // }
+    vm.prank(address(1));
+    vm.expectRevert(abi.encodeWithSelector(ZeroAddress.selector));
+    hoprChannels.fundChannelMulti(address(0), HoprChannels.Balance.wrap(amount1), accountA.accountAddr, HoprChannels.Balance.wrap(amount2));
+  }
 
-  // function testBumpChannel(uint256 amount1, uint256 amount2, bytes32 secret) public {
-  //   amount1 = bound(amount1, 1, 1e36);
-  //   amount2 = bound(amount2, 1, 1e36);
-  //   vm.assume(secret != bytes32(0));
+  function testFailFundChannelMulti_ZeroDestination(uint96 amount1, uint96 amount2) public {
+    amount1 = uint96(bound(amount1, MIN_USED_BALANCE, MAX_USED_BALANCE));
+    amount2 = uint96(bound(amount2, MIN_USED_BALANCE, MAX_USED_BALANCE));
 
-  //   _helperFundMultiAB(amount1, amount2);
+    vm.prank(address(1));
+    vm.expectRevert(abi.encodeWithSelector(ZeroAddress.selector));
+    hoprChannels.fundChannelMulti(accountA.accountAddr, HoprChannels.Balance.wrap(amount1), address(0), HoprChannels.Balance.wrap(amount2));
+  }
 
-  //   // channels
-  //   HoprChannels.Channel memory channelAB = HoprChannels.Channel(
-  //     amount1,
-  //     bytes32(0),
-  //     0,
-  //     0,
-  //     HoprChannels.ChannelStatus.WAITING_FOR_COMMITMENT,
-  //     1,
-  //     0
-  //   );
-  //   // ticket epoch is 1
-  //   HoprChannels.Channel memory channelBA = HoprChannels.Channel(
-  //     amount2,
-  //     secret,
-  //     1,
-  //     0,
-  //     HoprChannels.ChannelStatus.OPEN,
-  //     1,
-  //     0
-  //   );
-  //   vm.expectEmit(true, true, false, true, address(hoprChannels));
-  //   emit ChannelUpdated(accountB.accountAddr, accountA.accountAddr, channelBA);
-  //   vm.expectEmit(true, true, false, true, address(hoprChannels));
-  //   emit ChannelBumped(accountB.accountAddr, accountA.accountAddr, secret, 1, amount2);
+  function testFailFundChannelMulti_AmountATooLow(uint96 amount2) public {
+    amount2 = uint96(bound(amount2, MIN_USED_BALANCE, MAX_USED_BALANCE));
 
-  //   // accountA bump channel B->A with a non-zero secret
-  //   vm.prank(accountA.accountAddr);
-  //   hoprChannels.bumpChannel(accountB.accountAddr, secret);
+    vm.prank(address(1));
+    vm.expectRevert(abi.encodeWithSelector(InvalidBalance.selector, ""));
+    hoprChannels.fundChannelMulti(accountA.accountAddr, HoprChannels.Balance.wrap(0), accountB.accountAddr, HoprChannels.Balance.wrap(amount2));
+  }
 
-  //   // check vallidate from channels()
-  //   assertEqChannels(getChannelFromTuple(hoprChannels, channelIdAB), channelAB);
-  //   assertEqChannels(getChannelFromTuple(hoprChannels, channelIdBA), channelBA);
-  // }
+  function testFailFundChannelMulti_AmountBTooLow(uint96 amount1) public {
+    amount1 = uint96(bound(amount1, MIN_USED_BALANCE, MAX_USED_BALANCE));
 
-  // function testBumpChannelWithPreCommitment(uint256 amount1, uint256 amount2, bytes32 secret) public {
-  //   amount1 = bound(amount1, 1, 1e36);
-  //   amount2 = bound(amount2, 1, 1e36);
-  //   vm.assume(secret != bytes32(0));
-  //   // Firstly, accountA bumps channel B->A with a non-zero secret
-  //   vm.prank(accountA.accountAddr);
-  //   hoprChannels.bumpChannel(accountB.accountAddr, secret);
+    vm.prank(address(1));
+    vm.expectRevert(abi.encodeWithSelector(InvalidBalance.selector, ""));
+    hoprChannels.fundChannelMulti(accountA.accountAddr, HoprChannels.Balance.wrap(amount1), accountB.accountAddr, HoprChannels.Balance.wrap(0));
+  }
 
-  //   // channels
-  //   HoprChannels.Channel memory channelAB = HoprChannels.Channel(
-  //     amount1,
-  //     bytes32(0),
-  //     0,
-  //     0,
-  //     HoprChannels.ChannelStatus.WAITING_FOR_COMMITMENT,
-  //     1,
-  //     0
-  //   );
-  //   // ticket epoch is 1
-  //   HoprChannels.Channel memory channelBA = HoprChannels.Channel(
-  //     amount2,
-  //     secret,
-  //     0,
-  //     0,
-  //     HoprChannels.ChannelStatus.OPEN,
-  //     1,
-  //     0
-  //   );
+  function testFailFundChannelMulti_AmountATooHigh(uint96 amount2) public {
+    amount2 = uint96(bound(amount2, MIN_USED_BALANCE, MAX_USED_BALANCE));
 
-  //   // fund channel and check emitted events
-  //   _helperFundMultiAB(amount1, amount2, accountA.accountAddr, accountB.accountAddr, channelAB, channelBA);
+    vm.prank(address(1));
+    vm.expectRevert(abi.encodeWithSelector(InvalidBalance.selector, ""));
+    hoprChannels.fundChannelMulti(accountA.accountAddr, HoprChannels.Balance.wrap(HoprChannels.Balance.unwrap(hoprChannels.MAX_USED_BALANCE()) + 1), accountB.accountAddr, HoprChannels.Balance.wrap(amount2));
+  }
 
-  //   // check vallidate from channels()
-  //   assertEqChannels(getChannelFromTuple(hoprChannels, channelIdAB), channelAB);
-  //   assertEqChannels(getChannelFromTuple(hoprChannels, channelIdBA), channelBA);
-  // }
+  function testFailFundChannelMulti_AmountBTooHigh(uint96 amount1) public {
+    amount1 = uint96(bound(amount1, MIN_USED_BALANCE, MAX_USED_BALANCE));
 
-  // function testBumpChannelWithBothCommitments(
-  //   uint256 amount1,
-  //   uint256 amount2,
-  //   bytes32 secret1,
-  //   bytes32 secret2
-  // ) public {
-  //   vm.assume(amount1 > 0);
-  //   vm.assume(amount2 > 0);
-  //   amount1 = bound(amount1, 1, 1e36);
-  //   amount2 = bound(amount2, 1, 1e36);
+    vm.prank(address(1));
+    vm.expectRevert(abi.encodeWithSelector(InvalidBalance.selector, ""));
+    hoprChannels.fundChannelMulti(accountA.accountAddr, HoprChannels.Balance.wrap(amount1), accountB.accountAddr, HoprChannels.Balance.wrap(HoprChannels.Balance.unwrap(hoprChannels.MAX_USED_BALANCE()) + 1));
+  }
 
-  //   vm.assume(secret1 != bytes32(0));
-  //   vm.assume(secret2 != bytes32(0));
+  function testFailTransfer(uint96 amount1, uint96 amount2) public {
+    amount1 = uint96(bound(amount1, MIN_USED_BALANCE, MAX_USED_BALANCE));
+    amount2 = uint96(bound(amount2, MIN_USED_BALANCE, MAX_USED_BALANCE));
 
-  //   // Both accountA and accountB bump respective channels with secrets
-  //   vm.prank(accountA.accountAddr);
-  //   hoprChannels.bumpChannel(accountB.accountAddr, secret1);
-  //   vm.prank(accountB.accountAddr);
-  //   hoprChannels.bumpChannel(accountA.accountAddr, secret2);
+    vm.prank(address(1));
+    vm.mockCall(
+      vm.addr(1),
+      abi.encodeWithSignature(
+        'transferFrom(address,address,uint256)',
+        address(1),
+        address(hoprChannels),
+        amount1 + amount2
+      ),
+      abi.encode(false)
+    );
 
-  //   // channels
-  //   HoprChannels.Channel memory channelAB = HoprChannels.Channel(
-  //     amount1,
-  //     secret2,
-  //     0,
-  //     0,
-  //     HoprChannels.ChannelStatus.OPEN,
-  //     1,
-  //     0
-  //   );
-  //   // ticket epoch is 1
-  //   HoprChannels.Channel memory channelBA = HoprChannels.Channel(
-  //     amount2,
-  //     secret1,
-  //     0,
-  //     0,
-  //     HoprChannels.ChannelStatus.OPEN,
-  //     1,
-  //     0
-  //   );
-  //   // fund channel and check emitted events
-  //   _helperFundMultiAB(amount1, amount2, accountA.accountAddr, accountB.accountAddr, channelAB, channelBA);
+    vm.expectRevert(abi.encodeWithSelector(TokenTransferFailed.selector, ""));
+    hoprChannels.fundChannelMulti(accountA.accountAddr, HoprChannels.Balance.wrap(amount1), accountB.accountAddr, HoprChannels.Balance.wrap(amount2));
+  }
 
-  //   // check vallidate from channels()
-  //   assertEqChannels(getChannelFromTuple(hoprChannels, channelIdAB), channelAB);
-  //   assertEqChannels(getChannelFromTuple(hoprChannels, channelIdBA), channelBA);
-  // }
+  function testSetCommitment(uint96 amount1, uint96 amount2, uint256 commitmentA, uint256 commitmentB) public {
+    amount1 = uint96(bound(amount1, MIN_USED_BALANCE, MAX_USED_BALANCE));
+    amount2 = uint96(bound(amount2, MIN_USED_BALANCE, MAX_USED_BALANCE));
+
+    commitmentA = bound(commitmentA, uint256(1), type(uint256).max);
+    commitmentB = bound(commitmentB, uint256(1), type(uint256).max);
+
+    HoprChannels.Channel memory channelAB = HoprChannels.Channel(
+      bytes32(commitmentA),
+      HoprChannels.Balance.wrap(uint96(amount1)),
+      HoprChannels.TicketIndex.wrap(0),
+      HoprChannels.Timestamp.wrap(0),
+
+      HoprChannels.ChannelEpoch.wrap(1),
+      HoprChannels.ChannelStatus.OPEN
+    );
+    HoprChannels.Channel memory channelBA = HoprChannels.Channel(
+      bytes32(commitmentB),
+      HoprChannels.Balance.wrap(uint96(amount2)),
+      HoprChannels.TicketIndex.wrap(0),
+      HoprChannels.Timestamp.wrap(0),
+      HoprChannels.ChannelEpoch.wrap(1),
+      HoprChannels.ChannelStatus.OPEN
+    );
+
+    vm.prank(address(1));
+    vm.mockCall(
+      vm.addr(1),
+      abi.encodeWithSignature(
+        'transferFrom(address,address,uint256)',
+        address(1),
+        address(hoprChannels),
+        amount1 + amount2
+      ),
+      abi.encode(true)
+    );
+
+    vm.expectEmit(true, false, false, false, address(hoprChannels));
+    emit ChannelOpened(accountA.accountAddr, accountB.accountAddr, HoprChannels.Balance.wrap(amount1));
+
+    vm.expectEmit(true, false, false, false, address(hoprChannels));
+    emit ChannelOpened(accountB.accountAddr, accountA.accountAddr, HoprChannels.Balance.wrap(amount2));
+
+    hoprChannels.fundChannelMulti(accountA.accountAddr, HoprChannels.Balance.wrap(amount1), accountB.accountAddr, HoprChannels.Balance.wrap(amount2));
+    vm.clearMockedCalls();
+   
+    vm.expectEmit(true, false, false, false, address(hoprChannels));
+    emit CommitmentSet(channelIdAB, HoprChannels.ChannelEpoch.wrap(1));
+
+    vm.prank(accountB.accountAddr);
+    hoprChannels.setCommitment(bytes32(commitmentA), accountA.accountAddr);
+
+    vm.expectEmit(true, false, false, true, address(hoprChannels));
+    emit CommitmentSet(channelIdBA, HoprChannels.ChannelEpoch.wrap(1));
+
+    vm.prank(accountA.accountAddr);
+    hoprChannels.setCommitment(bytes32(commitmentB), accountB.accountAddr);
+
+    assertEq(
+      keccak256(
+        abi.encode(getChannelFromTuple(channelIdAB))
+      ),
+      keccak256(abi.encode(channelAB))
+    );
+    assertEq(
+      keccak256(
+        abi.encode(getChannelFromTuple(channelIdBA))
+      ),
+      keccak256(abi.encode(channelBA))
+    );
+  }
+
+  function testSetCommitmentEpochBump(uint96 amount1, uint96 amount2) public {
+    amount1 = uint96(bound(amount1, MIN_USED_BALANCE, MAX_USED_BALANCE));
+    amount2 = uint96(bound(amount2, MIN_USED_BALANCE, MAX_USED_BALANCE));
+
+    bytes32 commitment1 = 0xa74616c1018b7fccab7c6d508560a93768df100a80661bf2693d79d5b474d75e;
+    bytes32 commitment2 = 0x677cbfec2c3998a7ed96e60b2f408abe400313dc5f365a465ab6d40888b18375;
+
+    HoprChannels.Channel memory channelAB = HoprChannels.Channel(
+      bytes32(commitment1),
+      HoprChannels.Balance.wrap(uint96(amount1)),
+      HoprChannels.TicketIndex.wrap(0),
+      HoprChannels.Timestamp.wrap(0),
+
+      HoprChannels.ChannelEpoch.wrap(1),
+      HoprChannels.ChannelStatus.OPEN
+    );
+
+    vm.prank(address(1));
+    vm.mockCall(
+      vm.addr(1),
+      abi.encodeWithSignature(
+        'transferFrom(address,address,uint256)',
+        address(1),
+        address(hoprChannels),
+        amount1 + amount2
+      ),
+      abi.encode(true)
+    );
+
+    vm.expectEmit(true, false, false, false, address(hoprChannels));
+    emit ChannelOpened(accountA.accountAddr, accountB.accountAddr, HoprChannels.Balance.wrap(amount1));
+
+    vm.expectEmit(true, false, false, false, address(hoprChannels));
+    emit ChannelOpened(accountB.accountAddr, accountA.accountAddr, HoprChannels.Balance.wrap(amount2));
+    
+    hoprChannels.fundChannelMulti(accountA.accountAddr, HoprChannels.Balance.wrap(amount1), accountB.accountAddr, HoprChannels.Balance.wrap(amount2));
+    vm.clearMockedCalls();
+
+    vm.expectEmit(true, false, false, true, address(hoprChannels));
+    emit CommitmentSet(channelIdAB, HoprChannels.ChannelEpoch.wrap(1));
+
+    vm.prank(accountB.accountAddr);
+    hoprChannels.setCommitment(bytes32(commitment1), accountA.accountAddr);
+
+    assertEq(
+      keccak256(
+        abi.encode(getChannelFromTuple(channelIdAB))
+      ),
+      keccak256(abi.encode(channelAB))
+    );
+
+    vm.prank(accountB.accountAddr);
+    vm.expectRevert(abi.encodeWithSelector(InvalidCommitment.selector));
+    hoprChannels.setCommitment(bytes32(commitment1), accountA.accountAddr);
+
+    HoprChannels.Channel memory channelABBumped = HoprChannels.Channel(
+      bytes32(commitment2),
+      HoprChannels.Balance.wrap(uint96(amount1)),
+      HoprChannels.TicketIndex.wrap(0),
+      HoprChannels.Timestamp.wrap(0),
+
+      HoprChannels.ChannelEpoch.wrap(2),
+      HoprChannels.ChannelStatus.OPEN
+    );
+
+
+    vm.expectEmit(true, false, false, true, address(hoprChannels));
+    emit CommitmentSet(channelIdAB, HoprChannels.ChannelEpoch.wrap(2));
+
+    vm.prank(accountB.accountAddr);
+    hoprChannels.setCommitment(bytes32(commitment2), accountA.accountAddr);
+
+    assertEq(
+      keccak256(
+        abi.encode(getChannelFromTuple(channelIdAB))
+      ),
+      keccak256(abi.encode(channelABBumped))
+    );
+  }
+
+  function testFailSetCommitment() public {
+    vm.prank(accountA.accountAddr);
+    vm.expectRevert(abi.encodeWithSelector(InvalidCommitment.selector, ""));
+    hoprChannels.setCommitment(bytes32(0), accountB.accountAddr);
+  }
+
+  function testFailSetCommitmentChannelNotOpen(uint256 commitment) public {
+    commitment = bound(commitment, uint256(1), type(uint256).max);
+
+    vm.prank(accountA.accountAddr);
+    vm.expectRevert(abi.encodeWithSelector(WrongChannelState.selector, ""));
+    hoprChannels.setCommitment(bytes32(commitment), accountB.accountAddr);
+  }
+
+  // function testOpenChannel
 
   // /**
   //  *@dev it should fund A->B using send

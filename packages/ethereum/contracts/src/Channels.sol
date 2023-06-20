@@ -67,9 +67,12 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
   // encoded sign of y-component of base point of secp256k1 curve
   uint8 constant BASE_POINT_Y_COMPONENT_SIGN = 27;
 
-  // used by {tokensReceived} to distinguish which function to call after tokens are sent
+  // ERC-777 tokensReceived hook, fundChannelMulti
   uint256 public immutable FUND_CHANNEL_MULTI_SIZE =
     abi.encode(address(0), Balance.wrap(0), address(0), Balance.wrap(0)).length;
+
+  // ERC-777 tokensReceived hook, fundChannel
+  uint256 public immutable FUND_CHANNEL_SIZE =  abi.encode(address(0)).length;
 
   string public constant version = '2.0.0';
 
@@ -189,7 +192,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
    * Emitted once a commitment has been set for a channel. Includes
    * the current epoch since this value is necessary for issuing tickets.
    */
-  event CommitmentSet(bytes32 channelId, ChannelEpoch epoch);
+  event CommitmentSet(bytes32 indexed channelId, ChannelEpoch epoch);
 
   /**
    * Emitted once a party initiates the closure of an outgoing
@@ -298,7 +301,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     Balance amount1,
     address account2,
     Balance amount2
-  ) external validateBalance(amount1) validateBalance(amount2) validateChannelParties(account1, account2) {
+  ) external {
     // pull tokens from funder and handle result
     if (token.transferFrom(msg.sender, address(this), Balance.unwrap(amount1) + Balance.unwrap(amount2)) != true) {
       // sth. went wrong, we need to revert here
@@ -559,6 +562,11 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
       revert WrongChannelState({reason: 'Cannot set commitments for channels that are not in state OPEN.'});
     }
 
+    // Cannot set same commitment again
+    if (channel.commitment == newCommitment) {
+      revert InvalidCommitment();
+    }
+
     if (channel.commitment != bytes32(0)) {
       // The party ran out of commitment openings, this is a reset
       channel.epoch = ChannelEpoch.wrap(ChannelEpoch.unwrap(channel.epoch) + 1);
@@ -590,8 +598,15 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     require(msg.sender == address(token), 'caller must be HoprToken');
     require(to == address(this), 'must be sending tokens to HoprChannels');
 
-    // must be one of our supported functions
-    if (userData.length == FUND_CHANNEL_MULTI_SIZE) {
+    // Opens an outgoing channel
+    if (userData.length == FUND_CHANNEL_SIZE) {
+      address dest;
+
+      (dest) = abi.decode(userData, (address));
+
+      _fundChannel(msg.sender, dest, Balance.wrap(uint96(amount)));
+    // Opens two channels, donating msg.sender's tokens
+    } else if (userData.length == FUND_CHANNEL_MULTI_SIZE) {
       address account1;
       Balance amount1;
 
@@ -624,7 +639,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
    * @param dest the address of the channel destination
    * @param amount amount to fund account1
    */
-  function _fundChannel(address source, address dest, Balance amount) internal validateBalance(amount) {
+  function _fundChannel(address source, address dest, Balance amount) internal validateBalance(amount) validateChannelParties(source, dest) {
     bytes32 channelId = _getChannelId(source, dest);
     Channel storage channel = channels[channelId];
 
