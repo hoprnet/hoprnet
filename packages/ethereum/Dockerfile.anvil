@@ -6,7 +6,7 @@ FROM ${HOPR_TOOLCHAIN_IMAGE}
 
 RUN curl http://www.ifconfig.me
 
-RUN curl http://deb.debian.org/debian/dists/bullseye/InRelease
+RUN curl -v http://deb.debian.org/debian/dists/bullseye/InRelease
 
 WORKDIR /app/hoprnet
 
