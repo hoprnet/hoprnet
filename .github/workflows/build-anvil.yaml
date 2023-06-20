@@ -35,13 +35,15 @@ jobs:
           password: ${{ steps.auth.outputs.access_token }}
 
       - name: Docker info pre
-        run: docker info
+        run: docker version && docker info
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
+        with:
+          driver: kubernetes
 
       - name: Docker info post
-        run: docker info
+        run: docker version && docker info
 
       - name: Build and push docker image
         uses: docker/build-push-action@v4
