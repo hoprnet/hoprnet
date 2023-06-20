@@ -13,7 +13,7 @@ declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 # shellcheck disable=SC2034
 declare HOPR_LOG_ID="bump-version"
-# shellcheck disable=SC1091
+# shellcheck disable=SC1090
 source "${mydir}/utils.sh"
 
 usage() {

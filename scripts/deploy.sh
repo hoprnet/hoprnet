@@ -11,7 +11,9 @@ set -Eeuo pipefail
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 declare -x HOPR_LOG_ID="deploy"
+# shellcheck disable=SC1090
 source "${mydir}/utils.sh"
+# shellcheck disable=SC1090
 source "${mydir}/testnet.sh"
 
 declare branch cluster_size docker_image

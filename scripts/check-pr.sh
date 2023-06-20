@@ -8,7 +8,7 @@ set -Eeuo pipefail
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 declare -x HOPR_LOG_ID="check-pr"
-# shellcheck source=scripts/utils.sh
+# shellcheck disable=SC1090
 source "${mydir}/utils.sh"
 
 # prints usage of the script

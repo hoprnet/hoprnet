@@ -11,7 +11,9 @@ set -Eeuo pipefail
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 declare HOPR_LOG_ID="testnet"
+# shellcheck disable=SC1090
 source "${mydir}/utils.sh"
+# shellcheck disable=SC1090
 source "${mydir}/dns.sh"
 
 # API used for funding the calls, source code in https://github.com/hoprnet/api

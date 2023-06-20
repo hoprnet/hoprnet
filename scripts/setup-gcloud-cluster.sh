@@ -15,11 +15,11 @@ set -Eeuo pipefail
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 declare -x HOPR_LOG_ID="setup-gcloud-cluster"
-# shellcheck disable=SC1091
+# shellcheck disable=SC1090
 source "${mydir}/utils.sh"
-# shellcheck disable=SC1091
+# shellcheck disable=SC1090
 source "${mydir}/gcloud.sh"
-# shellcheck disable=SC1091
+# shellcheck disable=SC1090
 source "${mydir}/testnet.sh"
 
 usage() {
