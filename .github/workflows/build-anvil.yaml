@@ -34,21 +34,20 @@ jobs:
           username: oauth2accesstoken
           password: ${{ steps.auth.outputs.access_token }}
 
+      - name: Docker info pre
+        run: docker info
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Build and push docker image
-        run: |
-          cache_from="--cache-from type=registry,ref=europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/anvil:buildcache"
-          cache_to="--cache-to type=registry,ref=europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/anvil:buildcache"
-          tags="-t europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/anvil"
-          docker buildx build ${tags} ${cache_from} ${cache_to} --push -f packages/ethereum/Dockerfile.anvil .
+      - name: Docker info post
+        run: docker info
 
-      # - name: Build and push docker image
-      #   uses: docker/build-push-action@v4
-      #   with:
-      #     push: true
-      #     file: packages/ethereum/Dockerfile.anvil
-      #     cache-from: type=registry,ref=europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/anvil:buildcache
-      #     cache-to: type=registry,ref=europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/anvil:buildcache,mode=max
-      #     tags: europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/anvil:pr-${{ github.event.pull_request.number }}
+      - name: Build and push docker image
+        uses: docker/build-push-action@v4
+        with:
+          push: true
+          file: packages/ethereum/Dockerfile.anvil
+          cache-from: type=registry,ref=europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/anvil:buildcache
+          cache-to: type=registry,ref=europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/anvil:buildcache,mode=max
+          tags: europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/anvil:pr-${{ github.event.pull_request.number }}
