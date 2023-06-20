@@ -20,7 +20,7 @@ jobs:
     #   group: ${{ inputs.branch }}
     #   cancel-in-progress: true
     steps:
-      - name: Checkout hoprnet
+      - name: Checkout hoprnet repository
         uses: actions/checkout@v3
 
       - id: auth

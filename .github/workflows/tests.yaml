@@ -27,7 +27,8 @@ jobs:
     name: Unit
     runs-on: ubuntu-2-core
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v3
 
       - name: Disable sccache (act-only)
         if: ${{ env.ACT }}
@@ -96,7 +97,8 @@ jobs:
     runs-on: ubuntu-8-core
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v3
 
       - name: Disable sccache (act-only)
         if: ${{ env.ACT }}

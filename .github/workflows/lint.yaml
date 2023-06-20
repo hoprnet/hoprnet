@@ -26,7 +26,8 @@ jobs:
     name: Linter
     runs-on: ubuntu-2-core
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v3
 
       - name: Disable sccache (act-only)
         if: ${{ env.ACT }}
@@ -88,9 +89,8 @@ jobs:
     name: Shellcheck
     runs-on: ubuntu-2-core
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v3
 
       - name: Check shell scripts (not enforced for now)
-        continue-on-error: true
-        run:
-          shellcheck -a --norc -s bash -x scripts/*.sh
+        run: shellcheck -a --norc -s bash -x scripts/*.sh

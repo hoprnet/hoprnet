@@ -51,12 +51,9 @@ while (( "$#" )); do
       head_branch="${1}"
       shift
       ;;
-    -*|--*=)
+    *)
       usage
       exit 1
-      ;;
-    *)
-      shift
       ;;
   esac
 done
@@ -77,21 +74,21 @@ function check_push() {
   fi
   
   echo "Checking pushed changeset from ${head_branch} against ${base_branch}"
-  git diff --name-only --diff-filter=ACMRT ${base_branch} ${head_branch} > changes.txt
-  if cat changes.txt | grep -e ^scripts/ -e ^Makefile$ -e ^package.json$ -e ^.yarnrc.yml$ -e ^rust-toolchain.toml$ -e ^.nvmrc -e ^yarn.lock$ -e ^Cargo.toml 1> /dev/null; then
+  git diff --name-only --diff-filter=ACMRT "${base_branch}" "${head_branch}" > changes.txt
+  if grep -e ^scripts/ -e ^Makefile$ -e ^package.json$ -e ^.yarnrc.yml$ -e ^rust-toolchain.toml$ -e ^.nvmrc -e ^yarn.lock$ -e ^Cargo.toml changes.txt 1> /dev/null; then
       echo "Changes detected on Toolchain"
       echo "build_toolchain=true" >> ${results_file}
   fi
-  if cat changes.txt | grep ^packages/hopli/ 1> /dev/null; then
+  if grep ^packages/hopli/ changes.txt 1> /dev/null; then
       echo "Changes detected on Hopli"
       echo "build_hopli=true" >> ${results_file}
   fi
 
-  if cat changes.txt | grep -v ^packages/hopli/ | grep -v ^scripts | grep -v ^.processes | grep -v ^docs/ | grep -v .md 1> /dev/null; then
+  if grep -v ^packages/hopli/ changes.txt | grep -v ^scripts | grep -v ^.processes | grep -v ^docs/ | grep -v .md 1> /dev/null; then
       echo "Changes detected on Hoprd"
       echo "build_hoprd=true" >> ${results_file}
   fi
-  if cat changes.txt | grep -e ^scripts/ -e ^Makefile$ -e ^packages/ethereum/ | grep -v .md 1> /dev/null; then
+  if grep -e ^scripts/ -e ^Makefile$ -e ^packages/ethereum/ changes.txt | grep -v .md 1> /dev/null; then
       echo "Changes detected on Anvil"
       echo "build_anvil=true" >> ${results_file}
   fi

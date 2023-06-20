@@ -23,7 +23,7 @@ jobs:
     name: docker
     runs-on: ubuntu-2-core
     steps:
-      - name: Checkout hoprnet
+      - name: Checkout hoprnet repository
         uses: actions/checkout@v3          
 
       - id: auth
