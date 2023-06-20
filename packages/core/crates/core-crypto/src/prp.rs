@@ -130,7 +130,7 @@ impl PRP {
     // Internal helper functions
 
     fn xor_hash(data: &mut [u8], key: &[u8], iv: &[u8]) -> Result<()> {
-        let res = calculate_mac([key, iv].concat().as_slice(), &data[PRP_MIN_LENGTH..])?;
+        let res = calculate_mac([key, iv].concat().as_slice(), &data[PRP_MIN_LENGTH..]);
         utils::xor_inplace(data, res.as_ref());
         Ok(())
     }

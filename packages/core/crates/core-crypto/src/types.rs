@@ -25,12 +25,8 @@ use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
 use crate::errors::CryptoError::InvalidInputValue;
 use crate::errors::{CryptoError, CryptoError::CalculationError, Result};
 use crate::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
-use crate::parameters::SECRET_KEY_LENGTH;
 use crate::primitives::{DigestLike, EthDigest};
 use crate::random::random_group_element;
-
-/// Represents a secret key of fixed length
-pub type SecretKey = [u8; SECRET_KEY_LENGTH];
 
 /// Extend support for arbitrary array sizes in serde
 ///

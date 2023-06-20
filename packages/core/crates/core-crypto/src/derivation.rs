@@ -6,7 +6,7 @@ use k256::Secp256k1;
 
 use crate::errors::Result;
 use crate::parameters::{PACKET_TAG_LENGTH, PING_PONG_NONCE_SIZE, SECRET_KEY_LENGTH};
-use crate::primitives::{calculate_mac, DigestLike, SimpleDigest};
+use crate::primitives::{calculate_mac, DigestLike, SecretKey, SimpleDigest};
 use crate::random::random_fill;
 use crate::types::HalfKey;
 
@@ -52,7 +52,7 @@ pub fn derive_ping_pong(challenge: Option<&[u8]>) -> Box<[u8]> {
 /// and the serialized channel information.
 pub fn derive_commitment_seed(private_key: &[u8], channel_info: &[u8]) -> Result<Box<[u8]>> {
     hkdf_expand_from_prk::<SECRET_KEY_LENGTH>(private_key, HASH_KEY_COMMITMENT_SEED.as_bytes())
-        .and_then(|key| calculate_mac(&key, channel_info))
+        .map(|key| Box::from(calculate_mac(&key,channel_info)))
 }
 
 /// Represents a fixed size packet verification tag
@@ -64,8 +64,8 @@ pub fn derive_packet_tag(secret: &[u8]) -> Result<PacketTag> {
 }
 
 /// Derives a key for MAC calculation by expanding the given secret.
-pub fn derive_mac_key(secret: &[u8]) -> Result<Box<[u8]>> {
-    hkdf_expand_from_prk::<SECRET_KEY_LENGTH>(secret, HASH_KEY_HMAC.as_bytes()).map(Box::from)
+pub fn derive_mac_key(secret: &[u8]) -> Result<SecretKey> {
+    hkdf_expand_from_prk::<SECRET_KEY_LENGTH>(secret, HASH_KEY_HMAC.as_bytes())
 }
 
 /// Internal convenience function to generate key and IV from the given secret.
@@ -103,31 +103,32 @@ pub(crate) fn generate_key_iv(secret: &[u8], info: &[u8], key: &mut [u8], iv: &m
 /// The implementation uses `hash_to_field` function as defined in
 /// https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-13.html#name-hashing-to-a-finite-field
 /// The `tag` parameter will be used as an additional Domain Separation Tag.
-pub fn sample_field_element(secret: &[u8], tag: &str) -> Result<HalfKey> {
-    let scalar = Secp256k1::hash_to_scalar::<ExpandMsgXmd<sha3::Sha3_256>>(
-        &[secret],
-        &[b"secp256k1_XMD:SHA3-256_SSWU_RO_", tag.as_bytes()],
-    )
-    .map_err(|_| CalculationError)?;
-    Ok(HalfKey::new(scalar.to_bytes().as_ref()))
+pub fn sample_secp256k1_field_element(secret: &[u8], tag: &str) -> Result<HalfKey> {
+    if secret.len() >= SECRET_KEY_LENGTH {
+        let scalar = Secp256k1::hash_to_scalar::<ExpandMsgXmd<sha3::Sha3_256>>(
+            &[secret],
+            &[b"secp256k1_XMD:SHA3-256_SSWU_RO_", tag.as_bytes()],
+        )
+            .map_err(|_| CalculationError)?;
+        Ok(HalfKey::new(scalar.to_bytes().as_ref()))
+    } else {
+        Err(InvalidParameterSize {
+            name: "secret".into(),
+            expected: SECRET_KEY_LENGTH
+        })
+    }
 }
 
 /// Used in Proof of Relay to derive own half-key (S0)
 /// The function samples a secp256k1 field element using the given `secret` via `sample_field_element`.
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub fn derive_own_key_share(secret: &[u8]) -> HalfKey {
-    assert_eq!(SECRET_KEY_LENGTH, secret.len());
-
-    sample_field_element(secret, HASH_KEY_OWN_KEY).expect("failed to sample own key share")
+    sample_secp256k1_field_element(secret, HASH_KEY_OWN_KEY).expect("failed to sample own key share")
 }
 
 /// Used in Proof of Relay to derive the half-key of for the acknowledgement (S1)
 /// The function samples a secp256k1 field element using the given `secret` via `sample_field_element`.
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub fn derive_ack_key_share(secret: &[u8]) -> HalfKey {
-    assert_eq!(SECRET_KEY_LENGTH, secret.len());
-
-    sample_field_element(secret, HASH_KEY_ACK_KEY).expect("failed to sample ack key share")
+    sample_secp256k1_field_element(secret, HASH_KEY_ACK_KEY).expect("failed to sample ack key share")
 }
 
 #[cfg(test)]
@@ -167,6 +168,6 @@ mod tests {
     #[test]
     fn test_sample_field_element() {
         let secret = [1u8; SECRET_KEY_LENGTH];
-        assert!(sample_field_element(&secret, "TEST_TAG").is_ok());
+        assert!(sample_secp256k1_field_element(&secret, "TEST_TAG").is_ok());
     }
 }

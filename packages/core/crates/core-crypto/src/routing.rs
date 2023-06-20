@@ -158,7 +158,7 @@ impl RoutingInfo {
                 xor_inplace(&mut extended_header, &key_stream);
             }
 
-            let mut m = derive_mac_key(secret).and_then(|k| SimpleMac::new(&k)).unwrap();
+            let mut m = derive_mac_key(secret).map(|k| SimpleMac::new(&k)).unwrap();
             m.update(&extended_header[0..header_len]);
             m.finalize_into(&mut ret.mac);
         }

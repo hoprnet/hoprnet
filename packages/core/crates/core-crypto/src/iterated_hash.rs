@@ -1,13 +1,14 @@
+use generic_array::GenericArray;
 use serde::{Deserialize, Serialize};
 
 use crate::errors::CryptoError::{CalculationError, InvalidInputValue};
 use crate::errors::Result;
-use crate::primitives::{DigestLike, EthDigest};
+use crate::primitives::{DigestLike, EthDigest, SimpleMac};
 
 /// Contains the complete hash iteration progression
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct IteratedHash {
-    pub hash: Box<[u8]>,
+    pub hash: [u8; SimpleMac::SIZE],
     pub intermediates: Vec<Intermediate>,
 }
 
@@ -25,13 +26,13 @@ pub fn iterate_hash(seed: &[u8], iterations: usize, step_size: usize) -> Iterate
     assert!(!seed.is_empty() && step_size > 0 && iterations > step_size);
 
     let mut intermediates: Vec<Intermediate> = Vec::with_capacity(iterations / step_size + 1);
-    let mut intermediate: Box<[u8]> = EthDigest::create_output();
 
     let mut hash = EthDigest::default();
 
     // Unroll the first iteration, because it uses different input length
     hash.update(seed);
-    hash.finalize_into(&mut intermediate);
+    let mut intermediate = hash.finalize();
+
     intermediates.push(Intermediate {
         iteration: 0,
         intermediate: seed.into(),
@@ -43,7 +44,7 @@ pub fn iterate_hash(seed: &[u8], iterations: usize, step_size: usize) -> Iterate
         if iteration % step_size == 0 {
             intermediates.push(Intermediate {
                 iteration,
-                intermediate: intermediate.clone(),
+                intermediate: intermediate.as_slice().into(),
             });
         }
 
@@ -52,7 +53,7 @@ pub fn iterate_hash(seed: &[u8], iterations: usize, step_size: usize) -> Iterate
     }
 
     IteratedHash {
-        hash: intermediate,
+        hash: intermediate.into(),
         intermediates,
     }
 }
@@ -81,17 +82,18 @@ where
     for i in (0..=closest_intermediate).step_by(step_size) {
         // Check if we can get a hint for the current index
         let pos = closest_intermediate - i;
-        if let Some(mut intermediate) = hints(pos).await {
+        if let Some(fetched_intermediate) = hints(pos).await {
+            let mut intermediate = *GenericArray::from_slice(fetched_intermediate.as_ref());
             for iteration in 0..step_size {
                 // Compute the hash of current intermediate
                 digest.update(intermediate.as_ref());
                 let hash = digest.finalize();
 
                 // Is the computed hash the one we're looking for ?
-                if hash.len() == hash_value.len() && hash.as_ref() == hash_value {
+                if hash.len() == hash_value.len() && hash.as_slice() == hash_value {
                     return Ok(Intermediate {
                         iteration: iteration + pos,
-                        intermediate,
+                        intermediate: intermediate.as_slice().into(),
                     });
                 }
 
@@ -152,85 +154,3 @@ mod tests {
     }
 }
 
-#[cfg(feature = "wasm")]
-pub mod wasm {
-    use crate::iterated_hash::Intermediate;
-    use js_sys::{Number, Uint8Array};
-    use utils_log::error;
-    use utils_misc::ok_or_jserr;
-    use utils_misc::utils::wasm::JsResult;
-    use wasm_bindgen::prelude::wasm_bindgen;
-    use wasm_bindgen::JsValue;
-
-    #[wasm_bindgen]
-    pub struct IteratedHash {
-        w: super::IteratedHash,
-    }
-
-    #[wasm_bindgen]
-    impl IteratedHash {
-        pub fn hash(&self) -> Box<[u8]> {
-            self.w.hash.clone()
-        }
-
-        pub fn count_intermediates(&self) -> usize {
-            self.w.intermediates.len()
-        }
-
-        pub fn intermediate(&self, index: usize) -> Option<Intermediate> {
-            self.w.intermediates.get(index).cloned()
-        }
-    }
-
-    #[wasm_bindgen]
-    pub fn iterate_hash(seed: &[u8], iterations: usize, step_size: usize) -> IteratedHash {
-        IteratedHash {
-            w: super::iterate_hash(seed, iterations, step_size),
-        }
-    }
-
-    #[wasm_bindgen]
-    pub async fn recover_iterated_hash(
-        hash_value: &[u8],
-        hints: &js_sys::Function,
-        max_iterations: usize,
-        step_size: usize,
-        index_hint: Option<usize>,
-    ) -> JsResult<Intermediate> {
-        ok_or_jserr!(
-            super::recover_iterated_hash(
-                hash_value,
-                &|iteration: usize| async move {
-                    match hints
-                        .call1(&JsValue::null(), &Number::from(iteration as u32))
-                        .map(|r| js_sys::Promise::from(r))
-                    {
-                        Ok(promise) => {
-                            let arr = wasm_bindgen_futures::JsFuture::from(promise)
-                                .await
-                                .map(|res| Uint8Array::from(res))
-                                .expect("failed to retrieve iterated hash hint");
-
-                            if !arr.is_undefined() && !arr.is_null() {
-                                Some(arr.to_vec().into_boxed_slice())
-                            } else {
-                                None
-                            }
-                        }
-                        Err(e) => {
-                            error!(
-                                "error while evaluating iterated hash hint: {}",
-                                e.as_string().unwrap_or_else(|| "unknown error".to_owned()).as_str()
-                            );
-                            None
-                        }
-                    }
-                },
-                max_iterations,
-                step_size,
-                index_hint
-            )
-            .await
-        )
-    }
-}

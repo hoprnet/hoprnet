@@ -4,13 +4,16 @@ use chacha20::cipher::KeyIvInit;
 use chacha20::cipher::{IvSizeUser, KeySizeUser, StreamCipher, StreamCipherSeek};
 use chacha20::ChaCha20;
 use digest::{FixedOutputReset, Output, OutputSizeUser, Update};
-use hmac::{Mac, SimpleHmac};
+use generic_array::GenericArray;
 use sha3::Keccak256;
 use typenum::Unsigned;
 
 use crate::errors::CryptoError::{InvalidInputValue, InvalidParameterSize};
 use crate::errors::Result;
 use crate::parameters::SECRET_KEY_LENGTH;
+
+/// Represents a secret key of fixed length
+pub type SecretKey = [u8; SECRET_KEY_LENGTH];
 
 /// Generalization of digest-like operation (MAC, Digest,...)
 /// Defines the `update` and `finalize` operations to produce digest value of arbitrary data.
@@ -23,11 +26,6 @@ where
 
     /// Access to the internal state of the digest-like operation.
     fn internal_state(&mut self) -> &mut T;
-
-    /// Convenience method for creating a properly sized buffer to fit the output digest value.
-    fn create_output() -> Box<[u8]> {
-        vec![0u8; Self::SIZE].into_boxed_slice()
-    }
 
     /// Update the internal state of the digest-like using the given input data.
     fn update(&mut self, data: &[u8]) {
@@ -44,10 +42,10 @@ where
 
     /// Retrieve the final digest value and reset this instance so it could be reused for
     /// a new computation.
-    fn finalize(&mut self) -> Box<[u8]> {
-        let mut ret = Self::create_output();
-        self.finalize_into(&mut ret);
-        ret
+    fn finalize(&mut self) -> GenericArray<u8, T::OutputSize> {
+        let mut output = Output::<T>::default();
+        self.finalize_into(&mut output);
+        output
     }
 }
 
@@ -81,26 +79,29 @@ impl DigestLike<Keccak256> for EthDigest {
 
 /// Simple Message Authentication Code (MAC) computation wrapper
 /// Use `new`, `update` and `finalize` triplet to produce MAC of arbitrary data.
-/// Currently this instance is computing HMAC based on Blake2s256.
+/// Currently this instance implemented `Blake2s256(key || HOPR_BLAKE_BASED_MAC || message)`
 #[derive(Clone)]
 pub struct SimpleMac {
-    instance: SimpleHmac<Blake2s256>,
+    instance: Blake2s256,
 }
 
 impl SimpleMac {
+    const DOMAIN_TAG: &'static str = "HOPR_BLAKE_BASED_MAC";
+
     /// Create new instance of the MAC using the given secret key.
-    pub fn new(key: &[u8]) -> Result<Self> {
-        Ok(Self {
-            instance: SimpleHmac::<Blake2s256>::new_from_slice(key).map_err(|_| InvalidParameterSize {
-                name: "key".into(),
-                expected: SECRET_KEY_LENGTH,
-            })?,
-        })
+    /// The key size can be arbitrary, but must be at least `SECRET_KEY_LENGTH`
+    pub fn new(key: &[u8]) -> Self {
+        assert!(key.len() >= SECRET_KEY_LENGTH, "mac key too short");
+
+        let mut instance = Blake2s256::default();
+        digest::Digest::update(&mut instance, &key);
+        digest::Digest::update(&mut instance, Self::DOMAIN_TAG.as_bytes());
+        Self { instance }
     }
 }
 
-impl DigestLike<SimpleHmac<Blake2s256>> for SimpleMac {
-    fn internal_state(&mut self) -> &mut SimpleHmac<Blake2s256> {
+impl DigestLike<Blake2s256> for SimpleMac {
+    fn internal_state(&mut self) -> &mut Blake2s256 {
         &mut self.instance
     }
 }
@@ -154,26 +155,26 @@ impl SimpleStreamCipher {
     }
 }
 
-/// Calculates MAC using the given raw key and data.
-/// Uses HMAC based on Blake2s256.
-pub fn calculate_mac(key: &[u8], data: &[u8]) -> Result<Box<[u8]>> {
-    let mut mac = SimpleMac::new(key)?;
+/// Convenience function that calculates MAC using the given raw key and data.
+/// The key size can be arbitrary, but has to be at least `SECRET_KEY_LENGTH`.
+/// The function is based on `SimpleMac`.
+pub fn calculate_mac(key: &[u8], data: &[u8]) -> [u8; SimpleMac::SIZE] {
+    let mut mac = SimpleMac::new(key);
     mac.update(data);
-    Ok(mac.finalize())
+    mac.finalize().into()
 }
 
 /// Calculates a message authentication code with fixed key tag (HASH_KEY_HMAC)
 /// The given secret is first transformed using HKDF before the MAC calculation is performed.
-/// Uses HMAC based on Blake2s256.
-pub fn create_tagged_mac(secret: &[u8], data: &[u8]) -> Result<Box<[u8]>> {
-    calculate_mac(&derive_mac_key(secret)?, data)
+/// Based on `SimpleMac`
+pub fn create_tagged_mac(secret: &[u8], data: &[u8]) -> Result<[u8; SimpleMac::SIZE]> {
+    derive_mac_key(secret).map(|key| calculate_mac(&key, data))
 }
 
 #[cfg(test)]
 mod tests {
     use crate::parameters::SECRET_KEY_LENGTH;
-    use crate::primitives::wasm::create_tagged_mac;
-    use crate::primitives::{DigestLike, SimpleMac, SimpleStreamCipher};
+    use crate::primitives::{create_tagged_mac, DigestLike, SimpleMac, SimpleStreamCipher};
     use hex_literal::hex;
 
     #[test]
@@ -219,21 +220,3 @@ mod tests {
     }
 }
 
-/// Functions and types exposed to WASM
-#[cfg(feature = "wasm")]
-pub mod wasm {
-    use wasm_bindgen::prelude::*;
-
-    use utils_misc::ok_or_jserr;
-    use utils_misc::utils::wasm::JsResult;
-
-    #[wasm_bindgen]
-    pub fn calculate_mac(key: &[u8], data: &[u8]) -> JsResult<Box<[u8]>> {
-        ok_or_jserr!(super::calculate_mac(key, data))
-    }
-
-    #[wasm_bindgen]
-    pub fn create_tagged_mac(secret: &[u8], data: &[u8]) -> JsResult<Box<[u8]>> {
-        ok_or_jserr!(super::create_tagged_mac(secret, data))
-    }
-}
