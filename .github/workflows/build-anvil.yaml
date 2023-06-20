@@ -15,7 +15,7 @@ jobs:
 
   build:
     name: docker
-    runs-on: ubuntu-2-core
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v3
