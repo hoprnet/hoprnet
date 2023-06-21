@@ -8,6 +8,11 @@ use real_base::file::native::read_to_string;
 #[cfg(all(feature = "wasm", not(test)))]
 use real_base::file::wasm::read_to_string;
 
+#[cfg(any(not(feature = "wasm"), test))]
+use real_base::file::native::read_file;
+#[cfg(all(feature = "wasm", not(test)))]
+use real_base::file::wasm::read_file;
+
 pub trait FromJsonFile: Sized {
     fn from_json_file(mono_repo_path: &str) -> Result<Self, String>;
 }
@@ -105,9 +110,9 @@ impl FromJsonFile for ProtocolConfig {
     fn from_json_file(mono_repo_path: &str) -> Result<Self, String> {
         let protocol_config_path = format!("{}/packages/core/protocol-config.json", mono_repo_path);
 
-        let data = ok_or_str!(read_to_string(protocol_config_path.as_str()))?;
+        let data = ok_or_str!(read_file(protocol_config_path.as_str()))?;
 
-        let mut protocol_config = ok_or_str!(serde_json::from_str::<ProtocolConfig>(&data))?;
+        let mut protocol_config = ok_or_str!(serde_json::from_slice::<ProtocolConfig>(&data))?;
 
         for (id, env) in protocol_config.networks.iter_mut() {
             env.id = id.to_owned();
@@ -150,9 +155,9 @@ impl FromJsonFile for PackageJsonFile {
     fn from_json_file(mono_repo_path: &str) -> Result<Self, String> {
         let package_json_path = format!("{}/packages/hoprd/package.json", mono_repo_path);
 
-        let data = ok_or_str!(read_to_string(package_json_path.as_str()))?;
+        let data = ok_or_str!(read_file(package_json_path.as_str()))?;
 
-        ok_or_str!(serde_json::from_str::<PackageJsonFile>(&data))
+        ok_or_str!(serde_json::from_slice::<PackageJsonFile>(&data))
     }
 }
 

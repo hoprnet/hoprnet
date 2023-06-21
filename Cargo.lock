@@ -218,6 +218,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-process"
+version = "1.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7a9d28b1d97e08915212e2e45310d47854eafa69600756fc735fb788f75199c9"
+dependencies = [
+ "async-io",
+ "async-lock",
+ "autocfg",
+ "blocking",
+ "cfg-if",
+ "event-listener",
+ "futures-lite",
+ "rustix",
+ "signal-hook",
+ "windows-sys 0.48.0",
+]
+
+[[package]]
 name = "async-std"
 version = "1.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -228,6 +246,7 @@ dependencies = [
  "async-global-executor",
  "async-io",
  "async-lock",
+ "async-process",
  "crossbeam-utils",
  "futures-channel",
  "futures-core",
@@ -528,6 +547,12 @@ name = "bs58"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "771fe0050b883fcc3ea2359b1a96bcfbc090b7116eae7c3c512c7a083fdf23d3"
+
+[[package]]
+name = "build_const"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b4ae4235e6dac0694637c763029ecea1a2ec9e4e06ec2729bd21ba4d9c863eb7"
 
 [[package]]
 name = "bumpalo"
@@ -843,7 +868,7 @@ dependencies = [
 
 [[package]]
 name = "core-crypto"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "aes",
  "async-std",
@@ -882,24 +907,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "core-db"
-version = "0.2.0"
-dependencies = [
- "async-trait",
- "console_error_panic_hook",
- "core-crypto",
- "core-types",
- "serde",
- "utils-db",
- "utils-misc",
- "utils-types",
- "wasm-bindgen",
- "wasm-bindgen-test",
- "wasm-opt",
- "wasm-pack",
-]
-
-[[package]]
 name = "core-ethereum-db"
 version = "0.1.0"
 dependencies = [
@@ -912,6 +919,7 @@ dependencies = [
  "utils-misc",
  "utils-types",
  "wasm-bindgen",
+ "wasm-bindgen-futures",
  "wasm-bindgen-test",
  "wasm-opt",
  "wasm-pack",
@@ -919,10 +927,24 @@ dependencies = [
 
 [[package]]
 name = "core-ethereum-misc"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
+ "async-std",
+ "async-trait",
  "console_error_panic_hook",
+ "core-crypto",
+ "core-ethereum-db",
+ "futures",
+ "hex-literal 0.4.1",
+ "js-sys",
+ "libp2p-identity",
+ "mockall",
+ "rusty-leveldb",
+ "thiserror",
+ "utils-db",
+ "utils-log",
  "utils-proc-macros",
+ "utils-types",
  "wasm-bindgen",
  "wasm-bindgen-test",
  "wasm-opt",
@@ -964,15 +986,17 @@ dependencies = [
 
 [[package]]
 name = "core-mixer"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-std",
  "console_error_panic_hook",
+ "env_logger",
  "futures",
  "futures-lite",
  "getrandom 0.2.9",
  "gloo-timers",
  "js-sys",
+ "lazy_static",
  "more-asserts",
  "pin-project",
  "rand 0.8.5",
@@ -1015,20 +1039,36 @@ dependencies = [
 
 [[package]]
 name = "core-packet"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
+ "async-process",
+ "async-std",
+ "async-trait",
  "console_error_panic_hook",
  "core-crypto",
+ "core-ethereum-db",
+ "core-ethereum-misc",
+ "core-mixer",
  "core-types",
+ "env_logger",
+ "futures",
+ "hex",
+ "hex-literal 0.4.1",
  "js-sys",
+ "lazy_static",
  "libp2p-identity",
+ "mockall",
  "parameterized",
+ "rusty-leveldb",
+ "serial_test",
  "thiserror",
+ "utils-db",
  "utils-log",
  "utils-metrics",
  "utils-misc",
  "utils-types",
  "wasm-bindgen",
+ "wasm-bindgen-futures",
  "wasm-bindgen-test",
 ]
 
@@ -1090,6 +1130,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3e4c1eaa2012c47becbbad2ab175484c2a84d1185b566fb2cc5b8707343dfe58"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "crc"
+version = "1.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d663548de7f5cca343f1e0a48d14dcfb0e9eb4e079ec58883b7251539fa10aeb"
+dependencies = [
+ "build_const",
 ]
 
 [[package]]
@@ -1280,6 +1329,19 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.15",
+]
+
+[[package]]
+name = "dashmap"
+version = "5.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "907076dfda823b0b36d2a1bb5f90c96660a5bbcd7729e10727f07858f22c4edc"
+dependencies = [
+ "cfg-if",
+ "hashbrown",
+ "lock_api",
+ "once_cell",
+ "parking_lot_core 0.9.7",
 ]
 
 [[package]]
@@ -1557,7 +1619,22 @@ version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "85cdab6a89accf66733ad5a1693a4dcced6aeff64602b634530dd73c1f3ee9f0"
 dependencies = [
+ "humantime",
+ "is-terminal",
  "log",
+ "regex",
+ "termcolor",
+]
+
+[[package]]
+name = "errno"
+version = "0.2.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f639046355ee4f37944e44f60642c6f3a7efa3cf6b78c78a0d989a8ce6c396a1"
+dependencies = [
+ "errno-dragonfly",
+ "libc",
+ "winapi",
 ]
 
 [[package]]
@@ -2503,6 +2580,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "humantime"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9a3a5bfb195931eeb336b2a7b4d761daec841b97f947d34394601737a7bba5e4"
+
+[[package]]
 name = "hyper"
 version = "0.14.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2677,6 +2760,12 @@ dependencies = [
  "wasm-bindgen",
  "web-sys",
 ]
+
+[[package]]
+name = "integer-encoding"
+version = "3.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8bb03732005da905c88227371639bf1ad885cc712789c011c31c5fb3ab3ccf02"
 
 [[package]]
 name = "io-lifetimes"
@@ -3901,7 +3990,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f79bef90eb6d984c72722595b5b1348ab39275a5e5123faca6863bf07d75a4e0"
 dependencies = [
  "bitflags",
- "errno",
+ "errno 0.3.1",
  "io-lifetimes",
  "libc",
  "linux-raw-sys",
@@ -3934,6 +4023,20 @@ name = "rustversion"
 version = "1.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4f3208ce4d8448b3f3e7d168a73f5e0c43a61e32930de3bceeccedb388b6bf06"
+
+[[package]]
+name = "rusty-leveldb"
+version = "1.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "04c67700d4731d7c35c914a844dba95ae6689a419a576433c745b76757a555db"
+dependencies = [
+ "crc",
+ "errno 0.2.8",
+ "fs2",
+ "integer-encoding",
+ "rand 0.7.3",
+ "snap",
+]
 
 [[package]]
 name = "ryu"
@@ -4236,6 +4339,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "serial_test"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0e56dd856803e253c8f298af3f4d7eb0ae5e23a737252cd90bb4f3b435033b2d"
+dependencies = [
+ "dashmap",
+ "futures",
+ "lazy_static",
+ "log",
+ "parking_lot 0.12.1",
+ "serial_test_derive",
+]
+
+[[package]]
+name = "serial_test_derive"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "91d129178576168c589c9ec973feedf7d3126c01ac2bf08795109aa35b69fb8f"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.15",
+]
+
+[[package]]
 name = "sha1"
 version = "0.10.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4299,6 +4427,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "24188a676b6ae68c3b2cb3a01be17fbf7240ce009799bb56d5b1409051e78fde"
 
 [[package]]
+name = "signal-hook"
+version = "0.3.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "732768f1176d21d09e076c23a93123d40bba92d50c4058da34d45c8de8e682b9"
+dependencies = [
+ "libc",
+ "signal-hook-registry",
+]
+
+[[package]]
+name = "signal-hook-registry"
+version = "1.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d8229b473baa5980ac72ef434c4415e70c4b5e71b423043adb4ba059f89c99a1"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "signature"
 version = "1.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4347,6 +4494,12 @@ name = "smallvec"
 version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a507befe795404456341dfab10cef66ead4c041f62b8b11bbb92bffe5d0953e0"
+
+[[package]]
+name = "snap"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5e9f0ab6ef7eb7353d9119c170a436d1bf248eea575ac42d19d12f4e34130831"
 
 [[package]]
 name = "socket2"
@@ -4855,7 +5008,7 @@ checksum = "711b9620af191e0cdc7468a8d14e709c3dcdb115b36f838e601583af800a370a"
 
 [[package]]
 name = "utils-db"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-std",
  "async-trait",
@@ -4863,9 +5016,11 @@ dependencies = [
  "console_error_panic_hook",
  "futures-lite",
  "gloo-timers",
+ "hex",
  "js-sys",
  "mockall",
  "pin-project-lite",
+ "rusty-leveldb",
  "scopeguard",
  "serde",
  "serde-wasm-bindgen",
@@ -4936,7 +5091,7 @@ dependencies = [
 
 [[package]]
 name = "utils-types"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "bincode",
  "console_error_panic_hook",
@@ -5111,6 +5266,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5bba0e8cb82ba49ff4e229459ff22a191bbe9a1cb3a341610c9c33efc27ddf73"
 dependencies = [
  "cfg-if",
+ "serde",
+ "serde_json",
  "wasm-bindgen-macro",
 ]
 

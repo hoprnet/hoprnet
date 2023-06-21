@@ -12,6 +12,17 @@ pub mod native {
         })
     }
 
+    pub fn read_file(file_path: &str) -> Result<Box<[u8]>> {
+        match fs::read(file_path) {
+            Ok(buf) => Ok(Box::from(buf)),
+            Err(e) => Err(RealError::GeneralError(format!(
+                "Failed to read the file '{}' with error: {}",
+                file_path,
+                e.to_string()
+            ))),
+        }
+    }
+
     pub fn write<R>(path: &str, contents: R) -> Result<()>
     where
         R: AsRef<[u8]>,
@@ -32,7 +43,7 @@ pub mod wasm {
     #[wasm_bindgen(module = "node:fs")]
     extern "C" {
         #[wasm_bindgen(catch, js_name = "readFileSync")]
-        pub fn read_file(path: &str) -> std::result::Result<Box<[u8]>, JsValue>;
+        pub fn read_file_js(path: &str) -> std::result::Result<Box<[u8]>, JsValue>;
 
         #[wasm_bindgen(catch, js_name = "writeFileSync")]
         pub fn write_file(path: &str, contents: &[u8]) -> std::result::Result<(), JsValue>;
@@ -56,6 +67,10 @@ pub mod wasm {
         /// File is readable
         #[allow(non_camel_case_types)]
         R_OK = 4,
+    }
+
+    pub fn read_file(path: &str) -> Result<Box<[u8]>> {
+        read_file_js(path).map_err(RealError::from)
     }
 
     pub fn read_to_string(file_path: &str) -> Result<String> {

@@ -1,7 +1,6 @@
 use crate::error::{RealError, Result};
 
 // These functions are meant to be used in pure Rust code, since they are cleared from WASM types
-
 pub fn coerce_version(version: &str) -> Result<String> {
     wasm::coerce_version(version).map_err(RealError::from)
 }

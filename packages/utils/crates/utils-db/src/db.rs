@@ -1,3 +1,4 @@
+use std::fmt::{Display, Formatter};
 use std::ops::Deref;
 
 use futures_lite::stream::StreamExt;
@@ -46,6 +47,12 @@ pub struct Key {
     key: Box<[u8]>,
 }
 
+impl Display for Key {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", hex::encode(&self.key))
+    }
+}
+
 impl Key {
     pub fn new<'a, T: Serialize + BinarySerializable<'a>>(object: &T) -> Result<Self> {
         Ok(Self { key: object.to_bytes() })
@@ -69,10 +76,10 @@ impl Key {
         })
     }
 
-    pub fn new_bytes_with_prefix(object: Box<[u8]>, prefix: &str) -> Result<Self> {
+    pub fn new_bytes_with_prefix(object: &[u8], prefix: &str) -> Result<Self> {
         let mut result = Vec::with_capacity(prefix.len() + object.len());
         result.extend_from_slice(prefix.as_bytes().as_ref());
-        result.extend_from_slice(object.as_ref());
+        result.extend_from_slice(object);
 
         Ok(Self {
             key: result.into_boxed_slice(),
@@ -158,7 +165,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
     ) -> Result<Vec<V>> {
         let mut output = Vec::new();
 
-        let mut data_stream = self.backend.iterate(prefix, suffix_size)?;
+        let mut data_stream = Box::into_pin(self.backend.iterate(prefix, suffix_size)?);
 
         // fail fast for the first value that cannot be deserialized
         while let Some(value) = data_stream.next().await {

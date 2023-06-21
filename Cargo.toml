@@ -2,7 +2,6 @@
 
 members = [
     "packages/core/crates/core-crypto",
-    "packages/core/crates/core-db",
     "packages/core/crates/core-misc",
     "packages/core/crates/core-mixer",
     "packages/core/crates/core-network",

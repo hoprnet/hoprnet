@@ -1,10 +1,12 @@
+#[cfg(feature = "wasm")]
 #[macro_use]
 pub mod macros;
 
-pub use log::Level;
+#[cfg(feature = "wasm")]
+pub mod logger;
 
-#[cfg(not(feature = "wasm"))]
-pub use log::{debug, error, info, trace, warn};
+pub use log as downstream_log;
+pub use log::Level;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
@@ -12,7 +14,7 @@ pub mod wasm {
 
     #[allow(dead_code)]
     #[wasm_bindgen]
-    pub fn utils_log_set_panic_hook() {
+    pub fn utils_log_initialize_crate() {
         // When the `console_error_panic_hook` feature is enabled, we can call the
         // `set_panic_hook` function at least once during initialization, and then
         // we will get better error messages if our code ever panics.

@@ -2,13 +2,13 @@
 pragma solidity ^0.8;
 pragma abicoder v2;
 
-import 'openzeppelin-contracts-4.8.3/contracts/utils/Multicall.sol';
-import 'openzeppelin-contracts-4.8.3/contracts/utils/introspection/IERC1820Registry.sol';
-import 'openzeppelin-contracts-4.8.3/contracts/utils/introspection/ERC1820Implementer.sol';
-import 'openzeppelin-contracts-4.8.3/contracts/token/ERC20/IERC20.sol';
-import 'openzeppelin-contracts-4.8.3/contracts/token/ERC777/IERC777Recipient.sol';
-import 'openzeppelin-contracts-4.8.3/contracts/token/ERC20/utils/SafeERC20.sol';
-import 'openzeppelin-contracts-4.8.3/contracts/utils/cryptography/ECDSA.sol';
+import 'openzeppelin-contracts-4.8.3/utils/Multicall.sol';
+import 'openzeppelin-contracts-4.8.3/utils/introspection/IERC1820Registry.sol';
+import 'openzeppelin-contracts-4.8.3/utils/introspection/ERC1820Implementer.sol';
+import 'openzeppelin-contracts-4.8.3/token/ERC20/IERC20.sol';
+import 'openzeppelin-contracts-4.8.3/token/ERC777/IERC777Recipient.sol';
+import 'openzeppelin-contracts-4.8.3/token/ERC20/utils/SafeERC20.sol';
+import 'openzeppelin-contracts-4.8.3/utils/cryptography/ECDSA.sol';
 
 contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
   using SafeERC20 for IERC20;

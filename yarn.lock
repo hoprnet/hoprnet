@@ -621,7 +621,7 @@ __metadata:
     "@libp2p/interfaces": 2.0.4
     "@libp2p/peer-id": 1.1.16
     "@multiformats/multiaddr": 10.3.3
-    "@types/debug": 4.1.7
+    "@types/debug": 4.1.8
     "@types/mocha": 10.0.1
     "@types/node": 16
     "@types/simple-peer": 9.11.5
@@ -657,7 +657,7 @@ __metadata:
     "@types/bn.js": ^5.1.1
     "@types/chai": 4.3.5
     "@types/mocha": 10.0.1
-    "@types/sinon": 10.0.14
+    "@types/sinon": 10.0.15
     async-mutex: 0.4.0
     bn.js: 5.2.1
     chai: 4.3.7
@@ -670,7 +670,7 @@ __metadata:
     retimer: 3.0.0
     secp256k1: 4.0.3
     sinon: 12.0.1
-    typedoc: 0.24.6
+    typedoc: 0.24.7
     typedoc-plugin-markdown: 3.15.3
     typescript: 5.0.4
   languageName: unknown
@@ -715,7 +715,7 @@ __metadata:
     retimer: 3.0.0
     secp256k1: 4.0.3
     sinon: 12.0.1
-    typedoc: 0.24.6
+    typedoc: 0.24.7
     typedoc-plugin-markdown: 3.15.3
     typescript: 5.0.4
   languageName: unknown
@@ -728,7 +728,7 @@ __metadata:
     "@types/mocha": 10.0.1
     mocha: 10.2.0
     semver: 7.5.0
-    typedoc: 0.24.6
+    typedoc: 0.24.7
     typedoc-plugin-markdown: 3.15.3
     typescript: 5.0.4
   languageName: unknown
@@ -778,7 +778,7 @@ __metadata:
     secp256k1: 4.0.3
     sinon: 12.0.1
     timeout-abort-controller: 3.0.0
-    typedoc: 0.24.6
+    typedoc: 0.24.7
     typedoc-plugin-markdown: 3.15.3
     typescript: 5.0.4
   languageName: unknown
@@ -819,7 +819,7 @@ __metadata:
     swagger-ui-express: 4.6.2
     trace-unhandled: 2.0.1
     ts-node: ^10.9.1
-    typedoc: 0.24.6
+    typedoc: 0.24.7
     typedoc-plugin-markdown: 3.15.3
     typescript: 5.0.4
     uuid: ^9.0.0
@@ -2089,12 +2089,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/debug@npm:4.1.7":
-  version: 4.1.7
-  resolution: "@types/debug@npm:4.1.7"
+"@types/debug@npm:4.1.8":
+  version: 4.1.8
+  resolution: "@types/debug@npm:4.1.8"
   dependencies:
     "@types/ms": "*"
-  checksum: 0a7b89d8ed72526858f0b61c6fd81f477853e8c4415bb97f48b1b5545248d2ae389931680b94b393b993a7cfe893537a200647d93defe6d87159b96812305adc
+  checksum: a9a9bb40a199e9724aa944e139a7659173a9b274798ea7efbc277cb084bc37d32fc4c00877c3496fac4fed70a23243d284adb75c00b5fdabb38a22154d18e5df
   languageName: node
   linkType: hard
 
@@ -2150,16 +2150,16 @@ __metadata:
   linkType: hard
 
 "@types/node@npm:*, @types/node@npm:>= 8, @types/node@npm:>=13.7.0":
-  version: 20.2.2
-  resolution: "@types/node@npm:20.2.2"
-  checksum: a39bef01b7592fd35c5704c74b9167c154a9a357017db8cd8644461c6e6ad87be19f82dfc65ecb2f35a8fb143fc8a0587f17507bc0b0c9bfee676b3fb4bc89ae
+  version: 20.2.4
+  resolution: "@types/node@npm:20.2.4"
+  checksum: 6bc45fdc1c1c0c0e03ca9aded926a5ce0f5e8154ae476a996f22832c530a8c909cfa2979b0b08c506477e836910f8b888bbe6eb9ebb698c4cd6f1f602456a9d4
   languageName: node
   linkType: hard
 
 "@types/node@npm:16":
-  version: 16.18.32
-  resolution: "@types/node@npm:16.18.32"
-  checksum: c5966c8e671205b2971ae66ae548ce92235cef89ae1a0f2ecbf118e775923259dc85f57c58cfc56267089d56dfce967700c058276199c6ed9510d0a0b077af2d
+  version: 16.18.33
+  resolution: "@types/node@npm:16.18.33"
+  checksum: 4d23c8776186cf221e70410c68da8d98e962311104891e1995b565fc926bcb5bb07ae32f65dd0a41104dbe685abd5972c23146a74f9bb5d427a73622157b42f5
   languageName: node
   linkType: hard
 
@@ -2207,12 +2207,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/sinon@npm:10.0.14":
-  version: 10.0.14
-  resolution: "@types/sinon@npm:10.0.14"
+"@types/sinon@npm:10.0.15":
+  version: 10.0.15
+  resolution: "@types/sinon@npm:10.0.15"
   dependencies:
     "@types/sinonjs__fake-timers": "*"
-  checksum: b6e1d46bfb03fa5c11ba4a84790795dcb72dae4e599318ca6983affff106bf56874a0b1b5e263ca15319c7e7bd92132d6db30fa62890ffb2ee29b011bdd5d548
+  checksum: cec6d7d9d5582ca3ac851b029d5d90451bfe6d376164253792a6eb6ddcd609a0411a7fac9ed92e1879e7d3ec091d2ea2e8dbb4f6140a1065439b81dc20cafa7c
   languageName: node
   linkType: hard
 
@@ -10751,9 +10751,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"typedoc@npm:0.24.6":
-  version: 0.24.6
-  resolution: "typedoc@npm:0.24.6"
+"typedoc@npm:0.24.7":
+  version: 0.24.7
+  resolution: "typedoc@npm:0.24.7"
   dependencies:
     lunr: ^2.3.9
     marked: ^4.3.0
@@ -10763,7 +10763,7 @@ __metadata:
     typescript: 4.6.x || 4.7.x || 4.8.x || 4.9.x || 5.0.x
   bin:
     typedoc: bin/typedoc
-  checksum: 3911ef6a7736ce6655a4b22fabc5be6df8812412e209d730fd168bfa7797847897f05fed797bc16558f11ce647b20746453748ff8afe85b1375c3efe2d7b57df
+  checksum: 9ae433566cb02b96deb9eb2a9f5b23d1b199f5aeb61ca8c7e2653ff5d339fbfb4d526e024febab4f3278332978814aaa0885f1d5925ba21a441d93a611510ac3
   languageName: node
   linkType: hard
 
@@ -10786,11 +10786,11 @@ __metadata:
 
 "typescript@patch:typescript@5.0.4#~builtin<compat/typescript>":
   version: 5.0.4
-  resolution: "typescript@patch:typescript@npm%3A5.0.4#~builtin<compat/typescript>::version=5.0.4&hash=85af82"
+  resolution: "typescript@patch:typescript@npm%3A5.0.4#~builtin<compat/typescript>::version=5.0.4&hash=b5f058"
   bin:
     tsc: bin/tsc
     tsserver: bin/tsserver
-  checksum: bb309d320c59a26565fb3793dba550576ab861018ff3fd1b7fccabbe46ae4a35546bc45f342c0a0b6f265c801ccdf64ffd68f548f117ceb7f0eac4b805cd52a9
+  checksum: d26b6ba97b6d163c55dbdffd9bbb4c211667ebebc743accfeb2c8c0154aace7afd097b51165a72a5bad2cf65a4612259344ff60f8e642362aa1695c760d303ac
   languageName: node
   linkType: hard
 

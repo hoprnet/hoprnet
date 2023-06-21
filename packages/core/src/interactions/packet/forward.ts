@@ -6,8 +6,8 @@ import { debug, registerMetricsCollector } from '@hoprnet/hopr-utils'
 import { pushable, type Pushable } from 'it-pushable'
 
 import { Packet, PacketHelper, PacketState } from '../../messages/index.js'
-import { new_mixer, core_mixer_set_panic_hook, core_mixer_gather_metrics } from '../../../lib/core_mixer.js'
-core_mixer_set_panic_hook()
+import { new_mixer, core_mixer_initialize_crate, core_mixer_gather_metrics } from '../../../lib/core_mixer.js'
+core_mixer_initialize_crate()
 registerMetricsCollector(core_mixer_gather_metrics)
 
 import type { AcknowledgementInteraction } from './acknowledgement.js'
