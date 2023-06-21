@@ -4,7 +4,33 @@ ARG HOPR_TOOLCHAIN_IMAGE=${HOPR_TOOLCHAIN_IMAGE:-gcr.io/hoprassociation/hopr-too
 
 FROM ${HOPR_TOOLCHAIN_IMAGE}
 
-RUN sleep 10000000000
+# RUN sleep 10000000000
+
+WORKDIR /app/hoprnet
+
+LABEL description="Launches an anvil node running a local network with the HOPR contracts deployed and available."
+
+COPY packages/ethereum/contracts packages/ethereum/contracts
+COPY scripts/ scripts
+COPY Makefile .
+
+ENV FOUNDRY_DIR=/app/hoprnet-toolchain/.foundry
+ENV ETHERSCAN_API_KEY="random_giberish"
+
+# install missing process runner
+RUN apt-get update \
+ && apt-get install -y \
+      time tini \
+ && rm -rf /var/lib/apt/lists/* \
+ && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false
+
+# start anvil, deploy contracts, then terminate
+RUN make -f Makefile run-anvil \
+ && sleep 2 \
+ && make -f Makefile kill-anvil \
+ && rm -rf packages/ethereum/contracts/broadcast/ \
+ && rm -f /tmp/*.log \
+ && rm -f .anvil.state.json
 
 # start anvil in foreground, don't deploy contracts again
 ENTRYPOINT ["/usr/bin/tini", "--", "make", "run-anvil-foreground"]
