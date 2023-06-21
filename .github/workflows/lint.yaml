@@ -19,7 +19,7 @@ on:
       - 'packages/*/docs/**/*'
       - '**/*.md'
 concurrency:
-  group: ${{ github.head_ref }}
+  group: ${{ github.head_ref }}-lint
   cancel-in-progress: true
 jobs:
   lint:

@@ -18,7 +18,9 @@ on:
       - '.processes/**/*'
       - 'docs/**/*'
       - 'packages/*/docs/**/*'
-
+concurrency:
+  group: ${{ github.head_ref }}-docs
+  cancel-in-progress: true
 jobs:
   api:
     name: API docs
@@ -55,7 +57,7 @@ jobs:
 
       - name: get yarn cache directory path
         id: yarn-cache-dir-path
-        run: echo "dir=$(yarn config get cacheFolder)" >> $GITHUB_OUTPUT
+        run: echo "dir=$(pwd)/.yarn/cache" >> $GITHUB_OUTPUT
 
       - name: restore yarn cache
         uses: actions/cache@v3
