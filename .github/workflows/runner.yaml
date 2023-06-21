@@ -1,0 +1,28 @@
+---
+name: GH Runner
+
+on:
+  pull_request:
+    branches:
+      - master
+      - release/*
+    types:
+      - synchronize
+      - opened
+concurrency:
+  group: ${{ github.head_ref }}-runner
+  cancel-in-progress: true
+jobs:
+  check_changeset:
+    name: Build
+    runs-on: ubuntu-2-core
+    steps:
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v3
+
+      - name: Build
+        run: |
+          from="--cache-from type=registry,ref=europe-west3-docker.pkg.dev/hoprassociation/docker-images/anvil:buildcache-test"
+          to="--cache-to type=registry,ref=europe-west3-docker.pkg.dev/hoprassociation/docker-images/anvil:buildcache"
+          tag=" -t europe-west3-docker.pkg.dev/hoprassociation/docker-images/anvil"
+          docker buildx build ${from} ${to} ${tag} -f packages/ethereum/Dockerfile.test .
