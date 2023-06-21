@@ -4,11 +4,6 @@ use utils_misc::ok_or_str;
 // such as `#[wasm_bindgen(skip)]` work
 
 #[cfg(any(not(feature = "wasm"), test))]
-use real_base::file::native::read_to_string;
-#[cfg(all(feature = "wasm", not(test)))]
-use real_base::file::wasm::read_to_string;
-
-#[cfg(any(not(feature = "wasm"), test))]
 use real_base::file::native::read_file;
 #[cfg(all(feature = "wasm", not(test)))]
 use real_base::file::wasm::read_file;
