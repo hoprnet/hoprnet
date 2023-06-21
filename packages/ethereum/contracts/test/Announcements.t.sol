@@ -13,8 +13,8 @@ address constant even_addr = 0x70997970C51812dc3A010C7d01b50e0d17dc79C8;
 bytes32 constant even_secp256k1_x = 0xba5734d8f7091719471e7f7ed6b9df170dc70cc661ca05e688601ad984f068b0;
 bytes32 constant even_secp256k1_y = 0xd67351e5f06073092499336ab0839ef8a521afd334e53807205fa2f08eec74f4;
 // Dummy since there is no verification happening on-chain
-bytes32 constant ed25519_sig_0 = 0x0000000000000000000000000000000000000000000000000000000000025519;
-bytes32 constant ed25519_sig_1 = 0x1000000000000000000000000000000000000000000000000000000000025519;
+bytes32 constant ed25519_sig_0 = 0x000000000000000000000000000000000000000000000000000000000ed25519;
+bytes32 constant ed25519_sig_1 = 0x100000000000000000000000000000000000000000000000000000000ed25519;
 
 bytes4 constant ipv4 = 0x10000001; // 10.0.0.1
 bytes16 constant ipv6 = 0x20010db8000000000000ff0000428329; // 2001:0db8:0000:0000:0000:ff00:0042:8329
@@ -47,9 +47,7 @@ contract AccountTest is Test {
   }
 
   function testKeyBindingError() public {
-    vm.expectRevert(
-      abi.encodeWithSelector(PublicKeyDoesNotMatchSender.selector, odd_addr, even_addr)
-    );
+    vm.expectRevert(abi.encodeWithSelector(PublicKeyDoesNotMatchSender.selector, odd_addr, even_addr));
     vm.prank(even_addr);
     announcements.bindKeys(odd_secp256k1_x, odd_secp256k1_y, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key);
   }
