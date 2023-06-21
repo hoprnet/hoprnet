@@ -39,6 +39,7 @@ jobs:
         uses: docker/setup-buildx-action@v2
         with:
           driver: kubernetes
+          node: ausias
 
       - name: Build and push docker image
         uses: docker/build-push-action@v4
