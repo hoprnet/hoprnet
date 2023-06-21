@@ -1,9 +1,0 @@
-FROM osexp2000/ubuntu-with-utils
-
-
-RUN curl http://www.ifconfig.me
-
-RUN curl -v http://deb.debian.org/debian/dists/bullseye/InRelease
-
-RUN apt-get update
-
