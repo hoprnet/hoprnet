@@ -38,6 +38,8 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, AccountsFixtureTe
     return HoprChannels.Channel(commitment, balance, ticketIndex, closureTime, epoch,status );
   }
 
+  address hoprToken;
+
   HoprChannels public hoprChannels;
 
   // HoprChannels.RedeemableTicket TICKET_AB_WIN =
@@ -106,7 +108,9 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, AccountsFixtureTe
 
   function setUp() public virtual override {
     super.setUp();
-    // make vm.addr(1) HoprToken contract
+
+    hoprToken = vm.addr(1);
+
     hoprChannels = new HoprChannels(vm.addr(1), HoprChannels.Timestamp.wrap(15));
     channelIdAB = hoprChannels._getChannelId(accountA.accountAddr, accountB.accountAddr);
     channelIdBA = hoprChannels._getChannelId(accountB.accountAddr, accountA.accountAddr);
@@ -139,7 +143,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, AccountsFixtureTe
 
     vm.prank(address(1));
     vm.mockCall(
-      vm.addr(1),
+      hoprToken,
       abi.encodeWithSignature(
         'transferFrom(address,address,uint256)',
         address(1),
@@ -182,7 +186,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, AccountsFixtureTe
     amount2 = uint96(bound(amount2, MIN_USED_BALANCE, MAX_USED_BALANCE));
 
     vm.mockCall(
-      vm.addr(1),
+      hoprToken,
       abi.encodeWithSignature(
         'transferFrom(address,address,uint256)',
         address(1),
@@ -204,7 +208,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, AccountsFixtureTe
     amount2 = uint96(bound(amount2, MIN_USED_BALANCE, MAX_USED_BALANCE));
 
     vm.mockCall(
-      vm.addr(1),
+      hoprToken,
       abi.encodeWithSignature(
         'transferFrom(address,address,uint256)',
         address(1),
@@ -226,7 +230,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, AccountsFixtureTe
     amount2 = uint96(bound(amount2, MIN_USED_BALANCE, MAX_USED_BALANCE));
 
     vm.mockCall(
-      vm.addr(1),
+      hoprToken,
       abi.encodeWithSignature(
         'transferFrom(address,address,uint256)',
         address(1),
@@ -246,7 +250,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, AccountsFixtureTe
   function testRevert_FundChannelMulti_AmountTooLow() public {
 
     vm.mockCall(
-      vm.addr(1),
+      hoprToken,
       abi.encodeWithSignature(
         'transferFrom(address,address,uint256)',
         address(1),
@@ -270,7 +274,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, AccountsFixtureTe
     uint256 highAmount = MAX_USED_BALANCE + 1;
 
     vm.mockCall(
-      vm.addr(1),
+      hoprToken,
       abi.encodeWithSignature(
         'transferFrom(address,address,uint256)',
         address(1),
@@ -293,7 +297,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, AccountsFixtureTe
     uint256 highAmount = MAX_USED_BALANCE + 1;
 
     vm.mockCall(
-      vm.addr(1),
+      hoprToken,
       abi.encodeWithSignature(
         'transferFrom(address,address,uint256)',
         address(1),
@@ -316,7 +320,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, AccountsFixtureTe
 
     vm.prank(address(1));
     vm.mockCall(
-      vm.addr(1),
+      hoprToken,
       abi.encodeWithSignature(
         'transferFrom(address,address,uint256)',
         address(1),
@@ -359,7 +363,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, AccountsFixtureTe
 
     vm.prank(address(1));
     vm.mockCall(
-      vm.addr(1),
+      hoprToken,
       abi.encodeWithSignature(
         'transferFrom(address,address,uint256)',
         address(1),
@@ -423,7 +427,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, AccountsFixtureTe
 
     vm.prank(address(1));
     vm.mockCall(
-      vm.addr(1),
+      hoprToken,
       abi.encodeWithSignature(
         'transferFrom(address,address,uint256)',
         address(1),
