@@ -377,7 +377,7 @@ impl Debug for HoprKeys {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use js_sys::Promise;
+    use js_sys::{Promise, Uint8Array};
     use utils_misc::ok_or_jserr;
     use utils_types::traits::PeerIdLike;
     use wasm_bindgen::prelude::*;
@@ -426,6 +426,11 @@ pub mod wasm {
             sliced.copy_from_slice(&self.w.chain_key.1.to_peerid().to_bytes()[2..]);
 
             peer_id_from_keys(Box::new(sliced), Box::new(self.w.chain_key.0))
+        }
+
+        #[wasm_bindgen(getter, js_name = "chainKeyPrivKey")]
+        pub fn get_chain_key_priv_key(&self) -> Uint8Array {
+            Uint8Array::from(&self.w.chain_key.0[..])
         }
 
         #[wasm_bindgen]
