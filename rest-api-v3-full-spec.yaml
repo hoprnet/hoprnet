@@ -45,7 +45,7 @@ paths:
                 lifetime: 360
                 capabilities: []
       responses:
-        "201":
+        '201':
           description: Token succesfully created.
           content:
             application/json:
@@ -56,7 +56,7 @@ paths:
                     type: string
                     example: MYtoken1223
                     description: The generated token which must be used when authenticating for API calls.
-        "400":
+        '400':
           description: Problem with inputs.
           content:
             application/json:
@@ -64,9 +64,9 @@ paths:
                 $ref: '#/components/schemas/RequestStatus'
               example:
                 status: INVALID_TOKEN_LIFETIME | INVALID_TOKEN_CAPABILITIES
-        "403":
+        '403':
           description: Missing capability to access endpoint
-        "422":
+        '422':
           description: Unknown failure.
           content:
             application/json:
@@ -90,17 +90,17 @@ paths:
         - Tokens
       operationId: tokensGetToken
       responses:
-        "200":
+        '200':
           description: Token information.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Token'
-        "401":
+        '401':
           $ref: '#/components/responses/Unauthorized'
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-        "404":
+        '404':
           $ref: '#/components/responses/NotFound'
   /tickets/statistics:
     parameters: []
@@ -110,7 +110,7 @@ paths:
         - Tickets
       operationId: ticketsGetStatistics
       responses:
-        "200":
+        '200':
           description: Tickets statistics fetched successfully. Check schema for description of every field in the statistics.
           content:
             application/json:
@@ -147,11 +147,11 @@ paths:
                   rejectedValue:
                     type: string
                     description: Total value of rejected tickets in Hopr tokens
-        "401":
+        '401':
           $ref: '#/components/responses/Unauthorized'
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-        "422":
+        '422':
           description: Unknown failure.
           content:
             application/json:
@@ -175,13 +175,13 @@ paths:
         - Tickets
       operationId: ticketsRedeemTickets
       responses:
-        "204":
+        '204':
           description: Tickets redeemed succesfully.
-        "401":
+        '401':
           $ref: '#/components/responses/Unauthorized'
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-        "422":
+        '422':
           description: Unknown failure.
           content:
             application/json:
@@ -205,7 +205,7 @@ paths:
         - Tickets
       operationId: ticketsGetTickets
       responses:
-        "200":
+        '200':
           description: Tickets fetched successfully.
           content:
             application/json:
@@ -213,11 +213,11 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Ticket'
-        "401":
+        '401':
           $ref: '#/components/responses/Unauthorized'
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-        "422":
+        '422':
           description: Unknown failure.
           content:
             application/json:
@@ -241,17 +241,17 @@ paths:
         - Settings
       operationId: settingsGetSettings
       responses:
-        "200":
+        '200':
           description: Settings fetched succesfully.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Settings'
-        "401":
+        '401':
           $ref: '#/components/responses/Unauthorized'
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-        "422":
+        '422':
           description: Unknown failure.
           content:
             application/json:
@@ -275,7 +275,7 @@ paths:
         - Node
       operationId: nodeGetVersion
       responses:
-        "200":
+        '200':
           description: Returns the release version of the running node.
           content:
             application/json:
@@ -283,11 +283,11 @@ paths:
                 type: string
                 description: Node version.
                 example: 1.83.5
-        "401":
+        '401':
           $ref: '#/components/responses/Unauthorized'
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-        "422":
+        '422':
           description: Unknown failure.
           content:
             application/json:
@@ -319,9 +319,9 @@ paths:
           description: When quality is passed, the response will only include peers with higher or equal quality to the one specified.
           schema:
             type: number
-            example: "0.5"
+            example: '0.5'
       responses:
-        "200":
+        '200':
           description: Peers information fetched successfuly.
           content:
             application/json:
@@ -402,7 +402,7 @@ paths:
                           type: string
                           example: 1.92.12
                           description: HOPR protocol version as determined from the successful ping in the Major.Minor.Patch format or "unknown"
-        "400":
+        '400':
           description: Invalid input. One of the parameters passed is in an incorrect format.
           content:
             application/json:
@@ -410,11 +410,11 @@ paths:
                 $ref: '#/components/schemas/RequestStatus'
               example:
                 status: INVALID_QUALITY
-        "401":
+        '401':
           $ref: '#/components/responses/Unauthorized'
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-        "422":
+        '422':
           description: Unknown failure.
           content:
             application/json:
@@ -438,7 +438,7 @@ paths:
         - Node
       operationId: nodeGetMetrics
       responses:
-        "200":
+        '200':
           description: Returns the encoded serialized metrics.
           content:
             text/plain; version=0.0.4:
@@ -446,11 +446,11 @@ paths:
                 type: string
                 description: Prometheus metrics text format
                 example: basic_counter 30
-        "401":
+        '401':
           $ref: '#/components/responses/Unauthorized'
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-        "422":
+        '422':
           description: Unknown failure.
           content:
             application/json:
@@ -474,7 +474,7 @@ paths:
         - Node
       operationId: nodeGetInfo
       responses:
-        "200":
+        '200':
           description: Node information fetched successfuly.
           content:
             application/json:
@@ -530,11 +530,11 @@ paths:
                     type: number
                     example: 1
                     description: Time (in minutes) that this node needs in order to clean up before closing the channel. When requesting to close the channel each node needs some time to make sure that channel can be closed securely and cleanly. After this channelClosurePeriod passes the second request for closing channel will close the channel.
-        "401":
+        '401':
           $ref: '#/components/responses/Unauthorized'
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-        "422":
+        '422':
           description: Unknown failure.
           content:
             application/json:
@@ -558,7 +558,7 @@ paths:
         - Node
       operationId: nodeGetEntryNodes
       responses:
-        "200":
+        '200':
           description: Entry node information fetched successfuly.
           content:
             application/json:
@@ -575,11 +575,11 @@ paths:
                     isEligible:
                       type: boolean
                       description: true if peer is allowed to access network, otherwise false
-        "401":
+        '401':
           $ref: '#/components/responses/Unauthorized'
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-        "422":
+        '422':
           description: Unknown failure.
           content:
             application/json:
@@ -609,20 +609,20 @@ paths:
         - Messages
       operationId: messagesWebsocket
       responses:
-        "101":
+        '101':
           description: Switching protocols
-        "206":
+        '206':
           description: Incoming data
           content:
             application/text:
               schema:
                 type: string
               example: 104,101,108,108,111,32,119,111,114,108,100
-        "401":
+        '401':
           $ref: '#/components/responses/Unauthorized'
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-        "404":
+        '404':
           description: Not found
   /messages/:
     parameters: []
@@ -638,7 +638,7 @@ paths:
           schema:
             $ref: '#/components/schemas/MessageTag'
       responses:
-        "200":
+        '200':
           description: Returns list of messages.
           content:
             application/json:
@@ -663,11 +663,11 @@ paths:
           schema:
             $ref: '#/components/schemas/MessageTag'
       responses:
-        "204":
+        '204':
           description: Messages successfully deleted.
-        "401":
+        '401':
           $ref: '#/components/responses/Unauthorized'
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
     post:
       description: Send a message to another peer using a given path (list of node addresses that should relay our message through network). If no path is given, HOPR will attempt to find a path.
@@ -710,7 +710,7 @@ paths:
                   maximum: 3
                   example: 3
       responses:
-        "202":
+        '202':
           description: 'The message was sent successfully. NOTE: This does not imply successful delivery.'
           content:
             application/json:
@@ -718,11 +718,11 @@ paths:
                 type: string
                 description: Challenge token used to poll for the acknowledgment of the sent message by the first hop.
                 example: e61bbdda74873540c7244fe69c39f54e5270bd46709c1dcb74c8e3afce7b9e616d
-        "401":
+        '401':
           $ref: '#/components/responses/Unauthorized'
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-        "422":
+        '422':
           description: Unknown failure.
           content:
             application/json:
@@ -752,7 +752,7 @@ paths:
           schema:
             $ref: '#/components/schemas/MessageTag'
       responses:
-        "200":
+        '200':
           description: Returns the message inbox size filtered by the given tag.
           content:
             application/json:
@@ -779,13 +779,13 @@ paths:
                 tag:
                   $ref: '#/components/schemas/MessageTag'
       responses:
-        "200":
+        '200':
           description: Returns a message.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ReceivedMessage'
-        "404":
+        '404':
           description: No message found.
   /messages/pop-all:
     parameters: []
@@ -803,7 +803,7 @@ paths:
                 tag:
                   $ref: '#/components/schemas/MessageTag'
       responses:
-        "200":
+        '200':
           description: Returns list of messages.
           content:
             application/json:
@@ -842,9 +842,9 @@ paths:
                   description: Amount of HOPR tokens to fund the channel. It will be used to pay for sending messages through channel
               example:
                 peerId: 12Diu2HAmUsJwbECMroQUC29LQZZWsYpYZx1
-                amount: "1000000"
+                amount: '1000000'
       responses:
-        "201":
+        '201':
           description: Channel succesfully opened.
           content:
             application/json:
@@ -855,7 +855,7 @@ paths:
                     $ref: '#/components/schemas/ChannelId'
                   transactionReceipt:
                     $ref: '#/components/schemas/TransactionReceipt'
-        "400":
+        '400':
           description: Problem with inputs.
           content:
             application/json:
@@ -863,9 +863,9 @@ paths:
                 $ref: '#/components/schemas/RequestStatus'
               example:
                 status: INVALID_AMOUNT | INVALID_ADDRESS
-        "401":
+        '401':
           $ref: '#/components/responses/Unauthorized'
-        "403":
+        '403':
           description: Failed to open the channel because of insufficient HOPR balance.
           content:
             application/json:
@@ -878,7 +878,7 @@ paths:
                     description: Insufficient balance to open channel. Amount passed in request body exeeds current balance.
               example:
                 status: NOT_ENOUGH_BALANCE
-        "409":
+        '409':
           description: Failed to open the channel because the channel between this nodes already exists.
           content:
             application/json:
@@ -891,7 +891,7 @@ paths:
                     description: Channel already open. Cannot open more than one channel between two nodes.
               example:
                 status: CHANNEL_ALREADY_OPEN
-        "422":
+        '422':
           description: Unknown failure.
           content:
             application/json:
@@ -918,15 +918,15 @@ paths:
           description: When includingClosed is passed the response will include closed channels which are ommited by default.
           schema:
             type: string
-            example: "false"
+            example: 'false'
         - in: query
           name: fullTopology
           description: Get the full payment channel graph indexed by the node.
           schema:
             type: string
-            example: "false"
+            example: 'false'
       responses:
-        "200":
+        '200':
           description: Channels fetched successfully.
           content:
             application/json:
@@ -948,11 +948,11 @@ paths:
                     items:
                       $ref: '#/components/schemas/ChannelTopology'
                     description: All the channels indexed by the node in the current network.
-        "401":
+        '401':
           $ref: '#/components/responses/Unauthorized'
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-        "422":
+        '422':
           description: Unknown failure.
           content:
             application/json:
@@ -976,7 +976,7 @@ paths:
         - Aliases
       operationId: aliasesGetAliases
       responses:
-        "200":
+        '200':
           description: Returns List of Aliases and corresponding peerIds.
           content:
             application/json:
@@ -987,7 +987,7 @@ paths:
                     $ref: '#/components/schemas/HoprAddress'
                   bob:
                     $ref: '#/components/schemas/HoprAddress'
-        "422":
+        '422':
           description: Unknown failure.
           content:
             application/json:
@@ -1028,9 +1028,9 @@ paths:
                 peerId: 12Diu2HAmUsJwbECMroQUC29LQZZWsYpYZx1
                 alias: Alice
       responses:
-        "201":
+        '201':
           description: Alias set succesfully
-        "400":
+        '400':
           description: Invalid peerId. The format or length of the peerId is incorrect.
           content:
             application/json:
@@ -1038,11 +1038,11 @@ paths:
                 $ref: '#/components/schemas/RequestStatus'
               example:
                 status: INVALID_PEERID
-        "401":
+        '401':
           $ref: '#/components/responses/Unauthorized'
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-        "422":
+        '422':
           description: Unknown failure.
           content:
             application/json:
@@ -1081,11 +1081,11 @@ paths:
                   type: string
                   format: amount
                   description: Amount to withdraw in the currency's smallest unit.
-                  example: "1337"
+                  example: '1337'
                 recipient:
                   $ref: '#/components/schemas/NativeAddress'
       responses:
-        "200":
+        '200':
           description: Withdraw successful. Receipt from this response can be used to check details of the transaction on ethereum chain.
           content:
             application/json:
@@ -1096,7 +1096,7 @@ paths:
                     type: string
                     example: 0x37954ca4a630aa28f045df2e8e604cae22071046042e557355acf00f4ef20d2e
                     description: Withdraw txn hash that can be used to check details of the transaction on ethereum chain.
-        "400":
+        '400':
           description: Incorrect data in request body. Make sure to provide valid currency ('NATIVE' | 'HOPR') or amount.
           content:
             application/json:
@@ -1104,11 +1104,11 @@ paths:
                 $ref: '#/components/schemas/RequestStatus'
               example:
                 status: INVALID_CURRENCY | INVALID_AMOUNT
-        "401":
+        '401':
           $ref: '#/components/responses/Unauthorized'
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-        "422":
+        '422':
           description: Withdraw amount exeeds current balance or unknown error. You can check current balance using /account/balance endpoint.
           content:
             application/json:
@@ -1131,7 +1131,7 @@ paths:
         - Account
       operationId: accountGetBalances
       responses:
-        "200":
+        '200':
           description: Balances fetched successfuly.
           content:
             application/json:
@@ -1142,11 +1142,11 @@ paths:
                     $ref: '#/components/schemas/NativeBalance'
                   hopr:
                     $ref: '#/components/schemas/HoprBalance'
-        "401":
+        '401':
           $ref: '#/components/responses/Unauthorized'
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-        "422":
+        '422':
           description: Unknown failure.
           content:
             application/json:
@@ -1170,7 +1170,7 @@ paths:
         - Account
       operationId: accountGetAddresses
       responses:
-        "200":
+        '200':
           description: Addresses fetched successfully.
           content:
             application/json:
@@ -1181,11 +1181,11 @@ paths:
                     $ref: '#/components/schemas/NativeAddress'
                   hopr:
                     $ref: '#/components/schemas/HoprAddress'
-        "401":
+        '401':
           $ref: '#/components/responses/Unauthorized'
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-        "422":
+        '422':
           description: Unknown failure.
           content:
             application/json:
@@ -1217,13 +1217,13 @@ paths:
             type: string
             example: someTOKENid1234
       responses:
-        "204":
+        '204':
           description: Token successfully deleted.
-        "401":
+        '401':
           $ref: '#/components/responses/Unauthorized'
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-        "404":
+        '404':
           $ref: '#/components/responses/NotFound'
   /settings/{setting}:
     parameters: []
@@ -1253,9 +1253,9 @@ paths:
               example:
                 settingValue: true
       responses:
-        "204":
+        '204':
           description: Setting set succesfully
-        "400":
+        '400':
           description: Invalid input. Either setting with that name doesn't exist or the value is incorrect.
           content:
             application/json:
@@ -1263,11 +1263,11 @@ paths:
                 $ref: '#/components/schemas/RequestStatus'
               example:
                 status: INVALID_SETTING | INVALID_SETTING_VALUE
-        "401":
+        '401':
           $ref: '#/components/responses/Unauthorized'
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-        "422":
+        '422':
           description: Unknown failure.
           content:
             application/json:
@@ -1297,7 +1297,7 @@ paths:
           schema:
             $ref: '#/components/schemas/HoprAddress'
       responses:
-        "200":
+        '200':
           description: Peer information fetched successfully.
           content:
             application/json:
@@ -1312,11 +1312,11 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/MultiAddress'
-        "401":
+        '401':
           $ref: '#/components/responses/Unauthorized'
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-        "422":
+        '422':
           description: Unknown failure.
           content:
             application/json:
@@ -1346,7 +1346,7 @@ paths:
           schema:
             $ref: '#/components/schemas/HoprAddress'
       responses:
-        "200":
+        '200':
           description: Ping successful.
           content:
             application/json:
@@ -1361,7 +1361,7 @@ paths:
                     type: string
                     example: 1.92.12
                     description: HOPR protocol version as determined from the successful ping in the Major.Minor.Patch format or "unknown"
-        "400":
+        '400':
           description: Invalid peerId.
           content:
             application/json:
@@ -1369,11 +1369,11 @@ paths:
                 $ref: '#/components/schemas/RequestStatus'
               example:
                 status: INVALID_PEERID
-        "401":
+        '401':
           $ref: '#/components/responses/Unauthorized'
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-        "422":
+        '422':
           description: An error occured (see error details) or timeout - node with specified PeerId didn't respond in time.
           content:
             application/json:
@@ -1395,9 +1395,9 @@ paths:
           schema:
             $ref: '#/components/schemas/ChannelId'
       responses:
-        "204":
+        '204':
           description: Tickets redeemed succesfully.
-        "400":
+        '400':
           description: Invalid channel id.
           content:
             application/json:
@@ -1405,11 +1405,11 @@ paths:
                 $ref: '#/components/schemas/RequestStatus'
               example:
                 status: INVALID_CHANNELID
-        "401":
+        '401':
           $ref: '#/components/responses/Unauthorized'
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-        "404":
+        '404':
           description: Tickets were not found for that channel. That means that no messages were sent inside this channel yet.
           content:
             application/json:
@@ -1417,7 +1417,7 @@ paths:
                 $ref: '#/components/schemas/RequestStatus'
               example:
                 status: TICKETS_NOT_FOUND
-        "422":
+        '422':
           description: Unknown failure.
           content:
             application/json:
@@ -1447,7 +1447,7 @@ paths:
           schema:
             $ref: '#/components/schemas/ChannelId'
       responses:
-        "200":
+        '200':
           description: Tickets fetched successfully.
           content:
             application/json:
@@ -1455,7 +1455,7 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Ticket'
-        "400":
+        '400':
           description: Invalid channel id.
           content:
             application/json:
@@ -1463,11 +1463,11 @@ paths:
                 $ref: '#/components/schemas/RequestStatus'
               example:
                 status: INVALID_CHANNELID
-        "401":
+        '401':
           $ref: '#/components/responses/Unauthorized'
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-        "404":
+        '404':
           description: Tickets were not found for that channel. That means that no messages were sent inside this channel yet.
           content:
             application/json:
@@ -1475,7 +1475,7 @@ paths:
                 $ref: '#/components/schemas/RequestStatus'
               example:
                 status: TICKETS_NOT_FOUND
-        "422":
+        '422':
           description: Unknown failure.
           content:
             application/json:
@@ -1507,7 +1507,7 @@ paths:
           schema:
             $ref: '#/components/schemas/ChannelId'
       responses:
-        "200":
+        '200':
           description: Channel closed succesfully.
           content:
             application/json:
@@ -1518,7 +1518,7 @@ paths:
                     $ref: '#/components/schemas/TransactionReceipt'
                   channelStatus:
                     $ref: '#/components/schemas/ChannelStatus'
-        "400":
+        '400':
           description: Invalid peerId.
           content:
             application/json:
@@ -1526,11 +1526,11 @@ paths:
                 $ref: '#/components/schemas/RequestStatus'
               example:
                 status: INVALID_PEERID
-        "401":
+        '401':
           $ref: '#/components/responses/Unauthorized'
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-        "422":
+        '422':
           description: Unknown failure.
           content:
             application/json:
@@ -1558,14 +1558,14 @@ paths:
           schema:
             $ref: '#/components/schemas/ChannelId'
       responses:
-        "200":
+        '200':
           description: Channel fetched succesfully.
           content:
             application/json:
               schema:
                 items:
                   $ref: '#/components/schemas/Channel'
-        "400":
+        '400':
           description: Invalid channel id.
           content:
             application/json:
@@ -1573,11 +1573,11 @@ paths:
                 $ref: '#/components/schemas/RequestStatus'
               example:
                 status: INVALID_CHANNELID
-        "401":
+        '401':
           $ref: '#/components/responses/Unauthorized'
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-        "404":
+        '404':
           description: Channel with that id was not found.
           content:
             application/json:
@@ -1585,7 +1585,7 @@ paths:
                 $ref: '#/components/schemas/RequestStatus'
               example:
                 status: CHANNEL_NOT_FOUND
-        "422":
+        '422':
           description: Unknown failure.
           content:
             application/json:
@@ -1617,7 +1617,7 @@ paths:
             type: string
             example: Alice
       responses:
-        "200":
+        '200':
           description: HOPR address was found for the provided alias.
           content:
             application/json:
@@ -1626,11 +1626,11 @@ paths:
                 properties:
                   peerId:
                     $ref: '#/components/schemas/HoprAddress'
-        "401":
+        '401':
           $ref: '#/components/responses/Unauthorized'
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-        "404":
+        '404':
           description: This alias was not assigned to any PeerId before. You can get the list of all PeerId's and thier corresponding aliases using /aliases endpoint.
           content:
             application/json:
@@ -1638,7 +1638,7 @@ paths:
                 $ref: '#/components/schemas/RequestStatus'
               example:
                 status: PEERID_NOT_FOUND
-        "422":
+        '422':
           description: Unknown failure.
           content:
             application/json:
@@ -1668,13 +1668,13 @@ paths:
             type: string
             example: Alice
       responses:
-        "204":
+        '204':
           description: Alias removed succesfully.
-        "401":
+        '401':
           $ref: '#/components/responses/Unauthorized'
-        "403":
+        '403':
           $ref: '#/components/responses/Forbidden'
-        "422":
+        '422':
           description: Unknown failure.
           content:
             application/json:
@@ -1908,11 +1908,11 @@ components:
       example: Open
     NativeBalance:
       type: string
-      example: "1000000000000000000"
+      example: '1000000000000000000'
       description: Amount of NATIVE (ETH) balance in the smallest unit. Used only for gas fees on the blockchain the current release is running on. For example, when you will open or close the payment channel, it will use gas fees to execute this action.
     HoprBalance:
       type: string
-      example: "10000000000000000000"
+      example: '10000000000000000000'
       description: Amount of HOPR tokens in the smallest unit. Used for funding payment channels.
     Channel:
       type: object
@@ -2004,7 +2004,7 @@ components:
     TransactionReceipt:
       type: string
       description: Receipt identifier for an Ethereum transaction.
-      example: "0x37954ca4a630aa28f045df2e8e604cae22071046042e557355acf00f4ef20d2e"
+      example: '0x37954ca4a630aa28f045df2e8e604cae22071046042e557355acf00f4ef20d2e'
   securitySchemes:
     keyScheme:
       type: apiKey
