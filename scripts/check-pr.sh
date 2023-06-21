@@ -14,15 +14,14 @@ source "${mydir}/utils.sh"
 # prints usage of the script
 function usage() {
   msg
-  msg "Usage: $0 [-h|--help] [-e|--event event-name] [-l|--label label-name] [-b|--base-branch base-branch-name] [-hb|--head-branch head-branch-name]"
+  msg "Usage: $0 [-h|--help] [-b|--base-branch base-branch-name] [-hb|--head-branch head-branch-name]"
   msg
   msg "This script check the contents of the PR to determine which workflows need to be triggered"
   msg
 }
 
-declare event_type=""
-declare label=""
 declare base_branch=""
+declare head_branch=""
 declare results_file="check_pr.log"
 
 while (( "$#" )); do
@@ -31,16 +30,6 @@ while (( "$#" )); do
       # return early with help info when requested
       usage
       exit 0
-      ;;
-    -e|--event)
-      shift
-      event_type="${1}"
-      shift
-      ;;
-    -l|--label)
-      shift
-      label="${1}"
-      shift
       ;;
     -b|--base-branch)
       shift
@@ -59,15 +48,10 @@ while (( "$#" )); do
   esac
 done
 
-if [ -z "${event_type}" ]; then
-  # return early if required parameters have been set
-  log "Parameter 'event' is required"
-  usage
-  exit 1
-fi
 
 # Check wether the pushed commits to the PR involve building docker images
 function check_push() {
+  rm -rf ${results_file}
   if [ -z "${base_branch}" ] || [  -z "${head_branch:-}" ]; then
     log "Parameter 'base_branch' and 'head_branch' are required"
     usage
@@ -96,63 +80,6 @@ function check_push() {
   rm changes.txt
 }
 
-# Check how to react against the new labels added
-function check_labeled() {
-  if [ -z "${label:-}" ]; then
-    log "Parameter 'label' is required"
-    usage
-    exit 1
-  fi
-  echo "Checking adding of label ${label}"
-  case "${label}" in
-    deploy_nodes)
-      echo "create_deployment=true" > ${results_file}
-      ;;
-    *)
-      echo "Skipping any action with the label added: ${label}"
-      echo ""  > ${results_file}
-      ;;
-  esac
 
-}
-
-# Check how to react against the labels removed
-function check_unlabeled() {
-  if [ -z "${label:-}" ]; then
-    log "Parameter 'label' is required"
-    usage
-    exit 1
-  fi
-  echo "Checking removal of label ${label}"
-  case "${label}" in
-    deploy_nodes)
-      echo "delete_deployment=true" > ${results_file}
-      ;;
-    *)
-      echo "Skipping any action with the label removed: ${label}"
-      echo ""  > ${results_file}
-      ;;
-  esac
-}
-
-# Main function to trigger specific action
-function main() {
-  rm -rf ${results_file}
-  case "${event_type}" in
-    push)
-      check_push
-      ;;
-    labeled)
-      check_labeled
-      ;;
-    unlabeled)
-      check_unlabeled
-      ;;
-    *)
-      usage
-      exit 1
-      ;;
-  esac
-}
-
-main
+# Main function
+check_push
