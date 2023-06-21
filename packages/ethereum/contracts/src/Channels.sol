@@ -147,8 +147,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
   }
 
   struct RedeemableTicket {
-    CompactSignature signature;
     TicketData data;
+    CompactSignature signature;
     bytes32 opening;
     bytes32 porSecret;
   }
@@ -315,6 +315,10 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     // fund channel in direction of: account2 -> account1
     if (Balance.unwrap(amount2) > 0) {
       _fundChannel(account2, account1, amount2);
+    }
+
+    if (Balance.unwrap(amount1) == 0 && Balance.unwrap(amount2) == 0) {
+      revert InvalidBalance();
     }
   }
 

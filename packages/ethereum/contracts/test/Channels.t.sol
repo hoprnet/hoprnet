@@ -177,66 +177,140 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, AccountsFixtureTe
     );
   }
 
-  function testFailFundChannelMulti_SameSourceAndDestination(uint96 amount1, uint96 amount2) public {
+  function testRevert_FundChannelMulti_SameSourceAndDestination(uint96 amount1, uint96 amount2) public {
     amount1 = uint96(bound(amount1, MIN_USED_BALANCE ,MAX_USED_BALANCE));
     amount2 = uint96(bound(amount2, MIN_USED_BALANCE, MAX_USED_BALANCE));
 
+    vm.mockCall(
+      vm.addr(1),
+      abi.encodeWithSignature(
+        'transferFrom(address,address,uint256)',
+        address(1),
+        address(hoprChannels),
+        amount1 + amount2
+      ),
+      abi.encode(true)
+    );
+
     vm.prank(address(1));
-    vm.expectRevert(abi.encodeWithSelector(SourceEqualsDestination.selector, ""));
+    vm.expectRevert(SourceEqualsDestination.selector);
     hoprChannels.fundChannelMulti(accountA.accountAddr, HoprChannels.Balance.wrap(amount1), accountA.accountAddr, HoprChannels.Balance.wrap(amount2));
+
+    vm.clearMockedCalls();
   }
 
-  function testFailFundChannelMulti_ZeroSource(uint96 amount1, uint96 amount2) public {
+  function testRevert_FundChannelMulti_ZeroSource(uint96 amount1, uint96 amount2) public {
     amount1 = uint96(bound(amount1, MIN_USED_BALANCE, MAX_USED_BALANCE));
     amount2 = uint96(bound(amount2, MIN_USED_BALANCE, MAX_USED_BALANCE));
 
+    vm.mockCall(
+      vm.addr(1),
+      abi.encodeWithSignature(
+        'transferFrom(address,address,uint256)',
+        address(1),
+        address(hoprChannels),
+        amount1 + amount2
+      ),
+      abi.encode(true)
+    );
+
     vm.prank(address(1));
-    vm.expectRevert(abi.encodeWithSelector(ZeroAddress.selector));
+    vm.expectRevert(abi.encodeWithSelector(ZeroAddress.selector, "source must not be empty"));
     hoprChannels.fundChannelMulti(address(0), HoprChannels.Balance.wrap(amount1), accountA.accountAddr, HoprChannels.Balance.wrap(amount2));
+
+    vm.clearMockedCalls();
   }
 
-  function testFailFundChannelMulti_ZeroDestination(uint96 amount1, uint96 amount2) public {
+  function testRevert_FundChannelMulti_ZeroDestination(uint96 amount1, uint96 amount2) public {
     amount1 = uint96(bound(amount1, MIN_USED_BALANCE, MAX_USED_BALANCE));
     amount2 = uint96(bound(amount2, MIN_USED_BALANCE, MAX_USED_BALANCE));
 
+    vm.mockCall(
+      vm.addr(1),
+      abi.encodeWithSignature(
+        'transferFrom(address,address,uint256)',
+        address(1),
+        address(hoprChannels),
+        amount1 + amount2
+      ),
+      abi.encode(true)
+    );
+
     vm.prank(address(1));
-    vm.expectRevert(abi.encodeWithSelector(ZeroAddress.selector));
+    vm.expectRevert(abi.encodeWithSelector(ZeroAddress.selector, "destination must not be empty"));
     hoprChannels.fundChannelMulti(accountA.accountAddr, HoprChannels.Balance.wrap(amount1), address(0), HoprChannels.Balance.wrap(amount2));
+
+    vm.clearMockedCalls();
   }
 
-  function testFailFundChannelMulti_AmountATooLow(uint96 amount2) public {
+  function testRevert_FundChannelMulti_AmountTooLow() public {
+
+    vm.mockCall(
+      vm.addr(1),
+      abi.encodeWithSignature(
+        'transferFrom(address,address,uint256)',
+        address(1),
+        address(hoprChannels),
+        0
+      ),
+      abi.encode(true)
+    );
+
+    vm.prank(address(1));
+    vm.expectRevert(InvalidBalance.selector);
+    hoprChannels.fundChannelMulti(accountA.accountAddr, HoprChannels.Balance.wrap(0), accountB.accountAddr, HoprChannels.Balance.wrap(0));
+
+    vm.clearMockedCalls();
+  }
+
+
+  function testRevert_FundChannelMulti_AmountATooHigh(uint96 amount2) public {
     amount2 = uint96(bound(amount2, MIN_USED_BALANCE, MAX_USED_BALANCE));
 
+    uint256 highAmount = MAX_USED_BALANCE + 1;
+
+    vm.mockCall(
+      vm.addr(1),
+      abi.encodeWithSignature(
+        'transferFrom(address,address,uint256)',
+        address(1),
+        address(hoprChannels),
+        amount2 + highAmount
+      ),
+      abi.encode(true)
+    );
+
     vm.prank(address(1));
-    vm.expectRevert(abi.encodeWithSelector(InvalidBalance.selector, ""));
-    hoprChannels.fundChannelMulti(accountA.accountAddr, HoprChannels.Balance.wrap(0), accountB.accountAddr, HoprChannels.Balance.wrap(amount2));
+    vm.expectRevert(BalanceExceedsGlobalPerChannelAllowance.selector);
+    hoprChannels.fundChannelMulti(accountA.accountAddr, HoprChannels.Balance.wrap(uint96(highAmount)), accountB.accountAddr, HoprChannels.Balance.wrap(amount2));
+
+    vm.clearMockedCalls();
   }
 
-  function testFailFundChannelMulti_AmountBTooLow(uint96 amount1) public {
+  function testRevert_FundChannelMulti_AmountBTooHigh(uint96 amount1) public {
     amount1 = uint96(bound(amount1, MIN_USED_BALANCE, MAX_USED_BALANCE));
 
-    vm.prank(address(1));
-    vm.expectRevert(abi.encodeWithSelector(InvalidBalance.selector, ""));
-    hoprChannels.fundChannelMulti(accountA.accountAddr, HoprChannels.Balance.wrap(amount1), accountB.accountAddr, HoprChannels.Balance.wrap(0));
-  }
+    uint256 highAmount = MAX_USED_BALANCE + 1;
 
-  function testFailFundChannelMulti_AmountATooHigh(uint96 amount2) public {
-    amount2 = uint96(bound(amount2, MIN_USED_BALANCE, MAX_USED_BALANCE));
-
-    vm.prank(address(1));
-    vm.expectRevert(abi.encodeWithSelector(InvalidBalance.selector, ""));
-    hoprChannels.fundChannelMulti(accountA.accountAddr, HoprChannels.Balance.wrap(HoprChannels.Balance.unwrap(hoprChannels.MAX_USED_BALANCE()) + 1), accountB.accountAddr, HoprChannels.Balance.wrap(amount2));
-  }
-
-  function testFailFundChannelMulti_AmountBTooHigh(uint96 amount1) public {
-    amount1 = uint96(bound(amount1, MIN_USED_BALANCE, MAX_USED_BALANCE));
+    vm.mockCall(
+      vm.addr(1),
+      abi.encodeWithSignature(
+        'transferFrom(address,address,uint256)',
+        address(1),
+        address(hoprChannels),
+        amount1 + highAmount
+      ),
+      abi.encode(true)
+    );
 
     vm.prank(address(1));
-    vm.expectRevert(abi.encodeWithSelector(InvalidBalance.selector, ""));
-    hoprChannels.fundChannelMulti(accountA.accountAddr, HoprChannels.Balance.wrap(amount1), accountB.accountAddr, HoprChannels.Balance.wrap(HoprChannels.Balance.unwrap(hoprChannels.MAX_USED_BALANCE()) + 1));
+    vm.expectRevert(BalanceExceedsGlobalPerChannelAllowance.selector);
+    hoprChannels.fundChannelMulti(accountA.accountAddr, HoprChannels.Balance.wrap(amount1), accountB.accountAddr, HoprChannels.Balance.wrap(uint96(highAmount)));
+
+    vm.clearMockedCalls();
   }
 
-  function testFailTransfer(uint96 amount1, uint96 amount2) public {
+  function testRevert_FundChannelMultiTokenTransfer(uint96 amount1, uint96 amount2) public {
     amount1 = uint96(bound(amount1, MIN_USED_BALANCE, MAX_USED_BALANCE));
     amount2 = uint96(bound(amount2, MIN_USED_BALANCE, MAX_USED_BALANCE));
 
@@ -252,11 +326,13 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, AccountsFixtureTe
       abi.encode(false)
     );
 
-    vm.expectRevert(abi.encodeWithSelector(TokenTransferFailed.selector, ""));
+    vm.expectRevert(abi.encodeWithSelector(TokenTransferFailed.selector));
     hoprChannels.fundChannelMulti(accountA.accountAddr, HoprChannels.Balance.wrap(amount1), accountB.accountAddr, HoprChannels.Balance.wrap(amount2));
+
+    vm.clearMockedCalls();
   }
 
-  function testSetCommitment(uint96 amount1, uint96 amount2, uint256 commitmentA, uint256 commitmentB) public {
+  function test_SetCommitment(uint96 amount1, uint96 amount2, uint256 commitmentA, uint256 commitmentB) public {
     amount1 = uint96(bound(amount1, MIN_USED_BALANCE, MAX_USED_BALANCE));
     amount2 = uint96(bound(amount2, MIN_USED_BALANCE, MAX_USED_BALANCE));
 
@@ -328,7 +404,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, AccountsFixtureTe
     );
   }
 
-  function testSetCommitmentEpochBump(uint96 amount1, uint96 amount2) public {
+  function test_SetCommitmentEpochBump(uint96 amount1, uint96 amount2) public {
     amount1 = uint96(bound(amount1, MIN_USED_BALANCE, MAX_USED_BALANCE));
     amount2 = uint96(bound(amount2, MIN_USED_BALANCE, MAX_USED_BALANCE));
 
@@ -408,17 +484,17 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, AccountsFixtureTe
     );
   }
 
-  function testFailSetCommitment() public {
+  function testRevert_SetCommitment() public {
     vm.prank(accountA.accountAddr);
-    vm.expectRevert(abi.encodeWithSelector(InvalidCommitment.selector, ""));
+    vm.expectRevert(InvalidCommitment.selector);
     hoprChannels.setCommitment(bytes32(0), accountB.accountAddr);
   }
 
-  function testFailSetCommitmentChannelNotOpen(uint256 commitment) public {
+  function testRevert_SetCommitmentChannelNotOpen(uint256 commitment) public {
     commitment = bound(commitment, uint256(1), type(uint256).max);
 
     vm.prank(accountA.accountAddr);
-    vm.expectRevert(abi.encodeWithSelector(WrongChannelState.selector, ""));
+    vm.expectRevert(abi.encodeWithSelector(WrongChannelState.selector, "Cannot set commitments for channels that are not in state OPEN."));
     hoprChannels.setCommitment(bytes32(commitment), accountB.accountAddr);
   }
 
