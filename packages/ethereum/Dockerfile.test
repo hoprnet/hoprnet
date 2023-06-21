@@ -4,7 +4,7 @@ ARG HOPR_TOOLCHAIN_IMAGE=${HOPR_TOOLCHAIN_IMAGE:-gcr.io/hoprassociation/hopr-too
 
 FROM ${HOPR_TOOLCHAIN_IMAGE}
 
-RUN curl -v http://deb.debian.org/debian/dists/bullseye/InRelease
+# RUN curl http://deb.debian.org/debian/dists/bullseye/InRelease
 # RUN sleep 10000000000
 
 WORKDIR /app/hoprnet

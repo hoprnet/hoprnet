@@ -13,8 +13,9 @@ concurrency:
   group: ${{ github.head_ref }}-runner
   cancel-in-progress: true
 jobs:
-  builder:
-    name: Build
+
+  build:
+    name: docker
     runs-on: ubuntu-2-core
     steps:
       - name: Checkout hoprnet repository
@@ -39,9 +40,11 @@ jobs:
         with:
           driver: kubernetes
 
-      - name: Build
-        run: |
-          from="--cache-from type=registry,ref=europe-west3-docker.pkg.dev/hoprassociation/docker-images/anvil:buildcache-test"
-          to="--cache-to type=registry,ref=europe-west3-docker.pkg.dev/hoprassociation/docker-images/anvil:buildcache"
-          tag=" -t europe-west3-docker.pkg.dev/hoprassociation/docker-images/anvil"
-          docker buildx build ${from} ${to} ${tag} -f packages/ethereum/Dockerfile.test .
+      - name: Build and push docker image
+        uses: docker/build-push-action@v4
+        with:
+          push: true
+          file: packages/ethereum/Dockerfile.test
+          cache-from: type=registry,ref=europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/anvil:buildcache-test
+          cache-to: type=registry,ref=europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/anvil:buildcache-test,mode=max
+          tags: europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/anvil:pr-${{ github.event.pull_request.number }}
