@@ -31,6 +31,9 @@ pub enum KeyPairError {
     #[error("decoding error: invalid encrypted key length {actual} but expected {expected}")]
     InvalidEncryptedKeyLength { actual: usize, expected: usize },
 
+    #[error("invalid version")]
+    InvalidVersion { actual: usize, expected: usize },
+
     #[error("cryptographic parameter '{name:?}' must be {expected:?} bytes")]
     InvalidParameterSize { name: String, expected: usize },
 

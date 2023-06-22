@@ -13,7 +13,7 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 default = ["console_error_panic_hook", "wasm"]
-wasm = [ "dep:wasm-bindgen", "dep:real-base", "dep:js-sys" ]
+wasm = [ "dep:wasm-bindgen", "dep:js-sys" ]
 console_error_panic_hook = [ "dep:console_error_panic_hook" ]
 
 [dependencies]
@@ -28,7 +28,7 @@ libp2p-identity = { version = "0.1.2", features = ["secp256k1", "ed25519", "peer
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 scrypt = { version = "0.11.0", default-features = false }
-real-base = { path = "../../../real/crates/real-base", optional = true }
+real-base = { path = "../../../real/crates/real-base" }
 version = "3.0.0"
 sha3 = "0.10.0"
 thiserror = "1.0"

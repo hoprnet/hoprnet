@@ -1,6 +1,6 @@
 use crate::{
     errors::{KeyPairError, Result},
-    keystore::{CipherparamsJson, CryptoJson, EthKeystore, KdfType, KdfparamsType},
+    keystore::{CipherparamsJson, CryptoJson, EthKeystore, KdfType, KdfparamsType, PrivateKeys},
 };
 use aes::{
     cipher::{self, InnerIvInit, KeyInit, StreamCipherCore},
@@ -10,6 +10,7 @@ use core_crypto::types::{OffchainPublicKey, PublicKey};
 use getrandom::getrandom;
 use hex;
 use scrypt::{scrypt, Params as ScryptParams};
+use serde::{ser::SerializeStruct, Serialize, Serializer};
 use serde_json::{from_str as from_json_string, to_string as to_json_string};
 use sha3::{digest::Update, Digest, Keccak256};
 use std::fmt::Debug;
@@ -36,6 +37,9 @@ const CHAIN_KEY_LENGTH: usize = 32;
 
 pub type PacketKey = [u8; PACKET_KEY_LENGTH];
 pub type ChainKey = [u8; CHAIN_KEY_LENGTH];
+
+// Current version, deviates from pre 2.0
+const VERSION: u32 = 2;
 
 struct Aes128Ctr {
     inner: ctr::CtrCore<Aes128, ctr::flavors::Ctr128BE>,
@@ -83,18 +87,34 @@ impl IdentityOptions {
 }
 
 pub struct HoprKeys {
-    packet_key: (PacketKey, OffchainPublicKey),
-    chain_key: (ChainKey, PublicKey),
+    pub packet_key: (PacketKey, OffchainPublicKey),
+    pub chain_key: (ChainKey, PublicKey),
+    pub id: Uuid,
+}
+
+impl Serialize for HoprKeys {
+    /// Serialize without private keys
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut s = serializer.serialize_struct("HoprKeys", 3)?;
+        s.serialize_field("packet_key", self.packet_key.1.to_peerid_str().as_str())?;
+        s.serialize_field("chain_key", &self.chain_key.1.to_peerid_str().as_str())?;
+        s.serialize_field("uuid", &self.id)?;
+        s.end()
+    }
 }
 
 impl std::fmt::Display for HoprKeys {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "packet_key: {}, chain_key: {} (Ethereum address: {})",
+            "packet_key: {}, chain_key: {} (Ethereum address: {})\nUUID: {}",
             self.packet_key.1.to_peerid_str(),
             self.chain_key.1.to_peerid_str(),
-            self.chain_key.1.to_address()
+            self.chain_key.1.to_address(),
+            self.id.to_string()
         )
     }
 }
@@ -130,7 +150,7 @@ impl TryFrom<&str> for HoprKeys {
     }
 }
 
-impl TryFrom<[u8; CHAIN_KEY_LENGTH + PACKET_KEY_LENGTH]> for HoprKeys {
+impl TryFrom<[u8; PACKET_KEY_LENGTH + CHAIN_KEY_LENGTH]> for HoprKeys {
     type Error = KeyPairError;
     /// Deserializes HoprKeys from binary string
     ///
@@ -177,6 +197,7 @@ impl TryFrom<([u8; PACKET_KEY_LENGTH], [u8; CHAIN_KEY_LENGTH])> for HoprKeys {
         Ok(HoprKeys {
             packet_key: (value.0, OffchainPublicKey::from_privkey(&value.0[..])?),
             chain_key: (value.1, PublicKey::from_privkey(&value.1[..])?),
+            id: Uuid::new_v4(),
         })
     }
 }
@@ -192,6 +213,7 @@ impl HoprKeys {
         Self {
             packet_key: OffchainPublicKey::random_keypair(),
             chain_key: PublicKey::random_keypair(),
+            id: Uuid::new_v4(),
         }
     }
 
@@ -229,7 +251,20 @@ impl HoprKeys {
 
         if exists {
             match HoprKeys::read_eth_keystore(&opts.id_path, &opts.password) {
-                Ok(keys) => return Ok(keys),
+                Ok((keys, needs_migration)) => {
+                    if needs_migration {
+                        keys.write_eth_keystore(
+                            &opts.id_path,
+                            &opts.password,
+                            if let Some(true) = opts.use_weak_crypto {
+                                true
+                            } else {
+                                false
+                            },
+                        )?
+                    }
+                    return Ok(keys);
+                }
                 Err(e) => {
                     error!("{}", e.to_string());
                 }
@@ -259,7 +294,10 @@ impl HoprKeys {
         ))
     }
 
-    pub fn read_eth_keystore(path: &str, password: &str) -> Result<Self> {
+    /// Reads a keystore file using custom FS operations
+    ///
+    /// Highly inspired by https://github.com/roynalnaruto/eth-keystore-rs
+    pub fn read_eth_keystore(path: &str, password: &str) -> Result<(Self, bool)> {
         let json_string = read_to_string(path)?;
         let keystore: EthKeystore = from_json_string(&json_string)?;
 
@@ -291,27 +329,72 @@ impl HoprKeys {
 
         let mut pk = keystore.crypto.ciphertext;
 
-        if pk.len() != 64 {
-            return Err(KeyPairError::InvalidEncryptedKeyLength {
-                actual: pk.len(),
-                expected: PACKET_KEY_LENGTH + CHAIN_KEY_LENGTH,
-            });
+        match pk.len() {
+            32 => {
+                decryptor.apply_keystream(&mut pk);
+
+                let mut packet_key = [0u8; PACKET_KEY_LENGTH];
+                getrandom(&mut packet_key)?;
+
+                let mut chain_key = [0u8; 32];
+                chain_key.clone_from_slice(&pk.as_slice()[0..32]);
+
+                Ok((
+                    HoprKeys {
+                        packet_key: (packet_key, OffchainPublicKey::from_privkey(&packet_key[..]).unwrap()),
+                        chain_key: (chain_key, PublicKey::from_privkey(&chain_key[..]).unwrap()),
+                        id: keystore.id,
+                    },
+                    true,
+                ))
+            }
+            172 => {
+                decryptor.apply_keystream(&mut pk);
+
+                let private_keys = serde_json::from_slice::<PrivateKeys>(&pk)?;
+
+                if private_keys.packet_key.len() != PACKET_KEY_LENGTH {
+                    return Err(KeyPairError::InvalidEncryptedKeyLength {
+                        actual: private_keys.packet_key.len(),
+                        expected: PACKET_KEY_LENGTH,
+                    });
+                }
+
+                if private_keys.chain_key.len() != CHAIN_KEY_LENGTH {
+                    return Err(KeyPairError::InvalidEncryptedKeyLength {
+                        actual: private_keys.chain_key.len(),
+                        expected: CHAIN_KEY_LENGTH,
+                    });
+                }
+
+                let mut packet_key = [0u8; PACKET_KEY_LENGTH];
+                packet_key.clone_from_slice(private_keys.packet_key.as_slice());
+
+                let mut chain_key = [0u8; CHAIN_KEY_LENGTH];
+                chain_key.clone_from_slice(private_keys.chain_key.as_slice());
+
+                Ok((
+                    HoprKeys {
+                        packet_key: (packet_key, OffchainPublicKey::from_privkey(&packet_key[..]).unwrap()),
+                        // TODO: change this to off-chain privKey
+                        chain_key: (chain_key, PublicKey::from_privkey(&chain_key[..]).unwrap()),
+                        id: keystore.id,
+                    },
+                    false,
+                ))
+            }
+            _ => {
+                return Err(KeyPairError::InvalidEncryptedKeyLength {
+                    actual: pk.len(),
+                    expected: PACKET_KEY_LENGTH + CHAIN_KEY_LENGTH,
+                });
+            }
         }
-
-        decryptor.apply_keystream(&mut pk);
-
-        let mut packet_key = [0u8; 32];
-        packet_key.clone_from_slice(&pk.as_slice()[..32]);
-        let mut chain_key = [0u8; 32];
-        chain_key.clone_from_slice(&pk.as_slice()[32..64]);
-
-        Ok(HoprKeys {
-            packet_key: (packet_key, OffchainPublicKey::from_privkey(&packet_key[..]).unwrap()),
-            // TODO: change this to off-chain privKey
-            chain_key: (chain_key, PublicKey::from_privkey(&chain_key[..]).unwrap()),
-        })
     }
 
+    /// Writes a keystore file using custom FS operation and custom entropy source
+    ///
+    /// Highly inspired by https://github.com/roynalnaruto/eth-keystore-rs
     pub fn write_eth_keystore(&self, path: &str, password: &str, use_weak_crypto: bool) -> Result<()> {
         // Generate a random salt.
         let mut salt = [0u8; HOPR_KEY_SIZE];
@@ -337,23 +420,26 @@ impl HoprKeys {
 
         let encryptor = Aes128Ctr::new(&key[..16], &iv[..16]).expect("invalid length");
 
-        let mut ciphertext = [self.packet_key.0, self.chain_key.0].concat();
+        let private_keys = PrivateKeys {
+            chain_key: self.chain_key.0.into(),
+            packet_key: self.packet_key.0.into(),
+            version: VERSION,
+        };
+
+        let mut ciphertext = serde_json::to_vec(&private_keys)?;
         encryptor.apply_keystream(&mut ciphertext);
 
         // Calculate the MAC.
         let mac = Keccak256::new().chain(&key[16..32]).chain(&ciphertext).finalize();
 
-        // If a file name is not specified for the keystore, simply use the strigified uuid.
-        let id = Uuid::new_v4();
-
         // Construct and serialize the encrypted JSON keystore.
         let keystore = EthKeystore {
-            id,
+            id: self.id,
             version: 3,
             crypto: CryptoJson {
                 cipher: String::from(HOPR_CIPHER),
                 cipherparams: CipherparamsJson { iv: iv.to_vec() },
-                ciphertext: ciphertext.to_vec(),
+                ciphertext,
                 kdf: KdfType::Scrypt,
                 kdfparams: KdfparamsType::Scrypt {
                     dklen: HOPR_KDF_PARAMS_DKLEN,
@@ -390,7 +476,6 @@ impl Debug for HoprKeys {
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use js_sys::{Promise, Uint8Array};
-    use utils_misc::ok_or_jserr;
     use utils_types::traits::PeerIdLike;
     use wasm_bindgen::prelude::*;
 
@@ -444,29 +529,18 @@ pub mod wasm {
         pub fn get_chain_key_priv_key(&self) -> Uint8Array {
             Uint8Array::from(&self.w.chain_key.0[..])
         }
-
-        #[wasm_bindgen]
-        pub fn read_eth_keystore(path: &str, password: &str) -> Result<HoprKeys, JsValue> {
-            let keys = ok_or_jserr!(super::HoprKeys::read_eth_keystore(path, password))?;
-            Ok(Self { w: keys })
-        }
-
-        #[wasm_bindgen]
-        pub fn write_eth_keystore(&self, path: &str, password: &str, use_weak_crypto: bool) -> Result<(), JsValue> {
-            ok_or_jserr!(super::HoprKeys::write_eth_keystore(
-                &self.w,
-                path,
-                password,
-                use_weak_crypto
-            ))
-        }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
     use super::HoprKeys;
     use tempfile::tempdir;
+    use utils_types::traits::PeerIdLike;
+
+    const DEFAULT_PASSWORD: &str = "dummy password for unit testing";
 
     #[test]
     fn create_keys() {
@@ -481,13 +555,60 @@ mod tests {
 
         let keys = HoprKeys::new();
 
-        let password = "dummy password for unit testing";
-
-        keys.write_eth_keystore(identity_dir.to_str().unwrap(), password, true)
+        keys.write_eth_keystore(identity_dir.to_str().unwrap(), DEFAULT_PASSWORD, true)
             .unwrap();
 
-        let deserialized = HoprKeys::read_eth_keystore(identity_dir.to_str().unwrap(), password).unwrap();
+        let (deserialized, needs_migration) =
+            HoprKeys::read_eth_keystore(identity_dir.to_str().unwrap(), DEFAULT_PASSWORD).unwrap();
 
+        assert!(!needs_migration);
         assert_eq!(deserialized, keys);
+    }
+
+    #[test]
+    fn test_migration() {
+        let tmp = tempdir().unwrap();
+
+        let identity_dir = tmp.path().join("hopr-unit-test-identity");
+
+        let old_keystore_file = r#"{"id":"8e5fe142-6ef9-4fbb-aae8-5de32b680e31","version":3,"crypto":{"cipher":"aes-128-ctr","cipherparams":{"iv":"04141354edb9dfb0c65e6905a3a0b9dd"},"ciphertext":"74f12f72cf2d3d73ff09f783cb9b57995b3808f7d3f71aa1fa1968696aedfbdd","kdf":"scrypt","kdfparams":{"salt":"f5e3f04eaa0c9efffcb5168c6735d7e1fe4d96f48a636c4f00107e7c34722f45","n":1,"dklen":32,"p":1,"r":8},"mac":"d0daf0e5d14a2841f0f7221014d805addfb7609d85329d4c6424a098e50b6fbe"}}"#;
+
+        fs::write(identity_dir.to_str().unwrap(), old_keystore_file.as_bytes()).unwrap();
+
+        let (deserialized, needs_migration) =
+            HoprKeys::read_eth_keystore(identity_dir.to_str().unwrap(), "local").unwrap();
+
+        assert!(needs_migration);
+        assert_eq!(
+            deserialized.chain_key.1.to_peerid_str(),
+            "16Uiu2HAm8WFpakjrdWauUKq2hb5bejivnbtFAumVv9KHKN5AvXXK"
+        );
+    }
+
+    #[test]
+    fn test_auto_migration() {
+        let tmp = tempdir().unwrap();
+        let identity_dir = tmp.path().join("hopr-unit-test-identity");
+
+        let old_keystore_file = r#"{"id":"8e5fe142-6ef9-4fbb-aae8-5de32b680e31","version":3,"crypto":{"cipher":"aes-128-ctr","cipherparams":{"iv":"04141354edb9dfb0c65e6905a3a0b9dd"},"ciphertext":"74f12f72cf2d3d73ff09f783cb9b57995b3808f7d3f71aa1fa1968696aedfbdd","kdf":"scrypt","kdfparams":{"salt":"f5e3f04eaa0c9efffcb5168c6735d7e1fe4d96f48a636c4f00107e7c34722f45","n":1,"dklen":32,"p":1,"r":8},"mac":"d0daf0e5d14a2841f0f7221014d805addfb7609d85329d4c6424a098e50b6fbe"}}"#;
+        fs::write(identity_dir.to_str().unwrap(), old_keystore_file.as_bytes()).unwrap();
+
+        assert!(HoprKeys::init(super::IdentityOptions {
+            initialize: false,
+            id_path: identity_dir.to_str().unwrap().into(),
+            password: "local".into(),
+            use_weak_crypto: None,
+            private_key: None,
+        })
+        .is_ok());
+
+        let (deserialized, needs_migration) =
+            HoprKeys::read_eth_keystore(identity_dir.to_str().unwrap(), "local").unwrap();
+
+        assert!(!needs_migration);
+        assert_eq!(
+            deserialized.chain_key.1.to_peerid_str(),
+            "16Uiu2HAm8WFpakjrdWauUKq2hb5bejivnbtFAumVv9KHKN5AvXXK"
+        );
     }
 }

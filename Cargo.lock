@@ -2457,11 +2457,8 @@ version = "0.3.0"
 dependencies = [
  "clap 4.0.32",
  "core-crypto",
- "elliptic-curve 0.13.4",
- "eth-keystore",
  "ethers",
- "generic-array 0.14.7",
- "k256 0.13.1",
+ "hoprd-keypair",
  "log",
  "serde",
  "serde_json",
