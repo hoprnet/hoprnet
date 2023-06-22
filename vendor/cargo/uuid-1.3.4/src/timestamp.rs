@@ -137,20 +137,14 @@ impl Timestamp {
         )
     }
 
-    #[deprecated(note = "use `to_unix` instead")]
+    #[deprecated(note = "use `to_unix` instead; this method will be removed in a future release")]
     /// Get the number of fractional nanoseconds in the Unix timestamp.
     ///
     /// This method is deprecated and probably doesn't do what you're expecting it to.
     /// It doesn't return the timestamp as nanoseconds since the Unix epoch, it returns
     /// the fractional seconds of the timestamp.
     pub const fn to_unix_nanos(&self) -> u32 {
-        // NOTE: This method never did what it said on the tin: instead of
-        // converting the timestamp into nanos it simply returned the nanoseconds
-        // part of the timestamp.
-        //
-        // We can't fix the behavior because the return type is too small to fit
-        // a useful value for nanoseconds since the epoch.
-        self.nanos
+        panic!("`Timestamp::to_unix_nanos` is deprecated and will be removed: use `Timestamp::to_unix` instead")
     }
 }
 
@@ -238,7 +232,7 @@ pub(crate) const fn encode_unix_timestamp_millis(millis: u64, random_bytes: &[u8
     let millis_low = (millis & 0xFFFF) as u16;
 
     let random_and_version =
-        (random_bytes[0] as u16 | ((random_bytes[1] as u16) << 8) & 0x0FFF) | (0x7 << 12);
+        (random_bytes[1] as u16 | ((random_bytes[0] as u16) << 8) & 0x0FFF) | (0x7 << 12);
 
     let mut d4 = [0; 8];
 
@@ -268,7 +262,7 @@ pub(crate) const fn decode_unix_timestamp_millis(uuid: &Uuid) -> u64 {
     millis
 }
 
-#[cfg(all(feature = "std", feature = "js", target_arch = "wasm32"))]
+#[cfg(all(feature = "std", feature = "js", target = "wasm32-unknown-unknown"))]
 fn now() -> (u64, u32) {
     use wasm_bindgen::prelude::*;
 
@@ -286,7 +280,7 @@ fn now() -> (u64, u32) {
     dbg!((secs, nanos))
 }
 
-#[cfg(all(feature = "std", any(not(feature = "js"), not(target_arch = "wasm32"))))]
+#[cfg(all(feature = "std", any(not(feature = "js"), not(target = "wasm32-unknown-unknown"))))]
 fn now() -> (u64, u32) {
     let dur = std::time::SystemTime::UNIX_EPOCH
         .elapsed()

@@ -48,7 +48,7 @@ fn parse_host(s: &str) -> Result<crate::config::Host, String> {
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub fn parse_private_key(s: &str) -> Result<Box<[u8]>, String> {
     if crate::config::validate_private_key(s).is_ok() {
-        let mut decoded = [0u8; 32];
+        let mut decoded = [0u8; 64];
 
         let priv_key = match s.strip_prefix("0x") {
             Some(priv_without_prefix) => priv_without_prefix,
