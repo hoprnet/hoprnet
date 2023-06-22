@@ -14,6 +14,17 @@ env:
   GITOPS_ENVIRONMENT: prod
   GITOPS_BRANCH: master
 jobs:
+  debug:
+    name: debug
+    runs-on: ubuntu-2-core
+    if: github.event.label.name == 'deploy_nodes' && ${{ github.event.action }} == 'labeled'
+    steps:
+      - name: Label
+        run: "${{ github.event.label.name }}"
+
+      - name: Action
+        run: "${{ github.event.action }}"
+
   deploy:
     name: deploy
     runs-on: ubuntu-2-core
