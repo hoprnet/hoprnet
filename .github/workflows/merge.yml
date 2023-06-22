@@ -1,17 +1,23 @@
 name: Merge
 on:
   pull_request:
+    branches:
+      - master
     types:
-      - closed
+      - synchronize
+# on:
+#   pull_request:
+#     types:
+#       - closed
 concurrency:
   group: ${{ github.head_ref }}-merge
   cancel-in-progress: false
 jobs:
   cleanup:
-    name: Cleanup cache
+    name: Cleanup gh actions
     runs-on: ubuntu-2-core
     steps:
-      - name: Check out code
+      - name: Checkout hoprnet repository
         uses: actions/checkout@v3
       - name: Cleanup
         run: |
@@ -33,3 +39,37 @@ jobs:
           echo "Done"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  tag:
+    name: Tag images
+    runs-on: ubuntu-2-core
+    steps:
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Check PR changes
+        id: check_pr_changeset
+        run: |
+          ./scripts/check-pr.sh --base-branch ${{ github.event.pull_request.base.sha }} --head-branch ${{ github.event.pull_request.head.sha }}
+          cat check_pr.log >> $GITHUB_ENV
+      - name: Docker Tag Toolchain
+        if: env.build_toolchain
+        run: |
+          docker tag europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-toolchain:pr-${{ github.event.pull_request.number }} europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-toolchain:latest
+          docker push europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-toolchain:latest
+      - name: Docker Tag Hopli
+        if: env.build_hopli
+        run: |
+          docker tag europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopli:pr-${{ github.event.pull_request.number }} europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopli:latest
+          docker push europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopli:latest
+      - name: Docker Tag Hoprd
+        if: env.build_hoprd
+        run: |
+          docker tag europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hoprd:pr-${{ github.event.pull_request.number }} europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hoprd:latest
+          docker push europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hoprd:latest
+      - name: Docker Tag Toolchain
+        if: env.build_anvil
+        run: |
+          docker tag europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-anvil:pr-${{ github.event.pull_request.number }} europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-anvil:latest
+          docker push europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-anvil:latest
