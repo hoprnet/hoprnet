@@ -17,6 +17,7 @@
 - Upgrade OpenZeppelin dependency to 4.8.3 and Solidity to 0.8.19 ([#5094](https://github.com/hoprnet/hoprnet/pull/5094))
 - Add support for logs in wasm environment Rust tests ([#5108](https://github.com/hoprnet/hoprnet/pull/5108))
 - Migrate Packet and Acknowledgement interactions to Rust ([#5074](https://github.com/hoprnet/hoprnet/pull/5074))
+- Change keystore to hold `chain_key` and `packet_key` ([#5175](https://github.com/hoprnet/hoprnet/pull/5175))
 
 <a name="1.93"></a>
 
