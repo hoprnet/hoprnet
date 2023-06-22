@@ -31,8 +31,10 @@ pub mod native {
     }
 
     pub fn metadata(path: &str) -> Result<()> {
-        fs::metadata(path).map_err(|e| RealError::GeneralError(e.to_string()))?;
-        Ok(())
+        match fs::metadata(path) {
+            Ok(_) => Ok(()), // currently not interested in details
+            Err(e) => Err(RealError::GeneralError(e.to_string())),
+        }
     }
 }
 
@@ -46,10 +48,10 @@ pub mod wasm {
         pub fn read_file_js(path: &str) -> std::result::Result<Box<[u8]>, JsValue>;
 
         #[wasm_bindgen(catch, js_name = "writeFileSync")]
-        pub fn write_file(path: &str, contents: &[u8]) -> std::result::Result<(), JsValue>;
+        pub fn write_file_js(path: &str, contents: &[u8]) -> std::result::Result<(), JsValue>;
 
-        #[wasm_bindgen(catch)]
-        pub fn access(path: &str) -> std::result::Result<u32, JsValue>;
+        #[wasm_bindgen(catch, js_name = "accessSync")]
+        pub fn access_js(path: &str) -> std::result::Result<u32, JsValue>;
     }
 
     #[allow(dead_code)]
@@ -83,11 +85,13 @@ pub mod wasm {
     where
         R: AsRef<[u8]>,
     {
-        write_file(path, contents.as_ref()).map_err(|e| RealError::JsError(format!("{:?}", e)))
+        write_file_js(path, contents.as_ref()).map_err(|e| RealError::JsError(format!("{:?}", e)))
     }
 
     pub fn metadata(path: &str) -> Result<()> {
-        access(path).map_err(|e| RealError::JsError(format!("{:?}", e)))?;
-        Ok(())
+        match access_js(path) {
+            Ok(_) => Ok(()), // currently not interested in details
+            Err(e) => Err(RealError::JsError(format!("{:?}", e))),
+        }
     }
 }
