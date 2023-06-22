@@ -1,14 +1,8 @@
 name: Merge
 on:
   pull_request:
-    branches:
-      - master
     types:
-      - synchronize
-# on:
-#   pull_request:
-#     types:
-#       - closed
+      - closed
 concurrency:
   group: ${{ github.head_ref }}-merge
   cancel-in-progress: false
