@@ -21,7 +21,12 @@ pub fn read_identities(files: Vec<PathBuf>, password: &String) -> Result<Vec<Hop
         println!("{}", file_str);
 
         match HoprKeys::read_eth_keystore(file_str, password) {
-            Ok(keys) => results.push(keys),
+            Ok((keys, needs_migration)) => {
+                if needs_migration {
+                    keys.write_eth_keystore(file_str, password, false)?
+                }
+                results.push(keys)
+            }
             Err(e) => {
                 warn!("Could not decrypt keystore file at {}. {}", file_str, e.to_string())
             }
