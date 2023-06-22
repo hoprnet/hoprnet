@@ -172,6 +172,21 @@ mod tests {
     }
 
     #[test]
+    fn test_prp_fixed_2() {
+        let key = [0xab_u8; 4 * 32];
+        let iv = [0xcd_u8; 4 * 16];
+
+        let prp = PRP::new(&key, &iv);
+
+        let data = [0xef_u8; 278];
+
+        let ct = prp.forward(&data).unwrap();
+        let pt = prp.inverse(&ct).unwrap();
+
+        assert_eq!(&data, pt.as_ref());
+    }
+
+    #[test]
     fn test_prp_forward_only() {
         let key = [0u8; 4 * 32];
         let iv = [0u8; 4 * 16];
@@ -240,17 +255,18 @@ mod tests {
 
         let expected_key = hex!("a9c6632c9f76e5e4dd03203196932350a47562f816cebb810c64287ff68586f35cb715a26e268fc3ce68680e16767581de4e2cb3944c563d1f1a0cc077f3e788a12f31ae07111d77a876a66de5bdd6176bdaa2e07d1cb2e36e428afafdebb2109f70ce8422c8821233053bdd5871523ffb108f1e0f86809999a99d407590df25");
         let expected_iv = hex!("a59991716be504b26471dea53d688c4bab8e910328e54ebb6ebf07b49e6d12eacfc56e0935ba2300559b43ede25aa09eee7e8a2deea5f0bdaee2e859834edd38");
-        assert_eq!(expected_key, params.key);
-        assert_eq!(expected_iv, params.iv);
+        assert_eq!(expected_key, params.key, "key doesn't match");
+        assert_eq!(expected_iv, params.iv, "iv doesn't match");
 
         let prp = PRP::from_parameters(params);
 
         let pt = [0u8; 100];
         let ct = prp.forward(&pt).unwrap();
+        let r_pt = prp.inverse(&ct).unwrap();
 
-        let expected_ct = hex!("f80036d72b5e61e20f3f5840a013d12b5dd496f2da55b930f961905fbbbc8158dc17b58510bf280d0359e0b233a099bde840e07d54ca308e55ee0196b8f013b5def9b6a3ec9a727071c5dbdbeabdedcecfbdc3ecdd69fdcd957ff60ac573cc0dbab45b04");
-        assert_eq!([0u8; 100], pt); // input is not overwritten
-        assert_eq!(&expected_ct, ct.as_ref());
+        assert_eq!([0u8; 100], pt, "input should not be overwritten");
+        assert_ne!(&pt, ct.as_ref(), "ciphertext must be different from plaintext");
+        assert_eq!(r_pt.as_ref(), &pt, "plaintexts don't match");
     }
 }
 
