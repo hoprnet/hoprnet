@@ -14,17 +14,6 @@ env:
   GITOPS_ENVIRONMENT: prod
   GITOPS_BRANCH: master
 jobs:
-  debug:
-    name: debug
-    runs-on: ubuntu-2-core
-    if: github.event.label.name == 'deploy_nodes' && github.event.action == 'labeled'
-    steps:
-      - name: Label
-        run: "${{ github.event.label.name }}"
-
-      - name: Action
-        run: "${{ github.event.action }}"
-
   deploy:
     name: deploy
     runs-on: ubuntu-2-core
@@ -58,23 +47,23 @@ jobs:
           echo git checkout -b deployments/${network/_/-}-pr-${{ github.event.pull_request.number }}
           ./scripts/sync-deployment.sh deploy -e ${{ env.GITOPS_ENVIRONMENT }} -n ${network} -pr ${{ github.event.pull_request.number }}
         working-directory: "./gitops"
-      # - name: Create Deploy Pull Request
-      #   uses: peter-evans/create-pull-request@v5
-      #   with:
-      #     token: ${{ secrets.COMMIT_BOT_ACCESS_TOKEN }}
-      #     path: "./gitops"
-      #     commit-message: "Creating ClusterHoprd for pull request #${{ github.event.pull_request.number }}"
-      #     branch: "deployments/${{ env.NETWORK_DASH }}-pr-${{ github.event.pull_request.number }}"
-      #     title: "[Deployment] #${{ github.event.pull_request.number }} - ${{ github.event.pull_request.title }}"
-      #     body: "This pull request contains the creation of a ClusterHoprd in Kubernetes for testing PR https://github.com/hoprnet/hoprnet/pull/${{ github.event.pull_request.number }}"
-      #     labels: ClusterHoprd
-      #     assignees: ${{ github.event.pull_request.user.login }}
-      #     # reviewers: hopr-version-bot
+      - name: Create Deploy Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.COMMIT_BOT_ACCESS_TOKEN }}
+          path: "./gitops"
+          commit-message: "Creating ClusterHoprd for pull request #${{ github.event.pull_request.number }}"
+          branch: "deployments/${{ env.NETWORK_DASH }}-pr-${{ github.event.pull_request.number }}"
+          title: "[Deployment] #${{ github.event.pull_request.number }} - ${{ github.event.pull_request.title }}"
+          body: "This pull request contains the creation of a ClusterHoprd in Kubernetes for testing PR https://github.com/hoprnet/hoprnet/pull/${{ github.event.pull_request.number }}"
+          labels: ClusterHoprd
+          assignees: ${{ github.event.pull_request.user.login }}
+          # reviewers: hopr-version-bot
 
   undeploy:
     name: undeploy
     runs-on: ubuntu-2-core
-    if: github.event.label.name == 'deploy_nodes' && ${{ github.event.action }} == 'unlabeled'
+    if: github.event.label.name == 'deploy_nodes' && github.event.action == 'unlabeled'
     steps:
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -105,15 +94,15 @@ jobs:
           echo git checkout -b undeployments/${network/_/-}-pr-${{ github.event.pull_request.number }}
           ./scripts/sync-deployment.sh undeploy -e ${{ env.GITOPS_ENVIRONMENT }} -pr ${{ github.event.pull_request.number }}
         working-directory: "./gitops"
-      # - name: Create Undeploy Pull Request
-      #   uses: peter-evans/create-pull-request@v5
-      #   with:
-      #     token: ${{ secrets.COMMIT_BOT_ACCESS_TOKEN }}
-      #     path: "./gitops"
-      #     commit-message: "Deleting ClusterHoprd for pull request #${{ github.event.pull_request.number }}"
-      #     branch: "undeployments/${{ env.NETWORK_DASH }}-pr-${{ github.event.pull_request.number }}"
-      #     title: "[Undeployment] #${{ github.event.pull_request.number }} - ${{ github.event.pull_request.title }}"
-      #     body: "This pull request contains the deletion of a ClusterHoprd in Kubernetes used for testing PR https://github.com/hoprnet/hoprnet/pull/${{ github.event.pull_request.number }}"
-      #     labels: ClusterHoprd
-      #     assignees: ${{ github.event.pull_request.user.login }}
-      #     # reviewers: hopr-version-bot
+      - name: Create Undeploy Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.COMMIT_BOT_ACCESS_TOKEN }}
+          path: "./gitops"
+          commit-message: "Deleting ClusterHoprd for pull request #${{ github.event.pull_request.number }}"
+          branch: "undeployments/${{ env.NETWORK_DASH }}-pr-${{ github.event.pull_request.number }}"
+          title: "[Undeployment] #${{ github.event.pull_request.number }} - ${{ github.event.pull_request.title }}"
+          body: "This pull request contains the deletion of a ClusterHoprd in Kubernetes used for testing PR https://github.com/hoprnet/hoprnet/pull/${{ github.event.pull_request.number }}"
+          labels: ClusterHoprd
+          assignees: ${{ github.event.pull_request.user.login }}
+          # reviewers: hopr-version-bot
