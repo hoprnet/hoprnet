@@ -824,7 +824,7 @@ pub struct OffchainSignature {
 impl OffchainSignature {
     pub fn sign_message(msg: &[u8], signing_keypair: &OffchainKeypair) -> Self {
         let expanded_sk = ed25519_dalek::ExpandedSecretKey::from(
-            &ed25519_dalek::SecretKey::from_bytes(signing_keypair.secret()).expect("invalid private key")
+            &ed25519_dalek::SecretKey::from_bytes(signing_keypair.secret().as_ref()).expect("invalid private key")
         );
 
         let verifying = ed25519_dalek::PublicKey::from_bytes(signing_keypair.public().compressed.as_bytes())
@@ -896,14 +896,14 @@ impl Signature {
 
     /// Signs the given message using the chain private key.
     pub fn sign_message(message: &[u8], chain_keypair: &ChainKeypair) -> Signature {
-        Self::sign(message, chain_keypair.secret(), |k: &SigningKey, data: &[u8]| {
+        Self::sign(message, chain_keypair.secret().as_ref(), |k: &SigningKey, data: &[u8]| {
             k.sign_recoverable(data)
         })
     }
 
     /// Signs the given hash using the raw private key.
     pub fn sign_hash(hash: &[u8], chain_keypair: &ChainKeypair) -> Signature {
-        Self::sign(hash, chain_keypair.secret(), |k: &SigningKey, data: &[u8]| {
+        Self::sign(hash, chain_keypair.secret().as_ref(), |k: &SigningKey, data: &[u8]| {
             k.sign_prehash_recoverable(data)
         })
     }
@@ -1199,7 +1199,7 @@ pub mod tests {
     fn offchain_public_key_test() {
         let (s, pk1) = OffchainKeypair::random().unzip();
 
-        let pk2 = OffchainPublicKey::from_privkey(&s).unwrap();
+        let pk2 = OffchainPublicKey::from_privkey(s.as_ref()).unwrap();
         assert_eq!(pk1, pk2, "from privkey failed");
 
         let pk3 = OffchainPublicKey::from_bytes(&pk1.to_bytes()).unwrap();
