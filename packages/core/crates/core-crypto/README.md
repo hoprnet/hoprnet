@@ -14,7 +14,7 @@ The crate is structured into the following modules:
 - `keypairs`: defines the two types of keypairs (`ChainKeypair` used for on-chain operations - based on secp256k1, and `OffchainKeypair` for packet operations - based on Ed25519)
 - `parameters`: contains various cryptography related global constants
 - `prg`: implementation of a pseudo-random generator function used in SPHINX packet header construction
-- `primitives`: contains implementation of cryptographic primitives: Blake256s digest,  
+- `primitives`: contains implementation of cryptographic primitives: Blake2s256 digest, Keccak256 digest, Mac using Blake2s256 and ChaCha20 stream cipher 
 - 
 
 ## SPHINX shared keys derivation

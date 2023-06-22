@@ -1061,7 +1061,7 @@ mod tests {
                 .expect("failed to store pending ack");
 
             // This is what counterparty derives and sends back to solve the challenge
-            let ack_key = derive_ack_key_share(secrets[0].as_ref());
+            let ack_key = derive_ack_key_share(&secrets[0]);
 
             sent_challenges.push((ack_key, porv.ack_challenge));
         }

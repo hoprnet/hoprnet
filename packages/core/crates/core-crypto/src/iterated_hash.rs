@@ -13,7 +13,6 @@ pub struct IteratedHash {
 }
 
 /// Contains the intermediate result in the hash iteration progression
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Intermediate {
     pub iteration: usize,

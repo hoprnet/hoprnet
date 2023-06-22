@@ -3,39 +3,15 @@ use blake2::Blake2s256;
 use std::ops::Mul;
 use generic_array::{ArrayLength, GenericArray};
 
-use crate::errors::CryptoError::{CalculationError, InvalidInputValue};
+use crate::errors::CryptoError::CalculationError;
 use hkdf::SimpleHkdf;
-use zeroize::{ZeroizeOnDrop};
 
-use crate::errors::{CryptoError, Result};
-use crate::parameters::SECRET_KEY_LENGTH;
-use crate::random::random_bytes;
+use crate::errors::Result;
 use crate::keypairs::Keypair;
+use crate::utils::SecretValue;
 
 /// Represents a shared secret with a remote peer.
-#[derive(Debug, PartialEq, Eq, ZeroizeOnDrop)]
-pub struct SharedSecret([u8; SECRET_KEY_LENGTH]);
-
-impl AsRef<[u8]> for SharedSecret {
-    fn as_ref(&self) -> &[u8] {
-        &self.0
-    }
-}
-
-impl TryFrom<&[u8]> for SharedSecret {
-    type Error = CryptoError;
-
-    fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
-        Ok(Self(value.try_into().map_err(|_| InvalidInputValue)?))
-    }
-}
-
-impl SharedSecret {
-    /// Generates a random shared secret, not derived from a public group element
-    pub fn random() -> Self {
-        Self(random_bytes())
-    }
-}
+pub type SharedSecret = SecretValue<typenum::U32>;
 
 /// Types representing a valid non-zero scalar an additive abelian group.
 pub trait Scalar: Mul<Output = Self> + Sized {
@@ -81,18 +57,18 @@ pub trait GroupElement<A: ArrayLength<u8>, E: Scalar>: Clone + for <'a> Mul<&'a 
     /// Extract a keying material from a group element using HKDF extract
     fn extract_key(&self, salt: &[u8]) -> SharedSecret {
         let ikm = self.to_alpha();
-        SharedSecret(SimpleHkdf::<Blake2s256>::extract(Some(&salt), ikm.as_ref()).0.into())
+        SimpleHkdf::<Blake2s256>::extract(Some(&salt), ikm.as_ref()).0.into()
     }
 
     /// Performs KDF expansion from the given group element using HKDF expand
     fn expand_key(&self, salt: &[u8]) -> SharedSecret {
-        let mut out = [0u8; SECRET_KEY_LENGTH];
+        let mut out = GenericArray::default();
         let ikm = self.to_alpha();
         SimpleHkdf::<Blake2s256>::new(Some(salt), &ikm)
             .expand(b"", &mut out)
-            .unwrap(); // Cannot panic, unless the constants are wrong
+            .expect("invalid size of the shared secret output"); // Cannot panic, unless the constants are wrong
 
-        SharedSecret(out)
+        out.into()
     }
 }
 
@@ -136,7 +112,7 @@ impl <E: Scalar, A: ArrayLength<u8>, G: GroupElement<A, E>> SharedKeys<E, A, G> 
 
             // Compute the new blinding factor b_k (alpha needs compressing first)
             let b_k = shared_secret.expand_key(&alpha_prev.to_alpha());
-            let b_k_checked = E::from_bytes(&b_k.0)?;
+            let b_k_checked = E::from_bytes(&b_k.as_ref())?;
 
             // Update coeff_prev and alpha
             alpha_prev = alpha_prev.mul(&b_k_checked);
@@ -166,7 +142,7 @@ impl <E: Scalar, A: ArrayLength<u8>, G: GroupElement<A, E>> SharedKeys<E, A, G> 
 
         let b_k = s_k.expand_key(alpha);
 
-        let b_k_checked = E::from_bytes(&b_k.0)?;
+        let b_k_checked = E::from_bytes(&b_k.as_ref())?;
         let alpha_new = alpha_point.mul(&b_k_checked);
 
         Ok((alpha_new.to_alpha(), secret))
@@ -196,6 +172,7 @@ pub trait SphinxSuite {
 
 #[cfg(test)]
 pub mod tests {
+    use subtle::ConstantTimeEq;
     use super::*;
 
     pub fn generic_sphinx_suite_test<S: SphinxSuite>(node_count: usize) {
@@ -205,13 +182,13 @@ pub mod tests {
 
         // Now generate the key shares for the public keys
         let generated_shares = SharedKeys::<S::E, S::A, S::G>::generate(pub_keys.clone()).unwrap();
-        assert_eq!(node_count, generated_shares.secrets.len());
+        assert_eq!(node_count, generated_shares.secrets.len(), "number of generated keys should be equal to the number of nodes");
 
         let mut alpha_cpy = generated_shares.alpha.clone();
         for (i, priv_key) in priv_keys.into_iter().enumerate() {
             let (alpha, secret) = SharedKeys::<S::E, S::A, S::G>::forward_transform(&alpha_cpy, &priv_key, &pub_keys[i]).unwrap();
 
-            assert_eq!(secret, generated_shares.secrets[i]);
+            assert_eq!(secret.ct_eq(&generated_shares.secrets[i]).unwrap_u8(), 1, "forward transform should yield the same shared secret");
 
             alpha_cpy = alpha;
         }

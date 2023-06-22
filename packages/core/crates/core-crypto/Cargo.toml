@@ -26,7 +26,7 @@ digest = "0.10"
 ed25519-dalek = { version = "1.0.1", features = ["serde"] }
 elliptic-curve = { version = "0.13", features = ["serde"] }
 futures = "0.3.28"
-generic-array = "0.14.7"
+generic-array = { version = "0.14.7", features = ["zeroize"] }
 getrandom = { version = "0.2.8", features = ["js"] }
 hex = "0.4"
 hex-literal = "0.4"

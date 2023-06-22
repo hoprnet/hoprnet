@@ -113,7 +113,7 @@ impl<S: SphinxSuite> MetaPacket<S> {
 
         // Encrypt packet payload using the derived shared secrets
         for secret in shared_keys.secrets.iter().rev() {
-            let prp = PRP::from_parameters(PRPParameters::new(secret.as_ref()));
+            let prp = PRP::from_parameters(PRPParameters::new(secret));
             prp.forward_inplace(&mut padded)
                 .unwrap_or_else(|e| panic!("onion encryption error {e}"))
         }
@@ -196,7 +196,7 @@ impl<S: SphinxSuite> MetaPacket<S> {
 
         let mut routing_info_cpy: Vec<u8> = self.routing_info().into();
         let fwd_header = forward_header::<S>(
-            secret.as_ref(),
+            &secret,
             &mut routing_info_cpy,
             self.mac(),
             max_hops,
@@ -204,7 +204,7 @@ impl<S: SphinxSuite> MetaPacket<S> {
             additional_data_last_hop_len,
         )?;
 
-        let prp = PRP::from_parameters(PRPParameters::new(secret.as_ref()));
+        let prp = PRP::from_parameters(PRPParameters::new(&secret));
         let decrypted = prp.inverse(self.payload())?;
 
         Ok(match fwd_header {
@@ -215,13 +215,13 @@ impl<S: SphinxSuite> MetaPacket<S> {
                 additional_info,
             } => RelayedPacket {
                 packet: Self::new_from_parts(alpha, &header, &mac, &decrypted),
-                packet_tag: derive_packet_tag(secret.as_ref())?,
+                packet_tag: derive_packet_tag(&secret),
                 derived_secret: secret,
                 next_node: <S::P as Keypair>::Public::from_bytes(&next_node).map_err(|_| PacketDecodingError("couldn't parse next node id".into()))?,
                 additional_info,
             },
             ForwardedHeader::FinalNode { additional_data } => FinalPacket {
-                packet_tag: derive_packet_tag(secret.as_ref())?,
+                packet_tag: derive_packet_tag(&secret),
                 derived_secret: secret,
                 plain_text: remove_padding(&decrypted)
                     .ok_or(PacketDecodingError(format!("couldn't remove padding: {}", hex::encode(decrypted.as_ref()))))?
@@ -326,10 +326,10 @@ impl Packet {
                     next_node,
                     ..
                 } => {
-                    let ack_key = derive_ack_key_share(derived_secret.as_ref());
+                    let ack_key = derive_ack_key_share(&derived_secret);
 
                     let ticket = Ticket::from_bytes(pre_ticket)?;
-                    let verification_output = pre_verify(derived_secret.as_ref(), &additional_info, &ticket.challenge)?;
+                    let verification_output = pre_verify(&derived_secret, &additional_info, &ticket.challenge)?;
                     Ok(Self {
                         packet,
                         ticket,
@@ -351,7 +351,7 @@ impl Packet {
                     derived_secret,
                     additional_data: _,
                 } => {
-                    let ack_key = derive_ack_key_share(derived_secret.as_ref());
+                    let ack_key = derive_ack_key_share(&derived_secret);
 
                     let ticket = Ticket::from_bytes(pre_ticket)?;
                     Ok(Self {

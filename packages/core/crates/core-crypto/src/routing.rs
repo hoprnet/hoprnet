@@ -1,14 +1,11 @@
 use crate::derivation::derive_mac_key;
 use crate::errors::CryptoError::TagMismatch;
 use crate::errors::Result;
-use crate::parameters::SECRET_KEY_LENGTH;
 use crate::prg::{PRG, PRGParameters};
-use crate::primitives::{create_tagged_mac, DigestLike, SimpleMac};
+use crate::primitives::{create_tagged_mac, DigestLike, SecretKey, SimpleMac};
 use crate::random::random_fill;
 use crate::routing::ForwardedHeader::{FinalNode, RelayNode};
 use crate::utils::xor_inplace;
-use std::ops::Not;
-use subtle::ConstantTimeEq;
 use utils_types::traits::BinarySerializable;
 use crate::shared_keys::{SharedSecret, SphinxSuite};
 use crate::keypairs::Keypair;
@@ -49,7 +46,7 @@ fn generate_filler(
     let mut start = header_len;
 
     for secret in secrets.iter().take(secrets.len() - 1) {
-        let prg = PRG::from_parameters(PRGParameters::new(secret.as_ref()));
+        let prg = PRG::from_parameters(PRGParameters::new(secret));
 
         let digest = prg.digest(start, header_len + routing_info_len);
         xor_inplace(&mut ret[0..length], digest.as_ref());
@@ -121,8 +118,7 @@ impl RoutingInfo {
 
         for idx in 0..secrets.len() {
             let inverted_idx = secrets.len() - idx - 1;
-            let secret = secrets[inverted_idx].as_ref();
-            let prg = PRG::from_parameters(PRGParameters::new(secret));
+            let prg = PRG::from_parameters(PRGParameters::new(&secrets[inverted_idx]));
 
             if idx == 0 {
                 extended_header[0] = RELAYER_END_PREFIX;
@@ -158,7 +154,7 @@ impl RoutingInfo {
                 xor_inplace(&mut extended_header, &key_stream);
             }
 
-            let mut m = derive_mac_key(secret).map(|k| SimpleMac::new(&k)).unwrap();
+            let mut m = SimpleMac::new(derive_mac_key(&secrets[inverted_idx]).as_ref());
             m.update(&extended_header[0..header_len]);
             m.finalize_into(&mut ret.mac);
         }
@@ -203,14 +199,13 @@ pub enum ForwardedHeader {
 /// * `additional_data_relayer_len` length of the additional data for each relayer
 /// * `additional_data_last_hop_len` length of the additional data for the final destination
 pub fn forward_header<S: SphinxSuite>(
-    secret: &[u8],
+    secret: &SecretKey,
     header: &mut [u8],
     mac: &[u8],
     max_hops: usize,
     additional_data_relayer_len: usize,
     additional_data_last_hop_len: usize,
 ) -> Result<ForwardedHeader> {
-    assert_eq!(SECRET_KEY_LENGTH, secret.len(), "invalid secret length");
     assert_eq!(SimpleMac::SIZE, mac.len(), "invalid mac length");
 
     let pub_key_size = <S::P as Keypair>::Public::SIZE;
@@ -221,9 +216,8 @@ pub fn forward_header<S: SphinxSuite>(
 
     assert_eq!(header_len, header.len(), "invalid pre-header length");
 
-    let computed_mac = create_tagged_mac(secret, header).unwrap();
-    let choice = computed_mac.as_ref().ct_eq(mac).not();
-    if choice.into() {
+    let computed_mac = create_tagged_mac(secret, header);
+    if !mac.eq(&computed_mac) {
         return Err(TagMismatch);
     }
 
@@ -297,7 +291,7 @@ pub mod tests {
 
         for i in 0..hops - 1 {
             let idx = secrets.len() - i - 2;
-            let mask = PRG::from_parameters(PRGParameters::new(secrets[idx].as_ref())).digest(0, extended_header_len);
+            let mask = PRG::from_parameters(PRGParameters::new(&secrets[idx])).digest(0, extended_header_len);
 
             xor_inplace(&mut extended_header, &mask);
 
@@ -360,7 +354,7 @@ pub mod tests {
         last_mac.copy_from_slice(&rinfo.mac);
 
         for (i, secret) in shares.secrets.iter().enumerate() {
-            let fwd = forward_header::<S>(secret.as_ref(), &mut header, &last_mac, MAX_HOPS, 0, 0).unwrap();
+            let fwd = forward_header::<S>(secret, &mut header, &last_mac, MAX_HOPS, 0, 0).unwrap();
 
             match fwd {
                 ForwardedHeader::RelayNode { mac, next_node, .. } => {

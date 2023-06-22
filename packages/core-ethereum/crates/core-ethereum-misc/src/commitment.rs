@@ -1,4 +1,4 @@
-use crate::errors::CoreEthereumError::{CommitmentError, CryptoError, DbError};
+use crate::errors::CoreEthereumError::{CommitmentError, DbError};
 use crate::errors::Result;
 use async_trait::async_trait;
 use core_crypto::derivation::derive_commitment_seed;
@@ -102,7 +102,7 @@ impl ChannelCommitmentInfo {
         buf.extend_from_slice(&self.channel_id.to_bytes());
         buf.extend_from_slice(self.contract_address.as_bytes());
 
-        derive_commitment_seed(private_key, &buf).map_err(|e| CryptoError(e))
+        Ok(derive_commitment_seed(private_key, &buf).into())
     }
 }
 

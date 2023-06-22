@@ -1,5 +1,4 @@
 use core_crypto::derivation::{derive_ack_key_share, derive_own_key_share};
-use core_crypto::parameters::SECRET_KEY_LENGTH;
 use core_crypto::shared_keys::SharedSecret;
 use core_crypto::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, PublicKey, Response};
 use utils_types::errors::GeneralError::ParseError;
@@ -24,11 +23,11 @@ impl ProofOfRelayValues {
     /// Takes the secrets which the first and the second relayer are able to derive from the packet header
     /// and computes the challenge for the first ticket.
     pub fn new(secret_b: &SharedSecret, secret_c: Option<&SharedSecret>) -> Self {
-        let s0 = derive_own_key_share(secret_b.as_ref());
-        let s1 = derive_ack_key_share(secret_c.unwrap_or(&SharedSecret::random()).as_ref());
+        let s0 = derive_own_key_share(secret_b);
+        let s1 = derive_ack_key_share(secret_c.unwrap_or(&SharedSecret::random()));
 
         Self {
-            ack_challenge: derive_ack_key_share(secret_b.as_ref()).to_challenge(),
+            ack_challenge: derive_ack_key_share(secret_b).to_challenge(),
             ticket_challenge: Response::from_half_keys(&s0, &s1)
                 .expect("failed to derive response")
                 .to_challenge(),
@@ -48,9 +47,9 @@ pub struct ProofOfRelayString {
 impl ProofOfRelayString {
     /// Creates instance from the shared secrets with node+2 and node+3
     pub fn new(secret_c: &SharedSecret, secret_d: Option<&SharedSecret>) -> Self {
-        let s0 = derive_ack_key_share(secret_c.as_ref());
-        let s1 = derive_own_key_share(secret_c.as_ref());
-        let s2 = derive_ack_key_share(secret_d.unwrap_or(&SharedSecret::random()).as_ref());
+        let s0 = derive_ack_key_share(secret_c);
+        let s1 = derive_own_key_share(secret_c);
+        let s2 = derive_ack_key_share(secret_d.unwrap_or(&SharedSecret::random()));
 
         Self {
             next_ticket_challenge: Response::from_half_keys(&s1, &s2)
@@ -106,8 +105,7 @@ pub struct ProofOfRelayOutput {
 /// * `secret` shared secret with the creator of the packet
 /// * `por_bytes` serialized `ProofOfRelayString` as included within the packet
 /// * `challenge` ticket challenge of the incoming ticket
-pub fn pre_verify(secret: &[u8], por_bytes: &[u8], challenge: &EthereumChallenge) -> Result<ProofOfRelayOutput> {
-    assert_eq!(SECRET_KEY_LENGTH, secret.len(), "invalid secret length");
+pub fn pre_verify(secret: &SharedSecret, por_bytes: &[u8], challenge: &EthereumChallenge) -> Result<ProofOfRelayOutput> {
     assert_eq!(POR_SECRET_LENGTH, por_bytes.len(), "invalid por bytes length");
 
     let pors = ProofOfRelayString::from_bytes(por_bytes)?;
@@ -185,10 +183,10 @@ mod tests {
 
         // Computation result of the first relayer before receiving an acknowledgement from the second relayer
         let first_challenge_eth = first_challenge.ticket_challenge.to_ethereum_challenge();
-        let first_result = pre_verify(secrets[0].as_ref(), &first_por_string.to_bytes(), &first_challenge_eth)
+        let first_result = pre_verify(&secrets[0], &first_por_string.to_bytes(), &first_challenge_eth)
             .expect("First challenge must be plausible");
 
-        let expected_hkc = derive_ack_key_share(secrets[1].as_ref()).to_challenge();
+        let expected_hkc = derive_ack_key_share(&secrets[1]).to_challenge();
         assert_eq!(expected_hkc, first_result.ack_challenge);
 
         // Simulates the transformation done by the first relayer
@@ -199,7 +197,7 @@ mod tests {
         );
 
         // Computes the cryptographic material that is part of the acknowledgement
-        let first_ack = derive_ack_key_share(secrets[1].as_ref());
+        let first_ack = derive_ack_key_share(&secrets[1]);
         assert!(
             validate_por_half_keys(
                 &first_challenge.ticket_challenge.to_ethereum_challenge(),
@@ -211,10 +209,10 @@ mod tests {
 
         // Simulates the transformation as done by the second relayer
         let first_result_challenge_eth = first_result.next_ticket_challenge.to_ethereum_challenge();
-        let second_result = pre_verify(secrets[1].as_ref(), &second_por_string.to_bytes(), &first_result_challenge_eth)
+        let second_result = pre_verify(&secrets[1], &second_por_string.to_bytes(), &first_result_challenge_eth)
             .expect("Second challenge must be plausible");
 
-        let second_ack = derive_ack_key_share(secrets[2].as_ref());
+        let second_ack = derive_ack_key_share(&secrets[2]);
         assert!(
             validate_por_half_keys(
                 &first_result.next_ticket_challenge.to_ethereum_challenge(),
@@ -242,7 +240,7 @@ mod tests {
             .collect::<Vec<_>>();
 
         let first_challenge = ProofOfRelayValues::new(&secrets[0], Some(&secrets[1]));
-        let ack = derive_ack_key_share(secrets[1].as_ref());
+        let ack = derive_ack_key_share(&secrets[1]);
 
         assert!(
             validate_por_half_keys(
