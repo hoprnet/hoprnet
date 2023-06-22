@@ -17,7 +17,7 @@ jobs:
   debug:
     name: debug
     runs-on: ubuntu-2-core
-    if: github.event.label.name == 'deploy_nodes' && ${{ github.event.action }} == 'labeled'
+    if: github.event.label.name == 'deploy_nodes' && github.event.action == 'labeled'
     steps:
       - name: Label
         run: "${{ github.event.label.name }}"
@@ -28,7 +28,7 @@ jobs:
   deploy:
     name: deploy
     runs-on: ubuntu-2-core
-    if: github.event.label.name == 'deploy_nodes' && ${{ github.event.action }} == 'labeled'
+    if: github.event.label.name == 'deploy_nodes' && github.event.action == 'labeled'
     steps:
       - name: Set up Python
         uses: actions/setup-python@v4
