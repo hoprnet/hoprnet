@@ -227,8 +227,5 @@ mod tests {
 
         assert_eq!([0u8; 100], pt, "plain text must not change for in-place operation");
         assert_ne!(&pt, ct.as_ref(), "plain text must be different from ciphertext");
-
-        //let expected_ct = hex!("f80036d72b5e61e20f3f5840a013d12b5dd496f2da55b930f961905fbbbc8158dc17b58510bf280d0359e0b233a099bde840e07d54ca308e55ee0196b8f013b5def9b6a3ec9a727071c5dbdbeabdedcecfbdc3ecdd69fdcd957ff60ac573cc0dbab45b04");
-        //assert_eq!(&expected_ct, ct.as_ref());
     }
 }

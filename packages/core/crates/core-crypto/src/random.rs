@@ -117,28 +117,6 @@ pub mod wasm {
     use wasm_bindgen::prelude::wasm_bindgen;
 
     #[wasm_bindgen]
-    pub struct GroupElement {
-        coeff: Box<[u8]>,
-        element: CurvePoint,
-    }
-
-    #[wasm_bindgen]
-    impl GroupElement {
-        pub fn random() -> GroupElement {
-            let (coeff, element) = crate::random::random_group_element();
-            Self { coeff: coeff.into(), element }
-        }
-
-        pub fn coefficient(&self) -> Uint8Array {
-            self.coeff.as_ref().into()
-        }
-
-        pub fn element(&self) -> CurvePoint {
-            self.element.clone()
-        }
-    }
-
-    #[wasm_bindgen]
     pub fn random_float() -> f64 {
         crate::random::random_float()
     }
