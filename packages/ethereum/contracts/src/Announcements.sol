@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.19;
 
-error PublicKeyDoesNotMatchSender(address pubkey, address sender);
-
 import 'openzeppelin-contracts-4.8.3/utils/Multicall.sol';
 
 /**
