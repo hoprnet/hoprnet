@@ -7,7 +7,7 @@ use k256::Secp256k1;
 
 use crate::errors::Result;
 use crate::parameters::{PACKET_TAG_LENGTH, PING_PONG_NONCE_SIZE};
-use crate::primitives::{calculate_mac, DigestLike, SecretKey, SimpleDigest, SimpleMac};
+use crate::primitives::{DigestLike, SecretKey, SimpleDigest, SimpleMac};
 use crate::random::random_fill;
 use crate::types::HalfKey;
 
@@ -56,7 +56,9 @@ pub fn derive_commitment_seed(private_key: &[u8], channel_info: &[u8]) -> [u8; S
         &private_key.try_into().expect("commitment private key size invalid"),
         HASH_KEY_COMMITMENT_SEED.as_bytes())
         .into();
-    calculate_mac(sk.as_ref(), channel_info)
+    let mut mac = SimpleMac::new(&sk);
+    mac.update(channel_info);
+    mac.finalize().into()
 }
 
 /// Represents a fixed size packet verification tag
@@ -136,7 +138,7 @@ mod tests {
 
         let res = derive_commitment_seed(&priv_key, &chinfo);
 
-        let r = hex!("6CBD916300C24CC0DA636490668A4D85A4F42113496FCB452099F76131A3662E");
+        let r = hex!("0abe559a1577e99e16f112bb8a88f7793ff1fb22af46b810995fb754ea319386");
         assert_eq!(r, res.as_ref());
     }
 

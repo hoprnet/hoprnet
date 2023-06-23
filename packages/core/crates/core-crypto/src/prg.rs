@@ -1,5 +1,7 @@
-use crate::derivation::generate_key_iv;
 use aes::cipher::{KeyIvInit, StreamCipher};
+use zeroize::ZeroizeOnDrop;
+
+use crate::derivation::generate_key_iv;
 use crate::primitives::SecretKey;
 
 // Module-specific constants
@@ -16,6 +18,7 @@ type Aes128Ctr32BE = ctr::Ctr32BE<aes::Aes128>;
 
 /// Parameters for the Pseudo-Random Generator (PRG) function
 /// This consists of IV and the raw secret key for use by the underlying block cipher.
+#[derive(ZeroizeOnDrop)]
 pub struct PRGParameters {
     key: [u8; PRG_KEY_LENGTH],
     iv: [u8; PRG_IV_LENGTH],
@@ -38,9 +41,7 @@ impl PRGParameters {
         generate_key_iv(secret, HASH_KEY_PRG.as_bytes(), &mut ret.key, &mut ret.iv, true);
         ret
     }
-}
 
-impl PRGParameters {
     /// Raw key material for the underlying block cipher
     pub fn key(&self) -> &[u8] {
         &self.key
@@ -56,6 +57,7 @@ impl PRGParameters {
 /// using AES-128 block cipher in Counter mode (with 32-bit counter).
 /// It forms an infinite sequence of pseudo-random bytes (generated deterministically from the parameters)
 /// and can be queried by chunks using the `digest` function.
+#[derive(ZeroizeOnDrop)]
 pub struct PRG {
     params: PRGParameters,
 }
@@ -63,7 +65,6 @@ pub struct PRG {
 impl PRG {
     /// Creates a PRG instance  using the raw key and IV for the underlying block cipher.
     pub fn new(key: [u8; PRG_KEY_LENGTH], iv: [u8; PRG_IV_LENGTH]) -> Self {
-
         Self { params: PRGParameters { key, iv } }
     }
 

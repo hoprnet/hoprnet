@@ -58,7 +58,9 @@ impl Scalar for k256::Scalar {
     }
 }
 
-impl GroupElement<typenum::U32, curve25519_dalek::scalar::Scalar> for curve25519_dalek::montgomery::MontgomeryPoint {
+impl GroupElement<curve25519_dalek::scalar::Scalar> for curve25519_dalek::montgomery::MontgomeryPoint {
+    type AlphaLen = typenum::U32;
+
     fn to_alpha(&self) -> Alpha<typenum::U32> {
         self.0.into()
     }
@@ -76,7 +78,8 @@ impl GroupElement<typenum::U32, curve25519_dalek::scalar::Scalar> for curve25519
     }
 }
 
-impl GroupElement<typenum::U32, curve25519_dalek::scalar::Scalar> for curve25519_dalek::edwards::EdwardsPoint {
+impl GroupElement<curve25519_dalek::scalar::Scalar> for curve25519_dalek::edwards::EdwardsPoint {
+    type AlphaLen = typenum::U32;
 
     fn to_alpha(&self) -> Alpha<typenum::U32>{
         self.compress().0.into()
@@ -95,7 +98,8 @@ impl GroupElement<typenum::U32, curve25519_dalek::scalar::Scalar> for curve25519
     }
 }
 
-impl GroupElement<typenum::U33, k256::Scalar> for k256::ProjectivePoint {
+impl GroupElement<k256::Scalar> for k256::ProjectivePoint {
+    type AlphaLen = typenum::U33;
 
     fn to_alpha(&self) -> Alpha<typenum::U33> {
         let mut ret = Alpha::<typenum::U33>::default();
@@ -122,7 +126,6 @@ impl GroupElement<typenum::U33, k256::Scalar> for k256::ProjectivePoint {
 pub struct Secp256k1Suite ;
 
 impl SphinxSuite for Secp256k1Suite {
-    type A = typenum::U33;
     type P = ChainKeypair;
     type E = k256::Scalar;
     type G = k256::ProjectivePoint;
@@ -132,7 +135,6 @@ impl SphinxSuite for Secp256k1Suite {
 pub struct Ed25519Suite ;
 
 impl SphinxSuite for Ed25519Suite {
-    type A = typenum::U32;
     type P = OffchainKeypair;
     type E = curve25519_dalek::scalar::Scalar;
     type G = curve25519_dalek::edwards::EdwardsPoint;
@@ -142,7 +144,6 @@ impl SphinxSuite for Ed25519Suite {
 pub struct X25519Suite ;
 
 impl SphinxSuite for X25519Suite {
-    type A = typenum::U32;
     type P = OffchainKeypair;
     type E = curve25519_dalek::scalar::Scalar;
     type G = curve25519_dalek::montgomery::MontgomeryPoint;

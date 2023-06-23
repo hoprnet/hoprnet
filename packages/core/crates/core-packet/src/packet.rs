@@ -3,13 +3,13 @@ use core_crypto::derivation::{derive_ack_key_share, derive_packet_tag, PacketTag
 use core_crypto::primitives::{DigestLike, SimpleMac};
 use core_crypto::prp::{PRP, PRPParameters};
 use core_crypto::routing::{forward_header, ForwardedHeader, header_length, RoutingInfo};
-use core_crypto::shared_keys::{Alpha, SharedKeys, SharedSecret, SphinxSuite};
+use core_crypto::shared_keys::{Alpha, GroupElement, SharedKeys, SharedSecret, SphinxSuite};
 use core_crypto::types::{Challenge, HalfKey, HalfKeyChallenge};
 use core_types::acknowledgement::Acknowledgement;
 use core_types::channels::Ticket;
 use libp2p_identity::PeerId;
+use typenum::Unsigned;
 use core_crypto::types::OffchainPublicKey;
-use typenum::marker_traits::Unsigned;
 use core_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
 use utils_types::errors::GeneralError::ParseError;
 use utils_types::traits::{BinarySerializable, PeerIdLike};
@@ -68,7 +68,7 @@ fn remove_padding(msg: &[u8]) -> Option<&[u8]> {
 
 struct MetaPacket<S: SphinxSuite> {
     packet: Box<[u8]>,
-    alpha: Alpha<S::A>,
+    alpha: Alpha<<S::G as GroupElement<S::E>>::AlphaLen>,
     header_len: usize,
 }
 
@@ -91,7 +91,7 @@ enum ForwardedMetaPacket<S: SphinxSuite> {
 
 impl<S: SphinxSuite> MetaPacket<S> {
     pub fn new(
-        shared_keys: SharedKeys<S::E, S::A, S::G>,
+        shared_keys: SharedKeys<S::E, S::G>,
         msg: &[u8],
         path: &Vec<<S::P as Keypair>::Public>,
         max_hops: usize,
@@ -126,7 +126,7 @@ impl<S: SphinxSuite> MetaPacket<S> {
         )
     }
 
-    fn new_from_parts(alpha: Alpha<S::A>, routing_info: &[u8], mac: &[u8], payload: &[u8]) -> Self {
+    fn new_from_parts(alpha: Alpha<<S::G as GroupElement<S::E>>::AlphaLen>, routing_info: &[u8], mac: &[u8], payload: &[u8]) -> Self {
         assert!(routing_info.len() > 0);
         assert_eq!(SimpleMac::SIZE, mac.len());
         assert_eq!(PAYLOAD_SIZE, payload.len());
@@ -145,22 +145,22 @@ impl<S: SphinxSuite> MetaPacket<S> {
     }
 
     pub fn routing_info(&self) -> &[u8] {
-        let base = S::A::USIZE;
+        let base = <S::G as GroupElement<S::E>>::AlphaLen::USIZE;
         &self.packet[base .. base + self.header_len]
     }
 
     pub fn mac(&self) -> &[u8] {
-        let base = S::A::USIZE + self.header_len;
+        let base = <S::G as GroupElement<S::E>>::AlphaLen::USIZE + self.header_len;
         &self.packet[base..base + SimpleMac::SIZE]
     }
 
     pub fn payload(&self) -> &[u8] {
-        let base = S::A::USIZE + self.header_len + SimpleMac::SIZE;
+        let base = <S::G as GroupElement<S::E>>::AlphaLen::USIZE + self.header_len + SimpleMac::SIZE;
         &self.packet[base..base + PAYLOAD_SIZE]
     }
 
     pub const fn size(header_len: usize) -> usize {
-        S::A::USIZE + header_len + SimpleMac::SIZE + PAYLOAD_SIZE
+        <S::G as GroupElement<S::E>>::AlphaLen::USIZE + header_len + SimpleMac::SIZE + PAYLOAD_SIZE
     }
 
     pub fn from_bytes(packet: &[u8], header_len: usize) -> utils_types::errors::Result<Self> {
@@ -170,7 +170,7 @@ impl<S: SphinxSuite> MetaPacket<S> {
                 header_len,
                 alpha: Default::default(),
             };
-            ret.alpha.copy_from_slice(&packet[..S::A::USIZE]);
+            ret.alpha.copy_from_slice(&packet[..<S::G as GroupElement<S::E>>::AlphaLen::USIZE]);
             Ok(ret)
         } else {
             Err(ParseError)
@@ -188,7 +188,7 @@ impl<S: SphinxSuite> MetaPacket<S> {
         additional_data_relayer_len: usize,
         additional_data_last_hop_len: usize,
     ) -> Result<ForwardedMetaPacket<S>> {
-        let (alpha, secret) = SharedKeys::<S::E, S::A, S::G>::forward_transform(
+        let (alpha, secret) = SharedKeys::<S::E, S::G>::forward_transform(
             &self.alpha,
             &(node_keypair.into()),
             &(node_keypair.public().into())

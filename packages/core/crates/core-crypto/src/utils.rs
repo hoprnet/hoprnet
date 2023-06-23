@@ -3,7 +3,7 @@ use subtle::{Choice, ConstantTimeEq};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 use crate::errors::CryptoError;
 use crate::errors::CryptoError::InvalidInputValue;
-use crate::random::random_fill;
+use crate::random::{random_array};
 
 /// Convenience method to XOR one slice onto other.
 pub fn xor_inplace(a: &mut [u8], b: &[u8]) {
@@ -40,9 +40,15 @@ impl<L: ArrayLength<u8>> AsRef<[u8]> for SecretValue<L> {
     }
 }
 
-impl<L :ArrayLength<u8>> From<GenericArray<u8, L>> for SecretValue<L> {
+impl<L: ArrayLength<u8>> From<GenericArray<u8, L>> for SecretValue<L> {
     fn from(value: GenericArray<u8, L>) -> Self {
         Self(value)
+    }
+}
+
+impl<'a, L: ArrayLength<u8>> From<&'a SecretValue<L>> for &'a GenericArray<u8, L> {
+    fn from(value: &'a SecretValue<L>) -> Self {
+        &value.0
     }
 }
 
@@ -73,8 +79,6 @@ impl<L: ArrayLength<u8>> SecretValue<L> {
 
     /// Generates cryptographically strong random secret value.
     pub fn random() -> Self {
-        let mut ret = Self::default();
-        random_fill(&mut ret.0);
-        ret
+        Self(random_array())
     }
 }

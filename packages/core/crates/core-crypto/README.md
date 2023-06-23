@@ -3,7 +3,7 @@
 This Rust crate contains cryptographic primitives and basic types that
 are used in the HOPR protocol.
 
-The higher-level operations are meant to be in separate crates, like `core-packet`.
+The higher-level operations are meant to be in the separate crates, like `core-packet`.
 
 The crate is structured into the following modules:
 
@@ -15,7 +15,12 @@ The crate is structured into the following modules:
 - `parameters`: contains various cryptography related global constants
 - `prg`: implementation of a pseudo-random generator function used in SPHINX packet header construction
 - `primitives`: contains implementation of cryptographic primitives: Blake2s256 digest, Keccak256 digest, Mac using Blake2s256 and ChaCha20 stream cipher 
-- 
+- `prp`: implementation of the Lioness wide-block cipher using Chacha20 and Blake2b256
+- `random`: all functions that generate something requiring randomness source are implemented here
+- `routing`: implements the SPHINX header
+- `shared_keys`: derivation of shared keys for SPHINX header (see below)
+- `types`: general use types for the entire code base, e.g. public keys, signatures,...
+- `utils`: generic utility types and functions used by this crate
 
 ## SPHINX shared keys derivation
 

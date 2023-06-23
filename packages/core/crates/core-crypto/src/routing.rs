@@ -2,7 +2,7 @@ use crate::derivation::derive_mac_key;
 use crate::errors::CryptoError::TagMismatch;
 use crate::errors::Result;
 use crate::prg::{PRG, PRGParameters};
-use crate::primitives::{create_tagged_mac, DigestLike, SecretKey, SimpleMac};
+use crate::primitives::{DigestLike, SecretKey, SimpleMac};
 use crate::random::random_fill;
 use crate::routing::ForwardedHeader::{FinalNode, RelayNode};
 use crate::utils::xor_inplace;
@@ -154,7 +154,7 @@ impl RoutingInfo {
                 xor_inplace(&mut extended_header, &key_stream);
             }
 
-            let mut m = SimpleMac::new(derive_mac_key(&secrets[inverted_idx]).as_ref());
+            let mut m = SimpleMac::new(&derive_mac_key(&secrets[inverted_idx]));
             m.update(&extended_header[0..header_len]);
             m.finalize_into(&mut ret.mac);
         }
@@ -216,8 +216,9 @@ pub fn forward_header<S: SphinxSuite>(
 
     assert_eq!(header_len, header.len(), "invalid pre-header length");
 
-    let computed_mac = create_tagged_mac(secret, header);
-    if !mac.eq(&computed_mac) {
+    let mut computed_mac = SimpleMac::new(&derive_mac_key(secret));
+    computed_mac.update(header);
+    if !mac.eq(computed_mac.finalize().as_slice()) {
         return Err(TagMismatch);
     }
 

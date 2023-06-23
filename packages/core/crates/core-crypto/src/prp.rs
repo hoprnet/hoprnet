@@ -1,8 +1,11 @@
+use blake2::{Blake2bMac};
+use digest::{FixedOutput, Mac};
+use zeroize::ZeroizeOnDrop;
 use crate::derivation::generate_key_iv;
 use crate::errors::CryptoError::InvalidParameterSize;
 use crate::errors::Result;
 
-use crate::primitives::{calculate_mac, SecretKey, SimpleStreamCipher};
+use crate::primitives::{SecretKey, SimpleStreamCipher};
 use crate::utils;
 
 // Module-specific constants
@@ -17,6 +20,7 @@ pub const PRP_MIN_LENGTH: usize = PRP_INTERMEDIATE_KEY_LENGTH;
 
 /// Parameters for the Pseudo-Random Permutation (PRP) function
 /// This consists of IV and the raw secret key for use by the underlying cryptographic transformation.
+#[derive(ZeroizeOnDrop)]
 pub struct PRPParameters {
     key: [u8; PRP_KEY_LENGTH],
     iv: [u8; PRP_IV_LENGTH],
@@ -43,9 +47,10 @@ impl PRPParameters {
 
 /// Implementation of Pseudo-Random Permutation (PRP).
 /// Currently based on the Lioness wide-block cipher.
+#[derive(ZeroizeOnDrop)]
 pub struct PRP {
-    keys: [Box<[u8]>; 4],
-    ivs: [Box<[u8]>; 4],
+    keys: [[u8; PRP_INTERMEDIATE_KEY_LENGTH]; 4],
+    ivs: [[u8; PRP_INTERMEDIATE_IV_LENGTH]; 4],
 }
 
 impl PRP {
@@ -53,17 +58,17 @@ impl PRP {
     pub fn new(key: [u8; PRP_KEY_LENGTH], iv: [u8; PRP_IV_LENGTH]) -> Self {
         Self {
             keys: [
-                key[0 * PRP_INTERMEDIATE_KEY_LENGTH..1 * PRP_INTERMEDIATE_KEY_LENGTH].into(),
-                key[1 * PRP_INTERMEDIATE_KEY_LENGTH..2 * PRP_INTERMEDIATE_KEY_LENGTH].into(),
-                key[2 * PRP_INTERMEDIATE_KEY_LENGTH..3 * PRP_INTERMEDIATE_KEY_LENGTH].into(),
-                key[3 * PRP_INTERMEDIATE_KEY_LENGTH..4 * PRP_INTERMEDIATE_KEY_LENGTH].into(),
+                key[0 * PRP_INTERMEDIATE_KEY_LENGTH..1 * PRP_INTERMEDIATE_KEY_LENGTH].try_into().unwrap(),
+                key[1 * PRP_INTERMEDIATE_KEY_LENGTH..2 * PRP_INTERMEDIATE_KEY_LENGTH].try_into().unwrap(),
+                key[2 * PRP_INTERMEDIATE_KEY_LENGTH..3 * PRP_INTERMEDIATE_KEY_LENGTH].try_into().unwrap(),
+                key[3 * PRP_INTERMEDIATE_KEY_LENGTH..4 * PRP_INTERMEDIATE_KEY_LENGTH].try_into().unwrap(),
             ],
             ivs: [
                 // NOTE: ChaCha20 takes only 12 byte IV
-                iv[0 * PRP_INTERMEDIATE_IV_LENGTH..1 * PRP_INTERMEDIATE_IV_LENGTH].into(),
-                iv[1 * PRP_INTERMEDIATE_IV_LENGTH..2 * PRP_INTERMEDIATE_IV_LENGTH].into(),
-                iv[2 * PRP_INTERMEDIATE_IV_LENGTH..3 * PRP_INTERMEDIATE_IV_LENGTH].into(),
-                iv[3 * PRP_INTERMEDIATE_IV_LENGTH..4 * PRP_INTERMEDIATE_IV_LENGTH].into(),
+                iv[0 * PRP_INTERMEDIATE_IV_LENGTH..1 * PRP_INTERMEDIATE_IV_LENGTH].try_into().unwrap(),
+                iv[1 * PRP_INTERMEDIATE_IV_LENGTH..2 * PRP_INTERMEDIATE_IV_LENGTH].try_into().unwrap(),
+                iv[2 * PRP_INTERMEDIATE_IV_LENGTH..3 * PRP_INTERMEDIATE_IV_LENGTH].try_into().unwrap(),
+                iv[3 * PRP_INTERMEDIATE_IV_LENGTH..4 * PRP_INTERMEDIATE_IV_LENGTH].try_into().unwrap(),
             ],
         }
     }
@@ -78,7 +83,7 @@ impl PRP {
     /// Applies forward permutation on the given plaintext and returns a new buffer
     /// containing the result.
     pub fn forward(&self, plaintext: &[u8]) -> Result<Box<[u8]>> {
-        let mut out: Vec<u8> = plaintext.into();
+        let mut out= Vec::from(plaintext);
         self.forward_inplace(&mut out)?;
         Ok(out.into_boxed_slice())
     }
@@ -102,7 +107,7 @@ impl PRP {
     /// Applies inverse permutation on the given plaintext and returns a new buffer
     /// containing the result.
     pub fn inverse(&self, ciphertext: &[u8]) -> Result<Box<[u8]>> {
-        let mut out: Vec<u8> = ciphertext.into();
+        let mut out = Vec::from(ciphertext);
         self.inverse_inplace(&mut out)?;
         Ok(out.into_boxed_slice())
     }
@@ -126,8 +131,11 @@ impl PRP {
     // Internal helper functions
 
     fn xor_hash(data: &mut [u8], key: &[u8], iv: &[u8]) {
-        let res = calculate_mac([key, iv].concat().as_slice(), &data[PRP_MIN_LENGTH..]);
-        utils::xor_inplace(data, res.as_ref());
+        let mut blake = Blake2bMac::<typenum::U32>::new_with_salt_and_personal(key, iv, &[])
+            .expect("invalid intermediate key or iv size"); // should not happen
+        blake.update(&data[PRP_MIN_LENGTH..]);
+
+        utils::xor_inplace(data, &blake.finalize_fixed());
     }
 
     fn xor_keystream(data: &mut [u8], key: &[u8], iv: &[u8]) {

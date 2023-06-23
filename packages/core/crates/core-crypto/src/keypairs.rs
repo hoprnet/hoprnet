@@ -33,8 +33,10 @@ pub trait Keypair: ConstantTimeEq + ZeroizeOnDrop + Sized {
     /// Returns the public part of the keypair
     fn public(&self) -> &Self::Public;
 
-    /// Consumes the instance and produces separated private and public part
-    fn unzip(self) -> (SecretValue<Self::SecretLen>, Self::Public);
+    /// Consumes the instance and produces separated private and public parts
+    fn unzip(self) -> (SecretValue<Self::SecretLen>, Self::Public) {
+        (self.secret().clone(), self.public().clone())
+    }
 }
 
 /// Represents a keypair consisting of an Ed25519 private and public key
@@ -60,10 +62,6 @@ impl Keypair for OffchainKeypair {
 
     fn public(&self) -> &Self::Public {
         &self.1
-    }
-
-    fn unzip(self) -> (SecretValue<typenum::U32>, Self::Public) {
-        (self.0.clone(), self.1.clone())
     }
 }
 
@@ -116,10 +114,6 @@ impl Keypair for ChainKeypair {
     fn public(&self) -> &Self::Public {
         &self.1
     }
-
-    fn unzip(self) -> (SecretValue<typenum::U32>, Self::Public) {
-        (self.0.clone(), self.1.clone())
-    }
 }
 
 impl ConstantTimeEq for ChainKeypair {
@@ -151,6 +145,12 @@ mod tests {
         assert_eq!(kp_1.ct_eq(&kp_2).unwrap_u8(), 1, "keypairs generated from secrets must be equal");
         assert_eq!(&public, kp_2.public(), "secret keys must yield compatible public keys");
         assert_eq!(kp_1.public(), kp_2.public(), "keypair public keys must be equal");
+
+        let (s1, p1) = kp_1.unzip();
+        let (s2, p2) = kp_2.unzip();
+
+        assert_eq!(s1.ct_eq(&s2).unwrap_u8(), 1);
+        assert_eq!(p1, p2);
     }
 
     #[test]
@@ -164,6 +164,12 @@ mod tests {
         assert_eq!(kp_1.ct_eq(&kp_2).unwrap_u8(), 1, "keypairs generated from secrets must be equal");
         assert_eq!(&public, kp_2.public(), "secret keys must yield compatible public keys");
         assert_eq!(kp_1.public(), kp_2.public(), "keypair public keys must be equal");
+
+        let (s1, p1) = kp_1.unzip();
+        let (s2, p2) = kp_2.unzip();
+
+        assert_eq!(s1.ct_eq(&s2).unwrap_u8(), 1);
+        assert_eq!(p1, p2);
     }
 }
 

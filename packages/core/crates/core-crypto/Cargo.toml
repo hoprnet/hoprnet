@@ -18,8 +18,8 @@ wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys"]
 [dependencies]
 aes = "0.8"
 async-std = { version = "1.12.0", features = ["attributes"] }
-blake2 = "0.10"
-chacha20 = "0.9"
+blake2 = { version = "0.10", features = ["reset"] }
+chacha20 = { version = "0.9", features = ["zeroize"] }
 ctr = "0.9"
 curve25519-dalek = { version = "3", features = ["serde"] }
 digest = "0.10"
