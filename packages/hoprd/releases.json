@@ -1,5 +1,5 @@
 {
-  "rotsee": {
+  "development": {
     "git_ref": "^master$",
     "network": "rotsee"
   },
