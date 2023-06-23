@@ -25,6 +25,7 @@ jobs:
   lint:
     name: Linter
     runs-on: ubuntu-2-core
+    if: github.event.pull_request.draft == false
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v3
@@ -88,6 +89,7 @@ jobs:
   shellcheck:
     name: Shellcheck
     runs-on: ubuntu-2-core
+    if: github.event.pull_request.draft == false
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v3

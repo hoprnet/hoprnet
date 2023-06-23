@@ -25,6 +25,7 @@ jobs:
   api:
     name: API docs
     runs-on: ubuntu-2-core
+    if: github.event.pull_request.draft == false
     steps:
       - uses: actions/checkout@v3
 
