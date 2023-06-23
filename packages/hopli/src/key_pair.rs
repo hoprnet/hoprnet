@@ -1,46 +1,7 @@
 use crate::utils::HelperErrors;
-use core_crypto::types::{PublicKey, ToChecksum};
-use elliptic_curve::rand_core::{CryptoRng, RngCore};
-use eth_keystore;
-use ethers::core::rand::thread_rng;
-use generic_array::GenericArray;
-use k256::ecdsa::{SigningKey, VerifyingKey};
-use serde::Serialize;
-use std::{
-    fmt, fs,
-    path::{Path, PathBuf},
-};
-use utils_types::traits::PeerIdLike;
-
-#[derive(Debug, Serialize)]
-pub struct NodeIdentity {
-    pub peer_id: String,
-    pub ethereum_address: String,
-}
-
-impl NodeIdentity {
-    pub fn new(verifying_key: VerifyingKey) -> Self {
-        let public_key = PublicKey::from_bytes(&verifying_key.to_encoded_point(false).to_bytes()).unwrap();
-
-        // derive PeerId
-        let peer_id = public_key.to_peerid_str();
-
-        // derive ethereum address
-        let ethereum_address = public_key.to_address().to_checksum();
-
-        Self { peer_id, ethereum_address }
-    }
-}
-
-impl fmt::Display for NodeIdentity {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "peer_id: {}, ethereum_address: {}",
-            self.peer_id, self.ethereum_address
-        )
-    }
-}
+use hoprd_keypair::key_pair::HoprKeys;
+use log::warn;
+use std::{fs, path::PathBuf};
 
 /// Decrypt identity files and returns an vec of PeerIds and Ethereum Addresses
 ///
@@ -49,38 +10,30 @@ impl fmt::Display for NodeIdentity {
 /// * `identity_directory` - Directory to all the identity files
 /// * `password` - Password to unlock all the identity files
 /// * `identity_prefix` - Prefix of identity files. Only identity files with the provided are decrypted with the password
-pub fn read_identities(files: Vec<PathBuf>, password: &String) -> Result<Vec<NodeIdentity>, HelperErrors> {
-    // get the verifying key from each file
-    let signing_keys: Vec<VerifyingKey> = files
-        .into_iter()
-        .filter_map(|r| decrypt_keystore(r, password).ok())
-        .collect();
+pub fn read_identities(files: Vec<PathBuf>, password: &String) -> Result<Vec<HoprKeys>, HelperErrors> {
+    let mut results: Vec<HoprKeys> = Vec::with_capacity(files.len());
 
-    // convert verifying_keys to NodeIdentity
-    let results: Vec<NodeIdentity> = signing_keys.into_iter().map(|r| NodeIdentity::new(r)).collect();
+    for file in files.iter() {
+        let file_str = file
+            .to_str()
+            .ok_or(HelperErrors::IncorrectFilename(file.to_string_lossy().to_string()))?;
+
+        println!("{}", file_str);
+
+        match HoprKeys::read_eth_keystore(file_str, password) {
+            Ok((keys, needs_migration)) => {
+                if needs_migration {
+                    keys.write_eth_keystore(file_str, password, false)?
+                }
+                results.push(keys)
+            }
+            Err(e) => {
+                warn!("Could not decrypt keystore file at {}. {}", file_str, e.to_string())
+            }
+        }
+    }
 
     Ok(results)
-}
-
-fn decrypt_keystore<P, S>(keypath: P, password: S) -> Result<VerifyingKey, HelperErrors>
-where
-    P: AsRef<Path>,
-    S: AsRef<[u8]>,
-{
-    let secret = eth_keystore::decrypt_key(keypath, password)?;
-    let signer = SigningKey::from_bytes(GenericArray::from_slice(&secret))?;
-    Ok(*signer.verifying_key())
-}
-
-fn new_keystore<P, R, S>(dir: P, rng: &mut R, password: S) -> Result<(VerifyingKey, String), HelperErrors>
-where
-    P: AsRef<Path>,
-    R: CryptoRng + RngCore,
-    S: AsRef<[u8]>,
-{
-    let (secret, uuid) = eth_keystore::new(dir, rng, password, None)?;
-    let signer = SigningKey::from_bytes(GenericArray::from_slice(&secret))?;
-    Ok((*signer.verifying_key(), uuid))
 }
 
 /// Create one identity file and return the ethereum address
@@ -90,38 +43,35 @@ where
 /// * `dir_name` - Directory to the storage of an identity file
 /// * `password` - Password to encrypt the identity file
 /// * `name` - Prefix of identity files.
-pub fn create_identity(dir_name: &str, password: &str, name: &Option<String>) -> Result<NodeIdentity, HelperErrors> {
+pub fn create_identity(dir_name: &str, password: &str, maybe_name: &Option<String>) -> Result<HoprKeys, HelperErrors> {
     // create dir if not exist
     fs::create_dir_all(dir_name)?;
 
-    // create identity with the given password
-    let (verifying_key, uuid) = new_keystore(Path::new(dir_name), &mut thread_rng(), password)?;
-
-    // Rename keystore from uuid to uuid.id (or `name.id`, if provided)
-    let old_file_path = vec![dir_name, "/", &*uuid].concat();
+    let keys = HoprKeys::new();
 
     // check if `name` is end with `.id`, if not, append it
-    let new_file_path = match name {
-        Some(provided_name) => {
+    let file_path = match maybe_name {
+        Some(name) => {
             // check if ending with `.id`
-            if provided_name.ends_with(".id") {
-                vec![dir_name, "/", provided_name].concat()
+            if name.ends_with(".id") {
+                format!("{dir_name}/{name}")
             } else {
-                vec![dir_name, "/", provided_name, ".id"].concat()
+                format!("{dir_name}/{name}.id")
             }
         }
-        None => vec![dir_name, "/", &*uuid, ".id"].concat(),
+        None => format!("{dir_name}/{}.id", { keys.id.to_string() }),
     };
 
-    fs::rename(&old_file_path, &new_file_path)
-        .map_err(|err| println!("{:?}", err))
-        .ok();
+    keys.write_eth_keystore(&file_path, password, false)?;
 
-    Ok(NodeIdentity::new(verifying_key))
+    Ok(keys)
 }
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+    use utils_types::traits::PeerIdLike;
+
     use super::*;
 
     #[test]
@@ -145,8 +95,8 @@ mod tests {
         let files = get_files(path, &None);
         let read_id = read_identities(files, &pwd.to_string()).unwrap();
         assert_eq!(read_id.len(), 1);
-        assert_eq!(read_id[0].ethereum_address, created_id.ethereum_address);
-        assert_eq!(read_id[0].peer_id, created_id.peer_id);
+        assert_eq!(read_id[0].chain_key.1.to_address(), created_id.chain_key.1.to_address());
+        assert_eq!(read_id[0].chain_key.1.to_peerid(), created_id.chain_key.1.to_peerid());
 
         // print the read id
         println!("Debug {:#?}", read_id);
@@ -236,11 +186,11 @@ mod tests {
     fn read_complete_identities_from_tmp_folder() {
         let path = "./tmp_8";
         let name = "alice.id";
-        let pwd = "local";
+        let pwd = "e2e-test";
 
-        let weak_crypto_alice_keystore = r#"{"id":"8e5fe142-6ef9-4fbb-aae8-5de32b680e31","version":3,"crypto":{"cipher":"aes-128-ctr","cipherparams":{"iv":"04141354edb9dfb0c65e6905a3a0b9dd"},"ciphertext":"74f12f72cf2d3d73ff09f783cb9b57995b3808f7d3f71aa1fa1968696aedfbdd","kdf":"scrypt","kdfparams":{"salt":"f5e3f04eaa0c9efffcb5168c6735d7e1fe4d96f48a636c4f00107e7c34722f45","n":1,"dklen":32,"p":1,"r":8},"mac":"d0daf0e5d14a2841f0f7221014d805addfb7609d85329d4c6424a098e50b6fbe"}}"#;
-        let alice_peer_id = "16Uiu2HAm8WFpakjrdWauUKq2hb5bejivnbtFAumVv9KHKN5AvXXK";
-        let alice_address = "0x826A1bF3d51Fa7F402A1E01d1B2C8A8bAC28E666";
+        let weak_crypto_alice_keystore = r#"{"crypto":{"cipher":"aes-128-ctr","cipherparams":{"iv":"9a876992ad22bec8e82fe3452788b800"},"ciphertext":"f08651ab3c237e337f81e8fa6689bb896f35e4eaae34aca504fa30a86ad85f72281ba48a99cb1327435c935b9deb800d60ca2fc46072c5c3b3aafc1861f0a12c","kdf":"scrypt","kdfparams":{"dklen":32,"n":2,"p":1,"r":8,"salt":"82af32aac6a4377ce44877c3ae4f7c5e7b9e409e866a0e75fb3bff86f1fbc66d"},"mac":"524197480216a0d1d1781214de8b76ca08feddf337338765b3cea47f08b319cb"},"id":"c76e561b-bedf-4a9a-87f7-352efd718c9b","version":3}"#;
+        let alice_peer_id = "16Uiu2HAmUYnGY3USo8iy13SBFW7m5BMQvC4NETu1fGTdoB86piw7";
+        let alice_address = "0x838d3c1d2ff5c576d7b270aaaaaa67e619217aac";
 
         // create dir if not exist.
         fs::create_dir_all(path).unwrap();
@@ -250,8 +200,8 @@ mod tests {
         let files = get_files(path, &None);
         let val = read_identities(files, &pwd.to_string()).unwrap();
         assert_eq!(val.len(), 1);
-        assert_eq!(val[0].peer_id, alice_peer_id);
-        assert_eq!(val[0].ethereum_address, alice_address);
+        assert_eq!(val[0].chain_key.1.to_peerid_str(), alice_peer_id);
+        assert_eq!(val[0].chain_key.1.to_address().to_string(), alice_address);
 
         remove_json_keystore(path).map_err(|err| println!("{:?}", err)).ok();
     }
