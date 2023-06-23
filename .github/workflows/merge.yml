@@ -68,12 +68,12 @@ jobs:
           cat check_pr.log >> $GITHUB_ENV
           declare base_branch=${{ github.event.pull_request.base.ref }}
           if [ "${base_branch}" == "master" ]; then
-            echo "DOCKER_TAG=latest"  >> $GITHUB_ENV
+            echo "DOCKER_STABLE_TAG=latest"  >> $GITHUB_ENV
           else
-            echo "DOCKER_TAG=${base_branch/release\//}" >> $GITHUB_ENV
+            echo "DOCKER_STABLE_TAG=${base_branch/release\//}" >> $GITHUB_ENV
           fi
           ./scripts/bump-version.sh ${{ github.event.pull_request.base.ref }} ${{ github.event.pull_request.number }}
-          echo "DOCKER_CURRENT_TAG=$(./scripts/get-package-version.sh | sed 's/+/-/' )" >> $GITHUB_ENV
+          echo "DOCKER_PR_TAG=$(./scripts/get-package-version.sh | sed 's/+/-/' )" >> $GITHUB_ENV
       - id: auth
         name: Set up Google Cloud Credentials
         uses: google-github-actions/auth@v1
@@ -91,26 +91,26 @@ jobs:
       - name: Docker Tag Toolchain
         if: env.build_toolchain
         run: |
-          docker pull europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-toolchain:${{ DOCKER_CURRENT_TAG }}
-          docker tag europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-toolchain:${{ DOCKER_CURRENT_TAG }} europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-toolchain:${{ env.DOCKER_TAG }}
-          docker push europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-toolchain:${{ env.DOCKER_TAG }}
+          docker pull europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-toolchain:${{ DOCKER_PR_TAG }}
+          docker tag europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-toolchain:${{ DOCKER_PR_TAG }} europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-toolchain:${{ env.DOCKER_STABLE_TAG }}
+          docker push europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-toolchain:${{ env.DOCKER_STABLE_TAG }}
       - name: Docker Tag Hopli
         if: env.build_hopli
         run: |
-          docker pull europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopli:${{ DOCKER_CURRENT_TAG }}
-          docker tag europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopli:${{ DOCKER_CURRENT_TAG }} europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopli:${{ env.DOCKER_TAG }}
-          docker push europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopli:${{ env.DOCKER_TAG }}
+          docker pull europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopli:${{ DOCKER_PR_TAG }}
+          docker tag europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopli:${{ DOCKER_PR_TAG }} europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopli:${{ env.DOCKER_STABLE_TAG }}
+          docker push europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopli:${{ env.DOCKER_STABLE_TAG }}
       - name: Docker Tag Hoprd
         if: env.build_hoprd
         run: |
-          docker pull europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hoprd:${{ DOCKER_CURRENT_TAG }}
-          docker tag europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hoprd:${{ DOCKER_CURRENT_TAG }} europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hoprd:${{ env.DOCKER_TAG }}
-          docker push europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hoprd:${{ env.DOCKER_TAG }}
+          docker pull europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hoprd:${{ DOCKER_PR_TAG }}
+          docker tag europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hoprd:${{ DOCKER_PR_TAG }} europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hoprd:${{ env.DOCKER_STABLE_TAG }}
+          docker push europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hoprd:${{ env.DOCKER_STABLE_TAG }}
       - name: Docker Tag Anvil
         if: env.build_anvil
         run: |
-          docker pull europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-anvil:${{ DOCKER_CURRENT_TAG }}
-          docker tag europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-anvil:${{ DOCKER_CURRENT_TAG }} europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-anvil:latest
+          docker pull europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-anvil:${{ DOCKER_PR_TAG }}
+          docker tag europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-anvil:${{ DOCKER_PR_TAG }} europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-anvil:latest
           docker push europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-anvil:latest
 
   deploy_prn:
@@ -141,11 +141,11 @@ jobs:
         run: |
           declare base_branch=${{ github.event.pull_request.base.ref }}
           if [ "${base_branch}" == "master" ]; then
-            echo "DOCKER_TAG=latest"  >> $GITHUB_ENV
+            echo "DOCKER_STABLE_TAG=latest"  >> $GITHUB_ENV
           else
-            echo "DOCKER_TAG=${base_branch/release\//}" >> $GITHUB_ENV
+            echo "DOCKER_STABLE_TAG=${base_branch/release\//}" >> $GITHUB_ENV
           fi
-          ./scripts/deploy.sh "europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hoprd:${{ env.DOCKER_TAG }}" 3 ${base_branch}
+          ./scripts/deploy.sh "europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hoprd:${{ env.DOCKER_STABLE_TAG }}" 3 ${base_branch}
         env:
           DEPLOYER_PRIVATE_KEY: ${{ secrets.DEPLOYER_WALLET_PRIVATE_KEY }}
           HOPRD_PASSWORD: ${{ secrets.BS_PASSWORD }}
