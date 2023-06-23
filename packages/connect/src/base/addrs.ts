@@ -97,7 +97,10 @@ export function getAddrs(
     for (const address of iface) {
       const u8aAddr = ipToU8aAddress(address.address, address.family)
 
-      if ((process.env.DAPPNODE ?? 'false').toLowerCase() === 'true' && isDappnodePrivateNetwork(u8aAddr, address.family)) {
+      if (
+        (process.env.DAPPNODE ?? 'false').toLowerCase() === 'true' &&
+        isDappnodePrivateNetwork(u8aAddr, address.family)
+      ) {
         // Never expose internal container addresses of Dappnode machines
         continue
       }
