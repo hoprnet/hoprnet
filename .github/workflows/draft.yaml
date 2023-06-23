@@ -16,12 +16,11 @@ jobs:
     name: Convert to draft
     runs-on: ubuntu-latest
     if: github.event.pull_request.draft == false
-    # env:
-    #   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
     steps:
       - name: Convert to draft
         run: gh pr ready ${{ github.event.pull_request.number }} --undo
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 
   
