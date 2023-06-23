@@ -16,7 +16,6 @@ on:
       - release/*
     types:
       - synchronize
-      - opened
     paths-ignore:
       - '.processes/**/*'
       - 'docs/**/*'
