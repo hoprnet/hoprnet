@@ -42,7 +42,7 @@ jobs:
       - name: "Set PR number on version"
         run: | 
           ./scripts/bump-version.sh ${{ github.event.pull_request.base.ref }} ${{ github.event.pull_request.number }}
-          echo "DOCKER_TAG=$(./scripts/get-package-version.sh)" >> $GITHUB_ENV
+          echo "DOCKER_TAG=$(./scripts/get-package-version.sh | sed 's/+/-/' )" >> $GITHUB_ENV
 
       - name: Build and push docker image
         uses: docker/build-push-action@v4
