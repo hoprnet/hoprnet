@@ -9,10 +9,14 @@ use core_strategy::{
 };
 use hex;
 use proc_macro_regex::regex;
-use real_base::real;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use utils_misc::ok_or_str;
+
+#[cfg(any(not(feature = "wasm"), test))]
+use real_base::file::native::read_file;
+#[cfg(all(feature = "wasm", not(test)))]
+use real_base::file::wasm::read_file;
 
 pub const DEFAULT_API_HOST: &str = "localhost";
 pub const DEFAULT_API_PORT: u16 = 3001;
@@ -44,7 +48,7 @@ fn parse_host(s: &str) -> Result<crate::config::Host, String> {
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub fn parse_private_key(s: &str) -> Result<Box<[u8]>, String> {
     if crate::config::validate_private_key(s).is_ok() {
-        let mut decoded = [0u8; 32];
+        let mut decoded = [0u8; 64];
 
         let priv_key = match s.strip_prefix("0x") {
             Some(priv_without_prefix) => priv_without_prefix,
@@ -492,7 +496,7 @@ struct DefaultNetworkFile {
 impl FromJsonFile for DefaultNetworkFile {
     fn from_json_file(mono_repo_path: &str) -> Result<Self, String> {
         let default_environment_json_path: String = format!("{}/default-network.json", mono_repo_path);
-        let data = ok_or_str!(real::read_file(default_environment_json_path.as_str()))?;
+        let data = ok_or_str!(read_file(default_environment_json_path.as_str()))?;
 
         ok_or_str!(serde_json::from_slice::<DefaultNetworkFile>(&data))
     }

@@ -9,7 +9,8 @@ import {
   setupPromiseRejectionFilter,
   SUGGESTED_NATIVE_BALANCE,
   create_histogram_with_buckets,
-  pickVersion
+  pickVersion,
+  privKeyToPeerId
 } from '@hoprnet/hopr-utils'
 import {
   Health,
@@ -34,7 +35,9 @@ import type { State } from './types.js'
 import setupAPI from './api/index.js'
 import setupHealthcheck from './healthcheck.js'
 import { LogStream } from './logs.js'
-import { getIdentity } from './identity.js'
+
+import { HoprKeys, IdentityOptions, hoprd_keypair_set_panic_hook } from '../lib/hoprd_keypair.js'
+hoprd_keypair_set_panic_hook()
 import { decodeMessage } from './api/utils.js'
 import { type ChannelStrategyInterface, StrategyFactory } from '@hoprnet/hopr-core/lib/channel-strategy.js'
 import { RPCH_MESSAGE_REGEXP } from './api/v2.js'
@@ -263,13 +266,21 @@ async function main() {
     }
 
     // 1. Find or create an identity
-    const peerId = await getIdentity({
-      initialize: cfg.db.initialize,
-      idPath: cfg.identity.file,
-      password: cfg.identity.password,
-      useWeakCrypto: cfg.test.use_weak_crypto,
-      privateKey: cfg.identity.private_key === undefined ? undefined : parse_private_key(cfg.identity.private_key)
-    })
+    const keypair = HoprKeys.init(
+      new IdentityOptions(
+        cfg.db.initialize,
+        cfg.identity.file,
+        cfg.identity.password,
+        cfg.test.use_weak_crypto,
+        cfg.identity.private_key === undefined ? undefined : parse_private_key(cfg.identity.private_key)
+      )
+    )
+
+    // total hack. peerIdFromKeys seems to produce incorrect objects
+    const peerId = privKeyToPeerId(keypair.chainKeyPrivKey)
+
+    console.log(`chain_key`, (await keypair.chainKeyPeerId).toString())
+    console.log(`packet_key`, (await keypair.packetKeyPeerId).toString())
 
     // 2. Create node instance
     logs.log('Creating HOPR Node')

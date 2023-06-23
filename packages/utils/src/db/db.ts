@@ -257,27 +257,25 @@ export class LevelDb {
     let dumpFile = fs.createWriteStream(destFile, { flags: 'a' })
     this.backend
       .createReadStream({ keys: true, keyAsBuffer: true, values: true, valueAsBuffer: true })
-      .on('data', (d) => {
-        // Skip the public key prefix in each key
-        let key = (d.key as Buffer).subarray(PublicKey.size_compressed())
-        let keyString = ''
-        let isHex = false
-        let sawDelimiter = false
-        for (const b of key) {
-          if (!sawDelimiter && b >= 32 && b <= 126) {
-            // Print sequences of ascii chars normally
-            let cc = String.fromCharCode(b)
-            keyString += (isHex ? ' ' : '') + cc
-            isHex = false
-            // Once a delimiter is encountered, always print as hex since then
-            sawDelimiter = sawDelimiter || cc == '-' || cc == ':'
+      .on('data', ({ key }) => {
+        let out = ''
+        while (key.length > 0) {
+          const nextDelimiter = key.findIndex((v: number) => v == 0x2d) // 0x2d ~= '-'
+
+          if (key.subarray(0, nextDelimiter).every((v: number) => v >= 32 && v <= 126)) {
+            out += decoder.decode(key.subarray(0, nextDelimiter))
           } else {
-            // Print sequences of non-ascii chars as hex
-            keyString += (!isHex ? '0x' : '') + (b as number).toString(16)
-            isHex = true
+            out += u8aToHex(key.subarray(0, nextDelimiter))
+          }
+
+          if (nextDelimiter < 0) {
+            break
+          } else {
+            key = (key as Buffer).subarray(nextDelimiter + 1)
           }
         }
-        dumpFile.write(keyString + ':' + d.value.toString('hex') + '\n')
+
+        dumpFile.write(out + '\n')
       })
       .on('end', function () {
         dumpFile.close()
@@ -321,12 +319,18 @@ export class HoprDB {
   }
 
   protected async put(key: Uint8Array, value: Uint8Array): Promise<void> {
-    return await this.db.put(key, value)
+    // LevelDB does not support Uint8Arrays, always convert to Buffer
+    return await this.db.put(
+      Buffer.from(key.buffer, key.byteOffset, key.byteLength),
+      Buffer.from(value.buffer, value.byteOffset, value.byteLength)
+    )
   }
 
   protected async get(key: Uint8Array): Promise<Uint8Array> {
-    const value = await this.db.get(Buffer.from(key))
+    // LevelDB does not support Uint8Arrays, always convert to Buffer
+    const value = await this.db.get(Buffer.from(key.buffer, key.byteOffset, key.byteLength))
 
+    // LevelDB always outputs Buffer, so convert to Uint8Array
     return new Uint8Array(value.buffer, value.byteOffset, value.byteLength)
   }
 

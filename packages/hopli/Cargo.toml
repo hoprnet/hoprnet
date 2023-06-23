@@ -15,10 +15,7 @@ ethers = { version = "1.0.2" }
 serde = "1.0"
 serde_json = "1.0"
 core-crypto = { path = "../core/crates/core-crypto"}
+hoprd-keypair = { path = "../hoprd/crates/hoprd-keypair", default-features = false }
 utils-types = { path = "../utils/crates/utils-types"}
-eth-keystore = "0.5.0"
-k256 = { version = "0.13.0", features = ["arithmetic", "ecdh"] }
-elliptic-curve = "0.13"
 thiserror = "1.0"
-generic-array = "0.14.6"
 log = "0.4.17"

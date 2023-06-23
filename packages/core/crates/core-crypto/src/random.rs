@@ -40,12 +40,7 @@ pub fn random_group_element() -> ([u8; 32], CurvePoint) {
         scalar = NonZeroScalar::<Secp256k1>::random(&mut OsRng);
         point = ProjectivePoint::<Secp256k1>::GENERATOR * scalar.as_ref();
     }
-    let mut secret = [0u8; 32];
-    secret.copy_from_slice(&scalar.to_bytes());
-    (
-        secret,
-        CurvePoint::from_affine(point.to_affine()),
-    )
+    (scalar.to_bytes().into(), CurvePoint::from_affine(point.to_affine()))
 }
 
 /// Fills the specific number of bytes starting from the given offset in the given buffer.

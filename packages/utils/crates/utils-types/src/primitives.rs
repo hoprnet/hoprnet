@@ -13,6 +13,12 @@ pub struct Address {
     addr: [u8; Self::SIZE],
 }
 
+impl Display for Address {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_hex())
+    }
+}
+
 impl Default for Address {
     fn default() -> Self {
         Self {
