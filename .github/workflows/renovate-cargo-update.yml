@@ -1,4 +1,4 @@
-name: renovate cargo update
+name: Dependencies
 
 env:
   HOPR_GITHUB_REF: ${{ github.ref }}
