@@ -23,8 +23,6 @@ RUN make deps-docker package=hoprd && \
     NO_HOPLI=true make -j build package=hoprd && \
     # Remove all typescript files
     find ./packages -type f -name '*.ts' -delete && \
-    # No need for these packages
-    rm -R packages/avado packages/cover-traffic-daemon && \
     # Everything that we don't need in ethereum package
     rm -R packages/ethereum/contracts && \
     # Remove node_modules as they include devDependencies
