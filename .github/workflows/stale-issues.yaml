@@ -1,6 +1,6 @@
 # See docs: https://github.com/actions/stale
 
-name: 'Close stale issues and PRs'
+name: Cleanup
 
 on:
   schedule:
