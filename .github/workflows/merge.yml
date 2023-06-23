@@ -23,7 +23,8 @@ jobs:
 #           (echo; echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"') >> /home/runner/.profile
         run: |
           sudo /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-          sudo eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          set -x
+          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
           sudo brew install gh
           gh extension install actions/gh-actions-cache
 
