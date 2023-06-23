@@ -105,7 +105,6 @@ mod tests {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use crate::types::CurvePoint;
     use js_sys::Uint8Array;
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
