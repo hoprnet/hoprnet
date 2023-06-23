@@ -6,10 +6,8 @@ on:
     branches:
       - master
       - release/*
-      - debug-deploy/network-rotsee
     types:
       - opened
-      - synchronize
 concurrency:
   group: ${{ github.head_ref }}-draft
   cancel-in-progress: false
