@@ -51,7 +51,6 @@ usage() {
   msg "HOPRD_SHOW_PRESTART_INFO\tset to 'true' to print used parameter values before starting"
   msg "HOPRD_PERFORM_CLEANUP\t\tset to 'true' to perform the cleanup process for the given cluster id"
   msg "HOPRD_RESET_METADATA\t\tset to 'true' to trigger metadata reset on instances"
-  msg "HOPRD_SKIP_UNSTAKED\t\tset to 'true' to stake all nodes and not keep the first unstaked"
   msg
 }
 
@@ -75,7 +74,6 @@ declare password="${HOPRD_PASSWORD:-pw${RANDOM}${RANDOM}${RANDOM}pw}"
 declare perform_cleanup="${HOPRD_PERFORM_CLEANUP:-false}"
 declare show_prestartinfo="${HOPRD_SHOW_PRESTART_INFO:-false}"
 declare reset_metadata="${HOPRD_RESET_METADATA:-false}"
-declare skip_unstaked="${HOPRD_SKIP_UNSTAKED:-false}"
 
 function cleanup {
   local EXIT_CODE=$?

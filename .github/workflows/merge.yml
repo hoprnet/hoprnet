@@ -2,12 +2,23 @@ name: Merge
 
 on:
   pull_request:
+    branches:
+      - master
+      - release/*
     types:
-      - closed
+      # - closed
+      - synchronize
 
 concurrency:
-  group: ${{ github.head_ref }}-merge
+  group: merge
   cancel-in-progress: false
+
+env:
+  HOPR_GITHUB_REF: ${{ github.ref }}
+  MATRIX_ROOM: ${{ secrets.MATRIX_ROOM }}
+  MATRIX_CLUSTER_INFO_ROOM: ${{ secrets.MATRIX_CLUSTER_INFO_ROOM }}
+  MATRIX_SERVER: ${{ secrets.MATRIX_SERVER }}
+  MATRIX_ACCESS_TOKEN: ${{ secrets.MATRIX_ACCESS_TOKEN }}
 
 jobs:
   cleanup:
@@ -51,9 +62,15 @@ jobs:
 
       - name: Check PR changes
         id: check_pr_changeset
-        run: |
+        run: |          
           ./scripts/check-pr.sh --base-branch ${{ github.event.pull_request.base.sha }} --head-branch ${{ github.event.pull_request.head.sha }}
           cat check_pr.log >> $GITHUB_ENV
+          declare base_branch=${{ github.event.pull_request.base.ref }}
+          if [ "${base_branch}" eq "master" ]; then
+            echo "DOCKER_TAG=latest"  >> $GITHUB_ENV
+          else
+            echo "DOCKER_TAG=${base_branch/release\//}" >> $GITHUB_ENV
+          fi
 
       - id: auth
         name: Set up Google Cloud Credentials
@@ -73,23 +90,72 @@ jobs:
         if: env.build_toolchain
         run: |
           docker pull europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-toolchain:pr-${{ github.event.pull_request.number }}
-          docker tag europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-toolchain:pr-${{ github.event.pull_request.number }} europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-toolchain:latest
-          docker push europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-toolchain:latest
+          docker tag europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-toolchain:pr-${{ github.event.pull_request.number }} europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-toolchain:${{ env.DOCKER_TAG }}
+          docker push europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-toolchain:${{ env.DOCKER_TAG }}
       - name: Docker Tag Hopli
         if: env.build_hopli
         run: |
           docker pull europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopli:pr-${{ github.event.pull_request.number }}
-          docker tag europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopli:pr-${{ github.event.pull_request.number }} europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopli:latest
-          docker push europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopli:latest
+          docker tag europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopli:pr-${{ github.event.pull_request.number }} europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopli:${{ env.DOCKER_TAG }}
+          docker push europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopli:${{ env.DOCKER_TAG }}
       - name: Docker Tag Hoprd
         if: env.build_hoprd
         run: |
           docker pull europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hoprd:pr-${{ github.event.pull_request.number }}
-          docker tag europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hoprd:pr-${{ github.event.pull_request.number }} europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hoprd:latest
-          docker push europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hoprd:latest
+          docker tag europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hoprd:pr-${{ github.event.pull_request.number }} europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hoprd:${{ env.DOCKER_TAG }}
+          docker push europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hoprd:${{ env.DOCKER_TAG }}
       - name: Docker Tag Anvil
         if: env.build_anvil
         run: |
           docker pull europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-anvil:pr-${{ github.event.pull_request.number }}
           docker tag europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-anvil:pr-${{ github.event.pull_request.number }} europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-anvil:latest
           docker push europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-anvil:latest
+
+
+  deploy_prn:
+    name: Deploy PRN nodes
+    runs-on: ubuntu-2-core
+    needs:
+      - tag
+    steps:
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v3
+
+      - id: auth
+        name: Set up Google Cloud Credentials
+        uses: google-github-actions/auth@v1
+        with:
+          token_format: "access_token"
+          credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+
+      - name: Login Google Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: europe-west3-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.auth.outputs.access_token }}
+
+      - name: Deploy on GCP VM
+        if: ${{ !startsWith(github.ref, 'refs/heads/staging/') && !env.ACT }}
+        run: |
+          ./scripts/deploy.sh "gcr.io/hoprassociation/hoprd" 3
+        env:
+          DEPLOYER_PRIVATE_KEY: ${{ secrets.DEPLOYER_WALLET_PRIVATE_KEY }}
+          HOPRD_PASSWORD: ${{ secrets.BS_PASSWORD }}
+          HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
+          FAUCET_SECRET_API_KEY: ${{ secrets.FAUCET_SECRET_API_KEY }}
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN }}
+
+      # - name: Notify Success
+      #   if: ${{ success() && !env.ACT }}
+      #   run: |
+      #     ./scripts/notify-matrix-cluster-info.sh
+      #   env:
+      #     MATRIX_ROOM: ${{ env.MATRIX_CLUSTER_INFO_ROOM }}
+      #     HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
+
+      # - name: Notify Failure
+      #   if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/') || startsWith(github.ref, 'refs/heads/staging/')) && !env.ACT }}
+      #   run: |
+      #     ./scripts/notify-matrix-github-workflow-failure.sh "${MATRIX_ROOM}" "${{ github.repository }}" \
+      #       "${{ github.workflow }}" "${{ github.run_id }}"
