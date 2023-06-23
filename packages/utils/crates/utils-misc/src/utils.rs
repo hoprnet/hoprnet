@@ -1,7 +1,11 @@
 use real_base::error::RealError;
 use real_base::error::RealError::GeneralError;
-use real_base::real;
 use serde::Deserialize;
+
+#[cfg(any(not(feature = "wasm"), test))]
+use real_base::file::native::read_file;
+#[cfg(all(feature = "wasm", not(test)))]
+use real_base::file::wasm::read_file;
 
 /// Serialization structure for package.json
 #[derive(Deserialize)]
@@ -11,7 +15,7 @@ struct PackageJsonFile {
 
 /// Reads the given package.json file and determines its version.
 pub fn get_package_version(package_file: &str) -> Result<String, RealError> {
-    let file_data = real::read_file(package_file)?;
+    let file_data = read_file(package_file)?;
 
     match serde_json::from_slice::<PackageJsonFile>(&*file_data) {
         Ok(package_json) => Ok(package_json.version),
