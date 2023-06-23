@@ -37,7 +37,7 @@ jobs:
     name: Toolchain
     needs:
       - check_changeset
-    if: ${{needs.check_changeset.outputs.build_toolchain }}
+    if: ${{ needs.check_changeset.outputs.build_toolchain }}
     uses: ./.github/workflows/build-toolchain.yaml
     secrets:
       GOOGLE_HOPRASSOCIATION_PROJECT: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
@@ -47,7 +47,7 @@ jobs:
     name: Hopli
     needs:
       - check_changeset
-    if: ${{needs.check_changeset.outputs.build_hopli }}
+    if: ${{ needs.check_changeset.outputs.build_hopli }}
     uses: ./.github/workflows/build-hopli.yaml
     secrets:
       GOOGLE_HOPRASSOCIATION_PROJECT: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
@@ -57,7 +57,7 @@ jobs:
     name: Hoprd
     needs:
       - check_changeset
-    if: ${{needs.check_changeset.outputs.build_hoprd }}
+    if: ${{ needs.check_changeset.outputs.build_hoprd }}
     uses: ./.github/workflows/build-hoprd.yaml
     secrets:
       GOOGLE_HOPRASSOCIATION_PROJECT: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
@@ -70,7 +70,7 @@ jobs:
     name: Anvil
     needs:
       - check_changeset
-    if: ${{needs.check_changeset.outputs.build_anvil }}
+    if: ${{ needs.check_changeset.outputs.build_anvil }}
     uses: ./.github/workflows/build-anvil.yaml
     secrets:
       GOOGLE_HOPRASSOCIATION_PROJECT: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
@@ -80,6 +80,7 @@ jobs:
     name: Pluto
     needs:
       - check_changeset
+      - build_anvil
       - build_hoprd
       - build_hopli
     if: |
@@ -90,3 +91,7 @@ jobs:
     secrets:
       GOOGLE_HOPRASSOCIATION_PROJECT: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
       GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+    with:
+      build_hoprd: ${{ needs.check_changeset.outputs.build_hoprd }}
+      build_hopli: ${{ needs.check_changeset.outputs.build_hopli }}
+      build_anvil: ${{ needs.check_changeset.outputs.build_anvil }}
