@@ -65,8 +65,14 @@ jobs:
         run: |          
           ./scripts/check-pr.sh --base-branch ${{ github.event.pull_request.base.sha }} --head-branch ${{ github.event.pull_request.head.sha }}
           cat check_pr.log >> $GITHUB_ENV
+          set -x
           declare base_branch=${{ github.event.pull_request.base.ref }}
           if [ "${base_branch}" eq "master" ]; then
+            echo "DOCKER_TAG=latest"  >> $GITHUB_ENV
+          else
+            echo "DOCKER_TAG=${base_branch/release\//}" >> $GITHUB_ENV
+          fi
+          if [ ${{ github.event.pull_request.base.ref }} eq "master" ]; then
             echo "DOCKER_TAG=latest"  >> $GITHUB_ENV
           else
             echo "DOCKER_TAG=${base_branch/release\//}" >> $GITHUB_ENV
@@ -120,6 +126,8 @@ jobs:
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
       - id: auth
         name: Set up Google Cloud Credentials
