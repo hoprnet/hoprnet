@@ -75,3 +75,18 @@ jobs:
     secrets:
       GOOGLE_HOPRASSOCIATION_PROJECT: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
       GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+
+  build_pluto:
+    name: Pluto
+    needs:
+      - check_changeset
+      - build_hoprd
+      - build_hopli
+    if: |
+      always()
+      && contains(needs.*.result, 'success')
+      && !contains(needs.*.result, 'failure')
+    uses: ./.github/workflows/build-pluto.yaml
+    secrets:
+      GOOGLE_HOPRASSOCIATION_PROJECT: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
+      GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
