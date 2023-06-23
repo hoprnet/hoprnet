@@ -13,6 +13,7 @@ members = [
     "packages/ethereum/crates/bindings",
     "packages/hopli",
     "packages/real/crates/real-base",
+    "packages/hoprd/crates/hoprd-keypair",
     "packages/hoprd/crates/hoprd-misc",
     "packages/utils/crates/utils-db",
     "packages/utils/crates/utils-log",

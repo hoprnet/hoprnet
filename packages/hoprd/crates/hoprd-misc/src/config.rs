@@ -233,7 +233,7 @@ fn validate_password(s: &str) -> Result<(), ValidationError> {
     }
 }
 
-regex!(is_private_key "^(0[xX])?[a-fA-F0-9]{64}$");
+regex!(is_private_key "^(0[xX])?[a-fA-F0-9]{128}$");
 
 pub(crate) fn validate_private_key(s: &str) -> Result<(), ValidationError> {
     if is_private_key(s) {
