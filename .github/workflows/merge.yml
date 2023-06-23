@@ -15,11 +15,11 @@ jobs:
         uses: actions/checkout@v3
       - name: Cleanup
         run: |
-          /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-          (echo; echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"') >> /home/runner/.profile
-          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-          brew install gh
-          gh extension install actions/gh-actions-cache
+          sudo /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          sudo (echo; echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"') >> /home/runner/.profile
+          sudo eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          sudo brew install gh
+          sudo gh extension install actions/gh-actions-cache
 
           REPO=${{ github.repository }}
           BRANCH="refs/pull/${{ github.event.pull_request.number }}/merge"
