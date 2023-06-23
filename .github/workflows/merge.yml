@@ -148,7 +148,7 @@ jobs:
           if [ "${base_branch}" == "master" ]; then
             docker_stable_tag=latest
           else
-            docker_stable_tag=${base_branch/release\//}"
+            docker_stable_tag=${base_branch/release\//}
           fi
           ./scripts/deploy.sh "europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hoprd:${docker_stable_tag}" 3 ${base_branch}
         env:
