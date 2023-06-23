@@ -116,9 +116,9 @@ jobs:
       - name: Docker Tag Pluto
         if: env.build_hoprd || env.build_hopli || env.build_anvil
         run: |
-          docker pull ${{ env.DOCKER_REGISTRY }}/hopr-anvil:${{ env.DOCKER_PR_TAG }}
-          docker tag ${{ env.DOCKER_REGISTRY }}/hopr-anvil:${{ env.DOCKER_PR_TAG }} ${{ env.DOCKER_REGISTRY }}/hopr-anvil:${{ env.DOCKER_STABLE_TAG }}
-          docker push ${{ env.DOCKER_REGISTRY }}/hopr-anvil:${{ env.DOCKER_STABLE_TAG }}
+          docker pull ${{ env.DOCKER_REGISTRY }}/hopr-pluto:${{ env.DOCKER_PR_TAG }}
+          docker tag ${{ env.DOCKER_REGISTRY }}/hopr-pluto:${{ env.DOCKER_PR_TAG }} ${{ env.DOCKER_REGISTRY }}/hopr-pluto:${{ env.DOCKER_STABLE_TAG }}
+          docker push ${{ env.DOCKER_REGISTRY }}/hopr-pluto:${{ env.DOCKER_STABLE_TAG }}
 
   deploy_prn:
     name: Deploy PRN nodes
