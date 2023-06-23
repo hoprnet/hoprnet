@@ -1,8 +1,14 @@
 name: Merge
 on:
   pull_request:
+    branches:
+      - master
     types:
-      - closed
+      - synchronize
+# on:
+#   pull_request:
+#     types:
+#       - closed
 concurrency:
   group: ${{ github.head_ref }}-merge
   cancel-in-progress: false
@@ -19,7 +25,7 @@ jobs:
           sudo (echo; echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"') >> /home/runner/.profile
           sudo eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
           sudo brew install gh
-          sudo gh extension install actions/gh-actions-cache
+          gh extension install actions/gh-actions-cache
 
           REPO=${{ github.repository }}
           BRANCH="refs/pull/${{ github.event.pull_request.number }}/merge"
