@@ -25,9 +25,10 @@ declare branch cluster_size docker_image
 # docker_image and cluster_size are configurable through script arguments
 docker_image="${1:-gcr.io/hoprassociation/hoprd}"
 cluster_size=${2:-3}
-cluster_tag=${3:-} # optional cluster tag
+branch=${3:-master} # bratislava , providence
+cluster_tag=${4:-} # optional cluster tag
 
-branch=$(git branch --show-current)
+
 api_token="${HOPRD_API_TOKEN}"
 password="${HOPRD_PASSWORD}"
 
