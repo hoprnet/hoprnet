@@ -1,5 +1,5 @@
 ---
-name: Draft
+name: New PR
 
 on:
   pull_request:
@@ -19,6 +19,9 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event.pull_request.draft == false
     steps:
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v3
+
       - name: Convert to draft
         run: |
           set -x
