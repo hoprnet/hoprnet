@@ -139,7 +139,7 @@ jobs:
         uses: google-github-actions/setup-gcloud@v1
         with:
           project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
-          # install_components: beta
+          install_components: beta
 
       - name: Deploy on GCP VM
         run: |
