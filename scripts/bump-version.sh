@@ -31,7 +31,8 @@ usage() {
 declare version_suffix
 
 # Get the version suffix from input parameters
-version_suffix="${1:-}"
+base_branch_name="${1:-}"
+version_suffix="${2:-}"
 
 # define packages for versioning
 # does not include ethereum, which isn't a real package anymore, just a folder
@@ -40,8 +41,16 @@ declare -a versioned_packages=( utils connect core-ethereum core real hoprd )
 declare current_version
 current_version="$("${mydir}/get-package-version.sh")"
 
+declare pre_release
+if [ "${base_branch_name}" == "master" ]; then
+  pre_release="alpha"
+else
+  pre_release="beta"
+fi
+
 declare new_version
-new_version="${current_version}-pr-${version_suffix}"
+
+new_version="${current_version}-${pre_release}+pr.${version_suffix}"
 
 # create new version in each package
 for package in "${versioned_packages[@]}"; do

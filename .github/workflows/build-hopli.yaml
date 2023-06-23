@@ -39,11 +39,16 @@ jobs:
         with:
           driver: kubernetes
 
+      - name: "Set PR number on version"
+        run: | 
+          ./scripts/bump-version.sh ${{ github.event.pull_request.base.ref }} ${{ github.event.pull_request.number }}
+          echo "DOCKER_TAG=$(./scripts/get-package-version.sh)" >> $GITHUB_ENV
+
       - name: Build and push docker image
         uses: docker/build-push-action@v4
         with:
           push: true
           file: packages/hopli/Dockerfile
-          cache-from: type=registry,ref=europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopli:pr-${{ github.event.pull_request.number }}-cache
-          cache-to: type=registry,ref=europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopli:pr-${{ github.event.pull_request.number }}-cache,mode=max
-          tags: europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopli:pr-${{ github.event.pull_request.number }}
+          cache-from: type=registry,ref=europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopli:${{ env.DOCKER_TAG }}-cache
+          cache-to: type=registry,ref=europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopli:${{ env.DOCKER_TAG }}-cache,mode=max
+          tags: europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopli:${{ env.DOCKER_TAG }}
