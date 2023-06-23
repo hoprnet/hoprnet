@@ -20,7 +20,9 @@ jobs:
     if: github.event.pull_request.draft == false
     steps:
       - name: Convert to draft
-        run: gh pr ready ${{ github.event.pull_request.number }} --undo
+        run: |
+          set -x
+          gh pr ready ${{ github.event.pull_request.number }} --undo
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   
