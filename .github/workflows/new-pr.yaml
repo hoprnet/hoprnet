@@ -9,7 +9,7 @@ on:
     types:
       - opened
 concurrency:
-  group: ${{ github.head_ref }}-draft
+  group: ${{ github.head_ref }}-new
   cancel-in-progress: false
 jobs:
   draft:
