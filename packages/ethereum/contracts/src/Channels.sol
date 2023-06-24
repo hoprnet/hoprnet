@@ -8,6 +8,11 @@ import 'openzeppelin-contracts-4.8.3/token/ERC20/IERC20.sol';
 import 'openzeppelin-contracts-4.8.3/token/ERC777/IERC777Recipient.sol';
 import 'openzeppelin-contracts-4.8.3/utils/cryptography/ECDSA.sol';
 
+import './Crypto.sol';
+import './Ledger.sol';
+import './MultiSig.sol';
+import './node-stake/NodeSafeRegistry.sol';
+
 error InvalidBalance();
 error BalanceExceedsGlobalPerChannelAllowance();
 error SourceEqualsDestination();
@@ -16,12 +21,14 @@ error TokenTransferFailed();
 error InvalidNoticePeriod();
 error NoticePeriodNotDue();
 error WrongChannelState(string reason);
-error InvalidPoRSecret(string reason);
 error InvalidTicketSignature();
 error InvalidCommitmentOpening();
 error InsufficientChannelBalance();
 error InvalidCommitment();
 error TicketIsNotAWin();
+
+uint256 constant ONE_HOUR = 60 * 1000;
+uint256 constant INDEX_SNAPSHOT_INTERVAL = ONE_HOUR;
 
 /**
  *    &&&&
@@ -40,7 +47,7 @@ error TicketIsNotAWin();
  *
  * Manages mixnet incentives in the hopr network.
  **/
-contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
+contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprLedger(INDEX_SNAPSHOT_INTERVAL), HoprMultiSig, HoprCrypto {
   // required by ERC1820 spec
   IERC1820Registry internal constant _ERC1820_REGISTRY = IERC1820Registry(0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24);
   // required by ERC777 spec
@@ -48,24 +55,14 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
 
   type Balance is uint96;
   type TicketEpoch is uint32;
-  type TicketIndex is uint64;
+  type TicketIndex is uint48;
   type ChannelEpoch is uint24;
   type Timestamp is uint32; // overflows in year 2105
   // Using IEEE 754 double precision -> 53 significant bits
   type WinProb is uint56;
-  type TicketReserved is uint16;
 
   Balance public constant MAX_USED_BALANCE = Balance.wrap(10 ** 25); // 1% of total supply, staking more is not sound
   Balance public constant MIN_USED_BALANCE = Balance.wrap(1); // no empty token transactions
-
-  // Field order created by secp256k1 curve
-  bytes32 constant FIELD_ORDER = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141;
-
-  // x-component of base point of secp256k1 curve
-  bytes32 constant BASE_POINT_X_COMPONENT = 0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798;
-
-  // encoded sign of y-component of base point of secp256k1 curve
-  uint8 constant BASE_POINT_Y_COMPONENT_SIGN = 27;
 
   // ERC-777 tokensReceived hook, fundChannelMulti
   uint256 public immutable FUND_CHANNEL_MULTI_SIZE =
@@ -74,7 +71,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
   // ERC-777 tokensReceived hook, fundChannel
   uint256 public immutable FUND_CHANNEL_SIZE =  abi.encode(address(0)).length;
 
-  string public constant version = '2.0.0';
+  string public constant VERSION = '2.0.0';
 
   bytes32 public immutable domainSeparator; // depends on chainId
   // Non-standard usage of EIP712 due computed property and custom property encoding
@@ -104,13 +101,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     PENDING_TO_CLOSE
   }
 
-  /**
-   * Holds a compact ECDSA signature, following ERC-2098
-   */
-  struct CompactSignature {
-    bytes32 r;
-    bytes32 vs;
-  }
 
   /**
    * Represents the state of a channel
@@ -141,14 +131,14 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     bytes32 channelId;
     Balance amount;
     TicketIndex index;
+    TicketIndex indexAfter;
     ChannelEpoch epoch;
     WinProb winProb;
-    TicketReserved reserved; // for future use
   }
 
   struct RedeemableTicket {
     TicketData data;
-    CompactSignature signature;
+    HoprCrypto.CompactSignature signature;
     bytes32 opening;
     bytes32 porSecret;
   }
@@ -230,22 +220,13 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
       abi.encode(
         keccak256('EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)'),
         keccak256(bytes('HoprChannels')),
-        keccak256(bytes(version)),
+        keccak256(bytes(VERSION)),
         block.chainid,
         address(this)
       )
     );
   }
 
-  modifier onlySafe() {
-    // check if NodeSafeRegistry entry exists
-    _;
-  }
-
-  modifier noSafeSet() {
-    // check if NodeSafeRegistry entry **does not** exist
-    _;
-  }
 
   /**
    * Assert that source and destination are good addresses, and distinct.
@@ -269,17 +250,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     }
     if (Balance.unwrap(balance) > Balance.unwrap(MAX_USED_BALANCE)) {
       revert BalanceExceedsGlobalPerChannelAllowance();
-    }
-    _;
-  }
-
-  modifier validatePoRSecret(bytes32 response) {
-    if (response == bytes32(0)) {
-      revert InvalidPoRSecret('Response is 0. Value must be within the field');
-    }
-
-    if (response >= FIELD_ORDER) {
-      revert InvalidPoRSecret('Response greater than field order. Value must be within the field');
     }
     _;
   }
@@ -322,11 +292,11 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     }
   }
 
-  function redeemTicketSafe(address self, RedeemableTicket calldata redeemable) external onlySafe {
+  function redeemTicketSafe(address self, RedeemableTicket calldata redeemable) external HoprMultiSig.onlySafe(self) {
     _redeemTicketInternal(self, redeemable);
   }
 
-  function redeemTicket(RedeemableTicket calldata redeemable) external noSafeSet {
+  function redeemTicket(RedeemableTicket calldata redeemable) external HoprMultiSig.noSafeSet {
     _redeemTicketInternal(msg.sender, redeemable);
   }
 
@@ -343,7 +313,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
   function _redeemTicketInternal(
     address self,
     RedeemableTicket calldata redeemable
-  ) internal validateBalance(redeemable.data.amount) validatePoRSecret(redeemable.porSecret) {
+  ) internal validateBalance(redeemable.data.amount) HoprCrypto.isFieldElement(redeemable.porSecret) {
     Channel storage spendingChannel = channels[redeemable.data.channelId];
 
     if (
@@ -406,11 +376,11 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     emit TicketRedeemed(redeemable.data.channelId, redeemable.data.index);
   }
 
-  function initiateOutgoingChannelClosureSafe(address self, address destination) external onlySafe {
+  function initiateOutgoingChannelClosureSafe(address self, address destination) external HoprMultiSig.onlySafe(self) {
     _initiateOutgoingChannelClosureInternal(self, destination);
   }
 
-  function initiateOutgoingChannelClosure(address destination) external noSafeSet {
+  function initiateOutgoingChannelClosure(address destination) external HoprMultiSig.noSafeSet {
     _initiateOutgoingChannelClosureInternal(msg.sender, destination);
   }
 
@@ -441,11 +411,11 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     emit OutgoingChannelClosureInitiated(channelId, channel.closureTime);
   }
 
-  function closeIncomingChannelSafe(address self, address source) external onlySafe {
+  function closeIncomingChannelSafe(address self, address source) external HoprMultiSig.onlySafe(self) {
     _closeIncomingChannelInternal(self, source);
   }
 
-  function closeIncomingChannel(address source) external noSafeSet {
+  function closeIncomingChannel(address source) external HoprMultiSig.noSafeSet {
     _closeIncomingChannelInternal(msg.sender, source);
   }
 
@@ -487,11 +457,11 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     channel.balance = Balance.wrap(0);
   }
 
-  function finalizeOutgoingChannelClosureSafe(address self, address destination) external onlySafe {
+  function finalizeOutgoingChannelClosureSafe(address self, address destination) external HoprMultiSig.onlySafe(self) {
     _finalizeOutgoingChannelClosureInternal(self, destination);
   }
 
-  function finalizeOutgoingChannelClosure(address destination) external noSafeSet {
+  function finalizeOutgoingChannelClosure(address destination) external HoprMultiSig.noSafeSet {
     _finalizeOutgoingChannelClosureInternal(msg.sender, destination);
   }
 
@@ -534,11 +504,11 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     channel.balance = Balance.wrap(0);
   }
 
-  function setCommitmentSafe(address self, bytes32 newCommitment, address source) external onlySafe {
+  function setCommitmentSafe(address self, bytes32 newCommitment, address source) external HoprMultiSig.onlySafe(self) {
     _setCommitmentInternal(self, newCommitment, source);
   }
 
-  function setCommitment(bytes32 newCommitment, address source) external noSafeSet {
+  function setCommitment(bytes32 newCommitment, address source) external HoprMultiSig.noSafeSet {
     _setCommitmentInternal(msg.sender, newCommitment, source);
   }
 
@@ -685,30 +655,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
   }
 
   /**
-   * Ticket redemption uses an asymmetric challenge-response mechanism whose verification
-   * requires scalar multiplication of a secp256k1 curve point.
-   *
-   * Due to the lack of a cheap secp256k1 ECMUL precompile, the construction misuses
-   * the ECRECOVER precompile to compute the scalar multiplication over secp256k1.
-   * Although this returns an Ethereum address, the result is usable to validate the response
-   * against the stated challenge.
-   *
-   * For more information see
-   * https://ethresear.ch/t/you-can-kinda-abuse-ecrecover-to-do-ecmul-in-secp256k1-today/2384
-   *
-   * @param scalar to multiply with secp256k1 base point
-   */
-  function _scalarTimesBasepoint(bytes32 scalar) public pure returns (address) {
-    return
-      ecrecover(
-        0,
-        BASE_POINT_Y_COMPONENT_SIGN,
-        bytes32(BASE_POINT_X_COMPONENT),
-        bytes32(mulmod(uint256(scalar), uint256(BASE_POINT_X_COMPONENT), uint256(FIELD_ORDER)))
-      );
-  }
-
-  /**
    * Gets the non-trivial ticket hash.
    *
    * Note that signature is over ticket data and a computed property which implements
@@ -721,7 +667,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     bytes32 hashStruct = keccak256(
       abi.encode(
         redeemTicketSeparator,
-        keccak256(abi.encode(redeemable.data, _scalarTimesBasepoint(redeemable.porSecret)))
+        keccak256(abi.encode(redeemable.data, HoprCrypto.scalarTimesBasepoint(redeemable.porSecret)))
       )
     );
 

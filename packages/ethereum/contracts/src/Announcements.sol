@@ -3,6 +3,8 @@ pragma solidity 0.8.19;
 
 import 'openzeppelin-contracts-4.8.3/utils/Multicall.sol';
 
+import './MultiSig.sol';
+
 /**
  *    &&&&
  *    &&&&
@@ -20,7 +22,7 @@ import 'openzeppelin-contracts-4.8.3/utils/Multicall.sol';
  *
  * Publishes transport-layer information in the hopr network.
  **/
-contract HoprAnnouncements is Multicall {
+contract HoprAnnouncements is Multicall, HoprMultiSig {
   event KeyBinding(bytes32 ed25519_sig_0, bytes32 ed25519_sig_1, bytes32 ed25519_pub_key, address chain_key);
 
   event AddressAnnouncement4(address node, bytes4 ip4, bytes2 port);
@@ -28,22 +30,12 @@ contract HoprAnnouncements is Multicall {
 
   event RevokeAnnouncement(address node);
 
-  modifier onlySafe() {
-    // check if NodeSafeRegistry entry exists
-    _;
-  }
-
-  modifier noSafeSet() {
-    // check if NodeSafeRegistry entry **does not** exist
-    _;
-  }
-
   function bindKeysSafe(
     address self,
     bytes32 ed25519_sig_0,
     bytes32 ed25519_sig_1,
     bytes32 ed25519_pub_key
-  ) external onlySafe {
+  ) external HoprMultiSig.onlySafe(self) {
     _bindKeysInternal(self, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key);
   }
 
@@ -51,7 +43,7 @@ contract HoprAnnouncements is Multicall {
     bytes32 ed25519_sig_0,
     bytes32 ed25519_sig_1,
     bytes32 ed25519_pub_key
-  ) external noSafeSet {
+  ) external HoprMultiSig.noSafeSet {
     _bindKeysInternal(msg.sender, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key);
   }
 
@@ -62,7 +54,7 @@ contract HoprAnnouncements is Multicall {
     bytes32 ed25519_pub_key,
     bytes4 ip,
     bytes2 port
-  ) external onlySafe {
+  ) external HoprMultiSig.onlySafe(self) {
     _bindKeysInternal(self, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key);
     _announce4Internal(self, ip, port);
   }
@@ -76,7 +68,7 @@ contract HoprAnnouncements is Multicall {
     bytes32 ed25519_pub_key,
     bytes4 ip,
     bytes2 port
-  ) external noSafeSet {
+  ) external HoprMultiSig.noSafeSet {
     _bindKeysInternal(msg.sender,  ed25519_sig_0, ed25519_sig_1, ed25519_pub_key);
     _announce4Internal(msg.sender, ip, port);
   }
@@ -88,7 +80,7 @@ contract HoprAnnouncements is Multicall {
     bytes32 ed25519_pub_key,
     bytes16 ip,
     bytes2 port
-  ) external onlySafe {
+  ) external HoprMultiSig.onlySafe(self) {
     _bindKeysInternal(self, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key);
     _announce6Internal(self, ip, port);
   }
@@ -102,32 +94,32 @@ contract HoprAnnouncements is Multicall {
     bytes32 ed25519_pub_key,
     bytes16 ip,
     bytes2 port
-  ) external noSafeSet {
+  ) external HoprMultiSig.noSafeSet {
     _bindKeysInternal(msg.sender, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key);
     _announce6Internal(msg.sender, ip, port);
   }
 
-  function announce6Safe(address self, bytes16 ip, bytes2 port) external onlySafe {
+  function announce6Safe(address self, bytes16 ip, bytes2 port) external HoprMultiSig.onlySafe(self) {
     _announce6Internal(self, ip, port);
   }
 
-  function announce6(bytes16 ip, bytes2 port) external noSafeSet {
+  function announce6(bytes16 ip, bytes2 port) external HoprMultiSig.noSafeSet {
     _announce6Internal(msg.sender, ip, port);
   }
 
-  function announce4Safe(address self, bytes4 ip, bytes2 port) external onlySafe {
+  function announce4Safe(address self, bytes4 ip, bytes2 port) external HoprMultiSig.onlySafe(self) {
     _announce4Internal(self, ip, port);
   }
 
-  function announce4(bytes4 ip, bytes2 port) external noSafeSet {
+  function announce4(bytes4 ip, bytes2 port) external HoprMultiSig.noSafeSet {
     _announce4Internal(msg.sender, ip, port);
   }
 
-  function revokeSafe(address self) external onlySafe {
+  function revokeSafe(address self) external HoprMultiSig.onlySafe(self) {
     _revokeInternal(self);
   }
 
-  function revoke() external noSafeSet {
+  function revoke() external HoprMultiSig.noSafeSet {
     _revokeInternal(msg.sender);
   }
 
