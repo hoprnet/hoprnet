@@ -15,8 +15,8 @@ let
     envsubst
 
     ## node, minimum recommended version is v18, see README for more details
-    nodejs-18_x # v16.19.1
-    (yarn.override { nodejs = nodejs-18_x; }) # v3.5.0 (as per local yarn cfg)
+    nodejs-18_x # v18.16.1
+    (yarn.override { nodejs = nodejs-18_x; }) # v3.6.0 (as per local yarn cfg)
 
     ## rust for core development and required utils
     (rust-bin.fromRustupToolchainFile ./rust-toolchain.toml)
@@ -27,7 +27,7 @@ let
     pkg-config
 
     ## python is required by node module bcrypto and integration tests
-    python3 # v3.10.10
+    python3 # v3.10.12
   ];
   devPkgs = with pkgs; [
     patchelf
