@@ -521,7 +521,7 @@ mod tests {
 
     use super::HoprKeys;
     use tempfile::tempdir;
-    use utils_types::traits::PeerIdLike;
+    use core_crypto::keypairs::Keypair;
 
     const DEFAULT_PASSWORD: &str = "dummy password for unit testing";
 
@@ -563,7 +563,7 @@ mod tests {
 
         assert!(needs_migration);
         assert_eq!(
-            deserialized.chain_key.1.to_peerid_str(),
+            deserialized.chain_key.public().0.to_address().to_string(),
             "16Uiu2HAm8WFpakjrdWauUKq2hb5bejivnbtFAumVv9KHKN5AvXXK"
         );
     }
@@ -590,7 +590,7 @@ mod tests {
 
         assert!(!needs_migration);
         assert_eq!(
-            deserialized.chain_key.1.to_peerid_str(),
+            deserialized.chain_key.public().0.to_address().to_string(),
             "16Uiu2HAm8WFpakjrdWauUKq2hb5bejivnbtFAumVv9KHKN5AvXXK"
         );
     }

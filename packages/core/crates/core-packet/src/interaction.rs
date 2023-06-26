@@ -1,17 +1,18 @@
-use crate::errors::PacketError::{AcknowledgementValidation, ChannelNotFound, InvalidPacketState, OutOfFunds, PacketConstructionError, PacketDecodingError, PathNotValid, Retry, TagReplay, TransportError};
+use crate::errors::PacketError::{AcknowledgementValidation, ChannelNotFound, InvalidPacketState, OutOfFunds, PacketConstructionError, PacketDecodingError, PathError, Retry, TagReplay, TransportError};
 use crate::errors::Result;
 use crate::packet::{Packet, PacketState};
-use crate::path::Path;
 use async_std::channel::{bounded, Receiver, Sender, TrySendError};
 use core_crypto::types::{HalfKeyChallenge, Hash, OffchainPublicKey, PublicKey};
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_mixer::mixer::{Mixer, MixerConfig};
+use core_path::path::Path;
 use core_types::acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket};
 use core_types::channels::Ticket;
 use libp2p_identity::PeerId;
 use std::ops::{Deref, Mul};
 use std::sync::{Arc, Mutex};
 use core_crypto::keypairs::{ChainKeypair, OffchainKeypair};
+use core_path::errors::PathError::PathNotValid;
 use utils_log::{debug, error, info};
 use utils_types::primitives::{Balance, BalanceType, U256};
 use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
@@ -436,7 +437,7 @@ where
     pub async fn send_packet(&self, msg: &[u8], path: Path, wait: bool) -> Result<HalfKeyChallenge> {
         // Check if the path is valid
         if !path.valid() {
-            return Err(PathNotValid);
+            return Err(PathError(PathNotValid));
         }
 
         let next_peer = self.db
@@ -731,7 +732,6 @@ mod tests {
     use crate::interaction::{
         AcknowledgementInteraction, PacketInteraction, PacketInteractionConfig, Payload, PRICE_PER_PACKET,
     };
-    use crate::path::Path;
     use crate::por::ProofOfRelayValues;
     use async_trait::async_trait;
     use core_crypto::derivation::derive_ack_key_share;
@@ -757,6 +757,7 @@ mod tests {
     use std::time::Duration;
     use core_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
     use core_crypto::shared_keys::SharedSecret;
+    use core_path::path::Path;
     use utils_db::db::DB;
     use utils_db::errors::DbError;
     use utils_db::leveldb::rusty::RustyLevelDbShim;
@@ -1468,11 +1469,11 @@ mod tests {
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use crate::interaction::{AcknowledgementInteraction, PacketInteraction, PacketInteractionConfig, Payload};
-    use crate::path::Path;
     use async_std::channel::unbounded;
     use core_crypto::types::{HalfKeyChallenge, PublicKey};
     use core_ethereum_db::db::CoreEthereumDb;
     use core_mixer::mixer::Mixer;
+    use core_path::path::Path;
     use core_types::acknowledgement::{AcknowledgedTicket, Acknowledgement};
     use js_sys::{JsString, Uint8Array};
     use libp2p_identity::PeerId;

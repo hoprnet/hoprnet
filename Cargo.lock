@@ -1060,6 +1060,7 @@ dependencies = [
  "core-ethereum-db",
  "core-ethereum-misc",
  "core-mixer",
+ "core-path",
  "core-types",
  "env_logger",
  "futures",
@@ -1082,6 +1083,25 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-bindgen-test",
+]
+
+[[package]]
+name = "core-path"
+version = "0.1.0"
+dependencies = [
+ "console_error_panic_hook",
+ "hex",
+ "js-sys",
+ "libp2p-identity 0.2.0",
+ "tempfile",
+ "thiserror",
+ "utils-log",
+ "utils-misc",
+ "utils-types",
+ "wasm-bindgen",
+ "wasm-bindgen-test",
+ "wasm-opt",
+ "wasm-pack",
 ]
 
 [[package]]

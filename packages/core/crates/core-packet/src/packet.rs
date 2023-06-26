@@ -11,13 +11,13 @@ use libp2p_identity::PeerId;
 use typenum::Unsigned;
 use core_crypto::types::OffchainPublicKey;
 use core_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
+use core_path::path::Path;
 use utils_types::errors::GeneralError::ParseError;
 use utils_types::traits::{BinarySerializable, PeerIdLike};
 
 use crate::errors::Result;
 use crate::packet::ForwardedMetaPacket::{FinalPacket, RelayedPacket};
 use crate::packet::PacketState::{Final, Forwarded, Outgoing};
-use crate::path::Path;
 use crate::por::{POR_SECRET_LENGTH, pre_verify, ProofOfRelayString, ProofOfRelayValues};
 
 /// Currently used ciphersuite for Sphinx
@@ -434,9 +434,9 @@ mod tests {
     use core_crypto::ec_groups::{Ed25519Suite, Secp256k1Suite, X25519Suite};
     use core_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
     use core_crypto::shared_keys::SphinxSuite;
+    use core_path::path::Path;
     use utils_types::primitives::{Balance, BalanceType, U256};
     use utils_types::traits::PeerIdLike;
-    use crate::path::Path;
 
     #[test]
     fn test_padding() {

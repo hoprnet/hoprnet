@@ -1,8 +1,8 @@
 use libp2p_identity::PeerId;
 use std::fmt::{Display, Formatter};
 use utils_types::traits::PeerIdLike;
-use crate::errors::PacketError;
-use crate::errors::PacketError::{InvalidPeer, PathNotValid};
+use crate::errors::PathError;
+use crate::errors::PathError::{InvalidPeer, PathNotValid};
 
 /// Represents a path for a packet.
 /// The type internally carries an information if the path has been already validated or not (since path validation
@@ -44,7 +44,7 @@ impl Path {
 
 impl<T> TryFrom<&Path> for Vec<T>
 where T: PeerIdLike {
-    type Error = PacketError;
+    type Error = PathError;
 
     fn try_from(value: &Path) -> std::result::Result<Self, Self::Error> {
         if value.valid() {
@@ -84,7 +84,6 @@ mod tests {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use crate::errors::PacketError::Other;
     use crate::errors::Result;
     use crate::path::Path;
     use js_sys::JsString;
@@ -92,8 +91,8 @@ pub mod wasm {
     use std::str::FromStr;
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
-    use utils_types::errors::GeneralError::ParseError;
     use wasm_bindgen::prelude::wasm_bindgen;
+    use crate::errors::PathError::InvalidPeer;
 
     #[wasm_bindgen]
     impl Path {
@@ -101,7 +100,7 @@ pub mod wasm {
         pub fn _new_validated(validated_path: Vec<JsString>) -> JsResult<Path> {
             Ok(Path::new_valid(ok_or_jserr!(validated_path
                 .into_iter()
-                .map(|p| PeerId::from_str(&p.as_string().unwrap()).map_err(|_| Other(ParseError)))
+                .map(|p| PeerId::from_str(&p.as_string().unwrap()).map_err(|_| InvalidPeer(p.as_string().unwrap())))
                 .collect::<Result<Vec<PeerId>>>())?))
         }
     }

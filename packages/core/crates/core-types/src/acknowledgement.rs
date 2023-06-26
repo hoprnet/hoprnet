@@ -312,7 +312,7 @@ pub mod test {
     #[test]
     fn test_acknowledgement() {
         let pk_2 = OffchainKeypair::from_secret(&hex!("4471496ef88d9a7d86a92b7676f3c8871a60792a37fae6fc3abc347c3aa3b16b")).unwrap();
-        let pub_key_2 = OffchainPublicKey::from_privkey(pk_2.secret()).unwrap();
+        let pub_key_2 = OffchainPublicKey::from_privkey(pk_2.secret().as_ref()).unwrap();
 
         let ack_key = HalfKey::new(&hex!(
             "3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa"

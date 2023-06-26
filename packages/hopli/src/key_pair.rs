@@ -70,7 +70,7 @@ pub fn create_identity(dir_name: &str, password: &str, maybe_name: &Option<Strin
 #[cfg(test)]
 mod tests {
     use std::path::Path;
-    use utils_types::traits::PeerIdLike;
+    use core_crypto::keypairs::Keypair;
 
     use super::*;
 
@@ -95,8 +95,7 @@ mod tests {
         let files = get_files(path, &None);
         let read_id = read_identities(files, &pwd.to_string()).unwrap();
         assert_eq!(read_id.len(), 1);
-        assert_eq!(read_id[0].chain_key.1.to_address(), created_id.chain_key.1.to_address());
-        assert_eq!(read_id[0].chain_key.1.to_peerid(), created_id.chain_key.1.to_peerid());
+        assert_eq!(read_id[0].chain_key.public().0.to_address(), created_id.chain_key.public().0.to_address());
 
         // print the read id
         println!("Debug {:#?}", read_id);
@@ -189,7 +188,6 @@ mod tests {
         let pwd = "e2e-test";
 
         let weak_crypto_alice_keystore = r#"{"crypto":{"cipher":"aes-128-ctr","cipherparams":{"iv":"9a876992ad22bec8e82fe3452788b800"},"ciphertext":"f08651ab3c237e337f81e8fa6689bb896f35e4eaae34aca504fa30a86ad85f72281ba48a99cb1327435c935b9deb800d60ca2fc46072c5c3b3aafc1861f0a12c","kdf":"scrypt","kdfparams":{"dklen":32,"n":2,"p":1,"r":8,"salt":"82af32aac6a4377ce44877c3ae4f7c5e7b9e409e866a0e75fb3bff86f1fbc66d"},"mac":"524197480216a0d1d1781214de8b76ca08feddf337338765b3cea47f08b319cb"},"id":"c76e561b-bedf-4a9a-87f7-352efd718c9b","version":3}"#;
-        let alice_peer_id = "16Uiu2HAmUYnGY3USo8iy13SBFW7m5BMQvC4NETu1fGTdoB86piw7";
         let alice_address = "0x838d3c1d2ff5c576d7b270aaaaaa67e619217aac";
 
         // create dir if not exist.
@@ -200,8 +198,7 @@ mod tests {
         let files = get_files(path, &None);
         let val = read_identities(files, &pwd.to_string()).unwrap();
         assert_eq!(val.len(), 1);
-        assert_eq!(val[0].chain_key.1.to_peerid_str(), alice_peer_id);
-        assert_eq!(val[0].chain_key.1.to_address().to_string(), alice_address);
+        assert_eq!(val[0].chain_key.public().0.to_address().to_string(), alice_address);
 
         remove_json_keystore(path).map_err(|err| println!("{:?}", err)).ok();
     }

@@ -1,5 +1,6 @@
 use core_crypto::errors::CryptoError;
 use thiserror::Error;
+use core_path::errors::PathError;
 use utils_db::errors::DbError;
 use utils_types::errors::GeneralError;
 
@@ -19,12 +20,6 @@ pub enum PacketError {
 
     #[error("could not find channel to {0}")]
     ChannelNotFound(String),
-
-    #[error("path for the packet is not valid")]
-    PathNotValid,
-
-    #[error("path contains an invalid peer id")]
-    InvalidPeer(String),
 
     #[error("ticket validation failed, packet dropped: {0}")]
     TicketValidation(String),
@@ -49,6 +44,9 @@ pub enum PacketError {
 
     #[error(transparent)]
     PacketDbError(#[from] DbError),
+
+    #[error(transparent)]
+    PathError(#[from] PathError),
 
     #[error(transparent)]
     Other(#[from] GeneralError),
