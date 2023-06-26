@@ -19,6 +19,7 @@
 - Migrate Packet and Acknowledgement interactions to Rust ([#5074](https://github.com/hoprnet/hoprnet/pull/5074))
 - Change keystore to hold `chain_key` and `packet_key` ([#5175](https://github.com/hoprnet/hoprnet/pull/5175))
 - Switch to Curve25519 to generate Sphinx keys, use Ed25519 PeerIDs for transport ([#5069](https://github.com/hoprnet/hoprnet/pull/5069))
+- Remove Avado build support ([#5181](https://github.com/hoprnet/hoprnet/pull/5181))
 
 <a name="1.93"></a>
 
