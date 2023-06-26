@@ -23,6 +23,7 @@ core-ethereum-db = { path = "../../../core-ethereum/crates/core-ethereum-db" }
 core-mixer = { path = "../core-mixer"}
 core-types = { path = "../core-types" }
 futures = "0.3"
+hex = "0.4"
 js-sys = { version = "0.3.63", optional = true }
 lazy_static = "1.4"
 libp2p-identity = { version = "0.2.0", features = ["secp256k1", "peerid"] }

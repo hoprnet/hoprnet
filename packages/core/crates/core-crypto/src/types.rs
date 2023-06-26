@@ -736,6 +736,12 @@ impl BinarySerializable for CompressedPublicKey {
     }
 }
 
+impl From<PublicKey> for CompressedPublicKey {
+    fn from(value: PublicKey) -> Self {
+        Self(value)
+    }
+}
+
 impl From<&CompressedPublicKey> for k256::ProjectivePoint {
     fn from(value: &CompressedPublicKey) -> Self {
         (&value.0).into()

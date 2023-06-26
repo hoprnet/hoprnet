@@ -13,6 +13,7 @@ use ethers::{
 };
 use log::{log, Level};
 use std::{env, str::FromStr};
+use core_crypto::keypairs::Keypair;
 use utils_types::primitives::Address;
 
 /// CLI arguments for `hopli faucet`
@@ -110,7 +111,7 @@ impl FaucetArgs {
 
             match read_identities(local_files, &pwd) {
                 Ok(node_identities) => {
-                    addresses_all.extend(node_identities.iter().map(|ni| ni.chain_key.1.to_address().to_string()));
+                    addresses_all.extend(node_identities.iter().map(|ni| ni.chain_key.public().0.to_address().to_string()));
                 }
                 Err(e) => return Err(e),
             }
