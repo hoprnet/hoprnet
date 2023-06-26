@@ -28,7 +28,6 @@ The architecture of the SPHINX shared key derivation is done generically, so it 
 hard. The generic Sphinx implementation only requires one to implement the `SphinxSuite` trait.
 The trait requires to have the following building blocks:
 - elliptic curve group (`GroupElement`) and corresponding the scalar type (`Scalar`)
-- size of the Sphinx `Alpha` value (usually some encoding of `GroupElement`)
 - type representing public and private keypair and their conversion to `Scalar` and `GroupElement` (by the means of the corresponding `From` trait implementation)
 
 Currently, there are the following `SphinxSuite` implementations :
