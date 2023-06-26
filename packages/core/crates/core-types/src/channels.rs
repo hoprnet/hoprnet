@@ -1,4 +1,3 @@
-use std::fmt::{Display, Formatter};
 use core_crypto::errors::CryptoError::SignatureVerification;
 use core_crypto::keypairs::ChainKeypair;
 use core_crypto::types::{Hash, PublicKey, Response, Signature};
@@ -6,6 +5,7 @@ use enum_iterator::{all, Sequence};
 use ethnum::u256;
 use serde::{Deserialize, Serialize};
 use serde_repr::*;
+use std::fmt::{Display, Formatter};
 use std::ops::{Div, Mul, Sub};
 use utils_types::errors::{GeneralError::ParseError, Result};
 use utils_types::primitives::{Address, Balance, BalanceType, EthereumChallenge, U256};

@@ -620,8 +620,7 @@ impl PublicKey {
         ]
         .contains(&data.len())
         {
-            let key =
-            if data.len() == Self::SIZE_UNCOMPRESSED - 1 {
+            let key = if data.len() == Self::SIZE_UNCOMPRESSED - 1 {
                 elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(&[&[4u8], data].concat())
                     .map_err(|_| ParseError)?
             } else {
