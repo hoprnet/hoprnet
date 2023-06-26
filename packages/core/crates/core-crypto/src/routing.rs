@@ -324,7 +324,7 @@ pub mod tests {
             additional_data.push(e);
         }
 
-        let pub_keys = keypairs.iter().map(|kp| kp.public().clone()).collect();
+        let pub_keys = keypairs.iter().map(|kp| kp.public().clone()).collect::<Vec<_>>();
         let shares = S::new_shared_keys(&pub_keys).unwrap();
 
         let rinfo = RoutingInfo::new::<S>(MAX_HOPS, &pub_keys, &shares.secrets, 0, &additional_data, None);

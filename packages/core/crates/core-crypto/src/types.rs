@@ -620,13 +620,13 @@ impl PublicKey {
         ]
         .contains(&data.len())
         {
-            let key;
+            let key =
             if data.len() == Self::SIZE_UNCOMPRESSED - 1 {
-                key = elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(&[&[4u8], &data[..]].concat())
+                elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(&[&[4u8], data].concat())
                     .map_err(|_| ParseError)?
             } else {
-                key = elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(data).map_err(|_| ParseError)?
-            }
+                elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(data).map_err(|_| ParseError)?
+            };
 
             Ok(PublicKey {
                 key,
@@ -688,7 +688,7 @@ impl PublicKey {
     /// Panics if reaches infinity (EC identity point), which is an invalid public key.
     pub fn combine(summands: &[&PublicKey]) -> PublicKey {
         let cps = summands.iter().map(|pk| CurvePoint::from(*pk)).collect::<Vec<_>>();
-        let cps_ref = cps.iter().map(|cp| cp).collect::<Vec<_>>();
+        let cps_ref = cps.iter().collect::<Vec<_>>();
         CurvePoint::combine(&cps_ref)
             .try_into()
             .expect("combination results in the ec identity (which is an invalid pub key)")
@@ -801,7 +801,7 @@ impl Response {
     /// Derives the response from two half-keys.
     /// This is done by adding the two non-zero scalars that the given half-keys represent.
     pub fn from_half_keys(first: &HalfKey, second: &HalfKey) -> Result<Self> {
-        let res = NonZeroScalar::<Secp256k1>::try_from(HalfKey::to_bytes(&first).as_ref())
+        let res = NonZeroScalar::<Secp256k1>::try_from(HalfKey::to_bytes(first).as_ref())
             .and_then(|s1| {
                 NonZeroScalar::<Secp256k1>::try_from(second.to_bytes().as_ref()).map(|s2| s1.as_ref() + s2.as_ref())
             })

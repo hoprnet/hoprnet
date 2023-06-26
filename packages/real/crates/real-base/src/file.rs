@@ -7,7 +7,7 @@ pub mod native {
             RealError::GeneralError(format!(
                 "Failed to read the file '{}' with error: {}",
                 file_path,
-                e.to_string()
+                e
             ))
         })
     }
@@ -18,7 +18,7 @@ pub mod native {
             Err(e) => Err(RealError::GeneralError(format!(
                 "Failed to read the file '{}' with error: {}",
                 file_path,
-                e.to_string()
+                e
             ))),
         }
     }
@@ -27,7 +27,7 @@ pub mod native {
     where
         R: AsRef<[u8]>,
     {
-        fs::write(path, contents).map_err(|e| RealError::GeneralError(format!("{} {}", path, e.to_string())))
+        fs::write(path, contents).map_err(|e| RealError::GeneralError(format!("{} {}", path, e)))
     }
 
     pub fn metadata(path: &str) -> Result<()> {

@@ -189,7 +189,7 @@ impl UnacknowledgedTicket {
             .to_challenge()
             .to_ethereum_challenge()
             .eq(&self.ticket.challenge)
-            .then(|| ())
+            .then_some(())
             .ok_or(SignatureVerification)
     }
 

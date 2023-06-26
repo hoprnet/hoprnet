@@ -47,7 +47,7 @@ pub async fn bump_commitment<T: HoprCoreEthereumDbActions>(
 ) -> Result<()> {
     db.set_current_commitment(channel_id, new_commitment)
         .await
-        .map_err(|e| DbError(e))
+        .map_err(DbError)
 }
 
 /// Trait for retrieving and setting the commitment information from the chain

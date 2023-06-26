@@ -232,11 +232,11 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
                 #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_RECEIVED_FAILED_ACKS.increment();
 
-                return AcknowledgementValidation(format!(
+                AcknowledgementValidation(format!(
                     "received unexpected acknowledgement for half key challenge {} - half key {}",
                     ack.ack_challenge().to_hex(),
                     ack.ack_key_share.to_hex()
-                ));
+                ))
             })?;
 
         match pending {
@@ -259,9 +259,9 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
                     #[cfg(all(feature = "prometheus", not(test)))]
                     METRIC_RECEIVED_FAILED_ACKS.increment();
 
-                    return AcknowledgementValidation(format!(
+                    AcknowledgementValidation(format!(
                         "the acknowledgement is not sufficient to solve the embedded challenge, {e}"
-                    ));
+                    ))
                 })?;
 
                 self.db
@@ -273,9 +273,9 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
                         #[cfg(all(feature = "prometheus", not(test)))]
                         METRIC_RECEIVED_FAILED_ACKS.increment();
 
-                        return AcknowledgementValidation(format!(
+                        AcknowledgementValidation(format!(
                             "acknowledgement received for channel that does not exist, {e}"
-                        ));
+                        ))
                     })?;
                 let response = unackowledged.get_response(&ack.ack_key_share)?;
                 debug!("acknowledging ticket using response {}", response.to_hex());
@@ -568,7 +568,7 @@ where
                     self.db
                         .lock()
                         .unwrap()
-                        .get_channel_key(&previous_hop)
+                        .get_channel_key(previous_hop)
                         .await?
                         .ok_or(PacketDecodingError(format!(
                             "failed to find channel key for packet key {previous_hop} on previous hop"
@@ -578,7 +578,7 @@ where
                     self.db
                         .lock()
                         .unwrap()
-                        .get_channel_key(&next_hop)
+                        .get_channel_key(next_hop)
                         .await?
                         .ok_or(PacketDecodingError(format!(
                             "failed to find channel key for packet key {next_hop} on next hop"
@@ -651,7 +651,7 @@ where
         // Forward the packet to the next hop
         message_transport(packet.to_bytes(), next_peer.to_string())
             .await
-            .map_err(|e| TransportError(e))?;
+            .map_err(TransportError)?;
 
         // Acknowledge to the previous hop that we forwarded the packet
         let ack = packet.create_acknowledgement(&self.cfg.packet_keypair).unwrap();
@@ -1572,7 +1572,7 @@ pub mod wasm {
                 w: Arc::new(AcknowledgementInteraction::new(
                     Arc::new(Mutex::new(CoreEthereumDb::new(
                         DB::new(LevelDbShim::new(db)),
-                        chain_key.clone(),
+                        chain_key,
                     ))),
                     on_ack.0,
                     on_ack_ticket.0,

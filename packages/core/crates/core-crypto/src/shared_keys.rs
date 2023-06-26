@@ -59,7 +59,7 @@ pub trait GroupElement<E: Scalar>: Clone + for<'a> Mul<&'a E, Output = Self> {
     /// Extract a keying material from a group element using HKDF extract
     fn extract_key(&self, salt: &[u8]) -> SharedSecret {
         let ikm = self.to_alpha();
-        SimpleHkdf::<Blake2s256>::extract(Some(&salt), ikm.as_ref()).0.into()
+        SimpleHkdf::<Blake2s256>::extract(Some(salt), ikm.as_ref()).0.into()
     }
 
     /// Performs KDF expansion from the given group element using HKDF expand
@@ -112,7 +112,7 @@ impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
 
             // Compute the new blinding factor b_k (alpha needs compressing first)
             let b_k = shared_secret.expand_key(&alpha_prev.to_alpha());
-            let b_k_checked = E::from_bytes(&b_k.as_ref())?;
+            let b_k_checked = E::from_bytes(b_k.as_ref())?;
 
             // Update coeff_prev and alpha
             alpha_prev = alpha_prev.mul(&b_k_checked);
@@ -140,13 +140,13 @@ impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
     ) -> Result<(Alpha<G::AlphaLen>, SharedSecret)> {
         let alpha_point = G::from_alpha(alpha.clone())?;
 
-        let s_k = alpha_point.clone().mul(&private_scalar);
+        let s_k = alpha_point.clone().mul(private_scalar);
 
         let secret = s_k.extract_key(&public_group_element.to_alpha());
 
         let b_k = s_k.expand_key(alpha);
 
-        let b_k_checked = E::from_bytes(&b_k.as_ref())?;
+        let b_k_checked = E::from_bytes(b_k.as_ref())?;
         let alpha_new = alpha_point.mul(&b_k_checked);
 
         Ok((alpha_new.to_alpha(), secret))
@@ -165,7 +165,7 @@ pub trait SphinxSuite {
     type G: GroupElement<Self::E> + for<'a> From<&'a <Self::P as Keypair>::Public>;
 
     /// Convenience function to generate shared keys from the path of public keys.
-    fn new_shared_keys(public_keys: &Vec<<Self::P as Keypair>::Public>) -> Result<SharedKeys<Self::E, Self::G>> {
+    fn new_shared_keys(public_keys: &[<Self::P as Keypair>::Public]) -> Result<SharedKeys<Self::E, Self::G>> {
         SharedKeys::generate(public_keys.iter().map(|pk| pk.into()).collect())
     }
 }

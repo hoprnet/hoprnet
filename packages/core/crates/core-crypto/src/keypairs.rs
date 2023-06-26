@@ -107,7 +107,7 @@ impl Keypair for ChainKeypair {
     }
 
     fn from_secret(bytes: &[u8]) -> errors::Result<Self> {
-        let compressed = PublicKey::from_privkey(bytes).map(|pk| CompressedPublicKey(pk))?;
+        let compressed = PublicKey::from_privkey(bytes).map(CompressedPublicKey)?;
 
         Ok(Self(bytes.try_into().map_err(|_| InvalidInputValue)?, compressed))
     }

@@ -58,10 +58,10 @@ impl PRP {
     pub fn new(key: [u8; PRP_KEY_LENGTH], iv: [u8; PRP_IV_LENGTH]) -> Self {
         Self {
             keys: [
-                key[0 * PRP_INTERMEDIATE_KEY_LENGTH..1 * PRP_INTERMEDIATE_KEY_LENGTH]
+                key[..PRP_INTERMEDIATE_KEY_LENGTH]
                     .try_into()
                     .unwrap(),
-                key[1 * PRP_INTERMEDIATE_KEY_LENGTH..2 * PRP_INTERMEDIATE_KEY_LENGTH]
+                key[PRP_INTERMEDIATE_KEY_LENGTH..2 * PRP_INTERMEDIATE_KEY_LENGTH]
                     .try_into()
                     .unwrap(),
                 key[2 * PRP_INTERMEDIATE_KEY_LENGTH..3 * PRP_INTERMEDIATE_KEY_LENGTH]
@@ -73,10 +73,10 @@ impl PRP {
             ],
             ivs: [
                 // NOTE: ChaCha20 takes only 12 byte IV
-                iv[0 * PRP_INTERMEDIATE_IV_LENGTH..1 * PRP_INTERMEDIATE_IV_LENGTH]
+                iv[..PRP_INTERMEDIATE_IV_LENGTH]
                     .try_into()
                     .unwrap(),
-                iv[1 * PRP_INTERMEDIATE_IV_LENGTH..2 * PRP_INTERMEDIATE_IV_LENGTH]
+                iv[PRP_INTERMEDIATE_IV_LENGTH..2 * PRP_INTERMEDIATE_IV_LENGTH]
                     .try_into()
                     .unwrap(),
                 iv[2 * PRP_INTERMEDIATE_IV_LENGTH..3 * PRP_INTERMEDIATE_IV_LENGTH]

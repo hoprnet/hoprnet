@@ -45,7 +45,8 @@ impl Address {
     }
 
     // impl std::string::ToString {
-    pub fn to_string(&self) -> String {
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(js_name = "to_string"))]
+    pub fn _to_string(&self) -> String {
         self.to_hex()
     }
     // }
@@ -59,7 +60,7 @@ impl BinarySerializable for Address {
             let mut ret = Address {
                 addr: [0u8; Self::SIZE],
             };
-            ret.addr.copy_from_slice(&data);
+            ret.addr.copy_from_slice(data);
             Ok(ret)
         } else {
             Err(ParseError)
@@ -218,7 +219,7 @@ impl Balance {
     }
 
     pub fn amount(&self) -> U256 {
-        self.value.clone().into()
+        self.value
     }
 }
 
@@ -446,7 +447,7 @@ impl From<u32> for U256 {
 
 impl AsU256 for U256 {
     fn as_u256(self) -> ethnum::U256 {
-        self.value.clone()
+        self.value
     }
 }
 
@@ -712,7 +713,7 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "cmp")]
         pub fn _cmp(&self, other: &U256) -> i32 {
-            match self.cmp(&other) {
+            match self.cmp(other) {
                 Ordering::Less => -1,
                 Ordering::Equal => 0,
                 Ordering::Greater => 1,

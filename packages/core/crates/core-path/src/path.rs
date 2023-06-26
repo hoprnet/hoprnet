@@ -23,7 +23,7 @@ impl Path {
 
     /// Determines with the path is valid.
     pub fn valid(&self) -> bool {
-        self.hops.len() > 0 && self.valid
+        !self.hops.is_empty() && self.valid
     }
 }
 

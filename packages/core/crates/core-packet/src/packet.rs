@@ -93,7 +93,7 @@ impl<S: SphinxSuite> MetaPacket<S> {
     pub fn new(
         shared_keys: SharedKeys<S::E, S::G>,
         msg: &[u8],
-        path: &Vec<<S::P as Keypair>::Public>,
+        path: &[<S::P as Keypair>::Public],
         max_hops: usize,
         additional_relayer_data_len: usize,
         additional_data_relayer: &[&[u8]],
@@ -119,7 +119,7 @@ impl<S: SphinxSuite> MetaPacket<S> {
         }
 
         Self::new_from_parts(
-            shared_keys.alpha.clone(),
+            shared_keys.alpha,
             &routing_info.routing_information,
             &routing_info.mac,
             &padded,
@@ -132,9 +132,9 @@ impl<S: SphinxSuite> MetaPacket<S> {
         mac: &[u8],
         payload: &[u8],
     ) -> Self {
-        assert!(routing_info.len() > 0);
-        assert_eq!(SimpleMac::SIZE, mac.len());
-        assert_eq!(PAYLOAD_SIZE, payload.len());
+        assert!(!routing_info.is_empty(), "routing info must not be empty");
+        assert_eq!(SimpleMac::SIZE, mac.len(), "mac has incorrect length");
+        assert_eq!(PAYLOAD_SIZE, payload.len(), "payload has incorrect length");
 
         let mut packet = Vec::with_capacity(Self::size(routing_info.len()));
         packet.extend_from_slice(&alpha);
@@ -297,7 +297,7 @@ impl Packet {
 
         // Update the ticket with the challenge
         ticket.challenge = por_values.ticket_challenge.to_ethereum_challenge();
-        ticket.sign(&chain_keypair);
+        ticket.sign(chain_keypair);
 
         Ok(Self {
             packet: MetaPacket::new(
@@ -393,7 +393,7 @@ impl Packet {
         match &mut self.state {
             Forwarded { next_challenge, .. } => {
                 next_ticket.challenge = next_challenge.to_ethereum_challenge();
-                next_ticket.sign(&chain_keypair);
+                next_ticket.sign(chain_keypair);
                 self.ticket = next_ticket;
                 Ok(())
             }

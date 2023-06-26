@@ -1,3 +1,4 @@
+use std::fmt::{Display, Formatter};
 use core_crypto::errors::CryptoError::SignatureVerification;
 use core_crypto::keypairs::ChainKeypair;
 use core_crypto::types::{Hash, PublicKey, Response, Signature};
@@ -35,15 +36,16 @@ impl ChannelStatus {
     pub fn to_byte(&self) -> u8 {
         *self as u8
     }
+}
 
-    pub fn to_string(&self) -> String {
+impl Display for ChannelStatus {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            ChannelStatus::Closed => "Closed",
-            ChannelStatus::WaitingForCommitment => "WaitingForCommitment",
-            ChannelStatus::Open => "Open",
-            ChannelStatus::PendingToClose => "PendingToClose",
+            ChannelStatus::Closed => write!(f, "Closed"),
+            ChannelStatus::WaitingForCommitment => write!(f, "WaitingForCommitment"),
+            ChannelStatus::Open => write!(f, "Open"),
+            ChannelStatus::PendingToClose => write!(f, "PendingToClose"),
         }
-        .to_string()
     }
 }
 
@@ -374,7 +376,7 @@ impl Ticket {
     /// The operation can fail if a public key cannot be recovered from the ticket signature.
     pub fn verify(&self, public_key: &PublicKey) -> core_crypto::errors::Result<()> {
         let recovered = self.recover_signer()?;
-        recovered.eq(public_key).then(|| ()).ok_or(SignatureVerification)
+        recovered.eq(public_key).then_some(()).ok_or(SignatureVerification)
     }
 }
 
