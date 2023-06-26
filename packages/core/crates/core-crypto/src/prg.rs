@@ -65,7 +65,9 @@ pub struct PRG {
 impl PRG {
     /// Creates a PRG instance  using the raw key and IV for the underlying block cipher.
     pub fn new(key: [u8; PRG_KEY_LENGTH], iv: [u8; PRG_IV_LENGTH]) -> Self {
-        Self { params: PRGParameters { key, iv } }
+        Self {
+            params: PRGParameters { key, iv },
+        }
     }
 
     /// Creates a new PRG instance using the given parameters
@@ -116,8 +118,8 @@ impl PRG {
 #[cfg(test)]
 mod tests {
     use crate::prg::{PRGParameters, AES_BLOCK_SIZE, AES_KEY_SIZE, PRG};
-    use hex_literal::hex;
     use crate::primitives::SecretKey;
+    use hex_literal::hex;
 
     #[test]
     fn test_prg_single_block() {

@@ -105,7 +105,11 @@ pub struct ProofOfRelayOutput {
 /// * `secret` shared secret with the creator of the packet
 /// * `por_bytes` serialized `ProofOfRelayString` as included within the packet
 /// * `challenge` ticket challenge of the incoming ticket
-pub fn pre_verify(secret: &SharedSecret, por_bytes: &[u8], challenge: &EthereumChallenge) -> Result<ProofOfRelayOutput> {
+pub fn pre_verify(
+    secret: &SharedSecret,
+    por_bytes: &[u8],
+    challenge: &EthereumChallenge,
+) -> Result<ProofOfRelayOutput> {
     assert_eq!(POR_SECRET_LENGTH, por_bytes.len(), "invalid por bytes length");
 
     let pors = ProofOfRelayString::from_bytes(por_bytes)?;
@@ -168,9 +172,7 @@ mod tests {
     fn test_por_preverify_validate() {
         const AMOUNT: usize = 4;
 
-        let secrets = (0..AMOUNT)
-            .map(|_| SharedSecret::random())
-            .collect::<Vec<_>>();
+        let secrets = (0..AMOUNT).map(|_| SharedSecret::random()).collect::<Vec<_>>();
 
         // Generated challenge
         let first_challenge = ProofOfRelayValues::new(&secrets[0], Some(&secrets[1]));
@@ -235,9 +237,7 @@ mod tests {
     #[test]
     fn test_challenge_and_response_solving() {
         const AMOUNT: usize = 2;
-        let secrets = (0..AMOUNT)
-            .map(|_| SharedSecret::random())
-            .collect::<Vec<_>>();
+        let secrets = (0..AMOUNT).map(|_| SharedSecret::random()).collect::<Vec<_>>();
 
         let first_challenge = ProofOfRelayValues::new(&secrets[0], Some(&secrets[1]));
         let ack = derive_ack_key_share(&secrets[1]);
@@ -273,7 +273,10 @@ pub mod wasm {
         pub fn _new(secret_b: &[u8], secret_c: Uint8Array) -> Self {
             if !secret_c.is_null() && !secret_c.is_undefined() {
                 let c_slice = secret_c.to_vec();
-                Self::new(&secret_b.try_into().expect("illegal b size"), Some(&c_slice.as_slice().try_into().expect("illegal c size")))
+                Self::new(
+                    &secret_b.try_into().expect("illegal b size"),
+                    Some(&c_slice.as_slice().try_into().expect("illegal c size")),
+                )
             } else {
                 Self::new(&secret_b.try_into().expect("illegal size"), None)
             }

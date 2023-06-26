@@ -100,9 +100,10 @@ mod tests {
     use crate::errors::PacketError;
     use crate::validation::validate_unacknowledged_ticket;
     use async_trait::async_trait;
+    use core_crypto::types::OffchainPublicKey;
     use core_crypto::{
-        keypairs::{Keypair, ChainKeypair},
         iterated_hash::IteratedHash,
+        keypairs::{ChainKeypair, Keypair},
         types::{HalfKeyChallenge, Hash, PublicKey},
     };
     use core_ethereum_db::traits::HoprCoreEthereumDbActions;
@@ -112,7 +113,6 @@ mod tests {
         account::AccountEntry,
         channels::{ChannelEntry, Ticket},
     };
-    use core_crypto::types::OffchainPublicKey;
     use hex_literal::hex;
     use lazy_static::lazy_static;
     use mockall::mock;

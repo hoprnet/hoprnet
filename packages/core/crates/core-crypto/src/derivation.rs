@@ -23,8 +23,7 @@ const HASH_KEY_ACK_KEY: &str = "HASH_KEY_ACK_KEY";
 /// case is Blake2s256, meaning the `secret` size must be at least 32 bytes.
 fn hkdf_expand_from_prk<L: ArrayLength<u8>>(secret: &SecretKey, tag: &[u8]) -> GenericArray<u8, L> {
     // Create HKDF instance
-    let hkdf = SimpleHkdf::<Blake2s256>::from_prk(secret.as_ref())
-        .expect("size of the hkdf secret key is invalid"); // should not happen
+    let hkdf = SimpleHkdf::<Blake2s256>::from_prk(secret.as_ref()).expect("size of the hkdf secret key is invalid"); // should not happen
 
     // Expand the key to the required length
     let mut out = GenericArray::default();
@@ -54,8 +53,9 @@ pub fn derive_ping_pong(challenge: Option<&[u8]>) -> Box<[u8]> {
 pub fn derive_commitment_seed(private_key: &[u8], channel_info: &[u8]) -> [u8; SimpleMac::SIZE] {
     let sk: SecretKey = hkdf_expand_from_prk(
         &private_key.try_into().expect("commitment private key size invalid"),
-        HASH_KEY_COMMITMENT_SEED.as_bytes())
-        .into();
+        HASH_KEY_COMMITMENT_SEED.as_bytes(),
+    )
+    .into();
     let mut mac = SimpleMac::new(&sk);
     mac.update(channel_info);
     mac.finalize().into()
@@ -80,7 +80,8 @@ pub(crate) fn generate_key_iv(secret: &SecretKey, info: &[u8], key: &mut [u8], i
     let hkdf = SimpleHkdf::<Blake2s256>::from_prk(secret.as_ref()).expect("secret key length must be correct");
 
     let mut out = vec![0u8; key.len() + iv.len()];
-    hkdf.expand(info, &mut out).expect("key and iv are too big for this kdf");
+    hkdf.expand(info, &mut out)
+        .expect("key and iv are too big for this kdf");
 
     if iv_first {
         let (v_iv, v_key) = out.split_at(iv.len());
@@ -104,12 +105,12 @@ pub fn sample_secp256k1_field_element(secret: &[u8], tag: &str) -> Result<HalfKe
             &[secret],
             &[b"secp256k1_XMD:SHA3-256_SSWU_RO_", tag.as_bytes()],
         )
-            .map_err(|_| CalculationError)?;
+        .map_err(|_| CalculationError)?;
         Ok(HalfKey::new(scalar.to_bytes().as_ref()))
     } else {
         Err(InvalidParameterSize {
             name: "secret".into(),
-            expected: SecretKey::LENGTH
+            expected: SecretKey::LENGTH,
         })
     }
 }

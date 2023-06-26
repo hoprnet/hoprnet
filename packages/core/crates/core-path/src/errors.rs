@@ -2,7 +2,6 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum PathError {
-
     #[error("path is not valid")]
     PathNotValid,
 

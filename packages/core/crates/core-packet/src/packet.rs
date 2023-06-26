@@ -1,24 +1,24 @@
 use crate::errors::PacketError::{InvalidPacketState, PacketDecodingError};
 use core_crypto::derivation::{derive_ack_key_share, derive_packet_tag, PacketTag};
+use core_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
 use core_crypto::primitives::{DigestLike, SimpleMac};
-use core_crypto::prp::{PRP, PRPParameters};
-use core_crypto::routing::{forward_header, ForwardedHeader, header_length, RoutingInfo};
+use core_crypto::prp::{PRPParameters, PRP};
+use core_crypto::routing::{forward_header, header_length, ForwardedHeader, RoutingInfo};
 use core_crypto::shared_keys::{Alpha, GroupElement, SharedKeys, SharedSecret, SphinxSuite};
+use core_crypto::types::OffchainPublicKey;
 use core_crypto::types::{Challenge, HalfKey, HalfKeyChallenge};
+use core_path::path::Path;
 use core_types::acknowledgement::Acknowledgement;
 use core_types::channels::Ticket;
 use libp2p_identity::PeerId;
 use typenum::Unsigned;
-use core_crypto::types::OffchainPublicKey;
-use core_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
-use core_path::path::Path;
 use utils_types::errors::GeneralError::ParseError;
 use utils_types::traits::{BinarySerializable, PeerIdLike};
 
 use crate::errors::Result;
 use crate::packet::ForwardedMetaPacket::{FinalPacket, RelayedPacket};
 use crate::packet::PacketState::{Final, Forwarded, Outgoing};
-use crate::por::{POR_SECRET_LENGTH, pre_verify, ProofOfRelayString, ProofOfRelayValues};
+use crate::por::{pre_verify, ProofOfRelayString, ProofOfRelayValues, POR_SECRET_LENGTH};
 
 /// Currently used ciphersuite for Sphinx
 type CurrentSphinxSuite = core_crypto::ec_groups::X25519Suite;
@@ -126,7 +126,12 @@ impl<S: SphinxSuite> MetaPacket<S> {
         )
     }
 
-    fn new_from_parts(alpha: Alpha<<S::G as GroupElement<S::E>>::AlphaLen>, routing_info: &[u8], mac: &[u8], payload: &[u8]) -> Self {
+    fn new_from_parts(
+        alpha: Alpha<<S::G as GroupElement<S::E>>::AlphaLen>,
+        routing_info: &[u8],
+        mac: &[u8],
+        payload: &[u8],
+    ) -> Self {
         assert!(routing_info.len() > 0);
         assert_eq!(SimpleMac::SIZE, mac.len());
         assert_eq!(PAYLOAD_SIZE, payload.len());
@@ -140,13 +145,13 @@ impl<S: SphinxSuite> MetaPacket<S> {
         Self {
             packet: packet.into_boxed_slice(),
             header_len: routing_info.len(),
-            alpha
+            alpha,
         }
     }
 
     pub fn routing_info(&self) -> &[u8] {
         let base = <S::G as GroupElement<S::E>>::AlphaLen::USIZE;
-        &self.packet[base .. base + self.header_len]
+        &self.packet[base..base + self.header_len]
     }
 
     pub fn mac(&self) -> &[u8] {
@@ -170,7 +175,8 @@ impl<S: SphinxSuite> MetaPacket<S> {
                 header_len,
                 alpha: Default::default(),
             };
-            ret.alpha.copy_from_slice(&packet[..<S::G as GroupElement<S::E>>::AlphaLen::USIZE]);
+            ret.alpha
+                .copy_from_slice(&packet[..<S::G as GroupElement<S::E>>::AlphaLen::USIZE]);
             Ok(ret)
         } else {
             Err(ParseError)
@@ -191,7 +197,7 @@ impl<S: SphinxSuite> MetaPacket<S> {
         let (alpha, secret) = SharedKeys::<S::E, S::G>::forward_transform(
             &self.alpha,
             &(node_keypair.into()),
-            &(node_keypair.public().into())
+            &(node_keypair.public().into()),
         )?;
 
         let mut routing_info_cpy: Vec<u8> = self.routing_info().into();
@@ -217,14 +223,18 @@ impl<S: SphinxSuite> MetaPacket<S> {
                 packet: Self::new_from_parts(alpha, &header, &mac, &decrypted),
                 packet_tag: derive_packet_tag(&secret),
                 derived_secret: secret,
-                next_node: <S::P as Keypair>::Public::from_bytes(&next_node).map_err(|_| PacketDecodingError("couldn't parse next node id".into()))?,
+                next_node: <S::P as Keypair>::Public::from_bytes(&next_node)
+                    .map_err(|_| PacketDecodingError("couldn't parse next node id".into()))?,
                 additional_info,
             },
             ForwardedHeader::FinalNode { additional_data } => FinalPacket {
                 packet_tag: derive_packet_tag(&secret),
                 derived_secret: secret,
                 plain_text: remove_padding(&decrypted)
-                    .ok_or(PacketDecodingError(format!("couldn't remove padding: {}", hex::encode(decrypted.as_ref()))))?
+                    .ok_or(PacketDecodingError(format!(
+                        "couldn't remove padding: {}",
+                        hex::encode(decrypted.as_ref())
+                    )))?
                     .into(),
                 additional_data,
             },
@@ -381,10 +391,7 @@ impl Packet {
     /// Panics if the packet is not meant to be forwarded.
     pub fn forward(&mut self, chain_keypair: &ChainKeypair, mut next_ticket: Ticket) -> Result<()> {
         match &mut self.state {
-            Forwarded {
-                next_challenge,
-                ..
-            } => {
+            Forwarded { next_challenge, .. } => {
                 next_ticket.challenge = next_challenge.to_ethereum_challenge();
                 next_ticket.sign(&chain_keypair);
                 self.ticket = next_ticket;
@@ -407,15 +414,9 @@ impl Packet {
     /// Returns None if this packet is sent by us.
     pub fn create_acknowledgement(&self, node_keypair: &OffchainKeypair) -> Option<Acknowledgement> {
         match &self.state {
-            Final {
-                ack_key, ..
+            Final { ack_key, .. } | Forwarded { ack_key, .. } => {
+                Some(Acknowledgement::new(ack_key.clone(), node_keypair))
             }
-            | Forwarded {
-                ack_key, ..
-            } => Some(Acknowledgement::new(
-                ack_key.clone(),
-                node_keypair
-            )),
             Outgoing { .. } => None,
         }
     }
@@ -424,17 +425,17 @@ impl Packet {
 #[cfg(test)]
 mod tests {
     use crate::packet::{
-        add_padding, ForwardedMetaPacket, INTERMEDIATE_HOPS, MetaPacket, Packet, PacketState, PADDING_TAG,
-        remove_padding,
+        add_padding, remove_padding, ForwardedMetaPacket, MetaPacket, Packet, PacketState, INTERMEDIATE_HOPS,
+        PADDING_TAG,
     };
-    use crate::por::{POR_SECRET_LENGTH, ProofOfRelayString};
-    use core_crypto::types::PublicKey;
-    use core_types::channels::Ticket;
-    use parameterized::parameterized;
+    use crate::por::{ProofOfRelayString, POR_SECRET_LENGTH};
     use core_crypto::ec_groups::{Ed25519Suite, Secp256k1Suite, X25519Suite};
     use core_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
     use core_crypto::shared_keys::SphinxSuite;
+    use core_crypto::types::PublicKey;
     use core_path::path::Path;
+    use core_types::channels::Ticket;
+    use parameterized::parameterized;
     use utils_types::primitives::{Balance, BalanceType, U256};
     use utils_types::traits::PeerIdLike;
 
@@ -498,23 +499,17 @@ mod tests {
 
     #[parameterized(amount = { 4, 3, 2 })]
     fn test_ed25519_meta_packet(amount: usize) {
-        generic_test_meta_packet::<Ed25519Suite>((0..amount)
-            .map(|_| OffchainKeypair::random())
-            .collect());
+        generic_test_meta_packet::<Ed25519Suite>((0..amount).map(|_| OffchainKeypair::random()).collect());
     }
 
     #[parameterized(amount = { 4, 3, 2 })]
     fn test_x25519_meta_packet(amount: usize) {
-        generic_test_meta_packet::<X25519Suite>((0..amount)
-            .map(|_| OffchainKeypair::random())
-            .collect())
+        generic_test_meta_packet::<X25519Suite>((0..amount).map(|_| OffchainKeypair::random()).collect())
     }
 
     #[parameterized(amount = { 4, 3, 2 })]
     fn test_secp256k1_meta_packet(amount: usize) {
-        generic_test_meta_packet::<Secp256k1Suite>((0..amount)
-            .map(|_| ChainKeypair::random())
-            .collect())
+        generic_test_meta_packet::<Secp256k1Suite>((0..amount).map(|_| ChainKeypair::random()).collect())
     }
 
     fn mock_ticket(next_peer_channel_key: &PublicKey, path_len: usize, private_key: &ChainKeypair) -> Ticket {
@@ -556,8 +551,7 @@ mod tests {
 
         let test_message = b"some testing message";
         let path = Path::new_valid(keypairs.iter().map(|kp| kp.public().to_peerid()).collect());
-        let mut packet = Packet::new(test_message, &path, &own_channel_kp, ticket)
-            .expect("failed to construct packet");
+        let mut packet = Packet::new(test_message, &path, &own_channel_kp, ticket).expect("failed to construct packet");
 
         match &packet.state() {
             PacketState::Outgoing { .. } => {}
@@ -578,7 +572,11 @@ mod tests {
                     assert_eq!(&test_message, &plain_text.as_ref());
                 }
                 PacketState::Forwarded { .. } => {
-                    let ticket = mock_ticket(&channel_pairs[i + 1].public().0, keypairs.len() - i - 1, &channel_pairs[i]);
+                    let ticket = mock_ticket(
+                        &channel_pairs[i + 1].public().0,
+                        keypairs.len() - i - 1,
+                        &channel_pairs[i],
+                    );
                     packet.forward(&channel_pairs[i], ticket).unwrap();
                 }
                 PacketState::Outgoing { .. } => panic!("invalid packet state"),
@@ -586,4 +584,3 @@ mod tests {
         }
     }
 }
-

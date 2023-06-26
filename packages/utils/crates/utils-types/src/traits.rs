@@ -31,7 +31,7 @@ pub trait BinarySerializable: Sized {
 
 /// Type implementing this trait has automatic binary serialization/deserialization capability
 /// using the default binary format, which is currently `bincode`.
-pub trait AutoBinarySerializable: Serialize + for <'a> Deserialize<'a> {
+pub trait AutoBinarySerializable: Serialize + for<'a> Deserialize<'a> {
     /// Minimum size of an automatically serialized type in bytes is 1.
     const SIZE: usize = 1;
 }

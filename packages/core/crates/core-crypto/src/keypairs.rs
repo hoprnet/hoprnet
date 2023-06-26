@@ -1,15 +1,15 @@
-use zeroize::ZeroizeOnDrop;
-use ed25519_dalek::Sha512;
-use curve25519_dalek::digest::Digest;
-use generic_array::{ArrayLength, GenericArray};
-use subtle::{Choice, ConstantTimeEq};
-use utils_types::traits::BinarySerializable;
 use crate::errors;
 use crate::errors::CryptoError::InvalidInputValue;
 use crate::random::{random_bytes, random_group_element};
 use crate::shared_keys::Scalar;
 use crate::types::{CompressedPublicKey, OffchainPublicKey, PublicKey};
 use crate::utils::SecretValue;
+use curve25519_dalek::digest::Digest;
+use ed25519_dalek::Sha512;
+use generic_array::{ArrayLength, GenericArray};
+use subtle::{Choice, ConstantTimeEq};
+use utils_types::traits::BinarySerializable;
+use zeroize::ZeroizeOnDrop;
 
 /// Represents a generic key pair
 /// The keypair contains a private key and public key.
@@ -49,11 +49,14 @@ impl Keypair for OffchainKeypair {
     type Public = OffchainPublicKey;
 
     fn random() -> Self {
-        Self::from_secret(&random_bytes::<{ed25519_dalek::SECRET_KEY_LENGTH}>()).unwrap()
+        Self::from_secret(&random_bytes::<{ ed25519_dalek::SECRET_KEY_LENGTH }>()).unwrap()
     }
 
     fn from_secret(bytes: &[u8]) -> errors::Result<Self> {
-       Ok(Self(bytes.try_into().map_err(|_| InvalidInputValue)?, OffchainPublicKey::from_privkey(bytes)?))
+        Ok(Self(
+            bytes.try_into().map_err(|_| InvalidInputValue)?,
+            OffchainPublicKey::from_privkey(bytes)?,
+        ))
     }
 
     fn secret(&self) -> &SecretValue<typenum::U32> {
@@ -97,12 +100,14 @@ impl Keypair for ChainKeypair {
 
     fn random() -> Self {
         let (secret, public) = random_group_element();
-        Self (GenericArray::from(secret).into(), CompressedPublicKey(public.try_into().unwrap()))
+        Self(
+            GenericArray::from(secret).into(),
+            CompressedPublicKey(public.try_into().unwrap()),
+        )
     }
 
     fn from_secret(bytes: &[u8]) -> errors::Result<Self> {
-        let compressed = PublicKey::from_privkey(bytes)
-            .map(|pk| CompressedPublicKey(pk))?;
+        let compressed = PublicKey::from_privkey(bytes).map(|pk| CompressedPublicKey(pk))?;
 
         Ok(Self(bytes.try_into().map_err(|_| InvalidInputValue)?, compressed))
     }
@@ -130,9 +135,9 @@ impl From<&ChainKeypair> for k256::Scalar {
 
 #[cfg(test)]
 mod tests {
-    use subtle::ConstantTimeEq;
     use crate::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
     use crate::types::{CompressedPublicKey, OffchainPublicKey, PublicKey};
+    use subtle::ConstantTimeEq;
 
     #[test]
     fn test_offchain_keypair() {
@@ -142,7 +147,11 @@ mod tests {
         assert_eq!(&public, kp_1.public(), "secret keys must yield compatible public keys");
 
         let kp_2 = OffchainKeypair::from_secret(kp_1.secret().as_ref()).unwrap();
-        assert_eq!(kp_1.ct_eq(&kp_2).unwrap_u8(), 1, "keypairs generated from secrets must be equal");
+        assert_eq!(
+            kp_1.ct_eq(&kp_2).unwrap_u8(),
+            1,
+            "keypairs generated from secrets must be equal"
+        );
         assert_eq!(&public, kp_2.public(), "secret keys must yield compatible public keys");
         assert_eq!(kp_1.public(), kp_2.public(), "keypair public keys must be equal");
 
@@ -161,7 +170,11 @@ mod tests {
         assert_eq!(&public, kp_1.public(), "secret keys must yield compatible public keys");
 
         let kp_2 = ChainKeypair::from_secret(kp_1.secret().as_ref()).unwrap();
-        assert_eq!(kp_1.ct_eq(&kp_2).unwrap_u8(), 1, "keypairs generated from secrets must be equal");
+        assert_eq!(
+            kp_1.ct_eq(&kp_2).unwrap_u8(),
+            1,
+            "keypairs generated from secrets must be equal"
+        );
         assert_eq!(&public, kp_2.public(), "secret keys must yield compatible public keys");
         assert_eq!(kp_1.public(), kp_2.public(), "keypair public keys must be equal");
 
@@ -175,10 +188,10 @@ mod tests {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use wasm_bindgen::prelude::wasm_bindgen;
+    use crate::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
-    use crate::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
+    use wasm_bindgen::prelude::wasm_bindgen;
 
     #[wasm_bindgen]
     impl OffchainKeypair {

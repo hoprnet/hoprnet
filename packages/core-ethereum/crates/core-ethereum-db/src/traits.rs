@@ -1,10 +1,10 @@
 use async_trait::async_trait;
 
+use core_crypto::types::OffchainPublicKey;
 use core_crypto::{
     iterated_hash::IteratedHash,
     types::{HalfKeyChallenge, Hash, PublicKey},
 };
-use core_crypto::types::OffchainPublicKey;
 use core_types::acknowledgement::{AcknowledgedTicket, PendingAcknowledgement};
 use core_types::{
     account::AccountEntry,
@@ -53,7 +53,11 @@ pub trait HoprCoreEthereumDbActions {
 
     async fn get_channel_key(&self, packet_key: &OffchainPublicKey) -> Result<Option<PublicKey>>;
 
-    async fn link_packet_and_channel_keys(&mut self, channel_key: &PublicKey, packet_key: &OffchainPublicKey) -> Result<()>;
+    async fn link_packet_and_channel_keys(
+        &mut self,
+        channel_key: &PublicKey,
+        packet_key: &OffchainPublicKey,
+    ) -> Result<()>;
 
     async fn get_channel_to(&self, dest: &PublicKey) -> Result<Option<ChannelEntry>>;
 

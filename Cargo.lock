@@ -938,7 +938,7 @@ dependencies = [
 
 [[package]]
 name = "core-ethereum-misc"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-std",
  "async-trait",
@@ -1021,7 +1021,7 @@ dependencies = [
 
 [[package]]
 name = "core-network"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "async-std",
  "bincode",
@@ -2466,7 +2466,7 @@ dependencies = [
 
 [[package]]
 name = "hopli"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "clap 4.0.32",
  "core-crypto",
@@ -2481,7 +2481,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-keypair"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "aes",
  "console_error_panic_hook",
@@ -2512,7 +2512,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-misc"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "clap 4.0.32",
  "console_error_panic_hook",
@@ -5040,7 +5040,7 @@ checksum = "711b9620af191e0cdc7468a8d14e709c3dcdb115b36f838e601583af800a370a"
 
 [[package]]
 name = "utils-db"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "async-std",
  "async-trait",
@@ -5123,7 +5123,7 @@ dependencies = [
 
 [[package]]
 name = "utils-types"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "bincode",
  "console_error_panic_hook",

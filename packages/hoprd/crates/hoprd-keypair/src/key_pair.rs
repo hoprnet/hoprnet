@@ -6,6 +6,8 @@ use aes::{
     cipher::{self, InnerIvInit, KeyInit, StreamCipherCore},
     Aes128,
 };
+use core_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
+use core_crypto::random::random_bytes;
 use hex;
 use scrypt::{scrypt, Params as ScryptParams};
 use serde::{ser::SerializeStruct, Serialize, Serializer};
@@ -16,15 +18,13 @@ use typenum::Unsigned;
 use utils_log::error;
 use utils_types::traits::{PeerIdLike, ToHex};
 use uuid::Uuid;
-use core_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
-use core_crypto::random::random_bytes;
 
 #[cfg(all(feature = "wasm", not(test)))]
 use real_base::file::wasm::{metadata, read_to_string, write};
 
+use crate::errors::KeyPairError::KeyDerivationError;
 #[cfg(any(not(feature = "wasm"), test))]
 use real_base::file::native::{metadata, read_to_string, write};
-use crate::errors::KeyPairError::KeyDerivationError;
 
 const HOPR_CIPHER: &str = "aes-128-ctr";
 const HOPR_KEY_SIZE: usize = 32usize;
@@ -194,7 +194,8 @@ impl TryFrom<([u8; PACKET_KEY_LENGTH], [u8; CHAIN_KEY_LENGTH])> for HoprKeys {
     /// ```
     fn try_from(value: ([u8; PACKET_KEY_LENGTH], [u8; CHAIN_KEY_LENGTH])) -> std::result::Result<Self, Self::Error> {
         Ok(HoprKeys {
-            packet_key: OffchainKeypair::from_secret(&value.0).map_err(|e| KeyDerivationError { err: e.to_string()})?,
+            packet_key: OffchainKeypair::from_secret(&value.0)
+                .map_err(|e| KeyDerivationError { err: e.to_string() })?,
             chain_key: ChainKeypair::from_secret(&value.1).map_err(|e| KeyDerivationError { err: e.to_string() })?,
             id: Uuid::new_v4(),
         })
@@ -465,10 +466,10 @@ impl Debug for HoprKeys {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
+    use core_crypto::keypairs::Keypair;
     use js_sys::{Promise, Uint8Array};
     use utils_types::traits::PeerIdLike;
     use wasm_bindgen::prelude::*;
-    use core_crypto::keypairs::Keypair;
 
     use super::IdentityOptions;
 
@@ -520,8 +521,8 @@ mod tests {
     use std::fs;
 
     use super::HoprKeys;
-    use tempfile::tempdir;
     use core_crypto::keypairs::Keypair;
+    use tempfile::tempdir;
 
     const DEFAULT_PASSWORD: &str = "dummy password for unit testing";
 

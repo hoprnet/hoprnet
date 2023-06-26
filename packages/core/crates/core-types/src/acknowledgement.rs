@@ -1,9 +1,9 @@
 use crate::acknowledgement::PendingAcknowledgement::{WaitingAsRelayer, WaitingAsSender};
 use crate::channels::Ticket;
 use core_crypto::errors::CryptoError::SignatureVerification;
+use core_crypto::keypairs::OffchainKeypair;
 use core_crypto::types::{HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey, OffchainSignature, PublicKey, Response};
 use serde::{Deserialize, Serialize};
-use core_crypto::keypairs::OffchainKeypair;
 use utils_types::errors;
 use utils_types::errors::GeneralError::ParseError;
 use utils_types::traits::BinarySerializable;
@@ -32,8 +32,8 @@ impl Acknowledgement {
     /// any operations with the deserialized acknowledgment will panic.
     pub fn validate(&mut self, sender_node_key: &OffchainPublicKey) -> bool {
         self.validated = self
-                .ack_signature
-                .verify_message(&self.ack_key_share.to_bytes(), sender_node_key);
+            .ack_signature
+            .verify_message(&self.ack_key_share.to_bytes(), sender_node_key);
 
         self.validated
     }
@@ -271,14 +271,12 @@ impl BinarySerializable for PendingAcknowledgement {
 
 #[cfg(test)]
 pub mod test {
-    use crate::acknowledgement::{
-        AcknowledgedTicket, Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket,
-    };
+    use crate::acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket};
     use crate::channels::Ticket;
+    use core_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
     use core_crypto::types::{Challenge, CurvePoint, HalfKey, Hash, OffchainPublicKey, Response};
     use ethnum::u256;
     use hex_literal::hex;
-    use core_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
     use utils_types::primitives::{Address, Balance, BalanceType, U256};
     use utils_types::traits::BinarySerializable;
 
@@ -311,7 +309,10 @@ pub mod test {
 
     #[test]
     fn test_acknowledgement() {
-        let pk_2 = OffchainKeypair::from_secret(&hex!("4471496ef88d9a7d86a92b7676f3c8871a60792a37fae6fc3abc347c3aa3b16b")).unwrap();
+        let pk_2 = OffchainKeypair::from_secret(&hex!(
+            "4471496ef88d9a7d86a92b7676f3c8871a60792a37fae6fc3abc347c3aa3b16b"
+        ))
+        .unwrap();
         let pub_key_2 = OffchainPublicKey::from_privkey(pk_2.secret().as_ref()).unwrap();
 
         let ack_key = HalfKey::new(&hex!(
@@ -329,7 +330,10 @@ pub mod test {
 
     #[test]
     fn test_unacknowledged_ticket() {
-        let pk_1 = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
+        let pk_1 = ChainKeypair::from_secret(&hex!(
+            "492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"
+        ))
+        .unwrap();
         let pub_key_1 = pk_1.public().0.clone();
 
         let hk1 = HalfKey::new(&hex!(
@@ -359,7 +363,10 @@ pub mod test {
 
     #[test]
     fn test_acknowledged_ticket() {
-        let pk = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
+        let pk = ChainKeypair::from_secret(&hex!(
+            "492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"
+        ))
+        .unwrap();
         let pub_key = pk.public().0.clone();
         let resp = Response::new(&hex!(
             "4471496ef88d9a7d86a92b7676f3c8871a60792a37fae6fc3abc347c3aa3b16b"

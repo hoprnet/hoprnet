@@ -1,23 +1,23 @@
 use async_trait::async_trait;
 
 use core_crypto::iterated_hash::Intermediate;
+use core_crypto::types::OffchainPublicKey;
 use core_crypto::{
     iterated_hash::IteratedHash,
     types::{HalfKeyChallenge, Hash, PublicKey},
 };
-use core_crypto::types::OffchainPublicKey;
 use core_types::acknowledgement::{AcknowledgedTicket, PendingAcknowledgement};
 use core_types::channels::ChannelStatus;
 use core_types::{
     account::AccountEntry,
     channels::{generate_channel_id, ChannelEntry, Ticket},
 };
+use utils_db::db::Batch;
 use utils_db::{
     constants::*,
     db::{serialize_to_bytes, DB},
     traits::AsyncKVStorage,
 };
-use utils_db::db::Batch;
 use utils_types::primitives::{Address, Balance, BalanceType, EthereumChallenge, Snapshot, U256};
 use utils_types::traits::BinarySerializable;
 
@@ -224,7 +224,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
     }
 
     async fn get_packet_key(&self, channel_key: &PublicKey) -> Result<Option<OffchainPublicKey>> {
-        let key = utils_db::db::Key::new_with_prefix(&Hash::create(&[&channel_key.to_bytes(true)]), CHANNEL_KEY_PREFIX)?;
+        let key =
+            utils_db::db::Key::new_with_prefix(&Hash::create(&[&channel_key.to_bytes(true)]), CHANNEL_KEY_PREFIX)?;
         self.db.get_or_none(key).await
     }
 
@@ -233,9 +234,14 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         self.db.get_or_none(key).await
     }
 
-    async fn link_packet_and_channel_keys(&mut self, channel_key: &PublicKey, packet_key: &OffchainPublicKey) -> Result<()> {
+    async fn link_packet_and_channel_keys(
+        &mut self,
+        channel_key: &PublicKey,
+        packet_key: &OffchainPublicKey,
+    ) -> Result<()> {
         let mut batch = Batch::new();
-        let ck_key = utils_db::db::Key::new_with_prefix(&Hash::create(&[&channel_key.to_bytes(true)]), CHANNEL_KEY_PREFIX)?;
+        let ck_key =
+            utils_db::db::Key::new_with_prefix(&Hash::create(&[&channel_key.to_bytes(true)]), CHANNEL_KEY_PREFIX)?;
         let pk_key = utils_db::db::Key::new_with_prefix(&Hash::create(&[&packet_key.to_bytes()]), PACKET_KEY_PREFIX)?;
 
         batch.put(ck_key, packet_key);

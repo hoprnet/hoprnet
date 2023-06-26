@@ -1,9 +1,9 @@
-use blake2::{Blake2bMac};
-use digest::{FixedOutput, Mac};
-use zeroize::ZeroizeOnDrop;
 use crate::derivation::generate_key_iv;
 use crate::errors::CryptoError::InvalidParameterSize;
 use crate::errors::Result;
+use blake2::Blake2bMac;
+use digest::{FixedOutput, Mac};
+use zeroize::ZeroizeOnDrop;
 
 use crate::primitives::{SecretKey, SimpleStreamCipher};
 use crate::utils;
@@ -58,17 +58,33 @@ impl PRP {
     pub fn new(key: [u8; PRP_KEY_LENGTH], iv: [u8; PRP_IV_LENGTH]) -> Self {
         Self {
             keys: [
-                key[0 * PRP_INTERMEDIATE_KEY_LENGTH..1 * PRP_INTERMEDIATE_KEY_LENGTH].try_into().unwrap(),
-                key[1 * PRP_INTERMEDIATE_KEY_LENGTH..2 * PRP_INTERMEDIATE_KEY_LENGTH].try_into().unwrap(),
-                key[2 * PRP_INTERMEDIATE_KEY_LENGTH..3 * PRP_INTERMEDIATE_KEY_LENGTH].try_into().unwrap(),
-                key[3 * PRP_INTERMEDIATE_KEY_LENGTH..4 * PRP_INTERMEDIATE_KEY_LENGTH].try_into().unwrap(),
+                key[0 * PRP_INTERMEDIATE_KEY_LENGTH..1 * PRP_INTERMEDIATE_KEY_LENGTH]
+                    .try_into()
+                    .unwrap(),
+                key[1 * PRP_INTERMEDIATE_KEY_LENGTH..2 * PRP_INTERMEDIATE_KEY_LENGTH]
+                    .try_into()
+                    .unwrap(),
+                key[2 * PRP_INTERMEDIATE_KEY_LENGTH..3 * PRP_INTERMEDIATE_KEY_LENGTH]
+                    .try_into()
+                    .unwrap(),
+                key[3 * PRP_INTERMEDIATE_KEY_LENGTH..4 * PRP_INTERMEDIATE_KEY_LENGTH]
+                    .try_into()
+                    .unwrap(),
             ],
             ivs: [
                 // NOTE: ChaCha20 takes only 12 byte IV
-                iv[0 * PRP_INTERMEDIATE_IV_LENGTH..1 * PRP_INTERMEDIATE_IV_LENGTH].try_into().unwrap(),
-                iv[1 * PRP_INTERMEDIATE_IV_LENGTH..2 * PRP_INTERMEDIATE_IV_LENGTH].try_into().unwrap(),
-                iv[2 * PRP_INTERMEDIATE_IV_LENGTH..3 * PRP_INTERMEDIATE_IV_LENGTH].try_into().unwrap(),
-                iv[3 * PRP_INTERMEDIATE_IV_LENGTH..4 * PRP_INTERMEDIATE_IV_LENGTH].try_into().unwrap(),
+                iv[0 * PRP_INTERMEDIATE_IV_LENGTH..1 * PRP_INTERMEDIATE_IV_LENGTH]
+                    .try_into()
+                    .unwrap(),
+                iv[1 * PRP_INTERMEDIATE_IV_LENGTH..2 * PRP_INTERMEDIATE_IV_LENGTH]
+                    .try_into()
+                    .unwrap(),
+                iv[2 * PRP_INTERMEDIATE_IV_LENGTH..3 * PRP_INTERMEDIATE_IV_LENGTH]
+                    .try_into()
+                    .unwrap(),
+                iv[3 * PRP_INTERMEDIATE_IV_LENGTH..4 * PRP_INTERMEDIATE_IV_LENGTH]
+                    .try_into()
+                    .unwrap(),
             ],
         }
     }
@@ -83,7 +99,7 @@ impl PRP {
     /// Applies forward permutation on the given plaintext and returns a new buffer
     /// containing the result.
     pub fn forward(&self, plaintext: &[u8]) -> Result<Box<[u8]>> {
-        let mut out= Vec::from(plaintext);
+        let mut out = Vec::from(plaintext);
         self.forward_inplace(&mut out)?;
         Ok(out.into_boxed_slice())
     }
@@ -99,7 +115,7 @@ impl PRP {
         } else {
             Err(InvalidParameterSize {
                 name: "plaintext".into(),
-                expected: PRP_MIN_LENGTH
+                expected: PRP_MIN_LENGTH,
             })
         }
     }
@@ -123,7 +139,7 @@ impl PRP {
         } else {
             Err(InvalidParameterSize {
                 name: "ciphertext".into(),
-                expected: PRP_MIN_LENGTH
+                expected: PRP_MIN_LENGTH,
             })
         }
     }
@@ -146,7 +162,7 @@ impl PRP {
 
         let mut cipher = SimpleStreamCipher::new(
             key_cpy.try_into().expect("invalid keystream key size"),
-            iv_cpy.try_into().expect("invalid keystream iv size")
+            iv_cpy.try_into().expect("invalid keystream iv size"),
         );
 
         let block_counter = u32::from_le_bytes(iv[0..4].try_into().unwrap());
@@ -158,10 +174,10 @@ impl PRP {
 
 #[cfg(test)]
 mod tests {
-    use crate::prp::{PRPParameters, PRP};
-    use hex_literal::hex;
     use crate::primitives::SecretKey;
+    use crate::prp::{PRPParameters, PRP};
     use crate::random::random_bytes;
+    use hex_literal::hex;
 
     #[test]
     fn test_prp_fixed() {

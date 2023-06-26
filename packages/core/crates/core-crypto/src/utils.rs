@@ -1,9 +1,9 @@
+use crate::errors::CryptoError;
+use crate::errors::CryptoError::InvalidInputValue;
+use crate::random::random_array;
 use generic_array::{ArrayLength, GenericArray};
 use subtle::{Choice, ConstantTimeEq};
 use zeroize::{Zeroize, ZeroizeOnDrop};
-use crate::errors::CryptoError;
-use crate::errors::CryptoError::InvalidInputValue;
-use crate::random::{random_array};
 
 /// Convenience method to XOR one slice onto other.
 pub fn xor_inplace(a: &mut [u8], b: &[u8]) {

@@ -1,14 +1,14 @@
 use crate::derivation::derive_mac_key;
 use crate::errors::CryptoError::TagMismatch;
 use crate::errors::Result;
-use crate::prg::{PRG, PRGParameters};
+use crate::keypairs::Keypair;
+use crate::prg::{PRGParameters, PRG};
 use crate::primitives::{DigestLike, SecretKey, SimpleMac};
 use crate::random::random_fill;
 use crate::routing::ForwardedHeader::{FinalNode, RelayNode};
+use crate::shared_keys::{SharedSecret, SphinxSuite};
 use crate::utils::xor_inplace;
 use utils_types::traits::BinarySerializable;
-use crate::shared_keys::{SharedSecret, SphinxSuite};
-use crate::keypairs::Keypair;
 
 const RELAYER_END_PREFIX: u8 = 0xff;
 
@@ -143,8 +143,7 @@ impl RoutingInfo {
             } else {
                 extended_header.copy_within(0..header_len, routing_info_len);
                 extended_header[0..pub_key_size].copy_from_slice(&path[inverted_idx + 1].to_bytes());
-                extended_header[pub_key_size..pub_key_size + SimpleMac::SIZE]
-                    .copy_from_slice(&ret.mac);
+                extended_header[pub_key_size..pub_key_size + SimpleMac::SIZE].copy_from_slice(&ret.mac);
 
                 extended_header[pub_key_size + SimpleMac::SIZE
                     ..pub_key_size + SimpleMac::SIZE + additional_data_relayer[inverted_idx].len()]
@@ -233,8 +232,8 @@ pub fn forward_header<S: SphinxSuite>(
 
         let mac: Box<[u8]> = (&header[pub_key_size..pub_key_size + SimpleMac::SIZE]).into();
 
-        let additional_info: Box<[u8]> = (&header[pub_key_size + SimpleMac::SIZE
-            ..pub_key_size + SimpleMac::SIZE + additional_data_relayer_len])
+        let additional_info: Box<[u8]> = (&header
+            [pub_key_size + SimpleMac::SIZE..pub_key_size + SimpleMac::SIZE + additional_data_relayer_len])
             .into();
 
         header.copy_within(routing_info_len.., 0);
@@ -256,15 +255,15 @@ pub fn forward_header<S: SphinxSuite>(
 
 #[cfg(test)]
 pub mod tests {
-    use crate::prg::{PRG, PRGParameters};
+    use crate::ec_groups::{Ed25519Suite, Secp256k1Suite, X25519Suite};
+    use crate::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
+    use crate::prg::{PRGParameters, PRG};
     use crate::primitives::{DigestLike, SimpleMac};
-    use crate::routing::{forward_header, ForwardedHeader, generate_filler, RoutingInfo};
+    use crate::routing::{forward_header, generate_filler, ForwardedHeader, RoutingInfo};
+    use crate::shared_keys::{SharedSecret, SphinxSuite};
     use crate::utils::xor_inplace;
     use parameterized::parameterized;
     use utils_types::traits::BinarySerializable;
-    use crate::ec_groups::{Ed25519Suite, Secp256k1Suite, X25519Suite};
-    use crate::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
-    use crate::shared_keys::{SharedSecret, SphinxSuite};
 
     #[parameterized(hops = { 3, 4 })]
     fn test_filler_generate_verify(hops: usize) {
@@ -272,20 +271,13 @@ pub mod tests {
         let last_hop = 5;
         let max_hops = hops;
 
-        let secrets = (0..hops)
-            .map(|_| SharedSecret::random())
-            .collect::<Vec<_>>();
+        let secrets = (0..hops).map(|_| SharedSecret::random()).collect::<Vec<_>>();
         let extended_header_len = per_hop * max_hops + last_hop;
         let header_len = per_hop * (max_hops - 1) + last_hop;
 
         let mut extended_header = vec![0u8; per_hop * max_hops + last_hop];
 
-        let filler = generate_filler(
-            max_hops,
-            per_hop,
-            last_hop,
-            &secrets,
-        );
+        let filler = generate_filler(max_hops, per_hop, last_hop, &secrets);
 
         extended_header[last_hop..last_hop + filler.len()].copy_from_slice(&filler);
         extended_header.copy_within(0..header_len, per_hop);
@@ -312,16 +304,9 @@ pub mod tests {
         let hops = 1;
         let max_hops = hops;
 
-        let secrets = (0..hops)
-            .map(|_| SharedSecret::random())
-            .collect::<Vec<_>>();
+        let secrets = (0..hops).map(|_| SharedSecret::random()).collect::<Vec<_>>();
 
-        let first_filler = generate_filler(
-            max_hops,
-            per_hop,
-            last_hop,
-            &secrets,
-        );
+        let first_filler = generate_filler(max_hops, per_hop, last_hop, &secrets);
         assert_eq!(0, first_filler.len());
 
         let second_filler = generate_filler(0, per_hop, last_hop, &[]);
@@ -329,7 +314,9 @@ pub mod tests {
     }
 
     fn generic_test_generate_routing_info_and_forward<S>(keypairs: Vec<S::P>)
-    where S: SphinxSuite {
+    where
+        S: SphinxSuite,
+    {
         const MAX_HOPS: usize = 3;
         let mut additional_data: Vec<&[u8]> = Vec::with_capacity(keypairs.len());
         for _ in 0..keypairs.len() {
@@ -340,14 +327,7 @@ pub mod tests {
         let pub_keys = keypairs.iter().map(|kp| kp.public().clone()).collect();
         let shares = S::new_shared_keys(&pub_keys).unwrap();
 
-        let rinfo = RoutingInfo::new::<S>(
-            MAX_HOPS,
-            &pub_keys,
-            &shares.secrets,
-            0,
-            &additional_data,
-            None,
-        );
+        let rinfo = RoutingInfo::new::<S>(MAX_HOPS, &pub_keys, &shares.secrets, 0, &additional_data, None);
 
         let mut header: Vec<u8> = rinfo.routing_information.into();
 
@@ -373,16 +353,22 @@ pub mod tests {
 
     #[parameterized(amount = { 3, 2, 1 })]
     fn test_ed25519_generate_routing_info_and_forward(amount: usize) {
-        generic_test_generate_routing_info_and_forward::<Ed25519Suite>((0..amount).map(|_| OffchainKeypair::random()).collect())
+        generic_test_generate_routing_info_and_forward::<Ed25519Suite>(
+            (0..amount).map(|_| OffchainKeypair::random()).collect(),
+        )
     }
 
     #[parameterized(amount = { 3, 2, 1 })]
     fn test_x25519_generate_routing_info_and_forward(amount: usize) {
-        generic_test_generate_routing_info_and_forward::<X25519Suite>((0..amount).map(|_| OffchainKeypair::random()).collect())
+        generic_test_generate_routing_info_and_forward::<X25519Suite>(
+            (0..amount).map(|_| OffchainKeypair::random()).collect(),
+        )
     }
 
     #[parameterized(amount = { 3, 2, 1 })]
     fn test_secp256k1_generate_routing_info_and_forward(amount: usize) {
-        generic_test_generate_routing_info_and_forward::<Secp256k1Suite>((0..amount).map(|_| ChainKeypair::random()).collect())
+        generic_test_generate_routing_info_and_forward::<Secp256k1Suite>(
+            (0..amount).map(|_| ChainKeypair::random()).collect(),
+        )
     }
 }

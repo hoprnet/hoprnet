@@ -3,7 +3,7 @@ use blake2::{Blake2s256, Blake2sMac256};
 use chacha20::cipher::KeyIvInit;
 use chacha20::cipher::{IvSizeUser, KeySizeUser, StreamCipher, StreamCipherSeek};
 use chacha20::ChaCha20;
-use digest::{FixedOutputReset, Output, OutputSizeUser, Update, KeyInit};
+use digest::{FixedOutputReset, KeyInit, Output, OutputSizeUser, Update};
 use generic_array::GenericArray;
 use sha3::Keccak256;
 use typenum::Unsigned;
@@ -80,13 +80,15 @@ impl DigestLike<Keccak256> for EthDigest {
 /// Use `new`, `update` and `finalize` triplet to produce MAC of arbitrary data.
 /// Currently instantiated using Blake2s256 MAC.
 pub struct SimpleMac {
-    instance: Blake2sMac256
+    instance: Blake2sMac256,
 }
 
 impl SimpleMac {
     /// Create new instance of the MAC using the given secret key.
     pub fn new(key: &SecretKey) -> Self {
-        Self { instance: Blake2sMac256::new(key.into()) }
+        Self {
+            instance: Blake2sMac256::new(key.into()),
+        }
     }
 }
 
@@ -148,8 +150,8 @@ pub fn create_tagged_mac(secret: &SecretKey, data: &[u8]) -> [u8; SimpleMac::SIZ
 
 #[cfg(test)]
 mod tests {
-    use generic_array::GenericArray;
     use crate::primitives::{create_tagged_mac, DigestLike, SecretKey, SimpleMac, SimpleStreamCipher};
+    use generic_array::GenericArray;
     use hex_literal::hex;
 
     #[test]
@@ -194,4 +196,3 @@ mod tests {
         assert_eq!(expected, mac);
     }
 }
-
