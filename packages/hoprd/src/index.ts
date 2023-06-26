@@ -67,7 +67,7 @@ const metric_version = create_multi_gauge('hoprd_mgauge_version', 'Executed vers
 // reading the version manually to ensure the path is read correctly
 const packageFile = path.normalize(new URL('../package.json', import.meta.url).pathname)
 const version = get_package_version(packageFile)
-const on_avado = (process.env.AVADO ?? 'false').toLowerCase() === 'true'
+const on_dappnode = (process.env.DAPPNODE ?? 'false').toLowerCase() === 'true'
 
 function generateNodeOptions(cfg: HoprdConfig, network: ResolvedNetwork): HoprOptions {
   let strategy: ChannelStrategyInterface
@@ -261,8 +261,8 @@ async function main() {
     logs.log(`This is HOPRd version ${version}`)
     metric_version.set([pickVersion(version)], 1.0)
 
-    if (on_avado) {
-      logs.log('This node appears to be running on an AVADO/Dappnode')
+    if (on_dappnode) {
+      logs.log('This node appears to be running on an Dappnode')
     }
 
     // 1. Find or create an identity
