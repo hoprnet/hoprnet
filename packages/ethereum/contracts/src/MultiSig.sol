@@ -6,6 +6,7 @@ import './node-stake/NodeSafeRegistry.sol';
 error AlreadyInitialized();
 error MultiSigUninitialized();
 error ContractNotResponsible();
+error InvalidSafeAddress();
 
 /**
  *    &&&&
@@ -22,7 +23,7 @@ error ContractNotResponsible();
  *                                          %%%%
  *                                          %%%%
  *
- * Provides modifiers to enforce usage of MultiSig contract
+ * Provides modifiers to enforce usage of a MultiSig contract
  **/
 abstract contract HoprMultiSig {
   HoprNodeSafeRegistry registry;
@@ -36,6 +37,9 @@ abstract contract HoprMultiSig {
   function setNodeSafeRegistry(HoprNodeSafeRegistry _registry) internal {
     if (initialized) {
       revert AlreadyInitialized();
+    }
+    if (address(_registry) == address(0)) {
+      revert InvalidSafeAddress();
     }
 
     initialized = true;

@@ -30,7 +30,7 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto {
   function testIsCurvePoint() public {
     // .selector is not yet supported here
     bytes4 isCurvePointSelector = bytes4(0x9a82d40c);
-    // isCurvePoint(p)
+    
     (bool success, bytes memory returnValue) = address(this).staticcall(abi.encodeWithSelector(isCurvePointSelector, bytes32(0x8318535b54105d4a7aae60c08fc45f9687181b4fdfc625bd1a753fa7397fed75), bytes32(0x3547f11ca8696646f2f3acb08e31016afac23e630c5d11f59f61fef57b0d2aa5)));
 
     assertEq(bytes32(0), bytes32(returnValue));
