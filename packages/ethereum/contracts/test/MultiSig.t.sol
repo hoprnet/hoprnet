@@ -35,12 +35,11 @@ contract MulitSigTest is Test, AccountsFixtureTest {
     msContract.mySetNodeSafeRegistry(safeRegistry);
   }
 
-  function testRevert_emptySafeAddress() public {
-    vm.expectRevert(InvalidSafeAddress.selector);
+  function test_emptySafeAddress() public {
     (bool success, bytes memory result) = address(msContract).staticcall(abi.encodeWithSelector(MultiSigContract.mySetNodeSafeRegistry.selector, address(0)));
 
     assertFalse(success);
-    assertEq(bytes32(result), bytes32(0x0000000000000000000000000000000000000000000000000000000000000020)); // error code
+    assertEq(bytes32(result), InvalidSafeAddress.selector);
   }
 
   function testRevert_uninitialized(address caller) public {

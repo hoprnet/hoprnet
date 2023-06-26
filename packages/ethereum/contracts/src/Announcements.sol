@@ -4,6 +4,7 @@ pragma solidity 0.8.19;
 import 'openzeppelin-contracts-4.8.3/utils/Multicall.sol';
 
 import './MultiSig.sol';
+import './node-stake/NodeSafeRegistry.sol';
 
 /**
  *    &&&&
@@ -29,6 +30,10 @@ contract HoprAnnouncements is Multicall, HoprMultiSig {
   event AddressAnnouncement6(address node, bytes16 ip6, bytes2 port);
 
   event RevokeAnnouncement(address node);
+
+  constructor(HoprNodeSafeRegistry safeRegistry) {
+    setNodeSafeRegistry(safeRegistry);
+  }
 
   function bindKeysSafe(
     address self,
