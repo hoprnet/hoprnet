@@ -1,4 +1,18 @@
-{ pkgs ? import <nixpkgs> { }, ... }:
+{
+  system ? builtins.currentSystem,
+  pkgs ? import <nixpkgs> { inherit system; }
+, pkgs-dev ? let
+    lock = (builtins.fromJSON (builtins.readFile
+      ./flake.lock)).nodes.nixpkgs.locked;
+    nixpkgs = fetchTarball {
+      url =
+        "https://github.com/nixos/nixpkgs/archive/${lock.rev}.tar.gz";
+      sha256 = lock.narHash;
+    };
+  in
+  import nixpkgs { inherit system; }
+, ...
+}:
 let
   linuxPkgs = with pkgs; lib.optional stdenv.isLinux (
     inotifyTools
@@ -21,8 +35,8 @@ let
     ## rust for core development and required utils
     (rust-bin.fromRustupToolchainFile ./rust-toolchain.toml)
     protobuf # v3.21.12
-    wasm-pack # v0.11.1
-    binaryen # v112 (includes wasm-opt)
+    pkgs-dev.wasm-pack # v0.11.1
+    pkgs-dev.binaryen # v112 (includes wasm-opt)
     wasm-bindgen-cli # v0.2.83
     pkg-config
 
