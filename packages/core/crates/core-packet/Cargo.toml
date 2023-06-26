@@ -27,7 +27,7 @@ futures = "0.3"
 hex = "0.4"
 js-sys = { version = "0.3.63", optional = true }
 lazy_static = "1.4"
-libp2p-identity = { version = "0.2.0", features = ["secp256k1", "peerid"] }
+libp2p-identity = { version = "0.2.0", features = ["peerid"] }
 thiserror = "1.0"
 typenum = "1.16.0"
 utils-db = { path = "../../../utils/crates/utils-db" }
