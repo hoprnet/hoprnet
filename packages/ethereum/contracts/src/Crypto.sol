@@ -4,7 +4,7 @@ pragma solidity 0.8.19;
 error InvalidFieldElement();
 error InvalidCurvePoint();
 
-contract HoprCrypto {
+abstract contract HoprCrypto {
   // secp256k1: y^2 = x^3 + ax + b (mod F_p)
 
   bytes32 constant SECP256K1_B = 0x0000000000000000000000000000000000000000000000000000000000000007;
@@ -47,10 +47,10 @@ contract HoprCrypto {
    */
   modifier isCurvePoint(CurvePoint calldata p)  {
     if ( 
-      uint256(p.x) == 0 || uint256(p.x) >= uint256(SECP256K1_FIELD_ORDER) ||
-      uint256(p.y) == 0 || uint256(p.y) >= uint256(SECP256K1_FIELD_ORDER) ||
-      mulmod(uint256(p.x), uint256(p.x), uint256(SECP256K1_FIELD_ORDER)) != 
-      (mulmod(mulmod(uint256(p.y), uint256(p.y), uint256(SECP256K1_FIELD_ORDER)), uint256(p.y), uint256(SECP256K1_FIELD_ORDER)) + 7) % uint256(SECP256K1_FIELD_ORDER)
+      uint256(p.x) == 0 || uint256(p.x) >= uint256(SECP256K1_BASE_FIELD_ORDER) ||
+      uint256(p.y) == 0 || uint256(p.y) >= uint256(SECP256K1_BASE_FIELD_ORDER) ||
+      mulmod(uint256(p.y), uint256(p.y), uint256(SECP256K1_BASE_FIELD_ORDER)) != 
+      (mulmod(mulmod(uint256(p.x), uint256(p.x), uint256(SECP256K1_BASE_FIELD_ORDER)), uint256(p.x), uint256(SECP256K1_BASE_FIELD_ORDER)) + 7) % uint256(SECP256K1_BASE_FIELD_ORDER)
     ) {
       revert InvalidCurvePoint();
     }
