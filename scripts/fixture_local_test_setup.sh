@@ -208,7 +208,7 @@ function setup_node() {
     HOPRD_NETWORK_QUALITY_THRESHOLD="0.3" \
     HOPRD_ON_CHAIN_CONFIRMATIONS=2 \
     NODE_OPTIONS="--experimental-wasm-modules" \
-    node --experimental-wasm-anyref packages/hoprd/lib/main.cjs \
+    node packages/hoprd/lib/main.cjs \
       --data="${dir}" \
       --host="127.0.0.1:${node_port}" \
       --identity="${id}" \
