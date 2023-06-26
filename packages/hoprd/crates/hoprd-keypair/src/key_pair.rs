@@ -564,7 +564,7 @@ mod tests {
         assert!(needs_migration);
         assert_eq!(
             deserialized.chain_key.public().0.to_address().to_string(),
-            "16Uiu2HAm8WFpakjrdWauUKq2hb5bejivnbtFAumVv9KHKN5AvXXK"
+            "0x826a1bf3d51fa7f402a1e01d1b2c8a8bac28e666"
         );
     }
 
@@ -591,7 +591,7 @@ mod tests {
         assert!(!needs_migration);
         assert_eq!(
             deserialized.chain_key.public().0.to_address().to_string(),
-            "16Uiu2HAm8WFpakjrdWauUKq2hb5bejivnbtFAumVv9KHKN5AvXXK"
+            "0x826a1bf3d51fa7f402a1e01d1b2c8a8bac28e666"
         );
     }
 }

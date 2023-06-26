@@ -61,7 +61,7 @@ pub fn parse_private_key(s: &str) -> Result<Box<[u8]>, String> {
         Ok(Box::new(decoded))
     } else {
         Err(format!(
-            "Given string is not a private key. A private key must contain 64 hex chars."
+            "Given string is not a private key. A private key must contain 128 hex chars."
         ))
     }
 }
@@ -523,10 +523,11 @@ mod tests {
     #[test]
     fn parse_private_key() {
         let parsed =
-            super::parse_private_key("cd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e0317").unwrap();
+            super::parse_private_key("cd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e0317cd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e0317").unwrap();
 
         let priv_key: Vec<u8> = vec![
             205, 9, 249, 41, 63, 253, 214, 155, 233, 120, 3, 44, 83, 59, 107, 205, 2, 223, 213, 217, 55, 201, 135, 190,
+            222, 195, 226, 141, 224, 126, 3, 23,205, 9, 249, 41, 63, 253, 214, 155, 233, 120, 3, 44, 83, 59, 107, 205, 2, 223, 213, 217, 55, 201, 135, 190,
             222, 195, 226, 141, 224, 126, 3, 23,
         ];
 
@@ -536,10 +537,11 @@ mod tests {
     #[test]
     fn parse_private_key_with_prefix() {
         let parsed_with_prefix =
-            super::parse_private_key("cd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e0317").unwrap();
+            super::parse_private_key("0xcd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e0317cd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e0317").unwrap();
 
         let priv_key: Vec<u8> = vec![
             205, 9, 249, 41, 63, 253, 214, 155, 233, 120, 3, 44, 83, 59, 107, 205, 2, 223, 213, 217, 55, 201, 135, 190,
+            222, 195, 226, 141, 224, 126, 3, 23,205, 9, 249, 41, 63, 253, 214, 155, 233, 120, 3, 44, 83, 59, 107, 205, 2, 223, 213, 217, 55, 201, 135, 190,
             222, 195, 226, 141, 224, 126, 3, 23,
         ];
 
@@ -553,7 +555,7 @@ mod tests {
 
         assert_eq!(
             parsed,
-            "Given string is not a private key. A private key must contain 64 hex chars."
+            "Given string is not a private key. A private key must contain 128 hex chars."
         )
     }
 
@@ -564,7 +566,7 @@ mod tests {
 
         assert_eq!(
             parsed,
-            "Given string is not a private key. A private key must contain 64 hex chars."
+            "Given string is not a private key. A private key must contain 128 hex chars."
         )
     }
 
@@ -574,7 +576,7 @@ mod tests {
 
         assert_eq!(
             parsed,
-            "Given string is not a private key. A private key must contain 64 hex chars."
+            "Given string is not a private key. A private key must contain 128 hex chars."
         )
     }
 }
