@@ -272,6 +272,10 @@ declare deployments_summary="${mydir}/../packages/ethereum/contracts/contracts-a
 
 # --- Running Mock Blockchain --- {{{
 ${mydir}/run-local-anvil.sh -l "${anvil_rpc_log}" -c "${anvil_cfg_file}"
+if [ ! -f "${anvil_cfg_file}" ]; then
+  log "Could not find anvil cfg file ${anvil_cfg_file}"
+  exit 1
+fi
 
 # read auto-generated private key from anvil configuration
 declare anvil_private_key
