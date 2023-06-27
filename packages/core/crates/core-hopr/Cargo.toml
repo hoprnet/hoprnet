@@ -1,0 +1,40 @@
+[package]
+name = "core-hopr"
+version = "0.1.0"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+description = "Implements the main HOPR interface for the core library"
+edition = "2021"
+license = "GPL-3.0-only"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["console_error_panic_hook", "wasm", "prometheus"]
+wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys"]
+prometheus = ["dep:utils-metrics"]
+
+[dependencies]
+console_error_panic_hook = { version = "0.1.7", optional = true }
+core-ethereum-db = { path = "../../../core-ethereum/crates/core-ethereum-db" }
+core-ethereum-misc = { path = "../../../core-ethereum/crates/core-ethereum-misc" } 
+core-packet = { path = "../core-packet" }
+futures = "0.3.28"
+futures-lite = "1.12.0"
+js-sys = { version = "0.3.63", optional = true }
+lazy_static = "1.4.0"
+utils-log = { path = "../../../utils/crates/utils-log"}
+utils-misc = { path = "../../../utils/crates/utils-misc" }
+utils-metrics = { path = "../../../utils/crates/utils-metrics", optional = true }
+wasm-bindgen = { workspace = true, optional = true }
+wasm-bindgen-futures = { version = "0.4.36", optional = true }
+
+[dev-dependencies]
+env_logger = "0.10.0"
+wasm-bindgen-test = "0.3.36"
+
+[package.metadata.wasm-pack.profile.dev]
+wasm-opt = false
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ['-O', '--enable-reference-types']

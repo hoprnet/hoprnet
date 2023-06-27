@@ -12,14 +12,14 @@ import {
   Snapshot as Ethereum_Snapshot,
   Ticket as Ethereum_Ticket,
   U256 as Ethereum_U256,
-  core_ethereum_misc_initialize_crate,
+  core_hopr_initialize_crate,
   initialize_commitment,
   find_commitment_preimage,
   bump_commitment,
   ChannelCommitmentInfo
-} from '../lib/core_ethereum_misc.js'
+} from '../../core/lib/core_hopr.js'
 
-core_ethereum_misc_initialize_crate()
+core_hopr_initialize_crate()
 
 export {
   Ethereum_AccountEntry,

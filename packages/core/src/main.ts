@@ -26,18 +26,12 @@ import { createLibp2pMock } from './libp2p.mock.js'
 import { getContractData, supportedNetworks } from './network.js'
 import { MultiaddrConnection } from '@libp2p/interfaces/transport'
 import {
-  Database as Packet_Database,
-  PublicKey as Packet_PublicKey,
-  core_packet_initialize_crate
-} from '../lib/core_packet.js'
-core_packet_initialize_crate()
+  Database,
+  PublicKey as Database_PublicKey,
+  core_hopr_initialize_crate
+} from '../lib/core_hopr.js'
+core_hopr_initialize_crate()
 
-import {
-  Database as Ethereum_Database,
-  PublicKey as Ethereum_PublicKey,
-  core_ethereum_misc_initialize_crate
-} from '../../core-ethereum/lib/core_ethereum_misc.js'
-core_ethereum_misc_initialize_crate()
 
 const log = debug(`hopr-core:create-hopr`)
 const error = debug(`hopr-core:error`)
@@ -258,9 +252,11 @@ export async function createHoprNode(
     throw err
   }
 
+  let db = new Database(levelDb, Database_PublicKey.from_peerid_str(peerId.toString()))
+
   log(`using provider URL: ${options.network.chain.default_provider}`)
   const chain = HoprCoreEthereum.createInstance(
-    new Ethereum_Database(levelDb, Ethereum_PublicKey.from_peerid_str(peerId.toString())),
+    db,
     PublicKey.from_peerid_str(peerId.toString()),
     keysPBM.PrivateKey.decode(peerId.privateKey as Uint8Array).Data,
     {
@@ -280,5 +276,5 @@ export async function createHoprNode(
   // Initialize connection to the blockchain
   await chain.initializeChainWrapper(resolvedContractAddresses)
 
-  return new Hopr(peerId, new Packet_Database(levelDb, Packet_PublicKey.from_peerid_str(peerId.toString())), options)
+  return new Hopr(peerId, db, options)
 }
