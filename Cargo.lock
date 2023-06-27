@@ -942,7 +942,6 @@ dependencies = [
  "utils-log",
  "utils-types",
  "wasm-bindgen",
- "wasm-bindgen-test",
  "wasm-opt",
  "wasm-pack",
 ]
@@ -973,9 +972,7 @@ dependencies = [
  "serde-wasm-bindgen",
  "serde_json",
  "utils-misc",
- "utils-proc-macros",
  "wasm-bindgen",
- "wasm-bindgen-test",
  "wasm-opt",
  "wasm-pack",
 ]
@@ -1029,7 +1026,6 @@ dependencies = [
  "validator",
  "wasm-bindgen",
  "wasm-bindgen-futures",
- "wasm-bindgen-test",
 ]
 
 [[package]]
@@ -1064,7 +1060,6 @@ dependencies = [
  "utils-types",
  "wasm-bindgen",
  "wasm-bindgen-futures",
- "wasm-bindgen-test",
 ]
 
 [[package]]
@@ -2510,7 +2505,6 @@ dependencies = [
  "utils-misc",
  "validator",
  "wasm-bindgen",
- "wasm-bindgen-test",
  "wasm-opt",
  "wasm-pack",
 ]
@@ -3780,7 +3774,6 @@ version = "0.1.0"
 dependencies = [
  "thiserror",
  "wasm-bindgen",
- "wasm-bindgen-test",
  "wasm-opt",
  "wasm-pack",
 ]
@@ -4077,12 +4070,6 @@ checksum = "713cfb06c7059f3588fb8044c0fad1d09e3c01d225e25b9220dbfdcf16dbb1b3"
 dependencies = [
  "windows-sys 0.42.0",
 ]
-
-[[package]]
-name = "scoped-tls"
-version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e1cf6437eb19a8f4a6cc0f7dca544973b0b78843adbfeb3683d1a94a0024a294"
 
 [[package]]
 name = "scopeguard"
@@ -5013,7 +5000,6 @@ dependencies = [
  "utils-types",
  "wasm-bindgen",
  "wasm-bindgen-futures",
- "wasm-bindgen-test",
 ]
 
 [[package]]
@@ -5024,7 +5010,6 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "wasm-bindgen-test",
  "wasm-opt",
  "wasm-pack",
 ]
@@ -5039,7 +5024,6 @@ dependencies = [
  "regex",
  "utils-misc",
  "wasm-bindgen",
- "wasm-bindgen-test",
  "wasm-opt",
  "wasm-pack",
 ]
@@ -5056,20 +5040,10 @@ dependencies = [
  "serde-wasm-bindgen",
  "serde_bytes",
  "serde_json",
- "utils-proc-macros",
  "wasm-bindgen",
  "wasm-bindgen-futures",
- "wasm-bindgen-test",
  "wasm-opt",
  "wasm-pack",
-]
-
-[[package]]
-name = "utils-proc-macros"
-version = "1.0.0"
-dependencies = [
- "quote",
- "wasm-bindgen-macro-support",
 ]
 
 [[package]]
@@ -5090,7 +5064,6 @@ dependencies = [
  "utils-log",
  "utils-misc",
  "wasm-bindgen",
- "wasm-bindgen-test",
  "wasm-opt",
  "wasm-pack",
 ]
@@ -5304,30 +5277,6 @@ name = "wasm-bindgen-shared"
 version = "0.2.86"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed9d5b4305409d1fc9482fee2d7f9bcbf24b3972bf59817ef757e23982242a93"
-
-[[package]]
-name = "wasm-bindgen-test"
-version = "0.3.36"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c9e636f3a428ff62b3742ebc3c70e254dfe12b8c2b469d688ea59cdd4abcf502"
-dependencies = [
- "console_error_panic_hook",
- "js-sys",
- "scoped-tls",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "wasm-bindgen-test-macro",
-]
-
-[[package]]
-name = "wasm-bindgen-test-macro"
-version = "0.3.36"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f18c1fad2f7c4958e7bcce014fa212f59a65d5e3721d0f77e6c0b27ede936ba3"
-dependencies = [
- "proc-macro2",
- "quote",
-]
 
 [[package]]
 name = "wasm-opt"
