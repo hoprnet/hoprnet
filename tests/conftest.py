@@ -126,7 +126,7 @@ def setup_7_nodes(request):
     try:
         logging.info("Creating a 7 node cluster from source")
         subprocess.run(
-            f"./scripts/fixture_local_test_setup.sh --skip-cleanup | tee {log_file_path}",
+            f"./scripts/fixture_local_test_setup.sh --skip-cleanup 2>&1 | tee {log_file_path}",
             shell=True,
             capture_output=True,
             check=True,
