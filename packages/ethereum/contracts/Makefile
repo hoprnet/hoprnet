@@ -5,8 +5,8 @@ FOUNDRY_DIR ?= ${CURDIR}/../../../.foundry
 PATH := $(subst :${FOUNDRY_DIR}/bin,,$(PATH)):${FOUNDRY_DIR}/bin
 
 # use custom PATH in all shell processes
-#SHELL := env PATH=$(subst $(space),\$(space),$(PATH)) $(shell which bash)
-SHELL := /bin/bash
+SHELL := env PATH=$(subst $(space),\$(space),$(PATH)) $(shell which bash)
+#SHELL := /bin/bash
 
 # utility wrapper for forge script to use same options on every invocation
 forge := time forge

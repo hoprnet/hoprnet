@@ -24,7 +24,7 @@ core-crypto = { path = "../../../core/crates/core-crypto" }
 getrandom = { version = "0.2.8", features = ["js"] }
 hex = "0.4"
 js-sys = { version = "0.3.63", optional = true }
-libp2p-identity = { version = "0.2.0", features = ["ed25519", "peerid"] }
+libp2p-identity = { workspace = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 scrypt = { version = "0.11.0", default-features = false }

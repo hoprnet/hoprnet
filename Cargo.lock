@@ -906,8 +906,6 @@ dependencies = [
  "utils-proc-macros",
  "utils-types",
  "wasm-bindgen",
- "wasm-bindgen-futures",
- "wasm-bindgen-test",
  "zeroize",
 ]
 

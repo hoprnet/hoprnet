@@ -25,6 +25,7 @@ members = [
 ]
 
 [workspace.dependencies]
+libp2p-identity = { version = "0.2.0", features = ["peerid", "ed25519"] }
 wasm-pack = "0.11.1"
 wasm-opt = "0.112.0"
 wasm-bindgen = "0.2.86"

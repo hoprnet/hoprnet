@@ -370,7 +370,6 @@ impl HoprKeys {
                 Ok((
                     HoprKeys {
                         packet_key: OffchainKeypair::from_secret(&packet_key).unwrap(),
-                        // TODO: change this to off-chain privKey
                         chain_key: ChainKeypair::from_secret(&chain_key).unwrap(),
                         id: keystore.id,
                     },
