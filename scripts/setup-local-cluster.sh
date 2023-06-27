@@ -18,7 +18,7 @@ source "${mydir}/utils.sh"
 declare api_token="^^LOCAL-testing-123^^"
 declare myne_chat_url="http://app.myne.chat"
 declare init_script=""
-declare hoprd_command="node --experimental-wasm-modules --experimental-wasm-reftypes packages/hoprd/lib/main.cjs"
+declare hoprd_command="node --experimental-wasm-modules packages/hoprd/lib/main.cjs"
 declare listen_host="127.0.0.1"
 declare node_env="development"
 # first anvil account

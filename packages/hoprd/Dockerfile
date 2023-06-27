@@ -89,4 +89,4 @@ EXPOSE 8080
 EXPOSE 9091/udp
 EXPOSE 9091/tcp
 
-ENTRYPOINT ["/usr/bin/tini", "--", "node", "--experimental-wasm-reftypes", "./lib/main.cjs"]
+ENTRYPOINT ["/usr/bin/tini", "--", "node", "./lib/main.cjs"]

@@ -301,7 +301,6 @@ kill-anvil: ## kill process running at port 8545 (default port of anvil)
 run-local: args=
 run-local: ## run HOPRd from local repo
 	env NODE_OPTIONS="--experimental-wasm-modules" NODE_ENV=development DEBUG="hopr*" node \
-		--experimental-wasm-reftypes \
 		packages/hoprd/lib/main.cjs --init --api \
 		--password="local" --identity=`pwd`/.identity-local.id \
 		--network anvil-localhost --announce \

@@ -209,7 +209,7 @@ function setup_node() {
     HOPRD_NETWORK_QUALITY_THRESHOLD="0.3" \
     HOPRD_ON_CHAIN_CONFIRMATIONS=2 \
     NODE_OPTIONS="--experimental-wasm-modules" \
-    node --experimental-wasm-reftypes packages/hoprd/lib/main.cjs \
+    node packages/hoprd/lib/main.cjs \
       --data="${dir}" \
       --host="127.0.0.1:${node_port}" \
       --identity="${id}" \
@@ -273,6 +273,10 @@ declare deployments_summary="${mydir}/../packages/ethereum/contracts/contracts-a
 
 # --- Running Mock Blockchain --- {{{
 ${mydir}/run-local-anvil.sh -l "${anvil_rpc_log}" -c "${anvil_cfg_file}"
+if [ ! -f "${anvil_cfg_file}" ]; then
+  log "Could not find anvil cfg file ${anvil_cfg_file}"
+  exit 1
+fi
 
 # read auto-generated private key from anvil configuration
 declare anvil_private_key
