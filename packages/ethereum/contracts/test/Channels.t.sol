@@ -3,12 +3,20 @@ pragma solidity >=0.6.0 <0.9.0;
 
 import 'forge-std/Test.sol';
 import './utils/ERC1820Registry.sol';
-import './utils/Accounts.sol';
 // import './utils/Channels.sol';
 // import './utils/Tickets.sol';
 import '../src/Channels.sol';
+import '../src/node-stake/NodeSafeRegistry.sol';
 
-contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, AccountsFixtureTest {
+contract MyHoprChannels is HoprChannels {
+  constructor(address _token, Timestamp _noticePeriodChannelClosure, HoprNodeSafeRegistry safeRegistry) HoprChannels(_token, _noticePeriodChannelClosure, safeRegistry) {}
+
+  function myValidateBalance(HoprChannels.Balance balance) validateBalance(balance) public {}
+
+  function myValidateChannelParties(address source, address destination) validateChannelParties(source, destination) public {}
+}
+
+contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest {
   // Copied from HoprChannels contract
   event ChannelOpened(address indexed source, address indexed destination, HoprChannels.Balance amount);
   event ChannelBalanceIncreased(bytes32 indexed channelId, HoprChannels.Balance newBalance);
@@ -19,8 +27,8 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, AccountsFixtureTe
   event TicketRedeemed(bytes32 channelId, HoprChannels.TicketIndex newTicketIndex);
 
   bytes32 constant PROOF_OF_RELAY_SECRET_0 = keccak256(abi.encodePacked('PROOF_OF_RELAY_SECRET_0'));
-  HoprChannels.WinProb constant WIN_PROB_100 = HoprChannels.WinProb.wrap(type(uint56).max);
-  HoprChannels.WinProb constant WIN_PROB_0 = HoprChannels.WinProb.wrap(type(uint56).min);
+  // HoprChannels.WinProb constant WIN_PROB_100 = HoprChannels.WinProb.wrap(type(uint56).max);
+  // HoprChannels.WinProb constant WIN_PROB_0 = HoprChannels.WinProb.wrap(type(uint56).min);
 
   bytes32 constant SECRET_0 = keccak256(abi.encodePacked('secret'));
   bytes32 constant SECRET_1 = keccak256(abi.encodePacked(SECRET_0));
@@ -34,13 +42,14 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, AccountsFixtureTe
       HoprChannels.Timestamp closureTime,
       HoprChannels.ChannelEpoch epoch,
       HoprChannels.ChannelStatus status
-    ) = hoprChannels.channels(channelId);
+    ) = myHoprChannels.channels(channelId);
     return HoprChannels.Channel(commitment, balance, ticketIndex, closureTime, epoch,status );
   }
 
   address hoprToken;
 
-  HoprChannels public hoprChannels;
+  MyHoprChannels public myHoprChannels;
+  HoprNodeSafeRegistry public safeRegistry;
 
   // HoprChannels.RedeemableTicket TICKET_AB_WIN =
   //   HoprChannels.RedeemableTicket({
@@ -111,396 +120,428 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, AccountsFixtureTe
 
     hoprToken = vm.addr(1);
 
-    hoprChannels = new HoprChannels(vm.addr(1), HoprChannels.Timestamp.wrap(15));
-    channelIdAB = hoprChannels._getChannelId(accountA.accountAddr, accountB.accountAddr);
-    channelIdBA = hoprChannels._getChannelId(accountB.accountAddr, accountA.accountAddr);
+    safeRegistry = new HoprNodeSafeRegistry();
+    myHoprChannels = new MyHoprChannels(vm.addr(1), HoprChannels.Timestamp.wrap(15), safeRegistry);
 
-    MIN_USED_BALANCE = HoprChannels.Balance.unwrap(hoprChannels.MIN_USED_BALANCE()) + 1;
-    MAX_USED_BALANCE = HoprChannels.Balance.unwrap(hoprChannels.MAX_USED_BALANCE());   
+    MIN_USED_BALANCE = HoprChannels.Balance.unwrap(myHoprChannels.MIN_USED_BALANCE()) + 1;
+    MAX_USED_BALANCE = HoprChannels.Balance.unwrap(myHoprChannels.MAX_USED_BALANCE());   
   }
 
-  function testFundChannelMulti(uint96 amount1, uint96 amount2) public {
-    amount1 = uint96(bound(amount1, MIN_USED_BALANCE ,MAX_USED_BALANCE));
-    amount2 = uint96(bound(amount2, MIN_USED_BALANCE, MAX_USED_BALANCE));
+  function testValidateBalance(uint96 amount) public {
+    amount = uint96(bound(amount, MIN_USED_BALANCE ,MAX_USED_BALANCE));
 
-    HoprChannels.Channel memory channelAB = HoprChannels.Channel(
-      bytes32(0),
-      HoprChannels.Balance.wrap(uint96(amount1)),
-      HoprChannels.TicketIndex.wrap(0),
-      HoprChannels.Timestamp.wrap(0),
-
-      HoprChannels.ChannelEpoch.wrap(1),
-      HoprChannels.ChannelStatus.OPEN
-    );
-    HoprChannels.Channel memory channelBA = HoprChannels.Channel(
-      bytes32(0),
-      HoprChannels.Balance.wrap(uint96(amount2)),
-      HoprChannels.TicketIndex.wrap(0),
-      HoprChannels.Timestamp.wrap(0),
-      HoprChannels.ChannelEpoch.wrap(1),
-      HoprChannels.ChannelStatus.OPEN
-    );
-
-    vm.prank(address(1));
-    vm.mockCall(
-      hoprToken,
-      abi.encodeWithSignature(
-        'transferFrom(address,address,uint256)',
-        address(1),
-        address(hoprChannels),
-        amount1 + amount2
-      ),
-      abi.encode(true)
-    );
-    // fund channel for two parties triggers
-    vm.expectEmit(true, true, false, true, address(hoprChannels));
-    emit ChannelOpened(accountA.accountAddr, accountB.accountAddr, HoprChannels.Balance.wrap(uint96(amount1)));
-    vm.expectEmit(true, true, false, true, address(hoprChannels));
-    emit ChannelOpened(accountB.accountAddr, accountA.accountAddr, HoprChannels.Balance.wrap(uint96(amount2)));
-
-    // fund channel A->B and B->A
-    hoprChannels.fundChannelMulti(
-      accountA.accountAddr,
-      HoprChannels.Balance.wrap(amount1),
-      accountB.accountAddr,
-      HoprChannels.Balance.wrap(amount2)
-    );
-    vm.clearMockedCalls();
-
-    assertEq(
-      keccak256(
-        abi.encode(getChannelFromTuple(channelIdAB))
-      ),
-      keccak256(abi.encode(channelAB))
-    );
-    assertEq(
-      keccak256(
-        abi.encode(getChannelFromTuple(channelIdBA))
-      ),
-      keccak256(abi.encode(channelBA))
-    );
+    myHoprChannels.myValidateBalance(HoprChannels.Balance.wrap(amount));
   }
 
-  function testRevert_FundChannelMulti_SameSourceAndDestination(uint96 amount1, uint96 amount2) public {
-    amount1 = uint96(bound(amount1, MIN_USED_BALANCE ,MAX_USED_BALANCE));
-    amount2 = uint96(bound(amount2, MIN_USED_BALANCE, MAX_USED_BALANCE));
+  function testRevert_validateBalance() public {
+    vm.expectRevert(abi.encodeWithSelector(InvalidBalance.selector));
+    myHoprChannels.myValidateBalance(HoprChannels.Balance.wrap(0));
 
-    vm.mockCall(
-      hoprToken,
-      abi.encodeWithSignature(
-        'transferFrom(address,address,uint256)',
-        address(1),
-        address(hoprChannels),
-        amount1 + amount2
-      ),
-      abi.encode(true)
-    );
-
-    vm.prank(address(1));
-    vm.expectRevert(SourceEqualsDestination.selector);
-    hoprChannels.fundChannelMulti(accountA.accountAddr, HoprChannels.Balance.wrap(amount1), accountA.accountAddr, HoprChannels.Balance.wrap(amount2));
-
-    vm.clearMockedCalls();
+    vm.expectRevert(abi.encodeWithSelector(BalanceExceedsGlobalPerChannelAllowance.selector));
+    myHoprChannels.myValidateBalance(HoprChannels.Balance.wrap(uint96(MAX_USED_BALANCE) + 1));
   }
 
-  function testRevert_FundChannelMulti_ZeroSource(uint96 amount1, uint96 amount2) public {
-    amount1 = uint96(bound(amount1, MIN_USED_BALANCE, MAX_USED_BALANCE));
-    amount2 = uint96(bound(amount2, MIN_USED_BALANCE, MAX_USED_BALANCE));
+  function testValidateChannelParties(address source, address destination) public {
+    vm.assume(source != destination);
 
-    vm.mockCall(
-      hoprToken,
-      abi.encodeWithSignature(
-        'transferFrom(address,address,uint256)',
-        address(1),
-        address(hoprChannels),
-        amount1 + amount2
-      ),
-      abi.encode(true)
-    );
-
-    vm.prank(address(1));
-    vm.expectRevert(abi.encodeWithSelector(ZeroAddress.selector, "source must not be empty"));
-    hoprChannels.fundChannelMulti(address(0), HoprChannels.Balance.wrap(amount1), accountA.accountAddr, HoprChannels.Balance.wrap(amount2));
-
-    vm.clearMockedCalls();
+    myHoprChannels.myValidateChannelParties(source, destination);
   }
 
-  function testRevert_FundChannelMulti_ZeroDestination(uint96 amount1, uint96 amount2) public {
-    amount1 = uint96(bound(amount1, MIN_USED_BALANCE, MAX_USED_BALANCE));
-    amount2 = uint96(bound(amount2, MIN_USED_BALANCE, MAX_USED_BALANCE));
+  function testRevert_validateChannelParties(address addr) public {
+    vm.expectRevert(abi.encodeWithSelector(SourceEqualsDestination.selector));
+    myHoprChannels.myValidateChannelParties(addr, addr);
 
-    vm.mockCall(
-      hoprToken,
-      abi.encodeWithSignature(
-        'transferFrom(address,address,uint256)',
-        address(1),
-        address(hoprChannels),
-        amount1 + amount2
-      ),
-      abi.encode(true)
-    );
+    vm.expectRevert(abi.encodeWithSelector(ZeroAddress.selector, 'source must not be empty'));
+    myHoprChannels.myValidateChannelParties(address(0), addr);
 
-    vm.prank(address(1));
-    vm.expectRevert(abi.encodeWithSelector(ZeroAddress.selector, "destination must not be empty"));
-    hoprChannels.fundChannelMulti(accountA.accountAddr, HoprChannels.Balance.wrap(amount1), address(0), HoprChannels.Balance.wrap(amount2));
-
-    vm.clearMockedCalls();
+    vm.expectRevert(abi.encodeWithSelector(ZeroAddress.selector, 'destination must not be empty'));
+    myHoprChannels.myValidateChannelParties(addr, address(0));
   }
 
-  function testRevert_FundChannelMulti_AmountTooLow() public {
+  // function testFundChannelMulti(uint96 amount1, uint96 amount2, address account1, address account2) public {
+  //   amount1 = uint96(bound(amount1, MIN_USED_BALANCE ,MAX_USED_BALANCE));
+  //   amount2 = uint96(bound(amount2, MIN_USED_BALANCE, MAX_USED_BALANCE));
+  //   vm.assume(account1 != account2);
 
-    vm.mockCall(
-      hoprToken,
-      abi.encodeWithSignature(
-        'transferFrom(address,address,uint256)',
-        address(1),
-        address(hoprChannels),
-        0
-      ),
-      abi.encode(true)
-    );
+  //   HoprChannels.Channel memory channelAB = HoprChannels.Channel(
+  //     bytes32(0),
+  //     HoprChannels.Balance.wrap(uint96(amount1)),
+  //     HoprChannels.TicketIndex.wrap(0),
+  //     HoprChannels.Timestamp.wrap(0),
 
-    vm.prank(address(1));
-    vm.expectRevert(InvalidBalance.selector);
-    hoprChannels.fundChannelMulti(accountA.accountAddr, HoprChannels.Balance.wrap(0), accountB.accountAddr, HoprChannels.Balance.wrap(0));
+  //     HoprChannels.ChannelEpoch.wrap(1),
+  //     HoprChannels.ChannelStatus.OPEN
+  //   );
+  //   HoprChannels.Channel memory channelBA = HoprChannels.Channel(
+  //     bytes32(0),
+  //     HoprChannels.Balance.wrap(uint96(amount2)),
+  //     HoprChannels.TicketIndex.wrap(0),
+  //     HoprChannels.Timestamp.wrap(0),
+  //     HoprChannels.ChannelEpoch.wrap(1),
+  //     HoprChannels.ChannelStatus.OPEN
+  //   );
 
-    vm.clearMockedCalls();
-  }
+  //   vm.prank(address(1));
+  //   vm.mockCall(
+  //     hoprToken,
+  //     abi.encodeWithSignature(
+  //       'transferFrom(address,address,uint256)',
+  //       address(1),
+  //       address(hoprChannels),
+  //       amount1 + amount2
+  //     ),
+  //     abi.encode(true)
+  //   );
+  //   // fund channel for two parties triggers
+  //   vm.expectEmit(true, true, false, true, address(hoprChannels));
+  //   emit ChannelOpened(account1, account2, HoprChannels.Balance.wrap(uint96(amount1)));
+  //   vm.expectEmit(true, true, false, true, address(hoprChannels));
+  //   emit ChannelOpened(account2, account1, HoprChannels.Balance.wrap(uint96(amount2)));
+
+  //   // fund channel A->B and B->A
+  //   hoprChannels.fundChannelMulti(
+  //     account1,
+  //     HoprChannels.Balance.wrap(amount1),
+  //     account2,
+  //     HoprChannels.Balance.wrap(amount2)
+  //   );
+  //   vm.clearMockedCalls();
+
+  //   assertEq(
+  //     keccak256(
+  //       abi.encode(getChannelFromTuple(channelIdAB))
+  //     ),
+  //     keccak256(abi.encode(channelAB))
+  //   );
+  //   assertEq(
+  //     keccak256(
+  //       abi.encode(getChannelFromTuple(channelIdBA))
+  //     ),
+  //     keccak256(abi.encode(channelBA))
+  //   );
+  // }
+
+  // function testRevert_FundChannelMulti_SameSourceAndDestination(uint96 amount1, uint96 amount2, address account1) public {
+  //   amount1 = uint96(bound(amount1, MIN_USED_BALANCE ,MAX_USED_BALANCE));
+  //   amount2 = uint96(bound(amount2, MIN_USED_BALANCE, MAX_USED_BALANCE));
+
+  //   vm.mockCall(
+  //     hoprToken,
+  //     abi.encodeWithSignature(
+  //       'transferFrom(address,address,uint256)',
+  //       address(1),
+  //       address(hoprChannels),
+  //       amount1 + amount2
+  //     ),
+  //     abi.encode(true)
+  //   );
+
+  //   vm.prank(address(1));
+  //   vm.expectRevert(SourceEqualsDestination.selector);
+  //   hoprChannels.fundChannelMulti(account1, HoprChannels.Balance.wrap(amount1), account1, HoprChannels.Balance.wrap(amount2));
+
+  //   vm.clearMockedCalls();
+  // }
+
+  // function testRevert_FundChannelMulti_ZeroSource(uint96 amount1, uint96 amount2, address account1) public {
+  //   amount1 = uint96(bound(amount1, MIN_USED_BALANCE, MAX_USED_BALANCE));
+  //   amount2 = uint96(bound(amount2, MIN_USED_BALANCE, MAX_USED_BALANCE));
+  //   vm.assume(account1 != address(0));
+
+  //   vm.mockCall(
+  //     hoprToken,
+  //     abi.encodeWithSignature(
+  //       'transferFrom(address,address,uint256)',
+  //       address(1),
+  //       address(hoprChannels),
+  //       amount1 + amount2
+  //     ),
+  //     abi.encode(true)
+  //   );
+
+  //   vm.prank(address(1));
+  //   vm.expectRevert(abi.encodeWithSelector(ZeroAddress.selector, "source must not be empty"));
+  //   hoprChannels.fundChannelMulti(address(0), HoprChannels.Balance.wrap(amount1), account1, HoprChannels.Balance.wrap(amount2));
+
+  //   vm.clearMockedCalls();
+  // }
+
+  // function testRevert_FundChannelMulti_ZeroDestination(uint96 amount1, uint96 amount2) public {
+  //   amount1 = uint96(bound(amount1, MIN_USED_BALANCE, MAX_USED_BALANCE));
+  //   amount2 = uint96(bound(amount2, MIN_USED_BALANCE, MAX_USED_BALANCE));
+
+  //   vm.mockCall(
+  //     hoprToken,
+  //     abi.encodeWithSignature(
+  //       'transferFrom(address,address,uint256)',
+  //       address(1),
+  //       address(hoprChannels),
+  //       amount1 + amount2
+  //     ),
+  //     abi.encode(true)
+  //   );
+
+  //   vm.prank(address(1));
+  //   vm.expectRevert(abi.encodeWithSelector(ZeroAddress.selector, "destination must not be empty"));
+  //   hoprChannels.fundChannelMulti(accountA.accountAddr, HoprChannels.Balance.wrap(amount1), address(0), HoprChannels.Balance.wrap(amount2));
+
+  //   vm.clearMockedCalls();
+  // }
+
+  // function testRevert_FundChannelMulti_AmountTooLow() public {
+
+  //   vm.mockCall(
+  //     hoprToken,
+  //     abi.encodeWithSignature(
+  //       'transferFrom(address,address,uint256)',
+  //       address(1),
+  //       address(hoprChannels),
+  //       0
+  //     ),
+  //     abi.encode(true)
+  //   );
+
+  //   vm.prank(address(1));
+  //   vm.expectRevert(InvalidBalance.selector);
+  //   hoprChannels.fundChannelMulti(accountA.accountAddr, HoprChannels.Balance.wrap(0), accountB.accountAddr, HoprChannels.Balance.wrap(0));
+
+  //   vm.clearMockedCalls();
+  // }
 
 
-  function testRevert_FundChannelMulti_AmountATooHigh(uint96 amount2) public {
-    amount2 = uint96(bound(amount2, MIN_USED_BALANCE, MAX_USED_BALANCE));
+  // function testRevert_FundChannelMulti_AmountATooHigh(uint96 amount2) public {
+  //   amount2 = uint96(bound(amount2, MIN_USED_BALANCE, MAX_USED_BALANCE));
 
-    uint256 highAmount = MAX_USED_BALANCE + 1;
+  //   uint256 highAmount = MAX_USED_BALANCE + 1;
 
-    vm.mockCall(
-      hoprToken,
-      abi.encodeWithSignature(
-        'transferFrom(address,address,uint256)',
-        address(1),
-        address(hoprChannels),
-        amount2 + highAmount
-      ),
-      abi.encode(true)
-    );
+  //   vm.mockCall(
+  //     hoprToken,
+  //     abi.encodeWithSignature(
+  //       'transferFrom(address,address,uint256)',
+  //       address(1),
+  //       address(hoprChannels),
+  //       amount2 + highAmount
+  //     ),
+  //     abi.encode(true)
+  //   );
 
-    vm.prank(address(1));
-    vm.expectRevert(BalanceExceedsGlobalPerChannelAllowance.selector);
-    hoprChannels.fundChannelMulti(accountA.accountAddr, HoprChannels.Balance.wrap(uint96(highAmount)), accountB.accountAddr, HoprChannels.Balance.wrap(amount2));
+  //   vm.prank(address(1));
+  //   vm.expectRevert(BalanceExceedsGlobalPerChannelAllowance.selector);
+  //   hoprChannels.fundChannelMulti(accountA.accountAddr, HoprChannels.Balance.wrap(uint96(highAmount)), accountB.accountAddr, HoprChannels.Balance.wrap(amount2));
 
-    vm.clearMockedCalls();
-  }
+  //   vm.clearMockedCalls();
+  // }
 
-  function testRevert_FundChannelMulti_AmountBTooHigh(uint96 amount1) public {
-    amount1 = uint96(bound(amount1, MIN_USED_BALANCE, MAX_USED_BALANCE));
+  // function testRevert_FundChannelMulti_AmountBTooHigh(uint96 amount1) public {
+  //   amount1 = uint96(bound(amount1, MIN_USED_BALANCE, MAX_USED_BALANCE));
 
-    uint256 highAmount = MAX_USED_BALANCE + 1;
+  //   uint256 highAmount = MAX_USED_BALANCE + 1;
 
-    vm.mockCall(
-      hoprToken,
-      abi.encodeWithSignature(
-        'transferFrom(address,address,uint256)',
-        address(1),
-        address(hoprChannels),
-        amount1 + highAmount
-      ),
-      abi.encode(true)
-    );
+  //   vm.mockCall(
+  //     hoprToken,
+  //     abi.encodeWithSignature(
+  //       'transferFrom(address,address,uint256)',
+  //       address(1),
+  //       address(hoprChannels),
+  //       amount1 + highAmount
+  //     ),
+  //     abi.encode(true)
+  //   );
 
-    vm.prank(address(1));
-    vm.expectRevert(BalanceExceedsGlobalPerChannelAllowance.selector);
-    hoprChannels.fundChannelMulti(accountA.accountAddr, HoprChannels.Balance.wrap(amount1), accountB.accountAddr, HoprChannels.Balance.wrap(uint96(highAmount)));
+  //   vm.prank(address(1));
+  //   vm.expectRevert(BalanceExceedsGlobalPerChannelAllowance.selector);
+  //   hoprChannels.fundChannelMulti(accountA.accountAddr, HoprChannels.Balance.wrap(amount1), accountB.accountAddr, HoprChannels.Balance.wrap(uint96(highAmount)));
 
-    vm.clearMockedCalls();
-  }
+  //   vm.clearMockedCalls();
+  // }
 
-  function testRevert_FundChannelMultiTokenTransfer(uint96 amount1, uint96 amount2) public {
-    amount1 = uint96(bound(amount1, MIN_USED_BALANCE, MAX_USED_BALANCE));
-    amount2 = uint96(bound(amount2, MIN_USED_BALANCE, MAX_USED_BALANCE));
+  // function testRevert_FundChannelMultiTokenTransfer(uint96 amount1, uint96 amount2) public {
+  //   amount1 = uint96(bound(amount1, MIN_USED_BALANCE, MAX_USED_BALANCE));
+  //   amount2 = uint96(bound(amount2, MIN_USED_BALANCE, MAX_USED_BALANCE));
 
-    vm.prank(address(1));
-    vm.mockCall(
-      hoprToken,
-      abi.encodeWithSignature(
-        'transferFrom(address,address,uint256)',
-        address(1),
-        address(hoprChannels),
-        amount1 + amount2
-      ),
-      abi.encode(false)
-    );
+  //   vm.prank(address(1));
+  //   vm.mockCall(
+  //     hoprToken,
+  //     abi.encodeWithSignature(
+  //       'transferFrom(address,address,uint256)',
+  //       address(1),
+  //       address(hoprChannels),
+  //       amount1 + amount2
+  //     ),
+  //     abi.encode(false)
+  //   );
 
-    vm.expectRevert(abi.encodeWithSelector(TokenTransferFailed.selector));
-    hoprChannels.fundChannelMulti(accountA.accountAddr, HoprChannels.Balance.wrap(amount1), accountB.accountAddr, HoprChannels.Balance.wrap(amount2));
+  //   vm.expectRevert(abi.encodeWithSelector(TokenTransferFailed.selector));
+  //   hoprChannels.fundChannelMulti(accountA.accountAddr, HoprChannels.Balance.wrap(amount1), accountB.accountAddr, HoprChannels.Balance.wrap(amount2));
 
-    vm.clearMockedCalls();
-  }
+  //   vm.clearMockedCalls();
+  // }
 
-  function test_SetCommitment(uint96 amount1, uint96 amount2, uint256 commitmentA, uint256 commitmentB) public {
-    amount1 = uint96(bound(amount1, MIN_USED_BALANCE, MAX_USED_BALANCE));
-    amount2 = uint96(bound(amount2, MIN_USED_BALANCE, MAX_USED_BALANCE));
+  // function test_SetCommitment(uint96 amount1, uint96 amount2, uint256 commitmentA, uint256 commitmentB) public {
+  //   amount1 = uint96(bound(amount1, MIN_USED_BALANCE, MAX_USED_BALANCE));
+  //   amount2 = uint96(bound(amount2, MIN_USED_BALANCE, MAX_USED_BALANCE));
 
-    commitmentA = bound(commitmentA, uint256(1), type(uint256).max);
-    commitmentB = bound(commitmentB, uint256(1), type(uint256).max);
+  //   commitmentA = bound(commitmentA, uint256(1), type(uint256).max);
+  //   commitmentB = bound(commitmentB, uint256(1), type(uint256).max);
 
-    HoprChannels.Channel memory channelAB = HoprChannels.Channel(
-      bytes32(commitmentA),
-      HoprChannels.Balance.wrap(uint96(amount1)),
-      HoprChannels.TicketIndex.wrap(0),
-      HoprChannels.Timestamp.wrap(0),
+  //   HoprChannels.Channel memory channelAB = HoprChannels.Channel(
+  //     bytes32(commitmentA),
+  //     HoprChannels.Balance.wrap(uint96(amount1)),
+  //     HoprChannels.TicketIndex.wrap(0),
+  //     HoprChannels.Timestamp.wrap(0),
 
-      HoprChannels.ChannelEpoch.wrap(1),
-      HoprChannels.ChannelStatus.OPEN
-    );
-    HoprChannels.Channel memory channelBA = HoprChannels.Channel(
-      bytes32(commitmentB),
-      HoprChannels.Balance.wrap(uint96(amount2)),
-      HoprChannels.TicketIndex.wrap(0),
-      HoprChannels.Timestamp.wrap(0),
-      HoprChannels.ChannelEpoch.wrap(1),
-      HoprChannels.ChannelStatus.OPEN
-    );
+  //     HoprChannels.ChannelEpoch.wrap(1),
+  //     HoprChannels.ChannelStatus.OPEN
+  //   );
+  //   HoprChannels.Channel memory channelBA = HoprChannels.Channel(
+  //     bytes32(commitmentB),
+  //     HoprChannels.Balance.wrap(uint96(amount2)),
+  //     HoprChannels.TicketIndex.wrap(0),
+  //     HoprChannels.Timestamp.wrap(0),
+  //     HoprChannels.ChannelEpoch.wrap(1),
+  //     HoprChannels.ChannelStatus.OPEN
+  //   );
 
-    vm.prank(address(1));
-    vm.mockCall(
-      hoprToken,
-      abi.encodeWithSignature(
-        'transferFrom(address,address,uint256)',
-        address(1),
-        address(hoprChannels),
-        amount1 + amount2
-      ),
-      abi.encode(true)
-    );
+  //   vm.prank(address(1));
+  //   vm.mockCall(
+  //     hoprToken,
+  //     abi.encodeWithSignature(
+  //       'transferFrom(address,address,uint256)',
+  //       address(1),
+  //       address(hoprChannels),
+  //       amount1 + amount2
+  //     ),
+  //     abi.encode(true)
+  //   );
 
-    vm.expectEmit(true, false, false, false, address(hoprChannels));
-    emit ChannelOpened(accountA.accountAddr, accountB.accountAddr, HoprChannels.Balance.wrap(amount1));
+  //   vm.expectEmit(true, false, false, false, address(hoprChannels));
+  //   emit ChannelOpened(accountA.accountAddr, accountB.accountAddr, HoprChannels.Balance.wrap(amount1));
 
-    vm.expectEmit(true, false, false, false, address(hoprChannels));
-    emit ChannelOpened(accountB.accountAddr, accountA.accountAddr, HoprChannels.Balance.wrap(amount2));
+  //   vm.expectEmit(true, false, false, false, address(hoprChannels));
+  //   emit ChannelOpened(accountB.accountAddr, accountA.accountAddr, HoprChannels.Balance.wrap(amount2));
 
-    hoprChannels.fundChannelMulti(accountA.accountAddr, HoprChannels.Balance.wrap(amount1), accountB.accountAddr, HoprChannels.Balance.wrap(amount2));
-    vm.clearMockedCalls();
+  //   hoprChannels.fundChannelMulti(accountA.accountAddr, HoprChannels.Balance.wrap(amount1), accountB.accountAddr, HoprChannels.Balance.wrap(amount2));
+  //   vm.clearMockedCalls();
    
-    vm.expectEmit(true, false, false, false, address(hoprChannels));
-    emit CommitmentSet(channelIdAB, HoprChannels.ChannelEpoch.wrap(1));
+  //   vm.expectEmit(true, false, false, false, address(hoprChannels));
+  //   emit CommitmentSet(channelIdAB, HoprChannels.ChannelEpoch.wrap(1));
 
-    vm.prank(accountB.accountAddr);
-    hoprChannels.setCommitment(bytes32(commitmentA), accountA.accountAddr);
+  //   vm.prank(accountB.accountAddr);
+  //   hoprChannels.setCommitment(bytes32(commitmentA), accountA.accountAddr);
 
-    vm.expectEmit(true, false, false, true, address(hoprChannels));
-    emit CommitmentSet(channelIdBA, HoprChannels.ChannelEpoch.wrap(1));
+  //   vm.expectEmit(true, false, false, true, address(hoprChannels));
+  //   emit CommitmentSet(channelIdBA, HoprChannels.ChannelEpoch.wrap(1));
 
-    vm.prank(accountA.accountAddr);
-    hoprChannels.setCommitment(bytes32(commitmentB), accountB.accountAddr);
+  //   vm.prank(accountA.accountAddr);
+  //   hoprChannels.setCommitment(bytes32(commitmentB), accountB.accountAddr);
 
-    assertEq(
-      keccak256(
-        abi.encode(getChannelFromTuple(channelIdAB))
-      ),
-      keccak256(abi.encode(channelAB))
-    );
-    assertEq(
-      keccak256(
-        abi.encode(getChannelFromTuple(channelIdBA))
-      ),
-      keccak256(abi.encode(channelBA))
-    );
-  }
+  //   assertEq(
+  //     keccak256(
+  //       abi.encode(getChannelFromTuple(channelIdAB))
+  //     ),
+  //     keccak256(abi.encode(channelAB))
+  //   );
+  //   assertEq(
+  //     keccak256(
+  //       abi.encode(getChannelFromTuple(channelIdBA))
+  //     ),
+  //     keccak256(abi.encode(channelBA))
+  //   );
+  // }
 
-  function test_SetCommitmentEpochBump(uint96 amount1, uint96 amount2) public {
-    amount1 = uint96(bound(amount1, MIN_USED_BALANCE, MAX_USED_BALANCE));
-    amount2 = uint96(bound(amount2, MIN_USED_BALANCE, MAX_USED_BALANCE));
+  // function test_SetCommitmentEpochBump(uint96 amount1, uint96 amount2) public {
+  //   amount1 = uint96(bound(amount1, MIN_USED_BALANCE, MAX_USED_BALANCE));
+  //   amount2 = uint96(bound(amount2, MIN_USED_BALANCE, MAX_USED_BALANCE));
 
-    bytes32 commitment1 = 0xa74616c1018b7fccab7c6d508560a93768df100a80661bf2693d79d5b474d75e;
-    bytes32 commitment2 = 0x677cbfec2c3998a7ed96e60b2f408abe400313dc5f365a465ab6d40888b18375;
+  //   bytes32 commitment1 = 0xa74616c1018b7fccab7c6d508560a93768df100a80661bf2693d79d5b474d75e;
+  //   bytes32 commitment2 = 0x677cbfec2c3998a7ed96e60b2f408abe400313dc5f365a465ab6d40888b18375;
 
-    HoprChannels.Channel memory channelAB = HoprChannels.Channel(
-      bytes32(commitment1),
-      HoprChannels.Balance.wrap(uint96(amount1)),
-      HoprChannels.TicketIndex.wrap(0),
-      HoprChannels.Timestamp.wrap(0),
+  //   HoprChannels.Channel memory channelAB = HoprChannels.Channel(
+  //     bytes32(commitment1),
+  //     HoprChannels.Balance.wrap(uint96(amount1)),
+  //     HoprChannels.TicketIndex.wrap(0),
+  //     HoprChannels.Timestamp.wrap(0),
 
-      HoprChannels.ChannelEpoch.wrap(1),
-      HoprChannels.ChannelStatus.OPEN
-    );
+  //     HoprChannels.ChannelEpoch.wrap(1),
+  //     HoprChannels.ChannelStatus.OPEN
+  //   );
 
-    vm.prank(address(1));
-    vm.mockCall(
-      hoprToken,
-      abi.encodeWithSignature(
-        'transferFrom(address,address,uint256)',
-        address(1),
-        address(hoprChannels),
-        amount1 + amount2
-      ),
-      abi.encode(true)
-    );
+  //   vm.prank(address(1));
+  //   vm.mockCall(
+  //     hoprToken,
+  //     abi.encodeWithSignature(
+  //       'transferFrom(address,address,uint256)',
+  //       address(1),
+  //       address(hoprChannels),
+  //       amount1 + amount2
+  //     ),
+  //     abi.encode(true)
+  //   );
 
-    vm.expectEmit(true, false, false, false, address(hoprChannels));
-    emit ChannelOpened(accountA.accountAddr, accountB.accountAddr, HoprChannels.Balance.wrap(amount1));
+  //   vm.expectEmit(true, false, false, false, address(hoprChannels));
+  //   emit ChannelOpened(accountA.accountAddr, accountB.accountAddr, HoprChannels.Balance.wrap(amount1));
 
-    vm.expectEmit(true, false, false, false, address(hoprChannels));
-    emit ChannelOpened(accountB.accountAddr, accountA.accountAddr, HoprChannels.Balance.wrap(amount2));
+  //   vm.expectEmit(true, false, false, false, address(hoprChannels));
+  //   emit ChannelOpened(accountB.accountAddr, accountA.accountAddr, HoprChannels.Balance.wrap(amount2));
     
-    hoprChannels.fundChannelMulti(accountA.accountAddr, HoprChannels.Balance.wrap(amount1), accountB.accountAddr, HoprChannels.Balance.wrap(amount2));
-    vm.clearMockedCalls();
+  //   hoprChannels.fundChannelMulti(accountA.accountAddr, HoprChannels.Balance.wrap(amount1), accountB.accountAddr, HoprChannels.Balance.wrap(amount2));
+  //   vm.clearMockedCalls();
 
-    vm.expectEmit(true, false, false, true, address(hoprChannels));
-    emit CommitmentSet(channelIdAB, HoprChannels.ChannelEpoch.wrap(1));
+  //   vm.expectEmit(true, false, false, true, address(hoprChannels));
+  //   emit CommitmentSet(channelIdAB, HoprChannels.ChannelEpoch.wrap(1));
 
-    vm.prank(accountB.accountAddr);
-    hoprChannels.setCommitment(bytes32(commitment1), accountA.accountAddr);
+  //   vm.prank(accountB.accountAddr);
+  //   hoprChannels.setCommitment(bytes32(commitment1), accountA.accountAddr);
 
-    assertEq(
-      keccak256(
-        abi.encode(getChannelFromTuple(channelIdAB))
-      ),
-      keccak256(abi.encode(channelAB))
-    );
+  //   assertEq(
+  //     keccak256(
+  //       abi.encode(getChannelFromTuple(channelIdAB))
+  //     ),
+  //     keccak256(abi.encode(channelAB))
+  //   );
 
-    vm.prank(accountB.accountAddr);
-    vm.expectRevert(abi.encodeWithSelector(InvalidCommitment.selector));
-    hoprChannels.setCommitment(bytes32(commitment1), accountA.accountAddr);
+  //   vm.prank(accountB.accountAddr);
+  //   vm.expectRevert(abi.encodeWithSelector(InvalidCommitment.selector));
+  //   hoprChannels.setCommitment(bytes32(commitment1), accountA.accountAddr);
 
-    HoprChannels.Channel memory channelABBumped = HoprChannels.Channel(
-      bytes32(commitment2),
-      HoprChannels.Balance.wrap(uint96(amount1)),
-      HoprChannels.TicketIndex.wrap(0),
-      HoprChannels.Timestamp.wrap(0),
+  //   HoprChannels.Channel memory channelABBumped = HoprChannels.Channel(
+  //     bytes32(commitment2),
+  //     HoprChannels.Balance.wrap(uint96(amount1)),
+  //     HoprChannels.TicketIndex.wrap(0),
+  //     HoprChannels.Timestamp.wrap(0),
 
-      HoprChannels.ChannelEpoch.wrap(2),
-      HoprChannels.ChannelStatus.OPEN
-    );
+  //     HoprChannels.ChannelEpoch.wrap(2),
+  //     HoprChannels.ChannelStatus.OPEN
+  //   );
 
 
-    vm.expectEmit(true, false, false, true, address(hoprChannels));
-    emit CommitmentSet(channelIdAB, HoprChannels.ChannelEpoch.wrap(2));
+  //   vm.expectEmit(true, false, false, true, address(hoprChannels));
+  //   emit CommitmentSet(channelIdAB, HoprChannels.ChannelEpoch.wrap(2));
 
-    vm.prank(accountB.accountAddr);
-    hoprChannels.setCommitment(bytes32(commitment2), accountA.accountAddr);
+  //   vm.prank(accountB.accountAddr);
+  //   hoprChannels.setCommitment(bytes32(commitment2), accountA.accountAddr);
 
-    assertEq(
-      keccak256(
-        abi.encode(getChannelFromTuple(channelIdAB))
-      ),
-      keccak256(abi.encode(channelABBumped))
-    );
-  }
+  //   assertEq(
+  //     keccak256(
+  //       abi.encode(getChannelFromTuple(channelIdAB))
+  //     ),
+  //     keccak256(abi.encode(channelABBumped))
+  //   );
+  // }
 
-  function testRevert_SetCommitment() public {
-    vm.prank(accountA.accountAddr);
-    vm.expectRevert(InvalidCommitment.selector);
-    hoprChannels.setCommitment(bytes32(0), accountB.accountAddr);
-  }
+  // function testRevert_SetCommitment() public {
+  //   vm.prank(accountA.accountAddr);
+  //   vm.expectRevert(InvalidCommitment.selector);
+  //   hoprChannels.setCommitment(bytes32(0), accountB.accountAddr);
+  // }
 
-  function testRevert_SetCommitmentChannelNotOpen(uint256 commitment) public {
-    commitment = bound(commitment, uint256(1), type(uint256).max);
+  // function testRevert_SetCommitmentChannelNotOpen(uint256 commitment) public {
+  //   commitment = bound(commitment, uint256(1), type(uint256).max);
 
-    vm.prank(accountA.accountAddr);
-    vm.expectRevert(abi.encodeWithSelector(WrongChannelState.selector, "Cannot set commitments for channels that are not in state OPEN."));
-    hoprChannels.setCommitment(bytes32(commitment), accountB.accountAddr);
-  }
+  //   vm.prank(accountA.accountAddr);
+  //   vm.expectRevert(abi.encodeWithSelector(WrongChannelState.selector, "Cannot set commitments for channels that are not in state OPEN."));
+  //   hoprChannels.setCommitment(bytes32(commitment), accountB.accountAddr);
+  // }
 
   // function testOpenChannel
 

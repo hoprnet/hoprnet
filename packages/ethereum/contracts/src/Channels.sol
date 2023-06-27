@@ -205,12 +205,14 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprLe
    * @param _token HoprToken address
    * @param _noticePeriodChannelClosure seconds until a channel can be closed
    */
-  constructor(address _token, Timestamp _noticePeriodChannelClosure) {
+  constructor(address _token, Timestamp _noticePeriodChannelClosure, HoprNodeSafeRegistry safeRegistry) {
     if (Timestamp.unwrap(_noticePeriodChannelClosure) == 0) {
       revert InvalidNoticePeriod();
     }
 
     require(_token != address(0), 'token must not be empty');
+
+    setNodeSafeRegistry(safeRegistry);
 
     token = IERC20(_token);
     noticePeriodChannelClosure = _noticePeriodChannelClosure;
@@ -252,44 +254,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprLe
       revert BalanceExceedsGlobalPerChannelAllowance();
     }
     _;
-  }
-
-  /**
-   * Funds and thereby opens a channel from
-   * - `account1` -> `account2` with `amount1` tokens
-   * - `account2` -> `account1` with `amount2` tokens
-   *
-   * Used for testing and with ERC777.tokensReceived() method.
-   *
-   * @param account1 address of account1
-   * @param amount1 amount to fund for channel `account1` -> `account2`
-   * @param account2 address of account2
-   * @param amount2 amount to fund for channel `account2` -> `account1`
-   */
-  function fundChannelMulti(
-    address account1,
-    Balance amount1,
-    address account2,
-    Balance amount2
-  ) external {
-    // pull tokens from funder and handle result
-    if (token.transferFrom(msg.sender, address(this), Balance.unwrap(amount1) + Balance.unwrap(amount2)) != true) {
-      // sth. went wrong, we need to revert here
-      revert TokenTransferFailed();
-    }
-
-    // fund channel in direction of: account1 -> account2
-    if (Balance.unwrap(amount1) > 0) {
-      _fundChannel(account1, account2, amount1);
-    }
-    // fund channel in direction of: account2 -> account1
-    if (Balance.unwrap(amount2) > 0) {
-      _fundChannel(account2, account1, amount2);
-    }
-
-    if (Balance.unwrap(amount1) == 0 && Balance.unwrap(amount2) == 0) {
-      revert InvalidBalance();
-    }
   }
 
   function redeemTicketSafe(address self, RedeemableTicket calldata redeemable) external HoprMultiSig.onlySafe(self) {
