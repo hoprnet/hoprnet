@@ -20,9 +20,6 @@ wasm = [ "dep:wasm-bindgen" ]
 thiserror = "1.0"
 wasm-bindgen = { workspace = true, optional = true }
 
-[dev-dependencies]
-wasm-bindgen-test = "0.3.36"
-
 [target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
 wasm-pack = { workspace = true }
 wasm-opt = { workspace = true }

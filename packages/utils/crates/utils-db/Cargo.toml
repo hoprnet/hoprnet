@@ -46,5 +46,6 @@ wasm-opt = false
 wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
-default = ["wasm"]
-wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:serde-wasm-bindgen", "dep:js-sys", "dep:gloo-timers", "dep:console_error_panic_hook", "utils-log/wasm", "utils-types/wasm"]
+default = ["console_error_panic_hook", "wasm"]
+wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:serde-wasm-bindgen", "dep:js-sys", "dep:gloo-timers", "utils-log/wasm", "utils-types/wasm"]
+console_error_panic_hook = ["dep:console_error_panic_hook"]

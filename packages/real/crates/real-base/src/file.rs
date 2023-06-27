@@ -41,6 +41,7 @@ pub mod native {
 pub mod wasm {
     use crate::error::{RealError, Result};
     use wasm_bindgen::prelude::*;
+    use wasm_bindgen::JsValue;
 
     #[wasm_bindgen(module = "node:fs")]
     extern "C" {

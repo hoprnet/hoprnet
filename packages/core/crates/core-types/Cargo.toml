@@ -35,5 +35,6 @@ wasm-opt = false
 wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
-default = ["wasm"]
-wasm = ["dep:js-sys", "dep:wasm-bindgen", "dep:console_error_panic_hook", "core-crypto/wasm", "utils-misc/wasm", "utils-types/wasm" ]
+default = ["wasm", "console_error_panic_hook"]
+wasm = ["dep:js-sys", "dep:wasm-bindgen", "core-crypto/wasm", "utils-misc/wasm", "utils-types/wasm" ]
+console_error_panic_hook = ["dep:console_error_panic_hook"]
