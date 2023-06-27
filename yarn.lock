@@ -1913,6 +1913,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/node@npm:18":
+  version: 18.16.18
+  resolution: "@types/node@npm:18.16.18"
+  checksum: d32d8a0a04cd3f5ecb361bcb42f3a07623881ac90d680e06bf626defb3c663a94860d11690babe607cfe67265eceeb8a59ba5fe40c0e49f5a1b01e0088640469
+  languageName: node
+  linkType: hard
+
 "@types/request@npm:^2.48.7":
   version: 2.48.8
   resolution: "@types/request@npm:2.48.8"
@@ -4322,7 +4329,7 @@ __metadata:
   resolution: "hoprnet@workspace:."
   dependencies:
     "@ethersproject/cli": 5.7.0
-    "@types/node": 16
+    "@types/node": 18
     "@types/yargs": ^17.0.23
     prettier: 2.8.8
     ts-node: 10.9.1
