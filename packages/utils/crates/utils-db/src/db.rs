@@ -1,7 +1,6 @@
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
 
-use async_lock::RwLock;
 use futures_lite::stream::StreamExt;
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -103,25 +102,23 @@ impl Deref for Key {
 }
 
 pub struct DB<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> {
-    backend: RwLock<T>,
+    backend: T,
 }
 
 impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
     pub fn new(backend: T) -> Self {
         Self {
-            backend: RwLock::new(backend),
+            backend,
         }
     }
 
     pub async fn contains(&self, key: Key) -> bool {
-        let db = self.backend.read().await;
-        db.contains(key.into()).await
+        self.backend.contains(key.into()).await
     }
 
     pub async fn get<V: DeserializeOwned>(&self, key: Key) -> Result<V> {
         let key: T::Key = key.into();
-        let db = self.backend.read().await;
-        db.get(key.into()).await.and_then(|v| {
+        self.backend.get(key.into()).await.and_then(|v| {
             bincode::deserialize(v.as_ref())
                 .map_err(|e| DbError::DeserializationError(format!("during get operation: {}", e.to_string().as_str())))
         })
@@ -130,9 +127,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
     pub async fn get_or_none<V: DeserializeOwned>(&self, key: Key) -> Result<Option<V>> {
         let key: T::Key = key.into();
 
-        let db = self.backend.read().await;
-        if db.contains(key.clone()).await {
-            db.get(key.into())
+        if self.backend.contains(key.clone()).await {
+            self.backend.get(key.into())
                 .await
                 .and_then(|v| {
                     bincode::deserialize(v.as_ref()).map_err(|e| {
@@ -154,8 +150,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
             .map_err(|e| DbError::SerializationError(e.to_string()))?
             .into_boxed_slice();
 
-        let mut db = self.backend.write().await;
-        match db.set(key, value).await? {
+        match self.backend.set(key, value).await? {
             Some(v) => bincode::deserialize(v.as_ref()).map(|v| Some(v)).map_err(|e| {
                 DbError::DeserializationError(format!("during set operation: {}", e.to_string().as_str()))
             }),
@@ -166,8 +161,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
     pub async fn remove<V: DeserializeOwned>(&mut self, key: Key) -> Result<Option<V>> {
         let key: T::Key = key.into();
 
-        let mut db = self.backend.write().await;
-        match db.remove(key).await? {
+        match self.backend.remove(key).await? {
             Some(v) => bincode::deserialize(v.as_ref()).map(|v| Some(v)).map_err(|e| {
                 DbError::DeserializationError(format!("during remove operation: {}", e.to_string().as_str()))
             }),
@@ -183,8 +177,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
     ) -> Result<Vec<V>> {
         let mut output = Vec::new();
 
-        let db = self.backend.read().await;
-        let mut data_stream = Box::into_pin(db.iterate(prefix, suffix_size)?);
+        let mut data_stream = Box::into_pin(self.backend.iterate(prefix, suffix_size)?);
 
         // fail fast for the first value that cannot be deserialized
         while let Some(value) = data_stream.next().await {
@@ -200,8 +193,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
     }
 
     pub async fn batch(&mut self, batch: Batch, wait_for_write: bool) -> Result<()> {
-        let mut db = self.backend.write().await;
-        db.batch(batch.ops, wait_for_write).await
+        self.backend.batch(batch.ops, wait_for_write).await
     }
 }
 
