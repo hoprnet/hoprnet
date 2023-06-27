@@ -25,7 +25,7 @@ let
     (rust-bin.fromRustupToolchainFile ./rust-toolchain.toml)
     protobuf # v3.21.12
     pkgs-dev.wasm-pack # v0.11.1
-    pkgs-dev.binaryen # v112 (includes wasm-opt)
+    pkgs-dev.binaryen # v113 (includes wasm-opt)
     wasm-bindgen-cli # v0.2.83
     pkg-config
 
