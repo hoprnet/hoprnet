@@ -59,6 +59,7 @@ pub struct ChainOptions {
     pub tags: Option<Vec<String>>,
 }
 
+// duplicate due to issue of wasm_bindgen with proc macros on struct properties
 #[cfg(feature = "wasm")]
 #[derive(Deserialize, Serialize, Clone)]
 #[serde(deny_unknown_fields)]
@@ -117,6 +118,7 @@ pub struct Network {
     pub stake_season: Option<u32>,
 }
 
+// duplicate due to issue of wasm_bindgen with proc macros on struct properties
 #[cfg(feature = "wasm")]
 #[derive(Deserialize, Serialize, Clone)]
 #[serde(deny_unknown_fields)]
