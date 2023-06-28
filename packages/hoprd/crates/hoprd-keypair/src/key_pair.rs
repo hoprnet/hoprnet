@@ -35,6 +35,9 @@ const HOPR_KDF_PARAMS_P: u32 = 1u32;
 const PACKET_KEY_LENGTH: usize = 32;
 const CHAIN_KEY_LENGTH: usize = 32;
 
+const V1_PRIVKEY_LENGTH: usize = 32;
+const V2_PRIVKEYS_LENGTH: usize = 172;
+
 pub type PacketKey = [u8; PACKET_KEY_LENGTH];
 pub type ChainKey = [u8; CHAIN_KEY_LENGTH];
 
@@ -108,13 +111,15 @@ impl Serialize for HoprKeys {
 
 impl std::fmt::Display for HoprKeys {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "packet_key: {}, chain_key: {} (Ethereum address: {})\nUUID: {}",
-            self.packet_key.1.to_peerid_str(),
-            self.chain_key.1.to_peerid_str(),
-            self.chain_key.1.to_address(),
-            self.id.to_string()
+        f.write_str(
+            format!(
+                "packet_key: {}, chain_key: {} (Ethereum address: {})\nUUID: {}",
+                self.packet_key.1.to_peerid_str(),
+                self.chain_key.1.to_peerid_str(),
+                self.chain_key.1.to_address(),
+                self.id.to_string()
+            )
+            .as_str(),
         )
     }
 }
@@ -330,14 +335,14 @@ impl HoprKeys {
         let mut pk = keystore.crypto.ciphertext;
 
         match pk.len() {
-            32 => {
+            V1_PRIVKEY_LENGTH => {
                 decryptor.apply_keystream(&mut pk);
 
                 let mut packet_key = [0u8; PACKET_KEY_LENGTH];
                 getrandom(&mut packet_key)?;
 
-                let mut chain_key = [0u8; 32];
-                chain_key.clone_from_slice(&pk.as_slice()[0..32]);
+                let mut chain_key = [0u8; CHAIN_KEY_LENGTH];
+                chain_key.clone_from_slice(&pk.as_slice()[0..CHAIN_KEY_LENGTH]);
 
                 Ok((
                     HoprKeys {
@@ -348,7 +353,7 @@ impl HoprKeys {
                     true,
                 ))
             }
-            172 => {
+            V2_PRIVKEYS_LENGTH => {
                 decryptor.apply_keystream(&mut pk);
 
                 let private_keys = serde_json::from_slice::<PrivateKeys>(&pk)?;
@@ -386,7 +391,7 @@ impl HoprKeys {
             _ => {
                 return Err(KeyPairError::InvalidEncryptedKeyLength {
                     actual: pk.len(),
-                    expected: PACKET_KEY_LENGTH + CHAIN_KEY_LENGTH,
+                    expected: V2_PRIVKEYS_LENGTH,
                 });
             }
         }
@@ -475,11 +480,13 @@ impl Debug for HoprKeys {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
+    use super::IdentityOptions;
     use js_sys::{Promise, Uint8Array};
     use utils_types::traits::PeerIdLike;
     use wasm_bindgen::prelude::*;
 
-    use super::IdentityOptions;
+    const SECP256K1_PEERID_LENGTH: usize = 37;
+    const ED25519_PEERID_LENGTH: usize = 36;
 
     #[wasm_bindgen(module = "@libp2p/peer-id")]
     extern "C" {
@@ -512,14 +519,14 @@ pub mod wasm {
 
         #[wasm_bindgen(getter, js_name = "packetKeyPeerId")]
         pub fn get_packet_key_peer_id(&self) -> Promise {
-            let mut sliced = [0u8; 36];
+            let mut sliced = [0u8; ED25519_PEERID_LENGTH];
             sliced.copy_from_slice(&self.w.packet_key.1.to_peerid().to_bytes()[2..]);
             peer_id_from_keys(Box::new(sliced), Box::new(self.w.packet_key.0))
         }
 
         #[wasm_bindgen(getter, js_name = "chainKeyPeerId")]
         pub fn get_chain_key_peer_id(&self) -> Promise {
-            let mut sliced = [0u8; 37];
+            let mut sliced = [0u8; SECP256K1_PEERID_LENGTH];
             sliced.copy_from_slice(&self.w.chain_key.1.to_peerid().to_bytes()[2..]);
 
             peer_id_from_keys(Box::new(sliced), Box::new(self.w.chain_key.0))
