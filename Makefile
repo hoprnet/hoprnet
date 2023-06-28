@@ -339,10 +339,6 @@ else
 	./scripts/build-docker.sh --local --force -i $(image)
 endif
 
-.PHONY: docker-build-gcb
-docker-build-gcb: ## build Docker images on Google Cloud Build
-	./scripts/build-docker.sh --no-tags --force
-
 .PHONY: request-funds
 request-funds: ensure-environment-and-network-are-set
 request-funds: ## Request 1000 xHOPR tokens for the recipient

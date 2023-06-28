@@ -206,7 +206,7 @@ function install_node_js() {
     if ! command -v node || [[ ! "$(node -v)" =~ ^v${node_js_version}\..+$ ]]; then
         cd ${download_dir}
         # Downloads Node.js version specified in `.nvmrc` file
-        echo "Installing Node.js v${node_js_version}"
+        echo "Installing NodeJS v${node_js_version}"
         local node_release=$(curl 'https://unofficial-builds.nodejs.org/download/release/index.json' | jq -r "[.[] | .version | select(. | startswith(\"v${node_js_version}\"))][0]")
         # using linux x64 builds by default
         local node_download_url="https://nodejs.org/download/release/${node_release}/node-${node_release}-linux-x64.tar.xz"
@@ -215,7 +215,7 @@ function install_node_js() {
             node_download_url="https://unofficial-builds.nodejs.org/download/release/${node_release}/node-${node_release}-linux-x64-musl.tar.xz"
         fi
         curl -fsSL --compressed "${node_download_url}" > node.tar.xz
-        # ensure older installations are uninstalled first
+        echo "Ensure older NodeJS installations are removed"
         rm -rf \
           /usr/local/bin/node \
           /usr/local/bin/npx \
@@ -226,6 +226,7 @@ function install_node_js() {
           /usr/local/share/man/man1/node.1 \
           /usr/local/include/node \
           /usr/local/lib/node_modules
+        echo "Unpack NodeJS"
         tar -xJf node.tar.xz -C ${usr_local} \
           --strip-components=1 --no-same-owner \
           --exclude README.md \
@@ -287,7 +288,9 @@ echo "================================"
 echo ""
 command -v rustc >/dev/null && rustc --version
 command -v cargo >/dev/null && cargo --version
-command -v wasm-pack >/dev/null && wasm-pack --version
+# disabled check until v0.12.1, see
+# https://github.com/rustwasm/wasm-pack/pull/1305
+# command -v wasm-pack >/dev/null && wasm-pack --version
 command -v wasm-opt >/dev/null && wasm-opt --version
 command -v node >/dev/null && echo "node $(node --version)"
 command -v yarn >/dev/null && echo "yarn $(yarn --version)"
