@@ -40,6 +40,7 @@
 <a href="LevelDb.html#close" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>close</span></a>
 <a href="LevelDb.html#dump" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>dump</span></a>
 <a href="LevelDb.html#get" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>get</span></a>
+<a href="LevelDb.html#getNetworkId" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>get<wbr/>Network<wbr/>Id</span></a>
 <a href="LevelDb.html#has" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>has</span></a>
 <a href="LevelDb.html#init" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>init</span></a>
 <a href="LevelDb.html#iter" class="tsd-index-link tsd-is-protected"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>iter</span></a>
@@ -47,6 +48,8 @@
 <a href="LevelDb.html#maybeGet" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>maybe<wbr/>Get</span></a>
 <a href="LevelDb.html#put" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>put</span></a>
 <a href="LevelDb.html#remove" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>remove</span></a>
+<a href="LevelDb.html#setNetworkId" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>set<wbr/>Network<wbr/>Id</span></a>
+<a href="LevelDb.html#verifyNetworkId" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>verify<wbr/>Network<wbr/>Id</span></a>
 </div></section></div></details></section></section>
 <section class="tsd-panel-group tsd-member-group">
 <h2>Constructors</h2>
@@ -78,10 +81,10 @@
 <li>
 <h5><span class="tsd-kind-parameter">ops</span>: <span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">[]</span></h5></li>
 <li>
-<h5><span class="tsd-kind-parameter">wait_for_write</span>: <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol"> = false</span></h5></li></ul></div>
+<h5><span class="tsd-kind-parameter">wait_for_write</span>: <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol"> = true</span></h5></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L198">utils/src/db/db.ts:198</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L197">utils/src/db/db.ts:197</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member"><a id="close" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>close</span><a href="#close" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -89,7 +92,7 @@
 <li class="tsd-description">
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L251">utils/src/db/db.ts:251</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L250">utils/src/db/db.ts:250</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member"><a id="dump" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>dump</span><a href="#dump" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -102,7 +105,7 @@
 <h5><span class="tsd-kind-parameter">destFile</span>: <span class="tsd-signature-type">string</span></h5></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L256">utils/src/db/db.ts:256</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L255">utils/src/db/db.ts:255</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member"><a id="get" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>get</span><a href="#get" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -115,7 +118,15 @@
 <h5><span class="tsd-kind-parameter">key</span>: <span class="tsd-signature-type ">Uint8Array</span></h5></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type ">Uint8Array</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L188">utils/src/db/db.ts:188</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L187">utils/src/db/db.ts:187</a></li></ul></aside></li></ul></section>
+<section class="tsd-panel tsd-member"><a id="getNetworkId" class="tsd-anchor"></a>
+<h3 class="tsd-anchor-link"><span>get<wbr/>Network<wbr/>Id</span><a href="#getNetworkId" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li class="tsd-signature tsd-anchor-link" id="getNetworkId.getNetworkId-1"><span class="tsd-kind-call-signature">get<wbr/>Network<wbr/>Id</span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span><a href="#getNetworkId.getNetworkId-1" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
+<li class="tsd-description">
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L289">utils/src/db/db.ts:289</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member"><a id="has" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>has</span><a href="#has" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -128,11 +139,11 @@
 <h5><span class="tsd-kind-parameter">key</span>: <span class="tsd-signature-type ">Uint8Array</span></h5></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L180">utils/src/db/db.ts:180</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L179">utils/src/db/db.ts:179</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member"><a id="init" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>init</span><a href="#init" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures">
-<li class="tsd-signature tsd-anchor-link" id="init.init-1"><span class="tsd-kind-call-signature">init</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">initialize</span>, <span class="tsd-kind-parameter">dbPath</span>, <span class="tsd-kind-parameter">forceCreate</span><span class="tsd-signature-symbol">?</span>, <span class="tsd-kind-parameter">environmentId</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">&gt;</span><a href="#init.init-1" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
+<li class="tsd-signature tsd-anchor-link" id="init.init-1"><span class="tsd-kind-call-signature">init</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">initialize</span>, <span class="tsd-kind-parameter">dbPath</span>, <span class="tsd-kind-parameter">forceCreate</span><span class="tsd-signature-symbol">?</span>, <span class="tsd-kind-parameter">networkId</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">&gt;</span><a href="#init.init-1" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
 <li class="tsd-description">
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
@@ -144,7 +155,7 @@
 <li>
 <h5><span class="tsd-kind-parameter">forceCreate</span>: <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol"> = false</span></h5></li>
 <li>
-<h5><span class="tsd-kind-parameter">environmentId</span>: <span class="tsd-signature-type">string</span></h5></li></ul></div>
+<h5><span class="tsd-kind-parameter">networkId</span>: <span class="tsd-signature-type">string</span></h5></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <ul>
 <li>Defined in <a href="https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L123">utils/src/db/db.ts:123</a></li></ul></aside></li></ul></section>
@@ -162,7 +173,7 @@
 <h5><span class="tsd-kind-parameter">suffixLength</span>: <span class="tsd-signature-type">number</span></h5></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">AsyncIterable</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type ">Uint8Array</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L236">utils/src/db/db.ts:236</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L235">utils/src/db/db.ts:235</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member"><a id="iterValues" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>iter<wbr/>Values</span><a href="#iterValues" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -177,7 +188,7 @@
 <h5><span class="tsd-kind-parameter">suffixLength</span>: <span class="tsd-signature-type">number</span></h5></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">AsyncIterable</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type ">Uint8Array</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L232">utils/src/db/db.ts:232</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L231">utils/src/db/db.ts:231</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member"><a id="maybeGet" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>maybe<wbr/>Get</span><a href="#maybeGet" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -190,7 +201,7 @@
 <h5><span class="tsd-kind-parameter">key</span>: <span class="tsd-signature-type ">Uint8Array</span></h5></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type ">Uint8Array</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L221">utils/src/db/db.ts:221</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L220">utils/src/db/db.ts:220</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member"><a id="put" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>put</span><a href="#put" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -205,7 +216,7 @@
 <h5><span class="tsd-kind-parameter">value</span>: <span class="tsd-signature-type ">Uint8Array</span></h5></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L184">utils/src/db/db.ts:184</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L183">utils/src/db/db.ts:183</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member"><a id="remove" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>remove</span><a href="#remove" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -218,7 +229,33 @@
 <h5><span class="tsd-kind-parameter">key</span>: <span class="tsd-signature-type ">Uint8Array</span></h5></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L194">utils/src/db/db.ts:194</a></li></ul></aside></li></ul></section></section></div>
+<li>Defined in <a href="https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L193">utils/src/db/db.ts:193</a></li></ul></aside></li></ul></section>
+<section class="tsd-panel tsd-member"><a id="setNetworkId" class="tsd-anchor"></a>
+<h3 class="tsd-anchor-link"><span>set<wbr/>Network<wbr/>Id</span><a href="#setNetworkId" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li class="tsd-signature tsd-anchor-link" id="setNetworkId.setNetworkId-1"><span class="tsd-kind-call-signature">set<wbr/>Network<wbr/>Id</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">network_id</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">&gt;</span><a href="#setNetworkId.setNetworkId-1" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
+<li class="tsd-description">
+<div class="tsd-parameters">
+<h4 class="tsd-parameters-title">Parameters</h4>
+<ul class="tsd-parameter-list">
+<li>
+<h5><span class="tsd-kind-parameter">network_id</span>: <span class="tsd-signature-type">string</span></h5></li></ul></div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L285">utils/src/db/db.ts:285</a></li></ul></aside></li></ul></section>
+<section class="tsd-panel tsd-member"><a id="verifyNetworkId" class="tsd-anchor"></a>
+<h3 class="tsd-anchor-link"><span>verify<wbr/>Network<wbr/>Id</span><a href="#verifyNetworkId" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li class="tsd-signature tsd-anchor-link" id="verifyNetworkId.verifyNetworkId-1"><span class="tsd-kind-call-signature">verify<wbr/>Network<wbr/>Id</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">expectedId</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">&gt;</span><a href="#verifyNetworkId.verifyNetworkId-1" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
+<li class="tsd-description">
+<div class="tsd-parameters">
+<h4 class="tsd-parameters-title">Parameters</h4>
+<ul class="tsd-parameter-list">
+<li>
+<h5><span class="tsd-kind-parameter">expectedId</span>: <span class="tsd-signature-type">string</span></h5></li></ul></div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db/db.ts#L293">utils/src/db/db.ts:293</a></li></ul></aside></li></ul></section></section></div>
 <div class="col-sidebar">
 <div class="page-menu">
 <div class="tsd-navigation settings">
@@ -244,13 +281,16 @@
 <li><a href="#close" class=""><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>close</span></a></li>
 <li><a href="#dump" class=""><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>dump</span></a></li>
 <li><a href="#get" class=""><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>get</span></a></li>
+<li><a href="#getNetworkId" class=""><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>get<wbr/>Network<wbr/>Id</span></a></li>
 <li><a href="#has" class=""><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>has</span></a></li>
 <li><a href="#init" class=""><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>init</span></a></li>
 <li><a href="#iter" class="tsd-is-protected"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>iter</span></a></li>
 <li><a href="#iterValues" class=""><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>iter<wbr/>Values</span></a></li>
 <li><a href="#maybeGet" class=""><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>maybe<wbr/>Get</span></a></li>
 <li><a href="#put" class=""><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>put</span></a></li>
-<li><a href="#remove" class=""><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>remove</span></a></li></ul></div></details></div>
+<li><a href="#remove" class=""><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>remove</span></a></li>
+<li><a href="#setNetworkId" class=""><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>set<wbr/>Network<wbr/>Id</span></a></li>
+<li><a href="#verifyNetworkId" class=""><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>verify<wbr/>Network<wbr/>Id</span></a></li></ul></div></details></div>
 <div class="site-menu">
 <nav class="tsd-navigation"><a href="../modules.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><rect fill="var(--color-icon-background)" stroke="var(--color-ts-namespace)" stroke-width="1.5" x="1" y="1" width="22" height="22" rx="6" id="icon-4-path"></rect><path d="M9.33 16V7.24H10.77L13.446 14.74C13.43 14.54 13.41 14.296 13.386 14.008C13.37 13.712 13.354 13.404 13.338 13.084C13.33 12.756 13.326 12.448 13.326 12.16V7.24H14.37V16H12.93L10.266 8.5C10.282 8.692 10.298 8.936 10.314 9.232C10.33 9.52 10.342 9.828 10.35 10.156C10.366 10.476 10.374 10.784 10.374 11.08V16H9.33Z" fill="var(--color-text)" id="icon-4-text"></path></svg><span>@hoprnet/hopr-<wbr/>utils</span></a>
 <ul class="tsd-small-nested-navigation">
@@ -288,7 +328,6 @@
 <li><a href="U256.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-128-path"></use><use href="#icon-128-text"></use></svg><span>U256</span></a></li>
 <li><a href="UnacknowledgedTicket.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-128-path"></use><use href="#icon-128-text"></use></svg><span>Unacknowledged<wbr/>Ticket</span></a></li>
 <li><a href="../interfaces/FIFO.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><rect fill="var(--color-icon-background)" stroke="var(--color-ts-interface)" stroke-width="1.5" x="1" y="1" width="22" height="22" rx="6" id="icon-256-path"></rect><path d="M9.51 16V15.016H11.298V8.224H9.51V7.24H14.19V8.224H12.402V15.016H14.19V16H9.51Z" fill="var(--color-text)" id="icon-256-text"></path></svg><span>FIFO</span></a></li>
-<li><a href="../interfaces/Intermediate.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-256-path"></use><use href="#icon-256-text"></use></svg><span>Intermediate</span></a></li>
 <li><a href="../interfaces/NetOptions.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-256-path"></use><use href="#icon-256-text"></use></svg><span>Net<wbr/>Options</span></a></li>
 <li><a href="../types/AddressSorter.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><rect fill="var(--color-icon-background)" stroke="var(--color-ts-type-alias)" stroke-width="1.5" x="1" y="1" width="22" height="22" rx="6" id="icon-4194304-path"></rect><path d="M11.31 16V8.224H8.91V7.24H14.79V8.224H12.39V16H11.31Z" fill="var(--color-text)" id="icon-4194304-text"></path></svg><span>Address<wbr/>Sorter</span></a></li>
 <li><a href="../types/DeferType.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-4194304-path"></use><use href="#icon-4194304-text"></use></svg><span>Defer<wbr/>Type</span></a></li>
@@ -312,8 +351,6 @@
 <li><a href="../variables/LINK_LOCAL_NETWORKS.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-32-path"></use><use href="#icon-32-text"></use></svg><span>LINK_<wbr/>LOCAL_<wbr/>NETWORKS</span></a></li>
 <li><a href="../variables/LOOPBACK_ADDRS.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-32-path"></use><use href="#icon-32-text"></use></svg><span>LOOPBACK_<wbr/>ADDRS</span></a></li>
 <li><a href="../variables/MAX_AUTO_CHANNELS.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-32-path"></use><use href="#icon-32-text"></use></svg><span>MAX_<wbr/>AUTO_<wbr/>CHANNELS</span></a></li>
-<li><a href="../variables/MAX_RANDOM_BIGINTEGER.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-32-path"></use><use href="#icon-32-text"></use></svg><span>MAX_<wbr/>RANDOM_<wbr/>BIGINTEGER</span></a></li>
-<li><a href="../variables/MAX_RANDOM_INTEGER.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-32-path"></use><use href="#icon-32-text"></use></svg><span>MAX_<wbr/>RANDOM_<wbr/>INTEGER</span></a></li>
 <li><a href="../variables/MINIMUM_REASONABLE_CHANNEL_STAKE.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-32-path"></use><use href="#icon-32-text"></use></svg><span>MINIMUM_<wbr/>REASONABLE_<wbr/>CHANNEL_<wbr/>STAKE</span></a></li>
 <li><a href="../variables/MIN_NATIVE_BALANCE.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-32-path"></use><use href="#icon-32-text"></use></svg><span>MIN_<wbr/>NATIVE_<wbr/>BALANCE</span></a></li>
 <li><a href="../variables/MULTI_ADDR_MAX_LENGTH.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-32-path"></use><use href="#icon-32-text"></use></svg><span>MULTI_<wbr/>ADDR_<wbr/>MAX_<wbr/>LENGTH</span></a></li>
@@ -321,9 +358,9 @@
 <li><a href="../variables/PRIVATE_KEY_LENGTH.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-32-path"></use><use href="#icon-32-text"></use></svg><span>PRIVATE_<wbr/>KEY_<wbr/>LENGTH</span></a></li>
 <li><a href="../variables/PRIVATE_NETWORKS.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-32-path"></use><use href="#icon-32-text"></use></svg><span>PRIVATE_<wbr/>NETWORKS</span></a></li>
 <li><a href="../variables/PRIVATE_V4_CLASS_A.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-32-path"></use><use href="#icon-32-text"></use></svg><span>PRIVATE_<wbr/>V4_<wbr/>CLASS_<wbr/>A</span></a></li>
-<li><a href="../variables/PRIVATE_V4_CLASS_AVADO.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-32-path"></use><use href="#icon-32-text"></use></svg><span>PRIVATE_<wbr/>V4_<wbr/>CLASS_<wbr/>AVADO</span></a></li>
 <li><a href="../variables/PRIVATE_V4_CLASS_B.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-32-path"></use><use href="#icon-32-text"></use></svg><span>PRIVATE_<wbr/>V4_<wbr/>CLASS_<wbr/>B</span></a></li>
 <li><a href="../variables/PRIVATE_V4_CLASS_C.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-32-path"></use><use href="#icon-32-text"></use></svg><span>PRIVATE_<wbr/>V4_<wbr/>CLASS_<wbr/>C</span></a></li>
+<li><a href="../variables/PRIVATE_V4_CLASS_DAPPNODE.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-32-path"></use><use href="#icon-32-text"></use></svg><span>PRIVATE_<wbr/>V4_<wbr/>CLASS_<wbr/>DAPPNODE</span></a></li>
 <li><a href="../variables/PUBLIC_KEY_LENGTH.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-32-path"></use><use href="#icon-32-text"></use></svg><span>PUBLIC_<wbr/>KEY_<wbr/>LENGTH</span></a></li>
 <li><a href="../variables/RESERVED_ADDRS.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-32-path"></use><use href="#icon-32-text"></use></svg><span>RESERVED_<wbr/>ADDRS</span></a></li>
 <li><a href="../variables/SECRET_LENGTH.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-32-path"></use><use href="#icon-32-text"></use></svg><span>SECRET_<wbr/>LENGTH</span></a></li>
@@ -377,7 +414,7 @@
 <li><a href="../functions/ipToU8aAddress.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-64-path"></use><use href="#icon-64-text"></use></svg><span>ip<wbr/>To<wbr/>U8a<wbr/>Address</span></a></li>
 <li><a href="../functions/isAddressWithPeerId.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-64-path"></use><use href="#icon-64-text"></use></svg><span>is<wbr/>Address<wbr/>With<wbr/>Peer<wbr/>Id</span></a></li>
 <li><a href="../functions/isAnyAddress.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-64-path"></use><use href="#icon-64-text"></use></svg><span>is<wbr/>Any<wbr/>Address</span></a></li>
-<li><a href="../functions/isAvadoPrivateNetwork.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-64-path"></use><use href="#icon-64-text"></use></svg><span>is<wbr/>Avado<wbr/>Private<wbr/>Network</span></a></li>
+<li><a href="../functions/isDappnodePrivateNetwork.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-64-path"></use><use href="#icon-64-text"></use></svg><span>is<wbr/>Dappnode<wbr/>Private<wbr/>Network</span></a></li>
 <li><a href="../functions/isErrorOutOfFunds.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-64-path"></use><use href="#icon-64-text"></use></svg><span>is<wbr/>Error<wbr/>Out<wbr/>Of<wbr/>Funds</span></a></li>
 <li><a href="../functions/isErrorOutOfHoprFunds.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-64-path"></use><use href="#icon-64-text"></use></svg><span>is<wbr/>Error<wbr/>Out<wbr/>Of<wbr/>Hopr<wbr/>Funds</span></a></li>
 <li><a href="../functions/isErrorOutOfNativeFunds.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-64-path"></use><use href="#icon-64-text"></use></svg><span>is<wbr/>Error<wbr/>Out<wbr/>Of<wbr/>Native<wbr/>Funds</span></a></li>
@@ -389,7 +426,6 @@
 <li><a href="../functions/isReservedAddress.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-64-path"></use><use href="#icon-64-text"></use></svg><span>is<wbr/>Reserved<wbr/>Address</span></a></li>
 <li><a href="../functions/isSecp256k1PeerId.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-64-path"></use><use href="#icon-64-text"></use></svg><span>is<wbr/>Secp256k1<wbr/>Peer<wbr/>Id</span></a></li>
 <li><a href="../functions/iterableToArray.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-64-path"></use><use href="#icon-64-text"></use></svg><span>iterable<wbr/>To<wbr/>Array</span></a></li>
-<li><a href="../functions/iterateHash.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-64-path"></use><use href="#icon-64-text"></use></svg><span>iterate<wbr/>Hash</span></a></li>
 <li><a href="../functions/libp2pSendMessage.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-64-path"></use><use href="#icon-64-text"></use></svg><span>libp2p<wbr/>Send<wbr/>Message</span></a></li>
 <li><a href="../functions/libp2pSubscribe.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-64-path"></use><use href="#icon-64-text"></use></svg><span>libp2p<wbr/>Subscribe</span></a></li>
 <li><a href="../functions/loadJson.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-64-path"></use><use href="#icon-64-text"></use></svg><span>load<wbr/>Json</span></a></li>
@@ -404,12 +440,10 @@
 <li><a href="../functions/prefixLength.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-64-path"></use><use href="#icon-64-text"></use></svg><span>prefix<wbr/>Length</span></a></li>
 <li><a href="../functions/privKeyToPeerId.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-64-path"></use><use href="#icon-64-text"></use></svg><span>priv<wbr/>Key<wbr/>To<wbr/>Peer<wbr/>Id</span></a></li>
 <li><a href="../functions/pubKeyToPeerId.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-64-path"></use><use href="#icon-64-text"></use></svg><span>pub<wbr/>Key<wbr/>To<wbr/>Peer<wbr/>Id</span></a></li>
-<li><a href="../functions/randomBigInteger.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-64-path"></use><use href="#icon-64-text"></use></svg><span>random<wbr/>Big<wbr/>Integer</span></a></li>
-<li><a href="../functions/randomChoice.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-64-path"></use><use href="#icon-64-text"></use></svg><span>random<wbr/>Choice</span></a></li>
-<li><a href="../functions/randomInteger.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-64-path"></use><use href="#icon-64-text"></use></svg><span>random<wbr/>Integer</span></a></li>
 <li><a href="../functions/randomPermutation.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-64-path"></use><use href="#icon-64-text"></use></svg><span>random<wbr/>Permutation</span></a></li>
 <li><a href="../functions/randomSubset.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-64-path"></use><use href="#icon-64-text"></use></svg><span>random<wbr/>Subset</span></a></li>
-<li><a href="../functions/recoverIteratedHash.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-64-path"></use><use href="#icon-64-text"></use></svg><span>recover<wbr/>Iterated<wbr/>Hash</span></a></li>
+<li><a href="../functions/random_big_integer.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-64-path"></use><use href="#icon-64-text"></use></svg><span>random_<wbr/>big_<wbr/>integer</span></a></li>
+<li><a href="../functions/random_integer.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-64-path"></use><use href="#icon-64-text"></use></svg><span>random_<wbr/>integer</span></a></li>
 <li><a href="../functions/registerMetricsCollector.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-64-path"></use><use href="#icon-64-text"></use></svg><span>register<wbr/>Metrics<wbr/>Collector</span></a></li>
 <li><a href="../functions/retimer.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-64-path"></use><use href="#icon-64-text"></use></svg><span>retimer</span></a></li>
 <li><a href="../functions/retryWithBackoffThenThrow.html"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-64-path"></use><use href="#icon-64-text"></use></svg><span>retry<wbr/>With<wbr/>Backoff<wbr/>Then<wbr/>Throw</span></a></li>
