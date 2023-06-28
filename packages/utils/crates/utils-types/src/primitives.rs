@@ -582,6 +582,7 @@ pub mod wasm {
             self.clone()
         }
 
+        #[wasm_bindgen]
         pub fn size() -> u32 {
             Self::SIZE as u32
         }
@@ -614,6 +615,7 @@ pub mod wasm {
             self.value.to_string()
         }
 
+        #[wasm_bindgen]
         pub fn size() -> u32 {
             Self::SIZE as u32
         }
@@ -646,6 +648,7 @@ pub mod wasm {
             self.clone()
         }
 
+        #[wasm_bindgen]
         pub fn size() -> u32 {
             Self::SIZE as u32
         }
@@ -668,6 +671,7 @@ pub mod wasm {
             self.clone()
         }
 
+        #[wasm_bindgen]
         pub fn size() -> u32 {
             Self::SIZE as u32
         }
@@ -724,6 +728,7 @@ pub mod wasm {
             self.clone()
         }
 
+        #[wasm_bindgen]
         pub fn size() -> u32 {
             Self::SIZE as u32
         }

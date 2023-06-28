@@ -14,9 +14,9 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 # using own fork until the PR was merged
 clap = { git = "https://github.com/hoprnet/clap", branch = "robertkiel/update-env-from", features = ["derive", "env", "string"] }
+console_error_panic_hook = { version = "0.1.7", optional = true }
 hex = "0.4.3"
 js-sys = { version = "0.3.63", optional = true }
-real-base = { path = "../../../real/crates/real-base" }
 proc-macro-regex = "~1.1.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
@@ -30,11 +30,9 @@ core-misc = { path = "../../../core/crates/core-misc", default-features = false 
 core-network = { path = "../../../core/crates/core-network", default-features = false }
 core-strategy = { path = "../../../core/crates/core-strategy", default-features = false }
 core-ethereum-misc = { path = "../../../core-ethereum/crates/core-ethereum-misc", default-features = false }
+real-base = { path = "../../../real/crates/real-base", default-features = false }
 utils-log = { path = "../../../utils/crates/utils-log", default-features = false }
 utils-misc = { path = "../../../utils/crates/utils-misc", default-features = false }
-
-console_error_panic_hook = { version = "0.1.7", optional = true }
-#wee_alloc = { version = "0.4.5", optional = true }
 
 [dev-dependencies]
 tempfile = "3"
@@ -51,5 +49,5 @@ wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
 default = ["console_error_panic_hook", "wasm"]
-wasm = [ "dep:wasm-bindgen", "dep:serde-wasm-bindgen", "dep:js-sys", "core-misc/wasm", "core-network/wasm", "core-strategy/wasm", "core-ethereum-misc/wasm", "utils-log/wasm", "utils-misc/wasm" ]
+wasm = [ "dep:wasm-bindgen", "dep:serde-wasm-bindgen", "dep:js-sys", "core-misc/wasm", "core-network/wasm", "core-strategy/wasm", "core-ethereum-misc/wasm", "real-base/wasm", "utils-log/wasm", "utils-misc/wasm" ]
 console_error_panic_hook = [ "dep:console_error_panic_hook" ]

@@ -967,6 +967,7 @@ name = "core-misc"
 version = "0.1.0"
 dependencies = [
  "console_error_panic_hook",
+ "js-sys",
  "real-base",
  "serde",
  "serde-wasm-bindgen",
@@ -2450,6 +2451,7 @@ dependencies = [
  "log",
  "serde",
  "serde_json",
+ "tempfile",
  "thiserror",
  "utils-types",
 ]

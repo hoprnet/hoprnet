@@ -17,6 +17,7 @@ use utils_db::{
     traits::AsyncKVStorage,
 };
 use utils_types::primitives::{Address, Balance, BalanceType, EthereumChallenge, Snapshot, U256};
+use utils_types::traits::BinarySerializable;
 
 use crate::errors::Result;
 use crate::traits::HoprCoreEthereumDbActions;
@@ -75,7 +76,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             .db
             .get_more::<AcknowledgedTicket>(
                 Vec::from(ACKNOWLEDGED_TICKETS_PREFIX.as_bytes()).into_boxed_slice(),
-                EthereumChallenge::size(),
+                EthereumChallenge::SIZE as u32,
                 &|v: &AcknowledgedTicket| v.signer.eq(signer),
             )
             .await?
@@ -88,7 +89,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             .db
             .get_more::<PendingAcknowledgement>(
                 Vec::from(PENDING_ACKNOWLEDGEMENTS_PREFIX.as_bytes()).into_boxed_slice(),
-                HalfKeyChallenge::size(),
+                HalfKeyChallenge::SIZE as u32,
                 &move |v: &PendingAcknowledgement| match v {
                     PendingAcknowledgement::WaitingAsSender => false,
                     PendingAcknowledgement::WaitingAsRelayer(unack) => unack.signer.eq(signer),
@@ -186,7 +187,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         self.db
             .get_more::<AcknowledgedTicket>(
                 Vec::from(ACKNOWLEDGED_TICKETS_PREFIX.as_bytes()).into_boxed_slice(),
-                EthereumChallenge::size(),
+                EthereumChallenge::SIZE as u32,
                 &|ack: &AcknowledgedTicket| {
                     if filter.is_none() {
                         true
@@ -336,14 +337,14 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
 
     async fn get_channels(&self) -> Result<Vec<ChannelEntry>> {
         self.db
-            .get_more::<ChannelEntry>(Box::from(CHANNEL_PREFIX.as_bytes()), Hash::size(), &|_| true)
+            .get_more::<ChannelEntry>(Box::from(CHANNEL_PREFIX.as_bytes()), Hash::SIZE as u32, &|_| true)
             .await
     }
 
     async fn get_channels_open(&self) -> Result<Vec<ChannelEntry>> {
         Ok(self
             .db
-            .get_more::<ChannelEntry>(Box::from(CHANNEL_PREFIX.as_bytes()), Hash::size(), &|_| true)
+            .get_more::<ChannelEntry>(Box::from(CHANNEL_PREFIX.as_bytes()), Hash::SIZE as u32, &|_| true)
             .await?
             .into_iter()
             .filter(|x| x.status == ChannelStatus::Open)
@@ -368,7 +369,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
 
     async fn get_accounts(&self) -> Result<Vec<AccountEntry>> {
         self.db
-            .get_more::<AccountEntry>(Box::from(ACCOUNT_PREFIX.as_bytes()), Address::size(), &|_| true)
+            .get_more::<AccountEntry>(Box::from(ACCOUNT_PREFIX.as_bytes()), Address::SIZE as u32, &|_| true)
             .await
     }
 
@@ -497,7 +498,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
     async fn get_channels_from(&self, address: Address) -> Result<Vec<ChannelEntry>> {
         Ok(self
             .db
-            .get_more::<ChannelEntry>(Box::from(CHANNEL_PREFIX.as_bytes()), Hash::size(), &|_| true)
+            .get_more::<ChannelEntry>(Box::from(CHANNEL_PREFIX.as_bytes()), Hash::SIZE as u32, &|_| true)
             .await?
             .into_iter()
             .filter(move |x| x.source.to_address() == address)
@@ -507,7 +508,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
     async fn get_channels_to(&self, address: Address) -> Result<Vec<ChannelEntry>> {
         Ok(self
             .db
-            .get_more::<ChannelEntry>(Box::from(CHANNEL_PREFIX.as_bytes()), Hash::size(), &|_| true)
+            .get_more::<ChannelEntry>(Box::from(CHANNEL_PREFIX.as_bytes()), Hash::SIZE as u32, &|_| true)
             .await?
             .into_iter()
             .filter(move |x| x.destination.to_address() == address)
@@ -756,11 +757,11 @@ pub mod wasm {
 
     #[wasm_bindgen]
     pub struct Database {
-        core_ethereum_db: Arc<Mutex<CoreEthereumDb<leveldb::LevelDbShim>>>,
+        core_ethereum_db: Arc<Mutex<CoreEthereumDb<leveldb::wasm::LevelDbShim>>>,
     }
 
     impl Database {
-        pub fn core_ethereum_db(&self) -> Arc<Mutex<CoreEthereumDb<leveldb::LevelDbShim>>> {
+        pub fn core_ethereum_db(&self) -> Arc<Mutex<CoreEthereumDb<leveldb::wasm::LevelDbShim>>> {
             self.core_ethereum_db.clone()
         }
     }
@@ -768,10 +769,10 @@ pub mod wasm {
     #[wasm_bindgen]
     impl Database {
         #[wasm_bindgen(constructor)]
-        pub fn new(db: leveldb::LevelDb, public_key: PublicKey) -> Self {
+        pub fn new(db: leveldb::wasm::LevelDb, public_key: PublicKey) -> Self {
             Self {
-                core_ethereum_db: Arc::new(Mutex::new(CoreEthereumDb::<leveldb::LevelDbShim>::new(
-                    DB::<leveldb::LevelDbShim>::new(leveldb::LevelDbShim::new(db)),
+                core_ethereum_db: Arc::new(Mutex::new(CoreEthereumDb::<leveldb::wasm::LevelDbShim>::new(
+                    DB::<leveldb::wasm::LevelDbShim>::new(leveldb::wasm::LevelDbShim::new(db)),
                     public_key.clone(),
                 ))),
             }

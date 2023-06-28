@@ -12,7 +12,7 @@ license = "GPL-3.0-only"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-getrandom = { version = "0.2.8" }
+getrandom = "0.2.8"
 js-sys = { version = "0.3.63", optional = true }
 libp2p-identity = { version = "0.1.2", features = ["peerid"] }
 rand = "0.8.5"

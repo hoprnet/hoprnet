@@ -15,7 +15,7 @@ crate-type = ["cdylib", "rlib"]
 aes = "0.8.0"
 ctr = "0.9.0"
 console_error_panic_hook = { version = "0.1.7", optional = true }
-getrandom = { version = "0.2.8" }
+getrandom = "0.2.8"
 hex = "0.4"
 js-sys = { version = "0.3.63", optional = true }
 serde = { version = "1.0", features = ["derive"] }
@@ -47,5 +47,5 @@ wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
 default = ["console_error_panic_hook", "wasm"]
-wasm = [ "dep:wasm-bindgen", "dep:js-sys", "core-crypto/wasm", "real-base/wasm", "utils-misc/wasm", "utils-types/wasm", "utils-log/wasm", "getrandom/js", "uuid/js" ]
+wasm = [ "dep:wasm-bindgen", "dep:js-sys", "getrandom/js", "core-crypto/wasm", "real-base/wasm", "utils-misc/wasm", "utils-types/wasm", "utils-log/wasm", "getrandom/js", "uuid/js" ]
 console_error_panic_hook = [ "dep:console_error_panic_hook" ]

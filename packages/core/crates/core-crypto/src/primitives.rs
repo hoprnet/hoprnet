@@ -172,7 +172,7 @@ pub fn create_tagged_mac(secret: &[u8], data: &[u8]) -> Result<Box<[u8]>> {
 #[cfg(test)]
 mod tests {
     use crate::parameters::SECRET_KEY_LENGTH;
-    use crate::primitives::wasm::create_tagged_mac;
+    use crate::primitives::create_tagged_mac;
     use crate::primitives::{DigestLike, SimpleMac, SimpleStreamCipher};
     use hex_literal::hex;
 

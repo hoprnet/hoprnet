@@ -23,7 +23,7 @@ ed25519-dalek = "1.0.1"
 elliptic-curve = { version = "0.13", features = ["serde"] }
 futures = "0.3.28"
 generic-array = "0.14.7"
-getrandom = { version = "0.2.8" }
+getrandom = "0.2.8"
 hex = "0.4"
 hex-literal = "0.4"
 hkdf = "0.12"
