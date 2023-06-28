@@ -1,9 +1,9 @@
-use crate::identity_input::LocalIdentityArgs;
-use crate::utils::{Cmd, HelperErrors};
 use crate::{
+    identity_input::LocalIdentityArgs,
     key_pair::read_identities,
     password::PasswordArgs,
     process::{child_process_call_foundry_express_initialization, set_process_path_env},
+    utils::{Cmd, HelperErrors},
 };
 use clap::Parser;
 use ethers::{
@@ -12,6 +12,7 @@ use ethers::{
 };
 use log::{log, Level};
 use std::env;
+use core_crypto::keypairs::Keypair;
 
 /// CLI arguments for `hopli register-in-network-registry`
 #[derive(Parser, Default, Debug)]
@@ -77,7 +78,6 @@ impl InitializeNodeArgs {
 
         // 2. Calculate the peerID and addresses from the identity file
         // collect all the peer ids
-        let all_peer_ids: Vec<String>;
         let all_node_addresses: Vec<String>;
         // check if password is provided
         let pwd = match password.read_password() {
@@ -89,15 +89,16 @@ impl InitializeNodeArgs {
         let files = local_identity.get_files();
         match read_identities(files, &pwd) {
             Ok(node_identities) => {
-                all_peer_ids = node_identities.iter().map(|ni| ni.peer_id.clone()).collect();
-                all_node_addresses = node_identities.iter().map(|ni| ni.ethereum_address.clone()).collect();
+                all_node_addresses = node_identities
+                    .iter()
+                    .map(|ni| ni.chain_key.public().0.to_address().to_string())
+                    .collect();
             }
             Err(e) => {
                 println!("error {:?}", e);
                 return Err(e);
             }
         }
-        log!(target: "initialize_node", Level::Info, "PeerIds {:?}", all_peer_ids.join(","));
         log!(target: "initialize_node", Level::Info, "NodeAddresses {:?}", all_node_addresses.join(","));
 
         // set directory and environment variables
@@ -118,7 +119,7 @@ impl InitializeNodeArgs {
             &format!("[{}]", &&all_node_addresses.join(",")),
             &hopr_amount_uint256_string,
             &native_amount_uint256_string,
-            &all_peer_ids.join(","),
+            &all_node_addresses.join(","),
         )
     }
 }

@@ -1,6 +1,6 @@
 [package]
 name = "core-ethereum-misc"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Core-Ethereum-specific interaction with the backend database"
@@ -23,7 +23,7 @@ core-crypto = { path = "../../../core/crates/core-crypto" }
 core-ethereum-db = { path = "../core-ethereum-db" }
 futures = "0.3"
 js-sys = { version = "0.3.63", optional = true }
-libp2p-identity = "0.1.2"
+libp2p-identity = { workspace = true }
 thiserror = "1.0"
 utils-db = { path = "../../../utils/crates/utils-db" }
 utils-log = { path = "../../../utils/crates/utils-log" }

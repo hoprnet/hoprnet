@@ -1,11 +1,12 @@
 use core_crypto::errors::CryptoError::SignatureVerification;
+use core_crypto::keypairs::ChainKeypair;
 use core_crypto::types::{Hash, PublicKey, Response, Signature};
 use enum_iterator::{all, Sequence};
 use ethnum::u256;
 use serde::{Deserialize, Serialize};
 use serde_repr::*;
+use std::fmt::{Display, Formatter};
 use std::ops::{Div, Mul, Sub};
-use core_crypto::keypairs::ChainKeypair;
 use utils_types::errors::{GeneralError::ParseError, Result};
 use utils_types::primitives::{Address, Balance, BalanceType, EthereumChallenge, U256};
 
@@ -35,15 +36,16 @@ impl ChannelStatus {
     pub fn to_byte(&self) -> u8 {
         *self as u8
     }
+}
 
-    pub fn to_string(&self) -> String {
+impl Display for ChannelStatus {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            ChannelStatus::Closed => "Closed",
-            ChannelStatus::WaitingForCommitment => "WaitingForCommitment",
-            ChannelStatus::Open => "Open",
-            ChannelStatus::PendingToClose => "PendingToClose",
+            ChannelStatus::Closed => write!(f, "Closed"),
+            ChannelStatus::WaitingForCommitment => write!(f, "WaitingForCommitment"),
+            ChannelStatus::Open => write!(f, "Open"),
+            ChannelStatus::PendingToClose => write!(f, "PendingToClose"),
         }
-        .to_string()
     }
 }
 
@@ -374,16 +376,16 @@ impl Ticket {
     /// The operation can fail if a public key cannot be recovered from the ticket signature.
     pub fn verify(&self, public_key: &PublicKey) -> core_crypto::errors::Result<()> {
         let recovered = self.recover_signer()?;
-        recovered.eq(public_key).then(|| ()).ok_or(SignatureVerification)
+        recovered.eq(public_key).then_some(()).ok_or(SignatureVerification)
     }
 }
 
 #[cfg(test)]
 pub mod tests {
+    use core_crypto::keypairs::{ChainKeypair, Keypair};
     use core_crypto::types::{Hash, PublicKey};
     use ethnum::u256;
     use hex_literal::hex;
-    use core_crypto::keypairs::{ChainKeypair, Keypair};
     use utils_types::primitives::{Address, Balance, BalanceType, U256};
     use utils_types::traits::BinarySerializable;
 

@@ -133,12 +133,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8da52d66c7071e2e3fa2a1e5c6d088fec47b593032b254f5e980de8ea54454d6"
 
 [[package]]
-name = "asn1_der"
-version = "0.7.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "155a5a185e42c6b77ac7b88a15143d930a9e9727a5b7b77eed417404ab15c247"
-
-[[package]]
 name = "async-attributes"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -698,6 +692,7 @@ checksum = "773f3b9af64447d2ce9850330c473515014aa235e6a783b02db81ff39e4a3dad"
 dependencies = [
  "crypto-common",
  "inout",
+ "zeroize",
 ]
 
 [[package]]
@@ -770,7 +765,7 @@ dependencies = [
  "coins-core",
  "digest 0.10.6",
  "getrandom 0.2.9",
- "hmac 0.12.1",
+ "hmac",
  "k256 0.11.6",
  "lazy_static",
  "serde",
@@ -788,8 +783,8 @@ dependencies = [
  "coins-bip32",
  "getrandom 0.2.9",
  "hex",
- "hmac 0.12.1",
- "pbkdf2",
+ "hmac",
+ "pbkdf2 0.11.0",
  "rand 0.8.5",
  "sha2 0.10.6",
  "thiserror",
@@ -895,10 +890,10 @@ dependencies = [
  "hex",
  "hex-literal 0.4.1",
  "hkdf",
- "hmac 0.12.1",
+ "hmac",
  "js-sys",
  "k256 0.13.1",
- "libp2p-identity 0.2.0",
+ "libp2p-identity",
  "parameterized",
  "rand 0.8.5",
  "serde",
@@ -911,8 +906,6 @@ dependencies = [
  "utils-proc-macros",
  "utils-types",
  "wasm-bindgen",
- "wasm-bindgen-futures",
- "wasm-bindgen-test",
  "zeroize",
 ]
 
@@ -937,7 +930,7 @@ dependencies = [
 
 [[package]]
 name = "core-ethereum-misc"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-std",
  "async-trait",
@@ -947,7 +940,7 @@ dependencies = [
  "futures",
  "hex-literal 0.4.1",
  "js-sys",
- "libp2p-identity 0.1.2",
+ "libp2p-identity",
  "mockall",
  "rusty-leveldb",
  "thiserror",
@@ -1020,7 +1013,7 @@ dependencies = [
 
 [[package]]
 name = "core-network"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "async-std",
  "bincode",
@@ -1031,7 +1024,7 @@ dependencies = [
  "getrandom 0.2.9",
  "gloo-timers",
  "js-sys",
- "libp2p-identity 0.1.2",
+ "libp2p-identity",
  "mockall",
  "more-asserts",
  "rand 0.8.5",
@@ -1059,6 +1052,7 @@ dependencies = [
  "core-ethereum-db",
  "core-ethereum-misc",
  "core-mixer",
+ "core-path",
  "core-types",
  "env_logger",
  "futures",
@@ -1066,7 +1060,7 @@ dependencies = [
  "hex-literal 0.4.1",
  "js-sys",
  "lazy_static",
- "libp2p-identity 0.2.0",
+ "libp2p-identity",
  "mockall",
  "parameterized",
  "rusty-leveldb",
@@ -1084,6 +1078,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "core-path"
+version = "0.1.0"
+dependencies = [
+ "console_error_panic_hook",
+ "hex",
+ "js-sys",
+ "libp2p-identity",
+ "tempfile",
+ "thiserror",
+ "utils-log",
+ "utils-misc",
+ "utils-types",
+ "wasm-bindgen",
+ "wasm-bindgen-test",
+ "wasm-opt",
+ "wasm-pack",
+]
+
+[[package]]
 name = "core-strategy"
 version = "0.2.1"
 dependencies = [
@@ -1091,7 +1104,7 @@ dependencies = [
  "core-types",
  "getrandom 0.2.9",
  "js-sys",
- "libp2p-identity 0.1.2",
+ "libp2p-identity",
  "rand 0.8.5",
  "serde",
  "serde-wasm-bindgen",
@@ -1116,7 +1129,7 @@ dependencies = [
  "ethnum",
  "hex-literal 0.3.4",
  "js-sys",
- "multiaddr 0.18.0",
+ "multiaddr",
  "serde",
  "serde_repr",
  "utils-misc",
@@ -1208,16 +1221,6 @@ checksum = "1bfb12502f3fc46cca1bb51ac28df9d618d813cdc3d2f25b9fe775a34af26bb3"
 dependencies = [
  "generic-array 0.14.7",
  "typenum",
-]
-
-[[package]]
-name = "crypto-mac"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b584a330336237c1eecd3e94266efb216c56ed91225d634cb2991c5f3fd1aeab"
-dependencies = [
- "generic-array 0.14.7",
- "subtle",
 ]
 
 [[package]]
@@ -1666,10 +1669,10 @@ dependencies = [
  "ctr",
  "digest 0.10.6",
  "hex",
- "hmac 0.12.1",
- "pbkdf2",
+ "hmac",
+ "pbkdf2 0.11.0",
  "rand 0.8.5",
- "scrypt",
+ "scrypt 0.10.0",
  "serde",
  "serde_json",
  "sha2 0.10.6",
@@ -2410,17 +2413,7 @@ version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "791a029f6b9fc27657f6f188ec6e5e43f6911f6f878e0dc5501396e09809d437"
 dependencies = [
- "hmac 0.12.1",
-]
-
-[[package]]
-name = "hmac"
-version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "126888268dcc288495a26bf004b38c5fdbb31682f992c84ceb046a1f0fe38840"
-dependencies = [
- "crypto-mac",
- "digest 0.9.0",
+ "hmac",
 ]
 
 [[package]]
@@ -2433,27 +2426,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "hmac-drbg"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "17ea0a1394df5b6574da6e0c1ade9e78868c9fb0a4e5ef4428e32da4676b85b1"
-dependencies = [
- "digest 0.9.0",
- "generic-array 0.14.7",
- "hmac 0.8.1",
-]
-
-[[package]]
 name = "hopli"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "clap 4.0.32",
  "core-crypto",
- "elliptic-curve 0.13.4",
- "eth-keystore",
  "ethers",
- "generic-array 0.14.7",
- "k256 0.13.1",
+ "hoprd-keypair",
  "log",
  "serde",
  "serde_json",
@@ -2462,8 +2441,39 @@ dependencies = [
 ]
 
 [[package]]
-name = "hoprd-misc"
+name = "hoprd-keypair"
 version = "0.2.0"
+dependencies = [
+ "aes",
+ "console_error_panic_hook",
+ "core-crypto",
+ "ctr",
+ "getrandom 0.2.9",
+ "hex",
+ "js-sys",
+ "k256 0.13.1",
+ "libp2p-identity",
+ "real-base",
+ "scrypt 0.11.0",
+ "serde",
+ "serde_json",
+ "sha3",
+ "tempfile",
+ "thiserror",
+ "typenum",
+ "utils-log",
+ "utils-misc",
+ "utils-types",
+ "uuid 1.3.4",
+ "version",
+ "wasm-bindgen",
+ "wasm-opt",
+ "wasm-pack",
+]
+
+[[package]]
+name = "hoprd-misc"
+version = "0.2.1"
 dependencies = [
  "clap 4.0.32",
  "console_error_panic_hook",
@@ -2537,7 +2547,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "toml 0.7.3",
- "uuid 1.3.1",
+ "uuid 1.3.4",
 ]
 
 [[package]]
@@ -2859,88 +2869,19 @@ checksum = "6a987beff54b60ffa6d51982e1aa1146bc42f19bd26be28b0586f252fccf5317"
 
 [[package]]
 name = "libp2p-identity"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e2d584751cecb2aabaa56106be6be91338a60a0f4e420cf2af639204f596fc1"
-dependencies = [
- "asn1_der",
- "bs58 0.4.0",
- "libsecp256k1",
- "log",
- "multiaddr 0.17.1",
- "multihash 0.17.0",
- "quick-protobuf",
- "rand 0.8.5",
- "sha2 0.10.6",
- "thiserror",
- "zeroize",
-]
-
-[[package]]
-name = "libp2p-identity"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "93a7b3534b84fe89985d8076246806c845e716d0cdac50925dcf65caf49ab3c0"
 dependencies = [
- "asn1_der",
  "bs58 0.5.0",
  "ed25519-dalek",
- "libsecp256k1",
  "log",
- "multihash 0.19.0",
+ "multihash",
  "quick-protobuf",
  "rand 0.8.5",
  "sha2 0.10.6",
  "thiserror",
  "zeroize",
-]
-
-[[package]]
-name = "libsecp256k1"
-version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95b09eff1b35ed3b33b877ced3a691fc7a481919c7e29c53c906226fcf55e2a1"
-dependencies = [
- "arrayref",
- "base64 0.13.1",
- "digest 0.9.0",
- "hmac-drbg",
- "libsecp256k1-core",
- "libsecp256k1-gen-ecmult",
- "libsecp256k1-gen-genmult",
- "rand 0.8.5",
- "serde",
- "sha2 0.9.9",
- "typenum",
-]
-
-[[package]]
-name = "libsecp256k1-core"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5be9b9bb642d8522a44d533eab56c16c738301965504753b03ad1de3425d5451"
-dependencies = [
- "crunchy",
- "digest 0.9.0",
- "subtle",
-]
-
-[[package]]
-name = "libsecp256k1-gen-ecmult"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3038c808c55c87e8a172643a7d87187fc6c4174468159cb3090659d55bcb4809"
-dependencies = [
- "libsecp256k1-core",
-]
-
-[[package]]
-name = "libsecp256k1-gen-genmult"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3db8d6ba2cec9eacc40e6e8ccc98931840301f1006e95647ceb2dd5c3aa06f7c"
-dependencies = [
- "libsecp256k1-core",
 ]
 
 [[package]]
@@ -3064,25 +3005,6 @@ checksum = "1fafa6961cabd9c63bcd77a45d7e3b7f3b552b70417831fb0f56db717e72407e"
 
 [[package]]
 name = "multiaddr"
-version = "0.17.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b36f567c7099511fa8612bbbb52dda2419ce0bdbacf31714e3a5ffdb766d3bd"
-dependencies = [
- "arrayref",
- "byteorder",
- "data-encoding",
- "log",
- "multibase",
- "multihash 0.17.0",
- "percent-encoding",
- "serde",
- "static_assertions",
- "unsigned-varint",
- "url",
-]
-
-[[package]]
-name = "multiaddr"
 version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "92a651988b3ed3ad1bc8c87d016bb92f6f395b84ed1db9b926b32b1fc5a2c8b5"
@@ -3090,9 +3012,9 @@ dependencies = [
  "arrayref",
  "byteorder",
  "data-encoding",
- "libp2p-identity 0.2.0",
+ "libp2p-identity",
  "multibase",
- "multihash 0.19.0",
+ "multihash",
  "percent-encoding",
  "serde",
  "static_assertions",
@@ -3113,37 +3035,12 @@ dependencies = [
 
 [[package]]
 name = "multihash"
-version = "0.17.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "835d6ff01d610179fbce3de1694d007e500bf33a7f29689838941d6bf783ae40"
-dependencies = [
- "core2",
- "multihash-derive",
- "unsigned-varint",
-]
-
-[[package]]
-name = "multihash"
 version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2fd59dcc2bbe70baabeac52cd22ae52c55eefe6c38ff11a9439f16a350a939f2"
 dependencies = [
  "core2",
  "unsigned-varint",
-]
-
-[[package]]
-name = "multihash-derive"
-version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d6d4752e6230d8ef7adf7bd5d8c4b1f6561c1014c5ba9a37445ccefe18aa1db"
-dependencies = [
- "proc-macro-crate",
- "proc-macro-error",
- "proc-macro2",
- "quote",
- "syn 1.0.109",
- "synstructure",
 ]
 
 [[package]]
@@ -3441,9 +3338,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "83a0692ec44e4cf1ef28ca317f14f8f07da2d95ec3fa01f86e4467b725e60917"
 dependencies = [
  "digest 0.10.6",
- "hmac 0.12.1",
+ "hmac",
  "password-hash",
  "sha2 0.10.6",
+]
+
+[[package]]
+name = "pbkdf2"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f0ca0b5a68607598bf3bad68f32227a8164f6254833f84eafaac409cd6746c31"
+dependencies = [
+ "digest 0.10.6",
+ "hmac",
 ]
 
 [[package]]
@@ -3876,7 +3783,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7743f17af12fa0b03b803ba12cd6a8d9483a587e89c69445e3909655c0b9fabb"
 dependencies = [
  "crypto-bigint 0.4.9",
- "hmac 0.12.1",
+ "hmac",
  "zeroize",
 ]
 
@@ -3886,7 +3793,7 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8dd2a808d456c4a54e300a23e9f5a67e122c3024119acbfd73e3bf664491cb2"
 dependencies = [
- "hmac 0.12.1",
+ "hmac",
  "subtle",
 ]
 
@@ -4092,8 +3999,19 @@ version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f9e24d2b632954ded8ab2ef9fea0a0c769ea56ea98bddbafbad22caeeadf45d"
 dependencies = [
- "hmac 0.12.1",
- "pbkdf2",
+ "hmac",
+ "pbkdf2 0.11.0",
+ "salsa20",
+ "sha2 0.10.6",
+]
+
+[[package]]
+name = "scrypt"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0516a385866c09368f0b5bcd1caff3366aace790fcd46e2bb032697bb172fd1f"
+dependencies = [
+ "pbkdf2 0.12.1",
  "salsa20",
  "sha2 0.10.6",
 ]
@@ -4592,18 +4510,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "synstructure"
-version = "0.12.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f36bdaa60a83aca3921b5259d5400cbf5e90fc51931376a9bd4a0eb79aa7210f"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 1.0.109",
- "unicode-xid",
-]
-
-[[package]]
 name = "tap"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4970,7 +4876,7 @@ checksum = "711b9620af191e0cdc7468a8d14e709c3dcdb115b36f838e601583af800a370a"
 
 [[package]]
 name = "utils-db"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "async-std",
  "async-trait",
@@ -5053,7 +4959,7 @@ dependencies = [
 
 [[package]]
 name = "utils-types"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "bincode",
  "console_error_panic_hook",
@@ -5063,7 +4969,7 @@ dependencies = [
  "hex",
  "hex-literal 0.3.4",
  "js-sys",
- "libp2p-identity 0.2.0",
+ "libp2p-identity",
  "serde",
  "thiserror",
  "utils-log",
@@ -5086,11 +4992,13 @@ dependencies = [
 
 [[package]]
 name = "uuid"
-version = "1.3.1"
+version = "1.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b55a3fef2a1e3b3a00ce878640918820d3c51081576ac657d23af9fc7928fdb"
+checksum = "0fa2982af2eec27de306107c027578ff7f423d65f7250e40ce0fea8f45248b81"
 dependencies = [
  "getrandom 0.2.9",
+ "serde",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -5162,6 +5070,12 @@ name = "vector_assertions"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e88c1aa999bb527615bd34ef503bedecf0dd890a11879a0eded47db881d8c619"
+
+[[package]]
+name = "version"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3a449064fee414fcc201356a3e6c1510f6c8829ed28bb06b91c54ebe208ce065"
 
 [[package]]
 name = "version_check"
@@ -5710,8 +5624,8 @@ dependencies = [
  "crc32fast",
  "crossbeam-utils",
  "flate2",
- "hmac 0.12.1",
- "pbkdf2",
+ "hmac",
+ "pbkdf2 0.11.0",
  "sha1",
  "time 0.3.21",
  "zstd",

@@ -1,14 +1,14 @@
-use curve25519_dalek::traits::IsIdentity;
-use elliptic_curve::{Group, PrimeField};
-use utils_types::traits::BinarySerializable;
 use crate::errors::CryptoError::InvalidInputValue;
 use crate::errors::Result;
 use crate::shared_keys::{Alpha, GroupElement, Scalar, SphinxSuite};
 use crate::types::CurvePoint;
+use curve25519_dalek::traits::IsIdentity;
+use elliptic_curve::{Group, PrimeField};
+use utils_types::traits::BinarySerializable;
 
-use elliptic_curve::ops::MulByGenerator;
 use crate::keypairs::{ChainKeypair, OffchainKeypair};
 use crate::random::{random_bytes, random_fill};
+use elliptic_curve::ops::MulByGenerator;
 
 impl Scalar for curve25519_dalek::scalar::Scalar {
     fn random() -> Self {
@@ -21,9 +21,9 @@ impl Scalar for curve25519_dalek::scalar::Scalar {
             // Representation of the scalar is little-endian
             let mut clamped = [0u8; 32];
             clamped.copy_from_slice(&sk[..32]);
-            clamped[00] &= 0b1111_1000;  // clear the 3 LSB bits (= multiply by Curve25519's co-factor)
-            clamped[31] &= 0b0111_1111;  // clear the 256-th bit
-            clamped[31] |= 0b0100_0000;  // make it 255-bit number
+            clamped[00] &= 0b1111_1000; // clear the 3 LSB bits (= multiply by Curve25519's co-factor)
+            clamped[31] &= 0b0111_1111; // clear the 256-th bit
+            clamped[31] |= 0b0100_0000; // make it 255-bit number
 
             Ok(curve25519_dalek::scalar::Scalar::from_bits(clamped))
         } else {
@@ -58,7 +58,9 @@ impl Scalar for k256::Scalar {
     }
 }
 
-impl GroupElement<typenum::U32, curve25519_dalek::scalar::Scalar> for curve25519_dalek::montgomery::MontgomeryPoint {
+impl GroupElement<curve25519_dalek::scalar::Scalar> for curve25519_dalek::montgomery::MontgomeryPoint {
+    type AlphaLen = typenum::U32;
+
     fn to_alpha(&self) -> Alpha<typenum::U32> {
         self.0.into()
     }
@@ -76,14 +78,17 @@ impl GroupElement<typenum::U32, curve25519_dalek::scalar::Scalar> for curve25519
     }
 }
 
-impl GroupElement<typenum::U32, curve25519_dalek::scalar::Scalar> for curve25519_dalek::edwards::EdwardsPoint {
+impl GroupElement<curve25519_dalek::scalar::Scalar> for curve25519_dalek::edwards::EdwardsPoint {
+    type AlphaLen = typenum::U32;
 
-    fn to_alpha(&self) -> Alpha<typenum::U32>{
+    fn to_alpha(&self) -> Alpha<typenum::U32> {
         self.compress().0.into()
     }
 
     fn from_alpha(alpha: Alpha<typenum::U32>) -> Result<Self> {
-        curve25519_dalek::edwards::CompressedEdwardsY(alpha.into()).decompress().ok_or(InvalidInputValue)
+        curve25519_dalek::edwards::CompressedEdwardsY(alpha.into())
+            .decompress()
+            .ok_or(InvalidInputValue)
     }
 
     fn generate(scalar: &curve25519_dalek::scalar::Scalar) -> Self {
@@ -95,11 +100,16 @@ impl GroupElement<typenum::U32, curve25519_dalek::scalar::Scalar> for curve25519
     }
 }
 
-impl GroupElement<typenum::U33, k256::Scalar> for k256::ProjectivePoint {
+impl GroupElement<k256::Scalar> for k256::ProjectivePoint {
+    type AlphaLen = typenum::U33;
 
     fn to_alpha(&self) -> Alpha<typenum::U33> {
         let mut ret = Alpha::<typenum::U33>::default();
-        ret.copy_from_slice(CurvePoint::from_affine(self.to_affine()).serialize_compressed().as_ref());
+        ret.copy_from_slice(
+            CurvePoint::from_affine(self.to_affine())
+                .serialize_compressed()
+                .as_ref(),
+        );
         ret
     }
 
@@ -119,30 +129,27 @@ impl GroupElement<typenum::U33, k256::Scalar> for k256::ProjectivePoint {
 }
 
 /// Represents an instantiation of the Sphinx protocol using secp256k1 elliptic curve and `ChainKeypair`
-pub struct Secp256k1Suite ;
+pub struct Secp256k1Suite;
 
 impl SphinxSuite for Secp256k1Suite {
-    type A = typenum::U33;
     type P = ChainKeypair;
     type E = k256::Scalar;
     type G = k256::ProjectivePoint;
 }
 
 /// Represents an instantiation of the Sphinx protocol using the ed25519 curve and `OffchainKeypair`
-pub struct Ed25519Suite ;
+pub struct Ed25519Suite;
 
 impl SphinxSuite for Ed25519Suite {
-    type A = typenum::U32;
     type P = OffchainKeypair;
     type E = curve25519_dalek::scalar::Scalar;
     type G = curve25519_dalek::edwards::EdwardsPoint;
 }
 
 /// Represents an instantiation of the Sphinx protocol using the Curve25519 curve and `OffchainKeypair`
-pub struct X25519Suite ;
+pub struct X25519Suite;
 
 impl SphinxSuite for X25519Suite {
-    type A = typenum::U32;
     type P = OffchainKeypair;
     type E = curve25519_dalek::scalar::Scalar;
     type G = curve25519_dalek::montgomery::MontgomeryPoint;
@@ -150,11 +157,11 @@ impl SphinxSuite for X25519Suite {
 
 #[cfg(test)]
 mod tests {
+    use crate::ec_groups::{Ed25519Suite, Secp256k1Suite, X25519Suite};
     use crate::shared_keys::tests::generic_sphinx_suite_test;
+    use crate::shared_keys::GroupElement;
     use hex_literal::hex;
     use parameterized::parameterized;
-    use crate::ec_groups::{Ed25519Suite, Secp256k1Suite, X25519Suite};
-    use crate::shared_keys::GroupElement;
 
     #[test]
     fn test_extract_key_from_group_element() {

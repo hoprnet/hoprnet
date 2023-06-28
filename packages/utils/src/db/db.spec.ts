@@ -17,7 +17,8 @@ import {
   PublicKey,
   Address,
   Snapshot,
-  ChannelStatus
+  ChannelStatus,
+  ChainKeypair
 } from '../types.js'
 import BN from 'bn.js'
 import { stringToU8a, u8aEquals } from '../u8a/index.js'
@@ -72,11 +73,11 @@ function createMockedTicket(signerPrivKey: Uint8Array, counterparty: Address) {
     Balance.zero(BalanceType.HOPR),
     U256.from_inverse_probability(U256.one()),
     U256.one(),
-    signerPrivKey
+    new ChainKeypair(signerPrivKey)
   )
   tkt.set_challenge(
     new Response(Uint8Array.from(randomBytes(32))).to_challenge().to_ethereum_challenge(),
-    signerPrivKey
+    new ChainKeypair(signerPrivKey)
   )
   return tkt
 }

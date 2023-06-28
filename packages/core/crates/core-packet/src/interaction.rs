@@ -1,17 +1,21 @@
-use crate::errors::PacketError::{AcknowledgementValidation, ChannelNotFound, InvalidPacketState, OutOfFunds, PacketConstructionError, PacketDecodingError, PathNotValid, Retry, TagReplay, TransportError};
+use crate::errors::PacketError::{
+    AcknowledgementValidation, ChannelNotFound, InvalidPacketState, OutOfFunds, PacketConstructionError,
+    PacketDecodingError, PathError, Retry, TagReplay, TransportError,
+};
 use crate::errors::Result;
 use crate::packet::{Packet, PacketState};
-use crate::path::Path;
 use async_std::channel::{bounded, Receiver, Sender, TrySendError};
+use core_crypto::keypairs::{ChainKeypair, OffchainKeypair};
 use core_crypto::types::{HalfKeyChallenge, Hash, OffchainPublicKey, PublicKey};
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_mixer::mixer::{Mixer, MixerConfig};
+use core_path::errors::PathError::PathNotValid;
+use core_path::path::Path;
 use core_types::acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket};
 use core_types::channels::Ticket;
 use libp2p_identity::PeerId;
 use std::ops::{Deref, Mul};
 use std::sync::{Arc, Mutex};
-use core_crypto::keypairs::{ChainKeypair, OffchainKeypair};
 use utils_log::{debug, error, info};
 use utils_types::primitives::{Balance, BalanceType, U256};
 use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
@@ -167,7 +171,10 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
                                 );
                             }
                         } else {
-                            error!("failed to verify signature on acknowledgement from peer {}", payload.remote_peer)
+                            error!(
+                                "failed to verify signature on acknowledgement from peer {}",
+                                payload.remote_peer
+                            )
                         }
                     } else {
                         error!("invalid remote peer id {}", payload.remote_peer)
@@ -225,11 +232,11 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
                 #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_RECEIVED_FAILED_ACKS.increment();
 
-                return AcknowledgementValidation(format!(
+                AcknowledgementValidation(format!(
                     "received unexpected acknowledgement for half key challenge {} - half key {}",
                     ack.ack_challenge().to_hex(),
                     ack.ack_key_share.to_hex()
-                ));
+                ))
             })?;
 
         match pending {
@@ -252,9 +259,9 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
                     #[cfg(all(feature = "prometheus", not(test)))]
                     METRIC_RECEIVED_FAILED_ACKS.increment();
 
-                    return AcknowledgementValidation(format!(
+                    AcknowledgementValidation(format!(
                         "the acknowledgement is not sufficient to solve the embedded challenge, {e}"
-                    ));
+                    ))
                 })?;
 
                 self.db
@@ -266,9 +273,9 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
                         #[cfg(all(feature = "prometheus", not(test)))]
                         METRIC_RECEIVED_FAILED_ACKS.increment();
 
-                        return AcknowledgementValidation(format!(
+                        AcknowledgementValidation(format!(
                             "acknowledgement received for channel that does not exist, {e}"
-                        ));
+                        ))
                     })?;
                 let response = unackowledged.get_response(&ack.ack_key_share)?;
                 debug!("acknowledging ticket using response {}", response.to_hex());
@@ -436,10 +443,11 @@ where
     pub async fn send_packet(&self, msg: &[u8], path: Path, wait: bool) -> Result<HalfKeyChallenge> {
         // Check if the path is valid
         if !path.valid() {
-            return Err(PathNotValid);
+            return Err(PathError(PathNotValid));
         }
 
-        let next_peer = self.db
+        let next_peer = self
+            .db
             .lock()
             .unwrap()
             .get_channel_key(&OffchainPublicKey::from_peerid(&path.hops()[0])?)
@@ -556,21 +564,25 @@ where
 
                 let inverse_win_prob = U256::new(INVERSE_TICKET_WIN_PROB);
 
-                let previous_hop_channel_key = self
-                    .db
-                    .lock()
-                    .unwrap()
-                    .get_channel_key(&previous_hop)
-                    .await?
-                    .ok_or(PacketDecodingError(format!("failed to find channel key for packet key {previous_hop} on previous hop")))?;
+                let previous_hop_channel_key =
+                    self.db
+                        .lock()
+                        .unwrap()
+                        .get_channel_key(previous_hop)
+                        .await?
+                        .ok_or(PacketDecodingError(format!(
+                            "failed to find channel key for packet key {previous_hop} on previous hop"
+                        )))?;
 
-                let next_hop_channel_key = self
-                    .db
-                    .lock()
-                    .unwrap()
-                    .get_channel_key(&next_hop)
-                    .await?
-                    .ok_or(PacketDecodingError(format!("failed to find channel key for packet key {next_hop} on next hop")))?;
+                let next_hop_channel_key =
+                    self.db
+                        .lock()
+                        .unwrap()
+                        .get_channel_key(next_hop)
+                        .await?
+                        .ok_or(PacketDecodingError(format!(
+                            "failed to find channel key for packet key {next_hop} on next hop"
+                        )))?;
 
                 // Find the corresponding channel
                 let channel = self
@@ -639,7 +651,7 @@ where
         // Forward the packet to the next hop
         message_transport(packet.to_bytes(), next_peer.to_string())
             .await
-            .map_err(|e| TransportError(e))?;
+            .map_err(TransportError)?;
 
         // Acknowledge to the previous hop that we forwarded the packet
         let ack = packet.create_acknowledgement(&self.cfg.packet_keypair).unwrap();
@@ -679,7 +691,7 @@ where
         while let Ok(payload) = self.incoming_packets.1.recv().await {
             // Add some random delay via mixer
             let mixed_packet = self.mixer.mix(payload).await;
-            match Packet::from_bytes(&mixed_packet.data, &self.cfg.packet_keypair,&mixed_packet.remote_peer) {
+            match Packet::from_bytes(&mixed_packet.data, &self.cfg.packet_keypair, &mixed_packet.remote_peer) {
                 Ok(packet) => {
                     if let Err(e) = self
                         .handle_mixed_packet(packet, ack_interaction.clone(), message_transport)
@@ -731,19 +743,21 @@ mod tests {
     use crate::interaction::{
         AcknowledgementInteraction, PacketInteraction, PacketInteractionConfig, Payload, PRICE_PER_PACKET,
     };
-    use crate::path::Path;
     use crate::por::ProofOfRelayValues;
     use async_trait::async_trait;
     use core_crypto::derivation::derive_ack_key_share;
+    use core_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
     use core_crypto::random::random_bytes;
+    use core_crypto::shared_keys::SharedSecret;
     use core_crypto::types::{Hash, OffchainPublicKey, PublicKey};
     use core_ethereum_db::db::CoreEthereumDb;
     use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-    use core_ethereum_misc::commitment::{ChainCommitter, ChannelCommitmentInfo, initialize_commitment};
+    use core_ethereum_misc::commitment::{initialize_commitment, ChainCommitter, ChannelCommitmentInfo};
     use core_mixer::mixer::MixerConfig;
+    use core_path::path::Path;
     use core_types::acknowledgement::{Acknowledgement, PendingAcknowledgement};
     use core_types::channels::{ChannelEntry, ChannelStatus};
-    use futures::future::{Either, select};
+    use futures::future::{select, Either};
     use futures::pin_mut;
     use hex_literal::hex;
     use lazy_static::lazy_static;
@@ -755,8 +769,6 @@ mod tests {
     use std::str::FromStr;
     use std::sync::{Arc, Mutex};
     use std::time::Duration;
-    use core_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
-    use core_crypto::shared_keys::SharedSecret;
     use utils_db::db::DB;
     use utils_db::errors::DbError;
     use utils_db::leveldb::rusty::RustyLevelDbShim;
@@ -829,9 +841,15 @@ mod tests {
     }
 
     async fn create_dummy_channel(db: &CoreEthereumDb<RustyLevelDbShim>, from: &PeerId, to: &PeerId) -> ChannelEntry {
-        let source = db.get_channel_key(&OffchainPublicKey::from_peerid(from).unwrap()).await.unwrap()
+        let source = db
+            .get_channel_key(&OffchainPublicKey::from_peerid(from).unwrap())
+            .await
+            .unwrap()
             .expect("failed to retrieve source address");
-        let destination = db.get_channel_key(&OffchainPublicKey::from_peerid(to).unwrap()).await.unwrap()
+        let destination = db
+            .get_channel_key(&OffchainPublicKey::from_peerid(to).unwrap())
+            .await
+            .unwrap()
             .expect("failed to retrieve destination address");
 
         ChannelEntry::new(
@@ -899,7 +917,7 @@ mod tests {
             let this_peer = OffchainPublicKey::from_privkey(peer_key)?.to_peerid();
 
             if index < PEERS.len() - 1 {
-                channel = Some(create_dummy_channel(&db,&this_peer, &PEERS[index + 1]).await);
+                channel = Some(create_dummy_channel(&db, &this_peer, &PEERS[index + 1]).await);
 
                 db.update_channel_and_snapshot(
                     &channel.clone().unwrap().get_id(),
@@ -1061,7 +1079,7 @@ mod tests {
                 .expect("failed to store pending ack");
 
             // This is what counterparty derives and sends back to solve the challenge
-            let ack_key = derive_ack_key_share(secrets[0].as_ref());
+            let ack_key = derive_ack_key_share(&secrets[0]);
 
             sent_challenges.push((ack_key, porv.ack_challenge));
         }
@@ -1076,11 +1094,7 @@ mod tests {
         spawn_ack_handling(ack_interaction_sender.clone());
 
         // Peer 2: Recipient of the packet and sender of the acknowledgement
-        let ack_interaction_counterparty = Arc::new(AcknowledgementInteraction::new(
-            core_dbs[1].clone(),
-            None,
-            None,
-        ));
+        let ack_interaction_counterparty = Arc::new(AcknowledgementInteraction::new(core_dbs[1].clone(), None, None));
 
         // Peer 2: start sending out outgoing acknowledgement
         spawn_ack_send::<_, 1>(ack_interaction_counterparty.clone());
@@ -1092,11 +1106,7 @@ mod tests {
         let recv_kp = OffchainKeypair::from_secret(&PEERS_PRIVS[1]).unwrap();
         for (ack_key, _) in sent_challenges.iter() {
             ack_interaction_counterparty
-                .send_acknowledgement(
-                    Acknowledgement::new(ack_key.clone(),&recv_kp),
-                    PEERS[0].clone(),
-                    false,
-                )
+                .send_acknowledgement(Acknowledgement::new(ack_key.clone(), &recv_kp), PEERS[0].clone(), false)
                 .await
                 .expect("failed to send ack");
         }
@@ -1105,10 +1115,7 @@ mod tests {
             for i in 1..PENDING_ACKS + 1 {
                 let ack = done_rx.recv().await.expect("failed finalize ack");
                 debug!("sender has received acknowledgement: {}", ack.to_hex());
-                if let Some(_) = sent_challenges
-                    .iter()
-                    .find(|(_, chal)| chal.eq(&ack))
-                {
+                if let Some(_) = sent_challenges.iter().find(|(_, chal)| chal.eq(&ack)) {
                     // TODO: check solution of ack challenge
                     /*assert!(
                         ack_msg.solve(&ack_key.to_bytes()),
@@ -1181,11 +1188,8 @@ mod tests {
         spawn_pkt_send::<_, 0>(packet_sender.clone());
 
         // Peer 2 (relayer): relays packets to Peer 3 and awaits acknowledgements of relayer packets to Peer 3
-        let ack_interaction_relayer = Arc::new(AcknowledgementInteraction::new(
-            core_dbs[1].clone(),
-            None,
-            Some(ack_tx),
-        ));
+        let ack_interaction_relayer =
+            Arc::new(AcknowledgementInteraction::new(core_dbs[1].clone(), None, Some(ack_tx)));
         let pkt_interaction_relayer = Arc::new(PacketInteraction::new(
             core_dbs[1].clone(),
             None,
@@ -1204,11 +1208,7 @@ mod tests {
         spawn_ack_receive::<_, 1>(ack_interaction_relayer.clone());
 
         // Peer 3: Recipient of the packet and sender of the acknowledgement
-        let ack_interaction_counterparty = Arc::new(AcknowledgementInteraction::new(
-            core_dbs[2].clone(),
-            None,
-            None,
-        ));
+        let ack_interaction_counterparty = Arc::new(AcknowledgementInteraction::new(core_dbs[2].clone(), None, None));
         let pkt_interaction_counterparty = Arc::new(PacketInteraction::new(
             core_dbs[2].clone(),
             Some(pkt_tx),
@@ -1328,11 +1328,7 @@ mod tests {
         interactions.push((Some(packet_sender.clone()), None));
 
         // -------------- Peer 2: relayer
-        let ack_1 = Arc::new(AcknowledgementInteraction::new(
-            core_dbs[1].clone(),
-            None,
-            None,
-        ));
+        let ack_1 = Arc::new(AcknowledgementInteraction::new(core_dbs[1].clone(), None, None));
         let pkt_1 = Arc::new(PacketInteraction::new(
             core_dbs[1].clone(),
             None,
@@ -1353,11 +1349,7 @@ mod tests {
         interactions.push((Some(pkt_1), Some(ack_1)));
 
         // -------------- Peer 3: relayer
-        let ack_2 = Arc::new(AcknowledgementInteraction::new(
-            core_dbs[2].clone(),
-            None,
-            None,
-        ));
+        let ack_2 = Arc::new(AcknowledgementInteraction::new(core_dbs[2].clone(), None, None));
         let pkt_2 = Arc::new(PacketInteraction::new(
             core_dbs[2].clone(),
             None,
@@ -1378,11 +1370,7 @@ mod tests {
         interactions.push((Some(pkt_2), Some(ack_2)));
 
         // -------------- Peer 4: relayer
-        let ack_3 = Arc::new(AcknowledgementInteraction::new(
-            core_dbs[3].clone(),
-            None,
-            None,
-        ));
+        let ack_3 = Arc::new(AcknowledgementInteraction::new(core_dbs[3].clone(), None, None));
         let pkt_3 = Arc::new(PacketInteraction::new(
             core_dbs[3].clone(),
             None,
@@ -1403,11 +1391,7 @@ mod tests {
         interactions.push((Some(pkt_3), Some(ack_3)));
 
         // -------------- Peer 5: recipient
-        let ack_4 = Arc::new(AcknowledgementInteraction::new(
-            core_dbs[4].clone(),
-            None,
-            None,
-        ));
+        let ack_4 = Arc::new(AcknowledgementInteraction::new(core_dbs[4].clone(), None, None));
         let pkt_4 = Arc::new(PacketInteraction::new(
             core_dbs[4].clone(),
             Some(pkt_tx),
@@ -1468,11 +1452,12 @@ mod tests {
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use crate::interaction::{AcknowledgementInteraction, PacketInteraction, PacketInteractionConfig, Payload};
-    use crate::path::Path;
     use async_std::channel::unbounded;
+    use core_crypto::keypairs::Keypair;
     use core_crypto::types::{HalfKeyChallenge, PublicKey};
     use core_ethereum_db::db::CoreEthereumDb;
     use core_mixer::mixer::Mixer;
+    use core_path::path::Path;
     use core_types::acknowledgement::{AcknowledgedTicket, Acknowledgement};
     use js_sys::{JsString, Uint8Array};
     use libp2p_identity::PeerId;
@@ -1489,7 +1474,6 @@ pub mod wasm {
     use wasm_bindgen::prelude::wasm_bindgen;
     use wasm_bindgen::JsCast;
     use wasm_bindgen::JsValue;
-    use core_crypto::keypairs::Keypair;
 
     #[wasm_bindgen]
     impl Payload {
@@ -1588,7 +1572,7 @@ pub mod wasm {
                 w: Arc::new(AcknowledgementInteraction::new(
                     Arc::new(Mutex::new(CoreEthereumDb::new(
                         DB::new(LevelDbShim::new(db)),
-                        chain_key.clone(),
+                        chain_key,
                     ))),
                     on_ack.0,
                     on_ack_ticket.0,

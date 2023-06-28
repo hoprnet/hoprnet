@@ -17,7 +17,6 @@ Finally, it also implements a utility function which is used to validate tickets
 
 All the functionalities are heavily dependent on `core-ethereum-db` crate.
 
-
 The currently used implementation is selected using the `CurrentSphinxSuite` type in the `packet` module.
 
 The implementation can be easily extended for different elliptic curves (or even arithmetic multiplicative groups).

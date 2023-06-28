@@ -1,0 +1,44 @@
+[package]
+name = "core-path"
+version = "0.1.0"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+edition = "2021"
+description = "Contains mixnet path construction and path finding logic"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["console_error_panic_hook", "wasm"]
+wasm = [ "dep:wasm-bindgen" ]
+console_error_panic_hook = [ "dep:console_error_panic_hook" ]
+
+[dependencies]
+hex = "0.4.3"
+js-sys = "0.3.63"
+libp2p-identity = { workspace = true }
+thiserror = "1.0"
+utils-log = { path = "../../../utils/crates/utils-log" }
+utils-misc = { path = "../../../utils/crates/utils-misc" }
+utils-types = { path = "../../../utils/crates/utils-types" }
+wasm-bindgen = { workspace = true, optional = true }
+
+console_error_panic_hook = { version = "0.1.7", optional = true }
+#wee_alloc = { version = "0.4.5", optional = true }
+
+[dev-dependencies]
+tempfile = "3"
+wasm-bindgen-test = "0.3.36"
+
+[target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
+wasm-pack = { workspace = true }
+wasm-opt = { workspace = true }
+
+[package.metadata.wasm-pack.profile.dev]
+wasm-opt = false
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ['-O', '--enable-reference-types']

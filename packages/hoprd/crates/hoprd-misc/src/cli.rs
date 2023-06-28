@@ -9,10 +9,14 @@ use core_strategy::{
 };
 use hex;
 use proc_macro_regex::regex;
-use real_base::real;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use utils_misc::ok_or_str;
+
+#[cfg(any(not(feature = "wasm"), test))]
+use real_base::file::native::read_file;
+#[cfg(all(feature = "wasm", not(test)))]
+use real_base::file::wasm::read_file;
 
 pub const DEFAULT_API_HOST: &str = "localhost";
 pub const DEFAULT_API_PORT: u16 = 3001;
@@ -44,7 +48,7 @@ fn parse_host(s: &str) -> Result<crate::config::Host, String> {
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub fn parse_private_key(s: &str) -> Result<Box<[u8]>, String> {
     if crate::config::validate_private_key(s).is_ok() {
-        let mut decoded = [0u8; 32];
+        let mut decoded = [0u8; 64];
 
         let priv_key = match s.strip_prefix("0x") {
             Some(priv_without_prefix) => priv_without_prefix,
@@ -57,7 +61,7 @@ pub fn parse_private_key(s: &str) -> Result<Box<[u8]>, String> {
         Ok(Box::new(decoded))
     } else {
         Err(format!(
-            "Given string is not a private key. A private key must contain 64 hex chars."
+            "Given string is not a private key. A private key must contain 128 hex chars."
         ))
     }
 }
@@ -492,7 +496,7 @@ struct DefaultNetworkFile {
 impl FromJsonFile for DefaultNetworkFile {
     fn from_json_file(mono_repo_path: &str) -> Result<Self, String> {
         let default_environment_json_path: String = format!("{}/default-network.json", mono_repo_path);
-        let data = ok_or_str!(real::read_file(default_environment_json_path.as_str()))?;
+        let data = ok_or_str!(read_file(default_environment_json_path.as_str()))?;
 
         ok_or_str!(serde_json::from_slice::<DefaultNetworkFile>(&data))
     }
@@ -519,11 +523,12 @@ mod tests {
     #[test]
     fn parse_private_key() {
         let parsed =
-            super::parse_private_key("cd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e0317").unwrap();
+            super::parse_private_key("cd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e0317cd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e0317").unwrap();
 
         let priv_key: Vec<u8> = vec![
             205, 9, 249, 41, 63, 253, 214, 155, 233, 120, 3, 44, 83, 59, 107, 205, 2, 223, 213, 217, 55, 201, 135, 190,
-            222, 195, 226, 141, 224, 126, 3, 23,
+            222, 195, 226, 141, 224, 126, 3, 23, 205, 9, 249, 41, 63, 253, 214, 155, 233, 120, 3, 44, 83, 59, 107, 205,
+            2, 223, 213, 217, 55, 201, 135, 190, 222, 195, 226, 141, 224, 126, 3, 23,
         ];
 
         assert_eq!(parsed, priv_key.into())
@@ -532,11 +537,12 @@ mod tests {
     #[test]
     fn parse_private_key_with_prefix() {
         let parsed_with_prefix =
-            super::parse_private_key("cd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e0317").unwrap();
+            super::parse_private_key("0xcd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e0317cd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e0317").unwrap();
 
         let priv_key: Vec<u8> = vec![
             205, 9, 249, 41, 63, 253, 214, 155, 233, 120, 3, 44, 83, 59, 107, 205, 2, 223, 213, 217, 55, 201, 135, 190,
-            222, 195, 226, 141, 224, 126, 3, 23,
+            222, 195, 226, 141, 224, 126, 3, 23, 205, 9, 249, 41, 63, 253, 214, 155, 233, 120, 3, 44, 83, 59, 107, 205,
+            2, 223, 213, 217, 55, 201, 135, 190, 222, 195, 226, 141, 224, 126, 3, 23,
         ];
 
         assert_eq!(parsed_with_prefix, priv_key.into())
@@ -549,7 +555,7 @@ mod tests {
 
         assert_eq!(
             parsed,
-            "Given string is not a private key. A private key must contain 64 hex chars."
+            "Given string is not a private key. A private key must contain 128 hex chars."
         )
     }
 
@@ -560,7 +566,7 @@ mod tests {
 
         assert_eq!(
             parsed,
-            "Given string is not a private key. A private key must contain 64 hex chars."
+            "Given string is not a private key. A private key must contain 128 hex chars."
         )
     }
 
@@ -570,7 +576,7 @@ mod tests {
 
         assert_eq!(
             parsed,
-            "Given string is not a private key. A private key must contain 64 hex chars."
+            "Given string is not a private key. A private key must contain 128 hex chars."
         )
     }
 }

@@ -1,19 +1,18 @@
 use crate::derivation::derive_mac_key;
-use blake2::Blake2s256;
+use blake2::{Blake2s256, Blake2sMac256};
 use chacha20::cipher::KeyIvInit;
 use chacha20::cipher::{IvSizeUser, KeySizeUser, StreamCipher, StreamCipherSeek};
 use chacha20::ChaCha20;
-use digest::{FixedOutputReset, Output, OutputSizeUser, Update};
+use digest::{FixedOutputReset, KeyInit, Output, OutputSizeUser, Update};
 use generic_array::GenericArray;
 use sha3::Keccak256;
 use typenum::Unsigned;
+use zeroize::ZeroizeOnDrop;
 
-use crate::errors::CryptoError::{InvalidInputValue, InvalidParameterSize};
-use crate::errors::Result;
-use crate::parameters::SECRET_KEY_LENGTH;
+use crate::utils::SecretValue;
 
 /// Represents a secret key of fixed length
-pub type SecretKey = [u8; SECRET_KEY_LENGTH];
+pub type SecretKey = SecretValue<typenum::U32>;
 
 /// Generalization of digest-like operation (MAC, Digest,...)
 /// Defines the `update` and `finalize` operations to produce digest value of arbitrary data.
@@ -79,29 +78,22 @@ impl DigestLike<Keccak256> for EthDigest {
 
 /// Simple Message Authentication Code (MAC) computation wrapper
 /// Use `new`, `update` and `finalize` triplet to produce MAC of arbitrary data.
-/// Currently this instance implemented `Blake2s256(key || HOPR_BLAKE_BASED_MAC || message)`
-#[derive(Clone)]
+/// Currently instantiated using Blake2s256 MAC.
 pub struct SimpleMac {
-    instance: Blake2s256,
+    instance: Blake2sMac256,
 }
 
 impl SimpleMac {
-    const DOMAIN_TAG: &'static str = "HOPR_BLAKE_BASED_MAC";
-
     /// Create new instance of the MAC using the given secret key.
-    /// The key size can be arbitrary, but must be at least `SECRET_KEY_LENGTH`
-    pub fn new(key: &[u8]) -> Self {
-        assert!(key.len() >= SECRET_KEY_LENGTH, "mac key too short");
-
-        let mut instance = Blake2s256::default();
-        digest::Digest::update(&mut instance, &key);
-        digest::Digest::update(&mut instance, Self::DOMAIN_TAG.as_bytes());
-        Self { instance }
+    pub fn new(key: &SecretKey) -> Self {
+        Self {
+            instance: Blake2sMac256::new(key.into()),
+        }
     }
 }
 
-impl DigestLike<Blake2s256> for SimpleMac {
-    fn internal_state(&mut self) -> &mut Blake2s256 {
+impl DigestLike<Blake2sMac256> for SimpleMac {
+    fn internal_state(&mut self) -> &mut Blake2sMac256 {
         &mut self.instance
     }
 }
@@ -109,35 +101,27 @@ impl DigestLike<Blake2s256> for SimpleMac {
 /// Simple stream cipher wrapper
 /// Use `new` and `apply` (or `apply_copy`) to XOR the keystream on the plaintext or ciphertext.
 /// Currently this instance is using ChaCha20.
+#[derive(ZeroizeOnDrop)]
 pub struct SimpleStreamCipher {
     instance: ChaCha20,
 }
 
 impl SimpleStreamCipher {
+    /// Size of the secret key
+    pub const KEY_SIZE: usize = <ChaCha20 as KeySizeUser>::KeySize::USIZE;
+
+    /// Size of the initialization vector
+    pub const IV_SIZE: usize = <ChaCha20 as IvSizeUser>::IvSize::USIZE;
+
     /// Create new instance of the stream cipher initialized
     /// with the given secret key and IV.
-    pub fn new(key: &[u8], iv: &[u8]) -> Result<Self> {
-        let chacha_iv_size = ChaCha20::iv_size();
-        if iv.len() != chacha_iv_size {
-            return Err(InvalidParameterSize {
-                name: "iv".into(),
-                expected: chacha_iv_size,
-            });
+    pub fn new(key: [u8; Self::KEY_SIZE], iv: [u8; Self::IV_SIZE]) -> Self {
+        Self {
+            instance: ChaCha20::new(&key.into(), &iv.into()),
         }
-
-        let chacha_key_size = ChaCha20::key_size();
-        if key.len() != chacha_key_size {
-            return Err(InvalidParameterSize {
-                name: "key".into(),
-                expected: chacha_key_size,
-            });
-        }
-
-        Ok(Self {
-            instance: ChaCha20::new_from_slices(key, iv).map_err(|_| InvalidInputValue)?,
-        })
     }
 
+    /// Seeks the keystream to the given block position
     pub fn set_block_counter(&mut self, counter: u32) {
         self.instance.seek(counter as u64 * 64u64)
     }
@@ -155,26 +139,19 @@ impl SimpleStreamCipher {
     }
 }
 
-/// Convenience function that calculates MAC using the given raw key and data.
-/// The key size can be arbitrary, but has to be at least `SECRET_KEY_LENGTH`.
-/// The function is based on `SimpleMac`.
-pub fn calculate_mac(key: &[u8], data: &[u8]) -> [u8; SimpleMac::SIZE] {
-    let mut mac = SimpleMac::new(key);
+/// Calculates a message authentication code with fixed key tag (HASH_KEY_HMAC)
+/// The given `secret` is first transformed using HKDF before the MAC calculation is performed.
+/// Based on `SimpleMac`
+pub fn create_tagged_mac(secret: &SecretKey, data: &[u8]) -> [u8; SimpleMac::SIZE] {
+    let mut mac = SimpleMac::new(&derive_mac_key(secret));
     mac.update(data);
     mac.finalize().into()
 }
 
-/// Calculates a message authentication code with fixed key tag (HASH_KEY_HMAC)
-/// The given secret is first transformed using HKDF before the MAC calculation is performed.
-/// Based on `SimpleMac`
-pub fn create_tagged_mac(secret: &[u8], data: &[u8]) -> Result<[u8; SimpleMac::SIZE]> {
-    derive_mac_key(secret).map(|key| calculate_mac(&key, data))
-}
-
 #[cfg(test)]
 mod tests {
-    use crate::parameters::SECRET_KEY_LENGTH;
-    use crate::primitives::{create_tagged_mac, DigestLike, SimpleMac, SimpleStreamCipher};
+    use crate::primitives::{create_tagged_mac, DigestLike, SecretKey, SimpleMac, SimpleStreamCipher};
+    use generic_array::GenericArray;
     use hex_literal::hex;
 
     #[test]
@@ -183,7 +160,7 @@ mod tests {
         let mut iv = [0u8; 12];
         iv[11] = 2u8;
 
-        let mut cipher = SimpleStreamCipher::new(&key, &iv).unwrap();
+        let mut cipher = SimpleStreamCipher::new(key, iv);
 
         let mut data = [0u8; 64];
         cipher.apply(&mut data);
@@ -197,7 +174,7 @@ mod tests {
         let key = hex!("a9c6632c9f76e5e4dd03203196932350a47562f816cebb810c64287ff68586f3");
         let iv = hex!("6be504b26471dea53d688c4b");
 
-        let mut cipher = SimpleStreamCipher::new(&key, &iv).unwrap();
+        let mut cipher = SimpleStreamCipher::new(key, iv);
 
         cipher.set_block_counter(0xa5999171u32.to_be());
 
@@ -210,13 +187,12 @@ mod tests {
 
     #[test]
     fn test_mac() {
-        let key = [1u8; SECRET_KEY_LENGTH];
+        let key = GenericArray::from([1u8; SecretKey::LENGTH]);
         let data = [2u8; 64];
-        let mac = create_tagged_mac(&key, &data).unwrap();
+        let mac = create_tagged_mac(&key.into(), &data);
 
-        let expected = hex!("a52161fd19f576948f13effe9fb66b5705607e626f5a6621c20c828495639d04");
+        let expected = hex!("77264e8ea3052b621dbb8b1904403a64b1064c884cf7629c266edd7e237f2799");
         assert_eq!(SimpleMac::SIZE, mac.len());
-        assert_eq!(expected, mac.as_ref())
+        assert_eq!(expected, mac);
     }
 }
-

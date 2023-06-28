@@ -62,11 +62,8 @@ impl AccountEntry {
         match &self.entry_type {
             NotAnnounced => false,
             Announced { multiaddr, .. } => {
-                multiaddr
-                    .protocol_stack()
-                    .find(|p| p == &"ip4" || p == &"ip6")
-                    .is_some()
-                    && multiaddr.protocol_stack().find(|p| p == &"tcp").is_some()
+                multiaddr.protocol_stack().any(|p| p == "ip4" || p == "ip6")
+                    && multiaddr.protocol_stack().any(|p| p == "tcp")
             }
         }
     }
@@ -137,9 +134,9 @@ impl BinarySerializable for AccountEntry {
 
         match &self.entry_type {
             NotAnnounced => {
-                ret.extend_from_slice(&(0 as u32).to_be_bytes());
+                ret.extend_from_slice(&(0_u32).to_be_bytes());
                 ret.extend_from_slice(&[0u8; Self::MAX_MULTI_ADDR_LENGTH]);
-                ret.extend_from_slice(&(0 as u32).to_be_bytes());
+                ret.extend_from_slice(&(0_u32).to_be_bytes());
             }
             Announced {
                 multiaddr,

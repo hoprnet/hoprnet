@@ -1,5 +1,6 @@
 use elliptic_curve::rand_core::OsRng;
 use elliptic_curve::{Group, NonZeroScalar, ProjectivePoint};
+use generic_array::{ArrayLength, GenericArray};
 use k256::Secp256k1;
 use rand::{Rng, RngCore};
 
@@ -39,12 +40,7 @@ pub fn random_group_element() -> ([u8; 32], CurvePoint) {
         scalar = NonZeroScalar::<Secp256k1>::random(&mut OsRng);
         point = ProjectivePoint::<Secp256k1>::GENERATOR * scalar.as_ref();
     }
-    let mut secret = [0u8; 32];
-    secret.copy_from_slice(&scalar.to_bytes());
-    (
-        secret,
-        CurvePoint::from_affine(point.to_affine()),
-    )
+    (scalar.to_bytes().into(), CurvePoint::from_affine(point.to_affine()))
 }
 
 /// Fills the specific number of bytes starting from the given offset in the given buffer.
@@ -56,6 +52,13 @@ pub fn random_fill(buffer: &mut [u8]) {
 /// Allocates array of the given size and fills it with random bytes
 pub fn random_bytes<const T: usize>() -> [u8; T] {
     let mut ret = [0u8; T];
+    random_fill(&mut ret);
+    ret
+}
+
+/// Allocates `GenericArray` of the given size and fills it with random bytes
+pub fn random_array<L: ArrayLength<u8>>() -> GenericArray<u8, L> {
+    let mut ret = GenericArray::default();
     random_fill(&mut ret);
     ret
 }
@@ -102,33 +105,10 @@ mod tests {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use crate::types::CurvePoint;
     use js_sys::Uint8Array;
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use wasm_bindgen::prelude::wasm_bindgen;
-
-    #[wasm_bindgen]
-    pub struct GroupElement {
-        coeff: Box<[u8]>,
-        element: CurvePoint,
-    }
-
-    #[wasm_bindgen]
-    impl GroupElement {
-        pub fn random() -> GroupElement {
-            let (coeff, element) = crate::random::random_group_element();
-            Self { coeff: coeff.into(), element }
-        }
-
-        pub fn coefficient(&self) -> Uint8Array {
-            self.coeff.as_ref().into()
-        }
-
-        pub fn element(&self) -> CurvePoint {
-            self.element.clone()
-        }
-    }
 
     #[wasm_bindgen]
     pub fn random_float() -> f64 {

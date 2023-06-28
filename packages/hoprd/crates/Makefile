@@ -1,5 +1,5 @@
 # Append here when new Rust WASM crate is added (the list is space separated)
-PACKAGES = hoprd-misc
+PACKAGES = hoprd-misc hoprd-keypair
 ##########################################
 
 PKG_DIRS = $(addsuffix /pkg, $(PACKAGES))

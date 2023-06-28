@@ -20,6 +20,6 @@ pub fn wasm_bindgen_if(attr: TokenStream, input: TokenStream) -> TokenStream {
             Err(diagnostic) => (quote! { #diagnostic }).into(),
         }
     } else {
-        input.into()
+        input
     }
 }

@@ -1,3 +1,6 @@
+use curve25519_dalek::edwards::{CompressedEdwardsY, EdwardsPoint};
+use curve25519_dalek::montgomery::MontgomeryPoint;
+use elliptic_curve::sec1::EncodedPoint;
 use elliptic_curve::{NonZeroScalar, ProjectivePoint};
 use k256::ecdsa::signature::hazmat::PrehashVerifier;
 use k256::ecdsa::signature::Verifier;
@@ -5,15 +8,12 @@ use k256::ecdsa::{RecoveryId, Signature as ECDSASignature, SigningKey, Verifying
 use k256::elliptic_curve::generic_array::GenericArray;
 use k256::elliptic_curve::sec1::{FromEncodedPoint, ToEncodedPoint};
 use k256::elliptic_curve::CurveArithmetic;
-use k256::{AffinePoint, ecdsa, elliptic_curve, Secp256k1};
+use k256::{ecdsa, elliptic_curve, AffinePoint, Secp256k1};
 use libp2p_identity::{PeerId, PublicKey as lp2p_PublicKey};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::ops::Add;
 use std::str::FromStr;
-use curve25519_dalek::edwards::{CompressedEdwardsY, EdwardsPoint};
-use curve25519_dalek::montgomery::MontgomeryPoint;
-use elliptic_curve::sec1::EncodedPoint;
 
 use utils_log::warn;
 use utils_types::errors::GeneralError;
@@ -37,8 +37,8 @@ mod arrays {
 
     use serde::{
         de::{SeqAccess, Visitor},
-        Deserialize,
-        Deserializer, ser::SerializeTuple, Serialize, Serializer,
+        ser::SerializeTuple,
+        Deserialize, Deserializer, Serialize, Serializer,
     };
     pub fn serialize<S: Serializer, T: Serialize, const N: usize>(data: &[T; N], ser: S) -> Result<S::Ok, S::Error> {
         let mut s = ser.serialize_tuple(N)?;
@@ -469,7 +469,7 @@ impl Hash {
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct OffchainPublicKey {
-    compressed: CompressedEdwardsY
+    compressed: CompressedEdwardsY,
 }
 
 impl BinarySerializable for OffchainPublicKey {
@@ -477,7 +477,9 @@ impl BinarySerializable for OffchainPublicKey {
 
     fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
-            Ok(Self { compressed: CompressedEdwardsY::from_slice(data) })
+            Ok(Self {
+                compressed: CompressedEdwardsY::from_slice(data),
+            })
         } else {
             Err(ParseError)
         }
@@ -495,7 +497,9 @@ impl PeerIdLike for OffchainPublicKey {
             libp2p_identity::PublicKey::try_decode_protobuf(mh.digest())
                 .map_err(|_| ParseError)
                 .and_then(|pk| pk.try_into_ed25519().map(|p| p.to_bytes()).map_err(|_| ParseError))
-                .map(|pk| Self { compressed: CompressedEdwardsY::from_slice(&pk) } )
+                .map(|pk| Self {
+                    compressed: CompressedEdwardsY::from_slice(&pk),
+                })
         } else {
             Err(ParseError)
         }
@@ -518,7 +522,9 @@ impl OffchainPublicKey {
         let mut pk: [u8; ed25519_dalek::SECRET_KEY_LENGTH] = private_key.try_into().map_err(|_| InvalidInputValue)?;
         let sk = libp2p_identity::ed25519::SecretKey::try_from_bytes(&mut pk).map_err(|_| InvalidInputValue)?;
         let kp: libp2p_identity::ed25519::Keypair = sk.into();
-        Ok(Self {compressed: CompressedEdwardsY::from_slice(&kp.public().to_bytes()) })
+        Ok(Self {
+            compressed: CompressedEdwardsY::from_slice(&kp.public().to_bytes()),
+        })
     }
 }
 
@@ -614,13 +620,12 @@ impl PublicKey {
         ]
         .contains(&data.len())
         {
-            let key;
-            if data.len() == Self::SIZE_UNCOMPRESSED - 1 {
-                key = elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(&[&[4u8], &data[..]].concat())
+            let key = if data.len() == Self::SIZE_UNCOMPRESSED - 1 {
+                elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(&[&[4u8], data].concat())
                     .map_err(|_| ParseError)?
             } else {
-                key = elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(data).map_err(|_| ParseError)?
-            }
+                elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(data).map_err(|_| ParseError)?
+            };
 
             Ok(PublicKey {
                 key,
@@ -682,7 +687,7 @@ impl PublicKey {
     /// Panics if reaches infinity (EC identity point), which is an invalid public key.
     pub fn combine(summands: &[&PublicKey]) -> PublicKey {
         let cps = summands.iter().map(|pk| CurvePoint::from(*pk)).collect::<Vec<_>>();
-        let cps_ref = cps.iter().map(|cp| cp).collect::<Vec<_>>();
+        let cps_ref = cps.iter().collect::<Vec<_>>();
         CurvePoint::combine(&cps_ref)
             .try_into()
             .expect("combination results in the ec identity (which is an invalid pub key)")
@@ -733,6 +738,12 @@ impl BinarySerializable for CompressedPublicKey {
 
     fn to_bytes(&self) -> Box<[u8]> {
         self.0.to_bytes(true)
+    }
+}
+
+impl From<PublicKey> for CompressedPublicKey {
+    fn from(value: PublicKey) -> Self {
+        Self(value)
     }
 }
 
@@ -789,7 +800,7 @@ impl Response {
     /// Derives the response from two half-keys.
     /// This is done by adding the two non-zero scalars that the given half-keys represent.
     pub fn from_half_keys(first: &HalfKey, second: &HalfKey) -> Result<Self> {
-        let res = NonZeroScalar::<Secp256k1>::try_from(HalfKey::to_bytes(&first).as_ref())
+        let res = NonZeroScalar::<Secp256k1>::try_from(HalfKey::to_bytes(first).as_ref())
             .and_then(|s1| {
                 NonZeroScalar::<Secp256k1>::try_from(second.to_bytes().as_ref()).map(|s2| s1.as_ref() + s2.as_ref())
             })
@@ -818,19 +829,20 @@ impl BinarySerializable for Response {
 /// Represents an EdDSA signature using Ed25519 Edwards curve.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OffchainSignature {
-    signature: ed25519_dalek::Signature
+    signature: ed25519_dalek::Signature,
 }
 
 impl OffchainSignature {
     pub fn sign_message(msg: &[u8], signing_keypair: &OffchainKeypair) -> Self {
         let expanded_sk = ed25519_dalek::ExpandedSecretKey::from(
-            &ed25519_dalek::SecretKey::from_bytes(signing_keypair.secret()).expect("invalid private key")
+            &ed25519_dalek::SecretKey::from_bytes(signing_keypair.secret().as_ref()).expect("invalid private key"),
         );
 
-        let verifying = ed25519_dalek::PublicKey::from_bytes(signing_keypair.public().compressed.as_bytes())
-            .unwrap();
+        let verifying = ed25519_dalek::PublicKey::from_bytes(signing_keypair.public().compressed.as_bytes()).unwrap();
 
-        Self { signature: expanded_sk.sign(msg, &verifying) }
+        Self {
+            signature: expanded_sk.sign(msg, &verifying),
+        }
     }
 
     pub fn verify_message(&self, msg: &[u8], public_key: &OffchainPublicKey) -> bool {
@@ -896,14 +908,16 @@ impl Signature {
 
     /// Signs the given message using the chain private key.
     pub fn sign_message(message: &[u8], chain_keypair: &ChainKeypair) -> Signature {
-        Self::sign(message, chain_keypair.secret(), |k: &SigningKey, data: &[u8]| {
-            k.sign_recoverable(data)
-        })
+        Self::sign(
+            message,
+            chain_keypair.secret().as_ref(),
+            |k: &SigningKey, data: &[u8]| k.sign_recoverable(data),
+        )
     }
 
     /// Signs the given hash using the raw private key.
     pub fn sign_hash(hash: &[u8], chain_keypair: &ChainKeypair) -> Signature {
-        Self::sign(hash, chain_keypair.secret(), |k: &SigningKey, data: &[u8]| {
+        Self::sign(hash, chain_keypair.secret().as_ref(), |k: &SigningKey, data: &[u8]| {
             k.sign_prehash_recoverable(data)
         })
     }
@@ -929,7 +943,9 @@ impl Signature {
 
     /// Verifies this signature against the given hash and a public key object
     pub fn verify_hash(&self, hash: &[u8], public_key: &PublicKey) -> bool {
-        self.verify(hash, &public_key.to_bytes(false), |k, msg, sgn| k.verify_prehash(msg, sgn))
+        self.verify(hash, &public_key.to_bytes(false), |k, msg, sgn| {
+            k.verify_prehash(msg, sgn)
+        })
     }
 
     /// Returns the raw signature, without the encoded public key recovery bit.
@@ -1005,7 +1021,9 @@ impl ToChecksum for Address {
 
 #[cfg(test)]
 pub mod tests {
+    use crate::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
     use crate::random::random_group_element;
+    use ed25519_dalek::Signer;
     use hex_literal::hex;
     use k256::ecdsa::VerifyingKey;
     use k256::elliptic_curve::sec1::ToEncodedPoint;
@@ -1013,12 +1031,13 @@ pub mod tests {
     use k256::{NonZeroScalar, Secp256k1, U256};
     use libp2p_identity::PeerId;
     use std::str::FromStr;
-    use ed25519_dalek::Signer;
     use utils_types::primitives::Address;
     use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
-    use crate::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
 
-    use crate::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey, OffchainSignature, PublicKey, Response, Signature, ToChecksum};
+    use crate::types::{
+        Challenge, CurvePoint, HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey, OffchainSignature, PublicKey,
+        Response, Signature, ToChecksum,
+    };
 
     const PUBLIC_KEY: [u8; 33] = hex!("021464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8");
     const PRIVATE_KEY: [u8; 32] = hex!("e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8");
@@ -1045,7 +1064,7 @@ pub mod tests {
         let pk: ed25519_dalek::PublicKey = (&key).into();
         let kp = ed25519_dalek::Keypair {
             secret: key,
-            public: pk.clone()
+            public: pk.clone(),
         };
 
         let sgn = kp.sign(msg);
@@ -1054,8 +1073,14 @@ pub mod tests {
         let sgn_1 = OffchainSignature::sign_message(msg, &keypair);
         let sgn_2 = OffchainSignature::from_bytes(&sgn_1.to_bytes()).unwrap();
 
-        assert!(sgn_1.verify_message(msg, keypair.public()), "cannot verify message via sig 1");
-        assert!(sgn_2.verify_message(msg, keypair.public()), "cannot verify message via sig 2");
+        assert!(
+            sgn_1.verify_message(msg, keypair.public()),
+            "cannot verify message via sig 1"
+        );
+        assert!(
+            sgn_2.verify_message(msg, keypair.public()),
+            "cannot verify message via sig 2"
+        );
         assert_eq!(sgn_1, sgn_2, "signatures must be equal");
     }
 
@@ -1199,7 +1224,7 @@ pub mod tests {
     fn offchain_public_key_test() {
         let (s, pk1) = OffchainKeypair::random().unzip();
 
-        let pk2 = OffchainPublicKey::from_privkey(&s).unwrap();
+        let pk2 = OffchainPublicKey::from_privkey(s.as_ref()).unwrap();
         assert_eq!(pk1, pk2, "from privkey failed");
 
         let pk3 = OffchainPublicKey::from_bytes(&pk1.to_bytes()).unwrap();
@@ -1209,7 +1234,8 @@ pub mod tests {
     #[test]
     fn offchain_public_key_peerid_test() {
         let (_, pk1) = OffchainKeypair::random().unzip();
-        let pk2 = OffchainPublicKey::from_peerid_str(pk1.to_peerid_str().as_str()).expect("peer id serialization failed");
+        let pk2 =
+            OffchainPublicKey::from_peerid_str(pk1.to_peerid_str().as_str()).expect("peer id serialization failed");
         assert_eq!(pk1, pk2, "pubkeys don't match");
         assert_eq!(pk1.to_peerid_str(), pk2.to_peerid_str(), "peer id strings don't match");
 
@@ -1641,7 +1667,10 @@ pub mod wasm {
         #[wasm_bindgen(js_name = "random_keypair")]
         pub fn _random_keypair() -> KeyPair {
             let (private, public) = Self::random_keypair();
-            KeyPair { private: private.into(), public }
+            KeyPair {
+                private: private.into(),
+                public,
+            }
         }
 
         #[wasm_bindgen(js_name = "deserialize")]

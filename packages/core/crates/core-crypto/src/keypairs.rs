@@ -1,19 +1,22 @@
-use zeroize::{Zeroize, ZeroizeOnDrop};
-use ed25519_dalek::Sha512;
-use curve25519_dalek::digest::Digest;
-use utils_types::traits::BinarySerializable;
 use crate::errors;
 use crate::errors::CryptoError::InvalidInputValue;
 use crate::random::{random_bytes, random_group_element};
 use crate::shared_keys::Scalar;
 use crate::types::{CompressedPublicKey, OffchainPublicKey, PublicKey};
+use crate::utils::SecretValue;
+use curve25519_dalek::digest::Digest;
+use ed25519_dalek::Sha512;
+use generic_array::{ArrayLength, GenericArray};
+use subtle::{Choice, ConstantTimeEq};
+use utils_types::traits::BinarySerializable;
+use zeroize::ZeroizeOnDrop;
 
 /// Represents a generic key pair
 /// The keypair contains a private key and public key.
-/// The type must be zeroized on drop.
-pub trait Keypair: ZeroizeOnDrop + Sized {
+/// Must be comparable in constant time and zeroized on drop.
+pub trait Keypair: ConstantTimeEq + ZeroizeOnDrop + Sized {
     /// Represents the type of the private (secret) key
-    type Secret: Zeroize + AsRef<[u8]>;
+    type SecretLen: ArrayLength<u8>;
 
     /// Represents the type of the public key
     type Public: BinarySerializable + Clone + PartialEq;
@@ -25,42 +28,49 @@ pub trait Keypair: ZeroizeOnDrop + Sized {
     fn from_secret(bytes: &[u8]) -> errors::Result<Self>;
 
     /// Returns the private (secret) part of the keypair
-    fn secret(&self) -> &Self::Secret;
+    fn secret(&self) -> &SecretValue<Self::SecretLen>;
 
     /// Returns the public part of the keypair
     fn public(&self) -> &Self::Public;
 
-    /// Consumes the instance and produces separated private and public part
-    fn unzip(self) -> (Self::Secret, Self::Public);
+    /// Consumes the instance and produces separated private and public parts
+    fn unzip(self) -> (SecretValue<Self::SecretLen>, Self::Public) {
+        (self.secret().clone(), self.public().clone())
+    }
 }
 
 /// Represents a keypair consisting of an Ed25519 private and public key
-#[derive(Debug, Clone, PartialEq, ZeroizeOnDrop)]
+#[derive(Clone, ZeroizeOnDrop)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-pub struct OffchainKeypair([u8; ed25519_dalek::SECRET_KEY_LENGTH], #[zeroize(skip)] OffchainPublicKey);
+pub struct OffchainKeypair(SecretValue<typenum::U32>, #[zeroize(skip)] OffchainPublicKey);
 
 impl Keypair for OffchainKeypair {
-    type Secret = [u8; ed25519_dalek::SECRET_KEY_LENGTH];
+    type SecretLen = typenum::U32;
     type Public = OffchainPublicKey;
 
     fn random() -> Self {
-        Self::from_secret(&random_bytes::<{ed25519_dalek::SECRET_KEY_LENGTH}>()).unwrap()
+        Self::from_secret(&random_bytes::<{ ed25519_dalek::SECRET_KEY_LENGTH }>()).unwrap()
     }
 
     fn from_secret(bytes: &[u8]) -> errors::Result<Self> {
-       Ok(Self(bytes.try_into().map_err(|_| InvalidInputValue)?, OffchainPublicKey::from_privkey(bytes)?))
+        Ok(Self(
+            bytes.try_into().map_err(|_| InvalidInputValue)?,
+            OffchainPublicKey::from_privkey(bytes)?,
+        ))
     }
 
-    fn secret(&self) -> &Self::Secret {
+    fn secret(&self) -> &SecretValue<typenum::U32> {
         &self.0
     }
 
     fn public(&self) -> &Self::Public {
         &self.1
     }
+}
 
-    fn unzip(self) -> (Self::Secret, Self::Public) {
-        (self.0, self.1.clone())
+impl ConstantTimeEq for OffchainKeypair {
+    fn ct_eq(&self, other: &Self) -> Choice {
+        self.secret().ct_eq(other.secret())
     }
 }
 
@@ -80,51 +90,108 @@ impl From<&OffchainKeypair> for curve25519_dalek::scalar::Scalar {
 }
 
 /// Represents a keypair consisting of a secp256k1 private and public key
-#[derive(Clone, PartialEq, ZeroizeOnDrop)]
+#[derive(Clone, ZeroizeOnDrop)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-pub struct ChainKeypair([u8; 32], #[zeroize(skip)] CompressedPublicKey);
+pub struct ChainKeypair(SecretValue<typenum::U32>, #[zeroize(skip)] CompressedPublicKey);
 
 impl Keypair for ChainKeypair {
-    type Secret = [u8; 32];
+    type SecretLen = typenum::U32;
     type Public = CompressedPublicKey;
 
     fn random() -> Self {
         let (secret, public) = random_group_element();
-        Self (secret, CompressedPublicKey(public.try_into().unwrap()))
+        Self(
+            GenericArray::from(secret).into(),
+            CompressedPublicKey(public.try_into().unwrap()),
+        )
     }
 
     fn from_secret(bytes: &[u8]) -> errors::Result<Self> {
-        let compressed = PublicKey::from_privkey(bytes)
-            .map(|pk| CompressedPublicKey(pk))?;
+        let compressed = PublicKey::from_privkey(bytes).map(CompressedPublicKey)?;
 
         Ok(Self(bytes.try_into().map_err(|_| InvalidInputValue)?, compressed))
     }
 
-    fn secret(&self) -> &Self::Secret {
+    fn secret(&self) -> &SecretValue<typenum::U32> {
         &self.0
     }
 
     fn public(&self) -> &Self::Public {
         &self.1
     }
+}
 
-    fn unzip(self) -> (Self::Secret, Self::Public) {
-        (self.0, self.1.clone())
+impl ConstantTimeEq for ChainKeypair {
+    fn ct_eq(&self, other: &Self) -> Choice {
+        self.secret().ct_eq(other.secret())
     }
 }
 
 impl From<&ChainKeypair> for k256::Scalar {
     fn from(value: &ChainKeypair) -> Self {
-        k256::Scalar::from_bytes(&value.0).unwrap()
+        k256::Scalar::from_bytes(value.0.as_ref()).unwrap()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
+    use crate::types::{CompressedPublicKey, OffchainPublicKey, PublicKey};
+    use subtle::ConstantTimeEq;
+
+    #[test]
+    fn test_offchain_keypair() {
+        let kp_1 = OffchainKeypair::random();
+
+        let public = OffchainPublicKey::from_privkey(kp_1.secret().as_ref()).unwrap();
+        assert_eq!(&public, kp_1.public(), "secret keys must yield compatible public keys");
+
+        let kp_2 = OffchainKeypair::from_secret(kp_1.secret().as_ref()).unwrap();
+        assert_eq!(
+            kp_1.ct_eq(&kp_2).unwrap_u8(),
+            1,
+            "keypairs generated from secrets must be equal"
+        );
+        assert_eq!(&public, kp_2.public(), "secret keys must yield compatible public keys");
+        assert_eq!(kp_1.public(), kp_2.public(), "keypair public keys must be equal");
+
+        let (s1, p1) = kp_1.unzip();
+        let (s2, p2) = kp_2.unzip();
+
+        assert_eq!(s1.ct_eq(&s2).unwrap_u8(), 1);
+        assert_eq!(p1, p2);
+    }
+
+    #[test]
+    fn test_chain_keypair() {
+        let kp_1 = ChainKeypair::random();
+
+        let public = CompressedPublicKey(PublicKey::from_privkey(kp_1.secret().as_ref()).unwrap());
+        assert_eq!(&public, kp_1.public(), "secret keys must yield compatible public keys");
+
+        let kp_2 = ChainKeypair::from_secret(kp_1.secret().as_ref()).unwrap();
+        assert_eq!(
+            kp_1.ct_eq(&kp_2).unwrap_u8(),
+            1,
+            "keypairs generated from secrets must be equal"
+        );
+        assert_eq!(&public, kp_2.public(), "secret keys must yield compatible public keys");
+        assert_eq!(kp_1.public(), kp_2.public(), "keypair public keys must be equal");
+
+        let (s1, p1) = kp_1.unzip();
+        let (s2, p2) = kp_2.unzip();
+
+        assert_eq!(s1.ct_eq(&s2).unwrap_u8(), 1);
+        assert_eq!(p1, p2);
     }
 }
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use wasm_bindgen::prelude::wasm_bindgen;
+    use crate::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
-    use crate::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
+    use wasm_bindgen::prelude::wasm_bindgen;
 
     #[wasm_bindgen]
     impl OffchainKeypair {

@@ -1,5 +1,8 @@
-use crate::derivation::generate_key_iv;
 use aes::cipher::{KeyIvInit, StreamCipher};
+use zeroize::ZeroizeOnDrop;
+
+use crate::derivation::generate_key_iv;
+use crate::primitives::SecretKey;
 
 // Module-specific constants
 const AES_BLOCK_SIZE: usize = 16;
@@ -15,7 +18,7 @@ type Aes128Ctr32BE = ctr::Ctr32BE<aes::Aes128>;
 
 /// Parameters for the Pseudo-Random Generator (PRG) function
 /// This consists of IV and the raw secret key for use by the underlying block cipher.
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+#[derive(ZeroizeOnDrop)]
 pub struct PRGParameters {
     key: [u8; PRG_KEY_LENGTH],
     iv: [u8; PRG_IV_LENGTH],
@@ -30,20 +33,15 @@ impl Default for PRGParameters {
     }
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl PRGParameters {
     /// Creates new parameters for the PRG by expanding the given
     /// keying material into the secret key and IV for the underlying block cipher.
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
-    pub fn new(secret: &[u8]) -> Self {
+    pub fn new(secret: &SecretKey) -> Self {
         let mut ret = PRGParameters::default();
-        generate_key_iv(secret, HASH_KEY_PRG.as_bytes(), &mut ret.key, &mut ret.iv, true)
-            .expect("invalid secret given");
+        generate_key_iv(secret, HASH_KEY_PRG.as_bytes(), &mut ret.key, &mut ret.iv, true);
         ret
     }
-}
 
-impl PRGParameters {
     /// Raw key material for the underlying block cipher
     pub fn key(&self) -> &[u8] {
         &self.key
@@ -59,32 +57,22 @@ impl PRGParameters {
 /// using AES-128 block cipher in Counter mode (with 32-bit counter).
 /// It forms an infinite sequence of pseudo-random bytes (generated deterministically from the parameters)
 /// and can be queried by chunks using the `digest` function.
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+#[derive(ZeroizeOnDrop)]
 pub struct PRG {
     params: PRGParameters,
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl PRG {
     /// Creates a PRG instance  using the raw key and IV for the underlying block cipher.
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
-    pub fn new(key: &[u8], iv: &[u8]) -> Self {
-        assert_eq!(key.len(), PRG_KEY_LENGTH, "invalid key size");
-        assert_eq!(iv.len(), PRG_IV_LENGTH, "invalid iv size");
-
-        let mut ret = Self {
-            params: PRGParameters::default(),
-        };
-
-        ret.params.key.copy_from_slice(key);
-        ret.params.iv.copy_from_slice(iv);
-
-        ret
+    pub fn new(key: [u8; PRG_KEY_LENGTH], iv: [u8; PRG_IV_LENGTH]) -> Self {
+        Self {
+            params: PRGParameters { key, iv },
+        }
     }
 
     /// Creates a new PRG instance using the given parameters
     pub fn from_parameters(params: PRGParameters) -> Self {
-        Self::new(&params.key, &params.iv) // Correct sizing taken care of by PRGParameters
+        Self { params }
     }
 }
 
@@ -129,36 +117,26 @@ impl PRG {
 
 #[cfg(test)]
 mod tests {
-    use crate::parameters::SECRET_KEY_LENGTH;
     use crate::prg::{PRGParameters, AES_BLOCK_SIZE, AES_KEY_SIZE, PRG};
+    use crate::primitives::SecretKey;
     use hex_literal::hex;
 
     #[test]
     fn test_prg_single_block() {
-        let key = [0u8; 16];
-        let iv = [0u8; 12];
-
-        let out = PRG::new(&key, &iv).digest(5, 10);
-
+        let out = PRG::new([0u8; 16], [0u8; 12]).digest(5, 10);
         assert_eq!(5, out.len());
     }
 
     #[test]
     fn test_prg_more_blocks() {
-        let key = [0u8; 16];
-        let iv = [0u8; 12];
-
-        let out = PRG::new(&key, &iv).digest(0, AES_BLOCK_SIZE * 2);
+        let out = PRG::new([0u8; 16], [0u8; 12]).digest(0, AES_BLOCK_SIZE * 2);
 
         assert_eq!(32, out.len());
     }
 
     #[test]
     fn test_prg_across_blocks() {
-        let key = [0u8; 16];
-        let iv = [0u8; 12];
-
-        let out = PRG::new(&key, &iv).digest(5, AES_KEY_SIZE * 2 + 10);
+        let out = PRG::new([0u8; 16], [0u8; 12]).digest(5, AES_KEY_SIZE * 2 + 10);
 
         assert_eq!(AES_BLOCK_SIZE * 2 + 5, out.len());
     }
@@ -168,37 +146,9 @@ mod tests {
         let expected_key = hex!("c642ceb7af7a65308ab2dbff9f6c7132");
         let expected_iv = hex!("a735d1806513af957dd25de7");
 
-        let secret = [0u8; SECRET_KEY_LENGTH];
-        let params = PRGParameters::new(&secret);
+        let params = PRGParameters::new(&SecretKey::default());
 
         assert_eq!(expected_key, params.key);
         assert_eq!(expected_iv, params.iv)
-    }
-}
-
-#[cfg(feature = "wasm")]
-mod wasm {
-    use crate::prg::{PRGParameters, PRG};
-    use wasm_bindgen::prelude::wasm_bindgen;
-
-    #[wasm_bindgen]
-    impl PRGParameters {
-        #[wasm_bindgen(js_name = "key")]
-        pub fn _key(&self) -> Box<[u8]> {
-            self.key.into()
-        }
-
-        #[wasm_bindgen(js_name = "iv")]
-        pub fn _iv(&self) -> Box<[u8]> {
-            self.iv.into()
-        }
-    }
-
-    #[wasm_bindgen]
-    impl PRG {
-        #[wasm_bindgen(js_name = "digest")]
-        pub fn _digest(&self, from: u32, to: u32) -> Box<[u8]> {
-            self.digest(from as usize, to as usize)
-        }
     }
 }

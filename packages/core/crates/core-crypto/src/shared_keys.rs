@@ -1,41 +1,17 @@
-use std::marker::PhantomData;
 use blake2::Blake2s256;
-use std::ops::Mul;
 use generic_array::{ArrayLength, GenericArray};
+use std::marker::PhantomData;
+use std::ops::Mul;
 
-use crate::errors::CryptoError::{CalculationError, InvalidInputValue};
+use crate::errors::CryptoError::CalculationError;
 use hkdf::SimpleHkdf;
-use zeroize::{ZeroizeOnDrop};
 
-use crate::errors::{CryptoError, Result};
-use crate::parameters::SECRET_KEY_LENGTH;
-use crate::random::random_bytes;
+use crate::errors::Result;
 use crate::keypairs::Keypair;
+use crate::utils::SecretValue;
 
 /// Represents a shared secret with a remote peer.
-#[derive(Debug, PartialEq, Eq, ZeroizeOnDrop)]
-pub struct SharedSecret([u8; SECRET_KEY_LENGTH]);
-
-impl AsRef<[u8]> for SharedSecret {
-    fn as_ref(&self) -> &[u8] {
-        &self.0
-    }
-}
-
-impl TryFrom<&[u8]> for SharedSecret {
-    type Error = CryptoError;
-
-    fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
-        Ok(Self(value.try_into().map_err(|_| InvalidInputValue)?))
-    }
-}
-
-impl SharedSecret {
-    /// Generates a random shared secret, not derived from a public group element
-    pub fn random() -> Self {
-        Self(random_bytes())
-    }
-}
+pub type SharedSecret = SecretValue<typenum::U32>;
 
 /// Types representing a valid non-zero scalar an additive abelian group.
 pub trait Scalar: Mul<Output = Self> + Sized {
@@ -56,13 +32,15 @@ pub type Alpha<A> = GenericArray<u8, A>;
 /// Generic additive abelian group element with an associated scalar type.
 /// It also comes with the associated Alpha value size.
 /// A group element is considered valid if it is not neutral or a torsion element of small order.
-pub trait GroupElement<A: ArrayLength<u8>, E: Scalar>: Clone + for <'a> Mul<&'a E, Output = Self> {
+pub trait GroupElement<E: Scalar>: Clone + for<'a> Mul<&'a E, Output = Self> {
+    /// Length of the Alpha value - a binary representation of the group element.
+    type AlphaLen: ArrayLength<u8>;
 
     /// Converts the group element to a binary format suitable for representing the Alpha value.
-    fn to_alpha(&self) -> Alpha<A>;
+    fn to_alpha(&self) -> Alpha<Self::AlphaLen>;
 
     /// Converts the group element from the binary format representing an Alpha value.
-    fn from_alpha(alpha: Alpha<A>) -> Result<Self>;
+    fn from_alpha(alpha: Alpha<Self::AlphaLen>) -> Result<Self>;
 
     /// Create a group element using the group generator and the given scalar
     fn generate(scalar: &E) -> Self;
@@ -81,34 +59,33 @@ pub trait GroupElement<A: ArrayLength<u8>, E: Scalar>: Clone + for <'a> Mul<&'a 
     /// Extract a keying material from a group element using HKDF extract
     fn extract_key(&self, salt: &[u8]) -> SharedSecret {
         let ikm = self.to_alpha();
-        SharedSecret(SimpleHkdf::<Blake2s256>::extract(Some(&salt), ikm.as_ref()).0.into())
+        SimpleHkdf::<Blake2s256>::extract(Some(salt), ikm.as_ref()).0.into()
     }
 
     /// Performs KDF expansion from the given group element using HKDF expand
     fn expand_key(&self, salt: &[u8]) -> SharedSecret {
-        let mut out = [0u8; SECRET_KEY_LENGTH];
+        let mut out = GenericArray::default();
         let ikm = self.to_alpha();
         SimpleHkdf::<Blake2s256>::new(Some(salt), &ikm)
             .expand(b"", &mut out)
-            .unwrap(); // Cannot panic, unless the constants are wrong
+            .expect("invalid size of the shared secret output"); // Cannot panic, unless the constants are wrong
 
-        SharedSecret(out)
+        out.into()
     }
 }
 
 /// Structure containing shared keys for peers using the Sphinx algorithm.
-pub struct SharedKeys<E: Scalar, A: ArrayLength<u8>, G: GroupElement<A, E>> {
-    pub alpha: Alpha<A>,
+pub struct SharedKeys<E: Scalar, G: GroupElement<E>> {
+    pub alpha: Alpha<G::AlphaLen>,
     pub secrets: Vec<SharedSecret>,
     _e: PhantomData<E>,
     _g: PhantomData<G>,
 }
 
-impl <E: Scalar, A: ArrayLength<u8>, G: GroupElement<A, E>> SharedKeys<E, A, G> {
-
+impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
     /// Generates shared secrets given the group element of the peers.
     /// The order of the peer group elements is preserved for resulting shared keys.
-    pub fn generate(peer_group_elements: Vec<G>) -> Result<SharedKeys<E, A, G>> {
+    pub fn generate(peer_group_elements: Vec<G>) -> Result<SharedKeys<E, G>> {
         let mut shared_keys = Vec::new();
 
         // coeff_prev becomes: x * b_0 * b_1 * b_2 * ...
@@ -121,7 +98,6 @@ impl <E: Scalar, A: ArrayLength<u8>, G: GroupElement<A, E>> SharedKeys<E, A, G> 
         // Iterate through all the given peer public keys
         let keys_len = peer_group_elements.len();
         for (i, group_element) in peer_group_elements.into_iter().enumerate() {
-
             // Try to decode the given public key point & multiply by the current coefficient
             let salt = group_element.to_alpha();
             let shared_secret = group_element.mul(&coeff_prev);
@@ -136,7 +112,7 @@ impl <E: Scalar, A: ArrayLength<u8>, G: GroupElement<A, E>> SharedKeys<E, A, G> 
 
             // Compute the new blinding factor b_k (alpha needs compressing first)
             let b_k = shared_secret.expand_key(&alpha_prev.to_alpha());
-            let b_k_checked = E::from_bytes(&b_k.0)?;
+            let b_k_checked = E::from_bytes(b_k.as_ref())?;
 
             // Update coeff_prev and alpha
             alpha_prev = alpha_prev.mul(&b_k_checked);
@@ -151,22 +127,26 @@ impl <E: Scalar, A: ArrayLength<u8>, G: GroupElement<A, E>> SharedKeys<E, A, G> 
             alpha,
             secrets: shared_keys,
             _e: PhantomData,
-            _g: PhantomData
+            _g: PhantomData,
         })
     }
 
     /// Calculates the forward transformation for the given the local private key.
     /// The `public_group_element` is a precomputed group element associated to the private key for efficiency.
-    pub fn forward_transform(alpha: &Alpha<A>, private_scalar: &E, public_group_element: &G) -> Result<(Alpha<A>, SharedSecret)> {
+    pub fn forward_transform(
+        alpha: &Alpha<G::AlphaLen>,
+        private_scalar: &E,
+        public_group_element: &G,
+    ) -> Result<(Alpha<G::AlphaLen>, SharedSecret)> {
         let alpha_point = G::from_alpha(alpha.clone())?;
 
-        let s_k = alpha_point.clone().mul(&private_scalar);
+        let s_k = alpha_point.clone().mul(private_scalar);
 
         let secret = s_k.extract_key(&public_group_element.to_alpha());
 
         let b_k = s_k.expand_key(alpha);
 
-        let b_k_checked = E::from_bytes(&b_k.0)?;
+        let b_k_checked = E::from_bytes(b_k.as_ref())?;
         let alpha_new = alpha_point.mul(&b_k_checked);
 
         Ok((alpha_new.to_alpha(), secret))
@@ -175,21 +155,17 @@ impl <E: Scalar, A: ArrayLength<u8>, G: GroupElement<A, E>> SharedKeys<E, A, G> 
 
 /// Represents an instantiation of the Spinx protocol using the given EC group and corresponding public key object.
 pub trait SphinxSuite {
-
-    /// Length of the Sphinx Alpha value corresponding to the EC group
-    type A: ArrayLength<u8>;
-
     /// Keypair corresponding to the EC group
     type P: Keypair;
 
     /// Scalar type supported by the EC group
-    type E: Scalar + for <'a> From<&'a Self::P>;
+    type E: Scalar + for<'a> From<&'a Self::P>;
 
     /// EC group element
-    type G: GroupElement<Self::A, Self::E> + for<'a> From<&'a <Self::P as Keypair>::Public>;
+    type G: GroupElement<Self::E> + for<'a> From<&'a <Self::P as Keypair>::Public>;
 
     /// Convenience function to generate shared keys from the path of public keys.
-    fn new_shared_keys(public_keys: &Vec<<Self::P as Keypair>::Public>) -> Result<SharedKeys<Self::E, Self::A, Self::G>> {
+    fn new_shared_keys(public_keys: &[<Self::P as Keypair>::Public]) -> Result<SharedKeys<Self::E, Self::G>> {
         SharedKeys::generate(public_keys.iter().map(|pk| pk.into()).collect())
     }
 }
@@ -197,21 +173,29 @@ pub trait SphinxSuite {
 #[cfg(test)]
 pub mod tests {
     use super::*;
+    use subtle::ConstantTimeEq;
 
     pub fn generic_sphinx_suite_test<S: SphinxSuite>(node_count: usize) {
-        let (pub_keys, priv_keys): (Vec<S::G>, Vec<S::E>) = (0..node_count)
-            .map(|_| S::G::random_pair())
-            .unzip();
+        let (pub_keys, priv_keys): (Vec<S::G>, Vec<S::E>) = (0..node_count).map(|_| S::G::random_pair()).unzip();
 
         // Now generate the key shares for the public keys
-        let generated_shares = SharedKeys::<S::E, S::A, S::G>::generate(pub_keys.clone()).unwrap();
-        assert_eq!(node_count, generated_shares.secrets.len());
+        let generated_shares = SharedKeys::<S::E, S::G>::generate(pub_keys.clone()).unwrap();
+        assert_eq!(
+            node_count,
+            generated_shares.secrets.len(),
+            "number of generated keys should be equal to the number of nodes"
+        );
 
         let mut alpha_cpy = generated_shares.alpha.clone();
         for (i, priv_key) in priv_keys.into_iter().enumerate() {
-            let (alpha, secret) = SharedKeys::<S::E, S::A, S::G>::forward_transform(&alpha_cpy, &priv_key, &pub_keys[i]).unwrap();
+            let (alpha, secret) =
+                SharedKeys::<S::E, S::G>::forward_transform(&alpha_cpy, &priv_key, &pub_keys[i]).unwrap();
 
-            assert_eq!(secret, generated_shares.secrets[i]);
+            assert_eq!(
+                secret.ct_eq(&generated_shares.secrets[i]).unwrap_u8(),
+                1,
+                "forward transform should yield the same shared secret"
+            );
 
             alpha_cpy = alpha;
         }

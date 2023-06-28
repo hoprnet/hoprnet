@@ -13,7 +13,6 @@ pub mod shared_keys;
 pub mod types;
 mod utils;
 
-
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use utils_log::logger::JsLogger;
