@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.19;
 
-error PublicKeyDoesNotMatchSender(address pubkey, address sender);
-
 import 'openzeppelin-contracts-4.8.3/utils/Multicall.sol';
 
 /**
@@ -23,8 +21,7 @@ import 'openzeppelin-contracts-4.8.3/utils/Multicall.sol';
  * Publishes transport-layer information in the hopr network.
  **/
 contract HoprAnnouncements is Multicall {
-  event KeyBindingOdd(bytes32 secp256k1_x, bytes32 ed25519_sig_0, bytes32 ed25519_sig_1, bytes32 ed25519_pub_key);
-  event KeyBindingEven(bytes32 secp256k1_x, bytes32 ed25519_sig_0, bytes32 ed25519_sig_1, bytes32 ed25519_pub_key);
+  event KeyBinding(bytes32 ed25519_sig_0, bytes32 ed25519_sig_1, bytes32 ed25519_pub_key, address chain_key);
 
   event AddressAnnouncement4(address node, bytes4 ip4, bytes2 port);
   event AddressAnnouncement6(address node, bytes16 ip6, bytes2 port);
@@ -43,36 +40,30 @@ contract HoprAnnouncements is Multicall {
 
   function bindKeysSafe(
     address self,
-    bytes32 secp256k1_x,
-    bytes32 secp256k1_y,
     bytes32 ed25519_sig_0,
     bytes32 ed25519_sig_1,
     bytes32 ed25519_pub_key
   ) external onlySafe {
-    _bindKeysInternal(self, secp256k1_x, secp256k1_y, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key);
+    _bindKeysInternal(self, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key);
   }
 
   function bindKeys(
-    bytes32 secp256k1_x,
-    bytes32 secp256k1_y,
     bytes32 ed25519_sig_0,
     bytes32 ed25519_sig_1,
     bytes32 ed25519_pub_key
   ) external noSafeSet {
-    _bindKeysInternal(msg.sender, secp256k1_x, secp256k1_y, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key);
+    _bindKeysInternal(msg.sender, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key);
   }
 
   function bindKeysAnnounce4Safe(
     address self,
-    bytes32 secp256k1_x,
-    bytes32 secp256k1_y,
     bytes32 ed25519_sig_0,
     bytes32 ed25519_sig_1,
     bytes32 ed25519_pub_key,
     bytes4 ip,
     bytes2 port
   ) external onlySafe {
-    _bindKeysInternal(self, secp256k1_x, secp256k1_y, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key);
+    _bindKeysInternal(self, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key);
     _announce4Internal(self, ip, port);
   }
 
@@ -80,29 +71,25 @@ contract HoprAnnouncements is Multicall {
    * Convenience method to bind keys and announce a IPv4 address in one call.
    */
   function bindKeysAnnounce4(
-    bytes32 secp256k1_x,
-    bytes32 secp256k1_y,
     bytes32 ed25519_sig_0,
     bytes32 ed25519_sig_1,
     bytes32 ed25519_pub_key,
     bytes4 ip,
     bytes2 port
   ) external noSafeSet {
-    _bindKeysInternal(msg.sender, secp256k1_x, secp256k1_y, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key);
+    _bindKeysInternal(msg.sender,  ed25519_sig_0, ed25519_sig_1, ed25519_pub_key);
     _announce4Internal(msg.sender, ip, port);
   }
 
   function bindKeysAnnounce6Safe(
     address self,
-    bytes32 secp256k1_x,
-    bytes32 secp256k1_y,
     bytes32 ed25519_sig_0,
     bytes32 ed25519_sig_1,
     bytes32 ed25519_pub_key,
     bytes16 ip,
     bytes2 port
   ) external onlySafe {
-    _bindKeysInternal(self, secp256k1_x, secp256k1_y, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key);
+    _bindKeysInternal(self, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key);
     _announce6Internal(self, ip, port);
   }
 
@@ -110,15 +97,13 @@ contract HoprAnnouncements is Multicall {
    * Convenience method to bind keys and announce a IPv6 address in one call.
    */
   function bindKeysAnnounce6(
-    bytes32 secp256k1_x,
-    bytes32 secp256k1_y,
     bytes32 ed25519_sig_0,
     bytes32 ed25519_sig_1,
     bytes32 ed25519_pub_key,
     bytes16 ip,
     bytes2 port
   ) external noSafeSet {
-    _bindKeysInternal(msg.sender, secp256k1_x, secp256k1_y, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key);
+    _bindKeysInternal(msg.sender, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key);
     _announce6Internal(msg.sender, ip, port);
   }
 
@@ -158,32 +143,17 @@ contract HoprAnnouncements is Multicall {
    *
    * @dev Key binding and address announcements can happen in one call using `multicall`.
    *
-   * @param secp256k1_x first component of the public key
-   * @param secp256k1_y second component of the public key
    * @param ed25519_sig_0 first component of the EdDSA signature
    * @param ed25519_sig_1 second component of the EdDSA signature
    * @param ed25519_pub_key EdDSA public key
    */
   function _bindKeysInternal(
     address self,
-    bytes32 secp256k1_x,
-    bytes32 secp256k1_y,
     bytes32 ed25519_sig_0,
     bytes32 ed25519_sig_1,
     bytes32 ed25519_pub_key
   ) internal {
-    // Derive Ethereum address from uncompressed secp256k1 public key
-    address sender_addr = address(uint160(uint256(keccak256(abi.encodePacked(secp256k1_x, secp256k1_y)))));
-
-    if (self != sender_addr) {
-      revert PublicKeyDoesNotMatchSender({pubkey: sender_addr, sender: msg.sender});
-    }
-
-    if (uint256(secp256k1_y) % 2 == 1) {
-      emit KeyBindingOdd(secp256k1_x, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key);
-    } else {
-      emit KeyBindingEven(secp256k1_x, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key);
-    }
+    emit KeyBinding(ed25519_sig_0, ed25519_sig_1, ed25519_pub_key, self);
   }
 
   /**
