@@ -1445,7 +1445,7 @@ pub mod wasm {
     use std::str::FromStr;
     use std::sync::{Arc, Mutex};
     use utils_db::db::DB;
-    use utils_db::leveldb::{LevelDb, LevelDbShim};
+    use utils_db::leveldb::wasm::{LevelDb, LevelDbShim};
     use utils_log::error;
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;

@@ -14,6 +14,10 @@ pub trait ChannelStrategy {
     /// Human readable name of the strategy
     const NAME: &'static str;
 
+    fn name(&self) -> String {
+        Self::NAME.into()
+    }
+
     /// Performs the strategy tick - deciding which new channels should be opened and
     /// which existing channels should be closed.
     fn tick<Q>(

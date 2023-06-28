@@ -70,13 +70,16 @@ pub fn create_identity(dir_name: &str, password: &str, maybe_name: &Option<Strin
 #[cfg(test)]
 mod tests {
     use std::path::Path;
+    use tempfile::tempdir;
     use utils_types::traits::PeerIdLike;
 
     use super::*;
 
     #[test]
     fn create_identities_from_directory_with_id_files() {
-        let path = "./tmp_create";
+        let tmp = tempdir().unwrap();
+
+        let path = tmp.path().to_str().unwrap();
         let pwd = "password_create";
         match create_identity(path, pwd, &Some(String::from("node1"))) {
             Ok(_) => assert!(true),
@@ -87,7 +90,9 @@ mod tests {
 
     #[test]
     fn read_identities_from_directory_with_id_files() {
-        let path = "./tmp_1";
+        let tmp = tempdir().unwrap();
+
+        let path = tmp.path().to_str().unwrap();
         let pwd = "password";
         let created_id = create_identity(path, pwd, &None).unwrap();
 
@@ -107,7 +112,9 @@ mod tests {
 
     #[test]
     fn read_identities_from_directory_with_id_files_but_wrong_password() {
-        let path = "./tmp_2";
+        let tmp = tempdir().unwrap();
+
+        let path = tmp.path().to_str().unwrap();
         let pwd = "password";
         let wrong_pwd = "wrong_password";
         create_identity(path, pwd, &None).unwrap();
@@ -121,7 +128,9 @@ mod tests {
 
     #[test]
     fn read_identities_from_directory_without_id_files() {
-        let path = "./";
+        let tmp = tempdir().unwrap();
+
+        let path = tmp.path().to_str().unwrap();
         let files = get_files(path, &None);
         match read_identities(files, &"".to_string()) {
             Ok(val) => assert_eq!(val.len(), 0),
@@ -131,9 +140,11 @@ mod tests {
 
     #[test]
     fn read_identities_from_tmp_folder() {
-        let path = "./tmp_4";
+        let tmp = tempdir().unwrap();
+
+        let path = tmp.path().to_str().unwrap();
         let pwd = "local";
-        create_identity(path, pwd, &Some(String::from("local-alice"))).unwrap();
+        create_identity(path, pwd, &Some("local-alice".into())).unwrap();
         let files = get_files(path, &None);
         match read_identities(files, &pwd.to_string()) {
             Ok(val) => assert_eq!(val.len(), 1),
@@ -144,9 +155,11 @@ mod tests {
 
     #[test]
     fn read_identities_from_tmp_folder_with_prefix() {
-        let path = "./tmp_5";
+        let tmp = tempdir().unwrap();
+
+        let path = tmp.path().to_str().unwrap();
         let pwd = "local";
-        create_identity(path, pwd, &Some(String::from("local-alice"))).unwrap();
+        create_identity(path, pwd, &Some("local-alice".into())).unwrap();
         let files = get_files(path, &Some("local".to_string()));
         match read_identities(files, &pwd.to_string()) {
             Ok(val) => assert_eq!(val.len(), 1),
@@ -157,9 +170,11 @@ mod tests {
 
     #[test]
     fn read_identities_from_tmp_folder_no_match() {
-        let path = "./tmp_6";
+        let tmp = tempdir().unwrap();
+
+        let path = tmp.path().to_str().unwrap();
         let pwd = "local";
-        create_identity(path, pwd, &Some(String::from("local-alice"))).unwrap();
+        create_identity(path, pwd, &Some("local-alice".into())).unwrap();
         let files = get_files(path, &Some("npm-".to_string()));
         match read_identities(files, &pwd.to_string()) {
             Ok(val) => assert_eq!(val.len(), 0),
@@ -170,9 +185,11 @@ mod tests {
 
     #[test]
     fn read_identities_from_tmp_folder_with_wrong_prefix() {
-        let path = "./tmp_7";
+        let tmp = tempdir().unwrap();
+
+        let path = tmp.path().to_str().unwrap();
         let pwd = "local";
-        create_identity(path, pwd, &Some(String::from("local-alice"))).unwrap();
+        create_identity(path, pwd, &Some("local-alice".into())).unwrap();
 
         let files = get_files(path, &Some("alice".to_string()));
         match read_identities(files, &pwd.to_string()) {
@@ -184,11 +201,13 @@ mod tests {
 
     #[test]
     fn read_complete_identities_from_tmp_folder() {
-        let path = "./tmp_8";
+        let tmp = tempdir().unwrap();
+
+        let path = tmp.path().to_str().unwrap();
         let name = "alice.id";
         let pwd = "e2e-test";
 
-        let weak_crypto_alice_keystore = r#"{"crypto":{"cipher":"aes-128-ctr","cipherparams":{"iv":"9a876992ad22bec8e82fe3452788b800"},"ciphertext":"f08651ab3c237e337f81e8fa6689bb896f35e4eaae34aca504fa30a86ad85f72281ba48a99cb1327435c935b9deb800d60ca2fc46072c5c3b3aafc1861f0a12c","kdf":"scrypt","kdfparams":{"dklen":32,"n":2,"p":1,"r":8,"salt":"82af32aac6a4377ce44877c3ae4f7c5e7b9e409e866a0e75fb3bff86f1fbc66d"},"mac":"524197480216a0d1d1781214de8b76ca08feddf337338765b3cea47f08b319cb"},"id":"c76e561b-bedf-4a9a-87f7-352efd718c9b","version":3}"#;
+        let weak_crypto_alice_keystore = r#"{"crypto":{"cipher":"aes-128-ctr","cipherparams":{"iv":"6084fab56497402930d0833fbc17e7ea"},"ciphertext":"50c0cf2537d7bc0ab6dbb7909d21d3da6445e5bd2cb1236de7efbab33302ddf1dd6a0393c986f8c111fe73a22f36af88858d79d23882a5f991713cb798172069d060f28c680afc28743e8842e8e849ebc21209825e23465afcee52a49f9c4f6734061f91a45b4cc8fbd6b4c95cc4c1b487f0007ed88a1b46b5ebdda616013b3f7ba465f97352b9412e69e6690cee0330c0b25bcf5fc3cdf12e4167336997920df9d6b7d816943ab3817481b9","kdf":"scrypt","kdfparams":{"dklen":32,"n":2,"p":1,"r":8,"salt":"46e30c2d74ba04b881e99fb276ae6a970974499f6abe286a00a69ba774ace095"},"mac":"70dccb366e8ddde13ebeef9a6f35bbc1333176cff3d33a72c925ce23753b34f4"},"id":"b5babdf4-da20-4cc1-9484-58ea24f1b3ae","version":3}"#;
         let alice_peer_id = "16Uiu2HAmUYnGY3USo8iy13SBFW7m5BMQvC4NETu1fGTdoB86piw7";
         let alice_address = "0x838d3c1d2ff5c576d7b270aaaaaa67e619217aac";
 
