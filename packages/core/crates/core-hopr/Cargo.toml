@@ -13,7 +13,7 @@ crate-type = ["cdylib", "rlib"]
 default = ["console_error_panic_hook", "wasm", "prometheus"]
 console_error_panic_hook = ["dep:console_error_panic_hook"]
 wasm = ["dep:wasm-bindgen", "dep:js-sys", "core-ethereum-db/wasm", "core-ethereum-misc/wasm", "core-packet/wasm"]
-prometheus = ["dep:utils-metrics"]
+prometheus = ["dep:utils-metrics", "core-packet/prometheus"]
 
 [dependencies]
 console_error_panic_hook = { version = "0.1.7", optional = true }
