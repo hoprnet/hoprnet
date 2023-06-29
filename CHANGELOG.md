@@ -21,6 +21,7 @@
 - Remove Avado build support ([#5181](https://github.com/hoprnet/hoprnet/pull/5181))
 - Upgrade to Node v18 as default runtime ([#5184](https://github.com/hoprnet/hoprnet/pull/5184))
 - Use transitive Rust build features and fix various build issues ([#5187](https://github.com/hoprnet/hoprnet/pull/5187))
+- Change `core-ethereum` to operate on Ethereum `Address`es rather than `PublicKey`s ([#5189](https://github.com/hoprnet/hoprnet/pull/5189))
 
 <a name="1.93"></a>
 
