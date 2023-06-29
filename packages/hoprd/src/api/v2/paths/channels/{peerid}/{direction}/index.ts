@@ -67,7 +67,7 @@ export async function closeChannel(
 
 const DELETE: Operation = [
   async (req, res, _next) => {
-    const { node } = req.context
+    const { node }: { node: Hopr } = req.context
     const { peerid, direction } = req.params
 
     const closingResult = await closeChannel(node, peerid, direction as any)
@@ -193,7 +193,7 @@ export const getChannel = async (
 
 const GET: Operation = [
   async (req, res, _next) => {
-    const { node } = req.context
+    const { node }: { node: Hopr } = req.context
     const { peerid, direction } = req.params
 
     if (!['incoming', 'outgoing'].includes(direction)) {

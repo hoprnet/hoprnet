@@ -15,7 +15,8 @@ import {
   PublicKey,
   ChannelEntry,
   U256,
-  stringToU8a
+  stringToU8a,
+  number_to_channel_status
 } from '@hoprnet/hopr-utils'
 
 import Indexer from './index.js'
@@ -23,7 +24,6 @@ import type { ChainWrapper } from '../ethereum.js'
 import type { Event, TokenEvent, RegistryEvent } from './types.js'
 import * as fixtures from './fixtures.js'
 import { ACCOUNT_A, PARTY_A, PARTY_A_MULTIADDR, PARTY_B } from '../fixtures.js'
-import { numberToChannelStatus } from './utils.js'
 import { MOCK_PUBLIC_KEY } from './fixtures.js'
 
 //@TODO: Refactor this logger and mock outside of indexer
@@ -321,7 +321,7 @@ export const useFixtures = async (
       new Hash(stringToU8a(fixtures.OPENED_EVENT.args.newState.commitment)),
       new U256(fixtures.OPENED_EVENT.args.newState.ticketEpoch.toString()),
       new U256(fixtures.OPENED_EVENT.args.newState.ticketIndex.toString()),
-      numberToChannelStatus(fixtures.OPENED_EVENT.args.newState.status),
+      number_to_channel_status(fixtures.OPENED_EVENT.args.newState.status),
       new U256(fixtures.OPENED_EVENT.args.newState.channelEpoch.toString()),
       new U256(fixtures.OPENED_EVENT.args.newState.closureTime.toString())
     ),
@@ -332,7 +332,7 @@ export const useFixtures = async (
       new Hash(stringToU8a(fixtures.COMMITTED_EVENT.args.newState.commitment)),
       new U256(fixtures.COMMITTED_EVENT.args.newState.ticketEpoch.toString()),
       new U256(fixtures.COMMITTED_EVENT.args.newState.ticketIndex.toString()),
-      numberToChannelStatus(fixtures.COMMITTED_EVENT.args.newState.status),
+      number_to_channel_status(fixtures.COMMITTED_EVENT.args.newState.status),
       new U256(fixtures.COMMITTED_EVENT.args.newState.channelEpoch.toString()),
       new U256(fixtures.COMMITTED_EVENT.args.newState.closureTime.toString())
     )

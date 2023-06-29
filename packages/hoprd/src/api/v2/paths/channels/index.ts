@@ -1,5 +1,5 @@
 import type { Operation } from 'express-openapi'
-import type { default as Hopr } from '@hoprnet/hopr-core'
+import type Hopr from '@hoprnet/hopr-core'
 import {
   type ChannelEntry,
   ChannelStatus,
@@ -106,7 +106,7 @@ export const getAllChannels = async (node: Hopr) => {
 
 const GET: Operation = [
   async (req, res, _next) => {
-    const { node } = req.context
+    const { node }: { node: Hopr } = req.context
     const { includingClosed, fullTopology } = req.query
 
     try {
@@ -313,7 +313,7 @@ export async function openChannel(
 
 const POST: Operation = [
   async (req, res, _next) => {
-    const { node } = req.context
+    const { node }: { node: Hopr } = req.context
     const { peerId, amount } = req.body
 
     const openingResult = await openChannel(node, peerId, amount)

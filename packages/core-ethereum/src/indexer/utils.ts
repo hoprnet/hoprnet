@@ -1,5 +1,3 @@
-import { ChannelStatus } from '@hoprnet/hopr-utils'
-
 export type IndexerSnapshot = { blockNumber: number; transactionIndex: number; logIndex: number }
 
 /**
@@ -25,19 +23,4 @@ export function snapshotComparator(snapA: IndexerSnapshot, snapB: IndexerSnapsho
  */
 export function isConfirmedBlock(blockNumber: number, onChainBlockNumber: number, maxConfirmations: number): boolean {
   return blockNumber + maxConfirmations <= onChainBlockNumber
-}
-
-export function numberToChannelStatus(i: number): ChannelStatus {
-  switch (i) {
-    case 0:
-      return ChannelStatus.Closed
-    case 1:
-      return ChannelStatus.WaitingForCommitment
-    case 2:
-      return ChannelStatus.Open
-    case 3:
-      return ChannelStatus.PendingToClose
-    default:
-      throw Error(`Status at ${i} does not exist`)
-  }
 }

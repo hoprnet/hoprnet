@@ -30,7 +30,8 @@ import {
   create_multi_gauge,
   U256,
   random_integer,
-  Hash
+  Hash,
+  number_to_channel_status
 } from '@hoprnet/hopr-utils'
 
 import type { ChainWrapper } from '../ethereum.js'
@@ -45,7 +46,7 @@ import {
   type IndexerEventEmitter,
   IndexerStatus
 } from './types.js'
-import { isConfirmedBlock, snapshotComparator, type IndexerSnapshot, numberToChannelStatus } from './utils.js'
+import { isConfirmedBlock, snapshotComparator, type IndexerSnapshot } from './utils.js'
 import { BigNumber, type Contract, errors } from 'ethers'
 import { CORE_ETHEREUM_CONSTANTS } from '../../lib/core_ethereum_misc.js'
 import type { TypedEvent, TypedEventFilter } from '../utils/common.js'
@@ -853,7 +854,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       new Hash(stringToU8a(newState.commitment)),
       new U256(newState.ticketEpoch.toString()),
       new U256(newState.ticketIndex.toString()),
-      numberToChannelStatus(newState.status),
+      number_to_channel_status(newState.status),
       new U256(newState.channelEpoch.toString()),
       new U256(newState.closureTime.toString())
     )

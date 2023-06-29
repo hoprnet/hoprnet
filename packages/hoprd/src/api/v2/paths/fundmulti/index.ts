@@ -145,7 +145,7 @@ export async function fundMultiChannels(
 
 const POST: Operation = [
   async (req, res, _next) => {
-    const { node } = req.context
+    const { node }: { node: Hopr } = req.context
     const { peerId, outgoingAmount, incomingAmount } = req.body
 
     const fundingResult = await fundMultiChannels(node, peerId, outgoingAmount, incomingAmount)

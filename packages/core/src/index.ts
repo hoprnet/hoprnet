@@ -1436,9 +1436,8 @@ class Hopr extends EventEmitter {
     await HoprCoreEthereum.getInstance().redeemAllTickets()
   }
 
-  public async redeemTicketsInChannel(peerId: Address) {
+  public async redeemTicketsInChannel(counterparty: Address) {
     const self = this.getEthereumAddress()
-    const counterparty = PublicKey.from_peerid_str(peerId.toString()).to_address()
     const channel = await this.db.getChannelX(counterparty, self)
 
     await HoprCoreEthereum.getInstance().redeemTicketsInChannel(channel)

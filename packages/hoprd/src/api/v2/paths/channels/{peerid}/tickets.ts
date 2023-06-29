@@ -11,7 +11,7 @@ export const getTickets = async (node: Hopr, addr: Address) => {
 
 const GET: Operation = [
   async (req, res, _next) => {
-    const { node } = req.context
+    const { node }: { node: Hopr } = req.context
     const { peerid } = req.params
 
     const addr = PublicKey.from_peerid_str(peerid).to_address()
