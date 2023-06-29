@@ -7,10 +7,15 @@ on:
       GOOGLE_HOPRASSOCIATION_PROJECT:
         required: true
       GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY:
+    inputs:
+      build_toolchain:
+        type: string
         required: true
+
 concurrency:
   group: ${{ github.head_ref }}-hopli
   cancel-in-progress: true
+
 jobs:
 
   build:
@@ -40,9 +45,16 @@ jobs:
           driver: kubernetes
 
       - name: "Set PR number on version"
-        run: | 
+        run: |
           ./scripts/bump-version.sh ${{ github.event.pull_request.base.ref }} ${{ github.event.pull_request.number }}
-          echo "DOCKER_TAG=$(./scripts/get-package-version.sh | sed 's/+/-/' )" >> $GITHUB_ENV
+          new_version=$(./scripts/get-package-version.sh | sed 's/+/-/')
+          echo "DOCKER_TAG=${new_version}" >> $GITHUB_ENV
+
+          if [ "${{ inputs.build_toolchain }}" == "true" ];
+            echo "TOOLCHAIN_IMAGE_TAG=${new_version}" >> $GITHUB_ENV
+          then
+            echo "TOOLCHAIN_IMAGE_TAG=latest" >> $GITHUB_ENV
+          fi
 
       - name: Build and push docker image
         uses: docker/build-push-action@v4
@@ -52,3 +64,5 @@ jobs:
           cache-from: type=registry,ref=europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopli:${{ env.DOCKER_TAG }}-cache
           cache-to: type=registry,ref=europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopli:${{ env.DOCKER_TAG }}-cache,mode=max
           tags: europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopli:${{ env.DOCKER_TAG }}
+          build-args: |
+            TOOLCHAIN_IMAGE: europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-toolchain:${{ env.TOOLCHAIN_IMAGE_TAG }}

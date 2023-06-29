@@ -22,6 +22,7 @@ on:
 concurrency:
   group: ${{ github.head_ref }}-pluto
   cancel-in-progress: true
+
 jobs:
 
   build:
@@ -29,7 +30,7 @@ jobs:
     runs-on: ubuntu-2-core
     steps:
       - name: Checkout hoprnet repository
-        uses: actions/checkout@v3          
+        uses: actions/checkout@v3
 
       - id: auth
         name: Set up Google Cloud Credentials
@@ -51,24 +52,25 @@ jobs:
           driver: kubernetes
 
       - name: "Set PR number on version"
-        run: | 
+        run: |
           ./scripts/bump-version.sh ${{ github.event.pull_request.base.ref }} ${{ github.event.pull_request.number }}
           new_version=$(./scripts/get-package-version.sh | sed 's/+/-/')
           echo "DOCKER_TAG=${new_version}" >> $GITHUB_ENV
-          if [ "${{ inputs.build_hoprd }}" == "true" ]; 
+
+          if [ "${{ inputs.build_hoprd }}" == "true" ];
             echo "HOPRD_IMAGE_TAG=${new_version}" >> $GITHUB_ENV
           then
             echo "HOPRD_IMAGE_TAG=latest" >> $GITHUB_ENV
           fi
-          if [ "${{ inputs.build_hopli }}" == "true" ]; 
-            echo "HOPLI_IMAGE=${new_version}" >> $GITHUB_ENV
+          if [ "${{ inputs.build_hopli }}" == "true" ];
+            echo "HOPLI_IMAGE_TAG=${new_version}" >> $GITHUB_ENV
           then
-            echo "HOPLI_IMAGE=latest" >> $GITHUB_ENV
+            echo "HOPLI_IMAGE_TAG=latest" >> $GITHUB_ENV
           fi
-          if [ "${{ inputs.build_anvil }}" == "true" ]; 
-            echo "ANVIL_IMAGE=${new_version}" >> $GITHUB_ENV
+          if [ "${{ inputs.build_anvil }}" == "true" ];
+            echo "ANVIL_IMAGE_TAG=${new_version}" >> $GITHUB_ENV
           then
-            echo "ANVIL_IMAGE=latest" >> $GITHUB_ENV
+            echo "ANVIL_IMAGE_TAG=latest" >> $GITHUB_ENV
           fi
 
       - name: Build and push docker image
@@ -79,7 +81,7 @@ jobs:
           cache-from: type=registry,ref=europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-pluto:${{ env.DOCKER_TAG }}-cache
           cache-to: type=registry,ref=europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-pluto:${{ env.DOCKER_TAG }}-cache,mode=max
           tags: europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-pluto:${{ env.DOCKER_TAG }}
-          build-args: | 
+          build-args: |
             HOPRD_IMAGE: europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hoprd:${{ env.HOPRD_IMAGE_TAG }}
-            HOPLI_IMAGE: europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopli:${{ env.HOPLI_IMAGE_TAG }}            
+            HOPLI_IMAGE: europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopli:${{ env.HOPLI_IMAGE_TAG }}
             ANVIL_IMAGE: europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-anvil:${{ env.ANVIL_IMAGE_TAG }}
