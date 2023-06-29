@@ -44,8 +44,8 @@ export PATH=${PATH}:${CARGO_BIN_DIR}
 declare usr_local="/usr/local"
 declare usr_local_bin="${usr_local}/bin"
 
-declare install_all with_yarn
-install_all="true"
+declare runtime_only with_yarn
+runtime_only="false"
 with_yarn="false"
 
 while (( "$#" )); do
@@ -56,7 +56,7 @@ while (( "$#" )); do
       exit 0
       ;;
     --runtime-only)
-      install_all="false"
+      runtime_only="true"
       shift
       ;;
     --with-yarn)
@@ -255,7 +255,7 @@ function install_javascript_utilities() {
     CI=true yarn workspaces focus hoprnet
 }
 
-if ${install_all}; then
+if ! ${runtime_only}; then
     install_rustup
     install_cargo
 
@@ -286,16 +286,20 @@ echo ""
 echo "Checking installed tool versions"
 echo "================================"
 echo ""
-command -v rustc >/dev/null && rustc --version
-command -v cargo >/dev/null && cargo --version
-# disabled check until v0.12.1, see
-# https://github.com/rustwasm/wasm-pack/pull/1305
-# command -v wasm-pack >/dev/null && wasm-pack --version
-command -v wasm-opt >/dev/null && wasm-opt --version
-command -v node >/dev/null && echo "node $(node --version)"
-command -v yarn >/dev/null && echo "yarn $(yarn --version)"
-command -v protoc >/dev/null && protoc --version
-npx --no tsc --version >/dev/null && echo "Typescript $(npx tsc --version)"
+if ! ${runtime_only}; then
+  command -v rustc >/dev/null && rustc --version
+  command -v cargo >/dev/null && cargo --version
+  # disabled check until v0.12.1, see
+  # https://github.com/rustwasm/wasm-pack/pull/1305
+  # command -v wasm-pack >/dev/null && wasm-pack --version
+  command -v wasm-opt >/dev/null && wasm-opt --version
+  command -v node >/dev/null && echo "node $(node --version)"
+  command -v yarn >/dev/null && echo "yarn $(yarn --version)"
+  command -v protoc >/dev/null && protoc --version
+  npx --no tsc --version >/dev/null && echo "Typescript $(npx tsc --version)"
+else
+  command -v node >/dev/null && echo "node $(node --version)"
+fi
 echo ""
 
 rm -R ${download_dir}
