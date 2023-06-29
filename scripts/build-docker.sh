@@ -16,7 +16,7 @@ source "${mydir}/utils.sh"
 
 usage() {
   msg
-  msg "Usage: $0 [-h|--help] [-f|--force] [-n|--no-tags] [-i|--image]"
+  msg "Usage: $0 [-h|--help] [-f|--force] [-n|--no-tags] [-i|--image] [-p]"
   msg
   msg "This script builds all docker images."
   msg
@@ -25,10 +25,12 @@ usage() {
   msg
   msg "Use -f to force a Docker builds even though no environment can be found. This is useful for local testing. No additional docker tags will be applied though if no environment has been found which is in contrast to the normal execution of the script."
   msg
+  msg "Use -p to use Podman/Buildah instead of Docker"
 }
 
-declare image_version package_version releases branch force
+declare image_version package_version releases branch force build_cmd
 declare image_name=""
+build_cmd="docker"
 
 while (( "$#" )); do
   case "$1" in
@@ -44,6 +46,10 @@ while (( "$#" )); do
     -i|--image)
       image_name="${2}"
       shift
+      shift
+      ;;
+    -p)
+      build_cmd="podman"
       shift
       ;;
     -*|--*=)
@@ -65,7 +71,7 @@ build_and_tag_images() {
   cd "${mydir}/.."
 
   log "Building Docker image hopr-toolchain-local:latest"
-  docker build -t hopr-toolchain-local:latest \
+  ${build_cmd} build -t hopr-toolchain-local:latest \
     -f scripts/toolchain/Dockerfile . &
 
   log "Waiting for Docker builds (part 1) to finish"
@@ -76,7 +82,7 @@ build_and_tag_images() {
      [ "${image_name}" = "hoprd-nat" ] || \
      [ "${image_name}" = "pluto-complete" ]; then
     log "Building Docker image hoprd-local:latest"
-    docker build -q -t hoprd-local:latest \
+    ${build_cmd} build -t hoprd-local:latest \
       --build-arg=HOPR_TOOLCHAIN_IMAGE="hopr-toolchain-local:latest" \
       -f packages/hoprd/Dockerfile . &
   fi
@@ -84,7 +90,7 @@ build_and_tag_images() {
   if [ -z "${image_name}" ] || \
      [ "${image_name}" = "hoprd-nat" ]; then
     log "Building Docker image hoprd-nat-local:latest"
-    docker build -q -t hoprd-nat-local:latest \
+    ${build_cmd} build -t hoprd-nat-local:latest \
       --build-arg=HOPRD_RELEASE="${image_version}" \
       scripts/nat &
   fi
@@ -93,7 +99,7 @@ build_and_tag_images() {
      [ "${image_name}" = "anvil" ] || \
      [ "${image_name}" = "pluto-complete" ]; then
     log "Building Docker image hopr-anvil-local:latest"
-    docker build -t hopr-anvil-local:latest \
+    ${build_cmd} build -t hopr-anvil-local:latest \
       --build-arg=HOPR_TOOLCHAIN_IMAGE="hopr-toolchain-local:latest" \
       -f packages/ethereum/Dockerfile.anvil . &
   fi
@@ -103,7 +109,7 @@ build_and_tag_images() {
      [ "${image_name}" = "pluto" ] || \
      [ "${image_name}" = "pluto-complete" ]; then
     log "Building Docker image hopli-local:latest"
-    docker build -t hopli-local:latest \
+    ${build_cmd} build -t hopli-local:latest \
       --build-arg=HOPR_TOOLCHAIN_IMAGE="hopr-toolchain-local:latest" \
       -f packages/hopli/Dockerfile . &
   fi
@@ -115,7 +121,7 @@ build_and_tag_images() {
      [ "${image_name}" = "pluto" ] || \
      [ "${image_name}" = "pluto-complete" ]; then
     log "Building Docker image hopr-pluto-local:latest"
-    docker build -q -t hopr-pluto-local:latest \
+    ${build_cmd} build -t hopr-pluto-local:latest \
       --build-arg=ANVIL_IMAGE="hopr-anvil-local:latest" \
       --build-arg=HOPLI_IMAGE="hopli-local:latest" \
       --build-arg=HOPRD_IMAGE="hoprd-local:latest" \
