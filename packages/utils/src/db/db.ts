@@ -25,7 +25,7 @@ import {
 import BN from 'bn.js'
 import fs from 'fs'
 import { stringToU8a, toU8a, u8aConcat, u8aToHex, u8aToNumber } from '../u8a/index.js'
-import { IteratedHash } from '@hoprnet/hopr-core/lib/core_crypto.js'
+import type { IteratedHash } from '../../../core/lib/core_crypto.js'
 
 const log = debug(`hopr-core:db`)
 
