@@ -10,7 +10,8 @@ import {
   defer,
   generate_channel_id,
   PublicKey,
-  type DeferType
+  type DeferType,
+  Address
 } from '@hoprnet/hopr-utils'
 
 const closingRequests = new Map<string, DeferType<void>>()
@@ -41,10 +42,9 @@ export async function closeChannel(
     throw Error(STATUS_CODES.INVALID_PEERID)
   }
 
-  const channelId = generate_channel_id(
-    node.getEthereumAddress(),
-    PublicKey.from_peerid_str(peerId.toString()).to_address()
-  )
+  const pk = PublicKey.from_peerid_str(peerId.toString())
+
+  const channelId = generate_channel_id(node.getEthereumAddress(), pk.to_address())
 
   let closingRequest = closingRequests.get(channelId.to_hex())
   if (closingRequest == null) {
@@ -55,7 +55,7 @@ export async function closeChannel(
   }
 
   try {
-    const { status: channelStatus, receipt } = await node.closeChannel(peerId, direction)
+    const { status: channelStatus, receipt } = await node.closeChannel(pk.to_address(), direction)
     return { success: true, channelStatus, receipt }
   } catch (err) {
     const errString = err instanceof Error ? err.message : err?.toString?.() ?? 'Unknown error'
@@ -184,19 +184,17 @@ export const getChannel = async (
   counterparty: string,
   direction: ChannelInfo['type']
 ): Promise<ChannelInfo> => {
-  let counterpartyPeerId: PeerId
+  let counterpartyAddress: Address
   try {
-    counterpartyPeerId = peerIdFromString(counterparty)
+    counterpartyAddress = PublicKey.from_peerid_str(counterparty).to_address()
   } catch (err) {
     throw Error(STATUS_CODES.INVALID_PEERID)
   }
 
-  const selfPeerId = node.getId()
-
   try {
     return direction === 'outgoing'
-      ? await node.getChannel(selfPeerId, counterpartyPeerId).then(formatOutgoingChannel)
-      : await node.getChannel(counterpartyPeerId, selfPeerId).then(formatIncomingChannel)
+      ? await node.getChannel(node.getEthereumAddress(), counterpartyAddress).then(formatOutgoingChannel)
+      : await node.getChannel(counterpartyAddress, node.getEthereumAddress()).then(formatIncomingChannel)
   } catch {
     throw Error(STATUS_CODES.CHANNEL_NOT_FOUND)
   }

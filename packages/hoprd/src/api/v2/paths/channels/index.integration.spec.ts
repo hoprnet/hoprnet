@@ -32,8 +32,8 @@ node.openChannel = sinon.fake.returns(
 
 describe('GET /channels', function () {
   const incoming = new ChannelEntry(
-    PublicKey.from_peerid_str(ALICE_PEER_ID.toString()),
-    PublicKey.from_peerid_str(BOB_PEER_ID.toString()),
+    PublicKey.from_peerid_str(ALICE_PEER_ID.toString()).to_address(),
+    PublicKey.from_peerid_str(BOB_PEER_ID.toString()).to_address(),
     new Balance('1', BalanceType.HOPR),
     Hash.create([]),
     U256.one(),
@@ -43,8 +43,8 @@ describe('GET /channels', function () {
     U256.one()
   )
   const outgoing = new ChannelEntry(
-    PublicKey.from_peerid_str(BOB_PEER_ID.toString()),
-    PublicKey.from_peerid_str(ALICE_PEER_ID.toString()),
+    PublicKey.from_peerid_str(BOB_PEER_ID.toString()).to_address(),
+    PublicKey.from_peerid_str(ALICE_PEER_ID.toString()).to_address(),
     new Balance('2', BalanceType.HOPR),
     Hash.create([]),
     new U256('2'),
@@ -54,8 +54,8 @@ describe('GET /channels', function () {
     new U256('2')
   )
   const otherChannel = new ChannelEntry(
-    PublicKey.from_peerid_str(BOB_PEER_ID.toString()),
-    PublicKey.from_peerid_str(CHARLIE_PEER_ID.toString()),
+    PublicKey.from_peerid_str(BOB_PEER_ID.toString()).to_address(),
+    PublicKey.from_peerid_str(CHARLIE_PEER_ID.toString()).to_address(),
     new Balance('3', BalanceType.HOPR),
     Hash.create([]),
     new U256('3'),

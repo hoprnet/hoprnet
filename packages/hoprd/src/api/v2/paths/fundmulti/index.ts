@@ -1,8 +1,6 @@
 import type { Operation } from 'express-openapi'
 import type { default as Hopr } from '@hoprnet/hopr-core'
-import { defer, generate_channel_id, PublicKey, type DeferType } from '@hoprnet/hopr-utils'
-import { peerIdFromString } from '@libp2p/peer-id'
-import { PeerId } from '@libp2p/interface-peer-id'
+import { defer, generate_channel_id, PublicKey, type DeferType, Address } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import { STATUS_CODES } from '../../utils.js'
 
@@ -20,16 +18,16 @@ async function validateFundChannelMultiParameters(
     }
   | {
       valid: true
-      counterparty: PeerId
+      counterparty: Address
       outgoingAmount: BN
       incomingAmount: BN
     }
 > {
-  let counterparty: PeerId
+  let counterparty: Address
   try {
-    counterparty = peerIdFromString(counterpartyStr)
+    counterparty = PublicKey.from_peerid_str(counterpartyStr).to_address()
     // cannot open channel to self
-    if (counterparty.equals(node.getId())) {
+    if (counterparty.eq(node.getEthereumAddress())) {
       throw Error('Counter party is the same as current node')
     }
   } catch (err) {

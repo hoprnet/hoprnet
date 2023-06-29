@@ -12,8 +12,8 @@ import {
   ChannelEntry,
   HoprDB,
   PublicKey,
-  stringToU8a,
-  ChannelStatus
+  ChannelStatus,
+  Address
 } from '@hoprnet/hopr-utils'
 
 export const ALICE_PEER_ID: PeerId = peerIdFromString('16Uiu2HAmC9CRFeuF2cTf6955ECFmgDw6d27jLows7bftMqat5Woz')
@@ -36,10 +36,11 @@ export const TICKET_MOCK = {
 }
 
 export function channelEntryCreateMock(): ChannelEntry {
-  const pub = PublicKey.from_privkey(stringToU8a('0x1464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8'))
+  const src = Address.from_string('0x4a34f4c1f1defceaa88f1dd22a8d9c2db70b21eb')
+  const dest = Address.from_string('0xe1ad1f04979209f61e64a2a87bde502b465ade50')
   return new ChannelEntry(
-    pub.clone(),
-    pub,
+    src,
+    dest,
     new Balance('1', BalanceType.HOPR),
     Hash.create([]),
     U256.one(),
