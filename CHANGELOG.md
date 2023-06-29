@@ -20,6 +20,7 @@
 - Change keystore to hold `chain_key` and `packet_key` ([#5175](https://github.com/hoprnet/hoprnet/pull/5175))
 - Remove Avado build support ([#5181](https://github.com/hoprnet/hoprnet/pull/5181))
 - Upgrade to Node v18 as default runtime ([#5184](https://github.com/hoprnet/hoprnet/pull/5184))
+- Use transitive Rust build features and fix various build issues ([#5187](https://github.com/hoprnet/hoprnet/pull/5187))
 
 <a name="1.93"></a>
 

@@ -1,3 +1,4 @@
+#[cfg(not(feature = "wasm"))]
 pub mod native {
     pub fn current_timestamp() -> u64 {
         std::time::SystemTime::now()
@@ -7,6 +8,7 @@ pub mod native {
     }
 }
 
+#[cfg(feature = "wasm")]
 pub mod wasm {
     pub fn current_timestamp() -> u64 {
         js_sys::Date::now() as u64

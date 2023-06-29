@@ -1,3 +1,4 @@
+#[cfg(not(feature = "wasm"))]
 pub mod native {
     use crate::error::{RealError, Result};
     use std::fs;
@@ -38,9 +39,11 @@ pub mod native {
     }
 }
 
+#[cfg(feature = "wasm")]
 pub mod wasm {
     use crate::error::{RealError, Result};
     use wasm_bindgen::prelude::*;
+    use wasm_bindgen::JsValue;
 
     #[wasm_bindgen(module = "node:fs")]
     extern "C" {
