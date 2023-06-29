@@ -32,7 +32,6 @@ import {
 } from '../lib/core_hopr.js'
 core_hopr_initialize_crate()
 
-
 const log = debug(`hopr-core:create-hopr`)
 const error = debug(`hopr-core:error`)
 

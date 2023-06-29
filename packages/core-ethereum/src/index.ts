@@ -277,10 +277,6 @@ export default class HoprCoreEthereum extends EventEmitter {
         this.setTxHandler(`channel-updated-${txHash}`, txHash)
       )
     }
-    const getCommitment = async () =>
-      ChannelEntry.deserialize(
-        (await this.db.get_channel(Ethereum_Hash.deserialize(c.get_id().serialize()))).serialize()
-      ).commitment
 
     // Get all channel information required to build the initial commitment
     const cci = new ChannelCommitmentInfo(
@@ -290,7 +286,8 @@ export default class HoprCoreEthereum extends EventEmitter {
       Ethereum_U256.deserialize(c.channel_epoch.serialize())
     )
 
-    await initialize_commitment(this.db, this.privateKey, cci, getCommitment, setCommitment)
+    log(`initializing commitment`)
+    await initialize_commitment(this.db, this.privateKey, cci, setCommitment)
   }
 
   public async redeemAllTickets(): Promise<void> {
