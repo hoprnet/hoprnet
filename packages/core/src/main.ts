@@ -25,11 +25,7 @@ import { getAddrs } from './identity.js'
 import { createLibp2pMock } from './libp2p.mock.js'
 import { getContractData, supportedNetworks } from './network.js'
 import { MultiaddrConnection } from '@libp2p/interfaces/transport'
-import {
-  Database,
-  PublicKey as Database_PublicKey,
-  core_hopr_initialize_crate
-} from '../lib/core_hopr.js'
+import { Database, PublicKey as Database_PublicKey, core_hopr_initialize_crate } from '../lib/core_hopr.js'
 core_hopr_initialize_crate()
 
 const log = debug(`hopr-core:create-hopr`)

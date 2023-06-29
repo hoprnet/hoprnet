@@ -44,18 +44,18 @@ const log = debug('hopr-core-ethereum')
 
 export type RedeemTicketResponse =
   | {
-    status: 'SUCCESS'
-    receipt: string
-    ackTicket: AcknowledgedTicket
-  }
+      status: 'SUCCESS'
+      receipt: string
+      ackTicket: AcknowledgedTicket
+    }
   | {
-    status: 'FAILURE'
-    message: string
-  }
+      status: 'FAILURE'
+      message: string
+    }
   | {
-    status: 'ERROR'
-    error: Error | string
-  }
+      status: 'ERROR'
+      error: Error | string
+    }
 
 export type ChainOptions = {
   provider: string
@@ -387,7 +387,8 @@ export default class HoprCoreEthereum extends EventEmitter {
         ticket = fetched
 
         log(
-          `redeeming ticket ${ticket.response.to_hex()} in channel from ${channel.source} to ${channel.destination
+          `redeeming ticket ${ticket.response.to_hex()} in channel from ${channel.source} to ${
+            channel.destination
           }, preImage ${ticket.pre_image.to_hex()}, porSecret ${ticket.response.to_hex()}`
         )
 
@@ -559,7 +560,7 @@ export default class HoprCoreEthereum extends EventEmitter {
       c = ChannelEntry.deserialize(
         (await this.db.get_channel_to(Ethereum_PublicKey.deserialize(dest.serialize(false)))).serialize()
       )
-    } catch { }
+    } catch {}
     if (c && c.status !== ChannelStatus.Closed) {
       throw Error('Channel is already opened')
     }

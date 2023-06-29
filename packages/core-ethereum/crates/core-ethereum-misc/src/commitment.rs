@@ -74,6 +74,7 @@ where
 
 /// Holds the commitment information of a specific channel.
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
+#[derive(Clone, Debug)]
 pub struct ChannelCommitmentInfo {
     /// ID of the blockchain network
     pub chain_id: u32,
@@ -131,9 +132,7 @@ where
 
     if contains_already && chain_commitment.is_some() {
         match find_commitment_preimage(db, &channel_info.channel_id).await {
-            Ok(_) => {
-                return Ok(())
-            },
+            Ok(_) => return Ok(()),
             Err(e) => {
                 warn!("Secret is found but failed to find preimage, reinitializing.. {e}")
             }
@@ -156,9 +155,7 @@ where
 
 #[cfg(all(not(target_arch = "wasm32"), test))]
 mod tests {
-    use crate::commitment::{
-        bump_commitment, find_commitment_preimage, initialize_commitment, ChannelCommitmentInfo, MockChainCommitter,
-    };
+    use crate::commitment::{bump_commitment, find_commitment_preimage, initialize_commitment, ChannelCommitmentInfo};
     use async_std;
     use core_crypto::types::{Hash, PublicKey};
     use core_ethereum_db::db::CoreEthereumDb;
@@ -191,7 +188,7 @@ mod tests {
         };
         let mut db = create_mock_db();
 
-        let committer = |_| { Some(comm_info.channel_id.to_string()) };
+        let committer = |_| async { Some(comm_info.channel_id.to_string()) };
 
         initialize_commitment(&mut db, &PRIV_KEY, &comm_info, committer)
             .await
@@ -204,7 +201,7 @@ mod tests {
         let c2 = find_commitment_preimage(&mut db, &comm_info.channel_id).await.unwrap();
         assert_eq!(c2.hash(), c1, "c2 is commitment of c1");
 
-        let committer2 = |_| { Some(c2) };
+        let committer2 = |_| async { Some(c2.to_string()) };
 
         initialize_commitment(&mut db, &PRIV_KEY, &comm_info, committer2)
             .await
@@ -229,7 +226,6 @@ pub mod wasm {
 
     use crate::commitment::ChannelCommitmentInfo;
 
-
     #[wasm_bindgen]
     pub async fn initialize_commitment(
         db: &Database,
@@ -239,28 +235,29 @@ pub mod wasm {
     ) -> JsResult<()> {
         let val = db.as_ref_counted();
         //let r = {
-            let mut g = val.write().await;
-            //console_log!("++++ initializing commitment preimage");
-            ok_or_jserr!(
-                super::initialize_commitment(&mut *g, private_key, channel_info, |commitment: Hash| async move {
-                    let this = JsValue::null();
-                    let hash: JsValue = Uint8Array::from(commitment.to_bytes().as_ref()).into();
-                    match set_commitment.call1(&this, &hash) {
-                        Ok(r) => {
-                            let promise = js_sys::Promise::from(r);
-                            wasm_bindgen_futures::JsFuture::from(promise)
-                                .await
-                                .map_err(|e| error!("could not set commitment {:?}", e.as_string()))
-                                .map(|v| v.as_string().unwrap())
-                                .ok()
-                        }
-                        Err(e) => {
-                            error!("not call set commitment {:?}", e.as_string());
-                            None
-                        }
+        let mut g = val.write().await;
+        //console_log!("++++ initializing commitment preimage");
+        ok_or_jserr!(
+            super::initialize_commitment(&mut *g, private_key, channel_info, |commitment: Hash| async move {
+                let this = JsValue::null();
+                let hash: JsValue = Uint8Array::from(commitment.to_bytes().as_ref()).into();
+                match set_commitment.call1(&this, &hash) {
+                    Ok(r) => {
+                        let promise = js_sys::Promise::from(r);
+                        wasm_bindgen_futures::JsFuture::from(promise)
+                            .await
+                            .map_err(|e| error!("could not set commitment {:?}", e.as_string()))
+                            .map(|v| v.as_string().unwrap())
+                            .ok()
                     }
-                }).await
-            )
+                    Err(e) => {
+                        error!("not call set commitment {:?}", e.as_string());
+                        None
+                    }
+                }
+            })
+            .await
+        )
         //};
         //console_log!("==== initializing commitment preimage");
         //r
