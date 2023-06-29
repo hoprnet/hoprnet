@@ -14,7 +14,7 @@ import {
 
 import type { default as Hopr } from '@hoprnet/hopr-core'
 import type { Capability } from './token.js'
-import { Database, PublicKey, core_hopr_initialize_crate } from '@hoprnet/hopr-core/lib/core_hopr.js'
+import { Database, PublicKey, core_hopr_initialize_crate } from '../../../lib/core_hopr.js'
 core_hopr_initialize_crate()
 import { LevelDb } from '@hoprnet/hopr-utils'
 
