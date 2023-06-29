@@ -9,7 +9,7 @@ import { setTimeout } from 'timers/promises'
 import { Multiaddr } from '@multiformats/multiaddr'
 import { startStunServer } from '@hoprnet/hopr-connect'
 import type { PeerId } from '@libp2p/interface-peer-id'
-import { Database, PublicKey } from '../lib/core_packet.js'
+import { Database, PublicKey } from '../lib/core_hopr.js'
 
 /**
  * Synchronous function to sample PeerIds

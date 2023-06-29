@@ -26,7 +26,7 @@ import type Hopr from '@hoprnet/hopr-core'
 import { SettingKey, StateOps } from '../types.js'
 import type { LogStream } from './../logs.js'
 import type { Token } from './token.js'
-import { Database } from '@hoprnet/hopr-core/lib/core_packet.js'
+import { Database } from '@hoprnet/hopr-core/lib/core_hopr.js'
 
 const debugLog = debug('hoprd:api:v2')
 
