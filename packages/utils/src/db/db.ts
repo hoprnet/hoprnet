@@ -641,7 +641,7 @@ export class HoprDB {
   async checkAndSetPacketTag(packetTag: Uint8Array) {
     const packetTagKey = createPacketTagKey(packetTag)
     let present = await this.db.has(packetTagKey)
-    console.log(`===========> Checking if packet tag ${packetTagKey} is present` + present)
+    console.log(`===========> Checking if packet tag ${u8aToHex(packetTagKey)} is present`, present)
 
     if (!present) {
       // TODO: what is touch? Is this correct?

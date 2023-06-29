@@ -1,7 +1,5 @@
 import type Hopr from '@hoprnet/hopr-core'
 import type { Operation } from 'express-openapi'
-import type { PeerId } from '@libp2p/interface-peer-id'
-import { peerIdFromString } from '@libp2p/peer-id'
 import { STATUS_CODES } from '../../../../utils.js'
 import { ChannelInfo, formatIncomingChannel, formatOutgoingChannel } from '../../index.js'
 import {
@@ -35,16 +33,9 @@ export async function closeChannel(
       receipt: string
     }
 > {
-  let peerId: PeerId
-  try {
-    peerId = peerIdFromString(peerIdStr)
-  } catch (err) {
-    throw Error(STATUS_CODES.INVALID_PEERID)
-  }
+  const counterpartyPublicKey = PublicKey.from_peerid_str(peerIdStr)
 
-  const pk = PublicKey.from_peerid_str(peerId.toString())
-
-  const channelId = generate_channel_id(node.getEthereumAddress(), pk.to_address())
+  const channelId = generate_channel_id(node.getEthereumAddress(), counterpartyPublicKey.to_address())
 
   let closingRequest = closingRequests.get(channelId.to_hex())
   if (closingRequest == null) {
@@ -55,7 +46,7 @@ export async function closeChannel(
   }
 
   try {
-    const { status: channelStatus, receipt } = await node.closeChannel(pk.to_address(), direction)
+    const { status: channelStatus, receipt } = await node.closeChannel(counterpartyPublicKey.to_address(), direction)
     return { success: true, channelStatus, receipt }
   } catch (err) {
     const errString = err instanceof Error ? err.message : err?.toString?.() ?? 'Unknown error'

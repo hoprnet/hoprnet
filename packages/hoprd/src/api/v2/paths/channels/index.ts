@@ -281,10 +281,7 @@ export async function openChannel(
     return { success: false, reason: validationResult.reason }
   }
 
-  const channelId = generate_channel_id(
-    node.getEthereumAddress(),
-    PublicKey.from_peerid_str(validationResult.counterparty.toString()).to_address()
-  )
+  const channelId = generate_channel_id(node.getEthereumAddress(), validationResult.counterparty)
 
   let openingRequest = openingRequests.get(channelId.to_hex())
 

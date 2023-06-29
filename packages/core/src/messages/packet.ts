@@ -62,7 +62,7 @@ async function bumpTicketIndex(channelId: Hash, db: HoprDB): Promise<U256> {
  * @param privKey
  */
 async function createTicket(dest: Address, pathLength: number, db: HoprDB, privKey: Uint8Array): Promise<Ticket> {
-  const channel = await db.getChannelTo(dest)
+  const channel = await db.getChannelTo(Address.deserialize(dest.serialize()))
   const currentTicketIndex = await bumpTicketIndex(channel.get_id(), db)
   const amount = new Balance(
     PRICE_PER_PACKET.mul(INVERSE_TICKET_WIN_PROB)
@@ -95,7 +95,7 @@ async function createTicket(dest: Address, pathLength: number, db: HoprDB, privK
   }
 
   const ticket = Ticket.new(
-    dest,
+    Address.deserialize(dest.serialize()),
     new U256(channel.ticket_epoch.to_string()),
     currentTicketIndex,
     amount,
@@ -216,7 +216,7 @@ export class PacketHelper {
 
     let ticket: Ticket
     if (path.length == 1) {
-      ticket = Ticket.new_zero_hop(next_peer.to_address(), private_key)
+      ticket = Ticket.new_zero_hop(Address.deserialize(next_peer.to_address().serialize()), private_key)
     } else {
       ticket = await createTicket(next_peer.to_address(), path.length, db, private_key)
     }
@@ -273,18 +273,18 @@ export class PacketHelper {
       throw Error('packet must have previous hop - cannot be outgoing')
     }
 
-    const channel = await db.getChannelFrom(packet.previous_hop().to_address())
+    const channel = await db.getChannelFrom(Address.deserialize(packet.previous_hop().to_address().serialize()))
 
     try {
       await validateUnacknowledgedTicket(
-        packet.previous_hop().to_address(),
+        Address.deserialize(packet.previous_hop().to_address().serialize()),
         new Balance(PRICE_PER_PACKET.toString(), BalanceType.HOPR),
         new U256(INVERSE_TICKET_WIN_PROB.toString()),
         Ticket.deserialize(packet.ticket.serialize()),
         channel,
         async () =>
           await db.getTickets({
-            signer: packet.previous_hop().to_address()
+            signer: Address.deserialize(packet.previous_hop().to_address().serialize())
           }),
         checkUnrealizedBalance
       )

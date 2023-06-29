@@ -875,8 +875,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     }
 
     this.emit('channel-update', channel)
-    verbose('channel-update for channel')
-    verbose(channel.get_id().to_hex())
+    verbose(`channel-update for channel ${channel.get_id().to_hex()}`)
 
     if (channel.source.eq(this.address) || channel.destination.eq(this.address)) {
       this.emit('own-channel-updated', channel)
@@ -885,7 +884,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
         // Channel _to_ us
         if (channel.status === ChannelStatus.WaitingForCommitment) {
           log('channel to us waiting for commitment')
-          log(channel.toString())
+          log(channel.to_string())
           this.emit('channel-waiting-for-commitment', channel)
         }
       }
@@ -936,7 +935,9 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   ): Promise<void> {
     const account = Address.from_string(event.args.account)
     await this.db.setEligible(account, event.args.eligibility, lastSnapshot)
-    verbose(`network-registry: account ${account} is ${event.args.eligibility ? 'eligible' : 'not eligible'}`)
+    verbose(
+      `network-registry: account ${account.to_string()} is ${event.args.eligibility ? 'eligible' : 'not eligible'}`
+    )
     // emit event only when eligibility changes on accounts with a HoprNode associated
     try {
       const hoprNodes = await this.db.findHoprNodesUsingAccountInNetworkRegistry(account)

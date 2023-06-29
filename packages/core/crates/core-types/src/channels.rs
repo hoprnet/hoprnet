@@ -91,6 +91,7 @@ impl ChannelEntry {
     }
 
     /// Generates the ticket ID using the source and destination address
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
     pub fn get_id(&self) -> Hash {
         generate_channel_id(&self.source, &self.destination)
     }
@@ -111,6 +112,27 @@ impl ChannelEntry {
                 0
             }
         })
+    }
+
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+    pub fn to_string(&self) -> String {
+        format!("{}", self)
+    }
+}
+
+impl std::fmt::Display for ChannelEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.debug_struct("ChannelEntry")
+            .field("source", &self.source.to_string())
+            .field("destination", &self.destination.to_string())
+            .field("balance", &format!("{}", self.balance))
+            .field("commitment", &self.commitment.to_string())
+            .field("ticket_epoch", &self.ticket_epoch.to_string())
+            .field("ticket_index", &self.ticket_index.to_string())
+            .field("status", &self.status.to_string())
+            .field("channel_epoch", &self.channel_epoch.to_string())
+            .field("closure_time", &self.closure_time.to_string())
+            .finish()
     }
 }
 
