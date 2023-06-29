@@ -131,6 +131,7 @@ where
     let chain_commitment = db.get_channel(&channel_info.channel_id).await?.map(|c| c.commitment);
 
     if contains_already && chain_commitment.is_some() {
+        debug!("commitment already present for channel {}", channel_info.channel_id);
         match find_commitment_preimage(db, &channel_info.channel_id).await {
             Ok(_) => return Ok(()),
             Err(e) => {
@@ -157,14 +158,16 @@ where
 mod tests {
     use crate::commitment::{bump_commitment, find_commitment_preimage, initialize_commitment, ChannelCommitmentInfo};
     use async_std;
-    use core_crypto::types::{Hash, PublicKey};
+    use core_crypto::types::PublicKey;
     use core_ethereum_db::db::CoreEthereumDb;
+    use core_ethereum_db::traits::HoprCoreEthereumDbActions;
+    use core_types::channels::{ChannelEntry, ChannelStatus};
     use hex_literal::hex;
     use std::sync::{Arc, Mutex};
     use utils_db::db::DB;
     use utils_db::leveldb::rusty::RustyLevelDbShim;
-    use utils_types::primitives::U256;
-    use utils_types::traits::BinarySerializable;
+    use utils_types::primitives::BalanceType::HOPR;
+    use utils_types::primitives::{Balance, Snapshot, U256};
 
     const PRIV_KEY: [u8; 32] = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
 
@@ -180,10 +183,24 @@ mod tests {
 
     #[async_std::test]
     async fn test_should_publish_hash_secret() {
+        env_logger::init();
+
+        let channel = ChannelEntry {
+            source: PublicKey::random(),
+            destination: PublicKey::random(),
+            balance: Balance::zero(HOPR),
+            commitment: Default::default(),
+            ticket_epoch: U256::zero(),
+            ticket_index: U256::zero(),
+            status: ChannelStatus::Open,
+            channel_epoch: U256::zero(),
+            closure_time: U256::zero(),
+        };
+
         let comm_info = ChannelCommitmentInfo {
             chain_id: 1,
             contract_address: "fake_address".to_string(),
-            channel_id: Hash::new(&[0u8; Hash::SIZE]),
+            channel_id: channel.get_id(),
             channel_epoch: U256::zero(),
         };
         let mut db = create_mock_db();
@@ -201,9 +218,11 @@ mod tests {
         let c2 = find_commitment_preimage(&mut db, &comm_info.channel_id).await.unwrap();
         assert_eq!(c2.hash(), c1, "c2 is commitment of c1");
 
-        let committer2 = |_| async { Some(c2.to_string()) };
+        db.update_channel_and_snapshot(&comm_info.channel_id, &channel, &Snapshot::default())
+            .await
+            .unwrap();
 
-        initialize_commitment(&mut db, &PRIV_KEY, &comm_info, committer2)
+        initialize_commitment(&mut db, &PRIV_KEY, &comm_info, |_| async { None })
             .await
             .unwrap();
 

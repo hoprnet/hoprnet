@@ -11,27 +11,20 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 default = ["console_error_panic_hook", "wasm", "prometheus"]
-wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys"]
+console_error_panic_hook = ["dep:console_error_panic_hook"]
+wasm = ["dep:wasm-bindgen", "dep:js-sys", "core-ethereum-db/wasm", "core-ethereum-misc/wasm", "core-packet/wasm"]
 prometheus = ["dep:utils-metrics"]
 
 [dependencies]
 console_error_panic_hook = { version = "0.1.7", optional = true }
-core-ethereum-db = { path = "../../../core-ethereum/crates/core-ethereum-db" }
-core-ethereum-misc = { path = "../../../core-ethereum/crates/core-ethereum-misc" } 
-core-packet = { path = "../core-packet" }
-futures = "0.3.28"
-futures-lite = "1.12.0"
+core-ethereum-db = { path = "../../../core-ethereum/crates/core-ethereum-db", default-features = false }
+core-ethereum-misc = { path = "../../../core-ethereum/crates/core-ethereum-misc", default-features = false }
+core-packet = { path = "../core-packet", default-features = false }
 js-sys = { version = "0.3.63", optional = true }
-lazy_static = "1.4.0"
 utils-log = { path = "../../../utils/crates/utils-log"}
 utils-misc = { path = "../../../utils/crates/utils-misc" }
 utils-metrics = { path = "../../../utils/crates/utils-metrics", optional = true }
 wasm-bindgen = { workspace = true, optional = true }
-wasm-bindgen-futures = { version = "0.4.36", optional = true }
-
-[dev-dependencies]
-env_logger = "0.10.0"
-wasm-bindgen-test = "0.3.36"
 
 [package.metadata.wasm-pack.profile.dev]
 wasm-opt = false

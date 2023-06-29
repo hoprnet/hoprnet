@@ -309,6 +309,16 @@ pub struct Snapshot {
     pub log_index: U256,
 }
 
+impl Default for Snapshot {
+    fn default() -> Self {
+        Self {
+            block_number: U256::zero(),
+            transaction_index: U256::zero(),
+            log_index: U256::zero(),
+        }
+    }
+}
+
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl Snapshot {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
