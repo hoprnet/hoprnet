@@ -1,5 +1,4 @@
 import { Hash, stringToU8a } from '@hoprnet/hopr-utils'
-import { peerIdFromString } from '@libp2p/peer-id'
 import chaiAsPromised from 'chai-as-promised'
 import chai, { expect } from 'chai'
 import {
@@ -13,27 +12,23 @@ import {
   ChannelStatus
 } from '@hoprnet/hopr-utils'
 import { validateUnacknowledgedTicket } from './index.js'
-import { PeerId } from '@libp2p/interface-peer-id'
 
 chai.use(chaiAsPromised)
 
 // target is party A, sender is party B
-const TARGET = peerIdFromString('16Uiu2HAmM9KAPaXA4eAz58Q7Eb3LEkDvLarU4utkyLwDeEK6vM5m')
-const TARGET_PUBKEY = () => PublicKey.from_peerid_str(TARGET.toString())
-const TARGET_ADDRESS = () => new Address(stringToU8a('0x65e78d07acf7b654e5ae6777a93ebbf30f639356'))
-const SENDER = peerIdFromString('16Uiu2HAm5g4fTADcjPQrtp9LtN2wCmPJTQPD7vMnWCZp4kwKCVUT')
-// const SENDER_ADDRESS = new Address(stringToU8a('0xf3a509473be4bcd8af0d1961d75a5a3dc9e47ba0'))
+const TARGET_ADDRESS = new Address(stringToU8a('0x65e78d07acf7b654e5ae6777a93ebbf30f639356'))
+const SENDER_ADDRESS = new Address(stringToU8a('0xf3a509473be4bcd8af0d1961d75a5a3dc9e47ba0'))
 
 const createMockTicket = ({
-  sender = SENDER,
-  targetAddress = TARGET_ADDRESS(),
+  sender = SENDER_ADDRESS,
+  targetAddress = TARGET_ADDRESS,
   amount = new Balance('1', BalanceType.HOPR),
   win_prob = U256.from_inverse_probability(U256.one()),
   epoch = U256.one(),
   index = U256.one(),
   channel_epoch = U256.one()
 }: {
-  sender?: PeerId
+  sender?: Address
   targetAddress?: Address
   amount?: Balance
   win_prob?: U256
@@ -61,8 +56,8 @@ const mockChannelEntry = (
 ) =>
   Promise.resolve(
     new ChannelEntry(
-      TARGET_PUBKEY(),
-      TARGET_PUBKEY(),
+      TARGET_ADDRESS,
+      TARGET_ADDRESS,
       balance,
       Hash.create([stringToU8a('0xdeadbeef')]),
       ticketEpoch,
@@ -81,7 +76,7 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
 
     return expect(
       validateUnacknowledgedTicket(
-        SENDER,
+        SENDER_ADDRESS,
         new Balance('1', BalanceType.HOPR),
         U256.one(),
         signedTicket,
@@ -97,7 +92,7 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
 
     return expect(
       validateUnacknowledgedTicket(
-        TARGET,
+        TARGET_ADDRESS,
         new Balance('2', BalanceType.HOPR),
         U256.one(),
         signedTicket,
@@ -113,7 +108,7 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
 
     return expect(
       validateUnacknowledgedTicket(
-        SENDER,
+        SENDER_ADDRESS,
         new Balance('2', BalanceType.HOPR),
         U256.one(),
         signedTicket,
@@ -131,7 +126,7 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
 
     return expect(
       validateUnacknowledgedTicket(
-        SENDER,
+        SENDER_ADDRESS,
         new Balance('1', BalanceType.HOPR),
         U256.one(),
         signedTicket,
@@ -147,7 +142,7 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
 
     return expect(
       validateUnacknowledgedTicket(
-        SENDER,
+        SENDER_ADDRESS,
         new Balance('1', BalanceType.HOPR),
         U256.one(),
         signedTicket,
@@ -164,7 +159,7 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
 
     return expect(
       validateUnacknowledgedTicket(
-        SENDER,
+        SENDER_ADDRESS,
         new Balance('1', BalanceType.HOPR),
         U256.one(),
         signedTicket,
@@ -182,7 +177,7 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
 
     return expect(
       validateUnacknowledgedTicket(
-        SENDER,
+        SENDER_ADDRESS,
         new Balance('1', BalanceType.HOPR),
         U256.one(),
         signedTicket,
@@ -199,7 +194,7 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
 
     return expect(
       validateUnacknowledgedTicket(
-        SENDER,
+        SENDER_ADDRESS,
         new Balance('1', BalanceType.HOPR),
         U256.one(),
         signedTicket,
@@ -222,7 +217,7 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
 
     return expect(
       validateUnacknowledgedTicket(
-        SENDER,
+        SENDER_ADDRESS,
         new Balance('1', BalanceType.HOPR),
         U256.one(),
         signedTicket,
@@ -238,7 +233,7 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
 
     return expect(
       validateUnacknowledgedTicket(
-        SENDER,
+        SENDER_ADDRESS,
         new Balance('1', BalanceType.HOPR),
         U256.one(),
         signedTicket,
@@ -261,7 +256,7 @@ describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket'
 
     return expect(
       validateUnacknowledgedTicket(
-        SENDER,
+        SENDER_ADDRESS,
         new Balance('1', BalanceType.HOPR),
         U256.one(),
         signedTicket,

@@ -32,7 +32,7 @@ export function isStrategy(str: string): str is Strategy {
   return STRATEGIES.includes(str)
 }
 export interface OutgoingChannelStatus {
-  peer_id: string
+  address: string
   stake_str: string
   status: ChannelStatus
 }
@@ -53,7 +53,7 @@ export interface ChannelStrategyInterface {
 
   tick(
     balance: BN,
-    network_peer_ids: Iterator<string>,
+    network_addresses: Iterator<string>,
     outgoing_channel: OutgoingChannelStatus[],
     peer_quality: (string: string) => number
   ): StrategyTickResult
@@ -76,7 +76,7 @@ export abstract class SaneDefaults {
   async onAckedTicket(ackTicket: AcknowledgedTicket) {
     if (this.autoRedeemTickets) {
       const counterparty = ackTicket.signer
-      log(`auto redeeming tickets in channel to ${counterparty.to_peerid_str()}`)
+      log(`auto redeeming tickets in channel to ${counterparty.to_string()}`)
       await HoprCoreEthereum.getInstance().redeemTicketsInChannelByCounterparty(counterparty)
     } else {
       log(`encountered winning ticket, not auto-redeeming`)
@@ -92,8 +92,8 @@ export abstract class SaneDefaults {
       const chain = HoprCoreEthereum.getInstance()
       const counterparty = channel.source
       const selfPubKey = chain.getPublicKey()
-      if (!counterparty.eq(selfPubKey)) {
-        log(`auto redeeming tickets in channel to ${counterparty.to_peerid_str()}`)
+      if (!counterparty.eq(selfPubKey.to_address())) {
+        log(`auto redeeming tickets in channel to ${counterparty.to_string()}`)
         try {
           await chain.redeemTicketsInChannel(channel)
         } catch (err) {
@@ -116,7 +116,7 @@ export abstract class SaneDefaults {
 interface RustStrategyInterface {
   tick: (
     balance: Balance,
-    network_peer_ids: Iterator<string>,
+    network_addresses: Iterator<string>,
     outgoing_channels: OutgoingChannelStatus[],
     peer_quality: (string: string) => number
   ) => StrategyTickResult
@@ -142,13 +142,13 @@ class RustStrategyWrapper<T extends RustStrategyInterface> extends SaneDefaults 
 
   tick(
     balance: BN,
-    network_peer_ids: Iterator<string>,
+    network_addresses: Iterator<string>,
     outgoing_channels: OutgoingChannelStatus[],
     peer_quality: (string: string) => number
   ): StrategyTickResult {
     return this.strategy.tick(
       new Balance(balance.toString(), BalanceType.HOPR),
-      network_peer_ids,
+      network_addresses,
       outgoing_channels,
       peer_quality
     )

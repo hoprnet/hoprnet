@@ -29,7 +29,8 @@ import {
   create_gauge,
   create_multi_gauge,
   U256,
-  random_integer
+  random_integer,
+  Hash
 } from '@hoprnet/hopr-utils'
 
 import type { ChainWrapper } from '../ethereum.js'
@@ -44,7 +45,7 @@ import {
   type IndexerEventEmitter,
   IndexerStatus
 } from './types.js'
-import { isConfirmedBlock, snapshotComparator, type IndexerSnapshot, channelEntryFromSCEvent } from './utils.js'
+import { isConfirmedBlock, snapshotComparator, type IndexerSnapshot, numberToChannelStatus } from './utils.js'
 import { BigNumber, type Contract, errors } from 'ethers'
 import { CORE_ETHEREUM_CONSTANTS } from '../../lib/core_ethereum_misc.js'
 import type { TypedEvent, TypedEventFilter } from '../utils/common.js'
@@ -842,14 +843,20 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   }
 
   private async onChannelUpdated(event: Event<'ChannelUpdated'>, lastSnapshot: Snapshot): Promise<void> {
-    let channel: ChannelEntry
-    try {
-      log('channel-updated for hash %s', event.transactionHash)
-      channel = await channelEntryFromSCEvent(event, this.getPublicKeyOf.bind(this))
-    } catch (err) {
-      log(`fatal error: failed to construct new ChannelEntry from the SC event`, err)
-      return
-    }
+    const { source, destination, newState } = event.args
+
+    log('channel-updated for hash %s', event.transactionHash)
+    let channel = new ChannelEntry(
+      Address.from_string(source),
+      Address.from_string(destination),
+      new Balance(newState.balance.toString(), BalanceType.HOPR),
+      new Hash(stringToU8a(newState.commitment)),
+      new U256(newState.ticketEpoch.toString()),
+      new U256(newState.ticketIndex.toString()),
+      numberToChannelStatus(newState.status),
+      new U256(newState.channelEpoch.toString()),
+      new U256(newState.closureTime.toString())
+    )
 
     let prevState: ChannelEntry
     try {
@@ -871,10 +878,10 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     verbose('channel-update for channel')
     verbose(channel.get_id().to_hex())
 
-    if (channel.source.to_address().eq(this.address) || channel.destination.to_address().eq(this.address)) {
+    if (channel.source.eq(this.address) || channel.destination.eq(this.address)) {
       this.emit('own-channel-updated', channel)
 
-      if (channel.destination.to_address().eq(this.address)) {
+      if (channel.destination.eq(this.address)) {
         // Channel _to_ us
         if (channel.status === ChannelStatus.WaitingForCommitment) {
           log('channel to us waiting for commitment')
@@ -1058,9 +1065,9 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
    * @param source peer
    * @returns peer's open channels
    */
-  public async getOpenChannelsFrom(source: PublicKey): Promise<ChannelEntry[]> {
+  public async getOpenChannelsFrom(source: Address): Promise<ChannelEntry[]> {
     return await this.db
-      .getChannelsFrom(source.to_address())
+      .getChannelsFrom(source)
       .then((channels: ChannelEntry[]) => channels.filter((channel) => channel.status === ChannelStatus.Open))
   }
 

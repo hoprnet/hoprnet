@@ -559,7 +559,7 @@ mod tests {
                 private_key,
             )
         } else {
-            Ticket::new_zero_hop(PublicKey::from_peerid(next_peer).unwrap(), private_key)
+            Ticket::new_zero_hop(PublicKey::from_peerid(next_peer).unwrap().to_address(), private_key)
         }
     }
 

@@ -476,7 +476,7 @@ export class HoprDB {
    * @param filter optionally filter by signer
    * @returns an array of all unacknowledged tickets
    */
-  public async getUnacknowledgedTickets(filter?: { signer: PublicKey }): Promise<UnacknowledgedTicket[]> {
+  public async getUnacknowledgedTickets(filter?: { signer: Address }): Promise<UnacknowledgedTicket[]> {
     const filterFunc = (pending: PendingAcknowledgement): boolean => {
       if (pending.is_msg_sender() == true) {
         return false
@@ -524,7 +524,7 @@ export class HoprDB {
    * @returns an array of all acknowledged tickets
    */
   public async getAcknowledgedTickets(filter?: {
-    signer?: PublicKey
+    signer?: Address
     channel?: ChannelEntry
   }): Promise<AcknowledgedTicket[]> {
     const filterFunc = (a: AcknowledgedTicket): boolean => {
@@ -536,7 +536,7 @@ export class HoprDB {
       if (
         filter?.channel &&
         (!a.signer.eq(filter.channel.source) ||
-          !filter.channel.destination.eq(this.id) ||
+          !filter.channel.destination.eq(this.id.to_address()) ||
           !a.ticket.channel_epoch.eq(filter.channel.channel_epoch))
       ) {
         return false
@@ -620,7 +620,7 @@ export class HoprDB {
    * @param filter optionally filter by signer
    * @returns an array of signed tickets
    */
-  public async getTickets(filter?: { signer: PublicKey }): Promise<Ticket[]> {
+  public async getTickets(filter?: { signer: Address }): Promise<Ticket[]> {
     const [unAcks, acks] = await Promise.all([
       this.getUnacknowledgedTickets(filter),
       this.getAcknowledgedTickets(filter)
@@ -887,27 +887,27 @@ export class HoprDB {
     await this.addBalance(REJECTED_TICKETS_VALUE, t.amount)
   }
 
-  public async getChannelX(src: PublicKey, dest: PublicKey): Promise<ChannelEntry> {
-    return await this.getChannel(generate_channel_id(src.to_address(), dest.to_address()))
+  public async getChannelX(src: Address, dest: Address): Promise<ChannelEntry> {
+    return await this.getChannel(generate_channel_id(src, dest))
   }
 
-  public async getChannelTo(dest: PublicKey): Promise<ChannelEntry> {
-    return await this.getChannel(generate_channel_id(this.id.to_address(), dest.to_address()))
+  public async getChannelTo(dest: Address): Promise<ChannelEntry> {
+    return await this.getChannel(generate_channel_id(this.id.to_address(), dest))
   }
 
-  public async getChannelFrom(src: PublicKey): Promise<ChannelEntry> {
-    return await this.getChannel(generate_channel_id(src.to_address(), this.id.to_address()))
+  public async getChannelFrom(src: Address): Promise<ChannelEntry> {
+    return await this.getChannel(generate_channel_id(src, this.id.to_address()))
   }
 
   public async getChannelsFrom(address: Address) {
     return this.getChannels((channel) => {
-      return address.eq(channel.source.to_address())
+      return address.eq(channel.source)
     })
   }
 
   public async *getChannelsFromIterable(address: Address) {
     for await (const channel of this.getChannelsIterable()) {
-      if (address.eq(channel.source.to_address())) {
+      if (address.eq(channel.source)) {
         yield channel
       }
     }
@@ -915,13 +915,13 @@ export class HoprDB {
 
   public async getChannelsTo(address: Address) {
     return this.getChannels((channel) => {
-      return address.eq(channel.destination.to_address())
+      return address.eq(channel.destination)
     })
   }
 
   public async *getChannelsToIterable(address: Address) {
     for await (const channel of this.getChannelsIterable()) {
-      if (address.eq(channel.destination.to_address())) {
+      if (address.eq(channel.destination)) {
         yield channel
       }
     }

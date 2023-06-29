@@ -1038,7 +1038,6 @@ dependencies = [
  "core-types",
  "getrandom 0.2.9",
  "js-sys",
- "libp2p-identity",
  "rand 0.8.5",
  "serde",
  "serde-wasm-bindgen",

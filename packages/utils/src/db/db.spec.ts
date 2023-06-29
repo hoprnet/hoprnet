@@ -82,10 +82,11 @@ function createMockedTicket(signerPrivKey: Uint8Array, counterparty: Address) {
 }
 
 function channelEntryCreateMock(): ChannelEntry {
-  const pub = PublicKey.from_privkey(stringToU8a('0x1464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8'))
+  const src = Address.from_string('0x86d854baec85640ef8c80b2c618c28024f2926d4')
+  const dest = Address.from_string('0x245445dbdcdaa115bb1d7d1de8717f9facecdbbe')
   return new ChannelEntry(
-    pub.clone(),
-    pub.clone(),
+    src,
+    dest,
     new Balance('1', BalanceType.HOPR),
     Hash.create([]),
     U256.one(),
@@ -272,7 +273,7 @@ describe(`database tests`, function () {
     const unAck = new UnacknowledgedTicket(
       createMockedTicket(privKey, new Address(Uint8Array.from(randomBytes(Address.size())))),
       new HalfKey(Uint8Array.from(randomBytes(HalfKey.size()))),
-      pubKey.clone()
+      pubKey.to_address()
     )
     await db.storePendingAcknowledgement(halfKeyChallenge, false, unAck)
     assert((await db.getTickets()).length == 1, `DB should find one ticket`)
@@ -285,7 +286,7 @@ describe(`database tests`, function () {
       pending.ticket().ticket.clone(),
       new Response(Uint8Array.from(randomBytes(Hash.size()))),
       new Hash(Uint8Array.from(randomBytes(Hash.size()))),
-      pubKey.clone()
+      pubKey.to_address()
     )
     await db.replaceUnAckWithAck(halfKeyChallenge, ack)
 

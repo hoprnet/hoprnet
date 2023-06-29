@@ -20,7 +20,6 @@ console_error_panic_hook = [ "dep:console_error_panic_hook" ]
 core-types = { path = "../core-types" }
 getrandom = { version = "0.2.8", features = ["js"] }
 js-sys = { version = "0.3.63", optional = true }
-libp2p-identity = { version = "0.1.2", features = ["peerid"] }
 rand = "0.8.5"
 serde = { version = "1.0", features = ["derive"] }
 serde-wasm-bindgen = { version = "0.5", optional = true }
