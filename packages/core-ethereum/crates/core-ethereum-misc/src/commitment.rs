@@ -4,7 +4,6 @@ use core_crypto::derivation::derive_commitment_seed;
 use core_crypto::iterated_hash::{iterate_hash, recover_iterated_hash};
 use core_crypto::types::Hash;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-use futures::FutureExt;
 use utils_log::{debug, error, info, warn};
 use utils_types::primitives::U256;
 use utils_types::traits::{BinarySerializable, ToHex};
@@ -60,13 +59,17 @@ where
     C: Fn(Hash) -> F,
     F: futures::Future<Output = Option<String>>,
 {
-    let intermediates = iterate_hash(initial_commitment_seed, TOTAL_ITERATIONS, DB_ITERATION_BLOCK_SIZE);
+    let intermediates = iterate_hash(initial_commitment_seed, TOTAL_ITERATIONS, DB_ITERATION_BLOCK_SIZE).await;
 
     db.store_hash_intermediaries(channel_id, &intermediates).await?;
+    debug!("stored hash intermediaries for {channel_id}");
+
     let current = Hash::new(&intermediates.hash);
-    db.set_current_commitment(channel_id, &current)
-        .then(|_| committer(current))
-        .await;
+    db.set_current_commitment(channel_id, &current).await?;
+    match committer(current).await {
+        None => warn!("chain committer did not return any value or failed!"),
+        Some(s) => info!("chain committer set returned {s}"),
+    }
 
     info!("commitment chain initialized for {channel_id}");
     Ok(())
