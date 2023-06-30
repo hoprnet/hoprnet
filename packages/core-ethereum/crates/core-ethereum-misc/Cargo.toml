@@ -37,6 +37,8 @@ console_error_panic_hook = { version = "0.1.7", optional = true }
 # wee_alloc = { version = "0.4.5", optional = true }
 
 [dev-dependencies]
+env_logger = "0.10"
+core-types = { path = "../../../core/crates/core-types" }
 mockall = "0.11.4"
 hex-literal = "0.4"
 wasm-bindgen-test = "0.3.36"

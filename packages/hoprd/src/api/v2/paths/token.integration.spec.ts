@@ -9,7 +9,7 @@ import { createAuthenticatedTestApiInstance } from './../fixtures.js'
 
 import type { default as Hopr } from '@hoprnet/hopr-core'
 import { LevelDb } from '@hoprnet/hopr-utils'
-import { Database, PublicKey } from '@hoprnet/hopr-core/lib/core_packet.js'
+import { Database, PublicKey } from '@hoprnet/hopr-core/lib/core_hopr.js'
 
 describe('GET /token', function () {
   let node: Hopr

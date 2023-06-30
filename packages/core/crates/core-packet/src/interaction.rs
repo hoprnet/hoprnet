@@ -750,13 +750,12 @@ mod tests {
     use crate::path::Path;
     use crate::por::ProofOfRelayValues;
     use async_std::sync::RwLock;
-    use async_trait::async_trait;
     use core_crypto::derivation::derive_ack_key_share;
     use core_crypto::random::random_bytes;
     use core_crypto::types::{Hash, PublicKey};
     use core_ethereum_db::db::CoreEthereumDb;
     use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-    use core_ethereum_misc::commitment::{initialize_commitment, ChainCommitter, ChannelCommitmentInfo};
+    use core_ethereum_misc::commitment::{initialize_commitment, ChannelCommitmentInfo};
     use core_mixer::mixer::MixerConfig;
     use core_types::acknowledgement::{Acknowledgement, AcknowledgementChallenge, PendingAcknowledgement};
     use core_types::channels::{ChannelEntry, ChannelStatus};
@@ -765,7 +764,6 @@ mod tests {
     use hex_literal::hex;
     use lazy_static::lazy_static;
     use libp2p_identity::PeerId;
-    use mockall::mock;
     use serial_test::serial;
     use std::collections::HashMap;
     use std::ops::Mul;
@@ -879,15 +877,6 @@ mod tests {
             .collect::<Vec<_>>()
     }
 
-    mock! {
-        pub Commiter { }
-        #[async_trait(? Send)]
-        impl ChainCommitter for Commiter {
-            async fn get_commitment(&self) -> Option<Hash>;
-            async fn set_commitment(&mut self, _commitment: &Hash) -> String;
-        }
-    }
-
     async fn create_minimal_topology(dbs: &Vec<Arc<Mutex<rusty_leveldb::DB>>>) -> crate::errors::Result<()> {
         let testing_snapshot = Snapshot::new(U256::zero(), U256::zero(), U256::zero());
         let mut previous_channel: Option<ChannelEntry> = None;
@@ -926,11 +915,9 @@ mod tests {
                     channel_epoch: previous_channel.clone().unwrap().channel_epoch.clone(),
                 };
 
-                let mut commiter = MockCommiter::new();
-                commiter.expect_get_commitment().return_const(None);
-                commiter.expect_set_commitment().return_const("");
+                let commiter = |_| async { None };
 
-                initialize_commitment(&mut db, &PEERS_PRIVS[0], &channel_info, &mut commiter)
+                initialize_commitment(&mut db, &PEERS_PRIVS[0], &channel_info, commiter)
                     .await
                     .map_err(|e| PacketDbError(DbError::GenericError(e.to_string())))?;
             }

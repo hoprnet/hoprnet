@@ -44,18 +44,18 @@ const log = debug('hopr-core-ethereum')
 
 export type RedeemTicketResponse =
   | {
-    status: 'SUCCESS'
-    receipt: string
-    ackTicket: AcknowledgedTicket
-  }
+      status: 'SUCCESS'
+      receipt: string
+      ackTicket: AcknowledgedTicket
+    }
   | {
-    status: 'FAILURE'
-    message: string
-  }
+      status: 'FAILURE'
+      message: string
+    }
   | {
-    status: 'ERROR'
-    error: Error | string
-  }
+      status: 'ERROR'
+      error: Error | string
+    }
 
 export type ChainOptions = {
   provider: string
@@ -277,10 +277,6 @@ export default class HoprCoreEthereum extends EventEmitter {
         this.setTxHandler(`channel-updated-${txHash}`, txHash)
       )
     }
-    const getCommitment = async () =>
-      ChannelEntry.deserialize(
-        (await this.db.get_channel(Ethereum_Hash.deserialize(c.get_id().serialize()))).serialize()
-      ).commitment
 
     // Get all channel information required to build the initial commitment
     const cci = new ChannelCommitmentInfo(
@@ -290,7 +286,8 @@ export default class HoprCoreEthereum extends EventEmitter {
       Ethereum_U256.deserialize(c.channel_epoch.serialize())
     )
 
-    await initialize_commitment(this.db, this.privateKey, cci, getCommitment, setCommitment)
+    log(`initializing commitment`)
+    await initialize_commitment(this.db, this.privateKey, cci, setCommitment)
   }
 
   public async redeemAllTickets(): Promise<void> {
@@ -390,7 +387,8 @@ export default class HoprCoreEthereum extends EventEmitter {
         ticket = fetched
 
         log(
-          `redeeming ticket ${ticket.response.to_hex()} in channel from ${channel.source} to ${channel.destination
+          `redeeming ticket ${ticket.response.to_hex()} in channel from ${channel.source} to ${
+            channel.destination
           }, preImage ${ticket.pre_image.to_hex()}, porSecret ${ticket.response.to_hex()}`
         )
 
@@ -562,7 +560,7 @@ export default class HoprCoreEthereum extends EventEmitter {
       c = ChannelEntry.deserialize(
         (await this.db.get_channel_to(Ethereum_PublicKey.deserialize(dest.serialize(false)))).serialize()
       )
-    } catch { }
+    } catch {}
     if (c && c.status !== ChannelStatus.Closed) {
       throw Error('Channel is already opened')
     }

@@ -8,7 +8,7 @@ import { STATUS_CODES } from './../../utils.js'
 
 import type { default as Hopr } from '@hoprnet/hopr-core'
 import { LevelDb } from '@hoprnet/hopr-utils'
-import { Database, PublicKey } from '@hoprnet/hopr-core/lib/core_packet.js'
+import { Database, PublicKey } from '@hoprnet/hopr-core/lib/core_hopr.js'
 
 describe('POST /tokens', function () {
   let node: Hopr

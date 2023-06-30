@@ -73,10 +73,11 @@ impl std::str::FromStr for Address {
             hex::decode(&value[2..])
         } else {
             hex::decode(value)
-        }.map_err(|_| ParseError)?;
+        }
+        .map_err(|_| ParseError)?;
         if decoded.len() == Self::SIZE {
             let mut res = Self {
-                addr: [0u8; Self::SIZE]
+                addr: [0u8; Self::SIZE],
             };
             res.addr.copy_from_slice(&decoded);
             Ok(res)
@@ -306,6 +307,16 @@ pub struct Snapshot {
     pub block_number: U256,
     pub transaction_index: U256,
     pub log_index: U256,
+}
+
+impl Default for Snapshot {
+    fn default() -> Self {
+        Self {
+            block_number: U256::zero(),
+            transaction_index: U256::zero(),
+            log_index: U256::zero(),
+        }
+    }
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]

@@ -10,7 +10,7 @@ import { createAuthenticatedTestApiInstance } from '../../fixtures.js'
 import type { default as Hopr } from '@hoprnet/hopr-core'
 import type { Token } from './../../../token.js'
 import { LevelDb } from '@hoprnet/hopr-utils'
-import { Database, PublicKey } from '@hoprnet/hopr-core/lib/core_packet.js'
+import { Database, PublicKey } from '@hoprnet/hopr-core/lib/core_hopr.js'
 
 describe('DELETE /tokens/{id}', function () {
   let node: Hopr
