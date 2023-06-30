@@ -45,7 +45,7 @@ impl Display for Path {
             f,
             "{}{} ] ({} hops)",
             if self.valid { "[ " } else { "[ !! " },
-            self.hops.join("->"),
+            self.hops.iter().map(|p| p.to_string()).collect::<Vec<_>>().join("->"),
             self.length()
         )
     }
