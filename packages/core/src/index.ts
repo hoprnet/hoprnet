@@ -738,7 +738,7 @@ class Hopr extends EventEmitter {
         if (channel.status == ChannelStatus.Open) {
           metric_channelBalances.set(
             [channel.source.to_hex(), 'in'],
-            +ethersUtils.formatEther(channel.balance.toString())
+            +ethersUtils.formatEther(channel.balance.to_string())
           )
           incomingChannels++
         }
