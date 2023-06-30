@@ -50,7 +50,7 @@ RUN apt-get update && \
     # Install Node.js
     ./scripts/toolchain/install-toolchain.sh --runtime-only && \
     # Remove unused files and config
-    rm -R scripts .nvmrc packages/*/docs && \
+    rm -R scripts .nvmrc && \
     # create directory which is later used for the database, so that it inherits
     # permissions when mapped to a volume
     mkdir -p hoprd-db
