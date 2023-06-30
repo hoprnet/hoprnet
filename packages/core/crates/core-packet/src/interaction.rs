@@ -1553,7 +1553,7 @@ pub mod wasm {
                 w: Arc::new(AcknowledgementInteraction::new(
                     Arc::new(Mutex::new(CoreEthereumDb::new(
                         DB::new(LevelDbShim::new(db)),
-                        chain_key.clone(),
+                        chain_key.to_address(),
                     ))),
                     chain_key,
                     on_ack.0,
@@ -1605,7 +1605,9 @@ pub mod wasm {
             let mut w = PacketInteraction::new(
                 Arc::new(Mutex::new(CoreEthereumDb::new(
                     DB::new(LevelDbShim::new(db)),
-                    PublicKey::from_privkey(&cfg.private_key).expect("invalid private key"),
+                    PublicKey::from_privkey(&cfg.private_key)
+                        .expect("invalid private key")
+                        .to_address(),
                 ))),
                 on_msg.0,
                 cfg,

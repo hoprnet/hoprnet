@@ -42,12 +42,12 @@ where
     T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>,
 {
     pub db: DB<T>,
-    pub me: PublicKey,
+    pub me: Address,
 }
 
 impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> CoreEthereumDb<T> {
-    pub fn new(db: DB<T>, public_key: PublicKey) -> Self {
-        Self { db, me: public_key }
+    pub fn new(db: DB<T>, me: Address) -> Self {
+        Self { db, me }
     }
 }
 
@@ -193,7 +193,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
                         true
                     } else {
                         let f = filter.clone().unwrap();
-                        f.destination.eq(&self.me.to_address()) && ack.ticket.channel_epoch.eq(&f.channel_epoch)
+                        f.destination.eq(&self.me) && ack.ticket.channel_epoch.eq(&f.channel_epoch)
                     }
                 },
             )
@@ -222,15 +222,13 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
     }
 
     async fn get_channel_to(&self, dest: &Address) -> Result<Option<ChannelEntry>> {
-        let key =
-            utils_db::db::Key::new_with_prefix(&generate_channel_id(&self.me.to_address(), &dest), CHANNEL_PREFIX)?;
+        let key = utils_db::db::Key::new_with_prefix(&generate_channel_id(&self.me, &dest), CHANNEL_PREFIX)?;
 
         self.db.get_or_none(key).await
     }
 
     async fn get_channel_from(&self, src: &Address) -> Result<Option<ChannelEntry>> {
-        let key =
-            utils_db::db::Key::new_with_prefix(&generate_channel_id(&src, &self.me.to_address()), CHANNEL_PREFIX)?;
+        let key = utils_db::db::Key::new_with_prefix(&generate_channel_id(&src, &self.me), CHANNEL_PREFIX)?;
 
         self.db.get_or_none(key).await
     }
@@ -765,11 +763,11 @@ pub mod wasm {
     #[wasm_bindgen]
     impl Database {
         #[wasm_bindgen(constructor)]
-        pub fn new(db: leveldb::wasm::LevelDb, public_key: PublicKey) -> Self {
+        pub fn new(db: leveldb::wasm::LevelDb, me_addr: Address) -> Self {
             Self {
                 core_ethereum_db: Arc::new(Mutex::new(CoreEthereumDb::<leveldb::wasm::LevelDbShim>::new(
                     DB::<leveldb::wasm::LevelDbShim>::new(leveldb::wasm::LevelDbShim::new(db)),
-                    public_key.clone(),
+                    me_addr,
                 ))),
             }
         }
