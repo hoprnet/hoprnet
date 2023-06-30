@@ -1,5 +1,4 @@
 import request from 'supertest'
-import sinon from 'sinon'
 import chaiResponseValidator from 'chai-openapi-response-validator'
 import chai, { expect } from 'chai'
 import {
@@ -15,20 +14,18 @@ import { Balance, ChannelEntry, BalanceType, PublicKey, U256, Hash, ChannelStatu
 
 import { STATUS_CODES } from '../../utils.js'
 
-let node = sinon.fake() as any
-node.getId = sinon.fake.returns(ALICE_PEER_ID)
-node.getEthereumAddress = sinon.fake.returns(ALICE_NATIVE_ADDR())
-node.getNativeBalance = sinon.fake.returns(new Balance('10', BalanceType.Native))
-node.getBalance = sinon.fake.returns(new Balance('1', BalanceType.HOPR))
+let node = {} as any
+node.getId = () => ALICE_PEER_ID
+node.getEthereumAddress = () => ALICE_NATIVE_ADDR
+node.getNativeBalance = () => new Balance('10', BalanceType.Native)
+node.getBalance = () => new Balance('1', BalanceType.HOPR)
 
 const CHANNEL_ID = channelEntryCreateMock().get_id()
 
-node.openChannel = sinon.fake.returns(
-  Promise.resolve({
-    channelId: CHANNEL_ID,
-    receipt: 'testReceipt'
-  })
-)
+node.openChannel = async () => ({
+  channelId: CHANNEL_ID,
+  receipt: 'testReceipt'
+})
 
 describe('GET /channels', function () {
   const incoming = new ChannelEntry(
@@ -64,9 +61,9 @@ describe('GET /channels', function () {
     new U256('3'),
     new U256('3')
   )
-  node.getChannelsFrom = sinon.fake.returns(Promise.resolve([outgoing]))
-  node.getChannelsTo = sinon.fake.returns(Promise.resolve([incoming]))
-  node.getAllChannels = sinon.fake.returns(Promise.resolve([incoming, outgoing, otherChannel]))
+  node.getChannelsFrom = async () => [outgoing]
+  node.getChannelsTo = async () => [incoming]
+  node.getAllChannels = async () => [incoming, outgoing, otherChannel]
 
   let service: any
   before(async function () {
@@ -167,7 +164,9 @@ describe('POST /channels', () => {
   })
 
   it('should fail when channel is already open', async () => {
-    node.openChannel = sinon.fake.throws('Channel is already opened')
+    node.openChannel = () => {
+      throw Error('Channel is already opened')
+    }
 
     const res = await request(service).post('/api/v2/channels').send({
       peerId: ALICE_PEER_ID.toString(),

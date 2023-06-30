@@ -98,14 +98,8 @@ export async function fundMultiChannels(
     return { success: false, reason: validationResult.reason }
   }
 
-  const outgoingChannelId = generate_channel_id(
-    node.getEthereumAddress(),
-    PublicKey.from_peerid_str(validationResult.counterparty.toString()).to_address()
-  )
-  const incomingChannelId = generate_channel_id(
-    PublicKey.from_peerid_str(validationResult.counterparty.toString()).to_address(),
-    node.getEthereumAddress()
-  )
+  const outgoingChannelId = generate_channel_id(node.getEthereumAddress(), validationResult.counterparty)
+  const incomingChannelId = generate_channel_id(validationResult.counterparty, node.getEthereumAddress())
 
   let fundingOutgoingChannelRequest = fundingRequests.get(outgoingChannelId.to_hex())
   let fundingIncomingChannelRequest = fundingRequests.get(incomingChannelId.to_hex())
