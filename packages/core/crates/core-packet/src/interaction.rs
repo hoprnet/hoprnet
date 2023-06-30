@@ -835,7 +835,7 @@ mod tests {
             .map(|(i, db)| {
                 Arc::new(Mutex::new(CoreEthereumDb::new(
                     DB::new(RustyLevelDbShim::new(db.clone())),
-                    PublicKey::from_peerid(&PEERS[i]).unwrap(),
+                    PublicKey::from_peerid(&PEERS[i]).unwrap().to_address(),
                 )))
             })
             .collect::<Vec<_>>()
@@ -857,7 +857,7 @@ mod tests {
         for (index, peer_id) in PEERS.iter().enumerate().take(dbs.len()) {
             let mut db = CoreEthereumDb::new(
                 DB::new(RustyLevelDbShim::new(dbs[index].clone())),
-                PublicKey::from_peerid(&peer_id).unwrap(),
+                PublicKey::from_peerid(&peer_id).unwrap().to_address(),
             );
 
             let mut channel: Option<ChannelEntry> = None;

@@ -167,7 +167,7 @@ mod tests {
 
         CoreEthereumDb::new(
             DB::new(RustyLevelDbShim::new(Arc::new(Mutex::new(db)))),
-            PublicKey::from_privkey(&PRIV_KEY).unwrap(),
+            PublicKey::from_privkey(&PRIV_KEY).unwrap().to_address(),
         )
     }
 
