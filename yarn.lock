@@ -621,7 +621,7 @@ __metadata:
     multiaddr: 10.0.1
     retimer: 3.0.0
     sinon: 12.0.1
-    typedoc: 0.24.7
+    typedoc: 0.24.8
     typedoc-plugin-markdown: 3.15.3
     typescript: 5.0.4
   languageName: unknown
@@ -656,7 +656,7 @@ __metadata:
     mocha: 10.2.0
     retimer: 3.0.0
     secp256k1: 4.0.3
-    typedoc: 0.24.7
+    typedoc: 0.24.8
     typedoc-plugin-markdown: 3.15.3
     typescript: 5.0.4
   languageName: unknown
@@ -669,7 +669,7 @@ __metadata:
     "@types/mocha": 10.0.1
     mocha: 10.2.0
     semver: 7.5.0
-    typedoc: 0.24.7
+    typedoc: 0.24.8
     typedoc-plugin-markdown: 3.15.3
     typescript: 5.0.4
   languageName: unknown
@@ -719,7 +719,7 @@ __metadata:
     secp256k1: 4.0.3
     sinon: 12.0.1
     timeout-abort-controller: 3.0.0
-    typedoc: 0.24.7
+    typedoc: 0.24.8
     typedoc-plugin-markdown: 3.15.3
     typescript: 5.0.4
   languageName: unknown
@@ -760,7 +760,7 @@ __metadata:
     swagger-ui-express: 4.6.2
     trace-unhandled: 2.0.1
     ts-node: ^10.9.1
-    typedoc: 0.24.7
+    typedoc: 0.24.8
     typedoc-plugin-markdown: 3.15.3
     typescript: 5.0.4
     uuid: ^9.0.0
@@ -8434,19 +8434,19 @@ __metadata:
   languageName: node
   linkType: hard
 
-"typedoc@npm:0.24.7":
-  version: 0.24.7
-  resolution: "typedoc@npm:0.24.7"
+"typedoc@npm:0.24.8":
+  version: 0.24.8
+  resolution: "typedoc@npm:0.24.8"
   dependencies:
     lunr: ^2.3.9
     marked: ^4.3.0
     minimatch: ^9.0.0
     shiki: ^0.14.1
   peerDependencies:
-    typescript: 4.6.x || 4.7.x || 4.8.x || 4.9.x || 5.0.x
+    typescript: 4.6.x || 4.7.x || 4.8.x || 4.9.x || 5.0.x || 5.1.x
   bin:
     typedoc: bin/typedoc
-  checksum: 9ae433566cb02b96deb9eb2a9f5b23d1b199f5aeb61ca8c7e2653ff5d339fbfb4d526e024febab4f3278332978814aaa0885f1d5925ba21a441d93a611510ac3
+  checksum: a46a14497f789fb3594e6c3af2e45276934ac46df40b7ed15a504ee51dc7a8013a2ffb3a54fd73abca6a2b71f97d3ec9ad356fa9aa81d29743e4645a965a2ae0
   languageName: node
   linkType: hard
 
