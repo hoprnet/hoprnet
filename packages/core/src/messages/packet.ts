@@ -153,7 +153,7 @@ export async function validateUnacknowledgedTicket(
 
   // channel MUST be open or pending to close
   if (channel.status === ChannelStatus.Closed) {
-    throw Error(`Payment channel with '${them.toString()}' is not open or pending to close`)
+    throw Error(`Payment channel with '${them.to_string()}' is not open or pending to close`)
   }
 
   // ticket's epoch MUST match our channel's epoch
@@ -168,9 +168,9 @@ export async function validateUnacknowledgedTicket(
   // ticket's channelEpoch MUST match the current channel's epoch
   if (!ticket.channel_epoch.eq(channel.channel_epoch)) {
     throw Error(
-      `Ticket was created for a different channel iteration ${ticket.channel_epoch.to_string()} != ${
-        channel.channel_epoch
-      } of channel ${channel.get_id().to_hex()}`
+      `Ticket was created for a different channel iteration ${ticket.channel_epoch.to_string()} != ${channel.channel_epoch.to_string()} of channel ${channel
+        .get_id()
+        .to_hex()}`
     )
   }
 

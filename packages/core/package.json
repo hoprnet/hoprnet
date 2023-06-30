@@ -63,8 +63,6 @@
     "@types/chai-as-promised": "7.1.5",
     "@types/mocha": "10.0.1",
     "@types/semver": "^7",
-    "chai": "4.3.7",
-    "chai-as-promised": "7.1.1",
     "memdown": "6.1.1",
     "mocha": "10.2.0",
     "retimer": "3.0.0",

@@ -57,9 +57,9 @@ describe('test strategies', async function () {
       assert(res.to_close().includes(alice))
       assert(res.to_close().includes(gustave))
 
-      assert.equal(res.to_open()[0].peer_id, gustave)
-      assert.equal(res.to_open()[1].peer_id, eugene)
-      assert.equal(res.to_open()[2].peer_id, bob)
+      assert.equal(res.to_open()[0].address, gustave)
+      assert.equal(res.to_open()[1].address, eugene)
+      assert.equal(res.to_open()[2].address, bob)
     }
 
     // Now reconfigure the strategy and tick again with same inputs
@@ -78,7 +78,7 @@ describe('test strategies', async function () {
       assert(res.to_close().includes(alice))
       assert(res.to_close().includes(gustave))
 
-      assert.equal(res.to_open()[0].peer_id, gustave)
+      assert.equal(res.to_open()[0].address, gustave)
     }
   })
 })
