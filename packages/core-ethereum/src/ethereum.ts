@@ -88,7 +88,7 @@ export async function createChainWrapper(
     : new providers.WebSocketProvider(networkInfo.provider)
   log(`[DEBUG] provider ${provider}`)
   const publicKey = PublicKey.from_privkey(privateKey)
-  log(`[DEBUG] publicKey ${publicKey}`)
+  log(`[DEBUG] publicKey ${publicKey.to_hex(true)}`)
   const address = publicKey.to_address()
   log(`[DEBUG] address ${address.to_string()}`)
   const providerChainId = (await provider.getNetwork()).chainId

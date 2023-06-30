@@ -252,7 +252,7 @@ export default class HoprCoreEthereum extends EventEmitter {
 
   public async commitToChannel(c: ChannelEntry): Promise<void> {
     log(`committing to channel ${c.get_id().to_hex()}`)
-    log(c.toString())
+    log(c.to_string())
     const setCommitment = async (commitment: Hash) => {
       return this.chain.setCommitment(c.source, commitment, (txHash: string) =>
         this.setTxHandler(`channel-updated-${txHash}`, txHash)
