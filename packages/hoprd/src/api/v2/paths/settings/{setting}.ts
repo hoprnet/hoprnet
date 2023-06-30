@@ -58,7 +58,7 @@ export const setSetting = (node: Hopr, stateOps: StateOps, key: keyof State['set
 
 const PUT: Operation = [
   async (req, res, _next) => {
-    const { stateOps, node } = req.context
+    const { stateOps, node }: { stateOps: StateOps; node: Hopr } = req.context
     const { setting } = req.params
     const { settingValue } = req.body
 

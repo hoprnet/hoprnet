@@ -1,4 +1,5 @@
 use ethnum::{u256, AsU256};
+use getrandom::getrandom;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::ops::{Add, Mul, Sub};
@@ -7,7 +8,7 @@ use crate::errors::{GeneralError, GeneralError::InvalidInput, GeneralError::Pars
 use crate::traits::{BinarySerializable, ToHex};
 
 /// Represents an Ethereum address
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Hash)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Address {
     addr: [u8; Self::SIZE],
@@ -49,6 +50,14 @@ impl Address {
         self.to_hex()
     }
     // }
+
+    /// Creates a random Ethereum address, mostly used for testing
+    pub fn random() -> Self {
+        let mut addr = [0u8; Self::SIZE];
+        getrandom(&mut addr[..]).unwrap();
+
+        Self { addr }
+    }
 }
 
 impl BinarySerializable<'_> for Address {

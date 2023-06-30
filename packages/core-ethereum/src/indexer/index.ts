@@ -29,7 +29,9 @@ import {
   create_gauge,
   create_multi_gauge,
   U256,
-  random_integer
+  random_integer,
+  Hash,
+  number_to_channel_status
 } from '@hoprnet/hopr-utils'
 
 import type { ChainWrapper } from '../ethereum.js'
@@ -44,7 +46,7 @@ import {
   type IndexerEventEmitter,
   IndexerStatus
 } from './types.js'
-import { isConfirmedBlock, snapshotComparator, type IndexerSnapshot, channelEntryFromSCEvent } from './utils.js'
+import { isConfirmedBlock, snapshotComparator, type IndexerSnapshot } from './utils.js'
 import { BigNumber, type Contract, errors } from 'ethers'
 import { CORE_ETHEREUM_CONSTANTS } from '../../lib/core_ethereum_misc.js'
 import type { TypedEvent, TypedEventFilter } from '../utils/common.js'
@@ -842,14 +844,20 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   }
 
   private async onChannelUpdated(event: Event<'ChannelUpdated'>, lastSnapshot: Snapshot): Promise<void> {
-    let channel: ChannelEntry
-    try {
-      log('channel-updated for hash %s', event.transactionHash)
-      channel = await channelEntryFromSCEvent(event, this.getPublicKeyOf.bind(this))
-    } catch (err) {
-      log(`fatal error: failed to construct new ChannelEntry from the SC event`, err)
-      return
-    }
+    const { source, destination, newState } = event.args
+
+    log('channel-updated for hash %s', event.transactionHash)
+    let channel = new ChannelEntry(
+      Address.from_string(source),
+      Address.from_string(destination),
+      new Balance(newState.balance.toString(), BalanceType.HOPR),
+      new Hash(stringToU8a(newState.commitment)),
+      new U256(newState.ticketEpoch.toString()),
+      new U256(newState.ticketIndex.toString()),
+      number_to_channel_status(newState.status),
+      new U256(newState.channelEpoch.toString()),
+      new U256(newState.closureTime.toString())
+    )
 
     let prevState: ChannelEntry
     try {
@@ -868,17 +876,16 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     }
 
     this.emit('channel-update', channel)
-    verbose('channel-update for channel')
-    verbose(channel.get_id().to_hex())
+    verbose(`channel-update for channel ${channel.get_id().to_hex()}`)
 
-    if (channel.source.to_address().eq(this.address) || channel.destination.to_address().eq(this.address)) {
+    if (channel.source.eq(this.address) || channel.destination.eq(this.address)) {
       this.emit('own-channel-updated', channel)
 
-      if (channel.destination.to_address().eq(this.address)) {
+      if (channel.destination.eq(this.address)) {
         // Channel _to_ us
         if (channel.status === ChannelStatus.WaitingForCommitment) {
           log('channel to us waiting for commitment')
-          log(channel.toString())
+          log(channel.to_string())
           this.emit('channel-waiting-for-commitment', channel)
         }
       }
@@ -929,7 +936,9 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   ): Promise<void> {
     const account = Address.from_string(event.args.account)
     await this.db.setEligible(account, event.args.eligibility, lastSnapshot)
-    verbose(`network-registry: account ${account} is ${event.args.eligibility ? 'eligible' : 'not eligible'}`)
+    verbose(
+      `network-registry: account ${account.to_string()} is ${event.args.eligibility ? 'eligible' : 'not eligible'}`
+    )
     // emit event only when eligibility changes on accounts with a HoprNode associated
     try {
       const hoprNodes = await this.db.findHoprNodesUsingAccountInNetworkRegistry(account)
@@ -1058,9 +1067,9 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
    * @param source peer
    * @returns peer's open channels
    */
-  public async getOpenChannelsFrom(source: PublicKey): Promise<ChannelEntry[]> {
+  public async getOpenChannelsFrom(source: Address): Promise<ChannelEntry[]> {
     return await this.db
-      .getChannelsFrom(source.to_address())
+      .getChannelsFrom(source)
       .then((channels: ChannelEntry[]) => channels.filter((channel) => channel.status === ChannelStatus.Open))
   }
 

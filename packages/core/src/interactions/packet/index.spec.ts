@@ -153,8 +153,8 @@ function createFakeSendReceive(events: EventEmitter, self: PeerId) {
  */
 function getDummyChannel(from: PeerId, to: PeerId): ChannelEntry {
   return new ChannelEntry(
-    PublicKey.from_peerid_str(from.toString()),
-    PublicKey.from_peerid_str(to.toString()),
+    PublicKey.from_peerid_str(from.toString()).to_address(),
+    PublicKey.from_peerid_str(to.toString()).to_address(),
     DEFAULT_FUNDING.clone(),
     new Hash(Uint8Array.from(randomBytes(32))),
     DEFAULT_TICKET_EPOCH.clone(),

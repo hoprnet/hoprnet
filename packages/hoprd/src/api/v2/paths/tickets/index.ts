@@ -23,7 +23,7 @@ export const getAllTickets = async (node: Hopr) => {
 
 const GET: Operation = [
   async (req, res, _next) => {
-    const { node } = req.context
+    const { node }: { node: Hopr } = req.context
 
     try {
       const tickets = await getAllTickets(node)
