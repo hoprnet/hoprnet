@@ -223,7 +223,7 @@ library HoprCapabilityPermissions {
             revert FunctionSignatureTooShort();
         }
 
-        Target target = role.targets.tryGet(targetAddress);
+        Target target = role.targets.get(targetAddress);
 
         // target is in scope; delegate call is not allowed; value can only be sent with `SEND`
         checkExecutionOptions(value, operation, target);
@@ -231,11 +231,11 @@ library HoprCapabilityPermissions {
         bytes4 functionSig = bytes4(data);
 
         // check default permissions and get the fallback permission
-        Permission defaultPermission = getDefaultPermission(target, functionSig);
+        TargetPermission defaultPermission = getDefaultPermission(target, functionSig);
         // allow early revert or early return
-        if (defaultPermission == Permission.BLOCK_ALL) {
+        if (defaultPermission == TargetPermission.BLOCK_ALL) {
             revert PermissionRejected();
-        } else if (defaultPermission == Permission.ALLOW_ALL) {
+        } else if (defaultPermission == TargetPermission.ALLOW_ALL) {
             return;
         }
 
@@ -254,12 +254,12 @@ library HoprCapabilityPermissions {
         // check permission result
         if (
             granularPermission == GranularPermission.BLOCK ||
-            (granularPermission == GranularPermission.NONE && defaultPermission == Permission.SPECIFIC_FALLBACK_BLOCK)
+            (granularPermission == GranularPermission.NONE && defaultPermission == TargetPermission.SPECIFIC_FALLBACK_BLOCK)
         ) {
             revert PermissionRejected();
         } else if (
             granularPermission == GranularPermission.ALLOW || 
-            (granularPermission == GranularPermission.NONE && defaultPermission == Permission.SPECIFIC_FALLBACK_ALLOW)
+            (granularPermission == GranularPermission.NONE && defaultPermission == TargetPermission.SPECIFIC_FALLBACK_ALLOW)
         ) {
             return;
         } else {
@@ -315,7 +315,7 @@ library HoprCapabilityPermissions {
             channelId = redeemableTicket.data.channelId;
         } else if (functionSig == BATCH_REDEEM_TICKETS_SELECTOR) {
             // loop over tickets
-            checkBatchRedeem(capabilityKey, slicedData);
+            checkBatchRedeem(role, capabilityKey, slicedData);
         } else if (functionSig == CLOSE_INCOMING_CHANNEL_SELECTOR) {
             (address self, address source) = abi.decode(slicedData, (address, address));
             channelId = getChannelId(source, self);
@@ -326,7 +326,7 @@ library HoprCapabilityPermissions {
             (address self, address destination) = abi.decode(slicedData, (address, address));
             channelId = getChannelId(self, destination);
         } else if (functionSig == FUND_CHANNEL_MULTI_SELECTOR) {
-            checkFundChannel(capabilityKey, slicedData);
+            checkFundChannel(role, capabilityKey, slicedData);
         } else if (functionSig == SET_COMMITMENT_SELECTOR) {
             (address self, , address source) = abi.decode(slicedData, (address, bytes32, address));
             channelId = getChannelId(source, self);
@@ -342,7 +342,7 @@ library HoprCapabilityPermissions {
         uint256 noneCounter;
         (, HoprChannels.RedeemableTicket[] memory redeemableTickets) = abi.decode(slicedData, (address, HoprChannels.RedeemableTicket[]));
         for (uint256 i = 0; i < redeemableTickets.length; i++) {
-            bytes32 channelId = redeemableTickets[i].channelId;
+            bytes32 channelId = redeemableTickets[i].data.channelId;
             GranularPermission granularPermission = role.capabilities[capabilityKey][channelId];
             if (granularPermission == GranularPermission.NONE) {
                 noneCounter ++;
@@ -393,7 +393,7 @@ library HoprCapabilityPermissions {
         bytes32 capabilityKey,
         bytes4 functionSig,
         bytes memory slicedData
-    ) internal view returns (GranularPermission){
+    ) internal view returns (GranularPermission) {
         if (functionSig == APPROVE_SELECTOR) {
             (address beneficiary, ) = abi.decode(slicedData, (address, uint256));
             GranularPermission granularPermission = role.capabilities[capabilityKey][bytes32(uint256(uint160(beneficiary)))];
@@ -401,7 +401,7 @@ library HoprCapabilityPermissions {
         } else if (functionSig == SEND_SELECTOR) {
             (address beneficiary, , bytes memory sliceDataFundMulti) = abi.decode(slicedData, (address, uint256, bytes));
             // beneficiary must be a CHANNELS target, further check the data
-            Target target = role.targets.tryGet(beneficiary);
+            Target target = role.targets.get(beneficiary);
             if (!target.isTargetType(TargetType.CHANNELS)) {
               revert TargetAddressNotAllowed();
             }
@@ -421,7 +421,7 @@ library HoprCapabilityPermissions {
         Role storage role,
         address targetAddress,
         uint256 dataLength
-    ) internal view {
+    ) internal view returns (GranularPermission) {
         if (dataLength > 0) {
             // not allowed to call payable functions
             revert ParameterNotAllowed();
@@ -438,10 +438,10 @@ library HoprCapabilityPermissions {
     function getDefaultPermission(
         Target target, 
         bytes4 functionSig
-    ) internal view returns (Permission) {
+    ) internal view returns (TargetPermission) {
         // check default target permission
-        Permission defaultTargetPermission = target.getDefaultTargetPermission();
-        Permission defaultFunctionPermission;
+        TargetPermission defaultTargetPermission = target.getDefaultTargetPermission();
+        FunctionPermission defaultFunctionPermission;
         if (functionSig == REDEEM_TICKET_SELECTOR) {
             defaultFunctionPermission = target.getDefaultFunctionPermissionAt(0);
         } else if (functionSig == BATCH_REDEEM_TICKETS_SELECTOR) {
@@ -461,13 +461,13 @@ library HoprCapabilityPermissions {
         } else if (functionSig == SEND_SELECTOR) {
             defaultFunctionPermission = target.getDefaultFunctionPermissionAt(8);
         } else {
-            defaultFunctionPermission = Permission.BLOCK_ALL;
+            defaultFunctionPermission = FunctionPermission.BLOCK_ALL;
         }
         // only when function permission is not defined, use target default permission
-        if (defaultFunctionPermission == Permission.NONE) {
+        if (defaultFunctionPermission == FunctionPermission.NONE) {
             return defaultTargetPermission;
         } else {
-            return defaultFunctionPermission;
+            return TargetUtils.convertFunctionToTargetPermission(defaultFunctionPermission);
         }
     }
 
@@ -521,7 +521,7 @@ library HoprCapabilityPermissions {
         Target target
     ) external {
       address targetAddress = target.getTargetAddress();
-      if (targetAddress) {
+      if (targetAddress == address(0)) {
           revert AddressIsZero();
       }
       // check targetAddress is not scoped
@@ -533,7 +533,7 @@ library HoprCapabilityPermissions {
       Target updatedTarget = target.forceWriteAsTargetType(TargetType.TOKEN);
       role.targets.add(updatedTarget);
 
-      emit ScopedTargetToken(targetAddress, target);
+      emit ScopedTargetToken(targetAddress, updatedTarget);
     }
 
     /**
@@ -547,7 +547,7 @@ library HoprCapabilityPermissions {
         Target target
     ) external {
       address targetAddress = target.getTargetAddress();
-      if (targetAddress) {
+      if (targetAddress == address(0)) {
           revert AddressIsZero();
       }
       // check targetAddress is not scoped
@@ -558,7 +558,7 @@ library HoprCapabilityPermissions {
       Target updatedTarget = target.forceWriteAsTargetType(TargetType.CHANNELS);
       role.targets.add(updatedTarget);
 
-      emit ScopedTargetChannels(targetAddress, target);
+      emit ScopedTargetChannels(targetAddress, updatedTarget);
     }
 
     /**
@@ -572,7 +572,7 @@ library HoprCapabilityPermissions {
         Target target
     ) external {
       address targetAddress = target.getTargetAddress();
-      if (targetAddress) {
+      if (targetAddress == address(0)) {
           revert AddressIsZero();
       }
       // check targetAddress is not scoped
@@ -937,7 +937,4 @@ library HoprCapabilityPermissions {
             permissions[j] = GranularPermission(uint8((uint256(encoded) << (254 - 2 * j)) >> 254));
         }
     }
-
-    // TODO: Add encode function for default permissions
-    // TODO: Add decode function for default Target
 }

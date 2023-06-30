@@ -12,7 +12,7 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
     HoprNodeManagementModule public moduleSingleton;
     address public multiaddr;
     address public safe;
-    DefaultPermissions internal defaultPermissions;
+    FunctionPermission[] internal defaultFunctionPermission;
     /**
     * Manually import events and errors
     */
@@ -26,18 +26,18 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         safe = vm.addr(101); // make address(101) a safe
 
         moduleSingleton = new HoprNodeManagementModule();
-        defaultPermissions = DefaultPermissions({
-            defaultTargetPermission: Permission.SPECIFIC_FALLBACK_ALLOW,
-            defaultRedeemTicketSafeFunctionPermisson: Permission.SPECIFIC_FALLBACK_ALLOW,
-            defaultBatchRedeemTicketsSafeFunctionPermisson: Permission.SPECIFIC_FALLBACK_ALLOW,
-            defaultCloseIncomingChannelSafeFunctionPermisson: Permission.SPECIFIC_FALLBACK_ALLOW,
-            defaultInitiateOutgoingChannelClosureSafeFunctionPermisson: Permission.SPECIFIC_FALLBACK_ALLOW,
-            defaultFinalizeOutgoingChannelClosureSafeFunctionPermisson: Permission.SPECIFIC_FALLBACK_ALLOW,
-            defaultFundChannelMultiFunctionPermisson: Permission.SPECIFIC_FALLBACK_ALLOW,
-            defaultSetCommitmentSafeFunctionPermisson: Permission.SPECIFIC_FALLBACK_ALLOW,
-            defaultApproveFunctionPermisson: Permission.SPECIFIC_FALLBACK_BLOCK,
-            defaultSendFunctionPermisson: Permission.SPECIFIC_FALLBACK_BLOCK
-        });
+        defaultFunctionPermission = new FunctionPermission[](TargetUtils.NUM_DEFAULT_FUNCTION_PERMISSIONS);
+        defaultFunctionPermission = [
+            FunctionPermission.SPECIFIC_FALLBACK_ALLOW,
+            FunctionPermission.SPECIFIC_FALLBACK_ALLOW,
+            FunctionPermission.SPECIFIC_FALLBACK_ALLOW,
+            FunctionPermission.SPECIFIC_FALLBACK_ALLOW,
+            FunctionPermission.SPECIFIC_FALLBACK_ALLOW,
+            FunctionPermission.SPECIFIC_FALLBACK_ALLOW,
+            FunctionPermission.SPECIFIC_FALLBACK_ALLOW,
+            FunctionPermission.SPECIFIC_FALLBACK_BLOCK,
+            FunctionPermission.SPECIFIC_FALLBACK_BLOCK
+        ];
     }
 
     /**
@@ -70,25 +70,34 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
     /**
     * @dev Add token target(s) when the account is not address zero
     */
-    function testFuzz_AddTargetTokenFromModule(address account) public {
-        vm.assume(account != address(0));
+    function testFuzz_AddTargetTokenFromModule(address tokenAddress) public {
+        vm.assume(tokenAddress != address(0));
         address owner = moduleSingleton.owner();
+        Target actualTokenTarget = TargetUtils.encodeDefaultPermissions(
+            tokenAddress,
+            Clearance.FUNCTION,
+            TargetType.TOKEN,
+            TargetPermission.ALLOW_ALL,
+            defaultFunctionPermission
+        );
+
         vm.startPrank(owner);
 
         vm.expectEmit(true, false, false, false, address(moduleSingleton));
-        emit HoprCapabilityPermissions.ScopedTarget(account, TargetType.TOKEN, defaultPermissions);
-        moduleSingleton.scopeTargetToken(account, defaultPermissions);
+        emit HoprCapabilityPermissions.ScopedTargetToken(tokenAddress, actualTokenTarget);
+        moduleSingleton.scopeTargetToken(actualTokenTarget);
     }
 
     /**
     * @dev Add Channels and Token targets, where channel is vm.addr()
     */
-    function test_AddChannelsAndTokenTarget() public {
+    function test_AddChannelsAndTokenTarget(uint256 targetUint) public {
         address channels = makeAddr("HoprChannels");
         address token = makeAddr("HoprToken");
         address owner = moduleSingleton.owner();
-        vm.startPrank(owner);
 
+        Target target = Target.wrap(targetUint);
+        vm.startPrank(owner);
         vm.mockCall(
             channels,
             abi.encodeWithSignature(
@@ -96,12 +105,25 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
             ),
             abi.encode(token)
         );
+
+        // token target overwritten mask
+        // <         160 bits for address         >    <>              <func>
+        // ffffffffffffffffffffffffffffffffffffffff0000ff00000000000000ffff
+        // channels target overwritten mask
+        // <         160 bits for address         >    <   functions  >
+        // ffffffffffffffffffffffffffffffffffffffff0000ffffffffffffffff0000
+        Target overwrittenTokenTarget = _helperTargetBitwiseAnd(target, hex"ffffffffffffffffffffffffffffffffffffffff0000ff00000000000000ffff");
+        overwrittenTokenTarget = _helperTargetBitwiseOr(overwrittenTokenTarget, hex"0000000000000000000000000000000000000000010100000000000000000000");
+        Target overwrittenChannelTarget = _helperTargetBitwiseAnd(target, hex"ffffffffffffffffffffffffffffffffffffffff0000ffffffffffffffff0000");
+        overwrittenChannelTarget = _helperTargetBitwiseOr(overwrittenChannelTarget, hex"0000000000000000000000000000000000000000010200000000000000000000");
         vm.expectEmit(true, false, false, false, address(moduleSingleton));
-        emit HoprCapabilityPermissions.ScopedTarget(channels, TargetType.CHANNELS, defaultPermissions);
+        emit HoprCapabilityPermissions.ScopedTargetChannels(channels, overwrittenChannelTarget);
         vm.expectEmit(true, false, false, false, address(moduleSingleton));
-        emit HoprCapabilityPermissions.ScopedTarget(token, TargetType.TOKEN, defaultPermissions);
-        moduleSingleton.addChannelsAndTokenTarget(channels, defaultPermissions);
+        emit HoprCapabilityPermissions.ScopedTargetToken(token, overwrittenTokenTarget);
+        moduleSingleton.addChannelsAndTokenTarget(channels, target);
     }
+
+
 
     // /**
     // * @dev Encode an array of permission enums into uint256 and vice versa
@@ -187,4 +209,11 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
     //     functionSigs[4] = HoprCapabilityPermissions.FINALIZE_CHANNEL_CLOSURE_SELECTOR;
     //     functionSigs[5] = HoprCapabilityPermissions.BUMP_CHANNEL_SELECTOR;
     // }
+
+    function _helperTargetBitwiseAnd(Target target, bytes32 mask) private pure returns (Target) {
+        return Target.wrap(uint256(bytes32(Target.unwrap(target)) & mask));
+    }
+    function _helperTargetBitwiseOr(Target target, bytes32 mask) private pure returns (Target) {
+        return Target.wrap(uint256(bytes32(Target.unwrap(target)) | mask));
+    }
 }
