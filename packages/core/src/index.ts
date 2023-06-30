@@ -1446,13 +1446,13 @@ class Hopr extends EventEmitter {
     try {
       if (channel.status === ChannelStatus.Open || channel.status == ChannelStatus.WaitingForCommitment) {
         log('initiating closure of channel', channel.get_id().to_hex())
-        txHash = await connector.initializeClosure(channel.source, channel.destination)
+        txHash = await connector.initializeClosure(PublicKey.deserialize(channel.source.serialize(false)), PublicKey.deserialize(channel.destination.serialize(false)))
       } else {
         // verify that we passed the closure waiting period to prevent failing
         // on-chain transactions
 
         if (channel.closure_time_passed()) {
-          txHash = await connector.finalizeClosure(channel.source, channel.destination)
+          txHash = await connector.finalizeClosure(PublicKey.deserialize(channel.source.serialize(false)), PublicKey.deserialize(channel.destination.serialize(false)))
         } else {
           log(
             `ignoring finalizing closure of channel ${channel
