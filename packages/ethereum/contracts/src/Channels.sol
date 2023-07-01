@@ -140,7 +140,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprLe
     TicketData data;
     HoprCrypto.CompactSignature signature;
     bytes32 opening;
-    bytes32 porSecret;
+    uint256 porSecret;
   }
 
   /**
