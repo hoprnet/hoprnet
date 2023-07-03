@@ -30,7 +30,7 @@ let
     pkg-config
 
     ## python is required by node module bcrypto and integration tests
-    python3 # v3.10.12
+    python39 # v3.10.12
   ];
   devPkgs = with pkgs; [
     patchelf
@@ -38,7 +38,7 @@ let
     curl # v7.88.0
 
     # integration testing utilities
-    python310Packages.pip
+    python39Packages.pip
 
     # testing utilities
     jq # v1.6

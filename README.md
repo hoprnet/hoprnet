@@ -61,7 +61,7 @@ The preferred way of installation should be via Docker.
 
 All our docker images can be found in [our Google Cloud Container Registry][4].
 Each image is prefixed with `gcr.io/hoprassociation/$PROJECT:$RELEASE`.
-The `master-staging` tag represents the `master` branch, while the `bratislava` tag
+The `rotsee` tag represents the `master` branch, while the `bratislava` tag
 represents the most recent `release/*` branch.
 
 You can pull the Docker image like so:
@@ -123,7 +123,7 @@ The `hoprd` provides various command-line switches to configure its behaviour. F
 $ hoprd --help
 Options:
       --network <NETWORK>
-          Network id which the node shall run on [env: HOPRD_NETWORK=] [possible values: anvil-localhost, master, debug-staging, anvil-localhost2, monte_rosa]
+          Network id which the node shall run on [env: HOPRD_NETWORK=] [possible values: anvil-localhost, rotsee, debug-staging, anvil-localhost2, monte_rosa]
       --identity <identity>
           The path to the identity file [env: HOPRD_IDENTITY=] [default: <IDENTITY_DIR>]
       --data <data>
