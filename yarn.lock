@@ -604,7 +604,7 @@ __metadata:
   resolution: "@hoprnet/hopr-core-ethereum@workspace:packages/core-ethereum"
   dependencies:
     "@hoprnet/hopr-utils": "workspace:packages/utils"
-    "@libp2p/crypto": 1.0.0
+    "@libp2p/crypto": 1.0.17
     "@libp2p/interface-peer-id": 1.0.5
     "@libp2p/peer-id": 1.1.16
     "@multiformats/multiaddr": 10.3.3
@@ -635,7 +635,7 @@ __metadata:
     "@hoprnet/hopr-connect": "workspace:packages/connect"
     "@hoprnet/hopr-core-ethereum": "workspace:packages/core-ethereum"
     "@hoprnet/hopr-utils": "workspace:packages/utils"
-    "@libp2p/crypto": 1.0.0
+    "@libp2p/crypto": 1.0.17
     "@libp2p/interface-content-routing": 1.0.2
     "@libp2p/interface-peer-id": 1.0.5
     "@libp2p/interface-registrar": 1.1.0
@@ -682,7 +682,7 @@ __metadata:
     "@chainsafe/libp2p-noise": 7.0.0
     "@ethersproject/wallet": 5.7.0
     "@hoprnet/hopr-real": "workspace:packages/real"
-    "@libp2p/crypto": 1.0.0
+    "@libp2p/crypto": 1.0.17
     "@libp2p/interface-connection": 1.0.1
     "@libp2p/interface-connection-manager": 1.1.0
     "@libp2p/interface-keys": 1.0.3
@@ -836,20 +836,20 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@libp2p/crypto@npm:1.0.0":
-  version: 1.0.0
-  resolution: "@libp2p/crypto@npm:1.0.0"
+"@libp2p/crypto@npm:1.0.17, @libp2p/crypto@npm:^1.0.0":
+  version: 1.0.17
+  resolution: "@libp2p/crypto@npm:1.0.17"
   dependencies:
     "@libp2p/interface-keys": ^1.0.2
+    "@libp2p/interfaces": ^3.2.0
     "@noble/ed25519": ^1.6.0
     "@noble/secp256k1": ^1.5.4
-    err-code: ^3.0.1
-    iso-random-stream: ^2.0.0
-    multiformats: ^9.4.5
+    multiformats: ^11.0.0
     node-forge: ^1.1.0
-    protons-runtime: ^1.0.4
-    uint8arrays: ^3.0.0
-  checksum: ddd46c4453859b826d43574b9d5c8a0539999c88a611d816cdda11cfe6e6c1e75db2cdee67f0d195549e62d5c04b271aa88ef203a725e26a70871bdf1f64e8ac
+    protons-runtime: ^5.0.0
+    uint8arraylist: ^2.4.3
+    uint8arrays: ^4.0.2
+  checksum: 178474409ffe56ba6fb6b0f691e0b5de7fafb61c18a1a1197d75d0f9471e614c67d77fce84e337238d0835ba4b7bbc7f4b72ff9447968706c2ba190ed93cf650
   languageName: node
   linkType: hard
 
@@ -867,23 +867,6 @@ __metadata:
     protons-runtime: ^1.0.4
     uint8arrays: ^3.0.0
   checksum: 49719808cc1de6372d36d8c9b817ee43426f72483a5aa148fcfe40cd61da45deeb493b71531e948f50a2a8af9bcf14b4da31075efe602023fab5a28709d6076e
-  languageName: node
-  linkType: hard
-
-"@libp2p/crypto@npm:^1.0.0":
-  version: 1.0.17
-  resolution: "@libp2p/crypto@npm:1.0.17"
-  dependencies:
-    "@libp2p/interface-keys": ^1.0.2
-    "@libp2p/interfaces": ^3.2.0
-    "@noble/ed25519": ^1.6.0
-    "@noble/secp256k1": ^1.5.4
-    multiformats: ^11.0.0
-    node-forge: ^1.1.0
-    protons-runtime: ^5.0.0
-    uint8arraylist: ^2.4.3
-    uint8arrays: ^4.0.2
-  checksum: 178474409ffe56ba6fb6b0f691e0b5de7fafb61c18a1a1197d75d0f9471e614c67d77fce84e337238d0835ba4b7bbc7f4b72ff9447968706c2ba190ed93cf650
   languageName: node
   linkType: hard
 
