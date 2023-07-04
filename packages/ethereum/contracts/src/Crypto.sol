@@ -49,8 +49,6 @@ abstract contract HoprCrypto {
    */
   modifier isCurvePoint(CurvePoint memory p)  {
     if ( 
-      p.x == 0 || p.x >= SECP256K1_BASE_FIELD_ORDER ||
-      p.y == 0 || p.y >= SECP256K1_BASE_FIELD_ORDER ||
       mulmod(p.y, p.y, SECP256K1_BASE_FIELD_ORDER) != 
       (mulmod(mulmod(p.x, p.x, SECP256K1_BASE_FIELD_ORDER), p.x, SECP256K1_BASE_FIELD_ORDER) + 7) % SECP256K1_BASE_FIELD_ORDER
     ) {
@@ -110,28 +108,6 @@ abstract contract HoprCrypto {
 
       o := mload(p)
     }
-  } 
-
-  /**
-   * Performs a modular exponentiation using the expmod precompile.
-   */
-  function expmod(uint256 base, uint256 exponent, uint256 modulus) public view returns (uint256 o) {
-    assembly {
-      //  define pointer
-      let p := mload(0x40)
-      // store data assembly-favouring ways
-      mstore(p, 0x20)             // Length of Base
-      mstore(add(p, 0x20), 0x20)  // Length of Exponent
-      mstore(add(p, 0x40), 0x20)  // Length of Modulus
-      mstore(add(p, 0x60), base)  // Base
-      mstore(add(p, 0x80), exponent)    // Exponent
-      mstore(add(p, 0xa0), modulus)     // Modulus
-      if iszero(staticcall(not(0), 0x05, p, 0xC0, p, 0x20)) {
-        revert(0, 0)
-      }
-
-      o := mload(p)
-    }
   }
 
   /**
@@ -147,48 +123,75 @@ abstract contract HoprCrypto {
   /**
    * Adds two elliptic curve points using the general implementation.
    *
-   * This function is optimized to perform one point addition.
+   * This function is optimized to perform one single point addition, e.g.
+   * when using in a VRF or hash_to_curve scheme.
    *
    * Optimizations:
    * - solidity assembly
    * - optimize for a single addition
    */
-  function ecAdd(CurvePoint memory p, CurvePoint memory q) public view returns (CurvePoint memory r)  {
-    if (p.x == 0 && p.y == 0) { // Inf + Q = Q
-      return q;
-    }
+  function ecAdd(CurvePoint memory p, CurvePoint memory q, uint256 a) public view returns (CurvePoint memory r)  {
+    // if (p.x == q.x && p.y == q.y) {
+    //   assembly {
 
-    if (q.x == 0 && q.y == 0) { // P + Inf = P
-      return p;
-    }
-
+    //     return p
+    //   }
+    // }
     assembly {
-      let toInvert := addmod( // q.x - p.x
-        mload(q), // q.x 
-        sub(SECP256K1_BASE_FIELD_ORDER, mload(p)), // - p.x
-        SECP256K1_BASE_FIELD_ORDER
-      )
+      let lambda
+      let toInvert
+      switch and(eq(mload(p), mload(q)), eq(mload(add(p, 0x20)), mload(add(q, 0x20)))) // P == Q ?
+      case true {
+        // Point double
+        toInvert := addmod(mulmod(2, mload(add(p, 0x20)), SECP256K1_BASE_FIELD_ORDER), a, SECP256K1_BASE_FIELD_ORDER) // 2 * p.y
 
-      let payload := mload(0x40)
-      mstore(payload, 0x20)             // Length of Base
-      mstore(add(payload, 0x20), 0x20)  // Length of Exponent
-      mstore(add(payload, 0x40), 0x20)  // Length of Modulus
-      mstore(add(payload, 0x60), toInvert)  // Base
-      mstore(add(payload, 0x80), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2D) // p - 1
-      mstore(add(payload, 0xa0), SECP256K1_BASE_FIELD_ORDER)     // Modulus
-      if iszero(staticcall(not(0), 0x05, payload, 0xC0, payload, 0x20)) {
-        revert(0, 0)
+        // Compute (2 * p.y) ^ -1
+        let payload := mload(0x40)
+        mstore(payload, 0x20)             // Length of Base
+        mstore(add(payload, 0x20), 0x20)  // Length of Exponent
+        mstore(add(payload, 0x40), 0x20)  // Length of Modulus
+        mstore(add(payload, 0x60), toInvert)  // Base
+        mstore(add(payload, 0x80), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2D) // p - 1
+        mstore(add(payload, 0xa0), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F)     // Modulus
+        if iszero(staticcall(not(0), 0x05, payload, 0xC0, payload, 0x20)) {
+          revert(0, 0)
+        }
+        lambda := mulmod( // (3 * p.x ^ 2) * (2 * p.y) ^ -1
+          mulmod( // 3 * p.x ^ 2
+            3, 
+            mulmod(mload(p), mload(p), SECP256K1_BASE_FIELD_ORDER), SECP256K1_BASE_FIELD_ORDER), mload(payload), 
+            SECP256K1_BASE_FIELD_ORDER
+          )
       }
-
-      let lambda := mulmod( // (q.y - p.y) * (q.x - p.x) ^ -1
-        addmod( // q.y - p.y
-          mload(add(q, 0x20)), // q.y
-          sub(SECP256K1_BASE_FIELD_ORDER, mload(add(p, 0x20))), // - p.y
+      case false {
+        // Point addition
+        toInvert := addmod( // q.x - p.x
+          mload(q), // q.x 
+          sub(SECP256K1_BASE_FIELD_ORDER, mload(p)), // - p.x
           SECP256K1_BASE_FIELD_ORDER
-        ), 
-        mload(payload), // (q.x - p.x) ^ -1
-        SECP256K1_BASE_FIELD_ORDER
-      )
+        )
+
+        let payload := mload(0x40)
+        mstore(payload, 0x20)             // Length of Base
+        mstore(add(payload, 0x20), 0x20)  // Length of Exponent
+        mstore(add(payload, 0x40), 0x20)  // Length of Modulus
+        mstore(add(payload, 0x60), toInvert)  // Base
+        mstore(add(payload, 0x80), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2D) // p - 1
+        mstore(add(payload, 0xa0), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F)     // Modulus
+        if iszero(staticcall(not(0), 0x05, payload, 0xC0, payload, 0x20)) {
+          revert(0, 0)
+        }
+
+        lambda := mulmod( // (q.y - p.y) * (q.x - p.x) ^ -1
+          addmod( // q.y - p.y
+            mload(add(q, 0x20)), // q.y
+            sub(SECP256K1_BASE_FIELD_ORDER, mload(add(p, 0x20))), // - p.y
+            SECP256K1_BASE_FIELD_ORDER
+          ), 
+          mload(payload), // (q.x - p.x) ^ -1
+          SECP256K1_BASE_FIELD_ORDER
+        )
+      }
 
       mstore(
         r,
@@ -229,12 +232,15 @@ abstract contract HoprCrypto {
    * https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html
    */
   function hashToCurve(bytes memory payload, bytes memory DST) public view returns (CurvePoint memory) {
-    (uint256 u_0, uint256 u_1) = hash_to_field(abi.encodePacked(payload), abi.encodePacked(DST));
+    // uint256 A_Prime = 0x3f8731abdd661adca08a5558f0f5d272e953d363cb6f0e5d405447c01a444533
 
-    CurvePoint memory q_0 = map_to_curve_simple_swu(uint256(u_0));
-    CurvePoint memory q_1 = map_to_curve_simple_swu(uint256(u_1));
+    (uint256 u_0, uint256 u_1) = hash_to_field(payload, DST);
 
-    CurvePoint memory sum = ecAdd(q_0, q_1);
+    CurvePoint memory q_0 = map_to_curve_simple_swu(uint256(u_0)); // on isogenous curve
+    CurvePoint memory q_1 = map_to_curve_simple_swu(uint256(u_1)); // on isogenous curve
+
+    // P + Q on isogenous curve
+    CurvePoint memory sum = ecAdd(q_0, q_1, 0x3f8731abdd661adca08a5558f0f5d272e953d363cb6f0e5d405447c01a444533);
 
     return mapPoint(sum);
   } 
@@ -272,27 +278,62 @@ abstract contract HoprCrypto {
     // uint256 K_41 = 0x7a06534bb8bdb49fd5e9e6632722c2989467c1bfc8e8d978dfb425d2685c2573;
     // uint256 K_42 = 0x6484aa716545ca2cf3a70c3fa8fe337e0a3d21162f0d6299a7bf8192bfd2a76f;
 
-    uint256 pxSquare = mulmod(p.x, p.x, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F);
-    uint256 pxCubic = mulmod(p.x, pxSquare, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F);
+    assembly {
+      let pxSquare := mulmod(mload(p), mload(p), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F) // p.x * p.x
+      let pxCubic := mulmod(mload(p), pxSquare, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F) // p.x * pxSquare
 
-    // x_num = k_(1,3) * x'^3 + k_(1,2) * x'^2 + k_(1,1) * x' + k_(1,0)
-    uint256 tv1 = addmod(addmod(mulmod(0x8e38e38e38e38e38e38e38e38e38e38e38e38e38e38e38e38e38e38daaaaa88c, pxCubic, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F), mulmod(0x534c328d23f234e6e2a413deca25caece4506144037c40314ecbd0b53d9dd262, pxSquare, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F),addmod(mulmod(0x07d3d4c80bc321d5b9f315cea7fd44c5d595d2fc0bf63b92dfff1044f17c6581, p.x, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F), 0x8e38e38e38e38e38e38e38e38e38e38e38e38e38e38e38e38e38e38daaaaa8c7, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F);
-    // x_den = x'^2 + k_(2,1) * x' + k_(2,0)
-    uint256 tv2 = addmod(addmod(pxSquare, mulmod(0xedadc6f64383dc1df7c4b2d51b54225406d36b641f5e41bbc52a56612a8c6d14, p.x, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F), 0xd35771193d94918a9ca34ccbb7b640dd86cd409542f8487d9fe6b745781eb49b, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F);
+      // x_num = k_(1,3) * x'^3 + k_(1,2) * x'^2 + k_(1,1) * x' + k_(1,0)
+      let x_num := addmod(addmod(mulmod(0x8e38e38e38e38e38e38e38e38e38e38e38e38e38e38e38e38e38e38daaaaa88c, pxCubic, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F), mulmod(0x534c328d23f234e6e2a413deca25caece4506144037c40314ecbd0b53d9dd262, pxSquare, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F),addmod(mulmod(0x07d3d4c80bc321d5b9f315cea7fd44c5d595d2fc0bf63b92dfff1044f17c6581, mload(p), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F), 0x8e38e38e38e38e38e38e38e38e38e38e38e38e38e38e38e38e38e38daaaaa8c7, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F)
+      // x_den = x'^2 + k_(2,1) * x' + k_(2,0)
+      let x_den := addmod(addmod(pxSquare, mulmod(0xedadc6f64383dc1df7c4b2d51b54225406d36b641f5e41bbc52a56612a8c6d14, mload(p), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F), 0xd35771193d94918a9ca34ccbb7b640dd86cd409542f8487d9fe6b745781eb49b, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F)
 
-    // x = x_num / x_den
-    r.x = mulmod(tv1, invMod(tv2), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F);
+      {// Invert x_den using expmod precompile
+        let payload := mload(0x40)
+        mstore(payload, 0x20)             // Length of Base
+        mstore(add(payload, 0x20), 0x20)  // Length of Exponent
+        mstore(add(payload, 0x40), 0x20)  // Length of Modulus
+        mstore(add(payload, 0x60), x_den)  // Base
+        mstore(add(payload, 0x80), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2D) // p - 1
+        mstore(add(payload, 0xa0), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F)     // Modulus
+        if iszero(staticcall(not(0), 0x05, payload, 0xC0, payload, 0x20)) {
+          revert(0, 0)
+        }
 
-    // y_num = k_(3,3) * x'^3 + k_(3,2) * x'^2 + k_(3,1) * x' + k_(3,0)
-    tv1 = addmod(addmod(mulmod(0x2f684bda12f684bda12f684bda12f684bda12f684bda12f684bda12f38e38d84, pxCubic, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F), mulmod(0x29a6194691f91a73715209ef6512e576722830a201be2018a765e85a9ecee931, pxSquare, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F),addmod(mulmod(0xc75e0c32d5cb7c0fa9d0a54b12a0a6d5647ab046d686da6fdffc90fc201d71a3, p.x, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F), 0x4bda12f684bda12f684bda12f684bda12f684bda12f684bda12f684b8e38e23c, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F);
-    // y_den = x'^3 + k_(4,2) * x'^2 + k_(4,1) * x' + k_(4,0)
-    tv2 = addmod(addmod(pxCubic, mulmod(0x6484aa716545ca2cf3a70c3fa8fe337e0a3d21162f0d6299a7bf8192bfd2a76f, pxSquare, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F), addmod(mulmod(0x7a06534bb8bdb49fd5e9e6632722c2989467c1bfc8e8d978dfb425d2685c2573, p.x, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F), 0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffff93b, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F);
+        x_den := mload(payload)
+      }
     
-    // y = y' * y_num / y_den
-    r.y = mulmod(mulmod(p.y, tv1, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F), invMod(tv2), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F);
+      // x = x_num / x_den
+      mstore(r, mulmod(x_num, x_den, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F))
+
+      // y_num = k_(3,3) * x'^3 + k_(3,2) * x'^2 + k_(3,1) * x' + k_(3,0)
+      let y_num := addmod(addmod(mulmod(0x2f684bda12f684bda12f684bda12f684bda12f684bda12f684bda12f38e38d84, pxCubic, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F), mulmod(0x29a6194691f91a73715209ef6512e576722830a201be2018a765e85a9ecee931, pxSquare, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F),addmod(mulmod(0xc75e0c32d5cb7c0fa9d0a54b12a0a6d5647ab046d686da6fdffc90fc201d71a3, mload(p), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F), 0x4bda12f684bda12f684bda12f684bda12f684bda12f684bda12f684b8e38e23c, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F)
+      // y_den = x'^3 + k_(4,2) * x'^2 + k_(4,1) * x' + k_(4,0)
+      let y_den := addmod(addmod(pxCubic, mulmod(0x6484aa716545ca2cf3a70c3fa8fe337e0a3d21162f0d6299a7bf8192bfd2a76f, pxSquare, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F), addmod(mulmod(0x7a06534bb8bdb49fd5e9e6632722c2989467c1bfc8e8d978dfb425d2685c2573, mload(p), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F), 0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffff93b, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F)
+    
+      { // Invert y_den using expmod precompile
+        let payload := mload(0x40)
+        mstore(payload, 0x20)             // Length of Base
+        mstore(add(payload, 0x20), 0x20)  // Length of Exponent
+        mstore(add(payload, 0x40), 0x20)  // Length of Modulus
+        mstore(add(payload, 0x60), y_den)  // Base
+        mstore(add(payload, 0x80), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2D) // p - 1
+        mstore(add(payload, 0xa0), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F)     // Modulus
+        if iszero(staticcall(not(0), 0x05, payload, 0xC0, payload, 0x20)) {
+          revert(0, 0)
+        }
+
+        y_den := mload(payload)
+      }
+
+      // y = y' * y_num / y_den
+      mstore(add(r, 0x20),mulmod(mulmod(mload(add(p, 0x20)), y_num, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F), y_den, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F))
+    }
   }
 
   /**
+   * Takes a field element and return a curve point on a curve that is isogenous
+   * to secp256k1.
+   *
    * Implements the simplified SWU mapping. Uses the optimized sample implementation from
    * https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#name-simplified-swu-method
    *
@@ -355,45 +396,70 @@ abstract contract HoprCrypto {
    * Returns (true, sqrt(u / v)) if (u / v) is square in the field
    * Returns (false, sqrt(Z * (u / v))) otherwise
    *
+   * Algorithm from:
+   * https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#name-optimized-sqrt_ratio-for-q-
+   *
    * Optimizations:
    * - mathematical optimization: reduce expmod / mulmod / addmod operations
    * - few temporary values to reduce memory expansion
    * - inlined constants to reduce memory expansion and prevent MLOAD instructions
    */
-  function sqrt_ratio_3mod4(uint256 u, uint256 v) public view returns (bool, uint256) {
+  function sqrt_ratio_3mod4(uint256 u, uint256 v) public view returns (bool isSquare, uint256 y) {
     // uint256 C1 = 0x3fffffffffffffffffffffffffffffffffffffffffffffffffffffffbfffff0b;
     // uint256 C2 = 0x31fdf302724013e57ad13fb38f842afeec184f00a74789dd286729c8303c4a59;
     // uint256 SECP256K1_BASE_FIELD_ORDER = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F;
 
-    uint256 tv1 = mulmod(v,v, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F); // 1. tv1 = v^2
-    uint256 tv2 = mulmod(u,v, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F); // 2. tv2 = u * v
-    tv1 = mulmod(tv1, tv2, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F); // 3. tv1 = tv1 * tv2
-    uint256 y1 = expmod(tv1, 0x3fffffffffffffffffffffffffffffffffffffffffffffffffffffffbfffff0b, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F); // 4. y1 = tv1^c1
-    y1 = mulmod(y1, tv2, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F); // 5. y1 = y1 * tv2
-    uint256 y2 = mulmod(y1, 0x31fdf302724013e57ad13fb38f842afeec184f00a74789dd286729c8303c4a59, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F); // 6. y2 = y1 * c2
-    uint256 tv3 = mulmod(y1, y1, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F); // 7. tv3 = y1^2
-    tv3 = mulmod(tv3, v, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F); // 8. tv3 = tv3 * v
+    assembly {
+      let tv1 := mulmod(v,v, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F) // 1. tv1 = v^2
+      let tv2 := mulmod(u,v, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F) // 2. tv2 = u * v
 
-    if (tv3 == u) { // 9. isQR = tv3 == u
-      return (true, y1);
-    } else {
-      return (false, y2);
-    } // 10. y = CMOV(y2, y1, isQR)
+      tv1 := mulmod(tv1, tv2, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F) // 3. tv1 = tv1 * tv2
+      
+      let y1
+      { // 4. y1 = tv1^c1
+        let p := mload(0x40)
+        // store data assembly-favouring ways
+        mstore(p, 0x20)             // Length of Base
+        mstore(add(p, 0x20), 0x20)  // Length of Exponent
+        mstore(add(p, 0x40), 0x20)  // Length of Modulus
+        mstore(add(p, 0x60), tv1)  // Base
+        mstore(add(p, 0x80), 0x3fffffffffffffffffffffffffffffffffffffffffffffffffffffffbfffff0b)    // Exponent
+        mstore(add(p, 0xa0), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F)     // Modulus
+        if iszero(staticcall(not(0), 0x05, p, 0xC0, p, 0x20)) {
+          revert(0, 0)
+        }
+        y1 := mload(p)
+      }
+      y1 := mulmod(y1, tv2, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F) // 5. y1 = y1 * tv2
+      let y2 := mulmod(y1, 0x31fdf302724013e57ad13fb38f842afeec184f00a74789dd286729c8303c4a59, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F) // 6. y2 = y1 * c2
+      let tv3 := mulmod(y1, y1, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F) // 7. tv3 = y1^2
+      tv3 := mulmod(tv3, v, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F) // 8. tv3 = tv3 * v
+
+      switch eq(tv3, u) // 9. isQR = tv3 == u
+      case true { // 10. y = CMOV(y2, y1, isQR)
+        isSquare := true
+        y := y1
+      }
+      case false {
+        isSquare := false
+        y := y2
+      }
+    }
   }
 
   /**
-   * Consumes a byte-string and returns a field element of the secp256k1 base field.
-
+   * Takes a byte-string and a domain seperation tag and returns a field element.
+   *
+   * Used to compute hash_to_curve function
    */
   function hash_to_field(bytes memory message, bytes memory DST) public view returns (uint256 u_0, uint256 u_1) {
     // uint256 SECP256K1_BASE_FIELD_ORDER = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F;
 
-    (bytes32 b_1, bytes32 b_2, bytes32 b_3) = expand_message_xmd(message, DST);
+    (bytes32 b_1, bytes32 b_2, bytes32 b_3) = expand_message_xmd_keccak256(message, DST);
 
     // computes [...b_1[..], ...b_2[0..16]] ^ 1 mod n
     assembly {
-      //  define pointer
-      let p := mload(0x40)
+      let p := mload(0x40) // next free memory slot
       mstore(p, 0x30)             // Length of Base
       mstore(add(p, 0x20), 0x20)  // Length of Exponent
       mstore(add(p, 0x40), 0x20)  // Length of Modulus
@@ -410,9 +476,7 @@ abstract contract HoprCrypto {
 
     // computes [...b_2[16..32], ...b_3[..]] ^ 1 mod n
     assembly {
-      //  define pointer
       let p := mload(0x40)
-
       mstore(p, 0x30)             // Length of Base
       mstore(add(p, 0x20), 0x20)  // Length of Exponent
       mstore(add(p, 0x50), b_2)
@@ -426,7 +490,6 @@ abstract contract HoprCrypto {
 
       u_1 := mload(p)
     }
-
   }
 
   /**
@@ -435,33 +498,120 @@ abstract contract HoprCrypto {
    *
    * This is not a general implementation as the output length fixed.
    */
-  function expand_message_xmd(bytes memory message, bytes memory DST) public pure returns (bytes32 b_1, bytes32 b_2, bytes32 b_3) {
+  function expand_message_xmd_keccak256(bytes memory message, bytes memory DST) public pure returns (bytes32 b_1, bytes32 b_2, bytes32 b_3) {
     uint256 ell; 
 
-    if (message.length % 32 == 0) {
-      ell = message.length / 32;
+    if ((message.length >> 5) << 5 == 0) {
+      ell = message.length >> 5;
     } else {
-      ell = message.length / 32 + 1;
+      ell = message.length >> 5 + 1;
     }
 
     if (ell > 255 || message.length > 2040 || DST.length > 255) {
       revert MessageTooLong();
     }
 
-    bytes memory DST_prime = abi.encodePacked(DST, uint8(DST.length));
-    bytes memory message_prime = abi.encodePacked(
-      bytes32(0), bytes32(0), // block size of SHA256 is 64
-      message, 
-      bytes2(0x0060), // only supports 96 bytes output length
-      uint8(0), DST_prime); 
-    
-    bytes32 b_0 = sha256(message_prime);
-    b_1 = sha256(abi.encodePacked(b_0, uint8(1), DST_prime));
-    b_2 = sha256(abi.encodePacked(b_0 ^ b_1, uint8(2), DST_prime));
-    b_3 = sha256(abi.encodePacked(b_0 ^ b_2, uint8(3), DST_prime));
+    assembly {
+      let b_0
+      {
+        // create payload for b_0 hash
+        let b_0_payload := mload(0x40)
+
+        // payload[0..64] = 0
+
+        let b_0_payload_o := 0x40
+        let msg_o := 0x20
+
+        // payload[64..64+message.len()] = message[0..message.len()]
+        for { let i := 0 } lt(i, mload(message)) { i := add(i, 0x20) } {
+          mstore(add(b_0_payload, b_0_payload_o), mload(add(message, msg_o)))
+          b_0_payload_o := add(b_0_payload_o, 0x20)
+          msg_o := add(msg_o, 0x20)
+        }
+
+        // payload[64+message.len()+1..64+message.len()+2] = 96
+        b_0_payload_o := add(mload(message), 0x41)
+        mstore8(add(b_0_payload, b_0_payload_o), 0x60) // only support for 96 bytes output length
+
+        let dst_o := 0x20
+        b_0_payload_o := add(b_0_payload_o, 2)
+
+        // payload[64+message.len()+3..64+message.len()+DST.len()] = DST[0..DST.len()]
+        for { let i := 0 } lt(i, mload(DST)) { i := add(i, 0x20) } {
+          mstore(add(b_0_payload, b_0_payload_o), mload(add(DST, dst_o)))
+          b_0_payload_o := add(b_0_payload_o, 0x20)
+          dst_o := add(dst_o, 0x20)
+        }
+
+        // payload[64+message.len()+DST.len()..64+message.len()+DST.len()+1] = DST.len()
+        b_0_payload_o := add(add(mload(message), mload(DST)), 67)
+        mstore8(add(b_0_payload, b_0_payload_o), mload(DST))
+
+        b_0 := keccak256(b_0_payload, add(68, add(mload(message), mload(DST))))
+      }
+      
+      // create payload for b_1, b_2 ... hashes
+      let b_i_payload := mload(0x40)
+      mstore(b_i_payload, b_0)
+      // payload[64..65] = 1
+      mstore8(add(b_i_payload,0x21), 1)
+
+      let payload_o := 0x21
+      let dst_o := 0x20
+
+      // payload[65..65+DST.len()] = DST[0..DST.len()] 
+      for { let i := 0 } lt(i, mload(DST)) { i := add(i, 0x20) } {
+        mstore(add(b_i_payload, payload_o), mload(add(DST, dst_o)))
+        payload_o := add(payload_o, 0x20)
+        dst_o := add(dst_o, 0x20)
+      }
+
+      // payload[65+DST.len()..66+DST.len()] = DST.len()
+      mstore8(add(b_i_payload, payload_o), mload(DST))
+
+      b_1 := keccak256(b_i_payload, add(34, mload(DST)))
+      
+      // payload[0..32] = b_0 XOR b_1
+      mstore(b_i_payload, xor(b_0, b_1))
+      // payload[32..33] = 2
+      mstore8(add(b_i_payload, 0x21), 2)
+
+      b_2 := keccak256(b_i_payload, add(34, mload(DST)))
+
+      // payload[0..32] = b_0 XOR b_2
+      mstore(b_i_payload, xor(b_0, b_2))
+      // payload[32..33] = 2
+      mstore(add(b_i_payload, 0x21), 3)
+
+      b_3 := keccak256(b_i_payload, add(34, mload(DST)))
+    }
   }
 
   // ############ Alternative Implementations
+  // function expand_message_xmd_sha256(bytes memory message, bytes memory DST) public pure returns (bytes32 b_1, bytes32 b_2, bytes32 b_3) {
+  //   uint256 ell; 
+
+  //   if ((message.length >> 5) << 5 == 0) {
+  //     ell = message.length >> 5;
+  //   } else {
+  //     ell = message.length >> 5 + 1;
+  //   }
+
+  //   if (ell > 255 || message.length > 2040 || DST.length > 255) {
+  //     revert MessageTooLong();
+  //   }
+  //   bytes memory DST_prime = abi.encodePacked(DST, uint8(DST.length));
+  //   bytes memory message_prime = abi.encodePacked(
+  //     bytes32(0), bytes32(0), // block size of SHA256 is 64
+  //     message, 
+  //     bytes2(0x0060), // only supports 96 bytes output length
+  //     uint8(0), DST_prime); 
+    
+  //   bytes32 b_0 = sha256(message_prime);
+  //   b_1 = sha256(abi.encodePacked(b_0, uint8(1), DST_prime));
+  //   b_2 = sha256(abi.encodePacked(b_0 ^ b_1, uint8(2), DST_prime));
+  //   b_3 = sha256(abi.encodePacked(b_0 ^ b_2, uint8(3), DST_prime));
+  // }
 
 
   // function sqrtMod(uint256 el) public view returns (uint256 o) {
@@ -482,7 +632,7 @@ abstract contract HoprCrypto {
   //     o := mload(p)
   //   }
   // }
-  
+
   // function map_to_curve_simple_swu(uint256 u) public view returns (CurvePoint memory r) {
   // 1. tv1 = inv0(Z^2 * u^4 + Z * u^2)
   // 2.  x1 = (-B / A) * (1 + tv1)
