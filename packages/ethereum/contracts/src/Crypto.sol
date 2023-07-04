@@ -131,13 +131,12 @@ abstract contract HoprCrypto {
    * - optimize for a single addition
    */
   function ecAdd(CurvePoint memory p, CurvePoint memory q, uint256 a) public view returns (CurvePoint memory r)  {
-    // if (p.x == q.x && p.y == q.y) {
-    //   assembly {
 
-    //     return p
-    //   }
-    // }
     assembly {
+      if and(eq(mload(p), mload(q)), not(eq(mload(add(p, 0x20)), mload(add(q, 0x20))))) {
+        // Q = -P
+        revert (0,0)
+      }
       let lambda
       let toInvert
       switch and(eq(mload(p), mload(q)), eq(mload(add(p, 0x20)), mload(add(q, 0x20)))) // P == Q ?
