@@ -12,16 +12,19 @@ import {
   debug,
   AccountEntry,
   PublicKey,
-  LevelDb
+  LevelDb,
+  ChannelEntry,
+  U256,
+  stringToU8a,
+  number_to_channel_status
 } from '@hoprnet/hopr-utils'
 
-import { Ethereum_Database as Database, Ethereum_PublicKey as dbPublicKey } from '../db.js'
+import { Ethereum_Database as Database, Ethereum_Address as dbAddress } from '../db.js'
 import Indexer from './index.js'
 import type { ChainWrapper } from '../ethereum.js'
 import type { Event, TokenEvent, RegistryEvent } from './types.js'
 import * as fixtures from './fixtures.js'
 import { ACCOUNT_A, PARTY_A, PARTY_A_MULTIADDR, PARTY_B } from '../fixtures.js'
-import { channelEntryFromSCEvent } from './utils.js'
 import { MOCK_PUBLIC_KEY } from './fixtures.js'
 
 //@TODO: Refactor this logger and mock outside of indexer
@@ -290,7 +293,7 @@ export const useFixtures = async (
   const latestBlockNumber = ops.latestBlockNumber ?? 0
   const id = ops.id ?? MOCK_PUBLIC_KEY()
 
-  const db = new Database(new LevelDb(), dbPublicKey.deserialize(id.serialize(false)))
+  const db = new Database(new LevelDb(), dbAddress.deserialize(id.to_address().serialize()))
   const { provider, newBlock } = createProviderMock({ latestBlockNumber })
   const { hoprChannels, newEvent } = createHoprChannelsMock({ pastEvents: ops.pastEvents ?? [] })
   const { hoprToken, newEvent: newTokenEvent } = createHoprTokenMock({
@@ -313,11 +316,27 @@ export const useFixtures = async (
     newRegistryEvent,
     indexer: new TestingIndexer(id.to_address(), db, 1, 5),
     chain,
-    OPENED_CHANNEL: await channelEntryFromSCEvent(fixtures.OPENED_EVENT, (a: Address) =>
-      Promise.resolve(a.eq(PARTY_A().to_address()) ? PARTY_A() : PARTY_B())
+    OPENED_CHANNEL: new ChannelEntry(
+      Address.from_string(fixtures.OPENED_EVENT.args.source),
+      Address.from_string(fixtures.OPENED_EVENT.args.destination),
+      new Balance(fixtures.OPENED_EVENT.args.newState.balance.toString(), BalanceType.HOPR),
+      new Hash(stringToU8a(fixtures.OPENED_EVENT.args.newState.commitment)),
+      new U256(fixtures.OPENED_EVENT.args.newState.ticketEpoch.toString()),
+      new U256(fixtures.OPENED_EVENT.args.newState.ticketIndex.toString()),
+      number_to_channel_status(fixtures.OPENED_EVENT.args.newState.status),
+      new U256(fixtures.OPENED_EVENT.args.newState.channelEpoch.toString()),
+      new U256(fixtures.OPENED_EVENT.args.newState.closureTime.toString())
     ),
-    COMMITTED_CHANNEL: await channelEntryFromSCEvent(fixtures.COMMITTED_EVENT, (a: Address) =>
-      Promise.resolve(a.eq(PARTY_A().to_address()) ? PARTY_A() : PARTY_B())
+    COMMITTED_CHANNEL: new ChannelEntry(
+      Address.from_string(fixtures.COMMITTED_EVENT.args.source),
+      Address.from_string(fixtures.COMMITTED_EVENT.args.destination),
+      new Balance(fixtures.COMMITTED_EVENT.args.newState.balance.toString(), BalanceType.HOPR),
+      new Hash(stringToU8a(fixtures.COMMITTED_EVENT.args.newState.commitment)),
+      new U256(fixtures.COMMITTED_EVENT.args.newState.ticketEpoch.toString()),
+      new U256(fixtures.COMMITTED_EVENT.args.newState.ticketIndex.toString()),
+      number_to_channel_status(fixtures.COMMITTED_EVENT.args.newState.status),
+      new U256(fixtures.COMMITTED_EVENT.args.newState.channelEpoch.toString()),
+      new U256(fixtures.COMMITTED_EVENT.args.newState.closureTime.toString())
     )
   }
 }

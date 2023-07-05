@@ -19,7 +19,7 @@ pub trait HoprCoreEthereumDbActions {
     async fn get_current_ticket_index(&self, channel_id: &Hash) -> Result<Option<U256>>;
     async fn set_current_ticket_index(&mut self, channel_id: &Hash, index: U256) -> Result<()>;
 
-    async fn get_tickets(&self, signer: Option<PublicKey>) -> Result<Vec<Ticket>>;
+    async fn get_tickets(&self, signer: Option<Address>) -> Result<Vec<Ticket>>;
 
     async fn mark_rejected(&mut self, ticket: &Ticket) -> Result<()>;
 
@@ -55,11 +55,11 @@ pub trait HoprCoreEthereumDbActions {
     /// Get pending balance to a counter party's address.
     async fn get_pending_balance_to(&self, counterparty: &Address) -> Result<Balance>;
 
-    /// Get channel to peer with public key.
-    async fn get_channel_to(&self, dest: &PublicKey) -> Result<Option<ChannelEntry>>;
+    /// Get channel to peer with Ethereum address.
+    async fn get_channel_to(&self, dest: &Address) -> Result<Option<ChannelEntry>>;
 
-    /// Get channel from peer with public key.
-    async fn get_channel_from(&self, src: &PublicKey) -> Result<Option<ChannelEntry>>;
+    /// Get channel from peer with Ethereum address.
+    async fn get_channel_from(&self, src: &Address) -> Result<Option<ChannelEntry>>;
 
     /// Update channel information.
     async fn update_channel_and_snapshot(
@@ -146,7 +146,7 @@ pub trait HoprCoreEthereumDbActions {
     async fn get_rejected_tickets_count(&self) -> Result<usize>;
 
     /// Get channel from source to destination.
-    async fn get_channel_x(&self, src: &PublicKey, dest: &PublicKey) -> Result<Option<ChannelEntry>>;
+    async fn get_channel_x(&self, src: &Address, dest: &Address) -> Result<Option<ChannelEntry>>;
 
     /// Get all channels from a given address.
     async fn get_channels_from(&self, address: Address) -> Result<Vec<ChannelEntry>>;

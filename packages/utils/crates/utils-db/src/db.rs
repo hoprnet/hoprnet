@@ -1,13 +1,14 @@
-use std::fmt::{Display, Formatter};
-use std::ops::Deref;
-
+use crate::{
+    errors::{DbError, Result},
+    traits::AsyncKVStorage,
+};
 use futures_lite::stream::StreamExt;
 use serde::{de::DeserializeOwned, Serialize};
-
+use std::{
+    fmt::{Display, Formatter},
+    ops::Deref,
+};
 use utils_types::traits::BinarySerializable;
-
-use crate::errors::{DbError, Result};
-use crate::traits::AsyncKVStorage;
 
 pub struct Batch {
     pub ops: Vec<crate::traits::BatchOperation<Box<[u8]>, Box<[u8]>>>,
@@ -114,29 +115,19 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
         self.backend.contains(key.into()).await
     }
 
-    pub async fn get<V: DeserializeOwned>(&self, key: Key) -> Result<V> {
-        let key: T::Key = key.into();
-        self.backend.get(key.into()).await.and_then(|v| {
-            bincode::deserialize(v.as_ref())
-                .map_err(|e| DbError::DeserializationError(format!("during get operation: {}", e.to_string().as_str())))
-        })
-    }
-
     pub async fn get_or_none<V: DeserializeOwned>(&self, key: Key) -> Result<Option<V>> {
         let key: T::Key = key.into();
 
-        if self.backend.contains(key.clone()).await {
-            self.backend
-                .get(key.into())
-                .await
-                .and_then(|v| {
-                    bincode::deserialize(v.as_ref()).map_err(|e| {
-                        DbError::DeserializationError(format!("during get operation: {}", e.to_string().as_str()))
-                    })
-                })
-                .map(|v| Some(v))
-        } else {
-            Ok(None)
+        match self.backend.get(key.into()).await {
+            Ok(Some(val)) => match bincode::deserialize(&val) {
+                Ok(deserialized) => Ok(Some(deserialized)),
+                Err(e) => Err(DbError::DeserializationError(format!(
+                    "during get operation: {}",
+                    e.to_string().as_str()
+                ))),
+            },
+            Ok(None) => Ok(None),
+            Err(e) => Err(e),
         }
     }
 
@@ -256,7 +247,7 @@ mod tests {
         let value = TestValue { v: "value".to_string() };
 
         let expected_key = bincode::serialize(&key).unwrap().into_boxed_slice();
-        let ser_value: Result<Box<[u8]>> = Ok(bincode::serialize(&value).unwrap().into_boxed_slice());
+        let ser_value: Result<Option<Box<[u8]>>> = Ok(Some(bincode::serialize(&value).unwrap().into_boxed_slice()));
 
         let mut backend = MockAsyncKVStorage::new();
         backend
@@ -266,7 +257,10 @@ mod tests {
 
         let db = DB::new(backend);
 
-        assert_eq!(db.get::<TestValue>(Key::new(&key).ok().unwrap()).await, Ok(value))
+        assert_eq!(
+            db.get_or_none::<TestValue>(Key::new(&key).ok().unwrap()).await,
+            Ok(Some(value))
+        )
     }
 
     #[async_std::test]
@@ -279,12 +273,12 @@ mod tests {
         backend
             .expect_get()
             .with(predicate::eq(expected_key.clone()))
-            .return_once(|_| -> Result<Box<[u8]>> { Err(DbError::NotFound) });
+            .return_once(|_| -> Result<Option<Box<[u8]>>> { Err(DbError::NotFound) });
 
         let db = DB::new(backend);
 
         assert_eq!(
-            db.get::<TestValue>(Key::new(&key).ok().unwrap()).await,
+            db.get_or_none::<TestValue>(Key::new(&key).ok().unwrap()).await,
             Err(DbError::NotFound)
         )
     }

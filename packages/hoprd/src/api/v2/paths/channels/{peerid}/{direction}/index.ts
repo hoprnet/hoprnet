@@ -1,7 +1,5 @@
 import type Hopr from '@hoprnet/hopr-core'
 import type { Operation } from 'express-openapi'
-import type { PeerId } from '@libp2p/interface-peer-id'
-import { peerIdFromString } from '@libp2p/peer-id'
 import { STATUS_CODES } from '../../../../utils.js'
 import { ChannelInfo, formatIncomingChannel, formatOutgoingChannel } from '../../index.js'
 import {
@@ -10,7 +8,8 @@ import {
   defer,
   generate_channel_id,
   PublicKey,
-  type DeferType
+  type DeferType,
+  Address
 } from '@hoprnet/hopr-utils'
 import { log } from 'debug'
 
@@ -35,17 +34,9 @@ export async function closeChannel(
       receipt: string
     }
 > {
-  let peerId: PeerId
-  try {
-    peerId = peerIdFromString(peerIdStr)
-  } catch (err) {
-    throw Error(STATUS_CODES.INVALID_PEERID)
-  }
+  const counterpartyPublicKey = PublicKey.from_peerid_str(peerIdStr)
 
-  const channelId = generate_channel_id(
-    node.getEthereumAddress(),
-    PublicKey.from_peerid_str(peerId.toString()).to_address()
-  )
+  const channelId = generate_channel_id(node.getEthereumAddress(), counterpartyPublicKey.to_address())
 
   let closingRequest = closingRequests.get(channelId.to_hex())
   if (closingRequest == null) {
@@ -56,7 +47,7 @@ export async function closeChannel(
   }
 
   try {
-    const { status: channelStatus, receipt } = await node.closeChannel(peerId, direction)
+    const { status: channelStatus, receipt } = await node.closeChannel(counterpartyPublicKey.to_address(), direction)
     return { success: true, channelStatus, receipt }
   } catch (err) {
     log(`${err}`)
@@ -78,7 +69,7 @@ export async function closeChannel(
 
 const DELETE: Operation = [
   async (req, res, _next) => {
-    const { node } = req.context
+    const { node }: { node: Hopr } = req.context
     const { peerid, direction } = req.params
 
     const closingResult = await closeChannel(node, peerid, direction as any)
@@ -186,19 +177,17 @@ export const getChannel = async (
   counterparty: string,
   direction: ChannelInfo['type']
 ): Promise<ChannelInfo> => {
-  let counterpartyPeerId: PeerId
+  let counterpartyAddress: Address
   try {
-    counterpartyPeerId = peerIdFromString(counterparty)
+    counterpartyAddress = PublicKey.from_peerid_str(counterparty).to_address()
   } catch (err) {
     throw Error(STATUS_CODES.INVALID_PEERID)
   }
 
-  const selfPeerId = node.getId()
-
   try {
     return direction === 'outgoing'
-      ? await node.getChannel(selfPeerId, counterpartyPeerId).then(formatOutgoingChannel)
-      : await node.getChannel(counterpartyPeerId, selfPeerId).then(formatIncomingChannel)
+      ? await node.getChannel(node.getEthereumAddress(), counterpartyAddress).then(formatOutgoingChannel)
+      : await node.getChannel(counterpartyAddress, node.getEthereumAddress()).then(formatIncomingChannel)
   } catch {
     throw Error(STATUS_CODES.CHANNEL_NOT_FOUND)
   }
@@ -206,7 +195,7 @@ export const getChannel = async (
 
 const GET: Operation = [
   async (req, res, _next) => {
-    const { node } = req.context
+    const { node }: { node: Hopr } = req.context
     const { peerid, direction } = req.params
 
     if (!['incoming', 'outgoing'].includes(direction)) {

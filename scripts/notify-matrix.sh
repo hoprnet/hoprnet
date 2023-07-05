@@ -11,6 +11,7 @@ set -Eeuo pipefail
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 declare HOPR_LOG_ID="notify-matrix"
+# shellcheck disable=SC1090
 source "${mydir}/utils.sh"
 
 usage() {

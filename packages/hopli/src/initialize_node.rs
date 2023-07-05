@@ -1,9 +1,9 @@
-use crate::identity_input::LocalIdentityArgs;
-use crate::utils::{Cmd, HelperErrors};
 use crate::{
+    identity_input::LocalIdentityArgs,
     key_pair::read_identities,
     password::PasswordArgs,
     process::{child_process_call_foundry_express_initialization, set_process_path_env},
+    utils::{Cmd, HelperErrors},
 };
 use clap::Parser;
 use ethers::{
@@ -12,6 +12,7 @@ use ethers::{
 };
 use log::{log, Level};
 use std::env;
+use utils_types::traits::PeerIdLike;
 
 /// CLI arguments for `hopli register-in-network-registry`
 #[derive(Parser, Default, Debug)]
@@ -89,8 +90,14 @@ impl InitializeNodeArgs {
         let files = local_identity.get_files();
         match read_identities(files, &pwd) {
             Ok(node_identities) => {
-                all_peer_ids = node_identities.iter().map(|ni| ni.peer_id.clone()).collect();
-                all_node_addresses = node_identities.iter().map(|ni| ni.ethereum_address.clone()).collect();
+                all_peer_ids = node_identities
+                    .iter()
+                    .map(|ni| ni.chain_key.1.to_peerid_str())
+                    .collect();
+                all_node_addresses = node_identities
+                    .iter()
+                    .map(|ni| ni.chain_key.1.to_address().to_string())
+                    .collect();
             }
             Err(e) => {
                 println!("error {:?}", e);

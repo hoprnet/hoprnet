@@ -42,7 +42,7 @@ pub trait AsyncKVStorage {
     type Key: Serialize;
     type Value: Serialize;
 
-    async fn get(&self, key: Self::Key) -> Result<Self::Value>;
+    async fn get(&self, key: Self::Key) -> Result<Option<Self::Value>>;
 
     async fn set(&mut self, key: Self::Key, value: Self::Value) -> Result<Option<Self::Value>>;
 

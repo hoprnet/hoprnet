@@ -10,7 +10,7 @@ import { createAuthenticatedTestApiInstance } from '../../fixtures.js'
 import type { default as Hopr } from '@hoprnet/hopr-core'
 import type { Token } from './../../../token.js'
 import { LevelDb } from '@hoprnet/hopr-utils'
-import { Database, PublicKey } from '@hoprnet/hopr-core/lib/core_hopr.js'
+import { Database, PublicKey } from '../../../../../../core/lib/core_hopr.js'
 
 describe('DELETE /tokens/{id}', function () {
   let node: Hopr
@@ -21,7 +21,10 @@ describe('DELETE /tokens/{id}', function () {
     node = sinon.fake() as any
     let db = new LevelDb()
     await db.backend.open()
-    node.db = new Database(db, PublicKey.from_peerid_str('16Uiu2HAmM9KAPaXA4eAz58Q7Eb3LEkDvLarU4utkyLwDeEK6vM5m'))
+    node.db = new Database(
+      db,
+      PublicKey.from_peerid_str('16Uiu2HAmM9KAPaXA4eAz58Q7Eb3LEkDvLarU4utkyLwDeEK6vM5m').to_address()
+    )
 
     const loaded = await createAuthenticatedTestApiInstance(node)
     service = loaded.service
