@@ -139,52 +139,6 @@ contract EnumerableTargetSetTest is Test {
         (Target target, uint8 boundClearance, uint8 boundTargetType, uint8 boundTargetPermission, uint8[] memory boundFunctionPermissions) = _helperCreateValidTarget(targetAddress, clearance, targetType, targetPermission, functionPermissions);
         // force write 262
         uint256 gasStart = gasleft();
-        Target newTarget = TargetUtils.forceWriteAsTargetType(target, newTargetType);
-        uint256 gasEnd = gasleft();
-        emit log_named_uint("gas used", gasStart - gasEnd);
-
-        // verify invariant state updates 
-        assertEq(TargetUtils.getTargetAddress(newTarget), TargetUtils.getTargetAddress(target));
-        assertEq(uint8(TargetUtils.getTargetClearance(newTarget)), uint8(TargetUtils.getTargetClearance(target)));
-        assertEq(uint8(TargetUtils.getDefaultTargetPermission(newTarget)), uint8(TargetUtils.getDefaultTargetPermission(target)));
-        assertEq(uint8(TargetUtils.getTargetType(newTarget)), uint8(newTargetType));
-        // depending on the asTargetType, certain permissions are overwritten
-        if (newTargetType == TargetType.CHANNELS) {
-            for (uint256 i = 0; i < 7; i++) {
-                assertEq(uint8(TargetUtils.getDefaultFunctionPermissionAt(newTarget, i)), uint8(TargetUtils.getDefaultFunctionPermissionAt(target, i)));
-            }
-            // indexes 7 and 8 are overwritten
-            assertEq(uint8(TargetUtils.getDefaultFunctionPermissionAt(newTarget, 7)), uint8(FunctionPermission.NONE));
-            assertEq(uint8(TargetUtils.getDefaultFunctionPermissionAt(newTarget, 8)), uint8(FunctionPermission.NONE));
-        } else if (newTargetType == TargetType.TOKEN) {
-            // indexes 0 - 6 are overwritten
-            for (uint256 j = 0; j < 7; j++) {
-                assertEq(uint8(TargetUtils.getDefaultFunctionPermissionAt(newTarget, j)), uint8(FunctionPermission.NONE));
-            }
-            assertEq(uint8(TargetUtils.getDefaultFunctionPermissionAt(newTarget, 7)), uint8(TargetUtils.getDefaultFunctionPermissionAt(target, 7)));
-            assertEq(uint8(TargetUtils.getDefaultFunctionPermissionAt(newTarget, 8)), uint8(TargetUtils.getDefaultFunctionPermissionAt(target, 8)));
-        } else {
-            // TargetType.SEND
-            for (uint256 k = 0; k < TargetUtils.getNumDefaultFunctionPermissions(); k++) {
-                assertEq(uint8(TargetUtils.getDefaultFunctionPermissionAt(newTarget, k)), uint8(FunctionPermission.NONE));
-            }
-        }
-    }
-    function testFuzz_WriteAsTargetType2(
-        address targetAddress,
-        uint8 clearance,
-        uint8 targetType,
-        uint8 targetPermission,
-        uint8[] memory functionPermissions,
-        uint8 asTargetType
-    ) public {
-        // bound target type
-        asTargetType = uint8(bound(asTargetType, uint256(type(TargetType).min), uint256(type(TargetType).max)));
-        TargetType newTargetType = TargetType(asTargetType); 
-        // get valid target
-        (Target target, uint8 boundClearance, uint8 boundTargetType, uint8 boundTargetPermission, uint8[] memory boundFunctionPermissions) = _helperCreateValidTarget(targetAddress, clearance, targetType, targetPermission, functionPermissions);
-        // force write 262
-        uint256 gasStart = gasleft();
         Target newTarget = TargetUtils.forceWriteAsTargetType2(target, newTargetType);
         uint256 gasEnd = gasleft();
         emit log_named_uint("gas used", gasStart - gasEnd);

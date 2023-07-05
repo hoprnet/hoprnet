@@ -77,27 +77,6 @@ library TargetUtils {
     }
 
     function forceWriteAsTargetType(Target target, TargetType targetType) internal pure returns (Target) {
-        uint256 targetTypeMask = 255 << 80;
-        uint256 updatedTarget;
-        if (targetType == TargetType.CHANNELS) {
-            // remove all the default token function permissions (uint16)
-            updatedTarget = (Target.unwrap(target) >> 16) << 16;  
-        } else if (targetType == TargetType.TOKEN) {
-            // remove all the default function permissions (uint72)
-            updatedTarget = (Target.unwrap(target) >> 72) << 72;
-            // add the last 16 bits (from right) back
-            updatedTarget |= (Target.unwrap(target) << 240) >> 240;
-        } else {
-            // remove all the default function permissions (uint72)
-            updatedTarget = (Target.unwrap(target) >> 72) << 72;
-        }
-
-        // force clear target type and overwrite with expected one 
-        updatedTarget &= ~targetTypeMask;
-        updatedTarget |= uint256(targetType) << 80;   
-        return Target.wrap(updatedTarget);
-    }
-    function forceWriteAsTargetType2(Target target, TargetType targetType) internal pure returns (Target) {
         // remove value at TargetType position (22/32 bytes from left)
         // remove function permissions
         uint256 updatedTarget;
