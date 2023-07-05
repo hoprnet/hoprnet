@@ -26,11 +26,11 @@
 //! backend at the cost of decreased performance (using a modified form of
 //! the fixslicing technique called "semi-fixslicing").
 //!
-//! ## ARMv8 intrinsics (nightly-only)
+//! ## ARMv8 intrinsics (Rust 1.61+)
 //! On `aarch64` targets including `aarch64-apple-darwin` (Apple M1) and Linux
 //! targets such as `aarch64-unknown-linux-gnu` and `aarch64-unknown-linux-musl`,
 //! support for using AES intrinsics provided by the ARMv8 Cryptography Extensions
-//! is available when using the nightly compiler, and can be enabled using the
+//! is available when using Rust 1.61 or above, and can be enabled using the
 //! `aes_armv8` configuration flag.
 //!
 //! On Linux and macOS, when the `aes_armv8` flag is enabled support for AES
@@ -42,7 +42,7 @@
 //! in order to determine if AES-NI is available, and if it is not, it will
 //! fallback to using a constant-time software implementation.
 //!
-//! Passing `RUSTFLAGS=-Ctarget-feature=+aes,+ssse3` explicitly at compile-time
+//! Passing `RUSTFLAGS=-C target-feature=+aes,+ssse3` explicitly at compile-time
 //! will override runtime detection and ensure that AES-NI is always used.
 //! Programs built in this manner will crash with an illegal instruction on
 //! CPUs which do not have AES-NI enabled.
@@ -73,9 +73,10 @@
 //! cipher.decrypt_block(&mut block);
 //! assert_eq!(block, block_copy);
 //!
-//! // implementation supports parallel block processing
-//! // number of blocks processed in parallel depends in general
-//! // on hardware capabilities
+//! // Implementation supports parallel block processing. Number of blocks
+//! // processed in parallel depends in general on hardware capabilities.
+//! // This is achieved by instruction-level parallelism (ILP) on a single
+//! // CPU core, which is differen from multi-threaded parallelism.
 //! let mut blocks = [block; 100];
 //! cipher.encrypt_blocks(&mut blocks);
 //!
@@ -84,6 +85,7 @@
 //!     assert_eq!(block, &block_copy);
 //! }
 //!
+//! // `decrypt_blocks` also supports parallel block processing.
 //! cipher.decrypt_blocks(&mut blocks);
 //!
 //! for block in blocks.iter_mut() {
@@ -99,7 +101,7 @@
 //!
 //! You can modify crate using the following configuration flags:
 //!
-//! - `aes_armv8`: enable ARMv8 AES intrinsics (nightly-only).
+//! - `aes_armv8`: enable ARMv8 AES intrinsics (Rust 1.61+).
 //! - `aes_force_soft`: force software implementation.
 //! - `aes_compact`: reduce code size at the cost of slower performance
 //! (affects only software backend).
@@ -119,7 +121,6 @@
 )]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![warn(missing_docs, rust_2018_idioms)]
-#![cfg_attr(all(aes_armv8, target_arch = "aarch64"), feature(stdsimd))]
 
 #[cfg(feature = "hazmat")]
 #[cfg_attr(docsrs, doc(cfg(feature = "hazmat")))]
