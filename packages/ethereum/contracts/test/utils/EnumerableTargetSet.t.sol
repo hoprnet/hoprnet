@@ -138,10 +138,7 @@ contract EnumerableTargetSetTest is Test {
         // get valid target
         (Target target, uint8 boundClearance, uint8 boundTargetType, uint8 boundTargetPermission, uint8[] memory boundFunctionPermissions) = _helperCreateValidTarget(targetAddress, clearance, targetType, targetPermission, functionPermissions);
         // force write 262
-        uint256 gasStart = gasleft();
-        Target newTarget = TargetUtils.forceWriteAsTargetType2(target, newTargetType);
-        uint256 gasEnd = gasleft();
-        emit log_named_uint("gas used", gasStart - gasEnd);
+        Target newTarget = TargetUtils.forceWriteAsTargetType(target, newTargetType);
 
         // verify invariant state updates 
         assertEq(TargetUtils.getTargetAddress(newTarget), TargetUtils.getTargetAddress(target));
@@ -169,6 +166,11 @@ contract EnumerableTargetSetTest is Test {
                 assertEq(uint8(TargetUtils.getDefaultFunctionPermissionAt(newTarget, k)), uint8(FunctionPermission.NONE));
             }
         }
+    }
+
+    function testFuzz_WriteTargetAddress(uint256 targetVal, address newTargetAddress) public {
+        Target newTarget = TargetUtils.forceWriteTargetAddress(Target.wrap(targetVal), newTargetAddress);
+        assertEq(TargetUtils.getTargetAddress(newTarget), newTargetAddress);
     }
 
     function testFuzz_EncodeDefaultPermissions(
@@ -234,6 +236,57 @@ contract EnumerableTargetSetTest is Test {
         assertEq(uint8(TargetUtils.getDefaultTargetPermission(target)), boundTargetPermission);
         for (uint256 index = 0; index < functionPermissions.length; index++) {
             assertEq(uint8(TargetUtils.getDefaultFunctionPermissionAt(target, index)), boundFunctionPermissions[index]);
+        }
+    }
+
+    function testRevert_DecodeDefaultPermissions(uint256 targetVal) public {
+        Target target = Target.wrap(targetVal);
+
+        if ((targetVal << 160) >> 248 > uint256(type(Clearance).max)) {
+            // clearance is incorrect
+            vm.expectRevert(stdError.enumConversionError);
+            TargetUtils.decodeDefaultPermissions(target);
+        }
+
+        if ((targetVal << 168) >> 248 > uint256(type(TargetType).max)) {
+            // target type is incorrect
+            vm.expectRevert(stdError.enumConversionError);
+            TargetUtils.decodeDefaultPermissions(target);
+        }
+
+        if ((targetVal << 176) >> 248 > uint256(type(TargetPermission).max)) {
+            // target permission is incorrect
+            vm.expectRevert(stdError.enumConversionError);
+            TargetUtils.decodeDefaultPermissions(target);
+        }
+
+        for (uint256 i = 0; i < TargetUtils.getNumDefaultFunctionPermissions(); i++) {
+            if (targetVal << (176 + 8 * i) >> 248 > uint256(type(FunctionPermission).max)) {
+                // target permission is incorrect
+                vm.expectRevert(stdError.enumConversionError);
+                TargetUtils.decodeDefaultPermissions(target);
+            }
+        }
+    }
+
+    function testFuzz_ConvertFunctionToTargetPermissions(uint8 functionPermissionVal) public {
+        functionPermissionVal = uint8(bound(functionPermissionVal, uint256(type(FunctionPermission).min), uint256(type(FunctionPermission).max)));
+        vm.assume(functionPermissionVal != 0);
+        
+        TargetPermission targetPermission = TargetUtils.convertFunctionToTargetPermission(FunctionPermission(functionPermissionVal));
+        assertEq(uint8(targetPermission), functionPermissionVal - 1);
+    }
+
+    function testRevert_ConvertFunctionToTargetPermissions(uint8 functionPermissionVal) public {
+        if (functionPermissionVal > uint8(type(FunctionPermission).max)) {
+            vm.expectRevert(stdError.enumConversionError);
+            TargetUtils.convertFunctionToTargetPermission(FunctionPermission(functionPermissionVal));
+        }
+
+        if (functionPermissionVal == 0) {
+            FunctionPermission functionPermission = FunctionPermission(functionPermissionVal);
+            vm.expectRevert(PermissionNotFound.selector);
+            TargetUtils.convertFunctionToTargetPermission(FunctionPermission(functionPermissionVal));
         }
     }
 
