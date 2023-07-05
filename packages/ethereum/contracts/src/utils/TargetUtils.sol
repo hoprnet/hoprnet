@@ -47,14 +47,14 @@ library TargetUtils {
         return address(uint160(Target.unwrap(target) >> 96));
     }
 
-    function getTargetType(Target target) internal pure returns (TargetType) {
-        // left shift 160 + 8 bits then right shift 256 - 8 bits
-        return TargetType(uint8((Target.unwrap(target) << 168) >> 248));
-    }
-
     function getTargetClearance(Target target) internal pure returns (Clearance) {
         // left shift 160 bits then right shift 256 - 8 bits
         return Clearance(uint8((Target.unwrap(target) << 160) >> 248));
+    }
+
+    function getTargetType(Target target) internal pure returns (TargetType) {
+        // left shift 160 + 8 bits then right shift 256 - 8 bits
+        return TargetType(uint8((Target.unwrap(target) << 168) >> 248));
     }
 
     function isTargetType(Target target, TargetType targetType) internal pure returns (bool) {
@@ -94,6 +94,41 @@ library TargetUtils {
 
         // force clear target type and overwrite with expected one 
         updatedTarget &= ~targetTypeMask;
+        updatedTarget |= uint256(targetType) << 80;   
+        return Target.wrap(updatedTarget);
+    }
+    function forceWriteAsTargetType2(Target target, TargetType targetType) internal pure returns (Target) {
+        // remove value at TargetType position (22/32 bytes from left)
+        // remove function permissions
+        uint256 updatedTarget;
+        uint256 typeMask;
+        if (targetType == TargetType.CHANNELS) {
+            /**
+             remove all the default token function permissions (uint16). Equivalent to
+             updatedTarget = (Target.unwrap(target) >> 16) << 16;  
+             updatedTarget &= ~targetTypeMask;
+             */
+            typeMask = uint256(bytes32(hex"ffffffffffffffffffffffffffffffffffffffffff00ffffffffffffffff0000"));
+        } else if (targetType == TargetType.TOKEN) {
+            /**
+             remove all the default function permissions (uint72)
+             add the last 16 bits (from right) back. Equivalent to
+             updatedTarget = (Target.unwrap(target) >> 72) << 72;
+             updatedTarget |= (Target.unwrap(target) << 240) >> 240;
+             updatedTarget &= ~targetTypeMask;
+             */
+            typeMask = uint256(bytes32(hex"ffffffffffffffffffffffffffffffffffffffffff00ff00000000000000ffff"));
+        } else {
+            /**
+             remove all the default function permissions (uint72). Equivalent to
+             updatedTarget = (Target.unwrap(target) >> 72) << 72;
+             updatedTarget &= ~targetTypeMask;
+             */
+            typeMask = uint256(bytes32(hex"ffffffffffffffffffffffffffffffffffffffffff00ff000000000000000000"));
+        }
+        updatedTarget = Target.unwrap(target) & typeMask;
+
+        // force clear target type and overwrite with expected one 
         updatedTarget |= uint256(targetType) << 80;   
         return Target.wrap(updatedTarget);
     }
