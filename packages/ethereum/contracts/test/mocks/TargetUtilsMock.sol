@@ -2,6 +2,10 @@ pragma solidity ^0.8.0;
 
 import "../../src/utils/TargetUtils.sol";
 
+/** 
+ * @dev Mock contract to test internal library of TargetUtils
+ * Each function from the libarray has a wrapper in the mock contract
+ */
 contract TargetUtilsMock {
     using TargetUtils for Target;
 
