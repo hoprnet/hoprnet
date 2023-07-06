@@ -1,354 +1,184 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
+import "../mocks/EnumerableTargetSetMock.sol";
 import "../../src/utils/TargetUtils.sol";
 
 contract EnumerableTargetSetTest is Test {
-    address public targetUtilsLibAddress;
-    bytes32 private constant TARGET_ADDRESS_MASK =   hex"ffffffffffffffffffffffffffffffffffffffff000000000000000000000000";
-    bytes32 private constant TARGET_CLEARANCE_MASK = hex"0000000000000000000000000000000000000000ff0000000000000000000000";
-    bytes32 private constant TARGET_TYPE_MASK =      hex"000000000000000000000000000000000000000000ff00000000000000000000";
-    bytes32 private constant TARGET_DEFAULT_MASK =   hex"00000000000000000000000000000000000000000000ff000000000000000000";
- 
+    using stdStorage for StdStorage;
     using TargetUtils for Target;
 
+    EnumerableTargetSetMock public enumerableTargetSetMock;
+
+    /** 
+     * @dev create mock for test 
+     */
     function setUp() public {
-        targetUtilsLibAddress = deployCode("TargetUtils.sol:TargetUtils");
+        enumerableTargetSetMock = new EnumerableTargetSetMock();
     }
 
-    function test_GetNumDefaultFunctionPermissions() public {
-        uint256 num = TargetUtils.getNumDefaultFunctionPermissions();
-        assertEq(num, 9);
-    }
-
-    function testFuzz_GetTargetAddress(uint256 targetVal) public {
+    /** 
+     * @dev fuzz test oln add, length and contains
+     */
+    function testFuzz_AddLengthContains(uint256 targetVal) public {
         Target target = Target.wrap(targetVal);
-        bytes32 maskedTargetAddress = bytes32(targetVal) & TARGET_ADDRESS_MASK;
-        assertEq(bytes32(uint256(uint160(TargetUtils.getTargetAddress(target))) << 96), maskedTargetAddress);
-        assertEq(TargetUtils.getTargetAddress(target), address(uint160(uint256(maskedTargetAddress >> 96))));
+        assertTrue(enumerableTargetSetMock.add(target));
+        // check target is indeed added
+        // check the length of the TargetSet._values
+        Target[] memory firstValues = enumerableTargetSetMock.values();
+        assertEq(firstValues.length, 1);
+        assertEq(enumerableTargetSetMock.length(), 1);
+        assertEq(Target.unwrap(firstValues[0]), targetVal);
+        // check adding the same target for another time
+        assertFalse(enumerableTargetSetMock.add(target));
+        Target[] memory secondValues = enumerableTargetSetMock.values();
+        assertEq(secondValues.length, 1);
+        assertEq(enumerableTargetSetMock.length(), 1);
+        assertEq(Target.unwrap(secondValues[0]), targetVal);
+        // check set indeed contains the targetAddress
+        address targetAddress = target.getTargetAddress();
+        assertTrue(enumerableTargetSetMock.contains(targetAddress));
     }
 
-    function testFuzz_GetTargetClearance(uint256 targetVal) public {
-        Target target = Target.wrap(targetVal);
-        bytes32 maskedTargetClearance = bytes32(targetVal) & TARGET_CLEARANCE_MASK;
+    /** 
+     * @dev fuzz test on remove a random value from the set 
+     */
+    function testFuzz_RemoveRandom(uint256[] memory targetVals, uint256 index) public {
+        vm.assume(targetVals.length > 0);
+        // add values to target
+        _helperCreateTargetSet(targetVals);
+        uint256 length = enumerableTargetSetMock.length();
+        index = bound(index, 0, length - 1);
 
-        uint8 convertedMaskedTargetClearance = uint8(uint256(maskedTargetClearance >> 88));
-        vm.assume(convertedMaskedTargetClearance <= uint8(type(Clearance).max)); // valid target clearance
+        address targetAddress = enumerableTargetSetMock.values()[index].getTargetAddress();
 
-        assertEq(bytes32(uint256(uint8(TargetUtils.getTargetClearance(target))) << 88), maskedTargetClearance);
-        assertEq(uint8(TargetUtils.getTargetClearance(target)), convertedMaskedTargetClearance);
+        if (enumerableTargetSetMock.contains(targetAddress)) {
+            // able to remove
+            assertTrue(enumerableTargetSetMock.remove(targetAddress));
+            assertEq(enumerableTargetSetMock.length(), length - 1);
+            // targeAddress is not longer in the set
+            assertFalse(enumerableTargetSetMock.contains(targetAddress));
+        }
     }
 
-    function testRevert_GetTargetClearance(uint256 targetVal) public {
-        Target target = Target.wrap(targetVal);
-        bytes32 maskedTargetClearance = bytes32(targetVal) & TARGET_CLEARANCE_MASK;
+    /** 
+     * @dev fuzz test on removing the last (and the first if applicable) from the set
+     */
+    function testFuzz_RemoveTheFirstAndLast(uint256[] memory targetVals) public {
+        vm.assume(targetVals.length > 0);
+        // add values to target
+        _helperCreateTargetSet(targetVals);
+        uint256 length = enumerableTargetSetMock.length();
 
-        uint8 convertedMaskedTargetClearance = uint8(uint256(maskedTargetClearance >> 88));
-        vm.assume(convertedMaskedTargetClearance > uint8(type(Clearance).max)); // valid target clearance
+        // remove the last one
+        uint256 lastIndex = length - 1;
+        address lastTargetAddress = enumerableTargetSetMock.values()[lastIndex].getTargetAddress();
+        assertTrue(enumerableTargetSetMock.remove(lastTargetAddress));
+        assertEq(enumerableTargetSetMock.length(), length - 1);
+        assertFalse(enumerableTargetSetMock.contains(lastTargetAddress));
 
-        vm.expectRevert(stdError.enumConversionError);
-        TargetUtils.getTargetClearance(target);
+        // proceed with removing the first if there's still element
+        if (enumerableTargetSetMock.length() > 0) {
+            address firstTargetAddress = enumerableTargetSetMock.values()[0].getTargetAddress();
+            assertTrue(enumerableTargetSetMock.remove(firstTargetAddress));
+            assertEq(enumerableTargetSetMock.length(), length - 2);
+            assertFalse(enumerableTargetSetMock.contains(firstTargetAddress));
+        }
     }
 
-    function testFuzz_GetTargetType(uint256 targetVal) public {
-        Target target = Target.wrap(targetVal);
-        bytes32 maskedTargetType = bytes32(targetVal) & TARGET_TYPE_MASK;
+    /** 
+     * @dev fuzz test on removing a non existing target address
+     */
+    function testFuzz_RemoveNonExisting(uint256[] memory targetVals, address targetAddress) public {
+        // add values to target
+        _helperCreateTargetSet(targetVals);
+        uint256 length = enumerableTargetSetMock.length();
+        Target[] memory values = enumerableTargetSetMock.values();
 
-        uint8 convertedMaskedTargetType = uint8(uint256(maskedTargetType >> 80));
-        vm.assume(convertedMaskedTargetType <= uint8(type(TargetType).max)); // valid target type
+        vm.assume(!enumerableTargetSetMock.contains(targetAddress));
 
-        assertEq(bytes32(uint256(uint8(TargetUtils.getTargetType(target))) << 80), maskedTargetType);
-        assertEq(uint8(TargetUtils.getTargetType(target)), convertedMaskedTargetType);
+        // skip removal
+        assertFalse(enumerableTargetSetMock.remove(targetAddress));
+        assertEq(enumerableTargetSetMock.length(), length);
+        for (uint256 j = 0; j < length; j++) {
+            // no element has been moved
+            assertEq(Target.unwrap(enumerableTargetSetMock.at(j)), Target.unwrap(values[j]));
+        }
     }
 
-    function testRevert_GetTargetType(uint256 targetVal) public {
-        Target target = Target.wrap(targetVal);
-        bytes32 maskedTargetType = bytes32(targetVal) & TARGET_TYPE_MASK;
-
-        uint8 convertedMaskedTargetType = uint8(uint256(maskedTargetType >> 80));
-        vm.assume(convertedMaskedTargetType > uint8(type(TargetType).max)); // valid target type
-
-        vm.expectRevert(stdError.enumConversionError);
-        TargetUtils.getTargetType(target);
+    /** 
+     * @dev test values
+     */
+    function test_Values() public {
+        // check default values
+        Target[] memory values = enumerableTargetSetMock.values();
+        assertEq(values.length, 0);
     }
 
-    function testFuzz_IsTargetType(uint256 targetVal) public {
-        Target target = Target.wrap(targetVal);
-        bytes32 maskedTargetType = bytes32(targetVal) & TARGET_TYPE_MASK;
+    /** 
+     * @dev fuzz test at
+     */
+    function testFuzz_At(uint256[] memory targetVals) public {
+        // add values to target
+        _helperCreateTargetSet(targetVals);
+        Target[] memory values = enumerableTargetSetMock.values();
+        assertEq(values.length, enumerableTargetSetMock.length());
 
-        uint8 convertedMaskedTargetType = uint8(uint256(maskedTargetType >> 80));
-        vm.assume(convertedMaskedTargetType <= uint8(type(TargetType).max)); // valid target type
-        assertTrue(TargetUtils.isTargetType(target, TargetType(convertedMaskedTargetType)));
-        assertFalse(TargetUtils.isTargetType(target, TargetType((convertedMaskedTargetType + 1) % uint8(type(TargetType).max))));
+        for (uint256 i = 0; i < values.length; i++) {
+            assertEq(Target.unwrap(enumerableTargetSetMock.at(i)), Target.unwrap(values[i]));
+        }
     }
 
-    function testRevert_IsTargetType(uint256 targetVal) public {
-        Target target = Target.wrap(targetVal);
-        bytes32 maskedTargetType = bytes32(targetVal) & TARGET_TYPE_MASK;
+    /** 
+     * @dev fuzz test get and tryGet methods
+     */
+    function testFuzz_GetAndTryGetWithInArray(uint256[] memory targetVals) public {
+        // at least one item can be found from the array
+        vm.assume(targetVals.length > 0);
 
-        uint8 convertedMaskedTargetType = uint8(uint256(maskedTargetType >> 80));
-        vm.assume(convertedMaskedTargetType > uint8(type(TargetType).max));
+        // add values to target
+        _helperCreateTargetSet(targetVals);
 
-        vm.expectRevert(stdError.enumConversionError);
-        TargetUtils.isTargetType(target, TargetType(convertedMaskedTargetType));
-    }
+        for (uint256 i = 0; i < targetVals.length; i++) {
+            address targetAddress = Target.wrap(targetVals[i]).getTargetAddress();
+            if (targetAddress != address(0)) {
+                // address zero is not a valid target address
+                Target target = enumerableTargetSetMock.get(targetAddress);
+                assertEq(target.getTargetAddress(), targetAddress);
 
-    function testFuzz_GetDefaultTargetPermission(uint256 targetVal) public {
-        Target target = Target.wrap(targetVal);
-        bytes32 maskedDefaultPermission = bytes32(targetVal) & TARGET_DEFAULT_MASK;
-
-        uint8 convertedMaskedDefaultPermission = uint8(uint256(maskedDefaultPermission >> 72));
-        vm.assume(convertedMaskedDefaultPermission <= uint8(type(TargetPermission).max)); // valid target permission
-
-        assertEq(bytes32(uint256(uint8(TargetUtils.getDefaultTargetPermission(target))) << 72), maskedDefaultPermission);
-        assertEq(uint8(TargetUtils.getDefaultTargetPermission(target)), convertedMaskedDefaultPermission);
-    }
-
-    function testFuzz_GetDefaultPermissionAt(uint256 targetVal, uint256 position) public {
-        Target target = Target.wrap(targetVal);
-        uint256 limit = TargetUtils.getNumDefaultFunctionPermissions() - 1;
-        position = bound(position, 0, limit);
-
-        uint8 convertedMaskedDefaultPermissionAt = uint8((targetVal << 184 + position * 8) >> 248);
-        vm.assume(convertedMaskedDefaultPermissionAt <= uint8(type(FunctionPermission).max)); // valid target permission
-
-        FunctionPermission permission = TargetUtils.getDefaultFunctionPermissionAt(target, position);
-        assertEq(uint8(permission), convertedMaskedDefaultPermissionAt);
-    }
-
-    function testRevert_GetDefaultPermissionAt(uint256 offset) public {
-        offset = bound(offset, 1, 1e36);
-        
-        uint256 position = TargetUtils.getNumDefaultFunctionPermissions() + offset;
-        vm.expectRevert(FunctionPermissionsTooMany.selector);
-        TargetUtils.getDefaultFunctionPermissionAt(Target.wrap(0), position);
-    }
-
-    function testFuzz_WriteAsTargetType(
-        address targetAddress,
-        uint8 clearance,
-        uint8 targetType,
-        uint8 targetPermission,
-        uint8[] memory functionPermissions,
-        uint8 asTargetType
-    ) public {
-        // bound target type
-        asTargetType = uint8(bound(asTargetType, uint256(type(TargetType).min), uint256(type(TargetType).max)));
-        TargetType newTargetType = TargetType(asTargetType); 
-        // get valid target
-        (Target target, uint8 boundClearance, uint8 boundTargetType, uint8 boundTargetPermission, uint8[] memory boundFunctionPermissions) = _helperCreateValidTarget(targetAddress, clearance, targetType, targetPermission, functionPermissions);
-        // force write 262
-        Target newTarget = TargetUtils.forceWriteAsTargetType(target, newTargetType);
-
-        // verify invariant state updates 
-        assertEq(TargetUtils.getTargetAddress(newTarget), TargetUtils.getTargetAddress(target));
-        assertEq(uint8(TargetUtils.getTargetClearance(newTarget)), uint8(TargetUtils.getTargetClearance(target)));
-        assertEq(uint8(TargetUtils.getDefaultTargetPermission(newTarget)), uint8(TargetUtils.getDefaultTargetPermission(target)));
-        assertEq(uint8(TargetUtils.getTargetType(newTarget)), uint8(newTargetType));
-        // depending on the asTargetType, certain permissions are overwritten
-        if (newTargetType == TargetType.CHANNELS) {
-            for (uint256 i = 0; i < 7; i++) {
-                assertEq(uint8(TargetUtils.getDefaultFunctionPermissionAt(newTarget, i)), uint8(TargetUtils.getDefaultFunctionPermissionAt(target, i)));
+                (bool tryResult, Target tryTarget) = enumerableTargetSetMock.tryGet(targetAddress);
+                assertEq(tryTarget.getTargetAddress(), targetAddress);
+                assertTrue(tryResult);
             }
-            // indexes 7 and 8 are overwritten
-            assertEq(uint8(TargetUtils.getDefaultFunctionPermissionAt(newTarget, 7)), uint8(FunctionPermission.NONE));
-            assertEq(uint8(TargetUtils.getDefaultFunctionPermissionAt(newTarget, 8)), uint8(FunctionPermission.NONE));
-        } else if (newTargetType == TargetType.TOKEN) {
-            // indexes 0 - 6 are overwritten
-            for (uint256 j = 0; j < 7; j++) {
-                assertEq(uint8(TargetUtils.getDefaultFunctionPermissionAt(newTarget, j)), uint8(FunctionPermission.NONE));
-            }
-            assertEq(uint8(TargetUtils.getDefaultFunctionPermissionAt(newTarget, 7)), uint8(TargetUtils.getDefaultFunctionPermissionAt(target, 7)));
-            assertEq(uint8(TargetUtils.getDefaultFunctionPermissionAt(newTarget, 8)), uint8(TargetUtils.getDefaultFunctionPermissionAt(target, 8)));
+        }
+    }
+
+    /** 
+     * @dev test revert condition of get, namely when the address does not exist
+     */
+    function testRevert_Get(uint256[] memory targetVals, address targetAddress) public {
+        // add values to target
+        _helperCreateTargetSet(targetVals);
+
+        bool tryResult;
+        if (!enumerableTargetSetMock.contains(targetAddress)) {
+            (tryResult, ) = enumerableTargetSetMock.tryGet(targetAddress);
+            assertFalse(tryResult);
+
+            vm.expectRevert(EnumerableTargetSet.NonExistentKey.selector);
+            enumerableTargetSetMock.get(targetAddress);
         } else {
-            // TargetType.SEND
-            for (uint256 k = 0; k < TargetUtils.getNumDefaultFunctionPermissions(); k++) {
-                assertEq(uint8(TargetUtils.getDefaultFunctionPermissionAt(newTarget, k)), uint8(FunctionPermission.NONE));
-            }
+            (tryResult, ) = enumerableTargetSetMock.tryGet(targetAddress);
+            assertTrue(tryResult);
         }
     }
 
-    function testFuzz_WriteTargetAddress(uint256 targetVal, address newTargetAddress) public {
-        Target newTarget = TargetUtils.forceWriteTargetAddress(Target.wrap(targetVal), newTargetAddress);
-        assertEq(TargetUtils.getTargetAddress(newTarget), newTargetAddress);
-    }
-
-    function testFuzz_EncodeDefaultPermissions(
-        address targetAddress,
-        uint8 clearance,
-        uint8 targetType,
-        uint8 targetPermission,
-        uint8[] memory functionPermissions
-    ) public {     
-        (Target target, uint8 boundClearance, uint8 boundTargetType, uint8 boundTargetPermission, uint8[] memory boundFunctionPermissions) = _helperCreateValidTarget(targetAddress, clearance, targetType, targetPermission, functionPermissions);
-        // evaluate that target equals
-        assertEq(TargetUtils.getTargetAddress(target), targetAddress);
-        assertEq(uint8(TargetUtils.getTargetClearance(target)), boundClearance);
-        assertEq(uint8(TargetUtils.getTargetType(target)), boundTargetType);
-        assertEq(uint8(TargetUtils.getDefaultTargetPermission(target)), boundTargetPermission);
-        for (uint256 index = 0; index < functionPermissions.length; index++) {
-            assertEq(uint8(TargetUtils.getDefaultFunctionPermissionAt(target, index)), boundFunctionPermissions[index]);
+    /** 
+     * @dev helper function to create a set with an array of target values in fuzz testing
+     */
+    function _helperCreateTargetSet(uint256[] memory targetVals) private {
+        for (uint256 i = 0; i < targetVals.length; i++) {
+            enumerableTargetSetMock.add(Target.wrap(targetVals[i]));
         }
     }
-
-    function testRevert_EncodeDefaultPermissions(
-        address targetAddress,
-        uint8 clearance,
-        uint8 targetType,
-        uint8 targetPermission,
-        uint8[] memory functionPermissions
-    ) public {
-        
-        vm.assume(functionPermissions.length > TargetUtils.getNumDefaultFunctionPermissions());
-        // bound to each enum type
-        FunctionPermission[] memory funcPermissions = new FunctionPermission[](functionPermissions.length);
-        clearance = uint8(bound(clearance, uint256(type(Clearance).min), uint256(type(Clearance).max)));
-        targetType = uint8(bound(targetType, uint256(type(TargetType).min), uint256(type(TargetType).max)));
-        targetPermission = uint8(bound(targetPermission, uint256(type(TargetPermission).min), uint256(type(TargetPermission).max)));
-        for (uint256 i = 0; i < functionPermissions.length; i++) {
-            functionPermissions[i] = uint8(bound(functionPermissions[i], uint256(type(FunctionPermission).min), uint256(type(FunctionPermission).max)));
-            funcPermissions[i] = FunctionPermission(functionPermissions[i]);
-        }
-
-        vm.expectRevert(FunctionPermissionsTooMany.selector);
-        // get the target
-        TargetUtils.encodeDefaultPermissions(
-            targetAddress, 
-            Clearance(clearance), 
-            TargetType(targetType), 
-            TargetPermission(targetPermission), 
-            funcPermissions
-        );
-    }
-
-    function testFuzz_DecodeDefaultPermissions(
-        address targetAddress,
-        uint8 clearance,
-        uint8 targetType,
-        uint8 targetPermission,
-        uint8[] memory functionPermissions
-    ) public {
-        (Target target, uint8 boundClearance, uint8 boundTargetType, uint8 boundTargetPermission, uint8[] memory boundFunctionPermissions) = _helperCreateValidTarget(targetAddress, clearance, targetType, targetPermission, functionPermissions);
-        // evaluate that target equals
-        assertEq(TargetUtils.getTargetAddress(target), targetAddress);
-        assertEq(uint8(TargetUtils.getTargetClearance(target)), boundClearance);
-        assertEq(uint8(TargetUtils.getTargetType(target)), boundTargetType);
-        assertEq(uint8(TargetUtils.getDefaultTargetPermission(target)), boundTargetPermission);
-        for (uint256 index = 0; index < functionPermissions.length; index++) {
-            assertEq(uint8(TargetUtils.getDefaultFunctionPermissionAt(target, index)), boundFunctionPermissions[index]);
-        }
-    }
-
-    function testRevert_DecodeDefaultPermissions(uint256 targetVal) public {
-        Target target = Target.wrap(targetVal);
-
-        if ((targetVal << 160) >> 248 > uint256(type(Clearance).max)) {
-            // clearance is incorrect
-            vm.expectRevert(stdError.enumConversionError);
-            TargetUtils.decodeDefaultPermissions(target);
-        }
-
-        if ((targetVal << 168) >> 248 > uint256(type(TargetType).max)) {
-            // target type is incorrect
-            vm.expectRevert(stdError.enumConversionError);
-            TargetUtils.decodeDefaultPermissions(target);
-        }
-
-        if ((targetVal << 176) >> 248 > uint256(type(TargetPermission).max)) {
-            // target permission is incorrect
-            vm.expectRevert(stdError.enumConversionError);
-            TargetUtils.decodeDefaultPermissions(target);
-        }
-
-        for (uint256 i = 0; i < TargetUtils.getNumDefaultFunctionPermissions(); i++) {
-            if (targetVal << (176 + 8 * i) >> 248 > uint256(type(FunctionPermission).max)) {
-                // target permission is incorrect
-                vm.expectRevert(stdError.enumConversionError);
-                TargetUtils.decodeDefaultPermissions(target);
-            }
-        }
-    }
-
-    function testFuzz_ConvertFunctionToTargetPermissions(uint8 functionPermissionVal) public {
-        functionPermissionVal = uint8(bound(functionPermissionVal, uint256(type(FunctionPermission).min), uint256(type(FunctionPermission).max)));
-        vm.assume(functionPermissionVal != 0);
-        
-        TargetPermission targetPermission = TargetUtils.convertFunctionToTargetPermission(FunctionPermission(functionPermissionVal));
-        assertEq(uint8(targetPermission), functionPermissionVal - 1);
-    }
-
-    function testRevert_ConvertFunctionToTargetPermissions(uint8 functionPermissionVal) public {
-        if (functionPermissionVal > uint8(type(FunctionPermission).max)) {
-            vm.expectRevert(stdError.enumConversionError);
-            TargetUtils.convertFunctionToTargetPermission(FunctionPermission(functionPermissionVal));
-        }
-
-        if (functionPermissionVal == 0) {
-            FunctionPermission functionPermission = FunctionPermission(functionPermissionVal);
-            vm.expectRevert(PermissionNotFound.selector);
-            TargetUtils.convertFunctionToTargetPermission(FunctionPermission(functionPermissionVal));
-        }
-    }
-
-    function _helperCreateValidTarget(
-        address targetAddress,
-        uint8 clearance,
-        uint8 targetType,
-        uint8 targetPermission,
-        uint8[] memory functionPermissions
-    ) private returns (
-        Target target,
-        uint8 boundClearance,
-        uint8 boundTargetType,
-        uint8 boundTargetPermission,
-        uint8[] memory boundFunctionPermissions
-    ){
-        // otherwise revert
-        vm.assume(functionPermissions.length <= TargetUtils.getNumDefaultFunctionPermissions());
-   
-        // bound to each enum type
-        boundFunctionPermissions = new uint8[](functionPermissions.length);
-        FunctionPermission[] memory funcPermissions = new FunctionPermission[](functionPermissions.length);
-        boundClearance = uint8(bound(clearance, uint256(type(Clearance).min), uint256(type(Clearance).max)));
-        boundTargetType = uint8(bound(targetType, uint256(type(TargetType).min), uint256(type(TargetType).max)));
-        boundTargetPermission = uint8(bound(targetPermission, uint256(type(TargetPermission).min), uint256(type(TargetPermission).max)));
-        for (uint256 i = 0; i < functionPermissions.length; i++) {
-            boundFunctionPermissions[i] = uint8(bound(functionPermissions[i], uint256(type(FunctionPermission).min), uint256(type(FunctionPermission).max)));
-            funcPermissions[i] = FunctionPermission(boundFunctionPermissions[i]);
-        }
-
-        // get the target
-        target = TargetUtils.encodeDefaultPermissions(
-            targetAddress, 
-            Clearance(boundClearance), 
-            TargetType(boundTargetType), 
-            TargetPermission(boundTargetPermission), 
-            funcPermissions
-        );
-    }
-
-    // function _helperBindTypes(
-    //     uint8 clearance,
-    //     uint8 targetType,
-    //     uint8 targetPermission,
-    //     uint8[] memory functionPermissions
-    // ) private returns (
-    //     uint8 boundClearance,
-    //     uint8 boundTargetType,
-    //     uint8 boundTargetPermission,
-    //     uint8[] memory boundFunctionPermissions,
-    //     FunctionPermission[] memory funcPermissions
-    // ){
-    //     // bound to each enum type
-    //     boundFunctionPermissions = new uint8[](functionPermissions.length);
-    //     funcPermissions = new FunctionPermission[](functionPermissions.length);
-    //     FunctionPermission[] memory funcPermissions = new FunctionPermission[](functionPermissions.length);
-    //     boundClearance = uint8(bound(clearance, uint256(type(Clearance).min), uint256(type(Clearance).max)));
-    //     boundTargetType = uint8(bound(targetType, uint256(type(TargetType).min), uint256(type(TargetType).max)));
-    //     boundTargetPermission = uint8(bound(targetPermission, uint256(type(TargetPermission).min), uint256(type(TargetPermission).max)));
-    //     for (uint256 i = 0; i < functionPermissions.length; i++) {
-    //         boundFunctionPermissions[i] = uint8(bound(functionPermissions[i], uint256(type(FunctionPermission).min), uint256(type(FunctionPermission).max)));
-    //         funcPermissions[i] = FunctionPermission(boundFunctionPermissions[i]);
-    //     }
-    // }
 }

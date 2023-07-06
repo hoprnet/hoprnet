@@ -1,0 +1,41 @@
+pragma solidity ^0.8.0;
+
+import "../../src/utils/EnumerableTargetSet.sol";
+
+contract EnumerableTargetSetMock {
+    using EnumerableTargetSet for TargetSet;
+
+    TargetSet internal targetSet;
+
+    function add(Target target) public returns (bool) {
+        return EnumerableTargetSet.add(targetSet, target);
+    }
+
+    function remove(address targetAddress) public returns (bool) {
+        return EnumerableTargetSet.remove(targetSet, targetAddress);
+    }
+
+    function contains(address targetAddress) public returns (bool) {
+        return EnumerableTargetSet.contains(targetSet, targetAddress);
+    }
+
+    function length() public returns (uint256) {
+        return EnumerableTargetSet.length(targetSet);
+    }
+
+    function at(uint256 index) public returns (Target) {
+        return EnumerableTargetSet.at(targetSet, index);
+    }
+
+    function values() public returns (Target[] memory) {
+        return EnumerableTargetSet.values(targetSet);
+    }
+
+    function tryGet(address targetAddress) public returns (bool, Target) {
+        return EnumerableTargetSet.tryGet(targetSet, targetAddress);
+    }
+
+    function get(address targetAddress) public returns (Target) {
+        return EnumerableTargetSet.get(targetSet, targetAddress);
+    }
+}
