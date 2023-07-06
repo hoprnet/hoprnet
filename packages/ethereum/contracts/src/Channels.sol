@@ -67,9 +67,12 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
   // encoded sign of y-component of base point of secp256k1 curve
   uint8 constant BASE_POINT_Y_COMPONENT_SIGN = 27;
 
-  // used by {tokensReceived} to distinguish which function to call after tokens are sent
+  // ERC-777 tokensReceived hook, fundChannelMulti
   uint256 public immutable FUND_CHANNEL_MULTI_SIZE =
     abi.encode(address(0), Balance.wrap(0), address(0), Balance.wrap(0)).length;
+
+  // ERC-777 tokensReceived hook, fundChannel
+  uint256 public immutable FUND_CHANNEL_SIZE =  abi.encode(address(0)).length;
 
   string public constant version = '2.0.0';
 
@@ -144,8 +147,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
   }
 
   struct RedeemableTicket {
-    CompactSignature signature;
     TicketData data;
+    CompactSignature signature;
     bytes32 opening;
     bytes32 porSecret;
   }
@@ -189,7 +192,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
    * Emitted once a commitment has been set for a channel. Includes
    * the current epoch since this value is necessary for issuing tickets.
    */
-  event CommitmentSet(bytes32 channelId, ChannelEpoch epoch);
+  event CommitmentSet(bytes32 indexed channelId, ChannelEpoch epoch);
 
   /**
    * Emitted once a party initiates the closure of an outgoing
@@ -298,7 +301,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     Balance amount1,
     address account2,
     Balance amount2
-  ) external validateBalance(amount1) validateBalance(amount2) validateChannelParties(account1, account2) {
+  ) external {
     // pull tokens from funder and handle result
     if (token.transferFrom(msg.sender, address(this), Balance.unwrap(amount1) + Balance.unwrap(amount2)) != true) {
       // sth. went wrong, we need to revert here
@@ -313,6 +316,10 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     if (Balance.unwrap(amount2) > 0) {
       _fundChannel(account2, account1, amount2);
     }
+
+    if (Balance.unwrap(amount1) == 0 && Balance.unwrap(amount2) == 0) {
+      revert InvalidBalance();
+    }
   }
 
   function redeemTicketSafe(address self, RedeemableTicket calldata redeemable) external onlySafe {
@@ -323,7 +330,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     _redeemTicketInternal(msg.sender, redeemable);
   }
 
-  // TODO: temporarily add the batch redemption feature
+    // TODO: temporarily add the batch redemption feature
   function batchRedeemTicketsSafe(address self, RedeemableTicket[] calldata redeemable) external onlySafe {
     for (uint256 index = 0; index < redeemable.length; index++) {
       _redeemTicketInternal(self, redeemable[index]);
@@ -378,7 +385,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     // Deviates from EIP712 due to computed property and non-standard struct property encoding
     bytes32 ticketHash = _getTicketHash(redeemable);
 
-    if (!_isWinningTicket(ticketHash, redeemable.opening, redeemable.porSecret, redeemable.data.winProb)) {
+    if (!_isWinningTicket(ticketHash, redeemable)) {
       revert TicketIsNotAWin();
     }
 
@@ -573,6 +580,11 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
       revert WrongChannelState({reason: 'Cannot set commitments for channels that are not in state OPEN.'});
     }
 
+    // Cannot set same commitment again
+    if (channel.commitment == newCommitment) {
+      revert InvalidCommitment();
+    }
+
     if (channel.commitment != bytes32(0)) {
       // The party ran out of commitment openings, this is a reset
       channel.epoch = ChannelEpoch.wrap(ChannelEpoch.unwrap(channel.epoch) + 1);
@@ -604,8 +616,15 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     require(msg.sender == address(token), 'caller must be HoprToken');
     require(to == address(this), 'must be sending tokens to HoprChannels');
 
-    // must be one of our supported functions
-    if (userData.length == FUND_CHANNEL_MULTI_SIZE) {
+    // Opens an outgoing channel
+    if (userData.length == FUND_CHANNEL_SIZE) {
+      address dest;
+
+      (dest) = abi.decode(userData, (address));
+
+      _fundChannel(msg.sender, dest, Balance.wrap(uint96(amount)));
+    // Opens two channels, donating msg.sender's tokens
+    } else if (userData.length == FUND_CHANNEL_MULTI_SIZE) {
       address account1;
       Balance amount1;
 
@@ -638,7 +657,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
    * @param dest the address of the channel destination
    * @param amount amount to fund account1
    */
-  function _fundChannel(address source, address dest, Balance amount) internal validateBalance(amount) {
+  function _fundChannel(address source, address dest, Balance amount) internal validateBalance(amount) validateChannelParties(source, dest) {
     bytes32 channelId = _getChannelId(source, dest);
     Channel storage channel = channels[channelId];
 
@@ -730,17 +749,23 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
    * a property stated in the signed ticket.
    *
    * @param ticketHash hash of the ticket to check
-   * @param opening the commitment opening used to redeem the ticket
-   * @param porSecret response to challenge stated in ticket
-   * @param winProb winning probability stated in the ticket
+   * @param redeemable ticket, opening, porSecret, signature
    */
   function _isWinningTicket(
     bytes32 ticketHash,
-    bytes32 opening,
-    bytes32 porSecret,
-    WinProb winProb
+    RedeemableTicket calldata redeemable
   ) public pure returns (bool) {
     // hash function produces 256 bits output but we require only first 56 bits (IEEE 754 double precision means 53 signifcant bits)
-    return (uint56(bytes7(keccak256(abi.encodePacked(ticketHash, opening, porSecret))))) <= WinProb.unwrap(winProb);
+    uint56 ticketProb = (uint56(bytes7(keccak256(abi.encodePacked(
+      // unique due to ticketIndex + ticketEpoch
+      ticketHash, 
+      // entropy + commitment opening ticket redeemer
+      redeemable.opening, 
+      // challenge-response packet sender + next downstream node
+      redeemable.porSecret, 
+      // entropy by ticket issuer
+      redeemable.signature.r, redeemable.signature.vs)))));
+
+    return ticketProb <= WinProb.unwrap(redeemable.data.winProb);
   }
 }
