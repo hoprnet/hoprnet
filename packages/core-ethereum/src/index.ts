@@ -516,11 +516,7 @@ export default class HoprCoreEthereum extends EventEmitter {
       throw Error('Initialize incoming channel closure currently is not supported.')
     }
 
-    const c = ChannelEntry.deserialize(
-      (
-        await this.db.get_channel_x(src, dest)
-      ).serialize()
-    )
+    const c = ChannelEntry.deserialize((await this.db.get_channel_x(src, dest)).serialize())
     if (c.status !== ChannelStatus.Open && c.status !== ChannelStatus.WaitingForCommitment) {
       throw Error('Channel status is not OPEN or WAITING FOR COMMITMENT')
     }
@@ -534,11 +530,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     if (!this.publicKey.to_address().eq(src)) {
       throw Error('Finalizing incoming channel closure currently is not supported.')
     }
-    const c = ChannelEntry.deserialize(
-      (
-        await this.db.get_channel_x(src, dest)
-      ).serialize()
-    )
+    const c = ChannelEntry.deserialize((await this.db.get_channel_x(src, dest)).serialize())
     if (c.status !== ChannelStatus.PendingToClose) {
       throw Error('Channel status is not PENDING_TO_CLOSE')
     }
@@ -551,9 +543,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     // channel may not exist, we can still open it
     let c: ChannelEntry
     try {
-      c = ChannelEntry.deserialize(
-        (await this.db.get_channel_to(dest)).serialize()
-      )
+      c = ChannelEntry.deserialize((await this.db.get_channel_to(dest)).serialize())
     } catch {}
     if (c && c.status !== ChannelStatus.Closed) {
       throw Error('Channel is already opened')

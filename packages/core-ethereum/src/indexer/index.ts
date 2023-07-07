@@ -968,7 +968,9 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       event.args.eligibility,
       Ethereum_Snapshot.deserialize(lastSnapshot.serialize())
     )
-    verbose(`network-registry: account ${account.to_string()} is ${event.args.eligibility ? 'eligible' : 'not eligible'}`)
+    verbose(
+      `network-registry: account ${account.to_string()} is ${event.args.eligibility ? 'eligible' : 'not eligible'}`
+    )
     // emit event only when eligibility changes on accounts with a HoprNode associated
     try {
       let hoprNodes = await this.db.find_hopr_node_using_account_in_network_registry(

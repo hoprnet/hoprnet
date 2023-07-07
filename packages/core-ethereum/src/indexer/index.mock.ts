@@ -19,7 +19,7 @@ import {
   number_to_channel_status
 } from '@hoprnet/hopr-utils'
 
-import { Ethereum_Database as Database} from '../db.js'
+import { Ethereum_Database as Database } from '../db.js'
 import Indexer from './index.js'
 import type { ChainWrapper } from '../ethereum.js'
 import type { Event, TokenEvent, RegistryEvent } from './types.js'

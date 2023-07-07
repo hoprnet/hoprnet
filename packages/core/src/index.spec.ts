@@ -60,7 +60,11 @@ describe('hopr core (instance)', function () {
     const db = new LevelDb()
     await db.backend.open()
 
-    const node = new Hopr(peerId, new Database(db, PublicKey.from_peerid_str(peerId.toString()).to_address()), opts as HoprOptions)
+    const node = new Hopr(
+      peerId,
+      new Database(db, PublicKey.from_peerid_str(peerId.toString()).to_address()),
+      opts as HoprOptions
+    )
 
     log('Node created with Id', node.getId().toString())
     assert(node instanceof Hopr)

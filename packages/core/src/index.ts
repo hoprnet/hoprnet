@@ -1533,14 +1533,7 @@ class Hopr extends EventEmitter {
    * @returns the channel entry of those two nodes
    */
   public async getChannel(src: Address, dest: Address): Promise<ChannelEntry> {
-    return ChannelEntry.deserialize(
-      (
-        await this.db.get_channel_x(
-          src,
-          dest
-        )
-      ).serialize()
-    )
+    return ChannelEntry.deserialize((await this.db.get_channel_x(src, dest)).serialize())
   }
 
   public async getAllChannels(): Promise<ChannelEntry[]> {
