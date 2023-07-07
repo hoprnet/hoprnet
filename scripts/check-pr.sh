@@ -60,16 +60,16 @@ function check_push() {
 
   echo "Checking pushed changeset from ${head_branch} against ${base_branch}"
   git diff --name-only --diff-filter=ACMRT "${base_branch}" "${head_branch}" > changes.txt
-  if grep -e ^scripts/ -e ^Makefile$ -e ^package.json$ -e ^.yarnrc.yml$ -e ^rust-toolchain.toml$ -e ^.nvmrc -e ^yarn.lock$ -e ^Cargo.toml changes.txt 1> /dev/null; then
+  if grep -e ^scripts/ -e ^Makefile$ -e ^package.json$ -e ^.yarnrc.yml$ -e ^rust-toolchain.toml$ -e ^.nvmrc -e ^yarn.lock$ -e ^Cargo.toml$ changes.txt 1> /dev/null; then
       echo "Changes detected on Toolchain"
       echo "build_toolchain=true" >> ${results_file}
   fi
-  if grep ^packages/hopli/ changes.txt 1> /dev/null; then
+  if grep -e ^packages/hopli/ -e ^Makefile$ -e ^rust-toolchain.toml$ -e ^Cargo.toml$ changes.txt 1> /dev/null; then
       echo "Changes detected on Hopli"
       echo "build_hopli=true" >> ${results_file}
   fi
 
-  if grep -v ^packages/hopli/ changes.txt | grep -v ^scripts | grep -v ^.processes | grep -v ^docs/ | grep -v .md 1> /dev/null; then
+  if grep -e ^packages/(hoprd|core|core-ethereum|utils|real|connect)/ -e ^Makefile$ -e ^package.json$ -e ^.yarnrc.yml$ -e ^rust-toolchain.toml$ -e ^.nvmrc -e ^yarn.lock$ -e ^Cargo.toml$ changes.txt 1> /dev/null; then
       echo "Changes detected on Hoprd"
       echo "build_hoprd=true" >> ${results_file}
   fi
@@ -80,7 +80,6 @@ function check_push() {
 
   rm changes.txt
 }
-
 
 # Main function
 check_push
