@@ -12,7 +12,7 @@ license = "GPL-3.0-only"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-getrandom = "0.2.8"
+getrandom = "0.2.10"
 js-sys = { version = "0.3.63", optional = true }
 rand = "0.8.5"
 serde = { version = "1.0", features = ["derive"] }
