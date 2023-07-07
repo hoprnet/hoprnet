@@ -17,7 +17,7 @@ blake2 = "0.10"
 chacha20 = "0.9"
 ctr = "0.9"
 console_error_panic_hook = { version = "0.1.7", optional = true }
-curve25519-dalek = { version = "4.0.0-rc.2", features = ["serde", "rand_core"] }
+curve25519-dalek = { version = "4.0.0-rc.3", features = ["serde", "rand_core"] }
 digest = "0.10"
 ed25519-dalek = "1.0.1"
 elliptic-curve = { version = "0.13", features = ["serde"] }
