@@ -38,6 +38,9 @@ logs.txt
 # generated JS files
 packages/*/lib/
 
+# generated docs
+packages/*/docs/
+
 # generated wasm files
 packages/*/crates/*/pkg
 

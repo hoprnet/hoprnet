@@ -11,13 +11,14 @@ set -Eeuo pipefail
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 declare HOPR_LOG_ID="setup-local-cluster"
+# shellcheck disable=SC1090
 source "${mydir}/utils.sh"
 
 # verify and set parameters
 declare api_token="^^LOCAL-testing-123^^"
 declare myne_chat_url="http://app.myne.chat"
 declare init_script=""
-declare hoprd_command="node --experimental-wasm-modules --experimental-wasm-reftypes packages/hoprd/lib/main.cjs"
+declare hoprd_command="node --experimental-wasm-modules packages/hoprd/lib/main.cjs"
 declare listen_host="127.0.0.1"
 declare node_env="development"
 # first anvil account

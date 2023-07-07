@@ -17,6 +17,7 @@ use utils_db::{
     traits::AsyncKVStorage,
 };
 use utils_types::primitives::{Address, AuthorizationToken, Balance, BalanceType, EthereumChallenge, Snapshot, U256};
+use utils_types::traits::BinarySerializable;
 
 use crate::errors::Result;
 use crate::traits::HoprCoreEthereumDbActions;
@@ -41,12 +42,12 @@ where
     T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>,
 {
     pub db: DB<T>,
-    pub me: PublicKey,
+    pub me: Address,
 }
 
 impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> CoreEthereumDb<T> {
-    pub fn new(db: DB<T>, public_key: PublicKey) -> Self {
-        Self { db, me: public_key }
+    pub fn new(db: DB<T>, me: Address) -> Self {
+        Self { db, me }
     }
 }
 
@@ -65,12 +66,12 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         Ok(())
     }
 
-    async fn get_tickets(&self, signer: Option<PublicKey>) -> Result<Vec<Ticket>> {
+    async fn get_tickets(&self, signer: Option<Address>) -> Result<Vec<Ticket>> {
         let mut tickets = self
             .db
             .get_more::<AcknowledgedTicket>(
                 Vec::from(ACKNOWLEDGED_TICKETS_PREFIX.as_bytes()).into_boxed_slice(),
-                EthereumChallenge::size(),
+                EthereumChallenge::SIZE as u32,
                 &|v: &AcknowledgedTicket| signer.clone().map(|s| v.signer.eq(&s)).unwrap_or(true),
             )
             .await?
@@ -83,7 +84,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             .db
             .get_more::<PendingAcknowledgement>(
                 Vec::from(PENDING_ACKNOWLEDGEMENTS_PREFIX.as_bytes()).into_boxed_slice(),
-                HalfKeyChallenge::size(),
+                HalfKeyChallenge::SIZE as u32,
                 &move |v: &PendingAcknowledgement| match v {
                     PendingAcknowledgement::WaitingAsSender => false,
                     PendingAcknowledgement::WaitingAsRelayer(unack) => {
@@ -173,7 +174,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         self.db
             .get_more::<AcknowledgedTicket>(
                 Vec::from(ACKNOWLEDGED_TICKETS_PREFIX.as_bytes()).into_boxed_slice(),
-                EthereumChallenge::size(),
+                EthereumChallenge::SIZE as u32,
                 &|ack: &AcknowledgedTicket| {
                     filter
                         .clone()
@@ -228,21 +229,15 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             .map(|v| v.unwrap_or(Balance::zero(BalanceType::HOPR)))
     }
 
-    async fn get_channel_to(&self, dest: &PublicKey) -> Result<Option<ChannelEntry>> {
+    async fn get_channel_to(&self, dest: &Address) -> Result<Option<ChannelEntry>> {
         utils_log::debug!("DB: get_channel_to dest: {}", dest);
-        let key = utils_db::db::Key::new_with_prefix(
-            &generate_channel_id(&self.me.to_address(), &dest.to_address()),
-            CHANNEL_PREFIX,
-        )?;
+        let key = utils_db::db::Key::new_with_prefix(&generate_channel_id(&self.me, &dest), CHANNEL_PREFIX)?;
 
         self.db.get_or_none(key).await
     }
 
-    async fn get_channel_from(&self, src: &PublicKey) -> Result<Option<ChannelEntry>> {
-        let key = utils_db::db::Key::new_with_prefix(
-            &generate_channel_id(&src.to_address(), &self.me.to_address()),
-            CHANNEL_PREFIX,
-        )?;
+    async fn get_channel_from(&self, src: &Address) -> Result<Option<ChannelEntry>> {
+        let key = utils_db::db::Key::new_with_prefix(&generate_channel_id(&src, &self.me), CHANNEL_PREFIX)?;
 
         self.db.get_or_none(key).await
     }
@@ -342,14 +337,14 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
 
     async fn get_channels(&self) -> Result<Vec<ChannelEntry>> {
         self.db
-            .get_more::<ChannelEntry>(Box::from(CHANNEL_PREFIX.as_bytes()), Hash::size(), &|_| true)
+            .get_more::<ChannelEntry>(Box::from(CHANNEL_PREFIX.as_bytes()), Hash::SIZE as u32, &|_| true)
             .await
     }
 
     async fn get_channels_open(&self) -> Result<Vec<ChannelEntry>> {
         Ok(self
             .db
-            .get_more::<ChannelEntry>(Box::from(CHANNEL_PREFIX.as_bytes()), Hash::size(), &|_| true)
+            .get_more::<ChannelEntry>(Box::from(CHANNEL_PREFIX.as_bytes()), Hash::SIZE as u32, &|_| true)
             .await?
             .into_iter()
             .filter(|x| x.status == ChannelStatus::Open)
@@ -374,7 +369,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
 
     async fn get_accounts(&self) -> Result<Vec<AccountEntry>> {
         self.db
-            .get_more::<AccountEntry>(Box::from(ACCOUNT_PREFIX.as_bytes()), Address::size(), &|_| true)
+            .get_more::<AccountEntry>(Box::from(ACCOUNT_PREFIX.as_bytes()), Address::SIZE as u32, &|_| true)
             .await
     }
 
@@ -502,29 +497,29 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         self.db.get_or_none::<usize>(key).await.map(|v| v.unwrap_or(0))
     }
 
-    async fn get_channel_x(&self, src: &PublicKey, dest: &PublicKey) -> Result<Option<ChannelEntry>> {
+    async fn get_channel_x(&self, src: &Address, dest: &Address) -> Result<Option<ChannelEntry>> {
         utils_log::debug!("DB: get_channel_x src: {} & dest: {}", src, dest);
-        self.get_channel(&generate_channel_id(&src.to_address(), &dest.to_address()))
-            .await
+        let key = utils_db::db::Key::new_with_prefix(&generate_channel_id(&src, &dest), "")?;
+        self.db.get_or_none(key).await
     }
 
     async fn get_channels_from(&self, address: Address) -> Result<Vec<ChannelEntry>> {
         Ok(self
             .db
-            .get_more::<ChannelEntry>(Box::from(CHANNEL_PREFIX.as_bytes()), Hash::size(), &|_| true)
+            .get_more::<ChannelEntry>(Box::from(CHANNEL_PREFIX.as_bytes()), Hash::SIZE as u32, &|_| true)
             .await?
             .into_iter()
-            .filter(move |x| x.source.to_address() == address)
+            .filter(move |x| x.source == address)
             .collect())
     }
 
     async fn get_channels_to(&self, address: Address) -> Result<Vec<ChannelEntry>> {
         Ok(self
             .db
-            .get_more::<ChannelEntry>(Box::from(CHANNEL_PREFIX.as_bytes()), Hash::size(), &|_| true)
+            .get_more::<ChannelEntry>(Box::from(CHANNEL_PREFIX.as_bytes()), Hash::SIZE as u32, &|_| true)
             .await?
             .into_iter()
-            .filter(move |x| x.destination.to_address() == address)
+            .filter(move |x| x.destination == address)
             .collect())
     }
 
@@ -808,11 +803,11 @@ pub mod wasm {
     #[derive(Clone)]
     #[wasm_bindgen]
     pub struct Database {
-        core_ethereum_db: Arc<RwLock<CoreEthereumDb<leveldb::LevelDbShim>>>,
+        core_ethereum_db: Arc<RwLock<CoreEthereumDb<leveldb::wasm::LevelDbShim>>>,
     }
 
     impl Database {
-        pub fn as_ref_counted(&self) -> Arc<RwLock<CoreEthereumDb<leveldb::LevelDbShim>>> {
+        pub fn as_ref_counted(&self) -> Arc<RwLock<CoreEthereumDb<leveldb::wasm::LevelDbShim>>> {
             self.core_ethereum_db.clone()
         }
     }
@@ -820,11 +815,11 @@ pub mod wasm {
     #[wasm_bindgen]
     impl Database {
         #[wasm_bindgen(constructor)]
-        pub fn new(db: leveldb::LevelDb, public_key: PublicKey) -> Self {
+        pub fn new(db: leveldb::wasm::LevelDb, me_addr: Address) -> Self {
             Self {
-                core_ethereum_db: Arc::new(RwLock::new(CoreEthereumDb::<leveldb::LevelDbShim>::new(
-                    DB::<leveldb::LevelDbShim>::new(leveldb::LevelDbShim::new(db)),
-                    public_key.clone(),
+                core_ethereum_db: Arc::new(RwLock::new(CoreEthereumDb::<leveldb::wasm::LevelDbShim>::new(
+                    DB::<leveldb::wasm::LevelDbShim>::new(leveldb::wasm::LevelDbShim::new(db)),
+                    me_addr.clone(),
                 ))),
             }
         }
@@ -1067,21 +1062,21 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub async fn get_channel_x(&self, src: &PublicKey, dest: &PublicKey) -> Result<Option<ChannelEntry>, JsValue> {
+        pub async fn get_channel_x(&self, src: &Address, dest: &Address) -> Result<Option<ChannelEntry>, JsValue> {
             let data = self.core_ethereum_db.clone();
             let db = data.read().await;
             utils_misc::ok_or_jserr!(db.get_channel_x(src, dest).await)
         }
 
         #[wasm_bindgen]
-        pub async fn get_channel_to(&self, dest: &PublicKey) -> Result<Option<ChannelEntry>, JsValue> {
+        pub async fn get_channel_to(&self, dest: &Address) -> Result<Option<ChannelEntry>, JsValue> {
             let data = self.core_ethereum_db.clone();
             let db = data.read().await;
             utils_misc::ok_or_jserr!(db.get_channel_to(dest).await)
         }
 
         #[wasm_bindgen]
-        pub async fn get_channel_from(&self, src: &PublicKey) -> Result<Option<ChannelEntry>, JsValue> {
+        pub async fn get_channel_from(&self, src: &Address) -> Result<Option<ChannelEntry>, JsValue> {
             let data = self.core_ethereum_db.clone();
             let db = data.read().await;
             utils_misc::ok_or_jserr!(db.get_channel_from(src).await)
@@ -1276,8 +1271,8 @@ mod tests {
     #[test]
     fn test_core_ethereum_db_iterable_type_channelentry_must_have_fixed_key_length() {
         let channel_entry = ChannelEntry::new(
-            PublicKey::random(),
-            PublicKey::random(),
+            Address::random(),
+            Address::random(),
             Balance::zero(BalanceType::HOPR),
             Hash::default(),
             U256::from(0u64),

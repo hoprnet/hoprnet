@@ -1,9 +1,5 @@
 {
   "solidity.compileUsingRemoteVersion": "v0.8.19+commit.7dd6d404",
   "typescript.tsdk": "node_modules/typescript/lib",
-  "editor.formatOnSave": true,
-  "rust-analyzer.runnableEnv": {
-    "CARGO": "/nix/store/fwy16zywi5wq5472xjsls1wz48324wvb-rust-default-1.69.0/bin/cargo",
-    "RUSTC": "/nix/store/fwy16zywi5wq5472xjsls1wz48324wvb-rust-default-1.69.0/bin/rustc"
-  }
+  "editor.formatOnSave": false
 }

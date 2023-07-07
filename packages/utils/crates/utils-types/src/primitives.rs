@@ -1,4 +1,5 @@
 use ethnum::{u256, AsU256};
+use getrandom::getrandom;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::ops::{Add, Mul};
@@ -7,10 +8,16 @@ use crate::errors::{GeneralError, GeneralError::InvalidInput, GeneralError::Pars
 use crate::traits::{AutoBinarySerializable, BinarySerializable, ToHex};
 
 /// Represents an Ethereum address
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Hash)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Address {
     addr: [u8; Self::SIZE],
+}
+
+impl Display for Address {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_hex())
+    }
 }
 
 impl Default for Address {
@@ -43,6 +50,14 @@ impl Address {
         self.to_hex()
     }
     // }
+
+    /// Creates a random Ethereum address, mostly used for testing
+    pub fn random() -> Self {
+        let mut addr = [0u8; Self::SIZE];
+        getrandom(&mut addr[..]).unwrap();
+
+        Self { addr }
+    }
 }
 
 impl BinarySerializable<'_> for Address {
@@ -658,6 +673,7 @@ pub mod wasm {
             self.clone()
         }
 
+        #[wasm_bindgen]
         pub fn size() -> u32 {
             Self::SIZE as u32
         }
@@ -690,6 +706,7 @@ pub mod wasm {
             self.value.to_string()
         }
 
+        #[wasm_bindgen]
         pub fn size() -> u32 {
             Self::SIZE as u32
         }
@@ -722,6 +739,7 @@ pub mod wasm {
             self.clone()
         }
 
+        #[wasm_bindgen]
         pub fn size() -> u32 {
             Self::SIZE as u32
         }
@@ -744,6 +762,7 @@ pub mod wasm {
             self.clone()
         }
 
+        #[wasm_bindgen]
         pub fn size() -> u32 {
             Self::SIZE as u32
         }
@@ -800,6 +819,7 @@ pub mod wasm {
             self.clone()
         }
 
+        #[wasm_bindgen]
         pub fn size() -> u32 {
             Self::SIZE as u32
         }

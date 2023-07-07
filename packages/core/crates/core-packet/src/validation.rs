@@ -1,17 +1,16 @@
 use crate::errors::PacketError::{OutOfFunds, TicketValidation};
 use crate::errors::Result;
-use core_crypto::types::PublicKey;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::channels::{ChannelEntry, ChannelStatus, Ticket};
 use utils_log::{debug, info};
-use utils_types::primitives::{Balance, BalanceType, U256};
+use utils_types::primitives::{Address, Balance, BalanceType, U256};
 
 /// Performs validations of the given unacknowledged ticket and channel.
 pub async fn validate_unacknowledged_ticket<T: HoprCoreEthereumDbActions>(
     db: &T,
     ticket: &Ticket,
     channel: &ChannelEntry,
-    sender: &PublicKey,
+    sender: &Address,
     min_ticket_amount: Balance,
     req_inverse_ticket_win_prob: U256,
     check_unrealized_balance: bool,
@@ -159,8 +158,8 @@ mod tests {
             async fn get_unacknowledged_tickets(&self, filter: Option<ChannelEntry>) -> core_ethereum_db::errors::Result<Vec<UnacknowledgedTicket>>;
             async fn mark_pending(&mut self, ticket: &Ticket) -> core_ethereum_db::errors::Result<()>;
             async fn get_pending_balance_to(&self, counterparty: &Address) -> core_ethereum_db::errors::Result<Balance>;
-            async fn get_channel_to(&self, dest: &PublicKey) -> core_ethereum_db::errors::Result<Option<ChannelEntry>>;
-            async fn get_channel_from(&self, src: &PublicKey) -> core_ethereum_db::errors::Result<Option<ChannelEntry>>;
+            async fn get_channel_to(&self, dest: &Address) -> core_ethereum_db::errors::Result<Option<ChannelEntry>>;
+            async fn get_channel_from(&self, src: &Address) -> core_ethereum_db::errors::Result<Option<ChannelEntry>>;
             async fn update_channel_and_snapshot(
                 &mut self,
                 channel_id: &Hash,
@@ -191,7 +190,7 @@ mod tests {
             async fn mark_losing_acked_ticket(&mut self, ticket: &AcknowledgedTicket) -> core_ethereum_db::errors::Result<()>;
             async fn get_rejected_tickets_value(&self) -> core_ethereum_db::errors::Result<Balance>;
             async fn get_rejected_tickets_count(&self) -> core_ethereum_db::errors::Result<usize>;
-            async fn get_channel_x(&self, src: &PublicKey, dest: &PublicKey) -> core_ethereum_db::errors::Result<Option<ChannelEntry>>;
+            async fn get_channel_x(&self, src: &Address, dest: &Address) -> core_ethereum_db::errors::Result<Option<ChannelEntry>>;
             async fn get_channels_from(&self, address: Address) -> core_ethereum_db::errors::Result<Vec<ChannelEntry>>;
             async fn get_channels_to(&self, address: Address) -> core_ethereum_db::errors::Result<Vec<ChannelEntry>>;
             async fn get_public_node_accounts(&self) -> core_ethereum_db::errors::Result<Vec<AccountEntry>>;
@@ -237,8 +236,8 @@ mod tests {
 
     fn create_channel_entry() -> ChannelEntry {
         ChannelEntry::new(
-            TARGET_PUB.clone(),
-            TARGET_PUB.clone(),
+            TARGET_ADDR.clone(),
+            TARGET_ADDR.clone(),
             Balance::from_str("100", BalanceType::HOPR),
             Hash::create(&[&hex!("deadbeef")]),
             U256::one(),
@@ -261,7 +260,7 @@ mod tests {
             &db,
             &ticket,
             &channel,
-            &SENDER_PUB,
+            &SENDER_PUB.to_address(),
             Balance::from_str("1", BalanceType::HOPR),
             U256::one(),
             true,
@@ -282,7 +281,7 @@ mod tests {
             &db,
             &ticket,
             &channel,
-            &TARGET_PUB,
+            &TARGET_PUB.to_address(),
             Balance::from_str("1", BalanceType::HOPR),
             U256::one(),
             true,
@@ -308,7 +307,7 @@ mod tests {
             &db,
             &ticket,
             &channel,
-            &SENDER_PUB,
+            &SENDER_PUB.to_address(),
             Balance::from_str("2", BalanceType::HOPR),
             U256::one(),
             true,
@@ -337,7 +336,7 @@ mod tests {
             &db,
             &ticket,
             &channel,
-            &SENDER_PUB,
+            &SENDER_PUB.to_address(),
             Balance::from_str("1", BalanceType::HOPR),
             U256::one(),
             true,
@@ -364,7 +363,7 @@ mod tests {
             &db,
             &ticket,
             &channel,
-            &SENDER_PUB,
+            &SENDER_PUB.to_address(),
             Balance::from_str("1", BalanceType::HOPR),
             U256::one(),
             true,
@@ -391,7 +390,7 @@ mod tests {
             &db,
             &ticket,
             &channel,
-            &SENDER_PUB,
+            &SENDER_PUB.to_address(),
             Balance::from_str("1", BalanceType::HOPR),
             U256::one(),
             true,
@@ -420,7 +419,7 @@ mod tests {
             &db,
             &ticket,
             &channel,
-            &SENDER_PUB,
+            &SENDER_PUB.to_address(),
             Balance::from_str("1", BalanceType::HOPR),
             U256::one(),
             true,
@@ -447,7 +446,7 @@ mod tests {
             &db,
             &ticket,
             &channel,
-            &SENDER_PUB,
+            &SENDER_PUB.to_address(),
             Balance::from_str("1", BalanceType::HOPR),
             U256::one(),
             true,
@@ -475,7 +474,7 @@ mod tests {
             &db,
             &ticket,
             &channel,
-            &SENDER_PUB,
+            &SENDER_PUB.to_address(),
             Balance::from_str("1", BalanceType::HOPR),
             U256::one(),
             true,
@@ -498,7 +497,7 @@ mod tests {
             &db,
             &ticket,
             &channel,
-            &SENDER_PUB,
+            &SENDER_PUB.to_address(),
             Balance::from_str("1", BalanceType::HOPR),
             U256::one(),
             true,
@@ -528,7 +527,7 @@ mod tests {
             &db,
             &ticket,
             &channel,
-            &SENDER_PUB,
+            &SENDER_PUB.to_address(),
             Balance::from_str("1", BalanceType::HOPR),
             U256::one(),
             true,
@@ -558,7 +557,7 @@ mod tests {
             &db,
             &ticket,
             &channel,
-            &SENDER_PUB,
+            &SENDER_PUB.to_address(),
             Balance::from_str("1", BalanceType::HOPR),
             U256::one(),
             false,

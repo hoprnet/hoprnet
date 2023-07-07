@@ -20,7 +20,7 @@ use std::ops::{Deref, Mul};
 use std::sync::Arc;
 use std::time::Duration;
 use utils_log::{debug, error, info};
-use utils_types::primitives::{Balance, BalanceType, U256};
+use utils_types::primitives::{Address, Balance, BalanceType, U256};
 use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
 
 use crate::validation::validate_unacknowledged_ticket;
@@ -396,14 +396,15 @@ where
         Ok(current_ticket_index)
     }
 
-    async fn create_multihop_ticket(&self, destination: PublicKey, path_pos: u8) -> Result<Ticket> {
+    async fn create_multihop_ticket(&self, destination: Address, path_pos: u8) -> Result<Ticket> {
         let channel = self
             .db
             .read()
             .await
+            // TODO: map from off-chain key to on-chain address
             .get_channel_to(&destination)
             .await?
-            .ok_or(ChannelNotFound(destination.to_peerid().to_string()))?;
+            .ok_or(ChannelNotFound(destination.to_string()))?;
 
         let channel_id = channel.get_id();
         let current_index = self.bump_ticket_index(&channel_id).await?;
@@ -414,12 +415,7 @@ where
             BalanceType::HOPR,
         );
 
-        let outstanding_balance = self
-            .db
-            .read()
-            .await
-            .get_pending_balance_to(&destination.to_address())
-            .await?;
+        let outstanding_balance = self.db.read().await.get_pending_balance_to(&destination).await?;
 
         let channel_balance = channel.balance.sub(&outstanding_balance);
 
@@ -433,7 +429,7 @@ where
         }
 
         let ticket = Ticket::new(
-            destination.to_address(),
+            destination,
             channel.ticket_epoch,
             current_index,
             amount,
@@ -468,9 +464,11 @@ where
         // Decide whether to create 0-hop or multihop ticket
         let next_peer = PublicKey::from_peerid(&path.hops()[0])?;
         let next_ticket = if path.length() == 1 {
-            Ticket::new_zero_hop(next_peer, &self.cfg.private_key)
+            // TODO: map from off-chain key to on-chain address
+            Ticket::new_zero_hop(next_peer.to_address(), &self.cfg.private_key)
         } else {
-            self.create_multihop_ticket(next_peer, path.length() as u8).await?
+            self.create_multihop_ticket(next_peer.to_address(), path.length() as u8)
+                .await?
         };
 
         // Create the packet
@@ -591,7 +589,8 @@ where
                     .db
                     .read()
                     .await
-                    .get_channel_from(&previous_hop)
+                    // TODO: map from off-chain key to on-chain address
+                    .get_channel_from(&previous_hop.to_address())
                     .await?
                     .ok_or(ChannelNotFound(previous_hop.to_string()))?;
 
@@ -600,7 +599,7 @@ where
                     self.db.read().await.deref(),
                     &packet.ticket,
                     &channel,
-                    &previous_hop,
+                    &previous_hop.to_address(),
                     Balance::from_str(PRICE_PER_PACKET, BalanceType::HOPR),
                     inverse_win_prob,
                     self.cfg.check_unrealized_balance,
@@ -627,7 +626,7 @@ where
                         PendingAcknowledgement::WaitingAsRelayer(UnacknowledgedTicket::new(
                             packet.ticket.clone(),
                             own_key.clone(),
-                            previous_hop.clone(),
+                            previous_hop.to_address(),
                         )),
                     )
                     .await?;
@@ -638,9 +637,9 @@ where
 
                 // Create next ticket for the packet
                 next_ticket = if path_pos == 1 {
-                    Ticket::new_zero_hop(next_hop.clone(), &self.cfg.private_key)
+                    Ticket::new_zero_hop(next_hop.to_address(), &self.cfg.private_key)
                 } else {
-                    self.create_multihop_ticket(next_hop.clone(), path_pos).await?
+                    self.create_multihop_ticket(next_hop.to_address(), path_pos).await?
                 };
                 previous_peer = previous_hop.to_peerid();
                 next_peer = next_hop.to_peerid();
@@ -774,7 +773,7 @@ mod tests {
     use utils_db::errors::DbError;
     use utils_db::leveldb::rusty::RustyLevelDbShim;
     use utils_log::debug;
-    use utils_types::primitives::{Balance, BalanceType, Snapshot, U256};
+    use utils_types::primitives::{Address, Balance, BalanceType, Snapshot, U256};
     use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
 
     const PEERS_PRIVS: [[u8; 32]; 5] = [
@@ -841,10 +840,10 @@ mod tests {
         Some(MESSAGES.lock().unwrap()[PROTO].get_mut(&for_peer)?.drain(..).collect())
     }
 
-    fn create_dummy_channel(from: &PeerId, to: &PeerId) -> ChannelEntry {
+    fn create_dummy_channel(from: &Address, to: &Address) -> ChannelEntry {
         ChannelEntry::new(
-            PublicKey::from_peerid(from).unwrap(),
-            PublicKey::from_peerid(to).unwrap(),
+            from.to_owned(),
+            to.to_owned(),
             Balance::new(U256::new("1234").mul(U256::new(PRICE_PER_PACKET)), BalanceType::HOPR),
             Hash::new(&random_bytes::<32>()),
             U256::zero(),
@@ -871,7 +870,7 @@ mod tests {
             .map(|(i, db)| {
                 Arc::new(RwLock::new(CoreEthereumDb::new(
                     DB::new(RustyLevelDbShim::new(db.clone())),
-                    PublicKey::from_peerid(&PEERS[i]).unwrap(),
+                    PublicKey::from_peerid(&PEERS[i]).unwrap().to_address(),
                 )))
             })
             .collect::<Vec<_>>()
@@ -884,13 +883,16 @@ mod tests {
         for (index, peer_id) in PEERS.iter().enumerate().take(dbs.len()) {
             let mut db = CoreEthereumDb::new(
                 DB::new(RustyLevelDbShim::new(dbs[index].clone())),
-                PublicKey::from_peerid(&peer_id).unwrap(),
+                PublicKey::from_peerid(&peer_id).unwrap().to_address(),
             );
 
             let mut channel: Option<ChannelEntry> = None;
 
             if index < PEERS.len() - 1 {
-                channel = Some(create_dummy_channel(&peer_id, &PEERS[index + 1]));
+                channel = Some(create_dummy_channel(
+                    &PublicKey::from_peerid(peer_id).unwrap().to_address(),
+                    &PublicKey::from_peerid(&PEERS[index + 1]).unwrap().to_address(),
+                ));
 
                 db.update_channel_and_snapshot(
                     &channel.clone().unwrap().get_id(),
@@ -1468,9 +1470,10 @@ pub mod wasm {
     use std::future::Future;
     use std::pin::Pin;
     use std::str::FromStr;
-    use std::sync::Arc;
+    use std::sync::{Arc, Mutex};
     use std::time::Duration;
-    use utils_db::leveldb::LevelDbShim;
+    use utils_db::db::DB;
+    use utils_db::leveldb::wasm::{LevelDb, LevelDbShim};
     use utils_log::error;
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;

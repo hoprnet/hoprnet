@@ -11,7 +11,7 @@ set -Eeuo pipefail
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 declare HOPR_LOG_ID="get-default-network"
-
+# shellcheck disable=SC1090
 source "${mydir}/utils.sh"
 
 declare key_to_extract=".value.network"

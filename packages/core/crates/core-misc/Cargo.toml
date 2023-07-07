@@ -11,25 +11,16 @@ license = "GPL-3.0-only"
 [lib]
 crate-type = ["cdylib", "rlib"]
 
-[features]
-default = ["console_error_panic_hook", "wasm"]
-wasm = ["dep:wasm-bindgen", "dep:serde-wasm-bindgen"]
-console_error_panic_hook = [ "dep:console_error_panic_hook" ]
-
 [dependencies]
-real-base = { path = "../../../real/crates/real-base" }
+console_error_panic_hook = { version = "0.1.7", optional = true }
+js-sys = { version = "0.3.63", optional = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-utils-misc = { path = "../../../utils/crates/utils-misc"}
-utils-proc-macros = { path = "../../../utils/crates/utils-proc-macros" }
 serde-wasm-bindgen = { version = "0.5", optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 
-console_error_panic_hook = { version = "0.1.7", optional = true }
-# wee_alloc = { version = "0.4.5", optional = true }
-
-[dev-dependencies]
-wasm-bindgen-test = "0.3.36"
+real-base = { path = "../../../real/crates/real-base", default-features = false }
+utils-misc = { path = "../../../utils/crates/utils-misc", default-features = false }
 
 [target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
 wasm-pack = { workspace = true }
@@ -40,3 +31,8 @@ wasm-opt = false
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = ['-O', '--enable-reference-types']
+
+[features]
+default = ["console_error_panic_hook", "wasm"]
+wasm = ["dep:wasm-bindgen", "dep:serde-wasm-bindgen", "dep:js-sys", "real-base/wasm", "utils-misc/wasm"]
+console_error_panic_hook = ["dep:console_error_panic_hook"]

@@ -1,6 +1,8 @@
-ARG HOPR_TOOLCHAIN_IMAGE=${HOPR_TOOLCHAIN_IMAGE:-gcr.io/hoprassociation/hopr-toolchain:latest}
-# Debian 11.5 https://hub.docker.com/layers/library/debian/bullseye-slim/images/sha256-64e251208f3bddf166a7020437103f75aabf3fceb1d5bd932272f3f73668caa9?context=explore
-ARG DEBIAN_IMAGE=${DEBIAN_IMAGE:-debian:bullseye-slim@sha256:64e251208f3bddf166a7020437103f75aabf3fceb1d5bd932272f3f73668caa9}
+ARG HOPR_TOOLCHAIN_IMAGE=${HOPR_TOOLCHAIN_IMAGE:-europe-west3-docker.pkg.dev/hoprassociation/docker-images/hopr-toolchain:latest}
+
+# Debian 11.7
+# https://hub.docker.com/layers/library/debian/11.7-slim/images/sha256-b74f58783fdb8f58107f1d0b3d8e7721e11feeacd9c4c8faa159a14bb0fc6bb3?context=explore
+ARG DEBIAN_IMAGE=${DEBIAN_IMAGE:-debian:11.7-slim@sha256:b74f58783fdb8f58107f1d0b3d8e7721e11feeacd9c4c8faa159a14bb0fc6bb3}
 
 FROM ${HOPR_TOOLCHAIN_IMAGE} as builder
 
@@ -29,6 +31,8 @@ LABEL name="hopli" \
     vendor="HOPR" \
     summary="Hopli cli tool" \
     description="Hopli is a commandline tool that interacts mainly with Foundry"
+
+ENV ETHERSCAN_API_KEY="random_giberish"
 
 # build project sources
 WORKDIR /root

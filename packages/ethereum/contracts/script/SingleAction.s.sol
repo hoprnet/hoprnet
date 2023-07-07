@@ -24,7 +24,7 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
 
   function getNetworkAndMsgSender() private {
     // 1. Network check
-    // get envirionment of the script
+    // get network of the script
     getNetwork();
     // read records of deployed files
     readCurrentNetwork();

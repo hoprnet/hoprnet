@@ -33,10 +33,11 @@ const MOCK_PUBLIC_KEY = () =>
 const MOCK_ADDRESS = () => Address.from_string('Cf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9')
 
 function channelEntryCreateMock(): ChannelEntry {
-  const pub = PublicKey.from_privkey(stringToU8a('0x1464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8'))
+  const src = Address.from_string('0x86d854baec85640ef8c80b2c618c28024f2926d4')
+  const dest = Address.from_string('0x245445dbdcdaa115bb1d7d1de8717f9facecdbbe')
   return new ChannelEntry(
-    pub.clone(),
-    pub.clone(),
+    src,
+    dest,
     new Balance('1', BalanceType.HOPR),
     Hash.create([]),
     U256.one(),
@@ -96,7 +97,7 @@ describe('db shim tests', function () {
 })
 
 function test_in_memory_db() {
-  return new Database(new LevelDb(), MOCK_PUBLIC_KEY())
+  return new Database(new LevelDb(), MOCK_PUBLIC_KEY().to_address())
 }
 
 describe('db functional tests', function () {

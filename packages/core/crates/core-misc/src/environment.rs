@@ -1,9 +1,13 @@
 use real_base::real;
 use serde::{Deserialize, Serialize};
 use utils_misc::ok_or_str;
-// import need to be called wasm_bindgen to make field annotations
-// such as `#[wasm_bindgen(skip)]` work
-use utils_proc_macros::wasm_bindgen_if as wasm_bindgen;
+#[cfg(feature = "wasm")]
+use wasm_bindgen::prelude::*;
+
+#[cfg(any(not(feature = "wasm"), test))]
+use real_base::file::native::read_file;
+#[cfg(all(feature = "wasm", not(test)))]
+use real_base::file::wasm::read_file;
 
 pub trait FromJsonFile: Sized {
     fn from_json_file(mono_repo_path: &str) -> Result<Self, String>;
@@ -11,7 +15,7 @@ pub trait FromJsonFile: Sized {
 
 #[derive(Deserialize, Serialize, Clone, Copy)]
 #[serde(rename_all(deserialize = "lowercase"))]
-#[wasm_bindgen]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub enum EnvironmentType {
     Production,
     Staging,
@@ -32,6 +36,31 @@ impl ToString for EnvironmentType {
 
 /// Holds all information we need about the blockchain network
 /// the client is going to use
+#[derive(Deserialize, Serialize, Clone)]
+#[serde(deny_unknown_fields)]
+#[cfg(not(feature = "wasm"))]
+pub struct ChainOptions {
+    #[serde(skip_deserializing)]
+    pub id: String,
+    pub description: String,
+    /// >= 0
+    pub chain_id: u32,
+    pub live: bool,
+    /// a valid HTTP url pointing at a RPC endpoint
+    pub default_provider: String,
+    /// a valid HTTP url pointing at a RPC endpoint
+    pub etherscan_api_url: Option<String>,
+    /// The absolute maximum you are willing to pay per unit of gas to get your transaction included in a block, e.g. '10 gwei'
+    pub max_fee_per_gas: String,
+    /// Tips paid directly to miners, e.g. '2 gwei'
+    pub max_priority_fee_per_gas: String,
+    pub native_token_name: String,
+    pub hopr_token_name: String,
+    pub tags: Option<Vec<String>>,
+}
+
+// duplicate due to issue of wasm_bindgen with proc macros on struct properties
+#[cfg(feature = "wasm")]
 #[derive(Deserialize, Serialize, Clone)]
 #[serde(deny_unknown_fields)]
 #[wasm_bindgen(getter_with_clone)]
@@ -58,6 +87,39 @@ pub struct ChainOptions {
 
 /// Holds all information about the protocol network
 /// to be used by the client
+#[derive(Deserialize, Serialize, Clone)]
+#[serde(deny_unknown_fields)]
+#[cfg(not(feature = "wasm"))]
+pub struct Network {
+    #[serde(skip_deserializing)]
+    pub id: String,
+    /// must match one of the Network.id
+    pub chain: String,
+    pub environment_type: EnvironmentType,
+    // Node.js-fashioned semver string
+    pub version_range: String,
+    pub indexer_start_block_number: u32,
+    /// an Ethereum address
+    pub token_contract_address: String,
+    /// an Ethereum address
+    pub channels_contract_address: String,
+    /// an Ethereum address
+    pub xhopr_contract_address: String,
+    /// an Ethereum address
+    pub boost_contract_address: String,
+    /// an Ethereum address
+    pub stake_contract_address: String,
+    /// an Ethereum address
+    pub network_registry_proxy_contract_address: String,
+    /// an Ethereum address
+    pub network_registry_contract_address: String,
+    pub tags: Vec<String>,
+    /// the associated staking season
+    pub stake_season: Option<u32>,
+}
+
+// duplicate due to issue of wasm_bindgen with proc macros on struct properties
+#[cfg(feature = "wasm")]
 #[derive(Deserialize, Serialize, Clone)]
 #[serde(deny_unknown_fields)]
 #[wasm_bindgen(getter_with_clone)]
@@ -102,7 +164,7 @@ impl FromJsonFile for ProtocolConfig {
     fn from_json_file(mono_repo_path: &str) -> Result<Self, String> {
         let protocol_config_path = format!("{}/packages/core/protocol-config.json", mono_repo_path);
 
-        let data = ok_or_str!(real::read_file(protocol_config_path.as_str()))?;
+        let data = ok_or_str!(read_file(protocol_config_path.as_str()))?;
 
         let mut protocol_config = ok_or_str!(serde_json::from_slice::<ProtocolConfig>(&data))?;
 
@@ -147,7 +209,7 @@ impl FromJsonFile for PackageJsonFile {
     fn from_json_file(mono_repo_path: &str) -> Result<Self, String> {
         let package_json_path = format!("{}/packages/hoprd/package.json", mono_repo_path);
 
-        let data = ok_or_str!(real::read_file(package_json_path.as_str()))?;
+        let data = ok_or_str!(read_file(package_json_path.as_str()))?;
 
         ok_or_str!(serde_json::from_slice::<PackageJsonFile>(&data))
     }
@@ -164,7 +226,7 @@ impl PackageJsonFile {
 }
 
 #[derive(Serialize, Clone)]
-#[wasm_bindgen(getter_with_clone)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct ResolvedNetwork {
     /// the network identifier, e.g. monte_rosa
     pub id: String,
