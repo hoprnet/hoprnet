@@ -69,7 +69,7 @@ function check_push() {
       echo "build_hopli=true" >> ${results_file}
   fi
 
-  if grep -e ^packages/(hoprd|core|core-ethereum|utils|real|connect)/ -e ^Makefile$ -e ^package.json$ -e ^.yarnrc.yml$ -e ^rust-toolchain.toml$ -e ^.nvmrc -e ^yarn.lock$ -e ^Cargo.toml$ changes.txt 1> /dev/null; then
+  if grep -e "^packages/(hoprd|core|core-ethereum|utils|real|connect)/" -e ^Makefile$ -e ^package.json$ -e ^.yarnrc.yml$ -e ^rust-toolchain.toml$ -e ^.nvmrc -e ^yarn.lock$ -e ^Cargo.toml$ changes.txt 1> /dev/null; then
       echo "Changes detected on Hoprd"
       echo "build_hoprd=true" >> ${results_file}
   fi
