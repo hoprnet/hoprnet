@@ -32,4 +32,3 @@ wasm-bindgen = "0.2.86"
 opt-level = "s"
 #debug=true
 # Detect changes
-
