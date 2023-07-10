@@ -12,6 +12,15 @@ pub enum CoreEthereumError {
 
     #[error(transparent)]
     DbError(#[from] DbError),
+
+    #[error("Invalid response to acknowledgement {0}")]
+    InvalidResponseToAcknowledgement(String),
+
+    #[error("Ticket is not a win")]
+    NotAWinningTicket,
+
+    #[error("Error while trying to submit ticket")]
+    CouldNotSubmitTicket(String),
 }
 
 pub type Result<T> = core::result::Result<T, CoreEthereumError>;

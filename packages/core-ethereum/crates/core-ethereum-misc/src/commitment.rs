@@ -1,12 +1,18 @@
-use crate::errors::CoreEthereumError::{CommitmentError, CryptoError, DbError};
-use crate::errors::Result;
-use core_crypto::derivation::derive_commitment_seed;
-use core_crypto::iterated_hash::{iterate_hash, recover_iterated_hash};
-use core_crypto::types::Hash;
+use crate::errors::{
+    CoreEthereumError::{CommitmentError, CryptoError, DbError},
+    Result,
+};
+use core_crypto::{
+    derivation::derive_commitment_seed,
+    iterated_hash::{iterate_hash, recover_iterated_hash},
+    types::Hash,
+};
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use utils_log::{debug, error, info, warn};
-use utils_types::primitives::U256;
-use utils_types::traits::{BinarySerializable, ToHex};
+use utils_types::{
+    primitives::U256,
+    traits::{BinarySerializable, ToHex},
+};
 
 const DB_ITERATION_BLOCK_SIZE: usize = 10000;
 const TOTAL_ITERATIONS: usize = 100000;
@@ -48,16 +54,9 @@ pub async fn bump_commitment<T: HoprCoreEthereumDbActions>(
         .map_err(|e| DbError(e))
 }
 
-async fn create_commitment_chain<T, C, F>(
-    db: &mut T,
-    channel_id: &Hash,
-    initial_commitment_seed: &[u8],
-    committer: C,
-) -> Result<()>
+async fn create_commitment_chain<T>(db: &mut T, channel_id: &Hash, initial_commitment_seed: &[u8]) -> Result<Hash>
 where
     T: HoprCoreEthereumDbActions,
-    C: Fn(Hash) -> F,
-    F: futures::Future<Output = Option<String>>,
 {
     let intermediates = iterate_hash(initial_commitment_seed, TOTAL_ITERATIONS, DB_ITERATION_BLOCK_SIZE).await;
 
@@ -66,13 +65,8 @@ where
 
     let current = Hash::new(&intermediates.hash);
     db.set_current_commitment(channel_id, &current).await?;
-    match committer(current).await {
-        None => warn!("chain committer did not return any value or failed!"),
-        Some(s) => info!("chain committer set returned {s}"),
-    }
-
     info!("commitment chain initialized for {channel_id}");
-    Ok(())
+    Ok(current)
 }
 
 /// Holds the commitment information of a specific channel.
@@ -117,26 +111,23 @@ impl ChannelCommitmentInfo {
 }
 
 /// Initializes commitment for the given channel.
-/// The ChainCommitter is used to tell the current state of the channel and to determine if re-initialization is
-/// needed or not.
-pub async fn initialize_commitment<T, C, F>(
+///
+/// If necessary, return a commitment to be set on-chain
+pub async fn initialize_commitment<T>(
     db: &mut T,
     private_key: &[u8],
     channel_info: &ChannelCommitmentInfo,
-    committer: C,
-) -> Result<()>
+) -> Result<Option<Hash>>
 where
     T: HoprCoreEthereumDbActions,
-    C: Fn(Hash) -> F,
-    F: futures::Future<Output = Option<String>>,
 {
-    let contains_already = db.get_commitment(&channel_info.channel_id, 0).await?.is_some();
-    let chain_commitment = db.get_channel(&channel_info.channel_id).await?.map(|c| c.commitment);
+    let contains_already = { db.get_commitment(&channel_info.channel_id, 0).await?.is_some() };
+    let chain_commitment = { db.get_channel(&channel_info.channel_id).await?.map(|c| c.commitment) };
 
     if contains_already && chain_commitment.is_some() {
         debug!("commitment already present for channel {}", channel_info.channel_id);
         match find_commitment_preimage(db, &channel_info.channel_id).await {
-            Ok(_) => return Ok(()),
+            Ok(_) => return Ok(None),
             Err(e) => {
                 warn!("Secret is found but failed to find preimage, reinitializing.. {e}")
             }
@@ -148,13 +139,16 @@ where
         chain_commitment.map(|h| h.to_hex()).unwrap_or("false".to_string())
     );
 
-    create_commitment_chain(
-        db,
-        &channel_info.channel_id,
-        &channel_info.create_initial_commitment_seed(private_key)?,
-        committer,
-    )
-    .await
+    let foo = Ok(Some(
+        create_commitment_chain(
+            db,
+            &channel_info.channel_id,
+            &channel_info.create_initial_commitment_seed(private_key)?,
+        )
+        .await?,
+    ));
+
+    foo
 }
 
 #[cfg(all(not(target_arch = "wasm32"), test))]
@@ -162,15 +156,12 @@ mod tests {
     use crate::commitment::{bump_commitment, find_commitment_preimage, initialize_commitment, ChannelCommitmentInfo};
     use async_std;
     use core_crypto::types::PublicKey;
-    use core_ethereum_db::db::CoreEthereumDb;
-    use core_ethereum_db::traits::HoprCoreEthereumDbActions;
+    use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
     use core_types::channels::{ChannelEntry, ChannelStatus};
     use hex_literal::hex;
     use std::sync::{Arc, Mutex};
-    use utils_db::db::DB;
-    use utils_db::leveldb::rusty::RustyLevelDbShim;
-    use utils_types::primitives::BalanceType::HOPR;
-    use utils_types::primitives::{Address, Balance, Snapshot, U256};
+    use utils_db::{db::DB, leveldb::rusty::RustyLevelDbShim};
+    use utils_types::primitives::{Address, Balance, BalanceType::HOPR, Snapshot, U256};
 
     const PRIV_KEY: [u8; 32] = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
 
@@ -208,11 +199,7 @@ mod tests {
         };
         let mut db = create_mock_db();
 
-        let committer = |_| async { Some(comm_info.channel_id.to_string()) };
-
-        initialize_commitment(&mut db, &PRIV_KEY, &comm_info, committer)
-            .await
-            .unwrap();
+        initialize_commitment(&mut db, &PRIV_KEY, &comm_info).await.unwrap();
 
         let c1 = find_commitment_preimage(&mut db, &comm_info.channel_id).await.unwrap();
 
@@ -225,9 +212,7 @@ mod tests {
             .await
             .unwrap();
 
-        initialize_commitment(&mut db, &PRIV_KEY, &comm_info, |_| async { None })
-            .await
-            .unwrap();
+        initialize_commitment(&mut db, &PRIV_KEY, &comm_info).await.unwrap();
 
         let c3 = find_commitment_preimage(&mut db, &comm_info.channel_id).await.unwrap();
         assert_eq!(c2, c3, "repeated initializations should return the same commitment");
@@ -236,17 +221,13 @@ mod tests {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
+    use crate::commitment::ChannelCommitmentInfo;
     use core_crypto::types::Hash;
     use core_ethereum_db::db::wasm::Database;
     use js_sys::Uint8Array;
-    use utils_log::error;
-    use utils_misc::ok_or_jserr;
-    use utils_misc::utils::wasm::JsResult;
+    use utils_misc::{ok_or_jserr, utils::wasm::JsResult};
     use utils_types::traits::BinarySerializable;
-    use wasm_bindgen::prelude::wasm_bindgen;
-    use wasm_bindgen::JsValue;
-
-    use crate::commitment::ChannelCommitmentInfo;
+    use wasm_bindgen::{prelude::*, JsValue};
 
     #[wasm_bindgen]
     pub async fn initialize_commitment(
@@ -255,34 +236,27 @@ pub mod wasm {
         channel_info: &ChannelCommitmentInfo,
         set_commitment: &js_sys::Function, // async (Uint8Array) => String
     ) -> JsResult<()> {
-        let val = db.as_ref_counted();
-        //let r = {
-        let mut g = val.write().await;
-        //console_log!("++++ initializing commitment preimage");
-        ok_or_jserr!(
-            super::initialize_commitment(&mut *g, private_key, channel_info, |commitment: Hash| async move {
-                let this = JsValue::null();
-                let hash: JsValue = Uint8Array::from(commitment.to_bytes().as_ref()).into();
-                match set_commitment.call1(&this, &hash) {
-                    Ok(r) => {
-                        let promise = js_sys::Promise::from(r);
-                        wasm_bindgen_futures::JsFuture::from(promise)
-                            .await
-                            .map_err(|e| error!("could not set commitment {:?}", e.as_string()))
-                            .map(|v| v.as_string().unwrap())
-                            .ok()
-                    }
-                    Err(e) => {
-                        error!("not call set commitment {:?}", e.as_string());
-                        None
-                    }
-                }
-            })
-            .await
-        )
-        //};
-        //console_log!("==== initializing commitment preimage");
-        //r
+        let maybe_hash = {
+            let val = db.as_ref_counted();
+            let mut g = val.write().await;
+
+            ok_or_jserr!(super::initialize_commitment(&mut *g, private_key, channel_info).await)?
+        };
+
+        if let Some(hash) = maybe_hash {
+            let this = JsValue::null();
+            // let hash: JsValue = hash.to_bytes().as_ref()).into();
+
+            let r = set_commitment.call1(&this, &<JsValue as From<Hash>>::from(hash))?;
+
+            let promise: js_sys::Promise = js_sys::Promise::from(r);
+            return match wasm_bindgen_futures::JsFuture::from(promise).await {
+                Ok(_) => Ok(()),
+                Err(e) => Err(format!("could not set commitment {:?}", e).into()),
+            };
+        }
+
+        Ok(())
     }
 
     #[wasm_bindgen]

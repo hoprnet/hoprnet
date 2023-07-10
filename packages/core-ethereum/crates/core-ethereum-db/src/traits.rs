@@ -1,17 +1,15 @@
+use crate::errors::Result;
 use async_trait::async_trait;
-
 use core_crypto::{
     iterated_hash::IteratedHash,
-    types::{HalfKeyChallenge, Hash, PublicKey},
+    types::{HalfKeyChallenge, Hash},
 };
-use core_types::acknowledgement::{AcknowledgedTicket, PendingAcknowledgement, UnacknowledgedTicket};
 use core_types::{
     account::AccountEntry,
+    acknowledgement::{AcknowledgedTicket, PendingAcknowledgement, UnacknowledgedTicket},
     channels::{ChannelEntry, Ticket},
 };
 use utils_types::primitives::{Address, AuthorizationToken, Balance, Snapshot, U256};
-
-use crate::errors::Result;
 
 #[async_trait(? Send)] // not placing the `Send` trait limitations on the trait
 pub trait HoprCoreEthereumDbActions {
@@ -175,7 +173,7 @@ pub trait HoprCoreEthereumDbActions {
     /// Add Hopr public key to an ETH address.
     async fn add_to_network_registry(
         &mut self,
-        public_key: &PublicKey,
+        address: &Address,
         account: &Address,
         snapshot: &Snapshot,
     ) -> Result<()>;
@@ -183,16 +181,16 @@ pub trait HoprCoreEthereumDbActions {
     /// Unlink Hopr public key to an ETH address by removing the entry.
     async fn remove_from_network_registry(
         &mut self,
-        public_key: &PublicKey,
+        public_key: &Address,
         account: &Address,
         snapshot: &Snapshot,
     ) -> Result<()>;
 
     /// Get address associated with the public key.
-    async fn get_account_from_network_registry(&self, public_key: &PublicKey) -> Result<Option<Address>>;
+    async fn get_account_from_network_registry(&self, public_key: &Address) -> Result<Option<Address>>;
 
     /// Find HOPR node based on its address.
-    async fn find_hopr_node_using_account_in_network_registry(&self, account: &Address) -> Result<Vec<PublicKey>>;
+    async fn find_hopr_node_using_account_in_network_registry(&self, account: &Address) -> Result<Vec<Address>>;
 
     /// Check if address as eligible to be operating in the network.
     async fn is_eligible(&self, account: &Address) -> Result<bool>;

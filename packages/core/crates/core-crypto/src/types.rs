@@ -429,6 +429,12 @@ impl Default for Hash {
     }
 }
 
+impl std::fmt::Display for Hash {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.to_hex().as_str())
+    }
+}
+
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl Hash {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
@@ -462,12 +468,6 @@ impl BinarySerializable<'_> for Hash {
 
     fn to_bytes(&self) -> Box<[u8]> {
         self.hash.into()
-    }
-}
-
-impl Display for Hash {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.to_hex())
     }
 }
 
@@ -785,6 +785,12 @@ impl Default for Response {
                 .as_slice(),
         );
         ret
+    }
+}
+
+impl std::fmt::Display for Response {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.to_hex().as_str())
     }
 }
 

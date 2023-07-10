@@ -17,15 +17,7 @@ import * as fixtures from './fixtures.js'
 import { type Event, IndexerStatus } from './types.js'
 import { useFixtures } from './index.mock.js'
 import { SendTransactionStatus } from '../ethereum.js'
-import {
-  Ethereum_Address,
-  // Balance as Ethereum_Balance,
-  // ChannelEntry as Ethereum_ChannelEntry,
-  Ethereum_Ticket,
-  Ethereum_Database,
-  Ethereum_Hash,
-  Ethereum_PublicKey
-} from '../db.js'
+import { Ethereum_Address, Ethereum_Ticket, Ethereum_Database, Ethereum_Hash } from '../db.js'
 
 // WASM magic - types and DB operations live in a different crate, serde is necessary
 async function get_channels_from(db: Ethereum_Database, address: Address) {
@@ -49,7 +41,7 @@ async function get_pending_balance_to(db: Ethereum_Database, address: Address): 
 }
 
 async function get_account_from_network_registry(db: Ethereum_Database, key: PublicKey): Promise<Address | undefined> {
-  let address = await db.get_account_from_network_registry(Ethereum_PublicKey.deserialize(key.serialize(false)))
+  let address = await db.get_account_from_network_registry(Ethereum_Address.deserialize(key.to_address().serialize()))
   return address === undefined ? undefined : Address.deserialize(address.serialize())
 }
 

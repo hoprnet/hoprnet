@@ -1,23 +1,22 @@
 use async_trait::async_trait;
-
-use core_crypto::iterated_hash::Intermediate;
 use core_crypto::{
-    iterated_hash::IteratedHash,
-    types::{HalfKeyChallenge, Hash, PublicKey},
+    iterated_hash::{Intermediate, IteratedHash},
+    types::{HalfKeyChallenge, Hash},
 };
-use core_types::acknowledgement::{AcknowledgedTicket, PendingAcknowledgement, UnacknowledgedTicket};
-use core_types::channels::ChannelStatus;
 use core_types::{
     account::AccountEntry,
-    channels::{generate_channel_id, ChannelEntry, Ticket},
+    acknowledgement::{AcknowledgedTicket, PendingAcknowledgement, UnacknowledgedTicket},
+    channels::{generate_channel_id, ChannelEntry, ChannelStatus, Ticket},
 };
 use utils_db::{
     constants::*,
     db::{serialize_to_bytes, DB},
     traits::AsyncKVStorage,
 };
-use utils_types::primitives::{Address, AuthorizationToken, Balance, BalanceType, EthereumChallenge, Snapshot, U256};
-use utils_types::traits::BinarySerializable;
+use utils_types::{
+    primitives::{Address, AuthorizationToken, Balance, BalanceType, EthereumChallenge, Snapshot, U256},
+    traits::BinarySerializable,
+};
 
 use crate::errors::Result;
 use crate::traits::HoprCoreEthereumDbActions;
@@ -192,7 +191,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             .db
             .get_more::<PendingAcknowledgement>(
                 Vec::from(PENDING_ACKNOWLEDGEMENTS_PREFIX.as_bytes()).into_boxed_slice(),
-                EthereumChallenge::size(),
+                EthereumChallenge::SIZE as u32,
                 &|pending: &PendingAcknowledgement| match pending {
                     PendingAcknowledgement::WaitingAsSender => false,
                     PendingAcknowledgement::WaitingAsRelayer(unack) => filter
@@ -296,11 +295,12 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         self.db.batch(batch_ops, true).await
     }
 
-    async fn get_commitment(&self, channel: &Hash, iteration: usize) -> Result<Option<Hash>> {
-        self.db
-            .get_or_none::<Intermediate>(to_commitment_key(channel, iteration)?)
-            .await
-            .map(|opt| opt.map(|i| Hash::new(&i.intermediate)))
+    async fn get_commitment(&self, channel_id: &Hash, iteration: usize) -> Result<Option<Hash>> {
+        Ok(self
+            .db
+            .get_or_none::<Intermediate>(to_commitment_key(channel_id, iteration)?)
+            .await?
+            .map(|opt| Hash::new(&opt.intermediate)))
     }
 
     async fn get_current_commitment(&self, channel: &Hash) -> Result<Option<Hash>> {
@@ -377,7 +377,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
 
     async fn get_public_node_accounts(&self) -> Result<Vec<AccountEntry>> {
         self.db
-            .get_more::<AccountEntry>(Box::from(ACCOUNT_PREFIX.as_bytes()), Address::size(), &|x| {
+            .get_more::<AccountEntry>(Box::from(ACCOUNT_PREFIX.as_bytes()), Address::SIZE as u32, &|x| {
                 x.contains_routing_info()
             })
             .await
@@ -386,34 +386,35 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
     async fn get_redeemed_tickets_value(&self) -> Result<Balance> {
         let key = utils_db::db::Key::new_from_str(REDEEMED_TICKETS_VALUE)?;
 
-        self.db
+        Ok(self
+            .db
             .get_or_none::<Balance>(key)
-            .await
-            .map(|v| v.unwrap_or(Balance::zero(BalanceType::HOPR)))
+            .await?
+            .unwrap_or(Balance::zero(BalanceType::HOPR)))
     }
 
     async fn get_redeemed_tickets_count(&self) -> Result<usize> {
         let key = utils_db::db::Key::new_from_str(REDEEMED_TICKETS_COUNT)?;
 
-        self.db.get_or_none::<usize>(key).await.map(|v| v.unwrap_or(0))
+        Ok(self.db.get_or_none::<usize>(key).await?.unwrap_or(0))
     }
 
     async fn get_neglected_tickets_count(&self) -> Result<usize> {
         let key = utils_db::db::Key::new_from_str(NEGLECTED_TICKET_COUNT)?;
 
-        self.db.get_or_none::<usize>(key).await.map(|v| v.unwrap_or(0))
+        Ok(self.db.get_or_none::<usize>(key).await?.unwrap_or(0))
     }
 
     async fn get_pending_tickets_count(&self) -> Result<usize> {
         let key = utils_db::db::Key::new_from_str(PENDING_TICKETS_COUNT)?;
 
-        self.db.get_or_none::<usize>(key).await.map(|v| v.unwrap_or(0))
+        Ok(self.db.get_or_none::<usize>(key).await?.unwrap_or(0))
     }
 
     async fn get_losing_tickets_count(&self) -> Result<usize> {
         let key = utils_db::db::Key::new_from_str(LOSING_TICKET_COUNT)?;
 
-        self.db.get_or_none::<usize>(key).await.map(|v| v.unwrap_or(0))
+        Ok(self.db.get_or_none::<usize>(key).await?.unwrap_or(0))
     }
 
     async fn resolve_pending(&mut self, address: &Address, balance: &Balance, snapshot: &Snapshot) -> Result<()> {
@@ -584,6 +585,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         self.db.batch(batch_ops, true).await
     }
 
+    /// Checks whether network registry is enabled. Default: true
     async fn is_network_registry_enabled(&self) -> Result<bool> {
         let key = utils_db::db::Key::new_from_str(NETWORK_REGISTRY_ENABLED_PREFIX)?;
         Ok(self.db.get_or_none::<bool>(key.clone()).await?.unwrap_or(true))
@@ -603,16 +605,23 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         self.db.batch(batch_ops, true).await
     }
 
+    /// Adds an additional chain address to an Ethereum account that has staked tokens.
+    ///
+    /// - `address`: the additional address to add
+    /// - `stake_account`: the account that has staked tokens
+    /// - `snapshot`: the latest chain snapshot
     async fn add_to_network_registry(
         &mut self,
-        public_key: &PublicKey,
-        account: &Address,
+        address: &Address,
+        stake_account: &Address,
         snapshot: &Snapshot,
     ) -> Result<()> {
-        let mut public_keys = self.find_hopr_node_using_account_in_network_registry(&account).await?;
+        let mut addresses = self
+            .find_hopr_node_using_account_in_network_registry(&stake_account)
+            .await?;
 
-        for pk in public_keys.iter() {
-            if public_key == pk {
+        for addr in addresses.iter() {
+            if address == addr {
                 let _ = self
                     .db
                     .set(
@@ -624,19 +633,18 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             }
         }
 
-        public_keys.push(public_key.clone());
+        addresses.push(address.clone());
 
         let mut batch_ops = utils_db::db::Batch::new();
-        // node public key to address (N->1)
-        let curve_point: core_crypto::types::CurvePoint = public_key.into();
+        // node chain address to stake address (N->1)
         batch_ops.put(
-            utils_db::db::Key::new_with_prefix(&curve_point, NETWORK_REGISTRY_HOPR_NODE_PREFIX)?,
-            account,
+            utils_db::db::Key::new_with_prefix(address, NETWORK_REGISTRY_HOPR_NODE_PREFIX)?,
+            stake_account,
         );
-        // address to node public keys (1->M)
+        // stake address to node chain address (1->M)
         batch_ops.put(
-            utils_db::db::Key::new_with_prefix(account, NETWORK_REGISTRY_ADDRESS_PUBLIC_KEY_PREFIX)?,
-            &public_keys,
+            utils_db::db::Key::new_with_prefix(stake_account, NETWORK_REGISTRY_ADDRESS_CHAIN_KEY_PREFIX)?,
+            addresses,
         );
         batch_ops.put(
             utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?,
@@ -646,28 +654,31 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         self.db.batch(batch_ops, true).await
     }
 
+    /// Removes a node from the network registry
+    ///
+    /// - `address`: the address to remove
+    /// - `stake_account`: the stake account from which the address should be removed
+    /// - `snapshot`: latest chain snapshot
     async fn remove_from_network_registry(
         &mut self,
-        public_key: &PublicKey,
-        account: &Address,
+        address: &Address,
+        stake_account: &Address,
         snapshot: &Snapshot,
     ) -> Result<()> {
         let registered_nodes = self
-            .find_hopr_node_using_account_in_network_registry(account)
+            .find_hopr_node_using_account_in_network_registry(stake_account)
             .await?
             .into_iter()
-            .filter(|pk| pk != public_key)
+            .filter(|addr| !addr.eq(address))
             .collect::<Vec<_>>();
-
-        let curve_point: core_crypto::types::CurvePoint = public_key.into();
 
         let mut batch_ops = utils_db::db::Batch::new();
         batch_ops.del(utils_db::db::Key::new_with_prefix(
-            &curve_point,
+            address,
             NETWORK_REGISTRY_HOPR_NODE_PREFIX,
         )?);
         batch_ops.put(
-            utils_db::db::Key::new_with_prefix(account, NETWORK_REGISTRY_ADDRESS_PUBLIC_KEY_PREFIX)?,
+            utils_db::db::Key::new_with_prefix(stake_account, NETWORK_REGISTRY_ADDRESS_CHAIN_KEY_PREFIX)?,
             &registered_nodes,
         );
         batch_ops.put(
@@ -678,32 +689,42 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         self.db.batch(batch_ops, true).await
     }
 
-    async fn get_account_from_network_registry(&self, public_key: &PublicKey) -> Result<Option<Address>> {
-        let curve_point: core_crypto::types::CurvePoint = public_key.into();
-        let key = utils_db::db::Key::new_with_prefix(&curve_point, NETWORK_REGISTRY_HOPR_NODE_PREFIX)?;
+    /// Gets the stake account that registered to this node
+    ///
+    /// - `address`: the node's chain address
+    async fn get_account_from_network_registry(&self, address: &Address) -> Result<Option<Address>> {
+        let key = utils_db::db::Key::new_with_prefix(address, NETWORK_REGISTRY_HOPR_NODE_PREFIX)?;
 
         self.db.get_or_none::<Address>(key).await
     }
 
-    async fn find_hopr_node_using_account_in_network_registry(&self, account: &Address) -> Result<Vec<PublicKey>> {
+    /// Gets the registered accounts associated to this stake account
+    ///
+    /// - `stake_account`: the account which staked tokens
+    async fn find_hopr_node_using_account_in_network_registry(&self, stake_account: &Address) -> Result<Vec<Address>> {
         // NOTE: behavioral change, this method does not panic, when no results are found,
         // its returns an empty Vec instead
 
-        let key = utils_db::db::Key::new_with_prefix(account, NETWORK_REGISTRY_ADDRESS_PUBLIC_KEY_PREFIX)?;
-        self.db
-            .get_or_none::<Vec<PublicKey>>(key)
-            .await
-            .map(|v| v.unwrap_or(Vec::new()))
+        let key = utils_db::db::Key::new_with_prefix(stake_account, NETWORK_REGISTRY_ADDRESS_CHAIN_KEY_PREFIX)?;
+        Ok(self.db.get_or_none::<Vec<Address>>(key).await?.unwrap_or(vec![]))
     }
 
-    async fn is_eligible(&self, account: &Address) -> Result<bool> {
-        let key = utils_db::db::Key::new_with_prefix(account, NETWORK_REGISTRY_ADDRESS_ELIGIBLE_PREFIX)?;
+    /// Checks if an stake account is eligible to register nodes
+    ///
+    /// - `stake_account`: the account to check
+    async fn is_eligible(&self, stake_account: &Address) -> Result<bool> {
+        let key = utils_db::db::Key::new_with_prefix(stake_account, NETWORK_REGISTRY_ADDRESS_ELIGIBLE_PREFIX)?;
 
-        self.db.get_or_none::<bool>(key).await.map(|v| v.unwrap_or(false))
+        Ok(self.db.get_or_none::<bool>(key).await?.unwrap_or(false))
     }
 
-    async fn set_eligible(&mut self, account: &Address, eligible: bool, snapshot: &Snapshot) -> Result<()> {
-        let key = utils_db::db::Key::new_with_prefix(account, NETWORK_REGISTRY_ADDRESS_ELIGIBLE_PREFIX)?;
+    /// Sets the eligibility status of an account
+    ///
+    /// - `stake_account`: the account whose eligibility to be set
+    /// - `eligible`: true if `stake_account` is now eligible
+    /// - `snapshot`: latest chain snapshot
+    async fn set_eligible(&mut self, stake_account: &Address, eligible: bool, snapshot: &Snapshot) -> Result<()> {
+        let key = utils_db::db::Key::new_with_prefix(stake_account, NETWORK_REGISTRY_ADDRESS_ELIGIBLE_PREFIX)?;
 
         let mut batch_ops = utils_db::db::Batch::new();
 
@@ -743,7 +764,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use super::{CoreEthereumDb, HoprCoreEthereumDbActions, PublicKey, DB};
+    use super::{CoreEthereumDb, HoprCoreEthereumDbActions, DB};
     use async_lock::RwLock;
     use core_crypto::iterated_hash::IteratedHash;
     use core_crypto::types::Hash;
@@ -800,7 +821,7 @@ pub mod wasm {
     to_iterable!(WasmVecAcknowledgedTicket, AcknowledgedTicket);
     to_iterable!(WasmVecChannelEntry, ChannelEntry);
     to_iterable!(WasmVecAccountEntry, AccountEntry);
-    to_iterable!(WasmVecPublicKey, PublicKey);
+    to_iterable!(WasmVecAddress, Address);
 
     #[derive(Clone)]
     #[wasm_bindgen]
@@ -1149,46 +1170,43 @@ pub mod wasm {
         #[wasm_bindgen]
         pub async fn add_to_network_registry(
             &self,
-            public_key: &PublicKey,
+            address: &Address,
             account: &Address,
             snapshot: &Snapshot,
         ) -> Result<(), JsValue> {
             let data = self.core_ethereum_db.clone();
             let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.add_to_network_registry(public_key, account, snapshot).await)
+            utils_misc::ok_or_jserr!(db.add_to_network_registry(address, account, snapshot).await)
         }
 
         #[wasm_bindgen]
         pub async fn remove_from_network_registry(
             &self,
-            public_key: &PublicKey,
+            address: &Address,
             account: &Address,
             snapshot: &Snapshot,
         ) -> Result<(), JsValue> {
             let data = self.core_ethereum_db.clone();
             let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.remove_from_network_registry(public_key, account, snapshot).await)
+            utils_misc::ok_or_jserr!(db.remove_from_network_registry(address, account, snapshot).await)
         }
 
         #[wasm_bindgen]
-        pub async fn get_account_from_network_registry(
-            &self,
-            public_key: &PublicKey,
-        ) -> Result<Option<Address>, JsValue> {
+        pub async fn get_account_from_network_registry(&self, address: &Address) -> Result<Option<Address>, JsValue> {
             let data = self.core_ethereum_db.clone();
             let db = data.read().await;
-            utils_misc::ok_or_jserr!(db.get_account_from_network_registry(public_key).await)
+            utils_misc::ok_or_jserr!(db.get_account_from_network_registry(address).await)
         }
 
         #[wasm_bindgen]
         pub async fn find_hopr_node_using_account_in_network_registry(
             &self,
             account: &Address,
-        ) -> Result<WasmVecPublicKey, JsValue> {
+        ) -> Result<WasmVecAddress, JsValue> {
             let data = self.core_ethereum_db.clone();
             let db = data.read().await;
             utils_misc::ok_or_jserr!(db.find_hopr_node_using_account_in_network_registry(account).await)
-                .map(|v| WasmVecPublicKey::from(v))
+                .map(|v| WasmVecAddress::from(v))
         }
 
         #[wasm_bindgen]
@@ -1237,7 +1255,10 @@ pub mod wasm {
 mod tests {
     use super::*;
     use core_types::channels::ChannelEntry;
-    use std::sync::{Arc, Mutex};
+    use std::{
+        str::FromStr,
+        sync::{Arc, Mutex},
+    };
     use utils_db::db::serialize_to_bytes;
     use utils_db::leveldb::rusty::RustyLevelDbShim;
     use utils_types::primitives::{Address, EthereumChallenge};
@@ -1294,6 +1315,53 @@ mod tests {
 
         assert!(serialized.is_ok());
         assert_eq!(serialized.unwrap().len(), ChannelEntry::SIZE)
+    }
+
+    #[async_std::test]
+    async fn test_network_registry_workflow() {
+        let level_db = Arc::new(Mutex::new(
+            rusty_leveldb::DB::open("test", rusty_leveldb::in_memory()).unwrap(),
+        ));
+
+        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(level_db)), Address::random());
+
+        assert_eq!(db.is_network_registry_enabled().await, Ok(true));
+        assert!(db.set_network_registry(true, &Snapshot::default()).await.is_ok());
+        let test_stake_address = Address::from_str("0xe3386e9810582f596562d3fbd8afcad0fb698169").unwrap();
+
+        assert_eq!(db.is_eligible(&test_stake_address).await, Ok(false));
+
+        assert_eq!(
+            db.find_hopr_node_using_account_in_network_registry(&test_stake_address)
+                .await
+                .unwrap(),
+            vec![]
+        );
+
+        let test_chain_address = Address::from_str("0x7b6d32830bafb0212c092d33290d4cd2344b493a").unwrap();
+
+        assert!(db
+            .set_eligible(&test_stake_address, true, &Snapshot::default())
+            .await
+            .is_ok());
+
+        assert_eq!(db.is_eligible(&test_stake_address).await, Ok(true));
+
+        assert!(db
+            .add_to_network_registry(&test_chain_address, &test_stake_address, &Snapshot::default())
+            .await
+            .is_ok());
+
+        assert_eq!(
+            db.find_hopr_node_using_account_in_network_registry(&test_stake_address)
+                .await,
+            Ok(vec![test_chain_address])
+        );
+
+        assert_eq!(
+            db.get_account_from_network_registry(&test_chain_address).await,
+            Ok(Some(test_stake_address))
+        )
     }
 
     #[async_std::test]

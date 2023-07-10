@@ -24,6 +24,7 @@ wasm-bindgen-futures = { version = "0.4.36", features = ["futures-core-03-stream
 
 core-crypto = { path = "../../../core/crates/core-crypto", default-features = false }
 core-ethereum-db = { path = "../core-ethereum-db", default-features = false }
+core-types = { path = "../../../core/crates/core-types", default-features = false }
 utils-db = { path = "../../../utils/crates/utils-db", default-features = false }
 utils-misc = { path = "../../../utils/crates/utils-misc", default-features = false }
 utils-log = { path = "../../../utils/crates/utils-log", default-features = false }
@@ -31,7 +32,6 @@ utils-types = { path = "../../../utils/crates/utils-types", default-features = f
 
 [dev-dependencies]
 env_logger = "0.10"
-core-types = { path = "../../../core/crates/core-types" }
 mockall = "0.11.4"
 hex-literal = "0.4"
 
@@ -50,5 +50,5 @@ wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
 default = ["console_error_panic_hook", "wasm"]
-wasm = [ "dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "core-crypto/wasm", "core-ethereum-db/wasm", "utils-db/wasm", "utils-log/wasm", "utils-types/wasm", "utils-misc/wasm" ]
+wasm = [ "dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "core-crypto/wasm", "core-ethereum-db/wasm", "core-types/wasm", "utils-db/wasm", "utils-log/wasm", "utils-types/wasm", "utils-misc/wasm" ]
 console_error_panic_hook = [ "dep:console_error_panic_hook" ]

@@ -16,7 +16,9 @@ import {
   initialize_commitment,
   find_commitment_preimage,
   bump_commitment,
-  ChannelCommitmentInfo
+  ChannelCommitmentInfo,
+  is_allowed_to_access_network,
+  redeem_ticket
 } from '../../core/lib/core_hopr.js'
 
 core_hopr_initialize_crate()
@@ -38,5 +40,7 @@ export {
   find_commitment_preimage,
   bump_commitment,
   ChannelCommitmentInfo,
-  CORE_ETHEREUM_CONSTANTS
+  CORE_ETHEREUM_CONSTANTS,
+  is_allowed_to_access_network,
+  redeem_ticket
 }
