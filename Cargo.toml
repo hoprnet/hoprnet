@@ -31,4 +31,3 @@ wasm-bindgen = "0.2.86"
 # Tell `rustc` to optimize for small code size.
 opt-level = "s"
 #debug=true
-# Detect changes
