@@ -173,9 +173,3 @@ jobs:
           name: hopr-linux-smoke-test-logs
           path: |
             /tmp/hopr-smoke-test*.log
-
-      - name: Send notification if anything failed on master or release branches
-        if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT }}
-        run: |
-          ./scripts/notify-matrix-github-workflow-failure.sh "${MATRIX_ROOM}" "${{ github.repository }}" \
-            "${{ github.workflow }}" "${{ github.run_id }}"
