@@ -8,9 +8,6 @@ on:
       - release/*
     types:
       - synchronize
-  push:
-    branches:
-      - master
 concurrency:
   group: ${{ github.head_ref }}-build
   cancel-in-progress: true
