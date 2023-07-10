@@ -11,9 +11,9 @@ env:
 
 on:
   pull_request:
-    branches:
-      - master
-      - release/*
+    # branches:
+    #   - master
+    #   - release/*
     types:
       - synchronize
     paths-ignore:
