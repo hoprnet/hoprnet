@@ -50,9 +50,9 @@ jobs:
           new_version=$(./scripts/get-package-version.sh | sed 's/+/-/')
           echo "DOCKER_TAG=${new_version}" >> $GITHUB_ENV
 
-          if [ "${{ inputs.build_toolchain }}" == "true" ];
+          if [ "${{ inputs.build_toolchain }}" == "true" ]; then
             echo "TOOLCHAIN_IMAGE_TAG=${new_version}" >> $GITHUB_ENV
-          then
+          else
             echo "TOOLCHAIN_IMAGE_TAG=latest" >> $GITHUB_ENV
           fi
 
