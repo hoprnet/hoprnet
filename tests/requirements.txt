@@ -1,5 +1,5 @@
 black==23.3.0
-hoprd @ git+https://github.com/hoprnet/hoprd-sdk-python.git@main
+hoprd-sdk-python @ git+https://github.com/hoprnet/hoprd-sdk-python.git@main
 requests==2.28.2
 rlp==3.0.0
 ruff==0.0.261
