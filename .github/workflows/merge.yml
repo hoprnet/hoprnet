@@ -7,7 +7,7 @@ on:
       - release/*
     types:
       - closed
-      # - synchronize
+      - synchronize
 
 concurrency:
   group: merge
@@ -214,16 +214,19 @@ jobs:
           FAUCET_SECRET_API_KEY: ${{ secrets.FAUCET_SECRET_API_KEY }}
           ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN }}
 
-      # - name: Notify Success
-      #   if: ${{ success() && !env.ACT }}
-      #   run: |
-      #     ./scripts/notify-matrix-cluster-info.sh
-      #   env:
-      #     MATRIX_ROOM: ${{ env.MATRIX_CLUSTER_INFO_ROOM }}
-      #     HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
+      - name: Notify Success
+        if: ${{ success() }}
+        run: |
+          ./scripts/notify-matrix-cluster-info.sh
+        env:
+          MATRIX_ROOM: ${{ env.MATRIX_CLUSTER_INFO_ROOM }}
+          HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
 
-      # - name: Notify Failure
-      #   if: ${{ failure() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/') || startsWith(github.ref, 'refs/heads/staging/')) && !env.ACT }}
-      #   run: |
-      #     ./scripts/notify-matrix-github-workflow-failure.sh "${MATRIX_ROOM}" "${{ github.repository }}" \
-      #       "${{ github.workflow }}" "${{ github.run_id }}"
+      - name: Notify Failure
+        if: ${{ failure() }}
+        run: |
+          ./scripts/notify-matrix-github-workflow-failure.sh "${MATRIX_ROOM}" "${{ github.repository }}" \
+            "${{ github.workflow }}" "${{ github.run_id }}"
+
+
+
