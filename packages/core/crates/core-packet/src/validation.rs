@@ -137,7 +137,7 @@ mod tests {
         impl HoprCoreEthereumDbActions for Db {
             async fn get_current_ticket_index(&self, channel_id: &Hash) -> core_ethereum_db::errors::Result<Option<U256>>;
             async fn set_current_ticket_index(&mut self, channel_id: &Hash, index: U256) -> core_ethereum_db::errors::Result<()>;
-            async fn get_tickets(&self, signer: Option<PublicKey>) -> core_ethereum_db::errors::Result<Vec<Ticket>>;
+            async fn get_tickets(&self, signer: Option<Address>) -> core_ethereum_db::errors::Result<Vec<Ticket>>;
             async fn mark_rejected(&mut self, ticket: &Ticket) -> core_ethereum_db::errors::Result<()>;
             async fn check_and_set_packet_tag(&mut self, tag: &[u8]) -> core_ethereum_db::errors::Result<bool>;
             async fn get_pending_acknowledgement(
@@ -572,13 +572,13 @@ mod tests {
         let level_db = Arc::new(Mutex::new(
             rusty_leveldb::DB::open("test", rusty_leveldb::in_memory()).unwrap(),
         ));
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(level_db)), SENDER_PUB.clone());
+        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(level_db)), SENDER_PUB.to_address());
 
         let hkc = HalfKeyChallenge::new(&random_bytes::<{ HalfKeyChallenge::SIZE }>());
         let unack = UnacknowledgedTicket::new(
             create_valid_ticket(),
             HalfKey::new(&random_bytes::<{ HalfKey::SIZE }>()),
-            SENDER_PUB.clone(),
+            SENDER_PUB.to_address(),
         );
 
         db.store_pending_acknowledgment(hkc.clone(), PendingAcknowledgement::WaitingAsRelayer(unack))
@@ -599,7 +599,7 @@ mod tests {
                     ticket.ticket,
                     Response::new(&random_bytes::<{ Response::SIZE }>()),
                     Hash::new(&random_bytes::<{ Hash::SIZE }>()),
-                    SENDER_PUB.clone(),
+                    SENDER_PUB.to_address(),
                 );
                 db.replace_unack_with_ack(&hkc, ack).await.unwrap();
 
@@ -618,7 +618,7 @@ mod tests {
         let level_db = Arc::new(Mutex::new(
             rusty_leveldb::DB::open("test", rusty_leveldb::in_memory()).unwrap(),
         ));
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(level_db)), SENDER_PUB.clone());
+        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(level_db)), SENDER_PUB.to_address());
 
         let dummy_channel = Hash::new(&[0xffu8; Hash::SIZE]);
         let dummy_index = U256::one();

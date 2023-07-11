@@ -1,4 +1,4 @@
-#[cfg(not(feature = "wasm"))]
+#[cfg(any(not(feature = "wasm"), test))]
 pub mod native {
     use crate::error::{RealError, Result};
     use std::fs;

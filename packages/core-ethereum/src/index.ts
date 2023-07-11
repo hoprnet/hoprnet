@@ -323,7 +323,7 @@ export default class HoprCoreEthereum extends EventEmitter {
   }
 
   public async redeemTicketsInChannelByCounterparty(counterparty: Address) {
-    const channel = await this.db.get_channel_from(counterparty)
+    const channel = await this.db.get_channel_from(Ethereum_Address.deserialize(counterparty.serialize()))
     return this.redeemTicketsInChannel(ChannelEntry.deserialize(channel.serialize()))
   }
 
@@ -516,7 +516,15 @@ export default class HoprCoreEthereum extends EventEmitter {
       throw Error('Initialize incoming channel closure currently is not supported.')
     }
 
-    const c = ChannelEntry.deserialize((await this.db.get_channel_x(src, dest)).serialize())
+    const c = ChannelEntry.deserialize(
+      (
+        await this.db.get_channel_x(
+          Ethereum_Address.deserialize(src.serialize()),
+          Ethereum_Address.deserialize(dest.serialize())
+        )
+      ).serialize()
+    )
+
     if (c.status !== ChannelStatus.Open && c.status !== ChannelStatus.WaitingForCommitment) {
       throw Error('Channel status is not OPEN or WAITING FOR COMMITMENT')
     }
@@ -530,7 +538,15 @@ export default class HoprCoreEthereum extends EventEmitter {
     if (!this.publicKey.to_address().eq(src)) {
       throw Error('Finalizing incoming channel closure currently is not supported.')
     }
-    const c = ChannelEntry.deserialize((await this.db.get_channel_x(src, dest)).serialize())
+    const c = ChannelEntry.deserialize(
+      (
+        await this.db.get_channel_x(
+          Ethereum_Address.deserialize(src.serialize()),
+          Ethereum_Address.deserialize(dest.serialize())
+        )
+      ).serialize()
+    )
+
     if (c.status !== ChannelStatus.PendingToClose) {
       throw Error('Channel status is not PENDING_TO_CLOSE')
     }
@@ -543,8 +559,13 @@ export default class HoprCoreEthereum extends EventEmitter {
     // channel may not exist, we can still open it
     let c: ChannelEntry
     try {
-      c = ChannelEntry.deserialize((await this.db.get_channel_to(dest)).serialize())
-    } catch {}
+      c = ChannelEntry.deserialize(
+        (await this.db.get_channel_to(Ethereum_Address.deserialize(dest.serialize()))).serialize()
+      )
+    } catch {
+      log(`failed to retrieve channel information`)
+    }
+
     if (c && c.status !== ChannelStatus.Closed) {
       throw Error('Channel is already opened')
     }

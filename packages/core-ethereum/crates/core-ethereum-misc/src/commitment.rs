@@ -170,7 +170,7 @@ mod tests {
     use utils_db::db::DB;
     use utils_db::leveldb::rusty::RustyLevelDbShim;
     use utils_types::primitives::BalanceType::HOPR;
-    use utils_types::primitives::{Balance, Snapshot, U256};
+    use utils_types::primitives::{Address, Balance, Snapshot, U256};
 
     const PRIV_KEY: [u8; 32] = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
 
@@ -189,8 +189,8 @@ mod tests {
         env_logger::init();
 
         let channel = ChannelEntry {
-            source: PublicKey::random(),
-            destination: PublicKey::random(),
+            source: Address::random(),
+            destination: Address::random(),
             balance: Balance::zero(HOPR),
             commitment: Default::default(),
             ticket_epoch: U256::zero(),

@@ -190,7 +190,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             .db
             .get_more::<PendingAcknowledgement>(
                 Vec::from(PENDING_ACKNOWLEDGEMENTS_PREFIX.as_bytes()).into_boxed_slice(),
-                EthereumChallenge::size(),
+                EthereumChallenge::SIZE as u32,
                 &|pending: &PendingAcknowledgement| match pending {
                     PendingAcknowledgement::WaitingAsSender => false,
                     PendingAcknowledgement::WaitingAsRelayer(unack) => filter
@@ -375,7 +375,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
 
     async fn get_public_node_accounts(&self) -> Result<Vec<AccountEntry>> {
         self.db
-            .get_more::<AccountEntry>(Box::from(ACCOUNT_PREFIX.as_bytes()), Address::size(), &|x| {
+            .get_more::<AccountEntry>(Box::from(ACCOUNT_PREFIX.as_bytes()), Address::SIZE as u32, &|x| {
                 x.contains_routing_info()
             })
             .await
@@ -1293,7 +1293,7 @@ mod tests {
         let level_db = Arc::new(Mutex::new(
             rusty_leveldb::DB::open("test", rusty_leveldb::in_memory()).unwrap(),
         ));
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(level_db)), PublicKey::random());
+        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(level_db)), Address::random());
 
         let token_id = "test";
 
