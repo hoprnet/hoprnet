@@ -940,9 +940,7 @@ mod tests {
                     channel_epoch: previous_channel.clone().unwrap().channel_epoch.clone(),
                 };
 
-                let commiter = |_| async { None };
-
-                initialize_commitment(&mut db, &PEERS_PRIVS[0], &channel_info, commiter)
+                initialize_commitment(&mut db, &PEERS_PRIVS[0], &channel_info)
                     .await
                     .map_err(|e| PacketDbError(DbError::GenericError(e.to_string())))?;
             }
