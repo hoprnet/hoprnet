@@ -1,0 +1,84 @@
+{
+  "id" : 1,
+  "name" : "Name",
+  "description" : "Description",
+  "lastModifiedDate" : "2023-07-11T09:14:09Z",
+  "properties" : {
+    "structurizr.dsl" : "d29ya3NwYWNlIHsKICAhZG9jcyBkb2NzCgogICAgbW9kZWwgewogICAgICAgIHVzZXIgPSBwZXJzb24gIlVzZXIiCiAgICAgICAgc29mdHdhcmVTeXN0ZW0gPSBzb2Z0d2FyZVN5c3RlbSAiU29mdHdhcmUgU3lzdGVtIgoKICAgICAgICB1c2VyIC0+IHNvZnR3YXJlU3lzdGVtICJVc2VzIgogICAgfQoKICAgIHZpZXdzIHsKICAgICAgICBzeXN0ZW1Db250ZXh0IHNvZnR3YXJlU3lzdGVtICJEaWFncmFtMSIgewogICAgICAgICAgICBpbmNsdWRlICoKICAgICAgICAgICAgYXV0b0xheW91dAogICAgICAgIH0KICAgIH0KCn0K"
+  },
+  "configuration" : { },
+  "model" : {
+    "people" : [ {
+      "id" : "1",
+      "tags" : "Element,Person",
+      "properties" : {
+        "structurizr.dsl.identifier" : "user"
+      },
+      "name" : "User",
+      "relationships" : [ {
+        "id" : "3",
+        "tags" : "Relationship",
+        "properties" : {
+          "structurizr.dsl.identifier" : "aa2b175b-a798-4d52-a9d1-f854c50b530b"
+        },
+        "sourceId" : "1",
+        "destinationId" : "2",
+        "description" : "Uses"
+      } ],
+      "location" : "Unspecified"
+    } ],
+    "softwareSystems" : [ {
+      "id" : "2",
+      "tags" : "Element,Software System",
+      "properties" : {
+        "structurizr.dsl.identifier" : "softwaresystem"
+      },
+      "name" : "Software System",
+      "location" : "Unspecified",
+      "documentation" : { }
+    } ]
+  },
+  "documentation" : {
+    "sections" : [ {
+      "content" : "# HOPR Technical Design Documentation\n\nspace for technical design docs\n\n![](embed:hopr-logo)\n",
+      "format" : "Markdown",
+      "filename" : "01-context.md",
+      "order" : 1,
+      "title" : ""
+    } ]
+  },
+  "views" : {
+    "systemContextViews" : [ {
+      "key" : "Diagram1",
+      "order" : 1,
+      "softwareSystemId" : "2",
+      "automaticLayout" : {
+        "implementation" : "Graphviz",
+        "rankDirection" : "TopBottom",
+        "rankSeparation" : 300,
+        "nodeSeparation" : 300,
+        "edgeSeparation" : 0,
+        "vertices" : false
+      },
+      "enterpriseBoundaryVisible" : true,
+      "elements" : [ {
+        "id" : "1",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "2",
+        "x" : 0,
+        "y" : 0
+      } ],
+      "relationships" : [ {
+        "id" : "3"
+      } ]
+    } ],
+    "configuration" : {
+      "branding" : { },
+      "styles" : { },
+      "terminology" : { },
+      "lastSavedView" : "Diagram1"
+    }
+  }
+}

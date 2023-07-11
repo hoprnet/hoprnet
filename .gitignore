@@ -234,4 +234,5 @@ debug-identity
 !/vendor/**/*
 
 # design docs
-/docs/architecture/.structurizr
+/docs/design/.structurizr
+/docs/design/workspace.dsl

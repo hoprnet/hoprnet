@@ -5,7 +5,7 @@ all: help
 .PHONY: start-structurizr
 start-structurizr: ## start structurizr Docker container
 	@echo
-	@echo "Visit http://localhost:8080/workspace once the process has started"
+	@echo "Visit http://localhost:8080/workspace/documentation once the process has started"
 	@echo
 	docker run --pull always -it --rm -p 8080:8080 \
 		-v `pwd`:/usr/local/structurizr structurizr/lite
