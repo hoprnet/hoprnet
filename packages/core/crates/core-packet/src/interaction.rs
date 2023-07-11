@@ -62,6 +62,7 @@ const PREIMAGE_PLACE_HOLDER: [u8; Hash::SIZE] = [0xffu8; Hash::SIZE];
 
 /// Represents a payload (packet or acknowledgement) at the transport level.
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+#[derive(Debug)]
 pub struct Payload {
     remote_peer: PeerId,
     data: Box<[u8]>,
@@ -172,6 +173,8 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
     /// Start processing the incoming acknowledgement queue.
     pub async fn handle_incoming_acknowledgements(&self) {
         while let Ok(payload) = self.incoming_channel.1.recv().await {
+            debug!("handle incoming acknowledgement loop iteration {:?}", payload);
+
             match Acknowledgement::from_bytes(&payload.data) {
                 Ok(ack) => {
                     if let Err(e) = self.handle_acknowledgement(ack, &payload.remote_peer).await {
@@ -196,6 +199,8 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
         F: futures::Future<Output = core::result::Result<(), String>>,
     {
         while let Ok(payload) = self.outgoing_channel.1.recv().await {
+            debug!("handle incoming acknowledgement loop iteration {:?}", payload);
+
             if let Err(e) = message_transport(payload.data, payload.remote_peer.to_string()).await {
                 error!("failed to send acknowledgement to {}: {e}", payload.remote_peer);
             }
@@ -437,15 +442,17 @@ where
             &self.cfg.private_key,
         );
 
+        debug!("before mark_pending lock");
         self.db.write().await.mark_pending(&ticket).await?;
+        debug!("after mark_pending lock");
 
         debug!(
             "Creating ticket in channel {channel_id}. Ticket data: {}",
             ticket.to_hex()
         );
 
-        #[cfg(all(feature = "prometheus", not(test)))]
-        METRIC_TICKETS_COUNT.increment();
+        // #[cfg(all(feature = "prometheus", not(test)))]
+        // METRIC_TICKETS_COUNT.increment();
 
         Ok(ticket)
     }
@@ -472,14 +479,17 @@ where
 
         // Create the packet
         let packet = Packet::new(msg, &path.hops(), &self.cfg.private_key, next_ticket)?;
+        debug!("packet state {:?}", packet.state());
         match packet.state() {
             PacketState::Outgoing { ack_challenge, .. } => {
+                debug!("before store_pending_lock");
                 self.db
                     .write()
                     .await
                     .store_pending_acknowledgment(ack_challenge.clone(), PendingAcknowledgement::WaitingAsSender)
                     .await?;
 
+                debug!("after store_pending_lock");
                 #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_PACKETS_COUNT.increment();
 
@@ -513,7 +523,12 @@ where
 
                 Ok(ack_challenge.clone())
             }
-            _ => panic!("invalid packet state"),
+            _ => {
+                debug!("invalid packet state {:?}", packet.state());
+                Err(crate::errors::PacketError::Other(
+                    utils_types::errors::GeneralError::Other("invalid packet state".into()),
+                ))
+            }
         }
     }
 
@@ -541,9 +556,11 @@ where
                 ..
             } => {
                 // Validate if it's not a replayed packet
+                debug!("before check_and_set_packet_tag final lock");
                 if self.db.write().await.check_and_set_packet_tag(packet_tag).await? {
                     return Err(TagReplay);
                 }
+                debug!("after check_and_set_packet_tag final lock");
 
                 // We're the destination of the packet, so emit the packet contents
                 if let Some(emitter) = &self.on_final_packet {
@@ -577,9 +594,11 @@ where
                 ..
             } => {
                 // Validate if it's not a replayed packet
+                debug!("before check_and_set_packet_tag forwarded lock");
                 if self.db.write().await.check_and_set_packet_tag(packet_tag).await? {
                     return Err(TagReplay);
                 }
+                debug!("after check_and_set_packet_tag forwarded lock");
 
                 let inverse_win_prob = U256::new(INVERSE_TICKET_WIN_PROB);
 
@@ -605,7 +624,9 @@ where
                 .await
                 {
                     // Mark as reject and passthrough the error
+                    debug!("before mark_rejected forwarded lock");
                     self.db.write().await.mark_rejected(&packet.ticket).await?;
+                    debug!("after mark_rejected forwarded lock");
                     return Err(e);
                 }
 
@@ -671,6 +692,7 @@ where
         F: futures::Future<Output = core::result::Result<(), String>>,
     {
         while let Ok(payload) = self.outgoing_packets.1.recv().await {
+            debug!("handle outgoing packet loop iteration {:?}", payload);
             // Send the packet
             if let Err(e) = message_transport(payload.data, payload.remote_peer.to_string()).await {
                 error!("failed to send packet to {}: {e}", payload.remote_peer);
@@ -690,6 +712,7 @@ where
         F: futures::Future<Output = core::result::Result<(), String>>,
     {
         while let Ok(payload) = self.incoming_packets.1.recv().await {
+            debug!("handle incoming packet loop iteration {:?}", payload);
             // Add some random delay via mixer
             let mixed_packet = self.mixer.mix(payload).await;
             match Packet::from_bytes(&mixed_packet.data, &self.cfg.private_key, &mixed_packet.remote_peer) {
@@ -1471,7 +1494,7 @@ pub mod wasm {
     use std::sync::Arc;
     use std::time::Duration;
     use utils_db::leveldb::wasm::LevelDbShim;
-    use utils_log::error;
+    use utils_log::{debug, error};
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use utils_types::traits::BinarySerializable;
@@ -1501,15 +1524,15 @@ pub mod wasm {
                     match $transport_cb.call2(&this, &data, &peer) {
                         Ok(r) => {
                             let promise = js_sys::Promise::from(r);
-                            wasm_bindgen_futures::JsFuture::from(promise)
-                                .await
-                                .map(|_| ())
-                                .map_err(|x| {
-                                    x.dyn_ref::<JsString>()
-                                        .map_or("Failed to send ping message".to_owned(), |x| -> String {
-                                            x.into()
-                                        })
-                                })
+                            match wasm_bindgen_futures::JsFuture::from(promise).await {
+                                Ok(_) => Ok(()),
+                                Err(e) => {
+                                    error!("Failed to send message in packet / acknowledgement interaction");
+                                    error!("{:?}", e);
+
+                                    Err("Failed to send message in packet / acknowledgement interaction".into())
+                                }
+                            }
                         }
                         Err(e) => {
                             error!(
@@ -1551,6 +1574,8 @@ pub mod wasm {
                     let this = JsValue::null();
                     let cb = on_acknowledgement.unwrap();
                     while let Ok(ack) = ack_recv.recv().await {
+                        debug!("wasm ack recv interaction loop iteration {:?}", ack);
+
                         let param: JsValue = Uint8Array::from(ack.to_bytes().as_ref()).into();
                         if let Err(e) = cb.call1(&this, &param) {
                             error!("failed to call on_ack closure: {:?}", e.as_string());
@@ -1564,6 +1589,8 @@ pub mod wasm {
                     let this = JsValue::null();
                     let cb = on_acknowledged_ticket.unwrap();
                     while let Ok(ack) = ack_tkt_recv.recv().await {
+                        debug!("wasm ack ticket recv interaction loop iteration {:?}", ack);
+
                         let param: JsValue = Uint8Array::from(ack.to_bytes().as_ref()).into();
                         if let Err(e) = cb.call1(&this, &param) {
                             error!("failed to call on_ack_ticket closure: {:?}", e.as_string());
@@ -1639,6 +1666,7 @@ pub mod wasm {
                     let this = JsValue::null();
                     let cb = on_final_packet.unwrap();
                     while let Ok(ack) = on_msg_recv.recv().await {
+                        debug!("wasm packet interaction loop iteration {:?}", ack);
                         let param: JsValue = Uint8Array::from(ack.as_ref()).into();
                         if let Err(e) = cb.call1(&this, &param) {
                             error!("failed to call on_msg closure: {:?}", e.as_string());

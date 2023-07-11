@@ -104,9 +104,9 @@ import {
   Path,
   Payload,
   PublicKey as Packet_PublicKey,
+  Balance as Packet_Balance,
   WasmAckInteraction,
-  WasmPacketInteraction,
-  WasmVecAcknowledgedTicket
+  WasmPacketInteraction
 } from '../lib/core_hopr.js'
 core_hopr_initialize_crate()
 registerMetricsCollector(core_hopr_gather_metrics)
@@ -444,16 +444,24 @@ class Hopr extends EventEmitter {
     // react when an account's eligibility has changed
     connector.indexer.on(
       'network-registry-eligibility-changed',
-      async (_account: Address, nodes: PublicKey[], eligible: boolean) => {
+      async (_account: Address, nodeAddrs: Address[], eligible: boolean) => {
         // If account is no longer eligible to register nodes, we might need to close existing connections,
         // otherwise there is nothing to do
         if (!eligible) {
-          for (const node of nodes) {
-            this.networkPeers.unregister(node.to_peerid_str())
+          for (const nodeAddr of nodeAddrs) {
+            let pk: PublicKey
+            try {
+              pk = await connector.getPublicKeyOf(nodeAddr)
+            } catch (err) {
+              // node has not announced itself, so we don't need to care
+              return
+            }
+
+            this.networkPeers.unregister(pk.to_peerid_str())
 
             for (const conn of this.libp2pComponents
               .getConnectionManager()
-              .getConnections(peerIdFromString(node.to_peerid_str()))) {
+              .getConnections(peerIdFromString(pk.to_peerid_str()))) {
               await safeCloseConnection(conn, this.libp2pComponents, (_err) => {
                 error(`error while closing existing connection to ${conn.remotePeer.toString()}`)
               })
@@ -1413,8 +1421,14 @@ class Hopr extends EventEmitter {
     const connector = HoprCoreEthereum.getInstance()
     const channel =
       direction === 'outgoing'
-        ? await this.db.get_channel_x(this.getEthereumAddress(), counterparty)
-        : await this.db.get_channel_x(counterparty, this.getEthereumAddress())
+        ? await this.db.get_channel_x(
+            Packet_Address.deserialize(this.getEthereumAddress().serialize()),
+            Packet_Address.deserialize(counterparty.serialize())
+          )
+        : await this.db.get_channel_x(
+            Packet_Address.deserialize(counterparty.serialize()),
+            Packet_Address.deserialize(this.getEthereumAddress().serialize())
+          )
 
     if (channel === undefined) {
       log(`The requested channel for counterparty ${counterparty.toString()} does not exist`)
@@ -1506,23 +1520,21 @@ class Hopr extends EventEmitter {
   }
 
   public async getTicketStatistics() {
-    const ack = await this.db.get_acknowledged_tickets()
+    const acked_tickets = await this.db.get_acknowledged_tickets()
     const pending = await this.db.get_pending_tickets_count()
     const losing = await this.db.get_losing_tickets_count()
-    const totalValue = (ackTickets: WasmVecAcknowledgedTicket): Balance => {
-      let balance = Balance.zero(BalanceType.HOPR)
-      for (let i = 0; i < ackTickets.len(); i++) {
-        balance = balance.add(ackTickets.at(i).ticket.amount)
-      }
-      return balance
+
+    let totalValue = Packet_Balance.zero(BalanceType.HOPR)
+    for (let i = 0; i < acked_tickets.len(); i++) {
+      totalValue = totalValue.add(acked_tickets.at(i).ticket.amount)
     }
 
     return {
       pending,
       losing,
-      winProportion: ack.len() / (ack.len() + losing) || 0,
-      unredeemed: ack.len(),
-      unredeemedValue: totalValue(ack),
+      winProportion: acked_tickets.len() / (acked_tickets.len() + losing) || 0,
+      unredeemed: acked_tickets.len(),
+      unredeemedValue: totalValue.clone(),
       redeemed: await this.db.get_redeemed_tickets_count(),
       redeemedValue: await this.db.get_redeemed_tickets_value(),
       neglected: await this.db.get_neglected_tickets_count(),

@@ -123,6 +123,17 @@ impl AcknowledgedTicket {
     }
 }
 
+impl Default for AcknowledgedTicket {
+    fn default() -> Self {
+        Self {
+            ticket: Ticket::default(),
+            response: Response::default(),
+            pre_image: Hash::default(),
+            signer: Address::default(),
+        }
+    }
+}
+
 impl BinarySerializable<'_> for AcknowledgedTicket {
     const SIZE: usize = Ticket::SIZE + Response::SIZE + Hash::SIZE + Address::SIZE;
 
@@ -167,6 +178,17 @@ impl AcknowledgedTicket {
                 .eq(&self.ticket.challenge))
         .then_some(())
         .ok_or(SignatureVerification)
+    }
+}
+
+impl std::fmt::Display for AcknowledgedTicket {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AcknowledgedTicket")
+            .field("ticket", &self.ticket)
+            .field("response", &self.response)
+            .field("pre_image", &self.pre_image)
+            .field("signer", &self.signer)
+            .finish()
     }
 }
 

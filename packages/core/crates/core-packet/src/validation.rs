@@ -202,17 +202,17 @@ mod tests {
             async fn set_network_registry(&mut self, enabled: bool, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
             async fn add_to_network_registry(
                 &mut self,
-                public_key: &PublicKey,
+                public_key: &Address,
                 account: &Address,
                 snapshot: &Snapshot,
             ) -> core_ethereum_db::errors::Result<()>;
             async fn remove_from_network_registry(
                 &mut self,
-                public_key: &PublicKey,
+                public_key: &Address,
                 account: &Address,
                 snapshot: &Snapshot,
             ) -> core_ethereum_db::errors::Result<()>;
-            async fn get_account_from_network_registry(&self, public_key: &PublicKey) -> core_ethereum_db::errors::Result<Option<Address>>;
+            async fn get_account_from_network_registry(&self, public_key: &Address) -> core_ethereum_db::errors::Result<Option<Address>>;
             async fn find_hopr_node_using_account_in_network_registry(&self, account: &Address) -> core_ethereum_db::errors::Result<Vec<PublicKey>>;
             async fn is_eligible(&self, account: &Address) -> core_ethereum_db::errors::Result<bool>;
             async fn set_eligible(&mut self, account: &Address, eligible: bool, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;

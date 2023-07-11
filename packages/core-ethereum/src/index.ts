@@ -530,7 +530,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     if (totalFund.gt(myBalance)) {
       throw Error('We do not have enough balance to fund the channel')
     }
-    log(`====> fundChannel: src: ${this.publicKey.to_address()} dest: ${dest}`)
+    log(`====> fundChannel: src: ${this.publicKey.to_address().to_string()} dest: ${dest.to_string()}`)
 
     return this.chain.fundChannel(this.publicKey.to_address(), dest, myFund, counterpartyFund, (txHash: string) =>
       this.setTxHandler(`channel-updated-${txHash}`, txHash)

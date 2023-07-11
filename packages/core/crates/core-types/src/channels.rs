@@ -14,7 +14,7 @@ use utils_misc::time::wasm::current_timestamp;
 #[cfg(any(not(feature = "wasm"), test))]
 use utils_misc::time::native::current_timestamp;
 
-use utils_types::traits::BinarySerializable;
+use utils_types::traits::{BinarySerializable, ToHex};
 
 /// Describes status of a channel
 #[repr(u8)]
@@ -207,6 +207,35 @@ pub struct Ticket {
     pub win_prob: U256,
     pub channel_epoch: U256,
     pub signature: Option<Signature>,
+}
+
+impl Default for Ticket {
+    fn default() -> Self {
+        Self {
+            counterparty: Address::default(),
+            challenge: EthereumChallenge::default(),
+            epoch: U256::zero(),
+            index: U256::zero(),
+            amount: Balance::new(U256::zero(), BalanceType::HOPR),
+            win_prob: U256::max(),
+            channel_epoch: U256::zero(),
+            signature: None,
+        }
+    }
+}
+
+impl std::fmt::Display for Ticket {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Ticket")
+            .field("counterparty", &self.counterparty)
+            .field("challenge", &self.challenge)
+            .field("epoch", &self.epoch)
+            .field("index", &self.index)
+            .field("amount", &self.amount)
+            .field("channel_epoch", &self.channel_epoch)
+            .field("signature", &self.signature.as_ref().map(|s| s.to_hex()))
+            .finish()
+    }
 }
 
 /// Prefix message with "\x19Ethereum Signed Message:\n {length} {message}" and returns its hash

@@ -187,6 +187,20 @@ async function main() {
     }
   }
 
+  function stopGracefully(signal) {
+    logs.log(`Process exiting with signal ${signal}`)
+    process.exit()
+  }
+
+  process.on('uncaughtExceptionMonitor', (err, origin) => {
+    // Make sure we get a log.
+    logs.log(`FATAL ERROR, exiting with uncaught exception: ${origin} ${err}`)
+  })
+
+  process.once('exit', stopGracefully)
+  process.on('SIGINT', stopGracefully)
+  process.on('SIGTERM', stopGracefully)
+
   const setState = (newState: State): void => {
     state = newState
   }
@@ -356,20 +370,6 @@ async function main() {
     logs.logFatalError('' + e)
     process.exit(1)
   }
-
-  function stopGracefully(signal) {
-    logs.log(`Process exiting with signal ${signal}`)
-    process.exit()
-  }
-
-  process.on('uncaughtExceptionMonitor', (err, origin) => {
-    // Make sure we get a log.
-    logs.log(`FATAL ERROR, exiting with uncaught exception: ${origin} ${err}`)
-  })
-
-  process.once('exit', stopGracefully)
-  process.on('SIGINT', stopGracefully)
-  process.on('SIGTERM', stopGracefully)
 }
 
 main()

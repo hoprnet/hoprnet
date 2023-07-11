@@ -391,6 +391,10 @@ impl U256 {
         Self { value: u256::ZERO }
     }
 
+    pub fn max() -> Self {
+        Self { value: u256::MAX }
+    }
+
     pub fn one() -> Self {
         Self { value: u256::ONE }
     }

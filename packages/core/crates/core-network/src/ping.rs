@@ -346,25 +346,30 @@ pub mod wasm {
                     Box::pin(async move {
                         let this = JsValue::null();
                         let data: JsValue = js_sys::Uint8Array::from(msg.as_ref()).into();
-                        let peer: JsValue = JsString::from(peer.as_str()).into();
+                        let peer: JsValue = <JsValue as From<String>>::from(peer);
 
                         // call a send_msg_cb producing a JS promise that is further converted to a Future
                         // holding the reply of the pinged peer for the ping message.
                         match self.send_msg_cb.call2(&this, &data, &peer) {
                             Ok(r) => {
                                 let promise = js_sys::Promise::from(r);
-                                let data = wasm_bindgen_futures::JsFuture::from(promise)
-                                    .await
-                                    .map(|x| js_sys::Array::from(x.as_ref()).get(0))
-                                    .map(|x| js_sys::Uint8Array::new(&x).to_vec().into_boxed_slice())
-                                    .map_err(|x| {
-                                        x.dyn_ref::<JsString>()
-                                            .map_or("Failed to send ping message".to_owned(), |x| -> String {
-                                                x.into()
-                                            })
-                                    });
-
-                                data
+                                match wasm_bindgen_futures::JsFuture::from(promise).await {
+                                    Ok(x) => {
+                                        if x.is_undefined() {
+                                            Err("Failed to send ping message".into())
+                                        } else {
+                                            debug!("{:?}", x);
+                                            Ok(js_sys::Uint8Array::from(js_sys::Array::from(x.as_ref()).get(0))
+                                                .to_vec()
+                                                .into_boxed_slice())
+                                        }
+                                    }
+                                    Err(e) => {
+                                        error!("Failed to send ping message");
+                                        error!("{:?}", e);
+                                        Err("Failed to send ping message".into())
+                                    }
+                                }
                             }
                             Err(e) => {
                                 error!(

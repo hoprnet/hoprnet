@@ -29,9 +29,11 @@ const POST: Operation = [
 
     try {
       let ackChallenge = await req.context.node.sendMessage(message, recipient, path, hops)
+      log(`after sending message`)
       metric_successfulSendApiCalls.increment()
       return res.status(202).json(ackChallenge)
     } catch (err) {
+      log('error while sending message', err)
       metric_failedSendApiCalls.increment()
       let msg = req.body.body
       if (RPCH_MESSAGE_REGEXP.test(msg)) {

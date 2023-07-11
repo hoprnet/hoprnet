@@ -7,6 +7,7 @@ const POST: Operation = [
     const { node }: { node: Hopr } = req.context
 
     try {
+      console.log(`about to redeem tickets`)
       await node.redeemAllTickets()
       return res.status(204).send()
     } catch (err) {

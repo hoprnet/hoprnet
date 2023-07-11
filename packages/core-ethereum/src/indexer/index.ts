@@ -876,6 +876,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       new U256(newState.channelEpoch.toString()),
       new U256(newState.closureTime.toString())
     )
+    log(channel.to_string())
 
     let prevState: ChannelEntry
     let channel_entry = await this.db.get_channel(Ethereum_Hash.deserialize(channel.get_id().serialize()))
@@ -976,12 +977,15 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       let hoprNodes = await this.db.find_hopr_node_using_account_in_network_registry(
         Ethereum_Address.deserialize(account.serialize())
       )
-      let nodes: PublicKey[] = []
+      let nodes: Address[] = []
       while (hoprNodes.len() > 0) {
-        nodes.push(Ethereum_PublicKey.deserialize(hoprNodes.next().serialize(false)))
+        nodes.push(Address.deserialize(hoprNodes.next().serialize()))
       }
+
       this.emit('network-registry-eligibility-changed', account, nodes, event.args.eligibility)
-    } catch {}
+    } catch (err) {
+      log('error while changing eligibility', err)
+    }
   }
 
   private async onRegistered(
@@ -1000,7 +1004,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     assert(lastSnapshot !== undefined)
     const account = Address.from_string(event.args.account)
     await this.db.add_to_network_registry(
-      Ethereum_PublicKey.from_peerid_str(hoprNode.toString()),
+      Ethereum_PublicKey.from_peerid_str(hoprNode.toString()).to_address(),
       Ethereum_Address.deserialize(account.serialize()),
       Ethereum_Snapshot.deserialize(lastSnapshot.serialize())
     )
@@ -1021,7 +1025,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     }
     assert(lastSnapshot !== undefined)
     await this.db.remove_from_network_registry(
-      Ethereum_PublicKey.from_peerid_str(hoprNode.toString()),
+      Ethereum_PublicKey.from_peerid_str(hoprNode.toString()).to_address(),
       Ethereum_Address.from_string(event.args.account),
       Ethereum_Snapshot.deserialize(lastSnapshot.serialize())
     )

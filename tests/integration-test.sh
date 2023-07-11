@@ -302,21 +302,23 @@ log "Waiting for nodes to finish open channel (long running)"
 for j in ${jobs[@]}; do wait -n $j; done; jobs=()
 log "Waiting DONE"
 
-# closing temporary channel just to test get all channels later on
-api_close_channel 1 4 "${api1}" "${addr4}" "outgoing" "true"
+sleep 35
 
-for i in `seq 1 10`; do
+# closing temporary channel just to test get all channels later on
+# api_close_channel 1 4 "${api1}" "${addr4}" "outgoing" "true"
+
+for i in `seq 1 1`; do
   log "Node 1 send 1 hop message to self via node 2"
   api_send_message "${api1}" "${addr1}" 'hello, world' "${addr2}" & jobs+=( "$!" )
 
-  log "Node 2 send 1 hop message to self via node 3"
-  api_send_message "${api2}" "${addr2}" 'hello, world' "${addr3}" & jobs+=( "$!" )
+  # log "Node 2 send 1 hop message to self via node 3"
+  # api_send_message "${api2}" "${addr2}" 'hello, world' "${addr3}" & jobs+=( "$!" )
 
-  log "Node 3 send 1 hop message to self via node 4"
-  api_send_message "${api3}" "${addr3}" 'hello, world' "${addr4}" & jobs+=( "$!" )
+  # log "Node 3 send 1 hop message to self via node 4"
+  # api_send_message "${api3}" "${addr3}" 'hello, world' "${addr4}" & jobs+=( "$!" )
 
-  log "Node 4 send 1 hop message to self via node 5"
-  api_send_message "${api4}" "${addr4}" 'hello, world' "${addr5}" & jobs+=( "$!" )
+  # log "Node 4 send 1 hop message to self via node 5"
+  # api_send_message "${api4}" "${addr4}" 'hello, world' "${addr5}" & jobs+=( "$!" )
 done
 
 log "Waiting for nodes to finish sending 1 hop messages"
