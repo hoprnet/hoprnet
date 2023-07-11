@@ -235,4 +235,4 @@ debug-identity
 
 # design docs
 /docs/design/.structurizr
-/docs/design/workspace.dsl
+/docs/design/workspace.json
