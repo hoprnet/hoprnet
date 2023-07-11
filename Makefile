@@ -236,7 +236,7 @@ reset: clean
 test: smart-contract-test ## run unit tests for all packages, or a single package if package= is set
 ifeq ($(package),)
 	yarn workspaces foreach -pv run test
-	cargo test
+	cargo test --no-default-features
 # disabled until `wasm-bindgen-test-runner` supports ESM
 # cargo test --target wasm32-unknown-unknow
 else
@@ -302,7 +302,6 @@ kill-anvil: ## kill process running at port 8545 (default port of anvil)
 run-local: args=
 run-local: ## run HOPRd from local repo
 	env NODE_OPTIONS="--experimental-wasm-modules" NODE_ENV=development DEBUG="hopr*" node \
-		--experimental-wasm-reftypes \
 		packages/hoprd/lib/main.cjs --init --api \
 		--password="local" --identity=`pwd`/.identity-local.id \
 		--network anvil-localhost --announce \
@@ -340,10 +339,6 @@ ifeq ($(image),)
 else
 	./scripts/build-docker.sh --local --force -i $(image)
 endif
-
-.PHONY: docker-build-gcb
-docker-build-gcb: ## build Docker images on Google Cloud Build
-	./scripts/build-docker.sh --no-tags --force
 
 .PHONY: request-funds
 request-funds: ensure-environment-and-network-are-set

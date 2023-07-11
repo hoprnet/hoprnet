@@ -17,7 +17,7 @@
         "--disableApiAuthentication",
         "--data=/tmp/debug",
         "--identity=./debug-identity",
-        "--network=master"
+        "--network=rotsee"
       ],
       "env": {
         "DEBUG": "hopr*",

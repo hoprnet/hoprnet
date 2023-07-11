@@ -35,7 +35,7 @@ To stake xHOPR tokens, you can interact directly with the staking contract of th
 For the <mark>staging environment</mark>, please call the following function where the `PRIVATE_KEY` is the private key of the node runner's account. This call can only succeed if the caller (i.e. the `PRIVATE_KEY` or the node runner) has enough xHOPR (in staging environment).
 
 ```
-PRIVATE_KEY=<private key of "account"> make stake-funds network=master-staging environment_type=staging
+PRIVATE_KEY=<private key of "account"> make stake-funds network=rotsee environment_type=staging
 ```
 
 If there's not enough xHOPR token, please use "Dev Bank" account to transfer some to the node runner's account.
@@ -49,7 +49,7 @@ There are 6 "Network_registry" NFTs (3 "developer" rank and 3 of "community" ran
 For the <mark>staging environment</mark>, please call the following function where the `PRIVATE_KEY` is the private key of the node runner's account. This call can only succeed if the caller (i.e. the `PRIVATE_KEY` or the node runner) has "Network_registry" NFT (in staging environment).
 
 ```
-PRIVATE_KEY<private key of "account"> make stake-nrnft network=master-staging environment_type=staging nftrank=<rank of "Network_registry" nft>
+PRIVATE_KEY<private key of "account"> make stake-nrnft network=rotsee environment_type=staging nftrank=<rank of "Network_registry" nft>
 ```
 
 ### Register the peer ID
@@ -59,7 +59,7 @@ An eligible node runner can call `selfRegister(string[] hoprPeerIds)` method fro
 For the <mark>staging environment</mark>, please call the following function where the `PRIVATE_KEY` is the private key of the node runner's account. This call can only succeed if the caller (i.e. the `PRIVATE_KEY` of the node runner) is eligible (having enough stake or a "Network_registry" NFT).
 
 ```
-PRIVATE_KEY=<private key of “account”> make self-register-node network=master-staging environment_type=staging peer-ids=<peerId1,peerId2,peerId3>
+PRIVATE_KEY=<private key of “account”> make self-register-node network=rotsee environment_type=staging peer-ids=<peerId1,peerId2,peerId3>
 ```
 
 ## Deregister a node
@@ -69,7 +69,7 @@ A node runner can call `selfDeregister(string[] hoprPeerIds)` method from `HoprN
 For the <mark>staging environment</mark>, please call the following function where the `PRIVATE_KEY` is the private key of the node runner's account.
 
 ```
-PRIVATE_KEY=<private key of “account”> make self-deregister-node network=master-staging environment_type=staging peer-ids=<peerId1,peerId2,peerId3>
+PRIVATE_KEY=<private key of “account”> make self-deregister-node network=rotsee environment_type=staging peer-ids=<peerId1,peerId2,peerId3>
 ```
 
 ## Register a node by the Network Registry contract owner
@@ -83,8 +83,8 @@ Owner can register any account for any node. The eligibility of an account is no
 Owner can call `ownerRegister(address[] accounts, string[] hoprPeerIds)` method from `HoprNetworkRegistry` smart contract to register a list of HOPR nodes for a list of accounts respectively. Note that this registration can overwrite existing entries.
 
 ```
-make register-nodes network=master-staging environment_type=staging native_addresses=<address1,address2,address3,address4> peer_ids=<peerid1,peerid2,peerid3,peerid4>
-make force-eligibility-update network=master-staging environment_type=staging native_addresses=<address1,address2,address3,address4> eligibility=<true,false,true,true, etc>
+make register-nodes network=rotsee environment_type=staging native_addresses=<address1,address2,address3,address4> peer_ids=<peerid1,peerid2,peerid3,peerid4>
+make force-eligibility-update network=rotsee environment_type=staging native_addresses=<address1,address2,address3,address4> eligibility=<true,false,true,true, etc>
 ```
 
 ## Deregister a node
@@ -92,7 +92,7 @@ make force-eligibility-update network=master-staging environment_type=staging na
 Owner can call `ownerDeregister(string[] hoprPeerIds)` method from `HoprNetworkRegistry` smart contract to remove a list of nodes.
 
 ```
-make deregister-nodes network=master-staging environment_type=staging peer_ids=<peerId1,peerId2,peerId3,peerId4>
+make deregister-nodes network=rotsee environment_type=staging peer_ids=<peerId1,peerId2,peerId3,peerId4>
 ```
 
 ## Enable and disable globally
@@ -101,13 +101,13 @@ As mentioned in the beginning, by default, Network Registry is enabled for stagi
 To toggle the network registry, the following method can be called
 
 ```
-make disable-network-registry network=master-staging environment_type=staging
+make disable-network-registry network=rotsee environment_type=staging
 ```
 
 or
 
 ```
-make enable-network-registry network=master-staging environment_type=staging
+make enable-network-registry network=rotsee environment_type=staging
 ```
 
 ## Internal NR testing
@@ -144,13 +144,13 @@ source .env
 - Option 1: obtain a "Network_registry" NFT (with nftrank of "developer" or "community") and register your node on NR
 
   ```
-  make register-node-with-nft endpoint=<hoprd_endpoint> nftrank=<"Network_registry" NFT Rank> account=<staking_account> network=master-staging environment_type=staging
+  make register-node-with-nft endpoint=<hoprd_endpoint> nftrank=<"Network_registry" NFT Rank> account=<staking_account> network=rotsee environment_type=staging
   ```
 
 - Option 2: stake tokens and register your node on NR
 
   ```
-  make register-node-with-stake endpoint=<hoprd_endpoint> account=<staking_account> network=master-staging environment_type=staging
+  make register-node-with-stake endpoint=<hoprd_endpoint> account=<staking_account> network=rotsee environment_type=staging
   ```
 
 ### Production

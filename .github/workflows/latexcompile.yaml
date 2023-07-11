@@ -1,4 +1,4 @@
-name: build yellowpaper
+name: Yellowpaper
 
 env:
   HOPR_GITHUB_REF: ${{ github.ref }}
@@ -15,7 +15,7 @@ on:
 
 jobs:
   build_latex:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-2-core
     steps:
       - name: Set up Git repository
         uses: actions/checkout@v3

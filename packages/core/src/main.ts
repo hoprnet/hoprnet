@@ -247,7 +247,7 @@ export async function createHoprNode(
     throw err
   }
 
-  let db = new Database(levelDb, Database_PublicKey.from_peerid_str(peerId.toString()))
+  let db = new Database(levelDb, Database_PublicKey.from_peerid_str(peerId.toString()).to_address())
 
   log(`using provider URL: ${options.network.chain.default_provider}`)
   const chain = HoprCoreEthereum.createInstance(

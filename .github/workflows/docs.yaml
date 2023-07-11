@@ -1,4 +1,4 @@
-name: HOPR Generate API docs
+name: Docs
 
 env:
   HOPR_GITHUB_REF: ${{ github.ref }}
@@ -7,16 +7,24 @@ env:
   RUSTC_WRAPPER: "sccache"
 
 on:
-  push:
-    branches: ['**']
+  pull_request:
+    # branches:
+    #   - master
+    #   - release/*
+    types:
+      - synchronize
     paths-ignore:
-      - 'docs/**/*'
       - '.processes/**/*'
-
+      - 'docs/**/*'
+      - 'packages/*/docs/**/*'
+concurrency:
+  group: ${{ github.head_ref }}-docs
+  cancel-in-progress: true
 jobs:
-  docs:
-    name: Generate API docs
-    runs-on: ubuntu-latest
+  api:
+    name: API docs
+    runs-on: ubuntu-2-core
+    if: github.event.pull_request.draft == false
     steps:
       - uses: actions/checkout@v3
 
@@ -49,7 +57,7 @@ jobs:
 
       - name: get yarn cache directory path
         id: yarn-cache-dir-path
-        run: echo "dir=$(yarn config get cacheFolder)" >> $GITHUB_OUTPUT
+        run: echo "dir=$(pwd)/.yarn/cache" >> $GITHUB_OUTPUT
 
       - name: restore yarn cache
         uses: actions/cache@v3
