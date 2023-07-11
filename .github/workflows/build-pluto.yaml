@@ -57,19 +57,19 @@ jobs:
           new_version=$(./scripts/get-package-version.sh | sed 's/+/-/')
           echo "DOCKER_TAG=${new_version}" >> $GITHUB_ENV
 
-          if [ "${{ inputs.build_hoprd }}" == "true" ];
+          if [ "${{ inputs.build_hoprd }}" == "true" ]; then
             echo "HOPRD_IMAGE_TAG=${new_version}" >> $GITHUB_ENV
-          then
+          else
             echo "HOPRD_IMAGE_TAG=latest" >> $GITHUB_ENV
           fi
-          if [ "${{ inputs.build_hopli }}" == "true" ];
+          if [ "${{ inputs.build_hopli }}" == "true" ]; then
             echo "HOPLI_IMAGE_TAG=${new_version}" >> $GITHUB_ENV
-          then
+          else
             echo "HOPLI_IMAGE_TAG=latest" >> $GITHUB_ENV
           fi
-          if [ "${{ inputs.build_anvil }}" == "true" ];
+          if [ "${{ inputs.build_anvil }}" == "true" ]; then
             echo "ANVIL_IMAGE_TAG=${new_version}" >> $GITHUB_ENV
-          then
+          else
             echo "ANVIL_IMAGE_TAG=latest" >> $GITHUB_ENV
           fi
 
