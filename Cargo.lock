@@ -836,7 +836,7 @@ checksum = "245097e9a4535ee1e3e3931fcfcd55a796a44c643e8596ff6566d68f09b87bbc"
 
 [[package]]
 name = "core-crypto"
-version = "0.3.3"
+version = "0.4.0"
 dependencies = [
  "aes",
  "async-std",
@@ -874,31 +874,39 @@ dependencies = [
 
 [[package]]
 name = "core-ethereum-db"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
+ "async-lock",
+ "async-std",
  "async-trait",
  "console_error_panic_hook",
  "core-crypto",
  "core-types",
+ "rusty-leveldb",
  "serde",
+ "serde-wasm-bindgen",
  "utils-db",
+ "utils-log",
  "utils-misc",
  "utils-types",
  "wasm-bindgen",
  "wasm-bindgen-futures",
+ "wasm-bindgen-test",
  "wasm-opt",
  "wasm-pack",
 ]
 
 [[package]]
 name = "core-ethereum-misc"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "async-std",
  "async-trait",
  "console_error_panic_hook",
  "core-crypto",
  "core-ethereum-db",
+ "core-types",
+ "env_logger",
  "futures",
  "hex-literal 0.4.1",
  "js-sys",
@@ -908,8 +916,10 @@ dependencies = [
  "thiserror",
  "utils-db",
  "utils-log",
+ "utils-misc",
  "utils-types",
  "wasm-bindgen",
+ "wasm-bindgen-futures",
  "wasm-opt",
  "wasm-pack",
 ]
@@ -919,6 +929,21 @@ name = "core-foundation-sys"
 version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e496a50fda8aacccc86d7529e2c1e0892dbd0f898a6b5645b5561b89c3210efa"
+
+[[package]]
+name = "core-hopr"
+version = "0.1.0"
+dependencies = [
+ "console_error_panic_hook",
+ "core-ethereum-db",
+ "core-ethereum-misc",
+ "core-packet",
+ "js-sys",
+ "utils-log",
+ "utils-metrics",
+ "utils-misc",
+ "wasm-bindgen",
+]
 
 [[package]]
 name = "core-misc"
@@ -989,8 +1014,9 @@ dependencies = [
 
 [[package]]
 name = "core-packet"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
+ "async-lock",
  "async-process",
  "async-std",
  "async-trait",
@@ -4008,6 +4034,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "scoped-tls"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e1cf6437eb19a8f4a6cc0f7dca544973b0b78843adbfeb3683d1a94a0024a294"
+
+[[package]]
 name = "scopeguard"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4911,6 +4943,7 @@ checksum = "711b9620af191e0cdc7468a8d14e709c3dcdb115b36f838e601583af800a370a"
 name = "utils-db"
 version = "0.2.1"
 dependencies = [
+ "async-lock",
  "async-std",
  "async-trait",
  "bincode",
@@ -5196,6 +5229,30 @@ name = "wasm-bindgen-shared"
 version = "0.2.86"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed9d5b4305409d1fc9482fee2d7f9bcbf24b3972bf59817ef757e23982242a93"
+
+[[package]]
+name = "wasm-bindgen-test"
+version = "0.3.36"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c9e636f3a428ff62b3742ebc3c70e254dfe12b8c2b469d688ea59cdd4abcf502"
+dependencies = [
+ "console_error_panic_hook",
+ "js-sys",
+ "scoped-tls",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "wasm-bindgen-test-macro",
+]
+
+[[package]]
+name = "wasm-bindgen-test-macro"
+version = "0.3.36"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f18c1fad2f7c4958e7bcce014fa212f59a65d5e3721d0f77e6c0b27ede936ba3"
+dependencies = [
+ "proc-macro2",
+ "quote",
+]
 
 [[package]]
 name = "wasm-opt"
