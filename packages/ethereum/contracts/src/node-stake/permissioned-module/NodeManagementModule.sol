@@ -38,7 +38,7 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
   // from HoprCapabilityPermissions. This module is a Role where members are NODE_CHAIN_KEYs
   Role internal role;
 
-  event SetMultisendAddress(address multisendAddress);
+  event SetMultisendAddress(address indexed multisendAddress);
   event NodeAdded(address indexed node);
   event NodeRemoved(address indexed node);
 
@@ -66,7 +66,7 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
     }
 
     // cannot setup again if it's been set up
-    if (address(avatar) != address(0) || multisend != address(0)) {
+    if (avatar != address(0) || multisend != address(0)) {
       revert AlreadyInitialized();
     }
 

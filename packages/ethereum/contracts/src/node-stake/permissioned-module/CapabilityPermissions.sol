@@ -125,6 +125,9 @@ library HoprCapabilityPermissions {
     // target is already scoped
     error TargetIsScoped();
 
+    // target is not yet scoped
+    error TargetIsNotScoped();
+
 
     // ======================================================
     // ---------------------- CHECKERS ----------------------
@@ -506,8 +509,12 @@ library HoprCapabilityPermissions {
         Role storage role,
         address targetAddress
     ) external {
-        role.targets.remove(targetAddress);
-        emit RevokedTarget(targetAddress);
+        bool result = role.targets.remove(targetAddress);
+        if (result) {
+            emit RevokedTarget(targetAddress);
+        } else {
+            revert TargetIsNotScoped();
+        }
     }
 
     /**
@@ -584,7 +591,7 @@ library HoprCapabilityPermissions {
       Target updatedTarget = target.forceWriteAsTargetType(TargetType.SEND);
       role.targets.add(updatedTarget);
       
-      emit ScopedTargetSend(targetAddress, target);
+      emit ScopedTargetSend(targetAddress, updatedTarget);
     }
     
     /**

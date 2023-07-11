@@ -16,7 +16,7 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
     /**
     * Manually import events and errors
     */
-    event SetMultisendAddress(address multisendAddress);
+    event SetMultisendAddress(address indexed multisendAddress);
     event NodeAdded(address indexed node);
     event NodeRemoved(address indexed node);
 
@@ -67,10 +67,140 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         vm.stopPrank();
     }
 
+    function testRevert_AddNode(address[] memory accounts, uint256 index) public {
+        vm.assume(accounts.length > 0);
+        index = bound(index, 0, accounts.length - 1);
+
+        address owner = moduleSingleton.owner();
+        vm.startPrank(owner);
+        _helperAddNodes(accounts);
+
+        assertTrue(moduleSingleton.isNode(accounts[index]));
+        vm.expectRevert(WithMembership.selector);
+        moduleSingleton.addNode(accounts[index]);
+        vm.stopPrank();
+    }
+
+    function testFuzz_RemoveNode(address[] memory accounts, uint256 index) public {
+        vm.assume(accounts.length > 0);
+        index = bound(index, 0, accounts.length - 1);
+
+        address owner = moduleSingleton.owner();
+        vm.startPrank(owner);
+        _helperAddNodes(accounts);
+
+        assertTrue(moduleSingleton.isNode(accounts[index]));
+        vm.expectEmit(true, false, false, false, address(moduleSingleton));
+        emit NodeRemoved(accounts[index]);
+        moduleSingleton.removeNode(accounts[index]);
+        assertFalse(moduleSingleton.isNode(accounts[index]));
+        vm.stopPrank();
+    }
+
+    function testRevert_RemoveNode(address[] memory accounts, address nodeAddress) public {
+        address owner = moduleSingleton.owner();
+        vm.startPrank(owner);
+
+        _helperAddNodes(accounts);
+        vm.assume(!moduleSingleton.isNode(nodeAddress));
+
+        vm.expectRevert(HoprCapabilityPermissions.NoMembership.selector);
+        moduleSingleton.removeNode(nodeAddress);
+        vm.stopPrank();
+    }
+
+    function testFuzz_SetMultisend(address multisendAddr) public {
+        address owner = moduleSingleton.owner();
+        vm.startPrank(owner);
+        vm.expectEmit(true, false, false, false, address(moduleSingleton));
+        emit SetMultisendAddress(multisendAddr);
+        moduleSingleton.setMultisend(multisendAddr);
+        vm.stopPrank();
+        assertEq(moduleSingleton.multisend(), multisendAddr);
+    }
+
+    /**
+    * @dev Add channels target(s) when the account is not address zero
+    */
+    function testFuzz_ScopeTargetChannelsFromModule(address channelsAddress) public {
+        vm.assume(channelsAddress != address(0));
+        address owner = moduleSingleton.owner();
+        Target channelsTarget = TargetUtils.encodeDefaultPermissions(
+            channelsAddress,
+            Clearance.FUNCTION,
+            TargetType.CHANNELS,
+            TargetPermission.ALLOW_ALL,
+            defaultFunctionPermission
+        );
+
+        vm.startPrank(owner);
+
+        vm.expectEmit(true, false, false, false, address(moduleSingleton));
+        emit HoprCapabilityPermissions.ScopedTargetChannels(channelsAddress, channelsTarget);
+        moduleSingleton.scopeTargetChannels(channelsTarget);
+    }
+
+    /**
+    * @dev fail to channels target(s) when the account is address zero
+    */
+    function testRevert_ScopeZeroAddressTargetChannelsFromModule() public {
+        address channelsAddress = address(0);
+        address owner = moduleSingleton.owner();
+        Target channelsTarget = TargetUtils.encodeDefaultPermissions(
+            channelsAddress,
+            Clearance.FUNCTION,
+            TargetType.CHANNELS,
+            TargetPermission.ALLOW_ALL,
+            defaultFunctionPermission
+        );
+
+        vm.startPrank(owner);
+
+        vm.expectRevert(HoprCapabilityPermissions.AddressIsZero.selector);
+        moduleSingleton.scopeTargetChannels(channelsTarget);
+    }
+
+    /**
+    * @dev fail to add channels target(s) when the account has been scopec
+    */
+    function testRevert_ScopeExistingTargetChannelsFromModule(address[] memory channelsAddresses, uint256 randomIndex) public {
+        vm.assume(channelsAddresses.length > 0);
+        
+        address owner = moduleSingleton.owner();
+        vm.startPrank(owner);
+        (address[] memory results, address oneAddress) = _helperGetUniqueAddressArrayAndRandomItem(
+            channelsAddresses,
+            randomIndex
+        );
+        vm.assume(results.length > 0);
+
+        for (uint256 i = 0; i < results.length; i++) {
+            vm.assume(results[i] != address(0));
+            Target channelsTarget = TargetUtils.encodeDefaultPermissions(
+                results[i],
+                Clearance.FUNCTION,
+                TargetType.CHANNELS,
+                TargetPermission.ALLOW_ALL,
+                defaultFunctionPermission
+            );
+            moduleSingleton.scopeTargetChannels(channelsTarget);
+        }
+
+        Target existingChannelsTarget = TargetUtils.encodeDefaultPermissions(
+            oneAddress,
+            Clearance.FUNCTION,
+            TargetType.CHANNELS,
+            TargetPermission.ALLOW_ALL,
+            defaultFunctionPermission
+        );
+        vm.expectRevert(HoprCapabilityPermissions.TargetIsScoped.selector);
+        moduleSingleton.scopeTargetChannels(existingChannelsTarget);
+    }
+
     /**
     * @dev Add token target(s) when the account is not address zero
     */
-    function testFuzz_AddTargetTokenFromModule(address tokenAddress) public {
+    function testFuzz_ScopeTargetTokenFromModule(address tokenAddress) public {
         vm.assume(tokenAddress != address(0));
         address owner = moduleSingleton.owner();
         Target actualTokenTarget = TargetUtils.encodeDefaultPermissions(
@@ -86,6 +216,173 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         vm.expectEmit(true, false, false, false, address(moduleSingleton));
         emit HoprCapabilityPermissions.ScopedTargetToken(tokenAddress, actualTokenTarget);
         moduleSingleton.scopeTargetToken(actualTokenTarget);
+    }
+
+    /**
+    * @dev fail to token target(s) when the account is address zero
+    */
+    function testRevert_ScopeZeroAddressTargetTokenFromModule() public {
+        address tokenAddress = address(0);
+        address owner = moduleSingleton.owner();
+        Target tokenTarget = TargetUtils.encodeDefaultPermissions(
+            tokenAddress,
+            Clearance.FUNCTION,
+            TargetType.TOKEN,
+            TargetPermission.ALLOW_ALL,
+            defaultFunctionPermission
+        );
+
+        vm.startPrank(owner);
+
+        vm.expectRevert(HoprCapabilityPermissions.AddressIsZero.selector);
+        moduleSingleton.scopeTargetToken(tokenTarget);
+    }
+
+    /**
+    * @dev fail to add token target(s) when the account has been scopec
+    */
+    function testRevert_ScopeExistingTargetTokenFromModule(address[] memory tokenAddresses, uint256 randomIndex) public {
+        vm.assume(tokenAddresses.length > 0);
+        
+        address owner = moduleSingleton.owner();
+        vm.startPrank(owner);
+        (address[] memory results, address oneAddress) = _helperGetUniqueAddressArrayAndRandomItem(
+            tokenAddresses,
+            randomIndex
+        );
+        vm.assume(results.length > 0);
+
+        for (uint256 i = 0; i < results.length; i++) {
+            vm.assume(results[i] != address(0));
+            Target tokenTarget = TargetUtils.encodeDefaultPermissions(
+                results[i],
+                Clearance.FUNCTION,
+                TargetType.TOKEN,
+                TargetPermission.ALLOW_ALL,
+                defaultFunctionPermission
+            );
+
+            moduleSingleton.scopeTargetToken(tokenTarget);
+        }
+
+        Target existingTokenTarget = TargetUtils.encodeDefaultPermissions(
+                oneAddress,
+                Clearance.FUNCTION,
+                TargetType.TOKEN,
+                TargetPermission.ALLOW_ALL,
+                defaultFunctionPermission
+            );
+
+        vm.expectRevert(HoprCapabilityPermissions.TargetIsScoped.selector);
+        moduleSingleton.scopeTargetToken(existingTokenTarget);
+    }
+
+    /**
+    * @dev Add send target(s) when the account is a member
+    */
+    function testFuzz_ScopeTargetSendFromModule(address[] memory accounts, uint256 index) public {
+        vm.assume(accounts.length > 0);
+        index = bound(index, 0, accounts.length - 1);
+
+        address owner = moduleSingleton.owner();
+        vm.startPrank(owner);
+
+        // add nodes and take one from the added node
+        _helperAddNodes(accounts);
+        assertTrue(moduleSingleton.isNode(accounts[index]));
+
+        Target sendTarget = TargetUtils.encodeDefaultPermissions(
+            accounts[index],
+            Clearance.FUNCTION,
+            TargetType.SEND,
+            TargetPermission.ALLOW_ALL,
+            defaultFunctionPermission
+        );
+
+        vm.expectEmit(true, false, false, false, address(moduleSingleton));
+        emit HoprCapabilityPermissions.ScopedTargetSend(accounts[index], sendTarget);
+        moduleSingleton.scopeTargetSend(sendTarget);
+    }
+
+    /**
+    * @dev fail to scope send target(s) when the account is address zero
+    */
+    function testRevert_ScopeNonMemberTargetSendFromModule() public {
+        address tokenAddress = address(0);
+        address owner = moduleSingleton.owner();
+        Target sendTarget = TargetUtils.encodeDefaultPermissions(
+            tokenAddress,
+            Clearance.FUNCTION,
+            TargetType.SEND,
+            TargetPermission.ALLOW_ALL,
+            defaultFunctionPermission
+        );
+
+        vm.startPrank(owner);
+
+        vm.expectRevert(HoprCapabilityPermissions.NoMembership.selector);
+        moduleSingleton.scopeTargetSend(sendTarget);
+    }
+    /**
+    * @dev fail to scope send target(s) when the account is address zero
+    */
+    function testRevert_ScopeZeroAddressTargetSendFromModule() public {
+        address sendAddress = address(0);
+        address owner = moduleSingleton.owner();
+        Target sendTarget = TargetUtils.encodeDefaultPermissions(
+            sendAddress,
+            Clearance.FUNCTION,
+            TargetType.SEND,
+            TargetPermission.ALLOW_ALL,
+            defaultFunctionPermission
+        );
+
+        vm.startPrank(owner);
+        moduleSingleton.addNode(sendAddress);
+        vm.expectRevert(HoprCapabilityPermissions.AddressIsZero.selector);
+        moduleSingleton.scopeTargetSend(sendTarget);
+    }
+
+    /**
+    * @dev fail to add send target(s) when the account has been scopec
+    */
+    function testRevert_ScopeExistingTargetSendFromModule(address[] memory sendAddresses, uint256 randomIndex) public {
+        vm.assume(sendAddresses.length > 0);
+        
+        address owner = moduleSingleton.owner();
+        vm.startPrank(owner);
+        (address[] memory results, address oneAddress) = _helperGetUniqueAddressArrayAndRandomItem(
+            sendAddresses,
+            randomIndex
+        );
+        vm.assume(results.length > 0);
+        // add nodes and take one from the added node
+        _helperAddNodes(results);
+
+        for (uint256 i = 0; i < results.length; i++) {
+            vm.assume(results[i] != address(0));
+            assertTrue(moduleSingleton.isNode(results[i]));
+            Target sendTarget = TargetUtils.encodeDefaultPermissions(
+                results[i],
+                Clearance.FUNCTION,
+                TargetType.SEND,
+                TargetPermission.ALLOW_ALL,
+                defaultFunctionPermission
+            );
+
+            moduleSingleton.scopeTargetSend(sendTarget);
+        }
+
+        Target existingSendTarget = TargetUtils.encodeDefaultPermissions(
+                oneAddress,
+                Clearance.FUNCTION,
+                TargetType.SEND,
+                TargetPermission.ALLOW_ALL,
+                defaultFunctionPermission
+            );
+
+        vm.expectRevert(HoprCapabilityPermissions.TargetIsScoped.selector);
+        moduleSingleton.scopeTargetSend(existingSendTarget);
     }
 
     /**
@@ -123,97 +420,88 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         moduleSingleton.addChannelsAndTokenTarget(channels, target);
     }
 
+    // test revokeTarget
+    /**
+    * @dev owner revoke a target
+    */
+    function testFuzz_RevokeTargetFromModule(address[] memory accounts, uint256 randomIndex) public {
+        // scope some targets
+        vm.assume(accounts.length > 0);
+        address owner = moduleSingleton.owner();
+        vm.startPrank(owner);
+        (address[] memory results, address oneAddress) = _helperGetUniqueAddressArrayAndRandomItem(
+            accounts,
+            randomIndex
+        );
+        for (uint256 i = 0; i < results.length; i++) {
+            vm.assume(results[i] != address(0));
+            Target tokenTarget = TargetUtils.encodeDefaultPermissions(
+                results[i],
+                Clearance.FUNCTION,
+                TargetType.TOKEN,
+                TargetPermission.ALLOW_ALL,
+                defaultFunctionPermission
+            );
 
+            moduleSingleton.scopeTargetToken(tokenTarget);
+        }
 
-    // /**
-    // * @dev Encode an array of permission enums into uint256 and vice versa
-    // */
-    // function testFuzz_EncodeAndDecodePermissionEnums(uint256 length, bool startWithZero) public {
-    //     // length must not exceed 256
-    //     vm.assume(length <= 256);
-    //     // create a permission array that alternates between 0 and 1
-    //     uint256[] memory permissions = _helperCreateHoprChannelsPermissionsArray(length, startWithZero);
+        // remove target
+        vm.expectEmit(true, false, false, false, address(moduleSingleton));
+        emit HoprCapabilityPermissions.RevokedTarget(oneAddress);
+        moduleSingleton.revokeTarget(oneAddress);
+    }
 
-    //     (uint256 encodedValue, uint256 encodedLength) = HoprCapabilityPermissions.encodePermissionEnums(permissions);
-    //     (uint256[] memory decodedPermissions) = HoprCapabilityPermissions.decodePermissionEnums(encodedValue, encodedLength);
+    /**
+    * @dev fail to remove a target that is not scoped
+    */
+    function testRevert_RevokeNonScopedTargetFromModule(address scopeTargetAddr) public {
+        address owner = moduleSingleton.owner();
 
-    //     assertEq(encodedLength, length, "Encoding length is wrong");
-    //     assertEq(decodedPermissions.length, length, "Decoded length is wrong");
-
-    //     for (uint256 j = 0; j < length; j++) {
-    //         assertEq(decodedPermissions[j], permissions[j], "Element changes during the process");
-    //     }
-    // }
-
-    // /**
-    // * @dev Encode an array of funciton signatures (max. 7) into a bytes32
-    // */
-    // function test_EncodeAndDecodeFunctionSigs() public {
-    //     // create an array of funciton sigatures
-    //     bytes4[] memory functionSigs = _helperCreateHoprChannelsFunctionSigArray();
-
-    //     (bytes32 encodedValue, uint256 encodedLength) = HoprCapabilityPermissions.encodeFunctionSigs(functionSigs);
-    //     (bytes4[] memory decoded) = HoprCapabilityPermissions.decodeFunctionSigs(encodedValue, encodedLength);
-
-    //     assertEq(encodedLength, decoded.length, "Length is wrong");
-
-    //     for (uint256 j = 0; j < encodedLength; j++) {
-    //         assertEq(decoded[j], functionSigs[j], "Element changes during the process");
-    //     }
-    // }
-
-    // /**
-    // * @dev Encode an array of funciton signatures (max. 7) into a bytes32. Test with 6
-    // */
-    // function test_EncodeAndDecodeSigsAndPermissions(bool startWithZero) public {
-    //     uint256 length = 6;
-    //     // create an array of funciton sigatures
-    //     bytes4[] memory functionSigs = _helperCreateHoprChannelsFunctionSigArray();
-    //     uint256[] memory permissions = _helperCreateHoprChannelsPermissionsArray(length, startWithZero);
-
-    //     (bytes32 encodedValue, uint256 encodedLength) = HoprCapabilityPermissions.encodeFunctionSigsAndPermissions(functionSigs, permissions);
-    //     emit log_named_bytes32("encodedValue", encodedValue);
-    //     (bytes4[] memory decodedSigs, uint256[] memory decodedPermissions) = HoprCapabilityPermissions.decodeFunctionSigsAndPermissions(encodedValue, encodedLength);
-
-    //     assertEq(encodedLength, length, "Encoding length is wrong");
-    //     assertEq(decodedSigs.length, length, "Decoded sigs length is wrong");
-    //     assertEq(decodedPermissions.length, length, "Decoded permissions length is wrong");
-
-    //     for (uint256 j = 0; j < length; j++) {
-    //         assertEq(decodedSigs[j], functionSigs[j], "Sig changes during the process");
-    //     }
-    //     for (uint256 k = 0; k < length; k++) {
-    //         assertEq(decodedPermissions[k], permissions[k], "Permission changes during the process");
-    //     }
-    // }
-
-    // /**
-    //  * @dev create a permission array that alternates between 0 and 1
-    //  */
-    // function _helperCreateHoprChannelsPermissionsArray(uint256 length, bool startWithZero) private returns (uint256[] memory permissions) {
-    //     permissions = new uint256[](length);
-    //     for (uint256 i = 0; i < length; i++) {
-    //         permissions[i] = startWithZero == (i % 2 == 0) ? 0 : 1;
-    //     }
-    // }
-
-    // /**
-    //  * @dev create an array of funciton sigatures for HoprChannels
-    //  */
-    // function _helperCreateHoprChannelsFunctionSigArray() private returns (bytes4[] memory functionSigs) {
-    //     functionSigs = new bytes4[](6);
-    //     functionSigs[0] = HoprCapabilityPermissions.FUND_CHANNEL_MULTI_SELECTOR;
-    //     functionSigs[1] = HoprCapabilityPermissions.REDEEM_TICKET_SELECTOR;
-    //     functionSigs[2] = HoprCapabilityPermissions.REDEEM_TICKETS_SELECTOR;
-    //     functionSigs[3] = HoprCapabilityPermissions.INITIATE_CHANNEL_CLOSURE_SELECTOR;
-    //     functionSigs[4] = HoprCapabilityPermissions.FINALIZE_CHANNEL_CLOSURE_SELECTOR;
-    //     functionSigs[5] = HoprCapabilityPermissions.BUMP_CHANNEL_SELECTOR;
-    // }
+        vm.startPrank(owner);
+        vm.expectRevert(HoprCapabilityPermissions.TargetIsNotScoped.selector);
+        moduleSingleton.revokeTarget(scopeTargetAddr);
+    }
 
     function _helperTargetBitwiseAnd(Target target, bytes32 mask) private pure returns (Target) {
         return Target.wrap(uint256(bytes32(Target.unwrap(target)) & mask));
     }
     function _helperTargetBitwiseOr(Target target, bytes32 mask) private pure returns (Target) {
         return Target.wrap(uint256(bytes32(Target.unwrap(target)) | mask));
+    }
+    function _helperAddNodes(address[] memory accounts) private {
+        for (uint256 i = 0; i < accounts.length; i++) {
+            if (moduleSingleton.isNode(accounts[i])) continue;
+            moduleSingleton.addNode(accounts[i]);
+        }
+    }
+    /**
+     * @dev return an array with all unique addresses which does not contain address zeo
+     * return a random item
+     */
+    function _helperGetUniqueAddressArrayAndRandomItem(
+        address[] memory addrs,
+        uint256 randomIndex
+    ) private returns (address[] memory, address) {
+        if (addrs.length == 0) {
+            return (new address[](0), address(0));
+        } else if (addrs.length == 1) {
+            return (addrs, addrs[0]);
+        }
+
+        // for addrs are more 
+        address[] memory results = addrs;
+        for (uint256 i = 0; i < results.length; i++) {
+            address cur = results[i];
+            for (uint256 j = i + 1; j < results.length; j++) {
+                if (cur == results[j]) {
+                    delete results[i];
+                    break;
+                }
+            }            
+        }
+
+        randomIndex = bound(randomIndex, 0, results.length - 1);
+        return (results, results[randomIndex]);
     }
 }

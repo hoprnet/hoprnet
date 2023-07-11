@@ -8,8 +8,11 @@ import '../../lib/safe-contracts/contracts/Safe.sol';
 import "../../script/utils/SafeSuiteLib.sol";
 import "../utils/SafeSingleton.sol";
 import 'forge-std/Test.sol';
+import "@openzeppelin/contracts-upgradeable/proxy/ClonesUpgradeable.sol";
 
 contract HoprNodeManagementModuleTest is Test, SafeSingletonFixtureTest {
+    using ClonesUpgradeable for address;
+
     HoprNodeManagementModule public moduleSingleton;
     HoprNodeStakeFactory public factory;
     address public caller;
@@ -20,9 +23,11 @@ contract HoprNodeManagementModuleTest is Test, SafeSingletonFixtureTest {
     /**
     * Manually import events and errors
     */
-    event SetMultisendAddress(address multisendAddress);
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+    event SetMultisendAddress(address indexed multisendAddress);
     event NewHoprNodeStakeModule(address instance);
     event NewHoprNodeStakeSafe(address instance);
+    event AvatarSet(address indexed previousAvatar, address indexed newAvatar);
 
     function setUp() public override(SafeSingletonFixtureTest) {
         super.setUp();
@@ -78,5 +83,51 @@ contract HoprNodeManagementModuleTest is Test, SafeSingletonFixtureTest {
         assertEq(HoprNodeManagementModule(module).multisend(), SafeSuiteLib.SAFE_MultiSendCallOnly_ADDRESS, "Wrong module owner");
 
         vm.stopPrank();
+    }
+
+    function testFuzz_InitializeModuleProxy(uint256 nonce, address safeAddr, address multisendAddr) public {
+        vm.assume(safeAddr != address(0));
+        vm.assume(multisendAddr != address(0));
+        bytes32 salt = keccak256(abi.encodePacked(msg.sender, nonce));
+        // 1. Deploy node management module
+        address moduleProxy = address(moduleSingleton).cloneDeterministic(salt);
+        // add Safe and multisend to the module
+        bytes memory moduleInitializer = abi.encodeWithSignature("initialize(bytes)", abi.encode(safeAddr, multisendAddr));
+
+        vm.expectEmit(true, true, false, false, address(moduleProxy));
+        emit OwnershipTransferred(address(0), safeAddr);
+        vm.expectEmit(true, true, false, false, address(moduleProxy));
+        emit AvatarSet(address(0), safeAddr);
+        vm.expectEmit(true, false, false, false, address(moduleProxy));
+        emit SetMultisendAddress(multisendAddr);
+        moduleProxy.call(moduleInitializer);
+    }
+
+    function testRevert_CloneButFailToInitializeWithAddressZero(uint256 nonce, address safeAddr, address multisendAddr) public {
+        vm.assume(safeAddr == address(0) || multisendAddr == address(0));
+        bytes32 salt = keccak256(abi.encodePacked(msg.sender, nonce));
+        // 1. Deploy node management module
+        address moduleProxy = address(moduleSingleton).cloneDeterministic(salt);
+
+        // initialize module proxy with invalid variables
+        vm.expectRevert(HoprCapabilityPermissions.AddressIsZero.selector);
+        // add Safe and multisend to the module
+        bytes memory moduleInitializer = abi.encodeWithSignature("initialize(bytes)", abi.encode(safeAddr, multisendAddr));
+        moduleProxy.call(moduleInitializer);
+    }
+
+    function testRevert_CloneButFailToInitializeTwice(uint256 nonce, address safeAddr, address multisendAddr) public {
+        vm.assume(safeAddr != address(0) && multisendAddr != address(0));
+        bytes32 salt = keccak256(abi.encodePacked(msg.sender, nonce));
+        // 1. Deploy node management module
+        address moduleProxy = address(moduleSingleton).cloneDeterministic(salt);
+
+        // initialize module proxy with valid variables
+        bytes memory moduleInitializer = abi.encodeWithSignature("initialize(bytes)", abi.encode(address(1), address(2)));
+        moduleProxy.call(moduleInitializer);
+        // re-initialize module proxy with variables
+        bytes memory moduleReinitializer = abi.encodeWithSignature("initialize(bytes)", abi.encode(safeAddr, multisendAddr));
+        vm.expectRevert(AlreadyInitialized.selector);
+        moduleProxy.call(moduleReinitializer);
     }
 }
