@@ -12,8 +12,7 @@ use ethers::{
     utils::parse_units, //, types::U256, utils::format_units, ParseUnits
 };
 use log::{log, Level};
-use std::env;
-use std::str::FromStr;
+use std::{env, str::FromStr};
 use utils_types::primitives::Address;
 
 /// CLI arguments for `hopli faucet`

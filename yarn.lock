@@ -668,7 +668,7 @@ __metadata:
   dependencies:
     "@types/mocha": 10.0.1
     mocha: 10.2.0
-    semver: 7.5.0
+    semver: 7.5.3
     typedoc: 0.24.8
     typedoc-plugin-markdown: 3.15.3
     typescript: 5.0.4
@@ -751,13 +751,13 @@ __metadata:
     debug: 4.3.4
     ethers: 5.7.2
     express: 4.18.2
-    express-openapi: 12.1.0
+    express-openapi: 12.1.3
     mocha: 10.2.0
     rlp: 3.0.0
-    semver: 7.5.0
+    semver: 7.5.3
     sinon: 12.0.1
     supertest: ^6.2.2
-    swagger-ui-express: 4.6.2
+    swagger-ui-express: 4.6.3
     trace-unhandled: 2.0.1
     ts-node: ^10.9.1
     typedoc: 0.24.8
@@ -1879,16 +1879,16 @@ __metadata:
   linkType: hard
 
 "@types/node@npm:*, @types/node@npm:>=13.7.0":
-  version: 20.2.4
-  resolution: "@types/node@npm:20.2.4"
-  checksum: 6bc45fdc1c1c0c0e03ca9aded926a5ce0f5e8154ae476a996f22832c530a8c909cfa2979b0b08c506477e836910f8b888bbe6eb9ebb698c4cd6f1f602456a9d4
+  version: 20.3.3
+  resolution: "@types/node@npm:20.3.3"
+  checksum: 7a0d00800451ca8cd8df63a8cc218c697edadb3143bf46cd6afeb974542a6a1665c3679459be0016c29216ccfed6616b7e55851747527dfa71c5608d9157528c
   languageName: node
   linkType: hard
 
 "@types/node@npm:16":
-  version: 16.18.33
-  resolution: "@types/node@npm:16.18.33"
-  checksum: 4d23c8776186cf221e70410c68da8d98e962311104891e1995b565fc926bcb5bb07ae32f65dd0a41104dbe685abd5972c23146a74f9bb5d427a73622157b42f5
+  version: 16.18.38
+  resolution: "@types/node@npm:16.18.38"
+  checksum: a3baa141e49ce94486f083eea1240cf38479a73ba663e1bf3f52f85b466125821b6e3ea85ded38fde3901530aca4601291395a50eefcea533a4f3b45171bda28
   languageName: node
   linkType: hard
 
@@ -3617,14 +3617,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"express-openapi@npm:12.1.0":
-  version: 12.1.0
-  resolution: "express-openapi@npm:12.1.0"
+"express-openapi@npm:12.1.3":
+  version: 12.1.3
+  resolution: "express-openapi@npm:12.1.3"
   dependencies:
     express-normalize-query-params-middleware: ^0.5.0
-    openapi-framework: ^12.1.0
-    openapi-types: ^12.1.0
-  checksum: 6b87b7990891b1f4d4bd3e071eddd72d7433ae770d5ad0cfbbee234a0d4e712150640ec15d8fe9d1af99b49209700c58f4694045f00bd380a569a86ba5008755
+    openapi-framework: ^12.1.3
+    openapi-types: ^12.1.3
+  checksum: d0dcfa390b11bdcb7d7683e29bec55ac405c8520b3a920ffaf422e40e0e340cef6dda33b982806f16d03cf649cd4ec9db3b85f4f6af2380fee0b5723560785b2
   languageName: node
   linkType: hard
 
@@ -3894,12 +3894,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"fs-routes@npm:^12.0.0":
-  version: 12.0.0
-  resolution: "fs-routes@npm:12.0.0"
+"fs-routes@npm:^12.1.3":
+  version: 12.1.3
+  resolution: "fs-routes@npm:12.1.3"
   peerDependencies:
     glob: ">=7.1.6"
-  checksum: 4e97b08584c4ee04cf00215ac5175ba6f3aeaa4fb254cd108149d675edffcf90e802ead9965a5252271f26e1a47b31c341b41e209b9d210b2a584ae2a642c466
+  checksum: 373cf73af9485ae41bfcce13f3d338bbcf0e0d259674b363e17c46dff8d101e2f926dfca0a79e44ec798beacc198b9f0b577a2b2fda3889b0034b3d533dc5d7a
   languageName: node
   linkType: hard
 
@@ -6447,76 +6447,76 @@ __metadata:
   languageName: node
   linkType: hard
 
-"openapi-default-setter@npm:^12.1.0":
-  version: 12.1.0
-  resolution: "openapi-default-setter@npm:12.1.0"
+"openapi-default-setter@npm:^12.1.3":
+  version: 12.1.3
+  resolution: "openapi-default-setter@npm:12.1.3"
   dependencies:
-    openapi-types: ^12.1.0
-  checksum: 3b4543d7c091134690fcfc986258481b6211f17b4322552764b3a4a9725784202bc17419a524302dd1187ecea556dea4f2cb525f4a0258c2ab5ddec884bf00e2
+    openapi-types: ^12.1.3
+  checksum: 35010a8eb07ac21f7d15defd5d56e08734a22cfb21acd558aa5a382a2509d87f2072330a69c42545aed32d0f8e903b41e0676c5ced87de0367fcc7b90867dad5
   languageName: node
   linkType: hard
 
-"openapi-framework@npm:^12.1.0":
-  version: 12.1.0
-  resolution: "openapi-framework@npm:12.1.0"
+"openapi-framework@npm:^12.1.3":
+  version: 12.1.3
+  resolution: "openapi-framework@npm:12.1.3"
   dependencies:
     difunc: 0.0.4
-    fs-routes: ^12.0.0
+    fs-routes: ^12.1.3
     glob: "*"
     is-dir: ^1.0.0
     js-yaml: ^3.10.0
-    openapi-default-setter: ^12.1.0
-    openapi-request-coercer: ^12.1.0
-    openapi-request-validator: ^12.1.0
-    openapi-response-validator: ^12.1.0
-    openapi-schema-validator: ^12.1.0
-    openapi-security-handler: ^12.1.0
-    openapi-types: ^12.1.0
+    openapi-default-setter: ^12.1.3
+    openapi-request-coercer: ^12.1.3
+    openapi-request-validator: ^12.1.3
+    openapi-response-validator: ^12.1.3
+    openapi-schema-validator: ^12.1.3
+    openapi-security-handler: ^12.1.3
+    openapi-types: ^12.1.3
     ts-log: ^2.1.4
-  checksum: 4cbb35e2870604c91c01f397aa2ea8fb072f648acb9a47b830d0d67c1e68bb75eadc3e97bcbe2ea994b7374ba38866b6d91734df6e2481ce42e6625d66ccc5bd
+  checksum: edfdae99912625e6442108fb41e89d0615cc1e398c2a04d8abeb3f55beb584ba8973521aa529debe426cd5a8c82ca9733986a58d7ee107ed2ac017f10039bc56
   languageName: node
   linkType: hard
 
-"openapi-jsonschema-parameters@npm:^12.1.0":
-  version: 12.1.0
-  resolution: "openapi-jsonschema-parameters@npm:12.1.0"
+"openapi-jsonschema-parameters@npm:^12.1.3":
+  version: 12.1.3
+  resolution: "openapi-jsonschema-parameters@npm:12.1.3"
   dependencies:
-    openapi-types: ^12.1.0
-  checksum: 9465549e132d02ad4be67326e22c9a2e3f0cf19ffa0e3c1fe69a542a675707f11c33080836b0eebd75c02501dbcb5f4130fa446d470ede3ba67b7c52e1bc341f
+    openapi-types: ^12.1.3
+  checksum: 0e3d3073ff1602d038853005fd59243c0b78cd91597c17d9c3f859b3eb782bf70fe6d9b11aa8cf96420289e50f024e326ceabf60dbfb83935a69bae06ebe6525
   languageName: node
   linkType: hard
 
-"openapi-request-coercer@npm:^12.1.0":
-  version: 12.1.0
-  resolution: "openapi-request-coercer@npm:12.1.0"
+"openapi-request-coercer@npm:^12.1.3":
+  version: 12.1.3
+  resolution: "openapi-request-coercer@npm:12.1.3"
   dependencies:
-    openapi-types: ^12.1.0
+    openapi-types: ^12.1.3
     ts-log: ^2.1.4
-  checksum: 4359d4fd58b032146838aabb9762fc2ac01771e7bea4679af5a241964f3df15ddced7968e6a8d419954d166e93ad32e08f530da0d9a8483d3c4d97be7c7c848c
+  checksum: cbf257d0c662ded5291759235402c0ea14f4187bf137821303347e73faeafcc0eeb97642e825983dea8ddf79b3bf0c44897262774ae8dc22c516b0ee22231fb7
   languageName: node
   linkType: hard
 
-"openapi-request-validator@npm:^12.1.0":
-  version: 12.1.0
-  resolution: "openapi-request-validator@npm:12.1.0"
+"openapi-request-validator@npm:^12.1.3":
+  version: 12.1.3
+  resolution: "openapi-request-validator@npm:12.1.3"
   dependencies:
     ajv: ^8.3.0
     ajv-formats: ^2.1.0
     content-type: ^1.0.4
-    openapi-jsonschema-parameters: ^12.1.0
-    openapi-types: ^12.1.0
+    openapi-jsonschema-parameters: ^12.1.3
+    openapi-types: ^12.1.3
     ts-log: ^2.1.4
-  checksum: 794b1c15dbf04107ede7b8304e5b7c2fa183ad0c4bd65b3e0ee4d415cf508324932959f661120f1bfb58a23d88b5458dc0db868bc36f9ec44ea03b99ea9d42df
+  checksum: 89526c95845b4f07fb33b55ebd3252f90e07dd1abffdaf9cc755928c73269aa1cf06a40a36b1d6ac28eeee07e4fc610dd9a71f95addfbc7bd463198e353c5dd1
   languageName: node
   linkType: hard
 
-"openapi-response-validator@npm:^12.1.0":
-  version: 12.1.0
-  resolution: "openapi-response-validator@npm:12.1.0"
+"openapi-response-validator@npm:^12.1.3":
+  version: 12.1.3
+  resolution: "openapi-response-validator@npm:12.1.3"
   dependencies:
     ajv: ^8.4.0
-    openapi-types: ^12.1.0
-  checksum: f07036661ac846c5d508b423d01039cd5bd33d564e053fdc039046f964fad71b03a7c9254195b1d5a8a1912fcc45dce13616af97c445c6d7b040c825e1f91de1
+    openapi-types: ^12.1.3
+  checksum: b09c45b8b8d09b2448f52e2532a13a034fbe7f910aa194320048e53f304f5a8ec987dd4c2403bae711c5d0b5da9f7a44a407b6429b58c72e6a2e2b51137b6a81
   languageName: node
   linkType: hard
 
@@ -6530,15 +6530,15 @@ __metadata:
   languageName: node
   linkType: hard
 
-"openapi-schema-validator@npm:^12.1.0":
-  version: 12.1.0
-  resolution: "openapi-schema-validator@npm:12.1.0"
+"openapi-schema-validator@npm:^12.1.3":
+  version: 12.1.3
+  resolution: "openapi-schema-validator@npm:12.1.3"
   dependencies:
     ajv: ^8.1.0
     ajv-formats: ^2.0.2
     lodash.merge: ^4.6.1
-    openapi-types: ^12.1.0
-  checksum: 1008ef82910cc30e85132c041b269a4cc2991dad17e2d7c4cddbfb5641a15e934016bc4d1bab32f2dc79f7f3673b82b655c3634838c9ce3a8f497af3be762aa5
+    openapi-types: ^12.1.3
+  checksum: 68170db4aced2c47d90bffbfc07e7507b89f79342840bbe2fe349f4f73dd26940f3bb9dd682c9a4ff8075198a02a218d28cd793538b0aa4c88f23ee695a62ae8
   languageName: node
   linkType: hard
 
@@ -6554,19 +6554,19 @@ __metadata:
   languageName: node
   linkType: hard
 
-"openapi-security-handler@npm:^12.1.0":
-  version: 12.1.0
-  resolution: "openapi-security-handler@npm:12.1.0"
+"openapi-security-handler@npm:^12.1.3":
+  version: 12.1.3
+  resolution: "openapi-security-handler@npm:12.1.3"
   dependencies:
-    openapi-types: ^12.1.0
-  checksum: 07f645300fdc0ca5d01790fb77e01d8e537f6b0439f55ec9af5097d3dd044e3e0fc55ce0acb9551f04256819d7738f8c3d468645e581f7b0487648eed428d519
+    openapi-types: ^12.1.3
+  checksum: 16c84ee4c158aceae981b48835de16114c0e30f9589d1e1f474bf2373f1831078e7280d4431797c72f6f8dd98129b5fe8f4c4eb8f26e47ea84e56d21f2b9bf86
   languageName: node
   linkType: hard
 
-"openapi-types@npm:^12.1.0":
-  version: 12.1.0
-  resolution: "openapi-types@npm:12.1.0"
-  checksum: d8f3e2bae519aa6bcf2012f4a5592b7283fe928c06f3bdc182776ce637c7ed8d5f9f342724f68c95c9572aefe21ed5e89b18a0295a703da61af5f97bd2aea9a7
+"openapi-types@npm:^12.1.3":
+  version: 12.1.3
+  resolution: "openapi-types@npm:12.1.3"
+  checksum: 7fa5547f87a58d2aa0eba6e91d396f42d7d31bc3ae140e61b5d60b47d2fd068b48776f42407d5a8da7280cf31195aa128c2fc285e8bb871d1105edee5647a0bb
   languageName: node
   linkType: hard
 
@@ -7582,14 +7582,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"semver@npm:7.5.0, semver@npm:^7.3.5, semver@npm:^7.3.8":
-  version: 7.5.0
-  resolution: "semver@npm:7.5.0"
+"semver@npm:7.5.3, semver@npm:^7.3.5, semver@npm:^7.3.8":
+  version: 7.5.3
+  resolution: "semver@npm:7.5.3"
   dependencies:
     lru-cache: ^6.0.0
   bin:
     semver: bin/semver.js
-  checksum: 2d266937756689a76f124ffb4c1ea3e1bbb2b263219f90ada8a11aebebe1280b13bb76cca2ca96bdee3dbc554cbc0b24752eb895b2a51577aa644427e9229f2b
+  checksum: 9d58db16525e9f749ad0a696a1f27deabaa51f66e91d2fa2b0db3de3e9644e8677de3b7d7a03f4c15bc81521e0c3916d7369e0572dbde250d9bedf5194e2a8a7
   languageName: node
   linkType: hard
 
@@ -8156,14 +8156,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"swagger-ui-express@npm:4.6.2":
-  version: 4.6.2
-  resolution: "swagger-ui-express@npm:4.6.2"
+"swagger-ui-express@npm:4.6.3":
+  version: 4.6.3
+  resolution: "swagger-ui-express@npm:4.6.3"
   dependencies:
     swagger-ui-dist: ">=4.11.0"
   peerDependencies:
-    express: ">=4.0.0"
-  checksum: 3883dc9243ef3fd050ea99edfa14c686dd3477b1ca81655d9c49347b71a540e266fc658b5b6f936c3f9192f224e4cff41bc3d17ab325e9e110a19f0abec551b6
+    express: ">=4.0.0 || >=5.0.0-beta"
+  checksum: bd0e02d2572685fcd82701b29f27ba6a27bc72de2b1553e84f884d008a0bf85a3711c9e236bb658130d702892866744d1a8a30b52b887e4f8224635c57afc63d
   languageName: node
   linkType: hard
 

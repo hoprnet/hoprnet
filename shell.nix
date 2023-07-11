@@ -28,8 +28,6 @@ let
     pkgs-dev.binaryen # v113 (includes wasm-opt)
     wasm-bindgen-cli # v0.2.83
     pkg-config
-    openssl_1_1
-    patchelf
 
     ## python is required by node module bcrypto and integration tests
     python39 # v3.10.12

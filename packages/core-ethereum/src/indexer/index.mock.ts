@@ -19,7 +19,7 @@ import {
   number_to_channel_status
 } from '@hoprnet/hopr-utils'
 
-import { Ethereum_Database as Database, Ethereum_Address as dbAddress } from '../db.js'
+import { Ethereum_Address, Ethereum_Database as Database } from '../db.js'
 import Indexer from './index.js'
 import type { ChainWrapper } from '../ethereum.js'
 import type { Event, TokenEvent, RegistryEvent } from './types.js'
@@ -293,7 +293,7 @@ export const useFixtures = async (
   const latestBlockNumber = ops.latestBlockNumber ?? 0
   const id = ops.id ?? MOCK_PUBLIC_KEY()
 
-  const db = new Database(new LevelDb(), dbAddress.deserialize(id.to_address().serialize()))
+  const db = new Database(new LevelDb(), Ethereum_Address.deserialize(id.to_address().serialize()))
   const { provider, newBlock } = createProviderMock({ latestBlockNumber })
   const { hoprChannels, newEvent } = createHoprChannelsMock({ pastEvents: ops.pastEvents ?? [] })
   const { hoprToken, newEvent: newTokenEvent } = createHoprTokenMock({

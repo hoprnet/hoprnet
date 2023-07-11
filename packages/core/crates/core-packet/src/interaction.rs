@@ -406,6 +406,7 @@ where
             .db
             .read()
             .await
+            // TODO: map from off-chain key to on-chain address
             .get_channel_to(&destination)
             .await?
             .ok_or(ChannelNotFound(destination.to_string()))?;
@@ -607,6 +608,7 @@ where
                     .db
                     .read()
                     .await
+                    // TODO: map from off-chain key to on-chain address
                     .get_channel_from(&previous_hop.to_address())
                     .await?
                     .ok_or(ChannelNotFound(previous_hop.to_string()))?;

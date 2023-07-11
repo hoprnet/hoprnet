@@ -9,6 +9,12 @@ license = "GPL-3.0-only"
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[features]
+default = ["console_error_panic_hook", "wasm", "prometheus"]
+console_error_panic_hook = ["dep:console_error_panic_hook"]
+wasm = ["dep:wasm-bindgen", "dep:js-sys", "core-ethereum-db/wasm", "core-ethereum-misc/wasm", "core-packet/wasm", "utils-log/wasm", "utils-misc/wasm", "utils-metrics?/wasm"]
+prometheus = ["dep:utils-metrics", "core-packet/prometheus"]
+
 [dependencies]
 console_error_panic_hook = { version = "0.1.7", optional = true }
 js-sys = { version = "0.3.63", optional = true }
@@ -27,8 +33,4 @@ wasm-opt = false
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = ['-O', '--enable-reference-types']
 
-[features]
-default = ["console_error_panic_hook", "wasm", "prometheus"]
-console_error_panic_hook = ["dep:console_error_panic_hook"]
-wasm = ["dep:wasm-bindgen", "dep:js-sys", "core-ethereum-db/wasm", "core-ethereum-misc/wasm", "core-packet/wasm", "utils-log/wasm", "utils-misc/wasm", "utils-metrics?/wasm"]
-prometheus = ["dep:utils-metrics", "core-packet/prometheus"]
+

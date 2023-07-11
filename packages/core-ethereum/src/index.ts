@@ -475,6 +475,7 @@ export default class HoprCoreEthereum extends EventEmitter {
         )
       ).serialize()
     )
+
     if (c.status !== ChannelStatus.Open && c.status !== ChannelStatus.WaitingForCommitment) {
       throw Error('Channel status is not OPEN or WAITING FOR COMMITMENT')
     }
@@ -496,6 +497,7 @@ export default class HoprCoreEthereum extends EventEmitter {
         )
       ).serialize()
     )
+
     if (c.status !== ChannelStatus.PendingToClose) {
       throw Error('Channel status is not PENDING_TO_CLOSE')
     }
@@ -511,7 +513,10 @@ export default class HoprCoreEthereum extends EventEmitter {
       c = ChannelEntry.deserialize(
         (await this.db.get_channel_to(Ethereum_Address.deserialize(dest.serialize()))).serialize()
       )
-    } catch {}
+    } catch {
+      log(`failed to retrieve channel information`)
+    }
+
     if (c && c.status !== ChannelStatus.Closed) {
       throw Error('Channel is already opened')
     }

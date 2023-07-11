@@ -502,7 +502,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
 
     async fn get_channel_x(&self, src: &Address, dest: &Address) -> Result<Option<ChannelEntry>> {
         utils_log::debug!("DB: get_channel_x src: {} & dest: {}", src, dest);
-        self.get_channel(&generate_channel_id(&src, &dest)).await
+        let key = utils_db::db::Key::new_with_prefix(&generate_channel_id(&src, &dest), CHANNEL_PREFIX)?;
+        self.db.get_or_none(key).await
     }
 
     async fn get_channels_from(&self, address: Address) -> Result<Vec<ChannelEntry>> {

@@ -138,27 +138,27 @@ describe.only('db functional tests', function () {
     const account = MOCK_ADDRESS()
 
     // should be throw when not added
-    assert.equal(await db.get_account_from_network_registry(hoprNode), undefined)
+    assert.equal(await db.get_account_from_network_registry(hoprNode.to_address()), undefined)
 
     // should be set
-    await db.add_to_network_registry(hoprNode, account, TestingSnapshot)
+    await db.add_to_network_registry(hoprNode.to_address(), account, TestingSnapshot)
 
     let nodes = await db.find_hopr_node_using_account_in_network_registry(account)
     assert(nodes.len() === 1, 'should have only 1 hoprNode registered')
     assert(
-      (await db.find_hopr_node_using_account_in_network_registry(account)).next().eq(hoprNode),
+      (await db.find_hopr_node_using_account_in_network_registry(account)).next().eq(hoprNode.to_address()),
       'should match the registered hoprNode'
     )
-    assert((await db.get_account_from_network_registry(hoprNode)).eq(account), 'should match account added')
+    assert((await db.get_account_from_network_registry(hoprNode.to_address())).eq(account), 'should match account added')
 
     // should be removed
-    await db.remove_from_network_registry(hoprNode, account, TestingSnapshot)
+    await db.remove_from_network_registry(hoprNode.to_address(), account, TestingSnapshot)
 
     assert(
       (await db.find_hopr_node_using_account_in_network_registry(account)).len() === 0,
       'should have 0 hoprNode registered'
     )
-    assert.equal(await db.get_account_from_network_registry(hoprNode), undefined)
+    assert.equal(await db.get_account_from_network_registry(hoprNode.to_address()), undefined)
   })
 
   it('should test eligible', async function () {
