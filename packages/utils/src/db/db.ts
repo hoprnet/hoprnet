@@ -272,7 +272,7 @@ export class LevelDb {
     let dumpFile = fs.createWriteStream(destFile, { flags: 'a' })
     this.backend
       .createReadStream({ keys: true, keyAsBuffer: true, values: true, valueAsBuffer: true })
-      .on('data', ({ key, value }: { key: Buffer; value: Buffer }) => {
+      .on('data', ({ key }) => {
         let out = ''
         while (key.length > 0) {
           const nextDelimiter = key.findIndex((v: number) => v == 0x2d) // 0x2d ~= '-'
