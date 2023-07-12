@@ -95,7 +95,7 @@ forge verify-check --chain-id <number> <GUID>
 4. Switch back `token_contract_address` for `monte_rosa`
 5. Commit contract changes and make a PR
 6. Transfer contract ownership to COMM multisig with `cast send <new_stake_season_contract> "transferOwnership(address)" 0xD9a00176Cf49dFB9cA3Ef61805a2850F45Cb1D05 --rpc-url https://provider-proxy.hoprnet.workers.dev/xdai_mainnet --private-key $PRIVATE_KEY`
-7. Run `scripts/update-protocol-config.sh -e master`, `scripts/update-protocol-config.sh -e debug-staging` and `scripts/update-protocol-config.sh -e monte_rosa`
+7. Run `scripts/update-protocol-config.sh -n rotsee`, `scripts/update-protocol-config.sh -n debug-staging` and `scripts/update-protocol-config.sh -n monte_rosa`
 8. Create a branch (e.g. `feature/staking-s7-contract-update`) from `master` which contains changes in `contracts-addresses.json` and `protocol-config.json` and make a PR
 9. Extend "hopr-stake-all-season" subgraph with the production stake season contract and deploy it
 10. Create an issue in `hoprnet/hopr-devrel` repo with actions to check:
