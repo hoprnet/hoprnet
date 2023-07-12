@@ -169,7 +169,7 @@
       "channels_contract_address": "0xFaBeE463f31E39eC8952bBfB4490C41103bf573e",
       "xhopr_contract_address": "0xD057604A14982FE8D88c5fC25Aac3267eA142a08",
       "boost_contract_address": "0x43d13D7B83607F14335cF2cB75E87dA369D056c7",
-      "stake_contract_address": "0x488EB03650BD2de6b4fEB187F06b34Ee483D81ba",
+      "stake_contract_address": "0xDC8F03f19986859362d15c3d5ED74f26518870B9",
       "network_registry_contract_address": "0x819E6a81e1e3f96CF1ac9200477C2d09c676959D",
       "network_registry_proxy_contract_address": "0xcA9B1bC189F977B2A9217598D0300d956b6a719f",
       "tags": [
