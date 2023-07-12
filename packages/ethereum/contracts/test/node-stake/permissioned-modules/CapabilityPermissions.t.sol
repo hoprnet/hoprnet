@@ -207,11 +207,10 @@ contract HoprCapabilityPermissionsTest is Test, CapabilityPermissionsLibFixtureT
     function _helperCreateHoprChannelsFunctionSigArray() private pure returns (bytes4[] memory functionSigs) {
         functionSigs = new bytes4[](7);
         functionSigs[0] = HoprCapabilityPermissions.REDEEM_TICKET_SELECTOR;
-        functionSigs[1] = HoprCapabilityPermissions.BATCH_REDEEM_TICKETS_SELECTOR;
-        functionSigs[2] = HoprCapabilityPermissions.CLOSE_INCOMING_CHANNEL_SELECTOR;
-        functionSigs[3] = HoprCapabilityPermissions.INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTOR;
-        functionSigs[4] = HoprCapabilityPermissions.FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTOR;
-        functionSigs[5] = HoprCapabilityPermissions.FUND_CHANNEL_MULTI_SELECTOR;
-        functionSigs[6] = HoprCapabilityPermissions.SET_COMMITMENT_SELECTOR;
+        functionSigs[1] = HoprCapabilityPermissions.CLOSE_INCOMING_CHANNEL_SELECTOR;
+        functionSigs[2] = HoprCapabilityPermissions.INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTOR;
+        functionSigs[3] = HoprCapabilityPermissions.FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTOR;
+        functionSigs[4] = HoprCapabilityPermissions.FUND_CHANNEL_MULTI_SELECTOR;
+        functionSigs[5] = HoprCapabilityPermissions.SET_COMMITMENT_SELECTOR;
     }
 }

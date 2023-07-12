@@ -52,7 +52,6 @@ library HoprCapabilityPermissions {
 
     // HoprChannels method ids (TargetType.CHANNELS)
     bytes4 internal constant REDEEM_TICKET_SELECTOR = HoprChannels.redeemTicketSafe.selector;
-    bytes4 internal constant BATCH_REDEEM_TICKETS_SELECTOR = HoprChannels.batchRedeemTicketsSafe.selector;
     bytes4 internal constant CLOSE_INCOMING_CHANNEL_SELECTOR = HoprChannels.closeIncomingChannelSafe.selector;
     bytes4 internal constant INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTOR = HoprChannels.initiateOutgoingChannelClosureSafe.selector;
     bytes4 internal constant FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTOR = HoprChannels.finalizeOutgoingChannelClosureSafe.selector;
@@ -316,9 +315,6 @@ library HoprCapabilityPermissions {
         if (functionSig == REDEEM_TICKET_SELECTOR) {
             (, HoprChannels.RedeemableTicket memory redeemableTicket) = abi.decode(slicedData, (address, HoprChannels.RedeemableTicket));
             channelId = redeemableTicket.data.channelId;
-        } else if (functionSig == BATCH_REDEEM_TICKETS_SELECTOR) {
-            // loop over tickets
-            checkBatchRedeem(role, capabilityKey, slicedData);
         } else if (functionSig == CLOSE_INCOMING_CHANNEL_SELECTOR) {
             (address self, address source) = abi.decode(slicedData, (address, address));
             channelId = getChannelId(source, self);
@@ -447,8 +443,6 @@ library HoprCapabilityPermissions {
         FunctionPermission defaultFunctionPermission;
         if (functionSig == REDEEM_TICKET_SELECTOR) {
             defaultFunctionPermission = target.getDefaultFunctionPermissionAt(0);
-        } else if (functionSig == BATCH_REDEEM_TICKETS_SELECTOR) {
-            defaultFunctionPermission = target.getDefaultFunctionPermissionAt(1);
         } else if (functionSig == CLOSE_INCOMING_CHANNEL_SELECTOR) {
             defaultFunctionPermission = target.getDefaultFunctionPermissionAt(2);
         } else if (functionSig == INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTOR) {
