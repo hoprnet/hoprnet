@@ -100,7 +100,7 @@ function test_in_memory_db() {
   return new Database(new LevelDb(), MOCK_PUBLIC_KEY().to_address())
 }
 
-describe.only('db functional tests', function () {
+describe('db functional tests', function () {
   it('should store hopr balance', async function () {
     let db = test_in_memory_db()
 

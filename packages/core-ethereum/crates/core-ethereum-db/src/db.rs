@@ -66,7 +66,6 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
     }
 
     async fn get_tickets(&self, maybe_signer: Option<Address>) -> Result<Vec<Ticket>> {
-        // let foo = signer.unwrap_or(true);
         let mut tickets = self
             .db
             .get_more::<AcknowledgedTicket>(
@@ -1148,6 +1147,7 @@ pub mod wasm {
             utils_misc::ok_or_jserr!(db.sub_hopr_balance(balance, snapshot).await)
         }
 
+        #[wasm_bindgen]
         pub async fn check_and_set_packet_tag(&self, tag: &Uint8Array) -> Result<bool, JsValue> {
             let data = self.core_ethereum_db.clone();
             let mut db = data.write().await;

@@ -139,16 +139,14 @@ where
         chain_commitment.map(|h| h.to_hex()).unwrap_or("false".to_string())
     );
 
-    let foo = Ok(Some(
+    Ok(Some(
         create_commitment_chain(
             db,
             &channel_info.channel_id,
             &channel_info.create_initial_commitment_seed(private_key)?,
         )
         .await?,
-    ));
-
-    foo
+    ))
 }
 
 #[cfg(all(not(target_arch = "wasm32"), test))]
@@ -224,7 +222,6 @@ pub mod wasm {
     use crate::commitment::ChannelCommitmentInfo;
     use core_crypto::types::Hash;
     use core_ethereum_db::db::wasm::Database;
-    use js_sys::Uint8Array;
     use utils_misc::{ok_or_jserr, utils::wasm::JsResult};
     use utils_types::traits::BinarySerializable;
     use wasm_bindgen::{prelude::*, JsValue};
@@ -245,7 +242,6 @@ pub mod wasm {
 
         if let Some(hash) = maybe_hash {
             let this = JsValue::null();
-            // let hash: JsValue = hash.to_bytes().as_ref()).into();
 
             let r = set_commitment.call1(&this, &<JsValue as From<Hash>>::from(hash))?;
 

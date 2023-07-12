@@ -78,7 +78,6 @@ pub mod wasm {
     #[wasm_bindgen]
     pub async fn is_allowed_to_access_network(db: &Database, chain_address: &Address) -> Result<bool, JsValue> {
         let val = db.as_ref_counted();
-        //let r = {
         let g = val.read().await;
         ok_or_jserr!(super::is_allowed_to_access_network(&*g, chain_address).await)
     }
