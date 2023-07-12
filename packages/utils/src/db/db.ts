@@ -167,7 +167,7 @@ export class LevelDb {
     log(`Dumping current database to ${destFile}`)
     let dumpFile = fs.createWriteStream(destFile, { flags: 'a' })
     this.backend
-      .createReadStream({ keys: true, keyAsBuffer: true, values: false, valueAsBuffer: true })
+      .createReadStream({ keys: true, keyAsBuffer: true, values: true, valueAsBuffer: true })
       .on('data', ({ key }) => {
         let out = ''
         while (key.length > 0) {
@@ -184,9 +184,9 @@ export class LevelDb {
           } else {
             key = (key as Buffer).subarray(nextDelimiter + 1)
           }
-        }
 
-        dumpFile.write(out + '\n')
+          dumpFile.write(out + '\n')
+        }
       })
       .on('end', function () {
         dumpFile.close()
