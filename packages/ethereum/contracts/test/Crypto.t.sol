@@ -7,10 +7,14 @@ import './utils/Accounts.sol';
 import '../src/Crypto.sol';
 
 contract CryptoProxy is HoprCrypto {
-  function modifierIsCurvePoint(CurvePoint memory p) isCurvePoint(p) public {}
 }
 
 contract Crypto is Test, AccountsFixtureTest, HoprCrypto {
+  struct CurvePoint {
+    uint256 x;
+    uint256 y;
+  }
+
   CryptoProxy crypto;
   function setUp() public {
     // use dummy proxy to per-method have gas measurements
@@ -33,19 +37,18 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto {
   }
 
   function testIsCurvePoint() public { 
-    crypto.modifierIsCurvePoint(CurvePoint(0x8318535b54105d4a7aae60c08fc45f9687181b4fdfc625bd1a753fa7397fed75, 0x3547f11ca8696646f2f3acb08e31016afac23e630c5d11f59f61fef57b0d2aa5));
+    assertTrue(crypto.isCurvePointInternal(0x8318535b54105d4a7aae60c08fc45f9687181b4fdfc625bd1a753fa7397fed75, 0x3547f11ca8696646f2f3acb08e31016afac23e630c5d11f59f61fef57b0d2aa5));
   }
 
   function testRevert_NoCurvePoint() public {
-    vm.expectRevert(InvalidCurvePoint.selector);
-    crypto.modifierIsCurvePoint(CurvePoint(0x3547f11ca8696646f2f3acb08e31016afac23e630c5d11f59f61fef57b0d2aa5, 0x8318535b54105d4a7aae60c08fc45f9687181b4fdfc625bd1a753fa7397fed75));
+    assertFalse(crypto.isCurvePointInternal(0x3547f11ca8696646f2f3acb08e31016afac23e630c5d11f59f61fef57b0d2aa5, 0x8318535b54105d4a7aae60c08fc45f9687181b4fdfc625bd1a753fa7397fed75));
   }
 
   function testScalarTimeBasepoint() public {
     assertEq(HoprCrypto.scalarTimesBasepoint(accountA.privateKey), accountA.accountAddr);
   }
 
-  function testEcAdd() public {
+  function testEcAddPointAddition() public {
     CurvePoint memory p = CurvePoint(0x8318535b54105d4a7aae60c08fc45f9687181b4fdfc625bd1a753fa7397fed75,0x3547f11ca8696646f2f3acb08e31016afac23e630c5d11f59f61fef57b0d2aa5);
     CurvePoint memory q = CurvePoint(0xba5734d8f7091719471e7f7ed6b9df170dc70cc661ca05e688601ad984f068b0,0xd67351e5f06073092499336ab0839ef8a521afd334e53807205fa2f08eec74f4);
     CurvePoint memory r = CurvePoint(0x9d9031e97dd78ff8c15aa86939de9b1e791066a0224e331bc962a2099a7b1f04,0x64b8bbafe1535f2301c72c2cb3535b172da30b02686ab0393d348614f157fbdb);
@@ -53,13 +56,42 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto {
     CurvePoint memory p_q = CurvePoint(0x551c7c46a964dec7edd8a5cedc557ebce43cc3f70ff481bdcfbd4e86d435c2ba,0x16883c2c7e2527800aa21a8420f8af48eafb2594d00e0f7e9e7d11a938b9a168);
     CurvePoint memory q_r = CurvePoint(0x85744a09c2839969dd8aa41b3577e9ffa28bee884165b880ca4050c0c3a0083e,0xbf55c694c111642da3ac0017e44ed12b93798eb9cbd3b14b4db1227c85e58f6d);
     
-    CurvePoint memory maybe_p_q = crypto.ecAdd(p, q, 0);
-    assertEq(p_q.x, maybe_p_q.x);
-    assertEq(p_q.y, maybe_p_q.y);
+    (uint256 maybe_p_q_x, uint256 maybe_p_q_y) = crypto.ecAdd(p.x, p.y, q.x, q.y, 0);
+    assertEq(p_q.x, maybe_p_q_x);
+    assertEq(p_q.y, maybe_p_q_y);
 
-    CurvePoint memory maybe_q_r = crypto.ecAdd(q, r, 0);
-    assertEq(q_r.x, maybe_q_r.x);
-    assertEq(q_r.y, maybe_q_r.y);
+    (uint256 maybe_q_r_x, uint256 maybe_q_r_y) = crypto.ecAdd(q.x, q.y, r.x, r.y, 0);
+    assertEq(q_r.x, maybe_q_r_x);
+    assertEq(q_r.y, maybe_q_r_y);
+  }
+
+  function testEcAddPointDouble() public {
+    CurvePoint memory p = CurvePoint(0x9d9031e97dd78ff8c15aa86939de9b1e791066a0224e331bc962a2099a7b1f04,0x64b8bbafe1535f2301c72c2cb3535b172da30b02686ab0393d348614f157fbdb);
+
+    CurvePoint memory p_double = CurvePoint(0x3d8f348848814bc251670aa3fe6301dfb7fb9f131212644cec8b666f883f1709,0x630684d783172d70adb684b61aed0856efe0f10982b91d57a0abe3dd08d09d32);
+
+    (uint256 maybe_p_double_x, uint256 maybe_p_double_y) = crypto.ecAdd(p.x, p.y, p.x, p.y, 0);
+
+    assertEq(maybe_p_double_x, p_double.x);
+    assertEq(maybe_p_double_y, p_double.y);
+  }
+
+  function testEcAddFuzzy(uint256 u_0, uint256 u_1) public {
+    vm.assume(crypto.isFieldElementInternal(u_0));
+    vm.assume(crypto.isFieldElementInternal(u_1));
+
+    (uint256 mapped_p_x, uint256 mapped_p_y) = crypto.map_to_curve_simple_swu(u_0);
+    (uint256 p_x, uint256 p_y) = crypto.mapPoint(mapped_p_x, mapped_p_y);
+
+    (uint256 mapped_q_x, uint256 mapped_q_y) = crypto.map_to_curve_simple_swu(u_1);
+    (uint256 q_x, uint256 q_y) = crypto.mapPoint(mapped_q_x, mapped_q_y);
+    
+    // Q != -P
+    vm.assume(p_x == q_x || p_y != q_y);
+
+    (uint256 r_x, uint256 r_y) = crypto.ecAdd(p_x, p_y, q_x, q_y, 0);
+
+    assertTrue(crypto.isCurvePointInternal(r_x, r_y));
   }
   
 
@@ -94,9 +126,10 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto {
     ];
 
     for (uint i = 0; i < u.length; i++) {
-      CurvePoint memory p = crypto.mapPoint(crypto.map_to_curve_simple_swu(u[i]));
-      assertEq(p.x, points[i].x);
-      assertEq(p.y, points[i].y);
+      (uint256 mapped_x, uint256 mapped_y) = crypto.map_to_curve_simple_swu(u[i]);
+      (uint256 p_x, uint256 p_y) = crypto.mapPoint(mapped_x, mapped_y);
+      assertEq(p_x, points[i].x);
+      assertEq(p_y, points[i].y);
     }
   }
 
@@ -138,10 +171,9 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto {
   }
 
   function testExpandMsgXmd2() public {
-        bytes memory DST = "QUUX-V01-CS02-with-expander-SHA256-128";
+    bytes memory DST = "QUUX-V01-CS02-with-expander-SHA256-128";
 
-      (bytes32 u_0, bytes32 u_1, bytes32 u_2) = crypto.expand_message_xmd_keccak256("HOPR ...", "drh<zahy");
-
+    (bytes32 u_0, bytes32 u_1, bytes32 u_2) = crypto.expand_message_xmd_keccak256("HOPR ...", "drh<zahy");
   }
 
   function testHashToCurve() public {
@@ -165,7 +197,7 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto {
     ];
 
     for (uint256 i = 0; i < 5; i++) {
-      CurvePoint memory p = crypto.hashToCurve(testStrings[i], DST);
+      (uint256 p_x, uint256 p_y) = crypto.hashToCurve(testStrings[i], DST);
       CurvePoint memory should = points[i];
 
       // assertEq(p.x, should.x);
