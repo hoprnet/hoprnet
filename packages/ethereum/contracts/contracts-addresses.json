@@ -55,7 +55,7 @@
       "indexer_start_block_number": 24097267,
       "network_registry_contract_address": "0x819E6a81e1e3f96CF1ac9200477C2d09c676959D",
       "network_registry_proxy_contract_address": "0xcA9B1bC189F977B2A9217598D0300d956b6a719f",
-      "stake_contract_address": "0x488EB03650BD2de6b4fEB187F06b34Ee483D81ba",
+      "stake_contract_address": "0xDC8F03f19986859362d15c3d5ED74f26518870B9",
       "stake_season": 8,
       "token_contract_address": "0x66225dE86Cac02b32f34992eb3410F59DE416698",
       "xhopr_contract_address": "0xD057604A14982FE8D88c5fC25Aac3267eA142a08"
