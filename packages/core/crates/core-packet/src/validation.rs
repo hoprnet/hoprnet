@@ -213,7 +213,7 @@ mod tests {
                 snapshot: &Snapshot,
             ) -> core_ethereum_db::errors::Result<()>;
             async fn get_account_from_network_registry(&self, public_key: &Address) -> core_ethereum_db::errors::Result<Option<Address>>;
-            async fn find_hopr_node_using_account_in_network_registry(&self, account: &Address) -> core_ethereum_db::errors::Result<Vec<PublicKey>>;
+            async fn find_hopr_node_using_account_in_network_registry(&self, account: &Address) -> core_ethereum_db::errors::Result<Vec<Address>>;
             async fn is_eligible(&self, account: &Address) -> core_ethereum_db::errors::Result<bool>;
             async fn set_eligible(&mut self, account: &Address, eligible: bool, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
             async fn store_authorization(&mut self, token: AuthorizationToken) -> core_ethereum_db::errors::Result<()>;
