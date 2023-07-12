@@ -296,8 +296,8 @@ contract DeployAllContractsScript is
         }
       }
     }
-    // mint Network_registry type (except for production)
-    if (currentEnvironmentType != EnvironmentType.PRODUCTION) {
+    // mint Network_registry type (only in LOCAL)
+    if (currentEnvironmentType == EnvironmentType.LOCAL) {
       (bytes memory builtNftBatchMintPayload1, bytes memory builtNftBatchMintPayload2) = buildNftBatchMintInternal(
         deployerAddress,
         DEV_BANK_ADDRESS
