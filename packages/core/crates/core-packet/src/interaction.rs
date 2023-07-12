@@ -1634,6 +1634,7 @@ pub mod wasm {
             let gloo_mixer = Mixer::new_with_gloo_timers(cfg.mixer.clone());
 
             let mut w = PacketInteraction::new(db.as_ref_counted(), on_msg.0, cfg);
+
             w.mixer = gloo_mixer;
 
             if let Some(on_msg_recv) = on_msg.1 {

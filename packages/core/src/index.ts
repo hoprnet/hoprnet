@@ -1408,6 +1408,7 @@ class Hopr extends EventEmitter {
     direction: 'incoming' | 'outgoing'
   ): Promise<{ receipt: string; status: ChannelStatus }> {
     const connector = HoprCoreEthereum.getInstance()
+<<<<<<< HEAD
     const wrapped_pk = this.getEthereumAddress()
     const channel =
       direction === 'outgoing'
@@ -1418,6 +1419,12 @@ class Hopr extends EventEmitter {
       log(`The requested channel for counterparty ${counterparty.toString()} does not exist`)
       throw new Error('Requested channel does not exist')
     }
+=======
+    const channel =
+      direction === 'outgoing'
+        ? await this.db.getChannelX(this.getEthereumAddress(), counterparty)
+        : await this.db.getChannelX(counterparty, this.getEthereumAddress())
+>>>>>>> master
 
     // TODO: should we wait for confirmation?
     if (channel.status === ChannelStatus.Closed) {
@@ -1522,8 +1529,14 @@ class Hopr extends EventEmitter {
 
   public async redeemTicketsInChannel(counterparty: Address) {
     const self = this.getEthereumAddress()
+<<<<<<< HEAD
     const channel = await this.db.get_channel_x(counterparty, self)
     await HoprCoreEthereum.getInstance().redeemTicketsInChannel(ChannelEntry.deserialize(channel.serialize()))
+=======
+    const channel = await this.db.getChannelX(counterparty, self)
+
+    await HoprCoreEthereum.getInstance().redeemTicketsInChannel(channel)
+>>>>>>> master
   }
 
   /**
@@ -1533,7 +1546,11 @@ class Hopr extends EventEmitter {
    * @returns the channel entry of those two nodes
    */
   public async getChannel(src: Address, dest: Address): Promise<ChannelEntry> {
+<<<<<<< HEAD
     return ChannelEntry.deserialize((await this.db.get_channel_x(src, dest)).serialize())
+=======
+    return await this.db.getChannelX(src, dest)
+>>>>>>> master
   }
 
   public async getAllChannels(): Promise<ChannelEntry[]> {

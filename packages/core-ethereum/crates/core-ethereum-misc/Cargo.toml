@@ -28,6 +28,7 @@ utils-types = { path = "../../../utils/crates/utils-types", default-features = f
 wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen-futures = { version = "0.4.36", features = ["futures-core-03-stream"], optional = true }
 
+
 [dev-dependencies]
 env_logger = "0.10"
 core-types = { path = "../../../core/crates/core-types", default-features = false }

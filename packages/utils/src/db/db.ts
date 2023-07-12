@@ -286,17 +286,13 @@ export class LevelDb {
           if (nextDelimiter < 0) {
             break
           } else {
-            key = key.subarray(nextDelimiter + 1)
-          }
-
-          if (nextDelimiter < 0) {
-            break
-          } else {
             key = (key as Buffer).subarray(nextDelimiter + 1)
           }
-          dumpFile.write(out + ' ' + value.toString('hex') + '\n')
+
+          dumpFile.write(out + '\n')
         }
-      }).on('end', function () {
+      })
+      .on('end', function () {
         dumpFile.close()
       })
   }

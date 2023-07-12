@@ -1065,6 +1065,7 @@ pub mod wasm {
         pub async fn get_channel_x(&self, src: &Address, dest: &Address) -> Result<Option<ChannelEntry>, JsValue> {
             let data = self.core_ethereum_db.clone();
             let db = data.read().await;
+
             utils_misc::ok_or_jserr!(db.get_channel_x(src, dest).await)
         }
 
@@ -1072,6 +1073,7 @@ pub mod wasm {
         pub async fn get_channel_to(&self, dest: &Address) -> Result<Option<ChannelEntry>, JsValue> {
             let data = self.core_ethereum_db.clone();
             let db = data.read().await;
+
             utils_misc::ok_or_jserr!(db.get_channel_to(dest).await)
         }
 
@@ -1079,6 +1081,7 @@ pub mod wasm {
         pub async fn get_channel_from(&self, src: &Address) -> Result<Option<ChannelEntry>, JsValue> {
             let data = self.core_ethereum_db.clone();
             let db = data.read().await;
+
             utils_misc::ok_or_jserr!(db.get_channel_from(src).await)
         }
 
