@@ -1,22 +1,20 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.0;
 
-import 'openzeppelin-contracts-4.8.3/access/Ownable.sol';
+import 'openzeppelin-contracts-4.8.3/access/AccessControlEnumerable.sol';
 import './IHoprNetworkRegistryRequirement.sol';
 
 /**
  * @title HoprNetworkRegistry
- * @dev Smart contract that maintains a list of hopr node address (peer id) that are allowed
- * to enter HOPR network. Each peer id is linked with an Ethereum account. Only Ethereum
- * accounts that are eligible according to `IHoprNetworkRegistryRequirement` can register one
- * or multiple HOPR node address(es).
+ * @dev Smart contract that maintains a list of hopr node address that are allowed
+ * to enter HOPR network. 
+ * Eligibility of whether a node address can be registered is checked through
+ * `IHoprNetworkRegistryRequirement`.
  *
  * When reaching its limits, accounts can remove registered node addresses (`deregister`)
  * before adding more.
  *
- * A peer id can only be registered if it's not registered by another account.
- *
- * Note that HOPR node address refers to `PeerId.toString()`
+ * A node address can only be registered if it's not registered by another account.
  *
  * This network registry can be globally enabled/disabled by the owner
  *
@@ -25,126 +23,136 @@ import './IHoprNetworkRegistryRequirement.sol';
  *
  * Owner has the power to overwrite the registration
  */
-contract HoprNetworkRegistry is Ownable {
+contract HoprNetworkRegistry is AccessControlEnumerable {
+  bytes32 public constant MANAGER_ROLE = keccak256('MANAGER_ROLE');
+
   IHoprNetworkRegistryRequirement public requirementImplementation; // Implementation of network registry proxy
-  mapping(address => uint256) public countRegisterdNodesPerAccount; // counter for registered nodes per account
-  mapping(string => address) public nodePeerIdToAccount; // mapping the hopr node peer id in bytes to account
+  mapping(address => uint256) public countRegisterdNodesPerAccount; // counter for registered nodes per staking account
+  mapping(address => address) public nodeToAccount; // map the node address to its staking account
   bool public enabled;
 
-  error InvalidPeerId(string peerId);
+  error GloballyDisabledRegistry();
+  error GloballyEnabledRegistry();
+  error NodeAlreadyRegisterd();
+  error NotEnoughAllowanceToRegisterNode(uint256 maxAllowance, uint256 expectedAllowance);
+  error NotEligibleToRegisterNode(uint256 eligibleNodeCount);
 
   event EnabledNetworkRegistry(bool indexed isEnabled); // Global toggle of the network registry
   event RequirementUpdated(address indexed requirementImplementation); // Emit when the network registry proxy is updated
-  event Registered(address indexed account, string hoprPeerId); // Emit when an account register a node peer id for itself
-  event Deregistered(address indexed account, string hoprPeerId); // Emit when an account deregister a node peer id for itself
-  event RegisteredByOwner(address indexed account, string hoprPeerId); // Emit when the contract owner register a node peer id for an account
-  event DeregisteredByOwner(address indexed account, string hoprPeerId); // Emit when the contract owner deregister a node peer id for an account
+  event Registered(address indexed account, address indexed nodeAddress); // Emit when a node is included in the registry
+  event Deregistered(address indexed account, address indexed nodeAddress); // Emit when a node is removed from the registry
+  event RegisteredByManager(address indexed account, address indexed nodeAddress); // Emit when the contract manager includes a node to the registry
+  event DeregisteredByManager(address indexed account, address indexed nodeAddress); // Emit when the contract owner removes a node from the registry
   event EligibilityUpdated(address indexed account, bool indexed eligibility); // Emit when the eligibility of an account is updated
 
   /**
    * @dev Network registry can be globally toggled. If `enabled === true`, only nodes registered
    * in this contract with an eligible account associated can join HOPR network; If `!enabled`,
-   * all the nodes can join HOPR network regardless the eligibility of the associated account.
+   * all the nodes can join HOPR network.
    */
   modifier mustBeEnabled() {
-    require(enabled, 'HoprNetworkRegistry: Registry is disabled');
+    if (!enabled) {
+      revert GloballyDisabledRegistry();
+    }
     _;
   }
 
   /**
-   * Specify NetworkRegistry logic implementation and transfer the ownership
+   * @dev Specify NetworkRegistry logic implementation and set up manager role
    * enable the network registry on deployment.
    * @param _requirementImplementation address of the network registry logic implementation
    * @param _newOwner address of the contract owner
    */
-  constructor(address _requirementImplementation, address _newOwner) {
+  constructor(
+    address _requirementImplementation, 
+    address _newOwner
+  ) {
+    _setupRole(DEFAULT_ADMIN_ROLE, _newOwner);
+    _setupRole(MANAGER_ROLE, _newOwner);
+    
     requirementImplementation = IHoprNetworkRegistryRequirement(_requirementImplementation);
     enabled = true;
-    _transferOwnership(_newOwner);
     emit RequirementUpdated(_requirementImplementation);
     emit EnabledNetworkRegistry(true);
   }
 
   /**
-   * Specify NetworkRegistry logic implementation
+   * Specify NetworkRegistry logic implementation by a manager
    * @param _requirementImplementation address of the network registry logic implementation
    */
-  function updateRequirementImplementation(address _requirementImplementation) external onlyOwner {
+  function updateRequirementImplementation(address _requirementImplementation) external onlyRole(MANAGER_ROLE) {
     requirementImplementation = IHoprNetworkRegistryRequirement(_requirementImplementation);
     emit RequirementUpdated(_requirementImplementation);
   }
 
   /**
-   * Enable globally the network registry by the owner
+   * Enable globally the network registry by a manager
    */
-  function enableRegistry() external onlyOwner {
-    require(!enabled, 'HoprNetworkRegistry: Registry is enabled');
+  function enableRegistry() external onlyRole(MANAGER_ROLE) {
+    if (enabled) {
+      revert GloballyEnabledRegistry();
+    }
     enabled = true;
     emit EnabledNetworkRegistry(true);
   }
 
   /**
-   * Disanable globally the network registry by the owner
+   * Disable globally the network registry by a manager
    */
-  function disableRegistry() external onlyOwner mustBeEnabled {
+  function disableRegistry() external onlyRole(MANAGER_ROLE) mustBeEnabled {
     enabled = false;
     emit EnabledNetworkRegistry(false);
   }
 
   /**
-   * @dev Register a new node's peer id associated with the caller.
-   * @notice Transaction will fail, if
-   * 1) the peer ID is registered to an address, including the caller.
-   * 2) the caller will become ineligible after adding a new node
-   *
-   * Performs a minimum validation of node IDs. Full validation should be done off-chain.
-   * hopr node peer id should always start with '16Uiu2HA' (0x3136556975324841) and be of length 53
-   *
+   * @dev Register new nodes by its staking account
+   * @notice Transaction will fail, if a node has already been registered
+   * registered nodes are ignored by this function
    * Function can only be called when the registry is enabled.
-   * @param hoprPeerIds Array of hopr nodes id. e.g. [16Uiu2HAmHsB2c2puugVuuErRzLm9NZfceainZpkxqJMR6qGsf1x1]
+   * @param nodeAddresses addresses nodes to be registered
    */
-  function selfRegister(string[] calldata hoprPeerIds) external mustBeEnabled {
-    // update the counter
-    countRegisterdNodesPerAccount[msg.sender] += hoprPeerIds.length;
+  function selfRegister(address[] calldata nodeAddresses) external mustBeEnabled {
+    for (uint256 i = 0; i < nodeAddresses.length; i++) {
+      address nodeAddress = nodeAddresses[i];
+      address stakingAccount = nodeToAccount[nodeAddress];
 
-    // check sender eligibility
-    require(
-      _checkEligibility(msg.sender),
-      'HoprNetworkRegistry: selfRegister reaches limit, cannot register requested nodes.'
-    );
-    emit EligibilityUpdated(msg.sender, true);
+      if (stakingAccount == address(0)) {
+        // if node is not registered, update the counter
+        countRegisterdNodesPerAccount[msg.sender]++;
+        emit Registered(nodeAddress);
+      } else if (stakingAccount != msg.sender) {
+        // when the node is not registered under the caller, revert
+        revert NodeAlreadyRegisterd();
+      }
+    }
+    // TODO: delete me
+    // require(
+    //   _checkEligibility(msg.sender, nodeAddresses),
+    //   'HoprNetworkRegistry: selfRegister reaches limit, cannot register requested nodes.'
+    // );
 
-    for (uint256 i = 0; i < hoprPeerIds.length; i++) {
-      string memory hoprPeerId = hoprPeerIds[i];
-      if (bytes(hoprPeerId).length != 53 || bytes32(bytes(hoprPeerIds[i])[0:8]) != '16Uiu2HA') {
-        revert InvalidPeerId({peerId: hoprPeerId});
-      }
-      // get account associated with the given hopr node peer id, if any
-      address registeredAccount = nodePeerIdToAccount[hoprPeerId];
-      if (registeredAccount == msg.sender) {
-        // when registering the registerd account, skip
-        continue;
-      } else {
-        // if the hopr node peer id was linked to a different account, revert.
-        // To change a nodes' linked account, it must be deregistered by the previously linked account
-        // first before registering by the new account, to prevent hostile takeover of others' node peer id
-        require(registeredAccount == address(0), 'HoprNetworkRegistry: Cannot link a registered node.');
-        nodePeerIdToAccount[hoprPeerId] = msg.sender;
-        emit Registered(msg.sender, hoprPeerId);
-      }
+    // check eligibility of the sender staking account
+    (uint256 allowancePerAccount, uint256 eligibleNodeNum) = requirementImplementation.maxAllowedRegistrations(msg.sender, nodeAddresses);
+    if (countRegisterdNodesPerAccount[account] > allowancePerAccount) {
+      revert NotEnoughAllowanceToRegisterNode({maxAllowance: allowancePerAccount, expectedAllowance: nodeAddresses.length});
+    } else if (nodeAddresses.length > eligibleNodeCount) {
+      revert NotEligibleToRegisterNode({eligibleNodeCount: eligibleNodeNum});
+    } else {
+      emit EligibilityUpdated(msg.sender, true);
     }
   }
 
   /**
-   * @dev Allows account to deregister a registered peer ID
+   * @dev Allows the staking account to deregister a registered node address
    * Function can only be called when the registry is enabled.
    *
-   * Performs a minimum validation of node IDs. Full validation should be done off-chain.
-   * hopr node peer id should always start with '16Uiu2HA' (0x3136556975324841) and be of length 53
-   *
-   * @param hoprPeerIds Array of hopr nodes id. e.g. [16Uiu2HAmHsB2c2puugVuuErRzLm9NZfceainZpkxqJMR6qGsf1x1]
+   * @param nodeAddresses addresses nodes to be registered
    */
-  function selfDeregister(string[] calldata hoprPeerIds) external mustBeEnabled {
+  function selfDeregister(address[] calldata nodeAddresses) external mustBeEnabled {
+    // check eligibility of the sender staking account
+    (uint256 allowancePerAccount, uint256 eligibleNodeNum) = requirementImplementation.maxAllowedRegistrations(msg.sender, nodeAddresses);
+
+
     // update the counter
     countRegisterdNodesPerAccount[msg.sender] -= hoprPeerIds.length;
 
@@ -176,7 +184,7 @@ contract HoprNetworkRegistry is Ownable {
    * @param accounts Array of Ethereum accounts, e.g. [0xf6A8b267f43998B890857f8d1C9AabC68F8556ee]
    * @param hoprPeerIds Array of hopr nodes id. e.g. [16Uiu2HAmHsB2c2puugVuuErRzLm9NZfceainZpkxqJMR6qGsf1x1]
    */
-  function ownerRegister(address[] calldata accounts, string[] calldata hoprPeerIds) external onlyOwner {
+  function ownerRegister(address[] calldata accounts, string[] calldata hoprPeerIds) external onlyRole(MANAGER_ROLE) {
     require(hoprPeerIds.length == accounts.length, 'HoprNetworkRegistry: hoprPeerIdes and accounts lengths mismatch');
     for (uint256 i = 0; i < accounts.length; i++) {
       // validate peer the length and prefix of peer Ids. If invalid, skip.
@@ -198,7 +206,7 @@ contract HoprNetworkRegistry is Ownable {
    * @notice Owner can even remove self-declared entries.
    * @param hoprPeerIds Array of hopr nodes id. e.g. [16Uiu2HAmHsB2c2puugVuuErRzLm9NZfceainZpkxqJMR6qGsf1x1]
    */
-  function ownerDeregister(string[] calldata hoprPeerIds) external onlyOwner {
+  function ownerDeregister(string[] calldata hoprPeerIds) external onlyRole(MANAGER_ROLE) {
     for (uint256 i = 0; i < hoprPeerIds.length; i++) {
       string memory hoprPeerId = hoprPeerIds[i];
       address account = nodePeerIdToAccount[hoprPeerId];
@@ -220,7 +228,7 @@ contract HoprNetworkRegistry is Ownable {
    * @param accounts Array of Ethereum accounts, e.g. [0xf6A8b267f43998B890857f8d1C9AabC68F8556ee]
    * @param eligibility Array of account eligibility, e.g. [true]
    */
-  function ownerForceEligibility(address[] calldata accounts, bool[] calldata eligibility) external onlyOwner {
+  function ownerForceEligibility(address[] calldata accounts, bool[] calldata eligibility) external onlyRole(MANAGER_ROLE) {
     require(accounts.length == eligibility.length, 'HoprNetworkRegistry: accounts and eligibility lengths mismatch');
     for (uint256 i = 0; i < accounts.length; i++) {
       emit EligibilityUpdated(accounts[i], eligibility[i]);
@@ -233,7 +241,7 @@ contract HoprNetworkRegistry is Ownable {
    * @notice If a peer id hasn't been registered, its eligibility is not going to be updated
    * @param hoprPeerIds Array of hopr nodes id. e.g. [16Uiu2HAmHsB2c2puugVuuErRzLm9NZfceainZpkxqJMR6qGsf1x1]
    */
-  function sync(string[] calldata hoprPeerIds) external onlyOwner mustBeEnabled {
+  function sync(string[] calldata hoprPeerIds) external onlyRole(MANAGER_ROLE) mustBeEnabled {
     for (uint256 i = 0; i < hoprPeerIds.length; i++) {
       string memory hoprPeerId = hoprPeerIds[i];
       address account = nodePeerIdToAccount[hoprPeerId];
