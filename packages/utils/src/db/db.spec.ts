@@ -12,8 +12,11 @@ import {
   Snapshot,
   ChannelStatus,
   Database,
-  Response
+  Response,
+  core_ethereum_db_initialize_crate
 } from '../../../core-ethereum/lib/core_ethereum_db.js'
+core_ethereum_db_initialize_crate()
+
 import BN from 'bn.js'
 import { stringToU8a } from '../u8a/index.js'
 

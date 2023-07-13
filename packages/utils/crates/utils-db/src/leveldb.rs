@@ -179,6 +179,7 @@ pub mod wasm {
         // }
 
         if kv_storage.contains(key_1.as_bytes().into()).await {
+            utils_log::logger::js_log("1 failed");
             return Err::<bool, JsValue>(JsValue::from(JsError::new(
                 "Test #1 failed: empty DB should not contain any data",
             )));
@@ -188,6 +189,7 @@ pub mod wasm {
 
         let _ = kv_storage.set(key_1.as_bytes().into(), value_1.as_bytes().into()).await;
         if !kv_storage.contains(key_1.as_bytes().into()).await {
+            utils_log::logger::js_log("2 failed");
             return Err::<bool, JsValue>(JsValue::from(JsError::new("Test #2 failed: DB should contain the key")));
         }
 
@@ -202,6 +204,7 @@ pub mod wasm {
             .map_err(|_| JsValue::from(JsError::new("Test #3.0 failed: could not convert the get type")))?;
 
         if value_converted != value_1 {
+            utils_log::logger::js_log("3.1 failed");
             return Err::<bool, JsValue>(JsValue::from(JsError::new(
                 "Test #3.1 failed: DB value after get should be equal to the one before the get",
             )));
@@ -212,6 +215,7 @@ pub mod wasm {
         let _ = kv_storage.remove(key_1.as_bytes().into()).await;
 
         if kv_storage.contains(key_1.as_bytes().into()).await {
+            utils_log::logger::js_log("4 failed");
             return Err::<bool, JsValue>(JsValue::from(JsError::new(
                 "Test #4 failed: removal of key from the DB failed",
             )));
@@ -233,6 +237,7 @@ pub mod wasm {
             }),
         ];
         if let Err(e) = kv_storage.batch(batch_data, true).await {
+            utils_log::logger::js_log("5.0 failed");
             return Err::<bool, JsValue>(JsValue::from(JsError::new(
                 format!("Test #5.0 failed: batch operation failed: {}", e.to_string()).as_str(),
             )));
@@ -244,6 +249,7 @@ pub mod wasm {
 
         // TODO: levelup api with the passed options to do an immediate write does not perform an immediate write
         if !kv_storage.contains(key_3.as_bytes().into()).await {
+            utils_log::logger::js_log("5.1 failed");
             return Err::<bool, JsValue>(JsValue::from(JsError::new(
                 "Test #5.1 failed: the key should be present in the DB",
             )));
@@ -256,13 +262,19 @@ pub mod wasm {
             .await
             .expect("Could not write empty value");
 
-        assert!(kv_storage.contains(key_4.as_bytes().into()).await);
+        if !kv_storage.contains(key_4.as_bytes().into()).await {
+            utils_log::logger::js_log("5.2 failed");
+            return Err::<bool, JsValue>(JsValue::from(JsError::new(
+                "Test #5.2 failed: it should be possible to store empty values",
+            )));
+        }
 
-        assert_eq!(
-            kv_storage.get(key_4.as_bytes().into()).await,
-            Ok(None),
-            "Test #6 failed: Could not read empty value from DB"
-        );
+        if !kv_storage.get(key_4.as_bytes().into()).await.is_ok_and(|o| o.is_none()) {
+            utils_log::logger::js_log("6 failed");
+            return Err::<bool, JsValue>(JsValue::from(JsError::new(
+                "Test #6 failed: could not read empty value from DB",
+            )));
+        }
 
         // ===================================
 
@@ -304,6 +316,7 @@ pub mod wasm {
         }
 
         if received != expected {
+            utils_log::logger::js_log("7.2 failed");
             return Err::<bool, JsValue>(JsValue::from(JsError::new(
                 format!("Test #7.2 failed: db content mismatch {:?} != {:?}", received, expected).as_str(),
             )));
