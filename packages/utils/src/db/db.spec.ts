@@ -91,10 +91,9 @@ describe('db shim tests', function () {
     await db.init(true, db_dir_path, true, 'monte_rosa')
 
     try {
-      let result = await db_sanity_test(db)
-      assert(result)
+      await db_sanity_test(db)
     } catch (e) {
-      assert('EVERYTHING SHOULD PASS', e.toString())
+      assert.fail(`db sanity tests should pass: ${e}`)
     }
   })
 })

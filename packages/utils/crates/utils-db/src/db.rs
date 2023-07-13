@@ -112,7 +112,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
     }
 
     pub async fn contains(&self, key: Key) -> bool {
-        self.backend.contains(key.into()).await
+        self.backend.contains(key.into()).await.is_ok_and(|v| v)
     }
 
     pub async fn get_or_none<V: DeserializeOwned>(&self, key: Key) -> Result<Option<V>> {
@@ -234,7 +234,7 @@ mod tests {
         backend
             .expect_contains()
             .with(predicate::eq(expected.clone()))
-            .return_const(true);
+            .returning(|_| Ok(true));
 
         let db = DB::new(backend);
 

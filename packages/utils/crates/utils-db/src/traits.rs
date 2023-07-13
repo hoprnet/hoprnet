@@ -46,7 +46,7 @@ pub trait AsyncKVStorage {
 
     async fn set(&mut self, key: Self::Key, value: Self::Value) -> Result<Option<Self::Value>>;
 
-    async fn contains(&self, key: Self::Key) -> bool;
+    async fn contains(&self, key: Self::Key) -> Result<bool>;
 
     async fn remove(&mut self, key: Self::Key) -> Result<Option<Self::Value>>;
 
