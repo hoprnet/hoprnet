@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity >=0.6.0 <0.9.0;
 
-import '../src/HoprNetworkRegistry.sol';
+import '../src/NetworkRegistry.sol';
 import 'forge-std/Test.sol';
 
 contract HoprNetworkRegistryTest is Test {

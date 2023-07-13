@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity >=0.6.0 <0.9.0;
 
-import '../../src/proxy/HoprDummyProxyForNetworkRegistry.sol';
+import '../../src/proxy/DummyProxyForNetworkRegistry.sol';
 import 'forge-std/Test.sol';
 
 contract HoprDummyProxyForNetworkRegistryTest is Test {

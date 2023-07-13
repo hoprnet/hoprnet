@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity >=0.6.0 <0.9.0;
 
-import '../../src/proxy/HoprStakingProxyForNetworkRegistry.sol';
+import '../../src/proxy/StakingProxyForNetworkRegistry.sol';
 import 'forge-std/Test.sol';
 
 contract HoprStakingProxyForNetworkRegistryTest is Test {

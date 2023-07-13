@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import 'openzeppelin-contracts-4.8.3/access/AccessControlEnumerable.sol';
-import './IHoprNetworkRegistryRequirement.sol';
+import './interfaces/INetworkRegistryRequirement.sol';
 
 /**
  * @title HoprNetworkRegistry
