@@ -104,6 +104,15 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
   }
 
   /**
+    * @dev Get if the staking account is eligible to act on node address
+    * @param stakingAccount Staking account
+    * @param nodeAddress node address
+    */
+  function canOperateFor(address stakingAccount, address nodeAddress) external view returns (bool eligiblity) {
+      return true;
+  }
+
+  /**
    * @dev Owner adds/updates NFT type and rank to the list of special NFTs in batch.
    * @param nftTypes Array of type indexes of the special HoprBoost NFT
    * @param nftRanks Array of HOPR boost rank, which is associated to the special NFT, in string[]

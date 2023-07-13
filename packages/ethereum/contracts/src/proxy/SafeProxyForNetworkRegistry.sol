@@ -14,8 +14,8 @@ contract INodeSafeRegistry {
 /**
  * @dev Minimum interface for token contract
  */
-interface IERC20 {
-    function balanceOf(address account) external view returns (uint256);
+interface IERC777Snapshot {
+    function balanceOfAt(address _owner, uint128 _blockNumber) external view returns (uint256);
 }
 
 /**
@@ -23,27 +23,31 @@ interface IERC20 {
  * Node with are considered eligible:
  * Nodes' safe holding HOPR token blances above certain threshold
  */
-contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, AccessControlEnumerable {
+contract HoprSafeProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, AccessControlEnumerable {
     bytes32 public constant MANAGER_ROLE = keccak256('MANAGER_ROLE');
-    IERC20 public token;
+    IERC777Snapshot public token;
     INodeSafeRegistry public nodeSafeRegistry;
     uint256 public stakeThreshold;
+    uint128 public snapshotBlockNumber;
 
     error SameValue();
     event ThresholdUpdated(uint256 indexed threshold);
+    event SnapshotUpdated(uint128 indexed blockNumber);
     event TokenAndRegistryUpdated(address indexed token, address indexed nodeSafeRegistry);
 
     constructor(
         address _owner,
         uint256 _stakeThreshold,
+        uint128 _snapshotBlockNumber,
         address _token,
         address _nodeSafeRegistry
     ) {
         _setupRole(DEFAULT_ADMIN_ROLE, _owner);
         _setupRole(MANAGER_ROLE, _owner);
         _updateStakeThreshold(_stakeThreshold);
+        _updateSnapshotBlockNumber(_snapshotBlockNumber);
 
-        token = IERC20(_token);
+        token = IERC777Snapshot(_token);
         nodeSafeRegistry = INodeSafeRegistry(_nodeSafeRegistry);
         emit TokenAndRegistryUpdated(_token, _nodeSafeRegistry);
     }
@@ -64,15 +68,46 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
     /**
      * @dev Returns the maximum allowed registration
      * check the safe address associated with the node address and compute maxiAllowedRegistration
-     * @param nodeAddress Node address
+     * @param nodeAddress node address
      */
     function maxAllowedRegistrations(address nodeAddress) external view returns (uint256) {
         address safeAddress = nodeSafeRegistry.nodeToSafe(nodeAddress);
-        return token.balanceOf(safeAddress) / stakeThreshold;
+        return token.balanceOfAt(safeAddress, snapshotBlockNumber) / stakeThreshold;
     }
 
     /**
-     * @dev Owner updates the minimal staking amount required for users to add themselves onto the HoprNetworkRegistry
+     * @dev Get if the staking account is eligible to act on node address
+     * @param stakingAccount Staking account
+     * @param nodeAddress node address
+     */
+    function canOperateFor(address stakingAccount, address nodeAddress) external view returns (bool eligiblity) {
+        address safeAddress = nodeSafeRegistry.nodeToSafe(nodeAddress);
+        return safeAddress == stakingAccount;
+    }
+ 
+
+    /**
+     * @dev Manager updates the block number of the token balance snapshot, which is used for calculating maxAllowedRegistrations
+     * @param newSnapshotBlock new block number of the token balance snapshot
+     */
+    function updateSnapshotBlockNumber(uint128 newSnapshotBlock) external onlyRole(MANAGER_ROLE) {
+        if (snapshotBlockNumber == newSnapshotBlock) {
+            revert SameValue();
+        }
+        _updateSnapshotBlockNumber(newSnapshotBlock);
+    }
+
+    /**
+     * private function to update block number of the token balance snapshot
+     * @param _newSnapshotBlock new block number of the token balance snapshot
+     */
+    function _updateSnapshotBlockNumber(uint128 _newSnapshotBlock) private {
+        snapshotBlockNumber = _newSnapshotBlock;
+        emit SnapshotUpdated(_newSnapshotBlock);
+    }
+
+    /**
+     * @dev Manager updates the minimal staking amount required for users to add themselves onto the HoprNetworkRegistry
      * @param newThreshold Minimum stake of HOPR token
      */
     function updateStakeThreshold(uint256 newThreshold) external onlyRole(MANAGER_ROLE) {
