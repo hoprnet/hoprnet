@@ -26,8 +26,6 @@ where
 
     let pre_image = find_commitment_preimage(db, channel_id).await?;
 
-    println!("{}", pre_image);
-
     acked_ticket.set_preimage(&pre_image);
     debug!("Set preImage {} for ticket {}", pre_image, acked_ticket.response);
 
@@ -152,6 +150,7 @@ pub mod wasm {
     use utils_misc::ok_or_jserr;
     use utils_types::primitives::Address;
     use wasm_bindgen::{prelude::*, JsValue};
+    use utils_misc::utils::wasm::JsResult;
 
     #[wasm_bindgen]
     pub async fn redeem_ticket(
@@ -160,14 +159,14 @@ pub mod wasm {
         channel_id: &Hash,
         acked_ticket: &mut AcknowledgedTicket,
         submit_ticket: &Function, // (counterparty: Address, ackedTicket)
-    ) -> Result<String, JsValue> {
+    ) -> JsResult<String> {
+        debug!("start preparing ticket");
         let pre_image = {
             let val = db.as_ref_counted();
             let g = val.read().await;
 
-            ok_or_jserr!(super::prepare_redeem_ticket(&*g, counterparty, channel_id, acked_ticket,).await)?
+            super::prepare_redeem_ticket(&*g, counterparty, channel_id, acked_ticket,).await?
         };
-
         debug!("after preparing ticket");
 
         let this = JsValue::undefined();
@@ -183,10 +182,13 @@ pub mod wasm {
             .await
             .map_err(|e| format!("Error while trying to submit ticket {:?}", e))?;
 
-        let val = db.as_ref_counted();
-        let mut g = val.write().await;
-        ok_or_jserr!(super::after_redeem_ticket(&mut *g, channel_id, &pre_image, acked_ticket).await)?;
-
+        debug!(">>> WRITE after_redeem_ticket");
+        {
+            let val = db.as_ref_counted();
+            let mut g = val.write().await;
+            super::after_redeem_ticket(&mut *g, channel_id, &pre_image, acked_ticket).await?;
+        }
+        debug!("<<< WRITE after_redeem_ticket");
         debug!("Successfully submitted ticket {}", acked_ticket.response);
 
         Ok(JsString::from(receipt).as_string().unwrap_or("no receipt given".into()))

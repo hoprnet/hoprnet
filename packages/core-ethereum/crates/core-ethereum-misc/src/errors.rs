@@ -1,5 +1,6 @@
 use core_crypto::errors::CryptoError;
 use thiserror::Error;
+use wasm_bindgen::JsValue;
 use utils_db::errors::DbError;
 
 #[derive(Error, Debug)]
@@ -24,3 +25,10 @@ pub enum CoreEthereumError {
 }
 
 pub type Result<T> = core::result::Result<T, CoreEthereumError>;
+
+#[cfg(feature = "wasm")]
+impl From<CoreEthereumError> for JsValue {
+    fn from(value: CoreEthereumError) -> Self {
+        value.to_string().into()
+    }
+}

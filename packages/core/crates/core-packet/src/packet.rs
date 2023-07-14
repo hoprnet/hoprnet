@@ -1,3 +1,4 @@
+use std::fmt::{Display, Formatter};
 use crate::errors::PacketError::{InvalidPacketState, PacketDecodingError};
 use core_crypto::derivation::{derive_ack_key_share, derive_packet_tag};
 use core_crypto::primitives::{DigestLike, SimpleMac};
@@ -251,6 +252,16 @@ pub enum PacketState {
         next_hop: PublicKey,
         ack_challenge: HalfKeyChallenge,
     },
+}
+
+impl Display for PacketState {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match &self {
+            Final { .. } => write!(f, "Final"),
+            Forwarded { .. } => write!(f, "Forwarded"),
+            Outgoing { .. } => write!(f, "Outgoing"),
+        }
+    }
 }
 
 /// Represents a HOPR packet

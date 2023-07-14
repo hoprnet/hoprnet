@@ -344,6 +344,12 @@ pub struct HalfKeyChallenge {
     hkc: [u8; Self::SIZE],
 }
 
+impl Display for HalfKeyChallenge {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", hex::encode(&self.hkc))
+    }
+}
+
 impl Default for HalfKeyChallenge {
     fn default() -> Self {
         // Note that the default HalfKeyChallenge is the identity point on secp256k1, therefore

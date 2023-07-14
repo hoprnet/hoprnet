@@ -631,6 +631,7 @@ class Hopr extends EventEmitter {
       this.acknowledgements.handle_incoming_acknowledgements(),
       this.acknowledgements.handle_outgoing_acknowledgements(acknowledgementInteractionSendMsg)
     ])
+    log(`all interactions finished execution`)
   }
 
   /**

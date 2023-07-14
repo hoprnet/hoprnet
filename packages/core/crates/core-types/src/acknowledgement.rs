@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use crate::acknowledgement::PendingAcknowledgement::{WaitingAsRelayer, WaitingAsSender};
 use crate::channels::Ticket;
 use core_crypto::errors::CryptoError::SignatureVerification;
@@ -93,7 +94,7 @@ impl BinarySerializable<'_> for Acknowledgement {
 }
 
 /// Contains acknowledgment information and the respective ticket
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct AcknowledgedTicket {
     pub ticket: Ticket,
@@ -120,17 +121,6 @@ impl AcknowledgedTicket {
 
     pub fn set_preimage(&mut self, hash: &Hash) {
         self.pre_image = hash.clone();
-    }
-}
-
-impl Default for AcknowledgedTicket {
-    fn default() -> Self {
-        Self {
-            ticket: Ticket::default(),
-            response: Response::default(),
-            pre_image: Hash::default(),
-            signer: Address::default(),
-        }
     }
 }
 
