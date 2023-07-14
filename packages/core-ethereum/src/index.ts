@@ -371,7 +371,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     // Node.JS to schedule iterations at any time
     const ticketRedeemIterator = async function* () {
       let serdeChannel = Ethereum_ChannelEntry.deserialize(channel.serialize())
-      let tickets = await boundGetAckdTickets({ serdeChannel })
+      let tickets = await boundGetAckdTickets(serdeChannel)
       let ticket: AcknowledgedTicket
       while (tickets.len() > 0) {
         let fetched = tickets.next()
@@ -433,6 +433,7 @@ export default class HoprCoreEthereum extends EventEmitter {
   ): Promise<RedeemTicketResponse> {
     let receipt: string
     try {
+      log(`going to redeem ticket for counterparty ${counterparty}`)
       receipt = await redeem_ticket(
         this.db,
         Ethereum_Address.deserialize(counterparty.serialize()),
@@ -443,6 +444,7 @@ export default class HoprCoreEthereum extends EventEmitter {
             this.setTxHandler(`channel-updated-${txHash}`, txHash)
           )
       )
+      log(`redeemed ticket for counterparty ${counterparty}`)
     } catch (err) {
       return {
         status: 'ERROR',
