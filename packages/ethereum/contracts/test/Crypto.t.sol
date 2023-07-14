@@ -91,7 +91,23 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto {
 
     (uint256 r_x, uint256 r_y) = crypto.ecAdd(p_x, p_y, q_x, q_y, 0);
 
+    // point addition (two different points)
     assertTrue(crypto.isCurvePointInternal(r_x, r_y));
+
+    // point doubling (same point)
+    (uint256 s_x, uint256 s_y) = crypto.ecAdd(p_x, p_y, q_x, q_y, 0);
+    assertTrue(crypto.isCurvePointInternal(s_x, s_y));
+  }
+
+  function testRevert_EcAddEdgeCase(uint256 u_0) public {
+    vm.assume(crypto.isFieldElementInternal(u_0));
+
+    (uint256 mapped_p_x, uint256 mapped_p_y) = crypto.map_to_curve_simple_swu(u_0);
+    (uint256 p_x, uint256 p_y) = crypto.mapPoint(mapped_p_x, mapped_p_y);
+
+    // Test P - P
+    vm.expectRevert();
+    crypto.ecAdd(p_x, p_y, p_x, SECP256K1_BASE_FIELD_ORDER - p_y, 0);
   }
   
 
@@ -133,53 +149,10 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto {
     }
   }
 
-  function testExpandMsgXmd() public {
-    bytes memory DST = "QUUX-V01-CS02-with-expander-SHA256-128";
-
-    bytes[5] memory testStrings = [
-      bytes(""),
-      bytes("abc"),
-      bytes("abcdef0123456789"),
-      bytes("q128_qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq"),
-      bytes("a512_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
-    ];
-
-    uint256[15] memory hashValue = [
-      0x3432c9c0a960eeed516f6b01a3b605dc1eb3384cc5ca30dc6878563573ff7f0d,
-      0x37bdc07c1644d3686bb9571f67f110196b9c542a61b2674e3a8e0ac89cf46dd2,
-      0xb5bda8d8841e493fc9606f8cf16aad07e3d3ca015f8086a519377449b10ae80a,
-      0x15873f85fe27c01a13ce8a6d546e912e21a44f758cb4ceafdf7ce15f767106fa,
-      0x3ed2c1f928798606343e6aa60ca9d4d4d035cfcaccb3133f712df12d882bd800,
-      0x1a7e45c260f68f22d3f8a2e0b0d0825dbf0fc42386df81413d1435e0cce8fee5,
-      0xd19a5f98a7232b23563eb994f8e51d984fb4229b9eaf2e02854ac029c4faa0bf,
-      0x5f3ad1cc12e4e85509d86beaeae050a248b95dbe8efbcd3bf2d1141d59d0650d,
-      0xfd5149675a4057dd5a51843c1fdcffe3e1ef177c2f0068fc5999f1b99adbe140,
-      0x8c5fc5fd3358f7000fd3738d710a718bf5546020c65182d22edb73d012e734b7,
-      0x47dfb3c74fefeee6c7125245923af62757c45223e07d638b7aeb920743359fa3,
-      0x85485929b734d02783a664ffa98008bf77831606e64f285e49bf1b499a8ed568,
-      0xeec447c0cd64d426e3b9e71e2b7049330a20a5e1cddd0cb480fa4a326d5f0109,
-      0x8ba30055c478728248607000dd1892a9a38be8a2eb96d97458c7e9e667f58a34,
-      0xca03f7c3a51636cb786cb994fdc102ed8cf75e7473a4558bb0c3f551f027e3d8
-    ];
-
-    for (uint256 i = 0; i < 5; i++) {
-      (bytes32 u_0, bytes32 u_1, bytes32 u_2) = crypto.expand_message_xmd_keccak256(testStrings[i], DST);
-      assertEq(u_0, bytes32(hashValue[3*i]));
-      assertEq(u_1, bytes32(hashValue[3*i + 1])); 
-      assertEq(u_2, bytes32(hashValue[3*i + 2])); 
-    }
-  }
-
-  function testExpandMsgXmd2() public {
-    bytes memory DST = "QUUX-V01-CS02-with-expander-SHA256-128";
-
-    (bytes32 u_0, bytes32 u_1, bytes32 u_2) = crypto.expand_message_xmd_keccak256("HOPR ...", "drh<zahy");
-  }
-
   function testHashToCurve() public {
-    bytes memory DST = "QUUX-V01-CS02-with-secp256k1_XMD:SHA-256_SSWU_RO_";
+    bytes memory DST = "QUUX-V01-CS02-with-secp256k1_XMD:Keccak256_SSWU_RO_";
 
-    // test vector taken from https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#appendix-J.8.1
+    // test strings taken from https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#appendix-J.8.1
     bytes[5] memory testStrings = [
       bytes(""),
       bytes("abc"),
@@ -188,20 +161,24 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto {
       bytes("a512_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
     ];
 
+    // Generated with Rust implementation
     CurvePoint[5] memory points = [
-      CurvePoint(0xc1cae290e291aee617ebaef1be6d73861479c48b841eaba9b7b5852ddfeb1346,0x64fa678e07ae116126f08b022a94af6de15985c996c3a91b64c406a960e51067),
-      CurvePoint(0x3377e01eab42db296b512293120c6cee72b6ecf9f9205760bd9ff11fb3cb2c4b,0x7f95890f33efebd1044d382a01b1bee0900fb6116f94688d487c6c7b9c8371f6),
-      CurvePoint(0xbac54083f293f1fe08e4a70137260aa90783a5cb84d3f35848b324d0674b0e3a,0x4436476085d4c3c4508b60fcf4389c40176adce756b398bdee27bca19758d828),
-      CurvePoint(0xe2167bc785333a37aa562f021f1e881defb853839babf52a7f72b102e41890e9,0xf2401dd95cc35867ffed4f367cd564763719fbc6a53e969fb8496a1e6685d873),
-      CurvePoint(0xe3c8d35aaaf0b9b647e88a0a0a7ee5d5bed5ad38238152e4e6fd8c1f8cb7c998,0x8446eeb6181bf12f56a9d24e262221cc2f0c4725c7e3803024b5888ee5823aa6)
+      CurvePoint(0xa8d5be3d37133158c01970d186839bc7405fb26c0c8c9687c5a0783f3e23db6d,0xfa9b1660a78cfe5a60cdb6355fde4d4108bcfb58cc2b97b655e629c0604849bf),
+      CurvePoint(0xd7e69a5226454f72a551c0799460d068fd1ffff6445146fb3beb9a842d5affbd,0x6de9462bd1fe58a603945b88927724f20d2ac0671223195f21d41609ce4c1265),
+      CurvePoint(0xefe470da01abba8406af26987fd94d7e8cfb917c75e4d4a005c4da40be588035,0x4883332ba13cc90cdcdb4db0eea6e0426360c8a218e82c8823a4609e564e7ee9),
+      CurvePoint(0xc1f6f9a3d1f7268162d3c7f4f2e2853dfd7cc302ad70f1f449e6c3e3668b97ac,0x67040bae5790efe2aa6524b413e9b7949540b4f2839cc43adbb875ad5da2b4b0),
+      CurvePoint(0x7140c0230d96c79cd4c70de14c69eb89c35fa53b3b71b9580d2b2fd872af6d7c,0xdd315906c024f1609504fe1dbf432d019e645fb9f3ce23e94ddcdd0a225acafc)
     ];
 
-    for (uint256 i = 0; i < 5; i++) {
+    for (uint256 i = 0; i < testStrings.length; i++) {
       (uint256 p_x, uint256 p_y) = crypto.hashToCurve(testStrings[i], DST);
       CurvePoint memory should = points[i];
 
-      // assertEq(p.x, should.x);
-      // assertEq(p.y, should.y);
+      console2.logBytes32(bytes32(p_x));
+      console2.logBytes32(bytes32(p_y));
+
+      assertEq(p_x, should.x);
+      assertEq(p_y, should.y);
     }
   }
 }
