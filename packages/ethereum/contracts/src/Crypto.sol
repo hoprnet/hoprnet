@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.19;
 
+import "forge-std/console2.sol";
+
 error InvalidFieldElement();
 error InvalidCurvePoint();
 error InvalidPointWitness();
@@ -640,8 +642,6 @@ abstract contract HoprCrypto {
   /**
    * Takes an arbitrary byte-string and a domain seperation tag (DST) and returns
    * two elements of the field used to create the secp256k1 curve.
-   *
-   * The function is necessary because the SWU map operates on 
    */
   function hash_to_field(bytes memory message, bytes memory DST) public view returns (uint256 u_0, uint256 u_1) {
     (bytes32 b_1, bytes32 b_2, bytes32 b_3) = expand_message_xmd_keccak256(message, DST);
@@ -681,6 +681,31 @@ abstract contract HoprCrypto {
     }
   }
 
+    /**
+   * Takes an arbitrary byte-string and a domain seperation tag (DST) and returns
+   * two elements of the field used to create the secp256k1 curve.
+   */
+  function hash_to_field_single(bytes memory message, bytes memory DST) public view returns (uint256 u) {
+    (bytes32 b_1, bytes32 b_2) = expand_message_xmd_keccak256_single(message, DST);
+
+    // computes [...b_1[..], ...b_2[0..16]] ^ 1 mod n
+    assembly {
+      let p := mload(0x40) // next free memory slot
+      mstore(p, 0x30)             // Length of Base
+      mstore(add(p, 0x20), 0x20)  // Length of Exponent
+      mstore(add(p, 0x40), 0x20)  // Length of Modulus
+      mstore(add(p, 0x60), b_1)  // Base
+      mstore(add(p, 0x80), b_2)
+      mstore(add(p, 0x90), 1)    // Exponent
+      mstore(add(p, 0xb0), SECP256K1_BASE_FIELD_ORDER)     // Modulus
+      if iszero(staticcall(not(0), 0x05, p, 0xD0, p, 0x20)) {
+        revert(0, 0)
+      }
+
+      u := mload(p)
+    }
+  }
+
   /**
    * Expands an arbitrary byte-string to 96 bits using the `expand_message_xmd` method described in
    * https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html
@@ -688,7 +713,7 @@ abstract contract HoprCrypto {
    * Note: This is not a general implementation as the output length fixed. It is tailor-made
    *       for secp256k1_XMD:KECCAK_256_SSWU_RO_ hash_to_curve implementation.
    */
-  function expand_message_xmd_keccak256(bytes memory message, bytes memory DST) public view returns (bytes32 b_1, bytes32 b_2, bytes32 b_3) {
+  function expand_message_xmd_keccak256(bytes memory message, bytes memory DST) public pure returns (bytes32 b_1, bytes32 b_2, bytes32 b_3) {
     uint256 ell; 
 
     if ((message.length >> 5) << 5 == 0) {
@@ -777,42 +802,158 @@ abstract contract HoprCrypto {
     }
   }
 
+    function expand_message_xmd_keccak256_single(bytes memory message, bytes memory DST) public pure returns (bytes32 b_1, bytes32 b_2) {
+    uint256 ell; 
+
+    if ((message.length >> 5) << 5 == 0) {
+      ell = message.length >> 5;
+    } else {
+      ell = message.length >> 5 + 1;
+    }
+
+    if (ell > 255 || message.length > 2040 || DST.length > 255) {
+      revert MessageTooLong();
+    }
+
+    assembly {
+      let b_0
+      {
+        // create payload for b_0 hash
+        let b_0_payload := mload(0x40)
+
+        // payload[0..KECCAK256_BLOCKSIZE] = 0
+
+        let b_0_payload_o := KECCAK256_BLOCKSIZE // leave first block empty
+        let msg_o := 0x20 // skip length prefix
+
+        // payload[KECCAK256_BLOCKSIZE..KECCAK256_BLOCKSIZE+message.len()] = message[0..message.len()]
+        for { let i := 0 } lt(i, mload(message)) { i := add(i, 0x20) } {
+          mstore(add(b_0_payload, b_0_payload_o), mload(add(message, msg_o)))
+          b_0_payload_o := add(b_0_payload_o, 0x20)
+          msg_o := add(msg_o, 0x20)
+        }
+
+        // payload[KECCAK256_BLOCKSIZE+message.len()+1..KECCAK256_BLOCKSIZE+message.len()+2] = 48
+        b_0_payload_o := add(mload(message), 137)
+        mstore8(add(b_0_payload, b_0_payload_o), 0x30) // only support for 48 bytes output length
+
+        let dst_o := 0x20
+        b_0_payload_o := add(b_0_payload_o, 2)
+
+        // // payload[KECCAK256_BLOCKSIZE+message.len()+3..KECCAK256_BLOCKSIZE+message.len()+DST.len()] = DST[0..DST.len()]
+        for { let i := 0 } lt(i, mload(DST)) { i := add(i, 0x20) } {
+          mstore(add(b_0_payload, b_0_payload_o), mload(add(DST, dst_o)))
+          b_0_payload_o := add(b_0_payload_o, 0x20)
+          dst_o := add(dst_o, 0x20)
+        }
+
+        // // payload[KECCAK256_BLOCKSIZE+message.len()+DST.len()..KECCAK256_BLOCKSIZE+message.len()+DST.len()+1] = DST.len()
+        b_0_payload_o := add(add(mload(message), mload(DST)), 139)
+        mstore8(add(b_0_payload, b_0_payload_o), mload(DST))
+
+        b_0 := keccak256(b_0_payload, add(140, add(mload(DST), mload(message))))
+      }
+
+      // create payload for b_1, b_2 ... hashes
+      let b_i_payload := mload(0x40)
+      mstore(b_i_payload, b_0)
+      // payload[32..33] = 1
+      mstore8(add(b_i_payload,0x20), 1)
+
+      let payload_o := 0x21
+      let dst_o := 0x20
+
+      // payload[33..33+DST.len()] = DST[0..DST.len()] 
+      for { let i := 0 } lt(i, mload(DST)) { i := add(i, 0x20) } {
+        mstore(add(b_i_payload, payload_o), mload(add(DST, dst_o)))
+        payload_o := add(payload_o, 0x20)
+        dst_o := add(dst_o, 0x20)
+      }
+
+      // payload[65+DST.len()..66+DST.len()] = DST.len()
+      mstore8(add(b_i_payload, add(0x21, mload(DST))), mload(DST))
+
+      b_1 := keccak256(b_i_payload, add(34, mload(DST)))
+      
+      // payload[0..32] = b_0 XOR b_1
+      mstore(b_i_payload, xor(b_0, b_1))
+      // payload[32..33] = 2
+      mstore8(add(b_i_payload, 0x20), 2)
+
+      b_2 := keccak256(b_i_payload, add(34, mload(DST)))
+    }
+  }
+
+
+  struct VRF_Parameters {
+    address signer;
+    // we only support 32-byte messages
+    uint256 message;
+    uint256 v_x;
+    uint256 v_y;
+    uint256 s;
+    uint256 h;
+    uint256 sB_x;
+    uint256 sB_y;
+    uint256 hV_x;
+    uint256 hV_y;
+  }
+
   /**
    * Implements a VRF based on public-key cryptography using hash_to_curve primitive.
    *
    * Algorithm highly inspired by:
    * https://www.signal.org/docs/specifications/xeddsa/#vxeddsa
    */
-  function vrf_verify(bytes memory message, bytes memory DST, uint256 v_x, uint256 v_y, uint256 s, uint256 h, uint256 sB_x, uint256 sB_y, uint256 hV_x, uint256 hV_y, address signer) internal view returns (bool) {
-    if (h >= SECP256K1_FIELD_ORDER) {
+  function vrf_verify(VRF_Parameters memory params) public view returns (bool) {
+    if (params.h >= SECP256K1_FIELD_ORDER) {
       revert InvalidFieldElement();
     }
 
+    bytes memory DST = "some DST tag";
+
     // we get a pseudo-random curve point
-    (uint256 B_x, uint256 B_y) = hashToCurve(abi.encodePacked(signer, message), DST);
+    (uint256 B_x, uint256 B_y) = hashToCurve(abi.encodePacked(params.signer, params.message), DST);
 
-    // Mitigate missing ECMUL operation by using precomputed values and check
+    // Mitigate missing ECMUL operation by using precomputed values and verify
     // against computed Ethereum address.
-    address maybe_sBv = scalarPointMultiplication(s, B_x, B_y);
+    address maybe_sBv = scalarPointMultiplication(params.s, B_x, B_y);
 
-    if (maybe_sBv != pointToAddress(sB_x, sB_y)) {
+    if (maybe_sBv != pointToAddress(params.sB_x, params.sB_y)) {
       revert InvalidPointWitness();
     }
 
-    address maybe_hV = scalarPointMultiplication(h, v_x, v_y);
+    address maybe_hV = scalarPointMultiplication(params.h, params.v_x, params.v_y);
 
-    if (maybe_hV != pointToAddress(hV_x, hV_y)) {
+    if (maybe_hV != pointToAddress(params.hV_x, params.hV_y)) {
       revert InvalidPointWitness();
     }
 
-    // We checked validity of precomputed sB and hV values,
+    // We checked the validity of precomputed sB and hV values,
     // now use them as if they were intermediate results. 
 
     // R = sB - hV
-    (uint256 r_x, uint256 r_y) = ecAdd(sB_x, sB_y, hV_x, SECP256K1_BASE_FIELD_ORDER - hV_y, 0);
+    (uint256 r_x, uint256 r_y) = ecAdd(params.sB_x, params.sB_y, params.hV_x, SECP256K1_BASE_FIELD_ORDER - params.hV_y, 0);
 
-    bytes32 h_check = keccak256(abi.encodePacked(signer, message, v_x, v_y, r_x, r_y));
+    console2.logBytes32(bytes32(r_x));
+    console2.logBytes32(bytes32(r_y));
 
-    return h_check == bytes32(h);
+    uint256 h_check = hash_to_field_single(abi.encodePacked(params.signer, params.message, params.v_x, params.v_y, r_x, r_y), DST);
+
+    // assembly {
+    //   let payload := mload(0x40)
+
+    //   mstore(payload, mload(params)) // signer
+    //   mstore(add(0x14, payload), mload(add(0x14, params))) // message
+    //   mstore(add(0x34, payload), mload(add(0x34, params))) // v_x
+    //   mstore(add(0x54, payload), mload(add(0x54, params))) // v_y
+    //   mstore(add(0x74, payload), r_x) 
+    //   mstore(add(0x94, payload), r_y)
+
+    //   h_check := keccak256(payload, 0xa4)
+    // }
+
+
+    return h_check == params.h;
   }
 }

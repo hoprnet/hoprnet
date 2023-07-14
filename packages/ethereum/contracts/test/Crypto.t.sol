@@ -181,4 +181,25 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto {
       assertEq(p_y, should.y);
     }
   }
+
+  function testVRFVerify() public {
+    CurvePoint memory V = CurvePoint(0x7e4d7332351201f79215328221cf4baeb9365cdba1255cedfe1cc635b4780a0f, 0xd9fe81cfdd0537cd5f73120ab2f97caa93bddf4ce8922b99c6649ecb2b15ddd7);
+    bytes32 h = 0x0f6be5484fce28779f0ff72d4f68c619b3f96f1af895c7c6ec4aede81534cee8;
+    bytes32 s = 0xfdab2e0a3e314d1f2b0681e7c62e65345563907ab09751ec6292e039345f959f;
+
+    CurvePoint memory h_V = CurvePoint(0xa02218468ac06b30714a92a92dacca5a28a8a035efffecf03dae372646ad5489,0xa2dbfa875633e485399a8b0a933b2480129c90725ecc6bbdb906d27a4231a744);
+    CurvePoint memory s_B = CurvePoint(0xb2eff54b867ba38bd60631df94a4dcba261bdd88f6fa1d38dee11053ec0ec9c4,0xfa1f1e9cacd0b9c895e2d00e4fbedc791e2b176b261ba13ec73aaeb3e5d430f6);
+
+    address signer = 0x0c6146f8e9A92174A309bd0d7f000148fD6e2588;
+
+    HoprCrypto.VRF_Parameters memory params = HoprCrypto.VRF_Parameters(
+      signer,
+      0xf13233ff60e1f618525dac5f7d117bef0bad0eb0b0afb2459f9cbc57a3a987ba,
+      V.x,
+      V.y,
+      uint256(s), uint256(h), s_B.x, s_B.y, h_V.x, h_V.y
+    );
+
+    console2.logBool(crypto.vrf_verify(params));
+  }
 }
