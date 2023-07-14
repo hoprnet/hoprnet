@@ -23,6 +23,7 @@ utils-misc = { path = "../../../utils/crates/utils-misc", default-features = fal
 utils-types = { path = "../../../utils/crates/utils-types", default-features = false }
 js-sys = { version = "0.3.63", optional = true }
 serde = { version = "1.0", features = ["derive"] }
+stdext = "0.3.1"
 wasm-bindgen = { workspace = true, features = ["serde-serialize"], optional = true }
 wasm-bindgen-futures = { version = "0.4.36", features = ["futures-core-03-stream"], optional = true }
 serde-wasm-bindgen = { version = "0.5", optional = true }
