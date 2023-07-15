@@ -67,6 +67,13 @@ contract HoprNodeStakeIntegrationTest is Test, ERC1820RegistryFixtureTest, SafeS
         _helperSetupBalanceAndAnnounce();
     }
 
+    /**
+     * @dev check deployment is correct
+     */
+    function test_CheckDeployedContracts() public {
+
+    }
+
 // FIXME: fix all the detailed changes
     // /**
     //  * @dev compare open channel gas cost (through module vs directly with HoprChannels contract)
