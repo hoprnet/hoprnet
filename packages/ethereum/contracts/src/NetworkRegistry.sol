@@ -171,7 +171,7 @@ contract HoprNetworkRegistry is AccessControlEnumerable {
   }
 
   /**
-   * @dev sync the eligibilitybased on the latest criteria.
+   * @dev sync the eligibility based on the latest criteria.
    * Function can only be called when the registry is enabled.
    */
   function selfSync() external mustBeEnabled {
