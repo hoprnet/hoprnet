@@ -10,9 +10,8 @@ contract HoprSafeProxyForNetworkRegistryTest is Test {
   address public token;
   address public safeAddress;
   address public nodeSafeRegistry;
-  uint256 public stakeThreshold;
-  uint128 public snapshotBlockNumber;
-  address[] public accounts = new address[](7);
+  uint256 public constant DEFAULT_STAKE_THRESHOLD = 500 ether;
+  uint128 public constant DEFAULT_SNAPSHOT_BLOCK_NUMBER = 123;
 
   /**
    * Manually import the errors and events
@@ -24,35 +23,112 @@ contract HoprSafeProxyForNetworkRegistryTest is Test {
     safeAddress = vm.addr(255); // make address(255) the default safe address
     nodeSafeRegistry = vm.addr(103); // make vm.addr(103) nodeSafeRegistry
 
-    stakeThreshold = 500 ether;
-    snapshotBlockNumber = 123;
     // set _minStake with the production value
     hoprSafeProxyForNetworkRegistry = new HoprSafeProxyForNetworkRegistry(
         owner,
-        stakeThreshold,
-        snapshotBlockNumber,
+        DEFAULT_STAKE_THRESHOLD,
+        DEFAULT_SNAPSHOT_BLOCK_NUMBER,
         token,
         nodeSafeRegistry
     );
-
-    // assign vm.addr(1) to vm.addr(6) to accounts
-    accounts[0] = vm.addr(1);
-    accounts[1] = vm.addr(2);
-    accounts[2] = vm.addr(3);
-    accounts[3] = vm.addr(4);
-    accounts[4] = vm.addr(5);
-    accounts[5] = vm.addr(6);
-    accounts[6] = vm.addr(7);
   }
-    /**
-     * @dev test the maximum amount of nodes that 
-     */
-  function testFuzz_MaxAllowedRegistrations() public {
 
+  /**
+   * @dev test interface id is supported
+   */
+  function test_supportsInterface() public {
+    bytes4 interfaceId = type(IHoprNetworkRegistryRequirement).interfaceId;
+    assertTrue(hoprSafeProxyForNetworkRegistry.supportsInterface(interfaceId));
+  }
+
+  /**
+   * @dev test the maximum amount of nodes that 
+   */
+  function testFuzz_MaxAllowedRegistrations(address stakingAccount, uint256 tokenBalance) public {
+    _helpeMockSafeRegistyAndTokenBalance(stakingAccount, DEFAULT_SNAPSHOT_BLOCK_NUMBER, tokenBalance);
+    assertEq(hoprSafeProxyForNetworkRegistry.maxAllowedRegistrations(stakingAccount), tokenBalance / DEFAULT_STAKE_THRESHOLD);
+    vm.clearMockedCalls();
+  }
+
+  /**
+   * @dev manager can set the threshold
+   */
+  function testFuzz_SetThreshold(uint256 newThreshold) public {
+    vm.assume(newThreshold != DEFAULT_STAKE_THRESHOLD);
+    vm.prank(owner);
+    hoprSafeProxyForNetworkRegistry.updateStakeThreshold(newThreshold);
+    assertEq(hoprSafeProxyForNetworkRegistry.stakeThreshold(), newThreshold);
+  }
+  /**
+   * @dev fail to calculate allowance when threshold is 0.
+   * @notice This essentially disables "selfRegister" a node
+   */
+  function testRevert_SetThresholdToZero(address stakingAccount, uint256 tokenBalance) public {
+    _helpeMockSafeRegistyAndTokenBalance(stakingAccount, DEFAULT_SNAPSHOT_BLOCK_NUMBER, tokenBalance);
+    
+    vm.prank(owner);
+    hoprSafeProxyForNetworkRegistry.updateStakeThreshold(0);
+    vm.expectRevert(stdError.divisionError);
+    hoprSafeProxyForNetworkRegistry.maxAllowedRegistrations(stakingAccount);
+    vm.clearMockedCalls();
+  }
+
+  /**
+   * @dev manager cannot set the threshold of the same value
+   */
+  function testRevert_UpdateThreshold() public {
+    vm.prank(owner);
+    vm.expectRevert(HoprSafeProxyForNetworkRegistry.SameValue.selector);
+    hoprSafeProxyForNetworkRegistry.updateStakeThreshold(DEFAULT_STAKE_THRESHOLD);
+  }
+
+  /**
+   * @dev manager can set the snapshot block number
+   */
+  function testFuzz_UpdateSnapshotBlockNumber(uint128 newSnapshotBlockNumber) public {
+    vm.assume(newSnapshotBlockNumber != DEFAULT_SNAPSHOT_BLOCK_NUMBER);
+    vm.prank(owner);
+    hoprSafeProxyForNetworkRegistry.updateSnapshotBlockNumber(newSnapshotBlockNumber);
+    assertEq(hoprSafeProxyForNetworkRegistry.snapshotBlockNumber(), newSnapshotBlockNumber);
+  }
+
+  /**
+   * @dev test return of operate for
+   */
+  function testFuzz_CanOperateFor(address otherSafeAddress) public {
+    address nodeAddress = vm.addr(254);
+    // other nodes point to a different address than safeAddress
+    vm.mockCall(
+      nodeSafeRegistry,
+      abi.encodeWithSelector(INodeSafeRegistry.nodeToSafe.selector),
+      abi.encode(vm.addr(1))
+    );
+    // nodeSafeRegistry is able to reply to call nodeToSafe
+    vm.mockCall(
+      nodeSafeRegistry,
+      abi.encodeWithSignature(
+        'nodeToSafe(address)',
+        nodeAddress
+      ),
+      abi.encode(safeAddress)
+    );
+    assertTrue(hoprSafeProxyForNetworkRegistry.canOperateFor(safeAddress, nodeAddress));
+    assertFalse(hoprSafeProxyForNetworkRegistry.canOperateFor(otherSafeAddress, nodeAddress));
+    vm.clearMockedCalls();
+  }
+
+  /**
+   * @dev manager cannot set the threshold of the same value
+   */
+  function testRevert_UpdateSnapshotBlockNumber() public {
+    vm.prank(owner);
+    vm.expectRevert(HoprSafeProxyForNetworkRegistry.SameValue.selector);
+    hoprSafeProxyForNetworkRegistry.updateSnapshotBlockNumber(DEFAULT_SNAPSHOT_BLOCK_NUMBER);
   }
 
   function _helpeMockSafeRegistyAndTokenBalance(
     address nodeAddr,
+    uint128 blockNum,
     uint256 tokenBalance
   ) private {
     // nodeSafeRegistry is able to reply to call nodeToSafe
@@ -62,14 +138,14 @@ contract HoprSafeProxyForNetworkRegistryTest is Test {
         'nodeToSafe(address)',
         nodeAddr
       ),
-      abi.encode(true)
+      abi.encode(safeAddress)
     );
     // balanceOf safeAddress to be the given balance
     vm.mockCall(
       token,
       abi.encodeWithSignature(
-        'balanceOf(address)',
-        safeAddress
+        'balanceOfAt(address,uint128)',
+        safeAddress, blockNum
       ),
       abi.encode(tokenBalance)
     );
