@@ -96,6 +96,7 @@ contract HoprSafeProxyForNetworkRegistryTest is Test {
    * @dev test return of operate for
    */
   function testFuzz_CanOperateFor(address otherSafeAddress) public {
+    vm.assume(otherSafeAddress != safeAddress);
     address nodeAddress = vm.addr(254);
     // other nodes point to a different address than safeAddress
     vm.mockCall(

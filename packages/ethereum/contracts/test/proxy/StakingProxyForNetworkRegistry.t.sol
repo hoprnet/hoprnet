@@ -235,6 +235,58 @@ contract HoprStakingProxyForNetworkRegistryTest is Test {
   }
 
   /**
+   * @dev Fail to add special NFTs due to array length mismatch 1
+   */
+  function testRevert_OwnerBatchAddSpecialNFTsWrongLength1() public {
+    _helperMockStakeContractReturns();
+    // owner add nft type and rank
+    vm.startPrank(owner);
+
+    uint256[] memory types = new uint256[](2);
+    types[0] = SPECIAL_NFT_TYPE_INDEX;
+    types[1] = SPECIAL_NFT_TYPE_INDEX;
+    string[] memory ranks = new string[](3);
+    ranks[0] = SPECIAL_NFT_RANK_TECH;
+    ranks[1] = SPECIAL_NFT_RANK_COM;
+    ranks[2] = SPECIAL_NFT_RANK_COM;
+    uint256[] memory maxAllownaces = new uint256[](2);
+    maxAllownaces[0] = MAX_REGISTRATION_TECH;
+    maxAllownaces[1] = MAX_REGISTRATION_COM;
+
+    vm.expectRevert('HoprStakingProxyForNetworkRegistry: ownerBatchAddSpecialNftTypeAndRank nftTypes and nftRanks lengths mismatch');
+    hoprStakingProxyForNetworkRegistry.ownerBatchAddSpecialNftTypeAndRank(types, ranks, maxAllownaces);
+
+    vm.stopPrank();
+    vm.clearMockedCalls();
+  }
+
+  /**
+   * @dev Fail to add special NFTs due to array length mismatch 2
+   */
+  function testRevert_OwnerBatchAddSpecialNFTsWrongLength2() public {
+    _helperMockStakeContractReturns();
+    // owner add nft type and rank
+    vm.startPrank(owner);
+
+    uint256[] memory types = new uint256[](2);
+    types[0] = SPECIAL_NFT_TYPE_INDEX;
+    types[1] = SPECIAL_NFT_TYPE_INDEX;
+    string[] memory ranks = new string[](2);
+    ranks[0] = SPECIAL_NFT_RANK_TECH;
+    ranks[1] = SPECIAL_NFT_RANK_COM;
+    uint256[] memory maxAllownaces = new uint256[](3);
+    maxAllownaces[0] = MAX_REGISTRATION_TECH;
+    maxAllownaces[1] = MAX_REGISTRATION_COM;
+    maxAllownaces[2] = MAX_REGISTRATION_COM;
+
+    vm.expectRevert('HoprStakingProxyForNetworkRegistry: ownerBatchAddSpecialNftTypeAndRank nftTypes and maxRegistrations lengths mismatch');
+    hoprStakingProxyForNetworkRegistry.ownerBatchAddSpecialNftTypeAndRank(types, ranks, maxAllownaces);
+
+    vm.stopPrank();
+    vm.clearMockedCalls();
+  }
+
+  /**
    * @dev Special NFTs only:
    */
   function test_OwnerBatchAddSpecialNFTs() public {
@@ -257,7 +309,8 @@ contract HoprStakingProxyForNetworkRegistryTest is Test {
     _helperCheckMaxAllowance(
       [uint256(0), uint256(0), MAX_REGISTRATION_TECH, uint256(0), uint256(0), uint256(0), MAX_REGISTRATION_COM]
     );
-
+    // it's possible to overwrite them
+    hoprStakingProxyForNetworkRegistry.ownerBatchAddSpecialNftTypeAndRank(types, ranks, maxAllownaces);
     vm.stopPrank();
     vm.clearMockedCalls();
   }
@@ -331,6 +384,63 @@ contract HoprStakingProxyForNetworkRegistryTest is Test {
 
     vm.stopPrank();
     vm.clearMockedCalls();
+  }
+
+  /**
+   * @dev canOperateFor is always true
+   */
+  function testFuzz_MaxAllowedRegistrations(address account, address nodeAddress) public {
+    assertTrue(hoprStakingProxyForNetworkRegistry.canOperateFor(account, nodeAddress));
+    vm.prank(owner);
+  }
+
+  /**
+   * @dev Owner fail to remove special NFTs in batch due to mismatched length
+   */
+  function testRevert_OwnerBatchRemoveSpecialNFTs() public { 
+    _helperRegisterNodes();
+    uint256[] memory types = new uint256[](2);
+    types[0] = SPECIAL_NFT_TYPE_INDEX;
+    types[1] = SPECIAL_NFT_TYPE_INDEX;
+    string[] memory ranks = new string[](3);
+    ranks[0] = SPECIAL_NFT_RANK_TECH;
+    ranks[1] = SPECIAL_NFT_RANK_COM;
+    ranks[2] = SPECIAL_NFT_RANK_COM;
+    vm.prank(owner);
+    vm.expectRevert('HoprStakingProxyForNetworkRegistry: ownerBatchRemoveSpecialNftTypeAndRank lengths mismatch');
+    hoprStakingProxyForNetworkRegistry.ownerBatchRemoveSpecialNftTypeAndRank(types, ranks);
+    vm.clearMockedCalls();
+  }
+
+  /**
+   * @dev Owner fail to remove special NFTs in batch due to mismatched length
+   */
+  function test_OwnerBatchRemoveSpecialNFTs() public { 
+    _helperRegisterNodes();
+    uint256[] memory types = new uint256[](2);
+    types[0] = SPECIAL_NFT_TYPE_INDEX;
+    types[1] = SPECIAL_NFT_TYPE_INDEX;
+    string[] memory ranks = new string[](2);
+    ranks[0] = SPECIAL_NFT_RANK_TECH;
+    ranks[1] = SPECIAL_NFT_RANK_COM;
+
+    vm.prank(owner);
+    vm.expectEmit(true, false, false, true, address(hoprStakingProxyForNetworkRegistry));
+    emit SpecialNftTypeAndRankRemoved(types[0], ranks[0]);
+    vm.expectEmit(true, false, false, true, address(hoprStakingProxyForNetworkRegistry));
+    emit SpecialNftTypeAndRankRemoved(types[1], ranks[1]);
+    hoprStakingProxyForNetworkRegistry.ownerBatchRemoveSpecialNftTypeAndRank(types, ranks);
+    vm.clearMockedCalls();
+  }
+
+  /**
+   * @dev Owner can update the staking account
+   */
+  function test_updateStakeContract(address newStaking) public {
+    vm.prank(owner);
+    vm.expectEmit(true, false, false, false, address(hoprStakingProxyForNetworkRegistry));
+    emit StakeContractUpdated(newStaking);
+    hoprStakingProxyForNetworkRegistry.updateStakeContract(newStaking);
   }
 
   /**
@@ -425,22 +535,37 @@ contract HoprStakingProxyForNetworkRegistryTest is Test {
   }
 
   function _helperCheckMaxAllowance(uint8[7] memory allowances) internal {
-    assertEq(hoprStakingProxyForNetworkRegistry.maxAllowedRegistrations(accounts[0]), uint256(allowances[0]));
-    assertEq(hoprStakingProxyForNetworkRegistry.maxAllowedRegistrations(accounts[1]), uint256(allowances[1]));
-    assertEq(hoprStakingProxyForNetworkRegistry.maxAllowedRegistrations(accounts[2]), uint256(allowances[2]));
-    assertEq(hoprStakingProxyForNetworkRegistry.maxAllowedRegistrations(accounts[3]), uint256(allowances[3]));
-    assertEq(hoprStakingProxyForNetworkRegistry.maxAllowedRegistrations(accounts[4]), uint256(allowances[4]));
-    assertEq(hoprStakingProxyForNetworkRegistry.maxAllowedRegistrations(accounts[5]), uint256(allowances[5]));
-    assertEq(hoprStakingProxyForNetworkRegistry.maxAllowedRegistrations(accounts[6]), uint256(allowances[6]));
+    for (uint256 i = 0; i < accounts.length; i++) {
+      assertEq(hoprStakingProxyForNetworkRegistry.maxAllowedRegistrations(accounts[i]), allowances[i]);
+    }
   }
 
   function _helperCheckMaxAllowance(uint256[7] memory allowances) internal {
-    assertEq(hoprStakingProxyForNetworkRegistry.maxAllowedRegistrations(accounts[0]), allowances[0]);
-    assertEq(hoprStakingProxyForNetworkRegistry.maxAllowedRegistrations(accounts[1]), allowances[1]);
-    assertEq(hoprStakingProxyForNetworkRegistry.maxAllowedRegistrations(accounts[2]), allowances[2]);
-    assertEq(hoprStakingProxyForNetworkRegistry.maxAllowedRegistrations(accounts[3]), allowances[3]);
-    assertEq(hoprStakingProxyForNetworkRegistry.maxAllowedRegistrations(accounts[4]), allowances[4]);
-    assertEq(hoprStakingProxyForNetworkRegistry.maxAllowedRegistrations(accounts[5]), allowances[5]);
-    assertEq(hoprStakingProxyForNetworkRegistry.maxAllowedRegistrations(accounts[6]), allowances[6]);
+    for (uint256 i = 0; i < accounts.length; i++) {
+      assertEq(hoprStakingProxyForNetworkRegistry.maxAllowedRegistrations(accounts[i]), allowances[i]);
+    }
+  }
+
+  function _helperRegisterNodes() private {
+    _helperMockStakeContractReturns();
+    // owner add nft type and rank
+    vm.startPrank(owner);
+
+    uint256[] memory types = new uint256[](2);
+    types[0] = SPECIAL_NFT_TYPE_INDEX;
+    types[1] = SPECIAL_NFT_TYPE_INDEX;
+    string[] memory ranks = new string[](2);
+    ranks[0] = SPECIAL_NFT_RANK_TECH;
+    ranks[1] = SPECIAL_NFT_RANK_COM;
+    uint256[] memory maxAllownaces = new uint256[](2);
+    maxAllownaces[0] = MAX_REGISTRATION_TECH;
+    maxAllownaces[1] = MAX_REGISTRATION_COM;
+
+    hoprStakingProxyForNetworkRegistry.ownerBatchAddSpecialNftTypeAndRank(types, ranks, maxAllownaces);
+
+    _helperCheckMaxAllowance(
+      [uint256(0), uint256(0), MAX_REGISTRATION_TECH, uint256(0), uint256(0), uint256(0), MAX_REGISTRATION_COM]
+    );
+    vm.stopPrank();
   }
 }
