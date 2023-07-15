@@ -210,7 +210,7 @@ contract HoprCapabilityPermissionsTest is Test, CapabilityPermissionsLibFixtureT
         functionSigs[1] = HoprCapabilityPermissions.CLOSE_INCOMING_CHANNEL_SELECTOR;
         functionSigs[2] = HoprCapabilityPermissions.INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTOR;
         functionSigs[3] = HoprCapabilityPermissions.FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTOR;
-        functionSigs[4] = HoprCapabilityPermissions.FUND_CHANNEL_MULTI_SELECTOR;
+        functionSigs[4] = HoprCapabilityPermissions.FUND_CHANNEL_SELECTOR;
         functionSigs[5] = HoprCapabilityPermissions.SET_COMMITMENT_SELECTOR;
     }
 }

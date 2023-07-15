@@ -475,6 +475,9 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
             moduleSingleton.addNode(accounts[i]);
         }
     }
+
+
+    // ===================== helper functions =====================
     /**
      * @dev return an array with all unique addresses which does not contain address zeo
      * return a random item

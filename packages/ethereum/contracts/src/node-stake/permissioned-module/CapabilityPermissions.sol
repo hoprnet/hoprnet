@@ -55,7 +55,7 @@ library HoprCapabilityPermissions {
     bytes4 internal constant CLOSE_INCOMING_CHANNEL_SELECTOR = HoprChannels.closeIncomingChannelSafe.selector;
     bytes4 internal constant INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTOR = HoprChannels.initiateOutgoingChannelClosureSafe.selector;
     bytes4 internal constant FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTOR = HoprChannels.finalizeOutgoingChannelClosureSafe.selector;
-    bytes4 internal constant FUND_CHANNEL_MULTI_SELECTOR = HoprChannels.fundChannelMulti.selector;
+    bytes4 internal constant FUND_CHANNEL_SELECTOR = HoprChannels.fundChannelSafe.selector;
     bytes4 internal constant SET_COMMITMENT_SELECTOR = HoprChannels.setCommitmentSafe.selector;
     // HoprToken method ids (TargetType.TOKEN). As HoprToken contract is in production, its ABI is static
     bytes4 internal constant APPROVE_SELECTOR = hex"095ea7b3"; // equivalent to `HoprToken.approve.selector`, for ABI "approve(address,uint256)"
@@ -324,7 +324,7 @@ library HoprCapabilityPermissions {
         } else if (functionSig == FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTOR) {
             (address self, address destination) = abi.decode(slicedData, (address, address));
             channelId = getChannelId(self, destination);
-        } else if (functionSig == FUND_CHANNEL_MULTI_SELECTOR) {
+        } else if (functionSig == FUND_CHANNEL_SELECTOR) {
             checkFundChannel(role, capabilityKey, slicedData);
         } else if (functionSig == SET_COMMITMENT_SELECTOR) {
             (address self, , address source) = abi.decode(slicedData, (address, bytes32, address));
@@ -337,21 +337,22 @@ library HoprCapabilityPermissions {
         return granularPermission;
     }
 
-    function checkBatchRedeem(Role storage role, bytes32 capabilityKey, bytes memory slicedData) private view returns (GranularPermission) {
-        uint256 noneCounter;
-        (, HoprChannels.RedeemableTicket[] memory redeemableTickets) = abi.decode(slicedData, (address, HoprChannels.RedeemableTicket[]));
-        for (uint256 i = 0; i < redeemableTickets.length; i++) {
-            bytes32 channelId = redeemableTickets[i].data.channelId;
-            GranularPermission granularPermission = role.capabilities[capabilityKey][channelId];
-            if (granularPermission == GranularPermission.NONE) {
-                noneCounter ++;
-            } else if (granularPermission == GranularPermission.BLOCK) {
-                // return BLOCK when at least one exist
-                return GranularPermission.BLOCK;
-            }
-        }
-        return noneCounter > 0 ? GranularPermission.NONE : GranularPermission.ALLOW;
-    }
+    // TODO: FIXME: remove as batch redeem is a multisend at this stage
+    // function checkBatchRedeem(Role storage role, bytes32 capabilityKey, bytes memory slicedData) private view returns (GranularPermission) {
+    //     uint256 noneCounter;
+    //     (, HoprChannels.RedeemableTicket[] memory redeemableTickets) = abi.decode(slicedData, (address, HoprChannels.RedeemableTicket[]));
+    //     for (uint256 i = 0; i < redeemableTickets.length; i++) {
+    //         bytes32 channelId = redeemableTickets[i].data.channelId;
+    //         GranularPermission granularPermission = role.capabilities[capabilityKey][channelId];
+    //         if (granularPermission == GranularPermission.NONE) {
+    //             noneCounter ++;
+    //         } else if (granularPermission == GranularPermission.BLOCK) {
+    //             // return BLOCK when at least one exist
+    //             return GranularPermission.BLOCK;
+    //         }
+    //     }
+    //     return noneCounter > 0 ? GranularPermission.NONE : GranularPermission.ALLOW;
+    // }
 
     function checkFundChannel(Role storage role, bytes32 capabilityKey, bytes memory slicedData) private view returns (GranularPermission) {
         (address source, HoprChannels.Balance balance1, address destination, HoprChannels.Balance balance2) = abi.decode(slicedData, (address, HoprChannels.Balance, address, HoprChannels.Balance));
@@ -404,7 +405,7 @@ library HoprCapabilityPermissions {
             if (!target.isTargetType(TargetType.CHANNELS)) {
               revert TargetAddressNotAllowed();
             }
-            checkHoprChannelsParameters(role, keyForFunctions(beneficiary, FUND_CHANNEL_MULTI_SELECTOR), FUND_CHANNEL_MULTI_SELECTOR, sliceDataFundMulti);
+            checkHoprChannelsParameters(role, keyForFunctions(beneficiary, FUND_CHANNEL_SELECTOR), FUND_CHANNEL_SELECTOR, sliceDataFundMulti);
         } else {
             revert ParameterNotAllowed();
         }
@@ -449,7 +450,7 @@ library HoprCapabilityPermissions {
             defaultFunctionPermission = target.getDefaultFunctionPermissionAt(3);
         } else if (functionSig == FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTOR) {
             defaultFunctionPermission = target.getDefaultFunctionPermissionAt(4);
-        } else if (functionSig == FUND_CHANNEL_MULTI_SELECTOR) {
+        } else if (functionSig == FUND_CHANNEL_SELECTOR) {
             defaultFunctionPermission = target.getDefaultFunctionPermissionAt(5);
         } else if (functionSig == SET_COMMITMENT_SELECTOR) {
             defaultFunctionPermission = target.getDefaultFunctionPermissionAt(6);

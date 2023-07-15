@@ -285,6 +285,62 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
   }
 
   /**
+   * Fund an outgoing channel
+   * Used in channel operation with Safe
+   *
+   * @param self address of the source
+   * @param account address of the destination
+   * @param amount amount to fund for channel
+   */
+  function fundChannelSafe(
+    address self,
+    address account,
+    Balance amount
+  ) external onlySafe {
+    _fundChannelInternal(self, account, amount);
+  }
+
+  /**
+   * Fund an outgoing channel by a node
+   * @param self address of the source
+   * @param account address of the destination
+   * @param amount amount to fund for channel
+   */
+  function fundChannel(
+    address self,
+    address account,
+    Balance amount
+  ) external noSafeSet {
+    _fundChannelInternal(msg.sender, account, amount);
+  }
+
+  /**
+   * @dev Internal function to fund an outgoing channel from self to account with amount token
+   * @notice only balance above zero can execute
+   *
+   * @param self source address
+   * @param account destination address
+   * @param amount token amount
+   */
+  function _fundChannelInternal(
+    address self,
+    address account,
+    Balance amount
+  ) internal {
+    // pull tokens from funder and handle result
+    if (token.transferFrom(msg.sender, address(this), Balance.unwrap(amount)) != true) {
+      // sth. went wrong, we need to revert here
+      revert TokenTransferFailed();
+    }
+
+    if (Balance.unwrap(amount) == 0) {
+      revert InvalidBalance();
+    }
+
+    _fundChannel(self, account, amount);
+  }
+
+  /**
    * Funds and thereby opens a channel from
    * - `account1` -> `account2` with `amount1` tokens
    * - `account2` -> `account1` with `amount2` tokens
