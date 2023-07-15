@@ -53,6 +53,38 @@ contract HoprDummyProxyForNetworkRegistryTest is Test {
   }
 
   /**
+   * @dev when no account is added, maxAllowedRegistration is zero
+   */
+  function testFuzz_MaxAllowedRegistrations(address account) public {
+    vm.prank(owner);
+    assertEq(hoprDummyProxyForNetworkRegistry.maxAllowedRegistrations(account), 0);
+  }
+
+  /**
+   * @dev canOperateFor is always true
+   */
+  function testFuzz_MaxAllowedRegistrations(address account, address nodeAddress) public {
+    assertTrue(hoprDummyProxyForNetworkRegistry.canOperateFor(account, nodeAddress));
+    vm.prank(owner);
+  }
+
+  /**
+   * @dev Owner can always update the allow all
+   */
+  function testFuzz_OwnerUpdateAllowAll() public {
+    vm.startPrank(owner);
+    bool currentAllowAll = hoprDummyProxyForNetworkRegistry.isAllAllowed();
+    // update with the same value
+    hoprDummyProxyForNetworkRegistry.updateAllowAll(currentAllowAll);
+    assertEq(hoprDummyProxyForNetworkRegistry.isAllAllowed(), currentAllowAll);
+    // update to the opposite value.
+    vm.expectEmit(true, false, false, false, address(hoprDummyProxyForNetworkRegistry));
+    emit AllowAllAccountsEligible(!currentAllowAll);
+    hoprDummyProxyForNetworkRegistry.updateAllowAll(!currentAllowAll);
+    assertEq(hoprDummyProxyForNetworkRegistry.isAllAllowed(), !currentAllowAll);
+  }
+
+  /**
    * @dev Add account(s)
    * it can add accounts by owner in batch
    */

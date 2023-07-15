@@ -20,6 +20,10 @@ sc-test:
 sc-coverage:
 	$(forge) coverage --report lcov && genhtml lcov.info -o report --branch-coverage && open report/index.html
 
+.PHONY: sc-audit-coverage
+sc-audit-coverage:
+	$(forge) coverage --report lcov && genhtml lcov.info -o report --branch-coverage --legend --header-title "HOPR Smart Contracts" && open report/index.html
+
 .PHONY: forked-local-anvil
 forked-local-anvil:
 	anvil -f 'https://provider-proxy.hoprnet.workers.dev/xdai_mainnet'
