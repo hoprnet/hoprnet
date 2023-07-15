@@ -11,6 +11,7 @@ contract HoprSafeProxyForNetworkRegistryTest is Test {
   address public safeAddress;
   address public nodeSafeRegistry;
   uint256 public stakeThreshold;
+  uint128 public snapshotBlockNumber;
   address[] public accounts = new address[](7);
 
   /**
@@ -24,10 +25,12 @@ contract HoprSafeProxyForNetworkRegistryTest is Test {
     nodeSafeRegistry = vm.addr(103); // make vm.addr(103) nodeSafeRegistry
 
     stakeThreshold = 500 ether;
+    snapshotBlockNumber = 123;
     // set _minStake with the production value
     hoprSafeProxyForNetworkRegistry = new HoprSafeProxyForNetworkRegistry(
         owner,
         stakeThreshold,
+        snapshotBlockNumber,
         token,
         nodeSafeRegistry
     );

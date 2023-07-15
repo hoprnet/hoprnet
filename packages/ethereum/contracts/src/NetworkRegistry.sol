@@ -223,9 +223,9 @@ contract HoprNetworkRegistry is AccessControlEnumerable {
         revert NodeNotYetRegisterd(nodeAddress);
       }
 
-      countRegisterdNodesPerAccount[msg.sender]--;
+      countRegisterdNodesPerAccount[registeredAccount]--;
       nodeRegisterdToAccount[nodeAddress] = address(0);
-      emit DeregisteredByManager(msg.sender, nodeAddress);
+      emit DeregisteredByManager(registeredAccount, nodeAddress);
     }
   }
 
