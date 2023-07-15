@@ -189,16 +189,6 @@ contract HoprNetworkRegistryTest is Test {
     address stakingAccount = stakingAccounts[accountIndex];
     address[] memory nodeAddresses = _helperCreateNodeAddresses(accountIndex);
 
-    // // read allowance
-    // (bool successRead, bytes memory returndataAllowance) = proxy.staticcall(
-    //   abi.encodeWithSelector(IHoprNetworkRegistryRequirement.maxAllowedRegistrations.selector, stakingAccount)
-    // );
-    // // only continue when a value is returned
-    // assertTrue(successRead);
-    // uint256 allowance = abi.decode(returndataAllowance, (uint256));
-    // // when it's possible to register
-    // vm.assume(allowance > 0);
-
     vm.prank(stakingAccount);
     for (uint256 i = 0; i < nodeAddresses.length; i++) {
     emit log_named_uint("expect emit Registered", i);
@@ -208,15 +198,16 @@ contract HoprNetworkRegistryTest is Test {
     vm.expectEmit(true, true, false, false, address(hoprNetworkRegistry));
     emit EligibilityUpdated(stakingAccount, true);
     hoprNetworkRegistry.selfRegister(nodeAddresses);
+
+    // registered nodes are eligible
+    for (uint256 j = 0; j < nodeAddresses.length; j++) {
+      assertTrue(hoprNetworkRegistry.isNodeRegisteredAndEligible(nodeAddresses[j]));
+    }
     vm.clearMockedCalls();
   }
 
-  
-
   /**
-   * @dev Register contract for a single time:
-   * it cannot self-register when trying to register more than the limit
-   * it cannot self-register when the requirement is not fulfilled
+   * @dev Fail to register nodes exceeding its allowance
    */
   function testRevert_SelfRegisterTooManyAddresses(uint256[STAKING_ACCOUNTS_SIZE] memory allowances, uint256 accountIndex) public {
     accountIndex = bound(accountIndex, 0, STAKING_ACCOUNTS_SIZE - 1);
@@ -250,9 +241,34 @@ contract HoprNetworkRegistryTest is Test {
   }
 
   /**
+   * @dev fails to register by the manager when array lengths not match
+   */
+  function testRevert_ManagerRegisterRegisteredNode() public {
+    address[] memory oldAccounts = new address[](1);
+    oldAccounts[0] = stakingAccounts[1];
+    address[] memory accounts = new address[](1);
+    accounts[0] = stakingAccounts[0];
+    address[] memory nodeAddresses = _helperCreateNodeAddresses(1);
+
+    vm.startPrank(owner);
+    hoprNetworkRegistry.managerRegister(oldAccounts, nodeAddresses);
+    vm.expectRevert(abi.encodeWithSelector(HoprNetworkRegistry.NodeAlreadyRegisterd.selector, nodeAddresses[0]));
+    hoprNetworkRegistry.managerRegister(accounts, nodeAddresses);
+    vm.stopPrank();
+    vm.clearMockedCalls();
+  }
+
+  /**
    * @dev Manager can register safe and node
    */
   function test_ManagerRegister() public {
+    // mock the entire function that not acount can register any node
+    vm.mockCall(
+        proxy,
+        abi.encodeWithSelector(IHoprNetworkRegistryRequirement.maxAllowedRegistrations.selector),
+        abi.encode(0)
+    );
+
     address[] memory nodeAddresses = _helperCreateNodeAddresses(STAKING_ACCOUNTS_SIZE);
 
     vm.prank(owner);
@@ -261,6 +277,11 @@ contract HoprNetworkRegistryTest is Test {
       emit RegisteredByManager(stakingAccounts[i], nodeAddresses[i]);
     }
     hoprNetworkRegistry.managerRegister(stakingAccounts, nodeAddresses);
+
+    // registerd nodes are beyond their eligibility
+    for (uint256 j = 0; j < nodeAddresses.length; j++) {
+      assertFalse(hoprNetworkRegistry.isNodeRegisteredAndEligible(nodeAddresses[j]));
+    }
     vm.clearMockedCalls();
   }
 
@@ -368,18 +389,35 @@ contract HoprNetworkRegistryTest is Test {
    */
   function test_ManagerForceSyncStakingAccounts() public {
     bool[] memory eligibilities = new bool[](STAKING_ACCOUNTS_SIZE);
+    bool[] memory allTrue = new bool[](STAKING_ACCOUNTS_SIZE);
+    bool[] memory allFalse = new bool[](STAKING_ACCOUNTS_SIZE);
 
     // mock the number of curent registered nodes
     for (uint256 i = 0; i < STAKING_ACCOUNTS_SIZE; i++) {
       eligibilities[i] = i % 2 == 0 ? true : false;
+      allTrue[i] = true;
+      allFalse[i] = false;
     }
      
-    vm.prank(owner);
+    vm.startPrank(owner);
     for (uint256 j = 0; j < STAKING_ACCOUNTS_SIZE; j++) {
       vm.expectEmit(true, true, false, false, address(hoprNetworkRegistry));
       emit EligibilityUpdated(stakingAccounts[j], eligibilities[j]);
     }
     hoprNetworkRegistry.managerForceSync(stakingAccounts, eligibilities);
+
+    for (uint256 k = 0; k < STAKING_ACCOUNTS_SIZE; k++) {
+      vm.expectEmit(true, true, false, false, address(hoprNetworkRegistry));
+      emit EligibilityUpdated(stakingAccounts[k], true);
+    }
+    hoprNetworkRegistry.managerForceSync(stakingAccounts, allTrue);
+
+    for (uint256 m = 0; m < STAKING_ACCOUNTS_SIZE; m++) {
+      vm.expectEmit(true, true, false, false, address(hoprNetworkRegistry));
+      emit EligibilityUpdated(stakingAccounts[m], false);
+    }
+    hoprNetworkRegistry.managerForceSync(stakingAccounts, allFalse);
+    vm.stopPrank();
     vm.clearMockedCalls();
   }
 
@@ -401,9 +439,9 @@ contract HoprNetworkRegistryTest is Test {
   }
 
   /**
-   * @dev Fail to deregister an non-registered account
+   * @dev Fail to deregister an non-registered node
    */
-  function testRevert_DeregisterForOtherAccount() public {
+  function testRevert_DeregisterANonRegisteredNode() public {
     _helperRegisterAllNodeAddresses();
     address stakingAccount = stakingAccounts[3];
     address[] memory nodeAddresses = _helperCreateNodeAddresses(4);
@@ -418,16 +456,50 @@ contract HoprNetworkRegistryTest is Test {
   }
 
   /**
+   * @dev Fail to deregister an account registered under another account
+   */
+  function testRevert_DeregisterForOtherAccount() public {
+    address[] memory oldAccounts = new address[](1);
+    oldAccounts[0] = stakingAccounts[1];
+    address[] memory accounts = new address[](1);
+    accounts[0] = stakingAccounts[2];
+    address[] memory nodeAddresses = _helperCreateNodeAddresses(1);
+
+    // account is allowed to operate for node
+    vm.mockCall(
+      proxy,
+      abi.encodeWithSelector(IHoprNetworkRegistryRequirement.canOperateFor.selector),
+      abi.encode(true)
+    );
+
+    vm.prank(owner);
+    hoprNetworkRegistry.managerRegister(oldAccounts, nodeAddresses);
+
+
+    vm.prank(accounts[0]);
+    vm.expectRevert(abi.encodeWithSelector(HoprNetworkRegistry.NodeRegisterdToOtherAccount.selector, nodeAddresses[0]));
+    hoprNetworkRegistry.selfDeregister(nodeAddresses);
+    vm.clearMockedCalls();
+  }
+
+  /**
    * @dev Deregistering not registered nodes will not fail but no state gets updated
    */
   function test_DeregisterNonRegisteredNode() public {
     _helperRegisterAllNodeAddresses();
-    address nodeAddress = vm.addr(20);
+    address[] memory nodeAddresses = new address[](1);
+    nodeAddresses[0] = vm.addr(20);
 
-    assertEq(hoprNetworkRegistry.nodeRegisterdToAccount(nodeAddress), address(0));
+    // account is allowed to operate for node
+    vm.mockCall(
+      proxy,
+      abi.encodeWithSelector(IHoprNetworkRegistryRequirement.canOperateFor.selector),
+      abi.encode(true)
+    );
+    assertEq(hoprNetworkRegistry.nodeRegisterdToAccount(nodeAddresses[0]), address(0));
     vm.prank(stakingAccounts[0]);
     hoprNetworkRegistry.selfDeregister(nodeAddresses);
-    assertEq(hoprNetworkRegistry.nodeRegisterdToAccount(nodeAddress), address(0));
+    assertEq(hoprNetworkRegistry.nodeRegisterdToAccount(nodeAddresses[0]), address(0));
     vm.clearMockedCalls();
   }
 
@@ -453,179 +525,56 @@ contract HoprNetworkRegistryTest is Test {
     vm.clearMockedCalls();
   }
 
-  // /**
-  //  * @dev Register contract for multiple times by one
-  //  * it fails to register the node address by a different account
-  //  */
-  // function testRevert_RegisterARegisteredNode() public {
-  //   uint256 accountIndex = 1;
-  //   string[] memory nodeIds = _helperRegisterOneNode(accountIndex);
+  /**
+   * @dev Register a node that has been registered to the caller. No revert but also no state update
+   */
+  function test_RegisterASelfRegisteredNode() public {
+    uint256[STAKING_ACCOUNTS_SIZE] memory allowances = [uint256(0), uint256(1), uint256(2), uint256(3), uint256(4)];
+    // mock requirement function returns
+    _helperMockProxyReturns(allowances);
 
-  //   vm.prank(vm.addr(accountIndex + 1));
-  //   vm.expectRevert('HoprNetworkRegistry: Cannot link a registered node.');
-  //   hoprNetworkRegistry.selfRegister(nodeIds);
-  //   vm.clearMockedCalls();
-  // }
+    uint256 accountIndex = 4;
+    address[] memory nodeAddresses = _helperCreateNodeAddresses(accountIndex);
 
-  // /**
-  //  * @dev Register contract for multiple times by one
-  //  * it can register an additional peer ID
-  //  */
-  // function test_RegisterAnotherNode() public {
-  //   _helperMockProxyReturns();
-  //   uint256 accountIndex = 1;
+    vm.startPrank(stakingAccounts[accountIndex]);
+    hoprNetworkRegistry.selfRegister(nodeAddresses);
+    // register again
+    hoprNetworkRegistry.selfRegister(nodeAddresses);
+    vm.stopPrank();
+    vm.clearMockedCalls();
+  }
 
-  //   vm.prank(vm.addr(accountIndex));
+  /**
+   * @dev Register a node that has been registered to the caller
+   */
+  function testRevert_RegisterNodesRegisteredToOtherAccounts() public {
+    uint256[STAKING_ACCOUNTS_SIZE] memory allowances = [uint256(0), uint256(1), uint256(2), uint256(3), uint256(4)];
+    // mock requirement function returns
+    _helperMockProxyReturns(allowances);
 
-  //   string[] memory nodeAddresses = new string[](1);
-  //   nodeAddresses[0] = HOPR_NODE_ADDRESSES[accountIndex];
+    uint256 accountIndex = 1;
+    address[] memory nodeAddresses = _helperCreateNodeAddresses(accountIndex);
+    address[] memory oldAccounts = new address[](accountIndex);
+    oldAccounts[0] = stakingAccounts[4];
+    address[] memory accounts = new address[](accountIndex);
+    accounts[0] = stakingAccounts[accountIndex];
 
-  //   vm.expectEmit(true, true, false, false, address(hoprNetworkRegistry));
-  //   emit EligibilityUpdated(vm.addr(accountIndex), true);
-  //   vm.expectEmit(true, false, false, true, address(hoprNetworkRegistry));
-  //   emit Registered(vm.addr(accountIndex), nodeAddresses[0]);
-  //   hoprNetworkRegistry.selfRegister(nodeAddresses);
+    vm.prank(owner);
+    hoprNetworkRegistry.managerRegister(oldAccounts, nodeAddresses);
+    vm.prank(accounts[0]);
+    vm.expectRevert(abi.encodeWithSelector(HoprNetworkRegistry.NodeAlreadyRegisterd.selector, nodeAddresses[0]));
+    hoprNetworkRegistry.selfRegister(nodeAddresses);
+    vm.clearMockedCalls();
+  }
 
-  //   vm.clearMockedCalls();
-  // }
 
-  // /**
-  //  * @dev Register contract for multiple times by one
-  //  * it self-registered account emits true when the requirement is fulfilled, but no longer emits Registered event
-  //  */
-  // function test_RegisterAgainTheSameNode() public {
-  //   uint256 accountIndex = 1;
-  //   string[] memory nodeIds = _helperRegisterOneNode(accountIndex);
-
-  //   vm.prank(vm.addr(accountIndex));
-
-  //   vm.expectEmit(true, true, false, false, address(hoprNetworkRegistry));
-  //   emit EligibilityUpdated(vm.addr(accountIndex), true);
-  //   hoprNetworkRegistry.selfRegister(nodeIds);
-
-  //   vm.clearMockedCalls();
-  // }
-
-  // /**
-  //  * @dev Register contract for multiple times by one
-  //  * it fails self-registered when the requirement is not fulfilled
-  //  */
-  // function testRevert_WhenEligibilityChangesRegisterAnotherNode() public {
-  //   uint256 accountIndex = 1;
-  //   string[] memory nodeIds = _helperRegisterOneNode(accountIndex);
-  //   string[] memory nodeAddresses = new string[](1);
-  //   nodeAddresses[0] = HOPR_NODE_ADDRESSES[accountIndex];
-
-  //   // update the eligibility
-  //   vm.mockCall(
-  //     proxy,
-  //     abi.encodeWithSignature('maxAllowedRegistrations(address)', vm.addr(accountIndex)),
-  //     abi.encode(1)
-  //   );
-
-  //   // the same account cannot register another node
-  //   vm.prank(vm.addr(accountIndex));
-  //   vm.expectRevert('HoprNetworkRegistry: selfRegister reaches limit, cannot register requested nodes.');
-  //   hoprNetworkRegistry.selfRegister(nodeAddresses);
-  //   vm.clearMockedCalls();
-  // }
-
-  // /**
-  //  * @dev Force emit an eligibility update
-  //  * it allows owner to force emit an eligibility update
-  //  */
-  // function test_OwnerForceUpdateEligibility() public {
-  //   _helperMockProxyReturns();
-
-  //   address[] memory participantAddresses = new address[](3);
-  //   participantAddresses[0] = vm.addr(1);
-  //   participantAddresses[1] = vm.addr(3);
-  //   participantAddresses[2] = vm.addr(5);
-  //   bool[] memory eligibility = new bool[](3);
-  //   eligibility[0] = false;
-  //   eligibility[1] = true;
-  //   eligibility[2] = true;
-
-  //   vm.prank(owner);
-
-  //   vm.expectEmit(true, true, false, false, address(hoprNetworkRegistry));
-  //   emit EligibilityUpdated(participantAddresses[0], eligibility[0]);
-  //   vm.expectEmit(true, true, false, false, address(hoprNetworkRegistry));
-  //   emit EligibilityUpdated(participantAddresses[1], eligibility[1]);
-  //   vm.expectEmit(true, true, false, false, address(hoprNetworkRegistry));
-  //   emit EligibilityUpdated(participantAddresses[2], eligibility[2]);
-  //   hoprNetworkRegistry.ownerForceEligibility(participantAddresses, eligibility);
-
-  //   vm.clearMockedCalls();
-  // }
-
-  // /**
-  //  * @dev Sync with when criteria change
-  //  * it allows owner to sync the criteria, before criteria change
-  //  * it allows anyone to check account and node eligibility
-  //  */
-  // function test_OwnerSyncBeforeChange() public {
-  //   uint256 accountIndex = 3;
-  //   string[] memory nodeIds = _helperRegisterOneNode(accountIndex);
-
-  //   string[] memory nodeAddresses = new string[](3);
-  //   nodeAddresses[0] = HOPR_NODE_ADDRESSES[1];
-  //   nodeAddresses[1] = nodeIds[0];
-  //   nodeAddresses[2] = HOPR_NODE_ADDRESSES[5];
-
-  //   vm.prank(owner);
-
-  //   vm.expectEmit(true, true, false, false, address(hoprNetworkRegistry));
-  //   emit EligibilityUpdated(vm.addr(accountIndex), true);
-  //   hoprNetworkRegistry.sync(nodeAddresses);
-
-  //   // on registered eligible accounts
-  //   assertTrue(hoprNetworkRegistry.isAccountRegisteredAndEligible(vm.addr(accountIndex)));
-  //   assertTrue(hoprNetworkRegistry.isNodeRegisteredAndEligible(nodeIds[0]));
-  //   // on non-registered eligible accounts
-  //   assertFalse(hoprNetworkRegistry.isAccountRegisteredAndEligible(vm.addr(1)));
-  //   assertFalse(hoprNetworkRegistry.isNodeRegisteredAndEligible(HOPR_NODE_ADDRESSES[1]));
-  //   // on non-registered ineligible accounts
-  //   assertFalse(hoprNetworkRegistry.isAccountRegisteredAndEligible(vm.addr(5)));
-  //   assertFalse(hoprNetworkRegistry.isNodeRegisteredAndEligible(HOPR_NODE_ADDRESSES[5]));
-
-  //   vm.clearMockedCalls();
-  // }
-
-  // /**
-  //  * @dev Sync with when criteria change
-  //  * it allows owner to sync the criteria, after criteria change
-  //  * it allows anyone to check account and node eligibility
-  //  */
-  // function test_OwnerSyncAfterChange() public {
-  //   uint256 accountIndex = 3;
-  //   string[] memory nodeIds = _helperRegisterOneNode(accountIndex);
-
-  //   string[] memory nodeAddresses = new string[](3);
-  //   nodeAddresses[0] = HOPR_NODE_ADDRESSES[1];
-  //   nodeAddresses[1] = nodeIds[0];
-  //   nodeAddresses[2] = HOPR_NODE_ADDRESSES[5];
-
-  //   // update the eligibility
-  //   vm.mockCall(
-  //     proxy,
-  //     abi.encodeWithSignature('maxAllowedRegistrations(address)', vm.addr(accountIndex)),
-  //     abi.encode(0)
-  //   );
-
-  //   vm.prank(owner);
-
-  //   vm.expectEmit(true, true, false, false, address(hoprNetworkRegistry));
-  //   emit EligibilityUpdated(vm.addr(accountIndex), false);
-  //   hoprNetworkRegistry.sync(nodeAddresses);
-
-  //   // on registered, now ineligible accounts
-  //   assertFalse(hoprNetworkRegistry.isAccountRegisteredAndEligible(vm.addr(accountIndex)));
-  //   assertFalse(hoprNetworkRegistry.isNodeRegisteredAndEligible(nodeIds[0]));
-
-  //   vm.clearMockedCalls();
-  // }
-
+  /**
+   * @dev check if an addres is registered and eligible
+   */
+  function testFuzz_NonRegisteredNodeisNeitherNodeRegisteredNorEligible(address nodeAddress) public {
+    // registerd nodes are beyond their eligibility
+    assertFalse(hoprNetworkRegistry.isNodeRegisteredAndEligible(nodeAddress));
+  }
   /**
    *@dev Helper function to mock returns of `maxAllowedRegistrations` function on proxy contract
    * stakingAccounts[i] where i = 0..STAKING_ACCOUNTS_SIZE-1 has some random allowance value 
@@ -701,52 +650,4 @@ contract HoprNetworkRegistryTest is Test {
       hoprNetworkRegistry.selfRegister(nodes);
     }
   }
-
-//   /**
-//    *@dev Helper function to mock returns of `maxAllowedRegistrations` function on proxy contract
-//    */
-//   function _helperMockProxyReturns() internal {
-//     // account vm.addr(1) and vm.addr(2) have max allowance
-//     vm.mockCall(
-//       proxy,
-//       abi.encodeWithSignature('maxAllowedRegistrations(address)', vm.addr(1)),
-//       abi.encode(type(uint256).max)
-//     );
-//     vm.mockCall(
-//       proxy,
-//       abi.encodeWithSignature('maxAllowedRegistrations(address)', vm.addr(2)),
-//       abi.encode(type(uint256).max)
-//     );
-//     // account vm.addr(3) and vm.addr(4) have 1 allowance
-//     vm.mockCall(proxy, abi.encodeWithSignature('maxAllowedRegistrations(address)', vm.addr(3)), abi.encode(1));
-//     vm.mockCall(proxy, abi.encodeWithSignature('maxAllowedRegistrations(address)', vm.addr(4)), abi.encode(1));
-//     // account vm.addr(5) and vm.addr(6) have 0 allowance
-//     vm.mockCall(proxy, abi.encodeWithSignature('maxAllowedRegistrations(address)', vm.addr(5)), abi.encode(0));
-//     vm.mockCall(proxy, abi.encodeWithSignature('maxAllowedRegistrations(address)', vm.addr(6)), abi.encode(0));
-//   }
-
-//   /**
-//    * @dev helper function to reigster an account with a node. Note that
-//    * accountIndex should be between 1 and 6
-//    */
-//   function _helperRegisterOneNode(uint256 accountIndex) internal returns (string[] memory) {
-//     _helperMockProxyReturns();
-
-//     address[] memory participantAddresses = new address[](1);
-//     participantAddresses[0] = vm.addr(accountIndex);
-//     string[] memory nodeAddresses = new string[](1);
-//     nodeAddresses[0] = HOPR_NODE_ADDRESSES[accountIndex - 1];
-
-//     vm.prank(participantAddresses[0]);
-//     hoprNetworkRegistry.selfRegister(nodeAddresses);
-
-//     return nodeAddresses;
-//   }
-
-// /**
-//  * @dev return 
-//  */
-//   function _helperMockAllowedRegistrations(adress stakingAccountSize, uint256 nodeSize) private {
-    
-//   }
 }

@@ -35,6 +35,7 @@ contract HoprNetworkRegistry is AccessControlEnumerable {
   error GloballyEnabledRegistry();
   error NodeAlreadyRegisterd(address nodeAddress);
   error NodeNotYetRegisterd(address nodeAddress);
+  error NodeRegisterdToOtherAccount(address nodeAddress);
   error NotEnoughAllowanceToRegisterNode();
   error CannotOperateForNode(address nodeAddress);
   error ArrayLengthNotMatch();
@@ -159,13 +160,9 @@ contract HoprNetworkRegistry is AccessControlEnumerable {
         countRegisterdNodesPerAccount[msg.sender]--;
         nodeRegisterdToAccount[nodeAddress] = address(0);
         emit Deregistered(msg.sender, nodeAddress);
-
-        // if node is not registered, update the counter
-        if (countRegisterdNodesPerAccount[msg.sender] > 0) {
-        }
       } else if (registeredAccount != address(0)) {
         // when the node is not registered under the caller, revert
-        revert NodeNotYetRegisterd(nodeAddress);
+        revert NodeRegisterdToOtherAccount(nodeAddress);
       }
       // skip if the node is already deregistered
     }
