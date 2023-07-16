@@ -23,6 +23,7 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
     event SetMultisendAddress(address indexed multisendAddress);
     event NodeAdded(address indexed node);
     event NodeRemoved(address indexed node);
+    event AvatarSet(address indexed previousAvatar, address indexed newAvatar);
 
     function setUp() public virtual override(CapabilityPermissionsLibFixtureTest, SafeSingletonFixtureTest) {
         super.setUp();
@@ -61,15 +62,23 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
     }
 
     /**
-     * @dev Mock read avatar
+     * @dev Mock set avatar
      */
-    function test_ReadAvatar() public {
+    function test_SetAvatar(address account) public {
         stdstore
             .target(address(moduleSingleton))
             .sig("avatar()")
             .checked_write(safe);
 
         assertEq(moduleSingleton.avatar(), safe);
+    
+        vm.prank(moduleSingleton.owner());
+        vm.expectEmit(true, true, false, false, address(moduleSingleton));
+        emit AvatarSet(safe, account);
+        moduleSingleton.setAvatar(account);
+    
+        assertEq(moduleSingleton.avatar(), account);
+        vm.clearMockedCalls();
     }
 
     /**

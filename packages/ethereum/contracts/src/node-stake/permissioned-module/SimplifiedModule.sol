@@ -43,14 +43,13 @@ abstract contract SimplifiedModule is UUPSUpgradeable, OwnableUpgradeable {
         uint256 value,
         bytes memory data,
         Enum.Operation operation
-    ) internal virtual returns (bool success) {
-        success = IAvatar(avatar).execTransactionFromModule(
+    ) internal virtual returns (bool) {
+        return IAvatar(avatar).execTransactionFromModule(
             to,
             value,
             data,
             operation
         );
-        return success;
     }
 
     /**
@@ -66,10 +65,9 @@ abstract contract SimplifiedModule is UUPSUpgradeable, OwnableUpgradeable {
         uint256 value,
         bytes memory data,
         Enum.Operation operation
-    ) internal virtual returns (bool success, bytes memory returnData) {
-        (success, returnData) = IAvatar(avatar)
+    ) internal virtual returns (bool, bytes memory) {
+        return IAvatar(avatar)
             .execTransactionFromModuleReturnData(to, value, data, operation);
-        return (success, returnData);
     }
 
     /**
