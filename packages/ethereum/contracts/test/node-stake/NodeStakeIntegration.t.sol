@@ -4,6 +4,7 @@ pragma solidity >=0.8.0 <0.9.0;
 import '../../src/node-stake/permissioned-module/NodeManagementModule.sol';
 import '../../src/node-stake/permissioned-module/CapabilityPermissions.sol';
 import '../../src/node-stake/NodeStakeFactory.sol';
+import '../../src/node-stake/NodeSafeRegistry.sol';
 import '../../src/Channels.sol';
 import '../../lib/safe-contracts/contracts/Safe.sol';
 import "../../script/utils/SafeSuiteLib.sol";
@@ -22,6 +23,7 @@ contract HoprNodeStakeIntegrationTest is Test, ERC1820RegistryFixtureTest, SafeS
     HoprNodeManagementModule public moduleSingleton;
     HoprNodeStakeFactory public factory;
     HoprChannels public hoprChannels;
+    HoprNodeSafeRegistry public hoprNodeSafeRegistry;
     address public hoprToken;
 
     address public caller;
@@ -52,13 +54,15 @@ contract HoprNodeStakeIntegrationTest is Test, ERC1820RegistryFixtureTest, SafeS
         admin = vm.addr(102); // make make address(102) an admin
         moduleSingleton = new HoprNodeManagementModule();
         factory = new HoprNodeStakeFactory();
+        hoprNodeSafeRegistry = new HoprNodeSafeRegistry();
+
 
         // ensure that ERC1820 registry is in place
         vm.etch(ERC1820_REGISTRY_ADDRESS, ERC1820_REGISTRY_DEPLOYED_CODE);
         mustHaveErc1820Registry();
 
         hoprToken = deployCode("HoprToken.sol:HoprToken");
-        hoprChannels = new HoprChannels(hoprToken, HoprChannels.Timestamp.wrap(15));
+        hoprChannels = new HoprChannels(hoprToken, address(hoprNodeSafeRegistry), HoprChannels.Timestamp.wrap(15));
         node1 = 0xFD0E196A4548B9E8Cc28CB94B74B2f79F72C3e09;
         node2 = 0x4FCEB6F2C703E9FE573847EB391964aA58bE7191;
         node3 = 0xFD5328aB5BfCC27BeA70FDeA223Ef7D67Ce30Ef0;

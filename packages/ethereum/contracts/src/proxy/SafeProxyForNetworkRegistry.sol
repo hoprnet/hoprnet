@@ -2,14 +2,8 @@
 pragma solidity ^0.8.0;
 
 import '../interfaces/INetworkRegistryRequirement.sol';
+import '../interfaces/INodeSafeRegistry.sol';
 import 'openzeppelin-contracts-4.8.3/access/AccessControlEnumerable.sol';
-
-/**
- * @dev Minimum interface for NodeSafeRegistry contract
- */
-contract INodeSafeRegistry {
-  function nodeToSafe(address node) public view returns (address) {}
-}
 
 /**
  * @dev Minimum interface for token contract
@@ -26,7 +20,7 @@ interface IERC777Snapshot {
 contract HoprSafeProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, AccessControlEnumerable {
     bytes32 public constant MANAGER_ROLE = keccak256('MANAGER_ROLE');
     IERC777Snapshot public token;
-    INodeSafeRegistry public nodeSafeRegistry;
+    IHoprNodeSafeRegistry public nodeSafeRegistry;
     uint256 public stakeThreshold;
     uint128 public snapshotBlockNumber;
 
@@ -48,7 +42,7 @@ contract HoprSafeProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, Acc
         _updateSnapshotBlockNumber(_snapshotBlockNumber);
 
         token = IERC777Snapshot(_token);
-        nodeSafeRegistry = INodeSafeRegistry(_nodeSafeRegistry);
+        nodeSafeRegistry = IHoprNodeSafeRegistry(_nodeSafeRegistry);
         emit TokenAndRegistryUpdated(_token, _nodeSafeRegistry);
     }
 

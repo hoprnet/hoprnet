@@ -39,6 +39,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, AccountsFixtureTe
   }
 
   address hoprToken;
+  address hoprNodeSafeRegistry;
 
   HoprChannels public hoprChannels;
 
@@ -110,8 +111,9 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, AccountsFixtureTe
     super.setUp();
 
     hoprToken = vm.addr(1);
+    hoprNodeSafeRegistry = vm.addr(2);
 
-    hoprChannels = new HoprChannels(vm.addr(1), HoprChannels.Timestamp.wrap(15));
+    hoprChannels = new HoprChannels(hoprToken, hoprNodeSafeRegistry, HoprChannels.Timestamp.wrap(15));
     channelIdAB = hoprChannels._getChannelId(accountA.accountAddr, accountB.accountAddr);
     channelIdBA = hoprChannels._getChannelId(accountB.accountAddr, accountA.accountAddr);
 
@@ -372,6 +374,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, AccountsFixtureTe
       ),
       abi.encode(true)
     );
+    _helperNoSafeSetMock(accountA.accountAddr);
 
     vm.expectEmit(true, false, false, false, address(hoprChannels));
     emit ChannelOpened(accountA.accountAddr, accountB.accountAddr, HoprChannels.Balance.wrap(amount1));
@@ -380,7 +383,10 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, AccountsFixtureTe
     emit ChannelOpened(accountB.accountAddr, accountA.accountAddr, HoprChannels.Balance.wrap(amount2));
 
     hoprChannels.fundChannelMulti(accountA.accountAddr, HoprChannels.Balance.wrap(amount1), accountB.accountAddr, HoprChannels.Balance.wrap(amount2));
+    
     vm.clearMockedCalls();
+    _helperNoSafeSetMock(accountA.accountAddr);
+    _helperNoSafeSetMock(accountB.accountAddr);
    
     vm.expectEmit(true, false, false, false, address(hoprChannels));
     emit CommitmentSet(channelIdAB, HoprChannels.ChannelEpoch.wrap(1));
@@ -436,6 +442,8 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, AccountsFixtureTe
       ),
       abi.encode(true)
     );
+    _helperNoSafeSetMock(accountA.accountAddr);
+    _helperNoSafeSetMock(accountB.accountAddr);
 
     vm.expectEmit(true, false, false, false, address(hoprChannels));
     emit ChannelOpened(accountA.accountAddr, accountB.accountAddr, HoprChannels.Balance.wrap(amount1));
@@ -450,6 +458,8 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, AccountsFixtureTe
     emit CommitmentSet(channelIdAB, HoprChannels.ChannelEpoch.wrap(1));
 
     vm.prank(accountB.accountAddr);
+    _helperNoSafeSetMock(accountA.accountAddr);
+    _helperNoSafeSetMock(accountB.accountAddr);
     hoprChannels.setCommitment(bytes32(commitment1), accountA.accountAddr);
 
     assertEq(
@@ -489,12 +499,14 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, AccountsFixtureTe
   }
 
   function testRevert_SetCommitment() public {
+    _helperNoSafeSetMock(accountA.accountAddr);
     vm.prank(accountA.accountAddr);
     vm.expectRevert(InvalidCommitment.selector);
     hoprChannels.setCommitment(bytes32(0), accountB.accountAddr);
   }
 
   function testRevert_SetCommitmentChannelNotOpen(uint256 commitment) public {
+    _helperNoSafeSetMock(accountA.accountAddr);
     commitment = bound(commitment, uint256(1), type(uint256).max);
 
     vm.prank(accountA.accountAddr);
@@ -1518,4 +1530,32 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, AccountsFixtureTe
   //   hoprChannels.fundChannelMulti(accountA.accountAddr, accountB.accountAddr, reopenAmount1, reopenAmount2);
   //   vm.clearMockedCalls();
   // }
+
+  /**
+   * @dev mock a return of safe (vm.addr(100)) registsered to node
+   */
+  function _helperNoSafeSetMock(address node) private {
+    vm.mockCall(
+      hoprNodeSafeRegistry,
+      abi.encodeWithSelector(
+        IHoprNodeSafeRegistry.nodeToSafe.selector,
+        node
+      ),
+      abi.encode(address(0))
+    );
+  }
+
+  /**
+   * @dev mock a return of safe registsered to node
+   */
+  function _helperOnlySafeMock(address node, address caller) private {
+    vm.mockCall(
+      hoprNodeSafeRegistry,
+      abi.encodeWithSelector(
+        IHoprNodeSafeRegistry.nodeToSafe.selector,
+        node
+      ),
+      abi.encode(caller)
+    );
+  }
 }

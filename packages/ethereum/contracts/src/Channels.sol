@@ -7,6 +7,7 @@ import 'openzeppelin-contracts-4.8.3/utils/introspection/ERC1820Implementer.sol'
 import 'openzeppelin-contracts-4.8.3/token/ERC20/IERC20.sol';
 import 'openzeppelin-contracts-4.8.3/token/ERC777/IERC777Recipient.sol';
 import 'openzeppelin-contracts-4.8.3/utils/cryptography/ECDSA.sol';
+import './interfaces/INodeSafeRegistry.sol';
 
 error InvalidBalance();
 error BalanceExceedsGlobalPerChannelAllowance();
@@ -22,6 +23,8 @@ error InvalidCommitmentOpening();
 error InsufficientChannelBalance();
 error InvalidCommitment();
 error TicketIsNotAWin();
+error WrongSafeNodePair();
+error UnusedSafeNodePair();
 
 /**
  *    &&&&
@@ -164,6 +167,11 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
   IERC20 public immutable token;
 
   /**
+   * Contract that stores the node-safe registry
+   */
+  IHoprNodeSafeRegistry public immutable nodeSafeRegistry;
+
+  /**
    * Notice period before fund from an outgoing channel can be pulled out.
    */
   Timestamp public immutable noticePeriodChannelClosure; // in seconds
@@ -213,9 +221,14 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
 
   /**
    * @param _token HoprToken address
+   * @param _nodeSafeRegistry address of the global registry of node and safe
    * @param _noticePeriodChannelClosure seconds until a channel can be closed
    */
-  constructor(address _token, Timestamp _noticePeriodChannelClosure) {
+  constructor(
+    address _token, 
+    address _nodeSafeRegistry,
+    Timestamp _noticePeriodChannelClosure
+  ) {
     if (Timestamp.unwrap(_noticePeriodChannelClosure) == 0) {
       revert InvalidNoticePeriod();
     }
@@ -223,6 +236,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     require(_token != address(0), 'token must not be empty');
 
     token = IERC20(_token);
+    nodeSafeRegistry = IHoprNodeSafeRegistry(_nodeSafeRegistry);
     noticePeriodChannelClosure = _noticePeriodChannelClosure;
     _ERC1820_REGISTRY.setInterfaceImplementer(address(this), TOKENS_RECIPIENT_INTERFACE_HASH, address(this));
 
@@ -237,13 +251,19 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     );
   }
 
-  modifier onlySafe() {
+  modifier onlySafe(address node) {
     // check if NodeSafeRegistry entry exists
+    if (nodeSafeRegistry.nodeToSafe(node) != msg.sender) {
+      revert WrongSafeNodePair();
+    }
     _;
   }
 
-  modifier noSafeSet() {
+  modifier noSafeSet(address node) {
     // check if NodeSafeRegistry entry **does not** exist
+    if (nodeSafeRegistry.nodeToSafe(node) != address(0)) {
+      revert UnusedSafeNodePair();
+    }
     _;
   }
 
@@ -296,7 +316,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     address self,
     address account,
     Balance amount
-  ) external onlySafe {
+  ) external onlySafe(self) {
     _fundChannelInternal(self, account, amount);
   }
 
@@ -310,7 +330,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     address self,
     address account,
     Balance amount
-  ) external noSafeSet {
+  ) external noSafeSet(msg.sender) {
     _fundChannelInternal(msg.sender, account, amount);
   }
 
@@ -378,11 +398,11 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     }
   }
 
-  function redeemTicketSafe(address self, RedeemableTicket calldata redeemable) external onlySafe {
+  function redeemTicketSafe(address self, RedeemableTicket calldata redeemable) external onlySafe(self) {
     _redeemTicketInternal(self, redeemable);
   }
 
-  function redeemTicket(RedeemableTicket calldata redeemable) external noSafeSet {
+  function redeemTicket(RedeemableTicket calldata redeemable) external noSafeSet(msg.sender) {
     _redeemTicketInternal(msg.sender, redeemable);
   }
 
@@ -462,11 +482,11 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     emit TicketRedeemed(redeemable.data.channelId, redeemable.data.index);
   }
 
-  function initiateOutgoingChannelClosureSafe(address self, address destination) external onlySafe {
+  function initiateOutgoingChannelClosureSafe(address self, address destination) external onlySafe(self) {
     _initiateOutgoingChannelClosureInternal(self, destination);
   }
 
-  function initiateOutgoingChannelClosure(address destination) external noSafeSet {
+  function initiateOutgoingChannelClosure(address destination) external noSafeSet(msg.sender) {
     _initiateOutgoingChannelClosureInternal(msg.sender, destination);
   }
 
@@ -497,11 +517,11 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     emit OutgoingChannelClosureInitiated(channelId, channel.closureTime);
   }
 
-  function closeIncomingChannelSafe(address self, address source) external onlySafe {
+  function closeIncomingChannelSafe(address self, address source) external onlySafe(self) {
     _closeIncomingChannelInternal(self, source);
   }
 
-  function closeIncomingChannel(address source) external noSafeSet {
+  function closeIncomingChannel(address source) external noSafeSet(msg.sender) {
     _closeIncomingChannelInternal(msg.sender, source);
   }
 
@@ -543,11 +563,11 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     channel.balance = Balance.wrap(0);
   }
 
-  function finalizeOutgoingChannelClosureSafe(address self, address destination) external onlySafe {
+  function finalizeOutgoingChannelClosureSafe(address self, address destination) external onlySafe(self) {
     _finalizeOutgoingChannelClosureInternal(self, destination);
   }
 
-  function finalizeOutgoingChannelClosure(address destination) external noSafeSet {
+  function finalizeOutgoingChannelClosure(address destination) external noSafeSet(msg.sender) {
     _finalizeOutgoingChannelClosureInternal(msg.sender, destination);
   }
 
@@ -590,11 +610,11 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     channel.balance = Balance.wrap(0);
   }
 
-  function setCommitmentSafe(address self, bytes32 newCommitment, address source) external onlySafe {
+  function setCommitmentSafe(address self, bytes32 newCommitment, address source) external onlySafe(self) {
     _setCommitmentInternal(self, newCommitment, source);
   }
 
-  function setCommitment(bytes32 newCommitment, address source) external noSafeSet {
+  function setCommitment(bytes32 newCommitment, address source) external noSafeSet(msg.sender) {
     _setCommitmentInternal(msg.sender, newCommitment, source);
   }
 
