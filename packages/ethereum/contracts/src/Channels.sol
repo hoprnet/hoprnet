@@ -610,7 +610,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     channel.balance = Balance.wrap(0);
   }
 
-  function setCommitmentSafe(address self, bytes32 newCommitment, address source) external onlySafe(self) {
+  function setCommitmentSafe(address self, address source, bytes32 newCommitment) external onlySafe(self) {
     _setCommitmentInternal(self, newCommitment, source);
   }
 
