@@ -16,7 +16,7 @@ contract TargetUtilsTest is Test {
     }
 
     function test_GetNumDefaultFunctionPermissions() public {
-        uint256 num = targetUtilsMock.getNumDefaultFunctionPermissions();
+        uint256 num = targetUtilsMock.getNumCapabilityPermissions();
         assertEq(num, 9);
     }
 
@@ -106,22 +106,22 @@ contract TargetUtilsTest is Test {
 
     function testFuzz_GetDefaultPermissionAt(uint256 targetVal, uint256 position) public {
         targetUtilsMock.setTarget(targetVal);
-        uint256 limit = targetUtilsMock.getNumDefaultFunctionPermissions() - 1;
+        uint256 limit = targetUtilsMock.getNumCapabilityPermissions() - 1;
         position = bound(position, 0, limit);
 
         uint8 convertedMaskedDefaultPermissionAt = uint8((targetVal << 184 + position * 8) >> 248);
-        vm.assume(convertedMaskedDefaultPermissionAt <= uint8(type(FunctionPermission).max)); // valid target permission
+        vm.assume(convertedMaskedDefaultPermissionAt <= uint8(type(CapabilityPermission).max)); // valid target permission
 
-        FunctionPermission permission = targetUtilsMock.getDefaultFunctionPermissionAt(position);
+        CapabilityPermission permission = targetUtilsMock.getDefaultCapabilityPermissionAt(position);
         assertEq(uint8(permission), convertedMaskedDefaultPermissionAt);
     }
 
     function testRevert_GetDefaultPermissionAt(uint256 offset) public {
         offset = bound(offset, 1, 1e36);
         
-        uint256 position = targetUtilsMock.getNumDefaultFunctionPermissions() + offset;
-        vm.expectRevert(FunctionPermissionsTooMany.selector);
-        targetUtilsMock.getDefaultFunctionPermissionAt(position);
+        uint256 position = targetUtilsMock.getNumCapabilityPermissions() + offset;
+        vm.expectRevert(TooManyCapabilities.selector);
+        targetUtilsMock.getDefaultCapabilityPermissionAt(position);
     }
 
     function testFuzz_WriteAsTargetType(
@@ -150,22 +150,22 @@ contract TargetUtilsTest is Test {
         // depending on the asTargetType, certain permissions are overwritten
         if (newTargetType == TargetType.CHANNELS) {
             for (uint256 i = 0; i < 7; i++) {
-                assertEq(uint8(newTargetUtilsMock.getDefaultFunctionPermissionAt(i)), uint8(targetUtilsMock.getDefaultFunctionPermissionAt(i)));
+                assertEq(uint8(newTargetUtilsMock.getDefaultCapabilityPermissionAt(i)), uint8(targetUtilsMock.getDefaultCapabilityPermissionAt(i)));
             }
             // indexes 7 and 8 are overwritten
-            assertEq(uint8(newTargetUtilsMock.getDefaultFunctionPermissionAt(7)), uint8(FunctionPermission.NONE));
-            assertEq(uint8(newTargetUtilsMock.getDefaultFunctionPermissionAt(8)), uint8(FunctionPermission.NONE));
+            assertEq(uint8(newTargetUtilsMock.getDefaultCapabilityPermissionAt(7)), uint8(CapabilityPermission.NONE));
+            assertEq(uint8(newTargetUtilsMock.getDefaultCapabilityPermissionAt(8)), uint8(CapabilityPermission.NONE));
         } else if (newTargetType == TargetType.TOKEN) {
             // indexes 0 - 6 are overwritten
             for (uint256 j = 0; j < 7; j++) {
-                assertEq(uint8(newTargetUtilsMock.getDefaultFunctionPermissionAt(j)), uint8(FunctionPermission.NONE));
+                assertEq(uint8(newTargetUtilsMock.getDefaultCapabilityPermissionAt(j)), uint8(CapabilityPermission.NONE));
             }
-            assertEq(uint8(newTargetUtilsMock.getDefaultFunctionPermissionAt(7)), uint8(targetUtilsMock.getDefaultFunctionPermissionAt(7)));
-            assertEq(uint8(newTargetUtilsMock.getDefaultFunctionPermissionAt(8)), uint8(targetUtilsMock.getDefaultFunctionPermissionAt(8)));
+            assertEq(uint8(newTargetUtilsMock.getDefaultCapabilityPermissionAt(7)), uint8(targetUtilsMock.getDefaultCapabilityPermissionAt(7)));
+            assertEq(uint8(newTargetUtilsMock.getDefaultCapabilityPermissionAt(8)), uint8(targetUtilsMock.getDefaultCapabilityPermissionAt(8)));
         } else {
             // TargetType.SEND
-            for (uint256 k = 0; k < targetUtilsMock.getNumDefaultFunctionPermissions(); k++) {
-                assertEq(uint8(newTargetUtilsMock.getDefaultFunctionPermissionAt(k)), uint8(FunctionPermission.NONE));
+            for (uint256 k = 0; k < targetUtilsMock.getNumCapabilityPermissions(); k++) {
+                assertEq(uint8(newTargetUtilsMock.getDefaultCapabilityPermissionAt(k)), uint8(CapabilityPermission.NONE));
             }
         }
     }
@@ -192,7 +192,7 @@ contract TargetUtilsTest is Test {
         assertEq(uint8(targetUtilsMock.getTargetType()), boundTargetType);
         assertEq(uint8(targetUtilsMock.getDefaultTargetPermission()), boundTargetPermission);
         for (uint256 index = 0; index < functionPermissions.length; index++) {
-            assertEq(uint8(targetUtilsMock.getDefaultFunctionPermissionAt(index)), boundFunctionPermissions[index]);
+            assertEq(uint8(targetUtilsMock.getDefaultCapabilityPermissionAt(index)), boundFunctionPermissions[index]);
         }
     }
 
@@ -204,18 +204,18 @@ contract TargetUtilsTest is Test {
         uint8[] memory functionPermissions
     ) public {
         
-        vm.assume(functionPermissions.length > targetUtilsMock.getNumDefaultFunctionPermissions());
+        vm.assume(functionPermissions.length > targetUtilsMock.getNumCapabilityPermissions());
         // bound to each enum type
-        FunctionPermission[] memory funcPermissions = new FunctionPermission[](functionPermissions.length);
+        CapabilityPermission[] memory funcPermissions = new CapabilityPermission[](functionPermissions.length);
         clearance = uint8(bound(clearance, uint256(type(Clearance).min), uint256(type(Clearance).max)));
         targetType = uint8(bound(targetType, uint256(type(TargetType).min), uint256(type(TargetType).max)));
         targetPermission = uint8(bound(targetPermission, uint256(type(TargetPermission).min), uint256(type(TargetPermission).max)));
         for (uint256 i = 0; i < functionPermissions.length; i++) {
-            functionPermissions[i] = uint8(bound(functionPermissions[i], uint256(type(FunctionPermission).min), uint256(type(FunctionPermission).max)));
-            funcPermissions[i] = FunctionPermission(functionPermissions[i]);
+            functionPermissions[i] = uint8(bound(functionPermissions[i], uint256(type(CapabilityPermission).min), uint256(type(CapabilityPermission).max)));
+            funcPermissions[i] = CapabilityPermission(functionPermissions[i]);
         }
 
-        vm.expectRevert(FunctionPermissionsTooMany.selector);
+        vm.expectRevert(TooManyCapabilities.selector);
         // get the target
         targetUtilsMock.encodeDefaultPermissions(
             targetAddress, 
@@ -240,7 +240,7 @@ contract TargetUtilsTest is Test {
         assertEq(uint8(targetUtilsMock.getTargetType()), boundTargetType);
         assertEq(uint8(targetUtilsMock.getDefaultTargetPermission()), boundTargetPermission);
         for (uint256 index = 0; index < functionPermissions.length; index++) {
-            assertEq(uint8(targetUtilsMock.getDefaultFunctionPermissionAt(index)), boundFunctionPermissions[index]);
+            assertEq(uint8(targetUtilsMock.getDefaultCapabilityPermissionAt(index)), boundFunctionPermissions[index]);
         }
     }
 
@@ -265,8 +265,8 @@ contract TargetUtilsTest is Test {
             targetUtilsMock.decodeDefaultPermissions();
         }
 
-        for (uint256 i = 0; i < targetUtilsMock.getNumDefaultFunctionPermissions(); i++) {
-            if (targetVal << (176 + 8 * i) >> 248 > uint256(type(FunctionPermission).max)) {
+        for (uint256 i = 0; i < targetUtilsMock.getNumCapabilityPermissions(); i++) {
+            if (targetVal << (176 + 8 * i) >> 248 > uint256(type(CapabilityPermission).max)) {
                 // target permission is incorrect
                 vm.expectRevert(stdError.enumConversionError);
                 targetUtilsMock.decodeDefaultPermissions();
@@ -275,23 +275,23 @@ contract TargetUtilsTest is Test {
     }
 
     function testFuzz_ConvertFunctionToTargetPermissions(uint8 functionPermissionVal) public {
-        functionPermissionVal = uint8(bound(functionPermissionVal, uint256(type(FunctionPermission).min), uint256(type(FunctionPermission).max)));
+        functionPermissionVal = uint8(bound(functionPermissionVal, uint256(type(CapabilityPermission).min), uint256(type(CapabilityPermission).max)));
         vm.assume(functionPermissionVal != 0);
         
-        TargetPermission targetPermission = targetUtilsMock.convertFunctionToTargetPermission(FunctionPermission(functionPermissionVal));
+        TargetPermission targetPermission = targetUtilsMock.convertFunctionToTargetPermission(CapabilityPermission(functionPermissionVal));
         assertEq(uint8(targetPermission), functionPermissionVal - 1);
     }
 
     function testRevert_ConvertFunctionToTargetPermissions(uint8 functionPermissionVal) public {
-        if (functionPermissionVal > uint8(type(FunctionPermission).max)) {
+        if (functionPermissionVal > uint8(type(CapabilityPermission).max)) {
             vm.expectRevert(stdError.enumConversionError);
-            targetUtilsMock.convertFunctionToTargetPermission(FunctionPermission(functionPermissionVal));
+            targetUtilsMock.convertFunctionToTargetPermission(CapabilityPermission(functionPermissionVal));
         }
 
         if (functionPermissionVal == 0) {
-            FunctionPermission functionPermission = FunctionPermission(functionPermissionVal);
+            CapabilityPermission functionPermission = CapabilityPermission(functionPermissionVal);
             vm.expectRevert(PermissionNotFound.selector);
-            targetUtilsMock.convertFunctionToTargetPermission(FunctionPermission(functionPermissionVal));
+            targetUtilsMock.convertFunctionToTargetPermission(CapabilityPermission(functionPermissionVal));
         }
     }
 
@@ -308,17 +308,17 @@ contract TargetUtilsTest is Test {
         uint8[] memory boundFunctionPermissions
     ){
         // otherwise revert
-        vm.assume(functionPermissions.length <= targetUtilsMock.getNumDefaultFunctionPermissions());
+        vm.assume(functionPermissions.length <= targetUtilsMock.getNumCapabilityPermissions());
    
         // bound to each enum type
         boundFunctionPermissions = new uint8[](functionPermissions.length);
-        FunctionPermission[] memory funcPermissions = new FunctionPermission[](functionPermissions.length);
+        CapabilityPermission[] memory funcPermissions = new CapabilityPermission[](functionPermissions.length);
         boundClearance = uint8(bound(clearance, uint256(type(Clearance).min), uint256(type(Clearance).max)));
         boundTargetType = uint8(bound(targetType, uint256(type(TargetType).min), uint256(type(TargetType).max)));
         boundTargetPermission = uint8(bound(targetPermission, uint256(type(TargetPermission).min), uint256(type(TargetPermission).max)));
         for (uint256 i = 0; i < functionPermissions.length; i++) {
-            boundFunctionPermissions[i] = uint8(bound(functionPermissions[i], uint256(type(FunctionPermission).min), uint256(type(FunctionPermission).max)));
-            funcPermissions[i] = FunctionPermission(boundFunctionPermissions[i]);
+            boundFunctionPermissions[i] = uint8(bound(functionPermissions[i], uint256(type(CapabilityPermission).min), uint256(type(CapabilityPermission).max)));
+            funcPermissions[i] = CapabilityPermission(boundFunctionPermissions[i]);
         }
 
         // get the target

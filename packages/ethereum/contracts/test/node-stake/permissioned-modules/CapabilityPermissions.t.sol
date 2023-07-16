@@ -12,7 +12,8 @@ contract HoprCapabilityPermissionsTest is Test, CapabilityPermissionsLibFixtureT
     using HoprCapabilityPermissions for Role;
     Role internal role;
 
-    FunctionPermission[] internal defaultFunctionPermission;
+    CapabilityPermission[] internal defaultFunctionPermission;
+    uint256 maxCapabilitySize;
 
     // /**
     // * Manually import events and errors
@@ -40,8 +41,12 @@ contract HoprCapabilityPermissionsTest is Test, CapabilityPermissionsLibFixtureT
 
     function setUp() public virtual override(CapabilityPermissionsLibFixtureTest) {
         super.setUp();
-        // FIXME: update this with constant variables
-        defaultFunctionPermission = _helperCreateDefaultFunctionPermissionsArray(9, 0);
+        maxCapabilitySize = TargetUtils.getNumCapabilityPermissions();
+        defaultFunctionPermission = _helperCreateDefaultFunctionPermissionsArray(maxCapabilitySize, 0);
+    }
+
+    function test_CheckCapabilitySize() public {
+        assertGt(maxCapabilitySize, 8);
     }
 
     /** FIXME: expect revert data
@@ -79,13 +84,13 @@ contract HoprCapabilityPermissionsTest is Test, CapabilityPermissionsLibFixtureT
             defaultFunctionPermission
         );
 
-        FunctionPermission[] memory actualFunctionPermissions = new FunctionPermission[](9);
-        actualFunctionPermissions[0] = FunctionPermission.NONE;
-        actualFunctionPermissions[1] = FunctionPermission.NONE;
-        actualFunctionPermissions[2] = FunctionPermission.NONE;
-        actualFunctionPermissions[3] = FunctionPermission.NONE;
-        actualFunctionPermissions[4] = FunctionPermission.NONE;
-        actualFunctionPermissions[5] = FunctionPermission.NONE;
+        CapabilityPermission[] memory actualFunctionPermissions = new CapabilityPermission[](9);
+        actualFunctionPermissions[0] = CapabilityPermission.NONE;
+        actualFunctionPermissions[1] = CapabilityPermission.NONE;
+        actualFunctionPermissions[2] = CapabilityPermission.NONE;
+        actualFunctionPermissions[3] = CapabilityPermission.NONE;
+        actualFunctionPermissions[4] = CapabilityPermission.NONE;
+        actualFunctionPermissions[5] = CapabilityPermission.NONE;
         actualFunctionPermissions[7] = defaultFunctionPermission[7];
         actualFunctionPermissions[8] = defaultFunctionPermission[8];
 
@@ -114,13 +119,13 @@ contract HoprCapabilityPermissionsTest is Test, CapabilityPermissionsLibFixtureT
     //         TargetPermission.BLOCK_ALL,
     //         defaultFunctionPermission
     //     );
-    //     // FunctionPermission[] memory actualFunctionPermissions = new FunctionPermission[](defaultFunctionPermission.length);
-    //     FunctionPermission[] memory actualFunctionPermissions = defaultFunctionPermission;
+    //     // CapabilityPermission[] memory actualFunctionPermissions = new CapabilityPermission[](defaultFunctionPermission.length);
+    //     CapabilityPermission[] memory actualFunctionPermissions = defaultFunctionPermission;
     //     assertEq(actualFunctionPermissions.length, defaultFunctionPermission.length);
     //     assertEq(actualFunctionPermissions.length, 9);
 
     //     for (uint256 i = 0; i < 7; i++) {
-    //         actualFunctionPermissions[i] = FunctionPermission.NONE;
+    //         actualFunctionPermissions[i] = CapabilityPermission.NONE;
     //     }
     //     actualFunctionPermissions[7] = defaultFunctionPermission[7];
     //     actualFunctionPermissions[8] = defaultFunctionPermission[8];
@@ -183,11 +188,11 @@ contract HoprCapabilityPermissionsTest is Test, CapabilityPermissionsLibFixtureT
     /**
      * @dev create a permission array for all the functions default permissions
      */
-    function _helperCreateDefaultFunctionPermissionsArray(uint256 length, uint256 startingIndexOffset) private pure returns (FunctionPermission[] memory permissions) {
-        permissions = new FunctionPermission[](length);
+    function _helperCreateDefaultFunctionPermissionsArray(uint256 length, uint256 startingIndexOffset) private pure returns (CapabilityPermission[] memory permissions) {
+        permissions = new CapabilityPermission[](length);
         for (uint256 i = 0; i < length; i++) {
-            uint8 permissionIndex = uint8((i + startingIndexOffset) % (uint8(type(FunctionPermission).max) + 1));
-            permissions[i] = FunctionPermission(permissionIndex);
+            uint8 permissionIndex = uint8((i + startingIndexOffset) % (uint8(type(CapabilityPermission).max) + 1));
+            permissions[i] = CapabilityPermission(permissionIndex);
         }
     }
 

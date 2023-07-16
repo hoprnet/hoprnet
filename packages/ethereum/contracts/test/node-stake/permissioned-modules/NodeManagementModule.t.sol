@@ -12,7 +12,7 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
     HoprNodeManagementModule public moduleSingleton;
     address public multiaddr;
     address public safe;
-    FunctionPermission[] internal defaultFunctionPermission;
+    CapabilityPermission[] internal defaultFunctionPermission;
     /**
     * Manually import events and errors
     */
@@ -26,17 +26,17 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         safe = vm.addr(101); // make address(101) a safe
 
         moduleSingleton = new HoprNodeManagementModule();
-        defaultFunctionPermission = new FunctionPermission[](TargetUtils.NUM_DEFAULT_FUNCTION_PERMISSIONS);
+        defaultFunctionPermission = new CapabilityPermission[](TargetUtils.NUM_CAPABILITY_PERMISSIONS);
         defaultFunctionPermission = [
-            FunctionPermission.SPECIFIC_FALLBACK_ALLOW,
-            FunctionPermission.SPECIFIC_FALLBACK_ALLOW,
-            FunctionPermission.SPECIFIC_FALLBACK_ALLOW,
-            FunctionPermission.SPECIFIC_FALLBACK_ALLOW,
-            FunctionPermission.SPECIFIC_FALLBACK_ALLOW,
-            FunctionPermission.SPECIFIC_FALLBACK_ALLOW,
-            FunctionPermission.SPECIFIC_FALLBACK_ALLOW,
-            FunctionPermission.SPECIFIC_FALLBACK_BLOCK,
-            FunctionPermission.SPECIFIC_FALLBACK_BLOCK
+            CapabilityPermission.SPECIFIC_FALLBACK_ALLOW,
+            CapabilityPermission.SPECIFIC_FALLBACK_ALLOW,
+            CapabilityPermission.SPECIFIC_FALLBACK_ALLOW,
+            CapabilityPermission.SPECIFIC_FALLBACK_ALLOW,
+            CapabilityPermission.SPECIFIC_FALLBACK_ALLOW,
+            CapabilityPermission.SPECIFIC_FALLBACK_ALLOW,
+            CapabilityPermission.SPECIFIC_FALLBACK_ALLOW,
+            CapabilityPermission.SPECIFIC_FALLBACK_BLOCK,
+            CapabilityPermission.SPECIFIC_FALLBACK_BLOCK
         ];
     }
 

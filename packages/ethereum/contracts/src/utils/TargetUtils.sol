@@ -10,37 +10,37 @@ enum TargetType { TOKEN, CHANNELS, SEND }
 
 enum TargetPermission { BLOCK_ALL, SPECIFIC_FALLBACK_BLOCK, SPECIFIC_FALLBACK_ALLOW, ALLOW_ALL}
 
-enum FunctionPermission { NONE, BLOCK_ALL, SPECIFIC_FALLBACK_BLOCK, SPECIFIC_FALLBACK_ALLOW, ALLOW_ALL}
+enum CapabilityPermission { NONE, BLOCK_ALL, SPECIFIC_FALLBACK_BLOCK, SPECIFIC_FALLBACK_ALLOW, ALLOW_ALL}
 
 /**
  * @dev it stores the following information in uint256 = (160 + 8 * 12)
- * (address) as uint160: targetAddress 
- * (Clearance) as uint8: clearance 
- * (TargetType) as uint8: targetType 
- * (TargetPermission) as uint8: defaultTargetPermission                                       (for the target)
- * (FunctionPermission) as uint8: defaultRedeemTicketSafeFunctionPermisson                      (for Channels contract)
- * (FunctionPermission) as uint8: defaultBatchRedeemTicketsSafeFunctionPermisson                (for Channels contract)
- * (FunctionPermission) as uint8: defaultCloseIncomingChannelSafeFunctionPermisson              (for Channels contract)
- * (FunctionPermission) as uint8: defaultInitiateOutgoingChannelClosureSafeFunctionPermisson    (for Channels contract)
- * (FunctionPermission) as uint8: defaultFinalizeOutgoingChannelClosureSafeFunctionPermisson    (for Channels contract)
- * (FunctionPermission) as uint8: defaultFundChannelMultiFunctionPermisson                      (for Channels contract)
- * (FunctionPermission) as uint8: defaultSetCommitmentSafeFunctionPermisson                     (for Channels contract)
- * (FunctionPermission) as uint8: defaultApproveFunctionPermisson                               (for Token contract)
- * (FunctionPermission) as uint8: defaultSendFunctionPermisson                                  (for Token contract)
+ * (address)            as uint160: targetAddress 
+ * (Clearance)            as uint8: clearance 
+ * (TargetType)           as uint8: targetType 
+ * (TargetPermission)     as uint8: defaultTargetPermission                                       (for the target)
+ * (CapabilityPermission) as uint8: defaultRedeemTicketSafeFunctionPermisson                      (for Channels contract)
+ * (CapabilityPermission) as uint8: RESERVED FOR defaultBatchRedeemTicketsSafeFunctionPermisson   (for Channels contract)
+ * (CapabilityPermission) as uint8: defaultCloseIncomingChannelSafeFunctionPermisson              (for Channels contract)
+ * (CapabilityPermission) as uint8: defaultInitiateOutgoingChannelClosureSafeFunctionPermisson    (for Channels contract)
+ * (CapabilityPermission) as uint8: defaultFinalizeOutgoingChannelClosureSafeFunctionPermisson    (for Channels contract)
+ * (CapabilityPermission) as uint8: defaultFundChannelMultiFunctionPermisson                      (for Channels contract)
+ * (CapabilityPermission) as uint8: defaultSetCommitmentSafeFunctionPermisson                     (for Channels contract)
+ * (CapabilityPermission) as uint8: defaultApproveFunctionPermisson                               (for Token contract)
+ * (CapabilityPermission) as uint8: defaultSendFunctionPermisson                                  (for Token contract)
  */
 type Target is uint256;
 
-/// function permissions exceed maximum length
-error FunctionPermissionsTooMany();
+/// capability permissions exceed maximum length
+error TooManyCapabilities();
 
 /// cannot convert a function permission to target permission
 error PermissionNotFound();
 
 library TargetUtils {
-    uint256 internal constant NUM_DEFAULT_FUNCTION_PERMISSIONS = 9;
+    uint256 internal constant NUM_CAPABILITY_PERMISSIONS = 9;
 
-    function getNumDefaultFunctionPermissions() internal pure returns (uint256) {
-        return NUM_DEFAULT_FUNCTION_PERMISSIONS;
+    function getNumCapabilityPermissions() internal pure returns (uint256) {
+        return NUM_CAPABILITY_PERMISSIONS;
     }
 
     function getTargetAddress(Target target) internal pure returns (address) {
@@ -67,13 +67,13 @@ library TargetUtils {
         return TargetPermission(uint8((Target.unwrap(target) << 176) >> 248));
     }
 
-    function getDefaultFunctionPermissionAt(Target target, uint256 position) internal pure returns (FunctionPermission) {
-        if (position > NUM_DEFAULT_FUNCTION_PERMISSIONS) {
-            revert FunctionPermissionsTooMany();
+    function getDefaultCapabilityPermissionAt(Target target, uint256 position) internal pure returns (CapabilityPermission) {
+        if (position > NUM_CAPABILITY_PERMISSIONS) {
+            revert TooManyCapabilities();
         }
         // left shift 160 + 8 + 8 + 8 + 8 * pos bits then right shift 256 - 8 bits
         uint256 leftShiftBy = 184 + 8 * position;
-        return FunctionPermission(uint8((Target.unwrap(target) << leftShiftBy) >> 248));
+        return CapabilityPermission(uint8((Target.unwrap(target) << leftShiftBy) >> 248));
     }
 
     function forceWriteAsTargetType(Target target, TargetType targetType) internal pure returns (Target) {
@@ -126,7 +126,7 @@ library TargetUtils {
      * @param clearance clearance of the target
      * @param targetType Type of the target
      * @param targetPermission default target permissions
-     * @param functionPermissions Array of default function permissions
+     * @param CapabilityPermissions Array of default function permissions
      * Returns the wrapped target
      */
     function encodeDefaultPermissions(
@@ -134,10 +134,10 @@ library TargetUtils {
         Clearance clearance,
         TargetType targetType,
         TargetPermission targetPermission,
-        FunctionPermission[] memory functionPermissions
+        CapabilityPermission[] memory CapabilityPermissions
     ) internal pure returns (Target target) {
-        if (functionPermissions.length > NUM_DEFAULT_FUNCTION_PERMISSIONS) {
-            revert FunctionPermissionsTooMany();
+        if (CapabilityPermissions.length > NUM_CAPABILITY_PERMISSIONS) {
+            revert TooManyCapabilities();
         }
         
         uint256 _target;
@@ -149,10 +149,10 @@ library TargetUtils {
         _target |= uint256(targetType) << 80;
         // inclue TargetPermission to the next 8 bits (258 - 160 - 8 - 8 - 8 = 72)
         _target |= uint256(targetPermission) << 72;
-        // include the functionPermissions to the last 8 * 9 = 72 bits
-        for (uint256 i = 0; i < functionPermissions.length; i++) {
+        // include the CapabilityPermissions to the last 8 * 9 = 72 bits
+        for (uint256 i = 0; i < CapabilityPermissions.length; i++) {
             // left shift 72 - 8 - 8 * i bits
-            _target |= uint256(functionPermissions[i]) << (64 - 8 * i);
+            _target |= uint256(CapabilityPermissions[i]) << (64 - 8 * i);
         }
         return Target.wrap(_target);
     }
@@ -168,7 +168,7 @@ library TargetUtils {
         Clearance clearance,
         TargetType targetType,
         TargetPermission targetPermission,
-        FunctionPermission[] memory functionPermissions
+        CapabilityPermission[] memory CapabilityPermissions
     ) {
         // take the first 160 bits and parse it as address
         targetAddress = address(uint160(Target.unwrap(target) >> 96));
@@ -180,17 +180,17 @@ library TargetUtils {
         targetPermission = TargetPermission(uint8(Target.unwrap(target) << 176 >> 248));
         
         // there are 1 default target permission and 8 default function permissions
-        functionPermissions = new FunctionPermission[](NUM_DEFAULT_FUNCTION_PERMISSIONS);
+        CapabilityPermissions = new CapabilityPermission[](NUM_CAPABILITY_PERMISSIONS);
         // decode function permissions. By default, 8 function permissions
-        for (uint256 i = 0; i < NUM_DEFAULT_FUNCTION_PERMISSIONS; i++) {
+        for (uint256 i = 0; i < NUM_CAPABILITY_PERMISSIONS; i++) {
             // first left shift 160 + 8 + 8  + 8 * i = 176 + 8 * i bits
             // then RIGHT shift 256 - 8 = 248 bits
-            functionPermissions[i] = FunctionPermission(uint8(Target.unwrap(target) << (176 + 8 * i) >> 248));
+            CapabilityPermissions[i] = CapabilityPermission(uint8(Target.unwrap(target) << (176 + 8 * i) >> 248));
         }
     }
 
-    function convertFunctionToTargetPermission(FunctionPermission functionPermission) internal pure returns (TargetPermission) {
-        uint8 permissionIndex = uint8(functionPermission);
+    function convertFunctionToTargetPermission(CapabilityPermission capabilityPermission) internal pure returns (TargetPermission) {
+        uint8 permissionIndex = uint8(capabilityPermission);
         if (permissionIndex == 0) {
             revert PermissionNotFound();
         }

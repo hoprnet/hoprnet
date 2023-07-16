@@ -15,8 +15,8 @@ contract TargetUtilsMock {
         target = Target.wrap(targetVal);
     }
 
-    function getNumDefaultFunctionPermissions() public returns (uint256) {
-        return TargetUtils.getNumDefaultFunctionPermissions();
+    function getNumCapabilityPermissions() public returns (uint256) {
+        return TargetUtils.getNumCapabilityPermissions();
     }
 
     function getTargetAddress() public returns (address) {
@@ -39,8 +39,8 @@ contract TargetUtilsMock {
         return TargetUtils.getDefaultTargetPermission(target);
     }
 
-    function getDefaultFunctionPermissionAt(uint256 position) public returns (FunctionPermission) {
-        return TargetUtils.getDefaultFunctionPermissionAt(target, position);
+    function getDefaultCapabilityPermissionAt(uint256 position) public returns (CapabilityPermission) {
+        return TargetUtils.getDefaultCapabilityPermissionAt(target, position);
     }
 
     function forceWriteAsTargetType(TargetType targetType) public returns (Target) {
@@ -56,7 +56,7 @@ contract TargetUtilsMock {
         Clearance clearance,
         TargetType targetType,
         TargetPermission targetPermission,
-        FunctionPermission[] memory functionPermissions
+        CapabilityPermission[] memory functionPermissions
     ) public returns (Target) {
         return TargetUtils.encodeDefaultPermissions(
             targetAddress,
@@ -72,14 +72,14 @@ contract TargetUtilsMock {
         Clearance clearance,
         TargetType targetType,
         TargetPermission targetPermission,
-        FunctionPermission[] memory functionPermissions
+        CapabilityPermission[] memory functionPermissions
     ) {
         return TargetUtils.decodeDefaultPermissions(
             target
         );
     }
 
-    function convertFunctionToTargetPermission(FunctionPermission functionPermission) public returns (TargetPermission) {
+    function convertFunctionToTargetPermission(CapabilityPermission functionPermission) public returns (TargetPermission) {
         return TargetUtils.convertFunctionToTargetPermission(functionPermission);
     }
 }

@@ -11,8 +11,8 @@ struct Role {
     TargetSet targets;  // target addresses that can be called
     mapping(address => bool) members;   // eligible caller. May be able to receive native tokens (e.g. xDAI), if set to allowed
     // For CHANNELS target: capabilityKey (bytes32) => channel Id (keccak256(src, dest)) => GranularPermission
-    // For TOKEN target: capabilityKey (bytes32) => recipient Id (address in bytes32) => GranularPermission
-    // For SEND target:  bytes32(0x00) => recipient Id (address in bytes32) => GranularPermission
+    // For TOKEN target: capabilityKey (bytes32) => pair Id (keccak256(node address, spender address)) => GranularPermission
+    // For SEND target:  bytes32(0x00) => pair Id (keccak256(node address, spender address)) => GranularPermission
     mapping(bytes32 => mapping(bytes32 => GranularPermission)) capabilities; 
 }
 
@@ -439,28 +439,28 @@ library HoprCapabilityPermissions {
     ) internal view returns (TargetPermission) {
         // check default target permission
         TargetPermission defaultTargetPermission = target.getDefaultTargetPermission();
-        FunctionPermission defaultFunctionPermission;
+        CapabilityPermission defaultFunctionPermission;
         if (functionSig == REDEEM_TICKET_SELECTOR) {
-            defaultFunctionPermission = target.getDefaultFunctionPermissionAt(0);
+            defaultFunctionPermission = target.getDefaultCapabilityPermissionAt(0);
         } else if (functionSig == CLOSE_INCOMING_CHANNEL_SELECTOR) {
-            defaultFunctionPermission = target.getDefaultFunctionPermissionAt(2);
+            defaultFunctionPermission = target.getDefaultCapabilityPermissionAt(2);
         } else if (functionSig == INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTOR) {
-            defaultFunctionPermission = target.getDefaultFunctionPermissionAt(3);
+            defaultFunctionPermission = target.getDefaultCapabilityPermissionAt(3);
         } else if (functionSig == FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTOR) {
-            defaultFunctionPermission = target.getDefaultFunctionPermissionAt(4);
+            defaultFunctionPermission = target.getDefaultCapabilityPermissionAt(4);
         } else if (functionSig == FUND_CHANNEL_SELECTOR) {
-            defaultFunctionPermission = target.getDefaultFunctionPermissionAt(5);
+            defaultFunctionPermission = target.getDefaultCapabilityPermissionAt(5);
         } else if (functionSig == SET_COMMITMENT_SELECTOR) {
-            defaultFunctionPermission = target.getDefaultFunctionPermissionAt(6);
+            defaultFunctionPermission = target.getDefaultCapabilityPermissionAt(6);
         } else if (functionSig == APPROVE_SELECTOR) {
-            defaultFunctionPermission = target.getDefaultFunctionPermissionAt(7);
+            defaultFunctionPermission = target.getDefaultCapabilityPermissionAt(7);
         } else if (functionSig == SEND_SELECTOR) {
-            defaultFunctionPermission = target.getDefaultFunctionPermissionAt(8);
+            defaultFunctionPermission = target.getDefaultCapabilityPermissionAt(8);
         } else {
-            defaultFunctionPermission = FunctionPermission.BLOCK_ALL;
+            defaultFunctionPermission = CapabilityPermission.BLOCK_ALL;
         }
         // only when function permission is not defined, use target default permission
-        if (defaultFunctionPermission == FunctionPermission.NONE) {
+        if (defaultFunctionPermission == CapabilityPermission.NONE) {
             return defaultTargetPermission;
         } else {
             return TargetUtils.convertFunctionToTargetPermission(defaultFunctionPermission);
