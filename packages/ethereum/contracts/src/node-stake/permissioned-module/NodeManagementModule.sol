@@ -205,28 +205,32 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
    * @notice it can batch maxinum 7 capabilities. 
    * Encoding of function signatures is right-padded, where indexes grow from left to right
    * Encoding of permissions is left-padded, where indexes grow from left to right
+   * @param nodeAddress The address of the caller node
    * @param targetAddress The address of the scoped HoprToken target.
    * @param beneficiary The beneficiary address for the scoped HoprToken target.
    * @param encodedSigsPermissions The encoded function signatures and permissions
    */
   function scopeTokenCapabilities(
+    address nodeAddress,
     address targetAddress,
     address beneficiary,
     bytes32 encodedSigsPermissions
   ) external onlyOwner {
-    HoprCapabilityPermissions.scopeTokenCapabilities(role, targetAddress, beneficiary, encodedSigsPermissions);
+    HoprCapabilityPermissions.scopeTokenCapabilities(role, nodeAddress, targetAddress, beneficiary, encodedSigsPermissions);
   }
 
   /**
    * @dev Sets the permission for sending native tokens to a specific beneficiary
+   * @param nodeAddress The address of the caller node
    * @param beneficiary The beneficiary address for the scoped Send target.
    * @param permission The permission to be set for the specific function.
    */
   function scopeSendCapability(
+    address nodeAddress,
     address beneficiary,
     GranularPermission permission
   ) external onlyOwner {
-    HoprCapabilityPermissions.scopeSendCapability(role, beneficiary, permission);
+    HoprCapabilityPermissions.scopeSendCapability(role, nodeAddress, beneficiary, permission);
   }
 
   // ===========================================================
@@ -248,6 +252,7 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
       HoprCapabilityPermissions.check(
           role,
           multisend,
+          msg.sender,
           to,
           value,
           data,
@@ -271,6 +276,7 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
       HoprCapabilityPermissions.check(
           role,
           multisend,
+          msg.sender,
           to,
           value,
           data,
