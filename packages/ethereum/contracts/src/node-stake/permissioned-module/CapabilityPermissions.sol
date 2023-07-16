@@ -117,8 +117,14 @@ library HoprCapabilityPermissions {
     /// The provided calldata for execution is too short, or an OutOfBounds scoped parameter was configured
     error CalldataOutOfBounds();
 
-    // Permission not acquired
-    error PermissionRejected();
+    // Default permission not acquired
+    error DefaultPermissionRejected();
+
+    // Granular permission not acquired
+    error GranularPermissionRejected();
+
+    // Node permission rejected
+    error NodePermissionRejected();
 
     // Permission not properly configured
     error PermissionNotConfigured();
@@ -245,7 +251,7 @@ library HoprCapabilityPermissions {
         TargetPermission defaultPermission = getDefaultPermission(target, functionSig);
         // allow early revert or early return
         if (defaultPermission == TargetPermission.BLOCK_ALL) {
-            revert PermissionRejected();
+            revert DefaultPermissionRejected();
         } else if (defaultPermission == TargetPermission.ALLOW_ALL) {
             return;
         }
@@ -267,7 +273,7 @@ library HoprCapabilityPermissions {
             granularPermission == GranularPermission.BLOCK ||
             (granularPermission == GranularPermission.NONE && defaultPermission == TargetPermission.SPECIFIC_FALLBACK_BLOCK)
         ) {
-            revert PermissionRejected();
+            revert GranularPermissionRejected();
         } else if (
             granularPermission == GranularPermission.ALLOW || 
             (granularPermission == GranularPermission.NONE && defaultPermission == TargetPermission.SPECIFIC_FALLBACK_ALLOW)
@@ -332,7 +338,7 @@ library HoprCapabilityPermissions {
         address self = pluckOneStaticAddress(1, data);
         // the first slot should always store the self address
         if (self != nodeAddress) {
-            revert PermissionRejected();
+            revert NodePermissionRejected();
         }
         
         bytes32 channelId;
@@ -506,6 +512,11 @@ library HoprCapabilityPermissions {
     ) internal view returns (TargetPermission) {
         // check default target permission
         TargetPermission defaultTargetPermission = target.getDefaultTargetPermission();
+        // early return when the permission allows
+        if (defaultTargetPermission == TargetPermission.ALLOW_ALL || defaultTargetPermission == TargetPermission.BLOCK_ALL) {
+            return defaultTargetPermission;
+        }
+
         CapabilityPermission defaultFunctionPermission;
         if (functionSig == REDEEM_TICKET_SELECTOR) {
             defaultFunctionPermission = target.getDefaultCapabilityPermissionAt(0);
@@ -943,21 +954,21 @@ library HoprCapabilityPermissions {
         }
     }
 
-    /**
-     * @dev Returns a copy of a portion of the `data` byte array.
-     * @param data The byte array to slice.
-     * @param start The starting index of the slice (inclusive).
-     * @return result A new byte array containing the sliced portion.
-     */
-    function sliceFrom(
-        bytes memory data,
-        uint256 start
-    ) internal pure returns (bytes memory result) {
-        result = new bytes(data.length - start);
-        for (uint256 j = start; j < data.length; j++) {
-            result[j - start] = data[j];
-        }
-    }
+    // /**
+    //  * @dev Returns a copy of a portion of the `data` byte array.
+    //  * @param data The byte array to slice.
+    //  * @param start The starting index of the slice (inclusive).
+    //  * @return result A new byte array containing the sliced portion.
+    //  */
+    // function sliceFrom(
+    //     bytes memory data,
+    //     uint256 start
+    // ) internal pure returns (bytes memory result) {
+    //     result = new bytes(data.length - start);
+    //     for (uint256 j = start; j < data.length; j++) {
+    //         result[j - start] = data[j];
+    //     }
+    // }
 
     /**
      * @dev Returns the unique key for a function of a given `targetAddress`.

@@ -126,7 +126,7 @@ library TargetUtils {
      * @param clearance clearance of the target
      * @param targetType Type of the target
      * @param targetPermission default target permissions
-     * @param CapabilityPermissions Array of default function permissions
+     * @param capabilityPermissions Array of default function permissions
      * Returns the wrapped target
      */
     function encodeDefaultPermissions(
@@ -134,9 +134,9 @@ library TargetUtils {
         Clearance clearance,
         TargetType targetType,
         TargetPermission targetPermission,
-        CapabilityPermission[] memory CapabilityPermissions
+        CapabilityPermission[] memory capabilityPermissions
     ) internal pure returns (Target target) {
-        if (CapabilityPermissions.length > NUM_CAPABILITY_PERMISSIONS) {
+        if (capabilityPermissions.length > NUM_CAPABILITY_PERMISSIONS) {
             revert TooManyCapabilities();
         }
         
@@ -150,9 +150,9 @@ library TargetUtils {
         // inclue TargetPermission to the next 8 bits (258 - 160 - 8 - 8 - 8 = 72)
         _target |= uint256(targetPermission) << 72;
         // include the CapabilityPermissions to the last 8 * 9 = 72 bits
-        for (uint256 i = 0; i < CapabilityPermissions.length; i++) {
+        for (uint256 i = 0; i < capabilityPermissions.length; i++) {
             // left shift 72 - 8 - 8 * i bits
-            _target |= uint256(CapabilityPermissions[i]) << (64 - 8 * i);
+            _target |= uint256(capabilityPermissions[i]) << (64 - 8 * i);
         }
         return Target.wrap(_target);
     }
@@ -168,7 +168,7 @@ library TargetUtils {
         Clearance clearance,
         TargetType targetType,
         TargetPermission targetPermission,
-        CapabilityPermission[] memory CapabilityPermissions
+        CapabilityPermission[] memory capabilityPermissions
     ) {
         // take the first 160 bits and parse it as address
         targetAddress = address(uint160(Target.unwrap(target) >> 96));
@@ -180,12 +180,12 @@ library TargetUtils {
         targetPermission = TargetPermission(uint8(Target.unwrap(target) << 176 >> 248));
         
         // there are 1 default target permission and 8 default function permissions
-        CapabilityPermissions = new CapabilityPermission[](NUM_CAPABILITY_PERMISSIONS);
+        capabilityPermissions = new CapabilityPermission[](NUM_CAPABILITY_PERMISSIONS);
         // decode function permissions. By default, 8 function permissions
         for (uint256 i = 0; i < NUM_CAPABILITY_PERMISSIONS; i++) {
             // first left shift 160 + 8 + 8  + 8 * i = 176 + 8 * i bits
             // then RIGHT shift 256 - 8 = 248 bits
-            CapabilityPermissions[i] = CapabilityPermission(uint8(Target.unwrap(target) << (176 + 8 * i) >> 248));
+            capabilityPermissions[i] = CapabilityPermission(uint8(Target.unwrap(target) << (176 + 8 * i) >> 248));
         }
     }
 

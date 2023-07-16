@@ -6,9 +6,13 @@ import '../../../src/node-stake/permissioned-module/CapabilityPermissions.sol';
 import "../../utils/CapabilityLibrary.sol";
 import '../../../script/utils/SafeSuiteLib.sol';
 import '../../utils/SafeSingleton.sol';
+import '../../../src/interfaces/IAvatar.sol';
 import 'forge-std/Test.sol';
+import 'openzeppelin-contracts-4.8.3/token/ERC20/IERC20.sol';
 
 contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTest, SafeSingletonFixtureTest {
+    using stdStorage for StdStorage;
+
     HoprNodeManagementModule public moduleSingleton;
     address public multiaddr;
     address public safe;
@@ -54,6 +58,29 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
 
         vm.expectRevert(bytes("Initializable: contract is already initialized"));
         HoprNodeManagementModule(moduleSingleton).initialize(abi.encode(address(1), address(2)));
+    }
+
+    /**
+     * @dev Mock read avatar
+     */
+    function test_ReadAvatar() public {
+        stdstore
+            .target(address(moduleSingleton))
+            .sig("avatar()")
+            .checked_write(safe);
+
+        assertEq(moduleSingleton.avatar(), safe);
+    }
+
+    /**
+    * @dev fail to transfer ownership
+    */
+    function testRevert_TransferOwnership(address newAddress) public {
+        address owner = moduleSingleton.owner();
+
+        vm.startPrank(owner);
+        vm.expectRevert(CannotChangeOwner.selector);
+        moduleSingleton.transferOwnership(newAddress);
     }
 
     function test_AddNode(address account) public {
@@ -463,12 +490,209 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         moduleSingleton.revokeTarget(scopeTargetAddr);
     }
 
+    /**
+     * @dev scope channels for (source, destination)
+     */
+    function testFuzz_ScopeChannelsCapabilities(bytes4[] memory _randomFunctionSigs, uint256 _size) public {
+        // create some capabilities
+        _size = bound(_size, 0, 7);
+        _size = _randomFunctionSigs.length < _size ? _randomFunctionSigs.length : _size;
+        bytes4[] memory functionSigs = new bytes4[](_size);
+        GranularPermission[] memory permissions = new GranularPermission[](_size);
+        for (uint256 i = 0; i < _size; i++) {
+            functionSigs[i] = _randomFunctionSigs[i];
+            permissions[i] = GranularPermission(uint8(uint256(bytes32(_randomFunctionSigs[i])) % (uint256(type(GranularPermission).max) + 1)));
+        }
+        (bytes32 encoded, uint256 length) = HoprCapabilityPermissions.encodeFunctionSigsAndPermissions(functionSigs, permissions);
+        assertEq(length, _size);
+        // scope capabilities
+        vm.prank(moduleSingleton.owner());
+        for (uint256 j = 0; j < length; j++) {
+            if (functionSigs[j] != bytes4(hex"00")) {
+                vm.expectEmit(true, true, false, false, address(moduleSingleton));
+                emit HoprCapabilityPermissions.ScopedGranularChannelCapability(vm.addr(200), bytes32(hex"0200"), functionSigs[j], permissions[j]);
+            }
+        }
+        moduleSingleton.scopeChannelsCapabilities(
+            vm.addr(200),       // mocked targetAddress
+            bytes32(hex"0200"), // mocked channelId
+            encoded             // encodeSigsPermissions
+        );
+    }
+
+    /**
+     * @dev scope tokens for (source, destination)
+     */
+    function testFuzz_ScopeTokenCapabilities(bytes4[] memory _randomFunctionSigs, uint256 _size) public {
+        // create some capabilities
+        _size = bound(_size, 0, 7);
+        _size = _randomFunctionSigs.length < _size ? _randomFunctionSigs.length : _size;
+        bytes4[] memory functionSigs = new bytes4[](_size);
+        GranularPermission[] memory permissions = new GranularPermission[](_size);
+        for (uint256 i = 0; i < _size; i++) {
+            functionSigs[i] = _randomFunctionSigs[i];
+            permissions[i] = GranularPermission(uint8(uint256(bytes32(_randomFunctionSigs[i])) % (uint256(type(GranularPermission).max) + 1)));
+        }
+        (bytes32 encoded, uint256 length) = HoprCapabilityPermissions.encodeFunctionSigsAndPermissions(functionSigs, permissions);
+        assertEq(length, _size);
+        // scope capabilities
+        vm.prank(moduleSingleton.owner());
+        for (uint256 j = 0; j < length; j++) {
+            if (functionSigs[j] != bytes4(hex"00") && j < 2) {
+                vm.expectEmit(true, true, false, false, address(moduleSingleton));
+                emit HoprCapabilityPermissions.ScopedGranularTokenCapability(vm.addr(200), vm.addr(201), vm.addr(202), functionSigs[j], permissions[j]);
+            }
+        }
+        moduleSingleton.scopeTokenCapabilities(
+            vm.addr(200),       // mocked nodeAddress
+            vm.addr(201),       // mocked targetAddress
+            vm.addr(202),       // mocked beneficiary
+            encoded             // encodeSigsPermissions
+        );
+    }
+
+    /**
+     * @dev scope tokens for (source, destination)
+     */
+    function testFuzz_ScopeSendCapability(bytes4 functionSig) public {
+        GranularPermission permission = GranularPermission(uint8(uint256(bytes32(functionSig)) % (uint256(type(GranularPermission).max) + 1)));
+
+        // scope capabilities
+        vm.prank(moduleSingleton.owner());
+        if (functionSig != bytes4(hex"00")) {
+            vm.expectEmit(true, true, false, false, address(moduleSingleton));
+            emit HoprCapabilityPermissions.ScopedGranularSendCapability(vm.addr(200), vm.addr(201), permission);
+        }
+        moduleSingleton.scopeSendCapability(
+            vm.addr(200),       // mocked nodeAddress
+            vm.addr(201),       // mocked beneficiary
+            permission          // encodeSigsPermissions
+        );
+    }
+
+    /**
+     * @dev should successfully execute a transaction from the module to a scoped target
+     */
+    function test_ExecTransactionFromModuleToAScopedTarget() public {
+        // scope channels and token contract
+        address channels = makeAddr("HoprChannels");
+        address token = makeAddr("HoprToken");
+        address owner = moduleSingleton.owner();
+        address msgSender = vm.addr(1);
+
+        Target target = TargetUtils.encodeDefaultPermissions(
+            channels,
+            Clearance.FUNCTION,
+            TargetType.CHANNELS,
+            TargetPermission.ALLOW_ALL,
+            defaultFunctionPermission
+        );   // clerance: FUNCTION default ALLOW_ALL
+        vm.startPrank(owner);
+        stdstore
+            .target(address(moduleSingleton))
+            .sig("avatar()")
+            .checked_write(safe);
+        vm.mockCall(
+            channels,
+            abi.encodeWithSignature(
+                'token()'
+            ),
+            abi.encode(token)
+        );
+        vm.mockCall(
+            safe,
+            abi.encodeWithSelector(IAvatar.execTransactionFromModule.selector),
+            abi.encode(true)
+        );
+
+        // add token and channels as accept_all target
+        moduleSingleton.addChannelsAndTokenTarget(channels, target);
+        // include caller as node
+        moduleSingleton.addNode(msgSender);
+
+        // prepare a simple token approve
+        bytes memory data = abi.encodeWithSelector(IERC20.approve.selector, vm.addr(200), 100);
+        vm.stopPrank();
+
+        // execute function
+        vm.prank(msgSender);
+        bool result = moduleSingleton.execTransactionFromModule(
+            token,
+            0,
+            data,
+            Enum.Operation.Call
+        );
+        assertTrue(result);
+        vm.clearMockedCalls();
+    }
+
+    /**
+     * @dev should successfully execute a transaction from the module to a scoped target
+     */
+    function test_ExecTransactionFromModuleReturnData() public {
+        // scope channels and token contract
+        address channels = makeAddr("HoprChannels");
+        address token = makeAddr("HoprToken");
+        address owner = moduleSingleton.owner();
+        address msgSender = vm.addr(1);
+
+        Target target = TargetUtils.encodeDefaultPermissions(
+            channels,
+            Clearance.FUNCTION,
+            TargetType.CHANNELS,
+            TargetPermission.ALLOW_ALL,
+            defaultFunctionPermission
+        );   // clerance: FUNCTION default ALLOW_ALL
+        vm.startPrank(owner);
+        stdstore
+            .target(address(moduleSingleton))
+            .sig("avatar()")
+            .checked_write(safe);
+        vm.mockCall(
+            channels,
+            abi.encodeWithSignature(
+                'token()'
+            ),
+            abi.encode(token)
+        );
+        vm.mockCall(
+            safe,
+            abi.encodeWithSelector(IAvatar.execTransactionFromModuleReturnData.selector),
+            abi.encode(true, hex"12345678")
+        );
+
+        // add token and channels as accept_all target
+        moduleSingleton.addChannelsAndTokenTarget(channels, target);
+        // include caller as node
+        moduleSingleton.addNode(msgSender);
+
+        // prepare a simple token approve
+        bytes memory data = abi.encodeWithSelector(IERC20.approve.selector, vm.addr(200), 100);
+        vm.stopPrank();
+
+        // execute function
+        vm.prank(msgSender);
+        (bool success, bytes memory result) = moduleSingleton.execTransactionFromModuleReturnData(
+            token,
+            0,
+            data,
+            Enum.Operation.Call
+        );
+        assertTrue(success);
+        assertEq(result, hex"12345678");
+        vm.clearMockedCalls();
+    }
+
+    // ===================== helper functions =====================
+    
     function _helperTargetBitwiseAnd(Target target, bytes32 mask) private pure returns (Target) {
         return Target.wrap(uint256(bytes32(Target.unwrap(target)) & mask));
     }
+    
     function _helperTargetBitwiseOr(Target target, bytes32 mask) private pure returns (Target) {
         return Target.wrap(uint256(bytes32(Target.unwrap(target)) | mask));
     }
+    
     function _helperAddNodes(address[] memory accounts) private {
         for (uint256 i = 0; i < accounts.length; i++) {
             if (moduleSingleton.isNode(accounts[i])) continue;
@@ -477,7 +701,6 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
     }
 
 
-    // ===================== helper functions =====================
     /**
      * @dev return an array with all unique addresses which does not contain address zeo
      * return a random item
