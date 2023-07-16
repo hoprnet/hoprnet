@@ -399,13 +399,11 @@ library HoprCapabilityPermissions {
             GranularPermission granularPermission = role.capabilities[capabilityKey][bytes32(uint256(uint160(beneficiary)))];
             return granularPermission;
         } else if (functionSig == SEND_SELECTOR) {
-            (address beneficiary, , bytes memory sliceDataFundMulti) = abi.decode(slicedData, (address, uint256, bytes));
-            // beneficiary must be a CHANNELS target, further check the data
-            Target target = role.targets.get(beneficiary);
-            if (!target.isTargetType(TargetType.CHANNELS)) {
-              revert TargetAddressNotAllowed();
-            }
-            checkHoprChannelsParameters(role, keyForFunctions(beneficiary, FUND_CHANNEL_SELECTOR), FUND_CHANNEL_SELECTOR, sliceDataFundMulti);
+            (address beneficiary, , ) = abi.decode(slicedData, (address, uint256, bytes));
+            // beneficiary could event be a CHANNELS target. Calling send to a HoprChannels contract is equivalent
+            // to calling fundChannel or fundChannelsMulti function. However, granular control is skipped!
+            GranularPermission granularPermission = role.capabilities[capabilityKey][bytes32(uint256(uint160(beneficiary)))];
+            return granularPermission;
         } else {
             revert ParameterNotAllowed();
         }

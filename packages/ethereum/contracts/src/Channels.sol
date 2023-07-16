@@ -75,7 +75,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     abi.encode(address(0), Balance.wrap(0), address(0), Balance.wrap(0)).length;
 
   // ERC-777 tokensReceived hook, fundChannel
-  uint256 public immutable FUND_CHANNEL_SIZE =  abi.encode(address(0)).length;
+  uint256 public immutable FUND_CHANNEL_SIZE =  abi.encode(address(0), address(0)).length;
 
   string public constant version = '2.0.0';
 
@@ -668,7 +668,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
    */
   function tokensReceived(
     address,
-    address,
+    address from,
     address to,
     uint256 amount,
     bytes calldata userData,
@@ -680,11 +680,24 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
 
     // Opens an outgoing channel
     if (userData.length == FUND_CHANNEL_SIZE) {
+      address src;
       address dest;
 
-      (dest) = abi.decode(userData, (address));
+      (src, dest) = abi.decode(userData, (address, address));
 
-      _fundChannel(msg.sender, dest, Balance.wrap(uint96(amount)));
+      // skip the check between `from` and `src` on node-safe registry
+      if (from == src) {
+        // node if opening an outgoing channel
+        if (nodeSafeRegistry.nodeToSafe(src) != address(0)) {
+          revert UnusedSafeNodePair();
+        }
+      } else {
+        if (nodeSafeRegistry.nodeToSafe(src) != from) {
+          revert WrongSafeNodePair();
+        }
+      }
+
+      _fundChannel(src, dest, Balance.wrap(uint96(amount)));
     // Opens two channels, donating msg.sender's tokens
     } else if (userData.length == FUND_CHANNEL_MULTI_SIZE) {
       address account1;
