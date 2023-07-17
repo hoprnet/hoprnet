@@ -13,6 +13,7 @@ use utils_db::{
     db::{serialize_to_bytes, DB},
     traits::AsyncKVStorage,
 };
+use utils_log::debug;
 use utils_types::{
     primitives::{Address, AuthorizationToken, Balance, BalanceType, EthereumChallenge, Snapshot, U256},
     traits::BinarySerializable,
@@ -125,6 +126,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             let empty: [u8; 0] = [];
             self.db.set(key, &empty).await?;
         }
+
+        debug!("packet tag check: {}, set to: {}", has_packet_tag, hex::encode(tag));
 
         Ok(has_packet_tag)
     }

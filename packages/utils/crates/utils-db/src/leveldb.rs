@@ -5,6 +5,7 @@ pub mod wasm {
     use async_trait::async_trait;
     use futures_lite::stream::StreamExt;
     use wasm_bindgen::prelude::*;
+    use utils_log::debug;
 
     // https://users.rust-lang.org/t/wasm-web-sys-how-to-manipulate-js-objects-from-rust/36504
     #[wasm_bindgen]
@@ -83,11 +84,14 @@ pub mod wasm {
         }
 
         async fn set(&mut self, key: Self::Key, value: Self::Value) -> crate::errors::Result<Option<Self::Value>> {
-            self.db
+            debug!(">> begin put key");
+            let r = self.db
                 .put(key, value)
                 .await
                 .map(|_| None) // NOTE: The LevelDB API does not allow to return an evicted value
-                .map_err(|_| DbError::GenericError("Encountered error on DB put operation".to_string()))
+                .map_err(|_| DbError::GenericError("Encountered error on DB put operation".to_string()));
+            debug!("<< end put key");
+            r
         }
 
         async fn contains(&self, key: Self::Key) -> crate::errors::Result<bool> {

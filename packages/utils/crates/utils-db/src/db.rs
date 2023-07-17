@@ -8,6 +8,7 @@ use std::{
     fmt::{Display, Formatter},
     ops::Deref,
 };
+use utils_log::debug;
 use utils_types::traits::BinarySerializable;
 
 pub struct Batch {
@@ -135,6 +136,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
     where
         V: Serialize + DeserializeOwned,
     {
+        debug!("setting key {key}");
+
         let key: T::Key = key.into();
         let value: T::Value = bincode::serialize(&value)
             .map_err(|e| DbError::SerializationError(e.to_string()))?

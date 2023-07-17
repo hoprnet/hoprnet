@@ -80,11 +80,23 @@ export class LevelDb {
   }
 
   public async put(key: Uint8Array, value: Uint8Array): Promise<void> {
-    // LevelDB does not support Uint8Arrays, always convert to Buffer
-    return await this.backend.put(
-      Buffer.from(key.buffer, key.byteOffset, key.byteLength),
-      Buffer.from(value.buffer, value.byteOffset, value.byteLength)
-    )
+    console.log(`BEGIN level DB put key: ${new TextDecoder().decode(key)} and value: ${u8aToHex(value)}`)
+    let r
+    try {
+      // LevelDB does not support Uint8Arrays, always convert to Buffer
+      r = await this.backend.put(
+        Buffer.from(key.buffer, key.byteOffset, key.byteLength),
+        Buffer.from(value.buffer, value.byteOffset, value.byteLength),
+        { sync: true }
+      )
+    }
+    catch (e) {
+      console.log(`!!! ERROR level DB put key: ${new TextDecoder().decode(key)} and value: ${u8aToHex(value)}: ${e}`)
+    }
+    finally {
+      console.log(`END level DB put key: ${new TextDecoder().decode(key)} and value: ${u8aToHex(value)}`)
+    }
+    return  r
   }
 
   public async get(key: Uint8Array): Promise<Uint8Array> {

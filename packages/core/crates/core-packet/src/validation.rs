@@ -17,6 +17,8 @@ pub async fn validate_unacknowledged_ticket<T: HoprCoreEthereumDbActions>(
 ) -> Result<()> {
     let required_win_prob = U256::from_inverse_probability(req_inverse_ticket_win_prob)?;
 
+    debug!("validating unack ticket from {}", ticket.counterparty);
+
     // ticket signer MUST be the sender
     ticket
         .verify(sender)
@@ -91,6 +93,7 @@ pub async fn validate_unacknowledged_ticket<T: HoprCoreEthereumDbActions>(
         }
     }
 
+    debug!("ticket validation done");
     Ok(())
 }
 

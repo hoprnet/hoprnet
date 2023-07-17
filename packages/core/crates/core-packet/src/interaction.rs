@@ -416,6 +416,7 @@ where
     }
 
     async fn create_multihop_ticket(&self, destination: Address, path_pos: u8) -> Result<Ticket> {
+        debug!("begin creating multihop ticket for destination {destination}");
         let channel = self
             .db
             .read()
@@ -426,6 +427,7 @@ where
             .ok_or(ChannelNotFound(destination.to_string()))?;
 
         let channel_id = channel.get_id();
+        debug!("going to bump ticket index for channel id {channel_id}");
         let current_index = self.bump_ticket_index(&channel_id).await?;
         let amount = Balance::new(
             U256::new(PRICE_PER_PACKET)
@@ -434,6 +436,7 @@ where
             BalanceType::HOPR,
         );
 
+        debug!("retrieving pending balance to {destination}");
         let outstanding_balance = self.db.read().await.get_pending_balance_to(&destination).await?;
 
         let channel_balance = channel.balance.sub(&outstanding_balance);
@@ -620,6 +623,7 @@ where
                 let inverse_win_prob = U256::new(INVERSE_TICKET_WIN_PROB);
 
                 // Find the corresponding channel
+                debug!("looking for channel {}", previous_hop.to_address());
                 let channel = self
                     .db
                     .read()
@@ -653,6 +657,8 @@ where
                     let mut g = self.db.write().await;
                     g.set_current_ticket_index(&channel.get_id().hash(), packet.ticket.index)
                         .await?;
+
+                    debug!(">>> <<< updated current ticket index");
 
                     // Store the unacknowledged ticket
                     g.store_pending_acknowledgment(

@@ -358,7 +358,7 @@ pub mod wasm {
                                         if x.is_undefined() {
                                             Err("Failed to send ping message".into())
                                         } else {
-                                            debug!("{:?}", x);
+                                            debug!("transport returned {:?}", x);
                                             Ok(js_sys::Uint8Array::from(js_sys::Array::from(x.as_ref()).get(0))
                                                 .to_vec()
                                                 .into_boxed_slice())
