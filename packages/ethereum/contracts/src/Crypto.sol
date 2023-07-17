@@ -27,7 +27,7 @@ error MessageTooLong();
  * Bundles cryptographic primitives used by the HOPR protocol
  **/
 abstract contract HoprCrypto {
-  // secp256k1: y^2 = x^3 + 7 (mod F_p)
+  // secp256k1: y^2 = x^3 + b (mod F_p)
   uint256 constant SECP256K1_B = 0x0000000000000000000000000000000000000000000000000000000000000007;
   // Field order created by secp256k1 curve
   uint256 constant SECP256K1_FIELD_ORDER = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141;
