@@ -123,14 +123,13 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
    * @dev Allows the target address to be scoped as a HoprChannels target
    * and its token as a HoprToken target. HoprToken address is obtained from 
    * HoprChannels contract
-   * @param hoprChannelsAddress address of HoprChannels contract to be added to scope
    * @param defaultTarget The default target with default permissions for CHANNELS and TOKEN target
    */
   function addChannelsAndTokenTarget(
-    address hoprChannelsAddress,
     Target defaultTarget
   ) external onlyOwner {
-    // get tokens contract
+    // get channels andtokens contract
+    address hoprChannelsAddress = defaultTarget.getTargetAddress();
     address hoprTokenAddress = address(HoprChannels(hoprChannelsAddress).token());
 
     // add default scope for Channels TargetType, with the build target for hoprChannels address
