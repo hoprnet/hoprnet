@@ -876,61 +876,56 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
      * @dev should successfully execute transactions to a scoped target via multisend
      */
     function test_ExecuteMultiSendTransaction() public {
-        // scope channels and token contract
-        address owner = moduleSingleton.owner();
         address msgSender = vm.addr(1);
         CapabilityPermission[] memory channelsTokenPermission = new CapabilityPermission[](9);
         for (uint256 i = 0; i < channelsTokenPermission.length; i++) {
             channelsTokenPermission[i] = CapabilityPermission.SPECIFIC_FALLBACK_ALLOW;
         }
         channelsTokenPermission[8] = CapabilityPermission.SPECIFIC_FALLBACK_BLOCK;
+        // scope channels and token contract
+        _helperAddTokenAndChannelTarget(msgSender, channelsTokenPermission, defaultFunctionPermission);
+        
+        // prepare a simple token approve and a native token transfer
+        bytes[] memory data = new bytes[](2);
+        data[0] = abi.encodeWithSelector(IERC20.approve.selector, vm.addr(200), 100);   // approve on token
+        uint8[] memory txOperations = new uint8[](2);
+        txOperations[0] = 0;
+        txOperations[1] = 0;
+        address[] memory txTos = new address[](2);
+        txTos[0] = token;
+        txTos[1] = msgSender;
+        uint256[] memory txValues = new uint256[](2);
+        txValues[0] = 0;
+        txValues[1] = 1 ether;
+        uint256[] memory dataLengths = new uint256[](2);
+        dataLengths[0] = data[0].length;
+        dataLengths[1] = 0;
 
-        Target tokenChannelsTarget = TargetUtils.encodeDefaultPermissions(
-            channels,
-            Clearance.FUNCTION,
-            TargetType.CHANNELS,
-            TargetPermission.SPECIFIC_FALLBACK_ALLOW,
-            channelsTokenPermission
-        );   // clerance: FUNCTION default ALLOW_ALL
-        Target nodeTarget = TargetUtils.encodeDefaultPermissions(
-            msgSender,
-            Clearance.FUNCTION,
-            TargetType.SEND,
-            TargetPermission.ALLOW_ALL,
-            defaultFunctionPermission
-        );   // clerance: FUNCTION default ALLOW_ALL
-        vm.startPrank(owner);
-        stdstore
-            .target(address(moduleSingleton))
-            .sig("avatar()")
-            .checked_write(safe);
-        // set the multisend address to be multiaddr
-        stdstore
-            .target(address(moduleSingleton))
-            .sig("multisend()")
-            .checked_write(multiaddr);
-        vm.mockCall(
-            channels,
-            abi.encodeWithSignature(
-                'token()'
-            ),
-            abi.encode(token)
-        );
-        vm.mockCall(
-            safe,
-            abi.encodeWithSelector(IAvatar.execTransactionFromModule.selector),
-            abi.encode(true)
-        );
-        vm.deal(safe, 1 ether);
-        assertEq(safe.balance, 1 ether);
+        bytes memory safeTxData = _helperBuildMultiSendTx(txOperations, txTos, txValues, dataLengths, data);
 
-        // add token and channels as accept_all target
-        moduleSingleton.addChannelsAndTokenTarget(channels, tokenChannelsTarget);
-        // include caller as node
-        moduleSingleton.addNode(msgSender);
-        // add the node as a scoped target
-        moduleSingleton.scopeTargetSend(nodeTarget);
-        vm.stopPrank();
+        // execute function
+        vm.prank(msgSender);
+        bool result = moduleSingleton.execTransactionFromModule(
+            multiaddr,
+            0,
+            safeTxData,
+            Enum.Operation.DelegateCall
+        );
+        assertTrue(result);
+        vm.clearMockedCalls();
+    }
+
+    /**
+     * @dev should successfully execute transactions to a scoped target via multisend
+     */
+    function test_ExecuteMultiSendTransactionOfTwo() public {
+        address msgSender = vm.addr(1);
+        CapabilityPermission[] memory channelsTokenPermission = new CapabilityPermission[](9);
+        for (uint256 i = 0; i < channelsTokenPermission.length; i++) {
+            channelsTokenPermission[i] = CapabilityPermission.SPECIFIC_FALLBACK_ALLOW;
+        }
+        // scope channels and token contract
+        _helperAddTokenAndChannelTarget(msgSender, channelsTokenPermission, defaultFunctionPermission);
         
         // prepare a simple token approve and a native token transfer
         bytes[] memory data = new bytes[](2);
@@ -1022,5 +1017,62 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
             encodePacked = abi.encodePacked(encodePacked, txOperations[i], txTos[i], txValues[i], dataLengths[i], data[i]);
         }
         return abi.encodeWithSignature("multiSend(bytes)", encodePacked);
+    }
+
+    function _helperAddTokenAndChannelTarget(
+        address caller,
+        CapabilityPermission[] memory channelsTokenPermission, 
+        CapabilityPermission[] memory nodePermission
+    ) private {
+        // scope channels and token contract
+        address owner = moduleSingleton.owner();
+
+        Target tokenChannelsTarget = TargetUtils.encodeDefaultPermissions(
+            channels,
+            Clearance.FUNCTION,
+            TargetType.CHANNELS,
+            TargetPermission.SPECIFIC_FALLBACK_ALLOW,
+            channelsTokenPermission
+        );   // clerance: FUNCTION default ALLOW_ALL
+        Target nodeTarget = TargetUtils.encodeDefaultPermissions(
+            caller,
+            Clearance.FUNCTION,
+            TargetType.SEND,
+            TargetPermission.ALLOW_ALL,
+            nodePermission
+        );   // clerance: FUNCTION default ALLOW_ALL
+        
+        vm.startPrank(owner);
+        stdstore
+            .target(address(moduleSingleton))
+            .sig("avatar()")
+            .checked_write(safe);
+        // set the multisend address to be multiaddr
+        stdstore
+            .target(address(moduleSingleton))
+            .sig("multisend()")
+            .checked_write(multiaddr);
+        vm.mockCall(
+            channels,
+            abi.encodeWithSignature(
+                'token()'
+            ),
+            abi.encode(token)
+        );
+        vm.mockCall(
+            safe,
+            abi.encodeWithSelector(IAvatar.execTransactionFromModule.selector),
+            abi.encode(true)
+        );
+        vm.deal(safe, 1 ether);
+        assertEq(safe.balance, 1 ether);
+
+        // add token and channels as accept_all target
+        moduleSingleton.addChannelsAndTokenTarget(channels, tokenChannelsTarget);
+        // include caller as node
+        moduleSingleton.addNode(caller);
+        // add the node as a scoped target
+        moduleSingleton.scopeTargetSend(nodeTarget);
+        vm.stopPrank();
     }
 }
