@@ -205,13 +205,6 @@ pub fn foo<const T: usize>(msg: &[u8; T], secret: &[u8], chain_addr: &Address) -
     )?;
     let s = r + h * a;
 
-    let r_v_computed: ProjectivePoint = b * s - v * h;
-    let r_v_computed_encoded = r_v_computed.to_encoded_point(false);
-    println!(
-        "R_v computed ({},{})",
-        hex::encode(r_v_computed_encoded.x().unwrap()),
-        hex::encode(r_v_computed_encoded.y().unwrap())
-    );
     Ok(VrfParameters {
         v: v.to_affine(),
         h,

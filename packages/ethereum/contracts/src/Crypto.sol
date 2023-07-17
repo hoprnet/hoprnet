@@ -176,33 +176,6 @@ abstract contract HoprCrypto {
   }
 
   /**
-   * Computes multiplicative inverse of a secp256k1 field element.
-   *
-   * Uses little Fermat and `expmod` precompile because it is more gas-efficient
-   * than the extended euclidian algorithm in Solidity.
-   */
-  function invMod(uint256 el) public view returns (uint256 o) {
-    if (el == 0) {
-      revert InvalidFieldElement();
-    }
-
-    assembly {
-      let p := mload(0x40)
-      mstore(p, 0x20)             // Length of Base
-      mstore(add(p, 0x20), 0x20)  // Length of Exponent
-      mstore(add(p, 0x40), 0x20)  // Length of Modulus
-      mstore(add(p, 0x60), el)  // Base
-      mstore(add(p, 0x80), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2D) // p - 2
-      mstore(add(p, 0xa0), SECP256K1_BASE_FIELD_ORDER) // p
-      if iszero(staticcall(not(0), 0x05, p, 0xC0, p, 0x20)) { // 0x05 == expmod precompile
-        revert(0, 0)
-      }
-
-      o := mload(p)
-    }
-  }
-
-  /**
    * Converts a curve point to an Ethereum address.
    *
    * This function can be used to witness the result of a scalar
@@ -688,7 +661,7 @@ abstract contract HoprCrypto {
   function hash_to_field_single(bytes memory message, bytes memory DST) public view returns (uint256 u) {
     (bytes32 b_1, bytes32 b_2) = expand_message_xmd_keccak256_single(message, DST);
 
-    // computes [...b_1[..], ...b_2[0..16]] ^ 1 mod n
+    // computes [...b_1[0..32], ...b_2[0..16]] ^ 1 mod n
     assembly {
       let p := mload(0x40) // next free memory slot
       mstore(p, 0x30)             // Length of Base
@@ -697,7 +670,7 @@ abstract contract HoprCrypto {
       mstore(add(p, 0x60), b_1)  // Base
       mstore(add(p, 0x80), b_2)
       mstore(add(p, 0x90), 1)    // Exponent
-      mstore(add(p, 0xb0), SECP256K1_BASE_FIELD_ORDER)     // Modulus
+      mstore(add(p, 0xb0), SECP256K1_FIELD_ORDER)     // Modulus
       if iszero(staticcall(not(0), 0x05, p, 0xD0, p, 0x20)) {
         revert(0, 0)
       }
@@ -802,7 +775,7 @@ abstract contract HoprCrypto {
     }
   }
 
-    function expand_message_xmd_keccak256_single(bytes memory message, bytes memory DST) public pure returns (bytes32 b_1, bytes32 b_2) {
+  function expand_message_xmd_keccak256_single(bytes memory message, bytes memory DST) public pure returns (bytes32 b_1, bytes32 b_2) {
     uint256 ell; 
 
     if ((message.length >> 5) << 5 == 0) {
@@ -935,24 +908,7 @@ abstract contract HoprCrypto {
     // R = sB - hV
     (uint256 r_x, uint256 r_y) = ecAdd(params.sB_x, params.sB_y, params.hV_x, SECP256K1_BASE_FIELD_ORDER - params.hV_y, 0);
 
-    console2.logBytes32(bytes32(r_x));
-    console2.logBytes32(bytes32(r_y));
-
-    uint256 h_check = hash_to_field_single(abi.encodePacked(params.signer, params.message, params.v_x, params.v_y, r_x, r_y), DST);
-
-    // assembly {
-    //   let payload := mload(0x40)
-
-    //   mstore(payload, mload(params)) // signer
-    //   mstore(add(0x14, payload), mload(add(0x14, params))) // message
-    //   mstore(add(0x34, payload), mload(add(0x34, params))) // v_x
-    //   mstore(add(0x54, payload), mload(add(0x54, params))) // v_y
-    //   mstore(add(0x74, payload), r_x) 
-    //   mstore(add(0x94, payload), r_y)
-
-    //   h_check := keccak256(payload, 0xa4)
-    // }
-
+    uint256 h_check = hash_to_field_single(abi.encodePacked(params.signer, params.v_x, params.v_y, r_x, r_y, params.message), DST);
 
     return h_check == params.h;
   }

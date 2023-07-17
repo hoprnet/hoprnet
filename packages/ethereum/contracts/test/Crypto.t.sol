@@ -21,14 +21,6 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto {
     crypto = new CryptoProxy();
   }
 
-  function testInvMod(uint256 el) public {
-    el = bound(el, 2 , HoprCrypto.SECP256K1_BASE_FIELD_ORDER - 1);
-
-    uint256 invEl = crypto.invMod(el);
-
-    assertEq(mulmod(el, invEl, HoprCrypto.SECP256K1_BASE_FIELD_ORDER), 1);
-  }
-
   function testPointToAddress() public {
     (bool success, bytes memory returnValue) = address(this).staticcall(abi.encodeWithSelector(HoprCrypto.pointToAddress.selector, 0x8318535b54105d4a7aae60c08fc45f9687181b4fdfc625bd1a753fa7397fed75, 0x3547f11ca8696646f2f3acb08e31016afac23e630c5d11f59f61fef57b0d2aa5));
 
@@ -200,6 +192,6 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto {
       uint256(s), uint256(h), s_B.x, s_B.y, h_V.x, h_V.y
     );
 
-    console2.logBool(crypto.vrf_verify(params));
+    assertTrue(crypto.vrf_verify(params));
   }
 }
