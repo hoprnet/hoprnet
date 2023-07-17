@@ -22,10 +22,11 @@ error InvalidNoticePeriod();
 error NoticePeriodNotDue();
 error WrongChannelState(string reason);
 error InvalidTicketSignature();
-error InvalidCommitmentOpening();
+error InvalidVRFProof();
 error InsufficientChannelBalance();
 error InvalidCommitment();
 error TicketIsNotAWin();
+error InvalidAggregatedTicketInterval();
 
 uint256 constant ONE_HOUR = 60 * 1000;
 uint256 constant INDEX_SNAPSHOT_INTERVAL = ONE_HOUR;
@@ -89,10 +90,10 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprLe
    *            │                │                      │                  │
    *            │                └──────────────────────┘                  │
    *            v                                                          │
-   *     ┌────────────┐                                               ┌──────────┐
-   *     │            │              tokensReceived()                 │          │
-   *     │   Closed   │──────────────────────────────────────────────>│   Open   │
-   *     │            │                                               │          │
+   *     ┌────────────┐      tokensReceived() / fundChannel()         ┌──────────┐
+   *     │            │──────────────────────────────────────────────>│          │
+   *     │   Closed   │           closeIncomingChannel()              │   Open   │
+   *     │            │<──────────────────────────────────────────────│          │
    *     └────────────┘                                               └──────────┘
    */
   enum ChannelStatus {
@@ -108,8 +109,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprLe
    * Aligned to 2 EVM words
    */
   struct Channel {
-    // iterated commitment, most recent opening gets revealed when redeeming a ticket
-    bytes32 commitment;
     // latest balance of the channel, changes whenever a ticket gets redeemed
     Balance balance;
     // prevents tickets from being replayed, increased with every redeemed ticket
@@ -130,7 +129,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprLe
   struct TicketData {
     bytes32 channelId;
     Balance amount;
-    TicketIndex index;
+    TicketIndex maxTicketindex;
     TicketIndex indexAfter;
     ChannelEpoch epoch;
     WinProb winProb;
@@ -139,7 +138,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprLe
   struct RedeemableTicket {
     TicketData data;
     HoprCrypto.CompactSignature signature;
-    bytes32 opening;
     uint256 porSecret;
   }
 
@@ -256,12 +254,12 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprLe
     _;
   }
 
-  function redeemTicketSafe(address self, RedeemableTicket calldata redeemable) external HoprMultiSig.onlySafe(self) {
-    _redeemTicketInternal(self, redeemable);
+  function redeemTicketSafe(address self, RedeemableTicket calldata redeemable, HoprCrypto.VRF_Parameters calldata params) external HoprMultiSig.onlySafe(self) {
+    _redeemTicketInternal(self, redeemable, params);
   }
 
-  function redeemTicket(RedeemableTicket calldata redeemable) external HoprMultiSig.noSafeSet {
-    _redeemTicketInternal(msg.sender, redeemable);
+  function redeemTicket(RedeemableTicket calldata redeemable, HoprCrypto.VRF_Parameters calldata params) external HoprMultiSig.noSafeSet {
+    _redeemTicketInternal(msg.sender, redeemable, params);
   }
 
   /**
@@ -276,15 +274,10 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprLe
    */
   function _redeemTicketInternal(
     address self,
-    RedeemableTicket calldata redeemable
+    RedeemableTicket calldata redeemable,
+    HoprCrypto.VRF_Parameters calldata params
   ) internal validateBalance(redeemable.data.amount) HoprCrypto.isFieldElement(redeemable.porSecret) {
     Channel storage spendingChannel = channels[redeemable.data.channelId];
-
-    if (
-      redeemable.opening != bytes32(0) || spendingChannel.commitment != keccak256(abi.encodePacked(redeemable.opening))
-    ) {
-      revert InvalidCommitmentOpening();
-    }
 
     if (spendingChannel.status != ChannelStatus.OPEN && spendingChannel.status != ChannelStatus.PENDING_TO_CLOSE) {
       revert WrongChannelState({reason: 'spending channel must be open or pending to close'});
@@ -294,8 +287,16 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprLe
       revert WrongChannelState({reason: 'channel epoch must match'});
     }
 
-    if (TicketIndex.unwrap(spendingChannel.ticketIndex) >= TicketIndex.unwrap(redeemable.data.index)) {
-      revert WrongChannelState({reason: 'a ticket with higher ticket index has already been redeemed'});
+    if (TicketIndex.unwrap(spendingChannel.ticketIndex) >= TicketIndex.unwrap(redeemable.data.maxTicketindex)) {
+      revert InvalidAggregatedTicketInterval();
+    }
+
+    if (TicketIndex.unwrap(spendingChannel.ticketIndex) >= TicketIndex.unwrap(redeemable.data.indexAfter)) {
+      revert InvalidAggregatedTicketInterval();
+    }
+
+    if (TicketIndex.unwrap(redeemable.data.maxTicketindex) > TicketIndex.unwrap(redeemable.data.indexAfter)) {
+      revert InvalidAggregatedTicketInterval();
     }
 
     if (Balance.unwrap(spendingChannel.balance) < Balance.unwrap(redeemable.data.amount)) {
@@ -305,8 +306,18 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprLe
     // Deviates from EIP712 due to computed property and non-standard struct property encoding
     bytes32 ticketHash = _getTicketHash(redeemable);
 
-    if (!_isWinningTicket(ticketHash, redeemable)) {
+    if (!_isWinningTicket(ticketHash, redeemable, params)) {
       revert TicketIsNotAWin();
+    }
+
+    HoprCrypto.VRF_Payload memory payload = HoprCrypto.VRF_Payload(
+      ticketHash,
+      self,
+      abi.encodePacked(domainSeparator)
+    );
+
+    if (!vrf_verify(params, payload)) {
+      revert InvalidVRFProof();
     }
 
     address source = ECDSA.recover(ticketHash, redeemable.signature.r, redeemable.signature.vs);
@@ -314,8 +325,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprLe
       revert InvalidTicketSignature();
     }
 
-    spendingChannel.ticketIndex = redeemable.data.index;
-    spendingChannel.commitment = redeemable.opening;
+    spendingChannel.ticketIndex = redeemable.data.indexAfter;
     spendingChannel.balance = Balance.wrap(
       Balance.unwrap(spendingChannel.balance) - Balance.unwrap(redeemable.data.amount)
     );
@@ -337,7 +347,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprLe
     }
 
     // Informs about new ticketIndex
-    emit TicketRedeemed(redeemable.data.channelId, redeemable.data.index);
+    emit TicketRedeemed(redeemable.data.channelId, redeemable.data.indexAfter);
   }
 
   function initiateOutgoingChannelClosureSafe(address self, address destination) external HoprMultiSig.onlySafe(self) {
@@ -401,9 +411,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprLe
       revert WrongChannelState({reason: 'channel must have state OPEN'});
     }
 
-    // Wipes commitment and gives ~20k gas refund
-    channel.commitment = bytes32(0);
-
     channel.status = ChannelStatus.CLOSED; // ChannelStatus.CLOSED == 0
     channel.closureTime = Timestamp.wrap(0);
     channel.ticketIndex = TicketIndex.wrap(0);
@@ -448,9 +455,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprLe
       revert NoticePeriodNotDue();
     }
 
-    // Wipes commitment and gives ~20k gas refund
-    channel.commitment = bytes32(0);
-
     channel.status = ChannelStatus.CLOSED; // ChannelStatus.CLOSED == 0
     channel.closureTime = Timestamp.wrap(0);
     channel.ticketIndex = TicketIndex.wrap(0);
@@ -466,53 +470,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprLe
     emit ChannelClosed(channelId);
 
     channel.balance = Balance.wrap(0);
-  }
-
-  function setCommitmentSafe(address self, bytes32 newCommitment, address source) external HoprMultiSig.onlySafe(self) {
-    _setCommitmentInternal(self, newCommitment, source);
-  }
-
-  function setCommitment(bytes32 newCommitment, address source) external HoprMultiSig.noSafeSet {
-    _setCommitmentInternal(msg.sender, newCommitment, source);
-  }
-
-  /**
-   * Sets a new iterated commitment for the channel source -> self
-   *
-   * When issuing a probabilistic ticket, it must stay hidden whether that ticket
-   * leads to a payout. To hide this information, nodes must deposit in advance some
-   * entropy on-chain that is fetched when redeeming the ticket.
-   *
-   * @param newCommitment, a secret derived from this new commitment
-   * @param source the address of the source of the channel
-   */
-  function _setCommitmentInternal(address self, bytes32 newCommitment, address source) internal {
-    if (newCommitment == bytes32(0)) {
-      // revert since setting empty commitments is a no-op and therefore unintended
-      revert InvalidCommitment();
-    }
-
-    // We can only set commitment to incoming channels.
-    bytes32 channelId = _getChannelId(source, self);
-    Channel storage channel = channels[channelId];
-
-    if (channel.status != ChannelStatus.OPEN) {
-      revert WrongChannelState({reason: 'Cannot set commitments for channels that are not in state OPEN.'});
-    }
-
-    // Cannot set same commitment again
-    if (channel.commitment == newCommitment) {
-      revert InvalidCommitment();
-    }
-
-    if (channel.commitment != bytes32(0)) {
-      // The party ran out of commitment openings, this is a reset
-      channel.epoch = ChannelEpoch.wrap(ChannelEpoch.unwrap(channel.epoch) + 1);
-    }
-
-    channel.commitment = newCommitment;
-
-    emit CommitmentSet(channelId, channel.epoch);
   }
 
   /**
@@ -649,17 +606,19 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprLe
    */
   function _isWinningTicket(
     bytes32 ticketHash,
-    RedeemableTicket calldata redeemable
+    RedeemableTicket calldata redeemable,
+    HoprCrypto.VRF_Parameters calldata params
   ) public pure returns (bool) {
     // hash function produces 256 bits output but we require only first 56 bits (IEEE 754 double precision means 53 signifcant bits)
     uint56 ticketProb = (uint56(bytes7(keccak256(abi.encodePacked(
       // unique due to ticketIndex + ticketEpoch
       ticketHash, 
-      // entropy + commitment opening ticket redeemer
-      redeemable.opening, 
+      // use deterministic pseudo-random VRF output generated by redeemer
+      params.v_x,
+      params.v_y,
       // challenge-response packet sender + next downstream node
       redeemable.porSecret, 
-      // entropy by ticket issuer
+      // entropy by ticket issuer, only ticket issuer can generate a valid signature
       redeemable.signature.r, redeemable.signature.vs)))));
 
     return ticketProb <= WinProb.unwrap(redeemable.data.winProb);

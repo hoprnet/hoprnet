@@ -36,14 +36,13 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest {
 
   function getChannelFromTuple(bytes32 channelId) public view returns (HoprChannels.Channel memory) {
     (
-      bytes32 commitment,
       HoprChannels.Balance balance,
       HoprChannels.TicketIndex ticketIndex,
       HoprChannels.Timestamp closureTime,
       HoprChannels.ChannelEpoch epoch,
       HoprChannels.ChannelStatus status
     ) = myHoprChannels.channels(channelId);
-    return HoprChannels.Channel(commitment, balance, ticketIndex, closureTime, epoch,status );
+    return HoprChannels.Channel(balance, ticketIndex, closureTime, epoch,status );
   }
 
   address hoprToken;

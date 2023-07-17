@@ -185,13 +185,23 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto {
     address signer = 0x0c6146f8e9A92174A309bd0d7f000148fD6e2588;
 
     HoprCrypto.VRF_Parameters memory params = HoprCrypto.VRF_Parameters(
-      signer,
-      0xf13233ff60e1f618525dac5f7d117bef0bad0eb0b0afb2459f9cbc57a3a987ba,
       V.x,
       V.y,
-      uint256(s), uint256(h), s_B.x, s_B.y, h_V.x, h_V.y
+      uint256(s), 
+      uint256(h),
+      s_B.x, 
+      s_B.y, 
+      h_V.x, 
+      h_V.y
     );
 
-    assertTrue(crypto.vrf_verify(params));
+    HoprCrypto.VRF_Payload memory payload = HoprCrypto.VRF_Payload(
+      0xf13233ff60e1f618525dac5f7d117bef0bad0eb0b0afb2459f9cbc57a3a987ba,
+      signer,
+      "some DST tag"
+    );
+
+
+    assertTrue(crypto.vrf_verify(params, payload));
   }
 }
