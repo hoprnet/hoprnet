@@ -1501,7 +1501,10 @@ class Hopr extends EventEmitter {
 
   public async getTickets(counterparty: Address): Promise<Ticket[]> {
     const self = this.getEthereumAddress()
-    const channel = await this.db.get_channel_x(counterparty, self)
+    const channel = await this.db.get_channel_x(
+      Packet_Address.deserialize(counterparty.serialize()),
+      Packet_Address.deserialize(self.serialize())
+    )
 
     const ackedTickets = await this.db.get_acknowledged_tickets(channel)
 
@@ -1550,7 +1553,10 @@ class Hopr extends EventEmitter {
 
   public async redeemTicketsInChannel(counterparty: Address) {
     const self = this.getEthereumAddress()
-    const channel = await this.db.get_channel_x(counterparty, self)
+    const channel = await this.db.get_channel_x(
+      Packet_Address.deserialize(counterparty.serialize()),
+      Packet_Address.deserialize(self.serialize())
+    )
 
     await HoprCoreEthereum.getInstance().redeemTicketsInChannel(channel)
   }
@@ -1562,7 +1568,10 @@ class Hopr extends EventEmitter {
    * @returns the channel entry of those two nodes
    */
   public async getChannel(src: Address, dest: Address): Promise<ChannelEntry> {
-    return await this.db.get_channel_x(src, dest)
+    return await this.db.get_channel_x(
+      Packet_Address.deserialize(src.serialize()),
+      Packet_Address.deserialize(dest.serialize())
+    )
   }
 
   public async getAllChannels(): Promise<ChannelEntry[]> {
