@@ -10,12 +10,17 @@ import '../../../src/interfaces/IAvatar.sol';
 import 'forge-std/Test.sol';
 import 'openzeppelin-contracts-4.8.3/token/ERC20/IERC20.sol';
 
+/**
+ * @dev This files tests both HoprNodeManagementModule and the CapabilityPermissions.sol
+ */
 contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTest, SafeSingletonFixtureTest {
     using stdStorage for StdStorage;
 
     HoprNodeManagementModule public moduleSingleton;
     address public multiaddr;
     address public safe;
+    address public channels;
+    address public token;
     CapabilityPermission[] internal defaultFunctionPermission;
     /**
     * Manually import events and errors
@@ -29,6 +34,8 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         super.setUp();
         multiaddr = vm.addr(100); // make address(100) multiaddr
         safe = vm.addr(101); // make address(101) a safe
+        channels = makeAddr("HoprChannels");
+        token = makeAddr("HoprToken");
 
         moduleSingleton = new HoprNodeManagementModule();
         defaultFunctionPermission = new CapabilityPermission[](TargetUtils.NUM_CAPABILITY_PERMISSIONS);
@@ -425,8 +432,6 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
     * @dev Add Channels and Token targets, where channel is vm.addr()
     */
     function test_AddChannelsAndTokenTarget(uint256 targetUint) public {
-        address channels = makeAddr("HoprChannels");
-        address token = makeAddr("HoprToken");
         address owner = moduleSingleton.owner();
 
         Target target = Target.wrap(targetUint);
@@ -580,12 +585,56 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
     }
 
     /**
+     * @dev call transaction execution from a non-member account
+     */
+    function testRevert_CallFromNonMember(address caller) public {
+        vm.assume(caller != address(0));
+        vm.assume(caller != vm.addr(301));
+        address owner = moduleSingleton.owner();
+
+        vm.prank(owner);
+        // include some node as member
+        moduleSingleton.addNode(vm.addr(301));
+        // cannot call from
+        assertFalse(moduleSingleton.isNode(caller));
+        vm.prank(caller);
+        vm.expectRevert(HoprCapabilityPermissions.NoMembership.selector);
+        moduleSingleton.execTransactionFromModule(
+            token,
+            0,
+            hex"12345678",
+            Enum.Operation.Call
+        );
+        vm.clearMockedCalls();
+    }
+
+    /**
+     * @dev call transaction execution from a non-member account
+     */
+    function testRevert_CallWithInvalidData() public {
+        address owner = moduleSingleton.owner();
+        address caller = vm.addr(301);
+
+        vm.prank(owner);
+        // include some node as member
+        moduleSingleton.addNode(caller);
+        // cannot call from
+        vm.prank(caller);
+        vm.expectRevert(HoprCapabilityPermissions.FunctionSignatureTooShort.selector);
+        moduleSingleton.execTransactionFromModule(
+            token,
+            0,
+            hex"00",
+            Enum.Operation.Call
+        );
+        vm.clearMockedCalls();
+    }
+
+    /**
      * @dev should successfully execute a transaction from the module to a scoped target
      */
     function test_ExecTransactionFromModuleToAScopedTarget() public {
         // scope channels and token contract
-        address channels = makeAddr("HoprChannels");
-        address token = makeAddr("HoprToken");
         address owner = moduleSingleton.owner();
         address msgSender = vm.addr(1);
 
@@ -640,8 +689,6 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
      */
     function test_ExecTransactionFromModuleReturnData() public {
         // scope channels and token contract
-        address channels = makeAddr("HoprChannels");
-        address token = makeAddr("HoprToken");
         address owner = moduleSingleton.owner();
         address msgSender = vm.addr(1);
 

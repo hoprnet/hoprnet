@@ -159,7 +159,7 @@ library HoprCapabilityPermissions {
         bytes calldata data,
         Enum.Operation operation
     ) internal view {
-        if (!role.members[msg.sender]) {
+        if (!role.members[from]) {
             revert NoMembership();
         }
         if (multisend == to) {
