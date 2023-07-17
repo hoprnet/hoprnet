@@ -115,6 +115,8 @@ library HoprCapabilityPermissions {
     error UnacceptableMultiSendOffset();
 
     /// The provided calldata for execution is too short, or an OutOfBounds scoped parameter was configured
+    error CalldataAddressOutOfBounds();
+    /// The provided calldata for execution is too short, or an OutOfBounds scoped parameter was configured
     error CalldataOutOfBounds();
 
     // Default permission not acquired
@@ -324,7 +326,7 @@ library HoprCapabilityPermissions {
         //  - closeIncomingChannelSafe(address self, address source) // dst,src
         //  - finalizeOutgoingChannelClosureSafe(address self, address destination) // src,dst
         //  - setCommitmentSafe(address self, address source, bytes32 newCommitment) // dst,src
-        address self = pluckOneStaticAddress(1, data);
+        address self = pluckOneStaticAddress(0, data);
         // the first slot should always store the self address
         if (self != msg.sender) {
             revert NodePermissionRejected();
@@ -346,37 +348,6 @@ library HoprCapabilityPermissions {
         }
 
         return role.capabilities[capabilityKey][channelId];
-
-        // if (functionSig == REDEEM_TICKET_SELECTOR) {
-        //     (address self, HoprChannels.RedeemableTicket memory redeemableTicket) = abi.decode(slicedData, (address, HoprChannels.RedeemableTicket));
-        //     channelId = redeemableTicket.data.channelId;
-        // } else if (functionSig == CLOSE_INCOMING_CHANNEL_SELECTOR) {
-        //     (address self, address source) = abi.decode(slicedData, (address, address));
-        //     channelId = getChannelId(source, self);
-        // } else if (functionSig == INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTOR) {
-        //     (address self, address destination) = abi.decode(slicedData, (address, address));
-        //     channelId = getChannelId(self, destination);
-        // } else if (functionSig == FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTOR) {
-        //     (address self, address destination) = abi.decode(slicedData, (address, address));
-        //     channelId = getChannelId(self, destination);
-        // } else if (functionSig == FUND_CHANNEL_SELECTOR) {
-        //     (address self, address destination) = abi.decode(slicedData, (address, address));
-        //     channelId = getChannelId(self, destination);
-        //     // checkFundChannel(role, capabilityKey, slicedData);
-        // } else if (functionSig == SET_COMMITMENT_SELECTOR) {
-        //     (address self, address source,) = abi.decode(slicedData, (address, address, bytes32));
-        //     channelId = getChannelId(source, self);
-        // } else {
-        //     revert ParameterNotAllowed();
-        // }
-
-        // // the first evm slot must be the nodeAddress
-        // if (self != nodeAddress) {
-        //     revert PermissionRejected();
-        // }
-        // // return permission set per channel id
-        // GranularPermission granularPermission = role.capabilities[capabilityKey][channelId];
-        // return granularPermission;
     }
 
     // TODO: FIXME: remove as batch redeem is a multisend at this stage
@@ -749,7 +720,7 @@ library HoprCapabilityPermissions {
     ) internal pure returns (address) {
         // pre-check: is there a word available for the current parameter at argumentsBlock?
         if (data.length < 4 + index * 32 + 32) {
-            revert CalldataOutOfBounds();
+            revert CalldataAddressOutOfBounds();
         }
 
         uint256 offset = 4 + index * 32;
@@ -913,23 +884,23 @@ library HoprCapabilityPermissions {
     //     return (a, b);
     // }
 
-    /**
-     * @dev Returns a copy of a portion of the `data` byte array.
-     * @param data The byte array to slice.
-     * @param start The starting index of the slice (inclusive).
-     * @param end The ending index of the slice (exclusive).
-     * @return result A new byte array containing the sliced portion.
-     */
-    function slice(
-        bytes memory data,
-        uint256 start,
-        uint256 end
-    ) internal pure returns (bytes memory result) {
-        result = new bytes(end - start);
-        for (uint256 j = start; j < end; j++) {
-            result[j - start] = data[j];
-        }
-    }
+    // /**
+    //  * @dev Returns a copy of a portion of the `data` byte array.
+    //  * @param data The byte array to slice.
+    //  * @param start The starting index of the slice (inclusive).
+    //  * @param end The ending index of the slice (exclusive).
+    //  * @return result A new byte array containing the sliced portion.
+    //  */
+    // function slice(
+    //     bytes memory data,
+    //     uint256 start,
+    //     uint256 end
+    // ) internal pure returns (bytes memory result) {
+    //     result = new bytes(end - start);
+    //     for (uint256 j = start; j < end; j++) {
+    //         result[j - start] = data[j];
+    //     }
+    // }
 
     // /**
     //  * @dev Returns a copy of a portion of the `data` byte array.
@@ -967,6 +938,8 @@ library HoprCapabilityPermissions {
      * @notice Signature encoding is right-padded; Index 0 is the left most and grows to the right
      * Permission encoding is left-padded; Index grows from right to the left.
      * Returns a bytes32 and length of sigature and permissions
+     * @param functionSigs array of function signatures on target
+     * @param permissions array of granular permissions on target
      */
     function encodeFunctionSigsAndPermissions(
        bytes4[] memory functionSigs,
@@ -999,6 +972,8 @@ library HoprCapabilityPermissions {
      * of function signature and permissions. It can take maxinum 7 items.
      * Encoding of function signatures is right-padded, where indexes grow from left to right
      * Encoding of permissions is left-padded, where indexes grow from left to right
+     * @param encoded encode permissions in bytes32
+     * @param length length of permissions
      */
     function decodeFunctionSigsAndPermissions(
         bytes32 encoded, 

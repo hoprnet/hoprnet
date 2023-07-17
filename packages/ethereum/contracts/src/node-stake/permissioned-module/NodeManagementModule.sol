@@ -233,6 +233,39 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
   }
 
   // ===========================================================
+  // ------------------------ UTILITIES ------------------------
+  // ===========================================================
+  /** 
+   * @dev help encode function permissions into a bytes32
+   * @param functionSigs array of function signatures on target
+   * @param permissions array of granular permissions on target
+   */
+  function encodeFunctionSigsAndPermissions(
+      bytes4[] memory functionSigs,
+      GranularPermission[] memory permissions
+  ) external pure returns (
+    bytes32 encoded, 
+    uint256 length
+  ) {
+    return HoprCapabilityPermissions.encodeFunctionSigsAndPermissions(functionSigs, permissions);
+  }
+
+  /** 
+   * @dev help encode function permissions into a bytes32
+   * @param encoded encode permissions in bytes32
+   * @param length length of permissions
+   */
+  function decodeFunctionSigsAndPermissions(
+      bytes32 encoded, 
+      uint256 length
+  ) external pure returns (
+    bytes4[] memory functionSigs,
+    GranularPermission[] memory permissions
+  ) {
+    return HoprCapabilityPermissions.decodeFunctionSigsAndPermissions(encoded, length);
+  }
+
+  // ===========================================================
   // ----------------------- INHERITANCE -----------------------
   // ===========================================================
 
