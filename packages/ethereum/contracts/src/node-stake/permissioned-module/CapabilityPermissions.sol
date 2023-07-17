@@ -245,7 +245,7 @@ library HoprCapabilityPermissions {
         bytes4 functionSig = bytes4(data);
 
         // check default permissions and get the fallback permission
-        TargetPermission defaultPermission = getDefaultPermission(target, functionSig);
+        TargetPermission defaultPermission = getDefaultPermission(data.length, target, functionSig);
         // allow early revert or early return
         if (defaultPermission == TargetPermission.BLOCK_ALL) {
             revert DefaultPermissionRejected();
@@ -351,8 +351,6 @@ library HoprCapabilityPermissions {
         ) {
             address destination = pluckOneStaticAddress(1, data);
             channelId = getChannelId(self, destination);
-        } else {
-            revert ParameterNotAllowed();
         }
 
         return role.capabilities[capabilityKey][channelId];
@@ -448,10 +446,6 @@ library HoprCapabilityPermissions {
         bytes4 functionSig,
         bytes memory data
     ) internal view returns (GranularPermission) {
-        if (functionSig != APPROVE_SELECTOR && functionSig != SEND_SELECTOR) {
-            revert ParameterNotAllowed();
-        }
-
         // for APPROVE_SELECTOR the abi is (address, uint256)
         // for SEND_SELECTOR the abi is (address, uint256, bytes)
         // note that beneficiary could event be a CHANNELS target.  
@@ -489,10 +483,6 @@ library HoprCapabilityPermissions {
         address targetAddress,
         uint256 dataLength
     ) internal view returns (GranularPermission) {
-        if (dataLength > 0) {
-            // not allowed to call payable functions
-            revert ParameterNotAllowed();
-        }
         bytes32 pairId = getChannelId(nodeAddress, targetAddress);
         return role.capabilities[bytes32(0)][pairId];
     }
@@ -500,17 +490,19 @@ library HoprCapabilityPermissions {
     /**
      * @dev check the default target permission for target and for the function
      * returns the default permission
+     * @param dataLength Length of data payload
      * @param target Taret of the operation
      * @param functionSig bytes4 method Id of the operation
      */
     function getDefaultPermission(
+        uint256 dataLength,
         Target target, 
         bytes4 functionSig
     ) internal view returns (TargetPermission) {
         // check default target permission
         TargetPermission defaultTargetPermission = target.getDefaultTargetPermission();
         // early return when the permission allows
-        if (defaultTargetPermission == TargetPermission.ALLOW_ALL || defaultTargetPermission == TargetPermission.BLOCK_ALL) {
+        if (dataLength == 0 || defaultTargetPermission == TargetPermission.ALLOW_ALL || defaultTargetPermission == TargetPermission.BLOCK_ALL) {
             return defaultTargetPermission;
         }
 
@@ -532,7 +524,7 @@ library HoprCapabilityPermissions {
         } else if (functionSig == SEND_SELECTOR) {
             defaultFunctionPermission = target.getDefaultCapabilityPermissionAt(8);
         } else {
-            defaultFunctionPermission = CapabilityPermission.BLOCK_ALL;
+            revert ParameterNotAllowed();
         }
         // only when function permission is not defined, use target default permission
         if (defaultFunctionPermission == CapabilityPermission.NONE) {

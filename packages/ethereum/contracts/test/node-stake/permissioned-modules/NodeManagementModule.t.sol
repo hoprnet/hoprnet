@@ -720,6 +720,43 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
     }
 
     /**
+     * @dev call transaction to send native token to a scoped target but with data
+     */
+    function testRevert_SendWithDataNotAllowed(address caller) public {
+        vm.assume(caller != address(0));
+        address owner = moduleSingleton.owner();
+
+        vm.startPrank(owner);
+        // include some node as member
+        moduleSingleton.addNode(caller);
+        CapabilityPermission[] memory channelsTokenPermission = new CapabilityPermission[](9);
+        for (uint256 i = 0; i < channelsTokenPermission.length; i++) {
+            channelsTokenPermission[i] = CapabilityPermission.SPECIFIC_FALLBACK_ALLOW;
+        }
+        // target exist but not the target address of the calling function
+        Target target = TargetUtils.encodeDefaultPermissions(
+            caller,
+            Clearance.FUNCTION,
+            TargetType.SEND,
+            TargetPermission.SPECIFIC_FALLBACK_ALLOW,
+            channelsTokenPermission
+        ); 
+        // ffffffffffffffffffffffffffffffffffffffff ff00ff000000000000000000
+        emit log_named_bytes32("target", bytes32(Target.unwrap(target)));
+        moduleSingleton.scopeTargetSend(target);
+        vm.stopPrank();
+        vm.prank(caller);
+        vm.expectRevert(HoprCapabilityPermissions.ParameterNotAllowed.selector);
+        moduleSingleton.execTransactionFromModule(
+            caller,
+            1,
+            hex"12345678",
+            Enum.Operation.Call
+        );
+        vm.clearMockedCalls();
+    }
+
+    /**
      * @dev call transaction but delegate call is not allowed
      */
     function testRevert_DelegateCallNotAllowed(address caller) public {
