@@ -3,7 +3,6 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts-upgradeable/proxy/ClonesUpgradeable.sol";
 import "openzeppelin-contracts-4.8.3/utils/Address.sol";
-// import "openzeppelin-contracts-4.8.3/access/Ownable.sol"; // FIXME: remove me
 import "../../script/utils/SafeSuiteLib.sol";
 import "safe-contracts/proxies/SafeProxy.sol";
 import "safe-contracts/proxies/SafeProxyFactory.sol";
@@ -11,7 +10,6 @@ import "safe-contracts/Safe.sol";
 import "safe-contracts/common/Enum.sol";
 
 
-// contract HoprNodeStakeFactory is Ownable { // FIXME: remove me
 contract HoprNodeStakeFactory  {
     using Address for address;
     using ClonesUpgradeable for address;
@@ -35,7 +33,19 @@ contract HoprNodeStakeFactory  {
         return SafeSuiteLib.SAFE_VERSION;
     }
 
-    function clone(address moduleSingletonAddress, address admin, uint256 nonce) public returns (address, address payable) {
+    /**
+     * @dev Create a safe proxy and a module proxy
+     * @param moduleSingletonAddress singleton contract of Safe
+     * @param admin owner of safe by default it's 1 out of n
+     * @param nonce nonce to create salt
+     * @param defaultTarget default target (see TargetUtils.sol) for the current HoprChannels (and HoprToken) contract
+     */
+    function clone(
+        address moduleSingletonAddress,
+        address admin,
+        uint256 nonce,
+        bytes32 defaultTarget
+    ) public returns (address, address payable) {
         bytes32 salt = keccak256(abi.encodePacked(msg.sender, nonce));
 
         // 1. Deploy node management module
@@ -61,7 +71,7 @@ contract HoprNodeStakeFactory  {
         address payable safeProxyAddr = payable(address(safeProxy));
 
         // add Safe and multisend to the module, and transfer the ownership to module
-        bytes memory moduleInitializer = abi.encodeWithSignature("initialize(bytes)", abi.encode(address(safeProxy), SafeSuiteLib.SAFE_MultiSendCallOnly_ADDRESS));
+        bytes memory moduleInitializer = abi.encodeWithSignature("initialize(bytes)", abi.encode(address(safeProxy), SafeSuiteLib.SAFE_MultiSendCallOnly_ADDRESS, defaultTarget));
         moduleProxy.functionCall(moduleInitializer);
 
         // enable node management module 

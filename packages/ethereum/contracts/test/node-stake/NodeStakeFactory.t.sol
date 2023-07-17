@@ -54,19 +54,31 @@ contract HoprNodeManagementModuleTest is Test, SafeSingletonFixtureTest {
         assertGt(SafeSuiteLib.SAFE_MultiSendCallOnly_ADDRESS.code.length, 0);
         // there's code in Safe CompatibilityFallbackHandler 
         assertGt(SafeSuiteLib.SAFE_CompatibilityFallbackHandler_ADDRESS.code.length, 0);
+        // safe version matches
+        assertEq(factory.safeVersion(), SafeSuiteLib.SAFE_VERSION);
     }
 
     /**
     * @dev Clone a safe and a module and they are wired
     */
     function test_CloneSafeAndModule() public {
+        address channels = 0x0101010101010101010101010101010101010101;
+        address token = 0x1010101010101010101010101010101010101010;
+        vm.mockCall(
+            channels,
+            abi.encodeWithSignature(
+                'token()'
+            ),
+            abi.encode(token)
+        );
+
         uint256 nonce = 0;
         address expectedModuleAddress = factory.predictDeterministicAddress(address(moduleSingleton), keccak256(abi.encodePacked(caller, nonce)));
         
         vm.startPrank(caller);
         vm.expectEmit(true, false, false, false, address(factory));
         emit NewHoprNodeStakeModule(expectedModuleAddress);
-        (module, safe) = factory.clone(address(moduleSingleton), admin, nonce);
+        (module, safe) = factory.clone(address(moduleSingleton), admin, nonce, bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101"));
 
         // Safe should have module enabled
         assertTrue(Safe(safe).isModuleEnabled(module));
@@ -83,16 +95,26 @@ contract HoprNodeManagementModuleTest is Test, SafeSingletonFixtureTest {
         assertEq(HoprNodeManagementModule(module).multisend(), SafeSuiteLib.SAFE_MultiSendCallOnly_ADDRESS, "Wrong module owner");
 
         vm.stopPrank();
+        vm.clearMockedCalls();
     }
 
     function testFuzz_InitializeModuleProxy(uint256 nonce, address safeAddr, address multisendAddr) public {
+        address channels = 0x0101010101010101010101010101010101010101;
+        address token = 0x1010101010101010101010101010101010101010;
+        vm.mockCall(
+            channels,
+            abi.encodeWithSignature(
+                'token()'
+            ),
+            abi.encode(token)
+        );
         vm.assume(safeAddr != address(0));
         vm.assume(multisendAddr != address(0));
         bytes32 salt = keccak256(abi.encodePacked(msg.sender, nonce));
         // 1. Deploy node management module
         address moduleProxy = address(moduleSingleton).cloneDeterministic(salt);
         // add Safe and multisend to the module
-        bytes memory moduleInitializer = abi.encodeWithSignature("initialize(bytes)", abi.encode(safeAddr, multisendAddr));
+        bytes memory moduleInitializer = abi.encodeWithSignature("initialize(bytes)", abi.encode(safeAddr, multisendAddr, bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101")));
 
         vm.expectEmit(true, true, false, false, address(moduleProxy));
         emit OwnershipTransferred(address(0), safeAddr);
@@ -101,6 +123,7 @@ contract HoprNodeManagementModuleTest is Test, SafeSingletonFixtureTest {
         vm.expectEmit(true, false, false, false, address(moduleProxy));
         emit SetMultisendAddress(multisendAddr);
         moduleProxy.call(moduleInitializer);
+        vm.clearMockedCalls();
     }
 
     function testRevert_CloneButFailToInitializeWithAddressZero(uint256 nonce, address safeAddr, address multisendAddr) public {
@@ -114,6 +137,7 @@ contract HoprNodeManagementModuleTest is Test, SafeSingletonFixtureTest {
         // add Safe and multisend to the module
         bytes memory moduleInitializer = abi.encodeWithSignature("initialize(bytes)", abi.encode(safeAddr, multisendAddr));
         moduleProxy.call(moduleInitializer);
+        vm.clearMockedCalls();
     }
 
     function testRevert_CloneButFailToInitializeTwice(uint256 nonce, address safeAddr, address multisendAddr) public {
@@ -129,5 +153,6 @@ contract HoprNodeManagementModuleTest is Test, SafeSingletonFixtureTest {
         bytes memory moduleReinitializer = abi.encodeWithSignature("initialize(bytes)", abi.encode(safeAddr, multisendAddr));
         vm.expectRevert(AlreadyInitialized.selector);
         moduleProxy.call(moduleReinitializer);
+        vm.clearMockedCalls();
     }
 }

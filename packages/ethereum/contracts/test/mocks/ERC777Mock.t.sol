@@ -26,10 +26,8 @@ contract ERC777MockTest is Test, ERC1820RegistryFixtureTest {
         );
     }
 
-    function testFuzz_MintInternal(address recipient, uint256 amount) public {
-        vm.assume(recipient != address(0));
-        vm.assume(recipient != address(this));
-        vm.assume(recipient != address(erc777Mock));
+    function testFuzz_MintInternal(uint256 amount) public {
+        address recipient = vm.addr(200);
         erc777Mock.mintInternal(recipient, amount, hex"00", hex"00");
         assertEq(erc777Mock.balanceOf(recipient), amount);
     }

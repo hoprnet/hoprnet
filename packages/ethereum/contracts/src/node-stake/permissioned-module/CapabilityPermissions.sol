@@ -350,49 +350,6 @@ library HoprCapabilityPermissions {
         return role.capabilities[capabilityKey][channelId];
     }
 
-    // TODO: FIXME: remove as batch redeem is a multisend at this stage
-    // function checkBatchRedeem(Role storage role, bytes32 capabilityKey, bytes memory slicedData) private view returns (GranularPermission) {
-    //     uint256 noneCounter;
-    //     (, HoprChannels.RedeemableTicket[] memory redeemableTickets) = abi.decode(slicedData, (address, HoprChannels.RedeemableTicket[]));
-    //     for (uint256 i = 0; i < redeemableTickets.length; i++) {
-    //         bytes32 channelId = redeemableTickets[i].data.channelId;
-    //         GranularPermission granularPermission = role.capabilities[capabilityKey][channelId];
-    //         if (granularPermission == GranularPermission.NONE) {
-    //             noneCounter ++;
-    //         } else if (granularPermission == GranularPermission.BLOCK) {
-    //             // return BLOCK when at least one exist
-    //             return GranularPermission.BLOCK;
-    //         }
-    //     }
-    //     return noneCounter > 0 ? GranularPermission.NONE : GranularPermission.ALLOW;
-    // }
-
-    // function checkFundChannel(Role storage role, bytes32 capabilityKey, bytes memory slicedData) private view returns (GranularPermission) {
-    //     (address source, HoprChannels.Balance balance1, address destination, HoprChannels.Balance balance2) = abi.decode(slicedData, (address, HoprChannels.Balance, address, HoprChannels.Balance));
-    //     GranularPermission granularPermission1 = role.capabilities[capabilityKey][getChannelId(source, destination)];
-    //     GranularPermission granularPermission2 = role.capabilities[capabilityKey][getChannelId(destination, source)];
-    //     if (HoprChannels.Balance.unwrap(balance1) > 0 && HoprChannels.Balance.unwrap(balance2) == 0) {
-    //         return granularPermission1;
-    //     } else if (HoprChannels.Balance.unwrap(balance1) == 0 && HoprChannels.Balance.unwrap(balance2) > 0) {
-    //         return granularPermission2;
-    //     }
-
-    //     // when funding two channels
-    //     if (
-    //       granularPermission1 == GranularPermission.BLOCK || 
-    //       granularPermission2 == GranularPermission.BLOCK
-    //     ) {
-    //         return GranularPermission.BLOCK;
-    //     } else if (
-    //       granularPermission1 == GranularPermission.ALLOW && 
-    //       granularPermission2 == GranularPermission.ALLOW
-    //     ) {
-    //         return GranularPermission.ALLOW;    
-    //     } else {
-    //         return GranularPermission.NONE;
-    //     }
-    // }
-
     /*
      * @dev Will revert if a transaction has a parameter that is not allowed
      * @notice This function is invoked on non-HoprChannels contracts (i.e. HoprTokens)
@@ -418,20 +375,6 @@ library HoprCapabilityPermissions {
         address beneficiary = pluckOneStaticAddress(0, data);
         bytes32 pairId = getChannelId(msg.sender, beneficiary);
         return role.capabilities[capabilityKey][pairId];
-        // if (functionSig == APPROVE_SELECTOR) {
-        //     (address beneficiary, ) = abi.decode(slicedData, (address, uint256));
-        //     GranularPermission granularPermission = role.capabilities[capabilityKey][pairId];
-        //     return granularPermission;
-        // } else if (functionSig == SEND_SELECTOR) {
-        //     (address beneficiary, , ) = abi.decode(slicedData, (address, uint256, bytes));
-        //     // beneficiary could event be a CHANNELS target. Calling send to a HoprChannels contract is equivalent
-        //     // to calling fundChannel or fundChannelsMulti function. However, granular control is skipped!
-        //     bytes32 pairId = getChannelId(nodeAddress, beneficiary);
-        //     GranularPermission granularPermission = role.capabilities[capabilityKey][pairId];
-        //     return granularPermission;
-        // } else {
-        //     revert ParameterNotAllowed();
-        // }
     }
 
     /**
@@ -493,28 +436,6 @@ library HoprCapabilityPermissions {
             return TargetUtils.convertFunctionToTargetPermission(defaultFunctionPermission);
         }
     }
-
-    // /** FIXME:
-    //  * @dev Compares the permission for calling a HoprChannels contract.
-    //  * @param role The storage reference to the Role struct.
-    //  * @param capabilityKey The key representing the capability.
-    //  * @param source The source address of the HOPR channel.
-    //  * @param destination The destination address of the HOPR channel.
-    //  */
-    // function compareHoprChannelsPermission(
-    //     Role storage role, 
-    //     bytes32 capabilityKey, 
-    //     address source, 
-    //     address destination
-    // ) internal view {
-    //     // get channelId
-    //     bytes32 channelId = keccak256(abi.encodePacked(source, destination));
-    //     // check if it's allowed to call the channel
-    //     if (role.hoprChannelsCapability[capabilityKey][channelId] != HoprChannelsPermission.Allowed) {
-    //         // not allowed to call the capability
-    //         revert ParameterNotAllowed();
-    //     }
-    // }
 
     // ======================================================
     // ----------------------- SETTERS ----------------------
@@ -733,31 +654,6 @@ library HoprCapabilityPermissions {
         return addr;
     }
 
-    // /**
-    //  * @dev Extracts two addresses from the `data` byte array.
-    //  * @param data The byte array containing the addresses.
-    //  * @return addr0 The first address extracted from the `data` byte array.
-    //  * @return addr1 The second address extracted from the `data` byte array.
-    //  */
-    // function pluckTwoStaticAddresses(
-    //     bytes memory data
-    // ) internal pure returns (address, address) {
-    //     // pre-check: is there a word available for the current parameter at argumentsBlock?
-    //     if (data.length < 4 + 1 * 32 + 32) {
-    //         revert CalldataOutOfBounds();
-    //     }
-    //     address addr0;
-    //     address addr1;
-    //     assembly {
-    //         // add 32 - jump over the length encoding of the data bytes array
-    //         // offset0 = 4 + 0 * 32;
-    //         addr0 := mload(add(32, add(data, 4)))
-    //         // offset1 = 4 + 1 * 32;
-    //         addr1 := mload(add(32, add(data, 36)))
-    //     }
-    //     return (addr0, addr1);
-    // }
-
     /**
      * @dev Extracts one bytes32 from the `data` byte array.
      * @param data The byte array containing the bytes32.
@@ -781,143 +677,6 @@ library HoprCapabilityPermissions {
         }
         return by32;
     }
-
-    // /**
-    //  * @dev Returns an array of dynamically sized addresses decoded from a portion of the `data` byte array.
-    //  * @param data The byte array containing the encoded addresses.
-    //  * @param index The index of the parameter in the `data` byte array.
-    //  * @return decodedAddresses An array of decoded addresses.
-    //  */
-    // function pluckDynamicAddresses(
-    //     bytes memory data,
-    //     uint256 index
-    // ) internal pure returns (address[] memory decodedAddresses) {
-    //     // pre-check: is there a word available for the current parameter at argumentsBlock?
-    //     if (data.length < 4 + index * 32 + 32) {
-    //         revert CalldataOutOfBounds();
-    //     }
-
-    //     // the start of the parameter block
-    //     // 32 bytes - length encoding of the data bytes array
-    //     // 4  bytes - function sig
-    //     uint256 argumentsBlock;
-    //     assembly {
-    //         argumentsBlock := add(data, 36)
-    //     }
-
-    //     // the two offsets are relative to argumentsBlock
-    //     uint256 offset = index * 32;
-    //     uint256 offsetPayload;
-    //     assembly {
-    //         offsetPayload := mload(add(argumentsBlock, offset))
-    //     }
-
-    //     uint256 lengthPayload;
-    //     assembly {
-    //         lengthPayload := mload(add(argumentsBlock, offsetPayload))
-    //     }
-
-    //     // account for:
-    //     // 4  bytes - functionSig
-    //     // 32 bytes - length encoding for the parameter payload
-    //     // start with length and followed by actual values
-    //     uint256 start = 4 + offsetPayload;
-    //     uint256 end = start + lengthPayload * 32 + 32;
-
-    //     // are we slicing out of bounds?
-    //     if (data.length < end) {
-    //         revert CalldataOutOfBounds();
-    //     }
-
-    //     // prefix 32 bytes of offset which indicates the location of length
-    //     return abi.decode(abi.encodePacked(uint256(32),slice(data, start, end)), (address[]));
-    // }
-
-    // /**
-    //  * @dev Extracts and returns two addresses from a specific portion of the `data` byte array.
-    //  * @param data The byte array containing the data.
-    //  * @param index The index of the parameter to extract.
-    //  * @return a The first address extracted from the specified portion of the `data` byte array.
-    //  * @return b The second address extracted from the specified portion of the `data` byte array.
-    //  */
-    // function pluckSendPayload(
-    //     bytes memory data,
-    //     uint256 index
-    // ) internal pure returns (address, address) {
-    //     // pre-check: is there a word available for the current parameter at argumentsBlock?
-    //     if (data.length < 4 + index * 32 + 32) {
-    //         revert CalldataOutOfBounds();
-    //     }
-
-    //     // the start of the parameter block
-    //     // 32 bytes - length encoding of the data bytes array
-    //     // 4  bytes - function sig
-    //     uint256 argumentsBlock;
-    //     assembly {
-    //         argumentsBlock := add(data, 36)
-    //     }
-
-    //     // the two offsets are relative to argumentsBlock
-    //     uint256 offset = index * 32;
-    //     uint256 offsetPayload;
-    //     assembly {
-    //         offsetPayload := mload(add(argumentsBlock, offset))
-    //     }
-
-    //     uint256 lengthPayload;
-    //     assembly {
-    //         lengthPayload := mload(add(argumentsBlock, offsetPayload))
-    //     }
-
-    //     // account for:
-    //     // 4  bytes - functionSig
-    //     // 32 bytes - length encoding for the parameter payload
-    //     // Note that the start has skipped length location
-    //     uint256 start = 4 + offsetPayload + 32;
-    //     uint256 end = start + lengthPayload;
-
-    //     // are we slicing out of bounds?
-    //     if (data.length < end) {
-    //         revert CalldataOutOfBounds();
-    //     }
-
-    //     (address a, address b, , ) = abi.decode(slice(data, start, end), (address, address, uint256, uint256));
-    //     return (a, b);
-    // }
-
-    // /**
-    //  * @dev Returns a copy of a portion of the `data` byte array.
-    //  * @param data The byte array to slice.
-    //  * @param start The starting index of the slice (inclusive).
-    //  * @param end The ending index of the slice (exclusive).
-    //  * @return result A new byte array containing the sliced portion.
-    //  */
-    // function slice(
-    //     bytes memory data,
-    //     uint256 start,
-    //     uint256 end
-    // ) internal pure returns (bytes memory result) {
-    //     result = new bytes(end - start);
-    //     for (uint256 j = start; j < end; j++) {
-    //         result[j - start] = data[j];
-    //     }
-    // }
-
-    // /**
-    //  * @dev Returns a copy of a portion of the `data` byte array.
-    //  * @param data The byte array to slice.
-    //  * @param start The starting index of the slice (inclusive).
-    //  * @return result A new byte array containing the sliced portion.
-    //  */
-    // function sliceFrom(
-    //     bytes memory data,
-    //     uint256 start
-    // ) internal pure returns (bytes memory result) {
-    //     result = new bytes(data.length - start);
-    //     for (uint256 j = start; j < data.length; j++) {
-    //         result[j - start] = data[j];
-    //     }
-    // }
 
     /**
      * @dev Returns the unique key for a function of a given `targetAddress`.

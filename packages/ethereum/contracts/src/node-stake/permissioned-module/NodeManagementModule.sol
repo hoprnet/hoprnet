@@ -55,9 +55,9 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
   }
 
   function initialize(bytes memory initParams) public initializer {
-    (address _safe, address _multisend) = abi.decode(
+    (address _safe, address _multisend, bytes32 _defaultTokenChannelsTarget) = abi.decode(
         initParams,
-        (address, address)
+        (address, address, bytes32)
     );
 
     // cannot accept a zero address as Safe or multisend contract
@@ -73,6 +73,7 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
     // internally setAvatar and setTarget
     avatar = _safe;
     multisend = _multisend;
+    _addChannelsAndTokenTarget(Target.wrap(uint256(_defaultTokenChannelsTarget)));
     // transfer ownership
     _transferOwnership(_safe);
     emit AvatarSet(address(0), avatar);
@@ -128,14 +129,7 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
   function addChannelsAndTokenTarget(
     Target defaultTarget
   ) external onlyOwner {
-    // get channels andtokens contract
-    address hoprChannelsAddress = defaultTarget.getTargetAddress();
-    address hoprTokenAddress = address(HoprChannels(hoprChannelsAddress).token());
-
-    // add default scope for Channels TargetType, with the build target for hoprChannels address
-    HoprCapabilityPermissions.scopeTargetChannels(role, defaultTarget.forceWriteTargetAddress(hoprChannelsAddress));
-    // add default scope for Token TargetType
-    HoprCapabilityPermissions.scopeTargetToken(role, defaultTarget.forceWriteTargetAddress(hoprTokenAddress));
+    _addChannelsAndTokenTarget(defaultTarget);
   }
 
   /**
@@ -320,5 +314,22 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
    */
   function transferOwnership(address /*newOwner*/) public view override(OwnableUpgradeable) onlyOwner {
     revert CannotChangeOwner();
+  }
+
+  /**
+   * @dev Private function to scope a channel and token target.
+   * @param defaultTarget The default target with default permissions for CHANNELS and TOKEN target
+   */
+  function _addChannelsAndTokenTarget(
+    Target defaultTarget
+  ) private {
+    // get channels andtokens contract
+    address hoprChannelsAddress = defaultTarget.getTargetAddress();
+    address hoprTokenAddress = address(HoprChannels(hoprChannelsAddress).token());
+
+    // add default scope for Channels TargetType, with the build target for hoprChannels address
+    HoprCapabilityPermissions.scopeTargetChannels(role, defaultTarget.forceWriteTargetAddress(hoprChannelsAddress));
+    // add default scope for Token TargetType
+    HoprCapabilityPermissions.scopeTargetToken(role, defaultTarget.forceWriteTargetAddress(hoprTokenAddress));
   }
 }
