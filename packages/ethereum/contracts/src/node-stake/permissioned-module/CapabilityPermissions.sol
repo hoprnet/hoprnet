@@ -159,9 +159,6 @@ library HoprCapabilityPermissions {
         bytes calldata data,
         Enum.Operation operation
     ) internal view {
-        if (!role.members[from]) {
-            revert NoMembership();
-        }
         if (multisend == to) {
             // here the operation should be delegate
             checkMultisendTransaction(role, from, data);

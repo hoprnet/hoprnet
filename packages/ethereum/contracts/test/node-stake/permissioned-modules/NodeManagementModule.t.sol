@@ -40,15 +40,15 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         moduleSingleton = new HoprNodeManagementModule();
         defaultFunctionPermission = new CapabilityPermission[](TargetUtils.NUM_CAPABILITY_PERMISSIONS);
         defaultFunctionPermission = [
-            CapabilityPermission.SPECIFIC_FALLBACK_ALLOW,
-            CapabilityPermission.SPECIFIC_FALLBACK_ALLOW,
-            CapabilityPermission.SPECIFIC_FALLBACK_ALLOW,
-            CapabilityPermission.SPECIFIC_FALLBACK_ALLOW,
-            CapabilityPermission.SPECIFIC_FALLBACK_ALLOW,
-            CapabilityPermission.SPECIFIC_FALLBACK_ALLOW,
-            CapabilityPermission.SPECIFIC_FALLBACK_ALLOW,
-            CapabilityPermission.SPECIFIC_FALLBACK_BLOCK,
-            CapabilityPermission.SPECIFIC_FALLBACK_BLOCK
+            CapabilityPermission.SPECIFIC_FALLBACK_ALLOW,   // defaultRedeemTicketSafeFunctionPermisson
+            CapabilityPermission.SPECIFIC_FALLBACK_ALLOW,   // defaultBatchRedeemTicketsSafeFunctionPermisson
+            CapabilityPermission.SPECIFIC_FALLBACK_ALLOW,   // defaultCloseIncomingChannelSafeFunctionPermisson
+            CapabilityPermission.SPECIFIC_FALLBACK_ALLOW,   // defaultInitiateOutgoingChannelClosureSafeFunctionPermisson
+            CapabilityPermission.SPECIFIC_FALLBACK_ALLOW,   // defaultFinalizeOutgoingChannelClosureSafeFunctionPermisson
+            CapabilityPermission.SPECIFIC_FALLBACK_ALLOW,   // defaultFundChannelMultiFunctionPermisson
+            CapabilityPermission.SPECIFIC_FALLBACK_ALLOW,   // defaultSetCommitmentSafeFunctionPermisson
+            CapabilityPermission.SPECIFIC_FALLBACK_BLOCK,   // defaultApproveFunctionPermisson
+            CapabilityPermission.SPECIFIC_FALLBACK_BLOCK    // defaultSendFunctionPermisson
         ];
     }
 
@@ -361,8 +361,7 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
             defaultFunctionPermission
         );
 
-        vm.startPrank(owner);
-
+        vm.prank(owner);
         vm.expectRevert(HoprCapabilityPermissions.NoMembership.selector);
         moduleSingleton.scopeTargetSend(sendTarget);
     }
@@ -593,8 +592,6 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         address owner = moduleSingleton.owner();
 
         vm.prank(owner);
-        // include some node as member
-        moduleSingleton.addNode(vm.addr(301));
         // cannot call from
         assertFalse(moduleSingleton.isNode(caller));
         vm.prank(caller);
@@ -625,6 +622,60 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
             token,
             0,
             hex"00",
+            Enum.Operation.Call
+        );
+        vm.clearMockedCalls();
+    }
+
+    /**
+     * @dev revert due to default permission not allowed
+     */
+    function testRevert_ExecTransactionButDefaultPermissionRejects() public {
+        // scope channels and token contract
+        address owner = moduleSingleton.owner();
+        address msgSender = vm.addr(1);
+
+        Target target = TargetUtils.encodeDefaultPermissions(
+            channels,
+            Clearance.FUNCTION,
+            TargetType.CHANNELS,
+            TargetPermission.BLOCK_ALL,
+            defaultFunctionPermission
+        );   // clerance: FUNCTION default ALLOW_ALL
+        vm.startPrank(owner);
+        stdstore
+            .target(address(moduleSingleton))
+            .sig("avatar()")
+            .checked_write(safe);
+        vm.mockCall(
+            channels,
+            abi.encodeWithSignature(
+                'token()'
+            ),
+            abi.encode(token)
+        );
+        vm.mockCall(
+            safe,
+            abi.encodeWithSelector(IAvatar.execTransactionFromModule.selector),
+            abi.encode(true)
+        );
+
+        // add token and channels as accept_all target
+        moduleSingleton.addChannelsAndTokenTarget(channels, target);
+        // include caller as node
+        moduleSingleton.addNode(msgSender);
+
+        // prepare a simple token approve
+        bytes memory data = abi.encodeWithSelector(IERC20.approve.selector, vm.addr(200), 100);
+        vm.stopPrank();
+
+        // execute function
+        vm.prank(msgSender);
+        vm.expectRevert(HoprCapabilityPermissions.DefaultPermissionRejected.selector);
+        moduleSingleton.execTransactionFromModule(
+            token,
+            0,
+            data,
             Enum.Operation.Call
         );
         vm.clearMockedCalls();
@@ -687,6 +738,60 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
     /**
      * @dev should successfully execute a transaction from the module to a scoped target
      */
+    function test_ExecTransactionFromModuleButGranularPermissionReject() public {
+        // scope channels and token contract
+        address owner = moduleSingleton.owner();
+        address msgSender = vm.addr(1);
+
+        Target target = TargetUtils.encodeDefaultPermissions(
+            channels,
+            Clearance.FUNCTION,
+            TargetType.CHANNELS,
+            TargetPermission.SPECIFIC_FALLBACK_ALLOW,
+            defaultFunctionPermission
+        );   // clerance: FUNCTION default ALLOW_ALL
+        vm.startPrank(owner);
+        stdstore
+            .target(address(moduleSingleton))
+            .sig("avatar()")
+            .checked_write(safe);
+        vm.mockCall(
+            channels,
+            abi.encodeWithSignature(
+                'token()'
+            ),
+            abi.encode(token)
+        );
+        vm.mockCall(
+            safe,
+            abi.encodeWithSelector(IAvatar.execTransactionFromModule.selector),
+            abi.encode(true)
+        );
+
+        // add token and channels as accept_all target
+        moduleSingleton.addChannelsAndTokenTarget(channels, target);
+        // include caller as node
+        moduleSingleton.addNode(msgSender);
+
+        // prepare a simple token approve
+        bytes memory data = abi.encodeWithSelector(IERC20.approve.selector, vm.addr(200), 100);
+        vm.stopPrank();
+
+        // execute function
+        vm.prank(msgSender);
+        vm.expectRevert(HoprCapabilityPermissions.GranularPermissionRejected.selector);
+        moduleSingleton.execTransactionFromModule(
+            token,
+            0,
+            data,
+            Enum.Operation.Call
+        );
+        vm.clearMockedCalls();
+    }
+
+    /**
+     * @dev should successfully execute a transaction from the module to a scoped target
+     */
     function test_ExecTransactionFromModuleReturnData() public {
         // scope channels and token contract
         address owner = moduleSingleton.owner();
@@ -739,6 +844,124 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         vm.clearMockedCalls();
     }
 
+    /**
+     * @dev Fail to call to multisend address 
+     */
+    function testRevert_InvalidMultiSendData() public {
+        // set the multisend address to be multiaddr
+        stdstore
+            .target(address(moduleSingleton))
+            .sig("multisend()")
+            .checked_write(multiaddr);
+
+        address owner = moduleSingleton.owner();
+        address caller = vm.addr(301);
+
+        vm.prank(owner);
+        // include some node as member
+        moduleSingleton.addNode(caller);
+        // cannot call from
+        vm.prank(caller);
+        vm.expectRevert(HoprCapabilityPermissions.UnacceptableMultiSendOffset.selector);
+        moduleSingleton.execTransactionFromModule(
+            multiaddr,
+            0,
+            abi.encodePacked(bytes32(hex"12"), bytes32(hex"34")),
+            Enum.Operation.DelegateCall
+        );
+        vm.clearMockedCalls();
+    }
+
+    /**
+     * @dev should successfully execute transactions to a scoped target via multisend
+     */
+    function test_ExecuteMultiSendTransaction() public {
+        // scope channels and token contract
+        address owner = moduleSingleton.owner();
+        address msgSender = vm.addr(1);
+        CapabilityPermission[] memory channelsTokenPermission = new CapabilityPermission[](9);
+        for (uint256 i = 0; i < channelsTokenPermission.length; i++) {
+            channelsTokenPermission[i] = CapabilityPermission.SPECIFIC_FALLBACK_ALLOW;
+        }
+        channelsTokenPermission[8] = CapabilityPermission.SPECIFIC_FALLBACK_BLOCK;
+
+        Target tokenChannelsTarget = TargetUtils.encodeDefaultPermissions(
+            channels,
+            Clearance.FUNCTION,
+            TargetType.CHANNELS,
+            TargetPermission.SPECIFIC_FALLBACK_ALLOW,
+            channelsTokenPermission
+        );   // clerance: FUNCTION default ALLOW_ALL
+        Target nodeTarget = TargetUtils.encodeDefaultPermissions(
+            msgSender,
+            Clearance.FUNCTION,
+            TargetType.SEND,
+            TargetPermission.ALLOW_ALL,
+            defaultFunctionPermission
+        );   // clerance: FUNCTION default ALLOW_ALL
+        vm.startPrank(owner);
+        stdstore
+            .target(address(moduleSingleton))
+            .sig("avatar()")
+            .checked_write(safe);
+        // set the multisend address to be multiaddr
+        stdstore
+            .target(address(moduleSingleton))
+            .sig("multisend()")
+            .checked_write(multiaddr);
+        vm.mockCall(
+            channels,
+            abi.encodeWithSignature(
+                'token()'
+            ),
+            abi.encode(token)
+        );
+        vm.mockCall(
+            safe,
+            abi.encodeWithSelector(IAvatar.execTransactionFromModule.selector),
+            abi.encode(true)
+        );
+        vm.deal(safe, 1 ether);
+        assertEq(safe.balance, 1 ether);
+
+        // add token and channels as accept_all target
+        moduleSingleton.addChannelsAndTokenTarget(channels, tokenChannelsTarget);
+        // include caller as node
+        moduleSingleton.addNode(msgSender);
+        // add the node as a scoped target
+        moduleSingleton.scopeTargetSend(nodeTarget);
+        vm.stopPrank();
+        
+        // prepare a simple token approve and a native token transfer
+        bytes[] memory data = new bytes[](2);
+        data[0] = abi.encodeWithSelector(IERC20.approve.selector, vm.addr(200), 100);   // approve on token
+        uint8[] memory txOperations = new uint8[](2);
+        txOperations[0] = 0;
+        txOperations[1] = 0;
+        address[] memory txTos = new address[](2);
+        txTos[0] = token;
+        txTos[1] = msgSender;
+        uint256[] memory txValues = new uint256[](2);
+        txValues[0] = 0;
+        txValues[1] = 1 ether;
+        uint256[] memory dataLengths = new uint256[](2);
+        dataLengths[0] = data[0].length;
+        dataLengths[1] = 0;
+
+        bytes memory safeTxData = _helperBuildMultiSendTx(txOperations, txTos, txValues, dataLengths, data);
+
+        // execute function
+        vm.prank(msgSender);
+        bool result = moduleSingleton.execTransactionFromModule(
+            multiaddr,
+            0,
+            safeTxData,
+            Enum.Operation.DelegateCall
+        );
+        assertTrue(result);
+        vm.clearMockedCalls();
+    }
+
     // ===================== helper functions =====================
     
     function _helperTargetBitwiseAnd(Target target, bytes32 mask) private pure returns (Target) {
@@ -785,5 +1008,19 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
 
         randomIndex = bound(randomIndex, 0, results.length - 1);
         return (results, results[randomIndex]);
+    }
+
+    function _helperBuildMultiSendTx(
+        uint8[] memory txOperations,
+        address[] memory txTos,
+        uint256[] memory txValues,
+        uint256[] memory dataLengths,
+        bytes[] memory data
+    ) private returns (bytes memory) {
+        bytes memory encodePacked;
+        for (uint256 i = 0; i < txOperations.length; i++) {
+            encodePacked = abi.encodePacked(encodePacked, txOperations[i], txTos[i], txValues[i], dataLengths[i], data[i]);
+        }
+        return abi.encodeWithSignature("multiSend(bytes)", encodePacked);
     }
 }
