@@ -27,6 +27,6 @@ fi
 
 declare url="${apitoken}@${endpoint}/api/v2/account/addresses"
 
-declare cmd="$(get_authenticated_curl_cmd ${url})"
+declare cmd="$(get_authenticated_curl_cmd "${url}")"
 
 try_cmd "${cmd}" 30 5 | jq -r ".hopr"

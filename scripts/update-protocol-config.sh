@@ -31,7 +31,7 @@ while (( "$#" )); do
       ;;
     -n|--network)
       network="${2}"
-      : ${network?"parameter <network> must not be empty"}
+      : "${network?"parameter <network> must not be empty"}"
       shift 2
       ;;
     -*|--*=)

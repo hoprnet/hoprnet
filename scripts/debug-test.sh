@@ -65,4 +65,4 @@ function setup_node() {
 }
 
 #  --- Run nodes --- {{{
-setup_node 13301 19091 18081 "${node1_dir}" "${node1_dir}.log" ""/tmp/${node_prefix}-1" "127.0.0.1"
+setup_node 13301 19091 18081 "${node1_dir}" "${node1_dir}.log" "/tmp/${node_prefix}-1" "127.0.0.1"
