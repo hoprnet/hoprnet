@@ -144,7 +144,6 @@ library HoprCapabilityPermissions {
      * @dev Checks the permission of a transaction execution based on the role membership and transaction details.
      * @param role The storage reference to the Role struct.
      * @param multisend The address of the multisend contract.
-     * @param from The sender of the transaction.
      * @param to The recipient address of the transaction.
      * @param value The value of the transaction.
      * @param data The transaction data.
@@ -153,7 +152,6 @@ library HoprCapabilityPermissions {
     function check(
         Role storage role,
         address multisend,
-        address from,
         address to,
         uint256 value,
         bytes calldata data,
@@ -161,21 +159,19 @@ library HoprCapabilityPermissions {
     ) internal view {
         if (multisend == to) {
             // here the operation should be delegate
-            checkMultisendTransaction(role, from, data);
+            checkMultisendTransaction(role, data);
         } else {
-            checkTransaction(role, from, to, value, data, operation);
+            checkTransaction(role, to, value, data, operation);
         }
     }
 
     /**
      * @dev Splits a multisend data blob into transactions and forwards them to be checked.
      * @param role The storage reference to the Role struct.
-     * @param from The sender of the transaction.
      * @param data The packed transaction data (created by the `buildMultiSendSafeTx` utility function).
      */
     function checkMultisendTransaction(
         Role storage role,
-        address from,
         bytes memory data
     ) internal view {
         Enum.Operation operation;
@@ -212,14 +208,13 @@ library HoprCapabilityPermissions {
                 // We offset the load address by 85 byte (operation byte + 20 address bytes + 32 value bytes + 32 data length bytes)
                 out := add(data, add(i, 0x35))
             }
-            checkTransaction(role, from, to, value, out, operation);
+            checkTransaction(role, to, value, out, operation);
         }
     }
 
     /**
      * @dev Main transaction to check the permission of transaction execution of a module.
      * @param role The storage reference to the Role struct.
-     * @param nodeAddress The address of the caller node.
      * @param targetAddress The address of the target contract.
      * @param value The value of the transaction.
      * @param data The transaction data.
@@ -227,7 +222,6 @@ library HoprCapabilityPermissions {
      */
     function checkTransaction(
         Role storage role,
-        address nodeAddress,
         address targetAddress,
         uint256 value,
         bytes memory data,
@@ -257,12 +251,12 @@ library HoprCapabilityPermissions {
         // check function permission
         if (target.getTargetType() == TargetType.TOKEN) {
             // check with HoprToken contract
-            granularPermission = checkHoprTokenParameters(role, nodeAddress, keyForFunctions(targetAddress, functionSig), functionSig, data);
+            granularPermission = checkHoprTokenParameters(role, keyForFunctions(targetAddress, functionSig), functionSig, data);
         } else if (target.getTargetType() == TargetType.CHANNELS) {
             // check with HoprChannels contract
-            granularPermission = checkHoprChannelsParameters(role, nodeAddress, keyForFunctions(targetAddress, functionSig), functionSig, data);
+            granularPermission = checkHoprChannelsParameters(role, keyForFunctions(targetAddress, functionSig), functionSig, data);
         } else if (target.getTargetType() == TargetType.SEND) {
-            granularPermission = checkSendParameters(role, nodeAddress, targetAddress, data.length);
+            granularPermission = checkSendParameters(role, targetAddress, data.length);
         }
 
         // check permission result
@@ -312,14 +306,12 @@ library HoprCapabilityPermissions {
     /*
      * @dev Check parameters for HoprChannels capability
      * @param role reference to role storage
-     * @param nodeAddress The address of the caller node.
      * @param capabilityKey Key to the capability.
      * @param functionSig Function method ID
      * @param data payload (with function signature)
      */
     function checkHoprChannelsParameters(
         Role storage role,
-        address nodeAddress,
         bytes32 capabilityKey,
         bytes4 functionSig,
         bytes memory data
@@ -334,7 +326,7 @@ library HoprCapabilityPermissions {
         //  - setCommitmentSafe(address self, address source, bytes32 newCommitment) // dst,src
         address self = pluckOneStaticAddress(1, data);
         // the first slot should always store the self address
-        if (self != nodeAddress) {
+        if (self != msg.sender) {
             revert NodePermissionRejected();
         }
         
@@ -434,14 +426,12 @@ library HoprCapabilityPermissions {
      * @dev Will revert if a transaction has a parameter that is not allowed
      * @notice This function is invoked on non-HoprChannels contracts (i.e. HoprTokens)
      * @param role reference to role storage
-     * @param nodeAddress The address of the caller node.
      * @param capabilityKey Key to the capability.
      * @param functionSig Function method ID
      * @param data payload (with function signature)
      */
     function checkHoprTokenParameters(
         Role storage role,
-        address nodeAddress,
         bytes32 capabilityKey,
         bytes4 functionSig,
         bytes memory data
@@ -452,7 +442,7 @@ library HoprCapabilityPermissions {
         // Calling send to a HoprChannels contract is equivalent to calling 
         // fundChannel or fundChannelsMulti function. However, granular control is skipped!
         address beneficiary = pluckOneStaticAddress(0, data);
-        bytes32 pairId = getChannelId(nodeAddress, beneficiary);
+        bytes32 pairId = getChannelId(msg.sender, beneficiary);
         return role.capabilities[capabilityKey][pairId];
         // if (functionSig == APPROVE_SELECTOR) {
         //     (address beneficiary, ) = abi.decode(slicedData, (address, uint256));
@@ -473,17 +463,15 @@ library HoprCapabilityPermissions {
     /**
      * @dev Checks the parameters for sending native tokens.
      * @param role The Role storage instance.
-     * @param nodeAddress The address of the caller node.
      * @param targetAddress The target address for the send operation.
      * @param dataLength The length of the data associated with the send operation.
      */
     function checkSendParameters(
         Role storage role,
-        address nodeAddress,
         address targetAddress,
         uint256 dataLength
     ) internal view returns (GranularPermission) {
-        bytes32 pairId = getChannelId(nodeAddress, targetAddress);
+        bytes32 pairId = getChannelId(msg.sender, targetAddress);
         return role.capabilities[bytes32(0)][pairId];
     }
 

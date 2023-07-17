@@ -251,7 +251,6 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
       HoprCapabilityPermissions.check(
           role,
           multisend,
-          msg.sender,
           to,
           value,
           data,
@@ -275,7 +274,6 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
       HoprCapabilityPermissions.check(
           role,
           multisend,
-          msg.sender,
           to,
           value,
           data,

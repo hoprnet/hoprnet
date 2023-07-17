@@ -741,10 +741,9 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
             TargetPermission.SPECIFIC_FALLBACK_ALLOW,
             channelsTokenPermission
         ); 
-        // ffffffffffffffffffffffffffffffffffffffff ff00ff000000000000000000
-        emit log_named_bytes32("target", bytes32(Target.unwrap(target)));
         moduleSingleton.scopeTargetSend(target);
         vm.stopPrank();
+
         vm.prank(caller);
         vm.expectRevert(HoprCapabilityPermissions.ParameterNotAllowed.selector);
         moduleSingleton.execTransactionFromModule(
