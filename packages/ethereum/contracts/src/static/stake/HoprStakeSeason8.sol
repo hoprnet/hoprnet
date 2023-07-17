@@ -6,7 +6,7 @@ import './HoprStakeBase.sol';
 /**
  * Staking program - Season 8
  * Inherit a HoprStakeBase.
- * Include new function for owner to stake for a group of accounts
+ * Similar to the previous season, it includes functions for owner to stake for a group of accounts
  */
 contract HoprStakeSeason8 is HoprStakeBase {
   using SafeERC20 for IERC20;
@@ -55,7 +55,7 @@ contract HoprStakeSeason8 is HoprStakeBase {
 
   /**
    * @dev allow the owner to stake tokens for some accounts
-   * @notice Owner should have called `increaseApproval(s6contract, largeEnoughValue)` where ideally the
+   * @notice Owner should have called `increaseApproval(stakingcontract, largeEnoughValue)` where ideally the
    * `largeEnoughValue` equals the sum of all the stakes
    * After PROGRAM_END, it refuses tokens;
    * @param _accounts address array of addresses that receives LOCK_TOKEN
