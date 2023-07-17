@@ -1077,6 +1077,124 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
     }
 
     /**
+     * @dev fail when node address is not provided correctly
+     */
+    function testRevert_ExecTransactionFromModuleButGranularPermissionRejectNodePermissionRejected() public {
+        // scope channels and token contract
+        address owner = moduleSingleton.owner();
+        address msgSender = vm.addr(1);
+        CapabilityPermission[] memory channelsTokenPermission = new CapabilityPermission[](9);
+        for (uint256 i = 0; i < channelsTokenPermission.length; i++) {
+            channelsTokenPermission[i] = CapabilityPermission.SPECIFIC_FALLBACK_ALLOW;
+        }
+        // scope channels and token contract
+        _helperAddTokenAndChannelTarget(msgSender, channelsTokenPermission, channelsTokenPermission);
+        // make execTransactionFromModule go through 
+        vm.mockCall(
+            safe,
+            abi.encodeWithSelector(IAvatar.execTransactionFromModule.selector),
+            abi.encode(true)
+        );
+
+        // add another node
+        vm.prank(owner);
+        address anotherNode = vm.addr(201);
+        moduleSingleton.addNode(anotherNode);
+
+        // prepare a simple token approve
+        bytes memory data = abi.encodeWithSelector(HoprChannels.closeIncomingChannelSafe.selector, anotherNode, vm.addr(404));
+
+        // execute function
+        vm.prank(msgSender);
+        vm.expectRevert(HoprCapabilityPermissions.NodePermissionRejected.selector);
+        moduleSingleton.execTransactionFromModule(
+            channels,
+            0,
+            data,
+            Enum.Operation.Call
+        );
+        vm.clearMockedCalls();
+    }
+    /**
+     * @dev fail when calling the wrong target (channels)
+     */
+    function testRevert_ExecTransactionFromModuleButGranularPermissionRejectParameterNotAllowedForChannels() public {
+        // scope channels and token contract
+        address owner = moduleSingleton.owner();
+        address msgSender = vm.addr(1);
+        CapabilityPermission[] memory channelsTokenPermission = new CapabilityPermission[](9);
+        for (uint256 i = 0; i < channelsTokenPermission.length; i++) {
+            channelsTokenPermission[i] = CapabilityPermission.SPECIFIC_FALLBACK_ALLOW;
+        }
+        // scope channels and token contract
+        _helperAddTokenAndChannelTarget(msgSender, channelsTokenPermission, channelsTokenPermission);
+        // make execTransactionFromModule go through 
+        vm.mockCall(
+            safe,
+            abi.encodeWithSelector(IAvatar.execTransactionFromModule.selector),
+            abi.encode(true)
+        );
+
+        // add another node
+        vm.prank(owner);
+        address anotherNode = vm.addr(201);
+        moduleSingleton.addNode(anotherNode);
+
+        // prepare a simple token approve
+        bytes memory data = abi.encodeWithSelector(HoprChannels.closeIncomingChannelSafe.selector, anotherNode, vm.addr(404));
+
+        // execute function
+        vm.prank(msgSender);
+        vm.expectRevert(HoprCapabilityPermissions.ParameterNotAllowed.selector);
+        moduleSingleton.execTransactionFromModule(
+            token,
+            0,
+            data,
+            Enum.Operation.Call
+        );
+        vm.clearMockedCalls();
+    }
+    /**
+     * @dev fail when calling the wrong target (token)
+     */
+    function testRevert_ExecTransactionFromModuleButGranularPermissionRejectParameterNotAllowedForToken() public {
+        // scope channels and token contract
+        address owner = moduleSingleton.owner();
+        address msgSender = vm.addr(1);
+        CapabilityPermission[] memory channelsTokenPermission = new CapabilityPermission[](9);
+        for (uint256 i = 0; i < channelsTokenPermission.length; i++) {
+            channelsTokenPermission[i] = CapabilityPermission.SPECIFIC_FALLBACK_ALLOW;
+        }
+        // scope channels and token contract
+        _helperAddTokenAndChannelTarget(msgSender, channelsTokenPermission, channelsTokenPermission);
+        // make execTransactionFromModule go through 
+        vm.mockCall(
+            safe,
+            abi.encodeWithSelector(IAvatar.execTransactionFromModule.selector),
+            abi.encode(true)
+        );
+
+        // add another node
+        vm.prank(owner);
+        address anotherNode = vm.addr(201);
+        moduleSingleton.addNode(anotherNode);
+
+        // prepare a simple token approve
+        bytes memory data = abi.encodeWithSelector(IERC20.approve.selector, msgSender, 100);
+
+        // execute function
+        vm.prank(msgSender);
+        vm.expectRevert(HoprCapabilityPermissions.ParameterNotAllowed.selector);
+        moduleSingleton.execTransactionFromModule(
+            channels,
+            0,
+            data,
+            Enum.Operation.Call
+        );
+        vm.clearMockedCalls();
+    }
+
+    /**
      * @dev should successfully execute transactions to a scoped target via multisend
      */
     function test_ExecuteChannelTransactions() public {
@@ -1155,6 +1273,70 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
             Enum.Operation.DelegateCall
         );
         assertTrue(result);
+        vm.clearMockedCalls();
+    }
+    /**
+     * @dev fail to retrieve data at a specific index (Bytes32)
+     */
+    function testRevert_CalldataOutOfBoundsWhenPluckingOneBytes32() public {
+        address msgSender = vm.addr(1);
+        CapabilityPermission[] memory channelsTokenPermission = new CapabilityPermission[](9);
+        for (uint256 i = 0; i < channelsTokenPermission.length; i++) {
+            channelsTokenPermission[i] = CapabilityPermission.SPECIFIC_FALLBACK_ALLOW;
+        }
+        // scope channels and token contract
+        _helperAddTokenAndChannelTarget(msgSender, channelsTokenPermission, channelsTokenPermission);
+        // make execTransactionFromModule go through 
+        vm.mockCall(
+            safe,
+            abi.encodeWithSelector(IAvatar.execTransactionFromModule.selector),
+            abi.encode(true)
+        );
+        
+        // prepare a simple token approve
+        bytes memory data = abi.encodeWithSelector(HoprChannels.redeemTicketSafe.selector, msgSender); 
+
+        // execute function
+        vm.prank(msgSender);
+        vm.expectRevert(HoprCapabilityPermissions.CalldataOutOfBounds.selector);
+        bool result = moduleSingleton.execTransactionFromModule(
+            channels,
+            0,
+            data,
+            Enum.Operation.Call
+        );
+        vm.clearMockedCalls();
+    }
+    /**
+     * @dev fail to retrieve data at a specific index (address)
+     */
+    function testRevert_CalldataOutOfBoundsWhenPluckingOneStaticAddress() public {
+        address msgSender = vm.addr(1);
+        CapabilityPermission[] memory channelsTokenPermission = new CapabilityPermission[](9);
+        for (uint256 i = 0; i < channelsTokenPermission.length; i++) {
+            channelsTokenPermission[i] = CapabilityPermission.SPECIFIC_FALLBACK_ALLOW;
+        }
+        // scope channels and token contract
+        _helperAddTokenAndChannelTarget(msgSender, channelsTokenPermission, channelsTokenPermission);
+        // make execTransactionFromModule go through 
+        vm.mockCall(
+            safe,
+            abi.encodeWithSelector(IAvatar.execTransactionFromModule.selector),
+            abi.encode(true)
+        );
+        
+        // prepare a simple token approve
+        bytes memory data = abi.encodeWithSelector(HoprChannels.redeemTicketSafe.selector); 
+
+        // execute function
+        vm.prank(msgSender);
+        vm.expectRevert(HoprCapabilityPermissions.CalldataOutOfBounds.selector);
+        bool result = moduleSingleton.execTransactionFromModule(
+            channels,
+            0,
+            data,
+            Enum.Operation.Call
+        );
         vm.clearMockedCalls();
     }
 
@@ -1280,7 +1462,7 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
             caller,
             Clearance.FUNCTION,
             TargetType.SEND,
-            TargetPermission.ALLOW_ALL,
+            TargetPermission.SPECIFIC_FALLBACK_ALLOW,
             nodePermission
         );   // clerance: FUNCTION default ALLOW_ALL
         

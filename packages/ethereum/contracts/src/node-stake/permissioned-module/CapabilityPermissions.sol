@@ -115,8 +115,6 @@ library HoprCapabilityPermissions {
     error UnacceptableMultiSendOffset();
 
     /// The provided calldata for execution is too short, or an OutOfBounds scoped parameter was configured
-    error CalldataAddressOutOfBounds();
-    /// The provided calldata for execution is too short, or an OutOfBounds scoped parameter was configured
     error CalldataOutOfBounds();
 
     // Default permission not acquired
@@ -258,7 +256,7 @@ library HoprCapabilityPermissions {
             // check with HoprChannels contract
             granularPermission = checkHoprChannelsParameters(role, keyForFunctions(targetAddress, functionSig), functionSig, data);
         } else if (target.getTargetType() == TargetType.SEND) {
-            granularPermission = checkSendParameters(role, targetAddress, data.length);
+            granularPermission = checkSendParameters(role, targetAddress);
         }
 
         // check permission result
@@ -345,6 +343,8 @@ library HoprCapabilityPermissions {
         ) {
             address destination = pluckOneStaticAddress(1, data);
             channelId = getChannelId(self, destination);
+        } else {
+            revert ParameterNotAllowed();
         }
 
         return role.capabilities[capabilityKey][channelId];
@@ -412,6 +412,9 @@ library HoprCapabilityPermissions {
         // note that beneficiary could event be a CHANNELS target.  
         // Calling send to a HoprChannels contract is equivalent to calling 
         // fundChannel or fundChannelsMulti function. However, granular control is skipped!
+        if (functionSig != APPROVE_SELECTOR && functionSig != SEND_SELECTOR) {
+            revert ParameterNotAllowed();
+        }
         address beneficiary = pluckOneStaticAddress(0, data);
         bytes32 pairId = getChannelId(msg.sender, beneficiary);
         return role.capabilities[capabilityKey][pairId];
@@ -435,12 +438,10 @@ library HoprCapabilityPermissions {
      * @dev Checks the parameters for sending native tokens.
      * @param role The Role storage instance.
      * @param targetAddress The target address for the send operation.
-     * @param dataLength The length of the data associated with the send operation.
      */
     function checkSendParameters(
         Role storage role,
-        address targetAddress,
-        uint256 dataLength
+        address targetAddress
     ) internal view returns (GranularPermission) {
         bytes32 pairId = getChannelId(msg.sender, targetAddress);
         return role.capabilities[bytes32(0)][pairId];
@@ -461,7 +462,7 @@ library HoprCapabilityPermissions {
         // check default target permission
         TargetPermission defaultTargetPermission = target.getDefaultTargetPermission();
         // early return when the permission allows
-        if (dataLength == 0 || defaultTargetPermission == TargetPermission.ALLOW_ALL || defaultTargetPermission == TargetPermission.BLOCK_ALL) {
+        if (dataLength == 0 || functionSig == bytes4(0) || defaultTargetPermission == TargetPermission.ALLOW_ALL || defaultTargetPermission == TargetPermission.BLOCK_ALL) {
             return defaultTargetPermission;
         }
 
@@ -720,7 +721,7 @@ library HoprCapabilityPermissions {
     ) internal pure returns (address) {
         // pre-check: is there a word available for the current parameter at argumentsBlock?
         if (data.length < 4 + index * 32 + 32) {
-            revert CalldataAddressOutOfBounds();
+            revert CalldataOutOfBounds();
         }
 
         uint256 offset = 4 + index * 32;
