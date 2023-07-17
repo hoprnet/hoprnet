@@ -560,6 +560,62 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
     }
 
     /**
+     * @dev encode function permissions but revert due to ArrayTooLong
+     */
+    function testRevert_EncodeFunctionSigsAndPermissionsLengths() public {
+        uint256 size = 8;
+        bytes4[] memory functionSigs = new bytes4[](size);
+        GranularPermission[] memory permissions = new GranularPermission[](size);
+
+        for (uint256 i = 0; i < functionSigs.length; i++) {
+            functionSigs[i] = bytes4(bytes32(i));
+            permissions[i] = GranularPermission(uint8(uint256(bytes32(functionSigs[i])) % (uint256(type(GranularPermission).max) + 1)));
+        }
+        vm.expectRevert(HoprCapabilityPermissions.ArrayTooLong.selector);
+        moduleSingleton.encodeFunctionSigsAndPermissions(functionSigs, permissions);
+    }
+    /**
+     * @dev encode function permissions but revert due to ArraysDifferentLength
+     */
+    function testRevert_EncodeFunctionSigsAndPermissionsMismatchedLengths() public {
+        uint256 size = 6;
+        bytes4[] memory functionSigs = new bytes4[](size);
+        GranularPermission[] memory permissions = new GranularPermission[](size + 1);
+
+        for (uint256 i = 0; i < functionSigs.length; i++) {
+            functionSigs[i] = bytes4(bytes32(i));
+            permissions[i] = GranularPermission(uint8(uint256(bytes32(functionSigs[i])) % (uint256(type(GranularPermission).max) + 1)));
+        }
+        permissions[6] = GranularPermission(0);
+        vm.expectRevert(HoprCapabilityPermissions.ArraysDifferentLength.selector);
+        moduleSingleton.encodeFunctionSigsAndPermissions(functionSigs, permissions);
+    }
+    /**
+     * @dev encode function permissions but revert due to ArraysDifferentLength
+     */
+    function test_EncodeFunctionSigsAndPermissionsMismatchedLengths() public {
+        uint256 size = 6;
+        bytes4[] memory functionSigs = new bytes4[](size);
+        GranularPermission[] memory permissions = new GranularPermission[](size);
+
+        for (uint256 i = 0; i < functionSigs.length; i++) {
+            functionSigs[i] = bytes4(bytes32(i));
+            permissions[i] = GranularPermission(uint8(uint256(bytes32(functionSigs[i])) % (uint256(type(GranularPermission).max) + 1)));
+        }
+        (bytes32 encoded, uint256 length) = moduleSingleton.encodeFunctionSigsAndPermissions(functionSigs, permissions);
+        (bytes4[] memory _functionSigs, GranularPermission[] memory _permissions) = moduleSingleton.decodeFunctionSigsAndPermissions(encoded, length);
+        assertEq(_functionSigs.length, size);
+        assertEq(_permissions.length, size);
+    }
+    /**
+     * @dev deecode function permissions but revert due to ArrayTooLong
+     */
+    function testRevert_DecodeFunctionSigsAndPermissionsLengths() public {
+        vm.expectRevert(HoprCapabilityPermissions.ArrayTooLong.selector);
+        moduleSingleton.decodeFunctionSigsAndPermissions(bytes32(hex"1234567890"), 8);
+    }
+
+    /**
      * @dev scope tokens for (source, destination)
      */
     function testFuzz_ScopeTokenCapabilities(bytes4[] memory _randomFunctionSigs, uint256 _size) public {
