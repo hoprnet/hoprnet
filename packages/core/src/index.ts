@@ -1435,6 +1435,9 @@ class Hopr extends EventEmitter {
       log(`The requested channel for counterparty ${counterparty.toString()} does not exist`)
       throw new Error('Requested channel does not exist')
     }
+
+    log(`asking to close channel: ${channel.to_string()}`)
+
     // TODO: should we wait for confirmation?
     if (channel.status === ChannelStatus.Closed) {
       throw new Error('Channel is already closed')

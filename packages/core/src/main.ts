@@ -240,7 +240,7 @@ export async function createHoprNode(
     // Dump entire database to a file if given by the env variable
     const dump_file = process.env.DB_DUMP ?? ''
     if (dump_file.length > 0) {
-      levelDb.dump(dump_file)
+      await levelDb.dump(dump_file)
     }
   } catch (err: unknown) {
     log(`failed init db:`, err)

@@ -1,12 +1,11 @@
-import levelup, { type LevelUp } from 'levelup'
-import leveldown from 'leveldown'
-import MemDown from 'memdown'
 import { stat, mkdir, rm } from 'fs/promises'
 import { debug } from '../process/index.js'
 
 import fs from 'fs'
-import { u8aConcat, u8aToHex } from '../u8a/index.js'
-// import type { IteratedHash } from '../../../core/lib/core_crypto.js'
+import { stringToU8a, u8aConcat, u8aToHex } from '../u8a/index.js'
+import { AbstractLevel } from 'abstract-level'
+import { MemoryLevel } from 'memory-level'
+const SqliteLevel = (await import('sqlite-level')).default.SqliteLevel
 
 const log = debug(`hopr-core:db`)
 
@@ -16,11 +15,11 @@ const decoder = new TextDecoder()
 const NETWORK_KEY = encoder.encode('network_id')
 
 export class LevelDb {
-  public backend: LevelUp
+  public backend: AbstractLevel<string | Uint8Array | Buffer>
 
   constructor() {
     // unless initialized with a specific db path, memory version is used
-    this.backend = new levelup(MemDown())
+    this.backend = new MemoryLevel()
   }
 
   public async init(initialize: boolean, dbPath: string, forceCreate: boolean = false, networkId: string) {
@@ -57,9 +56,7 @@ export class LevelDb {
       }
     }
 
-    // CommonJS / ESM issue
-    // @ts-ignore
-    this.backend = levelup(leveldown(dbPath))
+    this.backend = new SqliteLevel({ filename: dbPath + "/db.sqlite" })
 
     // Fully initialize database
     await this.backend.open()
@@ -80,34 +77,15 @@ export class LevelDb {
   }
 
   public async put(key: Uint8Array, value: Uint8Array): Promise<void> {
-    console.log(`BEGIN level DB put key: ${new TextDecoder().decode(key)} and value: ${u8aToHex(value)}`)
-    let r
-    try {
-      // LevelDB does not support Uint8Arrays, always convert to Buffer
-      r = await this.backend.put(
-        Buffer.from(key.buffer, key.byteOffset, key.byteLength),
-        Buffer.from(value.buffer, value.byteOffset, value.byteLength),
-        { sync: true }
-      )
-    }
-    catch (e) {
-      console.log(`!!! ERROR level DB put key: ${new TextDecoder().decode(key)} and value: ${u8aToHex(value)}: ${e}`)
-    }
-    finally {
-      console.log(`END level DB put key: ${new TextDecoder().decode(key)} and value: ${u8aToHex(value)}`)
-    }
-    return  r
+    return await this.backend.put(u8aToHex(key), u8aToHex(value))
   }
 
   public async get(key: Uint8Array): Promise<Uint8Array> {
-    // LevelDB does not support Uint8Arrays, always convert to Buffer
-    const value = await this.backend.get(Buffer.from(key.buffer, key.byteOffset, key.byteLength))
-
-    return new Uint8Array(value.buffer, value.byteOffset, value.byteLength)
+    return stringToU8a(await this.backend.get(u8aToHex(key)))
   }
 
   public async remove(key: Uint8Array): Promise<void> {
-    await this.backend.del(Buffer.from(key.buffer, key.byteOffset, key.byteLength))
+    await this.backend.del(u8aToHex(key))
   }
 
   public async batch(ops: Array<any>, wait_for_write = true): Promise<void> {
@@ -122,14 +100,10 @@ export class LevelDb {
       }
 
       if (op.type === 'put') {
-        // LevelDB does not support Uint8Arrays, always convert to Buffer
-        batch.put(
-          Buffer.from(op.key, op.key.byteOffset, op.key.byteLength),
-          Buffer.from(op.value, op.value.byteOffset, op.value.byteLength)
-        )
+        batch.del(u8aToHex(op.key)) // We must try to delete first then insert (in case of updates)
+        batch.put(u8aToHex(op.key), u8aToHex(op.value))
       } else if (op.type === 'del') {
-        // LevelDB does not support Uint8Arrays, always convert to Buffer
-        batch.del(Buffer.from(op.key, op.key.byteOffset, op.key.byteLength))
+        batch.del(u8aToHex(op.key))
       } else {
         throw new Error(`Unsupported operation type: ${JSON.stringify(op)}`)
       }
@@ -140,7 +114,6 @@ export class LevelDb {
 
   public async maybeGet(key: Uint8Array): Promise<Uint8Array | undefined> {
     try {
-      // Conversion to Buffer done by `.get()` method
       return await this.get(key)
     } catch (err) {
       if (err.type === 'NotFoundError' || err.notFound) {
@@ -160,13 +133,11 @@ export class LevelDb {
 
     for await (const [_key, chunk] of this.backend.iterator({
       // LevelDB does not support Uint8Arrays, always convert to Buffer
-      gte: Buffer.from(firstPrefixed.buffer, firstPrefixed.byteOffset, firstPrefixed.byteLength),
-      lte: Buffer.from(lastPrefixed.buffer, lastPrefixed.byteOffset, lastPrefixed.byteLength),
+      gte: u8aToHex(firstPrefixed),
+      lte: u8aToHex(lastPrefixed),
       keys: false
     }) as any) {
-      const obj: Uint8Array = new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.byteLength)
-
-      yield obj
+      yield stringToU8a(chunk)
     }
   }
 
@@ -175,34 +146,30 @@ export class LevelDb {
     return await this.backend.close()
   }
 
-  public dump(destFile: string) {
+  public async dump(destFile: string) {
     log(`Dumping current database to ${destFile}`)
     let dumpFile = fs.createWriteStream(destFile, { flags: 'a' })
-    this.backend
-      .createReadStream({ keys: true, keyAsBuffer: true, values: true, valueAsBuffer: true })
-      .on('data', ({ key }) => {
-        let out = ''
-        while (key.length > 0) {
-          const nextDelimiter = key.findIndex((v: number) => v == 0x2d) // 0x2d ~= '-'
+    for await (const [key_hex, value_hex] of this.backend.iterator()) {
+      let key = stringToU8a(key_hex)
+      let out = ''
+      while (key.length > 0) {
+        const nextDelimiter = key.findIndex((v: number) => v == 0x2d) // 0x2d ~= '-'
 
-          if (key.subarray(0, nextDelimiter).every((v: number) => v >= 32 && v <= 126)) {
-            out += decoder.decode(key.subarray(0, nextDelimiter))
-          } else {
-            out += u8aToHex(key.subarray(0, nextDelimiter))
-          }
-
-          if (nextDelimiter < 0) {
-            break
-          } else {
-            key = (key as Buffer).subarray(nextDelimiter + 1)
-          }
-
-          dumpFile.write(out + '\n')
+        if (key.subarray(0, nextDelimiter).every((v: number) => v >= 32 && v <= 126)) {
+          out += decoder.decode(key.subarray(0, nextDelimiter))
+        } else {
+          out += u8aToHex(key.subarray(0, nextDelimiter))
         }
-      })
-      .on('end', function () {
-        dumpFile.close()
-      })
+
+        if (nextDelimiter < 0) {
+          break
+        } else {
+          key = (key as Buffer).subarray(nextDelimiter + 1)
+        }
+      }
+      dumpFile.write(out + ',' + value_hex + '\n')
+    }
+    dumpFile.close()
   }
 
   public async setNetworkId(network_id: string): Promise<void> {

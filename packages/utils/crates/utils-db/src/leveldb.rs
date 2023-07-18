@@ -29,7 +29,7 @@ pub mod wasm {
         fn iterValues(this: &LevelDb, prefix: js_sys::Uint8Array, suffix_length: u32) -> Result<JsValue, JsValue>;
 
         #[wasm_bindgen(method, catch)]
-        fn dump(this: &LevelDb, destination: String) -> Result<(), JsValue>;
+        async fn dump(this: &LevelDb, destination: String) -> Result<(), JsValue>;
     }
 
     #[wasm_bindgen]
@@ -128,6 +128,7 @@ pub mod wasm {
         async fn dump(&self, destination: String) -> crate::errors::Result<()> {
             self.db
                 .dump(destination.clone())
+                .await
                 .map_err(|_| DbError::DumpError(format!("Failed to dump DB into {}", destination)))
         }
 
