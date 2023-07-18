@@ -843,8 +843,8 @@ pub mod wasm {
         #[wasm_bindgen(constructor)]
         pub fn new(db: leveldb::wasm::LevelDb, me_addr: Address) -> Self {
             Self {
-                core_ethereum_db: Arc::new(RwLock::new(CoreEthereumDb::<leveldb::wasm::LevelDbShim>::new(
-                    DB::<leveldb::wasm::LevelDbShim>::new(leveldb::wasm::LevelDbShim::new(db)),
+                core_ethereum_db: Arc::new(RwLock::new(CoreEthereumDb::new(
+                    DB::new(leveldb::wasm::LevelDbShim::new(db)),
                     me_addr.clone(),
                 ))),
             }

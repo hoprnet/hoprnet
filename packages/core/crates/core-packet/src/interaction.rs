@@ -17,7 +17,7 @@ use core_types::channels::Ticket;
 use futures::future::{select, Either};
 use futures::pin_mut;
 use libp2p_identity::PeerId;
-use std::ops::{Deref, Mul};
+use std::ops::Mul;
 use std::sync::Arc;
 use std::time::Duration;
 use utils_log::{debug, error, info};
@@ -1520,7 +1520,6 @@ pub mod wasm {
     use utils_misc::utils::wasm::JsResult;
     use utils_types::traits::BinarySerializable;
     use wasm_bindgen::prelude::wasm_bindgen;
-    use wasm_bindgen::JsCast;
     use wasm_bindgen::JsValue;
 
     #[wasm_bindgen]
