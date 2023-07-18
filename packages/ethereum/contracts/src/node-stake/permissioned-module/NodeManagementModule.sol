@@ -92,12 +92,7 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
    * @dev Add a node to be able to execute this module, to the target
    */
   function addNode(address nodeAddress) external onlyOwner {
-    // cannot add a node that's added
-    if (role.members[nodeAddress]) {
-      revert WithMembership();
-    }
-    role.members[nodeAddress] = true;
-    emit NodeAdded(nodeAddress);
+    _addNode(nodeAddress);
   }
 
   /**
@@ -130,6 +125,19 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
     Target defaultTarget
   ) external onlyOwner {
     _addChannelsAndTokenTarget(defaultTarget);
+  }
+
+  /**
+   * @dev Include a node as a member, set its default SEND permissions
+   */
+  function includeNode(Target nodeDefaultTarget) external onlyOwner {
+    address nodeAddress = nodeDefaultTarget.getTargetAddress();
+    // add a node as a member
+    _addNode(nodeAddress);
+    // scope default capabilities
+    HoprCapabilityPermissions.scopeTargetSend(role, nodeDefaultTarget);
+    // scope granular capabilities to send native tokens to itself
+    HoprCapabilityPermissions.scopeSendCapability(role, nodeAddress, nodeAddress, GranularPermission.ALLOW);
   }
 
   /**
@@ -331,5 +339,17 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
     HoprCapabilityPermissions.scopeTargetChannels(role, defaultTarget.forceWriteTargetAddress(hoprChannelsAddress));
     // add default scope for Token TargetType
     HoprCapabilityPermissions.scopeTargetToken(role, defaultTarget.forceWriteTargetAddress(hoprTokenAddress));
+  }
+
+  /**
+   * @dev private function to add a node as a member of the module
+   */
+  function _addNode(address nodeAddress) private {
+    // cannot add a node that's added
+    if (role.members[nodeAddress]) {
+      revert WithMembership();
+    }
+    role.members[nodeAddress] = true;
+    emit NodeAdded(nodeAddress);
   }
 }

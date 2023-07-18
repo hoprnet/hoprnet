@@ -363,6 +363,46 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
     }
 
     /**
+    * @dev Add send target(s) when the account is a member
+    */
+    function testFuzz_IncludeANode(address node) public {
+        vm.assume(node != address(0));
+        address owner = moduleSingleton.owner();
+
+        // add nodes and take one from the added node
+        Target sendTarget = TargetUtils.encodeDefaultPermissions(
+            node,
+            Clearance.FUNCTION,
+            TargetType.SEND,
+            TargetPermission.ALLOW_ALL,
+            defaultFunctionPermission
+        );
+
+        CapabilityPermission[] memory updatedPermission = new CapabilityPermission[](TargetUtils.NUM_CAPABILITY_PERMISSIONS);
+        for (uint256 j = 0; j < updatedPermission.length; j++) {
+            updatedPermission[j] = CapabilityPermission.NONE;
+        }
+        // add nodes and take one from the added node
+        Target upatedTarget = TargetUtils.encodeDefaultPermissions(
+            node,
+            Clearance.FUNCTION,
+            TargetType.SEND,
+            TargetPermission.ALLOW_ALL,
+            updatedPermission
+        );
+
+        vm.prank(owner);
+        vm.expectEmit(true, false, false, false, address(moduleSingleton));
+        emit NodeAdded(node);
+        vm.expectEmit(true, false, false, false, address(moduleSingleton));
+        emit HoprCapabilityPermissions.ScopedTargetSend(node, upatedTarget);
+        vm.expectEmit(true, true, false, false, address(moduleSingleton));
+        emit HoprCapabilityPermissions.ScopedGranularSendCapability(node, node, GranularPermission.ALLOW);
+        moduleSingleton.includeNode(sendTarget);
+        vm.clearMockedCalls();
+    }
+
+    /**
     * @dev fail to scope send target(s) when the account is address zero
     */
     function testRevert_ScopeNonMemberTargetSendFromModule() public {
