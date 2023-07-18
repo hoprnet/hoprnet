@@ -418,9 +418,9 @@ export default class HoprCoreEthereum extends EventEmitter {
       for await (const ticketResponse of ticketRedeemIterator()) {
         log(`ticket ${ticketResponse.to_hex()} was redeemed`)
       }
-      log(`redemption of tickets from ${channel.source.toString()} is complete`)
+      log(`redemption of tickets from ${channel.source.to_string()} is complete`)
     } catch (err) {
-      log(`redemption of tickets from ${channel.source.toString()} failed`, err)
+      log(`redemption of tickets from ${channel.source.to_string()} failed`, err)
     } finally {
       this.ticketRedemtionInChannelOperations.delete(channelId.to_hex())
     }
