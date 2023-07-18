@@ -31,6 +31,7 @@ contract HoprSafeProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, Acc
 
     constructor(
         address _owner,
+        address _manager,
         uint256 _stakeThreshold,
         uint128 _snapshotBlockNumber,
         address _token,
@@ -38,6 +39,7 @@ contract HoprSafeProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, Acc
     ) {
         _setupRole(DEFAULT_ADMIN_ROLE, _owner);
         _setupRole(MANAGER_ROLE, _owner);
+        _setupRole(MANAGER_ROLE, _manager);
         _updateStakeThreshold(_stakeThreshold);
         _updateSnapshotBlockNumber(_snapshotBlockNumber);
 
