@@ -386,12 +386,12 @@ export default class HoprCoreEthereum extends EventEmitter {
         ticket = fetched
 
         log(
-          `redeeming ticket ${ticket.response.to_hex()} in channel from ${channel.source} to ${
-            channel.destination
+          `redeeming ticket ${ticket.response.to_hex()} in channel from ${channel.source.to_hex()} to ${
+            channel.destination.to_hex()
           }, preImage ${ticket.pre_image.to_hex()}, porSecret ${ticket.response.to_hex()}`
         )
 
-        log(ticket.ticket.toString())
+        log(ticket.ticket.to_string())
 
         const result = await boundRedeemTicket(channel.source, channelId, ticket)
 
@@ -410,7 +410,7 @@ export default class HoprCoreEthereum extends EventEmitter {
 
         yield ticket.response
 
-        tickets = await boundGetAckdTickets({ serdeChannel })
+        tickets = await boundGetAckdTickets(serdeChannel)
       }
     }
 
@@ -433,7 +433,7 @@ export default class HoprCoreEthereum extends EventEmitter {
   ): Promise<RedeemTicketResponse> {
     let receipt: string
     try {
-      log(`going to redeem ticket for counterparty ${counterparty}`)
+      log(`going to redeem ticket for counterparty ${counterparty.to_hex()}`)
       receipt = await redeem_ticket(
         this.db,
         Ethereum_Address.deserialize(counterparty.serialize()),
@@ -444,7 +444,7 @@ export default class HoprCoreEthereum extends EventEmitter {
             this.setTxHandler(`channel-updated-${txHash}`, txHash)
           )
       )
-      log(`redeemed ticket for counterparty ${counterparty}`)
+      log(`redeemed ticket for counterparty ${counterparty.to_hex()}`)
     } catch (err) {
       return {
         status: 'ERROR',
