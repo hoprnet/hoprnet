@@ -17,6 +17,9 @@ error NotValidSignatureFromNode();
 // Safe address is zero
 error SafeAddressZero();
 
+// Node address is zero
+error NodeAddressZero();
+
 // Provided address is neither an owner of Safe nor a member of an enabled NodeManagementModule
 error NotSafeOwnerNorNode();
 
@@ -33,13 +36,13 @@ contract HoprNodeSafeRegistry {
   }
 
   // Currently deployed version, starting with 1.0.0
-  string private constant version = '1.0.0';
+  string public constant version = '1.0.0';
 
-  bytes32 private immutable domainSeparator;
+  bytes32 public immutable domainSeparator;
   mapping(address => address) public nodeToSafe;
   // NodeSafe struct type hash.
   // keccak256("NodeSafe(address safeAddress,address nodeChainKeyAddress)");
-  bytes32 private constant NODE_SAFE_TYPEHASH = hex'6e9a9ee91e0fce141f0eeaf47e1bfe3af5b5f40e5baf2a86acc37a075199c16d';
+  bytes32 public constant NODE_SAFE_TYPEHASH = hex'6e9a9ee91e0fce141f0eeaf47e1bfe3af5b5f40e5baf2a86acc37a075199c16d';
   // start and end point for linked list of modules
   address private constant SENTINEL_MODULES = address(0x1);
   // page size of querying modules
@@ -99,7 +102,7 @@ contract HoprNodeSafeRegistry {
 
     // update and emit event
     nodeToSafe[nodeAddr] = address(0);
-    emit DergisteredNodeSafe(address(0), nodeAddr);
+    emit DergisteredNodeSafe(msg.sender, nodeAddr);
   }
 
   /**
@@ -113,13 +116,18 @@ contract HoprNodeSafeRegistry {
    * @dev internal funciton to store safe-node pair and emit events
    */
   function addNodeSafe(NodeSafe memory nodeSafe) internal {
-    // check this node hasn't been registered ower
-    if (nodeToSafe[nodeSafe.nodeChainKeyAddress] != address(0)) {
-      revert NodeHasSafe();
-    }
     // Safe address cannot be zero
     if (nodeSafe.safeAddress == address(0)) {
       revert SafeAddressZero();
+    }
+    // Safe address cannot be zero
+    if (nodeSafe.nodeChainKeyAddress == address(0)) {
+      revert NodeAddressZero();
+    }
+
+    // check this node hasn't been registered ower
+    if (nodeToSafe[nodeSafe.nodeChainKeyAddress] != address(0)) {
+      revert NodeHasSafe();
     }
 
     // ensure that node is either an owner or a member of the (enabled) NodeManagementModule
@@ -136,13 +144,6 @@ contract HoprNodeSafeRegistry {
    * @param nodeSafe struct to check
    */
   function ensureNodeIsSafeModuleMember(NodeSafe memory nodeSafe) internal view {
-    // check safeAddress has nodeChainKeyAddress as owner
-    address[] memory owners = IAvatar(nodeSafe.safeAddress).getOwners();
-    uint256 index = 0;
-    for (index; index < owners.length; index++) {
-      if (owners[index] == nodeSafe.nodeChainKeyAddress) return;
-    }
-
     // if nodeChainKeyAddress is not an owner, it must be a member of the enabled node management module
     address nextModule;
     address[] memory modules;
