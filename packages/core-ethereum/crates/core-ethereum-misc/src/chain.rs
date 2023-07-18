@@ -147,7 +147,6 @@ pub mod wasm {
     use core_types::acknowledgement::AcknowledgedTicket;
     use js_sys::{Function, JsString};
     use utils_log::debug;
-    use utils_misc::ok_or_jserr;
     use utils_types::primitives::Address;
     use wasm_bindgen::{prelude::*, JsValue};
     use utils_misc::utils::wasm::JsResult;

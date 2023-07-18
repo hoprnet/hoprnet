@@ -256,7 +256,6 @@ pub mod wasm {
     use js_sys::JsString;
     use std::str::FromStr;
     use wasm_bindgen::prelude::*;
-    use wasm_bindgen::JsCast;
 
     #[wasm_bindgen]
     struct WasmPingApi {

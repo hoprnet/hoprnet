@@ -223,7 +223,6 @@ pub mod wasm {
     use core_crypto::types::Hash;
     use core_ethereum_db::db::wasm::Database;
     use utils_misc::{ok_or_jserr, utils::wasm::JsResult};
-    use utils_types::traits::BinarySerializable;
     use wasm_bindgen::{prelude::*, JsValue};
     use utils_log::debug;
 

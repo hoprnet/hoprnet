@@ -1,4 +1,3 @@
-use std::fmt::Display;
 use crate::acknowledgement::PendingAcknowledgement::{WaitingAsRelayer, WaitingAsSender};
 use crate::channels::Ticket;
 use core_crypto::errors::CryptoError::SignatureVerification;
