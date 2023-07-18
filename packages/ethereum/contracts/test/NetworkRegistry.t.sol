@@ -58,6 +58,31 @@ contract HoprNetworkRegistryTest is Test {
 
     vm.clearMockedCalls();
   }
+
+  /**
+   * @dev the maximum ndoes in addition that a node can register, in theory
+   */
+  function testFuzz_maxAdditionalRegistrations(uint256 allowance, uint256 registered) public {
+    address account = vm.addr(404);
+    vm.mockCall(
+      proxy,
+      abi.encodeWithSelector(IHoprNetworkRegistryRequirement.maxAllowedRegistrations.selector, account),
+      abi.encode(allowance)
+    );
+    stdstore
+      .target(address(hoprNetworkRegistry))
+      .sig("countRegisterdNodesPerAccount(address)")
+      .with_key(account)
+      .depth(0)
+      .checked_write(registered);
+
+    if (allowance > registered) {
+      assertEq(hoprNetworkRegistry.maxAdditionalRegistrations(account), allowance - registered);
+    } else {
+      assertEq(hoprNetworkRegistry.maxAdditionalRegistrations(account), 0);
+    }
+    vm.clearMockedCalls();
+  }
   /**
    * @dev verify that return value of canOperateFor is correct
    */
