@@ -64,10 +64,9 @@ contract HoprSafeProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, Acc
     /**
      * @dev Returns the maximum allowed registration
      * check the safe address associated with the node address and compute maxiAllowedRegistration
-     * @param nodeAddress node address
+     * @param safeAddress node address
      */
-    function maxAllowedRegistrations(address nodeAddress) external view returns (uint256) {
-        address safeAddress = nodeSafeRegistry.nodeToSafe(nodeAddress);
+    function maxAllowedRegistrations(address safeAddress) external view returns (uint256) {
         return token.balanceOfAt(safeAddress, snapshotBlockNumber) / stakeThreshold;
     }
 

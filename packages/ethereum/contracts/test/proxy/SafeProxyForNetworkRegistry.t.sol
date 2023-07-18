@@ -129,25 +129,16 @@ contract HoprSafeProxyForNetworkRegistryTest is Test {
   }
 
   function _helpeMockSafeRegistyAndTokenBalance(
-    address nodeAddr,
+    address safeAddr,
     uint128 blockNum,
     uint256 tokenBalance
   ) private {
-    // nodeSafeRegistry is able to reply to call nodeToSafe
-    vm.mockCall(
-      nodeSafeRegistry,
-      abi.encodeWithSignature(
-        'nodeToSafe(address)',
-        nodeAddr
-      ),
-      abi.encode(safeAddress)
-    );
     // balanceOf safeAddress to be the given balance
     vm.mockCall(
       token,
       abi.encodeWithSignature(
         'balanceOfAt(address,uint128)',
-        safeAddress, blockNum
+        safeAddr, blockNum
       ),
       abi.encode(tokenBalance)
     );

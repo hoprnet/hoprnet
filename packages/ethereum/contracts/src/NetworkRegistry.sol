@@ -279,6 +279,23 @@ contract HoprNetworkRegistry is AccessControlEnumerable {
   }
 
   /**
+   * @dev Returns the number of nodes that the staking account can self register, 
+   * if _checkEligibility() check goes through
+   * @param stakingAccount address of the staking account
+   */
+  function maxAdditionalRegistrations (
+    address stakingAccount
+  ) public view returns (uint256) {
+    uint256 maxAllowedRegistration = requirementImplementation.maxAllowedRegistrations(stakingAccount);
+    uint256 registered = countRegisterdNodesPerAccount[stakingAccount];
+    if (maxAllowedRegistration > registered) {
+      return maxAllowedRegistration - registered;
+    } else {
+      return 0;
+    }
+  }
+
+  /**
    * @dev sync the eligibilitybased on the latest criteria.
    * Function can only be called when the registry is enabled.
   * @param stakingAccount address to check its eligibility
