@@ -874,7 +874,8 @@ abstract contract HoprCrypto {
   }
 
   /**
-   * Bundles payload used to create a VRF.
+   * Bundles payload used to create a VRF-generated deterministic 
+   * pseudo-random value.
    */
   struct VRF_Payload {
     // the main message, e.g. ticket Hash
