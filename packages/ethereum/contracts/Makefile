@@ -50,7 +50,7 @@ anvil-deploy-erc1820: ## deploy ERC1820 contracts
 
 # E.g. make anvil-deploy-safe-singleton network=anvil-localhost environment-type=local
 .PHONY: anvil-deploy-safe-singleton
-anvil-deploy-safe-singleton: ensure-environment-is-set
+anvil-deploy-safe-singleton: ensure-environment-and-network-are-set
 anvil-deploy-safe-singleton: ## deploy Safe Singleton contract according to https://github.com/safe-global/safe-singleton-factory/blob/main/artifacts/31337/deployment.json
 	if [ -n "$(cast code 0x914d7Fec6aaC8cd542e72Bca78B30650d45643d7)" ]; then \
 	  echo "Safe singleton contract already deployed, skipping"; \
@@ -68,14 +68,14 @@ anvil-deploy-contracts: ## deploy HOPR contracts
 
 # E.g. make anvil-deploy-safe-suite environment-name=anvil-localhost environment-type=development
 .PHONY: anvil-deploy-safe-suite
-anvil-deploy-safe-suite: ensure-environment-is-set
+anvil-deploy-safe-suite: ensure-environment-and-network-are-set
 anvil-deploy-safe-suite: ## deploy HOPR contracts
 	$(forge-script) --broadcast script/SafeSuiteSetup.s.sol:SafeSuiteSetupScript
 
 .PHONY: anvil-deploy-all
 anvil-deploy-all: ## deploy all contracts
 	$(MAKE) anvil-deploy-erc1820 network=anvil-localhost environment-type=local
-	$(MAKE) anvil-deploy-safe-singleton network=anvil-localhost environment-type=local
+	$(MAKE) anvil-deploy-safe-suite network=anvil-localhost environment-type=local
 	$(MAKE) anvil-deploy-contracts network=anvil-localhost environment-type=local
 
 # E.g. make get-account-balances network=anvil-localhost environment-type=local account=0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
