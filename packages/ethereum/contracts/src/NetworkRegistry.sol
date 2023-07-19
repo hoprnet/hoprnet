@@ -65,13 +65,16 @@ contract HoprNetworkRegistry is AccessControlEnumerable {
    * enable the network registry on deployment.
    * @param _requirementImplementation address of the network registry logic implementation
    * @param _newOwner address of the contract owner
+   * @param _manager address of an additional manager
    */
   constructor(
     address _requirementImplementation, 
-    address _newOwner
+    address _newOwner,
+    address _manager
   ) {
     _setupRole(DEFAULT_ADMIN_ROLE, _newOwner);
     _setupRole(MANAGER_ROLE, _newOwner);
+    _setupRole(MANAGER_ROLE, _manager);
     
     requirementImplementation = IHoprNetworkRegistryRequirement(_requirementImplementation);
     enabled = true;

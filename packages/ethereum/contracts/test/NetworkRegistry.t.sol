@@ -30,7 +30,7 @@ contract HoprNetworkRegistryTest is Test {
   function setUp() public {
     proxy = vm.addr(100); // make vm.addr(100) requirementImplementation
     owner = vm.addr(101); // make address(101) new owner
-    hoprNetworkRegistry = new HoprNetworkRegistry(proxy, owner);
+    hoprNetworkRegistry = new HoprNetworkRegistry(proxy, owner, owner);
 
     // create some unique staking account
     stakingAccounts = new address[](STAKING_ACCOUNTS_SIZE);

@@ -32,7 +32,9 @@ contract NetworkConfig is Script {
   // Deployed contract addresses
   // address constant PROD_WXHOPR_TOKEN_CONTRACT_ADDRESS = 0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1; // TODO: this contract is not necessarily the "HoprToken" contract used in releases
   bytes32 constant MINTER_ROLE = keccak256('MINTER_ROLE');
+  bytes32 constant MANAGER_ROLE = keccak256('MANAGER_ROLE');
   address constant DEV_BANK_ADDRESS = 0x2402da10A6172ED018AEEa22CA60EDe1F766655C;
+  address constant COMM_MULTISIG_ADDRESS = 0xD9a00176Cf49dFB9cA3Ef61805a2850F45Cb1D05;
 
   string public currentNetworkId;
   EnvironmentType public currentEnvironmentType;
