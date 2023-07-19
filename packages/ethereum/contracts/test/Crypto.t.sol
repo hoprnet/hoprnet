@@ -3,6 +3,7 @@ pragma solidity >=0.6.0 <0.9.0;
 
 import 'forge-std/Test.sol';
 import './utils/Accounts.sol';
+import 'solcrypto/SECP2561k.sol';
 
 import '../src/Crypto.sol';
 
@@ -15,10 +16,12 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto {
     uint256 y;
   }
 
+  SECP2561k secp256k1;
   CryptoProxy crypto;
   function setUp() public {
     // use dummy proxy to per-method have gas measurements
     crypto = new CryptoProxy();
+    secp256k1 = new SECP2561k();
   }
 
   function testPointToAddress() public {
@@ -37,7 +40,7 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto {
   }
 
   function testScalarTimeBasepoint() public {
-    assertEq(HoprCrypto.scalarTimesBasepoint(accountA.privateKey), accountA.accountAddr);
+    assertEq(crypto.scalarTimesBasepoint(accountA.privateKey), accountA.accountAddr);
   }
 
   function testEcAddPointAddition() public {
@@ -99,7 +102,7 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto {
 
     // Test P - P
     vm.expectRevert();
-    crypto.ecAdd(p_x, p_y, p_x, SECP256K1_BASE_FIELD_ORDER - p_y, 0);
+    crypto.ecAdd(p_x, p_y, p_x, crypto.SECP256K1_BASE_FIELD_ORDER() - p_y, 0);
   }
   
 
@@ -175,6 +178,7 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto {
   }
 
   function testVRFVerify() public {
+    // precomputed values with Rust implementation
     CurvePoint memory V = CurvePoint(0x7e4d7332351201f79215328221cf4baeb9365cdba1255cedfe1cc635b4780a0f, 0xd9fe81cfdd0537cd5f73120ab2f97caa93bddf4ce8922b99c6649ecb2b15ddd7);
     bytes32 h = 0x0f6be5484fce28779f0ff72d4f68c619b3f96f1af895c7c6ec4aede81534cee8;
     bytes32 s = 0xfdab2e0a3e314d1f2b0681e7c62e65345563907ab09751ec6292e039345f959f;
@@ -201,6 +205,63 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto {
       "some DST tag"
     );
 
+
+    assertTrue(crypto.vrf_verify(params, payload));
+  }
+
+  function testFuzzVRFVerify(uint256 privKey, bytes32 vrf_message) public {
+    string memory DST = "some DST tag";
+
+    privKey = bound(privKey, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
+
+    HoprCrypto.VRF_Payload memory payload;
+
+    // stack height optimization, doesn't compile otherwise
+    {
+      address chain_addr = crypto.scalarTimesBasepoint(privKey);
+      payload.message = vrf_message;
+      payload.signer = chain_addr;
+      payload.DST = abi.encodePacked(DST);
+    }
+    
+    HoprCrypto.VRF_Parameters memory params;
+
+    // stack height optimization, doesn't compile otherwise
+    {
+      (uint256 b_x, uint256 b_y) = crypto.hashToCurve(abi.encodePacked(payload.signer, payload.message), payload.DST);
+
+      {
+        (uint256 v_x, uint256 v_y) = secp256k1.ecmul(b_x, b_y, privKey);
+        params.v_x = v_x;
+        params.v_y = v_y;
+      }
+
+      uint256 r = crypto.hash_to_scalar(abi.encodePacked(privKey, b_x, b_y, payload.message), payload.DST);
+
+      (uint256 b_r_x, uint256 b_r_y) = secp256k1.ecmul(b_x,b_y, r);
+
+      params.h = crypto.hash_to_scalar(abi.encodePacked(
+        payload.signer,
+        params.v_x,
+        params.v_y,
+        b_r_x,
+        b_r_y,
+        payload.message
+      ), abi.encodePacked(DST));
+
+      // s = r + h * a (mod p)
+      params.s = addmod(r, mulmod(params.h, privKey, HoprCrypto.SECP256K1_FIELD_ORDER), HoprCrypto.SECP256K1_FIELD_ORDER);
+
+      {
+        (uint256 s_b_x, uint256 s_b_y) = secp256k1.ecmul(b_x, b_y, params.s);
+        params.sB_x = s_b_x;
+        params.sB_y = s_b_y;
+
+        (uint256 h_v_x, uint256 h_v_y) = secp256k1.ecmul(params.v_x, params.v_y, params.h);
+        params.hV_x = h_v_x;
+        params.hV_y = h_v_y;
+      }
+    }
 
     assertTrue(crypto.vrf_verify(params, payload));
   }

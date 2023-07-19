@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.19;
 
-import "forge-std/console2.sol";
-
 error InvalidFieldElement();
 error InvalidCurvePoint();
 error InvalidPointWitness();
@@ -33,7 +31,7 @@ abstract contract HoprCrypto {
   uint256 constant SECP256K1_FIELD_ORDER = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141;
 
   // Order of the underlying field used for secp256k1
-  uint256 constant SECP256K1_BASE_FIELD_ORDER = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F;
+  uint256 constant public SECP256K1_BASE_FIELD_ORDER = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F;
   // x-component of base point of secp256k1 curve
   uint256 constant SECP256K1_BASE_POINT_X_COMPONENT = 0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798;
 
@@ -307,7 +305,7 @@ abstract contract HoprCrypto {
   }
 
   /**
-   * Consumes a byte string and returns a pseudo-random sep256k1 curvepoint.
+   * Consumes a byte string and returns a pseudo-random secp256k1 curvepoint.
    * 
    * Implements secp256k1_XMD:KECCAK_256_SSWU_RO_, see
    * https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html
@@ -316,15 +314,13 @@ abstract contract HoprCrypto {
    * @param DST domain separation tag, used to makes protocol instantiations unique
    */
   function hashToCurve(bytes memory payload, bytes memory DST) public view returns (uint256 r_x, uint256 r_y) {
-    // uint256 A_Prime = 0x3f8731abdd661adca08a5558f0f5d272e953d363cb6f0e5d405447c01a444533
-
     (uint256 u_0, uint256 u_1) = hash_to_field(payload, DST);
 
     (uint256 q_0_x, uint256 q_0_y) = map_to_curve_simple_swu(uint256(u_0)); // on isogenous curve
     (uint256 q_1_x, uint256 q_1_y) = map_to_curve_simple_swu(uint256(u_1)); // on isogenous curve
 
     // P + Q on isogenous curve
-    (uint256 s_x, uint256 s_y) = ecAdd(q_0_x,q_0_y,q_1_x,q_1_y, 0x3f8731abdd661adca08a5558f0f5d272e953d363cb6f0e5d405447c01a444533);
+    (uint256 s_x, uint256 s_y) = ecAdd(q_0_x,q_0_y,q_1_x,q_1_y, A_Prime);
 
     return mapPoint(s_x, s_y);
   } 
@@ -336,7 +332,7 @@ abstract contract HoprCrypto {
    *
    * A' := 0x3f8731abdd661adca08a5558f0f5d272e953d363cb6f0e5d405447c01a444533
    * B' := 1771
-   * modulus 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F
+   * modulus 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F (same as secp256k1)
    *
    * see https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#appx-iso-secp256k1
    *
@@ -349,7 +345,6 @@ abstract contract HoprCrypto {
    * @param p_y second component of P
    */
   function mapPoint(uint256 p_x, uint256 p_y) public view returns (uint256 r_x, uint256 r_y) {
-    // uint256 SECP256K1_BASE_FIELD_ORDER = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F;
     assembly {
       let pxSquare := mulmod(p_x, p_x, SECP256K1_BASE_FIELD_ORDER) // p.x * p.x
       let pxCubic := mulmod(p_x, pxSquare, SECP256K1_BASE_FIELD_ORDER) // p.x * pxSquare
@@ -387,7 +382,7 @@ abstract contract HoprCrypto {
         K_20, 
         SECP256K1_BASE_FIELD_ORDER)
 
-      // Invert x_den using expmod precompile
+      // computes x_den ^ -1 using expmod precompile 
       let payload := mload(0x40)
       mstore(payload, 0x20)             // Length of Base
       mstore(add(payload, 0x20), 0x20)  // Length of Exponent
@@ -395,7 +390,7 @@ abstract contract HoprCrypto {
       mstore(add(payload, 0x60), x_den)  // Base
       mstore(add(payload, 0x80), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2D) // p - 1
       mstore(add(payload, 0xa0), SECP256K1_BASE_FIELD_ORDER)     // Modulus
-      if iszero(staticcall(not(0), 0x05, payload, 0xC0, payload, 0x20)) {
+      if iszero(staticcall(not(0), 0x05, payload, 0xC0, payload, 0x20)) { // 0x05 == expmod precompile
         revert(0, 0)
       }
 
@@ -443,7 +438,7 @@ abstract contract HoprCrypto {
           SECP256K1_BASE_FIELD_ORDER), 
         SECP256K1_BASE_FIELD_ORDER)
     
-      // Invert y_den using expmod precompile
+      // Computes (y_den ^ -1) using expmod precompile
       payload := mload(0x40)
       mstore(payload, 0x20)             // Length of Base
       mstore(add(payload, 0x20), 0x20)  // Length of Exponent
@@ -500,7 +495,6 @@ abstract contract HoprCrypto {
       case false {
         tv4 := sub(SECP256K1_BASE_FIELD_ORDER, tv2)
       }
-
 
       tv4 := mulmod(A_Prime, tv4, SECP256K1_BASE_FIELD_ORDER) // 8.  tv4 = A * tv4
       tv2 := mulmod(tv3, tv3, SECP256K1_BASE_FIELD_ORDER) // 9.  tv2 = tv3^2
@@ -664,7 +658,7 @@ abstract contract HoprCrypto {
   }
 
   /**
-   * Expands an arbitrary byte-string to 96 bits using the `expand_message_xmd` method described in
+   * Expands an arbitrary byte-string to 96 bytes using the `expand_message_xmd` method described in
    * https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html
    *
    * Used for hash_to_curve functionality.
@@ -765,7 +759,7 @@ abstract contract HoprCrypto {
   }
 
   /**
-   * Expands an arbitrary byte-string to >= 48 bits using the `expand_message_xmd` method described in
+   * Expands an arbitrary byte-string to 48 bytes using the `expand_message_xmd` method described in
    * https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html
    *
    * Used for the VRF functionality.
