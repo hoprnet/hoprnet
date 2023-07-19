@@ -26,11 +26,11 @@
       "channels_contract_address": "0xB20ee6e0b714e531CabF2C29fbA147f4e5905B7b",
       "environment_type": "staging",
       "indexer_start_block_number": 26356392,
-      "module_implementation_address": "0xF2213c490711dd492f2Acd99bE123E2297346A28",
-      "network_registry_contract_address": "0x278A44a487D2Ca9303c2B9Abe00605B075cBa69F",
-      "network_registry_proxy_contract_address": "0x628ED93eEBF1840bF26e8fB62BCe4F1BCCDE9e95",
-      "node_safe_registry_address": "0x5E08b772b00E902C30bC29e87e90536CeB66229E",
-      "node_stake_v2_factory_address": "0x196D355929611Ce09e264595E33BB41148d0cE58",
+      "module_implementation_address": "0x1cf6329673e8A2F009b00883118b3d15E35be529",
+      "network_registry_contract_address": "0x625D27594DF4564A52a0ea5667b0D0450a6f6685",
+      "network_registry_proxy_contract_address": "0xaefC99476f9F04326a748B7E32364B10B8fF4158",
+      "node_safe_registry_address": "0xf5FD9e286662830672B720c21A7Ddc67a00da77a",
+      "node_stake_v2_factory_address": "0x060Cb76C6541bF28f94088e658E4167966E37eF9",
       "token_contract_address": "0xf1aDf07D0d4e1beFdDe79066771d057337e55c08"
     },
     "debug-staging": {
