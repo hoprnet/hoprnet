@@ -51,7 +51,7 @@ contract NetworkConfig is Script {
   string public pathToDeploymentFile = string(abi.encodePacked(vm.projectRoot(), '/contracts-addresses.json'));
 
   function getNetwork() public {
-    // get envirionment of the script
+    // get environment of the script
     string memory profile = vm.envString('FOUNDRY_PROFILE');
     currentNetworkId = vm.envString('NETWORK');
     currentEnvironmentType = parseEnvironmentTypeFromString(profile);

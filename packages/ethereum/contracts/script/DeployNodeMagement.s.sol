@@ -11,7 +11,7 @@ contract DeployNodeManagementScript is
 
   function run() external {
     // 1. Network check
-    // get envirionment of the script
+    // get environment of the script
     getNetwork();
     // read records of deployed files
     readCurrentNetwork();
@@ -24,7 +24,7 @@ contract DeployNodeManagementScript is
     // 3. Deploy
     // 3.1. Singleton of HoprNodeManagementModule
     // Only deploy Token contract when no deployed one is detected.
-    // E.g. always in local envirionment, or should a new token contract be introduced in staging/production.
+    // E.g. always in local environment, or should a new token contract be introduced in staging/production.
     if (
       currentEnvironmentType == EnvironmentType.LOCAL ||
       !isValidAddress(currentNetworkDetail.moduleImplementationAddress)

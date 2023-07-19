@@ -11,7 +11,7 @@ import './utils/BoostUtilsLib.sol';
 error FailureInReadBalance(address token);
 
 /**
- * @dev script to interact with contract(s) of a given envirionment where the msg.sender comes from the environment variable `PRIVATE_KEY`
+ * @dev script to interact with contract(s) of a given environment where the msg.sender comes from the environment variable `PRIVATE_KEY`
  * Private key of the caller must be saved under the environment variable `PRIVATE_KEY`
  * Wrapper of contracts (incl. NetworkRegistery, HoprStake) with detection of contract address per network/environment_type
  */
@@ -24,7 +24,7 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
 
   function getNetworkAndMsgSender() private {
     // 1. Network check
-    // get envirionment of the script
+    // get environment of the script
     getNetwork();
     // read records of deployed files
     readCurrentNetwork();
@@ -162,7 +162,7 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
     // 1. get network and msg.sender
     getNetworkAndMsgSender();
 
-    // 2. owner registers nodes, depending on the envirionment
+    // 2. owner registers nodes, depending on the environment
     if (currentEnvironmentType == EnvironmentType.LOCAL) {
       // call register accounts on HoprDummyProxyForNetworkRegistry
       (bool successRegisterNodesOnDummyProxy, ) = currentNetworkDetail.networkRegistryProxyContractAddress.call(
@@ -191,7 +191,7 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
     // 1. get network and msg.sender
     getNetworkAndMsgSender();
 
-    // 2. owner registers nodes, depending on the envirionment
+    // 2. owner registers nodes, depending on the environment
     if (currentEnvironmentType == EnvironmentType.LOCAL) {
       // call deregister accounts on HoprDummyProxyForNetworkRegistry
       (bool successDeregisterNodesOnDummyProxy, ) = currentNetworkDetail.networkRegistryProxyContractAddress.call(

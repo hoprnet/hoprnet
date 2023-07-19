@@ -16,7 +16,7 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
 
     function run() external {
         // 1. Network check
-        // get envirionment of the script
+        // get environment of the script
         getNetwork();
         // read records of deployed files
         readCurrentNetwork();
@@ -32,7 +32,7 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
         // 3. Deploy
         // 3.1. HoprToken Contract
         // Only deploy Token contract when no deployed one is detected.
-        // E.g. always in local envirionment, or should a new token contract be introduced in development/staging/production.
+        // E.g. always in local environment, or should a new token contract be introduced in development/staging/production.
         if (
             currentEnvironmentType == EnvironmentType.LOCAL
                 || !isValidAddress(currentNetworkDetail.hoprTokenContractAddress)
@@ -59,7 +59,7 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
 
         // 3.2. HoprChannels Contract
         // Only deploy Channels contract when no deployed one is detected.
-        // E.g. always in local envirionment, or should a new channel contract be introduced in development/staging/production per meta environment.
+        // E.g. always in local environment, or should a new channel contract be introduced in development/staging/production per meta environment.
         if (
             currentEnvironmentType == EnvironmentType.LOCAL
                 || !isValidAddress(currentNetworkDetail.hoprChannelsContractAddress)
@@ -73,7 +73,7 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
 
         // 3.3. xHoprToken Contract
         // Only deploy Token contract when no deployed one is detected.
-        // E.g. always in local envirionment, or should a new token contract be introduced in development/staging.
+        // E.g. always in local environment, or should a new token contract be introduced in development/staging.
         // Production contract should remain 0xD057604A14982FE8D88c5fC25Aac3267eA142a08 TODO: Consider force check on this address
         if (currentEnvironmentType == EnvironmentType.LOCAL) {
             // Use the same contract address as in production (HOPR token on xDAI)
@@ -100,7 +100,7 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
 
         // 3.4. HoprBoost Contract
         // Only deploy Boost contract when no deployed one is detected.
-        // E.g. always in local envirionment, or should a new token contract be introduced in development/staging.
+        // E.g. always in local environment, or should a new token contract be introduced in development/staging.
         // Production contract should remain 0x43d13D7B83607F14335cF2cB75E87dA369D056c7 TODO: Consider force check on this address
         if (
             currentEnvironmentType == EnvironmentType.LOCAL
@@ -137,7 +137,7 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
         // Only deploy NetworkRegistryProxy contract when no deployed one is detected.
         // E.g. Always in local environment, or should a new NetworkRegistryProxy contract be introduced in development/staging/production
         if (currentEnvironmentType == EnvironmentType.LOCAL) {
-            // deploy DummyProxy in LOCAL envirionment
+            // deploy DummyProxy in LOCAL environment
             currentNetworkDetail.networkRegistryProxyContractAddress =
                 deployCode("DummyProxyForNetworkRegistry.sol", abi.encode(deployerAddress));
             isHoprNetworkRegistryDeployed = true;
@@ -250,7 +250,7 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
             }
         }
 
-        // 4. Batch mint Network_registry NFTs in local/development/staging envirionment
+        // 4. Batch mint Network_registry NFTs in local/development/staging environment
         // Ensure a "Network_registry" boost type is at the index 26. If not, mint dummy proxies (E.g. "Dummy_1") until index 25 and "Network_registry" at 26
         (bool existAtNetworkRegistryIndex, string memory nameOrError) =
             currentNetworkDetail.hoprBoostContractAddress.getBoostTypeAtIndex(NETWORK_REGISTRY_NFT_INDEX);

@@ -9,7 +9,7 @@ import '../test/utils/SafeSingleton.sol';
 contract SafeSuiteSetupScript is Script, NetworkConfig, SafeSingletonFixtureTest {
   function run() external {
     // 1. Network check
-    // get envirionment of the script
+    // get environment of the script
     getNetwork();
     // read records of deployed files
     readCurrentNetwork();
