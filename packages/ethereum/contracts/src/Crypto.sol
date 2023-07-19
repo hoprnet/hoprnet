@@ -865,7 +865,7 @@ abstract contract HoprCrypto {
     // hash over computed values
     uint256 h;
     // Ethereum only supports scalar multiplication to address
-    // so we provide wittnesses that are checked against
+    // so we provide witnesses that are checked against
     // computed values
     uint256 sB_x; // s * B
     uint256 sB_y;
