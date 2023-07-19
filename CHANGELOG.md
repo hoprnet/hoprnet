@@ -30,6 +30,7 @@
 - Add heartbeat and cleanup to API websocket connections ([#5023](https://github.com/hoprnet/hoprnet/pull/5023))
 - Add send message over websocket support ([#4882](https://github.com/hoprnet/hoprnet/pull/4882))
 - Increase Avado memory limit to 2GB ([#5051](https://github.com/hoprnet/hoprnet/pull/5051))
+- Add staking season 8 smart contract ([#5232](https://github.com/hoprnet/hoprnet/pull/5232))
 
 <a name="1.92"></a>
 
