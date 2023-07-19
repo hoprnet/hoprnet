@@ -10,7 +10,8 @@ import "./utils/BoostUtilsLib.sol";
 
 /**
  * @title Deploy all the required contracts in development, staging and production environment
- * @notice In local development environment, ERC1820Registry should ve deployed with 
+ * @notice In local development environment, ERC1820Registry, Safe deployment singleton, Safe suites should be deployed 
+ * before running this script.
  * @dev It reads the environment, netork and deployer private key from env variables
  * Then deploy contracts foll
  * 1. Deploy
@@ -22,6 +23,26 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
     bool private isHoprNetworkRegistryDeployed;
 
     function setUp() public override(ERC1820RegistryFixtureTest) {}
+
+    function _deployHoprNodeStakeFactory() private {
+        if (
+            currentEnvironmentType == EnvironmentType.LOCAL
+                || !isValidAddress(currentNetworkDetail.nodeStakeV2FactoryAddress)
+        ) {
+            // deploy HoprNodeStakeFactory contract
+            currentNetworkDetail.nodeStakeV2FactoryAddress = deployCode("NodeStakeFactory.sol:HoprNodeStakeFactory");
+        }
+    }
+
+    function _deployHoprNodeManagementModule() private {
+        if (
+            currentEnvironmentType == EnvironmentType.LOCAL
+                || !isValidAddress(currentNetworkDetail.moduleImplementationAddress)
+        ) {
+            // deploy HoprNodeManagementModule contract
+            currentNetworkDetail.moduleImplementationAddress = deployCode("NodeManagementModule.sol:HoprNodeManagementModule");
+        }
+    }
 
     function run() external {
         // 1. Network check
@@ -42,6 +63,12 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
 
         // 3. Deploy
         // 3.1 HoprNodeStakeFactory
+        _deployHoprNodeStakeFactory();
+
+        // 3.2 HoprNodeManagementModule singleton
+        _deployHoprNodeManagementModule();
+
+        // 3.3 Hopr
 
         // // 3.1. HoprToken Contract
         // // Only deploy Token contract when no deployed one is detected.
@@ -310,78 +337,10 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
         //     currentNetworkDetail.indexerStartBlockNumber = block.number;
         // }
 
-        // // broadcast transaction bundle
-        // vm.stopBroadcast();
+        // broadcast transaction bundle
+        vm.stopBroadcast();
 
-        // // write to file
-        // writeCurrentNetwork();
-    }
-
-    /**
-     * @dev Helper function to build payload for "ownerBatchAddSpecialNftTypeAndRank(uint256[],string[],uint256[])"
-     * By default, it adds `Network_registry` NFT (index. 26) (`developer` and `community`)
-     * It's possible to extend this array if more NR NFTs are issued
-     */
-    function buildBatchRegisterSpecialNrNft() private pure returns (bytes memory) {
-        // "Network_registry" type
-        uint256[] memory typeIndex = new uint256[](2);
-        typeIndex[0] = 26;
-        typeIndex[1] = 26;
-        // "developer" and "community" rank
-        string[] memory ranks = new string[](2);
-        ranks[0] = "developer";
-        ranks[1] = "community";
-        // max. number of allowed registration
-        uint256[] memory maxAllowedReg = new uint256[](2);
-        maxAllowedReg[0] = type(uint256).max;
-        maxAllowedReg[1] = 1;
-
-        return abi.encodeWithSignature(
-            "ownerBatchAddSpecialNftTypeAndRank(uint256[],string[],uint256[])", typeIndex, ranks, maxAllowedReg
-        );
-    }
-
-    /**
-     * @dev Helper function to build payload for "batchMintInternal(address[],uint256)"
-     */
-    function buildXHoprBatchMintInternal(address addr) private pure returns (bytes memory) {
-        address[] memory addrBook = new address[](1);
-        addrBook[0] = addr;
-
-        return abi.encodeWithSignature("batchMintInternal(address[],uint256)", addrBook, 5000000 ether);
-    }
-
-    /**
-     * @dev Helper function to build payload for "batchMint(address[],string,string,uint256,uint256)"
-     */
-    function buildNftBatchMintInternal(address addr1, address addr2)
-        private
-        pure
-        returns (bytes memory devPayload, bytes memory communityPayload)
-    {
-        address[] memory addrBook = new address[](6);
-        addrBook[0] = addr1;
-        addrBook[1] = addr1;
-        addrBook[2] = addr1;
-        addrBook[3] = addr2;
-        addrBook[4] = addr2;
-        addrBook[5] = addr2;
-
-        devPayload = abi.encodeWithSignature(
-            "batchMint(address[],string,string,uint256,uint256)",
-            addrBook,
-            NETWORK_REGISTRY_TYPE_NAME,
-            NETWORK_REGISTRY_RANK1_NAME,
-            0,
-            0
-        );
-        communityPayload = abi.encodeWithSignature(
-            "batchMint(address[],string,string,uint256,uint256)",
-            addrBook,
-            NETWORK_REGISTRY_TYPE_NAME,
-            NETWORK_REGISTRY_RANK2_NAME,
-            0,
-            0
-        );
+        // write to file
+        writeCurrentNetwork();
     }
 }
