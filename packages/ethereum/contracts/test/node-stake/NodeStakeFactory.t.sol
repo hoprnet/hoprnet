@@ -59,6 +59,30 @@ contract HoprNodeManagementModuleTest is Test, SafeSingletonFixtureTest {
     }
 
     /**
+    * @dev Fail to clone a safe when there's not event one admin
+    */
+    function testRevert_CloneSafeAndModuleWithFewOwner() public {
+        address channels = 0x0101010101010101010101010101010101010101;
+        address token = 0x1010101010101010101010101010101010101010;
+        vm.mockCall(
+            channels,
+            abi.encodeWithSignature(
+                'token()'
+            ),
+            abi.encode(token)
+        );
+
+        uint256 nonce = 0;
+        address[] memory admins = new address[](0);
+        address expectedModuleAddress = factory.predictDeterministicAddress(address(moduleSingleton), keccak256(abi.encodePacked(caller, nonce)));
+        
+        vm.prank(caller);
+        vm.expectRevert(HoprNodeStakeFactory.TooFewOwners.selector);
+        (module, safe) = factory.clone(address(moduleSingleton), admins, nonce, bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101"));
+        vm.clearMockedCalls();
+    }
+
+    /**
     * @dev Clone a safe and a module and they are wired
     */
     function test_CloneSafeAndModule() public {
@@ -78,15 +102,23 @@ contract HoprNodeManagementModuleTest is Test, SafeSingletonFixtureTest {
         vm.startPrank(caller);
         vm.expectEmit(true, false, false, false, address(factory));
         emit NewHoprNodeStakeModule(expectedModuleAddress);
-        (module, safe) = factory.clone(address(moduleSingleton), admin, nonce, bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101"));
+
+        address[] memory admins = new address[](10);
+        for (uint256 i = 0; i < admins.length; i++) {
+            admins[i] = vm.addr(200 + i);
+        }
+        (module, safe) = factory.clone(address(moduleSingleton), admins, nonce, bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101"));
 
         // Safe should have module enabled
         assertTrue(Safe(safe).isModuleEnabled(module));
         // Safe should have 1 threshold and admin as the only owner
         assertEq(Safe(safe).getThreshold(), 1, "Wrong threshold");
         address[] memory owners = Safe(safe).getOwners();
-        assertEq(owners.length, 1, "Wrong number of owners");
-        assertEq(owners[0], admin, "Wrong admin");
+        assertEq(owners.length, admins.length, "Wrong number of owners");
+        for (uint256 j = 0; j < admins.length; j++) {
+            assertTrue(Safe(safe).isOwner(admins[j]));   
+        }
+        assertFalse(Safe(safe).isOwner(address(factory)));
         // module should have safe as avatar
         assertEq(HoprNodeManagementModule(module).avatar(), safe, "Wrong avatar");
         // module owner should be safe

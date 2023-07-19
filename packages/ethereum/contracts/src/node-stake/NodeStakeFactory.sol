@@ -17,7 +17,8 @@ contract HoprNodeStakeFactory  {
     address internal constant SENTINEL_OWNERS = address(0x1);
     bytes32 internal r;
     bytes internal approvalHashSig;
-
+    
+    error TooFewOwners();
     event NewHoprNodeStakeModule(address instance);
     event NewHoprNodeStakeSafe(address instance);
 
@@ -36,27 +37,34 @@ contract HoprNodeStakeFactory  {
     /**
      * @dev Create a safe proxy and a module proxy
      * @param moduleSingletonAddress singleton contract of Safe
-     * @param admin owner of safe by default it's 1 out of n
+     * @param admins owners of safe by default it's 1 out of n
      * @param nonce nonce to create salt
      * @param defaultTarget default target (see TargetUtils.sol) for the current HoprChannels (and HoprToken) contract
      */
     function clone(
         address moduleSingletonAddress,
-        address admin,
+        address[] memory admins,
         uint256 nonce,
         bytes32 defaultTarget
     ) public returns (address, address payable) {
+        // check on provided admin array
+        if (admins.length == 0) {
+            revert TooFewOwners();
+        }
+        // set the salt
         bytes32 salt = keccak256(abi.encodePacked(msg.sender, nonce));
 
         // 1. Deploy node management module
         address moduleProxy = moduleSingletonAddress.cloneDeterministic(salt);
-        address[] memory tmpOwner = new address[](1);
-        tmpOwner[0] = address(this);
+
+        // swap one owner for factory
+        address admin0 = admins[0];
+        admins[0] = address(this);
 
         // prepare safe initializer;
         bytes memory safeInitializer = abi.encodeWithSignature(
             'setup(address[],uint256,address,bytes,address,address,uint256,address)', 
-            tmpOwner, 
+            admins, 
             1, // threshold
             address(0),
             hex"00",
@@ -83,7 +91,7 @@ contract HoprNodeStakeFactory  {
         // swap owner for Safe
         bytes memory swapOwnerData = abi.encodeWithSignature(
             'swapOwner(address,address,address)', 
-            SENTINEL_OWNERS, address(this), admin
+            SENTINEL_OWNERS, address(this), admin0
         );
         prepareSafeTx(Safe(safeProxyAddr), 1, swapOwnerData);
 
