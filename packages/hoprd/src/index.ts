@@ -29,8 +29,11 @@ import {
   parse_private_key,
   HoprdConfig,
   type Api,
-  type CliArgs
+  type CliArgs,
+  hoprd_misc_initialize_crate
 } from '../lib/hoprd_misc.js'
+hoprd_misc_initialize_crate()
+
 import type { State } from './types.js'
 import setupAPI from './api/index.js'
 import setupHealthcheck from './healthcheck.js'
