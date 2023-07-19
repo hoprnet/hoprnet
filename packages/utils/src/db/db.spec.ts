@@ -151,7 +151,10 @@ describe('db functional tests', function () {
       (await db.find_hopr_node_using_account_in_network_registry(account)).next().eq(hoprNode.to_address()),
       'should match the registered hoprNode'
     )
-    assert((await db.get_account_from_network_registry(hoprNode.to_address())).eq(account), 'should match account added')
+    assert(
+      (await db.get_account_from_network_registry(hoprNode.to_address())).eq(account),
+      'should match account added'
+    )
 
     // should be removed
     await db.remove_from_network_registry(hoprNode.to_address(), account, TestingSnapshot)

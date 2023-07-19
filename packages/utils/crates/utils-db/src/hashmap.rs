@@ -1,9 +1,9 @@
-use async_trait::async_trait;
-use std::cmp::Ordering;
-use futures_lite::stream::iter;
-use futures_lite::StreamExt;
 use crate::errors::DbError;
 use crate::traits::{AsyncKVStorage, BatchOperation, KVStorage, StorageValueIterator};
+use async_trait::async_trait;
+use futures_lite::stream::iter;
+use futures_lite::StreamExt;
+use std::cmp::Ordering;
 
 #[derive(Default)]
 pub struct InMemoryHashMapStorage<K, V>
@@ -100,11 +100,15 @@ impl AsyncKVStorage for BinaryHashMapStorage {
         Ok(Box::new(d))
     }
 
-    async fn batch(&mut self, operations: Vec<BatchOperation<Self::Key, Self::Value>>, _wait_for_write: bool) -> crate::errors::Result<()> {
+    async fn batch(
+        &mut self,
+        operations: Vec<BatchOperation<Self::Key, Self::Value>>,
+        _wait_for_write: bool,
+    ) -> crate::errors::Result<()> {
         for op in operations {
             match op {
                 BatchOperation::del(v) => self.data.remove(&v.key),
-                BatchOperation::put(v) => self.data.insert(v.key, v.value)
+                BatchOperation::put(v) => self.data.insert(v.key, v.value),
             };
         }
         Ok(())

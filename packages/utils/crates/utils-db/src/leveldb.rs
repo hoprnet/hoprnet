@@ -4,8 +4,8 @@ pub mod wasm {
     use crate::traits::{AsyncKVStorage, BatchOperation, StorageValueIterator};
     use async_trait::async_trait;
     use futures_lite::stream::StreamExt;
-    use wasm_bindgen::prelude::*;
     use utils_log::debug;
+    use wasm_bindgen::prelude::*;
 
     // https://users.rust-lang.org/t/wasm-web-sys-how-to-manipulate-js-objects-from-rust/36504
     #[wasm_bindgen]
@@ -85,7 +85,8 @@ pub mod wasm {
 
         async fn set(&mut self, key: Self::Key, value: Self::Value) -> crate::errors::Result<Option<Self::Value>> {
             debug!(">> begin put key");
-            let r = self.db
+            let r = self
+                .db
                 .put(key, value)
                 .await
                 .map(|_| None) // NOTE: The LevelDB API does not allow to return an evicted value
@@ -196,7 +197,9 @@ pub mod wasm {
         // }
 
         if kv_storage.contains(key_1.as_bytes().into()).await? {
-            return Err("Test #1 failed: empty DB should not contain any data".to_string().into());
+            return Err("Test #1 failed: empty DB should not contain any data"
+                .to_string()
+                .into());
         }
 
         // ===================================
@@ -217,7 +220,11 @@ pub mod wasm {
             .map_err(|_| JsValue::from(JsError::new("Test #3.0 failed: could not convert the get type")))?;
 
         if value_converted != value_1 {
-            return Err("Test #3.1 failed: DB value after get should be equal to the one before the get".to_string().into());
+            return Err(
+                "Test #3.1 failed: DB value after get should be equal to the one before the get"
+                    .to_string()
+                    .into(),
+            );
         }
 
         // ===================================
@@ -253,7 +260,9 @@ pub mod wasm {
 
         // TODO: levelup api with the passed options to do an immediate write does not perform an immediate write
         if !kv_storage.contains(key_3.as_bytes().into()).await? {
-            return Err("Test #5.1 failed: the key should be present in the DB".to_string().into())
+            return Err("Test #5.1 failed: the key should be present in the DB"
+                .to_string()
+                .into());
         }
 
         // ===================================
@@ -264,11 +273,13 @@ pub mod wasm {
             .expect("Could not write empty value");
 
         if !kv_storage.contains(key_4.as_bytes().into()).await? {
-            return Err("Test #5.2 failed: it should be possible to store empty values".to_string().into());
+            return Err("Test #5.2 failed: it should be possible to store empty values"
+                .to_string()
+                .into());
         }
 
         if !kv_storage.get(key_4.as_bytes().into()).await.is_ok_and(|o| o.is_none()) {
-            return Err("Test #6 failed: could not read empty value from DB".to_string().into())
+            return Err("Test #6 failed: could not read empty value from DB".to_string().into());
         }
 
         // ===================================

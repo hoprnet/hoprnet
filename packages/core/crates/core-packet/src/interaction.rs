@@ -1,5 +1,5 @@
-use std::fmt::{Display, Formatter};
 use async_lock::RwLock;
+use std::fmt::{Display, Formatter};
 
 use crate::errors::PacketError::{
     AcknowledgementValidation, ChannelNotFound, InvalidPacketState, OutOfFunds, PathNotValid, Retry, TagReplay,
@@ -662,14 +662,14 @@ where
 
                     // Store the unacknowledged ticket
                     g.store_pending_acknowledgment(
-                            ack_challenge.clone(),
-                            PendingAcknowledgement::WaitingAsRelayer(UnacknowledgedTicket::new(
-                                packet.ticket.clone(),
-                                own_key.clone(),
-                                previous_hop.to_address(),
-                            )),
-                        )
-                        .await?;
+                        ack_challenge.clone(),
+                        PendingAcknowledgement::WaitingAsRelayer(UnacknowledgedTicket::new(
+                            packet.ticket.clone(),
+                            own_key.clone(),
+                            previous_hop.to_address(),
+                        )),
+                    )
+                    .await?;
                 }
                 debug!("<<< WRITE storing pending ack");
 

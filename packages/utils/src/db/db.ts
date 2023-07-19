@@ -56,7 +56,7 @@ export class LevelDb {
       }
     }
 
-    this.backend = new SqliteLevel({ filename: dbPath + "/db.sqlite" })
+    this.backend = new SqliteLevel({ filename: dbPath + '/db.sqlite' })
 
     // Fully initialize database
     await this.backend.open()

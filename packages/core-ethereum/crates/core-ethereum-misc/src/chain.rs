@@ -147,9 +147,9 @@ pub mod wasm {
     use core_types::acknowledgement::AcknowledgedTicket;
     use js_sys::{Function, JsString};
     use utils_log::debug;
+    use utils_misc::utils::wasm::JsResult;
     use utils_types::primitives::Address;
     use wasm_bindgen::{prelude::*, JsValue};
-    use utils_misc::utils::wasm::JsResult;
 
     #[wasm_bindgen]
     pub async fn redeem_ticket(
@@ -166,7 +166,7 @@ pub mod wasm {
             let val = db.as_ref_counted();
             let g = val.read().await;
 
-            super::prepare_redeem_ticket(&*g, counterparty, channel_id, acked_ticket,).await?
+            super::prepare_redeem_ticket(&*g, counterparty, channel_id, acked_ticket).await?
         };
         debug!("<<< READ prepare_redeem_ticket");
 

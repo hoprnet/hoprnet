@@ -1,4 +1,3 @@
-use std::fmt::{Display, Formatter};
 use crate::errors::PacketError::{InvalidPacketState, PacketDecodingError};
 use core_crypto::derivation::{derive_ack_key_share, derive_packet_tag};
 use core_crypto::primitives::{DigestLike, SimpleMac};
@@ -9,6 +8,7 @@ use core_crypto::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, Publi
 use core_types::acknowledgement::{Acknowledgement, AcknowledgementChallenge};
 use core_types::channels::Ticket;
 use libp2p_identity::PeerId;
+use std::fmt::{Display, Formatter};
 use utils_types::errors::GeneralError::ParseError;
 use utils_types::traits::{BinarySerializable, PeerIdLike};
 

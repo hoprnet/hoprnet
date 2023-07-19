@@ -1306,10 +1306,7 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub async fn get_account_from_network_registry(
-            &self,
-            address: &Address,
-        ) -> Result<Option<Address>, JsValue> {
+        pub async fn get_account_from_network_registry(&self, address: &Address) -> Result<Option<Address>, JsValue> {
             let data = self.core_ethereum_db.clone();
             check_lock_read! {
                 let db = data.read().await;

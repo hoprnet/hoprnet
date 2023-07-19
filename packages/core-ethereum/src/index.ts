@@ -386,9 +386,7 @@ export default class HoprCoreEthereum extends EventEmitter {
         ticket = fetched
 
         log(
-          `redeeming ticket ${ticket.response.to_hex()} in channel from ${channel.source.to_hex()} to ${
-            channel.destination.to_hex()
-          }, preImage ${ticket.pre_image.to_hex()}, porSecret ${ticket.response.to_hex()}`
+          `redeeming ticket ${ticket.response.to_hex()} in channel from ${channel.source.to_hex()} to ${channel.destination.to_hex()}, preImage ${ticket.pre_image.to_hex()}, porSecret ${ticket.response.to_hex()}`
         )
 
         log(ticket.ticket.to_string())
