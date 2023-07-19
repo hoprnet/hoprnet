@@ -6,10 +6,39 @@ import './utils/ERC1820Registry.sol';
 // import './utils/Channels.sol';
 // import './utils/Tickets.sol';
 import '../src/Channels.sol';
+import 'openzeppelin-contracts-4.8.3/token/ERC777/ERC777.sol';
 import '../src/node-stake/NodeSafeRegistry.sol';
 
+// proxy contract to make modifiers testable
 contract MyHoprChannels is HoprChannels {
   constructor(address _token, Timestamp _noticePeriodChannelClosure, HoprNodeSafeRegistry safeRegistry) HoprChannels(_token, _noticePeriodChannelClosure, safeRegistry) {}
+
+  // Only for testing
+  function _storeChannelStatus(address src, address dest, HoprChannels.ChannelStatus status) public {
+    channels[_getChannelId(src, dest)] = HoprChannels.Channel(
+      HoprChannels.Balance.wrap(0),
+      HoprChannels.TicketIndex.wrap(0),
+      HoprChannels.Timestamp.wrap(0),
+      HoprChannels.ChannelEpoch.wrap(0),
+      status
+    );
+  }
+
+  // Only for testing
+  function _storeChannel(address src, address dest,uint256 balance, uint256 ticketIndex, uint256 closureTime, uint256 epoch, HoprChannels.ChannelStatus status) public {
+    channels[_getChannelId(src, dest)] = HoprChannels.Channel(
+      HoprChannels.Balance.wrap(uint96(balance)),
+      HoprChannels.TicketIndex.wrap(uint48(ticketIndex)),
+      HoprChannels.Timestamp.wrap(uint32(closureTime)),
+      HoprChannels.ChannelEpoch.wrap(uint24(epoch)),
+      status
+    );
+  }
+
+  // Only for testing
+  function _removeChannel(address src, address dest) public {
+    delete channels[_getChannelId(src, dest)];
+  }
 
   function myValidateBalance(HoprChannels.Balance balance) validateBalance(balance) public {}
 
@@ -34,75 +63,24 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest {
   bytes32 constant SECRET_1 = keccak256(abi.encodePacked(SECRET_0));
   bytes32 constant SECRET_2 = keccak256(abi.encodePacked(SECRET_1));
 
-  function getChannelFromTuple(bytes32 channelId) public view returns (HoprChannels.Channel memory) {
+  function getChannelFromTuple(address src, address dest) public view returns (HoprChannels.Channel memory) {
     (
       HoprChannels.Balance balance,
       HoprChannels.TicketIndex ticketIndex,
       HoprChannels.Timestamp closureTime,
       HoprChannels.ChannelEpoch epoch,
       HoprChannels.ChannelStatus status
-    ) = myHoprChannels.channels(channelId);
+    ) = hoprChannels.channels(hoprChannels._getChannelId(src, dest));
     return HoprChannels.Channel(balance, ticketIndex, closureTime, epoch,status );
   }
 
-  address hoprToken;
+  // We can't use HoprToken because HoprToken and HoprChannels rely
+  // on different versions of OpenZeppelin contracts which leads
+  // to compilation errors.
+  ERC777 hoprToken;
 
-  MyHoprChannels public myHoprChannels;
-  HoprNodeSafeRegistry public safeRegistry;
-
-  // HoprChannels.RedeemableTicket TICKET_AB_WIN =
-  //   HoprChannels.RedeemableTicket({
-  //     data: HoprChannels.TicketData({
-  //       channelId: hoprChannels._getChannelId(accountA.accountAddr, accountB.accountAddr),
-  //       amount: HoprChannels.Balance.wrap(10),
-  //       index: HoprChannels.TicketIndex.wrap(1),
-  //       epoch: HoprChannels.ChannelEpoch.wrap(0),
-  //       winProb: WIN_PROB_100,
-  //       reserved: HoprChannels.TicketReserved.wrap(0)
-  //     }),
-  //     opening: SECRET_0,
-  //     porSecret: PROOF_OF_RELAY_SECRET_0,
-  //     signature: HoprChannels.CompactSignature({
-  //       r: 0xe28514db6bf62eab85e382e77a551639f616a51e527480dc922004a197b44600,
-  //       vs: 0x6e396a671f35c69bbe966fbf26ccdd31da7722ea566fd34ba2724f6a10d7231b
-  //     })
-  //   });
-
-  // HoprChannels.Ticket immutable TICKET_BA_WIN =
-  //   HoprChannels.Ticket({
-  //     channelId: HoprChannels._getChannelId(accountB.accountAddr, accountA.accountAddr),
-  //     nextCommitment: SECRET_1,
-  //     ticketEpoch: 0,
-  //     ticketIndex: 1,
-  //     proofOfRelaySecret: PROOF_OF_RELAY_SECRET_0,
-  //     amount: 10,
-  //     winProb: WIN_PROB_100,
-  //     signature: hex'40e302cb0b8b18dbdd08ca1bfc93f1f2c40d5b93e8366dbd97f323aabb26e05f91b2e8828a3a15ffb39d10c55e3fbc2fca72c4d3a3083f09fe07797a6a9ecc54'
-  //   });
-
-  // HoprChannels.Ticket immutable TICKET_AB_LOSS =
-  //   HoprChannels.Ticket({
-  //     channelId: HoprChannels._getChannelId(accountA.accountAddr, accountB.accountAddr),
-  //     nextCommitment: SECRET_1,
-  //     ticketEpoch: 0,
-  //     ticketIndex: 1,
-  //     proofOfRelaySecret: PROOF_OF_RELAY_SECRET_0,
-  //     amount: 10,
-  //     winProb: WIN_PROB_0,
-  //     signature: hex'c81d8a3fe9d2dfbbf916bad5c3ff2acfb557c4972eb172f6441b85058e8cbd26b67afed7d5e72eae4e5bbf0b4ed9d949c0b06b0755b81b80742e4898f36fcc33'
-  //   });
-
-  // HoprChannels.Ticket immutable TICKET_AB_WIN_RECYCLED =
-  //   HoprChannels.Ticket({
-  //     channelId: HoprChannels._getChannelId(accountA.accountAddr, accountB.accountAddr),
-  //     nextCommitment: SECRET_1,
-  //     ticketEpoch: 0,
-  //     ticketIndex: 1,
-  //     proofOfRelaySecret: PROOF_OF_RELAY_SECRET_0,
-  //     amount: 10,
-  //     winProb: WIN_PROB_100,
-  //     signature: hex'43bbf7f4a28786e47be61b6e3c40f4ff95f214e0ac3b43b10d9d962a076e7e0f0a35e4a487ba460af46f9b061e3474c1af399a50033a3f6a48f84a279acdc981'
-  //   });
+  MyHoprChannels public hoprChannels;
+  HoprNodeSafeRegistry public hoprNodeSafeRegistry;
 
   bytes32 channelIdAB;
   bytes32 channelIdBA;
@@ -117,45 +95,163 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest {
   function setUp() public virtual override {
     super.setUp();
 
-    hoprToken = vm.addr(1);
+    hoprToken = new ERC777('HOPR', 'HOPR', new address[](0));
 
-    safeRegistry = new HoprNodeSafeRegistry();
-    myHoprChannels = new MyHoprChannels(vm.addr(1), HoprChannels.Timestamp.wrap(15), safeRegistry);
+    hoprNodeSafeRegistry = new HoprNodeSafeRegistry();
+    hoprChannels = new MyHoprChannels(address(hoprToken), HoprChannels.Timestamp.wrap(15), hoprNodeSafeRegistry);
 
-    MIN_USED_BALANCE = HoprChannels.Balance.unwrap(myHoprChannels.MIN_USED_BALANCE()) + 1;
-    MAX_USED_BALANCE = HoprChannels.Balance.unwrap(myHoprChannels.MAX_USED_BALANCE());   
+    MIN_USED_BALANCE = HoprChannels.Balance.unwrap(hoprChannels.MIN_USED_BALANCE()) + 1;
+    MAX_USED_BALANCE = HoprChannels.Balance.unwrap(hoprChannels.MAX_USED_BALANCE());   
   }
 
   function testValidateBalance(uint96 amount) public {
     amount = uint96(bound(amount, MIN_USED_BALANCE ,MAX_USED_BALANCE));
 
-    myHoprChannels.myValidateBalance(HoprChannels.Balance.wrap(amount));
+    hoprChannels.myValidateBalance(HoprChannels.Balance.wrap(amount));
   }
 
   function testRevert_validateBalance() public {
-    vm.expectRevert(abi.encodeWithSelector(InvalidBalance.selector));
-    myHoprChannels.myValidateBalance(HoprChannels.Balance.wrap(0));
+    vm.expectRevert(abi.encodeWithSelector(HoprChannels.InvalidBalance.selector));
+    hoprChannels.myValidateBalance(HoprChannels.Balance.wrap(0));
 
-    vm.expectRevert(abi.encodeWithSelector(BalanceExceedsGlobalPerChannelAllowance.selector));
-    myHoprChannels.myValidateBalance(HoprChannels.Balance.wrap(uint96(MAX_USED_BALANCE) + 1));
+    vm.expectRevert(abi.encodeWithSelector(HoprChannels.BalanceExceedsGlobalPerChannelAllowance.selector));
+    hoprChannels.myValidateBalance(HoprChannels.Balance.wrap(uint96(MAX_USED_BALANCE) + 1));
   }
 
   function testValidateChannelParties(address source, address destination) public {
     vm.assume(source != destination);
 
-    myHoprChannels.myValidateChannelParties(source, destination);
+    hoprChannels.myValidateChannelParties(source, destination);
   }
 
   function testRevert_validateChannelParties(address addr) public {
-    vm.expectRevert(abi.encodeWithSelector(SourceEqualsDestination.selector));
-    myHoprChannels.myValidateChannelParties(addr, addr);
+    vm.expectRevert(abi.encodeWithSelector(HoprChannels.SourceEqualsDestination.selector));
+    hoprChannels.myValidateChannelParties(addr, addr);
 
-    vm.expectRevert(abi.encodeWithSelector(ZeroAddress.selector, 'source must not be empty'));
-    myHoprChannels.myValidateChannelParties(address(0), addr);
+    vm.expectRevert(abi.encodeWithSelector(HoprChannels.ZeroAddress.selector, 'source must not be empty'));
+    hoprChannels.myValidateChannelParties(address(0), addr);
 
-    vm.expectRevert(abi.encodeWithSelector(ZeroAddress.selector, 'destination must not be empty'));
-    myHoprChannels.myValidateChannelParties(addr, address(0));
+    vm.expectRevert(abi.encodeWithSelector(HoprChannels.ZeroAddress.selector, 'destination must not be empty'));
+    hoprChannels.myValidateChannelParties(addr, address(0));
   }
+
+  function test_fundChannel(uint96 amount1, uint96 amount2, address src, address dest) public {
+    amount1 = uint96(bound(amount1, MIN_USED_BALANCE, MAX_USED_BALANCE));
+    amount2 = uint96(bound(amount2, MIN_USED_BALANCE, MAX_USED_BALANCE));
+    vm.assume(amount1 + amount2 < MAX_USED_BALANCE);
+    vm.assume(src != dest);
+    vm.assume(src != address(0));
+    vm.assume(dest != address(0));
+
+    _helperNoSafeSetMock(src);
+    _helperTokenTransferMock(src, amount1);
+
+    vm.expectEmit(true, true, false, true, address(hoprChannels));
+    emit ChannelOpened(src, dest, HoprChannels.Balance.wrap(amount1));
+
+    vm.startPrank(src);
+    hoprChannels.fundChannel(dest, HoprChannels.Balance.wrap(amount1));
+
+    assertEq(
+      keccak256(abi.encode(getChannelFromTuple(src, dest))), 
+      keccak256(abi.encode(wrapChannel(amount1,0,0,1, HoprChannels.ChannelStatus.OPEN))));
+
+    vm.clearMockedCalls();
+
+    // Now, let's increase funds
+    _helperTokenTransferMock(src, amount2);
+
+    hoprChannels.fundChannel(dest, HoprChannels.Balance.wrap(amount2));
+
+    assertEq(
+      keccak256(abi.encode(getChannelFromTuple(src, dest))), 
+      keccak256(abi.encode(wrapChannel(amount1 + amount2,0,0,1, HoprChannels.ChannelStatus.OPEN))));
+
+    vm.clearMockedCalls();
+    vm.stopPrank();
+  }
+
+  function testRevert_fundChannelNoTokens(uint96 amount, address src, address dest) public {
+    amount = uint96(bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE));
+    vm.assume(src != dest);
+    vm.assume(src != address(0));
+    vm.assume(dest != address(0));
+
+    _helperNoSafeSetMock(src);
+    _helperNoTokenTransferMock(src, amount);
+
+    vm.expectRevert(HoprChannels.TokenTransferFailed.selector);
+
+    vm.startPrank(src);
+    hoprChannels.fundChannel(dest, HoprChannels.Balance.wrap(amount));
+
+    vm.clearMockedCalls();
+    vm.stopPrank();
+  }
+
+  function testRevert_fundChannelInvalidBalance(address src, address dest) public {
+    vm.assume(src != dest);
+
+    _helperNoSafeSetMock(src);
+
+    vm.expectRevert(HoprChannels.InvalidBalance.selector);
+    hoprChannels.fundChannel(dest, HoprChannels.Balance.wrap(0));
+
+    vm.expectRevert(HoprChannels.BalanceExceedsGlobalPerChannelAllowance.selector);
+    hoprChannels.fundChannel(dest, HoprChannels.Balance.wrap(uint96(MAX_USED_BALANCE) + 1));
+
+    vm.clearMockedCalls();
+  }
+
+  function testRevert_fundChannelPendingToClose(address src, address dest, uint96 amount) public {
+    amount = uint96(bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE));
+    vm.assume(src != dest);
+    vm.assume(src != address(0));
+    vm.assume(dest != address(0));
+
+    _helperNoSafeSetMock(src);
+    _helperTokenTransferMock(src, amount);
+    hoprChannels._storeChannelStatus(src, dest, HoprChannels.ChannelStatus.PENDING_TO_CLOSE);
+
+    vm.startPrank(src);
+
+    vm.expectRevert(abi.encodeWithSelector(HoprChannels.WrongChannelState.selector, 'cannot fund a channel that will close soon'));
+    hoprChannels.fundChannel(dest, HoprChannels.Balance.wrap(amount));
+
+    hoprChannels._removeChannel(src, dest);
+    vm.clearMockedCalls();
+    vm.stopPrank();
+  }
+
+  function testRevert_fundChannelSameParty(address src, uint96 amount) public {
+    amount = uint96(bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE));
+    vm.assume(src != address(0));
+
+    vm.startPrank(src);
+
+    vm.expectRevert(HoprChannels.SourceEqualsDestination.selector);
+    hoprChannels.fundChannel(src, HoprChannels.Balance.wrap(amount));
+
+    vm.expectRevert(abi.encodeWithSelector(HoprChannels.ZeroAddress.selector, 'destination must not be empty'));
+    hoprChannels.fundChannel(address(0), HoprChannels.Balance.wrap(amount));
+
+    vm.stopPrank();
+    vm.expectRevert(abi.encodeWithSelector(HoprChannels.ZeroAddress.selector, 'source must not be empty'));
+    vm.startPrank(address(0));
+
+    hoprChannels.fundChannel(src, HoprChannels.Balance.wrap(amount));
+
+    vm.stopPrank();
+  }
+
+  // function test_closeIncomingChannel(address src, address dest, uint96 amount) public {
+  //   amount = uint96(bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE));
+  //   vm.assume(src != dest);
+
+
+  //   _helperNoSafeSetMock(src);
+
+  // }
 
   // function testFundChannelMulti(uint96 amount1, uint96 amount2, address account1, address account2) public {
   //   amount1 = uint96(bound(amount1, MIN_USED_BALANCE ,MAX_USED_BALANCE));
@@ -1558,4 +1654,66 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest {
   //   hoprChannels.fundChannelMulti(accountA.accountAddr, accountB.accountAddr, reopenAmount1, reopenAmount2);
   //   vm.clearMockedCalls();
   // }
+
+    /**
+   * @dev mock a return of safe (vm.addr(100)) registsered to node
+   */
+  function _helperNoSafeSetMock(address node) private {
+    vm.mockCall(
+      address(hoprNodeSafeRegistry),
+      abi.encodeWithSelector(
+        hoprNodeSafeRegistry.nodeToSafe.selector,
+        node
+      ),
+      abi.encode(address(0))
+    );
+  }
+
+  /**
+   * @dev mock a return of safe registsered to node
+   */
+  function _helperOnlySafeMock(address node, address caller) private {
+    vm.mockCall(
+      address(hoprNodeSafeRegistry),
+      abi.encodeWithSelector(
+        hoprNodeSafeRegistry.nodeToSafe.selector,
+        node
+      ),
+      abi.encode(caller)
+    );
+  }
+
+  function _helperTokenTransferMock(address owner, uint256 amount) private {
+    vm.mockCall(
+      address(hoprToken),
+      abi.encodeWithSelector(
+        hoprToken.transferFrom.selector, 
+        owner,
+        address(hoprChannels),
+        amount),
+      abi.encode(true)
+    );
+  }
+
+  function _helperNoTokenTransferMock(address owner, uint256 amount) private {
+    vm.mockCall(
+      address(hoprToken),
+      abi.encodeWithSelector(
+        hoprToken.transferFrom.selector, 
+        owner,
+        address(hoprChannels),
+        amount),
+      abi.encode(false)
+    );
+  }
+
+  function wrapChannel(uint256 balance, uint256 ticketIndex, uint256 closureTime, uint256 epoch, HoprChannels.ChannelStatus status) pure public returns (HoprChannels.Channel memory) {
+    return HoprChannels.Channel(
+      HoprChannels.Balance.wrap(uint96(balance)),
+      HoprChannels.TicketIndex.wrap(uint48(ticketIndex)),
+      HoprChannels.Timestamp.wrap(uint32(closureTime)),
+      HoprChannels.ChannelEpoch.wrap(uint24(epoch)),
+      status
+    );
+  }
 }

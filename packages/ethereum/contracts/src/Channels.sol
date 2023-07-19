@@ -13,20 +13,7 @@ import './Ledger.sol';
 import './MultiSig.sol';
 import './node-stake/NodeSafeRegistry.sol';
 
-error InvalidBalance();
-error BalanceExceedsGlobalPerChannelAllowance();
-error SourceEqualsDestination();
-error ZeroAddress(string reason);
-error TokenTransferFailed();
-error InvalidNoticePeriod();
-error NoticePeriodNotDue();
-error WrongChannelState(string reason);
-error InvalidTicketSignature();
-error InvalidVRFProof();
-error InsufficientChannelBalance();
-error InvalidCommitment();
-error TicketIsNotAWin();
-error InvalidAggregatedTicketInterval();
+import 'forge-std/console2.sol';
 
 uint256 constant ONE_HOUR = 60 * 1000;
 uint256 constant INDEX_SNAPSHOT_INTERVAL = ONE_HOUR;
@@ -61,6 +48,21 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprLe
   type Timestamp is uint32; // overflows in year 2105
   // Using IEEE 754 double precision -> 53 significant bits
   type WinProb is uint56;
+
+  error InvalidBalance();
+  error BalanceExceedsGlobalPerChannelAllowance();
+  error SourceEqualsDestination();
+  error ZeroAddress(string reason);
+  error TokenTransferFailed();
+  error InvalidNoticePeriod();
+  error NoticePeriodNotDue();
+  error WrongChannelState(string reason);
+  error InvalidTicketSignature();
+  error InvalidVRFProof();
+  error InsufficientChannelBalance();
+  error InvalidCommitment();
+  error TicketIsNotAWin();
+  error InvalidAggregatedTicketInterval();
 
   Balance public constant MAX_USED_BALANCE = Balance.wrap(10 ** 25); // 1% of total supply, staking more is not sound
   Balance public constant MIN_USED_BALANCE = Balance.wrap(1); // no empty token transactions
@@ -499,7 +501,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprLe
 
       (dest) = abi.decode(userData, (address));
 
-      _fundChannel(msg.sender, dest, Balance.wrap(uint96(amount)));
+      _fundChannelInternal(msg.sender, dest, Balance.wrap(uint96(amount)));
     // Opens two channels, donating msg.sender's tokens
     } else if (userData.length == FUND_CHANNEL_MULTI_SIZE) {
       address account1;
@@ -516,28 +518,66 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprLe
 
       // fund channel in direction of: account1 -> account2
       if (Balance.unwrap(amount1) > 0) {
-        _fundChannel(account1, account2, amount1);
+        _fundChannelInternal(account1, account2, amount1);
       }
       // fund channel in direction of: account2 -> account1
       if (Balance.unwrap(amount2) > 0) {
-        _fundChannel(account2, account1, amount2);
+        _fundChannelInternal(account2, account1, amount2);
       }
     }
   }
 
-  // internal code
+    /**
+   * Fund an outgoing channel
+   * Used in channel operation with Safe
+   *
+   * @param self address of the source
+   * @param account address of the destination
+   * @param amount amount to fund for channel
+   */
+  function fundChannelSafe(
+    address self,
+    address account,
+    Balance amount
+  ) external HoprMultiSig.onlySafe(self) {
+    _fundChannelInternal(self, account, amount);
+  }
 
   /**
-   * Funds and thereby opens a channel `source` -> `dest` with `amount` tokens.
-   *
-   * @param source the address of the channel source
-   * @param dest the address of the channel destination
-   * @param amount amount to fund account1
+   * Fund an outgoing channel by a node
+   * @param account address of the destination
+   * @param amount amount to fund for channel
    */
-  function _fundChannel(address source, address dest, Balance amount) internal validateBalance(amount) validateChannelParties(source, dest) {
-    bytes32 channelId = _getChannelId(source, dest);
+  function fundChannel(
+    address account,
+    Balance amount
+  ) external HoprMultiSig.noSafeSet {
+    _fundChannelInternal(msg.sender, account, amount);
+  }
+
+  /**
+   * @dev Internal function to fund an outgoing channel from self to account with amount token
+   * @notice only balance above zero can execute
+   *
+   * @param self source address
+   * @param account destination address
+   * @param amount token amount
+   */
+  function _fundChannelInternal(
+    address self,
+    address account,
+    Balance amount
+  ) internal validateBalance(amount) validateChannelParties(self, account) {
+    // pull tokens from funder and handle result
+    if (token.transferFrom(msg.sender, address(this), Balance.unwrap(amount)) != true) {
+      // sth. went wrong, we need to revert here
+      revert TokenTransferFailed();
+    }
+
+    bytes32 channelId = _getChannelId(self, account);
     Channel storage channel = channels[channelId];
 
+    console2.logUint(uint8(channel.status));
     if (channel.status == ChannelStatus.PENDING_TO_CLOSE) {
       revert WrongChannelState({reason: 'cannot fund a channel that will close soon'});
     }
@@ -550,7 +590,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprLe
       channel.ticketIndex = TicketIndex.wrap(0);
 
       channel.status = ChannelStatus.OPEN;
-      emit ChannelOpened(source, dest, channel.balance);
+      emit ChannelOpened(self, account, channel.balance);
     }
   }
 
