@@ -19,7 +19,7 @@ contract DeployNodeSafeScriptTest is Test, ERC1820RegistryFixtureTest {
         deployNodeSafeScriptContract = new DeployNodeSafeScript();
     }
 
-    function testFuzz_Run() public {
+    function test_Run() public {
         // deployNodeSafeScriptContract.run();
     }
 }

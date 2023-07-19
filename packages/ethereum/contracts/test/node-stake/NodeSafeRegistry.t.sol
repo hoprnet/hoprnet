@@ -2,22 +2,12 @@
 pragma solidity >=0.8.0 <0.9.0;
 
 import '../../src/node-stake/NodeSafeRegistry.sol';
-// import '../../src/utils/TargetUtils.sol';
-// import '../../src/node-stake/permissioned-module/NodeManagementModule.sol';
-// import "../utils/SafeSingleton.sol";
 import 'forge-std/Test.sol';
 
 contract HoprNodeSafeRegistryTest is Test {
     // to alter the storage
     using stdStorage for StdStorage;
-    // using ClonesUpgradeable for address;
-    // using TargetUtils for Target;
 
-    // HoprNodeManagementModule public moduleSingleton;
-    // HoprNodeStakeFactory public factory;
-    // address public caller;
-    // address public admin;
-    // address public module;
     address public safe;
     HoprNodeSafeRegistry public nodeSafeRegistry;
     address private constant SENTINEL_MODULES = address(0x1);
@@ -26,15 +16,12 @@ contract HoprNodeSafeRegistryTest is Test {
     /**
     * Manually import events and errors
     */
-  event RegisteredNodeSafe(address indexed safeAddress, address indexed nodeAddress);
-  event DergisteredNodeSafe(address indexed safeAddress, address indexed nodeAddress);
+    event RegisteredNodeSafe(address indexed safeAddress, address indexed nodeAddress);
+    event DergisteredNodeSafe(address indexed safeAddress, address indexed nodeAddress);
 
     function setUp() public {
         safe = vm.addr(101); // make make address(101) a caller
         nodeSafeRegistry = new HoprNodeSafeRegistry();
-        // admin = vm.addr(102); // make make address(102) an admin
-        // moduleSingleton = new HoprNodeManagementModule();
-        // factory = new HoprNodeStakeFactory();
     }
 
     /**
@@ -183,7 +170,7 @@ contract HoprNodeSafeRegistryTest is Test {
         vm.clearMockedCalls();
     }
 
-    // ================== helpe functions ==================
+    // ================== helper functions ==================
     /**
      * @dev mock return of module
      */
