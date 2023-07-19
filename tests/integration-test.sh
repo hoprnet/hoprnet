@@ -391,7 +391,7 @@ test_redeem_in_specific_channel() {
   # seems like there's slight delay needed for tickets endpoint to return up to date tickets, probably because of blockchain sync delay
   sleep 2
   ticket_amount=$(api_get_tickets_in_channel ${second_node_api} ${peer_id} | jq '. | length')
-  [[ "${ticket_amount}" != "3" ]] && { msg "Ticket ammount is different than expected: ${ticket_amount} != 3"; exit 1; }
+  [[ "${ticket_amount}" != "3" ]] && { msg "Ticket amount is different than expected: ${ticket_amount} != 3"; exit 1; }
 
   api_redeem_tickets_in_channel ${second_node_api} ${peer_id}
 

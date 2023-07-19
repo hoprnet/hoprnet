@@ -159,14 +159,16 @@ pub mod wasm {
         acked_ticket: &mut AcknowledgedTicket,
         submit_ticket: &Function, // (counterparty: Address, ackedTicket)
     ) -> JsResult<String> {
-        debug!("start preparing ticket");
+        debug!("redeeming ticket for counterparty {counterparty}");
+
+        debug!(">>> READ prepare_redeem_ticket");
         let pre_image = {
             let val = db.as_ref_counted();
             let g = val.read().await;
 
             super::prepare_redeem_ticket(&*g, counterparty, channel_id, acked_ticket,).await?
         };
-        debug!("after preparing ticket");
+        debug!("<<< READ prepare_redeem_ticket");
 
         let this = JsValue::undefined();
         let res = submit_ticket.call2(
