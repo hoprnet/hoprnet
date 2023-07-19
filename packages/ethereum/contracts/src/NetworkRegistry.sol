@@ -13,7 +13,7 @@ import './interfaces/INetworkRegistryRequirement.sol';
  *
  * When reaching its limits, accounts can remove registered node addresses (`deregister`)
  * before adding more.
- * Eligibility is always check at registration/deregistration. If there's any update in
+ * Eligibility is always checked at registration/deregistration. If there's any update in
  * eligibility, it should be done after deregistration
  *
  * This network registry can be globally enabled/disabled by the manager
