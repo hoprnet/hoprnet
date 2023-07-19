@@ -12,25 +12,15 @@ import "./utils/BoostUtilsLib.sol";
  * @title Deploy all the required contracts in development, staging and production environment
  * @notice In local development environment, ERC1820Registry, Safe deployment singleton, Safe suites should be deployed 
  * before running this script.
- * @dev It reads the environment, netork and deployer private key from env variables
+ * @dev It reads the environment, netork and deployer internal key from env variables
  */
 contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtureTest, PermittableTokenFixtureTest {
     using BoostUtilsLib for address;
 
-    bool private isHoprChannelsDeployed;
-    bool private isHoprNetworkRegistryDeployed;
+    bool internal isHoprChannelsDeployed;
+    bool internal isHoprNetworkRegistryDeployed;
 
     function setUp() public override(ERC1820RegistryFixtureTest) {}
-
-    function _deployHoprNodeStakeFactory() private {
-        if (
-            currentEnvironmentType == EnvironmentType.LOCAL
-                || !isValidAddress(currentNetworkDetail.nodeStakeV2FactoryAddress)
-        ) {
-            // deploy HoprNodeStakeFactory contract
-            currentNetworkDetail.nodeStakeV2FactoryAddress = deployCode("NodeStakeFactory.sol:HoprNodeStakeFactory");
-        }
-    }
 
     function run() external {
         // 1. Network check
@@ -42,11 +32,11 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
         mustHaveErc1820Registry();
         emit log_string(string(abi.encodePacked("Deploying in ", currentNetworkId)));
 
-        // 2. Get deployer private key. 
+        // 2. Get deployer internal key. 
         // Set to default when it's in development environment (uint for 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80)
         uint256 deployerPrivateKey = currentEnvironmentType == EnvironmentType.LOCAL ? 77814517325470205911140941194401928579557062014761831930645393041380819009408 : vm.envUint("DEPLOYER_PRIVATE_KEY");
         address deployerAddress = vm.addr(deployerPrivateKey);
-        emit log_string(string(abi.encodePacked("deployerAddress", deployerAddress)));
+        emit log_named_address("deployerAddress", deployerAddress);
         vm.startBroadcast(deployerPrivateKey);
 
         // 3. Deploy
@@ -110,9 +100,21 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
     }
 
     /**
+     * @dev deploy node safe factory
+     */
+    function _deployHoprNodeStakeFactory() internal {
+        if (
+            currentEnvironmentType == EnvironmentType.LOCAL
+                || !isValidAddress(currentNetworkDetail.nodeStakeV2FactoryAddress)
+        ) {
+            // deploy HoprNodeStakeFactory contract
+            currentNetworkDetail.nodeStakeV2FactoryAddress = deployCode("NodeStakeFactory.sol:HoprNodeStakeFactory");
+        }
+    }
+    /**
      * @dev Deploy node management module
      */
-     function _deployHoprNodeManagementModule() private {
+     function _deployHoprNodeManagementModule() internal {
         if (
             currentEnvironmentType == EnvironmentType.LOCAL
                 || !isValidAddress(currentNetworkDetail.moduleImplementationAddress)
@@ -125,7 +127,7 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
     /**
      * @dev Deploy node safe registry
      */
-    function _deployHoprHoprNodeSafeRegistry() private {
+    function _deployHoprHoprNodeSafeRegistry() internal {
         if (
             currentEnvironmentType == EnvironmentType.LOCAL
                 || !isValidAddress(currentNetworkDetail.nodeSafeRegistryAddress)
@@ -138,7 +140,7 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
     /**
      * @dev Deploy hopr token. Set a minter and mint some token to the deployer
      */
-    function _deployHoprTokenAndMintToAddress(address deployerAddress, address recipient) private {
+    function _deployHoprTokenAndMintToAddress(address deployerAddress, address recipient) internal {
         if (
             currentEnvironmentType == EnvironmentType.LOCAL
                 || !isValidAddress(currentNetworkDetail.tokenContractAddress)
@@ -168,7 +170,7 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
      * @dev deploy network registry proxy.
      * In development, dummy is used
      */
-    function _deployNRProxy(address deployerAddress) private {
+    function _deployNRProxy(address deployerAddress) internal {
         if (currentEnvironmentType == EnvironmentType.LOCAL) {
             // deploy DummyProxy in LOCAL environment
             currentNetworkDetail.networkRegistryProxyContractAddress =
@@ -195,7 +197,7 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
      * @dev deploy network registry
      * in development environment, it's disabled
      */
-    function _deployNetowrkRegistry(address deployerAddress) private {
+    function _deployNetowrkRegistry(address deployerAddress) internal {
         if (
             currentEnvironmentType == EnvironmentType.LOCAL
                 || !isValidAddress(currentNetworkDetail.networkRegistryContractAddress)
