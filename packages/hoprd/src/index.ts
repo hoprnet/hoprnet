@@ -31,7 +31,8 @@ import {
   HoprdConfig,
   hoprd_misc_initialize_crate,
   type Api,
-  type CliArgs
+  type CliArgs,
+  hoprd_misc_initialize_crate
 } from '../lib/hoprd_misc.js'
 hoprd_misc_initialize_crate()
 
