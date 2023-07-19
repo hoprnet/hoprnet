@@ -449,7 +449,7 @@ library HoprCapabilityPermissions {
     function revokeTarget(
         Role storage role,
         address targetAddress
-    ) external {
+    ) internal {
         bool result = role.targets.remove(targetAddress);
         if (result) {
             emit RevokedTarget(targetAddress);
@@ -467,7 +467,7 @@ library HoprCapabilityPermissions {
     function scopeTargetToken(
         Role storage role,
         Target target
-    ) external {
+    ) internal {
       address targetAddress = target.getTargetAddress();
       if (targetAddress == address(0)) {
           revert AddressIsZero();
@@ -493,7 +493,7 @@ library HoprCapabilityPermissions {
     function scopeTargetChannels(
         Role storage role,
         Target target
-    ) external {
+    ) internal {
       address targetAddress = target.getTargetAddress();
       if (targetAddress == address(0)) {
           revert AddressIsZero();
@@ -518,7 +518,7 @@ library HoprCapabilityPermissions {
     function scopeTargetSend(
         Role storage role,
         Target target
-    ) external {
+    ) internal {
       address targetAddress = target.getTargetAddress();
       if (targetAddress == address(0)) {
           revert AddressIsZero();
@@ -547,7 +547,7 @@ library HoprCapabilityPermissions {
         address targetAddress,
         bytes32 channelId,
         bytes32 encodedSigsPermissions
-    ) external {
+    ) internal {
         (bytes4[] memory functionSigs, GranularPermission[] memory permissions) = HoprCapabilityPermissions.decodeFunctionSigsAndPermissions(encodedSigsPermissions, 7);
 
         for (uint256 i = 0; i < 7; i++) {
@@ -580,7 +580,7 @@ library HoprCapabilityPermissions {
         address targetAddress,
         address beneficiary,
         bytes32 encodedSigsPermissions
-    ) external {
+    ) internal {
         (bytes4[] memory functionSigs, GranularPermission[] memory permissions) = HoprCapabilityPermissions.decodeFunctionSigsAndPermissions(encodedSigsPermissions, 2);
 
         for (uint256 i = 0; i < 2; i++) {
@@ -611,7 +611,7 @@ library HoprCapabilityPermissions {
         address nodeAddress,
         address beneficiary,
         GranularPermission permission
-    ) external {
+    ) internal {
         role.capabilities[bytes32(0)][getChannelId(nodeAddress, beneficiary)] = permission;
 
         emit ScopedGranularSendCapability(

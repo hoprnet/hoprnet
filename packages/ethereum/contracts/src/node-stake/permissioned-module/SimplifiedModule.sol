@@ -13,23 +13,6 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
  * This module removes target attribute, removes guard, and uses UUPS proxy.
  */
 abstract contract SimplifiedModule is UUPSUpgradeable, OwnableUpgradeable {
-    // Address that will ultimately execute function calls.
-    address public avatar; 
-
-    // Emitted each time the avatar is set.
-    event AvatarSet(address indexed previousAvatar, address indexed newAvatar);
-
-    /**
-     * @dev Sets the avatar to a new avatar (`newAvatar`).
-     * @notice Can only be called by the current owner.
-     * @param _avatar address of the new avatar
-     */
-    function setAvatar(address _avatar) external onlyOwner {
-        address previousAvatar = avatar;
-        avatar = _avatar;
-        emit AvatarSet(previousAvatar, _avatar);
-    }
-
     /**
      * @dev Passes a transaction to be executed by the avatar.
      * @notice Can only be called by this contract.
@@ -43,8 +26,8 @@ abstract contract SimplifiedModule is UUPSUpgradeable, OwnableUpgradeable {
         uint256 value,
         bytes memory data,
         Enum.Operation operation
-    ) internal virtual returns (bool) {
-        return IAvatar(avatar).execTransactionFromModule(
+    ) internal returns (bool) {
+        return IAvatar(owner()).execTransactionFromModule(
             to,
             value,
             data,
@@ -65,13 +48,13 @@ abstract contract SimplifiedModule is UUPSUpgradeable, OwnableUpgradeable {
         uint256 value,
         bytes memory data,
         Enum.Operation operation
-    ) internal virtual returns (bool, bytes memory) {
-        return IAvatar(avatar)
+    ) internal returns (bool, bytes memory) {
+        return IAvatar(owner())
             .execTransactionFromModuleReturnData(to, value, data, operation);
     }
 
     /**
      * @dev Override {_authorizeUpgrade} to only allow owner to upgrade the contract
      */
-    function _authorizeUpgrade(address) internal override onlyOwner {}
+    function _authorizeUpgrade(address) internal override(UUPSUpgradeable) onlyOwner {}
 }

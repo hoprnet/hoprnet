@@ -72,9 +72,16 @@ anvil-deploy-safe-suite: ensure-environment-and-network-are-set
 anvil-deploy-safe-suite: ## deploy HOPR contracts
 	$(forge-script) --broadcast script/SafeSuiteSetup.s.sol:SafeSuiteSetupScript
 
+.PHONY: test-script
+test-script: # development only.
+	lsof -i :8545 -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
+	anvil&
+	$(MAKE) anvil-deploy-all network=anvil-localhost environment-type=local
+
 .PHONY: anvil-deploy-all
 anvil-deploy-all: ## deploy all contracts
 	$(MAKE) anvil-deploy-erc1820 network=anvil-localhost environment-type=local
+	$(MAKE) anvil-deploy-safe-singleton network=anvil-localhost environment-type=local
 	$(MAKE) anvil-deploy-safe-suite network=anvil-localhost environment-type=local
 	$(MAKE) anvil-deploy-contracts network=anvil-localhost environment-type=local
 

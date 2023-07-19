@@ -1,26 +1,26 @@
 {
   "networks": {
     "anvil-localhost": {
+      "channels_contract_address": "0xd54eE5aDed3A4d2059A6f01DEbdb033BB5453433",
       "environment_type": "development",
       "indexer_start_block_number": 26356264,
-      "token_contract_address": "0xf1aDf07D0d4e1beFdDe79066771d057337e55c08",
-      "channels_contract_address": "0xd54eE5aDed3A4d2059A6f01DEbdb033BB5453433",
-      "node_stake_v2_factory_address": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
-      "module_implementation_address": "0x0000000000000000000000000000000000000000",
-      "node_safe_registry_address": "0x0000000000000000000000000000000000000000",
+      "module_implementation_address": "0x43d13D7B83607F14335cF2cB75E87dA369D056c7",
+      "network_registry_contract_address": "0x0000000000000000000000000000000000000000",
       "network_registry_proxy_contract_address": "0x9937Fa1497bE80C473c14B944E213bb381F18C34",
-      "network_registry_contract_address": "0x0000000000000000000000000000000000000000"
+      "node_safe_registry_address": "0x0000000000000000000000000000000000000000",
+      "node_stake_v2_factory_address": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
+      "token_contract_address": "0xf1aDf07D0d4e1beFdDe79066771d057337e55c08"
     },
     "anvil-localhost2": {
+      "channels_contract_address": "0xd54eE5aDed3A4d2059A6f01DEbdb033BB5453433",
       "environment_type": "development",
       "indexer_start_block_number": 26356264,
-      "token_contract_address": "0xf1aDf07D0d4e1beFdDe79066771d057337e55c08",
-      "channels_contract_address": "0xd54eE5aDed3A4d2059A6f01DEbdb033BB5453433",
-      "node_stake_v2_factory_address": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
-      "module_implementation_address": "0x0000000000000000000000000000000000000000",
-      "node_safe_registry_address": "0x0000000000000000000000000000000000000000",
+      "module_implementation_address": "0x43d13D7B83607F14335cF2cB75E87dA369D056c7",
+      "network_registry_contract_address": "0x0000000000000000000000000000000000000000",
       "network_registry_proxy_contract_address": "0x9937Fa1497bE80C473c14B944E213bb381F18C34",
-      "network_registry_contract_address": "0x0000000000000000000000000000000000000000"
+      "node_safe_registry_address": "0x0000000000000000000000000000000000000000",
+      "node_stake_v2_factory_address": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
+      "token_contract_address": "0xf1aDf07D0d4e1beFdDe79066771d057337e55c08"
     },
     "master": {
       "channels_contract_address": "0xB20ee6e0b714e531CabF2C29fbA147f4e5905B7b",

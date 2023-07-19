@@ -66,17 +66,15 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
     }
 
     // cannot setup again if it's been set up
-    if (avatar != address(0) || multisend != address(0)) {
+    if (owner() != address(0) || multisend != address(0)) {
       revert AlreadyInitialized();
     }
 
-    // internally setAvatar and setTarget
-    avatar = _safe;
+    // internally setTarget
     multisend = _multisend;
     _addChannelsAndTokenTarget(Target.wrap(uint256(_defaultTokenChannelsTarget)));
     // transfer ownership
     _transferOwnership(_safe);
-    emit AvatarSet(address(0), avatar);
     emit SetMultisendAddress(_multisend);
   }
 
@@ -315,13 +313,6 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
           operation
       );
       return execAndReturnData(to, value, data, operation);
-  }
-
-  /**
-   * @dev Override {transferOwnership} so the owner cannot be changed once created
-   */
-  function transferOwnership(address /*newOwner*/) public view override(OwnableUpgradeable) onlyOwner {
-    revert CannotChangeOwner();
   }
 
   /**

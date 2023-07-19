@@ -27,7 +27,6 @@ contract HoprNodeManagementModuleTest is Test, SafeSingletonFixtureTest {
     event SetMultisendAddress(address indexed multisendAddress);
     event NewHoprNodeStakeModule(address instance);
     event NewHoprNodeStakeSafe(address instance);
-    event AvatarSet(address indexed previousAvatar, address indexed newAvatar);
 
     function setUp() public override(SafeSingletonFixtureTest) {
         super.setUp();
@@ -119,8 +118,6 @@ contract HoprNodeManagementModuleTest is Test, SafeSingletonFixtureTest {
             assertTrue(Safe(safe).isOwner(admins[j]));   
         }
         assertFalse(Safe(safe).isOwner(address(factory)));
-        // module should have safe as avatar
-        assertEq(HoprNodeManagementModule(module).avatar(), safe, "Wrong avatar");
         // module owner should be safe
         assertEq(HoprNodeManagementModule(module).owner(), safe, "Wrong module owner");
         // module multisend should beSafeSuiteLib.SAFE_MultiSendCallOnly_ADDRESS
@@ -150,8 +147,6 @@ contract HoprNodeManagementModuleTest is Test, SafeSingletonFixtureTest {
 
         vm.expectEmit(true, true, false, false, address(moduleProxy));
         emit OwnershipTransferred(address(0), safeAddr);
-        vm.expectEmit(true, true, false, false, address(moduleProxy));
-        emit AvatarSet(address(0), safeAddr);
         vm.expectEmit(true, false, false, false, address(moduleProxy));
         emit SetMultisendAddress(multisendAddr);
         moduleProxy.call(moduleInitializer);
