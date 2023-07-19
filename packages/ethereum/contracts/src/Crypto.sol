@@ -901,7 +901,6 @@ abstract contract HoprCrypto {
       revert InvalidFieldElement();
     }
 
-
     // we get a pseudo-random curve point
     (uint256 B_x, uint256 B_y) = hashToCurve(abi.encodePacked(payload.signer, payload.message), payload.DST);
 
