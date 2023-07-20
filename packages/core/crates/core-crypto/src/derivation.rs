@@ -11,7 +11,7 @@ use utils_types::{primitives::Address, traits::BinarySerializable};
 use crate::errors::Result;
 use crate::parameters::{PACKET_TAG_LENGTH, PING_PONG_NONCE_SIZE, SECRET_KEY_LENGTH};
 use crate::primitives::{calculate_mac, DigestLike, SimpleDigest};
-use crate::random::random_fill;
+use crate::random::{random_bytes, random_fill};
 use crate::types::HalfKey;
 use elliptic_curve::sec1::ToEncodedPoint;
 
@@ -196,14 +196,17 @@ pub fn derive_vrf_parameters<const T: usize>(
 
     let a: Scalar = ScalarPrimitive::<Secp256k1>::from_slice(&secret)?.into();
 
+    if a.is_zero().into() {
+        return Err(crate::errors::CryptoError::InvalidSecretScalar);
+    }
+
     let v = b * a;
 
     let r = Secp256k1::hash_to_scalar::<ExpandMsgXmd<sha3::Keccak256>>(
         &[
             &a.to_bytes(),
             &v.to_affine().to_encoded_point(false).as_bytes()[1..],
-            // &random_bytes::<64>(),
-            &[0u8; 64], // TODO: remove this
+            &random_bytes::<64>(),
         ],
         &[dst],
     )?;

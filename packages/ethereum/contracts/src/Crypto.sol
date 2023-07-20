@@ -898,8 +898,12 @@ abstract contract HoprCrypto {
    * @param payload values over which the VRF was computed, e.g. ticketHash
    */
   function vrf_verify(VRF_Parameters memory params, VRF_Payload memory payload) public view returns (bool) {
-    if (params.h >= SECP256K1_FIELD_ORDER) {
+    if (params.h >= SECP256K1_BASE_FIELD_ORDER || params.s >= SECP256K1_BASE_FIELD_ORDER) {
       revert InvalidFieldElement();
+    }
+
+    if (!isCurvePointInternal(params.v_x, params.v_y)) {
+      revert InvalidCurvePoint();
     }
 
     // we get a pseudo-random curve point

@@ -145,6 +145,13 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto {
   }
 
   function testHashToCurve() public {
+    // sample Rust code:
+    // ```rust
+    // use elliptic_curve::hash2curve::{ExpandMsgXmd, GroupDigest};
+    // use k256::Secp256k1;
+    // 
+    // let hash = Secp256k1::hash_from_bytes::<ExpandMsgXmd<sha3::Keccak256>>(msg);
+    // ```
     bytes memory DST = "QUUX-V01-CS02-with-secp256k1_XMD:Keccak256_SSWU_RO_";
 
     // test strings taken from https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#appendix-J.8.1
@@ -183,6 +190,40 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto {
   }
 
   function testVRFVerify() public {
+    // sample Rust code:
+    // ```rust
+    // use elliptic_curve::{hash2curve::{ExpandMsgXmd, GroupDigest}, ScalarPrimitive};
+    // use k256::{AffinePoint, Scalar, Secp256k1};
+    //
+    // let b = Secp256k1::hash_from_bytes::<ExpandMsgXmd<sha3::Keccak256>>(&[&chain_addr.to_bytes(), msg], &[dst])?;
+    // let a: Scalar = ScalarPrimitive::<Secp256k1>::from_slice(&secret)?.into();
+    // if a.is_zero().into() {
+    //     return Err(crate::errors::CryptoError::InvalidSecretScalar);
+    // }
+    //
+    // let v = b * a;
+    // let r = Secp256k1::hash_to_scalar::<ExpandMsgXmd<sha3::Keccak256>>(
+    //     &[
+    //         &a.to_bytes(),
+    //         &v.to_affine().to_encoded_point(false).as_bytes()[1..],
+    //         &random_bytes::<64>(),
+    //     ],
+    //     &[dst],
+    // )?;
+    //
+    // let r_v = b * r;
+    //
+    // let h = Secp256k1::hash_to_scalar::<ExpandMsgXmd<sha3::Keccak256>>(
+    //     &[
+    //         &chain_addr.to_bytes(),
+    //         &v.to_affine().to_encoded_point(false).as_bytes()[1..],
+    //         &r_v.to_affine().to_encoded_point(false).as_bytes()[1..],
+    //         msg,
+    //     ],
+    //     &[dst],
+    // )?;
+    // let s = r + h * a;
+    // ```
     // precomputed values with Rust implementation
     CurvePoint memory V = CurvePoint(0x7e4d7332351201f79215328221cf4baeb9365cdba1255cedfe1cc635b4780a0f, 0xd9fe81cfdd0537cd5f73120ab2f97caa93bddf4ce8922b99c6649ecb2b15ddd7);
     bytes32 h = 0x0f6be5484fce28779f0ff72d4f68c619b3f96f1af895c7c6ec4aede81534cee8;
@@ -209,7 +250,6 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto {
       signer,
       "some DST tag"
     );
-
 
     assertTrue(crypto.vrf_verify(params, payload));
   }
