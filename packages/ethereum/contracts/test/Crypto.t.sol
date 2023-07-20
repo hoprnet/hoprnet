@@ -7,7 +7,47 @@ import 'solcrypto/SECP2561k.sol';
 
 import '../src/Crypto.sol';
 
+// Use proxy contract to have proper gas measurements for internal functions
 contract CryptoProxy is HoprCrypto {
+  function pointToAddressProxy(uint256 p_x, uint256 p_y) pure public returns (address) {
+    return pointToAddress(p_x, p_y);
+  }
+
+  function isCurvePointInternalProxy(uint256 p_x, uint256 p_y) pure public returns (bool) {
+    return isCurvePointInternal(p_x, p_y);
+  }
+
+  function isFieldElementInternalProxy(uint256 el) pure public returns (bool) {
+    return isFieldElementInternal(el);
+  }
+
+  function scalarTimesBasepointProxy(uint256 scalar) pure public returns (address) {
+    return scalarTimesBasepoint(scalar);
+  }
+
+  function ecAddProxy(uint256 p_x, uint256 p_y, uint256 q_x, uint256 q_y, uint256 a) view public returns (uint256 r_x, uint256 r_y) {
+    return ecAdd(p_x, p_y, q_x, q_y, a);
+  }
+
+  function mapToCurveSimpleSWUProxy(uint256 u) view public returns (uint256 r_x, uint256 r_y) {
+    return mapToCurveSimpleSWU(u);
+  }
+
+  function hashToScalarProxy(bytes memory message, bytes memory DST) view public returns (uint256) {
+    return hashToScalar(message, DST);
+  }
+
+  function mapPointProxy(uint256 p_x, uint256 p_y) view  public returns (uint256 r_x, uint256 r_y) {
+    return mapPoint(p_x, p_y);
+  }
+
+  function hashToCurveProxy(bytes memory payload, bytes memory DST) view public returns (uint256 r_x, uint256 r_y) {
+    return hashToCurve(payload, DST);
+  }
+
+  function vrfVerifyProxy(VRF_Parameters memory params, VRF_Payload memory payload) view public returns (bool) {
+    return vrfVerify(params, payload);
+  }
 }
 
 contract Crypto is Test, AccountsFixtureTest, HoprCrypto {
@@ -19,28 +59,27 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto {
   SECP2561k secp256k1;
   CryptoProxy crypto;
   function setUp() public {
-    // use dummy proxy to per-method have gas measurements
+    // Use proxy contract to have proper gas measurements for internal functions
     crypto = new CryptoProxy();
     secp256k1 = new SECP2561k();
   }
 
   function testPointToAddress() public {
-    (bool success, bytes memory returnValue) = address(this).staticcall(abi.encodeWithSelector(HoprCrypto.pointToAddress.selector, 0x8318535b54105d4a7aae60c08fc45f9687181b4fdfc625bd1a753fa7397fed75, 0x3547f11ca8696646f2f3acb08e31016afac23e630c5d11f59f61fef57b0d2aa5));
+    address converted = crypto.pointToAddressProxy(0x8318535b54105d4a7aae60c08fc45f9687181b4fdfc625bd1a753fa7397fed75, 0x3547f11ca8696646f2f3acb08e31016afac23e630c5d11f59f61fef57b0d2aa5);
 
-    assertTrue(success);
-    assertEq(address(uint160(uint256(bytes32(returnValue)))), accountA.accountAddr);
+    assertEq(converted, accountA.accountAddr);
   }
 
   function testIsCurvePoint() public { 
-    assertTrue(crypto.isCurvePointInternal(0x8318535b54105d4a7aae60c08fc45f9687181b4fdfc625bd1a753fa7397fed75, 0x3547f11ca8696646f2f3acb08e31016afac23e630c5d11f59f61fef57b0d2aa5));
+    assertTrue(crypto.isCurvePointInternalProxy(0x8318535b54105d4a7aae60c08fc45f9687181b4fdfc625bd1a753fa7397fed75, 0x3547f11ca8696646f2f3acb08e31016afac23e630c5d11f59f61fef57b0d2aa5));
   }
 
   function testRevert_NoCurvePoint() public {
-    assertFalse(crypto.isCurvePointInternal(0x3547f11ca8696646f2f3acb08e31016afac23e630c5d11f59f61fef57b0d2aa5, 0x8318535b54105d4a7aae60c08fc45f9687181b4fdfc625bd1a753fa7397fed75));
+    assertFalse(crypto.isCurvePointInternalProxy(0x3547f11ca8696646f2f3acb08e31016afac23e630c5d11f59f61fef57b0d2aa5, 0x8318535b54105d4a7aae60c08fc45f9687181b4fdfc625bd1a753fa7397fed75));
   }
 
   function testScalarTimeBasepoint() public {
-    assertEq(crypto.scalarTimesBasepoint(accountA.privateKey), accountA.accountAddr);
+    assertEq(crypto.scalarTimesBasepointProxy(accountA.privateKey), accountA.accountAddr);
   }
 
   function testEcAddPointAddition() public {
@@ -51,11 +90,11 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto {
     CurvePoint memory p_q = CurvePoint(0x551c7c46a964dec7edd8a5cedc557ebce43cc3f70ff481bdcfbd4e86d435c2ba,0x16883c2c7e2527800aa21a8420f8af48eafb2594d00e0f7e9e7d11a938b9a168);
     CurvePoint memory q_r = CurvePoint(0x85744a09c2839969dd8aa41b3577e9ffa28bee884165b880ca4050c0c3a0083e,0xbf55c694c111642da3ac0017e44ed12b93798eb9cbd3b14b4db1227c85e58f6d);
     
-    (uint256 maybe_p_q_x, uint256 maybe_p_q_y) = crypto.ecAdd(p.x, p.y, q.x, q.y, 0);
+    (uint256 maybe_p_q_x, uint256 maybe_p_q_y) = crypto.ecAddProxy(p.x, p.y, q.x, q.y, 0);
     assertEq(p_q.x, maybe_p_q_x);
     assertEq(p_q.y, maybe_p_q_y);
 
-    (uint256 maybe_q_r_x, uint256 maybe_q_r_y) = crypto.ecAdd(q.x, q.y, r.x, r.y, 0);
+    (uint256 maybe_q_r_x, uint256 maybe_q_r_y) = crypto.ecAddProxy(q.x, q.y, r.x, r.y, 0);
     assertEq(q_r.x, maybe_q_r_x);
     assertEq(q_r.y, maybe_q_r_y);
   }
@@ -65,46 +104,45 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto {
 
     CurvePoint memory p_double = CurvePoint(0x3d8f348848814bc251670aa3fe6301dfb7fb9f131212644cec8b666f883f1709,0x630684d783172d70adb684b61aed0856efe0f10982b91d57a0abe3dd08d09d32);
 
-    (uint256 maybe_p_double_x, uint256 maybe_p_double_y) = crypto.ecAdd(p.x, p.y, p.x, p.y, 0);
+    (uint256 maybe_p_double_x, uint256 maybe_p_double_y) = crypto.ecAddProxy(p.x, p.y, p.x, p.y, 0);
 
     assertEq(maybe_p_double_x, p_double.x);
     assertEq(maybe_p_double_y, p_double.y);
   }
 
   function testEcAddFuzzy(uint256 u_0, uint256 u_1) public {
-    vm.assume(crypto.isFieldElementInternal(u_0));
-    vm.assume(crypto.isFieldElementInternal(u_1));
+    vm.assume(crypto.isFieldElementInternalProxy(u_0));
+    vm.assume(crypto.isFieldElementInternalProxy(u_1));
 
-    (uint256 mapped_p_x, uint256 mapped_p_y) = crypto.map_to_curve_simple_swu(u_0);
-    (uint256 p_x, uint256 p_y) = crypto.mapPoint(mapped_p_x, mapped_p_y);
+    (uint256 mapped_p_x, uint256 mapped_p_y) = crypto.mapToCurveSimpleSWUProxy(u_0);
+    (uint256 p_x, uint256 p_y) = crypto.mapPointProxy(mapped_p_x, mapped_p_y);
 
-    (uint256 mapped_q_x, uint256 mapped_q_y) = crypto.map_to_curve_simple_swu(u_1);
-    (uint256 q_x, uint256 q_y) = crypto.mapPoint(mapped_q_x, mapped_q_y);
+    (uint256 mapped_q_x, uint256 mapped_q_y) = crypto.mapToCurveSimpleSWUProxy(u_1);
+    (uint256 q_x, uint256 q_y) = crypto.mapPointProxy(mapped_q_x, mapped_q_y);
     
     // Q != -P
     vm.assume(p_x == q_x || p_y != q_y);
 
-    (uint256 r_x, uint256 r_y) = crypto.ecAdd(p_x, p_y, q_x, q_y, 0);
+    (uint256 r_x, uint256 r_y) = crypto.ecAddProxy(p_x, p_y, q_x, q_y, 0);
 
     // point addition (two different points)
-    assertTrue(crypto.isCurvePointInternal(r_x, r_y));
+    assertTrue(crypto.isCurvePointInternalProxy(r_x, r_y));
 
     // point doubling (same point)
-    (uint256 s_x, uint256 s_y) = crypto.ecAdd(p_x, p_y, q_x, q_y, 0);
-    assertTrue(crypto.isCurvePointInternal(s_x, s_y));
+    (uint256 s_x, uint256 s_y) = crypto.ecAddProxy(p_x, p_y, q_x, q_y, 0);
+    assertTrue(crypto.isCurvePointInternalProxy(s_x, s_y));
   }
 
   function testRevert_EcAddEdgeCase(uint256 u_0) public {
     u_0 = bound(u_0, 1, HoprCrypto.SECP256K1_BASE_FIELD_ORDER - 1);
 
-    (uint256 mapped_p_x, uint256 mapped_p_y) = crypto.map_to_curve_simple_swu(u_0);
-    (uint256 p_x, uint256 p_y) = crypto.mapPoint(mapped_p_x, mapped_p_y);
+    (uint256 mapped_p_x, uint256 mapped_p_y) = crypto.mapToCurveSimpleSWUProxy(u_0);
+    (uint256 p_x, uint256 p_y) = crypto.mapPointProxy(mapped_p_x, mapped_p_y);
 
     // Test P - P
     vm.expectRevert();
-    crypto.ecAdd(p_x, p_y, p_x, HoprCrypto.SECP256K1_BASE_FIELD_ORDER - p_y, 0);
+    crypto.ecAddProxy(p_x, p_y, p_x, HoprCrypto.SECP256K1_BASE_FIELD_ORDER - p_y, 0);
   }
-  
 
   function testSWUMap() public {
     // Test vector taken from
@@ -137,8 +175,8 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto {
     ];
 
     for (uint i = 0; i < u.length; i++) {
-      (uint256 mapped_x, uint256 mapped_y) = crypto.map_to_curve_simple_swu(u[i]);
-      (uint256 p_x, uint256 p_y) = crypto.mapPoint(mapped_x, mapped_y);
+      (uint256 mapped_x, uint256 mapped_y) = crypto.mapToCurveSimpleSWUProxy(u[i]);
+      (uint256 p_x, uint256 p_y) = crypto.mapPointProxy(mapped_x, mapped_y);
       assertEq(p_x, points[i].x);
       assertEq(p_y, points[i].y);
     }
@@ -173,7 +211,7 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto {
     ];
 
     for (uint256 i = 0; i < testStrings.length; i++) {
-      (uint256 p_x, uint256 p_y) = crypto.hashToCurve(testStrings[i], DST);
+      (uint256 p_x, uint256 p_y) = crypto.hashToCurveProxy(testStrings[i], DST);
       CurvePoint memory should = points[i];
 
       assertEq(p_x, should.x);
@@ -184,9 +222,9 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto {
   function testFuzzyHashToCurve(bytes memory vrf_message) public {
     string memory DST = "some DST tag";
     
-    (uint256 p_x, uint256 p_y) = crypto.hashToCurve(vrf_message, abi.encodePacked(DST));
+    (uint256 p_x, uint256 p_y) = crypto.hashToCurveProxy(vrf_message, abi.encodePacked(DST));
 
-    assertTrue(crypto.isCurvePointInternal(p_x, p_y));
+    assertTrue(crypto.isCurvePointInternalProxy(p_x, p_y));
   }
 
   function testVRFVerify() public {
@@ -251,7 +289,7 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto {
       "some DST tag"
     );
 
-    assertTrue(crypto.vrf_verify(params, payload));
+    assertTrue(crypto.vrfVerifyProxy(params, payload));
   }
 
   function testFuzzVRFVerify(uint256 privKey, bytes32 vrf_message) public {
@@ -263,7 +301,7 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto {
 
     // stack height optimization, doesn't compile otherwise
     {
-      address chain_addr = crypto.scalarTimesBasepoint(privKey);
+      address chain_addr = crypto.scalarTimesBasepointProxy(privKey);
       payload.message = vrf_message;
       payload.signer = chain_addr;
       payload.DST = abi.encodePacked(DST);
@@ -273,7 +311,7 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto {
 
     // stack height optimization, doesn't compile otherwise
     {
-      (uint256 b_x, uint256 b_y) = crypto.hashToCurve(abi.encodePacked(payload.signer, payload.message), payload.DST);
+      (uint256 b_x, uint256 b_y) = crypto.hashToCurveProxy(abi.encodePacked(payload.signer, payload.message), payload.DST);
 
       {
         (uint256 v_x, uint256 v_y) = secp256k1.ecmul(b_x, b_y, privKey);
@@ -281,11 +319,11 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto {
         params.v_y = v_y;
       }
 
-      uint256 r = crypto.hash_to_scalar(abi.encodePacked(privKey, b_x, b_y, payload.message), payload.DST);
+      uint256 r = crypto.hashToScalarProxy(abi.encodePacked(privKey, b_x, b_y, payload.message), payload.DST);
 
       (uint256 b_r_x, uint256 b_r_y) = secp256k1.ecmul(b_x,b_y, r);
 
-      params.h = crypto.hash_to_scalar(abi.encodePacked(
+      params.h = crypto.hashToScalarProxy(abi.encodePacked(
         payload.signer,
         params.v_x,
         params.v_y,
@@ -308,6 +346,6 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto {
       }
     }
 
-    assertTrue(crypto.vrf_verify(params, payload));
+    assertTrue(crypto.vrfVerifyProxy(params, payload));
   }
 }
