@@ -78,16 +78,14 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprLe
 
   bytes32 public immutable domainSeparator; // depends on chainId
   // Non-standard usage of EIP712 due computed property and custom property encoding
-  bytes32 public constant redeemTicketSeparator =
-    keccak256(
-      'Ticket(bytes32 channelId,uint96 balance,uint64 ticketIndex,uint24 epoch,uint56 winProb,address porChallenge)'
-    );
 
   /**
-   * @dev Possible channel states.
-   *
-   * finalizeChannelClosure()    ┌──────────────────────┐
-   *  (after notice period)      │                      │ initiateChannelClosure()
+   * @dev Channel state machine
+   *                                  redeemTicket()
+   *                                     ┌──────┐
+   * finalizeChannelClosure()            v      │
+   *  (after notice period), or  ┌──────────────────────┐
+   *  closeIncomingChannel()     │                      │ initiateChannelClosure()
    *            ┌────────────────│   Pending To Close   │<─────────────────┐
    *            │                │                      │                  │
    *            │                └──────────────────────┘                  │
@@ -97,6 +95,9 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprLe
    *     │   Closed   │           closeIncomingChannel()              │   Open   │
    *     │            │<──────────────────────────────────────────────│          │
    *     └────────────┘                                               └──────────┘
+   *                                                                    │      ^
+   *                                                                    └──────┘
+   *                                                                  redeemTicket()
    */
   enum ChannelStatus {
     CLOSED,
@@ -188,12 +189,12 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprLe
    * Emitted once a party initiates the closure of an outgoing
    * channel. Includes the timestamp when the notice period is due.
    */
-  event OutgoingChannelClosureInitiated(bytes32 channelId, Timestamp closureInitiationTime);
+  event OutgoingChannelClosureInitiated(bytes32 indexed channelId, Timestamp closureInitiationTime);
 
   /**
    * Emitted once a channel closure is finalized.
    */
-  event ChannelClosed(bytes32 channelId);
+  event ChannelClosed(bytes32 indexed channelId);
 
   /**
    * Emitted once a ticket is redeemed. Includes latest ticketIndex
@@ -374,7 +375,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprLe
     Channel storage channel = channels[channelId];
 
     // calling initiateClosure on a PENDING_TO_CLOSE channel extends the noticePeriod
-    if (channel.status != ChannelStatus.OPEN && channel.status != ChannelStatus.PENDING_TO_CLOSE) {
+    if (channel.status == ChannelStatus.CLOSED) {
       revert WrongChannelState({reason: 'channel must have state OPEN or PENDING_TO_CLOSE'});
     }
 
@@ -409,8 +410,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprLe
 
     Channel storage channel = channels[channelId];
 
-    if (channel.status != ChannelStatus.OPEN) {
-      revert WrongChannelState({reason: 'channel must have state OPEN'});
+    if (channel.status == ChannelStatus.CLOSED) {
+      revert WrongChannelState({reason: 'channel must have state OPEN or PENDING_TO_CLOSE'});
     }
 
     channel.status = ChannelStatus.CLOSED; // ChannelStatus.CLOSED == 0
@@ -450,10 +451,10 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprLe
     Channel storage channel = channels[channelId];
 
     if (channel.status != ChannelStatus.PENDING_TO_CLOSE) {
-      revert WrongChannelState({reason: 'channel must be pending to close'});
+      revert WrongChannelState({reason: 'channel state must be PENDING_TO_CLOSE'});
     }
 
-    if (Timestamp.unwrap(channel.closureTime) < Timestamp.unwrap(_currentBlockTimestamp())) {
+    if (Timestamp.unwrap(channel.closureTime) >= Timestamp.unwrap(_currentBlockTimestamp())) {
       revert NoticePeriodNotDue();
     }
 
@@ -469,9 +470,9 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprLe
       }
     }
 
-    emit ChannelClosed(channelId);
-
     channel.balance = Balance.wrap(0);
+
+    emit ChannelClosed(channelId);
   }
 
   /**
@@ -627,7 +628,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprLe
     // Deviates from EIP712 due to computed property and non-standard struct property encoding
     bytes32 hashStruct = keccak256(
       abi.encode(
-        redeemTicketSeparator,
+        this.redeemTicket.selector,
         keccak256(abi.encode(redeemable.data, HoprCrypto.scalarTimesBasepoint(redeemable.porSecret)))
       )
     );

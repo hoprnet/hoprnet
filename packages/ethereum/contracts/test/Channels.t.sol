@@ -51,9 +51,11 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest {
   event ChannelBalanceIncreased(bytes32 indexed channelId, HoprChannels.Balance newBalance);
   event ChannelBalanceDecreased(bytes32 indexed channelId, HoprChannels.Balance newBalance);
   event CommitmentSet(bytes32 indexed channelId, HoprChannels.ChannelEpoch epoch);
-  event OutgoingChannelClosureInitiated(bytes32 channelId, HoprChannels.Timestamp closureInitiationTime);
-  event ChannelClosed(bytes32 channelId);
+  event OutgoingChannelClosureInitiated(bytes32 indexed channelId, HoprChannels.Timestamp closureInitiationTime);
+  event ChannelClosed(bytes32 indexed channelId);
   event TicketRedeemed(bytes32 channelId, HoprChannels.TicketIndex newTicketIndex);
+
+  HoprChannels.Timestamp constant closureNoticePeriod = HoprChannels.Timestamp.wrap(15);
 
   bytes32 constant PROOF_OF_RELAY_SECRET_0 = keccak256(abi.encodePacked('PROOF_OF_RELAY_SECRET_0'));
   // HoprChannels.WinProb constant WIN_PROB_100 = HoprChannels.WinProb.wrap(type(uint56).max);
@@ -82,13 +84,8 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest {
   MyHoprChannels public hoprChannels;
   HoprNodeSafeRegistry public hoprNodeSafeRegistry;
 
-  bytes32 channelIdAB;
-  bytes32 channelIdBA;
-
   uint256 MIN_USED_BALANCE;
   uint256 MAX_USED_BALANCE;
-
-  uint256 constant ENOUGH_TIME_FOR_CLOSURE = 100;
 
   // uint256 public globalSnapshot;
 
@@ -144,7 +141,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest {
     vm.assume(dest != address(0));
 
     _helperNoSafeSetMock(src);
-    _helperTokenTransferMock(src, amount1);
+    _helperTokenTransferFromMock(src, amount1);
 
     vm.expectEmit(true, true, false, true, address(hoprChannels));
     emit ChannelOpened(src, dest, HoprChannels.Balance.wrap(amount1));
@@ -159,7 +156,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest {
     vm.clearMockedCalls();
 
     // Now, let's increase funds
-    _helperTokenTransferMock(src, amount2);
+    _helperTokenTransferFromMock(src, amount2);
 
     hoprChannels.fundChannel(dest, HoprChannels.Balance.wrap(amount2));
 
@@ -178,7 +175,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest {
     vm.assume(dest != address(0));
 
     _helperNoSafeSetMock(src);
-    _helperNoTokenTransferMock(src, amount);
+    _helperNoTokenTransferFromMock(src, amount);
 
     vm.expectRevert(HoprChannels.TokenTransferFailed.selector);
 
@@ -210,7 +207,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest {
     vm.assume(dest != address(0));
 
     _helperNoSafeSetMock(src);
-    _helperTokenTransferMock(src, amount);
+    _helperTokenTransferFromMock(src, amount);
     hoprChannels._storeChannelStatus(src, dest, HoprChannels.ChannelStatus.PENDING_TO_CLOSE);
 
     vm.startPrank(src);
@@ -241,17 +238,217 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest {
 
     hoprChannels.fundChannel(src, HoprChannels.Balance.wrap(amount));
 
+    vm.clearMockedCalls();
     vm.stopPrank();
   }
 
-  // function test_closeIncomingChannel(address src, address dest, uint96 amount) public {
-  //   amount = uint96(bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE));
-  //   vm.assume(src != dest);
+  function test_closeIncomingChannel(address src, address dest, uint96 amount, uint48 ticketIndex) public {
+    amount = uint96(bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE));
+    vm.assume(src != dest);
 
+    hoprChannels._storeChannel(dest, src, amount, ticketIndex, 0, 1, HoprChannels.ChannelStatus.OPEN);
+    _helperNoSafeSetMock(src);
+    _helperTokenTransferMock(dest, amount);
 
-  //   _helperNoSafeSetMock(src);
+    vm.expectEmit(true,false, false, true, address(hoprChannels));
+    emit ChannelClosed(hoprChannels._getChannelId(dest, src));
 
-  // }
+    vm.prank(src);
+    hoprChannels.closeIncomingChannel(dest);
+
+    assertEq(
+      keccak256(abi.encode(getChannelFromTuple(dest, src))), 
+      keccak256(abi.encode(wrapChannel(0,0,0,1, HoprChannels.ChannelStatus.CLOSED)))
+    );
+
+    vm.clearMockedCalls();
+
+    _helperNoSafeSetMock(src);
+
+    // Now let's assume there is a channel without funds
+    hoprChannels._storeChannel(dest, src, 0, ticketIndex, 0, 2, HoprChannels.ChannelStatus.OPEN);
+
+    vm.expectEmit(true,false, false, true, address(hoprChannels));
+    emit ChannelClosed(hoprChannels._getChannelId(dest, src));
+
+    vm.prank(src);
+    hoprChannels.closeIncomingChannel(dest);
+
+    assertEq(
+      keccak256(abi.encode(getChannelFromTuple(dest, src))), 
+      keccak256(abi.encode(wrapChannel(0,0,0,2, HoprChannels.ChannelStatus.CLOSED)))
+    );
+
+    vm.clearMockedCalls();
+  }
+
+  function testRevert_closeIncomingChannelWrongChannelState(address src, address dest, uint96 amount, uint48 ticketIndex) public {
+    amount = uint96(bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE));
+    vm.assume(src != dest);
+
+    _helperNoSafeSetMock(src);
+
+    hoprChannels._storeChannel(dest, src, amount, ticketIndex, 0, 1, HoprChannels.ChannelStatus.CLOSED);
+
+    vm.expectRevert(abi.encodeWithSelector(HoprChannels.WrongChannelState.selector, 'channel must have state OPEN or PENDING_TO_CLOSE'));
+    hoprChannels.closeIncomingChannel(dest);
+
+    vm.clearMockedCalls();
+  }
+
+  function testRevert_closeIncomingChannelNoFunds(address src, address dest, uint96 amount, uint48 ticketIndex) public {
+    amount = uint96(bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE));
+    vm.assume(src != dest);
+
+    _helperNoSafeSetMock(src);
+    _helperNoTokenTransferMock(dest, amount);
+
+    hoprChannels._storeChannel(dest, src, amount, ticketIndex, 0, 1, HoprChannels.ChannelStatus.OPEN);
+
+    vm.expectRevert(HoprChannels.TokenTransferFailed.selector);
+    vm.prank(src);
+
+    hoprChannels.closeIncomingChannel(dest);
+
+    vm.clearMockedCalls();
+  }
+
+  function test_initiateOutgoingChannelClosure(address src, address dest, uint96 amount, uint48 ticketIndex, uint32 nextTimestamp) public {
+    amount = uint96(bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE));
+    vm.assume(src != dest);
+
+    _helperNoSafeSetMock(src);
+
+    HoprChannels.Timestamp closureTime = HoprChannels.Timestamp.wrap(uint32(block.timestamp) + HoprChannels.Timestamp.unwrap(closureNoticePeriod));
+    nextTimestamp = uint32(bound(nextTimestamp, uint32(block.timestamp), uint32(type(uint32).max - HoprChannels.Timestamp.unwrap(closureNoticePeriod))));
+
+    hoprChannels._storeChannel(src, dest, amount, ticketIndex, 0, 1, HoprChannels.ChannelStatus.OPEN);
+
+    vm.expectEmit(true, false, false, true, address(hoprChannels));
+    emit OutgoingChannelClosureInitiated(hoprChannels._getChannelId(src, dest), closureTime);
+
+    vm.prank(src);
+    hoprChannels.initiateOutgoingChannelClosure(dest);
+
+    assertEq(
+      keccak256(abi.encode(getChannelFromTuple(src, dest))), 
+      keccak256(abi.encode(wrapChannel(amount,ticketIndex,HoprChannels.Timestamp.unwrap(closureTime),1, HoprChannels.ChannelStatus.PENDING_TO_CLOSE)))
+    );
+
+    // let's try to extend closureTime, safe as it's done by ticket issuer
+    // which gives ticket redeemer more time to redeem tickets
+    vm.warp(nextTimestamp);
+
+    HoprChannels.Timestamp nextClosureTime = HoprChannels.Timestamp.wrap(uint32(block.timestamp) + HoprChannels.Timestamp.unwrap(closureNoticePeriod));
+    
+    vm.prank(src);
+    hoprChannels.initiateOutgoingChannelClosure(dest);
+
+    assertEq(
+      keccak256(abi.encode(getChannelFromTuple(src, dest))), 
+      keccak256(abi.encode(wrapChannel(amount,ticketIndex,HoprChannels.Timestamp.unwrap(nextClosureTime),1, HoprChannels.ChannelStatus.PENDING_TO_CLOSE)))
+    );
+
+    vm.clearMockedCalls();
+  }
+
+  function testRevert_initiateOutgoingChannelClosureWrongChannelState(address src, address dest, uint96 amount) public {
+    amount = uint96(bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE));
+    vm.assume(src != dest);
+
+    _helperNoSafeSetMock(src);
+
+    hoprChannels._storeChannelStatus(src, dest, HoprChannels.ChannelStatus.CLOSED);
+
+    vm.expectRevert(abi.encodeWithSelector(HoprChannels.WrongChannelState.selector, 'channel must have state OPEN or PENDING_TO_CLOSE'));
+    vm.prank(src);
+    hoprChannels.initiateOutgoingChannelClosure(dest);
+
+    vm.clearMockedCalls();
+  }
+
+  function test_finalizeOutgoingChannelClosure(address src, address dest, uint96 amount, uint48 ticketIndex, uint32 closureTime, uint24 epoch) public {
+    amount = uint96(bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE));
+    closureTime = uint32(bound(closureTime, block.timestamp, uint32(type(uint32).max) - HoprChannels.Timestamp.unwrap(closureNoticePeriod) - 1));
+    vm.assume(src != dest);
+
+    _helperNoSafeSetMock(src);
+    _helperTokenTransferMock(src, amount);
+
+    hoprChannels._storeChannel(src, dest, amount, ticketIndex, closureTime, epoch, HoprChannels.ChannelStatus.PENDING_TO_CLOSE);
+
+    vm.warp(closureTime + HoprChannels.Timestamp.unwrap(closureNoticePeriod) + 1);
+
+    vm.expectEmit(true, false, false, true, address(hoprChannels));
+    emit ChannelClosed(hoprChannels._getChannelId(src, dest));
+
+    vm.prank(src);
+    hoprChannels.finalizeOutgoingChannelClosure(dest);
+
+    assertEq(
+      keccak256(abi.encode(getChannelFromTuple(src, dest))), 
+      keccak256(abi.encode(wrapChannel(0,0,0,epoch, HoprChannels.ChannelStatus.CLOSED)))
+    );
+
+    vm.clearMockedCalls();
+  }
+
+  function testRevert_finalizeOutgoingChannelClosureWrongChannelState(address src, address dest) public {
+    vm.assume(src != dest);
+
+    _helperNoSafeSetMock(src);
+
+    hoprChannels._storeChannelStatus(src, dest, HoprChannels.ChannelStatus.CLOSED);
+
+    vm.startPrank(src);
+    vm.expectRevert(abi.encodeWithSelector(HoprChannels.WrongChannelState.selector, 'channel state must be PENDING_TO_CLOSE'));
+    hoprChannels.finalizeOutgoingChannelClosure(dest);
+
+    hoprChannels._storeChannelStatus(src, dest, HoprChannels.ChannelStatus.OPEN);
+
+    vm.expectRevert(abi.encodeWithSelector(HoprChannels.WrongChannelState.selector, 'channel state must be PENDING_TO_CLOSE'));
+    hoprChannels.finalizeOutgoingChannelClosure(dest);
+
+    vm.clearMockedCalls();
+    vm.stopPrank();
+  }
+
+  function testRevert_finalizeOutgoingChannelClosureNotDue(address src, address dest, uint96 amount, uint48 ticketIndex, uint32 closureTime, uint24 epoch) public {
+    amount = uint96(bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE));
+    closureTime = uint32(bound(closureTime, block.timestamp + 1, uint32(type(uint32).max) - HoprChannels.Timestamp.unwrap(closureNoticePeriod) - 1));
+    vm.assume(src != dest);
+
+    _helperNoSafeSetMock(src);
+
+    hoprChannels._storeChannel(src, dest, amount, ticketIndex, closureTime, epoch, HoprChannels.ChannelStatus.PENDING_TO_CLOSE);
+
+    vm.startPrank(src);
+    vm.expectRevert(HoprChannels.NoticePeriodNotDue.selector);
+    hoprChannels.finalizeOutgoingChannelClosure(dest);
+
+    vm.stopPrank();
+    vm.clearMockedCalls();
+  }
+
+  function testRevert_finalizeOutgoingChannelClosureTokenTransfer(address src, address dest, uint96 amount, uint48 ticketIndex, uint32 closureTime, uint24 epoch) public {
+    amount = uint96(bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE));
+    closureTime = uint32(bound(closureTime, block.timestamp + 1, uint32(type(uint32).max) - HoprChannels.Timestamp.unwrap(closureNoticePeriod) - 1));
+    vm.assume(src != dest);
+
+    _helperNoSafeSetMock(src);
+    _helperNoTokenTransferMock(src, amount);
+
+    vm.warp(closureTime + 1);
+
+    hoprChannels._storeChannel(src, dest, amount, ticketIndex, closureTime, epoch, HoprChannels.ChannelStatus.PENDING_TO_CLOSE);
+
+    vm.startPrank(src);
+    vm.expectRevert(HoprChannels.TokenTransferFailed.selector);
+    hoprChannels.finalizeOutgoingChannelClosure(dest);
+
+    vm.stopPrank();
+    vm.clearMockedCalls();
+  }
 
   // function testFundChannelMulti(uint96 amount1, uint96 amount2, address account1, address account2) public {
   //   amount1 = uint96(bound(amount1, MIN_USED_BALANCE ,MAX_USED_BALANCE));
@@ -1683,7 +1880,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest {
     );
   }
 
-  function _helperTokenTransferMock(address owner, uint256 amount) private {
+  function _helperTokenTransferFromMock(address owner, uint256 amount) private {
     vm.mockCall(
       address(hoprToken),
       abi.encodeWithSelector(
@@ -1695,13 +1892,36 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest {
     );
   }
 
-  function _helperNoTokenTransferMock(address owner, uint256 amount) private {
+  function _helperNoTokenTransferFromMock(address owner, uint256 amount) private {
     vm.mockCall(
       address(hoprToken),
       abi.encodeWithSelector(
         hoprToken.transferFrom.selector, 
         owner,
         address(hoprChannels),
+        amount),
+      abi.encode(false)
+    );
+  }
+
+  function _helperTokenTransferMock(address dest, uint256 amount) private {
+    vm.mockCall(
+      address(hoprToken),
+      abi.encodeWithSelector(
+        hoprToken.transfer.selector, 
+        dest,
+        amount),
+      abi.encode(true)
+    );
+  } 
+
+
+  function _helperNoTokenTransferMock(address dest, uint256 amount) private {
+    vm.mockCall(
+      address(hoprToken),
+      abi.encodeWithSelector(
+        hoprToken.transfer.selector, 
+        dest,
         amount),
       abi.encode(false)
     );
