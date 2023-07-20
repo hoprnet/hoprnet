@@ -224,19 +224,19 @@ pub struct CliArgs {
     pub max_auto_channels: Option<u32>, // Make this a string if we want to supply functions instead in the future.
 
     #[arg(
-        long = "autoRedeemTickets",
-        env = "HOPRD_AUTO_REDEEEM_TICKETS",
-        help = "If enabled automatically redeems winning tickets.",
-        action = ArgAction::SetTrue,
+        long = "disableTicketAutoRedeem",
+        env = "HOPRD_DISABLE_AUTO_REDEEEM_TICKETS",
+        help = "Disables automatic redeemeing of winning tickets.",
+        action = ArgAction::SetFalse,
         default_value_t = crate::config::Strategy::default().auto_redeem_tickets
     )]
     pub auto_redeem_tickets: bool,
 
     #[arg(
-        long = "checkUnrealizedBalance",
-        env = "HOPRD_CHECK_UNREALIZED_BALANCE",
-        help = "Determines if unrealized balance shall be checked first before validating unacknowledged tickets.",
-        action = ArgAction::SetTrue,
+        long = "disableUnrealizedBalanceCheck",
+        env = "HOPRD_DISABLE_UNREALIZED_BALANCE_CHECK",
+        help = "Disables checking of unrealized balance before validating unacknowledged tickets.",
+        action = ArgAction::SetFalse,
         default_value_t = crate::config::Chain::default().check_unrealized_balance
     )]
     pub check_unrealized_balance: bool,
