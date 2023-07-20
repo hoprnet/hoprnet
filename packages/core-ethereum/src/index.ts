@@ -527,6 +527,9 @@ export default class HoprCoreEthereum extends EventEmitter {
     if (myBalance.lt(amount)) {
       throw Error('We do not have enough balance to open a channel')
     }
+
+    log(`opening channel to ${dest.to_hex()} with amount ${amount.to_formatted_string()}`)
+
     const receipt = await this.fundChannel(dest, amount, Balance.zero(BalanceType.HOPR))
     return { channelId: generate_channel_id(this.publicKey.to_address(), dest), receipt }
   }

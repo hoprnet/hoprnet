@@ -158,12 +158,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         ack_ticket: AcknowledgedTicket,
     ) -> Result<()> {
         let unack_key = utils_db::db::Key::new_with_prefix(half_key_challenge, PENDING_ACKNOWLEDGEMENTS_PREFIX)?;
-
-        let mut ack_key = serialize_to_bytes(&ack_ticket.ticket.challenge)?;
-        let mut channel_epoch = serialize_to_bytes(&ack_ticket.ticket.channel_epoch)?;
-        ack_key.append(&mut channel_epoch);
-
-        let ack_key = utils_db::db::Key::new_bytes_with_prefix(&ack_key, ACKNOWLEDGED_TICKETS_PREFIX)?;
+        let ack_key = to_acknowledged_ticket_key(&ack_ticket.ticket.challenge, &ack_ticket.ticket.channel_epoch)?;
 
         let mut batch_ops = utils_db::db::Batch::new();
         batch_ops.del(unack_key);
@@ -179,10 +174,12 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
                 Vec::from(ACKNOWLEDGED_TICKETS_PREFIX.as_bytes()).into_boxed_slice(),
                 EthereumChallenge::SIZE as u32,
                 &|ack: &AcknowledgedTicket| {
-                    filter
-                        .clone()
-                        .map(|f| f.destination.eq(&self.me) && ack.ticket.channel_epoch.eq(&f.channel_epoch))
-                        .unwrap_or(true)
+                    match &filter {
+                        Some(f) => f.destination.eq(&self.me) &&
+                            ack.ticket.channel_epoch.eq(&f.channel_epoch) &&
+                            f.source.eq(&ack.signer),
+                        None => true
+                    }
                 },
             )
             .await
@@ -196,10 +193,13 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
                 EthereumChallenge::SIZE as u32,
                 &|pending: &PendingAcknowledgement| match pending {
                     PendingAcknowledgement::WaitingAsSender => false,
-                    PendingAcknowledgement::WaitingAsRelayer(unack) => filter
-                        .clone()
-                        .map(|f| f.destination.eq(&self.me) && unack.ticket.channel_epoch.eq(&f.channel_epoch))
-                        .unwrap_or(true),
+                    PendingAcknowledgement::WaitingAsRelayer(unack) =>
+                        match &filter {
+                            Some(f) => f.destination.eq(&self.me) &&
+                                unack.ticket.channel_epoch.eq(&f.channel_epoch) &&
+                                f.source.eq(&unack.signer),
+                            None => true
+                        }
                 },
             )
             .await?
@@ -443,14 +443,17 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             "marking ticket {} in channel with {} as redeemed",
             ticket.ticket.index, ticket.ticket.counterparty
         );
+
+        let mut ops = utils_db::db::Batch::new();
+
         let key = utils_db::db::Key::new_from_str(REDEEMED_TICKETS_COUNT)?;
         let count = self.db.get_or_none::<usize>(key.clone()).await?.unwrap_or(0);
         debug!("currently redeemed tickets count is {count}");
 
-        let _ = self.db.set(key, &(count + 1)).await?;
+        ops.put(key, count + 1);
 
         let key = to_acknowledged_ticket_key(&ticket.ticket.challenge, &ticket.ticket.channel_epoch)?;
-        let _ = self.db.remove::<AcknowledgedTicket>(key).await?;
+        ops.del(key);
 
         let key = utils_db::db::Key::new_from_str(REDEEMED_TICKETS_VALUE)?;
         let balance = self
@@ -461,7 +464,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         debug!("currently redeemed value is {balance}");
 
         let new_redeemed_balance = balance.add(&ticket.ticket.amount);
-        let _ = self.db.set(key, &new_redeemed_balance).await?;
+        ops.put(key, new_redeemed_balance);
         debug!("updated redeemed value is {new_redeemed_balance}");
 
         let key = utils_db::db::Key::new_with_prefix(&ticket.ticket.counterparty, PENDING_TICKETS_COUNT)?;
@@ -473,30 +476,36 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         debug!("currently pending unredeemed balance is {pending_balance}");
 
         let new_pending_balance = pending_balance.sub(&ticket.ticket.amount);
-        let _ = self.db.set(key, &new_pending_balance).await?;
+        ops.put(key, new_pending_balance);
         debug!("updated pending unredeemed balance is {new_pending_balance}");
 
-        Ok(())
+        self.db.batch(ops, true).await
     }
 
     async fn mark_losing_acked_ticket(&mut self, ticket: &AcknowledgedTicket) -> Result<()> {
+        debug!(
+            "marking ticket {} in channel with {} as losing",
+            ticket.ticket.index, ticket.ticket.counterparty
+        );
+
+        let mut ops = utils_db::db::Batch::new();
+
         let key = utils_db::db::Key::new_from_str(LOSING_TICKET_COUNT)?;
         let count = self.db.get_or_none::<usize>(key.clone()).await?.unwrap_or(0);
-        let _ = self.db.set(key, &(count + 1)).await?;
+        ops.put(key, count + 1);
 
         let key = to_acknowledged_ticket_key(&ticket.ticket.challenge, &ticket.ticket.channel_epoch)?;
-        let _ = self.db.remove::<AcknowledgedTicket>(key).await?;
+        ops.del(key);
 
         let key = utils_db::db::Key::new_with_prefix(&ticket.ticket.counterparty, PENDING_TICKETS_COUNT)?;
         let balance = self
             .db
             .get_or_none::<Balance>(key.clone())
             .await?
-            .unwrap_or(Balance::zero(BalanceType::HOPR))
-            .sub(&ticket.ticket.amount);
-        let _ = self.db.set(key, &balance).await?;
+            .unwrap_or(Balance::zero(BalanceType::HOPR));
+        ops.put(key, balance.sub(&ticket.ticket.amount));
 
-        Ok(())
+        self.db.batch(ops, true).await
     }
 
     async fn get_rejected_tickets_value(&self) -> Result<Balance> {

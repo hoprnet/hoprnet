@@ -1509,6 +1509,8 @@ class Hopr extends EventEmitter {
       Packet_Address.deserialize(self.serialize())
     )
 
+    log(`looking for tickets in channel ${channel.to_string()}`)
+
     const ackedTickets = await this.db.get_acknowledged_tickets(channel)
 
     let result = []
