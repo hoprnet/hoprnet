@@ -11,8 +11,8 @@ on:
       - unlabeled
 
 env:
-  GITOPS_ENVIRONMENT: stage
-  GITOPS_BRANCH: feature/pipeline-improvements
+  GITOPS_ENVIRONMENT: prod
+  GITOPS_BRANCH: master
 jobs:
   deploy:
     name: deploy

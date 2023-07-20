@@ -58,7 +58,7 @@ function check_push() {
     usage
     exit 1
   fi
-  
+
   echo "Checking pushed changeset from ${head_branch} against ${base_branch}"
   git diff --name-only --diff-filter=ACMRT "${base_branch}" "${head_branch}" > changes.txt
   if grep -e ^scripts/ -e ^.github/workflows/build.yaml -e ^.github/workflows/build-toolchain.yaml -e ^Makefile$ -e ^package.json$ -e ^.yarnrc.yml$ -e ^rust-toolchain.toml$ -e ^.nvmrc -e ^yarn.lock$ -e ^Cargo.toml$ changes.txt 1> /dev/null; then
