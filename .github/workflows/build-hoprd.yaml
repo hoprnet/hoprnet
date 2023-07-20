@@ -79,7 +79,10 @@ jobs:
     # needs: build
     if: ${{ contains(github.event.pull_request.labels.*.name, 'deploy_nodes') }}
     steps:
-      - name: "Setup environment"
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v3
+
+      - name: "Restart deployments"
         run: |
           prBase="${{ github.event.pull_request.base.ref }}"
           # Identify the network to deploy nodes
