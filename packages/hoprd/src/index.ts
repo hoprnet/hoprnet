@@ -29,7 +29,6 @@ import {
   fetch_configuration,
   parse_private_key,
   HoprdConfig,
-  hoprd_misc_initialize_crate,
   type Api,
   type CliArgs,
   hoprd_misc_initialize_crate
