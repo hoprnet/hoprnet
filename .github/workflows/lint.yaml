@@ -33,6 +33,7 @@ jobs:
         if: ${{ env.ACT }}
         run: |
           yq --help
+          gh --version
           echo "SCCACHE_GHA_ENABLED=false" >> $GITHUB_ENV
           echo "RUSTC_WRAPPER=" >> $GITHUB_ENV
 
