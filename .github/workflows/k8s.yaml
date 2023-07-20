@@ -52,7 +52,7 @@ jobs:
           echo "NETWORK=${network}" >> $GITHUB_ENV
           echo "NETWORK_DASH=${network/_/-}" >> $GITHUB_ENV
           pip install -r ./scripts/requirements.txt
-          python3 ./scripts/sync-deploymeny.py -a deploy -e ${{ env.GITOPS_ENVIRONMENT }} -n ${network} -v ${{ env.DOCKER_TAG_VERSION }}
+          python3 ./scripts/sync-deployment.py -a deploy -e ${{ env.GITOPS_ENVIRONMENT }} -n ${network} -v ${{ env.DOCKER_TAG_VERSION }}
         working-directory: "./gitops"
       - name: Create Deploy Pull Request
         uses: peter-evans/create-pull-request@v5
@@ -105,7 +105,7 @@ jobs:
           echo "NETWORK=${network}" >> $GITHUB_ENV
           echo "NETWORK_DASH=${network/_/-}" >> $GITHUB_ENV
           pip install -r ./scripts/requirements.txt
-          python3 ./scripts/sync-deploymeny.py -a undeploy -e ${{ env.GITOPS_ENVIRONMENT }} -v ${{ env.DOCKER_TAG_VERSION }}
+          python3 ./scripts/sync-deployment.py -a undeploy -e ${{ env.GITOPS_ENVIRONMENT }} -v ${{ env.DOCKER_TAG_VERSION }}
         working-directory: "./gitops"
       - name: Create Undeploy Pull Request
         uses: peter-evans/create-pull-request@v5
