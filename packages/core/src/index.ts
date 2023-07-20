@@ -1545,8 +1545,8 @@ class Hopr extends EventEmitter {
       redeemed: await this.db.get_redeemed_tickets_count(),
       redeemedValue: await this.db.get_redeemed_tickets_value(),
       neglected: await this.db.get_neglected_tickets_count(),
-      rejected: await this.db.get_redeemed_tickets_count(),
-      rejectedValue: await this.db.get_redeemed_tickets_value()
+      rejected: await this.db.get_rejected_tickets_count(),
+      rejectedValue: await this.db.get_rejected_tickets_value()
     }
   }
 
