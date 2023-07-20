@@ -27,7 +27,10 @@ where
     let pre_image = find_commitment_preimage(db, channel_id).await?;
 
     acked_ticket.set_preimage(&pre_image);
-    debug!("Set preImage {} for ticket {}", pre_image, acked_ticket.response);
+    debug!(
+        "Set preImage {pre_image} for ticket {} in channel to {counterparty}",
+        acked_ticket.response
+    );
 
     if !acked_ticket
         .ticket
@@ -56,7 +59,7 @@ where
     // bump commitment when on-chain ticket redemption is successful
     // FIXME: bump commitment can fail if channel runs out of commitments
     bump_commitment(db, channel_id, &pre_image).await?;
-    debug!("Successfully bumped local commitment after {}", pre_image);
+    debug!("Successfully bumped local commitment after {pre_image} for channel {channel_id}");
 
     db.mark_redeemed(&acked_ticket).await?;
 
@@ -159,7 +162,7 @@ pub mod wasm {
         acked_ticket: &mut AcknowledgedTicket,
         submit_ticket: &Function, // (counterparty: Address, ackedTicket)
     ) -> JsResult<String> {
-        debug!("redeeming ticket for counterparty {counterparty}");
+        debug!("redeeming ticket for counterparty {counterparty} in channel {channel_id}");
 
         debug!(">>> READ prepare_redeem_ticket");
         let pre_image = {
@@ -171,6 +174,7 @@ pub mod wasm {
         debug!("<<< READ prepare_redeem_ticket");
 
         let this = JsValue::undefined();
+        debug!("submitting tx for ticket redemption in channel {channel_id} to {counterparty}");
         let res = submit_ticket.call2(
             &this,
             &<JsValue as From<Address>>::from(counterparty.to_owned()),

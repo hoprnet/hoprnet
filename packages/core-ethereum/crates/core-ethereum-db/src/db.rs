@@ -439,8 +439,14 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
     }
 
     async fn mark_redeemed(&mut self, ticket: &AcknowledgedTicket) -> Result<()> {
+        debug!(
+            "marking ticket {} in channel with {} as redeemed",
+            ticket.ticket.index, ticket.ticket.counterparty
+        );
         let key = utils_db::db::Key::new_from_str(REDEEMED_TICKETS_COUNT)?;
         let count = self.db.get_or_none::<usize>(key.clone()).await?.unwrap_or(0);
+        debug!("currently redeemed tickets count is {count}");
+
         let _ = self.db.set(key, &(count + 1)).await?;
 
         let key = to_acknowledged_ticket_key(&ticket.ticket.challenge, &ticket.ticket.channel_epoch)?;
@@ -451,18 +457,24 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             .db
             .get_or_none::<Balance>(key.clone())
             .await?
-            .unwrap_or(Balance::zero(BalanceType::HOPR))
-            .add(&ticket.ticket.amount);
-        let _ = self.db.set(key, &balance).await?;
+            .unwrap_or(Balance::zero(BalanceType::HOPR));
+        debug!("currently redeemed value is {balance}");
+
+        let new_redeemed_balance = balance.add(&ticket.ticket.amount);
+        let _ = self.db.set(key, &new_redeemed_balance).await?;
+        debug!("updated redeemed value is {new_redeemed_balance}");
 
         let key = utils_db::db::Key::new_with_prefix(&ticket.ticket.counterparty, PENDING_TICKETS_COUNT)?;
-        let balance = self
+        let pending_balance = self
             .db
             .get_or_none::<Balance>(key.clone())
             .await?
-            .unwrap_or(Balance::zero(BalanceType::HOPR))
-            .sub(&ticket.ticket.amount);
-        let _ = self.db.set(key, &balance).await?;
+            .unwrap_or(Balance::zero(BalanceType::HOPR));
+        debug!("currently pending unredeemed balance is {pending_balance}");
+
+        let new_pending_balance = pending_balance.sub(&ticket.ticket.amount);
+        let _ = self.db.set(key, &new_pending_balance).await?;
+        debug!("updated pending unredeemed balance is {new_pending_balance}");
 
         Ok(())
     }

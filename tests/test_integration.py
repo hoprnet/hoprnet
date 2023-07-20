@@ -32,4 +32,3 @@ def test_hoprd_protocol_integration_tests(setup_7_nodes):
         # timeout=2000,
         check=True,
     )
-    print(res)

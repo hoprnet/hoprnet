@@ -1,6 +1,6 @@
 use crate::acknowledgement::PendingAcknowledgement::{WaitingAsRelayer, WaitingAsSender};
 use crate::channels::Ticket;
-use core_crypto::errors::CryptoError::SignatureVerification;
+use core_crypto::errors::CryptoError::{InvalidChallenge, SignatureVerification};
 use core_crypto::primitives::{DigestLike, SimpleDigest};
 use core_crypto::types::{HalfKey, HalfKeyChallenge, Hash, PublicKey, Response, Signature};
 use serde::{Deserialize, Serialize};
@@ -166,7 +166,7 @@ impl AcknowledgedTicket {
                 .to_ethereum_challenge()
                 .eq(&self.ticket.challenge))
         .then_some(())
-        .ok_or(SignatureVerification)
+        .ok_or(InvalidChallenge)
     }
 }
 

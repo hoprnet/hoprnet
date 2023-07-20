@@ -77,7 +77,9 @@ export class LevelDb {
   }
 
   public async put(key: Uint8Array, value: Uint8Array): Promise<void> {
-    return await this.backend.put(u8aToHex(key), u8aToHex(value))
+    let k = u8aToHex(key)
+    await this.backend.del(k) // Delete first in case the value already exists
+    return await this.backend.put(k, u8aToHex(value))
   }
 
   public async get(key: Uint8Array): Promise<Uint8Array> {

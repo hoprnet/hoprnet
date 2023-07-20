@@ -356,6 +356,8 @@ export default class HoprCoreEthereum extends EventEmitter {
       throw new Error('Cannot redeem ticket in channel that is not to us')
     }
 
+    log(`Going to redeem tickets in channel ${channelId.to_hex()}`)
+
     // Because tickets are ordered and require the previous redemption to
     // have succeeded before we can redeem the next, we need to do this
     // sequentially.
@@ -386,7 +388,7 @@ export default class HoprCoreEthereum extends EventEmitter {
         ticket = fetched
 
         log(
-          `redeeming ticket ${ticket.response.to_hex()} in channel from ${channel.source.to_hex()} to ${channel.destination.to_hex()}, preImage ${ticket.pre_image.to_hex()}, porSecret ${ticket.response.to_hex()}`
+          `redeeming ticket ${ticket.response.to_hex()} in channel ${channelId.to_hex()} from ${channel.source.to_hex()} to ${channel.destination.to_hex()}, preImage ${ticket.pre_image.to_hex()}, porSecret ${ticket.response.to_hex()}`
         )
 
         log(ticket.ticket.to_string())
@@ -431,7 +433,7 @@ export default class HoprCoreEthereum extends EventEmitter {
   ): Promise<RedeemTicketResponse> {
     let receipt: string
     try {
-      log(`going to redeem ticket for counterparty ${counterparty.to_hex()}`)
+      log(`Performing ticket redemption ticket for counterparty ${counterparty.to_hex()} in channel ${channelId.to_hex()}`)
       receipt = await redeem_ticket(
         this.db,
         Ethereum_Address.deserialize(counterparty.serialize()),
