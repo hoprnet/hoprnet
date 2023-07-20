@@ -32,6 +32,7 @@ jobs:
       - name: Disable sccache (act-only)
         if: ${{ env.ACT }}
         run: |
+          yq --help
           echo "SCCACHE_GHA_ENABLED=false" >> $GITHUB_ENV
           echo "RUSTC_WRAPPER=" >> $GITHUB_ENV
 
