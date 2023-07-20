@@ -34,6 +34,7 @@ jobs:
         run: |
           yq --help
           gh --version
+          kubectl version
           echo "SCCACHE_GHA_ENABLED=false" >> $GITHUB_ENV
           echo "RUSTC_WRAPPER=" >> $GITHUB_ENV
 
