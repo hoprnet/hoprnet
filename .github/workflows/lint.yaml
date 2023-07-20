@@ -32,9 +32,6 @@ jobs:
       - name: Disable sccache (act-only)
         if: ${{ env.ACT }}
         run: |
-          yq --help
-          gh --version
-          kubectl version
           echo "SCCACHE_GHA_ENABLED=false" >> $GITHUB_ENV
           echo "RUSTC_WRAPPER=" >> $GITHUB_ENV
 
@@ -58,7 +55,11 @@ jobs:
 
       - name: get yarn cache directory path
         id: yarn-cache-dir-path
-        run: echo "dir=$(pwd)/.yarn/cache" >> $GITHUB_OUTPUT
+        run: |
+          yq --help
+          gh --version
+          kubectl version
+          echo "dir=$(pwd)/.yarn/cache" >> $GITHUB_OUTPUT
 
       - name: restore yarn cache
         uses: actions/cache@v3
