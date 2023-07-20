@@ -60,12 +60,12 @@ jobs:
 
   build_hoprd:
     name: Hoprd
-    needs:
-      - check_changeset
-      - build_toolchain
-    if: |
-      needs.check_changeset.outputs.build_hoprd
-      || needs.check_changeset.outputs.build_toolchain
+    # needs:
+    #   - check_changeset
+    #   - build_toolchain
+    # if: |
+    #   needs.check_changeset.outputs.build_hoprd
+    #   || needs.check_changeset.outputs.build_toolchain
     uses: ./.github/workflows/build-hoprd.yaml
     secrets:
       GOOGLE_HOPRASSOCIATION_PROJECT: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
