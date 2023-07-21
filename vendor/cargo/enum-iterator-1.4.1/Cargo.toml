@@ -11,12 +11,12 @@
 
 [package]
 edition = "2021"
-name = "enum-iterator-derive"
-version = "1.2.0"
+name = "enum-iterator"
+version = "1.4.1"
 authors = ["Stephane Raux <stephaneyfx@gmail.com>"]
-description = "Procedural macro to derive Sequence"
+description = "Tools to iterate over all values of a type (e.g. all variants of an enumeration)"
 homepage = "https://github.com/stephaneyfx/enum-iterator"
-documentation = "https://docs.rs/enum-iterator-derive"
+documentation = "https://docs.rs/enum-iterator"
 readme = "README.md"
 keywords = [
     "enum",
@@ -29,15 +29,5 @@ license = "0BSD"
 repository = "https://github.com/stephaneyfx/enum-iterator.git"
 resolver = "1"
 
-[lib]
-proc-macro = true
-
-[dependencies.proc-macro2]
-version = "1.0.39"
-
-[dependencies.quote]
-version = "1.0.18"
-
-[dependencies.syn]
-version = "1.0.96"
-features = ["extra-traits"]
+[dependencies.enum-iterator-derive]
+version = "1.2.1"
