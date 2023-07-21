@@ -310,13 +310,13 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
                 );
 
                 // replace the un-acked ticket with acked ticket.
-                debug!(">>> WRITE replacing unack with acked");
+                //debug!(">>> WRITE replacing unack with acked");
                 self.db
                     .write()
                     .await
                     .replace_unack_with_ack(&ack.ack_challenge(), ack_ticket.clone())
                     .await?;
-                debug!("<<< WRITE replacing unack with acked");
+                //debug!("<<< WRITE replacing unack with acked");
 
                 #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_ACKED_TICKETS.increment();
@@ -404,13 +404,13 @@ where
             .await?
             .unwrap_or(U256::one());
 
-        debug!(">>> WRITE bumping ticket index");
+        //debug!(">>> WRITE bumping ticket index");
         self.db
             .write()
             .await
             .set_current_ticket_index(channel_id, current_ticket_index.addn(1))
             .await?;
-        debug!("<<< WRITE bumping ticket index");
+        //debug!("<<< WRITE bumping ticket index");
 
         Ok(current_ticket_index)
     }
@@ -460,9 +460,9 @@ where
             &self.cfg.private_key,
         );
 
-        debug!(">>> WRITE mark_pending lock");
+        //debug!(">>> WRITE mark_pending lock");
         self.db.write().await.mark_pending(&ticket).await?;
-        debug!("<<< WRITE mark_pending lock");
+        //debug!("<<< WRITE mark_pending lock");
 
         debug!(
             "Creating ticket in channel {channel_id}. Ticket data: {}",
@@ -500,14 +500,14 @@ where
         debug!("packet state {}", packet.state());
         match packet.state() {
             PacketState::Outgoing { ack_challenge, .. } => {
-                debug!(">>> WRITE store_pending_lock");
+                //debug!(">>> WRITE store_pending_lock");
                 self.db
                     .write()
                     .await
                     .store_pending_acknowledgment(ack_challenge.clone(), PendingAcknowledgement::WaitingAsSender)
                     .await?;
 
-                debug!("<<< WRITE store_pending_lock");
+                //debug!("<<< WRITE store_pending_lock");
 
                 #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_PACKETS_COUNT.increment();
@@ -575,11 +575,11 @@ where
                 ..
             } => {
                 // Validate if it's not a replayed packet
-                debug!(">>> WRITE check_and_set_packet_tag final lock");
+                //debug!(">>> WRITE check_and_set_packet_tag final lock");
                 if self.db.write().await.check_and_set_packet_tag(packet_tag).await? {
                     return Err(TagReplay);
                 }
-                debug!("<<< WRITE check_and_set_packet_tag final lock");
+                //debug!("<<< WRITE check_and_set_packet_tag final lock");
 
                 // We're the destination of the packet, so emit the packet contents
                 if let Some(emitter) = &self.on_final_packet {
@@ -614,11 +614,11 @@ where
                 ..
             } => {
                 // Validate if it's not a replayed packet
-                debug!(">>> WRITE check_and_set_packet_tag forwarded lock");
+                //debug!(">>> WRITE check_and_set_packet_tag forwarded lock");
                 if self.db.write().await.check_and_set_packet_tag(packet_tag).await? {
                     return Err(TagReplay);
                 }
-                debug!("<<< WRITE check_and_set_packet_tag forwarded lock");
+                //debug!("<<< WRITE check_and_set_packet_tag forwarded lock");
 
                 let inverse_win_prob = U256::new(INVERSE_TICKET_WIN_PROB);
 
@@ -646,19 +646,19 @@ where
                 .await
                 {
                     // Mark as reject and passthrough the error
-                    debug!(">>> WRITE mark_rejected forwarded lock");
+                    //debug!(">>> WRITE mark_rejected forwarded lock");
                     self.db.write().await.mark_rejected(&packet.ticket).await?;
-                    debug!("<<< WRITE mark_rejected forwarded lock");
+                    //debug!("<<< WRITE mark_rejected forwarded lock");
                     return Err(e);
                 }
 
-                debug!(">>> WRITE storing pending ack");
+                //debug!(">>> WRITE storing pending ack");
                 {
                     let mut g = self.db.write().await;
                     g.set_current_ticket_index(&channel.get_id().hash(), packet.ticket.index)
                         .await?;
 
-                    debug!(">>> <<< updated current ticket index");
+                    //debug!(">>> <<< updated current ticket index");
 
                     // Store the unacknowledged ticket
                     g.store_pending_acknowledgment(
@@ -671,7 +671,7 @@ where
                     )
                     .await?;
                 }
-                debug!("<<< WRITE storing pending ack");
+                //debug!("<<< WRITE storing pending ack");
 
                 let path_pos = packet
                     .ticket

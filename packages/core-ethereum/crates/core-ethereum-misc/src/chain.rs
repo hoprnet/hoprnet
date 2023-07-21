@@ -164,14 +164,14 @@ pub mod wasm {
     ) -> JsResult<String> {
         debug!("redeeming ticket for counterparty {counterparty} in channel {channel_id}");
 
-        debug!(">>> READ prepare_redeem_ticket");
+        //debug!(">>> READ prepare_redeem_ticket");
         let pre_image = {
             let val = db.as_ref_counted();
             let g = val.read().await;
 
             super::prepare_redeem_ticket(&*g, counterparty, channel_id, acked_ticket).await?
         };
-        debug!("<<< READ prepare_redeem_ticket");
+        //debug!("<<< READ prepare_redeem_ticket");
 
         let this = JsValue::undefined();
         debug!("submitting tx for ticket redemption in channel {channel_id} to {counterparty}");
@@ -187,13 +187,13 @@ pub mod wasm {
             .await
             .map_err(|e| format!("Error while trying to submit ticket {:?}", e))?;
 
-        debug!(">>> WRITE after_redeem_ticket");
+        //debug!(">>> WRITE after_redeem_ticket");
         {
             let val = db.as_ref_counted();
             let mut g = val.write().await;
             super::after_redeem_ticket(&mut *g, channel_id, &pre_image, acked_ticket).await?;
         }
-        debug!("<<< WRITE after_redeem_ticket");
+        //debug!("<<< WRITE after_redeem_ticket");
         debug!("Successfully submitted ticket {}", acked_ticket.response);
 
         Ok(JsString::from(receipt).as_string().unwrap_or("no receipt given".into()))

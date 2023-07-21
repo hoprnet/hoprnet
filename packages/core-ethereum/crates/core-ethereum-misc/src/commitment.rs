@@ -233,14 +233,14 @@ pub mod wasm {
         channel_info: &ChannelCommitmentInfo,
         set_commitment: &js_sys::Function, // async (Uint8Array) => String
     ) -> JsResult<()> {
-        debug!(">>> WRITE initialize_commitment");
+        //debug!(">>> WRITE initialize_commitment");
         let maybe_hash = {
             let val = db.as_ref_counted();
             let mut g = val.write().await;
 
             super::initialize_commitment(&mut *g, private_key, channel_info).await?
         };
-        debug!("<<< WRITE initialize_commitment");
+        //debug!("<<< WRITE initialize_commitment");
 
         if let Some(hash) = maybe_hash {
             let this = JsValue::null();
@@ -259,25 +259,25 @@ pub mod wasm {
 
     #[wasm_bindgen]
     pub async fn find_commitment_preimage(db: &Database, channel_id: &Hash) -> JsResult<Hash> {
-        debug!(">>> WRITE find_commitment_preimage");
+        //debug!(">>> WRITE find_commitment_preimage");
         let r = {
             let val = db.as_ref_counted();
             let mut g = val.write().await;
             ok_or_jserr!(super::find_commitment_preimage(&mut *g, channel_id).await)
         };
-        debug!("<<< WRITE find_commitment_preimage");
+        //debug!("<<< WRITE find_commitment_preimage");
         r
     }
 
     #[wasm_bindgen]
     pub async fn bump_commitment(db: &Database, channel_id: &Hash, new_commitment: &Hash) -> JsResult<()> {
-        debug!(">>> WRITE bump_commitment");
+        //debug!(">>> WRITE bump_commitment");
         let r = {
             let val = db.as_ref_counted();
             let mut g = val.write().await;
             ok_or_jserr!(super::bump_commitment(&mut *g, channel_id, new_commitment).await)
         };
-        debug!("<<< WRITE bump_commitment");
+        //debug!("<<< WRITE bump_commitment");
         r
     }
 }
