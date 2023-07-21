@@ -44,6 +44,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprLe
   type Balance is uint96;
   type TicketEpoch is uint32;
   type TicketIndex is uint48;
+  type TicketIndexOffset is uint32;
   type ChannelEpoch is uint24;
   type Timestamp is uint32; // overflows in year 2105
   // Using IEEE 754 double precision -> 53 significant bits
@@ -77,7 +78,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprLe
   string public constant VERSION = '2.0.0';
 
   bytes32 public immutable domainSeparator; // depends on chainId
-  // Non-standard usage of EIP712 due computed property and custom property encoding
 
   /**
    * @dev Channel state machine
@@ -133,7 +133,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprLe
     bytes32 channelId;
     Balance amount;
     TicketIndex maxTicketindex;
-    TicketIndex indexAfter;
+    TicketIndexOffset indexOffset;
     ChannelEpoch epoch;
     WinProb winProb;
   }
@@ -283,7 +283,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprLe
     Channel storage spendingChannel = channels[redeemable.data.channelId];
 
     if (spendingChannel.status != ChannelStatus.OPEN && spendingChannel.status != ChannelStatus.PENDING_TO_CLOSE) {
-      revert WrongChannelState({reason: 'spending channel must be open or pending to close'});
+      revert WrongChannelState({reason: 'spending channel must be OPEN or PENDING_TO_CLOSE'});
     }
 
     if (ChannelEpoch.unwrap(spendingChannel.epoch) != ChannelEpoch.unwrap(redeemable.data.epoch)) {
@@ -291,14 +291,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprLe
     }
 
     if (TicketIndex.unwrap(spendingChannel.ticketIndex) >= TicketIndex.unwrap(redeemable.data.maxTicketindex)) {
-      revert InvalidAggregatedTicketInterval();
-    }
-
-    if (TicketIndex.unwrap(spendingChannel.ticketIndex) >= TicketIndex.unwrap(redeemable.data.indexAfter)) {
-      revert InvalidAggregatedTicketInterval();
-    }
-
-    if (TicketIndex.unwrap(redeemable.data.maxTicketindex) > TicketIndex.unwrap(redeemable.data.indexAfter)) {
       revert InvalidAggregatedTicketInterval();
     }
 
@@ -328,7 +320,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprLe
       revert InvalidTicketSignature();
     }
 
-    spendingChannel.ticketIndex = redeemable.data.indexAfter;
+    spendingChannel.ticketIndex = TicketIndex.wrap(TicketIndex.unwrap(spendingChannel.ticketIndex) + TicketIndexOffset.unwrap(redeemable.data.indexOffset));
     spendingChannel.balance = Balance.wrap(
       Balance.unwrap(spendingChannel.balance) - Balance.unwrap(redeemable.data.amount)
     );
@@ -350,7 +342,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprLe
     }
 
     // Informs about new ticketIndex
-    emit TicketRedeemed(redeemable.data.channelId, redeemable.data.indexAfter);
+    emit TicketRedeemed(redeemable.data.channelId, spendingChannel.ticketIndex);
   }
 
   function initiateOutgoingChannelClosureSafe(address self, address destination) external HoprMultiSig.onlySafe(self) {
