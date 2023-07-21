@@ -222,7 +222,6 @@ pub mod wasm {
     use crate::commitment::ChannelCommitmentInfo;
     use core_crypto::types::Hash;
     use core_ethereum_db::db::wasm::Database;
-    use utils_log::debug;
     use utils_misc::{ok_or_jserr, utils::wasm::JsResult};
     use wasm_bindgen::{prelude::*, JsValue};
 
