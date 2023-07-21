@@ -91,9 +91,11 @@ jobs:
           if [ -z $network ]; then 
             network="rotsee"  
           fi
+          ./scripts/bump-version.sh ${{ github.event.pull_request.base.ref }} ${{ github.event.pull_request.number }}
+          DOCKER_TAG=$(./scripts/get-package-version.sh | sed 's/+/-/')
           echo "[INFO] Restarting deployments on ${network} from pr-${{ github.event.pull_request.number }}"
           # Get list of deployments to restart
-          export deployments=($(kubectl get deployments -n ${network} -l hoprds.hoprnet.org/cluster=hoprd-pr-${{ github.event.pull_request.number }} -o jsonpath="{.items[*].metadata.name}"))
+          export deployments=($(kubectl get deployments -n ${network} -l hoprds.hoprnet.org/cluster=hoprd-${ DOCKER_TAG } -o jsonpath="{.items[*].metadata.name}"))
           for deployment in "${deployments[@]}"; do
             echo "[INFO] Restarting hoprd node ${deployments}"
             kubectl rollout restart deployments -n ${network} $deployment;
