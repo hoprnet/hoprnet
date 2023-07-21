@@ -1463,19 +1463,13 @@ class Hopr extends EventEmitter {
     try {
       if (channel.status === ChannelStatus.Open || channel.status == ChannelStatus.WaitingForCommitment) {
         log('initiating closure of channel', channel.get_id().to_hex())
-        txHash = await connector.initializeClosure(
-          channel.source,
-          channel.destination
-        )
+        txHash = await connector.initializeClosure(channel.source, channel.destination)
       } else {
         // verify that we passed the closure waiting period to prevent failing
         // on-chain transactions
 
         if (channel.closure_time_passed()) {
-          txHash = await connector.finalizeClosure(
-            channel.source,
-            channel.destination
-          )
+          txHash = await connector.finalizeClosure(channel.source, channel.destination)
         } else {
           log(
             `ignoring finalizing closure of channel ${channel
@@ -1561,10 +1555,14 @@ class Hopr extends EventEmitter {
   public async redeemTicketsInChannel(counterparty: Address) {
     log(`redeeming tickets in channel with ${counterparty.to_hex()}`)
     const self = this.getEthereumAddress()
-    const channel = ChannelEntry.deserialize((await this.db.get_channel_x(
-      Packet_Address.deserialize(counterparty.serialize()),
-      Packet_Address.deserialize(self.serialize())
-    )).serialize())
+    const channel = ChannelEntry.deserialize(
+      (
+        await this.db.get_channel_x(
+          Packet_Address.deserialize(counterparty.serialize()),
+          Packet_Address.deserialize(self.serialize())
+        )
+      ).serialize()
+    )
 
     await HoprCoreEthereum.getInstance().redeemTicketsInChannel(channel)
   }

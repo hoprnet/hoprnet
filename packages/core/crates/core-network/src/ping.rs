@@ -360,9 +360,7 @@ pub mod wasm {
                                             debug!("transport returned {:?}", x);
                                             let arr = js_sys::Array::from(x.as_ref());
                                             if arr.length() > 0 {
-                                                Ok(js_sys::Uint8Array::from(arr.get(0))
-                                                    .to_vec()
-                                                    .into_boxed_slice())
+                                                Ok(js_sys::Uint8Array::from(arr.get(0)).to_vec().into_boxed_slice())
                                             } else {
                                                 error!("transport has returned an empty response");
                                                 Err("Empty response returned from ping transport".into())

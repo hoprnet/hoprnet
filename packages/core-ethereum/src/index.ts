@@ -404,12 +404,19 @@ export default class HoprCoreEthereum extends EventEmitter {
           if (result.status === 'ERROR') {
             // We need to abort as tickets require ordered redemption.
             // delete operation before returning
-            log(`error while redeeming ticket ${ticket.ticket.index.to_string()} in channel ${channelId.to_hex()}: ${result.error.toString()}`)
+            log(
+              `error while redeeming ticket ${ticket.ticket.index.to_string()} in channel ${channelId.to_hex()}: ${result.error.toString()}`
+            )
             throw result.error
-          } else { // result.status === 'FAILURE'
+          } else {
+            // result.status === 'FAILURE'
             // May fail due to out-of-commits, preimage-is-empty, not-a-winning-ticket
             // Treat those acked tickets as losing tickets, and remove them from the DB.
-            log(`redemption of ticket ${ticket.ticket.index} failed in channel ${channelId.to_hex()} - marking it as losing: ${result.message}`)
+            log(
+              `redemption of ticket ${
+                ticket.ticket.index
+              } failed in channel ${channelId.to_hex()} - marking it as losing: ${result.message}`
+            )
             await boundMarkLosingAckedTicket(Ethereum_AcknowledgedTicket.deserialize(ticket.serialize()))
             metric_losingTickets.increment()
           }
@@ -441,7 +448,9 @@ export default class HoprCoreEthereum extends EventEmitter {
   ): Promise<RedeemTicketResponse> {
     let receipt: string
     try {
-      log(`Performing ticket redemption ticket for counterparty ${counterparty.to_hex()} in channel ${channelId.to_hex()}`)
+      log(
+        `Performing ticket redemption ticket for counterparty ${counterparty.to_hex()} in channel ${channelId.to_hex()}`
+      )
       receipt = await redeem_ticket(
         this.db,
         Ethereum_Address.deserialize(counterparty.serialize()),

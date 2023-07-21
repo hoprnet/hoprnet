@@ -539,9 +539,9 @@ impl AuthorizationToken {
 /// Unit tests of pure Rust code
 #[cfg(test)]
 mod tests {
-    use std::cmp::Ordering;
     use super::*;
     use hex_literal::hex;
+    use std::cmp::Ordering;
     use std::str::FromStr;
 
     #[test]
@@ -636,8 +636,8 @@ mod tests {
 
         let u_3 = U256::new("2");
         let u_4 = U256::new("3");
-        assert_eq!(Ordering::Less , u_3.cmp(&u_4));
-        assert_eq!(Ordering::Greater , u_4.cmp(&u_3));
+        assert_eq!(Ordering::Less, u_3.cmp(&u_4));
+        assert_eq!(Ordering::Greater, u_4.cmp(&u_3));
     }
 }
 
