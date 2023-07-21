@@ -358,9 +358,15 @@ pub mod wasm {
                                             Err("Failed to send ping message".into())
                                         } else {
                                             debug!("transport returned {:?}", x);
-                                            Ok(js_sys::Uint8Array::from(js_sys::Array::from(x.as_ref()).get(0))
-                                                .to_vec()
-                                                .into_boxed_slice())
+                                            let arr = js_sys::Array::from(x.as_ref());
+                                            if arr.length() > 0 {
+                                                Ok(js_sys::Uint8Array::from(arr.get(0))
+                                                    .to_vec()
+                                                    .into_boxed_slice())
+                                            } else {
+                                                error!("transport has returned an empty response");
+                                                Err("Empty response returned from ping transport".into())
+                                            }
                                         }
                                     }
                                     Err(e) => {
