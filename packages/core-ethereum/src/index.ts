@@ -332,9 +332,11 @@ export default class HoprCoreEthereum extends EventEmitter {
 
     // verify that no operation is running, or return the active operation
     if (currentOperation) {
+      log(`redemption of tickets in channel ${channelId} is currently in progress`)
       return currentOperation
     }
 
+    log(`starting new ticket redemption in channel ${channelId}`)
     // start new operation and store it
     return new Promise((resolve, reject) => {
       try {
@@ -374,13 +376,16 @@ export default class HoprCoreEthereum extends EventEmitter {
     const ticketRedeemIterator = async function* () {
       let serdeChannel = Ethereum_ChannelEntry.deserialize(channel.serialize())
       let tickets = await boundGetAckdTickets(serdeChannel)
+      log(`there are ${tickets.len()} left to redeem in channel ${channelId.to_hex()}`)
+
       let ticket: AcknowledgedTicket
       while (tickets.len() > 0) {
         let fetched = tickets.next()
+        log(`fetched ticket with index ${fetched.ticket.index.to_string()}`)
         if (ticket != undefined && ticket.ticket.index.eq(fetched.ticket.index)) {
           // @TODO handle errors
           log(
-            `Could not redeem ticket with index ${ticket.ticket.index.to_string()} in channel ${channelId.to_hex()}. Giving up.`
+            `Fetched ticket with the same index ${ticket.ticket.index.to_string()} in channel ${channelId.to_hex()}. Giving up.`
           )
           break
         }
@@ -399,10 +404,12 @@ export default class HoprCoreEthereum extends EventEmitter {
           if (result.status === 'ERROR') {
             // We need to abort as tickets require ordered redemption.
             // delete operation before returning
+            log(`error while redeeming ticket ${ticket.ticket.index.to_string()} in channel ${channelId.to_hex()}: ${result.error.toString()}`)
             throw result.error
-          } else {
+          } else { // result.status === 'FAILURE'
             // May fail due to out-of-commits, preimage-is-empty, not-a-winning-ticket
             // Treat those acked tickets as losing tickets, and remove them from the DB.
+            log(`redemption of ticket ${ticket.ticket.index} failed in channel ${channelId.to_hex()} - marking it as losing: ${result.message}`)
             await boundMarkLosingAckedTicket(Ethereum_AcknowledgedTicket.deserialize(ticket.serialize()))
             metric_losingTickets.increment()
           }
@@ -411,16 +418,17 @@ export default class HoprCoreEthereum extends EventEmitter {
         yield ticket.response
 
         tickets = await boundGetAckdTickets(serdeChannel)
+        log(`yet there are ${tickets.len()} left to redeem in channel ${channelId.to_hex()}`)
       }
     }
 
     try {
       for await (const ticketResponse of ticketRedeemIterator()) {
-        log(`ticket ${ticketResponse.to_hex()} was redeemed`)
+        log(`ticket ${ticketResponse.to_hex()} in channel ${channelId.to_hex()} was redeemed`)
       }
-      log(`redemption of tickets from ${channel.source.to_string()} is complete`)
+      log(`redemption of tickets from ${channel.source.to_string()} in channel ${channelId.to_hex()} is complete`)
     } catch (err) {
-      log(`redemption of tickets from ${channel.source.to_string()} failed`, err)
+      log(`redemption of tickets from ${channel.source.to_string()} in channel ${channelId.to_hex()} failed`, err)
     } finally {
       this.ticketRedemtionInChannelOperations.delete(channelId.to_hex())
     }
@@ -446,6 +454,7 @@ export default class HoprCoreEthereum extends EventEmitter {
       )
       log(`redeemed ticket for counterparty ${counterparty.to_hex()}`)
     } catch (err) {
+      log(`ticket redemption error: ${err.toString()}`)
       return {
         status: 'ERROR',
         error: err.toString()

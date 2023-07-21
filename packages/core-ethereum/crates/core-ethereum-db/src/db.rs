@@ -169,7 +169,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
 
     // core and core-ethereum part
     async fn get_acknowledged_tickets(&self, filter: Option<ChannelEntry>) -> Result<Vec<AcknowledgedTicket>> {
-        self.db
+        let mut tickets = self.db
             .get_more::<AcknowledgedTicket>(
                 Vec::from(ACKNOWLEDGED_TICKETS_PREFIX.as_bytes()).into_boxed_slice(),
                 EthereumChallenge::SIZE as u32,
@@ -182,7 +182,11 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
                     }
                 },
             )
-            .await
+            .await?;
+
+        tickets.sort_by(|a,b| a.ticket.index.cmp(&b.ticket.index));
+
+        Ok(tickets)
     }
 
     async fn get_unacknowledged_tickets(&self, filter: Option<ChannelEntry>) -> Result<Vec<UnacknowledgedTicket>> {

@@ -823,8 +823,8 @@ class Hopr extends EventEmitter {
       let outgoingChannels = 0
       let outChannels = await this.db.get_channels_from(selfAddr.clone())
       for (let i = 0; i < outChannels.len(); i++) {
-        let channel = outChannels.at(i)
-        if (channel.status == ChannelStatus.Open) {
+        let channel = outChannels.at(i) // TODO: why this sometimes give undefined ?
+        if (channel && channel.status == ChannelStatus.Open) {
           metric_channelBalances.set(
             [channel.source.to_hex(), 'out'],
             +ethersUtils.formatEther(channel.balance.to_string())
@@ -836,8 +836,8 @@ class Hopr extends EventEmitter {
       let incomingChannels = 0
       let inChannels = await this.db.get_channels_to(selfAddr.clone())
       for (let i = 0; i < inChannels.len(); i++) {
-        let channel = outChannels.at(i)
-        if (channel.status == ChannelStatus.Open) {
+        let channel = outChannels.at(i) // TODO: why this sometimes give undefined ?
+        if (channel && channel.status == ChannelStatus.Open) {
           metric_channelBalances.set(
             [channel.source.to_hex(), 'in'],
             +ethersUtils.formatEther(channel.balance.to_string())
@@ -1420,8 +1420,8 @@ class Hopr extends EventEmitter {
     direction: 'incoming' | 'outgoing'
   ): Promise<{ receipt: string; status: ChannelStatus }> {
     const connector = HoprCoreEthereum.getInstance()
-    const channel =
-      direction === 'outgoing'
+    const channel = ChannelEntry.deserialize(
+      (direction === 'outgoing'
         ? await this.db.get_channel_x(
             Packet_Address.deserialize(this.getEthereumAddress().serialize()),
             Packet_Address.deserialize(counterparty.serialize())
@@ -1430,6 +1430,8 @@ class Hopr extends EventEmitter {
             Packet_Address.deserialize(counterparty.serialize()),
             Packet_Address.deserialize(this.getEthereumAddress().serialize())
           )
+      ).serialize()
+    )
 
     if (channel === undefined) {
       log(`The requested channel for counterparty ${counterparty.toString()} does not exist`)
@@ -1462,8 +1464,8 @@ class Hopr extends EventEmitter {
       if (channel.status === ChannelStatus.Open || channel.status == ChannelStatus.WaitingForCommitment) {
         log('initiating closure of channel', channel.get_id().to_hex())
         txHash = await connector.initializeClosure(
-          Address.deserialize(channel.source.serialize()),
-          Address.deserialize(channel.destination.serialize())
+          channel.source,
+          channel.destination
         )
       } else {
         // verify that we passed the closure waiting period to prevent failing
@@ -1471,8 +1473,8 @@ class Hopr extends EventEmitter {
 
         if (channel.closure_time_passed()) {
           txHash = await connector.finalizeClosure(
-            Address.deserialize(channel.source.serialize()),
-            Address.deserialize(channel.destination.serialize())
+            channel.source,
+            channel.destination
           )
         } else {
           log(
@@ -1557,11 +1559,12 @@ class Hopr extends EventEmitter {
   }
 
   public async redeemTicketsInChannel(counterparty: Address) {
+    log(`redeeming tickets in channel with ${counterparty.to_hex()}`)
     const self = this.getEthereumAddress()
-    const channel = await this.db.get_channel_x(
+    const channel = ChannelEntry.deserialize((await this.db.get_channel_x(
       Packet_Address.deserialize(counterparty.serialize()),
       Packet_Address.deserialize(self.serialize())
-    )
+    )).serialize())
 
     await HoprCoreEthereum.getInstance().redeemTicketsInChannel(channel)
   }
