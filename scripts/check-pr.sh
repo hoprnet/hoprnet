@@ -52,6 +52,7 @@ done
 # Check wether the pushed commits to the PR involve building docker images
 function check_push() {
   rm -rf ${results_file}
+  touch ${results_file}
   if [ -z "${base_branch}" ] || [  -z "${head_branch:-}" ]; then
     log "Parameter 'base_branch' and 'head_branch' are required"
     usage
