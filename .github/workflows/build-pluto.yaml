@@ -32,8 +32,8 @@ jobs:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v3
 
-      - id: auth
-        name: Set up Google Cloud Credentials
+      - name: Set up Google Cloud Credentials
+        id: auth
         uses: google-github-actions/auth@v1
         with:
           token_format: "access_token"
