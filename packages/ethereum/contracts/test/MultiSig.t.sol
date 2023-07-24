@@ -31,7 +31,7 @@ contract MulitSigTest is Test, AccountsFixtureTest {
   function testRevert_initializeTwice() public {
     msContract.mySetNodeSafeRegistry(safeRegistry);
 
-    vm.expectRevert(AlreadyInitialized.selector);
+    vm.expectRevert(HoprMultiSig.AlreadyInitialized.selector);
     msContract.mySetNodeSafeRegistry(safeRegistry);
   }
 
@@ -39,11 +39,11 @@ contract MulitSigTest is Test, AccountsFixtureTest {
     (bool success, bytes memory result) = address(msContract).staticcall(abi.encodeWithSelector(MultiSigContract.mySetNodeSafeRegistry.selector, address(0)));
 
     assertFalse(success);
-    assertEq(bytes32(result), InvalidSafeAddress.selector);
+    assertEq(bytes32(result), HoprMultiSig.InvalidSafeAddress.selector);
   }
 
   function testRevert_uninitialized(address caller) public {
-    vm.expectRevert(MultiSigUninitialized.selector);
+    vm.expectRevert(HoprMultiSig.MultiSigUninitialized.selector);
 
     vm.mockCall(
       address(safeRegistry),
@@ -83,7 +83,7 @@ contract MulitSigTest is Test, AccountsFixtureTest {
     );
     
     vm.prank(caller);
-    vm.expectRevert(ContractNotResponsible.selector);
+    vm.expectRevert(HoprMultiSig.ContractNotResponsible.selector);
     msContract.modifierNoSafeSet();
 
     vm.clearMockedCalls();
@@ -117,7 +117,7 @@ contract MulitSigTest is Test, AccountsFixtureTest {
       abi.encode(setSafeAddr)
     );
 
-    vm.expectRevert(ContractNotResponsible.selector);
+    vm.expectRevert(HoprMultiSig.ContractNotResponsible.selector);
     vm.prank(safeAddr);
     msContract.modifierOnlySafe(caller);
   }

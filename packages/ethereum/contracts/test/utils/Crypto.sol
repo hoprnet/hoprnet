@@ -17,6 +17,12 @@ abstract contract CryptoUtils is HoprCrypto, SECP2561k {
     sig.vs = bytes32(uint256(v - 27) << 255) | s;
   }
 
+  function decompressSignature(bytes32 r, bytes32 vs) pure internal returns (uint8 v_out, bytes32 r_out, bytes32 s_out) {
+    s_out = vs & bytes32(0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
+    v_out = uint8((uint256(vs) >> 255) + 27);
+    r_out = r;
+  }
+
   function getVRFParameters(uint256 privKey, bytes memory DST, bytes32 vrfMessage) view internal returns (HoprCrypto.VRF_Parameters memory params) {
     HoprCrypto.VRF_Payload memory payload;
 

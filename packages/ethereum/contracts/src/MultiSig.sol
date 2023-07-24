@@ -3,10 +3,6 @@ pragma solidity 0.8.19;
 
 import './node-stake/NodeSafeRegistry.sol';
 
-error AlreadyInitialized();
-error MultiSigUninitialized();
-error ContractNotResponsible();
-error InvalidSafeAddress();
 
 /**
  *    &&&&
@@ -26,6 +22,11 @@ error InvalidSafeAddress();
  * Provides modifiers to enforce usage of a MultiSig contract
  **/
 abstract contract HoprMultiSig {
+  error AlreadyInitialized();
+  error MultiSigUninitialized();
+  error ContractNotResponsible();
+  error InvalidSafeAddress();
+
   HoprNodeSafeRegistry registry;
   bool initialized = false;
 
