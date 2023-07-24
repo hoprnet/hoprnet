@@ -83,8 +83,7 @@ pub mod wasm {
         }
 
         async fn set(&mut self, key: Self::Key, value: Self::Value) -> crate::errors::Result<Option<Self::Value>> {
-            self
-                .db
+            self.db
                 .put(key, value)
                 .await
                 .map(|_| None) // NOTE: The LevelDB API does not allow to return an evicted value
