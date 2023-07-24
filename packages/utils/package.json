@@ -33,6 +33,7 @@
     "@libp2p/peer-id": "1.1.16",
     "@multiformats/multiaddr": "10.3.3",
     "abortable-iterator": "4.0.3",
+    "abstract-level": "1.0.3",
     "bignumber.js": "9.0.2",
     "bn.js": "5.2.1",
     "chalk": "5.2.0",
@@ -42,11 +43,10 @@
     "hjson": "3.2.2",
     "it-pipe": "2.0.5",
     "jsonschema": "1.4.1",
-    "leveldown": "6.1.1",
-    "levelup": "5.1.1",
-    "memdown": "6.1.1",
+    "memory-level": "1.0.0",
     "multiformats": "9.6.5",
     "secp256k1": "4.0.3",
+    "sqlite-level": "1.0.1",
     "timeout-abort-controller": "3.0.0"
   },
   "devDependencies": {

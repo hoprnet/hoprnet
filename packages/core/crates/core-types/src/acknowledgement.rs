@@ -1,6 +1,6 @@
 use crate::acknowledgement::PendingAcknowledgement::{WaitingAsRelayer, WaitingAsSender};
 use crate::channels::Ticket;
-use core_crypto::errors::CryptoError::SignatureVerification;
+use core_crypto::errors::CryptoError::{InvalidChallenge, SignatureVerification};
 use core_crypto::primitives::{DigestLike, SimpleDigest};
 use core_crypto::types::{HalfKey, HalfKeyChallenge, Hash, PublicKey, Response, Signature};
 use serde::{Deserialize, Serialize};
@@ -93,7 +93,7 @@ impl BinarySerializable<'_> for Acknowledgement {
 }
 
 /// Contains acknowledgment information and the respective ticket
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct AcknowledgedTicket {
     pub ticket: Ticket,
@@ -166,7 +166,18 @@ impl AcknowledgedTicket {
                 .to_ethereum_challenge()
                 .eq(&self.ticket.challenge))
         .then_some(())
-        .ok_or(SignatureVerification)
+        .ok_or(InvalidChallenge)
+    }
+}
+
+impl std::fmt::Display for AcknowledgedTicket {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AcknowledgedTicket")
+            .field("ticket", &self.ticket)
+            .field("response", &self.response)
+            .field("pre_image", &self.pre_image)
+            .field("signer", &self.signer)
+            .finish()
     }
 }
 

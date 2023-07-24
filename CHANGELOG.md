@@ -23,6 +23,7 @@
 - Use transitive Rust build features and fix various build issues ([#5187](https://github.com/hoprnet/hoprnet/pull/5187))
 - Change `core-ethereum` to operate on Ethereum `Address`es rather than `PublicKey`s ([#5189](https://github.com/hoprnet/hoprnet/pull/5189))
 - Change the ticket auto redeem and check unrealized balance cli arguments ([#5235](https://github.com/hoprnet/hoprnet/pull/5235))
+- Fixed DB deadlocks and changed the DB backend & fixed channel and ticket issues in the DB ([#5229](https://github.com/hoprnet/hoprnet/pull/5229))
 
 <a name="1.93"></a>
 

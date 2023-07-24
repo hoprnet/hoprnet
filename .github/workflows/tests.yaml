@@ -96,9 +96,9 @@ jobs:
 
   e2e_testing:
     name: End to end
-    runs-on: ubuntu-8-core
+    runs-on: ubuntu-latest-8-cores
     if: github.event.pull_request.draft == false
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v3

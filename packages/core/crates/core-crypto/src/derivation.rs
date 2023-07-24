@@ -111,7 +111,6 @@ pub fn sample_field_element(secret: &[u8], tag: &str) -> Result<HalfKey> {
 
 /// Used in Proof of Relay to derive own half-key (S0)
 /// The function samples a secp256k1 field element using the given `secret` via `sample_field_element`.
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub fn derive_own_key_share(secret: &[u8]) -> HalfKey {
     assert_eq!(SECRET_KEY_LENGTH, secret.len());
 
@@ -120,33 +119,10 @@ pub fn derive_own_key_share(secret: &[u8]) -> HalfKey {
 
 /// Used in Proof of Relay to derive the half-key of for the acknowledgement (S1)
 /// The function samples a secp256k1 field element using the given `secret` via `sample_field_element`.
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub fn derive_ack_key_share(secret: &[u8]) -> HalfKey {
     assert_eq!(SECRET_KEY_LENGTH, secret.len());
 
     sample_field_element(secret, HASH_KEY_ACK_KEY).expect("failed to sample ack key share")
-}
-
-#[cfg(feature = "wasm")]
-pub mod wasm {
-    use utils_misc::ok_or_jserr;
-    use utils_misc::utils::wasm::JsResult;
-    use wasm_bindgen::prelude::*;
-
-    #[wasm_bindgen]
-    pub fn derive_packet_tag(secret: &[u8]) -> JsResult<Box<[u8]>> {
-        ok_or_jserr!(super::derive_packet_tag(secret))
-    }
-
-    #[wasm_bindgen]
-    pub fn derive_commitment_seed(private_key: &[u8], channel_info: &[u8]) -> JsResult<Box<[u8]>> {
-        ok_or_jserr!(super::derive_commitment_seed(private_key, channel_info))
-    }
-
-    #[wasm_bindgen]
-    pub fn derive_mac_key(secret: &[u8]) -> JsResult<Box<[u8]>> {
-        ok_or_jserr!(super::derive_mac_key(secret))
-    }
 }
 
 #[cfg(test)]

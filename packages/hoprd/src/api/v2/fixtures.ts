@@ -4,17 +4,7 @@ import { peerIdFromString } from '@libp2p/peer-id'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { Multiaddr } from '@multiformats/multiaddr'
 import { setupRestApi } from '../v2.js'
-import {
-  Balance,
-  BalanceType,
-  Hash,
-  U256,
-  ChannelEntry,
-  HoprDB,
-  PublicKey,
-  ChannelStatus,
-  Address
-} from '@hoprnet/hopr-utils'
+import { Balance, BalanceType, Hash, U256, ChannelEntry, PublicKey, ChannelStatus, Address } from '@hoprnet/hopr-utils'
 
 export const ALICE_PEER_ID: PeerId = peerIdFromString('16Uiu2HAmC9CRFeuF2cTf6955ECFmgDw6d27jLows7bftMqat5Woz')
 export const ALICE_MULTI_ADDR = new Multiaddr(`/ip4/34.65.237.196/tcp/9091/p2p/${ALICE_PEER_ID.toString()}`)
@@ -98,27 +88,4 @@ export const createTestMocks = () => {
       return state
     }
   }
-}
-
-/**
- * Used in tests to create a db mock for generic object storage
- * @returns testing mocked db
- */
-export const createMockDb = () => {
-  const store = {}
-  const key = (ns: string, id: string) => `${ns}:${id}`
-  const db = {
-    putSerializedObject: async (ns: string, id: string, object: Uint8Array): Promise<void> => {
-      store[key(ns, id)] = object
-      return
-    },
-    getSerializedObject: async (ns: string, id: string): Promise<Uint8Array | undefined> => {
-      return store[key(ns, id)]
-    },
-    deleteObject: async (ns: string, id: string): Promise<void> => {
-      delete store[key(ns, id)]
-      return
-    }
-  }
-  return db as any as HoprDB
 }

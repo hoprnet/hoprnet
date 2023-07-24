@@ -352,15 +352,18 @@ use real_base::file::native::read_to_string;
 
 #[cfg(all(feature = "wasm", not(test)))]
 use real_base::file::wasm::read_to_string;
+use utils_log::debug;
 
 impl HoprdConfig {
     pub fn from_cli_args(cli_args: crate::cli::CliArgs, skip_validation: bool) -> crate::errors::Result<HoprdConfig> {
         let mut cfg: HoprdConfig = if let Some(cfg_path) = cli_args.configuration_file_path {
+            debug!("fetching configuration from file {cfg_path}");
             let yaml_configuration = read_to_string(cfg_path.as_str())
                 .map_err(|e| crate::errors::HoprdConfigError::FileError(e.to_string()))?;
             serde_yaml::from_str(&yaml_configuration)
                 .map_err(|e| crate::errors::HoprdConfigError::SerializationError(e.to_string()))?
         } else {
+            debug!("loading default configuration");
             HoprdConfig::default()
         };
 

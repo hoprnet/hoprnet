@@ -17,7 +17,6 @@ pub const PRP_MIN_LENGTH: usize = PRP_INTERMEDIATE_KEY_LENGTH;
 
 /// Parameters for the Pseudo-Random Permutation (PRP) function
 /// This consists of IV and the raw secret key for use by the underlying cryptographic transformation.
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct PRPParameters {
     key: [u8; PRP_KEY_LENGTH],
     iv: [u8; PRP_IV_LENGTH],
@@ -32,11 +31,9 @@ impl Default for PRPParameters {
     }
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl PRPParameters {
     /// Creates new parameters for the PRP by expanding the given
     /// keying material into the secret key and IV for the underlying cryptographic transformation.
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(secret: &[u8]) -> Self {
         let mut ret = PRPParameters::default();
         generate_key_iv(secret, HASH_KEY_PRP.as_bytes(), &mut ret.key, &mut ret.iv, false)
@@ -47,13 +44,11 @@ impl PRPParameters {
 
 /// Implementation of Pseudo-Random Permutation (PRP).
 /// Currently based on the Lioness wide-block cipher.
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct PRP {
     keys: [Box<[u8]>; 4],
     ivs: [Box<[u8]>; 4],
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl PRP {
     /// Creates new instance of the PRP using the raw key and IV.
     pub fn new(key: &[u8], iv: &[u8]) -> Self {
@@ -78,7 +73,6 @@ impl PRP {
     }
 
     /// Creates a new PRP instance using the given parameters
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn from_parameters(params: PRPParameters) -> Self {
         Self::new(&params.key, &params.iv) // Parameter size checking taken care of by PRPParameters
     }
@@ -251,39 +245,5 @@ mod tests {
         let expected_ct = hex!("f80036d72b5e61e20f3f5840a013d12b5dd496f2da55b930f961905fbbbc8158dc17b58510bf280d0359e0b233a099bde840e07d54ca308e55ee0196b8f013b5def9b6a3ec9a727071c5dbdbeabdedcecfbdc3ecdd69fdcd957ff60ac573cc0dbab45b04");
         assert_eq!([0u8; 100], pt); // input is not overwritten
         assert_eq!(&expected_ct, ct.as_ref());
-    }
-}
-
-#[cfg(feature = "wasm")]
-pub mod wasm {
-    use crate::prp::{PRPParameters, PRP};
-    use utils_misc::ok_or_jserr;
-    use utils_misc::utils::wasm::JsResult;
-    use wasm_bindgen::prelude::wasm_bindgen;
-
-    #[wasm_bindgen]
-    impl PRPParameters {
-        #[wasm_bindgen(js_name = "key")]
-        pub fn _key(&self) -> Box<[u8]> {
-            self.key.into()
-        }
-
-        #[wasm_bindgen(js_name = "iv")]
-        pub fn _iv(&self) -> Box<[u8]> {
-            self.iv.into()
-        }
-    }
-
-    #[wasm_bindgen]
-    impl PRP {
-        #[wasm_bindgen(js_name = "forward")]
-        pub fn _forward(&self, plaintext: &[u8]) -> JsResult<Box<[u8]>> {
-            ok_or_jserr!(self.forward(plaintext))
-        }
-
-        #[wasm_bindgen(js_name = "inverse")]
-        pub fn _inverse(&self, ciphertext: &[u8]) -> JsResult<Box<[u8]>> {
-            ok_or_jserr!(self.inverse(ciphertext))
-        }
     }
 }

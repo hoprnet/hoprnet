@@ -2,13 +2,14 @@ import { rm } from 'fs/promises'
 import { randomBytes } from 'crypto'
 import assert from 'assert'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
-import { dbMock, debug, privKeyToPeerId, u8aToHex } from '@hoprnet/hopr-utils'
+import { debug, LevelDb, privKeyToPeerId, u8aToHex } from '@hoprnet/hopr-utils'
 import Hopr, { type HoprOptions } from './index.js'
 import { sampleOptions } from './index.mock.js'
 import { setTimeout } from 'timers/promises'
 import { Multiaddr } from '@multiformats/multiaddr'
 import { startStunServer } from '@hoprnet/hopr-connect'
 import type { PeerId } from '@libp2p/interface-peer-id'
+import { Database, PublicKey } from '../lib/core_hopr.js'
 
 /**
  * Synchronous function to sample PeerIds
@@ -56,7 +57,14 @@ describe('hopr core (instance)', function () {
 
     log('Creating hopr node...')
     HoprCoreEthereum.createMockInstance(peerId)
-    const node = new Hopr(peerId, dbMock, opts as HoprOptions)
+    const db = new LevelDb()
+    await db.backend.open()
+
+    const node = new Hopr(
+      peerId,
+      new Database(db, PublicKey.from_peerid_str(peerId.toString()).to_address()),
+      opts as HoprOptions
+    )
 
     log('Node created with Id', node.getId().toString())
     assert(node instanceof Hopr)

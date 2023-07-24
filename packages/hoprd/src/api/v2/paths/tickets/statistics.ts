@@ -24,6 +24,7 @@ const GET: Operation = [
     const { node }: { node: Hopr } = req.context
 
     try {
+      console.log(`about to get ticket statistics`)
       const tickets = await getTicketsStatistics(node)
       return res.status(200).send(tickets)
     } catch (err) {

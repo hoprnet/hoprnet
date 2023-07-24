@@ -15,7 +15,6 @@ type Aes128Ctr32BE = ctr::Ctr32BE<aes::Aes128>;
 
 /// Parameters for the Pseudo-Random Generator (PRG) function
 /// This consists of IV and the raw secret key for use by the underlying block cipher.
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct PRGParameters {
     key: [u8; PRG_KEY_LENGTH],
     iv: [u8; PRG_IV_LENGTH],
@@ -30,11 +29,9 @@ impl Default for PRGParameters {
     }
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl PRGParameters {
     /// Creates new parameters for the PRG by expanding the given
     /// keying material into the secret key and IV for the underlying block cipher.
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(secret: &[u8]) -> Self {
         let mut ret = PRGParameters::default();
         generate_key_iv(secret, HASH_KEY_PRG.as_bytes(), &mut ret.key, &mut ret.iv, true)
@@ -59,15 +56,12 @@ impl PRGParameters {
 /// using AES-128 block cipher in Counter mode (with 32-bit counter).
 /// It forms an infinite sequence of pseudo-random bytes (generated deterministically from the parameters)
 /// and can be queried by chunks using the `digest` function.
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct PRG {
     params: PRGParameters,
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl PRG {
     /// Creates a PRG instance  using the raw key and IV for the underlying block cipher.
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(key: &[u8], iv: &[u8]) -> Self {
         assert_eq!(key.len(), PRG_KEY_LENGTH, "invalid key size");
         assert_eq!(iv.len(), PRG_IV_LENGTH, "invalid iv size");
@@ -173,32 +167,5 @@ mod tests {
 
         assert_eq!(expected_key, params.key);
         assert_eq!(expected_iv, params.iv)
-    }
-}
-
-#[cfg(feature = "wasm")]
-mod wasm {
-    use crate::prg::{PRGParameters, PRG};
-    use wasm_bindgen::prelude::wasm_bindgen;
-
-    #[wasm_bindgen]
-    impl PRGParameters {
-        #[wasm_bindgen(js_name = "key")]
-        pub fn _key(&self) -> Box<[u8]> {
-            self.key.into()
-        }
-
-        #[wasm_bindgen(js_name = "iv")]
-        pub fn _iv(&self) -> Box<[u8]> {
-            self.iv.into()
-        }
-    }
-
-    #[wasm_bindgen]
-    impl PRG {
-        #[wasm_bindgen(js_name = "digest")]
-        pub fn _digest(&self, from: u32, to: u32) -> Box<[u8]> {
-            self.digest(from as usize, to as usize)
-        }
     }
 }

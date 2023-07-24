@@ -11,6 +11,7 @@ import {
   type DeferType,
   Address
 } from '@hoprnet/hopr-utils'
+import { log } from 'debug'
 
 const closingRequests = new Map<string, DeferType<void>>()
 
@@ -33,9 +34,9 @@ export async function closeChannel(
       receipt: string
     }
 > {
-  const counterpartyPublicKey = PublicKey.from_peerid_str(peerIdStr)
+  const counterpartyAddress = PublicKey.from_peerid_str(peerIdStr).to_address()
 
-  const channelId = generate_channel_id(node.getEthereumAddress(), counterpartyPublicKey.to_address())
+  const channelId = generate_channel_id(node.getEthereumAddress(), counterpartyAddress)
 
   let closingRequest = closingRequests.get(channelId.to_hex())
   if (closingRequest == null) {
@@ -46,9 +47,10 @@ export async function closeChannel(
   }
 
   try {
-    const { status: channelStatus, receipt } = await node.closeChannel(counterpartyPublicKey.to_address(), direction)
+    const { status: channelStatus, receipt } = await node.closeChannel(counterpartyAddress, direction)
     return { success: true, channelStatus, receipt }
   } catch (err) {
+    log(`${err}`)
     const errString = err instanceof Error ? err.message : err?.toString?.() ?? 'Unknown error'
 
     if (errString.match(/Channel is already closed/)) {
