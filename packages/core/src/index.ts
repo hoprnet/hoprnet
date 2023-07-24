@@ -104,9 +104,9 @@ import {
   Path,
   Payload,
   PublicKey as Packet_PublicKey,
+  Balance as Packet_Balance,
   WasmAckInteraction,
-  WasmPacketInteraction,
-  WasmVecAcknowledgedTicket
+  WasmPacketInteraction
 } from '../lib/core_hopr.js'
 core_hopr_initialize_crate()
 registerMetricsCollector(core_hopr_gather_metrics)
@@ -444,16 +444,24 @@ class Hopr extends EventEmitter {
     // react when an account's eligibility has changed
     connector.indexer.on(
       'network-registry-eligibility-changed',
-      async (_account: Address, nodes: PublicKey[], eligible: boolean) => {
+      async (_account: Address, nodeAddrs: Address[], eligible: boolean) => {
         // If account is no longer eligible to register nodes, we might need to close existing connections,
         // otherwise there is nothing to do
         if (!eligible) {
-          for (const node of nodes) {
-            this.networkPeers.unregister(node.to_peerid_str())
+          for (const nodeAddr of nodeAddrs) {
+            let pk: PublicKey
+            try {
+              pk = await connector.getPublicKeyOf(nodeAddr)
+            } catch (err) {
+              // node has not announced itself, so we don't need to care
+              return
+            }
+
+            this.networkPeers.unregister(pk.to_peerid_str())
 
             for (const conn of this.libp2pComponents
               .getConnectionManager()
-              .getConnections(peerIdFromString(node.to_peerid_str()))) {
+              .getConnections(peerIdFromString(pk.to_peerid_str()))) {
               await safeCloseConnection(conn, this.libp2pComponents, (_err) => {
                 error(`error while closing existing connection to ${conn.remotePeer.toString()}`)
               })
@@ -623,6 +631,7 @@ class Hopr extends EventEmitter {
       this.acknowledgements.handle_incoming_acknowledgements(),
       this.acknowledgements.handle_outgoing_acknowledgements(acknowledgementInteractionSendMsg)
     ])
+    log(`all interactions finished execution`)
   }
 
   /**
@@ -814,8 +823,8 @@ class Hopr extends EventEmitter {
       let outgoingChannels = 0
       let outChannels = await this.db.get_channels_from(selfAddr.clone())
       for (let i = 0; i < outChannels.len(); i++) {
-        let channel = outChannels.at(i)
-        if (channel.status == ChannelStatus.Open) {
+        let channel = outChannels.at(i) // TODO: why this sometimes give undefined ?
+        if (channel && channel.status == ChannelStatus.Open) {
           metric_channelBalances.set(
             [channel.source.to_hex(), 'out'],
             +ethersUtils.formatEther(channel.balance.to_string())
@@ -827,8 +836,8 @@ class Hopr extends EventEmitter {
       let incomingChannels = 0
       let inChannels = await this.db.get_channels_to(selfAddr.clone())
       for (let i = 0; i < inChannels.len(); i++) {
-        let channel = outChannels.at(i)
-        if (channel.status == ChannelStatus.Open) {
+        let channel = outChannels.at(i) // TODO: why this sometimes give undefined ?
+        if (channel && channel.status == ChannelStatus.Open) {
           metric_channelBalances.set(
             [channel.source.to_hex(), 'in'],
             +ethersUtils.formatEther(channel.balance.to_string())
@@ -1034,7 +1043,10 @@ class Hopr extends EventEmitter {
 
       let channel: ChannelEntry
       try {
-        channel = await this.db.get_channel_x(ticketIssuer, ticketReceiver)
+        channel = await this.db.get_channel_x(
+          Packet_Address.deserialize(ticketIssuer.serialize()),
+          Packet_Address.deserialize(ticketReceiver.serialize())
+        )
       } catch (err) {
         throw Error(`Channel from ${ticketIssuer.to_hex()} to ${ticketReceiver.to_hex()} not found`)
       }
@@ -1408,16 +1420,25 @@ class Hopr extends EventEmitter {
     direction: 'incoming' | 'outgoing'
   ): Promise<{ receipt: string; status: ChannelStatus }> {
     const connector = HoprCoreEthereum.getInstance()
-    const wrapped_pk = this.getEthereumAddress()
-    const channel =
-      direction === 'outgoing'
-        ? await this.db.get_channel_x(wrapped_pk, counterparty)
-        : await this.db.get_channel_x(counterparty, wrapped_pk)
+    const channel = ChannelEntry.deserialize(
+      (direction === 'outgoing'
+        ? await this.db.get_channel_x(
+            Packet_Address.deserialize(this.getEthereumAddress().serialize()),
+            Packet_Address.deserialize(counterparty.serialize())
+          )
+        : await this.db.get_channel_x(
+            Packet_Address.deserialize(counterparty.serialize()),
+            Packet_Address.deserialize(this.getEthereumAddress().serialize())
+          )
+      ).serialize()
+    )
 
     if (channel === undefined) {
       log(`The requested channel for counterparty ${counterparty.toString()} does not exist`)
       throw new Error('Requested channel does not exist')
     }
+
+    log(`asking to close channel: ${channel.to_string()}`)
 
     // TODO: should we wait for confirmation?
     if (channel.status === ChannelStatus.Closed) {
@@ -1479,40 +1500,51 @@ class Hopr extends EventEmitter {
 
   public async getTickets(counterparty: Address): Promise<Ticket[]> {
     const self = this.getEthereumAddress()
-    const channel = await this.db.get_channel_x(counterparty, self)
-    let list = await this.db.get_acknowledged_tickets(channel)
+    const channel = await this.db.get_channel_x(
+      Packet_Address.deserialize(counterparty.serialize()),
+      Packet_Address.deserialize(self.serialize())
+    )
 
-    let ret: Ticket[] = []
-    for (let i = 0; i < list.len(); i++) {
-      ret.push(Ticket.deserialize(list.at(i).ticket.serialize()))
+    log(`looking for tickets in channel ${channel.to_string()}`)
+
+    const ackedTickets = await this.db.get_acknowledged_tickets(channel)
+
+    let result = []
+    let current: AcknowledgedTicket | undefined
+    while (true) {
+      current = ackedTickets.next()
+
+      if (current == undefined) {
+        break
+      } else {
+        result.push(current.ticket)
+      }
     }
 
-    return ret
+    return result
   }
 
   public async getTicketStatistics() {
-    const ack = await this.db.get_acknowledged_tickets()
+    const acked_tickets = await this.db.get_acknowledged_tickets()
     const pending = await this.db.get_pending_tickets_count()
     const losing = await this.db.get_losing_tickets_count()
-    const totalValue = (ackTickets: WasmVecAcknowledgedTicket): Balance => {
-      let balance = Balance.zero(BalanceType.HOPR)
-      for (let i = 0; i < ackTickets.len(); i++) {
-        balance = balance.add(ackTickets.at(i).ticket.amount)
-      }
-      return balance
+
+    let totalValue = Packet_Balance.zero(BalanceType.HOPR)
+    for (let i = 0; i < acked_tickets.len(); i++) {
+      totalValue = totalValue.add(acked_tickets.at(i).ticket.amount)
     }
 
     return {
       pending,
       losing,
-      winProportion: ack.len() / (ack.len() + losing) || 0,
-      unredeemed: ack.len(),
-      unredeemedValue: totalValue(ack),
+      winProportion: acked_tickets.len() / (acked_tickets.len() + losing) || 0,
+      unredeemed: acked_tickets.len(),
+      unredeemedValue: totalValue.clone(),
       redeemed: await this.db.get_redeemed_tickets_count(),
       redeemedValue: await this.db.get_redeemed_tickets_value(),
       neglected: await this.db.get_neglected_tickets_count(),
-      rejected: await this.db.get_redeemed_tickets_count(),
-      rejectedValue: await this.db.get_redeemed_tickets_value()
+      rejected: await this.db.get_rejected_tickets_count(),
+      rejectedValue: await this.db.get_rejected_tickets_value()
     }
   }
 
@@ -1521,9 +1553,18 @@ class Hopr extends EventEmitter {
   }
 
   public async redeemTicketsInChannel(counterparty: Address) {
+    log(`redeeming tickets in channel with ${counterparty.to_hex()}`)
     const self = this.getEthereumAddress()
-    const channel = await this.db.get_channel_x(counterparty, self)
-    await HoprCoreEthereum.getInstance().redeemTicketsInChannel(ChannelEntry.deserialize(channel.serialize()))
+    const channel = ChannelEntry.deserialize(
+      (
+        await this.db.get_channel_x(
+          Packet_Address.deserialize(counterparty.serialize()),
+          Packet_Address.deserialize(self.serialize())
+        )
+      ).serialize()
+    )
+
+    await HoprCoreEthereum.getInstance().redeemTicketsInChannel(channel)
   }
 
   /**
@@ -1533,7 +1574,10 @@ class Hopr extends EventEmitter {
    * @returns the channel entry of those two nodes
    */
   public async getChannel(src: Address, dest: Address): Promise<ChannelEntry> {
-    return ChannelEntry.deserialize((await this.db.get_channel_x(src, dest)).serialize())
+    return await this.db.get_channel_x(
+      Packet_Address.deserialize(src.serialize()),
+      Packet_Address.deserialize(dest.serialize())
+    )
   }
 
   public async getAllChannels(): Promise<ChannelEntry[]> {

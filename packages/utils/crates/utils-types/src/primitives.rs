@@ -391,6 +391,10 @@ impl U256 {
         Self { value: u256::ZERO }
     }
 
+    pub fn max() -> Self {
+        Self { value: u256::MAX }
+    }
+
     pub fn one() -> Self {
         Self { value: u256::ONE }
     }
@@ -537,6 +541,7 @@ impl AuthorizationToken {
 mod tests {
     use super::*;
     use hex_literal::hex;
+    use std::cmp::Ordering;
     use std::str::FromStr;
 
     #[test]
@@ -628,6 +633,11 @@ mod tests {
         let u_2 = U256::from_bytes(&u_1.to_bytes()).unwrap();
 
         assert_eq!(u_1, u_2);
+
+        let u_3 = U256::new("2");
+        let u_4 = U256::new("3");
+        assert_eq!(Ordering::Less, u_3.cmp(&u_4));
+        assert_eq!(Ordering::Greater, u_4.cmp(&u_3));
     }
 }
 

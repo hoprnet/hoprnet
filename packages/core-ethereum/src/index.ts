@@ -25,14 +25,13 @@ import {
   Ethereum_Balance,
   Ethereum_BalanceType,
   Ethereum_ChannelEntry,
-  Ethereum_PublicKey,
   Ethereum_U256,
   Ethereum_Hash,
   initialize_commitment,
-  find_commitment_preimage,
-  bump_commitment,
   ChannelCommitmentInfo,
-  CORE_ETHEREUM_CONSTANTS
+  CORE_ETHEREUM_CONSTANTS,
+  is_allowed_to_access_network,
+  redeem_ticket
 } from './db.js'
 
 import Indexer from './indexer/index.js'
@@ -333,9 +332,11 @@ export default class HoprCoreEthereum extends EventEmitter {
 
     // verify that no operation is running, or return the active operation
     if (currentOperation) {
+      log(`redemption of tickets in channel ${channelId} is currently in progress`)
       return currentOperation
     }
 
+    log(`starting new ticket redemption in channel ${channelId}`)
     // start new operation and store it
     return new Promise((resolve, reject) => {
       try {
@@ -357,6 +358,8 @@ export default class HoprCoreEthereum extends EventEmitter {
       throw new Error('Cannot redeem ticket in channel that is not to us')
     }
 
+    log(`Going to redeem tickets in channel ${channelId.to_hex()}`)
+
     // Because tickets are ordered and require the previous redemption to
     // have succeeded before we can redeem the next, we need to do this
     // sequentially.
@@ -372,14 +375,17 @@ export default class HoprCoreEthereum extends EventEmitter {
     // Node.JS to schedule iterations at any time
     const ticketRedeemIterator = async function* () {
       let serdeChannel = Ethereum_ChannelEntry.deserialize(channel.serialize())
-      let tickets = await boundGetAckdTickets({ serdeChannel })
+      let tickets = await boundGetAckdTickets(serdeChannel)
+      log(`there are ${tickets.len()} left to redeem in channel ${channelId.to_hex()}`)
+
       let ticket: AcknowledgedTicket
       while (tickets.len() > 0) {
         let fetched = tickets.next()
+        log(`fetched ticket with index ${fetched.ticket.index.to_string()}`)
         if (ticket != undefined && ticket.ticket.index.eq(fetched.ticket.index)) {
           // @TODO handle errors
           log(
-            `Could not redeem ticket with index ${ticket.ticket.index.to_string()} in channel ${channelId.to_hex()}. Giving up.`
+            `Fetched ticket with the same index ${ticket.ticket.index.to_string()} in channel ${channelId.to_hex()}. Giving up.`
           )
           break
         }
@@ -387,12 +393,10 @@ export default class HoprCoreEthereum extends EventEmitter {
         ticket = fetched
 
         log(
-          `redeeming ticket ${ticket.response.to_hex()} in channel from ${channel.source} to ${
-            channel.destination
-          }, preImage ${ticket.pre_image.to_hex()}, porSecret ${ticket.response.to_hex()}`
+          `redeeming ticket ${ticket.response.to_hex()} in channel ${channelId.to_hex()} from ${channel.source.to_hex()} to ${channel.destination.to_hex()}, preImage ${ticket.pre_image.to_hex()}, porSecret ${ticket.response.to_hex()}`
         )
 
-        log(ticket.ticket.toString())
+        log(ticket.ticket.to_string())
 
         const result = await boundRedeemTicket(channel.source, channelId, ticket)
 
@@ -400,10 +404,19 @@ export default class HoprCoreEthereum extends EventEmitter {
           if (result.status === 'ERROR') {
             // We need to abort as tickets require ordered redemption.
             // delete operation before returning
+            log(
+              `error while redeeming ticket ${ticket.ticket.index.to_string()} in channel ${channelId.to_hex()}: ${result.error.toString()}`
+            )
             throw result.error
           } else {
+            // result.status === 'FAILURE'
             // May fail due to out-of-commits, preimage-is-empty, not-a-winning-ticket
             // Treat those acked tickets as losing tickets, and remove them from the DB.
+            log(
+              `redemption of ticket ${
+                ticket.ticket.index
+              } failed in channel ${channelId.to_hex()} - marking it as losing: ${result.message}`
+            )
             await boundMarkLosingAckedTicket(Ethereum_AcknowledgedTicket.deserialize(ticket.serialize()))
             metric_losingTickets.increment()
           }
@@ -411,17 +424,18 @@ export default class HoprCoreEthereum extends EventEmitter {
 
         yield ticket.response
 
-        tickets = await boundGetAckdTickets({ serdeChannel })
+        tickets = await boundGetAckdTickets(serdeChannel)
+        log(`yet there are ${tickets.len()} left to redeem in channel ${channelId.to_hex()}`)
       }
     }
 
     try {
       for await (const ticketResponse of ticketRedeemIterator()) {
-        log(`ticket ${ticketResponse.to_hex()} was redeemed`)
+        log(`ticket ${ticketResponse.to_hex()} in channel ${channelId.to_hex()} was redeemed`)
       }
-      log(`redemption of tickets from ${channel.source.toString()} is complete`)
+      log(`redemption of tickets from ${channel.source.to_string()} in channel ${channelId.to_hex()} is complete`)
     } catch (err) {
-      log(`redemption of tickets from ${channel.source.toString()} failed`, err)
+      log(`redemption of tickets from ${channel.source.to_string()} in channel ${channelId.to_hex()} failed`, err)
     } finally {
       this.ticketRedemtionInChannelOperations.delete(channelId.to_hex())
     }
@@ -432,81 +446,38 @@ export default class HoprCoreEthereum extends EventEmitter {
     channelId: Hash,
     ackTicket: AcknowledgedTicket
   ): Promise<RedeemTicketResponse> {
-    if (!ackTicket.verify(counterparty)) {
-      return {
-        status: 'FAILURE',
-        message: 'Invalid response to acknowledgement'
-      }
-    }
-
-    let commitmentPreImage: Ethereum_Hash // actual ackTicket.preImage
-
-    try {
-      commitmentPreImage = await find_commitment_preimage(this.db, Ethereum_Hash.deserialize(channelId.serialize()))
-    } catch (err) {
-      log(`Channel ${channelId.to_hex()} is out of commitments`)
-      // TODO: How should we handle this ticket if it's out of commitment
-      return {
-        status: 'ERROR',
-        error: err
-      }
-    }
-    // set the commitment
-    ackTicket.set_preimage(Hash.deserialize(commitmentPreImage.serialize()))
-    log(`Set preImage ${commitmentPreImage.to_hex()} for ticket ${ackTicket.response.to_hex()}`)
-
     let receipt: string
-
     try {
-      const ticket = ackTicket.ticket
-      log('Submitting ticket', ackTicket.response.to_hex())
-      const emptyPreImage = new Hash(new Uint8Array(Hash.size()).fill(0x00))
-      const hasPreImage = !ackTicket.pre_image.eq(emptyPreImage)
-      if (!hasPreImage) {
-        log(`Failed to submit ticket ${ackTicket.response.to_hex()}: 'PreImage is empty.'`)
-        return {
-          status: 'FAILURE',
-          message: 'PreImage is empty.'
-        }
-      }
-
-      const isWinning = ticket.is_winning(ackTicket.pre_image, ackTicket.response, ticket.win_prob)
-
-      if (!isWinning) {
-        log(`Failed to submit ticket ${ackTicket.response.to_hex()}:  'Not a winning ticket.'`)
-        return {
-          status: 'FAILURE',
-          message: 'Not a winning ticket.'
-        }
-      }
-
-      // address winning ticket
-      metric_winningTickets.increment()
-
-      receipt = await this.chain.redeemTicket(counterparty, ackTicket, (txHash: string) =>
-        this.setTxHandler(`channel-updated-${txHash}`, txHash)
+      log(
+        `Performing ticket redemption ticket for counterparty ${counterparty.to_hex()} in channel ${channelId.to_hex()}`
       )
+      receipt = await redeem_ticket(
+        this.db,
+        Ethereum_Address.deserialize(counterparty.serialize()),
+        Ethereum_Hash.deserialize(channelId.serialize()),
+        Ethereum_AcknowledgedTicket.deserialize(ackTicket.serialize()),
+        async () =>
+          await this.chain.redeemTicket(counterparty, ackTicket, (txHash: string) =>
+            this.setTxHandler(`channel-updated-${txHash}`, txHash)
+          )
+      )
+      log(`redeemed ticket for counterparty ${counterparty.to_hex()}`)
     } catch (err) {
-      // TODO delete ackTicket -- check if it's due to gas!
-      log('Unexpected error when redeeming ticket', ackTicket.response.to_hex(), err)
+      log(`ticket redemption error: ${err.toString()}`)
       return {
         status: 'ERROR',
-        error: err
+        error: err.toString()
       }
     }
-    log('Successfully submitted ticket', ackTicket.response.to_hex())
 
-    // bump commitment when on-chain ticket redemption is successful
-    // FIXME: bump commitment can fail if channel runs out of commitments
-    await bump_commitment(this.db, Ethereum_Hash.deserialize(channelId.serialize()), commitmentPreImage)
-    log(`Successfully bump local commitment after ${commitmentPreImage.to_hex()}`)
+    metric_winningTickets.increment()
 
-    await this.db.mark_redeemed(Ethereum_AcknowledgedTicket.deserialize(ackTicket.serialize()))
     this.emit('ticket:redeemed', ackTicket)
+
     return {
       status: 'SUCCESS',
-      receipt,
-      ackTicket
+      ackTicket,
+      receipt
     }
   }
 
@@ -574,6 +545,9 @@ export default class HoprCoreEthereum extends EventEmitter {
     if (myBalance.lt(amount)) {
       throw Error('We do not have enough balance to open a channel')
     }
+
+    log(`opening channel to ${dest.to_hex()} with amount ${amount.to_formatted_string()}`)
+
     const receipt = await this.fundChannel(dest, amount, Balance.zero(BalanceType.HOPR))
     return { channelId: generate_channel_id(this.publicKey.to_address(), dest), receipt }
   }
@@ -584,6 +558,8 @@ export default class HoprCoreEthereum extends EventEmitter {
     if (totalFund.gt(myBalance)) {
       throw Error('We do not have enough balance to fund the channel')
     }
+    log(`====> fundChannel: src: ${this.publicKey.to_address().to_string()} dest: ${dest.to_string()}`)
+
     return this.chain.fundChannel(this.publicKey.to_address(), dest, myFund, counterpartyFund, (txHash: string) =>
       this.setTxHandler(`channel-updated-${txHash}`, txHash)
     )
@@ -597,23 +573,7 @@ export default class HoprCoreEthereum extends EventEmitter {
    * @returns true if registered
    */
   public async isAllowedAccessToNetwork(hoprNode: PublicKey): Promise<boolean> {
-    try {
-      // if register is disabled, all nodes are seen as "allowed"
-      const registerEnabled = await this.db.is_network_registry_enabled()
-      if (!registerEnabled) return true
-      // find hoprNode's linked account
-      const account = await this.db.get_account_from_network_registry(
-        Ethereum_PublicKey.deserialize(hoprNode.serialize(false))
-      )
-      if (!account) {
-        log('error: could not determine whether node has allowed access')
-        return false
-      }
-      // check if account is eligible
-      return this.db.is_eligible(account)
-    } catch (error) {
-      return false
-    }
+    return await is_allowed_to_access_network(this.db, Ethereum_Address.deserialize(hoprNode.to_address().serialize()))
   }
 
   public static createMockInstance(peer: PeerId): HoprCoreEthereum {

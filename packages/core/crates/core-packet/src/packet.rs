@@ -8,6 +8,7 @@ use core_crypto::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, Publi
 use core_types::acknowledgement::{Acknowledgement, AcknowledgementChallenge};
 use core_types::channels::Ticket;
 use libp2p_identity::PeerId;
+use std::fmt::{Display, Formatter};
 use utils_types::errors::GeneralError::ParseError;
 use utils_types::traits::{BinarySerializable, PeerIdLike};
 
@@ -251,6 +252,16 @@ pub enum PacketState {
         next_hop: PublicKey,
         ack_challenge: HalfKeyChallenge,
     },
+}
+
+impl Display for PacketState {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match &self {
+            Final { .. } => write!(f, "Final"),
+            Forwarded { .. } => write!(f, "Forwarded"),
+            Outgoing { .. } => write!(f, "Outgoing"),
+        }
+    }
 }
 
 /// Represents a HOPR packet

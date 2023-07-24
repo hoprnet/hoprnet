@@ -12,8 +12,11 @@ import {
   Snapshot,
   ChannelStatus,
   Database,
-  Response
+  Response,
+  core_ethereum_db_initialize_crate
 } from '../../../core-ethereum/lib/core_ethereum_db.js'
+core_ethereum_db_initialize_crate()
+
 import BN from 'bn.js'
 import { stringToU8a } from '../u8a/index.js'
 
@@ -88,10 +91,9 @@ describe('db shim tests', function () {
     await db.init(true, db_dir_path, true, 'monte_rosa')
 
     try {
-      let result = await db_sanity_test(db)
-      assert(result)
+      await db_sanity_test(db)
     } catch (e) {
-      assert('EVERYTHING SHOULD PASS', e.toString())
+      assert.fail(`db sanity tests should pass: ${e}`)
     }
   })
 })
@@ -138,27 +140,30 @@ describe('db functional tests', function () {
     const account = MOCK_ADDRESS()
 
     // should be throw when not added
-    assert.equal(await db.get_account_from_network_registry(hoprNode), undefined)
+    assert.equal(await db.get_account_from_network_registry(hoprNode.to_address()), undefined)
 
     // should be set
-    await db.add_to_network_registry(hoprNode, account, TestingSnapshot)
+    await db.add_to_network_registry(hoprNode.to_address(), account, TestingSnapshot)
 
     let nodes = await db.find_hopr_node_using_account_in_network_registry(account)
     assert(nodes.len() === 1, 'should have only 1 hoprNode registered')
     assert(
-      (await db.find_hopr_node_using_account_in_network_registry(account)).next().eq(hoprNode),
+      (await db.find_hopr_node_using_account_in_network_registry(account)).next().eq(hoprNode.to_address()),
       'should match the registered hoprNode'
     )
-    assert((await db.get_account_from_network_registry(hoprNode)).eq(account), 'should match account added')
+    assert(
+      (await db.get_account_from_network_registry(hoprNode.to_address())).eq(account),
+      'should match account added'
+    )
 
     // should be removed
-    await db.remove_from_network_registry(hoprNode, account, TestingSnapshot)
+    await db.remove_from_network_registry(hoprNode.to_address(), account, TestingSnapshot)
 
     assert(
       (await db.find_hopr_node_using_account_in_network_registry(account)).len() === 0,
       'should have 0 hoprNode registered'
     )
-    assert.equal(await db.get_account_from_network_registry(hoprNode), undefined)
+    assert.equal(await db.get_account_from_network_registry(hoprNode.to_address()), undefined)
   })
 
   it('should test eligible', async function () {
@@ -234,6 +239,14 @@ describe('db functional tests', function () {
     const fromDb = await db.get_current_commitment(DUMMY_CHANNEL)
 
     assert(fromDb.eq(DUMMY_COMMITMENT))
+  })
+
+  it('should set a packet tag', async function () {
+    let db = test_in_memory_db()
+
+    const DUMMY_TAG = new Uint8Array(Hash.size()).fill(0xff)
+
+    await db.check_and_set_packet_tag(DUMMY_TAG)
   })
 })
 

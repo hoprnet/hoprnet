@@ -26,16 +26,19 @@
   - [Install via Nix package manager](#install-via-nix-package-manager)
 - [Using](#using)
   - [Using Docker](#using-docker)
-  - [Using Docker Compose with extended monitoring](#using-docker-compose-with-extended-hopr-node-monitoring)
+  - [Using Docker Compose with extended HOPR node monitoring](#using-docker-compose-with-extended-hopr-node-monitoring)
 - [Testnet accessibility](#testnet-accessibility)
 - [Migrating between releases](#migrating-between-releases)
 - [Develop](#develop)
+- [Local cluster](#local-cluster)
 - [Test](#test)
   - [Unit testing](#unit-testing)
     - [Test-driven development](#test-driven-development)
   - [Github Actions CI](#github-actions-ci)
   - [End-to-End Testing](#end-to-end-testing)
     - [Running Tests Locally](#running-tests-locally)
+      - [Testing environment](#testing-environment)
+      - [Test execution](#test-execution)
 - [Deploy](#deploy)
   - [Using Google Cloud Platform](#using-google-cloud-platform)
   - [Using Google Cloud Platform and a Default Topology](#using-google-cloud-platform-and-a-default-topology)
@@ -152,10 +155,10 @@ Options:
           Default channel strategy to use after node starts up [env: HOPRD_DEFAULT_STRATEGY=] [default: passive] [possible values: promiscuous, passive, random]
       --maxAutoChannels <MAX_AUTO_CHANNELS>
           Maximum number of channel a strategy can open. If not specified, square root of number of available peers is used. [env: HOPRD_MAX_AUTO_CHANNELS=]
-      --autoRedeemTickets
-          If enabled automatically redeems winning tickets. [env: HOPRD_AUTO_REDEEEM_TICKETS=]
-      --checkUnrealizedBalance
-          Determines if unrealized balance shall be checked first before validating unacknowledged tickets. [env: HOPRD_CHECK_UNREALIZED_BALANCE=]
+      --disableTicketAutoRedeem
+          Disables automatic redeemeing of winning tickets. [env: HOPRD_DISABLE_AUTO_REDEEEM_TICKETS]
+      --disableUnrealizedBalanceCheck
+          Disables checking of unrealized balance before validating unacknowledged tickets. [env: HOPRD_DISABLE_UNREALIZED_BALANCE_CHECK]
       --provider <PROVIDER>
           A custom RPC provider to be used for the node to connect to blockchain [env: HOPRD_PROVIDER=]
       --dryRun
