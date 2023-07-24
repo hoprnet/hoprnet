@@ -183,13 +183,6 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto {
   }
 
   function testHashToCurve() public {
-    // sample Rust code:
-    // ```rust
-    // use elliptic_curve::hash2curve::{ExpandMsgXmd, GroupDigest};
-    // use k256::Secp256k1;
-    // 
-    // let hash = Secp256k1::hash_from_bytes::<ExpandMsgXmd<sha3::Keccak256>>(msg);
-    // ```
     bytes memory DST = "QUUX-V01-CS02-with-secp256k1_XMD:Keccak256_SSWU_RO_";
 
     // test strings taken from https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#appendix-J.8.1
@@ -202,6 +195,13 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto {
     ];
 
     // Generated with Rust implementation
+    // sample Rust code:
+    // ```rust
+    // use elliptic_curve::hash2curve::{ExpandMsgXmd, GroupDigest};
+    // use k256::Secp256k1;
+    // 
+    // let hash = Secp256k1::hash_from_bytes::<ExpandMsgXmd<sha3::Keccak256>>(msg);
+    // ```
     CurvePoint[5] memory points = [
       CurvePoint(0xa8d5be3d37133158c01970d186839bc7405fb26c0c8c9687c5a0783f3e23db6d,0xfa9b1660a78cfe5a60cdb6355fde4d4108bcfb58cc2b97b655e629c0604849bf),
       CurvePoint(0xd7e69a5226454f72a551c0799460d068fd1ffff6445146fb3beb9a842d5affbd,0x6de9462bd1fe58a603945b88927724f20d2ac0671223195f21d41609ce4c1265),
