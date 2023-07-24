@@ -373,22 +373,14 @@ impl HoprdConfig {
 
         // db
         cfg.db.data = cli_args.data;
-        if let Some(x) = cli_args.init {
-            cfg.db.initialize = x
-        };
-        if let Some(x) = cli_args.force_init {
-            cfg.db.force_initialize = x
-        };
+        cfg.db.initialize = cli_args.init;
+        cfg.db.force_initialize = cli_args.force_init;
 
         // api
-        if let Some(x) = cli_args.api {
-            cfg.api.enable = x
-        };
-        if let Some(x) = cli_args.disable_api_authentication {
-            if x {
-                if &cfg.api.auth != &Auth::None {
-                    cfg.api.auth = Auth::None;
-                }
+        cfg.api.enable = cli_args.api;
+        if cli_args.disable_api_authentication {
+            if &cfg.api.auth != &Auth::None {
+                cfg.api.auth = Auth::None;
             }
         };
         if let Some(x) = cli_args.api_token {
@@ -413,15 +405,9 @@ impl HoprdConfig {
         };
 
         // network options
-        if let Some(x) = cli_args.announce {
-            cfg.network_options.announce = x
-        };
-        if let Some(x) = cli_args.allow_local_node_connections {
-            cfg.network_options.allow_local_node_connections = x
-        };
-        if let Some(x) = cli_args.allow_private_node_connections {
-            cfg.network_options.allow_private_node_connections = x
-        };
+        cfg.network_options.announce = cli_args.announce;
+        cfg.network_options.allow_local_node_connections = cli_args.allow_local_node_connections;
+        cfg.network_options.allow_private_node_connections = cli_args.allow_private_node_connections;
         if let Some(x) = cli_args.max_parallel_connections {
             cfg.network_options.max_parallel_connections = x
         } else if cfg.network_options.announce {
@@ -430,14 +416,10 @@ impl HoprdConfig {
         if let Some(x) = cli_args.network_quality_threshold {
             cfg.network_options.network_quality_threshold = x
         };
-        if let Some(x) = cli_args.no_relay {
-            cfg.network_options.no_relay = x
-        }
+        cfg.network_options.no_relay = cli_args.no_relay;
 
         // healthcheck
-        if let Some(x) = cli_args.health_check {
-            cfg.healthcheck.enable = x
-        };
+        cfg.healthcheck.enable = cli_args.health_check;
         if let Some(x) = cli_args.health_check_host {
             cfg.healthcheck.host = x
         };
@@ -461,40 +443,25 @@ impl HoprdConfig {
         if let Some(x) = cli_args.max_auto_channels {
             cfg.strategy.max_auto_channels = Some(x)
         };
-        if let Some(x) = cli_args.auto_redeem_tickets {
-            cfg.strategy.auto_redeem_tickets = x
-        };
+
+        cfg.strategy.auto_redeem_tickets = cli_args.auto_redeem_tickets;
 
         // chain
         if let Some(x) = cli_args.provider {
             cfg.chain.provider = Some(x)
         };
-        if let Some(x) = cli_args.check_unrealized_balance {
-            cfg.chain.check_unrealized_balance = x
-        };
+        cfg.chain.check_unrealized_balance = cli_args.check_unrealized_balance;
         if let Some(x) = cli_args.on_chain_confirmations {
             cfg.chain.on_chain_confirmations = x
         };
 
         // test
-        if let Some(x) = cli_args.test_announce_local_addresses {
-            cfg.test.announce_local_addresses = x
-        };
-        if let Some(x) = cli_args.test_prefer_local_addresses {
-            cfg.test.prefer_local_addresses = x
-        };
-        if let Some(x) = cli_args.test_local_mode_stun {
-            cfg.test.local_mode_stun = x
-        };
-        if let Some(x) = cli_args.test_no_webrtc_upgrade {
-            cfg.test.no_webrtc_upgrade = x
-        };
-        if let Some(x) = cli_args.test_no_direct_connections {
-            cfg.test.no_direct_connections = x
-        };
-        if let Some(x) = cli_args.test_use_weak_crypto {
-            cfg.test.use_weak_crypto = x
-        };
+        cfg.test.announce_local_addresses = cli_args.test_announce_local_addresses;
+        cfg.test.prefer_local_addresses = cli_args.test_prefer_local_addresses;
+        cfg.test.local_mode_stun = cli_args.test_local_mode_stun;
+        cfg.test.no_webrtc_upgrade = cli_args.test_no_webrtc_upgrade;
+        cfg.test.no_direct_connections = cli_args.test_no_direct_connections;
+        cfg.test.use_weak_crypto = cli_args.test_use_weak_crypto;
 
         if skip_validation {
             Ok(cfg)
@@ -533,8 +500,6 @@ pub mod wasm {
     pub fn fetch_configuration(cli_args: JsValue) -> Result<HoprdConfig, JsValue> {
         let args: crate::cli::CliArgs = serde_wasm_bindgen::from_value(cli_args)?;
         HoprdConfig::from_cli_args(args, false).map_err(|e| wasm_bindgen::JsValue::from(e.to_string()))
-        // let cfg = HoprdConfig::from_cli_args(args, false).map_err(|e| wasm_bindgen::JsValue::from(e.to_string()))?;
-        // ok_or_jserr!(serde_wasm_bindgen::to_value(&cfg))
     }
 }
 
