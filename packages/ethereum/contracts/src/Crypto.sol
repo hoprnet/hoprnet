@@ -1,12 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.19;
 
-error InvalidFieldElement();
-error InvalidCurvePoint();
-error InvalidPointWitness();
-error GeneralError();
-error MessageTooLong();
-
 /**
  *    &&&&
  *    &&&&
@@ -25,6 +19,12 @@ error MessageTooLong();
  * Bundles cryptographic primitives used by the HOPR protocol
  **/
 abstract contract HoprCrypto {
+  error InvalidFieldElement();
+  error InvalidCurvePoint();
+  error InvalidPointWitness();
+  error GeneralError();
+  error MessageTooLong();
+
   // secp256k1: y^2 = x^3 + b (mod F_p)
   uint256 constant internal SECP256K1_B = 0x0000000000000000000000000000000000000000000000000000000000000007;
   // Field order created by secp256k1 curve
@@ -528,36 +528,38 @@ abstract contract HoprCrypto {
       // https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#name-optimized-sqrt_ratio-for-q-
   
       // ===================================
-      let tv7 := mulmod(tv6,tv6, SECP256K1_BASE_FIELD_ORDER) // 1. tv1 = v^2
-      let tv8 := mulmod(tv2,tv6, SECP256K1_BASE_FIELD_ORDER) // 2. tv2 = u * v
+      {
+        let tv7 := mulmod(tv6,tv6, SECP256K1_BASE_FIELD_ORDER) // 1. tv1 = v^2
+        let tv8 := mulmod(tv2,tv6, SECP256K1_BASE_FIELD_ORDER) // 2. tv2 = u * v
 
-      tv7 := mulmod(tv7, tv8, SECP256K1_BASE_FIELD_ORDER) // 3. tv1 = tv1 * tv2
+        tv7 := mulmod(tv7, tv8, SECP256K1_BASE_FIELD_ORDER) // 3. tv1 = tv1 * tv2
             
-      // 4. y1 = tv1^c1 (using expmod precompile)
-      let p := mload(0x40)
-      mstore(p, 0x20)             // Length of Base
-      mstore(add(p, 0x20), 0x20)  // Length of Exponent
-      mstore(add(p, 0x40), 0x20)  // Length of Modulus
-      mstore(add(p, 0x60), tv7)   // Base
-      mstore(add(p, 0x80), C_1)   // Exponent
-      mstore(add(p, 0xa0), SECP256K1_BASE_FIELD_ORDER)     // Modulus
-      if iszero(staticcall(not(0), 0x05, p, 0xC0, p, 0x20)) { // 0x05 == expmod precompile
-        revert(0, 0)
-      }
+        // 4. y1 = tv1^c1 (using expmod precompile)
+        let p := mload(0x40)
+        mstore(p, 0x20)             // Length of Base
+        mstore(add(p, 0x20), 0x20)  // Length of Exponent
+        mstore(add(p, 0x40), 0x20)  // Length of Modulus
+        mstore(add(p, 0x60), tv7)   // Base
+        mstore(add(p, 0x80), C_1)   // Exponent
+        mstore(add(p, 0xa0), SECP256K1_BASE_FIELD_ORDER)     // Modulus
+        if iszero(staticcall(not(0), 0x05, p, 0xC0, p, 0x20)) { // 0x05 == expmod precompile
+          revert(0, 0)
+        }
       
-      let y1_inner := mulmod(mload(p), tv8, SECP256K1_BASE_FIELD_ORDER) // 5. y1 = y1 * tv2
-      let y2_inner := mulmod(y1_inner, C_2, SECP256K1_BASE_FIELD_ORDER) // 6. y2 = y1 * c2
-      let tv9 := mulmod(y1_inner, y1_inner, SECP256K1_BASE_FIELD_ORDER) // 7. tv3 = y1^2
-      tv9 := mulmod(tv9, tv6, SECP256K1_BASE_FIELD_ORDER) // 8. tv3 = tv3 * v
+        let y1_inner := mulmod(mload(p), tv8, SECP256K1_BASE_FIELD_ORDER) // 5. y1 = y1 * tv2
+        let y2_inner := mulmod(y1_inner, C_2, SECP256K1_BASE_FIELD_ORDER) // 6. y2 = y1 * c2
+        let tv9 := mulmod(y1_inner, y1_inner, SECP256K1_BASE_FIELD_ORDER) // 7. tv3 = y1^2
+        tv9 := mulmod(tv9, tv6, SECP256K1_BASE_FIELD_ORDER) // 8. tv3 = tv3 * v
 
-      switch eq(tv9, tv2) // 9. isQR = tv3 == u
-      case true { // 10. y = CMOV(y2, y1, isQR)
-        is_square := true
-        y1 := y1_inner
-      }
-      case false {
-        is_square := false
-        y1 := y2_inner
+        switch eq(tv9, tv2) // 9. isQR = tv3 == u
+        case true { // 10. y = CMOV(y2, y1, isQR)
+          is_square := true
+          y1 := y1_inner
+        }
+        case false {
+          is_square := false
+          y1 := y2_inner
+        }
       }
 
       // =====================================
