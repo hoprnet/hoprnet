@@ -44,6 +44,7 @@ jobs:
           echo "Done"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   tag:
     name: Tag images
     runs-on: ubuntu-2-core
@@ -117,6 +118,7 @@ jobs:
   deploy_prn:
     name: Deploy PRN nodes
     runs-on: ubuntu-2-core
+    if: ${{ needs.tag.result == 'success' }}
     needs:
       - tag
     steps:
@@ -223,6 +225,7 @@ jobs:
   deploy_nodes:
     name: Deploy Hoprd nodes
     runs-on: ubuntu-2-core
+    if: ${{ needs.tag.result == 'success' }}
     needs:
       - tag
     steps:
@@ -246,8 +249,6 @@ jobs:
             echo "[INFO] Restarting hoprd node ${deployments}"
             kubectl rollout restart deployments -n ${network} $deployment;
           done
-
-
 
   cleanup-docker:
     name: Cleanup Docker
