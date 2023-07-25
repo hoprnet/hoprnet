@@ -118,7 +118,7 @@ jobs:
   deploy_prn:
     name: Deploy PRN nodes
     runs-on: ubuntu-2-core
-    if: ${{ needs.tag.result == 'success' }}
+    if: needs.tag.result == 'success'
     needs:
       - tag
     steps:
@@ -225,7 +225,7 @@ jobs:
   deploy_nodes:
     name: Deploy Hoprd nodes
     runs-on: ubuntu-2-core
-    if: ${{ needs.tag.result == 'success' }}
+    if: needs.tag.result == 'success'
     needs:
       - tag
     steps:
