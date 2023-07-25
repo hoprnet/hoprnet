@@ -10,7 +10,7 @@ JS_FILES = $(foreach package,$(PACKAGES),$(package)/pkg/$(subst -,_,$(package)).
 all: $(JS_FILES)
 
 test: $(JS_FILES)
-	$(foreach pkg,$(PACKAGES),cargo test -p $(pkg) && WASM_BINDGEN_WEAKREF=1 WASM_BINDGEN_EXTERNREF=1 wasm-pack test --node `pwd`/$(pkg) && ) true
+	$(foreach pkg,$(PACKAGES),cargo test --no-default-features -p $(pkg) && WASM_BINDGEN_WEAKREF=1 WASM_BINDGEN_EXTERNREF=1 wasm-pack test --node `pwd`/$(pkg) && ) true
 
 $(JS_FILES):
 	mkdir -p $(@D)
