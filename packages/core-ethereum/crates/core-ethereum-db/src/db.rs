@@ -817,7 +817,7 @@ pub mod wasm {
     use super::{CoreEthereumDb, HoprCoreEthereumDbActions, DB};
     use async_lock::RwLock;
     use core_crypto::iterated_hash::IteratedHash;
-    use core_crypto::types::Hash;
+    use core_crypto::types::{Hash, PublicKey, OffchainPublicKey};
     use core_types::account::AccountEntry;
     use core_types::acknowledgement::AcknowledgedTicket;
     use core_types::channels::{ChannelEntry, Ticket};
@@ -1147,6 +1147,37 @@ pub mod wasm {
             //check_lock_read! {
             let db = data.read().await;
             utils_misc::ok_or_jserr!(db.get_pending_balance_to(counterparty).await)
+            //}
+        }
+
+        #[wasm_bindgen]
+        pub async fn get_packet_key(&self, channel_key: &PublicKey) -> Result<Option<OffchainPublicKey>, JsValue> {
+            let data = self.core_ethereum_db.clone();
+            //check_lock_read! {
+            let db = data.read().await;
+            utils_misc::ok_or_jserr!(db.get_packet_key(channel_key).await)
+            //}
+        }
+
+        #[wasm_bindgen]
+        pub async fn get_channel_key(&self, packet_key: &OffchainPublicKey) -> Result<Option<PublicKey>, JsValue> {
+            let data = self.core_ethereum_db.clone();
+            //check_lock_read! {
+            let db = data.read().await;
+            utils_misc::ok_or_jserr!(db.get_channel_key(packet_key).await)
+            //}
+        }
+
+        #[wasm_bindgen]
+        pub async fn link_packet_and_channel_keys(
+            &self,
+            channel_key: &PublicKey,
+            packet_key: &OffchainPublicKey,
+        ) -> Result<(), JsValue> {
+            let data = self.core_ethereum_db.clone();
+            //check_lock_write! {
+            let mut db = data.write().await;
+            utils_misc::ok_or_jserr!(db.link_packet_and_channel_keys(channel_key, packet_key).await)
             //}
         }
 

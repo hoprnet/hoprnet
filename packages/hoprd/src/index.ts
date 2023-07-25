@@ -297,7 +297,7 @@ async function main() {
     // total hack. peerIdFromKeys seems to produce incorrect objects
     const peerId = privKeyToPeerId(keypair.chainKeyPrivKey)
 
-    console.log(`chain_key`, (await keypair.chainKeyPeerId).toString())
+    //console.log(`chain_key`, (await keypair.chainKeyPeerId).toString())
     console.log(`packet_key`, (await keypair.packetKeyPeerId).toString())
 
     // 2. Create node instance

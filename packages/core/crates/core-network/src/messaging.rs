@@ -74,7 +74,7 @@ impl PingMessage {
 }
 
 #[cfg(not(feature = "compat-ping"))]
-impl utils_types::traits::AutoBinarySerializable<'_> for PingMessage {}
+impl utils_types::traits::AutoBinarySerializable for PingMessage {}
 
 #[cfg(feature = "compat-ping")]
 impl BinarySerializable for PingMessage {

@@ -1095,12 +1095,16 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     let publicAccounts = await this.db.get_public_node_accounts()
     while (publicAccounts.len() > 0) {
       let account = publicAccounts.next()
-
-      out += `  - ${account.get_peer_id_str()} ${account.get_multiaddress_str()}\n`
-      result.push({
-        id: peerIdFromString(account.get_peer_id_str()),
-        multiaddrs: [new Multiaddr(account.get_multiaddress_str())]
-      })
+      let packetKey = await this.db.get_packet_key(account.public_key)
+      if (packetKey) {
+        out += `  - ${packetKey.to_peerid_str()} (on-chain ${account.get_address().to_string()}) ${account.get_multiaddress_str()}\n`
+        result.push({
+          id: peerIdFromString(packetKey.to_peerid_str()),
+          multiaddrs: [new Multiaddr(account.get_multiaddress_str())]
+        })
+      } else {
+        log(`could not retrieve packet key for address ${account.get_address()}`)
+      }
     }
 
     // Remove last `\n`

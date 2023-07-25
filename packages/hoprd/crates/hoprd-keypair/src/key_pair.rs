@@ -37,6 +37,9 @@ const HOPR_KDF_PARAMS_P: u32 = 1u32;
 const PACKET_KEY_LENGTH: usize = <OffchainKeypair as Keypair>::SecretLen::USIZE;
 const CHAIN_KEY_LENGTH: usize = <ChainKeypair as Keypair>::SecretLen::USIZE;
 
+const V1_PRIVKEY_LENGTH: usize = 32;
+const V2_PRIVKEYS_LENGTH: usize = 172;
+
 // Current version, deviates from pre 2.0
 const VERSION: u32 = 2;
 
@@ -473,7 +476,6 @@ pub mod wasm {
     use utils_types::traits::PeerIdLike;
     use wasm_bindgen::prelude::*;
 
-    const SECP256K1_PEERID_LENGTH: usize = 37;
     const ED25519_PEERID_LENGTH: usize = 36;
 
     #[wasm_bindgen(module = "@libp2p/peer-id")]
@@ -508,16 +510,8 @@ pub mod wasm {
         #[wasm_bindgen(getter, js_name = "packetKeyPeerId")]
         pub fn get_packet_key_peer_id(&self) -> Promise {
             let mut sliced = [0u8; ED25519_PEERID_LENGTH];
-            sliced.copy_from_slice(&self.w.packet_key.1.to_peerid().to_bytes()[2..]);
-            peer_id_from_keys(Box::new(sliced), Box::new(self.w.packet_key.0))
-        }
-
-        #[wasm_bindgen(getter, js_name = "chainKeyPeerId")]
-        pub fn get_chain_key_peer_id(&self) -> Promise {
-            let mut sliced = [0u8; SECP256K1_PEERID_LENGTH];
-            sliced.copy_from_slice(&self.w.chain_key.1.to_peerid().to_bytes()[2..]);
-
-            peer_id_from_keys(Box::new(sliced), Box::new(self.w.chain_key.0))
+            sliced.copy_from_slice(&self.w.packet_key.public().to_peerid().to_bytes()[2..]);
+            peer_id_from_keys(Box::new(sliced), Box::from(self.w.packet_key.secret().as_ref()))
         }
 
         #[wasm_bindgen(getter, js_name = "chainKeyPrivKey")]
