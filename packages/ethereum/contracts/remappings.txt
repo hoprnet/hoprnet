@@ -4,3 +4,4 @@ openzeppelin-contracts-4.4.2/=lib/openzeppelin-contracts-4.4.2/contracts/
 openzeppelin-contracts/=lib/openzeppelin-contracts-4.9.2/contracts/
 safe-contracts/=lib/safe-contracts-1.4.0/contracts/
 openzeppelin-contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable-4.9.2/contracts
+solcrypto=lib/solcrypto/contracts/
