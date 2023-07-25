@@ -22,8 +22,6 @@ abstract contract HoprCrypto {
   error InvalidFieldElement();
   error InvalidCurvePoint();
   error InvalidPointWitness();
-  error GeneralError();
-  error MessageTooLong();
 
   // secp256k1: y^2 = x^3 + b (mod F_p)
   uint256 constant internal SECP256K1_B = 0x0000000000000000000000000000000000000000000000000000000000000007;
@@ -679,19 +677,11 @@ abstract contract HoprCrypto {
    * @param DST domain separation tag, used to make protocol instantiations unique
    */
   function expand_message_xmd_keccak256(bytes memory message, bytes memory DST) internal pure returns (bytes32 b_1, bytes32 b_2, bytes32 b_3) {
-    uint256 ell; 
-
-    if ((message.length >> 5) << 5 == 0) {
-      ell = message.length >> 5;
-    } else {
-      ell = message.length >> 5 + 1;
-    }
-
-    if (ell > 255 || message.length > 2040 || DST.length > 255) {
-      revert MessageTooLong();
-    }
-
     assembly {
+      if gt(mload(DST), 255) {
+        revert (0,0)
+      }
+
       let b_0
       {
         // create payload for b_0 hash
@@ -780,19 +770,11 @@ abstract contract HoprCrypto {
    * @param DST domain separation tag, used to make protocol instantiations unique
    */
   function expand_message_xmd_keccak256_single(bytes memory message, bytes memory DST) internal pure returns (bytes32 b_1, bytes32 b_2) {
-    uint256 ell; 
-
-    if ((message.length >> 5) << 5 == 0) {
-      ell = message.length >> 5;
-    } else {
-      ell = message.length >> 5 + 1;
-    }
-
-    if (ell > 255 || message.length > 2040 || DST.length > 255) {
-      revert MessageTooLong();
-    }
-
     assembly {
+      if gt(mload(DST), 255) {
+        revert (0,0)
+      }
+
       let b_0
       {
         // create payload for b_0 hash

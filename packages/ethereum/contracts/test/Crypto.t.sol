@@ -185,6 +185,16 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto, CryptoUtils {
     }
   }
 
+  function testRevert_expandMessageLongDST(bytes memory message) public {
+    string memory super_long_DST = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam leo sem, consectetur facilisis nibh eget, feugiat ultrices ipsum. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Duis vel elit tempor, laoreet mauris.';
+
+    vm.expectRevert();
+    expand_message_xmd_keccak256(message, abi.encodePacked(super_long_DST));
+
+    vm.expectRevert();
+    expand_message_xmd_keccak256_single(message, abi.encodePacked(super_long_DST));
+  }
+
   function testHashToCurve() public {
     bytes memory DST = "QUUX-V01-CS02-with-secp256k1_XMD:Keccak256_SSWU_RO_";
 
