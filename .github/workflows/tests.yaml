@@ -11,9 +11,6 @@ env:
 
 on:
   pull_request:
-    # branches:
-    #   - master
-    #   - release/*
     types:
       - synchronize
     paths-ignore:
@@ -96,7 +93,7 @@ jobs:
 
   e2e_testing:
     name: End to end
-    runs-on: ubuntu-latest-8-cores
+    runs-on: ubuntu-8-core
     if: github.event.pull_request.draft == false
     timeout-minutes: 90
     steps:
