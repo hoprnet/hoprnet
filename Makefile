@@ -493,14 +493,18 @@ endif
 	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make stake-funds
 	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node peer_ids=$(shell eval ./scripts/get-hopr-address.sh "$(api_token)" "$(endpoint)")
 
-ensure-environment-and-network-are-set:
+ensure-environment-and-network-are-set: ensure-network-is-set ensure-environment-is-set
+
+ensure-network-is-set:
 ifeq ($(network),)
 	echo "parameter <network> missing" >&2 && exit 1
 else
-environment_type != jq '.networks."$(network)".environment_type // empty' packages/ethereum/contracts/contracts-addresses.json
-ifeq ($(environment_type),)
-	echo "could not read environment type info from contracts-addresses.json" >&2 && exit 1
+environment-type != jq '.networks."$(network)".environment_type // empty' packages/ethereum/contracts/contracts-addresses.json
 endif
+
+ensure-environment-is-set:
+ifeq ($(environment-type),)
+	echo "could not read environment info from contracts-addresses.json" >&2 && exit 1
 endif
 
 .PHONY: run-docker-dev
