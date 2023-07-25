@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import '../interfaces/INetworkRegistryRequirement.sol';
 import '../interfaces/INodeSafeRegistry.sol';
-import 'openzeppelin-contracts-4.8.3/access/AccessControlEnumerable.sol';
+import 'openzeppelin-contracts/access/AccessControlEnumerable.sol';
 
 /**
  * @dev Minimum interface for token contract

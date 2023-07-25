@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.19;
 
-import 'openzeppelin-contracts-4.8.3/utils/Multicall.sol';
-import 'openzeppelin-contracts-4.8.3/utils/introspection/IERC1820Registry.sol';
-import 'openzeppelin-contracts-4.8.3/utils/introspection/ERC1820Implementer.sol';
-import 'openzeppelin-contracts-4.8.3/token/ERC20/IERC20.sol';
-import 'openzeppelin-contracts-4.8.3/token/ERC777/IERC777Recipient.sol';
-import 'openzeppelin-contracts-4.8.3/utils/cryptography/ECDSA.sol';
+import 'openzeppelin-contracts/utils/Multicall.sol';
+import 'openzeppelin-contracts/utils/introspection/IERC1820Registry.sol';
+import 'openzeppelin-contracts/utils/introspection/ERC1820Implementer.sol';
+import 'openzeppelin-contracts/token/ERC20/IERC20.sol';
+import 'openzeppelin-contracts/token/ERC777/IERC777Recipient.sol';
+import 'openzeppelin-contracts/utils/cryptography/ECDSA.sol';
 import './interfaces/INodeSafeRegistry.sol';
 
 error InvalidBalance();
@@ -225,7 +225,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
    * @param _noticePeriodChannelClosure seconds until a channel can be closed
    */
   constructor(
-    address _token, 
+    address _token,
     address _nodeSafeRegistry,
     Timestamp _noticePeriodChannelClosure
   ) {

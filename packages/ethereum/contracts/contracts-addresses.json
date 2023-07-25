@@ -2,7 +2,7 @@
   "networks": {
     "anvil-localhost": {
       "channels_contract_address": "0xd54eE5aDed3A4d2059A6f01DEbdb033BB5453433",
-      "environment_type": "development",
+      "environment_type": "local",
       "indexer_start_block_number": 26356264,
       "module_implementation_address": "0x43d13D7B83607F14335cF2cB75E87dA369D056c7",
       "network_registry_contract_address": "0x43d13D7B83607F14335cF2cB75E87dA369D056c7",
@@ -13,7 +13,7 @@
     },
     "anvil-localhost2": {
       "channels_contract_address": "0xd54eE5aDed3A4d2059A6f01DEbdb033BB5453433",
-      "environment_type": "development",
+      "environment_type": "local",
       "indexer_start_block_number": 26356264,
       "module_implementation_address": "0x43d13D7B83607F14335cF2cB75E87dA369D056c7",
       "network_registry_contract_address": "0x43d13D7B83607F14335cF2cB75E87dA369D056c7",

@@ -10,7 +10,7 @@ import "./utils/BoostUtilsLib.sol";
 
 /**
  * @title Deploy all the required contracts in development, staging and production environment
- * @notice In local development environment, ERC1820Registry, Safe deployment singleton, Safe suites should be deployed 
+ * @notice In local development environment, ERC1820Registry, Safe deployment singleton, Safe suites should be deployed
  * before running this script.
  * @dev It reads the environment, netork and deployer internal key from env variables
  */
@@ -32,7 +32,7 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
         mustHaveErc1820Registry();
         emit log_string(string(abi.encodePacked("Deploying in ", currentNetworkId)));
 
-        // 2. Get deployer internal key. 
+        // 2. Get deployer internal key.
         // Set to default when it's in development environment (uint for 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80)
         uint256 deployerPrivateKey = currentEnvironmentType == EnvironmentType.LOCAL ? 77814517325470205911140941194401928579557062014761831930645393041380819009408 : vm.envUint("DEPLOYER_PRIVATE_KEY");
         address deployerAddress = vm.addr(deployerPrivateKey);
@@ -65,7 +65,7 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
             uint256 closure = currentEnvironmentType == EnvironmentType.LOCAL ? 15 : 5 * 60;
             currentNetworkDetail.channelsContractAddress =
                 deployCode(
-                    "Channels.sol:HoprChannels", 
+                    "Channels.sol:HoprChannels",
                     abi.encode(
                         currentNetworkDetail.tokenContractAddress,
                         currentNetworkDetail.nodeSafeRegistryAddress,
@@ -182,7 +182,7 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
                 "SafeProxyForNetworkRegistry.sol:HoprSafeProxyForNetworkRegistry",
                 abi.encode(
                     COMM_MULTISIG_ADDRESS,
-                    deployerAddress, 
+                    deployerAddress,
                     0, // disable self-registry
                     block.number,   // latest block number
                     currentNetworkDetail.tokenContractAddress,

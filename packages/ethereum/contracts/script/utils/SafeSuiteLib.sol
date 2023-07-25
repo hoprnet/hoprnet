@@ -2,8 +2,9 @@
 pragma solidity >=0.8.0 <0.9.0;
 
 /**
- * library for Safe 1.4 addresses
- * deployed contract addresses from https://github.com/safe-global/safe-deployments/tree/main/src/assets/v1.4.0
+ * library for Safe 1.4.0 addresses
+ * deployed contract addresses on Gnosis Chain from
+ * https://github.com/safe-global/safe-deployments/tree/2dc3a9913ccc7a524ccfdacd50a2f864f423cf2b/src/assets/v1.4.0
  */
 library SafeSuiteLib {
   address internal constant SAFE_SimulateTxAccessor_ADDRESS = 0x3d4BA2E0884aa488718476ca2FB8Efc291A46199;

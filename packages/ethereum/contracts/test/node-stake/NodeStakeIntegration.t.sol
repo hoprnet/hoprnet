@@ -6,7 +6,6 @@ import '../../src/node-stake/permissioned-module/CapabilityPermissions.sol';
 import '../../src/node-stake/NodeStakeFactory.sol';
 import '../../src/node-stake/NodeSafeRegistry.sol';
 import '../../src/Channels.sol';
-import '../../lib/safe-contracts/contracts/Safe.sol';
 import "../../script/utils/SafeSuiteLib.sol";
 import "../utils/SafeSingleton.sol";
 import "../utils/ERC1820Registry.sol";

@@ -12,7 +12,7 @@ contract DeployNodeSafeScriptTest is Test, ERC1820RegistryFixtureTest {
 
     function setUp() public override {
         super.setUp();
-        vm.setEnv("FOUNDRY_PROFILE", "development");
+        vm.setEnv("FOUNDRY_PROFILE", "local");
         vm.setEnv("NETWORK", "anvil-localhost");
         deployScriptContract = new DeployAllContractsScript();
         deployScriptContract.run();

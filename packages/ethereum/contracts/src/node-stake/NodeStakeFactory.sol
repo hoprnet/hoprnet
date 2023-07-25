@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts-upgradeable/proxy/ClonesUpgradeable.sol";
-import "openzeppelin-contracts-4.8.3/utils/Address.sol";
+import "openzeppelin-contracts-upgradeable/proxy/ClonesUpgradeable.sol";
+import "openzeppelin-contracts/utils/Address.sol";
 import "../../script/utils/SafeSuiteLib.sol";
 import "safe-contracts/proxies/SafeProxy.sol";
 import "safe-contracts/proxies/SafeProxyFactory.sol";
@@ -17,7 +17,7 @@ contract HoprNodeStakeFactory  {
     address internal constant SENTINEL_OWNERS = address(0x1);
     bytes32 internal r;
     bytes internal approvalHashSig;
-    
+
     error TooFewOwners();
     event NewHoprNodeStakeModule(address instance);
     event NewHoprNodeStakeSafe(address instance);

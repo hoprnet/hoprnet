@@ -4,11 +4,11 @@ pragma solidity >=0.8.0 <0.9.0;
 import '../../src/node-stake/permissioned-module/NodeManagementModule.sol';
 import '../../src/node-stake/permissioned-module/CapabilityPermissions.sol';
 import '../../src/node-stake/NodeStakeFactory.sol';
-import '../../lib/safe-contracts/contracts/Safe.sol';
+import 'safe-contracts/Safe.sol';
 import "../../script/utils/SafeSuiteLib.sol";
 import "../utils/SafeSingleton.sol";
 import 'forge-std/Test.sol';
-import "@openzeppelin/contracts-upgradeable/proxy/ClonesUpgradeable.sol";
+import "openzeppelin-contracts-upgradeable/proxy/ClonesUpgradeable.sol";
 
 contract HoprNodeManagementModuleTest is Test, SafeSingletonFixtureTest {
     using ClonesUpgradeable for address;

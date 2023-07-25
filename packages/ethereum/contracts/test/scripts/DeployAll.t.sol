@@ -14,7 +14,7 @@ contract DeployAllTest is Test, ERC1820RegistryFixtureTest {
     }
 
     function test_Run() public {
-        vm.setEnv("FOUNDRY_PROFILE", "development");
+        vm.setEnv("FOUNDRY_PROFILE", "local");
         vm.setEnv("NETWORK", "anvil-localhost");
         deployScriptContract.run();
     }

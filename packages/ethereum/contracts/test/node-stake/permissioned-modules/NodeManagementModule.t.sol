@@ -8,8 +8,8 @@ import '../../../script/utils/SafeSuiteLib.sol';
 import '../../utils/SafeSingleton.sol';
 import '../../../src/interfaces/IAvatar.sol';
 import 'forge-std/Test.sol';
-import 'openzeppelin-contracts-4.8.3/token/ERC20/IERC20.sol';
-import "@openzeppelin/contracts-upgradeable/proxy/ClonesUpgradeable.sol";
+import 'openzeppelin-contracts/token/ERC20/IERC20.sol';
+import "openzeppelin-contracts-upgradeable/proxy/ClonesUpgradeable.sol";
 
 /**
  * @dev This files tests both HoprNodeManagementModule and the CapabilityPermissions.sol

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8;
 
-import 'openzeppelin-contracts-4.8.3/utils/cryptography/ECDSA.sol';
+import 'openzeppelin-contracts/utils/cryptography/ECDSA.sol';
 import '../interfaces/IAvatar.sol';
 import '../interfaces/INodeManagementModule.sol';
 
