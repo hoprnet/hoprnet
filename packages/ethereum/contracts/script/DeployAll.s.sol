@@ -84,7 +84,7 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
         // 3.7. NetworkRegistry Contract
         // Only deploy NetworkRegistrycontract when no deployed one is detected.
         // E.g. Always in local environment, or should a new NetworkRegistryProxy contract be introduced in development/staging/production
-         _deployNetowrkRegistry(deployerAddress);
+         _deployNetworkRegistry(deployerAddress);
 
         // 4. update indexerStartBlockNumber
         // if both HoprChannels and HoprNetworkRegistry contracts are deployed, update the startup block number for indexer
@@ -174,7 +174,7 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
         if (currentEnvironmentType == EnvironmentType.LOCAL) {
             // deploy DummyProxy in LOCAL environment
             currentNetworkDetail.networkRegistryProxyContractAddress =
-                deployCode("DummyProxyForNetworkRegistry.sol", abi.encode(deployerAddress));
+                deployCode("DummyProxyForNetworkRegistry.sol:HoprDummyProxyForNetworkRegistry", abi.encode(deployerAddress));
             isHoprNetworkRegistryDeployed = true;
         } else if (!isValidAddress(currentNetworkDetail.networkRegistryProxyContractAddress)) {
             // deploy StakingProxy in other environment types, if no proxy contract is given.
@@ -197,7 +197,7 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
      * @dev deploy network registry
      * in development environment, it's disabled
      */
-    function _deployNetowrkRegistry(address deployerAddress) internal {
+    function _deployNetworkRegistry(address deployerAddress) internal {
         if (
             currentEnvironmentType == EnvironmentType.LOCAL
                 || !isValidAddress(currentNetworkDetail.networkRegistryContractAddress)
@@ -206,7 +206,7 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
             currentNetworkDetail.networkRegistryContractAddress = deployCode(
                 "NetworkRegistry.sol:HoprNetworkRegistry",
                 abi.encode(
-                    currentNetworkDetail.networkRegistryProxyContractAddress, 
+                    currentNetworkDetail.networkRegistryProxyContractAddress,
                     COMM_MULTISIG_ADDRESS,
                     deployerAddress
                 )
