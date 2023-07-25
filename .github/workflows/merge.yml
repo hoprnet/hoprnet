@@ -2,9 +2,6 @@ name: Merge
 
 on:
   pull_request:
-    branches:
-      - master
-      - release/*
     types:
       - closed
       # - synchronize
@@ -47,9 +44,11 @@ jobs:
           echo "Done"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   tag:
     name: Tag images
     runs-on: ubuntu-2-core
+    if: github.event.pull_request.merged == true && (github.event.pull_request.base.ref == 'master' || contains(github.event.pull_request.base.ref,'release/'))
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v3
@@ -247,8 +246,6 @@ jobs:
             echo "[INFO] Restarting hoprd node ${deployments}"
             kubectl rollout restart deployments -n ${network} $deployment;
           done
-
-
 
   cleanup-docker:
     name: Cleanup Docker
