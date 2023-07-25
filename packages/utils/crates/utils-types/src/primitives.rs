@@ -205,7 +205,7 @@ impl Balance {
                 value: self
                     .value()
                     .value()
-                    .checked_sub(other.value().value().clone())
+                    .checked_sub(*other.value().value())
                     .unwrap_or(u256::ZERO),
             },
             balance_type: self.balance_type,
@@ -681,7 +681,7 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "clone")]
         pub fn _clone(&self) -> Self {
-            self.clone()
+            *self
         }
 
         #[wasm_bindgen]
@@ -709,7 +709,7 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "clone")]
         pub fn _clone(&self) -> Self {
-            self.clone()
+            *self
         }
 
         #[wasm_bindgen(js_name = "to_string")]
@@ -770,7 +770,7 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "clone")]
         pub fn _clone(&self) -> Self {
-            self.clone()
+            *self
         }
 
         #[wasm_bindgen]
@@ -827,7 +827,7 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "clone")]
         pub fn _clone(&self) -> Self {
-            self.clone()
+            *self
         }
 
         #[wasm_bindgen]

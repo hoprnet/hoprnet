@@ -136,7 +136,7 @@ pub mod wasm {
             let iterable = self
                 .db
                 .iterValues(js_sys::Uint8Array::from(prefix.as_ref()), suffix_size)
-                .map(|v| js_sys::AsyncIterator::from(v))
+                .map(js_sys::AsyncIterator::from)
                 .map_err(|e| DbError::GenericError(format!("Iteration failed with an exception: {:?}", e)))?;
 
             let stream = wasm_bindgen_futures::stream::JsStream::from(iterable);
@@ -246,7 +246,7 @@ pub mod wasm {
             }),
         ];
         if let Err(e) = kv_storage.batch(batch_data, true).await {
-            return Err(format!("Test #5.0 failed: batch operation failed: {}", e.to_string()).into());
+            return Err(format!("Test #5.0 failed: batch operation failed: {e}").into());
         }
 
         // ===================================

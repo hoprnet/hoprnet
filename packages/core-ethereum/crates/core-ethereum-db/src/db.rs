@@ -74,7 +74,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             .get_more::<AcknowledgedTicket>(
                 Vec::from(ACKNOWLEDGED_TICKETS_PREFIX.as_bytes()).into_boxed_slice(),
                 EthereumChallenge::SIZE as u32,
-                &|v: &AcknowledgedTicket| maybe_signer.clone().map(|s| v.signer.eq(&s)).unwrap_or(true),
+                &|v: &AcknowledgedTicket| maybe_signer.map(|s| v.signer.eq(&s)).unwrap_or(true),
             )
             .await?
             .into_iter()
@@ -269,13 +269,13 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
 
     async fn get_channel_to(&self, dest: &Address) -> Result<Option<ChannelEntry>> {
         //utils_log::debug!("DB: get_channel_to dest: {}", dest);
-        let key = utils_db::db::Key::new_with_prefix(&generate_channel_id(&self.me, &dest), CHANNEL_PREFIX)?;
+        let key = utils_db::db::Key::new_with_prefix(&generate_channel_id(&self.me, dest), CHANNEL_PREFIX)?;
 
         self.db.get_or_none(key).await
     }
 
     async fn get_channel_from(&self, src: &Address) -> Result<Option<ChannelEntry>> {
-        let key = utils_db::db::Key::new_with_prefix(&generate_channel_id(&src, &self.me), CHANNEL_PREFIX)?;
+        let key = utils_db::db::Key::new_with_prefix(&generate_channel_id(src, &self.me), CHANNEL_PREFIX)?;
 
         self.db.get_or_none(key).await
     }
@@ -302,10 +302,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         let acknowledged_tickets = self.get_acknowledged_tickets(Some(channel)).await?;
 
         let key = utils_db::db::Key::new_from_str(NEGLECTED_TICKET_COUNT)?;
-        let neglected_ticket_count = match self.db.get_or_none::<usize>(key.clone()).await? {
-            Some(x) => x,
-            None => 0,
-        };
+        let neglected_ticket_count = self.db.get_or_none::<usize>(key.clone()).await?.unwrap_or(0);
 
         let mut batch_ops = utils_db::db::Batch::new();
         for ticket in acknowledged_tickets.iter() {
@@ -315,7 +312,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             )?);
         }
 
-        if acknowledged_tickets.len() > 0 {
+        if !acknowledged_tickets.is_empty() {
             batch_ops.put(key, neglected_ticket_count + acknowledged_tickets.len())
         }
 
@@ -326,7 +323,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         let mut batch_ops = utils_db::db::Batch::new();
 
         for intermediate in iterated_hash.intermediates.iter() {
-            batch_ops.put(to_commitment_key(&channel, intermediate.iteration)?, intermediate);
+            batch_ops.put(to_commitment_key(channel, intermediate.iteration)?, intermediate);
         }
 
         self.db.batch(batch_ops, true).await
@@ -464,10 +461,10 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
 
         let mut batch_ops = utils_db::db::Batch::new();
         // TODO: NOTE: was there a bug in the original implementation in TS? val.sub(val)?
-        batch_ops.put(key.clone(), &current_balance.sub(&balance));
+        batch_ops.put(key.clone(), current_balance.sub(balance));
         batch_ops.put(
             utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?,
-            &snapshot,
+            snapshot,
         );
 
         self.db.batch(batch_ops, true).await
@@ -554,7 +551,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
 
     async fn get_channel_x(&self, src: &Address, dest: &Address) -> Result<Option<ChannelEntry>> {
         //utils_log::debug!("DB: get_channel_x src: {} & dest: {}", src, dest);
-        let key = utils_db::db::Key::new_with_prefix(&generate_channel_id(&src, &dest), CHANNEL_PREFIX)?;
+        let key = utils_db::db::Key::new_with_prefix(&generate_channel_id(src, dest), CHANNEL_PREFIX)?;
         self.db.get_or_none(key).await
     }
 
@@ -610,10 +607,10 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             .unwrap_or(Balance::zero(BalanceType::HOPR));
 
         let mut batch_ops = utils_db::db::Batch::new();
-        batch_ops.put(key, &current_balance.add(&balance));
+        batch_ops.put(key, current_balance.add(balance));
         batch_ops.put(
             utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?,
-            &snapshot,
+            snapshot,
         );
 
         self.db.batch(batch_ops, true).await
@@ -629,10 +626,10 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             .unwrap_or(Balance::zero(BalanceType::HOPR));
 
         let mut batch_ops = utils_db::db::Batch::new();
-        batch_ops.put(key, &current_balance.sub(&balance));
+        batch_ops.put(key, current_balance.sub(balance));
         batch_ops.put(
             utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?,
-            &snapshot,
+            snapshot,
         );
 
         self.db.batch(batch_ops, true).await
@@ -648,11 +645,11 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         let mut batch_ops = utils_db::db::Batch::new();
         batch_ops.put(
             utils_db::db::Key::new_from_str(NETWORK_REGISTRY_ENABLED_PREFIX)?,
-            &enabled,
+            enabled,
         );
         batch_ops.put(
             utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?,
-            &snapshot,
+            snapshot,
         );
 
         self.db.batch(batch_ops, true).await
@@ -670,7 +667,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         snapshot: &Snapshot,
     ) -> Result<()> {
         let mut addresses = self
-            .find_hopr_node_using_account_in_network_registry(&stake_account)
+            .find_hopr_node_using_account_in_network_registry(stake_account)
             .await?;
 
         for addr in addresses.iter() {
@@ -686,7 +683,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             }
         }
 
-        addresses.push(address.clone());
+        addresses.push(*address);
 
         let mut batch_ops = utils_db::db::Batch::new();
         // node chain address to stake address (N->1)
@@ -736,7 +733,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         );
         batch_ops.put(
             utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?,
-            &snapshot,
+            snapshot,
         );
 
         self.db.batch(batch_ops, true).await
@@ -782,7 +779,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         let mut batch_ops = utils_db::db::Batch::new();
 
         if eligible {
-            batch_ops.put(key, &true);
+            batch_ops.put(key, true);
         } else {
             batch_ops.del(key);
         }
@@ -895,7 +892,7 @@ pub mod wasm {
             Self {
                 core_ethereum_db: Arc::new(RwLock::new(CoreEthereumDb::new(
                     DB::new(leveldb::wasm::LevelDbShim::new(db)),
-                    me_addr.clone(),
+                    me_addr,
                 ))),
             }
         }
@@ -942,7 +939,7 @@ pub mod wasm {
             //check_lock_read! {
             let db = data.read().await;
             utils_misc::ok_or_jserr!(db.get_acknowledged_tickets(filter).await)
-                .map(|v| WasmVecAcknowledgedTicket::from(v))
+                .map(WasmVecAcknowledgedTicket::from)
             //}
         }
 
@@ -1033,7 +1030,7 @@ pub mod wasm {
             let data = self.core_ethereum_db.clone();
             //check_lock_read! {
             let db = data.read().await;
-            utils_misc::ok_or_jserr!(db.get_channels().await).map(|v| WasmVecChannelEntry::from(v))
+            utils_misc::ok_or_jserr!(db.get_channels().await).map(WasmVecChannelEntry::from)
             //}
         }
 
@@ -1041,7 +1038,7 @@ pub mod wasm {
             let data = self.core_ethereum_db.clone();
             //check_lock_read! {
             let db = data.read().await;
-            utils_misc::ok_or_jserr!(db.get_channels_open().await).map(|v| WasmVecChannelEntry::from(v))
+            utils_misc::ok_or_jserr!(db.get_channels_open().await).map(WasmVecChannelEntry::from)
             //}
         }
 
@@ -1086,7 +1083,7 @@ pub mod wasm {
             let data = self.core_ethereum_db.clone();
             //check_lock_read! {
             let db = data.read().await;
-            utils_misc::ok_or_jserr!(db.get_accounts().await).map(|v| WasmVecAccountEntry::from(v))
+            utils_misc::ok_or_jserr!(db.get_accounts().await).map(WasmVecAccountEntry::from)
             //}
         }
 
@@ -1095,7 +1092,7 @@ pub mod wasm {
             let data = self.core_ethereum_db.clone();
             //check_lock_read! {
             let db = data.read().await;
-            utils_misc::ok_or_jserr!(db.get_public_node_accounts().await).map(|v| WasmVecAccountEntry::from(v))
+            utils_misc::ok_or_jserr!(db.get_public_node_accounts().await).map(WasmVecAccountEntry::from)
             //}
         }
 
@@ -1254,7 +1251,7 @@ pub mod wasm {
             let data = self.core_ethereum_db.clone();
             //check_lock_read! {
             let db = data.read().await;
-            utils_misc::ok_or_jserr!(db.get_channels_from(address).await).map(|v| WasmVecChannelEntry::from(v))
+            utils_misc::ok_or_jserr!(db.get_channels_from(address).await).map(WasmVecChannelEntry::from)
             //}
         }
 
@@ -1263,7 +1260,7 @@ pub mod wasm {
             let data = self.core_ethereum_db.clone();
             //check_lock_read! {
             let db = data.read().await;
-            utils_misc::ok_or_jserr!(db.get_channels_to(address).await).map(|v| WasmVecChannelEntry::from(v))
+            utils_misc::ok_or_jserr!(db.get_channels_to(address).await).map(WasmVecChannelEntry::from)
             //}
         }
 
@@ -1376,7 +1373,7 @@ pub mod wasm {
             //check_lock_read! {
             let db = data.read().await;
             utils_misc::ok_or_jserr!(db.find_hopr_node_using_account_in_network_registry(account).await)
-                .map(|v| WasmVecAddress::from(v))
+                .map(WasmVecAddress::from)
             //}
         }
 

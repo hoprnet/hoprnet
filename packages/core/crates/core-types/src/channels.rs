@@ -117,8 +117,8 @@ impl ChannelEntry {
         })
     }
 
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-    pub fn to_string(&self) -> String {
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(js_name = "to_string"))]
+    pub fn _to_string(&self) -> String {
         format!("{}", self)
     }
 }

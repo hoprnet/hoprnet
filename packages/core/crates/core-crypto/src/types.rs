@@ -336,7 +336,7 @@ pub struct HalfKeyChallenge {
 
 impl Display for HalfKeyChallenge {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", hex::encode(&self.hkc))
+        write!(f, "{}", hex::encode(self.hkc))
     }
 }
 
@@ -1583,7 +1583,7 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "clone")]
         pub fn _clone(&self) -> Self {
-            self.clone()
+            *self
         }
 
         #[wasm_bindgen]
@@ -1628,7 +1628,7 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "clone")]
         pub fn _clone(&self) -> Self {
-            self.clone()
+            *self
         }
 
         #[wasm_bindgen]

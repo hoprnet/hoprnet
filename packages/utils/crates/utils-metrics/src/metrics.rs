@@ -58,7 +58,7 @@ where
     M: Clone + Collector + 'static,
     C: Fn(Opts, &[&str]) -> prometheus::Result<M>,
 {
-    if labels.len() == 0 {
+    if labels.is_empty() {
         return Err(prometheus::Error::Msg(
             "at least a single label must be specified".into(),
         ));
@@ -308,7 +308,7 @@ macro_rules! histogram_start_measure {
 enum TimerVariant {
     Native(HistogramTimer),
     #[cfg(feature = "wasm")]
-    WASM {
+    Wasm {
         start_ts: f64,
         new_ts: fn() -> f64,
         labels: Vec<String>,
@@ -341,7 +341,7 @@ impl SimpleHistogram {
         match timer.inner {
             TimerVariant::Native(timer) => timer.observe_duration(),
             #[cfg(feature = "wasm")]
-            TimerVariant::WASM { start_ts, new_ts, .. } => self.hh.observe(new_ts() - start_ts),
+            TimerVariant::Wasm { start_ts, new_ts, .. } => self.hh.observe(new_ts() - start_ts),
         }
     }
 
@@ -350,7 +350,7 @@ impl SimpleHistogram {
         match timer.inner {
             TimerVariant::Native(timer) => timer.stop_and_discard(),
             #[cfg(feature = "wasm")]
-            TimerVariant::WASM { start_ts, new_ts, .. } => new_ts() - start_ts,
+            TimerVariant::Wasm { start_ts, new_ts, .. } => new_ts() - start_ts,
         }
     }
 
@@ -414,7 +414,7 @@ impl MultiHistogram {
         match timer.inner {
             TimerVariant::Native(timer) => timer.observe_duration(),
             #[cfg(feature = "wasm")]
-            TimerVariant::WASM {
+            TimerVariant::Wasm {
                 start_ts,
                 new_ts,
                 labels,
@@ -434,7 +434,7 @@ impl MultiHistogram {
         match timer.inner {
             TimerVariant::Native(timer) => timer.stop_and_discard(),
             #[cfg(feature = "wasm")]
-            TimerVariant::WASM { start_ts, new_ts, .. } => new_ts() - start_ts,
+            TimerVariant::Wasm { start_ts, new_ts, .. } => new_ts() - start_ts,
         }
     }
 
@@ -692,7 +692,7 @@ mod tests {
 /// Bindings for JS/TS
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use crate::metrics::TimerVariant::WASM;
+    use crate::metrics::TimerVariant::Wasm;
     use crate::metrics::{
         MultiCounter, MultiGauge, MultiHistogram, SimpleCounter, SimpleGauge, SimpleHistogram, SimpleTimer,
     };
@@ -806,7 +806,7 @@ pub mod wasm {
         #[wasm_bindgen(js_name = "start_measure")]
         pub fn wasm_start_measure(&self) -> SimpleTimer {
             SimpleTimer {
-                inner: WASM {
+                inner: Wasm {
                     start_ts: js_sys::Date::now() / 1000.0,
                     new_ts: || js_sys::Date::now() / 1000.0,
                     labels: vec![],
@@ -844,7 +844,7 @@ pub mod wasm {
             convert_from_jstrvec!(label_values, bind);
             match self.hh.get_metric_with_label_values(bind.as_slice()) {
                 Ok(_) => Ok(SimpleTimer {
-                    inner: WASM {
+                    inner: Wasm {
                         start_ts: js_sys::Date::now() / 1000.0,
                         new_ts: || js_sys::Date::now() / 1000.0,
                         labels: label_values.into_iter().map(String::from).collect(),

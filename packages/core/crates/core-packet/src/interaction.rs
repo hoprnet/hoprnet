@@ -397,7 +397,7 @@ where
             incoming_packets: bounded(PACKET_RX_QUEUE_SIZE),
             outgoing_packets: bounded(PACKET_TX_QUEUE_SIZE),
             on_final_packet,
-            mixer: Mixer::new(cfg.mixer.clone()),
+            mixer: Mixer::new(cfg.mixer),
             cfg,
         }
     }
@@ -516,7 +516,7 @@ where
                 self.db
                     .write()
                     .await
-                    .store_pending_acknowledgment(ack_challenge.clone(), PendingAcknowledgement::WaitingAsSender)
+                    .store_pending_acknowledgment(*ack_challenge, PendingAcknowledgement::WaitingAsSender)
                     .await?;
 
                 //debug!("<<< WRITE store_pending_lock");
@@ -526,7 +526,7 @@ where
 
                 if let Some(timeout_value) = timeout {
                     let push = self.outgoing_packets.0.send(Payload {
-                        remote_peer: path.hops()[0].clone(),
+                        remote_peer: path.hops()[0],
                         data: packet.to_bytes(),
                     });
                     if !timeout_value.is_zero() {
@@ -543,7 +543,7 @@ where
                     self.outgoing_packets
                         .0
                         .try_send(Payload {
-                            remote_peer: path.hops()[0].clone(),
+                            remote_peer: path.hops()[0],
                             data: packet.to_bytes(),
                         })
                         .map_err(|e| match e {
@@ -552,7 +552,7 @@ where
                         })
                 }?;
 
-                Ok(ack_challenge.clone())
+                Ok(*ack_challenge)
             }
             _ => {
                 debug!("invalid packet state {:?}", packet.state());
@@ -693,7 +693,7 @@ where
 
                     // Store the unacknowledged ticket
                     g.store_pending_acknowledgment(
-                        ack_challenge.clone(),
+                        *ack_challenge,
                         PendingAcknowledgement::WaitingAsRelayer(UnacknowledgedTicket::new(
                             packet.ticket.clone(),
                             own_key.clone(),
@@ -1690,7 +1690,7 @@ pub mod wasm {
             let on_msg = on_final_packet.is_some().then(unbounded::<Box<[u8]>>).unzip();
 
             // For WASM we need to create mixer with gloo-timers
-            let gloo_mixer = Mixer::new_with_gloo_timers(cfg.mixer.clone());
+            let gloo_mixer = Mixer::new_with_gloo_timers(cfg.mixer);
 
             let mut w = PacketInteraction::new(db.as_ref_counted(), on_msg.0, cfg);
 

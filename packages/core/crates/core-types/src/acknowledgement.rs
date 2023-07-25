@@ -100,7 +100,7 @@ impl AcknowledgedTicket {
     }
 
     pub fn set_preimage(&mut self, hash: &Hash) {
-        self.pre_image = hash.clone();
+        self.pre_image = *hash;
     }
 }
 

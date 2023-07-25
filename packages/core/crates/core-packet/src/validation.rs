@@ -71,13 +71,13 @@ pub async fn validate_unacknowledged_ticket<T: HoprCoreEthereumDbActions>(
         info!("checking unrealized balances for channel {}", channel.get_id());
 
         let unrealized_balance = db
-            .get_tickets(Some(sender.clone()))
+            .get_tickets(Some(*sender))
             .await? // all tickets from sender
             .into_iter()
             .filter(|t| t.epoch.eq(&channel.ticket_epoch) && t.channel_epoch.eq(&channel.channel_epoch))
             .fold(Some(channel.balance), |result, t| {
                 result
-                    .and_then(|b| b.value().value().checked_sub(t.amount.value().value().clone()))
+                    .and_then(|b| b.value().value().checked_sub(*t.amount.value().value()))
                     .map(|u| Balance::new(u.into(), channel.balance.balance_type()))
             });
 
