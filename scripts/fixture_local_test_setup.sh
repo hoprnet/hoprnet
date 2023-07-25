@@ -11,8 +11,9 @@ set -Eeuo pipefail
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 declare HOPR_LOG_ID="smoke-fixture-setup"
-
+# shellcheck disable=SC1090
 source "${mydir}/testnet.sh"
+# shellcheck disable=SC1090
 source "${mydir}/utils.sh"
 
 usage() {
@@ -208,7 +209,7 @@ function setup_node() {
     HOPRD_NETWORK_QUALITY_THRESHOLD="0.3" \
     HOPRD_ON_CHAIN_CONFIRMATIONS=2 \
     NODE_OPTIONS="--experimental-wasm-modules" \
-    node --experimental-wasm-reftypes packages/hoprd/lib/main.cjs \
+    node packages/hoprd/lib/main.cjs \
       --data="${dir}" \
       --host="127.0.0.1:${node_port}" \
       --identity="${id}" \
@@ -272,6 +273,10 @@ declare deployments_summary="${mydir}/../packages/ethereum/contracts/contracts-a
 
 # --- Running Mock Blockchain --- {{{
 ${mydir}/run-local-anvil.sh -l "${anvil_rpc_log}" -c "${anvil_cfg_file}"
+if [ ! -f "${anvil_cfg_file}" ]; then
+  log "Could not find anvil cfg file ${anvil_cfg_file}"
+  exit 1
+fi
 
 # read auto-generated private key from anvil configuration
 declare anvil_private_key
@@ -333,7 +338,7 @@ wait_for_regex ${node7_log} "STARTED NODE"
 
 #  --- Ensure data directories are used --- {{{
 for node_dir in ${node1_dir} ${node2_dir} ${node3_dir} ${node4_dir} ${node5_dir} ${node6_dir} ${node7_dir}; do
-  declare node_dir_db="${node_dir}/db/LOG"
+  declare node_dir_db="${node_dir}/db/db.sqlite"
   declare node_dir_peerstore="${node_dir}/peerstore/LOG"
   [ -f "${node_dir_db}" ] || { echo "Data file ${node_dir_db} missing"; exit 1; }
   [ -f "${node_dir_peerstore}" ] || { echo "Data file ${node_dir_peerstore} missing"; exit 1; }

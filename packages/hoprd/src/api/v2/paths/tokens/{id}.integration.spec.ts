@@ -5,10 +5,12 @@ import chai, { expect } from 'chai'
 
 import { authenticateToken, createToken, storeToken } from '../../../token.js'
 
-import { createAuthenticatedTestApiInstance, createMockDb } from '../../fixtures.js'
+import { createAuthenticatedTestApiInstance } from '../../fixtures.js'
 
 import type { default as Hopr } from '@hoprnet/hopr-core'
 import type { Token } from './../../../token.js'
+import { LevelDb } from '@hoprnet/hopr-utils'
+import { Database, PublicKey } from '../../../../../../core/lib/core_hopr.js'
 
 describe('DELETE /tokens/{id}', function () {
   let node: Hopr
@@ -17,7 +19,12 @@ describe('DELETE /tokens/{id}', function () {
 
   before(async function () {
     node = sinon.fake() as any
-    node.db = createMockDb()
+    let db = new LevelDb()
+    await db.backend.open()
+    node.db = new Database(
+      db,
+      PublicKey.from_peerid_str('16Uiu2HAmM9KAPaXA4eAz58Q7Eb3LEkDvLarU4utkyLwDeEK6vM5m').to_address()
+    )
 
     const loaded = await createAuthenticatedTestApiInstance(node)
     service = loaded.service

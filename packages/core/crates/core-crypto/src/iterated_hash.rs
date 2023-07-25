@@ -6,7 +6,7 @@ use crate::errors::Result;
 use crate::primitives::{DigestLike, EthDigest, SimpleMac};
 
 /// Contains the complete hash iteration progression
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct IteratedHash {
     pub hash: [u8; SimpleMac::SIZE],
     pub intermediates: Vec<Intermediate>,
@@ -21,7 +21,8 @@ pub struct Intermediate {
 
 /// Performs hash iteration progression from the given seed, the total number of iteration and step size.
 /// The Keccak256 digest is used to perform the hash iteration.
-pub fn iterate_hash(seed: &[u8], iterations: usize, step_size: usize) -> IteratedHash {
+/// As this is potentially a long running function, it is asynchronous and yields at every `step_size` iterations.
+pub async fn iterate_hash(seed: &[u8], iterations: usize, step_size: usize) -> IteratedHash {
     assert!(!seed.is_empty() && step_size > 0 && iterations > step_size);
 
     let mut intermediates: Vec<Intermediate> = Vec::with_capacity(iterations / step_size + 1);
@@ -45,10 +46,10 @@ pub fn iterate_hash(seed: &[u8], iterations: usize, step_size: usize) -> Iterate
                 iteration,
                 intermediate: intermediate.as_slice().into(),
             });
+            async_std::task::yield_now().await;
         }
 
         hash.finalize_into(&mut intermediate);
-        // TODO: make this function async and do `async_std::task::yield_now().await` here
     }
 
     IteratedHash {
@@ -111,10 +112,10 @@ mod tests {
     use hex_literal::hex;
     use utils_types::traits::BinarySerializable;
 
-    #[test]
-    fn test_iteration() {
+    #[async_std::test]
+    async fn test_iteration() {
         let seed = [0u8; 16];
-        let final_hash = iterate_hash(&seed, 1000, 10);
+        let final_hash = iterate_hash(&seed, 1000, 10).await;
         assert_eq!(final_hash.intermediates.len(), 100);
 
         let hint = &final_hash.intermediates[98]; // hint is at iteration num. 980

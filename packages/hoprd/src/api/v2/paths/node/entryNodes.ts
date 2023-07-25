@@ -27,7 +27,7 @@ export async function getEntryNodes(node: Hopr): Promise<EntryNodeInfo> {
 
 const GET: Operation = [
   async (req, res, _next) => {
-    const { node } = req.context
+    const { node }: { node: Hopr } = req.context
 
     try {
       const info = await getEntryNodes(node)

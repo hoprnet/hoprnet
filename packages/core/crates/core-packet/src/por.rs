@@ -1,6 +1,7 @@
 use core_crypto::derivation::{derive_ack_key_share, derive_own_key_share};
 use core_crypto::shared_keys::SharedSecret;
 use core_crypto::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, PublicKey, Response};
+use utils_log::error;
 use utils_types::errors::GeneralError::ParseError;
 use utils_types::primitives::EthereumChallenge;
 use utils_types::traits::BinarySerializable;
@@ -12,7 +13,6 @@ pub const POR_SECRET_LENGTH: usize = 2 * PublicKey::SIZE_COMPRESSED;
 
 /// Type that contains the challenge for the first ticket sent to the first relayer.
 #[derive(Clone)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct ProofOfRelayValues {
     pub ack_challenge: HalfKeyChallenge,
     pub ticket_challenge: Challenge,
@@ -136,8 +136,8 @@ pub fn pre_verify(
 pub fn validate_por_half_keys(ethereum_challenge: &EthereumChallenge, own_key: &HalfKey, ack: &HalfKey) -> bool {
     Response::from_half_keys(own_key, ack)
         .map(|response| validate_por_response(ethereum_challenge, &response))
-        .unwrap_or_else(|_| {
-            // TODO: log error here
+        .unwrap_or_else(|e| {
+            error!("failed to validate por half keys: {e}");
             false
         })
 }
@@ -151,8 +151,8 @@ pub fn validate_por_response(ethereum_challenge: &EthereumChallenge, response: &
 pub fn validate_por_hint(ethereum_challenge: &EthereumChallenge, own_share: &HalfKeyChallenge, ack: &HalfKey) -> bool {
     Challenge::from_own_share_and_half_key(own_share, ack)
         .map(|c| c.to_ethereum_challenge().eq(ethereum_challenge))
-        .unwrap_or_else(|_| {
-            // TODO: log error here
+        .unwrap_or_else(|e| {
+            error!("failed to validate por hint: {e}");
             false
         })
 }
@@ -258,28 +258,5 @@ mod tests {
             ),
             "Returned response must solve the challenge"
         );
-    }
-}
-
-#[cfg(feature = "wasm")]
-pub mod wasm {
-    use crate::por::ProofOfRelayValues;
-    use js_sys::Uint8Array;
-    use wasm_bindgen::prelude::wasm_bindgen;
-
-    #[wasm_bindgen]
-    impl ProofOfRelayValues {
-        #[wasm_bindgen(constructor)]
-        pub fn _new(secret_b: &[u8], secret_c: Uint8Array) -> Self {
-            if !secret_c.is_null() && !secret_c.is_undefined() {
-                let c_slice = secret_c.to_vec();
-                Self::new(
-                    &secret_b.try_into().expect("illegal b size"),
-                    Some(&c_slice.as_slice().try_into().expect("illegal c size")),
-                )
-            } else {
-                Self::new(&secret_b.try_into().expect("illegal size"), None)
-            }
-        }
     }
 }

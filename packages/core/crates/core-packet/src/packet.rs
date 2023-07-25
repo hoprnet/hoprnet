@@ -12,6 +12,7 @@ use core_types::acknowledgement::Acknowledgement;
 use core_types::channels::Ticket;
 use libp2p_identity::PeerId;
 use typenum::Unsigned;
+use std::fmt::{Display, Formatter};
 use utils_types::errors::GeneralError::ParseError;
 use utils_types::traits::{BinarySerializable, PeerIdLike};
 
@@ -268,6 +269,16 @@ pub enum PacketState {
         next_hop: OffchainPublicKey,
         ack_challenge: HalfKeyChallenge,
     },
+}
+
+impl Display for PacketState {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match &self {
+            Final { .. } => write!(f, "Final"),
+            Forwarded { .. } => write!(f, "Forwarded"),
+            Outgoing { .. } => write!(f, "Outgoing"),
+        }
+    }
 }
 
 /// Represents a HOPR packet.
@@ -531,7 +542,7 @@ mod tests {
                 private_key,
             )
         } else {
-            Ticket::new_zero_hop(next_peer_channel_key.clone(), private_key)
+            Ticket::new_zero_hop(next_peer_channel_key.clone().to_address(), private_key)
         }
     }
 

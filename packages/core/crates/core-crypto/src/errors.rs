@@ -24,6 +24,9 @@ pub enum CryptoError {
     #[error("signature verification failed")]
     SignatureVerification,
 
+    #[error("ethereum challenge on the ticket is invalid")]
+    InvalidChallenge,
+
     #[error("lower-level error: {0}")]
     Other(#[from] GeneralError),
 }

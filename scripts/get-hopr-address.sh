@@ -9,6 +9,7 @@ set -Eeuo pipefail
 
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
+# shellcheck disable=SC1090
 source "${mydir}/utils.sh"
 
 # $1 = optional: apitoken, defaults to ""

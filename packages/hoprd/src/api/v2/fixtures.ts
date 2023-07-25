@@ -4,23 +4,14 @@ import { peerIdFromString } from '@libp2p/peer-id'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { Multiaddr } from '@multiformats/multiaddr'
 import { setupRestApi } from '../v2.js'
-import {
-  Balance,
-  BalanceType,
-  Hash,
-  U256,
-  ChannelEntry,
-  HoprDB,
-  PublicKey,
-  stringToU8a,
-  ChannelStatus
-} from '@hoprnet/hopr-utils'
+import { Balance, BalanceType, Hash, U256, ChannelEntry, PublicKey, ChannelStatus, Address } from '@hoprnet/hopr-utils'
 
 export const ALICE_PEER_ID: PeerId = peerIdFromString('16Uiu2HAmC9CRFeuF2cTf6955ECFmgDw6d27jLows7bftMqat5Woz')
 export const ALICE_MULTI_ADDR = new Multiaddr(`/ip4/34.65.237.196/tcp/9091/p2p/${ALICE_PEER_ID.toString()}`)
-export const ALICE_NATIVE_ADDR = () => PublicKey.from_peerid_str(ALICE_PEER_ID.toString()).to_address()
+export const ALICE_NATIVE_ADDR = PublicKey.from_peerid_str(ALICE_PEER_ID.toString()).to_address()
 export const BOB_PEER_ID: PeerId = peerIdFromString('16Uiu2HAm29vyHEGNm6ebghEs1tm92UxfaNtj8Rc1Y4qV4TAN5xyQ')
 export const BOB_MULTI_ADDR = new Multiaddr(`/ip4/34.65.237.197/tcp/9091/p2p/${BOB_PEER_ID.toString()}`)
+export const BOB_NATIVE_ADDR = PublicKey.from_peerid_str(BOB_PEER_ID.toString()).to_address()
 export const CHARLIE_PEER_ID: PeerId = peerIdFromString('16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12')
 export const INVALID_PEER_ID = 'definetly not a valid peerId'
 
@@ -36,10 +27,11 @@ export const TICKET_MOCK = {
 }
 
 export function channelEntryCreateMock(): ChannelEntry {
-  const pub = PublicKey.from_privkey(stringToU8a('0x1464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8'))
+  const src = Address.from_string('0x4a34f4c1f1defceaa88f1dd22a8d9c2db70b21eb')
+  const dest = Address.from_string('0xe1ad1f04979209f61e64a2a87bde502b465ade50')
   return new ChannelEntry(
-    pub.clone(),
-    pub,
+    src,
+    dest,
     new Balance('1', BalanceType.HOPR),
     Hash.create([]),
     U256.one(),
@@ -96,27 +88,4 @@ export const createTestMocks = () => {
       return state
     }
   }
-}
-
-/**
- * Used in tests to create a db mock for generic object storage
- * @returns testing mocked db
- */
-export const createMockDb = () => {
-  const store = {}
-  const key = (ns: string, id: string) => `${ns}:${id}`
-  const db = {
-    putSerializedObject: async (ns: string, id: string, object: Uint8Array): Promise<void> => {
-      store[key(ns, id)] = object
-      return
-    },
-    getSerializedObject: async (ns: string, id: string): Promise<Uint8Array | undefined> => {
-      return store[key(ns, id)]
-    },
-    deleteObject: async (ns: string, id: string): Promise<void> => {
-      delete store[key(ns, id)]
-      return
-    }
-  }
-  return db as any as HoprDB
 }

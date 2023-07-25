@@ -2,6 +2,7 @@
 
 members = [
     "packages/core/crates/core-crypto",
+    "packages/core/crates/core-hopr",
     "packages/core/crates/core-misc",
     "packages/core/crates/core-mixer",
     "packages/core/crates/core-network",
@@ -20,13 +21,12 @@ members = [
     "packages/utils/crates/utils-log",
     "packages/utils/crates/utils-metrics",
     "packages/utils/crates/utils-misc",
-    "packages/utils/crates/utils-proc-macros",
     "packages/utils/crates/utils-types"
 ]
 
 [workspace.dependencies]
 libp2p-identity = { version = "0.2.0", features = ["peerid", "ed25519"] }
-wasm-pack = "0.11.1"
+wasm-pack = "0.12.0"
 wasm-opt = "0.112.0"
 wasm-bindgen = "0.2.86"
 

@@ -10,14 +10,16 @@ import {
   ALICE_NATIVE_ADDR,
   BOB_PEER_ID,
   INVALID_PEER_ID,
-  channelEntryCreateMock
+  channelEntryCreateMock,
+  BOB_NATIVE_ADDR
 } from '../../../../fixtures.js'
 import { getChannel, closeChannel } from './index.js'
 import { formatIncomingChannel, formatOutgoingChannel } from '../../index.js'
+import type { Address } from '@hoprnet/hopr-utils'
 
 let node = sinon.fake() as any
 node.getId = sinon.fake.returns(ALICE_PEER_ID)
-node.getEthereumAddress = sinon.fake.returns(ALICE_NATIVE_ADDR())
+node.getEthereumAddress = sinon.fake.returns(ALICE_NATIVE_ADDR)
 const outgoingMock = channelEntryCreateMock()
 const incomingMock = channelEntryCreateMock()
 
@@ -42,8 +44,11 @@ describe('getChannel', function () {
   })
 
   it('should return outgoing channel', async function () {
-    node.getChannel = sinon.stub()
-    node.getChannel.withArgs(ALICE_PEER_ID, BOB_PEER_ID).resolves(outgoingMock)
+    node.getChannel = (src: Address, dest: Address) => {
+      if (src.eq(ALICE_NATIVE_ADDR) && dest.eq(BOB_NATIVE_ADDR)) {
+        return Promise.resolve(outgoingMock)
+      }
+    }
 
     const outgoing = await getChannel(node, BOB_PEER_ID.toString(), 'outgoing')
     assert.notEqual(outgoing, undefined)
@@ -51,9 +56,15 @@ describe('getChannel', function () {
   })
 
   it('should return outgoing and incoming channels', async function () {
-    node.getChannel = sinon.stub()
-    node.getChannel.withArgs(ALICE_PEER_ID, BOB_PEER_ID).resolves(outgoingMock)
-    node.getChannel.withArgs(BOB_PEER_ID, ALICE_PEER_ID).resolves(incomingMock)
+    node.getChannel = (src: Address, dest: Address) => {
+      if (src.eq(ALICE_NATIVE_ADDR) && dest.eq(BOB_NATIVE_ADDR)) {
+        return Promise.resolve(outgoingMock)
+      }
+
+      if (src.eq(BOB_NATIVE_ADDR) && dest.eq(ALICE_NATIVE_ADDR)) {
+        return Promise.resolve(incomingMock)
+      }
+    }
 
     const outgoing = await getChannel(node, BOB_PEER_ID.toString(), 'outgoing')
     assert.notEqual(outgoing, undefined)
@@ -99,16 +110,22 @@ describe('GET /channels/{peerId}/{direction}', () => {
   })
 
   it('should get outgoing channels', async () => {
-    node.getChannel = sinon.stub()
-    node.getChannel.withArgs(ALICE_PEER_ID, BOB_PEER_ID).resolves(outgoingMock)
+    node.getChannel = (src: Address, dest: Address) => {
+      if (src.eq(ALICE_NATIVE_ADDR) && dest.eq(BOB_NATIVE_ADDR)) {
+        return Promise.resolve(outgoingMock)
+      }
+    }
     const res = await request(service).get(`/api/v2/channels/${BOB_PEER_ID.toString()}/outgoing`)
     expect(res.status).to.equal(200)
     expect(res).to.satisfyApiSpec
   })
 
-  it('should get outgoing channels', async () => {
-    node.getChannel = sinon.stub()
-    node.getChannel.withArgs(BOB_PEER_ID, ALICE_PEER_ID).resolves(incomingMock)
+  it('should get incoming channels', async () => {
+    node.getChannel = (src: Address, dest: Address) => {
+      if (src.eq(BOB_NATIVE_ADDR) && dest.eq(ALICE_NATIVE_ADDR)) {
+        return Promise.resolve(incomingMock)
+      }
+    }
     const res = await request(service).get(`/api/v2/channels/${BOB_PEER_ID.toString()}/incoming`)
     expect(res.status).to.equal(200)
     expect(res).to.satisfyApiSpec

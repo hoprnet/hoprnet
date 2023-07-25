@@ -334,6 +334,12 @@ pub struct HalfKeyChallenge {
     hkc: [u8; Self::SIZE],
 }
 
+impl Display for HalfKeyChallenge {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", hex::encode(&self.hkc))
+    }
+}
+
 impl Default for HalfKeyChallenge {
     fn default() -> Self {
         // Note that the default HalfKeyChallenge is the identity point on secp256k1, therefore
@@ -409,6 +415,12 @@ impl Default for Hash {
     }
 }
 
+impl std::fmt::Display for Hash {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.to_hex().as_str())
+    }
+}
+
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl Hash {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
@@ -442,12 +454,6 @@ impl BinarySerializable for Hash {
 
     fn to_bytes(&self) -> Box<[u8]> {
         self.hash.into()
-    }
-}
-
-impl Display for Hash {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.to_hex())
     }
 }
 
@@ -773,6 +779,12 @@ impl Default for Response {
                 .as_slice(),
         );
         ret
+    }
+}
+
+impl std::fmt::Display for Response {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.to_hex().as_str())
     }
 }
 
@@ -1459,6 +1471,7 @@ pub mod wasm {
             self.clone()
         }
 
+        #[wasm_bindgen]
         pub fn size() -> u32 {
             Self::SIZE as u32
         }
@@ -1496,6 +1509,7 @@ pub mod wasm {
             self.clone()
         }
 
+        #[wasm_bindgen]
         pub fn size() -> u32 {
             Self::SIZE as u32
         }
@@ -1528,6 +1542,7 @@ pub mod wasm {
             self.eq(other)
         }
 
+        #[wasm_bindgen]
         pub fn size() -> u32 {
             Self::SIZE as u32
         }
@@ -1565,6 +1580,7 @@ pub mod wasm {
             self.clone()
         }
 
+        #[wasm_bindgen]
         pub fn size() -> u32 {
             Self::SIZE as u32
         }
@@ -1609,6 +1625,7 @@ pub mod wasm {
             self.clone()
         }
 
+        #[wasm_bindgen]
         pub fn size() -> u32 {
             Self::SIZE as u32
         }
@@ -1651,6 +1668,7 @@ pub mod wasm {
             self.clone()
         }
 
+        #[wasm_bindgen]
         pub fn size() -> u32 {
             Self::SIZE as u32
         }
@@ -1745,6 +1763,7 @@ pub mod wasm {
             self.clone()
         }
 
+        #[wasm_bindgen]
         pub fn size() -> u32 {
             Self::SIZE as u32
         }
@@ -1772,6 +1791,7 @@ pub mod wasm {
             self.clone()
         }
 
+        #[wasm_bindgen]
         pub fn size() -> u32 {
             Self::SIZE as u32
         }

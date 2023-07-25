@@ -63,11 +63,13 @@ where
 
 impl Display for Path {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "[{}", if self.valid { " " } else { " !! " })?;
-        for peer in &self.hops {
-            write!(f, "{peer}->")?;
-        }
-        write!(f, " ]")
+        write!(
+            f,
+            "{}{} ] ({} hops)",
+            if self.valid { "[ " } else { "[ !! " },
+            self.hops.iter().map(|p| p.to_string()).collect::<Vec<_>>().join("->"),
+            self.length()
+        )
     }
 }
 
@@ -108,6 +110,11 @@ pub mod wasm {
                 .into_iter()
                 .map(|p| PeerId::from_str(&p.as_string().unwrap()).map_err(|_| InvalidPeer(p.as_string().unwrap())))
                 .collect::<Result<Vec<PeerId>>>())?))
+        }
+
+        #[wasm_bindgen(js_name = "to_string")]
+        pub fn _to_string(&self) -> String {
+            self.to_string()
         }
     }
 }
