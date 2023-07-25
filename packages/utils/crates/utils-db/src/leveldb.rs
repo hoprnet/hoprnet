@@ -141,7 +141,7 @@ pub mod wasm {
 
             let stream = wasm_bindgen_futures::stream::JsStream::from(iterable);
 
-            Ok(Box::new(crate::types::BinaryStreamWrapper::new(stream)))
+            Ok(Box::new(crate::types::wasm::BinaryStreamWrapper::new(stream)))
         }
         async fn batch(
             &mut self,

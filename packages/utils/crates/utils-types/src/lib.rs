@@ -7,7 +7,7 @@ pub mod traits;
 #[cfg(feature = "wasm")]
 pub mod wasm {
 
-    use utils_log::logger::JsLogger;
+    use utils_log::logger::wasm::JsLogger;
     use wasm_bindgen::prelude::*;
 
     // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global allocator.

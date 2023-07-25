@@ -3,7 +3,7 @@ pub mod path;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use utils_log::logger::JsLogger;
+    use utils_log::logger::wasm::JsLogger;
     use wasm_bindgen::prelude::wasm_bindgen;
 
     static LOGGER: JsLogger = JsLogger {};

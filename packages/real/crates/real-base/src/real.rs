@@ -8,7 +8,7 @@ pub fn coerce_version(version: &str) -> Result<String> {
 
 #[cfg(not(feature = "wasm"))]
 // These functions are meant to be used in pure Rust code, since they are cleared from WASM types
-pub fn coerce_version(version: &str) -> Result<String> {
+pub fn coerce_version(_version: &str) -> Result<String> {
     todo!("Implement native coerce_version")
 }
 
@@ -18,7 +18,7 @@ pub fn satisfies(version: &str, range: &str) -> Result<bool> {
 }
 
 #[cfg(not(feature = "wasm"))]
-pub fn satisfies(version: &str, range: &str) -> Result<bool> {
+pub fn satisfies(_version: &str, _range: &str) -> Result<bool> {
     todo!("Implement native satisfies")
 }
 

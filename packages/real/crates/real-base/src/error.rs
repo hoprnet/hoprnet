@@ -1,7 +1,5 @@
 use thiserror::Error;
 
-use crate::error::RealError::JsError;
-
 #[cfg(feature = "wasm")]
 use wasm_bindgen::JsValue;
 
@@ -17,7 +15,7 @@ pub enum RealError {
 #[cfg(feature = "wasm")]
 impl From<JsValue> for RealError {
     fn from(v: JsValue) -> Self {
-        JsError(v.as_string().unwrap_or("unknown".into()))
+        crate::error::RealError::JsError(v.as_string().unwrap_or("unknown".into()))
     }
 }
 
