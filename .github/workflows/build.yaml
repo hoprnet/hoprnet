@@ -3,9 +3,6 @@ name: Build
 
 on:
   pull_request:
-    # branches:
-    #   - master
-    #   - release/*
     types:
       - synchronize
 concurrency:
