@@ -5,7 +5,6 @@ import type { HoprChannels, HoprNetworkRegistry, HoprToken, TypedEvent } from '.
 import {
   Address,
   Hash,
-  HoprDB,
   generate_channel_id,
   Balance,
   BalanceType,
@@ -13,12 +12,14 @@ import {
   debug,
   AccountEntry,
   PublicKey,
+  LevelDb,
   ChannelEntry,
   U256,
   stringToU8a,
   number_to_channel_status
 } from '@hoprnet/hopr-utils'
 
+import { Ethereum_Address, Ethereum_Database as Database } from '../db.js'
 import Indexer from './index.js'
 import type { ChainWrapper } from '../ethereum.js'
 import type { Event, TokenEvent, RegistryEvent } from './types.js'
@@ -290,8 +291,9 @@ export const useFixtures = async (
   } = {}
 ) => {
   const latestBlockNumber = ops.latestBlockNumber ?? 0
+  const id = ops.id ?? MOCK_PUBLIC_KEY()
 
-  const db = HoprDB.createMock(ops.id)
+  const db = new Database(new LevelDb(), Ethereum_Address.deserialize(id.to_address().serialize()))
   const { provider, newBlock } = createProviderMock({ latestBlockNumber })
   const { hoprChannels, newEvent } = createHoprChannelsMock({ pastEvents: ops.pastEvents ?? [] })
   const { hoprToken, newEvent: newTokenEvent } = createHoprTokenMock({
@@ -312,7 +314,7 @@ export const useFixtures = async (
     newEvent,
     newTokenEvent,
     newRegistryEvent,
-    indexer: new TestingIndexer(!ops.id ? MOCK_PUBLIC_KEY().to_address() : ops.id.to_address(), db, 1, 5),
+    indexer: new TestingIndexer(id.to_address(), db, 1, 5),
     chain,
     OPENED_CHANNEL: new ChannelEntry(
       Address.from_string(fixtures.OPENED_EVENT.args.source),

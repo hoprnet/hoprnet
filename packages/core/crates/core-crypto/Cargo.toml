@@ -1,6 +1,6 @@
 [package]
 name = "core-crypto"
-version = "0.3.3"
+version = "0.4.0"
 description = "Core cryptographic primitives and functions used in the HOPR protocol"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
@@ -13,6 +13,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 aes = "0.8"
+async-std = { version = "1", features = ["attributes"] }
 blake2 = "0.10"
 chacha20 = "0.9"
 ctr = "0.9"
@@ -46,7 +47,6 @@ utils-types = { path = "../../../utils/crates/utils-types", default-features = f
 
 
 [dev-dependencies]
-async-std = { version = "1.12.0", features = ["attributes"] }
 parameterized = "1.0"
 
 [package.metadata.wasm-pack.profile.dev]
