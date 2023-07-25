@@ -215,7 +215,7 @@ for instance_idx in "${!instance_names_arr[@]}" ; do
   fund_if_empty "${api_wallet_addr}" "${network}"
 done
 
-if [ ! -z ${hopr_addrs} ]; then
+if [ ! -z "${hopr_addrs}" ]; then
   # Register all nodes in cluster
   IFS=','
   # use CI wallet to register VM instances. This action may fail if nodes were previously linked to other staking accounts

@@ -8,10 +8,10 @@ fi
 cleanup_ip() {
   local IP="${1}"
 
-    if [ $IP ]; then
+    if [ "$IP" ]; then
       local NAME=$(echo "$IPS" | grep "${release_name}" | awk '{ print $1 }')
       echo "- releasing - $NAME ($IP)"
-      gcloud compute addresses delete $NAME $REGION --quiet
+      gcloud compute addresses delete "$NAME" "$REGION" --quiet
     fi
   
 }
@@ -23,13 +23,13 @@ cleanup_instance() {
   while read -r instance; do
     local name=$(echo "$instance" | awk '{ print $1 }')
     echo "- stopping $name"
-    gcloud compute instances stop $name $ZONE
+    gcloud compute instances stop "$name" "$ZONE"
   done < <(gcloud compute instances list --filter="name~'^${release_name}-'" | tail -n +2)
 
   while read -r instance; do
     local name=$(echo "$instance" | awk '{ print $1 }')
     local zone=$(echo "$instance" | awk '{ print $2 }')
     echo "- deleting terminated instance $name"
-    gcloud compute instances delete $name --zone=$zone --keep-disks=data --quiet
+    gcloud compute instances delete "$name" --zone="$zone" --keep-disks=data --quiet
   done < <(gcloud compute instances list --filter="name~'^${release_name}-' AND status=TERMINATED" | tail -n +2)
 }

@@ -30,9 +30,9 @@ usage() {
 declare pkg pkg_vsn pkg_name pkg_path
 
 pkg=${1:-hoprd}
-pkg_vsn=${2:-$("${mydir}/get-package-version.sh" ${pkg})}
+pkg_vsn=${2:-$("${mydir}/get-package-version.sh" "${pkg}")}
 pkg_path="${mydir}/../packages/${pkg}/package.json"
-pkg_name=$(jq -r '.name' ${pkg_path})
+pkg_name=$(jq -r '.name' "${pkg_path}")
 
 log "Get npm package info for ${pkg_name}@${pkg_vsn}"
 
