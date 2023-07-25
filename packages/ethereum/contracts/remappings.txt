@@ -2,3 +2,4 @@ ds-test/=lib/forge-std/lib/ds-test/src/
 forge-std/=lib/forge-std/src/
 openzeppelin-contracts-4.4.2/=lib/openzeppelin-contracts-4.4.2/contracts/
 openzeppelin-contracts-4.8.3/=lib/openzeppelin-contracts-4.8.3/contracts/
+solcrypto=lib/solcrypto/contracts/

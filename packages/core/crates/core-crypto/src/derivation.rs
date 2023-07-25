@@ -1,14 +1,19 @@
 use crate::errors::CryptoError::{CalculationError, InvalidInputValue, InvalidParameterSize};
 use blake2::Blake2s256;
-use elliptic_curve::hash2curve::{ExpandMsgXmd, GroupDigest};
+use elliptic_curve::{
+    hash2curve::{ExpandMsgXmd, GroupDigest},
+    ScalarPrimitive,
+};
 use hkdf::SimpleHkdf;
-use k256::Secp256k1;
+use k256::{AffinePoint, Scalar, Secp256k1};
+use utils_types::{primitives::Address, traits::BinarySerializable};
 
 use crate::errors::Result;
 use crate::parameters::{PACKET_TAG_LENGTH, PING_PONG_NONCE_SIZE, SECRET_KEY_LENGTH};
 use crate::primitives::{calculate_mac, DigestLike, SimpleDigest};
-use crate::random::random_fill;
+use crate::random::{random_bytes, random_fill};
 use crate::types::HalfKey;
+use elliptic_curve::sec1::ToEncodedPoint;
 
 // Module-specific constants
 const HASH_KEY_COMMITMENT_SEED: &str = "HASH_KEY_COMMITMENT_SEED";
@@ -103,7 +108,7 @@ pub(crate) fn generate_key_iv(secret: &[u8], info: &[u8], key: &mut [u8], iv: &m
 pub fn sample_field_element(secret: &[u8], tag: &str) -> Result<HalfKey> {
     let scalar = Secp256k1::hash_to_scalar::<ExpandMsgXmd<sha3::Sha3_256>>(
         &[secret],
-        &[b"secp256k1_XMD:SHA3-256_SSWU_RO_", tag.as_bytes()],
+        &[b"secp256k1_XMD:SHA3-256_SSWU_NU_", tag.as_bytes()],
     )
     .map_err(|_| CalculationError)?;
     Ok(HalfKey::new(scalar.to_bytes().as_ref()))
@@ -125,6 +130,107 @@ pub fn derive_ack_key_share(secret: &[u8]) -> HalfKey {
     assert_eq!(SECRET_KEY_LENGTH, secret.len());
 
     sample_field_element(secret, HASH_KEY_ACK_KEY).expect("failed to sample ack key share")
+}
+
+/// Bundles values given to the smart contract to prove that a ticket is a win.
+///
+/// The VRF is thereby needed because it generates on-demand determinitstic
+/// entropy that can only be derived by the ticket redeemer.
+pub struct VrfParameters {
+    /// the pseudo-random point
+    pub v: AffinePoint,
+    pub h: Scalar,
+    pub s: Scalar,
+    /// helper value for smart contract
+    pub h_v: AffinePoint,
+    /// helper value for smart contract
+    pub s_b: AffinePoint,
+}
+
+impl std::fmt::Display for VrfParameters {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let v_encoded = self.v.to_encoded_point(false);
+        let h_v_encoded = self.h_v.to_encoded_point(false);
+        let s_b_encoded = self.s_b.to_encoded_point(false);
+        f.debug_struct("VrfParameters")
+            .field(
+                "V",
+                &format!(
+                    "({},{})",
+                    hex::encode(v_encoded.x().unwrap()),
+                    hex::encode(v_encoded.y().unwrap())
+                ),
+            )
+            .field("h", &hex::encode(self.h.to_bytes()))
+            .field("s", &hex::encode(self.s.to_bytes()))
+            .field(
+                "h_v",
+                &format!(
+                    "({},{})",
+                    hex::encode(h_v_encoded.x().unwrap()),
+                    hex::encode(h_v_encoded.y().unwrap())
+                ),
+            )
+            .field(
+                "s_b",
+                &format!(
+                    "({},{})",
+                    hex::encode(s_b_encoded.x().unwrap()),
+                    hex::encode(s_b_encoded.y().unwrap())
+                ),
+            )
+            .finish()
+    }
+}
+
+/// Takes a private key, the corresponding Ethereum address and a payload
+/// and creates all parameters that are required by the smart contract
+/// to prove that a ticket is a win.
+pub fn derive_vrf_parameters<const T: usize>(
+    msg: &[u8; T],
+    secret: &[u8],
+    chain_addr: &Address,
+    dst: &[u8],
+) -> Result<VrfParameters> {
+    let b = Secp256k1::hash_from_bytes::<ExpandMsgXmd<sha3::Keccak256>>(&[&chain_addr.to_bytes(), msg], &[dst])?;
+
+    let a: Scalar = ScalarPrimitive::<Secp256k1>::from_slice(&secret)?.into();
+
+    if a.is_zero().into() {
+        return Err(crate::errors::CryptoError::InvalidSecretScalar);
+    }
+
+    let v = b * a;
+
+    let r = Secp256k1::hash_to_scalar::<ExpandMsgXmd<sha3::Keccak256>>(
+        &[
+            &a.to_bytes(),
+            &v.to_affine().to_encoded_point(false).as_bytes()[1..],
+            &random_bytes::<64>(),
+        ],
+        &[dst],
+    )?;
+
+    let r_v = b * r;
+
+    let h = Secp256k1::hash_to_scalar::<ExpandMsgXmd<sha3::Keccak256>>(
+        &[
+            &chain_addr.to_bytes(),
+            &v.to_affine().to_encoded_point(false).as_bytes()[1..],
+            &r_v.to_affine().to_encoded_point(false).as_bytes()[1..],
+            msg,
+        ],
+        &[dst],
+    )?;
+    let s = r + h * a;
+
+    Ok(VrfParameters {
+        v: v.to_affine(),
+        h,
+        s,
+        h_v: (v * h).to_affine(),
+        s_b: (b * s).to_affine(),
+    })
 }
 
 #[cfg(feature = "wasm")]
@@ -152,6 +258,7 @@ pub mod wasm {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::PublicKey;
     use hex_literal::hex;
 
     #[test]
@@ -187,5 +294,43 @@ mod tests {
     fn test_sample_field_element() {
         let secret = [1u8; SECRET_KEY_LENGTH];
         assert!(sample_field_element(&secret, "TEST_TAG").is_ok());
+    }
+
+    #[test]
+    fn test_vrf_parameter_generation() {
+        let dst = b"some DST tag";
+        let priv_key: [u8; 32] = hex!("f13233ff60e1f618525dac5f7d117bef0bad0eb0b0afb2459f9cbc57a3a987ba"); // dummy
+        let message = hex!("f13233ff60e1f618525dac5f7d117bef0bad0eb0b0afb2459f9cbc57a3a987ba"); // dummy
+
+        // vrf verification algorithm
+        let pub_key = PublicKey::from_privkey(&priv_key).unwrap();
+
+        let params = derive_vrf_parameters(&message, &priv_key, &pub_key.to_address(), dst).unwrap();
+
+        let cap_b = Secp256k1::hash_from_bytes::<ExpandMsgXmd<sha3::Keccak256>>(
+            &[&pub_key.to_address().to_bytes(), &message],
+            &[dst],
+        )
+        .unwrap();
+
+        assert_eq!(params.s_b, cap_b * params.s);
+
+        let a: Scalar = ScalarPrimitive::<Secp256k1>::from_slice(&priv_key).unwrap().into();
+        assert_eq!(params.h_v, cap_b * a * params.h);
+
+        let r_v = cap_b * params.s - params.v * params.h;
+
+        let h_check = Secp256k1::hash_to_scalar::<ExpandMsgXmd<sha3::Keccak256>>(
+            &[
+                &pub_key.to_address().to_bytes(),
+                &params.v.to_encoded_point(false).as_bytes()[1..],
+                &r_v.to_affine().to_encoded_point(false).as_bytes()[1..],
+                &message,
+            ],
+            &[dst],
+        )
+        .unwrap();
+
+        assert_eq!(h_check, params.h);
     }
 }
