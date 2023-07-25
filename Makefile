@@ -493,6 +493,7 @@ endif
 	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make stake-funds
 	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node peer_ids=$(shell eval ./scripts/get-hopr-address.sh "$(api_token)" "$(endpoint)")
 
+# These targets needs to be splitted in macOs systems
 ensure-environment-and-network-are-set: ensure-network-is-set ensure-environment-is-set
 
 ensure-network-is-set:
