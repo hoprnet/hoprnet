@@ -23,10 +23,8 @@ jobs:
     runs-on: ubuntu-2-core
     if: github.event.pull_request.draft == false
     steps:
-      - uses: actions/checkout@v3
-
-      - name: Configure Git info
-        run: ./scripts/configure-git-info.sh
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v3
 
       - name: Disable sccache (act-only)
         if: ${{ env.ACT }}
