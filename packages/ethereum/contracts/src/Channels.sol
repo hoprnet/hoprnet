@@ -126,17 +126,34 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprMu
    * Aligned to 2 EVM words
    */
   struct TicketData {
+    // ticket is valid in this channel
     bytes32 channelId;
+    // amount of tokens to transfer if ticket is a win
     Balance amount;
-    TicketIndex maxTicketIndex;
+    // highest channel.ticketIndex to accept when redeeming
+    // ticket, used to aggregate tickets off-chain
+    TicketIndex ticketIndex;
+    // delta by which channel.ticketIndex gets increased when redeeming
+    // the ticket, should be set to 1 if ticket is not aggregated
     TicketIndexOffset indexOffset;
+    // replay protection, invalidates all tickets once payment channel
+    // gets closed
     ChannelEpoch epoch;
+    // encoded winning probability of the ticket
     WinProb winProb;
   }
 
+  /**
+   * Bundles data that is necessary to redeem a ticket
+   */
   struct RedeemableTicket {
+    // gives each ticket a unique identity and defines what this
+    // ticket is worth
     TicketData data;
+    // signature by the ticket issuer
     HoprCrypto.CompactSignature signature;
+    // proof-of-relay secret computed by ticket redeemer, after 
+    // receiving keying material from next downstream node
     uint256 porSecret;
   }
 
@@ -201,6 +218,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprMu
   /**
    * @param _token HoprToken address
    * @param _noticePeriodChannelClosure seconds until a channel can be closed
+   * @param safeRegistry address of the contract that maps from accounts to deployed Gnosis Safe instances
    */
   constructor(address _token, Timestamp _noticePeriodChannelClosure, HoprNodeSafeRegistry safeRegistry) {
     if (Timestamp.unwrap(_noticePeriodChannelClosure) == 0) {
@@ -253,23 +271,60 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprMu
     _;
   }
 
+  /**
+   * See `_redeemTicketInternal`, entrypoint for MultiSig contract
+   */
   function redeemTicketSafe(address self, RedeemableTicket calldata redeemable, HoprCrypto.VRF_Parameters calldata params) external HoprMultiSig.onlySafe(self) {
     _redeemTicketInternal(self, redeemable, params);
   }
 
+  /**
+   * See `_redeemTicketInternal`
+   */
   function redeemTicket(RedeemableTicket calldata redeemable, HoprCrypto.VRF_Parameters calldata params) external HoprMultiSig.noSafeSet {
     _redeemTicketInternal(msg.sender, redeemable, params);
   }
 
   /**
+   * ~51k gas execution cost
    * Claims the incentive for relaying a mixnet packet using probabilistic payments.
    *
-   * The caller needs to present a signed ticket. This ticket states a challenge which
-   * must be fulfilled. The caller must provide the opening of an on-chain commitment.
-   * Last, but not least, the probabilistic ticket must be a win - which can be determined
-   * by the caller before submitting the transaction.
+   * Verifies the outcome of a 3-to-4-party protocol: creator of the packet, ticket
+   * issuer and ticket and next downstream node that acknowledges the reception and
+   * the validity of the relayed mixnet packet. In many cases, the creator of the
+   * packet and ticket redeemer is the same party.
    *
-   * @param redeemable ticket, signature, opening, porSecret
+   * The packet creator states the challenge which gets fulfilled by presenting
+   * `porSecret` (Proof-Of-Relay). The ticket issuer creates the ticket and signs
+   * it. The provided signature acts as a source of entropy given by the ticket
+   * issuer. The ticket redeemer ultimately receives a packet with a ticket next
+   * to it. Once the ticket redeemer receives the acknowledgement from the next
+   * downstream node, it can compute `porSecret`.
+   *
+   * When submitting the ticket, the ticket redeemer creates a deterministic
+   * pseudo-random value that is verifiable by using its public key. This value is
+   * unique for each ticket and adds entropy that can only be known by the ticket
+   * redeemer.
+   *
+   * Tickets embed the incentive for relaying a single packet. To reduce on-chain
+   * state changes, they can get aggregated before submitting to this function.
+   *
+   * Aggregated tickets define an validity interval such that the redemption of any
+   * individual ticket invalidates the aggregated ticket and vice-versa.
+   *
+   * Used cryptographic primitives:
+   * - ECDSA signature
+   * - secp256k1 group homomorphism and DLP property
+   * - hash_to_curve using simplified Shallue, van de Woestijne method
+   * - Verifiable random function based on hash_to_curve
+   * - pseudorandomness of keccak256 function
+   *
+   * @dev This method makes use of several methods to reduce stack height.
+   *
+   * @param self account address of the ticket redeemer
+   * @param redeemable ticket, signature of ticket issuer, porSecret
+   * @param params pseudo-random VRF value + proof that it was correctly using
+   *               ticket redeemer's private key
    */
   function _redeemTicketInternal(
     address self,
@@ -286,9 +341,9 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprMu
       revert WrongChannelState({reason: 'channel epoch must match'});
     }
 
-    // Aggregatable Tickets:
-    // ( maxTicketIndex, maxTicketIndex + indexOffset ] for indexOffset > 0
-    if (TicketIndex.unwrap(redeemable.data.maxTicketIndex) <= TicketIndex.unwrap(spendingChannel.ticketIndex)  || TicketIndexOffset.unwrap(redeemable.data.indexOffset) == 0) {
+    // Aggregatable Tickets - validity interval:
+    // ( ticketIndex, ticketIndex + indexOffset ] for indexOffset > 0
+    if (TicketIndex.unwrap(redeemable.data.ticketIndex) <= TicketIndex.unwrap(spendingChannel.ticketIndex)  || TicketIndexOffset.unwrap(redeemable.data.indexOffset) == 0) {
       revert InvalidAggregatedTicketInterval();
     }
 
@@ -343,10 +398,16 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprMu
     emit TicketRedeemed(redeemable.data.channelId, spendingChannel.ticketIndex);
   }
 
+  /**
+   * See `_initiateOutgoingChannelClosureInternal`, entrypoint for MultiSig contract
+   */
   function initiateOutgoingChannelClosureSafe(address self, address destination) external HoprMultiSig.onlySafe(self) {
     _initiateOutgoingChannelClosureInternal(self, destination);
   }
 
+  /**
+   * See `_initiateOutgoingChannelClosureInternal`
+   */
   function initiateOutgoingChannelClosure(address destination) external HoprMultiSig.noSafeSet {
     _initiateOutgoingChannelClosureInternal(msg.sender, destination);
   }
@@ -378,10 +439,16 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprMu
     emit OutgoingChannelClosureInitiated(channelId, channel.closureTime);
   }
 
+  /**
+   * See `_closeIncomingChannelInternal`, entrypoint for MultiSig contract
+   */
   function closeIncomingChannelSafe(address self, address source) external HoprMultiSig.onlySafe(self) {
     _closeIncomingChannelInternal(self, source);
   }
 
+  /**
+   * See `_closeIncomingChannelInternal`
+   */
   function closeIncomingChannel(address source) external HoprMultiSig.noSafeSet {
     _closeIncomingChannelInternal(msg.sender, source);
   }
@@ -421,10 +488,16 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprMu
     channel.balance = Balance.wrap(0);
   }
 
+  /**
+   * See `_finalizeOutgoingChannelClosureInternal`, entrypoint for MultiSig contract
+   */
   function finalizeOutgoingChannelClosureSafe(address self, address destination) external HoprMultiSig.onlySafe(self) {
     _finalizeOutgoingChannelClosureInternal(self, destination);
   }
 
+  /**
+   * See `_finalizeOutgoingChannelClosureInternal`
+   */
   function finalizeOutgoingChannelClosure(address destination) external HoprMultiSig.noSafeSet {
     _finalizeOutgoingChannelClosureInternal(msg.sender, destination);
   }
@@ -466,22 +539,27 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprMu
   }
 
   /**
-   * ERC777.tokensReceived() hook, triggered when sending funds to this contract
+   * ERC777.tokensReceived() hook, triggered by ERC777 token contract after
+   * transfering tokens.
    *
-   * Parses the payload and opens encoded channels.
+   * Depending on the userData payload, this method either funds one
+   * channel, or a bidirectional channel, consisting of two unidirectional
+   * channels.
    *
-   * @param from address who sent the tokens
-   * @param to address recipient address
-   * @param amount uint256 amount of tokens to transfer
-   * @param userData bytes extra information provided by the token holder (if any)
+   * Channel source and destination are specified by the userData payload.
+   *
+   * @param from account from which the tokens have been transferred
+   * @param to account to which the the tokens have been transferred
+   * @param amount uint256 amount of tokens that have been transferred
+   * @param userData payload, determines what is supposed to happen
    */
   function tokensReceived(
-    address,
+    address, // operator not needed
     address from,
     address to,
     uint256 amount,
     bytes calldata userData,
-    bytes calldata
+    bytes calldata // operatorData not needed
   ) external override {
     if (amount > type(uint96).max) {
       revert InvalidBalance();
@@ -630,10 +708,15 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprMu
   }
 
   /**
-   * Gets the non-trivial ticket hash.
+   * Gets the hash of a ticket upon which the signature has been
+   * created. Also used by the VRF.
    *
-   * Note that signature is over ticket data and a computed property which implements
-   * a challenge-response mechanism.
+   * Tickets come with a signature from the ticket issuer and state a
+   * challenge to be fulfilled when redeeming the ticket. As the validity
+   * of the signature need to be checked before being able reconstruct
+   * the response to the stated challenge, the signature includes the 
+   * challenge - rather the response, whereas the smart contract
+   * requires the response.
    *
    * @param redeemable ticket data
    */
@@ -657,6 +740,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprMu
    *
    * @param ticketHash hash of the ticket to check
    * @param redeemable ticket, opening, porSecret, signature
+   * @param params VRF values, entropy given by ticket redeemer
    */
   function _isWinningTicket(
     bytes32 ticketHash,
