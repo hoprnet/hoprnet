@@ -2,9 +2,6 @@ name: Merge
 
 on:
   pull_request:
-    branches:
-      - master
-      - release/*
     types:
       - closed
       # - synchronize
