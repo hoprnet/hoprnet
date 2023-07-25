@@ -515,7 +515,7 @@ pub struct AuthorizationToken {
     token: Box<[u8]>,
 }
 
-impl AutoBinarySerializable<'_> for AuthorizationToken {}
+impl AutoBinarySerializable for AuthorizationToken {}
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl AuthorizationToken {
