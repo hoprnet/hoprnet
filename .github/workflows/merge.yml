@@ -58,7 +58,8 @@ jobs:
       - name: Check PR changes
         id: check_pr_changeset
         run: |
-          git fetch -u --unshallow --progress origin pull/${{ github.event.pull_request.number }}/head:${{ github.event.pull_request.base.ref }}
+          #git fetch -u --progress origin pull/${{ github.event.pull_request.number }}/head:${{ github.event.pull_request.base.ref }}
+          git fetch -u --progress origin pull/${{ github.event.pull_request.number }}/head:${{ github.event.pull_request.head.ref }}
           ./scripts/check-pr.sh --base-branch ${{ github.event.pull_request.base.sha }} --head-branch ${{ github.event.pull_request.head.sha }}
           cat check_pr.log >> $GITHUB_ENV
           declare base_branch=${{ github.event.pull_request.base.ref }}
