@@ -26,22 +26,22 @@ error MessageTooLong();
  **/
 abstract contract HoprCrypto {
   // secp256k1: y^2 = x^3 + b (mod F_p)
-  uint256 constant SECP256K1_B = 0x0000000000000000000000000000000000000000000000000000000000000007;
+  uint256 constant internal SECP256K1_B = 0x0000000000000000000000000000000000000000000000000000000000000007;
   // Field order created by secp256k1 curve
-  uint256 constant SECP256K1_FIELD_ORDER = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141;
+  uint256 constant internal SECP256K1_FIELD_ORDER = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141;
 
   // Order of the underlying field used for secp256k1
-  uint256 constant public SECP256K1_BASE_FIELD_ORDER = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F;
+  uint256 constant internal SECP256K1_BASE_FIELD_ORDER = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F;
   // x-component of base point of secp256k1 curve
-  uint256 constant SECP256K1_BASE_POINT_X_COMPONENT = 0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798;
+  uint256 constant internal SECP256K1_BASE_POINT_X_COMPONENT = 0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798;
 
   // encoded sign of y-component of base point of secp256k1 curve
-  uint8 constant SECP256K1_BASE_POINT_Y_COMPONENT_SIGN = 27;
+  uint8 constant internal SECP256K1_BASE_POINT_Y_COMPONENT_SIGN = 27;
 
   // E': y^2 = x^3 + A_Prime + B_Prime (mod F_p)
   // used by `hash_to_curve` function
-  uint256 constant A_Prime = 0x3f8731abdd661adca08a5558f0f5d272e953d363cb6f0e5d405447c01a444533;
-  uint256 constant B_Prime = 1771;
+  uint256 constant private A_Prime = 0x3f8731abdd661adca08a5558f0f5d272e953d363cb6f0e5d405447c01a444533;
+  uint256 constant private B_Prime = 1771;
 
   // Coefficients used for isogeneous mapping from E' to secp256k1
   // see https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#appx-iso-secp256k1
@@ -83,7 +83,7 @@ abstract contract HoprCrypto {
    *
    * @param el element to check
    */
-  function isFieldElementInternal(uint256 el) public pure returns (bool) {
+  function isFieldElementInternal(uint256 el) internal pure returns (bool) {
     return 0 == el || el < SECP256K1_FIELD_ORDER;
   }
 
@@ -93,7 +93,7 @@ abstract contract HoprCrypto {
    * @param p_x first component of P
    * @param p_y second component of P
    */
-  function isCurvePointInternal(uint256 p_x, uint256 p_y) public pure returns (bool r) {
+  function isCurvePointInternal(uint256 p_x, uint256 p_y) internal pure returns (bool r) {
     assembly {
       r := eq(
         mulmod(
@@ -141,7 +141,7 @@ abstract contract HoprCrypto {
    *
    * @param scalar to multiply with secp256k1 base point
    */
-  function scalarTimesBasepoint(uint256 scalar) public pure returns (address) {
+  function scalarTimesBasepoint(uint256 scalar) internal pure returns (address) {
     return
       ecrecover(
         0,
@@ -191,7 +191,7 @@ abstract contract HoprCrypto {
    * @param p_x first component of P
    * @param p_y second component of P
    */
-  function pointToAddress(uint256 p_x, uint256 p_y) public pure returns (address) {
+  function pointToAddress(uint256 p_x, uint256 p_y) internal pure returns (address) {
     return address(uint160(uint256(keccak256(abi.encodePacked(p_x, p_y)))));
   }
 
@@ -200,6 +200,13 @@ abstract contract HoprCrypto {
    *
    * This function is optimized to perform one single point addition, e.g.
    * when using in a VRF or hash_to_curve scheme.
+   *
+   * @dev Throws if Q = -P since Infinity point is not supported.
+   *
+   * @dev This function is meant to be part of another function and thus does 
+   *      not perform any sanity checks, such as if any of the given points
+   *      fulfill the curve equation. These checks are left to the caller of
+   *      the function.
    *
    * Optimizations:
    * - solidity assembly
@@ -212,7 +219,7 @@ abstract contract HoprCrypto {
    * @param q_y second component of Q
    * @param a curve parameter, y^2 = x^3 + a*x + b (mod p)
    */
-  function ecAdd(uint256 p_x, uint256 p_y, uint256 q_x, uint256 q_y, uint256 a) public view returns (uint256 r_x, uint256 r_y)  {
+  function ecAdd(uint256 p_x, uint256 p_y, uint256 q_x, uint256 q_y, uint256 a) internal view returns (uint256 r_x, uint256 r_y)  {
     assembly {
       if and(eq(p_x, q_x), not(eq(p_y, q_y))) {
         // Q = -P
@@ -313,11 +320,11 @@ abstract contract HoprCrypto {
    * @param payload values "to hash"
    * @param DST domain separation tag, used to makes protocol instantiations unique
    */
-  function hashToCurve(bytes memory payload, bytes memory DST) public view returns (uint256 r_x, uint256 r_y) {
+  function hashToCurve(bytes memory payload, bytes memory DST) internal view returns (uint256 r_x, uint256 r_y) {
     (uint256 u_0, uint256 u_1) = hash_to_field(payload, DST);
 
-    (uint256 q_0_x, uint256 q_0_y) = map_to_curve_simple_swu(uint256(u_0)); // on isogenous curve
-    (uint256 q_1_x, uint256 q_1_y) = map_to_curve_simple_swu(uint256(u_1)); // on isogenous curve
+    (uint256 q_0_x, uint256 q_0_y) = mapToCurveSimpleSWU(uint256(u_0)); // on isogenous curve
+    (uint256 q_1_x, uint256 q_1_y) = mapToCurveSimpleSWU(uint256(u_1)); // on isogenous curve
 
     // P + Q on isogenous curve
     (uint256 s_x, uint256 s_y) = ecAdd(q_0_x,q_0_y,q_1_x,q_1_y, A_Prime);
@@ -344,7 +351,7 @@ abstract contract HoprCrypto {
    * @param p_x first component of P
    * @param p_y second component of P
    */
-  function mapPoint(uint256 p_x, uint256 p_y) public view returns (uint256 r_x, uint256 r_y) {
+  function mapPoint(uint256 p_x, uint256 p_y) internal view returns (uint256 r_x, uint256 r_y) {
     assembly {
       let pxSquare := mulmod(p_x, p_x, SECP256K1_BASE_FIELD_ORDER) // p.x * p.x
       let pxCubic := mulmod(p_x, pxSquare, SECP256K1_BASE_FIELD_ORDER) // p.x * pxSquare
@@ -478,7 +485,7 @@ abstract contract HoprCrypto {
    *
    * @param u the field element to map to a secp256k1 curve point
    */
-  function map_to_curve_simple_swu(uint256 u) public view returns (uint256 r_x, uint256 r_y) {
+  function mapToCurveSimpleSWU(uint256 u) internal view returns (uint256 r_x, uint256 r_y) {
     assembly {
       let tv1 := mulmod(u, u, SECP256K1_BASE_FIELD_ORDER) // 1.  tv1 = u^2
       tv1 := mulmod(Z, tv1, SECP256K1_BASE_FIELD_ORDER) // 2.  tv1 = Z * tv1
@@ -593,7 +600,7 @@ abstract contract HoprCrypto {
    * @param message the message to hash
    * @param DST domain separation tag, used to make protocol instantiations unique
    */
-  function hash_to_field(bytes memory message, bytes memory DST) public view returns (uint256 u_0, uint256 u_1) {
+  function hash_to_field(bytes memory message, bytes memory DST) internal view returns (uint256 u_0, uint256 u_1) {
     (bytes32 b_1, bytes32 b_2, bytes32 b_3) = expand_message_xmd_keccak256(message, DST);
 
     // computes [...b_1[..], ...b_2[0..16]] ^ 1 mod n
@@ -638,7 +645,7 @@ abstract contract HoprCrypto {
    * @param message the message to hash
    * @param DST domain separation tag, used to make protocol instantiations unique
    */
-  function hash_to_scalar(bytes memory message, bytes memory DST) public view returns (uint256 u) {
+  function hashToScalar(bytes memory message, bytes memory DST) internal view returns (uint256 u) {
     (bytes32 b_1, bytes32 b_2) = expand_message_xmd_keccak256_single(message, DST);
 
     // computes [...b_1[0..32], ...b_2[0..16]] ^ 1 mod n
@@ -671,7 +678,7 @@ abstract contract HoprCrypto {
    * @param message the message to hash
    * @param DST domain separation tag, used to make protocol instantiations unique
    */
-  function expand_message_xmd_keccak256(bytes memory message, bytes memory DST) public pure returns (bytes32 b_1, bytes32 b_2, bytes32 b_3) {
+  function expand_message_xmd_keccak256(bytes memory message, bytes memory DST) internal pure returns (bytes32 b_1, bytes32 b_2, bytes32 b_3) {
     uint256 ell; 
 
     if ((message.length >> 5) << 5 == 0) {
@@ -772,7 +779,7 @@ abstract contract HoprCrypto {
    * @param message the message to hash
    * @param DST domain separation tag, used to make protocol instantiations unique
    */
-  function expand_message_xmd_keccak256_single(bytes memory message, bytes memory DST) public pure returns (bytes32 b_1, bytes32 b_2) {
+  function expand_message_xmd_keccak256_single(bytes memory message, bytes memory DST) internal pure returns (bytes32 b_1, bytes32 b_2) {
     uint256 ell; 
 
     if ((message.length >> 5) << 5 == 0) {
@@ -876,7 +883,8 @@ abstract contract HoprCrypto {
   }
 
   /**
-   * Bundles payload used to create a VRF.
+   * Bundles payload used to create a VRF-generated deterministic 
+   * pseudo-random value.
    */
   struct VRF_Payload {
     // the main message, e.g. ticket Hash
@@ -898,11 +906,14 @@ abstract contract HoprCrypto {
    * @param params necessary values verify validity of VRF
    * @param payload values over which the VRF was computed, e.g. ticketHash
    */
-  function vrf_verify(VRF_Parameters memory params, VRF_Payload memory payload) public view returns (bool) {
-    if (params.h >= SECP256K1_FIELD_ORDER) {
+  function vrfVerify(VRF_Parameters memory params, VRF_Payload memory payload) internal view returns (bool) {
+    if (params.h >= SECP256K1_BASE_FIELD_ORDER || params.s >= SECP256K1_BASE_FIELD_ORDER) {
       revert InvalidFieldElement();
     }
 
+    if (!isCurvePointInternal(params.v_x, params.v_y)) {
+      revert InvalidCurvePoint();
+    }
 
     // we get a pseudo-random curve point
     (uint256 B_x, uint256 B_y) = hashToCurve(abi.encodePacked(payload.signer, payload.message), payload.DST);
@@ -927,7 +938,7 @@ abstract contract HoprCrypto {
     // R = sB - hV
     (uint256 r_x, uint256 r_y) = ecAdd(params.sB_x, params.sB_y, params.hV_x, SECP256K1_BASE_FIELD_ORDER - params.hV_y, 0);
 
-    uint256 h_check = hash_to_scalar(abi.encodePacked(payload.signer, params.v_x, params.v_y, r_x, r_y, payload.message), payload.DST);
+    uint256 h_check = hashToScalar(abi.encodePacked(payload.signer, params.v_x, params.v_y, r_x, r_y, payload.message), payload.DST);
 
     return h_check == params.h;
   }
