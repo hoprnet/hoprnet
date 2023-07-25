@@ -1,15 +1,18 @@
 use crate::{
-    errors::{Result, CryptoError::{CalculationError, InvalidInputValue, InvalidParameterSize}},
-    random::{random_bytes, random_fill},
+    errors::{
+        CryptoError::{CalculationError, InvalidInputValue, InvalidParameterSize},
+        Result,
+    },
     parameters::{PACKET_TAG_LENGTH, PING_PONG_NONCE_SIZE, SECRET_KEY_LENGTH},
     primitives::{calculate_mac, DigestLike, SimpleDigest},
-    types::HalfKey
+    random::{random_bytes, random_fill},
+    types::HalfKey,
 };
 use blake2::Blake2s256;
 use elliptic_curve::{
     hash2curve::{ExpandMsgXmd, GroupDigest},
+    sec1::ToEncodedPoint,
     ScalarPrimitive,
-    sec1::ToEncodedPoint
 };
 use hkdf::SimpleHkdf;
 use k256::{AffinePoint, Scalar, Secp256k1};
@@ -112,101 +115,6 @@ pub fn sample_field_element(secret: &[u8], tag: &str) -> Result<HalfKey> {
     )
     .map_err(|_| CalculationError)?;
     Ok(HalfKey::new(scalar.to_bytes().as_ref()))
-}
-
-pub struct VrfParameters {
-    /// the pseudo-random point
-    pub v: AffinePoint,
-    pub h: Scalar,
-    pub s: Scalar,
-    /// helper value for smart contract
-    pub h_v: AffinePoint,
-    /// helper value for smart contract
-    pub s_b: AffinePoint,
-}
-
-impl std::fmt::Display for VrfParameters {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let v_encoded = self.v.to_encoded_point(false);
-        let h_v_encoded = self.h_v.to_encoded_point(false);
-        let s_b_encoded = self.s_b.to_encoded_point(false);
-        f.debug_struct("VrfParameters")
-            .field(
-                "V",
-                &format!(
-                    "({},{})",
-                    hex::encode(v_encoded.x().unwrap()),
-                    hex::encode(v_encoded.y().unwrap())
-                ),
-            )
-            .field("h", &hex::encode(self.h.to_bytes()))
-            .field("s", &hex::encode(self.s.to_bytes()))
-            .field(
-                "h_v",
-                &format!(
-                    "({},{})",
-                    hex::encode(h_v_encoded.x().unwrap()),
-                    hex::encode(h_v_encoded.y().unwrap())
-                ),
-            )
-            .field(
-                "s_b",
-                &format!(
-                    "({},{})",
-                    hex::encode(s_b_encoded.x().unwrap()),
-                    hex::encode(s_b_encoded.y().unwrap())
-                ),
-            )
-            .finish()
-    }
-}
-
-pub fn foo<const T: usize>(msg: &[u8; T], secret: &[u8], chain_addr: &Address) -> Result<VrfParameters> {
-    let dst = b"some DST tag";
-
-    let b = Secp256k1::hash_from_bytes::<ExpandMsgXmd<sha3::Keccak256>>(&[&chain_addr.to_bytes(), msg], &[dst])?;
-
-    let a: Scalar = ScalarPrimitive::<Secp256k1>::from_slice(&secret)?.into();
-
-    let v = b * a;
-
-    let r = Secp256k1::hash_to_scalar::<ExpandMsgXmd<sha3::Keccak256>>(
-        &[
-            &a.to_bytes(),
-            &v.to_affine().to_encoded_point(false).as_bytes()[1..],
-            // &random_bytes::<64>(),
-            &[0u8; 64], // TODO: remove this
-        ],
-        &[dst],
-    )?;
-
-    let r_v = b * r;
-
-    let r_v_encoded = r_v.to_encoded_point(false);
-    println!(
-        "R_v ({},{})",
-        hex::encode(r_v_encoded.x().unwrap()),
-        hex::encode(r_v_encoded.y().unwrap())
-    );
-
-    let h = Secp256k1::hash_to_scalar::<ExpandMsgXmd<sha3::Keccak256>>(
-        &[
-            &chain_addr.to_bytes(),
-            &v.to_affine().to_encoded_point(false).as_bytes()[1..],
-            &r_v.to_affine().to_encoded_point(false).as_bytes()[1..],
-            msg,
-        ],
-        &[dst],
-    )?;
-    let s = r + h * a;
-
-    Ok(VrfParameters {
-        v: v.to_affine(),
-        h,
-        s,
-        h_v: (v * h).to_affine(),
-        s_b: (b * s).to_affine(),
-    })
 }
 
 /// Used in Proof of Relay to derive own half-key (S0)
@@ -352,8 +260,6 @@ pub mod wasm {
 
 #[cfg(test)]
 mod tests {
-    use crate::types::PublicKey;
-
     use super::*;
     use crate::types::PublicKey;
     use hex_literal::hex;
