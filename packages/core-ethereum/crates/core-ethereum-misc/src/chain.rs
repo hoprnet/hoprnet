@@ -79,6 +79,7 @@ pub mod tests {
     use core_types::channels::{generate_channel_id, Ticket};
     use hex_literal::hex;
     use std::sync::{Arc, Mutex};
+    use core_crypto::keypairs::{ChainKeypair, Keypair};
     use utils_db::{db::DB, leveldb::rusty::RustyLevelDbShim};
     use utils_types::primitives::BalanceType;
     use utils_types::primitives::{Address, Balance, BalanceType::HOPR, Snapshot, U256};
@@ -101,13 +102,14 @@ pub mod tests {
     async fn redeem_ticket_workflow() {
         let mut db = create_mock_db();
 
-        let counterparty_pubkey = PublicKey::from_privkey(&COUNTERPARTY_PRIV_KEY).unwrap();
+        let counterparty_keypair = ChainKeypair::from_secret(&COUNTERPARTY_PRIV_KEY).unwrap();
+
         let self_pubkey = PublicKey::from_privkey(&SELF_PRIV_KEY).unwrap();
 
         let response = Response::default();
         let challenge = response.to_challenge();
 
-        let channel_id = generate_channel_id(&counterparty_pubkey.to_address(), &self_pubkey.to_address());
+        let channel_id = generate_channel_id(&counterparty_keypair.public().to_address(), &self_pubkey.to_address());
 
         let cci = ChannelCommitmentInfo::new(100, Address::random().to_string(), channel_id.clone(), U256::zero());
 
@@ -117,23 +119,22 @@ pub mod tests {
             response,
             pre_image: Hash::default(),
             ticket: Ticket::new(
-                counterparty_pubkey.to_address(),
+                counterparty_keypair.public().to_address(),
                 U256::zero(),
                 U256::zero(),
                 Balance::new(U256::zero(), BalanceType::HOPR),
                 U256::max(),
                 U256::zero(),
-                &COUNTERPARTY_PRIV_KEY,
+                &counterparty_keypair,
             ),
-            signer: counterparty_pubkey.to_address(),
+            signer: counterparty_keypair.public().to_address(),
         };
 
         acked_ticket
             .ticket
-            .set_challenge(challenge.into(), &COUNTERPARTY_PRIV_KEY);
-        acked_ticket.ticket.sign(&COUNTERPARTY_PRIV_KEY);
+            .set_challenge(challenge.into(), &counterparty_keypair);
 
-        let pre_image = prepare_redeem_ticket(&db, &counterparty_pubkey.to_address(), &channel_id, &mut acked_ticket)
+        let pre_image = prepare_redeem_ticket(&db, &counterparty_keypair.public().to_address(), &channel_id, &mut acked_ticket)
             .await
             .expect("preparing ticket redemption must not fail");
 

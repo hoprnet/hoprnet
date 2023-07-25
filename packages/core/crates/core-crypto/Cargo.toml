@@ -23,7 +23,7 @@ ed25519-dalek = { version = "1.0.1", features = ["serde"] }
 elliptic-curve = { version = "0.13", features = ["serde"] }
 futures = "0.3.28"
 generic-array = { version = "0.14.7", features = ["zeroize"] }
-getrandom = { version = "0.2.8", features = ["js"] }
+getrandom = { version = "0.2", features = ["js"] }
 hex = "0.4"
 hex-literal = "0.4"
 hkdf = "0.12"
@@ -39,12 +39,12 @@ typenum = "1.16"
 thiserror = "1.0"
 wasm-bindgen-futures = { version = "0.4.34", optional = true, features = ["futures-core-03-stream"] }
 wasm-bindgen = { workspace = true, optional = true }
+zeroize = { version = "1.6", features = ["zeroize_derive"] }
 
 utils-log = { path = "../../../utils/crates/utils-log", default-features = false }
 utils-misc = { path = "../../../utils/crates/utils-misc", default-features = false }
 utils-types = { path = "../../../utils/crates/utils-types", default-features = false }
 
-zeroize = { version = "1.6", features = ["zeroize_derive"] }
 console_error_panic_hook = { version = "0.1.7", optional = true }
 
 [dev-dependencies]

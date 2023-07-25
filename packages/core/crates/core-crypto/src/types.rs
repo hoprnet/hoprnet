@@ -759,6 +759,12 @@ impl From<&CompressedPublicKey> for k256::ProjectivePoint {
     }
 }
 
+impl CompressedPublicKey {
+    pub fn to_address(&self) -> Address {
+        self.0.to_address()
+    }
+}
+
 /// Contains a response upon ticket acknowledgement
 /// It is equivalent to a non-zero secret scalar on secp256k1 (EC private key).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

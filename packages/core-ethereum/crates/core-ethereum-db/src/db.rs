@@ -1,7 +1,5 @@
 use async_trait::async_trait;
-
-use core_crypto::iterated_hash::Intermediate;
-use core_crypto::types::OffchainPublicKey;
+use core_crypto::types::{OffchainPublicKey, PublicKey};
 use core_crypto::{
     iterated_hash::{Intermediate, IteratedHash},
     types::{HalfKeyChallenge, Hash},
@@ -22,7 +20,6 @@ use utils_types::{
     primitives::{Address, AuthorizationToken, Balance, BalanceType, EthereumChallenge, Snapshot, U256},
     traits::BinarySerializable,
 };
-use utils_types::traits::BinarySerializable;
 
 use crate::errors::Result;
 use crate::traits::HoprCoreEthereumDbActions;

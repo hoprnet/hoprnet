@@ -1,7 +1,7 @@
 use crate::errors::Result;
 use async_trait::async_trait;
 
-use core_crypto::types::OffchainPublicKey;
+use core_crypto::types::{OffchainPublicKey, PublicKey};
 use core_crypto::{
     iterated_hash::IteratedHash,
     types::{HalfKeyChallenge, Hash},
