@@ -30,8 +30,8 @@ contract HoprNodeSafeRegistryTest is Test {
      * @dev node can actively register a node
      */
     function testFuzz_RegisterSafeByNode(address safeAddress, address nodeAddress) public {
-        vm.assume(!PrecompileUtils.isPrecompileAddress(safeAddress));
-        vm.assume(!PrecompileUtils.isPrecompileAddress(nodeAddress));
+        vm.assume(!PrecompileUtils.isPrecompileAddress(safeAddress) && safeAddress != address(0));
+        vm.assume(!PrecompileUtils.isPrecompileAddress(nodeAddress) && nodeAddress != address(0));
 
         _helperMockSafe(safeAddress, nodeAddress, true, true);
         vm.prank(nodeAddress);
@@ -46,7 +46,7 @@ contract HoprNodeSafeRegistryTest is Test {
      */
     function testFuzz_RegisterSafeWithNodeSig(uint256 nodePrivateKey, address safeAddress) public {
         nodePrivateKey = bound(nodePrivateKey, 1, 1e36);
-        vm.assume(!PrecompileUtils.isPrecompileAddress(safeAddress));
+        vm.assume(!PrecompileUtils.isPrecompileAddress(safeAddress) && safeAddress != address(0));
 
         HoprNodeSafeRegistry.NodeSafe memory nodeSafe = HoprNodeSafeRegistry.NodeSafe(safeAddress, vm.addr(nodePrivateKey));
 
@@ -64,8 +64,8 @@ contract HoprNodeSafeRegistryTest is Test {
      * @dev node fail to register a node due to it's registered
      */
     function testRevert_FailToRegisterSafeByNodeDueToRegistered(address safeAddress, address nodeAddress) public {
-        vm.assume(!PrecompileUtils.isPrecompileAddress(safeAddress));
-        vm.assume(!PrecompileUtils.isPrecompileAddress(nodeAddress));
+        vm.assume(!PrecompileUtils.isPrecompileAddress(safeAddress) && safeAddress != address(0));
+        vm.assume(!PrecompileUtils.isPrecompileAddress(nodeAddress) && nodeAddress != address(0));
 
         _helperMockSafe(safeAddress, nodeAddress, true, true);
 
@@ -84,7 +84,7 @@ contract HoprNodeSafeRegistryTest is Test {
      * @dev node fail to register a node due to the provided safe address is zero
      */
     function testRevert_FailToRegisterSafeByNodeDueToSafeAddressZero(address nodeAddress) public {
-        vm.assume(!PrecompileUtils.isPrecompileAddress(nodeAddress));
+        vm.assume(!PrecompileUtils.isPrecompileAddress(nodeAddress) && nodeAddress != address(0));
 
         address safeAddress = address(0);
         _helperMockSafe(safeAddress, nodeAddress, true, true);
@@ -104,7 +104,7 @@ contract HoprNodeSafeRegistryTest is Test {
      * @dev node fail to register a node due to the provided node address is zero
      */
     function testRevert_FailToRegisterSafeByNodeDueToNodeAddressZero(address safeAddress) public {
-        vm.assume(!PrecompileUtils.isPrecompileAddress(safeAddress));
+        vm.assume(!PrecompileUtils.isPrecompileAddress(safeAddress) && safeAddress != address(0));
 
         address nodeAddress = address(0);
         _helperMockSafe(safeAddress, nodeAddress, true, true);
@@ -124,8 +124,8 @@ contract HoprNodeSafeRegistryTest is Test {
      * @dev node fail to register a node due to node and safe addresses are random
      */
     function testRevert_FailToRegisterSafeByNodeDueToNotSafeOwnerNorNode(address safeAddress, address nodeAddress) public {
-        vm.assume(!PrecompileUtils.isPrecompileAddress(safeAddress));
-        vm.assume(!PrecompileUtils.isPrecompileAddress(nodeAddress));
+        vm.assume(!PrecompileUtils.isPrecompileAddress(safeAddress) && safeAddress != address(0));
+        vm.assume(!PrecompileUtils.isPrecompileAddress(nodeAddress) && nodeAddress != address(0));
 
         _helperMockSafe(safeAddress, nodeAddress, false, false);
 
@@ -144,8 +144,8 @@ contract HoprNodeSafeRegistryTest is Test {
      * @dev safe can deregister a node by the safe
      */
     function testFuzz_DeregisterNodeBySafe(address safeAddress, address nodeAddress) public {
-        vm.assume(!PrecompileUtils.isPrecompileAddress(safeAddress));
-        vm.assume(!PrecompileUtils.isPrecompileAddress(nodeAddress));
+        vm.assume(!PrecompileUtils.isPrecompileAddress(safeAddress) && safeAddress != address(0));
+        vm.assume(!PrecompileUtils.isPrecompileAddress(nodeAddress) && nodeAddress != address(0));
 
         _helperMockSafe(safeAddress, nodeAddress, true, true);
 
@@ -163,8 +163,8 @@ contract HoprNodeSafeRegistryTest is Test {
      * @dev cannot deregister a random address
      */
     function testRevert_DeregisterNodeBySafeDueToNotValidSafe(address safeAddress, address nodeAddress) public {
-        vm.assume(!PrecompileUtils.isPrecompileAddress(safeAddress));
-        vm.assume(!PrecompileUtils.isPrecompileAddress(nodeAddress));
+        vm.assume(!PrecompileUtils.isPrecompileAddress(safeAddress) && safeAddress != address(0));
+        vm.assume(!PrecompileUtils.isPrecompileAddress(nodeAddress) && nodeAddress != address(0));
 
         _helperMockSafe(safeAddress, nodeAddress, true, true);
 
