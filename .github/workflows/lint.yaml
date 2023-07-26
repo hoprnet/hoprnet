@@ -12,7 +12,6 @@ on:
       - synchronize
     paths-ignore:
       - 'docs/**/*'
-      - 'packages/*/docs/**/*'
       - '**/*.md'
 concurrency:
   group: ${{ github.head_ref }}-lint
