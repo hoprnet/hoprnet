@@ -171,6 +171,7 @@ jobs:
       - name: Compress test logs
         run: |
           tar -czvf test-e2e-${{ github.run_id }}-${{ github.run_number }}.tgz hopr-smoke-test*
+        working-directory: "/tmp"
         timeout-minutes: 5
 
       - name: Upload test logs
