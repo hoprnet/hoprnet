@@ -1323,7 +1323,7 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         );
         
         // try all functions on tokens
-        uint256 size = 4;
+        uint256 size = 7;
         bytes[] memory data = new bytes[](size);
         uint8[] memory txOperations = new uint8[](size);
         address[] memory txTos = new address[](size);
@@ -1349,12 +1349,12 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         );
 
         data[0] = abi.encodeWithSelector(IERC20.approve.selector, vm.addr(200), 100);
-        // data[1] = abi.encodeWithSignature("send(address,uint256,bytes)", vm.addr(200),vm.addr(201), hex"ff"); 
-        // data[2] = abi.encodeWithSelector(HoprChannels.redeemTicketSafe.selector, msgSender, dummyRedeemableTicket); 
-        // data[3] = abi.encodeWithSelector(HoprChannels.closeIncomingChannelSafe.selector, msgSender, vm.addr(404));
-        // data[4] = abi.encodeWithSelector(HoprChannels.initiateOutgoingChannelClosureSafe.selector, msgSender, vm.addr(404));
-        // data[5] = abi.encodeWithSelector(HoprChannels.finalizeOutgoingChannelClosureSafe.selector, msgSender, vm.addr(404));
-        // data[6] = abi.encodeWithSelector(HoprChannels.fundChannelSafe.selector, msgSender, vm.addr(404), HoprChannels.Balance.wrap(66));
+        data[1] = abi.encodeWithSignature("send(address,uint256,bytes)", vm.addr(200),vm.addr(201), hex"ff");
+        data[2] = abi.encodeWithSelector(HoprChannels.redeemTicketSafe.selector, msgSender, dummyRedeemableTicket);
+        data[3] = abi.encodeWithSelector(HoprChannels.closeIncomingChannelSafe.selector, msgSender, vm.addr(404));
+        data[4] = abi.encodeWithSelector(HoprChannels.initiateOutgoingChannelClosureSafe.selector, msgSender, vm.addr(404));
+        data[5] = abi.encodeWithSelector(HoprChannels.finalizeOutgoingChannelClosureSafe.selector, msgSender, vm.addr(404));
+        data[6] = abi.encodeWithSelector(HoprChannels.fundChannelSafe.selector, msgSender, vm.addr(404), HoprChannels.Balance.wrap(66));
         // data[7] nothing
         // data[8] nothing
 
