@@ -21,13 +21,19 @@ concurrency:
   group: ${{ github.head_ref }}-test
   cancel-in-progress: true
 jobs:
-  # unit_testing:
-  #   name: Unit
-  #   runs-on: ubuntu-2-core
-  #   if: github.event.pull_request.draft == false
-  #   steps:
-  #     - name: Checkout hoprnet repository
-  #       uses: actions/checkout@v3
+  unit_testing:
+    name: Unit
+    runs-on: ubuntu-2-core
+    if: github.event.pull_request.draft == false
+    steps:
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v3
+
+      - name: Upload logs
+        uses: actions/upload-artifact@v3
+        with:
+          name: hopr-linux-smoke-test-logs
+          path: /runner/_work/hoprnet/hoprnet/scripts
 
   #     - name: Disable sccache (act-only)
   #       if: ${{ env.ACT }}
@@ -163,7 +169,7 @@ jobs:
         env:
           ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN }}
 
-      - name: Upload node logs (Linux)
+      - name: Upload logs
         uses: actions/upload-artifact@v3
         if: ${{ always() && runner.os == 'Linux' }}
         with:
