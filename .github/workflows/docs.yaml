@@ -26,6 +26,9 @@ jobs:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v3
 
+      - name: Configure Git info
+        run: ./scripts/configure-git-info.sh
+
       - name: Disable sccache (act-only)
         if: ${{ env.ACT }}
         run: |
@@ -103,7 +106,6 @@ jobs:
         # only commit changes when not running via act and when on final branches
         if: |
           (github.ref == 'refs/heads/master' ||
-           github.ref == 'refs/heads/avado' ||
            startsWith(github.ref, 'refs/heads/debug-docs/') ||
            startsWith(github.ref, 'refs/heads/release/')
           ) && !env.ACT
