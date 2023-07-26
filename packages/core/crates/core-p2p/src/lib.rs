@@ -1,4 +1,4 @@
-pub use libp2p_identity;
+pub use libp2p_identity as identity;
 
 use libp2p_identity::PeerId;
 use libp2p_core::{upgrade, Transport};
@@ -17,8 +17,7 @@ pub fn build_p2p_network(me: &PeerId) -> libp2p_swarm::Swarm<libp2p_swarm::dummy
 
     let network_behavior = libp2p_swarm::dummy::Behaviour;
 
-    let swarm = SwarmBuilder::with_wasm_executor(transport, network_behavior, me.clone()).build();
-    swarm
+    SwarmBuilder::with_wasm_executor(transport, network_behavior, me.clone()).build()
 }
 
 #[cfg(feature = "wasm")]

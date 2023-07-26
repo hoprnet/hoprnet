@@ -10,19 +10,24 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 default = ["console_error_panic_hook", "wasm"]
-wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:libp2p-wasm-ext", "dep:js-sys", "dep:getrandom", "utils-log/wasm"]
+wasm = [
+    "dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:getrandom",
+    "libp2p-swarm/wasm-bindgen", "libp2p-ping/wasm-bindgen", "dep:libp2p-wasm-ext",
+    "utils-log/wasm"
+]
 
 [dependencies]
 libp2p-identity = "0.2.1"
-libp2p-core = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "hopr/wasm-ext/add-tcp-transport" }
-libp2p-mplex = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "hopr/wasm-ext/add-tcp-transport" }
-libp2p-noise = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "hopr/wasm-ext/add-tcp-transport" }
-libp2p-swarm = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "hopr/wasm-ext/add-tcp-transport", features = ["wasm-bindgen"] }
+libp2p-core = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "release/providence" }
+libp2p-mplex = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "release/providence" }
+libp2p-noise = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "release/providence" }
+libp2p-swarm = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "release/providence" }
+libp2p-ping = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "release/providence" }
 futures = "0.3.28"
 futures-lite = "1.12.0"
 
 # wasm
-libp2p-wasm-ext = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "hopr/wasm-ext/add-tcp-transport", features = ["tcp"], optional=true }
+libp2p-wasm-ext = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "release/providence", features = ["tcp"], optional=true }
 getrandom = { version = "0.2.8", features = ["js"], optional = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }
 js-sys = { version = "0.3.63", optional = true }

@@ -1132,6 +1132,7 @@ dependencies = [
  "libp2p-identity 0.2.1",
  "libp2p-mplex",
  "libp2p-noise",
+ "libp2p-ping",
  "libp2p-swarm",
  "libp2p-wasm-ext",
  "more-asserts",
@@ -2815,6 +2816,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a5bbe824c507c5da5956355e86a746d82e0e1464f65d862cc5e71da70e94b2c"
 dependencies = [
  "cfg-if",
+ "js-sys",
+ "wasm-bindgen",
+ "web-sys",
 ]
 
 [[package]]
@@ -2975,7 +2979,7 @@ checksum = "7fc7aa29613bd6a620df431842069224d8bc9011086b1db4c0e0cd47fa03ec9a"
 [[package]]
 name = "libp2p-core"
 version = "0.40.0"
-source = "git+https://github.com/hoprnet/rust-libp2p.git?branch=hopr/wasm-ext/add-tcp-transport#7f1d68ea511409d3aa3a6312bbe2833e6bfa36c8"
+source = "git+https://github.com/hoprnet/rust-libp2p.git?branch=release/providence#ad83a80e4a8248b1888410d4859dc10aa6e24772"
 dependencies = [
  "either",
  "fnv",
@@ -3039,7 +3043,7 @@ dependencies = [
 [[package]]
 name = "libp2p-mplex"
 version = "0.40.0"
-source = "git+https://github.com/hoprnet/rust-libp2p.git?branch=hopr/wasm-ext/add-tcp-transport#7f1d68ea511409d3aa3a6312bbe2833e6bfa36c8"
+source = "git+https://github.com/hoprnet/rust-libp2p.git?branch=release/providence#ad83a80e4a8248b1888410d4859dc10aa6e24772"
 dependencies = [
  "asynchronous-codec",
  "bytes",
@@ -3057,7 +3061,7 @@ dependencies = [
 [[package]]
 name = "libp2p-noise"
 version = "0.43.0"
-source = "git+https://github.com/hoprnet/rust-libp2p.git?branch=hopr/wasm-ext/add-tcp-transport#7f1d68ea511409d3aa3a6312bbe2833e6bfa36c8"
+source = "git+https://github.com/hoprnet/rust-libp2p.git?branch=release/providence#ad83a80e4a8248b1888410d4859dc10aa6e24772"
 dependencies = [
  "bytes",
  "curve25519-dalek 3.2.0",
@@ -3079,9 +3083,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "libp2p-ping"
+version = "0.43.0"
+source = "git+https://github.com/hoprnet/rust-libp2p.git?branch=release/providence#ad83a80e4a8248b1888410d4859dc10aa6e24772"
+dependencies = [
+ "either",
+ "futures",
+ "futures-timer",
+ "getrandom 0.2.10",
+ "instant",
+ "libp2p-core",
+ "libp2p-identity 0.2.1",
+ "libp2p-swarm",
+ "log",
+ "rand 0.8.5",
+ "void",
+]
+
+[[package]]
 name = "libp2p-swarm"
 version = "0.43.1"
-source = "git+https://github.com/hoprnet/rust-libp2p.git?branch=hopr/wasm-ext/add-tcp-transport#7f1d68ea511409d3aa3a6312bbe2833e6bfa36c8"
+source = "git+https://github.com/hoprnet/rust-libp2p.git?branch=release/providence#ad83a80e4a8248b1888410d4859dc10aa6e24772"
 dependencies = [
  "either",
  "fnv",
@@ -3103,7 +3125,7 @@ dependencies = [
 [[package]]
 name = "libp2p-wasm-ext"
 version = "0.40.0"
-source = "git+https://github.com/hoprnet/rust-libp2p.git?branch=hopr/wasm-ext/add-tcp-transport#7f1d68ea511409d3aa3a6312bbe2833e6bfa36c8"
+source = "git+https://github.com/hoprnet/rust-libp2p.git?branch=release/providence#ad83a80e4a8248b1888410d4859dc10aa6e24772"
 dependencies = [
  "futures",
  "js-sys",
@@ -3371,7 +3393,7 @@ dependencies = [
 [[package]]
 name = "multistream-select"
 version = "0.13.0"
-source = "git+https://github.com/hoprnet/rust-libp2p.git?branch=hopr/wasm-ext/add-tcp-transport#7f1d68ea511409d3aa3a6312bbe2833e6bfa36c8"
+source = "git+https://github.com/hoprnet/rust-libp2p.git?branch=release/providence#ad83a80e4a8248b1888410d4859dc10aa6e24772"
 dependencies = [
  "bytes",
  "futures",
@@ -4344,7 +4366,7 @@ dependencies = [
 [[package]]
 name = "rw-stream-sink"
 version = "0.4.0"
-source = "git+https://github.com/hoprnet/rust-libp2p.git?branch=hopr/wasm-ext/add-tcp-transport#7f1d68ea511409d3aa3a6312bbe2833e6bfa36c8"
+source = "git+https://github.com/hoprnet/rust-libp2p.git?branch=release/providence#ad83a80e4a8248b1888410d4859dc10aa6e24772"
 dependencies = [
  "futures",
  "pin-project",
