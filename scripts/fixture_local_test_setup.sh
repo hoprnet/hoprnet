@@ -223,7 +223,7 @@ function setup_node() {
       --testUseWeakCrypto \
       --allowLocalNodeConnections \
       --allowPrivateNodeConnections \
-      "${additional_args}" \
+      ${additional_args} \
       > "${log}" 2>&1 &
 }
 
