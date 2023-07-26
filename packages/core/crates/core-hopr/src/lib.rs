@@ -1,3 +1,8 @@
+pub async fn start_core_application() {
+    let mut swarm = core_p2p::build_p2p_network(&core_p2p::identity::PeerId::random());
+    ()
+}
+
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use utils_log::logger::JsLogger;
