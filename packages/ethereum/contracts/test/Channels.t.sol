@@ -102,8 +102,8 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils {
       keccak256(abi.encode(getChannelFromTuple(src, dest))), 
       keccak256(abi.encode(wrapChannel(balance, ticketIndex, closureTime, epoch, HoprChannels.ChannelStatus.PENDING_TO_CLOSE))));
   
-    assertEq(hoprChannels.ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE(), 64);
-    assertEq(hoprChannels.ERC777_HOOK_FUND_CHANNEL_SIZE(), 40);
+    assertEq(hoprChannels.ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE(), 128);
+    assertEq(hoprChannels.ERC777_HOOK_FUND_CHANNEL_SIZE(), 64);
 
     assertEq(hoprChannels.VERSION(), '2.0.0');
 
@@ -130,11 +130,14 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils {
 
   function testValidateChannelParties(address source, address destination) public {
     vm.assume(source != destination);
+    vm.assume(source != address(0) && destination != address(0));
 
     hoprChannels.myValidateChannelParties(source, destination);
   }
 
   function testRevert_validateChannelParties(address addr) public {
+    vm.assume(addr != address(0));
+
     vm.expectRevert(abi.encodeWithSelector(HoprChannels.SourceEqualsDestination.selector));
     hoprChannels.myValidateChannelParties(addr, addr);
 
@@ -1160,7 +1163,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils {
   function testRevert_tokensReceivedWrongABI(address operator, bytes memory operatorData, address from, uint256 amount, bytes memory userData) public {
     amount = bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE);
     
-    vm.assume(userData.length != 40 && userData.length != 64);
+    vm.assume(userData.length != 0 && userData.length != 64 && userData.length != 128);
 
     vm.expectRevert(HoprChannels.InvalidTokensReceivedUsage.selector);
     vm.prank(address(hoprToken));
@@ -1185,7 +1188,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils {
     amount = bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE);
 
     vm.assume(src != dest && safeContract != src && safeContract != dest);
-    vm.assume(src != address(0) && dest != address(0) && safeContract != address(0));
+    vm.assume(src != address(0) && dest != address(0) && safeContract != address(0) && someAccount != address(0));
     vm.assume(someAccount != src);
 
     _helperOnlySafeMock(src, safeContract);

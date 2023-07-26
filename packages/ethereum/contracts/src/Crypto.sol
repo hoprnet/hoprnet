@@ -1,12 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.19;
 
-error InvalidFieldElement();
-error InvalidCurvePoint();
-error InvalidPointWitness();
-error GeneralError();
-error MessageTooLong();
-
 /**
  *    &&&&
  *    &&&&
@@ -25,6 +19,10 @@ error MessageTooLong();
  * Bundles cryptographic primitives used by the HOPR protocol
  **/
 abstract contract HoprCrypto {
+  error InvalidFieldElement();
+  error InvalidCurvePoint();
+  error InvalidPointWitness();
+
   // secp256k1: y^2 = x^3 + b (mod F_p)
   uint256 constant internal SECP256K1_B = 0x0000000000000000000000000000000000000000000000000000000000000007;
   // Field order created by secp256k1 curve
@@ -317,6 +315,9 @@ abstract contract HoprCrypto {
    * Implements secp256k1_XMD:KECCAK_256_SSWU_RO_, see
    * https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html
    *
+   * @dev DSTs longer than 255 bytes are considered unsound.
+   *      see https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#name-domain-separation
+   *
    * @param payload values "to hash"
    * @param DST domain separation tag, used to makes protocol instantiations unique
    */
@@ -597,6 +598,9 @@ abstract contract HoprCrypto {
    * Takes an arbitrary byte-string and a domain seperation tag (DST) and returns
    * two elements of the field used to create the secp256k1 curve.
    *
+   * @dev DSTs longer than 255 bytes are considered unsound.
+   *      see https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#name-domain-separation
+   *
    * @param message the message to hash
    * @param DST domain separation tag, used to make protocol instantiations unique
    */
@@ -642,6 +646,9 @@ abstract contract HoprCrypto {
    * Takes an arbitrary bytestring and a domain seperation tag and returns a
    * pseudo-random scalar in the secp256k1 curve field.
    *
+   * @dev DSTs longer than 255 bytes are considered unsound.
+   *      see https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#name-domain-separation
+   *
    * @param message the message to hash
    * @param DST domain separation tag, used to make protocol instantiations unique
    */
@@ -672,26 +679,21 @@ abstract contract HoprCrypto {
    *
    * Used for hash_to_curve functionality.
    *
-   * Note: This is not a general implementation as the output length fixed. It is tailor-made
-   *       for secp256k1_XMD:KECCAK_256_SSWU_RO_ hash_to_curve implementation.
+   * @dev This is not a general implementation as the output length fixed. It is tailor-made
+   *      for secp256k1_XMD:KECCAK_256_SSWU_RO_ hash_to_curve implementation.
+   *
+   * @dev DSTs longer than 255 bytes are considered unsound.
+   *      see https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#name-domain-separation
    *
    * @param message the message to hash
    * @param DST domain separation tag, used to make protocol instantiations unique
    */
   function expand_message_xmd_keccak256(bytes memory message, bytes memory DST) internal pure returns (bytes32 b_1, bytes32 b_2, bytes32 b_3) {
-    uint256 ell; 
-
-    if ((message.length >> 5) << 5 == 0) {
-      ell = message.length >> 5;
-    } else {
-      ell = message.length >> 5 + 1;
-    }
-
-    if (ell > 255 || message.length > 2040 || DST.length > 255) {
-      revert MessageTooLong();
-    }
-
     assembly {
+      if gt(mload(DST), 255) {
+        revert (0,0)
+      }
+
       let b_0
       {
         // create payload for b_0 hash
@@ -773,26 +775,21 @@ abstract contract HoprCrypto {
    *
    * Used for the VRF functionality.
    *
-   * Note: This is not a general implementation as the output length fixed. It is tailor-made
-   *       for secp256k1_XMD:KECCAK_256_SSWU_RO_ hash_to_curve implementation.
+   * @dev This is not a general implementation as the output length fixed. It is tailor-made
+   *      for secp256k1_XMD:KECCAK_256_SSWU_RO_ hash_to_curve implementation.
+   *
+   * @dev DSTs longer than 255 bytes are considered unsound.
+   *      see https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#name-domain-separation
    *
    * @param message the message to hash
    * @param DST domain separation tag, used to make protocol instantiations unique
    */
   function expand_message_xmd_keccak256_single(bytes memory message, bytes memory DST) internal pure returns (bytes32 b_1, bytes32 b_2) {
-    uint256 ell; 
-
-    if ((message.length >> 5) << 5 == 0) {
-      ell = message.length >> 5;
-    } else {
-      ell = message.length >> 5 + 1;
-    }
-
-    if (ell > 255 || message.length > 2040 || DST.length > 255) {
-      revert MessageTooLong();
-    }
-
     assembly {
+      if gt(mload(DST), 255) {
+        revert (0,0)
+      }
+
       let b_0
       {
         // create payload for b_0 hash
@@ -893,7 +890,9 @@ abstract contract HoprCrypto {
     // necessary to make VRF individual for each Ethereum account
     address signer;
     // domain separation tag, make each protocol instantiation,
-    // unique, such as staging and production environment
+    // unique, such as staging and production environment,
+    // must be at most 255 bytes, otherwise considered unsound
+    // see https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#name-domain-separation
     bytes DST;
   }
 

@@ -44,11 +44,11 @@ abstract contract CryptoUtils is HoprCrypto, SECP2561k {
         params.v_y = v_y;
       }
 
-      uint256 r = HoprCrypto.hash_to_scalar(abi.encodePacked(privKey, b_x, b_y, payload.message), payload.DST);
+      uint256 r = HoprCrypto.hashToScalar(abi.encodePacked(privKey, b_x, b_y, payload.message), payload.DST);
 
       (uint256 b_r_x, uint256 b_r_y) = SECP2561k.ecmul(b_x,b_y, r);
 
-      params.h = HoprCrypto.hash_to_scalar(abi.encodePacked(
+      params.h = HoprCrypto.hashToScalar(abi.encodePacked(
         payload.signer,
         params.v_x,
         params.v_y,
