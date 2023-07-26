@@ -5,6 +5,7 @@ on:
   pull_request:
     types:
       - synchronize
+      - ready_for_review
 concurrency:
   group: ${{ github.head_ref }}-build
   cancel-in-progress: true
