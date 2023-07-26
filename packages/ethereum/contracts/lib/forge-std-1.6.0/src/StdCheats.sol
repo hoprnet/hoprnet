@@ -5,10 +5,12 @@ pragma experimental ABIEncoderV2;
 
 import {StdStorage, stdStorage} from "./StdStorage.sol";
 import {Vm} from "./Vm.sol";
-import {console2} from "./console2.sol";
 
 abstract contract StdCheatsSafe {
     Vm private constant vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
+
+    uint256 private constant UINT256_MAX =
+        115792089237316195423570985008687907853269984665640564039457584007913129639935;
 
     bool private gasMeteringOff;
 
@@ -194,14 +196,22 @@ abstract contract StdCheatsSafe {
         uint256 key;
     }
 
+    enum AddressType {
+        Payable,
+        NonPayable,
+        ZeroAddress,
+        Precompile,
+        ForgeAddress
+    }
+
     // Checks that `addr` is not blacklisted by token contracts that have a blacklist.
-    function assumeNoBlacklisted(address token, address addr) internal virtual {
+    function assumeNotBlacklisted(address token, address addr) internal view virtual {
         // Nothing to check if `token` is not a contract.
         uint256 tokenCodeSize;
         assembly {
             tokenCodeSize := extcodesize(token)
         }
-        require(tokenCodeSize > 0, "StdCheats assumeNoBlacklisted(address,address): Token address is not a contract.");
+        require(tokenCodeSize > 0, "StdCheats assumeNotBlacklisted(address,address): Token address is not a contract.");
 
         bool success;
         bytes memory returnData;
@@ -215,16 +225,99 @@ abstract contract StdCheatsSafe {
         vm.assume(!success || abi.decode(returnData, (bool)) == false);
     }
 
-    function assumeNoPrecompiles(address addr) internal virtual {
-        // Assembly required since `block.chainid` was introduced in 0.8.0.
-        uint256 chainId;
-        assembly {
-            chainId := chainid()
-        }
-        assumeNoPrecompiles(addr, chainId);
+    // Checks that `addr` is not blacklisted by token contracts that have a blacklist.
+    // This is identical to `assumeNotBlacklisted(address,address)` but with a different name, for
+    // backwards compatibility, since this name was used in the original PR which has already has
+    // a release. This function can be removed in a future release once we want a breaking change.
+    function assumeNoBlacklisted(address token, address addr) internal view virtual {
+        assumeNotBlacklisted(token, addr);
     }
 
-    function assumeNoPrecompiles(address addr, uint256 chainId) internal pure virtual {
+    function assumeAddressIsNot(address addr, AddressType addressType) internal virtual {
+        if (addressType == AddressType.Payable) {
+            assumeNotPayable(addr);
+        } else if (addressType == AddressType.NonPayable) {
+            assumePayable(addr);
+        } else if (addressType == AddressType.ZeroAddress) {
+            assumeNotZeroAddress(addr);
+        } else if (addressType == AddressType.Precompile) {
+            assumeNotPrecompile(addr);
+        } else if (addressType == AddressType.ForgeAddress) {
+            assumeNotForgeAddress(addr);
+        }
+    }
+
+    function assumeAddressIsNot(address addr, AddressType addressType1, AddressType addressType2) internal virtual {
+        assumeAddressIsNot(addr, addressType1);
+        assumeAddressIsNot(addr, addressType2);
+    }
+
+    function assumeAddressIsNot(
+        address addr,
+        AddressType addressType1,
+        AddressType addressType2,
+        AddressType addressType3
+    ) internal virtual {
+        assumeAddressIsNot(addr, addressType1);
+        assumeAddressIsNot(addr, addressType2);
+        assumeAddressIsNot(addr, addressType3);
+    }
+
+    function assumeAddressIsNot(
+        address addr,
+        AddressType addressType1,
+        AddressType addressType2,
+        AddressType addressType3,
+        AddressType addressType4
+    ) internal virtual {
+        assumeAddressIsNot(addr, addressType1);
+        assumeAddressIsNot(addr, addressType2);
+        assumeAddressIsNot(addr, addressType3);
+        assumeAddressIsNot(addr, addressType4);
+    }
+
+    // This function checks whether an address, `addr`, is payable. It works by sending 1 wei to
+    // `addr` and checking the `success` return value.
+    // NOTE: This function may result in state changes depending on the fallback/receive logic
+    // implemented by `addr`, which should be taken into account when this function is used.
+    function _isPayable(address addr) private returns (bool) {
+        require(
+            addr.balance < UINT256_MAX,
+            "StdCheats _isPayable(address): Balance equals max uint256, so it cannot receive any more funds"
+        );
+        uint256 origBalanceTest = address(this).balance;
+        uint256 origBalanceAddr = address(addr).balance;
+
+        vm.deal(address(this), 1);
+        (bool success,) = payable(addr).call{value: 1}("");
+
+        // reset balances
+        vm.deal(address(this), origBalanceTest);
+        vm.deal(addr, origBalanceAddr);
+
+        return success;
+    }
+
+    // NOTE: This function may result in state changes depending on the fallback/receive logic
+    // implemented by `addr`, which should be taken into account when this function is used. See the
+    // `_isPayable` method for more information.
+    function assumePayable(address addr) internal virtual {
+        vm.assume(_isPayable(addr));
+    }
+
+    function assumeNotPayable(address addr) internal virtual {
+        vm.assume(!_isPayable(addr));
+    }
+
+    function assumeNotZeroAddress(address addr) internal pure virtual {
+        vm.assume(addr != address(0));
+    }
+
+    function assumeNotPrecompile(address addr) internal pure virtual {
+        assumeNotPrecompile(addr, _pureChainId());
+    }
+
+    function assumeNotPrecompile(address addr, uint256 chainId) internal pure virtual {
         // Note: For some chains like Optimism these are technically predeploys (i.e. bytecode placed at a specific
         // address), but the same rationale for excluding them applies so we include those too.
 
@@ -245,6 +338,11 @@ abstract contract StdCheatsSafe {
             vm.assume(addr < address(0x0300000000000000000000000000000000000000) || addr > address(0x03000000000000000000000000000000000000Ff));
         }
         // forgefmt: disable-end
+    }
+
+    function assumeNotForgeAddress(address addr) internal pure virtual {
+        // vm and console addresses
+        vm.assume(addr != address(vm) || addr != 0x000000000000000000636F6e736F6c652e6c6f67);
     }
 
     function readEIP1559ScriptArtifact(string memory path)
@@ -510,11 +608,26 @@ abstract contract StdCheatsSafe {
         }
     }
 
-    // a cheat for fuzzing addresses that are payable only
-    // see https://github.com/foundry-rs/foundry/issues/3631
-    function assumePayable(address addr) internal virtual {
-        (bool success,) = payable(addr).call{value: 0}("");
-        vm.assume(success);
+    // We use this complex approach of `_viewChainId` and `_pureChainId` to ensure there are no
+    // compiler warnings when accessing chain ID in any solidity version supported by forge-std. We
+    // can't simply access the chain ID in a normal view or pure function because the solc View Pure
+    // Checker changed `chainid` from pure to view in 0.8.0.
+    function _viewChainId() private view returns (uint256 chainId) {
+        // Assembly required since `block.chainid` was introduced in 0.8.0.
+        assembly {
+            chainId := chainid()
+        }
+
+        address(this); // Silence warnings in older Solc versions.
+    }
+
+    function _pureChainId() private pure returns (uint256 chainId) {
+        function() internal view returns (uint256) fnIn = _viewChainId;
+        function() internal pure returns (uint256) pureChainId;
+        assembly {
+            pureChainId := fnIn
+        }
+        chainId = pureChainId();
     }
 }
 
@@ -672,5 +785,21 @@ abstract contract StdCheats is StdCheatsSafe {
 
         // update owner
         stdstore.target(token).sig(0x6352211e).with_key(id).checked_write(to);
+    }
+
+    function deployCodeTo(string memory what, address where) internal virtual {
+        deployCodeTo(what, "", 0, where);
+    }
+
+    function deployCodeTo(string memory what, bytes memory args, address where) internal virtual {
+        deployCodeTo(what, args, 0, where);
+    }
+
+    function deployCodeTo(string memory what, bytes memory args, uint256 value, address where) internal virtual {
+        bytes memory creationCode = vm.getCode(what);
+        vm.etch(where, abi.encodePacked(creationCode, args));
+        (bool success, bytes memory runtimeBytecode) = where.call{value: value}("");
+        require(success, "StdCheats deployCodeTo(string,bytes,uint256,address): Failed to create runtime bytecode.");
+        vm.etch(where, runtimeBytecode);
     }
 }

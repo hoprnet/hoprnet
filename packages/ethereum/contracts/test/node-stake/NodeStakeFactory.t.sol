@@ -153,8 +153,28 @@ contract HoprNodeManagementModuleTest is Test, SafeSingletonFixtureTest {
         vm.clearMockedCalls();
     }
 
-    function testRevert_CloneButFailToInitializeWithAddressZero(uint256 nonce, address safeAddr, address multisendAddr) public {
-        vm.assume(safeAddr == address(0) || multisendAddr == address(0));
+    function testRevert_CloneButFailToInitializeWithSafeAddressZero(uint256 nonce, address multisendAddr) public {
+        vm.assume(multisendAddr != address(0));
+
+        address safeAddr = address(0);
+
+        bytes32 salt = keccak256(abi.encodePacked(msg.sender, nonce));
+        // 1. Deploy node management module
+        address moduleProxy = address(moduleSingleton).cloneDeterministic(salt);
+
+        // initialize module proxy with invalid variables
+        vm.expectRevert(HoprCapabilityPermissions.AddressIsZero.selector);
+        // add Safe and multisend to the module
+        bytes memory moduleInitializer = abi.encodeWithSignature("initialize(bytes)", abi.encode(safeAddr, multisendAddr));
+        moduleProxy.call(moduleInitializer);
+        vm.clearMockedCalls();
+    }
+
+    function testRevert_CloneButFailToInitializeWithMultisendAddressZero(uint256 nonce, address safeAddr) public {
+        vm.assume(safeAddr != address(0));
+
+        address multisendAddr = address(0);
+
         bytes32 salt = keccak256(abi.encodePacked(msg.sender, nonce));
         // 1. Deploy node management module
         address moduleProxy = address(moduleSingleton).cloneDeterministic(salt);

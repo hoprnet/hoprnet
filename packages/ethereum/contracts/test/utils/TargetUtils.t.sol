@@ -118,7 +118,7 @@ contract TargetUtilsTest is Test {
 
     function testRevert_GetDefaultPermissionAt(uint256 offset) public {
         offset = bound(offset, 1, 1e36);
-        
+
         uint256 position = targetUtilsMock.getNumCapabilityPermissions() + offset;
         vm.expectRevert(TooManyCapabilities.selector);
         targetUtilsMock.getDefaultCapabilityPermissionAt(position);
@@ -134,7 +134,7 @@ contract TargetUtilsTest is Test {
     ) public {
         // bound target type
         asTargetType = uint8(bound(asTargetType, uint256(type(TargetType).min), uint256(type(TargetType).max)));
-        TargetType newTargetType = TargetType(asTargetType); 
+        TargetType newTargetType = TargetType(asTargetType);
         // get valid target
         (uint8 boundClearance, uint8 boundTargetType, uint8 boundTargetPermission, uint8[] memory boundFunctionPermissions) = _helperCreateValidTarget(targetAddress, clearance, targetType, targetPermission, functionPermissions);
         // force write
@@ -142,7 +142,7 @@ contract TargetUtilsTest is Test {
         TargetUtilsMock newTargetUtilsMock = new TargetUtilsMock();
         newTargetUtilsMock.setTarget(Target.unwrap(newTarget));
 
-        // verify invariant state updates 
+        // verify invariant state updates
         assertEq(newTargetUtilsMock.getTargetAddress(), targetUtilsMock.getTargetAddress());
         assertEq(uint8(newTargetUtilsMock.getTargetClearance()), uint8(targetUtilsMock.getTargetClearance()));
         assertEq(uint8(newTargetUtilsMock.getDefaultTargetPermission()), uint8(targetUtilsMock.getDefaultTargetPermission()));
@@ -184,7 +184,7 @@ contract TargetUtilsTest is Test {
         uint8 targetType,
         uint8 targetPermission,
         uint8[] memory functionPermissions
-    ) public {     
+    ) public {
         (uint8 boundClearance, uint8 boundTargetType, uint8 boundTargetPermission, uint8[] memory boundFunctionPermissions) = _helperCreateValidTarget(targetAddress, clearance, targetType, targetPermission, functionPermissions);
         // evaluate that target equals
         assertEq(targetUtilsMock.getTargetAddress(), targetAddress);
@@ -203,7 +203,6 @@ contract TargetUtilsTest is Test {
         uint8 targetPermission,
         uint8[] memory functionPermissions
     ) public {
-        
         vm.assume(functionPermissions.length > targetUtilsMock.getNumCapabilityPermissions());
         // bound to each enum type
         CapabilityPermission[] memory funcPermissions = new CapabilityPermission[](functionPermissions.length);
@@ -218,10 +217,10 @@ contract TargetUtilsTest is Test {
         vm.expectRevert(TooManyCapabilities.selector);
         // get the target
         targetUtilsMock.encodeDefaultPermissions(
-            targetAddress, 
-            Clearance(clearance), 
-            TargetType(targetType), 
-            TargetPermission(targetPermission), 
+            targetAddress,
+            Clearance(clearance),
+            TargetType(targetType),
+            TargetPermission(targetPermission),
             funcPermissions
         );
     }
@@ -277,7 +276,7 @@ contract TargetUtilsTest is Test {
     function testFuzz_ConvertFunctionToTargetPermissions(uint8 functionPermissionVal) public {
         functionPermissionVal = uint8(bound(functionPermissionVal, uint256(type(CapabilityPermission).min), uint256(type(CapabilityPermission).max)));
         vm.assume(functionPermissionVal != 0);
-        
+
         TargetPermission targetPermission = targetUtilsMock.convertFunctionToTargetPermission(CapabilityPermission(functionPermissionVal));
         assertEq(uint8(targetPermission), functionPermissionVal - 1);
     }
@@ -309,7 +308,7 @@ contract TargetUtilsTest is Test {
     ){
         // otherwise revert
         vm.assume(functionPermissions.length <= targetUtilsMock.getNumCapabilityPermissions());
-   
+
         // bound to each enum type
         boundFunctionPermissions = new uint8[](functionPermissions.length);
         CapabilityPermission[] memory funcPermissions = new CapabilityPermission[](functionPermissions.length);
@@ -323,10 +322,10 @@ contract TargetUtilsTest is Test {
 
         // get the target
         Target target = targetUtilsMock.encodeDefaultPermissions(
-            targetAddress, 
-            Clearance(boundClearance), 
-            TargetType(boundTargetType), 
-            TargetPermission(boundTargetPermission), 
+            targetAddress,
+            Clearance(boundClearance),
+            TargetType(boundTargetType),
+            TargetPermission(boundTargetPermission),
             funcPermissions
         );
         // set to mock

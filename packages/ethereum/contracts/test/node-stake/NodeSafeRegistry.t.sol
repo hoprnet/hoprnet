@@ -3,6 +3,7 @@ pragma solidity >=0.8.0 <0.9.0;
 
 import '../../src/node-stake/NodeSafeRegistry.sol';
 import 'forge-std/Test.sol';
+import 'forge-std/StdCheats.sol';
 
 contract HoprNodeSafeRegistryTest is Test {
     // to alter the storage
@@ -20,7 +21,7 @@ contract HoprNodeSafeRegistryTest is Test {
     event DergisteredNodeSafe(address indexed safeAddress, address indexed nodeAddress);
 
     function setUp() public {
-        safe = vm.addr(101); // make make address(101) a caller
+        safe = vm.addr(101); // make address(101) a caller
         nodeSafeRegistry = new HoprNodeSafeRegistry();
     }
 
@@ -28,8 +29,9 @@ contract HoprNodeSafeRegistryTest is Test {
      * @dev node can actively register a node
      */
     function testFuzz_RegisterSafeByNode(address safeAddress, address nodeAddress) public {
-        vm.assume(safeAddress != address(0));
-        vm.assume(nodeAddress != address(0));
+        _assumeNotZeroAndNotForgeAddress(safeAddress);
+        _assumeNotZeroAndNotForgeAddress(nodeAddress);
+
         _helperMockSafe(safeAddress, nodeAddress, true, true);
         vm.prank(nodeAddress);
         vm.expectEmit(true, true, false, false, address(nodeSafeRegistry));
@@ -43,7 +45,8 @@ contract HoprNodeSafeRegistryTest is Test {
      */
     function testFuzz_RegisterSafeWithNodeSig(uint256 nodePrivateKey, address safeAddress) public {
         nodePrivateKey = bound(nodePrivateKey, 1, 1e36);
-        vm.assume(safeAddress != address(0));
+        _assumeNotZeroAndNotForgeAddress(safeAddress);
+
         HoprNodeSafeRegistry.NodeSafe memory nodeSafe = HoprNodeSafeRegistry.NodeSafe(safeAddress, vm.addr(nodePrivateKey));
 
         (address nodeAddress, bytes memory sig) = _helperBuildSig(nodePrivateKey,nodeSafe);
@@ -60,8 +63,9 @@ contract HoprNodeSafeRegistryTest is Test {
      * @dev node fail to register a node due to it's registered
      */
     function testRevert_FailToRegisterSafeByNodeDueToRegistered(address safeAddress, address nodeAddress) public {
-        vm.assume(safeAddress != address(0));
-        vm.assume(nodeAddress != address(0));
+        _assumeNotZeroAndNotForgeAddress(safeAddress);
+        _assumeNotZeroAndNotForgeAddress(nodeAddress);
+
         _helperMockSafe(safeAddress, nodeAddress, true, true);
 
         vm.store(
@@ -79,7 +83,8 @@ contract HoprNodeSafeRegistryTest is Test {
      * @dev node fail to register a node due to the provided safe address is zero
      */
     function testRevert_FailToRegisterSafeByNodeDueToSafeAddressZero(address nodeAddress) public {
-        vm.assume(nodeAddress != address(0));
+        _assumeNotZeroAndNotForgeAddress(nodeAddress);
+
         address safeAddress = address(0);
         _helperMockSafe(safeAddress, nodeAddress, true, true);
 
@@ -98,7 +103,8 @@ contract HoprNodeSafeRegistryTest is Test {
      * @dev node fail to register a node due to the provided node address is zero
      */
     function testRevert_FailToRegisterSafeByNodeDueToNodeAddressZero(address safeAddress) public {
-        vm.assume(safeAddress != address(0));
+        _assumeNotZeroAndNotForgeAddress(safeAddress);
+
         address nodeAddress = address(0);
         _helperMockSafe(safeAddress, nodeAddress, true, true);
 
@@ -117,8 +123,9 @@ contract HoprNodeSafeRegistryTest is Test {
      * @dev node fail to register a node due to node and safe addresses are random
      */
     function testRevert_FailToRegisterSafeByNodeDueToNotSafeOwnerNorNode(address safeAddress, address nodeAddress) public {
-        vm.assume(safeAddress != address(0));
-        vm.assume(nodeAddress != address(0));
+        _assumeNotZeroAndNotForgeAddress(safeAddress);
+        _assumeNotZeroAndNotForgeAddress(nodeAddress);
+
         _helperMockSafe(safeAddress, nodeAddress, false, false);
 
         vm.store(
@@ -133,11 +140,12 @@ contract HoprNodeSafeRegistryTest is Test {
     }
 
     /**
-     * @dev safe can deregster a node by the safe
+     * @dev safe can deregister a node by the safe
      */
     function testFuzz_DeregisterNodeBySafe(address safeAddress, address nodeAddress) public {
-        vm.assume(safeAddress != address(0));
-        vm.assume(nodeAddress != address(0));
+        _assumeNotZeroAndNotForgeAddress(safeAddress);
+        _assumeNotZeroAndNotForgeAddress(nodeAddress);
+
         _helperMockSafe(safeAddress, nodeAddress, true, true);
 
         vm.prank(nodeAddress);
@@ -154,8 +162,12 @@ contract HoprNodeSafeRegistryTest is Test {
      * @dev cannot deregister a random address
      */
     function testRevert_DeregisterNodeBySafeDueToNotValidSafe(address safeAddress, address nodeAddress) public {
-        vm.assume(safeAddress != address(0));
+        _assumeNotZeroAndNotForgeAddress(safeAddress);
+        _assumeNotZeroAndNotForgeAddress(nodeAddress);
+        vm.assume(safeAddress != address(1));
+
         _helperMockSafe(safeAddress, nodeAddress, true, true);
+
         vm.prank(nodeAddress);
         nodeSafeRegistry.registerSafeByNode(safeAddress);
 
@@ -164,9 +176,11 @@ contract HoprNodeSafeRegistryTest is Test {
             bytes32(stdstore.target(address(nodeSafeRegistry)).sig('nodeToSafe(address)').with_key(nodeAddress).find()),
             bytes32(abi.encode(address(1)))
         );
+
         vm.prank(safeAddress);
         vm.expectRevert(NotValidSafe.selector);
         nodeSafeRegistry.deregisterNodeBySafe(nodeAddress);
+
         vm.clearMockedCalls();
     }
 
@@ -175,9 +189,9 @@ contract HoprNodeSafeRegistryTest is Test {
      * @dev mock return of module
      */
     function _helperMockSafe(
-        address safeAddress, 
-        address nodeAddress, 
-        bool isModuleSet, 
+        address safeAddress,
+        address nodeAddress,
+        bool isModuleSet,
         bool isNodeIncluded
     ) private {
         // modules
@@ -228,5 +242,12 @@ contract HoprNodeSafeRegistryTest is Test {
         assertEq(recovered, nodeAddress);
 
         return (nodeAddress, sig);
+    }
+
+    function _assumeNotZeroAndNotForgeAddress(address addr) internal pure virtual {
+        vm.assume(addr != address(0));
+        // vm and console addresses
+        vm.assume(addr != address(vm));
+        vm.assume(addr != 0x000000000000000000636F6e736F6c652e6c6f67);
     }
 }

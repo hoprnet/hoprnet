@@ -36,7 +36,7 @@ contract HoprNodeSafeRegistry {
   }
 
   // Currently deployed version, starting with 1.0.0
-  string public constant version = '1.0.0';
+  string public constant VERSION = '1.0.0';
 
   bytes32 public immutable domainSeparator;
   mapping(address => address) public nodeToSafe;
@@ -57,7 +57,7 @@ contract HoprNodeSafeRegistry {
       abi.encode(
         keccak256('EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)'),
         keccak256(bytes('NodeStakeRegistry')),
-        keccak256(bytes(version)),
+        keccak256(bytes(VERSION)),
         block.chainid,
         address(this)
       )

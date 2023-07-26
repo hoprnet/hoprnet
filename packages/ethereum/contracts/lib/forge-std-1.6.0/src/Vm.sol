@@ -10,6 +10,14 @@ pragma experimental ABIEncoderV2;
 // 3. Otherwise you're `pure`.
 
 interface VmSafe {
+    enum CallerMode {
+        None,
+        Broadcast,
+        RecurrentBroadcast,
+        Prank,
+        RecurrentPrank
+    }
+
     struct Log {
         bytes32[] topics;
         bytes data;
@@ -108,7 +116,7 @@ interface VmSafe {
     // Labels an address in call traces
     function label(address account, string calldata newLabel) external;
     // Gets the label for the specified address
-    function getLabel(address account) external returns (string memory label);
+    function getLabel(address account) external returns (string memory currentLabel);
     // Using the address that calls the test contract, has the next call (at this call depth only) create a transaction that can later be signed and sent onchain
     function broadcast() external;
     // Has the next call (at this call depth only) create a transaction with the address provided as the sender that can later be signed and sent onchain
@@ -380,10 +388,14 @@ interface Vm is VmSafe {
     function startPrank(address msgSender, address txOrigin) external;
     // Resets subsequent calls' msg.sender to be `address(this)`
     function stopPrank() external;
+    // Reads the current `msg.sender` and `tx.origin` from state and reports if there is any active caller modification
+    function readCallers() external returns (CallerMode callerMode, address msgSender, address txOrigin);
     // Sets an address' balance
     function deal(address account, uint256 newBalance) external;
     // Sets an address' code
     function etch(address target, bytes calldata newRuntimeBytecode) external;
+    // Marks a test as skipped. Must be called at the top of the test.
+    function skip(bool skipTest) external;
     // Expects an error on next call
     function expectRevert(bytes calldata revertData) external;
     function expectRevert(bytes4 revertData) external;
