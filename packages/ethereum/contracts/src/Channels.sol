@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.19;
 
-import 'openzeppelin-contracts-4.8.3/utils/Multicall.sol';
-import 'openzeppelin-contracts-4.8.3/utils/introspection/IERC1820Registry.sol';
-import 'openzeppelin-contracts-4.8.3/utils/introspection/ERC1820Implementer.sol';
-import 'openzeppelin-contracts-4.8.3/token/ERC20/IERC20.sol';
-import 'openzeppelin-contracts-4.8.3/token/ERC777/IERC777Recipient.sol';
-import 'openzeppelin-contracts-4.8.3/utils/cryptography/ECDSA.sol';
+import 'openzeppelin-contracts/utils/Multicall.sol';
+import 'openzeppelin-contracts/utils/introspection/IERC1820Registry.sol';
+import 'openzeppelin-contracts/utils/introspection/ERC1820Implementer.sol';
+import 'openzeppelin-contracts/token/ERC20/IERC20.sol';
+import 'openzeppelin-contracts/token/ERC777/IERC777Recipient.sol';
+import 'openzeppelin-contracts/utils/cryptography/ECDSA.sol';
+import './interfaces/INodeSafeRegistry.sol';
 
 error InvalidBalance();
 error BalanceExceedsGlobalPerChannelAllowance();
@@ -22,6 +23,8 @@ error InvalidCommitmentOpening();
 error InsufficientChannelBalance();
 error InvalidCommitment();
 error TicketIsNotAWin();
+error WrongSafeNodePair();
+error UnusedSafeNodePair();
 
 /**
  *    &&&&
@@ -72,7 +75,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     abi.encode(address(0), Balance.wrap(0), address(0), Balance.wrap(0)).length;
 
   // ERC-777 tokensReceived hook, fundChannel
-  uint256 public immutable FUND_CHANNEL_SIZE =  abi.encode(address(0)).length;
+  uint256 public immutable FUND_CHANNEL_SIZE =  abi.encode(address(0), address(0)).length;
 
   string public constant version = '2.0.0';
 
@@ -164,6 +167,11 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
   IERC20 public immutable token;
 
   /**
+   * Contract that stores the node-safe registry
+   */
+  IHoprNodeSafeRegistry public immutable nodeSafeRegistry;
+
+  /**
    * Notice period before fund from an outgoing channel can be pulled out.
    */
   Timestamp public immutable noticePeriodChannelClosure; // in seconds
@@ -213,9 +221,14 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
 
   /**
    * @param _token HoprToken address
+   * @param _nodeSafeRegistry address of the global registry of node and safe
    * @param _noticePeriodChannelClosure seconds until a channel can be closed
    */
-  constructor(address _token, Timestamp _noticePeriodChannelClosure) {
+  constructor(
+    address _token,
+    address _nodeSafeRegistry,
+    Timestamp _noticePeriodChannelClosure
+  ) {
     if (Timestamp.unwrap(_noticePeriodChannelClosure) == 0) {
       revert InvalidNoticePeriod();
     }
@@ -223,6 +236,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     require(_token != address(0), 'token must not be empty');
 
     token = IERC20(_token);
+    nodeSafeRegistry = IHoprNodeSafeRegistry(_nodeSafeRegistry);
     noticePeriodChannelClosure = _noticePeriodChannelClosure;
     _ERC1820_REGISTRY.setInterfaceImplementer(address(this), TOKENS_RECIPIENT_INTERFACE_HASH, address(this));
 
@@ -237,13 +251,19 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     );
   }
 
-  modifier onlySafe() {
+  modifier onlySafe(address node) {
     // check if NodeSafeRegistry entry exists
+    if (nodeSafeRegistry.nodeToSafe(node) != msg.sender) {
+      revert WrongSafeNodePair();
+    }
     _;
   }
 
-  modifier noSafeSet() {
+  modifier noSafeSet(address node) {
     // check if NodeSafeRegistry entry **does not** exist
+    if (nodeSafeRegistry.nodeToSafe(node) != address(0)) {
+      revert UnusedSafeNodePair();
+    }
     _;
   }
 
@@ -285,6 +305,62 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
   }
 
   /**
+   * Fund an outgoing channel
+   * Used in channel operation with Safe
+   *
+   * @param self address of the source
+   * @param account address of the destination
+   * @param amount amount to fund for channel
+   */
+  function fundChannelSafe(
+    address self,
+    address account,
+    Balance amount
+  ) external onlySafe(self) {
+    _fundChannelInternal(self, account, amount);
+  }
+
+  /**
+   * Fund an outgoing channel by a node
+   * @param self address of the source
+   * @param account address of the destination
+   * @param amount amount to fund for channel
+   */
+  function fundChannel(
+    address self,
+    address account,
+    Balance amount
+  ) external noSafeSet(msg.sender) {
+    _fundChannelInternal(msg.sender, account, amount);
+  }
+
+  /**
+   * @dev Internal function to fund an outgoing channel from self to account with amount token
+   * @notice only balance above zero can execute
+   *
+   * @param self source address
+   * @param account destination address
+   * @param amount token amount
+   */
+  function _fundChannelInternal(
+    address self,
+    address account,
+    Balance amount
+  ) internal {
+    // pull tokens from funder and handle result
+    if (token.transferFrom(msg.sender, address(this), Balance.unwrap(amount)) != true) {
+      // sth. went wrong, we need to revert here
+      revert TokenTransferFailed();
+    }
+
+    if (Balance.unwrap(amount) == 0) {
+      revert InvalidBalance();
+    }
+
+    _fundChannel(self, account, amount);
+  }
+
+  /**
    * Funds and thereby opens a channel from
    * - `account1` -> `account2` with `amount1` tokens
    * - `account2` -> `account1` with `amount2` tokens
@@ -322,11 +398,11 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     }
   }
 
-  function redeemTicketSafe(address self, RedeemableTicket calldata redeemable) external onlySafe {
+  function redeemTicketSafe(address self, RedeemableTicket calldata redeemable) external onlySafe(self) {
     _redeemTicketInternal(self, redeemable);
   }
 
-  function redeemTicket(RedeemableTicket calldata redeemable) external noSafeSet {
+  function redeemTicket(RedeemableTicket calldata redeemable) external noSafeSet(msg.sender) {
     _redeemTicketInternal(msg.sender, redeemable);
   }
 
@@ -406,11 +482,11 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     emit TicketRedeemed(redeemable.data.channelId, redeemable.data.index);
   }
 
-  function initiateOutgoingChannelClosureSafe(address self, address destination) external onlySafe {
+  function initiateOutgoingChannelClosureSafe(address self, address destination) external onlySafe(self) {
     _initiateOutgoingChannelClosureInternal(self, destination);
   }
 
-  function initiateOutgoingChannelClosure(address destination) external noSafeSet {
+  function initiateOutgoingChannelClosure(address destination) external noSafeSet(msg.sender) {
     _initiateOutgoingChannelClosureInternal(msg.sender, destination);
   }
 
@@ -441,11 +517,11 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     emit OutgoingChannelClosureInitiated(channelId, channel.closureTime);
   }
 
-  function closeIncomingChannelSafe(address self, address source) external onlySafe {
+  function closeIncomingChannelSafe(address self, address source) external onlySafe(self) {
     _closeIncomingChannelInternal(self, source);
   }
 
-  function closeIncomingChannel(address source) external noSafeSet {
+  function closeIncomingChannel(address source) external noSafeSet(msg.sender) {
     _closeIncomingChannelInternal(msg.sender, source);
   }
 
@@ -487,11 +563,11 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     channel.balance = Balance.wrap(0);
   }
 
-  function finalizeOutgoingChannelClosureSafe(address self, address destination) external onlySafe {
+  function finalizeOutgoingChannelClosureSafe(address self, address destination) external onlySafe(self) {
     _finalizeOutgoingChannelClosureInternal(self, destination);
   }
 
-  function finalizeOutgoingChannelClosure(address destination) external noSafeSet {
+  function finalizeOutgoingChannelClosure(address destination) external noSafeSet(msg.sender) {
     _finalizeOutgoingChannelClosureInternal(msg.sender, destination);
   }
 
@@ -534,11 +610,11 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
     channel.balance = Balance.wrap(0);
   }
 
-  function setCommitmentSafe(address self, bytes32 newCommitment, address source) external onlySafe {
+  function setCommitmentSafe(address self, address source, bytes32 newCommitment) external onlySafe(self) {
     _setCommitmentInternal(self, newCommitment, source);
   }
 
-  function setCommitment(bytes32 newCommitment, address source) external noSafeSet {
+  function setCommitment(bytes32 newCommitment, address source) external noSafeSet(msg.sender) {
     _setCommitmentInternal(msg.sender, newCommitment, source);
   }
 
@@ -592,7 +668,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
    */
   function tokensReceived(
     address,
-    address,
+    address from,
     address to,
     uint256 amount,
     bytes calldata userData,
@@ -604,11 +680,24 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall {
 
     // Opens an outgoing channel
     if (userData.length == FUND_CHANNEL_SIZE) {
+      address src;
       address dest;
 
-      (dest) = abi.decode(userData, (address));
+      (src, dest) = abi.decode(userData, (address, address));
 
-      _fundChannel(msg.sender, dest, Balance.wrap(uint96(amount)));
+      // skip the check between `from` and `src` on node-safe registry
+      if (from == src) {
+        // node if opening an outgoing channel
+        if (nodeSafeRegistry.nodeToSafe(src) != address(0)) {
+          revert UnusedSafeNodePair();
+        }
+      } else {
+        if (nodeSafeRegistry.nodeToSafe(src) != from) {
+          revert WrongSafeNodePair();
+        }
+      }
+
+      _fundChannel(src, dest, Balance.wrap(uint96(amount)));
     // Opens two channels, donating msg.sender's tokens
     } else if (userData.length == FUND_CHANNEL_MULTI_SIZE) {
       address account1;

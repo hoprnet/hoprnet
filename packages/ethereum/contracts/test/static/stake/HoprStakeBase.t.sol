@@ -4,6 +4,7 @@ pragma solidity >=0.6.0 <0.9.0;
 import '../../../src/static/stake/HoprStakeBase.sol';
 import '../../utils/ERC1820Registry.sol';
 import 'forge-std/Test.sol';
+import 'forge-std/StdCheats.sol';
 
 contract HoprStakeBaseTest is Test, ERC1820RegistryFixtureTest {
   // to alter the storage
@@ -574,8 +575,10 @@ contract HoprStakeBaseTest is Test, ERC1820RegistryFixtureTest {
    */
   function test_reclaimErc20Tokens(address tokenAddr) public {
     vm.assume(tokenAddr != nftAddress);
-    vm.assume(tokenAddr != 0x7109709ECfa91a80626fF3989D68f67F5b1DD12D); // not from the cheatsheet address
+    vm.assume(tokenAddr != address(vm));
+    vm.assume(tokenAddr != 0x000000000000000000636F6e736F6c652e6c6f67); // console precompile
     vm.assume(tokenAddr != lockToken); // will mock the lockToken case below
+
     // hoprStakeBase has 1 ether of locked token
     uint256 lockedSlot = stdstore.target(address(hoprStakeBase)).sig('totalLocked()').find();
     vm.store(address(hoprStakeBase), bytes32(lockedSlot), bytes32(abi.encode(1 ether)));
@@ -635,7 +638,9 @@ contract HoprStakeBaseTest is Test, ERC1820RegistryFixtureTest {
    */
   function test_reclaimErc721Tokens(address tokenAddr, uint256 tokenId) public {
     vm.assume(tokenAddr != nftAddress);
-    vm.assume(tokenAddr != 0x7109709ECfa91a80626fF3989D68f67F5b1DD12D);
+    vm.assume(tokenAddr != address(vm));
+    vm.assume(tokenAddr != 0x000000000000000000636F6e736F6c652e6c6f67); // console precompile
+
     // hoprStakeBase has the ERC721 token of tokenId
     vm.mockCall(
       address(tokenAddr),
