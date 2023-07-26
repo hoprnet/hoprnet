@@ -574,6 +574,12 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprMu
       revert InvalidTokenRecipient();
     }
 
+    if (userData.length == 0) {
+      // ERC777.tokensReceived() hook got called by `ERC777.send()` or
+      // `ERC777.transferFrom()` which we can ignore at this point
+      return;
+    }
+
     // Opens an outgoing channel
     if (userData.length == ERC777_HOOK_FUND_CHANNEL_SIZE) {
       (address src, address dest) = abi.decode(userData, (address, address));
@@ -624,7 +630,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprMu
     address self,
     address account,
     Balance amount
-  ) external HoprMultiSig.onlySafe(self) {
+  ) external HoprMultiSig.onlySafe(self) validateBalance(amount) validateChannelParties(self, account) {
     // pull tokens from Safe and handle result
     if (token.transferFrom(msg.sender, address(this), Balance.unwrap(amount)) != true) {
       // sth. went wrong, we need to revert here
@@ -642,7 +648,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprMu
   function fundChannel(
     address account,
     Balance amount
-  ) external HoprMultiSig.noSafeSet {
+  ) external HoprMultiSig.noSafeSet validateBalance(amount) validateChannelParties(msg.sender, account) {
     // pull tokens from funder and handle result
     if (token.transferFrom(msg.sender, address(this), Balance.unwrap(amount)) != true) {
       // sth. went wrong, we need to revert here
@@ -664,7 +670,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprMu
     address self,
     address account,
     Balance amount
-  ) internal validateBalance(amount) validateChannelParties(self, account) {
+  ) internal {
     bytes32 channelId = _getChannelId(self, account);
     Channel storage channel = channels[channelId];
 
