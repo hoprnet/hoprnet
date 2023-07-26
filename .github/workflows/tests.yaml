@@ -19,7 +19,6 @@ on:
     paths-ignore:
       - '.processes/**/*'
       - 'docs/**/*'
-      - 'packages/*/docs/**/*'
 concurrency:
   group: ${{ github.head_ref }}-test
   cancel-in-progress: true
