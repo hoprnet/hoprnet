@@ -14,9 +14,9 @@ enum CapabilityPermission { NONE, BLOCK_ALL, SPECIFIC_FALLBACK_BLOCK, SPECIFIC_F
 
 /**
  * @dev it stores the following information in uint256 = (160 + 8 * 12)
- * (address)            as uint160: targetAddress 
- * (Clearance)            as uint8: clearance 
- * (TargetType)           as uint8: targetType 
+ * (address)              as uint160: targetAddress
+ * (Clearance)            as uint8: clearance
+ * (TargetType)           as uint8: targetType
  * (TargetPermission)     as uint8: defaultTargetPermission                                       (for the target)
  * (CapabilityPermission) as uint8: defaultRedeemTicketSafeFunctionPermisson                      (for Channels contract)
  * (CapabilityPermission) as uint8: RESERVED FOR defaultBatchRedeemTicketsSafeFunctionPermisson   (for Channels contract)
@@ -84,7 +84,7 @@ library TargetUtils {
         if (targetType == TargetType.CHANNELS) {
             /**
              remove all the default token function permissions (uint16). Equivalent to
-             updatedTarget = (Target.unwrap(target) >> 16) << 16;  
+             updatedTarget = (Target.unwrap(target) >> 16) << 16;
              updatedTarget &= ~targetTypeMask;
              */
             typeMask = uint256(bytes32(hex"ffffffffffffffffffffffffffffffffffffffffff00ffffffffffffffff0000"));

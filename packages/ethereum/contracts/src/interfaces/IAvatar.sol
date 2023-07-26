@@ -1,6 +1,6 @@
 /**
  * @title Interface for Avatar (Safe)
- * Adapted from `IAvatar.sol` at commit 8a77e7b224af8004bd9f2ff4e2919642e93ffd85, which 
+ * Adapted from `IAvatar.sol` at commit 8a77e7b224af8004bd9f2ff4e2919642e93ffd85, which
  * was audited https://github.com/gnosis/zodiac/tree/master/audits
  * Added an additional function `getOwners()`
  */

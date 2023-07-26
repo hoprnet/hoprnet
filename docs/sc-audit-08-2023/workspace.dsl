@@ -1,6 +1,5 @@
-workspace {
+workspace "HOPR Smart Contracts Audit 08/2023" {
   !docs docs
-  !docs sc-audit-2023
 
     model {
         user = person "User"
