@@ -70,8 +70,9 @@ jobs:
           ./scripts/bump-version.sh ${{ github.event.pull_request.base.ref }} ${{ github.event.pull_request.number }}
           echo "DOCKER_PR_TAG=$(./scripts/get-package-version.sh | sed 's/+/-/' )" >> $GITHUB_ENV
           echo "DOCKER_REGISTRY=europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images" >> $GITHUB_ENV
-      - id: auth
-        name: Set up Google Cloud Credentials
+
+      - name: Set up Google Cloud Credentials
+        id: auth
         uses: google-github-actions/auth@v1
         with:
           token_format: "access_token"

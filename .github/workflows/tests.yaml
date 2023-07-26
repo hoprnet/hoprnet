@@ -29,11 +29,18 @@ jobs:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v3
 
-      - name: Upload logs
-        uses: actions/upload-artifact@v3
+      - name: Set up Google Cloud Credentials
+        id: auth
+        uses: google-github-actions/auth@v1
         with:
-          name: hopr-linux-smoke-test-logs
+          token_format: "access_token"
+          credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+
+      - name: Upload test logs
+        uses: 'google-github-actions/upload-cloud-storage@v1'
+        with:
           path: /runner/_work/hoprnet/hoprnet/scripts
+          destination: hoprnet-test-logs/unit-test
 
   #     - name: Disable sccache (act-only)
   #       if: ${{ env.ACT }}
@@ -166,8 +173,7 @@ jobs:
       - name: Test with pytest
         run: |
           nix develop -c make smoke-test
-        env:
-          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN }}
+        timeout-minutes: 40
 
       - name: Upload logs
         uses: actions/upload-artifact@v3
