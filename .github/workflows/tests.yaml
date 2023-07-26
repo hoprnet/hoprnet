@@ -100,13 +100,6 @@ jobs:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v3
 
-      - name: Set up Google Cloud Credentials
-        id: auth
-        uses: google-github-actions/auth@v1
-        with:
-          token_format: "access_token"
-          credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
-
       - name: Disable sccache (act-only)
         if: ${{ env.ACT }}
         run: |
@@ -167,12 +160,13 @@ jobs:
       - name: Test with pytest
         run: |
           nix develop -c make smoke-test
-        timeout-minutes: 10
+        timeout-minutes: 5
 
       - name: Upload test logs
-        uses: 'google-github-actions/upload-cloud-storage@v1'
-        if: ${{ always() }}
+        uses: actions/upload-artifact@v3
+        if: ${{ always() && runner.os == 'Linux' }}
         with:
+          name: hopr-linux-smoke-test-logs
           path: /tmp/hopr-smoke-test*.log
-          destination: hoprnet-test-logs/pr-${{ github.event.pull_request.number }}/${{ github.run_id }}-${{ github.run_number }}
+
 
