@@ -1,0 +1,52 @@
+
+[advisories]
+ignore = [
+    # https://rustsec.org/advisories/RUSTSEC-2021-0145
+    # 1. On windows, `atty` dereferences a potentially unaligned pointer.
+    # 2. Last release of `atty` was almost 3 years ago.
+    "RUSTSEC-2021-0145",
+
+    # https://rustsec.org/advisories/RUSTSEC-2021-0127
+    # 1. serde_cbor is unmaintained
+    "RUSTSEC-2021-0127"
+]
+notice = "deny"
+unmaintained = "warn"
+vulnerability = "deny"
+yanked = "deny"
+
+[licenses]
+allow = [
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "CC0-1.0",
+    "MIT",
+    "Unicode-DFS-2016",
+]
+default = "deny"
+confidence-threshold = 1.0
+unlicensed = "deny"
+
+[bans]
+allow = []
+deny = []
+# TODO before changing to 'deny':
+#   * Resolve duplicate versions of itoa (used by criterion)
+#   * Remove atty from criterion
+#   * Resolve duplicate versions of constant_time_eq (used by blake2_sid and blake3)
+multiple-versions = "warn"
+skip = []
+skip-tree = []
+wildcards = "warn"
+
+[sources]
+allow-git = []
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+unknown-git = "deny"
+unknown-registry = "deny"
+
+[sources.allow-org]
+github = []
+gitlab = []
+bitbucket = []
