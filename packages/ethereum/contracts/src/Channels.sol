@@ -381,6 +381,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprLe
     spendingChannel.balance = Balance.wrap(
       Balance.unwrap(spendingChannel.balance) - Balance.unwrap(redeemable.data.amount)
     );
+    indexEvent(abi.encodePacked(ChannelBalanceDecreased.selector, redeemable.data.channelId, spendingChannel.balance));
     emit ChannelBalanceDecreased(redeemable.data.channelId, spendingChannel.balance);
 
     bytes32 outgoingChannelId = _getChannelId(self, source);
@@ -395,10 +396,12 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprLe
       earningChannel.balance = Balance.wrap(
         Balance.unwrap(earningChannel.balance) + Balance.unwrap(redeemable.data.amount)
       );
+      indexEvent(abi.encodePacked(ChannelBalanceIncreased.selector, outgoingChannelId, earningChannel.balance));
       emit ChannelBalanceIncreased(outgoingChannelId, earningChannel.balance);
     }
 
     // Informs about new ticketIndex
+    indexEvent(abi.encodePacked(TicketRedeemed.selector, redeemable.data.channelId, spendingChannel.ticketIndex));
     emit TicketRedeemed(redeemable.data.channelId, spendingChannel.ticketIndex);
   }
 
@@ -440,6 +443,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprLe
     channel.status = ChannelStatus.PENDING_TO_CLOSE;
 
     // Inform others at which time the notice period is due
+    indexEvent(abi.encodePacked(OutgoingChannelClosureInitiated.selector, channelId, channel.closureTime));
     emit OutgoingChannelClosureInitiated(channelId, channel.closureTime);
   }
 
@@ -487,6 +491,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprLe
       }
     }
 
+    indexEvent(abi.encodePacked(ChannelClosed.selector, channelId));
     emit ChannelClosed(channelId);
 
     channel.balance = Balance.wrap(0);
@@ -539,6 +544,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprLe
 
     channel.balance = Balance.wrap(0);
 
+    indexEvent(abi.encodePacked(ChannelClosed.selector, channelId));
     emit ChannelClosed(channelId);
   }
 
@@ -690,8 +696,11 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprLe
       channel.ticketIndex = TicketIndex.wrap(0);
 
       channel.status = ChannelStatus.OPEN;
+
+      indexEvent(abi.encodePacked(ChannelOpened.selector, self, account, channel.balance));
       emit ChannelOpened(self, account, channel.balance);
     } else {
+      indexEvent(abi.encodePacked(ChannelBalanceIncreased.selector, channelId, channel.balance));
       emit ChannelBalanceIncreased(channelId, channel.balance);
     }
   }

@@ -19,7 +19,7 @@ pragma solidity 0.8.19;
  * Indexes data trustlessly to allow a fast-sync for nodes in the network.
  **/
 abstract contract HoprLedger {
-  string public constant VERSION = '1.0.0';
+  string public constant LEDGER_VERSION = '1.0.0';
 
   uint256 immutable snapshotInterval;
 
@@ -38,7 +38,7 @@ abstract contract HoprLedger {
 
   RootStruct latestSnapshotRoot;
 
-  bytes32 public domainSeparator;
+  bytes32 public ledgerDomainSeparator;
 
   /**
    * @param _snapshotInterval time in miliseconds to create a new snapshot
@@ -50,37 +50,34 @@ abstract contract HoprLedger {
     latestRoot.rootHash = bytes28(keccak256(abi.encodePacked(address(this))));
     latestRoot.timestamp = uint32(block.timestamp);
 
-    domainSeparator = keccak256(
+    ledgerDomainSeparator = keccak256(
       abi.encode(
         keccak256('EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)'),
         keccak256(bytes('HoprLedger')),
-        keccak256(bytes(VERSION)),
+        keccak256(bytes(LEDGER_VERSION)),
         block.chainid,
         address(this)
       )
     );
   }
 
-  function indexEvent(bytes memory payload) external  {
+  function indexEvent(bytes memory payload) internal  {
     bool createSnapshot = false;
-
-    if (latestRoot.timestamp - uint32(block.timestamp) >= snapshotInterval) {
+    if (block.timestamp > latestRoot.timestamp + snapshotInterval) {
       createSnapshot = true;
     }
 
     // take first 28 bytes
     latestRoot.rootHash = bytes28(keccak256(abi.encode(
       // ledger feed must be unique
-      domainSeparator,
+      ledgerDomainSeparator,
       // Allows the verifier to detect up until which block the snapshot includes state changes
       block.number,
       // Bind result to previous root
       latestRoot.rootHash,
       // Information about the happened state change
-      payload
+      keccak256(payload)
     )));
-
-    latestRoot.timestamp = uint32(block.timestamp);
 
     if (createSnapshot) {
       latestSnapshotRoot = latestRoot;
