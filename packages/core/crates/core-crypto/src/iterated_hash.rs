@@ -5,7 +5,7 @@ use crate::errors::Result;
 use crate::primitives::{DigestLike, EthDigest};
 
 /// Contains the complete hash iteration progression
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct IteratedHash {
     pub hash: Box<[u8]>,
     pub intermediates: Vec<Intermediate>,
@@ -21,7 +21,8 @@ pub struct Intermediate {
 
 /// Performs hash iteration progression from the given seed, the total number of iteration and step size.
 /// The Keccak256 digest is used to perform the hash iteration.
-pub fn iterate_hash(seed: &[u8], iterations: usize, step_size: usize) -> IteratedHash {
+/// As this is potentially a long running function, it is asynchronous and yields at every `step_size` iterations.
+pub async fn iterate_hash(seed: &[u8], iterations: usize, step_size: usize) -> IteratedHash {
     assert!(!seed.is_empty() && step_size > 0 && iterations > step_size);
 
     let mut intermediates: Vec<Intermediate> = Vec::with_capacity(iterations / step_size + 1);
@@ -45,10 +46,10 @@ pub fn iterate_hash(seed: &[u8], iterations: usize, step_size: usize) -> Iterate
                 iteration,
                 intermediate: intermediate.clone(),
             });
+            async_std::task::yield_now().await;
         }
 
         hash.finalize_into(&mut intermediate);
-        // TODO: make this function async and do `async_std::task::yield_now().await` here
     }
 
     IteratedHash {
@@ -110,10 +111,10 @@ mod tests {
     use hex_literal::hex;
     use utils_types::traits::BinarySerializable;
 
-    #[test]
-    fn test_iteration() {
+    #[async_std::test]
+    async fn test_iteration() {
         let seed = [0u8; 16];
-        let final_hash = iterate_hash(&seed, 1000, 10);
+        let final_hash = iterate_hash(&seed, 1000, 10).await;
         assert_eq!(final_hash.intermediates.len(), 100);
 
         let hint = &final_hash.intermediates[98]; // hint is at iteration num. 980
@@ -155,12 +156,7 @@ mod tests {
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use crate::iterated_hash::Intermediate;
-    use js_sys::{Number, Uint8Array};
-    use utils_log::error;
-    use utils_misc::ok_or_jserr;
-    use utils_misc::utils::wasm::JsResult;
     use wasm_bindgen::prelude::wasm_bindgen;
-    use wasm_bindgen::JsValue;
 
     #[wasm_bindgen]
     pub struct IteratedHash {
@@ -180,57 +176,5 @@ pub mod wasm {
         pub fn intermediate(&self, index: usize) -> Option<Intermediate> {
             self.w.intermediates.get(index).cloned()
         }
-    }
-
-    #[wasm_bindgen]
-    pub fn iterate_hash(seed: &[u8], iterations: usize, step_size: usize) -> IteratedHash {
-        IteratedHash {
-            w: super::iterate_hash(seed, iterations, step_size),
-        }
-    }
-
-    #[wasm_bindgen]
-    pub async fn recover_iterated_hash(
-        hash_value: &[u8],
-        hints: &js_sys::Function,
-        max_iterations: usize,
-        step_size: usize,
-        index_hint: Option<usize>,
-    ) -> JsResult<Intermediate> {
-        ok_or_jserr!(
-            super::recover_iterated_hash(
-                hash_value,
-                &|iteration: usize| async move {
-                    match hints
-                        .call1(&JsValue::null(), &Number::from(iteration as u32))
-                        .map(|r| js_sys::Promise::from(r))
-                    {
-                        Ok(promise) => {
-                            let arr = wasm_bindgen_futures::JsFuture::from(promise)
-                                .await
-                                .map(|res| Uint8Array::from(res))
-                                .expect("failed to retrieve iterated hash hint");
-
-                            if !arr.is_undefined() && !arr.is_null() {
-                                Some(arr.to_vec().into_boxed_slice())
-                            } else {
-                                None
-                            }
-                        }
-                        Err(e) => {
-                            error!(
-                                "error while evaluating iterated hash hint: {}",
-                                e.as_string().unwrap_or_else(|| "unknown error".to_owned()).as_str()
-                            );
-                            None
-                        }
-                    }
-                },
-                max_iterations,
-                step_size,
-                index_hint
-            )
-            .await
-        )
     }
 }

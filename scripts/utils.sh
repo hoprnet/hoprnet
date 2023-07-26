@@ -9,7 +9,7 @@ set -Eeuo pipefail
 
 # $1=version string, semver
 function get_version_maj_min() {
-  echo $(get_version_maj_min_pat $1 | cut -d. -f1,2)
+  echo $(get_version_maj_min_pat "$1" | cut -d. -f1,2)
 }
 
 # $1=version string, semver
@@ -79,7 +79,7 @@ function wait_for_port() {
     fi
     sleep "${delay}"
     ((i=i+1))
-    if [ $i -gt ${max_wait} ]; then
+    if [ $i -gt "${max_wait}" ]; then
       exit 1
     fi
   done
@@ -126,7 +126,7 @@ try_cmd() {
     log "Executing command: ${cmd}"
   fi
 
-  if [ ${retries_left} -le 0 ]; then
+  if [ "${retries_left}" -le 0 ]; then
     # no retries left, so we just execute the command as is
     # shellcheck disable=SC2086
     eval ${cmd}
@@ -136,7 +136,7 @@ try_cmd() {
     output_file="$(mktemp -q)"
     rm -f "${output_file}"
     set +Eeo pipefail
-    if eval ${cmd} > ${output_file}; then
+    if eval "${cmd}" > "${output_file}"; then
       # command succeeded, return the output
       set -Eeo pipefail
       result="$(cat "${output_file}")"
@@ -147,11 +147,11 @@ try_cmd() {
       set -Eeo pipefail
       rm -f "${output_file}"
       ((retries_left--))
-      if [ ${wait_in_sec} -gt 0 ]; then
+      if [ "${wait_in_sec}" -gt 0 ]; then
         sleep "${wait_in_sec}"
       fi
       log "Retrying command ${retries_left} more time(s)"
-      try_cmd "${cmd}" ${retries_left} ${wait_in_sec}
+      try_cmd "${cmd}" ${retries_left} "${wait_in_sec}"
     fi
   fi
 }
@@ -232,7 +232,7 @@ get_native_address(){
 
   endpoint="${1:-localhost:3001}"
   url="${endpoint}/api/v2/account/addresses"
-  cmd="$(get_authenticated_curl_cmd ${url})"
+  cmd="$(get_authenticated_curl_cmd "${url}")"
 
   try_cmd "${cmd}" 30 5 | jq -r ".native"
 }
@@ -243,7 +243,7 @@ get_hopr_address() {
 
   endpoint="${1:-localhost:3001}"
   url="${endpoint}/api/v2/account/addresses"
-  cmd="$(get_authenticated_curl_cmd ${url})"
+  cmd="$(get_authenticated_curl_cmd "${url}")"
 
   try_cmd "${cmd}" 30 5 | jq -r ".hopr"
 }
@@ -317,7 +317,7 @@ get_authenticated_curl_cmd() {
   fi
 
   # remove protocol from endpoint
-  local endpoint_wo_protocol="${full_endpoint#$protocol}"
+  local endpoint_wo_protocol="${full_endpoint#"$protocol"}"
 
   # extract host:port/url portion of endpoint
   local host_w_port="${endpoint_wo_protocol#*@}"

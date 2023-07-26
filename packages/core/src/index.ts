@@ -45,7 +45,6 @@ import {
   registerMetricsCollector,
   retimer as intervalTimer,
   retryWithBackoffThenThrow,
-  iterableToArray,
   safeCloseConnection,
   Address,
   AcknowledgedTicket,
@@ -57,7 +56,7 @@ import {
   HalfKeyChallenge,
   Balance,
   BalanceType,
-  type HoprDB
+  pickVersion
 } from '@hoprnet/hopr-utils'
 
 import { FULL_VERSION, INTERMEDIATE_HOPS, MAX_HOPS, PACKET_SIZE, VERSION, MAX_PARALLEL_PINGS } from './constants.js'
@@ -91,15 +90,28 @@ import {
   StrategyTickResult
 } from './channel-strategy.js'
 
-import { AcknowledgementInteraction } from './interactions/packet/acknowledgement.js'
-import { PacketForwardInteraction } from './interactions/packet/forward.js'
-
-import { Packet, PacketHelper } from './messages/index.js'
 import type { ResolvedNetwork } from './network.js'
 import { createLibp2pInstance } from './main.js'
 import type { EventEmitter as Libp2pEmitter } from '@libp2p/interfaces/events'
 import { utils as ethersUtils } from 'ethers/lib/ethers.js'
 import { peerIdFromString } from '@libp2p/peer-id'
+import {
+  core_hopr_initialize_crate,
+  core_hopr_gather_metrics,
+  Database,
+  Address as Packet_Address,
+  PacketInteractionConfig,
+  Path,
+  Payload,
+  PublicKey as Packet_PublicKey,
+  Balance as Packet_Balance,
+  WasmAckInteraction,
+  WasmPacketInteraction
+} from '../lib/core_hopr.js'
+core_hopr_initialize_crate()
+registerMetricsCollector(core_hopr_gather_metrics)
+
+import pkg from '../package.json' assert { type: 'json' }
 
 const CODE_P2P = protocols('p2p').code
 
@@ -116,7 +128,6 @@ const metric_channelBalances = create_multi_gauge(
   'Balances on channels with counterparties',
   ['counterparty', 'direction']
 )
-const metric_sentMessageCount = create_counter('core_counter_sent_messages', 'Number of sent messages')
 const metric_sentMessageFailCount = create_counter(
   'core_counter_failed_send_messages',
   'Number of sent messages failures'
@@ -139,6 +150,15 @@ const metric_strategyMaxChannels = create_gauge(
   'core_gauge_strategy_max_auto_channels',
   'Maximum number of channels the current strategy can open'
 )
+
+/// Maximum time to wait for a packet to be pushed to the interaction queue
+const PACKET_QUEUE_TIMEOUT_SECONDS = 15n
+
+export function privateKeyFromPeer(peer: PeerId) {
+  if (peer.privateKey == undefined) throw Error('peer id does not contain a private key')
+
+  return keysPBM.PrivateKey.decode(peer.privateKey).Data
+}
 
 // Using libp2p components directly because it allows us
 // to bypass the API layer
@@ -233,6 +253,8 @@ export type SendMessage = ((
 ) => Promise<Uint8Array[]>) &
   ((dest: PeerId, protocols: string | string[], msg: Uint8Array, includeReply: false, opts?: DialOpts) => Promise<void>)
 
+const NORMALIZED_VERSION = pickVersion(pkg.version)
+
 class Hopr extends EventEmitter {
   public status: NodeStatus = 'UNINITIALIZED'
 
@@ -240,8 +262,8 @@ class Hopr extends EventEmitter {
   private strategy: ChannelStrategyInterface
   private networkPeers: Network
   private heartbeat: Heartbeat
-  private forward: PacketForwardInteraction
-  private acknowledgements: AcknowledgementInteraction
+  private forward: WasmPacketInteraction
+  private acknowledgements: WasmAckInteraction
   private libp2pComponents: Components
   private stopLibp2p: Libp2p['stop']
   private pubKey: PublicKey
@@ -264,7 +286,7 @@ class Hopr extends EventEmitter {
    */
   public constructor(
     private id: PeerId,
-    public db: HoprDB,
+    public db: Database,
     private options: HoprOptions,
     private publicNodesEmitter = new (EventEmitter as new () => HoprConnectConfig['config']['publicNodes'])()
   ) {
@@ -422,16 +444,24 @@ class Hopr extends EventEmitter {
     // react when an account's eligibility has changed
     connector.indexer.on(
       'network-registry-eligibility-changed',
-      async (_account: Address, nodes: PublicKey[], eligible: boolean) => {
+      async (_account: Address, nodeAddrs: Address[], eligible: boolean) => {
         // If account is no longer eligible to register nodes, we might need to close existing connections,
         // otherwise there is nothing to do
         if (!eligible) {
-          for (const node of nodes) {
-            this.networkPeers.unregister(node.to_peerid_str())
+          for (const nodeAddr of nodeAddrs) {
+            let pk: PublicKey
+            try {
+              pk = await connector.getPublicKeyOf(nodeAddr)
+            } catch (err) {
+              // node has not announced itself, so we don't need to care
+              return
+            }
+
+            this.networkPeers.unregister(pk.to_peerid_str())
 
             for (const conn of this.libp2pComponents
               .getConnectionManager()
-              .getConnections(peerIdFromString(node.to_peerid_str()))) {
+              .getConnections(peerIdFromString(pk.to_peerid_str()))) {
               await safeCloseConnection(conn, this.libp2pComponents, (_err) => {
                 error(`error while closing existing connection to ${conn.remotePeer.toString()}`)
               })
@@ -460,38 +490,68 @@ class Hopr extends EventEmitter {
       this.networkPeers.register(event.detail.remotePeer.toString(), PeerOrigin.IncomingConnection)
     })
 
-    this.acknowledgements = new AcknowledgementInteraction(
-      sendMessage,
-      this.libp2pComponents,
-      this.getId(),
-      this.db,
-      (ackChallenge: HalfKeyChallenge) => {
-        // Can subscribe to both: per specific message or all message acknowledgments
-        this.emit(`hopr:message-acknowledged:${ackChallenge.to_hex()}`)
-        this.emit('hopr:message-acknowledged', ackChallenge.to_hex())
-      },
-      (ack: AcknowledgedTicket) => connector.emit('ticket:acknowledged', ack),
-      this.network
+    const onAck = (ackChallenge: Uint8Array) => {
+      let chal = HalfKeyChallenge.deserialize(ackChallenge)
+      // Can subscribe to both: per specific message or all message acknowledgments
+      this.emit(`hopr:message-acknowledged:${chal.to_hex()}`)
+      this.emit('hopr:message-acknowledged', chal.to_hex())
+    }
+
+    const onAckTicket = (ackTicket: Uint8Array) => {
+      let tkt = AcknowledgedTicket.deserialize(ackTicket)
+      connector.emit('ticket:acknowledged', tkt)
+    }
+    this.acknowledgements = new WasmAckInteraction(
+      this.db.clone(),
+      Packet_PublicKey.from_peerid_str(this.id.toString()),
+      onAck,
+      onAckTicket
     )
 
+    let acknowledgementProtocols = [
+      // current
+      `/hopr/${this.network.id}/ack/${NORMALIZED_VERSION}`,
+      // deprecated
+      `/hopr/${this.network.id}/ack`
+    ]
+
+    await this.libp2pComponents.getRegistrar().handle(acknowledgementProtocols, async ({ connection, stream }) => {
+      try {
+        for await (const chunk of stream.source) {
+          let payload = new Payload(connection.remotePeer.toString(), chunk)
+          await this.acknowledgements.received_acknowledgement(payload)
+        }
+      } catch (err) {
+        log(`Error while receiving acknowledgement`, err)
+      }
+    })
+
+    let packetCfg = new PacketInteractionConfig(privateKeyFromPeer(this.id))
+    packetCfg.check_unrealized_balance = this.options.checkUnrealizedBalance ?? true
+
     const onMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
-    this.forward = new PacketForwardInteraction(
-      this.libp2pComponents,
-      sendMessage,
-      this.getId(),
-      onMessage,
-      this.db,
-      this.network,
-      this.acknowledgements,
-      this.options
-    )
+    this.forward = new WasmPacketInteraction(this.db.clone(), onMessage, packetCfg)
+
+    let packetProtocols = [
+      // current
+      `/hopr/${this.network.id}/msg/${NORMALIZED_VERSION}`,
+      // deprecated
+      `/hopr/${this.network.id}/msg`
+    ]
+
+    await this.libp2pComponents.getRegistrar().handle(packetProtocols, async ({ connection, stream }) => {
+      try {
+        for await (const chunk of stream.source) {
+          let payload = new Payload(connection.remotePeer.toString(), chunk)
+          await this.forward.received_packet(payload)
+        }
+      } catch (err) {
+        error(`Error while receiving packet`, err)
+      }
+    })
 
     // Attach socket listener and check availability of entry nodes
     await libp2p.start()
-
-    // Register protocols
-    await this.acknowledgements.start()
-    await this.forward.start()
 
     log('libp2p started')
 
@@ -534,6 +594,44 @@ class Hopr extends EventEmitter {
 
     // Enable DHT server-mode if announcing publicly routable addresses to the DHT
     await this.maybeEnableDhtServerMode()
+  }
+
+  public async startProcessing() {
+    const sendMessage = ((
+      dest: PeerId,
+      protocols: string | string[],
+      msg: Uint8Array,
+      includeReply: boolean,
+      opts: DialOpts
+    ) => libp2pSendMessage(this.libp2pComponents, dest, protocols, msg, includeReply, opts)) as SendMessage // Typescript limitation
+
+    let acknowledgementProtocols = [
+      // current
+      `/hopr/${this.network.id}/ack/${NORMALIZED_VERSION}`,
+      // deprecated
+      `/hopr/${this.network.id}/ack`
+    ]
+
+    let packetProtocols = [
+      // current
+      `/hopr/${this.network.id}/msg/${NORMALIZED_VERSION}`,
+      // deprecated
+      `/hopr/${this.network.id}/msg`
+    ]
+
+    const packetInteractionSendMsg = (msg: Uint8Array, dest: string): Promise<void> =>
+      sendMessage(peerIdFromString(dest), packetProtocols, msg, false)
+
+    const acknowledgementInteractionSendMsg = (msg: Uint8Array, dest: string): Promise<void> =>
+      sendMessage(peerIdFromString(dest), acknowledgementProtocols, msg, false)
+
+    await Promise.all([
+      this.forward.handle_incoming_packets(this.acknowledgements, packetInteractionSendMsg),
+      this.forward.handle_outgoing_packets(packetInteractionSendMsg),
+      this.acknowledgements.handle_incoming_acknowledgements(),
+      this.acknowledgements.handle_outgoing_acknowledgements(acknowledgementInteractionSendMsg)
+    ])
+    log(`all interactions finished execution`)
   }
 
   /**
@@ -719,12 +817,14 @@ class Hopr extends EventEmitter {
   }
 
   private async updateChannelMetrics() {
-    const selfAddr = this.getEthereumAddress()
+    const selfAddr = Packet_Address.deserialize(this.getEthereumAddress().serialize())
 
     try {
       let outgoingChannels = 0
-      for await (const channel of this.db.getChannelsFromIterable(selfAddr)) {
-        if (channel.status == ChannelStatus.Open) {
+      let outChannels = await this.db.get_channels_from(selfAddr.clone())
+      for (let i = 0; i < outChannels.len(); i++) {
+        let channel = outChannels.at(i) // TODO: why this sometimes give undefined ?
+        if (channel && channel.status == ChannelStatus.Open) {
           metric_channelBalances.set(
             [channel.source.to_hex(), 'out'],
             +ethersUtils.formatEther(channel.balance.to_string())
@@ -734,8 +834,10 @@ class Hopr extends EventEmitter {
       }
 
       let incomingChannels = 0
-      for await (const channel of this.db.getChannelsToIterable(selfAddr)) {
-        if (channel.status == ChannelStatus.Open) {
+      let inChannels = await this.db.get_channels_to(selfAddr.clone())
+      for (let i = 0; i < inChannels.len(); i++) {
+        let channel = outChannels.at(i) // TODO: why this sometimes give undefined ?
+        if (channel && channel.status == ChannelStatus.Open) {
           metric_channelBalances.set(
             [channel.source.to_hex(), 'in'],
             +ethersUtils.formatEther(channel.balance.to_string())
@@ -846,10 +948,6 @@ class Hopr extends EventEmitter {
     verbose('Stopping heartbeat & indexer')
     this.heartbeat?.stop()
 
-    verbose('Stopping database')
-    await this.db?.close()
-    log(`Database closed.`)
-
     if (this.stopLibp2p) {
       verbose('Stopping libp2p')
       await this.stopLibp2p()
@@ -945,7 +1043,10 @@ class Hopr extends EventEmitter {
 
       let channel: ChannelEntry
       try {
-        channel = await this.db.getChannelX(ticketIssuer, ticketReceiver)
+        channel = await this.db.get_channel_x(
+          Packet_Address.deserialize(ticketIssuer.serialize()),
+          Packet_Address.deserialize(ticketReceiver.serialize())
+        )
       } catch (err) {
         throw Error(`Channel from ${ticketIssuer.to_hex()} to ${ticketReceiver.to_hex()} not found`)
       }
@@ -996,35 +1097,10 @@ class Hopr extends EventEmitter {
       }
     }
 
-    const path: PublicKey[] = [].concat(intermediatePath, [PublicKey.from_peerid_str(destination.toString())])
-    metric_pathLength.observe(path.length)
+    const path = new Path([...intermediatePath.map((pk) => pk.to_peerid_str()), destination.toString()])
+    metric_pathLength.observe(path.length())
 
-    let packet: Packet
-    try {
-      packet = await PacketHelper.create(
-        msg,
-        path.map((x) => peerIdFromString(x.to_peerid_str())),
-        this.getId(),
-        this.db
-      )
-    } catch (err) {
-      log(`Could not create packet ${err}`)
-      metric_sentMessageFailCount.increment()
-      throw Error(`Error while creating packet.`)
-    }
-
-    await PacketHelper.storePendingAcknowledgement(packet, this.db)
-
-    try {
-      await this.forward.interact(peerIdFromString(path[0].to_peerid_str()), packet)
-    } catch (err) {
-      log(`Could not send packet ${err}`)
-      metric_sentMessageFailCount.increment()
-      throw Error(`Failed to send packet.`)
-    }
-
-    metric_sentMessageCount.increment()
-    return packet.ack_challenge().to_hex()
+    return (await this.forward.send_packet(msg, path, PACKET_QUEUE_TIMEOUT_SECONDS)).to_hex()
   }
 
   /**
@@ -1344,10 +1420,25 @@ class Hopr extends EventEmitter {
     direction: 'incoming' | 'outgoing'
   ): Promise<{ receipt: string; status: ChannelStatus }> {
     const connector = HoprCoreEthereum.getInstance()
-    const channel =
-      direction === 'outgoing'
-        ? await this.db.getChannelX(this.getEthereumAddress(), counterparty)
-        : await this.db.getChannelX(counterparty, this.getEthereumAddress())
+    const channel = ChannelEntry.deserialize(
+      (direction === 'outgoing'
+        ? await this.db.get_channel_x(
+            Packet_Address.deserialize(this.getEthereumAddress().serialize()),
+            Packet_Address.deserialize(counterparty.serialize())
+          )
+        : await this.db.get_channel_x(
+            Packet_Address.deserialize(counterparty.serialize()),
+            Packet_Address.deserialize(this.getEthereumAddress().serialize())
+          )
+      ).serialize()
+    )
+
+    if (channel === undefined) {
+      log(`The requested channel for counterparty ${counterparty.toString()} does not exist`)
+      throw new Error('Requested channel does not exist')
+    }
+
+    log(`asking to close channel: ${channel.to_string()}`)
 
     // TODO: should we wait for confirmation?
     if (channel.status === ChannelStatus.Closed) {
@@ -1399,36 +1490,61 @@ class Hopr extends EventEmitter {
   }
 
   public async getAllTickets(): Promise<Ticket[]> {
-    return this.db.getAcknowledgedTickets().then((list) => list.map((t) => t.ticket))
+    let list = await this.db.get_acknowledged_tickets()
+    let ret: Ticket[] = []
+    for (let i = 0; i < list.len(); i++) {
+      ret.push(Ticket.deserialize(list.at(i).ticket.serialize()))
+    }
+    return ret
   }
 
   public async getTickets(counterparty: Address): Promise<Ticket[]> {
     const self = this.getEthereumAddress()
-    const channel = await this.db.getChannelX(counterparty, self)
+    const channel = await this.db.get_channel_x(
+      Packet_Address.deserialize(counterparty.serialize()),
+      Packet_Address.deserialize(self.serialize())
+    )
 
-    const ackedTickets = await this.db.getAcknowledgedTickets({ channel })
+    log(`looking for tickets in channel ${channel.to_string()}`)
 
-    return ackedTickets.map((t) => t.ticket)
+    const ackedTickets = await this.db.get_acknowledged_tickets(channel)
+
+    let result = []
+    let current: AcknowledgedTicket | undefined
+    while (true) {
+      current = ackedTickets.next()
+
+      if (current == undefined) {
+        break
+      } else {
+        result.push(current.ticket)
+      }
+    }
+
+    return result
   }
 
   public async getTicketStatistics() {
-    const ack = await this.db.getAcknowledgedTickets()
-    const pending = await this.db.getPendingTicketCount()
-    const losing = await this.db.getLosingTicketCount()
-    const totalValue = (ackTickets: AcknowledgedTicket[]): Balance =>
-      ackTickets.map((a) => a.ticket.amount).reduce((x, y) => x.add(y), Balance.zero(BalanceType.HOPR))
+    const acked_tickets = await this.db.get_acknowledged_tickets()
+    const pending = await this.db.get_pending_tickets_count()
+    const losing = await this.db.get_losing_tickets_count()
+
+    let totalValue = Packet_Balance.zero(BalanceType.HOPR)
+    for (let i = 0; i < acked_tickets.len(); i++) {
+      totalValue = totalValue.add(acked_tickets.at(i).ticket.amount)
+    }
 
     return {
       pending,
       losing,
-      winProportion: ack.length / (ack.length + losing) || 0,
-      unredeemed: ack.length,
-      unredeemedValue: totalValue(ack),
-      redeemed: await this.db.getRedeemedTicketsCount(),
-      redeemedValue: await this.db.getRedeemedTicketsValue(),
-      neglected: await this.db.getNeglectedTicketsCount(),
-      rejected: await this.db.getRejectedTicketsCount(),
-      rejectedValue: await this.db.getRejectedTicketsValue()
+      winProportion: acked_tickets.len() / (acked_tickets.len() + losing) || 0,
+      unredeemed: acked_tickets.len(),
+      unredeemedValue: totalValue.clone(),
+      redeemed: await this.db.get_redeemed_tickets_count(),
+      redeemedValue: await this.db.get_redeemed_tickets_value(),
+      neglected: await this.db.get_neglected_tickets_count(),
+      rejected: await this.db.get_rejected_tickets_count(),
+      rejectedValue: await this.db.get_rejected_tickets_value()
     }
   }
 
@@ -1437,8 +1553,16 @@ class Hopr extends EventEmitter {
   }
 
   public async redeemTicketsInChannel(counterparty: Address) {
+    log(`redeeming tickets in channel with ${counterparty.to_hex()}`)
     const self = this.getEthereumAddress()
-    const channel = await this.db.getChannelX(counterparty, self)
+    const channel = ChannelEntry.deserialize(
+      (
+        await this.db.get_channel_x(
+          Packet_Address.deserialize(counterparty.serialize()),
+          Packet_Address.deserialize(self.serialize())
+        )
+      ).serialize()
+    )
 
     await HoprCoreEthereum.getInstance().redeemTicketsInChannel(channel)
   }
@@ -1450,19 +1574,37 @@ class Hopr extends EventEmitter {
    * @returns the channel entry of those two nodes
    */
   public async getChannel(src: Address, dest: Address): Promise<ChannelEntry> {
-    return await this.db.getChannelX(src, dest)
+    return await this.db.get_channel_x(
+      Packet_Address.deserialize(src.serialize()),
+      Packet_Address.deserialize(dest.serialize())
+    )
   }
 
   public async getAllChannels(): Promise<ChannelEntry[]> {
-    return iterableToArray(this.db.getChannelsIterable())
+    let list = await this.db.get_channels()
+    let ret: ChannelEntry[] = []
+    for (let i = 0; i < list.len(); i++) {
+      ret.push(ChannelEntry.deserialize(list.at(i).serialize()))
+    }
+    return ret
   }
 
   public async getChannelsFrom(addr: Address): Promise<ChannelEntry[]> {
-    return await this.db.getChannelsFrom(addr)
+    let list = await this.db.get_channels_from(Packet_Address.deserialize(addr.serialize()))
+    let ret: ChannelEntry[] = []
+    for (let i = 0; i < list.len(); i++) {
+      ret.push(ChannelEntry.deserialize(list.at(i).serialize()))
+    }
+    return ret
   }
 
   public async getChannelsTo(addr: Address): Promise<ChannelEntry[]> {
-    return await this.db.getChannelsTo(addr)
+    let list = await this.db.get_channels_to(Packet_Address.deserialize(addr.serialize()))
+    let ret: ChannelEntry[] = []
+    for (let i = 0; i < list.len(); i++) {
+      ret.push(ChannelEntry.deserialize(list.at(i).serialize()))
+    }
+    return ret
   }
 
   public async getPublicKeyOf(addr: Address): Promise<PublicKey> {

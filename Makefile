@@ -72,7 +72,8 @@ init: ## initialize repository (idempotent operation)
 $(CRATES): ## builds all Rust crates with wasm-pack (except for hopli)
 # --out-dir is relative to working directory
 	echo "use wasm-pack build"
-	env WASM_BINDGEN_WEAKREF=1 WASM_BINDGEN_EXTERNREF=1 \
+	wasm-pack build --target=bundler --out-dir ./pkg $@
+	#env WASM_BINDGEN_WEAKREF=1 WASM_BINDGEN_EXTERNREF=1 \
 		wasm-pack build --target=bundler --out-dir ./pkg $@
 
 .PHONY: $(HOPLI_CRATE)
@@ -492,14 +493,19 @@ endif
 	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make stake-funds
 	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node peer_ids=$(shell eval ./scripts/get-hopr-address.sh "$(api_token)" "$(endpoint)")
 
-ensure-environment-and-network-are-set:
+# These targets needs to be splitted in macOs systems
+ensure-environment-and-network-are-set: ensure-network-is-set ensure-environment-is-set
+
+ensure-network-is-set:
 ifeq ($(network),)
 	echo "parameter <network> missing" >&2 && exit 1
 else
-environment_type != jq '.networks."$(network)".environment_type // empty' packages/ethereum/contracts/contracts-addresses.json
-ifeq ($(environment_type),)
-	echo "could not read environment type info from contracts-addresses.json" >&2 && exit 1
+environment-type != jq '.networks."$(network)".environment_type // empty' packages/ethereum/contracts/contracts-addresses.json
 endif
+
+ensure-environment-is-set:
+ifeq ($(environment-type),)
+	echo "could not read environment info from contracts-addresses.json" >&2 && exit 1
 endif
 
 .PHONY: run-docker-dev

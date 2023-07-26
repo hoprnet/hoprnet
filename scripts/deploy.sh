@@ -18,9 +18,9 @@ source "${mydir}/testnet.sh"
 
 declare branch cluster_size docker_image
 
-: ${HOPRD_API_TOKEN:?"env var missing"}
-: ${HOPRD_PASSWORD:?"env var missing"}
-: ${FAUCET_SECRET_API_KEY:?"env var missing"}
+: "${HOPRD_API_TOKEN:?"env var missing"}"
+: "${HOPRD_PASSWORD:?"env var missing"}"
+: "${FAUCET_SECRET_API_KEY:?"env var missing"}"
 
 # docker_image and cluster_size are configurable through script arguments
 docker_image="${1:-europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:latest}"
@@ -78,7 +78,7 @@ for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entr
       # check if the tag ends with -nat
       if [[ "${cluster_tag}" =~ "-nat$" ]]; then
         log "\tNATed node, no announcements"
-        ${mydir}/setup-gcloud-cluster.sh \
+        "${mydir}"/setup-gcloud-cluster.sh \
           "${network}" \
           "" \
           "${cluster_name}" \
@@ -88,7 +88,7 @@ for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entr
           ""
       else
         # announce on-chain with routable address
-        ${mydir}/setup-gcloud-cluster.sh \
+        "${mydir}"/setup-gcloud-cluster.sh \
           "${network}" \
           "" \
           "${cluster_name}" \

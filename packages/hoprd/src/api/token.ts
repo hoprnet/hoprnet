@@ -2,11 +2,10 @@ import { isDeepStrictEqual } from 'util'
 import { v4 as uuidv4 } from 'uuid'
 import { createHash } from 'crypto'
 
-import { HoprDB } from '@hoprnet/hopr-utils'
-
 // List of endpoints which are supported as capabilitities.
 // Each entry also specifies supported endpoint-specific limits.
 import supportedCapabilities from './../supported-api-capabilities.json' assert { type: 'json' }
+import { AuthorizationToken, Database } from '../../../core/lib/core_hopr.js'
 
 enum LimitType {
   calls
@@ -35,20 +34,17 @@ export type Token = {
   valid_until?: number
 }
 
-// this namespace is used as a prefix for all stored keys
-const ns = 'authenticationTokens'
-
 // Authenticate the given token object, verifying its stored in the database.
 // @param db Reference to a HoprDB instance.
 // @param id Token id which should be authenticated.
 // @return the token object which is found in the database, or undefined
-export async function authenticateToken(db: HoprDB, id: string): Promise<Token> {
+export async function authenticateToken(db: Database, id: string): Promise<Token> {
   if (!id) {
     return undefined
   }
 
   // id is used as key, the returned object includes the associated data
-  const token = await db.getSerializedObject(ns, id)
+  const token = await db.retrieve_authorization(id)
 
   // if no token was found, we return directly, otherwise the result is
   // deserialized first
@@ -56,7 +52,7 @@ export async function authenticateToken(db: HoprDB, id: string): Promise<Token> 
     return undefined
   }
 
-  const deserializedToken = deserializeToken(token)
+  const deserializedToken = deserializeToken(token.get())
 
   // delete token if lifetime has passed, otherwise return
   const now = Date.now()
@@ -75,7 +71,7 @@ export async function authenticateToken(db: HoprDB, id: string): Promise<Token> 
 // @param endpointRef Logical name of the endpoint the authorization is checked
 // for.
 // @return true if the token is authorized, false if not
-export async function authorizeToken(db: HoprDB, token: Token, endpointRef: string): Promise<boolean> {
+export async function authorizeToken(db: Database, token: Token, endpointRef: string): Promise<boolean> {
   // find relevant endpoint capabilities
   const endpointCaps = token.capabilities.filter((capability: Capability) => capability.endpoint === endpointRef)
 
@@ -146,7 +142,7 @@ export async function authorizeToken(db: HoprDB, token: Token, endpointRef: stri
 // @param description Description which is attached to the token object.
 // @param lifetime Number of seconds used to calculate the maximum lifetime of the token.
 export async function createToken(
-  db: HoprDB,
+  db: Database,
   tokenScope: Token,
   capabilities: Array<Capability>,
   description?: string,
@@ -187,19 +183,19 @@ export async function createToken(
 // Store a token in the database.
 // @param db Reference to a HoprDB instance.
 // @param id Token object.
-export async function storeToken(db: HoprDB, token: Token): Promise<void> {
+export async function storeToken(db: Database, token: Token): Promise<void> {
   const serializedToken = serializeToken(token)
-  await db.putSerializedObject(ns, token.id, serializedToken)
+  await db.store_authorization(new AuthorizationToken(token.id, serializedToken))
 }
 
 // Delete a token from the database.
 // @param db Reference to a HoprDB instance.
 // @param id Token id. The operation is a no-op if its an empty string.
-export async function deleteToken(db: HoprDB, id: string): Promise<void> {
+export async function deleteToken(db: Database, id: string): Promise<void> {
   if (!id) {
     return
   }
-  await db.deleteObject(ns, id)
+  await db.delete_authorization(id)
 }
 
 // Serialize the given token object into a byte array.
@@ -221,7 +217,7 @@ function deserializeToken(token: Uint8Array): Token {
 // Generate a token id which is not present yet in the database.
 // @param db Reference to a HoprDB instance.
 // @return a new unique token id
-async function generateNewId(db: HoprDB): Promise<string> {
+async function generateNewId(db: Database): Promise<string> {
   let id = undefined
 
   // iterate until we find a usable id

@@ -206,14 +206,18 @@ endif
 	$(forge-script) script/SingleAction.s.sol:SingleActionFromPrivateKeyScript \
 		--broadcast --sig "syncEligibility(string[])" $(peer_ids)
 
-ensure-environment-and-network-are-set:
+ensure-environment-and-network-are-set: ensure-network-is-set ensure-environment-is-set
+
+ensure-network-is-set:
 ifeq ($(network),)
 	echo "parameter <network> missing" >&2 && exit 1
 else
 environment-type != jq '.networks."$(network)".environment_type // empty' contracts-addresses.json
+endif
+
+ensure-environment-is-set:
 ifeq ($(environment-type),)
 	echo "could not read environment info from contracts-addresses.json" >&2 && exit 1
-endif
 endif
 
 ensure-privatekey-is-set:

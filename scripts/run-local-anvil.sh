@@ -112,7 +112,7 @@ fi
 if ! lsof -i ":8545" -s TCP:LISTEN; then
   log "Start local anvil chain"
   anvil ${flags} > "${log_file}" 2>&1 &
-  wait_for_regex ${log_file} "Listening on 0.0.0.0:8545"
+  wait_for_regex "${log_file}" "Listening on 0.0.0.0:8545"
   log "Anvil chain started (0.0.0.0:8545)"
 else
   log "Anvil chain already running, skipping"
@@ -120,7 +120,7 @@ fi
 
 if [ "${skip_deploy}" != "true" ]; then
   log "Deploying contracts"
-  DEPLOYER_PRIVATE_KEY=${deployer_private_key} make -C ${mydir}/../packages/ethereum/contracts/ anvil-deploy-all
+  DEPLOYER_PRIVATE_KEY=${deployer_private_key} make -C "${mydir}"/../packages/ethereum/contracts/ anvil-deploy-all
   log "Deploying contracts finished"
 fi
 

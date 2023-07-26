@@ -59,7 +59,7 @@ impl Default for PromiscuousStrategy {
             minimum_channel_balance: Balance::from_str("10000000000000000", BalanceType::HOPR),
             minimum_node_balance: Balance::from_str("100000000000000000", BalanceType::HOPR),
             max_channels: None,
-            auto_redeem_tickets: false,
+            auto_redeem_tickets: true,
             enforce_max_channels: true,
             sma: SimpleMovingAvg::new(),
         }
