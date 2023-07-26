@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.19;
 
-import 'openzeppelin-contracts-4.8.3/utils/Multicall.sol';
-import 'openzeppelin-contracts-4.8.3/utils/introspection/IERC1820Registry.sol';
-import 'openzeppelin-contracts-4.8.3/utils/introspection/ERC1820Implementer.sol';
-import 'openzeppelin-contracts-4.8.3/token/ERC20/IERC20.sol';
-import 'openzeppelin-contracts-4.8.3/token/ERC777/IERC777Recipient.sol';
-import 'openzeppelin-contracts-4.8.3/utils/cryptography/ECDSA.sol';
+import 'openzeppelin-contracts/utils/Multicall.sol';
+import 'openzeppelin-contracts/utils/introspection/IERC1820Registry.sol';
+import 'openzeppelin-contracts/utils/introspection/ERC1820Implementer.sol';
+import 'openzeppelin-contracts/token/ERC20/IERC20.sol';
+import 'openzeppelin-contracts/token/ERC777/IERC777Recipient.sol';
+import 'openzeppelin-contracts/utils/cryptography/ECDSA.sol';
+import './interfaces/INodeSafeRegistry.sol';
 
 import './Crypto.sol';
 import './MultiSig.sol';
@@ -218,16 +219,16 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprMu
   /**
    * @param _token HoprToken address
    * @param _noticePeriodChannelClosure seconds until a channel can be closed
-   * @param safeRegistry address of the contract that maps from accounts to deployed Gnosis Safe instances
+   * @param _safeRegistry address of the contract that maps from accounts to deployed Gnosis Safe instances
    */
-  constructor(address _token, Timestamp _noticePeriodChannelClosure, HoprNodeSafeRegistry safeRegistry) {
+  constructor(address _token, Timestamp _noticePeriodChannelClosure, HoprNodeSafeRegistry _safeRegistry) {
     if (Timestamp.unwrap(_noticePeriodChannelClosure) == 0) {
       revert InvalidNoticePeriod();
     }
 
     require(_token != address(0), 'token must not be empty');
 
-    setNodeSafeRegistry(safeRegistry);
+    setNodeSafeRegistry(_safeRegistry);
 
     token = IERC20(_token);
     noticePeriodChannelClosure = _noticePeriodChannelClosure;
