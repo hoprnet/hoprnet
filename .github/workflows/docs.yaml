@@ -8,9 +8,6 @@ env:
 
 on:
   pull_request:
-    # branches:
-    #   - master
-    #   - release/*
     types:
       - synchronize
     paths-ignore:
@@ -26,7 +23,8 @@ jobs:
     runs-on: ubuntu-2-core
     if: github.event.pull_request.draft == false
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v3
 
       - name: Configure Git info
         run: ./scripts/configure-git-info.sh
@@ -108,7 +106,6 @@ jobs:
         # only commit changes when not running via act and when on final branches
         if: |
           (github.ref == 'refs/heads/master' ||
-           github.ref == 'refs/heads/avado' ||
            startsWith(github.ref, 'refs/heads/debug-docs/') ||
            startsWith(github.ref, 'refs/heads/release/')
           ) && !env.ACT
