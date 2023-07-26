@@ -1,7 +1,10 @@
 use crate::errors::NetworkingError::MessagingError;
 use core_crypto::derivation::derive_ping_pong;
 use serde::{Deserialize, Serialize};
+
+#[cfg(feature = "compat-ping")]
 use utils_types::errors::GeneralError::ParseError;
+#[cfg(feature = "compat-ping")]
 use utils_types::traits::BinarySerializable;
 
 use crate::errors::Result;
