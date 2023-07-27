@@ -8,7 +8,7 @@ import './utils/ERC1820Registry.sol';
 import '../src/Channels.sol';
 import './utils/Crypto.sol';
 import '../src/MultiSig.sol';
-import 'openzeppelin-contracts-4.8.3/token/ERC777/ERC777.sol';
+import 'openzeppelin-contracts/token/ERC777/ERC777.sol';
 import '../src/node-stake/NodeSafeRegistry.sol';
 
 // proxy contract to make modifiers testable
@@ -625,7 +625,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils {
 
     hoprChannels._storeChannel(src, dest, channelAmount, channelTicketIndex, 0, epoch, HoprChannels.ChannelStatus.OPEN);
 
-    (HoprChannels.RedeemableTicket memory redeemable, HoprCrypto.VRF_Parameters memory vrf) = getRedeemableTicket(args);
+    (HoprChannels.RedeemableTicket memory redeemable, HoprCrypto.VRF_Parameters memory vrf) = CryptoUtils.getRedeemableTicket(args, hoprChannels.domainSeparator());
 
     vm.expectEmit(true, false, false, true, address(hoprChannels));
     emit ChannelBalanceDecreased(redeemable.data.channelId, HoprChannels.Balance.wrap(channelAmount - amount));
@@ -711,7 +711,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils {
       porSecret
     );
 
-    (HoprChannels.RedeemableTicket memory redeemable, HoprCrypto.VRF_Parameters memory vrf) = getRedeemableTicket(args);
+    (HoprChannels.RedeemableTicket memory redeemable, HoprCrypto.VRF_Parameters memory vrf) = CryptoUtils.getRedeemableTicket(args, hoprChannels.domainSeparator());
 
     vm.expectEmit(true, false, false, true, address(hoprChannels));
     emit ChannelBalanceDecreased(redeemable.data.channelId, HoprChannels.Balance.wrap(channelABAmount - amount));
@@ -761,7 +761,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils {
 
     hoprChannels._storeChannel(src, dest, channelAmount, channelTicketIndex, 0, epoch, HoprChannels.ChannelStatus.OPEN);
 
-    (HoprChannels.RedeemableTicket memory redeemable, HoprCrypto.VRF_Parameters memory vrf) = getRedeemableTicket(args);
+    (HoprChannels.RedeemableTicket memory redeemable, HoprCrypto.VRF_Parameters memory vrf) = CryptoUtils.getRedeemableTicket(args, hoprChannels.domainSeparator());
 
     vm.prank(dest);
 
@@ -803,7 +803,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils {
 
     hoprChannels._storeChannel(src, dest, channelAmount, channelTicketIndex, 0, epoch, HoprChannels.ChannelStatus.OPEN);
 
-    (HoprChannels.RedeemableTicket memory redeemable, HoprCrypto.VRF_Parameters memory vrf) = getRedeemableTicket(args);
+    (HoprChannels.RedeemableTicket memory redeemable, HoprCrypto.VRF_Parameters memory vrf) = CryptoUtils.getRedeemableTicket(args, hoprChannels.domainSeparator());
 
     vm.prank(dest);
 
@@ -845,7 +845,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils {
 
     hoprChannels._storeChannel(src, dest, channelAmount, channelTicketIndex, 0, epoch, HoprChannels.ChannelStatus.OPEN);
 
-    (HoprChannels.RedeemableTicket memory redeemable, HoprCrypto.VRF_Parameters memory vrf) = getRedeemableTicket(args);
+    (HoprChannels.RedeemableTicket memory redeemable, HoprCrypto.VRF_Parameters memory vrf) = CryptoUtils.getRedeemableTicket(args, hoprChannels.domainSeparator());
 
     vm.prank(dest);
 
@@ -887,7 +887,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils {
 
     hoprChannels._storeChannel(src, dest, channelAmount, channelTicketIndex, 0, epoch, HoprChannels.ChannelStatus.CLOSED);
 
-    (HoprChannels.RedeemableTicket memory redeemable, HoprCrypto.VRF_Parameters memory vrf) = getRedeemableTicket(args);
+    (HoprChannels.RedeemableTicket memory redeemable, HoprCrypto.VRF_Parameters memory vrf) = CryptoUtils.getRedeemableTicket(args, hoprChannels.domainSeparator());
 
     vm.prank(dest);
 
@@ -929,7 +929,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils {
 
     hoprChannels._storeChannel(src, dest, channelAmount, channelTicketIndex, 0, 2, HoprChannels.ChannelStatus.OPEN);
 
-    (HoprChannels.RedeemableTicket memory redeemable, HoprCrypto.VRF_Parameters memory vrf) = getRedeemableTicket(args);
+    (HoprChannels.RedeemableTicket memory redeemable, HoprCrypto.VRF_Parameters memory vrf) = CryptoUtils.getRedeemableTicket(args, hoprChannels.domainSeparator());
 
     vm.prank(dest);
 
@@ -971,7 +971,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils {
 
     hoprChannels._storeChannel(src, dest, channelAmount, channelTicketIndex, 0, epoch, HoprChannels.ChannelStatus.OPEN);
 
-    (HoprChannels.RedeemableTicket memory redeemable, HoprCrypto.VRF_Parameters memory vrf) = getRedeemableTicket(args);
+    (HoprChannels.RedeemableTicket memory redeemable, HoprCrypto.VRF_Parameters memory vrf) = CryptoUtils.getRedeemableTicket(args, hoprChannels.domainSeparator());
 
     vrf.h = 1;
     vrf.hV_x = vrf.v_x;
@@ -1017,7 +1017,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils {
 
     hoprChannels._storeChannel(src, dest, channelAmount, channelTicketIndex, 0, epoch, HoprChannels.ChannelStatus.OPEN);
 
-    (HoprChannels.RedeemableTicket memory redeemable, HoprCrypto.VRF_Parameters memory vrf) = getRedeemableTicket(args);
+    (HoprChannels.RedeemableTicket memory redeemable, HoprCrypto.VRF_Parameters memory vrf) = CryptoUtils.getRedeemableTicket(args, hoprChannels.domainSeparator());
 
     (uint8 v, bytes32 r, bytes32 s) = CryptoUtils.decompressSignature(redeemable.signature.r, redeemable.signature.vs);
     if (v == 27) { // v == 27 or v == 28
@@ -1069,7 +1069,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils {
 
     hoprChannels._storeChannel(src, dest, channelAmount, channelTicketIndex, 0, epoch, HoprChannels.ChannelStatus.OPEN);
 
-    (HoprChannels.RedeemableTicket memory redeemable, HoprCrypto.VRF_Parameters memory vrf) = getRedeemableTicket(args);
+    (HoprChannels.RedeemableTicket memory redeemable, HoprCrypto.VRF_Parameters memory vrf) = CryptoUtils.getRedeemableTicket(args, hoprChannels.domainSeparator());
 
     redeemable.data.indexOffset = HoprChannels.TicketIndexOffset.wrap(0);
 
@@ -1288,62 +1288,6 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils {
       HoprChannels.ChannelEpoch.wrap(uint24(epoch)),
       status
     );
-  }
-
-  struct RedeemTicketArgBuilder {
-    uint256 privKeyA;
-    uint256 privKeyB;
-    bytes DST;
-    address src;
-    address dest;
-    uint256 amount;
-    uint256 maxTicketIndex;
-    uint256 indexOffset;
-    uint256 epoch;
-    uint256 winProb;
-    uint256 porSecret;
-  }
-
-  function getRedeemableTicket(
-    RedeemTicketArgBuilder memory args
-  ) view private returns (HoprChannels.RedeemableTicket memory redeemable, VRF_Parameters memory vrf) {
-    bytes32 channelId = hoprChannels._getChannelId(args.src, args.dest);
-
-    HoprChannels.TicketData memory ticketData = HoprChannels.TicketData(
-      channelId,
-      HoprChannels.Balance.wrap(uint96(args.amount)),
-      HoprChannels.TicketIndex.wrap(uint48(args.maxTicketIndex)),
-      HoprChannels.TicketIndexOffset.wrap(uint32(args.indexOffset)),
-      HoprChannels.ChannelEpoch.wrap(uint24(args.epoch)),
-      HoprChannels.WinProb.wrap(uint56(args.winProb))
-    );
-
-    bytes32 ticketHash;
-    {
-      bytes32 pre_ticketHash = keccak256(
-        abi.encode(
-          HoprChannels.redeemTicket.selector,
-          keccak256(abi.encode(ticketData, vm.addr(args.porSecret)))
-        )
-      );
-      ticketHash = keccak256(abi.encode(bytes1(0x19), bytes1(0x01), hoprChannels.domainSeparator(), pre_ticketHash));
-      console2.logBytes32(ticketHash);
-    }
-
-    CompactSignature memory sig;
-    {
-      (uint8 v, bytes32 r, bytes32 s) = vm.sign(args.privKeyA, ticketHash);
-      
-    console2.logBytes32(r);
-    console2.logBytes32(s);
-    console2.logUint(v);
-      sig = CryptoUtils.toCompactSignature(v, r, s);
-    }
-
-
-    redeemable = HoprChannels.RedeemableTicket(ticketData, sig, args.porSecret);
-
-    vrf = CryptoUtils.getVRFParameters(args.privKeyB, args.DST, ticketHash);
   }
 
   function getChannelFromTuple(address src, address dest) public view returns (HoprChannels.Channel memory) {

@@ -4,19 +4,9 @@
  * was audited https://github.com/gnosis/zodiac/tree/master/audits
  * Added an additional function `getOwners()`
  */
-pragma solidity >=0.7.0 <0.9.0;
+pragma solidity ^0.8.0;
 
-// FIXME: revert to import "safe-contracts/common/Enum.sol"; when the library is imported
-/**
- * @title Enum - Collection of enums used in Safe contracts.
- * @author Richard Meissner - @rmeissner
- */
-abstract contract Enum {
-    enum Operation {
-        Call,
-        DelegateCall
-    }
-}
+import "safe-contracts/common/Enum.sol";
 
 interface IAvatar {
   function getOwners() external view returns (address[] memory);
