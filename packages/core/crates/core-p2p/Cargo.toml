@@ -12,17 +12,13 @@ crate-type = ["cdylib", "rlib"]
 default = ["console_error_panic_hook", "wasm"]
 wasm = [
     "dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:getrandom",
-    "libp2p-swarm/wasm-bindgen", "libp2p-ping/wasm-bindgen", "dep:libp2p-wasm-ext",
+    "libp2p/wasm-bindgen", "dep:libp2p-wasm-ext",
     "utils-log/wasm"
 ]
 
 [dependencies]
-libp2p-identity = "0.2.1"
-libp2p-core = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "release/providence" }
+libp2p = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "release/providence", features = ["noise", "request-response"] }
 libp2p-mplex = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "release/providence" }
-libp2p-noise = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "release/providence" }
-libp2p-swarm = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "release/providence" }
-libp2p-ping = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "release/providence" }
 futures = "0.3.28"
 futures-lite = "1.12.0"
 

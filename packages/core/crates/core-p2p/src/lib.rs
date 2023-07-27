@@ -1,4 +1,9 @@
-pub use libp2p_identity as identity;
+pub use libp2p::identity;
+
+use libp2p::identity as libp2p_identity;
+use libp2p::core as libp2p_core;
+use libp2p::swarm as libp2p_swarm;
+use libp2p::noise as libp2p_noise;
 
 use libp2p_identity::PeerId;
 use libp2p_core::{upgrade, Transport};
