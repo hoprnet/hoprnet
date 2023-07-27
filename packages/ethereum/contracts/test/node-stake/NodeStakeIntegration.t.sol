@@ -9,13 +9,11 @@ import '../../src/Channels.sol';
 import "../../script/utils/SafeSuiteLib.sol";
 import "../utils/SafeSingleton.sol";
 import "../utils/ERC1820Registry.sol";
-import '../utils/Tickets.sol';
-import '../utils/Channels.sol';
 import "safe-contracts/Safe.sol";
 import "safe-contracts/common/Enum.sol";
 import 'forge-std/Test.sol';
 
-contract HoprNodeStakeIntegrationTest is Test, ERC1820RegistryFixtureTest, SafeSingletonFixtureTest, ChannelsUtilsTest, TicketsUtilsTest {
+contract HoprNodeStakeIntegrationTest is Test, ERC1820RegistryFixtureTest, SafeSingletonFixtureTest {
     // to alter the storage
     using stdStorage for StdStorage;
 
@@ -61,7 +59,7 @@ contract HoprNodeStakeIntegrationTest is Test, ERC1820RegistryFixtureTest, SafeS
         mustHaveErc1820Registry();
 
         hoprToken = deployCode("HoprToken.sol:HoprToken");
-        hoprChannels = new HoprChannels(hoprToken, address(hoprNodeSafeRegistry), HoprChannels.Timestamp.wrap(15));
+        hoprChannels = new HoprChannels(hoprToken, HoprChannels.Timestamp.wrap(15), hoprNodeSafeRegistry);
         node1 = 0xFD0E196A4548B9E8Cc28CB94B74B2f79F72C3e09;
         node2 = 0x4FCEB6F2C703E9FE573847EB391964aA58bE7191;
         node3 = 0xFD5328aB5BfCC27BeA70FDeA223Ef7D67Ce30Ef0;

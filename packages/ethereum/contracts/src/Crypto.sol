@@ -1,12 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.19;
 
-error InvalidFieldElement();
-error InvalidCurvePoint();
-error InvalidPointWitness();
-error GeneralError();
-error MessageTooLong();
-
 /**
  *    &&&&
  *    &&&&
@@ -25,6 +19,10 @@ error MessageTooLong();
  * Bundles cryptographic primitives used by the HOPR protocol
  **/
 abstract contract HoprCrypto {
+  error InvalidFieldElement();
+  error InvalidCurvePoint();
+  error InvalidPointWitness();
+
   // secp256k1: y^2 = x^3 + b (mod F_p)
   uint256 constant internal SECP256K1_B = 0x0000000000000000000000000000000000000000000000000000000000000007;
   // Field order created by secp256k1 curve
@@ -317,6 +315,9 @@ abstract contract HoprCrypto {
    * Implements secp256k1_XMD:KECCAK_256_SSWU_RO_, see
    * https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html
    *
+   * @dev DSTs longer than 255 bytes are considered unsound.
+   *      see https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#name-domain-separation
+   *
    * @param payload values "to hash"
    * @param DST domain separation tag, used to makes protocol instantiations unique
    */
@@ -528,36 +529,38 @@ abstract contract HoprCrypto {
       // https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#name-optimized-sqrt_ratio-for-q-
   
       // ===================================
-      let tv7 := mulmod(tv6,tv6, SECP256K1_BASE_FIELD_ORDER) // 1. tv1 = v^2
-      let tv8 := mulmod(tv2,tv6, SECP256K1_BASE_FIELD_ORDER) // 2. tv2 = u * v
+      {
+        let tv7 := mulmod(tv6,tv6, SECP256K1_BASE_FIELD_ORDER) // 1. tv1 = v^2
+        let tv8 := mulmod(tv2,tv6, SECP256K1_BASE_FIELD_ORDER) // 2. tv2 = u * v
 
-      tv7 := mulmod(tv7, tv8, SECP256K1_BASE_FIELD_ORDER) // 3. tv1 = tv1 * tv2
+        tv7 := mulmod(tv7, tv8, SECP256K1_BASE_FIELD_ORDER) // 3. tv1 = tv1 * tv2
             
-      // 4. y1 = tv1^c1 (using expmod precompile)
-      let p := mload(0x40)
-      mstore(p, 0x20)             // Length of Base
-      mstore(add(p, 0x20), 0x20)  // Length of Exponent
-      mstore(add(p, 0x40), 0x20)  // Length of Modulus
-      mstore(add(p, 0x60), tv7)   // Base
-      mstore(add(p, 0x80), C_1)   // Exponent
-      mstore(add(p, 0xa0), SECP256K1_BASE_FIELD_ORDER)     // Modulus
-      if iszero(staticcall(not(0), 0x05, p, 0xC0, p, 0x20)) { // 0x05 == expmod precompile
-        revert(0, 0)
-      }
+        // 4. y1 = tv1^c1 (using expmod precompile)
+        let p := mload(0x40)
+        mstore(p, 0x20)             // Length of Base
+        mstore(add(p, 0x20), 0x20)  // Length of Exponent
+        mstore(add(p, 0x40), 0x20)  // Length of Modulus
+        mstore(add(p, 0x60), tv7)   // Base
+        mstore(add(p, 0x80), C_1)   // Exponent
+        mstore(add(p, 0xa0), SECP256K1_BASE_FIELD_ORDER)     // Modulus
+        if iszero(staticcall(not(0), 0x05, p, 0xC0, p, 0x20)) { // 0x05 == expmod precompile
+          revert(0, 0)
+        }
       
-      let y1_inner := mulmod(mload(p), tv8, SECP256K1_BASE_FIELD_ORDER) // 5. y1 = y1 * tv2
-      let y2_inner := mulmod(y1_inner, C_2, SECP256K1_BASE_FIELD_ORDER) // 6. y2 = y1 * c2
-      let tv9 := mulmod(y1_inner, y1_inner, SECP256K1_BASE_FIELD_ORDER) // 7. tv3 = y1^2
-      tv9 := mulmod(tv9, tv6, SECP256K1_BASE_FIELD_ORDER) // 8. tv3 = tv3 * v
+        let y1_inner := mulmod(mload(p), tv8, SECP256K1_BASE_FIELD_ORDER) // 5. y1 = y1 * tv2
+        let y2_inner := mulmod(y1_inner, C_2, SECP256K1_BASE_FIELD_ORDER) // 6. y2 = y1 * c2
+        let tv9 := mulmod(y1_inner, y1_inner, SECP256K1_BASE_FIELD_ORDER) // 7. tv3 = y1^2
+        tv9 := mulmod(tv9, tv6, SECP256K1_BASE_FIELD_ORDER) // 8. tv3 = tv3 * v
 
-      switch eq(tv9, tv2) // 9. isQR = tv3 == u
-      case true { // 10. y = CMOV(y2, y1, isQR)
-        is_square := true
-        y1 := y1_inner
-      }
-      case false {
-        is_square := false
-        y1 := y2_inner
+        switch eq(tv9, tv2) // 9. isQR = tv3 == u
+        case true { // 10. y = CMOV(y2, y1, isQR)
+          is_square := true
+          y1 := y1_inner
+        }
+        case false {
+          is_square := false
+          y1 := y2_inner
+        }
       }
 
       // =====================================
@@ -594,6 +597,9 @@ abstract contract HoprCrypto {
   /**
    * Takes an arbitrary byte-string and a domain seperation tag (DST) and returns
    * two elements of the field used to create the secp256k1 curve.
+   *
+   * @dev DSTs longer than 255 bytes are considered unsound.
+   *      see https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#name-domain-separation
    *
    * @param message the message to hash
    * @param DST domain separation tag, used to make protocol instantiations unique
@@ -640,6 +646,9 @@ abstract contract HoprCrypto {
    * Takes an arbitrary bytestring and a domain seperation tag and returns a
    * pseudo-random scalar in the secp256k1 curve field.
    *
+   * @dev DSTs longer than 255 bytes are considered unsound.
+   *      see https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#name-domain-separation
+   *
    * @param message the message to hash
    * @param DST domain separation tag, used to make protocol instantiations unique
    */
@@ -670,26 +679,21 @@ abstract contract HoprCrypto {
    *
    * Used for hash_to_curve functionality.
    *
-   * Note: This is not a general implementation as the output length fixed. It is tailor-made
-   *       for secp256k1_XMD:KECCAK_256_SSWU_RO_ hash_to_curve implementation.
+   * @dev This is not a general implementation as the output length fixed. It is tailor-made
+   *      for secp256k1_XMD:KECCAK_256_SSWU_RO_ hash_to_curve implementation.
+   *
+   * @dev DSTs longer than 255 bytes are considered unsound.
+   *      see https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#name-domain-separation
    *
    * @param message the message to hash
    * @param DST domain separation tag, used to make protocol instantiations unique
    */
   function expand_message_xmd_keccak256(bytes memory message, bytes memory DST) internal pure returns (bytes32 b_1, bytes32 b_2, bytes32 b_3) {
-    uint256 ell; 
-
-    if ((message.length >> 5) << 5 == 0) {
-      ell = message.length >> 5;
-    } else {
-      ell = message.length >> 5 + 1;
-    }
-
-    if (ell > 255 || message.length > 2040 || DST.length > 255) {
-      revert MessageTooLong();
-    }
-
     assembly {
+      if gt(mload(DST), 255) {
+        revert (0,0)
+      }
+
       let b_0
       {
         // create payload for b_0 hash
@@ -771,26 +775,21 @@ abstract contract HoprCrypto {
    *
    * Used for the VRF functionality.
    *
-   * Note: This is not a general implementation as the output length fixed. It is tailor-made
-   *       for secp256k1_XMD:KECCAK_256_SSWU_RO_ hash_to_curve implementation.
+   * @dev This is not a general implementation as the output length fixed. It is tailor-made
+   *      for secp256k1_XMD:KECCAK_256_SSWU_RO_ hash_to_curve implementation.
+   *
+   * @dev DSTs longer than 255 bytes are considered unsound.
+   *      see https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#name-domain-separation
    *
    * @param message the message to hash
    * @param DST domain separation tag, used to make protocol instantiations unique
    */
   function expand_message_xmd_keccak256_single(bytes memory message, bytes memory DST) internal pure returns (bytes32 b_1, bytes32 b_2) {
-    uint256 ell; 
-
-    if ((message.length >> 5) << 5 == 0) {
-      ell = message.length >> 5;
-    } else {
-      ell = message.length >> 5 + 1;
-    }
-
-    if (ell > 255 || message.length > 2040 || DST.length > 255) {
-      revert MessageTooLong();
-    }
-
     assembly {
+      if gt(mload(DST), 255) {
+        revert (0,0)
+      }
+
       let b_0
       {
         // create payload for b_0 hash
@@ -891,7 +890,9 @@ abstract contract HoprCrypto {
     // necessary to make VRF individual for each Ethereum account
     address signer;
     // domain separation tag, make each protocol instantiation,
-    // unique, such as staging and production environment
+    // unique, such as staging and production environment,
+    // must be at most 255 bytes, otherwise considered unsound
+    // see https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#name-domain-separation
     bytes DST;
   }
 

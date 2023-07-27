@@ -3,8 +3,8 @@ pragma solidity >=0.6.0 <0.9.0;
 
 import 'forge-std/Test.sol';
 import './utils/Accounts.sol';
+import './utils/Crypto.sol';
 import 'solcrypto/SECP2561k.sol';
-
 import '../src/Crypto.sol';
 
 // Use proxy contract to have proper gas measurements for internal functions
@@ -50,11 +50,14 @@ contract CryptoProxy is HoprCrypto {
   }
 }
 
-contract Crypto is Test, AccountsFixtureTest, HoprCrypto {
+contract Crypto is Test, AccountsFixtureTest, HoprCrypto, CryptoUtils {
   struct CurvePoint {
     uint256 x;
     uint256 y;
   }
+
+  uint256 constant SECP256K1_BASEPOINT_X = 0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798;
+  uint256 constant SECP256K1_BASEPOINT_Y = 0x483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8;
 
   SECP2561k secp256k1;
   CryptoProxy crypto;
@@ -182,6 +185,16 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto {
     }
   }
 
+  function testRevert_expandMessageLongDST(bytes memory message) public {
+    string memory super_long_DST = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam leo sem, consectetur facilisis nibh eget, feugiat ultrices ipsum. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Duis vel elit tempor, laoreet mauris.';
+
+    vm.expectRevert();
+    expand_message_xmd_keccak256(message, abi.encodePacked(super_long_DST));
+
+    vm.expectRevert();
+    expand_message_xmd_keccak256_single(message, abi.encodePacked(super_long_DST));
+  }
+
   function testHashToCurve() public {
     bytes memory DST = "QUUX-V01-CS02-with-secp256k1_XMD:Keccak256_SSWU_RO_";
 
@@ -299,53 +312,143 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto {
 
     HoprCrypto.VRF_Payload memory payload;
 
-    // stack height optimization, doesn't compile otherwise
-    {
-      address chain_addr = crypto.scalarTimesBasepointProxy(privKey);
-      payload.message = vrf_message;
-      payload.signer = chain_addr;
-      payload.DST = abi.encodePacked(DST);
-    }
-    
-    HoprCrypto.VRF_Parameters memory params;
+    address chain_addr = crypto.scalarTimesBasepointProxy(privKey);
+    payload.message = vrf_message;
+    payload.signer = chain_addr;
+    payload.DST = abi.encodePacked(DST);
 
-    // stack height optimization, doesn't compile otherwise
-    {
-      (uint256 b_x, uint256 b_y) = crypto.hashToCurveProxy(abi.encodePacked(payload.signer, payload.message), payload.DST);
-
-      {
-        (uint256 v_x, uint256 v_y) = secp256k1.ecmul(b_x, b_y, privKey);
-        params.v_x = v_x;
-        params.v_y = v_y;
-      }
-
-      uint256 r = crypto.hashToScalarProxy(abi.encodePacked(privKey, b_x, b_y, payload.message), payload.DST);
-
-      (uint256 b_r_x, uint256 b_r_y) = secp256k1.ecmul(b_x,b_y, r);
-
-      params.h = crypto.hashToScalarProxy(abi.encodePacked(
-        payload.signer,
-        params.v_x,
-        params.v_y,
-        b_r_x,
-        b_r_y,
-        payload.message
-      ), abi.encodePacked(DST));
-
-      // s = r + h * a (mod p)
-      params.s = addmod(r, mulmod(params.h, privKey, HoprCrypto.SECP256K1_FIELD_ORDER), HoprCrypto.SECP256K1_FIELD_ORDER);
-
-      {
-        (uint256 s_b_x, uint256 s_b_y) = secp256k1.ecmul(b_x, b_y, params.s);
-        params.sB_x = s_b_x;
-        params.sB_y = s_b_y;
-
-        (uint256 h_v_x, uint256 h_v_y) = secp256k1.ecmul(params.v_x, params.v_y, params.h);
-        params.hV_x = h_v_x;
-        params.hV_y = h_v_y;
-      }
-    }
+    HoprCrypto.VRF_Parameters memory params = CryptoUtils.getVRFParameters(privKey, abi.encodePacked(DST), vrf_message);
 
     assertTrue(crypto.vrfVerifyProxy(params, payload));
+  }
+
+  function testRevert_vrfVerifyInvalidFieldElement(uint256 s_tweaked, uint256 h_tweaked, uint256 privKey, bytes32 vrf_message) public {
+    s_tweaked = bound(s_tweaked, HoprCrypto.SECP256K1_BASE_FIELD_ORDER, type(uint256).max);
+    h_tweaked = bound(h_tweaked, HoprCrypto.SECP256K1_BASE_FIELD_ORDER, type(uint256).max);
+
+    string memory DST = "some DST tag";
+
+    privKey = bound(privKey, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
+
+    HoprCrypto.VRF_Payload memory payload;
+
+    address chain_addr = crypto.scalarTimesBasepointProxy(privKey);
+    payload.message = vrf_message;
+    payload.signer = chain_addr;
+    payload.DST = abi.encodePacked(DST);
+
+    HoprCrypto.VRF_Parameters memory params = CryptoUtils.getVRFParameters(privKey, abi.encodePacked(DST), vrf_message);
+
+    uint256 tmp = params.s;
+    params.s = s_tweaked;
+
+    vm.expectRevert(HoprCrypto.InvalidFieldElement.selector);
+    crypto.vrfVerifyProxy(params, payload);
+
+    // reset value
+    params.s = tmp;
+
+    params.h = h_tweaked;
+
+    vm.expectRevert(HoprCrypto.InvalidFieldElement.selector);
+    crypto.vrfVerifyProxy(params, payload);
+  }
+
+  function testRevert_vrfVerifyInvalidCurvePoint(uint256 p_x_tweaked, uint256 p_y_tweaked, uint256 privKey, bytes32 vrf_message) public {
+    p_x_tweaked = bound(p_x_tweaked, 0, HoprCrypto.SECP256K1_BASE_FIELD_ORDER - 1);
+    p_y_tweaked = bound(p_y_tweaked, 0, HoprCrypto.SECP256K1_BASE_FIELD_ORDER - 1);
+
+    // there should be plenty of these points
+    vm.assume(!crypto.isCurvePointInternalProxy(p_x_tweaked, p_y_tweaked));
+
+    string memory DST = "some DST tag";
+
+    privKey = bound(privKey, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
+
+    HoprCrypto.VRF_Payload memory payload;
+
+    address chain_addr = crypto.scalarTimesBasepointProxy(privKey);
+    payload.message = vrf_message;
+    payload.signer = chain_addr;
+    payload.DST = abi.encodePacked(DST);
+
+    HoprCrypto.VRF_Parameters memory params = CryptoUtils.getVRFParameters(privKey, abi.encodePacked(DST), vrf_message);
+
+    params.v_x = p_x_tweaked;
+    params.v_y = p_y_tweaked;
+
+    vm.expectRevert(HoprCrypto.InvalidCurvePoint.selector);
+    crypto.vrfVerifyProxy(params, payload);
+  }
+
+  function testRevert_vrfVerifyInvalidPointWitness(uint256 s_tweaked, uint256 h_tweaked, uint256 privKey, bytes32 vrf_message) public {
+    s_tweaked = bound(s_tweaked, 1, HoprCrypto.SECP256K1_BASE_FIELD_ORDER - 1);
+    h_tweaked = bound(h_tweaked, 1, HoprCrypto.SECP256K1_BASE_FIELD_ORDER - 1);
+
+    string memory DST = "some DST tag";
+
+    privKey = bound(privKey, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
+
+    HoprCrypto.VRF_Payload memory payload;
+
+    address chain_addr = crypto.scalarTimesBasepointProxy(privKey);
+    payload.message = vrf_message;
+    payload.signer = chain_addr;
+    payload.DST = abi.encodePacked(DST);
+
+    HoprCrypto.VRF_Parameters memory params = CryptoUtils.getVRFParameters(privKey, abi.encodePacked(DST), vrf_message);
+
+    vm.assume(s_tweaked != params.s);
+    vm.assume(h_tweaked != params.h);
+    
+    // use different scalar
+    (uint256 r_x, uint256 r_y) = ecmul(SECP256K1_BASEPOINT_X, SECP256K1_BASEPOINT_Y, s_tweaked);
+
+    uint256 tmp_x = params.hV_x;
+    uint256 tmp_y = params.hV_y;
+
+    params.hV_x = r_x;
+    params.hV_y = r_y;
+
+    vm.expectRevert(HoprCrypto.InvalidPointWitness.selector);
+    crypto.vrfVerifyProxy(params, payload);
+
+    params.hV_x = tmp_x;
+    params.hV_y = tmp_y;
+
+    (r_x, r_y) = ecmul(SECP256K1_BASEPOINT_X, SECP256K1_BASEPOINT_Y, h_tweaked);
+
+    params.sB_x = r_x;
+    params.sB_y = r_y;
+
+    vm.expectRevert(HoprCrypto.InvalidPointWitness.selector);
+    crypto.vrfVerifyProxy(params, payload);
+  }
+
+  function test_vrfVerifyFail(uint256 h_tweaked, uint256 privKey, bytes32 vrf_message) public {
+    h_tweaked = bound(h_tweaked, 1, HoprCrypto.SECP256K1_BASE_FIELD_ORDER - 1);
+
+    string memory DST = "some DST tag";
+
+    privKey = bound(privKey, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
+
+    HoprCrypto.VRF_Payload memory payload;
+
+    address chain_addr = crypto.scalarTimesBasepointProxy(privKey);
+    payload.message = vrf_message;
+    payload.signer = chain_addr;
+    payload.DST = abi.encodePacked(DST);
+
+    HoprCrypto.VRF_Parameters memory params = CryptoUtils.getVRFParameters(privKey, abi.encodePacked(DST), vrf_message);
+
+    vm.assume(h_tweaked != params.h);
+
+    (uint256 r_x, uint256 r_y) = ecmul(params.v_x, params.v_y, h_tweaked);
+
+    params.h = h_tweaked;
+    params.hV_x = r_x;
+    params.hV_y = r_y;
+
+    assertFalse(crypto.vrfVerifyProxy(params, payload));
   }
 }

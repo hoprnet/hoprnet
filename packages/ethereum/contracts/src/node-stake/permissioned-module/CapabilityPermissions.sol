@@ -5,6 +5,8 @@ import "safe-contracts/common/Enum.sol";
 import "../../Channels.sol";
 import "../../utils/EnumerableTargetSet.sol";
 
+import "forge-std/console2.sol";
+
 enum GranularPermission { NONE, ALLOW, BLOCK }
 
 struct Role {
@@ -56,7 +58,6 @@ library HoprCapabilityPermissions {
     bytes4 internal constant INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTOR = HoprChannels.initiateOutgoingChannelClosureSafe.selector;
     bytes4 internal constant FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTOR = HoprChannels.finalizeOutgoingChannelClosureSafe.selector;
     bytes4 internal constant FUND_CHANNEL_SELECTOR = HoprChannels.fundChannelSafe.selector;
-    bytes4 internal constant SET_COMMITMENT_SELECTOR = HoprChannels.setCommitmentSafe.selector;
     // HoprToken method ids (TargetType.TOKEN). As HoprToken contract is in production, its ABI is static
     bytes4 internal constant APPROVE_SELECTOR = hex"095ea7b3"; // equivalent to `HoprToken.approve.selector`, for ABI "approve(address,uint256)"
     bytes4 internal constant SEND_SELECTOR = hex"9bd9bbc6"; // equivalent to `HoprToken.send.selector`, for ABI "send(address,uint256,bytes)"
@@ -208,6 +209,7 @@ library HoprCapabilityPermissions {
                 // We offset the load address by 85 byte (operation byte + 20 address bytes + 32 value bytes + 32 data length bytes)
                 out := add(data, add(i, 0x35))
             }
+            // console2.logBytes(data[:100]);
             checkTransaction(role, to, value, out, operation);
         }
     }
@@ -333,7 +335,7 @@ library HoprCapabilityPermissions {
         bytes32 channelId;
         if (functionSig == REDEEM_TICKET_SELECTOR) {
             channelId = pluckOneBytes32(1, data);
-        } else if (functionSig == CLOSE_INCOMING_CHANNEL_SELECTOR || functionSig == SET_COMMITMENT_SELECTOR) {
+        } else if (functionSig == CLOSE_INCOMING_CHANNEL_SELECTOR) {
             address source = pluckOneStaticAddress(1, data);
             channelId = getChannelId(source, self);
         } else if (
@@ -420,8 +422,6 @@ library HoprCapabilityPermissions {
             defaultFunctionPermission = target.getDefaultCapabilityPermissionAt(4);
         } else if (functionSig == FUND_CHANNEL_SELECTOR) {
             defaultFunctionPermission = target.getDefaultCapabilityPermissionAt(5);
-        } else if (functionSig == SET_COMMITMENT_SELECTOR) {
-            defaultFunctionPermission = target.getDefaultCapabilityPermissionAt(6);
         } else if (functionSig == APPROVE_SELECTOR) {
             defaultFunctionPermission = target.getDefaultCapabilityPermissionAt(7);
         } else if (functionSig == SEND_SELECTOR) {

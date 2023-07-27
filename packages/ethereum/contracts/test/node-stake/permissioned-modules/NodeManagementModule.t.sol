@@ -7,6 +7,7 @@ import "../../utils/CapabilityLibrary.sol";
 import '../../../script/utils/SafeSuiteLib.sol';
 import '../../utils/SafeSingleton.sol';
 import '../../../src/interfaces/IAvatar.sol';
+import '../../../src/Crypto.sol';
 import 'forge-std/Test.sol';
 import 'openzeppelin-contracts/token/ERC20/IERC20.sol';
 import "openzeppelin-contracts-upgradeable/proxy/ClonesUpgradeable.sol";
@@ -1322,7 +1323,7 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         );
         
         // try all functions on tokens
-        uint256 size = 9;
+        uint256 size = 7;
         bytes[] memory data = new bytes[](size);
         uint8[] memory txOperations = new uint8[](size);
         address[] memory txTos = new address[](size);
@@ -1333,29 +1334,28 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
             bytes32(hex"11"),
             HoprChannels.Balance.wrap(1),
             HoprChannels.TicketIndex.wrap(1),
+            HoprChannels.TicketIndexOffset.wrap(1),
             HoprChannels.ChannelEpoch.wrap(1),
-            HoprChannels.WinProb.wrap(1),
-            HoprChannels.TicketReserved.wrap(1)
+            HoprChannels.WinProb.wrap(1)
         );
-        HoprChannels.CompactSignature memory dummyCompactSignature = HoprChannels.CompactSignature(
+        HoprChannels.CompactSignature memory dummyCompactSignature = HoprCrypto.CompactSignature(
             bytes32(hex"22"),
             bytes32(hex"33")
         );
         HoprChannels.RedeemableTicket memory dummyRedeemableTicket = HoprChannels.RedeemableTicket(
             dummyTicketData,
             dummyCompactSignature,
-            bytes32(hex"44"),
-            bytes32(hex"55")
+            uint256(bytes32(hex"44"))
         );
 
         data[0] = abi.encodeWithSelector(IERC20.approve.selector, vm.addr(200), 100);
-        data[1] = abi.encodeWithSignature("send(address,uint256,bytes)", vm.addr(200),vm.addr(201), hex"ff"); 
-        data[2] = abi.encodeWithSelector(HoprChannels.redeemTicketSafe.selector, msgSender, dummyRedeemableTicket); 
+        data[1] = abi.encodeWithSignature("send(address,uint256,bytes)", vm.addr(200),vm.addr(201), hex"ff");
+        data[2] = abi.encodeWithSelector(HoprChannels.redeemTicketSafe.selector, msgSender, dummyRedeemableTicket);
         data[3] = abi.encodeWithSelector(HoprChannels.closeIncomingChannelSafe.selector, msgSender, vm.addr(404));
         data[4] = abi.encodeWithSelector(HoprChannels.initiateOutgoingChannelClosureSafe.selector, msgSender, vm.addr(404));
         data[5] = abi.encodeWithSelector(HoprChannels.finalizeOutgoingChannelClosureSafe.selector, msgSender, vm.addr(404));
         data[6] = abi.encodeWithSelector(HoprChannels.fundChannelSafe.selector, msgSender, vm.addr(404), HoprChannels.Balance.wrap(66));
-        data[7] = abi.encodeWithSelector(HoprChannels.setCommitmentSafe.selector, msgSender, vm.addr(404), bytes32(hex"77"));
+        // data[7] nothing
         // data[8] nothing
 
         emit log_named_bytes("data[2]", data[2]);
@@ -1368,8 +1368,8 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         }
         txTos[0] = token;
         txTos[1] = token;
-        txTos[8] = msgSender;
-        txValues[8] = 1 ether;
+        // txTos[8] = msgSender;
+        // txValues[8] = 1 ether;
 
         bytes memory safeTxData = _helperBuildMultiSendTx(txOperations, txTos, txValues, dataLengths, data);
 

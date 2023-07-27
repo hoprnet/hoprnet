@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8.0;
 
 import "../../src/utils/TargetUtils.sol";
@@ -15,39 +16,39 @@ contract TargetUtilsMock {
         target = Target.wrap(targetVal);
     }
 
-    function getNumCapabilityPermissions() public returns (uint256) {
+    function getNumCapabilityPermissions() pure public returns (uint256) {
         return TargetUtils.getNumCapabilityPermissions();
     }
 
-    function getTargetAddress() public returns (address) {
+    function getTargetAddress() view public returns (address) {
         return TargetUtils.getTargetAddress(target);
     }
 
-    function getTargetClearance() public returns (Clearance) {
+    function getTargetClearance() view public returns (Clearance) {
         return TargetUtils.getTargetClearance(target);
     }
 
-    function getTargetType() public returns (TargetType) {
+    function getTargetType() view public returns (TargetType) {
         return TargetUtils.getTargetType(target);
     }
 
-    function isTargetType(TargetType targetType) public returns (bool) {
+    function isTargetType(TargetType targetType) view public returns (bool) {
         return TargetUtils.isTargetType(target, targetType);
     }
 
-    function getDefaultTargetPermission() public returns (TargetPermission) {
+    function getDefaultTargetPermission() view public returns (TargetPermission) {
         return TargetUtils.getDefaultTargetPermission(target);
     }
 
-    function getDefaultCapabilityPermissionAt(uint256 position) public returns (CapabilityPermission) {
+    function getDefaultCapabilityPermissionAt(uint256 position) view public returns (CapabilityPermission) {
         return TargetUtils.getDefaultCapabilityPermissionAt(target, position);
     }
 
-    function forceWriteAsTargetType(TargetType targetType) public returns (Target) {
+    function forceWriteAsTargetType(TargetType targetType) view public returns (Target) {
         return TargetUtils.forceWriteAsTargetType(target, targetType);
     }
 
-    function forceWriteTargetAddress(address targetAddress) public returns (Target) {
+    function forceWriteTargetAddress(address targetAddress) view public returns (Target) {
         return TargetUtils.forceWriteTargetAddress(target, targetAddress);
     }
 
@@ -57,7 +58,7 @@ contract TargetUtilsMock {
         TargetType targetType,
         TargetPermission targetPermission,
         CapabilityPermission[] memory functionPermissions
-    ) public returns (Target) {
+    ) pure public returns (Target) {
         return TargetUtils.encodeDefaultPermissions(
             targetAddress,
             clearance,
@@ -67,7 +68,7 @@ contract TargetUtilsMock {
         );
     }
 
-    function decodeDefaultPermissions() public returns (
+    function decodeDefaultPermissions() view public returns (
         address targetAddress,
         Clearance clearance,
         TargetType targetType,
@@ -79,7 +80,7 @@ contract TargetUtilsMock {
         );
     }
 
-    function convertFunctionToTargetPermission(CapabilityPermission functionPermission) public returns (TargetPermission) {
+    function convertFunctionToTargetPermission(CapabilityPermission functionPermission) pure public returns (TargetPermission) {
         return TargetUtils.convertFunctionToTargetPermission(functionPermission);
     }
 }

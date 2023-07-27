@@ -3,6 +3,7 @@ pragma solidity >=0.8.0 <0.9.0;
 
 import '../../src/node-stake/NodeSafeRegistry.sol';
 import '../utils/Precompiles.sol';
+import 'openzeppelin-contracts/utils/cryptography/ECDSA.sol';
 import 'forge-std/Test.sol';
 import 'forge-std/StdCheats.sol';
 
@@ -238,7 +239,8 @@ contract HoprNodeSafeRegistryTest is Test {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(mockNodePrivateKey, registerHash);
         bytes memory sig = abi.encodePacked(r, s, v);
 
-        (address recovered, ECDSA.RecoverError error) = ECDSA.tryRecover(registerHash, sig);
+        (address recovered, ECDSA.RecoverError recoverError) = ECDSA.tryRecover(registerHash, sig);
+        assertTrue(recoverError == ECDSA.RecoverError.NoError);
         assertEq(recovered, nodeAddress);
 
         return (nodeAddress, sig);

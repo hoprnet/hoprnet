@@ -68,8 +68,8 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
                     "Channels.sol:HoprChannels",
                     abi.encode(
                         currentNetworkDetail.tokenContractAddress,
-                        currentNetworkDetail.nodeSafeRegistryAddress,
-                        closure
+                        closure,
+                        currentNetworkDetail.nodeSafeRegistryAddress
                     )
                 );
             isHoprChannelsDeployed = true;
