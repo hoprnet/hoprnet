@@ -24,7 +24,7 @@ https://github.com/hoprnet/hoprnet
 The Git commit hash under audit is:
 
 ```
-37ce7f762f982f789e01dfb2fbf2b987c3efa421
+d3dbcbe20975c1b0b4bd02fa8afaf42cf0d34c25
 ```
 
 All smart contracts can be found within the folder:
@@ -37,7 +37,7 @@ For convenience, the following link points to the source folder using the
 correct version:
 
 ```
-https://github.com/hoprnet/hoprnet/tree/37ce7f762f982f789e01dfb2fbf2b987c3efa421/packages/ethereum/contracts/src
+https://github.com/hoprnet/hoprnet/tree/d3dbcbe20975c1b0b4bd02fa8afaf42cf0d34c25/packages/ethereum/contracts/src
 ```
 
 
@@ -46,6 +46,7 @@ Specifically, the following contracts are within the scope of the audit:
 ```bash
 ├── Channels.sol
 ├── Crypto.sol
+├── MultiSig.sol
 ├── interfaces
 │   ├── IAvatar.sol
 │   ├── INetworkRegistryRequirement.sol
@@ -64,13 +65,62 @@ Specifically, the following contracts are within the scope of the audit:
     └── TargetUtils.sol
 ```
 
+### Out of Scope
+
+The following contracts are out of scope:
+
+```bash
+├── Announcements.sol # node announcement scheme which is independent from staking
+├── NetworkRegistry.sol # implements network gate which will be removed eventually
+├── proxy # implementations of adapters between network registry and staking
+│   ├── DummyProxyForNetworkRegistry.sol
+│   ├── SafeProxyForNetworkRegistry.sol
+│   └── StakingProxyForNetworkRegistry.sol
+└── static # existing contracts which will not be updated
+    ├── EnumerableStringSet.sol
+    ├── ERC777
+    │   └── ERC777Snapshot.sol
+    ├── HoprDistributor.sol
+    ├── HoprForwarder.sol
+    ├── HoprToken.sol
+    ├── HoprWrapper.sol
+    ├── HoprWrapperProxy.sol
+    ├── openzeppelin-contracts
+    │   ├── ERC777.sol
+    │   └── README.md
+    └── stake
+        ├── HoprBoost.sol
+        ├── HoprStake.sol
+        ├── HoprStake2.sol
+        ├── HoprStakeBase.sol
+        ├── HoprStakeSeason3.sol
+        ├── HoprStakeSeason4.sol
+        ├── HoprStakeSeason5.sol
+        ├── HoprStakeSeason6.sol
+        ├── HoprStakeSeason7.sol
+        ├── HoprWhitehat.sol
+        └── IHoprBoost.sol
+```
+
 ## Concepts
 
 todo
 
 ### Staking
 
+Presentation (WIP) which explains the new staking design:
+
+```
+https://docs.google.com/presentation/d/1oNG4LIBT0PKDHP1naOykdOaMaxlOxug7v3pQehwjBWc/edit?usp=sharing
+```
+
 todo
+
+![alt](./sc-flow-1.png)
+![alt](./sc-flow-2.png)
+![alt](./sc-flow-3.png)
+![alt](./sc-flow-4.png)
+![alt](./sc-flow-5.png)
 
 ### Payment Channels
 
