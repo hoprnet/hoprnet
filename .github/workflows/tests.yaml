@@ -169,7 +169,6 @@ jobs:
 
       - name: Test with pytest
         run: |
-          sleep 1000000000
           nix develop -c make smoke-test
         # timeout-minutes: 50
 
