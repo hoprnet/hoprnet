@@ -171,7 +171,15 @@ jobs:
       - name: Compress test logs
         if: always()
         run: |
-          tar -czvf test-e2e-${{ github.run_id }}-${{ github.run_number }}.tgz hopr-smoke-test*
+          sleep 120
+          # Log files are still being written while executing this step
+          set +e 
+          tar -czvf --warning=no-file-changed test-e2e-${{ github.run_id }}-${{ github.run_number }}.tgz hopr-smoke-test*
+          exitcode=$?
+          if [ "$exitcode" != "1" ] && [ "$exitcode" != "0" ]; then
+              exit $exitcode
+          fi
+          set -e          
         working-directory: "/tmp"
 
       - name: Upload test logs
