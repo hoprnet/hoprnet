@@ -10,6 +10,7 @@ on:
   pull_request:
     types:
       - synchronize
+      - ready_for_review
     paths-ignore:
       - 'docs/**/*'
       - '**/*.md'
