@@ -92,13 +92,13 @@
       "outFiles": ["${workspaceFolder}/packages/ethereum/**/*.{ts,js}"]
     },
     {
-      "name": "Run E2E tests",
+      "name": "Run Tests - E2E",
       "request": "launch",
       "type": "python",
       "module": "pytest",
       "justMyCode": true,
       "args": [
-              "${workspaceFolder}/tests/test_integration.py"
+              "${workspaceFolder}/tests"
           ],
       "console": "integratedTerminal",
       "env": {
