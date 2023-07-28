@@ -178,7 +178,7 @@ jobs:
           gzip_file=test-e2e-${{ github.run_id }}-${{ github.run_number }}.tgz
           # Prevent the tar command file because the path of the ${gzip_file} is being changed while it is being created 
           # https://stackoverflow.com/a/37993307
-          touch gzip_file
+          touch ${gzip_file}
           tar -czvf --warning=no-file-changed ${gzip_file} hopr-smoke-test*        
         working-directory: "/tmp"
 
