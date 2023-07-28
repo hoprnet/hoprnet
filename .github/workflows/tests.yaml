@@ -178,7 +178,7 @@ jobs:
           # Prevent the tar command file because the path of the ${test_path}.tgz is being changed while it is being created 
           test_path=/tmp/test-e2e-${{ github.run_id }}-${{ github.run_number }}
           mkdir -p ${test_path}
-          cp /tmp/hopr-smoke-test* ${test_path}
+          cp -r /tmp/hopr-smoke-test* ${test_path}
           cd ${test_path}
           tar -czvf ${test_path}.tgz ${test_path}
         working-directory: "/tmp"
