@@ -318,7 +318,7 @@ checksum = "a564d521dd56509c4c47480d00b80ee55f7e385ae48db5744c67ad50c92d2ebf"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.25",
+ "syn 2.0.27",
 ]
 
 [[package]]
@@ -661,6 +661,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "cbor4ii"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "13e8c816014cad3f58c2f0607677e8d2c6f76754dd8e735461a440b27b95199c"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "cc"
 version = "1.0.79"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -803,7 +812,7 @@ dependencies = [
  "heck",
  "proc-macro2",
  "quote",
- "syn 2.0.25",
+ "syn 2.0.27",
 ]
 
 [[package]]
@@ -1052,21 +1061,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "core-libp2p-hopr-protocol"
-version = "0.1.0"
-dependencies = [
- "console_error_panic_hook",
- "env_logger",
- "libp2p",
- "more-asserts",
- "utils-log",
- "utils-metrics",
- "utils-misc",
- "wasm-bindgen",
- "wasm-bindgen-test",
-]
-
-[[package]]
 name = "core-misc"
 version = "0.1.0"
 dependencies = [
@@ -1110,15 +1104,17 @@ name = "core-network"
 version = "0.2.1"
 dependencies = [
  "async-std",
+ "async-trait",
  "bincode",
  "blake2",
  "console_error_panic_hook",
  "core-crypto",
  "futures",
+ "futures-lite",
  "getrandom 0.2.10",
  "gloo-timers",
  "js-sys",
- "libp2p-identity 0.1.2",
+ "libp2p-identity 0.2.2",
  "mockall",
  "more-asserts",
  "rand 0.8.5",
@@ -1137,9 +1133,12 @@ dependencies = [
 name = "core-p2p"
 version = "0.1.0"
 dependencies = [
+ "async-std",
  "console_error_panic_hook",
+ "core-network",
  "env_logger",
  "futures",
+ "futures-concurrency",
  "futures-lite",
  "getrandom 0.2.10",
  "js-sys",
@@ -1147,7 +1146,12 @@ dependencies = [
  "libp2p-mplex",
  "libp2p-wasm-ext",
  "more-asserts",
+ "serde",
+ "syn 2.0.27",
+ "thiserror",
  "utils-log",
+ "utils-misc",
+ "void",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-bindgen-test",
@@ -1415,7 +1419,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "scratch",
- "syn 2.0.25",
+ "syn 2.0.27",
 ]
 
 [[package]]
@@ -1432,7 +1436,7 @@ checksum = "81b2dab6991c7ab1572fea8cb049db819b1aeea1e2dac74c0869f244d9f21a7c"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.25",
+ "syn 2.0.27",
 ]
 
 [[package]]
@@ -1703,7 +1707,7 @@ checksum = "eecf8589574ce9b895052fa12d69af7a233f99e6107f5cb8dd1044f2a17bfdcb"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.25",
+ "syn 2.0.27",
 ]
 
 [[package]]
@@ -1893,7 +1897,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
- "syn 2.0.25",
+ "syn 2.0.27",
  "toml 0.7.6",
  "walkdir",
 ]
@@ -1911,7 +1915,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "serde_json",
- "syn 2.0.25",
+ "syn 2.0.27",
 ]
 
 [[package]]
@@ -1937,7 +1941,7 @@ dependencies = [
  "serde",
  "serde_json",
  "strum",
- "syn 2.0.25",
+ "syn 2.0.27",
  "tempfile",
  "thiserror",
  "tiny-keccak",
@@ -2234,6 +2238,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "futures-concurrency"
+version = "7.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b726119e6cd29cf120724495b2085e1ed3d17821ea17b86de54576d1aa565f5e"
+dependencies = [
+ "bitvec 1.0.1",
+ "futures-core",
+ "pin-project",
+]
+
+[[package]]
 name = "futures-core"
 version = "0.3.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2290,7 +2305,7 @@ checksum = "89ca545a94061b6365f2c7355b4b32bd20df3ff95f02da9329b34ccc3bd6ee72"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.25",
+ "syn 2.0.27",
 ]
 
 [[package]]
@@ -3024,7 +3039,7 @@ dependencies = [
  "libp2p-connection-limits",
  "libp2p-core",
  "libp2p-gossipsub",
- "libp2p-identity 0.2.1",
+ "libp2p-identity 0.2.2",
  "libp2p-noise",
  "libp2p-request-response",
  "libp2p-swarm",
@@ -3038,7 +3053,7 @@ version = "0.2.0"
 source = "git+https://github.com/hoprnet/rust-libp2p.git?branch=release/providence#91fa879de8fa8c5b8e639af9e346fc4a54a437e0"
 dependencies = [
  "libp2p-core",
- "libp2p-identity 0.2.1",
+ "libp2p-identity 0.2.2",
  "libp2p-swarm",
  "void",
 ]
@@ -3049,7 +3064,7 @@ version = "0.2.0"
 source = "git+https://github.com/hoprnet/rust-libp2p.git?branch=release/providence#91fa879de8fa8c5b8e639af9e346fc4a54a437e0"
 dependencies = [
  "libp2p-core",
- "libp2p-identity 0.2.1",
+ "libp2p-identity 0.2.2",
  "libp2p-swarm",
  "void",
 ]
@@ -3064,7 +3079,7 @@ dependencies = [
  "futures",
  "futures-timer",
  "instant",
- "libp2p-identity 0.2.1",
+ "libp2p-identity 0.2.2",
  "log",
  "multiaddr 0.18.0",
  "multihash 0.19.0",
@@ -3098,7 +3113,7 @@ dependencies = [
  "hex_fmt",
  "instant",
  "libp2p-core",
- "libp2p-identity 0.2.1",
+ "libp2p-identity 0.2.2",
  "libp2p-swarm",
  "log",
  "prometheus-client",
@@ -3134,12 +3149,14 @@ dependencies = [
 
 [[package]]
 name = "libp2p-identity"
-version = "0.2.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d2874d9c6575f1d7a151022af5c42bb0ffdcdfbafe0a6fd039de870b384835a2"
+checksum = "a38d6012784fe4cc14e6d443eb415b11fc7c456dc15d9f0d90d9b70bc7ac3ec1"
 dependencies = [
+ "asn1_der",
  "bs58 0.5.0",
  "ed25519-dalek",
+ "libsecp256k1",
  "log",
  "multihash 0.19.0",
  "quick-protobuf",
@@ -3158,7 +3175,7 @@ dependencies = [
  "bytes",
  "futures",
  "libp2p-core",
- "libp2p-identity 0.2.1",
+ "libp2p-identity 0.2.2",
  "log",
  "nohash-hasher",
  "parking_lot",
@@ -3176,7 +3193,7 @@ dependencies = [
  "curve25519-dalek 3.2.0",
  "futures",
  "libp2p-core",
- "libp2p-identity 0.2.1",
+ "libp2p-identity 0.2.2",
  "log",
  "multiaddr 0.18.0",
  "multihash 0.19.0",
@@ -3197,13 +3214,15 @@ version = "0.25.1"
 source = "git+https://github.com/hoprnet/rust-libp2p.git?branch=release/providence#91fa879de8fa8c5b8e639af9e346fc4a54a437e0"
 dependencies = [
  "async-trait",
+ "cbor4ii",
  "futures",
  "instant",
  "libp2p-core",
- "libp2p-identity 0.2.1",
+ "libp2p-identity 0.2.2",
  "libp2p-swarm",
  "log",
  "rand 0.8.5",
+ "serde",
  "smallvec",
  "void",
 ]
@@ -3220,7 +3239,8 @@ dependencies = [
  "getrandom 0.2.10",
  "instant",
  "libp2p-core",
- "libp2p-identity 0.2.1",
+ "libp2p-identity 0.2.2",
+ "libp2p-swarm-derive",
  "log",
  "multistream-select",
  "once_cell",
@@ -3228,6 +3248,18 @@ dependencies = [
  "smallvec",
  "void",
  "wasm-bindgen-futures",
+]
+
+[[package]]
+name = "libp2p-swarm-derive"
+version = "0.33.0"
+source = "git+https://github.com/hoprnet/rust-libp2p.git?branch=release/providence#91fa879de8fa8c5b8e639af9e346fc4a54a437e0"
+dependencies = [
+ "heck",
+ "proc-macro-warning",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.27",
 ]
 
 [[package]]
@@ -3442,7 +3474,7 @@ dependencies = [
  "arrayref",
  "byteorder",
  "data-encoding",
- "libp2p-identity 0.2.1",
+ "libp2p-identity 0.2.2",
  "multibase",
  "multihash 0.19.0",
  "percent-encoding",
@@ -3566,7 +3598,7 @@ dependencies = [
  "proc-macro-crate",
  "proc-macro2",
  "quote",
- "syn 2.0.25",
+ "syn 2.0.27",
 ]
 
 [[package]]
@@ -3813,7 +3845,7 @@ dependencies = [
  "phf_shared 0.11.2",
  "proc-macro2",
  "quote",
- "syn 2.0.25",
+ "syn 2.0.27",
 ]
 
 [[package]]
@@ -3851,7 +3883,7 @@ checksum = "ec2e072ecce94ec471b13398d5402c188e76ac03cf74dd1a975161b23a3f6d9c"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.25",
+ "syn 2.0.27",
 ]
 
 [[package]]
@@ -3976,7 +4008,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "92139198957b410250d43fad93e630d956499a625c527eda65175c8680f83387"
 dependencies = [
  "proc-macro2",
- "syn 2.0.25",
+ "syn 2.0.27",
 ]
 
 [[package]]
@@ -4038,6 +4070,17 @@ dependencies = [
  "regex-syntax 0.6.29",
  "syn 1.0.109",
  "thiserror",
+]
+
+[[package]]
+name = "proc-macro-warning"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "70550716265d1ec349c41f70dd4f964b4fd88394efe4405f0c1da679c4799a07"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.27",
 ]
 
 [[package]]
@@ -4688,7 +4731,7 @@ checksum = "389894603bd18c46fa56231694f8d827779c0951a667087194cf9de94ed24682"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.25",
+ "syn 2.0.27",
 ]
 
 [[package]]
@@ -4719,7 +4762,7 @@ checksum = "1d89a8107374290037607734c0b73a85db7ed80cae314b3c5791f192a496e731"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.25",
+ "syn 2.0.27",
 ]
 
 [[package]]
@@ -4788,7 +4831,7 @@ checksum = "91d129178576168c589c9ec973feedf7d3126c01ac2bf08795109aa35b69fb8f"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.25",
+ "syn 2.0.27",
 ]
 
 [[package]]
@@ -5062,9 +5105,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "2.0.25"
+version = "2.0.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15e3fc8c0c74267e2df136e5e5fb656a464158aa57624053375eb9c8c6e25ae2"
+checksum = "b60f673f44a8255b9c8c657daf66a596d435f2da81a555b06dc644d080ba45e0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -5157,7 +5200,7 @@ checksum = "090198534930841fab3a5d1bb637cde49e339654e606195f8d9c76eeb081dc96"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.25",
+ "syn 2.0.27",
 ]
 
 [[package]]
@@ -5336,7 +5379,7 @@ checksum = "5f4f31f56159e98206da9efd823404b79b6ef3143b4a7ab76e67b1751b25a4ab"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.25",
+ "syn 2.0.27",
 ]
 
 [[package]]
@@ -5755,7 +5798,7 @@ dependencies = [
  "once_cell",
  "proc-macro2",
  "quote",
- "syn 2.0.25",
+ "syn 2.0.27",
  "wasm-bindgen-shared",
 ]
 
@@ -5790,7 +5833,7 @@ checksum = "54681b18a46765f095758388f2d0cf16eb8d4169b639ab575a8f5693af210c7b"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.25",
+ "syn 2.0.27",
  "wasm-bindgen-backend",
  "wasm-bindgen-shared",
 ]
@@ -6207,7 +6250,7 @@ checksum = "ce36e65b0d2999d2aafac989fb249189a141aee1f53c612c1f37d72631959f69"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.25",
+ "syn 2.0.27",
 ]
 
 [[package]]

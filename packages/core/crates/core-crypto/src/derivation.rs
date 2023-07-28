@@ -26,7 +26,7 @@ fn hkdf_expand_from_prk<const OUT_LENGTH: usize>(secret: &[u8], tag: &[u8]) -> R
     })?;
 
     // Expand the key to the required length
-    let mut out = [0u8; OUT_LENGTH];
+    let mut out: [u8; OUT_LENGTH] = [0u8; OUT_LENGTH];
     hkdf.expand(tag, &mut out).map_err(|_| InvalidInputValue)?;
 
     Ok(out)
