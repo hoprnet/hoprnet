@@ -92,13 +92,13 @@ jobs:
           docker tag ${{ env.DOCKER_REGISTRY }}/hopr-toolchain:${{ env.DOCKER_PR_TAG }} ${{ env.DOCKER_REGISTRY }}/hopr-toolchain:${{ env.DOCKER_STABLE_TAG }}
           docker push ${{ env.DOCKER_REGISTRY }}/hopr-toolchain:${{ env.DOCKER_STABLE_TAG }}
       - name: Docker Tag Hopli
-        if: env.build_hopli
+        if: env.build_toolchain || env.build_hopli
         run: |
           docker pull ${{ env.DOCKER_REGISTRY }}/hopli:${{ env.DOCKER_PR_TAG }}
           docker tag ${{ env.DOCKER_REGISTRY }}/hopli:${{ env.DOCKER_PR_TAG }} ${{ env.DOCKER_REGISTRY }}/hopli:${{ env.DOCKER_STABLE_TAG }}
           docker push ${{ env.DOCKER_REGISTRY }}/hopli:${{ env.DOCKER_STABLE_TAG }}
       - name: Docker Tag Hoprd
-        if: env.build_hoprd
+        if: env.build_toolchain || env.build_hoprd
         run: |
           docker pull ${{ env.DOCKER_REGISTRY }}/hoprd:${{ env.DOCKER_PR_TAG }}
           docker tag ${{ env.DOCKER_REGISTRY }}/hoprd:${{ env.DOCKER_PR_TAG }} ${{ env.DOCKER_REGISTRY }}/hoprd:${{ env.DOCKER_STABLE_TAG }}
@@ -277,9 +277,9 @@ jobs:
         run: |
           images=('hopli' 'hoprd' 'hopr-anvil' 'hopr-pluto' 'hopr-toolchain' 'hoprd')
           for image in "${images[@]}"; do
-            image_tags=$(gcloud artifacts docker images list --include-tags europe-west3-docker.pkg.dev/hoprassociation/docker-images/${image} --format="json" 2> /dev/null | jq -r --arg date "$date"  '.[] | select(.tags | length > 0) | select(.tags | contains("-pr.${{ github.event.pull_request.number }}")).version')
+            image_tags=$(gcloud artifacts docker images list --include-tags europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/${image} --format="json" 2> /dev/null | jq -r --arg date "$date"  '.[] | select(.tags | length > 0) | select(.tags | contains("-pr.${{ github.event.pull_request.number }}")).version')
             for image_tag in $image_tags; do
-              gcloud artifacts docker images delete --quiet --delete-tags --async europe-west3-docker.pkg.dev/hoprassociation/docker-images/${image}@${image_tag}
+              gcloud artifacts docker images delete --quiet --delete-tags --async europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/${image}@${image_tag}
             done
           done
 

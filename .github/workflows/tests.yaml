@@ -13,6 +13,7 @@ on:
   pull_request:
     types:
       - synchronize
+      - ready_for_review
     paths-ignore:
       - '.processes/**/*'
       - 'docs/**/*'
@@ -159,18 +160,27 @@ jobs:
       - name: Install dependencies
         run: nix develop -c make -j deps-ci
 
+      - name: Setup Hoprd Runtime
+        run: |
+          sudo ./scripts/toolchain/install-toolchain.sh --runtime-only
+
       - name: Build application
         run: nix develop -c make -j build
 
       - name: Test with pytest
         run: |
           nix develop -c make smoke-test
-        timeout-minutes: 50
+        timeout-minutes: 60
 
       - name: Compress test logs
         if: always()
         run: |
-          tar -czvf test-e2e-${{ github.run_id }}-${{ github.run_number }}.tgz hopr-smoke-test*
+          # Copy all the logs to a directory to avoid log file changes and simplify tar command
+          test_path=/tmp/test-e2e-${{ github.run_id }}-${{ github.run_number }}
+          mkdir -p ${test_path}
+          cp -r /tmp/hopr-smoke-test* ${test_path}
+          cd ${test_path}
+          tar -czvf ${test_path}.tgz ${test_path}
         working-directory: "/tmp"
 
       - name: Upload test logs
