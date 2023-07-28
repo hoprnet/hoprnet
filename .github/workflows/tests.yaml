@@ -162,7 +162,7 @@ jobs:
 
       - name: Setup Hoprd Runtime
         run: |
-          ./scripts/toolchain/install-toolchain.sh --runtime-only
+          sudo ./scripts/toolchain/install-toolchain.sh --runtime-only
 
       - name: Build application
         run: nix develop -c make -j build
