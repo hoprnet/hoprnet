@@ -170,7 +170,7 @@ jobs:
       - name: Test with pytest
         run: |
           nix develop -c make smoke-test
-        # timeout-minutes: 50
+        timeout-minutes: 60
 
       - name: Compress test logs
         if: always()
