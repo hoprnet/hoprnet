@@ -12,7 +12,10 @@ crate-type = ["cdylib", "rlib"]
 [features]
 default = ["console_error_panic_hook", "wasm", "prometheus"]
 console_error_panic_hook = ["dep:console_error_panic_hook"]
-wasm = ["dep:wasm-bindgen", "dep:js-sys", "core-ethereum-db/wasm", "core-ethereum-misc/wasm", "core-packet/wasm", "core-p2p/wasm", "utils-log/wasm", "utils-misc/wasm", "utils-metrics?/wasm"]
+wasm = ["dep:wasm-bindgen", "dep:js-sys",
+    "core-ethereum-db/wasm", "core-ethereum-misc/wasm", "core-packet/wasm", "core-p2p/wasm",
+    "utils-log/wasm", "utils-misc/wasm", "utils-metrics?/wasm"
+]
 prometheus = ["dep:utils-metrics", "core-packet/prometheus"]
 
 [dependencies]
@@ -24,9 +27,9 @@ core-ethereum-db = { path = "../../../core-ethereum/crates/core-ethereum-db", de
 core-ethereum-misc = { path = "../../../core-ethereum/crates/core-ethereum-misc", default-features = false }
 core-packet = { path = "../core-packet", default-features = false }
 core-p2p = { path = "../core-p2p", default-features = false }
-utils-log = { path = "../../../utils/crates/utils-log", default-features = false}
-utils-misc = { path = "../../../utils/crates/utils-misc", default-features = false }
-utils-metrics = { path = "../../../utils/crates/utils-metrics", optional = true, default-features = false }
+utils-log = { workspace = true }
+utils-misc = { workspace = true }
+utils-metrics = { workspace = true, optional = true }
 
 [package.metadata.wasm-pack.profile.dev]
 wasm-opt = false
