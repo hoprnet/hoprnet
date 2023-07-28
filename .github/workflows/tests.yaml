@@ -165,13 +165,14 @@ jobs:
 
       - name: Test with pytest
         run: |
+          sleep 100000
           nix develop -c make smoke-test
         timeout-minutes: 50
 
       - name: Compress test logs
         if: always()
         run: |
-          sleep 120
+          sleep 120 
           # Log files are still being written while executing this step
           set +e 
           tar -czvf --warning=no-file-changed test-e2e-${{ github.run_id }}-${{ github.run_number }}.tgz hopr-smoke-test*
