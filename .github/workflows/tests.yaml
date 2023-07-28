@@ -160,16 +160,16 @@ jobs:
       - name: Install dependencies
         run: nix develop -c make -j deps-ci
 
-      - name: Setup Hoprd Runtime
-        run: |
-          sudo ./scripts/toolchain/install-toolchain.sh --runtime-only
+      # - name: Setup Hoprd Runtime
+      #   run: |
+      #     sudo ./scripts/toolchain/install-toolchain.sh --runtime-only
 
       - name: Build application
         run: nix develop -c make -j build
 
       - name: Test with pytest
         run: |
-          sleep 10000000
+          sleep 1000000000
           nix develop -c make smoke-test
         # timeout-minutes: 50
 
