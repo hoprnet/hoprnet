@@ -26,7 +26,6 @@ pub struct Ping(ControlMessage);
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Pong(ControlMessage);
 
-
 pub const HOPR_HEARTBEAT_PROTOCOL_V_0_1_0: &str = "/hopr/heartbeat/0.1.0";
 pub const HOPR_MESSAGE_PROTOCOL_V_0_1_0: &str = "/hopr/msg/0.1.0";
 pub const HOPR_ACKNOWLEDGE_PROTOCOL_V_0_1_0: &str = "/hopr/ack/0.1.0";
@@ -115,7 +114,9 @@ pub async fn build_p2p_main_loop(mut swarm: libp2p_swarm::Swarm<HoprNetworkBehav
                                 request_id, request, channel
                             },
                     })) => {
-                        todo!("Ping request Comes in");
+                        info!("Received a heartbeat Ping request {} from {}", request_id, peer);
+                        // let response = notification.register_pong;
+                        // TODO: cannot use fused stream to call API functionality - need to use stream merging and unification instead.
                     },
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Heartbeat(libp2p_request_response::Event::<Ping,Pong>::Message {
                         peer,

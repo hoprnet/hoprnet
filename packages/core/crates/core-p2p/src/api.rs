@@ -46,6 +46,17 @@ impl PingMechanism {
         }
     }
 
+    pub fn generate_challenge_response(&self, challenge: &ControlMessage) -> ControlMessage {
+        match ControlMessage::generate_pong_response(challenge) {
+            Ok(value) => value,
+            Err(_) => {
+                error!("Failed to generate a pong response, creating random failing one");
+                ControlMessage::generate_pong_response(&ControlMessage::generate_ping_request())
+                    .expect("Pong from correct Ping is always creatable")
+            },
+        }
+    }
+
     pub async fn register_pong(&mut self, pong: (PeerId, std::result::Result<ControlMessage,()>)) -> Result<()> {
         match poll_fn(|cx| Pin::new(&mut self.notify_heartbeat_pong).poll_ready(cx)).await {
             Ok(_) => {
