@@ -18,12 +18,8 @@ use libp2p_swarm::{NetworkBehaviour, SwarmBuilder, SwarmEvent};
 
 use serde::{Serialize, Deserialize};
 
-use core_crypto::random::random_bytes;
 use core_network::messaging::ControlMessage;
-
-
-const HEARTBEAT_SECRET_SIZE: usize = 40;
-
+use utils_log::{info, error};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Ping(ControlMessage);
@@ -100,18 +96,14 @@ pub fn build_p2p_network(me: &PeerId) -> libp2p_swarm::Swarm<HoprNetworkBehavior
     SwarmBuilder::with_wasm_executor(transport, behavior, me.clone()).build()
 }
 
-pub async fn build_p2p_main_loop(mut swarm: libp2p_swarm::Swarm<HoprNetworkBehavior>, notifier: api::Notifier) {
-    let mut input = futures::stream::pending::<()>();
-    
+pub async fn build_p2p_main_loop(mut swarm: libp2p_swarm::Swarm<HoprNetworkBehavior>, notifier: api::PingMechanism) {
     let a = async move {
-        let heartbeat_secret = random_bytes::<HEARTBEAT_SECRET_SIZE>();
-
         let mut notification = notifier.fuse();
         loop {
             select! {
-                input = notification.select_next_some() => match input {
-                    api::NotifierMessage::HeartbeatSendPing(ping) => {
-                        // swarm.
+                input = notification.select_next_some() => match api::Triggers::from(input) {
+                    api::Triggers::Heartbeat(api::HeartbeatChallenge(peer, challenge)) => {
+                        swarm.behaviour_mut().heartbeat.send_request(&peer, Ping(challenge));
                     },
                     _ => {}
                 },

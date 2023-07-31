@@ -167,7 +167,7 @@ impl Ping {
         F: futures::Future<Output = Result<Box<[u8]>, String>>,
     {
         info!("Pinging peer '{}'", destination);
-        let sent_ping = ControlMessage::generate_ping_request(None);
+        let sent_ping = ControlMessage::generate_ping_request();
 
         let ping_result: PingMeasurement = {
             let ping_peer_timer = if let Some(metric_time_to_ping) = &self.metric_time_to_ping {

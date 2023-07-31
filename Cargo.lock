@@ -1133,7 +1133,6 @@ version = "0.1.0"
 dependencies = [
  "async-std",
  "console_error_panic_hook",
- "core-crypto",
  "core-network",
  "env_logger",
  "futures",

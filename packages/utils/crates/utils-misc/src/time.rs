@@ -1,4 +1,3 @@
-#[cfg(not(feature = "wasm"))]
 pub mod native {
     pub fn current_timestamp() -> u64 {
         std::time::SystemTime::now()
@@ -7,7 +6,6 @@ pub mod native {
             .unwrap_or(0u64)
     }
 }
-
 #[cfg(feature = "wasm")]
 pub mod wasm {
     pub fn current_timestamp() -> u64 {

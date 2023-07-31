@@ -13,7 +13,7 @@ default = ["console_error_panic_hook", "wasm"]
 wasm = [
     "dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:getrandom",
     "libp2p/wasm-bindgen", "dep:libp2p-wasm-ext",
-    "core-network/wasm", "utils-log/wasm"
+    "core-network/wasm", "utils-log/wasm", "utils-misc/wasm"
 ]
 
 [dependencies]
@@ -35,7 +35,6 @@ wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen-futures = { version = "0.4.36", optional = true }
 #wee_alloc = { version = "0.4.5", optional = true }
 
-core-crypto = { workspace = true }
 core-network = { workspace = true }
 utils-log = { workspace = true }
 utils-misc = { workspace = true }
