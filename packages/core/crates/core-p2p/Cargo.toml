@@ -23,21 +23,25 @@ futures = "0.3.28"
 futures-lite = "1.12.0"
 serde = { workspace = true, features = ["derive"]}
 syn = "2.0.27"      # needed for `features=["macros"]` from `libp2p`
-void = "1"
+void = "1"          # needed for Behavior implementations from libp2p
 
 # wasm
 libp2p-wasm-ext = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "release/providence", features = ["tcp"], optional = true }
 getrandom = { version = "0.2.8", features = ["js"], optional = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }
 js-sys = { version = "0.3.63", optional = true }
+thiserror = { workspace = true }
 wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen-futures = { version = "0.4.36", optional = true }
 #wee_alloc = { version = "0.4.5", optional = true }
 
-utils-log = { workspace = true }
+core-crypto = { workspace = true }
 core-network = { workspace = true }
+utils-log = { workspace = true }
+utils-misc = { workspace = true }
 
 [dev-dependencies]
+async-std = { version = "1.12.0", features = ["attributes"] }
 more-asserts = "0.3.1"
 env_logger = "0.10.0"
 wasm-bindgen-test = "0.3.36"

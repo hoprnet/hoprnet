@@ -1131,7 +1131,9 @@ dependencies = [
 name = "core-p2p"
 version = "0.1.0"
 dependencies = [
+ "async-std",
  "console_error_panic_hook",
+ "core-crypto",
  "core-network",
  "env_logger",
  "futures",
@@ -1144,7 +1146,9 @@ dependencies = [
  "more-asserts",
  "serde",
  "syn 2.0.27",
+ "thiserror",
  "utils-log",
+ "utils-misc",
  "void",
  "wasm-bindgen",
  "wasm-bindgen-futures",

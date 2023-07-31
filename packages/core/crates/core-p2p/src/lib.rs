@@ -1,3 +1,6 @@
+pub mod api;
+pub mod errors;
+
 use futures::{select, StreamExt};
 use libp2p::StreamProtocol;
 
@@ -15,12 +18,18 @@ use libp2p_swarm::{NetworkBehaviour, SwarmBuilder, SwarmEvent};
 
 use serde::{Serialize, Deserialize};
 
+use core_crypto::random::random_bytes;
+use core_network::messaging::ControlMessage;
+
+
+const HEARTBEAT_SECRET_SIZE: usize = 40;
+
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Ping(ControlMessage);
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Pong(ControlMessage);
 
-use core_network::messaging::ControlMessage;
 
 pub const HOPR_HEARTBEAT_PROTOCOL_V_0_1_0: &str = "/hopr/heartbeat/0.1.0";
 pub const HOPR_MESSAGE_PROTOCOL_V_0_1_0: &str = "/hopr/msg/0.1.0";
@@ -86,19 +95,25 @@ pub fn build_p2p_network(me: &PeerId) -> libp2p_swarm::Swarm<HoprNetworkBehavior
         .timeout(std::time::Duration::from_secs(20))
         .boxed();
 
-    let network_behavior = HoprNetworkBehavior::default();
+    let behavior = HoprNetworkBehavior::default();
 
-    SwarmBuilder::with_wasm_executor(transport, network_behavior, me.clone()).build()
+    SwarmBuilder::with_wasm_executor(transport, behavior, me.clone()).build()
 }
 
-pub async fn build_p2p_main_loop(mut swarm: libp2p_swarm::Swarm<HoprNetworkBehavior>) {
+pub async fn build_p2p_main_loop(mut swarm: libp2p_swarm::Swarm<HoprNetworkBehavior>, notifier: api::Notifier) {
     let mut input = futures::stream::pending::<()>();
     
     let a = async move {
+        let heartbeat_secret = random_bytes::<HEARTBEAT_SECRET_SIZE>();
+
+        let mut notification = notifier.fuse();
         loop {
             select! {
-                _ = input.select_next_some() => {
-                    todo!("This should contain switchable input");
+                input = notification.select_next_some() => match input {
+                    api::NotifierMessage::HeartbeatSendPing(ping) => {
+                        // swarm.
+                    },
+                    _ => {}
                 },
                 event = swarm.select_next_some() => match event {
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Heartbeat(libp2p_request_response::Event::<Ping,Pong>::Message {

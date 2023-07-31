@@ -1,10 +1,10 @@
 use crate::errors::NetworkingError::MessagingError;
 use core_crypto::derivation::derive_ping_pong;
+use core_crypto::types::Hash;
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "compat-ping")]
 use utils_types::errors::GeneralError::ParseError;
-#[cfg(feature = "compat-ping")]
 use utils_types::traits::BinarySerializable;
 
 use crate::errors::Result;
@@ -21,9 +21,17 @@ pub enum ControlMessage {
 
 impl ControlMessage {
     /// Creates ping challenge message
-    pub fn generate_ping_request() -> Self {
+    pub fn generate_ping_request(id_and_secret: Option<&[u8]>) -> Self {
         let mut ping = PingMessage::default();
-        ping.nonce.copy_from_slice(&derive_ping_pong(None));
+        match id_and_secret {
+            Some(v) => {
+                ping.nonce.copy_from_slice(&Hash::create(&[&v]).to_bytes().as_ref()[..core_crypto::parameters::PING_PONG_NONCE_SIZE]);
+            },
+            None => {
+                ping.nonce.copy_from_slice(&derive_ping_pong(None));
+            }
+        }
+        
         Self::Ping(ping)
     }
 
@@ -115,7 +123,7 @@ mod tests {
         let sent_req_s: Box<[u8]>;
         let sent_req: ControlMessage;
         {
-            sent_req = ControlMessage::generate_ping_request();
+            sent_req = ControlMessage::generate_ping_request(None);
             sent_req_s = sent_req.get_ping_message().unwrap().to_bytes();
         }
 
