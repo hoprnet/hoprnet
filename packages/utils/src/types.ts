@@ -29,6 +29,8 @@ export {
   Ticket,
   U256,
   Hash,
+  OffchainPublicKey,
+  OffchainKeypair,
   PublicKey,
   PendingAcknowledgement,
   Signature,

@@ -56,6 +56,7 @@ import {
   Ethereum_ChannelEntry,
   Ethereum_Database,
   Ethereum_Hash,
+  Ethereum_OffchainPublicKey,
   Ethereum_PublicKey,
   Ethereum_Snapshot
 } from '../db.js'
@@ -65,6 +66,7 @@ import type { TypedEvent, TypedEventFilter } from '../utils/common.js'
 // @ts-ignore untyped library
 import retimer from 'retimer'
 import assert from 'assert'
+import { OffchainPublicKey } from '../../crates/core-ethereum-db/pkg/core_ethereum_db.js'
 
 // Exported from Rust
 const constants = CORE_ETHEREUM_CONSTANTS()
@@ -828,8 +830,9 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   }
 
   private async onAnnouncement(event: Event<'Announcement'>, blockNumber: BN, lastSnapshot: Snapshot): Promise<void> {
-    // publicKey given by the SC is verified
-    const publicKey = PublicKey.deserialize(stringToU8a(event.args.publicKey))
+    // public keys given by the SC are verified
+    const packetKey = OffchainPublicKey.deserialize(stringToU8a(event.args.publicKey))
+    const chainKey = PublicKey.random() // TODO: load this from the SC event
 
     let multiaddr: Multiaddr
     try {
@@ -837,16 +840,16 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
         // remove "p2p" and corresponding peerID
         .decapsulateCode(421)
         // add new peerID
-        .encapsulate(`/p2p/${publicKey.to_peerid_str()}`)
+        .encapsulate(`/p2p/${packetKey.to_peerid_str()}`)
     } catch (error) {
       log(`Invalid multiaddr '${event.args.multiaddr}' given in event 'onAnnouncement'`)
       log(error)
       return
     }
 
-    const account = new AccountEntry(publicKey, multiaddr.toString(), blockNumber.toNumber())
+    const account = new AccountEntry(chainKey, packetKey, multiaddr.toString(), blockNumber.toNumber())
 
-    log('New node announced', account.get_address().to_hex(), account.get_multiaddress_str())
+    log('New node announced', account.get_peerid_str(), account.get_multiaddress_str())
     metric_numAnnouncements.increment()
 
     assert(lastSnapshot !== undefined)
@@ -855,8 +858,14 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       Ethereum_Snapshot.deserialize(lastSnapshot.serialize())
     )
 
+    // Establish linkage between packet and chain keys
+    await this.db.link_chain_and_packet_keys(
+      Ethereum_PublicKey.deserialize(chainKey.serialize(false)),
+      Ethereum_OffchainPublicKey.deserialize(packetKey.serialize())
+    )
+
     this.emit('peer', {
-      id: peerIdFromString(account.get_peer_id_str()),
+      id: peerIdFromString(account.get_peerid_str()),
       multiaddrs: [new Multiaddr(account.get_multiaddress_str())]
     })
   }
@@ -992,11 +1001,13 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     event: RegistryEvent<'Registered'> | RegistryEvent<'RegisteredByOwner'>,
     lastSnapshot: Snapshot
   ): Promise<void> {
-    let hoprNode: PeerId
+    let hoprNode: Ethereum_Address
+    //let nodeAddrStr = event.args.nodeAddress
+    let nodeAddrStr = '' // TODO: read the actual node chain-key address from the event
     try {
-      hoprNode = peerIdFromString(event.args.hoprPeerId)
+      hoprNode = Ethereum_Address.from_string(nodeAddrStr)
     } catch (error) {
-      log(`Invalid peer Id '${event.args.hoprPeerId}' given in event 'onRegistered'`)
+      log(`Invalid address '${nodeAddrStr}' given in event 'onRegistered'`)
       log(error)
       return
     }
@@ -1004,7 +1015,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     assert(lastSnapshot !== undefined)
     const account = Address.from_string(event.args.account)
     await this.db.add_to_network_registry(
-      Ethereum_PublicKey.from_peerid_str(hoprNode.toString()).to_address(),
+      hoprNode,
       Ethereum_Address.deserialize(account.serialize()),
       Ethereum_Snapshot.deserialize(lastSnapshot.serialize())
     )
@@ -1015,17 +1026,19 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     event: RegistryEvent<'Deregistered'> | RegistryEvent<'DeregisteredByOwner'>,
     lastSnapshot: Snapshot
   ): Promise<void> {
-    let hoprNode: PeerId
+    let hoprNode: Ethereum_Address
+    //let nodeAddrStr = event.args.nodeAddress
+    let nodeAddrStr = '' // TODO: read the actual node chain-key address from the event
     try {
-      hoprNode = peerIdFromString(event.args.hoprPeerId)
+      hoprNode = Ethereum_Address.from_string(nodeAddrStr)
     } catch (error) {
-      log(`Invalid peer Id '${event.args.hoprPeerId}' given in event 'onDeregistered'`)
+      log(`Invalid address '${nodeAddrStr}' given in event 'onRegistered'`)
       log(error)
       return
     }
     assert(lastSnapshot !== undefined)
     await this.db.remove_from_network_registry(
-      Ethereum_PublicKey.from_peerid_str(hoprNode.toString()).to_address(),
+      hoprNode,
       Ethereum_Address.from_string(event.args.account),
       Ethereum_Snapshot.deserialize(lastSnapshot.serialize())
     )
@@ -1073,12 +1086,20 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     return account
   }
 
-  public async getPublicKeyOf(address: Address): Promise<PublicKey> {
+  public async getChainKeyOf(address: Address): Promise<PublicKey> {
     const account = await this.getAccount(address)
     if (account !== undefined) {
-      return account.public_key
+      return account.chain_key
     }
-    throw new Error('Could not find public key for address - have they announced? -' + address.to_hex())
+    throw new Error('Could not find chain key for address - have they announced? -' + address.to_hex())
+  }
+
+  public async getPacketKeyOf(address: Address): Promise<OffchainPublicKey> {
+    const account = await this.getAccount(address)
+    if (account !== undefined) {
+      return account.packet_key
+    }
+    throw new Error('Could not find packet key for address - have they announced? -' + address.to_hex())
   }
 
   public async *getAddressesAnnouncedOnChain() {
@@ -1095,11 +1116,10 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     let publicAccounts = await this.db.get_public_node_accounts()
     while (publicAccounts.len() > 0) {
       let account = publicAccounts.next()
-      let packetKey = await this.db.get_packet_key(account.public_key)
-      if (packetKey) {
-        out += `  - ${packetKey.to_peerid_str()} (on-chain ${account.get_address().to_string()}) ${account.get_multiaddress_str()}\n`
+      if (account) {
+        out += `  - ${account.packet_key.to_peerid_str()} (on-chain ${account.get_address().to_string()}) ${account.get_multiaddress_str()}\n`
         result.push({
-          id: peerIdFromString(packetKey.to_peerid_str()),
+          id: peerIdFromString(account.packet_key.to_peerid_str()),
           multiaddrs: [new Multiaddr(account.get_multiaddress_str())]
         })
       } else {

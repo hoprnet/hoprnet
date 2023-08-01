@@ -204,6 +204,11 @@ pub mod wasm {
             ok_or_jserr!(Self::from_secret(secret))
         }
 
+        #[wasm_bindgen(js_name = "random")]
+        pub fn _random() -> OffchainKeypair {
+            Self::random()
+        }
+
         #[wasm_bindgen(js_name = "public")]
         pub fn _public(&self) -> OffchainPublicKey {
             self.1.clone()
@@ -225,6 +230,11 @@ pub mod wasm {
         #[wasm_bindgen(constructor)]
         pub fn _new(secret: &[u8]) -> JsResult<ChainKeypair> {
             ok_or_jserr!(Self::from_secret(secret))
+        }
+
+        #[wasm_bindgen(js_name = "random")]
+        pub fn _random() -> ChainKeypair {
+            Self::random()
         }
 
         #[wasm_bindgen(js_name = "public")]
