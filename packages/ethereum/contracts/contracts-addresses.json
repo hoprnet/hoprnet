@@ -9,7 +9,8 @@
       "network_registry_proxy_contract_address": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853",
       "node_safe_registry_address": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
       "node_stake_v2_factory_address": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
-      "token_contract_address": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
+      "token_contract_address": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
+      "ticket_price_oracle_contract_address": "0x0000000000000000000000000000000000000000"
     },
     "anvil-localhost2": {
       "channels_contract_address": "0x0165878A594ca255338adfa4d48449f69242Eb8F",
@@ -20,7 +21,8 @@
       "network_registry_proxy_contract_address": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853",
       "node_safe_registry_address": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
       "node_stake_v2_factory_address": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
-      "token_contract_address": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
+      "token_contract_address": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
+      "ticket_price_oracle_contract_address": "0x0000000000000000000000000000000000000000"
     },
     "rotsee": {
       "channels_contract_address": "0xB20ee6e0b714e531CabF2C29fbA147f4e5905B7b",
@@ -31,7 +33,8 @@
       "network_registry_proxy_contract_address": "0xaefC99476f9F04326a748B7E32364B10B8fF4158",
       "node_safe_registry_address": "0xf5FD9e286662830672B720c21A7Ddc67a00da77a",
       "node_stake_v2_factory_address": "0x060Cb76C6541bF28f94088e658E4167966E37eF9",
-      "token_contract_address": "0xf1aDf07D0d4e1beFdDe79066771d057337e55c08"
+      "token_contract_address": "0xf1aDf07D0d4e1beFdDe79066771d057337e55c08",
+      "ticket_price_oracle_contract_address": "0x0000000000000000000000000000000000000000"
     },
     "debug-staging": {
       "channels_contract_address": "0xd54eE5aDed3A4d2059A6f01DEbdb033BB5453433",
@@ -42,7 +45,8 @@
       "token_contract_address": "0xf1aDf07D0d4e1beFdDe79066771d057337e55c08",
       "node_stake_v2_factory_address": "0x0000000000000000000000000000000000000000",
       "node_safe_registry_address": "0x0000000000000000000000000000000000000000",
-      "module_implementation_address": "0x0000000000000000000000000000000000000000"
+      "module_implementation_address": "0x0000000000000000000000000000000000000000",
+      "ticket_price_oracle_contract_address": "0x0000000000000000000000000000000000000000"
     },
     "monte_rosa": {
       "channels_contract_address": "0xFaBeE463f31E39eC8952bBfB4490C41103bf573e",
@@ -53,7 +57,8 @@
       "token_contract_address": "0x66225dE86Cac02b32f34992eb3410F59DE416698",
       "node_stake_v2_factory_address": "0x0000000000000000000000000000000000000000",
       "node_safe_registry_address": "0x0000000000000000000000000000000000000000",
-      "module_implementation_address": "0x0000000000000000000000000000000000000000"
+      "module_implementation_address": "0x0000000000000000000000000000000000000000",
+      "ticket_price_oracle_contract_address": "0x0000000000000000000000000000000000000000"
     }
   }
 }

@@ -26,6 +26,7 @@ contract NetworkConfig is Script {
     address nodeSafeRegistryAddress;
     address networkRegistryContractAddress;
     address networkRegistryProxyContractAddress;
+    address ticketPriceOracleContractAddress;
     uint256 indexerStartBlockNumber;
   }
 
@@ -79,6 +80,9 @@ contract NetworkConfig is Script {
     address networkRegistryAddr = json.readAddress(
       string(abi.encodePacked(levelToNetworkConfig, '.network_registry_contract_address'))
     );
+    address ticketPriceOracleAddress = json.readAddress(
+      string(abi.encodePacked(levelToNetworkConfig, '.ticket_price_oracle_contract_address'))
+    );
 
     networkDetail = NetworkDetail({
       environmentType: envType,
@@ -89,7 +93,8 @@ contract NetworkConfig is Script {
       nodeSafeRegistryAddress: nodeSafeRegistryAddr,
       indexerStartBlockNumber: indexerStartBlkNum,
       networkRegistryContractAddress: networkRegistryAddr,
-      networkRegistryProxyContractAddress: networkRegistryProxyAddr
+      networkRegistryProxyContractAddress: networkRegistryProxyAddr,
+      ticketPriceOracleContractAddress: ticketPriceOracleAddress
     });
   }
 
@@ -187,6 +192,16 @@ contract NetworkConfig is Script {
         )
       )
     );
+    vm.writeLine(
+      filePath,
+      string(
+        abi.encodePacked(
+          '"ticket_price_oracle_contract_address": "',
+          vm.toString(networkDetail.ticketPriceOracleContractAddress),
+          '",'
+        )
+      )
+    );
   }
 
   // FIXME: remove this temporary method
@@ -232,6 +247,7 @@ contract NetworkConfig is Script {
     json.serialize('module_implementation_address', networkDetail.moduleImplementationAddress);
     json.serialize('node_safe_registry_address', networkDetail.nodeSafeRegistryAddress);
     json.serialize('network_registry_proxy_contract_address', networkDetail.networkRegistryProxyContractAddress);
+    json.serialize('ticket_price_oracle_contract_address', networkDetail.ticketPriceOracleContractAddress);
     json = json.serialize('network_registry_contract_address', networkDetail.networkRegistryContractAddress);
     return json;
   }

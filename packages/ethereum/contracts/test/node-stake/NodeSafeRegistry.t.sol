@@ -51,6 +51,9 @@ contract HoprNodeSafeRegistryTest is Test {
 
         HoprNodeSafeRegistry.NodeSafe memory nodeSafe = HoprNodeSafeRegistry.NodeSafe(safeAddress, vm.addr(nodePrivateKey));
 
+        // verify the registration is not known beforehand
+        assertFalse(nodeSafeRegistry.isNodeSafeRegistered(nodeSafe));
+
         (address nodeAddress, bytes memory sig) = _helperBuildSig(nodePrivateKey,nodeSafe);
 
         _helperMockSafe(safeAddress, nodeAddress, true, true);
@@ -58,6 +61,10 @@ contract HoprNodeSafeRegistryTest is Test {
         vm.expectEmit(true, true, false, false, address(nodeSafeRegistry));
         emit RegisteredNodeSafe(safeAddress, nodeAddress);
         nodeSafeRegistry.registerSafeWithNodeSig(nodeSafe, sig);
+
+        // verify the registration worked
+        assertTrue(nodeSafeRegistry.isNodeSafeRegistered(nodeSafe));
+
         vm.clearMockedCalls();
     }
 

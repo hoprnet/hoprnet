@@ -139,7 +139,7 @@ library TargetUtils {
         if (capabilityPermissions.length > NUM_CAPABILITY_PERMISSIONS) {
             revert TooManyCapabilities();
         }
-        
+
         uint256 _target;
         // include address to the first 160 bits
         _target |= uint256(uint160(targetAddress)) << 96;
@@ -178,7 +178,7 @@ library TargetUtils {
         targetType = TargetType(uint8((Target.unwrap(target) << 168) >> 248));
         // decode default target permissions
         targetPermission = TargetPermission(uint8(Target.unwrap(target) << 176 >> 248));
-        
+
         // there are 1 default target permission and 8 default function permissions
         capabilityPermissions = new CapabilityPermission[](NUM_CAPABILITY_PERMISSIONS);
         // decode function permissions. By default, 8 function permissions
