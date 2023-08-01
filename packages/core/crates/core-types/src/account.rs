@@ -143,6 +143,7 @@ impl BinarySerializable for AccountEntry {
     fn to_bytes(&self) -> Box<[u8]> {
         let mut ret = Vec::with_capacity(Self::SIZE);
         ret.extend_from_slice(&self.chain_key.to_bytes(false));
+        ret.extend_from_slice(&self.packet_key.to_bytes());
 
         match &self.entry_type {
             NotAnnounced => {
@@ -171,7 +172,7 @@ impl BinarySerializable for AccountEntry {
 mod test {
     use crate::account::AccountEntry;
     use crate::account::AccountType::{Announced, NotAnnounced};
-    use core_crypto::types::PublicKey;
+    use core_crypto::types::{OffchainPublicKey, PublicKey};
     use hex_literal::hex;
     use multiaddr::Multiaddr;
     use utils_types::traits::BinarySerializable;
@@ -181,9 +182,11 @@ mod test {
     #[test]
     fn test_account_entry_non_routable() {
         let pub_key = PublicKey::from_privkey(&PRIVATE_KEY).unwrap();
+        let pub_key2 = OffchainPublicKey::from_privkey(&PRIVATE_KEY).unwrap();
 
         let ae1 = AccountEntry::new(
             pub_key.clone(),
+            pub_key2.clone(),
             Announced {
                 multiaddr: "/p2p/16Uiu2HAm3rUQdpCz53tK1MVUUq9NdMAU6mFgtcXrf71Ltw6AStzk"
                     .parse::<Multiaddr>()
@@ -203,9 +206,11 @@ mod test {
     #[test]
     fn test_account_entry_routable() {
         let pub_key = PublicKey::from_privkey(&PRIVATE_KEY).unwrap();
+        let pub_key2 = OffchainPublicKey::from_privkey(&PRIVATE_KEY).unwrap();
 
         let ae1 = AccountEntry::new(
             pub_key.clone(),
+            pub_key2.clone(),
             Announced {
                 multiaddr: "/ip4/34.65.237.196/tcp/9091/p2p/16Uiu2HAm3rUQdpCz53tK1MVUUq9NdMAU6mFgtcXrf71Ltw6AStzk"
                     .parse::<Multiaddr>()
@@ -225,8 +230,9 @@ mod test {
     #[test]
     fn test_account_entry_not_announced() {
         let pub_key = PublicKey::from_privkey(&PRIVATE_KEY).unwrap();
+        let pub_key2 = OffchainPublicKey::from_privkey(&PRIVATE_KEY).unwrap();
 
-        let ae1 = AccountEntry::new(pub_key.clone(), NotAnnounced);
+        let ae1 = AccountEntry::new(pub_key.clone(), pub_key2.clone(), NotAnnounced);
 
         assert!(!ae1.has_announced());
         assert!(ae1.updated_at().is_none());

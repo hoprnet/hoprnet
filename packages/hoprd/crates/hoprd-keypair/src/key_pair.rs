@@ -456,6 +456,10 @@ impl HoprKeys {
 
         write(path, serialized).map_err(|e| e.into())
     }
+
+    pub fn id(&self) -> &Uuid {
+        &self.id
+    }
 }
 
 impl Debug for HoprKeys {

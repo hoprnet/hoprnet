@@ -59,7 +59,7 @@ pub fn create_identity(dir_name: &str, password: &str, maybe_name: &Option<Strin
                 format!("{dir_name}/{name}.id")
             }
         }
-        None => format!("{dir_name}/{}.id", { keys.id.to_string() }),
+        None => format!("{dir_name}/{}.id", { keys.id().to_string() }),
     };
 
     keys.write_eth_keystore(&file_path, password, false)?;

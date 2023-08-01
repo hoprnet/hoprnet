@@ -13,6 +13,7 @@ use utils_types::traits::{PeerIdLike, ToHex};
 /// Represents a path for a packet.
 /// The type internally carries an information if the path has been already validated or not (since path validation
 /// is potentially an expensive operation).
+/// Path validation process checks if all the channels on the path exist and are in an `Open` state.
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug, Clone)]
 pub struct Path {

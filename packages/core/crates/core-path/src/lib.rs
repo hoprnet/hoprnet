@@ -1,5 +1,6 @@
 pub mod errors;
 pub mod path;
+pub mod finder;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
