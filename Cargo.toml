@@ -24,6 +24,8 @@ members = [
 ]
 
 [workspace.dependencies]
+futures = "0.3.28"
+futures-lite = "1.12.0"
 libp2p = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "release/providence" }
 serde = { version = "1.0" }
 thiserror = "1.0"

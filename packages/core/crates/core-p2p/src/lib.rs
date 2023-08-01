@@ -19,12 +19,14 @@ use libp2p_swarm::{NetworkBehaviour, SwarmBuilder, SwarmEvent};
 use serde::{Serialize, Deserialize};
 
 use core_network::messaging::ControlMessage;
-use utils_log::{info, error};
+use utils_log::{debug, info, error};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Ping(ControlMessage);
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Pong(ControlMessage);
+
+use futures_concurrency::stream::Merge;
 
 pub const HOPR_HEARTBEAT_PROTOCOL_V_0_1_0: &str = "/hopr/heartbeat/0.1.0";
 pub const HOPR_MESSAGE_PROTOCOL_V_0_1_0: &str = "/hopr/msg/0.1.0";
@@ -95,12 +97,26 @@ pub fn build_p2p_network(me: &PeerId) -> libp2p_swarm::Swarm<HoprNetworkBehavior
     SwarmBuilder::with_wasm_executor(transport, behavior, me.clone()).build()
 }
 
-pub async fn build_p2p_main_loop(mut swarm: libp2p_swarm::Swarm<HoprNetworkBehavior>, notifier: api::PingMechanism) {
+pub enum X {
+    U8(u8),
+    H(api::HeartbeatChallenge)
+}
+
+pub async fn build_p2p_main_loop(swarm: libp2p_swarm::Swarm<HoprNetworkBehavior>,
+    heartbeat_requests: api::HeartbeatRequester, heartbeat_responds: api::HeartbeatResponder)
+{
+    let mut swarm = swarm;
+    let mut heartbeat_responds = heartbeat_responds;
+
     let a = async move {
-        let mut notification = notifier.fuse();
+        // TODO: use the merged stream instead of the select
+        // let x = (notifier.map(X::H), futures_lite::stream::once(1u8).map(X::U8)).merge();
+        // let r = notifier.register_pong((PeerId::random(), Err(()))).await;
+
+        let mut hb_reqs = heartbeat_requests.fuse();
         loop {
             select! {
-                input = notification.select_next_some() => match api::Triggers::from(input) {
+                input = hb_reqs.select_next_some() => match api::Triggers::from(input) {
                     api::Triggers::Heartbeat(api::HeartbeatChallenge(peer, challenge)) => {
                         swarm.behaviour_mut().heartbeat.send_request(&peer, Ping(challenge));
                     },
@@ -115,8 +131,13 @@ pub async fn build_p2p_main_loop(mut swarm: libp2p_swarm::Swarm<HoprNetworkBehav
                             },
                     })) => {
                         info!("Received a heartbeat Ping request {} from {}", request_id, peer);
-                        // let response = notification.register_pong;
-                        // TODO: cannot use fused stream to call API functionality - need to use stream merging and unification instead.
+                        let challenge_response = api::HeartbeatResponder::generate_challenge_response(&request.0);
+                        match swarm.behaviour_mut().heartbeat.send_response(channel, Pong(challenge_response)) {
+                            Ok(_) => {},
+                            Err(_) => {
+                                error!("An error occured during the ping response, channel is either closed or timed out.");
+                            }    
+                        };
                     },
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Heartbeat(libp2p_request_response::Event::<Ping,Pong>::Message {
                         peer,
@@ -125,16 +146,28 @@ pub async fn build_p2p_main_loop(mut swarm: libp2p_swarm::Swarm<HoprNetworkBehav
                                 request_id, response
                             },
                     })) => {
-                        todo!("Ping response comes in");
+                        info!("Heartbeat protocol: Received a Pong response for request {} from {}", request_id, peer);
+                        match heartbeat_responds.record_pong((peer, Ok(response.0))).await {
+                            Ok(_) => {},
+                            Err(e) => {
+                                error!("Heartbeat mechanism could not be updated with pong messages: {}", e);
+                            }
+                        }
                     },
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Heartbeat(libp2p_request_response::Event::<Ping,Pong>::OutboundFailure {
                         peer, request_id, error,
                     })) => {
-                        todo!("Filed to send ping request for some reason");
+                        info!("Heartbeat protocol: Failed to send a Ping message {} to {} with an error: {}", request_id, peer, error);
+                        match heartbeat_responds.record_pong((peer, Err(()))).await {
+                            Ok(_) => {},
+                            Err(e) => {
+                                error!("Heartbeat mechanism could not be updated with pong messages: {}", e);
+                            }
+                        }
                     },
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Heartbeat(libp2p_request_response::Event::<Ping,Pong>::InboundFailure {..}))
                     | SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Heartbeat(libp2p_request_response::Event::<Ping,Pong>::ResponseSent {..})) => {
-                        todo!("We do not care about this at all!");
+                        // debug!("Discarded messages not relevant for the protocol!");
                     },
                     _ => {
                         todo!("Not relevant for protocol implementation, connection items!");

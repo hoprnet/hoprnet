@@ -34,6 +34,12 @@ use utils_misc::time::wasm::current_timestamp;
 
 const PINGS_MAX_PARALLEL: usize = 14;
 
+// TODO: NOTE: UnboundedSender and UnboundedReceiver are bound only by available memory
+// in case of faster input than output the memory might run out
+pub type HeartbeaSendPingTx = futures::channel::mpsc::UnboundedSender<(PeerId, ControlMessage)>;
+pub type HeartbeatGetPongRx = futures::channel::mpsc::UnboundedReceiver<(PeerId, std::result::Result<ControlMessage, ()>)>;
+
+
 #[cfg_attr(test, mockall::automock)]
 pub trait PingExternalAPI {
     fn on_finished_ping(&self, peer: &PeerId, result: crate::types::Result);

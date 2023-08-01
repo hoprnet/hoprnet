@@ -1136,6 +1136,7 @@ dependencies = [
  "core-network",
  "env_logger",
  "futures",
+ "futures-concurrency",
  "futures-lite",
  "getrandom 0.2.10",
  "js-sys",
@@ -2232,6 +2233,17 @@ checksum = "955518d47e09b25bbebc7a18df10b81f0c766eaf4c4f1cccef2fca5f2a4fb5f2"
 dependencies = [
  "futures-core",
  "futures-sink",
+]
+
+[[package]]
+name = "futures-concurrency"
+version = "7.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b726119e6cd29cf120724495b2085e1ed3d17821ea17b86de54576d1aa565f5e"
+dependencies = [
+ "bitvec 1.0.1",
+ "futures-core",
+ "pin-project",
 ]
 
 [[package]]
