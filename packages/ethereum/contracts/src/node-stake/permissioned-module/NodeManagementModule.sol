@@ -20,12 +20,12 @@ error CannotChangeOwner();
 /**
  * @title Permissioned capability-based module for HOPR nodes operations
  *
- * @dev Drawing inspiration from the `zodiac-modifier-roles-v1` `Roles.sol` contract, 
+ * @dev Drawing inspiration from the `zodiac-modifier-roles-v1` `Roles.sol` contract,
  * this module removes target attribute and is dedicated for managing HOPR nodes
  * with capability based permissions.
  * Only those addresses that are added by the Safe can call execTransactionFromModule
  * A deployed Multisend contract address is included in the contract
- * Module can only execute DELEGATECALL to the Multisend contract 
+ * Module can only execute DELEGATECALL to the Multisend contract
  * Module can execute CALLs to HoprChannels contracts
  * Module can execute CALLs to HoprToken contracts
  */
@@ -33,7 +33,7 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
   using TargetUtils for Target;
 
   bool public constant isHoprNodeManagementModule = true;
-  // address to send delegated multisend calls to 
+  // address to send delegated multisend calls to
   address public multisend;
   // from HoprCapabilityPermissions. This module is a Role where members are NODE_CHAIN_KEYs
   Role internal role;

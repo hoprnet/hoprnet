@@ -15,7 +15,7 @@ struct Role {
     // For CHANNELS target: capabilityKey (bytes32) => channel Id (keccak256(src, dest)) => GranularPermission
     // For TOKEN target: capabilityKey (bytes32) => pair Id (keccak256(node address, spender address)) => GranularPermission
     // For SEND target:  bytes32(0x00) => pair Id (keccak256(node address, spender address)) => GranularPermission
-    mapping(bytes32 => mapping(bytes32 => GranularPermission)) capabilities; 
+    mapping(bytes32 => mapping(bytes32 => GranularPermission)) capabilities;
 }
 
 /**
@@ -531,10 +531,10 @@ library HoprCapabilityPermissions {
       // force overwrite irrelevant defaults
       Target updatedTarget = target.forceWriteAsTargetType(TargetType.SEND);
       role.targets.add(updatedTarget);
-      
+
       emit ScopedTargetSend(targetAddress, updatedTarget);
     }
-    
+
     /**
      * @dev Sets permissions for a set of max. 7 functions on a scoped CHANNELS target.
      * @param role The storage reference to the Role struct.
@@ -712,7 +712,7 @@ library HoprCapabilityPermissions {
         if (functionSigs.length != permissions.length) {
             revert ArraysDifferentLength();
         }
-        
+
         bytes32 val;
         // add function signatures
         for (uint256 i = 0; i < len; i++) {
@@ -736,7 +736,7 @@ library HoprCapabilityPermissions {
      * @param length length of permissions
      */
     function decodeFunctionSigsAndPermissions(
-        bytes32 encoded, 
+        bytes32 encoded,
         uint256 length
     ) internal pure returns (bytes4[] memory functionSigs, GranularPermission[] memory permissions) {
         if (length > 7) {

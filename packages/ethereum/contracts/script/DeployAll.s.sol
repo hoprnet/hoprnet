@@ -86,6 +86,9 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
         // E.g. Always in local environment, or should a new NetworkRegistryProxy contract be introduced in development/staging/production
          _deployNetworkRegistry(deployerAddress);
 
+        // 3.8. TicketPriceOracle
+        _deployHoprTicketPriceOracle(deployerAddress, 100);
+
         // 4. update indexerStartBlockNumber
         // if both HoprChannels and HoprNetworkRegistry contracts are deployed, update the startup block number for indexer
         if (isHoprChannelsDeployed && isHoprNetworkRegistryDeployed) {
@@ -111,6 +114,7 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
             currentNetworkDetail.nodeStakeV2FactoryAddress = deployCode("NodeStakeFactory.sol:HoprNodeStakeFactory");
         }
     }
+
     /**
      * @dev Deploy node management module
      */
@@ -220,6 +224,18 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
                     emit log_string("Cannot disableRegistry");
                 }
             }
+        }
+    }
+
+    /**
+     * @dev deploy ticket price oracle
+     */
+    function _deployHoprTicketPriceOracle(address deployerAddress, uint256 price) internal {
+        if ( currentEnvironmentType == EnvironmentType.LOCAL
+                || !isValidAddress(currentNetworkDetail.ticketPriceOracleContractAddress)
+        ) {
+            // deploy contract
+            currentNetworkDetail.ticketPriceOracleContractAddress = deployCode("TicketPriceOracle.sol:HoprTicketPriceOracle", abi.encode(deployerAddress, price));
         }
     }
 }
