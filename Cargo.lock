@@ -1112,7 +1112,7 @@ dependencies = [
  "getrandom 0.2.10",
  "gloo-timers",
  "js-sys",
- "libp2p-identity 0.1.2",
+ "libp2p-identity 0.2.2",
  "mockall",
  "more-asserts",
  "rand 0.8.5",
@@ -3037,7 +3037,7 @@ dependencies = [
  "libp2p-connection-limits",
  "libp2p-core",
  "libp2p-gossipsub",
- "libp2p-identity 0.2.1",
+ "libp2p-identity 0.2.2",
  "libp2p-noise",
  "libp2p-request-response",
  "libp2p-swarm",
@@ -3051,7 +3051,7 @@ version = "0.2.0"
 source = "git+https://github.com/hoprnet/rust-libp2p.git?branch=release/providence#91fa879de8fa8c5b8e639af9e346fc4a54a437e0"
 dependencies = [
  "libp2p-core",
- "libp2p-identity 0.2.1",
+ "libp2p-identity 0.2.2",
  "libp2p-swarm",
  "void",
 ]
@@ -3062,7 +3062,7 @@ version = "0.2.0"
 source = "git+https://github.com/hoprnet/rust-libp2p.git?branch=release/providence#91fa879de8fa8c5b8e639af9e346fc4a54a437e0"
 dependencies = [
  "libp2p-core",
- "libp2p-identity 0.2.1",
+ "libp2p-identity 0.2.2",
  "libp2p-swarm",
  "void",
 ]
@@ -3077,7 +3077,7 @@ dependencies = [
  "futures",
  "futures-timer",
  "instant",
- "libp2p-identity 0.2.1",
+ "libp2p-identity 0.2.2",
  "log",
  "multiaddr 0.18.0",
  "multihash 0.19.0",
@@ -3111,7 +3111,7 @@ dependencies = [
  "hex_fmt",
  "instant",
  "libp2p-core",
- "libp2p-identity 0.2.1",
+ "libp2p-identity 0.2.2",
  "libp2p-swarm",
  "log",
  "prometheus-client",
@@ -3147,12 +3147,14 @@ dependencies = [
 
 [[package]]
 name = "libp2p-identity"
-version = "0.2.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d2874d9c6575f1d7a151022af5c42bb0ffdcdfbafe0a6fd039de870b384835a2"
+checksum = "a38d6012784fe4cc14e6d443eb415b11fc7c456dc15d9f0d90d9b70bc7ac3ec1"
 dependencies = [
+ "asn1_der",
  "bs58 0.5.0",
  "ed25519-dalek",
+ "libsecp256k1",
  "log",
  "multihash 0.19.0",
  "quick-protobuf",
@@ -3171,7 +3173,7 @@ dependencies = [
  "bytes",
  "futures",
  "libp2p-core",
- "libp2p-identity 0.2.1",
+ "libp2p-identity 0.2.2",
  "log",
  "nohash-hasher",
  "parking_lot",
@@ -3189,7 +3191,7 @@ dependencies = [
  "curve25519-dalek 3.2.0",
  "futures",
  "libp2p-core",
- "libp2p-identity 0.2.1",
+ "libp2p-identity 0.2.2",
  "log",
  "multiaddr 0.18.0",
  "multihash 0.19.0",
@@ -3214,7 +3216,7 @@ dependencies = [
  "futures",
  "instant",
  "libp2p-core",
- "libp2p-identity 0.2.1",
+ "libp2p-identity 0.2.2",
  "libp2p-swarm",
  "log",
  "rand 0.8.5",
@@ -3235,7 +3237,7 @@ dependencies = [
  "getrandom 0.2.10",
  "instant",
  "libp2p-core",
- "libp2p-identity 0.2.1",
+ "libp2p-identity 0.2.2",
  "libp2p-swarm-derive",
  "log",
  "multistream-select",
@@ -3470,7 +3472,7 @@ dependencies = [
  "arrayref",
  "byteorder",
  "data-encoding",
- "libp2p-identity 0.2.1",
+ "libp2p-identity 0.2.2",
  "multibase",
  "multihash 0.19.0",
  "percent-encoding",

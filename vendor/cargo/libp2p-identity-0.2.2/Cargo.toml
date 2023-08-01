@@ -13,7 +13,7 @@
 edition = "2021"
 rust-version = "1.65.0"
 name = "libp2p-identity"
-version = "0.2.1"
+version = "0.2.2"
 description = "Data structures and algorithms for identifying peers in libp2p."
 keywords = [
     "peer-to-peer",
@@ -116,7 +116,7 @@ version = "0.5"
 version = "0.4.1"
 
 [dev-dependencies.rmp-serde]
-version = "1.0"
+version = "1.1"
 
 [dev-dependencies.serde_json]
 version = "1.0"

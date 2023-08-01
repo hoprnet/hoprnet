@@ -116,7 +116,7 @@ mod tests {
         let sent_req_s: Box<[u8]>;
         let sent_req: ControlMessage;
         {
-            sent_req = ControlMessage::generate_ping_request(None);
+            sent_req = ControlMessage::generate_ping_request();
             sent_req_s = sent_req.get_ping_message().unwrap().to_bytes();
         }
 
