@@ -5,10 +5,6 @@ use libp2p::identity::PeerId;
 
 use core_network::messaging::ControlMessage;
 use utils_log::error;
-#[cfg(any(not(feature = "wasm"), test))]
-use utils_misc::time::native::current_timestamp;
-#[cfg(all(feature = "wasm", not(test)))]
-use utils_misc::time::wasm::current_timestamp;
 
 use crate::errors::{Result, P2PError};
 
@@ -94,32 +90,6 @@ impl Stream for HeartbeatRequester {
         (0, None)
     }
 }
-
-//     pub async fn register_pong(&mut self, pong: (PeerId, std::result::Result<ControlMessage,()>)) -> Result<()> {
-//         match poll_fn(|cx| Pin::new(&mut self.notify_heartbeat_pong).poll_ready(cx)).await {
-//             Ok(_) => {
-//                 let (timestamp, challenge) = self.active_pings.remove(&pong.0)
-//                     .ok_or_else(|| P2PError::Logic("Received a pong for an unregistered ping".to_owned()))?;
-//                 let duration: std::result::Result<std::time::Duration, ()> = match pong.1 {
-//                     Ok(response) => {
-//                         if ControlMessage::validate_pong_response(&challenge, &response).is_ok() {
-//                             Ok(std::time::Duration::from_millis(current_timestamp() - timestamp))
-//                         } else {
-//                             error!("Failed to verify the challenge for ping to peer: {}", pong.0.to_string());
-//                             Err(())
-//                         }
-//                     },
-//                     Err(_) => Err(())
-//                 };
-//                 match self.notify_heartbeat_pong.start_send((pong.0, duration)) {
-//                     Err(e) => Err(P2PError::Notification(format!("Failed to send notification to heartbeat mechanism: {}", e))),
-//                     _ => Ok(()),
-//                 }
-//             },
-//             Err(_) => Err(P2PError::Notification(format!("The heartbeat mechanism cannot be notified, the receiver was closed"))),
-//         }
-//     }
-// }
 
 #[cfg(test)]
 mod tests {
