@@ -14,7 +14,8 @@ import './Ledger.sol';
 import './MultiSig.sol';
 import './node-stake/NodeSafeRegistry.sol';
 
-uint256 constant ONE_HOUR = 60 * 1000;
+uint256 constant ONE_HOUR = 60 * 60 * 1000; // in milliseconds
+
 uint256 constant INDEX_SNAPSHOT_INTERVAL = ONE_HOUR;
 
 /**

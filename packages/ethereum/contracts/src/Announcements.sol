@@ -26,8 +26,18 @@ import './node-stake/NodeSafeRegistry.sol';
 contract HoprAnnouncements is Multicall, HoprMultiSig {
   event KeyBinding(bytes32 ed25519_sig_0, bytes32 ed25519_sig_1, bytes32 ed25519_pub_key, address chain_key);
 
-  event AddressAnnouncement4(address node, bytes4 ip4, bytes2 port);
-  event AddressAnnouncement6(address node, bytes16 ip6, bytes2 port);
+  /**
+   * A node is announce with a multiaddress base which a peer can use to
+   * construct a full p2p multiaddress.
+   * Examples:
+   *   /dns4/ams-2.bootstrap.libp2p.io/tcp/443/wss
+   *   /ip6/2604:1380:2000:7a00::1/tcp/4001
+   *   /ip4/147.75.83.83/tcp/4001
+   *   /ip6/2604:1380:2000:7a00::1/udp/4001/quic
+   *   /ip4/147.75.83.83/udp/4001/quic
+   *   /dns6/ams-2.bootstrap.libp2p.io/tcp/443/wss
+   */
+  event AddressAnnouncement(address node, string baseMultiaddr);
 
   event RevokeAnnouncement(address node);
 
@@ -52,72 +62,36 @@ contract HoprAnnouncements is Multicall, HoprMultiSig {
     _bindKeysInternal(msg.sender, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key);
   }
 
-  function bindKeysAnnounce4Safe(
+  function bindKeysAnnounceSafe(
     address self,
     bytes32 ed25519_sig_0,
     bytes32 ed25519_sig_1,
     bytes32 ed25519_pub_key,
-    bytes4 ip,
-    bytes2 port
+    string calldata baseMultiaddr
   ) external HoprMultiSig.onlySafe(self) {
     _bindKeysInternal(self, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key);
-    _announce4Internal(self, ip, port);
+    _announceInternal(self, baseMultiaddr);
   }
 
   /**
-   * Convenience method to bind keys and announce a IPv4 address in one call.
+   * Convenience method to bind keys and announce in one call.
    */
-  function bindKeysAnnounce4(
+  function bindKeysAnnounce(
     bytes32 ed25519_sig_0,
     bytes32 ed25519_sig_1,
     bytes32 ed25519_pub_key,
-    bytes4 ip,
-    bytes2 port
+    string calldata baseMultiaddr
   ) external HoprMultiSig.noSafeSet {
     _bindKeysInternal(msg.sender,  ed25519_sig_0, ed25519_sig_1, ed25519_pub_key);
-    _announce4Internal(msg.sender, ip, port);
+    _announceInternal(msg.sender, baseMultiaddr);
   }
 
-  function bindKeysAnnounce6Safe(
-    address self,
-    bytes32 ed25519_sig_0,
-    bytes32 ed25519_sig_1,
-    bytes32 ed25519_pub_key,
-    bytes16 ip,
-    bytes2 port
-  ) external HoprMultiSig.onlySafe(self) {
-    _bindKeysInternal(self, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key);
-    _announce6Internal(self, ip, port);
+  function announceSafe(address self, string calldata baseMultiaddr) external HoprMultiSig.onlySafe(self) {
+    _announceInternal(self, baseMultiaddr);
   }
 
-  /**
-   * Convenience method to bind keys and announce a IPv6 address in one call.
-   */
-  function bindKeysAnnounce6(
-    bytes32 ed25519_sig_0,
-    bytes32 ed25519_sig_1,
-    bytes32 ed25519_pub_key,
-    bytes16 ip,
-    bytes2 port
-  ) external HoprMultiSig.noSafeSet {
-    _bindKeysInternal(msg.sender, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key);
-    _announce6Internal(msg.sender, ip, port);
-  }
-
-  function announce6Safe(address self, bytes16 ip, bytes2 port) external HoprMultiSig.onlySafe(self) {
-    _announce6Internal(self, ip, port);
-  }
-
-  function announce6(bytes16 ip, bytes2 port) external HoprMultiSig.noSafeSet {
-    _announce6Internal(msg.sender, ip, port);
-  }
-
-  function announce4Safe(address self, bytes4 ip, bytes2 port) external HoprMultiSig.onlySafe(self) {
-    _announce4Internal(self, ip, port);
-  }
-
-  function announce4(bytes4 ip, bytes2 port) external HoprMultiSig.noSafeSet {
-    _announce4Internal(msg.sender, ip, port);
+  function announce(string calldata baseMultiaddr) external HoprMultiSig.noSafeSet {
+    _announceInternal(msg.sender, baseMultiaddr);
   }
 
   function revokeSafe(address self) external HoprMultiSig.onlySafe(self) {
@@ -154,27 +128,14 @@ contract HoprAnnouncements is Multicall, HoprMultiSig {
   }
 
   /**
-   * [optional] Announces a IPv4 address with port for the node
+   * [optional] Announces a base mutliaddress for a node
    *
    * @dev Turns a node into a public relay node (PRN)
    *
-   * @param ip the IPv4 address to announce
-   * @param port the port to use
+   * @param baseMultiaddr base multiaddress of the node
    */
-  function _announce4Internal(address self, bytes4 ip, bytes2 port) internal {
-    emit AddressAnnouncement4(self, ip, port);
-  }
-
-  /**
-   * [optional] Announces a IPv6 address with port for the node
-   *
-   * @dev Turns a node into a public relay node (PRN)
-   *
-   * @param ip the IPv6 address to announce
-   * @param port the port to use
-   */
-  function _announce6Internal(address self, bytes16 ip, bytes2 port) internal {
-    emit AddressAnnouncement6(self, ip, port);
+  function _announceInternal(address self, string calldata baseMultiaddr) internal {
+    emit AddressAnnouncement(self, baseMultiaddr);
   }
 
   /**

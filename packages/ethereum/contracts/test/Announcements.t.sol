@@ -9,9 +9,7 @@ import '../src/node-stake/NodeSafeRegistry.sol';
 bytes32 constant ed25519_sig_0 = 0x000000000000000000000000000000000000000000000000000000000ed25519;
 bytes32 constant ed25519_sig_1 = 0x100000000000000000000000000000000000000000000000000000000ed25519;
 
-bytes4 constant ipv4 = 0x10000001; // 10.0.0.1
-bytes16 constant ipv6 = 0x20010db8000000000000ff0000428329; // 2001:0db8:0000:0000:0000:ff00:0042:8329
-bytes2 constant port = 0xffff; // port 65535
+string constant multiaddress = "/ip6/2604:1380:2000:7a00::1/udp/4001/quic";
 
 bytes32 constant ed25519_pub_key = 0x3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c;
 
@@ -42,10 +40,9 @@ contract AccountTest is Test {
     vm.clearMockedCalls();
   }
 
-  event AddressAnnouncement4(address node, bytes4 ip4, bytes2 port);
-  event AddressAnnouncement6(address node, bytes16 ip6, bytes2 port);
+  event AddressAnnouncement(address node, string baseMultiaddr);
 
-  function testIpPortAnnouncements(address caller) public {
+  function testAnnouncements(address caller) public {
     vm.mockCall(
       address(safeRegistry),
       abi.encodeWithSignature('nodeToSafe(address)', caller),
@@ -53,16 +50,10 @@ contract AccountTest is Test {
     );
 
     vm.expectEmit(true, false, false, false, address(announcements));
-    emit AddressAnnouncement4(caller, ipv4, port);
+    emit AddressAnnouncement(caller, multiaddress);
 
     vm.prank(caller);
-    announcements.announce4(ipv4, port);
-
-    vm.expectEmit(true, false, false, false, address(announcements));
-    emit AddressAnnouncement6(caller, ipv6, port);
-
-    vm.prank(caller);
-    announcements.announce6(ipv6, port);
+    announcements.announce(multiaddress);
 
     vm.clearMockedCalls();
   }
@@ -96,21 +87,16 @@ contract AccountTest is Test {
     emit KeyBinding(ed25519_sig_0, ed25519_sig_1, ed25519_pub_key, caller);
 
     vm.expectEmit(true, false, false, false, address(announcements));
-    emit AddressAnnouncement4(caller, ipv4, port);
+    emit AddressAnnouncement(caller, multiaddress);
 
-    vm.expectEmit(true, false, false, false, address(announcements));
-    emit AddressAnnouncement6(caller, ipv6, port);
-
-    bytes[] memory calls = new bytes[](3);
+    bytes[] memory calls = new bytes[](2);
 
     calls[0] = abi.encodeCall(
       announcements.bindKeys,
       (ed25519_sig_0, ed25519_sig_1, ed25519_pub_key)
     );
 
-    calls[1] = abi.encodeCall(announcements.announce4, (ipv4, port));
-
-    calls[2] = abi.encodeCall(announcements.announce6, (ipv6, port));
+    calls[1] = abi.encodeCall(announcements.announce, (multiaddress));
 
     vm.prank(caller);
     announcements.multicall(calls);
@@ -118,7 +104,7 @@ contract AccountTest is Test {
     vm.clearMockedCalls();
   }
 
-  function testBindKeyAnnounce4(address caller) public {
+  function testBindKeyAnnounce(address caller) public {
     vm.mockCall(
       address(safeRegistry),
       abi.encodeWithSignature('nodeToSafe(address)', caller),
@@ -129,34 +115,14 @@ contract AccountTest is Test {
     emit KeyBinding(ed25519_sig_0, ed25519_sig_1, ed25519_pub_key, caller);
 
     vm.expectEmit(true, false, false, false, address(announcements));
-    emit AddressAnnouncement4(caller, ipv4, port);
+    emit AddressAnnouncement(caller, multiaddress);
 
     vm.prank(caller);
-    announcements.bindKeysAnnounce4(
+    announcements.bindKeysAnnounce(
       ed25519_sig_0,
       ed25519_sig_1,
       ed25519_pub_key,
-      ipv4,
-      port
-    );
-
-    vm.clearMockedCalls();
-  }
-
-  function testBindKeyAnnounce6(address caller) public {
-    vm.expectEmit(true, false, false, false, address(announcements));
-    emit KeyBinding(ed25519_sig_0, ed25519_sig_1, ed25519_pub_key, caller);
-
-    vm.expectEmit(true, false, false, false, address(announcements));
-    emit AddressAnnouncement6(caller, ipv6, port);
-
-    vm.prank(caller);
-    announcements.bindKeysAnnounce6(
-      ed25519_sig_0,
-      ed25519_sig_1,
-      ed25519_pub_key,
-      ipv6,
-      port
+      multiaddress
     );
 
     vm.clearMockedCalls();
