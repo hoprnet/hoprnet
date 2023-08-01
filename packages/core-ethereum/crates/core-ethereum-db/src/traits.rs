@@ -57,9 +57,9 @@ pub trait HoprCoreEthereumDbActions {
 
     async fn get_packet_key(&self, channel_key: &PublicKey) -> Result<Option<OffchainPublicKey>>;
 
-    async fn get_channel_key(&self, packet_key: &OffchainPublicKey) -> Result<Option<PublicKey>>;
+    async fn get_chain_key(&self, packet_key: &OffchainPublicKey) -> Result<Option<PublicKey>>;
 
-    async fn link_packet_and_channel_keys(
+    async fn link_chain_and_packet_keys(
         &mut self,
         channel_key: &PublicKey,
         packet_key: &OffchainPublicKey,

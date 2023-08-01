@@ -495,7 +495,7 @@ where
             .db
             .read()
             .await
-            .get_channel_key(&OffchainPublicKey::from_peerid(&path.hops()[0])?)
+            .get_chain_key(&OffchainPublicKey::from_peerid(&path.hops()[0])?)
             .await?
             .ok_or(PacketConstructionError)?;
 
@@ -638,7 +638,7 @@ where
                     self.db
                         .read()
                         .await
-                        .get_channel_key(previous_hop)
+                        .get_chain_key(previous_hop)
                         .await?
                         .ok_or(PacketDecodingError(format!(
                             "failed to find channel key for packet key {previous_hop} on previous hop"
@@ -648,7 +648,7 @@ where
                     self.db
                         .read()
                         .await
-                        .get_channel_key(next_hop)
+                        .get_chain_key(next_hop)
                         .await?
                         .ok_or(PacketDecodingError(format!(
                             "failed to find channel key for packet key {next_hop} on next hop"
@@ -919,12 +919,12 @@ mod tests {
 
     async fn create_dummy_channel(db: &CoreEthereumDb<RustyLevelDbShim>, from: &PeerId, to: &PeerId) -> ChannelEntry {
         let source = db
-            .get_channel_key(&OffchainPublicKey::from_peerid(from).unwrap())
+            .get_chain_key(&OffchainPublicKey::from_peerid(from).unwrap())
             .await
             .unwrap()
             .expect("failed to retrieve source address");
         let destination = db
-            .get_channel_key(&OffchainPublicKey::from_peerid(to).unwrap())
+            .get_chain_key(&OffchainPublicKey::from_peerid(to).unwrap())
             .await
             .unwrap()
             .expect("failed to retrieve destination address");
@@ -978,7 +978,7 @@ mod tests {
             for peer_key in PEERS_PRIVS {
                 let node_key = OffchainPublicKey::from_privkey(&peer_key)?;
                 let chain_key = PublicKey::from_privkey(&peer_key)?;
-                db.link_packet_and_channel_keys(&chain_key, &node_key).await?;
+                db.link_chain_and_packet_keys(&chain_key, &node_key).await?;
             }
 
             let mut channel: Option<ChannelEntry> = None;

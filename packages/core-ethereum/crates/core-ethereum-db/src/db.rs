@@ -246,12 +246,12 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         self.db.get_or_none(key).await
     }
 
-    async fn get_channel_key(&self, packet_key: &OffchainPublicKey) -> Result<Option<PublicKey>> {
+    async fn get_chain_key(&self, packet_key: &OffchainPublicKey) -> Result<Option<PublicKey>> {
         let key = utils_db::db::Key::new_with_prefix(&Hash::create(&[&packet_key.to_bytes()]), PACKET_KEY_PREFIX)?;
         self.db.get_or_none(key).await
     }
 
-    async fn link_packet_and_channel_keys(
+    async fn link_chain_and_packet_keys(
         &mut self,
         channel_key: &PublicKey,
         packet_key: &OffchainPublicKey,
@@ -1160,16 +1160,16 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub async fn get_channel_key(&self, packet_key: &OffchainPublicKey) -> Result<Option<PublicKey>, JsValue> {
+        pub async fn get_chain_key(&self, packet_key: &OffchainPublicKey) -> Result<Option<PublicKey>, JsValue> {
             let data = self.core_ethereum_db.clone();
             //check_lock_read! {
             let db = data.read().await;
-            utils_misc::ok_or_jserr!(db.get_channel_key(packet_key).await)
+            utils_misc::ok_or_jserr!(db.get_chain_key(packet_key).await)
             //}
         }
 
         #[wasm_bindgen]
-        pub async fn link_packet_and_channel_keys(
+        pub async fn link_chain_and_packet_keys(
             &self,
             channel_key: &PublicKey,
             packet_key: &OffchainPublicKey,
@@ -1177,7 +1177,7 @@ pub mod wasm {
             let data = self.core_ethereum_db.clone();
             //check_lock_write! {
             let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.link_packet_and_channel_keys(channel_key, packet_key).await)
+            utils_misc::ok_or_jserr!(db.link_chain_and_packet_keys(channel_key, packet_key).await)
             //}
         }
 

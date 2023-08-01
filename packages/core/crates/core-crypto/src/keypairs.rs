@@ -188,16 +188,35 @@ mod tests {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
+    use js_sys::Uint8Array;
     use crate::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use wasm_bindgen::prelude::wasm_bindgen;
+    use utils_types::primitives::Address;
+    use utils_types::traits::PeerIdLike;
+    use crate::types::{OffchainPublicKey, PublicKey};
 
     #[wasm_bindgen]
     impl OffchainKeypair {
         #[wasm_bindgen(constructor)]
         pub fn _new(secret: &[u8]) -> JsResult<OffchainKeypair> {
             ok_or_jserr!(Self::from_secret(secret))
+        }
+
+        #[wasm_bindgen(js_name = "public")]
+        pub fn _public(&self) -> OffchainPublicKey {
+            self.1.clone()
+        }
+
+        #[wasm_bindgen(js_name = "secret")]
+        pub fn _secret(&self) -> Uint8Array {
+            self.0.as_ref().into()
+        }
+
+        #[wasm_bindgen(js_name = "to_peerid_str")]
+        pub fn _to_peerid_str(&self) -> String {
+            self.1.to_peerid_str()
         }
     }
 
@@ -206,6 +225,21 @@ pub mod wasm {
         #[wasm_bindgen(constructor)]
         pub fn _new(secret: &[u8]) -> JsResult<ChainKeypair> {
             ok_or_jserr!(Self::from_secret(secret))
+        }
+
+        #[wasm_bindgen(js_name = "public")]
+        pub fn _public(&self) -> PublicKey {
+            self.1.0.clone()
+        }
+
+        #[wasm_bindgen(js_name = "secret")]
+        pub fn _secret(&self) -> Uint8Array {
+            self.0.as_ref().into()
+        }
+
+        #[wasm_bindgen(js_name = "to_address")]
+        pub fn _to_address(&self) -> Address {
+            self.1.0.to_address()
         }
     }
 }

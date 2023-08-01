@@ -47,7 +47,7 @@ pub fn create_identity(dir_name: &str, password: &str, maybe_name: &Option<Strin
     // create dir if not exist
     fs::create_dir_all(dir_name)?;
 
-    let keys = HoprKeys::new();
+    let keys = HoprKeys::random();
 
     // check if `name` is end with `.id`, if not, append it
     let file_path = match maybe_name {

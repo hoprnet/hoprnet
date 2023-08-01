@@ -1,12 +1,12 @@
 use serde::{Deserialize, Serialize};
 
 use crate::account::AccountType::{Announced, NotAnnounced};
-use core_crypto::types::PublicKey;
+use core_crypto::types::{OffchainPublicKey, PublicKey};
 use multiaddr::Multiaddr;
 use std::fmt::{Display, Formatter};
 use utils_types::errors::GeneralError::ParseError;
 use utils_types::primitives::Address;
-use utils_types::traits::BinarySerializable;
+use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
 
 /// Type of the node account.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -17,21 +17,45 @@ pub enum AccountType {
     Announced { multiaddr: Multiaddr, updated_block: u32 },
 }
 
+impl Display for AccountType {
+
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match &self {
+            NotAnnounced => {
+                write!(f, "Not announced")
+            }
+            Announced {
+                multiaddr,
+                updated_block,
+            } => {
+                f.debug_struct("AccountType")
+                    .field("MultiAddr", multiaddr)
+                    .field("UpdatedAt", updated_block)
+                    .finish()
+            }
+        }
+    }
+}
+
 /// Represents a node announcement entry on the block chain.
 /// This contains node's public key and optional announcement information (multiaddress, block number).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct AccountEntry {
-    pub public_key: PublicKey,
+    pub chain_key: PublicKey,
+    pub packet_key: OffchainPublicKey,
     entry_type: AccountType,
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl AccountEntry {
-    /// Gets public key as an address
+    /// Gets chain key as an address
     pub fn get_address(&self) -> Address {
-        self.public_key.to_address()
+        self.chain_key.to_address()
     }
+
+    /// Gets the packet key represented as Peer ID
+    pub fn get_peerid_str(&self) -> String { self.packet_key.to_peerid_str() }
 
     /// Gets multiaddress as string if this peer ID has been announced.
     pub fn get_multiaddress_str(&self) -> Option<String> {
@@ -73,41 +97,29 @@ impl AccountEntry {
     const MAX_MULTI_ADDR_LENGTH: usize = 200;
     const MA_LENGTH_PREFIX: usize = std::mem::size_of::<u32>();
 
-    pub fn new(public_key: PublicKey, entry_type: AccountType) -> Self {
-        Self { public_key, entry_type }
+    pub fn new(chain_key: PublicKey, packet_key: OffchainPublicKey, entry_type: AccountType) -> Self {
+        Self { chain_key, packet_key, entry_type }
     }
 }
 
 impl Display for AccountEntry {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "AccountEntry:")?;
-        write!(f, " PublicKey: {}", self.public_key.to_hex(true))?;
-        match &self.entry_type {
-            NotAnnounced => {
-                write!(f, " Multiaddr: not announced")?;
-                write!(f, " UpdatedAt: not announced")?;
-                write!(f, " RoutingInfo: false")?;
-            }
-            Announced {
-                multiaddr,
-                updated_block,
-            } => {
-                write!(f, " Multiaddr: {}", multiaddr)?;
-                write!(f, " UpdatedAt: {}", updated_block)?;
-                write!(f, " RoutingInfo: {}", self.contains_routing_info())?;
-            }
-        }
-        Ok(())
+        f.debug_struct("AccountEntry")
+            .field("ChainKey", &self.chain_key.to_hex(true))
+            .field("PacketKey", &self.packet_key.to_hex())
+            .field("Type", &self.entry_type)
+            .finish()
     }
 }
 
 impl BinarySerializable for AccountEntry {
-    const SIZE: usize = PublicKey::SIZE_UNCOMPRESSED + Self::MA_LENGTH_PREFIX + Self::MAX_MULTI_ADDR_LENGTH + 4;
+    const SIZE: usize = PublicKey::SIZE_UNCOMPRESSED + OffchainPublicKey::SIZE + Self::MA_LENGTH_PREFIX + Self::MAX_MULTI_ADDR_LENGTH + 4;
 
     fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
             let mut buf = data.to_vec();
-            let public_key = PublicKey::from_bytes(buf.drain(..PublicKey::SIZE_UNCOMPRESSED).as_ref())?;
+            let chain_key = PublicKey::from_bytes(buf.drain(..PublicKey::SIZE_UNCOMPRESSED).as_ref())?;
+            let packet_key = OffchainPublicKey::from_bytes(buf.drain(..OffchainPublicKey::SIZE).as_ref())?;
             let ma_len = u32::from_be_bytes(buf.drain(..Self::MA_LENGTH_PREFIX).as_ref().try_into().unwrap()) as usize;
             let entry_type = if ma_len > 0 {
                 let multiaddr =
@@ -122,7 +134,7 @@ impl BinarySerializable for AccountEntry {
             } else {
                 NotAnnounced
             };
-            Ok(Self { public_key, entry_type })
+            Ok(Self { chain_key, packet_key, entry_type })
         } else {
             Err(ParseError)
         }
@@ -130,7 +142,7 @@ impl BinarySerializable for AccountEntry {
 
     fn to_bytes(&self) -> Box<[u8]> {
         let mut ret = Vec::with_capacity(Self::SIZE);
-        ret.extend_from_slice(&self.public_key.to_bytes(false));
+        ret.extend_from_slice(&self.chain_key.to_bytes(false));
 
         match &self.entry_type {
             NotAnnounced => {
@@ -229,7 +241,7 @@ mod test {
 pub mod wasm {
     use crate::account::AccountEntry;
     use crate::account::AccountType::{Announced, NotAnnounced};
-    use core_crypto::types::PublicKey;
+    use core_crypto::types::{OffchainPublicKey, PublicKey};
     use multiaddr::Multiaddr;
     use std::str::FromStr;
     use utils_misc::ok_or_jserr;
@@ -241,13 +253,15 @@ pub mod wasm {
     impl AccountEntry {
         #[wasm_bindgen(constructor)]
         pub fn _new(
-            public_key: PublicKey,
+            chain_key: PublicKey,
+            packet_key: OffchainPublicKey,
             multiaddr: Option<String>,
             updated_at: Option<u32>,
         ) -> JsResult<AccountEntry> {
             if (multiaddr.is_some() && updated_at.is_some()) || (multiaddr.is_none() && updated_at.is_none()) {
                 Ok(Self {
-                    public_key,
+                    chain_key,
+                    packet_key,
                     entry_type: match multiaddr {
                         None => NotAnnounced,
                         Some(multiaddr) => Announced {

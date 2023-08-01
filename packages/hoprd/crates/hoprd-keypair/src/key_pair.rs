@@ -88,10 +88,11 @@ impl IdentityOptions {
     }
 }
 
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct HoprKeys {
     pub packet_key: OffchainKeypair,
     pub chain_key: ChainKeypair,
-    pub id: Uuid,
+    id: Uuid,
 }
 
 impl Serialize for HoprKeys {
@@ -213,15 +214,19 @@ impl PartialEq for HoprKeys {
     }
 }
 
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl HoprKeys {
-    pub fn new() -> Self {
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
+    pub fn random() -> Self {
         Self {
             packet_key: OffchainKeypair::random(),
             chain_key: ChainKeypair::random(),
             id: Uuid::new_v4(),
         }
     }
+}
 
+impl HoprKeys {
     pub fn init(opts: IdentityOptions) -> Result<Self> {
         let exists = metadata(&opts.id_path).is_ok();
 
@@ -239,7 +244,7 @@ impl HoprKeys {
 
                 priv_keys.try_into()?
             } else {
-                HoprKeys::new()
+                HoprKeys::random()
             };
             keys.write_eth_keystore(
                 &opts.id_path,
@@ -277,7 +282,7 @@ impl HoprKeys {
         }
 
         if opts.initialize {
-            let keys = HoprKeys::new();
+            let keys = HoprKeys::random();
             keys.write_eth_keystore(
                 &opts.id_path,
                 &opts.password,
@@ -471,52 +476,16 @@ impl Debug for HoprKeys {
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use super::IdentityOptions;
-    use core_crypto::keypairs::Keypair;
-    use js_sys::{Promise, Uint8Array};
-    use utils_types::traits::PeerIdLike;
     use wasm_bindgen::prelude::*;
-
-    const ED25519_PEERID_LENGTH: usize = 36;
-
-    #[wasm_bindgen(module = "@libp2p/peer-id")]
-    extern "C" {
-        #[wasm_bindgen]
-        pub type JsPeerId;
-
-        #[wasm_bindgen(js_name = "peerIdFromKeys")]
-        pub fn peer_id_from_keys(pub_key: Box<[u8]>, priv_key: Box<[u8]>) -> Promise;
-    }
-
-    #[wasm_bindgen]
-    pub struct HoprKeys {
-        w: super::HoprKeys,
-    }
+    use utils_misc::ok_or_jserr;
+    use utils_misc::utils::wasm::JsResult;
+    use crate::key_pair::HoprKeys;
 
     #[wasm_bindgen]
     impl HoprKeys {
-        #[wasm_bindgen(constructor)]
-        pub fn new() -> Self {
-            let keys = super::HoprKeys::new();
-            Self { w: keys }
-        }
-
-        #[wasm_bindgen]
-        pub fn init(identity_options: IdentityOptions) -> Result<HoprKeys, JsValue> {
-            Ok(Self {
-                w: super::HoprKeys::init(identity_options).map_err(|e| JsValue::from(e.to_string()))?,
-            })
-        }
-
-        #[wasm_bindgen(getter, js_name = "packetKeyPeerId")]
-        pub fn get_packet_key_peer_id(&self) -> Promise {
-            let mut sliced = [0u8; ED25519_PEERID_LENGTH];
-            sliced.copy_from_slice(&self.w.packet_key.public().to_peerid().to_bytes()[2..]);
-            peer_id_from_keys(Box::new(sliced), Box::from(self.w.packet_key.secret().as_ref()))
-        }
-
-        #[wasm_bindgen(getter, js_name = "chainKeyPrivKey")]
-        pub fn get_chain_key_priv_key(&self) -> Uint8Array {
-            Uint8Array::from(self.w.chain_key.secret().as_ref())
+        #[wasm_bindgen(js_name = "init")]
+        pub fn _init(identity_options: IdentityOptions) -> JsResult<HoprKeys> {
+            ok_or_jserr!(HoprKeys::init(identity_options))
         }
     }
 }
@@ -533,7 +502,7 @@ mod tests {
 
     #[test]
     fn create_keys() {
-        println!("{:?}", HoprKeys::new())
+        println!("{:?}", HoprKeys::random())
     }
 
     #[test]
@@ -542,7 +511,7 @@ mod tests {
 
         let identity_dir = tmp.path().join("hopr-unit-test-identity");
 
-        let keys = HoprKeys::new();
+        let keys = HoprKeys::random();
 
         keys.write_eth_keystore(identity_dir.to_str().unwrap(), DEFAULT_PASSWORD, true)
             .unwrap();
