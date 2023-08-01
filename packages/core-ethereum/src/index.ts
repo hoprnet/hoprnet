@@ -1,8 +1,9 @@
 import { Multiaddr } from '@multiformats/multiaddr'
 import type { PeerId } from '@libp2p/interface-peer-id'
-import { AnnouncementData, ChainWrapper, createChainWrapper, Receipt } from './ethereum.js'
+import { ChainWrapper, createChainWrapper, Receipt } from './ethereum.js'
 import chalk from 'chalk'
 import {
+  AnnouncementData,
   AcknowledgedTicket,
   Balance,
   BalanceType,
@@ -16,7 +17,7 @@ import {
   type DeferType,
   PublicKey,
   AccountEntry,
-  create_counter, ChainKeypair, OffchainKeypair, stringToU8a, KeyBinding
+  create_counter, ChainKeypair, OffchainKeypair, KeyBinding
 } from '@hoprnet/hopr-utils'
 import {
   Ethereum_AcknowledgedTicket,
@@ -583,7 +584,7 @@ export default class HoprCoreEthereum extends EventEmitter {
 
   public static createMockInstance(chainKeypair: ChainKeypair, peerId: PeerId): HoprCoreEthereum {
     const connectorLogger = debug(`hopr:mocks:connector`)
-    const packetSecret = "1d6689707dfff6a93b206b3f5addcaa8789a1812e43fb393f8ad02f54ddf599d"
+    //const packetSecret = "1d6689707dfff6a93b206b3f5addcaa8789a1812e43fb393f8ad02f54ddf599d"
     HoprCoreEthereum._instance = {
       start: () => {
         connectorLogger('starting connector called.')
