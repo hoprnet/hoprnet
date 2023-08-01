@@ -19,7 +19,7 @@ import {
   type AcknowledgedTicket,
   type DeferType,
   type Hash,
-  create_counter
+  create_counter, OffchainPublicKey, OffchainSignature, u8aAddrToString, u8aToNumber, u8aSplit
 } from '@hoprnet/hopr-utils'
 
 import NonceTracker from './nonce-tracker.js'
@@ -67,6 +67,16 @@ export type SendTransactionReturn =
   | {
       code: SendTransactionStatus.DUPLICATE
     }
+
+export class AnnouncementData {
+  multiaddress:
+  packetKey: OffchainPublicKey
+  signature: OffchainSignature
+
+  public toString() {
+    return `${this.packetKey.to_peerid_str()} via ${u8aAddrToString(this.address, this.protocol)}:${u8aToNumber(this.port)}`
+  }
+}
 
 export async function createChainWrapper(
   deploymentExtract: DeploymentExtract,
@@ -437,17 +447,25 @@ export async function createChainWrapper(
    * @param txHandler handler to call once the transaction has been published
    * @returns a Promise that resolves with the transaction hash
    */
-  const announce = async (multiaddr: Multiaddr, txHandler: (tx: string) => DeferType<string>): Promise<string> => {
-    log('Announcing on-chain with %s', multiaddr.toString())
+  const announce = async (data: AnnouncementData, txHandler: (tx: string) => DeferType<string>): Promise<string> => {
+    log('Announcing on-chain with %s', data.toString())
     let sendResult: SendTransactionReturn
     let error: unknown
     try {
+      // TODO: use the correct contract call based on the IP address length and protocol
+      let method = data.address.length == 4 ? 'bindKeysAnnounce4' : `bindKeysAnnounce6`
+      let sgn = u8aSplit(data.signature.serialize(), [32])
+
       const confirmationEssentialTxPayload = buildEssentialTxPayload(
         0,
-        channels,
-        'announce',
-        publicKey.to_hex(false),
-        multiaddr.bytes
+        channels, // TODO: change the target contract used for announcement
+        method,
+        publicKey.to_address(),
+        sgn[0],
+        sgn[1],
+        data.packetKey.serialize(),
+        data.address,
+        data.port
       )
       sendResult = await sendTransaction(checkDuplicate, confirmationEssentialTxPayload, txHandler)
     } catch (err) {

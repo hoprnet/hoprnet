@@ -56,8 +56,7 @@ impl Path {
         for hop in path.iter() {
             ticket_receiver = db.get_chain_key(&OffchainPublicKey::from_peerid(hop)?)
                 .await?
-                .ok_or(InvalidPeer(format!("could not find channel key for {hop}")))?
-                .to_address();
+                .ok_or(InvalidPeer(format!("could not find channel key for {hop}")))?;
 
             // Check for loops
             if ticket_issuer == ticket_receiver {

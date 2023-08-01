@@ -260,7 +260,6 @@ const createChainMock = (
     getChannels: () => hoprChannels,
     getToken: () => hoprToken,
     getNetworkRegistry: () => hoprRegistry,
-    getWallet: () => account ?? fixtures.ACCOUNT_A,
     getAccount: () => {
       chainLogger('getAccount method was called')
       return Promise.resolve(

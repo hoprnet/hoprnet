@@ -501,9 +501,9 @@ where
 
         // Decide whether to create 0-hop or multihop ticket
         let next_ticket = if path.length() == 1 {
-            Ticket::new_zero_hop(next_peer.to_address(), &self.cfg.chain_keypair)
+            Ticket::new_zero_hop(next_peer, &self.cfg.chain_keypair)
         } else {
-            self.create_multihop_ticket(next_peer.to_address(), path.length() as u8)
+            self.create_multihop_ticket(next_peer, path.length() as u8)
                 .await?
         };
 
@@ -634,7 +634,7 @@ where
 
                 let inverse_win_prob = U256::new(INVERSE_TICKET_WIN_PROB);
 
-                let previous_hop_channel_key =
+                let previous_hop_addr =
                     self.db
                         .read()
                         .await
@@ -644,7 +644,7 @@ where
                             "failed to find channel key for packet key {previous_hop} on previous hop"
                         )))?;
 
-                let next_hop_channel_key =
+                let next_hop_addr =
                     self.db
                         .read()
                         .await
@@ -660,7 +660,7 @@ where
                     .db
                     .read()
                     .await
-                    .get_channel_from(&previous_hop_channel_key.to_address())
+                    .get_channel_from(&previous_hop_addr)
                     .await?
                     .ok_or(ChannelNotFound(previous_hop.to_string()))?;
 
@@ -669,7 +669,7 @@ where
                     &*self.db.read().await,
                     &packet.ticket,
                     &channel,
-                    &previous_hop_channel_key.to_address(),
+                    &previous_hop_addr,
                     Balance::from_str(PRICE_PER_PACKET, BalanceType::HOPR),
                     inverse_win_prob,
                     self.cfg.check_unrealized_balance,
@@ -697,7 +697,7 @@ where
                         PendingAcknowledgement::WaitingAsRelayer(UnacknowledgedTicket::new(
                             packet.ticket.clone(),
                             own_key.clone(),
-                            previous_hop_channel_key.to_address(),
+                            previous_hop_addr,
                         )),
                     )
                     .await?;
@@ -710,9 +710,9 @@ where
 
                 // Create next ticket for the packet
                 next_ticket = if path_pos == 1 {
-                    Ticket::new_zero_hop(next_hop_channel_key.to_address(), &self.cfg.chain_keypair)
+                    Ticket::new_zero_hop(next_hop_addr, &self.cfg.chain_keypair)
                 } else {
-                    self.create_multihop_ticket(next_hop_channel_key.to_address(), path_pos).await?
+                    self.create_multihop_ticket(next_hop_addr, path_pos).await?
                 };
                 previous_peer = previous_hop.to_peerid();
                 next_peer = next_hop.to_peerid();
@@ -930,8 +930,8 @@ mod tests {
             .expect("failed to retrieve destination address");
 
         ChannelEntry::new(
-            source.to_address(),
-            destination.to_address(),
+            source,
+            destination,
             Balance::new(U256::new("1234").mul(U256::new(PRICE_PER_PACKET)), BalanceType::HOPR),
             Hash::new(&random_bytes::<32>()),
             U256::zero(),

@@ -846,10 +846,12 @@ impl BinarySerializable for Response {
 
 /// Represents an EdDSA signature using Ed25519 Edwards curve.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct OffchainSignature {
     signature: ed25519_dalek::Signature,
 }
 
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl OffchainSignature {
     pub fn sign_message(msg: &[u8], signing_keypair: &OffchainKeypair) -> Self {
         let expanded_sk = ed25519_dalek::ExpandedSecretKey::from(
@@ -857,7 +859,6 @@ impl OffchainSignature {
         );
 
         let verifying = ed25519_dalek::PublicKey::from_bytes(signing_keypair.public().compressed.as_bytes()).unwrap();
-
         Self {
             signature: expanded_sk.sign(msg, &verifying),
         }
@@ -1431,9 +1432,7 @@ pub mod wasm {
     use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
     use wasm_bindgen::prelude::*;
 
-    use crate::types::{
-        Challenge, CurvePoint, HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey, PublicKey, Response, Signature,
-    };
+    use crate::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey, OffchainSignature, PublicKey, Response, Signature};
 
     #[wasm_bindgen]
     impl CurvePoint {
@@ -1780,6 +1779,34 @@ pub mod wasm {
         #[wasm_bindgen(js_name = "deserialize")]
         pub fn _deserialize(signature: &[u8]) -> JsResult<Signature> {
             ok_or_jserr!(Signature::from_bytes(signature))
+        }
+
+        #[wasm_bindgen(js_name = "to_hex")]
+        pub fn _to_hex(&self) -> String {
+            self.to_hex()
+        }
+
+        #[wasm_bindgen(js_name = "serialize")]
+        pub fn _serialize(&self) -> Box<[u8]> {
+            self.to_bytes()
+        }
+
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> Self {
+            self.clone()
+        }
+
+        #[wasm_bindgen]
+        pub fn size() -> u32 {
+            Self::SIZE as u32
+        }
+    }
+
+    #[wasm_bindgen]
+    impl OffchainSignature {
+        #[wasm_bindgen(js_name = "deserialize")]
+        pub fn _deserialize(signature: &[u8]) -> JsResult<OffchainSignature> {
+            ok_or_jserr!(OffchainSignature::from_bytes(signature))
         }
 
         #[wasm_bindgen(js_name = "to_hex")]

@@ -1,6 +1,6 @@
 import { Multiaddr } from '@multiformats/multiaddr'
 import type { PeerId } from '@libp2p/interface-peer-id'
-import { ChainWrapper, createChainWrapper, Receipt } from './ethereum.js'
+import { AnnouncementData, ChainWrapper, createChainWrapper, Receipt } from './ethereum.js'
 import chalk from 'chalk'
 import {
   AcknowledgedTicket,
@@ -191,7 +191,11 @@ export default class HoprCoreEthereum extends EventEmitter {
   }
 
   announce(multiaddr: Multiaddr): Promise<string> {
-    return this.chain.announce(multiaddr, (txHash: string) => this.setTxHandler(`announce-${txHash}`, txHash))
+    let data: AnnouncementData = {
+
+    }
+
+    return this.chain.announce(data, (txHash: string) => this.setTxHandler(`announce-${txHash}`, txHash))
   }
 
   async withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
@@ -602,8 +606,7 @@ export default class HoprCoreEthereum extends EventEmitter {
         connectorLogger('getAccount method was called')
         return Promise.resolve(
           new AccountEntry(
-            chainKeypair.public(),
-            new OffchainKeypair(stringToU8a(packetSecret)).public(),
+            chainKeypair.public().to_address(),
             `/ip4/127.0.0.1/tcp/124/p2p/${peerId.toString()}`,
             1
           )

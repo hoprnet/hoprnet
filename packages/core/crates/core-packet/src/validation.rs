@@ -173,9 +173,9 @@ mod tests {
                 channel: &ChannelEntry,
                 snapshot: &Snapshot,
             ) -> core_ethereum_db::errors::Result<()>;
-            async fn get_packet_key(&self, channel_key: &PublicKey) -> core_ethereum_db::errors::Result<Option<OffchainPublicKey>>;
-            async fn get_chain_key(&self, packet_key: &OffchainPublicKey) -> core_ethereum_db::errors::Result<Option<PublicKey>>;
-            async fn link_chain_and_packet_keys(&mut self, channel_key: &PublicKey, packet_key: &OffchainPublicKey) -> core_ethereum_db::errors::Result<()>;
+            async fn get_packet_key(&self, chain_key: &Address) -> core_ethereum_db::errors::Result<Option<OffchainPublicKey>>;
+            async fn get_chain_key(&self, packet_key: &OffchainPublicKey) -> core_ethereum_db::errors::Result<Option<Address>>;
+            async fn link_chain_and_packet_keys(&mut self, chain_key: &Address, packet_key: &OffchainPublicKey, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
             async fn delete_acknowledged_tickets_from(&mut self, source: ChannelEntry) -> core_ethereum_db::errors::Result<()>;
             async fn store_hash_intermediaries(&mut self, channel: &Hash, intermediates: &IteratedHash) -> core_ethereum_db::errors::Result<()>;
             async fn get_commitment(&self, channel: &Hash, iteration: usize) -> core_ethereum_db::errors::Result<Option<Hash>>;

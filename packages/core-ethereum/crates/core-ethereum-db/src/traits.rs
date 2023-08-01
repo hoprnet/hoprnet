@@ -1,7 +1,7 @@
 use crate::errors::Result;
 use async_trait::async_trait;
 
-use core_crypto::types::{OffchainPublicKey, PublicKey};
+use core_crypto::types::{OffchainPublicKey};
 use core_crypto::{
     iterated_hash::IteratedHash,
     types::{HalfKeyChallenge, Hash},
@@ -55,14 +55,15 @@ pub trait HoprCoreEthereumDbActions {
     /// Get pending balance to a counter party's address.
     async fn get_pending_balance_to(&self, counterparty: &Address) -> Result<Balance>;
 
-    async fn get_packet_key(&self, channel_key: &PublicKey) -> Result<Option<OffchainPublicKey>>;
+    async fn get_packet_key(&self, chain_key: &Address) -> Result<Option<OffchainPublicKey>>;
 
-    async fn get_chain_key(&self, packet_key: &OffchainPublicKey) -> Result<Option<PublicKey>>;
+    async fn get_chain_key(&self, packet_key: &OffchainPublicKey) -> Result<Option<Address>>;
 
     async fn link_chain_and_packet_keys(
         &mut self,
-        channel_key: &PublicKey,
+        chain_key: &Address,
         packet_key: &OffchainPublicKey,
+        snapshot: &Snapshot
     ) -> Result<()>;
 
     async fn get_channel_to(&self, dest: &Address) -> Result<Option<ChannelEntry>>;

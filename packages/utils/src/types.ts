@@ -31,6 +31,7 @@ export {
   Hash,
   OffchainPublicKey,
   OffchainKeypair,
+  OffchainSignature,
   PublicKey,
   PendingAcknowledgement,
   Signature,

@@ -1073,7 +1073,7 @@ class Hopr extends EventEmitter {
     } else {
       let chain_key = await this.peerIdToChainKey(destination)
       if (chain_key) {
-        intermediatePath = await this.getIntermediateNodes(chain_key.to_address(), hops)
+        intermediatePath = await this.getIntermediateNodes(chain_key, hops)
 
         if (intermediatePath == null || !intermediatePath.length) {
           metric_sentMessageFailCount.increment()
@@ -1269,7 +1269,7 @@ class Hopr extends EventEmitter {
       addrToAnnounce = new Multiaddr('/p2p/' + this.getId().toString())
     }
 
-    // Check if there was a previous annoucement from us
+    // Check if there was a previous announcement from us
     const ownAccount = await connector.getAccount(this.getEthereumAddress())
 
     // Do not announce if our last is equal to what we intend to announce
@@ -1651,7 +1651,7 @@ class Hopr extends EventEmitter {
     let chain_key = await this.peerIdToChainKey(id)
     if (chain_key) {
       return HoprCoreEthereum.getInstance().isAllowedAccessToNetwork(
-        Address.deserialize(chain_key.to_address().serialize())
+        Address.deserialize(chain_key.serialize())
       )
     } else {
       log(`failed to determine channel key of ${id.toString()}`)
