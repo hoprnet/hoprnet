@@ -201,15 +201,15 @@ abstract contract HoprCrypto {
    *
    * @dev Throws if Q = -P since Infinity point is not supported.
    *
-   * Optimizations:
-   * - solidity assembly
-   * - optimize for a single point addition
-   * - inline modular inversion
-   *
    * @dev This function is meant to be part of another function and thus does 
    *      not perform any sanity checks, such as if any of the given points
    *      fulfill the curve equation. These checks are left to the caller of
    *      the function.
+   *
+   * Optimizations:
+   * - solidity assembly
+   * - optimize for a single point addition
+   * - inline modular inversion
    *
    * @param p_x first component of P
    * @param p_y second component of P

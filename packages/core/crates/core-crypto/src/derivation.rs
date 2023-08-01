@@ -1,19 +1,22 @@
-use crate::errors::CryptoError::{CalculationError, InvalidInputValue, InvalidParameterSize};
+use crate::{
+    errors::{
+        CryptoError::{CalculationError, InvalidInputValue, InvalidParameterSize},
+        Result,
+    },
+    parameters::{PACKET_TAG_LENGTH, PING_PONG_NONCE_SIZE, SECRET_KEY_LENGTH},
+    primitives::{calculate_mac, DigestLike, SimpleDigest},
+    random::{random_bytes, random_fill},
+    types::HalfKey,
+};
 use blake2::Blake2s256;
 use elliptic_curve::{
     hash2curve::{ExpandMsgXmd, GroupDigest},
+    sec1::ToEncodedPoint,
     ScalarPrimitive,
 };
 use hkdf::SimpleHkdf;
 use k256::{AffinePoint, Scalar, Secp256k1};
 use utils_types::{primitives::Address, traits::BinarySerializable};
-
-use crate::errors::Result;
-use crate::parameters::{PACKET_TAG_LENGTH, PING_PONG_NONCE_SIZE, SECRET_KEY_LENGTH};
-use crate::primitives::{calculate_mac, DigestLike, SimpleDigest};
-use crate::random::{random_bytes, random_fill};
-use crate::types::HalfKey;
-use elliptic_curve::sec1::ToEncodedPoint;
 
 // Module-specific constants
 const HASH_KEY_COMMITMENT_SEED: &str = "HASH_KEY_COMMITMENT_SEED";

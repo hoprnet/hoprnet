@@ -10,8 +10,13 @@ import 'openzeppelin-contracts/utils/cryptography/ECDSA.sol';
 import './interfaces/INodeSafeRegistry.sol';
 
 import './Crypto.sol';
+import './Ledger.sol';
 import './MultiSig.sol';
 import './node-stake/NodeSafeRegistry.sol';
+
+uint256 constant ONE_HOUR = 60 * 60 * 1000; // in milliseconds
+
+uint256 constant INDEX_SNAPSHOT_INTERVAL = ONE_HOUR;
 
 /**
  *    &&&&
@@ -30,7 +35,7 @@ import './node-stake/NodeSafeRegistry.sol';
  *
  * Manages mixnet incentives in the hopr network.
  **/
-contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprMultiSig, HoprCrypto {
+contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprLedger(INDEX_SNAPSHOT_INTERVAL), HoprMultiSig, HoprCrypto {
   // required by ERC1820 spec
   IERC1820Registry internal constant _ERC1820_REGISTRY = IERC1820Registry(0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24);
   // required by ERC777 spec
@@ -378,6 +383,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprMu
     spendingChannel.balance = Balance.wrap(
       Balance.unwrap(spendingChannel.balance) - Balance.unwrap(redeemable.data.amount)
     );
+    indexEvent(abi.encodePacked(ChannelBalanceDecreased.selector, redeemable.data.channelId, spendingChannel.balance));
     emit ChannelBalanceDecreased(redeemable.data.channelId, spendingChannel.balance);
 
     bytes32 outgoingChannelId = _getChannelId(self, source);
@@ -392,10 +398,12 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprMu
       earningChannel.balance = Balance.wrap(
         Balance.unwrap(earningChannel.balance) + Balance.unwrap(redeemable.data.amount)
       );
+      indexEvent(abi.encodePacked(ChannelBalanceIncreased.selector, outgoingChannelId, earningChannel.balance));
       emit ChannelBalanceIncreased(outgoingChannelId, earningChannel.balance);
     }
 
     // Informs about new ticketIndex
+    indexEvent(abi.encodePacked(TicketRedeemed.selector, redeemable.data.channelId, spendingChannel.ticketIndex));
     emit TicketRedeemed(redeemable.data.channelId, spendingChannel.ticketIndex);
   }
 
@@ -437,6 +445,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprMu
     channel.status = ChannelStatus.PENDING_TO_CLOSE;
 
     // Inform others at which time the notice period is due
+    indexEvent(abi.encodePacked(OutgoingChannelClosureInitiated.selector, channelId, channel.closureTime));
     emit OutgoingChannelClosureInitiated(channelId, channel.closureTime);
   }
 
@@ -484,6 +493,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprMu
       }
     }
 
+    indexEvent(abi.encodePacked(ChannelClosed.selector, channelId));
     emit ChannelClosed(channelId);
 
     channel.balance = Balance.wrap(0);
@@ -536,6 +546,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprMu
 
     channel.balance = Balance.wrap(0);
 
+    indexEvent(abi.encodePacked(ChannelClosed.selector, channelId));
     emit ChannelClosed(channelId);
   }
 
@@ -687,8 +698,11 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Multicall, HoprMu
       channel.ticketIndex = TicketIndex.wrap(0);
 
       channel.status = ChannelStatus.OPEN;
+
+      indexEvent(abi.encodePacked(ChannelOpened.selector, self, account, channel.balance));
       emit ChannelOpened(self, account, channel.balance);
     } else {
+      indexEvent(abi.encodePacked(ChannelBalanceIncreased.selector, channelId, channel.balance));
       emit ChannelBalanceIncreased(channelId, channel.balance);
     }
   }
