@@ -16,7 +16,7 @@ import {
   type DeferType,
   PublicKey,
   AccountEntry,
-  create_counter, ChainKeypair, OffchainKeypair, stringToU8a
+  create_counter, ChainKeypair, OffchainKeypair, stringToU8a, KeyBinding
 } from '@hoprnet/hopr-utils'
 import {
   Ethereum_AcknowledgedTicket,
@@ -190,10 +190,9 @@ export default class HoprCoreEthereum extends EventEmitter {
     await this.indexer.stop()
   }
 
-  announce(multiaddr: Multiaddr): Promise<string> {
-    let data: AnnouncementData = {
-
-    }
+  announce(multiaddr: Multiaddr, packetKeypair: OffchainKeypair): Promise<string> {
+    let keyBinding = new KeyBinding(this.chainKeypair.to_address(), packetKeypair)
+    let data = new AnnouncementData(multiaddr.toString(), keyBinding)
 
     return this.chain.announce(data, (txHash: string) => this.setTxHandler(`announce-${txHash}`, txHash))
   }

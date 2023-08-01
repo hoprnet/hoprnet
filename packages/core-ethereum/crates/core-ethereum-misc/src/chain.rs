@@ -1,4 +1,3 @@
-use multiaddr::Multiaddr;
 use crate::{
     commitment::{bump_commitment, find_commitment_preimage},
     errors::{
@@ -6,7 +5,7 @@ use crate::{
         Result,
     },
 };
-use core_crypto::types::{Hash, OffchainPublicKey, OffchainSignature};
+use core_crypto::types::Hash;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::acknowledgement::AcknowledgedTicket;
 use utils_log::debug;

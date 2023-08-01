@@ -29,7 +29,7 @@ import {
   U256,
   random_integer,
   Hash,
-  number_to_channel_status, u8aToNumber, u8aAddrToString
+  number_to_channel_status, KeyBinding, OffchainSignature, u8aConcat
 } from '@hoprnet/hopr-utils'
 
 import type { ChainWrapper } from '../ethereum.js'
@@ -761,18 +761,10 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       log('Event name %s and hash %s', eventName, event.transactionHash)
 
       switch (eventName) {
-        case 'Announcement4':
-        case 'Announcement4(address,bytes4,bytes2)':
-          await this.onAddressAnnouncement4(
-            event as Event<'AddressAnnouncement4'>,
-            new BN(blockNumber.toPrecision()),
-            lastDatabaseSnapshot
-          )
-          break
-        case 'Announcement6':
-        case 'Announcement6(address,bytes6,bytes2)':
-          await this.onAddressAnnouncement6(
-            event as Event<'AddressAnnouncement6'>,
+        case 'AddressAnnouncement':
+        case 'AddressAnnouncement(address,string)':
+          await this.onAddressAnnouncement(
+            event as Event<'AddressAnnouncement'>,
             new BN(blockNumber.toPrecision()),
             lastDatabaseSnapshot
           )
@@ -843,26 +835,29 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   }
 
   private async onKeyBinding(event: Event<'KeyBinding'>, lastSnapshot: Snapshot): Promise<void> {
-    const packetKeyStr = event.args.ed25519_pub_key
-    const chainKeyStr = event.args.chain_key
-
     try {
+      let keyBinding = KeyBinding.from_parts(
+        Address.deserialize(event.args.chain_key),
+        OffchainPublicKey.deserialize(event.args.ed25519_pub_key),
+        OffchainSignature.deserialize(u8aConcat(event.args.ed25519_sig_0, event.args.ed25519_sig_1))
+      )
+
       // Establish linkage between packet and chain keys
       await this.db.link_chain_and_packet_keys(
-        Ethereum_Address.deserialize(stringToU8a(chainKeyStr)),
-        Ethereum_OffchainPublicKey.deserialize(stringToU8a(packetKeyStr)),
+        Ethereum_Address.deserialize(keyBinding.chain_key.serialize()),
+        Ethereum_OffchainPublicKey.deserialize(keyBinding.packet_key.serialize()),
         Ethereum_Snapshot.deserialize(lastSnapshot.serialize())
       )
     }
     catch (e) {
-      log(`failed to link packet key ${packetKeyStr} with chain key ${chainKeyStr}: ${e}`)
+      log(`failed to link packet key with chain key: ${e}`)
     }
   }
 
-  private async completeAnnouncement(chainKey: Address, multiaddrTransportPart: string, blockNumber: BN, lastSnapshot: Snapshot): Promise<void> {
+  private async onAddressAnnouncement(event: Event<'AddressAnnouncement'>, blockNumber: BN, lastSnapshot: Snapshot): Promise<void> {
+    let chainKey = event.args.node
+    let multiAddrPrefix = event.args.baseMultiaddr
     try {
-      log(`announcing ${chainKey.to_string()} via ${multiaddrTransportPart}`)
-
       let packetKey = await this.getPacketKeyOf(chainKey)
       if (!packetKey) {
         log(`could not fetch packet key of ${chainKey}`)
@@ -870,7 +865,8 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       }
 
       const peerId = packetKey.to_peerid_str()
-      const multiaddr = new Multiaddr(`${multiaddrTransportPart}/p2p/${peerId}`)
+      const multiaddr = new Multiaddr(`${multiAddrPrefix}/p2p/${peerId}`)
+
       const account= new AccountEntry(chainKey, multiaddr.toString(), blockNumber.toNumber())
 
       log('New node announced', peerId, account.get_multiaddress_str())
@@ -891,22 +887,6 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       log(`Failed to process announcement of ${chainKey.to_string()}`)
       log(e)
     }
-  }
-
-  private async onAddressAnnouncement4(event: Event<'AddressAnnouncement4'>, blockNumber: BN, lastSnapshot: Snapshot): Promise<void> {
-    const ip = u8aAddrToString(event.args.ip4, 'IPv4')
-    const port = u8aToNumber(event.args.port)
-
-    // NOTE: this currently supports TCP transport only
-    await this.completeAnnouncement(Address.from_string(event.args.node), `/ip4/${ip}/tcp/${port}`, blockNumber, lastSnapshot)
-  }
-
-  private async onAddressAnnouncement6(event: Event<'AddressAnnouncement6'>, blockNumber: BN, lastSnapshot: Snapshot): Promise<void> {
-    const ip = u8aAddrToString(event.args.ip4, 'IPv6')
-    const port = u8aToNumber(event.args.port)
-
-    // NOTE: this currently supports TCP transport only
-    await this.completeAnnouncement(Address.from_string(event.args.node), `/ip6/${ip}/tcp/${port}`, blockNumber, lastSnapshot)
   }
 
   private async onChannelUpdated(event: Event<'ChannelUpdated'>, lastSnapshot: Snapshot): Promise<void> {

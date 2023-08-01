@@ -1,5 +1,5 @@
 import { setImmediate as setImmediatePromise } from 'timers/promises'
-import type { Multiaddr } from '@multiformats/multiaddr'
+
 import {
   providers,
   utils,
@@ -19,7 +19,7 @@ import {
   type AcknowledgedTicket,
   type DeferType,
   type Hash,
-  create_counter, OffchainPublicKey, OffchainSignature, u8aAddrToString, u8aToNumber, u8aSplit
+  create_counter, AnnouncementData, u8aSplit
 } from '@hoprnet/hopr-utils'
 
 import NonceTracker from './nonce-tracker.js'
@@ -67,16 +67,6 @@ export type SendTransactionReturn =
   | {
       code: SendTransactionStatus.DUPLICATE
     }
-
-export class AnnouncementData {
-  multiaddress:
-  packetKey: OffchainPublicKey
-  signature: OffchainSignature
-
-  public toString() {
-    return `${this.packetKey.to_peerid_str()} via ${u8aAddrToString(this.address, this.protocol)}:${u8aToNumber(this.port)}`
-  }
-}
 
 export async function createChainWrapper(
   deploymentExtract: DeploymentExtract,
@@ -448,24 +438,27 @@ export async function createChainWrapper(
    * @returns a Promise that resolves with the transaction hash
    */
   const announce = async (data: AnnouncementData, txHandler: (tx: string) => DeferType<string>): Promise<string> => {
-    log('Announcing on-chain with %s', data.toString())
+    log('Announcing on-chain with %s', data.to_string())
     let sendResult: SendTransactionReturn
     let error: unknown
-    try {
-      // TODO: use the correct contract call based on the IP address length and protocol
-      let method = data.address.length == 4 ? 'bindKeysAnnounce4' : `bindKeysAnnounce6`
-      let sgn = u8aSplit(data.signature.serialize(), [32])
 
+    let keyBinding = data.key_binding
+    if (!keyBinding)
+      throw new Error("announcing without key-binding at the same time not supported at the moment")
+
+    if (!keyBinding.chain_key.eq(publicKey.to_address()))
+      throw new Error("cannot bind with different public key")
+
+    try {
+      let sgn = u8aSplit(keyBinding.signature.serialize(), [32])
       const confirmationEssentialTxPayload = buildEssentialTxPayload(
         0,
         channels, // TODO: change the target contract used for announcement
-        method,
-        publicKey.to_address(),
+        'bindKeysAnnounce',
         sgn[0],
         sgn[1],
-        data.packetKey.serialize(),
-        data.address,
-        data.port
+        keyBinding.packet_key.serialize(),
+        data.to_multiaddress_str()
       )
       sendResult = await sendTransaction(checkDuplicate, confirmationEssentialTxPayload, txHandler)
     } catch (err) {
