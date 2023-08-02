@@ -1,0 +1,44 @@
+[package]
+name = "hoprd-inbox"
+version = "0.1.0"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+edition = "2021"
+description = "Implements Message inbox and filtering functionality on top of HOPR protocol messages"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+async-lock = "2.7.0"
+async-trait = "0.1"
+console_error_panic_hook = { version = "0.1.7", optional = true }
+gloo-timers = { version = "0.2.6", optional = true }
+hex = "0.4.3"
+ringbuffer = "0.14.2"
+js-sys = { version = "0.3.63", optional = true }
+wasm-bindgen = { workspace = true, optional = true }
+
+core-packet = { path = "../../../core/crates/core-packet", default-features = false }
+utils-log = { path = "../../../utils/crates/utils-log", default-features = false }
+utils-misc = { path = "../../../utils/crates/utils-misc", default-features = false }
+
+[dev-dependencies]
+tempfile = "3"
+
+[target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
+wasm-pack = { workspace = true }
+wasm-opt = { workspace = true }
+
+[package.metadata.wasm-pack.profile.dev]
+wasm-opt = false
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ['-O', '--enable-reference-types']
+
+[features]
+default = ["console_error_panic_hook", "wasm"]
+wasm = [ "dep:wasm-bindgen", "dep:js-sys", "dep:gloo-timers", "core-packet/wasm", "utils-log/wasm", "utils-misc/wasm" ]
+console_error_panic_hook = [ "dep:console_error_panic_hook" ]
