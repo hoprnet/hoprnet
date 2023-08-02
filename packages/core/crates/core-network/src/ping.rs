@@ -49,15 +49,11 @@ pub trait PingExternalAPI {
     fn on_finished_ping(&self, peer: &PeerId, result: crate::types::Result);
 }
 
-/// Basic type used for internally aggregating ping results to be further processed in the
-/// PingExternalAPI callbacks.
-type PingMeasurement = (PeerId, crate::types::Result);
-
-
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PingConfig {
     pub max_parallel_pings: usize,
-    pub timeout: Duration,
+    pub timeout: u64    // `Duration` -> should be in millis,
 }
 
 #[async_trait(? Send)] // not placing the `Send` trait limitations on the trait
@@ -215,96 +211,13 @@ impl Pinging for Ping {
             self.external_api.on_finished_ping(&peer, result.map(|v| v.as_millis() as u64));
 
             let remaining_time = current_timestamp() - start_all_peers;
-            if (remaining_time as u128) < self.config.timeout.as_millis() {
+            if (remaining_time as u128) < self.config.timeout as u128 {
                 while let Some(peer) = waiting.pop_front() {
                     if self.initiate_peer_ping(&peer) {
                         break
                     }
                 }
             }
-        }
-    }
-}
-
-#[cfg(feature = "wasm")]
-pub mod wasm {
-    use super::*;
-    use js_sys::JsString;
-    use std::str::FromStr;
-    use wasm_bindgen::prelude::*;
-
-    #[wasm_bindgen]
-    struct WasmPingApi {
-        on_finished_ping_cb: js_sys::Function,
-    }
-
-    impl PingExternalAPI for WasmPingApi {
-        fn on_finished_ping(&self, peer: &PeerId, result: crate::types::Result) {
-            let this = JsValue::null();
-            let peer = JsValue::from(peer.to_base58());
-            let res = {
-                if let Ok(v) = result {
-                    JsValue::from(v as f64)
-                } else {
-                    JsValue::undefined()
-                }
-            };
-
-            if let Err(err) = self.on_finished_ping_cb.call2(&this, &peer, &res) {
-                error!(
-                    "Failed to perform on peer offline operation with: {}",
-                    err.as_string()
-                        .unwrap_or_else(|| { "Unspecified error occurred on registering the ping result".to_owned() })
-                        .as_str()
-                )
-            };
-        }
-    }
-
-    /// WASM wrapper for the Ping that accepts a JS function for sending a ping message and returing
-    /// a Future for the peer reply.
-    #[wasm_bindgen]
-    pub struct Pinger {
-        pinger: Ping,
-    }
-
-    #[wasm_bindgen]
-    impl Pinger {
-        // TODO: needs to be constructed from a common object that builds and binds about channels
-        // #[wasm_bindgen]
-        // pub fn build(
-        //     on_finished_ping_cb: js_sys::Function,
-        // ) -> Self {
-        //     let api = Box::new(WasmPingApi {
-        //         on_finished_ping_cb,
-        //     });
-
-        //     let config = PingConfig {
-        //         max_parallel_pings: PINGS_MAX_PARALLEL,
-        //         timeout: Duration::from_secs(30),
-        //     };
-
-        //     Self {
-        //         pinger: Ping::new(config, api),
-        //     }
-        // }
-
-        /// Ping the peers represented as a Vec<JsString> values that are converted into usable
-        /// PeerIds.
-        ///
-        /// # Arguments
-        /// * `peers` - Vector of String representations of the PeerIds to be pinged.
-        #[wasm_bindgen]
-        pub async fn ping(&mut self, mut peers: Vec<JsString>) {
-            let converted = peers
-                .drain(..)
-                .filter_map(|x| {
-                    let x: String = x.into();
-                    PeerId::from_str(&x).ok()
-                })
-                .collect::<Vec<_>>();
-
-            self.pinger.ping(converted).await;
         }
     }
 }
@@ -398,7 +311,7 @@ mod tests {
 
         let peer = PeerId::random();
         let mut ping_config = simple_ping_config();
-        ping_config.timeout = Duration::from_millis(0);
+        ping_config.timeout = 0; 
 
         let mut mock = MockPingExternalAPI::new();
         mock.expect_on_finished_ping()

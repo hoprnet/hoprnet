@@ -26,15 +26,21 @@ members = [
 [workspace.dependencies]
 futures = "0.3.28"
 futures-lite = "1.12.0"
+futures-concurrency = "7.3.0"
 libp2p = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "release/providence" }
 serde = { version = "1.0" }
 thiserror = "1.0"
 wasm-pack = "0.12.0"
 wasm-opt = "0.112.0"
 wasm-bindgen = "0.2.86"
+wasm-bindgen-futures = "0.4.36"
 
+core-ethereum-db = { path = "packages/core-ethereum/crates/core-ethereum-db", default-features = false }
+core-ethereum-misc = { path = "packages/core-ethereum/crates/core-ethereum-misc", default-features = false }
 core-crypto = { path = "packages/core/crates/core-crypto", default-features = false }
 core-network = { path = "packages/core/crates/core-network", default-features = false }
+core-packet = { path = "packages/core/crates/core-packet", default-features = false }
+core-p2p = { path = "packages/core/crates/core-p2p", default-features = false }
 utils-log = { path = "packages/utils/crates/utils-log", default-features = false }
 utils-misc = { path = "packages/utils/crates/utils-misc", default-features = false}
 utils-metrics = { path = "packages/utils/crates/utils-metrics", default-features = false }
