@@ -1,43 +1,42 @@
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
+use std::time::Duration;
 use async_trait::async_trait;
 use ringbuffer::{AllocRingBuffer, RingBuffer};
-use crate::inbox::{InboxBackend, RESERVED_TAG, Tag};
+use crate::inbox::{InboxBackend, RESERVED_TAG, Tag, TimestampFn};
 
 struct PayloadWrapper<T> {
     payload: T,
-    ts: u64
+    ts: Duration
 }
 
 pub struct RingBufferInboxBackend<T> {
     buffers: HashMap<Tag, AllocRingBuffer<PayloadWrapper<T>>>,
-    capacity: usize
+    capacity: usize,
+    ts: TimestampFn
 }
 
 impl<T> RingBufferInboxBackend<T> {
-    fn ts() -> u64 {
-        // TODO:
-        0u64
-    }
+
 }
 
 #[async_trait(? Send)]
 impl<T> InboxBackend<T> for RingBufferInboxBackend<T> {
-    fn new_with_capacity(capacity: usize) -> Self {
+    fn new_with_capacity(capacity: usize, ts: TimestampFn) -> Self {
         let mut buffers = HashMap::new();
         buffers.insert(RESERVED_TAG, AllocRingBuffer::new(capacity));
-        Self { capacity, buffers }
+        Self { capacity, buffers, ts}
     }
 
     async fn push(&mut self, tag: Option<Tag>, payload: T) {
         match self.buffers.entry(tag.unwrap_or(RESERVED_TAG)) {
             Entry::Occupied(mut e) => {
                 e.get_mut()
-                    .push(PayloadWrapper { payload, ts: Self::ts() })
+                    .push(PayloadWrapper { payload, ts: (self.ts)() })
             }
             Entry::Vacant(e) => {
                 e.insert(AllocRingBuffer::new(self.capacity))
-                    .push(PayloadWrapper { payload, ts: Self::ts() })
+                    .push(PayloadWrapper { payload, ts: (self.ts)() })
             }
         }
     }
@@ -62,11 +61,11 @@ impl<T> InboxBackend<T> for RingBufferInboxBackend<T> {
             .unwrap_or_else(Vec::<T>::new)
     }
 
-    async fn purge(&mut self, older_than_ts: u64) {
+    async fn purge(&mut self, older_than: Duration) {
         self.buffers
             .iter_mut()
             .for_each(|(_, buf)| {
-                while buf.peek().map(|w| w.ts).unwrap_or(u64::MAX) < older_than_ts {
+                while buf.peek().map(|w| w.ts).unwrap_or(Duration::MAX) < older_than {
                     buf.dequeue();
                 }
             });

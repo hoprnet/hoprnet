@@ -6,29 +6,31 @@ use async_trait::async_trait;
 pub type Tag = u16;
 pub const RESERVED_TAG: Tag = 0;
 
+pub type TimestampFn = fn() -> Duration;
+
 #[async_trait(?Send)]
 pub trait InboxBackend<T> {
-    fn new_with_capacity(cap: usize) -> Self;
+    fn new_with_capacity(cap: usize, ts: TimestampFn) -> Self;
     async fn push(&mut self, tag: Option<Tag>, payload: T);
     async fn count(&self, tag: Option<Tag>) -> usize;
     async fn pop(&mut self, tag: Option<Tag>) -> Option<T>;
     async fn pop_all(&mut self, tag: Option<Tag>) -> Vec<T>;
-    async fn purge(&mut self, older_than_ts: u64);
+    async fn purge(&mut self, older_than_ts: Duration);
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct MessageInboxConfiguration {
-    capacity: u32,
-    max_age_millis: u64,
-    excluded_tags: Vec<Tag>,
+    pub capacity: u32,
+    pub max_age_sec: u64,
+    pub excluded_tags: Vec<Tag>,
 }
 
 impl Default for MessageInboxConfiguration {
     fn default() -> Self {
         Self {
             capacity: 1024,
-            max_age_millis: 15*60000_u64,
+            max_age_sec: 15*60_u64,
             excluded_tags: vec![]
         }
     }
@@ -38,7 +40,7 @@ pub struct MessageInbox<P, B>
 where P: AsRef<[u8]>, B: InboxBackend<P> {
     cfg: MessageInboxConfiguration,
     backend: Mutex<B>,
-    time: fn() -> Duration,
+    time: TimestampFn,
     _data: PhantomData<P>
 }
 
@@ -51,9 +53,9 @@ where P: AsRef<[u8]>, B: InboxBackend<P> {
             .unwrap())
     }
 
-    pub fn new_with_time(cfg: MessageInboxConfiguration, time: fn() -> Duration) -> Self {
+    pub fn new_with_time(cfg: MessageInboxConfiguration, time: TimestampFn) -> Self {
         Self {
-            backend: Mutex::new(B::new_with_capacity(cfg.capacity as usize)),
+            backend: Mutex::new(B::new_with_capacity(cfg.capacity as usize, time)),
             time, cfg, _data: PhantomData
         }
     }
@@ -69,7 +71,7 @@ where P: AsRef<[u8]>, B: InboxBackend<P> {
         let mut db = self.backend.lock().await;
         db.push(tag, payload)
             .await;
-        db.purge((self.time)().as_secs() - self.cfg.max_age_millis).await;
+        db.purge((self.time)() - Duration::from_secs(self.cfg.max_age_sec)).await;
     }
 
     pub async fn size(&self, tag: Option<Tag>) -> usize {
@@ -78,13 +80,13 @@ where P: AsRef<[u8]>, B: InboxBackend<P> {
 
     pub async fn pop(&mut self, tag: Option<Tag>) -> Option<P> {
         let mut db = self.backend.lock().await;
-        db.purge((self.time)().as_secs() - self.cfg.max_age_millis).await;
+        db.purge((self.time)() - Duration::from_secs(self.cfg.max_age_sec)).await;
         db.pop(tag).await
     }
 
     pub async fn pop_all(&mut self, tag: Option<Tag>) -> Vec<P> {
         let mut db = self.backend.lock().await;
-        db.purge((self.time)().as_secs() - self.cfg.max_age_millis).await;
+        db.purge((self.time)() - Duration::from_secs(self.cfg.max_age_sec)).await;
         db.pop_all(tag).await
     }
 }
