@@ -1,12 +1,17 @@
 use std::fmt::{Display, Formatter};
 use multiaddr::{Multiaddr, Protocol};
+use core_crypto::errors::CryptoError;
 use core_crypto::keypairs::{Keypair, OffchainKeypair};
 use core_crypto::types::{OffchainPublicKey, OffchainSignature};
 use utils_types::errors::GeneralError;
-use utils_types::errors::GeneralError::InvalidInput;
+use utils_types::errors::GeneralError::{InvalidInput, NonSpecificError};
 use utils_types::primitives::Address;
 use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
 
+/// Holds the signed binding of the chain key and the packet key.
+/// The signature
+/// This is used to attest on-chain that node owns the corresponding packet key and links it with
+/// the chain key.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct KeyBinding {
@@ -25,6 +30,7 @@ impl KeyBinding {
         to_sign.into_boxed_slice()
     }
 
+    /// Create and sign new key binding of the given chain key and packet key.
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(chain_key: Address, packet_key: &OffchainKeypair) -> Self {
         let to_sign = Self::prepare_for_signing(&chain_key, packet_key.public());
@@ -37,11 +43,13 @@ impl KeyBinding {
 }
 
 impl KeyBinding {
+    /// Re-construct binding from the chain key and packet key, while also verifying the given signature of the binding.
+    /// Fails if the signature is not valid for the given entries.
     pub fn from_parts(chain_key: Address, packet_key: OffchainPublicKey, signature: OffchainSignature) -> Result<Self, GeneralError> {
         let to_verify = Self::prepare_for_signing(&chain_key, &packet_key);
         signature.verify_message(&to_verify, &packet_key)
             .then_some(Self { chain_key, packet_key, signature})
-            .ok_or(InvalidInput)
+            .ok_or(GeneralError::Other(CryptoError::SignatureVerification.into()))
     }
 }
 
@@ -55,6 +63,9 @@ impl Display for KeyBinding {
     }
 }
 
+/// Structure containing data used for on-chain announcement.
+/// That is the decapsulated multiaddress (with the /p2p/<peer id> suffix removed) and
+/// optional `KeyBinding` (announcement can be done with key bindings or without)
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct AnnouncementData {
@@ -70,12 +81,15 @@ impl AnnouncementData {
 }
 
 impl AnnouncementData {
+    /// Constructs structure from multiaddress and optionally also `KeyBinding`.
+    /// The multiaddress must not be empty and must end with `/p2p/<peer id>` to be considered valid.
+    /// Also if `key_binding` is specified, the public key must match the peer id of the multiaddress.
     pub fn new(multiaddress: Multiaddr, key_binding: Option<KeyBinding>) -> Result<Self, GeneralError> {
         let mut decapsulated = multiaddress.clone();
         match decapsulated.pop().ok_or(InvalidInput)? {
             Protocol::P2p(peer) => {
                 if key_binding.clone().is_some_and(|kb| !peer.eq(&kb.packet_key.to_peerid())) {
-                    return Err(InvalidInput)
+                    return Err(NonSpecificError("decapsulated peer id does not match key binding".into()))
                 }
             }
             _ => return Err(InvalidInput)
