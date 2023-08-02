@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.19;
 
-import "openzeppelin-contracts/access/Ownable.sol";
+import {Ownable} from "openzeppelin-contracts/access/Ownable.sol";
+
+contract HoprTicketPriceOracleEvents {
+    // emitted when ticket price was updated
+    event TicketPriceUpdated(uint256, uint256);
+}
 
 /**
  *    &&&&
@@ -26,11 +31,8 @@ import "openzeppelin-contracts/access/Ownable.sol";
  * An update of the ticket price triggers an event `TicketPriceUpdated`.
  *
  */
-contract TicketPriceOracle is Ownable {
+contract HoprTicketPriceOracle is Ownable, HoprTicketPriceOracleEvents {
     uint256 public currentTicketPrice;
-
-    // emitted when ticket price was updated
-    event TicketPriceUpdated(uint256, uint256);
 
     // when new ticket price is 0
     error TicketPriceMustNotBeZero();

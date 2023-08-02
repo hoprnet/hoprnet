@@ -2,34 +2,26 @@
 pragma solidity >=0.6.0 <0.9.0;
 
 import "forge-std/Test.sol";
-import "../src/TicketPriceOracle.sol";
+import {HoprTicketPriceOracle, HoprTicketPriceOracleEvents} from "../src/TicketPriceOracle.sol";
 
-contract TicketPriceOracleTest is Test {
-    TicketPriceOracle public oracle;
+contract TicketPriceOracleTest is Test, HoprTicketPriceOracleEvents {
+    HoprTicketPriceOracle public oracle;
     address public owner;
-
-    /**
-     * Manually import the errors and events
-     */
-    event TicketPriceUpdated(uint256, uint256);
-
-    error TicketPriceMustNotBeZero();
-    error TicketPriceMustNotBeSame();
 
     function setUp() public {
         owner = vm.addr(101); // make address(101) new owner
-        oracle = new TicketPriceOracle(owner, 1);
+        oracle = new HoprTicketPriceOracle(owner, 1);
     }
 
     function test_setZeroFails() public {
         vm.prank(owner);
-        vm.expectRevert(TicketPriceMustNotBeZero.selector);
+        vm.expectRevert(HoprTicketPriceOracle.TicketPriceMustNotBeZero.selector);
         oracle.setTicketPrice(0);
     }
 
     function test_setSameFails() public {
         vm.prank(owner);
-        vm.expectRevert(TicketPriceMustNotBeSame.selector);
+        vm.expectRevert(HoprTicketPriceOracle.TicketPriceMustNotBeSame.selector);
         oracle.setTicketPrice(1);
     }
 
@@ -40,7 +32,7 @@ contract TicketPriceOracleTest is Test {
         oracle.setTicketPrice(2);
 
         vm.prank(owner);
-        vm.expectRevert(TicketPriceMustNotBeSame.selector);
+        vm.expectRevert(HoprTicketPriceOracle.TicketPriceMustNotBeSame.selector);
         oracle.setTicketPrice(2);
     }
 
@@ -64,10 +56,10 @@ contract TicketPriceOracleTest is Test {
 
     function testFuzz_setUpAndDown(uint256 price) public {
         if (price == 0) {
-            vm.expectRevert(TicketPriceMustNotBeZero.selector);
+            vm.expectRevert(HoprTicketPriceOracle.TicketPriceMustNotBeZero.selector);
         } else {
             if (price == oracle.currentTicketPrice()) {
-                vm.expectRevert(TicketPriceMustNotBeSame.selector);
+                vm.expectRevert(HoprTicketPriceOracle.TicketPriceMustNotBeSame.selector);
             } else {
                 vm.expectEmit(true, false, false, false, address(oracle));
                 emit TicketPriceUpdated(oracle.currentTicketPrice(), price);

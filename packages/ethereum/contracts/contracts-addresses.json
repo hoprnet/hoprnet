@@ -9,8 +9,8 @@
       "network_registry_proxy_contract_address": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853",
       "node_safe_registry_address": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
       "node_stake_v2_factory_address": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
-      "token_contract_address": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
-      "ticket_price_oracle_contract_address": "0x0000000000000000000000000000000000000000"
+      "ticket_price_oracle_contract_address": "0x610178dA211FEF7D417bC0e6FeD39F05609AD788",
+      "token_contract_address": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
     },
     "anvil-localhost2": {
       "channels_contract_address": "0x0165878A594ca255338adfa4d48449f69242Eb8F",
@@ -21,8 +21,8 @@
       "network_registry_proxy_contract_address": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853",
       "node_safe_registry_address": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
       "node_stake_v2_factory_address": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
-      "token_contract_address": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
-      "ticket_price_oracle_contract_address": "0x0000000000000000000000000000000000000000"
+      "ticket_price_oracle_contract_address": "0x610178dA211FEF7D417bC0e6FeD39F05609AD788",
+      "token_contract_address": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
     },
     "rotsee": {
       "channels_contract_address": "0xB20ee6e0b714e531CabF2C29fbA147f4e5905B7b",

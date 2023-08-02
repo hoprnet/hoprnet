@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity >=0.6.0 <0.9.0;
 
-import "../../src/proxy/StakingProxyForNetworkRegistry.sol";
+import {HoprStakingProxyForNetworkRegistry} from "../../src/proxy/StakingProxyForNetworkRegistry.sol";
 import "forge-std/Test.sol";
 
 contract HoprStakingProxyForNetworkRegistryTest is Test {
@@ -75,7 +75,7 @@ contract HoprStakingProxyForNetworkRegistryTest is Test {
         _helperMockStakeContractReturns();
 
         vm.prank(owner);
-        vm.expectRevert("HoprStakingProxyForNetworkRegistry: try to update with the same staking threshold");
+        vm.expectRevert(HoprStakingProxyForNetworkRegistry.SameStakingThreshold.selector);
         hoprStakingProxyForNetworkRegistry.ownerUpdateThreshold(INITIAL_MIN_STAKE);
         vm.clearMockedCalls();
     }
@@ -153,7 +153,7 @@ contract HoprStakingProxyForNetworkRegistryTest is Test {
         ranks[0] = NFT_RANK[1];
         ranks[1] = NFT_RANK[0];
         vm.prank(owner);
-        vm.expectRevert("HoprStakingProxyForNetworkRegistry: ownerBatchAddNftTypeAndRank lengths mismatch");
+        vm.expectRevert(HoprStakingProxyForNetworkRegistry.NftRanksMismatch.selector);
         hoprStakingProxyForNetworkRegistry.ownerBatchAddNftTypeAndRank(types, ranks);
         vm.clearMockedCalls();
     }
@@ -228,7 +228,7 @@ contract HoprStakingProxyForNetworkRegistryTest is Test {
         string[] memory ranks = new string[](1);
         ranks[0] = NFT_RANK[0];
 
-        vm.expectRevert("HoprStakingProxyForNetworkRegistry: ownerBatchRemoveNftTypeAndRank lengths mismatch");
+        vm.expectRevert(HoprStakingProxyForNetworkRegistry.NftRanksMismatch.selector);
         hoprStakingProxyForNetworkRegistry.ownerBatchRemoveNftTypeAndRank(types, ranks);
 
         vm.clearMockedCalls();
@@ -253,9 +253,7 @@ contract HoprStakingProxyForNetworkRegistryTest is Test {
         maxAllownaces[0] = MAX_REGISTRATION_TECH;
         maxAllownaces[1] = MAX_REGISTRATION_COM;
 
-        vm.expectRevert(
-            "HoprStakingProxyForNetworkRegistry: ownerBatchAddSpecialNftTypeAndRank nftTypes and nftRanks lengths mismatch"
-        );
+        vm.expectRevert(HoprStakingProxyForNetworkRegistry.NftRanksMismatch.selector);
         hoprStakingProxyForNetworkRegistry.ownerBatchAddSpecialNftTypeAndRank(types, ranks, maxAllownaces);
 
         vm.stopPrank();
@@ -281,9 +279,7 @@ contract HoprStakingProxyForNetworkRegistryTest is Test {
         maxAllownaces[1] = MAX_REGISTRATION_COM;
         maxAllownaces[2] = MAX_REGISTRATION_COM;
 
-        vm.expectRevert(
-            "HoprStakingProxyForNetworkRegistry: ownerBatchAddSpecialNftTypeAndRank nftTypes and maxRegistrations lengths mismatch"
-        );
+        vm.expectRevert(HoprStakingProxyForNetworkRegistry.MaxRegistrationsMismatch.selector);
         hoprStakingProxyForNetworkRegistry.ownerBatchAddSpecialNftTypeAndRank(types, ranks, maxAllownaces);
 
         vm.stopPrank();
@@ -411,7 +407,7 @@ contract HoprStakingProxyForNetworkRegistryTest is Test {
         ranks[1] = SPECIAL_NFT_RANK_COM;
         ranks[2] = SPECIAL_NFT_RANK_COM;
         vm.prank(owner);
-        vm.expectRevert("HoprStakingProxyForNetworkRegistry: ownerBatchRemoveSpecialNftTypeAndRank lengths mismatch");
+        vm.expectRevert(HoprStakingProxyForNetworkRegistry.NftRanksMismatch.selector);
         hoprStakingProxyForNetworkRegistry.ownerBatchRemoveSpecialNftTypeAndRank(types, ranks);
         vm.clearMockedCalls();
     }

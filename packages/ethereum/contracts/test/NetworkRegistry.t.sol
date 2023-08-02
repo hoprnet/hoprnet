@@ -12,7 +12,6 @@ contract HoprNetworkRegistryTest is Test {
     address public proxy;
     address public owner;
     address[] public stakingAccounts;
-    address[] public nodeAddresses;
     uint256 public constant STAKING_ACCOUNTS_SIZE = 5;
     // uint256[] public allowances;
 

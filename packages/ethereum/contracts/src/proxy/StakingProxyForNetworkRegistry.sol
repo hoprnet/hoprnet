@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.0;
+pragma solidity 0.8.19;
 
-import "openzeppelin-contracts/access/Ownable.sol";
+import {Ownable} from "openzeppelin-contracts/access/Ownable.sol";
 import "openzeppelin-contracts/utils/math/Math.sol";
 import "../interfaces/INetworkRegistryRequirement.sol";
 
@@ -11,14 +11,13 @@ import "../interfaces/INetworkRegistryRequirement.sol";
  * staking v2 is deployed at https://blockscout.com/xdai/mainnet/address/0x2cDD13ddB0346E0F620C8E5826Da5d7230341c6E
  * staking v3 is deployed at https://blockscout.com/xdai/mainnet/address/0xae933331ef0bE122f9499512d3ed4Fa3896DCf20
  */
-contract IHoprStake {
-    function stakedHoprTokens(address _account) public view returns (uint256) {}
+interface IHoprStake {
+    function stakedHoprTokens(address _account) external view returns (uint256);
 
     function isNftTypeAndRankRedeemed2(uint256 nftTypeIndex, string memory nftRank, address hodler)
         external
         view
-        returns (bool)
-    {}
+        returns (bool);
 }
 
 /**
@@ -42,16 +41,29 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
     // minimum amount HOPR tokens being staked in the staking contract to be considered eligible
     // for every stakeThreshold, one peer id can be registered.
     uint256 public stakeThreshold;
-    NftTypeAndRank[] public eligibleNftTypeAndRank; // list of NFTs whose owner are considered as eligible to the network if the `stakeThreshold` is also met
-    uint256[] public maxRegistrationsPerSpecialNft; // for holders of special NFT, it's the cap of peer ids one address can register.
-    NftTypeAndRank[] public specialNftTypeAndRank; // list of NFTs whose owner are considered as eligible to the network without meeting the `stakeThreshold`, e.g. "Network_registry NFT"
+    // list of NFTs whose owner are considered as eligible to the network if the `stakeThreshold` is also met
+    NftTypeAndRank[] public eligibleNftTypeAndRank;
+    // for holders of special NFT, it's the cap of peer ids one address can register.
+    uint256[] public maxRegistrationsPerSpecialNft;
+    // list of NFTs whose owner are considered as eligible to the network without meeting the `stakeThreshold`, e.g. "Network_registry NFT"
+    NftTypeAndRank[] public specialNftTypeAndRank;
 
-    event NftTypeAndRankAdded(uint256 indexed nftType, string nftRank); // emit when a new NFT type and rank gets included in the eligibility list
-    event NftTypeAndRankRemoved(uint256 indexed nftType, string nftRank); // emit when a NFT type and rank gets removed from the eligibility list
-    event SpecialNftTypeAndRankAdded(uint256 indexed nftType, string nftRank, uint256 indexed maxRegistration); // emit when a new special type and rank of NFT gets included in the eligibility list
-    event SpecialNftTypeAndRankRemoved(uint256 indexed nftType, string nftRank); // emit when a special type and rank of NFT gets removed from the eligibility list
-    event ThresholdUpdated(uint256 indexed threshold); // emit when the staking threshold gets updated.
-    event StakeContractUpdated(address indexed stakeContract); // emit when the staking threshold gets updated.
+    // emit when a new NFT type and rank gets included in the eligibility list
+    event NftTypeAndRankAdded(uint256 indexed nftType, string nftRank);
+    // emit when a NFT type and rank gets removed from the eligibility list
+    event NftTypeAndRankRemoved(uint256 indexed nftType, string nftRank);
+    // emit when a new special type and rank of NFT gets included in the eligibility list
+    event SpecialNftTypeAndRankAdded(uint256 indexed nftType, string nftRank, uint256 indexed maxRegistration);
+    // emit when a special type and rank of NFT gets removed from the eligibility list
+    event SpecialNftTypeAndRankRemoved(uint256 indexed nftType, string nftRank);
+    // emit when the staking threshold gets updated.
+    event ThresholdUpdated(uint256 indexed threshold);
+    // emit when the staking threshold gets updated.
+    event StakeContractUpdated(address indexed stakeContract);
+
+    error SameStakingThreshold();
+    error NftRanksMismatch();
+    error MaxRegistrationsMismatch();
 
     /**
      * @dev Set stake contract address, transfer ownership, and set the maximum registrations per
@@ -101,10 +113,8 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
 
     /**
      * @dev Get if the staking account is eligible to act on node address
-     * @param stakingAccount Staking account
-     * @param nodeAddress node address
      */
-    function canOperateFor(address stakingAccount, address nodeAddress) external view returns (bool eligiblity) {
+    function canOperateFor(address, address) external view returns (bool eligiblity) {
         return true;
     }
 
@@ -119,14 +129,8 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
         string[] calldata nftRanks,
         uint256[] calldata maxRegistrations
     ) external onlyOwner {
-        require(
-            nftTypes.length == nftRanks.length,
-            "HoprStakingProxyForNetworkRegistry: ownerBatchAddSpecialNftTypeAndRank nftTypes and nftRanks lengths mismatch"
-        );
-        require(
-            nftTypes.length == maxRegistrations.length,
-            "HoprStakingProxyForNetworkRegistry: ownerBatchAddSpecialNftTypeAndRank nftTypes and maxRegistrations lengths mismatch"
-        );
+        if (nftTypes.length != nftRanks.length) revert NftRanksMismatch();
+        if (nftTypes.length != maxRegistrations.length) revert MaxRegistrationsMismatch();
         for (uint256 index = 0; index < nftTypes.length; index++) {
             _addSpecialNftTypeAndRank(nftTypes[index], nftRanks[index], maxRegistrations[index]);
         }
@@ -141,10 +145,7 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
         external
         onlyOwner
     {
-        require(
-            nftTypes.length == nftRanks.length,
-            "HoprStakingProxyForNetworkRegistry: ownerBatchRemoveSpecialNftTypeAndRank lengths mismatch"
-        );
+        if (nftTypes.length != nftRanks.length) revert NftRanksMismatch();
         for (uint256 index = 0; index < nftTypes.length; index++) {
             _removeSpecialNftTypeAndRank(nftTypes[index], nftRanks[index]);
         }
@@ -156,10 +157,7 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
      * @param nftRanks Array of HOPR boost rank, which is associated to the eligible NFT, in string[]
      */
     function ownerBatchAddNftTypeAndRank(uint256[] calldata nftTypes, string[] calldata nftRanks) external onlyOwner {
-        require(
-            nftTypes.length == nftRanks.length,
-            "HoprStakingProxyForNetworkRegistry: ownerBatchAddNftTypeAndRank lengths mismatch"
-        );
+        if (nftTypes.length != nftRanks.length) revert NftRanksMismatch();
         for (uint256 index = 0; index < nftTypes.length; index++) {
             _addNftTypeAndRank(nftTypes[index], nftRanks[index]);
         }
@@ -174,10 +172,7 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
         external
         onlyOwner
     {
-        require(
-            nftTypes.length == nftRanks.length,
-            "HoprStakingProxyForNetworkRegistry: ownerBatchRemoveNftTypeAndRank lengths mismatch"
-        );
+        if (nftTypes.length != nftRanks.length) revert NftRanksMismatch();
         for (uint256 index = 0; index < nftTypes.length; index++) {
             _removeNftTypeAndRank(nftTypes[index], nftRanks[index]);
         }
@@ -206,10 +201,7 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
      * @param newThreshold Minimum stake of HOPR token
      */
     function ownerUpdateThreshold(uint256 newThreshold) external onlyOwner {
-        require(
-            stakeThreshold != newThreshold,
-            "HoprStakingProxyForNetworkRegistry: try to update with the same staking threshold"
-        );
+        if (stakeThreshold == newThreshold) revert SameStakingThreshold();
         stakeThreshold = newThreshold;
         emit ThresholdUpdated(stakeThreshold);
     }
